@@ -21,7 +21,6 @@ import { Hono } from 'hono';
 import {
   agentSkillsFound,
   BUILTIN_SKILLS,
-  COMMANDS,
   givenSkills as givenRead,
   isBuiltinPlace,
   listAgents,
@@ -55,7 +54,7 @@ import { refusedBeforeReading, type Guarded, type Refusal } from '../guard.ts';
 import { type ApiEnv, served } from '../layer.ts';
 import type { Engine } from '../store.ts';
 import { placesOf } from '../workflows/workflows.ts';
-import { runPlaced } from '../store.ts';
+import { commandNamed, runPlaced } from '../store.ts';
 import type { PlaceService } from 'agent-orchestrator';
 
 /**
@@ -130,13 +129,23 @@ export function foundInOf(dir: string, repo: string, home: string): string | nul
  * The board's skill library in the package's table, each entry served on the api alone: the skill folders listed, each read
  * (`skills`), one skill read for its page (`skills show`), and one of yours written or copied (`skills write`).
  */
-const LIST = COMMANDS.find((c) => c.name === 'skills')!;
-const READ = COMMANDS.find((c) => c.name === 'skills show')!;
-const WRITE = COMMANDS.find((c) => c.name === 'skills write')!;
+const LIST = commandNamed('skills');
+const READ = commandNamed('skills show');
+const WRITE = commandNamed('skills write');
 
 /** Each skill folder of `dirs` read now, through the table's `skills`, by folder. */
 const readsOf = async (e: Engine['Service'], placeService: PlaceService['Service'], dirs: readonly string[]) =>
   (await runPlaced(placeService, e, LIST.handler({ skills: dirs }))) as Record<string, SkillRead>;
+
+/**
+ * The reading of the folder `dir` among `reads`, which the table's `skills` gives for each folder it was asked: thrown, naming the
+ * folder, where it gave none.
+ */
+function readAt(reads: Record<string, SkillRead>, dir: string): SkillRead {
+  const read = reads[dir];
+  if (read === undefined) throw new Error(`The table's \`skills\` gave no reading of '${dir}', which it was asked to read.`);
+  return read;
+}
 
 /** One skill as the picker lists it: the package's reading of its folder (`read`), where it is, and who gives it. */
 export function skillRow(
@@ -175,13 +184,12 @@ export async function listSkills(
   const found = skillsOfYours(repo, home);
   const agents = yourAgentsSkills(home);
   const usedBy = (name: string) => agents.filter(([, skills]) => skills.includes(name)).map(([agent]) => agent);
-  const places: SkillPlace[] = [
-    { from: 'yours', dir: librarySkills(home), skills: [] },
-    { from: 'repo', dir: path.join(path.resolve(repo), '.claude', SKILLS_FOLDER), skills: [] },
-  ];
+  const yours: SkillPlace = { from: 'yours', dir: librarySkills(home), skills: [] };
+  const inRepo: SkillPlace = { from: 'repo', dir: path.join(path.resolve(repo), '.claude', SKILLS_FOLDER), skills: [] };
+  const places: SkillPlace[] = [yours, inRepo];
   const sorted = [...found.all].filter(([, at]) => typeof at !== 'string' || !isBuiltinPlace(at)).sort(([a], [b]) => a.localeCompare(b));
   const dirOf = ([name, at]: (typeof sorted)[number]) =>
-    at instanceof WorkflowError ? (skillDirIn([places[0].dir, places[1].dir], name) ?? path.join(places[0].dir, name)) : at;
+    at instanceof WorkflowError ? (skillDirIn([yours.dir, inRepo.dir], name) ?? path.join(yours.dir, name)) : at;
   const builtinNames = skillFolders(builtin);
   const reads = await readsOf(e, placeService, [...sorted.map(dirOf), ...builtinNames.map((name) => path.join(builtin, name))]);
   const where = new Map<string, 'yours' | 'repo'>();
@@ -189,8 +197,8 @@ export async function listSkills(
     const dir = dirOf([name, at]);
     if (at instanceof WorkflowError) {
       const from = sourceOf(dir, repo, home) === 'repo' ? 'repo' : 'yours';
-      places[from === 'yours' ? 0 : 1].skills.push({
-        ...skillRow(name, dir, from, reads[dir], usedBy(name)),
+      (from === 'yours' ? yours : inRepo).skills.push({
+        ...skillRow(name, dir, from, readAt(reads, dir), usedBy(name)),
         entry: null,
         error: at.message,
       });
@@ -198,7 +206,7 @@ export async function listSkills(
       continue;
     }
     const from = sourceOf(at, repo, home) === 'yours' ? 'yours' : 'repo';
-    places[from === 'yours' ? 0 : 1].skills.push(skillRow(name, at, from, reads[dir], usedBy(name)));
+    (from === 'yours' ? yours : inRepo).skills.push(skillRow(name, at, from, readAt(reads, dir), usedBy(name)));
     where.set(name, from);
   }
   places.push({
@@ -206,7 +214,7 @@ export async function listSkills(
     dir: builtin,
     skills: builtinNames.map((name) => {
       const dir = path.join(builtin, name);
-      return skillRow(name, dir, 'builtin', reads[dir], [], where.get(name) ?? null);
+      return skillRow(name, dir, 'builtin', readAt(reads, dir), [], where.get(name) ?? null);
     }),
   });
   return places;
@@ -386,8 +394,12 @@ export function skillUsers(dir: string, name: string, repo: string): SkillUser[]
   const at = path.resolve(dir);
   return listAgents(repo).flatMap(({ from, dir: agents, name: agent, agent: read }) => {
     if (read instanceof Error || !read.skills?.includes(name)) return [];
-    if (!found.has(agents)) found.set(agents, agentSkillsFound(agents, repo));
-    const given = found.get(agents)!.at.get(name);
+    let skills = found.get(agents);
+    if (skills === undefined) {
+      skills = agentSkillsFound(agents, repo);
+      found.set(agents, skills);
+    }
+    const given = skills.at.get(name);
     return typeof given === 'string' && (path.resolve(given) === at || oneFolder(given, at)) ? [{ from, name: agent }] : [];
   });
 }
@@ -563,7 +575,7 @@ export const skills = new Hono<ApiEnv>()
       const agents = yourAgentsSkills(home)
         .filter(([, given]) => given.includes(name))
         .map(([agent]) => agent);
-      const reading = (await readsOf(e, placeService, [copied.dir]))[copied.dir];
+      const reading = readAt(await readsOf(e, placeService, [copied.dir]), copied.dir);
       return c.json({ skill: skillRow(name, copied.dir, 'yours', reading, agents), written: copied.written } satisfies SkillAdded, 201);
     }),
   )

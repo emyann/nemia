@@ -21,7 +21,7 @@ import { decisionOf } from '../decide/decision.ts';
 import { detail, type RunDetail } from '../detail/index.ts';
 import { type ApiEnv, served, type Served } from '../layer.ts';
 import { workflowPageOf, type WorkflowPageAddress } from '../step/step.ts';
-import { findRun, noSuchRun, runPlaced } from '../store.ts';
+import { commandNamed, findRun, noSuchRun, runPlaced } from '../store.ts';
 
 /** A person's hold on a run, as `PUT /api/runs/:id/hold` answers it beside the run (`{ id, lifted: false, hold }`). */
 export type { Hold } from 'agent-orchestrator/run';
@@ -45,13 +45,13 @@ export type OpenListing = Omit<OpenRuns, 'waiting' | 'inFlight'> & {
 export type FinishedListing = Omit<FinishedPage, 'runs'> & { runs: Array<FinishedRun & Paged> };
 
 /** Every run's summary (`runs`), an entry of the package's table the api serves alone: on `GET /api/runs`. */
-const RUNS = COMMANDS.find((c) => c.name === 'runs')!;
+const RUNS = commandNamed('runs');
 
 /** The runs that wait or move, with the counts (`runs open`), an entry of the package's table: on `GET /api/runs-open`. */
-const RUNS_OPEN = COMMANDS.find((c) => c.name === 'runs open')!;
+const RUNS_OPEN = commandNamed('runs open');
 
 /** One page of the finished runs (`runs finished`), an entry of the package's table: on `GET /api/runs-finished`. */
-const RUNS_FINISHED = COMMANDS.find((c) => c.name === 'runs finished')!;
+const RUNS_FINISHED = commandNamed('runs finished');
 
 /**
  * The query keys the two reads of the list take, by the key of the entry's argument each sets. The factory to keep is read off
@@ -80,10 +80,10 @@ const paged = <R extends RunSummary>(rows: readonly R[], { repo, home }: Served)
   rows.map((run) => ({ ...run, workflowPage: workflowPageOf(run, repo, home) }));
 
 /** One run read for its page (`run`), an entry of the package's table the api serves alone: on `GET /api/runs/:id`. */
-const RUN = COMMANDS.find((c) => c.name === 'run')!;
+const RUN = commandNamed('run');
 
 /** What a run would hand a run started with it as context (`concluded`), an entry of the package's table: on `GET …/concluded`. */
-const CONCLUDED = COMMANDS.find((c) => c.name === 'concluded')!;
+const CONCLUDED = commandNamed('concluded');
 
 /**
  * The runs' routes: the list, one run in full, what `nemia decide` shows of it, and what it would hand as context. The board's writes on a

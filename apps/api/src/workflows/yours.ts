@@ -5,14 +5,15 @@
  */
 import path from 'node:path';
 import { Hono } from 'hono';
-import { COMMANDS, commandLine } from 'agent-orchestrator';
+import { commandLine } from 'agent-orchestrator';
 import { librarySkills } from '../agents/skills.ts';
 import { yourAgentsDir } from 'agent-orchestrator';
 import { type ApiEnv, served } from '../layer.ts';
+import { commandNamed } from '../store.ts';
 
-const FACTORY_ADD = COMMANDS.find((c) => c.name === 'factory add')!;
+const FACTORY_ADD = commandNamed('factory add');
 
-const LEVEL = COMMANDS.find((c) => c.name === 'level')!;
+const LEVEL = commandNamed('level');
 
 /**
  * Your store's folders, each absolute: `workflows`, where your workflows' folders are; `agents`, your agents' files; `skills`, your

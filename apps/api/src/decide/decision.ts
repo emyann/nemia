@@ -10,7 +10,6 @@ import {
   type BranchReader,
   branchWord,
   changesOf,
-  COMMANDS,
   type Collisions,
   type Decided,
   decideRun,
@@ -43,7 +42,7 @@ import {
   waitedOn,
   waitsOf,
 } from 'agent-orchestrator/run';
-import { type Engine, runPlaced } from '../store.ts';
+import { commandNamed, type Engine, runPlaced } from '../store.ts';
 import { type StepUsed, totalOf, usedOf } from '../detail/usage.ts';
 import type { PlaceService } from 'agent-orchestrator';
 
@@ -154,8 +153,9 @@ export const DIFF_LINES = 400;
 export function diffFiles(diff: string): DiffFile[] {
   const files: string[][] = [];
   for (const line of diff.replace(/\n$/, '').split('\n')) {
-    if (line.startsWith('diff --git ') || !files.length) files.push([]);
-    files.at(-1)!.push(line);
+    const last = files.at(-1);
+    if (line.startsWith('diff --git ') || last === undefined) files.push([line]);
+    else last.push(line);
   }
   return files.map((lines) => ({ path: diffPath(lines), lines: lines.slice(0, DIFF_LINES), cut: Math.max(0, lines.length - DIFF_LINES) }));
 }
@@ -200,7 +200,7 @@ function lessonOf(touched: readonly Touched[]): Lesson {
 }
 
 /** The merge check, the table's entry served on the api alone. */
-const MERGES = COMMANDS.find((c) => c.name === 'merges')!;
+const MERGES = commandNamed('merges');
 
 /**
  * What `nemia decide` shows a person about a run, decided by the package (`decideRun`, the handler of the command table's `decide`): its
@@ -301,6 +301,13 @@ function nothingOf(run: Run, d: Decided['decision']): string | undefined {
   return undefined;
 }
 
+/** What `branch` changed among `changes`, which `changesOf` gives for each branch it was asked: thrown, naming it, where none. */
+function changeOf(changes: readonly BranchChanges[], branch: string): BranchChanges {
+  const change = changes.find((c) => c.branch === branch);
+  if (change === undefined) throw new Error(`\`changesOf\` gave nothing for the branch ${branch}, which it was asked to read.`);
+  return change;
+}
+
 /**
  * What each branch the CLI reads changed (`branchesToRead`, `changesOf`), and where each result branch stands against the base
  * (`Standing`): the branches `awaiting` names, or the result steps' while the run still runs. None for a folder run, and no standings for a
@@ -330,7 +337,7 @@ async function branchesOf(
     run.isolate ? run.branch : undefined,
   );
   const changes = changesOf(placeService, run, [...toRead, ...(run.isolate ? results : [])]);
-  const read = toRead.map((branch) => changes.find((c) => c.branch === branch)!);
+  const read = toRead.map((branch) => changeOf(changes, branch));
   if (!run.isolate) return { read, standings: [] };
   const stands = branchStandings(run, results, git);
   const merges = collisions
@@ -339,7 +346,7 @@ async function branchesOf(
   const standings: Standing[] = stands.map((s) => ({
     ...s,
     said: branchWord(run, s),
-    stat: statOf(changes.find((c) => c.branch === s.branch)!.radius),
+    stat: statOf(changeOf(changes, s.branch).radius),
     merge: s.where === 'ahead' ? (merges[s.branch] ?? null) : null,
   }));
   return { read, standings };

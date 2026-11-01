@@ -120,14 +120,14 @@ export function ageWord(ms: number): string {
  * out.
  */
 function windowsOf(limits: readonly QuotaLimit[], now: number): QuotaWindow[] {
-  return ORDER.flatMap((key) => {
+  return Object.entries(LABELS).flatMap(([key, label]) => {
     const limit = limits.find((l) => l.key === key);
     if (!limit) return [];
     const at = limit.resetsAt === null ? NaN : Date.parse(limit.resetsAt);
     return [
       {
         key,
-        label: LABELS[key],
+        label,
         usedPercentage: limit.usedPercentage,
         resetsAt: limit.resetsAt,
         reset: Number.isFinite(at) && at <= now,
@@ -232,7 +232,7 @@ export function quotaOf(held: Held | null, last: Held | null, now: number, keepM
     askedAt: held && new Date(held.at).toISOString(),
     ageMs: held && Math.max(0, now - held.at),
     againAt: held && new Date(held.at + keptMs).toISOString(),
-    last: lastRead?.state === 'fresh' ? { askedAt: new Date(last!.at).toISOString(), windows: lastRead.windows } : null,
+    last: last && lastRead?.state === 'fresh' ? { askedAt: new Date(last.at).toISOString(), windows: lastRead.windows } : null,
     keepMs,
     markAt: QUOTA_MARK_PERCENT,
   };
@@ -351,7 +351,7 @@ function oneQuota(): ReadQuota {
       });
   };
   const flightFor = (started: number, keepMs: number, go: (flight: Flight) => Promise<void>): Flight => {
-    if (running !== null && started - running.began! < keepMs) return running;
+    if (running !== null && running.began !== null && started - running.began < keepMs) return running;
     if (queued !== null) return queued;
     const flight: Flight = { began: null, done: false, settled: Promise.resolve() };
     const before = running;

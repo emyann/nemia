@@ -28,7 +28,7 @@ import {
   PlaceService,
 } from 'agent-orchestrator';
 import { McpAsker } from './capabilities/capabilities.ts';
-import type { LastSaid } from './detail/detail.ts';
+import type { LastSaid } from './steps/logs.ts';
 import { placeFor } from './factories/place.ts';
 import { QuotaAsker } from './factory/quota.ts';
 import { Followings } from './steps/following.ts';

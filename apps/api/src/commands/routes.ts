@@ -56,8 +56,8 @@ export function bodySchema(command: CommandSpec, inPath: readonly string[], rout
   for (const [key, value] of command.spec.flags.flatMap((f) => Object.entries(f.sets ?? {})))
     set.set(key, [...new Set([...(set.get(key) ?? []), value])]);
   for (const [key, values] of set) fields[key] = Schema.Literals(values);
-  for (const f of command.spec.flags.filter((f) => f.key !== undefined && f.only?.side !== 'cli'))
-    fields[f.key!] = f.only?.required ? flagSchema(f) : Schema.optionalKey(flagSchema(f));
+  for (const f of command.spec.flags.filter((f): f is Flag & { key: string } => f.key !== undefined && f.only?.side !== 'cli'))
+    fields[f.key] = f.only?.required ? flagSchema(f) : Schema.optionalKey(flagSchema(f));
   for (const key of command.apiTakes ?? []) {
     const takes = EXTENSIONS[command.name]?.takes[key];
     if (takes) fields[key] = Schema.optionalKey(takes);
@@ -80,6 +80,7 @@ const lastWord = (path: string): string =>
  */
 export const wordsAt = (name: string, path: string): RouteWords & { said: string } => {
   const own = WORDS[name];
+  if (own === undefined) throw new Error(`No words for the command '${name}' in WORDS (commands/words.ts): give it its words there.`);
   const word = lastWord(path);
   const kept = own.on && Object.hasOwn(own.on, word) ? own.on[word] : undefined;
   return kept ? { ...kept, said: word } : { ...own, said: name };

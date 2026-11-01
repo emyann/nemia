@@ -9,6 +9,9 @@ import path from 'node:path';
 import { Option, Schema } from 'effect';
 import { Agent, AgentName, agentsModel, SkillName, StepAgent } from './agents.model.ts';
 import { parseAgent } from './agents.ts';
+import { overridesOf } from '../workflow/fence.ts';
+import { readKeys } from '../former/former.ts';
+import { splitFrontmatter } from '../step/step.ts';
 import { TEAM, TEAM_DEV } from '../../test/team.ts';
 
 /** The files of `dir` that end in `.md`, without it, the folder's README left out. */
@@ -56,6 +59,24 @@ test("each step of the tests' team names its agent by id", async (t) => {
       const agent = /^agent:\s*(\S+)/m.exec(fs.readFileSync(path.join(TEAM_DEV, `${step}.md`), 'utf8'))?.[1];
       assert.equal(Schema.is(StepAgent)({ workflow: 'dev', step, agent }), true);
     });
+  await t.test('each step overrides only what its agent offers', () => {
+    const at = (file: string) => path.join(TEAM, 'agents', file);
+    const read = (file: string) => fs.readFileSync(at(file), 'utf8');
+    const agents = new Map(named(path.join(TEAM, 'agents')).map((name) => [name, parseAgent(name, read(`${name}.md`), read)]));
+    for (const step of named(TEAM_DEV)) {
+      const text = fs.readFileSync(path.join(TEAM_DEV, `${step}.md`), 'utf8');
+      const name = /^agent:\s*(\S+)/m.exec(text)?.[1];
+      if (name === undefined) continue;
+      const block = splitFrontmatter(step, text).block ?? '';
+      const overrides = overridesOf(readKeys(step, block, () => undefined).meta);
+      const offered = agents.get(name)?.overridable;
+      assert.equal(Schema.is(StepAgent)({ workflow: 'dev', step, agent: name, overrides }), true, step);
+      for (const word of overrides) assert.ok(offered === undefined || offered.includes(word), `${step} overrides ${word} of ${name}`);
+    }
+  });
+  await t.test('REFUSED: an override that is nothing a step may override', () =>
+    assert.equal(Schema.is(StepAgent)({ workflow: 'dev', step: 'x', agent: 'a', overrides: ['check'] }), false),
+  );
   await t.test('REFUSED: a step with no agent', () => assert.equal(Schema.is(StepAgent)({ workflow: 'dev', step: 'x' }), false));
   await t.test('the model', () => {
     assert.deepEqual(agentsModel.ids, { AgentName: 'Agent' });

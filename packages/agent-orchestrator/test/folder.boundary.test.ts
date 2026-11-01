@@ -333,7 +333,7 @@ test("a folder run's folder outlives its end: a run that ended blocked is tried 
   const ended = (await runWith(e, decideRun(run.id))).decision;
   assert.deepEqual(ended.kind === 'awaiting' && ended.outcome, 'waiting', JSON.stringify(ended));
 
-  await runWith(e, retryRun(run.id, 'write', { mode: 'nudge', message: 'the ocean ones' }));
+  await runWith(e, retryRun(run.id, 'write', { mode: 'continue', message: 'the ocean ones' }));
   assert.deepEqual((await runWith(e, advanceRun(readRun(run.id)))).tried, ['write']);
   const again = tasks.get(stepTaskId(readRun(run.id), 'write', 2));
   assert.ok(again, 'the try is filed');

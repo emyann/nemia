@@ -102,7 +102,7 @@ test('budgetUsdFor and budgetOf: what is left of the cap in force goes to the en
     assert.equal(budgetUsdFor(budgetOf({ ...step('implement'), budget: 3 }, undefined), cost(1)), 2);
   });
   await t.test('a raised cap, less what was spent', () => {
-    const raised = budgetOf(capped, { taskId: 't2', tries: [{ taskId: 't1', cause: 'nudge', budget: 10 }] });
+    const raised = budgetOf(capped, { taskId: 't2', tries: [{ taskId: 't1', cause: 'continue', budget: 10 }] });
     assert.equal(budgetUsdFor(raised, cost(4.25)), 5.75);
   });
   await t.test('digits, rounded up to a millionth: never 0, which the engine refuses', () => {

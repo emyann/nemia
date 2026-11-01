@@ -22,7 +22,7 @@
     "correctness": "error"
   },
   "rules": {
-    // A try's `then` ('round', 'nudge', 'fresh') is a string on run records and api answers, never callable, so `await`
+    // A try's `cause` ('round', 'continue', 'fresh') is a string on run records and api answers, never callable, so `await`
     // cannot take it for a promise; renaming it would move a word on every record on disk for no bug.
     "unicorn/no-thenable": "off",
     // A name that starts with `_` says it is unused on purpose: a callback's leading argument, a destructured field left out.

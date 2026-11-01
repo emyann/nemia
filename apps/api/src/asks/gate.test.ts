@@ -461,7 +461,7 @@ test('a person sends a step back from its gate: refused without words, asked wit
     "REFUSED at shipped defaults: sending a step back from its gate without words is a 409 in `retryRefusal`'s words, and nothing is written",
     async () => {
       gatedRun(id);
-      for (const how of [{ mode: 'nudge' }, { mode: 'fresh' }] as const) {
+      for (const how of [{ mode: 'continue' }, { mode: 'fresh' }] as const) {
         const error = await refusedWith(await ask('plan', how, id), 409, JSON.stringify(how));
         let refused = '';
         await runWith(engine(), retryRun(id, 'plan', how, { stopBlocked: true })).catch((err: Error) => {
@@ -477,13 +477,13 @@ test('a person sends a step back from its gate: refused without words, asked wit
   await s.test(
     "with words it is the answer box's ask: 202, the step still at its gate until the tick files the try, and the run waits on nobody",
     async () => {
-      const back = await ask('plan', { mode: 'nudge', message: 'Store the flag before you parse it.' }, id);
+      const back = await ask('plan', { mode: 'continue', message: 'Store the flag before you parse it.' }, id);
       assert.equal(back.status, 202, await back.clone().text());
       assert.deepEqual(await back.json(), { try: 2, file: askFile(id, 'plan', 2), stopFirst: false });
       const plan = (await detail(id)).steps[0];
       assert.deepEqual(plan.asked, {
         try: 2,
-        mode: 'nudge',
+        mode: 'continue',
         model: null,
         message: 'Store the flag before you parse it.',
         stopFirst: false,
@@ -515,14 +515,14 @@ test('a person sends a step back from its gate: refused without words, asked wit
       const asks = 'r-gate-asks-back';
       askingRun(asks);
       assert.match(
-        await refused400(await ask('design', { mode: 'nudge', answers: [{ question: cut.title, chose: ['a'] }] }, asks), asks),
+        await refused400(await ask('design', { mode: 'continue', answers: [{ question: cut.title, chose: ['a'] }] }, asks), asks),
         /^"Where do the answers go\?" is not answered/,
       );
       const answers = [
         { question: cut.title, chose: ['b'] },
         { question: where.title, chose: ['retry'] },
       ];
-      const back = await ask('design', { mode: 'nudge', message: 'Cut it smaller.', answers }, asks);
+      const back = await ask('design', { mode: 'continue', message: 'Cut it smaller.', answers }, asks);
       assert.equal(back.status, 202, await back.clone().text());
       const written = JSON.parse(fs.readFileSync(askFile(asks, 'design', 2), 'utf8')) as { message: string };
       assert.equal(written.message, answerText([cut, where], answers, 'Cut it smaller.'));

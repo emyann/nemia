@@ -618,7 +618,7 @@ test("inputsLine, inputsNote and composeBrief of a run's inputs", async (t) => {
         brief(step('implement'), run({ implement: 't1' }, { inputs }), [step('implement')], {
           try: 2,
           by: 'ask',
-          mode: 'nudge',
+          mode: 'continue',
           resumed: true,
           status: 'stopped',
         }),
@@ -688,7 +688,7 @@ test("what was read of a closeout's files: its own task's, dropped by a new try,
     assert.deepEqual(lackedOf(undefined), []);
   });
   await t.test('nextTry: a new try drops it, and a recheck, the same task, keeps it', () => {
-    assert.equal(nextTry(LACKING, { step: 'implement', try: 2, mode: 'nudge', by: 'signoff' }, 't2').filesRead, undefined);
+    assert.equal(nextTry(LACKING, { step: 'implement', try: 2, mode: 'continue', by: 'signoff' }, 't2').filesRead, undefined);
     assert.equal(nextTry(LACKING, { step: 'implement', try: 2, mode: 'fresh', by: 'ask' }, 't2').filesRead, undefined);
     const rechecked = nextTry({ ...LACKING, check: { taskId: 't1-check' } }, { step: 'implement', try: 2, mode: 'recheck', by: 'ask' });
     assert.deepEqual([rechecked.taskId, rechecked.filesRead, rechecked.check], ['t1', LACKING.filesRead, undefined]);

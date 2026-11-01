@@ -35,6 +35,12 @@
  * for what a loop's end writes (`acceptRun`, `acceptAsk`, the `accept-<step>-<n>` file), and the word's other senses (a trust accepted,
  * a level's words). The decision's `accept` offer label is `approve` since slice B, as its `merge` is `refresh`.
  *
+ * `nudge`, on the day decision 7's slice C retired it (`Try` in the run core's table): a retry's mode and a try's cause are `continue`.
+ * What is left is the former spelling kept on purpose — `FORMER_MODES` (`retry-ask.ts`), through which a record and an ask file read, and
+ * `RENAMED_FLAGS` and `RENAMED_VALUES` (`command.ts`), through which `nemia retry --nudge` and an api body's `"mode": "nudge"` are
+ * taken with a hint. It stays while a record, an ask file or a caller may still say it. The runtime's own `nudge` is another sense,
+ * outside the table's paths.
+ *
  * `agents remove`, `workflows remove`, `policy drop`, `agents try`, `template check` and `factory plan`, on the day decision 8 retired them
  * (its rows Rm, Run an agent, Lint and Diff in the run core's table): each is left once, as its own row of `RENAMED` (`command.ts`), which
  * still runs a line that says it, with a hint naming the new spelling. They stay until a later card removes the former spellings.
@@ -76,6 +82,10 @@ export const RETIRED_COUNTS: Readonly<Record<string, Readonly<Record<string, num
     'packages/agent-orchestrator/src/round/round.verb.ts': 2,
     'packages/agent-orchestrator/src/status/status.ts': 1,
     'packages/agent-orchestrator/src/trust/trust.ts': 1,
+  },
+  nudge: {
+    'packages/agent-orchestrator/src/command/command.ts': 4,
+    'packages/agent-orchestrator/src/retry/retry-ask.ts': 2,
   },
   needshuman: {
     'packages/agent-orchestrator/src/former-reason/former-reason.ts': 2,

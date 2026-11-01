@@ -2457,7 +2457,7 @@ test("the answers: a box for a step that asks, Try again for a refused check wit
   assert.deepEqual(
     radios('implement'),
     [
-      ['nudge', true],
+      ['continue', true],
       ['fresh', false],
     ],
     'a nudge unless a new session is chosen (a server render writes `checked` before `value`)',
@@ -2470,7 +2470,7 @@ test("the answers: a box for a step that asks, Try again for a refused check wit
   assert.deepEqual(
     radios('theme'),
     [
-      ['nudge', true],
+      ['continue', true],
       ['fresh', false],
       ['recheck', false],
     ],
@@ -2479,7 +2479,7 @@ test("the answers: a box for a step that asks, Try again for a refused check wit
   assert.deepEqual(
     radios('lint'),
     [
-      ['nudge', false],
+      ['continue', false],
       ['fresh', false],
       ['recheck', true],
     ],
@@ -2495,7 +2495,7 @@ test("the answers: a box for a step that asks, Try again for a refused check wit
   assert.equal(unescaped(said('docs')), `docs ${OFFERS['try-again'].said.unsigned}`, 'an unsigned step: no closeout the run accepts');
   assert.equal(said('lint'), `lint ${OFFERS['try-again'].said.unfinished}`, 'a check that did not finish');
   assert.deepEqual(radios('docs'), [
-    ['nudge', true],
+    ['continue', true],
     ['fresh', false],
   ]);
 
@@ -2530,7 +2530,7 @@ test('a step `denials: fail` stopped is offered Try again with a new session fir
     radios,
     [
       ['fresh', true],
-      ['nudge', false],
+      ['continue', false],
     ],
     'a new session first, and no recheck: no check of it ran',
   );
@@ -2787,7 +2787,7 @@ test("the banner continues a session the harness blocked: Continue, and a box fo
   );
 
   const note = 'try 2 asked (--continue) — stopping its blocked session, then the tick files it';
-  const held = { ...base.steps[0], note, asked: { try: 2, mode: 'nudge' as const, model: null, message: null, stopFirst: true } };
+  const held = { ...base.steps[0], note, asked: { try: 2, mode: 'continue' as const, model: null, message: null, stopFirst: true } };
   const asked = bannerMarkup({ ...run, steps: [asks, held] });
   assert.ok(
     asked.includes(`<p data-note="true" class="font-mono text-body-small">${note}</p></li>`),
@@ -2998,7 +2998,7 @@ test('the gate: Approve with a box for the words, which may stay empty, and Send
   assert.deepEqual(
     radios,
     [
-      ['nudge', true],
+      ['continue', true],
       ['fresh', false],
     ],
     'no recheck: a gate held nothing a check refused',
@@ -3969,7 +3969,7 @@ test("a step past its budget is offered a raise: its word with the amounts, a bo
     by: 'retry' as const,
     above: 4.25,
     said: '$4.25',
-    modes: ['nudge', 'fresh', 'recheck'] as RetryMode[],
+    modes: ['continue', 'fresh', 'recheck'] as RetryMode[],
     own: 'failed (check)' as const,
     needs: null,
     unfinished: false,
@@ -3985,7 +3985,7 @@ test("a step past its budget is offered a raise: its word with the amounts, a bo
       by: 'retry',
       above: 1.5,
       said: '$1.50',
-      modes: ['nudge', 'fresh'],
+      modes: ['continue', 'fresh'],
       own: 'blocked',
       needs: 'Warm colours, or cool ones?',
       unfinished: false,
@@ -4048,7 +4048,7 @@ test("a step past its budget is offered a raise: its word with the amounts, a bo
   assert.deepEqual(
     radios('tokens'),
     [
-      ['nudge', true],
+      ['continue', true],
       ['fresh', false],
       ['recheck', false],
     ],
@@ -4078,7 +4078,7 @@ test("a step past its budget is offered a raise: its word with the amounts, a bo
     "the button waits for the answer, as an answer row's does",
   );
   assert.deepEqual(radios('palette'), [
-    ['nudge', true],
+    ['continue', true],
     ['fresh', false],
   ]);
   assert.doesNotMatch(rows.get('tokens')!.html, /data-asks/, 'a step that asked nothing has no question on its row');
@@ -4086,7 +4086,7 @@ test("a step past its budget is offered a raise: its word with the amounts, a bo
   assert.deepEqual(
     radios('types'),
     [
-      ['nudge', false],
+      ['continue', false],
       ['fresh', false],
       ['recheck', true],
     ],
@@ -4739,9 +4739,9 @@ test("a send-back carries the gate's answers all or none: every one answered goe
   const all = { [cut.title]: { chose: ['a'], own: '' }, [where.title]: { chose: ['retry'], own: '' } };
   const some = { [cut.title]: { chose: ['a'], own: '' } };
   const back = (to: string, draft: Record<string, { chose: string[]; own: string }>, objection: string) =>
-    Gates.sendBackBody({ step: 'design', to, mode: 'nudge', objection, questions: [cut, where], draft });
+    Gates.sendBackBody({ step: 'design', to, mode: 'continue', objection, questions: [cut, where], draft });
   assert.deepEqual(back('design', all, ''), {
-    mode: 'nudge',
+    mode: 'continue',
     step: 'design',
     answers: [
       { question: cut.title, chose: ['a'] },
@@ -4749,8 +4749,8 @@ test("a send-back carries the gate's answers all or none: every one answered goe
     ],
   });
   assert.deepEqual(back('design', all, 'Smaller.'), { ...back('design', all, ''), message: 'Smaller.' });
-  assert.deepEqual(back('design', {}, 'Smaller.'), { mode: 'nudge', message: 'Smaller.', step: 'design' });
-  assert.deepEqual(back('plan', all, 'Redo it.'), { mode: 'nudge', message: 'Redo it.', step: 'plan' });
+  assert.deepEqual(back('design', {}, 'Smaller.'), { mode: 'continue', message: 'Smaller.', step: 'design' });
+  assert.deepEqual(back('plan', all, 'Redo it.'), { mode: 'continue', message: 'Redo it.', step: 'plan' });
   const waits = (to: string, draft: Record<string, { chose: string[]; own: string }>) =>
     Gates.sendBackWaits({ step: 'design', to, questions: [cut, where], draft });
   assert.deepEqual(waits('design', some), [where.title], 'some answered: held until the rest are');
@@ -4771,7 +4771,7 @@ test('a raise of a step that signed off blocked asking questions as data draws t
       by: 'retry',
       above: 1.5,
       said: '$1.50',
-      modes: ['nudge', 'fresh'],
+      modes: ['continue', 'fresh'],
       own: 'blocked',
       needs: 'Two questions.',
       unfinished: false,
@@ -4791,16 +4791,16 @@ test('a raise of a step that signed off blocked asking questions as data draws t
 
 test("what a raise's try sends: the budget typed, and for a step asking questions as data its answers in the order asked, the note left out when empty", () => {
   const draft = { [where.title]: { chose: ['retry', 'gate'], own: '' }, [cut.title]: { chose: ['b'], own: '' } };
-  const asked = { mode: 'nudge' as const, amount: '3', asks: true, questions: [cut, where], draft };
+  const asked = { mode: 'continue' as const, amount: '3', asks: true, questions: [cut, where], draft };
   const answers = [
     { question: cut.title, chose: ['b'] },
     { question: where.title, chose: ['retry', 'gate'] },
   ];
-  assert.deepEqual(raiseBody({ ...asked, message: '' }), { mode: 'nudge', budget: 3, answers });
-  assert.deepEqual(raiseBody({ ...asked, message: 'Hurry.' }), { mode: 'nudge', budget: 3, answers, message: 'Hurry.' });
-  assert.deepEqual(raiseBody({ ...asked, amount: ' ', message: '' }), { mode: 'nudge', answers });
-  assert.deepEqual(raiseBody({ ...asked, questions: [], message: 'Warm.' }), { mode: 'nudge', budget: 3, message: 'Warm.' });
-  assert.deepEqual(raiseBody({ ...asked, asks: false, questions: [], message: '' }), { mode: 'nudge', budget: 3 });
+  assert.deepEqual(raiseBody({ ...asked, message: '' }), { mode: 'continue', budget: 3, answers });
+  assert.deepEqual(raiseBody({ ...asked, message: 'Hurry.' }), { mode: 'continue', budget: 3, answers, message: 'Hurry.' });
+  assert.deepEqual(raiseBody({ ...asked, amount: ' ', message: '' }), { mode: 'continue', answers });
+  assert.deepEqual(raiseBody({ ...asked, questions: [], message: 'Warm.' }), { mode: 'continue', budget: 3, message: 'Warm.' });
+  assert.deepEqual(raiseBody({ ...asked, asks: false, questions: [], message: '' }), { mode: 'continue', budget: 3 });
 });
 
 test("an agent's form shows its card read-only, generated from its skills: an entry each, no field to edit it, and the package's refusal where none can be made", async () => {

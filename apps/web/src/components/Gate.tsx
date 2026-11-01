@@ -254,7 +254,7 @@ function SendBackForm({
   busy: boolean;
 }) {
   const [objection, setObjection] = useState('');
-  const [mode, setMode] = useState<RetryMode>('nudge');
+  const [mode, setMode] = useState<RetryMode>('continue');
   const backName = back.length === 1 ? back[0] : 'the work';
   const body = sendBackBody({ step, to, mode, objection, questions, draft });
   const waits = sendBackWaits({ step, to, questions, draft });
@@ -304,7 +304,7 @@ function SendBackForm({
   );
 }
 
-const RETRY_MODES = ['nudge', 'fresh'] as const;
+const RETRY_MODES = ['continue', 'fresh'] as const;
 
 /** A send-back's mode as its radio says it: what it does, and the CLI's flag for it. */
 const modeLabel = (m: RetryMode): ReactNode => (

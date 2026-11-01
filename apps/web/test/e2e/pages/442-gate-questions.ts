@@ -133,7 +133,7 @@ export default {
         throw new Refused(`the api takes the send-back with its answers — it answered ${sent.status()}: ${await sent.text()}`);
       const back = askIn(path.join(asks, `retry-${gated}-2`));
       const told = ['Answers to your questions:', ...blocks, `Note: ${ASKING.objection}`, 'Answered by: person, on the board'];
-      if (back.mode !== 'nudge' || back.message !== told.join('\n\n'))
+      if (back.mode !== 'continue' || back.message !== told.join('\n\n'))
         throw new Refused(`the send-back carries the answers, the objection their note — it holds ${JSON.stringify(back)}`);
       await expectCount(gate, 0, 'and the gate is offered no more: it is sent back');
     } finally {

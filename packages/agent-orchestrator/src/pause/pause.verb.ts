@@ -51,7 +51,7 @@ export const nowRead = Effect.fn('nowRead')(function* (memo?: PauseRuns) {
 /**
  * Pauses the store at once: puts the pause (`putPause`), or keeps the one that stands as it was put — its since, its by and its why, so
  * `said` is then not written — and, for each task at work but a landing (`interruptsOf`), writes the ask that tries its step again once the
- * store is resumed, a nudge of the session or a recheck of the check, naming the task (`interrupted`), and only then asks the engine to
+ * store is resumed, a continue of the session or a recheck of the check, naming the task (`interrupted`), and only then asks the engine to
  * stop it (`stopAsked`), so a stop is never taken with no ask to pick it up. A task whose step already has an ask for that try is left at
  * work (`skipped`). A stop the engine refuses — the task settled since it was read — is passed over: the tick sets its ask aside
  * (`pauseAskVoid`).
@@ -67,7 +67,7 @@ export const pauseNow = Effect.fn('pauseNow')(function* (said: { why?: string; b
     const ask = {
       step: i.step,
       try: tryOf(runs.get(i.run)!, i.step) + 1,
-      mode: i.kind === 'check' ? ('recheck' as const) : ('nudge' as const),
+      mode: i.kind === 'check' ? ('recheck' as const) : ('continue' as const),
       interrupted: i.taskId,
       at: now.toISOString(),
     };

@@ -1799,7 +1799,7 @@ test("what a run established, read as the tick and `nemia ls` have it: each step
         ],
         steps: { implement: { taskId: 't-33-implement' }, review: { taskId: null } },
       });
-      askFor('r-33', 'retry-implement-2', { mode: 'nudge' });
+      askFor('r-33', 'retry-implement-2', { mode: 'continue' });
 
       await expectJudged([
         [
@@ -2496,7 +2496,7 @@ test("what a step runs with: the workflow's effort, context and tools, the mode 
       const cases: Array<[id: string, tries: object[], askedModel: string | null]> = [
         ['r-55', [asked], 'sonnet'],
         ['r-56', [asked, { taskId: 'r-55-implement-try2', cause: 'recheck' }], 'sonnet'],
-        ['r-57', [{ taskId: 'r-55-implement', cause: 'nudge' }], null],
+        ['r-57', [{ taskId: 'r-55-implement', cause: 'continue' }], null],
         ['r-58', [{ taskId: 'r-55-implement', cause: 'retries' }], null],
       ];
       for (const [id, tries, askedModel] of cases) {
@@ -2875,7 +2875,7 @@ test("where a run's time and tokens went, on its list line and its page, and the
             taskId: 'r-60-implement-try3',
             tries: [
               ...record.steps.implement.tries,
-              { taskId: 'r-60-implement-try2', check: { taskId: 'r-60-implement-try2-check' }, cause: 'nudge' },
+              { taskId: 'r-60-implement-try2', check: { taskId: 'r-60-implement-try2-check' }, cause: 'continue' },
             ],
           },
         },

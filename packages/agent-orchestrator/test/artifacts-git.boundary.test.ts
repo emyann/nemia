@@ -297,7 +297,7 @@ test('REFUSED as findings on the screen, never silently: a path that climbs out 
       ['implement'],
       [
         `implement: its closeout named ${named.join(', ')}, which the run does not have — not accepted`,
-        'implement: try 2 — a nudge to sign off, once a round',
+        'implement: try 2 — an ask to sign off, once a round',
       ],
     ],
     'nothing collected, review not filed, and the step asked again',

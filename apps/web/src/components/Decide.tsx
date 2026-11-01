@@ -203,7 +203,7 @@ function offerSaid(offer: Extract<Answer, { case: 'answer' | 'try-again' | 'deni
 export function OfferRow({ runId, offer }: { runId: string; offer: Extract<Answer, { case: 'answer' | 'try-again' | 'denied' }> }) {
   const [message, setMessage] = useState('');
   const [mode, setMode] = useState<RetryMode>(
-    offer.case === 'try-again' && offer.unfinished ? 'recheck' : offer.case === 'denied' ? 'fresh' : 'nudge',
+    offer.case === 'try-again' && offer.unfinished ? 'recheck' : offer.case === 'denied' ? 'fresh' : 'continue',
   );
   const field = useId();
   const rechecking = mode === 'recheck';
@@ -215,10 +215,10 @@ export function OfferRow({ runId, offer }: { runId: string; offer: Extract<Answe
 
   const modes: RetryMode[] =
     offer.case === 'try-again' && offer.recheck
-      ? ['nudge', 'fresh', 'recheck']
+      ? ['continue', 'fresh', 'recheck']
       : offer.case === 'denied'
-        ? ['fresh', 'nudge']
-        : ['nudge', 'fresh'];
+        ? ['fresh', 'continue']
+        : ['continue', 'fresh'];
   return (
     <li
       data-offer={offer.case}
@@ -280,11 +280,11 @@ export function OfferRow({ runId, offer }: { runId: string; offer: Extract<Answe
 }
 
 /**
- * Continue a session the harness blocked, from the banner beside what it said last, as the CLI's `retry` continues it: a nudge — with
+ * Continue a session the harness blocked, from the banner beside what it said last, as the CLI's `retry` continues it: a continue — with
  * something to tell it, if you like — which the package's `retry()` takes for such a step, and the tick honours by stopping the session,
  * then filing the try, which continues it told what happened. The api's refusal shows beside the button, verbatim. Once the api has the
  * ask, what the tick does with it (`askedSaid`), until the run is read again and the banner says it in the CLI `ls`'s words. Nothing
- * written is a nudge with no message, as the CLI's `retry` sends one; something written goes as it was typed, as `--message` takes it.
+ * written is a continue with no message, as the CLI's `retry` sends one; something written goes as it was typed, as `--message` takes it.
  */
 export function Continue({ runId, step, line }: { runId: string; step: string; line: string }) {
   const [message, setMessage] = useState('');
@@ -304,7 +304,7 @@ export function Continue({ runId, step, line }: { runId: string; step: string; l
         className="space-y-2"
         onSubmit={(event) => {
           event.preventDefault();
-          ask.mutate({ mode: 'nudge', ...(message.trim() ? { message } : {}) });
+          ask.mutate({ mode: 'continue', ...(message.trim() ? { message } : {}) });
         }}
       >
         <label htmlFor={field} className="sr-only">

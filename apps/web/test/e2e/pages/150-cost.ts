@@ -238,7 +238,7 @@ export default {
         row.getByRole('button', { name: 'Raise the budget and try again' }).click(),
       ]);
       const sent = answered.request().postDataJSON() as { mode?: unknown; budget?: unknown } | null;
-      if (sent?.mode !== 'nudge' || sent.budget !== COSTLY.refused) {
+      if (sent?.mode !== 'continue' || sent.budget !== COSTLY.refused) {
         throw new Refused(
           `the raise is sent as wf retry --budget ${COSTLY.refused} sends it, a nudge with the amount as a number — the board sent ${JSON.stringify(sent)}`,
         );

@@ -94,7 +94,7 @@ export function CardGate({
                 onCancel={close}
                 onSend={(message) =>
                   sendBack.mutate(
-                    { mode: 'nudge', message, step: to },
+                    { mode: 'continue', message, step: to },
                     {
                       onSuccess: (asked) => {
                         close();

@@ -7,7 +7,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { Option, Schema } from 'effect';
-import { Agent, AgentName, agentsModel, SkillName, StepAgent } from './agents.model.ts';
+import { Agent, AgentName, agentsModel, Skill, SkillName, StepAgent } from './agents.model.ts';
+import { skillDraftOf } from '../skills/skills.ts';
 import { parseAgent } from './agents.ts';
 import { overridesOf } from '../workflow/index.ts';
 import { readKeys } from '../former/former.ts';
@@ -79,7 +80,20 @@ test("each step of the tests' team names its agent by id", async (t) => {
   );
   await t.test('REFUSED: a step with no agent', () => assert.equal(Schema.is(StepAgent)({ workflow: 'dev', step: 'x' }), false));
   await t.test('the model', () => {
-    assert.deepEqual(agentsModel.ids, { AgentName: 'Agent' });
-    assert.deepEqual(agentsModel.entities, [Agent, StepAgent]);
+    assert.deepEqual(agentsModel.ids, { AgentName: 'Agent', SkillName: 'Skill' });
+    assert.deepEqual(agentsModel.entities, [Agent, Skill, StepAgent]);
   });
+});
+
+test("each skill of the tests' team decodes as `skillDraftOf` reads it, and a description is one line", async (t) => {
+  const skills = path.join(TEAM, 'skills');
+  for (const name of fs.readdirSync(skills)) {
+    const file = path.join(skills, name, 'SKILL.md');
+    await t.test(name, () => assert.equal(Schema.is(Skill)(skillDraftOf(file, name, fs.readFileSync(file, 'utf8'))), true));
+  }
+  const draft = { name: 'a-skill', description: 'One line.', preload: false, body: 'Do it.' };
+  await t.test('REFUSED: a skill with no description', () => assert.equal(Schema.is(Skill)({ ...draft, description: ' ' }), false));
+  await t.test('REFUSED: a description with a line break', () =>
+    assert.equal(Schema.is(Skill)({ ...draft, description: 'One\nand two.' }), false),
+  );
 });

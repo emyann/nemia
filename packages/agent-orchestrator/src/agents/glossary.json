@@ -76,11 +76,12 @@
     },
     {
       "term": "Skill",
-      "meaning": "a folder of instructions and files an agent is given for one kind of work.",
+      "meaning": "a folder of instructions and files an agent is given for one kind of work: its `SKILL.md`, whose frontmatter gives its card entry — a one-line description, required — and whether it is loaded every turn (`preload:`).",
       "see": {
         "label": "Skills",
         "href": "/agents/#skills"
-      }
+      },
+      "type": "Skill"
     },
     {
       "term": "Skill name",

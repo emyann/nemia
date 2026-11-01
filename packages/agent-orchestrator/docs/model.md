@@ -154,13 +154,22 @@ erDiagram
     AgentName name PK
     string role "optional"
     string description "optional"
-    list skills "optional"
+    list skills FK "optional"
     enum harnessPrompt "optional"
     list mcp "optional"
     list overridable "optional"
     object keys
     string body
     string customInstructions "optional"
+  }
+  Skill {
+    SkillName name PK
+    string title "optional"
+    string description
+    list tags "optional"
+    list examples "optional"
+    boolean preload
+    string body
   }
   StepAgent {
     WorkflowName workflow FK
@@ -252,6 +261,7 @@ erDiagram
   Agent ||--o{ Hire : agent
   Agent ||--o{ Template : hires
   Workflow ||--o{ Template : workflows
+  Skill ||--o{ Agent : skills
   Workflow ||--o{ StepAgent : workflow
   WorkflowStep ||--o{ StepAgent : step
   Agent ||--o{ StepAgent : agent

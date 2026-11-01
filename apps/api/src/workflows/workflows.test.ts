@@ -520,7 +520,7 @@ test('a person starts runs from the board: the record as `nemia start` writes it
       const listed = ((await (await app.request('/api/runs')).json()) as RunSummary[]).find((r) => r.id === id)!;
       assert.equal(listed.workflowDir, good, 'the board lists it, with the folder it was started from');
       assert.deepEqual(
-        listed.steps.map((s) => s.status),
+        listed.steps.map((s) => s.message),
         ['pending', 'pending'],
       );
     },

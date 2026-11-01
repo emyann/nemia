@@ -46,7 +46,7 @@ const factory = (name: string, hires: Record<string, string>): Factory => ({
 /** A step of `run` at work by `agent` since `since`. */
 const atWorkBy = (run: RunSummary, step: string, agent: string, since: number): RunSummary => ({
   ...run,
-  steps: [...run.steps.filter((s) => s.name !== step), { ...run.steps[0], name: step, status: 'running', agent, since: at(since) }],
+  steps: [...run.steps.filter((s) => s.name !== step), { ...run.steps[0], name: step, message: 'running', agent, since: at(since) }],
 });
 
 const landedToday = ended('r-landed', 'succeeded', DAY + 10 * MIN, 6);

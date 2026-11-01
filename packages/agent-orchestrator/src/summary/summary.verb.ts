@@ -151,10 +151,9 @@ export type RunSummary = {
    * `phase` and `reason` are where the step stands, as codes (`StepPhase`, the feed's `StepReason`), computed where the listing judges
    * it (`lineOf`) and never parsed from a sentence; a screen groups and colours by them. `message` is what `nemia ls` prints for the step,
    * shown to a person and never compared. `verdict` is its check's, as codes (`CheckVerdict`), for a step judged by its check — passed,
-   * failed with its exit, unfinished, running — and null for any other. `status` is `message` under its old name, kept for one card so a
-   * reader of it keeps working, and compared by nothing: read `message`.
+   * failed with its exit, unfinished, running — and null for any other.
    *
-   * `status` is what `nemia ls` prints for the step — see `judge` for the one word it corrects. `note` is what `nemia ls` prints
+   * See `judge` for the one word of `message` it corrects. `note` is what `nemia ls` prints
    * beside it, for a step tried again or about to be, or in a loop past its first round — `try 2, by retries: 1`,
    * `round 2 of 3`, `round 3 asked (nemia retry --round) — …` — and null where it prints nothing. `roundDue`: whether a looping step's next
    * round is due, which its note words. `agent`: the agent the step is given, a hire's included, as the workflow it is judged by
@@ -174,8 +173,6 @@ export type RunSummary = {
       via: AnswerVia | null;
       message: string;
       verdict: CheckVerdict | null;
-      /** @deprecated `message` under its old name, kept for one card: read `message`. */
-      status: string;
       note: string | null;
       roundDue: boolean;
       agent: string | null;
@@ -333,7 +330,6 @@ function unjudged(run: Run, views: Views, unreadable: Unreadable, said: string, 
       ...unjudgedCodes(wordOf(run.steps[name])),
       message: wordOf(run.steps[name]),
       verdict: null,
-      status: wordOf(run.steps[name]),
       note: null,
       roundDue: false,
       agent: agentOf(name),

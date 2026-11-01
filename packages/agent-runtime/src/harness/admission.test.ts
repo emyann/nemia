@@ -178,34 +178,46 @@ test("the adapter hands admission the neutral call and maps its answer to the ho
   let seen = '';
   const out = admitCall(HOOK_INPUT, ['my-admit'], (_command, call) => {
     seen = call;
-    return { status: 0, stdout: '{"decision":"deny","reason":"not hers"}\n', failed: false };
+    return { status: 0, stdout: '{"decision":"deny","message":"not hers"}\n', failed: false };
   });
   assert.deepEqual(JSON.parse(seen), { tool: 'Bash', input: { command: 'ls' }, cwd: '/w' });
   assert.deepEqual(JSON.parse(out), {
     hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'deny', permissionDecisionReason: 'not hers' },
   });
   for (const decision of ['allow', 'ask'])
-    assert.equal(decisionOf(admitCall(HOOK_INPUT, ['a'], ran(JSON.stringify({ decision, reason: 'r' })))), decision);
+    assert.equal(decisionOf(admitCall(HOOK_INPUT, ['a'], ran(JSON.stringify({ decision, message: 'r' })))), decision);
   assert.equal(admitCall(HOOK_INPUT, ['a'], ran('')), '', 'no opinion: the call meets the session’s own rules');
+});
+
+test('an answer that says its sentence as `reason`, as a command written before `message` prints it, is read, and the fix is said', () => {
+  const warned: string[] = [];
+  const out = admitCall(HOOK_INPUT, ['old-admit'], ran('{"decision":"deny","reason":"not hers"}'), (line) => warned.push(line));
+  assert.equal(JSON.parse(out).hookSpecificOutput.permissionDecision, 'deny');
+  assert.equal(JSON.parse(out).hookSpecificOutput.permissionDecisionReason, 'not hers');
+  assert.equal(warned.length, 1, 'the retired spelling is warned of once');
+  assert.ok(warned[0].includes('old-admit') && warned[0].includes('message'), 'the warning names the command and the field to print');
+  const now: string[] = [];
+  admitCall(HOOK_INPUT, ['a'], ran('{"decision":"deny","message":"m","reason":"r"}'), (line) => now.push(line));
+  assert.deepEqual(now, [], '`message` given: nothing is warned, whatever else the answer carries');
 });
 
 test('REFUSED to allow on a fault: admission that fails, hangs, prints garbage or an unknown decision, or a call that is no call, asks the person', () => {
   const faults: [string, () => AdmissionRun][] = [
-    ['exit 1', ran('{"decision":"allow","reason":"r"}', 1)],
+    ['exit 1', ran('{"decision":"allow","message":"r"}', 1)],
     ['a signal', ran('', null)],
     ['did not start or ran past its bound', ran('', null, true)],
     ['garbage', ran('allow')],
-    ['an unknown decision', ran('{"decision":"yes","reason":"r"}')],
-    ['no reason', ran('{"decision":"allow"}')],
+    ['an unknown decision', ran('{"decision":"yes","message":"r"}')],
+    ['no message', ran('{"decision":"allow"}')],
   ];
   for (const [what, run] of faults) assert.equal(decisionOf(admitCall(HOOK_INPUT, ['a'], run)), 'ask', what);
-  assert.equal(decisionOf(admitCall('not json', ['a'], ran('{"decision":"allow","reason":"r"}'))), 'ask', 'a call that is not JSON');
-  assert.equal(decisionOf(admitCall('{}', ['a'], ran('{"decision":"allow","reason":"r"}'))), 'ask', 'a call that names no tool');
+  assert.equal(decisionOf(admitCall('not json', ['a'], ran('{"decision":"allow","message":"r"}'))), 'ask', 'a call that is not JSON');
+  assert.equal(decisionOf(admitCall('{}', ['a'], ran('{"decision":"allow","message":"r"}'))), 'ask', 'a call that names no tool');
 });
 
 test('`ae admission -- <command>` runs the command on the call and prints the hook output; a command that does not start asks', () => {
   const ae = path.join(import.meta.dirname, '..', '..', 'bin', 'ae.ts');
-  const answer = `process.stdin.on('data', (d) => process.stdout.write(JSON.stringify({ decision: 'ask', reason: JSON.parse(d).tool })))`;
+  const answer = `process.stdin.on('data', (d) => process.stdout.write(JSON.stringify({ decision: 'ask', message: JSON.parse(d).tool })))`;
   const out = execFileSync(process.execPath, [ae, 'admission', '--', process.execPath, '-e', answer], {
     input: HOOK_INPUT,
     encoding: 'utf8',
@@ -232,7 +244,7 @@ test("REFUSED: `ae admission`'s command inherits none of the telemetry its sessi
     CLAUDE_CODE_ENHANCED_TELEMETRY_BETA: '1',
   };
   const seen = `const seen = ${JSON.stringify(['ADMISSION_OWN', ...Object.keys(handed)])}.filter((k) => k in process.env).join(' ');
-process.stdin.on('data', () => process.stdout.write(JSON.stringify({ decision: 'ask', reason: seen })))`;
+process.stdin.on('data', () => process.stdout.write(JSON.stringify({ decision: 'ask', message: seen })))`;
   const out = execFileSync(process.execPath, [ae, 'admission', '--', process.execPath, '-e', seen], {
     input: HOOK_INPUT,
     encoding: 'utf8',

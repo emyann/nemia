@@ -67,7 +67,7 @@
     },
     {
       "term": "Phase / reason / message",
-      "meaning": "what each step and each try carries at the api: its `phase` and its `reason`, the codes a reader groups and compares, and its `message`, the sentence a person reads and nothing compares; `status` is the message under its old name, kept for one card.",
+      "meaning": "what each step and each try carries at the api: its `phase` and its `reason`, the codes a reader groups and compares, and its `message`, the sentence a person reads and nothing compares.",
       "type": "RunDetail",
       "see": {
         "label": "The api",

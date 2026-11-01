@@ -1614,7 +1614,6 @@ const threeTries: StepTry[] = [
     on: null,
     via: null,
     message: 'succeeded',
-    status: 'succeeded',
     attempts: ranOnce,
     check: {
       command: 'npm test',
@@ -1638,7 +1637,6 @@ const threeTries: StepTry[] = [
     on: null,
     via: null,
     message: 'succeeded',
-    status: 'succeeded',
     attempts: ranOnce,
     check: { command: 'npm test', taskId: 'r-1-implement-try2-check', verdict: PASSED, refused: null },
     closeout: closeoutSaying('Fixed the failing test.'),
@@ -1657,7 +1655,6 @@ const threeTries: StepTry[] = [
     on: null,
     via: null,
     message: 'running (working)',
-    status: 'running (working)',
     attempts: { count: 2, latest: { startedAt: tookAt, ended: null, endedAt: null, reason: null } },
     check: { command: 'npm test', taskId: null, verdict: null, refused: null },
     closeout: null,

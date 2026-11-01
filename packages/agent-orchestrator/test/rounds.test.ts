@@ -246,7 +246,7 @@ test('three rounds, then a person accepts the work as it stands', async (t) => {
     stage.board().settle(`${id}-implement-try2`, 'succeeded', { ...SIGNED, summary: 'IMPLEMENTER-SUMMARY' });
     const pass = await tick(id);
     assert.deepEqual([pass.checked, pass.unreachable], [[], ['review']]);
-    assert.match((await over(list(stage.board().e, readRun(id)))).steps[0].status, /^unsigned/);
+    assert.match((await over(list(stage.board().e, readRun(id)))).steps[0].message, /^unsigned/);
   });
   await s.test(
     "a fresh try inside round 2 is a new session handed the round's findings, off review's try that asked, owing replies",
@@ -282,7 +282,7 @@ test('three rounds, then a person accepts the work as it stands', async (t) => {
     }
     assert.deepEqual(stage.board().filings, filed, 'nothing filed at the cap: the ending is never filed');
     const l = await over(list(stage.board().e, readRun(id)));
-    assert.deepEqual([l.steps[1].status, l.waitingOnYou], ['rounds exhausted', ['review']]);
+    assert.deepEqual([l.steps[1].message, l.waitingOnYou], ['rounds exhausted', ['review']]);
     namesFor('the note', l.steps[1].note, 'round 3 of 3', `nemia retry ${id} review --round`);
     const { decision: d, offers, closeouts } = await over(decideRun(id));
     assert.deepEqual(d.kind === 'awaiting' && [d.outcome, d.exhausted, d.failed], ['waiting', ['review'], []]);
@@ -350,7 +350,7 @@ test('three rounds, then a person accepts the work as it stands', async (t) => {
         `${written}: ${pass.notes.join(' | ')}`,
       );
       assert.equal(fs.readFileSync(accept, 'utf8'), written, 'not touched');
-      assert.equal((await over(list(stage.board().e, readRun(id)))).steps[1].status, 'rounds exhausted');
+      assert.equal((await over(list(stage.board().e, readRun(id)))).steps[1].message, 'rounds exhausted');
     }
     fs.rmSync(accept);
   });
@@ -380,7 +380,7 @@ test('three rounds, then a person accepts the work as it stands', async (t) => {
         refusedAs('Conflict', 'review asked for round 5', 'accept-review-4', `nemia retry ${id} review --round`),
       );
       const l = await over(list(stage.board().e, readRun(id)));
-      assert.equal(l.steps[1].status, 'unverified · done');
+      assert.equal(l.steps[1].message, 'unverified · done');
       namesFor('the note', l.steps[1].note, `accepted as it stands at ${at}`, 'its findings open');
     },
   );
@@ -400,7 +400,7 @@ test('three rounds, then a person accepts the work as it stands', async (t) => {
     stage.board().settle(`${id}-ship`, 'succeeded', SIGNED);
     await tick(id);
     const held = await over(list(stage.board().e, readRun(id)));
-    assert.deepEqual([held.steps[2].status, held.waitingOnYou], ['awaiting approval', ['ship']]);
+    assert.deepEqual([held.steps[2].message, held.waitingOnYou], ['awaiting approval', ['ship']]);
     const { decision: d, offers, accepted } = await over(decideRun(id));
     assert.deepEqual(d.kind === 'awaiting' && [d.outcome, d.exhausted, d.awaitingApproval], ['waiting', [], ['ship']]);
     assert.deepEqual(offers, [], 'the loop is over');
@@ -426,7 +426,7 @@ test('a loop past its budget waits for a person to raise it, then goes round and
     assert.deepEqual(stage.board().filings, filed, 'no round');
     const l = await over(list(stage.board().e, readRun(id)));
     assert.deepEqual(
-      [l.steps.map((x) => x.status), l.waitingOnYou],
+      [l.steps.map((x) => x.message), l.waitingOnYou],
       [
         ['over budget $4.25 of $3', 'over budget — implement $4.25 of $3'],
         ['implement', 'review'],
@@ -449,7 +449,7 @@ test('a loop past its budget waits for a person to raise it, then goes round and
       const ask = JSON.parse(fs.readFileSync(path.join(asksDir(id), 'round-review-2'), 'utf8'));
       assert.deepEqual([ask.step, ask.round, ask.budget], ['review', 2, 10], 'the ask `nemia retry --round --budget 10` writes');
       const asked = await over(list(stage.board().e, readRun(id)));
-      assert.deepEqual([asked.steps.map((x) => x.status), asked.waitingOnYou], [['verified ✓', 'unverified · done'], []]);
+      assert.deepEqual([asked.steps.map((x) => x.message), asked.waitingOnYou], [['verified ✓', 'unverified · done'], []]);
       assert.deepEqual((await over(decideRun(id))).decision, { kind: 'running', waiting: ['review'] });
       const printed: string[] = [];
       const log = t.mock.method(console, 'log', (...args: unknown[]) => {

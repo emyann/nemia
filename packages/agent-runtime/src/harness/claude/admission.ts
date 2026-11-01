@@ -67,30 +67,40 @@ const runAdmission = (command: string[], call: string): AdmissionRun => {
 /** The hook's output for a decision, as Claude Code reads a `PreToolUse` hook's. */
 const hookOutput = (answer: AdmissionAnswer): string =>
   JSON.stringify({
-    hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: answer.decision, permissionDecisionReason: answer.reason },
+    hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: answer.decision, permissionDecisionReason: answer.message },
   });
 
-/** Admission's printed answer, or undefined where it printed what is no answer. */
-const answerOf = (printed: string): AdmissionAnswer | undefined => {
+/**
+ * Admission's printed answer, or undefined where it printed what is no answer; `retired` where its sentence came under `reason`,
+ * the spelling `message` took the place of, which a command written before the rename still prints.
+ */
+const answerOf = (printed: string): { answer: AdmissionAnswer; retired: boolean } | undefined => {
   try {
-    const read = JSON.parse(printed) as Partial<AdmissionAnswer> | null;
-    return read !== null && ADMISSION_DECISIONS.includes(read.decision as never) && typeof read.reason === 'string'
-      ? { decision: read.decision as AdmissionAnswer['decision'], reason: read.reason }
-      : undefined;
+    const read = JSON.parse(printed) as (Partial<AdmissionAnswer> & { reason?: unknown }) | null;
+    if (read === null || !ADMISSION_DECISIONS.includes(read.decision as never)) return undefined;
+    const decision = read.decision as AdmissionAnswer['decision'];
+    if (typeof read.message === 'string') return { answer: { decision, message: read.message }, retired: false };
+    return typeof read.reason === 'string' ? { answer: { decision, message: read.reason }, retired: true } : undefined;
   } catch {
     return undefined;
   }
 };
 
 /** Asks the person, saying why admission could not answer. */
-const askFor = (why: string): string => hookOutput({ decision: 'ask', reason: `admission could not decide: ${why}` });
+const askFor = (why: string): string => hookOutput({ decision: 'ask', message: `admission could not decide: ${why}` });
 
 /**
  * The hook's output for Claude Code's hook input: the call handed to admission's `command` as an `AdmissionCall`, and its answer as
  * the hook's decision; nothing where admission printed nothing, for no opinion. Asks the person where the input is no call, and where
- * admission did not start, ran past its bound, exited but 0, or printed what is no answer.
+ * admission did not start, ran past its bound, exited but 0, or printed what is no answer. An answer that says its sentence as
+ * `reason` is read as its `message`, and `warn` is handed the fix.
  */
-export const admitCall = (hookInput: string, command: string[], run: typeof runAdmission = runAdmission): string => {
+export const admitCall = (
+  hookInput: string,
+  command: string[],
+  run: typeof runAdmission = runAdmission,
+  warn: (line: string) => void = (line) => process.stderr.write(`${line}\n`),
+): string => {
   let given: { tool_name?: unknown; tool_input?: unknown; cwd?: unknown };
   try {
     given = JSON.parse(hookInput) as typeof given;
@@ -104,8 +114,11 @@ export const admitCall = (hookInput: string, command: string[], run: typeof runA
   if (ran.failed) return askFor(`${command[0]} did not start or ran past ${ADMISSION_BOUND_MS / 1000}s`);
   if (ran.status !== 0) return askFor(`${command[0]} exited ${ran.status ?? 'on a signal'}`);
   if (ran.stdout.trim() === '') return '';
-  const answer = answerOf(ran.stdout.trim());
-  return answer === undefined ? askFor(`${command[0]} printed no answer`) : hookOutput(answer);
+  const read = answerOf(ran.stdout.trim());
+  if (read === undefined) return askFor(`${command[0]} printed no answer`);
+  if (read.retired)
+    warn(`${command[0]} printed its answer's sentence as \`reason\`, read as its \`message\`: print { "decision", "message" } instead.`);
+  return hookOutput(read.answer);
 };
 
 /**

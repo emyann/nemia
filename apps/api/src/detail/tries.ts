@@ -100,8 +100,6 @@ export type StepTry = {
   /** Where an `AwaitingAnswer` try's answer is asked; null for any other reason. */
   via: AnswerVia | null;
   message: string;
-  /** @deprecated `message` under its old name, kept for one card. */
-  status: string;
   attempts: StepAttempts;
   check: StepCheck | null;
   closeout: StepCloseout | null;
@@ -220,7 +218,7 @@ export function triesOf(
   name: string,
   steps: readonly Workflow[],
   views: Views,
-  current: Pick<StepTry, 'phase' | 'reason' | 'on' | 'via' | 'message' | 'status' | 'check' | 'closeout' | 'unreadable' | 'attempts'> & {
+  current: Pick<StepTry, 'phase' | 'reason' | 'on' | 'via' | 'message' | 'check' | 'closeout' | 'unreadable' | 'attempts'> & {
     verdict?: unknown;
   },
   answers: readonly RetryAsk[],
@@ -235,10 +233,10 @@ export function triesOf(
   const answerAt = (n: number): string | null =>
     answerOf({ ...run, steps: { ...run.steps, [name]: recordAt(n) } }, name, answers)?.message ?? null;
   const noteOf = (n: number) => tryNote(step, recordAt(n), steps, answerAt(n) !== null) || null;
-  const earlierSaid = (t: EarlierTry, i: number): Pick<StepTry, 'phase' | 'reason' | 'on' | 'via' | 'message' | 'status'> => {
+  const earlierSaid = (t: EarlierTry, i: number): Pick<StepTry, 'phase' | 'reason' | 'on' | 'via' | 'message'> => {
     const word = turnAt(t, i) < (views.get(t.taskId)?.state.inputs?.length ?? 0) ? 'succeeded' : wordOf(views)(t.taskId);
     const { reason, on, via } = ENGINE_REASON[word];
-    return { phase: PHASE_OF[reason], reason, on: on ?? null, via: via ?? null, message: word, status: word };
+    return { phase: PHASE_OF[reason], reason, on: on ?? null, via: via ?? null, message: word };
   };
   return [
     ...earlier.map((t, i): StepTry => ({

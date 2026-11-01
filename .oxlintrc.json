@@ -786,7 +786,7 @@
     {
       "files": ["packages/agent-runtime/src/service/engine.ts"],
       "rules": {
-        "max-lines-per-function": ["error", { "max": 150, "skipBlankLines": true, "skipComments": true }]
+        "max-lines-per-function": ["error", { "max": 147, "skipBlankLines": true, "skipComments": true }]
       }
     }
   ],

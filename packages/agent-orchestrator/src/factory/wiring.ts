@@ -1,0 +1,115 @@
+/**
+ * A factory's wiring, judged: the change a person's verb asks of what a factory offers, hires and schedules (`WiringChange`), why it is
+ * refused (`wiringRefusal`), and the factory after it where it is not (`rewired`). Pure: what is on disk — that a step's own file names
+ * its agent, that a cron fires — is its caller's to ask, and the words are `factory.ts`'s. Both are proved by
+ * `contracts/wiring.contract.ts`, so the door's invariant — a factory hires and schedules only into a workflow it offers — is kept by
+ * every change this accepts.
+ */
+import type { Rewired, WiringRefusal } from '../../contracts/wiring.contract.ts';
+import {
+  hiredDetachRefusal,
+  hireRefusal,
+  scheduledDetachRefusal,
+  unattachedDetachRefusal,
+  unattachedHireRefusal,
+  unhiredFireRefusal,
+  unofferedScheduleRefusal,
+  unscheduledRefusal,
+  workflowNameRefusal,
+  type Schedule,
+} from './factory.ts';
+
+/**
+ * A change of a factory's wiring, by its verb: a workflow attached or detached, an agent hired into a step `<workflow>/<step>` or fired
+ * from it, a workflow's schedule written or taken back.
+ */
+export type WiringChange =
+  | { readonly verb: 'attach'; readonly workflow: string }
+  | { readonly verb: 'detach'; readonly workflow: string }
+  | { readonly verb: 'hire'; readonly step: string; readonly agent: string }
+  | { readonly verb: 'fire'; readonly step: string }
+  | { readonly verb: 'schedule'; readonly workflow: string; readonly schedule: Schedule }
+  | { readonly verb: 'unschedule'; readonly workflow: string };
+
+/** What a change of wiring is refused as: a name or a state that cannot take it (`Invalid`), or what it names is not there (`Missing`). */
+export type WiringRefused = { readonly kind: 'Invalid' | 'Missing'; readonly message: string };
+
+/** The workflow a hire's step `<workflow>/<step>` names. */
+const workflowOfStep = (step: string): string => step.slice(0, step.indexOf('/'));
+
+/** Whether `dict` holds an entry of its own at `key`: a prototype's name (`constructor`, `valueOf`) is none. */
+const holds = (dict: Readonly<Record<string, unknown>>, key: string): boolean => Object.hasOwn(dict, key);
+
+/** The steps of `workflow` a factory's `hires` hire into. */
+const hiredInto = (hires: Readonly<Record<string, string>>, workflow: string): string[] =>
+  Object.keys(hires).filter((step) => step.startsWith(`${workflow}/`));
+
+/** `names` sorted, each named once. */
+export const sortedNames = (names: readonly string[]): string[] => [...new Set(names)].sort();
+
+/** Whether `hires` hire into a step of the workflow `workflow`: a hire's key is `<workflow>/<step>`. */
+export const hiresInto = (hires: Readonly<Record<string, string>>, workflow: string): boolean =>
+  Object.keys(hires).some((step) => step.startsWith(`${workflow}/`));
+
+/** `hires` with `agent` hired into `step`, an earlier hire there replaced. */
+export const withHire = (hires: Readonly<Record<string, string>>, step: string, agent: string): Record<string, string> => ({
+  ...hires,
+  [step]: agent,
+});
+
+/** `dict` with `value` at `key`, an earlier one there replaced. */
+export const withEntry = <V>(dict: Readonly<Record<string, V>>, key: string, value: V): Record<string, V> => ({ ...dict, [key]: value });
+
+/** `dict` with no entry at `key`. */
+export const withoutEntry = <V>(dict: Readonly<Record<string, V>>, key: string): Record<string, V> => {
+  const { [key]: _gone, ...rest } = dict;
+  return rest;
+};
+
+/** What each verb did, as its refusal says it was not done. */
+const DONE = { attach: 'attached', detach: 'detached', schedule: 'scheduled', unschedule: 'unscheduled' } as const;
+
+const invalid = (message: string): WiringRefused => ({ kind: 'Invalid', message });
+const missing = (message: string): WiringRefused => ({ kind: 'Missing', message });
+
+/** Why `factory` cannot take `change`, or null where it can, each in the words its verb has always said. */
+export const wiringRefusal: WiringRefusal = (factory, change) => {
+  if (change.verb === 'hire') {
+    const bad = hireRefusal(change.step, change.agent);
+    if (bad !== undefined) return invalid(`${bad} Nothing was hired.`);
+    const workflow = workflowOfStep(change.step);
+    return factory.workflows.includes(workflow) ? null : invalid(`${unattachedHireRefusal(factory.name, workflow)} Nothing was hired.`);
+  }
+  if (change.verb === 'fire')
+    return !holds(factory.hires, change.step) ? missing(unhiredFireRefusal(factory.name, change.step, factory.hires)) : null;
+  const badName = workflowNameRefusal(change.workflow);
+  if (badName !== undefined) return invalid(`${badName} Nothing was ${DONE[change.verb]}.`);
+  if (change.verb === 'attach') return null;
+  if (change.verb === 'schedule')
+    return factory.workflows.includes(change.workflow) ? null : invalid(unofferedScheduleRefusal(factory.name, change.workflow));
+  if (change.verb === 'unschedule')
+    return !holds(factory.schedules, change.workflow)
+      ? missing(unscheduledRefusal(factory.name, change.workflow, Object.keys(factory.schedules)))
+      : null;
+  if (!factory.workflows.includes(change.workflow)) return missing(unattachedDetachRefusal(factory, change.workflow));
+  if (hiresInto(factory.hires, change.workflow))
+    return invalid(hiredDetachRefusal(factory.name, change.workflow, hiredInto(factory.hires, change.workflow)));
+  if (holds(factory.schedules, change.workflow)) return invalid(scheduledDetachRefusal(factory.name, change.workflow));
+  return null;
+};
+
+/**
+ * `factory` after `change`, which `wiringRefusal` accepted: its workflows kept sorted and each named once, a hire replacing the step's
+ * earlier one, a schedule the workflow's earlier one; everything else as it was.
+ */
+export const rewired: Rewired = (factory, change) => {
+  if (change.verb === 'attach')
+    return factory.workflows.includes(change.workflow)
+      ? factory
+      : { ...factory, workflows: sortedNames([...factory.workflows, change.workflow]) };
+  if (change.verb === 'detach') return { ...factory, workflows: factory.workflows.filter((w) => w !== change.workflow) };
+  if (change.verb === 'hire') return { ...factory, hires: withHire(factory.hires, change.step, change.agent) };
+  if (change.verb === 'fire') return { ...factory, hires: withoutEntry(factory.hires, change.step) };
+  if (change.verb === 'schedule') return { ...factory, schedules: withEntry(factory.schedules, change.workflow, change.schedule) };
+  return { ...factory, schedules: withoutEntry(factory.schedules, change.workflow) };
+};

@@ -5,10 +5,15 @@
  * takes is checked first, on every layer, by the aggregate's own schema (`checked`), so a write that breaks an invariant is refused the
  * same way whichever layer holds the records. The walks that hold the layers to one table are the tests' (`test/door-walks.ts`).
  *
+ * A door whose files are under the store's root is rooted (`rootedDoor`): its default reads the root the program is given, `StoreRoot`,
+ * when a method runs, and is refused where none was given, so a door never reads a root of its own module's. The Run door's default is
+ * not rooted yet: its files store still reads the module's (`test/global-roots.baseline.ts`).
+ *
  * A store file by its name, as the kinds go (`test/boundary.test.ts`): it touches no disk, and a pure file loads no Effect but
  * `effect/Data`. The client builds `tried` on `fromThrow`, so a controller's read and a door's act fail and die alike.
  */
-import { Effect, Result, Schema, SchemaIssue } from 'effect';
+import { Effect, Option, Result, Schema, SchemaIssue } from 'effect';
+import { StoreRoot } from '../config/root.store.ts';
 import { Invalid, isRefusal, type Refusal } from '../refusal/refusal.ts';
 
 /**
@@ -64,3 +69,31 @@ export const checked =
       ? Effect.succeed(value)
       : Effect.fail(new Invalid({ message: `${subject(value as never)} is not written: ${broken}` }));
   };
+
+/**
+ * A door whose layer is built at the store's root a program is given (`StoreRoot`), when each method runs: `over(root)`'s method, or,
+ * given no root, `Invalid` naming the fix — a program reads no store it was not pointed at. What a definition door defaults to, so a
+ * program given `StoreRoot` (the CLI's, the api's) reads its files and a test gives the door's memory layer with no root at all. `over`
+ * is built once with no root for its methods' names, none of which runs; `door` names the door in the refusal.
+ */
+export function rootedDoor<D extends object>(over: (root: string) => D, door: string): D {
+  const unrooted = new Invalid({
+    message: `the ${door} was given no store root: provide StoreRoot where the program is composed (storeRootLayer, src/config/root.store.ts), or give the program the door's memory layer. Nothing was read or written.`,
+  });
+  const at = (root: string) => over(root) as Record<string, Record<string, (...args: never[]) => Effect.Effect<unknown, Refusal>>>;
+  return Object.fromEntries(
+    Object.entries(at('')).map(([group, methods]) => [
+      group,
+      Object.fromEntries(
+        Object.keys(methods).map((name) => [
+          name,
+          (...args: never[]) =>
+            Effect.flatMap(Effect.serviceOption(StoreRoot), (root) => {
+              const method = Option.isSome(root) ? at(root.value)[group]?.[name] : undefined;
+              return method === undefined ? Effect.fail(unrooted) : method(...args);
+            }),
+        ]),
+      ),
+    ]),
+  ) as D;
+}

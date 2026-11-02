@@ -147,7 +147,7 @@ export function quotaOfUsage(usage: unknown): HarnessQuota {
  */
 type SdkError = { errorClass?: unknown; exitCode?: unknown; signal?: unknown; message?: unknown };
 
-/** How the SDK joins a child's stderr to the message of a process that exited badly or was killed (read off 0.3.308, unchanged). */
+/** How the SDK joins a child's stderr to the message of a process that exited badly or was killed (read off 0.3.316, unchanged). */
 const STDERR_TAIL = '. stderr: ';
 
 /**

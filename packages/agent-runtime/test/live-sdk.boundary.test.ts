@@ -19,10 +19,14 @@
  * attempt's record, which is the `init` line's word arrived at its resting place, and the attempt as the engine recorded it is
  * written to `WF_ARTIFACTS` when that is set.
  *
- * The raw line itself is not kept from here, and this test does not pretend to: the holder writes the capture as the session ends
- * and the engine releases the session in the same tick it reads that end from, so there is no pass of any wait at which the file is
- * on disk — watched at 100 ms through a whole session, never seen, while `ranOn` was read all the same. A daemon-held session's
- * capture holds the line for as long as the session lives, which is where a person reads one.
+ * The engine's job does not keep the raw line: the holder writes the capture as the session ends and the engine releases the
+ * session in the same tick it reads that end from, so there is no pass of any wait at which the file is on disk — watched at 100 ms
+ * through a whole session, never seen, while `ranOn` was read all the same. So the second case runs the process the worker spawns for
+ * a step, `bin/ae-claude-job.ts`, itself, on the same request shape and the SDK's own Claude Code (no `AE_CLAUDE_EXECUTABLE`), and
+ * keeps its stdout, ending its stdin at the session's `result` line as the worker does (`closesOn`). The session's `system`/`init`
+ * line, whose `model` and `claude_code_version` are asserted, is the one `claudeStreamOutput` — the reader the engine uses — reads as
+ * `ranOn`. That line is written to `WF_ARTIFACTS` as
+ * `sdk-<version>-init.json`, beside the engine's attempt, so the record and the line it came from are handed over together.
  *
  * Its control is the old SDK: the same job on 0.3.270 records `claude-opus-5`, which is the measurement the card was filed on.
  *
@@ -31,15 +35,17 @@
  */
 import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { Effect } from 'effect';
 import { Engine as EngineService, type TaskView } from '../src/index.ts';
 import { builtEngine } from './engine.ts';
 import { scratch } from './scratch.ts';
 import { until, WAITED } from '../src/waits/index.ts';
-import { OPUS_TODAY, SDK_VERSION } from './sdk-pin.ts';
+import { claudeStreamOutput } from '../src/harness/detached/output.ts';
+import { CLAUDE_CODE_VERSION, OPUS_TODAY, SDK_VERSION } from './sdk-pin.ts';
 
 const skip = process.env.AE_LIVE === '1' ? false : 'set AE_LIVE=1 to run against Claude Code (spends money)';
 
@@ -98,5 +104,58 @@ test(
             execFileSync('claude', [verb, session.split('-')[0]], { stdio: 'ignore', timeout: 30_000 });
           } catch {}
     }
+  },
+);
+
+/**
+ * Each JSON line of a job's stdout. The `init` line is looked for rather than taken first: on 0.3.308 and 0.3.316 the SDK prints its
+ * command lifecycle lines for the queued prompt ahead of it, and a `result` line does not open with its `type`.
+ */
+type Line = { type?: string; subtype?: string; model?: string; claude_code_version?: string };
+const linesOf = (out: string): Line[] =>
+  out.split('\n').flatMap((text) => {
+    try {
+      return [JSON.parse(text) as Line];
+    } catch {
+      return [];
+    }
+  });
+
+const BIN = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'bin', 'ae-claude-job.ts');
+
+test(
+  "a step's job process, asked for `opus`, says on its `init` line the model and the Claude Code it started on, and its reader records that model",
+  { skip, timeout: 10 * 60_000 },
+  async () => {
+    const dir = scratch('ae-live-sdk-bin-');
+    const at = path.join(dir, 'spawn.request.json');
+    const brief = 'Answer with the single word ok. Do nothing else.';
+    fs.writeFileSync(
+      at,
+      JSON.stringify({ request: { name: 'ae/live/init', brief, cwd: dir, config: { model: 'opus', effort: 'low', tools: [] } }, io: {} }),
+    );
+    const env = { ...process.env };
+    delete env.AE_CLAUDE_EXECUTABLE;
+
+    const { stdout, code, err } = await new Promise<{ stdout: string; code: number | null; err: string }>((done) => {
+      const child = spawn(process.execPath, [BIN, at], { cwd: dir, env, stdio: ['pipe', 'pipe', 'pipe'] });
+      let out = '';
+      let errs = '';
+      child.stderr.on('data', (d: Buffer) => (errs += d.toString()));
+      child.stdout.on('data', (d: Buffer) => {
+        out += d.toString();
+        if (linesOf(out).some((line) => line.type === 'result')) child.stdin.end();
+      });
+      child.stdin.write(`${JSON.stringify({ type: 'user', message: { content: brief } })}\n`);
+      child.on('close', (c) => done({ stdout: out, code: c, err: errs }));
+    });
+
+    const init = linesOf(stdout).find((line) => line.type === 'system' && line.subtype === 'init');
+    assert.ok(init, `the session printed its init line: ${stdout.slice(0, 300)} ${err}`);
+    handOver(`sdk-${SDK_VERSION}-init.json`, `${JSON.stringify(init)}\n`);
+    assert.equal(init.model, OPUS_TODAY, `\`opus\` on the Claude Code ${SDK_VERSION} bundles started on ${init.model}`);
+    assert.equal(init.claude_code_version, CLAUDE_CODE_VERSION, `the session ran the Claude Code ${SDK_VERSION} bundles`);
+    assert.equal(claudeStreamOutput(stdout).ranOn, init.model, 'the reader the engine uses records the model the init line says');
+    assert.equal(code, 0, `and the session ran to a result: ${err}`);
   },
 );

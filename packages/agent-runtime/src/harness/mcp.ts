@@ -213,7 +213,7 @@ export const sessionMcp = (cwd: string, config: HarnessArgs | undefined): Record
  * the task's server wins a name both give. `{}` where neither gives one.
  *
  * What `writeMcpConfig` writes to a file, for the caller that hands the map over as a value instead: an attached session's
- * `Options.mcpServers` (`sdk.d.ts:1991`). The values are a `.mcp.json`'s and a task's, read as they were written and never checked
+ * `Options.mcpServers` (`sdk.d.ts:2018`). The values are a `.mcp.json`'s and a task's, read as they were written and never checked
  * here, so the type says `unknown` and the caller that hands them to the SDK is the one that names the SDK's shape.
  */
 export const everyMcpServer = (cwd: string, config: HarnessArgs | undefined): Record<string, unknown> => {

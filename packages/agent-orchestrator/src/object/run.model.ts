@@ -430,9 +430,9 @@ const Drift = Schema.Struct({
 /**
  * The run now: the runs list's judged fields (`judgedFields`) — its word and codes, whether it moves, its cost, time at work and tokens,
  * what it waits on, its hold and what a person has to decide — then its graph, where its time went as a whole (`Timeline`'s rounds, run
- * and slot), and each step; and the rest of what its page shows of it but the lines to type, which are the command table's: when it started and was called off, what a prune
- * took and would find, the runs it is held until, what its sessions read, who it waits on, its gates, a warning on its folder, and the
- * kinds it is behind the files on (`RunDetail`, page.verb.ts).
+ * and slot), and each step; and the rest of what its page shows of it but the lines to type, which are the command table's: when it
+ * started and was called off, what a prune took and would find, the runs it is held until, what its sessions read, who it waits on, its
+ * gates, a warning on its folder, and the kinds it is behind the files on (`RunDetail`, page.verb.ts).
  */
 export const RunStatus = Schema.Struct({
   status: Schema.Literals(RUN_STATUSES),

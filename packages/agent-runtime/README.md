@@ -1042,7 +1042,7 @@ here — a flag only Claude Code has, which is what this bag is for. The context
 `claude.settings` is a file's path: there is no settings object of the runtime's to put it in, and the runtime rewrites no
 settings file. Both reach the same window (measured against Claude Code on SDK 0.3.270, and carried: 150000 asked either way,
 `rawMaxTokens: 150000`; a session asked for neither got the model's 200000. `Settings.autoCompactWindow` and `--autocompact` are
-both still there on 0.3.308, `sdk.d.ts:9304` and the CLI's own flag, so what moved is neither option).
+both still there on 0.3.308, `sdk.d.ts:9396` and the CLI's own flag, so what moved is neither option).
 
 `file()` refuses a `claude` that is not an object of camelCase keys, two letters or more, whose values each say one thing
 on the command line (`false`, `null`, `''`, an object and an empty list do not); a flag the runtime gives itself

@@ -150,7 +150,7 @@ const blockEvents = (
 type Same<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
 
 /**
- * The seam's origin words are the Agent SDK's (`SDKMessageOrigin`, `sdk.d.ts:5561`) and `unknown`: an SDK that names another kind fails
+ * The seam's origin words are the Agent SDK's (`SDKMessageOrigin`, `sdk.d.ts:5609`) and `unknown`: an SDK that names another kind fails
  * this typecheck until `ORIGIN_KINDS` (`../seam.ts`) names it too, while a line that already says it reads as `unknown`.
  */
 export const originKindsHeld: Same<TranscriptOriginKind, SDKMessageOrigin['kind'] | 'unknown'> = true;

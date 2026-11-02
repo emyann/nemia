@@ -73,7 +73,7 @@ the orchestrator's code holds a fact today, it is named beside it.
   with background tasks off alone, moved to the background with neither), and a shell `&` still detaches, its `$!` alive to `kill -0`.
 - **A job exports logs, metrics and traces from its environment over `http/json`, flushed at exit, and joins `TRACEPARENT`** — an
   environment `attachedOptions` composes onto `Options.env` inside the job's bin, since the SDK replaces the child's environment
-  entirely (`sdk.d.ts:1694`), so the engine's own telemetry is off the bin's process and the session's is on the CLI's; a job's Bash
+  entirely (`sdk.d.ts:1721`), so the engine's own telemetry is off the bin's process and the session's is on the CLI's; a job's Bash
   tool sees no `OTEL_*`, but `TRACEPARENT` (2.1.291, 2026-10-06, then `claude -p`; `claudeTelemetryEnv`).
 - **`OTEL_LOG_TOOL_DETAILS=1` puts a tool's inputs on its `claude_code.tool` span (`full_command`, `file_path`) and on the
   `tool_decision` and `tool_result` events (`tool_parameters`, `tool_input`, `error`)** (2.1.293, 2026-10-07, `claude -p`): without it no
@@ -166,11 +166,11 @@ own (public) client id. It stopped at the authorize URL: no browser, no token ex
 
 | affordance | declared in `sdk.d.ts`? | there? | what it answered |
 | --- | --- | --- | --- |
-| `Query.mcpServerStatus()` | **yes**, `sdk.d.ts:3078` | yes | one row for the inline server, `status: 'pending'` at the first call |
+| `Query.mcpServerStatus()` | **yes**, `sdk.d.ts:3117` | yes | one row for the inline server, `status: 'pending'` at the first call |
 | `Query.mcpAuthenticate(name, redirectUri)` | no | yes | `{ authUrl, requiresUserAction: true, callbackExpected: true, redirectScheme: 'localhost', state, callbackPort: 8791 }` |
 | `Query.mcpSubmitOAuthCallbackUrl(name, url)` | no | yes | refuses a URL with no code or a mismatched state, in a sentence that says to submit the redirect URL from the sign-in's own page |
 | `Query.mcpClearAuth(name)` | no | yes | resolves with `{}`, and the sign-in in flight stays in flight |
-| the inline http server's `oauth: { clientId, callbackPort }` | **no**, `sdk.d.ts:1205-1220` declares `type`, `url`, `headers`, `tools`, `timeout`, `alwaysLoad` and no `oauth` | yes, and **validated** | echoed back whole on `McpServerStatus.config.oauth`, and the authorize URL is built from it |
+| the inline http server's `oauth: { clientId, callbackPort }` | **no**, `sdk.d.ts:1219-1234` declares `type`, `url`, `headers`, `tools`, `timeout`, `alwaysLoad` and no `oauth` | yes, and **validated** | echoed back whole on `McpServerStatus.config.oauth`, and the authorize URL is built from it |
 
 What moved from 0.3.270, for the card that designs the GitHub sign-in on this:
 
@@ -230,7 +230,7 @@ What the GitHub sign-in card measured of the CLI that stores the secret, **Claud
 What a session's cost does across its processes, measured **2026-10-23 on Agent SDK 0.3.308 and the Claude Code it bundles,
 2.1.308**, with Haiku, by a script on `query()` and again through `attachedSessions` (`test/live.test.ts`, *an attached session's
 cost*, `AE_LIVE=1`). `total_cost_usd` is the running total of one `query()` call, and a resumed one "continues from the total its
-transcript saved, when it has one" (`sdk.d.ts:6034-6037`); this is what that saving takes:
+transcript saved, when it has one" (`sdk.d.ts:6100-6103`); this is what that saving takes:
 
 - **A process that ends cleanly saves its total, and a resumed query carries it on.** A session that ran to its result and whose
   input was closed exited 0 and appended a `cost-state` line (`totalCostUSD` equal to its result's `total_cost_usd`) to its

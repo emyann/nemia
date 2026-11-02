@@ -5,7 +5,7 @@
  * which is the very thing this refuses — and the files it scans are the real git listing of the checkout.
  *
  * Prose is not a constraint: a dozen comments across the runtime name a line of the SDK's own declarations, and an SDK bump rewrites
- * that file top to bottom — 0.3.270 to 0.3.308 moved every one of them, some by two hundred lines. A citation nobody can check rots
+ * that file top to bottom — 0.3.270 to 0.3.308 moved every one of them, some by two hundred lines, and 0.3.308 to 0.3.316 every one again. A citation nobody can check rots
  * into a line that says something else, and a reader who follows it is misled with no warning, which is the same class of fault as a
  * lock that fell behind a range. So each citation is named here with the identifier it stands for, and the cited line — or, for a
  * range, some line of it — must hold that identifier in the installed `sdk.d.ts`. A citation this table does not name is refused too:
@@ -29,21 +29,21 @@ const SDK = path.join(ROOT, 'node_modules', '@anthropic-ai', 'claude-agent-sdk',
  * claim is about a whole type or a doc comment with its field, and then the identifier is looked for anywhere inside it.
  */
 const CLAIMS: Record<string, string> = {
-  '1205-1220': 'McpHttpServerConfig',
-  '1249': 'McpServerConfigForProcessTransport',
-  '1265-1315': 'McpServerStatus',
-  '1694': 'env',
-  '1896': 'includePartialMessages',
-  '1991': 'mcpServers',
-  '2054': 'permissionPrompts',
-  '2349': 'strictMcpConfig',
-  '2350-2461': 'systemPrompt',
-  '2451-2461': 'systemPrompt',
-  '3078': 'mcpServerStatus',
-  '4687': 'appendSystemPrompt',
-  '5561': 'SDKMessageOrigin',
-  '6034-6037': 'total_cost_usd',
-  '9304': 'autoCompactWindow',
+  '1219-1234': 'McpHttpServerConfig',
+  '1264': 'McpServerConfigForProcessTransport',
+  '1280-1334': 'McpServerStatus',
+  '1721': 'env',
+  '1923': 'includePartialMessages',
+  '2018': 'mcpServers',
+  '2081': 'permissionPrompts',
+  '2388': 'strictMcpConfig',
+  '2389-2500': 'systemPrompt',
+  '2490-2500': 'systemPrompt',
+  '3117': 'mcpServerStatus',
+  '4728': 'appendSystemPrompt',
+  '5609': 'SDKMessageOrigin',
+  '6100-6103': 'total_cost_usd',
+  '9396': 'autoCompactWindow',
 };
 
 /** Every `sdk.d.ts:<n>` and `sdk.d.ts:<n>-<m>` in `text`, by the `<n>` or `<n>-<m>` it cites. */
@@ -106,17 +106,17 @@ test('every sdk.d.ts citation in our prose points at the identifier it claims', 
 });
 
 test('REFUSED: a citation one line off, a citation past the end of the file, and a citation the table does not name', () => {
-  const drifted = citationRefusals(lines, 'a/file.ts', '2053', { '2053': 'permissionPrompts' });
+  const drifted = citationRefusals(lines, 'a/file.ts', '2080', { '2080': 'permissionPrompts' });
   assert.equal(drifted.length, 1, 'a citation one line above the declaration is refused');
-  assert.match(drifted[0], /line 2053 of the installed sdk\.d\.ts/);
+  assert.match(drifted[0], /line 2080 of the installed sdk\.d\.ts/);
   assert.match(drifted[0], /Grep the installed sdk\.d\.ts for permissionPrompts/, 'and says how to correct it');
-  assert.deepEqual(citationRefusals(lines, 'a/file.ts', '2054', { '2054': 'permissionPrompts' }), [], 'and the line itself is not');
+  assert.deepEqual(citationRefusals(lines, 'a/file.ts', '2081', { '2081': 'permissionPrompts' }), [], 'and the line itself is not');
 
-  const narrowed = citationRefusals(lines, 'a/file.ts', '1205-1220', { '1205-1220': 'McpServerStatus' });
+  const narrowed = citationRefusals(lines, 'a/file.ts', '1219-1234', { '1219-1234': 'McpServerStatus' });
   assert.equal(narrowed.length, 1, 'a range that holds a different type than the one claimed is refused');
-  assert.match(narrowed[0], /no line of 1205-1220/);
+  assert.match(narrowed[0], /no line of 1219-1234/);
 
-  const unnamed = citationRefusals(lines, 'a/file.ts', '2054', {});
+  const unnamed = citationRefusals(lines, 'a/file.ts', '2081', {});
   assert.equal(unnamed.length, 1);
   assert.match(unnamed[0], /names no identifier for/, 'a citation nobody wrote a claim for is refused');
 

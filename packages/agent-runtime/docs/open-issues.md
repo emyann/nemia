@@ -1595,7 +1595,7 @@ it, and was refused at design (2026-10-23) as a second cost source drifting from
 bites.
 
 The step's spend cap does not hold across those processes either: the SDK's `maxBudgetUsd` counts only the spend since its `query()`
-call started (`sdk.d.ts:6034-6037`), and `adopt` resumes with the task's whole `config.budgetUsd`, so every restart of the holder
+call started (`sdk.d.ts:6100-6103`), and `adopt` resumes with the task's whole `config.budgetUsd`, so every restart of the holder
 hands the session its whole cap again. Left to an intent of its own by the person's answer at the design gate (2026-10-23).
 
 ## `claude-detached` still spells `claude -p`, and is the only road that does (closed 2026-10-24)

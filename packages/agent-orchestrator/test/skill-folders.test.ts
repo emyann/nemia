@@ -13,6 +13,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import { Effect } from 'effect';
 import { scratch } from './scratch.ts';
 import { REPO, teamCopy } from './team.ts';
 import { testPlace } from '../place/memory/index.ts';
@@ -23,12 +24,16 @@ process.env.WF_ROOT = ROOT;
 const { startRun } = await import('../src/runner.ts');
 const { loadWorkflows } = await import('../src/folder/folder.store.ts');
 const { workflowVersion } = await import('../src/folder/version.store.ts');
+const { StoreRoot } = await import('../src/config/root.store.ts');
 const { skillVersion } = await import('../src/skills/read.store.ts');
 const { agentFilesDir, renderedSkillVersions } = await import('../src/agents/agents.store.ts');
 const { enabledSkillsOf } = await import('../src/agents/agents.ts');
 const { readRun } = await import('../src/record/record.store.ts');
 const stand = eachTest(testPlace);
 const runPlaced = runGiven(() => stand().layer);
+/** A workflow folder's version, read through the doors at this file's store. */
+const versionOf = (dir: string, places: Parameters<typeof workflowVersion>[1]): string =>
+  Effect.runSync(workflowVersion(dir, places).pipe(Effect.provideService(StoreRoot, ROOT)));
 
 /** A SKILL.md named `name` whose body is `body`. */
 const skill = (name: string, body = 'Do it.'): string => `---\nname: ${name}\ndescription: Do the thing.\n---\n${body}\n`;
@@ -198,10 +203,10 @@ test('a folder’s version moves with a skill named with its folder, of one segm
     ['x, apps/web:z', path.join(repo, '.claude', 'skills', 'x')],
   ] as const) {
     const workflowDir = byStep(line);
-    const before = workflowVersion(workflowDir, { repo });
-    assert.equal(workflowVersion(workflowDir, { repo }), before);
+    const before = versionOf(workflowDir, { repo });
+    assert.equal(versionOf(workflowDir, { repo }), before);
     fs.appendFileSync(path.join(edited, 'SKILL.md'), 'Edited.\n');
-    assert.notEqual(workflowVersion(workflowDir, { repo }), before, `skills: ${line}, after an edit of ${edited}`);
+    assert.notEqual(versionOf(workflowDir, { repo }), before, `skills: ${line}, after an edit of ${edited}`);
   }
 });
 

@@ -14,6 +14,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import { Effect, Layer } from 'effect';
+import type { StoreRoot as Root } from '../src/config/root.store.ts';
+import type { Kept, Resolved } from '../src/revisions/pin.verb.ts';
 import { scratch } from './scratch.ts';
 import { staged, story } from './story.ts';
 import { digestOf, kindsDrift, revisionNow, stepsDrift, type Pin } from '../src/revisions/revisions.ts';
@@ -35,6 +38,20 @@ const { refreshRun } = await import('../src/revisions/pin.verb.ts');
 const { metered } = await import('../src/meter/tally.store.ts');
 const { writeRules } = await import('../src/rules/rules.store.ts');
 const { setRevisions } = await import('../src/factory/factory.store.ts');
+const { StoreRoot } = await import('../src/config/root.store.ts');
+const { agentDoorMemory } = await import('../src/agents/agent-memory.store.ts');
+const { AgentDoor } = await import('../src/agents/agent-door.store.ts');
+const { AgentName } = await import('../src/agents/agents.model.ts');
+const { SkillDoor, skillDoorOver, skillFiles } = await import('../src/skills/skill-door.store.ts');
+const { Invalid } = await import('../src/refusal/refusal.ts');
+const { anAgent } = await import('./agent-walks.ts');
+
+/** A program of the pin pass run to its end at this file's store, which the doors read the files of. */
+const rooted = <A, E>(program: Effect.Effect<A, E, Root>): A => Effect.runSync(program.pipe(Effect.provideService(StoreRoot, ROOT)));
+/** A pass's reader of what a resolve reads, made at this file's store: one per pass, shared by every resolve handed it. */
+const aPass = () => rooted(passRevisions());
+/** What `resolvedNow` answers a run, at this file's store, read as the verb's own three answers. */
+const resolve = (...args: Parameters<typeof resolvedNow>): Resolved | Kept | undefined => rooted(resolvedNow(...args));
 
 const SIGNED = { outcome: 'done', summary: 'did it', artifacts: [], needs: null };
 
@@ -231,7 +248,11 @@ test('a folder edited around a run: what it pins, what the ledger numbers, and w
       await runWith(b.e, advanceRun(readRun(run.id)));
       b.settle(`${run.id}-build`, 'failed');
       const ledger = ledgerOf('agent', t.agent).length;
-      assert.equal(followPass(readRun(run.id), new Date().toISOString(), true).wrote, false, 'a filing due with no edit re-pins nothing');
+      assert.equal(
+        rooted(followPass(readRun(run.id), new Date().toISOString(), true)).wrote,
+        false,
+        'a filing due with no edit re-pins nothing',
+      );
       assert.equal(ledgerOf('agent', t.agent).length, ledger, 'and numbers nothing new');
 
       fs.writeFileSync(t.agentFile, `---\nskills: ${t.skill}\n---\nYou follow the files.\n`);
@@ -403,7 +424,7 @@ test('a folder edited around a run: what it pins, what the ledger numbers, and w
         return readRun(run.id);
       };
       const agentDrift = (run: Parameters<typeof driftNow>[0], name: string) =>
-        driftNow(run).filter((d) => d.kind === 'agent' && d.name === name && d.step === undefined);
+        rooted(driftNow(run)).filter((d) => d.kind === 'agent' && d.name === name && d.step === undefined);
 
       await c.test('an edit later reverted is no drift, though the ledger numbered the edit', async () => {
         const on = team();
@@ -417,7 +438,7 @@ test('a folder edited around a run: what it pins, what the ledger numbers, and w
           'another start numbered the edit',
         );
         fs.writeFileSync(on.agentFile, first);
-        assert.deepEqual(driftNow(run), [], 'the files hold the bytes the run pins: nothing is behind');
+        assert.deepEqual(rooted(driftNow(run)), [], 'the files hold the bytes the run pins: nothing is behind');
       });
 
       await c.test('content reverted to an older revision is drift, its `now` that older number', async () => {
@@ -694,14 +715,14 @@ const AT = '2026-10-16T12:00:00.000Z';
 
 test('a pass resolves one workflow folder once for every run on it, and each run is given the pins it would be given alone', async () => {
   const { one, two } = await twoOnOneFolder();
-  const alone = await resolveCalls(() => resolvedNow(one, AT, passRevisions()));
+  const alone = await resolveCalls(() => resolve(one, AT, aPass()));
   assert.ok(alone > 0, 'resolving a run reads the world');
 
-  const shared = passRevisions();
+  const shared = aPass();
   let pins: Pin[][] = [];
   const together = await resolveCalls(() => {
     pins = [one, two].map((run) => {
-      const resolved = resolvedNow(run, AT, shared);
+      const resolved = resolve(run, AT, shared);
       assert.ok(resolved && 'pins' in resolved, 'each run resolved');
       return resolved.pins;
     });
@@ -709,7 +730,7 @@ test('a pass resolves one workflow folder once for every run on it, and each run
   assert.equal(together, alone, 'the second run on the folder costs no read of its own: the folder, its digests and its ledger are shared');
 
   const apart = await resolveCalls(() => {
-    for (const run of [one, two]) resolvedNow(run, AT, passRevisions());
+    for (const run of [one, two]) resolve(run, AT, aPass());
   });
   assert.equal(apart, alone * 2, 'a reader each — a one-off verb, which is handed no pass — pays for each run, as it did before');
   assert.deepEqual(pins[0], pins[1], 'and the pins the two runs are given are the same');
@@ -722,7 +743,7 @@ test('a pass resolves one workflow folder once for every run on it, and each run
 
 test('a memo is keyed by what it reads: one folder read once, and again for another repository or another factory', async () => {
   const { one, t } = await twoOnOneFolder();
-  const alone = await resolveCalls(() => resolvedNow(one, AT, passRevisions()));
+  const alone = await resolveCalls(() => resolve(one, AT, aPass()));
   const elsewhere = { ...one, repo: aRepo() };
   const factory = `factory-${t.name}`;
   addFactory({ name: factory, repos: [one.repo!] });
@@ -730,22 +751,26 @@ test('a memo is keyed by what it reads: one folder read once, and again for anot
   writeRules({ name: factory }, 'Never push on a Friday.');
   const hired = { ...one, factory };
 
-  const read = passRevisions();
-  assert.equal(read.steps(one), read.steps(one), 'the folder of one run is loaded once, and the one load answered again');
-  assert.equal(read.skills(one), read.skills(one), 'and the skills beside it found once');
-  assert.notEqual(read.steps(one), read.steps(elsewhere), 'the repository is in the key: it is where the folder looks for its agents');
-  assert.notEqual(read.skills(one), read.skills(elsewhere), 'and where it looks for its skills');
-  assert.notEqual(read.steps(one), read.steps(hired), "the factory is in the key: it fills the folder's hires and rules");
-  assert.equal(read.digest({ kind: 'rules', name: factory }, one), null, 'a run in no factory has no rules to digest');
+  const read = aPass();
+  assert.equal(rooted(read.steps(one)), rooted(read.steps(one)), 'the folder of one run is loaded once, and the one load answered again');
+  assert.equal(rooted(read.skills(one)), rooted(read.skills(one)), 'and the skills beside it found once');
+  assert.notEqual(
+    rooted(read.steps(one)),
+    rooted(read.steps(elsewhere)),
+    'the repository is in the key: it is where the folder looks for its agents',
+  );
+  assert.notEqual(rooted(read.skills(one)), rooted(read.skills(elsewhere)), 'and where it looks for its skills');
+  assert.notEqual(rooted(read.steps(one)), rooted(read.steps(hired)), "the factory is in the key: it fills the folder's hires and rules");
+  assert.equal(rooted(read.digest({ kind: 'rules', name: factory }, one)), null, 'a run in no factory has no rules to digest');
   assert.equal(
-    typeof read.digest({ kind: 'rules', name: factory }, hired),
+    typeof rooted(read.digest({ kind: 'rules', name: factory }, hired)),
     'string',
     "and a digest is keyed by the factory it was taken of, so the hired run's rules are digested rather than answered as none",
   );
 
   const twoRepos = await resolveCalls(() => {
-    const apart = passRevisions();
-    for (const run of [one, elsewhere]) resolvedNow(run, AT, apart);
+    const apart = aPass();
+    for (const run of [one, elsewhere]) resolve(run, AT, apart);
   });
   assert.ok(
     twoRepos > alone,
@@ -757,51 +782,51 @@ test('a run with no repository is keyed apart, never as the ticking process\u201
   const t = team();
   const folderRun = { workflowDir: t.dir, repo: undefined, factory: undefined };
   const atCwd = { workflowDir: t.dir, repo: process.cwd(), factory: undefined };
-  const read = passRevisions();
+  const read = aPass();
   assert.notEqual(
-    read.skills(folderRun),
-    read.skills(atCwd),
+    rooted(read.skills(folderRun)),
+    rooted(read.skills(atCwd)),
     "a run on a folder place looks for its skills beside the store alone; a run whose repository is the daemon's own directory looks beside that repository too, and the two are not one read",
   );
   assert.notEqual(
-    read.steps(folderRun),
-    read.steps(atCwd),
+    rooted(read.steps(folderRun)),
+    rooted(read.steps(atCwd)),
     'and the folder is loaded with the places each was given, never with the other\u2019s',
   );
   assert.equal(
-    read.skills(folderRun),
-    read.skills({ ...folderRun }),
+    rooted(read.skills(folderRun)),
+    rooted(read.skills({ ...folderRun })),
     'a second run with no repository shares the first\u2019s read, as two runs on one folder do',
   );
 });
 
 test('a workflow folder that has stopped reading is read once a pass, and every run on it keeps what it froze', async () => {
   const { one, two, t } = await twoOnOneFolder();
-  const read = passRevisions();
-  const alone = await resolveCalls(() => resolvedNow(one, AT, read));
+  const read = aPass();
+  const alone = await resolveCalls(() => resolve(one, AT, read));
   fs.rmSync(t.dir, { recursive: true, force: true });
 
-  const gone = passRevisions();
+  const gone = aPass();
   let answers: unknown[] = [];
   const both = await resolveCalls(() => {
-    answers = [one, two].map((run) => resolvedNow(run, AT, gone));
+    answers = [one, two].map((run) => resolve(run, AT, gone));
   });
   assert.deepEqual(answers, [undefined, undefined], 'each run keeps the workflow and the revisions it froze');
   assert.ok(both < alone, `the folder that does not load costs less than one that does — ${both} reads against ${alone}`);
 
   const apart = await resolveCalls(() => {
-    for (const run of [one, two]) resolvedNow(run, AT, passRevisions());
+    for (const run of [one, two]) resolve(run, AT, aPass());
   });
   assert.equal(both * 2, apart, 'and the throw is kept, so the second run on it reads nothing: one read a pass, not one a run');
 
-  const took = pinPass(two, AT, gone);
+  const took = rooted(pinPass(two, AT, gone));
   assert.deepEqual(took, { wrote: false, notes: [], lift: false }, 'the pass writes nothing for it, and judges every other run');
 });
 
 test('each run on one folder is handed its own steps, so a write onto one run’s record leaves the other’s alone', async () => {
   const { one, two } = await twoOnOneFolder();
-  const read = passRevisions();
-  const [first, second] = [one, two].map((run) => resolvedNow(run, AT, read));
+  const read = aPass();
+  const [first, second] = [one, two].map((run) => resolve(run, AT, read));
   assert.ok(first && 'steps' in first && second && 'steps' in second, 'both resolved');
   assert.notEqual(first.steps, second.steps, 'not the one array');
   assert.notEqual(first.steps[0], second.steps[0], 'nor the one step object');
@@ -857,31 +882,100 @@ test('the pure parts: a revision already given keeps its number, a gap gives no 
 
 test('a folder edited while a run waits to give a step a tool nothing allows keeps the set it froze, says why, and stops no other run', async () => {
   const { one, two, t } = await twoOnOneFolder();
-  const read = passRevisions();
-  const before = resolvedNow(one, AT, read);
+  const read = aPass();
+  const before = resolve(one, AT, read);
   assert.ok(before && 'pins' in before, 'the folder resolves while its agent can call what it is given');
 
   fs.writeFileSync(t.agentFile, `---\nskills: ${t.skill}\npermissionMode: dontAsk\ntools: Read, Grep, Skill, WebFetch\n---\nYou build.\n`);
-  const after = passRevisions();
-  const kept = resolvedNow(one, AT, after);
+  const after = aPass();
+  const kept = resolve(one, AT, after);
   assert.ok(kept && 'kept' in kept, 'the run keeps the step set it froze');
   assert.match(kept.kept, /^build: /);
   assert.match(kept.kept, /gives its session `WebFetch`/);
   assert.equal(kept.kept.includes('\n'), false, 'the note is the refusal’s first line');
-  const other = resolvedNow(two, AT, after);
+  const other = resolve(two, AT, after);
   assert.ok(other && 'kept' in other, 'the other run on the folder is judged too, and kept for the same reason');
 
-  const allowed = passRevisions();
+  const allowed = aPass();
   fs.mkdirSync(path.join(one.repo!, '.claude'), { recursive: true });
   fs.writeFileSync(path.join(one.repo!, '.claude', 'settings.json'), JSON.stringify({ permissions: { allow: ['WebFetch'] } }));
-  const now = resolvedNow(one, AT, allowed);
+  const now = resolve(one, AT, allowed);
   assert.ok(now && 'pins' in now, "the repository's own rule makes the call reachable, and the run takes the folder again");
 });
 
 test("the allow rules of a run's repository are read once a pass for every run on it, as the folder and its digests are", async () => {
   const { one, two } = await twoOnOneFolder();
-  const read = passRevisions();
+  const read = aPass();
   assert.equal(read.allows(one), read.allows(one), 'one repository read once, and the one read answered again');
   assert.equal(read.allows(one), read.allows(two), 'and shared between two runs on it');
   assert.notEqual(read.allows(one), read.allows({ ...one, repo: aRepo() }), 'the repository is the key: its own settings are what is read');
+});
+
+test('the pin pass reads through the doors: an agent the Agent door holds in memory alone is pinned at the version that door gives it', () => {
+  const holder = fs.mkdtempSync(path.join(ROOT, 'doors-'));
+  const dir = path.join(holder, 'through-doors');
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(path.join(dir, 'build.md'), '---\nplace: folder\nagent: door-agent\n---\nDo it through the doors.\n');
+  const agents = path.join(holder, 'agents');
+  const memory = agentDoorMemory();
+  const there = Effect.gen(function* () {
+    const door = yield* AgentDoor;
+    yield* door.agents.write(AgentName.read('door-agent'), anAgent('door-agent'), undefined, { dir: agents, anywhere: true });
+    return yield* door.agents.there(AgentName.read('door-agent'), { dir: agents });
+  });
+  const run = { workflowDir: dir, isolate: true };
+  const { held, resolved } = Effect.runSync(
+    Effect.gen(function* () {
+      const held = yield* there;
+      const resolved: Resolved | Kept | undefined = yield* resolvedNow(run, AT, yield* passRevisions());
+      return { held, resolved };
+    }).pipe(Effect.provide(memory), Effect.provideService(StoreRoot, ROOT)),
+  );
+  assert.equal(fs.existsSync(path.join(agents, 'door-agent.md')), false, 'the agent is on no disk: the memory holds it alone');
+  assert.equal(held.kind, 'held', 'the Agent door holds the agent');
+  assert.ok(resolved && 'pins' in resolved, 'the folder resolves, its agent found through the Agent door');
+  assert.equal(
+    pinOf(resolved.pins, 'agent', 'door-agent')?.hash,
+    held.kind === 'held' ? held.version : undefined,
+    "the agent's pin carries the version the Agent door gives it",
+  );
+});
+
+test('a read that fails is kept for the pass: asked again it fails again with no second look, and the pass says `unread` in its first line', async () => {
+  const { one } = await twoOnOneFolder();
+  const files = skillFiles(ROOT);
+  let failing = false;
+  let looked = 0;
+  const unreadable = Layer.succeed(SkillDoor)(
+    skillDoorOver({
+      skills: {
+        ...files.skills,
+        found: (at) => {
+          if (!failing) return files.skills.found(at);
+          looked += 1;
+          throw new Invalid({ message: 'the skills beside the folder did not read\na second line the note leaves out' });
+        },
+      },
+    }),
+  );
+  const { first, second, lookedThen, took } = Effect.runSync(
+    Effect.gen(function* () {
+      const read = yield* passRevisions();
+      yield* read.steps(one);
+      failing = true;
+      const first = yield* Effect.result(read.skills(one));
+      const second = yield* Effect.result(read.skills(one));
+      const lookedThen = looked;
+      const took = yield* pinPass(one, AT, read);
+      return { first, second, lookedThen, took };
+    }).pipe(Effect.provide(unreadable), Effect.provideService(StoreRoot, ROOT)),
+  );
+  assert.equal(first._tag, 'Failure', 'the lookup fails');
+  assert.equal(second._tag, 'Failure', 'and asked again within the pass, fails again');
+  assert.equal(lookedThen, 1, 'the Skill door was asked once: the failure is kept, not looked up again');
+  assert.equal(took.wrote, false, 'the pass writes nothing for the run');
+  assert.equal(took.notes.length, 1, 'and says one note');
+  const note = took.notes[0] ?? '';
+  assert.ok(note.includes('the skills beside the folder did not read'), 'the note names the failure');
+  assert.equal(note.includes('a second line'), false, 'by its first line alone');
 });

@@ -240,7 +240,7 @@ export function placesAroundAt(home: string, workflowDir: string): Places {
 }
 
 /**
- * `writeWorkflowAt` with its agents and skills read from the disk where a run of the folder would look (`foundAt`): what a caller with
+ * `writeWorkflowAt` with the agents and skills found on the disk where a run of the folder would look (`foundAt`): what a caller with
  * no Agent and Skill doors writes with, which no file of `src` is.
  */
 const writeWorkflowOnDisk = (

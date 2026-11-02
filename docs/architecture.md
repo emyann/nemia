@@ -338,7 +338,11 @@ invariants (one step at least, no name twice, every `after:` naming a step of it
 it was read at, judged by a pure function (`workflowVersionRefusal`, `src/folder/folder.ts`, which `contracts/workflow-version.contract.ts`
 proves). What still calls the folder's stores is counted per file in `test/workflow-door.baseline.ts`, which only shrinks; `write.store.ts`'s
 functions each take the store's root first (`writeWorkflowAt`, `isWorkflowsHolderAt`, `knownReposAt`, `placesAroundAt`), its old
-spellings the same functions at the module's root.
+spellings the same functions at the module's root. A read and a write parse the steps against the agents and skills the door finds
+through the Agent and Skill doors (`agents.found`, `skills.found`), at the places its layer says (`around`), and hand them to the layer:
+those of `workflowDoorOver`'s `defs` where given, else those the program is given, so a program given `agentDoorMemory()` and a store's
+root reads a workflow on the files whose step names an agent the memory holds. The version (`workflowVersion`) still reads the files'
+agents and skills, and moves with the revisions' pin.
 
 **The Template door.** A factory template — a folder that holds its `nemia.yaml`, or an archive `nemia template pack` wrote — is read,
 written as a new folder and packed as a new archive through `TemplateDoor` (`packages/agent-orchestrator/src/templates/templates.store.ts`),
@@ -365,9 +369,12 @@ from is one pure, proved decider for both layers and both doors (`lookedUp`, `sr
 the builtin place skills found last. A write checks the name on create, then what the draft renders to through the model's `Agent` or
 `Skill`, then the version it was read at, judged by `definitionVersionRefusal` (`src/agents/agents.ts`,
 `contracts/definition-version.contract.ts`) before either layer acts; the place, a link, a sidecar and a step still naming an agent stay
-the files' own refusals. What still calls the agent and skill stores — the folder's load and version, the roster, a start, the tick, the
-revisions pinned, a template, the sources — is counted per file in `test/agent-door.baseline.ts`, which only shrinks; the api's own
-reads of agents and skills are a later card's.
+the files' own refusals. What still calls the agent and skill stores — the folder's load for its synchronous readers and the version,
+the roster, a start, the tick, the revisions pinned, a template, the sources — is counted per file in `test/agent-door.baseline.ts`,
+which only shrinks. The api reads agents and skills through the two doors alone, each handler running its program over the request's
+own services (`inRequest`, `apps/api/src/layer.ts`), so the door is the app's rooted one or the stand-in a test merged into the app's
+layer; `src/agents/agent-door.store.test.ts` counts the api's calls of the stores, none allowed. The stand-ins reach the api's tests on
+the testing entry (`agent-orchestrator/testing`, `packages/agent-orchestrator/testing.ts`) beside the test place, never a program.
 
 **The Task door.** A task's journal is read and written through the runtime's `Journal` (`packages/agent-runtime/src/core/engine/journal.ts`),
 which is the Task door: every store reaches the engine through `Journal.layer`, so the door holds a hand-written store as it holds the

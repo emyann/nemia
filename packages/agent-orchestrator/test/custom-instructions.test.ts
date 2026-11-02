@@ -26,7 +26,7 @@ const stand = eachTest(testPlace);
 const runPlaced = runGiven(() => stand().layer);
 const { readRun } = await import('../src/record/record.store.ts');
 const { agentFilesDir } = await import('../src/agents/agents.store.ts');
-const { clearCustomInstructions, writeCustomInstructions } = await import('../src/agents/custom.store.ts');
+const { clearCustomInstructions, writeCustomInstructions } = await import('../src/custom/custom.store.ts');
 const { Invalid } = await import('../src/refusal/refusal.ts');
 
 /** The agent `ada`, told in English, with `custom` as a person's custom instructions for it when given. */

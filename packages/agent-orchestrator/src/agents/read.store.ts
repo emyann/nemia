@@ -4,7 +4,7 @@
  * its words or the refusal of them, and the record of an agent copied into their library (`readCopyRecord`) with where its source's
  * skills are found (`sourceSkills`). A store file one level above the bottom of the tree beneath the controllers: of the store it imports
  * only the skill reads (`skills/read.store.ts`, `test/boundary.test.ts`), so the workflow folder read (`folder/folder.store.ts`) and the
- * one writer of custom instructions (`custom.store.ts`) both read through it.
+ * one writer of custom instructions (`src/custom/custom.store.ts`) both read through it.
  */
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
@@ -22,7 +22,7 @@ import {
   type Agents,
   type SkillsFound,
 } from './agents.ts';
-import { lookedUp } from '../skills/lookup.ts';
+import { lookedUp } from '../skills/skills.ts';
 import { folderForVersion, lookupOf, lookupRoots, readForVersion, skillsFor, type Places } from '../skills/read.store.ts';
 
 /** The file of a person's custom instructions for the agent `name`, in the store `home`: `<home>/custom-instructions/<name>.md`. */

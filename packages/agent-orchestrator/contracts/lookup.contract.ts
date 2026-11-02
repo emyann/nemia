@@ -1,5 +1,5 @@
 /**
- * Which of the lookup roots a name is read from (agent-orchestrator, src/skills/lookup.ts, `lookedUp`): the roots in the order a name
+ * Which of the lookup roots a name is read from (agent-orchestrator, src/skills/skills.ts, `lookedUp`): the roots in the order a name
  * is looked for (`lookupRoots`), each with the repository whose two places — its `workflows/` and its `.claude/` — it is one of, if any,
  * and whether it holds the name. The first root that holds it wins, and a name one repository holds in both of its places is refused,
  * naming both, since nothing says which of the two is read. One decider for agents and skills, on the files and in memory.

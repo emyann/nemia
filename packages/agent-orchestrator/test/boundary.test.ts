@@ -198,12 +198,12 @@ const STORE_SHARED: Record<string, readonly string[]> = {
     'src/door/door.store.ts',
     'src/agents/read.store.ts',
     'src/agents/agents.store.ts',
-    'src/agents/custom.store.ts',
+    'src/custom/custom.store.ts',
     'src/skills/read.store.ts',
   ],
   'src/agents/agent-memory.store.ts': [
     'src/agents/agent-door.store.ts',
-    'src/agents/custom.store.ts',
+    'src/custom/custom.store.ts',
     'src/agents/read.store.ts',
     'src/skills/read.store.ts',
   ],
@@ -870,8 +870,8 @@ test('REFUSED: a store file that imports the runtime, a controller or the client
   assert.deepEqual(treeBreaks(adding('src/folder/folder.store.ts', 'src/skills/skills.store.ts')), [
     'src/folder/folder.store.ts imports src/skills/skills.store.ts, which the tree does not let it: of the store it imports src/agents/read.store.ts, src/skills/read.store.ts',
   ]);
-  assert.deepEqual(treeBreaks(adding('src/folder/folder.store.ts', 'src/agents/custom.store.ts')), [
-    'src/folder/folder.store.ts imports src/agents/custom.store.ts, which the tree does not let it: of the store it imports src/agents/read.store.ts, src/skills/read.store.ts',
+  assert.deepEqual(treeBreaks(adding('src/folder/folder.store.ts', 'src/custom/custom.store.ts')), [
+    'src/folder/folder.store.ts imports src/custom/custom.store.ts, which the tree does not let it: of the store it imports src/agents/read.store.ts, src/skills/read.store.ts',
   ]);
   assert.ok('src/skills/read.store.ts' in packageSources());
   assert.deepEqual(treeBreaks(adding('src/skills/read.store.ts', 'src/folder/folder.store.ts')), [
@@ -887,8 +887,8 @@ test('REFUSED: a store file that imports the runtime, a controller or the client
   assert.deepEqual(treeBreaks(adding('src/agents/read.store.ts', 'src/folder/folder.store.ts')), [
     'src/agents/read.store.ts imports src/folder/folder.store.ts, which the tree does not let it: of the store it imports src/skills/read.store.ts',
   ]);
-  assert.deepEqual(treeBreaks(adding('src/agents/read.store.ts', 'src/agents/custom.store.ts')), [
-    'src/agents/read.store.ts imports src/agents/custom.store.ts, which the tree does not let it: of the store it imports src/skills/read.store.ts',
+  assert.deepEqual(treeBreaks(adding('src/agents/read.store.ts', 'src/custom/custom.store.ts')), [
+    'src/agents/read.store.ts imports src/custom/custom.store.ts, which the tree does not let it: of the store it imports src/skills/read.store.ts',
   ]);
   assert.deepEqual(treeBreaks(adding('src/folder/write.store.ts', 'src/workspace/worktree.store.ts')), [
     'src/folder/write.store.ts imports src/workspace/worktree.store.ts, which the tree does not let it: of the store it imports src/record/record.store.ts, src/agents/read.store.ts, src/skills/read.store.ts, src/factory/factory.store.ts',

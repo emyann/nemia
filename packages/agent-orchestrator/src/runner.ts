@@ -176,7 +176,7 @@ export { cardSkills, isBuiltinPlace, lookupRoots, oneFolder, preloads, skillsFor
 export { BUILTIN_SKILLS } from './skills/read.store.ts';
 export type { Places } from './skills/read.store.ts';
 export { agentsFor, agentVersion, customInstructionsFile, loadAgents, readCustomInstructions } from './agents/read.store.ts';
-export { clearCustomInstructions, customInstructionsFor, writeCustomInstructions } from './agents/custom.store.ts';
+export { clearCustomInstructions, customInstructionsFor, writeCustomInstructions } from './custom/custom.store.ts';
 export { cardToStart, planLines, planStopped } from './plan/plan.ts';
 export type { Card, Planned } from './plan/plan.ts';
 export {
@@ -335,9 +335,8 @@ export { branchStandings, parentRecord, resultBranches, type BranchReader } from
 export { passStanding, standingLive, standingLiveOf, standingReader, standingSnapshot, standingWhen } from './standing/standing.verb.ts';
 export { changesOf, type BranchChanges, type Note } from './branches/changes.store.ts';
 export { evictedBy } from './rest/index.ts';
-export { givenSkills, skillDirIn, skillFolders } from './skills/skills.store.ts';
-export { AgentDoor, agentDoorFiles, type AgentAt, type AgentDoorShape } from './agents/agent-door.store.ts';
-export { SkillDoor, skillDoorFiles, type SkillDoorShape, type SkillPage } from './skills/skill-door.store.ts';
+export { removeAgent, writeAgent } from './agents/agents.store.ts';
+export { copySkill, givenSkills, skillDirIn, skillFolders, skillRead, skillText, writeSkill } from './skills/skills.store.ts';
 export { PlaceService, type Place } from './place/place.store.ts';
 export { builtin, builtinGitPlace, gitPlaceLayer } from './place/builtin.store.ts';
 export { briefNow } from './tick/told.verb.ts';
@@ -435,6 +434,7 @@ export { runSlots, type Slots, slotsOf } from './cap/cap.verb.ts';
 export type { MergeWord, StandingMerge } from './branches/index.ts';
 export type { Collision, Collisions } from './collide/collide.ts';
 export type { FolderLoaded } from './workflows/workflows.verb.ts';
+export type { SkillPage } from './skills/skills.verb.ts';
 export type { Advanced } from './tick/advance.verb.ts';
 export type { Pass } from './tick/tick.verb.ts';
 export { acceptRun, roundRun } from './round/round.verb.ts';
@@ -483,7 +483,7 @@ export { serverSignIn, serverSignInState, serverSignOut } from './servers/sign-i
 export type { ServerSignInStarted, ServerSignInState } from './servers/sign-in.verb.ts';
 export type { FactoryRules } from './rules/rules.verb.ts';
 export type { FactoryInstruction } from './factory/instruction.verb.ts';
-export { AGENTS_CUSTOM } from './agents/custom.verb.ts';
+export { AGENTS_CUSTOM } from './custom/custom.verb.ts';
 export { POLICY_PROPOSE } from './auto/auto.verb.ts';
 export type { Command, Ran } from './command/entry.verb.ts';
 export { CLI, CLI_VERBS, commandBreaks, commandLine, generated, helpOf, leftOut, parseArgv, routeList } from './command/command.ts';

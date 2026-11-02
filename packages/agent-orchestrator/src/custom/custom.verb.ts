@@ -6,10 +6,10 @@
 import { Effect } from 'effect';
 import { leftOut, type Args, type Flag, type Spec } from '../command/command.ts';
 import type { Command } from '../command/entry.verb.ts';
-import { customInstructionsFile } from './read.store.ts';
+import { customInstructionsFile } from '../agents/read.store.ts';
 import { isStoreAgent } from './custom.store.ts';
-import { AgentDoor } from './agent-door.store.ts';
-import { AgentName } from './agents.model.ts';
+import { AgentDoor } from '../agents/agent-door.store.ts';
+import { AgentName } from '../agents/agents.model.ts';
 import { rooted } from '../wiring/wire.verb.ts';
 import { StoreRoot } from '../config/root.store.ts';
 

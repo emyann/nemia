@@ -15,10 +15,10 @@ import { Layer } from 'effect';
 import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
 import { AGENTS_FOLDER, WorkflowError } from '../step/step.ts';
 import { customInstructionsRefusal, parseAgent, renderAgent, type Agent } from './agents.ts';
-import { lookedUp } from '../skills/lookup.ts';
+import { lookedUp } from '../skills/skills.ts';
 import { lookupOf, lookupRoots, type Places } from '../skills/read.store.ts';
 import { customInstructionsFile } from './read.store.ts';
-import { isStoreAgent } from './custom.store.ts';
+import { isStoreAgent } from '../custom/custom.store.ts';
 import { AgentDoor, agentDoorOver, type AgentAt, type AgentLayer } from './agent-door.store.ts';
 
 /** Where the stand-in says an agent's folder is: the root its paths are named under, as the files' are under the store's root. */

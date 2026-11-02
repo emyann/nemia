@@ -94,7 +94,7 @@ const SEAM = [
 const OWN = [
   'src/agents/read.store.ts',
   'src/agents/agents.store.ts',
-  'src/agents/custom.store.ts',
+  'src/custom/custom.store.ts',
   'src/skills/read.store.ts',
   'src/skills/skills.store.ts',
   'src/agents/agent-door.store.ts',

@@ -25,7 +25,7 @@
  */
 import path from 'node:path';
 import type { DefinitionVersionRefusal } from '../../contracts/definition-version.contract.ts';
-import { takenAt } from '../folder/folder.ts';
+import { takenAt, type VersionRefused } from '../folder/folder.ts';
 import {
   AGENTS_FOLDER,
   isReadme,
@@ -776,25 +776,8 @@ export type { DefinitionThere } from '../../contracts/definition-version.contrac
  */
 export const definitionVersionRefusal: DefinitionVersionRefusal = (what, name, does, there, given) => {
   const named = what === 'agent' ? `${AGENTS_FOLDER}/${name}.md` : `${SKILLS_FOLDER}/${name}`;
-  const anew = what === 'agent' ? 'Give the new agent another name' : 'Give the new skill another name';
-  if (there.kind !== 'held') {
-    if (does === 'remove') return null;
-    if (given !== undefined)
-      return {
-        kind: 'Missing',
-        message: `${named} is not there: it was removed since it was read. Write it as a new ${what} to have it back.`,
-      };
-    if (there.kind === 'none') return null;
-    return { kind: 'Conflict', message: `${named} is there already, and is no ${what}. ${anew}, or remove what is there first.` };
-  }
-  if (given === undefined) {
-    if (does === 'write')
-      return { kind: 'Conflict', message: `${named} is there already. ${anew}, or open it and change it${takenAt(there.version)}.` };
-    return {
-      kind: 'Invalid',
-      message: `${named} is at version ${there.version}, and a removal is checked against the version it was read at, so ${what === 'agent' ? 'an agent' : 'a skill'} changed since is not removed unseen. Give that version to remove it.`,
-    };
-  }
+  if (there.kind !== 'held') return does === 'remove' ? null : notHeldRefusal(what, named, there.kind, given);
+  if (given === undefined) return unversionedRefusal(what, named, does, there.version);
   if (given === there.version) return null;
   return {
     kind: 'Conflict',
@@ -804,3 +787,34 @@ export const definitionVersionRefusal: DefinitionVersionRefusal = (what, name, d
         : `${named} changed since it was read (version ${given}, now ${there.version}). Read it again before removing it.`,
   };
 };
+
+/** A write where no definition is held: `Missing` given a version it was read at, else a `Conflict` where something else is. */
+const notHeldRefusal = (
+  what: 'agent' | 'skill',
+  named: string,
+  kind: 'none' | 'other',
+  given: string | undefined,
+): VersionRefused | null => {
+  if (given !== undefined)
+    return {
+      kind: 'Missing',
+      message: `${named} is not there: it was removed since it was read. Write it as a new ${what} to have it back.`,
+    };
+  if (kind === 'none') return null;
+  return {
+    kind: 'Conflict',
+    message: `${named} is there already, and is no ${what}. Give the new ${what} another name, or remove what is there first.`,
+  };
+};
+
+/** An act with no version over a definition held at `version`: a write is a `Conflict`, a removal `Invalid`. */
+const unversionedRefusal = (what: 'agent' | 'skill', named: string, does: 'write' | 'remove', version: string): VersionRefused =>
+  does === 'write'
+    ? {
+        kind: 'Conflict',
+        message: `${named} is there already. Give the new ${what} another name, or open it and change it${takenAt(version)}.`,
+      }
+    : {
+        kind: 'Invalid',
+        message: `${named} is at version ${version}, and a removal is checked against the version it was read at, so ${what === 'agent' ? 'an agent' : 'a skill'} changed since is not removed unseen. Give that version to remove it.`,
+      };

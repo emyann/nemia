@@ -34,7 +34,7 @@ import {
 import type { VersionRefused } from '../folder/folder.ts';
 import { agentsFor, agentVersion, loadAgents } from './read.store.ts';
 import { removeAgent, writeAgent, type AgentSidecar, type AgentWritten } from './agents.store.ts';
-import { clearCustomInstructions, customInstructionsFor, writeCustomInstructions } from './custom.store.ts';
+import { clearCustomInstructions, customInstructionsFor, writeCustomInstructions } from '../custom/custom.store.ts';
 import { skillsFor, type Places } from '../skills/read.store.ts';
 
 /**

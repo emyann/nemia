@@ -16,7 +16,7 @@ import { Layer } from 'effect';
 import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
 import { SKILLS_FOLDER, WorkflowError } from '../step/step.ts';
 import { skillTurnCost, type SkillsFound } from '../agents/agents.ts';
-import { lookedUp } from './lookup.ts';
+import { lookedUp } from './skills.ts';
 import { renderSkill, skillEntryOf, withPreload } from './skills.ts';
 import { lookupOf, lookupRoots, PLACE_SKILLS, placeSkillFolders, type Places } from './read.store.ts';
 import { SkillDoor, skillDoorOver, type SkillLayer, type SkillPage, type SkillWhere } from './skill-door.store.ts';

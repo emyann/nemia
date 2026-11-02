@@ -5,6 +5,7 @@
   "paths": [
     "packages/agent-orchestrator/src/agents",
     "packages/agent-orchestrator/src/skills",
+    "packages/agent-orchestrator/src/custom",
     "packages/agent-orchestrator/src/workflow/fence.ts"
   ],
   "terms": [

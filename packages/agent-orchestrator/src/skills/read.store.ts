@@ -17,7 +17,7 @@ import { agentsDir } from '../folder/folder.ts';
 import { ownSkill, type Agent, type SkillsFound } from '../agents/agents.ts';
 import { givenSkillOf, type GivenSkill } from '../keys/index.ts';
 import { skillEntryOf, type AgentSkill, type SkillRule } from './skills.ts';
-import { lookedUp, type LookupRoot } from './lookup.ts';
+import { lookedUp, type LookupRoot } from './skills.ts';
 
 /**
  * Where else a workflow's agents and skills are looked for, beside its own folder: the repository it runs on, whose `.claude/agents/` and

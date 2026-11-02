@@ -82,7 +82,6 @@ const RECORD: Record<string, Partial<Record<Rule, number>>> = {
     complexity: 1,
     'sonarjs/cognitive-complexity': 1,
   },
-  'packages/agent-orchestrator/src/skills/skills.store.ts': { 'sonarjs/cognitive-complexity': 1 },
   'packages/agent-orchestrator/src/closeout/closeout.ts': { complexity: 1, 'sonarjs/cognitive-complexity': 1 },
   'packages/agent-orchestrator/src/former/former.ts': { 'sonarjs/cognitive-complexity': 1 },
   'packages/agent-orchestrator/src/inbox/inbox.store.ts': { 'sonarjs/cognitive-complexity': 1 },

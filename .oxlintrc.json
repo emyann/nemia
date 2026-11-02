@@ -535,15 +535,9 @@
     {
       "files": ["packages/agent-orchestrator/src/agents/agents.store.ts"],
       "rules": {
-        "max-lines-per-function": ["error", { "max": 136, "skipBlankLines": true, "skipComments": true }],
-        "complexity": ["error", { "max": 40 }],
-        "sonarjs/cognitive-complexity": ["error", 57]
-      }
-    },
-    {
-      "files": ["packages/agent-orchestrator/src/skills/skills.store.ts"],
-      "rules": {
-        "sonarjs/cognitive-complexity": ["error", 17]
+        "max-lines-per-function": ["error", { "max": 124, "skipBlankLines": true, "skipComments": true }],
+        "complexity": ["error", { "max": 38 }],
+        "sonarjs/cognitive-complexity": ["error", 50]
       }
     },
     {

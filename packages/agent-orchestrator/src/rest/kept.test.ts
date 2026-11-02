@@ -4,7 +4,7 @@
  * projected again; one gone from the stamps is gone from the memo; and under `verify` a projection the stamps do not watch is refused,
  * naming the run.
  */
-import { test } from 'node:test';
+import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import type { Run } from '../record/record.ts';
 import { keptRecords, recordMemo } from './kept.ts';
@@ -29,42 +29,55 @@ const reader = (briefs: Record<string, string>) => {
 
 const briefOf = (run: Run) => ({ id: run.id, brief: run.brief });
 
-test('a run whose stamp stands is answered from memory and its record is not read; one whose stamp moved is read and projected again', () => {
-  const memo = recordMemo<{ id: string; brief: string }>();
-  const stamps = new Map([
-    ['a', '1'],
-    ['b', '1'],
-  ]);
-  const cold = reader({ a: 'the a', b: 'the b' });
-  const first = keptRecords(memo, { stamps, find: cold.find, verify: false }, briefOf);
-  assert.deepEqual(cold.read, ['a', 'b'], 'the first read reads every record');
-  assert.deepEqual(first, [
-    { id: 'a', brief: 'the a' },
-    { id: 'b', brief: 'the b' },
-  ]);
+/** The rows of each table below, a claim each, told by the table's one test after its last row. */
+type Rows = Array<[string, (t: TestContext) => void | Promise<void>]>;
+const row = (rows: Rows, name: string, claim: (t: TestContext) => void | Promise<void>) => rows.push([name, claim]);
+/** A table's rows, each a subtest of `t`. */
+const told = (rows: Rows) => async (t: TestContext) => {
+  for (const [name, claim] of rows) await t.test(name, claim);
+};
+const KEPT: Rows = [];
 
-  const warm = reader({ a: 'the a', b: 'the b' });
-  assert.deepEqual(keptRecords(memo, { stamps, find: warm.find, verify: false }, briefOf), first, 'the same answer');
-  assert.deepEqual(warm.read, [], 'and no record read');
+row(
+  KEPT,
+  'a run whose stamp stands is answered from memory and its record is not read; one whose stamp moved is read and projected again',
+  () => {
+    const memo = recordMemo<{ id: string; brief: string }>();
+    const stamps = new Map([
+      ['a', '1'],
+      ['b', '1'],
+    ]);
+    const cold = reader({ a: 'the a', b: 'the b' });
+    const first = keptRecords(memo, { stamps, find: cold.find, verify: false }, briefOf);
+    assert.deepEqual(cold.read, ['a', 'b'], 'the first read reads every record');
+    assert.deepEqual(first, [
+      { id: 'a', brief: 'the a' },
+      { id: 'b', brief: 'the b' },
+    ]);
 
-  const moved = reader({ a: 'the a', b: 'b, edited' });
-  const after = keptRecords(
-    memo,
-    {
-      stamps: new Map([
-        ['a', '1'],
-        ['b', '2'],
-      ]),
-      find: moved.find,
-      verify: false,
-    },
-    briefOf,
-  );
-  assert.deepEqual(moved.read, ['b'], 'the run whose stamp moved, and no other');
-  assert.deepEqual(after[1], { id: 'b', brief: 'b, edited' });
-});
+    const warm = reader({ a: 'the a', b: 'the b' });
+    assert.deepEqual(keptRecords(memo, { stamps, find: warm.find, verify: false }, briefOf), first, 'the same answer');
+    assert.deepEqual(warm.read, [], 'and no record read');
 
-test('an id gone from the stamps is gone from the memo, and a run the reader does not answer for is left out and forgotten', () => {
+    const moved = reader({ a: 'the a', b: 'b, edited' });
+    const after = keptRecords(
+      memo,
+      {
+        stamps: new Map([
+          ['a', '1'],
+          ['b', '2'],
+        ]),
+        find: moved.find,
+        verify: false,
+      },
+      briefOf,
+    );
+    assert.deepEqual(moved.read, ['b'], 'the run whose stamp moved, and no other');
+    assert.deepEqual(after[1], { id: 'b', brief: 'b, edited' });
+  },
+);
+
+row(KEPT, 'an id gone from the stamps is gone from the memo, and a run the reader does not answer for is left out and forgotten', () => {
   const memo = recordMemo<{ id: string; brief: string }>();
   const stamps = new Map([
     ['a', '1'],
@@ -85,7 +98,7 @@ test('an id gone from the stamps is gone from the memo, and a run the reader doe
   assert.deepEqual([...memo.runs.keys()], [], 'and is forgotten, not kept at its old stamp');
 });
 
-test('REFUSED under WF_VERIFY_REST: a projection kept that a fresh read does not give again, named by its run', () => {
+row(KEPT, 'REFUSED under WF_VERIFY_REST: a projection kept that a fresh read does not give again, named by its run', () => {
   const memo = recordMemo<{ id: string; brief: string }>();
   const stamps = new Map([['a', '1']]);
   keptRecords(memo, { stamps, find: reader({ a: 'the a' }).find, verify: true }, briefOf);
@@ -98,7 +111,7 @@ test('REFUSED under WF_VERIFY_REST: a projection kept that a fresh read does not
   );
 });
 
-test('with no memo every record is read, and the answer is the memo’s own, in the store’s order', () => {
+row(KEPT, 'with no memo every record is read, and the answer is the memo’s own, in the store’s order', () => {
   const stamps = new Map([
     ['b', '1'],
     ['a', '1'],
@@ -108,3 +121,8 @@ test('with no memo every record is read, and the answer is the memo’s own, in 
   assert.deepEqual(cold.read, ['a', 'b'], 'by id, as listRuns orders its runs, whatever order the stamps came in');
   assert.deepEqual(listed, keptRecords(recordMemo(), { stamps, find: reader({ a: 'the a', b: 'the b' }).find, verify: false }, briefOf));
 });
+
+test(
+  'the stamp-keyed memo of the records (keptRecords): what a stamp that stands, moves or goes answers, with no memo and under verify',
+  told(KEPT),
+);

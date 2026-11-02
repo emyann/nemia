@@ -71,20 +71,82 @@ test('entries are sorted by code unit, never by locale: B.md before a.md', () =>
   assert.equal(tar.subarray(1024, 1124).toString('utf8').replace(/\0+$/, ''), 'team/a.md');
 });
 
-test('a path no ustar header holds is refused at pack, by name', () => {
-  const long = `skills/${'x'.repeat(101)}`;
-  assert.throws(
-    () => packArchive('team', [file('nemia.yaml', 'a'), file(long, 'b')]),
-    (err: Error & { _tag?: string }) =>
-      err._tag === 'Invalid' && err.message.includes(`${long}: team/${long} is longer than an archive holds`),
-  );
-});
-
-test('a tar over the limit is refused at pack, naming it', () => {
-  assert.throws(
-    () => packArchive('team', [file('nemia.yaml', 'x'.repeat(4096))], 1024),
-    (err: Error) => /over the 1024 an archive holds/.test(err.message),
-  );
+test('what an archive refuses, at pack and at unpack, each entry by name', async (t) => {
+  await t.test('a path no ustar header holds is refused at pack, by name', () => {
+    const long = `skills/${'x'.repeat(101)}`;
+    assert.throws(
+      () => packArchive('team', [file('nemia.yaml', 'a'), file(long, 'b')]),
+      (err: Error & { _tag?: string }) =>
+        err._tag === 'Invalid' && err.message.includes(`${long}: team/${long} is longer than an archive holds`),
+    );
+  });
+  await t.test('a tar over the limit is refused at pack, naming it', () => {
+    assert.throws(
+      () => packArchive('team', [file('nemia.yaml', 'x'.repeat(4096))], 1024),
+      (err: Error) => /over the 1024 an archive holds/.test(err.message),
+    );
+  });
+  await t.test('a path that climbs out of the folder is refused by name', () => {
+    assert.match(refusal([MANIFEST, { name: 't/../escape', body: 'x' }]), /t\/\.\.\/escape: has a part that is empty, \. or \.\./);
+  });
+  await t.test('an absolute path is refused by name', () => {
+    assert.match(refusal([MANIFEST, { name: '/etc/passwd', body: 'x' }]), /\/etc\/passwd: is absolute/);
+  });
+  await t.test('a backslash and an empty part are refused by name', () => {
+    assert.match(refusal([MANIFEST, { name: 't\\..\\x', body: 'x' }]), /t\\\.\.\\x: holds a backslash/);
+    assert.match(refusal([MANIFEST, { name: 't//x', body: 'x' }]), /t\/\/x: has a part that is empty/);
+    assert.match(refusal([MANIFEST, { name: 't/./x', body: 'x' }]), /t\/\.\/x: has a part that is empty, \. or \.\./);
+  });
+  await t.test('a second top folder is refused, naming both', () => {
+    assert.match(refusal([MANIFEST, { name: 'other/x', body: 'x' }]), /other, t: are two top folders or more/);
+  });
+  await t.test('a top folder that is no name is refused', () => {
+    assert.match(refusal([{ name: 'T x/nemia.yaml', body: 'x' }]), /T x: is the top folder, and is no name/);
+    assert.match(refusal([{ name: '../nemia.yaml', body: 'x' }]), /\.\.\/nemia\.yaml: has a part that is empty, \. or \.\./);
+  });
+  await t.test('a file beside the folder, not in it, is refused', () => {
+    assert.match(refusal([{ name: 'nemia.yaml', body: 'x' }]), /nemia\.yaml: is a file beside the template's folder/);
+  });
+  await t.test('a symbolic link, a hard link, a device, a pax header and a GNU long name are each refused by type', () => {
+    for (const type of ['2', '1', '3', '6', 'x', 'g', 'L', 'K'])
+      assert.match(
+        refusal([MANIFEST, { name: 't/odd', type }]),
+        new RegExp(`t/odd: is of type "${type}", and a template holds files and folders only[^]*nemia template pack`),
+        type,
+      );
+  });
+  await t.test('a path given twice, and a file another entry stands under, are refused by name', () => {
+    assert.match(refusal([MANIFEST, MANIFEST]), /t\/nemia\.yaml: is given twice/);
+    assert.match(refusal([MANIFEST, { name: 't/a', body: 'x' }, { name: 't/a/b', body: 'y' }]), /\n {2}t\/a: is a file, and another entry/);
+    assert.match(refusal([MANIFEST, { name: 't/a/', type: '5' }, { name: 't/a', body: 'x' }]), /t\/a: is given twice/);
+  });
+  await t.test('a bad checksum, a body cut short and bytes that are no gzip are refused', () => {
+    const checksum = refusal([{ ...MANIFEST, checksum: 1 }]);
+    assert.ok(checksum.includes('the block at byte 0'), checksum);
+    assert.ok(checksum.includes('checksum'), checksum);
+    const cut = rawTar([MANIFEST, { name: 't/big', body: 'x'.repeat(2000) }], 512 * 4);
+    assert.throws(
+      () => unpackArchive(gzipSync(cut)),
+      (err: Error) => /t\/big: is cut short: 2000 bytes/.test(err.message),
+    );
+    assert.throws(
+      () => unpackArchive(Buffer.from('not an archive'), ARCHIVE_LIMIT, 'x.tgz'),
+      (err: Error & { _tag?: string }) => err._tag === 'Invalid' && err.message.startsWith('x.tgz is no archive: its bytes are not gzip'),
+    );
+  });
+  await t.test('a tar larger than the limit is refused, naming the limit', () => {
+    const tar = rawTar([MANIFEST, { name: 't/big', body: 'x'.repeat(3000) }]);
+    assert.ok(tar.length >= 4096);
+    assert.throws(
+      () => unpackArchive(gzipSync(tar), 1024),
+      (err: Error & { _tag?: string }) => err._tag === 'Invalid' && /unpacks to more than 1024 bytes/.test(err.message),
+    );
+    assert.equal(unpackArchive(gzipSync(tar), tar.length).files.length, 2);
+  });
+  await t.test('every refused entry is said at once', () => {
+    const message = refusal([MANIFEST, { name: 't/../a', body: 'x' }, { name: 't/l', type: '2' }, { name: '/b', body: 'y' }]);
+    for (const said of ['t/../a: has a part', 't/l: is of type "2"', '/b: is absolute']) assert.ok(message.includes(said), message);
+  });
 });
 
 test('a mode is kept to its permission bits: 0o4755 comes back 0o755', () => {
@@ -96,78 +158,6 @@ test('a mode is kept to its permission bits: 0o4755 comes back 0o755', () => {
     unpackArchive(gzipSync(rawTar([{ name: 't/run.sh', mode: 0o4755 }]))).files.map((f) => f.mode),
     [0o755],
   );
-});
-
-test('a path that climbs out of the folder is refused by name', () => {
-  assert.match(refusal([MANIFEST, { name: 't/../escape', body: 'x' }]), /t\/\.\.\/escape: has a part that is empty, \. or \.\./);
-});
-
-test('an absolute path is refused by name', () => {
-  assert.match(refusal([MANIFEST, { name: '/etc/passwd', body: 'x' }]), /\/etc\/passwd: is absolute/);
-});
-
-test('a backslash and an empty part are refused by name', () => {
-  assert.match(refusal([MANIFEST, { name: 't\\..\\x', body: 'x' }]), /t\\\.\.\\x: holds a backslash/);
-  assert.match(refusal([MANIFEST, { name: 't//x', body: 'x' }]), /t\/\/x: has a part that is empty/);
-  assert.match(refusal([MANIFEST, { name: 't/./x', body: 'x' }]), /t\/\.\/x: has a part that is empty, \. or \.\./);
-});
-
-test('a second top folder is refused, naming both', () => {
-  assert.match(refusal([MANIFEST, { name: 'other/x', body: 'x' }]), /other, t: are two top folders or more/);
-});
-
-test('a top folder that is no name is refused', () => {
-  assert.match(refusal([{ name: 'T x/nemia.yaml', body: 'x' }]), /T x: is the top folder, and is no name/);
-  assert.match(refusal([{ name: '../nemia.yaml', body: 'x' }]), /\.\.\/nemia\.yaml: has a part that is empty, \. or \.\./);
-});
-
-test('a file beside the folder, not in it, is refused', () => {
-  assert.match(refusal([{ name: 'nemia.yaml', body: 'x' }]), /nemia\.yaml: is a file beside the template's folder/);
-});
-
-test('a symbolic link, a hard link, a device, a pax header and a GNU long name are each refused by type', () => {
-  for (const type of ['2', '1', '3', '6', 'x', 'g', 'L', 'K'])
-    assert.match(
-      refusal([MANIFEST, { name: 't/odd', type }]),
-      new RegExp(`t/odd: is of type "${type}", and a template holds files and folders only[^]*nemia template pack`),
-      type,
-    );
-});
-
-test('a path given twice, and a file another entry stands under, are refused by name', () => {
-  assert.match(refusal([MANIFEST, MANIFEST]), /t\/nemia\.yaml: is given twice/);
-  assert.match(refusal([MANIFEST, { name: 't/a', body: 'x' }, { name: 't/a/b', body: 'y' }]), /\n {2}t\/a: is a file, and another entry/);
-  assert.match(refusal([MANIFEST, { name: 't/a/', type: '5' }, { name: 't/a', body: 'x' }]), /t\/a: is given twice/);
-});
-
-test('a bad checksum, a body cut short and bytes that are no gzip are refused', () => {
-  const checksum = refusal([{ ...MANIFEST, checksum: 1 }]);
-  assert.ok(checksum.includes('the block at byte 0'), checksum);
-  assert.ok(checksum.includes('checksum'), checksum);
-  const cut = rawTar([MANIFEST, { name: 't/big', body: 'x'.repeat(2000) }], 512 * 4);
-  assert.throws(
-    () => unpackArchive(gzipSync(cut)),
-    (err: Error) => /t\/big: is cut short: 2000 bytes/.test(err.message),
-  );
-  assert.throws(
-    () => unpackArchive(Buffer.from('not an archive'), ARCHIVE_LIMIT, 'x.tgz'),
-    (err: Error & { _tag?: string }) => err._tag === 'Invalid' && err.message.startsWith('x.tgz is no archive: its bytes are not gzip'),
-  );
-});
-
-test('a tar larger than the limit is refused, naming the limit', () => {
-  const tar = rawTar([MANIFEST, { name: 't/big', body: 'x'.repeat(3000) }]);
-  assert.ok(tar.length >= 4096);
-  assert.throws(
-    () => unpackArchive(gzipSync(tar), 1024),
-    (err: Error & { _tag?: string }) => err._tag === 'Invalid' && /unpacks to more than 1024 bytes/.test(err.message),
-  );
-  assert.equal(unpackArchive(gzipSync(tar), tar.length).files.length, 2);
-});
-
-test('every refused entry is said at once', () => {
-  const message = refusal([MANIFEST, { name: 't/../a', body: 'x' }, { name: 't/l', type: '2' }, { name: '/b', body: 'y' }]);
-  for (const said of ['t/../a: has a part', 't/l: is of type "2"', '/b: is absolute']) assert.ok(message.includes(said), message);
 });
 
 test("GNU tar's magic and its folder entries are read", () => {

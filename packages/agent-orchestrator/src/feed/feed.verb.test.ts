@@ -15,6 +15,7 @@ import { Effect, Exit, Fiber, Layer, Logger, ManagedRuntime, Metric, PubSub, Ref
 import { isRunLine, type FeedWords } from './feed.ts';
 import { scratch } from '../../test/scratch.ts';
 import { bell, until, WAITED } from 'agent-runtime/testing';
+import { StoreRoot } from '../config/root.store.ts';
 
 const ROOT = scratch('wf-feed-verb-');
 const FEED = path.join(ROOT, 'feed.jsonl');
@@ -24,6 +25,9 @@ const { emitFeed, FEED_FOLLOW_BEATS, FEED_FOLLOW_LINES, FEED_FOLLOW_READS, FEED_
   await import('./feed.verb.ts');
 const { feedSize } = await import('./feed.store.ts');
 
+/** The store's root as the tick and the api give it, which the Feed door reads by (`FeedDoor`). */
+const rooted = StoreRoot.layer(ROOT);
+
 type Followed = Stream.Success<ReturnType<typeof followFeed>>;
 
 /** What a pass judged of the one run, `r-1`: the run at `word`, and `step` at `word` where it is given. */
@@ -32,13 +36,13 @@ const judged = (word: string, step?: string): ReadonlyMap<string, FeedWords> =>
 
 /** A runtime with a hub of `capacity` lines and no logger, the process a reader and a writer share: let go once the test `t` ends. */
 function hubbed(t: TestContext, capacity?: number) {
-  const rt = ManagedRuntime.make(Layer.merge(feedHubLayer(capacity), Logger.layer([])));
+  const rt = ManagedRuntime.make(Layer.mergeAll(feedHubLayer(capacity), Logger.layer([]), rooted));
   t.after(() => rt.dispose());
   return rt;
 }
 
 /** A word written by another process: through the same writer, with no hub, so no reader is handed an item of it. */
-const foreign = (word: string) => Effect.runPromise(emitFeed(judged(word)).pipe(Effect.provide(Logger.layer([]))));
+const foreign = (word: string) => Effect.runPromise(emitFeed(judged(word)).pipe(Effect.provide(Layer.merge(Logger.layer([]), rooted))));
 
 /** A metric's count now, read off the registry every runtime shares. */
 const counted = (metric: typeof FEED_FOLLOW_READS) => Effect.runSync(Metric.value(metric)).count;
@@ -223,7 +227,7 @@ test('REFUSED: a cursor the feed cannot be read from fails the stream before the
     [feedSize() + 5, /is past the end of the feed/],
     [1, /falls inside a line of the feed/],
   ] as const) {
-    const exit = await Effect.runPromiseExit(Stream.runDrain(followFeed(from, { beat: '1 hour' })));
+    const exit = await Effect.runPromiseExit(Stream.runDrain(followFeed(from, { beat: '1 hour' })).pipe(Effect.provide(rooted)));
     assert.ok(Exit.isFailure(exit));
     const failure = exit.cause.reasons.find((r) => r._tag === 'Fail');
     assert.ok(failure && failure._tag === 'Fail');
@@ -285,7 +289,9 @@ test('each line emitFeed writes is logged at Info, annotated with its labels, it
       annotations: { ...fiber.getRef(References.CurrentLogAnnotations) },
     });
   });
-  const lines = await Effect.runPromise(emitFeed(judged('running', 'plan')).pipe(Effect.provide(Logger.layer([keeper]))));
+  const lines = await Effect.runPromise(
+    emitFeed(judged('running', 'plan')).pipe(Effect.provide(Layer.merge(Logger.layer([keeper]), rooted))),
+  );
   assert.equal(lines.length, 2);
   assert.deepEqual(logs, [
     { level: 'Info', text: 'r-1  —  running', annotations: { run: 'r-1', reason: 'Running', type: 'Normal', word: 'running' } },

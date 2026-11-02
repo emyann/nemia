@@ -4,10 +4,10 @@
  * and the feed beneath it; a stream its caller runs over the engine (`EngineService`).
  */
 import { Effect, Stream } from 'effect';
-import { EngineService, asked, tried, type Engine, type TranscriptEvent } from '../runtime-client.ts';
+import { EngineService, asked, type Engine, type TranscriptEvent } from '../runtime-client.ts';
 import { Missing, type Refusal } from '../refusal/refusal.ts';
 import { isRunLine } from '../feed/index.ts';
-import { feedSize } from '../feed/feed.store.ts';
+import { FeedDoor } from '../feed/feed.store.ts';
 import { followFeed } from '../feed/feed.verb.ts';
 import { nextOf, type FollowedAttempt, type StepMoment, type StepNow } from './following.ts';
 import { RunDoor } from '../runs/runs.store.ts';
@@ -167,7 +167,7 @@ export const followStep = (runId: string, step: string, after?: string): Stream.
   Stream.unwrap(
     Effect.gen(function* () {
       const e = yield* EngineService;
-      const cursor = yield* tried(feedSize);
+      const cursor = (yield* (yield* FeedDoor).lines.end())?.cursor ?? 0;
       const now = yield* stepNowOf(e, runId, step);
       const o: Onward = { e, runId, step, hold: { unstreamed: false }, ...(after === undefined ? {} : { after }) };
       const { taskId } = now;

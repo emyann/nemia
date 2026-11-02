@@ -24,6 +24,7 @@ import { Clock, Effect, Fiber, Layer, Logger, ManagedRuntime, Metric } from 'eff
 import { bell, until, WAITED } from 'agent-runtime/testing';
 import type { FeedLine, FeedWords } from '../src/feed/feed.ts';
 import { scratch } from './scratch.ts';
+import { StoreRoot } from '../src/config/root.store.ts';
 import { staged, story } from './story.ts';
 import { names } from './assessed.ts';
 
@@ -416,7 +417,7 @@ test(
   async (t) => {
     const s = story(t);
     const { e, asked } = engineFor();
-    const rt = ManagedRuntime.make(Layer.merge(feedHubLayer(), Logger.layer([])));
+    const rt = ManagedRuntime.make(Layer.mergeAll(feedHubLayer(), Logger.layer([]), StoreRoot.layer(ROOT)));
     t.after(() => rt.dispose());
     const following = () => Effect.runSync(Metric.value(FEED_FOLLOWERS)).value;
     const handed = () => Effect.runSync(Metric.value(FEED_FOLLOW_LINES)).count;

@@ -1,15 +1,31 @@
 /**
- * The feed (`feed.ts`) over the store's own file: `$WF_ROOT/feed.jsonl`, and this process's one fold of it, which the tick writes through.
+ * The Feed door: the one way a program reads and appends to the feed (`feed.ts`) — an Effect service, `FeedDoor`, whose one group,
+ * `lines`, answers where the feed ends (`end`), the lines after a cursor (`read`), why a cursor cannot be read from (`cursorRefusal`) and
+ * the lines written (`append`), each an Effect failing with a refusal. Its pattern is the Card door's (`src/door/door.store.ts`). The feed
+ * only grows: nothing rewrites or drops a line through the door.
+ *
+ * Two layers: the files (`feedFiles`, `<root>/feed.jsonl`, written by the daemon alone: its tick, and `up`'s start), and the memory
+ * stand-in (`feedDoorMemory`, `memory.store.ts`), which keeps the lines as the bytes they would be, so a cursor is a byte offset on both.
+ * Both are built by `feedDoorOver`, so the door's checks are one on both: a read's cursor is a `FeedCursor` (`FeedCursor.OnCreate`) the
+ * feed has a line boundary at (`cursorRefusalAt`'s words), or `Invalid`; each line appended decodes through the model's `FeedLine`, or
+ * `Invalid` names the line and nothing of the append is written. The walks of `test/feed-walks.ts` hold both layers to one table.
+ *
+ * A layer carries nothing between passes: the fold of the feed a process has read so far (`FeedMemo`) is its caller's, kept by `emitFeed`
+ * (`feed.verb.ts`) and handed to `feedPass` with the door, keyed on the generation the door's end answers (the file's inode) and on the
+ * cursor's refusal, so a feed cut under it is read again from the start.
+ *
+ * The door's default is rooted (`rootedDoor`): the files at the store's root the program is given (`StoreRoot`). The module spellings
+ * (`recordFeed`, `readFeed`, `feedSize`, …) are the same door over the module's root, run where they are called, for the synchronous
+ * callers left (`test/feed-door.baseline.ts`). Following the file as it grows (`watchFeed`) is the files' alone.
  *
  * Beneath the controllers, beside `record.store.ts`: it imports neither the engine nor a controller, and `runner.ts` re-exports it.
- * `feed.ts` is the pure half — the line, the fold, what a pass owes — and this is the file: read, appended to and followed, each helper
- * taking the file as an argument, and the exports over the store's own.
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { Schema } from 'effect';
+import { Cause, Context, Effect, Exit, Layer, Schema } from 'effect';
 import { HOME } from '../record/record.store.ts';
 import { countRead, within } from '../meter/tally.store.ts';
+import { brokenBy, doorOf, rootedDoor, type DoorOf } from '../door/door.store.ts';
 import {
   DAEMON_STARTED,
   feedChanges,
@@ -23,72 +39,134 @@ import {
   type FeedWords,
   lineAsRead,
 } from './feed.ts';
-import { Invalid } from '../refusal/refusal.ts';
+import { FeedCursor, FeedLine as FeedLineModel } from './feed.model.ts';
+import { Invalid, type Refusal } from '../refusal/refusal.ts';
 
-/** The workflow layer's feed (`feed.ts`): beside `runs/`, one for the store, written by the daemon alone: its tick, and `up`'s start. */
-export const feedFile = (): string => path.join(HOME, 'feed.jsonl');
+/** The feed of the store `root`: beside `runs/`, one for the store. */
+export const feedAt = (root: string): string => path.join(root, 'feed.jsonl');
 
-/** This process's fold of the feed, as far as it has read it: a restarted daemon starts from none, and reads the feed once. */
-const feedMemo: FeedMemo = freshMemo();
+/** The root the module spellings read: the store's, as the module loaded (`test/global-roots.baseline.ts`). */
+const moduleRoot = (): string => HOME;
 
-/**
- * Write what the pass judged of every run in the store, where it is not what the feed said of it last (`recordFeedFile`): the lines
- * written, and where their bytes went (`FeedAppended`). `now` is every run the pass judged: one the feed still names that is not in it is
- * gone, and gets its `removed` — but for one of `unjudged`, which the pass read and could not judge (`feedChanges`). `pause` is the store's
- * pause as the pass read it (`readPause`), whose put and lift the feed says once each; a caller that read none gives none, and nothing is
- * said of the store. `memo` is for a test, which starts one afresh to be a restarted daemon.
- */
-export const recordFeed = (
-  now: ReadonlyMap<string, FeedWords>,
-  {
-    at = new Date().toISOString(),
-    memo = feedMemo,
-    unjudged = new Set<string>(),
-    pause,
-  }: { at?: string; memo?: FeedMemo; unjudged?: ReadonlySet<string>; pause?: FeedPause } = {},
-): FeedAppended => within('act', () => recordFeedFile(feedFile(), now, at, memo, unjudged, pause));
+/** The workflow layer's feed (`feed.ts`), at the module's root: written by the daemon alone, its tick and `up`'s start. */
+export const feedFile = (): string => feedAt(moduleRoot());
 
 /**
- * Appends a daemon's line (`startedLine`) to the feed, after a newline where its last line was left unended, as `recordFeed` appends; the
- * fold is not moved, since a daemon's line is no run's. Answers where its bytes went (`FeedAppended`).
+ * Where the feed ends: the cursor after its last byte, and the generation of the feed it is the end of — the file's inode on the files, the
+ * stand-in's own in memory — which changes when the feed is cut and another put in its place.
  */
-export const recordDaemonLine = (line: DaemonLine): FeedAppended => within('act', () => appendDaemonLine(feedFile(), line));
+export type FeedEnd = { cursor: number; generation: number };
 
-/** `recordDaemonLine` over `file`. */
-function appendDaemonLine(file: string, line: DaemonLine): FeedAppended {
-  const before = statOf(file)?.size ?? 0;
-  const leading = before > 0 && byteAt(file, before - 1) !== 0x0a ? '\n' : '';
-  fs.mkdirSync(path.dirname(file), { recursive: true });
-  fs.appendFileSync(file, `${leading}${JSON.stringify(line)}\n`);
-  return { lines: [line], before, after: statOf(file)?.size ?? 0, leading };
+/** The lines after a cursor, each with the byte just after it (`ends`, one for each of `lines`), and the cursor to read on from. */
+export type FeedRead = { lines: FeedLine[]; ends: number[]; cursor: number };
+
+/** A layer of the Feed door, as plain synchronous methods over the feed's lines. */
+export type FeedLayer = {
+  readonly lines: {
+    /** Where the feed ends (`FeedEnd`), or null for a feed not written yet. */
+    readonly end: () => FeedEnd | null;
+    /** Every complete line after `after`, never past a line with no newline yet (`FeedRead`); the door has checked the cursor. */
+    readonly read: (after: number) => FeedRead;
+    /** Why `after` cannot be read from, in words that say what to do (`cursorRefusalOf`) — or undefined when it can. */
+    readonly cursorRefusal: (after: number) => string | undefined;
+    /** `lines` appended, after a newline where the last line was left unended, and where their bytes went (`FeedAppended`). */
+    readonly append: (lines: readonly FeedLine[]) => FeedAppended;
+  };
+};
+
+/** The Feed door's shape: each method of `FeedLayer` answering an Effect. The feed has no id. */
+export type FeedDoorShape = DoorOf<FeedLayer, string>;
+
+/**
+ * Why a cursor cannot be read from, in words that say what to do — or undefined when it can: 0, or the byte just after a line, at most the
+ * feed's `size`. A cursor inside a line would have the reader take the rest of that line for one; one past the end was handed out by a
+ * feed that has been truncated or replaced, and nothing after it means what the reader thinks. `byteBefore(at)` is the byte at `at`, and
+ * `where` the feed a message names. Both layers say it.
+ */
+export function cursorRefusalOf(after: number, size: number, byteBefore: (at: number) => number, where: string): string | undefined {
+  if (!Number.isSafeInteger(after) || after < 0)
+    return `a feed cursor is a whole number of bytes — 0, or one a \`cursor:\` line printed — not ${after}`;
+  if (after > size) {
+    return `cursor ${after} is past the end of the feed (${size} bytes, ${where}): the feed it came from was truncated or replaced since — read it again from the start: nemia watch --once 0`;
+  }
+  if (after > 0 && byteBefore(after - 1) !== 0x0a) {
+    return `cursor ${after} falls inside a line of the feed, not after one: a cursor is 0 or the number a \`cursor:\` line printed — nemia watch --once 0 reads from the start`;
+  }
+  return undefined;
 }
 
-/** A fold of nothing, for a test that plays a restarted daemon. */
-export const freshFeedMemo = freshMemo;
+/**
+ * Every complete line of `buf`, which holds the feed's bytes from `after` on, each with the byte just after its newline (`ends`), and the
+ * byte after the last complete line: never past a line with no newline yet. The ends are counted in bytes, on the buffer, not in
+ * characters of the text — a note with a dash in it is three bytes of one character. A line nobody can read keeps no end, and moves the
+ * cursor all the same. Both layers read by it.
+ */
+export function linesIn(buf: Buffer, after: number): FeedRead {
+  const lines: FeedLine[] = [];
+  const ends: number[] = [];
+  let start = 0;
+  for (let nl = buf.indexOf(0x0a); nl >= 0; start = nl + 1, nl = buf.indexOf(0x0a, start)) {
+    for (const line of parseLine(buf.subarray(start, nl).toString('utf8'))) {
+      lines.push(line);
+      ends.push(after + nl + 1);
+    }
+  }
+  return { lines, ends, cursor: after + start };
+}
 
 /**
- * The feed's lines after `after`, and the cursor to read on from (`readFeedFile`): a cursor inside a line, or past the end, is refused by
- * name.
+ * The text an append of `lines` writes after the feed's `last` byte (undefined for an empty feed): one JSON line each, after a newline
+ * where the last line was left unended — one a writer died in, which then ends as the line nobody can read (`parseLine`) and the lines
+ * after it are whole. Both layers write by it.
  */
-export const readFeed = (after = 0): { lines: FeedLine[]; cursor: number } => readFeedFile(feedFile(), after);
+export function appendedText(lines: readonly FeedLine[], last: number | undefined): { text: string; leading: string } {
+  const leading = last !== undefined && last !== 0x0a ? '\n' : '';
+  return { text: `${leading}${lines.map((l) => `${JSON.stringify(l)}\n`).join('')}`, leading };
+}
 
-/** Why `after` cannot be read from — or undefined when it can (`cursorRefusalAt`). */
-export const feedCursorRefusal = (after: number): string | undefined => cursorRefusalAt(feedFile(), after);
+/** A read's cursor, as `FeedCursor.OnCreate` checks it: a whole number of bytes, at least 0. */
+const cursorChecked = (after: number): Effect.Effect<void, Invalid> => {
+  const broken = brokenBy(FeedCursor.OnCreate, after);
+  return broken === null
+    ? Effect.void
+    : Effect.fail(
+        new Invalid({
+          message: `a feed cursor is a whole number of bytes — 0, or one a \`cursor:\` line printed — not ${after} (${broken}): nemia watch --once 0 reads from the start`,
+        }),
+      );
+};
 
-/** The feed's size in bytes, 0 for a feed not written yet: what a live reader compares its cursor with before it reads. */
-export const feedSize = (): number => statOf(feedFile())?.size ?? 0;
+/** Each line of an append, decoded through the model's `FeedLine`: `Invalid` naming the first that breaks it, before any is written. */
+const linesChecked = (lines: readonly FeedLine[]): Effect.Effect<void, Invalid> => {
+  for (const [i, line] of lines.entries()) {
+    const broken = brokenBy(FeedLineModel, line);
+    if (broken !== null)
+      return Effect.fail(
+        new Invalid({
+          message: `line ${i + 1} of ${lines.length} is no line of the feed, so none of them is written: ${broken} — a line is a run's, a daemon's or the store's (FeedLine, src/feed/feed.model.ts)`,
+        }),
+      );
+  }
+  return Effect.void;
+};
 
-/**
- * The lines after `after`, each with the byte just after it (`ends`), and the cursor to read on from (`readEnds`): what a live reader
- * hands on. A cursor that is not the start of a line, or is past the end, is refused by name (exit 2).
- */
-export const readFeedEnds = (after: number): { lines: FeedLine[]; ends: number[]; cursor: number } => readEnds(feedFile(), after);
-
-/**
- * Follow the feed from `from` until `stop()` (`watchFeedFile`), each line with the cursor just after it: refused before anything is watched
- * when the cursor cannot be read from.
- */
-export const watchFeed = (opts: Parameters<typeof watchFeedFile>[1]): { stop(): void } => watchFeedFile(feedFile(), opts);
+/** The door over `layer`: each method as `doorOf` makes it, a read's cursor checked first and each appended line before any is written. */
+export function feedDoorOver(layer: FeedLayer): FeedDoorShape {
+  const door = doorOf<FeedLayer, string>(layer);
+  return {
+    lines: {
+      ...door.lines,
+      read: (after) =>
+        Effect.gen(function* () {
+          yield* cursorChecked(after);
+          const refusal = yield* door.lines.cursorRefusal(after);
+          if (refusal !== undefined) return yield* Effect.fail(new Invalid({ message: refusal }));
+          return yield* door.lines.read(after);
+        }),
+      append: (lines) => Effect.andThen(linesChecked(lines), door.lines.append(lines)),
+    },
+  };
+}
 
 const statOf = (file: string): fs.Stats | undefined => fs.statSync(file, { throwIfNoEntry: false });
 
@@ -104,23 +182,154 @@ function byteAt(file: string, at: number): number {
   }
 }
 
-/**
- * Why a cursor cannot be read from, in words that say what to do — or undefined when it can: 0, or the byte just after a line, at most the
- * feed's size. A cursor inside a line would have the reader take the rest of that line for one; one past the end was handed out by a feed
- * that has been truncated or replaced, and nothing after it means what the reader thinks.
- */
-function cursorRefusalAt(file: string, after: number): string | undefined {
-  if (!Number.isSafeInteger(after) || after < 0)
-    return `a feed cursor is a whole number of bytes — 0, or one a \`cursor:\` line printed — not ${after}`;
-  const size = statOf(file)?.size ?? 0;
-  if (after > size) {
-    return `cursor ${after} is past the end of the feed (${size} bytes, ${file}): the feed it came from was truncated or replaced since — read it again from the start: nemia watch --once 0`;
+/** Why a cursor cannot be read from the file — or undefined when it can (`cursorRefusalOf`). */
+const cursorRefusalAt = (file: string, after: number): string | undefined =>
+  cursorRefusalOf(after, statOf(file)?.size ?? 0, (at) => byteAt(file, at), file);
+
+/** The file's complete lines from `after` to `size` (`linesIn`). */
+function linesFrom(file: string, after: number, size: number): FeedRead {
+  if (after >= size) return { lines: [], ends: [], cursor: after };
+  const buf = Buffer.alloc(size - after);
+  const fd = fs.openSync(file, 'r');
+  try {
+    countRead(fs.readSync(fd, buf, 0, buf.length, after));
+  } finally {
+    fs.closeSync(fd);
   }
-  if (after > 0 && byteAt(file, after - 1) !== 0x0a) {
-    return `cursor ${after} falls inside a line of the feed, not after one: a cursor is 0 or the number a \`cursor:\` line printed — nemia watch --once 0 reads from the start`;
-  }
-  return undefined;
+  return linesIn(buf, after);
 }
+
+/** `lines` appended to the file in one write (`appendedText`): the file's size before and after, and the newline written first, if any. */
+function appendLines(file: string, lines: readonly FeedLine[]): FeedAppended {
+  const before = statOf(file)?.size ?? 0;
+  if (!lines.length) return { lines: [...lines], before, after: before, leading: '' };
+  const { text, leading } = appendedText(lines, before > 0 ? byteAt(file, before - 1) : undefined);
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.appendFileSync(file, text);
+  return { lines: [...lines], before, after: statOf(file)?.size ?? 0, leading };
+}
+
+/** The Feed door's files layer over the store `root`'s feed: its end by the file's size and inode. */
+export function feedFiles(root: string): FeedLayer {
+  const file = feedAt(root);
+  return {
+    lines: {
+      end: () => {
+        const stat = statOf(file);
+        return stat ? { cursor: stat.size, generation: stat.ino } : null;
+      },
+      read: (after) => linesFrom(file, after, statOf(file)?.size ?? 0),
+      cursorRefusal: (after) => cursorRefusalAt(file, after),
+      append: (lines) => appendLines(file, lines),
+    },
+  };
+}
+
+/**
+ * The Feed door, as the service a program yields: a reference whose default is rooted (`rootedDoor`) — the door over the files at the
+ * store's root the program is given, refused `Invalid` where it was given none — and a test gives `feedDoorMemory()` with no root at all.
+ */
+export const FeedDoor = Context.Reference<FeedDoorShape>('agent-orchestrator/FeedDoor', {
+  defaultValue: () => rootedDoor((root) => feedDoorOver(feedFiles(root)), 'Feed door'),
+});
+
+/** The Feed door over the files of the store `root`, as a layer: for a program that names its root by the door, not by `StoreRoot`. */
+export const feedDoorFiles = (root: string): Layer.Layer<never> => Layer.succeed(FeedDoor)(feedDoorOver(feedFiles(root)));
+
+/**
+ * One pass's words written on `door` where they are not what the feed said of them last: the lines written, and where their bytes went
+ * (`FeedAppended`). `now` is every run the pass judged: one the feed still names that is not in it is gone, and gets its `removed` — but
+ * for one of `unjudged`, which the pass read and could not judge (`feedChanges`). `pause` is the store's pause as the pass read it
+ * (`readPause`), whose put and lift the feed says once each; a caller that read none gives none, and nothing is said of the store.
+ *
+ * `memo` is the fold its caller has read so far, which this moves: it is read on to the end of the feed first — the lines the caller wrote
+ * last pass, and any another wrote — and read again from the start when it does not fit the feed: another generation (a file cut and put
+ * back), or a cursor the feed has no line boundary at. It is not moved past what this call writes: the next call reads those lines back,
+ * so what it compares against is always what the feed says.
+ */
+export const feedPass = (
+  door: FeedDoorShape,
+  memo: FeedMemo,
+  now: ReadonlyMap<string, FeedWords>,
+  {
+    at = new Date().toISOString(),
+    unjudged = new Set<string>(),
+    pause,
+  }: { at?: string; unjudged?: ReadonlySet<string>; pause?: FeedPause } = {},
+): Effect.Effect<FeedAppended, Refusal> =>
+  Effect.gen(function* () {
+    const end = yield* door.lines.end();
+    if (
+      (memo.generation !== undefined && end?.generation !== memo.generation) ||
+      (yield* door.lines.cursorRefusal(memo.cursor)) !== undefined
+    )
+      Object.assign(memo, freshMemo());
+    const read = yield* door.lines.read(memo.cursor);
+    foldFeed(memo.fold, read.lines);
+    memo.cursor = read.cursor;
+    memo.generation = end?.generation;
+    const lines = feedChanges(memo.fold, now, at, unjudged, pause);
+    const size = end?.cursor ?? 0;
+    if (!lines.length) return { lines, before: size, after: size, leading: '' };
+    const appended = yield* door.lines.append(lines);
+    if (memo.generation === undefined) memo.generation = (yield* door.lines.end())?.generation;
+    return appended;
+  });
+
+/** The door over the module's root, for the module spellings. */
+const moduleDoor = (): FeedDoorShape => feedDoorOver(feedFiles(moduleRoot()));
+
+/** `effect` run where it is called: what it succeeds with, or the refusal it failed with thrown, or the defect it died of. */
+function ran<A>(effect: Effect.Effect<A, Refusal>): A {
+  const exit = Effect.runSyncExit(effect);
+  if (Exit.isSuccess(exit)) return exit.value;
+  throw Cause.squash(exit.cause);
+}
+
+/**
+ * Write what the pass judged of every run in the store, where it is not what the feed said of it last (`feedPass`), on the module's feed:
+ * the lines written, and where their bytes went (`FeedAppended`). `memo` is the fold the caller has read so far, a fresh one where it
+ * gives none — a caller that keeps none reads the whole feed, and writes what a restarted daemon would.
+ */
+export const recordFeed = (
+  now: ReadonlyMap<string, FeedWords>,
+  { memo = freshMemo(), ...pass }: { at?: string; memo?: FeedMemo; unjudged?: ReadonlySet<string>; pause?: FeedPause } = {},
+): FeedAppended => within('act', () => ran(feedPass(moduleDoor(), memo, now, pass)));
+
+/**
+ * Appends a daemon's line (`startedLine`) to the feed, after a newline where its last line was left unended, as `recordFeed` appends; no
+ * fold is moved, since a daemon's line is no run's. Answers where its bytes went (`FeedAppended`).
+ */
+export const recordDaemonLine = (line: DaemonLine): FeedAppended => within('act', () => ran(moduleDoor().lines.append([line])));
+
+/** A fold of nothing, for a test that plays a restarted daemon. */
+export const freshFeedMemo = freshMemo;
+
+/**
+ * The feed's lines after `after`, and the cursor to read on from: a cursor inside a line, or past the end, is refused by name (exit 2).
+ */
+export const readFeed = (after = 0): { lines: FeedLine[]; cursor: number } => {
+  const { lines, cursor } = ran(moduleDoor().lines.read(after));
+  return { lines, cursor };
+};
+
+/** Why `after` cannot be read from — or undefined when it can (`cursorRefusalOf`). */
+export const feedCursorRefusal = (after: number): string | undefined => ran(moduleDoor().lines.cursorRefusal(after));
+
+/** The feed's size in bytes, 0 for a feed not written yet: what a live reader compares its cursor with before it reads. */
+export const feedSize = (): number => ran(moduleDoor().lines.end())?.cursor ?? 0;
+
+/**
+ * The lines after `after`, each with the byte just after it (`ends`), and the cursor to read on from: what a live reader hands on. A
+ * cursor that is not the start of a line, or is past the end, is refused by name (exit 2).
+ */
+export const readFeedEnds = (after: number): FeedRead => ran(moduleDoor().lines.read(after));
+
+/**
+ * Follow the feed from `from` until `stop()` (`watchFeedFile`), each line with the cursor just after it: refused before anything is watched
+ * when the cursor cannot be read from.
+ */
+export const watchFeed = (opts: Parameters<typeof watchFeedFile>[1]): { stop(): void } => watchFeedFile(feedFile(), opts);
 
 /** What every key a line does not name is kept as, so a line a newer `nemia` wrote keeps it through a read and a write back. */
 const Rest = [Schema.Record(Schema.String, Schema.Unknown)] as const;
@@ -217,87 +426,13 @@ function parseLine(text: string): FeedLine[] {
   }
 }
 
-/**
- * Every complete line from `after` to `size`, each with the byte just after its newline (`ends`, one for each of `lines`), and the byte
- * after the last complete line: never past a line with no newline yet. The ends are counted in bytes, on the buffer, not in characters
- * of the text — a note with a dash in it is three bytes of one character. A line nobody can read keeps no end, and moves the cursor all
- * the same.
- */
-function linesFrom(file: string, after: number, size: number): { lines: FeedLine[]; ends: number[]; cursor: number } {
-  if (after >= size) return { lines: [], ends: [], cursor: after };
-  const buf = Buffer.alloc(size - after);
-  const fd = fs.openSync(file, 'r');
-  try {
-    countRead(fs.readSync(fd, buf, 0, buf.length, after));
-  } finally {
-    fs.closeSync(fd);
-  }
-  const lines: FeedLine[] = [];
-  const ends: number[] = [];
-  let start = 0;
-  for (let nl = buf.indexOf(0x0a); nl >= 0; start = nl + 1, nl = buf.indexOf(0x0a, start)) {
-    for (const line of parseLine(buf.subarray(start, nl).toString('utf8'))) {
-      lines.push(line);
-      ends.push(after + nl + 1);
-    }
-  }
-  return { lines, ends, cursor: after + start };
-}
-
 const refused = (message: string): Invalid => new Invalid({ message });
 
-/**
- * The lines written since `after`, and the cursor to read on from: the byte after the last complete line. A feed not written yet reads as
- * none, at 0. A cursor that is not the start of a line, or is past the end, is refused by name (exit 2).
- */
-function readFeedFile(file: string, after = 0): { lines: FeedLine[]; cursor: number } {
-  const { lines, cursor } = readEnds(file, after);
-  return { lines, cursor };
-}
-
-/** `readFeedFile`, with the byte after each line (`linesFrom`'s `ends`): what a watch hands on with each line. */
-function readEnds(file: string, after: number): { lines: FeedLine[]; ends: number[]; cursor: number } {
+/** The file's lines after `after`, its cursor refused by name first (exit 2): what a watch given no `onCut` reads by. */
+function readEnds(file: string, after: number): FeedRead {
   const refusal = cursorRefusalAt(file, after);
   if (refusal) throw refused(refusal);
   return linesFrom(file, after, statOf(file)?.size ?? 0);
-}
-
-/**
- * The pass's words written where they changed (`feedChanges`), in one append: the lines written, the file's size before and after the
- * append, and the newline written before them, if any (`FeedAppended`).
- *
- * `memo` is the fold this process has read so far. It is read on to the end of the feed first — the lines this process wrote last pass,
- * and any another wrote — and read again from the start when it does not fit the file: another file, or a cursor the file has no line
- * boundary at. It is not moved past what this call writes: the next call reads those lines back, so what it compares against is
- * always what the feed says.
- *
- * A line with no newline at the end of the feed is one a writer died in: the append starts with a newline, so that line ends as the one
- * nobody can read (`parseLine`) and the lines after it are whole.
- */
-function recordFeedFile(
-  file: string,
-  now: ReadonlyMap<string, FeedWords>,
-  at: string,
-  memo: FeedMemo,
-  unjudged: ReadonlySet<string>,
-  pause: FeedPause | undefined,
-): FeedAppended {
-  const stat = statOf(file);
-  const size = stat?.size ?? 0;
-  if ((memo.ino !== undefined && stat?.ino !== memo.ino) || cursorRefusalAt(file, memo.cursor) !== undefined)
-    Object.assign(memo, freshMemo());
-  const read = linesFrom(file, memo.cursor, size);
-  foldFeed(memo.fold, read.lines);
-  memo.cursor = read.cursor;
-  memo.ino = stat?.ino;
-  const lines = feedChanges(memo.fold, now, at, unjudged, pause);
-  if (!lines.length) return { lines, before: size, after: size, leading: '' };
-  const leading = read.cursor < size ? '\n' : '';
-  fs.mkdirSync(path.dirname(file), { recursive: true });
-  fs.appendFileSync(file, `${leading}${lines.map((l) => JSON.stringify(l)).join('\n')}\n`);
-  const after = statOf(file);
-  if (memo.ino === undefined) memo.ino = after?.ino;
-  return { lines, before: size, after: after?.size ?? 0, leading };
 }
 
 /**

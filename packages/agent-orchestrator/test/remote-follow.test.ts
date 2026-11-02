@@ -58,6 +58,7 @@ function runtimeOf(t: TestContext, e: Engine) {
       EngineService.layer(e),
       stand().layer,
       Layer.succeed(References.MinimumLogLevel, 'Warn'),
+      storeRootLayer(process.env),
     ),
   );
   t.after(() => rt.dispose());

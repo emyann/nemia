@@ -202,6 +202,7 @@ export type FactoryServers = Holds<
 >;
 export type BuiltinServer = Holds<Same<Board.BuiltinServer, servers.FactoryServersRead['builtin'][number]>>;
 
+export type RunLines = Holds<Same<Board.RunLines, runs.RunLinesAnswer>>;
 export type RunGraph = Holds<Same<Board.RunGraph, runs.RunPage['graph']>>;
 export type GraphEdge = Holds<Same<Board.GraphEdge, runs.RunPage['graph']['edges'][number]>>;
 

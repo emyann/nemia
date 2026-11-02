@@ -38,16 +38,16 @@ export type RunListing = RunSummary & { workflowPage: WorkflowPageAddress | null
 export type RunAnswer = RunObject.Run;
 
 /**
- * A run as its page answers it, under `GET /api/runs/:id?view=page`: in full (`RunDetail`), and the address of its workflow's page, null
- * where the board pages none. The board's until it reads the run object and its sub-resources.
- */
-/**
  * The lines read beside the run object (`GET /api/runs/:runId/lines`): the command lines a person types about the run and each of its
  * steps (`runLines`), where it came from, and the address of its workflow's page (`workflowPageOf`), as the list gives it. Constant for a
  * run, off its record alone: the board reads it once and never again on the feed.
  */
 export type RunLinesAnswer = RunLines & { workflowPage: WorkflowPageAddress | null };
 
+/**
+ * A run as its page answers it, under `GET /api/runs/:id?view=page`: in full (`RunDetail`), and the address of its workflow's page, null
+ * where the board pages none. The board's until it reads the run object and its sub-resources.
+ */
 export type RunPage = RunDetail & { workflowPage: WorkflowPageAddress | null };
 
 /** What the list adds to a row: the address of its workflow's page, null where the board pages none. */

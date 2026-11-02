@@ -21,6 +21,7 @@ import { eachTest, runGiven, runOver } from './placed.ts';
 const ROOT = scratch('wf-agents-copy-');
 process.env.WF_ROOT = ROOT;
 process.env.WF_VERIFY_REST = '1';
+const { addFactoryAt } = await import('../src/factory/factory.store.ts');
 const { addFactory, attachWorkflow, hireAgent, runWith: runEngine, startRun, TABLE } = await import('../src/runner.ts');
 const { engineOf } = await import('../src/runtime-client.ts');
 const stand = eachTest(testPlace);
@@ -312,7 +313,7 @@ test('nemia agents sources lists each repository the store knows, workflows/agen
   fs.cpSync(FIXTURE, repo, { recursive: true });
   const unknown = scratch('wf-agents-copy-unknown-');
   fs.cpSync(FIXTURE, unknown, { recursive: true });
-  addFactory({ name: 'sources', repos: [repo] });
+  addFactoryAt(home, { name: 'sources', repos: [repo] });
   const team = teamCopy();
   await copy({ file: path.join(team, 'agents', 'implementer.md') }, home);
   const named = path.join(team, 'agents');

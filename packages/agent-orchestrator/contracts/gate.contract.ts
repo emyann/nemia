@@ -86,6 +86,26 @@ const approvalRefusalSpec = spec<
         );
       },
     },
+    takenAtItsGate: {
+      description:
+        'An approval of a step waiting at its gate, on a run neither cancelled nor pruned, is taken: but where its words are blank, the run is held, the try after it is asked for, or it is an ending not yet filed whose work is sent back or already on the base',
+      condition: ({ input: [steps, run, name, message, p, c, a, v, asks, s, standings], output }) => {
+        const step = steps.find((x) => x.name === name);
+        if (step === undefined || run.cancelledAt || run.pruned) return true;
+        if (message !== undefined && message.trim() === '') return true;
+        if (run.hold) return true;
+        const asked = asks ?? [];
+        if (asked.some((x) => x.step === name && x.try === tryNow(run, name) + 1)) return true;
+        const on = standings ?? [];
+        const unfiledEnding = step.workspace === 'base' && gated(step, run) && !run.steps[name]?.taskId;
+        if (unfiledEnding && asked.some((x) => step.after.includes(x.step))) return true;
+        if (unfiledEnding && on.length > 0 && on.every((b) => b.where === 'on')) return true;
+        const waits =
+          standing(step, run, p, c ?? (() => undefined), a ?? (() => false), steps, s ?? (() => undefined), v).status ===
+          'awaiting approval';
+        return !waits || output === null;
+      },
+    },
     heldOpenForIt: {
       description: "What nemia approve accepts, the step's task is held open for: the approval reaches the session that waits",
       condition: ({ input: [steps, run, name, , p, c, a, v, , s], output }) => {

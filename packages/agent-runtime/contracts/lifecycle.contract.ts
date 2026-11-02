@@ -4,7 +4,7 @@
  * rather than as a second copy of the code. Read in place.
  */
 import { type Implementation, spec } from '@emyann/tsverify';
-import type { State } from '../src/core/domain.ts';
+import { type State, waitsForInput } from '../src/core/domain.ts';
 import type { LifecycleState } from '../src/core/lifecycle.ts';
 
 const lifecycleSpec = spec<(state: State) => LifecycleState>({
@@ -61,6 +61,29 @@ const lifecycleSpec = spec<(state: State) => LifecycleState>({
       description: 'Submitted: nothing has been attempted in the current turn',
       condition: ({ input: [state], output }) =>
         output !== 'submitted' || !state.attempts.some((a) => (a.turn ?? 0) === state.inputs.length),
+    },
+    inputRequiredOnlyWhenAsked: {
+      description: "Input required only of a task whose turn ended in success and that waits on a person's answer",
+      condition: ({ input: [state], output }) => output !== 'input-required' || waitsForInput(state),
+    },
+    aPersonIsWaitedOn: {
+      description: "A task waiting on a person's answer, not asked to stop, is input-required",
+      condition: ({ input: [state], output }) => !waitsForInput(state) || state.stopRequested || output === 'input-required',
+    },
+    aClosedTaskEnds: {
+      description: 'A task held open and closed by a person, with nothing in flight and no stop asked, is ending',
+      condition: ({ input: [state], output }) => {
+        const last = state.attempts.at(-1);
+        if (state.settled !== null || state.stopRequested || (last !== undefined && last.ended === null)) return true;
+        return !(state.holdOpen === true && state.closed) || output === 'ending';
+      },
+    },
+    endingOnlyOnceAttemptedOrClosed: {
+      description: 'Ending only once its current turn has an attempt, or a person closed it',
+      condition: ({ input: [state], output }) =>
+        output !== 'ending' ||
+        (state.holdOpen === true && state.closed) ||
+        state.attempts.some((a) => (a.turn ?? 0) === state.inputs.length),
     },
   },
 });

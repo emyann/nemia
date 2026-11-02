@@ -72,6 +72,14 @@ export const entryRemoved = assume(withoutEntry, {
 });
 
 const wiringRefusalSpec = spec<(factory: Factory, change: WiringChange) => WiringRefused | null>({
+  /**
+   * Whether a hire into a workflow the factory offers is refused turns on whether its step and agent are names
+   * (`hireRefusal`), declared not pure (`hireNamed`, `pure: false`), so a law that asks it cannot say what the code was told.
+   * It cannot be declared pure: the verifier refuses `pure: true`, since it calls `stepNameRefusal`, which calls
+   * `new TextEncoder().encode`, a method the purity check cannot see into. Left to the code, and held by `hireRefusal`'s tests
+   * (`src/factory/factory.test.ts`). What a refusal is refused as is said by the laws below.
+   */
+  open: ['output'],
   ensures: {
     hireOnlyIntoOffered: {
       description: 'A hire into a step of a workflow the factory does not offer is refused',
@@ -127,6 +135,23 @@ const wiringRefusalSpec = spec<(factory: Factory, change: WiringChange) => Wirin
         !accepted(factory, change) ||
         output === null,
     },
+    aBadNameIsInvalid: {
+      description: 'A change of a workflow whose name is not one is refused as Invalid, whatever the factory holds',
+      condition: ({ input: [, change], output }) =>
+        change.verb === 'hire' ||
+        change.verb === 'fire' ||
+        workflowNameRefusal(change.workflow) === undefined ||
+        output?.kind === 'Invalid',
+    },
+    missingOnlyOfWhatIsNotThere: {
+      description:
+        'Missing only where what the change names is not there: a step it hires no one into, a workflow it does not offer or schedule',
+      condition: ({ input: [factory, change], output }) =>
+        output?.kind !== 'Missing' ||
+        (change.verb === 'fire' && !Object.hasOwn(factory.hires, change.step)) ||
+        (change.verb === 'detach' && !factory.workflows.includes(change.workflow)) ||
+        (change.verb === 'unschedule' && !Object.hasOwn(factory.schedules, change.workflow)),
+    },
   },
 });
 export type WiringRefusal = Implementation<typeof wiringRefusalSpec>;
@@ -137,6 +162,12 @@ const rewiredSpec = spec<(factory: Factory, change: WiringChange) => Factory>({
    * the model's to refuse otherwise: the Factory door decodes every factory it writes through `Factory` (`factoryChecked`).
    */
   requires: ({ input: [factory, change] }) => accepted(factory, change),
+  /**
+   * A wiring change copies the factory's instruction, revisions, template and tree as they were, by a spread, and the verifier
+   * reads no optional field through one (tsverify's `docs/reads.md`: "a field read through a spread, where the spread value may
+   * lack it"), so no law can say they are kept: left to the code, which names none of them, until the verifier reads one.
+   */
+  open: ['output.instruction', 'output.revisions', 'output.template', 'output.tree'],
   ensures: {
     detachWithdraws: {
       description: 'After a detach the factory no longer offers the workflow',
@@ -162,6 +193,10 @@ const rewiredSpec = spec<(factory: Factory, change: WiringChange) => Factory>({
     hireNames: {
       description: 'After a hire the step names the hired agent',
       condition: ({ input: [, change], output }) => change.verb !== 'hire' || output.hires[change.step] === change.agent,
+    },
+    keepsItsName: {
+      description: 'A wiring change never renames the factory',
+      condition: ({ input: [factory], output }) => output.name === factory.name,
     },
     attachOffers: {
       description: 'After an attach the factory offers the workflow',

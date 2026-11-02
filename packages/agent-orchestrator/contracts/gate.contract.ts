@@ -204,6 +204,15 @@ const holdsOpenSpec = spec<
       condition: ({ input: [step, run, p, c, a, steps, s, v], output }) =>
         !output || gated(step, run) || standing(step, run, p, c, a, steps, s, v).own === 'blocked',
     },
+    aGateHoldsOnlyWhileAPersonIsAsked: {
+      description:
+        'A gated step is held open only while it signed off blocked, its check runs, or it awaits approval: anything else closes it',
+      condition: ({ input: [step, run, p, c, a, steps, s, v], output }) => {
+        if (!output || !gated(step, run)) return true;
+        const stands = standing(step, run, p, c, a, steps, s, v);
+        return stands.own === 'blocked' || stands.own === 'checking' || stands.status === 'awaiting approval';
+      },
+    },
   },
 });
 /** The function's type, which the code takes: it then imports nothing of tsverify. */

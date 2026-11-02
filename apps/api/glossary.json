@@ -76,6 +76,10 @@
       "type": "MetricRead"
     },
     {
+      "term": "OpenAPI document",
+      "meaning": "the api's description of the run object and its sub-resources' routes in OpenAPI 3.1, generated from the package's Schema and served on `GET /openapi/v3/nemia/v1`, from which a client's types are generated."
+    },
+    {
       "term": "Phase / reason / message",
       "meaning": "what each step and each try carries at the api: its `phase` and its `reason`, the codes a reader groups and compares, and its `message`, the sentence a person reads and nothing compares.",
       "type": "RunDetail",

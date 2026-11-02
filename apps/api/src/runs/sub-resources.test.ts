@@ -2,7 +2,7 @@
  * The run object's sub-resources on their routes (`tries`, `try`, `closeout`, `told`): a step's tries, one try, its closeout, and what it
  * was told, each the package's entry with its path bound to its arguments; a step or a try the run does not have is a 404.
  *
- * On the stand-ins: the runtime's test engine, its task filed and settled by hand, and the test place, under the run record this file seeds.
+ * On the stand-ins: the runtime's test engine, its task filed and settled by hand, and the test place, under the record this file seeds.
  */
 import { root } from '../../test/harness.ts';
 import { test } from 'node:test';

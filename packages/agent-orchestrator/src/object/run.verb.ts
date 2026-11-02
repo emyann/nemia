@@ -5,7 +5,8 @@
  */
 import { Effect } from 'effect';
 import { PlaceService } from '../place/place.store.ts';
-import { runStore } from '../record/files.store.ts';
+import { RunDoor } from '../runs/runs.store.ts';
+import { RunId } from '../record/record.model.ts';
 import { placeOf, type Run } from '../record/record.ts';
 import { Conflict, Missing } from '../refusal/refusal.ts';
 import { stepRaise } from '../retry/index.ts';
@@ -15,7 +16,6 @@ import { bare, type Filings } from '../summary/reads.verb.ts';
 import { stepSaid } from '../summary/judged.verb.ts';
 import { judgedFields } from '../summary/summary.verb.ts';
 import { runLabels } from '../telemetry/telemetry.ts';
-import { tried } from '../runtime-client.ts';
 import type { StepCloseout, StepTry, StepUnreadable } from '../resource/tries.verb.ts';
 import { toldOf } from '../resource/told.verb.ts';
 import type { Run as RunObject, RunSpec, RunStepStatus, TryShort } from './run.model.ts';
@@ -106,7 +106,7 @@ export const runObject = Effect.fn('runObject')(function* (run: Run, { filings }
 
 /** The run `runId`'s record and its one read, its step `step` named: refused where the run is not judged, or has no such step. */
 const stepRead = Effect.fnUntraced(function* (runId: string, step: string) {
-  const run = yield* tried(() => runStore.runs.read(runId));
+  const run = yield* (yield* RunDoor).runs.read(RunId.read(runId));
   const at = yield* runReading(run, { filed: new Map(), cursor: 0 });
   if ('unjudged' in at)
     return yield* Effect.fail(

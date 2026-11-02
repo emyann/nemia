@@ -30,8 +30,11 @@ import { names } from './assessed.ts';
 const ROOT = scratch('wf-subscription-wakes-');
 process.env.WF_ROOT = ROOT;
 const { SUBSCRIPTION_DIGEST_CHECKS, deliver } = await import('../src/subscription/deliver.verb.ts');
-const { deliveryFile, dropSubscription, putSubscription, readDelivery, subscriptionFile, writeDelivery, listSubscriptions } =
+const { deliveryFileAt, dropSubscription, putSubscription, readDelivery, subscriptionFileAt, writeDelivery, listSubscriptions } =
   await import('../src/subscription/subscription.store.ts');
+const deliveryFile = (name: string) => deliveryFileAt(ROOT, name);
+const subscriptionFile = (name: string) => subscriptionFileAt(ROOT, name);
+const { StoreRoot } = await import('../src/config/root.store.ts');
 const { DEFAULT_SELECTORS } = await import('../src/subscription/subscription.ts');
 const { DAEMON_STARTED, isRunLine, upgraded } = await import('../src/feed/feed.ts');
 const { feedFile, feedSize, readFeed } = await import('../src/feed/feed.store.ts');
@@ -143,7 +146,12 @@ const delivering = (
   let fiber: Fiber.Fiber<never> | undefined;
   let stopped = 0;
   const start = () => {
-    const program = over(e)(deliver()).pipe(Effect.provide(clock.layer), Effect.provide(Logger.layer([])), Effect.provide(runs));
+    const program = over(e)(deliver()).pipe(
+      Effect.provide(clock.layer),
+      Effect.provide(Logger.layer([])),
+      Effect.provide(runs),
+      Effect.provideService(StoreRoot, ROOT),
+    );
     fiber = rt ? rt.runFork(program) : Effect.runFork(program);
   };
   const stop = async () => {

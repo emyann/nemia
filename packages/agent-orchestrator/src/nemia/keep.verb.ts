@@ -8,7 +8,8 @@
  * written down (`recordAsks`) and the person's answers to them carried to her (`answersDue`). Level-triggered: it carries nothing between
  * beats, so a restart owes what the files and the engine say. A task stopped from outside is never filed again.
  *
- * A controller: it reaches the runtime through the client (`EngineService`), run by `up` (`daemon/up.verb.ts`) beside the deliverer.
+ * A controller: it reaches the runtime through the client (`EngineService`), run by `up` (`daemon/up.verb.ts`) beside the deliverer, and
+ * her subscription through the Subscription door (`SubscriptionDoor`), at the store root `up` is given.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -19,7 +20,9 @@ import { factoryMounts } from '../factory/factory.ts';
 import type { Mount } from '../record/record.ts';
 import { readFactories } from '../factory/factory.store.ts';
 import { feedSize } from '../feed/feed.store.ts';
-import { dropSubscription, listSubscriptions, putSubscription } from '../subscription/subscription.store.ts';
+import { SubscriptionDoor } from '../subscription/subscription.store.ts';
+import { SubscriptionName } from '../feed/feed.model.ts';
+import type { Refusal } from '../refusal/refusal.ts';
 import { EngineService, asked, over, trustedFolder, type Engine } from '../runtime-client.ts';
 import { answersDue, answersOwed, closesOwed, sayOutbox, outboxOwed, recordAsks } from '../chat/say.verb.ts';
 import { upOf } from '../chat/chat.ts';
@@ -168,22 +171,23 @@ const sayCustom = (e: Engine, id: string) =>
   });
 
 /** Each act the keeper owes on her task `id`: a stop or a drop already done by another is no failure. */
-const ACTS: Record<NemiaAct, (e: Engine, id: string) => Effect.Effect<void>> = {
+const ACTS: Record<NemiaAct, (e: Engine, id: string) => Effect.Effect<void, Refusal>> = {
   file: fileHer,
   stop: (e, id) => asked('stop', e.stop(id).pipe(Effect.catchTag('StopRefused', () => Effect.void))),
   subscribe: (_e, id) =>
-    Effect.sync(() =>
-      putSubscription(NEMIA_SUBSCRIPTION, {
+    Effect.gen(function* () {
+      yield* (yield* SubscriptionDoor).subscriptions.put(HERS, {
         task: id,
         selectors: [...NEMIA_SELECTORS],
         digestEvery: NEMIA_DIGEST_EVERY,
         from: feedSize(),
         scope: { atLeast: NEMIA_FLOOR },
-      }),
-    ),
+      });
+    }),
   drop: () =>
-    Effect.sync(() => {
-      if (listSubscriptions().some((s) => s.name === NEMIA_SUBSCRIPTION)) dropSubscription(NEMIA_SUBSCRIPTION);
+    Effect.gen(function* () {
+      const door = yield* SubscriptionDoor;
+      if ((yield* door.subscriptions.list()).listed.some((s) => s.name === NEMIA_SUBSCRIPTION)) yield* door.subscriptions.drop(HERS);
     }),
   sayCustom,
   sayOutbox: (e, id) => sayOutbox(id, nemiaDir()).pipe(over(e), Effect.asVoid),
@@ -212,11 +216,18 @@ const herTask = (e: Engine, id: string | undefined) =>
     };
   });
 
-/** Her subscription as the keeper reads it: the task it tells and whether it carries her floor, or undefined where there is none. */
-const herSubscription = (): HerSubscription | undefined => {
-  const sub = listSubscriptions().find((s) => s.name === NEMIA_SUBSCRIPTION)?.subscription;
-  return sub === undefined ? undefined : { task: sub.task, scoped: sub.scope?.atLeast === NEMIA_FLOOR };
-};
+/** Her subscription's name, as the Subscription door takes it. */
+const HERS = SubscriptionName.read(NEMIA_SUBSCRIPTION);
+
+/**
+ * Her subscription as the keeper reads it through the door: the task it tells and whether it carries her floor, or undefined where
+ * there is none. A file left out of the listing is the deliverer's to say.
+ */
+const herSubscription = Effect.fn('herSubscription')(function* () {
+  const { listed } = yield* (yield* SubscriptionDoor).subscriptions.list();
+  const sub = listed.find((s) => s.name === NEMIA_SUBSCRIPTION)?.subscription;
+  return sub === undefined ? undefined : ({ task: sub.task, scoped: sub.scope?.atLeast === NEMIA_FLOOR } satisfies HerSubscription);
+});
 
 /**
  * One beat: the levels, her task, her subscription and her folder's trust read (`trustedFolder`, so no task is filed where her harness
@@ -230,7 +241,7 @@ export const keepOnce = Effect.fn('keepOnce')(function* () {
   const { task, up, asking, closing } = yield* herTask(e, id);
   const trusted = trustedFolder(DEFAULT_HARNESS, nemiaDir());
   const keeping = { above, ...(id === undefined ? {} : { task: id }), ...(trusted === undefined ? {} : { trusted }) };
-  const subscribed = herSubscription();
+  const subscribed = yield* herSubscription();
   const kept = nemiaState(keeping, task, subscribed) === 'kept';
   const stale = kept && customChanged(readTold(), nemiaCustom(), filedPrompt());
   const owed = nemiaDue(

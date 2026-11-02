@@ -13,7 +13,9 @@
  * stopped before its cursor was written. The file is stamped with the subscription it is for, so one put again under the same name starts
  * from its own `from`. A `say` that fails is said again whole, for ever, on a capped exponential backoff, each failure a warning; the feed
  * read meanwhile waits for the next message. A feed cut under the cursor is read again from its start. Each beat the subscriptions are
- * read again: one gone is stopped and its deliverer's file dropped, one new or changed is started (`FiberMap`).
+ * read again: one gone is stopped and its deliverer's file dropped, one new or changed is started (`FiberMap`). Each is read and written
+ * through the Subscription door (`SubscriptionDoor`), and a file of it that does not read is a warning said once for as long as the
+ * deliverer runs.
  *
  * A scoped subscription carries only the lines of runs whose factory is at its floor or above (`atLeast`), read as each line comes: the
  * run's factory once per run, frozen at its start, and the factory's level each time, so a raise counts from its start to its end. A
@@ -29,7 +31,8 @@ import { followFeed, type Followed } from '../feed/feed.verb.ts';
 import { EngineService } from '../runtime-client.ts';
 import { atLeast } from '../level/level.ts';
 import { levelOfFactory, runFactory } from '../level/levels.verb.ts';
-import { dropDelivery, listDeliveries, listSubscriptions, readDelivery, writeDelivery } from './subscription.store.ts';
+import { SubscriptionDoor } from './subscription.store.ts';
+import { SubscriptionName } from '../feed/feed.model.ts';
 import { digestDue, digestOf, readDelivered, resumedAt, type Delivery, type Subscription } from './subscription.ts';
 import { parseSelectors, type Selectors } from '../watch/selector.ts';
 
@@ -107,11 +110,34 @@ type Delivering = {
   factories: Map<string, string>;
 };
 
-/** `next` kept: in memory, and on disk stamped with the subscription it is for. */
+/**
+ * `next` kept: in memory, and through the door stamped with the subscription it is for. A write the door refuses is the deliverer's
+ * own defect: its fiber dies, and the next read of the subscriptions starts it again from what was kept.
+ */
 const keep = (d: Delivering, next: Delivery): Effect.Effect<void> =>
   Ref.set(d.state, next).pipe(
-    Effect.andThen(Effect.sync(() => writeDelivery(d.name, { ...next, of: { task: d.sub.task, from: d.sub.from } }))),
+    Effect.andThen(
+      Effect.gen(function* () {
+        const door = yield* SubscriptionDoor;
+        yield* door.deliveries.write(SubscriptionName.read(d.name), { ...next, of: { task: d.sub.task, from: d.sub.from } });
+      }),
+    ),
+    Effect.orDie,
   );
+
+/** Each line said once, for as long as the deliverer runs: a file that does not read is read again every beat. */
+type SaidOnce = (line: string) => Effect.Effect<void>;
+
+/** A `SaidOnce` over a set of its own: each line a warning the first time. */
+const saidOnce = (): SaidOnce => {
+  const said = new Set<string>();
+  return (line) =>
+    Effect.suspend(() => {
+      if (said.has(line)) return Effect.void;
+      said.add(line);
+      return Effect.logWarning(line);
+    });
+};
 
 /** Whether the subscription carries a line of the run `run`: unscoped, always; scoped, where the run's factory is at its floor now. */
 const carries = (d: Delivering, run: string): Effect.Effect<boolean> => {
@@ -196,9 +222,11 @@ const reading = (d: Delivering): Effect.Effect<never, never, EngineService> =>
  * The subscription `name` delivered, from where its deliverer's file says it was if the file was written for it, else from its `from`,
  * until interrupted.
  */
-const delivering = (name: string, sub: Subscription, o: DeliverOptions): Effect.Effect<never, never, EngineService> =>
+const delivering = (name: string, sub: Subscription, o: DeliverOptions, say: SaidOnce): Effect.Effect<never, never, EngineService> =>
   Effect.gen(function* () {
-    const state = yield* Ref.make<Delivery>(resumedAt(readDelivery(name), sub));
+    const read = yield* (yield* SubscriptionDoor).deliveries.read(SubscriptionName.read(name)).pipe(Effect.orDie);
+    if (read !== null && 'unread' in read) yield* say(read.unread);
+    const state = yield* Ref.make<Delivery>(resumedAt(read !== null && 'kept' in read ? read.kept : undefined, sub));
     const d: Delivering = {
       name,
       sub,
@@ -217,21 +245,24 @@ const delivering = (name: string, sub: Subscription, o: DeliverOptions): Effect.
  * One read of the subscriptions: each gone stopped, then each deliverer's file whose subscription is gone dropped, then each new or changed
  * started, a changed one's deliverer stopped first. `started` holds what each running one was started with.
  */
-const reconcile = (fibers: FiberMap.FiberMap<string>, started: Map<string, string>, o: DeliverOptions) =>
+const reconcile = (fibers: FiberMap.FiberMap<string>, started: Map<string, string>, o: DeliverOptions, say: SaidOnce) =>
   Effect.gen(function* () {
-    const subs = listSubscriptions();
+    const door = yield* SubscriptionDoor;
+    const { listed: subs, left } = yield* door.subscriptions.list();
+    for (const one of left) yield* say(one.words);
     const names = new Set(subs.map((s) => s.name));
     for (const name of [...started.keys()].filter((n) => !names.has(n))) {
       yield* FiberMap.remove(fibers, name);
       started.delete(name);
     }
-    for (const name of listDeliveries().filter((n) => !names.has(n))) dropDelivery(name);
+    for (const name of (yield* door.deliveries.list()).filter((n) => !names.has(n)))
+      yield* door.deliveries.drop(SubscriptionName.read(name));
     for (const { name, subscription } of subs) {
       const spec = JSON.stringify(subscription);
       if (started.get(name) === spec && (yield* FiberMap.has(fibers, name))) continue;
       yield* FiberMap.remove(fibers, name);
       started.set(name, spec);
-      yield* FiberMap.run(fibers, name, delivering(name, subscription, o));
+      yield* FiberMap.run(fibers, name, delivering(name, subscription, o, say));
     }
   });
 
@@ -245,7 +276,8 @@ export const deliver = (options: Partial<DeliverOptions> = {}): Effect.Effect<ne
     Effect.gen(function* () {
       const fibers = yield* FiberMap.make<string>();
       const started = new Map<string, string>();
-      const pass = Effect.suspend(() => reconcile(fibers, started, o)).pipe(
+      const say = saidOnce();
+      const pass = Effect.suspend(() => reconcile(fibers, started, o, say)).pipe(
         Effect.catchCause((cause) => Effect.logWarning(`the subscriptions could not be read: ${Cause.pretty(cause)}`)),
       );
       return yield* Effect.forever(pass.pipe(Effect.andThen(Effect.sleep(o.every))));

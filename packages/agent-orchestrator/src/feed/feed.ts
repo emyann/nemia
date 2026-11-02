@@ -111,10 +111,11 @@ export const STORE = 'store';
 
 /**
  * The store's line of the feed: when, which store (`STORE`), the word — its pause put or lifted (`storeOnce`) — and the note beside it, the
- * moment the pause was put. Of no run, so it carries no run's labels, and a subscription scoped to a factory is handed it as it is handed a
- * daemon's.
+ * moment the pause was put. A put carries who put the pause (`by`) and the person's words for why (`why`), each where the pause's file
+ * says it, never in the note, which pairs the put with its lift. Of no run, so it carries no run's labels, and a subscription scoped to a
+ * factory is handed it as it is handed a daemon's.
  */
-export type StoreLine = { at: string; store: string; word: string; note?: string } & Line;
+export type StoreLine = { at: string; store: string; word: string; note?: string; by?: string; why?: string } & Line;
 
 /** One line of the feed: a run's (`RunLine`), a daemon's (`DaemonLine`), or the store's (`StoreLine`). */
 export type FeedLine = RunLine | DaemonLine | StoreLine;
@@ -182,9 +183,18 @@ export function upgraded(line: FeedLine): FeedLine {
     type: typeOf(reason),
     ...(waitsOf(reason) ? { waits: 'person' as const } : {}),
     source: line.source ?? sourceOf(reason),
-    message: messageOf(line),
+    message: lineMessage(line),
   };
 }
+
+/**
+ * The message a person reads of `line`: its word and its note (`messageOf`) — but for the store's line that says who paused it and why,
+ * which reads `store paused by ann · merging by hand`, or `store paused by ann` where no why was given. Pure.
+ */
+const lineMessage = (line: FeedLine): string => {
+  if (!isStoreLine(line) || (!line.by && !line.why)) return messageOf(line);
+  return `${line.word}${line.by ? ` by ${line.by}` : ''}${line.why ? ` · ${line.why}` : ''}`;
+};
 
 /**
  * A signed line with its reason current (`currentOf`): the line as it is where its code is, else the same line under the current code
@@ -344,7 +354,16 @@ const saidKeys = (said: FeedSaid): { word: string; note?: string } => ({
  * What identifies one occurrence is its reason, what it is of, its try and its note (`onceKey`) — and, where several share all four, its
  * place among them: nothing in the runtime's journal stamps a denial, and two attempts of one try lost are told apart only by being two.
  */
-export type Once = { step?: string; word: string; note?: string; call?: string; try?: number; source?: LineSource };
+export type Once = {
+  step?: string;
+  word: string;
+  note?: string;
+  call?: string;
+  try?: number;
+  source?: LineSource;
+  by?: string;
+  why?: string;
+};
 
 /** What a one-shot offered is about: the run it is of, or its step, as `onceInvolved` says it — or the store, for `storeOnce`'s. */
 type About = (o: Once) => Involved;
@@ -419,10 +438,11 @@ function holdOnce(fold: FeedFold, run: string, held: string | undefined, lifted:
 const STORE_INVOLVED: Involved = { kind: 'Store', name: STORE };
 
 /**
- * The store's pause as a pass read it (`readPause`): the moment it was put while one stands, `null` when none does. A caller that did not
- * read it passes nothing, and the feed then offers nothing of the store — no absence read where nobody looked.
+ * The store's pause as a pass read it (`readPause`): the moment it was put while one stands, and who put it and why where its file says,
+ * `null` when none does. A caller that did not read it passes nothing, and the feed then offers nothing of the store — no absence read
+ * where nobody looked.
  */
-export type FeedPause = { at: string } | null;
+export type FeedPause = { at: string; by?: string; why?: string } | null;
 
 /**
  * The one-shots the store's pause owes the feed: the put, while a pause stands, and a lift for each put the feed holds that is not the one
@@ -433,10 +453,16 @@ export type FeedPause = { at: string } | null;
  * stands; the feed holds the put, so the lift is due, and once written the pair is matched. A pause put, lifted and put again is two puts
  * and two lifts, told apart by the moment each was put (`holdSince`); `nemia pause --now` on a store already paused keeps the standing
  * moment, and so writes no second put. A pause put and lifted between two passes leaves no line: a pass reads what stands.
+ *
+ * The put carries who put the pause and why, as fields of its own (`by`, `why`), never in its note: the note is what the lift is paired
+ * by, and the lift, read off an absence, cannot know them.
  */
 function storeOnce(fold: FeedFold, pause: FeedPause): Once[] {
   const standing = pause === null ? undefined : holdSince(pause.at);
-  const out: Once[] = standing !== undefined ? [{ word: LINE_WORDS.StorePaused, note: standing }] : [];
+  const out: Once[] =
+    pause !== null && standing !== undefined
+      ? [{ word: LINE_WORDS.StorePaused, note: standing, ...(pause.by ? { by: pause.by } : {}), ...(pause.why ? { why: pause.why } : {}) }]
+      : [];
   const puts = onceKey(STORE_INVOLVED, 'StorePaused', undefined, '');
   for (const key of fold.shots.keys()) {
     if (!key.startsWith(puts)) continue;
@@ -455,6 +481,8 @@ const storeLines = (fold: FeedFold, at: string, pause: FeedPause): StoreLine[] =
         store: STORE,
         word: o.word,
         ...(o.note !== undefined ? { note: o.note } : {}),
+        ...(o.by !== undefined ? { by: o.by } : {}),
+        ...(o.why !== undefined ? { why: o.why } : {}),
         involved: STORE_INVOLVED,
         labels: {},
       }) as StoreLine,
@@ -562,10 +590,13 @@ export function feedChanges(
 
 /**
  * What one line of the feed says, without its time: `r-1  plan  awaiting approval  · approve it: …`, a daemon's `pid 4242  daemon
- * started  · …`, or the store's `store  —  store paused  · since …`; the message `emitFeed` logs.
+ * started  · …`, or the store's `store  —  store paused by ann  · merging by hand  · since …`; the message `emitFeed` logs.
  */
-export const feedSaidWords = (l: FeedLine): string =>
-  `${isRunLine(l) ? `${l.run}  ${l.step ?? '—'}` : isStoreLine(l) ? `${l.store}  —` : `pid ${l.daemon}`}  ${l.word}${l.note ? `  · ${l.note}` : ''}`;
+export const feedSaidWords = (l: FeedLine): string => {
+  const who = isStoreLine(l) && l.by ? ` by ${l.by}` : '';
+  const notes = [isStoreLine(l) ? l.why : undefined, l.note].filter((n) => n);
+  return `${isRunLine(l) ? `${l.run}  ${l.step ?? '—'}` : isStoreLine(l) ? `${l.store}  —` : `pid ${l.daemon}`}  ${l.word}${who}${notes.map((n) => `  · ${n}`).join('')}`;
+};
 
 /**
  * One line of the feed, for a person: `10:02:13  r-1  plan  awaiting approval  · approve it: …`: what `nemia watch` prints of it.

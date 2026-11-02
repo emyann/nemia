@@ -241,6 +241,8 @@ erDiagram
     string store
     string word
     string note "optional"
+    string by "optional"
+    string why "optional"
     string apiVersion "optional"
     object involved "optional"
     object labels "optional"

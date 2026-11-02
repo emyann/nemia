@@ -30,7 +30,7 @@ const { Invalid } = await import('../refusal/refusal.ts');
 const { readRun } = await import('../record/record.store.ts');
 const { engineOf } = await import('../runtime-client.ts');
 const { metered } = await import('../meter/tally.store.ts');
-const { restingMemo } = await import('../rest/resting.verb.ts');
+const { informerMemo } = await import('../rest/informer.verb.ts');
 type FinishedPage = import('./runlist.verb.ts').FinishedPage;
 type OpenRuns = import('./runlist.verb.ts').OpenRuns;
 type RunSummary = import('../summary/summary.verb.ts').RunSummary;
@@ -399,7 +399,7 @@ test('a warm read of the open runs costs the records of the open runs alone: as 
   const model = await aFinished();
   await aWaiting();
   await anInFlight();
-  const kept = { runs: restingMemo<Omit<RunSummary, 'startedAt'>>(), filings: { filed: new Map(), cursor: 0 } };
+  const kept = { runs: informerMemo(), filings: { filed: new Map(), cursor: 0 } };
   const unverified = { ...process.env, WF_VERIFY_REST: '0' };
   const warm = async (): Promise<number | undefined> => {
     await runWith(e(), RUNS_OPEN.handler({}, unverified, ROOT, kept));

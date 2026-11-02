@@ -14,7 +14,7 @@ import { artifactFile, fileIn } from '../artifacts/artifacts.store.ts';
 import { runStore } from '../record/files.store.ts';
 import { isRepositoryRun, type Run } from '../record/record.ts';
 import { verifiesRest } from '../config/config.store.ts';
-import { restingMemo } from '../rest/resting.verb.ts';
+import { informerMemo } from '../rest/informer.verb.ts';
 import { HOME } from '../record/record.store.ts';
 import { type FinishedPage, type OpenRuns, runsFinished, runsOpen } from '../runlist/runlist.verb.ts';
 import { type RunSummary, runsSummarized, type SummaryHow } from '../summary/summary.verb.ts';
@@ -42,7 +42,7 @@ const NAME: readonly Positional[] = [{ key: 'name', takes: 'required', kind: 'na
 const runOf = (args: Args): Run | undefined => runStore.runs.find(textOf(args, 'id') ?? '');
 
 /**
- * Every run's summary, in the store's order (`runsSummarized`): read off the memo of runs at rest and the feed's filing times the caller
+ * Every run's summary, in the store's order (`runsSummarized`): read off the informer and the feed's filing times the caller
  * keeps (`kept.runs`, `kept.filings`), verified as its environment says (`verifiesRest`); a caller that keeps neither judges every run.
  */
 export const RUNS: Command<RunSummary[]> = {
@@ -60,7 +60,7 @@ export const RUNS: Command<RunSummary[]> = {
   handler: Effect.fnUntraced(function* (_args: Args, env?: NodeJS.ProcessEnv, home?: string, kept?: Kept) {
     return yield* runsSummarized(yield* EngineService, {
       home: home ?? HOME,
-      memo: kept?.runs ?? restingMemo(),
+      memo: kept?.runs ?? informerMemo(),
       filings: kept?.filings ?? { filed: new Map(), cursor: 0 },
       verify: env ? verifiesRest(env) : false,
     });
@@ -69,12 +69,12 @@ export const RUNS: Command<RunSummary[]> = {
 };
 
 /**
- * How a read of the list reads, as `RUNS` does: the memo of runs at rest and the feed's filing times its caller keeps, verified as its
+ * How a read of the list reads, as `RUNS` does: the informer and the feed's filing times its caller keeps, verified as its
  * environment says; a caller that keeps neither judges every run.
  */
 const howOf = (env?: NodeJS.ProcessEnv, home?: string, kept?: Kept): SummaryHow => ({
   home: home ?? HOME,
-  memo: kept?.runs ?? restingMemo(),
+  memo: kept?.runs ?? informerMemo(),
   filings: kept?.filings ?? { filed: new Map(), cursor: 0 },
   verify: env ? verifiesRest(env) : false,
 });

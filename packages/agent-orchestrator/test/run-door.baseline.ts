@@ -30,7 +30,7 @@ export const RUN_DOOR_DEBT: Readonly<Record<string, number>> = {
   'src/list/list.verb.ts': 8,
   'src/pause/pause.verb.ts': 2,
   'src/prune/prune.verb.ts': 10,
-  'src/rest/resting.verb.ts': 1,
+  'src/rest/informer.verb.ts': 1,
   'src/retry/retry.verb.ts': 1,
   'src/revisions/pin.verb.ts': 2,
   'src/round/round.verb.ts': 2,

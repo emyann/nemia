@@ -5,7 +5,7 @@
  * It copies the workflows' store (`--from`, `WF_ROOT` or `~/.agent-workflows`, its runtime's journals under `engine/` with it) and the
  * runtime's own (`--engine`, `AE_ROOT` or `~/.agent-engine`) into a fresh temp folder, leaving out what no read opens and what would tie
  * the copy to the live machine (`LEFT_OUT` in `fence.ts`), and refusing a temp folder inside either store; points `WF_ROOT` and `AE_ROOT`
- * at the copy before the orchestrator loads (it pins its root as it loads); and times five reads there, each cold — the first call over
+ * at the copy before the orchestrator loads (it pins its root as it loads); and times seven reads there, each cold — the first call over
  * memos that hold nothing — and warm — called again with what the memos kept — as the median over `--repeat` calls and the heap each
  * left held after a collection:
  *
@@ -23,6 +23,10 @@
  *   side by side, not one answer before and after.
  * - `feedFromCursor`: `GET /api/feed/stream` from the cursor `FEED_BACK` lines before the workflow feed's end, read until its last line
  *   came, then let go.
+ * - `runListAfterPass`, `openRunAfterPass`: `GET /api/runs` and `GET /api/runs/:id` of the newest open run, each asked after a pass of
+ *   the tick has filled the app's informer (`Informer`, given by `liveOf`), as the daemon's pass fills it: the pass is not timed, the read
+ *   is. Cold over an app built afresh and one pass for each call; warm, called again within the same pass, which serves even a moving
+ *   run's judgement.
  *
  * Beside the numbers: the runs, finished and open, the runtime's tasks and their journals' bytes, the runs whose tasks did not read
  * and the pass's unreadable lines, and `invariantRefusals`, the records the Run model refuses. A markdown table on stdout; with
@@ -47,8 +51,17 @@ import {
   type Refusal,
 } from './fence.ts';
 
-/** The five reads, the run's object counted twice: each a key of the report's `measures`. */
-export const MEASURES = ['tickPass', 'runList', 'stats', 'finishedRun', 'openRun', 'feedFromCursor'] as const;
+/** The five reads, the run's object counted twice, and the list and an open run read again after a pass: each a key of `measures`. */
+export const MEASURES = [
+  'tickPass',
+  'runList',
+  'stats',
+  'finishedRun',
+  'openRun',
+  'feedFromCursor',
+  'runListAfterPass',
+  'openRunAfterPass',
+] as const;
 
 /** A read the report measures. */
 export type MeasureKey = (typeof MEASURES)[number];
@@ -332,6 +345,28 @@ async function tickMeasured(orch: Orchestrator, place: Place, fence: Fence, wf: 
   return { measured: { cold: medianOf(cold), warm: medianOf(warm) }, pass };
 }
 
+/**
+ * A fresh app whose informer (`Informer`, the app's own) a pass of the tick on the copy at `wf` filled, the fence armed for a pass: what
+ * `overApps` reads `runListAfterPass` and `openRunAfterPass` over, so the pass is not timed and the read is, the warm calls within it.
+ */
+const passedOver = (orch: Orchestrator, place: Place, fence: Fence, wf: string, fresh: () => Promise<Built>) => async () => {
+  const built = await fresh();
+  const informer = await built.runtime.runPromise(Effect.service(orch.Informer));
+  const program = orch
+    .tickRun({ repo: wf, verifyRest: false })
+    .pipe(
+      Effect.provide(Layer.merge(orch.PlaceService.layer(place), orch.storeRootLayer(process.env))),
+      Effect.provideService(orch.Informer, informer),
+    );
+  fence.arm('pass');
+  try {
+    await orch.runWith(passEngine(orch.engine(), fence), program);
+  } finally {
+    fence.arm('read');
+  }
+  return built;
+};
+
 /** The newest run of `listing`, by `createdAt`, finished or not; null where there is none. */
 const newestOf = (listing: readonly RunSummary[], finished: boolean): string | null =>
   listing
@@ -354,6 +389,7 @@ async function measure(asked: Asked, root: string, fence: Fence) {
   const finishedRun = newestOf(listing, true);
   const openRun = newestOf(listing, false);
   const feed = feedOf(wf);
+  const passed = passedOver(orch, place, fence, wf, fresh);
   const objectOf = (id: string | null) =>
     id === null ? null : overApps(fresh, (app) => getJson(app, `/api/runs/${encodeURIComponent(id)}`), repeat);
   const measures: Record<MeasureKey, Measured | null> = {
@@ -363,6 +399,9 @@ async function measure(asked: Asked, root: string, fence: Fence) {
     openRun: await objectOf(openRun),
     feedFromCursor: await overApps(fresh, (app) => feedStreamed(app, feed), repeat),
     tickPass: null,
+    runListAfterPass: await overApps(passed, (app) => getJson(app, '/api/runs'), repeat),
+    openRunAfterPass:
+      openRun === null ? null : await overApps(passed, (app) => getJson(app, `/api/runs/${encodeURIComponent(openRun)}`), repeat),
   };
   const { measured, pass } = await tickMeasured(orch, place, fence, wf, repeat);
   measures.tickPass = measured;

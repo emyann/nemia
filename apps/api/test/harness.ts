@@ -6,7 +6,7 @@
  * own tests hand theirs. What it is called with as a flag it hands to `fixtures/stand-in-claude.ts`, which answers the Agent SDK as
  * Claude Code does. So the runner itself — the run files it reads, the transcripts it reads, the flags it spawns with — is what the api's
  * tests exercise, and not a stand-in for it. It sets
- * `WF_VERIFY_REST=1`: every answer the list's memo of runs at rest gives (`RestingMemo`) is
+ * `WF_VERIFY_REST=1`: every answer the informer of each run's judgement gives (`Informer`) is
  * judged afresh too, and a difference fails the request. And the store is a scratch folder too (`root`, `WF_ROOT`), never this machine's.
  * It sets the daemon's two ceilings, `WF_MAX_RUNS` and `WF_MAX_CONCURRENT`, to `set-it-in-the-test`, which the package refuses by name: a
  * run's check inherits the daemon's environment, so a test that reads a ceiling sets or deletes it itself. It sets

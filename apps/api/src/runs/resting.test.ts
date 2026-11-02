@@ -1,11 +1,11 @@
 /**
- * The list's memo of runs at rest (`restingRead`, the package's rest/resting.verb.ts): `GET /api/runs` answers a finished run from memory
- * while nothing it was judged on has moved, so a poll reads the journals of the runs still moving and of none other — and answers afresh
- * the moment anything it watches does: the run's record, a file a person writes beside it, a line of its tasks on the engine's feed, a tip
- * of a branch as the tick's last pass read it (`standing.json`, written here as a pass writes it: `aPass`), or the record gone. Every api
- * test runs with `WF_VERIFY_REST=1` (test/harness.ts), which judges each kept answer afresh too and fails the request on a difference; the
- * tests here turn it off where they measure what the memo saves, or ask whether it saw a change on its own. What a poll read is what the
- * api's `api.poll.reads` counts for it (`served`, layer.ts).
+ * The informer of each run's judgement (`informerRead`, the package's rest/informer.verb.ts), as the list reads it: `GET /api/runs` answers
+ * a finished run from memory while nothing it was judged on has moved, so a poll reads the journals of the runs still moving and of none
+ * other — and answers afresh the moment anything it watches does: the run's record, a file a person writes beside it, a line of its tasks
+ * on the engine's feed, a tip of a branch as the tick's last pass read it (`standing.json`, written here as a pass writes it: `aPass`), or
+ * the record gone. Every api test runs with `WF_VERIFY_REST=1` (test/harness.ts), which judges each kept answer afresh too and fails the
+ * request on a difference; the tests here turn it off where they measure what the memo saves, or ask whether it saw a change on its own.
+ * What a poll read is what the api's `api.poll.reads` counts for it (`served`, layer.ts).
  *
  * At shipped defaults: the api's own engine over a store this file seeds, the harness's fake `claude` (test/harness.ts) first on PATH.
  */
@@ -19,14 +19,14 @@ import { createRequire, syncBuiltinESMExports } from 'node:module';
 import fs from 'node:fs';
 import path from 'node:path';
 import { app, runtime } from '../app.ts';
-import { ReadMemo } from '../layer.ts';
 import type { MetricRead } from '../factory/ceilings.ts';
 import { Engine, findRun } from '../store.ts';
 import {
   approveRun,
   engine,
   passStanding,
-  restingRead,
+  Informer,
+  informerRead,
   runStore,
   type RunSummary,
   standingReader,
@@ -46,8 +46,14 @@ const snapshotGit = async () => standingReader(await runWith(e, standingSnapshot
  * read is one the memo watches.
  */
 const aPass = () => runWith(e, passStanding(runStore.runs.list()));
-/** The list's memo of runs at rest, the app's own (`ReadMemo`). */
-const { resting } = await runtime.runPromise(ReadMemo.useSync((memo) => memo));
+/** The app's informer of each run's judgement (`Informer`, given by `liveOf`), which the list reads and keeps runs in. */
+const resting = await runtime.runPromise(
+  Effect.gen(function* () {
+    const informer = yield* Informer;
+    assert.ok(informer, "the app's layer gives an informer");
+    return informer;
+  }),
+);
 
 const git = (repo: string, ...args: string[]) =>
   execFileSync(
@@ -368,23 +374,26 @@ test('two requests at once: the first reads the feed and judges the run succeede
   aFinishedRun('r-raced');
   await aPass();
   const answer = await listed('r-raced');
-  assert.ok(answer && resting.runs.has('r-raced'));
+  const entry = resting.runs.get('r-raced');
+  assert.ok(answer && entry);
   resting.runs.delete('r-raced');
-  const { startedAt: _, ...judged } = answer;
+  const judged = entry.value;
 
-  const first = await runWith(e, restingRead(e, resting, false, await snapshotGit()));
+  const first = await runWith(e, informerRead(e, resting, false, await snapshotGit()));
   blocked('r-raced-implement');
   fed('r-raced-implement');
-  await runWith(e, restingRead(e, resting, false, await snapshotGit()));
-  first.keep(findRun('r-raced')!, judged, [], () => new Map());
+  await runWith(e, informerRead(e, resting, false, await snapshotGit()));
+  first.keep(findRun('r-raced')!, judged, [], () => new Map(), true);
+  await runWith(e, first.commit());
   assert.ok(
     !resting.runs.has('r-raced'),
-    'kept nothing: the first request read the feed before the line; the second read on past it while the run was not kept, so took nothing out; and no request will read the line again',
+    'kept nothing: the first request read the feed before the line, the second read on past it while the run was not kept, so took nothing out, and the first, overtaken, reads the feed again from where it read to and finds the line (`commit`)',
   );
   assert.equal((await unverified(() => listed('r-raced')))?.status, 'waiting');
 
-  const alone = await runWith(e, restingRead(e, resting, false, await snapshotGit()));
-  alone.keep(findRun('r-raced')!, judged, [], () => new Map());
+  const alone = await runWith(e, informerRead(e, resting, false, await snapshotGit()));
+  alone.keep(findRun('r-raced')!, judged, [], () => new Map(), true);
+  await runWith(e, alone.commit());
   assert.ok(resting.runs.has('r-raced'), 'a request no other overtook keeps what it judged');
   resting.runs.delete('r-raced');
 });
@@ -491,7 +500,7 @@ test("WF_VERIFY_REST: the memo's check fails a request it answered wrong, and a 
     await list();
     const kept = resting.runs.get('r-poisoned');
     assert.ok(kept);
-    resting.runs.set('r-poisoned', { ...kept, answer: { ...kept.answer, brief: 'not what the record says' } });
+    resting.runs.set('r-poisoned', { ...kept, value: { ...kept.value, run: { ...kept.value.run, brief: 'not what the record says' } } });
     assert.equal((await unverified(() => listed('r-poisoned')))?.brief, 'not what the record says', 'the memo answers, unchecked');
     const res = await app.request('/api/runs');
     assert.equal(res.status, 500);

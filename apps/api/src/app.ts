@@ -2,7 +2,16 @@ import { Layer, ManagedRuntime, Metric } from 'effect';
 import { type ErrorHandler, Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import type { ContentfulStatusCode } from 'hono/utils/http-status';
-import { feedHubLayer, gitPlaceLayer, leaseRelease, runningRelease, storeRootLayer, telemetryLayer, VERSION } from 'agent-orchestrator';
+import {
+  feedHubLayer,
+  gitPlaceLayer,
+  informerLayer,
+  leaseRelease,
+  runningRelease,
+  storeRootLayer,
+  telemetryLayer,
+  VERSION,
+} from 'agent-orchestrator';
 import { isRefusal, type Refusal } from 'agent-orchestrator';
 import { agents, skills } from './agents/index.ts';
 import { customInstructions } from './custom/custom.ts';
@@ -54,11 +63,12 @@ const RELEASE = leaseRelease(runningRelease());
 export type VersionAnswer = { version: string; release: typeof RELEASE };
 
 /**
- * Every service the api reads, live, over `env`: the settings read from it on each request (`ApiConfig`), the package's engine
- * (`Engine`) and the store's root, read from `env` (`StoreRoot`, `storeRootLayer`: `WF_ROOT`), an MCP asker and a quota asker with
- * nothing asked yet (`McpAsker`, `QuotaAsker`), reads that have
- * kept nothing yet (`ReadMemo`), the steps followed live, none yet (`Followings`), the hub the feed's lines are published to as the
- * process's daemon writes them (`feedHubLayer`), and the git place (`gitPlaceLayer`).
+ * Every service the api reads, live, over `env`: the settings read from it on each request (`ApiConfig`), the package's engine (`Engine`)
+ * and the store's root, read from `env` (`StoreRoot`, `storeRootLayer`: `WF_ROOT`), an MCP asker and a quota asker with nothing asked yet
+ * (`McpAsker`, `QuotaAsker`), reads that have kept nothing yet (`ReadMemo`), an informer of each run's judgement holding none, which the
+ * daemon's passes fill and every request reads (`informerLayer`: one per app, so the store's daemon and the board's reads judge a run
+ * once), the steps followed live, none yet (`Followings`), the hub the feed's lines are published to as the process's daemon writes them
+ * (`feedHubLayer`), and the git place (`gitPlaceLayer`).
  *
  * And the process's telemetry (`telemetryLayer`): the line logger every log of the app goes through — each request's among them — and,
  * where `env` names an OTLP collector, the tracer, the exporters and their `Flusher` besides. Held here and not around the process's
@@ -74,6 +84,7 @@ export const liveOf = (env: NodeJS.ProcessEnv = process.env): Layer.Layer<Servic
     McpAsker.live,
     QuotaAsker.live,
     ReadMemo.live,
+    informerLayer(),
     Followings.live,
     feedHubLayer(),
     gitPlaceLayer,

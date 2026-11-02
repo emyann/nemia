@@ -7,20 +7,13 @@ import { Effect } from 'effect';
 import { timeline, type Timeline } from '../timeline/index.ts';
 import { closeoutAsked, closeoutReader, exitVerdicts } from '../views/views.verb.ts';
 import { phaseOfView } from '../views/views-words.ts';
-import { type Engine, EngineService } from '../runtime-client.ts';
+import { type Engine, EngineService, tried } from '../runtime-client.ts';
 import type { RaiseReads } from '../retry/index.ts';
-import {
-  bare,
-  filedTimes,
-  type Filings,
-  judgedSteps,
-  judgedUnlessUnreadable,
-  stepNames,
-  type Views,
-  viewsFor,
-  workflowsOf,
-} from '../summary/reads.verb.ts';
-import { judge, standingsOf, stepSaid } from '../summary/judged.verb.ts';
+import { bare, filedTimes, type Filings, type Views, workflowsOf } from '../summary/reads.verb.ts';
+import { stepSaid } from '../summary/judged.verb.ts';
+import { type Judgement, judgementsOf, sameJudgement } from '../summary/judgement.verb.ts';
+import { informedJudgements, Informer, informerRead } from '../rest/informer.verb.ts';
+import { verifiesRest } from '../config/config.store.ts';
 import { standingReader, standingSnapshot } from '../standing/standing.verb.ts';
 import { StoreRoot } from '../config/root.store.ts';
 import type { Run } from '../record/record.ts';
@@ -29,37 +22,31 @@ import { type CheckStderr, checksOf, refusedStderr, type StepCheck } from '../re
 import { attemptsIn, closeoutIn, type StepTry, triesOf, unreadableIn } from '../resource/tries.verb.ts';
 
 /**
- * The views of `run`'s tasks over `e`, and what the run is judged as off them, its steps `names` of `workflows`, where its branches stand
- * read off `standing.json` (`standingSnapshot`): or, when its unfrozen folder does not load or a task it reads does not, why it is not
- * judged (`judgedUnlessUnreadable`).
+ * What the package judges of `run` (`Judgement`), its steps `folder` as it loads now: read through this process's informer where it keeps
+ * one (`Informer`), served from what the tick's pass or an earlier request judged while every input it was judged on holds
+ * (`informedJudgements`), and kept on a miss; judged on demand where it keeps none (`judgementsOf`), as an in-process read is. Where its
+ * branches stand is read off `standing.json` (`standingSnapshot`).
  */
-const judgedOn = Effect.fnUntraced(function* (e: Engine, run: Run, names: readonly string[], workflows: readonly Workflow[] | null) {
-  const { views, reader, unreadable } = yield* viewsFor(e, [run]);
+const judgedOn = Effect.fnUntraced(function* (e: Engine, home: string, run: Run) {
   const git = standingReader(yield* standingSnapshot());
-  const standings = (status: Parameters<typeof standingsOf>[2], steps: Parameters<typeof standingsOf>[1]) =>
-    standingsOf(run, steps, status, git);
-  const read = yield* judgedUnlessUnreadable(run, unreadable, () => judge(run, names, workflows, views, { reader, git, standings }));
-  return { views, read };
+  const informer = yield* Informer;
+  const read = informer ? yield* informerRead(e, informer, yield* tried(() => verifiesRest()), git, sameJudgement) : undefined;
+  const judged = read ? yield* informedJudgements(e, home, [run], read, git) : yield* judgementsOf(e, home, [run], git);
+  const one = judged.runs.get(run.id);
+  return one ?? (yield* Effect.die(new Error(`Run ${run.id} was handed to its judgement and not judged.`)));
 });
 
 /** What the run is judged as (`judge`), when it is. */
-export type JudgedRun = Extract<Effect.Success<ReturnType<typeof judge>>, object>;
+export type { JudgedRun } from '../summary/judgement.verb.ts';
 
 /** What `stepsReading` read once of a run: its steps judged, their checks, and none of the clock. */
-export type StepsReading = {
+export type StepsReading = Judgement & {
   readonly e: Engine;
   readonly home: string;
-  readonly run: Run;
   /** The workflow folder as it loads now, or why it does not (`workflowsOf`). */
   readonly folder: ReturnType<typeof workflowsOf>;
-  /** Its steps by name, in the order the run started with them (`stepNames`). */
-  readonly names: readonly string[];
-  /** The steps it is judged by (`judgedSteps`). */
-  readonly steps: readonly Workflow[];
   /** The steps a page shows the workflow of: the frozen workflow, else the folder (`shownWorkflow`). */
   readonly source: readonly Workflow[] | null;
-  readonly views: Views;
-  readonly judged: JudgedRun;
   readonly checks: ReadonlyMap<string, StepCheck>;
   readonly stderr: CheckStderr;
 };
@@ -74,23 +61,23 @@ export type RunReading = StepsReading & { readonly clock: Timeline; readonly fil
 const shownWorkflow = (run: Run, folder: readonly Workflow[] | null): readonly Workflow[] | null => run.workflow ?? folder;
 
 /**
- * The run's steps read once (`StepsReading`), off the views of its tasks over one look at the harnesses (`viewsFor`); or, when its
- * unfrozen folder does not load or a task it reads does not, why it is not judged, in the words the list says it with (`{ unjudged }`).
- * A refused check's streams are read through the engine's `output`, which observes nothing. No feed is read: a step's tries, closeout and
- * told layers are answered from this alone.
+ * The run's steps read once (`StepsReading`): its judgement (`judgedOn`), the informer's where it serves one, else judged off the views of
+ * its tasks over one look at the harnesses; or, when its unfrozen folder does not load or a task it reads does not, why it is not judged,
+ * in the words the list says it with (`{ unjudged }`). The folder, whose words a page shows, is read now, and a refused check's streams
+ * through the engine's `output`, which observes nothing, on each read. No feed is read: a step's tries, closeout and told layers are
+ * answered from this alone.
  */
 export const stepsReading = Effect.fnUntraced(function* (run: Run) {
   const e = yield* EngineService;
   const home = yield* StoreRoot;
   const folder = workflowsOf(run, home);
-  const names = stepNames(run, folder.steps);
-  const { views, read } = yield* judgedOn(e, run, names, folder.steps);
-  if ('unreadable' in read) return { unjudged: read.unreadable };
-  const steps = judgedSteps(run, folder.steps);
-  const stderr = yield* Effect.promise(() => refusedStderr(e, run, views));
-  const checks = yield* Effect.promise(() => checksOf(e, run, steps, views, stderr));
+  const one = yield* judgedOn(e, home, run);
+  if ('unjudged' in one) return { unjudged: one.unjudged };
+  const { judgement } = one;
+  const stderr = yield* Effect.promise(() => refusedStderr(e, run, judgement.views));
+  const checks = yield* Effect.promise(() => checksOf(e, run, judgement.steps, judgement.views, stderr));
   const source = shownWorkflow(run, folder.steps);
-  const at: StepsReading = { e, home, run, folder, names, steps, source, views, judged: read.judged, checks, stderr };
+  const at: StepsReading = { ...judgement, run, e, home, folder, source, checks, stderr };
   return at;
 });
 

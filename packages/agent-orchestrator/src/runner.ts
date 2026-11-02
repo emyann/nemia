@@ -519,8 +519,9 @@ export type { Filings, TaskView, Unreadable, Views } from './summary/reads.verb.
 export { holdingOf, judge, needsOf, runSaid, runWaitingOf, spentOf, standingsOf, stepSaid, wordOf } from './summary/judged.verb.ts';
 export { atHarness } from './summary/judged.verb.ts';
 export type { GitAsked, JudgeHow, RunHolding, RunStatus, RunToDecide, RunWaiting, Spent, StepNeeds } from './summary/judged.verb.ts';
-export { restingMemo, restingRead } from './rest/resting.verb.ts';
-export type { RestingMemo, RestingRead } from './rest/resting.verb.ts';
+export { dropInformed, Informer, informerLayer, informerMemo, informerRead } from './rest/informer.verb.ts';
+export type { InformerMemo, InformerRead } from './rest/informer.verb.ts';
+export type { Judgement } from './summary/judgement.verb.ts';
 export { recordMemo, type RecordMemo } from './rest/index.ts';
 export type { ScheduleRuns } from './schedule/listed.store.ts';
 export type { PauseRuns } from './pause/pause.ts';

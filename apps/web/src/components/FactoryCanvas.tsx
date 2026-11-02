@@ -22,7 +22,7 @@ import { routeLink } from '@/components/routeLink';
 import { Button, LinkButton } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
-import { ceilingsQuery, inboxQuery, runQuery, type RunDetail, type RunSummary } from '@/lib/api';
+import { ceilingsQuery, inboxQuery, runObjectQuery, type RunObject, type RunSummary } from '@/lib/api';
 import {
   forgetFactoryLayout,
   forgetFactoryOpen,
@@ -181,11 +181,14 @@ export function FactoryCanvas({ runs, factory, above }: { runs: readonly RunSumm
 type PlacedCard = Node<Record<string, never>, 'run'>;
 const nodeOf = (id: string, position: Point): PlacedCard => ({ id, type: 'run', position, data: {} });
 
-/** What a card is told of an open run's read: its record once read, or why it could not be. */
-type Read = { detail: RunDetail | null; trouble: string | null };
+/** What a card is told of an open run's read: its object's status once read, or why it could not be. */
+type Read = { detail: RunObject.RunStatus | null; trouble: string | null };
 const NOT_READ: Read = { detail: null, trouble: null };
-const readsOf = (results: UseQueryResult<RunDetail>[]): Read[] =>
-  results.map(({ data, error }) => ({ detail: data ?? null, trouble: error ? `Could not read its steps: ${error.message}` : null }));
+const readsOf = (results: UseQueryResult<RunObject.Run>[]): Read[] =>
+  results.map(({ data, error }) => ({
+    detail: data?.status ?? null,
+    trouble: error ? `Could not read its steps: ${error.message}` : null,
+  }));
 
 /** The floor's header counts: the runs in flight (`flying` of `runs`), finished, to decide and waiting on you. */
 function FloorCounts({ runs, flying }: { runs: readonly RunSummary[]; flying: number }) {
@@ -212,8 +215,8 @@ const placing = (change: NodeChange<RunFlowNode>): change is NodePositionChange 
  * The factory's floor and its header, for `FactoryCanvas`: the runs shown (`floorRuns`), each a card placed by `placeRuns`.
  *
  * - A refetch that moves a status moves no card: what lays the cards out is kept by its content (`useContent`).
- * - Only a run open on the floor reads its detail, again on each of its events on the feed (`runQuery`): each tile's attempt and cost,
- *   which the bar reads for itself. A closed card reads the list, and so does an open card's flowchart.
+ * - Only a run open on the floor reads its object, again on each of its events on the feed (`runObjectQuery`): each tile's attempt and
+ *   cost, which the bar reads for itself. A closed card reads the list, and so does an open card's flowchart.
  * - The cards' positions change only through a drag or React Flow measuring a card, a run joining or leaving the floor, a card opening   or
  *   closing, and Reset layout. The open cards claim their cells first, the one opened last first; a card on the floor stays put unless   an
  *   opening card covers it, and one coming back takes its saved cell. A card moved is saved in this browser (`keepLayout`), where a   card
@@ -258,7 +261,7 @@ function Floor({ runs, factory }: { runs: readonly RunSummary[]; factory: Factor
   const { inspecting, inspected, step: barStep, onStep, machine, ...press } = useFloorPress();
 
   const opened = useMemo(() => open.filter((id) => ids.includes(id)), [open, ids]);
-  const reads = useQueries({ queries: opened.map((id) => runQuery(id)), combine: readsOf });
+  const reads = useQueries({ queries: opened.map((id) => runObjectQuery(id)), combine: readsOf });
   const details = useMemo(() => new Map(opened.map((id, i) => [id, reads[i] ?? NOT_READ])), [opened, reads]);
 
   const spanEntries = useContent(

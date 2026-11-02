@@ -6,7 +6,6 @@ import { ChevronRight } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { decisionQuery, type RunSummary, type RunWaiting } from '@/lib/api';
-import type { RunView } from '@/lib/runView';
 import { TryTag } from './TryTag';
 import { needLine, needsOf, stepAnchor } from '@/lib/asks';
 import { spentTitle } from '@/lib/cost';
@@ -19,7 +18,7 @@ import { ENDED } from '@/lib/words';
 import { RouteLink } from './AgentParts';
 import { CardGate, type Taken } from './CardGate';
 import { CardLift } from './LiftHold';
-import { StepRail, StepTiles } from './StepRail';
+import { StepRail, StepTiles, type TilesRead } from './StepRail';
 
 /**
  * `finished` is a run not in flight: on the floor only when finished runs are asked for, and dimmed.
@@ -33,7 +32,7 @@ export type RunNodeData = {
   reads: string[];
   finished: boolean;
   open: boolean;
-  detail: RunView | null;
+  detail: TilesRead | null;
   trouble: string | null;
   inspected: boolean;
   selected: string | null;

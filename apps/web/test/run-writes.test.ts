@@ -116,7 +116,6 @@ test("runsMoved with a run: a write that changes a try without moving its step r
   const subs: QueryKey[] = [
     ['runs', 'a', 'steps', 'plan', 'tries', 's'],
     ['runs', 'a', 'steps', 'plan', 'told', 's'],
-    ['runs', 'a', 'page'],
   ];
   const seeded: QueryKey[] = [
     ...subs,
@@ -130,7 +129,7 @@ test("runsMoved with a run: a write that changes a try without moving its step r
   assert.deepEqual(
     seeded.filter((key) => client.getQueryState(key)?.isInvalidated),
     subs,
-    "its steps' tries and told at every stamp, and its page; never its lines, its decision or another run's",
+    "its steps' tries and told at every stamp; never its lines, its decision or another run's",
   );
   client.clear();
 });

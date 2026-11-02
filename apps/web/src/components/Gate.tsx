@@ -1,15 +1,6 @@
 import { useId, useState, type ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import {
-  approveStep,
-  decisionQuery,
-  type Question,
-  type QuestionAnswer,
-  type RetryMode,
-  type StepApproval,
-  type StepCloseout,
-  type StepGate,
-} from '../lib/api';
+import { approveStep, decisionQuery, type Question, type QuestionAnswer, type RetryMode, type StepCloseout } from '../lib/api';
 import type { RunView, StepView } from '../lib/runView';
 import { askedSaid } from '../lib/asks';
 import { decidableRun, decisionStamp, isDecidable } from '../lib/decide';
@@ -20,6 +11,11 @@ import { answersFrom, QuestionFields, RecommendButton, unanswered, type Draft } 
 import { when } from './Facts';
 import { runsMoved } from '@/lib/runWrites';
 import type { Frozen } from '../lib/frozen';
+
+/** A gated step's gate, as its object's status holds it. */
+type StepGate = NonNullable<StepView['gate']>;
+/** A person's approval of the try a gated step is on. */
+type StepApproval = NonNullable<StepGate['approval']>;
 
 /**
  * A step waiting at its gate, beside the closeout it handed on: the two things the CLI's `ls` says a person can do. Approve, with a box for

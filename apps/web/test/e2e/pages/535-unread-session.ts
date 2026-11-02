@@ -11,18 +11,18 @@ const WHY =
   "`ae/t-tokens/1`'s transcript cannot be read: line 2 of ~/.claude/projects/-code-app/" +
   '0123456789abcdef0123456789abcdef.jsonl does not decode: Expected string, got "yesterday" at ["timestamp"]';
 
-/** Where the run's detail is read. */
+/** Where the run's object is read. */
 const isDetail = (url: URL) => url.pathname === `/api/runs/${FAKE.id}`;
 
-/** The seeded run's detail with `FAKE.unverified`'s session alone unread, saying `WHY`; the rest as the api says it. */
+/** The seeded run's object with `FAKE.unverified`'s session alone unread, saying `WHY`; the rest as the api says it. */
 const unread = async (route: Route) => {
   const response = await route.fetch();
-  const body = (await response.json()) as { steps: Array<{ name: string }> };
-  const steps = body.steps.map((step) => (step.name === FAKE.unverified ? { ...step, sessionUnread: WHY } : step));
-  await route.fulfill({ response, json: { ...body, steps } });
+  const body = (await response.json()) as { status: { steps: Array<{ name: string }> } };
+  const steps = body.status.steps.map((step) => (step.name === FAKE.unverified ? { ...step, sessionUnread: WHY } : step));
+  await route.fulfill({ response, json: { ...body, status: { ...body.status, steps } } });
 };
 
-/** The run's page, its detail answered with `FAKE.unverified` unread; its section once loaded. */
+/** The run's page, its object answered with `FAKE.unverified` unread; its section once loaded. */
 async function onRun(page: Page): Promise<Locator> {
   await page.route(isDetail, unread);
   await page.goto(new URL(`/runs/${FAKE.id}`, page.url()).href, { waitUntil: 'load' });
@@ -34,7 +34,7 @@ export default {
   /**
    * Why one step's session alone could not be read, on the run's page: an `unread` row in that step's facts, the runtime's words whole,
    * wrapped within its section on a phone's 390 pixels however long a path it quotes, and no such row on a step read beside it. The
-   * run's detail is routed, since the e2e's sessions are all read, and let go after. Nothing is written to the store.
+   * run's object is routed, since the e2e's sessions are all read, and let go after. Nothing is written to the store.
    */
   name: 'unread-session',
   route: '/runs',

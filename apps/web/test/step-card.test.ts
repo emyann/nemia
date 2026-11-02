@@ -5,7 +5,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import type { RunDetail } from '../src/lib/api.ts';
+import type { RunView } from '../src/lib/runView.ts';
 import { kindOf, stepCardOf, type StepCardFacts, type StepKind } from '../src/lib/stepCard.ts';
 import type { StepPhase } from '../src/lib/api/reasons.ts';
 import type { StepState } from '../src/lib/status.ts';
@@ -13,7 +13,7 @@ import { PERSON } from '../src/lib/words.ts';
 import { aCardOpen, CARD_REACH, cardOpened, previewSide, SHEET_QUERY } from '../src/lib/useSheetPreview.ts';
 import { coded, detail, step, summary, triedAs, type Word } from './run-fixtures.ts';
 
-type Step = RunDetail['steps'][number];
+type Step = RunView['steps'][number];
 
 const NOW = new Date('2026-09-30T05:20:00.000Z');
 

@@ -2,8 +2,8 @@
  * The frame's floating bar for a run: what a person needs to see of it without leaving the floor — what it asks of them, its steps and
  * their statuses, and its brief — read from the run's record, which a read again keeps current. Its page, which Open visits, has the rest.
  */
-import { useQuery } from '@tanstack/react-query';
-import { runGone, runQuery, type RunDetail } from '@/lib/api';
+import { runGone } from '@/lib/api';
+import { useRunRead, type RunView } from '@/lib/runView';
 import { titleOf } from '@/lib/factory';
 import { useBar } from '@/lib/useBar';
 import { FloatingBar } from './FloatingBar';
@@ -19,7 +19,7 @@ import { Unread } from './StepBar';
  * read never writes the address.
  */
 export function RunBar({ run: id }: { run: string }) {
-  const { data: run, error } = useQuery(runQuery(id));
+  const { view: run, error } = useRunRead(id);
   return (
     <FloatingBar title={run ? titleOf(run) : id} description={<span className="font-mono text-body-small">{id}</span>}>
       <RunBody id={id} run={run} error={error} />
@@ -32,7 +32,7 @@ export function RunBar({ run: id }: { run: string }) {
  * waits on, as the run's page says them, each step they name a button that shows the step in the bar; its steps, each a button with its
  * status that shows it in the bar; and its brief.
  */
-export function RunBody({ id, run, error }: { id: string; run: RunDetail | undefined; error: unknown }) {
+export function RunBody({ id, run, error }: { id: string; run: RunView | undefined; error: unknown }) {
   const { show } = useBar();
   if (run && runGone(error)) return <RunGone run={run} />;
   if (!run) return <Unread id={id} error={error} />;

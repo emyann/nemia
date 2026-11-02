@@ -308,7 +308,7 @@ export const titleOf = (run: Pick<RunSummary, 'id' | 'brief'>): string =>
  * What a card's chip of the runs it reads says on hover: a line per run in its `context`, its id and its title where `runs` has it, its
  * id alone where it does not.
  */
-export const readsLines = (run: Pick<RunSummary, 'context'>, runs: ReadonlyArray<Pick<RunSummary, 'id' | 'brief'>>): string[] => {
+export const readsLines = (run: Frozen<Pick<RunSummary, 'context'>>, runs: ReadonlyArray<Pick<RunSummary, 'id' | 'brief'>>): string[] => {
   const byId = new Map(runs.map((source) => [source.id, source]));
   return run.context.map((id) => {
     const source = byId.get(id);

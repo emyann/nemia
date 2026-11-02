@@ -1,14 +1,14 @@
 /**
- * The run page's reads decode the api's answers where they enter (`get`): a run's detail (`runQuery`), its decision (`decisionQuery`), a
- * step's conversation (`readTranscript`) and its try's path (`stepPathQuery`). Each reads back what the api gave, every union in its
- * shapes; a key the api leaves out stays out and one the board does not know is dropped. Which keys each answer has is
- * `test/wire.test.ts`'s.
+ * The run page's reads decode the api's answers where they enter (`get`): a run's object (`runObjectQuery`), a step's tries
+ * (`stepTriesQuery`), its decision (`decisionQuery`), a step's conversation (`readTranscript`) and its try's path (`stepPathQuery`). Each
+ * reads back what the api gave, every union in its shapes; a key the api leaves out stays out and one the board does not know is dropped.
+ * Which keys each answer has is `test/wire.test.ts`'s, and the generated mirror's (`run.gen.ts`).
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { ReadRefusal, UnreadAnswer } from '../src/lib/api/read.ts';
-import { runQuery, type RunDetail } from '../src/lib/api/detail.ts';
-import { runGone } from '../src/lib/api/run.ts';
+import { runGone, runObjectQuery, stepTriesQuery } from '../src/lib/api/run.ts';
+import type { Run, StepTry } from '../src/lib/api/run.gen.ts';
 import { decisionQuery, type RunDecision } from '../src/lib/api/decision.ts';
 import { readTranscript, stepPathQuery, type StepPath } from '../src/lib/api/steps.ts';
 import { decidable, detail, step, stepPath, transcript } from './run-fixtures.ts';
@@ -22,30 +22,27 @@ function answering(t: { after: (fn: () => void) => void }, body: unknown, status
   });
 }
 
-const readDetail = runQuery('r-1').queryFn as unknown as () => Promise<RunDetail>;
+const readObject = runObjectQuery('r-1').queryFn as unknown as () => Promise<Run>;
+const readTries = stepTriesQuery('r-1', 'implement', 'stamp').queryFn as unknown as () => Promise<readonly StepTry[]>;
 const readDecision = decisionQuery('r-1', 'stamp').queryFn as unknown as () => Promise<RunDecision>;
 const readPath = stepPathQuery('r-1', 'implement', 'stamp', null, () => false).queryFn as unknown as () => Promise<StepPath>;
 
-/** `value` without `keys`, as an api that does not send them answers. */
-const without = (value: object, ...keys: string[]): object => Object.fromEntries(Object.entries(value).filter(([k]) => !keys.includes(k)));
+/** A step's tries as the api answers them, the current one carrying the closeout whose files are read. */
+const tries = () => {
+  const [first, current] = step().tries;
+  return [first, { ...current, closeout: step().closeout }];
+};
 
 test("get, the run page's reads: each decodes what the api gives, keeps out what it leaves out, drops what the board does not know, and keeps a 404 the api's", async (t) => {
-  await t.test("a run's detail decodes as the api gave it, each union in its every shape", async (t) => {
-    answering(t, detail());
-    assert.deepEqual(await readDetail(), detail());
-  });
-  await t.test("a run's detail from no inbox card has neither `from` nor `fromNote`, and they stay absent", async (t) => {
-    const bare = without(detail(), 'from', 'fromNote');
-    answering(t, bare);
-    const read = await readDetail();
-    assert.equal(Object.hasOwn(read, 'from') || Object.hasOwn(read, 'fromNote'), false);
-    assert.deepEqual(read, bare);
+  await t.test("a step's tries decode as the api gave them, each union in its every shape", async (t) => {
+    answering(t, { tries: tries() });
+    assert.deepEqual(await readTries(), tries());
   });
   await t.test(
     'a file a closeout names keeps what the api served it with, or pruned it with: a bare path does not swallow either',
     async (t) => {
-      answering(t, detail());
-      const [artifact, pruned, bare] = (await readDetail()).steps[0].closeout?.artifacts ?? [];
+      answering(t, { tries: tries() });
+      const [artifact, pruned, bare] = (await readTries()).at(-1)?.closeout?.artifacts ?? [];
       assert.deepEqual(artifact, {
         path: 'shot.png',
         name: 'shot.png',
@@ -57,16 +54,16 @@ test("get, the run page's reads: each decodes what the api gives, keeps out what
       assert.deepEqual(bare, { path: 'RESPONSE.md' });
     },
   );
-  await t.test("a key the board does not know is dropped from a run's detail and its steps, not refused", async (t) => {
-    answering(t, { ...detail(), colour: 'blue', steps: [{ ...step(), mood: 'calm' }] });
-    const read = await readDetail();
-    assert.equal(Object.hasOwn(read, 'colour'), false);
-    assert.equal(Object.hasOwn(read.steps[0], 'mood'), false);
-    assert.deepEqual(read, detail());
+  await t.test("a key the board does not know is dropped from a step's tries, not refused", async (t) => {
+    const [first, current] = tries();
+    answering(t, { colour: 'blue', tries: [first, { ...current, mood: 'calm' }] });
+    const read = await readTries();
+    assert.equal(Object.hasOwn(read.at(-1) ?? {}, 'mood'), false);
+    assert.deepEqual(read, tries());
   });
   await t.test("a run gone is still the api's 404 in its words, never an answer unread", async (t) => {
     answering(t, { error: "No run 'r-1' in this store." }, 404);
-    const err: unknown = await readDetail().then(
+    const err: unknown = await readObject().then(
       () => assert.fail('a 404 was read'),
       (e: unknown) => e,
     );
@@ -74,15 +71,15 @@ test("get, the run page's reads: each decodes what the api gives, keeps out what
     assert.equal(err.status, 404);
     assert.equal(runGone(err), true);
   });
-  await t.test('a word the board does not know in a closed field of a step is refused at decode, never shown', async (t) => {
-    const said = [{ at: '2026-09-30T05:00:00.000Z', attempt: 1, text: 'hi', after: { kind: 'mystery', id: 'e-1' } }];
+  await t.test('a word the board does not know in a closed field of a try is refused at decode, never shown', async (t) => {
     const attempts = { count: 1, latest: { startedAt: '2026-09-30T05:00:00.000Z', ended: 'failed', endedAt: null, reason: 'mystery' } };
+    const [first, current] = tries();
     for (const strange of [
-      { ...step(), said },
-      { ...step(), attempts },
+      { ...current, attempts },
+      { ...current, phase: 'mystery' },
     ]) {
-      answering(t, { ...detail(), steps: [strange] });
-      const err: unknown = await readDetail().then(
+      answering(t, { tries: [first, strange] });
+      const err: unknown = await readTries().then(
         () => assert.fail('a word the board does not know was read'),
         (e: unknown) => e,
       );

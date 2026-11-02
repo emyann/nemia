@@ -1,6 +1,6 @@
 /**
  * Whether a run's read found no run, and how such a read is tried again: what every read of a run shares — its object and its sub-resources
- * (`run.ts`), and its page while readers of it remain (`detail.ts`).
+ * (`run.ts`).
  */
 import { ReadRefusal } from './read.ts';
 

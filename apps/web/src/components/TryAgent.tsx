@@ -1,6 +1,7 @@
 import { useId, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { runGone, runQuery, runsQuery, tryAgent, type AgentListing } from '../lib/api';
+import { runGone, runsQuery, tryAgent, type AgentListing } from '../lib/api';
+import { useRunRead } from '../lib/runView';
 import { latestTryOf, TRY_FENCE, TRY_TERMS, tryHeld } from '../lib/agents';
 import { costText } from '../lib/cost';
 import { AgentRefused, RouteLink } from './AgentParts';
@@ -96,7 +97,7 @@ function TryForm({ agent }: { agent: AgentListing }) {
  * what it spent of its budget, the files its folder holds, and its run's page.
  */
 export function TryRun({ id }: { id: string }) {
-  const { data: run, error } = useQuery(runQuery(id));
+  const { view: run, error } = useRunRead(id);
   const link = (
     <RouteLink
       to="/runs/$runId"

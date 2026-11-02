@@ -1,8 +1,8 @@
-/** What sessions consumed, in the CLI `decide`'s words (apps/api/src/detail/usage.ts), each type with the schema `get` decodes it with. */
+/** What sessions consumed, in the CLI `decide`'s words (apps/api/src/runs/runs.ts), each type with the schema `get` decodes it with. */
 import { Schema } from 'effect';
 import { decodes } from './decodes.ts';
 
-/** Mirrors `Usage` in apps/api/src/detail/usage.ts: a count nobody measured is absent, never 0. */
+/** Mirrors `Usage` in apps/api/src/runs/runs.ts: a count nobody measured is absent, never 0. */
 export type Usage = {
   responses?: number;
   toolCalls?: number;
@@ -52,7 +52,7 @@ export type PeakMark = 'cap' | 'large' | null;
 export const PeakMarkSchema = decodes<PeakMark>()(Schema.NullOr(Schema.Literals(['cap', 'large'])));
 
 /**
- * Mirrors `StepUsed` in apps/api/src/detail/usage.ts: the usage, and the CLI `decide`'s words for it — `used` and `cost`, `not measured`
+ * Mirrors `StepUsed` in apps/api/src/runs/runs.ts: the usage, and the CLI `decide`'s words for it — `used` and `cost`, `not measured`
  * where nobody counted — and the engine's cost, api time and tool time off it, each null where nobody measured it. `read` is what the
  * sessions read, by price, in the CLI `decide`'s words (`read 21.4M · wrote 412k · peak 167k`), null where nothing measured it; `peak`
  * where its peak stands; and `rebuilt` how many resumed sessions wrote their context to the cache again.
@@ -85,7 +85,7 @@ export const StepUsedSchema = decodes<StepUsed>()(
 );
 
 /**
- * Mirrors `RunRead` in apps/api/src/detail/usage.ts: what a run's sessions read, by price, in words, where its peak stands, and how many
+ * Mirrors `RunRead` in apps/api/src/runs/runs.ts: what a run's sessions read, by price, in words, where its peak stands, and how many
  * rebuilt their cache.
  */
 export type RunRead = { said: string; peak: PeakMark; rebuilt: number };

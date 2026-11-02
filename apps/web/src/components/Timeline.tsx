@@ -1,9 +1,15 @@
 import type { ReactNode } from 'react';
-import type { StepTimelineTry, TaskSpan, TimelineTotal } from '../lib/api';
-import type { RunView } from '../lib/runView';
+import type { RunView, StepView } from '../lib/runView';
 import { spentTitle } from '../lib/cost';
 import { instantWhole } from '../lib/instant';
 import { timeToTheSecond } from '../lib/timeOfDay';
+
+/** One try of a step on the clock, as its object's status holds it. */
+type StepTimelineTry = StepView['timeline'][number];
+/** A try's session or its check on the clock. */
+type TaskSpan = NonNullable<StepTimelineTry['session']>;
+/** A round's total, or the run's. */
+type TimelineTotal = RunView['timeline']['run'];
 
 /**
  * Where a run's time went, as the CLI's `decide` prints it: a row for each try's session and each try's check of every step, in the order

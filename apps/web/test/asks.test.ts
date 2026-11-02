@@ -19,7 +19,8 @@ import {
   stepAnchor,
   type Need,
 } from '../src/lib/asks.ts';
-import type { RetryMode, RunDetail, RunToDecide } from '../src/lib/api.ts';
+import type { RetryMode, RunToDecide } from '../src/lib/api.ts';
+import type { RunView } from '../src/lib/runView.ts';
 import { coded, EXIT_1, UNFINISHED, type Word } from './run-fixtures.ts';
 
 const LOGIN =
@@ -27,7 +28,7 @@ const LOGIN =
 /** What the harness says such a session waits for, in the package's words, as the api gives them (`StepNeeds.waitingFor`). */
 const WAIT = { words: 'waiting for a permission prompt', advice: 'answer it in Claude Code: claude agents, session ae/t-held/1' };
 
-type Step = RunDetail['steps'][number];
+type Step = RunView['steps'][number];
 
 /** A step as a run's detail gives it, saying `word` with its codes, cut to what these read. */
 const step = (name: string, word: Word, over: Partial<Step> = {}): Step =>
@@ -249,7 +250,7 @@ test('offersOf: what the Decide section offers a step, and nothing on a run held
           { field: 'open', questions: [asking('Which cut?'), asking('Which name?')] },
           { field: 'later', questions: [asking('When?')] },
         ],
-      } as Step['closeout'];
+      } as unknown as Step['closeout'];
       const design = step('design', 'succeeded · BLOCKED', { needs: 'Three questions.', closeout });
       const worded = step('spec', 'succeeded · BLOCKED', {
         needs: 'Postgres or MySQL?',
@@ -358,7 +359,7 @@ test('raiseTo, answersOf, gateOffered: a raise and its answers, and a gate offer
           { field: 'open', questions: [asking('Which cut?')] },
           { field: 'later', questions: [asking('When?')] },
         ],
-      } as Step['closeout'];
+      } as unknown as Step['closeout'];
       const blocked = {
         by: 'retry' as const,
         above: 1.5,

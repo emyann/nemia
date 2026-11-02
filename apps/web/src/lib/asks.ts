@@ -104,8 +104,8 @@ export const needLine = (need: Need): string =>
 /**
  * Whether a step's section offers its gate — Approve and Send back — beside what it handed on: it waits at its gate on you, as the CLI's
  * `ls` asks it (`approve plan`), on a run nobody called off. Only words offer it: a step approved or sent back carries none, and neither
- * does a detail from an api that has no approve route, whose `approve` is not there at all (the read refuses such a detail first,
- * `runQuery`).
+ * does a run from an api that has no approve route, whose `approve` is not there at all (the read refuses such an object first,
+ * `runObjectQuery`).
  */
 export const gateOffered = (step: Pick<StepView, 'approve'>, runCancelled: boolean): boolean => Boolean(step.approve) && !runCancelled;
 

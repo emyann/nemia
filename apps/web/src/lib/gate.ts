@@ -6,11 +6,14 @@
  * sentences joining them are the board's, so a person reads what approving does without knowing the package: the CLI's `ls` prints the
  * command.
  */
-import type { Collision, Collisions, Decidable, RunSummary, StepAsked } from './api';
+import type { Collision, Collisions, Decidable, RunSummary } from './api';
 import type { RunView, StepView } from './runView';
 import { askedSaid, needsOf, stepAnchor, type Need } from './asks.ts';
 import { touchedSummary } from './decide.ts';
 import { verdictWords } from './words.ts';
+
+/** A try a person asked for, which the next tick files, as its step's status holds it. */
+type StepAsked = NonNullable<StepView['asked']>;
 
 type DetailStep = StepView;
 

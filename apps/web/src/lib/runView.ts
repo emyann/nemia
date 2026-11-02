@@ -4,7 +4,15 @@
  * the generated mirror (`api/run.gen.ts`) and the lines' (`RunLines`), under the names the run's components read.
  */
 import { useMemo } from 'react';
-import { useQueries, useQueryClient, useSuspenseQuery, type QueryClient, type QueryKey, type UseQueryResult } from '@tanstack/react-query';
+import {
+  useQueries,
+  useQuery,
+  useQueryClient,
+  useSuspenseQuery,
+  type QueryClient,
+  type QueryKey,
+  type UseQueryResult,
+} from '@tanstack/react-query';
 import type { Run, RunSpec, RunSpecStep, RunStatus, RunStepStatus, StepTold, StepTry } from './api/run.gen.ts';
 import type { StepCloseout, StepTry as StepTryRead, StepUnreadable } from './api/tries.ts';
 import type { WorkflowPageAddress } from './api/address.ts';
@@ -26,8 +34,8 @@ export type StepFiledView = Omit<NonNullable<RunStepStatus['filed']>, 'fence'> &
  * try's closeout, or why it could not be read.
  *
  * Its closeout, its tries and its current try's short (`current`, absent from the page) are typed as the decision's mirror has them
- * (`api/tries.ts`), read only, which the generated ones are too: so the run's page (`RunDetail`), which the readers not yet on the object
- * still hand the same components, is a view as well, until it goes.
+ * (`api/tries.ts`), read only, which the generated ones are too. `current` is optional for a view built with no try read, as a
+ * workflow's unstarted run is (`unstartedRun`).
  */
 export type StepView = Omit<RunStepStatus, 'status' | 'filed' | 'current'> & {
   readonly current?: RunStepStatus['current'];
@@ -154,16 +162,18 @@ const lastRead = <T>(client: QueryClient, key: QueryKey): T | undefined =>
 /** The data of each of a list of reads, in order: a `combine` declared once, so the list keeps its identity while no read changes. */
 const dataOf = <T>(results: UseQueryResult<T>[]): Array<T | undefined> => results.map((r) => r.data);
 
+/** No steps, for a run whose object is not read yet: one array for the module's life. */
+const NO_STEPS: readonly RunStepStatus[] = [];
+
 /**
- * The view of the run `id`, and the error of its object's last read — a run gone (`runGone`) is said by the page, which keeps what it
- * last read. Its object and lines are suspense reads, which the route's loader has read (`loadRun`); each step's tries and told are read
- * under its stamp (`stepStamp`), so they are read again only when the step moves, and while they are what was read before stays.
+ * Each step's tries and told, read under its stamp (`stepStamp`), so they are read again only when the step moves; while they are, what
+ * was read before stays (`lastRead`). Undefined for a read not answered yet.
  */
-export function useRunView(id: string): { view: RunView; error: unknown } {
+function useStepReads(
+  id: string,
+  steps: readonly RunStepStatus[],
+): { tries: Array<readonly StepTry[] | undefined>; told: Array<StepTold | null | undefined> } {
   const client = useQueryClient();
-  const { data: object, error } = useSuspenseQuery(runObjectQuery(id));
-  const { data: lines } = useSuspenseQuery(runLinesQuery(id));
-  const steps = object.status.steps;
   const tries = useQueries({
     queries: steps.map((step) => ({
       ...stepTriesQuery(id, step.name, stepStamp(step)),
@@ -178,17 +188,55 @@ export function useRunView(id: string): { view: RunView; error: unknown } {
     })),
     combine: dataOf<StepTold | null>,
   });
+  return { tries, told };
+}
+
+/** The view of `object` with its lines and its steps' reads, each step's by its name. */
+const viewOf = (
+  object: Run,
+  lines: RunLines,
+  tries: ReadonlyArray<readonly StepTry[] | undefined>,
+  told: ReadonlyArray<StepTold | null | undefined>,
+): RunView => {
+  const steps = object.status.steps;
+  return runViewOf(
+    object,
+    lines,
+    Object.fromEntries(steps.map((step, i) => [step.name, tries[i]])),
+    Object.fromEntries(steps.map((step, i) => [step.name, told[i]])),
+  );
+};
+
+/**
+ * The view of the run `id`, and the error of its object's last read — a run gone (`runGone`) is said by the page, which keeps what it
+ * last read. Its object and lines are suspense reads, which the route's loader has read (`loadRun`); each step's tries and told are read
+ * under its stamp (`useStepReads`).
+ */
+export function useRunView(id: string): { view: RunView; error: unknown } {
+  const { data: object, error } = useSuspenseQuery(runObjectQuery(id));
+  const { data: lines } = useSuspenseQuery(runLinesQuery(id));
+  const { tries, told } = useStepReads(id, object.status.steps);
+  const view = useMemo(() => viewOf(object, lines, tries, told), [object, lines, tries, told]);
+  return { view, error };
+}
+
+/**
+ * The view of the run `id` where no loader has read it — a bar, a preview, a try — and the error of its object's or its lines' last
+ * read. Undefined until the object, the lines and every step's tries and told are read, so it is drawn whole or not at all; once drawn it
+ * stays, through a failed read (a run gone keeps what it last read) and while a step that moved is read again.
+ */
+export function useRunRead(id: string): { view: RunView | undefined; error: unknown } {
+  const object = useQuery(runObjectQuery(id));
+  const lines = useQuery(runLinesQuery(id));
+  const { tries, told } = useStepReads(id, object.data?.status.steps ?? NO_STEPS);
+  const run = object.data;
+  const said = lines.data;
   const view = useMemo(
     () =>
-      runViewOf(
-        object,
-        lines,
-        Object.fromEntries(steps.map((step, i) => [step.name, tries[i]])),
-        Object.fromEntries(steps.map((step, i) => [step.name, told[i]])),
-      ),
-    [object, lines, steps, tries, told],
+      run && said && tries.every((t) => t !== undefined) && told.every((t) => t !== undefined) ? viewOf(run, said, tries, told) : undefined,
+    [run, said, tries, told],
   );
-  return { view, error };
+  return { view, error: object.error ?? lines.error };
 }
 
 /**

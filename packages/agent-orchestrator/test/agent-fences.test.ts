@@ -88,17 +88,15 @@ import { parseAgent } from '../src/agents/agents.ts';
 import { stepPlace, WorkflowError, type Workflow } from '../src/step/step.ts';
 import { readSkillRules, RULES_FILE } from '../src/skills/read.store.ts';
 import { appliesMatch, appliesOf, type SkillRule } from '../src/skills/skills.ts';
-import { filedConfig, inputsMounts, readsMounts } from '../src/filed/filed.ts';
-import { handedMounts } from '../src/artifacts/artifacts.ts';
 import { isFolderTeam, sandboxed, unallowedRefusal, upstreamOf } from '../src/workflow/index.ts';
 import { scratch } from './scratch.ts';
-import { declared } from '../place/git/declared.ts';
 import { levelFile, promptFile, readNemia, storeDenies, toldFile } from '../src/nemia/level.store.ts';
 import { admissionOf, nemiaFence, widened } from '../src/admission/index.ts';
 import { TABLE } from '../src/command/commands.verb.ts';
 import { rulesOfTry } from '../src/stats/discipline.ts';
 import { givenSkillOf } from '../src/keys/given-skill.ts';
 import { placesOf, shippedFolders, SHIPPED_HOLDERS, TEAM, TEAM_DEV, teamCopy } from './team.ts';
+import { CARD, filedOf, handedBy, INPUT_FILE, INPUTS, readsAt, writesAt } from './mounted.ts';
 
 const REPO = path.join(import.meta.dirname, '..', '..', '..');
 
@@ -3143,130 +3141,6 @@ test("REFUSED: a git question review-a-change names that Agora's own allow does 
   );
 });
 
-/** The run's artifacts folder the reach below is filed against, one folder per step under it. */
-const RUN_ARTIFACTS = '/s/runs/r-1/artifacts';
-
-/** The store's inbox the reach below is filed against, and a card in it. */
-const INBOX = '/s/inbox';
-const CARD = path.join(INBOX, 'card.md');
-
-/** A file the step `by` handed over, in its own folder of the run's artifacts. */
-const handedBy = (by: string): string => path.join(RUN_ARTIFACTS, by, 'shot.png');
-
-/** The run's inputs folder the reach below is filed against, and a file `nemia start --input` gave the run in it. */
-const INPUTS = '/s/runs/r-1/inputs';
-const INPUT_FILE = path.join(INPUTS, 'template-draft.md');
-
-/**
- * Each step of `steps` by its name, with the config its first filing gives its harness (`filedConfig`), in a run that mounts nothing, and
- * is given no input unless `inputs` names its inputs folder.
- */
-const filedOf = (steps: readonly Step[], inputs?: string): Map<string, Filed> =>
-  new Map(
-    steps.map((step) => [
-      step.name,
-      filedConfig(
-        step,
-        steps,
-        { gates: [] },
-        {
-          model: undefined,
-          budgetUsd: undefined,
-          runArtifacts: RUN_ARTIFACTS,
-          inbox: INBOX,
-          ...(inputs === undefined ? {} : { inputs }),
-          own: {},
-          landingDenied: () => declared.denyWhileLanding,
-        },
-      ),
-    ]),
-  );
-
-type Filed = ReturnType<typeof filedConfig>;
-
-/** Whether `file` is under the folder a rule `Tool(//<folder>/**)` of the tool `tool` names, for a rule of that shape. */
-const ruleCovers = (rule: string, tool: string, file: string): boolean => {
-  const folder = new RegExp(`^${tool}\\(/(/.*)/\\*\\*\\)$`).exec(rule)?.[1];
-  return folder !== undefined && file.startsWith(`${folder}/`);
-};
-
-/** Whether a mount of a filed config holds `file`, read-only or writable as `readOnly` says. */
-const mountHolds = (config: Filed, file: string, readOnly: boolean): boolean =>
-  (config.mounts ?? []).some((m) => m.readOnly === readOnly && file.startsWith(`${m.path}/`));
-
-/** Whether a session filed with `config` reads `file` outside its workspace: a mount holds it, or a `Read(//<folder>/**)` allow does. */
-const readsAt = (config: Filed, file: string): boolean =>
-  mountHolds(config, file, true) ||
-  mountHolds(config, file, false) ||
-  (config.allowedTools ?? []).some((rule) => ruleCovers(rule, 'Read', file));
-
-/**
- * Whether a session filed with `config` may write `file` outside its workspace: a writable mount or an `Edit(//<folder>/**)` allow names
- * it, and neither a read-only mount, whose deny beats every allow and mode, nor an `Edit(//<folder>/**)` deny holds it.
- */
-const writesAt = (config: Filed, file: string): boolean =>
-  (mountHolds(config, file, false) || (config.allowedTools ?? []).some((rule) => ruleCovers(rule, 'Edit', file))) &&
-  !mountHolds(config, file, true) &&
-  !(config.disallowedTools ?? []).some((rule) => ruleCovers(rule, 'Edit', file));
-
-test('a later step reads, and never writes, what each step it comes after handed over; its own folder is held by none', () => {
-  const filed = filedOf(loadWorkflows(TEAM_DEV));
-  const review = filed.get('review')!;
-  const ship = filed.get('ship')!;
-  const implement = filed.get('implement')!;
-  assert.ok(readsAt(review, handedBy('implement')), "review reads implement's pictures");
-  assert.equal(writesAt(review, handedBy('implement')), false, "review writes none of implement's");
-  for (const by of ['implement', 'review']) {
-    assert.ok(readsAt(ship, handedBy(by)), `ship reads ${by}'s`);
-    assert.equal(writesAt(ship, handedBy(by)), false, `ship writes none of ${by}'s`);
-  }
-  assert.equal(readsAt(implement, handedBy('review')), false, 'implement comes after nothing, and reads no folder of the run');
-  for (const [name, config] of filed) {
-    assert.equal(mountHolds(config, handedBy(name), true), false, `${name}'s own folder is not mounted read-only`);
-    assert.equal(mountHolds(config, handedBy(name), false), false, `${name}'s own folder is not mounted`);
-  }
-});
-
-test('REFUSED: a step does not read the folder of a step it does not come after', () => {
-  const steps = loadWorkflows(folderOf({ a: 'permissionMode: dontAsk', b: 'permissionMode: dontAsk', c: 'after: a', d: 'after: b, c' }));
-  const filed = filedOf(steps);
-  const reads = (name: string): string[] => ['a', 'b', 'c', 'd'].filter((by) => readsAt(filed.get(name)!, handedBy(by)));
-  assert.deepEqual(reads('c'), ['a'], "c reads a's, never its sibling b's nor d's after it");
-  assert.deepEqual(reads('d'), ['a', 'b', 'c'], 'd reads b and c, and a through c');
-  assert.deepEqual(reads('a'), [], 'a comes after nothing');
-  assert.deepEqual(reads('b'), [], 'b comes after nothing');
-  assert.deepEqual(
-    handedMounts(
-      steps.find((s) => s.name === 'd')!,
-      steps,
-      RUN_ARTIFACTS,
-    ),
-    ['a', 'b', 'c'].map((by) => ({ path: path.join(RUN_ARTIFACTS, by), readOnly: true })),
-    "in the workflow's order",
-  );
-});
-
-test('REFUSED: a handed folder mounted writable is open to a write, and an Edit allow on it is no write while it is mounted read-only', () => {
-  const review = filedOf(loadWorkflows(TEAM_DEV)).get('review')!;
-  const opened = { ...review, mounts: review.mounts!.map((m) => ({ ...m, readOnly: false })) };
-  assert.ok(writesAt(opened, handedBy('implement')), 'the model sees a writable mount as a write');
-  const allowed = { ...review, allowedTools: [...(review.allowedTools ?? []), `Edit(/${path.join(RUN_ARTIFACTS, 'implement')}/**)`] };
-  assert.ok(writesAt({ ...allowed, mounts: [] }, handedBy('implement')), 'the model sees an Edit allow as a write');
-  assert.equal(writesAt(allowed, handedBy('implement')), false, "the read-only mount's deny beats the allow");
-});
-
-test('a step on a sandboxed or a remote harness is filed no handed mount', () => {
-  const steps = loadWorkflows(TEAM_DEV);
-  const review = steps.find((s) => s.name === 'review')!;
-  const codex = { ...review, harness: 'codex', permissionMode: 'read-only' };
-  assert.deepEqual(handedMounts(codex, steps, RUN_ARTIFACTS), [], 'codex reads the disk in its sandbox already');
-  assert.equal(Object.hasOwn(filedOf(steps.map((s) => (s.name === 'review' ? codex : s))).get('review')!, 'mounts'), false, 'no key');
-  assert.deepEqual(handedMounts({ ...review, harness: 'a2a:peer' }, steps, RUN_ARTIFACTS), [], 'a remote agent is filed no local field');
-  assert.deepEqual(handedMounts({ ...review, harness: 'claude' }, steps, RUN_ARTIFACTS), [
-    { path: path.join(RUN_ARTIFACTS, 'implement'), readOnly: true },
-  ]);
-});
-
 test('every shipped step on a harness fenced by a permission mode reads, and never writes, what each step it comes after handed over', () => {
   const checked: string[] = [];
   for (const dir of FOLDERS) {
@@ -3297,35 +3171,6 @@ test('the janitor reads the inbox, and writes none of it: every shipped step who
   }
 });
 
-test('REFUSED: a step whose `reads:` does not name the inbox reads none of it', () => {
-  const at = (workflow: string, name: string): Filed => {
-    const found = shipped().find(({ dir, step }) => path.basename(dir) === workflow && step.name === name);
-    assert.ok(found, `${workflow}/${name} is shipped`);
-    return filedOf(loadWorkflows(found.dir, placesOf(found.dir))).get(name)!;
-  };
-  for (const [workflow, name] of [
-    ['build', 'design'],
-    ['build', 'review'],
-    ['intake', 'intake'],
-  ])
-    assert.equal(readsAt(at(workflow, name), CARD), false, `${workflow}/${name} names no store folder, and reads no card`);
-  const argus = shippedStepOf('argus');
-  assert.equal(readsAt(filedOf([{ ...argus, reads: undefined }]).get(argus.name)!, CARD), false, 'Argus without the line reads none');
-  assert.deepEqual(readsMounts({ ...argus, harness: 'codex' }, INBOX), [], 'codex reads the disk in its sandbox already');
-  assert.deepEqual(readsMounts({ ...argus, harness: 'a2a:peer' }, INBOX), [], 'a remote agent is filed no local field');
-  assert.deepEqual(readsMounts(argus, INBOX), [{ path: INBOX, readOnly: true }]);
-});
-
-test('REFUSED: the inbox mounted writable is open to a write, and an Edit allow on it is no write while it is mounted read-only', () => {
-  const argus = shippedStepOf('argus');
-  const config = filedOf([argus]).get(argus.name)!;
-  const opened = { ...config, mounts: config.mounts!.map((m) => ({ ...m, readOnly: false })) };
-  assert.ok(writesAt(opened, CARD), 'the model sees a writable mount as a write');
-  const allowed = { ...config, allowedTools: [...(config.allowedTools ?? []), `Edit(/${INBOX}/**)`] };
-  assert.ok(writesAt({ ...allowed, mounts: [] }, CARD), 'the model sees an Edit allow as a write');
-  assert.equal(writesAt(allowed, CARD), false, "the read-only mount's deny beats the allow");
-});
-
 test("every shipped step of a repository run on a harness fenced by a permission mode reads, and never writes, its run's inputs", () => {
   const checked: string[] = [];
   for (const dir of FOLDERS) {
@@ -3340,28 +3185,6 @@ test("every shipped step of a repository run on a harness fenced by a permission
     }
   }
   assert.ok(checked.includes('intake/intake') && checked.includes('build/design'), checked.join('\n'));
-});
-
-test('REFUSED: a run given no input reads none; the inputs mounted writable are open to a write, and an Edit allow is no write while they are read-only', () => {
-  const steps = loadWorkflows(TEAM_DEV);
-  for (const [name, config] of filedOf(steps)) assert.equal(readsAt(config, INPUT_FILE), false, `${name} is given no input`);
-  const implement = filedOf(steps, INPUTS).get('implement')!;
-  const opened = { ...implement, mounts: implement.mounts!.map((m) => ({ ...m, readOnly: false })) };
-  assert.ok(writesAt(opened, INPUT_FILE), 'the model sees a writable mount as a write');
-  const allowed = { ...implement, allowedTools: [...(implement.allowedTools ?? []), `Edit(/${INPUTS}/**)`] };
-  assert.ok(writesAt({ ...allowed, mounts: [] }, INPUT_FILE), 'the model sees an Edit allow as a write');
-  assert.equal(writesAt(allowed, INPUT_FILE), false, "the read-only mount's deny beats the allow");
-});
-
-test("a step on a sandboxed or a remote harness, and a folder team's, is filed no inputs mount; a run given none mounts nothing", () => {
-  const repo = [{ place: 'git' as const }];
-  const folder = [{ place: 'folder' as const }];
-  assert.deepEqual(inputsMounts({ harness: 'claude' }, repo, INPUTS), [{ path: INPUTS, readOnly: true }]);
-  assert.deepEqual(inputsMounts({ harness: undefined }, repo, INPUTS), [{ path: INPUTS, readOnly: true }], 'the default harness');
-  assert.deepEqual(inputsMounts({ harness: 'codex' }, repo, INPUTS), [], 'codex reads the disk in its sandbox already');
-  assert.deepEqual(inputsMounts({ harness: 'a2a:peer' }, repo, INPUTS), [], 'a remote agent is filed no local field');
-  assert.deepEqual(inputsMounts({ harness: 'claude' }, folder, INPUTS), [], "a folder team's steps read the copy in their own folder");
-  assert.deepEqual(inputsMounts({ harness: 'claude' }, repo, undefined), [], 'a run given none');
 });
 
 /** Nemia as her keeper files her: her shipped definition, long-lived. */

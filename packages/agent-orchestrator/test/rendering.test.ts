@@ -1,27 +1,18 @@
 /**
- * An agent rendered for Claude Code (`agents/agents.ts`): the skills it gives by name, found in the workflow's own root, the repository's
- * `.claude/` or the store, the repository's before the store's; what becomes of Claude Code's own prompt (`harnessPrompt:`); what
- * `nemia start` writes under `runs/<id>/agents/<step>/`; and the flags the tick files the step with. Each refusal at shipped defaults. The
- * runs are folder teams, so no git is asked; a folder team started from `HERE` reads that directory's `.claude/` as its repository's.
+ * An agent rendered for its harness (`agents/agents.ts`, `brief/brief.ts`), as one table per renderer: the layers a step is told and
+ * their order, in its body, its brief and Claude Code's prompt (`renderedPrompt`); the flags the tick files a step with (`renderedFlags`);
+ * the skills its session may load (`enabledSkillsOf`); what a filed brief is cut back into by layer (`toldLayers`, `skillLayers`); where a
+ * skill or an agent is found (`lookupRoots`, `skillsFor`), and how a codex step's sandbox reaches Codex (`modeOf`). What `nemia start`
+ * writes and the tick files from it is told as a story in `agent-session.test.ts`.
  */
-import { test } from 'node:test';
+import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { Result, Schema } from 'effect';
 import { codex, CODEX_SANDBOXES } from 'agent-runtime';
 import { CLAUDE_AUTO_DROPPED } from 'agent-runtime/vocabulary';
-import {
-  asNamed,
-  autoDropped,
-  modeOf,
-  parseAgent,
-  parseWorkflow,
-  renderAgent,
-  WorkflowError,
-  type Agent,
-  type Workflow,
-} from '../src/workflow.ts';
+import { asNamed, autoDropped, modeOf, parseAgent, parseWorkflow, WorkflowError, type Agents, type Workflow } from '../src/workflow.ts';
 import { FrozenStepSchema, loadWorkflows } from '../src/folder/folder.store.ts';
 import { agentsFor, agentVersion } from '../src/agents/read.store.ts';
 import { PLACE_SKILLS, isBuiltinPlace, lookupRoots, skillsFor } from '../src/skills/read.store.ts';
@@ -30,55 +21,19 @@ import {
   briefBody,
   enabledSkillsOf,
   noCodingStyle,
-  pluginOf,
   renderedFlags,
   renderedPrompt,
   rendersAgent,
+  skillLayers,
   unrendered,
 } from '../src/agents/agents.ts';
-import { PRECEDENCE } from '../src/brief/index.ts';
+import { composeBrief, PRECEDENCE, toldLayers, type RepositoryRun } from '../src/run.ts';
+import { headedLayers } from '../src/workflow/index.ts';
 import { scratch } from './scratch.ts';
-import { promised } from './promised.ts';
-import { testPlace } from '../place/memory/index.ts';
-import { eachTest, runGiven, runOver } from './placed.ts';
+import { names } from './assessed.ts';
 
 const ROOT = scratch('wf-render-');
 process.env.WF_ROOT = ROOT;
-const stand = eachTest(testPlace);
-const { advanceRun, startRun, runWith: runEngine } = await import('../src/runner.ts');
-const runWith = runOver(runEngine, () => stand().layer);
-const runPlaced = runGiven(() => stand().layer);
-const { readRun } = await import('../src/record/record.store.ts');
-const { agentFilesDir } = await import('../src/agents/agents.store.ts');
-
-type Filed = {
-  id: string;
-  brief: string;
-  cwd: string;
-  harness?: string;
-  config?: { claude?: Record<string, unknown>; permissionMode?: string; enabledSkills?: string[] | 'default' };
-};
-
-/** Just enough engine to file: every task's spec as it was filed, none of them started. */
-const board = () => {
-  const filed = new Map<string, Filed>();
-  const e = promised({
-    view: async (id: string) => ({
-      id,
-      phase: 'pending',
-      sessionId: null,
-      state: { brief: filed.get(id)?.brief ?? '', settled: null, stopRequested: false, said: [], attempts: [] },
-    }),
-    file: async (spec: Filed) => {
-      filed.set(spec.id, spec);
-      return spec.id;
-    },
-    stop: async () => {},
-    logs: async () => '',
-    feed: async () => ({ entries: [], cursor: 0 }),
-  });
-  return { e, filed };
-};
 
 /** A tree of files under a fresh directory, each written from `files` by its path from it; the directory. */
 function tree(files: Record<string, string>): string {
@@ -90,7 +45,7 @@ function tree(files: Record<string, string>): string {
   return dir;
 }
 
-/** What `fn` is refused with, as a `WorkflowError`'s message. */
+/** What `fn` is refused with: a `WorkflowError`, exit 2, and its message. */
 function refusal(fn: () => unknown): string {
   try {
     fn();
@@ -102,19 +57,15 @@ function refusal(fn: () => unknown): string {
   return assert.fail('it was not refused');
 }
 
-/** That `words` open on `head` — the file or the step, and the line refused — and name each of `fixes`: the key, the value, the word. */
-function says(words: string, head: string, ...fixes: string[]): void {
-  assert.ok(words.startsWith(head), words);
-  for (const fix of fixes) assert.ok(words.includes(fix), `${words} names ${fix}`);
+/** Each row of `all` a subtest of `t`: its name, and what it asserts. */
+async function rows(t: TestContext, all: ReadonlyArray<readonly [string, () => void]>): Promise<void> {
+  for (const [name, body] of all) await t.test(name, body);
 }
 
 const SKILL = (name: string, extra = '') =>
   `---\nname: ${name}\ndescription: Use this when ${name.replace(/-/g, ' ')} is asked.\n${extra}---\nHow to ${name.replace(/-/g, ' ')}.\n`;
 
-/**
- * A team of one step `build` on `place: git` naming `agent: <name>` in `<dir>/workflows/team`, the agent and skills beside it as `files`
- * gives them.
- */
+/** A team of one step `build` naming `agent: builder` in `<dir>/workflows/team`, the agent and skills beside it as `files` gives them. */
 const team = (agent: string, files: Record<string, string>, step = "---\nagent: builder\n---\nThe step's own note.\n"): string =>
   path.join(
     tree({ 'workflows/team/build.md': step.replace(/^---\n/, '---\nplace: git\n'), 'workflows/agents/builder.md': agent, ...files }),
@@ -122,9 +73,12 @@ const team = (agent: string, files: Record<string, string>, step = "---\nagent: 
     'team',
   );
 
+/** A step as the parser resolves it from a team of one. */
+const resolved = (agent: string, files: Record<string, string> = {}, step?: string): Workflow => loadWorkflows(team(agent, files, step))[0];
+
 /**
- * The heading each layer Nemia composes is told under, as a session reads it: its number in the doctrine's precedence order and the owner
- * whose words follow. Written out here, not read from the code, so a heading reworded fails the assertions that quote it.
+ * The heading each layer Nemia composes is told under: its number in the precedence and the owner whose words follow. Written out here,
+ * not read from the code, so a heading reworded fails the assertions that quote it.
  */
 const HEAD = {
   instructions: "## 1. Instructions — your role's own words",
@@ -133,532 +87,339 @@ const HEAD = {
   policy: "## 5. The step's policy — this step of this process",
 } as const;
 
-test("an agent gives skills by name and says what becomes of Claude Code's prompt, each its own line, read and written back", () => {
-  const a = parseAgent(
-    'builder',
-    '---\nskills: review-a-change, write-a-note\nharnessPrompt: no-coding\ntools: Read, Skill\n---\nYou build.\n',
+/** The agent `scribe`, told in English, with `custom` as a person's custom instructions for it when given. */
+const scribeWith = (custom?: string, keys = 'tools: Read'): Agents =>
+  new Map([
+    [
+      'scribe',
+      { ...parseAgent('scribe', `---\n${keys}\n---\nReply in English.\n`), ...(custom !== undefined && { customInstructions: custom }) },
+    ],
+  ]);
+
+/** The step `build` naming the scribe, its own note in Spanish, with `lines` in its frontmatter, in a factory whose rules are `rules`. */
+const buildWith = (agents: Agents, rules?: string, lines = 'harness: claude'): Workflow =>
+  parseWorkflow(
+    'build',
+    `---\nplace: git\nagent: scribe\n${lines}\n---\nReply in Spanish.\n`,
+    undefined,
+    agents,
+    undefined,
+    undefined,
+    rules,
   );
-  assert.deepEqual(a.skills, ['review-a-change', 'write-a-note']);
-  assert.equal(a.harnessPrompt, 'no-coding');
-  assert.equal('skills' in a.keys, false, 'no role key: a step does not inherit it as one of its own');
-  const written = renderAgent({
-    name: 'builder',
-    skills: 'review-a-change, write-a-note',
-    harnessPrompt: 'no-coding',
-    keys: { tools: 'Read, Skill' },
-    body: 'You build.\n',
-  });
-  assert.equal(
-    written,
-    '---\nskills: review-a-change, write-a-note\nharnessPrompt: no-coding\nclaude:\n  fence:\n    tools: Read, Skill\n---\nYou build.\n',
-  );
-  assert.deepEqual(parseAgent('builder', written).skills, a.skills);
-  for (const word of ['keep', 'no-coding', 'replace']) {
-    const agent = parseAgent('builder', `---\nharnessPrompt: ${word}\n---\nYou build.\n`);
-    assert.equal(agent.harnessPrompt, word);
-    assert.equal(
-      renderAgent({ name: 'builder', harnessPrompt: agent.harnessPrompt, keys: {}, body: agent.body }),
-      `---\nharnessPrompt: ${word}\n---\nYou build.\n`,
-    );
-  }
+
+const RULES = 'Reply in German.';
+
+/** Where `text` is in `told`, which must hold it. */
+const at = (told: string, text: string): number => {
+  const i = told.indexOf(text);
+  assert.ok(i >= 0, `told ${JSON.stringify(text)}:\n${told}`);
+  return i;
+};
+
+/** Whether `told` says each of `words` in the order given. */
+const inOrder = (told: string, ...words: string[]): boolean => words.every((w, i) => i === 0 || at(told, words[i - 1]) < at(told, w));
+
+test("the layers a step is told — its agent's instructions, the custom instructions, the factory's rules, its own note — in that order", async (t) => {
+  await rows(t, [
+    [
+      'in the body, the four disagreeing, each kept apart on the agent',
+      () => {
+        const step = buildWith(scribeWith('Reply in French.'), RULES);
+        assert.ok(inOrder(step.body, 'English', 'French', 'German', 'Spanish'), step.body);
+        assert.equal(step.agent?.factoryRules, RULES);
+        assert.equal(step.agent?.customInstructions, 'Reply in French.', "the person's words are kept apart from the factory's");
+        assert.equal(step.agent?.instructions, 'Reply in English.', "the agent's own words are kept apart from the person's");
+        assert.equal(step.agent?.body, 'Reply in Spanish.');
+        const none = buildWith(scribeWith());
+        assert.equal(none.agent?.customInstructions, undefined);
+        assert.equal(none.body.includes('French'), false);
+      },
+    ],
+    [
+      'codex, and a step that continues a session, are told the four in their brief, in the same order',
+      () => {
+        const onCodex = buildWith(scribeWith('Reply in French.', ''), RULES, 'harness: codex');
+        assert.ok(inOrder(onCodex.body, 'English', 'French', 'German', 'Spanish'), onCodex.body);
+        assert.equal(briefBody(onCodex), onCodex.body);
+        const resumed = buildWith(scribeWith('Reply in French.'), RULES, 'harness: claude\nresume: plan');
+        assert.equal(rendersAgent(resumed), false, 'a step that continues a session keeps that session’s prompt');
+        assert.ok(inOrder(briefBody(resumed), 'English', 'French', 'German', 'Spanish'), briefBody(resumed));
+      },
+    ],
+    [
+      'each layer the body is told in carries its number and its owner',
+      () => {
+        const cody: Agents = new Map([['cody', { ...parseAgent('cody', '---\n---\nYou are Cody.\n'), customInstructions: 'Be terse.' }]]);
+        const ruled = parseWorkflow(
+          'build',
+          '---\nplace: git\nagent: cody\nharness: codex\n---\nBuild it.\n',
+          undefined,
+          cody,
+          undefined,
+          undefined,
+          'Never push on a Friday.',
+        );
+        assert.equal(
+          ruled.body,
+          headedLayers([
+            ['instructions', 'You are Cody.'],
+            ['custom', 'Be terse.'],
+            ['factory', 'Never push on a Friday.'],
+            ['policy', 'Build it.'],
+          ]),
+        );
+        for (const heading of [HEAD.instructions, HEAD.custom, HEAD.factory, HEAD.policy])
+          assert.ok(ruled.body.includes(`${heading}\n\n`), heading);
+      },
+    ],
+    [
+      "Claude Code's prompt is the instructions, the custom instructions, the rules, then the skills; the brief is the step's own note",
+      () => {
+        const step = buildWith(scribeWith('Reply in French.'), RULES);
+        const prompt = renderedPrompt(step, [{ name: 'alpha' }]);
+        assert.ok(inOrder(prompt, 'English', 'French', 'German', 'nemia-scribe:alpha'), prompt);
+        assert.equal(prompt.includes('Spanish'), false, "the step's policy is its brief's");
+        assert.equal(briefBody(step), 'Reply in Spanish.');
+        assert.ok(
+          inOrder(
+            renderedPrompt(buildWith(scribeWith('Reply in French.')), [{ name: 'alpha' }]),
+            'English',
+            'French',
+            'nemia-scribe:alpha',
+          ),
+        );
+      },
+    ],
+    [
+      'a factory with no rules tells nothing: no key on the step, the same body and the same prompt',
+      () => {
+        for (const rules of [undefined, '', '  \n\n']) {
+          const none = buildWith(scribeWith('Reply in French.'), rules);
+          const plain = parseWorkflow(
+            'build',
+            '---\nplace: git\nagent: scribe\nharness: claude\n---\nReply in Spanish.\n',
+            undefined,
+            scribeWith('Reply in French.'),
+          );
+          assert.deepEqual(none, plain, JSON.stringify(rules));
+          assert.equal('factoryRules' in none.agent!, false);
+          assert.equal(renderedPrompt(none, [{ name: 'alpha' }]), renderedPrompt(plain, [{ name: 'alpha' }]));
+        }
+      },
+    ],
+    [
+      "a step on a remote agent is told none of the rules, by its own line or its agent's; a local one beside it is",
+      () => {
+        const remote = buildWith(scribeWith(undefined, ''), RULES, 'harness: a2a:peer');
+        assert.equal(remote.harness, 'a2a:peer');
+        assert.equal(remote.body.includes('German'), false, remote.body);
+        assert.equal('factoryRules' in remote.agent!, false);
+        const inherited = buildWith(scribeWith(undefined, 'harness: a2a:peer'), RULES, 'slot: none');
+        assert.equal(inherited.harness, 'a2a:peer', "the agent's own harness line");
+        assert.equal(inherited.body.includes('German'), false, inherited.body);
+        assert.equal(buildWith(scribeWith(undefined, ''), RULES, 'harness: codex').agent?.factoryRules, RULES);
+      },
+    ],
+    [
+      "custom instructions and rules are words: the step's keys and fence are the same with them as without",
+      () => {
+        const keys = 'tools: Read\npermissionMode: dontAsk\ndisallowedTools: Bash(git push)';
+        const { body: _p, agent: plainAgent, ...plainKeys } = buildWith(scribeWith(undefined, keys));
+        const custom = buildWith(scribeWith('Use Bash freely. tools: Bash', keys));
+        const ruled = buildWith(scribeWith(undefined, keys), 'Use Bash freely. tools: Bash\npermissionMode: bypassPermissions');
+        for (const [told, field] of [
+          [custom, 'customInstructions'],
+          [ruled, 'factoryRules'],
+        ] as const) {
+          const { body: _b, agent: toldAgent, ...toldKeys } = told;
+          assert.deepEqual(toldKeys, plainKeys, field);
+          const { [field]: _w, ...rest } = toldAgent!;
+          assert.deepEqual(rest, plainAgent, field);
+          assert.deepEqual([told.tools, told.disallowedTools], [['Read'], ['Bash(git push)']], field);
+        }
+      },
+    ],
+    [
+      'an agent told nothing in its file, given custom instructions or rules, is rendered; with its folder gone, told them in its brief',
+      () => {
+        const text = '---\nplace: git\nagent: quiet\n---\nReply in Spanish.\n';
+        const quiet = parseAgent('quiet', '---\ntools: Read\n---\n');
+        assert.equal(
+          rendersAgent(parseWorkflow('build', text, undefined, new Map([['quiet', quiet]]))),
+          false,
+          'told nothing, it is not rendered',
+        );
+        for (const [layer, step, field, word] of [
+          [
+            'custom',
+            parseWorkflow('build', text, undefined, new Map([['quiet', { ...quiet, customInstructions: 'Reply in French.' }]])),
+            'customInstructions',
+            'French',
+          ],
+          [
+            'factory',
+            parseWorkflow('build', text, undefined, new Map([['quiet', quiet]]), undefined, undefined, RULES),
+            'factoryRules',
+            'German',
+          ],
+        ] as const) {
+          assert.equal(rendersAgent(step), true, layer);
+          assert.deepEqual(renderedFlags(step, '/r'), { appendSystemPromptFile: '/r/prompt.md' });
+          assert.equal(renderedPrompt(step, []), `${headedLayers([[layer, `Reply in ${word}.`]])}\n`);
+          assert.equal(briefBody(step), 'Reply in Spanish.', 'its brief is its own note alone');
+          const gone = unrendered(step);
+          assert.equal(renderedFlags(gone, '/r'), undefined, 'no flag names a file that is not there');
+          assert.equal(gone.agent?.[field], undefined);
+          assert.ok(at(briefBody(gone), word) < at(briefBody(gone), 'Spanish'), briefBody(gone));
+        }
+      },
+    ],
+    [
+      'a rendered step is briefed with its own note alone, and one whose folder is gone as before: its instructions in its brief, no flags',
+      () => {
+        const step = resolved('---\n---\nYou build.\n');
+        assert.equal(briefBody(step).trim(), "The step's own note.");
+        const before = unrendered(step);
+        assert.equal(rendersAgent(before), false);
+        assert.equal(briefBody(before), `${HEAD.instructions}\n\nYou build.\n\n${HEAD.policy}\n\nThe step's own note.`);
+        assert.equal(renderedFlags(before, '/x'), undefined);
+      },
+    ],
+    [
+      'a codex agent that says only `keep`, and a step that resumes, are not rendered: their instructions are in the brief',
+      () => {
+        const [onCodex] = loadWorkflows(team('---\nharness: codex\nharnessPrompt: keep\n---\nYou build.\n', {}));
+        assert.equal(rendersAgent(onCodex), false);
+        assert.ok(briefBody(onCodex).startsWith(`${HEAD.instructions}\n\nYou build.`), briefBody(onCodex));
+        const told = loadWorkflows(
+          team(
+            '---\n---\nYou build.\n',
+            { 'workflows/team/plan.md': '---\nplace: git\n---\nPlan it.\n' },
+            '---\nagent: builder\nafter: plan\nresume: plan\n---\nAnd go on.\n',
+          ),
+        ).find((s) => s.name === 'build')!;
+        assert.equal(rendersAgent(told), false);
+        assert.equal(briefBody(told), `${HEAD.instructions}\n\nYou build.\n\n${HEAD.policy}\n\nAnd go on.`);
+      },
+    ],
+  ]);
 });
 
-test('the former `systemPrompt:` line is still read, each of its words as the one it is now, and written back as `harnessPrompt:`', () => {
-  for (const [former, now] of [
-    ['default', 'keep'],
-    ['no-coding', 'no-coding'],
-    ['own', 'replace'],
-  ] as const) {
-    const agent = parseAgent('builder', `---\nsystemPrompt: ${former}\n---\nYou build.\n`);
-    assert.equal(agent.harnessPrompt, now, `systemPrompt: ${former}`);
-    assert.equal('systemPrompt' in agent, false, 'nothing reads the former field');
-    const written = renderAgent({ name: 'builder', harnessPrompt: agent.harnessPrompt, keys: {}, body: agent.body });
-    assert.equal(written, `---\nharnessPrompt: ${now}\n---\nYou build.\n`);
-  }
+test("renderedPrompt: the instructions, the person's and the factory's layers, each skill by its namespaced name, and each told whole", async (t) => {
+  await rows(t, [
+    [
+      'each skill by its namespaced name, then each skill that asks to be told whole',
+      () => {
+        const step = resolved('---\nskills: write-a-note, review-a-change\n---\nYou build.\n', {
+          'workflows/skills/write-a-note/SKILL.md': SKILL('write-a-note'),
+          'workflows/skills/review-a-change/SKILL.md': SKILL('review-a-change'),
+        });
+        assert.equal(
+          renderedPrompt(step, [{ name: 'write-a-note' }, { name: 'review-a-change', whole: 'Read the diff.\n' }]),
+          `${HEAD.instructions}\n\nYou build.\n\nYour skills, each loaded with the Skill tool by its name when you need it: \`nemia-builder:write-a-note\`.\n\n## Skill \`nemia-builder:review-a-change\`\n\nRead the diff.\n`,
+        );
+        assert.match(noCodingStyle('builder'), /^---\nname: no-coding\n[\s\S]*keep-coding-instructions: false\n---\n/);
+      },
+    ],
+    [
+      "each layer under its number and owner; one frozen with none left out, heading and all; the step's policy never",
+      () => {
+        const step = resolved('---\n---\nYou build.\n');
+        const told = { ...step, agent: { ...step.agent!, customInstructions: 'Be terse.', factoryRules: 'Never push on a Friday.' } };
+        assert.equal(
+          renderedPrompt(told, []),
+          `${HEAD.instructions}\n\nYou build.\n\n${HEAD.custom}\n\nBe terse.\n\n${HEAD.factory}\n\nNever push on a Friday.\n`,
+        );
+        const { factoryRules: _r, ...noRules } = told.agent;
+        assert.equal(
+          renderedPrompt({ ...told, agent: noRules }, []),
+          `${HEAD.instructions}\n\nYou build.\n\n${HEAD.custom}\n\nBe terse.\n`,
+        );
+        assert.ok(!renderedPrompt(told, []).includes(HEAD.policy), "the step's policy heads its brief");
+      },
+    ],
+  ]);
 });
 
-test("an agent's `skills:` takes a skill named with its folder; REFUSED: one that is neither form, and two of one bare name", () => {
-  assert.deepEqual(parseAgent('builder', '---\nskills: write-a-note, app:y\n---\nx\n').skills, ['write-a-note', 'app:y']);
-  const odd = refusal(() => parseAgent('builder', '---\nskills: write-a-note, ../app:y\n---\nx\n'));
-  assert.ok(odd.startsWith("agents/builder.md: `skills: write-a-note, ../app:y` has `../app:y`, which is not a skill's name."), odd);
-  assert.ok(odd.includes('`folder:name`'), odd);
-  assert.ok(
-    refusal(() => parseAgent('builder', '---\nskills: y, app:y\n---\nx\n')).includes('gives `y` and `app:y`, two skills named `y`'),
-  );
-});
-
-test('REFUSED at shipped defaults: a skill name that is none, a name given twice, an empty list, and a harness prompt that is not one of the three', () => {
-  says(
-    refusal(() => parseAgent('builder', '---\nskills: Review A Change\n---\nx\n')),
-    'agents/builder.md: `skills: Review A Change`',
-    'has `Review A Change`',
-    "not a skill's name",
-  );
-  assert.match(
-    refusal(() => parseAgent('builder', '---\nskills: a-b, a-b\n---\nx\n')),
-    /names `a-b` twice/,
-  );
-  assert.match(
-    refusal(() => parseAgent('builder', '---\nskills: ,\n---\nx\n')),
-    /names no skill/,
-  );
-  says(
-    refusal(() => parseAgent('builder', '---\nharnessPrompt: terse\n---\nx\n')),
-    'agents/builder.md: `harnessPrompt: terse`',
-    'not one of keep, no-coding, replace',
-  );
-  says(
-    refusal(() => parseAgent('builder', '---\nsystemPrompt: terse\n---\nx\n')),
-    'agents/builder.md: `systemPrompt: terse`',
-    'not one of keep, no-coding, replace',
-  );
-});
-
-test('REFUSED at shipped defaults: a former word under the new key, which a file written after the rename does not say', () => {
-  says(
-    refusal(() => parseAgent('builder', '---\nharnessPrompt: own\n---\nx\n')),
-    'agents/builder.md: `harnessPrompt: own`',
-    'not one of keep, no-coding, replace',
-    '`own` is the former word',
-    '`systemPrompt:`',
-    'write `harnessPrompt: replace`',
-  );
-  assert.match(
-    refusal(() => parseAgent('builder', '---\nharnessPrompt: default\n---\nx\n')),
-    /write `harnessPrompt: keep`/,
-  );
-});
-
-test('REFUSED at shipped defaults: `systemPrompt:` and `harnessPrompt:` both set, which are one key', () => {
-  says(
-    refusal(() => parseAgent('builder', '---\nsystemPrompt: own\nharnessPrompt: keep\n---\nx\n')),
-    'agents/builder.md: `harnessPrompt: keep` and `systemPrompt: own`',
-    'both set',
-    'one key',
-  );
-});
-
-test('REFUSED: a draft that sends the former `systemPrompt`, among its keys or as its own line, which nothing writes', () => {
-  says(
-    refusal(() => renderAgent({ name: 'builder', keys: { systemPrompt: 'own' } as never, body: 'x' })),
-    'agents/builder.md: `systemPrompt`',
-    "`harnessPrompt`'s former name",
-    'nothing writes',
-  );
-  says(
-    refusal(() => renderAgent({ name: 'builder', systemPrompt: 'own', keys: {}, body: 'x' } as never)),
-    'agents/builder.md: `systemPrompt`',
-    "`harnessPrompt`'s former name",
-  );
-});
-
-test('REFUSED at shipped defaults: `harnessPrompt: replace` with no instructions, which would start a session with no prompt at all', () => {
-  for (const line of ['harnessPrompt: replace', 'systemPrompt: own'])
-    says(
-      refusal(() => parseAgent('builder', `---\n${line}\n---\n`)),
-      'agents/builder.md: ',
-      `\`${line}\``,
-      "in place of Claude Code's own prompt",
-      'this agent has none',
-    );
-  assert.equal(parseAgent('builder', '---\nharnessPrompt: replace\n---\nYou are the whole prompt.\n').harnessPrompt, 'replace');
-});
-
-test('REFUSED at shipped defaults: skills an agent gives with no `Skill` in its tools, or with `Skill` denied (F11)', () => {
-  says(
-    refusal(() => parseAgent('builder', '---\nskills: write-a-note\ntools: Read, Write\n---\nx\n')),
-    'agents/builder.md: `skills: write-a-note`',
-    '`tools: Read, Write`',
-    'no `Skill`',
-  );
-  assert.match(
-    refusal(() => parseAgent('builder', '---\nskills: write-a-note\ndisallowedTools: Skill\n---\nx\n')),
-    /`disallowedTools: Skill` denies `Skill`/,
-  );
-  assert.deepEqual(
-    parseAgent('builder', '---\nskills: write-a-note\n---\nx\n').skills,
-    ['write-a-note'],
-    'no `tools:` is every tool, Skill among them',
-  );
-});
-
-test("REFUSED at shipped defaults: a step's own `tools:` or deny list that takes `Skill` from an agent that gives skills", () => {
-  const skills = { 'workflows/skills/write-a-note/SKILL.md': SKILL('write-a-note') };
-  const agent = '---\nskills: write-a-note\ntools: Read, Skill\n---\nYou build.\n';
-  says(
-    refusal(() => loadWorkflows(team(agent, skills, '---\nagent: builder\ntools: Read\n---\n'))),
-    'build: `agent: builder`: `skills: write-a-note`',
-    '`tools: Read`',
-    'no `Skill`',
-  );
-  assert.match(
-    refusal(() => loadWorkflows(team(agent, skills, '---\nagent: builder\ndisallowedTools: Skill\n---\n'))),
-    /^build: .*denies `Skill`/,
-  );
-  assert.equal(loadWorkflows(team(agent, skills)).length, 1);
-});
-
-test('REFUSED at shipped defaults: a codex agent with skills or a harness prompt, and a Claude Code agent with them run on codex by its step', () => {
-  says(
-    refusal(() => parseAgent('builder', '---\nharness: codex\nskills: write-a-note\n---\nx\n')),
-    'agents/builder.md: ',
-    '`skills: write-a-note`',
-    'Claude Code skills',
-    'codex loads none',
-  );
-  says(
-    refusal(() => parseAgent('builder', '---\nharness: codex\nharnessPrompt: no-coding\n---\nx\n')),
-    'agents/builder.md: ',
-    '`harnessPrompt: no-coding`',
-    "Claude Code's own prompt",
-    'codex is handed its instructions in the brief',
-  );
-  const skills = { 'workflows/skills/write-a-note/SKILL.md': SKILL('write-a-note') };
-  says(
-    refusal(() =>
-      loadWorkflows(team('---\nskills: write-a-note\n---\nYou build.\n', skills, '---\nagent: builder\nharness: codex\n---\n')),
-    ),
-    'build: `agent: builder`: `skills: write-a-note`',
-    'Claude Code skills',
-    'codex loads none',
-  );
-  says(
-    refusal(() => loadWorkflows(team('---\nharnessPrompt: replace\n---\nYou build.\n', {}, '---\nagent: builder\nharness: codex\n---\n'))),
-    'build: `agent: builder`: `harnessPrompt: replace`',
-    "shapes Claude Code's own prompt",
-  );
-  const formerLineJudgedAsNow = refusal(() =>
-    loadWorkflows(team('---\nsystemPrompt: own\n---\nYou build.\n', {}, '---\nagent: builder\nharness: codex\n---\n')),
-  );
-  says(formerLineJudgedAsNow, 'build: `agent: builder`: `harnessPrompt: replace`', "shapes Claude Code's own prompt");
-  const [codex] = loadWorkflows(team('---\nharness: codex\nharnessPrompt: keep\n---\nYou build.\n', {}));
-  assert.equal(
-    rendersAgent(codex),
-    false,
-    'a codex agent that says only `keep`, or nothing, is not rendered: its instructions are in the brief',
-  );
-  assert.ok(briefBody(codex).startsWith(`${HEAD.instructions}\n\nYou build.`), briefBody(codex));
-});
-
-test('REFUSED at shipped defaults: skills or a harness prompt on a step that continues another session, which keeps its own (F13)', () => {
-  const dir = team(
-    '---\nharnessPrompt: no-coding\n---\nYou build.\n',
-    { 'workflows/team/plan.md': '---\nplace: git\n---\nPlan it.\n' },
-    '---\nagent: builder\nafter: plan\nresume: plan\n---\n',
-  );
-  says(
-    refusal(() => loadWorkflows(dir)),
-    'build: `agent: builder`: `harnessPrompt: no-coding`',
-    'a session the step starts',
-    "`resume: plan` continues plan's",
-  );
-  const told = loadWorkflows(
-    team(
-      '---\n---\nYou build.\n',
-      { 'workflows/team/plan.md': '---\nplace: git\n---\nPlan it.\n' },
-      '---\nagent: builder\nafter: plan\nresume: plan\n---\nAnd go on.\n',
-    ),
-  ).find((s) => s.name === 'build')!;
-  assert.equal(rendersAgent(told), false, 'instructions alone are told in the brief of a step that resumes');
-  assert.equal(briefBody(told), `${HEAD.instructions}\n\nYou build.\n\n${HEAD.policy}\n\nAnd go on.`);
-});
-
-test("REFUSED at shipped defaults: `auto` on a model Claude Code drops it on (F21) — the runtime's default mode or written — and let through where it is kept", () => {
-  for (const model of ['haiku', 'claude-haiku-4-5-20251001', 'claude-sonnet-4-5']) {
-    says(
-      refusal(() => loadWorkflows(team(`---\nmodel: ${model}\n---\nYou build.\n`, {}))),
-      'build: `agent: builder` names an agent',
-      'whose file is refused',
-      `agents/builder.md: \`model: ${model}\``,
-      'no `permissionMode:`',
-      "filed in `auto`, the runtime's default",
-      'Claude Code drops `auto` on that model',
-    );
-    assert.match(
-      refusal(() => loadWorkflows(team('---\n---\nx\n', {}, `---\nagent: builder\nmodel: ${model}\npermissionMode: auto\n---\n`))),
-      /^build: `model: .*` says `permissionMode: auto`, and Claude Code drops `auto`/,
-    );
-  }
-  assert.equal(loadWorkflows(team('---\nmodel: haiku\npermissionMode: dontAsk\n---\nx\n', {})).length, 1, 'kept: a mode the model keeps');
-  assert.equal(loadWorkflows(team('---\nmodel: sonnet\n---\nx\n', {})).length, 1, 'kept: a model that keeps auto');
-  assert.equal(loadWorkflows(team('---\nharness: codex\nmodel: haiku\n---\nx\n', {})).length, 1, 'kept: a codex step');
-  assert.equal(loadWorkflows(team('---\n---\nx\n', {})).length, 1, 'kept: no model at all');
-  assert.deepEqual(
-    [...CLAUDE_AUTO_DROPPED],
-    ['haiku', 'claude-haiku-4-5', 'claude-sonnet-4-5'],
-    'F21 measured these three; a new one is measured first',
-  );
-  assert.ok(autoDropped('claude', 'claude-sonnet-4-5-20250929', undefined));
-  assert.equal(autoDropped('claude', 'claude-sonnet-5', undefined), undefined, 'a name that only begins like one measured is not it');
-});
-
-test('REFUSED at shipped defaults: a skill no place has, naming each place looked in, in order', () => {
-  const repo = tree({});
-  const dir = team('---\nskills: draw-a-map\n---\nYou build.\n', {});
-  const message = refusal(() => loadWorkflows(dir, { repo, home: ROOT }));
-  const looked = [
-    path.join(path.dirname(dir), 'skills'),
-    path.join(repo, '.claude', 'skills'),
-    path.join(ROOT, 'workflows', 'skills'),
-  ].join(', ');
-  says(message, 'build: `agent: builder` gives the skill `draw-a-map`', 'no skills folder has it', 'looked in ');
-  assert.ok(message.includes(looked), message);
-});
-
-test("a name is looked for in the workflow's own root, then the repository's .claude/, then the store — the repository's before the store's", () => {
-  const home = tree({
-    'workflows/skills/write-a-note/SKILL.md': SKILL('write-a-note'),
-    'workflows/agents/helper.md': "---\n---\nThe store's helper.\n",
-  });
-  const repo = tree({
-    '.claude/skills/write-a-note/SKILL.md': SKILL('write-a-note', 'preload: true\n'),
-    '.claude/agents/helper.md': "---\n---\nThe repository's helper.\n",
-  });
-  const dir = team('---\nskills: write-a-note\n---\nYou build.\n', {});
-  const places = { repo, home };
-  assert.deepEqual(lookupRoots(dir, places), [path.dirname(dir), path.join(repo, '.claude'), path.join(home, 'workflows')]);
-  assert.equal(skillsFor(dir, places).at.get('write-a-note'), path.join(repo, '.claude', 'skills', 'write-a-note'));
-  assert.equal((agentsFor(dir, places).get('helper') as { body: string }).body.trim(), "The repository's helper.");
-  assert.equal(
-    skillsFor(dir, { home }).at.get('write-a-note'),
-    path.join(home, 'workflows', 'skills', 'write-a-note'),
-    'with no repository, the store',
-  );
-  const own = team('---\nskills: write-a-note\n---\nYou build.\n', { 'workflows/skills/write-a-note/SKILL.md': SKILL('write-a-note') });
-  assert.equal(
-    skillsFor(own, places).at.get('write-a-note'),
-    path.join(path.dirname(own), 'skills', 'write-a-note'),
-    "the workflow's own root first: a store workflow's is the store, so its own come first there",
-  );
-});
-
-test("the package's place skill is found after every place, where none has its name: a place's own `git` comes first", () => {
-  const home = tree({});
-  const repo = tree({});
-  const dir = team('---\nskills: git\n---\nYou build.\n', {});
-  const found = skillsFor(dir, { repo, home });
-  assert.equal(found.at.get('git'), BUILTIN_PLACE);
-  assert.equal(found.looked.at(-1), PLACE_SKILLS);
-  assert.ok(isBuiltinPlace(BUILTIN_PLACE));
-  const own = team('---\nskills: git\n---\nYou build.\n', { 'workflows/skills/git/SKILL.md': SKILL('git') });
-  const ownGit = path.join(path.dirname(own), 'skills', 'git');
-  assert.equal(skillsFor(own, { repo, home }).at.get('git'), ownGit);
-  assert.equal(isBuiltinPlace(ownGit), false);
-});
-
-/**
- * A project subagent as Claude Code's /agents wizard writes one: its name, a description with an example, its tools, its model, its
- * colour.
- */
-const WIZARD =
-  '---\nname: code-reviewer\ndescription: Use this agent when a change needs a second look. Example: after a feature is written.\ntools: Read, Grep, Glob, Bash\nmodel: sonnet\ncolor: blue\n---\nYou are a careful code reviewer.\n';
-
-test("an agent Claude Code's /agents wizard wrote into .claude/agents/ runs as it is: `color` read and ignored, every other line the run's", () => {
-  const repo = tree({ '.claude/agents/code-reviewer.md': WIZARD });
-  const home = tree({ 'workflows/team/review.md': '---\nplace: git\nagent: code-reviewer\n---\nReview the change.\n' });
-  const [step] = loadWorkflows(path.join(home, 'workflows', 'team'), { repo, home });
-  assert.deepEqual([step.model, step.tools, step.permissionMode], ['sonnet', ['Read', 'Grep', 'Glob', 'Bash'], undefined]);
-  const agent = agentsFor(path.join(home, 'workflows', 'team'), { repo, home }).get('code-reviewer') as Agent;
-  assert.equal(agent.description, 'Use this agent when a change needs a second look. Example: after a feature is written.');
-  assert.equal(agent.body.trim(), 'You are a careful code reviewer.');
-  assert.ok(!('color' in agent.keys), 'not a role key: no step inherits it');
-  assert.doesNotMatch(
-    renderAgent({ name: agent.name, description: agent.description, keys: agent.keys, body: agent.body }),
-    /color/,
-    'not written back',
-  );
-});
-
-test("REFUSED at shipped defaults: Claude Code's own subagent keys a run would drop — each named, with what does it in a run — and `model: inherit`, which a step has no parent to inherit from", () => {
-  const cases: Array<[string, RegExp]> = [
-    ['maxTurns: 20', /`budget:` and `deadlineSeconds:`/],
-    ['mcpServers: github', /name the servers of the repository's `\.mcp\.json` its sessions load on an `mcp:` line/],
-    ['hooks: lint', /`\.claude\/settings\.json`/],
-    ['memory: project', /no memory of an agent's own/],
-    ['isolation: worktree', /`workspace:`/],
-  ];
-  for (const [line, why] of cases) {
-    const said = refusal(() => parseAgent('code-reviewer', `---\ndescription: Reviews.\n${line}\n---\nYou review.\n`));
-    assert.ok(
-      said.startsWith(
-        `agents/code-reviewer.md: \`${line.split(':')[0]}\` is Claude Code's own subagent key, and a run does not carry it to its sessions — `,
-      ),
-      said,
-    );
-    assert.match(said, why);
-  }
-  says(
-    refusal(() => parseAgent('code-reviewer', WIZARD.replace('model: sonnet', 'model: inherit'))),
-    'agents/code-reviewer.md: `model: inherit`',
-    "Claude Code's word for a subagent",
-    'the model of the conversation that called it',
-  );
-  assert.match(
-    refusal(() => parseAgent('code-reviewer', '---\ncolour: blue\n---\n')),
-    /`colour` is not a key an agent has/,
-    "a key that is no one's is refused",
-  );
-});
-
-test("REFUSED at shipped defaults: a name in both of one repository's places, workflows/ and .claude/ — an agent and a skill — naming both", () => {
-  const repo = tree({
-    'workflows/team/build.md': '---\nplace: git\nagent: builder\n---\n',
-    'workflows/agents/builder.md': '---\nskills: write-a-note\n---\nYou build.\n',
-    'workflows/skills/write-a-note/SKILL.md': SKILL('write-a-note'),
-    '.claude/skills/write-a-note/SKILL.md': SKILL('write-a-note'),
-  });
-  const dir = path.join(repo, 'workflows', 'team');
-  const skill = refusal(() => loadWorkflows(dir, { repo }));
-  says(
-    skill,
-    'build: `agent: builder` gives the skill `write-a-note`',
-    'write-a-note is a skill in both',
-    "one repository's two places for skills",
-    'Keep one of them',
-  );
-  assert.ok(
-    skill.includes(path.join(repo, 'workflows', 'skills', 'write-a-note')) &&
-      skill.includes(path.join(repo, '.claude', 'skills', 'write-a-note')),
-    skill,
-  );
-  fs.rmSync(path.join(repo, '.claude', 'skills'), { recursive: true });
-  fs.mkdirSync(path.join(repo, '.claude', 'agents'), { recursive: true });
-  fs.writeFileSync(path.join(repo, '.claude', 'agents', 'builder.md'), '---\n---\nAnother builder.\n');
-  says(
-    refusal(() => loadWorkflows(dir, { repo })),
-    '',
-    'builder is an agent in both',
-    path.join(repo, '.claude', 'agents', 'builder.md'),
-    "one repository's two places for agents",
-    'nothing says which runs',
-  );
-  assert.equal(
-    loadWorkflows(dir).length,
-    1,
-    "read with no repository, the same folder finds its own and is not refused: the clash is one repository's",
-  );
-});
-
-test('a `skills:` line naming a card file, as it did until 2026-09-25, is refused where it is read and where it is written: the card file is retired', () => {
-  const legacy = refusal(() => parseAgent('builder', '---\nskills: builder.skills.json\n---\nx\n', () => '[]'));
-  says(legacy, 'agents/builder.md: `skills: builder.skills.json`', 'names a card file, which is retired', "an agent's card is generated");
-  const dir = team('---\nskills: builder.skills.json\n---\nYou build.\n', { 'workflows/agents/builder.skills.json': '[]' });
-  says(
-    refusal(() => loadWorkflows(dir)),
-    '',
-    '`skills: builder.skills.json`',
-    'names a card file, which is retired',
-  );
-  const written = refusal(() => renderAgent({ name: 'builder', skills: 'builder.skills.json', keys: {}, body: 'x\n' }));
-  says(written, 'agents/builder.md: `skills: builder.skills.json`', 'names a card file, which is retired', 'reload it, and save again');
-  assert.ok(written.endsWith('save again.'), written);
-  says(
-    refusal(() => renderAgent({ name: 'builder', card: 'builder.skills.json', keys: {}, body: 'x\n' } as never)),
-    'agents/builder.md: `card: builder.skills.json`',
-    'names a card file, which is retired',
-  );
-});
-
-test("an agent's version moves with each skill it gives, and not with one it does not", () => {
-  const dir = team('---\nskills: write-a-note\n---\nYou build.\n', {
-    'workflows/skills/write-a-note/SKILL.md': SKILL('write-a-note'),
-    'workflows/skills/other/SKILL.md': SKILL('other'),
-  });
-  const agents = path.join(path.dirname(dir), 'agents');
-  const skills = path.join(path.dirname(dir), 'skills');
-  const at = agentVersion(agents, 'builder');
-  fs.appendFileSync(path.join(skills, 'other', 'SKILL.md'), 'More.\n');
-  assert.equal(agentVersion(agents, 'builder'), at, 'a skill it does not give');
-  fs.appendFileSync(path.join(skills, 'write-a-note', 'SKILL.md'), 'More.\n');
-  const edited = agentVersion(agents, 'builder');
-  assert.notEqual(edited, at, 'its SKILL.md');
-  fs.writeFileSync(path.join(skills, 'write-a-note', 'template.md'), '# A template\n');
-  assert.notEqual(agentVersion(agents, 'builder'), edited, 'a file beside it, which the plugin copies too');
-});
-
-/** A step as the parser resolves it, for the pure functions. */
-const resolved = (agent: string, files: Record<string, string> = {}, step?: string): Workflow => loadWorkflows(team(agent, files, step))[0];
-
-test('the prompt is the instructions, then each skill by its namespaced name, then each skill that asks to be told whole', () => {
-  const step = resolved('---\nskills: write-a-note, review-a-change\n---\nYou build.\n', {
-    'workflows/skills/write-a-note/SKILL.md': SKILL('write-a-note'),
-    'workflows/skills/review-a-change/SKILL.md': SKILL('review-a-change'),
-  });
-  assert.equal(
-    renderedPrompt(step, [{ name: 'write-a-note' }, { name: 'review-a-change', whole: 'Read the diff.\n' }]),
-    `${HEAD.instructions}\n\nYou build.\n\nYour skills, each loaded with the Skill tool by its name when you need it: \`nemia-builder:write-a-note\`.\n\n## Skill \`nemia-builder:review-a-change\`\n\nRead the diff.\n`,
-  );
-  assert.match(noCodingStyle('builder'), /^---\nname: no-coding\n[\s\S]*keep-coding-instructions: false\n---\n/);
-});
-
-test("the prompt heads each layer it composes with that layer's number and its owner, and the step's policy is none of them", () => {
-  const step = resolved('---\n---\nYou build.\n');
-  const told = { ...step, agent: { ...step.agent!, customInstructions: 'Be terse.', factoryRules: 'Never push on a Friday.' } };
-  assert.equal(
-    renderedPrompt(told, []),
-    `${HEAD.instructions}\n\nYou build.\n\n${HEAD.custom}\n\nBe terse.\n\n${HEAD.factory}\n\nNever push on a Friday.\n`,
-    'each layer under its own heading, in the order the session reads them',
-  );
-  const { factoryRules: _r, ...noRules } = told.agent;
-  assert.equal(
-    renderedPrompt({ ...told, agent: noRules }, []),
-    `${HEAD.instructions}\n\nYou build.\n\n${HEAD.custom}\n\nBe terse.\n`,
-    'a layer the run froze none of is left out, heading and all',
-  );
-  assert.ok(!renderedPrompt(told, []).includes(HEAD.policy), "the step's policy heads its brief, and is never in the prompt");
-});
-
-test("the flags: the prompt appended by default and for no-coding, in place of Claude Code's for own; the plugin for skills or a style; the style by its namespaced name, and no skill turned off by name", () => {
+test("renderedFlags: the prompt appended or in place of Claude Code's, the plugin for skills or a style, the style by its namespaced name", async (t) => {
   const dir = '/runs/r/agents/build';
   const flags = (agent: string, files: Record<string, string> = {}) => renderedFlags(resolved(agent, files), dir);
   const skill = { 'workflows/skills/write-a-note/SKILL.md': SKILL('write-a-note') };
   const STYLE = JSON.stringify({ outputStyle: 'nemia-builder:no-coding' });
-  assert.deepEqual(flags('---\n---\nYou build.\n'), { appendSystemPromptFile: `${dir}/prompt.md` });
-  assert.deepEqual(flags('---\nskills: write-a-note\n---\nYou build.\n', skill), {
-    appendSystemPromptFile: `${dir}/prompt.md`,
-    pluginDir: [`${dir}/nemia-builder`],
-  });
-  assert.deepEqual(flags('---\nharnessPrompt: no-coding\nskills: write-a-note\n---\nYou build.\n', skill), {
-    appendSystemPromptFile: `${dir}/prompt.md`,
-    pluginDir: [`${dir}/nemia-builder`],
-    settings: STYLE,
-  });
-  assert.deepEqual(flags('---\nharnessPrompt: replace\n---\nYou build.\n'), { systemPromptFile: `${dir}/prompt.md` });
-  assert.deepEqual(flags('---\nharnessPrompt: keep\n---\nYou build.\n'), { appendSystemPromptFile: `${dir}/prompt.md` });
-  assert.deepEqual(flags('---\nharnessPrompt: no-coding\n---\nYou build.\n'), {
-    appendSystemPromptFile: `${dir}/prompt.md`,
-    pluginDir: [`${dir}/nemia-builder`],
-    settings: STYLE,
-  });
-  assert.deepEqual(flags('---\nsystemPrompt: own\n---\nYou build.\n'), { systemPromptFile: `${dir}/prompt.md` }, 'own is replace');
-  assert.deepEqual(flags('---\nsystemPrompt: default\n---\nYou build.\n'), { appendSystemPromptFile: `${dir}/prompt.md` });
-  assert.deepEqual(flags('---\nsystemPrompt: no-coding\n---\nYou build.\n'), {
-    appendSystemPromptFile: `${dir}/prompt.md`,
-    pluginDir: [`${dir}/nemia-builder`],
-    settings: STYLE,
-  });
-  assert.equal(
-    flags('---\nmodel: opus\n---\n'),
-    undefined,
-    'nothing to render: an agent with no instructions, no skills and the default prompt',
-  );
-  assert.equal(
-    renderedFlags(
-      loadWorkflows(path.join(tree({ 'workflows/team/build.md': '---\nplace: git\n---\nJust a step.\n' }), 'workflows', 'team'))[0],
-      dir,
+  const appended = { appendSystemPromptFile: `${dir}/prompt.md` };
+  const plugin = { ...appended, pluginDir: [`${dir}/nemia-builder`] };
+  const styled = { ...plugin, settings: STYLE };
+  const table: Array<[string, string, Record<string, string>, object | undefined]> = [
+    ['instructions alone: the prompt appended', '---\n---\nYou build.\n', {}, appended],
+    ['skills: the plugin beside it', '---\nskills: write-a-note\n---\nYou build.\n', skill, plugin],
+    [
+      'skills with no instructions: still rendered, the prompt naming them, the plugin beside it',
+      '---\nskills: write-a-note\n---\n',
+      skill,
+      plugin,
+    ],
+    [
+      'no-coding and skills: the plugin and its style',
+      '---\nharnessPrompt: no-coding\nskills: write-a-note\n---\nYou build.\n',
+      skill,
+      styled,
+    ],
+    [
+      "replace: the prompt in place of Claude Code's",
+      '---\nharnessPrompt: replace\n---\nYou build.\n',
+      {},
+      { systemPromptFile: `${dir}/prompt.md` },
+    ],
+    ['keep: the prompt appended', '---\nharnessPrompt: keep\n---\nYou build.\n', {}, appended],
+    ['no-coding with no skills: the plugin for its style', '---\nharnessPrompt: no-coding\n---\nYou build.\n', {}, styled],
+    [
+      'the former `systemPrompt: own` is replace',
+      '---\nsystemPrompt: own\n---\nYou build.\n',
+      {},
+      { systemPromptFile: `${dir}/prompt.md` },
+    ],
+    ['the former `systemPrompt: default` is keep', '---\nsystemPrompt: default\n---\nYou build.\n', {}, appended],
+    ['the former `systemPrompt: no-coding`', '---\nsystemPrompt: no-coding\n---\nYou build.\n', {}, styled],
+    ['nothing to render: no instructions, no skills, the default prompt', '---\nmodel: opus\n---\n', {}, undefined],
+  ];
+  for (const [name, agent, files, expected] of table) await t.test(name, () => assert.deepEqual(flags(agent, files), expected));
+  await t.test('nothing to render: a step with no agent', () =>
+    assert.equal(
+      renderedFlags(
+        loadWorkflows(path.join(tree({ 'workflows/team/build.md': '---\nplace: git\n---\nJust a step.\n' }), 'workflows', 'team'))[0],
+        dir,
+      ),
+      undefined,
     ),
-    undefined,
-    'nothing to render: a step with no agent',
   );
+  await t.test('a record frozen with the off-list it once carried reads back, and turns no skill off by name', () => {
+    const record = {
+      name: 'build',
+      after: [],
+      body: 'You build.\n\nGo.',
+      agent: {
+        name: 'builder',
+        keys: [],
+        body: 'Go.',
+        given: {},
+        instructions: 'You build.',
+        skills: ['write-a-note'],
+        offSkills: ['git', 'write-a-note'],
+      },
+    };
+    const decoded = Schema.decodeUnknownResult(FrozenStepSchema)(record);
+    assert.ok(Result.isSuccess(decoded), Result.isFailure(decoded) ? String(decoded.failure) : '');
+    const frozen = asNamed(decoded.success);
+    assert.equal(renderedFlags(frozen, dir)?.settings, undefined);
+    assert.deepEqual(enabledSkillsOf(frozen), ['nemia-builder:write-a-note']);
+  });
 });
 
-test("a step's session is given its plugin's copies of its skills and no other, as a closed list; the command-line roads, the harness's own", async (t) => {
-  const files = {
-    'workflows/skills/write-a-note/SKILL.md': SKILL('write-a-note'),
-    'workflows/skills/other/SKILL.md': SKILL('other'),
-  };
+test("enabledSkillsOf: a step's session is given its plugin's copies of its skills and no other, as a closed list", async (t) => {
+  const files = { 'workflows/skills/write-a-note/SKILL.md': SKILL('write-a-note'), 'workflows/skills/other/SKILL.md': SKILL('other') };
   const step = resolved('---\nskills: write-a-note\n---\nYou build.\n', files);
-  const rows: Array<[string, Workflow, string[] | 'default']> = [
+  const table: Array<[string, Workflow, string[] | 'default']> = [
     [
       "its agent's skill, as its plugin holds it, and neither the one no line names nor the place skill",
       step,
@@ -669,249 +430,352 @@ test("a step's session is given its plugin's copies of its skills and no other, 
     ["none for a step that continues another's session", { ...step, resume: 'before' }, []],
     ["the harness's own on a harness besides the default, codex", { ...step, harness: 'codex' }, 'default'],
   ];
-  for (const [name, given, skills] of rows) await t.test(name, () => assert.deepEqual(enabledSkillsOf(given), skills));
+  for (const [name, given, skills] of table) await t.test(name, () => assert.deepEqual(enabledSkillsOf(given), skills));
 });
 
-test('a record frozen with the off-list it once carried reads back, and its session turns no skill off by name', () => {
-  const record = {
-    name: 'build',
-    after: [],
-    body: 'You build.\n\nGo.',
-    agent: {
-      name: 'builder',
-      keys: [],
-      body: 'Go.',
-      given: {},
-      instructions: 'You build.',
-      skills: ['write-a-note'],
-      offSkills: ['git', 'write-a-note'],
-    },
-  };
-  const decoded = Schema.decodeUnknownResult(FrozenStepSchema)(record);
-  assert.ok(Result.isSuccess(decoded), Result.isFailure(decoded) ? String(decoded.failure) : '');
-  const frozen = asNamed(decoded.success);
-  assert.equal(renderedFlags(frozen, '/runs/r/agents/build')?.settings, undefined);
-  assert.deepEqual(enabledSkillsOf(frozen), ['nemia-builder:write-a-note']);
+const AGENTS: Agents = new Map([
+  ['scribe', { ...parseAgent('scribe', '---\nskills: alpha, beta\n---\nYou are Scribe.\n'), customInstructions: 'Be terse.' }],
+  ['bare', parseAgent('bare', '---\n---\nYou are bare.\n')],
+  ['cody', { ...parseAgent('cody', '---\n---\nYou are Cody.\n'), customInstructions: 'Be terse.' }],
+  ['dee', parseAgent('dee', '---\nmodel: opus\ndisallowedTools: Bash(git push:*)\n---\nYou are Dee.\n')],
+]);
+
+/** The step `build` written with `lines` as its frontmatter and `note` as its own words, resolved with the agents above. */
+const stepOf = (lines: string, note = 'Build it.', rules?: string): Workflow =>
+  parseWorkflow('build', `---\nplace: git\n${lines}\n---\n${note}\n`, undefined, AGENTS, undefined, undefined, rules);
+
+/** A run of `steps`, none filed, asked for `brief`. */
+const runOf = (steps: readonly Workflow[], brief = 'add a flag'): RepositoryRun => ({
+  id: 'r-1',
+  repo: '/repo',
+  workspace: '/wt',
+  baseRef: 'abc123',
+  branch: 'main',
+  isolate: true,
+  brief,
+  workflowDir: '/wf',
+  createdAt: '2026-01-01T00:00:00Z',
+  steps: Object.fromEntries(steps.map((s) => [s.name, { taskId: null }])),
 });
 
-test('a rendered step is briefed with its own note alone, and one whose folder is gone is told as before — its instructions in its brief, no flags', () => {
-  const step = resolved('---\n---\nYou build.\n');
-  assert.equal(briefBody(step).trim(), "The step's own note.");
-  const before = unrendered(step);
-  assert.equal(rendersAgent(before), false);
-  assert.equal(briefBody(before), `${HEAD.instructions}\n\nYou build.\n\n${HEAD.policy}\n\nThe step's own note.`);
-  assert.equal(renderedFlags(before, '/x'), undefined);
+/** What `step` would be told as the first step of a run of it alone. */
+const briefOf = (step: Workflow): string => composeBrief(step, runOf([step]), [step]);
+
+const TASK = '## What was asked for\n\nadd a flag';
+
+test('toldLayers: a filed brief cut back into what the step was told, by layer, only where it opens with the layers above the task', async (t) => {
+  await rows(t, [
+    [
+      "a rendered step: the agent's words and the person's apart, its own note as the policy, the task after it, and nothing lost",
+      () => {
+        const step = stepOf('agent: scribe\nskills: beta, gamma');
+        const brief = briefOf(step);
+        const told = toldLayers(step, brief);
+        assert.deepEqual(
+          [told.via, told.agent, told.instructions, told.custom, told.factory, told.policy],
+          ['prompt', 'scribe', 'You are Scribe.', 'Be terse.', null, 'Build it.'],
+        );
+        assert.deepEqual([told.agentSkills, told.addedSkills], [['alpha', 'beta'], ['gamma']]);
+        assert.ok(told.task?.startsWith(TASK), told.task ?? 'null');
+        assert.ok(!told.task?.includes('Build it.'), 'the policy is not told again in the task');
+        assert.equal(`${PRECEDENCE}\n\n${briefBody(step)}\n\n${told.task}`, brief, 'the cut loses nothing');
+      },
+    ],
+    [
+      "a codex step and a `resume:` step are told their agent's words in the brief: the task starts after the policy",
+      () => {
+        for (const step of [stepOf('agent: cody\nharness: codex'), stepOf('agent: cody\nresume: plan')]) {
+          const told = toldLayers(step, `${step.body}\n\n${TASK}`);
+          assert.deepEqual(
+            [told.via, told.instructions, told.custom, told.policy, told.task],
+            ['brief', 'You are Cody.', 'Be terse.', 'Build it.', TASK],
+          );
+        }
+        const onCodex = stepOf('agent: cody\nharness: codex');
+        assert.equal(toldLayers(onCodex, briefOf(onCodex)).task?.startsWith('## What was asked for'), true);
+      },
+    ],
+    [
+      "the factory's rules are a layer of their own, as frozen, never told again in the task; a record frozen before them shows none",
+      () => {
+        const rules = 'Never push on a Friday.';
+        const rendered = stepOf('agent: scribe', 'Build it.', rules);
+        const brief = briefOf(rendered);
+        const told = toldLayers(rendered, brief);
+        assert.deepEqual([told.via, told.factory, told.custom, told.policy], ['prompt', rules, 'Be terse.', 'Build it.']);
+        assert.ok(told.task?.startsWith('## What was asked for'), told.task ?? 'null');
+        assert.ok(!brief.includes(rules), "the rules are the rendered prompt's, not the brief's");
+        for (const step of [
+          stepOf('agent: cody\nharness: codex', 'Build it.', rules),
+          stepOf('agent: cody\nresume: plan', 'Build it.', rules),
+        ]) {
+          const inBrief = toldLayers(step, `${step.body}\n\n${TASK}`);
+          assert.deepEqual([inBrief.via, inBrief.factory, inBrief.policy, inBrief.task], ['brief', rules, 'Build it.', TASK]);
+        }
+        const bare = stepOf('agent: bare\nharness: codex', 'Build it.', rules);
+        assert.deepEqual([toldLayers(bare, null).custom, toldLayers(bare, null).factory], [null, rules]);
+        const { factoryRules: _r, ...before } = rendered.agent!;
+        assert.equal(toldLayers({ ...rendered, agent: before }, brief).factory, null);
+      },
+    ],
+    [
+      'a brief that does not open with the layers is the task whole, never cut at a wrong offset',
+      () => {
+        const step = stepOf('agent: scribe');
+        const resumed = '## Your answer\n\nTry again.\n\n## When you are finished\n\nSign off.';
+        assert.equal(toldLayers(step, resumed).task, resumed);
+        const shorter = `${'x'.repeat(step.agent!.body.length)}\n\n## What was asked for`;
+        assert.equal(toldLayers(step, shorter).task, shorter);
+        const old = { ...step, agent: { ...step.agent!, instructions: undefined, customInstructions: undefined, skills: undefined } };
+        const frozen = `${old.body}\n\n## What was asked for`;
+        const told = toldLayers(old, frozen);
+        assert.equal(told.instructions, null);
+        assert.equal(told.task, frozen, 'a record frozen without the instructions keeps them in the task');
+        assert.ok(told.task.includes('You are Scribe.'));
+        const onCodex = stepOf('agent: cody\nharness: codex', 'Build it.', 'Never push on a Friday.');
+        const dropped = headedLayers([
+          ['instructions', 'You are Cody.'],
+          ['custom', 'Be terse.'],
+          ['policy', 'Build it.'],
+        ]);
+        const notFrozen = `${PRECEDENCE}\n\n${dropped}\n\n## What was asked for`;
+        assert.equal(toldLayers(onCodex, notFrozen).task, notFrozen, 'layers not the ones frozen');
+        assert.equal(
+          toldLayers(onCodex, briefOf(onCodex)).task?.startsWith('## What was asked for'),
+          true,
+          'the task starts after the headed layers',
+        );
+      },
+    ],
+    [
+      'a step filed with its rendered folder gone is told its layers in its brief, then its skills whole, which stay in the task',
+      () => {
+        const step = stepOf('agent: scribe');
+        const told = toldLayers(step, `${unrendered(step, [{ name: 'alpha', text: 'Alpha.' }]).body}\n\n${TASK}`);
+        assert.equal(told.via, 'brief');
+        assert.ok(told.task?.startsWith('No skill is loaded with the Skill tool'), told.task ?? 'null');
+        assert.ok(!told.task?.includes('You are Scribe.'));
+      },
+    ],
+    [
+      'a step with no agent: its own words are the policy, no agent layer, and a brief not filed is no task',
+      () => {
+        const step = parseWorkflow('build', '---\nplace: git\n---\nBuild it.\n');
+        assert.deepEqual(toldLayers(step, null), {
+          agent: null,
+          instructions: null,
+          custom: null,
+          factory: null,
+          agentSkills: [],
+          policy: 'Build it.',
+          addedSkills: [],
+          fence: [],
+          folderFiles: true,
+          task: null,
+          via: 'brief',
+        });
+        assert.equal(toldLayers(step, briefOf(step)).task?.startsWith('## What was asked for'), true);
+      },
+    ],
+    [
+      "the step's fence lines are the fence keys its own file sets, as resolved: never a role key, never its agent's fence",
+      () => {
+        const own = toldLayers(stepOf('agent: dee\nmodel: sonnet\ndisallowedTools: Bash(git push:*), Bash(rm:*)'), null).fence;
+        assert.deepEqual(own, [{ key: 'disallowedTools', value: 'Bash(rm:*)' }]);
+        const added = stepOf('agent: dee\ndisallowedTools: Bash(rm:*)');
+        assert.deepEqual(added.disallowedTools, ['Bash(rm:*)', 'Bash(git push:*)'], "a step's line adds to its agent's");
+        assert.deepEqual(toldLayers(added, null).fence, [{ key: 'disallowedTools', value: 'Bash(rm:*)' }]);
+        assert.deepEqual(
+          toldLayers(stepOf('agent: dee\ndisallowedTools: Bash(git push:*)'), null).fence,
+          [],
+          'a line that only repeats its agent',
+        );
+        const inherited = stepOf('agent: dee');
+        assert.deepEqual(inherited.disallowedTools, ['Bash(git push:*)']);
+        assert.deepEqual(toldLayers(inherited, null).fence, [], "the agent's fence is not the step's policy");
+      },
+    ],
+    [
+      'the brief opens with the precedence, then the layers the step is told in its brief',
+      () => {
+        const onCodex = stepOf('agent: cody\nharness: codex');
+        const brief = briefOf(onCodex);
+        assert.equal(brief.split('\n')[0], PRECEDENCE);
+        assert.equal(brief.slice(0, PRECEDENCE.length + 2 + briefBody(onCodex).length), `${PRECEDENCE}\n\n${briefBody(onCodex)}`);
+        assert.ok(
+          briefOf(stepOf('agent: scribe')).startsWith(`${PRECEDENCE}\n\nBuild it.\n\n`),
+          'a rendered step: the precedence, then its own note',
+        );
+        const bare = parseWorkflow('build', '---\nplace: git\nagent: scribe\n---\n', undefined, AGENTS);
+        assert.ok(briefOf(bare).startsWith(`${PRECEDENCE}\n\n## What was asked for`), 'a rendered step with no note of its own');
+        const resumed = stepOf('agent: cody\nresume: plan');
+        assert.ok(briefOf(resumed).startsWith(`${PRECEDENCE}\n\n${resumed.body}`));
+      },
+    ],
+    [
+      'a brief composed with the precedence cuts back to the identical task, and so does one filed before it, headed or plain',
+      () => {
+        for (const step of [stepOf('agent: scribe'), stepOf('agent: cody\nharness: codex'), stepOf('')]) {
+          const task = toldLayers(step, briefOf(step)).task ?? '';
+          assert.ok(task.startsWith(TASK), `${step.harness ?? 'rendered'}: ${task}`);
+          assert.ok(!task.includes(PRECEDENCE), 'the precedence is a layer of its own');
+        }
+        const onCodex = stepOf('agent: cody\nharness: codex');
+        assert.equal(toldLayers(onCodex, `${onCodex.body}\n\n${TASK}`).task, TASK, 'filed before the precedence, its layers headed');
+        const before = toldLayers(onCodex, `${['You are Cody.', 'Be terse.', 'Build it.'].join('\n\n')}\n\n${TASK}`);
+        assert.deepEqual([before.task, before.via], [TASK, 'brief'], 'filed before the headings, its layers joined plainly');
+      },
+    ],
+    [
+      "the folder's files are a layer the session reads itself: told for a step that works in a folder here, never on a remote agent",
+      () => {
+        assert.equal(toldLayers(stepOf('agent: scribe'), null).folderFiles, true);
+        assert.equal(toldLayers(parseWorkflow('build', '---\nplace: git\n---\nBuild it.\n'), null).folderFiles, true);
+        assert.equal(toldLayers(stepOf('agent: bare\nharness: a2a:partner'), null).folderFiles, false);
+      },
+    ],
+    [
+      "skillLayers: a skill both the agent and the step name is the agent's; a record frozen before the added skills counts each the step's",
+      () => {
+        assert.deepEqual(skillLayers(stepOf('agent: scribe\nskills: beta, gamma')), { agent: ['alpha', 'beta'], added: ['gamma'] });
+        assert.deepEqual(skillLayers(stepOf('agent: scribe')), { agent: ['alpha', 'beta'], added: [] });
+        assert.deepEqual(skillLayers(stepOf('agent: bare\nskills: gamma')), { agent: [], added: ['gamma'] });
+        assert.deepEqual(skillLayers(parseWorkflow('build', '---\nplace: git\n---\nBuild it.\n')), { agent: [], added: [] });
+        const step = stepOf('agent: scribe\nskills: beta, gamma');
+        const { addedSkills: _added, ...agent } = step.agent!;
+        assert.deepEqual(skillLayers({ ...step, agent }), { agent: ['alpha'], added: ['beta', 'gamma'] });
+      },
+    ],
+  ]);
 });
 
-/** A folder team in the store's own workflows, beside the store's agents and skills. */
-function storeTeam(name: string, steps: Record<string, string>): string {
-  const dir = path.join(ROOT, 'workflows', name);
-  fs.mkdirSync(dir, { recursive: true });
-  for (const [step, text] of Object.entries(steps)) fs.writeFileSync(path.join(dir, `${step}.md`), text);
-  return dir;
-}
-const FOLDER = 'workspace: folder\npermissionMode: dontAsk\n';
-const HERE = fs.mkdirSync(path.join(ROOT, 'here'), { recursive: true }) ?? path.join(ROOT, 'here');
-fs.mkdirSync(path.join(ROOT, 'workflows', 'agents'), { recursive: true });
-fs.mkdirSync(path.join(ROOT, 'workflows', 'skills', 'write-a-note'), { recursive: true });
-fs.writeFileSync(
-  path.join(ROOT, 'workflows', 'agents', 'scribe.md'),
-  '---\nskills: write-a-note, mind-the-tone\nharnessPrompt: no-coding\ntools: Read, Edit, Skill\nallowedTools: Edit(**)\n---\nYou write notes.\n',
-);
-fs.writeFileSync(path.join(ROOT, 'workflows', 'agents', 'coder.md'), '---\nharness: codex\n---\nYou write code.\n');
-fs.writeFileSync(path.join(ROOT, 'workflows', 'skills', 'write-a-note', 'SKILL.md'), SKILL('write-a-note'));
-fs.writeFileSync(path.join(ROOT, 'workflows', 'skills', 'write-a-note', 'template.md'), '# Title\n');
-fs.mkdirSync(path.join(HERE, '.claude', 'skills', 'mind-the-tone'), { recursive: true });
-fs.writeFileSync(path.join(HERE, '.claude', 'skills', 'mind-the-tone', 'SKILL.md'), SKILL('mind-the-tone', 'preload: true\n'));
-
-test("nemia start renders each Claude Code step's agent under runs/<id>/agents/<step>/, and the tick files it with the flags and a brief without the instructions", async () => {
-  const dir = storeTeam('noted', {
-    write: `---\nagent: scribe\n${FOLDER}---\nWrite about tides.\n`,
-    code: `---\nagent: coder\nworkspace: folder\nafter: write\n---\nCode it.\n`,
-  });
-  const run = await runPlaced(startRun({ brief: 'a note on tides', repo: HERE, workflowDir: dir }));
-  const at = agentFilesDir(run, 'write');
-  assert.equal(
-    fs.readFileSync(path.join(at, 'prompt.md'), 'utf8'),
-    `${HEAD.instructions}\n\nYou write notes.\n\nYour skills, each loaded with the Skill tool by its name when you need it: \`nemia-scribe:write-a-note\`.\n\n## Skill \`nemia-scribe:mind-the-tone\`\n\nHow to mind the tone.\n`,
-  );
-  assert.equal(
-    fs.readFileSync(path.join(at, 'nemia-scribe', 'skills', 'write-a-note', 'SKILL.md'), 'utf8'),
-    SKILL('write-a-note'),
-    "the store's skill, copied",
-  );
-  assert.equal(
-    fs.readFileSync(path.join(at, 'nemia-scribe', 'skills', 'write-a-note', 'template.md'), 'utf8'),
-    '# Title\n',
-    'whole, with what is beside its SKILL.md',
-  );
-  assert.ok(fs.existsSync(path.join(at, 'nemia-scribe', 'skills', 'mind-the-tone', 'SKILL.md')), "the repository's skill, copied");
-  assert.equal(JSON.parse(fs.readFileSync(path.join(at, 'nemia-scribe', '.claude-plugin', 'plugin.json'), 'utf8')).name, 'nemia-scribe');
-  assert.equal(fs.readFileSync(path.join(at, 'nemia-scribe', 'output-styles', 'no-coding.md'), 'utf8'), noCodingStyle('scribe'));
-  assert.equal(fs.existsSync(agentFilesDir(run, 'code')), false, 'a codex step is not rendered');
-
-  fs.appendFileSync(path.join(ROOT, 'workflows', 'skills', 'write-a-note', 'SKILL.md'), 'Edited later.\n');
-  assert.doesNotMatch(
-    fs.readFileSync(path.join(at, 'nemia-scribe', 'skills', 'write-a-note', 'SKILL.md'), 'utf8'),
-    /Edited later/,
-    "an edit after the start reaches no run already started: the folder is the run's",
-  );
-
-  const { e, filed } = board();
-  assert.deepEqual((await runWith(e, advanceRun(readRun(run.id)))).filed, ['write']);
-  const write = filed.get(`${run.id}-write`)!;
-  assert.deepEqual(write.config?.claude, {
-    appendSystemPromptFile: path.join(at, 'prompt.md'),
-    pluginDir: [path.join(at, 'nemia-scribe')],
-    settings: JSON.stringify({ outputStyle: 'nemia-scribe:no-coding' }),
-  });
-  assert.deepEqual(
-    write.config?.enabledSkills,
-    ['nemia-scribe:write-a-note', 'nemia-scribe:mind-the-tone'],
-    "its plugin's copies, and no other skill",
-  );
-  assert.ok(
-    write.brief.startsWith(`${PRECEDENCE}\n\nWrite about tides.\n`),
-    "the precedence, then the step's own note: the layers above it are in Claude Code's prompt",
-  );
-  assert.doesNotMatch(write.brief, /You write notes/, "the instructions are in Claude Code's prompt, not the brief");
-});
-
-test('a codex step is filed as before: its instructions in its brief, and no Claude Code flags', async () => {
-  const dir = storeTeam('coded', { code: `---\nagent: coder\nworkspace: folder\n---\nCode it.\n` });
-  const run = await runPlaced(startRun({ brief: 'some code', repo: HERE, workflowDir: dir }));
-  const { e, filed } = board();
-  await runWith(e, advanceRun(readRun(run.id)));
-  const code = filed.get(`${run.id}-code`)!;
-  assert.equal(code.config?.claude, undefined);
-  assert.ok(code.brief.startsWith(`${PRECEDENCE}\n\n${HEAD.instructions}\n\nYou write code.\n\n${HEAD.policy}\n\nCode it.`), code.brief);
-});
-
-test('a rendered step whose folder is gone is filed as before 2026-09-25 — the instructions in its brief, no flag naming a file that is not there — and told its skills whole', async () => {
-  const dir = storeTeam('lost', { write: `---\nagent: scribe\n${FOLDER}---\nWrite about tides.\n` });
-  const run = await runPlaced(startRun({ brief: 'a note on tides', repo: HERE, workflowDir: dir }));
-  fs.rmSync(agentFilesDir(run, 'write'), { recursive: true });
-  const { e, filed } = board();
-  await runWith(e, advanceRun(readRun(run.id)));
-  const write = filed.get(`${run.id}-write`)!;
-  assert.equal(write.config?.claude, undefined);
-  assert.ok(
-    write.brief.startsWith(`${PRECEDENCE}\n\n${HEAD.instructions}\n\nYou write notes.\n\n${HEAD.policy}\n\nWrite about tides.`),
-    write.brief,
-  );
-  assert.match(
-    write.brief,
-    /Write about tides\.\n\nNo skill is loaded with the Skill tool for this step[^\n]*\n\n## Skill `write-a-note`\n\nHow to write a note\./,
-    "with no plugin there is nothing to load, so each skill is told whole, read again where a start of the run's folder finds it: the store's",
-  );
-  assert.ok(
-    write.brief.includes(`/workflows/skills, ${PLACE_SKILLS}. Sign off blocked if you need it.\n\n## What was asked for`),
-    write.brief,
-  );
-  assert.match(
-    write.brief,
-    /\n## Skill `mind-the-tone`\n\nNot told: no folder holds it in [^\n]*\/workflows\/skills, [^\n]*\. Sign off blocked if you need it\.\n\n## What was asked for/,
-    'a folder run keeps no repository, so the skill the start found in the one it was typed in is said not to be told, and where it was looked for',
-  );
-});
-
-test('a rendered step whose plugin is under another name, as a start before the rename wrote it, is filed as one whose folder is gone; one that names no plugin is filed with its prompt', async () => {
-  fs.writeFileSync(
-    path.join(ROOT, 'workflows', 'agents', 'plain.md'),
-    '---\ntools: Read\nallowedTools: Edit(**)\n---\nYou write plainly.\n',
-  );
-  const dir = storeTeam('renamed', {
-    write: `---\nagent: scribe\n${FOLDER}---\nWrite about tides.\n`,
-    plain: `---\nagent: plain\n${FOLDER}---\nWrite plainly.\n`,
-  });
-  const run = await runPlaced(startRun({ brief: 'a note on tides', repo: HERE, workflowDir: dir }));
-  const at = agentFilesDir(run, 'write');
-  fs.renameSync(path.join(at, pluginOf('scribe')), path.join(at, 'before-scribe'));
-  const { e, filed } = board();
-  await runWith(e, advanceRun(readRun(run.id)));
-  const write = filed.get(`${run.id}-write`)!;
-  assert.equal(write.config?.claude, undefined, 'no flag naming a plugin that is not there');
-  assert.ok(
-    write.brief.startsWith(`${PRECEDENCE}\n\n${HEAD.instructions}\n\nYou write notes.\n\n${HEAD.policy}\n\nWrite about tides.`),
-    write.brief,
-  );
-  assert.match(write.brief, /\n## Skill `write-a-note`\n\nHow to write a note\./, 'and its skills told whole');
-  assert.deepEqual(write.config?.enabledSkills, [], 'and given no skill to load: none is there');
-  const plain = filed.get(`${run.id}-plain`)!;
-  assert.deepEqual(plain.config?.claude, { appendSystemPromptFile: path.join(agentFilesDir(run, 'plain'), 'prompt.md') });
-  assert.equal(fs.readdirSync(agentFilesDir(run, 'plain')).join(), 'prompt.md', 'its folder holds no plugin, and names none');
-  assert.deepEqual(
-    plain.config?.enabledSkills,
-    [],
-    'a step that names no skill is given none, not the two another step of its folder names',
-  );
-});
-
-test("a repository run's step whose folder is gone is told a skill from the run's repository too, as its start found it", async () => {
-  const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
-  fs.mkdirSync(path.join(repo, '.claude', 'skills', 'mind-the-tone'), { recursive: true });
-  const skill = SKILL('mind-the-tone', 'preload: true\n').replace('How to', 'In this repository, how to');
-  fs.writeFileSync(path.join(repo, '.claude', 'skills', 'mind-the-tone', 'SKILL.md'), skill);
-  stand().world.repository(repo, { '.claude/skills/mind-the-tone/SKILL.md': skill });
-  const dir = storeTeam('lost-git', { write: '---\nplace: git\nagent: scribe\n---\nWrite about tides.\n' });
-  const run = await runPlaced(startRun({ brief: 'a note on tides', repo, workflowDir: dir, isolate: false }));
-  fs.rmSync(agentFilesDir(run, 'write'), { recursive: true });
-  const { e, filed } = board();
-  await runWith(e, advanceRun(readRun(run.id)));
-  const write = filed.get(`${run.id}-write`)!;
-  assert.equal(write.config?.claude, undefined);
-  assert.match(write.brief, /\n## Skill `mind-the-tone`\n\nIn this repository, how to mind the tone\.\n/);
-});
-
-test('a step whose folder is gone is told a skill named with its folder under the name its line writes, or why the folder no longer holds it', async () => {
-  const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
-  const tone = SKILL('mind-the-tone');
-  const nested = SKILL('y').replace(/\n---\n[\s\S]*$/, '\n---\nOf the folder app.\n');
-  for (const [file, text] of [
-    ['.claude/skills/mind-the-tone/SKILL.md', tone],
-    ['app/.claude/skills/y/SKILL.md', nested],
-  ]) {
-    fs.mkdirSync(path.dirname(path.join(repo, file)), { recursive: true });
-    fs.writeFileSync(path.join(repo, file), text);
-  }
-  stand().world.repository(repo, { '.claude/skills/mind-the-tone/SKILL.md': tone, 'app/.claude/skills/y/SKILL.md': nested });
-  const dir = storeTeam('lost-nested', { write: '---\nplace: git\nagent: scribe\nskills: app:y\n---\nWrite about tides.\n' });
-  const told = async (): Promise<string> => {
-    const run = await runPlaced(startRun({ brief: 'a note on tides', repo, workflowDir: dir, isolate: false }));
-    fs.rmSync(agentFilesDir(run, 'write'), { recursive: true });
-    const { e, filed } = board();
-    await runWith(e, advanceRun(readRun(run.id)));
-    return filed.get(`${run.id}-write`)!.brief;
-  };
-  const brief = await told();
-  assert.match(brief, /\n## Skill `app:y`\n\nOf the folder app\.(\n|$)/);
-  assert.doesNotMatch(brief, /## Skill `y`/);
-  const run = await runPlaced(startRun({ brief: 'a note on tides', repo, workflowDir: dir, isolate: false }));
-  fs.rmSync(agentFilesDir(run, 'write'), { recursive: true });
-  fs.rmSync(path.join(repo, 'app'), { recursive: true });
-  const { e, filed } = board();
-  await runWith(e, advanceRun(readRun(run.id)));
-  const at = path.join(repo, 'app', '.claude', 'skills', 'y');
-  assert.ok(
-    filed
-      .get(`${run.id}-write`)!
-      .brief.includes(
-        `## Skill \`app:y\`\n\nNot told: \`app:y\` is the skill \`y\` of the repository's folder \`app\`, and ${at} holds no SKILL.md.`,
-      ),
-  );
-});
-
-test('REFUSED at shipped defaults: nemia start of a team whose agent gives a skill no place has, and nothing written', async () => {
-  const dir = storeTeam('unskilled', { write: `---\nagent: scribe\n${FOLDER}---\nWrite.\n` });
-  const runs = path.join(ROOT, 'runs');
-  const before = fs.existsSync(runs) ? fs.readdirSync(runs).sort() : [];
-  const elsewhere = fs.mkdtempSync(path.join(ROOT, 'elsewhere-'));
-  await assert.rejects(
-    async () => await runPlaced(startRun({ brief: 'x', repo: elsewhere, workflowDir: dir })),
-    (e: Error) => e instanceof WorkflowError && e.message.includes('`mind-the-tone`') && e.message.includes('no skills folder has it'),
-    'started from a directory whose .claude/ has no mind-the-tone, and the store has write-a-note alone',
-  );
-  assert.deepEqual(fs.existsSync(runs) ? fs.readdirSync(runs).sort() : [], before);
+test("where a skill or an agent is found: the workflow's own root, the repository's .claude/, the store, then the place skill", async (t) => {
+  await rows(t, [
+    [
+      "the workflow's own root, then the repository's .claude/, then the store — the repository's before the store's",
+      () => {
+        const home = tree({
+          'workflows/skills/write-a-note/SKILL.md': SKILL('write-a-note'),
+          'workflows/agents/helper.md': "---\n---\nThe store's helper.\n",
+        });
+        const repo = tree({
+          '.claude/skills/write-a-note/SKILL.md': SKILL('write-a-note', 'preload: true\n'),
+          '.claude/agents/helper.md': "---\n---\nThe repository's helper.\n",
+        });
+        const dir = team('---\nskills: write-a-note\n---\nYou build.\n', {});
+        const places = { repo, home };
+        assert.deepEqual(lookupRoots(dir, places), [path.dirname(dir), path.join(repo, '.claude'), path.join(home, 'workflows')]);
+        assert.equal(skillsFor(dir, places).at.get('write-a-note'), path.join(repo, '.claude', 'skills', 'write-a-note'));
+        assert.equal((agentsFor(dir, places).get('helper') as { body: string }).body.trim(), "The repository's helper.");
+        assert.equal(
+          skillsFor(dir, { home }).at.get('write-a-note'),
+          path.join(home, 'workflows', 'skills', 'write-a-note'),
+          'with no repository, the store',
+        );
+        const own = team('---\nskills: write-a-note\n---\nYou build.\n', {
+          'workflows/skills/write-a-note/SKILL.md': SKILL('write-a-note'),
+        });
+        assert.equal(
+          skillsFor(own, places).at.get('write-a-note'),
+          path.join(path.dirname(own), 'skills', 'write-a-note'),
+          "the workflow's own root first",
+        );
+      },
+    ],
+    [
+      "the package's place skill after every place, where none has its name: a place's own `git` comes first",
+      () => {
+        const home = tree({});
+        const repo = tree({});
+        const found = skillsFor(team('---\nskills: git\n---\nYou build.\n', {}), { repo, home });
+        assert.equal(found.at.get('git'), BUILTIN_PLACE);
+        assert.equal(found.looked.at(-1), PLACE_SKILLS);
+        assert.ok(isBuiltinPlace(BUILTIN_PLACE));
+        const own = team('---\nskills: git\n---\nYou build.\n', { 'workflows/skills/git/SKILL.md': SKILL('git') });
+        const ownGit = path.join(path.dirname(own), 'skills', 'git');
+        assert.equal(skillsFor(own, { repo, home }).at.get('git'), ownGit);
+        assert.equal(isBuiltinPlace(ownGit), false);
+      },
+    ],
+    [
+      'REFUSED: a skill no place has, naming each place looked in, in order',
+      () => {
+        const repo = tree({});
+        const dir = team('---\nskills: draw-a-map\n---\nYou build.\n', {});
+        const looked = [
+          path.join(path.dirname(dir), 'skills'),
+          path.join(repo, '.claude', 'skills'),
+          path.join(ROOT, 'workflows', 'skills'),
+        ].join(', ');
+        names(
+          refusal(() => loadWorkflows(dir, { repo, home: ROOT })),
+          'build: `agent: builder` gives the skill `draw-a-map`',
+          'no skills folder has it',
+          `looked in ${looked}`,
+        );
+      },
+    ],
+    [
+      "REFUSED: a name in both of one repository's places, workflows/ and .claude/ — a skill, then an agent — naming both",
+      () => {
+        const repo = tree({
+          'workflows/team/build.md': '---\nplace: git\nagent: builder\n---\n',
+          'workflows/agents/builder.md': '---\nskills: write-a-note\n---\nYou build.\n',
+          'workflows/skills/write-a-note/SKILL.md': SKILL('write-a-note'),
+          '.claude/skills/write-a-note/SKILL.md': SKILL('write-a-note'),
+        });
+        const dir = path.join(repo, 'workflows', 'team');
+        names(
+          refusal(() => loadWorkflows(dir, { repo })),
+          'build: `agent: builder` gives the skill `write-a-note`',
+          'write-a-note is a skill in both',
+          "one repository's two places for skills",
+          'Keep one of them',
+          path.join(repo, 'workflows', 'skills', 'write-a-note'),
+          path.join(repo, '.claude', 'skills', 'write-a-note'),
+        );
+        fs.rmSync(path.join(repo, '.claude', 'skills'), { recursive: true });
+        fs.mkdirSync(path.join(repo, '.claude', 'agents'), { recursive: true });
+        fs.writeFileSync(path.join(repo, '.claude', 'agents', 'builder.md'), '---\n---\nAnother builder.\n');
+        const both = refusal(() => loadWorkflows(dir, { repo }));
+        names(
+          both,
+          'builder is an agent in both',
+          path.join(repo, '.claude', 'agents', 'builder.md'),
+          "one repository's two places for agents",
+          'nothing says which runs',
+        );
+        assert.equal(loadWorkflows(dir).length, 1, "read with no repository, the clash is no one repository's");
+      },
+    ],
+    [
+      "an agent's version moves with each skill it gives and each file beside it, and not with one it does not give",
+      () => {
+        const dir = team('---\nskills: write-a-note\n---\nYou build.\n', {
+          'workflows/skills/write-a-note/SKILL.md': SKILL('write-a-note'),
+          'workflows/skills/other/SKILL.md': SKILL('other'),
+        });
+        const agents = path.join(path.dirname(dir), 'agents');
+        const skills = path.join(path.dirname(dir), 'skills');
+        const was = agentVersion(agents, 'builder');
+        fs.appendFileSync(path.join(skills, 'other', 'SKILL.md'), 'More.\n');
+        assert.equal(agentVersion(agents, 'builder'), was, 'a skill it does not give');
+        fs.appendFileSync(path.join(skills, 'write-a-note', 'SKILL.md'), 'More.\n');
+        const edited = agentVersion(agents, 'builder');
+        assert.notEqual(edited, was, 'its SKILL.md');
+        fs.writeFileSync(path.join(skills, 'write-a-note', 'template.md'), '# A template\n');
+        assert.notEqual(agentVersion(agents, 'builder'), edited, 'a file beside it, which the plugin copies too');
+      },
+    ],
+    [
+      "F21's models: the three measured, and a name that only begins like one is not it",
+      () => {
+        assert.deepEqual([...CLAUDE_AUTO_DROPPED], ['haiku', 'claude-haiku-4-5', 'claude-sonnet-4-5'], 'a new one is measured first');
+        assert.ok(autoDropped('claude', 'claude-sonnet-4-5-20250929', undefined));
+        assert.equal(autoDropped('claude', 'claude-sonnet-5', undefined), undefined);
+      },
+    ],
+  ]);
 });
 
 test("a codex step's `sandbox:` reaches Codex as its `-s`, every sandbox, and the one it was written as before 2026-09-23 the same", () => {
@@ -943,6 +807,6 @@ test("a codex step's `sandbox:` reaches Codex as its `-s`, every sandbox, and th
   assert.equal(
     args[args.indexOf('-s') + 1],
     'workspace-write',
-    "filed from permissionMode alone, without modeOf, the reviewer runs in Codex's default, which writes",
+    "filed from permissionMode alone, without modeOf, the reviewer runs in Codex's default",
   );
 });

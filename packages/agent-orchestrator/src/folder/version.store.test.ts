@@ -7,7 +7,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { Effect, Layer } from 'effect';
@@ -141,7 +140,6 @@ test("the version over the files doors is the synchronous reader's, byte for byt
   });
   await t.test("an added skill whose SKILL.md is a link, followed in a checkout's own skills, reads as null, so its digest moves", () => {
     const repo = scratch('wf-version-repo-');
-    execFileSync('git', ['init', '-q'], { cwd: repo });
     const skill = path.join(repo, '.claude', 'skills', 'linked');
     fs.mkdirSync(skill, { recursive: true });
     fs.writeFileSync(path.join(repo, 'card.md'), '---\ndescription: A linked card.\n---\nLinked.\n');

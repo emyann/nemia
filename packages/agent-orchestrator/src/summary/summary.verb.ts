@@ -204,6 +204,57 @@ export type RunSummary = {
   unreadable: string | null;
 };
 
+/**
+ * The fields of a run's row that are its judgement and not its record: where it stands (`status`, `phase`, `reason`, `on`, `via`), whether
+ * it still moves, what it cost, how long it has been at work and the tokens it used, what it waits on and is held until, and what a person
+ * has to decide. The list's row (`RunSummary`) and the run's object carry them from here alone (`judgedFields`).
+ */
+export type JudgedFields = Pick<
+  RunSummary,
+  'status' | 'phase' | 'reason' | 'on' | 'via' | 'moving' | 'cost' | 'atWork' | 'tokens' | 'waiting' | 'holding' | 'toDecide'
+>;
+
+/** What `judgedFields` reads of a run's judgement (`judge`). */
+export type JudgedRun = Omit<JudgedFields, 'atWork' | 'tokens'>;
+
+/**
+ * A run's judged fields (`JudgedFields`): `judge`'s reading of the run as a door carries it (`runSaid`), and its time at work and tokens
+ * off the views the judgement read (`atWork`, `runTokens`). The one assembly of them: the list's row and the run's object each call it.
+ */
+export function judgedFields(run: Pick<Run, 'steps'>, judged: JudgedRun, views: Views): JudgedFields {
+  return {
+    waiting: judged.waiting,
+    holding: judged.holding,
+    ...runSaid(judged),
+    moving: judged.moving,
+    cost: judged.cost,
+    atWork: atWork(run, views),
+    tokens: runTokens(run, views),
+    toDecide: judged.toDecide,
+  };
+}
+
+/**
+ * A run's judged fields when nothing judges it (`unjudged`): `running` and moving, as the tick counts it in flight, with nothing measured,
+ * waited on, held or to decide.
+ */
+export function unjudgedFields(): JudgedFields {
+  return {
+    waiting: null,
+    holding: null,
+    status: 'running',
+    phase: 'running',
+    reason: 'Running',
+    on: null,
+    via: null,
+    moving: true,
+    cost: null,
+    atWork: null,
+    tokens: null,
+    toDecide: null,
+  };
+}
+
 /** The agent each step of a run is given, by its name, off the workflow it is judged by (`judgedSteps`); null for a step given none. */
 function agentsOf(run: Run, folder: readonly Workflow[] | null): (name: string) => string | null {
   const steps = judgedSteps(run, folder);
@@ -243,14 +294,8 @@ const summarize = Effect.fnUntraced(function* (run: Run, views: Views, reader: E
     pruned: run.pruned ? { said: `${prunedWords(run.pruned)}; ${prunedKept(run.pruned)}` } : null,
     after: run.after ?? [],
     context: run.context ?? [],
-    waiting: judged.waiting,
+    ...judgedFields(run, judged, views),
     holdUntil: judged.holding && run.hold ? run.hold.until : [],
-    holding: judged.holding,
-    ...runSaid(judged),
-    moving: judged.moving,
-    cost: judged.cost,
-    atWork: atWork(run, views),
-    tokens: runTokens(run, views),
     steps: names.map((name) => ({
       name,
       taskId: run.steps[name]?.taskId ?? null,
@@ -265,7 +310,6 @@ const summarize = Effect.fnUntraced(function* (run: Run, views: Views, reader: E
     graph: runGraph(judgedSteps(run, folder), names),
     waitingOnYou: judged.waitingOnYou,
     waitingOnYouWords: judged.waitingOnYouWords,
-    toDecide: judged.toDecide,
     unreadable: null,
   };
   return { summary, asked } satisfies Judged;
@@ -311,18 +355,8 @@ function unjudged(run: Run, views: Views, unreadable: Unreadable, said: string, 
     pruned: run.pruned ? { said: `${prunedWords(run.pruned)}; ${prunedKept(run.pruned)}` } : null,
     after: run.after ?? [],
     context: run.context ?? [],
-    waiting: null,
+    ...unjudgedFields(),
     holdUntil: run.hold && !run.cancelledAt ? run.hold.until : [],
-    holding: null,
-    status: 'running',
-    phase: 'running',
-    reason: 'Running',
-    on: null,
-    via: null,
-    moving: true,
-    cost: null,
-    atWork: null,
-    tokens: null,
     steps: names.map((name) => ({
       name,
       taskId: run.steps[name]?.taskId ?? null,
@@ -343,7 +377,6 @@ function unjudged(run: Run, views: Views, unreadable: Unreadable, said: string, 
     graph: runGraph(judgedSteps(run, folder), names),
     waitingOnYou: [],
     waitingOnYouWords: [],
-    toDecide: null,
     unreadable: said,
   };
 }

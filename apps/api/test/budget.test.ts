@@ -17,13 +17,13 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { RunDecision } from '../src/decide/decision.ts';
-import type { RunDetail } from '../src/detail/detail.ts';
 import { askFile, decideRun, list, retryRun, roundAskFile, roundRun, runStore, type RunSummary, usedLines } from 'agent-orchestrator';
 import { Effect } from 'effect';
 import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from 'agent-orchestrator/testing';
 import { appOver, beforeEachTest, eachTest, engineFor, runOver } from './placed.ts';
 import { story } from './checkpoints.ts';
+import { objectOf, stepOf } from './run-reads.ts';
 
 const stand = eachTest(testPlace);
 const standIn = eachTest(testEngine);
@@ -211,16 +211,12 @@ beforeEachTest(() => {
 
 const record = fs.readFileSync(recordFile, 'utf8');
 
-const detail = async (id = R) => (await (await app().request(`/api/runs/${id}`)).json()) as RunDetail;
+/** The run object `GET /api/runs/:id` answers. */
+const detail = async (id = R) => objectOf(app(), id);
 const summary = async (id = R) => {
   const run = ((await (await app().request('/api/runs')).json()) as RunSummary[]).find((r) => r.id === id);
   assert.ok(run, `${id} is on the list`);
   return run;
-};
-const stepOf = (run: RunDetail, name: string) => {
-  const step = run.steps.find((s) => s.name === name);
-  assert.ok(step, name);
-  return step;
 };
 const decision = async (id = R) => (await (await app().request(`/api/runs/${id}/decision`)).json()) as RunDecision;
 type Refused = { error: string };
@@ -440,30 +436,30 @@ test('a run whose steps went over their budgets: what each try cost, the steps h
       assert.equal(stepOf(run, 'implement').spent?.said, '$2.10');
 
       const words = await runWith(engine(), list(engine(), runStore.runs.read(R)));
-      assert.ok(run.cost);
-      const { usd, ...total } = run.cost;
+      assert.ok(run.status.cost);
+      const { usd, ...total } = run.status.cost;
       assert.deepEqual(
         total,
         { measured: 4, unmeasured: 2, said: '≥$6.35' },
         "the run's: every step's tries, ≥ since two of review's sessions have no cost on them",
       );
       assert.ok(Math.abs(usd - 6.35) < 1e-9, String(usd));
-      assert.equal(run.cost.said, words.cost, "as nemia ls says it on the run's line");
-      assert.deepEqual((await summary()).cost, run.cost, 'the list carries it too');
+      assert.equal(run.status.cost.said, words.cost, "as nemia ls says it on the run's line");
+      assert.deepEqual((await summary()).cost, run.status.cost, 'the list carries it too');
       assert.deepEqual(
-        run.timeline.rounds.map((r) => [r.round, r.cost?.said, r.cost?.measured, r.cost?.unmeasured]),
+        run.status.timeline.rounds.map((r) => [r.round, r.cost?.said, r.cost?.measured, r.cost?.unmeasured]),
         [
           [1, '≥$1.20', 1, 1],
           [2, '≥$0.90', 1, 1],
         ],
         "on the timeline's totals: each round's sessions",
       );
-      assert.deepEqual(run.timeline.run.cost, run.cost, "and the run's");
+      assert.deepEqual(run.status.timeline.run.cost, run.status.cost, "and the run's");
 
       const free = await detail(FREE);
-      assert.equal(free.cost, null, 'a run nobody priced has no cost on either endpoint, and neither has its step: null, never 0');
+      assert.equal(free.status.cost, null, 'a run nobody priced has no cost on either endpoint, and neither has its step: null, never 0');
       assert.equal((await summary(FREE)).cost, null);
-      assert.equal(free.timeline.run.cost, null);
+      assert.equal(free.status.timeline.run.cost, null);
       const plan = stepOf(free, 'plan');
       assert.deepEqual([plan.spent, plan.used?.costUsd, plan.used?.cost], [null, null, 'not measured']);
       assert.deepEqual(
@@ -499,10 +495,10 @@ test('a run whose steps went over their budgets: what each try cost, the steps h
 
       const run = await detail();
       assert.deepEqual(
-        run.steps.map((s) => s.message),
+        run.status.steps.map((s) => s.message),
         statuses,
       );
-      assert.deepEqual(run.waitingOnYou, listed.waitingOnYou);
+      assert.deepEqual(run.status.waitingOnYou, listed.waitingOnYou);
       const [implement, review, tokens] = ['implement', 'review', 'tokens'].map((name) => stepOf(run, name));
       assert.deepEqual(tokens.budget, { usd: 3, said: '$3', of: '$4.25 of $3', over: true });
       assert.deepEqual(implement.budget, { usd: 2, said: '$2', of: '$2.10 of $2', over: true });
@@ -584,12 +580,12 @@ test('a run whose steps went over their budgets: what each try cost, the steps h
 
         const run = await detail();
         assert.deepEqual(
-          run.pruned,
+          run.status.pruned,
           { ...pruned, artifacts: null },
           'the marker nemia prune --unmerged writes beside the record, which nothing removes: taken back, so what follows reads R as it was',
         );
-        assert.deepEqual([run.waitingOnYou, run.steps.map((s) => s.raise)], [[], [null, null, null]]);
-        assert.doesNotMatch(JSON.stringify(run.steps.map((s) => s.note)), /nemia (retry|approve) /);
+        assert.deepEqual([run.status.waitingOnYou, run.status.steps.map((s) => s.raise)], [[], [null, null, null]]);
+        assert.doesNotMatch(JSON.stringify(run.status.steps.map((s) => s.note)), /nemia (retry|approve) /);
       } finally {
         fs.rmSync(marker);
       }
@@ -618,14 +614,17 @@ test('a run whose steps went over their budgets: what each try cost, the steps h
       const words = await runWith(engine(), list(engine(), runStore.runs.read(R)));
       const run = await detail();
       assert.deepEqual(
-        run.steps.map(({ name, note }) => ({ name, note })),
+        run.status.steps.map(({ name, note }) => ({ name, note })),
         words.steps.map(({ name, note }) => ({ name, note: note ?? null })),
         'as nemia ls has them: notes beside the steps',
       );
       assert.equal(stepOf(run, 'tokens').note, 'try 3 asked (--continue, --budget 5) — the next tick files it');
       assert.equal(stepOf(run, 'review').note, 'round 3 asked (nemia retry --round --budget 3) — the next tick files implement');
-      assert.deepEqual(run.waitingOnYou, words.waitingOnYou);
-      assert.ok(!run.waitingOnYou.includes('tokens') && !run.waitingOnYou.includes('review'), run.waitingOnYou.join(', '));
+      assert.deepEqual(run.status.waitingOnYou, words.waitingOnYou);
+      assert.ok(
+        !run.status.waitingOnYou.includes('tokens') && !run.status.waitingOnYou.includes('review'),
+        run.status.waitingOnYou.join(', '),
+      );
       fs.rmSync(asksDir, { recursive: true, force: true });
     },
   );
@@ -646,7 +645,7 @@ test('steps past their budget on their own work: one that signed off blocked is 
         ['over budget $1.50 of $1', 'over budget $1.20 of $1'],
         'how it ended is on the raise',
       );
-      assert.deepEqual(run.waitingOnYou, ['palette', 'lint']);
+      assert.deepEqual(run.status.waitingOnYou, ['palette', 'lint']);
       assert.deepEqual(palette.raise, { by: 'retry', above: 1.5, said: '$1.50', modes: ['continue', 'fresh'], own: 'blocked' });
       assert.deepEqual(lint.raise, {
         by: 'retry',
@@ -712,12 +711,12 @@ test('steps past their budget on their own work: one that signed off blocked is 
     const words = await runWith(engine(), list(engine(), runStore.runs.read(R2)));
     const after = await detail(R2);
     assert.deepEqual(
-      after.steps.map(({ name, note }) => ({ name, note })),
+      after.status.steps.map(({ name, note }) => ({ name, note })),
       words.steps.map(({ name, note }) => ({ name, note: note ?? null })),
       'as nemia ls has them: notes beside the steps',
     );
-    assert.deepEqual(after.waitingOnYou, [], 'and neither waited on');
-    assert.deepEqual(after.waitingOnYou, words.waitingOnYou);
+    assert.deepEqual(after.status.waitingOnYou, [], 'and neither waited on');
+    assert.deepEqual(after.status.waitingOnYou, words.waitingOnYou);
     fs.rmSync(asks, { recursive: true, force: true });
   });
 });

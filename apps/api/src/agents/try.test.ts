@@ -28,6 +28,7 @@ import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from 'agent-orchestrator/testing';
 import { appOver, eachTest, engineFor, runOver } from '../../test/placed.ts';
 import { story } from '../../test/checkpoints.ts';
+import { objectOf } from '../../test/run-reads.ts';
 
 const stand = eachTest(testPlace);
 const standIn = eachTest(testEngine);
@@ -97,7 +98,6 @@ fs.writeFileSync(
 );
 
 type RunSummary = import('agent-orchestrator').RunSummary;
-type RunDetail = import('../detail/detail.ts').RunDetail;
 type AgentListing = import('./agents.ts').AgentListing;
 
 const json = { 'content-type': 'application/json' };
@@ -206,8 +206,7 @@ test('a person tries an agent of theirs: a folder run fenced with a dollar, one 
     const summary = (await listed()).find((r) => r.id === first)!;
     assert.deepEqual(summary.try, { agent: 'scribe' });
     assert.equal(summary.moving, true, 'a try nothing has filed yet moves: a tick files it');
-    const detail = (await (await app().request(`/api/runs/${first}`)).json()) as RunDetail;
-    assert.deepEqual(detail.try, { agent: 'scribe' });
+    assert.deepEqual((await objectOf(app(), first)).spec.try, { agent: 'scribe' });
   });
 
   await s.test('a try while one of the same agent still moves is refused', async () => {
@@ -337,7 +336,7 @@ test('what a try refuses, and what it is fenced to: the default factory, rules o
     const run = await runWith(engine(), startRun({ brief: 'Write a note.', repo: '', workflowDir: other }));
     try {
       assert.equal((await listed()).find((r) => r.id === run.id)!.try, null);
-      assert.equal(((await (await app().request(`/api/runs/${run.id}`)).json()) as RunDetail).try, null);
+      assert.equal((await objectOf(app(), run.id)).spec.try, null);
       const res = await remove(run.id);
       const body = (await res.json()) as { error: string };
       assert.equal(res.status, 409, "the board removes only a try: another run is `nemia rm`'s, which says what it leaves");

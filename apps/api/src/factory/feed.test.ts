@@ -14,12 +14,14 @@ import { until, WAITED, type Waiter } from '../../test/waits.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import path from 'node:path';
 import type { Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { createAdaptorServer } from '@hono/node-server';
 import { type Duration, Effect, Layer, Logger, Metric, Stream } from 'effect';
 import { app, appOf, liveOf, runtime } from '../app.ts';
 import { Beats } from '../layer.ts';
+import { StoreRoot } from '../store.ts';
 import { feedEvents, OPENED } from './feed.ts';
 import {
   BOOKMARK_EVERY,
@@ -48,7 +50,8 @@ const emptyFeed = () => {
   const written = (runs: Record<string, FeedWords>) =>
     emitFeed(new Map(Object.entries(runs)), { memo }).pipe(Effect.provide(Logger.layer([])));
   return Object.assign((runs: Record<string, FeedWords>) => runtime.runPromise(written(runs)), {
-    elsewhere: (runs: Record<string, FeedWords>) => Effect.runPromise(written(runs)),
+    elsewhere: (runs: Record<string, FeedWords>) =>
+      Effect.runPromise(written(runs).pipe(Effect.provide(StoreRoot.layer(path.dirname(feedFile()))))),
   });
 };
 const planAt = (word: string, note?: string): FeedWords => ({

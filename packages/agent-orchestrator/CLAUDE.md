@@ -139,6 +139,13 @@ it holds today that is a candidate for the runtime is in `docs/architecture.md`,
   factory controller (`reconcileFactory`) — is given `StoreRoot`, a handler through `rooted`, and a test runs it with one
   (`test/templated.ts`) or gives `templateDoorMemory()` (`src/templates/memory.store.ts`). The door checks a tree's name and paths
   (`TemplateTreeWrite`), never the template's lint: a verb that must refuse a template that does not pass checks it first (`checkedTree`).
+- **A subscription and its delivery are read and written through the Subscription door (`SubscriptionDoor`,
+  `src/subscription/subscription.store.ts`), the revision ledger through the Ledger door (`LedgerDoor`, `src/revisions/revisions.store.ts`)
+  and the feed through the Feed door (`FeedDoor`, `src/feed/feed.store.ts`), each rooted as the Factory door is**: a program that yields
+  one is given `StoreRoot`, or a test gives it `subscriptionDoorMemory()`, `ledgerDoorMemory()` or `feedDoorMemory()` (each a
+  `memory.store.ts` beside its store). A synchronous caller still on the module spellings (`listSubscriptions`, `ledgerOf`, `readFeed`, …)
+  reads the module's root whatever door was given, counted per door in `test/subscription-door.baseline.ts`,
+  `test/ledger-door.baseline.ts` and `test/feed-door.baseline.ts`. The feed's fold memo is `emitFeed`'s, never the layer's.
 - **A file written back is decoded by a `StructWithRest`**: a `Struct` strips the keys it does not name, and a record written by a newer
   tick keeps them. `Struct({})` accepts an array; a struct with a key refuses one. A frozen step is decoded by `FrozenStepSchema`
   (`folder/folder.store.ts`), a field per `StepKey`: a key added without one fails the typecheck.

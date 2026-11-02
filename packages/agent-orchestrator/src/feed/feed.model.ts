@@ -1,7 +1,8 @@
 /**
  * The feed model: a line of the feed, its cursor, and a subscription to it, as Schemas at the context's door. A line is a run's, a
- * daemon's or the store's; a run's names its run, step and try by id, and a subscription the runtime's task it tells, by id alone. A
- * declaration in S1: no read path decodes through it.
+ * daemon's or the store's; a run's names its run, step and try by id, a subscription the runtime's task it tells, by id alone, and a
+ * delivery where the deliverer is with one. A declaration in S1; in S6 the Subscription door (`subscription.store.ts`) checks each
+ * write through `Subscription`, `Delivery` and `FeedLine`, pattern on create, nominal on read.
  */
 import { Schema } from 'effect';
 import { brandedCount, brandedId, type Count, type Id } from '../model/brand.model.ts';
@@ -92,8 +93,29 @@ export type StoreLine = typeof StoreLine.Type;
 export const FeedLine = Schema.Union([RunLine, DaemonLine, StoreLine]);
 export type FeedLine = typeof FeedLine.Type;
 
+/** A moment as the deliverer stamps a digest's first line: the wall clock, and the boot's monotonic reading where it has one. */
+const Instant = Schema.Struct({
+  at: Schema.Finite,
+  mono: Schema.optional(Schema.Struct({ boot: Schema.String.check(Schema.isNonEmpty()), ms: Schema.Finite })),
+});
+
+/**
+ * Where the deliverer is with a subscription (`KeptDelivery`, subscription.ts), as `writeDelivery` keeps it beside the subscription's
+ * file: the task and the `from` of the subscription it was written for (`of`), the byte of the feed every line before which is delivered
+ * or folded (`cursor`), the routine lines folded and not yet said (`digest`), and when the first of them was (`since`). A cursor may go
+ * back to 0, where the feed was cut under it (deliver.verb.ts), so it is never held above its `from`.
+ */
+export const Delivery = Schema.Struct({
+  name: SubscriptionName.OnRead,
+  of: Schema.Struct({ task: TaskId.OnRead, from: FeedCursor.OnRead }),
+  cursor: FeedCursor.OnRead,
+  digest: Schema.Array(FeedLine),
+  since: Schema.optional(Instant),
+}).annotate({ identifier: 'Delivery' });
+export type Delivery = typeof Delivery.Type;
+
 /** The feed context's part of the orchestrator's diagram. */
 export const feedModel = {
-  entities: [Subscription, RunLine, DaemonLine, StoreLine],
+  entities: [Subscription, Delivery, RunLine, DaemonLine, StoreLine],
   ids: { SubscriptionName: 'Subscription' },
 } satisfies ErModel;

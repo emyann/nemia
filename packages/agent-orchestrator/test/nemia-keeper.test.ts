@@ -36,6 +36,7 @@ const { appendOutbox, chatDir, stopsFile } = await import('../src/chat/chat.stor
 const { framedForHer } = await import('../src/chat/chat.ts');
 const { levelFile, memoryDir, nemiaDir, ownBin, promptFile, readLevel, readNemia, toldFile } = await import('../src/nemia/level.store.ts');
 const { listSubscriptions } = await import('../src/subscription/subscription.store.ts');
+const { StoreRoot } = await import('../src/config/root.store.ts');
 const { customInstructionsFile } = await import('../src/agents/read.store.ts');
 const { addFactory, factoryNames } = await import('../src/factory/factory.store.ts');
 const { factoryLevelFile } = await import('../src/level/level.store.ts');
@@ -164,7 +165,7 @@ test("Nemia kept and let go: trusted late, filed long-lived in auto with the dae
     async (sub) => {
       const b = stage.board();
       const clock = stage.clock();
-      const keeper = Effect.runFork(over(viewed())(keep()).pipe(Effect.provide(clock.layer)));
+      const keeper = Effect.runFork(over(viewed())(keep()).pipe(Effect.provide(clock.layer), Effect.provideService(StoreRoot, ROOT)));
       const stopped = () => Effect.runPromise(Fiber.interrupt(keeper));
       try {
         await until(sub, () => clock.asked.length === 1, 'the first beat done', { bell: clock.bell });

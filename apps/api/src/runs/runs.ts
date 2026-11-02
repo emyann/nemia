@@ -230,6 +230,8 @@ export const runs = new Hono<ApiEnv>()
   .get('/api/runs/:runId', (c) =>
     served(c, async (s) => {
       const id = c.req.param('runId');
+      const raw = c.req.query('raw');
+      if (raw !== undefined && raw !== 'false') return rawRecord(c, s, id, raw);
       const view = c.req.query('view');
       if (view !== undefined) return c.json({ error: noView(id, view) }, 422);
       const run = findRun(id);
@@ -272,4 +274,37 @@ export const runs = new Hono<ApiEnv>()
     served(c, async ({ e, placeService, home }) =>
       c.json(await runPlaced({ placeService, home }, e, CONCLUDED.handler({ runId: c.req.param('runId') }))),
     ),
-  );
+  )
+  .get('/api/listing', (c) => subResource(c, LS))
+  .get('/api/listing/:runId', (c) => subResource(c, LS));
+
+/**
+ * The reads `nemia` prints from, a client of the api, beside the board's: what `nemia ls` lists and a run's record as `nemia show --raw`
+ * prints it.
+ *
+ * - `GET /api/listing` and `GET /api/listing/:runId` — `nemia ls`'s answer (`RunsListed`), every run or the one named, by its entry of the
+ *   command table (`ls`), whose lines `nemia` prints: each run with its record, judged or left unjudged, and its result branches; the
+ *   daemon's standing; where the branches stand; the pause; and the schedules. A run the store does not have is the package's `Missing`, a
+ *   404. Not the board's list, which is `GET /api/runs`, and not in the OpenAPI document, which documents the run object alone.
+ * - `GET /api/runs/:runId?raw=true` — the run's record as `nemia show --raw` prints it (`RawRecord`), by `show`'s entry with `raw` set:
+ *   its brief cut at 120 characters and each frozen step's body at 60. `raw=false` is the object, as with no `raw`; any other value a 422
+ *   naming `raw=true`; a run the store does not have a 404, as the object's.
+ *
+ * This is `nemia ls`'s entry of the package's table, served on the first two.
+ */
+const LS = commandNamed('ls');
+
+/** `nemia show`'s entry of the package's table, whose `raw` answers the record. */
+const SHOW = commandNamed('show');
+
+/** A run's record as `GET /api/runs/:runId?raw=true` answers it: as `nemia show --raw` prints it. */
+export type RawRecord = Readonly<Record<string, unknown>>;
+
+/** `GET /api/runs/:runId?raw=…`: the record for `raw=true`, else a 422 naming it. */
+async function rawRecord(c: Context<ApiEnv>, { e, placeService, env, home }: Served, id: string, raw: string) {
+  if (raw !== 'true')
+    return c.json({ error: `GET /api/runs/${id} takes raw=true for the run's record, or no raw for the run object: not raw=${raw}.` }, 422);
+  if (!findRun(id)) return c.json({ error: noSuchRun(id) }, 404);
+  const record: RawRecord = await runPlaced({ placeService, home }, e, SHOW.handler({ runId: id, raw: true }, env, home));
+  return c.json(record);
+}

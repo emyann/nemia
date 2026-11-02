@@ -6,6 +6,9 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
+/** The lease's name under the store: what the daemon writes, and what a line about it names. */
+export const LEASE_FILE = 'daemon.json';
+
 /** The store's folder: `WF_ROOT`, else `~/.agent-workflows`, as the orchestrator reads it. */
 export const storeRoot = (env: NodeJS.ProcessEnv = process.env): string =>
   env.WF_ROOT !== undefined && env.WF_ROOT !== '' ? env.WF_ROOT : path.join(os.homedir(), '.agent-workflows');
@@ -14,7 +17,7 @@ export const storeRoot = (env: NodeJS.ProcessEnv = process.env): string =>
 export function servedAt(env: NodeJS.ProcessEnv = process.env): string | undefined {
   let text: string;
   try {
-    text = fs.readFileSync(path.join(storeRoot(env), 'daemon.json'), 'utf8');
+    text = fs.readFileSync(path.join(storeRoot(env), LEASE_FILE), 'utf8');
   } catch {
     return undefined;
   }

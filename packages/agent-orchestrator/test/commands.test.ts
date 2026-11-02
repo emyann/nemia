@@ -124,7 +124,13 @@ test('each command is served on the api where it was before the table, the lift 
         ],
       ],
       ['say', { method: 'POST', path: '/api/runs/:runId/steps/:step/say', status: 202 }],
-      ['ls', 'cli'],
+      [
+        'ls',
+        [
+          { method: 'GET', path: '/api/listing', status: 200 },
+          { method: 'GET', path: '/api/listing/:runId', status: 200 },
+        ],
+      ],
       ['show', { method: 'GET', path: '/api/runs/:runId', status: 200 }],
       ['closeout', { method: 'GET', path: '/api/runs/:runId/steps/:step/tries/:try/closeout', status: 200 }],
       ['tries', { method: 'GET', path: '/api/runs/:runId/steps/:step/tries', status: 200 }],
@@ -290,8 +296,8 @@ test('every command the api posts or deletes on writes, and the api guards it; t
   );
 });
 
-test("show is the run's one entry on both sides: its --raw, the record, is the CLI's alone", () => {
+test("show is the run's one entry on both sides: its --raw, the record, too, which the api answers on ?raw=true for nemia", () => {
   const show = TABLE.find((c) => c.name === 'show');
   assert.equal(show?.only, undefined);
-  assert.equal(show?.spec?.flags.find((f) => f.flag === '--raw')?.only?.side, 'cli');
+  assert.equal(show?.spec?.flags.find((f) => f.flag === '--raw')?.only, undefined);
 });

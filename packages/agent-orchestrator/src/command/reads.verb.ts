@@ -38,8 +38,8 @@ const rawOf = (run: Run) => {
 
 /**
  * `nemia show`: the run as one object, `nemia/v1`'s `Run` (`runObject`), as JSON, with a line on stderr pointing to `--raw`; `--raw`, the
- * run's record as it printed before, its brief cut at 120 characters and each frozen step's body at 60, the CLI's alone. The api serves the
- * object on `GET /api/runs/:runId`, by hand, handed the app's memo, as one judgement for both sides.
+ * run's record as it printed before, its brief cut at 120 characters and each frozen step's body at 60. The api serves the object on
+ * `GET /api/runs/:runId`, by hand, handed the app's memo, as one judgement for both sides, and the record on `?raw=true`, for `nemia`.
  */
 export const SHOW: Command = {
   name: 'show',
@@ -47,14 +47,7 @@ export const SHOW: Command = {
   help: ['the run as one object (nemia/v1 Run); --raw: its record, and', 'what each step was told'],
   spec: {
     positionals: [{ key: 'runId', takes: 'required', kind: 'name' }],
-    flags: [
-      {
-        flag: '--raw',
-        kind: 'switch',
-        key: 'raw',
-        only: { side: 'cli', why: "the record is the store's, for a person at the command line; a client reads the run object" },
-      },
-    ],
+    flags: [{ flag: '--raw', kind: 'switch', key: 'raw' }],
     unknown: takesNo('show', "one run's id, and --raw"),
   },
   writes: false,

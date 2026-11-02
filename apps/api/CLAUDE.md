@@ -65,6 +65,11 @@ from the orchestrator; what it holds today below its layer is in `docs/architect
 - **A package program that asks the place is run with `runPlaced(placeService, e, program)`** (`src/store.ts`), the place the app's layer
   holds (`PlaceService` in `Services`, `gitPlaceLayer` in `liveOf`, `Served.placeService`); a test replaces it with
   `Layer.merge(liveOf(), PlaceService.layer(…))`, and runs a package program itself with the `runOver` of `test/placed.ts`.
+- **A handler reads an agent or a skill through the package's `AgentDoor` and `SkillDoor`, run with `inRequest`** (`Served`, `layer.ts`),
+  never a store of them (`loadAgents`, `agentsFor`, `skillsFor`, …; the orchestrator's `src/agents/agent-door.store.test.ts` counts the
+  api's calls, none allowed): `inRequest` runs a program over the request's own services, so the door reads the app's `StoreRoot`, or
+  the door a test merged into the app's layer. A test merges `agentDoorMemory()` or `skillDoorMemory()` (`agent-orchestrator/testing`)
+  only where the route makes no `runPlaced` read of agents or skills, which runs outside the app's runtime and reads the files.
 - **A request's factory and repository are resolved in `served`** (`placeFor`, `factories/place.ts`): a handler reads `repo` and `factory`
   off `Served`, never `?repo=` itself.
 - **An agent fills a step by the file a start would run it with** (`stepsFilled`, the package's `roster/fills.store.ts`), never by its

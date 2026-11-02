@@ -6,17 +6,46 @@
  * at one it moved on from, and one given a version where nothing is, are each refused with nothing written; a removal something still
  * needs is refused, the folder kept.
  *
+ * A step naming an agent is resolved against the agents the side's Agent door holds (`agentsOn`): each side gives its Workflow door the
+ * Agent and Skill doors of the same layer (`defs`), and a walk writes the agent through that door.
+ *
  * Each walk is on a side of its own: a fresh store, or a fresh stand-in. A former spelling a folder's files still hold is the files'
  * alone, since the stand-in renders every file today: `workflows.store.test.ts` reads its hint.
  */
+import assert from 'node:assert/strict';
 import type { DoorSide, DoorWalk } from './door-walks.ts';
 import { act, done } from './door-walks.ts';
-import type { WorkflowDoorShape, WorkflowDraft } from '../src/workflows/workflows.store.ts';
+import { anAgent } from './agent-walks.ts';
+import type { WorkflowDefs, WorkflowDoorShape, WorkflowDraft } from '../src/workflows/workflows.store.ts';
+import type { AgentDoorShape } from '../src/agents/agent-door.store.ts';
+import { AgentName } from '../src/agents/agents.model.ts';
 import { WorkflowDir } from '../src/folder/folder.model.ts';
 import type { StepDraft } from '../src/workflow/index.ts';
 
 type Walk = DoorWalk<WorkflowDoorShape>;
 type Side = DoorSide<WorkflowDoorShape>;
+
+/** A side of the Workflow door with the Agent and Skill doors its door finds a workflow's agents and skills through. */
+export type WorkflowSide = Side & { readonly defs: WorkflowDefs };
+
+/** The Agent door a side's Workflow door reads agents through: what a walk writes an agent with. */
+const agentsOn = (side: Side): AgentDoorShape => {
+  const { defs } = side as Partial<WorkflowSide>;
+  assert.ok(defs, `the ${side.layer} side gives its Workflow door no Agent door: give the side its defs`);
+  return defs.agents;
+};
+
+/** `scribe` written on a side as an agent of yours, through the Agent door its Workflow door reads through. */
+const scribeOn = (side: Side): void => {
+  done(agentsOn(side).agents.write(AgentName.read('scribe'), anAgent(), undefined, { dir: `${side.root}/workflows/agents` }));
+};
+
+/** A workflow of one step, `build`, naming the agent `scribe`. */
+const scribed = (): WorkflowDraft => aWorkflow([{ ...aStep('build'), agent: 'scribe' }]);
+
+/** Of a step read or written, what a walk compares of its agent: its name, and the model it gives the step. */
+const agentOf = (steps: readonly { name: string; agent?: { name: string }; model?: string }[]) =>
+  steps.map((s) => [s.name, s.agent?.name, s.model]);
 
 /** A step drafted as the builder sends one: its name, the steps it waits on, and its words. */
 export const aStep = (name: string, after: string[] = []): StepDraft => ({ name, after, place: 'git', body: `Do ${name}.` });
@@ -76,6 +105,15 @@ export const WORKFLOW_WALKS: Readonly<Record<string, readonly Walk[]>> = {
       ],
     },
     {
+      name: "a step naming an agent the side's Agent door holds, resolved with its keys",
+      walk: (side) => {
+        scribeOn(side);
+        written(side, 'dev', scribed());
+        return agentOf(done(side.door.workflows.read(yoursOn(side, 'dev'))));
+      },
+      says: [['build', 'scribe', 'sonnet']],
+    },
+    {
       name: 'REFUSED: a folder that is no workflow’s id is Invalid',
       walk: (side) => act(side.door.workflows.read(WorkflowDir.read(`${side.root}/workflows/../dev`))),
       says: { refused: 'Invalid' },
@@ -114,6 +152,20 @@ export const WORKFLOW_WALKS: Readonly<Record<string, readonly Walk[]>> = {
         return { written: files, kept, removed };
       },
       says: { written: [], kept: ['plan.md'], removed: ['build.md'] },
+    },
+    {
+      name: "a step naming an agent the side's Agent door holds: written, and answered resolved with its keys",
+      walk: (side) => {
+        scribeOn(side);
+        const { written: files, steps } = done(side.door.workflows.write(yoursOn(side, 'dev'), scribed()));
+        return { written: files, steps: agentOf(steps) };
+      },
+      says: { written: ['build.md'], steps: [['build', 'scribe', 'sonnet']] },
+    },
+    {
+      name: 'REFUSED: a step naming an agent no door holds is Invalid, nothing written',
+      walk: (side) => refusedWrite(side, scribed()),
+      says: { write: { refused: 'Invalid' }, there: 'none' },
     },
     {
       name: 'REFUSED: over a folder with no version is a Conflict, the folder as it was',

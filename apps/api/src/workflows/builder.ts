@@ -20,15 +20,13 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { Schema } from 'effect';
+import { Effect, Schema } from 'effect';
 import { Hono } from 'hono';
 import {
-  agentsFor,
+  AgentDoor,
   HARNESS_CHOICES,
-  loadAgents,
   remoteAgents,
-  skillsFor,
-  type Places,
+  SkillDoor,
   type WorkflowWritten,
   repoWriteRefusal,
   workflowStale,
@@ -49,12 +47,14 @@ import {
   STEP_KEYS,
   stepNameRefusal,
   WorkflowError,
+  type Agents,
+  type SkillsFound,
   type StepDraft,
   type StepKey,
 } from 'agent-orchestrator/workflow';
 import { readBody, valueAt, type BodyIssue, type Words } from '../body.ts';
 import { refusedBeforeReading, type Guarded, type Refusal } from '../guard.ts';
-import { type ApiEnv, served } from '../layer.ts';
+import { type ApiEnv, type Served, served } from '../layer.ts';
 import { KINDS, schemaNameRefusal, WORDS, workflowNameRefusal, type KeyKind } from './words.ts';
 import type { Engine } from '../store.ts';
 import { folderOf, listed, loadedAt, loadedOf, placesOf, specOf, type WorkflowListing, type WorkflowStepSpec } from './workflows.ts';
@@ -112,18 +112,26 @@ const ROLE_KEYS: readonly StepKey[] = AGENT_KEYS.filter(
 );
 
 /**
- * The agents a step of yours may name: each file of yours' `agents/`, by name, readable or not — naming a broken one is refused on save, in
- * its words.
+ * Yours' agents as the form reads them, through the Agent door: the names its `agents/` holds (`names`), readable or not — naming a broken
+ * one is refused on save, in its words — and each found as a workflow of yours finds it with no other place (`agents`), a refusal kept.
  */
-const agentsOfYours = (home: string): string[] => [...loadAgents(path.join(home, 'workflows', AGENTS_FOLDER)).keys()].sort();
+export type YourAgents = { readonly names: readonly string[]; readonly agents: Agents };
+
+/** Yours' agents read through the Agent door: the folder listed, and the agents a workflow of yours alone finds. */
+const yourAgentsRead = (home: string) =>
+  Effect.gen(function* () {
+    const door = yield* AgentDoor;
+    const names = yield* door.agents.list(path.join(home, 'workflows', AGENTS_FOLDER));
+    const agents = yield* door.agents.found({ dir: path.join(home, 'workflows', '_') });
+    return { names, agents } satisfies YourAgents;
+  });
 
 /**
  * What each agent of yours gives a step it is attached to: a step that names it and sets nothing but the `place:` every step says, read by
  * the parser and shown as the listing shows a step, cut to the keys the agent sets. An agent the load refuses gives nothing, and a step
  * saved naming it is refused in its words.
  */
-function agentValues(home: string): Record<string, Partial<WorkflowStepSpec>> {
-  const agents = loadAgents(path.join(home, 'workflows', AGENTS_FOLDER));
+function agentValues(agents: Agents): Record<string, Partial<WorkflowStepSpec>> {
   const values: Record<string, Partial<WorkflowStepSpec>> = {};
   for (const [name, agent] of [...agents].sort(([a], [b]) => a.localeCompare(b))) {
     if (agent instanceof WorkflowError) continue;
@@ -152,18 +160,18 @@ function harnessChoices(): readonly string[] {
   }
 }
 
-export const keyForm = (home: string): KeyForm => ({
+export const keyForm = (yours: YourAgents): KeyForm => ({
   keys: STEP_KEYS.map((key) => ({
     key,
     meaning: STEP_KEY_MEANINGS[key],
     kind: KINDS[key],
-    choices: key === 'harness' ? harnessChoices() : key === 'agent' ? agentsOfYours(home) : (WORDS[key] ?? null),
+    choices: key === 'harness' ? harnessChoices() : key === 'agent' ? [...yours.names] : (WORDS[key] ?? null),
     byHarness: key === 'effort' || key === 'permissionMode' || key === 'sandbox' ? HARNESS_CHOICES[key] : null,
   })),
   defaultHarness: DEFAULT_HARNESS,
   roleKeys: [...ROLE_KEYS],
   policyKeys: [...OVERRIDE_KEYS],
-  agents: agentValues(home),
+  agents: agentValues(yours.agents),
   remote: { prefix: REMOTE_PREFIX, refuses: [...REMOTE_REFUSED_KEYS] },
 });
 
@@ -402,7 +410,12 @@ const namingSchema = (steps: readonly StepDraft[], file: string): string[] =>
  * package's words, naming the steps. A step's name `writeWorkflow` refuses first is left to it (`unnamed`), which writes nothing on it
  * either.
  */
-function judgedWith(dir: string, steps: readonly StepDraft[], schemas: readonly SchemaFile[], places: Places): BuildRefused | null {
+function judgedWith(
+  dir: string,
+  steps: readonly StepDraft[],
+  schemas: readonly SchemaFile[],
+  found: { readonly agents: Agents; readonly skills: SkillsFound },
+): BuildRefused | null {
   for (const { file, text } of schemas) {
     let schema: unknown;
     try {
@@ -433,8 +446,8 @@ function judgedWith(dir: string, steps: readonly StepDraft[], schemas: readonly 
     parseFolder(
       steps.map((step) => [step.name, renderStep(step)] as const),
       read,
-      agentsFor(dir, places),
-      skillsFor(dir, places),
+      found.agents,
+      found.skills,
     );
     return null;
   } catch (err) {
@@ -488,7 +501,8 @@ const WRITE = commandNamed('workflows write');
 
 /**
  * A write of the folder `name` at `dir`, of yours, read as a start on `repo` reads it, through the engine `e`: a change of the folder
- * there (`changes`), handed the version it holds once its schemas are written, or a new one.
+ * there (`changes`), handed the version it holds once its schemas are written, or a new one. The agents and skills its schemas are
+ * judged with are read through the doors on the request's services (`inRequest`).
  */
 type Writing = {
   e: Engine['Service'];
@@ -498,6 +512,7 @@ type Writing = {
   repo: string;
   home: string;
   changes: boolean;
+  inRequest: Served['inRequest'];
 };
 
 /**
@@ -514,7 +529,7 @@ type Writing = {
  * a write that fails partway has changed the file all the same, so a schema counts as written before its write, not after it.
  */
 async function write(
-  { e, placeService, name, dir, repo, home, changes }: Writing,
+  { e, placeService, name, dir, repo, home, changes, inRequest }: Writing,
   steps: readonly StepDraft[],
   readme: string | undefined,
   schemas: readonly SchemaFile[] = [],
@@ -529,7 +544,13 @@ async function write(
   });
   const writing = unnamed(steps) ? [] : schemas;
   if (writing.length) {
-    const judged = judgedWith(dir, steps, writing, places);
+    const found = await inRequest(
+      Effect.all({
+        agents: Effect.flatMap(AgentDoor, (door) => door.agents.found({ dir, places })),
+        skills: Effect.flatMap(SkillDoor, (door) => door.skills.found({ dir, places })),
+      }),
+    );
+    const judged = judgedWith(dir, steps, writing, found);
     if (judged) return judged;
   }
   const before: Array<SchemaWas & { text: string }> = writing.map(({ file, text }) => {
@@ -583,9 +604,9 @@ async function write(
  *   now, since a step edited, added or removed since would be written over — nothing is written. 200 with the folder read back.
  */
 export const builder = new Hono<ApiEnv>()
-  .get('/api/workflows/keys', (c) => served(c, ({ home }) => c.json(keyForm(home))))
+  .get('/api/workflows/keys', (c) => served(c, async ({ home, inRequest }) => c.json(keyForm(await inRequest(yourAgentsRead(home))))))
   .post('/api/workflows/:from', (c) =>
-    served(c, async ({ e, placeService, repo, home }) => {
+    served(c, async ({ e, placeService, repo, home, inRequest }) => {
       const { from } = c.req.param();
       const route = `POST /api/workflows/${from}`;
       const refused = refusedBeforeReading(
@@ -603,13 +624,13 @@ export const builder = new Hono<ApiEnv>()
       const step = draftOf(read.body.step, '`step`', route, POST_SHAPE);
       if ('status' in step) return c.json({ error: step.error }, step.status);
       const dir = path.join(home, 'workflows', name);
-      const saved = await write({ e, placeService, name, dir, repo, home, changes: false }, [step], readme);
+      const saved = await write({ e, placeService, name, dir, repo, home, changes: false, inRequest }, [step], readme);
       if ('error' in saved) return c.json(saved, 422);
       return c.json(saved, 201);
     }),
   )
   .put('/api/workflows/:from/:name', (c) =>
-    served(c, async ({ e, placeService, repo, home }) => {
+    served(c, async ({ e, placeService, repo, home, inRequest }) => {
       const { from, name } = c.req.param();
       const route = `PUT /api/workflows/${from}/${name}`;
       const refused = refusedBeforeReading(
@@ -639,7 +660,12 @@ export const builder = new Hono<ApiEnv>()
       }
       const now = workflowVersion(folder.dir, placesOf(repo, home));
       if (now !== body.version) return c.json({ error: workflowStale.write(folder.dir, body.version, now), steps: [] }, 409);
-      const saved = await write({ e, placeService, name, dir: folder.dir, repo, home, changes: true }, steps, body.readme, schemas);
+      const saved = await write(
+        { e, placeService, name, dir: folder.dir, repo, home, changes: true, inRequest },
+        steps,
+        body.readme,
+        schemas,
+      );
       if ('error' in saved) return c.json(saved, 422);
       return c.json(saved, 200);
     }),

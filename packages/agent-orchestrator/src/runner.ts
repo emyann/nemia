@@ -173,12 +173,12 @@ export {
   workflowsIn,
 } from './folder/folder.store.ts';
 export { cardSkills, isBuiltinPlace, lookupRoots, oneFolder, preloads, skillsFor, skillVersion } from './skills/read.store.ts';
-export { BUILTIN_SKILLS } from './skills/read.store.ts';
-export type { Places } from './skills/read.store.ts';
+export { BUILTIN_SKILLS, type Places } from './skills/read.store.ts';
 export { agentsFor, agentVersion, customInstructionsFile, loadAgents, readCustomInstructions } from './agents/read.store.ts';
+export { AgentDoor, type AgentDoorShape } from './agents/agent-door.store.ts';
+export { SkillDoor, type SkillDoorShape } from './skills/skill-door.store.ts';
 export { clearCustomInstructions, customInstructionsFor, writeCustomInstructions } from './custom/custom.store.ts';
-export { cardToStart, planLines, planStopped } from './plan/plan.ts';
-export type { Card, Planned } from './plan/plan.ts';
+export { cardToStart, planLines, planStopped, type Card, type Planned } from './plan/plan.ts';
 export {
   INBOX_KEY_MEANINGS,
   INBOX_KEYS,

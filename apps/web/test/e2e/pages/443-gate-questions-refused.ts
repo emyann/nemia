@@ -25,7 +25,7 @@ export default {
       const { problems } = watch(refused);
       const detailPath = `/api/runs/${id}`;
       const url = new URL(`/runs/${id}`, page.url()).href;
-      const read = await (await refused.request.get(new URL(`${detailPath}?view=page`, page.url()).href)).text();
+      const read = await (await refused.request.get(new URL(detailPath, page.url()).href)).text();
       await refused.route(
         (u) => u.pathname === detailPath,
         (route) => route.fulfill({ status: 200, contentType: 'application/json', body: read }),

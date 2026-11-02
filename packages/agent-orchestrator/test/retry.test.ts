@@ -362,7 +362,10 @@ test('what `nemia decide` and `nemia ls` print of a step asking no question, or 
     const refused = screen.find((l) => l.startsWith('    !! not accepted:'));
     assert.ok(refused, screen.join('\n'));
     names(refused, '`open`', 'question 1');
-    assert.ok(screen.some((l) => l.includes(`nemia retry ${half} plan`)), screen.join('\n'));
+    assert.ok(
+      screen.some((l) => l.includes(`nemia retry ${half} plan`)),
+      screen.join('\n'),
+    );
   });
 });
 

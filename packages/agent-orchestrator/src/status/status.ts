@@ -438,6 +438,13 @@ function roundWanted(
 }
 
 /**
+ * Whether `said` signs off `blocked` and the run accepts it: a blocked closeout whose questions do not read is refused
+ * (`closeoutRefusals`).
+ */
+const blockedAccepted = (step: Workflow, said: Closeout | undefined): boolean =>
+  said?.outcome === 'blocked' && !closeoutRefusals(step, said).length;
+
+/**
  * Where a step stands on its own work, its budget aside: `stepStatus`, but never `over budget` — `budget exhausted` is the harness's end of
  * the session, and its own. What a try's brief says the last try ended as (`retrySection`): being over budget is why nothing was filed, not
  * how the try ended.
@@ -455,7 +462,7 @@ export const ownStatus: OwnStatus = (step, run, phaseOf, closeoutOf, askedCloseo
   const st = run.steps[step.name];
   if (!st?.taskId) return 'pending';
   const said = closeoutOf(step.name);
-  if (said?.outcome === 'blocked' && !closeoutRefusals(step, said).length) return 'blocked';
+  if (blockedAccepted(step, said)) return 'blocked';
 
   const phase = phaseOf(st.taskId);
   if ((phase === 'failed' || phase === 'succeeded') && spendOf(st.taskId)?.budgetEnded) return 'budget exhausted';

@@ -22,7 +22,8 @@ const questionBlock = (q: Question, n: number): string[] => [
         .map((line) => `     ${line}`)
     : []),
   ...q.options.map(
-    (o, i) => `     ${letterOf(i)}  ${o.label}${o.meaning ? ` — ${o.meaning}` : ''}${recommendedOf(q).includes(o.label) ? '  (recommended)' : ''}`,
+    (o, i) =>
+      `     ${letterOf(i)}  ${o.label}${o.meaning ? ` — ${o.meaning}` : ''}${recommendedOf(q).includes(o.label) ? '  (recommended)' : ''}`,
   ),
   `     ${q.multiple ? 'choose one or more' : 'choose one'}, or answer in your own words`,
 ];

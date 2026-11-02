@@ -1,8 +1,9 @@
 /**
  * The runs in two reads (`runsOpen`, `runsFinished`), through their entries of the command table (`RUNS_OPEN`, `RUNS_FINISHED`), on a
  * store of runs started and advanced over the stand-ins: together they say what the whole list says (`RUNS`), each run once; the finished
- * runs page by when their work stopped; the light answer does not grow with the finished runs, and read warm costs no record of one;
- * and a page asked wrongly is refused.
+ * runs page by when their work stopped; the light answer does not grow with the finished runs, and read warm costs no record of one,
+ * each compared whole on a seeded clock, with a waiting row among them (the big quiet store of rest-store.test.ts says the same on the
+ * runtime itself, without the clocks); and a page asked wrongly is refused.
  *
  * `WF_ROOT` is set before the package is imported, since the store reads it as it loads; each test empties the store's runs first, and
  * a test that compares two answers, or orders runs by time, seeds `Date`.

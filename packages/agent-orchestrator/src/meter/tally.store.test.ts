@@ -6,7 +6,7 @@
  * read as the module loads, so it is set before the import. `WF_VERIFY_REST=1` judges in full every run a pass answers from its memo of
  * runs at rest, and a difference throws (`verifyRest` in tick.verb.ts).
  */
-import { test } from 'node:test';
+import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -142,6 +142,17 @@ const started = async (n: number): Promise<Run[]> => {
   return runs;
 };
 
+/** The rows of each table below, a claim each, told by the four tests at the end of the file. */
+type Rows = Array<[string, (t: TestContext) => void | Promise<void>]>;
+const TIME: Rows = [];
+const COUNTS: Rows = [];
+const WRITES: Rows = [];
+const WHOSE: Rows = [];
+const time = (name: string, claim: (t: TestContext) => void | Promise<void>) => TIME.push([name, claim]);
+const counts = (name: string, claim: (t: TestContext) => void | Promise<void>) => COUNTS.push([name, claim]);
+const writes = (name: string, claim: (t: TestContext) => void | Promise<void>) => WRITES.push([name, claim]);
+const whose = (name: string, claim: (t: TestContext) => void | Promise<void>) => WHOSE.push([name, claim]);
+
 const phaseSum = (c: PassCost) => PHASES.reduce((n, p) => n + c.phases[p].ms, 0);
 
 /**
@@ -150,48 +161,54 @@ const phaseSum = (c: PassCost) => PHASES.reduce((n, p) => n + c.phases[p].ms, 0)
  */
 const ROUNDING_MS = 1e-6;
 
-test("a pass's phases add up to its time, less what measuring took, and the time is no more than the pass took seen from outside", async () => {
-  emptyStore();
-  await started(3);
-  const e = fake({ passMs: 20, observeMs: 12 });
-  for (let k = 0; k < 3; k++) {
-    const t0 = performance.now();
-    const { cost } = await runWith(e, tickRun());
-    const outside = performance.now() - t0;
-    assert.ok(cost, 'the pass says what it cost');
-    assert.ok(cost.ms <= outside, `the pass's ${cost.ms} ms fit in the ${outside} ms tick took`);
-    const sum = phaseSum(cost);
-    assert.ok(sum <= cost.ms + ROUNDING_MS, `the phases (${sum} ms) are no more than the pass (${cost.ms} ms)`);
+time(
+  "a pass's phases add up to its time, less what measuring took, and the time is no more than the pass took seen from outside",
+  async () => {
+    emptyStore();
+    await started(3);
+    const e = fake({ passMs: 20, observeMs: 12 });
+    for (let k = 0; k < 3; k++) {
+      const t0 = performance.now();
+      const { cost } = await runWith(e, tickRun());
+      const outside = performance.now() - t0;
+      assert.ok(cost, 'the pass says what it cost');
+      assert.ok(cost.ms <= outside, `the pass's ${cost.ms} ms fit in the ${outside} ms tick took`);
+      const sum = phaseSum(cost);
+      assert.ok(sum <= cost.ms + ROUNDING_MS, `the phases (${sum} ms) are no more than the pass (${cost.ms} ms)`);
+      assert.ok(
+        cost.ms - sum <= cost.overheadMs + ROUNDING_MS,
+        `the phases (${sum} ms) and measuring (${cost.overheadMs} ms) cover the pass (${cost.ms} ms)`,
+      );
+      assert.ok(
+        sum + cost.overheadMs <= outside + ROUNDING_MS,
+        `the phases (${sum} ms) and measuring, the cost's write after the pass included (${cost.overheadMs} ms), fit in the ${outside} ms tick took`,
+      );
+      for (const p of PHASES) assert.ok(cost.phases[p].ms >= 0, `${p} took no negative time`);
+    }
+  },
+);
+
+time(
+  'what measuring took is in no phase: a runtime whose report is slow to read adds to the overhead, and the phases stay the rest',
+  async () => {
+    emptyStore();
+    await started(3);
+    const { ms, tallies } = await metered(() => runWith(fake({ passMs: 5, ioMs: 3 }), tickRun()));
+    assert.ok(tallies);
+    const sum = PHASES.reduce((n, p) => n + tallies.kinds[p].ms, 0);
+    const reads = 2 * (tallies.kinds.runtime.calls + tallies.kinds.journals.calls);
     assert.ok(
-      cost.ms - sum <= cost.overheadMs + ROUNDING_MS,
-      `the phases (${sum} ms) and measuring (${cost.overheadMs} ms) cover the pass (${cost.ms} ms)`,
+      tallies.overheadMs >= 3 * reads,
+      `the report read twice by each of the ${reads / 2} passes and reads, 3 ms a read, is overhead (${tallies.overheadMs} ms)`,
     );
     assert.ok(
-      sum + cost.overheadMs <= outside + ROUNDING_MS,
-      `the phases (${sum} ms) and measuring, the cost's write after the pass included (${cost.overheadMs} ms), fit in the ${outside} ms tick took`,
+      Math.abs(ms - sum - tallies.overheadMs) <= ROUNDING_MS,
+      `metered from outside, so the meter's own counts are read, not the pass's overhead, which also has what came after its time: the phases (${sum} ms) and measuring (${tallies.overheadMs} ms) are the pass (${ms} ms), no more and no less`,
     );
-    for (const p of PHASES) assert.ok(cost.phases[p].ms >= 0, `${p} took no negative time`);
-  }
-});
+  },
+);
 
-test('what measuring took is in no phase: a runtime whose report is slow to read adds to the overhead, and the phases stay the rest', async () => {
-  emptyStore();
-  await started(3);
-  const { ms, tallies } = await metered(() => runWith(fake({ passMs: 5, ioMs: 3 }), tickRun()));
-  assert.ok(tallies);
-  const sum = PHASES.reduce((n, p) => n + tallies.kinds[p].ms, 0);
-  const reads = 2 * (tallies.kinds.runtime.calls + tallies.kinds.journals.calls);
-  assert.ok(
-    tallies.overheadMs >= 3 * reads,
-    `the report read twice by each of the ${reads / 2} passes and reads, 3 ms a read, is overhead (${tallies.overheadMs} ms)`,
-  );
-  assert.ok(
-    Math.abs(ms - sum - tallies.overheadMs) <= ROUNDING_MS,
-    `metered from outside, so the meter's own counts are read, not the pass's overhead, which also has what came after its time: the phases (${sum} ms) and measuring (${tallies.overheadMs} ms) are the pass (${ms} ms), no more and no less`,
-  );
-});
-
-test('on a clock that moves at every reading, the phases and measuring are the pass exactly: no reading falls between them', async (t) => {
+time('on a clock that moves at every reading, the phases and measuring are the pass exactly: no reading falls between them', async (t) => {
   emptyStore();
   await started(3);
   let clock = 0;
@@ -209,7 +226,7 @@ test('on a clock that moves at every reading, the phases and measuring are the p
   );
 });
 
-test('a pass on a fixture store counts the run records it read: twice as many runs, twice as many records', async () => {
+counts('a pass on a fixture store counts the run records it read: twice as many runs, twice as many records', async () => {
   emptyStore();
   const e = fake();
   const none = (await runWith(e, tickRun())).cost!;
@@ -232,7 +249,7 @@ test('a pass on a fixture store counts the run records it read: twice as many ru
   assert.ok(four.phases.records.calls >= four.records, 'each record read is a call of the records phase');
 });
 
-test("a harness's observe is moved out of the runtime's pass into observe, and the harness is named with what it listed", async () => {
+counts("a harness's observe is moved out of the runtime's pass into observe, and the harness is named with what it listed", async () => {
   emptyStore();
   await started(1);
   const { cost } = await runWith(fake({ passMs: 30, observeMs: 20 }), tickRun());
@@ -267,7 +284,7 @@ test("a harness's observe is moved out of the runtime's pass into observe, and t
   );
 });
 
-test('an engine that keeps no totals is still metered, with no harness named', async () => {
+counts('an engine that keeps no totals is still metered, with no harness named', async () => {
   emptyStore();
   await started(1);
   const { cost } = await runWith(fake({ withIo: false }), tickRun());
@@ -277,7 +294,7 @@ test('an engine that keeps no totals is still metered, with no harness named', a
   assert.ok(cost.phases.runtime.calls >= 1, "the runtime's pass is still a call");
 });
 
-test("the last pass's cost is written to the store and read back; a file that does not read as one reads as none", async () => {
+writes("the last pass's cost is written to the store and read back; a file that does not read as one reads as none", async () => {
   emptyStore();
   assert.equal(lastPassCost(), undefined, 'no pass, no cost');
   await started(1);
@@ -297,19 +314,22 @@ test("the last pass's cost is written to the store and read back; a file that do
   assert.equal(lastPassCost(), undefined);
 });
 
-test("what a pass could not read of a harness is written with its cost, in the runtime's words, and a pass that read it all writes none", async () => {
-  emptyStore();
-  await started(1);
-  const unobserved = ['harness `claude`: claude agents: timed out'];
-  await runWith(fake({ unobserved }), tickRun());
-  assert.deepEqual(lastPassCost()?.unobserved, unobserved);
-  await runWith(fake(), tickRun());
-  const read = lastPassCost();
-  assert.ok(read);
-  assert.equal(Object.hasOwn(read, 'unobserved'), false);
-});
+writes(
+  "what a pass could not read of a harness is written with its cost, in the runtime's words, and a pass that read it all writes none",
+  async () => {
+    emptyStore();
+    await started(1);
+    const unobserved = ['harness `claude`: claude agents: timed out'];
+    await runWith(fake({ unobserved }), tickRun());
+    assert.deepEqual(lastPassCost()?.unobserved, unobserved);
+    await runWith(fake(), tickRun());
+    const read = lastPassCost();
+    assert.ok(read);
+    assert.equal(Object.hasOwn(read, 'unobserved'), false);
+  },
+);
 
-test('outside a pass the readers count nothing, and a pass inside a metered call is counted as part of it', async () => {
+whose('outside a pass the readers count nothing, and a pass inside a metered call is counted as part of it', async () => {
   emptyStore();
   const [run] = await started(1);
   const outside = await metered(async () => 'none');
@@ -326,43 +346,49 @@ test('outside a pass the readers count nothing, and a pass inside a metered call
   assert.ok(outer.tallies!.kinds.act.ms >= 2);
 });
 
-test('a pass says no `admit` of its own: the runtime admits inside its own pass, so a task it reports queued costs `act` nothing', async () => {
-  emptyStore();
-  const idle = fake();
-  const base = (await runWith(idle, tickRun())).cost!;
-  const e = fake({ queued: ['t-1'] });
-  const { cost } = await runWith(e, tickRun());
-  assert.deepEqual([idle.admitted, e.admitted], [[], []], 'no word said, the queued task left to the runtime');
-  assert.equal(cost?.phases.act.calls, base.phases.act.calls, 'act made the calls the same pass with nothing queued made');
-});
+counts(
+  'a pass says no `admit` of its own: the runtime admits inside its own pass, so a task it reports queued costs `act` nothing',
+  async () => {
+    emptyStore();
+    const idle = fake();
+    const base = (await runWith(idle, tickRun())).cost!;
+    const e = fake({ queued: ['t-1'] });
+    const { cost } = await runWith(e, tickRun());
+    assert.deepEqual([idle.admitted, e.admitted], [[], []], 'no word said, the queued task left to the runtime');
+    assert.equal(cost?.phases.act.calls, base.phases.act.calls, 'act made the calls the same pass with nothing queued made');
+  },
+);
 
-test("a program metered as a pass counts as a Promise metered does: its reads, its kinds, and a program inside another's meter no counts", async () => {
-  emptyStore();
-  const [run] = await started(1);
-  const alone = await Effect.runPromise(
-    meteredPass(
-      Effect.sync(() => {
-        readRun(run.id);
-        within('act', () => busy(2));
-        return 'read';
-      }),
-    ),
-  );
-  assert.equal(alone.value, 'read');
-  assert.ok(alone.tallies, 'a pass alone is counted');
-  assert.equal(alone.tallies.records, 1, 'the one read counted');
-  assert.ok(alone.tallies.kinds.act.ms >= 2 && alone.ms >= alone.tallies.kinds.act.ms, 'act charged, within the pass');
-  assert.equal(metering(), false, 'the meter closed with the pass');
-  const outer = await metered(async () => {
-    const inner = await Effect.runPromise(meteredPass(Effect.sync(() => readRun(run.id))));
-    assert.equal(inner.tallies, undefined, "a program inside another's meter carries no counts of its own");
-    assert.equal(metering(), true, 'and leaves the outer meter open');
-    return 'done';
-  });
-  assert.equal(outer.tallies?.records, 1, 'the outer meter counted the inner read');
-});
+whose(
+  "a program metered as a pass counts as a Promise metered does: its reads, its kinds, and a program inside another's meter no counts",
+  async () => {
+    emptyStore();
+    const [run] = await started(1);
+    const alone = await Effect.runPromise(
+      meteredPass(
+        Effect.sync(() => {
+          readRun(run.id);
+          within('act', () => busy(2));
+          return 'read';
+        }),
+      ),
+    );
+    assert.equal(alone.value, 'read');
+    assert.ok(alone.tallies, 'a pass alone is counted');
+    assert.equal(alone.tallies.records, 1, 'the one read counted');
+    assert.ok(alone.tallies.kinds.act.ms >= 2 && alone.ms >= alone.tallies.kinds.act.ms, 'act charged, within the pass');
+    assert.equal(metering(), false, 'the meter closed with the pass');
+    const outer = await metered(async () => {
+      const inner = await Effect.runPromise(meteredPass(Effect.sync(() => readRun(run.id))));
+      assert.equal(inner.tallies, undefined, "a program inside another's meter carries no counts of its own");
+      assert.equal(metering(), true, 'and leaves the outer meter open');
+      return 'done';
+    });
+    assert.equal(outer.tallies?.records, 1, 'the outer meter counted the inner read');
+  },
+);
 
-test('REFUSED: a metered program leaves no meter open, whether it fails, dies or is interrupted', async () => {
+whose('REFUSED: a metered program leaves no meter open, whether it fails, dies or is interrupted', async () => {
   const refusal = new Invalid({ message: 'x' });
   const failed = await Effect.runPromise(Effect.flip(meteredPass(Effect.fail(refusal))));
   assert.equal(failed, refusal, 'the failure is the one it failed with');
@@ -382,80 +408,89 @@ test('REFUSED: a metered program leaves no meter open, whether it fails, dies or
   assert.equal(metering(), false, 'no meter open after an interruption');
 });
 
-test("REFUSED: a reader called beside an open pass, by another caller in the process, counts nothing to the pass: only the pass's own", async () => {
-  emptyStore();
-  const [run] = await started(1);
-  let go!: () => void;
-  const waiting = new Promise<void>((resolve) => (go = resolve));
-  const own = Effect.sync(() => readRun(run.id));
-  const pass = Effect.runPromise(
-    meteredPass(
-      Effect.andThen(
-        Effect.promise(() => waiting),
-        own,
+whose(
+  "REFUSED: a reader called beside an open pass, by another caller in the process, counts nothing to the pass: only the pass's own",
+  async () => {
+    emptyStore();
+    const [run] = await started(1);
+    let go!: () => void;
+    const waiting = new Promise<void>((resolve) => (go = resolve));
+    const own = Effect.sync(() => readRun(run.id));
+    const pass = Effect.runPromise(
+      meteredPass(
+        Effect.andThen(
+          Effect.promise(() => waiting),
+          own,
+        ),
       ),
-    ),
-  );
-  const promised = metered(async () => {
-    await waiting;
+    );
+    const promised = metered(async () => {
+      await waiting;
+      readRun(run.id);
+    });
+    await Effect.runPromise(Effect.sync(() => readRun(run.id)));
     readRun(run.id);
-  });
-  await Effect.runPromise(Effect.sync(() => readRun(run.id)));
-  readRun(run.id);
-  assert.equal(metering(), false, 'no pass is open to a caller beside them');
-  go();
-  assert.deepEqual([(await pass).tallies?.records, (await promised).tallies?.records], [1, 1], 'each pass its own read alone');
-});
+    assert.equal(metering(), false, 'no pass is open to a caller beside them');
+    go();
+    assert.deepEqual([(await pass).tallies?.records, (await promised).tallies?.records], [1, 1], 'each pass its own read alone');
+  },
+);
 
-test('REFUSED: a fiber beside a pass does not run while the pass is at work: the pass yields to the process only where it waits', async () => {
-  let beside = 0;
-  const other = Effect.runFork(
-    Effect.forever(
-      Effect.andThen(
-        Effect.sync(() => beside++),
-        Effect.yieldNow,
+whose(
+  'REFUSED: a fiber beside a pass does not run while the pass is at work: the pass yields to the process only where it waits',
+  async () => {
+    let beside = 0;
+    const other = Effect.runFork(
+      Effect.forever(
+        Effect.andThen(
+          Effect.sync(() => beside++),
+          Effect.yieldNow,
+        ),
       ),
-    ),
-  );
-  await Effect.runPromise(Effect.yieldNow);
-  const { value } = await Effect.runPromise(
-    meteredPass(
-      Effect.gen(function* () {
-        const from = beside;
-        yield* Effect.forEach(Array.from({ length: 20_000 }), () => Effect.void);
-        return beside - from;
-      }),
-    ),
-  );
-  await Effect.runPromise(Fiber.interrupt(other));
-  assert.ok(beside > 0, 'the fiber beside ran');
-  assert.equal(value, 0, 'and not once inside the pass');
-});
+    );
+    await Effect.runPromise(Effect.yieldNow);
+    const { value } = await Effect.runPromise(
+      meteredPass(
+        Effect.gen(function* () {
+          const from = beside;
+          yield* Effect.forEach(Array.from({ length: 20_000 }), () => Effect.void);
+          return beside - from;
+        }),
+      ),
+    );
+    await Effect.runPromise(Fiber.interrupt(other));
+    assert.ok(beside > 0, 'the fiber beside ran');
+    assert.equal(value, 0, 'and not once inside the pass');
+  },
+);
 
-test('a pass keeps what it saw: the runs listed, the tasks, the sessions queued and at work; and the recent passes grow by it', async () => {
-  emptyStore();
-  fs.rmSync(recentFile(), { force: true });
-  await started(2);
-  const first = (await runWith(fake({ queued: ['t-q'], running: { claude: 1 } }), tickRun())).cost!;
-  assert.deepEqual(
-    { runs: first.runs, tasks: first.tasks, queued: first.queued, admitted: first.admitted },
-    { runs: 2, tasks: 1, queued: 1, admitted: 1 },
-  );
-  assert.equal(recentPasses().length, 1);
-  await started(1);
-  await runWith(fake(), tickRun());
-  const kept = recentPasses();
-  assert.deepEqual(
-    kept.map((p) => [p.runs, p.queued]),
-    [
-      [2, 1],
-      [3, 0],
-    ],
-    'one entry a pass, oldest first, each with what its own pass saw',
-  );
-});
+counts(
+  'a pass keeps what it saw: the runs listed, the tasks, the sessions queued and at work; and the recent passes grow by it',
+  async () => {
+    emptyStore();
+    fs.rmSync(recentFile(), { force: true });
+    await started(2);
+    const first = (await runWith(fake({ queued: ['t-q'], running: { claude: 1 } }), tickRun())).cost!;
+    assert.deepEqual(
+      { runs: first.runs, tasks: first.tasks, queued: first.queued, admitted: first.admitted },
+      { runs: 2, tasks: 1, queued: 1, admitted: 1 },
+    );
+    assert.equal(recentPasses().length, 1);
+    await started(1);
+    await runWith(fake(), tickRun());
+    const kept = recentPasses();
+    assert.deepEqual(
+      kept.map((p) => [p.runs, p.queued]),
+      [
+        [2, 1],
+        [3, 0],
+      ],
+      'one entry a pass, oldest first, each with what its own pass saw',
+    );
+  },
+);
 
-test("a pass's metrics go into the registry of whoever runs it: its time, each phase by name, and what it saw", async () => {
+writes("a pass's metrics go into the registry of whoever runs it: its time, each phase by name, and what it saw", async () => {
   emptyStore();
   await started(1);
   const registry = new Map();
@@ -481,3 +516,13 @@ test("a pass's metrics go into the registry of whoever runs it: its time, each p
   assert.equal((one('sessions.admitted')[0].state as { value: number }).value, 3);
   assert.equal(one('pass.journal_reads').length, 1);
 });
+
+/** A table's rows, each a subtest of `t`. */
+const told = (rows: Rows) => async (t: TestContext) => {
+  for (const [name, claim] of rows) await t.test(name, claim);
+};
+
+test("a pass's time is its phases and what measuring took, no more and no less", told(TIME));
+test('a pass counts what it read and observed, and what it saw', told(COUNTS));
+test('a pass writes its cost and its metrics where they are read back', told(WRITES));
+test("a meter counts its own pass's reads alone, and leaves no meter open", told(WHOSE));

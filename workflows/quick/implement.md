@@ -66,6 +66,10 @@ The check refuses a change under `apps/web/src` whose `artifacts` names no pictu
 `apps/web/test` asks for none. Run the e2e on the pages the change touches, `npm run e2e -- --pages <name,…>`, never the whole suite
 but to measure it: CI runs every page on the commit your check pushes, before the review.
 
+When the change edits a context's `glossary.json`, cite each path in its rows from the repository's root
+(`packages/agent-orchestrator/src/folder/folder.model.ts`, never `src/folder/folder.model.ts`), and run the docs' tests after it, `node
+--test test/*.test.ts` in `apps/docs`: they read every table by a glob, so grepping the tests for its path does not find them.
+
 When the change touches a file that imports from `effect`, load the `effect` skill before you read, write or judge it: it says how this
 repository writes Effect 4, and sends you to the docs installed with Effect first.
 

@@ -10,7 +10,7 @@ import type { Verdict } from '../src/check/check.ts';
 import type { Closeout } from '../src/closeout/index.ts';
 import type { CloseoutAsked, Run, StepStatus, TaskPhase } from '../src/record/record.ts';
 import type { Workflow } from '../src/step/step.ts';
-import { askedAgain, notHandedOn, overBudget, type SpendOf } from '../src/status/status.ts';
+import { askedAgain, notHandedOn, overBudget, ownStatus, type SpendOf } from '../src/status/status.ts';
 import { loopSpan } from '../src/workflow/validate.ts';
 import { declaredOutput } from '../src/closeout/closeout.ts';
 import { approved, gated } from './laws.ts';
@@ -45,6 +45,11 @@ const standingSpec = spec<Stands>({
       description: 'Nobody has approved the try that waits',
       condition: ({ input: [step, run], output }) => output.status !== 'awaiting approval' || !approved(run, step.name),
     },
+    ownIsItsOwn: {
+      description:
+        "Its own status is the one ownStatus gives: standing reads a step's own work as ownStatus does, and holds it only above that",
+      condition: ({ input: [step, run, p, c, a, steps, s], output }) => output.own === ownStatus(step, run, p, c, a, steps, s),
+    },
     ownOrHeld: {
       description: 'Where a step stands but for its budget and its gate: its own status, or one of those two',
       condition: ({ output }) => output.status === output.own || output.status === 'over budget' || output.status === 'awaiting approval',
@@ -78,6 +83,15 @@ const standingSpec = spec<Stands>({
       description: 'Over budget only over its cap, or as a loop held by a step of it over its own',
       condition: ({ input: [step, run, , , , steps, s], output }) =>
         output.status !== 'over budget' || overBudget(step, run, s) !== undefined || steps.some((x) => x.name === step.name && !!x.loop),
+    },
+    overBudgetWhereATryIsTheWayOn: {
+      description:
+        'A filed step over its cap whose try ended unsigned, failed, stopped or denied reads over budget: another try of it is the way on, and nothing is left to spend on one',
+      condition: ({ input: [step, run, , , , , s], output }) =>
+        !run.steps[step.name]?.taskId ||
+        overBudget(step, run, s) === undefined ||
+        (output.own !== 'unsigned' && output.own !== 'failed' && output.own !== 'stopped' && output.own !== 'denied') ||
+        output.status === 'over budget',
     },
     anEndingWaitsBeforeItIsFiled: {
       description: 'An ending approved before it is filed waits at its gate once every step before it has handed on',

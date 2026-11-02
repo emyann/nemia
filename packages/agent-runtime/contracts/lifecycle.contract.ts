@@ -18,6 +18,10 @@ const lifecycleSpec = spec<(state: State) => LifecycleState>({
       description: 'A task that succeeded is completed',
       condition: ({ input: [state], output }) => state.settled !== 'succeeded' || output === 'completed',
     },
+    failedFails: {
+      description: 'A task that failed is failed',
+      condition: ({ input: [state], output }) => state.settled !== 'failed' || output === 'failed',
+    },
     stoppedCancels: {
       description: 'A task stopped is canceled',
       condition: ({ input: [state], output }) => state.settled !== 'stopped' || output === 'canceled',

@@ -21,14 +21,25 @@ import { parseFolder } from '../folder/folder.ts';
 import { parseAgent, type Agents } from '../agents/agents.ts';
 import { envNameOf, readRemoteAgents } from './a2a.store.ts';
 import { scratch } from '../../test/scratch.ts';
+import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from '../../place/memory/index.ts';
-import { eachTest, runGiven } from '../../test/placed.ts';
+import { eachTest, runGiven, runOver } from '../../test/placed.ts';
+import type { EnginePhase } from '../views/views-words.ts';
 
 const ROOT = scratch('wf-a2a-agents-');
 process.env.WF_ROOT = ROOT;
-const { remoteAgents, startRun } = await import('../runner.ts');
+const { advanceRun, remoteAgents, startRun, runWith: runEngine } = await import('../runner.ts');
+const { engineOf } = await import('../runtime-client.ts');
+const { readRun } = await import('../record/record.store.ts');
 const stand = eachTest(testPlace);
+const engine = eachTest(testEngine);
+const runWith = runOver(runEngine, () => stand().layer);
 const runPlaced = runGiven(() => stand().layer);
+const board = () => {
+  const held = engine();
+  const settle = (id: string, phase: EnginePhase, closeout?: unknown) => held.settle(id, phase, closeout === undefined ? {} : { closeout });
+  return { e: engineOf(held.layer), tasks: held.tasks, settle };
+};
 const { credentials, missingCredential, readRemote } = await import('../runtime-client.ts');
 const { remoteBrief } = await import('../run.ts');
 
@@ -502,4 +513,38 @@ test("a remote step's try is a new task, told which try and what a person said, 
   const auto = remoteBrief(steps[0], run, steps, undefined, { try: 2, by: 'retries', mode: 'continue', resumed: false, status: 'failed' });
   assert.match(auto, /The run filed this try itself: this step declares `retries: 1`\./);
   assert.doesNotMatch(auto, /\/store/);
+});
+
+test('the tick files a remote step with no harness arguments, schema, hold or session, and a brief that names nothing of this machine', async () => {
+  declare({ reviewer: { url: 'https://a.example/reviewer' } });
+  try {
+    const dir = team('remote', {
+      draft: `---\n${FOLDER}---\nDraft a note on tides.\n`,
+      ask: `---\n${FOLDER}after: draft\nharness: a2a:reviewer\n---\nReview the draft.\n`,
+    });
+    const input = path.join(ROOT, 'tides.csv');
+    fs.writeFileSync(input, 'hour,height\n');
+    const run = await runPlaced(startRun({ brief: 'a note on tides', repo: HERE, workflowDir: dir, inputs: [input] }));
+    const { e, tasks, settle } = board();
+    await runWith(e, advanceRun(readRun(run.id)));
+    const draft = tasks.get(`${run.id}-draft`)!.spec;
+    assert.ok('config' in draft && 'closeoutSchema' in draft, 'a local step is filed as it always was');
+
+    settle(`${run.id}-draft`, 'succeeded', { outcome: 'done', summary: 'drafted', artifacts: [], needs: null });
+    await runWith(e, advanceRun(readRun(run.id)));
+    const ask = tasks.get(`${run.id}-ask`)?.spec;
+    assert.ok(ask, `signed off, the draft lets the remote step be filed: ${[...tasks.keys()].join(', ')}`);
+    assert.equal(ask.harness, 'a2a:reviewer');
+    for (const key of ['config', 'closeoutSchema', 'holdOpen', 'resumeFrom'])
+      assert.equal(key in ask, false, `${key} is not on a remote filing at all`);
+    assert.match(ask.brief, /^Review the draft\.\n\n## What was asked for\n\na note on tides\n/);
+    assert.match(
+      ask.brief,
+      /Files were given with it \(`nemia start --input`\): `tides\.csv`\. They stay on the machine that runs this workflow/,
+    );
+    assert.equal(ask.brief.includes(ROOT), false, `no path under the store: ${ask.brief}`);
+    assert.doesNotMatch(ask.brief, /closeout|artifacts|## Finishing/i, 'no contract a remote agent could not keep');
+  } finally {
+    fs.rmSync(FILE, { force: true });
+  }
 });

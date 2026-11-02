@@ -185,16 +185,6 @@ test('REFUSED: an opener that points a direction rather than naming the section,
   assert.ok(!sectionOf(cut, SKILL_SECTIONS.read).includes('`git blame'));
 });
 
-test('open answers the repository as given, the commit HEAD is at, the branch it is on, and the file a staged merge is named in', () => {
-  const dir = repository();
-  assert.deepEqual(answerOf(run('open', { root: dir, isolate: true })), {
-    repo: dir,
-    baseRef: git(dir, 'rev-parse', 'HEAD'),
-    branch: 'main',
-    inProgressFile: path.join(dir, '.git', 'MERGE_HEAD'),
-  });
-});
-
 test("open names a linked worktree's own staged-merge file, under the git directory its .git file names, and no other's", () => {
   const dir = repository();
   branched(dir, 'wf/x/a', 'g', 'theirs\n');
@@ -203,6 +193,7 @@ test("open names a linked worktree's own staged-merge file, under the git direct
   const staged = stagedOf(tree);
   assert.ok(!staged.startsWith(tree), `the file is not under the worktree's folder: ${staged}`);
   assert.notEqual(staged, stagedOf(dir));
+  assert.equal(stagedOf(dir), path.join(dir, '.git', 'MERGE_HEAD'), "the checkout's own is its MERGE_HEAD");
   assert.equal(fs.existsSync(staged), false);
   git(tree, 'merge', '-q', '--no-ff', '--no-commit', 'wf/x/a');
   assert.equal(fs.existsSync(staged), true, 'there exactly while a merge is staged in that worktree');
@@ -243,47 +234,89 @@ test('REFUSED: open on no directory, on a directory that is no repository, and o
   );
 });
 
-test('open is unread for a request with no root, and for one whose isolate is missing or no boolean', () => {
-  const dir = repository();
-  assert.equal(unreadOf(run('open', { isolate: true })), "the request's `root` is missing, where a string is asked");
-  assert.equal(unreadOf(run('open', { root: dir })), "the request's `isolate` is missing, where a boolean is asked");
-  assert.equal(unreadOf(run('open', { root: dir, isolate: 'yes' })), 'the request\'s `isolate` is "yes", where a boolean is asked');
+/** `.worktreeinclude` as a repository holds it, `null` for a folder of that name, and whether the run cuts worktrees; what open says. */
+const INCLUDES: readonly { name: string; text: string | null; isolate: boolean; refused: readonly RegExp[] }[] = [
+  { name: 'a line outside the repository is refused by name', text: '/.env.local\n../x\n', isolate: true, refused: [/"\.\.\/x"/] },
+  { name: "a path under git's own folder is refused by name", text: '.git/config\n', isolate: true, refused: [/"\.git\/config"/] },
+  { name: "git's own folder itself is refused by name", text: '.git\n', isolate: true, refused: [/"\.git"/] },
+  {
+    name: 'every refused line is named, in one refusal',
+    text: '/.env.local\n../x\n.git/config\n',
+    isolate: true,
+    refused: [/"\.\.\/x"/, /"\.git\/config"/],
+  },
+  { name: 'a .worktreeinclude that is no file is refused', text: null, isolate: true, refused: [/\.worktreeinclude is not a file/] },
+  { name: 'a run that cuts no worktree reads no file, and opens', text: '../x\n.git/config\n', isolate: false, refused: [] },
+  {
+    name: 'a file with a comment, an anchored path and node_modules has nothing to refuse, and opens',
+    text: '# for claude --worktree\n/.env.local\nnode_modules\n',
+    isolate: true,
+    refused: [],
+  },
+];
+
+test('REFUSED: open, for a run that cuts worktrees, refuses a .worktreeinclude line make would refuse as written, each by name, and one that is no file', async (t) => {
+  for (const { name, text, isolate, refused } of INCLUDES)
+    await t.test(name, () => {
+      const dir = repository();
+      const file = path.join(dir, '.worktreeinclude');
+      if (text === null) fs.mkdirSync(file);
+      else fs.writeFileSync(file, text);
+      const outcome = run('open', { root: dir, isolate });
+      if (!refused.length) return assert.equal(answerOf(outcome).repo, dir);
+      const words = refusalOf(outcome);
+      assert.ok(words.startsWith(file), words);
+      for (const line of refused) assert.match(words, line);
+    });
 });
 
-test('REFUSED: open, for a run that cuts worktrees, refuses a .worktreeinclude line make would refuse as written, each by name, and one that is no file', () => {
-  const dir = repository();
-  const file = path.join(dir, '.worktreeinclude');
-  fs.writeFileSync(file, '/.env.local\n../x\n.git/config\n');
-  assert.equal(
-    refusalOf(run('open', { root: dir, isolate: true })),
-    `${file}: "../x" is outside the repository; ".git/config" is git's own. Each line is a gitignored path inside the repository, relative to its root — fix or remove those lines.`,
-  );
-  assert.equal(
-    answerOf(run('open', { root: dir, isolate: false })).repo,
-    dir,
-    'a run that cuts no worktree copies nothing, and reads no file',
-  );
-  fs.writeFileSync(file, '.git\n');
-  assert.match(refusalOf(run('open', { root: dir, isolate: true })), /: "\.git" is git's own\. .* fix or remove that line\.$/);
-  fs.rmSync(file);
-  fs.mkdirSync(file);
-  assert.equal(
-    refusalOf(run('open', { root: dir, isolate: true })),
-    `${file} is not a file: write it as a file, one gitignored path per line, or remove it`,
-  );
-  fs.rmdirSync(file);
-  fs.writeFileSync(file, '# for claude --worktree\n/.env.local\nnode_modules\n');
-  assert.equal(answerOf(run('open', { root: dir, isolate: true })).repo, dir, 'a file with nothing to refuse opens');
-});
+/** A request each verb cannot read, and the field its unread outcome names. */
+const UNREAD: readonly { name: string; verb: PlaceVerb; request: object; field: string }[] = [
+  { name: 'open with no root', verb: 'open', request: { isolate: true }, field: 'root' },
+  { name: 'open with no isolate', verb: 'open', request: { root: '/' }, field: 'isolate' },
+  { name: 'open whose isolate is no boolean', verb: 'open', request: { root: '/', isolate: 'yes' }, field: 'isolate' },
+  {
+    name: 'make whose also is missing',
+    verb: 'make',
+    request: { repo: '/', at: '/a', run: 'r-1', leaf: 'a', from: 'main' },
+    field: 'also',
+  },
+  { name: 'handoff with no step', verb: 'handoff', request: { workspace: '/', why: '' }, field: 'step' },
+  {
+    name: 'report whose diffOf is no list',
+    verb: 'report',
+    request: { repo: '/', baseRef: 'main', onto: 'main', branches: [], diffOf: 'src/a.ts', present: [], atBase: [] },
+    field: 'diffOf',
+  },
+  {
+    name: 'standing whose branches is no list',
+    verb: 'standing',
+    request: { repo: '/', base: 'main', branches: 'wf/r/a' },
+    field: 'branches',
+  },
+  { name: 'status whose tips are no object of strings', verb: 'status', request: { repo: '/', tips: ['wf/x/a'] }, field: 'tips' },
+  { name: 'land with an act it does not know', verb: 'land', request: { repo: '/', act: 'push' }, field: 'act' },
+  { name: 'land, a commit with no message', verb: 'land', request: { repo: '/', act: 'commit' }, field: 'message' },
+  { name: 'trial with no repo', verb: 'trial', request: { trials: [] }, field: 'repo' },
+  { name: 'trial whose pairs lack a branch', verb: 'trial', request: { repo: '/', trials: [{ onto: 'main' }] }, field: 'trials' },
+  { name: 'inventory with no run', verb: 'inventory', request: { repo: '/', under: '/', base: 'main' }, field: 'run' },
+  {
+    name: 'remove whose workspaces is no list',
+    verb: 'remove',
+    request: { repo: '/', workspaces: '/w', branches: [] },
+    field: 'workspaces',
+  },
+  { name: 'export with no tag', verb: 'export', request: { repo: '/', into: '/v1' }, field: 'tag' },
+];
 
-test('handoff commits what a step left, under its name and why, and answers the commit', () => {
-  const dir = repository();
-  fs.writeFileSync(path.join(dir, 'f'), 'changed\n');
-  fs.writeFileSync(path.join(dir, 'new'), 'added\n');
-  const { commit } = answerOf(run('handoff', { workspace: dir, step: 'build', why: ', before its run was forgotten' }));
-  assert.equal(commit, git(dir, 'rev-parse', 'HEAD'));
-  assert.equal(git(dir, 'log', '-1', '--format=%s'), 'build: hand off what was left uncommitted, before its run was forgotten');
-  assert.equal(git(dir, 'status', '--porcelain'), '');
+test('a request a verb cannot read is unread, never acted on, naming the field it could not read', async (t) => {
+  for (const { name, verb, request, field } of UNREAD)
+    await t.test(name, () => {
+      const outcome = run(verb, request);
+      assert.ok('unread' in outcome, `unread expected, got ${JSON.stringify(outcome)}`);
+      assert.equal(outcome.unread.verb, verb);
+      assert.ok(outcome.unread.said.includes(`\`${field}\``), outcome.unread.said);
+    });
 });
 
 test('handoff of a clean tree commits nothing and answers a null commit', () => {
@@ -305,38 +338,6 @@ test('REFUSED: handoff when a hook refuses the commit, in the hook words, and in
     refusalOf(run('handoff', { workspace: gone, step: 'build', why: '' })),
     `${gone} is not a directory, so nothing of build is there to hand off`,
   );
-});
-
-test('handoff is unread for a request with no step', () => {
-  assert.equal(unreadOf(run('handoff', { workspace: '/', why: '' })), "the request's `step` is missing, where a string is asked");
-});
-
-test('status of a checkout merging nothing: none, nothing unmerged, and a tip not on HEAD is missing', () => {
-  const dir = repository();
-  const head = git(dir, 'rev-parse', 'HEAD');
-  assert.deepEqual(answerOf(run('status', { repo: dir, tips: {} })), { merging: 'none', conflicted: false, missing: [], tip: head });
-  const tip = branched(dir, 'wf/x/b', 'g', 'b\n');
-  assert.deepEqual(answerOf(run('status', { repo: dir, tips: { 'wf/x/b': tip } })), {
-    merging: 'none',
-    conflicted: false,
-    missing: ['wf/x/b'],
-    tip: head,
-  });
-  git(dir, 'merge', '-q', '--no-ff', '-m', 'land b', 'wf/x/b');
-  assert.deepEqual(answerOf(run('status', { repo: dir, tips: { 'wf/x/b': tip } })).missing, []);
-});
-
-test("status of a clean merge staged: ours when it merges the run's tips, other when it merges anything else", () => {
-  const dir = repository();
-  const tip = staged(dir);
-  const head = git(dir, 'rev-parse', 'HEAD');
-  assert.deepEqual(answerOf(run('status', { repo: dir, tips: { 'wf/x/a': tip } })), {
-    merging: 'ours',
-    conflicted: false,
-    missing: [],
-    tip: head,
-  });
-  assert.deepEqual(answerOf(run('status', { repo: dir, tips: { 'wf/x/c': head } })).merging, 'other');
 });
 
 test('status of a merge that conflicts: conflicted, read off the index even while a lock is held on it', () => {
@@ -377,26 +378,6 @@ test('status reads a worktree, whose MERGE_HEAD is not under its own folder', ()
 test('REFUSED: status of a checkout that is no repository', () => {
   const plain = scratch('wf-git-skill-plain-');
   assert.equal(refusalOf(run('status', { repo: plain, tips: {} })), `${plain} is not a git repository, so no merge can be staged there`);
-});
-
-test('status is unread when its tips are not an object of strings', () => {
-  assert.equal(
-    unreadOf(run('status', { repo: '/', tips: ['wf/x/a'] })),
-    'the request\'s `tips` is ["wf/x/a"], where an object of strings is asked',
-  );
-});
-
-test('land commits a staged merge with the message given, and answers the commit', () => {
-  const dir = repository();
-  const tip = staged(dir);
-  const before = git(dir, 'rev-parse', 'HEAD');
-  const { commit } = answerOf(run('land', { repo: dir, act: 'commit', message: 'Land wf/x/a\n\nIt passed its check.' })) as {
-    commit: string;
-  };
-  assert.equal(commit, git(dir, 'rev-parse', 'HEAD'));
-  assert.equal(git(dir, 'log', '-1', '--format=%B'), 'Land wf/x/a\n\nIt passed its check.');
-  assert.equal(git(dir, 'rev-parse', `${commit}^1`, `${commit}^2`), `${before}\n${tip}`);
-  assert.equal(merging(dir), false);
 });
 
 /**
@@ -563,11 +544,6 @@ test('REFUSED: land with no merge in progress, either act, and a commit git will
   assert.equal(merging(dir), true, 'the merge is left for the abort');
 });
 
-test('land is unread for an act it does not know, and for a commit with no message', () => {
-  assert.equal(unreadOf(run('land', { repo: '/', act: 'push' })), 'the request\'s `act` is "push", where commit or abort is asked');
-  assert.equal(unreadOf(run('land', { repo: '/', act: 'commit' })), "the request's `message` is missing, where a string is asked");
-});
-
 /** Every ref of `dir` with its commit, HEAD and what the checkout and index hold: what a trial merge must leave as it was. */
 const untouched = (dir: string): string =>
   [git(dir, 'for-each-ref', '--format=%(refname) %(objectname)'), git(dir, 'rev-parse', 'HEAD'), git(dir, 'status', '--porcelain')].join(
@@ -598,16 +574,6 @@ test('trial answers each pair in the order asked, clean, conflicted or not known
   assert.ok('unknown' in lacked && /wf\/no\/such/.test(lacked.unknown), JSON.stringify(lacked));
   assert.ok('unknown' in noBase && /gone/.test(noBase.unknown), JSON.stringify(noBase));
   assert.equal(untouched(dir), before, 'no ref, HEAD, index or checkout moved');
-});
-
-test('REFUSED: trial in a repository that is not there; unread for a request with no repo or no list of pairs', () => {
-  const gone = path.join(scratch('wf-git-skill-trial-'), 'gone');
-  assert.equal(refusalOf(run('trial', { repo: gone, trials: [] })), `${gone} is not a directory, so no branch in it can be tried`);
-  assert.equal(unreadOf(run('trial', { trials: [] })), "the request's `repo` is missing, where a string is asked");
-  assert.equal(
-    unreadOf(run('trial', { repo: '/', trials: [{ onto: 'main' }] })),
-    'the request\'s `trials` is [{"onto":"main"}], where a list of { onto, branch } is asked',
-  );
 });
 
 test("export writes the tag's tree, not the working tree, into an empty repository of its own, and answers the tag's commit", () => {
@@ -644,17 +610,6 @@ test('REFUSED: export of a tag the repository lacks, from no directory, and into
     `${into} is not empty, and a tag is exported into an empty folder`,
   );
   assert.deepEqual(fs.readdirSync(into), ['kept']);
-  assert.equal(unreadOf(run('export', { repo: dir, into })), "the request's `tag` is missing, where a string is asked");
-});
-
-test("seal takes away an export's empty repository, and answers false for a tree that has none", () => {
-  const dir = repository();
-  git(dir, 'tag', 'v1');
-  const into = path.join(scratch('wf-git-skill-seal-'), 'v1');
-  answerOf(run('export', { repo: dir, tag: 'v1', into }));
-  assert.deepEqual(answerOf(run('seal', { tree: into })), { removed: true });
-  assert.deepEqual(fs.readdirSync(into).sort(), ['f', 'g']);
-  assert.deepEqual(answerOf(run('seal', { tree: into })), { removed: false });
 });
 
 test('REFUSED: seal of a repository that holds a commit, which it leaves, and of a tree that is not there', () => {

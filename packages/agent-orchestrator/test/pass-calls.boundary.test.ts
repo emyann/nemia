@@ -8,7 +8,7 @@
  * `WF_ROOT` is set before the runner is imported: the module reads it as it loads. `WF_VERIFY_REST=1` judges in full every run a pass
  * answers from its memo of runs at rest.
  */
-import { test } from 'node:test';
+import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -139,7 +139,16 @@ const pass = async (b: ReturnType<typeof board>, id: string) => {
   };
 };
 
-test('a fresh step is filed with no look first; the step after it waits, unasked', async () => {
+/** The rows of each table below, a claim each, told by the table's one test after its last row. */
+type Rows = Array<[string, (t: TestContext) => void | Promise<void>]>;
+const row = (rows: Rows, name: string, claim: (t: TestContext) => void | Promise<void>) => rows.push([name, claim]);
+/** A table's rows, each a subtest of `t`. */
+const told = (rows: Rows) => async (t: TestContext) => {
+  for (const [name, claim] of rows) await t.test(name, claim);
+};
+const FILED: Rows = [];
+
+row(FILED, 'a fresh step is filed with no look first; the step after it waits, unasked', async () => {
   const run = await started(folder({ implement: '', review: 'after: implement' }));
   const b = board();
   const p = await pass(b, run.id);
@@ -152,7 +161,7 @@ test('a fresh step is filed with no look first; the step after it waits, unasked
   assert.deepEqual(again.counted, { journals: 1, act: 2 }, 'the hand-off and the asks, with nothing written');
 });
 
-test("a signed step's check is looked for, then filed; once it passes, the ready step after it is filed", async () => {
+row(FILED, "a signed step's check is looked for, then filed; once it passes, the ready step after it is filed", async () => {
   const run = await started(folder({ implement: 'check: npm test', review: 'after: implement' }));
   const b = board();
   await pass(b, run.id);
@@ -174,7 +183,7 @@ test("a signed step's check is looked for, then filed; once it passes, the ready
   assert.deepEqual(ready.counted, { journals: 4, act: 5 }, "the two views, and the check's two streams");
 });
 
-test('a try its check refused is looked for, then filed, under its own id', async () => {
+row(FILED, 'a try its check refused is looked for, then filed, under its own id', async () => {
   const run = await started(folder({ implement: 'check: npm test\nretries: 1', review: 'after: implement' }));
   const b = board();
   await pass(b, run.id);
@@ -196,7 +205,7 @@ test('a try its check refused is looked for, then filed, under its own id', asyn
   assert.deepEqual(tried.counted, { journals: 6, act: 4 }, 'the check it refused read for its brief');
 });
 
-test('a round the looping step asked for is looked for, then filed, under its target’s next try', async () => {
+row(FILED, 'a round the looping step asked for is looked for, then filed, under its target’s next try', async () => {
   const run = await started(
     folder(
       { implement: '', review: 'after: implement\noutput: review.schema.json\nloop: implement' },
@@ -221,7 +230,7 @@ test('a round the looping step asked for is looked for, then filed, under its ta
   assert.deepEqual(looped.counted, { journals: 4, act: 4 });
 });
 
-test('a try and a round due on one pass: the try is filed first, then the round, each looked for before', async () => {
+row(FILED, 'a try and a round due on one pass: the try is filed first, then the round, each looked for before', async () => {
   const run = await started(
     folder(
       {
@@ -264,7 +273,7 @@ test('a try and a round due on one pass: the try is filed first, then the round,
   assert.deepEqual(both.counted, { journals: 10, act: 5 });
 });
 
-test("a cancelled run's task in flight is stopped by the pass, and nothing more is filed", async () => {
+row(FILED, "a cancelled run's task in flight is stopped by the pass, and nothing more is filed", async () => {
   const run = await started(folder({ implement: '', review: 'after: implement' }));
   const b = board();
   await pass(b, run.id);
@@ -277,7 +286,7 @@ test("a cancelled run's task in flight is stopped by the pass, and nothing more 
   assert.deepEqual(stopped.counted, { journals: 1, act: 3 });
 });
 
-test('an approved ending is filed in the checkout, once the pass has read afresh who holds it', async () => {
+row(FILED, 'an approved ending is filed in the checkout, once the pass has read afresh who holds it', async () => {
   const run = await started(folder({ implement: '', ship: 'after: implement\nworkspace: base\ngate: true' }), true);
   const b = board();
   await pass(b, run.id);
@@ -298,6 +307,11 @@ test('an approved ending is filed in the checkout, once the pass has read afresh
   );
   assert.deepEqual(landing.counted, { journals: 2, act: 5 });
 });
+
+test(
+  "what a pass calls of the engine, in order: each filing looked for first, a cancelled run's task stopped, an ending filed in the checkout",
+  told(FILED),
+);
 
 test("each question a pass asks its place is one call of its place phase, and each git process the place starts for it is counted once there, no other process started: the standing, a worktree's make, a hand-off", async (t) => {
   const run = await started(folder({ implement: '', ship: 'after: implement\nworkspace: base\ngate: true' }), true);

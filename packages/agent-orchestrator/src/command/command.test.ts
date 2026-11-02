@@ -1,6 +1,7 @@
 /**
  * The command table's parser, help and rules: a command line read against a spec and refused in its own words, the line a refusal
- * shows, the help the table prints, and where a table breaks its rules.
+ * shows, the help the table prints, where a table breaks its rules (one table, `BREAKS`), and what each command of the CLI refuses
+ * of its command line before anything is read (one table, `REFUSALS`), matched by the command, flag and fix each names.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -136,6 +137,7 @@ test('a flag given once for each value collects them in order, never refused as 
   assert.deepEqual(parseArgv(HOLDING, ['r-1', '--until', 'a', '--until=b']), { runId: 'r-1', until: ['a', 'b'] });
   assert.deepEqual(parseArgv(HOLDING, ['r-1', '--until', 'a']), { runId: 'r-1', until: ['a'] });
   assert.equal(refusalOf(['r-1', '--until'], HOLDING), 'UNTIL TAKES');
+  assert.deepEqual(parseArgv(entry('watch').spec, ['-l', 'agent=ada', '-l', 'kind=Step']), { selector: ['agent=ada', 'kind=Step'] });
 });
 
 test('a switch with a key sets it to true, given once or more', () => {
@@ -679,213 +681,6 @@ test('the help prints no command the CLI does not serve', () => {
   );
 });
 
-test('REFUSED: an entry that ticks and writes nothing, since nothing it does waits on a pass', () => {
-  const route = { method: 'POST', path: '/api/x', status: 202 } as const;
-  assert.deepEqual(commandBreaks([{ name: 'x', route, handler, writes: true, ticks: true }], []), []);
-  assert.deepEqual(commandBreaks([{ name: 'x', route, handler, writes: false, ticks: true }], []), [
-    'x ticks and writes nothing: a command whose work waits on the next pass files it, so give it writes: true, or take ticks out',
-  ]);
-});
-
-test('a table breaks its rules: a name twice, an entry served nowhere, a command that is also a verb of the CLI', () => {
-  const route = { method: 'POST', path: '/api/x', status: 202 } as const;
-  assert.deepEqual(commandBreaks([{ name: 'a', route, handler }], ['b']), []);
-  assert.deepEqual(commandBreaks([{ name: 'a', only: { side: 'cli', why: 'w' }, handler }], []), []);
-  assert.deepEqual(
-    commandBreaks(
-      [
-        { name: 'a', route, handler },
-        { name: 'a', route: { ...route, path: '/api/y' }, handler },
-      ],
-      [],
-    ),
-    ['a is defined twice: a command is one entry of the table'],
-  );
-  assert.deepEqual(commandBreaks([{ name: 'a', handler }], []), [
-    'a has no route and no only: give it its route on the api, or say which side alone serves it, and why',
-  ]);
-  assert.deepEqual(commandBreaks([{ name: 'a', route, handler }], ['a']), [
-    'a is a command of the table and a verb of the CLI: take it out of VERBS',
-  ]);
-});
-
-test('a table breaks its rules: two entries routed on one method and path, of which the api serves the first alone', () => {
-  const route = { method: 'GET', path: '/api/x', status: 200 } as const;
-  const only = { side: 'api', why: 'w' } as const;
-  assert.deepEqual(
-    commandBreaks(
-      [
-        { name: 'a', route, handler },
-        { name: 'b', route: { method: 'POST', path: '/api/x', status: 202 }, handler },
-      ],
-      [],
-    ),
-    [],
-    'one path, another method',
-  );
-  assert.deepEqual(
-    commandBreaks(
-      [
-        { name: 'a', route, only, handler },
-        { name: 'b', route, only, handler },
-      ],
-      [],
-    ),
-    ['b is routed on GET /api/x, as a is: give it a path of its own'],
-  );
-});
-
-test('a table breaks its rules: an entry named by a former spelling, which the line it names would never reach', () => {
-  const route = { method: 'POST', path: '/api/x', status: 202 } as const;
-  const breaks = commandBreaks([{ name: 'agents remove', route, handler }], []);
-  assert.equal(breaks.length, 1);
-  names(breaks[0], 'agents remove', 'RENAMED');
-});
-
-test('a table breaks its rules: a verb of the CLI is refused only against an entry the CLI serves', () => {
-  const route = { method: 'GET', path: '/api/x', status: 200 } as const;
-  assert.deepEqual(commandBreaks([{ name: 'decide', route, only: { side: 'api', why: 'w' }, handler }], ['decide']), []);
-  const breaks = commandBreaks([{ name: 'decide', route, only: { side: 'cli', why: 'w' }, handler }], ['decide']);
-  assert.equal(breaks.length, 1);
-  names(breaks[0], 'decide is', 'take it out of VERBS');
-});
-
-test('a table breaks its rules: an entry the api serves with no handler, and one the CLI serves alone with no handler nor runner', () => {
-  const route = { method: 'POST', path: '/api/x', status: 202 } as const;
-  const only = { side: 'cli', why: 'w' } as const;
-  assert.deepEqual(commandBreaks([{ name: 'a', only }], [], ['a']), []);
-  assert.deepEqual(commandBreaks([{ name: 'a', route }], [], ['a']), [
-    'a has no handler and is served on the api: give it a handler, or serve it on the CLI alone and run it there',
-  ]);
-  assert.deepEqual(commandBreaks([{ name: 'a', only }], []), [
-    "a has no handler and no runner: give it a handler, or a runner in the CLI's RUNS",
-  ]);
-});
-
-test('a table breaks its rules: a runner of the CLI that runs no entry the CLI serves', () => {
-  const route = { method: 'GET', path: '/api/x', status: 200 } as const;
-  const breaks = commandBreaks([{ name: 'a', route, only: { side: 'api', why: 'w' }, handler }], [], ['a', 'b']);
-  assert.equal(breaks.length, 2);
-  breaks.forEach((words, i) => {
-    assert.ok(words.startsWith(`${'ab'[i]} has a runner`), words);
-    names(words, 'its entry in the table', 'take it out of RUNS');
-  });
-});
-
-test('a table breaks its rules: a key a route sets that no flag of its spec fills', () => {
-  const route = { method: 'DELETE', path: '/api/x', status: 200, sets: { off: true, mode: 'fast' } } as const;
-  assert.deepEqual(commandBreaks([{ name: 'a', route, spec: { ...HOLDING, flags: [...HOLDING.flags, ...SPEC.flags] }, handler }], []), []);
-  assert.deepEqual(commandBreaks([{ name: 'a', route, spec: SPEC, handler }], []), [
-    "a's route sets off, which no flag of its spec fills: name a key the command reads",
-  ]);
-  assert.deepEqual(commandBreaks([{ name: 'a', route, spec: HOLDING, handler }], []), [
-    "a's route sets mode, which no flag of its spec fills: name a key the command reads",
-  ]);
-});
-
-/** `nemia hold`'s two forms, as each of its refusals ends on them. */
-const HOLD_SHAPE = 'nemia hold <runId> --until <runId> [--until <runId> ...] [--why "<words>"] [--by <name>], or nemia hold <runId> --off';
-
-test("REFUSED at shipped defaults: nemia hold's arguments, before any run is read, in today's words whole", () => {
-  const hold = entry('hold');
-  const first = 'nemia hold takes the run first: nemia hold <runId> --until <runId> [--until <runId> ...], or nemia hold <runId> --off.';
-  for (const argv of [[], ['--until', 'a'], ['-x', '--off']]) assert.equal(refusedBy(hold, argv), first, argv.join(' '));
-  const until = `--until takes the run to wait on, by id: ${HOLD_SHAPE}.`;
-  for (const argv of [['--until'], ['--until', '--off'], ['--until', '-a'], ['--until=']])
-    assert.equal(refusedBy(hold, ['r-x', ...argv]), until, argv.join(' '));
-  assert.equal(refusedBy(hold, ['r-x']), `nemia hold needs the runs to wait on, or --off to lift a hold: ${HOLD_SHAPE}.`);
-  assert.equal(
-    refusedBy(hold, ['r-x', '--until', 'a', '--off']),
-    `nemia hold takes --until or --off, not both: lift the hold first, then hold it again — ${HOLD_SHAPE}.`,
-  );
-  assert.equal(
-    refusedBy(hold, ['r-x', '--off', '--why', 'w']),
-    `nemia hold --off lifts the hold whole, and takes no --why or --by: those go with --until, on the hold put next — ${HOLD_SHAPE}.`,
-  );
-  assert.equal(
-    refusedBy(hold, ['r-x', '--after', 'a']),
-    `nemia hold does not take --after. It takes the run, then the runs it waits on or --off: ${HOLD_SHAPE}.`,
-  );
-  assert.equal(refusedBy(hold, ['r-x', '--until', 'a', '--why', '--x']), `--why takes the words for why the run is held: ${HOLD_SHAPE}.`);
-  names(refusedBy(hold, ['r-x', '--until', 'a', '--by', ' ']), '--by takes', 'only blanks', 'leave --by out');
-  assert.equal(
-    refusedBy(hold, ['r-x', '--until', 'a', '--by', 'a', '--by', 'b']),
-    `nemia hold takes --by once: a hold says one by. ${HOLD_SHAPE}.`,
-  );
-  assert.equal(refusedBy(hold, ['r-x', '--until', 'a', '--until', 'b', '--why', 'w']), null);
-  assert.equal(refusedBy(hold, ['r-x', '--off', '--off']), null);
-});
-
-test("REFUSED at shipped defaults: nemia pause's and nemia resume's arguments, before the store is read, in their words whole", () => {
-  const pause = entry('pause');
-  const shape = 'nemia pause [--why "<words>"] [--by <name>] [--now [--yes]]';
-  assert.equal(refusedBy(pause, ['--why', '--by']), `--why takes the words for why the store is paused: ${shape}.`);
-  assert.equal(refusedBy(pause, ['--by']), `--by takes who pauses it, by a name: ${shape}.`);
-  assert.equal(refusedBy(pause, ['--why', '--x']), `--why takes the words for why the store is paused: ${shape}.`);
-  names(refusedBy(pause, ['--why', ' \n ']), '--why takes', 'only blanks', 'leave --why out');
-  names(refusedBy(pause, ['--by', 'b'.repeat(65)]), '--by takes at most 64', 'given 65', 'shorter');
-  assert.equal(refusedBy(pause, ['--by', 'a', '--by', 'b']), `nemia pause takes --by once: a pause says one by. ${shape}.`);
-  assert.equal(refusedBy(pause, ['now']), `nemia pause does not take now: ${shape}.`);
-  assert.equal(refusedBy(pause, ['--why', 'merging by hand', '--by=ann']), null);
-  assert.equal(refusedBy(pause, []), null);
-  assert.equal(refusedBy(pause, ['--now', '--now=yes']), `nemia pause does not take --now=yes: ${shape}.`);
-  assert.equal(refusedBy(pause, ['--now', '--yes', '--why', 'the bill']), null);
-  names(refusedBy(entry('resume'), ['--all']), 'nemia resume takes no --all', 'whoever paused it');
-  assert.equal(refusedBy(entry('resume'), []), null);
-});
-
-test("REFUSED at shipped defaults: nemia tick's, nemia up's and nemia watch's arguments, in today's words whole", () => {
-  names(refusedBy(entry('tick'), ['--bogus']), 'nemia tick takes no --bogus', 'nemia tick --stats');
-  assert.equal(refusedBy(entry('tick'), ['--stats']), null);
-  const up = entry('up');
-  for (const argv of [
-    ['--stats', '20'],
-    ['20', '--stats'],
-  ])
-    names(refusedBy(up, argv), 'nemia up --stats', 'takes no 20', 'nemia up --stats alone', 'nemia up 20 to tick');
-  for (const given of ['soon', '--x']) {
-    const words = refusedBy(up, [given]);
-    names(words, 'nemia up takes', 'whole milliseconds', `"${given}" is not one`);
-    assert.match(words!, /from 1 to \d+/);
-  }
-  names(refusedBy(up, ['10', '20']), 'one pass interval at most', 'given 20', 'nemia up [ms]');
-  assert.equal(refusedBy(up, ['10']), null);
-  const form = 'nemia watch [cursor] [--once] [-l <selector>]... [--cursor-file <path>] [--json]';
-  const cursor = `nemia watch takes one cursor at most, a whole number of bytes — 0, or the number a \`cursor:\` line printed: ${form}`;
-  assert.equal(refusedBy(entry('watch'), ['x']), cursor);
-  assert.equal(refusedBy(entry('watch'), ['1', '2']), `nemia watch does not take 2: ${form}`);
-  assert.equal(refusedBy(entry('watch'), ['--from']), `nemia watch does not take --from: ${form}`);
-  assert.equal(refusedBy(entry('watch'), ['-L']), `nemia watch does not take -L: ${form}`, "a typo'd short flag is no cursor");
-  assert.equal(refusedBy(entry('watch'), ['12']), null);
-  assert.equal(refusedBy(entry('watch'), ['--once', '12', '-l', 'factory=nemia', '--json']), null);
-});
-
-test("REFUSED at shipped defaults: nemia watch's selectors, its cursor file, and a cursor given beside it", () => {
-  const watch = entry('watch');
-  assert.match(refusedBy(watch, ['-l', 'message=hi']) ?? '', /^"message" is no key of a feed line/);
-  assert.match(refusedBy(watch, ['-l', 'factory=nemia', '-l', '']) ?? '', /^"" is no selector: it holds no clause/);
-  const selector = refusedBy(watch, ['-l', '--json']);
-  names(selector, 'nemia watch -l takes', '-l <key>=<value>', '-l <key>!=<value>', '-l "<key> in (<a>,<b>)"', '-l "<key> notin (<a>,<b>)"');
-  assert.deepEqual(selector!.split('The keys: ')[1].split(', '), [
-    'run',
-    'factory',
-    'workflow',
-    'step',
-    'agent',
-    'kind',
-    'reason',
-    'on',
-    'via',
-    'type',
-    'waits',
-    'source',
-  ]);
-  assert.match(refusedBy(watch, ['--cursor-file']) ?? '', /^nemia watch --cursor-file takes the path this watch keeps/);
-  assert.equal(refusedBy(watch, ['--cursor-file', 'a', '--cursor-file', 'b']), 'nemia watch takes --cursor-file once.');
-  names(refusedBy(watch, ['500', '--cursor-file', 'f']), 'not both', 'given 500', 'drop the 500', 'drop --cursor-file', 'delete the file');
-  assert.deepEqual(parseArgv(entry('watch').spec, ['-l', 'agent=ada', '-l', 'kind=Step']), { selector: ['agent=ada', 'kind=Step'] });
-});
-
 /** A spec that takes a card's `name`, and the words a person or the api alone gives. */
 const CARD: Spec = {
   positionals: [{ key: 'name', takes: 'required', kind: 'name' }],
@@ -896,61 +691,424 @@ const CARD: Spec = {
   unknown: (arg) => `UNKNOWN ${arg}`,
 };
 
-test('a table breaks its rules: a name in a route’s path that no argument of its spec takes', () => {
-  const route = { method: 'PUT', path: '/api/cards/:name', status: 200 } as const;
-  assert.deepEqual(commandBreaks([{ name: 'a', route, spec: CARD, handler }], []), []);
-  assert.deepEqual(commandBreaks([{ name: 'a', route: { ...route, path: '/api/cards/:card' }, spec: CARD, handler }], []), [
-    "a's route PUT /api/cards/:card names :card, which no argument of its spec takes: key a positional card",
-  ]);
+type Table = Parameters<typeof commandBreaks>[0];
+
+const POST = { method: 'POST', path: '/api/x', status: 202 } as const;
+const GET = { method: 'GET', path: '/api/x', status: 200 } as const;
+const PUT = { method: 'PUT', path: '/api/cards/:name', status: 200 } as const;
+const BY_HAND = { method: 'POST', path: '/api/x', status: 201, hand: 'it answers a Location' } as const;
+const SETS = { method: 'DELETE', path: '/api/x', status: 200, sets: { off: true, mode: 'fast' } } as const;
+const ROUTES = [
+  { method: 'POST', path: '/api/x', status: 200 },
+  { method: 'DELETE', path: '/api/x', status: 200, sets: { off: true } },
+] as const;
+const API = { side: 'api', why: 'w' } as const;
+const CLI_ALONE = { side: 'cli', why: 'w' } as const;
+const SAID_NOTHING = { ...CARD, flags: [{ ...CARD.flags[0], only: { side: 'cli', why: '' } } as const, CARD.flags[1]] };
+
+/**
+ * Each table `commandBreaks` reads, the CLI's verbs and runners beside it, and what it breaks: one list of fragments per break, in
+ * order, each naming the entry and the fix; none for a table that keeps its rules.
+ */
+const BREAKS: ReadonlyArray<readonly [string, Table, readonly string[], readonly string[], ReadonlyArray<readonly string[]>]> = [
+  ['an entry that ticks and writes', [{ name: 'x', route: POST, handler, writes: true, ticks: true }], [], [], []],
+  [
+    'REFUSED: an entry that ticks and writes nothing, since nothing it does waits on a pass',
+    [{ name: 'x', route: POST, handler, writes: false, ticks: true }],
+    [],
+    [],
+    [['x ticks and writes nothing', 'writes: true']],
+  ],
+  ['an entry routed, beside a verb of another name', [{ name: 'a', route: POST, handler }], ['b'], [], []],
+  ['an entry the CLI alone serves', [{ name: 'a', only: CLI_ALONE, handler }], [], [], []],
+  [
+    'a name twice',
+    [
+      { name: 'a', route: POST, handler },
+      { name: 'a', route: { ...POST, path: '/api/y' }, handler },
+    ],
+    [],
+    [],
+    [['a is defined twice']],
+  ],
+  ['an entry served nowhere', [{ name: 'a', handler }], [], [], [['a has no route and no only', 'which side alone serves it']]],
+  ['a command that is also a verb of the CLI', [{ name: 'a', route: POST, handler }], ['a'], [], [['a is a command', 'out of VERBS']]],
+  [
+    'one path, another method',
+    [
+      { name: 'a', route: GET, handler },
+      { name: 'b', route: POST, handler },
+    ],
+    [],
+    [],
+    [],
+  ],
+  [
+    'two entries routed on one method and path, of which the api serves the first alone',
+    [
+      { name: 'a', route: GET, only: API, handler },
+      { name: 'b', route: GET, only: API, handler },
+    ],
+    [],
+    [],
+    [['b is routed on GET /api/x, as a is', 'a path of its own']],
+  ],
+  [
+    'an entry named by a former spelling, which the line it names would never reach',
+    [{ name: 'agents remove', route: POST, handler }],
+    [],
+    [],
+    [['agents remove', 'RENAMED']],
+  ],
+  ['a verb of the CLI beside an entry the api alone serves', [{ name: 'decide', route: GET, only: API, handler }], ['decide'], [], []],
+  [
+    'a verb of the CLI beside an entry the CLI serves',
+    [{ name: 'decide', route: GET, only: CLI_ALONE, handler }],
+    ['decide'],
+    [],
+    [['decide is', 'take it out of VERBS']],
+  ],
+  ['an entry the CLI alone serves with a runner and no handler', [{ name: 'a', only: CLI_ALONE }], [], ['a'], []],
+  [
+    'an entry the api serves with no handler',
+    [{ name: 'a', route: POST }],
+    [],
+    ['a'],
+    [['a has no handler and is served on the api', 'give it a handler']],
+  ],
+  [
+    'an entry the CLI serves alone with no handler nor runner',
+    [{ name: 'a', only: CLI_ALONE }],
+    [],
+    [],
+    [['a has no handler and no runner', "the CLI's RUNS"]],
+  ],
+  [
+    'a runner of the CLI that runs no entry the CLI serves',
+    [{ name: 'a', route: GET, only: API, handler }],
+    [],
+    ['a', 'b'],
+    [
+      ['a has a runner', 'its entry in the table', 'take it out of RUNS'],
+      ['b has a runner', 'its entry in the table', 'take it out of RUNS'],
+    ],
+  ],
+  [
+    'the keys a route sets, each filled by a flag',
+    [{ name: 'a', route: SETS, spec: { ...HOLDING, flags: [...HOLDING.flags, ...SPEC.flags] }, handler }],
+    [],
+    [],
+    [],
+  ],
+  [
+    'a key a route sets that no flag fills: off',
+    [{ name: 'a', route: SETS, spec: SPEC, handler }],
+    [],
+    [],
+    [["a's route sets off", 'name a key']],
+  ],
+  ['a key a route sets that no flag fills: mode', [{ name: 'a', route: SETS, spec: HOLDING, handler }], [], [], [["a's route sets mode"]]],
+  ["a name in a route's path its spec takes", [{ name: 'a', route: PUT, spec: CARD, handler }], [], [], []],
+  [
+    "a name in a route's path that no argument of its spec takes",
+    [{ name: 'a', route: { ...PUT, path: '/api/cards/:card' }, spec: CARD, handler }],
+    [],
+    [],
+    [['names :card', 'key a positional card']],
+  ],
+  ['a route served by hand, saying why', [{ name: 'a', route: BY_HAND, handler }], [], [], []],
+  [
+    'a why left empty, of a route served by hand',
+    [{ name: 'a', route: { ...BY_HAND, hand: ' ' }, handler }],
+    [],
+    [],
+    [['served by hand and says no why']],
+  ],
+  [
+    'a why left empty, of a side alone',
+    [{ name: 'a', only: { side: 'cli', why: '' }, handler }],
+    [],
+    [],
+    [['served on the cli alone and says no why']],
+  ],
+  [
+    'a why left empty, of a flag one side alone takes',
+    [{ name: 'a', route: PUT, spec: SAID_NOTHING, handler }],
+    [],
+    [],
+    [["a's --file is taken on the cli alone", 'says no why']],
+  ],
+  [
+    'a flag the api alone takes, handed by a route served by hand',
+    [{ name: 'a', route: { ...PUT, hand: 'by hand' }, spec: CARD, handler }],
+    [],
+    [],
+    [],
+  ],
+  [
+    'a flag the api alone takes on an entry with no route that hands it',
+    [{ name: 'a', route: { ...PUT, method: 'GET' }, spec: CARD, handler }],
+    [],
+    [],
+    [["a's --words is taken on the api alone", 'route it, or take the flag out']],
+  ],
+  [
+    'a flag the api alone takes on an entry the CLI alone serves',
+    [{ name: 'a', only: { side: 'cli', why: 'a file' }, spec: CARD, handler }],
+    [],
+    [],
+    [["a's --words is taken on the api alone"]],
+  ],
+  ["an entry's routes, each keeping the rules", [{ name: 'a', route: ROUTES, spec: HOLDING, handler }], [], [], []],
+  [
+    "one of an entry's routes routed on another's path",
+    [
+      { name: 'a', route: ROUTES, spec: HOLDING, handler },
+      { name: 'b', route: { method: 'DELETE', path: '/api/x', status: 200 }, handler },
+    ],
+    [],
+    [],
+    [['b is routed on DELETE /api/x, as a is']],
+  ],
+  [
+    "a key one of an entry's routes sets that no flag fills",
+    [{ name: 'a', route: ROUTES, spec: SPEC, handler }],
+    [],
+    [],
+    [["a's route sets off"]],
+  ],
+];
+
+test('a table breaks its rules, each break named with its fix, and a table that keeps them breaks none', async (t) => {
+  for (const [row, table, verbs, runners, broken] of BREAKS)
+    await t.test(row, () => {
+      const breaks = commandBreaks(table, verbs, runners);
+      assert.equal(breaks.length, broken.length, breaks.join('\n'));
+      broken.forEach((fixes, i) => names(breaks[i], ...fixes));
+    });
 });
 
-test('a table breaks its rules: a why left empty, of a route served by hand, of a side alone, of a flag one side alone takes', () => {
-  const route = { method: 'POST', path: '/api/x', status: 201, hand: 'it answers a Location' } as const;
-  assert.deepEqual(commandBreaks([{ name: 'a', route, handler }], []), []);
-  assert.deepEqual(commandBreaks([{ name: 'a', route: { ...route, hand: ' ' }, handler }], []), [
-    "a's route POST /api/x is served by hand and says no why: say why the table does not generate it",
-  ]);
-  assert.deepEqual(commandBreaks([{ name: 'a', only: { side: 'cli', why: '' }, handler }], []), [
-    'a is served on the cli alone and says no why: say why',
-  ]);
-  const put = { method: 'PUT', path: '/api/cards/:name', status: 200 } as const;
-  const said = { ...CARD, flags: [{ ...CARD.flags[0], only: { side: 'cli', why: '' } } as const, CARD.flags[1]] };
-  assert.deepEqual(commandBreaks([{ name: 'a', route: put, spec: said, handler }], []), [
-    "a's --file is taken on the cli alone and says no why: say why",
-  ]);
-});
+/** What each flag `nemia stats` takes, as its refusal of one it does not take lists them. */
+const STATS_FLAGS = ['--from', '--to', '--by', '--agent', '--step', '--factory', '--workflow', '--repo', '--line', '--json'];
 
-test('a table breaks its rules: a flag the api alone takes on an entry with no route that hands it', () => {
-  const put = { method: 'PUT', path: '/api/cards/:name', status: 200 } as const;
-  assert.deepEqual(commandBreaks([{ name: 'a', route: put, spec: CARD, handler }], []), []);
-  assert.deepEqual(commandBreaks([{ name: 'a', route: { ...put, hand: 'by hand' }, spec: CARD, handler }], []), []);
-  const broken = ["a's --words is taken on the api alone, and no route of the entry hands it: route it, or take the flag out"];
-  assert.deepEqual(
-    commandBreaks([{ name: 'a', route: { method: 'GET', path: '/api/cards/:name', status: 200 }, spec: CARD, handler }], []),
-    broken,
-  );
-  assert.deepEqual(commandBreaks([{ name: 'a', only: { side: 'cli', why: 'a file' }, spec: CARD, handler }], []), broken);
-});
+/**
+ * The commands a flag none of them takes was typed to, the words that fill their required arguments, and whether, typed where those
+ * stand, it is refused as the argument left out (the command says its refusal of one, `missing`) or as the flag (`flagFirst`).
+ */
+const STRAY: ReadonlyArray<readonly [string, readonly string[], 'missing' | 'flag']> = [
+  ['start', ['build it'], 'flag'],
+  ['inbox', [], 'flag'],
+  ['inbox add', ['an idea'], 'missing'],
+  ['inbox queue', ['card'], 'missing'],
+  ['inbox rm', ['card'], 'missing'],
+  ['factory', [], 'flag'],
+  ['factory ls', [], 'flag'],
+  ['factory add', ['f'], 'missing'],
+  ['factory attach', ['f', 'w'], 'flag'],
+  ['factory detach', ['f', 'w'], 'flag'],
+  ['factory hire', ['f', 'a'], 'missing'],
+  ['factory fire', ['f'], 'missing'],
+  ['factory rules', ['f'], 'missing'],
+  ['factory instruction', ['f'], 'missing'],
+  ['factory instruct', ['f'], 'missing'],
+  ['factory rm', ['f'], 'missing'],
+  ['agents custom', ['scribe'], 'flag'],
+  ['pause', [], 'flag'],
+  ['resume', [], 'flag'],
+];
 
-test('a table breaks its rules on each of an entry’s routes: one routed on another’s path, and a key one of them sets that no flag fills', () => {
-  const routes = [
-    { method: 'POST', path: '/api/x', status: 200 },
-    { method: 'DELETE', path: '/api/x', status: 200, sets: { off: true } },
-  ] as const;
-  assert.deepEqual(commandBreaks([{ name: 'a', route: routes, spec: HOLDING, handler }], []), []);
-  assert.deepEqual(
-    commandBreaks(
-      [
-        { name: 'a', route: routes, spec: HOLDING, handler },
-        { name: 'b', route: { method: 'DELETE', path: '/api/x', status: 200 }, handler },
-      ],
-      [],
-    ),
-    ['b is routed on DELETE /api/x, as a is: give it a path of its own'],
-  );
-  assert.deepEqual(commandBreaks([{ name: 'a', route: routes, spec: SPEC, handler }], []), [
-    "a's route sets off, which no flag of its spec fills: name a key the command reads",
-  ]);
+/**
+ * A command of the table, a command line, and what it refuses of it before anything is read: the fragments it names — the command,
+ * the flag, the value and the fix — and those it must not; null where it takes the line.
+ */
+type Refused = readonly [row: string, command: string, argv: readonly string[], said: readonly string[] | null, not?: readonly string[]];
+
+const REFUSALS: readonly Refused[] = [
+  ...[[], ['--until', 'a'], ['-x', '--off']].map((argv): Refused => [
+    `hold, the run left out: ${argv.join(' ')}`,
+    'hold',
+    argv,
+    ['nemia hold takes the run first', '--off'],
+  ]),
+  ...[['--until'], ['--until', '--off'], ['--until', '-a'], ['--until=']].map((argv): Refused => [
+    `hold, --until given no run: ${argv.join(' ')}`,
+    'hold',
+    ['r-x', ...argv],
+    ['--until takes the run to wait on'],
+  ]),
+  ['hold, neither --until nor --off', 'hold', ['r-x'], ['nemia hold needs the runs to wait on', '--off to lift a hold']],
+  ['hold, --until and --off', 'hold', ['r-x', '--until', 'a', '--off'], ['takes --until or --off, not both', 'lift the hold first']],
+  ['hold, --off with --why', 'hold', ['r-x', '--off', '--why', 'w'], ['nemia hold --off', 'takes no --why or --by']],
+  ['hold, a flag it does not take', 'hold', ['r-x', '--after', 'a'], ['nemia hold does not take --after']],
+  ['hold, --why given a flag', 'hold', ['r-x', '--until', 'a', '--why', '--x'], ['--why takes the words for why the run is held']],
+  ['hold, --by only blanks', 'hold', ['r-x', '--until', 'a', '--by', ' '], ['--by takes', 'only blanks', 'leave --by out']],
+  ['hold, --by twice', 'hold', ['r-x', '--until', 'a', '--by', 'a', '--by', 'b'], ['nemia hold takes --by once']],
+  ['hold, --until twice with --why', 'hold', ['r-x', '--until', 'a', '--until', 'b', '--why', 'w'], null],
+  ['hold, --off twice', 'hold', ['r-x', '--off', '--off'], null],
+
+  ['pause, --why given a flag', 'pause', ['--why', '--by'], ['--why takes the words for why the store is paused']],
+  ['pause, --why given a word starting -', 'pause', ['--why', '--x'], ['--why takes the words for why the store is paused']],
+  ['pause, --by given nothing', 'pause', ['--by'], ['--by takes who pauses it']],
+  ['pause, --why only blanks', 'pause', ['--why', ' \n '], ['--why takes', 'only blanks', 'leave --why out']],
+  ['pause, --by too long', 'pause', ['--by', 'b'.repeat(65)], ['--by takes at most 64', 'given 65', 'shorter']],
+  ['pause, --by twice', 'pause', ['--by', 'a', '--by', 'b'], ['nemia pause takes --by once']],
+  ['pause, a word', 'pause', ['now'], ['nemia pause does not take now']],
+  ['pause, --now given a value', 'pause', ['--now', '--now=yes'], ['nemia pause does not take --now=yes']],
+  ['pause, why and by', 'pause', ['--why', 'merging by hand', '--by=ann'], null],
+  ['pause, nothing', 'pause', [], null],
+  ['pause, now with yes', 'pause', ['--now', '--yes', '--why', 'the bill'], null],
+  ['resume, a flag', 'resume', ['--all'], ['nemia resume takes no --all', 'whoever paused it']],
+  ['resume, nothing', 'resume', [], null],
+
+  ['tick, a flag it does not take', 'tick', ['--bogus'], ['nemia tick takes no --bogus', 'nemia tick --stats']],
+  ['tick, --stats', 'tick', ['--stats'], null],
+  ...[
+    ['--stats', '20'],
+    ['20', '--stats'],
+  ].map((argv): Refused => [
+    `up, --stats with an interval: ${argv.join(' ')}`,
+    'up',
+    argv,
+    ['nemia up --stats', 'takes no 20', 'nemia up --stats alone', 'nemia up 20 to tick'],
+  ]),
+  ...['soon', '--x'].map((given): Refused => [
+    `up, an interval that is none: ${given}`,
+    'up',
+    [given],
+    ['nemia up takes', 'whole milliseconds', `"${given}" is not one`, 'from 1 to '],
+  ]),
+  ['up, two intervals', 'up', ['10', '20'], ['one pass interval at most', 'given 20', 'nemia up [ms]']],
+  ['up, an interval', 'up', ['10'], null],
+
+  ['watch, a cursor that is no number', 'watch', ['x'], ['nemia watch takes one cursor at most', '`cursor:` line']],
+  ['watch, two cursors', 'watch', ['1', '2'], ['nemia watch does not take 2']],
+  ['watch, a flag it does not take', 'watch', ['--from'], ['nemia watch does not take --from']],
+  ["watch, a typo'd short flag is no cursor", 'watch', ['-L'], ['nemia watch does not take -L']],
+  ['watch, a cursor', 'watch', ['12'], null],
+  ['watch, every flag', 'watch', ['--once', '12', '-l', 'factory=nemia', '--json'], null],
+  ['watch, a selector on no key of a feed line', 'watch', ['-l', 'message=hi'], ['"message" is no key of a feed line']],
+  ['watch, an empty selector', 'watch', ['-l', 'factory=nemia', '-l', ''], ['"" is no selector']],
+  ['watch, --cursor-file given nothing', 'watch', ['--cursor-file'], ['nemia watch --cursor-file takes the path']],
+  ['watch, --cursor-file twice', 'watch', ['--cursor-file', 'a', '--cursor-file', 'b'], ['nemia watch takes --cursor-file once']],
+  [
+    'watch, a cursor beside a cursor file',
+    'watch',
+    ['500', '--cursor-file', 'f'],
+    ['not both', 'given 500', 'drop the 500', 'drop --cursor-file', 'delete the file'],
+  ],
+
+  ...[
+    [['a', '--bad'], '--bad'],
+    [['-x'], '-x'],
+    [['a', '-x', 'b'], '-x'],
+    [['a', '--delete-branches=yes'], '--delete-branches=yes'],
+  ].map(([argv, arg]): Refused => [
+    `rm, a flag it does not take: ${(argv as string[]).join(' ')}`,
+    'rm',
+    argv as string[],
+    [`nemia rm does not take ${arg as string}.`, '--delete-branches', '--force-unmerged'],
+  ]),
+  ...[['a', '--force-unmerged'], ['--force-unmerged']].map((argv): Refused => [
+    `rm, --force-unmerged alone: ${argv.join(' ')}`,
+    'rm',
+    argv,
+    ['--force-unmerged forces --delete-branches', 'alone deletes nothing'],
+  ]),
+  ['rm, --delete-branches naming no run', 'rm', ['--delete-branches'], ['nemia rm <runId> [<runId> ...]', 'nemia ls']],
+  ['rm, nothing: its runner prints the help', 'rm', [], null],
+  ['rm, a run with both switches', 'rm', ['a', '--delete-branches', '--force-unmerged'], null],
+  ...[
+    [['--artifact'], '--artifact'],
+    [['a', '-x'], '-x'],
+    [['--yes=1'], '--yes=1'],
+  ].map(([argv, arg]): Refused => [
+    `prune, a flag it does not take: ${(argv as string[]).join(' ')}`,
+    'prune',
+    argv as string[],
+    [`nemia prune does not take ${arg as string}.`, '--unmerged, --artifacts and --yes'],
+  ]),
+  ['prune, a run with every switch', 'prune', ['a', '--unmerged', '--artifacts', '--yes'], null],
+
+  ['show, a run', 'show', ['r'], null],
+  ['show, a flag where the run stands', 'show', ['--x'], ["nemia show takes one run's id", 'not --x.']],
+  ['show, a word more', 'show', ['r', 'extra'], ["nemia show takes one run's id", 'not extra.']],
+  ['logs, a run and a step', 'logs', ['r', 's'], null],
+  ['logs, a word more', 'logs', ['r', 's', 'extra'], ['nemia logs', "one run's id and one step's name", 'not extra.']],
+  ['logs, a flag more', 'logs', ['r', 's', '--tail'], ['nemia logs', "one run's id and one step's name", 'not --tail.']],
+
+  ...[['--from'], ['--from', '--to'], ['--from', '--to', '2026-09-30'], ['--from', '']].map((argv): Refused => [
+    `stats, --from given no day: ${JSON.stringify(argv)}`,
+    'stats',
+    argv,
+    ['--from takes a day', 'YYYY-MM-DD'],
+  ]),
+  ['stats, --agent given nothing', 'stats', ['--agent='], ["--agent takes an agent's name"]],
+  ['stats, --by given a flag', 'stats', ['--by=--line'], ['--by', 'agent, step, factory, workflow, repo']],
+  ['stats, --by twice', 'stats', ['--by', 'agent', '--by', 'step'], ['nemia stats takes --by once']],
+  ['stats, --line twice', 'stats', ['--line', '--line'], null],
+  ['stats, a flag it does not take', 'stats', ['--nope'], ['nemia stats does not take --nope.', ...STATS_FLAGS]],
+  ['stats, a word', 'stats', ['stray'], ['nemia stats does not take stray.', ...STATS_FLAGS]],
+  [
+    'stats, --by a key the query does not take',
+    'stats',
+    ['--by', 'colour'],
+    ['--by', 'agent, step, factory, workflow, repo', 'not "colour"'],
+  ],
+  ['stats, --to a day that is none', 'stats', ['--to', '2026-13-40'], ['--to', 'YYYY-MM-DD', 'UTC', 'not "2026-13-40"']],
+  [
+    'stats, days out of order',
+    'stats',
+    ['--from', '2026-09-30', '--to', '2026-09-01'],
+    ['--from 2026-09-30', '--to 2026-09-01', 'earlier day first'],
+  ],
+  ['stats, a whole query', 'stats', ['--from', '2026-09-01', '--to', '2026-09-30', '--by', 'agent', '--repo', '/r'], null],
+
+  ...STRAY.flatMap(([command, required, where]): Refused[] => [
+    [`${command}, a flag it does not take after its arguments`, command, [...required, '--nope'], [`nemia ${command}`, '--nope']],
+    ...(required.length > 0
+      ? [
+          where === 'missing'
+            ? ([
+                `${command}, a flag where its arguments stand: the argument left out`,
+                command,
+                ['--nope'],
+                [`nemia ${command} takes`],
+                ['--nope'],
+              ] as const)
+            : ([`${command}, a flag where its arguments stand: the flag`, command, ['--nope'], [`nemia ${command}`, '--nope']] as const),
+        ]
+      : []),
+  ]),
+  ['inbox, a word it has no command of', 'inbox', ['frob'], ['nemia inbox does not take frob', 'nemia inbox --help']],
+  ['factory, a word it has no command of', 'factory', ['frob'], ['nemia factory does not take frob', 'nemia factory --help']],
+];
+
+test('REFUSED at shipped defaults: what each command refuses of its command line, before anything is read, Invalid with exit 2', async (t) => {
+  for (const [row, command, argv, said, not = []] of REFUSALS)
+    await t.test(row, () => {
+      const words = refusedBy(entry(command), argv);
+      if (said === null) return assert.equal(words, null);
+      names(words, ...said);
+      for (const word of not) assert.ok(!words!.includes(word), `${words} names ${word}`);
+    });
+  await t.test('watch, -l given no selector: the forms, then every key of a feed line, in order', () => {
+    const words = refusedBy(entry('watch'), ['-l', '--json']);
+    names(words, 'nemia watch -l takes', '-l <key>=<value>', '-l <key>!=<value>', '-l "<key> in (<a>,<b>)"', '-l "<key> notin (<a>,<b>)"');
+    assert.deepEqual(words!.split('The keys: ')[1].split(', '), [
+      'run',
+      'factory',
+      'workflow',
+      'step',
+      'agent',
+      'kind',
+      'reason',
+      'on',
+      'via',
+      'type',
+      'waits',
+      'source',
+    ]);
+  });
 });
 
 test('a command line refuses a flag the api alone takes, as one the command does not take, and reads one the CLI alone takes', () => {

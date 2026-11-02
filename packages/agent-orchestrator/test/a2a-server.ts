@@ -1,5 +1,5 @@
 /**
- * A remote A2A agent for `remote-step.test.ts`: the SDK's own server over HTTP, on a port the system picks, so a workflow step on
+ * A remote A2A agent for `remote.boundary.test.ts`: the SDK's own server over HTTP, on a port the system picks, so a workflow step on
  * `harness: a2a:<name>` is proven against the protocol as another party speaks it — not against the runtime's handler, and not against the
  * runtime's own test server, which this package may not import (`contract.test.ts`). Not a test file.
  *

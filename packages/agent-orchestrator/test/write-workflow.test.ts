@@ -184,114 +184,238 @@ test("written where the board lists workflows from — the store's workflows/ an
   );
 });
 
-test("REFUSED at shipped defaults, with the folder as it was: a folder outside the store's workflows/ and a repository's — or the workflows/ itself, or one below a workflow", () => {
-  const fix = (at: string) =>
-    `${at} is not a workflow in the store's workflows/ (${path.join(STORE, '<name>')}) nor in a repository's the store knows (<repo>/workflows/<name>, for a factory's repo), and writing a workflow removes the files of the steps it no longer has. Write it to a folder in one of the two, give its repository to a factory (nemia factory add <name> --repo <repo>), or pass { anywhere: true } to write ${at} all the same.`;
+/** A row of the refusals: the folder it writes, the write, and the text the refusal opens on with what else it names. */
+type Refused = { row: string; dir: () => string; write: (dir: string) => unknown; naming: string[]; asLoaded?: (dir: string) => string };
+
+/** What `loadWorkflows` refuses a copy of dev with `file` written as `text` with: a folder on disk read with the words of a write. */
+const loadRefusal = (file: string, text: string): string => {
+  const copy = devIn(`copy-${path.basename(file, '.md')}-${Math.random().toString(36).slice(2, 6)}`);
+  fs.writeFileSync(path.join(copy, file), text);
+  try {
+    loadWorkflows(copy);
+  } catch (e) {
+    return (e as Error).message;
+  }
+  return assert.fail(`${file} loaded`);
+};
+
+/** dev's steps, in a copy of its own. */
+const devSteps = (dir: string) => loadWorkflows(dir) as [Workflow, Workflow, Workflow];
+
+/** What each linked file pointed at held when it was linked, by the path it points at. */
+const linkedTo = new Map<string, string>();
+
+/** `file` of `dir` moved out of it and linked back in, where it was. */
+const linked = (dir: string, file: string): void => {
+  const to = path.join(scratch('wf-write-linked-'), file);
+  fs.renameSync(path.join(dir, file), to);
+  fs.symlinkSync(to, path.join(dir, file));
+  linkedTo.set(to, fs.readFileSync(to, 'utf8'));
+};
+
+test('REFUSED at shipped defaults, with the folder as it was, before a byte is written: a write a folder could not take', async (t) => {
   const outside = scratch('wf-write-outside-');
   fs.writeFileSync(path.join(outside, 'old.md'), 'a step nobody meant to remove\n');
-  assert.equal(
-    refusal(outside, () => writeWorkflow(outside, [step('implement')])),
-    fix(outside),
-  );
-  const notYet = path.join(outside, 'workflows', 'dev');
-  assert.equal(
-    refusal(notYet, () => writeWorkflow(notYet, [step('implement')])),
-    fix(notYet),
-    "a workflows/ no factory names is no repository's",
-  );
   const unknown = scratch('wf-write-unknown-');
   fs.mkdirSync(path.join(unknown, '.git'));
-  const checkout = path.join(unknown, 'workflows', 'dev');
-  assert.equal(
-    refusal(checkout, () => writeWorkflow(checkout, [step('implement')])),
-    fix(checkout),
-    'a .git no factory names is not known by it',
-  );
-  assert.equal(
-    refusal(STORE, () => writeWorkflow(STORE, [step('implement')])),
-    fix(STORE),
-    "the store's workflows/ holds workflows, and is not one",
-  );
-  const below = path.join(devIn('below'), 'ui');
-  assert.equal(
-    refusal(below, () => writeWorkflow(below, [step('implement')])),
-    fix(below),
-  );
-  assert.equal(
-    refusal(outside, () => writeWorkflow(path.relative(process.cwd(), outside), [step('implement')])),
-    fix(outside),
-    'a relative path, resolved',
-  );
-});
-
-test("REFUSED, with the folder as it was, in the parser's words and naming the step: a key a step does not have, a loop that is not a back edge", () => {
-  const dir = devIn('refused');
-  const [implement, review] = loadWorkflows(dir) as [Workflow, Workflow];
-  const loadRefusal = (file: string, text: string): string => {
-    const copy = devIn(`copy-${path.basename(file, '.md')}-${Math.random().toString(36).slice(2, 6)}`);
-    fs.writeFileSync(path.join(copy, file), text);
-    try {
-      loadWorkflows(copy);
-    } catch (e) {
-      return (e as Error).message;
-    }
-    return assert.fail(`${file} loaded`);
-  };
-
-  const typo = refusal(dir, () => writeWorkflow(dir, [implement, { ...review, afer: ['implement'] } as StepDraft]));
-  assert.match(typo, /^review: `afer` is not a key a step has\. A step's keys are: after, resume, /);
-  assert.equal(typo, loadRefusal('review.md', '---\nafer: implement\n---\nreview it\n'), 'the sentence a folder on disk is refused with');
-
-  const docs = step('docs', { after: ['implement'] });
-  const unwaited = refusal(dir, () => writeWorkflow(dir, [implement, docs, { ...review, after: ['implement'], loop: 'docs' }]));
-  assert.ok(unwaited.startsWith('review: `loop: docs`, but review does not wait on docs'), unwaited);
-  assert.match(
-    refusal(dir, () => writeWorkflow(dir, [implement, { ...review, loop: 'review' }])),
-    /^review: `loop: review` names this step\./,
-  );
-  assert.match(
-    refusal(dir, () => writeWorkflow(dir, [implement, { ...review, rounds: 0 }])),
-    /^review: `rounds: 0` is not a count\./,
-  );
-});
-
-test('REFUSED, with the folder as it was: an `output:` naming a schema that is not beside the step — not there, or outside the folder though it is there', () => {
-  const dir = devIn('output');
-  const [implement, review] = loadWorkflows(dir) as [Workflow, Workflow];
-  const absent = refusal(dir, () => writeWorkflow(dir, [implement, { ...review, output: { file: 'reviews.schema.json' } }]));
-  assert.ok(absent.startsWith('review: `output: reviews.schema.json` is not there.'), absent);
-  assert.ok(absent.includes('write it beside review.md'), absent);
-  const theirs = path.join(devIn('theirs'), 'review.schema.json');
-  const up = path.relative(dir, theirs);
-  const elsewhere = refusal(dir, () => writeWorkflow(dir, [implement, { ...review, output: { file: up } }]));
-  assert.ok(
-    elsewhere.startsWith('review: `output: ' + up + '` names a file outside the workflow folder.'),
-    "a schema of the step's own beside another workflow",
-  );
-  assert.ok(elsewhere.includes('write it beside review.md'), elsewhere);
-  assert.ok(elsewhere.includes('`output: review.schema.json`'), elsewhere);
-  assert.ok(elsewhere.includes('or delete the line'), elsewhere);
-  const absolute = refusal(dir, () => writeWorkflow(dir, [implement, { ...review, output: { file: theirs } }]));
-  assert.ok(absolute.startsWith('review: `output: ' + theirs + '` names a file outside the workflow folder'), absolute);
-  const loose = { type: 'object', properties: { x: { type: 'string' } }, required: [], additionalProperties: false } as const;
-  const written = writeWorkflow(dir, [implement, { ...review, output: { file: 'review.schema.json', schema: loose } } as StepDraft]);
-  assert.deepEqual(
-    written.steps.find((s) => s.name === 'review')!.output,
-    review.output,
-    "a schema given with the step is not what is read: the folder's file is",
-  );
-});
-
-test('REFUSED, with the folder as it was: a folder that is a file', () => {
-  const dir = devIn('names');
-  const [implement] = loadWorkflows(dir) as [Workflow, Workflow];
+  const nowhere = [
+    "is not a workflow in the store's workflows/",
+    '<repo>/workflows/<name>',
+    'nemia factory add <name> --repo <repo>',
+    '{ anywhere: true }',
+  ];
   const file = path.join(STORE, 'a-file');
   fs.writeFileSync(file, 'not a folder\n');
-  assert.equal(
-    refusal(STORE, () => writeWorkflow(file, [implement])),
-    `${file} is a file, and a workflow is a folder of steps. Name a folder — one that is not there yet is made.`,
+  const theirs = path.join(devIn('theirs'), 'review.schema.json');
+  const tally = 'review: `tally: findings, nope` in review.md';
+  const rows: Refused[] = [
+    {
+      row: 'a folder outside both',
+      dir: () => outside,
+      write: (dir) => writeWorkflow(dir, [step('implement')]),
+      naming: [outside, ...nowhere],
+    },
+    {
+      row: "a workflows/ no factory names is no repository's",
+      dir: () => path.join(outside, 'workflows', 'dev'),
+      write: (dir) => writeWorkflow(dir, [step('implement')]),
+      naming: [path.join(outside, 'workflows', 'dev'), ...nowhere],
+    },
+    {
+      row: 'a .git no factory names is not known by it',
+      dir: () => path.join(unknown, 'workflows', 'dev'),
+      write: (dir) => writeWorkflow(dir, [step('implement')]),
+      naming: [path.join(unknown, 'workflows', 'dev'), ...nowhere],
+    },
+    {
+      row: "the store's workflows/ itself",
+      dir: () => STORE,
+      write: (dir) => writeWorkflow(dir, [step('implement')]),
+      naming: [STORE, ...nowhere],
+    },
+    {
+      row: 'a folder below a workflow',
+      dir: () => path.join(devIn('below'), 'ui'),
+      write: (dir) => writeWorkflow(dir, [step('implement')]),
+      naming: [path.join(STORE, 'below', 'ui'), ...nowhere],
+    },
+    {
+      row: 'a relative path, resolved',
+      dir: () => outside,
+      write: () => writeWorkflow(path.relative(process.cwd(), outside), [step('implement')]),
+      naming: [outside, ...nowhere],
+    },
+    {
+      row: 'a key a step does not have, in the words of a folder on disk',
+      dir: () => devIn('refused-key'),
+      write: (dir) => writeWorkflow(dir, [devSteps(dir)[0], { ...devSteps(dir)[1], afer: ['implement'] } as StepDraft]),
+      naming: ['review: ', '`afer` is not a key a step has', 'after, resume'],
+      asLoaded: () => loadRefusal('review.md', '---\nafer: implement\n---\nreview it\n'),
+    },
+    {
+      row: 'a loop to a step it does not wait on',
+      dir: () => devIn('refused-unwaited'),
+      write: (dir) => {
+        const [implement, review] = devSteps(dir);
+        return writeWorkflow(dir, [implement, step('docs', { after: ['implement'] }), { ...review, after: ['implement'], loop: 'docs' }]);
+      },
+      naming: ['review: ', '`loop: docs`', 'does not wait on docs'],
+    },
+    {
+      row: 'a loop to itself',
+      dir: () => devIn('refused-self'),
+      write: (dir) => writeWorkflow(dir, [devSteps(dir)[0], { ...devSteps(dir)[1], loop: 'review' }]),
+      naming: ['review: ', '`loop: review` names this step'],
+    },
+    {
+      row: 'rounds that are no count',
+      dir: () => devIn('refused-rounds'),
+      write: (dir) => writeWorkflow(dir, [devSteps(dir)[0], { ...devSteps(dir)[1], rounds: 0 }]),
+      naming: ['review: ', '`rounds: 0` is not a count'],
+    },
+    {
+      row: 'an output schema not there',
+      dir: () => devIn('output-absent'),
+      write: (dir) => writeWorkflow(dir, [devSteps(dir)[0], { ...devSteps(dir)[1], output: { file: 'reviews.schema.json' } }]),
+      naming: ['review: ', '`output: reviews.schema.json` is not there', 'write it beside review.md'],
+    },
+    {
+      row: 'an output schema beside another workflow, by a path that climbs',
+      dir: () => devIn('output-up'),
+      write: (dir) => writeWorkflow(dir, [devSteps(dir)[0], { ...devSteps(dir)[1], output: { file: path.relative(dir, theirs) } }]),
+      naming: [
+        'review: ',
+        'names a file outside the workflow folder',
+        'write it beside review.md',
+        '`output: review.schema.json`',
+        'or delete the line',
+      ],
+    },
+    {
+      row: 'an output schema by an absolute path',
+      dir: () => devIn('output-absolute'),
+      write: (dir) => writeWorkflow(dir, [devSteps(dir)[0], { ...devSteps(dir)[1], output: { file: theirs } }]),
+      naming: [`review: \`output: ${theirs}\``, 'names a file outside the workflow folder'],
+    },
+    {
+      row: 'a folder that is a file',
+      dir: () => STORE,
+      write: () => writeWorkflow(file, [step('implement')]),
+      naming: [file, 'is a file', 'Name a folder'],
+    },
+    {
+      row: "a step's file that is a link, rendered through it",
+      dir: () => {
+        const dir = devIn('linked-render');
+        linked(dir, 'review.md');
+        return dir;
+      },
+      write: (dir) => {
+        const [implement, review, ship] = devSteps(dir);
+        return writeWorkflow(dir, [implement, { ...review, rounds: 2 }, ship]);
+      },
+      naming: [path.join(STORE, 'linked-render', 'review.md'), 'is a link', 'rm <file> && cp <target> <file>'],
+    },
+    {
+      row: "a step's file that is a link, its step gone",
+      dir: () => {
+        const dir = devIn('linked-gone');
+        linked(dir, 'review.md');
+        return dir;
+      },
+      write: (dir) => writeWorkflow(dir, [devSteps(dir)[0]]),
+      naming: [path.join(STORE, 'linked-gone', 'review.md'), 'is a link'],
+    },
+    {
+      row: 'a README that is a link, when a README is given',
+      dir: () => {
+        const dir = devIn('linked-readme');
+        linked(dir, 'README.md');
+        return dir;
+      },
+      write: (dir) => writeWorkflow(dir, devSteps(dir), '# theirs\n'),
+      naming: [path.join(STORE, 'linked-readme', 'README.md'), 'is a link'],
+    },
+    {
+      row: 'a tally the closeout cannot hold, in the words of a folder on disk',
+      dir: () => devIn('tallied'),
+      write: (dir) =>
+        writeWorkflow(
+          dir,
+          devSteps(dir).map((s) => (s.name === 'review' ? { ...s, tally: ['findings', 'nope'] } : s)),
+        ),
+      naming: [tally, '`output: review.schema.json` declares no field `nope`', 'findings, again'],
+      asLoaded: (dir) => {
+        const review = path.join(dir, 'review.md');
+        const original = fs.readFileSync(review, 'utf8');
+        fs.writeFileSync(review, original.replace(/^budget: 20$/m, 'budget: 20\ntally: findings, nope'));
+        try {
+          loadWorkflows(dir);
+        } catch (e) {
+          return (e as Error).message;
+        } finally {
+          fs.writeFileSync(review, original);
+        }
+        return assert.fail('a tally the closeout cannot hold loaded');
+      },
+    },
+  ];
+  for (const { row, dir, write, naming, asLoaded } of rows)
+    await t.test(row, () => {
+      const at = dir();
+      const said = refusal(at, () => write(at));
+      const [opens, ...named] = naming;
+      assert.ok(said.startsWith(opens), `opens on ${opens}: ${said}`);
+      for (const name of named) assert.ok(said.includes(name), `names ${name}: ${said}`);
+      if (asLoaded) assert.equal(said, asLoaded(at), 'the words a folder on disk is refused with');
+    });
+  assert.equal(fs.readFileSync(file, 'utf8'), 'not a folder\n', 'the file a folder was asked of is untouched');
+  for (const [to, was] of linkedTo) assert.equal(fs.readFileSync(to, 'utf8'), was, `${to}, what a link points at, is untouched`);
+});
+
+test("a schema given with a step is not what is written or read: the folder's file is", () => {
+  const dir = devIn('output');
+  const [implement, review] = devSteps(dir);
+  const loose = { type: 'object', properties: { x: { type: 'string' } }, required: [], additionalProperties: false } as const;
+  const written = writeWorkflow(dir, [implement, { ...review, output: { file: 'review.schema.json', schema: loose } } as StepDraft]);
+  assert.deepEqual(written.steps.find((s) => s.name === 'review')?.output, review.output);
+});
+
+test('a link a write does not touch is no refusal: with no README given, a linked README is left as it is', () => {
+  const dir = devIn('linked-kept');
+  const steps = devSteps(dir);
+  linked(dir, 'README.md');
+  assert.deepEqual(writeWorkflow(dir, steps).kept, ['implement.md', 'review.md', 'ship.md']);
+});
+
+test('a tally the closeout of the step can hold is written, and reads back', () => {
+  const dir = devIn('tally-kept');
+  writeWorkflow(
+    dir,
+    devSteps(dir).map((s) => (s.name === 'review' ? { ...s, tally: ['findings'] } : s)),
   );
-  assert.equal(fs.readFileSync(file, 'utf8'), 'not a folder\n');
+  assert.match(fs.readFileSync(path.join(dir, 'review.md'), 'utf8'), /^tally: findings$/m);
+  assert.deepEqual(loadWorkflows(dir).find((s) => s.name === 'review')?.tally, ['findings']);
 });
 
 /**
@@ -360,72 +484,6 @@ test(
     );
   },
 );
-
-test("REFUSED at shipped defaults, with the folder as it was: a step's file that is a link, and a README that is one when a README is given", () => {
-  const dir = devIn('linked');
-  const [implement, review, ship] = loadWorkflows(dir) as [Workflow, Workflow, Workflow];
-  const away = scratch('wf-write-linked-');
-  const link = (file: string): string => {
-    const to = path.join(away, file);
-    fs.renameSync(path.join(dir, file), to);
-    fs.symlinkSync(to, path.join(dir, file));
-    return to;
-  };
-  const fix = (file: string) =>
-    `${path.join(dir, file)} is a link, and a workflow's files are its own. Writing this workflow would follow it and write into whatever it points at, outside the folder, and would not remove it when its step goes. Replace the link with a file of its own — remove the link and copy what it pointed at into its place, rm <file> && cp <target> <file> — or take it out of the folder.`;
-
-  const was = fs.readFileSync(link('review.md'), 'utf8');
-  assert.equal(
-    refusal(dir, () => writeWorkflow(dir, [implement, { ...review, rounds: 2 }, ship])),
-    fix('review.md'),
-    'a step the write would render through a link',
-  );
-  assert.equal(
-    refusal(dir, () => writeWorkflow(dir, [implement])),
-    fix('review.md'),
-    'and a step gone, whose link the write would not remove',
-  );
-  assert.equal(fs.readFileSync(path.join(away, 'review.md'), 'utf8'), was, 'what it points at is untouched');
-
-  fs.rmSync(path.join(dir, 'review.md'));
-  fs.renameSync(path.join(away, 'review.md'), path.join(dir, 'review.md'));
-  const readme = fs.readFileSync(link('README.md'), 'utf8');
-  assert.equal(
-    refusal(dir, () => writeWorkflow(dir, [implement, review, ship], '# theirs\n')),
-    fix('README.md'),
-    'a linked README is refused when a README is given',
-  );
-  assert.equal(fs.readFileSync(path.join(away, 'README.md'), 'utf8'), readme, 'and what it points at is untouched');
-  assert.deepEqual(
-    writeWorkflow(dir, [implement, review, ship]).kept,
-    ['implement.md', 'review.md', 'ship.md'],
-    'with no README given, the link is nothing the write touches',
-  );
-});
-
-test('REFUSED at load and at write, in the same words: a `tally:` the closeout of the step cannot hold, naming its file, the schema and the field', () => {
-  const dir = devIn('tallied');
-  const review = path.join(dir, 'review.md');
-  const original = fs.readFileSync(review, 'utf8');
-  const steps = loadWorkflows(dir);
-  fs.writeFileSync(review, original.replace(/^budget: 20$/m, 'budget: 20\ntally: findings, nope'));
-  assert.match(fs.readFileSync(review, 'utf8'), /^tally: findings, nope$/m, 'the line is really in the file');
-  const said =
-    'review: `tally: findings, nope` in review.md: `output: review.schema.json` declares no field `nope`; it declares findings, again.';
-  assert.throws(
-    () => loadWorkflows(dir),
-    (e: unknown) => e instanceof WorkflowError && e.message.startsWith(said),
-  );
-  fs.writeFileSync(review, original);
-
-  const drafted = steps.map((s) => (s.name === 'review' ? { ...s, tally: ['findings', 'nope'] } : s));
-  assert.ok(refusal(dir, () => writeWorkflow(dir, drafted)).startsWith(said));
-
-  const kept = steps.map((s) => (s.name === 'review' ? { ...s, tally: ['findings'] } : s));
-  writeWorkflow(dir, kept);
-  assert.match(fs.readFileSync(review, 'utf8'), /^tally: findings$/m);
-  assert.deepEqual(loadWorkflows(dir).find((s) => s.name === 'review')?.tally, ['findings'], 'and a tally it can hold reads back');
-});
 
 test('a line break in a value is written as a literal block, and read back as the one value, never as a key of its own', () => {
   const dir = devIn('names');

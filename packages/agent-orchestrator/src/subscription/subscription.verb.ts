@@ -1,7 +1,8 @@
 /**
  * `nemia subscribe` and `nemia unsubscribe`: a long-lived task given a subscription to the feed, and one taken away, on
  * `POST /api/subscriptions/:name` and `DELETE /api/subscriptions/:name` too. What a subscription is told, and when, is the daemon's
- * deliverer (`deliver.verb.ts`); its file is `subscription.store.ts`'s.
+ * deliverer (`deliver.verb.ts`); its file is put and dropped through the Subscription door (`SubscriptionDoor`), at the store's root the
+ * handler is given (`rooted`).
  *
  * A controller: it reads the task off the engine (`EngineService`, `asked`) before it puts the subscription, and the feed's size, where
  * the subscription's news starts.
@@ -9,10 +10,12 @@
 import { Effect } from 'effect';
 import type { Args } from '../command/command.ts';
 import type { Command } from '../command/entry.verb.ts';
-import { feedSize } from '../feed/feed.store.ts';
+import { FeedDoor } from '../feed/feed.store.ts';
 import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
-import { EngineService, asked, tried, type TaskView } from '../runtime-client.ts';
-import { dropSubscription, putSubscription } from './subscription.store.ts';
+import { EngineService, asked, type TaskView } from '../runtime-client.ts';
+import { SubscriptionDoor } from './subscription.store.ts';
+import { SubscriptionName } from '../feed/feed.model.ts';
+import { rooted } from '../wiring/wire.verb.ts';
 import { NEMIA_SUBSCRIPTION } from '../nemia/nemia.ts';
 import { LEVELS, type Level } from '../level/level.ts';
 import { SELECTOR_FORM } from '../watch/selector.ts';
@@ -90,10 +93,10 @@ const subscribe = Effect.fn('subscribe')(function* (args: Args) {
     task,
     selectors,
     digestEvery,
-    from: feedSize(),
+    from: (yield* (yield* FeedDoor).lines.end())?.cursor ?? 0,
     ...(atLeast === undefined ? {} : { scope: { atLeast: atLeast as Level } }),
   };
-  yield* tried(() => putSubscription(name, subscription));
+  yield* (yield* SubscriptionDoor).subscriptions.put(SubscriptionName.read(name), subscription);
   return { name, subscription } satisfies Subscribed;
 });
 
@@ -134,7 +137,7 @@ export const SUBSCRIBE: Command<Subscribed> = {
   writes: true,
   class: 'act',
   route: { method: 'POST', path: '/api/subscriptions/:name', status: 201 },
-  handler: subscribe,
+  handler: (args, _env, home) => rooted(home, 'subscribe', subscribe(args)),
   note: ({ subscription: s }) => s.selectors.flatMap(formerHints).map((hint) => `nemia subscribe: ${hint}`),
   print: ({ name, subscription: s }) => [
     `subscribed ${name}: ${s.task} is told at once of a line taken by ${s.selectors.join(' or ')}, and of the rest in a digest every ` +
@@ -143,7 +146,7 @@ export const SUBSCRIBE: Command<Subscribed> = {
 };
 
 /**
- * `nemia unsubscribe`: a subscription taken away, its file removed alone (`dropSubscription`); the deliverer's next read of the
+ * `nemia unsubscribe`: a subscription taken away, its file removed alone (`subscriptions.drop`); the deliverer's next read of the
  * subscriptions stops it and removes its `<name>.state.json` (`reconcile` in `deliver.verb.ts`).
  */
 export const UNSUBSCRIBE: Command<{ name: string }> = {
@@ -159,12 +162,17 @@ export const UNSUBSCRIBE: Command<{ name: string }> = {
   writes: true,
   class: 'act',
   route: { method: 'DELETE', path: '/api/subscriptions/:name', status: 200 },
-  handler: (args) =>
-    tried(() => {
-      const reserved = reservedRefusal(String(args.name));
-      if (reserved) throw reserved;
-      dropSubscription(String(args.name));
-      return { name: String(args.name) };
-    }),
+  handler: (args, _env, home) =>
+    rooted(
+      home,
+      'unsubscribe',
+      Effect.gen(function* () {
+        const name = String(args.name);
+        const reserved = reservedRefusal(name);
+        if (reserved) return yield* Effect.fail(reserved);
+        yield* (yield* SubscriptionDoor).subscriptions.drop(SubscriptionName.read(name));
+        return { name };
+      }),
+    ),
   print: ({ name }) => [`unsubscribed ${name}: its task is told nothing more of the feed.`],
 };

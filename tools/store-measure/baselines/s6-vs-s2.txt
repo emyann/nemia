@@ -1,0 +1,42 @@
+# S6 (after the Subscription, Ledger and Feed doors, commit 58504e7c9) against S2 (after the Run door, 8462ca324)
+# node --expose-gc tools/store-measure/report.ts --repeat 5 --json tools/store-measure/baselines/s6.json, on a copy of the store, never the live one
+# The store grew from 100 runs and 7234 tasks at s2 to 118 runs and 7386 tasks, 37461 feed lines (36680 at s2),
+# and the copy from 2255.6 MB to 2547.1 MB: the two compare different stores on a machine shared with other runs.
+# So the doors are judged by a control, not by s2: the base before S6 (0528a0b82, slice 3 landed) measured on the same store a minute
+# before S6, load 4.23 then 3.46. Two other runs of S6, at loads 5.59 and 3.45 with the load rising, read every row
+# ×1.2 to ×2.0 of s2, run list and stats included, which no door of S6 reads: the machine's, not the doors', and discarded.
+# No threshold is fixed: the owner judges per record kind whether SQLite earns its place (decision 13).
+
+## S6 against the base before it, the same store, a minute apart (the control)
+
+| read | cold ms | baseline | ratio | warm ms | baseline | ratio |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| tickPass | 835.3 | 823.7 | ×1.01 | 127.5 | 126.7 | ×1.01 |
+| runList | 1548.2 | 1584.5 | ×0.98 | 51.7 | 54.7 | ×0.95 |
+| stats | 5441.3 | 5300.7 | ×1.03 | 207.1 | 209.3 | ×0.99 |
+| finishedRun | 951.1 | 954.0 | ×1.00 | 117.4 | 128.4 | ×0.91 |
+| openRun | 953.3 | 960.4 | ×0.99 | 129.9 | 124.8 | ×1.04 |
+| feedFromCursor | 22.2 | 21.9 | ×1.01 | 21.4 | 20.9 | ×1.02 |
+
+## S6 against s2 (different stores: 118 runs now, 100 then)
+
+| read | cold ms | baseline | ratio | warm ms | baseline | ratio |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| tickPass | 835.3 | 665.0 | ×1.26 | 127.5 | 108.2 | ×1.18 |
+| runList | 1548.2 | 1334.0 | ×1.16 | 51.7 | 41.4 | ×1.25 |
+| stats | 5441.3 | 4116.7 | ×1.32 | 207.1 | 148.6 | ×1.39 |
+| finishedRun | 951.1 | 864.1 | ×1.10 | 117.4 | 106.4 | ×1.10 |
+| openRun | 953.3 | 861.4 | ×1.11 | 129.9 | 111.9 | ×1.16 |
+| feedFromCursor | 22.2 | 21.7 | ×1.02 | 21.4 | 19.2 | ×1.11 |
+
+## Per record kind, for the owner
+
+- Subscription (its file and its delivery): no row of the measure reads it; the deliverer reads it per subscription per pass, a few
+  small JSON files, now decoded by the model's `Delivery` on write only.
+- Revision ledger: read inside a tick pass (the pins), tickPass ×1.01 cold and ×1.01 warm of the control: the append's
+  `Revision` check costs nothing a pass shows. One small file per kind and name.
+- Feed: feedFromCursor ×1.01 cold and ×1.02 warm of the control, 22.2 ms for 1000 lines from a cursor; an append now decodes
+  each line through `FeedLine` before it writes. The feed is one append-only file read from a byte offset.
+- Runs (run list, stats, a run's page): not these doors'; they stay what S2 measured on a bigger store, and stats remains the costliest
+  read (~5.4 s cold).
+

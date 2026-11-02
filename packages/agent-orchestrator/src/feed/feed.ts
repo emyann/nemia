@@ -244,10 +244,11 @@ export type FeedFold = { said: Map<string, FeedSaid>; shots: Map<string, number>
 export const freshFold = (): FeedFold => ({ said: new Map(), shots: new Map() });
 
 /**
- * A process's fold of the feed, as far as it has read it: the byte it read to (`cursor`), and the file it read (`ino`), so a feed
- * replaced or truncated under it is read again from the start instead of compared against a fold of another file.
+ * A process's fold of the feed, as far as it has read it: the byte it read to (`cursor`), and the generation of the feed it read
+ * (`generation`, the Feed door's end: the file's inode), so a feed replaced or truncated under it is read again from the start instead of
+ * compared against a fold of another file.
  */
-export type FeedMemo = { cursor: number; ino?: number; fold: FeedFold };
+export type FeedMemo = { cursor: number; generation?: number; fold: FeedFold };
 
 /** A fold of nothing: what a process that has read no feed starts from. */
 export const freshMemo = (): FeedMemo => ({ cursor: 0, fold: freshFold() });

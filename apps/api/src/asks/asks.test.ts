@@ -17,13 +17,13 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import type { RunDetail } from '../detail/detail.ts';
 import { askFile, list, runStore, type RunSummary } from 'agent-orchestrator';
 import { Effect } from 'effect';
 import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from 'agent-orchestrator/testing';
 import { appOver, beforeEachTest, eachTest, engineFor, runOver } from '../../test/placed.ts';
 import { story } from '../../test/checkpoints.ts';
+import { objectOf, stepOf, triesOf } from '../../test/run-reads.ts';
 
 const stand = eachTest(testPlace);
 const standIn = eachTest(testEngine);
@@ -146,7 +146,8 @@ const nothingWritten = (why: string) => {
   assert.equal(fs.readFileSync(recordFile, 'utf8'), record, `the run's record untouched: ${why}`);
 };
 
-const detail = async (id = R) => (await app().request(`/api/runs/${id}`)).json() as Promise<RunDetail>;
+/** The run object of `id` (`GET /api/runs/:id`). */
+const object = async (id = R) => objectOf(app(), id);
 const summary = async (id = R) => ((await (await app().request('/api/runs')).json()) as RunSummary[]).find((r) => r.id === id)!;
 
 /** The error a refused ask answered with, its status `status`. */
@@ -236,7 +237,9 @@ test("a blocked session's last line is what it said last — its last `text` or 
   standIn().plantTranscript('t-implement', 1, [event('a-1', 2, 'assistant', 'text', 'Which database?')]);
   const WAITED = ['held', 'idle', 'silent', 'implement'];
   const lastLines = async () =>
-    Object.fromEntries((await detail()).steps.filter((step) => WAITED.includes(step.name)).map((step) => [step.name, step.lastLine]));
+    Object.fromEntries(
+      (await object()).status.steps.filter((step) => WAITED.includes(step.name)).map((step) => [step.name, step.lastLine]),
+    );
   assert.deepEqual(
     await lastLines(),
     { held: login, idle: 'Session idle', silent: null, implement: null },
@@ -284,8 +287,8 @@ test('a person answers a blocked step, rechecks a refused check and continues th
       assert.equal(fs.readFileSync(recordFile, 'utf8'), record, "the api wrote nothing of the run's record");
 
       const words = await runWith(engine(), list(engine(), runStore.runs.read(R)));
-      const run = await detail();
-      const implement = run.steps.find((s) => s.name === 'implement')!;
+      const run = await object();
+      const implement = stepOf(run, 'implement');
       assert.equal(implement.note, 'try 2 asked (--continue, with your answer) — the next tick files it');
       assert.equal(implement.note, words.steps.find((s) => s.name === 'implement')?.note, 'as `nemia ls` has it: a note beside the step');
       assert.deepEqual(implement.asked, {
@@ -296,7 +299,7 @@ test('a person answers a blocked step, rechecks a refused check and continues th
         stopFirst: false,
       });
       assert.equal(implement.needs, blocked.needs, "the question is still the closeout's");
-      assert.deepEqual(run.waitingOnYou, ['theme'], 'and nobody waited on for implement');
+      assert.deepEqual(run.status.waitingOnYou, ['theme'], 'and nobody waited on for implement');
       assert.deepEqual((await summary()).waitingOnYou, words.waitingOnYou);
 
       const again = await ask('implement', { mode: 'fresh', message: 'MySQL.' });
@@ -312,7 +315,7 @@ test('a person answers a blocked step, rechecks a refused check and continues th
         { try: 2, file: askFile(R, 'theme', 2), stopFirst: false },
         'a refused check, run again: no message, and no session',
       );
-      assert.deepEqual((await detail()).steps.find((s) => s.name === 'theme')!.asked, {
+      assert.deepEqual(stepOf(await object(), 'theme').asked, {
         try: 2,
         mode: 'recheck',
         model: null,
@@ -359,8 +362,8 @@ test('a person answers a blocked step, rechecks a refused check and continues th
 
       const words = await runWith(engine(), list(engine(), runStore.runs.read(R)));
       const noteOf = (name: string) => words.steps.find((s) => s.name === name)?.note;
-      const run = await detail();
-      const held = run.steps.find((s) => s.name === 'held')!;
+      const run = await object();
+      const held = stepOf(run, 'held');
       assert.equal(held.note, 'try 2 asked (--continue) — stopping its blocked session, then the tick files it');
       assert.equal(
         held.note,
@@ -373,7 +376,7 @@ test('a person answers a blocked step, rechecks a refused check and continues th
         ['needs-human', 'AwaitingAnswer', 'session'],
         'still blocked: no tick has stopped it',
       );
-      const idle = run.steps.find((s) => s.name === 'idle')!;
+      const idle = stepOf(run, 'idle');
       assert.equal(idle.note, 'try 2 asked (--fresh, with your answer) — stopping its blocked session, then the tick files it');
       assert.equal(idle.note, noteOf('idle'));
       assert.deepEqual(idle.asked, { try: 2, mode: 'fresh', model: null, message: 'Sign in again first.', stopFirst: true });
@@ -383,7 +386,7 @@ test('a person answers a blocked step, rechecks a refused check and continues th
         [noteOf('held'), noteOf('idle')],
         'the list says it too',
       );
-      assert.deepEqual(run.waitingOnYou, words.waitingOnYou);
+      assert.deepEqual(run.status.waitingOnYou, words.waitingOnYou);
 
       const again = await ask('held', { mode: 'continue' });
       assert.equal(again.status, 409, "asked once: a second Continue is refused in the package's words");
@@ -431,10 +434,11 @@ test('a person answers a blocked step, rechecks a refused check and continues th
       );
       write(path.join(root, 'runs', `${A}.asks`, 'done', 'retry-plan-2'), JSON.stringify({ mode: 'fresh', at: at(30) }));
 
-      const run = await detail(A);
-      const [implement, plan] = run.steps;
+      const run = await object(A);
+      const implement = stepOf(run, 'implement');
+      const [implementTries, planTries] = [await triesOf(app(), A, 'implement'), await triesOf(app(), A, 'plan')];
       assert.deepEqual(
-        implement.tries.map((t: { try: number; answer: string | null; note: string | null }) => [t.try, t.answer, t.note]),
+        implementTries.map((t: { try: number; answer: string | null; note: string | null }) => [t.try, t.answer, t.note]),
         [
           [1, null, null],
           [2, 'Postgres.', 'try 2, continued on your word, answered'],
@@ -442,18 +446,18 @@ test('a person answers a blocked step, rechecks a refused check and continues th
         'the answer read off the ask as the tick leaves it once it filed the try: consumed, into done/',
       );
       assert.deepEqual(
-        plan.tries.map((t: { try: number; answer: string | null; note: string | null }) => [t.try, t.answer, t.note]),
+        planTries.map((t: { try: number; answer: string | null; note: string | null }) => [t.try, t.answer, t.note]),
         [
           [1, null, null],
           [2, null, 'try 2, fresh, on your word'],
         ],
       );
-      assert.equal(implement.tries[0].closeout!.needs, blocked.needs, "the question the answer answers is on the try before's closeout");
+      assert.equal(implementTries[0].closeout!.needs, blocked.needs, "the question the answer answers is on the try before's closeout");
       assert.equal(implement.needs, null, 'the current try signed off done');
 
       const words = await runWith(engine(), list(engine(), runStore.runs.read(A)));
       for (const [where, said] of [
-        ['detail', run],
+        ['object', run.status],
         ['list', await summary(A)],
       ] as const) {
         assert.deepEqual(

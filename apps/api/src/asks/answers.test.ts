@@ -18,7 +18,7 @@ import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from 'agent-orchestrator/testing';
 import { appOver, beforeEachTest, eachTest, engineFor } from '../../test/placed.ts';
 import { story } from '../../test/checkpoints.ts';
-import type { RunDetail } from '../detail/detail.ts';
+import { closeoutOf, objectOf, stepOf } from '../../test/run-reads.ts';
 import { askFile } from 'agent-orchestrator';
 import { answerText, type Question } from 'agent-orchestrator/run';
 import { parseWorkflow } from 'agent-orchestrator/workflow';
@@ -176,18 +176,18 @@ test('a person reads the questions a closeout asks on the run’s detail and ans
   await s.test(
     "a closeout's questions are on the run's detail, blocked or done; a field that asks in free text, or does not decode, has none",
     async () => {
-      const run = (await (await app().request(`/api/runs/${R}`)).json()) as RunDetail;
-      const questions = (name: string) => run.steps.find((s) => s.name === name)!.closeout!.questions;
-      assert.deepEqual(questions('design'), [{ field: 'open', questions: [cut, where] }]);
-      assert.deepEqual(questions('spec'), [{ field: 'open', questions: [cut] }], 'a done step’s questions, drawn read-only');
-      assert.deepEqual(questions('plain'), []);
-      assert.deepEqual(questions('broken'), [], 'drawn as any other field');
+      const run = await objectOf(app(), R);
+      const questions = async (name: string) => (await closeoutOf(app(), R, name))!.closeout!.questions;
+      assert.deepEqual(await questions('design'), [{ field: 'open', questions: [cut, where] }]);
+      assert.deepEqual(await questions('spec'), [{ field: 'open', questions: [cut] }], 'a done step’s questions, drawn read-only');
+      assert.deepEqual(await questions('plain'), []);
+      assert.deepEqual(await questions('broken'), [], 'drawn as any other field');
       assert.deepEqual(
-        questions('twice'),
+        await questions('twice'),
         [],
         'two fields asking one title: an answer names its question by title alone, so it is answered in words',
       );
-      assert.equal(run.steps.find((s) => s.name === 'design')!.needs, 'Two questions.', '`needs` stays the one line it was');
+      assert.equal(stepOf(run, 'design').needs, 'Two questions.', '`needs` stays the one line it was');
     },
   );
 

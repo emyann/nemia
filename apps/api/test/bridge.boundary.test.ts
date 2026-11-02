@@ -13,7 +13,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from './scratch.ts';
-import type { RunDetail } from '../src/detail/detail.ts';
+import type { RunAnswer } from '../src/runs/runs.ts';
+import { objectOf } from './run-reads.ts';
 import { app } from '../src/app.ts';
 import { Effect } from 'effect';
 import { engine } from 'agent-orchestrator';
@@ -86,7 +87,7 @@ test("a step that says remote: true answers its session's web link on its detail
 
   const res = await app.request('/api/runs/r-70');
   assert.equal(res.status, 200);
-  const [implement, review] = ((await res.json()) as RunDetail).steps;
+  const [implement, review] = ((await res.json()) as RunAnswer).status.steps;
   assert.deepEqual(implement.filed?.bridge, { url: 'https://claude.ai/code/session_01StepLink', why: null });
   assert.equal(
     (await Effect.runPromise(engine().view('r-70-implement'))).bridge?.url,
@@ -96,7 +97,7 @@ test("a step that says remote: true answers its session's web link on its detail
   assert.equal(review.filed?.bridge, null, 'not bridged: null, whatever its run file holds');
 
   held('r-70-implement', 'aaaaaaaa-0000-4000-8000-000000000001');
-  const down = ((await (await app.request('/api/runs/r-70')).json()) as RunDetail).steps[0].filed?.bridge;
+  const down = (await objectOf(app, 'r-70')).status.steps[0].filed?.bridge;
   assert.equal(down?.url, null, 'asked and not up: no link');
   assert.ok(down?.why, 'and why, in the runtime’s words');
 });

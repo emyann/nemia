@@ -126,7 +126,7 @@ test("REFUSED: a draft the model's Workflow refuses is thrown as the door's Inva
 
 /** The version a remove of the folder `dir` is handed: the one it is at, where it is a folder; none where it is not. */
 function versionAt(dir: string): { version?: string } {
-  return fs.statSync(dir, { throwIfNoEntry: false })?.isDirectory() ? { version: workflowVersion(dir, { home: ROOT }) } : {};
+  return fs.statSync(dir, { throwIfNoEntry: false })?.isDirectory() ? { version: Effect.runSync(Effect.provideService(workflowVersion(dir, { home: ROOT }), StoreRoot, ROOT)) } : {};
 }
 
 /** The folder of yours `dir` removed through the entry, by its name, at the version it is at, as the api hands it. */

@@ -40,8 +40,8 @@ const standingSpec = spec<Stands>({
    * Whether a step is held is left to the code where it turns on what `phaseOf`, `closeoutOf`, `askedCloseout`, `spendOf` and
    * `verdictOf` say: a blocked step whose session has settled, a check that refused, a looping step's round, an ending not
    * yet filed. The verifier reads each callback as answering anew on each call, so a law that asks one cannot say what the
-   * code was told; held by `src/status/status.test.ts` until a callback can be declared pure (tsverify's
-   * `docs/design-2026-11-01-spec-checks.md`, item 4, "a callback declared pure").
+   * code was told; held by `src/status/status.test.ts` until a callback can be declared pure (tsverify's `docs/roadmap.md`,
+   * "A function the code is given, declared pure where a spec says so").
    */
   open: ['output.status'],
   ensures: {
@@ -152,8 +152,8 @@ const ownStatusSpec = spec<
   /**
    * Every status but pending turns on what `phaseOf`, `closeoutOf`, `askedCloseout` and `spendOf` say of its task, which the
    * verifier reads as answering anew on each call, so a law that asks one cannot say what the code was told; held by
-   * `src/status/status.test.ts` until a callback can be declared pure (tsverify's `docs/design-2026-11-01-spec-checks.md`,
-   * item 4, "a callback declared pure").
+   * `src/status/status.test.ts` until a callback can be declared pure (tsverify's `docs/roadmap.md`, "A function the code is
+   * given, declared pure where a spec says so").
    */
   open: true,
   ensures: {
@@ -171,7 +171,8 @@ const ownStatusSpec = spec<
     },
     aCheckIsReadOnlyOfAStepWithOne: {
       description: 'Verified, checking, or failed at its check only of a step that has a check',
-      condition: ({ input: [step], output }) => (output !== 'verified' && output !== 'checking' && output !== 'failed (check)') || !!step.check,
+      condition: ({ input: [step], output }) =>
+        (output !== 'verified' && output !== 'checking' && output !== 'failed (check)') || !!step.check,
     },
     deniedOnlyUnderDenialsFail: {
       description: 'Denied only of a step whose denials fail it',

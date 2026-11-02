@@ -186,7 +186,10 @@ const DESIGN_LAWS_TOLD = [
   'run `npx tsverify <file> <name>`, bare, on the file the function is written in',
 ];
 
-/** What an implement step is told of a contract, build's and quick's alike: the laws first, an undecided answered, the verdicts said, a test deleted on proof. */
+/**
+ * What an implement step is told of a contract, build's and quick's alike: the laws first, an undecided answered, the verdicts said,
+ * a test deleted on proof.
+ */
 const LAWS_TOLD = [
   'load the `tsverify` skill before you change the code.',
   'Write the laws into the contract first and run the verifier',

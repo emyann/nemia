@@ -137,7 +137,10 @@ const wiringRefusalSpec = spec<(factory: Factory, change: WiringChange) => Wirin
     aBadNameIsInvalid: {
       description: 'A change of a workflow whose name is not one is refused as Invalid, whatever the factory holds',
       condition: ({ input: [, change], output }) =>
-        change.verb === 'hire' || change.verb === 'fire' || workflowNameRefusal(change.workflow) === undefined || output?.kind === 'Invalid',
+        change.verb === 'hire' ||
+        change.verb === 'fire' ||
+        workflowNameRefusal(change.workflow) === undefined ||
+        output?.kind === 'Invalid',
     },
     missingOnlyOfWhatIsNotThere: {
       description:

@@ -17,6 +17,7 @@ import { eachTest } from '../../test/placed.ts';
 import { heldUnasked } from '../../test/unasked.ts';
 import { rawTar } from '../../test/tar.ts';
 import { teamCopy } from '../../test/team.ts';
+import { anAgent } from '../../test/agent-walks.ts';
 import { Cause, Effect, Exit } from 'effect';
 import type { StoreRoot as Root } from '../config/root.store.ts';
 import { packArchive } from '../archive/archive.ts';
@@ -35,6 +36,9 @@ const { engineOf } = await import('../runtime-client.ts');
 const engine = eachTest(testEngine);
 heldUnasked(engine);
 const { exportedTemplate, packedTemplate, unpackedTemplate } = await import('./template.verb.ts');
+const { AgentDoor } = await import('../agents/agent-door.store.ts');
+const { agentDoorMemory } = await import('../agents/agent-memory.store.ts');
+const { AgentName } = await import('../agents/agents.model.ts');
 
 /** `program` run at the store's root, as the CLI runs a verb's: what it answers, or the refusal it failed with, thrown. */
 function run<A>(program: Effect.Effect<A, unknown, Root>): A {
@@ -141,6 +145,22 @@ function exported(): string {
 }
 
 test('what export writes from a repository and a factory, read back as it was written, each draft passing its check', async (t) => {
+  await t.test("an export whose workflow names an agent only the Agent door's memory holds writes that agent into the tree", () => {
+    const repo = scratch('wf-template-repo-');
+    fs.mkdirSync(path.join(repo, 'workflows', 'solo'), { recursive: true });
+    fs.writeFileSync(path.join(repo, 'workflows', 'solo', 'work.md'), '---\nplace: git\nagent: scribe\n---\nDo the work.\n');
+    const agents = path.join(repo, 'workflows', 'agents');
+    const dir = target();
+    run(
+      Effect.gen(function* () {
+        yield* (yield* AgentDoor).agents.write(AgentName.read('scribe'), anAgent('scribe'), undefined, { dir: agents, anywhere: true });
+        return yield* exportedTemplate(dir, repo, undefined);
+      }).pipe(Effect.provide(agentDoorMemory())),
+    );
+    assert.equal(fs.existsSync(path.join(agents, 'scribe.md')), false, 'the agent is on no disk');
+    assert.equal(fs.existsSync(path.join(dir, 'agents', 'scribe', 'agent.yaml')), true);
+    assert.deepEqual(checkTemplateAt(dir), []);
+  });
   await t.test('an export carries the real files of a skill linked inside the repository, and writes no link', () => {
     const repo = repoGivenLinked(() => '../../skills/x');
     const dir = target();

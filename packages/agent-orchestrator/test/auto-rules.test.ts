@@ -16,7 +16,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { Effect } from 'effect';
+import { Effect, type Layer } from 'effect';
 import { scratch } from './scratch.ts';
 import { staged, story } from './story.ts';
 import { names } from './assessed.ts';
@@ -33,9 +33,12 @@ const { writeFactoryLevel } = await import('../src/level/level.store.ts');
 const { writeLevel } = await import('../src/nemia/level.store.ts');
 const { customInstructionsFile } = await import('../src/agents/read.store.ts');
 const { DEFAULT_AUTO, ruleWords } = await import('../src/auto/auto.ts');
-const { confirmedFile, confirmRule, digestOf, dropRule, proposedFile, readConfirmed, writeProposed } =
+const { confirmedFile, confirmRule, digestOf, dropRule, proposedFile, readConfirmed, readProposed, writeProposed } =
   await import('../src/auto/auto.store.ts');
-const { policyListOf, proposalOf } = await import('../src/auto/auto.verb.ts');
+const { POLICY, POLICY_PROPOSE, proposalOf } = await import('../src/auto/auto.verb.ts');
+const { AgentDoor } = await import('../src/agents/agent-door.store.ts');
+const { agentDoorMemory } = await import('../src/agents/agent-memory.store.ts');
+const { AgentName } = await import('../src/agents/agents.model.ts');
 const { engineOf, runWith } = await import('../src/runtime-client.ts');
 const { RunDoor } = await import('../src/runs/runs.store.ts');
 const { runDoorMemory } = await import('../src/runs/memory.store.ts');
@@ -63,6 +66,15 @@ function proposed(): string {
   writeProposed(home, 'nemia', { at: NOW.toISOString(), ...proposalOf(PROPOSAL), digest: null });
   return home;
 }
+
+/**
+ * nemia's rules in the store `home`, as `nemia policy nemia` shows them: its handler, which reads her custom instruction through the Agent
+ * door — the files at `home`, or the door `agents` where one is given.
+ */
+const shown = (home = ROOT, agents?: Layer.Layer<never>) => {
+  const program = POLICY.handler({ name: 'nemia' }, undefined, home);
+  return stage.runWith(stage.board().e, agents === undefined ? program : Effect.provide(program, agents));
+};
 
 /** The kind of what `fn` throws, and its message. */
 function refusal(fn: () => unknown): { kind: string; message: string } {
@@ -160,11 +172,11 @@ test('Her floor: a call on a run or a factory left at manual is denied, one rais
 
 test('Auto rules decide an approval: proposed, confirmed beside the default, given unasked at auto, asked otherwise, dropped, and a proposal gone stale', async (t) => {
   const s = story(t);
-  await s.test("a proposal writes the agent's file alone; the person's list is none, and the default stays in force", () => {
+  await s.test("a proposal writes the agent's file alone; the person's list is none, and the default stays in force", async () => {
     writeProposed(ROOT, 'nemia', { at: NOW.toISOString(), ...proposalOf(PROPOSAL), digest: null });
     assert.equal(fs.existsSync(confirmedFile(ROOT, 'nemia')), false);
     assert.equal(path.dirname(proposedFile(ROOT, 'nemia')), path.dirname(confirmedFile(ROOT, 'nemia')));
-    const list = policyListOf(ROOT, 'nemia');
+    const list = await shown();
     assert.equal(list.isDefault, true);
     assert.equal(list.builtin.id, 'default', 'the builtin rule is offered to be confirmed again');
     assert.deepEqual(
@@ -178,13 +190,13 @@ test('Auto rules decide an approval: proposed, confirmed beside the default, giv
     );
     assert.deepEqual(list.proposed?.guidance, ['be kind to the reviewer']);
   });
-  await s.test('the first confirm seeds the list with the default beside the rule confirmed, marked by where each came from', () => {
+  await s.test('the first confirm seeds the list with the default beside the rule confirmed, marked by where each came from', async () => {
     confirmRule(ROOT, 'nemia', 'tries', TRIES, NOW);
     assert.deepEqual(readConfirmed(ROOT, 'nemia'), {
       since: NOW.toISOString(),
       rules: [DEFAULT_AUTO, { id: 'tries', answer: 'retry', steps: ['implement'], when: ['checked'], under: 20, from: 'proposed' }],
     });
-    const list = policyListOf(ROOT, 'nemia');
+    const list = await shown();
     assert.equal(list.isDefault, false);
     const words = list.rules[1]?.words ?? '';
     for (const fact of ['Try again', 'implement', 'its check passed', 'under $20']) assert.ok(words.includes(fact), words);
@@ -240,17 +252,37 @@ test('Auto rules decide an approval: proposed, confirmed beside the default, giv
   await s.test('REFUSED: a confirm of a rule is asked every time, at auto', async () => {
     assert.equal(await decidedAtAuto('nemia policy confirm nemia default'), 'ask');
   });
-  await s.test('a proposal read from a custom instruction is stale once its words change, and one proposed from none is stale', () => {
-    const file = customInstructionsFile(ROOT, 'nemia');
-    fs.mkdirSync(path.dirname(file), { recursive: true });
-    fs.writeFileSync(file, 'approve when all agree\n');
-    writeProposed(ROOT, 'nemia', { at: NOW.toISOString(), ...proposalOf(PROPOSAL), digest: digestOf('approve when all agree') });
-    assert.equal(policyListOf(ROOT, 'nemia').proposed?.stale, false);
-    assert.equal(policyListOf(ROOT, 'nemia').instruction, 'approve when all agree');
-    fs.writeFileSync(file, 'approve when all agree, and retry a check once\n');
-    assert.equal(policyListOf(ROOT, 'nemia').proposed?.stale, true);
-    writeProposed(ROOT, 'nemia', { at: NOW.toISOString(), ...proposalOf(PROPOSAL), digest: null });
-    assert.equal(policyListOf(ROOT, 'nemia').proposed?.stale, true, 'proposed from no instruction');
+  await s.test(
+    'a proposal read from a custom instruction is stale once its words change, and one proposed from none is stale',
+    async () => {
+      const file = customInstructionsFile(ROOT, 'nemia');
+      fs.mkdirSync(path.dirname(file), { recursive: true });
+      fs.writeFileSync(file, 'approve when all agree\n');
+      writeProposed(ROOT, 'nemia', { at: NOW.toISOString(), ...proposalOf(PROPOSAL), digest: digestOf('approve when all agree') });
+      assert.equal((await shown()).proposed?.stale, false);
+      assert.equal((await shown()).instruction, 'approve when all agree');
+      fs.writeFileSync(file, 'approve when all agree, and retry a check once\n');
+      assert.equal((await shown()).proposed?.stale, true);
+      writeProposed(ROOT, 'nemia', { at: NOW.toISOString(), ...proposalOf(PROPOSAL), digest: null });
+      assert.equal((await shown()).proposed?.stale, true, 'proposed from no instruction');
+    },
+  );
+  await s.test("her custom instruction is read through the Agent door: shown, and a proposal's digest is of it, none on disk", async () => {
+    const home = scratch('auto-store-');
+    const agents = agentDoorMemory();
+    const WORDS = 'approve when all agree, in memory';
+    Effect.runSync(
+      Effect.provide(
+        Effect.flatMap(AgentDoor, (d) => d.custom.write(AgentName.read('nemia'), WORDS, home)),
+        agents,
+      ),
+    );
+    assert.equal(fs.existsSync(customInstructionsFile(home, 'nemia')), false, 'her words are on no disk');
+    assert.equal((await shown(home, agents)).instruction, WORDS);
+    const propose = POLICY_PROPOSE.handler({ name: 'nemia', words: PROPOSAL }, undefined, home);
+    const list = await stage.runWith(stage.board().e, Effect.provide(propose, agents));
+    assert.equal(readProposed(home, 'nemia')?.digest, digestOf(WORDS), 'the digest is of the words the door holds');
+    assert.equal(list.proposed?.stale, false);
   });
   await s.test('the person drops the default: an approval is asked, and a list that does not read lets nothing through', async () => {
     dropRule(ROOT, 'nemia', 'default', new Date('2026-10-06T09:00:00.000Z'));
@@ -262,11 +294,11 @@ test('Auto rules decide an approval: proposed, confirmed beside the default, giv
     fs.writeFileSync(confirmedFile(ROOT, 'nemia'), '{');
     assert.equal(await decidedAtAuto('nemia approve g-auto build'), 'ask', 'a list that does not read lets nothing through');
   });
-  await s.test('a drop before any confirm takes the default out of force, and the default is confirmed again by its id', () => {
+  await s.test('a drop before any confirm takes the default out of force, and the default is confirmed again by its id', async () => {
     const home = proposed();
     dropRule(home, 'nemia', 'default', NOW);
     assert.deepEqual(readConfirmed(home, 'nemia')?.rules, [], 'nothing in force: every answer is asked');
-    assert.equal(policyListOf(home, 'nemia').isDefault, false);
+    assert.equal((await shown(home)).isDefault, false);
     confirmRule(home, 'nemia', 'default', DEFAULT, NOW);
     assert.deepEqual(readConfirmed(home, 'nemia')?.rules, [DEFAULT_AUTO]);
   });

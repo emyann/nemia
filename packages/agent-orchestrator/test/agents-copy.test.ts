@@ -13,6 +13,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Effect } from 'effect';
 import { scratch } from './scratch.ts';
+import { anAgent } from './agent-walks.ts';
+import { aSkill } from './skill-walks.ts';
 import { teamCopy } from './team.ts';
 import { names } from './assessed.ts';
 import { staged, story } from './story.ts';
@@ -25,11 +27,20 @@ const { addFactory, attachWorkflow, hireAgent, runWith: runEngine, startRun, TAB
 const { engineOf } = await import('../src/runtime-client.ts');
 const { main } = await import('../src/cli/main.ts');
 const { AGENTS_COPY } = await import('../src/sources/copy.verb.ts');
-const { agentsRead } = await import('../src/roster/roster.store.ts');
+const { agentsRead: agentsReadAt } = await import('../src/roster/roster.store.ts');
+const { StoreRoot } = await import('../src/config/root.store.ts');
 const { agentsLines } = await import('../src/roster/roster.ts');
 const { agentSources } = await import('../src/sources/sources.store.ts');
 const { sourcesLines } = await import('../src/sources/sources.ts');
+const { AgentDoor } = await import('../src/agents/agent-door.store.ts');
+const { agentDoorMemory } = await import('../src/agents/agent-memory.store.ts');
+const { SkillDoor } = await import('../src/skills/skill-door.store.ts');
+const { skillDoorMemory } = await import('../src/skills/skill-memory.store.ts');
+const { AgentName, SkillName } = await import('../src/agents/agents.model.ts');
 const stage = staged({ runWith: runEngine, main, engineOf });
+
+/** `nemia agents`' reading of `repo` and the store `home`, through the Agent and Skill doors at that store's root. */
+const agentsRead = (at: { repo: string; home: string }) => Effect.runSync(agentsReadAt(at).pipe(Effect.provideService(StoreRoot, at.home)));
 
 /**
  * The fixture repository: `.claude/agents/` with `scout` and `counted`, `workflows/agents/` with `planner`, and a planted `docs/agents/`.
@@ -39,6 +50,10 @@ const FIXTURE = path.join(import.meta.dirname, 'fixtures', 'agents-copy', 'repo'
 /** The copy `args` asks for, into the library of the store `home`. */
 const copy = (args: Record<string, string | readonly string[]>, home: string) =>
   stage.runWith(stage.board().e, AGENTS_COPY.handler(args, undefined, home));
+
+/** `nemia agents sources`' program over the store `home`, as its handler runs it: what it lists, or the refusal it fails with. */
+const sourcesAt = (ask: { at?: string; home: string }) =>
+  stage.runWith(stage.board().e, Effect.provideService(agentSources(ask), StoreRoot, ask.home));
 
 /** Refused by kind, exit 2, naming each of `facts` — what it refused and the flag or the command that fixes it. */
 const refusedWith =
@@ -185,7 +200,7 @@ test('copy from a repository: its places listed by nemia agents sources, each ag
       addFactoryAt(home, { name: 'sources', repos: [repo] });
       const team = teamCopy();
       await copy({ file: path.join(team, 'agents', 'implementer.md') }, home);
-      const { sources } = agentSources({ at: path.join(team, 'agents'), home });
+      const { sources } = await sourcesAt({ at: path.join(team, 'agents'), home });
       const ours = sources.filter((s) => s.repo === null || s.repo === repo);
       assert.deepEqual(
         ours.map((s) => [s.place, s.name]),
@@ -208,12 +223,25 @@ test('copy from a repository: its places listed by nemia agents sources, each ag
       const lines = sourcesLines({ sources: ours });
       assert.equal(lines.at(-1), 'copy one into your library: nemia agents copy <file> [--as <name>]');
       assert.ok(lines.includes(`${path.join(repo, '.claude', 'agents')}  (the repository ${repo})`));
-      await assert.rejects(
-        stage.runWith(stage.board().e, Effect.try({ try: () => agentSources({ at: path.join(home, 'none'), home }), catch: (err) => err })),
-        refusedWith('Missing', 'none is not a folder'),
-      );
+      await assert.rejects(sourcesAt({ at: path.join(home, 'none'), home }), refusedWith('Missing', 'none is not a folder'));
     },
   );
+
+  await s.test('nemia agents sources reads each folder through the Agent door: an agent only its memory holds is listed', async () => {
+    const home = scratch('wf-agents-copy-home-');
+    const at = { dir: libraryOf(home).agents, anywhere: true };
+    const { sources } = await stage.runWith(
+      stage.board().e,
+      Effect.gen(function* () {
+        yield* (yield* AgentDoor).agents.write(AgentName.read('scribe'), anAgent('scribe'), undefined, at);
+        return yield* agentSources({ home });
+      }).pipe(Effect.provide(agentDoorMemory()), Effect.provideService(StoreRoot, home)),
+    );
+    assert.equal(fs.existsSync(path.join(at.dir, 'scribe.md')), false, 'the agent is on no disk');
+    const scribe = sources.find((s) => s.name === 'scribe');
+    assert.deepEqual([scribe?.place, scribe?.file, scribe?.error], ['library', path.join(at.dir, 'scribe.md'), null]);
+    assert.match(scribe?.version ?? '', /^[0-9a-f]{16}$/);
+  });
 
   await s.test('an agent never copied, and every agent of a repository, has no record', () => {
     const home = scratch('wf-agents-copy-home-');
@@ -289,6 +317,25 @@ test('REFUSED: a copy the library or its source cannot take, by kind and exit 2 
     assert.ok(kept.copied.includes('agents/reviewer.md'));
     assert.ok(!kept.copied.includes('review-a-change'));
     assert.match(fs.readFileSync(path.join(ours, 'SKILL.md'), 'utf8'), /Our own way\./);
+  });
+
+  await t.test("a skill the library holds otherwise only in the Skill door's memory is judged differing, naming --keep", async () => {
+    const home = scratch('wf-agents-copy-home-');
+    const team = teamCopy();
+    const program = Effect.gen(function* () {
+      const { skills } = yield* SkillDoor;
+      const name = SkillName.read('review-a-change');
+      const theirs = aSkill('review-a-change', { body: 'Their way.' });
+      yield* skills.write(name, theirs, undefined, path.join(team, 'skills'), { anywhere: true });
+      const ours = aSkill('review-a-change', { body: 'Our own way.' });
+      yield* skills.write(name, ours, undefined, libraryOf(home).skills, { anywhere: true });
+      return yield* AGENTS_COPY.handler({ file: reviewer(team) }, undefined, home);
+    }).pipe(Effect.provide(skillDoorMemory()));
+    await assert.rejects(
+      stage.runWith(stage.board().e, program),
+      refusedWith('Conflict', 'the skill review-a-change in', 'differs', '--keep review-a-change', 'nothing was copied'),
+    );
+    assert.deepEqual(written(home), NOTHING);
   });
 
   await t.test('another agent of the same name in the library, naming --as; copied under another name, it is written', async () => {

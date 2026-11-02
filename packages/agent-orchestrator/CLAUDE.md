@@ -63,7 +63,7 @@ it holds today that is a candidate for the runtime is in `docs/architecture.md`,
 - **A team is whole with its `agents/` and `skills/`**: a test that copies a workflow folder copies both, as `teamCopy` copies the
   tests' team (`test/fixtures/team/`); a sentence a step is told is read with `toldIn`.
 - **A Claude Code step's instructions are in `runs/<id>/agents/<step>/prompt.md`** and its brief is its own note (`briefBody`); a step
-  whose rendered folder is gone is told its skills whole in the brief (`unrendered`, `skillsAgain`).
+  whose rendered folder is gone is told its skills whole in the brief (`unrendered`, `toldOf`).
 - **A step's `body` opens with the heading of its agent's instructions** (`LAYER_HEADINGS`, one per layer `headedLayers` composes): a
   screen that quotes the step reads its own words, `ownNote` (`ending/ending.ts`), as `toDecide` and `wf decide` do.
 - **The board's listing of a step is resolved; its file is not**: write a step's own keys (`ListedStep.own`). A key the parser converts

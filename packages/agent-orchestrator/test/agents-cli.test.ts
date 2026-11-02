@@ -15,12 +15,19 @@ import { story } from './story.ts';
 import { testEngine } from 'agent-runtime/testing';
 import { eachTest } from './placed.ts';
 import { heldUnasked } from './unasked.ts';
+import { Effect, Layer } from 'effect';
+import { anAgent as aDraft } from './agent-walks.ts';
 
 const ROOT = scratch('wf-agents-cli-');
 process.env.WF_ROOT = ROOT;
 const { main } = await import('../src/cli/main.ts');
 const { clearCustomInstructions, writeCustomInstructions } = await import('../src/custom/custom.store.ts');
 const { Invalid } = await import('../src/refusal/refusal.ts');
+const { agentsRead } = await import('../src/roster/roster.store.ts');
+const { AgentDoor } = await import('../src/agents/agent-door.store.ts');
+const { agentDoorMemory, MEMORY_AGENTS, MEMORY_ROOT } = await import('../src/agents/agent-memory.store.ts');
+const { skillDoorMemory } = await import('../src/skills/skill-memory.store.ts');
+const { AgentName } = await import('../src/agents/agents.model.ts');
 
 const { engineOf } = await import('../src/runtime-client.ts');
 const engine = eachTest(testEngine);
@@ -110,6 +117,21 @@ test("nemia agents at the terminal: both places listed with what each agent can 
       fs.rmSync(path.join(YOURS, 'archivist.md'));
     },
   );
+
+  await s.test('nemia agents reads through the Agent door: an agent its memory holds is listed, though no disk has its file', async () => {
+    const read = await Effect.runPromise(
+      Effect.gen(function* () {
+        const door = yield* AgentDoor;
+        yield* door.agents.write(AgentName.read('courier'), aDraft('courier'), undefined, { dir: MEMORY_AGENTS });
+        return yield* agentsRead({ repo, home: MEMORY_ROOT });
+      }).pipe(Effect.provide(Layer.merge(agentDoorMemory(), skillDoorMemory()))),
+    );
+    assert.deepEqual(
+      read.agents.map(({ from, name, error, description }) => ({ from, name, error, description })),
+      [{ from: 'yours', name: 'courier', error: null, description: 'Use courier when a change needs its notes written.' }],
+    );
+    assert.equal(fs.existsSync(path.join(MEMORY_AGENTS, 'courier.md')), false, 'read from the door, not from a file');
+  });
 
   await s.test(
     'an agent with no skills is listed by the one thing its description says; one with no card says why; the servers an agent loads, and none for one naming none',

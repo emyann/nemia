@@ -16,7 +16,6 @@
  * serves alone and runs itself, with no handler: `nemia tick`, `nemia up` and `nemia watch` (`RAN`).
  */
 import { Effect } from 'effect';
-import { tried } from '../runtime-client.ts';
 import { APPROVE } from '../gate/commands.verb.ts';
 import { ANSWER_HELP, answerFlag, recheckAnswerRefusal, typedAnswers, typedOf } from '../question/asked.verb.ts';
 import { stepsOf } from '../record/record.store.ts';
@@ -462,7 +461,7 @@ function agentsRefusal(args: Args): string | null {
   return `nemia agents --from takes repo or yours, not ${from}: repo is <repo>/workflows/agents, yours is your store's.`;
 }
 
-/** `nemia agents`: every agent of both places, the repository's then yours, each read now from disk. */
+/** `nemia agents`: every agent of both places, the repository's then yours, each read now through the Agent door. */
 const AGENTS: Command<AgentsRead> = {
   name: 'agents',
   usage: '[--repo .]',
@@ -476,7 +475,12 @@ const AGENTS: Command<AgentsRead> = {
   writes: false,
   class: 'read',
   route: { method: 'GET', path: '/api/agents', status: 200 },
-  handler: (args, _env, home) => tried(() => agentsRead({ repo: textOf(args, 'repo') ?? '.', ...(home !== undefined && { home }) })),
+  handler: (args, _env, home) =>
+    rooted(
+      home,
+      'agents',
+      Effect.flatMap(StoreRoot, (root) => agentsRead({ repo: textOf(args, 'repo') ?? '.', home: root })),
+    ),
   print: agentsLines,
 };
 
@@ -496,14 +500,18 @@ const AGENT_CARD: Command<CardRead> = {
   class: 'read',
   route: { method: 'GET', path: '/api/agents/:from/:name/card', status: 200 },
   handler: (args, _env, home) =>
-    tried(() => {
-      const from = textOf(args, 'from');
-      return agentCardRead(textOf(args, 'name') ?? '', {
-        repo: textOf(args, 'repo') ?? '.',
-        ...(home !== undefined && { home }),
-        ...((from === 'repo' || from === 'yours') && { from }),
-      });
-    }),
+    rooted(
+      home,
+      'agents card',
+      Effect.flatMap(StoreRoot, (root) => {
+        const from = textOf(args, 'from');
+        return agentCardRead(textOf(args, 'name') ?? '', {
+          repo: textOf(args, 'repo') ?? '.',
+          home: root,
+          ...((from === 'repo' || from === 'yours') && { from }),
+        });
+      }),
+    ),
   print: ({ card }) => [JSON.stringify(card, null, 2)],
   note: (data, args) => cardNote(data, textOf(args, 'name') ?? ''),
 };

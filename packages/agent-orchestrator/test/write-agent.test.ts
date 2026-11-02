@@ -11,6 +11,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import { Effect } from 'effect';
 import { parseAgent, renderAgent, type Agent, type AgentDraft } from '../src/workflow.ts';
 import { agentUsers, loadWorkflows } from '../src/folder/folder.store.ts';
 import { agentVersion, loadAgents } from '../src/agents/read.store.ts';
@@ -21,7 +22,7 @@ import { staged, story } from './story.ts';
 
 const ROOT = scratch('wf-agent-');
 process.env.WF_ROOT = ROOT;
-const { addFactory, agentSkillsFound, isRefusal, runWith: runEngine } = await import('../src/runner.ts');
+const { addFactory, agentSkillsFound, isRefusal, runWith: runEngine, StoreRoot } = await import('../src/runner.ts');
 const { removeAgent, writeAgent } = await import('../src/agents/agents.store.ts');
 const { AGENTS_READ, AGENTS_REMOVE, AGENTS_WRITE } = await import('../src/agents/library.verb.ts');
 const { engineOf } = await import('../src/runtime-client.ts');
@@ -210,7 +211,8 @@ test("write, rename and remove an agent at its version, as the board's Agents pa
       body: 'Carry it.',
     };
     const made = writeAgent(ROOT, AGENTS, courier, { version: null, repo });
-    const listed = agentVersion(AGENTS, 'courier', agentSkillsFound(AGENTS, repo));
+    const found = () => Effect.runSync(agentSkillsFound(AGENTS, repo, ROOT).pipe(Effect.provideService(StoreRoot, ROOT)));
+    const listed = agentVersion(AGENTS, 'courier', found());
     assert.equal(made.version, listed, 'the version a write answers is the one the listing reads');
     assert.notEqual(listed, agentVersion(AGENTS, 'courier'), 'the skill is found only in the repository, so the two readings differ');
     refused(
@@ -225,7 +227,7 @@ test("write, rename and remove an agent at its version, as the board's Agents pa
       'Conflict',
       'agents/courier.md changed since it was read',
     );
-    const now = agentVersion(AGENTS, 'courier', agentSkillsFound(AGENTS, repo))!;
+    const now = agentVersion(AGENTS, 'courier', found())!;
     assert.deepEqual(removeAgent(ROOT, AGENTS, 'courier', { version: now, repo }).removed, ['courier.md']);
   });
 

@@ -214,12 +214,18 @@ export const AGENTS_READ: Command<{ agent: AgentReading | null }> = {
     why: "the board's agent page reads one agent with its versions and users; at the command line, nemia agents lists them",
   },
   handler: (args, _env, home) =>
-    tried(() => ({
-      agent: agentRead(textOf(args, 'from') as AgentPlace, textOf(args, 'dir') ?? '', textOf(args, 'name') ?? '', {
-        repo: textOf(args, 'repo') ?? '',
-        ...(home !== undefined && { home }),
+    rooted(
+      home,
+      'agents read',
+      Effect.gen(function* () {
+        const root = yield* StoreRoot;
+        const agent = yield* agentRead(textOf(args, 'from') as AgentPlace, textOf(args, 'dir') ?? '', textOf(args, 'name') ?? '', {
+          repo: textOf(args, 'repo') ?? '',
+          home: root,
+        });
+        return { agent };
       }),
-    })),
+    ),
   print: () => [],
 };
 

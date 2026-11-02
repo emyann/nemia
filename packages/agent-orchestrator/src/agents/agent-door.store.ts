@@ -33,9 +33,9 @@ import {
   type SkillsFound,
 } from './agents.ts';
 import type { VersionRefused } from '../folder/folder.ts';
-import { agentsFor, agentVersion, loadAgents } from './read.store.ts';
 import { removeAgent, writeAgent, type AgentSidecar, type AgentWritten } from './agents.store.ts';
 import { clearCustomInstructions, customInstructionsFor, writeCustomInstructions } from '../custom/custom.store.ts';
+import { agentsFor, agentVersion, loadAgents, readCustomInstructions } from './read.store.ts';
 import { skillsFor, type Places } from '../skills/read.store.ts';
 
 /**
@@ -56,7 +56,8 @@ export type AgentRemoved = { dir: string; removed: string[] };
  * A layer of the Agent door, as plain synchronous methods. `agents`: every agent a workflow's steps may name, found where a run of it
  * looks (`agentsFor`); the names a folder of agents holds; one agent read; what is at a name now and its version (`DefinitionThere`);
  * an agent written from a draft — renamed, where the draft's name is not the one it changes — at the version it was read at; and one
- * removed. `custom`: a person's custom instructions for the agent of a name a run on `repo` could name, read, written and cleared.
+ * removed. `custom`: a person's custom instructions for the agent of a name a run on `repo` could name, read, written and cleared; read
+ * given no `repo`, they are the words held for the name, whatever place names it — the read a run's start and Nemia's keeper make.
  */
 export type AgentLayer = {
   readonly agents: {
@@ -68,7 +69,7 @@ export type AgentLayer = {
     readonly remove: (name: string, version: string | undefined, at: AgentAt) => AgentRemoved;
   };
   readonly custom: {
-    readonly read: (name: string, repo: string) => string | undefined;
+    readonly read: (name: string, repo?: string) => string | undefined;
     readonly write: (name: string, text: string, repo: string) => string;
     readonly clear: (name: string, repo: string) => boolean;
   };
@@ -165,7 +166,8 @@ export function agentDoorOver(layer: AgentLayer): AgentDoorShape {
 
 /**
  * The files of the store `home`, as a layer of the door: today's agents and custom instructions, read and written by the agents' own
- * functions. A version counts the skills a start on `repo` finds, where `repo` is given, as `writeAgent` reads it.
+ * functions. A version counts the skills a start on `repo` finds, where `repo` is given, as `writeAgent` reads it. Custom instructions
+ * read given no repository are read with no check of a place (`readCustomInstructions`).
  */
 export function agentFiles(home: string): AgentLayer {
   const skillsAt = (at: AgentAt) =>
@@ -203,7 +205,7 @@ export function agentFiles(home: string): AgentLayer {
       remove: (name, version, at) => removeAgent(home, at.dir, name, { version: version ?? null, ...placed(at) }),
     },
     custom: {
-      read: (name, repo) => customInstructionsFor(home, name, repo),
+      read: (name, repo) => (repo === undefined ? readCustomInstructions(home, name) : customInstructionsFor(home, name, repo)),
       write: (name, text, repo) => writeCustomInstructions(home, name, text, repo),
       clear: (name, repo) => clearCustomInstructions(home, name, repo),
     },

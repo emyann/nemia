@@ -3,13 +3,16 @@
  * and the custom instruction it read (`POLICY`); a proposal written, the agent's own (`POLICY_PROPOSE`); a rule confirmed or dropped, the
  * person's, asked of them every time an agent calls it (`POLICY_CONFIRM`, `POLICY_DROP`). Any agent's: the name is the one given.
  */
+import { Effect } from 'effect';
 import { tried } from '../runtime-client.ts';
 import type { Args, Spec } from '../command/command.ts';
 import type { Command } from '../command/entry.verb.ts';
 import { agentNameRefusal } from '../agents/agents.ts';
-import { readCustomInstructions } from '../agents/read.store.ts';
+import { AgentDoor } from '../agents/agent-door.store.ts';
+import { AgentName } from '../agents/agents.model.ts';
 import { HOME } from '../record/record.store.ts';
 import { Invalid } from '../refusal/refusal.ts';
+import { rooted } from '../wiring/wire.verb.ts';
 import { DEFAULT_AUTO, listInForce, ruleRefusal, ruleWords, type AutoRule } from './auto.ts';
 import { confirmedFile, confirmRule, digestOf, dropRule, proposedFile, readConfirmed, readProposed, writeProposed } from './auto.store.ts';
 
@@ -50,12 +53,14 @@ const wordsIn = (args: Args): string => String(args.words ?? '');
 /** A rule with its words. */
 const worded = (rule: AutoRule): WordedRule => ({ ...rule, words: ruleWords(rule) });
 
-/** `agent`'s rules in the store `home`, composed from the person's list, the agent's proposal and its custom instruction. */
-export function policyListOf(home: string, agent: string): PolicyList {
+/**
+ * `agent`'s rules in the store `home`, composed from the person's list, the agent's proposal and its custom instruction, `instruction`
+ * (`instructionOf`).
+ */
+export function policyListOf(home: string, agent: string, instruction: string | undefined): PolicyList {
   const confirmed = readConfirmed(home, agent);
   const rules = listInForce(confirmed?.rules);
   const proposed = readProposed(home, agent);
-  const instruction = readCustomInstructions(home, agent);
   return {
     agent,
     file: confirmedFile(home, agent),
@@ -75,6 +80,16 @@ export function policyListOf(home: string, agent: string): PolicyList {
     builtin: worded(DEFAULT_AUTO),
   };
 }
+
+/** The custom instruction for `agent`, as the Agent door reads it, whatever place names the agent: a policy is any agent's. */
+const instructionOf = Effect.fnUntraced(function* (agent: string) {
+  return yield* (yield* AgentDoor).custom.read(AgentName.read(agent));
+});
+
+/** `agent`'s rules in the store `home`, its custom instruction read through the Agent door. */
+const listed = Effect.fnUntraced(function* (home: string, agent: string) {
+  return policyListOf(home, agent, yield* instructionOf(agent));
+});
 
 /** The lines `nemia policy` prints of an agent's rules. */
 function listLines(list: PolicyList): string[] {
@@ -127,7 +142,7 @@ export const POLICY: Command<PolicyList> = {
   writes: false,
   class: 'read',
   route: { method: 'GET', path: '/api/policy/:name', status: 200 },
-  handler: (args, _env, home = HOME) => tried(() => policyListOf(home, agentIn(args))),
+  handler: (args, _env, home = HOME) => rooted(home, 'policy', listed(home, agentIn(args))),
   print: listLines,
 };
 
@@ -193,13 +208,17 @@ export const POLICY_PROPOSE: Command<PolicyList> = {
   class: 'act',
   only: { side: 'cli', why: 'the agent proposes from its own session; the board shows the proposal and confirms its rules' },
   handler: (args, _env, home = HOME) =>
-    tried(() => {
-      const agent = agentIn(args);
-      const { rules, guidance } = proposalOf(String(args.words ?? ''));
-      const digest = digestOf(readCustomInstructions(home, agent));
-      writeProposed(home, agent, { at: new Date().toISOString(), rules, guidance, digest });
-      return policyListOf(home, agent);
-    }),
+    rooted(
+      home,
+      'policy propose',
+      Effect.gen(function* () {
+        const agent = agentIn(args);
+        const { rules, guidance } = yield* tried(() => proposalOf(String(args.words ?? '')));
+        const digest = digestOf(yield* instructionOf(agent));
+        yield* tried(() => writeProposed(home, agent, { at: new Date().toISOString(), rules, guidance, digest }));
+        return yield* listed(home, agent);
+      }),
+    ),
   print: (list) => [
     `${list.agent} proposed ${list.proposed?.rules.length ?? 0} rule(s), none in force until confirmed.`,
     ...listLines(list),
@@ -243,10 +262,14 @@ export const POLICY_CONFIRM: Command<PolicyList> = {
   asksAlways: true,
   route: { method: 'PUT', path: '/api/policy/:name/rules/:id', status: 200 },
   handler: (args, _env, home = HOME) =>
-    tried(() => {
-      confirmRule(home, agentIn(args), idIn(args), wordsIn(args), new Date());
-      return policyListOf(home, agentIn(args));
-    }),
+    rooted(
+      home,
+      'policy confirm',
+      Effect.andThen(
+        tried(() => confirmRule(home, agentIn(args), idIn(args), wordsIn(args), new Date())),
+        listed(home, agentIn(args)),
+      ),
+    ),
   print: (list, args) => [`${list.agent}: the rule ${idIn(args)} is in force at auto.`, ...listLines(list)],
 };
 
@@ -262,10 +285,14 @@ export const POLICY_DROP: Command<PolicyList> = {
   asksAlways: true,
   route: { method: 'DELETE', path: '/api/policy/:name/rules/:id', status: 200 },
   handler: (args, _env, home = HOME) =>
-    tried(() => {
-      dropRule(home, agentIn(args), idIn(args), new Date());
-      return policyListOf(home, agentIn(args));
-    }),
+    rooted(
+      home,
+      'policy rm',
+      Effect.andThen(
+        tried(() => dropRule(home, agentIn(args), idIn(args), new Date())),
+        listed(home, agentIn(args)),
+      ),
+    ),
   print: (list, args) => [`${list.agent}: the rule ${idIn(args)} is out of force; what it allowed is asked again.`, ...listLines(list)],
 };
 

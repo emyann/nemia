@@ -155,8 +155,11 @@ test("a step's own skills: line adding a skill only the skill door holds reads r
   );
 });
 
-/** The functions of the stores the Workflow door is over that `src`'s code still calls rather than yielding the door. */
-const SEAM = ['loadWorkflows', 'writeWorkflow', 'writeWorkflowAt', 'removeWorkflow', 'removeWorkflowAt', 'formerKeyLines'];
+/**
+ * The functions of the stores the Workflow door is over that `src`'s code still calls rather than yielding the door, and `foundAt`, which
+ * reads a folder's agents and skills off the disk beside the Agent and Skill doors: its callers are this seam's own files alone.
+ */
+const SEAM = ['loadWorkflows', 'writeWorkflow', 'writeWorkflowAt', 'removeWorkflow', 'removeWorkflowAt', 'formerKeyLines', 'foundAt'];
 
 /** The stores the door is over, and the door's own files: where the seam is defined, not a debt. */
 const OWN = [
@@ -226,6 +229,11 @@ test('REFUSED: a converted file that calls a store again, and a count the baseli
     'src/workflows/workflows.verb.ts': `${sources['src/workflows/workflows.verb.ts']}\nconst x = loadWorkflows('a');\n`,
   };
   assert.equal(debtBreaks(again, WORKFLOW_DOOR_DEBT).length, 1);
+  const found = {
+    ...sources,
+    'src/workflows/workflows.verb.ts': `${sources['src/workflows/workflows.verb.ts']}\nconst y = foundAt('a', {});\n`,
+  };
+  assert.equal(debtBreaks(found, WORKFLOW_DOOR_DEBT).length, 1, "a read of a folder's agents and skills off the disk is the seam's");
   const [first] = Object.keys(WORKFLOW_DOOR_DEBT);
   assert.equal(debtBreaks(sources, { ...WORKFLOW_DOOR_DEBT, [first]: (WORKFLOW_DOOR_DEBT[first] ?? 0) + 1 }).length, 1);
 });

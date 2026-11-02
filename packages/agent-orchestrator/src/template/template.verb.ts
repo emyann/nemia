@@ -5,7 +5,7 @@
  * which writes an archive's folder back. Their handlers answer data, and the CLI prints it.
  */
 import path from 'node:path';
-import { Effect } from 'effect';
+import { Effect, Result } from 'effect';
 import { tried } from '../runtime-client.ts';
 import { leftOut, type Flag, type Spec } from '../command/command.ts';
 import type { Command } from '../command/entry.verb.ts';
@@ -19,15 +19,21 @@ import { FactoryDoor } from '../factories/factories.store.ts';
 import { TemplateDoor } from '../templates/templates.store.ts';
 import { StoreRoot } from '../config/root.store.ts';
 import { rooted } from '../wiring/wire.verb.ts';
+import { AgentDoor } from '../agents/agent-door.store.ts';
+import { SkillDoor } from '../skills/skill-door.store.ts';
+import type { AgentName } from '../agents/agents.model.ts';
+import type { Agent } from '../agents/agents.ts';
 import { TemplateSource } from '../templates/templates.model.ts';
 import {
   archiveAsked,
   checkedTree,
   exportTree,
   folderAsked,
+  lookupsOf,
   packOut,
   placeSkillNames,
   problemLine,
+  type ExportFound,
   type FactoryParts,
 } from './template.store.ts';
 
@@ -155,10 +161,31 @@ const factoryParts = Effect.fn('factoryParts')(function* (name: string) {
   return { factory, file, instruction: instructionOf(factory), rules } satisfies FactoryParts;
 });
 
+/**
+ * The agents and skills an export of the repository `from` may name, read through the Agent and Skill doors over the roots it looks in
+ * (`lookupsOf`): each folder of agents' names, each read or the refusal of it (a name the door refuses among them), and the skills found.
+ */
+const exportFound = Effect.fnUntraced(function* (from: string) {
+  const { workflowDir, places, agentDirs } = lookupsOf(from);
+  const { agents } = yield* AgentDoor;
+  const found: Array<ExportFound['agents'][number]> = [];
+  for (const dir of agentDirs) {
+    const held = new Map<string, Agent | Error>();
+    for (const name of yield* agents.list(dir)) {
+      const read = yield* Effect.result(agents.read(name as AgentName, { dir }));
+      held.set(name, Result.isSuccess(read) ? read.success : read.failure);
+    }
+    found.push({ dir, found: held });
+  }
+  const skills = yield* (yield* SkillDoor).skills.found({ dir: workflowDir, places });
+  return { agents: found, skills: skills.at } satisfies ExportFound;
+});
+
 /** The template `nemia template export` asks for, made and checked (`exportTree`), then written through the Template door. */
 export const exportedTemplate = Effect.fn('templateExport')(function* (dir: string, from: string, factory: string | undefined) {
   const parts = factory === undefined ? undefined : yield* factoryParts(factory);
-  const tree = yield* tried(() => exportTree({ dir, from, factory: parts }, placeSkillNames()));
+  const found = yield* exportFound(from);
+  const tree = yield* tried(() => exportTree({ dir, from, factory: parts }, placeSkillNames(), found));
   yield* (yield* TemplateDoor).templates.create(TemplateSource.read(tree.dir), tree);
   return { dir: tree.dir, from: tree.from };
 });

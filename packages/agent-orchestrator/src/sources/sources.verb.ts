@@ -2,9 +2,10 @@
  * `nemia agents sources` as an entry of the command table (`AGENTS_SOURCES`): every agent file the store knows of, read
  * (`agentSources`), to copy into a person's library with `nemia agents copy`.
  */
-import { tried } from '../runtime-client.ts';
+import { Effect } from 'effect';
 import type { Command } from '../command/entry.verb.ts';
-import { rootGiven } from '../config/root.store.ts';
+import { StoreRoot } from '../config/root.store.ts';
+import { rooted } from '../wiring/wire.verb.ts';
 import { agentSources } from './sources.store.ts';
 import { sourcesLines, type AgentSource } from './sources.ts';
 
@@ -34,10 +35,13 @@ export const AGENTS_SOURCES: Command<{ sources: AgentSource[] }> = {
     status: 200,
     hand: 'the board reads the listing at its own path, beside the agents',
   },
-  handler: (args, _env, home) =>
-    tried(() => {
-      const at = typeof args.path === 'string' ? args.path : undefined;
-      return agentSources({ ...(at !== undefined && { at }), home: rootGiven(home, 'agents sources') });
-    }),
+  handler: (args, _env, home) => {
+    const at = typeof args.path === 'string' ? args.path : undefined;
+    return rooted(
+      home,
+      'agents sources',
+      Effect.flatMap(StoreRoot, (root) => agentSources({ ...(at !== undefined && { at }), home: root })),
+    );
+  },
   print: sourcesLines,
 };

@@ -11,7 +11,6 @@ import path from 'node:path';
 import { Result, Schema } from 'effect';
 import { CONFIG_FOLDERS } from 'agent-runtime/vocabulary';
 import { wfRoot } from '../config/config.store.ts';
-import { readCustomInstructions } from '../agents/read.store.ts';
 import { parseAgent } from '../agents/agents.ts';
 import { stepFrom } from '../workflow/index.ts';
 import type { Workflow } from '../step/step.ts';
@@ -169,9 +168,6 @@ export function storeDenies(root: string = ROOT): string[] {
 /** Her chat as the chat's verbs and its delivery are given it: the task her session is filed under, if any, and her folder. */
 export const nemiaChatPlace = (): { task: string | undefined; dir: string } => ({ task: readLevel()?.task, dir: nemiaDir() });
 
-/** The person's custom words for her in the store `home`, or undefined where there are none (`readCustomInstructions`). */
-export const nemiaCustom = (home: string = ROOT): string | undefined => readCustomInstructions(home, 'nemia');
-
 /** Writes `text` as the instruction her session is filed with (`promptFile`), and answers the file. */
 export function writePrompt(text: string): string {
   fs.mkdirSync(nemiaDir(), { recursive: true });
@@ -209,11 +205,10 @@ export function readTold(): ToldCustom | undefined {
 }
 
 /**
- * Writes the instruction her session is filed with (`promptFile`): her builtin instruction, then the person's custom words for her from
- * the store `home`, where there are any, and records those words (`writeTold`). Answers the file.
+ * Writes the instruction her session is filed with (`promptFile`): her builtin instruction, then the person's custom words for her,
+ * `custom`, where there are any (read through the Agent door, `keep.verb.ts`), and records those words (`writeTold`). Answers the file.
  */
-export function composePrompt(body: string, home: string = ROOT): string {
-  const custom = nemiaCustom(home);
+export function composePrompt(body: string, custom: string | undefined): string {
   const file = writePrompt(nemiaPrompt(body, custom));
   writeTold(custom);
   return file;

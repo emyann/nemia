@@ -276,7 +276,9 @@ const TOLD: Told[] = [
     says: [
       SHADCN_READ,
       'The checks you may run here, each bare: `npx turbo run test --force --continue`, `npm run typecheck`, `npm run lint`.',
-      'When the work you design is larger than one run of this workflow usually is, say so, and how to cut it into intents that each fit one.',
+      'Cut the work by its seams, never by its cost',
+      'Propose a second intent only for a seam of logic, where a part cannot be built until another has landed and been used, never to stay under a budget.',
+      "propose each step's `budget:` from those figures, not from a guess, and say which you went by.",
       'To see a board in the browser, run `npm run board:serve`, bare, and open the address it prints with the `look` skill',
       NO_LIVE_BOARD,
       NO_FILENAME,

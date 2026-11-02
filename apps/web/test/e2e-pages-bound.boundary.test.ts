@@ -85,7 +85,12 @@ test('the bound job refuses a set of shard files that is no one whole run’s, b
 
   const nowhere = verdictOf(path.join(scratch('nemia-pages-bound-'), 'not-there'));
   assert.equal(nowhere.status, 2, `a directory that is not there checks nothing: ${nowhere.said}`);
-  assert.match(nowhere.said, /is not there, and a shard's page times cannot be read from it/, nowhere.said);
+  assert.match(nowhere.said, /is not there/, nowhere.said);
+  assert.doesNotMatch(
+    nowhere.said,
+    /npm run e2e/,
+    `a download that left nothing is of shards that failed, not to be run by hand: ${nowhere.said}`,
+  );
 
   assert.equal(verdictOf().status, 2, 'and the command with no directory named says which to give it');
 });

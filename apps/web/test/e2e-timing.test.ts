@@ -181,10 +181,9 @@ test('REFUSED: a shard that did not write its page times, by name, as a shard th
 });
 
 test('REFUSED: no shard file at all, a shard written twice, a shard out of range, and two runs’ files together', () => {
-  assert.match(
-    String(shardsMissing([])),
-    /^no shard of the e2e wrote its page times here: run `npm run e2e -- --shard <i> --of <n>` for every shard of n/,
-  );
+  const none = String(shardsMissing([]));
+  assert.match(none, /^no shard of the e2e wrote its page times here/);
+  assert.doesNotMatch(none, /npm run e2e/, `every shard with no times failed or was cancelled, and is not to be run by hand: ${none}`);
   const [one, two] = shardsOf(4, SEVEN);
   assert.equal(
     shardsMissing([one, two, two, ...shardsOf(4, SEVEN).slice(2)]),

@@ -63,8 +63,9 @@ const listed = (ns: readonly number[]): string => (ns.length < 2 ? String(ns[0])
 export function shardsMissing(shards: readonly ShardPages[]): string | null {
   if (!shards.length)
     return (
-      'no shard of the e2e wrote its page times here: run `npm run e2e -- --shard <i> --of <n>` for every shard of n, ' +
-      'each with WF_ARTIFACTS set to the directory it writes its pages-<i>-of-<n>.json into, and give this that directory'
+      'no shard of the e2e wrote its page times here, and a shard writes them only once its pages have passed (run.ts): in CI every ' +
+      'shard failed or was cancelled, and their own results are the e2e\u2019s verdict, so read their logs and answer them; by hand, ' +
+      'give this the directory each shard\u2019s WF_ARTIFACTS named, where it wrote its pages-<i>-of-<n>.json'
     );
   const counts = [...new Set(shards.map((shard) => shard.of))].sort((a, b) => a - b);
   if (counts.length > 1)

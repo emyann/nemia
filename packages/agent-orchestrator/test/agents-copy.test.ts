@@ -32,7 +32,6 @@ const { StoreRoot } = await import('../src/config/root.store.ts');
 const { agentsLines } = await import('../src/roster/roster.ts');
 const { agentSources } = await import('../src/sources/sources.store.ts');
 const { sourcesLines } = await import('../src/sources/sources.ts');
-const { StoreRoot } = await import('../src/config/root.store.ts');
 const { AgentDoor } = await import('../src/agents/agent-door.store.ts');
 const { agentDoorMemory } = await import('../src/agents/agent-memory.store.ts');
 const { SkillDoor } = await import('../src/skills/skill-door.store.ts');

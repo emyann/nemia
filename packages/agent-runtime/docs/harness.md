@@ -95,9 +95,17 @@ the orchestrator's code holds a fact today, it is named beside it.
   `{"type":"system","subtype":"init",…}` line, which the runtime now reads and carries onto the attempt as `ranOn`
   (`harness/detached/output.ts`, `core/domain.ts`): which model a session ran on is a fact of the record, not a grep of a kept stdout.
   `test/sdk-pin.ts`'s `OPUS_TODAY` is what was measured, and an alias can move under a version that did not, so it is measured again
-  at each bump and never carried.
+  at each bump and never carried. Measured again on **SDK 0.3.316, Claude Code 2.1.316, 2026-11-01**: still `claude-opus-5-5`, alike
+  on the `init` line of `bin/ae-claude-job.ts` run on the bundled Claude Code (`live-sdk.boundary.test.ts`, which keeps that line as
+  `sdk-0.3.316-init.json`), on the attempt the engine recorded (`ranOn`), and on the owner's own `claude -p --model opus` at 2.1.316.
+- **A job's bin prints the SDK's `command_lifecycle` lines for the queued prompt ahead of `system`/`init`** (SDK 0.3.308 and 0.3.316,
+  2026-11-01): `queued`, then `started`, each with the `session_id`, then `init`; and a `result` line does not open with its `type`.
+  The worker passes over every line before the start event (`HarnessSpec.start`, `bin/ae-worker.ts`), so it reads the id all the same.
+- **A settings file left out of `settingSources` no longer supplies auto-mode rules or saved permission consents** (Claude Code 2.1.314,
+  SDK 0.3.314, from their changelogs, not measured here): a session runs `settingSources: ['project']`, so an `auto` step no longer
+  inherits a user-level consent; the first sign of what that changes is the runs' denials after the daemon restarts.
 - **The SDK joins most of the flags it builds for Claude Code as `--flag=value`, and a few as two arguments** (0.3.308, read off
-  `sdk.mjs`, 2026-10-22; the change landed in 0.3.295): joined for the mode, the prompts, the tool lists, the setting sources,
+  `sdk.mjs`, 2026-10-22, and re-read on 0.3.316, 2026-11-01, unchanged; the change landed in 0.3.295): joined for the mode, the prompts, the tool lists, the setting sources,
   `--add-dir`, `--plugin-dir`, `--resume`, `--model`, `--effort`; two arguments for `--mcp-config`, `--managed-settings` and every
   `extraArgs` key, `--settings` among them — those it joins only where the value itself opens with a dash — beside the four it opens
   with (`--output-format stream-json --verbose --input-format stream-json`). A test that read such a value as
@@ -131,7 +139,7 @@ the orchestrator's code holds a fact today, it is named beside it.
   line as the shell would; a permission rule only matches the text.
 - **A detached session's first stdout line names its id** (2026-10-06): `codex exec --json` (0.154.0) prints `thread.started` first;
   `claude -p` (2.1.291) prints `system`/`init` first under `--output-format stream-json --verbose`, and one `result` line under
-  `--output-format json`; a job's bin prints the SDK's messages in order, whose first is that same `system`/`init` (`readers`,
+  `--output-format json`; a job's bin prints the SDK's messages in order, whose first is that same `system`/`init` but for the `command_lifecycle` lines said above (`readers`,
   `bin/ae-worker.ts`).
 - **`Options.skills` as a list closes an attached session's skills to it; Claude Code's command line has no equivalent** (SDK 0.3.308,
   CLI 2.1.310, 2026-10-24, `live.test.ts`): a session given one plugin skill (`nemia-aeprobe:say-the-word`, by `--plugin-dir`) is

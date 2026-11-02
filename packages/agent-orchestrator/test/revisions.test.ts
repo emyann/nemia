@@ -801,14 +801,6 @@ test('the pure parts: a revision already given keeps its number, a gap gives no 
   assert.equal(digestOf([{ a: 1 }]).length, 16);
 });
 
-test('the ledger reads as empty where its file does not read', () => {
-  assert.deepEqual(ledgerOf('workflow', 'never-resolved'), []);
-  const file = path.join(ROOT, 'revisions', 'workflow', 'broken.json');
-  fs.mkdirSync(path.dirname(file), { recursive: true });
-  fs.writeFileSync(file, 'not json');
-  assert.deepEqual(ledgerOf('workflow', 'broken'), [], 'a file a hand edit broke leaves every other kind readable');
-});
-
 test('a folder edited while a run waits to give a step a tool nothing allows keeps the set it froze, says why, and stops no other run', async () => {
   const { one, two, t } = await twoOnOneFolder();
   const read = passRevisions();

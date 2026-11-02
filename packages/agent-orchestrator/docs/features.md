@@ -5661,15 +5661,16 @@ most of `test/run.test.ts`'s cases out into its stories and tables, and its 9,40
 
 ## 14. The former frontmatter form, no longer read
 
-**Registered** 2026-10-23, once the frontmatter was read as YAML. A block in the former line form, `key: the rest of the line`, never
-quoted, is still read so where YAML refuses it (`readFrontmatter`, `former: true`), and `nemia start` names each such file with the fix.
-That fallback is a second reader beside the YAML one, and a value it reads YAML would read otherwise.
-
-**Waits on** `nemia frontmatter rewrite --check` coming back clean on the owner's machine: the store's own folders, and
-`~/nemia-templates`. Then the card takes out the former reading (`formerShaped`, `formerEntries`, the `former` mark and the readers that
-branch on it, `formerFormLine` at `nemia start`), so such a block is refused naming its line and the YAML to write; `rewriteFormer` and
-the verb stay, for a folder written before that is brought in later. A run frozen before keeps its steps as records, which no
-frontmatter reader reads.
+Shipped 2026-11-02, once `nemia frontmatter rewrite --check` came back clean on the owner's machine, on the store's own folders and on
+`~/nemia-templates` (2026-10-23). A block in the former line form, `key: the rest of the line`, never quoted, where YAML refuses it or
+reads a flow collection on a key that holds one value, is refused at load (`readFrontmatter`, `Invalid`, exit 2), naming its first
+line YAML reads otherwise, that line written as YAML with its value the same, and `nemia frontmatter rewrite <folder>` for the whole
+folder. The `former` mark is gone from `Frontmatter` with the readers that branched on it (a skill's card key and `applies:` read alone,
+`withKey`'s rewrite, `fenceMoved`), and so is `formerFormLine` at `nemia start`: the load says it instead. `nemia frontmatter rewrite`
+and `rewriteFormer` stay, for a folder written before that is brought in later. The form is still recognised in two places, by the same
+helpers (`formerForm`, `formerShaped`, `formerEntries`; `inFormerForm` exported for the rewrite's caller and its tests): the load
+recognises it to refuse it, and the rewrite to write it as YAML. No reader takes a value from it. A run frozen before keeps its steps as
+records, which no frontmatter reader reads.
 
 ## 15. The runtime's `HarnessArgs` take a generic `fence` (decision 12, slice 2)
 

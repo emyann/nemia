@@ -387,10 +387,10 @@ check: |-
 ```
 
 A frontmatter written before the reader was YAML is in the former line form, `key: the rest of the line`, split at its first colon and
-never quoted, which YAML may read otherwise or refuse (`check: [ -f out.md ]`, `description: Reviews: the diff`). A block YAML refuses
-whose every line is `key: rest` is still read the former way, every value as it was, and `nemia start` prints a line naming each such
-file with the fix. A block in neither form is refused, naming its line and what to write. The fallback goes once no store holds a
-former file (`docs/features.md`, §14).
+never quoted, which YAML may read otherwise or refuse (`check: [ -f out.md ]`, `description: Reviews: the diff`). Such a block is no
+longer read (`docs/features.md`, §14): a block YAML refuses, or reads as a flow collection on a key that holds one value, whose every
+line is `key: rest`, is refused at load, naming its first line YAML reads otherwise and that line written as YAML, or the command that
+rewrites the folder. A block in neither form is refused, naming its line and what to write.
 
 `nemia frontmatter rewrite [<folder>...]` rewrites a former frontmatter as YAML, every value byte for byte, the body as it was. Given no
 folder it walks the store's own: `workflows/`, `inbox/`, and each factory's `tree/` and `applied/`. It says each file rewritten, each it
@@ -702,7 +702,7 @@ name as its tag. An agent with no description has no card. The frontmatter is re
 `description` each one text, a block scalar among them, and `tags` and `examples` each a YAML list of text, written in brackets or one
 item a line under the key. A list where a text is read, a text where a list is, a map, an empty list or an empty item, and a card key
 set twice are refused with the form to write; `skills-rendered.test.ts` holds this reading to js-yaml's on every SKILL.md the
-repository has. A SKILL.md still in the former line form is read each card key's line on its own, as the card was read before. A skill that no place has, or whose SKILL.md cannot be read, is refused where a card is asked for, never at load.
+repository has. A SKILL.md still in the former line form is refused at its line, as every frontmatter is. A skill that no place has, or whose SKILL.md cannot be read, is refused where a card is asked for, never at load.
 
 The card was a hand-written `.json` beside the agent, named by `card:` (by `skills:` before 2026-09-25), until agents card 2. Both
 lines are refused now, at load and on the board's save, saying what replaced them: delete the line and the file.
@@ -2806,7 +2806,7 @@ run 'wf tick' (or 'wf up') to start them
   frontmatter, so neither the run's id nor any step's brief carries a `workflow:` line. `--workflows` defaults to the
   card's `workflow:`, found from its plan folder as `wf start <folder>` finds it. A card whose `after:` names cards is refused
   without `--after`, and the refusal names the ids to give; `wf start` checks the ids given, as it checks any `--after`.
-  A file that opens with a closed frontmatter block that reads, as YAML or in the former line form, as a map of keys, each a word
+  A file that opens with a closed frontmatter block that reads as YAML as a map of keys, each a word
   (`KEY_WORD`), is a plan's card, and a block of keys is never taken into a brief: a key a plan's card lacks — an inbox card's `repo:` or `factory:`, a `title:` — is
   refused by name, exit 2, naming `wf inbox add <file>`, whose cards read those keys. A file whose block has a line of
   prose, is empty, or opens with a `---` it never closes is not a card, and is taken whole.
@@ -3965,7 +3965,7 @@ holding a concurrency slot forever.
 | `src/keys/keys.ts` | a step's keys read one each — pure: a value as written, the value the step carries, or the refusal that names the fix (`wordOf`, `contextOf`, `budgetOf`, `gateOf`, `workspaceOf`, `slotOf`, `outputOf`), and skills or a system prompt a step's sessions cannot reach (`composedRefusal`) |
 | `src/keys/tools.ts` | a step's tool rules — pure: its `tools` (`toolsOf`), its allow and deny rules, a write named as anything but `Edit` refused (`rulesOf`), and the rule offered for a call a fenced step was denied (`allowRuleOf`, `disallowedBy`) |
 | `src/former/former.ts` | a key under the name it had before — pure: `FORMER_KEYS`, and an agent's own `FORMER_OWN_KEYS` with its words (`harnessPromptNamed`), read in a file (`readKeys`) and on a frozen record (`asNamed`), written back in the form the file has (`formerKeyWritten`), and the fence a step asks for under either key (`modeOf`) |
-| `src/frontmatter/frontmatter.ts`, `frontmatter.verb.ts` | a frontmatter block as YAML 1.2 — pure: the one reader of every step, agent, skill and card (`readFrontmatter`, `frontmatterOrNull`), the former line form still read and marked, a list key's value as its one string (`flatValue`), the one writer (`renderFrontmatter`), a key set or taken out (`withKey`), a former file rewritten (`rewriteFormer`); and `nemia frontmatter rewrite` (`FRONTMATTER_REWRITE`) |
+| `src/frontmatter/frontmatter.ts`, `frontmatter.verb.ts` | a frontmatter block as YAML 1.2 — pure: the one reader of every step, agent, skill and card (`readFrontmatter`, `frontmatterOrNull`), the former line form refused at its line, the YAML to write named (`inFormerForm`), a list key's value as its one string (`flatValue`), the one writer (`renderFrontmatter`), a key set or taken out (`withKey`), a former file rewritten (`rewriteFormer`); and `nemia frontmatter rewrite` (`FRONTMATTER_REWRITE`) |
 | `src/workflow/step-file.ts` | one step file — pure: read into a `Workflow` through each key's reader, an unknown key refused (`parseWorkflow`), and written back, the parser run backwards (`renderStep`) |
 | `src/workflow/validate.ts` | a folder's steps checked together — pure: a cycle, a dangling `after`, an `input:` on work that has not finished, a workspace, a mode or a loop the team cannot run (`validate`), and the graph the `after` edges draw (`orderSteps`, `upstreamOf`, `fansOut`, `terminalSteps`) |
 | `src/folder/folder.ts` | a folder of markdown from its text — pure: its step files (`stepFiles`), the names a step and the folders beside it may take, and every step read and checked together (`parseFolder`) |

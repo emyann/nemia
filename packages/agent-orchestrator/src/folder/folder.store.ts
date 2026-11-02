@@ -16,7 +16,6 @@ import { AGENTS_FOLDER, isReadme, SKILLS_FOLDER, STEP_KEYS, WorkflowError, type 
 import { PLACES } from '../keys/index.ts';
 import {
   codexModeLine,
-  formerFormLine,
   formerKeyLine,
   formerKeysIn,
   formerFenceIn,
@@ -24,7 +23,6 @@ import {
   overridableLine,
   frontmatterKey,
   harnessPromptLine,
-  inFormerForm,
   placeLine,
   baseLine,
 } from '../former/former.ts';
@@ -81,9 +79,8 @@ export function loadWorkflowsWith(dir: string, found: Found, fills?: Fills): Wor
  * A file that runs on codex — by its own `harness:` line, or a step's by its agent's — and still names its sandbox as `permissionMode:` is
  * named too (`codexModeLine`): the parser reads the line as `sandbox:`. So is an agent that still says `systemPrompt:`
  * (`harnessPromptLine`), which the parser reads as `harnessPrompt:`, and a step file that still says `workspace: folder` (`placeLine`),
- * which the parser reads as `place: folder`, or `workspace: main` (`baseLine`), which it reads as `workspace: base`. And each step or
- * agent file whose frontmatter is still in the former line form, not YAML (`formerFormLine`): the parser reads it, and `nemia frontmatter
- * rewrite` writes it as YAML.
+ * which the parser reads as `place: folder`, or `workspace: main` (`baseLine`), which it reads as `workspace: base`. A frontmatter still in
+ * the former line form is not named here: the load refuses it, at its line (`readFrontmatter`).
  */
 export function formerKeyLines(dir: string): string[] {
   const steps = stepTexts(dir);
@@ -96,7 +93,6 @@ export function formerKeyLines(dir: string): string[] {
     ...steps.flatMap(({ file, text, harness }) => {
       const at = path.join(dir, file);
       return [
-        ...(inFormerForm(text) ? [formerFormLine(at)] : []),
         ...formerKeysIn(text).map((former) => formerKeyLine(at, former)),
         ...formerFenceIn(text).map((key) => formerFenceLine(at, key)),
         ...codexMode(at, text, harness),
@@ -109,7 +105,6 @@ export function formerKeyLines(dir: string): string[] {
       const text = textAt(at);
       const prompt = frontmatterKey(text, 'systemPrompt');
       return [
-        ...(inFormerForm(text) ? [formerFormLine(at)] : []),
         ...formerKeysIn(text).map((former) => formerKeyLine(at, former)),
         ...formerFenceIn(text).map((key) => formerFenceLine(at, key)),
         ...codexMode(at, text, frontmatterKey(text, 'harness')),
@@ -206,7 +201,7 @@ export function workflowDirAt(dir: string): WorkflowDir {
  * a person points at is never shadowed by one of the tree's or the repository's.
  *
  * Answered as a `WorkflowDir`, absolute and resolved (`workflowDirAt`). Refused when none is a folder, naming where it looked and the
- * workflows the repository has. Whether the folder is a workflow is `loadWorkflows`' to say.
+ * workflows the repository has. Whether the folder is a workflow is `loadWorkflows`' (`workflows/workflows.store.ts`) to say.
  */
 export function workflowFolder(given: string, from: string, repo: string, tree?: string): WorkflowDir {
   const at = path.resolve(from, given);
@@ -253,7 +248,7 @@ export function agentUsers(workflowsDir: string, name: string): string[] {
  * What a workflow is for, in its author's words: the first paragraph of its folder's README, its lines joined into one.
  *
  * Null when the folder has no README, or the README has nothing else (`readmeDescription`, which reads its text). Never throws: a README
- * that cannot be read describes nothing, and the steps beside it are `loadWorkflows`' to judge.
+ * that cannot be read describes nothing, and the steps beside it are `loadWorkflows`' (`workflows/workflows.store.ts`) to judge.
  */
 export function workflowDescription(dir: string): string | null {
   const text = workflowReadme(dir);
@@ -264,7 +259,8 @@ export function workflowDescription(dir: string): string | null {
  * A workflow's README in full, the workflow level's instruction: the text of the first README of its folder by name, any case, without a
  * leading byte order mark.
  *
- * Null when the folder has no README or it cannot be read. Never throws: the steps beside it are `loadWorkflows`' to judge.
+ * Null when the folder has no README or it cannot be read. Never throws: the steps beside it are `loadWorkflows`'
+ * (`workflows/workflows.store.ts`) to judge.
  */
 export function workflowReadme(dir: string): string | null {
   try {

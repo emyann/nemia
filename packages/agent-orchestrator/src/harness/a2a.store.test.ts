@@ -303,7 +303,7 @@ test('a2a-agents.json, the secrets a remote step is given and the keys it may no
     assert.equal(parseWorkflow('ask', '---\nplace: git\nharness: a2a:second-opinion\n---\nReview it.\n').harness, 'a2a:second-opinion');
     for (const bad of ['a2a:', 'a2a:Reviewer', 'a2a:code_review', 'a2a:-x', 'a2a:a b']) {
       assert.match(
-        loadRefusal(() => parseWorkflow('ask', `---\nplace: git\nharness: ${bad}\n---\nReview it.\n`)),
+        loadRefusal(() => parseWorkflow('ask', `---\nplace: git\nharness: ${JSON.stringify(bad)}\n---\nReview it.\n`)),
         /names a remote A2A agent, and `.*` is not a name one is declared under/,
         bad,
       );

@@ -149,7 +149,7 @@ const PARSE: Refused[] = [
   ],
   [
     'an `after:` naming no card',
-    () => parsePlan([card('a', 'workflow: dev'), card('b', 'workflow: dev\nafter: ,')]),
+    () => parsePlan([card('a', 'workflow: dev'), card('b', 'workflow: dev\nafter: ","')]),
     /^b\.md: `after: ,` names no card\./,
   ],
   [
@@ -227,7 +227,7 @@ const START: Refused[] = [
     () => cardToStart('d.md', '---\nworkflow:\n  - dev\n  - ui\n---\nx\n', []),
     /^d\.md:2: /,
   ],
-  ['an after: naming no card', () => cardToStart('a.md', '---\nafter: ,\n---\nx\n', ['r-b']), /^a\.md: `after: ,` names no card\./],
+  ['an after: naming no card', () => cardToStart('a.md', '---\nafter: ","\n---\nx\n', ['r-b']), /^a\.md: `after: ,` names no card\./],
   ['an after: naming one twice', () => cardToStart('a.md', '---\nafter: b, b\n---\nx\n', ['r-b']), /^a\.md: `after: b, b` names b twice\./],
   [
     'a card carried out of the inbox: a card, not a brief, its `repo:` refused by name',

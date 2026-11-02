@@ -198,7 +198,7 @@ test('what export writes from a repository and a factory, read back as it was wr
       const repo = repoWithTeam();
       const long = `npm test && ${Array.from({ length: 12 }, (_, i) => `node "scripts/check-${i}.ts" --mode: 'strict' # ${i}`).join(' && ')}`;
       const ship = path.join(repo, 'workflows', 'dev', 'ship.md');
-      fs.writeFileSync(ship, fs.readFileSync(ship, 'utf8').replace(/^check: .*$/m, `check: ${long}`));
+      fs.writeFileSync(ship, fs.readFileSync(ship, 'utf8').replace(/^check: .*$/m, `check: ${JSON.stringify(long)}`));
       const review = path.join(repo, 'workflows', 'dev', 'review.md');
       fs.writeFileSync(
         review,

@@ -668,7 +668,7 @@ test('`writable:`: the folders a step may write, read, refused, and mounted', as
     ),
     refuses('a hidden one', 'writable: ..', '`writable: ..` has `..`', "not a directory's name"),
     refuses('one given twice', 'writable: web, web', 'names `web` twice'),
-    refuses('none', 'writable: , ,', '`writable: , ,` names no folder'),
+    refuses('none', 'writable: ", ,"', '`writable: , ,` names no folder'),
     refuses(
       'on a remote A2A agent',
       'harness: a2a:peer\nwritable: web',

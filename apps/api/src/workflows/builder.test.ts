@@ -843,12 +843,9 @@ test("versionOf: what moves a folder's version — the agents its steps name, th
   });
 
   await t.test(
-    "versionOf reads `agent:` as the parser does — indented, or with a space before its colon — and covers the schema the agent's output: names",
+    "versionOf reads `agent:` as the parser does — with a space before its colon — and covers the schema the agent's output: names",
     async () => {
-      for (const [folder, line] of [
-        ['indented', '  agent: critic'],
-        ['spaced', 'agent : critic'],
-      ] as const) {
+      for (const [folder, line] of [['spaced', 'agent : critic']] as const) {
         const dir = path.join(STORE, `version-${folder}`);
         write(path.join(STORE, 'agents', 'critic.md'), '---\nharness: claude\noutput: critique.schema.json\n---\nFind what is wrong.\n');
         write(

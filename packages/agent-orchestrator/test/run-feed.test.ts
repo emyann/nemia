@@ -1156,6 +1156,14 @@ test("the store's pause and resume, each one line of the store's, said once by t
     at = readPause()!.at;
     await ticks(3);
     assert.deepEqual(storeSaid(), [[STORE, 'StorePaused', 'store paused', `since ${at}`, 'person']]);
+    const [put] = readFeed(0).lines.filter((l) => 'store' in l);
+    const by = readPause()!.by;
+    assert.deepEqual(
+      [put && 'by' in put ? put.by : undefined, put && 'why' in put ? put.why : undefined],
+      [by, 'a rebase'],
+      'who paused, and why, beside the note',
+    );
+    assert.ok(put?.message?.includes(by) && put.message.includes('a rebase'), put?.message);
   });
   await s.test('nemia pause --now --yes on the pause that stands keeps its moment, and writes no second put', async () => {
     await printedBy(t, 'pause', '--now', '--yes');
@@ -1177,7 +1185,7 @@ test("the store's pause and resume, each one line of the store's, said once by t
   await s.test('nemia watch -l kind=Store prints the two lines of the store and no other', async () => {
     const printed = (await printedBy(t, 'watch', '--once', '-l', 'kind=Store')).filter((l) => /\d\d:\d\d:\d\d/.test(l));
     assert.equal(printed.length, 2, printed.join('\n'));
-    assert.ok(printed[0].includes('store  —  store paused'), printed[0]);
+    assert.ok(printed[0].includes('store  —  store paused') && printed[0].includes('a rebase'), printed[0]);
     assert.ok(printed[1].includes('store  —  store resumed'), printed[1]);
   });
 });

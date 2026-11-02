@@ -94,7 +94,10 @@ own — its pid and `word: "daemon started"`, `reason: "DaemonStarted"`, and how
 — so a follower sees a restart, and a crash before it, in the feed it already reads. It is routine to a
 subscription, and no run's: the fold and a run's `removed` leave it out. The store has lines of its own, about `Store/store`:
 `nemia pause` (and the board's pause, which calls it) is one `store paused`, `reason: "StorePaused"`, and `nemia resume` one
-`store resumed`, `reason: "StoreResumed"`, each `source: "person"`, its note `since <the moment the pause was put>`. The verbs write
+`store resumed`, `reason: "StoreResumed"`, each `source: "person"`, its note `since <the moment the pause was put>`, which pairs a put
+with its lift. A put says who paused and why, as the pause's file does, in fields of its own (`by`, `why`) and in its message
+(`store paused by ann · merging by hand`, who alone where no why was given), never in its note; `nemia service status` says a pause that
+stands the same way. The verbs write
 no line: the tick's pass, which reads the store's pause (`$WF_ROOT/cordon`) already, offers the put while the pause stands and the lift
 for each put the feed holds that no longer stands (`storeOnce`), each counted off the feed's own lines, so a second daemon or a restart
 says neither again; a pause put and lifted between two passes leaves no line, since a pass reads what stands. `nemia watch -l

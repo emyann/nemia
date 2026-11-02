@@ -133,6 +133,7 @@ function hostOf(world: World): { host: ServiceHost; events: string[] } {
       return '';
     },
     linger: () => true,
+    standing: () => null,
     lease: () => {
       const read = world.lease;
       world.lease = world.later?.shift() ?? world.lease;

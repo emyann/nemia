@@ -475,16 +475,8 @@ test('a change of a skill moves the version of every agent that gives it, and th
 test('REFUSED at shipped defaults: a name that is not a folder-safe id, a clash with a skill of your library, a frontmatter the card reader refuses', async () => {
   await refused(send('/api/skills/yours', { skill: { ...NOTES, name: '../agents' } }), 422, /`\.\.\/agents` is not a skill's name/);
   await refused(send('/api/skills/yours', { skill: { ...NOTES, name: 'Tidy Notes' } }), 422, /`Tidy Notes` is not a skill's name/);
-  await refused(
-    send('/api/skills/yours', { skill: { ...NOTES, name: 'mine' } }),
-    409,
-    /^skills\/mine is there already/,
-  );
-  await refused(
-    send('/api/skills/yours', { skill: { ...NOTES, name: 'fresh', description: '' } }),
-    422,
-    /`description` is required/,
-  );
+  await refused(send('/api/skills/yours', { skill: { ...NOTES, name: 'mine' } }), 409, /^skills\/mine is there already/);
+  await refused(send('/api/skills/yours', { skill: { ...NOTES, name: 'fresh', description: '' } }), 422, /`description` is required/);
   await refused(send('/api/skills/yours', { skill: { ...NOTES, name: 'fresh', tags: [] } }), 422, /`tags` is an empty list/);
   await refused(
     send('/api/skills/yours', { skill: { ...NOTES, name: 'fresh', description: 'one\npreload: true' } }),

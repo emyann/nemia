@@ -19,7 +19,8 @@ import { TEAM } from './team.ts';
 
 const ROOT = scratch('wf-skill-copy-');
 process.env.WF_ROOT = ROOT;
-const { copySkill, isRefusal } = await import('../src/runner.ts');
+const { isRefusal } = await import('../src/runner.ts');
+const { copySkill } = await import('../src/skills/skills.store.ts');
 type Refusal = import('../src/refusal/refusal.ts').Refusal;
 
 const SHIPPED = path.join(TEAM, 'skills');

@@ -18,7 +18,8 @@ import { scratch } from './scratch.ts';
 
 const ROOT = scratch('wf-skill-write-');
 process.env.WF_ROOT = ROOT;
-const { addFactory, writeSkill, isRefusal } = await import('../src/runner.ts');
+const { addFactory, isRefusal } = await import('../src/runner.ts');
+const { writeSkill } = await import('../src/skills/skills.store.ts');
 type Refusal = import('../src/refusal/refusal.ts').Refusal;
 
 const LIBRARY = path.join(ROOT, 'workflows', 'skills');

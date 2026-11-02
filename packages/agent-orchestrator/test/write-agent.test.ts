@@ -22,7 +22,8 @@ import { TEAM } from './team.ts';
 
 const ROOT = scratch('wf-agent-');
 process.env.WF_ROOT = ROOT;
-const { addFactory, agentSkillsFound, isRefusal, removeAgent, writeAgent } = await import('../src/runner.ts');
+const { addFactory, agentSkillsFound, isRefusal } = await import('../src/runner.ts');
+const { removeAgent, writeAgent } = await import('../src/agents/agents.store.ts');
 type Refusal = import('../src/refusal/refusal.ts').Refusal;
 
 const STORE = path.join(ROOT, 'workflows');
@@ -389,14 +390,10 @@ test('a result schema travels with its agent: written with it, refused when not 
 test('REFUSED at shipped defaults: a card sent with its agent, which is generated from its skills', () => {
   fresh();
   const text = '[{"id":"write-a-note","name":"Write a note","description":"Write the notes of a change.","tags":["note"]}]';
-  refused(
-    () => writeAgent(ROOT, AGENTS, scribe, { version: null, card: { file: 'scribe.skills.json', text } } as never),
-    /^`card` is not written with an agent: its card is generated from its skills\./,
-  );
-  refused(
-    () => writeAgent(ROOT, AGENTS, scribe, { version: null, card: undefined } as never),
-    /^`card` is not written with an agent: its card is generated from its skills/,
-  );
+  const sent = { version: null, card: { file: 'scribe.skills.json', text } };
+  const sentEmpty = { version: null, card: undefined };
+  refused(() => writeAgent(ROOT, AGENTS, scribe, sent), /^`card` is not written with an agent: its card is generated from its skills\./);
+  refused(() => writeAgent(ROOT, AGENTS, scribe, sentEmpty), /^`card` is not written with an agent: its card is generated from its skills/);
   assert.equal(fs.existsSync(path.join(AGENTS, 'scribe.md')), false, 'and nothing of it is written');
   assert.equal(fs.existsSync(path.join(AGENTS, 'scribe.skills.json')), false);
 });

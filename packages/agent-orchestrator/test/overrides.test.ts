@@ -15,7 +15,7 @@ import { scratch } from './scratch.ts';
 
 const ROOT = scratch('wf-overrides-');
 process.env.WF_ROOT = ROOT;
-const { writeAgent } = await import('../src/runner.ts');
+const { writeAgent } = await import('../src/agents/agents.store.ts');
 const { agentVersion } = await import('../src/agents/read.store.ts');
 
 /** The agents a step may name, each parsed from its file's text. */

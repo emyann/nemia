@@ -118,7 +118,6 @@ export const TEAM_NAMES: Baseline = {
   'packages/agent-orchestrator/test/step-skills.test.ts': { count: 25, ...TEAM_MOVES.fixtures },
   'packages/agent-orchestrator/test/subscription-wakes.test.ts': { count: 5, ...TEAM_MOVES.fixtures },
   'packages/agent-orchestrator/test/told-layers.test.ts': { count: 18, ...TEAM_MOVES.fixtures },
-  'packages/agent-orchestrator/test/workflow.test.ts': { count: 4, ...TEAM_MOVES.teamTests },
   'packages/agent-orchestrator/test/write-agent.test.ts': { count: 3, ...TEAM_MOVES.fixtures },
   'packages/agent-runtime/src/harness/settings.test.ts': { count: 1, ...TEAM_MOVES.fixtures },
   'packages/agent-runtime/test/reader-streams.ts': { count: 2, ...TEAM_MOVES.fixtures },

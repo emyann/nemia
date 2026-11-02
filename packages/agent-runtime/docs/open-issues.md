@@ -46,7 +46,7 @@ of a held session on its `system`/`init` message, and `bin/ae-claude-job.ts`, wh
 file beside the run (`bridgeDue`).
 
 **What is known.** `@anthropic-ai/claude-agent-sdk` declares no `enableRemoteControl` on its `Query` type — not on 0.3.270, and not
-on 0.3.308, where `sdk.d.ts` still has no such name and `sdk.mjs` still carries the method (re-read 2026-10-22 at the bump) — yet the object
+on 0.3.316, where `sdk.d.ts` still has no such name and `sdk.mjs` still carries the method (re-read 2026-11-01 at the bump) — yet the object
 `query()` answers carries it: `enableRemoteControl(enabled, name?, { reattachSessionId?, keepSessionOnExit?, workSecret? })`, which
 sends a `remote_control` control request with `reattach_session_id` and `keep_session_on_exit` at its top level, answers the bridge's
 facts (`session_url`, `connect_url`, `environment_id`, `bridge_epoch`, `bridge_session_id`), and drives `system`/`bridge_state`

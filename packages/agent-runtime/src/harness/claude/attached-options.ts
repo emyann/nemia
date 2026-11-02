@@ -7,7 +7,7 @@
  * **`mcpServers` here is the one site that names the SDK's shape for a server, so the one that says where the shape and ours part.** A
  * recorded server carries `oauth: { clientId, callbackPort }` (`mcpServerOf`), and `oauth` is still not declared on the SDK's type
  * for an HTTP server (`sdk.d.ts:1219-1234`), so the cast is what lets it through and no typecheck reads it. What it does is measured
- * rather than typed: on 0.3.308 the SDK's own schema for an http server declares `oauth` and the server comes back with it echoed on
+ * rather than typed: on 0.3.308, and again on 0.3.316 (2026-11-01), the SDK's own schema for an http server declares `oauth` and the server comes back with it echoed on
  * `McpServerStatus.config` (`seam.ts`, `docs/harness.md`). An SDK that renamed the field would break every sign-in silently — the
  * server would simply come back `needs-auth` for ever — so it is re-measured at each bump, not carried.
  */
@@ -209,7 +209,7 @@ export const attachedOptions = (r: SpawnRequest): AttachedOptions => {
     strictMcpConfig: true,
     ...askedOf(r),
     /**
-     * What is left of Claude Code's command line: `config.claude`'s own flags, and the two the Agent SDK 0.3.308 has no `Options`
+     * What is left of Claude Code's command line: `config.claude`'s own flags, and the two the Agent SDK 0.3.316 has no `Options`
      * for — `--no-chrome`, because Claude in Chrome, switched on by a user setting (`claudeInChromeDefaultEnabled`), connects even in
      * a strict session, and a session that needs a browser names one in `mcp` or its checkout's `.mcp.json`; and `--worktree`. Looked
      * for in `sdk.d.ts` and not there; everything else a task gives here is a flag only Claude Code has. Look for an `Options`
@@ -218,7 +218,7 @@ export const attachedOptions = (r: SpawnRequest): AttachedOptions => {
      * `--autocompact` beside them for the one task that cannot carry `autoCompactWindow`: where `config.claude.settings` is a
      * file's path there is no settings object of ours to put the window in, and the runtime rewrites no settings file
      * (`memorylessSettings`). The two reach the same window, measured on 0.3.270 against the real Claude Code and carried, both
-     * options still there on 0.3.308: 150000 asked each
+     * options still there on 0.3.316: 150000 asked each
      * way gave `rawMaxTokens: 150000`, where a session asked for neither got the model's 200000.
      */
     extraArgs: {

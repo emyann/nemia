@@ -22,7 +22,7 @@ import { withoutTelemetry } from './telemetry.ts';
 
 /**
  * The five words a harness has for a server's state, as the SDK reports them (`sdk.d.ts:1280-1334`), carried and never re-worded.
- * Re-read on SDK 0.3.308 and unchanged; `McpServerStatus` carries `config`, `scope` and `source` beside them, which nobody here reads
+ * Re-read on SDK 0.3.316 and unchanged; `McpServerStatus` carries `config`, `scope` and `source` beside them, which nobody here reads
  * (`docs/harness.md`, *The MCP sign-in affordances*).
  */
 export const MCP_STATES = ['connected', 'needs-auth', 'failed', 'pending', 'disabled'] as const;

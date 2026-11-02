@@ -18,6 +18,9 @@
  *
  * A fence also reaches the run's artifacts folder: each step is filed the folder of every step it comes after, read-only
  * (`handedMounts`), and reads what it holds and writes none of it, in any mode; it is filed no folder of a step it does not come after.
+ * A step whose mode writes outside its directory only by rule (`writesOutsideByRule`, each read-only agent's) is filed its own folder
+ * too, read-only (`ownMounts`), so it reads what its tools wrote there and writes none of it; a writer's is filed none, its reach there
+ * left as its mode gives it.
  * The reach is read off the config a filing gives the harness (`filedConfig`), as Claude Code holds a mount (`readsAt`, `writesAt`). So
  * does the store's inbox, for a step whose `reads:` names it (`readsMounts`): read-only, in any mode, and to no other step.
  *
@@ -89,7 +92,7 @@ import { parseAgent } from '../src/agents/agents.ts';
 import { stepPlace, WorkflowError, type Workflow } from '../src/step/step.ts';
 import { readSkillRules, RULES_FILE } from '../src/skills/read.store.ts';
 import { appliesMatch, appliesOf, type SkillRule } from '../src/skills/skills.ts';
-import { isFolderTeam, sandboxed, unallowedRefusal, upstreamOf } from '../src/workflow/index.ts';
+import { isFolderTeam, sandboxed, unallowedRefusal, upstreamOf, writesOutsideByRule } from '../src/workflow/index.ts';
 import { scratch } from './scratch.ts';
 import { levelFile, promptFile, readNemia, storeDenies, toldFile } from '../src/nemia/level.store.ts';
 import { admissionOf, nemiaFence, widened } from '../src/admission/index.ts';
@@ -97,7 +100,7 @@ import { TABLE } from '../src/command/commands.verb.ts';
 import { rulesOfTry } from '../src/stats/discipline.ts';
 import { givenSkillOf } from '../src/keys/given-skill.ts';
 import { placesOf, shippedFolders, SHIPPED_HOLDERS, TEAM, TEAM_DEV, teamCopy } from './team.ts';
-import { CARD, filedOf, handedBy, INPUT_FILE, INPUTS, readsAt, writesAt } from './mounted.ts';
+import { CARD, filedOf, handedBy, INPUT_FILE, INPUTS, readsAt, RUN_ARTIFACTS, writesAt } from './mounted.ts';
 
 const REPO = path.join(import.meta.dirname, '..', '..', '..');
 
@@ -3192,6 +3195,38 @@ test('every shipped step on a harness fenced by a permission mode reads, and nev
     }
   }
   assert.ok(checked.includes('build/review <- implement'), checked.join('\n'));
+});
+
+test("every shipped step whose mode writes outside its directory only by rule reads, and never writes, its own files directory, and no other run's", () => {
+  const readers: string[] = [];
+  for (const dir of FOLDERS) {
+    const steps = loadWorkflows(dir, placesOf(dir));
+    const filed = filedOf(steps);
+    for (const step of steps.filter((s) => !sandboxed(s.harness ?? 'claude') && !s.harness?.startsWith('a2a:'))) {
+      const config = filed.get(step.name)!;
+      const where = `${path.basename(dir)}/${step.name}`;
+      const handed = new Set([...upstreamOf(steps, step.name)].map((by) => path.join(RUN_ARTIFACTS, by)));
+      const own = path.join(RUN_ARTIFACTS, step.name);
+      const reached = (config.mounts ?? []).map((m) => m.path).filter((at) => at.startsWith(`${path.dirname(RUN_ARTIFACTS)}/`));
+      if (writesOutsideByRule(step.sandbox ?? step.permissionMode)) {
+        assert.ok(readsAt(config, handedBy(step.name)), `${where} reads its own folder`);
+        assert.equal(writesAt(config, handedBy(step.name)), false, `${where} writes none of its own folder`);
+        assert.deepEqual(
+          reached.filter((at) => at !== own && !handed.has(at)),
+          [],
+          `${where} is filed no other step's folder, nor another run's`,
+        );
+        readers.push(where);
+      } else {
+        assert.equal(
+          reached.includes(own),
+          false,
+          `${where}, a writer, is filed no mount of its own folder: its reach there is its mode's`,
+        );
+      }
+    }
+  }
+  assert.ok(readers.includes('build/review') && readers.includes('quick/review'), readers.join('\n'));
 });
 
 test('the janitor reads the inbox, and writes none of it: every shipped step whose `reads:` names it', () => {

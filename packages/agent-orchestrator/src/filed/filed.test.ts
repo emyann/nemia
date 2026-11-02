@@ -1,7 +1,8 @@
 /**
  * What a step's session is filed (`filedConfig`), and the runtime's refusal of it said as the step's (`filedRefusal`). Two tables.
  *
- * The first: every local step is filed `STEP_FILES` naming the run's artifacts folder of that step, and the MCP servers it is filed: a
+ * The first: every local step is filed `STEP_FILES` naming the run's artifacts folder of that step, mounted read-only where its mode
+ * writes outside its directory only by rule (`ownMounts`), and the MCP servers it is filed: a
  * name the factory records rides the task's own `mcp`, as the servers themselves, and is left out of `projectMcp`, which is what keeps
  * the runtime's "one would hide the other" refusal untripped.
  *
@@ -54,6 +55,63 @@ test('filedConfig: what a local step is filed beside its fence, its files direct
     assert.equal(STEP_FILES, 'WF_STEP_FILES');
     assert.deepEqual(filed(stepOf()).env, { WF_STEP_FILES: '/runs/r/artifacts/look' });
   });
+
+  await t.test(
+    'a step whose mode writes outside its directory only by rule is filed its own files directory read-only, and no other',
+    () => {
+      const review = parseWorkflow('review', '---\nplace: git\nafter: look\npermissionMode: dontAsk\n---\nReview.\n');
+      const steps = [stepOf('permissionMode: auto\n'), review];
+      const config = filedConfig(
+        review,
+        steps,
+        { gates: [] },
+        { model: undefined, budgetUsd: undefined, runArtifacts: '/runs/r/artifacts', inbox: '/inbox', own: {}, landingDenied: () => [] },
+      );
+      assert.deepEqual(
+        config.mounts,
+        [
+          { path: '/runs/r/artifacts/review', readOnly: true },
+          { path: '/runs/r/artifacts/look', readOnly: true },
+        ],
+        "its own folder, as WF_STEP_FILES names it, then the one it comes after; no other step's, no other run's",
+      );
+      assert.equal(config.env.WF_STEP_FILES, '/runs/r/artifacts/review');
+      assert.deepEqual(
+        filed(stepOf('permissionMode: dontAsk\n')).mounts,
+        [{ path: '/runs/r/artifacts/look', readOnly: true }],
+        'a step alone: its own folder alone',
+      );
+      assert.deepEqual(filed(stepOf('permissionMode: plan\n')).mounts, [{ path: '/runs/r/artifacts/look', readOnly: true }]);
+      const unruled = filedConfig(
+        stepOf('permissionMode: dontAsk\n'),
+        [],
+        { gates: [] },
+        {
+          model: undefined,
+          budgetUsd: undefined,
+          runArtifacts: '/runs (old)/r/artifacts',
+          inbox: '/inbox',
+          own: {},
+          landingDenied: () => [],
+        },
+      );
+      assert.equal(Object.hasOwn(unruled, 'mounts'), false, 'a path no permission rule carries is not mounted: the step runs as it did');
+      assert.equal(
+        Object.hasOwn(filed(stepOf('permissionMode: yolo\n')), 'mounts'),
+        false,
+        'a word the harness does not take, the runtime refuses',
+      );
+    },
+  );
+
+  await t.test(
+    'a writer, whose mode writes outside its directory unasked, is filed no mount of its own folder: its reach is as it was',
+    () => {
+      assert.equal(Object.hasOwn(filed(stepOf('permissionMode: auto\n')), 'mounts'), false);
+      assert.equal(Object.hasOwn(filed(stepOf('permissionMode: bypassPermissions\n')), 'mounts'), false);
+      assert.equal(Object.hasOwn(filed(stepOf()), 'mounts'), false, "a step naming no mode runs in the runtime's default, auto");
+    },
+  );
 
   await t.test("a name the factory records is filed as the server, and left off projectMcp; the rest stay the checkout's", () => {
     const config = filed(withAgent('github, repo'), { github: GITHUB });

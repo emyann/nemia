@@ -3,8 +3,9 @@
  * and what `nemia decide` shows of it.
  */
 import { Effect } from 'effect';
-import { Hono } from 'hono';
+import { type Context, Hono } from 'hono';
 import {
+  type Command,
   COMMANDS,
   type FinishedPage,
   type FinishedRun,
@@ -136,7 +137,22 @@ const CONCLUDED = commandNamed('concluded');
  * - `GET /api/runs/:runId/concluded` — what a run started now with `--from <runId>` would be handed of it (`nemia concluded`): the run,
  *   whether it has landed and its `## From run` section, made by the package as the tick makes it. A 404 with no such run, the package's
  *   `Missing`, answered by `app.onError`.
+ * - `GET /api/runs/:runId/steps/:step/tries`, `…/tries/:try`, `…/tries/:try/closeout` and `…/steps/:step/told` — the run object's
+ *   sub-resources (`tries`, `try`, `closeout`, `told`): a step's tries, one try, its closeout, and the layers it was told. Each binds its
+ *   path into the entry's arguments, as the CLI's flags do; a step or a try the run does not have is the package's `Missing`, a 404.
  */
+
+/** The run object's sub-resources, each a read of the package's table served on its route. */
+const TRIES = commandNamed('tries');
+const TRY = commandNamed('try');
+const CLOSEOUT = commandNamed('closeout');
+const TOLD = commandNamed('told');
+
+/** Answers a sub-resource's entry, its path's parameters bound to the argument keys of the same names. */
+const subResource = (c: Context<ApiEnv>, command: Command) =>
+  served(c, async ({ e, placeService, env, home }) =>
+    c.json(await runPlaced({ placeService, home }, e, command.handler(c.req.param(), env, home))),
+  );
 
 export const runs = new Hono<ApiEnv>()
   .get('/api/runs', (c) =>
@@ -196,6 +212,10 @@ export const runs = new Hono<ApiEnv>()
       return c.json(read.judged);
     }),
   )
+  .get('/api/runs/:runId/steps/:step/tries', (c) => subResource(c, TRIES))
+  .get('/api/runs/:runId/steps/:step/tries/:try', (c) => subResource(c, TRY))
+  .get('/api/runs/:runId/steps/:step/tries/:try/closeout', (c) => subResource(c, CLOSEOUT))
+  .get('/api/runs/:runId/steps/:step/told', (c) => subResource(c, TOLD))
   .get('/api/runs/:runId/concluded', (c) =>
     served(c, async ({ e, placeService, home }) =>
       c.json(await runPlaced({ placeService, home }, e, CONCLUDED.handler({ runId: c.req.param('runId') }))),

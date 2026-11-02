@@ -363,12 +363,6 @@
       }
     },
     {
-      "files": ["packages/agent-orchestrator/src/resource/page.verb.ts"],
-      "rules": {
-        "complexity": ["error", { "max": 22 }]
-      }
-    },
-    {
       "files": ["apps/api/src/workflows/workflows.ts"],
       "rules": {
         "complexity": ["error", { "max": 21 }]

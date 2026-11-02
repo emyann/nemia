@@ -27,19 +27,42 @@ import {
   placeLine,
   baseLine,
 } from '../former/former.ts';
-import { agentsDir, agentsFolderRefusal, parseFolder, readmeDescription, stepFiles, workflowDirRefusal, type Fills } from './folder.ts';
+import {
+  agentsDir,
+  agentsFolderRefusal,
+  parseFolder,
+  readmeDescription,
+  stepFiles,
+  workflowDirRefusal,
+  type Fills,
+  type Found,
+} from './folder.ts';
 import { WorkflowDir } from './folder.model.ts';
 import { HARNESS_PROMPTS } from '../agents/agents.ts';
 import { agentsFor } from '../agents/read.store.ts';
 import { entriesOf, skillsFor, type Places } from '../skills/read.store.ts';
 
 /**
+ * The agents and skills a workflow at `dir` finds beside it or in `places` (`agentsFor`, `skillsFor`), read from the disk: what a
+ * synchronous reader not yet on the Agent and Skill doors parses a folder against (`test/agent-door.baseline.ts`).
+ */
+export const foundAt = (dir: string, places: Places): Found => ({ agents: agentsFor(dir, places), skills: skillsFor(dir, places) });
+
+/**
  * Read a folder of steps and check that they form a workflow rather than a wish. A `README.md` in the folder
  * describes the workflow (`workflowDescription`) and is not a step. The steps come back in the order they run
- * (`orderSteps`), not the folder's, each resolved against the agent it names, found beside it or in `places` (`agentsFor`), and each skill
- * that agent gives found (`skillsFor`). A step `fills` hires an agent into is resolved against that agent, found the same way (`Fills`).
+ * (`orderSteps`), not the folder's, each resolved against the agent it names, found beside it or in `places` (`foundAt`), and each skill
+ * that agent gives found. A step `fills` hires an agent into is resolved against that agent, found the same way (`Fills`).
  */
 export function loadWorkflows(dir: string, places: Places = {}, fills?: Fills): Workflow[] {
+  return loadWorkflowsWith(dir, foundAt(dir, places), fills);
+}
+
+/**
+ * `loadWorkflows` against the agents and skills already `found`: what the Workflow door's files read with, having found them through the
+ * Agent and Skill doors.
+ */
+export function loadWorkflowsWith(dir: string, found: Found, fills?: Fills): Workflow[] {
   if (!fs.existsSync(dir)) throw new WorkflowError(`no workflow folder at ${dir}`);
   const agents = agentsFolderRefusal(dir);
   if (agents) throw new WorkflowError(agents);
@@ -57,8 +80,8 @@ export function loadWorkflows(dir: string, places: Places = {}, fills?: Fills): 
   return parseFolder(
     files.map((f) => [path.basename(f, '.md'), fs.readFileSync(path.join(dir, f), 'utf8')]),
     read,
-    agentsFor(dir, places),
-    skillsFor(dir, places),
+    found.agents,
+    found.skills,
     fills,
   );
 }

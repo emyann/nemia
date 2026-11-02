@@ -109,12 +109,14 @@ const STORE_BOTTOM = ['src/record/places.store.ts', 'src/skills/read.store.ts', 
  * the run store and both, and the run store's files on them and on the configuration (`runStore`, whose `keptRuns` reads
  * `WF_VERIFY_REST`), the door's pattern on the store's root (`door.store.ts`) and each door on it and the stores it is over — the Run
  * door on the run store's files, the Factory door on the factories and a factory's level, rules and servers, each on the run store, the
- * Workflow door on the folders, their versions (`version.store.ts`, on the two reads) and the folder written, and
+ * Workflow door on the folders, their versions (`version.store.ts`, on the two reads), the folder written and the Agent and Skill doors
+ * it finds a workflow's agents and skills through, and
  * the Template door on the pattern alone, a template being a folder outside the store —
  * what a place is and how its processes are stopped, on no store file (`place.store.ts`), then a step's workspace, cut by the place, a
- * workflow folder written on the run store, the two reads and the factories, and where a run looks and a place's workflow folders
- * (`lookup.store.ts`) on the run store and the skills read; what a branch changed, as the place says, on the place (`changes.store.ts`),
- * a step's own agent read for a hire (`own-agent.store.ts`), on no store file, and where the branches stood on the run store and the place
+ * workflow folder written on the run store, the two reads, the folders (`foundAt`, for a caller with no doors) and the factories, and
+ * where a run looks and a place's workflow folders (`lookup.store.ts`) on the run store and the skills read; what a branch changed, as
+ * the place says, on the place (`changes.store.ts`), a step's own agent read for a hire (`own-agent.store.ts`), on no store file, and
+ * where the branches stood on the run store and the place
  * (`standing.store.ts`), and a run's result branches (`branches.store.ts`), which a landing reads beside its place (`landing.store.ts`);
  * and the feed's file on the run store and the tally (`feed.store.ts`), whose one schema for a line of it the deliverer's file decodes a
  * kept digest with, so the two cannot drift. No
@@ -159,6 +161,7 @@ const STORE_SHARED: Record<string, readonly string[]> = {
     'src/record/record.store.ts',
     'src/agents/read.store.ts',
     'src/skills/read.store.ts',
+    'src/folder/folder.store.ts',
     'src/factory/factory.store.ts',
   ],
   'src/folder/lookup.store.ts': ['src/record/record.store.ts', 'src/skills/read.store.ts'],
@@ -191,6 +194,8 @@ const STORE_SHARED: Record<string, readonly string[]> = {
     'src/folder/version.store.ts',
     'src/folder/write.store.ts',
     'src/skills/read.store.ts',
+    'src/agents/agent-door.store.ts',
+    'src/skills/skill-door.store.ts',
   ],
   'src/templates/templates.store.ts': ['src/door/door.store.ts'],
   'src/skills/skills.store.ts': ['src/skills/read.store.ts', 'src/folder/write.store.ts'],
@@ -893,7 +898,7 @@ test('REFUSED: a store file that imports the runtime, a controller or the client
     'src/agents/read.store.ts imports src/custom/custom.store.ts, which the tree does not let it: of the store it imports src/skills/read.store.ts',
   ]);
   assert.deepEqual(treeBreaks(adding('src/folder/write.store.ts', 'src/workspace/worktree.store.ts')), [
-    'src/folder/write.store.ts imports src/workspace/worktree.store.ts, which the tree does not let it: of the store it imports src/record/record.store.ts, src/agents/read.store.ts, src/skills/read.store.ts, src/factory/factory.store.ts',
+    'src/folder/write.store.ts imports src/workspace/worktree.store.ts, which the tree does not let it: of the store it imports src/record/record.store.ts, src/agents/read.store.ts, src/skills/read.store.ts, src/folder/folder.store.ts, src/factory/factory.store.ts',
   ]);
   assert.deepEqual(treeBreaks(adding('src/factory/factory.store.ts', 'src/folder/write.store.ts')), [
     'src/factory/factory.store.ts imports src/folder/write.store.ts, which the tree does not let it: of the store it imports src/record/record.store.ts, src/schedule/schedule.store.ts, src/applied/applied.store.ts, src/wiring/own-agent.store.ts',

@@ -117,6 +117,13 @@ export const stepFiles = (entries: readonly string[]): string[] => entries.filte
  */
 export type Fills = { factory: string; workflow: string; agents: Readonly<Record<string, string>>; rules?: string };
 
+/**
+ * The agents a workflow's steps may name and the skills they may be given, found where a run of the folder looks: what its steps are
+ * parsed against (`parseFolder`), found by the Agent and Skill doors (`agents.found`, `skills.found`) or, for a synchronous reader, by
+ * `foundAt` (`folder.store.ts`).
+ */
+export type Found = { readonly agents: Agents; readonly skills: SkillsFound };
+
 /** The hire `fills` makes into the step `step`, or undefined for none. */
 function hireOf(fills: Fills | undefined, step: string): Hire | undefined {
   if (!fills || !Object.hasOwn(fills.agents, step)) return undefined;

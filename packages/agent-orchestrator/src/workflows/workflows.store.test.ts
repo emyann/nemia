@@ -8,19 +8,29 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { Effect } from 'effect';
+import { Effect, Layer } from 'effect';
 import { scratch } from '../../test/scratch.ts';
 import { act, done, doorFrom, walksOn } from '../../test/door-walks.ts';
-import { aWorkflow, WORKFLOW_WALKS, yoursOn } from '../../test/workflow-walks.ts';
+import { aWorkflow, WORKFLOW_WALKS, yoursOn, type WorkflowSide } from '../../test/workflow-walks.ts';
 import { WorkflowDoor, workflowDoorFiles } from './workflows.store.ts';
-import { writeWorkflowAt } from '../folder/write.store.ts';
+import { placesAroundAt, writeWorkflowAt } from '../folder/write.store.ts';
+import { foundAt } from '../folder/folder.store.ts';
 import { StoreRoot } from '../config/root.store.ts';
+import { WorkflowDir } from '../folder/folder.model.ts';
+import { AgentDoor, agentDoorFiles } from '../agents/agent-door.store.ts';
+import { agentDoorMemory } from '../agents/agent-memory.store.ts';
+import { AgentName, SkillName } from '../agents/agents.model.ts';
+import { SkillDoor, skillDoorFiles } from '../skills/skill-door.store.ts';
+import { skillDoorMemory } from '../skills/skill-memory.store.ts';
+import { anAgent } from '../../test/agent-walks.ts';
+import { aSkill } from '../../test/skill-walks.ts';
 
 const PKG = path.join(import.meta.dirname, '..', '..');
 
-for (const [name, body] of walksOn(WORKFLOW_WALKS, () => {
+for (const [name, body] of walksOn(WORKFLOW_WALKS, (): WorkflowSide => {
   const root = scratch('wf-workflow-door-');
-  return { door: doorFrom(WorkflowDoor, workflowDoorFiles(root)), root, layer: 'files' };
+  const defs = { agents: doorFrom(AgentDoor, agentDoorFiles(root)), skills: doorFrom(SkillDoor, skillDoorFiles(root)) };
+  return { door: doorFrom(WorkflowDoor, workflowDoorFiles(root)), root, layer: 'files', defs };
 }))
   test(name, body);
 
@@ -44,7 +54,7 @@ test("a folder written through the door is, byte for byte, the folder today's wr
   const draft = aWorkflow(undefined, '# Dev\n\nPlans, then builds.\n');
   done(side.door.workflows.write(yoursOn(side, 'dev'), draft));
   const theirs = path.join(root, 'workflows', 'theirs');
-  writeWorkflowAt(root, theirs, draft.steps, draft.readme);
+  writeWorkflowAt(root, theirs, draft.steps, draft.readme, { found: foundAt(theirs, placesAroundAt(root, theirs)) });
   assert.deepEqual(bytes(path.join(root, 'workflows', 'dev')), bytes(theirs));
 });
 
@@ -70,6 +80,79 @@ test('the default door reads the files at the store root the program is given, a
   });
   assert.deepEqual(act(Effect.provideService(list, StoreRoot, root)), ['dev']);
   assert.deepEqual(act(list), { refused: 'Invalid' });
+});
+
+/**
+ * A store with the agent `scribe`, which may load a skill, held only by a fresh `agentDoorMemory()`, in the folder of agents a workflow
+ * of yours looks in, and `tidy-notes` only by a fresh `skillDoorMemory()`, in your library: the store, the folder `dev` of yours, and
+ * `over`, which gives a program both doors and the store's root, so the rooted Workflow door reads the files through them.
+ */
+const heldApart = () => {
+  const root = scratch('wf-workflow-door-');
+  const agents = agentDoorMemory();
+  const skills = skillDoorMemory();
+  done(
+    doorFrom(AgentDoor, agents).agents.write(
+      AgentName.read('scribe'),
+      anAgent('scribe', { keys: { model: 'sonnet', tools: 'Read, Write, Skill' } }),
+      undefined,
+      {
+        dir: path.join(root, 'workflows', 'agents'),
+        anywhere: true,
+      },
+    ),
+  );
+  done(
+    doorFrom(SkillDoor, skills).skills.write(SkillName.read('tidy-notes'), aSkill(), undefined, path.join(root, 'workflows', 'skills'), {
+      anywhere: true,
+    }),
+  );
+  const over = <A, E>(program: Effect.Effect<A, E>) =>
+    Effect.provide(Effect.provideService(program, StoreRoot, root), Layer.mergeAll(agents, skills));
+  return { root, dir: WorkflowDir.read(path.join(root, 'workflows', 'dev')), over };
+};
+
+/** A step file of `dev` that names its agent, and the skills it adds where given. */
+const plantStep = (dir: string, skills?: string) => {
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(path.join(dir, 'build.md'), `---\nplace: git\nagent: scribe\n${skills ? `skills: ${skills}\n` : ''}---\nBuild it.\n`);
+};
+
+test('a files workflow whose step names an agent only the agent door holds reads resolved with its keys', () => {
+  const { dir, over } = heldApart();
+  plantStep(dir);
+  const steps = done(over(Effect.flatMap(WorkflowDoor, (door) => door.workflows.read(dir))));
+  assert.deepEqual(
+    steps.map((s) => [s.name, s.agent?.name, s.model, s.tools]),
+    [['build', 'scribe', 'sonnet', ['Read', 'Write', 'Skill']]],
+  );
+});
+
+test('a files workflow written naming an agent only the agent door holds is written and answers its steps resolved', () => {
+  const { dir, over } = heldApart();
+  const saved = done(
+    over(
+      Effect.flatMap(WorkflowDoor, (door) =>
+        door.workflows.write(dir, aWorkflow([{ name: 'build', after: [], place: 'git', agent: 'scribe', body: 'Build it.' }])),
+      ),
+    ),
+  );
+  assert.deepEqual(saved.written, ['build.md']);
+  assert.deepEqual(
+    saved.steps.map((s) => [s.name, s.agent?.name, s.model]),
+    [['build', 'scribe', 'sonnet']],
+  );
+  assert.ok(fs.existsSync(path.join(dir, 'build.md')), 'written to the files');
+});
+
+test("a step's own skills: line adding a skill only the skill door holds reads resolved", () => {
+  const { dir, over } = heldApart();
+  plantStep(dir, 'tidy-notes');
+  const steps = done(over(Effect.flatMap(WorkflowDoor, (door) => door.workflows.read(dir))));
+  assert.deepEqual(
+    steps.map((s) => [s.name, s.skills, s.agent?.skills]),
+    [['build', ['tidy-notes'], ['tidy-notes']]],
+  );
 });
 
 /** The functions of the stores the Workflow door is over that `src`'s code still calls rather than yielding the door. */

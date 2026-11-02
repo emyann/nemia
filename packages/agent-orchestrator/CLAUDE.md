@@ -124,6 +124,10 @@ it holds today that is a candidate for the runtime is in `docs/architecture.md`,
   gives its program one `workflowDoorMemory()` (`src/workflows/memory.store.ts`) and writes it through the door (`aWorkflow`,
   `test/workflow-walks.ts`); code still on the folder's stores (`test/workflow-door.baseline.ts`) reads the disk whatever door was given. A
   write's version is judged by `workflowVersionRefusal` (`src/folder/folder.ts`), whose contract a new rule of the version is a law of.
+  The door's read and write find a workflow's agents and skills through the Agent and Skill doors, so a program given
+  `agentDoorMemory()` and a store's root reads a files workflow's agents from the memory; `workflowDoorMemory(defs?)` takes the agent
+  and skill doors it reads through (`doorFrom`, `test/door-walks.ts`), and given none yields the program's, rooted. The version
+  (`workflowVersion`) still reads the files' agents.
 - **An agent and a skill are read and written through the Agent and Skill doors (`AgentDoor`, `src/agents/agent-door.store.ts`;
   `SkillDoor`, `src/skills/skill-door.store.ts`), rooted as the Factory door is**: a handler that yields one runs through `rooted`, and a
   test that only needs an agent or a skill to exist gives its program `agentDoorMemory()` or `skillDoorMemory()` (`anAgent`,

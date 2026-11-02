@@ -5,9 +5,10 @@
  * `test/workflow-walks.ts` hold it to what the files answer. Its folders are under `MEMORY_ROOT`, named as the files name them under the
  * store's root: yours are `<MEMORY_ROOT>/workflows/<name>`.
  *
- * A draft is held as its steps render (`renderStep`) and read back as a folder on disk is (`parseFolder`), with no agents nor skills
- * beside it: a step that names an agent is the files layer's to read. Its files are rendered today, so it holds no former spelling and
- * gives no hint.
+ * A draft is held as its steps render (`renderStep`) and read back as a folder on disk is (`parseFolder`), against the agents and skills
+ * the door found through the Agent and Skill doors (`defs`, else those the program is given), in the places given or beside the folder
+ * alone: a step naming an agent is resolved as the files resolve it, so a test gives `agentDoorMemory()`'s door beside it. Its files are
+ * rendered today, so it holds no former spelling and gives no hint.
  */
 import { createHash } from 'node:crypto';
 import path from 'node:path';
@@ -15,7 +16,8 @@ import { Layer } from 'effect';
 import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
 import { renderStep } from '../workflow/index.ts';
 import { parseFolder, workflowInUse } from '../folder/folder.ts';
-import { WorkflowDoor, workflowDoorOver, type WorkflowDraft, type WorkflowLayer } from './workflows.store.ts';
+import { WorkflowDoor, workflowDoorOver, type WorkflowDefs, type WorkflowDraft, type WorkflowLayer } from './workflows.store.ts';
+import type { Fills, Found } from '../folder/folder.ts';
 
 /** Where the stand-in says a workflow's folder is: the root its paths are named under, as the files' are under the store's root. */
 export const MEMORY_ROOT = '/memory';
@@ -33,12 +35,19 @@ const versionOf = (held: Held): string =>
     .digest('hex')
     .slice(0, 12);
 
-/** A fresh Workflow door over a map: no workflow held. */
-export function workflowDoorMemory(): Layer.Layer<never> {
+/**
+ * A fresh Workflow door over a map: no workflow held. Its agents and skills found through `defs`, the Agent and Skill doors given, else
+ * through those the program is given.
+ */
+export function workflowDoorMemory(defs?: WorkflowDefs): Layer.Layer<never> {
   const workflows = new Map<string, Held>();
-  const read = (dir: string) =>
-    parseFolder([...(workflows.get(dir)?.files ?? new Map<string, string>())], (file) =>
-      file === 'README.md' ? workflows.get(dir)?.readme : undefined,
+  const read = (dir: string, found: Found, fills?: Fills) =>
+    parseFolder(
+      [...(workflows.get(dir)?.files ?? new Map<string, string>())],
+      (file) => (file === 'README.md' ? workflows.get(dir)?.readme : undefined),
+      found.agents,
+      found.skills,
+      fills,
     );
   const layer: WorkflowLayer = {
     workflows: {
@@ -47,17 +56,18 @@ export function workflowDoorMemory(): Layer.Layer<never> {
           .filter((dir) => path.posix.dirname(dir) === holder)
           .map((dir) => path.posix.basename(dir))
           .sort(),
-      read: (dir) => {
+      around: (_dir, places) => places ?? {},
+      read: (dir, found, fills) => {
         if (!workflows.has(dir)) throw new Invalid({ message: `no workflow folder at ${dir}: write it first, or name one that is there.` });
-        return read(dir);
+        return read(dir, found, fills);
       },
       there: (dir) => {
         const held = workflows.get(dir);
         return held === undefined ? { kind: 'none' } : { kind: 'folder', version: versionOf(held) };
       },
-      write: (dir, draft: WorkflowDraft) => {
+      write: (dir, draft: WorkflowDraft, found) => {
         const files = new Map(draft.steps.map((step) => [step.name, renderStep(step)] as const));
-        const steps = parseFolder([...files]);
+        const steps = parseFolder([...files], undefined, found.agents, found.skills);
         const before = workflows.get(dir);
         const readme = draft.readme ?? before?.readme;
         const held: Held = readme === undefined ? { files } : { files, readme };
@@ -91,5 +101,5 @@ export function workflowDoorMemory(): Layer.Layer<never> {
       hints: () => [],
     },
   };
-  return Layer.succeed(WorkflowDoor)(workflowDoorOver(layer));
+  return Layer.succeed(WorkflowDoor)(workflowDoorOver(layer, defs));
 }

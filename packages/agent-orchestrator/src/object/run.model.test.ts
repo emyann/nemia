@@ -47,7 +47,7 @@ const stepTimelineSame: Same<RunStepStatus['timeline'], StepTimelineTry[]> = tru
 const stepWordSame: Same<RunStepStatus['status'], StepStatus> = true;
 const modesSame: Same<StepRaise['modes'][number], RetryMode> = true;
 
-/** A sub-resource's answer, by its Schema, is what the package builds it as, both ways (the page's types, tries.verb.ts and told.verb.ts). */
+/** A sub-resource's answer, by its Schema, is what the package builds it as, both ways (tries.verb.ts, told.verb.ts and the page's). */
 const subResourcesSame = [
   true satisfies Same<StepTry, Tries.StepTry>,
   true satisfies Same<StepTries, { tries: Tries.StepTry[] }>,

@@ -489,6 +489,25 @@ test('REFUSED: an agent of the team with a `harnessPrompt:` line, `no-coding` or
   }
 });
 
+/**
+ * The window each step of build and quick compacts at (`context:`, its own or its agent's). Over 126 sessions at 200k, design
+ * compacted in 15 of 23 and review in 9 of 38, most often a call or two before the closeout, which was then written from a summary of
+ * what the session had read. Opus's window is 1M at one price, so the four that read most run at 400k; the landing, which reads a pull
+ * request and merges it, keeps its agent's 200k.
+ */
+const WINDOWS: Readonly<Record<string, Readonly<Record<string, number>>>> = {
+  build: { design: 400_000, implement: 400_000, review: 400_000, land: 200_000 },
+  quick: { implement: 400_000, review: 400_000, land: 200_000 },
+};
+
+test('build and quick compact design, implement and review at 400k, and the landing at its agent’s 200k', () => {
+  for (const [workflow, windows] of Object.entries(WINDOWS)) {
+    const dir = path.join(HOLDER, workflow);
+    const given = Object.fromEntries(loadWorkflows(dir, placesOf(dir)).map((s) => [s.name, s.context]));
+    assert.deepEqual(given, windows, workflow);
+  }
+});
+
 test('each shipped step still says, adds, denies and declares what its agent and its skill said before', () => {
   for (const workflow of new Set(TOLD.map((told) => told.workflow))) {
     const dir = path.join(HOLDER, workflow);

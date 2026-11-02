@@ -44,6 +44,7 @@ const CLAIMS: Record<string, string> = {
   '5561': 'SDKMessageOrigin',
   '6034-6037': 'total_cost_usd',
   '9304': 'autoCompactWindow',
+  '9510': 'claudeMdExcludes',
 };
 
 /** Every `sdk.d.ts:<n>` and `sdk.d.ts:<n>-<m>` in `text`, by the `<n>` or `<n>-<m>` it cites. */

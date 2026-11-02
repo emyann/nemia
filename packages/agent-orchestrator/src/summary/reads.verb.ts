@@ -11,7 +11,9 @@ import { asked, over, type Engine, type TaskView, unreadableJournal } from '../r
 import { DEFAULT_FACTORY } from '../factory/factory.ts';
 import { readFactory } from '../factory/factory.store.ts';
 import type { Fills } from '../folder/folder.ts';
-import { loadWorkflows } from '../folder/folder.store.ts';
+import { WorkflowDir } from '../folder/folder.model.ts';
+import { WorkflowDoor } from '../workflows/workflows.store.ts';
+import { StoreRoot } from '../config/root.store.ts';
 import { isRefusal, Missing } from '../refusal/refusal.ts';
 import { factoryFills } from '../rules/rules.store.ts';
 import { runStore } from '../record/files.store.ts';
@@ -138,7 +140,8 @@ const stopped = (why: string): string => (/[.!?]$/.test(why) ? why : `${why}.`);
 
 /**
  * The run's workflow folder, read now as its start read it: its steps, or none and a warning — the folder gone, or no longer read as a
- * workflow, in the folder's words ended with one full stop.
+ * workflow, in the folder's words ended with one full stop. Read through the Workflow door, run here at once with the store `home` as
+ * its root (`StoreRoot`), since its callers are synchronous: every layer under the door is.
  *
  * Its agents and skills are looked for where the start looked, the run's repository's own folder of them, then yours; and a run started
  * in a factory is read with that factory's hires and rules as they are now (`factoryRead`), so a step the factory hires an agent into
@@ -154,7 +157,10 @@ const stopped = (why: string): string => (/[.!?]$/.test(why) ? why : `${why}.`);
 export function workflowsOf(run: Run, home: string): { steps: Workflow[]; warning: null } | { steps: null; warning: string } {
   const { fills, unread } = factoryRead(run);
   try {
-    return { steps: loadWorkflows(run.workflowDir, { repo: run.repo, home }, fills), warning: null };
+    const read = Effect.gen(function* () {
+      return yield* (yield* WorkflowDoor).workflows.read(WorkflowDir.read(run.workflowDir), { repo: run.repo, home }, fills);
+    });
+    return { steps: Effect.runSync(Effect.provideService(read, StoreRoot, home)), warning: null };
   } catch (err) {
     const folder = `The workflow folder ${run.workflowDir}`;
     const why = !fs.existsSync(run.workflowDir)

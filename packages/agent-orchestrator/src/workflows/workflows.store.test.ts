@@ -14,13 +14,12 @@ import { act, done, doorFrom, walksOn } from '../../test/door-walks.ts';
 import { aWorkflow, WORKFLOW_WALKS, yoursOn, type WorkflowSide } from '../../test/workflow-walks.ts';
 import { WorkflowDoor, workflowDoorFiles } from './workflows.store.ts';
 import { placesAroundAt, writeWorkflowAt } from '../folder/write.store.ts';
-import { foundAt } from '../folder/folder.store.ts';
 import { StoreRoot } from '../config/root.store.ts';
 import { WorkflowDir } from '../folder/folder.model.ts';
-import { AgentDoor, agentDoorFiles } from '../agents/agent-door.store.ts';
+import { AgentDoor, agentDoorFiles, agentFiles } from '../agents/agent-door.store.ts';
 import { agentDoorMemory } from '../agents/agent-memory.store.ts';
 import { AgentName, SkillName } from '../agents/agents.model.ts';
-import { SkillDoor, skillDoorFiles } from '../skills/skill-door.store.ts';
+import { SkillDoor, skillDoorFiles, skillFiles } from '../skills/skill-door.store.ts';
 import { skillDoorMemory } from '../skills/skill-memory.store.ts';
 import { anAgent } from '../../test/agent-walks.ts';
 import { aSkill } from '../../test/skill-walks.ts';
@@ -54,7 +53,9 @@ test("a folder written through the door is, byte for byte, the folder today's wr
   const draft = aWorkflow(undefined, '# Dev\n\nPlans, then builds.\n');
   done(side.door.workflows.write(yoursOn(side, 'dev'), draft));
   const theirs = path.join(root, 'workflows', 'theirs');
-  writeWorkflowAt(root, theirs, draft.steps, draft.readme, { found: foundAt(theirs, placesAroundAt(root, theirs)) });
+  const where = { dir: theirs, places: placesAroundAt(root, theirs) };
+  const found = { agents: agentFiles(root).agents.found(where), skills: skillFiles(root).skills.found(where) };
+  writeWorkflowAt(root, theirs, draft.steps, draft.readme, { found });
   assert.deepEqual(bytes(path.join(root, 'workflows', 'dev')), bytes(theirs));
 });
 
@@ -156,10 +157,10 @@ test("a step's own skills: line adding a skill only the skill door holds reads r
 });
 
 /**
- * The functions of the stores the Workflow door is over that `src`'s code still calls rather than yielding the door, and `foundAt`, which
- * reads a folder's agents and skills off the disk beside the Agent and Skill doors: its callers are this seam's own files alone.
+ * The functions of the stores the Workflow door is over that `src`'s code still calls rather than yielding the door, a call spread into a
+ * list (`...formerKeyLines(dir)`) counted as any other.
  */
-const SEAM = ['loadWorkflows', 'writeWorkflow', 'writeWorkflowAt', 'removeWorkflow', 'removeWorkflowAt', 'formerKeyLines', 'foundAt'];
+const SEAM = ['loadWorkflows', 'writeWorkflow', 'writeWorkflowAt', 'removeWorkflow', 'removeWorkflowAt', 'formerKeyLines'];
 
 /** The stores the door is over, and the door's own files: where the seam is defined, not a debt. */
 const OWN = [
@@ -182,7 +183,7 @@ function sourcesOfSrc(): Record<string, string> {
 
 /** The seam's calls in each file, comment lines left out: what `WORKFLOW_DOOR_DEBT` counts. */
 function seamUses(sources: Record<string, string>): Map<string, number> {
-  const call = new RegExp(`(?<![\\w$.])(?:${SEAM.join('|')})\\s*\\(`, 'g');
+  const call = new RegExp(`(?<![\\w$]|[^.]\\.)(?:${SEAM.join('|')})\\s*\\(`, 'g');
   const uses = new Map<string, number>();
   for (const [file, text] of Object.entries(sources)) {
     const code = text
@@ -229,12 +230,12 @@ test('REFUSED: a converted file that calls a store again, and a count the baseli
     'src/workflows/workflows.verb.ts': `${sources['src/workflows/workflows.verb.ts']}\nconst x = loadWorkflows('a');\n`,
   };
   assert.equal(debtBreaks(again, WORKFLOW_DOOR_DEBT).length, 1);
-  const found = {
+  const spread = {
     ...sources,
-    'src/workflows/workflows.verb.ts': `${sources['src/workflows/workflows.verb.ts']}\nconst y = foundAt('a', {});\n`,
+    'src/workflows/workflows.verb.ts': `${sources['src/workflows/workflows.verb.ts']}\nconst y = [...formerKeyLines('a')];\n`,
   };
-  assert.equal(debtBreaks(found, WORKFLOW_DOOR_DEBT).length, 1, "a read of a folder's agents and skills off the disk is the seam's");
-  const [first] = Object.keys(WORKFLOW_DOOR_DEBT);
+  assert.equal(debtBreaks(spread, WORKFLOW_DOOR_DEBT).length, 1, 'a call spread into a list is a call');
+  const [first = 'src/workflows/workflows.verb.ts'] = Object.keys(WORKFLOW_DOOR_DEBT);
   assert.equal(debtBreaks(sources, { ...WORKFLOW_DOOR_DEBT, [first]: (WORKFLOW_DOOR_DEBT[first] ?? 0) + 1 }).length, 1);
 });
 

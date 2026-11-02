@@ -5,7 +5,8 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { HOME, Invalid, loadWorkflows, runWith, TABLE, type Place, templatedTree, type Args, type Command } from '../runner.ts';
+import { Effect } from 'effect';
+import { draftSteps, HOME, Invalid, runWith, TABLE, type Place, templatedTree, type Args, type Command } from '../runner.ts';
 import { agentDraftOf, frontmatterKey, isReadme, skillDraftOf } from '../workflow.ts';
 import { usage, placedIn, type Engine } from './flags.ts';
 
@@ -95,8 +96,8 @@ export async function skillsWriteRun(args: Args, e: Engine, place: Place): Promi
 
 /**
  * `nemia workflows write`'s runner: the draft folder `--folder` names read as a start reads a folder, its agents looked for beside it
- * and in yours (`loadWorkflows`), or in the tree written for the place `factory` (`templatedTree`), into the steps the builder sends, and
- * its README where it has one.
+ * and in yours, through the Workflow door (`draftSteps`), or in the tree written for the place `factory` (`templatedTree`), into the
+ * steps the builder sends, and its README where it has one.
  */
 export async function workflowsWriteRun(args: Args, e: Engine, place: Place): Promise<void> {
   const command = entryOf('workflows write');
@@ -105,7 +106,10 @@ export async function workflowsWriteRun(args: Args, e: Engine, place: Place): Pr
     usage(`nemia workflows write reads the folder ${path.resolve(folder)}, and it is not one. Name the draft folder.`);
   const factory = args.from === 'factory' && typeof args.factory === 'string' ? args.factory : undefined;
   const home = factory === undefined ? HOME : templatedTree(factory, 'nemia workflows write');
-  const steps = readOf(folder, () => loadWorkflows(folder, { home }));
+  const read = draftSteps(folder, { home }).pipe(
+    Effect.mapError((err) => new Invalid({ message: `${path.resolve(folder)} does not read: ${err.message}` })),
+  );
+  const steps = await runWith(e, placedIn(place, read));
   const readme = fs.readdirSync(folder).find(isReadme);
   const asked = {
     ...args,

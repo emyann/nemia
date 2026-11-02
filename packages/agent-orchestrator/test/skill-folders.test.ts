@@ -17,7 +17,7 @@ import { eachTest, runGiven } from './placed.ts';
 const ROOT = scratch('wf-skill-folders-');
 process.env.WF_ROOT = ROOT;
 const { startRun } = await import('../src/runner.ts');
-const { loadWorkflows } = await import('../src/folder/folder.store.ts');
+const { loadWorkflows } = await import('../src/workflows/workflows.store.ts');
 const { agentFilesDir } = await import('../src/agents/agents.store.ts');
 const { readRun } = await import('../src/record/record.store.ts');
 const stand = eachTest(testPlace);

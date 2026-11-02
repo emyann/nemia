@@ -186,6 +186,7 @@ const PINNED: Record<string, string[]> = {
     'deniedWords',
     'detachWorkflow',
     'dollars',
+    'draftSteps',
     'dropFromInbox',
     'dueNote',
     'durationWord',

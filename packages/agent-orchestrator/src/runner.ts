@@ -163,15 +163,7 @@ export type {
 } from './run.ts';
 export type { AtWork, RunTokens, SlotWait, TaskSpan, Timeline, TimelineTotal, TimelineTry } from './timeline/index.ts';
 export type { Retry, RetryAsk, RetryHow, RetryMode } from './retry/index.ts';
-export {
-  agentUsers,
-  formerKeyLines,
-  loadWorkflows,
-  workflowDescription,
-  workflowFolder,
-  workflowReadme,
-  workflowsIn,
-} from './folder/folder.store.ts';
+export { agentUsers, formerKeyLines, workflowDescription, workflowFolder, workflowReadme, workflowsIn } from './folder/folder.store.ts';
 export { cardSkills, isBuiltinPlace, lookupRoots, oneFolder, preloads, skillsFor, skillVersion } from './skills/read.store.ts';
 export { BUILTIN_SKILLS, type Places } from './skills/read.store.ts';
 export { agentsFor, agentVersion, customInstructionsFile, loadAgents, readCustomInstructions } from './agents/read.store.ts';
@@ -361,7 +353,7 @@ export type {
   TrialMerge,
   Unread,
 } from './place/place.ts';
-export { writeWorkflow } from './folder/write.store.ts';
+export { draftSteps, loadWorkflows, writeWorkflow } from './workflows/workflows.store.ts';
 export { workflowStale, workflowTaken } from './folder/folder.ts';
 export { workflowVersion } from './folder/version.store.ts';
 export { foldersIn } from './folder/lookup.store.ts';

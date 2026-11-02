@@ -6,7 +6,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Result, Schema } from 'effect';
-import { FrozenStepSchema, loadWorkflows, type FrozenStepFields } from '../src/folder/folder.store.ts';
+import { FrozenStepSchema, type FrozenStepFields } from '../src/folder/folder.store.ts';
+import { loadWorkflows } from '../src/workflows/workflows.store.ts';
 import { asNamed, FORMER_KEYS, type Workflow } from '../src/workflow.ts';
 import { ownDenies } from '../src/workflow/index.ts';
 import { placesOf, shippedFolders, TEAM_DEV } from './team.ts';

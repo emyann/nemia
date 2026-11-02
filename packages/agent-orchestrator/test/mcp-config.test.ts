@@ -34,7 +34,7 @@ import { Engine as EngineService } from 'agent-runtime';
 import { type Engine } from '../src/runtime-client.ts';
 import { parseAgent, parseWorkflow } from '../src/workflow.ts';
 import { filedConfig, STEP_FILES } from '../src/filed/filed.ts';
-import { loadWorkflows } from '../src/folder/folder.store.ts';
+import { loadWorkflows } from '../src/workflows/workflows.store.ts';
 import { scratch } from './scratch.ts';
 import { placesOf, shippedFolders } from './team.ts';
 import { plainEngine } from './promised.ts';

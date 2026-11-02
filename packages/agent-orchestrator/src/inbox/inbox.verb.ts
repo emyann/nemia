@@ -5,7 +5,9 @@
 import path from 'node:path';
 import { Cause, Effect, Exit } from 'effect';
 import { WorkflowError } from '../step/step.ts';
-import { loadWorkflows, workflowFolder, workflowsIn } from '../folder/folder.store.ts';
+import { workflowFolder, workflowsIn } from '../folder/folder.store.ts';
+import type { WorkflowDir } from '../folder/folder.model.ts';
+import { WorkflowDoor } from '../workflows/workflows.store.ts';
 import {
   fromText,
   inboxListing,
@@ -91,7 +93,13 @@ export type InboxStarted = { run: Run; card: InboxCard; ignoredRepo?: string; qu
  * `opts.from`, else the card's `workflow:`, from the inbox. Refused by name: a card's workflow that does not load, in the card's words,
  * and none from either, naming the repository's.
  */
-function cardWorkflow(opts: Pick<InboxStart, 'workflow' | 'from'>, card: InboxCard, file: string, repo: string, tree?: string): string {
+function cardWorkflow(
+  opts: Pick<InboxStart, 'workflow' | 'from'>,
+  card: InboxCard,
+  file: string,
+  repo: string,
+  tree?: string,
+): WorkflowDir {
   if (opts.workflow !== undefined) return workflowFolder(opts.workflow, opts.from ?? process.cwd(), repo, tree);
   if (card.workflow === undefined) throw new WorkflowError(noWorkflowRefusal(card, file, repo, workflowsIn(path.join(repo, 'workflows'))));
   try {
@@ -165,7 +173,7 @@ export const startFromInbox = Effect.fn('startFromInbox')(function* (opts: Inbox
       `${card.file}: the brief given in place of the card's body is empty. Give what the run is asked to do, or leave it out, and the run is asked what the card says.`,
     );
   }
-  const gates = cardGates(card, opts.gates ?? [], workflowDir, repo);
+  const gates = yield* cardGates(card, opts.gates ?? [], workflowDir, repo);
   const ids = new Set(yield* runs.runs.ids());
   const context = cardContext(card, opts, (id) => ids.has(id));
 
@@ -207,14 +215,18 @@ const takeQueueOff = (name: CardName, file: string): Effect.Effect<string | unde
     return undefined;
   }).pipe(Effect.catchCause((cause) => Effect.succeed(`${file} keeps its queued: line — ${(Cause.squash(cause) as Error).message}`)));
 
-/** The steps a card's run is gated at: its `gate:` first, then `flags`, a step both name once — refused as the card's line when no step. */
-function cardGates(card: InboxCard, flags: readonly string[], workflowDir: string, repo: string): string[] {
+/**
+ * The steps a card's run is gated at: its `gate:` first, then `flags`, a step both name once — refused as the card's line when no step,
+ * its workflow's steps read through the Workflow door the program is given.
+ */
+const cardGates = Effect.fn('cardGates')(function* (card: InboxCard, flags: readonly string[], workflowDir: WorkflowDir, repo: string) {
   if (card.gate !== undefined) {
-    const refusedGate = gateRefusal([card.gate], loadWorkflows(workflowDir, placesOf(repo)), (step) => `${card.file}: \`gate: ${step}\``);
-    if (refusedGate) throw new WorkflowError(`${refusedGate} Correct the line, or delete it.`);
+    const steps = yield* (yield* WorkflowDoor).workflows.read(workflowDir, placesOf(repo));
+    const refusedGate = gateRefusal([card.gate], steps, (step) => `${card.file}: \`gate: ${step}\``);
+    if (refusedGate) return yield* Effect.fail(new WorkflowError(`${refusedGate} Correct the line, or delete it.`));
   }
   return [...(card.gate !== undefined && !flags.includes(card.gate) ? [card.gate] : []), ...flags];
-}
+});
 
 /**
  * The runs a card's run is handed as context: its `from:`, then `opts.context`, a run both name once — refused as `contextRefusal` says.

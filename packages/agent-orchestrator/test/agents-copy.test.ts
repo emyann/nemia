@@ -27,7 +27,8 @@ const { addFactory, attachWorkflow, hireAgent, runWith: runEngine, startRun, TAB
 const { engineOf } = await import('../src/runtime-client.ts');
 const { main } = await import('../src/cli/main.ts');
 const { AGENTS_COPY } = await import('../src/sources/copy.verb.ts');
-const { agentsRead } = await import('../src/roster/roster.store.ts');
+const { agentsRead: agentsReadAt } = await import('../src/roster/roster.store.ts');
+const { StoreRoot } = await import('../src/config/root.store.ts');
 const { agentsLines } = await import('../src/roster/roster.ts');
 const { agentSources } = await import('../src/sources/sources.store.ts');
 const { sourcesLines } = await import('../src/sources/sources.ts');
@@ -38,6 +39,9 @@ const { SkillDoor } = await import('../src/skills/skill-door.store.ts');
 const { skillDoorMemory } = await import('../src/skills/skill-memory.store.ts');
 const { AgentName, SkillName } = await import('../src/agents/agents.model.ts');
 const stage = staged({ runWith: runEngine, main, engineOf });
+
+/** `nemia agents`' reading of `repo` and the store `home`, through the Agent and Skill doors at that store's root. */
+const agentsRead = (at: { repo: string; home: string }) => Effect.runSync(agentsReadAt(at).pipe(Effect.provideService(StoreRoot, at.home)));
 
 /**
  * The fixture repository: `.claude/agents/` with `scout` and `counted`, `workflows/agents/` with `planner`, and a planted `docs/agents/`.

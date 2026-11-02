@@ -18,8 +18,7 @@
 /** Each file by its path from the package, and the lines of it that read a root the module holds. */
 export const GLOBAL_ROOTS: Readonly<Record<string, number>> = {
   'src/admission/admit.verb.ts': 1,
-  'src/agents/custom.verb.ts': 1,
-  'src/agents/library.verb.ts': 3,
+  'src/agents/library.verb.ts': 1,
   'src/applied/applied.store.ts': 1,
   'src/auto/auto.verb.ts': 4,
   'src/chat/chat.verb.ts': 1,
@@ -56,7 +55,6 @@ export const GLOBAL_ROOTS: Readonly<Record<string, number>> = {
   'src/schedule/schedule.store.ts': 1,
   'src/series/series.store.ts': 1,
   'src/service/service.store.ts': 1,
-  'src/skills/skills.verb.ts': 1,
   'src/sources/copy.verb.ts': 2,
   'src/sources/sources.store.ts': 1,
   'src/standing/standing.store.ts': 3,

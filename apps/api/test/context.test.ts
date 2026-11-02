@@ -12,11 +12,14 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { RunDetail } from '../src/detail/detail.ts';
 import type { InboxFromAnswer } from '../src/inbox/inbox.ts';
-import { addToInbox } from 'agent-orchestrator';
+import { addToInbox, StoreRoot } from 'agent-orchestrator';
 import { Effect } from 'effect';
 import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from 'agent-orchestrator/testing';
 import { appOver, eachTest, engineFor } from './placed.ts';
+
+/** `program`, one of the package's inbox verbs, run on the harness's store (`root`): its refusal thrown as itself. */
+const onStore = <A, E>(program: Effect.Effect<A, E>): A => Effect.runSync(Effect.provideService(program, StoreRoot, root));
 
 const stand = eachTest(testPlace);
 const standIn = eachTest(testEngine);
@@ -85,7 +88,7 @@ test("context without a wait: a run's concluded section read, a card's from: set
     "PUT /api/inbox/:name/from sets a card's from:, DELETE takes it off — REFUSED: a run the store does not have is a 404, nothing written",
     async () => {
       writeRun({ id: 'source-f1' });
-      const { card } = addToInbox({ text: 'Read what source-f1 concluded' });
+      const { card } = onStore(addToInbox({ text: 'Read what source-f1 concluded' }));
       const file = path.join(root, 'inbox', `${card.name}.md`);
       const put = (runs: string[]) =>
         app().request(`/api/inbox/${card.name}/from`, { method: 'PUT', headers: JSON_TYPE, body: JSON.stringify({ runs }) });

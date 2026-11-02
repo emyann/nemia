@@ -258,6 +258,7 @@ const PINNED: Record<string, string[]> = {
     'inFactory',
     'inFullLines',
     'inboxDir',
+    'inboxEntries',
     'inboxLines',
     'inboxNameAt',
     'inboxNameRefusal',

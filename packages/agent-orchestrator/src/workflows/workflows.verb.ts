@@ -157,13 +157,13 @@ export const WORKFLOWS_WRITE: Command<WorkflowWritten & { version: string }> = {
  * tick never starts again; and every factory that attaches its name while none of its repositories has a workflow of that name, with its
  * hires into it. A run that froze its steps, a card not queued and a factory with a repository's workflow of the name go on without it.
  */
-function usersOf(dir: string): string[] {
+const usersOf = Effect.fn('usersOf')(function* (dir: string) {
   const name = path.basename(dir);
   const runs = runStore.runs
     .list(() => {})
     .filter((run) => run.workflow === undefined && path.resolve(run.workflowDir) === dir)
     .map((run) => stillNeeded.run(run.id, dir));
-  const cards = readInbox()
+  const cards = (yield* readInbox())
     .filter((card) => card.queued?.place != null && card.workflow !== null && path.resolve(inboxDir(), card.workflow) === dir)
     .map((card) => stillNeeded.card(card.name, dir));
   const factories = readFactories().flatMap((factory) => {
@@ -173,7 +173,7 @@ function usersOf(dir: string): string[] {
     return [stillNeeded.factory(factory.name, name, hires.sort())];
   });
   return [...runs, ...cards, ...factories];
-}
+});
 
 /**
  * A folder of yours, `<home>/workflows/<name>`, removed whole through the Workflow door, checked first against the version it was read at
@@ -204,7 +204,7 @@ export const WORKFLOWS_REMOVE: Command<WorkflowRemoved> = {
       'nemia workflows rm',
       Effect.gen(function* () {
         const dir = yield* tried(() => yoursWorkflowDir('nemia workflows rm', args, home));
-        const users = yield* tried(() => usersOf(dir));
+        const users = yield* usersOf(dir);
         const places = yield* tried(() => writePlacesOf(args, home));
         const door = yield* WorkflowDoor;
         return yield* door.workflows.remove(dir, textOf(args, 'version'), users, places);

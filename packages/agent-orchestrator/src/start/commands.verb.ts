@@ -5,6 +5,7 @@
  * take.
  */
 import { Effect } from 'effect';
+import { rooted } from '../wiring/wire.verb.ts';
 import { leftOut, type Args, type Flag, type Spec } from '../command/command.ts';
 import type { Command } from '../command/entry.verb.ts';
 import { endingSteps } from '../ending/ending.ts';
@@ -333,8 +334,8 @@ export const START: Command<Started> = {
     status: 201,
     hand: 'its body names a workflow by `from` and name, or an inbox card by name, which the api finds among the folders a start finds one in, in the factory the request is served in: never a path sent',
   },
-  handler: Effect.fnUntraced(function* (args: Args) {
-    const started = yield* startOf(args);
+  handler: Effect.fnUntraced(function* (args: Args, _env?: NodeJS.ProcessEnv, home?: string) {
+    const started = yield* startOf(args, home);
     const paused = yield* pausedRead();
     const landed: string[] = [];
     const context = started.run.context ?? [];
@@ -383,9 +384,9 @@ export const CONCLUDED: Command<Concluded> = {
 };
 
 /** A run of a brief, or of an inbox card under `card`, started off the handler's arguments (`START`). */
-const startOf = Effect.fnUntraced(function* (args: Args) {
+const startOf = Effect.fnUntraced(function* (args: Args, home: string | undefined) {
   const card = textOf(args, 'card');
-  if (card !== undefined) return yield* cardStart(card, args);
+  if (card !== undefined) return yield* rooted(home, 'start', cardStart(card, args));
   const factory = textOf(args, 'factory');
   const run = yield* startRun({
     brief: textOf(args, 'brief') ?? '',

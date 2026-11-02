@@ -25,8 +25,13 @@ import {
   slotWord,
   standingReader,
   standingSnapshot,
+  StoreRoot,
 } from 'agent-orchestrator';
 import { runWith } from '../../test/builtin-place.ts';
+import { Effect } from 'effect';
+
+/** `program`, one of the package's inbox verbs, run on the harness's store (`root`): its refusal thrown as itself. */
+const onStore = <A, E>(program: Effect.Effect<A, E>): A => Effect.runSync(Effect.provideService(program, StoreRoot, root));
 delete process.env.WF_MAX_RUNS;
 const repo = scratch('nemia-api-queue-repo-');
 process.env.HKB_REPO = repo;
@@ -70,7 +75,7 @@ const listed = async (): Promise<InboxEntry[]> => {
 /** What the package refuses a queue of `name` with — or its taking back — asked of it directly, which writes nothing when it refuses. */
 const refusalOf = (name: string, off = false): string => {
   try {
-    queueInInbox(name, { off });
+    onStore(queueInInbox(name, { off }));
   } catch (err) {
     return (err as Error).message;
   }
@@ -99,12 +104,12 @@ test("a person queues cards, reads their place and the tick's tries, and takes t
     async (t) => {
       clear();
       t.mock.timers.enable({ apis: ['Date'], now: Date.parse('2026-09-16T09:30:00.000Z') });
-      const first = addToInbox({ text: 'Cache the views between passes', workflow: 'dev', repo }).card;
-      const second = addToInbox({ text: 'Show what a step cost', workflow: 'gone' }).card;
-      const parked = addToInbox({ text: 'Not queued' }).card;
-      queueInInbox(first.name);
+      const first = onStore(addToInbox({ text: 'Cache the views between passes', workflow: 'dev', repo })).card;
+      const second = onStore(addToInbox({ text: 'Show what a step cost', workflow: 'gone' })).card;
+      const parked = onStore(addToInbox({ text: 'Not queued' })).card;
+      onStore(queueInInbox(first.name));
       t.mock.timers.tick(1);
-      queueInInbox(second.name);
+      onStore(queueInInbox(second.name));
       const tried = {
         at: '2026-09-16T10:00:00.000Z',
         text: cardText(second.name),
@@ -117,7 +122,7 @@ test("a person queues cards, reads their place and the tick's tries, and takes t
 
       const entries = await listed();
       const byName = new Map(entries.map((e) => [e.name, e]));
-      for (const entry of readInbox()) {
+      for (const entry of onStore(readInbox())) {
         const { body, filedAt, ...rest } = byName.get(entry.name)!;
         assert.deepEqual(rest, entry, `${entry.name}: every key the package lists, as it lists it, the api's own two beside them`);
         assert.equal(typeof body, 'string');
@@ -141,8 +146,8 @@ test("a person queues cards, reads their place and the tick's tries, and takes t
     async (t) => {
       clear();
       t.mock.timers.enable({ apis: ['Date'], now: Date.parse('2026-09-16T09:30:00.000Z') });
-      const first = addToInbox({ text: 'Cache the views between passes', workflow: 'dev' }).card;
-      const second = addToInbox({ text: 'Show what a step cost', workflow: 'dev', repo }).card;
+      const first = onStore(addToInbox({ text: 'Cache the views between passes', workflow: 'dev' })).card;
+      const second = onStore(addToInbox({ text: 'Show what a step cost', workflow: 'dev', repo })).card;
 
       const queued = await queue(first.name);
       assert.equal(queued.status, 200, await queued.clone().text());
@@ -199,8 +204,8 @@ test("a person queues cards, reads their place and the tick's tries, and takes t
     "a queue and its taking back leave a card's filing time as it was: no edit of the idea, and the Inbox orders by it",
     async () => {
       clear();
-      const older = addToInbox({ text: 'Filed an hour ago', workflow: 'dev' });
-      const newer = addToInbox({ text: 'Filed a minute ago', workflow: 'dev' });
+      const older = onStore(addToInbox({ text: 'Filed an hour ago', workflow: 'dev' }));
+      const newer = onStore(addToInbox({ text: 'Filed a minute ago', workflow: 'dev' }));
       const [hourAgo, minuteAgo] = [new Date('2026-09-16T09:00:00.000Z'), new Date('2026-09-16T09:59:00.000Z')];
       fs.utimesSync(older.file, hourAgo, hourAgo);
       fs.utimesSync(newer.file, minuteAgo, minuteAgo);
@@ -233,8 +238,8 @@ test("a person queues cards, reads their place and the tick's tries, and takes t
     async () => {
       clear();
       const about = scratch('nemia-api-queue-gone-');
-      const { card } = addToInbox({ text: 'About a repository deleted', workflow: 'dev', repo: about });
-      queueInInbox(card.name);
+      const { card } = onStore(addToInbox({ text: 'About a repository deleted', workflow: 'dev', repo: about }));
+      onStore(queueInInbox(card.name));
       fs.rmSync(about, { recursive: true, force: true });
       const entry = (await listed()).find((e) => e.name === card.name)!;
       assert.match(entry.error!, /names no directory/);
@@ -253,10 +258,10 @@ test('the queue routes: what a queue or a take-back refuses, writing nothing', a
     'a card with no workflow, or that does not read, is a 422; one not there a 404; one queued or started from a 409',
     async () => {
       clear();
-      const bare = addToInbox({ text: 'No workflow named' }).card;
-      const queued = addToInbox({ text: 'Queued already', workflow: 'dev' }).card;
-      queueInInbox(queued.name);
-      const started = addToInbox({ text: 'Started already', workflow: 'dev' }).card;
+      const bare = onStore(addToInbox({ text: 'No workflow named' })).card;
+      const queued = onStore(addToInbox({ text: 'Queued already', workflow: 'dev' })).card;
+      onStore(queueInInbox(queued.name));
+      const started = onStore(addToInbox({ text: 'Started already', workflow: 'dev' })).card;
       fs.mkdirSync(path.join(root, 'runs'), { recursive: true });
       fs.writeFileSync(path.join(root, 'runs', 'started-run-k2q9.json'), startedFrom('started-run-k2q9', started.name));
       fs.writeFileSync(path.join(inbox, 'broken.md'), '---\nafter: some-run\nworkflow: dev\n---\nWait for it.\n');
@@ -321,7 +326,7 @@ test('the queue routes: what a queue or a take-back refuses, writing nothing', a
     "a name that is not a card's is a 400, and a body that is not none or `{}` a 400 naming the route, before the card is read",
     async () => {
       clear();
-      const { card } = addToInbox({ text: 'No workflow named' });
+      const { card } = onStore(addToInbox({ text: 'No workflow named' }));
       const before = inboxAsIs();
       for (const sent of ['.hidden', '..%2Fruns%2Fr-1', 'a%2Fb', 'a%5Cb']) {
         for (const send of [queue, unqueue]) {
@@ -353,7 +358,7 @@ test('the queue routes: what a queue or a take-back refuses, writing nothing', a
 
   await t.test('a body that is JSON and not `{}` — null, a workflow named null — is a 400 saying what was sent', async () => {
     clear();
-    const { card } = addToInbox({ text: 'Queue me not', workflow: 'dev' });
+    const { card } = onStore(addToInbox({ text: 'Queue me not', workflow: 'dev' }));
     const before = inboxAsIs();
     const route = `POST /api/inbox/${card.name}/queue`;
     const takes = `${route} takes no body, or \`{}\``;

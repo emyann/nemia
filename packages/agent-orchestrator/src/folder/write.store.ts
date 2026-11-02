@@ -1,8 +1,9 @@
 /**
- * A workflow folder written from its steps (`writeWorkflowAt`, which `writeWorkflow` in `workflows.store.ts` calls), what the board's builder saves, and one of yours removed whole
- * (`removeWorkflow`); where a folder's runs look for agents and skills (`placesAroundAt`); and whether a folder holds the workflows
- * the board lists (`isWorkflowsHolderAt`). A store beside `folder.store.ts`, reading through the agents and skills reads: it imports
- * neither the engine nor a controller. A run that froze its folder at `nemia start` is changed by none of it.
+ * A workflow folder written from its steps (`writeWorkflowAt`, which `writeWorkflow` in `workflows.store.ts` calls), what the board's
+ * builder saves, and one of yours removed whole (`removeWorkflow`); where a folder's runs look for agents and skills (`placesAroundAt`);
+ * and whether a folder holds the workflows the board lists (`isWorkflowsHolderAt`). A store beside `folder.store.ts`, reading through the
+ * agents and skills reads: it imports neither the engine nor a controller. A run that froze its folder at `nemia start` is changed by none
+ * of it.
  */
 import fs from 'node:fs';
 import path from 'node:path';

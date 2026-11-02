@@ -30,7 +30,7 @@ import { CardDoor, cardNameAt, inboxAt } from '../cards/cards.store.ts';
 import { CardName } from './inbox.model.ts';
 import { workRoot } from '../record/places.store.ts';
 import { firstPiece } from '../piece/piece.ts';
-import { WorkflowError, type Workflow } from '../step/step.ts';
+import { WorkflowError } from '../step/step.ts';
 import { isFolderTeam } from '../workflow/index.ts';
 import { workflowFolder } from '../folder/folder.store.ts';
 import { WorkflowDoor } from '../workflows/workflows.store.ts';

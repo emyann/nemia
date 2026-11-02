@@ -96,8 +96,8 @@ export async function skillsWriteRun(args: Args, e: Engine, place: Place): Promi
 
 /**
  * `nemia workflows write`'s runner: the draft folder `--folder` names read as a start reads a folder, its agents looked for beside it
- * and in yours, through the Workflow door (`draftSteps`), or in the tree written for the place `factory` (`templatedTree`), into the steps the builder sends, and
- * its README where it has one.
+ * and in yours, through the Workflow door (`draftSteps`), or in the tree written for the place `factory` (`templatedTree`), into the
+ * steps the builder sends, and its README where it has one.
  */
 export async function workflowsWriteRun(args: Args, e: Engine, place: Place): Promise<void> {
   const command = entryOf('workflows write');

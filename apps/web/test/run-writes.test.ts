@@ -6,7 +6,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { QueryClient, QueryObserver } from '@tanstack/react-query';
+import { QueryClient, QueryObserver, type QueryKey } from '@tanstack/react-query';
 import { finishedRunsQuery, openRunsQuery } from '../src/lib/api/runs.ts';
 import { runsMoved } from '../src/lib/runWrites.ts';
 import { bell, until, WAITED } from './waits.ts';
@@ -110,6 +110,29 @@ test("runsMoved: a write that changes a run reads the frame's answer and each pa
       '/api/runs-open?ofFactory=harbour',
     ]);
   });
+});
+
+test("runsMoved with a run: a write that changes a try without moving its step reads that run's steps again", async () => {
+  const subs: QueryKey[] = [
+    ['runs', 'a', 'steps', 'plan', 'tries', 's'],
+    ['runs', 'a', 'steps', 'plan', 'told', 's'],
+    ['runs', 'a', 'page'],
+  ];
+  const seeded: QueryKey[] = [
+    ...subs,
+    ['runs', 'a', 'lines'],
+    ['runs', 'a', 'decision', 's'],
+    ['runs', 'b', 'steps', 'plan', 'tries', 's'],
+  ];
+  const client = new QueryClient();
+  for (const key of seeded) client.setQueryData(key, {});
+  await runsMoved(client, 'a');
+  assert.deepEqual(
+    seeded.filter((key) => client.getQueryState(key)?.isInvalidated),
+    subs,
+    "its steps' tries and told at every stamp, and its page; never its lines, its decision or another run's",
+  );
+  client.clear();
 });
 
 test('the writes that change a run, in src: none invalidates the whole list by hand', async (t) => {

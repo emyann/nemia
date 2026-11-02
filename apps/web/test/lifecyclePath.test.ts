@@ -4,7 +4,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { byPerson, centredScroll, litAt, PATH_POLL_MS, pathPoll, pathStamp, takenRoutes } from '../src/lib/lifecyclePath.ts';
+import { byPerson, centredScroll, litAt, PATH_POLL_MS, pathPoll, stepStamp, takenRoutes } from '../src/lib/lifecyclePath.ts';
 import type { MachineEdge, MachineVerb } from '../src/lib/api/machines.ts';
 import type { LifecycleTransition, StepPath } from '../src/lib/api/steps.ts';
 
@@ -51,7 +51,7 @@ const closed = [...running, ...pathOf(['input-required', 'ended'], ['ending', 'c
   at: `c${i}`,
 }));
 
-test("pathPoll, pathStamp: when a task's path is read again, and the stamp that keys it", async (t) => {
+test("pathPoll, stepStamp: when a task's path is read again, and the stamp that keys it", async (t) => {
   await t.test('the current try of a task still moving is read again every PATH_POLL_MS', () => {
     assert.equal(pathPoll(read(running), FINAL, true), PATH_POLL_MS);
     assert.equal(pathPoll(read([]), FINAL, true), PATH_POLL_MS, 'a task filed whose journal is not read yet');
@@ -66,15 +66,16 @@ test("pathPoll, pathStamp: when a task's path is read again, and the stamp that 
       assert.equal(pathPoll(read(running), [], true), false, 'a machine whose final states are not known');
     },
   );
-  await t.test('the stamp moves with the step’s task, its tries and its word, and with nothing else', () => {
-    const step = { taskId: 't-1', tries: [{}], message: 'running', note: 'working' };
-    const stamp = pathStamp(step);
-    const noted = { ...step, note: 'something else' };
-    assert.equal(pathStamp(noted), stamp);
-    assert.notEqual(pathStamp({ ...step, message: 'succeeded' }), stamp, 'its word');
-    assert.notEqual(pathStamp({ ...step, tries: [{}, {}] }), stamp, 'a try more');
-    assert.notEqual(pathStamp({ ...step, taskId: 't-2' }), stamp, 'another task');
-    assert.notEqual(pathStamp({ ...step, taskId: null }), stamp, 'no task');
+  await t.test('the stamp moves with the step’s task, its attempts and its current try, and with nothing else', () => {
+    const current = { try: 1, round: 1, phase: 'running', reason: 'Running', outcome: null, verdict: null } as const;
+    const step = { taskId: 't-1', attempts: { count: 1, latest: null }, current };
+    const stamp = stepStamp(step);
+    assert.equal(stepStamp({ ...step, attempts: { ...step.attempts } }), stamp);
+    assert.notEqual(stepStamp({ ...step, current: { ...current, phase: 'succeeded', reason: 'Succeeded' } }), stamp, 'its word');
+    assert.notEqual(stepStamp({ ...step, attempts: { count: 2, latest: null } }), stamp, 'an attempt more');
+    assert.notEqual(stepStamp({ ...step, current: { ...current, try: 2 } }), stamp, 'a try more');
+    assert.notEqual(stepStamp({ ...step, taskId: 't-2' }), stamp, 'another task');
+    assert.notEqual(stepStamp({ ...step, taskId: null }), stamp, 'no task');
   });
 });
 

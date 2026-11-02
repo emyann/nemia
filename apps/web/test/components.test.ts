@@ -5219,7 +5219,7 @@ test('REFUSED: a second try while one moves — the button is held, and the late
   ];
   const html = await routedWith(createElement(TryAgent, { agent: composing as never }), [
     [['runs'], runs],
-    [['runs', 'r-t'], tryDetail({ status: 'running' })],
+    [['runs', 'r-t', 'page'], tryDetail({ status: 'running' })],
   ]);
   assert.match(html, /data-try-held[^>]*>A try is still running \(r-t\): one at a time\./);
   assert.match(html, /<button type="submit" disabled=""/);
@@ -5234,7 +5234,7 @@ test("a try stopped where no step broke says what stopped it, in its run's own w
   const { TryAgent } = await import('../src/components/TryAgent.tsx');
   const html = await routedWith(createElement(TryAgent, { agent: composing as never }), [
     [['runs'], [tried('r-t', { status: 'running' })]],
-    [['runs', 'r-t'], tryDetail({ status: 'blocked' })],
+    [['runs', 'r-t', 'page'], tryDetail({ status: 'blocked' })],
   ]);
   assert.match(html, /data-try-status[^>]*>blocked</);
 });
@@ -5243,7 +5243,7 @@ test('a try not filed yet says so in place of its files', async () => {
   const { TryRun } = await import('../src/components/TryAgent.tsx');
   const unfiled = tryDetail();
   (unfiled.steps[0] as { taskId: string | null }).taskId = null;
-  const html = await routedWith(createElement(TryRun, { id: 'r-t' }), [[['runs', 'r-t'], unfiled]]);
+  const html = await routedWith(createElement(TryRun, { id: 'r-t' }), [[['runs', 'r-t', 'page'], unfiled]]);
   assert.match(html, /Not filed yet/);
   assert.doesNotMatch(html, /data-try-files/);
 });
@@ -5663,7 +5663,7 @@ test("the run bar: the run's title and id, what it asks of a person, its steps e
     { waitingOnYou: ['review', 'theme'], waitingOnYouWords: ['approve review', 'theme'], brief: 'Make the **floor** clear.' },
   );
   const run = { ...base, steps: [base.steps[0], theme] };
-  const html = await pagedWith(createElement(RunBar, { run: run.id }), [[['runs', run.id], run]]);
+  const html = await pagedWith(createElement(RunBar, { run: run.id }), [[['runs', run.id, 'page'], run]]);
   assert.ok(html.includes(`>${runTitle(run)}</h2>`), html);
   assert.ok(html.includes(`<span class="font-mono text-body-small">${run.id}</span>`), html);
   assert.match(html, /<section aria-label="Waiting on you"/);
@@ -5678,7 +5678,7 @@ test("the run bar: the run's title and id, what it asks of a person, its steps e
   );
   assert.match(/<section aria-label="Brief"[\s\S]*?<\/section>/.exec(html)![0], /<strong>floor<\/strong>/);
 
-  const decide = await pagedWith(createElement(RunBar, { run: 'r-1' }), [[['runs', 'r-1'], endingRun()]]);
+  const decide = await pagedWith(createElement(RunBar, { run: 'r-1' }), [[['runs', 'r-1', 'page'], endingRun()]]);
   assert.match(decide, /<section aria-label="To decide"[^>]*>[\s\S]*?<button type="button" data-approve="ship"/);
 });
 

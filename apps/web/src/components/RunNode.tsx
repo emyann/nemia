@@ -5,7 +5,8 @@ import { Handle, Position, type Node, type NodeProps } from '@xyflow/react';
 import { ChevronRight } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
-import { decisionQuery, type RunDetail, type RunSummary, type RunWaiting } from '@/lib/api';
+import { decisionQuery, type RunSummary, type RunWaiting } from '@/lib/api';
+import type { RunView } from '@/lib/runView';
 import { TryTag } from './TryTag';
 import { needLine, needsOf, stepAnchor } from '@/lib/asks';
 import { spentTitle } from '@/lib/cost';
@@ -32,7 +33,7 @@ export type RunNodeData = {
   reads: string[];
   finished: boolean;
   open: boolean;
-  detail: RunDetail | null;
+  detail: RunView | null;
   trouble: string | null;
   inspected: boolean;
   selected: string | null;

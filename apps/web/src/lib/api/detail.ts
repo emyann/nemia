@@ -2,11 +2,12 @@
  * A run's detail, as its page reads it (`GET /api/runs/:id?view=page`, apps/api/src/runs/runs.ts): each step's spec, filing, gate, tries
  * and timeline. Each type has its schema beside it, which `get` decodes the api's answer with.
  */
-import { queryOptions, type QueryClient } from '@tanstack/react-query';
+import { queryOptions } from '@tanstack/react-query';
 import { Schema } from 'effect';
 import { decodes } from './decodes.ts';
 import { pace } from '../feed.ts';
-import { ReadRefusal, get } from './read.ts';
+import { get } from './read.ts';
+import { retryRun } from './gone.ts';
 import type { RetryMode, Said } from './asks.ts';
 import { RunGraphSchema, type RunGraph } from './graph.ts';
 import { WorkflowPageAddressSchema, type WorkflowPageAddress } from './address.ts';
@@ -670,38 +671,14 @@ const RunDetailSchema = decodes<RunDetail>()(
 );
 
 /**
- * Whether a read of a run's record found no run: the api's 404 (`noSuchRun`), as the CLI's `rm` leaves it. A page open on the run keeps
- * what it last read when a read again fails — a suspense query throws only while it has nothing — so the run's pages read the query's
- * `error` beside its `data`, and say the run is gone rather than draw it as it was.
- */
-export const runGone = (error: unknown): boolean => error instanceof ReadRefusal && error.status === 404;
-
-/**
- * Every failure is tried again three times, as react-query does by default, but a run gone from the store: said at once, not seconds later.
- */
-export const retryRun = (failures: number, error: unknown): boolean => !runGone(error) && failures < 3;
-
-/**
  * A run's detail, decoded (`RunDetailSchema`). Read again every 5 s while the feed is not followed — every minute while it is. Asked for
- * as the page (`?view=page`): the run's route answers the run object, which the board reads once it is ported onto it.
+ * as the page (`?view=page`), by the readers not yet ported onto the run object (`runObjectQuery`, `run.ts`): under a key of its own, which
+ * the feed reads again with the object's (`keysOf`), so the two shapes never share a key.
  */
 export const runQuery = (id: string) =>
   queryOptions({
-    queryKey: ['runs', id],
+    queryKey: ['runs', id, 'page'],
     queryFn: () => get(`/api/runs/${encodeURIComponent(id)}?view=page`, RunDetailSchema),
     refetchInterval: () => pace(5_000),
     retry: retryRun,
   });
-
-/**
- * What a run's page loads before it draws: the run read into `client`'s cache (`runQuery`), and `gone` when the store has no such run
- * (`runGone`), so the page says so in place of a failure; any other failure is thrown, for the route's error to say.
- */
-export const loadRun = (client: QueryClient, id: string): Promise<{ gone: boolean }> =>
-  client.ensureQueryData(runQuery(id)).then(
-    () => ({ gone: false }),
-    (error: unknown) => {
-      if (runGone(error)) return { gone: true };
-      throw error;
-    },
-  );

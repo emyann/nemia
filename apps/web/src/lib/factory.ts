@@ -9,6 +9,7 @@ import { instantWhole } from './instant.ts';
 import { layers, type Point } from './layout.ts';
 import { sinceShort } from './runWords.ts';
 import { ENDED } from './words.ts';
+import type { Frozen } from './frozen.ts';
 
 /**
  * Whether a run is in flight, and so on the Factory by default: `assess` has it `running`, or it still moves — the engine holds a task of
@@ -29,7 +30,7 @@ import { ENDED } from './words.ts';
  * steps say, and the tick lifts the hold when those runs land, though nothing of it is filed before then. Not once only a person lifts it
  * (`holding.waitingOnYou`): then it waits on them (`waitsOnYou`). A listing without `holding` is read as holding nothing.
  */
-export const inFlight = (run: Pick<RunSummary, 'status' | 'moving'> & Held): boolean =>
+export const inFlight = (run: Frozen<Pick<RunSummary, 'status' | 'moving'> & Held>): boolean =>
   run.moving || (run.status === 'running' && !run.waiting?.waitingOnYou && !run.holding?.waitingOnYou);
 
 /**
@@ -46,7 +47,7 @@ type Held = { waiting?: RunSummary['waiting']; holding?: RunSummary['holding']; 
  * while there is nothing — and for a listing without `toDecide`, read tolerantly as `onYouOf` is, since the Factory polls the list and a
  * refusal would take the whole floor down for a word.
  */
-export const toDecideOf = (run: { toDecide?: RunToDecide | null }): RunToDecide | null => run.toDecide ?? null;
+export const toDecideOf = (run: { toDecide?: Frozen<RunToDecide> | null }): Frozen<RunToDecide> | null => run.toDecide ?? null;
 
 /**
  * Whether the run waits on a person: a step does (`waitingOnYou`) — at its gate anywhere in the run, or signed off blocked — or a run it
@@ -54,7 +55,7 @@ export const toDecideOf = (run: { toDecide?: RunToDecide | null }): RunToDecide 
  * (`holding.waitingOnYou`: a run it is held until is cancelled, gone, or not there). Not once it is cancelled: a cancelled run waits on
  * nobody, whatever its steps last said.
  */
-export const waitsOnYou = (run: Pick<RunSummary, 'waitingOnYou' | 'cancelledAt'> & Held): boolean =>
+export const waitsOnYou = (run: Frozen<Pick<RunSummary, 'waitingOnYou' | 'cancelledAt'> & Held>): boolean =>
   !run.cancelledAt && (run.waitingOnYou.length > 0 || Boolean(run.waiting?.waitingOnYou) || Boolean(run.holding?.waitingOnYou));
 
 /**
@@ -74,7 +75,7 @@ export const waitsOnRuns = (run: Pick<RunSummary, 'waitingOnYou' | 'cancelledAt'
  * whole of what is asked is the decision — so a caller that says `waiting on you:` asks whether there is anything to say first.
  */
 export const onYouOf = (
-  run: Pick<RunSummary, 'waitingOnYou'> & { waitingOnYouWords?: readonly string[]; toDecide?: RunToDecide | null },
+  run: Frozen<Pick<RunSummary, 'waitingOnYou'> & { waitingOnYouWords?: readonly string[]; toDecide?: RunToDecide | null }>,
 ): readonly string[] => {
   const said = run.waitingOnYouWords ?? run.waitingOnYou;
   const decide = toDecideOf(run);
@@ -88,8 +89,9 @@ export const onYouOf = (
 export const standingOf = (run: Pick<RunSummary, 'cancelledAt' | 'status' | 'moving' | 'waitingOnYou' | 'waiting'>): string =>
   run.cancelledAt ? ENDED.cancelled.word : waitsOnYou(run) ? 'waiting on you' : inFlight(run) ? 'in flight' : 'finished';
 
-type Clocked = Pick<RunSummary, 'createdAt' | 'startedAt' | 'cancelledAt'> &
-  Held & { waitingOnYou?: RunSummary['waitingOnYou']; atWork?: AtWork | null };
+type Clocked = Frozen<
+  Pick<RunSummary, 'createdAt' | 'startedAt' | 'cancelledAt'> & Held & { waitingOnYou?: RunSummary['waitingOnYou']; atWork?: AtWork | null }
+>;
 
 /** How long a run waited before it started — created to its first filing — or null while nothing of it is filed. */
 export const waitedMs = (run: Pick<RunSummary, 'createdAt' | 'startedAt'>): number | null =>

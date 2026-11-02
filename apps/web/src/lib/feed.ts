@@ -38,6 +38,11 @@ export const FLUSH_MS = 1_000;
  * so the inbox is read again on it. A run removed is gone from the list and from the cap, and its record is read again too: the read
  * that finds none is how a page open on the run learns it is gone (`runGone`).
  *
+ * A run's object (`['runs', id]`) is read again on each of them, and the page the readers not yet ported onto it read (`runQuery`,
+ * `['runs', id, 'page']`) with it. A step's tries and told (`['runs', id, 'steps', …]`) are keyed by the step's state in the object
+ * (`stepStamp`), so a step's event, which moves that state, never names them; a run's own event and a removal read every one of them
+ * again, by prefix: a change to a try that moves no step — its files pruned at the command line — is said by a run's event.
+ *
  * And every event reads again whether a daemon ticks the store (`daemonQuery`): a line on the feed is written by a tick, the
  * daemon's, so a daemon started while the board says none does is seen on its first line, not on the fallback a minute later. A
  * daemon's own line is that first line, and reads the daemon's standing alone: it names no run, and moves no run's record.
@@ -55,13 +60,38 @@ export function keysOf(event: FeedEvent, run?: string): QueryKey[] {
     case 'store':
       return [['pause'], ['pause', 'now'], ['daemon']];
     case 'step':
-      return [['runs'], ['runs-open'], ['runs-finished'], ['runs', run], ['daemon']];
+      return [['runs'], ['runs-open'], ['runs-finished'], ['runs', run], ['runs', run, PAGE], ['daemon']];
     case 'run':
-      return [['runs'], ['runs-open'], ['runs-finished'], ['runs', run], ['ceilings'], ['inbox'], ['daemon']];
+      return [
+        ['runs'],
+        ['runs-open'],
+        ['runs-finished'],
+        ['runs', run],
+        ['runs', run, PAGE],
+        ['runs', run, STEPS],
+        ['ceilings'],
+        ['inbox'],
+        ['daemon'],
+      ];
     case 'removed':
-      return [['runs'], ['runs-open'], ['runs-finished'], ['runs', run], ['ceilings'], ['daemon']];
+      return [
+        ['runs'],
+        ['runs-open'],
+        ['runs-finished'],
+        ['runs', run],
+        ['runs', run, PAGE],
+        ['runs', run, STEPS],
+        ['ceilings'],
+        ['daemon'],
+      ];
   }
 }
+
+/** The third word of the key of the page of a run (`runQuery`), read by the readers not yet ported onto its object. */
+const PAGE = 'page';
+
+/** The third word of every key of a step's sub-resources (`stepTriesQuery`, `stepToldQuery`): it stands for each step's, at each stamp. */
+const STEPS = 'steps';
 
 /** The key of the light answer for every factory (`openRunsQuery`), which stands for the one of each factory, keyed under it. */
 const OPEN = 'runs-open';
@@ -70,13 +100,16 @@ const OPEN = 'runs-open';
 const FINISHED = 'runs-finished';
 
 /**
- * How a key an event or a write names is invalidated: exactly, for every key but the light answer's and the finished runs', each of
- * which stands for every key under it — a factory's own answer and each page move with every run's, and the feed names no factory and
- * no page. No key under them is keyed by a state.
+ * How a key an event or a write names is invalidated: exactly, for every key but the light answer's, the finished runs' and a run's
+ * steps' (`['runs', id, 'steps']`), each of which stands for every key under it — a factory's own answer and each page move with every
+ * run's, and every stamp of each step's tries and told with a run's event, and the feed names no factory, no page and no stamp.
  */
 export const filterOf = (queryKey: QueryKey): { queryKey: QueryKey; exact: boolean } => ({
   queryKey,
-  exact: !(queryKey.length === 1 && (queryKey[0] === OPEN || queryKey[0] === FINISHED)),
+  exact: !(
+    (queryKey.length === 1 && (queryKey[0] === OPEN || queryKey[0] === FINISHED)) ||
+    (queryKey.length === 3 && queryKey[2] === STEPS)
+  ),
 });
 
 /**
@@ -87,6 +120,7 @@ export const filterOf = (queryKey: QueryKey): { queryKey: QueryKey; exact: boole
 export const polled = (key: QueryKey): boolean =>
   (key.length === 1 && (key[0] === 'runs' || key[0] === OPEN || key[0] === 'ceilings' || key[0] === 'daemon')) ||
   (key.length === 2 && (key[0] === 'runs' || key[0] === OPEN) && typeof key[1] === 'string') ||
+  (key.length === 3 && key[0] === 'runs' && key[2] === PAGE) ||
   key[0] === FINISHED;
 
 /** Whether the feed's stream is open now: one stream a page, so one flag, set by `followFeed` alone. */

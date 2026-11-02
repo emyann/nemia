@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { isDeepStrictEqual } from 'node:util';
 import { QueryClient, QueryObserver } from '@tanstack/react-query';
-import { decisionQuery, ReadRefusal, retryRun, runGone, runQuery, sayToStep } from '../src/lib/api.ts';
+import { decisionQuery, ReadRefusal, retryRun, runGone, runObjectQuery, runQuery, sayToStep, type RunObject } from '../src/lib/api.ts';
 import { decisionStamp } from '../src/lib/decide.ts';
 import { coded, decidable, detail, type Word } from './run-fixtures.ts';
 import { bell, until, WAITED } from './waits.ts';
@@ -358,7 +358,7 @@ test("a run's reads: gone on a 404 alone, its last read kept, any other failure 
       const observer = new QueryObserver(client, { ...runQuery('r-1'), refetchOnMount: false });
       t.after(observer.subscribe(() => {}));
 
-      await client.invalidateQueries({ queryKey: ['runs', 'r-1'], exact: true });
+      await client.invalidateQueries({ queryKey: runQuery('r-1').queryKey, exact: true });
       const result = observer.getCurrentResult();
       assert.equal(
         runGone(result.error),
@@ -369,6 +369,34 @@ test("a run's reads: gone on a 404 alone, its last read kept, any other failure 
       assert.equal(result.error.message, said, "in the api's words");
       assert.equal(result.data, last, 'the last read is kept by the query — the page, not the query, stops drawing it');
       assert.deepEqual(asked, ['/api/runs/r-1?view=page'], 'read once: a run gone is said at once, not after three tries');
+    },
+  );
+  await t.test(
+    "the run object's read: a 404 is the run gone, said at once, its last read kept, asked of the run's own route",
+    async (t) => {
+      const before = globalThis.fetch;
+      const asked: string[] = [];
+      globalThis.fetch = (async (url: string) => {
+        asked.push(url);
+        return new Response(JSON.stringify({ error: "No run 'r-1' in this store." }), {
+          status: 404,
+          headers: { 'content-type': 'application/json' },
+        });
+      }) as typeof fetch;
+      const client = new QueryClient();
+      t.after(() => {
+        globalThis.fetch = before;
+        client.clear();
+      });
+      const last = { kind: 'Run' } as unknown as RunObject.Run;
+      client.setQueryData(runObjectQuery('r-1').queryKey, last);
+      const observer = new QueryObserver(client, { ...runObjectQuery('r-1'), refetchOnMount: false });
+      t.after(observer.subscribe(() => {}));
+      await client.invalidateQueries({ queryKey: ['runs', 'r-1'], exact: true });
+      const result = observer.getCurrentResult();
+      assert.equal(runGone(result.error), true, String(result.error));
+      assert.equal(result.data, last, 'the last read is kept by the query');
+      assert.deepEqual(asked, ['/api/runs/r-1'], "read once, the object at the run's own route: a run gone is not tried again");
     },
   );
   await t.test("a run's place said `repository`, the former spelling an api not yet restarted answers, is read as `git`", async (t) => {

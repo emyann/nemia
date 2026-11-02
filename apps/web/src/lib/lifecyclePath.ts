@@ -5,6 +5,7 @@
  */
 import type { MachineGraph, MachineVerb } from './api/machines.ts';
 import type { LifecycleTransition, StepPath } from './api/steps.ts';
+import type { RunStepStatus } from './api/run.gen.ts';
 
 /**
  * How often the path of a task still moving is read again while the panel is open: a move that changes no step's word says nothing on the
@@ -24,11 +25,18 @@ export function pathPoll(read: StepPath | undefined, final: readonly string[], c
 }
 
 /**
- * What keys the current try's path by the step's state in the run's record: its task, how many tries it has had, and its word. The
- * feed's `step` event reads the record again, and a step that moved reads its path again under a key of its own.
+ * What keys a step's sub-resources by its state in the run object — its tries and what it was told (`stepTriesQuery`, `stepToldQuery`),
+ * and its current try's path: its task, how many attempts it has had, and its current try, by number, round, phase, reason, outcome and
+ * verdict. The feed's events read the object again, and a step that moved reads them again under a key of its own; what it cost, and
+ * what a person said to it, move none of it.
  */
-export const pathStamp = (step: { taskId: string | null; tries: readonly unknown[]; message: string }): string =>
-  `${step.taskId ?? '-'}|${step.tries.length}|${step.message}`;
+export const stepStamp = <S extends Pick<RunStepStatus, 'taskId' | 'attempts' | 'current'>>(step: S): string => {
+  const c = step.current;
+  const now = c
+    ? [c.try, c.round, c.phase, c.reason, c.outcome ?? '-', c.verdict ? `${c.verdict.result}:${c.verdict.exit ?? '-'}` : '-'].join('.')
+    : '-';
+  return `${step.taskId ?? '-'}|${step.attempts.count}|${now}`;
+};
 
 /** The state lit at step `at` of `path`: the state its journal said once that entry was on it; undefined for an empty path. */
 export const litAt = (path: readonly LifecycleTransition[], at: number): string | undefined => path[Math.min(at, path.length - 1)]?.state;

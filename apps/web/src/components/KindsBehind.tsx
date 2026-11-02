@@ -1,6 +1,6 @@
 import { CutTag } from '@/components/look';
 import { Tag } from '@/components/ui/ds';
-import type { RunDetail } from '@/lib/api';
+import type { RunView } from '@/lib/runView';
 
 /**
  * One kind the run is behind on, in words: `agent coder: rev 5, files at rev 7` for what a filing after this would take, and
@@ -10,7 +10,7 @@ import type { RunDetail } from '@/lib/api';
  * comparing each digest with the run's pins, so a kind reverted to the content the run pins is behind on nothing, and one reverted to
  * an older content says the older number.
  */
-export const behindWords = (k: NonNullable<RunDetail['kinds']>[number]): string =>
+export const behindWords = (k: NonNullable<RunView['kinds']>[number]): string =>
   `${k.kind} ${k.name}: ${k.step ? `${k.step} ran on rev ${k.pinned}` : `rev ${k.pinned}`}, files at rev ${k.now}`;
 
 /**
@@ -18,7 +18,7 @@ export const behindWords = (k: NonNullable<RunDetail['kinds']>[number]): string 
  * kind, with the verb to type to take them. A note, so at rest: nothing of it waits on a person, and a run on the newest of every kind
  * draws nothing. The tag is the look's (`CutTag`), as every tag on the board is.
  */
-export function KindsBehind({ run }: { run: RunDetail }) {
+export function KindsBehind({ run }: { run: RunView }) {
   const kinds = run.kinds;
   if (kinds.length === 0) return null;
   return (

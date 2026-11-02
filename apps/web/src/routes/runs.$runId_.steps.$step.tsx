@@ -1,5 +1,4 @@
 import { useMemo, useState } from 'react';
-import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { DebugPanel } from '@/components/DebugPanel';
 import { SessionRetryingBand, SessionStoppedBand, SessionUnreadableBand } from '@/components/session/SessionBand';
@@ -7,7 +6,8 @@ import { SessionComposer } from '@/components/session/SessionComposer';
 import { SessionQuiet, SessionTalk } from '@/components/session/SessionTalk';
 import { RunGone } from '@/components/RunGone';
 import { StatusChip, StepNote } from '@/components/StatusChip';
-import { loadRun, runGone, runQuery, type RunDetail, type Said } from '@/lib/api';
+import { runGone, type Said } from '@/lib/api';
+import { loadRun, useRunView, type RunView, type StepView } from '@/lib/runView';
 import { titleOf } from '@/lib/factory';
 import { mergeSaid, sayable } from '@/lib/say';
 import { waitsAtGate, stepState } from '@/lib/status';
@@ -32,7 +32,7 @@ export const Route = createFileRoute('/runs/$runId_/steps/$step')({
   ),
 });
 
-type Step = RunDetail['steps'][number];
+type Step = StepView;
 
 /**
  * The page of a step's session, or, when the store has no run of its id as the page loads (`loadRun`), the words that say so, by the
@@ -60,7 +60,7 @@ function SessionPage() {
  * conversation never stands in for another's while that one is read.
  */
 function SessionRead({ runId, name }: { runId: string; name: string }) {
-  const { data: run, error } = useSuspenseQuery(runQuery(runId));
+  const { view: run, error } = useRunView(runId);
   if (runGone(error)) {
     return (
       <div className="space-y-3 p-4">
@@ -95,11 +95,18 @@ function SessionRead({ runId, name }: { runId: string; name: string }) {
  * kept with the task it was said to, so a later try starts afresh. Words the transcript shows reaching the session are drawn once, as what
  * was said, where they reached it (`heardIn`).
  */
-function Session({ run, step }: { run: RunDetail; step: Step }) {
+function Session({ run, step }: { run: RunView; step: Step }) {
   const cancelled = run.cancelledAt !== null;
   const following = useStepTranscript(run.id, step.name, sessionToRead(step), waitsAtGate(stepState(step, cancelled, false), cancelled));
   const [sent, setSent] = useState<{ taskId: string | null; said: Said[] }>({ taskId: step.taskId, said: [] });
-  const said = useMemo(() => mergeSaid(step.said, sent.taskId === step.taskId ? sent.said : []), [step.said, step.taskId, sent]);
+  const said = useMemo(
+    () =>
+      mergeSaid(
+        step.said.map((s) => ({ ...s, after: s.after ?? null })),
+        sent.taskId === step.taskId ? sent.said : [],
+      ),
+    [step.said, step.taskId, sent],
+  );
   const turns = useMemo(() => {
     const heard = heardIn(following.events, said);
     return withSaid(foldTranscript(heard.events), heard.said);
@@ -167,7 +174,7 @@ function SessionBody({ step, following, turns }: { step: Step; following: Follow
   );
 }
 
-function BackToRun({ run }: { run: RunDetail }) {
+function BackToRun({ run }: { run: RunView }) {
   return (
     <Link
       to="/runs/$runId"

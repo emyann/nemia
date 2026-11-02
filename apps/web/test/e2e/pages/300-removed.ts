@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { Page } from 'playwright';
 import { fed, photograph, themeOf } from '../board.ts';
-import { expectCount, expectVisible, idle, Refused, settled, watch } from '../checks.ts';
+import { expectCount, expectVisible, idle, literal, Refused, settled, watch } from '../checks.ts';
 import { LANDED } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT, store } from '../world.ts';
@@ -65,14 +65,21 @@ export default {
       await settled(step.other);
       await photograph(step.other, path.join(OUT, `removed-step-${await themeOf(step.other)}.png`), { fullPage: true });
 
-      const refused = `request answered 404: GET ${new URL(`/api/runs/${id}?view=page`, page.url()).href}`;
+      const refused = `request answered 404: GET ${new URL(`/api/runs/${id}`, page.url()).href}`;
+      // The feed's `removed` reads every step's tries and told again too (`keysOf`), each a 404 of the same run gone.
+      const steps = new RegExp(
+        `^request answered 404: GET ${literal(new URL(`/api/runs/${id}/steps/`, page.url()).href)}[^/]+/(tries|told)$`,
+      );
       for (const [{ problems }, where] of [
         [run, 'the run page'],
         [step, 'the step page'],
       ] as const) {
         const seen = problems();
         const others = seen.filter(
-          (p) => p !== refused && !/^console error: Failed to load resource: the server responded with a status of 404\b/.test(p),
+          (p) =>
+            p !== refused &&
+            !steps.test(p) &&
+            !/^console error: Failed to load resource: the server responded with a status of 404\b/.test(p),
         );
         if (!seen.includes(refused) || others.length)
           throw new Refused(

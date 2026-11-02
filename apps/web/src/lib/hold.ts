@@ -1,6 +1,9 @@
 import type { RunSummary } from './api/runs.ts';
+import type { Frozen } from './frozen.ts';
 
-type Holdable = Pick<RunSummary, 'id' | 'place' | 'repo' | 'cancelledAt' | 'holding' | 'holdUntil' | 'status'> & { pruned: object | null };
+type Holdable = Frozen<Pick<RunSummary, 'id' | 'place' | 'repo' | 'cancelledAt' | 'holding' | 'holdUntil' | 'status'>> & {
+  pruned: object | null;
+};
 
 type Candidate = Pick<RunSummary, 'id' | 'place' | 'repo' | 'cancelledAt' | 'pruned' | 'status' | 'toDecide'>;
 

@@ -1,5 +1,6 @@
 import { Button as AriaButton } from 'react-aria-components';
-import type { RunDetail, RunSummary } from '../lib/api';
+import type { RunSummary } from '../lib/api';
+import type { RunView } from '../lib/runView';
 import { needNodeText, needOf, needText, type Need } from '../lib/asks';
 import { attemptLine, edgeLine, edgeStroke, isLive } from '../lib/canvas';
 import { costText, pastBudget } from '../lib/cost';
@@ -125,7 +126,7 @@ export function StepTiles({
   onStep,
 }: {
   run: RunSummary;
-  detail: RunDetail | null;
+  detail: RunView | null;
   flow: Flow;
   selected: string | null;
   onStep: (step: string) => void;

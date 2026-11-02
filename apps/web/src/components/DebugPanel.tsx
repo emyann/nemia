@@ -4,13 +4,14 @@ import { Button as AriaButton, Slider, SliderThumb, SliderTrack, ToggleButton, T
 import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Sheet, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
-import { machineQuery, stepPathQuery, type LifecycleTransition, type MachineGraph, type RunDetail, type StepPath } from '@/lib/api';
-import { byPerson, centredScroll, litAt, pathPoll, pathStamp, takenRoutes } from '@/lib/lifecyclePath';
+import { machineQuery, stepPathQuery, type LifecycleTransition, type MachineGraph, type StepPath } from '@/lib/api';
+import type { RunView, StepView } from '@/lib/runView';
+import { byPerson, centredScroll, litAt, pathPoll, stepStamp, takenRoutes } from '@/lib/lifecyclePath';
 import { clockWord } from '@/lib/quota';
 import { useNow } from '@/lib/useNow';
 import { MachineCanvas } from './MachineCanvas';
 
-type Step = RunDetail['steps'][number];
+type Step = StepView;
 
 /** The machine the panel draws a task's path on: the runtime's lifecycle, as the `/machines` page draws it. */
 const LIFECYCLE = 'lifecycle';
@@ -26,7 +27,7 @@ const PATH_TITLE = "The task's path through the runtime's lifecycle";
  * moved through the runtime's lifecycle, drawn over the lifecycle's graph, with a timeline to scrub back through, and a button that opens
  * the same lit graph full width, at a size its names can be read. Nothing of it is read or drawn while it is closed.
  */
-export function DebugPanel({ run, step }: { run: RunDetail; step: Step }) {
+export function DebugPanel({ run, step }: { run: RunView; step: Step }) {
   return (
     <section aria-label="Debug" className="shrink-0 border-b">
       <Collapsible>
@@ -44,7 +45,7 @@ export function DebugPanel({ run, step }: { run: RunDetail; step: Step }) {
 }
 
 /** The panel opened: the lifecycle's graph read first, then the path drawn on it. */
-function DebugBody({ run, step }: { run: RunDetail; step: Step }) {
+function DebugBody({ run, step }: { run: RunView; step: Step }) {
   const machine = useQuery(machineQuery(LIFECYCLE));
   if (machine.error) {
     return <p className="px-4 pb-3 text-body-medium text-failure">Could not read the lifecycle's graph: {machine.error.message}</p>;
@@ -58,11 +59,11 @@ function DebugBody({ run, step }: { run: RunDetail; step: Step }) {
  * every entry of its journal. The timeline follows the newest entry until a person moves it, and again once they move it back to the end;
  * picking another try follows that try's newest. The graph opened full width is drawn from the same read and the same entry shown.
  */
-function PathOf({ run, step, machine }: { run: RunDetail; step: Step; machine: MachineGraph }) {
+function PathOf({ run, step, machine }: { run: RunView; step: Step; machine: MachineGraph }) {
   const [tryNumber, setTryNumber] = useState<number | null>(null);
   const [pinned, setPinned] = useState<number | null>(null);
   const poll = (r: StepPath | undefined) => pathPoll(r, machine.final, tryNumber === null);
-  const read = useQuery(stepPathQuery(run.id, step.name, pathStamp(step), tryNumber, poll));
+  const read = useQuery(stepPathQuery(run.id, step.name, stepStamp({ ...step, current: step.current ?? null }), tryNumber, poll));
   const path = read.data?.path ?? [];
   const last = path.length - 1;
   const at = pinned === null ? last : Math.min(pinned, last);

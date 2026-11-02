@@ -6,12 +6,13 @@
  * sentences joining them are the board's, so a person reads what approving does without knowing the package: the CLI's `ls` prints the
  * command.
  */
-import type { Collision, Collisions, Decidable, RunDetail, RunSummary, StepAsked } from './api';
+import type { Collision, Collisions, Decidable, RunSummary, StepAsked } from './api';
+import type { RunView, StepView } from './runView';
 import { askedSaid, needsOf, stepAnchor, type Need } from './asks.ts';
 import { touchedSummary } from './decide.ts';
 import { verdictWords } from './words.ts';
 
-type DetailStep = RunDetail['steps'][number];
+type DetailStep = StepView;
 
 /**
  * A gate a person answers from the board: the step waiting at it; whether it ends the run in the repository's own checkout (`ends`), held
@@ -46,7 +47,7 @@ export function gateOfSummary(
  * edges for an ending that has no task yet.
  */
 export function gateOfStep(
-  run: Pick<RunDetail, 'cancelledAt' | 'waitingOnYou' | 'branch' | 'graph'>,
+  run: Pick<RunView, 'cancelledAt' | 'waitingOnYou' | 'branch' | 'graph'>,
   step: Pick<DetailStep, 'name' | 'approve' | 'spec' | 'taskId'>,
 ): GateAsk | null {
   if (run.cancelledAt !== null || !step.approve || !run.waitingOnYou.includes(step.name)) return null;
@@ -137,7 +138,7 @@ export type GateFact = { label: string; said: string; state?: 'good' | 'bad'; st
  * without them says it signed off, and how. A step not run says so. A looping step a person ended out of rounds (the CLI's `accept`) is
  * said accepted as it stands, with their words, not as asking another round, though its closeout still says `again: true`.
  */
-export function gateFacts(run: Pick<RunDetail, 'steps' | 'cost'>, decision: Decidable | null): GateFact[] {
+export function gateFacts(run: Pick<RunView, 'steps' | 'cost'>, decision: Decidable | null): GateFact[] {
   const facts: GateFact[] = [];
   const loops = run.steps.filter((s) => s.spec?.loop);
   const round = Math.max(1, ...run.steps.flatMap((s) => s.tries.map((t) => t.round)));
@@ -168,7 +169,7 @@ export function gateFacts(run: Pick<RunDetail, 'steps' | 'cost'>, decision: Deci
  * The fact of a step's check under a gate: its verdict in words (`verdictWords`), `not run` before it is filed, and the try it is on
  * where there was more than one — good where it passed, bad where it settled otherwise, and neither while it runs.
  */
-function checkFact(checked: RunDetail['steps'][number]): GateFact {
+function checkFact(checked: StepView): GateFact {
   const verdict = checked.check?.verdict ?? null;
   return {
     label: 'check',

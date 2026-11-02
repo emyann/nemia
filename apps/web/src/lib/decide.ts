@@ -4,12 +4,13 @@
  */
 import type { Decidable, Group, RunDecision, RunSummary, Touched } from './api';
 import { stepState } from './status.ts';
+import type { Frozen } from './frozen.ts';
 
 /**
  * Whether a run has something to decide, as its page and the list read it: `assess` says it finished, or a step waits
  * on a person — and nobody called it off. The api has the last word (`isDecidable`); this only says when to ask.
  */
-export const decidableRun = (run: Pick<RunSummary, 'status' | 'cancelledAt' | 'waitingOnYou'>): boolean =>
+export const decidableRun = (run: Frozen<Pick<RunSummary, 'status' | 'cancelledAt' | 'waitingOnYou'>>): boolean =>
   run.cancelledAt === null && run.status !== 'cancelled' && (run.status !== 'running' || run.waitingOnYou.length > 0);
 
 /** Whether the api's answer is a decision to show, rather than `running` or `nothing`. */
@@ -27,9 +28,11 @@ export const isDecidable = (decision: RunDecision | undefined): decision is Deci
  * settles, a try filed (a new task) all move it.
  */
 export const decisionStamp = (
-  run: Pick<RunSummary, 'status' | 'cancelledAt' | 'waitingOnYou'> & { holding?: RunSummary['holding'] } & {
-    steps: ReadonlyArray<Pick<RunSummary['steps'][number], 'name' | 'taskId' | 'phase' | 'reason' | 'on' | 'via' | 'message'>>;
-  },
+  run: Frozen<
+    Pick<RunSummary, 'status' | 'cancelledAt' | 'waitingOnYou'> & { holding?: RunSummary['holding'] } & {
+      steps: ReadonlyArray<Pick<RunSummary['steps'][number], 'name' | 'taskId' | 'phase' | 'reason' | 'on' | 'via' | 'message'>>;
+    }
+  >,
 ): string =>
   JSON.stringify([
     run.status,

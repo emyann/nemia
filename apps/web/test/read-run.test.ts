@@ -7,7 +7,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { ReadRefusal, UnreadAnswer } from '../src/lib/api/read.ts';
-import { runGone, runQuery, type RunDetail } from '../src/lib/api/detail.ts';
+import { runQuery, type RunDetail } from '../src/lib/api/detail.ts';
+import { runGone } from '../src/lib/api/run.ts';
 import { decisionQuery, type RunDecision } from '../src/lib/api/decision.ts';
 import { readTranscript, stepPathQuery, type StepPath } from '../src/lib/api/steps.ts';
 import { decidable, detail, step, stepPath, transcript } from './run-fixtures.ts';

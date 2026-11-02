@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
-import type { RunDetail, StepTimelineTry, TaskSpan, TimelineTotal } from '../lib/api';
+import type { StepTimelineTry, TaskSpan, TimelineTotal } from '../lib/api';
+import type { RunView } from '../lib/runView';
 import { spentTitle } from '../lib/cost';
 import { instantWhole } from '../lib/instant';
 import { timeToTheSecond } from '../lib/timeOfDay';
@@ -11,7 +12,7 @@ import { timeToTheSecond } from '../lib/timeOfDay';
  * what its sessions cost. The words are the api's, which are the package's; the times are the engine's instants, shown in this browser's
  * clock. Nothing is drawn for a run with nothing filed.
  */
-export function Timeline({ run }: { run: RunDetail }) {
+export function Timeline({ run }: { run: RunView }) {
   const steps = run.steps.filter((step) => step.timeline.length > 0);
   if (!steps.length) return null;
   const { rounds } = run.timeline;

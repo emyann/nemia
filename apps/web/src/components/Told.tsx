@@ -15,6 +15,7 @@ import { Badge } from '@/components/ui/badge';
 import type { StepLayers, TaskPart } from '../lib/api';
 import { RouteLink } from './AgentParts';
 import { Markdown } from './Markdown';
+import type { Frozen } from '../lib/frozen';
 
 /**
  * Where each layer of a step lives, for its page: drawn beside the agent's instructions, your custom instructions, the factory's rules and
@@ -60,7 +61,7 @@ const NO_RULES_TOLD = 'This step is told none: the factory keeps none that can b
  * What a step's policy is told after, in words: agent `agent`'s instructions, then your custom instructions and the factory's rules,
  * each where `layers` holds some.
  */
-export function toldBefore(agent: string, layers: Pick<StepLayers, 'custom' | 'factory'>): string {
+export function toldBefore(agent: string, layers: Pick<Frozen<StepLayers>, 'custom' | 'factory'>): string {
   const first = `${agent}'s instructions`;
   const rest = [
     ...(layers.custom === null ? [] : ['your custom instructions']),
@@ -83,8 +84,8 @@ export function Told({
   homes,
 }: {
   told: string | null;
-  layers: StepLayers | null;
-  parts?: TaskPart[] | null;
+  layers: Frozen<StepLayers> | null;
+  parts?: Frozen<TaskPart[]> | null;
   filed: boolean;
   homes?: LayerHomes;
 }) {
@@ -104,7 +105,7 @@ export function Told({
  * The layers in the order the session reads them, the factory's rules among them only where the run froze some, and where the agent's
  * words, the person's and the factory's went.
  */
-function Layers({ layers, parts }: { layers: StepLayers; parts: TaskPart[] | null }) {
+function Layers({ layers, parts }: { layers: Frozen<StepLayers>; parts: Frozen<TaskPart[]> | null }) {
   return (
     <div className="mt-2 flex flex-col gap-3">
       {layers.agent === null ? (
@@ -152,7 +153,7 @@ function Layers({ layers, parts }: { layers: StepLayers; parts: TaskPart[] | nul
  * each beside where it lives, the agent's instructions folded, the factory's rules where the page is read in a factory or some are told,
  * and the task left to the brief a run is started with.
  */
-function WillBeTold({ layers, homes }: { layers: StepLayers; homes: LayerHomes }) {
+function WillBeTold({ layers, homes }: { layers: Frozen<StepLayers>; homes: LayerHomes }) {
   return (
     <details open className="text-body-medium" data-told data-will-be-told>
       <summary className="cursor-pointer text-muted-foreground hover:text-foreground">What it will be told</summary>
@@ -206,7 +207,7 @@ function WillBeTold({ layers, homes }: { layers: StepLayers; homes: LayerHomes }
  * A step's body, drawn above its fold only where its run froze no layers (`layers` null): there it is all the record says of the step's
  * own words. Nothing where layers were frozen, since the fold draws each of the body's words by layer, and nothing for an empty body.
  */
-export function StepBody({ body, layers }: { body: string | null; layers: StepLayers | null }) {
+export function StepBody({ body, layers }: { body: string | null; layers: Frozen<StepLayers> | null }) {
   if (layers !== null || !body) return null;
   return <Markdown className="text-body-medium">{body}</Markdown>;
 }
@@ -217,7 +218,7 @@ export function StepBody({ body, layers }: { body: string | null; layers: StepLa
  * over which it wins where they conflict, and where every layer is. Nothing for a step with no agent, whose own words are all it was told
  * and are its policy layer in the fold, nor for a run that froze no layers (`layers` null).
  */
-export function StepPolicy({ layers }: { layers: StepLayers | null }) {
+export function StepPolicy({ layers }: { layers: Frozen<StepLayers> | null }) {
   const agent = layers?.agent ?? null;
   if (layers === null || agent === null) return null;
   return (
@@ -242,7 +243,7 @@ const HANDED = { read: 'Read as context', waited: 'Waited on, landed' } as const
  * run was asked, linked to the run's page, over the section's body. A run the record names as neither waited on nor read is a plain
  * block, its section as it was written.
  */
-export function TaskParts({ parts }: { parts: TaskPart[] }) {
+export function TaskParts({ parts }: { parts: Frozen<TaskPart[]> }) {
   return (
     <div className="flex flex-col gap-2">
       {parts.map((part, i) => {
@@ -296,7 +297,7 @@ export function Words({ text, none = 'None frozen on this run' }: { text: string
 }
 
 /** The skills a layer gives, after `word`, each drawn by `link` where it is given; nothing where it gives none. */
-export function Skills({ word, skills, link }: { word: string; skills: string[]; link?: (name: string) => ReactNode }) {
+export function Skills({ word, skills, link }: { word: string; skills: readonly string[]; link?: (name: string) => ReactNode }) {
   if (!skills.length) return null;
   return (
     <p className="flex flex-wrap items-center gap-1 text-body-small text-muted-foreground">
@@ -311,7 +312,7 @@ export function Skills({ word, skills, link }: { word: string; skills: string[];
 }
 
 /** The fence lines a step's own file tightens agent `agent`'s with, each as its line writes it; nothing where it sets none. */
-function Fence({ agent, fence }: { agent: string | null; fence: StepLayers['fence'] }) {
+function Fence({ agent, fence }: { agent: string | null; fence: Frozen<StepLayers['fence']> }) {
   if (!fence.length) return null;
   return (
     <div className="flex flex-col gap-1 text-body-small text-muted-foreground">

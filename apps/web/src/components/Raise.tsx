@@ -9,6 +9,7 @@ import { cn } from '../lib/utils';
 import { OFFERS } from '../lib/words';
 import { BUTTON, MODES, Refusal, TEXTAREA, useAsk, useRound } from './Ask';
 import { answersFrom, Asks, QuestionFields, RecommendButton, unanswered, type Draft } from './Questions';
+import type { Frozen } from '../lib/frozen';
 
 const AMOUNT =
   'w-24 rounded border border-outline bg-background px-2 py-1 font-mono text-body-medium focus:border-on-surface-variant focus:outline-none';
@@ -230,7 +231,7 @@ function RaiseWords({
   field: string;
   asks: boolean;
   rechecking: boolean;
-  questions: readonly Question[];
+  questions: readonly Frozen<Question>[];
   message: string;
   onMessage: (next: string) => void;
   draft: Draft;
@@ -282,7 +283,7 @@ export const raiseBody = ({
   amount: string;
   message: string;
   asks: boolean;
-  questions: readonly Question[];
+  questions: readonly Frozen<Question>[];
   draft: Draft;
 }): { mode: RetryMode; budget?: number; message?: string; answers?: QuestionAnswer[] } => {
   const budget = amount.trim() === '' ? {} : { budget: Number(amount) };

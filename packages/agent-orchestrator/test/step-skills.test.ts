@@ -17,7 +17,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
-import { Result, Schema } from 'effect';
+import { Effect, Result, Schema } from 'effect';
 import { parseAgent, parseWorkflow, renderStep, splitFrontmatter, WorkflowError, type Agents, type Workflow } from '../src/workflow.ts';
 import { headedLayers } from '../src/workflow/index.ts';
 import { briefBody, enabledSkillsOf, pluginOf, unrendered } from '../src/agents/agents.ts';
@@ -33,6 +33,10 @@ const { engineOf } = await import('../src/runtime-client.ts');
 const { main } = await import('../src/cli/main.ts');
 const { FrozenStepSchema, loadWorkflows } = await import('../src/folder/folder.store.ts');
 const { workflowVersion } = await import('../src/folder/version.store.ts');
+const { StoreRoot } = await import('../src/config/root.store.ts');
+/** A workflow folder's version, read through the doors at this file's store. */
+const versionOf = (dir: string, places: Parameters<typeof workflowVersion>[1]): string =>
+  Effect.runSync(workflowVersion(dir, places).pipe(Effect.provideService(StoreRoot, ROOT)));
 const { skillsFor, skillVersion } = await import('../src/skills/read.store.ts');
 const { agentFilesDir, renderedSkillVersions, skillsAgain, writeAgentFiles } = await import('../src/agents/agents.store.ts');
 const { readRun } = await import('../src/record/record.store.ts');
@@ -237,10 +241,10 @@ test('a step given skills from four places: frozen as files under bare names, na
         path.join(nested(repo, 'apps/web', 'z'), 'SKILL.md'),
         path.join(repo, 'skills', 'x', 'notes.md'),
       ]) {
-        const before = workflowVersion(dev, { repo });
-        assert.equal(workflowVersion(dev, { repo }), before);
+        const before = versionOf(dev, { repo });
+        assert.equal(versionOf(dev, { repo }), before);
         fs.appendFileSync(file, 'Edited.\n');
-        assert.notEqual(workflowVersion(dev, { repo }), before, file);
+        assert.notEqual(versionOf(dev, { repo }), before, file);
       }
     },
   );

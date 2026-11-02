@@ -16,7 +16,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { Effect } from 'effect';
+import { Effect, Layer } from 'effect';
 import { scratch } from './scratch.ts';
 import { names } from './assessed.ts';
 import { staged, story } from './story.ts';
@@ -28,6 +28,12 @@ process.env.WF_VERIFY_REST = '1';
 const { runWith } = await import('../src/runner.ts');
 const { configRefused, startRun, StartRefusal, stepsToStart } = await import('../src/start/start.verb.ts');
 const { startPlan } = await import('../src/plan/plan.verb.ts');
+const { StoreRoot } = await import('../src/config/root.store.ts');
+const { AgentDoor } = await import('../src/agents/agent-door.store.ts');
+const { agentDoorMemory } = await import('../src/agents/agent-memory.store.ts');
+const { AgentName } = await import('../src/agents/agents.model.ts');
+const { agentFilesDir } = await import('../src/agents/agents.store.ts');
+const { anAgent } = await import('./agent-walks.ts');
 const { loadWorkflows } = await import('../src/folder/folder.store.ts');
 const { configRefusal, engineOf } = await import('../src/runtime-client.ts');
 const { main } = await import('../src/cli/main.ts');
@@ -90,7 +96,7 @@ function started(
     ...(opts.inputs ? { inputs: opts.inputs } : {}),
     ...(opts.isolate === undefined ? {} : { isolate: opts.isolate }),
   });
-  const placed = program.pipe(Effect.provide(stage.place().layer));
+  const placed = program.pipe(Effect.provide(stage.place().layer), Effect.provideService(StoreRoot, ROOT));
   const exit = Effect.runSyncExit(opts.refused ? placed.pipe(Effect.provideService(StartRefusal, opts.refused)) : placed);
   if (exit._tag === 'Success') return exit.value.id;
   throw Effect.runSync(Effect.flip(Effect.failCause(exit.cause)));
@@ -213,14 +219,20 @@ test("configRefused: the runtime asked of each local step's first filing, refuse
 
   await t.test('stepsToStart asks the same of a folder it lets through, the gates beside the workflow', () => {
     const asked: (readonly string[])[] = [];
-    stepsToStart(
-      lone('let-through', 'effort: high'),
-      true,
-      PLACES,
-      DENIED,
-      undefined,
-      ['implement'],
-      (_s, _p, gates) => void asked.push(gates),
+    Effect.runSync(
+      Effect.provideService(
+        stepsToStart(
+          lone('let-through', 'effort: high'),
+          true,
+          PLACES,
+          DENIED,
+          undefined,
+          ['implement'],
+          (_s, _p, gates) => void asked.push(gates),
+        ),
+        StoreRoot,
+        ROOT,
+      ),
     );
     assert.deepEqual(asked, [['implement']]);
   });
@@ -348,5 +360,23 @@ test("REFUSED at nemia start: a store whose path holds a `(`, which no permissio
 
   await t.test('a workflow of one step, handed nothing and reading no store folder, starts in the same store', () => {
     assert.ok(written(started(folder('one', lines({ implement: 'harness: claude' })), { isolate: false })));
+  });
+
+  await t.test('a start reads its agent through the Agent door it is given: rendered and pinned from memory, the agent on no disk', () => {
+    const dir = folder('remembered', { implement: '---\nplace: git\nagent: scribe\n---\nBuild it.\n' });
+    const at = { dir: path.join(dir, '..', 'agents'), anywhere: true };
+    const { run, version } = Effect.runSync(
+      Effect.gen(function* () {
+        const door = yield* AgentDoor;
+        yield* door.agents.write(AgentName.read('scribe'), anAgent('scribe', { keys: { model: 'sonnet' } }), undefined, at);
+        const there = yield* door.agents.there(AgentName.read('scribe'), at);
+        const run = yield* startRun({ brief: 'add a flag', repo: aRepo(), workflowDir: dir });
+        return { run, version: there.kind === 'held' ? there.version : undefined };
+      }).pipe(Effect.provide(Layer.mergeAll(stage.place().layer, agentDoorMemory())), Effect.provideService(StoreRoot, ROOT)),
+    );
+    assert.equal(fs.existsSync(path.join(at.dir, 'scribe.md')), false, 'the agent is on no disk');
+    const prompt = fs.readFileSync(path.join(agentFilesDir(run, 'implement'), 'prompt.md'), 'utf8');
+    assert.ok(prompt.includes('Write the notes, scribe.'), 'its instructions are rendered from the memory');
+    assert.deepEqual(run.pinned?.find((p) => p.kind === 'agent')?.hash, version, "its pin carries the Agent door's version of it");
   });
 });

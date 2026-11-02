@@ -23,6 +23,7 @@ import { stepsOf } from '../record/record.store.ts';
 import { messageRefusal, modeWord, type RetryHow } from '../retry/index.ts';
 import { retryRun } from '../retry/retry.verb.ts';
 import { rootGiven, StoreRoot } from '../config/root.store.ts';
+import { rooted } from '../wiring/wire.verb.ts';
 import { roundRun } from '../round/round.verb.ts';
 import { saidLines } from '../say/say.ts';
 import { sayRun } from '../say/say.verb.ts';
@@ -289,9 +290,9 @@ const REFRESH: Command<{
     { method: 'POST', path: '/api/runs/:runId/merge', status: 202, sets: { base: true } },
   ],
   apiKeys: ['drift', 'step', 'target', 'onto', 'sha', 'round', 'file'],
-  handler: Effect.fnUntraced(function* (args: Args) {
+  handler: Effect.fnUntraced(function* (args: Args, _env?: NodeJS.ProcessEnv, home?: string) {
     const { runId } = named(args);
-    if (args.base !== true) return { drift: yield* refreshRun(runId) };
+    if (args.base !== true) return { drift: yield* rooted(home, 'refresh', refreshRun(runId)) };
     const { run, ask, file } = yield* mergeRun(runId, textOf(args, 'step'));
     const looping = stepsOf(run).find((s) => s.name === ask.step);
     if (looping === undefined)

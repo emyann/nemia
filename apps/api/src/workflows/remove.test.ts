@@ -12,7 +12,8 @@ import path from 'node:path';
 import { scratch } from '../../test/scratch.ts';
 import { story } from '../../test/checkpoints.ts';
 import { app } from '../app.ts';
-import { workflowVersion as versionIn } from 'agent-orchestrator';
+import { Effect } from 'effect';
+import { StoreRoot, workflowVersion as versionIn } from 'agent-orchestrator';
 const repo = scratch('nemia-api-remove-repo-');
 process.env.HKB_REPO = repo;
 execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: repo });
@@ -23,7 +24,8 @@ const STORE = path.join(root, 'workflows');
 const json = { 'content-type': 'application/json' };
 
 /** A folder's version as the board reads it, its agents and skills looked for in the repository and in yours. */
-const versionOf = (dir: string): string => versionIn(dir, { repo, home: root });
+const versionOf = (dir: string): string =>
+  Effect.runSync(versionIn(dir, { repo, home: root }).pipe(Effect.provideService(StoreRoot, root)));
 
 const write = (file: string, text: string): void => {
   fs.mkdirSync(path.dirname(file), { recursive: true });

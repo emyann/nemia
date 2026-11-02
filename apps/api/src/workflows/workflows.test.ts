@@ -15,7 +15,8 @@ import { scratch } from '../../test/scratch.ts';
 import { story } from '../../test/checkpoints.ts';
 import { app, runtime } from '../app.ts';
 import { ReadMemo } from '../layer.ts';
-import { workflowVersion as versionIn } from 'agent-orchestrator';
+import { Effect } from 'effect';
+import { StoreRoot, workflowVersion as versionIn } from 'agent-orchestrator';
 import { runWith } from '../../test/builtin-place.ts';
 import { listWorkflows } from './workflows.ts';
 import { engine, builtinGitPlace, hireRefusalOf, loadWorkflows, passStanding, runStore } from 'agent-orchestrator';
@@ -27,7 +28,11 @@ execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: repo });
 execFileSync('git', ['-c', 'user.email=t@local', '-c', 'user.name=t', 'commit', '-q', '--allow-empty', '-m', 'init'], { cwd: repo });
 
 /** A folder's version as the board lists it: its agents and skills looked for in the repository's `.claude/` and in yours too. */
-const versionOf = (dir: string): string => versionIn(dir, { repo, home: root });
+/** A program that reads the store, run over the harness's root (`WF_ROOT`), as a request's services give it. */
+const inRoot = <A, E>(program: Effect.Effect<A, E, StoreRoot>): Promise<A> =>
+  Effect.runPromise(program.pipe(Effect.provideService(StoreRoot, root)));
+const versionOf = (dir: string): string =>
+  Effect.runSync(versionIn(dir, { repo, home: root }).pipe(Effect.provideService(StoreRoot, root)));
 
 type WorkflowStepSpec = import('./workflows.ts').WorkflowStepSpec;
 type WorkflowStepPage = import('../step/step.ts').WorkflowStepPage;
@@ -714,7 +719,7 @@ test('POST /api/runs: what a start refuses, writing nothing, and the name two pl
       write(path.join(clash, 'build.md'), '---\nplace: git\ncheck: npm run build\n---\nBuild it.\n');
       write(path.join(clash, 'build-check.md'), '---\nafter: build\nplace: git\n---\nCheck the build by hand.\n');
       assert.equal(
-        (await listWorkflows(engine(), builtinGitPlace, repo, root)).find((w) => w.name === 'clash')?.error,
+        (await listWorkflows(engine(), builtinGitPlace, repo, root, inRoot)).find((w) => w.name === 'clash')?.error,
         null,
         "the loader reads this folder; `nemia start` refuses it, as the run files build's check as `build-check`",
       );

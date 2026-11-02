@@ -388,18 +388,22 @@ const startOf = Effect.fnUntraced(function* (args: Args, home: string | undefine
   const card = textOf(args, 'card');
   if (card !== undefined) return yield* rooted(home, 'start', cardStart(card, args));
   const factory = textOf(args, 'factory');
-  const run = yield* startRun({
-    brief: textOf(args, 'brief') ?? '',
-    repo: textOf(args, 'repo') ?? '.',
-    repoNamed: args.repoNamed === true,
-    workflowDir: textOf(args, 'workflows') ?? '',
-    isolate: args.noWorktree !== true,
-    after: listOf(args, 'after'),
-    context: listOf(args, 'context'),
-    inputs: listOf(args, 'inputs'),
-    gates: listOf(args, 'gates'),
-    ...(factory !== undefined ? { factory } : {}),
-  });
+  const run = yield* rooted(
+    home,
+    'start',
+    startRun({
+      brief: textOf(args, 'brief') ?? '',
+      repo: textOf(args, 'repo') ?? '.',
+      repoNamed: args.repoNamed === true,
+      workflowDir: textOf(args, 'workflows') ?? '',
+      isolate: args.noWorktree !== true,
+      after: listOf(args, 'after'),
+      context: listOf(args, 'context'),
+      inputs: listOf(args, 'inputs'),
+      gates: listOf(args, 'gates'),
+      ...(factory !== undefined ? { factory } : {}),
+    }),
+  );
   return { id: run.id, run } satisfies Started;
 });
 

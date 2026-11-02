@@ -34,6 +34,7 @@ import {
 } from '../views/views.verb.ts';
 import { phaseOfView } from '../views/views-words.ts';
 import { passRead, type PassRead } from '../cap/cap.verb.ts';
+import { passRevisions } from '../revisions/pin.verb.ts';
 import type { PassStanding } from '../standing/standing.verb.ts';
 
 /**
@@ -66,7 +67,7 @@ export const checkoutHold = Effect.fn('checkoutHold')(function* (
 ) {
   const ending = steps.find((s) => endsOnBase(s));
   if (!ending || run.cancelledAt || endingAsked(run, ending, runStore.asks.read(run.id).asks) === undefined) return undefined;
-  const read = 'read' in from ? from.read : passRead(e, runStore.runs.list(), env, yield* from.standing);
+  const read = 'read' in from ? from.read : passRead(e, runStore.runs.list(), env, yield* from.standing, yield* passRevisions());
   const slotOf = (id: string) => read.slots.pipe(Effect.map((slots) => slots.get(id)));
   const mine = yield* mainClaim(e, run, 'read' in from ? Effect.succeed(from.slot) : slotOf(run.id), read.parents, memo);
   if (!mine || mine.holds) return undefined;

@@ -30,6 +30,7 @@ import {
   type AgentDraft,
   type Agents,
   type DefinitionThere,
+  type SkillsFound,
 } from './agents.ts';
 import type { VersionRefused } from '../folder/folder.ts';
 import { agentsFor, agentVersion, loadAgents } from './read.store.ts';
@@ -39,9 +40,11 @@ import { skillsFor, type Places } from '../skills/read.store.ts';
 
 /**
  * Where an agent is: its folder of agents (`<workflows>/agents`), the repository whose skills its version counts, as the board lists it
- * (`repo`), and whether the folder is written though it is none of the places the board lists agents from (`anywhere`).
+ * (`repo`), whether the folder is written though it is none of the places the board lists agents from (`anywhere`), and the skills its
+ * version counts, where the reader found them (`skills`): a workflow's version counts an agent's skills as found beside the workflow, not
+ * beside the agent. The memory layer's version counts no skill, so it reads none.
  */
-export type AgentAt = { readonly dir: string; readonly repo?: string; readonly anywhere?: boolean };
+export type AgentAt = { readonly dir: string; readonly repo?: string; readonly anywhere?: boolean; readonly skills?: SkillsFound };
 
 /** Where an agent is written, and the result schema its `output:` names, written beside it (`AgentSidecar`), where one is sent. */
 export type AgentWriteAt = AgentAt & { readonly schema?: AgentSidecar | null };
@@ -187,7 +190,7 @@ export function agentFiles(home: string): AgentLayer {
         return agent;
       },
       there: (name, at) => {
-        const version = agentVersion(at.dir, name, skillsAt(at));
+        const version = agentVersion(at.dir, name, at.skills ?? skillsAt(at));
         return version === null ? { kind: 'none' } : { kind: 'held', version };
       },
       write: (name, draft, version, at) =>

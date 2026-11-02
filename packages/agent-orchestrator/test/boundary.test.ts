@@ -109,7 +109,8 @@ const STORE_BOTTOM = ['src/record/places.store.ts', 'src/skills/read.store.ts', 
  * the run store and both, and the run store's files on them and on the configuration (`runStore`, whose `keptRuns` reads
  * `WF_VERIFY_REST`), the door's pattern on the store's root (`door.store.ts`) and each door on it and the stores it is over — the Run
  * door on the run store's files, the Factory door on the factories and a factory's level, rules and servers, each on the run store, the
- * Workflow door on the folders, their versions (`version.store.ts`, on the two reads), the folder written and the Agent and Skill doors
+ * Workflow door on the folders, their versions (`version.store.ts`, on the skills read and the Agent and Skill doors it reads a
+ * folder's agents and skills through), the folder written and the Agent and Skill doors
  * it finds a workflow's agents and skills through, and
  * the Template door on the pattern alone, a template being a folder outside the store, the Ledger door on the pattern and the
  * configuration, the Feed door on the pattern beside the feed's own two, and the Subscription door on the pattern, the feed's file, the
@@ -189,7 +190,12 @@ const STORE_SHARED: Record<string, readonly string[]> = {
     'src/servers/servers.store.ts',
   ],
   'src/cards/cards.store.ts': ['src/door/door.store.ts', 'src/record/record.store.ts'],
-  'src/folder/version.store.ts': ['src/agents/read.store.ts', 'src/skills/read.store.ts'],
+  'src/folder/version.store.ts': [
+    'src/door/door.store.ts',
+    'src/skills/read.store.ts',
+    'src/agents/agent-door.store.ts',
+    'src/skills/skill-door.store.ts',
+  ],
   'src/workflows/workflows.store.ts': [
     'src/door/door.store.ts',
     'src/folder/folder.store.ts',

@@ -34,6 +34,7 @@ const { metered } = await import('../src/meter/tally.store.ts');
 const { meteredEngine } = await import('../src/meter/meter.verb.ts');
 const { passStanding } = await import('../src/standing/standing.verb.ts');
 const { passRead } = await import('../src/cap/cap.verb.ts');
+const { passRevisions } = await import('../src/revisions/pin.verb.ts');
 const { advancePass } = await import('../src/tick/advance.verb.ts');
 
 const SIGNED = { outcome: 'done', summary: 'did it', artifacts: [], needs: null };
@@ -330,7 +331,7 @@ test("each question a pass asks its place is one call of its place phase, and ea
     const e = meteredEngine(b.e);
     const program = Effect.gen(function* () {
       const runs = [readRun(run.id)];
-      const read = passRead(e, runs, process.env, yield* passStanding(runs));
+      const read = passRead(e, runs, process.env, yield* passStanding(runs), yield* passRevisions());
       return (yield* advancePass(e, runs[0], undefined, read)).advanced;
     });
     const before = gitRan();

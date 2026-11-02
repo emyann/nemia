@@ -61,6 +61,7 @@ export function workflowDoorMemory(defs?: WorkflowDefs): Layer.Layer<never> {
         if (!workflows.has(dir)) throw new Invalid({ message: `no workflow folder at ${dir}: write it first, or name one that is there.` });
         return read(dir, found, fills);
       },
+      named: () => ({ agents: [], added: [] }),
       there: (dir) => {
         const held = workflows.get(dir);
         return held === undefined ? { kind: 'none' } : { kind: 'folder', version: versionOf(held) };
@@ -83,7 +84,6 @@ export function workflowDoorMemory(defs?: WorkflowDefs): Layer.Layer<never> {
           removed: names(before?.files)
             .filter((file) => !now.has(file))
             .sort(),
-          version: versionOf(held),
         };
       },
       remove: (dir, users) => {

@@ -18,7 +18,7 @@ import { AgentDoor, type AgentDoorShape } from 'agent-orchestrator';
 import { agentDoorMemory } from 'agent-orchestrator/testing';
 import { app, appOf, liveOf } from '../app.ts';
 import { DEFAULT_HARNESS, putSchemasBack, stepsNamed } from './builder.ts';
-import { workflowVersion as versionIn } from 'agent-orchestrator';
+import { StoreRoot, workflowVersion as versionIn } from 'agent-orchestrator';
 import { listWorkflows } from './workflows.ts';
 import { engine, builtinGitPlace, HARNESS_CHOICES, loadWorkflows, workflowTaken, writeWorkflow } from 'agent-orchestrator';
 import {
@@ -37,7 +37,11 @@ process.env.HKB_REPO = repo;
 execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: repo });
 
 /** A folder's version as the board reads it: its agents and skills looked for in the repository's `.claude/` and in yours too. */
-const versionOf = (dir: string): string => versionIn(dir, { repo, home: root });
+/** A program that reads the store, run over the harness's root (`WF_ROOT`), as a request's services give it. */
+const inRoot = <A, E>(program: Effect.Effect<A, E, StoreRoot>): Promise<A> =>
+  Effect.runPromise(program.pipe(Effect.provideService(StoreRoot, root)));
+const versionOf = (dir: string): string =>
+  Effect.runSync(versionIn(dir, { repo, home: root }).pipe(Effect.provideService(StoreRoot, root)));
 
 type KeyForm = import('./builder.ts').KeyForm;
 type WorkflowSaved = import('./builder.ts').WorkflowSaved;
@@ -396,7 +400,7 @@ test('a person builds a workflow of theirs on the board: the form, a new folder,
       assert.deepEqual(saved.written, ['README.md', 'plan.md']);
       assert.deepEqual(
         saved.workflow,
-        (await listWorkflows(engine(), builtinGitPlace, repo, root)).find((w) => w.name === 'fresh'),
+        (await listWorkflows(engine(), builtinGitPlace, repo, root, inRoot)).find((w) => w.name === 'fresh'),
       );
       assert.equal(saved.workflow.from, 'yours');
       assert.deepEqual(
@@ -439,7 +443,7 @@ test('a person builds a workflow of theirs on the board: the form, a new folder,
       assert.deepEqual(snapshot(dir), before, 'byte for byte');
       assert.deepEqual(
         saved.workflow,
-        (await listWorkflows(engine(), builtinGitPlace, repo, root)).find((w) => w.name === 'as-listed' && w.from === 'yours'),
+        (await listWorkflows(engine(), builtinGitPlace, repo, root, inRoot)).find((w) => w.name === 'as-listed' && w.from === 'yours'),
         'answered as the listing reads it',
       );
     },
@@ -493,7 +497,7 @@ test('a person builds a workflow of theirs on the board: the form, a new folder,
       assert.equal(saved.workflow.readme, '# drawn\n\nPlan, build, review.\n', 'the README it wrote, whole');
       assert.deepEqual(
         saved.workflow,
-        (await listWorkflows(engine(), builtinGitPlace, repo, root)).find((w) => w.name === 'drawn'),
+        (await listWorkflows(engine(), builtinGitPlace, repo, root, inRoot)).find((w) => w.name === 'drawn'),
         'answered as the listing reads it',
       );
 
@@ -744,7 +748,7 @@ test('a step with an agent on the board: listed resolved, with its layers and se
           (e: Error) => e.message.includes('gives the skill `mind-the-cache`') && e.message.includes('no skills folder has it'),
           'read with its own place alone, the skill is not there',
         );
-        const listing = (await listWorkflows(engine(), builtinGitPlace, repo, root)).find(
+        const listing = (await listWorkflows(engine(), builtinGitPlace, repo, root, inRoot)).find(
           (w) => w.name === 'skilled' && w.from === 'yours',
         );
         assert.equal(
@@ -857,7 +861,7 @@ test("versionOf: what moves a folder's version — the agents its steps name, th
           }),
         );
         write(path.join(dir, 'judge.md'), `---\nplace: git\n${line}\n---\n`);
-        const listing = (await listWorkflows(engine(), builtinGitPlace, repo, root)).find((w) => w.name === `version-${folder}`);
+        const listing = (await listWorkflows(engine(), builtinGitPlace, repo, root, inRoot)).find((w) => w.name === `version-${folder}`);
         assert.equal(
           listing?.steps[0]?.spec.agent,
           'critic',

@@ -176,8 +176,8 @@ export function appOf(layer: Layer.Layer<Services>): { app: Hono<ApiEnv>; runtim
     .get('/api/health', (c) => c.json({ ok: true }))
     .get('/api/version', (c) => c.json({ version: VERSION, release: RELEASE }))
     .get('/api/capabilities', (c) =>
-      served(c, async ({ e, placeService, env, repo, home, mcp }) =>
-        c.json(await capabilitiesWithSteps(repo, { e, placeService, env, home, asker: mcp })),
+      served(c, async ({ e, placeService, env, repo, home, mcp, inRequest }) =>
+        c.json(await capabilitiesWithSteps(repo, { e, placeService, env, home, asker: mcp, inRequest })),
       ),
     )
     .route('/', factories)

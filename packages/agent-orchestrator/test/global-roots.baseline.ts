@@ -46,7 +46,6 @@ export const GLOBAL_ROOTS: Readonly<Record<string, number>> = {
   'src/question/asked.verb.ts': 1,
   'src/record/files.store.ts': 3,
   'src/record/record.store.ts': 2,
-  'src/record/steps.store.ts': 1,
   'src/release/release.store.ts': 6,
   'src/revisions/revisions.store.ts': 2,
   'src/rules/rules.store.ts': 1,

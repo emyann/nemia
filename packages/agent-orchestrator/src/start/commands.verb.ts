@@ -10,11 +10,14 @@ import { leftOut, type Args, type Flag, type Spec } from '../command/command.ts'
 import type { Command } from '../command/entry.verb.ts';
 import { endingSteps } from '../ending/ending.ts';
 import { writersOf } from '../factory/factory.ts';
-import { formerKeyLines } from '../folder/folder.store.ts';
+import { WorkflowDoor } from '../workflows/workflows.store.ts';
+import { WorkflowDir } from '../folder/folder.model.ts';
 import { ignoredRepoLine } from '../inbox/index.ts';
 import { startFromInbox } from '../inbox/inbox.verb.ts';
 import { isRepositoryRun, type Run } from '../record/record.ts';
-import { inputsDir, stepsOf } from '../record/record.store.ts';
+import { inputsDir } from '../record/record.store.ts';
+import { frozenStepsOf } from '../steps/steps.ts';
+import type { Workflow } from '../workflow.ts';
 import { approvedFirst, gatesOf } from '../status/status.ts';
 import { fromNote } from './inputs.ts';
 import { leftOutMounts, startRun } from './start.verb.ts';
@@ -145,8 +148,9 @@ const START_SPEC: Spec = {
 /**
  * A run started, and, for an inbox card, the card, why its `queued:` line is still on it when it could not be taken off, and a `repo:` the
  * start did not take; the store's
- * pause as it stood once the run was written (`pausedRead`), while one stands; and `landed`, the runs it is handed as context that had
- * landed when it started.
+ * pause as it stood once the run was written (`pausedRead`), while one stands; `landed`, the runs it is handed as context that had
+ * landed when it started; and `hints`, a line for each file of its folder that still writes a former spelling, read through the Workflow
+ * door (`hints`), where any does.
  */
 type Started = {
   id: string;
@@ -156,14 +160,18 @@ type Started = {
   ignoredRepo?: string;
   paused?: Paused;
   landed?: readonly string[];
+  hints?: readonly string[];
 };
+
+/** The steps of a run just started: the workflow `nemia start` froze on its record, which every run it writes has (`frozenStepsOf`). */
+const startedSteps = (run: Run): Workflow[] => frozenStepsOf(run) ?? [];
 
 /**
  * The folders of its factory a run mounts, read-only, and those left out because they were no directory; none in the default factory.
  */
 function mountLines(run: Run): string[] {
   const missing = leftOutMounts(run);
-  const written = writersOf(stepsOf(run), run.mounts);
+  const written = writersOf(startedSteps(run), run.mounts);
   return [
     ...(run.mounts?.length
       ? [
@@ -179,7 +187,7 @@ function mountLines(run: Run): string[] {
 
 /** The steps of a run just started that wait on a person: each gated, and the ending a person approves before it is filed. */
 function gateLines(run: Run): string[] {
-  const steps = stepsOf(run);
+  const steps = startedSteps(run);
   const gates = gatesOf(steps, run);
   const ends = endingSteps(steps, run)
     .filter((s) => approvedFirst(s, run))
@@ -219,7 +227,7 @@ const fromLines = ({ run, card, queueLeft }: Started): string[] =>
  */
 function startedLines(started: Started): string[] {
   const { run } = started;
-  const steps = stepsOf(run);
+  const steps = startedSteps(run);
   return [
     `${run.id}  ${steps.length} step(s): ${steps.map((s) => (s.agent ? `${s.name} (${s.agent.name})` : s.name)).join(' → ')}`,
     ...fromLines(started),
@@ -234,10 +242,19 @@ function startedLines(started: Started): string[] {
     ...gateLines(run),
     `run 'nemia tick' (or 'nemia up') to start it`,
     ...(started.paused ? [`${pausedWords(started.paused)}: nothing of this run is filed until then`] : []),
-    ...formerKeyLines(run.workflowDir),
+    ...(started.hints ?? []),
     ...(started.ignoredRepo !== undefined ? [ignoredRepoLine(started.ignoredRepo)] : []),
   ];
 }
+
+/**
+ * The lines `nemia start` prints of `run`'s folder still on a former spelling, read through the Workflow door off the folder its record
+ * names; none where the door refuses it, which the start has already said why.
+ */
+const hintsOf = Effect.fnUntraced(function* (run: Run) {
+  const hints = (yield* WorkflowDoor).workflows.hints(WorkflowDir.read(run.workflowDir));
+  return yield* hints.pipe(Effect.orElseSucceed((): readonly string[] => []));
+});
 
 /** An inbox card's start, off the handler's arguments (`START`). */
 const cardStart = Effect.fnUntraced(function* (card: string, args: Args) {
@@ -341,7 +358,13 @@ export const START: Command<Started> = {
     const context = started.run.context ?? [];
     const git = context.length ? yield* standingLive([started.run]) : undefined;
     for (const id of context) if (git && (yield* parentRead(id, git)).landed) landed.push(id);
-    return { ...started, ...(paused.pause ? { paused } : {}), ...(started.run.context?.length ? { landed } : {}) };
+    const hints = yield* rooted(home, 'start', hintsOf(started.run));
+    return {
+      ...started,
+      ...(paused.pause ? { paused } : {}),
+      ...(started.run.context?.length ? { landed } : {}),
+      ...(hints.length ? { hints } : {}),
+    };
   }),
   print: startedLines,
 };

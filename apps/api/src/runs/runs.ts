@@ -73,7 +73,7 @@ const listArgs = (query: (name: string) => string | undefined): Record<string, s
  * them.
  */
 const listRead = ({ e, placeService, env, home, memo }: Served, entry: (typeof COMMANDS)[number], args: Record<string, string>) =>
-  runPlaced(placeService, e, entry.handler(args, env, home, { runs: memo.resting, filings: memo.filings }));
+  runPlaced({ placeService, home }, e, entry.handler(args, env, home, { runs: memo.resting, filings: memo.filings }));
 
 /** `rows`, each with the address of its workflow's page (`workflowPageOf`), as the whole list gives it. */
 const paged = <R extends RunSummary>(rows: readonly R[], { repo, home }: Served): Array<R & Paged> =>
@@ -141,7 +141,7 @@ export const runs = new Hono<ApiEnv>()
   .get('/api/runs', (c) =>
     served(c, async ({ e, placeService, env, home, memo, repo }) => {
       const summaries = (await runPlaced(
-        placeService,
+        { placeService, home },
         e,
         RUNS.handler({}, env, home, { runs: memo.resting, filings: memo.filings }),
       )) as unknown as RunSummary[];
@@ -171,7 +171,7 @@ export const runs = new Hono<ApiEnv>()
   .get('/api/runs/:id', (c) =>
     served(c, async (s) => {
       const id = c.req.param('id');
-      const { run } = (await runPlaced(s.placeService, s.e, RUN.handler({ id }))) as { run: Run | null };
+      const { run } = (await runPlaced(s, s.e, RUN.handler({ id }))) as { run: Run | null };
       if (!run) return c.json({ error: noSuchRun(id) }, 404);
       const full = await detail(run, s);
       if ('unjudged' in full) return c.json({ error: full.unjudged }, 502);
@@ -184,10 +184,11 @@ export const runs = new Hono<ApiEnv>()
       const run = findRun(id);
       if (!run) return c.json({ error: noSuchRun(id) }, 404);
       const { unreadable } = await runWith(e, viewsFor(e, [run]));
-      const read = await runWith(
+      const read = await runPlaced(
+        { placeService, home },
         e,
         judgedUnlessUnreadable(run, unreadable, () =>
-          Effect.tryPromise({ try: () => decisionOf(run, e, placeService, home, env), catch: (err) => err }),
+          Effect.tryPromise({ try: () => decisionOf(run, e, { placeService, home }, env), catch: (err) => err }),
         ),
       );
       if ('unreadable' in read) return c.json({ error: read.unreadable }, 502);
@@ -195,5 +196,7 @@ export const runs = new Hono<ApiEnv>()
     }),
   )
   .get('/api/runs/:runId/concluded', (c) =>
-    served(c, async ({ e, placeService }) => c.json(await runPlaced(placeService, e, CONCLUDED.handler({ runId: c.req.param('runId') })))),
+    served(c, async ({ e, placeService, home }) =>
+      c.json(await runPlaced({ placeService, home }, e, CONCLUDED.handler({ runId: c.req.param('runId') }))),
+    ),
   );

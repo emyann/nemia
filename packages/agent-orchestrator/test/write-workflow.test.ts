@@ -13,12 +13,12 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { parseAgent, WorkflowError, type StepDraft, type Workflow } from '../src/workflow.ts';
 import { agentDeniesOf } from '../src/workflow/index.ts';
-import { loadWorkflows } from '../src/folder/folder.store.ts';
 import { scratch } from './scratch.ts';
 import { TEAM, TEAM_DEV } from './team.ts';
 
 const ROOT = scratch('wf-write-');
 process.env.WF_ROOT = ROOT;
+const { loadWorkflows } = await import('../src/workflows/workflows.store.ts');
 const { addFactory, writeWorkflow } = await import('../src/runner.ts');
 
 const STORE = path.join(ROOT, 'workflows');

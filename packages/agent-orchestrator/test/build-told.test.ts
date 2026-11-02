@@ -38,7 +38,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { loadWorkflows } from '../src/folder/folder.store.ts';
+import { loadWorkflows } from '../src/workflows/workflows.store.ts';
 import { parseAgent, type Agent } from '../src/workflow.ts';
 import { isReadme } from '../src/step/step.ts';
 import { outputFields } from '../src/step/step.ts';

@@ -65,58 +65,54 @@ test('REFUSED: a page with a broken internal link fails the build', () => {
 /** What `test/dev.ts` says on its `RESULT` line. */
 type Result = { status: number; drawn: boolean; pid: number; registered: number | null };
 
-test(
-  'dev starts without the prerender server’s error, renders a page, and leaves the dev server’s record as it found it',
-  WAITED,
-  async (t) => {
-    const rang = bell();
-    let said = '';
-    let ended: { code: number | null; signal: NodeJS.Signals | null } | undefined;
-    const child = spawn(process.execPath, [path.join(import.meta.dirname, 'dev.ts'), APP], {
-      cwd: APP,
-      env: { ...process.env, ASTRO_TELEMETRY_DISABLED: '1', ASTRO_DISABLE_UPDATE_CHECK: 'true', NO_COLOR: '1' },
-      stdio: ['pipe', 'pipe', 'pipe'],
-    });
-    t.after(() => void child.kill('SIGKILL'));
-    child.stdin.on('error', () => undefined);
-    for (const stream of [child.stdout, child.stderr])
-      stream.on('data', (chunk: Buffer) => {
-        said += chunk;
-        rang.ring();
-      });
-    child.once('close', (code, signal) => {
-      ended = { code, signal };
+test('dev starts without the prerender server’s error, renders a page, and registers no dev server of its own', WAITED, async (t) => {
+  const rang = bell();
+  let said = '';
+  let ended: { code: number | null; signal: NodeJS.Signals | null } | undefined;
+  const child = spawn(process.execPath, [path.join(import.meta.dirname, 'dev.ts'), APP], {
+    cwd: APP,
+    env: { ...process.env, ASTRO_TELEMETRY_DISABLED: '1', ASTRO_DISABLE_UPDATE_CHECK: 'true', NO_COLOR: '1' },
+    stdio: ['pipe', 'pipe', 'pipe'],
+  });
+  t.after(() => void child.kill('SIGKILL'));
+  child.stdin.on('error', () => undefined);
+  for (const stream of [child.stdout, child.stderr])
+    stream.on('data', (chunk: Buffer) => {
+      said += chunk;
       rang.ring();
     });
+  child.once('close', (code, signal) => {
+    ended = { code, signal };
+    rang.ring();
+  });
 
-    const line = await until(
-      t,
-      () => {
-        const got = /^RESULT (.*)$/m.exec(said)?.[1];
-        if (got === undefined && ended) assert.fail(`the dev child ended before its RESULT line (${JSON.stringify(ended)}):\n${said}`);
-        return got;
-      },
-      () => `the dev child’s RESULT line; it has said:\n${said || '(nothing)'}`,
-      { bell: rang },
-    );
-    await until(
-      t,
-      () => ended,
-      () => `the dev child’s end; it has said:\n${said}`,
-      { bell: rang },
-    );
-    assert.deepEqual(ended, { code: 0, signal: null }, said);
-    assert.doesNotMatch(said, /Failed to create the prerender server app/, 'the prerender server starts');
-    const result = JSON.parse(line) as Result;
-    assert.deepEqual(
-      { status: result.status, drawn: result.drawn },
-      { status: 200, drawn: true },
-      'the runtime page renders in dev, its lifecycle drawn',
-    );
-    assert.notEqual(
-      result.registered,
-      result.pid,
-      `the dev server it started named itself the checkout’s in ${LOCK}, which a person’s own \`npm run dev\` owns`,
-    );
-  },
-);
+  const line = await until(
+    t,
+    () => {
+      const got = /^RESULT (.*)$/m.exec(said)?.[1];
+      if (got === undefined && ended) assert.fail(`the dev child ended before its RESULT line (${JSON.stringify(ended)}):\n${said}`);
+      return got;
+    },
+    () => `the dev child’s RESULT line; it has said:\n${said || '(nothing)'}`,
+    { bell: rang },
+  );
+  await until(
+    t,
+    () => ended,
+    () => `the dev child’s end; it has said:\n${said}`,
+    { bell: rang },
+  );
+  assert.deepEqual(ended, { code: 0, signal: null }, said);
+  assert.doesNotMatch(said, /Failed to create the prerender server app/, 'the prerender server starts');
+  const result = JSON.parse(line) as Result;
+  assert.deepEqual(
+    { status: result.status, drawn: result.drawn },
+    { status: 200, drawn: true },
+    'the runtime page renders in dev, its lifecycle drawn',
+  );
+  assert.notEqual(
+    result.registered,
+    result.pid,
+    `the dev server it started named itself the checkout’s in ${LOCK}, which a person’s own \`npm run dev\` owns`,
+  );
+});

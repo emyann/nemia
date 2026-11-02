@@ -28,13 +28,13 @@ import { inputsMounts, readsMounts } from '../src/filed/filed.ts';
 import { handedMounts } from '../src/artifacts/artifacts.ts';
 import { parseWorkflow, agentsDir } from '../src/workflow.ts';
 import { loadAgents } from '../src/agents/read.store.ts';
-import { loadWorkflows } from '../src/folder/folder.store.ts';
 import { Invalid } from '../src/refusal/refusal.ts';
 
 const ROOT = scratch('wf-mounts-');
 process.env.WF_ROOT = ROOT;
 process.env.WF_VERIFY_REST = '1';
 process.env.WF_MAX_RUNS = '100';
+const { loadWorkflows } = await import('../src/workflows/workflows.store.ts');
 const { addFactory, advanceRun, approveRun, attachWorkflow, hireAgent, retryRun, startRun, runWith } = await import('../src/runner.ts');
 const { engineOf } = await import('../src/runtime-client.ts');
 const { artifactsDir, inputsDir, readRun } = await import('../src/record/record.store.ts');

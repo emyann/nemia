@@ -3,8 +3,11 @@
  * off git, and every trial merge in one call of the place's trial verb (`trialMerges`). Nothing is kept: the next decision reads them
  * again.
  */
+import { Effect } from 'effect';
 import { tried } from '../runtime-client.ts';
-import { isRepositoryRun, type Run } from '../record/record.ts';
+import { stepsOf } from '../steps/steps.verb.ts';
+import type { Workflow } from '../workflow.ts';
+import { isRepositoryRun, type RepositoryRun, type Run } from '../record/record.ts';
 import type { BranchStanding } from '../status/status.ts';
 import { runStore } from '../record/files.store.ts';
 import { standingsOf, type BranchReader } from '../branches/branches.store.ts';
@@ -20,19 +23,26 @@ const ahead = (standings: readonly BranchStanding[]): string[] => standings.filt
  * read threw; dies of anything else (`tried`).
  */
 export const collisionsAt = (run: Run, ending: string, standings: readonly BranchStanding[], git: BranchReader, place: Place) =>
-  tried(() => collisionsRead(run, ending, standings, git, place));
+  Effect.gen(function* () {
+    const ours = ahead(standings);
+    if (!isRepositoryRun(run) || !run.isolate || !ours.length) return undefined;
+    const others = othersInFlight(run, runStore.runs.list());
+    const steps = new Map(yield* Effect.forEach(others, (other) => Effect.map(stepsOf(other), (s) => [other.id, s] as const)));
+    return yield* tried(() => collisionsRead(run, ending, ours, git, place, others, steps));
+  });
 
+/** The collisions of `ours`, `run`'s branches ahead, with the branches ahead of `others`, whose `steps` were read. */
 function collisionsRead(
-  run: Run,
+  run: RepositoryRun,
   ending: string,
-  standings: readonly BranchStanding[],
+  ours: readonly string[],
   git: BranchReader,
   place: Place,
-): Collisions | undefined {
-  const ours = ahead(standings);
-  if (!isRepositoryRun(run) || !run.isolate || !ours.length) return undefined;
-  const theirs: Theirs[] = othersInFlight(run, runStore.runs.list()).flatMap((other) =>
-    ahead(standingsOf(other, git)).map((branch) => ({ run: other.id, branch })),
+  others: readonly RepositoryRun[],
+  steps: ReadonlyMap<string, readonly Workflow[]>,
+): Collisions {
+  const theirs: Theirs[] = others.flatMap((other) =>
+    ahead(standingsOf(other, steps.get(other.id) ?? [], git)).map((branch) => ({ run: other.id, branch })),
   );
   return collisionsOf(run, ending, ours, theirs, trialMerges(run.repo, trialsOf(run.branch, ours, theirs), place));
 }

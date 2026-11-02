@@ -163,15 +163,7 @@ export type {
 } from './run.ts';
 export type { AtWork, RunTokens, SlotWait, TaskSpan, Timeline, TimelineTotal, TimelineTry } from './timeline/index.ts';
 export type { Retry, RetryAsk, RetryHow, RetryMode } from './retry/index.ts';
-export {
-  agentUsers,
-  formerKeyLines,
-  loadWorkflows,
-  workflowDescription,
-  workflowFolder,
-  workflowReadme,
-  workflowsIn,
-} from './folder/folder.store.ts';
+export { agentUsers, formerKeyLines, workflowDescription, workflowFolder, workflowReadme, workflowsIn } from './folder/folder.store.ts';
 export { cardSkills, isBuiltinPlace, lookupRoots, oneFolder, preloads, skillsFor, skillVersion } from './skills/read.store.ts';
 export { BUILTIN_SKILLS, type Places } from './skills/read.store.ts';
 export { agentsFor, agentVersion, customInstructionsFile, loadAgents, readCustomInstructions } from './agents/read.store.ts';
@@ -278,8 +270,8 @@ export {
   readApprovals,
   roundAskFile,
   runId,
-  stepsOf,
 } from './record/record.store.ts';
+export { parentRecord, stepsOf } from './steps/steps.verb.ts';
 export { inboxDir, keptRuns, runStore } from './record/files.store.ts';
 export type { RunStore } from './record/record.ts';
 export {
@@ -331,7 +323,7 @@ export { lockfileParts, provisionDeps } from './workspace/worktree.store.ts';
 export { artifactFiles, missingArtifacts } from './artifacts/artifacts.store.ts';
 export { lackLines } from './artifacts/artifacts.ts';
 export { lackedOf } from './record/record.ts';
-export { branchStandings, parentRecord, resultBranches, type BranchReader } from './branches/branches.store.ts';
+export { branchStandings, resultBranches, type BranchReader } from './branches/branches.store.ts';
 export { passStanding, standingLive, standingLiveOf, standingReader, standingSnapshot, standingWhen } from './standing/standing.verb.ts';
 export { changesOf, type BranchChanges, type Note } from './branches/changes.store.ts';
 export { evictedBy } from './rest/index.ts';
@@ -361,7 +353,7 @@ export type {
   TrialMerge,
   Unread,
 } from './place/place.ts';
-export { writeWorkflow } from './folder/write.store.ts';
+export { draftSteps, loadWorkflows, writeWorkflow } from './workflows/workflows.store.ts';
 export { workflowStale, workflowTaken } from './folder/folder.ts';
 export { workflowVersion } from './folder/version.store.ts';
 export { foldersIn } from './folder/lookup.store.ts';

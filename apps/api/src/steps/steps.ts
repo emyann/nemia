@@ -12,8 +12,7 @@ import { type StepLog, tailOf } from './logs.ts';
 import { type LifecycleTransition, pathToTurn, type StepPath, tryOfStep } from './path.ts';
 import type { Followings, Relayed } from './following.ts';
 import { type ApiEnv, type ApiRuntime, served } from '../layer.ts';
-import { commandNamed, engineRead, type Engine, taskOfStep, runPlaced } from '../store.ts';
-import type { PlaceService } from 'agent-orchestrator';
+import { commandNamed, engineRead, type Engine, type Placed, taskOfStep, runPlaced } from '../store.ts';
 
 /**
  * The board's reads of a step in the package's table, each served on the api alone: a file of its files directory (`step artifact`) and of
@@ -25,15 +24,8 @@ const PATH = commandNamed('step path');
 const TRANSCRIPT = commandNamed('step transcript');
 
 /** One read of the conversation of `task`, a task of the step `step` of the run `id`, from `after` (`step transcript`). */
-const transcriptOf = async (
-  e: Engine['Service'],
-  placeService: PlaceService['Service'],
-  id: string,
-  step: string,
-  task: string,
-  after?: string,
-) =>
-  (await runPlaced(placeService, e, TRANSCRIPT.handler({ id, step, task, ...(after !== undefined && { after }) }))) as Omit<Read, 'live'>;
+const transcriptOf = async (e: Engine['Service'], at: Placed, id: string, step: string, task: string, after?: string) =>
+  (await runPlaced(at, e, TRANSCRIPT.handler({ id, step, task, ...(after !== undefined && { after }) }))) as Omit<Read, 'live'>;
 
 /** How much of a step's output the board is given: the end of it, which is where a running step is. */
 const LOG_LINES = 200;
@@ -98,7 +90,7 @@ class Unread extends Error {
  */
 async function readTranscript(
   e: Engine['Service'],
-  placeService: PlaceService['Service'],
+  at: Placed,
   id: string,
   step: string,
   taskId: string,
@@ -122,7 +114,7 @@ async function readTranscript(
     );
   }
   try {
-    const { events, cursor } = await transcriptOf(e, placeService, id, step, taskId, after);
+    const { events, cursor } = await transcriptOf(e, at, id, step, taskId, after);
     return { events, cursor, live: phase === 'running' || phase === 'pending', open: view.state.settled === null };
   } catch (err) {
     const why = err instanceof Error ? err.message : String(err);
@@ -134,7 +126,7 @@ async function readTranscript(
     }
     if (
       after !== undefined &&
-      (await transcriptOf(e, placeService, id, step, taskId).then(
+      (await transcriptOf(e, at, id, step, taskId).then(
         () => true,
         () => false,
       ))
@@ -204,7 +196,7 @@ type Reading = {
   runtime: ApiRuntime;
   followings: Followings['Service'];
   e: Engine['Service'];
-  placeService: PlaceService['Service'];
+  at: Placed;
   id: string;
   step: string;
   /** How long `readAgain` waits between two reads: the served `Beats.step`, `STEP_BEAT_MS` unless a test gives another. */
@@ -235,7 +227,7 @@ async function followed(
   const at = { cursor: read.cursor };
   let stopped: Stopped | null = null;
   let followedTask = taskId;
-  const caught = Effect.tryPromise(() => readTranscript(r.e, r.placeService, r.id, r.step, taskId, read.cursor)).pipe(
+  const caught = Effect.tryPromise(() => readTranscript(r.e, r.at, r.id, r.step, taskId, read.cursor)).pipe(
     Effect.map((got): Relayed => ({ kind: 'events', events: got.events, cursor: got.cursor })),
     Effect.orElseSucceed(() => undefined),
   );
@@ -292,7 +284,7 @@ async function readAgain(
     await say(words);
     let read: Read | undefined;
     try {
-      read = await readTranscript(r.e, r.placeService, r.id, r.step, task, after);
+      read = await readTranscript(r.e, r.at, r.id, r.step, task, after);
     } catch (err) {
       words = err instanceof Error ? err.message : String(err);
     }
@@ -358,7 +350,7 @@ export const steps = new Hono<ApiEnv>()
       if ('error' in found) return c.json({ error: found.error }, 404);
       const { taskId } = found;
       try {
-        const { output } = await runPlaced(placeService, e, LOGS.handler({ runId: id, step }, env, home));
+        const { output } = await runPlaced({ placeService, home }, e, LOGS.handler({ runId: id, step }, env, home));
         return c.json(output === undefined ? ({ lines: [], truncated: false } satisfies StepLog) : tailOf(output, LOG_LINES));
       } catch (err) {
         const why = err instanceof Error ? err.message : String(err);
@@ -380,7 +372,7 @@ export const steps = new Hono<ApiEnv>()
       if ('error' in found) return c.json({ error: found.error }, 404);
       const refused = refusedName(name);
       if (refused) return c.json({ error: refused }, 400);
-      const { file } = (await runPlaced(placeService, e, ARTIFACT.handler({ id, step, name }))) as { file: Buffer | null };
+      const { file } = (await runPlaced({ placeService, home }, e, ARTIFACT.handler({ id, step, name }))) as { file: Buffer | null };
       const pruned = found.run.pruned?.artifacts;
       if (!file && pruned) {
         return c.json(
@@ -411,7 +403,7 @@ export const steps = new Hono<ApiEnv>()
       if ('error' in found) return c.json({ error: found.error }, 404);
       const refused = refusedName(name);
       if (refused) return c.json({ error: refused }, 400);
-      const { folder, file } = (await runPlaced(placeService, e, FILE.handler({ id, step, name }))) as {
+      const { folder, file } = (await runPlaced({ placeService, home }, e, FILE.handler({ id, step, name }))) as {
         folder: string | null;
         file: Buffer | null;
       };
@@ -443,7 +435,7 @@ export const steps = new Hono<ApiEnv>()
       if ('error' in asked) return c.json({ error: asked.error }, asked.status);
       if (!asked.taskId) return c.json({ taskId: null, try: asked.try, path: [] } satisfies StepPath);
       try {
-        const whole = (await runPlaced(placeService, e, PATH.handler({ id: found.run.id, step, task: asked.taskId }))) as {
+        const whole = (await runPlaced({ placeService, home }, e, PATH.handler({ id: found.run.id, step, task: asked.taskId }))) as {
           path: LifecycleTransition[];
         };
         const path = pathToTurn(whole.path, asked.turn);
@@ -467,7 +459,7 @@ export const steps = new Hono<ApiEnv>()
       if ('error' in found) return c.json({ error: found.error }, 404);
       if (!found.taskId) return c.json({ events: [], cursor: null, live: false, open: false } satisfies StepTranscript);
       try {
-        const read = await readTranscript(e, placeService, id, step, found.taskId, c.req.query('after') || undefined);
+        const read = await readTranscript(e, { placeService, home }, id, step, found.taskId, c.req.query('after') || undefined);
         return c.json(read satisfies StepTranscript);
       } catch (err) {
         if (err instanceof Unread) return c.json({ error: err.message }, err.status);
@@ -493,14 +485,22 @@ export const steps = new Hono<ApiEnv>()
       const after = c.req.header('Last-Event-ID') || c.req.query('after') || undefined;
       let read: Read;
       try {
-        read = await readTranscript(e, placeService, id, step, taskId, after);
+        read = await readTranscript(e, { placeService, home }, id, step, taskId, after);
       } catch (err) {
         if (err instanceof Unread) return c.json({ error: err.message }, err.status);
         throw err;
       }
       return streamSSE(c, async (stream) => {
         if (!read.open) return settledFrom(stream, read);
-        const r: Reading = { runtime: c.var.runtime, followings, e, placeService, id, step, beatMs: beats.step ?? STEP_BEAT_MS };
+        const r: Reading = {
+          runtime: c.var.runtime,
+          followings,
+          e,
+          at: { placeService, home },
+          id,
+          step,
+          beatMs: beats.step ?? STEP_BEAT_MS,
+        };
         const stopped = await followed(stream, r, taskId, read);
         if (stopped === null) return;
         const same = stopped.taskId === taskId;

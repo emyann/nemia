@@ -2,7 +2,7 @@
  * The cap on runs in flight as it holds between passes (`slotsOf`, `runSlots`): every run read as a pass reads it, for `nemia ls`, `nemia
  * decide`, the repository's checkout and the board's ceilings. A controller, reaching the runtime through the client (`runtime-client.ts`).
  */
-import { Cause, Deferred, Effect, Exit } from 'effect';
+import { Cause, Deferred, Effect, Exit, Result } from 'effect';
 import { EngineService, asked, over, unreadableJournal, type Engine, type TaskView } from '../runtime-client.ts';
 import type { Workflow } from '../workflow.ts';
 import type { Refusal } from '../refusal/refusal.ts';
@@ -11,7 +11,8 @@ import { runTasks, type Run } from '../record/record.ts';
 import { hasStarted } from '../wait/wait.ts';
 import { assess } from '../tick/assess.ts';
 import { runStore } from '../record/files.store.ts';
-import { stepsOf, unloadedFolder } from '../record/steps.store.ts';
+import { unloadedFolder } from '../steps/steps.ts';
+import { stepsOf } from '../steps/steps.verb.ts';
 import { lastCeilings } from '../daemon/daemon.store.ts';
 import { maxRuns } from '../config/config.store.ts';
 import {
@@ -100,13 +101,12 @@ export const slotsOf = Effect.fn('slotsOf')(function* (
   const seen = seenIn(e, listed);
   const needs: Array<Pick<Run, 'id' | 'createdAt'> & { inFlight: boolean; wants: boolean }> = [];
   for (const run of runs) {
-    let steps: Workflow[];
-    try {
-      steps = stepsOf(run);
-    } catch (err) {
-      if (unloadedFolder(err) !== undefined) needs.push({ id: run.id, createdAt: run.createdAt, ...UNJUDGED });
+    const read = yield* Effect.result(stepsOf(run));
+    if (Result.isFailure(read)) {
+      if (unloadedFolder(read.failure) !== undefined) needs.push({ id: run.id, createdAt: run.createdAt, ...UNJUDGED });
       continue;
     }
+    const steps: Workflow[] = read.success;
     let need: { inFlight: boolean; wants: boolean } = UNJUDGED;
     if (!runTasks(run).some((taskId) => unreadable.has(taskId))) {
       const judged = yield* Effect.exit(needOf(seen, listed, run, steps, parents));

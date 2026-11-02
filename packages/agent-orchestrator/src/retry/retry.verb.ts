@@ -14,7 +14,7 @@ import { budgetOf, budgetUsdFor, stepSpend, type SpendOf } from '../status/statu
 import { filedAt, toldOf, type StepTold } from '../tick/told.verb.ts';
 import type { Workflow } from '../workflow.ts';
 import { retryable, retryRefusal, type RetryAsk, type RetryHow } from './index.ts';
-import { stepsOf } from '../record/record.store.ts';
+import { stepsOf } from '../steps/steps.verb.ts';
 import { runStore } from '../record/files.store.ts';
 import { strayAsk } from '../say/say.verb.ts';
 import { closeoutAsked, closeoutReader, exitVerdicts, harnessBlocked, spendReader, taskPhasesRead } from '../views/views.verb.ts';
@@ -53,7 +53,7 @@ export const retryRun = Effect.fn('retry')(function* (
   { stopBlocked = false }: { stopBlocked?: boolean } = {},
 ) {
   const run = yield* (yield* RunDoor).runs.read(RunId.read(id));
-  const steps = yield* tried(() => stepsOf(run));
+  const steps = yield* stepsOf(run);
   const { views, phaseOf } = yield* taskPhasesRead(run);
   const blocked = stopBlocked ? harnessBlocked(views) : () => false;
   const spendOf = spendReader(views);

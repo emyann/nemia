@@ -134,10 +134,17 @@ export type StepTold = {
 export type Told = StepTold & PlaceTold;
 
 /**
- * What `step` of `run` is told and denied by `place` (`landingWords`, `placeSay`), its branches named off `heads` where given.
+ * What `step` of `run`, among its `steps`, is told and denied by `place` (`landingWords`, `placeSay`), its branches named off `heads`
+ * where given.
  */
-export function placeTold(run: Run, step: Workflow, place: Place, heads?: Readonly<Record<string, string>>): PlaceTold {
-  return { words: landingWords(run, step, place, heads), say: placeSay(run, place) };
+export function placeTold(
+  run: Run,
+  steps: readonly Workflow[],
+  step: Workflow,
+  place: Place,
+  heads?: Readonly<Record<string, string>>,
+): PlaceTold {
+  return { words: landingWords(run, steps, step, place, heads), say: placeSay(run, place) };
 }
 
 /**
@@ -186,7 +193,7 @@ const recordedServers = (factory: string | undefined, home: string): FactoryServ
  * what the board shows of a step to come. Where the place gives no words, the brief sends the step to its place's skill.
  */
 export function briefNow(step: Workflow, run: Run, steps: readonly Workflow[], place: Place): string {
-  const told = placeTold(run, step, place);
+  const told = placeTold(run, steps, step, place);
   const none = [undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined] as const;
   return composeBrief(step, run, steps, ...none, told);
 }

@@ -329,8 +329,6 @@ const readRecord = (id: string): Run => {
   };
 };
 
-export { stepsOf } from './steps.store.ts';
-
 /**
  * Write down that this run is cancelled, and answer with the time that now stands.
  *

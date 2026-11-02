@@ -38,16 +38,22 @@ const POLICY = commandNamed('policy');
  *   keeps the method and the body, its `Location` naming the route to call now.
  */
 export const nemia = new Hono<ApiEnv>()
-  .get('/api/level', (c) => served(c, async ({ e, placeService }) => c.json(await runPlaced(placeService, e, LEVEL.handler({})))))
-  .get('/api/nemia/memory', (c) => served(c, async ({ e, placeService }) => c.json(await runPlaced(placeService, e, MEMORY.handler({})))))
+  .get('/api/level', (c) =>
+    served(c, async ({ e, placeService, home }) => c.json(await runPlaced({ placeService, home }, e, LEVEL.handler({})))),
+  )
+  .get('/api/nemia/memory', (c) =>
+    served(c, async ({ e, placeService, home }) => c.json(await runPlaced({ placeService, home }, e, MEMORY.handler({})))),
+  )
   .get('/api/nemia/memory/:fact', (c) =>
-    served(c, async ({ e, placeService }) => c.json(await runPlaced(placeService, e, MEMORY.handler({ fact: c.req.param('fact') })))),
+    served(c, async ({ e, placeService, home }) =>
+      c.json(await runPlaced({ placeService, home }, e, MEMORY.handler({ fact: c.req.param('fact') }))),
+    ),
   )
   .get('/api/policy/:name', (c) =>
     served(c, async ({ e, placeService, home }) => {
       const wrong = POLICY.check?.({ name: c.req.param('name') });
       if (wrong) return c.json({ error: wrong }, 400);
-      return c.json(await runPlaced(placeService, e, POLICY.handler({ name: c.req.param('name') }, undefined, home)));
+      return c.json(await runPlaced({ placeService, home }, e, POLICY.handler({ name: c.req.param('name') }, undefined, home)));
     }),
   )
   .all('/api/auto/*', (c) => {

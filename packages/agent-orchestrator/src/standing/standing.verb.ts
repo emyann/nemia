@@ -17,6 +17,8 @@ import { hasStarted, waitedOn } from '../wait/wait.ts';
 import { resultBranches, type BranchReader } from '../branches/branches.store.ts';
 import { landedOver } from '../branches/index.ts';
 import { runStore } from '../record/files.store.ts';
+import { stepsOf } from '../steps/steps.verb.ts';
+import type { Workflow } from '../workflow.ts';
 import { readStanding, writeStanding, type StandingFile, type StoodRead } from './standing.store.ts';
 
 /** How long a pass waits for one `standing`: past it, the repository reads unread on this pass, and is asked again on the next. */
@@ -102,14 +104,17 @@ const remember = (memo: StandingMemo, asks: readonly Ask[], read: readonly Stood
   for (const [key, kept] of next) memo.set(key, kept);
 };
 
-/** A run's result branches, none where its steps cannot be read. */
-const branchesOf = (run: Run): string[] => {
-  try {
-    return resultBranches(run);
-  } catch {
-    return [];
-  }
-};
+/** Each repository run's result branches by its id, read once (`stepsOf`): none where its steps cannot be read. */
+const branchesAmong = (runs: readonly Run[]): Effect.Effect<ReadonlyMap<string, readonly string[]>> =>
+  Effect.map(
+    Effect.forEach(runs.filter(isRepositoryRun), (run) =>
+      Effect.map(
+        Effect.orElseSucceed(stepsOf(run), (): Workflow[] => []),
+        (steps) => [run.id, resultBranches(run, steps)] as const,
+      ),
+    ),
+    (pairs) => new Map(pairs),
+  );
 
 /**
  * Whether `run`'s own result branches are asked: a repository run that cut worktrees of its own and was not called off; a prune keeps them.
@@ -122,7 +127,7 @@ const asksOwn = (run: Run): run is RepositoryRun => isRepositoryRun(run) && run.
  * — of the runs waited on there (`waitedOn`: `--after` and a hold's `--until`), and of the runs a run not yet started is handed as context,
  * with the tip each recorded and the commit it was cut at.
  */
-function asksOf(runs: readonly Run[], own: (run: RepositoryRun) => boolean): Ask[] {
+function asksOf(runs: readonly Run[], own: (run: RepositoryRun) => boolean, branches: ReadonlyMap<string, readonly string[]>): Ask[] {
   const asks = new Map<string, Ask>();
   const askOf = (run: RepositoryRun): Ask => {
     const key = keyOf(run.repo, run.branch);
@@ -134,19 +139,19 @@ function asksOf(runs: readonly Run[], own: (run: RepositoryRun) => boolean): Ask
   for (const run of runs) {
     if (!isRepositoryRun(run)) continue;
     const ask = askOf(run);
-    if (own(run)) askedOf(ask, run);
+    if (own(run)) askedOf(ask, run, branches);
     const related = [...waitedOn(run), ...(hasStarted(run) || run.cancelledAt ? [] : (run.context ?? []))];
     for (const other of related.map((id) => byId.get(id))) {
-      if (other && isRepositoryRun(other) && !other.cancelledAt) askedOf(askOf(other), other);
+      if (other && isRepositoryRun(other) && !other.cancelledAt) askedOf(askOf(other), other, branches);
     }
   }
   return [...asks.values()];
 }
 
 /** `ask`, where there is one, asked of each result branch of `run` too, with the tip it recorded and the commit it was cut at. */
-function askedOf(ask: Ask | undefined, run: RepositoryRun): void {
+function askedOf(ask: Ask | undefined, run: RepositoryRun, branches: ReadonlyMap<string, readonly string[]>): void {
   if (!ask) return;
-  for (const branch of branchesOf(run)) {
+  for (const branch of branches.get(run.id) ?? []) {
     const tip = run.tips?.[branch];
     ask.branches.set(branch, { branch, baseRef: run.baseRef, ...(tip ? { tip } : {}) });
   }
@@ -184,7 +189,7 @@ export const standingNow = Effect.fn('standingNow')(function* (
   memo?: StandingMemo,
 ) {
   const place = yield* PlaceService;
-  const asks = asksOf(runs, own);
+  const asks = asksOf(runs, own, yield* branchesAmong(runs));
   const read = yield* Effect.forEach(asks, (ask) => stoodRead(place, ask, memo), { concurrency: 'unbounded' });
   if (memo) remember(memo, asks, read);
   return { read: byKey(read), at: new Date().toISOString() } satisfies PassStanding;

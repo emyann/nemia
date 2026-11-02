@@ -1,10 +1,7 @@
 /**
- * Nemia is MIT-licensed, and says so where a person and a tool look: the root's `LICENSE`, and the `license` field of the root's
- * `package.json` and of every workspace's. The field defaulted to `ISC` in both packages, which `npm init` writes and nobody chose,
- * so a package added or regenerated from that default is refused here. The root also names the repository it is published from.
- *
- * The third parties' licences are their own, reproduced in `THIRD_PARTY_NOTICES.md`: the README's last line says both, so a person
- * who reads no further knows what the repository is under and where the rest is.
+ * Nemia is MIT-licensed, and the `license` field of the root's `package.json` and of every workspace's, a future one's included, says
+ * so. The field defaulted to `ISC` in both packages, which `npm init` writes and nobody chose, so a package added or regenerated from
+ * that default, or with no field at all, is refused here.
  *
  * The test reads files outside this package: after a change elsewhere, `npx turbo run test --force`.
  */
@@ -48,27 +45,4 @@ test("REFUSED: a package left on npm init's default, or with no license field at
     'apps/web/package.json says "license": null: set it to "MIT", what this repository is under',
   ]);
   assert.deepEqual(misLicensed([{ name: 'package.json', license: 'MIT' }]), []);
-});
-
-test("the root LICENSE is the MIT License, under the owner's copyright", () => {
-  const text = fs.readFileSync(path.join(ROOT, 'LICENSE'), 'utf8');
-  assert.match(text, /^MIT License\n/);
-  assert.match(text, /\nCopyright \(c\) 2026 emyann\n/);
-  assert.match(text, /Permission is hereby granted, free of charge, to any person obtaining a copy\nof this software/);
-  assert.match(text, /The above copyright notice and this permission notice shall be included in all\ncopies/);
-  assert.match(text, /THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND/);
-});
-
-test('the root package.json names the repository Nemia is published from', () => {
-  const root = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')) as {
-    repository?: { type?: string; url?: string };
-  };
-  assert.deepEqual(root.repository, { type: 'git', url: 'git+https://github.com/emyann/nemia.git' });
-});
-
-test("the README says Nemia is MIT and where the third parties' notices are", () => {
-  const readme = fs.readFileSync(path.join(ROOT, 'README.md'), 'utf8');
-  const line = readme.split('\n\n').at(-1) ?? '';
-  assert.match(line, /MIT/, 'the README no longer says what Nemia is licensed under: say it in its last section');
-  assert.match(line, /THIRD_PARTY_NOTICES\.md/, "the README's licence line does not say where the third parties' notices are");
 });

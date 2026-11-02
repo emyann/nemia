@@ -12,7 +12,7 @@ import { approveForm } from './form.verb.ts';
 import type { Command } from '../command/entry.verb.ts';
 import { ANSWER_HELP, answerFlag, typedAnswers, typedOf } from '../question/asked.verb.ts';
 import { runStore } from '../record/files.store.ts';
-import { stepsOf } from '../record/record.store.ts';
+import { stepsOf } from '../steps/steps.verb.ts';
 import { writerText as textOf } from '../yours/yours.ts';
 import { approvalWordsRefusal } from './gate.ts';
 import { approveRun } from './gate.verb.ts';
@@ -102,7 +102,7 @@ export const APPROVE: Command<{
       const refused = runStore.runs.exists(runId) ? loopRefusal(args) : null;
       if (refused) return yield* Effect.fail(new Invalid({ message: refused }));
       const { acceptance, file } = yield* acceptRun(runId, step, words);
-      const waited = stepsOf(runStore.runs.read(runId)).some((s) => s.after.includes(acceptance.step));
+      const waited = (yield* stepsOf(runStore.runs.read(runId))).some((s) => s.after.includes(acceptance.step));
       const { step: looping, try: tryNo, at, message } = acceptance;
       return { step: looping, try: tryNo, at, message, file, next: waited ? 'waiting' : 'nothing', loop: true } as const;
     }
@@ -111,7 +111,11 @@ export const APPROVE: Command<{
     const message = typed.length ? yield* typedAnswers(runId, gated, typed, { note: words, approval: true }) : words;
     const { approval, file } = yield* approveRun(runId, gated, message);
     const after = runStore.runs.read(runId);
-    const next: Next = !after.steps[gated]?.taskId ? 'step' : stepsOf(after).some((s) => s.after.includes(gated)) ? 'waiting' : 'nothing';
+    const next: Next = !after.steps[gated]?.taskId
+      ? 'step'
+      : (yield* stepsOf(after)).some((s) => s.after.includes(gated))
+        ? 'waiting'
+        : 'nothing';
     return { step: gated, try: approval.try, at: approval.at, message: approval.message ?? null, file, next, loop: false };
   }),
   print({ step, try: tryNo, message, file, next, loop }, args) {

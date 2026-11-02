@@ -47,7 +47,6 @@ import {
   saidLines,
   signoffsSpent,
   slotWord,
-  stepsOf,
   timelineLines,
   timelineTotalLines,
   touchedLines,
@@ -159,8 +158,7 @@ export async function decideVerb(rest: string[], e: Engine, place: Place): Promi
     const unjudged = await runWith(e, placedIn(place, unjudgedOf(e, runStore.runs.read(runId), err, 'nemia decide')));
     throw unjudged ? new Error(unjudged.said) : err;
   });
-  const { run } = decided;
-  const steps = stepsOf(run);
+  const { run, steps } = decided;
   const head = headOf(run);
   const out = heldOutOf(steps, decided.checkout);
   const decision = standstill(decided, head, steps, out);
@@ -184,7 +182,7 @@ export async function decideVerb(rest: string[], e: Engine, place: Place): Promi
 type Awaiting = Extract<Decided['decision'], { kind: 'awaiting' }>;
 
 /** A run's steps, as its workflow was frozen. */
-type Steps = ReturnType<typeof stepsOf>;
+type Steps = Decided['steps'];
 
 /** The step at `workspace: base`, the run's ending, and the line that says it waits for the checkout another run's ending has, or `''`. */
 type HeldOut = { ending?: Steps[number]; heldOut: string };

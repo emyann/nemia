@@ -7,7 +7,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { loadWorkflows } from '../src/folder/folder.store.ts';
+import { loadWorkflows } from '../src/workflows/workflows.store.ts';
 import { composeBrief, type RepositoryRun, type Run } from '../src/run.ts';
 import type { Workflow } from '../src/workflow.ts';
 import type { Closeout } from '../src/closeout/closeout.ts';
@@ -61,7 +61,7 @@ type Telling = (run: Run, step: Workflow) => BriefPlace;
 const toldBy =
   (place: Place = builtinGitPlace): Telling =>
   (run, step) =>
-    placeTold(run, step, place);
+    placeTold(run, STEPS, step, place);
 
 /** The six briefs of a repository run, by the name of their pinned file, each told what `told` says. */
 function briefs(told: Telling): Record<string, string> {

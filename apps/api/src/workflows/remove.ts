@@ -53,6 +53,8 @@ export const remover = new Hono<ApiEnv>().delete('/api/workflows/:from/:name', (
     if ('status' in read) return c.json({ error: read.error }, read.status);
     const folder = folderOf(name, 'yours', repo, home);
     if ('status' in folder) return c.json({ error: folder.error }, folder.status);
-    return c.json(await runPlaced(placeService, e, REMOVE.handler({ from, name, version: read.body.version, repo }, undefined, home)));
+    return c.json(
+      await runPlaced({ placeService, home }, e, REMOVE.handler({ from, name, version: read.body.version, repo }, undefined, home)),
+    );
   }),
 );

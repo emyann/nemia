@@ -6,12 +6,12 @@
  * after a merge reads its own closeout (`closeoutsAfterMerge`).
  */
 import { Effect } from 'effect';
-import { asked, tried, type Engine } from '../runtime-client.ts';
+import { asked, type Engine } from '../runtime-client.ts';
 import { isRepositoryRun, type CloseoutAsked, type Run, type TaskPhase } from '../record/record.ts';
 import { endingStopped, merged, standing, type RoundAsk, type SpendOf } from '../status/status.ts';
 import { parseCloseout, type Closeout } from '../closeout/index.ts';
 import { roundsDue } from '../round/round.ts';
-import { stepsOf } from '../record/record.store.ts';
+import { stepsOf } from '../steps/steps.verb.ts';
 import { PlaceService, trialMerges, type Place } from '../place/place.store.ts';
 import { mergeWordOf } from '../branches/index.ts';
 import { strayAsk } from '../say/say.verb.ts';
@@ -102,7 +102,7 @@ export const mergeRun = Effect.fn('merge')(function* (id: string, stepName?: str
       }),
     );
   const run = yield* (yield* RunDoor).runs.read(RunId.read(id));
-  const steps = yield* tried(() => stepsOf(run));
+  const steps = yield* stepsOf(run);
   const { views, phaseOf } = yield* taskPhasesRead(run);
   const reads = mergeReads(steps, run, phaseOf, closeoutReader(views, run), closeoutAsked(views), spendReader(views));
   const at = new Date().toISOString();

@@ -4025,7 +4025,7 @@ holding a concurrency slot forever.
 | `src/standing/standing.store.ts` | `standing.json`, what the last pass read of where the branches stand, written whole by the tick alone (`writeStanding`), and decoded by its schema, a file that does not decode refused (`Invalid`) naming it (`readStanding`) |
 | `src/branches/changes.store.ts` | what a repository run's branches changed, as its place's `report` says on each read (`changesOf`), and what is at a path on a branch (`presentOn`): nothing kept between reads, and an answer the place does not give said as not known |
 | `src/artifacts/artifacts.store.ts` | the files a step hands over, copied out of its workspace (`collectArtifacts`), each it named that the run does not have (`missingArtifacts`; off the disk alone as the step signs off, `filesLacked`; those there for the step after, `filesHanded`), what its files directory holds (`artifactFiles`), a landed ending's check pictures removed (`dropLandedPictures`), and one file of that directory or of a step's folder, read by its name and never by a path (`artifactFile`, `fileIn`) |
-| `src/folder/write.store.ts` | what the board's builder writes: a workflow folder from its steps (`writeWorkflow`), refused where it is no place the board lists (`workflowPlaceRefusal`) |
+| `src/folder/write.store.ts` | what the board's builder writes: a workflow folder from its steps (`writeWorkflowAt`, which `writeWorkflow` in `workflows.store.ts` calls), refused where it is no place the board lists (`workflowPlaceRefusal`) |
 | `src/skills/skills.store.ts` | what the board's skill picker and skill page write: a skill copied from another folder of skills (`copySkill`), and a skill made or changed (`writeSkill`), refused as `Missing`, `Conflict` or `Invalid` |
 | `src/skills/read.store.ts` | the skills read: where a workflow's agents and skills are looked for (`lookupRoots`), each skill an agent may give (`skillsFor`, with the package's builtin place skills, `PLACE_SKILLS`), a skill's rules (`readSkillRules`), its version (`skillVersion`), an agent card's entries (`cardSkills`) and whether a skill is told whole (`preloads`); at the bottom of the store's tree |
 | `src/plan/plan.store.ts` | a plan folder's cards read from disk (`readPlan`) |
@@ -4103,7 +4103,7 @@ spawn nothing, and import no file of the other kinds. **Store** files are the I/
 no runtime, never a controller and not the client, and load as a tree — `record/places.store.ts`, `skills/read.store.ts`
 (the skills read), `meter/tally.store.ts` (the pass's meter) and `config/config.store.ts` (the `WF_` environment) at the
 bottom, `agents/read.store.ts` (the agents read, and a person's custom instructions) on the skills read,
-`folder/folder.store.ts` on both reads, `record/record.store.ts` on the bottom, the folders and `record/steps.store.ts`,
+`folder/folder.store.ts` on both reads, `record/record.store.ts` on the bottom, the folders and the revisions,
 `workspace/worktree.store.ts` on `record.store.ts`, `places.store.ts` and `tally.store.ts`, `folder/write.store.ts` on
 `record.store.ts`, the two reads and the factories — and outside the store only the client and the
 controllers beneath the CLI import them. **Controllers** use the runtime through the client: `runner.ts`, the root, which

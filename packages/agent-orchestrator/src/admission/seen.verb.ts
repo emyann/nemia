@@ -4,8 +4,7 @@
  * person, read as `nemia retry` reads them at the moment of the call. A controller over `EngineService`.
  */
 import { Effect } from 'effect';
-import { tried } from '../runtime-client.ts';
-import { stepsOf } from '../record/record.store.ts';
+import { stepsOf } from '../steps/steps.verb.ts';
 import { retryable, WAITS_ON_PERSON } from '../retry/index.ts';
 import { acceptanceOf, overBudget, runSpend } from '../status/status.ts';
 import { askedQuestions } from '../question/index.ts';
@@ -22,7 +21,7 @@ import { RunId } from '../record/record.model.ts';
  */
 export const seenOf = Effect.fnUntraced(function* (runId: string, stepName: string) {
   const run = yield* (yield* RunDoor).runs.read(RunId.read(runId));
-  const steps = yield* tried(() => stepsOf(run));
+  const steps = yield* stepsOf(run);
   const step = steps.find((s) => s.name === stepName);
   const { views, phaseOf } = yield* taskPhasesRead(run);
   const closeoutOf = closeoutReader(views, run);

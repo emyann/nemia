@@ -25,8 +25,9 @@ import {
   type ForgetHow,
   type Forgot,
 } from './forget.ts';
-import { HOME, lstatOf, stepsOf } from '../record/record.store.ts';
-import { UnloadedFolder } from '../record/steps.store.ts';
+import { HOME, lstatOf } from '../record/record.store.ts';
+import { stepsOf } from '../steps/steps.verb.ts';
+import { UnloadedFolder } from '../steps/steps.ts';
 import { runStore } from '../record/files.store.ts';
 import { PlaceService, readRunPlace, type Place, type RunPlaceRead } from '../place/place.store.ts';
 import { sayFilled, unansweredWords, type Held } from '../place/place.ts';
@@ -144,13 +145,11 @@ const forgetMissing = Effect.fn('forgetMissing')(function* (id: string, dir: str
  * A run's frozen steps, or, for a record with no frozen workflow whose folder does not read, why (`unfrozen`): whatever reading it throws,
  * a plain `ENOENT` included, so the run is judged without its steps.
  */
-function frozenSteps(run: Run): { steps?: Workflow[]; unfrozen?: string } {
-  try {
-    return { steps: stepsOf(run) };
-  } catch (err) {
-    return { unfrozen: err instanceof UnloadedFolder ? err.why : (err as Error).message };
-  }
-}
+const frozenSteps = (run: Run): Effect.Effect<{ steps?: Workflow[]; unfrozen?: string }> =>
+  stepsOf(run).pipe(
+    Effect.map((steps) => ({ steps })),
+    Effect.catch((err) => Effect.succeed({ unfrozen: err instanceof UnloadedFolder ? err.why : err.message })),
+  );
 
 /**
  * Read the run `id` as `cancel` does: its record, its frozen steps (`frozenSteps`), the engine's view of its tasks, and its asks; then
@@ -158,7 +157,7 @@ function frozenSteps(run: Run): { steps?: Workflow[]; unfrozen?: string } {
  */
 const readForgetting = Effect.fn('readForgetting')(function* (e: Engine, id: string) {
   const run = yield* (yield* RunDoor).runs.read(RunId.read(id));
-  const { steps, unfrozen } = frozenSteps(run);
+  const { steps, unfrozen } = yield* frozenSteps(run);
   const { views, phaseOf } = yield* taskPhasesRead(run).pipe(over(e));
   const { asks, rounds } = yield* (yield* RunDoor).asks.read(RunId.read(id));
   const reader = closeoutReader(views, run);
@@ -214,7 +213,7 @@ function refusalOf(id: string, f: Forgetting, git: BranchReader, place: Place): 
   const { run, steps } = f;
   const askAt = (a: AskName) => runStore.asks.where(id, a);
   const others = runStore.runs.list().filter((o) => o.id !== id);
-  const standings = steps?.some((s) => approvedFirst(s, run) && !run.steps[s.name]?.taskId) ? standingsOf(run, git) : [];
+  const standings = steps?.some((s) => approvedFirst(s, run) && !run.steps[s.name]?.taskId) ? standingsOf(run, steps, git) : [];
   const { phaseOf, reader, asked, verdictOf, asks, rounds, spendOf } = f;
   return forgetRefusal(
     steps,

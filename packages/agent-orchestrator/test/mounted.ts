@@ -4,7 +4,7 @@
  * and each step's first filing of them (`filedOf`). Held here so the mount tests and the shipped steps' fence share one model of it.
  */
 import path from 'node:path';
-import type { loadWorkflows } from '../src/folder/folder.store.ts';
+import type { loadWorkflows } from '../src/workflows/workflows.store.ts';
 import { filedConfig } from '../src/filed/filed.ts';
 
 type Step = ReturnType<typeof loadWorkflows>[number];

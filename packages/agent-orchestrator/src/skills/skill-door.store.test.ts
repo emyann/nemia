@@ -5,7 +5,7 @@
  *
  * Through the door a link at a skill's name is judged by its version before the writer reads the link: a new skill there finds something
  * else at its name, and a version read at the folder it points at is not the link's (`skillVersion` digests a link as one), each a
- * `Conflict`; the writer's own refusal of a link, `Invalid`, is `test/skill-write.test.ts`'s.
+ * `Conflict`; the writer's own refusal of a link, `Invalid`, is `test/skill-life.test.ts`'s.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

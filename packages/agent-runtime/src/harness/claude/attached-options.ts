@@ -142,15 +142,25 @@ const extraOf = (
 };
 
 /**
+ * The tool that loads a deferred tool's definition when the session asks for it: Claude Code sends an MCP server's tools as names alone,
+ * each definition fetched on demand, only when the session has this tool. A task's closed `tools` list that leaves it out has every
+ * server's tools sent whole on every request instead — Playwright's 23 were 4.1k tokens of a design session's first request, on
+ * Claude Code 2.1.308 — so it is added to a closed list wherever the session has a server (`fenceOf`). A deny of it still wins.
+ */
+export const TOOL_SEARCH = 'ToolSearch';
+
+/**
  * The fence: the tools, the denies and allows (`claudeDenies`, `claudeAllows`), the mounts as added folders, and the skills when the task
  * closes them (`enabledSkills`): the SDK hides every skill off the list and its Skill tool refuses one, and it allows `Skill(<name>)` for
- * each on the list itself. `'default'`, or none, leaves `skills` out, which is Claude Code's own set, never `'all'`.
+ * each on the list itself. `'default'`, or none, leaves `skills` out, which is Claude Code's own set, never `'all'`. A closed `tools`
+ * list is given `TOOL_SEARCH` beside it where the session has a server (`served`), so the servers' tools load on demand.
  */
-const fenceOf = (c: SpawnRequest['config']): AttachedOptions => {
+const fenceOf = (c: SpawnRequest['config'], served: boolean): AttachedOptions => {
   const denies = claudeDenies(c);
   const allows = claudeAllows(c);
+  const tools = c?.tools && served && !c.tools.includes(TOOL_SEARCH) ? [...c.tools, TOOL_SEARCH] : c?.tools;
   return {
-    ...(c?.tools ? { tools: c.tools } : {}),
+    ...(tools ? { tools } : {}),
     ...(denies.length ? { disallowedTools: denies } : {}),
     ...(allows.length ? { allowedTools: allows } : {}),
     ...(c?.mounts?.length ? { additionalDirectories: c.mounts.map((m) => m.path) } : {}),
@@ -170,9 +180,10 @@ const askedOf = (r: SpawnRequest): AttachedOptions => ({
 /**
  * `r` as the SDK takes it, in this order:
  *
- * - the tools, denies and allows (`claudeDenies`, `claudeAllows`), the mounts as `additionalDirectories`;
+ * - the tools, with `TOOL_SEARCH` added to a closed list where the session has a server, the denies and allows (`claudeDenies`,
+ *   `claudeAllows`), the mounts as `additionalDirectories`;
  * - `config.claude` with the admission's hook (`admittedFlags`) on `extraArgs`, its plugin folders as `plugins`, its settings on
- *   the SDK's own `settings`, the session's auto-memory off in them (`memorylessSettings`), and its prompt files as `systemPrompt`;
+ *   the SDK's own `settings`, the session's auto-memory and every dependency's `CLAUDE.md` off in them (`memorylessSettings`), and its prompt files as `systemPrompt`;
  * - the partial messages, always asked for: the SDK emits a `stream_event` for each piece of a block only when
  *   `includePartialMessages` is set (`sdk.d.ts:1896`, `--include-partial-messages` to its CLI), and a follow of the session reads
  *   their `text_delta`s and nothing else (`attached-follow.ts`); the capture goes on dropping them;
@@ -198,7 +209,7 @@ export const attachedOptions = (r: SpawnRequest): AttachedOptions => {
   const windowed = window !== undefined && typeof settings === 'object';
   return {
     cwd: r.cwd,
-    ...fenceOf(c),
+    ...fenceOf(c, Object.keys(servers).length > 0),
     ...(plugins.length ? { plugins: plugins.map((p) => ({ type: 'local' as const, path: path.resolve(r.cwd, p) })) } : {}),
     includePartialMessages: true,
     permissionMode: (c?.permissionMode ?? CLAUDE_DEFAULT_MODE) as Options['permissionMode'],

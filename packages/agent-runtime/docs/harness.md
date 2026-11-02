@@ -143,6 +143,16 @@ the orchestrator's code holds a fact today, it is named beside it.
   runs are folded into the turn in flight and answered by its one result** (SDK 0.3.270, CLI 2.1.301, 2026-10-16): so a turn is
   answered by the `user_message_uuids` on its result (`answered`, `harness/claude/attached-session.ts`), never by counting;
   `queued_turn_count` was 0 on a result a second turn followed, so nothing reads it.
+- **An MCP server's tools are deferred only where the session has `ToolSearch`** (SDK 0.3.308, Claude Code 2.1.308, 2026-11-02): a
+  closed `tools` list without it sends every server's tools whole on every request — a design step's 23 Playwright tools, 4.1k tokens
+  of its first request — and one with it sends them as names, each definition loaded on demand. So `attachedOptions` adds `ToolSearch`
+  to a closed list where the session has a server (`TOOL_SEARCH`, `harness/claude/attached-options.ts`). In `dontAsk`, with the tool
+  on `allowedTools`, the session loaded it and called it; `ToolSearch` itself needed no allow. Read off the transcript's first
+  `api-request-shape`, by `test/live.test.ts` and its control on the code before it.
+- **`claudeMdExcludes` in `Options.settings` keeps a folder's `CLAUDE.md` out of a session** (2.1.308, 2026-11-02):
+  `**/node_modules/**/CLAUDE.md` left out the `nested_memory` attachment a read under `node_modules/<dep>/` brought, while one beside
+  it outside `node_modules` was still attached; without the key, both were, and the dependency's text reached the model
+  (`DEPENDENCY_CLAUDE_MD`, `harness/claude/memory.ts`; `test/live.test.ts`).
 
 ## The claude.ai bridge
 

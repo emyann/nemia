@@ -474,7 +474,7 @@ test(
       assert.ok(!argv.includes('--autocompact'), 'the window is no flag of ours any more');
       assert.deepEqual(
         JSON.parse(sdkArgValue(argv, '--settings')),
-        { autoMemoryEnabled: false, autoCompactWindow: 150_000 },
+        { autoMemoryEnabled: false, claudeMdExcludes: ['**/node_modules/**/CLAUDE.md'], autoCompactWindow: 150_000 },
         'it rides the one settings object, beside auto-memory off: `Settings.autoCompactWindow`, which the SDK spells as `--settings`',
       );
     });

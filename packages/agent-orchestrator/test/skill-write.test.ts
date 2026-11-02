@@ -1,8 +1,10 @@
 /**
  * A skill written (`writeSkill`, `renderSkill`, `withPreload`): what the board's skill page does, a person writing a skill of their own in
- * the store's library. What is written is read back as the card reader reads it and as YAML does, each refusal is made to refuse at shipped
- * defaults — asserted on its message, its kind, and with the library as it was — and a write of a skill is proven to move the version of
- * every agent that gives it. `WF_ROOT` is set before the modules are imported, since they read it as they load.
+ * the store's library. What is written is read back as the card reader reads it and as YAML does, the files' own refusals — the place, a
+ * link, a version moved by a file beside SKILL.md — are made to refuse at shipped defaults, asserted on their kind and with the library as
+ * it was, and a write of a skill is proven to move the version of every agent that gives it. A skill made, changed at its version, made
+ * twice, a name that is no skill's, a stale or gone version and a description refused are the Skill door's walks (`test/skill-walks.ts`).
+ * `WF_ROOT` is set before the modules are imported, since they read it as they load.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -215,43 +217,6 @@ test("withPreload toggles preload and leaves every other key's reading equal: a 
   assert.equal(skillDraftOf('SKILL.md', 'x', on).preload, true);
 });
 
-test('a skill is made in the library, read by the store, and refused a second time under the same name', () => {
-  fresh();
-  const made = writeSkill(ROOT, LIBRARY, DRAFT, { version: null });
-  assert.deepEqual(made, {
-    dir: path.join(LIBRARY, 'tidy-notes'),
-    name: 'tidy-notes',
-    version: skillVersion(path.join(LIBRARY, 'tidy-notes')),
-    written: ['SKILL.md'],
-  });
-  assert.equal(read('tidy-notes'), renderSkill(DRAFT));
-  assert.deepEqual(hidden(LIBRARY), []);
-  refuses(
-    () => writeSkill(ROOT, LIBRARY, { ...DRAFT, description: 'Something else.' }, { version: null }),
-    'Conflict',
-    new RegExp(
-      `skills/tidy-notes is there already, in .*Give it another name, or open tidy-notes and change it: it is at version ${skillVersion(path.join(LIBRARY, 'tidy-notes'))}, and a write given that version changes it\\.$`,
-    ),
-  );
-});
-
-test('a name that is not a folder-safe id is refused, and nothing is made', () => {
-  fresh();
-  for (const name of ['../escape', 'Upper', 'two words', 'trailing-', '', 'a'.repeat(65)]) {
-    refuses(() => writeSkill(ROOT, LIBRARY, { ...DRAFT, name }, { version: null }), 'Invalid', /skill/);
-  }
-  assert.equal(fs.existsSync(path.join(ROOT, 'workflows', 'escape')), false);
-});
-
-test('a frontmatter the card reader refuses is refused, and nothing is made or changed', () => {
-  fresh();
-  refuses(() => writeSkill(ROOT, LIBRARY, { ...DRAFT, description: '' }, { version: null }), 'Invalid', /has no `description:`/);
-  refuses(() => writeSkill(ROOT, LIBRARY, { ...DRAFT, tags: [] }, { version: null }), 'Invalid', /`tags` is an empty list/);
-  const { version } = writeSkill(ROOT, LIBRARY, DRAFT, { version: null });
-  refuses(() => writeSkill(ROOT, LIBRARY, { ...DRAFT, examples: [] }, { version }), 'Invalid', /`examples` is an empty list/);
-  refuses(() => writeSkill(ROOT, LIBRARY, { ...DRAFT, title: 'a\nb' }, { version }), 'Invalid', /`title` holds a line break/);
-});
-
 test('a place that is not a skills folder beside the workflows is refused, and a link is never written through', () => {
   fresh();
   refuses(
@@ -286,29 +251,11 @@ test('REFUSED at shipped defaults: a skill written into the workflows/ of a chec
   assert.ok(fs.existsSync(path.join(library, DRAFT.name, 'SKILL.md')), "a factory's repository");
 });
 
-test('a change is written at the version it was read at, and refused once the skill has moved (a file added beside SKILL.md moves it too) or gone', () => {
+test('a file added beside SKILL.md moves its version: a change at the version read before it is a Conflict, the skill as it was', () => {
   fresh();
   const { version } = writeSkill(ROOT, LIBRARY, DRAFT, { version: null });
-  const changed = writeSkill(ROOT, LIBRARY, { ...DRAFT, body: 'New body.' }, { version });
-  assert.notEqual(changed.version, version);
-  assert.match(read('tidy-notes'), /\n---\nNew body\.\n$/);
-  refuses(
-    () => writeSkill(ROOT, LIBRARY, { ...DRAFT, body: 'Lost.' }, { version }),
-    'Conflict',
-    /changed since it was read \(version [0-9a-f]{16}, now [0-9a-f]{16}\)\. Read it again/,
-  );
   fs.writeFileSync(path.join(LIBRARY, 'tidy-notes', 'reference.md'), 'more');
-  refuses(
-    () => writeSkill(ROOT, LIBRARY, { name: 'tidy-notes', preload: true }, { version: changed.version }),
-    'Conflict',
-    /changed since it was read/,
-  );
-  refuses(() => writeSkill(ROOT, LIBRARY, { ...DRAFT, name: 'gone' }, { version }), 'Missing', /skills\/gone is not in .*: it was removed/);
-  refuses(
-    () => writeSkill(ROOT, LIBRARY, { name: 'new-one', preload: true }, { version: null }),
-    'Invalid',
-    /is a change of `preload:` alone, and there is no skill to change/,
-  );
+  refuses(() => writeSkill(ROOT, LIBRARY, { name: 'tidy-notes', preload: true }, { version }), 'Conflict', /changed since it was read/);
 });
 
 test('the switch writes preload alone, and the run reads it', () => {

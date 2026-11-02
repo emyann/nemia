@@ -2,8 +2,10 @@
  * A skill copied into a library (`copySkill`): what the board's skill picker does with a skill from another place, so an agent of yours
  * can give it. And what a skill costs a turn (`skillTurnCost`), which the picker shows beside each.
  *
- * The copy is held byte for byte against its source, the tests' team's skills (`team.ts`), and each refusal is made to refuse at shipped
- * defaults, asserted on its message, its kind, and with the library as it was. `WF_ROOT` is set before the modules are imported, since they
+ * The copy is held byte for byte against its source, the tests' team's skills (`team.ts`), and each of the files' own refusals — a card
+ * that does not read, a link, a place the board does not list — is made to refuse at shipped defaults, asserted on its kind and with the
+ * library as it was. A copy onto a name taken, of a skill the source has not, and of a name that is no skill's are the Skill door's walks
+ * (`test/skill-walks.ts`). `WF_ROOT` is set before the modules are imported, since they
  * read it as they load.
  */
 import { test } from 'node:test';
@@ -76,34 +78,6 @@ test('a skill is copied whole into the library, and the store finds it there', (
     path.join(LIBRARY, name),
     'an agent of the store is given it now',
   );
-});
-
-test('a copy is refused where the library has the name already, and the library is left as it was', () => {
-  fs.rmSync(LIBRARY, { recursive: true, force: true });
-  const name = fs.readdirSync(SHIPPED).sort()[0];
-  fs.mkdirSync(path.join(LIBRARY, name), { recursive: true });
-  fs.writeFileSync(path.join(LIBRARY, name, 'SKILL.md'), '---\ndescription: mine\n---\nMine.\n');
-  refuses(
-    () => copySkill(ROOT, SHIPPED, LIBRARY, name),
-    'Conflict',
-    new RegExp(`^skills/${name} is there already, in ${LIBRARY.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}, and a copy would write over it\\.`),
-  );
-});
-
-test("a copy is refused for a skill the source does not have, and for a name that is not a skill's", () => {
-  fs.rmSync(LIBRARY, { recursive: true, force: true });
-  refuses(
-    () => copySkill(ROOT, SHIPPED, LIBRARY, 'no-such-skill'),
-    'Missing',
-    /has no skill named no-such-skill: a skill is a folder holding a SKILL\.md/,
-  );
-  for (const bad of ['../agents', 'Review', 'a_b', '.hidden', '', 'x'.repeat(65)]) {
-    refuses(
-      () => copySkill(ROOT, SHIPPED, LIBRARY, bad),
-      'Invalid',
-      /is not a skill's name: a skill is a folder in skills\/, named in lowercase words joined by dashes/,
-    );
-  }
 });
 
 test('a copy is refused for a skill whose SKILL.md does not read as a card entry: no agent could be given it', () => {

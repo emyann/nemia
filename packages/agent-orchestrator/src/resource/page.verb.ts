@@ -17,6 +17,9 @@ import type { StepAcceptance, StepAttempts, StepCloseout, StepGate, StepTry, Ste
 import type { StepFiled, TaskPart } from './told.verb.ts';
 import type { RunRead, StepUsed } from './usage.ts';
 import { type RunParts, runParts, type RunReads } from '../object/run.verb.ts';
+import { commandLine } from '../command/command.ts';
+import { COMMANDS } from '../command/commands.verb.ts';
+import type { Command } from '../command/entry.verb.ts';
 import type { RunSpecStep, RunStepStatus, StepTold } from '../object/run.model.ts';
 
 /**
@@ -219,7 +222,7 @@ export type RunDetail = {
     /** As on `RunSummary`. */
     roundDue: boolean;
     /** The lines a person types for what the step's controls do, built off the table (`stepCommands`). */
-    commands: RunStepStatus['commands'];
+    commands: StepCommands;
     /** As on `RunSummary` (`StepNeeds`): read off that type, field by field, so a field it gains is declared here too and not only sent. */
     needs: StepNeeds['needs'];
     waitingFor: StepNeeds['waitingFor'];
@@ -313,15 +316,16 @@ export type RunPageAnswer = RunDetail | { unjudged: string };
 const unjudgedPage = (why: string): RunPageAnswer => ({ unjudged: why });
 
 /**
- * The run's page projected from its object and every step's tries and told layers (`runParts`): pure, so each field the page shows is a
- * field of the object or of a sub-resource, and a field the object drops fails every test of the page.
+ * The run's page projected from its object and every step's tries and told layers (`runParts`), with the lines a person types built off
+ * the command table: so each other field the page shows is a field of the object or of a sub-resource, and a field the object drops fails
+ * every test of the page.
  */
 export const pageOf = ({ object, tries, told }: RunParts): RunDetail => {
   const { metadata, spec, status } = object;
   return {
     id: metadata.name,
     brief: spec.brief,
-    decide: status.decide,
+    decide: decideLine(metadata.name),
     repo: spec.repo,
     place: spec.place,
     work: spec.work,
@@ -357,9 +361,9 @@ export const pageOf = ({ object, tries, told }: RunParts): RunDetail => {
     gates: status.gates,
     warning: status.warning,
     kinds: status.kinds,
-    refresh: status.refresh,
+    refresh: refreshLine(metadata.name),
     graph: { roots: status.graph.roots, edges: status.graph.edges.filter((e): e is GraphEdge => e.kind !== 'input') },
-    steps: status.steps.map((step) => stepPageOf(step, spec.steps, tries[step.name] ?? [], told[step.name])),
+    steps: status.steps.map((step) => stepPageOf(metadata.name, step, spec.steps, tries[step.name] ?? [], told[step.name])),
     timeline: { rounds: status.timeline.rounds, run: status.timeline.run },
   };
 };
@@ -376,7 +380,7 @@ const stepSpecOf = (s: RunSpecStep | undefined): StepSpec | null =>
         workspace: s.workspace,
         place: s.place,
         resume: s.resume,
-        permissionMode: s.permissionMode,
+        permissionMode: s.fence,
         sandbox: s.sandbox,
         tools: s.tools,
         deadlineSeconds: s.deadlineSeconds,
@@ -387,16 +391,19 @@ const stepSpecOf = (s: RunSpecStep | undefined): StepSpec | null =>
 
 /** One step of the page, from its status in the object, the frozen steps, its tries whole and what it was told. */
 const stepPageOf = (
+  runId: string,
   step: RunStepStatus,
   frozen: readonly RunSpecStep[],
   tries: StepTry[],
   told: StepTold | undefined,
 ): RunDetail['steps'][number] => {
-  const { status: _word, current: _short, ...rest } = step;
+  const { status: _word, current: _short, filed, ...rest } = step;
   const latest = tries.find((t) => t.current);
   return {
     ...rest,
     spec: stepSpecOf(frozen.find((s) => s.name === step.name)),
+    commands: stepCommands(runId, step.name),
+    filed: filed && (({ fence, ...given }) => ({ ...given, permissionMode: fence }))(filed),
     body: told?.body ?? null,
     told: told?.told ?? null,
     layers: told?.layers ?? null,
@@ -420,4 +427,43 @@ const stepPageOf = (
 export const runPage = Effect.fn('runPage')(function* (run: Run, reads: RunPageReads) {
   const parts = yield* runParts(run, reads);
   return 'unjudged' in parts ? unjudgedPage(parts.unjudged) : pageOf(parts);
+});
+
+/**
+ * The command of the table (`COMMANDS`) named `name`: thrown as this module loads when the table holds none by that name, so a name the
+ * table renamed is a failed start, not a page that fails as it is read.
+ */
+function named(name: string): Command {
+  const command = COMMANDS.find((c) => c.name === name);
+  if (command === undefined) throw new Error(`No command '${name}' in the orchestrator's table (COMMANDS): name one it holds.`);
+  return command;
+}
+
+const DECIDE = named('decide');
+const APPROVE = named('approve');
+const RETRY = named('retry');
+const SAY = named('say');
+const REFRESH = named('refresh');
+
+/** The line that prints what there is to decide on a run: `nemia decide <run>`. */
+export const decideLine = (runId: string): string => commandLine(DECIDE, { runId });
+
+/**
+ * The line that takes the new revisions of every kind a run resolved: `nemia refresh <run>`, the run alone — the step refresh takes is
+ * `--base`'s (`nemia refresh <run> [<step>] --base`), which this line does not ask, so it is not said, not even as `[<step>]`.
+ */
+export const refreshLine = (runId: string): string =>
+  commandLine(
+    { name: REFRESH.name, spec: { ...REFRESH.spec, positionals: REFRESH.spec.positionals.filter((p) => p.key === 'runId') } },
+    { runId },
+  );
+
+/** A step's lines beside its controls: its approval at its gate, a try in its session, and words said to it. */
+export type StepCommands = { approve: string; retry: string; say: string };
+
+/** A step's lines: `nemia approve <run> <step>`, `nemia retry <run> <step>` and `nemia say <run> <step>`. */
+export const stepCommands = (runId: string, step: string): StepCommands => ({
+  approve: commandLine(APPROVE, { runId, step }),
+  retry: commandLine(RETRY, { runId, step }),
+  say: commandLine(SAY, { runId, step }),
 });

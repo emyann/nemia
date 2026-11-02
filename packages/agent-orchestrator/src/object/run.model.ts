@@ -110,7 +110,8 @@ export type RunMetadata = typeof RunMetadata.Type;
 /**
  * One step as the run froze it: what it waits on (`after`), whose declared output it is handed (`input`), and on a looping step the step
  * a round runs again and how many rounds it may run (`loop`, `rounds`; null on any other); then the rest of its frontmatter the page shows
- * (`StepSpec`, page.verb.ts), each null where the step does not set it.
+ * (`StepSpec`, page.verb.ts), each null where the step does not set it: `fence` is the fence word the run froze for its session, said in
+ * this layer's word.
  */
 export const RunSpecStep = Schema.Struct({
   name: Schema.String,
@@ -125,7 +126,7 @@ export const RunSpecStep = Schema.Struct({
   workspace: NullString,
   place: NullString,
   resume: NullString,
-  permissionMode: NullString,
+  fence: NullString,
   sandbox: NullString,
   tools: Schema.NullOr(Strings),
   deadlineSeconds: NullNumber,
@@ -295,13 +296,13 @@ export const StepAttempts = Schema.Struct({
 }).annotate({ identifier: 'StepAttempts' });
 export type StepAttempts = typeof StepAttempts.Type;
 
-/** What the engine filed a step's current try with (`StepFiled`, told.verb.ts). */
+/** What the engine filed a step's current try with (`StepFiled`, told.verb.ts), the fence it was filed with said in this layer's word. */
 const StepFiled = Schema.Struct({
   model: NullString,
   askedModel: NullString,
   effort: NullString,
   contextTokens: NullNumber,
-  permissionMode: NullString,
+  fence: NullString,
   runsIn: Schema.NullOr(Schema.Struct({ mode: Schema.String, by: Schema.Literals(RUNS_IN_BY) })),
   remote: Schema.NullOr(Schema.Struct({ name: Schema.String, address: NullString })),
   bridge: Schema.NullOr(Schema.Struct({ url: NullString, why: NullString })),
@@ -342,9 +343,9 @@ const StepBudget = Schema.Struct({ usd: Schema.Finite, said: Schema.String, of: 
 /**
  * A step now: where it stands as codes and in its word, the raise of its cap the package takes (null where none), its tries on the clock
  * (`TimelineTry`), the short of its current try (null while it has none); then all the run's page shows of it but its tries whole and
- * what it was told — its task and place, its folder's files, its note, the lines to type, what it needs of a person, its gate, what was
- * said to it and asked of it, its current try's check and attempts, and what it used, cost and may cost (`RunDetail['steps']`,
- * page.verb.ts).
+ * what it was told — its task and place, its folder's files, its note, what it needs of a person, its gate, what was said to it and asked
+ * of it, its current try's check and attempts, and what it used, cost and may cost (`RunDetail['steps']`, page.verb.ts). The lines a
+ * person types for it are the command table's, not the step's: the page builds them.
  */
 export const RunStepStatus = Schema.Struct({
   name: Schema.String,
@@ -366,7 +367,6 @@ export const RunStepStatus = Schema.Struct({
   filesError: NullString,
   note: NullString,
   roundDue: Schema.Boolean,
-  commands: Schema.Struct({ approve: Schema.String, retry: Schema.String, say: Schema.String }),
   needs: NullString,
   waitingFor: Schema.NullOr(Schema.Struct({ words: Schema.String, advice: Schema.String })),
   approve: NullString,
@@ -430,7 +430,7 @@ const Drift = Schema.Struct({
 /**
  * The run now: the runs list's judged fields (`judgedFields`) — its word and codes, whether it moves, its cost, time at work and tokens,
  * what it waits on, its hold and what a person has to decide — then its graph, where its time went as a whole (`Timeline`'s rounds, run
- * and slot), and each step; and the rest of what its page shows of it: the lines to type, when it started and was called off, what a prune
+ * and slot), and each step; and the rest of what its page shows of it but the lines to type, which are the command table's: when it started and was called off, what a prune
  * took and would find, the runs it is held until, what its sessions read, who it waits on, its gates, a warning on its folder, and the
  * kinds it is behind the files on (`RunDetail`, page.verb.ts).
  */
@@ -482,8 +482,6 @@ export const RunStatus = Schema.Struct({
     slot: Schema.NullOr(Schema.Struct({ from: Schema.String, filedAt: NullString, ms: NullNumber, queued: Schema.String })),
   }),
   steps: List(RunStepStatus),
-  decide: Schema.String,
-  refresh: Schema.String,
   startedAt: NullString,
   cancelledAt: NullString,
   pruned: Schema.NullOr(

@@ -37,10 +37,8 @@ import { runStartedAt, type Timeline, type TimelineTotal } from '../timeline/ind
 import { consumption } from '../views/views.verb.ts';
 import type { Drift } from '../revisions/revisions.ts';
 import { driftNow } from '../revisions/pin.verb.ts';
-import { commandLine } from '../command/command.ts';
-import type { Command } from '../command/entry.verb.ts';
 import { acceptedOf, driftOf, gateOf, type StepTry } from '../resource/tries.verb.ts';
-import { filedOf, toldOf } from '../resource/told.verb.ts';
+import { filedOf, type StepFiled, toldOf } from '../resource/told.verb.ts';
 import { folderFiles, workFolderOf } from '../resource/files.store.ts';
 import { type LastSaid, lastLineOf } from '../resource/checks.verb.ts';
 import { readOf, totalOf, usedOf } from '../resource/usage.ts';
@@ -91,7 +89,7 @@ const specStepOf = (s: Workflow): RunSpec['steps'][number] => ({
   workspace: s.workspace ?? null,
   place: s.place ?? null,
   resume: s.resume ?? null,
-  permissionMode: s.permissionMode ?? null,
+  fence: s.permissionMode ?? null,
   sandbox: s.sandbox ?? null,
   tools: s.tools ?? null,
   deadlineSeconds: s.deadlineSeconds ?? null,
@@ -165,6 +163,10 @@ function filesOf(run: Run, step: string): Pick<RunStepStatus, 'files' | 'filesEr
   return { files, filesError: error };
 }
 
+/** What the engine filed a try with (`filedOf`), its fence in this layer's word. */
+const filedIn = (filed: StepFiled | null): RunStepStatus['filed'] =>
+  filed && (({ permissionMode: fence, ...rest }) => ({ ...rest, fence }))(filed);
+
 /** A try asked for, as the object says it. */
 const askedOf = (r: Retry | undefined): RunStepStatus['asked'] =>
   r ? { try: r.try, mode: r.mode, model: r.model ?? null, message: r.message ?? null, stopFirst: r.stopFirst === true } : null;
@@ -201,48 +203,11 @@ const runRead = ({ clock, steps, names }: RunReading): RunStatus['read'] =>
     ),
   );
 
-/**
- * The lines a person types for a run and its steps, built off the command table (`COMMANDS`): `nemia decide <run>`, `nemia refresh <run>`
- * — the run alone, the step refresh takes being `--base`'s, which this line does not ask, so it is not said, not even as `[<step>]` — and
- * a step's `nemia approve`, `nemia retry` and `nemia say`. The table is handed in, read by `runParts` as it runs: its own entries
- * (`nemia show`, reads.verb.ts) import this module, so the table is not there yet when this module loads. Thrown where the table holds
- * no command by a name, which every test of the page or the object meets.
- */
-export const linesOf = (commands: readonly Command[]) => {
-  const named = (name: string): Command => {
-    const command = commands.find((c) => c.name === name);
-    if (command === undefined) throw new Error(`No command '${name}' in the orchestrator's table (COMMANDS): name one it holds.`);
-    return command;
-  };
-  const decide = named('decide');
-  const approve = named('approve');
-  const retry = named('retry');
-  const say = named('say');
-  const refresh = named('refresh');
-  const refreshRun = {
-    name: refresh.name,
-    spec: { ...refresh.spec, positionals: refresh.spec.positionals.filter((p) => p.key === 'runId') },
-  };
-  return {
-    decide: (runId: string): string => commandLine(decide, { runId }),
-    refresh: (runId: string): string => commandLine(refreshRun, { runId }),
-    step: (runId: string, step: string): RunStepStatus['commands'] => ({
-      approve: commandLine(approve, { runId, step }),
-      retry: commandLine(retry, { runId, step }),
-      say: commandLine(say, { runId, step }),
-    }),
-  };
-};
-
-/** The command lines of the table (`linesOf`). */
-type Lines = ReturnType<typeof linesOf>;
-
 /** What `runParts` read once for the run (`RunReading`), handed to each step's part of it, with what only the parts read. */
 type StepAt = RunReading & {
   readonly placeService: PlaceService['Service'];
   readonly used: ReturnType<typeof consumption>;
   readonly said: LastSaid;
-  readonly lines: Lines;
 };
 
 /** The step `name`'s word, as `nemia decide` says it (`stepStatus`), off the views already read. */
@@ -278,14 +243,13 @@ const stepParts = Effect.fnUntraced(function* (name: string, at: StepAt) {
     status: stepWord(at, name),
     timeline: (clock.steps[name] ?? []).map((t) => ({ ...t, used: t.session ? usedOf(t.used, judgedContext) : null })),
     current: latest ? tryShort(latest) : null,
-    filed: filedOf(run.steps[name], views),
+    filed: filedIn(filedOf(run.steps[name], views)),
     taskId,
     workspace: run.steps[name]?.workspace ?? null,
     ...filesOf(run, name),
     branch: run.steps[name]?.branch ?? null,
     note: judged.notes.get(name) ?? null,
     roundDue: judged.roundDue.has(name),
-    commands: at.lines.step(run.id, name),
     ...needsOf(run, name, views, judged),
     lastLine,
     gate: gateOf(run, steps.find((s) => s.name === name) ?? bare(name), current.reason),
@@ -304,12 +268,13 @@ const stepParts = Effect.fnUntraced(function* (name: string, at: StepAt) {
   return { status, tries, told };
 });
 
-/** The object's run-level status beyond the list's judged fields, the graph, the timeline and the steps: the rest the page shows. */
-const pageFieldsOf = (run: Run, at: RunReading, kinds: readonly Drift[], lines: Lines) => {
+/**
+ * The object's run-level status beyond the list's judged fields, the graph, the timeline and the steps: the rest the page shows but the
+ * lines a person types, which are the command table's (`pageOf`, page.verb.ts), not the run's.
+ */
+const pageFieldsOf = (run: Run, at: RunReading, kinds: readonly Drift[]) => {
   const { home, folder, steps, judged, filed } = at;
   return {
-    decide: lines.decide(run.id),
-    refresh: lines.refresh(run.id),
     startedAt: runStartedAt(run, filed),
     cancelledAt: run.cancelledAt ?? null,
     pruned: prunedOf(run),
@@ -335,9 +300,7 @@ export const runParts = Effect.fn('runParts')(function* (run: Run, { memo, inReq
   const at = yield* runReading(run, memo.filings);
   if ('unjudged' in at) return { unjudged: at.unjudged };
   const kinds = inRequest ? yield* Effect.promise(() => inRequest(driftNow(run))) : yield* driftNow(run);
-  const { COMMANDS } = yield* Effect.promise(() => import('../command/commands.verb.ts'));
-  const lines = linesOf(COMMANDS);
-  const stepAt: StepAt = { ...at, placeService, used: consumption(at.views, run), said: memo.said, lines };
+  const stepAt: StepAt = { ...at, placeService, used: consumption(at.views, run), said: memo.said };
   const parts = yield* Effect.forEach(at.names, (name) => stepParts(name, stepAt), { concurrency: 'unbounded' });
   const { factory, workflow } = runLabels(run);
   const object: RunObject = {
@@ -350,7 +313,7 @@ export const runParts = Effect.fn('runParts')(function* (run: Run, { memo, inReq
       graph: runInputGraph(at.steps, at.names),
       timeline: runTimeline(at),
       steps: parts.map((p) => p.status),
-      ...pageFieldsOf(run, at, kinds, lines),
+      ...pageFieldsOf(run, at, kinds),
     },
   };
   const result: RunParts = {

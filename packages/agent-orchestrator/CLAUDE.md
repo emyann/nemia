@@ -1,8 +1,14 @@
-# packages/agent-orchestrator — `nemia` (`wf`, its alias)
+# packages/agent-orchestrator — the in-process `nemia` (`wf`, its alias)
 
 Workflows as folders of markdown, runs of their steps, a tick that files and admits them on the runtime, and the verbs a person uses:
 run slots, worktrees and landing, what a check means, budgets across tries, gates, the inbox, factories, stats, agent definitions. What
 it holds today that is a candidate for the runtime is in `docs/architecture.md`, *Who owns what*.
+
+The `nemia` a person types is the client in `apps/cli` (`apps/cli/CLAUDE.md`): it asks the api for the moved reads and spawns this
+package's CLI for everything else — every write, `decide`, a help, and a read typed with `--local` — with the same words. `bin/nemia.ts`
+and `bin/wf.ts` are that in-process CLI, the old path: exported as `agent-orchestrator/bin` and `/bin/wf`, resolved and spawned by
+`apps/cli/src/local.ts` alone, and no package declares them as its bins. A change to a moved read's output changes the client's printer
+too, which holds parity with this one until the in-process reads retire.
 
 ## Folders
 
@@ -177,7 +183,9 @@ it holds today that is a candidate for the runtime is in `docs/architecture.md`,
   hands the runtime the ceiling and the pools. A new engine verb goes into `ENGINE_PHASES`, and into `ENGINE_WRITES`, or `ENGINE_READS`
   where it changes no task (`views/views.verb.ts`); an admitted task starts on the runtime's next pass.
 - **Every test file that ticks a store sets `WF_VERIFY_REST=1`**, and a new input of a finished run's pass goes into `restStamps` (and
-  into the list's own memo, `restingRead`): what the stamps miss is missed for good.
+  into the list's own memo, `restingRead`): what the stamps miss is missed for good. The informer beside it (`src/rest/`) holds every
+  run's judgement for a daemon, filled by the pass and read by the api's run object, list and sub-resources, checked against the same
+  inputs before it is served and rebuilt on a restart: a new input of a run's judgement goes into what it checks too.
 - **A test that starts a daemon and reads a finished run's worktree afterwards sets `WF_KEEP_WORKTREES=1`**: the daemon frees a finished
   run's worktrees on a sweep beside its passes (`freeOnce`, `src/prune/free.verb.ts`).
 - **The daemon measures the store's disk on a sweep beside its passes** (`diskOnce`, `src/disk/disk.verb.ts`): a test daemon walks its

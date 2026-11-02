@@ -4,6 +4,11 @@ A workflow is **a folder of markdown files**. One file is one step. It runs on
 [`agent-runtime`](../agent-runtime), and it is the proof that the engine's boundary is real: this
 package uses the runtime's `Engine` service, `file`, `tick`, `view`, `stop`, `logs` and nothing else.
 
+`nemia` (and `wf`, its alias) is the client in [`apps/cli`](../../apps/cli): a moved read — `show`, `closeout`, `ls`, the inbox's
+read, `watch` — asks the api serving the store, starting its daemon on demand; every other verb, a help, and a read typed with
+`--local` run on this package's own CLI, `bin/nemia.ts`, which the client spawns with the same words. The commands below read the
+same either way.
+
 ```bash
 wf start ./brief.md --repo ~/code/myapp --workflows ./workflows
 wf start ./next.md --repo ~/code/myapp --after r-xyz   # file nothing of it until r-xyz has landed

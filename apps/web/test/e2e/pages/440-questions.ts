@@ -42,7 +42,7 @@ const QUESTIONS = {
     body: 'Any of them, or all.',
     options: [
       { label: 'The board', meaning: 'Under Decide, as choices.' },
-      { label: 'The terminal', meaning: 'Numbered, in `nemia decide`.' },
+      { label: 'The terminal', meaning: 'Numbered, at the terminal.' },
       { label: 'The feed', meaning: 'A line of their own.' },
     ],
     recommended: ['The board', 'The terminal'],

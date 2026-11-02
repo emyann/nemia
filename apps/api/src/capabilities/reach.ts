@@ -29,7 +29,7 @@ import {
   type McpServer,
 } from './capabilities.ts';
 import { runPlaced, type Engine } from '../store.ts';
-import { listWorkflows, type WorkflowListing, type WorkflowSource, type WorkflowStepSpec } from '../workflows/workflows.ts';
+import { listWorkflows, type InRequest, type WorkflowListing, type WorkflowSource, type WorkflowStepSpec } from '../workflows/workflows.ts';
 import type { PlaceService } from 'agent-orchestrator';
 
 /** The harness that is Claude Code, as the engine names it: every session of it a job on the Agent SDK. */
@@ -509,13 +509,21 @@ export async function capabilitiesWithSteps(
     env,
     home,
     asker,
-  }: { e: Engine['Service']; placeService: PlaceService['Service']; env: NodeJS.ProcessEnv; home: string; asker: AskServer },
+    inRequest,
+  }: {
+    e: Engine['Service'];
+    placeService: PlaceService['Service'];
+    env: NodeJS.ProcessEnv;
+    home: string;
+    asker: AskServer;
+    inRequest: InRequest;
+  },
 ): Promise<CapabilitiesWithSteps> {
   const capabilities = await capabilitiesOf(repo, { env, asker });
   capabilities.mcp = await statedByFactory(capabilities.mcp, e, placeService, home);
   let workflows: WorkflowListing[] = [];
   try {
-    workflows = await listWorkflows(e, placeService, repo, home);
+    workflows = await listWorkflows(e, placeService, repo, home, inRequest);
   } catch (err) {
     capabilities.warnings.push(`${err instanceof Error ? err.message : String(err)} What each step gets is not shown for any workflow.`);
   }

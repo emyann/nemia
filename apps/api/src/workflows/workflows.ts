@@ -19,7 +19,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { Schema } from 'effect';
+import { Effect, Schema } from 'effect';
 import { Hono } from 'hono';
 import {
   cardSkills,
@@ -51,7 +51,7 @@ import { toldLayers, type ToldLayers } from 'agent-orchestrator/run';
 import { NotBlank, readBody, valueAt, type BodyIssue } from '../body.ts';
 import { refusedBeforeReading, type Guarded, type Refusal } from '../guard.ts';
 import { type ApiEnv, served } from '../layer.ts';
-import type { Engine } from '../store.ts';
+import { StoreRoot, type Engine } from '../store.ts';
 import { graphOf, workflowVersion, type RunGraph } from 'agent-orchestrator';
 import { commandNamed, runPlaced } from '../store.ts';
 import type { PlaceService } from 'agent-orchestrator';
@@ -276,13 +276,15 @@ export function loadedAt(loaded: Readonly<Record<string, FolderLoaded>>, dir: st
 /**
  * Every workflow `repo` and `home` have that `factory` offers: each folder in each source, by name — in a factory, only those attached to
  * it, and in one made from a template, its tree's first (`sourcesOf`). Loads every folder, so each can say whether it reads, and, in a
- * factory, which steps its hires leave unfilled.
+ * factory, which steps its hires leave unfilled. Each folder's version is read through the doors over `inRequest`, the request's services
+ * (`Served`), or a test's root given.
  */
 export async function listWorkflows(
   e: Engine['Service'],
   placeService: PlaceService['Service'],
   repo: string,
   home: string,
+  inRequest: InRequest,
   factory?: Factory,
 ): Promise<WorkflowListing[]> {
   const folders = unshadowed(
@@ -301,8 +303,16 @@ export async function listWorkflows(
     home,
     factory,
   );
-  return folders.map(({ name, from, dir }) => listed(name, from, dir, { repo, home }, loadedAt(loaded, dir), factory));
+  const versioned = await inRequest(
+    Effect.forEach(folders, (f) => Effect.map(workflowVersion(f.dir, placesOf(repo, home)), (version) => ({ ...f, version }))),
+  );
+  return versioned.map(({ name, from, dir, version }) => listed(name, from, dir, loadedAt(loaded, dir), version, factory));
 }
+
+/**
+ * How a read runs a program that needs the store's root: the request's `inRequest` (`Served`), or, in a test, one with the root given.
+ */
+export type InRequest = <A, E>(program: Effect.Effect<A, E, StoreRoot>) => Promise<A>;
 
 /**
  * Where a folder's agents and skills are looked for beyond its own `agents/` and `skills/`, as `nemia start --repo <repo>` looks: the
@@ -314,20 +324,19 @@ export const placesOf = (repo: string, home: string): Places => ({ repo, home })
 /**
  * One folder as the board lists it, read from disk now, its steps as the table's `workflows` loaded them (`loaded`): what the listing
  * has for it, and what the builder answers a write with. In `factory`, its steps are read with the factory's hires, and those left with no
- * agent named (`unfilled`).
+ * agent named (`unfilled`). Its `version` is the folder's now (`workflowVersion`), read by the caller over the request's services.
  */
 export function listed(
   name: string,
   from: WorkflowSource,
   dir: string,
-  places: Places,
   loaded: FolderLoaded,
+  version: string,
   factory?: Factory,
 ): WorkflowListing {
   const description = workflowDescription(dir);
   const readme = workflowReadme(dir);
   const schemas = schemasIn(dir);
-  const version = workflowVersion(dir, places);
   if ('error' in loaded) {
     return {
       name,
@@ -644,7 +653,9 @@ async function cardStarted(
  */
 export const workflows = new Hono<ApiEnv>()
   .get('/api/workflows', (c) =>
-    served(c, async ({ e, placeService, repo, home, factory }) => c.json(await listWorkflows(e, placeService, repo, home, factory))),
+    served(c, async ({ e, placeService, repo, home, factory, inRequest }) =>
+      c.json(await listWorkflows(e, placeService, repo, home, inRequest, factory)),
+    ),
   )
   .get('/api/repository', (c) => served(c, ({ repo }) => c.json({ repo })))
   .post('/api/runs', (c) =>

@@ -44,7 +44,8 @@ import { entriesOf, skillsFor, type Places } from '../skills/read.store.ts';
 
 /**
  * The agents and skills a workflow at `dir` finds beside it or in `places` (`agentsFor`, `skillsFor`), read from the disk: what a
- * synchronous reader not yet on the Agent and Skill doors parses a folder against (`test/agent-door.baseline.ts`).
+ * synchronous reader not yet on the Agent and Skill doors parses a folder against (`test/agent-door.baseline.ts`). Counted on the
+ * Workflow door's seam (`src/workflows/workflows.store.test.ts`): this file and `write.store.ts` alone call it.
  */
 export const foundAt = (dir: string, places: Places): Found => ({ agents: agentsFor(dir, places), skills: skillsFor(dir, places) });
 

@@ -84,6 +84,13 @@ const decideSpec = spec<(state: State, observed: ReadonlyMap<string, Sighting>, 
     (state.deadlineSeconds === undefined ||
       (Number.isInteger(state.deadlineSeconds) && state.deadlineSeconds >= 0 && state.deadlineSeconds <= 2 ** 31)) &&
     state.attempts.every(attemptStamped),
+  /**
+   * Which step it takes is the code's: these laws are all of what `decide` must never do, and the step is the lifecycle's
+   * edge for what the pass saw, whose table is XState's and declared above (`edges`), not read. Where the task stands and
+   * what the pass sees are decided by `lifecycleOf`'s and `observe`'s contracts, and its progress is held by tests
+   * (`test/engine.test.ts`, every state against every event in `test/assumptions.test.ts`).
+   */
+  open: true,
   ensures: {
     aSettledTaskIsLeftAlone: {
       description: 'A settled task is left alone',

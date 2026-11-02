@@ -13,7 +13,10 @@ import path from 'node:path';
 import { scratch } from '../../test/scratch.ts';
 import { TEAM } from '../../test/team.ts';
 import { story } from '../../test/checkpoints.ts';
-import { app } from '../app.ts';
+import { Effect, Layer } from 'effect';
+import { AgentDoor, type AgentDoorShape } from 'agent-orchestrator';
+import { agentDoorMemory } from 'agent-orchestrator/testing';
+import { app, appOf, liveOf } from '../app.ts';
 import { DEFAULT_HARNESS, putSchemasBack, stepsNamed } from './builder.ts';
 import { workflowVersion as versionIn } from 'agent-orchestrator';
 import { listWorkflows } from './workflows.ts';
@@ -1628,4 +1631,29 @@ test("stepsNamed: the steps a refusal names — a cycle's several, a name refuse
   assert.deepEqual(stepsNamed('two steps are named plan, and a step is its file, plan.md. Rename one of them.', names), ['plan']);
   assert.deepEqual(stepsNamed('no steps to write to /x, and a workflow has at least one.', names), []);
   assert.deepEqual(stepsNamed('planning: something', names), []);
+});
+
+test("the form a step is drawn in reads yours' agents through the app's Agent door: one held only by the door it was given is offered, with the values it gives", async () => {
+  const { app: own, runtime: ownRuntime } = appOf(Layer.merge(liveOf(), agentDoorMemory()));
+  const name = 'remembered' as Parameters<AgentDoorShape['agents']['write']>[0];
+  await ownRuntime.runPromise(
+    Effect.flatMap(AgentDoor, (door) =>
+      door.agents.write(
+        name,
+        { name, description: 'Use it when a note is to be kept.', keys: { model: 'opus', tools: 'Read, Grep' }, body: 'Keep the note.' },
+        undefined,
+        { dir: path.join(STORE, 'agents'), anywhere: true },
+      ),
+    ),
+  );
+  assert.equal(fs.existsSync(path.join(STORE, 'agents', 'remembered.md')), false, 'the agent is held by the door, not on disk');
+  const res = await own.request('/api/workflows/keys');
+  assert.equal(res.status, 200);
+  const form = (await res.json()) as KeyForm;
+  assert.deepEqual(
+    form.keys.find((k) => k.key === 'agent')?.choices,
+    ['remembered'],
+    "the agents of yours are the door's, none of the files beside it",
+  );
+  assert.deepEqual(form.agents, { remembered: { model: 'opus', tools: ['Read', 'Grep'] } }, 'and it comes with the role values it sets');
 });

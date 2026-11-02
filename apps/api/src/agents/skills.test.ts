@@ -17,8 +17,12 @@ import path from 'node:path';
 import { engine, builtinGitPlace, skillCopyCommand } from 'agent-orchestrator';
 import { skillTurnCost } from 'agent-orchestrator/workflow';
 import { scratch } from '../../test/scratch.ts';
-import { app } from '../app.ts';
-import { foundInOf, listSkills, BUILTIN_SKILLS, skillDetail } from './skills.ts';
+import { Effect, Layer } from 'effect';
+import { AgentDoor, SkillDoor, type AgentDoorShape, type SkillDoorShape } from 'agent-orchestrator';
+import { agentDoorMemory, skillDoorMemory } from 'agent-orchestrator/testing';
+import { app, appOf, liveOf } from '../app.ts';
+import { foundInOf, listSkills, BUILTIN_SKILLS, skillDetail, yourSkillsRead } from './skills.ts';
+import { StoreRoot } from '../store.ts';
 import { TEAM } from '../../test/team.ts';
 const repo = scratch('nemia-api-skills-repo-');
 process.env.HKB_REPO = repo;
@@ -203,7 +207,8 @@ test('a repository skill linked inside the repository lists under repo, read, wi
 });
 
 test('a builtin skill says where an agent of yours already finds its name: in your library, in the repository, or nowhere yet', async () => {
-  const places = await listSkills(engine(), builtinGitPlace, repo, root, TEAM_SKILLS);
+  const yoursRead = await Effect.runPromise(Effect.provideService(yourSkillsRead(repo, root, TEAM_SKILLS), StoreRoot, root));
+  const places = await listSkills(engine(), builtinGitPlace, repo, root, yoursRead);
   assert.equal(rowOf(places, 'builtin', inLibrary)!.found, 'yours');
   assert.equal(rowOf(places, 'builtin', inRepo)!.found, 'repo');
   assert.equal(rowOf(places, 'builtin', toCopy)!.found, null);
@@ -605,3 +610,35 @@ function snapshotOf(dir: string): Record<string, string> {
       .map((f) => [f, fs.readFileSync(path.join(dir, f), 'utf8')]),
   );
 }
+
+test("the picker finds a skill and the agents of yours that give it through the app's Agent and Skill doors: one held only by the doors is listed in yours, given by its agent", async () => {
+  const { app: own, runtime: ownRuntime } = appOf(Layer.mergeAll(liveOf(), agentDoorMemory(), skillDoorMemory()));
+  const agent = 'keeper' as Parameters<AgentDoorShape['agents']['write']>[0];
+  const kept = 'kept-notes' as Parameters<SkillDoorShape['skills']['write']>[0];
+  await ownRuntime.runPromise(
+    Effect.gen(function* () {
+      yield* (yield* SkillDoor).skills.write(
+        kept,
+        { name: kept, description: 'Keeps a note, one fact a line.', body: 'Keep it.' },
+        undefined,
+        LIBRARY,
+        { anywhere: true },
+      );
+      yield* (yield* AgentDoor).agents.write(
+        agent,
+        { name: agent, description: 'Use it when a note is to be kept.', skills: kept, keys: {}, body: 'Keep the note.' },
+        undefined,
+        { dir: path.join(root, 'workflows', 'agents'), anywhere: true },
+      );
+    }),
+  );
+  assert.equal(fs.existsSync(path.join(LIBRARY, kept)), false, 'the skill is held by the door, not on disk');
+  const res = await own.request('/api/skills');
+  assert.equal(res.status, 200);
+  const places = (await res.json()) as SkillPlace[];
+  assert.deepEqual(
+    places.find((p) => p.from === 'yours')?.skills.map((s) => [s.name, s.usedBy]),
+    [[kept, [agent]]],
+    "yours are the door's skills alone, each with the door's agents that give it",
+  );
+});

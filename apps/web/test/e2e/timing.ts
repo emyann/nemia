@@ -58,7 +58,7 @@ const listed = (ns: readonly number[]): string => (ns.length < 2 ? String(ns[0])
 /**
  * Why `shards` are not the shards of one whole run, or null when they are: none at all, a shard that wrote its times twice, a shard
  * outside 1..of, shards that disagree about how many there are, and a shard that wrote nothing. Each of those would sum less than the
- * whole e2e and pass, which is the worst way for the bound to be wrong, so each is a sentence naming what to run or what to delete.
+ * whole e2e and pass, which is the worst way for the bound to be wrong, so each is a sentence naming what to read, run or delete.
  */
 export function shardsMissing(shards: readonly ShardPages[]): string | null {
   if (!shards.length)
@@ -89,10 +89,9 @@ export function shardsMissing(shards: readonly ShardPages[]): string | null {
   const absent = Array.from({ length: of }, (_, i) => i + 1).filter((i) => !here.has(i));
   if (absent.length)
     return (
-      `shard${absent.length > 1 ? 's' : ''} ${listed(absent)} of ${of} wrote no page times here, so the pages ` +
-      `${absent.length > 1 ? 'they' : 'it'} visited are in no sum and the e2e is held to less than the whole: run ` +
-      `${absent.map((i) => `\`npm run e2e -- --shard ${i} --of ${of}\``).join(' and ')} and put ` +
-      `${absent.map((i) => `pages-${i}-of-${of}.json`).join(' and ')} here`
+      `shard${absent.length > 1 ? 's' : ''} ${listed(absent)} of ${of} wrote no page times here, and a shard writes them only once its ` +
+      `pages have passed (run.ts), so ${absent.length > 1 ? 'each' : 'it'} failed or was cancelled: ${absent.length > 1 ? 'their' : 'its'} own result is the ` +
+      `e2e\u2019s verdict, so read ${absent.length > 1 ? 'their logs' : 'its log'} and answer it, and the pages ${absent.length > 1 ? 'they' : 'it'} visited are summed against the bound once ${absent.length > 1 ? 'they pass' : 'it passes'}`
     );
   return null;
 }

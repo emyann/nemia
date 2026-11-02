@@ -169,13 +169,12 @@ test('the shards together are held to the bound a whole run is, naming the slowe
   assert.equal(overBound(shardsOf(4, SEVEN)[0].pages, true), null, 'and one shard alone is far under it: a shard is never the whole');
 });
 
-test('REFUSED: a shard that did not write its page times, by name and by the command that writes it', () => {
-  const three = shardsOf(4, SEVEN).filter((shard) => shard.shard !== 3);
-  assert.equal(
-    shardsMissing(three),
-    'shard 3 of 4 wrote no page times here, so the pages it visited are in no sum and the e2e is held to less than the whole: ' +
-      'run `npm run e2e -- --shard 3 --of 4` and put pages-3-of-4.json here',
-  );
+test('REFUSED: a shard that did not write its page times, by name, as a shard that failed rather than one to run again', () => {
+  const three = String(shardsMissing(shardsOf(4, SEVEN).filter((shard) => shard.shard !== 3)));
+  assert.match(three, /^shard 3 of 4 wrote no page times here/);
+  // A shard writes its times only after its pages pass (run.ts), so a shard with none failed or was cancelled, and its own failure is
+  // the verdict: the refusal sends no one to run it again by hand.
+  assert.doesNotMatch(three, /npm run e2e/, three);
   assert.match(
     String(shardsMissing(shardsOf(4, SEVEN).filter((shard) => shard.shard > 2))),
     /^shards 1 and 2 of 4 wrote no page times here/,

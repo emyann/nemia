@@ -20,7 +20,7 @@ import { overBound, pagesLine, shardPages, shardsMissing, type ShardPages } from
 /** The shard file a shard run writes, by its name: `pages-<i>-of-<n>.json`. */
 const SHARD_FILE = /^pages-\d+-of-\d+\.json$/;
 
-/** Every shard file under `dirs`, each directory read one level deep, in the order their names sort. */
+/** Every shard file under `dirs`, each directory read through its whole tree (a download without `merge-multiple` nests a folder per artifact), in the order their names sort. */
 function shardsIn(dirs: readonly string[]): ShardPages[] {
   return dirs.flatMap((dir) =>
     fs

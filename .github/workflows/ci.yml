@@ -209,7 +209,7 @@ jobs:
           WF_ARTIFACTS: ${{ github.workspace }}/.e2e
       - name: Upload this shard's page times
         # On a pass alone: run.ts writes the file after the pages passed, so a failing shard has none to upload — and the bound job
-        # below then names that shard and the command to run again, rather than summing less than the whole silently. if-no-files-found:
+        # below then names that shard as failed or cancelled, rather than summing less than the whole silently. if-no-files-found:
         # error — a shard that passed and wrote no times is a broken runner, not a quiet success.
         if: success()
         uses: actions/upload-artifact@v7
@@ -239,8 +239,8 @@ jobs:
     needs: [e2e]
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    # Whatever the shards did: a shard that failed still uploaded its times, and this job names a shard that wrote none rather than
-    # summing less than the whole.
+    # Whatever the shards did: a shard that failed or was cancelled uploaded no times (the upload above is on a pass alone), so this job
+    # names each such shard as failed or cancelled, its own failure being the verdict, rather than summing less than the whole.
     if: always()
     steps:
       - uses: actions/checkout@v7

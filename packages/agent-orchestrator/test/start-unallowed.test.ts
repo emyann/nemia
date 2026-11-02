@@ -19,6 +19,7 @@ const stand = eachTest(testPlace);
 const ROOT = scratch('wf-unallowed-start-');
 process.env.WF_ROOT = ROOT;
 const { startRun } = await import('../src/start/start.verb.ts');
+const { StoreRoot } = await import('../src/config/root.store.ts');
 
 /** A holder of one workflow folder `name` and the agents beside it: the folder's path. */
 function folder(name: string, steps: Record<string, string>, agents: Record<string, string> = {}): string {
@@ -49,7 +50,9 @@ const runsWritten = (): string[] =>
 
 /** `startRun` of `workflowDir` in `repo`: the run's id, or the refusal it failed with, thrown. */
 function started(workflowDir: string, repo: string): string {
-  const exit = Effect.runSyncExit(startRun({ brief: 'add a flag', repo, workflowDir }).pipe(Effect.provide(stand().layer)));
+  const exit = Effect.runSyncExit(
+    startRun({ brief: 'add a flag', repo, workflowDir }).pipe(Effect.provide(stand().layer), Effect.provideService(StoreRoot, ROOT)),
+  );
   if (exit._tag === 'Success') return exit.value.id;
   throw Effect.runSync(Effect.flip(Effect.failCause(exit.cause)));
 }

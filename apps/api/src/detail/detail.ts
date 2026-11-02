@@ -586,7 +586,7 @@ const prunedOf = (run: Run): RunDetail['pruned'] =>
     : null;
 
 /** What `detail` reads of the app's services: the engine, the place, the store's root, and what it read before. */
-type Detailing = Pick<Served, 'e' | 'placeService' | 'home' | 'memo'>;
+type Detailing = Pick<Served, 'e' | 'placeService' | 'home' | 'memo' | 'inRequest'>;
 
 /**
  * A run in full, judged off the views of its tasks; or, when its unfrozen folder does not load or a task it reads does not
@@ -599,9 +599,9 @@ type Detailing = Pick<Served, 'e' | 'placeService' | 'home' | 'memo'>;
  * observation is made for each blocked session's last line (`lastLineOf`), which only a run's own detail reads. What its tries consumed and
  * cost, and its timeline, come off the same views and the feed's filing times (`filedTimes`), with no observation of their own; the
  * timeline's rounds are of the loops of the steps the run is judged by. Read through the app's engine and root, what it read before kept in
- * its `memo`.
+ * its `memo`; the kinds it is behind the files on (`driftNow`) through the doors, over the request's services (`inRequest`).
  */
-export async function detail(run: Run, { e, placeService, home, memo }: Detailing): Promise<RunDetail | { unjudged: string }> {
+export async function detail(run: Run, { e, placeService, home, memo, inRequest }: Detailing): Promise<RunDetail | { unjudged: string }> {
   const folder = workflowsOf(run, home);
   const workflows = folder.steps;
   const names = stepNames(run, workflows);
@@ -641,7 +641,7 @@ export async function detail(run: Run, { e, placeService, home, memo }: Detailin
     toDecide: judged.toDecide,
     gates: gatesOf(steps, run),
     warning: folder.steps ? driftOf(run, folder.steps) : folder.warning,
-    kinds: driftNow(run),
+    kinds: await inRequest(driftNow(run)),
     refresh: refreshLine(run.id),
     graph: runGraph(steps, names),
     steps: await Promise.all(

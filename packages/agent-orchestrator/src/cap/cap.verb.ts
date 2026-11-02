@@ -25,7 +25,7 @@ import {
   type Parents,
 } from '../views/views.verb.ts';
 import { standingReader, standingSnapshot, type PassStanding } from '../standing/standing.verb.ts';
-import { passRevisions, type PassRevisions } from '../revisions/pin.verb.ts';
+import type { PassRevisions } from '../revisions/pin.verb.ts';
 import { phaseOfView } from '../views/views-words.ts';
 
 /** A run a task of which does not read (`unreadableJournal`), as a pass counts it: in flight, and asking the cap for nothing more. */
@@ -156,9 +156,15 @@ export type PassRead = {
 
 /**
  * What one pass reads once (`PassRead`), over `e` and the pass's listing `runs`, the cap read from `env` as `runSlots` reads it, and the
- * runs others wait on read off `standing`.
+ * runs others wait on read off `standing`, and what resolving each run's kinds reads, which the caller made for the pass (`passRevisions`).
  */
-export const passRead = (e: Engine, runs: readonly Run[], env: NodeJS.ProcessEnv, standing: PassStanding): PassRead => {
+export const passRead = (
+  e: Engine,
+  runs: readonly Run[],
+  env: NodeJS.ProcessEnv,
+  standing: PassStanding,
+  revisions: PassRevisions,
+): PassRead => {
   const parents = passParents(standingReader(standing));
   type Held = Deferred.Deferred<Map<string, RunSlot>, Refusal>;
   let held: Held | undefined;
@@ -173,5 +179,5 @@ export const passRead = (e: Engine, runs: readonly Run[], env: NodeJS.ProcessEnv
       }),
     );
   });
-  return { runs, slots, parents, standing, revisions: passRevisions() };
+  return { runs, slots, parents, standing, revisions };
 };

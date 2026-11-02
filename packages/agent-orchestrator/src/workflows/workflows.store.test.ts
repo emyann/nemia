@@ -229,3 +229,19 @@ test('REFUSED: a converted file that calls a store again, and a count the baseli
   const [first] = Object.keys(WORKFLOW_DOOR_DEBT);
   assert.equal(debtBreaks(sources, { ...WORKFLOW_DOOR_DEBT, [first]: (WORKFLOW_DOOR_DEBT[first] ?? 0) + 1 }).length, 1);
 });
+
+test("the door's version moves with an agent the folder names, and a write answers the version of the folder as written", () => {
+  const { root, side } = store();
+  const dir = WorkflowDir.read(path.join(root, 'workflows', 'notes'));
+  const agents = path.join(root, 'workflows', 'agents');
+  fs.mkdirSync(agents, { recursive: true });
+  fs.writeFileSync(path.join(agents, 'scribe.md'), '---\ndescription: Writes notes.\n---\nWrite them.\n');
+  const saved = done(
+    side.door.workflows.write(dir, aWorkflow([{ name: 'build', after: [], place: 'git', agent: 'scribe', body: 'Build.' }])),
+  );
+  const there = done(side.door.workflows.there(dir));
+  assert.deepEqual(there, { kind: 'folder', version: saved.version }, 'the write answers what the door reads after it');
+  fs.writeFileSync(path.join(agents, 'scribe.md'), '---\ndescription: Writes notes.\n---\nOther words.\n');
+  const moved = done(side.door.workflows.there(dir));
+  assert.notDeepEqual(moved, there, 'an edit of the agent the folder names moves its version');
+});

@@ -16,8 +16,11 @@ import { budgetUsdFor } from '../status/status.ts';
 import { renderedFlags } from '../agents/agents.ts';
 import { ownOf } from '../tick/told.verb.ts';
 import { isFolderTeam, stepSetRefusal, unallowedRefusal } from '../workflow/index.ts';
-import { formerModesWritten, loadWorkflows } from '../folder/folder.store.ts';
-import { isBuiltinPlace, skillsFor, type Places } from '../skills/read.store.ts';
+import { formerModesWritten, workflowDirAt } from '../folder/folder.store.ts';
+import { isBuiltinPlace, type Places } from '../skills/read.store.ts';
+import { SkillDoor } from '../skills/skill-door.store.ts';
+import { WorkflowDoor } from '../workflows/workflows.store.ts';
+import type { SkillsFound } from '../agents/agents.ts';
 import { placesOf } from '../folder/lookup.store.ts';
 import { pinsOf } from '../revisions/pin.verb.ts';
 import { workRoot } from '../record/places.store.ts';
@@ -63,27 +66,31 @@ import { RunDoor } from '../runs/runs.store.ts';
  * steps. Refused (`Invalid`), naming the file, before a run is written: a rules file that cannot be told — a link, anything that is no
  * file, one that does not read, and a frontmatter block, since rules only add words.
  */
-function stepsIn(workflowDir: string, places: Places, factory: Factory | undefined): Workflow[] {
-  if (!factory) return loadWorkflows(workflowDir, places);
+const stepsIn = Effect.fnUntraced(function* (workflowDir: string, places: Places, factory: Factory | undefined) {
+  const workflows = (yield* WorkflowDoor).workflows;
+  const dir = yield* tried(() => workflowDirAt(workflowDir));
+  if (!factory) return yield* workflows.read(dir, places);
   const workflow = path.basename(path.resolve(workflowDir));
   const unattached = unattachedRefusal(factory, workflow);
-  if (unattached) throw new Invalid({ message: unattached });
+  if (unattached) return yield* Effect.fail(new Invalid({ message: unattached }));
   const { fills, error } = factoryFills(factory, workflow);
   if (error !== null)
-    throw new Invalid({
-      message: `${error} Or remove the rules: nemia factory rules ${factory.name} --clear. Nothing was started.`,
-    });
-  const steps = loadWorkflows(workflowDir, places, fills);
+    return yield* Effect.fail(
+      new Invalid({
+        message: `${error} Or remove the rules: nemia factory rules ${factory.name} --clear. Nothing was started.`,
+      }),
+    );
+  const steps = yield* workflows.read(dir, places, fills);
   const unfilled = unfilledRefusal(steps, factory.name, workflow);
-  if (unfilled) throw new Invalid({ message: unfilled });
+  if (unfilled) return yield* Effect.fail(new Invalid({ message: unfilled }));
   return steps;
-}
+});
 
 /**
  * A workflow folder's steps, refused as `start` refuses them before a run is written, with the fix. What `startPlan` asks of every card
  * before the first run is started. Refused:
- * - a folder that is not a workflow (`loadWorkflows`), and, in a factory, a workflow it has not attached, or a step its hires leave
- *   unfilled or fill twice (`stepsIn`);
+ * - a folder that is not a workflow (the Workflow door's `read`), and, in a factory, a workflow it has not attached, or a step its hires
+ *   leave unfilled or fill twice (`stepsIn`);
  * - a step set no run may take (`stepSetRefusal`, pure, asked of a folder a waiting run takes again too): a step named for another step's
  *   check or try, and, with `isolate: false` (`--no-worktree`), a `place: folder` team, one that fans out, and an ending;
  * - a team that says `place: folder` whose agent is given the package's place skill (`placeSkillRefusal`);
@@ -96,7 +103,7 @@ function stepsIn(workflowDir: string, places: Places, factory: Factory | undefin
  * - a step whose `tools:` names a tool nothing its session would be allowed (`unallowedRefusal`, pure, asked of a folder a waiting run
  *   takes again too), judged against `allows`, the allow rules the run's own repository grants a session started in it (`repoAllows`).
  */
-export function stepsToStart(
+export const stepsToStart = Effect.fn('stepsToStart')(function* (
   workflowDir: string,
   isolate: boolean,
   places: Places,
@@ -106,13 +113,30 @@ export function stepsToStart(
   refused: ConfigRefused = configRefused,
   given = false,
   allows: Allows = NO_ALLOWS,
+) {
+  const steps = yield* stepsIn(workflowDir, places, factory);
+  const found = isFolderTeam(steps) ? yield* (yield* SkillDoor).skills.found({ dir: workflowDir, places }) : undefined;
+  return yield* tried(() => startable(steps, workflowDir, isolate, places, denied, found, gates, refused, given, allows));
+});
+
+/** `stepsToStart`'s judgement of the steps read, past the folder's load: each refusal it names thrown as `Invalid`. */
+function startable(
+  steps: Workflow[],
+  workflowDir: string,
+  isolate: boolean,
+  places: Places,
+  denied: readonly string[],
+  found: SkillsFound | undefined,
+  gates: readonly string[],
+  refused: ConfigRefused,
+  given: boolean,
+  allows: Allows,
 ): Workflow[] {
-  const steps = stepsIn(workflowDir, places, factory);
   const set = stepSetRefusal(steps, isolate);
   if (set) throw new Invalid({ message: set });
   const unallowed = unallowedRefusal(steps, allows.rules, allows.untrusted);
   if (unallowed) throw new Invalid({ message: unallowed });
-  const placeSkill = placeSkillRefusal(steps, workflowDir, places);
+  const placeSkill = placeSkillRefusal(steps, found);
   if (placeSkill) throw new Invalid({ message: placeSkill });
   const undeclared = undeclaredRefusal(steps);
   if (undeclared) throw new Invalid({ message: undeclared });
@@ -129,14 +153,14 @@ export function stepsToStart(
 
 /**
  * Why a team that says `place: folder` cannot start: a step whose session is given a skill its places resolve to a builtin place skill
- * (`isBuiltinPlace`), which acts on a repository a folder run does not have; undefined for a repository team, or where none is.
+ * (`isBuiltinPlace`), which acts on a repository a folder run does not have; undefined for a repository team, or where none is. The skills
+ * are those the Skill door `found` in the folder's places, read only for a folder team.
  */
-function placeSkillRefusal(steps: readonly Workflow[], workflowDir: string, places: Places): string | undefined {
-  if (!isFolderTeam(steps)) return undefined;
-  const found = skillsFor(workflowDir, places).at;
+function placeSkillRefusal(steps: readonly Workflow[], found: SkillsFound | undefined): string | undefined {
+  if (!isFolderTeam(steps) || found === undefined) return undefined;
   for (const step of steps) {
     const skill = step.agent?.skills?.find((name) => {
-      const at = found.get(name);
+      const at = found.at.get(name);
       return typeof at === 'string' && isBuiltinPlace(at);
     });
     if (skill)
@@ -436,12 +460,12 @@ function copyInputs(run: Run, inputs: readonly InputFile[]): void {
 }
 
 /**
- * Renders the steps' agents into the run's `agents/` (`writeAgentFiles`), with the skills the folder's places hold (`skillsFor`); throws
- * with exit 1 when they cannot be, the run's directory removed.
+ * Renders the steps' agents into the run's `agents/` (`writeAgentFiles`), with the skills the Skill door `found` in the folder's places;
+ * throws with exit 1 when they cannot be, the run's directory removed.
  */
-function renderAgents(run: Run, steps: readonly Workflow[], workflowDir: string, places: Places): void {
+function renderAgents(run: Run, steps: readonly Workflow[], found: SkillsFound): void {
   try {
-    writeAgentFiles(run, steps, skillsFor(workflowDir, places));
+    writeAgentFiles(run, steps, found);
   } catch (err) {
     runStore.runs.forget(run.id);
     throw Object.assign(
@@ -523,19 +547,18 @@ export const startRun = Effect.fn('start')(function* (opts: StartOptions) {
   const refused = yield* StartRefusal;
   const { declared } = yield* PlaceService;
   const denied = declared.denyWhileLanding;
-  const steps = yield* tried(() =>
-    stepsToStart(
-      opts.workflowDir,
-      isolate,
-      places,
-      denied,
-      factory,
-      opts.gates,
-      refused,
-      Boolean(opts.inputs?.length),
-      repoAllows(opts.repo, opts.factory),
-    ),
+  const steps = yield* stepsToStart(
+    opts.workflowDir,
+    isolate,
+    places,
+    denied,
+    factory,
+    opts.gates,
+    refused,
+    Boolean(opts.inputs?.length),
+    yield* tried(() => repoAllows(opts.repo, opts.factory)),
   );
+  const found = yield* (yield* SkillDoor).skills.found({ dir: opts.workflowDir, places });
   const folder = isFolderTeam(steps);
   if (folder && opts.repoNamed) return yield* Effect.fail(new Invalid({ message: repoNamedRefusal(opts.repo) }));
   const outside = factory && !folder ? outsideRefusal(factory, opts.repo) : undefined;
@@ -556,11 +579,9 @@ export const startRun = Effect.fn('start')(function* (opts: StartOptions) {
   const stepRecords = Object.fromEntries(steps.map((s) => [s.name, { taskId: null }]));
   const run = yield* folder ? folderRun(id, told, stepRecords) : repositoryRun(id, told, stepRecords, opts.repo, isolate);
   yield* tried(() => copyInputs(run, inputs));
-  yield* tried(() => renderAgents(run, steps, opts.workflowDir, places));
-  yield* tried(() => {
-    const pinned = pinsOf(run, steps, run.createdAt);
-    if (pinned.length) run.pinned = pinned;
-  });
+  yield* tried(() => renderAgents(run, steps, found));
+  const pinned = yield* pinsOf(run, steps, run.createdAt);
+  if (pinned.length) run.pinned = pinned;
   yield* (yield* RunDoor).runs.create(run);
   return run;
 });

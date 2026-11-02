@@ -5,11 +5,16 @@
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
+import { Effect } from 'effect';
 import { frontmatterKey } from '../former/former.ts';
 import { AGENTS_FOLDER } from '../step/step.ts';
+import { AgentName, SkillName } from '../agents/agents.model.ts';
+import { brokenBy } from '../door/door.store.ts';
+import { AgentDoor, type AgentDoorShape } from '../agents/agent-door.store.ts';
+import { SkillDoor, type SkillDoorShape } from '../skills/skill-door.store.ts';
+import { lookupRoots, type Places } from '../skills/read.store.ts';
+import type { Refusal } from '../refusal/refusal.ts';
 import type { SkillsFound } from '../agents/agents.ts';
-import { agentVersion } from '../agents/read.store.ts';
-import { lookupRoots, skillsFor, skillVersion, type Places } from '../skills/read.store.ts';
 
 /**
  * The value a file's frontmatter gives `key`, as the parser reads it (`frontmatterKey`), so `  agent: coder` and `agent : coder` name the
@@ -29,12 +34,6 @@ const addedSkillsIn = (text: string): string[] =>
       .map((skill) => skill.trim())
       .filter(Boolean),
   );
-
-/** A skill a step adds, as a folder's version counts it: its folder's version where `found` has it (`skillVersion`), else missing. */
-function addedSkillVersion(skill: string, found: SkillsFound): [string, string | null | { missing: string }] {
-  const at = found.at.get(skill);
-  return [`skills/${skill}`, typeof at === 'string' ? skillVersion(at) : { missing: skill }];
-}
 
 /** Each `.md` and `.json` directly in `dir`, sorted by name, with what it holds or why it does not read. None for a folder not there. */
 function filesOf(dir: string): Array<readonly [string, string | { unreadable: string }]> {
@@ -58,32 +57,110 @@ function filesOf(dir: string): Array<readonly [string, string | { unreadable: st
   return names.map((name) => [name, read(path.join(dir, name))] as const);
 }
 
+/** A file of a folder as its version counts it: its name, and what it holds or why it does not read. */
+export type VersionFile = readonly [string, string | { unreadable: string }];
+
+/** What a folder's own files are and name, read with no door: the files, the agents its steps name and the skills they add, sorted. */
+export type VersionNamed = {
+  readonly files: readonly VersionFile[];
+  readonly agents: readonly string[];
+  readonly added: readonly string[];
+};
+
+/** An agent a folder names, as its version counts it: where the load finds it and its version there, or missing. */
+export type VersionAgent = readonly [string, { at: string; version: string } | { missing: string }];
+
+/** A skill a step adds, as its version counts it: its folder's version where found (null where no skill is there), or missing. */
+export type VersionSkill = readonly [string, string | null | { missing: string }];
+
+/** What the doors answer of the agents and skills a folder names: each agent and each added skill, as the version counts them. */
+export type VersionGathered = { readonly agents: readonly VersionAgent[]; readonly added: readonly VersionSkill[] };
+
+/** The Agent and Skill doors a version reads through, where given; else those the program is given. */
+export type VersionDefs = { readonly agents: AgentDoorShape; readonly skills: SkillDoorShape };
+
+/** The folder's own files and what they name (`VersionNamed`): no agent or skill is read here. */
+export function versionNamed(dir: string): VersionNamed {
+  const files = filesOf(dir);
+  const texts = files.flatMap(([, text]) => (typeof text === 'string' ? [text] : []));
+  return {
+    files,
+    agents: [...new Set(texts.flatMap((text) => frontmatterNamed(text, 'agent')))].sort(),
+    added: [...new Set(texts.flatMap(addedSkillsIn))].sort(),
+  };
+}
+
+/** The version of a folder's files and what the doors gathered of what they name, as one word, as the reader before the doors gave it. */
+export const versionDigest = (files: readonly VersionFile[], gathered: VersionGathered): string =>
+  createHash('sha256')
+    .update(JSON.stringify([...files, ...gathered.agents, ...gathered.added]))
+    .digest('hex')
+    .slice(0, 16);
+
+/**
+ * Where an agent a folder names is, as the version counts it: the first of `roots` whose Agent door holds it, with its version counting the
+ * skills `found` beside the workflow; missing where none does, or where the Agent door refuses its name.
+ */
+const agentAt = (
+  door: AgentDoorShape,
+  agent: string,
+  roots: readonly string[],
+  found: SkillsFound,
+): Effect.Effect<VersionAgent[1], Refusal> =>
+  Effect.gen(function* () {
+    if (brokenBy(AgentName.OnCreate, agent) !== null) return { missing: agent };
+    for (const root of roots) {
+      const there = yield* door.agents.there(AgentName.read(agent), { dir: path.join(root, AGENTS_FOLDER), skills: found });
+      if (there.kind === 'held') return { at: root, version: there.version };
+    }
+    return { missing: agent };
+  });
+
+/**
+ * The agents and skills a folder names, read through the Agent and Skill doors (`defs`, else the program's): the skills found where a
+ * run of it looks, only when something is named; each agent at the first root of `lookupRoots` whose door holds it, its version counting
+ * the skills found beside the workflow (`AgentAt.skills`), else missing, as is a name the Agent door refuses; and each added skill's
+ * folder, its version where a skill is held there, else null, or missing where none is found.
+ */
+export const versionGathered = (
+  dir: string,
+  places: Places,
+  named: Pick<VersionNamed, 'agents' | 'added'>,
+  defs?: VersionDefs,
+): Effect.Effect<VersionGathered, Refusal> =>
+  Effect.gen(function* () {
+    if (!named.agents.length && !named.added.length) return { agents: [], added: [] };
+    const agentDoor = defs?.agents ?? (yield* AgentDoor);
+    const skillDoor = defs?.skills ?? (yield* SkillDoor);
+    const found = yield* skillDoor.skills.found({ dir, places });
+    const agents: VersionAgent[] = [];
+    for (const agent of named.agents) agents.push([agent, yield* agentAt(agentDoor, agent, lookupRoots(dir, places), found)]);
+    const added: VersionSkill[] = [];
+    for (const skill of named.added) {
+      const at = found.at.get(skill);
+      if (typeof at !== 'string') {
+        added.push([`skills/${skill}`, { missing: skill }]);
+        continue;
+      }
+      const there = yield* skillDoor.skills.there(SkillName.read(path.basename(at)), path.dirname(at));
+      added.push([`skills/${skill}`, there.kind === 'held' ? there.version : null]);
+    }
+    return { agents, added };
+  });
+
 /**
  * What a folder's files hold, as one word: a digest of each `.md` and `.json` directly in it — its steps, its README and its schemas, what
  * a save writes, removes or reads — by name, with what it holds. Hidden ones too: the package reads a `.draft.md` as a step and
  * `writeWorkflow` removes it when the steps saved do not have it, and an `output:` may name a hidden schema. Any of them edited, added or
  * removed changes it, and nothing else does: a note beside the steps, or a folder inside, is no step. A file that cannot be read counts as
- * what it says, so it changes the word too. So does each agent a step names (`agent:`), as the package versions it (`agentVersion`): its
- * file, where the load finds it (`lookupRoots`), each file it names beside it and each skill folder its `skills:` gives. So does each skill
- * a step's own `skills:` adds to its agent's, its folder where the load finds it (`skillVersion`).
+ * what it says, so it changes the word too. So does each agent a step names (`agent:`), as the Agent door versions it (`there`): its
+ * file, where the load finds it (`lookupRoots`), each file it names beside it and each skill folder its `skills:` gives, found beside the
+ * workflow. So does each skill a step's own `skills:` adds to its agent's, its folder where the load finds it, as the Skill door versions
+ * it. Both are read through the doors (`versionGathered`): `defs` where given, else the program's, so a program given `agentDoorMemory()`
+ * counts the memory's agents. Two cases digest otherwise than the reader before the doors did: an agent's name the Agent door refuses
+ * (`AgentName`), read as missing, and an added skill whose `SKILL.md` is no regular file, read as null.
  */
-export function workflowVersion(dir: string, places: Places): string {
-  const files = filesOf(dir);
-  const texts = files.flatMap(([, text]) => (typeof text === 'string' ? [text] : []));
-  const named = [...new Set(texts.flatMap((text) => frontmatterNamed(text, 'agent')))].sort();
-  const added = [...new Set(texts.flatMap(addedSkillsIn))].sort();
-  const skills = named.length || added.length ? skillsFor(dir, places) : undefined;
-  const agents = named.map((agent) => {
-    const root = lookupRoots(dir, places).find((at) =>
-      fs.lstatSync(path.join(at, AGENTS_FOLDER, `${agent}.md`), { throwIfNoEntry: false }),
-    );
-    return [
-      agent,
-      root === undefined ? { missing: agent } : { at: root, version: agentVersion(path.join(root, AGENTS_FOLDER), agent, skills) },
-    ];
-  });
-  return createHash('sha256')
-    .update(JSON.stringify([...files, ...agents, ...(skills === undefined ? [] : added.map((skill) => addedSkillVersion(skill, skills)))]))
-    .digest('hex')
-    .slice(0, 16);
-}
+export const workflowVersion = Effect.fn('workflowVersion')(function* (dir: string, places: Places, defs?: VersionDefs) {
+  const named = versionNamed(dir);
+  return versionDigest(named.files, yield* versionGathered(dir, places, named, defs));
+});

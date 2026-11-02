@@ -16,7 +16,12 @@ import { eachTest, runGiven } from './placed.ts';
 
 const ROOT = scratch('wf-start-config-');
 process.env.WF_ROOT = ROOT;
-const { configRefused, startRun, StartRefusal, stepsToStart } = await import('../src/start/start.verb.ts');
+const { configRefused, startRun, StartRefusal, stepsToStart: stepsProgram } = await import('../src/start/start.verb.ts');
+const { StoreRoot } = await import('../src/config/root.store.ts');
+
+/** `stepsToStart` run to its end at this file's store, whose doors read the files; it throws the refusal itself. */
+const stepsToStart = (...args: Parameters<typeof stepsProgram>) =>
+  Effect.runSync(Effect.provideService(stepsProgram(...args), StoreRoot, ROOT));
 const stand = eachTest(testPlace);
 const runPlaced = runGiven(() => stand().layer);
 const { startPlan } = await import('../src/plan/plan.verb.ts');
@@ -56,7 +61,7 @@ const runsWritten = (): string[] =>
 /** `startRun` of `workflowDir` in a repository of its own, run to its end: the run's id, or the refusal it failed with. */
 function started(workflowDir: string, opts: { gates?: string[]; refused?: ConfigRefused } = {}): string {
   const program = startRun({ brief: 'add a flag', repo: aRepo(), workflowDir, gates: opts.gates });
-  const placed = program.pipe(Effect.provide(stand().layer));
+  const placed = program.pipe(Effect.provide(stand().layer), Effect.provideService(StoreRoot, ROOT));
   const exit = Effect.runSyncExit(opts.refused ? placed.pipe(Effect.provideService(StartRefusal, opts.refused)) : placed);
   if (exit._tag === 'Success') return exit.value.id;
   throw Effect.runSync(Effect.flip(Effect.failCause(exit.cause)));

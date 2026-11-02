@@ -195,3 +195,20 @@ test("REFUSED: a file of the api's src that calls an agent store is one break", 
   const method = { ...sources, 'src/agents/skills.ts': `${sources['src/agents/skills.ts']}\nconst z = door.loadAgents('a');\n` };
   assert.deepEqual(debtBreaks(method, {}, SPREAD_TOO), [], 'a method of the same name is no call of the store');
 });
+
+test("an agent's version counts the skills its reader found (`AgentAt.skills`), else those beside its own folder", async () => {
+  const { agentVersion } = await import('./read.store.ts');
+  const { skillsFor } = await import('../skills/read.store.ts');
+  const { side } = store();
+  const at = yoursAt(side);
+  fs.mkdirSync(at.dir, { recursive: true });
+  fs.writeFileSync(path.join(at.dir, 'scribe.md'), '---\ndescription: Writes notes.\nskills: tidy-notes\n---\nWrite them.\n');
+  const elsewhere = scratch('wf-agent-skills-');
+  fs.mkdirSync(path.join(elsewhere, 'skills', 'tidy-notes'), { recursive: true });
+  fs.writeFileSync(path.join(elsewhere, 'skills', 'tidy-notes', 'SKILL.md'), '---\ndescription: Tidy the notes.\n---\nTidy.\n');
+  const found = skillsFor(path.join(elsewhere, '_'));
+  const own = done(side.door.agents.there(scribe, at));
+  const counted = done(side.door.agents.there(scribe, { ...at, skills: found }));
+  assert.deepEqual(counted, { kind: 'held', version: agentVersion(at.dir, 'scribe', found) }, 'the version the reader would digest');
+  assert.notDeepEqual(counted, own, 'and not the one its own folder gives, which holds no tidy-notes');
+});

@@ -574,7 +574,7 @@ async function write(
       draft: JSON.stringify(steps),
       repo,
       ...(readme !== undefined && { readme }),
-      ...(changes && { version: workflowVersion(dir, places) }),
+      ...(changes && { version: await inRequest(workflowVersion(dir, places)) }),
     };
     result = (await runPlaced(placeService, e, WRITE.handler(args, undefined, home))) as WorkflowWritten;
   } catch (err) {
@@ -584,7 +584,13 @@ async function write(
   }
   const kept = writing.filter((s) => !schemasWritten.includes(s.file)).map((s) => s.file);
   return {
-    workflow: listed(name, 'yours', dir, places, loadedAt(await loadedOf(e, placeService, [dir], repo, home), dir)),
+    workflow: listed(
+      name,
+      'yours',
+      dir,
+      loadedAt(await loadedOf(e, placeService, [dir], repo, home), dir),
+      await inRequest(workflowVersion(dir, places)),
+    ),
     written: [...result.written, ...schemasWritten].sort(),
     kept: [...result.kept, ...kept].sort(),
     removed: result.removed,
@@ -658,7 +664,7 @@ export const builder = new Hono<ApiEnv>()
         const make = folder.status === 404 ? ` To make a new one, POST /api/workflows/yours with its name and a first step.` : '';
         return c.json({ error: `${folder.error}${make}` }, folder.status);
       }
-      const now = workflowVersion(folder.dir, placesOf(repo, home));
+      const now = await inRequest(workflowVersion(folder.dir, placesOf(repo, home)));
       if (now !== body.version) return c.json({ error: workflowStale.write(folder.dir, body.version, now), steps: [] }, 409);
       const saved = await write(
         { e, placeService, name, dir: folder.dir, repo, home, changes: true, inRequest },

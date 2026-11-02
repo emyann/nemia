@@ -248,10 +248,10 @@ test('every key a step has is read — none is accepted and then dropped', () =>
   assert.equal(
     attached.agent?.name,
     'implementer',
-    'agent: names an agent the step is resolved with, and test/agents.test.ts reads it too',
+    'agent: names an agent the step is resolved with, and src/agents/agents.test.ts reads it too',
   );
   assert.deepEqual(attached.skills, ['look'], 'skills: is read on a step with an agent, and test/step-skills.test.ts reads it too');
-  assert.deepEqual(attached.mcp, ['docs'], 'mcp: is read on a step with an agent, and test/agent-mcp.test.ts reads it too');
+  assert.deepEqual(attached.mcp, ['docs'], 'mcp: is read on a step with an agent, and src/agents/agents.test.ts reads it too');
   const fenced = fm('review', 'harness: codex\nsandbox: read-only');
   assert.equal(fenced.sandbox, 'read-only', "sandbox: is read on a step of its own: it is Codex's, and the step above runs on Claude Code");
   const all = {

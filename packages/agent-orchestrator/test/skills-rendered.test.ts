@@ -1,6 +1,7 @@
 /**
- * A step's skills as a session is given them: rendered into the step's plugin by `nemia start`, a preloaded one told whole in the prompt,
- * and every skill told whole in the brief when the rendered folder is gone. Held over the tests' team (`team.ts`).
+ * Every SKILL.md there is, read as a session's harness reads it, and the board's skill as build's implement step is given it. How a
+ * step's skills are rendered by `nemia start` — named, a preloaded one told whole, every one told whole in the brief when the rendered
+ * folder is gone — is the story of `step-skills.test.ts`.
  *
  * A SKILL.md whose frontmatter is not YAML is dropped by Claude Code with nothing said — the session is simply not given it — so every
  * SKILL.md there is, the team's, whatever is shipped, Nemia's and the repository's own, is parsed here as YAML, as a card entry reads it.
@@ -14,14 +15,13 @@ import { skillEntryOf, splitFrontmatter } from '../src/workflow.ts';
 import { loadWorkflows } from '../src/folder/folder.store.ts';
 import { skillsFor } from '../src/skills/read.store.ts';
 import { appliesOf, renderSkill, skillDraftOf, withPreload } from '../src/skills/skills.ts';
-import { briefBody, pluginOf, unrendered } from '../src/agents/agents.ts';
+import { pluginOf } from '../src/agents/agents.ts';
 import { scratch } from './scratch.ts';
-import { placesOf, SHIPPED_HOLDERS, TEAM, TEAM_DEV } from './team.ts';
-import { headedLayers } from '../src/workflow/index.ts';
+import { placesOf, SHIPPED_HOLDERS, TEAM } from './team.ts';
 
 const ROOT = scratch('wf-skills-rendered-');
 process.env.WF_ROOT = ROOT;
-const { agentFilesDir, skillsAgain, writeAgentFiles } = await import('../src/agents/agents.store.ts');
+const { agentFilesDir, writeAgentFiles } = await import('../src/agents/agents.store.ts');
 
 const REPO = path.join(import.meta.dirname, '..', '..', '..');
 /** Nemia's own skills, her plugin's. */
@@ -33,8 +33,6 @@ const SKILL_FOLDERS = [
   NEMIA_SKILLS,
   path.join(REPO, '.claude', 'skills'),
 ];
-/** The team's skill told whole, after the agent's instructions (`preload: true`): the shipper's merge. */
-const PRELOADED = ['trial-merge-a-branch'];
 
 /** A SKILL.md's frontmatter as YAML reads it, or a throw saying why it does not read: what a skill that Claude Code would drop fails on. */
 function frontmatterOf(file: string, text: string): Record<string, unknown> {
@@ -92,71 +90,6 @@ test('every SKILL.md there is, written again from its draft or its preload switc
     const { preload: __, ...before } = frontmatterOf(file, text);
     assert.deepEqual(switched, before, `${file}: its preload switched`);
   }
-});
-
-test("an agent renders as `nemia start` renders it: skills to load named in its prompt, a preloaded one appended whole, each in the step's plugin", () => {
-  const skillText = (place: string, skill: string) => {
-    const file = path.join(place, 'skills', skill, 'SKILL.md');
-    return splitFrontmatter(file, fs.readFileSync(file, 'utf8')).body;
-  };
-  const folder = 'dev';
-  const dir = TEAM_DEV;
-  for (const [i, name] of ['implement', 'review', 'ship'].entries()) {
-    const steps = loadWorkflows(dir);
-    const step = steps.find((s) => s.name === name)!;
-    const run = { id: `r-${i}` };
-    writeAgentFiles(run, [step], skillsFor(dir));
-    const at = agentFilesDir(run, name);
-    const prompt = fs.readFileSync(path.join(at, 'prompt.md'), 'utf8');
-    const agent = step.agent!;
-    const plugin = pluginOf(agent.name);
-    assert.ok(
-      prompt.startsWith(headedLayers([['instructions', agent.instructions!]])),
-      `${folder}/${name}: the agent's instructions first, under the heading of their layer`,
-    );
-    const loaded = agent.skills!.filter((s) => !PRELOADED.includes(s));
-    if (loaded.length)
-      assert.ok(
-        prompt.includes(
-          `Your skills, each loaded with the Skill tool by its name when you need it: ${loaded.map((s) => `\`${plugin}:${s}\``).join(', ')}.`,
-        ),
-        `${folder}/${name}\n\n${prompt}`,
-      );
-    for (const skill of agent.skills!) {
-      assert.equal(
-        fs.readFileSync(path.join(at, plugin, 'skills', skill, 'SKILL.md'), 'utf8'),
-        fs.readFileSync(path.join(TEAM, 'skills', skill, 'SKILL.md'), 'utf8'),
-        `${folder}/${name}: ${skill} in the plugin`,
-      );
-      const whole = `## Skill \`${plugin}:${skill}\`\n\n${skillText(TEAM, skill)}`;
-      assert.equal(
-        prompt.includes(whole),
-        PRELOADED.includes(skill),
-        `${folder}/${name}: ${skill} ${PRELOADED.includes(skill) ? 'is' : 'is not'} told whole\n\n${prompt}`,
-      );
-    }
-  }
-});
-
-test("a step whose rendered folder is gone is told every skill whole in its brief — the shipper's merge without committing included", () => {
-  const dir = TEAM_DEV;
-  for (const step of loadWorkflows(dir).filter((s) => s.agent?.skills?.length)) {
-    const brief = briefBody(unrendered(step, skillsAgain(step, skillsFor(dir))));
-    assert.ok(
-      brief.startsWith(headedLayers([['instructions', step.agent!.instructions!]])),
-      `${step.name}: the instructions first, under the heading of their layer`,
-    );
-    for (const skill of step.agent!.skills!) {
-      const file = path.join(TEAM, 'skills', skill, 'SKILL.md');
-      assert.ok(
-        brief.includes(`## Skill \`${skill}\`\n\n${splitFrontmatter(file, fs.readFileSync(file, 'utf8')).body}`),
-        `${step.name}: ${skill} told whole\n\n${brief}`,
-      );
-    }
-  }
-  const ship = loadWorkflows(dir).find((s) => s.name === 'ship')!;
-  assert.match(briefBody(unrendered(ship, skillsAgain(ship, skillsFor(dir)))), /--no-commit/);
-  assert.doesNotMatch(briefBody(unrendered(ship)), /--no-commit/, 'the fallback before: the promise of skills, and none of them');
 });
 
 /** The order to load shadcn's skill, as a SKILL.md gives it, across line breaks. */

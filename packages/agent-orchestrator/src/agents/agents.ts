@@ -493,7 +493,7 @@ export function agentDraftOf(name: string, text: string, read?: (file: string) =
  * The protocol marks `supported_interfaces` REQUIRED: it is the list of URLs and bindings a client would call the agent at. Nothing here
  * serves this agent over A2A, so there is no URL to give, and this leaves the field out rather than give an address that does not answer. A
  * document missing a REQUIRED field is not a valid `AgentCard`, so everything that prints this says so in the same breath (`nemia agents
- * card` on stderr, the api's `servedOverA2A: false`), and `test/agent-card.test.ts` pins the omission, which only
+ * card` on stderr, the api's `servedOverA2A: false`), and `src/agents/agents.test.ts` pins the omission, which only
  * code that serves a card over A2A may lift.
  *
  * `provider`, `documentationUrl`, `iconUrl`, `securitySchemes`, `security` and `signatures` are left out for the same reason — nothing here

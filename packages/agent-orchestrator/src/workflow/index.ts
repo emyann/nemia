@@ -15,6 +15,7 @@ export {
   ownDenies,
   sandboxed,
   toolOf,
+  writesOutsideByRule,
   type Overridable,
 } from './fence.ts';
 export { headedLayers, LAYER_HEADINGS } from './layers.ts';

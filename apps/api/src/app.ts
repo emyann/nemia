@@ -1,3 +1,4 @@
+import fs from 'node:fs/promises';
 import { Layer, ManagedRuntime, Metric } from 'effect';
 import { type ErrorHandler, Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
@@ -25,7 +26,7 @@ import { ApiConfig, type ApiEnv, type ApiRuntime, ReadMemo, served, type Service
 import { machines } from './machines/machines.ts';
 import { nemia, nemiaChat } from './nemia/index.ts';
 import { runs } from './runs/runs.ts';
-import { openapi } from './openapi/index.ts';
+import { openapi, REFERENCE_BUNDLE, referenceOf } from './openapi/index.ts';
 import { saidRequest } from './request/request.ts';
 import { stats } from './stats/stats.ts';
 import { step } from './step/step.ts';
@@ -90,6 +91,10 @@ export const liveOf = (env: NodeJS.ProcessEnv = process.env): Layer.Layer<Servic
     gitPlaceLayer,
     telemetryLayer(env),
   );
+
+let bundle: Promise<string> | undefined;
+/** The OpenAPI page's viewer script, read from the installed package once and kept: a reread would serve the same file. */
+const viewerScript = () => (bundle ??= fs.readFile(REFERENCE_BUNDLE, 'utf8'));
 
 /**
  * An api over `layer`, and the runtime its handlers run on (`ManagedRuntime`), built from the layer once, the first time a request or
@@ -208,6 +213,7 @@ export function appOf(layer: Layer.Layer<Services>): { app: Hono<ApiEnv>; runtim
     .route('/', inbox)
     .route('/', runs)
     .route('/', openapi)
+    .route('/', referenceOf(viewerScript))
     .route('/', stats)
     .get('/api/ceilings', (c) =>
       served(c, async ({ e, placeService, env, home }) => c.json(await ceilingsOf(e, { placeService, home }, env))),

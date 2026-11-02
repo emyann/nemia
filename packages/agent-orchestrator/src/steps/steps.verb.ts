@@ -91,7 +91,8 @@ export const stepsAmong = (runs: readonly Run[]): Effect.Effect<ReadonlyMap<stri
  * A run another waits on, as its record (`RunDoor`) and `git` say it without the engine: the record, when the store has one, and the
  * result branches it names that git no longer has and cannot find on the base by their recorded tips (`BranchReader.landed`). What
  * `nemia start --after` refuses an edge by (`afterRefusal`), and where `parentOf` starts. A record whose steps cannot be read — no
- * frozen workflow, and its folder gone — names no result branch; one whose branches were not read names none gone. Fails with a refusal `git` threw.
+ * frozen workflow, and its folder gone — names no result branch; one whose branches were not read names none gone. Fails with a
+ * refusal `git` threw.
  */
 export const parentRecord = (id: string, git: BranchReader): Effect.Effect<Pick<ParentRun, 'record' | 'gone'>, Refusal> =>
   Effect.gen(function* () {

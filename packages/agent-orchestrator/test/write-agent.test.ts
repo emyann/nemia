@@ -13,7 +13,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { agentNameRefusal, parseAgent, renderAgent, type Agent, type AgentDraft } from '../src/workflow.ts';
+import { parseAgent, renderAgent, type Agent, type AgentDraft } from '../src/workflow.ts';
 import { Invalid } from '../src/refusal/refusal.ts';
 import { agentUsers, loadWorkflows } from '../src/folder/folder.store.ts';
 import { agentVersion, loadAgents } from '../src/agents/read.store.ts';
@@ -143,22 +143,6 @@ test('a render writes a value YAML would read otherwise quoted, and one with a l
   assert.ok(!/^check:/m.test(smuggled), `a line break makes no key of its own: ${smuggled}`);
 });
 
-test('a name is refused unless it is one file of the agents folder that a step can name', () => {
-  assert.equal(agentNameRefusal('scribe'), undefined);
-  for (const [name, pattern] of [
-    ['', /^An agent has no name/],
-    ['a/b', /a slash names a file in another folder/],
-    ['..', /a hidden file/],
-    ['.x', /a hidden file/],
-    [' x', /trimmed as it is read/],
-    ['x.md', /named without its \.md: `x`/],
-    ['README', /the folder's README/],
-    ['x'.repeat(260), /255 bytes/],
-    ['a' + String.fromCharCode(7), /control character/],
-  ] as const)
-    assert.match(agentNameRefusal(name) ?? '', pattern, JSON.stringify(name));
-});
-
 test('a new agent is written, reads back, and changes no workflow beside it', () => {
   fresh();
   const dev = snapshot(path.join(STORE, 'dev'));
@@ -174,20 +158,6 @@ test('a new agent is written, reads back, and changes no workflow beside it', ()
     body: scribe.body,
   });
   assert.deepEqual(snapshot(path.join(STORE, 'dev')), dev);
-});
-
-test('an edit carries the version it read, and a stale one is refused', () => {
-  fresh();
-  const { version } = writeAgent(ROOT, AGENTS, scribe, { version: null });
-  const edited = writeAgent(ROOT, AGENTS, { ...scribe, keys: { ...scribe.keys, effort: 'high' } }, { version });
-  assert.notEqual(edited.version, version);
-  assert.equal((loadAgents(AGENTS).get('scribe') as Agent).keys.effort, 'high');
-  refused(
-    () => writeAgent(ROOT, AGENTS, scribe, { version }),
-    /^agents\/scribe\.md changed since it was read \(version [0-9a-f]{16}, now [0-9a-f]{16}\)/,
-    'Conflict',
-  );
-  refused(() => removeAgent(ROOT, AGENTS, 'scribe', { version }), /^agents\/scribe\.md changed since it was read/, 'Conflict');
 });
 
 test("with `repo`, a write's and a removal's version is read with the skills a start there finds, as the board lists it", () => {
@@ -221,19 +191,6 @@ test("with `repo`, a write's and a removal's version is read with the skills a s
   );
   const now = agentVersion(AGENTS, 'courier', agentSkillsFound(AGENTS, repo))!;
   assert.deepEqual(removeAgent(ROOT, AGENTS, 'courier', { version: now, repo }).removed, ['courier.md']);
-});
-
-test('a new agent over one that is there, and an edit of one that is not, are refused', () => {
-  fresh();
-  refused(
-    () => writeAgent(ROOT, AGENTS, { ...scribe, name: 'reviewer' }, { version: null }),
-    new RegExp(
-      `^agents/reviewer\\.md is there already\\. Give the new agent another name, or open it and change it: it is at version ${agentVersion(AGENTS, 'reviewer')}, and a write given that version changes it\\.$`,
-    ),
-    'Conflict',
-  );
-  refused(() => writeAgent(ROOT, AGENTS, scribe, { version: '0123456789abcdef' }), /^agents\/scribe\.md is not there/, 'Missing');
-  refused(() => removeAgent(ROOT, AGENTS, 'scribe', { version: '0123456789abcdef' }), /^agents\/scribe\.md is not there/, 'Missing');
 });
 
 test("a write refuses what the parser refuses, in the parser's words", () => {

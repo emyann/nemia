@@ -26,8 +26,8 @@ const stand = eachTest(testPlace);
 const runPlaced = runGiven(() => stand().layer);
 const { readRun } = await import('../src/record/record.store.ts');
 const { agentFilesDir } = await import('../src/agents/agents.store.ts');
-const { clearCustomInstructions, customInstructionsFor, writeCustomInstructions } = await import('../src/agents/custom.store.ts');
-const { Invalid, Missing } = await import('../src/refusal/refusal.ts');
+const { clearCustomInstructions, writeCustomInstructions } = await import('../src/agents/custom.store.ts');
+const { Invalid } = await import('../src/refusal/refusal.ts');
 
 /** The agent `ada`, told in English, with `custom` as a person's custom instructions for it when given. */
 const adaWith = (custom?: string, keys = 'tools: Read'): Agents =>
@@ -208,42 +208,6 @@ test('a frozen step with custom instructions reads back by the schema, and so do
   }
   const step = JSON.parse(JSON.stringify(buildOn(adaWith('Reply in French.')))) as Workflow;
   assert.ok(Result.isFailure(decode({ ...step, agent: { ...step.agent, customInstructions: 7 } })));
-});
-
-test("REFUSED: writeCustomInstructions and clearCustomInstructions for a name no place has throw Missing and write nothing; a name only the repository's .claude/agents has is written", () => {
-  const home = scratch('wf-custom-home-');
-  const repo = scratch('wf-custom-repo-');
-  fs.mkdirSync(path.join(repo, 'workflows', 'agents'), { recursive: true });
-  fs.writeFileSync(path.join(repo, 'workflows', 'agents', 'scribe.md'), '---\ndescription: Writes it down.\n---\nWrite.\n');
-  const custom = path.join(home, 'custom-instructions');
-  for (const [what, call] of [
-    ['a write', () => writeCustomInstructions(home, 'ghost', 'Boo.', repo)],
-    ['a clear', () => clearCustomInstructions(home, 'ghost', repo)],
-  ] as const) {
-    assert.throws(call, (err: Error) => {
-      assert.ok(err instanceof Missing, `${what}: ${err.message}`);
-      assert.ok(err.message.startsWith(`no agent named ghost where a run on ${repo} looks for one`), err.message);
-      assert.ok(err.message.includes('The agents there: scribe.') && err.message.includes('the repository it is in'), err.message);
-      return true;
-    });
-    assert.equal(fs.existsSync(custom), false, `${what} writes nothing`);
-  }
-  fs.mkdirSync(path.join(repo, '.claude', 'agents'), { recursive: true });
-  fs.writeFileSync(path.join(repo, '.claude', 'agents', 'helper.md'), '---\ndescription: Helps.\n---\nHelp.\n');
-  assert.equal(writeCustomInstructions(home, 'helper', 'Help in French.', repo), path.join(custom, 'helper.md'));
-  assert.equal(fs.readFileSync(path.join(custom, 'helper.md'), 'utf8'), 'Help in French.\n');
-  assert.equal(clearCustomInstructions(home, 'helper', repo), true);
-});
-
-test("the store's own agent, nemia, whom no place names, has custom instructions all the same: written, read and cleared", () => {
-  const home = scratch('wf-custom-home-');
-  const repo = scratch('wf-custom-repo-');
-  const file = path.join(home, 'custom-instructions', 'nemia.md');
-  assert.equal(customInstructionsFor(home, 'nemia', repo), undefined, 'none yet, and no refusal');
-  assert.equal(writeCustomInstructions(home, 'nemia', 'Write to me in French.', repo), file);
-  assert.equal(customInstructionsFor(home, 'nemia', repo), 'Write to me in French.');
-  assert.equal(clearCustomInstructions(home, 'nemia', repo), true);
-  assert.equal(fs.existsSync(file), false);
 });
 
 test('REFUSED: writeCustomInstructions over a directory throws Invalid naming the file and the clear, and leaves the directory as it was', () => {

@@ -1,13 +1,17 @@
 /**
  * `nemia agents custom`, an entry of the command table: a person's custom instructions for one agent, read, written and cleared. The api
- * serves the write and the clear on the routes the table generates, and the read by a route of its own, which calls the same handler.
+ * serves the write and the clear on the routes the table generates, and the read by a route of its own, which calls the same handler; each
+ * through the Agent door's `custom` (`AgentDoor`, run `rooted` at the store's root its handler is given).
  */
-import { tried } from '../runtime-client.ts';
+import { Effect } from 'effect';
 import { leftOut, type Args, type Flag, type Spec } from '../command/command.ts';
 import type { Command } from '../command/entry.verb.ts';
 import { customInstructionsFile } from './read.store.ts';
-import { HOME } from '../record/record.store.ts';
-import { clearCustomInstructions, customInstructionsFor, isStoreAgent, writeCustomInstructions } from './custom.store.ts';
+import { isStoreAgent } from './custom.store.ts';
+import { AgentDoor } from './agent-door.store.ts';
+import { AgentName } from './agents.model.ts';
+import { rooted } from '../wiring/wire.verb.ts';
+import { StoreRoot } from '../config/root.store.ts';
 
 /** The text under `key`, or undefined where none was given. */
 const textOf = (args: Args, key: string): string | undefined => {
@@ -102,16 +106,23 @@ export const AGENTS_CUSTOM: Command<Read | Cleared> = {
     { method: 'PUT', path: '/api/custom-instructions/:name', status: 200, sets: { clear: false } },
     { method: 'DELETE', path: '/api/custom-instructions/:name', status: 200, sets: { clear: true } },
   ],
-  handler: (args, _env, home = HOME) =>
-    tried(() => {
-      const name = textOf(args, 'name') ?? '';
-      const repo = textOf(args, 'repo') ?? '.';
-      const file = customInstructionsFile(home, name);
-      if (args.clear === true) return { name, file, removed: clearCustomInstructions(home, name, repo) };
-      const words = textOf(args, 'words');
-      if (words !== undefined) writeCustomInstructions(home, name, words, repo);
-      return { name, file, words: customInstructionsFor(home, name, repo) ?? null, error: null };
-    }),
+  handler: (args, _env, home) =>
+    rooted(
+      home,
+      'nemia agents custom',
+      Effect.gen(function* () {
+        const root = yield* StoreRoot;
+        const name = textOf(args, 'name') ?? '';
+        const repo = textOf(args, 'repo') ?? '.';
+        const file = customInstructionsFile(root, name);
+        const door = (yield* AgentDoor).custom;
+        const agent = AgentName.read(name);
+        if (args.clear === true) return { name, file, removed: yield* door.clear(agent, repo) };
+        const words = textOf(args, 'words');
+        if (words !== undefined) yield* door.write(agent, words, repo);
+        return { name, file, words: (yield* door.read(agent, repo)) ?? null, error: null };
+      }),
+    ),
   print(data, args) {
     const name = data.name;
     const hers = isStoreAgent(name);

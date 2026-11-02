@@ -32,7 +32,7 @@ delete process.env.WF_MAX_RUNS;
 const { advanceRun, cancelRun, decideRun, list, parentRead, standingLiveOf, startPlan, startRun, runWith } =
   await import('../src/runner.ts');
 const { stepsNow: stepsOf } = await import('./steps-now.ts');
-const { UnloadedFolder } = await import('../src/record/steps.ts');
+const { UnloadedFolder } = await import('../src/steps/steps.ts');
 const { isRepositoryRun } = await import('../src/run.ts');
 const { listRuns, markCancelled, readRun } = await import('../src/record/record.store.ts');
 const { passStanding } = await import('../src/standing/standing.verb.ts');

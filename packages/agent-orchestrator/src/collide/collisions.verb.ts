@@ -5,7 +5,7 @@
  */
 import { Effect } from 'effect';
 import { tried } from '../runtime-client.ts';
-import { stepsOf } from '../record/steps.verb.ts';
+import { stepsOf } from '../steps/steps.verb.ts';
 import type { Workflow } from '../workflow.ts';
 import { isRepositoryRun, type Run } from '../record/record.ts';
 import type { BranchStanding } from '../status/status.ts';

@@ -4,7 +4,7 @@
  * person, read as `nemia retry` reads them at the moment of the call. A controller over `EngineService`.
  */
 import { Effect } from 'effect';
-import { stepsOf } from '../record/steps.verb.ts';
+import { stepsOf } from '../steps/steps.verb.ts';
 import { retryable, WAITS_ON_PERSON } from '../retry/index.ts';
 import { acceptanceOf, overBudget, runSpend } from '../status/status.ts';
 import { askedQuestions } from '../question/index.ts';

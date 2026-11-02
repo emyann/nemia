@@ -33,7 +33,7 @@ import { roundFiled, roundsDue } from '../round/round.ts';
 import type { Closeout } from '../closeout/index.ts';
 import { nextTry, pauseAsksVoid, retriesDue, turnsOf, type RetryAsk } from '../retry/index.ts';
 import { runsDir } from '../record/record.store.ts';
-import { stepsOf } from '../record/steps.verb.ts';
+import { stepsOf } from '../steps/steps.verb.ts';
 import { runStore } from '../record/files.store.ts';
 import { collectArtifacts, filesLacked, handCloseout } from '../artifacts/artifacts.store.ts';
 import {

@@ -3,7 +3,7 @@
  * stands (`acceptRun`), which `nemia accept` gave. Read off the run as it stands, so the command and admission read it alike.
  */
 import { Effect } from 'effect';
-import { stepsOf } from '../record/steps.verb.ts';
+import { stepsOf } from '../steps/steps.verb.ts';
 import { retryable } from '../retry/index.ts';
 import { hasGate } from '../status/status.ts';
 import { approveFormOf } from './gate.ts';

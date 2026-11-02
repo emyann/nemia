@@ -12,7 +12,7 @@ import { approveForm } from './form.verb.ts';
 import type { Command } from '../command/entry.verb.ts';
 import { ANSWER_HELP, answerFlag, typedAnswers, typedOf } from '../question/asked.verb.ts';
 import { runStore } from '../record/files.store.ts';
-import { stepsOf } from '../record/steps.verb.ts';
+import { stepsOf } from '../steps/steps.verb.ts';
 import { writerText as textOf } from '../yours/yours.ts';
 import { approvalWordsRefusal } from './gate.ts';
 import { approveRun } from './gate.verb.ts';

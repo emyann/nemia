@@ -5,7 +5,7 @@
  */
 import { orderSteps, type Workflow } from '../workflow.ts';
 import { Invalid } from '../refusal/refusal.ts';
-import type { Run } from './record.ts';
+import type { Run } from '../record/record.ts';
 
 /**
  * A run that froze no workflow at `nemia start`, whose workflow folder does not load: missing, unreadable, or refused by the parser. Its

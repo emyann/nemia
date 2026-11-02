@@ -8,7 +8,7 @@ import { Effect } from 'effect';
 import { EngineService, asked } from '../runtime-client.ts';
 import { tryOf, type Run } from '../record/record.ts';
 import { keptRuns, runStore } from '../record/files.store.ts';
-import { stepsOf } from '../record/steps.verb.ts';
+import { stepsOf } from '../steps/steps.verb.ts';
 import { stopAsked } from '../tick/held.verb.ts';
 import { putPause, readPause } from './pause.store.ts';
 import { currentTasks, interruptsAmong, liveAmong, type Interrupt, type PauseRuns, type PausedNow, type RunTasks } from './pause.ts';

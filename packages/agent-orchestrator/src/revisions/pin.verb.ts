@@ -32,7 +32,7 @@ import { DEFAULT_FACTORY, revisionsOf, type Factory } from '../factory/factory.t
 import { readFactory } from '../factory/factory.store.ts';
 import { runStore } from '../record/files.store.ts';
 import { within, withinEffect } from '../meter/tally.store.ts';
-import { stepsOf } from '../record/steps.verb.ts';
+import { stepsOf } from '../steps/steps.verb.ts';
 import { hasStarted } from '../wait/wait.ts';
 import { Conflict } from '../refusal/refusal.ts';
 import type { SkillsFound } from '../agents/agents.ts';

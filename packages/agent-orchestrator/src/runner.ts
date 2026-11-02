@@ -279,7 +279,7 @@ export {
   roundAskFile,
   runId,
 } from './record/record.store.ts';
-export { parentRecord, stepsOf } from './record/steps.verb.ts';
+export { parentRecord, stepsOf } from './steps/steps.verb.ts';
 export { inboxDir, keptRuns, runStore } from './record/files.store.ts';
 export type { RunStore } from './record/record.ts';
 export {

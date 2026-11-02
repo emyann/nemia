@@ -8,7 +8,7 @@ import { asked, over, type Engine } from '../runtime-client.ts';
 import type { Workflow } from '../workflow.ts';
 import type { Run } from '../record/record.ts';
 import { resultSteps } from '../branches/index.ts';
-import { stepsOf } from '../record/steps.verb.ts';
+import { stepsOf } from '../steps/steps.verb.ts';
 import { runStore } from '../record/files.store.ts';
 import { closeoutOf, parentRead } from '../views/views.verb.ts';
 import type { BranchReader } from '../branches/branches.store.ts';

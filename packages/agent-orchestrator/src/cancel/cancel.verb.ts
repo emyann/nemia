@@ -8,7 +8,7 @@ import { Effect } from 'effect';
 import { EngineService } from '../runtime-client.ts';
 import { type Run } from '../record/record.ts';
 import { cancelPlan, type CancelPlan } from './cancel.ts';
-import { stepsOf } from '../record/steps.verb.ts';
+import { stepsOf } from '../steps/steps.verb.ts';
 import { closeoutAsked, closeoutReader, exitVerdicts, spendReader, taskPhasesRead } from '../views/views.verb.ts';
 import { adoptChecks, adoptRounds, adoptTries } from '../tick/advance.verb.ts';
 import { closeWaitingTasks } from '../tick/held.verb.ts';

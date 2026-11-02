@@ -11,9 +11,10 @@ import { StoreRoot } from '../config/root.store.ts';
 import { WorkflowDoor } from '../workflows/workflows.store.ts';
 import { WorkflowDir } from '../folder/folder.model.ts';
 import { Invalid, type Refusal } from '../refusal/refusal.ts';
-import { runStore } from './files.store.ts';
+import { RunDoor } from '../runs/runs.store.ts';
+import { RunId } from '../record/record.model.ts';
 import { tried } from '../runtime-client.ts';
-import { isRepositoryRun, type Run } from './record.ts';
+import { isRepositoryRun, type Run } from '../record/record.ts';
 import { frozenStepsOf, UnloadedFolder, unloadedFolder } from './steps.ts';
 import { resultBranches, type BranchReader } from '../branches/branches.store.ts';
 import type { ParentRun } from '../wait/wait.ts';
@@ -87,14 +88,19 @@ export const stepsAmong = (runs: readonly Run[]): Effect.Effect<ReadonlyMap<stri
   );
 
 /**
- * A run another waits on, as its record and `git` say it without the engine: the record, when the store has one, and the result branches
- * it names that git no longer has and cannot find on the base by their recorded tips (`BranchReader.landed`). What `nemia start --after`
- * refuses an edge by (`afterRefusal`), and where `parentOf` starts. A record whose steps cannot be read — no frozen workflow, and its
- * folder gone — names no result branch; one whose branches were not read names none gone.
+ * A run another waits on, as its record (`RunDoor`) and `git` say it without the engine: the record, when the store has one, and the
+ * result branches it names that git no longer has and cannot find on the base by their recorded tips (`BranchReader.landed`). What
+ * `nemia start --after` refuses an edge by (`afterRefusal`), and where `parentOf` starts. A record whose steps cannot be read — no
+ * frozen workflow, and its folder gone — names no result branch; one whose branches were not read names none gone.
  */
 export const parentRecord = (id: string, git: BranchReader): Effect.Effect<Pick<ParentRun, 'record' | 'gone'>> =>
   Effect.gen(function* () {
-    const read = yield* Effect.exit(tried(() => runStore.runs.read(id)));
+    const read = yield* Effect.exit(
+      Effect.flatMap(
+        tried(() => RunId.read(id)),
+        (runId) => Effect.flatMap(RunDoor, (door) => door.runs.read(runId)),
+      ),
+    );
     if (Exit.isFailure(read)) return Cause.hasInterruptsOnly(read.cause) ? yield* Effect.interrupt : {};
     const record = read.value;
     const steps = yield* Effect.orElseSucceed(stepsOf(record), (): Workflow[] => []);

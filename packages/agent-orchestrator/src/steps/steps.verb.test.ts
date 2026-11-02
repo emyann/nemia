@@ -22,7 +22,7 @@ import { agentDoorMemory } from '../agents/agent-memory.store.ts';
 import { AgentName } from '../agents/agents.model.ts';
 import { WorkflowDir } from '../folder/folder.model.ts';
 import { Invalid } from '../refusal/refusal.ts';
-import { isRepositoryRun, type Run } from './record.ts';
+import { isRepositoryRun, type Run } from '../record/record.ts';
 import { UnloadedFolder, unloadedFolder } from './steps.ts';
 import { stepsOf, stepsOrNone, unloadedOf } from './steps.verb.ts';
 

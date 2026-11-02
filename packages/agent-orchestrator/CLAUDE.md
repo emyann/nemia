@@ -123,7 +123,7 @@ it holds today that is a candidate for the runtime is in `docs/architecture.md`,
   branded from a plain string with `WorkflowDir.read` outside the model and a stored record. A test that only needs a workflow to exist
   gives its program one `workflowDoorMemory()` (`src/workflows/memory.store.ts`) and writes it through the door (`aWorkflow`,
   `test/workflow-walks.ts`); code still on the folder's stores (`test/workflow-door.baseline.ts`) reads the disk whatever door was given. A
-  run's steps are a program (`stepsOf`, `src/record/steps.verb.ts`): a frozen record's need no door and no root, and an unfrozen one's
+  run's steps are a program (`stepsOf`, `src/steps/steps.verb.ts`): a frozen record's need no door and no root, and an unfrozen one's
   folder is read through the door at the program's `StoreRoot`, refused `UnloadedFolder` where it does not load. A
   write's version is judged by `workflowVersionRefusal` (`src/folder/folder.ts`), whose contract a new rule of the version is a law of.
   The door's read and write find a workflow's agents and skills through the Agent and Skill doors, so a program given

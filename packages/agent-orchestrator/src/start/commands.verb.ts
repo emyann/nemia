@@ -15,7 +15,7 @@ import { ignoredRepoLine } from '../inbox/index.ts';
 import { startFromInbox } from '../inbox/inbox.verb.ts';
 import { isRepositoryRun, type Run } from '../record/record.ts';
 import { inputsDir } from '../record/record.store.ts';
-import { frozenStepsOf } from '../record/steps.ts';
+import { frozenStepsOf } from '../steps/steps.ts';
 import type { Workflow } from '../workflow.ts';
 import { approvedFirst, gatesOf } from '../status/status.ts';
 import { fromNote } from './inputs.ts';

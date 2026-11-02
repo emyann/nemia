@@ -19,7 +19,7 @@ import { runReady } from '../wait/wait.ts';
 import { assess } from '../tick/assess.ts';
 import type { Closeout } from '../closeout/index.ts';
 import { runStore } from '../record/files.store.ts';
-import { stepsOf } from '../record/steps.verb.ts';
+import { stepsOf } from '../steps/steps.verb.ts';
 import { checkoutStatus, landThrough, stagedHere, type StatusMemo } from '../place/landing.store.ts';
 import { dropLandedPictures, LANDED_PICTURES } from '../artifacts/artifacts.store.ts';
 import {

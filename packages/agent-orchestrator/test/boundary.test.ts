@@ -1078,7 +1078,7 @@ test('REFUSED: a type imported from the runtime by a controller, a store file, a
     'src/runtime-client.ts imports no agent-runtime: CLIENT names the wrong file',
   ]);
   assert.deepEqual(
-    clientBreaks(planted('src/views/views.verb.ts', (imports) => imports.filter((m) => m !== CLIENT && m !== 'src/record/steps.verb.ts'))),
+    clientBreaks(planted('src/views/views.verb.ts', (imports) => imports.filter((m) => m !== CLIENT && m !== 'src/steps/steps.verb.ts'))),
     [
       'src/views/views.verb.ts is a controller and reaches src/runtime-client.ts through none of its imports: the controllers reach the runtime through the client',
     ],
@@ -1127,7 +1127,7 @@ test('REFUSED: a cycle between two controllers, a longer one, and one through th
     'a cycle: src/schedule/schedule.verb.ts → src/start/start.verb.ts → src/tick/tick.verb.ts → src/schedule/schedule.verb.ts',
   ]);
   assert.deepEqual(cycles(adding(CLIENT, 'src/views/views.verb.ts')), [
-    'a cycle: src/record/steps.verb.ts → src/runtime-client.ts → src/views/views.verb.ts → src/record/steps.verb.ts',
     'a cycle: src/runtime-client.ts → src/views/views.verb.ts → src/runtime-client.ts',
+    'a cycle: src/runtime-client.ts → src/views/views.verb.ts → src/steps/steps.verb.ts → src/runtime-client.ts',
   ]);
 });

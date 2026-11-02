@@ -26,8 +26,8 @@ import {
   type Forgot,
 } from './forget.ts';
 import { HOME, lstatOf } from '../record/record.store.ts';
-import { stepsOf } from '../record/steps.verb.ts';
-import { UnloadedFolder } from '../record/steps.ts';
+import { stepsOf } from '../steps/steps.verb.ts';
+import { UnloadedFolder } from '../steps/steps.ts';
 import { runStore } from '../record/files.store.ts';
 import { PlaceService, readRunPlace, type Place, type RunPlaceRead } from '../place/place.store.ts';
 import { sayFilled, unansweredWords, type Held } from '../place/place.ts';

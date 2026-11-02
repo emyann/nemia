@@ -17,7 +17,7 @@ import { hasStarted, waitedOn } from '../wait/wait.ts';
 import { resultBranches, type BranchReader } from '../branches/branches.store.ts';
 import { landedOver } from '../branches/index.ts';
 import { runStore } from '../record/files.store.ts';
-import { stepsOf } from '../record/steps.verb.ts';
+import { stepsOf } from '../steps/steps.verb.ts';
 import type { Workflow } from '../workflow.ts';
 import { readStanding, writeStanding, type StandingFile, type StoodRead } from './standing.store.ts';
 

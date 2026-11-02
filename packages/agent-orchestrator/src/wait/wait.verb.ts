@@ -9,7 +9,7 @@ import { type Hold, type Run } from '../record/record.ts';
 import { holdRefusal } from './wait.ts';
 import { idRefusal } from '../forget/forget.ts';
 import { assess } from '../tick/assess.ts';
-import { stepsOf } from '../record/steps.verb.ts';
+import { stepsOf } from '../steps/steps.verb.ts';
 import { standingLiveOf } from '../standing/standing.verb.ts';
 import {
   closeoutAsked,

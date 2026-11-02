@@ -18,7 +18,7 @@ import { approvedFirst, landsOnCheck } from '../status/status.ts';
 import { decision } from '../decide/decide.ts';
 import { forgetRefusal, heldWorktree, idRefusal, inventoryUnread, runWorktrees, type AskName } from '../forget/forget.ts';
 import { HOME } from '../record/record.store.ts';
-import { stepsOf } from '../record/steps.verb.ts';
+import { stepsOf } from '../steps/steps.verb.ts';
 import { runStore } from '../record/files.store.ts';
 import { askRunPlace, PlaceService, type RunPlaceRead } from '../place/place.store.ts';
 import { freedBytes } from './freed.store.ts';

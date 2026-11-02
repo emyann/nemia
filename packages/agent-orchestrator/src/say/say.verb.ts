@@ -8,7 +8,7 @@ import { Cause, Effect, Exit } from 'effect';
 import { EngineService, asked, type Engine } from '../runtime-client.ts';
 import { tryOf, type Run } from '../record/record.ts';
 import { sayRefusal, type Said } from './say.ts';
-import { stepsOf } from '../record/steps.verb.ts';
+import { stepsOf } from '../steps/steps.verb.ts';
 import { phaseOfView } from '../views/views-words.ts';
 import { Conflict } from '../refusal/refusal.ts';
 import { RunDoor } from '../runs/runs.store.ts';

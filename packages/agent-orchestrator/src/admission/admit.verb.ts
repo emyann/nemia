@@ -7,7 +7,7 @@
  */
 import { Effect, Result } from 'effect';
 import type { AdmissionAnswer, AdmissionCall } from 'agent-runtime/vocabulary';
-import { stepsOf } from '../record/steps.verb.ts';
+import { stepsOf } from '../steps/steps.verb.ts';
 import { retryable, waitsOnPerson } from '../retry/index.ts';
 import { closeoutAsked, closeoutReader, exitVerdicts, harnessBlocked, spendReader, taskPhasesRead } from '../views/views.verb.ts';
 import type { Ran } from '../command/entry.verb.ts';

@@ -11,7 +11,7 @@ import { isRepositoryRun, type CloseoutAsked, type Run, type TaskPhase } from '.
 import { endingStopped, merged, standing, type RoundAsk, type SpendOf } from '../status/status.ts';
 import { parseCloseout, type Closeout } from '../closeout/index.ts';
 import { roundsDue } from '../round/round.ts';
-import { stepsOf } from '../record/steps.verb.ts';
+import { stepsOf } from '../steps/steps.verb.ts';
 import { PlaceService, trialMerges, type Place } from '../place/place.store.ts';
 import { mergeWordOf } from '../branches/index.ts';
 import { strayAsk } from '../say/say.verb.ts';

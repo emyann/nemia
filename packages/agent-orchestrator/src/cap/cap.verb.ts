@@ -11,8 +11,8 @@ import { runTasks, type Run } from '../record/record.ts';
 import { hasStarted } from '../wait/wait.ts';
 import { assess } from '../tick/assess.ts';
 import { runStore } from '../record/files.store.ts';
-import { unloadedFolder } from '../record/steps.ts';
-import { stepsOf } from '../record/steps.verb.ts';
+import { unloadedFolder } from '../steps/steps.ts';
+import { stepsOf } from '../steps/steps.verb.ts';
 import { lastCeilings } from '../daemon/daemon.store.ts';
 import { maxRuns } from '../config/config.store.ts';
 import {

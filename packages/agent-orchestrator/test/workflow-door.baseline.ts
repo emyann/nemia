@@ -5,7 +5,7 @@
  * (`WorkflowDoor`, `src/workflows/workflows.store.ts`), with how many calls do (`src/workflows/workflows.store.test.ts`). A debt, and
  * nothing else: a program yields the door, whose writes are checked on every layer and whose memory stand-in a test gives it; a call
  * left on the seam is a synchronous caller S5b did not convert — the inbox, the writers and the board's folder read; a run's steps are
- * read through the door (`stepsOf`, `src/record/steps.verb.ts`). S5b moved the
+ * read through the door (`stepsOf`, `src/steps/steps.verb.ts`). S5b moved the
  * board's four workflow entries (`src/workflows/workflows.verb.ts`); the start (and so the plan) and the revisions pinned then read a
  * folder through the door.
  *

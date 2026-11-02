@@ -14,7 +14,7 @@ import { budgetOf, budgetUsdFor, stepSpend, type SpendOf } from '../status/statu
 import { filedAt, toldOf, type StepTold } from '../tick/told.verb.ts';
 import type { Workflow } from '../workflow.ts';
 import { retryable, retryRefusal, type RetryAsk, type RetryHow } from './index.ts';
-import { stepsOf } from '../record/steps.verb.ts';
+import { stepsOf } from '../steps/steps.verb.ts';
 import { runStore } from '../record/files.store.ts';
 import { strayAsk } from '../say/say.verb.ts';
 import { closeoutAsked, closeoutReader, exitVerdicts, harnessBlocked, spendReader, taskPhasesRead } from '../views/views.verb.ts';

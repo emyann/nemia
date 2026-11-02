@@ -256,7 +256,8 @@ each step's tries whole and what it was told, which are its sub-resources, each 
 step's tries and told at `…/steps/:step/tries` and `…/steps/:step/told`, keyed by the step's stamp so a step reads again only when it
 moved, and the lines once at `GET /api/runs/:id/lines` (`RunLinesAnswer`, mirrored by hand); the api's tests read the same. The api
 serves the object's sub-resources from the command table and its OpenAPI 3.1 document, generated from the Schemas, names the run's path
-and theirs (`apps/api/src/openapi/`, printed by its `print.ts`). The board's run mirror is generated from
+and theirs (`apps/api/src/openapi/`, printed by its `print.ts`), and `GET /openapi` serves a page to browse it (Scalar's
+reference, its script served by the api from the installed package, reading the document at its route). The board's run mirror is generated from
 that document by Effect's own modules (`apps/web/src/lib/api/run.gen.ts`, written by `npm run mirror` in `apps/web`), checked in, and
 refused when it drifts (`apps/web/test/mirror.test.ts`).
 

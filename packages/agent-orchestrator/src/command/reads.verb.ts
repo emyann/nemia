@@ -6,6 +6,11 @@
  */
 import { Effect } from 'effect';
 import { EngineService, asked, tried } from '../runtime-client.ts';
+import type { PlaceService } from '../place/place.store.ts';
+import type { Refusal } from '../refusal/refusal.ts';
+import { rooted } from '../wiring/wire.verb.ts';
+import type { StepTry } from '../resource/tries.verb.ts';
+import { runObject, stepCloseout, stepTold, stepTries, stepTry, type TryCloseout } from '../object/run.verb.ts';
 import { runStore } from '../record/files.store.ts';
 import type { Run } from '../record/record.ts';
 import { verifiesRest } from '../config/config.store.ts';
@@ -25,26 +30,127 @@ const textOf = (args: Args, key: string): string | undefined => {
 /** `nemia show` and `nemia logs`' refusal of a word or a flag they do not take. */
 const takesNo = (verb: string, form: string) => (arg: string) => `nemia ${verb} takes ${form}: not ${arg}.`;
 
-/** `nemia show`: the run's record, its brief cut at 120 characters and each frozen step's body at 60, as JSON. */
-export const SHOW: Command<Run> = {
+/** The record as `nemia show --raw` prints it: its brief cut at 120 characters and each frozen step's body at 60. */
+const rawOf = (run: Run) => {
+  const workflow = run.workflow?.map(({ body, ...keys }) => ({ ...keys, body: `${body.slice(0, 60)}…` }));
+  return { ...run, brief: `${run.brief.slice(0, 120)}…`, workflow };
+};
+
+/**
+ * `nemia show`: the run as one object, `nemia/v1`'s `Run` (`runObject`), as JSON, with a line on stderr pointing to `--raw`; `--raw`, the
+ * run's record as it printed before, its brief cut at 120 characters and each frozen step's body at 60.
+ */
+export const SHOW: Command = {
   name: 'show',
-  usage: '<runId>',
-  help: ['the run, and what each step was told'],
+  usage: '<runId> [--raw]',
+  help: ['the run as one object (nemia/v1 Run); --raw: its record, and', 'what each step was told'],
   spec: {
     positionals: [{ key: 'runId', takes: 'required', kind: 'name' }],
-    flags: [],
-    unknown: takesNo('show', "one run's id"),
+    flags: [{ flag: '--raw', kind: 'switch', key: 'raw' }],
+    unknown: takesNo('show', "one run's id, and --raw"),
   },
   writes: false,
   class: 'read',
   only: { side: 'cli', why: "the board's run page is the api's judged view of a run (GET /api/runs/:id), not its record" },
-  handler: (args) =>
-    tried(() => {
-      const run = runStore.runs.read(textOf(args, 'runId') ?? '');
-      const workflow = run.workflow?.map(({ body, ...keys }) => ({ ...keys, body: `${body.slice(0, 60)}…` }));
-      return { ...run, brief: `${run.brief.slice(0, 120)}…`, workflow };
-    }),
-  print: (run) => [JSON.stringify(run, null, 2)],
+  handler: (args, _env, home, kept?: Kept) =>
+    Effect.flatMap(
+      tried(() => runStore.runs.read(textOf(args, 'runId') ?? '')),
+      (run): Effect.Effect<Readonly<Record<string, unknown>>, Refusal, EngineService | PlaceService> =>
+        args.raw === true
+          ? Effect.succeed(rawOf(run))
+          : rooted(home, 'show', runObject(run, { filings: kept?.filings ?? { filed: new Map(), cursor: 0 } })),
+    ),
+  print: (data) => [JSON.stringify(data, null, 2)],
+  note: (_data, args) =>
+    args.raw === true
+      ? []
+      : [`nemia show prints the run as one object; \`nemia show --raw ${textOf(args, 'runId') ?? '<runId>'}\` prints its record.`],
+};
+
+/** The run and the step a sub-resource names. */
+const stepNamed = (args: Args): [string, string] => [textOf(args, 'runId') ?? '', textOf(args, 'step') ?? ''];
+
+/** The positionals of a step's sub-resource: the run's id and the step's name. */
+const RUN_STEP = [
+  { key: 'runId', takes: 'required', kind: 'name' },
+  { key: 'step', takes: 'required', kind: 'name' },
+] as const;
+
+/** What the sub-resources the api alone serves say of the command line. */
+const API_ONLY = 'a sub-resource of the run object, for a client; at the command line `nemia show <run>` prints the run whole';
+
+/** `GET /api/runs/:runId/steps/:step/tries`: a step's tries, earliest first, the current one last (`StepTry`). */
+export const TRIES: Command<{ tries: StepTry[] }> = {
+  name: 'tries',
+  usage: '<runId> <step>',
+  help: ["a step's tries"],
+  spec: { positionals: [...RUN_STEP], flags: [], unknown: takesNo('tries', "one run's id and one step's name") },
+  writes: false,
+  class: 'read',
+  only: { side: 'api', why: API_ONLY },
+  route: { method: 'GET', path: '/api/runs/:runId/steps/:step/tries', status: 200 },
+  handler: (args, _env, home) => rooted(home, 'tries', stepTries(...stepNamed(args))),
+  print: (data) => [JSON.stringify(data, null, 2)],
+};
+
+/** `GET /api/runs/:runId/steps/:step/tries/:try`: one try of a step (`StepTry`). */
+export const TRY: Command<StepTry> = {
+  name: 'try',
+  usage: '<runId> <step> <try>',
+  help: ['one try of a step'],
+  spec: {
+    positionals: [...RUN_STEP, { key: 'try', takes: 'required', kind: 'name' }],
+    flags: [],
+    unknown: takesNo('try', "one run's id, one step's name and one try's number"),
+  },
+  writes: false,
+  class: 'read',
+  only: { side: 'api', why: API_ONLY },
+  route: { method: 'GET', path: '/api/runs/:runId/steps/:step/tries/:try', status: 200 },
+  handler: (args, _env, home) => rooted(home, 'try', stepTry(...stepNamed(args), textOf(args, 'try'))),
+  print: (data) => [JSON.stringify(data, null, 2)],
+};
+
+/**
+ * `nemia closeout <run> <step> [--try n]`, `GET /api/runs/:runId/steps/:step/tries/:try/closeout`: what a try of a step signed off with,
+ * its latest by default (`TryCloseout`).
+ */
+export const CLOSEOUT: Command<TryCloseout> = {
+  name: 'closeout',
+  usage: '<runId> <step> [--try <n>]',
+  help: ["what a step's try signed off with: its latest, or --try <n>"],
+  spec: {
+    positionals: [...RUN_STEP],
+    flags: [{ flag: '--try', kind: 'text', key: 'try', takes: "a try's number", twice: 'nemia closeout takes --try once.' }],
+    unknown: takesNo('closeout', "one run's id, one step's name, and --try <n>"),
+  },
+  writes: false,
+  class: 'read',
+  route: { method: 'GET', path: '/api/runs/:runId/steps/:step/tries/:try/closeout', status: 200 },
+  handler: (args, _env, home) => rooted(home, 'closeout', stepCloseout(...stepNamed(args), textOf(args, 'try'))),
+  print: ({ try: n, closeout, unreadable }, args) =>
+    closeout
+      ? [
+          `try ${n}: ${closeout.outcome}: ${closeout.summary}`,
+          ...(closeout.body && closeout.body !== closeout.summary ? ['', closeout.body] : []),
+        ]
+      : [
+          `try ${n} of ${textOf(args, 'step') ?? ''}: ${unreadable ? `its closeout does not read: ${unreadable.error}` : 'no closeout yet'}`,
+        ],
+};
+
+/** `GET /api/runs/:runId/steps/:step/told`: what a step was told, its brief by layer and its task by part (`toldOf`). */
+export const TOLD: Command<Effect.Success<ReturnType<typeof stepTold>>> = {
+  name: 'told',
+  usage: '<runId> <step>',
+  help: ['what a step was told'],
+  spec: { positionals: [...RUN_STEP], flags: [], unknown: takesNo('told', "one run's id and one step's name") },
+  writes: false,
+  class: 'read',
+  only: { side: 'api', why: API_ONLY },
+  route: { method: 'GET', path: '/api/runs/:runId/steps/:step/told', status: 200 },
+  handler: (args, _env, home) => rooted(home, 'told', stepTold(...stepNamed(args))),
+  print: (data) => [JSON.stringify(data, null, 2)],
 };
 
 /**
@@ -205,4 +311,4 @@ export const SERIES: Command<SeriesRead> = {
 };
 
 /** The reads, in the order `nemia`'s help lists them. */
-export const READS: readonly Command[] = [SHOW, LOGS, STATS];
+export const READS: readonly Command[] = [SHOW, CLOSEOUT, TRIES, TRY, TOLD, LOGS, STATS];

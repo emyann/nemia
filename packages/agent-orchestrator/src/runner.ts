@@ -35,10 +35,9 @@ export { VERSION } from './version/version.ts';
 export { leaseRelease, trialRefusal, type Running } from './release/release.ts';
 export { currentRelease } from './release/release.store.ts';
 export { runningRelease } from './release/version.verb.ts';
-export { Conflict, Invalid, isRefusal, Missing } from './refusal/refusal.ts';
+export { Conflict, Invalid, isRefusal, Missing, type Refusal } from './refusal/refusal.ts';
 export { maxConcurrent, maxRuns, verifiesRest, wfRoot } from './config/config.store.ts';
 export { StoreRoot, storeRootLayer } from './config/root.store.ts';
-export type { Refusal } from './refusal/refusal.ts';
 export {
   AGENT_FACING,
   CHECK_AFFECTING,
@@ -458,7 +457,8 @@ export { sayRun } from './say/say.verb.ts';
 export { COMMANDS, TABLE } from './command/commands.verb.ts';
 export { admitted } from './admission/admit.verb.ts';
 export { PRUNE, RM } from './command/runs.verb.ts';
-export { LOGS, STATS } from './command/reads.verb.ts';
+export { CLOSEOUT, LOGS, STATS, TOLD, TRIES, TRY } from './command/reads.verb.ts';
+export { runObject, type RunObjectAnswer, type TryCloseout } from './object/run.verb.ts';
 export { folderRefusal, START } from './start/commands.verb.ts';
 export { INBOX, INBOX_ADD, INBOX_QUEUE } from './inbox/commands.verb.ts';
 export { FACTORY } from './factory/factory.verb.ts';

@@ -5,29 +5,15 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { Effect } from 'effect';
-import { type AtWork, atWork, runStartedAt, type RunTokens, runTokens, type Timeline, timeline } from '../timeline/index.ts';
+import { type AtWork, atWork, runStartedAt, type RunTokens, runTokens, type Timeline } from '../timeline/index.ts';
 import type { TimelineTotal, TimelineTry } from '../timeline/index.ts';
 import { artifactsDir } from '../record/record.store.ts';
 import { budgetWord } from '../status/status.ts';
-import { closeoutAsked, closeoutReader, consumption, exitVerdicts } from '../views/views.verb.ts';
-import { phaseOfView } from '../views/views-words.ts';
-import { type Engine, EngineService } from '../runtime-client.ts';
-import { type Retry, type RetryMode, stepRaise, type RaiseReads, type StepRaise } from '../retry/index.ts';
-import {
-  bare,
-  filedTimes,
-  type Filings,
-  judgedSteps,
-  judgedUnlessUnreadable,
-  stepNames,
-  tryOf,
-  type Views,
-  viewsFor,
-  workflowsOf,
-} from '../summary/reads.verb.ts';
+import { consumption } from '../views/views.verb.ts';
+import { type Retry, type RetryMode, stepRaise, type StepRaise } from '../retry/index.ts';
+import { bare, type Filings, tryOf, type Views } from '../summary/reads.verb.ts';
 import {
   atHarness,
-  judge,
   needsOf,
   type RunHolding,
   type RunStatus,
@@ -36,13 +22,9 @@ import {
   runSaid,
   type Spent,
   spentOf,
-  standingsOf,
-  stepSaid,
   type StepNeeds,
 } from '../summary/judged.verb.ts';
-import { standingReader, standingSnapshot } from '../standing/standing.verb.ts';
 import { PlaceService } from '../place/place.store.ts';
-import { StoreRoot } from '../config/root.store.ts';
 import type { Drift } from '../revisions/revisions.ts';
 import { driftNow } from '../revisions/pin.verb.ts';
 import { type RunGraph, runGraph } from '../summary/graph.ts';
@@ -66,11 +48,9 @@ import {
 } from '../run.ts';
 import { loopSpan, type Workflow } from '../workflow.ts';
 import { folderFiles, type StepArtifact, workFolderOf } from './files.store.ts';
-import { type CheckStderr, checksOf, type LastSaid, lastLineOf, refusedStderr, type StepCheck } from './checks.verb.ts';
+import { type LastSaid, lastLineOf, type StepCheck } from './checks.verb.ts';
 import {
   acceptedOf,
-  attemptsIn,
-  closeoutIn,
   driftOf,
   type StepAcceptance,
   type StepAttempts,
@@ -79,11 +59,10 @@ import {
   type StepTry,
   type StepUnreadable,
   gateOf,
-  triesOf,
-  unreadableIn,
 } from './tries.verb.ts';
 import { filedOf, type StepFiled, type TaskPart, toldOf } from './told.verb.ts';
 import { readOf, type RunRead, type StepUsed, totalOf, usedOf } from './usage.ts';
+import { currentOf, raiseReads, runReading, type RunReading, triesIn } from '../object/read.verb.ts';
 import { commandLine } from '../command/command.ts';
 import { COMMANDS } from '../command/commands.verb.ts';
 import type { Command } from '../command/entry.verb.ts';
@@ -416,14 +395,6 @@ function costOf(
   return { spent, budget, raise: step ? stepRaise(step, run, steps, raiseReads(run, views), spendOf) : null };
 }
 
-/** What a step's raise is read from, off the views the request already read (`RaiseReads`), as `nemia decide` reads them. */
-const raiseReads = (run: Run, views: Views): RaiseReads => ({
-  phaseOf: (taskId) => phaseOfView(views.get(taskId)),
-  closeoutOf: closeoutReader(views, run),
-  askedCloseout: closeoutAsked(views),
-  verdictOf: exitVerdicts(views, run),
-});
-
 /**
  * What a round of a loop cost: the session of each try the package's `timeline` counts in that round — the steps the loop files again
  * (`loopSpan`), a session each once, which a try a recheck reached has none of — as `taskSpend` reads it, added up (`addSpend`). The
@@ -470,12 +441,6 @@ const specOf = (step: Workflow): StepSpec => ({
   rounds: step.rounds ?? null,
 });
 
-/**
- * Where what a page shows of a step's workflow is read from: the workflow the run froze at `nemia start`, which the tick
- * files from and `judgedSteps` judges by; the folder only for a record that froze none. Null when neither reads.
- */
-const shownWorkflow = (run: Run, folder: readonly Workflow[] | null): readonly Workflow[] | null => run.workflow ?? folder;
-
 /** The runs a run waits on (`after`) and is handed as context (`context`), as its page shows them: none where it names none. */
 const handedRuns = (run: Run): Pick<RunDetail, 'after' | 'context'> => ({ after: run.after ?? [], context: run.context ?? [] });
 
@@ -499,58 +464,27 @@ export type RunPageReads = {
   readonly inRequest: (program: ReturnType<typeof driftNow>) => Promise<readonly Drift[]>;
 };
 
-/**
- * The views of `run`'s tasks over `e`, and what the run is judged as off them, its steps `names` of `workflows`, where its branches stand
- * read off `standing.json` (`standingSnapshot`): or, when its unfrozen folder does not load or a task it reads does not, why it is not
- * judged (`judgedUnlessUnreadable`).
- */
-const judgedOn = Effect.fnUntraced(function* (e: Engine, run: Run, names: readonly string[], workflows: readonly Workflow[] | null) {
-  const { views, reader, unreadable } = yield* viewsFor(e, [run]);
-  const git = standingReader(yield* standingSnapshot());
-  const standings = (status: Parameters<typeof standingsOf>[2], steps: Parameters<typeof standingsOf>[1]) =>
-    standingsOf(run, steps, status, git);
-  const read = yield* judgedUnlessUnreadable(run, unreadable, () => judge(run, names, workflows, views, { reader, git, standings }));
-  return { views, read };
-});
-
 /** The run in full, or why it is not judged, in the words the list says it with (`RunSummary.unreadable`). */
 export type RunPageAnswer = RunDetail | { unjudged: string };
 
 /** A run not judged, as its page answers it: why, and nothing else. */
 const unjudgedPage = (why: string): RunPageAnswer => ({ unjudged: why });
 
-/** What `runPage` read once for the run, handed to each step's part of it (`stepPage`). */
-type StepAt = {
-  readonly e: Engine;
+/** What `runPage` read once for the run (`RunReading`), handed to each step's part of it (`stepPage`), with what only the page reads. */
+type StepAt = RunReading & {
   readonly placeService: PlaceService['Service'];
-  readonly run: Run;
-  readonly source: readonly Workflow[] | null;
-  readonly steps: readonly Workflow[];
-  readonly views: Views;
-  readonly judged: Extract<Effect.Success<ReturnType<typeof judge>>, object>;
-  readonly checks: ReadonlyMap<string, StepCheck>;
   readonly used: ReturnType<typeof consumption>;
-  readonly clock: Timeline;
-  readonly stderr: CheckStderr;
   readonly said: LastSaid;
 };
 
 /** One step of the run's page (`RunDetail['steps']`), off what `runPage` read once for the run (`StepAt`). */
-const stepPage = Effect.fnUntraced(function* (
-  name: string,
-  { e, placeService, run, source, steps, views, judged, checks, used, clock, stderr, said: memoSaid }: StepAt,
-) {
+const stepPage = Effect.fnUntraced(function* (name: string, at: StepAt) {
+  const { e, placeService, run, source, steps, views, judged, used, clock, said: memoSaid } = at;
   const step = source?.find((s) => s.name === name);
   const taskId = run.steps[name]?.taskId ?? null;
   const judgedContext = steps.find((s) => s.name === name)?.context;
   const needs = needsOf(run, name, views, judged);
-  const current = {
-    ...stepSaid(judged, name),
-    check: checks.get(name) ?? null,
-    closeout: closeoutIn(run, name, step ?? bare(name), taskId, views),
-    unreadable: unreadableIn(taskId, views),
-    attempts: attemptsIn(taskId, views),
-  };
+  const current = currentOf(at, name);
   const lastLine = atHarness(current) ? yield* Effect.promise(() => lastLineOf(e, views, taskId, memoSaid)) : null;
   return {
     name,
@@ -574,7 +508,7 @@ const stepPage = Effect.fnUntraced(function* (
     ...current,
     used: taskId ? usedOf(used[name], judgedContext) : null,
     ...costOf(run, name, steps, views, judged.spendOf),
-    tries: triesOf(run, name, steps, views, current, judged.answers, stderr),
+    tries: triesIn(at, name, current),
     timeline: (clock.steps[name] ?? []).map((t) => ({ ...t, used: t.session ? usedOf(t.used, judgedContext) : null })),
   };
 });
@@ -594,24 +528,13 @@ const stepPage = Effect.fnUntraced(function* (
  * (`driftNow`) through the doors, over the request's services (`inRequest`).
  */
 export const runPage = Effect.fn('runPage')(function* (run: Run, { memo, inRequest }: RunPageReads) {
-  const e = yield* EngineService;
   const placeService = yield* PlaceService;
-  const home = yield* StoreRoot;
-  const folder = workflowsOf(run, home);
-  const workflows = folder.steps;
-  const names = stepNames(run, workflows);
-  const { views, read } = yield* judgedOn(e, run, names, workflows);
-  if ('unreadable' in read) return unjudgedPage(read.unreadable);
-  const judged = read.judged;
-  const steps = judgedSteps(run, workflows);
-  const stderr = yield* Effect.promise(() => refusedStderr(e, run, views));
-  const checks = yield* Effect.promise(() => checksOf(e, run, steps, views, stderr));
-  const source = shownWorkflow(run, workflows);
+  const read = yield* runReading(run, memo.filings);
+  if ('unjudged' in read) return unjudgedPage(read.unjudged);
+  const { home, folder, names, steps, views, judged, clock, filed } = read;
   const used = consumption(views, run);
-  const filed = yield* filedTimes(e, memo.filings);
-  const clock = timeline(run, views, filed, steps);
   const kinds = yield* Effect.promise(() => inRequest(driftNow(run)));
-  const at: StepAt = { e, placeService, run, source, steps, views, judged, checks, used, clock, stderr, said: memo.said };
+  const at: StepAt = { ...read, placeService, used, said: memo.said };
   const shown = yield* Effect.forEach(names, (name) => stepPage(name, at), { concurrency: 'unbounded' });
   const page: RunDetail = {
     id: run.id,

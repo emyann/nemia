@@ -338,6 +338,22 @@ tree (`checkedTree`, pure, in `src/template/template.store.ts`) before they writ
 factory controller reads a template through the door on every pass (`renderedAt`), and a factory's `template` is the model's
 `AppliedTemplate`, whose source names the `Template` it was applied from.
 
+**The Agent and Skill doors.** An agent and a skill, one context read through the same lookup roots, are each read and written through
+a door of its own, on the Workflow door's pattern and rooted as it is: `AgentDoor` (`packages/agent-orchestrator/src/agents/agent-door.store.ts`),
+whose `agents` group finds, lists, reads, writes and removes an agent and whose `custom` group reads, writes and clears a person's custom
+instructions for one, and `SkillDoor` (`src/skills/skill-door.store.ts`), which finds, lists, reads, writes and copies a skill. Each
+method takes a branded `AgentName` or `SkillName` (`src/agents/agents.model.ts`), but `found`, given a workflow's folder and its places,
+and `list`, given a holder's path. Their files layers (`agentFiles(home)`, `skillFiles(home)`) are over today's stores, so a definition
+is the very bytes today's writers write and no database is its source; their memory stand-ins (`agentDoorMemory`, `skillDoorMemory`, in
+`STAND_INS`) are held to the files by one table of walks each (`test/agent-walks.ts`, `test/skill-walks.ts`). Which root a name is read
+from is one pure, proved decider for both layers and both doors (`lookedUp`, `src/skills/lookup.ts`, `contracts/lookup.contract.ts`),
+the builtin place skills found last. A write checks the name on create, then what the draft renders to through the model's `Agent` or
+`Skill`, then the version it was read at, judged by `definitionVersionRefusal` (`src/agents/agents.ts`,
+`contracts/definition-version.contract.ts`) before either layer acts; the place, a link, a sidecar and a step still naming an agent stay
+the files' own refusals. What still calls the agent and skill stores — the folder's load and version, the roster, a start, the tick, the
+revisions pinned, a template, the sources — is counted per file in `test/agent-door.baseline.ts`, which only shrinks; the api's own
+reads of agents and skills are a later card's.
+
 **The Task door.** A task's journal is read and written through the runtime's `Journal` (`packages/agent-runtime/src/core/engine/journal.ts`),
 which is the Task door: every store reaches the engine through `Journal.layer`, so the door holds a hand-written store as it holds the
 files and the memory layers. Its methods take and give a branded `TaskId`, nominal on read, so a journal written under any id still

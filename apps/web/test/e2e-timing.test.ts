@@ -172,9 +172,7 @@ test('the shards together are held to the bound a whole run is, naming the slowe
 test('REFUSED: a shard that did not write its page times, by name, as a shard that failed rather than one to run again', () => {
   const three = String(shardsMissing(shardsOf(4, SEVEN).filter((shard) => shard.shard !== 3)));
   assert.match(three, /^shard 3 of 4 wrote no page times here/);
-  // A shard writes its times only after its pages pass (run.ts), so a shard with none failed or was cancelled, and its own failure is
-  // the verdict: the refusal sends no one to run it again by hand.
-  assert.doesNotMatch(three, /npm run e2e/, three);
+  assert.doesNotMatch(three, /npm run e2e/, `a shard with no times failed or was cancelled, and is not to be run by hand: ${three}`);
   assert.match(
     String(shardsMissing(shardsOf(4, SEVEN).filter((shard) => shard.shard > 2))),
     /^shards 1 and 2 of 4 wrote no page times here/,

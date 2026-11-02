@@ -87,12 +87,15 @@ export function shardsMissing(shards: readonly ShardPages[]): string | null {
     );
   const here = new Set(shards.map((shard) => shard.shard));
   const absent = Array.from({ length: of }, (_, i) => i + 1).filter((i) => !here.has(i));
-  if (absent.length)
+  if (absent.length) {
+    const many = absent.length > 1;
     return (
-      `shard${absent.length > 1 ? 's' : ''} ${listed(absent)} of ${of} wrote no page times here, and a shard writes them only once its ` +
-      `pages have passed (run.ts), so ${absent.length > 1 ? 'each' : 'it'} failed or was cancelled: ${absent.length > 1 ? 'their' : 'its'} own result is the ` +
-      `e2e\u2019s verdict, so read ${absent.length > 1 ? 'their logs' : 'its log'} and answer it, and the pages ${absent.length > 1 ? 'they' : 'it'} visited are summed against the bound once ${absent.length > 1 ? 'they pass' : 'it passes'}`
+      `shard${many ? 's' : ''} ${listed(absent)} of ${of} wrote no page times here, and a shard writes them only once its pages have ` +
+      `passed (run.ts), so ${many ? 'each' : 'it'} failed or was cancelled: ${many ? 'their' : 'its'} own result is the e2e\u2019s ` +
+      `verdict, so read ${many ? 'their logs' : 'its log'} and answer it, and the pages ${many ? 'they' : 'it'} visited are summed ` +
+      `against the bound once ${many ? 'they pass' : 'it passes'}`
     );
+  }
   return null;
 }
 

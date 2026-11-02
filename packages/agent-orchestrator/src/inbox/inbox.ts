@@ -532,8 +532,8 @@ const definedOf = (given: Partial<Record<InboxKey, string | undefined>>): Partia
  * The file `nemia inbox add` writes for an idea, and its body — refused, naming `from`, as the card it writes would be refused
  * (`parseInboxCard`).
  *
- * `text` is the idea as given: a note, or a file's text. A file whose frontmatter is an inbox card's — a block that reads, as YAML or in
- * the former line form (`frontmatterOrNull`), as keys each of `INBOX_KEYS`, or an `after:`, which is refused by name — gives its keys
+ * `text` is the idea as given: a note, or a file's text. A file whose frontmatter is an inbox card's — a block that reads as YAML
+ * (`frontmatterOrNull`) as keys each of `INBOX_KEYS`, or an `after:`, which is refused by name — gives its keys
  * and its body; any other text, a frontmatter that never closes included, is the body whole, as `nemia start` takes a brief that is
  * not a card. `workflow`, `repo` and `factory`, when given, are written over the text's own, the keys in `INBOX_KEYS`' order. Refused
  * too: text with nothing in it, a `workflow`, `repo` or `factory` given on more than one line, and a `queued:` in the text: a card is

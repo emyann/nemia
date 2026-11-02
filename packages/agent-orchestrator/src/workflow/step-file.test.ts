@@ -167,13 +167,17 @@ test('each key a step has: read as written, and refused blank, twice or with a w
     reads(
       'check: verbatim, colons and all; retries: a count',
       'implement',
-      'check: npm test && node -e "console.log(1 ? 2 : 3)"\nretries: 2',
+      `check: 'npm test && node -e "console.log(1 ? 2 : 3)"'\nretries: 2`,
       {
         check: 'npm test && node -e "console.log(1 ? 2 : 3)"',
         retries: 2,
       },
     ),
-    reads('check: a flow list is the shell the line form wrote', 'implement', 'check: [ -f x ]', { check: '[ -f x ]' }),
+    {
+      row: 'REFUSED: check: a flow list, the shell the former line form wrote, at its line, with the YAML to write',
+      run: () => fm('implement', 'check: [ -f x ]'),
+      naming: ['implement:3:', '`check: "[ -f x ]"`'],
+    },
     refuses('check: blank', 'implement', 'check:', '`check` has no value', 'exit 0'),
     refuses('check: only spaces', 'implement', 'check:   ', '`check` has no value'),
     refuses('check: none, which runs as a command', 'implement', 'check: none', 'exits 127'),
@@ -424,7 +428,7 @@ test('each key a step has: read as written, and refused blank, twice or with a w
       ),
     ),
     ...['inbox', 'costs'].map((name) => refuses(`reads: ${name} twice`, 'review', `reads: ${name}, ${name}`, `names \`${name}\` twice`)),
-    refuses('reads: no name', 'review', 'reads: , ,', '`reads: , ,` names nothing'),
+    refuses('reads: no name', 'review', 'reads: ", ,"', '`reads: , ,` names nothing'),
     refuses('reads: on a remote agent', 'review', 'harness: a2a:peer\nreads: inbox', '`reads: inbox` gives a session on this machine'),
   ]);
 });
@@ -440,8 +444,8 @@ test('the list entries of `tools:`, `disallowedTools:` and `allowedTools:`: one 
     reads("tools: quotes are YAML's", 'review', 'tools: "Read"', { tools: ['Read'] }),
     reads('tools: on claude', 'review', 'harness: claude\ntools: Read', { tools: ['Read'] }),
     refuses('tools: blank', 'review', 'tools:', '`tools` has no value', '`tools: Read, Grep, Glob, Bash`'),
-    refuses('tools: only a comma', 'review', 'tools: ,', '`tools: ,`', 'names no tool', 'Without the line'),
-    refuses('tools: only commas', 'review', 'tools:  , ,', 'names no tool'),
+    refuses('tools: only a comma', 'review', 'tools: ","', '`tools: ,`', 'names no tool', 'Without the line'),
+    refuses('tools: only commas', 'review', 'tools: " , ,"', 'names no tool'),
     refuses('tools: no commas', 'review', 'tools: Read Grep Glob', '`tools: Read Grep Glob`', '`Read Grep Glob`', 'comma-separated'),
     refuses(
       'tools: a comma inside an entry',
@@ -514,8 +518,8 @@ test('the list entries of `tools:`, `disallowedTools:` and `allowedTools:`: one 
       '`disallowedTools: Bash(npm run build), SendMessage`',
       'delete the line',
     ),
-    refuses('disallowedTools: only a comma', 'review', 'disallowedTools: ,', '`disallowedTools: ,`', 'names no rule', 'Without the line'),
-    refuses('disallowedTools: only commas', 'review', 'disallowedTools:  , ,', 'names no rule'),
+    refuses('disallowedTools: only a comma', 'review', 'disallowedTools: ","', '`disallowedTools: ,`', 'names no rule', 'Without the line'),
+    refuses('disallowedTools: only commas', 'review', 'disallowedTools: " , ,"', 'names no rule'),
     refuses(
       'disallowedTools: a comma inside the parentheses',
       'review',
@@ -585,7 +589,7 @@ test('the list entries of `tools:`, `disallowedTools:` and `allowedTools:`: one 
     refuses(
       'allowedTools: only a comma',
       'write',
-      'allowedTools: ,',
+      'allowedTools: ","',
       '`allowedTools: ,`',
       'names no rule',
       'Without the line',
@@ -900,7 +904,7 @@ const EVERY: Record<Exclude<StepKey, 'workspace' | 'slot' | 'agent' | 'skills' |
   remote: 'true',
   deadlineSeconds: '900',
   budget: '2.50',
-  check: 'npm test && node -e "console.log(1 ? 2 : 3)"',
+  check: `'npm test && node -e "console.log(1 ? 2 : 3)"'`,
   retries: '0',
   gate: 'true',
   output: 'review.schema.json',

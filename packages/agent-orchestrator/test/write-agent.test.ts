@@ -455,7 +455,7 @@ test('REFUSED: a write or a removal the store will not make, by its kind and wha
       'renaming it to critic',
     );
     fs.mkdirSync(path.join(STORE, 'broken'));
-    fs.writeFileSync(path.join(STORE, 'broken', 'a.md'), '---\n  agent : reviewer\nafter: nowhere\n---\nx\n');
+    fs.writeFileSync(path.join(STORE, 'broken', 'a.md'), '---\nagent : reviewer\nafter: nowhere\n---\nx\n');
     assert.deepEqual(
       agentUsers(STORE, 'reviewer'),
       ['broken/a', 'dev/review'],

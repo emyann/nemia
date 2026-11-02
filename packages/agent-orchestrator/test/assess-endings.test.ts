@@ -1731,6 +1731,10 @@ test("`heldCheckouts` and `branchWord`: the repository's checkout goes to one ru
       'wf/r-1/implement is ahead of main by 1 commit',
     );
     assert.equal(branchWord(r, { branch: 'wf/r-1/implement', where: 'gone' }), 'wf/r-1/implement is gone: git no longer has it');
+    assert.match(
+      branchWord(r, { branch: 'wf/r-1/implement', where: 'unread', why: 'git timed out' }),
+      /^wf\/r-1\/implement: .*git timed out/,
+    );
     assert.equal(firstLine('\n\n  Ship it.\nThen the check.\n'), 'Ship it.');
     assert.equal(firstLine(''), '');
   });

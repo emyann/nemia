@@ -9,8 +9,8 @@ import { OUT, store } from '../world.ts';
 
 /**
  * A run of two steps that ask a person questions as data, written for this page's visit and taken back before it ends: `design` signed off
- * done asking one that takes several and recommends two, `spec` signed off blocked asking two — one that takes a single answer and recommends one, one that takes several and
- * recommends none.
+ * done asking one that takes several and recommends two, `spec` signed off blocked asking two — one that takes a single answer and
+ * recommends one, one that takes several and recommends none.
  */
 const QUESTIONS = {
   id: 'answer-by-choosing-e2e',
@@ -143,8 +143,8 @@ const chosenOn = (form: ReturnType<Page['locator']>, title: string): Promise<str
 
 export default {
   /**
-   * A run whose steps ask questions as data. A done step's are drawn read-only on its Output tab, each option it recommends marked. A blocked
-   * step's are a form under Decide: an option for each answer, radios where it takes one and checkboxes where several, nothing chosen, and
+   * A run whose steps ask questions as data. A done step's are drawn read-only on its Output tab, each option it recommends marked. A
+   * blocked step's are a form under Decide: an option for each answer, radios where it takes one and checkboxes where several, nothing chosen, and
    * `Answer and continue` held until each question has an answer. `Choose the recommended answers` chooses the one recommended and leaves
    * the question without one as it was; a box ticked there and words of the person's own beside it, the answers go to the api, which writes
    * them as the next try's message, in the package's words. The page leaves the run before it takes it back, so no poll asks for a run that

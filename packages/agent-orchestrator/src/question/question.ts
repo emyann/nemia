@@ -125,7 +125,10 @@ export function expandShapes(properties: Record<string, unknown>): { properties:
   return { properties: expanded };
 }
 
-/** Whether a field's schema is `QUESTIONS_SCHEMA`, or a former one a frozen run holds (`FORMER_QUESTIONS_SCHEMAS`), its `description` aside. */
+/**
+ * Whether a field's schema is `QUESTIONS_SCHEMA`, or a former one a frozen run holds (`FORMER_QUESTIONS_SCHEMAS`), its `description`
+ * aside.
+ */
 const isQuestionsSchema = (schema: unknown): boolean => {
   if (!isObject(schema)) return false;
   const { description: _, ...rest } = schema;

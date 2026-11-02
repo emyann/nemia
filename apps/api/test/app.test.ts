@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from './scratch.ts';
 import { until } from './waits.ts';
-import type { RunDetail } from '../src/detail/detail.ts';
+import { closeoutOf, objectOf, pageRead, specOf, stepOf, toldOf, triesOf } from './run-reads.ts';
 import { app } from '../src/app.ts';
 import {
   atWork,
@@ -174,7 +174,7 @@ const filedBare = {
   askedModel: null,
   effort: null,
   contextTokens: null,
-  permissionMode: null,
+  fence: null,
   runsIn: { mode: 'workspace-write', by: 'default' },
   remote: null,
   bridge: null,
@@ -188,8 +188,6 @@ const listed = async (id: string) => {
   assert.ok(run, `${id} is on the list`);
   return run;
 };
-/** A run as GET /api/runs/:id answers it. */
-const detailOf = async (id: string) => (await (await app.request(`/api/runs/${id}`)).json()) as RunDetail;
 
 /** That run `id`'s page and its decision are refused as the list leaves it unjudged, in the list's words. */
 const saysAsListed = async (id: string) => {
@@ -293,6 +291,7 @@ const oneTaskTotals = () => ({
     wall: 'not known',
     cost: null,
   },
+  slot: null,
 });
 
 test("a store's runs read on the list and on a run's page: each summarized with what its steps do, one in full, a blocked step waiting on you, a task the engine has no record of", async (t) => {
@@ -415,16 +414,12 @@ test("a store's runs read on the list and on a run's page: each summarized with 
     settledTask('t-2', blocked);
     writeRun(r2);
 
-    const res = await app.request('/api/runs/r-2');
-    assert.equal(res.status, 200);
-    const run = (await res.json()) as RunDetail;
-    const [implement, review] = run.steps;
+    const run = await objectOf(app, 'r-2');
+    assert.deepEqual([run.metadata.name, run.metadata.creationTimestamp], ['r-2', '2026-09-12T02:00:00.000Z']);
     assert.deepEqual(
-      { ...run, steps: undefined },
+      { ...run.spec, steps: undefined },
       {
-        id: 'r-2',
         brief: 'Add a cache\n\nKeep it small.',
-        decide: 'nemia decide r-2',
         repo: '/code/app',
         place: 'git',
         work: null,
@@ -433,13 +428,19 @@ test("a store's runs read on the list and on a run's page: each summarized with 
         baseRef: 'def456',
         branch: 'main',
         isolate: true,
-        createdAt: '2026-09-12T02:00:00.000Z',
+        after: [],
+        context: [],
+        from: null,
+        steps: undefined,
+      },
+    );
+    assert.deepEqual(
+      { ...run.status, steps: undefined },
+      {
         startedAt: '2026-09-12T02:00:00.000Z',
         cancelledAt: null,
         pruned: null,
         onDisk: { worktrees: false, files: false },
-        after: [],
-        context: [],
         waiting: null,
         holdUntil: [],
         holding: null,
@@ -463,13 +464,24 @@ test("a store's runs read on the list and on a run's page: each summarized with 
         gates: [],
         warning: null,
         kinds: [],
-        refresh: 'nemia refresh r-2',
         graph: { roots: ['implement'], edges: [{ from: 'implement', to: 'review', kind: 'after' }] },
         steps: undefined,
         timeline: oneTaskTotals(),
-        /** A folder given by path: the board pages it on no address. */
-        workflowPage: null,
       },
+    );
+    const page = await pageRead(app, 'r-2');
+    assert.deepEqual(
+      [page.decide, page.refresh, page.workflowPage, page.steps.map((s) => s.commands)],
+      [
+        'nemia decide r-2',
+        'nemia refresh r-2',
+        null,
+        [
+          { approve: 'nemia approve r-2 implement', retry: 'nemia retry r-2 implement', say: 'nemia say r-2 implement' },
+          { approve: 'nemia approve r-2 review', retry: 'nemia retry r-2 review', say: 'nemia say r-2 review' },
+        ],
+      ],
+      "the lines a person types are the page's, not the object's; and a folder given by path the board pages on no address",
     );
 
     const implementTry = {
@@ -480,35 +492,40 @@ test("a store's runs read on the list and on a run's page: each summarized with 
       via: 'closeout',
       message: 'succeeded · BLOCKED',
       check: null,
-      closeout: blockedCloseout,
-      unreadable: null,
       attempts: { count: 1, latest: { startedAt: at, ended: 'succeeded', endedAt: at, reason: 'harness' } },
     };
-    assert.deepEqual(implement, {
+    assert.deepEqual(specOf(run, 'implement'), {
       name: 'implement',
-      spec: {
-        harness: 'codex',
-        model: 'gpt-5',
-        effort: null,
-        context: null,
-        after: [],
-        workspace: null,
-        place: 'git',
-        resume: null,
-        permissionMode: null,
-        sandbox: null,
-        tools: null,
-        deadlineSeconds: 600,
-        loop: null,
-        rounds: null,
-      },
-      /** The engine's record, not the folder's words: this journal was written with none of them. */
-      filed: filedBare,
+      harness: 'codex',
+      model: 'gpt-5',
+      effort: null,
+      context: null,
+      after: [],
+      input: [],
+      workspace: null,
+      place: 'git',
+      resume: null,
+      fence: null,
+      sandbox: null,
+      tools: null,
+      deadlineSeconds: 600,
+      loop: null,
+      rounds: null,
+    });
+    assert.deepEqual(await toldOf(app, 'r-2', 'implement'), {
       body: 'Implement the thing.',
       /** What the engine was filed with, not the brief recomposed from today's folder and record. */
       told: filedBrief('t-2'),
       layers: null,
       taskParts: [{ kind: 'text', text: filedBrief('t-2') }],
+    });
+    assert.deepEqual(await triesOf(app, 'r-2', 'implement'), firstTry({ ...implementTry, closeout: blockedCloseout }));
+    assert.deepEqual(stepOf(run, 'implement'), {
+      name: 'implement',
+      status: 'blocked',
+      current: { try: 1, round: 1, phase: 'waiting', reason: 'AwaitingAnswer', outcome: 'blocked', verdict: null },
+      /** The engine's record, not the folder's words: this journal was written with none of them. */
+      filed: filedBare,
       workspace: '/code/app/.wt/r-2/implement',
       branch: 'wf/r-2/implement',
       /** A repository run's step works on a branch: it lists no files, whatever its worktree holds. */
@@ -516,7 +533,6 @@ test("a store's runs read on the list and on a run's page: each summarized with 
       filesError: null,
       note: null,
       roundDue: false,
-      commands: { approve: 'nemia approve r-2 implement', retry: 'nemia retry r-2 implement', say: 'nemia say r-2 implement' },
       /** Its question, off its closeout; no session the harness blocked, so no last line; nothing asked of it yet. */
       needs: 'Which database?',
       waitingFor: null,
@@ -545,9 +561,9 @@ test("a store's runs read on the list and on a run's page: each summarized with 
       spent: null,
       budget: null,
       raise: null,
-      tries: firstTry(implementTry),
       timeline: settledTimeline('t-2'),
     });
+    assert.deepEqual(await closeoutOf(app, 'r-2', 'implement'), { try: 1, closeout: blockedCloseout, unreadable: null });
 
     const reviewTry = {
       taskId: null,
@@ -557,68 +573,68 @@ test("a store's runs read on the list and on a run's page: each summarized with 
       via: null,
       message: 'pending',
       check: null,
-      closeout: null,
-      unreadable: null,
       attempts: { count: 0, latest: null },
     };
+    const review = await toldOf(app, 'r-2', 'review');
     assert.ok(
       review.taskParts?.length && review.taskParts.every((part) => part.kind === 'text'),
       'composed: its task by part, none handed',
     );
     assert.deepEqual(
       { ...review, told: undefined, taskParts: undefined },
-      {
-        name: 'review',
-        spec: {
-          harness: null,
-          model: null,
-          effort: null,
-          context: null,
-          after: ['implement'],
-          workspace: null,
-          place: 'git',
-          resume: null,
-          permissionMode: null,
-          sandbox: null,
-          tools: null,
-          deadlineSeconds: null,
-          loop: null,
-          rounds: null,
-        },
-        /** Not filed: the engine has filed it with nothing yet. */
-        filed: null,
-        body: 'Review what implement did.',
-        told: undefined,
-        layers: null,
-        taskParts: undefined,
-        workspace: null,
-        branch: null,
-        files: [],
-        filesError: null,
-        note: null,
-        roundDue: false,
-        commands: { approve: 'nemia approve r-2 review', retry: 'nemia retry r-2 review', say: 'nemia say r-2 review' },
-        needs: null,
-        waitingFor: null,
-        approve: null,
-        denied: null,
-        sessionUnread: null,
-        gate: null,
-        accepted: null,
-        lastLine: null,
-        said: [],
-        asked: null,
-        ...reviewTry,
-        verdict: null,
-        /** Not filed: it consumed nothing, and has no try on the clock. */
-        used: null,
-        spent: null,
-        budget: null,
-        raise: null,
-        tries: firstTry(reviewTry),
-        timeline: [],
-      },
+      { body: 'Review what implement did.', told: undefined, layers: null, taskParts: undefined },
     );
+    assert.deepEqual(specOf(run, 'review'), {
+      name: 'review',
+      harness: null,
+      model: null,
+      effort: null,
+      context: null,
+      after: ['implement'],
+      input: [],
+      workspace: null,
+      place: 'git',
+      resume: null,
+      fence: null,
+      sandbox: null,
+      tools: null,
+      deadlineSeconds: null,
+      loop: null,
+      rounds: null,
+    });
+    assert.deepEqual(await triesOf(app, 'r-2', 'review'), firstTry({ ...reviewTry, closeout: null }));
+    assert.deepEqual(await closeoutOf(app, 'r-2', 'review'), { try: 1, closeout: null, unreadable: null });
+    assert.deepEqual(stepOf(run, 'review'), {
+      name: 'review',
+      status: 'pending',
+      current: { try: 1, round: 1, phase: 'pending', reason: 'Pending', outcome: null, verdict: null },
+      /** Not filed: the engine has filed it with nothing yet. */
+      filed: null,
+      workspace: null,
+      branch: null,
+      files: [],
+      filesError: null,
+      note: null,
+      roundDue: false,
+      needs: null,
+      waitingFor: null,
+      approve: null,
+      denied: null,
+      sessionUnread: null,
+      gate: null,
+      accepted: null,
+      lastLine: null,
+      said: [],
+      asked: null,
+      ...reviewTry,
+      verdict: null,
+      /** Not filed: it consumed nothing, and has no try on the clock. */
+      used: null,
+      spent: null,
+      budget: null,
+      raise: null,
+      timeline: [],
+    });
     assert.ok(review.told, 'not filed, so told what it would be given now: implement has run in this workspace, so look there');
     assert.ok(
       review.told.startsWith(`${PRECEDENCE}\n\nReview what implement did.\n\n## What was asked for\n\nAdd a cache\n\nKeep it small.`),
@@ -640,14 +656,14 @@ test("a store's runs read on the list and on a run's page: each summarized with 
     queuedTask('t-5');
     writeRun({ ...r2, id: 'r-5', steps: { implement: { taskId: 't-5', branch: 'wf/r-5/implement' }, review: { taskId: null } } });
 
-    const lost = await detailOf('r-4');
-    assert.equal(lost.steps[0].message, 'unknown');
-    assert.equal(lost.steps[0].told, null);
+    const lost = await objectOf(app, 'r-4');
+    assert.equal(stepOf(lost, 'implement').message, 'unknown');
+    assert.equal((await toldOf(app, 'r-4', 'implement')).told, null);
     assert.equal((await listed('r-4')).steps[0].message, 'unknown');
 
-    const queued = await detailOf('r-5');
-    assert.equal(queued.steps[0].message, 'pending', 'a task filed and waiting for a slot is still pending');
-    assert.equal(queued.steps[0].told, filedBrief('t-5'));
+    const queued = await objectOf(app, 'r-5');
+    assert.equal(stepOf(queued, 'implement').message, 'pending', 'a task filed and waiting for a slot is still pending');
+    assert.equal((await toldOf(app, 'r-5', 'implement')).told, filedBrief('t-5'));
     assert.equal((await listed('r-5')).steps[0].message, 'pending');
   });
   await s.test(
@@ -696,15 +712,17 @@ const frozenLoop = [
 
 const frozenSpecs = {
   implement: {
+    name: 'implement',
     harness: 'claude',
     model: 'opus',
     effort: null,
     context: null,
     after: [],
+    input: [],
     workspace: null,
     place: null,
     resume: null,
-    permissionMode: null,
+    fence: null,
     sandbox: null,
     tools: null,
     deadlineSeconds: null,
@@ -712,15 +730,17 @@ const frozenSpecs = {
     rounds: null,
   },
   review: {
+    name: 'review',
     harness: 'codex',
     model: null,
     effort: null,
     context: null,
     after: ['implement'],
+    input: [],
     workspace: null,
     place: null,
     resume: null,
-    permissionMode: null,
+    fence: null,
     sandbox: null,
     tools: null,
     deadlineSeconds: null,
@@ -794,7 +814,8 @@ test('a run whose workflow folder changes or vanishes after it starts is read of
     fs.renameSync(path.join(changed, 'original.md'), path.join(changed, 'replacement.md'));
     fs.writeFileSync(path.join(changed, 'review.md'), '---\nafter: replacement\nplace: git\n---\nReview it.\n');
 
-    const run = await detailOf('r-6');
+    const object = await objectOf(app, 'r-6');
+    const run = object.status;
     assert.ok(run.warning, "a step renamed after the run started: the folder still reads as a workflow, only not this run's");
     assert.match(run.warning, /no longer has original/);
     assert.match(run.warning, /has replacement, which the run did not start with/);
@@ -813,25 +834,33 @@ test('a run whose workflow folder changes or vanishes after it starts is read of
       via: 'closeout',
       message: 'succeeded · BLOCKED',
       check: null,
-      closeout: blockedCloseout,
-      unreadable: null,
       attempts: { count: 1, latest: { startedAt: at, ended: 'succeeded', endedAt: at, reason: 'harness' } },
     };
-    assert.deepEqual(original, {
-      name: 'original',
-      spec: null,
-      filed: filedBare,
+    assert.equal(specOf(object, 'original'), undefined, 'the folder no longer has it: no spec of it');
+    assert.deepEqual(await toldOf(app, 'r-6', 'original'), {
       body: null,
       told: filedBrief('t-6'),
       layers: null,
       taskParts: [{ kind: 'text', text: filedBrief('t-6') }],
+    });
+    assert.deepEqual((await pageRead(app, 'r-6')).steps.find((s) => s.name === 'original')?.commands, {
+      approve: 'nemia approve r-6 original',
+      retry: 'nemia retry r-6 original',
+      say: 'nemia say r-6 original',
+    });
+    assert.deepEqual(await triesOf(app, 'r-6', 'original'), firstTry({ ...originalTry, closeout: blockedCloseout }));
+    assert.deepEqual(await closeoutOf(app, 'r-6', 'original'), { try: 1, closeout: blockedCloseout, unreadable: null });
+    assert.deepEqual(original, {
+      name: 'original',
+      status: 'blocked',
+      current: { try: 1, round: 1, phase: 'waiting', reason: 'AwaitingAnswer', outcome: 'blocked', verdict: null },
+      filed: filedBare,
       workspace: '/code/app/.wt/r-6/original',
       branch: 'wf/r-6/original',
       files: [],
       filesError: null,
       note: null,
       roundDue: false,
-      commands: { approve: 'nemia approve r-6 original', retry: 'nemia retry r-6 original', say: 'nemia say r-6 original' },
       needs: 'Which database?',
       waitingFor: null,
       approve: null,
@@ -858,13 +887,20 @@ test('a run whose workflow folder changes or vanishes after it starts is read of
       spent: null,
       budget: null,
       raise: null,
-      tries: firstTry(originalTry),
       timeline: settledTimeline('t-6'),
     });
-    assert.deepEqual([review.body, review.spec?.after, review.message], ['Review it.', ['replacement'], 'pending']);
     assert.deepEqual(
-      [replacement.body, replacement.taskId, replacement.message, replacement.closeout],
-      ['Do the original thing.', null, 'pending', null],
+      [(await toldOf(app, 'r-6', 'review')).body, specOf(object, 'review')?.after, review.message],
+      ['Review it.', ['replacement'], 'pending'],
+    );
+    assert.deepEqual(
+      [
+        (await toldOf(app, 'r-6', 'replacement')).body,
+        replacement.taskId,
+        replacement.message,
+        await closeoutOf(app, 'r-6', 'replacement'),
+      ],
+      ['Do the original thing.', null, 'pending', { try: 1, closeout: null, unreadable: null }],
     );
 
     const summary = await listed('r-6');
@@ -893,14 +929,15 @@ test('a run whose workflow folder changes or vanishes after it starts is read of
         steps: { implement: { taskId: null }, review: { taskId: null } },
       });
 
-      const run = await detailOf('r-40');
+      const object = await objectOf(app, 'r-40');
+      const run = object.status;
       assert.ok(run.warning);
       assert.match(run.warning, /no longer reads as a workflow/);
       assert.match(run.warning, /someNewerKey/);
       assert.match(run.warning, /the workflow the run froze/);
       assert.ok(!run.warning.includes('..'), run.warning);
       assert.deepEqual(
-        run.steps.map((s) => [s.name, s.spec, s.body]),
+        await Promise.all(run.steps.map(async (s) => [s.name, specOf(object, s.name), (await toldOf(app, 'r-40', s.name)).body])),
         [
           ['implement', frozenSpecs.implement, 'Implement it, as frozen.'],
           ['review', frozenSpecs.review, 'Review it, as frozen.'],
@@ -916,9 +953,10 @@ test('a run whose workflow folder changes or vanishes after it starts is read of
         frozenGraph,
         "the list draws the card's flow off the same graph, with no read of the run",
       );
+      const { told } = await toldOf(app, 'r-40', 'implement');
       assert.ok(
-        run.steps[0].told?.startsWith(`${PRECEDENCE}\n\nImplement it, as frozen.\n\n## What was asked for`),
-        `not filed: told what the tick would file it with, composed from the frozen workflow, not ${String(run.steps[0].told)}`,
+        told?.startsWith(`${PRECEDENCE}\n\nImplement it, as frozen.\n\n## What was asked for`),
+        `not filed: told what the tick would file it with, composed from the frozen workflow, not ${String(told)}`,
       );
 
       writeRun({
@@ -928,12 +966,13 @@ test('a run whose workflow folder changes or vanishes after it starts is read of
         workflow: frozenLoop,
         steps: { implement: { taskId: null }, review: { taskId: null } },
       });
-      const gone = await detailOf('r-41');
+      const goneObject = await objectOf(app, 'r-41');
+      const gone = goneObject.status;
       assert.ok(gone.warning);
       assert.match(gone.warning, /is gone\. Nothing here is read from it/);
       assert.ok(!gone.warning.includes('..'), gone.warning);
       assert.deepEqual(
-        gone.steps.map((s) => s.spec),
+        gone.steps.map((s) => specOf(goneObject, s.name)),
         [frozenSpecs.implement, frozenSpecs.review],
         'with no folder at all: the same page',
       );
@@ -950,15 +989,14 @@ test('a run whose workflow folder changes or vanishes after it starts is read of
       workflow: frozen,
       steps: { implement: { taskId: null }, review: { taskId: null } },
     });
-    const response = await app.request('/api/runs/r-44');
-    assert.equal(response.status, 200);
-    const run = (await response.json()) as RunDetail;
+    const run = await objectOf(app, 'r-44');
     assert.deepEqual(
-      run.steps.map((s) => s.spec),
+      run.status.steps.map((s) => specOf(run, s.name)),
       [frozenSpecs.implement, frozenSpecs.review],
     );
-    assert.ok(run.steps[1].spec);
-    assert.equal('maxAttempts' in run.steps[1].spec, false);
+    const review = specOf(run, 'review');
+    assert.ok(review);
+    assert.equal('maxAttempts' in review, false);
     assert.ok(await listed('r-44'), 'and it lists');
   });
   await s.test('a run that froze its workflow is drawn from it, not from a folder that reads and says something else', async () => {
@@ -974,14 +1012,16 @@ test('a run whose workflow folder changes or vanishes after it starts is read of
       steps: { implement: { taskId: null }, review: { taskId: null } },
     });
 
-    const run = await detailOf('r-42');
+    const object = await objectOf(app, 'r-42');
+    const run = object.status;
     assert.equal(run.warning, null);
     assert.deepEqual(
-      run.steps.map((s) => s.spec),
+      run.steps.map((s) => specOf(object, s.name)),
       [frozenSpecs.implement, frozenSpecs.review],
     );
+    const told = await Promise.all(run.steps.map((s) => toldOf(app, 'r-42', s.name)));
     assert.deepEqual(
-      run.steps.map((s) => s.body),
+      told.map((s) => s.body),
       ['Implement it, as frozen.', 'Review it, as frozen.'],
     );
     assert.deepEqual(
@@ -994,7 +1034,7 @@ test('a run whose workflow folder changes or vanishes after it starts is read of
       frozenGraph,
       "and so is its card: not the edited folder's graph, which has no edge at all",
     );
-    assert.ok(run.steps[1].told?.startsWith(`${PRECEDENCE}\n\nReview it, as frozen.`), String(run.steps[1].told));
+    assert.ok(told[1].told?.startsWith(`${PRECEDENCE}\n\nReview it, as frozen.`), String(told[1].told));
   });
   await s.test(
     'a run that froze its workflow shows only its steps: one its folder gained since is named in the warning, and neither listed nor drawn',
@@ -1012,7 +1052,7 @@ test('a run whose workflow folder changes or vanishes after it starts is read of
         steps: { implement: { taskId: null }, review: { taskId: null } },
       });
 
-      const run = await detailOf('r-43');
+      const run = (await objectOf(app, 'r-43')).status;
       assert.ok(run.warning, 'docs was added to the folder after `nemia start`: the tick reads the frozen workflow, so it never files it');
       assert.match(
         run.warning,
@@ -1051,7 +1091,7 @@ test("a step's attempts and its log: how many, when the latest began and ended, 
     retryingTask('t-7');
     writeRun({ ...r2, id: 'r-7', steps: { implement: { taskId: 't-7', branch: 'wf/r-7/implement' }, review: { taskId: null } } });
 
-    const run = await detailOf('r-7');
+    const run = (await objectOf(app, 'r-7')).status;
     assert.deepEqual(
       run.steps.map((s: { attempts: unknown }) => s.attempts),
       [
@@ -1070,7 +1110,7 @@ test("a step's attempts and its log: how many, when the latest began and ended, 
     ]);
     writeRun({ ...r2, id: 'r-8', steps: { implement: { taskId: 't-8', branch: 'wf/r-8/implement' }, review: { taskId: null } } });
     assert.deepEqual(
-      (await detailOf('r-8')).steps[0].attempts,
+      (await objectOf(app, 'r-8')).status.steps[0].attempts,
       {
         count: 1,
         latest: { startedAt: at, ended: 'succeeded', endedAt: later, reason: 'harness' },
@@ -1089,7 +1129,7 @@ test("a step's attempts and its log: how many, when the latest began and ended, 
     const unsignedWords = { count: 1, latest: { startedAt: at, ended: 'failed', endedAt: later, reason: 'unsigned' } };
     quiet('t-8u', { observed: 'done', reason: 'harness', closedOut: false }, 'succeeded');
     writeRun({ ...r2, id: 'r-8u', steps: { implement: { taskId: 't-8u', branch: 'wf/r-8u/implement' }, review: { taskId: null } } });
-    const unsigned = await detailOf('r-8u');
+    const unsigned = (await objectOf(app, 'r-8u')).status;
     assert.deepEqual(
       unsigned.steps[0].attempts,
       unsignedWords,
@@ -1098,7 +1138,7 @@ test("a step's attempts and its log: how many, when the latest began and ended, 
     assert.equal(unsigned.steps[0].message, 'unsigned');
     quiet('t-8o', { observed: 'failed', reason: 'unsigned' }, 'failed');
     writeRun({ ...r2, id: 'r-8o', steps: { implement: { taskId: 't-8o', branch: 'wf/r-8o/implement' }, review: { taskId: null } } });
-    const judgedUnsigned = await detailOf('r-8o');
+    const judgedUnsigned = (await objectOf(app, 'r-8o')).status;
     assert.deepEqual(
       judgedUnsigned.steps[0].attempts,
       unsignedWords,
@@ -1109,7 +1149,7 @@ test("a step's attempts and its log: how many, when the latest began and ended, 
     const cappedWords = { count: 1, latest: { startedAt: at, ended: 'failed', endedAt: later, reason: 'budget' } };
     quiet('t-8b', { observed: 'failed', reason: 'harness', limit: 'budget', exitCode: 1 }, 'failed');
     writeRun({ ...r2, id: 'r-8b', steps: { implement: { taskId: 't-8b', branch: 'wf/r-8b/implement' }, review: { taskId: null } } });
-    const capped = await detailOf('r-8b');
+    const capped = (await objectOf(app, 'r-8b')).status;
     assert.deepEqual(
       capped.steps[0].attempts,
       cappedWords,
@@ -1118,12 +1158,12 @@ test("a step's attempts and its log: how many, when the latest began and ended, 
     assert.equal(capped.steps[0].message, 'budget exhausted');
     quiet('t-8c', { observed: 'failed', reason: 'budget', exitCode: 1 }, 'failed');
     writeRun({ ...r2, id: 'r-8c', steps: { implement: { taskId: 't-8c', branch: 'wf/r-8c/implement' }, review: { taskId: null } } });
-    const judgedCapped = await detailOf('r-8c');
+    const judgedCapped = (await objectOf(app, 'r-8c')).status;
     assert.deepEqual(judgedCapped.steps[0].attempts, cappedWords, 'an end the runtime judged budget itself reads the same');
     assert.equal(judgedCapped.steps[0].message, 'budget exhausted');
 
     assert.deepEqual(
-      (await detailOf('r-4')).steps[0].attempts,
+      (await objectOf(app, 'r-4')).status.steps[0].attempts,
       { count: 0, latest: null },
       'a task the engine has no record of has had no attempts it can speak for',
     );
@@ -1451,7 +1491,7 @@ async function expectJudged(cases: readonly Judgement[]) {
     const words = await runWith(e, list(e, runStore.runs.read(id)));
     for (const [where, run] of [
       ['list', await listed(id)],
-      ['detail', await detailOf(id)],
+      ['detail', (await objectOf(app, id)).status],
     ] as const) {
       assert.deepEqual([run.status, run.moving, run.waitingOnYou], [status, moving, waitingOnYou], `${id}, ${where}: ${why}`);
       assert.deepEqual(
@@ -1479,7 +1519,7 @@ test("what a run established, read as the tick and `nemia ls` have it: each step
       ['plan', 'starting'],
       ['ship', 'pending'],
     ];
-    const detail = await detailOf('r-20');
+    const detail = (await objectOf(app, 'r-20')).status;
     const summary = await listed('r-20');
     assert.deepEqual(
       detail.steps.map((s) => [s.name, s.message]),
@@ -1501,7 +1541,7 @@ test("what a run established, read as the tick and `nemia ls` have it: each step
     const e = engine();
     for (const id of ['r-20', 'r-21']) {
       const words = await runWith(e, list(e, runStore.runs.read(id)));
-      const detail = await detailOf(id);
+      const detail = (await objectOf(app, id)).status;
       for (const [where, run] of [
         ['list', await listed(id)],
         ['detail', detail],
@@ -1550,7 +1590,7 @@ test("what a run established, read as the tick and `nemia ls` have it: each step
       ];
       for (const [id, status, why] of cases) {
         const row = (await listed(id)) as unknown as Record<string, unknown>;
-        const full = (await detailOf(id)) as unknown as Record<string, unknown>;
+        const full = (await objectOf(app, id)).status as unknown as Record<string, unknown>;
         assert.equal(row.status, status, `${id} listed: ${why}`);
         assert.equal(full.status, status, `${id} in full: ${why}`);
         assert.deepEqual(['stoppedOn' in row, 'stoppedOn' in full], [false, false], `${id}: the word has one key`);
@@ -1636,7 +1676,7 @@ test("what a run established, read as the tick and `nemia ls` have it: each step
     ];
     for (const [id, status, moving, why] of cases) {
       const summary = await listed(id);
-      const detail = await detailOf(id);
+      const detail = (await objectOf(app, id)).status;
       assert.deepEqual([summary.status, summary.moving], [status, moving], `${id} listed: ${why}`);
       assert.deepEqual([detail.status, detail.moving], [status, moving], `${id} in full: ${why}`);
     }
@@ -1699,7 +1739,7 @@ test("what a run established, read as the tick and `nemia ls` have it: each step
         assert.deepEqual((await runWith(e, list(e, runStore.runs.read(id)))).waitingOnYou, waitingOnYou, `${id}, nemia ls: ${why}`);
         for (const [where, run] of [
           ['list', await listed(id)],
-          ['detail', await detailOf(id)],
+          ['detail', (await objectOf(app, id)).status],
         ] as const) {
           assert.deepEqual(
             [run.status, run.moving, run.waitingOnYou, run.steps[0].message],
@@ -1756,7 +1796,7 @@ test("what a run established, read as the tick and `nemia ls` have it: each step
     async () => {
       seedLoop('r-34', 1, true);
       const entry = (name: string) => COMMANDS.find((c) => c.name === name)!;
-      const run = await detailOf('r-34');
+      const run = await pageRead(app, 'r-34');
       assert.equal(run.decide, commandLine(entry('decide'), { runId: 'r-34' }));
       assert.equal(run.decide, 'nemia decide r-34');
       assert.deepEqual(
@@ -1827,7 +1867,7 @@ test("a step's check read on the board: its command, and once it refused its exi
   await s.test(
     "a step with a `check:` carries its command, and once its check refused, the exit and each stream's last lines",
     async () => {
-      const run = await detailOf('r-20');
+      const run = (await objectOf(app, 'r-20')).status;
       const checkOf = (name: string) => run.steps.find((s) => s.name === name)?.check;
       assert.deepEqual(checkOf('build'), {
         command: 'npm run build',
@@ -1892,7 +1932,7 @@ test("a step's check read on the board: its command, and once it refused its exi
         steps: Object.fromEntries(cases.map(([name]) => [name, { taskId: `t-72-${name}`, check: { taskId: `r-72-${name}-check` } }])),
       });
 
-      const { steps } = await detailOf('r-72');
+      const { steps } = (await objectOf(app, 'r-72')).status;
       const words = Object.fromEntries(steps.map((s) => [s.name, [s.message, s.verdict, s.check?.verdict, s.check?.refused?.exit]]));
       const unfinished = { result: 'unfinished', exit: null };
       assert.deepEqual(words, {
@@ -1921,10 +1961,10 @@ test("a step's check read on the board: its command, and once it refused its exi
       },
     });
 
-    const [implement] = (await detailOf('r-73')).steps;
-    const first = implement.tries[0].check;
+    const tries = await triesOf(app, 'r-73', 'implement');
+    const first = tries[0].check;
     assert.deepEqual([first?.verdict, first?.refused?.exit], [{ result: 'unfinished', exit: null }, 'unfinished']);
-    assert.deepEqual(implement.tries[1].check?.verdict, { result: 'passed', exit: 0 });
+    assert.deepEqual(tries[1].check?.verdict, { result: 'passed', exit: 0 });
   });
   await s.test('a refused check that kept no stdout is read off its log, as `nemia decide` reads it', async () => {
     settledTask('t-74-e2e', done);
@@ -1938,7 +1978,7 @@ test("a step's check read on the board: its command, and once it refused its exi
       steps: { e2e: { taskId: 't-74-e2e', check: { taskId: 'r-74-e2e-check' } } },
     });
 
-    const [e2e] = (await detailOf('r-74')).steps;
+    const [e2e] = (await objectOf(app, 'r-74')).status.steps;
     assert.deepEqual(e2e.check?.refused?.stdout, { lines: ['starting the browser'], truncated: false });
   });
   await s.test('a refused check whose output cannot be read still answers, and says how to read it from the command line', async () => {
@@ -1953,9 +1993,7 @@ test("a step's check read on the board: its command, and once it refused its exi
       steps: { test: { taskId: 't-22-test', check: { taskId: 'r-22-test-check' } } },
     });
 
-    const res = await app.request('/api/runs/r-22');
-    assert.equal(res.status, 200);
-    const [test] = ((await res.json()) as RunDetail).steps;
+    const [test] = (await objectOf(app, 'r-22')).status.steps;
     assert.equal(test.message, 'failed ✗ check (exit 2)');
     const refused = test.check?.refused;
     assert.ok(refused);
@@ -1987,7 +2025,7 @@ test("a step's check read on the board: its command, and once it refused its exi
         steps: { test: { taskId: 't-71-test', check: { taskId: 'r-71-test-check' } } },
       });
 
-      const [test] = (await detailOf('r-71')).steps;
+      const [test] = (await objectOf(app, 'r-71')).status.steps;
       const refused = test.check?.refused;
       assert.ok(refused);
       assert.deepEqual(
@@ -2080,7 +2118,7 @@ test("a step's tries and its closeout: every try of a looped step off one observ
         },
       });
 
-      const run = await detailOf('r-50');
+      const run = (await objectOf(app, 'r-50')).status;
 
       const once = { count: 1, latest: { startedAt: at, ended: 'succeeded', endedAt: at, reason: 'harness' } };
       const closeout = (raw: { summary: string }, more: object = {}) => ({
@@ -2103,8 +2141,9 @@ test("a step's tries and its closeout: every try of a looped step off one observ
       const passed = (taskId: string) => ({ command: 'npm test', taskId, verdict: { result: 'passed', exit: 0 }, refused: null });
       const [implement, review] = run.steps;
       assert.deepEqual([implement.message, implement.note, implement.attempts], ['verified ✓', 'round 2 of 3', once]);
+      const implementTries = await triesOf(app, 'r-50', 'implement');
       assert.deepEqual(
-        implement.tries,
+        implementTries,
         [
           {
             try: 1,
@@ -2170,12 +2209,12 @@ test("a step's tries and its closeout: every try of a looped step off one observ
         "each closeout keeps what was recorded, untouched, as raw: replies is read into the api's shape, and the statement is not",
       );
       assert.deepEqual(
-        [implement.check, implement.closeout],
-        [implement.tries[2].check, implement.tries[2].closeout],
+        [implement.check, (await closeoutOf(app, 'r-50', 'implement'))?.closeout],
+        [implementTries[2].check, implementTries[2].closeout],
         "the step's own check and closeout are its current try's",
       );
 
-      assert.deepEqual(review.tries, [
+      assert.deepEqual(await triesOf(app, 'r-50', 'review'), [
         {
           try: 1,
           round: 1,
@@ -2248,8 +2287,7 @@ test("a step's tries and its closeout: every try of a looped step off one observ
         workflow: [{ name: 'plan', after: [], body: 'Plan it.', output: { file: 'plan.json', schema } }],
         steps: { plan: { taskId: 'r-51-plan' } },
       });
-      const run = await detailOf('r-51');
-      const { closeout } = run.steps[0];
+      const closeout = (await closeoutOf(app, 'r-51', 'plan'))?.closeout;
       assert.ok(closeout);
       assert.deepEqual(
         [closeout.outcome, closeout.artifacts, closeout.output, closeout.missing],
@@ -2286,12 +2324,13 @@ test("a step's tries and its closeout: every try of a looped step off one observ
         ],
         steps: { cut: { taskId: 'r-52-cut' }, list: { taskId: 'r-52-list' }, fine: { taskId: 'r-52-fine' } },
       });
-      const [c, l, f] = (await detailOf('r-52')).steps;
+      const [c, l, f] = await Promise.all(['cut', 'list', 'fine'].map((step) => closeoutOf(app, 'r-52', step)));
+      assert.ok(c && l && f, 'each step has a try');
       assert.equal(c.closeout, null);
       assert.ok(c.unreadable);
       assert.equal(c.unreadable.raw, cut, 'cut off mid-string: not a closeout, and what the agent said, shown whole');
       assert.match(c.unreadable.error, /\S/);
-      assert.deepEqual(c.tries.at(-1)?.unreadable, c.unreadable, 'the try carries it too');
+      assert.deepEqual((await triesOf(app, 'r-52', 'cut')).at(-1)?.unreadable, c.unreadable, 'the try carries it too');
       assert.equal(l.closeout, null);
       assert.ok(l.unreadable);
       assert.deepEqual(l.unreadable.raw, ['done'], 'an array: not a closeout, and what the agent said, shown whole');
@@ -2335,17 +2374,20 @@ test("what a step runs with: the workflow's effort, context and tools, the mode 
         steps: { implement: { taskId: 'r-51-implement' }, review: { taskId: null } },
       });
 
-      const [implement, review] = (await detailOf('r-51')).steps;
-      assert.deepEqual(implement.spec, {
+      const run = await objectOf(app, 'r-51');
+      const [implement, review] = run.status.steps;
+      assert.deepEqual(specOf(run, 'implement'), {
+        name: 'implement',
         harness: 'claude',
         model: null,
         effort: 'high',
         context: 200_000,
         after: [],
+        input: [],
         workspace: null,
         place: null,
         resume: null,
-        permissionMode: null,
+        fence: null,
         sandbox: null,
         tools: ['Read', 'Grep'],
         deadlineSeconds: null,
@@ -2359,7 +2401,7 @@ test("what a step runs with: the workflow's effort, context and tools, the mode 
           askedModel: null,
           effort: 'high',
           contextTokens: 200_000,
-          permissionMode: null,
+          fence: null,
           runsIn: { mode: 'auto', by: 'default' },
           remote: null,
           bridge: null,
@@ -2369,7 +2411,7 @@ test("what a step runs with: the workflow's effort, context and tools, the mode 
         "the engine's defaults, off its journal: one attempt, no deadline, which is no limit, and no model, which is the harness's; and auto, the mode Claude Code runs a task filed with none in, which is not Claude Code's own",
       );
       assert.equal(review.filed, null, 'not filed: nothing the engine could say');
-      assert.equal((await detailOf('r-4')).steps[0].filed, null, 'nor for a task the engine has no record of');
+      assert.equal((await objectOf(app, 'r-4')).status.steps[0].filed, null, 'nor for a task the engine has no record of');
     },
   );
   await s.test(
@@ -2395,7 +2437,7 @@ test("what a step runs with: the workflow's effort, context and tools, the mode 
           workflow: [{ name: 'implement', after: [], body: 'Implement it.', ...spec }],
           steps: { implement: { taskId: `${id}-implement` } },
         });
-        const [implement] = (await detailOf(id)).steps;
+        const [implement] = (await objectOf(app, id)).status.steps;
         assert.deepEqual(implement.filed?.runsIn, runsIn, `${id}, filed as the tick files it: the harness's arguments under config`);
       }
     },
@@ -2425,9 +2467,7 @@ test("what a step runs with: the workflow's effort, context and tools, the mode 
           workflow: [{ name: 'implement', after: [], body: 'Implement it.', ...spec }],
           steps: { implement: { taskId: `${id}-implement` } },
         });
-        const res = await app.request(`/api/runs/${id}`);
-        assert.equal(res.status, 200, id);
-        const { filed } = ((await res.json()) as RunDetail).steps[0];
+        const { filed } = stepOf(await objectOf(app, id), 'implement');
         assert.ok(filed?.runsIn, id);
         said.set(id, filed.runsIn.mode);
       }
@@ -2495,7 +2535,7 @@ test("what a step runs with: the workflow's effort, context and tools, the mode 
           workflow: [{ name: 'implement', after: [], body: 'Implement it.', harness: 'claude' }],
           steps: { implement: { taskId: 'r-55-implement-try2', tries } },
         });
-        const { filed } = (await detailOf(id)).steps[0];
+        const { filed } = (await objectOf(app, id)).status.steps[0];
         assert.ok(filed, id);
         assert.deepEqual([filed.model, filed.askedModel], ['sonnet', askedModel], id);
       }
@@ -2565,8 +2605,8 @@ test("a step's files: a closeout's files with where they are served, each served
     "a closeout's files in the step's files directory carry where the api serves them, their kind and size — any other path is the path alone",
     async () => {
       const { dir, named } = seedFiles();
-      const [shoot] = (await detailOf('r-52')).steps;
-      assert.ok(shoot.closeout);
+      const shoot = await closeoutOf(app, 'r-52', 'shoot');
+      assert.ok(shoot?.closeout);
       const served = (name: string, kind: string, size: number) => ({
         path: path.join(dir, name),
         name,
@@ -2591,7 +2631,7 @@ test("a step's files: a closeout's files with where they are served, each served
         ],
         'the path alone: outside the directory however it is spelled, under it where no name reaches, a link out of it, a name the route refuses, a file it does not have, a path on the branch, and an absolute path anywhere else, which is not looked at',
       );
-      assert.deepEqual(shoot.tries[0].closeout?.artifacts, shoot.closeout.artifacts);
+      assert.deepEqual((await triesOf(app, 'r-52', 'shoot'))[0].closeout?.artifacts, shoot.closeout.artifacts);
     },
   );
   await s.test(
@@ -2652,13 +2692,11 @@ test("a step's files: a closeout's files with where they are served, each served
       fs.writeFileSync(marker, JSON.stringify({ at: files.at, worktrees: [], artifacts: files }));
       fs.rmSync(path.join(root, 'runs', 'r-52', 'artifacts'), { recursive: true });
       try {
-        const res = await app.request('/api/runs/r-52');
-        assert.equal(res.status, 200);
-        const page = (await res.json()) as RunDetail;
-        assert.deepEqual(page.pruned, { at: files.at, worktrees: [], artifacts: files });
+        const run = await objectOf(app, 'r-52');
+        assert.deepEqual(run.status.pruned, { at: files.at, worktrees: [], artifacts: files });
         const said = `its files were removed at ${files.at} (nemia prune --artifacts)`;
-        const [shoot] = page.steps;
-        assert.ok(shoot.closeout);
+        const shoot = await closeoutOf(app, 'r-52', 'shoot');
+        assert.ok(shoot?.closeout);
         assert.deepEqual(
           shoot.closeout.artifacts,
           [
@@ -2670,7 +2708,7 @@ test("a step's files: a closeout's files with where they are served, each served
           ],
           'every file named in the directory went with it, one beneath it and one the route refuses by name included; beside the directory is not in it: the path alone',
         );
-        assert.deepEqual(shoot.tries[0].closeout?.artifacts, shoot.closeout.artifacts);
+        assert.deepEqual((await triesOf(app, 'r-52', 'shoot'))[0].closeout?.artifacts, shoot.closeout.artifacts);
 
         const base = '/api/runs/r-52/steps/shoot/artifacts';
         for (const name of ['shot.png', 'gone.png']) {
@@ -2779,7 +2817,7 @@ test("where a run's time and tokens went, on its list line and its page, and the
       };
       writeRun(record);
 
-      const run = await detailOf('r-60');
+      const run = (await objectOf(app, 'r-60')).status;
       const [implement, review] = run.steps;
       const words = (
         s: { at: string; filedAt: string | null; spawnedAt: string | null; endedAt: string | null; queued: string; ran: string } | null,
@@ -2868,7 +2906,7 @@ test("where a run's time and tokens went, on its list line and its page, and the
           },
         },
       });
-      const again = await detailOf('r-60');
+      const again = (await objectOf(app, 'r-60')).status;
       assert.deepEqual(
         words(again.steps[0].timeline[2].session),
         {
@@ -2917,7 +2955,7 @@ test("where a run's time and tokens went, on its list line and its page, and the
       });
 
       const summary = await listed('r-61');
-      const run = await detailOf('r-61');
+      const run = (await objectOf(app, 'r-61')).status;
       assert.deepEqual(
         [summary.atWork, run.atWork],
         [
@@ -2995,7 +3033,7 @@ test("where a run's time and tokens went, on its list line and its page, and the
       assert.equal(implement.message, 'unverified · done', 'and the word the chip reads as it was');
       assert.equal(implement.note, null, 'nor in the note: the board says it once, from its own field');
       assert.equal(review.denied, null, 'a step denied nothing: null, not an empty list');
-      const page = (await detailOf('r-denied')).steps;
+      const page = (await objectOf(app, 'r-denied')).status.steps;
       assert.deepEqual([page[0].message, page[0].denied, page[1].denied], ['unverified · done', denied, null]);
     },
   );

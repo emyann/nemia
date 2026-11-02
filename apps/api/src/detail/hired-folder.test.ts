@@ -1,5 +1,5 @@
 /**
- * A run's page of a run started in a factory (`GET /api/runs/:id`): its workflow folder is read with the factory's hires, as its start
+ * A run's object of a run started in a factory (`GET /api/runs/:id`): its workflow folder is read with the factory's hires, as its start
  * read it, so a step the factory hires an agent into, whose file adds `skills:` to that agent, raises no warning; and the same folder
  * truly broken after the start still warns, in the folder's words, said once, with one full stop.
  *
@@ -12,7 +12,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from '../../test/scratch.ts';
-import type { RunDetail } from './detail.ts';
+import { objectOf } from '../../test/run-reads.ts';
 import { app } from '../app.ts';
 import { addFactory, attachWorkflow, hireAgent } from 'agent-orchestrator';
 
@@ -49,24 +49,20 @@ write(
   }),
 );
 
-const detailOf = async (): Promise<RunDetail> => {
-  const res = await app.request(`/api/runs/${R}`);
-  const body = (await res.json()) as RunDetail;
-  assert.equal(res.status, 200, JSON.stringify(body));
-  return body;
-};
+/** The run's object answers 200 (`objectOf` throws otherwise), its warning on its status. */
+const warningOf = async (): Promise<string | null> => (await objectOf(app, R)).status.warning;
 
 test('a run of a factory that hires an agent into a step reads its folder with the hires, and warns once that folder truly breaks', async (t) => {
   const s = story(t);
   await s.test(
     'a run of a factory that hires an agent into a step whose file adds `skills:` carries no warning: its folder reads with the hires',
     async () => {
-      assert.equal((await detailOf()).warning, null);
+      assert.equal(await warningOf(), null);
     },
   );
   await s.test('the same folder truly broken after the start warns in the same words, with one full stop', async () => {
     write(path.join(folder, 'design.md'), '---\nplace: git\nskills: spec-it\nsomeNewerKey: 1\n---\nDesign it.\n');
-    const { warning } = await detailOf();
+    const warning = await warningOf();
     assert.ok(warning);
     assert.ok(
       warning.startsWith(`The workflow folder ${folder} no longer reads as a workflow: design: \`someNewerKey\` is not a key a step has.`),

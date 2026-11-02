@@ -82,7 +82,10 @@ const threeRuns = async () => {
 
 /** The object of the run `id`, given the store's root. */
 const object = async (id: string) =>
-  await runWith(e(), Effect.provideService(runObject(readRun(id), { filings: { filed: new Map(), cursor: 0 } }), StoreRoot, ROOT));
+  await runWith(
+    e(),
+    Effect.provideService(runObject(readRun(id), { memo: { filings: { filed: new Map(), cursor: 0 }, said: new Map() } }), StoreRoot, ROOT),
+  );
 
 const handled = <D>(entry: { handler: (...a: never[]) => unknown }, args: Record<string, string>): Promise<D> =>
   runWith(e(), (entry.handler as (a: Record<string, string>, env: NodeJS.ProcessEnv, home: string) => never)(args, process.env, ROOT));

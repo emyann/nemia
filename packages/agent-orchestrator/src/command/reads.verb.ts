@@ -58,7 +58,7 @@ export const SHOW: Command = {
       (run): Effect.Effect<Readonly<Record<string, unknown>>, Refusal, EngineService | PlaceService> =>
         args.raw === true
           ? Effect.succeed(rawOf(run))
-          : rooted(home, 'show', runObject(run, { filings: kept?.filings ?? { filed: new Map(), cursor: 0 } })),
+          : rooted(home, 'show', runObject(run, { memo: { filings: kept?.filings ?? { filed: new Map(), cursor: 0 }, said: new Map() } })),
     ),
   print: (data) => [JSON.stringify(data, null, 2)],
   note: (_data, args) =>

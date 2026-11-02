@@ -70,8 +70,8 @@ export const toldOf = Effect.fnUntraced(function* (run: Run, step: Workflow) {
 
 /**
  * The skills of `step`, each read again through the Skill door from where a start of `run`'s folder finds it (`SkillDoor.skills.found`):
- * its body, or why it could not be told — none found, refused, or a SKILL.md the door reads none of. What `skillsAgain` reads off the
- * disk, asked of the door, so a program given the door's memory tells what the memory holds.
+ * its body, or why it could not be told — none found, refused, or a SKILL.md the door reads none of. The one read of a skill after a run
+ * started, since the copy `nemia start` froze went with the folder; asked of the door, so a program given its memory tells what it holds.
  */
 const skillsTold = Effect.fnUntraced(function* (step: Workflow, run: Run) {
   const door = (yield* SkillDoor).skills;

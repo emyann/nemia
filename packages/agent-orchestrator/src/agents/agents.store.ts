@@ -1,10 +1,9 @@
 /**
  * The agent files: where `nemia start` renders each step's agent for Claude Code (`agentFilesDir`), the render itself (`writeAgentFiles`),
  * the version of each skill it rendered (`renderedSkillVersions`), the rules each declares (`renderedSkillRules`) and the paths of its work
- * (`renderedSkillApplies`), and a skill read again once its rendered folder is gone (`skillsAgain`); and what the board's Agents page
- * writes — an agent and the files beside it (`writeAgent`, `removeAgent`, refused as `Missing`, `Conflict` or `Invalid`). What a folder
- * holds is `agents.ts`'s; this writes and reads it, and the agents of the two places the board lists them from are read in
- * `roster.store.ts`.
+ * (`renderedSkillApplies`); and what the board's Agents page writes — an agent and the files beside it (`writeAgent`, `removeAgent`,
+ * refused as `Missing`, `Conflict` or `Invalid`). What a folder holds is `agents.ts`'s; this writes and reads it, and the agents of the
+ * two places the board lists them from are read in `roster.store.ts`.
  *
  * Beneath the controllers, beside `record.store.ts`, whose run folder holds the agent files: it imports neither the engine nor a
  * controller, and no pure file imports it (`test/boundary.test.ts`). A run is changed by none of the writes: it froze its agents at
@@ -29,7 +28,6 @@ import {
   PROMPT_FILE,
   renderedPrompt,
   rendersAgent,
-  type SkillAgain,
   definitionVersionRefusal,
   type DefinitionThere,
 } from './agents.ts';
@@ -154,23 +152,6 @@ export function renderedSkillApplies(run: Pick<Run, 'id'>, step: Workflow): Map<
       return globs.length ? [[name, globs] as const] : [];
     }),
   );
-}
-
-/**
- * The skills of a step whose rendered folder is gone (`unrendered`), read again from where the load finds them now (`skills`): each
- * SKILL.md's body, or why it is not there. The copy `nemia start` froze went with the folder, so this is the one read of a skill after a
- * run started.
- */
-export function skillsAgain(step: Workflow, skills: SkillsFound): SkillAgain[] {
-  return (step.agent?.skills ?? []).map((name) => {
-    const from = skills.at.get(name);
-    if (typeof from !== 'string') return { name, missing: from ? from.message : `no folder holds it in ${skills.looked.join(', ')}.` };
-    try {
-      return { name, text: splitFrontmatter(`${name}/SKILL.md`, fs.readFileSync(path.join(from, 'SKILL.md'), 'utf8')).body };
-    } catch (err) {
-      return { name, missing: `${path.join(from, 'SKILL.md')} could not be read — ${(err as Error).message}.` };
-    }
-  });
 }
 
 /**

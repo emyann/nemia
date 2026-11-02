@@ -40,7 +40,7 @@ const { StoreRoot } = await import('../src/config/root.store.ts');
 const versionOf = (dir: string, places: Parameters<typeof workflowVersion>[1]): string =>
   Effect.runSync(workflowVersion(dir, places).pipe(Effect.provideService(StoreRoot, ROOT)));
 const { skillsFor, skillVersion } = await import('../src/skills/read.store.ts');
-const { agentFilesDir, renderedSkillVersions, skillsAgain, writeAgentFiles } = await import('../src/agents/agents.store.ts');
+const { agentFilesDir, renderedSkillVersions, writeAgentFiles } = await import('../src/agents/agents.store.ts');
 const { readRun } = await import('../src/record/record.store.ts');
 const { toldOf } = await import('../src/tick/told.verb.ts');
 const { SkillDoor } = await import('../src/skills/skill-door.store.ts');
@@ -223,8 +223,11 @@ test('a step given skills from four places: frozen as files under bare names, na
 
   await s.test('a step whose rendered folder is gone is told every skill whole in its brief, under the name its line writes', () => {
     const found = skillsFor(dev, { repo });
+    const gone = { ...readRun(run.id), id: 'told-gone-files' };
     for (const step of record.filter((s) => s.agent?.skills?.length)) {
-      const brief = briefBody(unrendered(step, skillsAgain(step, found)));
+      assert.equal(fs.existsSync(agentFilesDir(gone, step.name)), false, `${step.name}: its rendered folder is not there`);
+      const told = Effect.runSync(toldOf(gone, step).pipe(Effect.provideService(StoreRoot, ROOT)));
+      const brief = briefBody(told.step);
       assert.ok(brief.startsWith(headedLayers([['instructions', step.agent!.instructions!]])), `${step.name}: the instructions first`);
       for (const given of step.agent!.skills!) {
         const dir = found.at.get(given);

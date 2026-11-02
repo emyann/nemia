@@ -27,8 +27,12 @@ The diagram below is printed by the code (`src/model/diagram.model.ts`, through 
   loosely); the callers still on the folder's stores are counted in `test/workflow-door.baseline.ts`. **S5d**, the Template door
   (`TemplateDoor`, `src/templates/templates.store.ts`): a template's folder or archive read, written and packed, rooted as S5a's, each
   tree written checked by `TemplateTreeWrite`; the model's `Template` (`src/templates/templates.model.ts`) is keyed by its source, and a
-  factory's `template` is an `AppliedTemplate`, whose source names it. Still to come, its own card on S5a: **S5c**, the Agent and Skill
-  doors (one context, the same lookup roots). A run's `pinned` revisions, left out of `Run` today, are named there.
+  factory's `template` is an `AppliedTemplate`, whose source names it. **S5c**, the Agent and Skill doors (`AgentDoor`,
+  `src/agents/agent-door.store.ts`; `SkillDoor`, `src/skills/skill-door.store.ts`): one context read through the same lookup roots, the
+  model's `Skill` beside its `Agent`, whose `skills` are `SkillName`s (a skill as its door writes it: its `applies:` line and its
+  `rules.json`, which no write of the door sets, are left out), rooted as S5a's, which root a name is read from decided by
+  `lookedUp` (`contracts/lookup.contract.ts`) and a write judged against the version it was read at by `definitionVersionRefusal`
+  (`contracts/definition-version.contract.ts`); the callers still on their stores are counted in `test/agent-door.baseline.ts`. A run's `pinned` revisions, left out of `Run` today, are named there.
 - **S6, the subscription, the ledger and the feed**, each behind a door on the feed's model.
 - **AgentOnStep** is `StepAgent` in the agents' model: the agent a step is given, and what the step overrides of it, within what the
   agent offers (`Agent.overridable`).
@@ -156,13 +160,22 @@ erDiagram
     AgentName name PK
     string role "optional"
     string description "optional"
-    list skills "optional"
+    list skills FK "optional"
     enum harnessPrompt "optional"
     list mcp "optional"
     list overridable "optional"
     object keys
     string body
     string customInstructions "optional"
+  }
+  Skill {
+    SkillName name PK
+    string title "optional"
+    string description
+    list tags "optional"
+    list examples "optional"
+    boolean preload
+    string body
   }
   StepAgent {
     WorkflowName workflow FK
@@ -254,6 +267,7 @@ erDiagram
   Agent ||--o{ Hire : agent
   Agent ||--o{ Template : hires
   Workflow ||--o{ Template : workflows
+  Skill ||--o{ Agent : skills
   Workflow ||--o{ StepAgent : workflow
   WorkflowStep ||--o{ StepAgent : step
   Agent ||--o{ StepAgent : agent

@@ -1,8 +1,8 @@
 /**
  * A workflow folder written from its steps (`writeWorkflow`), what the board's builder saves, and one of yours removed whole
- * (`removeWorkflow`); where a folder's runs look for agents and skills (`placesAround`); and whether a folder holds the workflows the board
- * lists (`isWorkflowsHolder`). A store beside `folder.store.ts`, reading through the agents and skills reads: it imports neither the
- * engine nor a controller. A run that froze its folder at `nemia start` is changed by none of it.
+ * (`removeWorkflow`); where a folder's runs look for agents and skills (`placesAroundAt`); and whether a folder holds the workflows
+ * the board lists (`isWorkflowsHolderAt`). A store beside `folder.store.ts`, reading through the agents and skills reads: it imports
+ * neither the engine nor a controller. A run that froze its folder at `nemia start` is changed by none of it.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -49,9 +49,9 @@ export type WorkflowWritten = { dir: string; steps: Workflow[]; written: string[
  * `renderStep` refuses one that says `harness: codex`: it would be written under the former name, which the parser still reads.
  *
  * Where: a workflow in the store's `workflows/` or in that of a repository the store knows, a factory's or the `repo` of `places`
- * (`isWorkflowsHolder`), the two places the board lists workflows from. Anywhere else only with `{ anywhere: true }`, since a write
+ * (`isWorkflowsHolderAt`), the two places the board lists workflows from. Anywhere else only with `{ anywhere: true }`, since a write
  * removes files, and a path mistyped would remove them from a folder that is not a workflow. Its agents and skills are found where a run
- * of it would look (`lookupRoots`): in `places`, or else the factory's repository its folder is in and the store (`placesAround`). A run
+ * of it would look (`lookupRoots`): in `places`, or else the factory's repository its folder is in and the store (`placesAroundAt`). A run
  * is not changed by any of it: it froze its folder at `nemia start`.
  */
 export function writeWorkflowAt(
@@ -252,9 +252,3 @@ const atHome =
 export const writeWorkflow = atHome(writeWorkflowAt);
 /** `removeWorkflowAt` the module's root. */
 export const removeWorkflow = atHome(removeWorkflowAt);
-/** `knownReposAt` the module's root. */
-export const knownRepos = atHome(knownReposAt);
-/** `isWorkflowsHolderAt` the module's root. */
-export const isWorkflowsHolder = atHome(isWorkflowsHolderAt);
-/** `placesAroundAt` the module's root. */
-export const placesAround = atHome(placesAroundAt);

@@ -1,8 +1,9 @@
 /**
  * A skill folder read off disk, as the board's picker and page read one: its entry or why it has none (`skillRead`), the skill folders of
  * a folder of skills (`skillFolders`), the skills an agent gives, each read where it was found (`givenSkills`), the first of several
- * folders that has a skill (`skillDirIn`), and a SKILL.md's text (`skillText`). `WF_ROOT` is set before the import, since the store reads
- * it as it loads.
+ * folders that has a skill (`skillDirIn`), and a SKILL.md's text read through a link (`skillText`). A skill's text read back, and none
+ * where no skill is, are the Skill door's walks (`test/skill-walks.ts`). `WF_ROOT` is set before the import, since the store reads it as
+ * it loads.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -123,12 +124,6 @@ test('the first folder of skills that has a skill is where it is: the order deci
   assert.equal(skillDirIn([second, first], 'tidy'), path.join(second, 'tidy'));
   assert.equal(skillDirIn([first, second], 'audit'), path.join(second, 'audit'));
   assert.equal(skillDirIn([first, second], 'gone'), null);
-});
-
-test("a SKILL.md's text, or empty where it cannot be read", () => {
-  const root = scratch('wf-skills-');
-  assert.equal(skillText(skillAt(root, 'tidy', SKILL)), SKILL);
-  assert.equal(skillText(path.join(root, 'gone')), '');
 });
 
 test("REFUSED: a given skill no folder has, naming where a start looked; one two folders of a place have, in the package's words", () => {

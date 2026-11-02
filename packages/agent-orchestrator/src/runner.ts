@@ -176,7 +176,7 @@ export { cardSkills, isBuiltinPlace, lookupRoots, oneFolder, preloads, skillsFor
 export { BUILTIN_SKILLS } from './skills/read.store.ts';
 export type { Places } from './skills/read.store.ts';
 export { agentsFor, agentVersion, customInstructionsFile, loadAgents, readCustomInstructions } from './agents/read.store.ts';
-export { clearCustomInstructions, customInstructionsFor, writeCustomInstructions } from './agents/custom.store.ts';
+export { clearCustomInstructions, customInstructionsFor, writeCustomInstructions } from './custom/custom.store.ts';
 export { cardToStart, planLines, planStopped } from './plan/plan.ts';
 export type { Card, Planned } from './plan/plan.ts';
 export {
@@ -483,7 +483,7 @@ export { serverSignIn, serverSignInState, serverSignOut } from './servers/sign-i
 export type { ServerSignInStarted, ServerSignInState } from './servers/sign-in.verb.ts';
 export type { FactoryRules } from './rules/rules.verb.ts';
 export type { FactoryInstruction } from './factory/instruction.verb.ts';
-export { AGENTS_CUSTOM } from './agents/custom.verb.ts';
+export { AGENTS_CUSTOM } from './custom/custom.verb.ts';
 export { POLICY_PROPOSE } from './auto/auto.verb.ts';
 export type { Command, Ran } from './command/entry.verb.ts';
 export { CLI, CLI_VERBS, commandBreaks, commandLine, generated, helpOf, leftOut, parseArgv, routeList } from './command/command.ts';

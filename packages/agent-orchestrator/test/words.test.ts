@@ -310,7 +310,7 @@ const HARNESS_WORDS: Baseline = {
   'packages/agent-orchestrator/src/yours/yours.ts': { count: 1, ...MOVES.checkout },
   'packages/agent-orchestrator/src/runner.ts': { count: 1, ...MOVES.wait },
   'packages/agent-orchestrator/src/runtime-client.ts': { count: 5, ...MOVES.defaults },
-  'packages/agent-orchestrator/src/skills/read.store.ts': { count: 9, ...MOVES.checkout },
+  'packages/agent-orchestrator/src/skills/read.store.ts': { count: 8, ...MOVES.checkout },
   'packages/agent-orchestrator/src/skills/skills.ts': { count: 11, ...MOVES.render },
   'packages/agent-orchestrator/src/stats/discipline.ts': { count: 6, card: 'u42s' },
   'packages/agent-orchestrator/src/status/status.ts': { count: 8, card: 'u42s' },

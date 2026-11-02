@@ -2,8 +2,10 @@
  * A skill copied into a library (`copySkill`): what the board's skill picker does with a skill from another place, so an agent of yours
  * can give it. And what a skill costs a turn (`skillTurnCost`), which the picker shows beside each.
  *
- * The copy is held byte for byte against its source, the tests' team's skills (`team.ts`), and each refusal is made to refuse at shipped
- * defaults, asserted on its message, its kind, and with the library as it was. `WF_ROOT` is set before the modules are imported, since they
+ * The copy is held byte for byte against its source, the tests' team's skills (`team.ts`), and each of the files' own refusals — a card
+ * that does not read, a link, a place the board does not list — is made to refuse at shipped defaults, asserted on its kind and with the
+ * library as it was. A copy onto a name taken, of a skill the source has not, and of a name that is no skill's are the Skill door's walks
+ * (`test/skill-walks.ts`). `WF_ROOT` is set before the modules are imported, since they
  * read it as they load.
  */
 import { test } from 'node:test';
@@ -17,7 +19,8 @@ import { TEAM } from './team.ts';
 
 const ROOT = scratch('wf-skill-copy-');
 process.env.WF_ROOT = ROOT;
-const { copySkill, isRefusal } = await import('../src/runner.ts');
+const { isRefusal } = await import('../src/runner.ts');
+const { copySkill } = await import('../src/skills/skills.store.ts');
 type Refusal = import('../src/refusal/refusal.ts').Refusal;
 
 const SHIPPED = path.join(TEAM, 'skills');
@@ -67,7 +70,7 @@ function source(skills: Record<string, string>): string {
 test('a skill is copied whole into the library, and the store finds it there', () => {
   fs.rmSync(LIBRARY, { recursive: true, force: true });
   const name = fs.readdirSync(SHIPPED).sort()[0];
-  const copied = copySkill(SHIPPED, LIBRARY, name);
+  const copied = copySkill(ROOT, SHIPPED, LIBRARY, name);
   assert.equal(copied.dir, path.join(LIBRARY, name));
   assert.deepEqual(snapshot(copied.dir), snapshot(path.join(SHIPPED, name)), 'byte for byte');
   assert.ok(copied.written.includes('SKILL.md'));
@@ -78,39 +81,11 @@ test('a skill is copied whole into the library, and the store finds it there', (
   );
 });
 
-test('a copy is refused where the library has the name already, and the library is left as it was', () => {
-  fs.rmSync(LIBRARY, { recursive: true, force: true });
-  const name = fs.readdirSync(SHIPPED).sort()[0];
-  fs.mkdirSync(path.join(LIBRARY, name), { recursive: true });
-  fs.writeFileSync(path.join(LIBRARY, name, 'SKILL.md'), '---\ndescription: mine\n---\nMine.\n');
-  refuses(
-    () => copySkill(SHIPPED, LIBRARY, name),
-    'Conflict',
-    new RegExp(`^skills/${name} is there already, in ${LIBRARY.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}, and a copy would write over it\\.`),
-  );
-});
-
-test("a copy is refused for a skill the source does not have, and for a name that is not a skill's", () => {
-  fs.rmSync(LIBRARY, { recursive: true, force: true });
-  refuses(
-    () => copySkill(SHIPPED, LIBRARY, 'no-such-skill'),
-    'Missing',
-    /has no skill named no-such-skill: a skill is a folder holding a SKILL\.md/,
-  );
-  for (const bad of ['../agents', 'Review', 'a_b', '.hidden', '', 'x'.repeat(65)]) {
-    refuses(
-      () => copySkill(SHIPPED, LIBRARY, bad),
-      'Invalid',
-      /is not a skill's name: a skill is a folder in skills\/, named in lowercase words joined by dashes/,
-    );
-  }
-});
-
 test('a copy is refused for a skill whose SKILL.md does not read as a card entry: no agent could be given it', () => {
   fs.rmSync(LIBRARY, { recursive: true, force: true });
   const from = source({ bare: '# Bare\n\nNo frontmatter.\n', undescribed: '---\nname: undescribed\n---\nNothing said.\n' });
-  refuses(() => copySkill(from, LIBRARY, 'bare'), 'Invalid', /SKILL\.md has no frontmatter/);
-  refuses(() => copySkill(from, LIBRARY, 'undescribed'), 'Invalid', /SKILL\.md has no `description:`/);
+  refuses(() => copySkill(ROOT, from, LIBRARY, 'bare'), 'Invalid', /SKILL\.md has no frontmatter/);
+  refuses(() => copySkill(ROOT, from, LIBRARY, 'undescribed'), 'Invalid', /SKILL\.md has no `description:`/);
 });
 
 test('a copy is refused for a skill holding a link, and for a skill that is one: a copy would follow it out of the skill', () => {
@@ -119,11 +94,11 @@ test('a copy is refused for a skill holding a link, and for a skill that is one:
   const outside = scratch('wf-skill-outside-');
   fs.writeFileSync(path.join(outside, 'secret.txt'), "not the skill's");
   fs.symlinkSync(path.join(outside, 'secret.txt'), path.join(from, 'linking', 'notes.txt'));
-  refuses(() => copySkill(from, LIBRARY, 'linking'), 'Invalid', /notes\.txt is a link/);
+  refuses(() => copySkill(ROOT, from, LIBRARY, 'linking'), 'Invalid', /notes\.txt is a link/);
   fs.mkdirSync(path.join(outside, 'real'));
   fs.writeFileSync(path.join(outside, 'real', 'SKILL.md'), '---\ndescription: Real.\n---\nBody.\n');
   fs.symlinkSync(path.join(outside, 'real'), path.join(from, 'linked'));
-  refuses(() => copySkill(from, LIBRARY, 'linked'), 'Invalid', /linked is a link/);
+  refuses(() => copySkill(ROOT, from, LIBRARY, 'linked'), 'Invalid', /linked is a link/);
 });
 
 test("a copy is refused for a skill of a checkout's .claude/skills/ linked inside the checkout, which a start is given: a copy follows no link", () => {
@@ -134,22 +109,22 @@ test("a copy is refused for a skill of a checkout's .claude/skills/ linked insid
   fs.mkdirSync(path.join(repo, '.claude', 'skills'), { recursive: true });
   fs.symlinkSync('../../skills/x', path.join(repo, '.claude', 'skills', 'x'));
   assert.equal(skillsFor(path.join(repo, 'workflows', 'dev'), { repo }).at.get('x'), path.join(repo, '.claude', 'skills', 'x'));
-  refuses(() => copySkill(path.join(repo, '.claude', 'skills'), LIBRARY, 'x'), 'Invalid', /x is a link/);
+  refuses(() => copySkill(ROOT, path.join(repo, '.claude', 'skills'), LIBRARY, 'x'), 'Invalid', /x is a link/);
 });
 
 test('a copy is refused into a folder that is not a skills/ the board lists, unless anywhere', () => {
   const elsewhere = path.join(scratch('wf-skill-elsewhere-'), 'skills');
   const name = fs.readdirSync(SHIPPED).sort()[0];
   assert.throws(
-    () => copySkill(SHIPPED, elsewhere, name),
+    () => copySkill(ROOT, SHIPPED, elsewhere, name),
     (err: unknown) => isRefusal(err) && err._tag === 'Invalid' && /is not the store's skills\/ .* nor a repository's/.test(err.message),
   );
   assert.equal(fs.existsSync(elsewhere), false, 'nothing is made there');
   assert.throws(
-    () => copySkill(SHIPPED, path.join(ROOT, 'workflows', 'agents'), name),
+    () => copySkill(ROOT, SHIPPED, path.join(ROOT, 'workflows', 'agents'), name),
     (err: unknown) => isRefusal(err) && err._tag === 'Invalid' && /is not a folder of skills/.test(err.message),
   );
-  assert.equal(copySkill(SHIPPED, elsewhere, name, { anywhere: true }).dir, path.join(elsewhere, name), 'written with anywhere');
+  assert.equal(copySkill(ROOT, SHIPPED, elsewhere, name, { anywhere: true }).dir, path.join(elsewhere, name), 'written with anywhere');
 });
 
 test('a skill costs a turn its listing, and its body too when it is preloaded', () => {

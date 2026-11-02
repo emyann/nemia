@@ -39,7 +39,7 @@ import { amountIn, commandLine, type Args, type CommandSpec, type Flag } from '.
 import type { Command, Ran } from './entry.verb.ts';
 import { READS, SERIES } from './reads.verb.ts';
 import { PAGES } from './pages.verb.ts';
-import { AGENTS_CUSTOM } from '../agents/custom.verb.ts';
+import { AGENTS_CUSTOM } from '../custom/custom.verb.ts';
 import { LIBRARY_ENTRIES } from '../agents/library.verb.ts';
 import { SKILL_ENTRIES } from '../skills/skills.verb.ts';
 import { MERGES } from '../branches/merges.verb.ts';

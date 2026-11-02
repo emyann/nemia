@@ -15,7 +15,7 @@ import { scratch } from './scratch.ts';
 
 const ROOT = scratch('wf-overrides-');
 process.env.WF_ROOT = ROOT;
-const { writeAgent } = await import('../src/runner.ts');
+const { writeAgent } = await import('../src/agents/agents.store.ts');
 const { agentVersion } = await import('../src/agents/read.store.ts');
 
 /** The agents a step may name, each parsed from its file's text. */
@@ -159,9 +159,9 @@ test("a save of an agent that does not send its `overridable:` line keeps the fi
   const file = path.join(dir, 'reviewer.md');
   fs.writeFileSync(file, '---\noverridable: model, fence\nmodel: opus\n---\nYou review.\n');
   const draft = { name: 'reviewer', keys: { model: 'sonnet' }, body: 'You review.' };
-  writeAgent(dir, draft, { version: agentVersion(dir, 'reviewer') });
+  writeAgent(ROOT, dir, draft, { version: agentVersion(dir, 'reviewer') });
   assert.deepEqual(parseAgent('reviewer', fs.readFileSync(file, 'utf8')).overridable, ['model', 'fence'], 'the line kept');
   assert.equal(parseAgent('reviewer', fs.readFileSync(file, 'utf8')).keys.model, 'sonnet', 'and the change written');
-  writeAgent(dir, { ...draft, overridable: null }, { version: agentVersion(dir, 'reviewer') });
+  writeAgent(ROOT, dir, { ...draft, overridable: null }, { version: agentVersion(dir, 'reviewer') });
   assert.equal(parseAgent('reviewer', fs.readFileSync(file, 'utf8')).overridable, undefined, 'taken out');
 });

@@ -5,6 +5,7 @@
  * (`cli/writers.ts`), the board sends its form — and one agent read for its page (`AGENTS_READ`, `agentRead`), on the api alone. The api
  * guards each write and words the board's answer around what each entry answers.
  */
+import { Effect } from 'effect';
 import { tried } from '../runtime-client.ts';
 import type { Args, Flag, Positional, Spec } from '../command/command.ts';
 import { apiKey, cliPath, factoryFlag, FROM, versionFlag, writerSpec, writerText, yoursOrRefused } from '../yours/yours.ts';
@@ -16,7 +17,11 @@ import { agentRead } from '../roster/roster.store.ts';
 import { TRY_BUDGET } from '../try/try.ts';
 import { tryAgent } from '../try/try.verb.ts';
 import type { AgentDraft } from './agents.ts';
-import { removeAgent, writeAgent, type AgentSidecar, type AgentWritten } from './agents.store.ts';
+import type { AgentSidecar, AgentWritten } from './agents.store.ts';
+import { AgentDoor, type AgentRemoved } from './agent-door.store.ts';
+import { AgentName } from './agents.model.ts';
+import { rooted } from '../wiring/wire.verb.ts';
+import { StoreRoot } from '../config/root.store.ts';
 import { AGENTS_COPY } from '../sources/copy.verb.ts';
 
 /** The text under `key`, or undefined where none was given. */
@@ -54,11 +59,11 @@ const writtenLines = ({ dir, agent, version, written, removed }: AgentWritten): 
 ];
 
 /**
- * An agent of yours written (`writeAgent`): `draft`, the agent as JSON text, which the command line reads off `--file`; `schema`, the
- * result schema its `output:` names as JSON text, read beside that file; `version`, what the agent was read at, none for a new one; and the
- * agent's name on the path (`name`), the one it is renamed from — none given for the agent of the draft's own name with no version, a new
- * one. Written to the tree of the factory `--factory` names for the place `factory`. Refused, as `Invalid`, for a place but those two
- * (`yoursOrRefused`).
+ * An agent of yours written through the Agent door (`AgentDoor`, run `rooted` at the store's root its handler is given): `draft`, the
+ * agent as JSON text, which the command line reads off `--file`; `schema`, the result schema its `output:` names as JSON text, read
+ * beside that file; `version`, what the agent was read at, none for a new one; and the agent's name on the path (`name`), the one it is
+ * renamed from — none given for the agent of the draft's own name with no version, a new one. Written to the tree of the factory
+ * `--factory` names for the place `factory`. Refused, as `Invalid`, for a place but those two (`yoursOrRefused`).
  */
 export const AGENTS_WRITE: Command<AgentWritten> = {
   name: 'agents write',
@@ -92,29 +97,36 @@ export const AGENTS_WRITE: Command<AgentWritten> = {
     { method: 'POST', path: '/api/agents/:from', status: 201, hand: WRITE_HAND },
     { method: 'PUT', path: '/api/agents/:from/:name', status: 200, hand: WRITE_HAND },
   ],
-  handler: (args, _env, home = HOME) =>
-    tried(() => {
-      const name = writerText(args, 'name');
-      const from = writerText(args, 'from') ?? '';
-      const factory = writerText(args, 'factory');
-      const tree = (named: string) => templatedTree(named, 'nemia agents write');
-      const repo = from === 'factory' && factory !== undefined ? tree(factory) : writerText(args, 'repo');
-      const dir = yoursOrRefused('nemia agents write', 'agents', from, name ?? null, repo ?? '', home, { factory, treeOf: tree });
-      const draft = JSON.parse(writerText(args, 'draft') ?? '{}') as AgentDraft;
-      const version = writerText(args, 'version') ?? null;
-      const schema = writerText(args, 'schema');
-      return writeAgent(dir, draft, {
-        version,
-        ...(name !== undefined && (version !== null || name !== draft?.name) && { from: name }),
-        ...(schema !== undefined && { schema: JSON.parse(schema) as AgentSidecar | null }),
-        ...(repo !== undefined && { repo }),
-      });
-    }),
+  handler: (args, _env, home) =>
+    rooted(
+      home,
+      'nemia agents write',
+      Effect.gen(function* () {
+        const root = yield* StoreRoot;
+        const name = writerText(args, 'name');
+        const from = writerText(args, 'from') ?? '';
+        const factory = writerText(args, 'factory');
+        const tree = (named: string) => templatedTree(named, 'nemia agents write');
+        const repo = yield* tried(() => (from === 'factory' && factory !== undefined ? tree(factory) : writerText(args, 'repo')));
+        const dir = yield* tried(() =>
+          yoursOrRefused('nemia agents write', 'agents', from, name ?? null, repo ?? '', root, { factory, treeOf: tree }),
+        );
+        const draft = yield* tried(() => JSON.parse(writerText(args, 'draft') ?? '{}') as AgentDraft);
+        const schema = writerText(args, 'schema');
+        const sidecar = yield* tried(() => (schema === undefined ? undefined : (JSON.parse(schema) as AgentSidecar | null)));
+        const door = yield* AgentDoor;
+        return yield* door.agents.write(AgentName.read(name ?? draft?.name), draft, writerText(args, 'version'), {
+          dir,
+          ...(sidecar !== undefined && { schema: sidecar }),
+          ...(repo !== undefined && { repo }),
+        });
+      }),
+    ),
   print: writtenLines,
 };
 
-/** An agent of yours removed (`removeAgent`), against the `version` it was read at, which a removal without it names. */
-export const AGENTS_REMOVE: Command<{ dir: string; removed: string[] }> = {
+/** An agent of yours removed through the Agent door, against the `version` it was read at, which a removal without it names. */
+export const AGENTS_REMOVE: Command<AgentRemoved> = {
   name: 'agents rm',
   usage: 'yours <name> --version <v>',
   help: ['an agent of yours removed, at the --version it was read at'],
@@ -127,13 +139,19 @@ export const AGENTS_REMOVE: Command<{ dir: string; removed: string[] }> = {
     status: 200,
     hand: 'the board guards the removal, and reads the version the agent was read at before it is removed',
   },
-  handler: (args, _env, home = HOME) =>
-    tried(() => {
-      const name = writerText(args, 'name') ?? '';
-      const repo = writerText(args, 'repo');
-      const dir = yoursOrRefused('nemia agents rm', 'agents', writerText(args, 'from') ?? '', name, repo ?? '', home);
-      return removeAgent(dir, name, { version: writerText(args, 'version') ?? null, ...(repo !== undefined && { repo }) });
-    }),
+  handler: (args, _env, home) =>
+    rooted(
+      home,
+      'nemia agents rm',
+      Effect.gen(function* () {
+        const root = yield* StoreRoot;
+        const name = writerText(args, 'name') ?? '';
+        const repo = writerText(args, 'repo');
+        const dir = yield* tried(() => yoursOrRefused('nemia agents rm', 'agents', writerText(args, 'from') ?? '', name, repo ?? '', root));
+        const door = yield* AgentDoor;
+        return yield* door.agents.remove(AgentName.read(name), writerText(args, 'version'), { dir, ...(repo !== undefined && { repo }) });
+      }),
+    ),
   print: ({ dir, removed }) => [`removed from ${dir}: ${removed.join(', ')}`],
 };
 

@@ -7,8 +7,8 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { customInstructionsRefusal } from './agents.ts';
-import { agentsFor, customInstructionsFile, notAFileRefusal, readCustomInstructions } from './read.store.ts';
+import { customInstructionsRefusal } from '../agents/agents.ts';
+import { agentsFor, customInstructionsFile, notAFileRefusal, readCustomInstructions } from '../agents/read.store.ts';
 import { Invalid, Missing } from '../refusal/refusal.ts';
 
 /** The store's own agent, Nemia, whom no place names: she is built into this package, and her custom instruction is the person's. */

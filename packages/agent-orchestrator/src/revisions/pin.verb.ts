@@ -296,7 +296,9 @@ export const resolvedNow = Effect.fn('resolvedNow')(function* (
   if (!steps) return undefined;
   const allows = read.allows(run);
   const refused = stepSetRefusal(steps, run.isolate ?? true) ?? unallowedRefusal(steps, allows.rules, allows.untrusted);
-  return refused ? ({ kept: firstLine(refused) } satisfies Kept) : ({ steps, pins: yield* pinsOf(run, steps, at, read) } satisfies Resolved);
+  return refused
+    ? ({ kept: firstLine(refused) } satisfies Kept)
+    : ({ steps, pins: yield* pinsOf(run, steps, at, read) } satisfies Resolved);
 });
 
 /**

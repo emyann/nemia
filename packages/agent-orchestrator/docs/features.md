@@ -5667,9 +5667,10 @@ reads a flow collection on a key that holds one value, is refused at load (`read
 line YAML reads otherwise, that line written as YAML with its value the same, and `nemia frontmatter rewrite <folder>` for the whole
 folder. The `former` mark is gone from `Frontmatter` with the readers that branched on it (a skill's card key and `applies:` read alone,
 `withKey`'s rewrite, `fenceMoved`), and so is `formerFormLine` at `nemia start`: the load says it instead. `nemia frontmatter rewrite`
-and `rewriteFormer` stay, for a folder written before that is brought in later: the former form is still recognised there, and only
-there (`inFormerForm`, `formerShaped` and `formerEntries` private to the rewrite). A run frozen before keeps its steps as records, which
-no frontmatter reader reads.
+and `rewriteFormer` stay, for a folder written before that is brought in later. The form is still recognised in two places, by the same
+helpers (`formerForm`, `formerShaped`, `formerEntries`; `inFormerForm` exported for the rewrite's caller and its tests): the load
+recognises it to refuse it, and the rewrite to write it as YAML. No reader takes a value from it. A run frozen before keeps its steps as
+records, which no frontmatter reader reads.
 
 ## 15. The runtime's `HarnessArgs` take a generic `fence` (decision 12, slice 2)
 

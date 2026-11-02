@@ -293,8 +293,12 @@ const commentsOf = (block: string): string =>
     .map((line) => `${line}\n`)
     .join('');
 
-/** Whether one former line `key: value` reads, as YAML on its own, as the former reader read it. */
+/**
+ * Whether one former line `key: value` reads, as YAML on its own, as the former reader read it. A line still in the former form on its own
+ * does not, and is answered before it is read: the load refuses it by naming a line this picks (`formerRefusal`).
+ */
 const lineReadsSame = (line: string, key: string, value: string): boolean => {
+  if (formerForm(parsed(line), line)) return false;
   const only = onlyEntry(frontmatterOrNull(line));
   return only !== undefined && only.key === key && only.value === value;
 };

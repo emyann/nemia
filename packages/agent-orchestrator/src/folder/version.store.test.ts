@@ -7,6 +7,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
+import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { Effect, Layer } from 'effect';
@@ -137,6 +138,22 @@ test("the version over the files doors is the synchronous reader's, byte for byt
     assert.notEqual(doorVersion(dir, {}), syncVersion(dir, {}));
     fs.rmSync(path.join(team, 'agents', 'README.md'));
     assert.equal(doorVersion(dir, {}), syncVersion(dir, {}), 'with no file there either, both read it missing');
+  });
+  await t.test("an added skill whose SKILL.md is a link, followed in a checkout's own skills, reads as null, so its digest moves", () => {
+    const repo = scratch('wf-version-repo-');
+    execFileSync('git', ['init', '-q'], { cwd: repo });
+    const skill = path.join(repo, '.claude', 'skills', 'linked');
+    fs.mkdirSync(skill, { recursive: true });
+    fs.writeFileSync(path.join(repo, 'card.md'), '---\ndescription: A linked card.\n---\nLinked.\n');
+    fs.symlinkSync(path.join(repo, 'card.md'), path.join(skill, 'SKILL.md'));
+    const dir = path.join(repo, 'workflows', 'dev');
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, 'build.md'), `---\nplace: git\nskills: linked\n---\nBuild.\n`);
+    assert.equal(typeof skillsFor(dir, { repo }).at.get('linked'), 'string', 'the checkout follows the link, so the skill is found');
+    assert.notEqual(doorVersion(dir, { repo }), syncVersion(dir, { repo }));
+    fs.rmSync(path.join(skill, 'SKILL.md'));
+    fs.copyFileSync(path.join(repo, 'card.md'), path.join(skill, 'SKILL.md'));
+    assert.equal(doorVersion(dir, { repo }), syncVersion(dir, { repo }), 'a regular SKILL.md reads the same on both');
   });
 });
 

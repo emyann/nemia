@@ -102,6 +102,9 @@ const stepsIn = Effect.fnUntraced(function* (workflowDir: string, places: Places
  *   `gates` beside the workflow's own: a word, a window, a cap or a bridge (`remote: true`) its harness does not take;
  * - a step whose `tools:` names a tool nothing its session would be allowed (`unallowedRefusal`, pure, asked of a folder a waiting run
  *   takes again too), judged against `allows`, the allow rules the run's own repository grants a session started in it (`repoAllows`).
+ *
+ * The skills a folder team's place skills are judged against are `known` where given — the start's own read, which renders the agents
+ * too, so a start asks the Skill door once — else read from the Skill door for a folder team alone.
  */
 export const stepsToStart = Effect.fn('stepsToStart')(function* (
   workflowDir: string,
@@ -113,9 +116,10 @@ export const stepsToStart = Effect.fn('stepsToStart')(function* (
   refused: ConfigRefused = configRefused,
   given = false,
   allows: Allows = NO_ALLOWS,
+  known?: SkillsFound,
 ) {
   const steps = yield* stepsIn(workflowDir, places, factory);
-  const found = isFolderTeam(steps) ? yield* (yield* SkillDoor).skills.found({ dir: workflowDir, places }) : undefined;
+  const found = known ?? (isFolderTeam(steps) ? yield* (yield* SkillDoor).skills.found({ dir: workflowDir, places }) : undefined);
   return yield* tried(() => startable(steps, workflowDir, isolate, places, denied, found, gates, refused, given, allows));
 });
 
@@ -547,6 +551,7 @@ export const startRun = Effect.fn('start')(function* (opts: StartOptions) {
   const refused = yield* StartRefusal;
   const { declared } = yield* PlaceService;
   const denied = declared.denyWhileLanding;
+  const found = yield* (yield* SkillDoor).skills.found({ dir: opts.workflowDir, places });
   const steps = yield* stepsToStart(
     opts.workflowDir,
     isolate,
@@ -557,8 +562,8 @@ export const startRun = Effect.fn('start')(function* (opts: StartOptions) {
     refused,
     Boolean(opts.inputs?.length),
     yield* tried(() => repoAllows(opts.repo, opts.factory)),
+    found,
   );
-  const found = yield* (yield* SkillDoor).skills.found({ dir: opts.workflowDir, places });
   const folder = isFolderTeam(steps);
   if (folder && opts.repoNamed) return yield* Effect.fail(new Invalid({ message: repoNamedRefusal(opts.repo) }));
   const outside = factory && !folder ? outsideRefusal(factory, opts.repo) : undefined;

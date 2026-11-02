@@ -1,6 +1,6 @@
 /**
- * The frontmatter reader and writer: what is written reads back the same, to this reader and to js-yaml; the former line form is read
- * and rewritten with every value byte for byte; and a block in neither form is refused at its line.
+ * The frontmatter reader and writer: what is written reads back the same, to this reader and to js-yaml; the former line form is
+ * refused at its line, and rewritten with every value byte for byte; and a block in neither form is refused at its line.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -11,6 +11,7 @@ import { WorkflowError } from '../step/step.ts';
 import {
   commentTails,
   flatValue,
+  inFormerForm,
   readFrontmatter,
   renderFrontmatter,
   rewriteFormer,
@@ -79,7 +80,6 @@ test('a value written reads back the same, to this reader and to js-yaml (but a 
     await t.test(JSON.stringify(value).slice(0, 40), () => {
       const block = renderFrontmatter([['check', value]]);
       assert.deepEqual(valuesOf(block), { check: value });
-      assert.equal(readFrontmatter('t', block).former, false);
       const read = jsyaml.load(block) as Record<string, unknown>;
       const coreWord = /^(~|null|[\d.]+)$/.test(value);
       if (typeof read.check === 'string' || !coreWord) assert.equal(String(read.check), value, 'js-yaml reads the same text');
@@ -112,12 +112,13 @@ test('the former blocks are rewritten as YAML, every value the former reader rea
     await t.test(file, () => {
       const text = fs.readFileSync(path.join(FORMER, file), 'utf8');
       const before = blockOf(text);
-      assert.equal(readFrontmatter(file, before).former, true, 'it is read in the former form');
+      assert.equal(inFormerForm(before), true, 'it is in the former form');
+      assert.throws(() => readFrontmatter(file, before), WorkflowError, 'which the reader refuses');
       const { text: after, changed } = rewriteFormer(file, text);
       assert.equal(changed, true);
       const block = blockOf(after);
       const read = readFrontmatter(file, block);
-      assert.equal(read.former, false);
+      assert.equal(inFormerForm(block), false);
       assert.deepEqual(
         read.entries.map(({ key, value }) => [key, value]),
         formerReading(before),
@@ -134,18 +135,18 @@ test('the former blocks are rewritten as YAML, every value the former reader rea
   });
 });
 
-test('the former form is read where YAML refuses it or reads a flow map, and a block in neither form is refused at its line', async (t) => {
+test('the former form is refused at its first line YAML reads otherwise, and a block in neither form is refused at its line', async (t) => {
+  const refusedAt = (block: string, line: number) =>
+    assert.throws(
+      () => readFrontmatter('t', block),
+      (e: unknown) => e instanceof WorkflowError && e.exitCode === 2 && e.message.startsWith(`t:${line}:`),
+    );
   await t.test('YAML refuses it', () => {
-    const read = readFrontmatter('t', 'agent: coder\ncheck: a: b\n');
-    assert.equal(read.former, true);
-    assert.deepEqual(read.entries, [
-      { key: 'agent', value: 'coder', line: 2 },
-      { key: 'check', value: 'a: b', line: 3 },
-    ]);
+    assert.equal(inFormerForm('agent: coder\ncheck: a: b\n'), true);
+    refusedAt('agent: coder\ncheck: a: b\n', 3);
   });
-  await t.test('YAML reads a flow map, or a flow list on a key that holds none', () => {
-    assert.deepEqual(readFrontmatter('t', 'check: { true; }\n').entries[0].value, '{ true; }');
-    assert.deepEqual(readFrontmatter('t', 'check: [ -f x ]\n').entries[0].value, '[ -f x ]');
+  await t.test('YAML reads a flow map on a key that holds one value, where a list key reads its list', () => {
+    refusedAt('agent: coder\ncheck: { true; }\n', 3);
     assert.deepEqual(readFrontmatter('t', 'tools: [Read, Grep]\n').entries[0].value, ['Read', 'Grep']);
   });
   await t.test('neither form', () => {
@@ -169,7 +170,7 @@ test('the former form is read where YAML refuses it or reads a flow map, and a b
     assert.throws(() => readFrontmatter('t', 'This is a brief, not keys\n'), WorkflowError);
   });
   await t.test('a block of comments alone has no keys', () => {
-    assert.deepEqual(readFrontmatter('t', '# only\n'), { entries: [], former: false });
+    assert.deepEqual(readFrontmatter('t', '# only\n'), { entries: [] });
   });
   await t.test('a key set twice is listed twice, for its reader to refuse', () => {
     assert.deepEqual(
@@ -197,7 +198,7 @@ test('withKey sets or takes out one key, each other as written', () => {
   assert.equal(withKey('t', block, 'preload', undefined), '# kept\ndescription: "a: b"\ntags: [ x ]\n');
   assert.deepEqual(valuesOf(withKey('t', block, 'preload', 'false')), { description: 'a: b', preload: 'false', tags: ['x'] });
   assert.deepEqual(valuesOf(withKey('t', 'description: a\n', 'preload', 'true')), { description: 'a', preload: 'true' });
-  assert.deepEqual(valuesOf(withKey('t', 'description: a: b\n', 'preload', 'true')), { description: 'a: b', preload: 'true' });
+  assert.throws(() => withKey('t', 'description: a: b\n', 'preload', 'true'), WorkflowError, 'a former block is refused, not rewritten');
 });
 
 test('commentTails lists a plain value YAML ends at ` #`, which the former reader read on', () => {

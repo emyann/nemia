@@ -8,9 +8,10 @@
  * keys may hold a list (`LIST_KEYS`, `step.ts`).
  *
  * **The former form.** Before this reader, a line was `key: the rest of the line`, split at its first colon, and a value was never quoted.
- * A block YAML refuses, or reads as a flow collection on a key that holds none, whose every line is `key: rest`, is still read that way,
- * and marked `former`; `nemia frontmatter rewrite` turns it into YAML with every value the same, byte for byte. A block in neither form is
- * refused, naming its line and the fix.
+ * It is no longer read: a block YAML refuses, or reads as a flow collection on a key that holds none, whose every line is `key: rest`, is
+ * refused at load naming its first line YAML reads otherwise and that line written as YAML (`formerRefusal`), or the command that rewrites
+ * the folder. `nemia frontmatter rewrite` still recognises it (`inFormerForm`), for a person's folder written before, and turns it into
+ * YAML with every value the same, byte for byte. A block in neither form is refused, naming its line and the fix.
  */
 import { Document, isMap, isScalar, isSeq, LineCounter, parseDocument, Scalar, YAMLSeq, type Node, type Pair } from 'yaml';
 import { firstPiece } from '../piece/piece.ts';
@@ -22,8 +23,8 @@ export type FrontmatterValue = string | readonly FrontmatterValue[] | { readonly
 /** One key of a block, in the order written, with the line of the file it opens on (the block opens on line 2, after `---`). */
 export type FrontmatterEntry = { key: string; value: FrontmatterValue; line: number };
 
-/** A block read: its keys in order, a key set twice listed twice, and whether it was read in the former line form. */
-export type Frontmatter = { entries: FrontmatterEntry[]; former: boolean };
+/** A block read: its keys in order, a key set twice listed twice. */
+export type Frontmatter = { entries: FrontmatterEntry[] };
 
 /** A key and the value to write under it, in the order a file says them. */
 export type FrontmatterPair = readonly [key: string, value: FrontmatterValue];
@@ -58,15 +59,15 @@ function valueOf(node: unknown): FrontmatterValue {
   return '';
 }
 
-/** Whether a block's every line is a former line, a comment or blank: what the former reader read without refusing. */
+/** Whether a block's every line is a former line, a comment or blank: what the former reader read without refusing. For the rewrite. */
 const formerShaped = (block: string): boolean =>
   block.split('\n').every((raw) => {
     const line = raw.trim();
     return !line || line.startsWith('#') || FORMER_LINE.test(line);
   });
 
-/** A block read the former way: each line trimmed, split at its first colon. */
-function formerEntries(block: string): FrontmatterEntry[] {
+/** A block as the former reader read it, each line trimmed, split at its first colon: what the rewrite keeps every value of. */
+function formerEntries(block: string): (FrontmatterEntry & { value: string })[] {
   return block.split('\n').flatMap((raw, i) => {
     const line = raw.trim();
     if (!line || line.startsWith('#')) return [];
@@ -80,11 +81,46 @@ const YAML_FIX =
   'The frontmatter is YAML: quote a value that holds `: ` or ` #`, or opens on one of `{ [ * & ! % @ | > - ? ` and a backtick — `check: "a: b"` — or write a long or multi-line one as a literal block, `check: |-` and the value on the lines below it, indented';
 
 /**
+ * Whether a parsed block is in the former line form: YAML refuses it, reads it as no map, or reads a flow collection on a step's key that
+ * holds one value (`ONE_VALUE`), and its every line is a former one. What the former reader read and YAML reads otherwise.
+ */
+function formerForm(doc: ReturnType<typeof parsed>, block: string): boolean {
+  if (!formerShaped(block)) return false;
+  if (doc.errors.length) return true;
+  const root = doc.contents;
+  if (root === null || (isScalar(root) && (root.value === null || root.value === ''))) return false;
+  if (!isMap(root)) return true;
+  return (root.items as Pair[]).some(
+    ({ key, value }) =>
+      (isMap(value) || isSeq(value)) && (value as YAMLSeq).flow && ONE_VALUE.includes(String(isScalar(key) ? key.value : key)),
+  );
+}
+
+/** Whether a block (a file's lines between its two `---`) is in the former line form: refused at load, written as YAML by the rewrite. */
+export const inFormerForm = (block: string): boolean => formerForm(parsed(block), block);
+
+/**
+ * What the load says of a block in the former line form: the first line YAML reads otherwise than the former reader did, or that sits
+ * indented, and that line written as YAML, every value the same; or the rewrite of the whole folder, which writes every file so.
+ */
+function formerRefusal(name: string, block: string): string {
+  const entries = formerEntries(block);
+  const lines = block.split('\n');
+  const first =
+    entries.find(({ key, value, line }) => {
+      const raw = lines[line - FIRST_LINE] ?? '';
+      return raw !== raw.trim() || !lineReadsSame(raw, key, value);
+    }) ?? entries[0];
+  const yaml = first === undefined ? '' : writtenPair(first.key, first.value).replace(/\n$/, '');
+  const write = yaml.includes('\n') ? `as YAML, on its lines:\n${yaml}\n` : `as YAML, \`${yaml}\`, `;
+  return `${name}:${first?.line ?? FIRST_LINE}: the frontmatter is in the former line form, \`key: the rest of the line\`, which is no longer read. Write this line ${write}or rewrite every file of the folder as YAML, every value the same: nemia frontmatter rewrite <folder>.`;
+}
+
+/**
  * A frontmatter block (the lines between the two `---`, as `splitFrontmatter` hands it) as its keys, in order, each with its line. Read as
- * YAML 1.2; read the former way and marked `former` when YAML refuses it, or reads a flow collection on a step's key that holds one
- * value (`ONE_VALUE`), and its every line is a former one. Refused, as `WorkflowError`, naming the file's line and
- * the fix: a block in neither form, one that is not a map of keys (a line of prose), a key that is not a word of text, and a line that
- * is a YAML document's marker (`---`, `...`), which would end the block.
+ * YAML 1.2. Refused, as `WorkflowError`, naming the file's line and the fix: a block in the former line form (`formerForm`), named with
+ * the line to write as YAML (`formerRefusal`); a block YAML refuses, one that is not a map of keys (a line of prose), a key that is not a
+ * word of text, and a line that is a YAML document's marker (`---`, `...`), which would end the block.
  */
 export function readFrontmatter(name: string, block: string): Frontmatter {
   const counter = new LineCounter();
@@ -97,27 +133,19 @@ export function readFrontmatter(name: string, block: string): Frontmatter {
       `${name}:${marker + FIRST_LINE}: a line of \`${block.split('\n')[marker]}\` inside the frontmatter would end it, and every line after it be lost. The frontmatter ends at the first line that is just \`---\`: delete this one, or put the rule in the body.`,
     );
   }
-  const shaped = formerShaped(block);
+  if (formerForm(doc, block)) refuse(formerRefusal(name, block));
   const [error] = doc.errors;
   if (error !== undefined) {
-    if (shaped) return { entries: formerEntries(block), former: true };
     refuse(`${name}:${lineAt(error.pos[0])}: ${firstPiece(error.message, '\n')}. ${YAML_FIX}.`);
   }
   const root = doc.contents;
-  if (root === null || (isScalar(root) && (root.value === null || root.value === ''))) return { entries: [], former: false };
+  if (root === null || (isScalar(root) && (root.value === null || root.value === ''))) return { entries: [] };
   if (!isMap(root)) {
-    if (shaped) return { entries: formerEntries(block), former: true };
     refuse(
       `${name}:${lineAt(root.range?.[0])}: the frontmatter is not a map of keys, and every line of it is a key, a colon and its value: \`after: a, b\`. ${YAML_FIX}.`,
     );
   }
-  const pairs = root.items as Pair[];
-  const flowWhereNone = pairs.some(
-    ({ key, value }) =>
-      (isMap(value) || isSeq(value)) && (value as YAMLSeq).flow && ONE_VALUE.includes(String(isScalar(key) ? key.value : key)),
-  );
-  if (flowWhereNone && shaped) return { entries: formerEntries(block), former: true };
-  const entries = pairs.map(({ key, value }) => {
+  const entries = (root.items as Pair[]).map(({ key, value }) => {
     if (!isScalar(key) || typeof key.value !== 'string' || !key.value) {
       refuse(
         `${name}:${lineAt((key as Node | null)?.range?.[0])}: a frontmatter key is a word, written plain: \`after: a, b\`. ${YAML_FIX}.`,
@@ -125,7 +153,7 @@ export function readFrontmatter(name: string, block: string): Frontmatter {
     }
     return { key: key.value, value: valueOf(value), line: lineAt(key.range?.[0]) };
   });
-  return { entries, former: false };
+  return { entries };
 }
 
 /**
@@ -197,9 +225,9 @@ function readsBack(text: string, key: string, value: FrontmatterValue): boolean 
   return only !== undefined && only.key === key && same(only.value, value);
 }
 
-/** The one entry of a block read as YAML, or undefined for a block that did not read, read in the former form, or holds more or fewer. */
+/** The one entry of a block read as YAML, or undefined for a block that did not read, or holds more or fewer. */
 function onlyEntry(read: Frontmatter | null): FrontmatterEntry | undefined {
-  if (read === null || read.former || read.entries.length !== 1) return undefined;
+  if (read === null || read.entries.length !== 1) return undefined;
   return read.entries[0];
 }
 
@@ -233,16 +261,14 @@ export function renderFrontmatter(pairs: readonly FrontmatterPair[]): string {
   return pairs.map(([key, value]) => writtenPair(key, value)).join('');
 }
 
-/** A block in YAML: the former form's rewritten (`rewriteBlock`), a block already in YAML as it is. */
-const yamlOf = (name: string, block: string): string => (readFrontmatter(name, block).former ? rewriteBlock(name, block) : block);
-
 /**
  * `block` with `key` set to `value`, or taken out where `value` is undefined, each other key, its comment and its form as written: what a
- * switch writes into a file whose other keys no render keeps (`withPreload`). A key set twice is set or taken out each time. A block in
- * the former form is rewritten into YAML first (`rewriteFormer`). Returns the block's lines, as `renderFrontmatter` does.
+ * switch writes into a file whose other keys no render keeps (`withPreload`). A key set twice is set or taken out each time. A block
+ * `readFrontmatter` refuses, the former form among them, is refused so. Returns the block's lines, as `renderFrontmatter` does.
  */
 export function withKey(name: string, block: string, key: string, value: FrontmatterValue | undefined): string {
-  const doc = parsed(yamlOf(name, block));
+  readFrontmatter(name, block);
+  const doc = parsed(block);
   if (doc.contents === null || isScalar(doc.contents)) doc.contents = doc.createNode({}) as never;
   if (!isMap(doc.contents)) refuse(`${name}: the frontmatter is not a map of keys, and \`${key}\` is a key of it. ${YAML_FIX}.`);
   const map = doc.contents;
@@ -274,7 +300,7 @@ const lineReadsSame = (line: string, key: string, value: string): boolean => {
 };
 
 /**
- * A former block (`readFrontmatter` marks it `former`) as YAML: each line that YAML reads otherwise, or that sits indented, written again
+ * A former block (`inFormerForm`) as YAML: each line that YAML reads otherwise, or that sits indented, written again
  * as `writtenPair` writes it, every other line, comment and blank left byte for byte. Refused, naming the line, where YAML would not read
  * the result as the former reader read the block: a key's value, its order or its count.
  */
@@ -295,7 +321,7 @@ function rewriteBlock(name: string, block: string, eol = '\n'): string {
   const before = formerEntries(block.replace(/\r\n/g, '\n'));
   const after = frontmatterOrNull(text.replace(/\r\n/g, '\n'));
   const wrong =
-    after === null || after.former
+    after === null
       ? before[0]
       : before.find((entry, i) => !same(after.entries[i]?.value ?? '\0', entry.value) || after.entries[i]?.key !== entry.key);
   if (wrong !== undefined || (after && after.entries.length !== before.length)) {
@@ -310,7 +336,7 @@ function rewriteBlock(name: string, block: string, eol = '\n'): string {
 const FRONTMATTER_AT = /^(﻿?---[ \t]*(\r?\n))([\s\S]*?\r?\n)?(---[ \t]*(?:\r?\n|$))/;
 
 /**
- * A file's text with its frontmatter in YAML, where the former reader read it (`readFrontmatter` marks it `former`), and `changed`: each
+ * A file's text with its frontmatter in YAML, where it is in the former line form (`inFormerForm`), and `changed`: each
  * line YAML would read otherwise written again (quoted, or as a literal block), every other byte of the file — its other lines, its
  * line breaks, its body — as it was. A file with no frontmatter, or one already in YAML, is returned as it is. Refused, naming the line,
  * where the result would not read as the former reader read it, and where the block is in neither form (`readFrontmatter`). Pure: the
@@ -320,7 +346,11 @@ export function rewriteFormer(name: string, text: string): { text: string; chang
   const m = FRONTMATTER_AT.exec(text);
   if (!m) return { text, changed: false };
   const block = m[3] ?? '';
-  if (!readFrontmatter(name, block.replace(/\r\n/g, '\n')).former) return { text, changed: false };
+  const lf = block.replace(/\r\n/g, '\n');
+  if (!inFormerForm(lf)) {
+    readFrontmatter(name, lf);
+    return { text, changed: false };
+  }
   const written = rewriteBlock(name, block, m[2]);
   return { text: `${m[1]}${written}${m[4]}${text.slice(m[0].length)}`, changed: written !== block };
 }
@@ -328,11 +358,11 @@ export function rewriteFormer(name: string, text: string): { text: string; chang
 /**
  * The lines of a block in YAML where a plain value goes on past ` #`, which YAML reads as a comment and the former reader read as part
  * of the value, each by its line in the file. What `nemia frontmatter rewrite` lists rather than guesses: whether the tail was meant
- * is the author's to say. None for a block read in the former form, whose rewrite keeps the tail in the value.
+ * is the author's to say. None for a block in the former form, whose rewrite keeps the tail in the value, nor one that does not read.
  */
 export function commentTails(block: string): number[] {
   const read = frontmatterOrNull(block);
-  if (read === null || read.former) return [];
+  if (read === null) return [];
   const lines = block.split('\n');
   return read.entries.flatMap(({ key, value, line }) => {
     const raw = lines[line - FIRST_LINE]?.trim() ?? '';

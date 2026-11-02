@@ -95,14 +95,14 @@ function entryValuesOf(
       `${file} has no frontmatter, and a skill's card entry is read from it: Claude Code lists a skill by its description. Open the file with \`---\`, \`description: <what it does, one line>\` and \`---\`.`,
     );
   }
-  const { entries, former } = readFrontmatter(file, block);
+  const { entries } = readFrontmatter(file, block);
   const values: Partial<Record<EntryKey, FrontmatterValue>> = {};
   for (const { key, value } of entries) {
     if (!(ENTRY_KEYS as readonly string[]).includes(key)) continue;
     const reading = key as EntryKey;
     if (Object.hasOwn(values, reading))
       refuse(`${file}: \`${reading}\` is set twice, and YAML reads no file that says two things. Keep one line.`);
-    values[reading] = former && typeof value === 'string' ? formerValue(reading, value) : value;
+    values[reading] = value;
   }
   const words = (key: EntryKey): string | undefined => {
     const value = values[key];
@@ -129,16 +129,6 @@ function entryValuesOf(
     return (items as readonly string[]).map((item) => item.trim());
   };
   return { words, list };
-}
-
-/**
- * A key's value in a block read in the former line form: its line, `key: value`, read as YAML on its own — a quoted text, a list —
- * where it reads so, and the value as written where it does not.
- */
-function formerValue(key: string, value: string): FrontmatterValue {
-  const alone = frontmatterOrNull(`${key}: ${value}\n`);
-  const only = alone !== null && !alone.former && alone.entries.length === 1 ? alone.entries[0] : undefined;
-  return only === undefined ? value : only.value;
 }
 
 /**
@@ -258,8 +248,8 @@ export function withPreload(file: string, text: string, on: boolean): string {
 
 /**
  * The globs a SKILL.md's `applies:` key names (`text`, the whole file): a YAML list of globs, or one glob, each from the folder a session
- * runs in (`apps/web/**`). `[]` where it names none, or holds anything else — a map, an empty item — or the frontmatter does not read;
- * in a block read in the former line form, its line is read as YAML on its own, and `[]` where it does not read so.
+ * runs in (`apps/web/**`). `[]` where it names none, or holds anything else — a map, an empty item — or the frontmatter does not read,
+ * a block in the former line form among them.
  */
 export function appliesOf(text: string): string[] {
   let block: string | null;
@@ -271,9 +261,7 @@ export function appliesOf(text: string): string[] {
   const read = block === null ? null : frontmatterOrNull(block);
   const entry = read?.entries.find(({ key }) => key === 'applies');
   if (read == null || entry === undefined) return [];
-  const alone = read.former && typeof entry.value === 'string' ? frontmatterOrNull(`applies: ${entry.value}\n`) : null;
-  if (alone !== null && (alone.former || alone.entries.length !== 1)) return [];
-  const value = alone === null ? entry.value : alone.entries[0]?.value;
+  const value = entry.value;
   const globs = Array.isArray(value) ? value : [value];
   return globs.every((g) => typeof g === 'string' && g.trim()) ? globs.map((g: string) => g.trim()) : [];
 }

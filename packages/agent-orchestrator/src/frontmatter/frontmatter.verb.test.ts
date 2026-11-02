@@ -9,7 +9,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Cause, Effect, Exit } from 'effect';
 import { scratch } from '../../test/scratch.ts';
-import { readFrontmatter } from './frontmatter.ts';
+import { inFormerForm, readFrontmatter, rewriteFormer } from './frontmatter.ts';
 import { readKeys } from '../former/former.ts';
 import { splitFrontmatter, WorkflowError } from '../step/step.ts';
 import { FRONTMATTER_REWRITE, rewriteFolders, rewrittenLines, storeFolders, type Rewritten } from './frontmatter.verb.ts';
@@ -67,11 +67,11 @@ test("the store's workflows, inbox and a templated factory's tree and applied ba
   for (const file of files) {
     const text = fs.readFileSync(file, 'utf8');
     assert.notEqual(text, FORMER);
-    assert.equal(readFrontmatter(file, splitFrontmatter(file, text).block!).former, false, 'now YAML');
+    assert.equal(inFormerForm(splitFrontmatter(file, text).block!), false, 'now YAML');
     assert.deepEqual(
       keysOf(file, text),
-      keysOf(file, FORMER),
-      'every value as the former reader read it, a top-level fence key read from its block',
+      keysOf(file, rewriteFormer(file, FORMER).text),
+      'every value as the former reader read it (the line rewrite keeps each, `frontmatter.test.ts`), a top-level fence key read from its block',
     );
     assert.equal(bodyOf(text), bodyOf(FORMER), 'the body byte for byte');
   }

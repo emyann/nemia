@@ -52,13 +52,13 @@ export type NemiaChat = {
 };
 
 /** What the read and the stream write into: the state they change, the try they ask for again, and whether the stream is followed. */
-type Reader = { setState: Dispatch<SetStateAction<ChatFollowed>>; tryAgain: () => void; follow: boolean };
+export type Reader = { setState: Dispatch<SetStateAction<ChatFollowed>>; tryAgain: () => void; follow: boolean };
 
 /**
  * Reads her chat once and follows it from the cursor it answered, and asks for another try after `CHAT_RETRY_MS` where the read did not
  * work. Returns what stops it: the read abandoned, the retry dropped, the stream closed.
  */
-function reading({ setState, tryAgain, follow }: Reader): () => void {
+export function reading({ setState, tryAgain, follow }: Reader): () => void {
   const read = new AbortController();
   let stop: (() => void) | undefined;
   let again: ReturnType<typeof setTimeout> | undefined;
@@ -81,7 +81,7 @@ function reading({ setState, tryAgain, follow }: Reader): () => void {
     },
     (err: unknown) => {
       if (read.signal.aborted) return;
-      setState((s) => ({ ...s, loading: false, live: false, error: err instanceof Error ? err.message : String(err) }));
+      setState((s) => ({ ...s, loading: false, live: false, error: err instanceof Error ? err.message : String(err), retrying: null }));
       again = setTimeout(tryAgain, CHAT_RETRY_MS);
     },
   );

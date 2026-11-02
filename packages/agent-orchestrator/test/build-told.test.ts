@@ -208,11 +208,11 @@ const REVIEW_LAWS_TOLD = [
   'a test deleted where the summary names no bug planted and no law that refused it.',
 ];
 
-/** What an implement step is told of a glossary table: its rows cite paths from the root, and the docs' tests, which no grep finds, are run. */
+/** What an implement step is told of a glossary table: its rows cite paths from the root, and the docs' tests, found by no grep, run. */
 const GLOSSARY_TOLD =
   "When the change edits a context's `glossary.json`, cite each path in its rows from the repository's root (`packages/agent-orchestrator/src/folder/folder.model.ts`, never `src/folder/folder.model.ts`), and run the docs' tests after it, `node --test test/*.test.ts` in `apps/docs`: they read every table by a glob, so grepping the tests for its path does not find them.";
 
-/** What an implement step is told, build's and quick's alike: the base, the board's components, a dashboard rendered, a glossary, a contract. */
+/** What an implement step is told, build's and quick's alike: the base, the board's components, a dashboard, a glossary, a contract. */
 const IMPLEMENT_TOLD = [
   ...MERGES_THE_BASE,
   EFFECT_TOLD,

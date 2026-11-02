@@ -14,7 +14,7 @@
  * `WF_ROOT` is set before the runner is imported: the module reads it as it loads. `WF_VERIFY_REST=1` judges in full every run a pass
  * answers from its memo of runs at rest; each pass here is handed a fresh memo, so none is.
  */
-import { test } from 'node:test';
+import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -242,7 +242,19 @@ const onePass = async (b: ReturnType<typeof board>) => {
   return { pass: value, tallies };
 };
 
-test("a pass reads each task's view once, and once more after a write of the pass names it", async () => {
+/** The rows of each table below, a claim each, told by the table's one test after its last row. */
+type Rows = Array<[string, (t: TestContext) => void | Promise<void>]>;
+const row = (rows: Rows, name: string, claim: (t: TestContext) => void | Promise<void>) => rows.push([name, claim]);
+/** A table's rows, each a subtest of `t`. */
+const told = (rows: Rows) => async (t: TestContext) => {
+  for (const [name, claim] of rows) await t.test(name, claim);
+};
+const ONCE: Rows = [];
+const GIT: Rows = [];
+const VIEWS: Rows = [];
+const STANDING: Rows = [];
+
+row(ONCE, "a pass reads each task's view once, and once more after a write of the pass names it", async () => {
   const { b, waiting } = await theStore();
   await onePass(b);
   assert.equal(readRun(waiting.id).steps.ship?.taskId ?? undefined, undefined, 'the approved ending still waits for the checkout');
@@ -251,7 +263,7 @@ test("a pass reads each task's view once, and once more after a write of the pas
   assert.deepEqual(over, [], 'no task is read twice with no write of the pass naming it between');
 });
 
-test("the cap's slots are read once for the pass, however many claims ask", async () => {
+row(ONCE, "the cap's slots are read once for the pass, however many claims ask", async () => {
   const { b } = await theStore();
   const read = passRead(b.e, runStore.runs.list(), process.env, NOTHING_READ);
   b.lists.calls = 0;
@@ -261,7 +273,7 @@ test("the cap's slots are read once for the pass, however many claims ask", asyn
   assert.equal(second, first, 'the same slots, not read again');
 });
 
-test('a pass resolves one workflow folder once, however many runs wait on it', async () => {
+row(ONCE, 'a pass resolves one workflow folder once, however many runs wait on it', async () => {
   const { b, repo, waiting } = await theStore();
   const unfiled = () => runStore.runs.list().filter((r) => !r.steps.implement?.taskId && !r.cancelledAt).length;
   const { tallies: before } = await onePass(b);
@@ -278,7 +290,7 @@ test('a pass resolves one workflow folder once, however many runs wait on it', a
   );
 });
 
-test('a one-off verb, handed no pass, resolves the folder for itself', async () => {
+row(ONCE, 'a one-off verb, handed no pass, resolves the folder for itself', async () => {
   const { b, repo } = await theStore();
   const run = await runPlaced(startRun({ brief: 'resolved for itself', repo, workflowDir: oneStep }));
   const { tallies } = await metered(() => runWith(b.e, advanceRun(readRun(run.id))));
@@ -289,7 +301,7 @@ test('a one-off verb, handed no pass, resolves the folder for itself', async () 
   );
 });
 
-test("a run's own claim on the checkout reads the slot its pass gave it, and the cap for no one", async () => {
+row(ONCE, "a run's own claim on the checkout reads the slot its pass gave it, and the cap for no one", async () => {
   const { b, waiting } = await theStore();
   const run = readRun(waiting.id);
   let asked = 0;
@@ -320,7 +332,9 @@ test("a run's own claim on the checkout reads the slot its pass gave it, and the
   assert.equal(asked, 0, "the cap's slots are not read for the run's own claim");
 });
 
-test('a pass spends no git process more for more runs waiting on runs of the same repository', async () => {
+test("a pass reads once what its runs share: each view, the cap's slots, a workflow folder, the slot a claim was given", told(ONCE));
+
+row(GIT, 'a pass spends no git process more for more runs waiting on runs of the same repository', async () => {
   const { b, repo, waiting, second } = await theStore();
   const runs = () => runStore.runs.list().length;
   const was = runs();
@@ -338,46 +352,54 @@ test('a pass spends no git process more for more runs waiting on runs of the sam
   );
 });
 
-test("a pass's one standing for the repository asks of a finished run, a pruned one, a pruned run handed to one not started and one held until", async () => {
-  const { b, repo } = await theStore();
-  const done = await settledOne(b, repo, 'succeeded');
-  const pruned = await settledOne(b, repo, 'succeeded');
-  const handed = await settledOne(b, repo, 'succeeded');
-  const until = await atTheGate(b, repo);
-  await runPlaced(startRun({ brief: 'handed one', repo, workflowDir: oneStep, context: [handed.id] }));
-  const held = await runPlaced(startRun({ brief: 'held until one', repo, workflowDir: oneStep }));
-  await runWith(b.e, hold(held.id, [until.id]));
-  for (const r of [handed, until, pruned])
-    fs.writeFileSync(pruneFile(r.id), JSON.stringify({ at: new Date().toISOString(), worktrees: [] }));
-  await onePass(b);
-  const { value: git, tallies } = await metered(() => runWith(b.e, standingSnapshot().pipe(Effect.map(standingReader))));
-  for (const r of [done, handed, until, pruned]) {
-    const branch = r.steps.implement.branch!;
-    assert.equal(git.unread(readRun(r.id) as never, branch), undefined, `${r.id}'s ${branch} answered off the pass`);
-  }
-  assert.equal(
-    Object.values(tallies!.kinds).reduce((n, k) => n + k.spawned, 0),
-    0,
-    'read off standing.json',
-  );
-});
+row(
+  GIT,
+  "a pass's one standing for the repository asks of a finished run, a pruned one, a pruned run handed to one not started and one held until",
+  async () => {
+    const { b, repo } = await theStore();
+    const done = await settledOne(b, repo, 'succeeded');
+    const pruned = await settledOne(b, repo, 'succeeded');
+    const handed = await settledOne(b, repo, 'succeeded');
+    const until = await atTheGate(b, repo);
+    await runPlaced(startRun({ brief: 'handed one', repo, workflowDir: oneStep, context: [handed.id] }));
+    const held = await runPlaced(startRun({ brief: 'held until one', repo, workflowDir: oneStep }));
+    await runWith(b.e, hold(held.id, [until.id]));
+    for (const r of [handed, until, pruned])
+      fs.writeFileSync(pruneFile(r.id), JSON.stringify({ at: new Date().toISOString(), worktrees: [] }));
+    await onePass(b);
+    const { value: git, tallies } = await metered(() => runWith(b.e, standingSnapshot().pipe(Effect.map(standingReader))));
+    for (const r of [done, handed, until, pruned]) {
+      const branch = r.steps.implement.branch!;
+      assert.equal(git.unread(readRun(r.id) as never, branch), undefined, `${r.id}'s ${branch} answered off the pass`);
+    }
+    assert.equal(
+      Object.values(tallies!.kinds).reduce((n, k) => n + k.spawned, 0),
+      0,
+      'read off standing.json',
+    );
+  },
+);
 
-test('nemia ls reads where branches stand off standing.json and starts no process; with none, it says not read, never a verdict', async () => {
-  const { b } = await theStore();
-  await onePass(b);
-  const spawned = async () => {
-    const { value, tallies } = await metered(() => runWith(b.e, runsListed()));
-    return { lines: lsLines(value, Date.now()).join('\n'), spawned: Object.values(tallies!.kinds).reduce((n, k) => n + k.spawned, 0) };
-  };
-  assert.equal((await spawned()).spawned, 0, 'read off the snapshot');
-  fs.rmSync(standingFile());
-  const { lines, spawned: none } = await spawned();
-  assert.equal(none, 0, 'no snapshot, and still no process');
-  assert.match(lines, /where branches stand: not read/);
-  for (const verdict of ['landed', ' is on ', 'ahead of', 'is gone']) assert.ok(!lines.includes(verdict), `nemia ls says ${verdict}`);
-});
+row(
+  GIT,
+  'nemia ls reads where branches stand off standing.json and starts no process; with none, it says not read, never a verdict',
+  async () => {
+    const { b } = await theStore();
+    await onePass(b);
+    const spawned = async () => {
+      const { value, tallies } = await metered(() => runWith(b.e, runsListed()));
+      return { lines: lsLines(value, Date.now()).join('\n'), spawned: Object.values(tallies!.kinds).reduce((n, k) => n + k.spawned, 0) };
+    };
+    assert.equal((await spawned()).spawned, 0, 'read off the snapshot');
+    fs.rmSync(standingFile());
+    const { lines, spawned: none } = await spawned();
+    assert.equal(none, 0, 'no snapshot, and still no process');
+    assert.match(lines, /where branches stand: not read/);
+    for (const verdict of ['landed', ' is on ', 'ahead of', 'is gone']) assert.ok(!lines.includes(verdict), `nemia ls says ${verdict}`);
+  },
+);
 
-test("a run's asks are listed once a read, and each file in them read once", async () => {
+row(GIT, "a run's asks are listed once a read, and each file in them read once", async () => {
   const { waiting } = await theStore();
   const id = waiting.id;
   const at = new Date().toISOString();
@@ -391,6 +413,11 @@ test("a run's asks are listed once a read, and each file in them read once", asy
   const record = (await metered(async () => readRun(id))).tallies!.kinds.asks;
   assert.deepEqual({ calls: record.calls, reads: record.reads }, { calls: 1, reads: 2 }, 'the approval and the acceptance, off one walk');
 });
+
+test(
+  "a pass asks git and a run's asks once: no process more for more runs waiting, one standing a repository, nemia ls none, each ask file once",
+  told(GIT),
+);
 
 /**
  * An engine that answers a view of any task, records each task it is asked to view or list, holds a view of `slow` until let go, and
@@ -413,22 +440,26 @@ const askedEngine = () => {
   return { e: promised({ view, list, file: wrote, answer: wrote, forget: wrote }), asked, held };
 };
 
-test('a view kept for the pass is read again once a write names its task, and the views of the tasks it does not name are kept', async () => {
-  const { e: engine, asked } = askedEngine();
-  const e = reportedEngine(engine, []);
-  await Effect.runPromise(e.view('t-1'));
-  await Effect.runPromise(e.list(['t-1', 't-2']));
-  await Effect.runPromise(e.view('t-2'));
-  assert.deepEqual(asked, ['t-1', 't-2'], 'each read once');
-  await Effect.runPromise(e.file({ id: 't-1' } as never));
-  await Effect.runPromise(e.list(['t-1', 't-2']));
-  assert.deepEqual(asked, ['t-1', 't-2', 't-1'], 'the task filed is read again, and the other kept');
-  await Effect.runPromise(e.answer('t-2', 'yes'));
-  await Effect.runPromise(e.view('t-2'));
-  assert.deepEqual(asked, ['t-1', 't-2', 't-1', 't-2'], 'the task answered is read again');
-});
+row(
+  VIEWS,
+  'a view kept for the pass is read again once a write names its task, and the views of the tasks it does not name are kept',
+  async () => {
+    const { e: engine, asked } = askedEngine();
+    const e = reportedEngine(engine, []);
+    await Effect.runPromise(e.view('t-1'));
+    await Effect.runPromise(e.list(['t-1', 't-2']));
+    await Effect.runPromise(e.view('t-2'));
+    assert.deepEqual(asked, ['t-1', 't-2'], 'each read once');
+    await Effect.runPromise(e.file({ id: 't-1' } as never));
+    await Effect.runPromise(e.list(['t-1', 't-2']));
+    assert.deepEqual(asked, ['t-1', 't-2', 't-1'], 'the task filed is read again, and the other kept');
+    await Effect.runPromise(e.answer('t-2', 'yes'));
+    await Effect.runPromise(e.view('t-2'));
+    assert.deepEqual(asked, ['t-1', 't-2', 't-1', 't-2'], 'the task answered is read again');
+  },
+);
 
-test('a view the engine was still reading when a write of the pass went through is not kept', async () => {
+row(VIEWS, 'a view the engine was still reading when a write of the pass went through is not kept', async () => {
   const { e: engine, asked, held } = askedEngine();
   const e = reportedEngine(engine, []);
   const slow = Effect.runPromise(e.view('slow'));
@@ -441,7 +472,7 @@ test('a view the engine was still reading when a write of the pass went through 
   assert.deepEqual(asked, ['slow', 'slow'], 'read again: what it read may be from before the write');
 });
 
-test('a view kept for the pass that a write drops while a list is in flight is read again, never left out of the list', async () => {
+row(VIEWS, 'a view kept for the pass that a write drops while a list is in flight is read again, never left out of the list', async () => {
   const { e: engine, asked, held } = askedEngine();
   const e = reportedEngine(engine, []);
   await Effect.runPromise(e.view('kept'));
@@ -466,7 +497,7 @@ test('a view kept for the pass that a write drops while a list is in flight is r
   assert.deepEqual(asked, ['kept', 'slow', 'kept', 'slow'], 'the kept task read again, after the write, with the read in flight across it');
 });
 
-test('a forget drops the views of the tasks it forgets, and keeps the others the pass read', async () => {
+row(VIEWS, 'a forget drops the views of the tasks it forgets, and keeps the others the pass read', async () => {
   const { e: engine, asked } = askedEngine();
   const e = reportedEngine(engine, []);
   await Effect.runPromise(e.view('a'));
@@ -477,51 +508,65 @@ test('a forget drops the views of the tasks it forgets, and keeps the others the
   assert.deepEqual(asked, ['a', 'b', 'a'], 'the task forgotten is read again, and the other kept');
 });
 
+test('the views a pass keeps (reportedEngine): read again once a write or a forget names their task, and only then', told(VIEWS));
+
 /** The place the package ships, its `standing` not heard, in `said`. */
 const standingUnread = (said: string) => PlaceService.layer(placeOver(builtinGitPlace, { standing: () => unreadBy('standing', said) }));
 
-test('a pass asks one standing for each repository, place and base branch: a run on a second base branch adds exactly one', async () => {
-  const { b, repo } = await theStore();
-  const { tallies: before } = await onePass(b);
-  assert.deepEqual(
-    readStanding()?.places.map((p) => [p.repo, p.base]),
-    [[path.resolve(repo), 'main']],
-  );
-  git(repo, 'switch', '-q', '-c', 'other');
-  try {
-    await settledOne(b, repo, 'succeeded');
-  } finally {
-    git(repo, 'switch', '-q', 'main');
-  }
-  const { tallies: after } = await onePass(b);
-  assert.deepEqual(
-    readStanding()
-      ?.places.map((p) => p.base)
-      .sort(),
-    ['main', 'other'],
-  );
-  assert.equal(after.kinds.place.spawned, before.kinds.place.spawned + 1, 'one process more, for the second base');
-});
+row(
+  STANDING,
+  'a pass asks one standing for each repository, place and base branch: a run on a second base branch adds exactly one',
+  async () => {
+    const { b, repo } = await theStore();
+    const { tallies: before } = await onePass(b);
+    assert.deepEqual(
+      readStanding()?.places.map((p) => [p.repo, p.base]),
+      [[path.resolve(repo), 'main']],
+    );
+    git(repo, 'switch', '-q', '-c', 'other');
+    try {
+      await settledOne(b, repo, 'succeeded');
+    } finally {
+      git(repo, 'switch', '-q', 'main');
+    }
+    const { tallies: after } = await onePass(b);
+    assert.deepEqual(
+      readStanding()
+        ?.places.map((p) => p.base)
+        .sort(),
+      ['main', 'other'],
+    );
+    assert.equal(after.kinds.place.spawned, before.kinds.place.spawned + 1, 'one process more, for the second base');
+  },
+);
 
-test('REFUSED: a run waits on one whose standing is unread, though it has landed, says why, and is filed once standing answers', async () => {
-  const { b, repo } = await theStore();
-  const parent = await atTheGate(b, repo);
-  const child = await runPlaced(startRun({ brief: 'after it', repo, workflowDir: oneStep, after: [parent.id] }));
-  git(repo, 'merge', '-q', '--no-ff', '-m', 'land it', parent.steps.implement.branch!);
-  const unread = standingUnread('the standing broke');
-  const held = await runWith(b.e, tickRun({ memo: freshRestMemo() }).pipe(Effect.provide(unread)));
-  assert.equal(readRun(child.id).steps.implement.taskId ?? undefined, undefined, 'nothing of it filed while its parent reads unread');
-  assert.deepEqual(held.runs.find((r) => r.run.id === child.id)?.waiting, [
-    { run: parent.id, unread: 'the place was not heard: the standing broke' },
-  ]);
-  const places = readStanding()?.places ?? [];
-  assert.ok(places.length > 0 && places.every((p) => 'unread' in p), JSON.stringify(places));
-  await runWith(b.e, tickRun({ memo: freshRestMemo() }));
-  assert.ok(readRun(child.id).steps.implement.taskId, 'filed once its parent reads landed');
-  assert.equal(readRun(child.id).baseRef, git(repo, 'rev-parse', 'main').trim(), 'cut from the base as the pass read it, the merge on it');
-});
+row(
+  STANDING,
+  'REFUSED: a run waits on one whose standing is unread, though it has landed, says why, and is filed once standing answers',
+  async () => {
+    const { b, repo } = await theStore();
+    const parent = await atTheGate(b, repo);
+    const child = await runPlaced(startRun({ brief: 'after it', repo, workflowDir: oneStep, after: [parent.id] }));
+    git(repo, 'merge', '-q', '--no-ff', '-m', 'land it', parent.steps.implement.branch!);
+    const unread = standingUnread('the standing broke');
+    const held = await runWith(b.e, tickRun({ memo: freshRestMemo() }).pipe(Effect.provide(unread)));
+    assert.equal(readRun(child.id).steps.implement.taskId ?? undefined, undefined, 'nothing of it filed while its parent reads unread');
+    assert.deepEqual(held.runs.find((r) => r.run.id === child.id)?.waiting, [
+      { run: parent.id, unread: 'the place was not heard: the standing broke' },
+    ]);
+    const places = readStanding()?.places ?? [];
+    assert.ok(places.length > 0 && places.every((p) => 'unread' in p), JSON.stringify(places));
+    await runWith(b.e, tickRun({ memo: freshRestMemo() }));
+    assert.ok(readRun(child.id).steps.implement.taskId, 'filed once its parent reads landed');
+    assert.equal(
+      readRun(child.id).baseRef,
+      git(repo, 'rev-parse', 'main').trim(),
+      'cut from the base as the pass read it, the merge on it',
+    );
+  },
+);
 
-test('REFUSED: a standing.json that is not the one the tick writes is refused, naming the file and what to do', async () => {
+row(STANDING, 'REFUSED: a standing.json that is not the one the tick writes is refused, naming the file and what to do', async () => {
   await onePass((await theStore()).b);
   const { standingFile } = await import('../src/standing/standing.store.ts');
   const was = fs.readFileSync(standingFile(), 'utf8');
@@ -544,39 +589,52 @@ test('REFUSED: a standing.json that is not the one the tick writes is refused, n
   assert.equal(readStanding()?.v, 1);
 });
 
-test('a step that left its work uncommitted is handed off on the pass that finishes its run, and the tip that pass keeps is the hand-off', async () => {
-  const { b, repo } = await theStore();
-  const run = await runPlaced(startRun({ brief: 'left uncommitted', repo, workflowDir: oneStep }));
-  await runWith(b.e, advanceRun(readRun(run.id)));
-  const work = readRun(run.id).steps.implement;
-  fs.writeFileSync(path.join(work.workspace!, 'left.ts'), 'export const left = 1;\n');
-  b.settle(`${run.id}-implement`, 'succeeded', SIGNED);
-  await runWith(b.e, tickRun({ memo: freshRestMemo() }));
-  const tip = git(repo, 'rev-parse', work.branch!).trim();
-  assert.notEqual(tip, readRun(run.id).baseRef, 'the hand-off committed the work on its branch');
-  assert.deepEqual(readRun(run.id).tips, { [work.branch!]: tip }, 'the tip kept is the one git has after the hand-off');
-});
+row(
+  STANDING,
+  'a step that left its work uncommitted is handed off on the pass that finishes its run, and the tip that pass keeps is the hand-off',
+  async () => {
+    const { b, repo } = await theStore();
+    const run = await runPlaced(startRun({ brief: 'left uncommitted', repo, workflowDir: oneStep }));
+    await runWith(b.e, advanceRun(readRun(run.id)));
+    const work = readRun(run.id).steps.implement;
+    fs.writeFileSync(path.join(work.workspace!, 'left.ts'), 'export const left = 1;\n');
+    b.settle(`${run.id}-implement`, 'succeeded', SIGNED);
+    await runWith(b.e, tickRun({ memo: freshRestMemo() }));
+    const tip = git(repo, 'rev-parse', work.branch!).trim();
+    assert.notEqual(tip, readRun(run.id).baseRef, 'the hand-off committed the work on its branch');
+    assert.deepEqual(readRun(run.id).tips, { [work.branch!]: tip }, 'the tip kept is the one git has after the hand-off');
+  },
+);
 
-test('REFUSED: a run filed on a pass whose standing read no head of its base keeps the base it was started on, its parent read landed', async () => {
-  const { b, repo } = await theStore();
-  const parent = await atTheGate(b, repo);
-  const child = await runPlaced(startRun({ brief: 'after it, no head', repo, workflowDir: oneStep, after: [parent.id] }));
-  git(repo, 'merge', '-q', '--no-ff', '-m', 'land it', parent.steps.implement.branch!);
-  const headless = PlaceService.layer(
-    placeOver(builtinGitPlace, {
-      standing: (request) => {
-        const read = builtinGitPlace.askNow('standing', request);
-        if (!('answer' in read)) return read;
-        const { main: _base, ...tips } = read.answer.tips;
-        return { answer: { ...read.answer, tips } };
-      },
-    }),
-  );
-  await runWith(b.e, tickRun({ memo: freshRestMemo() }).pipe(Effect.provide(headless)));
-  assert.ok(readRun(child.id).steps.implement.taskId, 'filed: its parent reads landed');
-  assert.notEqual(git(repo, 'rev-parse', 'main').trim(), child.baseRef, 'the base moved past where the child was started');
-  assert.equal(readRun(child.id).baseRef, child.baseRef, 'and the child keeps the base it was started on: the pass read no head of it');
-});
+row(
+  STANDING,
+  'REFUSED: a run filed on a pass whose standing read no head of its base keeps the base it was started on, its parent read landed',
+  async () => {
+    const { b, repo } = await theStore();
+    const parent = await atTheGate(b, repo);
+    const child = await runPlaced(startRun({ brief: 'after it, no head', repo, workflowDir: oneStep, after: [parent.id] }));
+    git(repo, 'merge', '-q', '--no-ff', '-m', 'land it', parent.steps.implement.branch!);
+    const headless = PlaceService.layer(
+      placeOver(builtinGitPlace, {
+        standing: (request) => {
+          const read = builtinGitPlace.askNow('standing', request);
+          if (!('answer' in read)) return read;
+          const { main: _base, ...tips } = read.answer.tips;
+          return { answer: { ...read.answer, tips } };
+        },
+      }),
+    );
+    await runWith(b.e, tickRun({ memo: freshRestMemo() }).pipe(Effect.provide(headless)));
+    assert.ok(readRun(child.id).steps.implement.taskId, 'filed: its parent reads landed');
+    assert.notEqual(git(repo, 'rev-parse', 'main').trim(), child.baseRef, 'the base moved past where the child was started');
+    assert.equal(readRun(child.id).baseRef, child.baseRef, 'and the child keeps the base it was started on: the pass read no head of it');
+  },
+);
+
+test(
+  "a pass's standing, one for each repository, place and base branch, and what a pass does where it is unread or refused",
+  told(STANDING),
+);
 
 test(
   'REFUSED at the shipped deadline: a standing whose git never answers is stopped at 15 s, and its repository reads unread on that pass',

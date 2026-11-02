@@ -1,0 +1,4 @@
+---
+allow: Edit(**)
+---
+Write it.

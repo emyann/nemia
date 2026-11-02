@@ -1,0 +1,26 @@
+{
+  "id": "notes",
+  "repo": "@ROOT@/repo",
+  "workspace": "@ROOT@/repo",
+  "baseRef": "@BASE@",
+  "branch": "main",
+  "isolate": false,
+  "brief": "take the notes",
+  "workflowDir": "@ROOT@/workflows/notes",
+  "slotHeldAt": "2026-08-01T00:00:00.000Z",
+  "steps": {
+    "implement": {
+      "taskId": "notes-implement-try2",
+      "workspace": "@ROOT@/repo",
+      "branch": "main",
+      "check": { "taskId": "notes-implement-try2-check" },
+      "tries": [
+        { "taskId": "notes-implement", "check": { "taskId": "notes-implement-check" }, "then": "retries" },
+        { "taskId": "notes-implement-try1b", "cause": "nudge" }
+      ],
+      "handedOff": "notes-implement-try2"
+    },
+    "ship": { "taskId": "notes-ship", "landed": { "commit": "fed789" } }
+  },
+  "createdAt": "2026-08-01T00:00:00.000Z"
+}

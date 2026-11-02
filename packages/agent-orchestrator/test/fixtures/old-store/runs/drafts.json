@@ -1,0 +1,29 @@
+{
+  "id": "drafts",
+  "workspace": "@ROOT@/desk",
+  "brief": "draft the letter",
+  "workflowDir": "@ROOT@/workflows/drafts",
+  "place": { "kind": "folder" },
+  "fromANewerNemia": { "kept": true },
+  "workflow": [
+    {
+      "name": "write",
+      "after": [],
+      "body": "You write.\n\nWrite it.",
+      "workspace": "folder",
+      "disallowedTools": ["SendMessage"],
+      "disallow": ["SendMessage"],
+      "aNewStepKey": 3,
+      "agent": {
+        "name": "writer",
+        "keys": ["workspace", "disallowedTools"],
+        "body": "Write it.",
+        "given": { "disallowedTools": "SendMessage", "disallow": "SendMessage" },
+        "instructions": "You write.",
+        "systemPrompt": "default"
+      }
+    }
+  ],
+  "steps": { "write": { "taskId": null } },
+  "createdAt": "2026-09-02T00:00:00.000Z"
+}

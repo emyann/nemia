@@ -113,7 +113,7 @@ function detachRefusal(factory: Parameters<WiringRefusal>[0], workflow: string):
 export const rewired: Rewired = (factory, change) => {
   if (change.verb === 'attach')
     return factory.workflows.includes(change.workflow) ? factory : { ...factory, workflows: withName(factory.workflows, change.workflow) };
-  if (change.verb === 'detach') return { ...factory, name: '', workflows: factory.workflows.filter((w) => w !== change.workflow) };
+  if (change.verb === 'detach') return { ...factory, workflows: factory.workflows.filter((w) => w !== change.workflow) };
   if (change.verb === 'hire') return { ...factory, hires: withHire(factory.hires, change.step, change.agent) };
   if (change.verb === 'fire') return { ...factory, hires: withoutEntry(factory.hires, change.step) };
   if (change.verb === 'schedule') return { ...factory, schedules: withEntry(factory.schedules, change.workflow, change.schedule) };

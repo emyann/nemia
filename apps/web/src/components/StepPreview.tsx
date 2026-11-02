@@ -2,7 +2,8 @@ import { useContext, useEffect, useId, useMemo, useRef, useState, type KeyboardE
 import { Button, PopoverContext } from 'react-aria-components';
 import { useQuery } from '@tanstack/react-query';
 import { BottomSheet, PreviewCard, PreviewTrigger } from '@/components/ui/ds';
-import { agentsQuery, runQuery, type RunSummary, type WaitOn } from '@/lib/api';
+import { agentsQuery, type RunSummary, type WaitOn } from '@/lib/api';
+import { useRunRead } from '@/lib/runView';
 import { barSaid } from '@/lib/runWords';
 import type { StepState } from '@/lib/status';
 import { stepCardOf, type StepCardInput } from '@/lib/stepCard';
@@ -24,9 +25,9 @@ const BAR_BUTTON = cn('-my-3 grid h-8 w-full cursor-pointer content-center outli
  * instant the run was read; while they are read, what the row already knows.
  */
 function OpenedCard({ run, step, asOf }: { run: RailRun; step: string; asOf: Date }) {
-  const detail = useQuery(runQuery(run.id));
+  const detail = useRunRead(run.id);
   const agents = useQuery(agentsQuery);
-  const input: StepCardInput = { run, step, detail: detail.data, agents: agents.data, now: asOf };
+  const input: StepCardInput = { run, step, detail: detail.view, agents: agents.data, now: asOf };
   return <StepCard facts={stepCardOf(input)} />;
 }
 

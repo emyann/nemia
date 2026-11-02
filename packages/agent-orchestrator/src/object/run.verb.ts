@@ -1,8 +1,8 @@
 /**
  * The run as one object (`RunObject.Run`, run.model.ts), and its sub-resources: a step's tries, one try, its closeout and what it was told.
  * Each is built off one read of the run (`runReading`), and its status's run-level fields from the function the runs list calls
- * (`judgedFields`), so the object, the page and the list say a run alike. The page (`runPage`) is the object and every step's tries and
- * told layers, built here together off that one read (`runParts`).
+ * (`judgedFields`), so the object and the list say a run alike. The board reads the object, and a step's tries and told layers at their
+ * sub-resources, each its own read.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -46,7 +46,7 @@ import type { Run as RunObject, RunSpec, RunStatus, RunStepStatus, StepTold, Try
 import { currentOf, raiseReads, runReading, type RunReading, stepsReading, triesIn } from './read.verb.ts';
 
 /**
- * What `runObject` and `runParts` are handed beside their services: what a caller's reads keep between requests (`filings`, the feed's
+ * What `runObject` is handed beside its services: what a caller's reads keep between requests (`filings`, the feed's
  * filing times; `said`, where each blocked session's conversation was last read), and `inRequest`, which runs the drift's program
  * (`driftNow`) over a request's own services, so it reads the doors the api was given; without it the drift runs over the program's own.
  */
@@ -55,15 +55,8 @@ export type RunReads = {
   readonly inRequest?: (program: ReturnType<typeof driftNow>) => Promise<readonly Drift[]>;
 };
 
-/** The object of a run, or why it is not judged, in the words the list says it with — as its page answers (`RunPageAnswer`). */
+/** The object of a run, or why it is not judged, in the words the list says it with. */
 export type RunObjectAnswer = RunObject | { unjudged: string };
-
-/** The object of a run with every step's tries and what it was told, off one read (`runParts`): what its page is projected from. */
-export type RunParts = {
-  readonly object: RunObject;
-  readonly tries: Readonly<Record<string, StepTry[]>>;
-  readonly told: Readonly<Record<string, StepTold>>;
-};
 
 /** The short of a try (`TryShort`): its number, round and codes, how it signed off and its check's verdict. */
 export const tryShort = (t: StepTry): TryShort => ({
@@ -203,9 +196,8 @@ const runRead = ({ clock, steps, names }: RunReading): RunStatus['read'] =>
     ),
   );
 
-/** What `runParts` read once for the run (`RunReading`), handed to each step's part of it, with what only the parts read. */
+/** What `runObject` read once for the run (`RunReading`), handed to each step's status, with what only the steps read. */
 type StepAt = RunReading & {
-  readonly placeService: PlaceService['Service'];
   readonly used: ReturnType<typeof consumption>;
   readonly said: LastSaid;
 };
@@ -226,11 +218,11 @@ const stepWord = ({ run, steps, views, judged }: StepAt, name: string): RunStepS
 };
 
 /**
- * One step's parts, off what `runParts` read once for the run (`StepAt`): its status (`RunStepStatus`), its tries whole, and what it was
- * told with its body. One more observation for a blocked session's last line (`lastLineOf`).
+ * One step's status (`RunStepStatus`), off what `runObject` read once for the run (`StepAt`), its current try's short read off its tries.
+ * One more observation for a blocked session's last line (`lastLineOf`).
  */
-const stepParts = Effect.fnUntraced(function* (name: string, at: StepAt) {
-  const { e, placeService, run, source, steps, views, judged, used, clock, said: memoSaid } = at;
+const stepStatusOf = Effect.fnUntraced(function* (name: string, at: StepAt) {
+  const { e, run, steps, views, judged, used, clock, said: memoSaid } = at;
   const taskId = run.steps[name]?.taskId ?? null;
   const judgedContext = steps.find((s) => s.name === name)?.context;
   const current = currentOf(at, name);
@@ -261,18 +253,14 @@ const stepParts = Effect.fnUntraced(function* (name: string, at: StepAt) {
     used: taskId ? usedOf(used[name], judgedContext) : null,
     ...costOf(run, name, at),
   };
-  const told: StepTold = {
-    body: source?.find((s) => s.name === name)?.body ?? null,
-    ...toldOf(run, name, source, views, placeService),
-  };
-  return { status, tries, told };
+  return status;
 });
 
 /**
- * The object's run-level status beyond the list's judged fields, the graph, the timeline and the steps: the rest the page shows but the
- * lines a person types, which are the command table's (`pageOf`, page.verb.ts), not the run's.
+ * The object's run-level status beyond the list's judged fields, the graph, the timeline and the steps: the rest the board shows but the
+ * lines a person types, which are the command table's (`runLines`, lines.verb.ts), not the run's.
  */
-const pageFieldsOf = (run: Run, at: RunReading, kinds: readonly Drift[]) => {
+const restOf = (run: Run, at: RunReading, kinds: readonly Drift[]) => {
   const { home, folder, steps, judged, filed } = at;
   return {
     startedAt: runStartedAt(run, filed),
@@ -290,18 +278,20 @@ const pageFieldsOf = (run: Run, at: RunReading, kinds: readonly Drift[]) => {
 };
 
 /**
- * The run's object and every step's tries and told layers (`RunParts`), off one read of the run (`runReading`) — never a sub-resource's
- * verb per step, each of which reads the run again — or, when its unfrozen folder does not load or a task it reads does not, why it is
- * not judged, in the words the list says it with (`{ unjudged }`). One more observation for each blocked session's last line
- * (`lastLineOf`); the kinds it is behind the files on (`driftNow`) through the doors, over `inRequest`'s services where given.
+ * The run as one object, `nemia/v1`'s `Run`: its name, when it was made and its labels (`runLabels`, the feed's); the record it was started
+ * with (`spec`); and what the package judges of it now (`status`) — the runs list's judged fields (`judgedFields`), the graph with its
+ * `input` edges (`runInputGraph`), its time as a whole and each step, and the rest the board shows (`restOf`). Off one read of the run
+ * (`runReading`) — never a sub-resource's verb per step, each of which reads the run again — or, when its unfrozen folder does not load
+ * or a task it reads does not, why it is not judged, in the words the list says it with (`{ unjudged }`). One more observation for each
+ * blocked session's last line (`lastLineOf`); the kinds it is behind the files on (`driftNow`) through the doors, over `inRequest`'s
+ * services where given. A program over the engine, the place and the store's root.
  */
-export const runParts = Effect.fn('runParts')(function* (run: Run, { memo, inRequest }: RunReads) {
-  const placeService = yield* PlaceService;
+export const runObject = Effect.fn('runObject')(function* (run: Run, { memo, inRequest }: RunReads) {
   const at = yield* runReading(run, memo.filings);
-  if ('unjudged' in at) return { unjudged: at.unjudged };
+  if ('unjudged' in at) return { unjudged: at.unjudged } satisfies RunObjectAnswer;
   const kinds = inRequest ? yield* Effect.promise(() => inRequest(driftNow(run))) : yield* driftNow(run);
-  const stepAt: StepAt = { ...at, placeService, used: consumption(at.views, run), said: memo.said };
-  const parts = yield* Effect.forEach(at.names, (name) => stepParts(name, stepAt), { concurrency: 'unbounded' });
+  const stepAt: StepAt = { ...at, used: consumption(at.views, run), said: memo.said };
+  const steps = yield* Effect.forEach(at.names, (name) => stepStatusOf(name, stepAt), { concurrency: 'unbounded' });
   const { factory, workflow } = runLabels(run);
   const object: RunObject = {
     apiVersion: 'nemia/v1',
@@ -312,27 +302,11 @@ export const runParts = Effect.fn('runParts')(function* (run: Run, { memo, inReq
       ...judgedFields(run, at.judged, at.views),
       graph: runInputGraph(at.steps, at.names),
       timeline: runTimeline(at),
-      steps: parts.map((p) => p.status),
-      ...pageFieldsOf(run, at, kinds),
+      steps,
+      ...restOf(run, at, kinds),
     },
   };
-  const result: RunParts = {
-    object,
-    tries: Object.fromEntries(at.names.map((name, i) => [name, parts[i]?.tries ?? []])),
-    told: Object.fromEntries(parts.map((p) => [p.status.name, p.told])),
-  };
-  return result;
-});
-
-/**
- * The run as one object, `nemia/v1`'s `Run`: its name, when it was made and its labels (`runLabels`, the feed's); the record it was started
- * with (`spec`); and what the package judges of it now (`status`) — the runs list's judged fields (`judgedFields`), the graph with its
- * `input` edges (`runInputGraph`), its time as a whole and each step, and the rest its page shows. Or, for a run that does not judge, why,
- * as its page answers. A program over the engine, the place and the store's root, reading the run once (`runParts`).
- */
-export const runObject = Effect.fn('runObject')(function* (run: Run, reads: RunReads) {
-  const parts = yield* runParts(run, reads);
-  return ('unjudged' in parts ? { unjudged: parts.unjudged } : parts.object) satisfies RunObjectAnswer;
+  return object satisfies RunObjectAnswer;
 });
 
 /** The run `runId`'s record and its one read, its step `step` named: refused where the run is not judged, or has no such step. */

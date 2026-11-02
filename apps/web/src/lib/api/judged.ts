@@ -1,6 +1,6 @@
 /**
- * What a run established, as agent-orchestrator judges it and the api answers it on a run's summary and detail (`GET /api/runs`,
- * `GET /api/runs/:id?view=page`): where it stands, who it waits on, what it cost, what to decide. Each type has its schema beside it, which
+ * What a run established, as agent-orchestrator judges it and the api answers it on a run's summary (`GET /api/runs`) and its object's
+ * status (`GET /api/runs/:id`): where it stands, who it waits on, what it cost, what to decide. Each type has its schema beside it, which
  * `get` decodes the api's answer with.
  */
 import { Schema, SchemaTransformation } from 'effect';

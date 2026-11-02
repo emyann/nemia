@@ -17,7 +17,7 @@ const WHY =
   `its registration's \`bridgeSessionId\` is ${MALFORMED.slice(0, 60)}\u2026, not \`session_\` and letters and digits, so no link is` +
   ' built from it: run a Claude Code whose registration this runtime reads.';
 
-/** Where the run's detail is read, and Nemia's level. */
+/** Where the run's object is read, and Nemia's level. */
 const isDetail = (url: URL) => url.pathname === `/api/runs/${FAKE.id}`;
 const isLevel = (url: URL) => url.pathname === '/api/level';
 
@@ -33,13 +33,17 @@ const UP = { url: LINK, why: null };
 /** A bridge asked and not up, saying `WHY`. */
 const DOWN = { url: null, why: WHY };
 
-/** The seeded run's detail with `FAKE.unverified` filed bridged, its bridge `bridge`. */
-const bridgedStep = (bridge: typeof UP | typeof DOWN) => (body: Record<string, unknown>) => ({
-  ...body,
-  steps: (body.steps as Array<{ name: string; filed: Record<string, unknown> | null }>).map((step) =>
-    step.name === FAKE.unverified ? { ...step, filed: { ...step.filed, bridge } } : step,
-  ),
-});
+/** The seeded run's object with `FAKE.unverified` filed bridged, its bridge `bridge`. */
+const bridgedStep = (bridge: typeof UP | typeof DOWN) => (body: Record<string, unknown>) => {
+  const status = body.status as { steps: Array<{ name: string; filed: Record<string, unknown> | null }> };
+  return {
+    ...body,
+    status: {
+      ...status,
+      steps: status.steps.map((step) => (step.name === FAKE.unverified ? { ...step, filed: { ...step.filed, bridge } } : step)),
+    },
+  };
+};
 
 /** Her level with her session up and bridged, its bridge `bridge`: the attach line, then her link or why not, as the api says them. */
 const bridgedLevel = (bridge: typeof UP | typeof DOWN) => (body: Record<string, unknown>) => ({
@@ -81,7 +85,7 @@ async function expectLink(link: Locator, where: string): Promise<void> {
     throw new Refused(`${where}'s link opens ${LINK} in a new tab with no referrer — it is ${JSON.stringify({ href, target, rel })}`);
 }
 
-/** The run's page, its detail answered bridged for `FAKE.unverified` with `bridge`; read once loaded. */
+/** The run's page, its object answered bridged for `FAKE.unverified` with `bridge`; read once loaded. */
 async function onRun(page: Page, bridge: typeof UP | typeof DOWN): Promise<Locator> {
   await page.route(isDetail, answered(bridgedStep(bridge)));
   await page.goto(new URL(`/runs/${FAKE.id}`, page.url()).href, { waitUntil: 'load' });
@@ -90,7 +94,7 @@ async function onRun(page: Page, bridge: typeof UP | typeof DOWN): Promise<Locat
 }
 
 /**
- * The step's facts draw a `reach` row: the link while its bridge is up, why not while it is not. The run's detail is routed for each, and
+ * The step's facts draw a `reach` row: the link while its bridge is up, why not while it is not. The run's object is routed for each, and
  * let go after.
  */
 async function expectStep(page: Page): Promise<void> {

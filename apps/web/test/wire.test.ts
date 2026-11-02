@@ -23,7 +23,6 @@ import type * as chat from '../../api/src/nemia/chat.ts';
 import type * as custom from '../../api/src/custom/custom.ts';
 import type * as daemon from '../../api/src/factory/daemon.ts';
 import type * as decision from '../../api/src/decide/decision.ts';
-import type * as detail from '../../api/src/detail/detail.ts';
 import type * as factories from '../../api/src/factories/factories.ts';
 import type * as inbox from '../../api/src/inbox/inbox.ts';
 import type * as instruction from '../../api/src/factories/instruction.ts';
@@ -40,15 +39,12 @@ import type * as servers from '../../api/src/servers/servers.ts';
 import type * as skills from '../../api/src/agents/skills.ts';
 import type * as step from '../../api/src/step/step.ts';
 import type * as steps from '../../api/src/steps/steps.ts';
-import type * as told from '../../api/src/detail/told.ts';
-import type * as tries from '../../api/src/detail/tries.ts';
-import type * as usage from '../../api/src/detail/usage.ts';
 import type * as words from '../../api/src/workflows/words.ts';
 import type * as workflows from '../../api/src/workflows/workflows.ts';
 import type * as yours from '../../api/src/workflows/yours.ts';
 
-/** A step of a run's page, as the api answers it. */
-type Step = runs.RunPage['steps'][number];
+/** A step of a run's object, as the api answers it (`GET /api/runs/:id`): its status, as the package judges it. */
+type Step = runs.RunAnswer['status']['steps'][number];
 type SaidHeld = Omit<Step['said'][number], 'after'> & { after: NonNullable<Step['said'][number]['after']> | null };
 type RadiusOf = Extract<decision.Touched['radius'], { changes: unknown }>;
 type ChatEventOf = chat.ChatHistoryAnswer['events'][number];
@@ -110,7 +106,7 @@ export type PolicyList = Holds<Same<Board.PolicyList, nemia.PolicyAnswer>>;
 export type AutoRule = Holds<Same<Board.AutoRule, nemia.PolicyAnswer['rules'][number]>>;
 export type Condition = Holds<Same<Board.Condition, nemia.PolicyAnswer['rules'][number]['when'][number]>>;
 
-export type Bridge = Holds<Same<Board.Bridge, NonNullable<detail.StepFiled['bridge']>>>;
+export type Bridge = Holds<Same<Board.Bridge, NonNullable<runs.StepFiled['bridge']>>>;
 
 export type KeyKind = Holds<Same<Board.KeyKind, words.KeyKind>>;
 export type KeyField = Holds<Same<Board.KeyField, builder.KeyField>>;
@@ -169,24 +165,6 @@ export type MergeWord = Holds<Same<Board.MergeWord, decision.Collisions['collidi
 export type CheckoutHold = Holds<Same<Board.CheckoutHold, NonNullable<decision.Decidable['checkout']>>>;
 export type RunSlot = Holds<Same<Board.RunSlot, NonNullable<Extract<decision.RunDecision, { running: true }>['held']>>>;
 
-export type StepBudget = Holds<Same<Board.StepBudget, detail.StepBudget>>;
-export type StepRaise = Holds<Same<Board.StepRaise, detail.StepRaise>>;
-export type StepApproval = Holds<Same<Board.StepApproval, detail.StepApproval>>;
-export type StepGate = Holds<Same<Board.StepGate, detail.StepGate>>;
-export type StepAcceptance = Holds<Same<Board.StepAcceptance, detail.StepAcceptance>>;
-export type StepAsked = Holds<Same<Board.StepAsked, detail.StepAsked>>;
-export type StepSpec = Holds<Same<Board.StepSpec, detail.StepSpec>>;
-export type StepFiled = Holds<Same<Board.StepFiled, detail.StepFiled>>;
-/** As `Said`, held open. */
-export type RunDetail = Holds<
-  Same<Board.RunDetail, Omit<runs.RunPage, 'steps'> & { steps: Array<Omit<Step, 'said'> & { said: SaidHeld[] }> }>
->;
-export type StepTimelineTry = Holds<Same<Board.StepTimelineTry, detail.StepTimelineTry>>;
-export type TimelineTotal = Holds<Same<Board.TimelineTotal, detail.StepTimelineTotal>>;
-export type StepStatus = Holds<Same<Board.StepStatus, NonNullable<detail.StepRaise['own']>>>;
-export type TaskSpan = Holds<Same<Board.TaskSpan, NonNullable<detail.StepTimelineTry['session']>>>;
-export type TurnSpan = Holds<Same<Board.TurnSpan, NonNullable<detail.StepTimelineTry['turn']>>>;
-
 export type FactorySchedule = Holds<Same<Board.FactorySchedule, factories.ScheduleAnswer>>;
 export type FactoryUntrusted = Holds<Same<Board.FactoryUntrusted, factories.UntrustedAnswer>>;
 export type Factory = Holds<Same<Board.Factory, factories.FactoryAnswer>>;
@@ -202,25 +180,26 @@ export type FactoryServers = Holds<
 >;
 export type BuiltinServer = Holds<Same<Board.BuiltinServer, servers.FactoryServersRead['builtin'][number]>>;
 
-export type RunGraph = Holds<Same<Board.RunGraph, runs.RunPage['graph']>>;
-export type GraphEdge = Holds<Same<Board.GraphEdge, runs.RunPage['graph']['edges'][number]>>;
+export type RunLines = Holds<Same<Board.RunLines, runs.RunLinesAnswer>>;
+export type RunGraph = Holds<Same<Board.RunGraph, runs.RunListing['graph']>>;
+export type GraphEdge = Holds<Same<Board.GraphEdge, runs.RunListing['graph']['edges'][number]>>;
 
 export type InboxEntry = Holds<Same<Board.InboxEntry, inbox.InboxEntry>>;
 export type InboxCardPage = Holds<Same<Board.InboxCardPage, inbox.InboxCardPage>>;
 export type Queued = Holds<Same<Board.Queued, inbox.InboxQueueAnswer>>;
 export type FromSet = Holds<Same<Board.FromSet, inbox.InboxFromAnswer>>;
 
-export type PlaceKind = Holds<Same<Board.PlaceKind, runs.RunPage['place']>>;
-export type RunStatus = Holds<Same<Board.RunStatus, runs.RunPage['status']>>;
+export type PlaceKind = Holds<Same<Board.PlaceKind, runs.RunListing['place']>>;
+export type RunStatus = Holds<Same<Board.RunStatus, runs.RunListing['status']>>;
 /** The codes the board groups and colours by, each held to the field the api carries it in. */
-export type RunPhase = Holds<Same<Board.RunPhase, runs.RunPage['phase']>>;
+export type RunPhase = Holds<Same<Board.RunPhase, runs.RunListing['phase']>>;
 export type RunReason = Holds<Same<Board.RunReason, runs.RunListing['reason']>>;
 export type StepPhase = Holds<Same<Board.StepPhase, runs.RunListing['steps'][number]['phase']>>;
 export type StepReason = Holds<Same<Board.StepReason, Step['reason']>>;
-export type TryPhase = Holds<Same<Board.StepPhase, tries.StepTry['phase']>>;
-export type TryReason = Holds<Same<Board.StepReason, tries.StepTry['reason']>>;
-export type TryOn = Holds<Same<Board.WaitOn | null, tries.StepTry['on']>>;
-export type TryVia = Holds<Same<Board.AnswerVia | null, tries.StepTry['via']>>;
+export type TryPhase = Holds<Same<Board.StepPhase, runs.StepTry['phase']>>;
+export type TryReason = Holds<Same<Board.StepReason, runs.StepTry['reason']>>;
+export type TryOn = Holds<Same<Board.WaitOn | null, runs.StepTry['on']>>;
+export type TryVia = Holds<Same<Board.AnswerVia | null, runs.StepTry['via']>>;
 export type StepOn = Holds<Same<Board.WaitOn | null, Step['on']>>;
 export type StepVia = Holds<Same<Board.AnswerVia | null, Step['via']>>;
 export type RunOn = Holds<Same<Board.WaitOn | null, runs.RunListing['on']>>;
@@ -228,16 +207,16 @@ export type RunVia = Holds<Same<Board.AnswerVia | null, runs.RunListing['via']>>
 export type CheckVerdict = Holds<Same<Board.CheckVerdict, NonNullable<logs.StepCheck['verdict']>>>;
 export type StepVerdict = Holds<Same<Board.CheckVerdict, NonNullable<runs.RunListing['steps'][number]['verdict']>>>;
 export type CheckResult = Holds<Same<Board.CheckResult, NonNullable<logs.StepCheck['verdict']>['result']>>;
-export type RunToDecide = Holds<Same<Board.RunToDecide, NonNullable<runs.RunPage['toDecide']>>>;
-export type Spent = Holds<Same<Board.Spent, NonNullable<runs.RunPage['cost']>>>;
-export type AtWork = Holds<Same<Board.AtWork, NonNullable<runs.RunPage['atWork']>>>;
-export type RunTokens = Holds<Same<Board.RunTokens, NonNullable<runs.RunPage['tokens']>>>;
-export type RunWaiting = Holds<Same<Board.RunWaiting, NonNullable<runs.RunPage['waiting']>>>;
-export type RunHolding = Holds<Same<Board.RunHolding, NonNullable<runs.RunPage['holding']>>>;
+export type RunToDecide = Holds<Same<Board.RunToDecide, NonNullable<runs.RunListing['toDecide']>>>;
+export type Spent = Holds<Same<Board.Spent, NonNullable<runs.RunListing['cost']>>>;
+export type AtWork = Holds<Same<Board.AtWork, NonNullable<runs.RunListing['atWork']>>>;
+export type RunTokens = Holds<Same<Board.RunTokens, NonNullable<runs.RunListing['tokens']>>>;
+export type RunWaiting = Holds<Same<Board.RunWaiting, NonNullable<runs.RunListing['waiting']>>>;
+export type RunHolding = Holds<Same<Board.RunHolding, NonNullable<runs.RunListing['holding']>>>;
 export type StepNeeds = Holds<Same<Board.StepNeeds, Pick<Step, keyof Board.StepNeeds>>>;
 
-export type TaskPart = Holds<Same<Board.TaskPart, told.TaskPart>>;
-export type StepLayers = Holds<Same<Board.StepLayers, NonNullable<Step['layers']>>>;
+export type TaskPart = Holds<Same<Board.TaskPart, runs.TaskPart>>;
+export type StepLayers = Holds<Same<Board.StepLayers, NonNullable<workflows.ListedStep['layers']>>>;
 
 export type GivenSkill = Holds<Same<Board.GivenSkill, skills.GivenSkill>>;
 export type WorkflowStepSpec = Holds<Same<Board.WorkflowStepSpec, workflows.WorkflowStepSpec>>;
@@ -290,23 +269,23 @@ export type StepPath = Holds<Same<Board.StepPath, Omit<path.StepPath, 'path'> & 
 export type YourStore = Holds<Same<Board.YourStore, yours.YourStore>>;
 
 export type StepArtifact = Holds<Same<Board.StepArtifact, artifacts.StepArtifact>>;
-export type StepReply = Holds<Same<Board.StepReply, tries.StepReply>>;
-export type StepCloseout = Holds<Same<Board.StepCloseout, tries.StepCloseout>>;
+export type StepReply = Holds<Same<Board.StepReply, runs.StepReply>>;
+export type StepCloseout = Holds<Same<Board.StepCloseout, runs.StepCloseout>>;
 export type StepValue = Holds<Same<Board.StepValue, artifacts.StepValue>>;
 export type StepLog = Holds<Same<Board.StepLog, logs.StepLog>>;
 export type StepCheck = Holds<Same<Board.StepCheck, logs.StepCheck>>;
-export type StepUnreadable = Holds<Same<Board.StepUnreadable, tries.StepUnreadable>>;
-export type StepAttempts = Holds<Same<Board.StepAttempts, tries.StepAttempts>>;
-export type StepTry = Holds<Same<Board.StepTry, tries.StepTry>>;
-export type AskedQuestions = Holds<Same<Board.AskedQuestions, tries.StepCloseout['questions'][number]>>;
-export type Question = Holds<Same<Board.Question, tries.StepCloseout['questions'][number]['questions'][number]>>;
+export type StepUnreadable = Holds<Same<Board.StepUnreadable, runs.StepUnreadable>>;
+export type StepAttempts = Holds<Same<Board.StepAttempts, runs.StepAttempts>>;
+export type StepTry = Holds<Same<Board.StepTry, runs.StepTry>>;
+export type AskedQuestions = Holds<Same<Board.AskedQuestions, runs.StepCloseout['questions'][number]>>;
+export type Question = Holds<Same<Board.Question, runs.StepCloseout['questions'][number]['questions'][number]>>;
 export type QuestionOption = Holds<
-  Same<Board.QuestionOption, tries.StepCloseout['questions'][number]['questions'][number]['options'][number]>
+  Same<Board.QuestionOption, runs.StepCloseout['questions'][number]['questions'][number]['options'][number]>
 >;
 
-export type Usage = Holds<Same<Board.Usage, usage.Usage>>;
-export type StepUsed = Holds<Same<Board.StepUsed, usage.StepUsed>>;
-export type RunRead = Holds<Same<Board.RunRead, usage.RunRead>>;
+export type Usage = Holds<Same<Board.Usage, runs.Usage>>;
+export type StepUsed = Holds<Same<Board.StepUsed, runs.StepUsed>>;
+export type RunRead = Holds<Same<Board.RunRead, runs.RunRead>>;
 
 /**
  * Held open: the footer still draws a version with no release (`versionWords`, lib/footer.ts), which the api always answers; making

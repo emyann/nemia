@@ -1,4 +1,4 @@
-import type { RunDetail } from './api/detail.ts';
+import type { RunView } from './runView.ts';
 import type { Decidable, RunDecision } from './api/decision.ts';
 import { isDecidable } from './decide.ts';
 import type { PruneHow } from './api/runs.ts';
@@ -19,7 +19,7 @@ export type PruneChoice = {
 /** What the board offers to prune of a run, and what a prune `--unmerged` gives up, said plainly (`unmergedWarning`). */
 export type PruneOffer = { choices: PruneChoice[]; warning: string | null };
 
-type Prunable = Pick<RunDetail, 'id' | 'place' | 'status' | 'moving' | 'onDisk'>;
+type Prunable = Pick<RunView, 'id' | 'place' | 'status' | 'moving' | 'onDisk'>;
 
 /**
  * Whether the run finished and nobody has decided it, as the api's decision says it off the package's own (`Decidable['awaiting']`): the

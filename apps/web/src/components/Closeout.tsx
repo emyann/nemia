@@ -10,6 +10,7 @@ import { Artifacts, Values } from './Artifacts';
 import { Markdown } from './Markdown';
 import { FieldView, Json, OutcomeHead } from './Outcome';
 import { Questions } from './Questions';
+import type { Frozen } from '../lib/frozen';
 
 export { Artifacts, bytesWord } from './Artifacts';
 
@@ -17,7 +18,7 @@ export { Artifacts, bytesWord } from './Artifacts';
  * A try as the Rounds rows and the Output tab name it: its round, its number, and in brackets how it was reached — what replaced
  * the try before it: `round 2 · try 3 (round)`, `round 1 · try 2 (retries)`.
  */
-export function tryLabel(t: StepTry, tries: readonly StepTry[]): string {
+export function tryLabel(t: Frozen<StepTry>, tries: readonly Frozen<StepTry>[]): string {
   const before = tries.find((other) => other.try === t.try - 1);
   return `round ${t.round} · try ${t.try}${before?.cause ? ` (${before.cause})` : ''}`;
 }
@@ -52,7 +53,15 @@ function CheckVerdictWords({ verdict }: { verdict: CheckVerdict | null }) {
  * Every try of a step, a row each, earliest first: its round and number and how it was reached, its task, its attempts and how
  * long the latest took, its check's verdict — and a link that selects it, whose closeout the Output tab then shows.
  */
-export function Rounds({ tries, selected, onSelect }: { tries: readonly StepTry[]; selected: number; onSelect: (n: number) => void }) {
+export function Rounds({
+  tries,
+  selected,
+  onSelect,
+}: {
+  tries: readonly Frozen<StepTry>[];
+  selected: number;
+  onSelect: (n: number) => void;
+}) {
   return (
     <section aria-label="Rounds" className="space-y-1">
       <h3 className="text-label-medium text-muted-foreground">Rounds</h3>
@@ -107,7 +116,7 @@ export function Rounds({ tries, selected, onSelect }: { tries: readonly StepTry[
  * The outcome of the try selected — the current one until another is — and beneath it every other try's, folded. `none` is what
  * is said of the selected try when it gave no statement and the engine records no reason it has none.
  */
-export function TryCloseouts({ tries, selected, none }: { tries: readonly StepTry[]; selected: StepTry; none: string }) {
+export function TryCloseouts({ tries, selected, none }: { tries: readonly Frozen<StepTry>[]; selected: Frozen<StepTry>; none: string }) {
   const others = tries.filter((t) => t.try !== selected.try).reverse();
   return (
     <>
@@ -164,7 +173,7 @@ function YourAnswer({ answer }: { answer: string }) {
  * How a try ended, said first — by its agent, or by the machine for it — then its statement drawn, when there is one. A statement that
  * could not be read is shown whole, as the engine recorded it: nothing hidden.
  */
-function TryOutcome({ t, none }: { t: StepTry; none: string }) {
+function TryOutcome({ t, none }: { t: Frozen<StepTry>; none: string }) {
   const outcome = outcomeOf(t, none);
   if (t.unreadable) {
     return (
@@ -183,7 +192,7 @@ function TryOutcome({ t, none }: { t: StepTry; none: string }) {
  * replies, what it did not give, and its files. The Raw switch shows the statement as the engine recorded it instead, whole; its word is a
  * label of its own beside it, naming the switch's input, since React Aria's switch is a label round its input.
  */
-export function CloseoutView({ closeout, outcome }: { closeout: StepCloseout; outcome: Outcome }) {
+export function CloseoutView({ closeout, outcome }: { closeout: Frozen<StepCloseout>; outcome: Outcome }) {
   const [raw, setRaw] = useState(false);
   const switchId = useId();
   const toggle = (
@@ -220,7 +229,15 @@ export function CloseoutView({ closeout, outcome }: { closeout: StepCloseout; ou
  * tab's, and the gate's (`HandedOn`), which folds the long ones (`foldsAtGate`) and says what each holds on its fold. `answered` leaves
  * out each question field: the gate draws its questions to answer beside it.
  */
-function DeclaredFields({ closeout, fold = false, answered = false }: { closeout: StepCloseout; fold?: boolean; answered?: boolean }) {
+function DeclaredFields({
+  closeout,
+  fold = false,
+  answered = false,
+}: {
+  closeout: Frozen<StepCloseout>;
+  fold?: boolean;
+  answered?: boolean;
+}) {
   const images = imagePaths(closeout.artifacts);
   const asked = new Map(closeout.questions.map((a) => [a.field, a.questions]));
   const field = (name: string, value: unknown, first = false) => {
@@ -283,7 +300,7 @@ function Fold({ name, count, children }: { name: string; count: number; children
  * drawing, without its outcome line and Raw switch: at a gate the step has signed off, and the statement whole is a tab away.
  * `answeredBeside` where the gate draws the questions it asks to answer: they are then left out here, so each is drawn once.
  */
-export function HandedOn({ closeout, answeredBeside = false }: { closeout: StepCloseout; answeredBeside?: boolean }) {
+export function HandedOn({ closeout, answeredBeside = false }: { closeout: Frozen<StepCloseout>; answeredBeside?: boolean }) {
   return (
     <div data-handed-on className="min-w-0 space-y-3">
       {closeout.needs && <ClosedNeeds needs={closeout.needs} />}
@@ -304,7 +321,7 @@ export function HandedOn({ closeout, answeredBeside = false }: { closeout: StepC
  * What a closeout says in words: its summary, one line as the api cut it, then its body as markdown, and what the run did not accept of
  * it, each under `not accepted`. A body that opens with the summary (`bodyLeadsWith`) is drawn alone, so the line is said once.
  */
-export function Statement({ closeout }: { closeout: StepCloseout }) {
+export function Statement({ closeout }: { closeout: Frozen<StepCloseout> }) {
   return (
     <>
       {!bodyLeadsWith(closeout.summary, closeout.body) && (

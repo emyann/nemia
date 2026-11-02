@@ -16,9 +16,10 @@ import {
   readLink,
   takenLine,
 } from '../src/lib/gate.ts';
-import type { Collision, Collisions, Decidable, RunDetail, RunSummary } from '../src/lib/api.ts';
+import type { Collision, Collisions, Decidable, RunSummary } from '../src/lib/api.ts';
+import type { RunView } from '../src/lib/runView.ts';
 
-type Step = RunDetail['steps'][number];
+type Step = RunView['steps'][number];
 
 const step = (name: string, over: Partial<Step> = {}): Step =>
   ({
@@ -54,7 +55,7 @@ const summary = (over: Partial<RunSummary> = {}) =>
     'cancelledAt' | 'waitingOnYou' | 'steps' | 'toDecide'
   >;
 
-const detail = (steps: Step[], over: Partial<RunDetail> = {}) =>
+const detail = (steps: Step[], over: Partial<RunView> = {}) =>
   ({
     cancelledAt: null,
     waitingOnYou: ['ship'],
@@ -69,7 +70,7 @@ const detail = (steps: Step[], over: Partial<RunDetail> = {}) =>
     },
     steps,
     ...over,
-  }) as unknown as RunDetail;
+  }) as unknown as RunView;
 
 const tried = (round: number, n = 1) => ({ try: n, round }) as Step['tries'][number];
 

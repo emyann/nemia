@@ -15,16 +15,32 @@ import {
   viewsFor,
   runWith,
   runObject,
-  runPage,
+  runLines,
+  type RunLines,
   type RunObject,
   type RunSummary,
   type WaitingRun,
 } from 'agent-orchestrator';
 import { decisionOf } from '../decide/decision.ts';
-import type { RunDetail } from '../detail/index.ts';
 import { type ApiEnv, served, type Served } from '../layer.ts';
 import { workflowPageOf, type WorkflowPageAddress } from '../step/step.ts';
 import { commandNamed, findRun, noSuchRun, runPlaced } from '../store.ts';
+
+/**
+ * The types of what the run object's sub-resources and its steps answer, judged by the package: a step's tries (`triesOf`), what it was
+ * told (`toldOf`) and what its sessions used (`usedOf`), where the board's mirrors read them.
+ */
+export type {
+  StepAcceptance,
+  StepApproval,
+  StepAttempts,
+  StepCloseout,
+  StepGate,
+  StepReply,
+  StepTry,
+  StepUnreadable,
+} from 'agent-orchestrator';
+export type { StepFiled, StepRaise, TaskPart, RunRead, StepUsed, Usage } from 'agent-orchestrator';
 
 /** A person's hold on a run, as `PUT /api/runs/:id/hold` answers it beside the run (`{ id, lifted: false, hold }`). */
 export type { Hold } from 'agent-orchestrator/run';
@@ -36,10 +52,11 @@ export type RunListing = RunSummary & { workflowPage: WorkflowPageAddress | null
 export type RunAnswer = RunObject.Run;
 
 /**
- * A run as its page answers it, under `GET /api/runs/:id?view=page`: in full (`RunDetail`), and the address of its workflow's page, null
- * where the board pages none. The board's until it reads the run object and its sub-resources.
+ * The lines read beside the run object (`GET /api/runs/:runId/lines`): the command lines a person types about the run and each of its
+ * steps (`runLines`), where it came from, and the address of its workflow's page (`workflowPageOf`), as the list gives it. Constant for a
+ * run, off its record alone: the board reads it once and never again on the feed.
  */
-export type RunPage = RunDetail & { workflowPage: WorkflowPageAddress | null };
+export type RunLinesAnswer = RunLines & { workflowPage: WorkflowPageAddress | null };
 
 /** What the list adds to a row: the address of its workflow's page, null where the board pages none. */
 type Paged = { workflowPage: WorkflowPageAddress | null };
@@ -88,8 +105,14 @@ const listRead = ({ e, placeService, env, home, memo }: Served, entry: (typeof C
 const paged = <R extends RunSummary>(rows: readonly R[], { repo, home }: Served): Array<R & Paged> =>
   rows.map((run) => ({ ...run, workflowPage: workflowPageOf(run, repo, home) }));
 
-/** The one view `GET /api/runs/:id` takes besides the object: the run's page, which the board reads until it reads the object. */
-const PAGE_VIEW = 'page';
+/**
+ * Why `GET /api/runs/:id` refuses `?view=`, the page's `view=page` among them: it answers the run object alone, and names where the rest
+ * is read.
+ */
+const noView = (id: string, view: string): string =>
+  `GET /api/runs/${id} takes no view, not view=${view}: drop it — the route answers the run object; read a step's tries at ` +
+  `/api/runs/${id}/steps/<step>/tries, what it was told at /api/runs/${id}/steps/<step>/told, and the command lines and the ` +
+  `workflow's page at /api/runs/${id}/lines.`;
 
 /** What a run would hand a run started with it as context (`concluded`), an entry of the package's table: on `GET …/concluded`. */
 const CONCLUDED = commandNamed('concluded');
@@ -139,11 +162,16 @@ const CONCLUDED = commandNamed('concluded');
  *   package (`runObject`) as `nemia show` judges it, handed the app's memo and the request's doors (`inRequest`), which the entry's own
  *   handler is not: so it is served here, by hand. Found among the runs the store lists, never by a path made of its id: refused with a
  *   404 when there is no such run, and with a 502 when a task it reads does not, in the words the list says it with
- *   (`RunSummary.unreadable`). Under `?view=page` it answers the run's page (`runPage`, `RunPage`), the board's until it reads the
- *   object; any other `view` is a 422 naming the one it takes.
+ *   (`RunSummary.unreadable`). It takes no `view`: the page `?view=page` once answered is gone, and any `view` is a 422 that says what
+ *   to read in its place — the object here, a step's tries and told at their sub-resources, and the lines at `…/lines`.
+ * - `GET /api/runs/:runId/lines` — the lines beside the object (`RunLinesAnswer`): the run's `decide` and `refresh` lines, each step's
+ *   `approve`, `retry` and `say` by its name, where it came from (`fromNote`, null for a run started from no card), and the address of
+ *   its workflow's page (`workflowPageOf`), the one the list gives the run. Off the run's record alone (`runLines`): it judges nothing and
+ *   reads no task, and it is constant for the run, so the board reads it once. Served by hand, as no entry of the command table answers
+ *   it; a 404 when there is no such run, as the object's route.
  * - `GET /api/runs/:runId/decision` — what `nemia decide` shows a person (`decisionOf`), the route of its entry of the command table. Not
- *   on the page's poll, since it runs `git diff`. Refused as the run's page is: a 404 with no such run, and a 502 when a task it reads does
- *   not, in the words the list says it with (`RunSummary.unreadable`).
+ *   on the board's poll, since it runs `git diff`. Refused as the run's object is: a 404 with no such run, and a 502 when a task it reads
+ *   does not, in the words the list says it with (`RunSummary.unreadable`).
  * - `GET /api/runs/:runId/concluded` — what a run started now with `--from <runId>` would be handed of it (`nemia concluded`): the run,
  *   whether it has landed and its `## From run` section, made by the package as the tick makes it. A 404 with no such run, the package's
  *   `Missing`, answered by `app.onError`.
@@ -199,21 +227,20 @@ export const runs = new Hono<ApiEnv>()
     served(c, async (s) => {
       const id = c.req.param('runId');
       const view = c.req.query('view');
-      if (view !== undefined && view !== PAGE_VIEW)
-        return c.json(
-          { error: `GET /api/runs/${id} takes view=${PAGE_VIEW} or no view, not view=${view}: drop it, or ask for the page.` },
-          422,
-        );
+      if (view !== undefined) return c.json({ error: noView(id, view) }, 422);
       const run = findRun(id);
       if (!run) return c.json({ error: noSuchRun(id) }, 404);
-      if (view === PAGE_VIEW) {
-        const full = await runPlaced(s, s.e, runPage(run, s));
-        if ('unjudged' in full) return c.json({ error: full.unjudged }, 502);
-        return c.json({ ...full, workflowPage: workflowPageOf(run, s.repo, s.home) } satisfies RunPage);
-      }
       const object = await runPlaced(s, s.e, runObject(run, s));
       if ('unjudged' in object) return c.json({ error: object.unjudged }, 502);
       return c.json(object satisfies RunAnswer);
+    }),
+  )
+  .get('/api/runs/:runId/lines', (c) =>
+    served(c, async ({ repo, home }) => {
+      const id = c.req.param('runId');
+      const run = findRun(id);
+      if (!run) return c.json({ error: noSuchRun(id) }, 404);
+      return c.json({ ...runLines(run), workflowPage: workflowPageOf(run, repo, home) } satisfies RunLinesAnswer);
     }),
   )
   .get('/api/runs/:runId/decision', (c) =>

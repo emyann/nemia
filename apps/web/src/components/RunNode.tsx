@@ -5,7 +5,7 @@ import { Handle, Position, type Node, type NodeProps } from '@xyflow/react';
 import { ChevronRight } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
-import { decisionQuery, type RunDetail, type RunSummary, type RunWaiting } from '@/lib/api';
+import { decisionQuery, type RunSummary, type RunWaiting } from '@/lib/api';
 import { TryTag } from './TryTag';
 import { needLine, needsOf, stepAnchor } from '@/lib/asks';
 import { spentTitle } from '@/lib/cost';
@@ -18,7 +18,7 @@ import { ENDED } from '@/lib/words';
 import { RouteLink } from './AgentParts';
 import { CardGate, type Taken } from './CardGate';
 import { CardLift } from './LiftHold';
-import { StepRail, StepTiles } from './StepRail';
+import { StepRail, StepTiles, type TilesRead } from './StepRail';
 
 /**
  * `finished` is a run not in flight: on the floor only when finished runs are asked for, and dimmed.
@@ -32,7 +32,7 @@ export type RunNodeData = {
   reads: string[];
   finished: boolean;
   open: boolean;
-  detail: RunDetail | null;
+  detail: TilesRead | null;
   trouble: string | null;
   inspected: boolean;
   selected: string | null;

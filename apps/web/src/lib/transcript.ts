@@ -14,7 +14,8 @@
  * (`lib/conversation.ts`), as `chatItems` is hers: a file of its own, since the two together pass the 500 lines a file is
  * held to.
  */
-import type { RunDetail, Said, StepTry, TranscriptEvent } from './api';
+import type { Said, StepTry, TranscriptEvent } from './api';
+import type { StepView } from './runView';
 
 /**
  * The task whose conversation a step has to read: its current try's, once an attempt of it has started — on its current turn, or on a
@@ -23,7 +24,7 @@ import type { RunDetail, Said, StepTry, TranscriptEvent } from './api';
  * of — which has none to read. `tries` are the step's, each with its own turn's attempts.
  */
 export const sessionToRead = (
-  step: Pick<RunDetail['steps'][number], 'taskId' | 'attempts'> & { tries: readonly Pick<StepTry, 'taskId' | 'attempts'>[] },
+  step: Pick<StepView, 'taskId' | 'attempts'> & { tries: readonly Pick<StepTry, 'taskId' | 'attempts'>[] },
 ): string | null =>
   step.attempts.count > 0 || step.tries.some((t) => t.taskId === step.taskId && t.attempts.count > 0) ? step.taskId : null;
 

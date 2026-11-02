@@ -146,7 +146,7 @@ const StepPathSchema = decodes<StepPath>()(
 );
 
 /**
- * The path of a step's try: the current one for a `tryNumber` of null, keyed by `stamp` (`pathStamp`), so the feed's `step` event, which
+ * The path of a step's try: the current one for a `tryNumber` of null, keyed by `stamp` (`stepStamp`), so the feed's `step` event, which
  * reads the run's record again, reads it again once the step moved; an earlier one by its number, which never moves. The current try's
  * is read again as `poll` answers for the path last read (`pathPoll`), and while another is read the path last read stays on the page.
  */

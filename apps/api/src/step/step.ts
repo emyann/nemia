@@ -4,8 +4,8 @@
  * hire into it, where each of its skills is found, and its recent runs. And the address of a run's workflow page (`workflowPageOf`),
  * which a run's page links back to: the board builds no address from a store path.
  *
- * Everything here is read now, from the files: a run freezes its workflow and its hires as it starts, and what a run was told is its own
- * page's (`toldOf` in detail/told.ts).
+ * Everything here is read now, from the files: a run freezes its workflow and its hires as it starts, and what a run was told is its
+ * step's own sub-resource (`GET /api/runs/:runId/steps/:step/told`, the package's `toldOf`).
  */
 import path from 'node:path';
 import { Effect } from 'effect';

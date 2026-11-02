@@ -1,5 +1,6 @@
 import { Handle, Position, type Node, type NodeProps } from '@xyflow/react';
-import type { RunDetail, WorkflowStepSpec } from '../lib/api';
+import type { WorkflowStepSpec } from '../lib/api';
+import type { StepView } from '../lib/runView';
 import { deniedNodeText, needNodeText, needOf, needText, type Need } from '../lib/asks';
 import { gateNodeLine } from '../lib/gate';
 import { attemptLine, isLive, LOOP_SOURCE, LOOP_TARGET } from '../lib/canvas';
@@ -15,7 +16,7 @@ import { PERSON } from '../lib/words';
  * run's `waitingOnYou` names the step: the api's word, which leaves out a step a person has already asked something of.
  */
 export type StepNodeData = {
-  step: RunDetail['steps'][number];
+  step: StepView;
   index: number;
   runCancelled: boolean;
   runHeld: boolean;

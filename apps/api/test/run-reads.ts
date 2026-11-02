@@ -3,11 +3,11 @@
  * a step's tries, one try, a try's closeout and what the step was told — each on its route and named by the package's type of its answer.
  * A read that does not answer 200 throws, naming the route and what it answered, so a test reads the field it means and nothing else.
  *
- * `pageRead` is the board's page (`?view=page`), read for what the object leaves out on purpose — the lines a person types (`decide`,
- * `refresh`, a step's `commands`), `fromNote` and `workflowPage` — until the board reads the object and those find their home.
+ * `linesOf` is the lines read beside the object (`…/lines`, `RunLinesAnswer`), for what the object leaves out on purpose — the lines a
+ * person types (`decide`, `refresh`, each step's `approve`, `retry` and `say`), `fromNote` and `workflowPage`.
  */
 import type { RunObject } from 'agent-orchestrator';
-import type { RunAnswer, RunPage } from '../src/runs/runs.ts';
+import type { RunAnswer, RunLinesAnswer } from '../src/runs/runs.ts';
 
 /** What a test reads through: the app, or anything that answers a request as it does. */
 export type Asked = { request: (url: string) => Response | Promise<Response> };
@@ -49,8 +49,8 @@ export const tryOf = async (app: Asked, id: string, step: string, n: number): Pr
   (await ok(app, `${at(id, step)}/tries/${n}`)) as RunObject.StepTry;
 
 /**
- * What the step's try `n` signed off with, or why it does not read (`…/tries/:try/closeout`); with no `n`, its current try's, as the page's
- * step carried it — null where the step has no try yet.
+ * What the step's try `n` signed off with, or why it does not read (`…/tries/:try/closeout`); with no `n`, its current try's, as the
+ * board's step shows it — null where the step has no try yet.
  */
 export async function closeoutOf(app: Asked, id: string, step: string, n?: number): Promise<RunObject.TryCloseout | null> {
   const which = n ?? (await triesOf(app, id, step)).find((t) => t.current)?.try;
@@ -62,6 +62,6 @@ export async function closeoutOf(app: Asked, id: string, step: string, n?: numbe
 export const toldOf = async (app: Asked, id: string, step: string): Promise<RunObject.StepTold> =>
   (await ok(app, `${at(id, step)}/told`)) as RunObject.StepTold;
 
-/** The board's page of the run (`?view=page`): read only for what the object leaves out on purpose (this file's head). */
-export const pageRead = async (app: Asked, id: string): Promise<RunPage> =>
-  (await ok(app, `/api/runs/${encodeURIComponent(id)}?view=page`)) as RunPage;
+/** The lines read beside the run object (`…/lines`): what the object leaves out on purpose (this file's head). */
+export const linesOf = async (app: Asked, id: string): Promise<RunLinesAnswer> =>
+  (await ok(app, `/api/runs/${encodeURIComponent(id)}/lines`)) as RunLinesAnswer;

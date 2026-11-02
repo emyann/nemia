@@ -2,9 +2,10 @@
  * What a run or a step cost, as the board says it: the api's words — the package's — put side by side, and never a sum worked out here.
  * Pure.
  */
-import type { RunDetail, Spent } from './api';
+import type { Spent } from './api';
+import type { StepView } from './runView';
 
-type Priced = Pick<RunDetail['steps'][number], 'spent' | 'budget'>;
+type Priced = Pick<StepView, 'spent' | 'budget'>;
 
 /**
  * What a step's tries have cost, as its node and the inspector say it: of its cap where it has one (`$4.25 of $3`), all of them where it

@@ -7,7 +7,17 @@
 export { ReadRefusal, UnreadAnswer, WriteRefusal } from './api/read.ts';
 export type * from './api/judged.ts';
 export * from './api/runs.ts';
-export * from './api/detail.ts';
+export {
+  retryRun,
+  runGone,
+  runLinesQuery,
+  runObjectQuery,
+  stepToldQuery,
+  stepTriesQuery,
+  type RunLines,
+  type StepCommands,
+} from './api/run.ts';
+export type * as RunObject from './api/run.gen.ts';
 export type * from './api/graph.ts';
 export type * from './api/layers.ts';
 export type * from './api/tries.ts';

@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { Page } from 'playwright';
 import type { Paused } from '../../../src/lib/api/pause.ts';
-import type { RunDetail } from '../../../src/lib/api.ts';
+import type { RunObject } from '../../../src/lib/api.ts';
 import { finishingSentence } from '../../../src/lib/pause.ts';
 import { photograph, themeOf } from '../board.ts';
 import { expectCount, expectTexts, expectVisible, idle, Refused, settled } from '../checks.ts';
@@ -46,8 +46,8 @@ const HELD_WORDS = {
   note: 'its check is filed on nemia resume',
 } as const satisfies Partial<Step>;
 
-/** A step of a run's read, as the board decodes it. */
-type Step = RunDetail['steps'][number];
+/** A step of a run's object, as its status holds it. */
+type Step = RunObject.RunStepStatus;
 
 /** The person's word the chip draws for that reason (`lib/words.ts`). */
 const PAUSE_WORD = 'waits on the pause';
@@ -56,17 +56,17 @@ const PAUSE_WORD = 'waits on the pause';
 const fakeRead = (url: URL) => url.pathname === `/api/runs/${FAKE.id}`;
 
 /**
- * Opens FAKE's page with the api's read of it held with `route`, its refused step worded as the package words a step whose check the
- * pause holds; refuses unless the step's chip is drawn waiting, in those words; photographs its graph, wide and on a phone's screen;
+ * Opens FAKE's page with the api's read of its object held with `route`, its refused step worded as the package words a step whose check
+ * the pause holds; refuses unless the step's chip is drawn waiting, in those words; photographs its graph, wide and on a phone's screen;
  * and goes back to the Factory.
  */
 async function heldRun(page: Page, theme: string): Promise<void> {
   const size = page.viewportSize();
   await page.route(fakeRead, async (route) => {
     if (route.request().method() !== 'GET') return route.fallback();
-    const read = (await (await route.fetch()).json()) as { steps: { name: string }[] };
-    const steps = read.steps.map((s) => (s.name === FAKE.refused ? { ...s, ...HELD_WORDS } : s));
-    return route.fulfill({ json: { ...read, steps } });
+    const read = (await (await route.fetch()).json()) as RunObject.Run;
+    const steps = read.status.steps.map((s) => (s.name === FAKE.refused ? { ...s, ...HELD_WORDS } : s));
+    return route.fulfill({ json: { ...read, status: { ...read.status, steps } } });
   });
   try {
     await page.goto(new URL(`/runs/${FAKE.id}`, page.url()).href, { waitUntil: 'load' });

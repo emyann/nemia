@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useRef, type RefObject } from 'react';
 import { useNavigate } from '@tanstack/react-router';
 import { Background, BackgroundVariant, type Edge, Position, ReactFlow, ReactFlowProvider, useReactFlow } from '@xyflow/react';
-import type { PagePlace, RunDetail, WorkflowListing } from '../lib/api';
+import type { PagePlace, WorkflowListing } from '../lib/api';
 import { specStep, stepPage } from '../lib/bar';
 import { extentOf, layout, stepsOf } from '../lib/layout';
 import { useBarOver } from '../lib/useBarOver';
 import { useCanvasPress } from '../lib/useCanvasPress';
+import type { RunView, StepView } from '../lib/runView';
 import { StateEdge } from './StateEdge';
 import { stepEdges } from './stepGraph';
 import { SpecNode, type SpecFlowNode } from './StepNode';
@@ -26,7 +27,7 @@ const LOOP_ROOM = 70;
  * on. What a workflow's graph is drawn as, so its edges are the run canvas's own (`stepEdges`), drawn as they are on a run's
  * page before anything has happened: dashed, since all of it is still to come.
  */
-export function unstartedRun(workflow: WorkflowListing): RunDetail {
+export function unstartedRun(workflow: WorkflowListing): RunView {
   return {
     id: `${workflow.from}:${workflow.name}`,
     kinds: [],
@@ -89,7 +90,7 @@ export function unstartedRun(workflow: WorkflowListing): RunDetail {
 }
 
 /** The step `name` of an unstarted run: waiting, on its first try, nothing filed, told nothing yet. */
-function unstartedStep(name: string): RunDetail['steps'][number] {
+function unstartedStep(name: string): StepView {
   return {
     name,
     spec: null,

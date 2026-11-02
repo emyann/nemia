@@ -1,6 +1,7 @@
 import { lazy, Suspense, useMemo, useState } from 'react';
 import { Link } from '@tanstack/react-router';
-import type { RunDetail, StepTry } from '../lib/api';
+import type { StepTry } from '../lib/api';
+import type { RunView, StepView } from '../lib/runView';
 import { duration, isLive } from '../lib/canvas';
 import { waitsAtGate, stepState, type StepState } from '../lib/status';
 import { gateOfStep } from '../lib/gate';
@@ -19,8 +20,9 @@ import { Asked } from './GateBrief';
  */
 const SessionTalk = lazy(() => import('./session/SessionTalk').then((m) => ({ default: m.SessionTalk })));
 import { StatusChip, StepNote } from './StatusChip';
+import type { Frozen } from '../lib/frozen';
 
-type Step = RunDetail['steps'][number];
+type Step = StepView;
 
 const TABS = ['Details', 'Output', 'Activity'] as const;
 type Tab = (typeof TABS)[number];
@@ -39,7 +41,7 @@ export const openingTab = (step: Pick<Step, 'closeout'>): Tab => (step.closeout 
  * Opened on Output at a gate, it says first that the answer is on Details, so the plan read is not a dead end. The Activity tab is keyed by
  * run and step, so a conversation never stands in for another step's while that one is read. `className` places it in what holds it.
  */
-export function StepTabs({ run, step, className }: { run: RunDetail; step: Step; className?: string }) {
+export function StepTabs({ run, step, className }: { run: RunView; step: Step; className?: string }) {
   const [picked, setTab] = useState<Tab | null>(null);
   const tab = picked ?? openingTab(step);
   const [chosen, setChosen] = useState<{ step: string; try: number } | null>(null);
@@ -104,12 +106,12 @@ export function StepTabs({ run, step, className }: { run: RunDetail; step: Step;
 }
 
 type DetailsProps = {
-  run: RunDetail;
+  run: RunView;
   step: Step;
   state: StepState;
   runCancelled: boolean;
-  current: StepTry;
-  selected: StepTry;
+  current: Frozen<StepTry>;
+  selected: Frozen<StepTry>;
   onSelect: (n: number) => void;
 };
 
@@ -196,7 +198,7 @@ function Ended({ at, how }: { at: string | null; how: string }) {
  * The selected try's closeout, and every other try's folded beneath it. Of a try with no closeout, the current try's is said in the step's
  * own words, an earlier one's off the engine's record.
  */
-function Output({ step, state, selected }: { step: Step; state: StepState; selected: StepTry }) {
+function Output({ step, state, selected }: { step: Step; state: StepState; selected: Frozen<StepTry> }) {
   const none = !selected.current
     ? "No closeout on the engine's record of this try."
     : step.reason === 'UnreadableCloseout'
@@ -215,7 +217,7 @@ const ACTIVITY_TURNS = 30;
  * until the step waits on a person's word, its session over, and never stops for `held`: a hold on the run (the CLI's `hold`) answers
  * nothing, and the session runs or rests as it did.
  */
-function Activity({ run, step }: { run: RunDetail; step: Step }) {
+function Activity({ run, step }: { run: RunView; step: Step }) {
   const cancelled = run.cancelledAt !== null;
   const following = useStepTranscript(run.id, step.name, sessionToRead(step), waitsAtGate(stepState(step, cancelled, false), cancelled));
   const turns = useMemo(() => foldTranscript(following.events), [following.events]);

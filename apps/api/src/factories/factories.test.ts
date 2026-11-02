@@ -17,7 +17,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from '../../test/scratch.ts';
 import { story } from '../../test/checkpoints.ts';
-import { pageRead } from '../../test/run-reads.ts';
+import { linesOf } from '../../test/run-reads.ts';
 import { app } from '../app.ts';
 import {
   addFactory,
@@ -288,9 +288,9 @@ test('a person works in a factory with hires: the listing names what is unfilled
         "the list gives the address of the run's workflow page, in its factory",
       );
       assert.deepEqual(
-        (await pageRead(app, id)).workflowPage,
+        (await linesOf(app, id)).workflowPage,
         address,
-        "and so does its page (`?view=page`), which keeps the board's address the run object leaves out",
+        "and so does the lines read beside its object (`…/lines`), which keeps the board's address the run object leaves out",
       );
 
       const page = await get<WorkflowStepPage>('/api/workflows/repo/alpha/implement?factory=hired');

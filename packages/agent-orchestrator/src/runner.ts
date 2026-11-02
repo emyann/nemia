@@ -293,8 +293,7 @@ export {
   takeStore,
 } from './daemon/daemon.store.ts';
 export type { TakenStore } from './daemon/daemon.store.ts';
-export { holdUrl, runMain, up } from './daemon/up.verb.ts';
-export type { QuotaAsk, UpOptions } from './daemon/up.verb.ts';
+export { holdUrl, type QuotaAsk, runMain, up, type UpOptions } from './daemon/up.verb.ts';
 export { ensureDaemon, liveDemandHost } from './demand/demand.verb.ts';
 export type { DemandHost } from './demand/demand.verb.ts';
 export { telemetryLayer } from './telemetry/telemetry.store.ts';
@@ -459,6 +458,7 @@ export { admitted } from './admission/admit.verb.ts';
 export { PRUNE, RM } from './command/runs.verb.ts';
 export { CLOSEOUT, LOGS, STATS, TOLD, TRIES, TRY } from './command/reads.verb.ts';
 export { runObject, type RunObjectAnswer, type TryCloseout } from './object/run.verb.ts';
+export { runLines, type RunLines, type StepCommands } from './object/lines.verb.ts';
 export { folderRefusal, START } from './start/commands.verb.ts';
 export { INBOX, INBOX_ADD, INBOX_QUEUE } from './inbox/commands.verb.ts';
 export { FACTORY } from './factory/factory.verb.ts';
@@ -528,12 +528,11 @@ export type { InboxRuns } from './inbox/index.ts';
 export { judgedNow, runsSummarized } from './summary/summary.verb.ts';
 export type { RunSummary, SummaryHow } from './summary/summary.verb.ts';
 /**
- * The run's page (`runPage`, `GET /api/runs/:id?view=page`) and the types it answers with, and of what it is built of what the api reads
- * besides: a step's file routes (`refusedName`, `typeOf`), its log's tail (`tailOf`), its try's turn (`turnOfTry`) and `nemia decide`'s
- * usage (`totalOf`, `usedOf`).
+ * The types of a step's tries, what it was told and what its sessions used, as the run object's sub-resources answer them, and what the
+ * api reads besides: a step's file routes (`refusedName`, `typeOf`), its log's tail (`tailOf`), its try's turn (`turnOfTry`) and
+ * `nemia decide`'s usage (`totalOf`, `usedOf`).
  */
-export { runPage, type RunDetail, type StepAsked, type StepBudget, type StepRaise, type StepSpec } from './resource/page.verb.ts';
-export type { StepTimelineTotal, StepTimelineTry } from './resource/page.verb.ts';
+export type { StepRaise } from './retry/index.ts';
 export { turnOfTry, type StepAcceptance, type StepApproval, type StepAttempts, type StepCloseout } from './resource/tries.verb.ts';
 export type { StepGate, StepReply, StepTry, StepUnreadable } from './resource/tries.verb.ts';
 export type { StepFiled, TaskPart } from './resource/told.verb.ts';

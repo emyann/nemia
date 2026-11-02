@@ -2,8 +2,8 @@
  * The store as every run route reads it: the engine an app reads through, as a service (`Engine`), and the store's root, which is the
  * package's own service, re-exported here so a route has one import site for both (`StoreRoot`, given at `app.ts` from `WF_ROOT`); every
  * task's view, a run found by its id, and the task a step's routes read. What the board's reading of a run stands on — the views of its
- * tasks, its workflow and steps, the feed's filing times, the run judged for its page — is the package's (`viewsFor`, `workflowsOf`,
- * `filedTimes`, `runPage`).
+ * tasks, its workflow and steps, the feed's filing times, the run judged as its object — is the package's (`viewsFor`, `workflowsOf`,
+ * `filedTimes`, `runObject`).
  */
 import { Context, Effect, Layer } from 'effect';
 import {

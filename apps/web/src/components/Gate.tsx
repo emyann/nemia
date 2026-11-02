@@ -1,16 +1,7 @@
 import { useId, useState, type ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import {
-  approveStep,
-  decisionQuery,
-  type Question,
-  type QuestionAnswer,
-  type RetryMode,
-  type RunDetail,
-  type StepApproval,
-  type StepCloseout,
-  type StepGate,
-} from '../lib/api';
+import { approveStep, decisionQuery, type Question, type QuestionAnswer, type RetryMode, type StepCloseout } from '../lib/api';
+import type { RunView, StepView } from '../lib/runView';
 import { askedSaid } from '../lib/asks';
 import { decidableRun, decisionStamp, isDecidable } from '../lib/decide';
 import { cn } from '../lib/utils';
@@ -19,6 +10,12 @@ import { BUTTON, MODES, Refusal, TEXTAREA, useAsk } from './Ask';
 import { answersFrom, QuestionFields, RecommendButton, unanswered, type Draft } from './Questions';
 import { when } from './Facts';
 import { runsMoved } from '@/lib/runWrites';
+import type { Frozen } from '../lib/frozen';
+
+/** A gated step's gate, as its object's status holds it. */
+type StepGate = NonNullable<StepView['gate']>;
+/** A person's approval of the try a gated step is on. */
+type StepApproval = NonNullable<StepGate['approval']>;
 
 /**
  * A step waiting at its gate, beside the closeout it handed on: the two things the CLI's `ls` says a person can do. Approve, with a box for
@@ -68,8 +65,8 @@ export function Gate({
   acts?: boolean;
   /** False where what the gate asks is said above it already (the inspector's brief): no sentence of its own, and no box around it. */
   framed?: boolean;
-  closeout?: StepCloseout | null;
-  questions?: readonly Question[];
+  closeout?: Frozen<StepCloseout> | null;
+  questions?: readonly Frozen<Question>[];
 }) {
   const [draft, setDraft] = useState<Draft>({});
   const [to, setTo] = useState(back[0] ?? step);
@@ -136,7 +133,7 @@ function GateQuestions({
   onDraft,
 }: {
   step: string;
-  questions: readonly Question[];
+  questions: readonly Frozen<Question>[];
   draft: Draft;
   onDraft: (next: Draft) => void;
 }) {
@@ -152,7 +149,7 @@ function GateQuestions({
 }
 
 /** What a gate's form is given of the questions: those asked, what the person has said of them, and those not answered yet. */
-type Answering = { questions: readonly Question[]; draft: Draft; left: readonly string[] };
+type Answering = { questions: readonly Frozen<Question>[]; draft: Draft; left: readonly string[] };
 
 const notAnswered = (left: readonly string[]) => (left.length > 0 ? `Not answered: ${left.join(' · ')}` : undefined);
 
@@ -350,7 +347,7 @@ function Choice<T extends string>({
  * written — beside answers, their note.
  */
 export const approvalBody = (
-  questions: readonly Question[],
+  questions: readonly Frozen<Question>[],
   draft: Draft,
   words: string,
 ): { message?: string; answers?: QuestionAnswer[] } => ({
@@ -370,7 +367,7 @@ export const sendBackWaits = ({
 }: {
   step: string;
   to: string;
-  questions: readonly Question[];
+  questions: readonly Frozen<Question>[];
   draft: Draft;
 }): string[] => {
   const left = unanswered(questions, draft);
@@ -394,7 +391,7 @@ export const sendBackBody = ({
   to: string;
   mode: RetryMode;
   objection: string;
-  questions: readonly Question[];
+  questions: readonly Frozen<Question>[];
   draft: Draft;
 }): { mode: RetryMode; step: string; message?: string; answers?: QuestionAnswer[] } => {
   const answered = to === step && questions.length > 0 && unanswered(questions, draft).length === 0;
@@ -445,7 +442,7 @@ export const takenOf = (
  * The two read the same off a step's record at its gate (unfiled, awaiting approval), so the key is what tells them apart; a detail from an
  * api that does not carry it reads as any other step, and its gate is drawn as §6's.
  */
-export const endsTheRun = (step: Pick<RunDetail['steps'][number], 'spec'>): boolean => step.spec?.workspace === 'base';
+export const endsTheRun = (step: Pick<StepView, 'spec'>): boolean => step.spec?.workspace === 'base';
 
 /**
  * What an ending step would act on, beside its gate: the run's result, for the person deciding whether to let it run.
@@ -457,7 +454,7 @@ export const endsTheRun = (step: Pick<RunDetail['steps'][number], 'spec'>): bool
  * or the sentence saying what the run changed is not known — as the CLI's `decide` prints them beside the branch; the steps waited on are
  * read in the run's order off the graph the api gives, whatever the ending's spec reads.
  */
-export function ActsOn({ run, step }: { run: RunDetail; step: RunDetail['steps'][number] }) {
+export function ActsOn({ run, step }: { run: RunView; step: StepView }) {
   const { data, error } = useQuery({ ...decisionQuery(run.id, decisionStamp(run)), enabled: decidableRun(run) });
   const standings = isDecidable(data) ? data.standings : [];
   const waitsOn = new Set(run.graph.edges.filter((e) => e.kind === 'after' && e.to === step.name).map((e) => e.from));
@@ -579,7 +576,7 @@ export function useApprove(runId: string, step: string, onApproved: () => void) 
     onSuccess: () => {
       onApproved();
       void queryClient.invalidateQueries({ queryKey: ['runs', runId], exact: true });
-      void runsMoved(queryClient);
+      void runsMoved(queryClient, runId);
     },
   });
 }

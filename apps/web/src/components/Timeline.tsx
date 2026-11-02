@@ -1,8 +1,15 @@
 import type { ReactNode } from 'react';
-import type { RunDetail, StepTimelineTry, TaskSpan, TimelineTotal } from '../lib/api';
+import type { RunView, StepView } from '../lib/runView';
 import { spentTitle } from '../lib/cost';
 import { instantWhole } from '../lib/instant';
 import { timeToTheSecond } from '../lib/timeOfDay';
+
+/** One try of a step on the clock, as its object's status holds it. */
+type StepTimelineTry = StepView['timeline'][number];
+/** A try's session or its check on the clock. */
+type TaskSpan = NonNullable<StepTimelineTry['session']>;
+/** A round's total, or the run's. */
+type TimelineTotal = RunView['timeline']['run'];
 
 /**
  * Where a run's time went, as the CLI's `decide` prints it: a row for each try's session and each try's check of every step, in the order
@@ -11,7 +18,7 @@ import { timeToTheSecond } from '../lib/timeOfDay';
  * what its sessions cost. The words are the api's, which are the package's; the times are the engine's instants, shown in this browser's
  * clock. Nothing is drawn for a run with nothing filed.
  */
-export function Timeline({ run }: { run: RunDetail }) {
+export function Timeline({ run }: { run: RunView }) {
   const steps = run.steps.filter((step) => step.timeline.length > 0);
   if (!steps.length) return null;
   const { rounds } = run.timeline;

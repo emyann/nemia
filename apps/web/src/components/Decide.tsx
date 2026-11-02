@@ -9,10 +9,10 @@ import {
   type Group,
   type Lesson,
   type RetryMode,
-  type RunDetail,
   type SensitiveDiff,
   type Touched,
 } from '../lib/api';
+import type { RunView, StepView } from '../lib/runView';
 import { answersOf, askedOf, askedSaid, type Answer } from '../lib/asks';
 import { barOf, changeOf, decidableRun, decisionStamp, diffLine, isDecidable, mostLines, type DiffLine } from '../lib/decide';
 import { cn } from '../lib/utils';
@@ -33,7 +33,7 @@ import { OFFERS } from '../lib/words';
  * with a try asked of a session the harness blocked, continued from the banner, has that note and nothing to decide. An api that
  * refuses says why, here.
  */
-export function Decide({ run }: { run: RunDetail }) {
+export function Decide({ run }: { run: RunView }) {
   const decidable = decidableRun(run);
   const { data, error } = useQuery({ ...decisionQuery(run.id, decisionStamp(run)), enabled: decidable });
   const offers = answersOf(run);
@@ -92,7 +92,7 @@ export const DecideSection = ({ offers = null, ...parts }: DecisionProps & { off
 );
 
 /** What `DecisionParts` reads: the run's id, its decision, and where it worked, if known. */
-type DecisionProps = { runId: string; decision: Decidable; run?: Pick<RunDetail, 'place' | 'work'> | null };
+type DecisionProps = { runId: string; decision: Decidable; run?: Pick<RunView, 'place' | 'work'> | null };
 
 /** What there is to decide, after the answers, as `DecideSection` lists it; a fragment, so its parts sit in the frame's own spacing. */
 function DecisionParts({ runId, decision, run = null }: DecisionProps) {
@@ -155,7 +155,7 @@ export function Offers({
   runId: string;
   offers: readonly Answer[];
   asked?: readonly AskedNote[];
-  steps: readonly Pick<RunDetail['steps'][number], 'name' | 'commands'>[];
+  steps: readonly Pick<StepView, 'name' | 'commands'>[];
 }) {
   const lineOf = (offer: Answer): string => steps.find((s) => s.name === offer.step)?.commands[offer.kind] ?? '';
   return (

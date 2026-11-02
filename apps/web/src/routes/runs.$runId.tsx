@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { useQuery, useSuspenseQuery } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { createFileRoute, Link, redirect } from '@tanstack/react-router';
 import { Values } from '../components/Artifacts';
 import { Artifacts, bytesWord, ClosedNeeds, Statement } from '../components/Closeout';
@@ -20,12 +20,12 @@ import { LiftHold } from '../components/LiftHold';
 import { HoldRun } from '../components/HoldRun';
 import { PruneRun } from '../components/PruneRun';
 import { KindsBehind } from '../components/KindsBehind';
-import { factoriesQuery, loadRun, runGone, runQuery, type RunDetail } from '../lib/api';
+import { factoriesQuery, runGone } from '../lib/api';
+import { loadRun, useRunView, type RunView, type StepView } from '../lib/runView';
 import { untrustedFor, type UntrustedPlace } from '../lib/factories';
-import { answersOf, askedIn, gateOffered, stepAnchor } from '../lib/asks';
+import { askedIn, decideDrawn, gateOffered, stepAnchor } from '../lib/asks';
 import { barValue } from '../lib/bar';
 import { spentTitle } from '../lib/cost';
-import { decidableRun } from '../lib/decide';
 import { duration } from '../lib/canvas';
 import { clockCounts, inFlight, runClock, waitedMs } from '../lib/factory';
 import { useNow } from '../lib/useNow';
@@ -54,8 +54,6 @@ export const Route = createFileRoute('/runs/$runId')({
   ),
 });
 
-type Step = RunDetail['steps'][number];
-
 /**
  * The page of a run, or, when the store has no run of its id as the page loads (`loadRun`), the words that say so, by its id: the
  * address of a run removed, or of none.
@@ -78,7 +76,7 @@ function RunPage() {
  * while the page is open is said to be gone: the query keeps its last read, which is not drawn as if the run were still there.
  */
 function RunRead({ runId }: { runId: string }) {
-  const { data: run, error } = useSuspenseQuery(runQuery(runId));
+  const { view: run, error } = useRunView(runId);
   if (runGone(error)) {
     return (
       <div className="space-y-3">
@@ -104,7 +102,7 @@ function RunRead({ runId }: { runId: string }) {
  * it made; when it started, its first step filed, and the wait before, which a run started `--after` runs spends doing nothing; and, only
  * once the CLI's `prune` removed its worktrees, the prune: the run is then read as it ended, and nothing of it can be tried again.
  */
-function Run({ run }: { run: RunDetail }) {
+function Run({ run }: { run: RunView }) {
   const runCancelled = run.cancelledAt !== null;
 
   return (
@@ -154,7 +152,7 @@ function Run({ run }: { run: RunDetail }) {
         </div>
       </header>
 
-      {(decidableRun(run) || answersOf(run).length > 0) && <Decide run={run} />}
+      {decideDrawn(run) && <Decide run={run} />}
 
       <section aria-label="The run's steps as a graph">
         <RunCanvas run={run} />
@@ -199,7 +197,7 @@ function Run({ run }: { run: RunDetail }) {
  * `--artifacts` removed its files, what that freed: the files then go from what is kept. One prune took both, or its files alone, or the
  * files went later than the worktrees, each at its own time.
  */
-function Pruned({ pruned: { at, worktrees, artifacts } }: { pruned: NonNullable<RunDetail['pruned']> }) {
+function Pruned({ pruned: { at, worktrees, artifacts } }: { pruned: NonNullable<RunView['pruned']> }) {
   const bytes = worktrees.reduce((sum, w) => sum + w.bytes, 0);
   const count = `${worktrees.length} worktree${worktrees.length === 1 ? '' : 's'}`;
   const title = [
@@ -261,7 +259,7 @@ const deniedRow = (calls: readonly string[], cause: UntrustedPlace | undefined):
  * The place the run `run` works on that a harness does not trust, read off the factories' answer only where a step of it was denied a
  * call (`asked`): nothing while that is read, and nothing where every place is trusted.
  */
-function useDeniedCause(run: RunDetail, asked: boolean): UntrustedPlace | undefined {
+function useDeniedCause(run: RunView, asked: boolean): UntrustedPlace | undefined {
   const { data } = useQuery({ ...factoriesQuery, enabled: asked });
   return asked && data ? untrustedFor(data, { repo: run.repo }) : undefined;
 }
@@ -294,7 +292,7 @@ function useDeniedCause(run: RunDetail, asked: boolean): UntrustedPlace | undefi
  * waits on. Once approved, under the step: when, and the words every step after the gate is handed — or, for the step that ends the run,
  * what its own approval filed and the terms it acts on.
  */
-function StepSection({ run, step, runCancelled }: { run: RunDetail; step: Step; runCancelled: boolean }) {
+function StepSection({ run, step, runCancelled }: { run: RunView; step: StepView; runCancelled: boolean }) {
   const { spec, closeout, gate } = step;
   const cause = useDeniedCause(run, Boolean(step.denied));
   const atGate = gateOffered(step, runCancelled);
@@ -372,7 +370,7 @@ function StepSection({ run, step, runCancelled }: { run: RunDetail; step: Step; 
  * sending back the steps it waits on; any other beside what the step handed on, with the questions it asks (`askedIn`), sending back the
  * step.
  */
-function AtGate({ run, step, acts }: { run: RunDetail; step: Step; acts: boolean }) {
+function AtGate({ run, step, acts }: { run: RunView; step: StepView; acts: boolean }) {
   const back = acts ? run.graph.edges.filter((e) => e.kind === 'after' && e.to === step.name).map((e) => e.from) : [step.name];
   return (
     <>
@@ -400,7 +398,7 @@ function AtGate({ run, step, acts }: { run: RunDetail; step: Step; acts: boolean
  * What the run took, or how long it has been at work, as its card's clock says it (`runClock`), the start, the end and the wall time on
  * hover; it moves every second while a task of it runs (`clockCounts`). Nothing before the run started, which the `started` row says.
  */
-function RunTook({ run }: { run: RunDetail }) {
+function RunTook({ run }: { run: RunView }) {
   const finished = !inFlight(run);
   const now = useNow(clockCounts(run, finished) ? 1_000 : 30_000);
   if (run.startedAt === null) return null;
@@ -418,7 +416,7 @@ function RunTook({ run }: { run: RunDetail }) {
  * When the run started — its first step filed — and, where it waited before that, for how long: the wait the Factory's card does not count
  * as time at work (`runClock`). Not yet while nothing of it is filed, and never for a run called off first.
  */
-function startedRow(run: RunDetail): ReactNode {
+function startedRow(run: RunView): ReactNode {
   if (run.startedAt === null) return run.cancelledAt ? 'never: called off first' : 'not yet';
   const waited = waitedMs(run)!;
   return (
@@ -434,7 +432,7 @@ function startedRow(run: RunDetail): ReactNode {
  * word, what it leaves a person to do, and each run it names, linked to its page where the store has it. In the yours container when one
  * never lands without a person, at rest otherwise.
  */
-function WaitingOnRuns({ run }: { run: RunDetail }) {
+function WaitingOnRuns({ run }: { run: RunView }) {
   const { waiting } = run;
   if (!waiting) return null;
   return (
@@ -468,7 +466,7 @@ function WaitingOnRuns({ run }: { run: RunDetail }) {
  * once only a person lifts it. While it stands no step offers an answer — the package refuses each — so this is the one thing on the page
  * asked of anyone.
  */
-function HeldUntil({ run }: { run: RunDetail }) {
+function HeldUntil({ run }: { run: RunView }) {
   const { holding } = run;
   if (!holding) return null;
   return (
@@ -500,7 +498,7 @@ function HeldUntil({ run }: { run: RunDetail }) {
 }
 
 /** A run's id, its page's heading. */
-function RunHeading({ run }: { run: RunDetail }) {
+function RunHeading({ run }: { run: RunView }) {
   return <h1 className="font-mono text-body-medium text-muted-foreground">{run.id}</h1>;
 }
 

@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
-import type { Bridge, Collisions, PeakMark, RunDetail, StepCheck, StepFiled, StepLog, StepSpec, StepUsed } from '../lib/api';
+import type { Bridge, Collisions, PeakMark, StepCheck, StepLog, StepUsed } from '../lib/api';
+import type { StepFiledView, StepSpecView, StepView } from '../lib/runView';
 import { stepAnchor } from '../lib/asks';
 import { contextText } from '../lib/builder';
 import { costText, pastBudget } from '../lib/cost';
@@ -8,6 +9,7 @@ import { cn } from '../lib/utils';
 import { RouteLink } from './AgentParts';
 import { CopyButton } from './CopyButton';
 import { Instant } from './Instant';
+import type { Frozen } from '../lib/frozen';
 
 /** A section's quiet heading: small, medium weight, in the muted ink. */
 export const HEADING = 'text-body-small font-medium text-muted-foreground';
@@ -101,7 +103,7 @@ export function Facts({ rows }: { rows: Array<[label: string, value: ReactNode]>
  * engine's task files as its permission mode: the same row, under Codex's name (`fenceLabel`). A step filed bridged has a `reach` row: its
  * session's web link, or why it is not up.
  */
-export const specRows = (spec: StepSpec, filed: StepFiled | null = null): Array<[string, ReactNode]> =>
+export const specRows = (spec: StepSpecView, filed: StepFiledView | null = null): Array<[string, ReactNode]> =>
   isRemote(spec, filed)
     ? remoteRows(spec, filed)
     : [
@@ -119,7 +121,7 @@ export const specRows = (spec: StepSpec, filed: StepFiled | null = null): Array<
               ['rounds', spec.rounds],
             ] satisfies Array<[string, ReactNode]>)),
         ['resume', code(spec.resume)],
-        [fenceLabel(spec), modeRow(spec.sandbox ?? spec.permissionMode, filed)],
+        [fenceLabel(spec), modeRow(spec.sandbox ?? spec.fence, filed)],
         ['tools', ranWith(toolsWord(spec.tools), filed, (f) => toolsWord(f.tools))],
         ['deadline', ranWith(secondsWord(spec.deadlineSeconds), filed, (f) => secondsWord(f.deadlineSeconds), 'no limit')],
         ...(filed?.bridge
@@ -142,10 +144,10 @@ export function BridgeWords({ bridge, ...data }: { bridge: Bridge } & Record<`da
 }
 
 /** The `place` row of a step that works in a folder the run makes: none for one on a repository, which every step was before the key. */
-const placeRows = (spec: StepSpec): Array<[string, ReactNode]> => (spec.place === 'folder' ? [['place', code(spec.place)]] : []);
+const placeRows = (spec: StepSpecView): Array<[string, ReactNode]> => (spec.place === 'folder' ? [['place', code(spec.place)]] : []);
 
 /** A step on a remote A2A agent: its harness names one (`a2a:<name>`), or the api says its try was sent to one. */
-const isRemote = (spec: StepSpec, filed: StepFiled | null): boolean => !!filed?.remote || !!spec.harness?.startsWith('a2a:');
+const isRemote = (spec: StepSpecView, filed: StepFiledView | null): boolean => !!filed?.remote || !!spec.harness?.startsWith('a2a:');
 
 /**
  * A step on a remote A2A agent, as rows: the harness, the agent's address, and what the run itself keeps — `after`, `workspace`, `place`,
@@ -153,7 +155,7 @@ const isRemote = (spec: StepSpec, filed: StepFiled | null): boolean => !!filed?.
  * default` row there would say the run chose what nobody here chose. The address is the store's current word; where the store does not
  * declare the agent, it says so.
  */
-function remoteRows(spec: StepSpec, filed: StepFiled | null): Array<[string, ReactNode]> {
+function remoteRows(spec: StepSpecView, filed: StepFiledView | null): Array<[string, ReactNode]> {
   const address = filed?.remote === undefined || filed.remote === null ? null : (filed.remote.address ?? 'no longer in a2a-agents.json');
   return [
     ['harness', code(spec.harness ?? (filed?.remote ? `a2a:${filed.remote.name}` : null))],
@@ -166,11 +168,11 @@ function remoteRows(spec: StepSpec, filed: StepFiled | null): Array<[string, Rea
 }
 
 /** What a step's fence is called on its harness: `sandbox` on codex, whose `sandbox:` it is, and `permission mode` on Claude Code. */
-export const fenceLabel = (spec: Pick<StepSpec, 'harness' | 'sandbox'>): string =>
+export const fenceLabel = (spec: Pick<StepSpecView, 'harness' | 'sandbox'>): string =>
   spec.harness === 'codex' || spec.sandbox ? 'sandbox' : 'permission mode';
 
 const tokensWord = (tokens: number | null | undefined) => (tokens === null || tokens === undefined ? null : contextText(tokens));
-const toolsWord = (tools: string[] | null) => (tools === null ? null : tools.join(', ') || 'none');
+const toolsWord = (tools: readonly string[] | null) => (tools === null ? null : tools.join(', ') || 'none');
 const secondsWord = (seconds: number | null) => (seconds === null ? null : `${seconds} s`);
 
 /**
@@ -179,8 +181,8 @@ const secondsWord = (seconds: number | null) => (seconds === null ? null : `${se
  */
 function ranWith(
   workflow: string | null,
-  filed: StepFiled | null,
-  pick: (filed: StepFiled) => string | null,
+  filed: StepFiledView | null,
+  pick: (filed: StepFiledView) => string | null,
   unset = "harness's own",
 ): ReactNode {
   const engine = filed && pick(filed);
@@ -196,7 +198,7 @@ function ranWith(
  * The model, as `ranWith` reads it — and the model a person's `retry --model` asked this try for, marked `this try`, whatever the
  * workflow says.
  */
-function modelRow(workflow: string | null, filed: StepFiled | null): ReactNode {
+function modelRow(workflow: string | null, filed: StepFiledView | null): ReactNode {
   if (!filed?.askedModel) return ranWith(workflow, filed, (f) => f.model);
   const says = workflow === null ? 'names no model' : `says ${workflow}`;
   return (
@@ -213,10 +215,10 @@ function modelRow(workflow: string | null, filed: StepFiled | null): ReactNode {
  * Claude Code, not the prompting mode Claude Code has of its own — and a Codex sandbox the step's tools narrowed, marked `by tools`.
  * Where the api could not ask the harness, as `ranWith` reads it.
  */
-function modeRow(workflow: string | null, filed: StepFiled | null): ReactNode {
+function modeRow(workflow: string | null, filed: StepFiledView | null): ReactNode {
   const runs = filed?.runsIn;
-  const asFiled = filed && filedFence(filed.permissionMode, workflow);
-  if (!filed || !runs) return ranWith(workflow, filed, (f) => filedFence(f.permissionMode, workflow));
+  const asFiled = filed && filedFence(filed.fence, workflow);
+  if (!filed || !runs) return ranWith(workflow, filed, (f) => filedFence(f.fence, workflow));
   if (runs.by === 'tools') {
     const named = workflow === null ? '' : `, though the workflow says ${workflow}`;
     return (
@@ -229,7 +231,7 @@ function modeRow(workflow: string | null, filed: StepFiled | null): ReactNode {
       <Marked
         value={runs.mode}
         mark="this try"
-        title={`The workflow says ${workflow}; this try was filed with ${filed.permissionMode ?? 'none'}.`}
+        title={`The workflow says ${workflow}; this try was filed with ${filed.fence ?? 'none'}.`}
       />
     );
   }
@@ -272,7 +274,7 @@ export const pathRow = (at: string | null) =>
     </span>
   );
 
-type Priced = Pick<RunDetail['steps'][number], 'spent' | 'budget' | 'taskId' | 'tries'>;
+type Priced = Pick<StepView, 'spent' | 'budget' | 'taskId' | 'tries'>;
 
 /**
  * A `spent` row for `Facts`, where one says more than the current try's `cost` does: for a step with a cap, what its tries have cost of it
@@ -373,7 +375,7 @@ const REBUILT_TITLE =
  * The command a step is judged by, and once it failed its check, what it exited with and the last lines of
  * each stream: its output first, where a test runner says what failed, then its stderr.
  */
-export function Check({ check: { command, refused } }: { check: StepCheck }) {
+export function Check({ check: { command, refused } }: { check: Frozen<StepCheck> }) {
   return (
     <section aria-label="Check" className="space-y-2">
       <h3 className="text-label-medium text-muted-foreground">Check</h3>
@@ -400,7 +402,7 @@ export function Check({ check: { command, refused } }: { check: StepCheck }) {
 }
 
 /** One of a refused check's streams, as the api cut it: its last lines, and whether there were more. */
-function Stream({ name, log }: { name: string; log: StepLog }) {
+function Stream({ name, log }: { name: string; log: Frozen<StepLog> }) {
   if (!log.lines.length) return <p className="text-body-small text-muted-foreground">No {name}.</p>;
   return (
     <div className="space-y-1">

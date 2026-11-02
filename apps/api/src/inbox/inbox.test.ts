@@ -24,7 +24,7 @@ import {
   StoreRoot,
 } from 'agent-orchestrator';
 import { runWith } from '../../test/builtin-place.ts';
-import { objectOf, pageRead } from '../../test/run-reads.ts';
+import { objectOf, linesOf } from '../../test/run-reads.ts';
 import { Effect } from 'effect';
 
 /** `program`, one of the package's inbox verbs, run on the harness's store (`root`): its refusal thrown as itself. */
@@ -176,13 +176,13 @@ test('a person starts a card: the run carries where it came from, and the card s
       const { id } = (await started.json()) as CardStarted;
       const run = await objectOf(app, id);
       assert.deepEqual(run.spec.from, { inbox: card.name });
-      const page = await pageRead(app, id);
+      const lines = await linesOf(app, id);
       assert.equal(
-        page.fromNote,
+        lines.fromNote,
         fromNote(runStore.runs.read(id)),
-        "`nemia decide`'s sentence is the page's alone: the object leaves it out",
+        "`nemia decide`'s sentence is the lines read's alone: the object leaves it out",
       );
-      assert.equal(page.fromNote, `from inbox card ${card.name}`);
+      assert.equal(lines.fromNote, `from inbox card ${card.name}`);
 
       const typed = await startCard({ workflow: 'dev', brief: 'Typed, not parked' });
       assert.equal(typed.status, 201, await typed.clone().text());
@@ -190,11 +190,10 @@ test('a person starts a card: the run carries where it came from, and the card s
       const plain = await objectOf(app, typedId);
       assert.equal(plain.metadata.name, typedId);
       assert.equal(plain.spec.from, null, "typed at the board's start, as at `nemia start`: no card, so the object's `from` is null");
-      const plainPage = await pageRead(app, typedId);
-      assert.deepEqual(
-        ['from' in plainPage, 'fromNote' in plainPage],
-        [false, false],
-        "typed at the board's start, as at `nemia start`: no card, so no `from`, absent and not null, and no sentence",
+      assert.equal(
+        (await linesOf(app, typedId)).fromNote,
+        null,
+        "typed at the board's start, as at `nemia start`: no card, so no sentence of where it came from",
       );
     },
   );

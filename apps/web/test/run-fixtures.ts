@@ -1,22 +1,16 @@
 /**
- * A run's page's reads as the api answers them, every key the board reads and each union in its shapes: a run's detail (`detail`, its
- * steps from `step`), a run's row in a list (`summary`), its decision (`decidable`), a step's conversation (`transcript`) and its try's
- * path (`stepPath`). Each takes keys to put over its own.
+ * A run's page's reads as the api answers them, every key the board reads and each union in its shapes: a run's view (`detail`, its
+ * steps from `step`), the reads it is composed from (`readsOf`), a run's row in a list (`summary`), its decision (`decidable`), a step's
+ * conversation (`transcript`) and its try's path (`stepPath`). Each takes keys to put over its own.
  */
-import type {
-  Decidable,
-  ListedRun,
-  RunDetail,
-  RunSummary,
-  WaitingRun,
-  StepPath,
-  StepTranscript,
-  StepTry,
-  StepUsed,
-  TimelineTotal,
-} from '../src/lib/api.ts';
+import type { Decidable, ListedRun, RunSummary, WaitingRun, StepPath, StepTranscript, StepTry, StepUsed } from '../src/lib/api.ts';
+import type { RunObject } from '../src/lib/api.ts';
+import type { RunLines } from '../src/lib/api/run.ts';
+import type { RunView, StepView } from '../src/lib/runView.ts';
+import { stepStamp } from '../src/lib/lifecyclePath.ts';
 
-type Step = RunDetail['steps'][number];
+type Step = StepView;
+type TimelineTotal = RunView['timeline']['run'];
 
 /** A step's codes as the api carries them beside its word. */
 type Codes = Pick<Step, 'phase' | 'reason' | 'on' | 'via' | 'verdict'>;
@@ -132,7 +126,7 @@ export const step = (extra: Partial<Step> = {}): Step => ({
     workspace: null,
     place: null,
     resume: null,
-    permissionMode: 'dontAsk',
+    fence: 'dontAsk',
     sandbox: null,
     tools: ['Read', 'Edit'],
     deadlineSeconds: 3600,
@@ -144,7 +138,7 @@ export const step = (extra: Partial<Step> = {}): Step => ({
     askedModel: null,
     effort: 'high',
     contextTokens: null,
-    permissionMode: 'dontAsk',
+    fence: 'dontAsk',
     runsIn: { mode: 'dontAsk', by: 'filed' },
     tools: null,
     deadlineSeconds: 3600,
@@ -283,7 +277,7 @@ export const step = (extra: Partial<Step> = {}): Step => ({
 });
 
 /** A run's detail, as `GET /api/runs/r-1` answers it: from an inbox card, pruned, waiting and held, its steps `step`'s. */
-export const detail = (extra: Partial<RunDetail> = {}): RunDetail => ({
+export const detail = (extra: Partial<RunView> = {}): RunView => ({
   id: 'r-1',
   brief: 'Decode the reads',
   decide: 'nemia decide r-1',
@@ -517,7 +511,7 @@ export const waitingRun = (
 });
 
 /** A run behind on an agent, and on a skill a step already ran on the older one of: what the run page draws the drift from. */
-export const behind = (): RunDetail =>
+export const behind = (): RunView =>
   detail({
     kinds: [
       { kind: 'agent', name: 'coder', pinned: 5, now: 6 },
@@ -526,4 +520,69 @@ export const behind = (): RunDetail =>
   });
 
 /** A run behind no revision: no `kinds`, and nothing drawn. */
-export const unpinned = (): RunDetail => ({ ...detail(), kinds: [] });
+export const unpinned = (): RunView => ({ ...detail(), kinds: [] });
+
+/**
+ * The reads a run's view is composed from (`runViewOf`), each under the key its query reads it by: the object, the lines, and each step's
+ * tries and told at its stamp — what a reader with no loader (`useRunRead`) finds in the cache for `view`. A step's closeout is its
+ * current try's, so a view whose closeout no try carries reads back without one.
+ */
+export function readsOf(view: RunView): Array<[readonly unknown[], unknown]> {
+  const { id, createdAt, decide, refresh, workflowPage, from, fromNote, graph, steps, timeline, ...rest } = view;
+  const { brief, repo, place, work, workflowDir, try: tried, baseRef, branch, isolate, after, context, ...judged } = rest;
+  const statusOf = (s: StepView): RunObject.RunStepStatus => {
+    const {
+      spec: _spec,
+      commands: _c,
+      body: _b,
+      told: _t,
+      layers: _l,
+      taskParts: _p,
+      closeout: _co,
+      unreadable: _u,
+      tries: _tr,
+      ...own
+    } = s;
+    const filed = s.filed;
+    return { ...own, status: 'pending', filed, current: s.current ?? null };
+  };
+  const object = {
+    apiVersion: 'nemia/v1',
+    kind: 'Run',
+    metadata: { name: id, creationTimestamp: createdAt, labels: { factory: null, workflow: '' } },
+    spec: {
+      steps: steps.flatMap((s) => (s.spec ? [{ ...s.spec, name: s.name, input: [] }] : [])),
+      brief,
+      place,
+      repo,
+      baseRef,
+      branch,
+      isolate,
+      work,
+      workflowDir,
+      try: tried,
+      after,
+      context,
+      from: from ?? null,
+    },
+    status: { ...judged, graph, timeline: { ...timeline, slot: null }, steps: steps.map(statusOf) },
+  } as unknown as RunObject.Run;
+  const lines: RunLines = {
+    decide,
+    refresh,
+    fromNote: fromNote ?? null,
+    steps: Object.fromEntries(steps.map((s) => [s.name, s.commands])),
+    workflowPage,
+  };
+  return [
+    [['runs', id], object],
+    [['runs', id, 'lines'], lines],
+    ...steps.flatMap((s): Array<[readonly unknown[], unknown]> => {
+      const stamp = stepStamp(statusOf(s));
+      return [
+        [['runs', id, 'steps', s.name, 'tries', stamp], s.tries],
+        [['runs', id, 'steps', s.name, 'told', stamp], { body: s.body, told: s.told, layers: s.layers, taskParts: s.taskParts }],
+      ];
+    }),
+  ];
+}

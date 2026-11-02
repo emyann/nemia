@@ -1,5 +1,5 @@
 import { Button as AriaButton } from 'react-aria-components';
-import type { RunDetail, RunSummary } from '../lib/api';
+import type { RunObject, RunSummary } from '../lib/api';
 import { needNodeText, needOf, needText, type Need } from '../lib/asks';
 import { attemptLine, edgeLine, edgeStroke, isLive } from '../lib/canvas';
 import { costText, pastBudget } from '../lib/cost';
@@ -112,8 +112,16 @@ function stepTitle(step: SummaryStep | undefined, name: string, cancelled: boole
 }
 
 /**
+ * What the tiles read of an open run, once read: each step's attempts, filing and cost, as its object's status holds them
+ * (`runObjectQuery`) — a run's view (`RunView`) holds them too.
+ */
+export type TilesRead = {
+  readonly steps: readonly Pick<RunObject.RunStepStatus, 'name' | 'attempts' | 'taskId' | 'spent' | 'budget'>[];
+};
+
+/**
  * A run's steps on its card opened, to the right of what the card says at rest: every step a tile on the run's layering (`tilesOf`), with
- * its status, its latest attempt and what its tries cost — once the run's detail is read — and what it waits on a person for. A press on a
+ * its status, its latest attempt and what its tries cost — once the run's object is read — and what it waits on a person for. A press on a
  * tile shows its step in the frame's bar (`onStep`), and the tile pressed is the step the bar shows (`selected`). The attempts' times move
  * every second while one counts, and every 30 s otherwise.
  */
@@ -125,7 +133,7 @@ export function StepTiles({
   onStep,
 }: {
   run: RunSummary;
-  detail: RunDetail | null;
+  detail: TilesRead | null;
   flow: Flow;
   selected: string | null;
   onStep: (step: string) => void;

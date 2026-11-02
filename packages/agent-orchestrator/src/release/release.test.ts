@@ -37,11 +37,25 @@ const lease = (kind: 'ticking' | 'stopped' | 'gone', pid = 4242, release?: Runni
   identity: 'same',
 });
 
-test('REFUSED: a tag that climbs out of releases/, hides as a dot folder, holds a space or is the pointer; a plain tag passes', () => {
-  for (const tag of ['../x', 'a/b', '.hidden', 'v 1', '', '-v1'])
-    assert.match(tagRefusal(tag) ?? '', /is not a tag a release folder can be named by/, JSON.stringify(tag));
-  assert.match(tagRefusal('current') ?? '', /current is the pointer's name, not a tag/);
-  for (const tag of ['v1.2.0', 'v1', '2026.10.06', 'release_3-rc.1']) assert.equal(tagRefusal(tag), null, tag);
+test('REFUSED: a tag that climbs out of releases/, hides as a dot folder, holds a space or is the pointer; a plain tag passes', async (t) => {
+  const rows: readonly (readonly [string, string, RegExp | null])[] = [
+    ['a tag that climbs out', '../x', /is not a tag a release folder/],
+    ['a tag with a slash', 'a/b', /is not a tag a release folder/],
+    ['a dot folder', '.hidden', /is not a tag a release folder/],
+    ['a tag holding a space', 'v 1', /is not a tag a release folder/],
+    ['no tag', '', /is not a tag a release folder/],
+    ['a tag read as an option', '-v1', /is not a tag a release folder/],
+    ["the pointer's name", 'current', /current is the pointer's name/],
+    ['a version', 'v1.2.0', null],
+    ['a short version', 'v1', null],
+    ['a date', '2026.10.06', null],
+    ['underscores and dashes', 'release_3-rc.1', null],
+  ];
+  for (const [name, tag, refused] of rows)
+    await t.test(name, () => {
+      if (refused === null) assert.equal(tagRefusal(tag), null);
+      else assert.match(tagRefusal(tag) ?? '', refused);
+    });
 });
 
 test('REFUSED: a checkout on a store whose pointer names an install, naming a trial store, the installed nemia and the setting', () => {

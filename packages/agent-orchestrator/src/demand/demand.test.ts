@@ -1,53 +1,10 @@
 /**
- * The daemon started on demand, judged: the plan for each way the lease stands, the switch and an installed service; the environment a
- * spawned daemon is given; and its lines.
+ * The daemon started on demand, judged: the environment a spawned daemon is given, and its lines. What each way the lease stands
+ * starts is `demand.verb.test.ts`'s story.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import type { DaemonStanding } from '../daemon/daemon.ts';
-import { DEMAND_OFF, daemonEnv, demandPlan, offLine, otherTookLine, serviceStartedLine, startedLine, unstartedLine } from './demand.ts';
-
-/** A lease of pid 4242 standing as `kind`. */
-const standing = (kind: 'ticking' | 'stalled' | 'gone' | 'stopped'): DaemonStanding => ({
-  kind,
-  file: { pid: 4242, by: 'api', startedAt: '2026-10-06T08:00:00.000Z', cwd: '/', every: 4000, passedAt: null },
-  last: 0,
-  quiet: 0,
-  identity: 'same',
-});
-
-const NO_SERVICE = () => false;
-
-test('a daemon ticking is left alone, and the service is not even looked for', () => {
-  assert.deepEqual(
-    demandPlan(standing('ticking'), () => assert.fail('looked for a service beside a ticking daemon'), {}),
-    { kind: 'ticking' },
-  );
-});
-
-test('a lease stalled, gone, stopped, unreadable or absent is no holder: a daemon is started', () => {
-  const free: DaemonStanding[] = [
-    { kind: 'none' },
-    { kind: 'unreadable', text: '{' },
-    standing('stalled'),
-    standing('gone'),
-    standing('stopped'),
-  ];
-  for (const lease of free) assert.deepEqual(demandPlan(lease, NO_SERVICE, {}), { kind: 'spawn' }, lease.kind);
-});
-
-test('NEMIA_DAEMON_START=off starts nothing; an installed service is started before a daemon of another kind', () => {
-  assert.deepEqual(demandPlan({ kind: 'none' }, NO_SERVICE, { [DEMAND_OFF]: 'off' }), { kind: 'off' });
-  assert.deepEqual(
-    demandPlan({ kind: 'none' }, () => true, { [DEMAND_OFF]: 'off' }),
-    { kind: 'off' },
-  );
-  assert.deepEqual(
-    demandPlan({ kind: 'none' }, () => true, {}),
-    { kind: 'service' },
-  );
-  assert.deepEqual(demandPlan({ kind: 'none' }, NO_SERVICE, { [DEMAND_OFF]: 'on' }), { kind: 'spawn' });
-});
+import { daemonEnv, offLine, otherTookLine, serviceStartedLine, startedLine, unstartedLine } from './demand.ts';
 
 test("the daemon's environment is the service's and the login's: nothing else of the command's shell", () => {
   const shell = {

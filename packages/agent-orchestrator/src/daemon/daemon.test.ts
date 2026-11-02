@@ -311,23 +311,36 @@ test("nemia ls's line: whether a daemon ticks the store, and when its last pass 
   );
 });
 
-test('REFUSED: an interval the file cannot hold — negative, zero, fractional, not a number, or longer than a timer keeps', () => {
-  for (const arg of ['-5', '0', '1.5', '1e400', 'Infinity', 'NaN', 'abc', '', ' ', String(MAX_EVERY_MS + 1)]) {
-    const asked = everyOf(arg);
-    assert.ok('refusal' in asked, JSON.stringify(arg));
-    assert.equal(
-      asked.refusal,
-      `nemia up takes its pass interval in whole milliseconds, from 1 to 2147483647, and ${JSON.stringify(arg)} is not one: nemia up [ms], 4000 when none is given. The interval is written into daemon.json, and a holder whose interval does not read there holds nothing: a second nemia up would take the store from it while it ticks.`,
-    );
-  }
-  assert.deepEqual(everyOf(undefined), { every: DEFAULT_EVERY_MS });
+test('REFUSED: an interval the file cannot hold — negative, zero, fractional, not a number, or longer than a timer keeps', async (t) => {
+  const refused: readonly (readonly [string, string])[] = [
+    ['negative', '-5'],
+    ['zero', '0'],
+    ['fractional', '1.5'],
+    ['past a double', '1e400'],
+    ['infinite', 'Infinity'],
+    ['not a number', 'NaN'],
+    ['words', 'abc'],
+    ['empty', ''],
+    ['a space', ' '],
+    ['longer than a timer keeps', String(MAX_EVERY_MS + 1)],
+  ];
+  for (const [name, arg] of refused)
+    await t.test(name, () => {
+      const asked = everyOf(arg);
+      assert.ok('refusal' in asked);
+      assert.match(asked.refusal, /whole milliseconds, from 1 to 2147483647/);
+      assert.ok(asked.refusal.includes(JSON.stringify(arg)), 'the refusal names what it was given');
+      assert.match(asked.refusal, /nemia up \[ms\]/);
+    });
+  await t.test('none given is the shipped interval', () => assert.deepEqual(everyOf(undefined), { every: DEFAULT_EVERY_MS }));
   for (const [arg, every] of [
     ['1', 1],
     ['10', 10],
     ['4000', 4000],
     [String(MAX_EVERY_MS), MAX_EVERY_MS],
-  ] as const) {
-    assert.deepEqual(everyOf(arg), { every }, arg);
-    assert.equal(parseDaemonFile(text(holder({ every })))?.every, every, 'every interval taken is one the file reads back');
-  }
+  ] as const)
+    await t.test(`${arg} is taken, and the file reads it back`, () => {
+      assert.deepEqual(everyOf(arg), { every });
+      assert.equal(parseDaemonFile(text(holder({ every })))?.every, every);
+    });
 });

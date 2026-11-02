@@ -8,11 +8,11 @@ import { Effect } from 'effect';
 import { type AtWork, atWork, runStartedAt, type RunTokens, runTokens, type Timeline, timeline } from '../timeline/index.ts';
 import type { TimelineTotal, TimelineTry } from '../timeline/index.ts';
 import { artifactsDir } from '../record/record.store.ts';
-import { budgetWord, dollars } from '../status/status.ts';
+import { budgetWord } from '../status/status.ts';
 import { closeoutAsked, closeoutReader, consumption, exitVerdicts } from '../views/views.verb.ts';
 import { phaseOfView } from '../views/views-words.ts';
 import { type Engine, EngineService } from '../runtime-client.ts';
-import type { Retry, RetryMode } from '../retry/index.ts';
+import { type Retry, type RetryMode, stepRaise, type RaiseReads, type StepRaise } from '../retry/index.ts';
 import {
   bare,
   filedTimes,
@@ -54,17 +54,13 @@ import {
   fromNote,
   gatesOf,
   isRepositoryRun,
-  loopOver,
   overBudget,
-  ownStatus,
   type PlaceKind,
   placeOf,
-  retryable,
   type Run,
   type Said,
   type Spend,
   type SpendOf,
-  type StepStatus,
   stepSpend,
   type ToldLayers,
 } from '../run.ts';
@@ -103,20 +99,8 @@ import type { Command } from '../command/entry.verb.ts';
  */
 export type StepBudget = { usd: number; said: string; of: string | null; over: boolean };
 
-/**
- * A raise of a step's cap the package takes, and how it is asked for: `retry` — `nemia retry --budget`, the board's `POST …/retry` — for a
- * step over its budget or ended at it that a try takes on (`retryable`'s `raise`); `round` — `nemia retry --round --budget`, `POST …/round`
- * — for a looping step whose round waits on a step of its loop over its budget (`loopOver`). `above` is what the budget has to be more
- * than, as the package refuses one that is not — what the tries have cost, or the cap a session was ended at — and `said` that, in dollars
- * (`dollars`).
- *
- * For a try, `modes` are the ways the package takes it (`retryable`) — `recheck` among them where a check did not pass, which costs nothing
- * and needs no raise — and `own` how the step ended on its own work, its budget aside (`ownStatus`): `blocked` for a step that signed off
- * blocked, whose try is answered with its raise (`nemia retry --budget <amount> --message "<answer>"`, as `nemia decide` offers it),
- * `unsigned`, `failed (check)`, `failed`, `stopped`, `denied` or `budget exhausted`. Over its budget, a step's word is `over budget`, so
- * the word alone does not say which. For a round, no modes, and `own` null: a round is asked for as it is, with a budget.
- */
-export type StepRaise = { by: 'retry' | 'round'; above: number; said: string; modes: RetryMode[]; own: StepStatus | null };
+/** A raise of a step's cap the package takes, and how it is asked for: the one `nemia decide` offers (`stepRaise`, retry.ts). */
+export type { StepRaise };
 
 /**
  * A try a person asked for — with `nemia retry`, or the board's answer box or Continue — that the next tick files: `assess`'s, off their
@@ -429,34 +413,16 @@ function costOf(
           over: Boolean(overBudget(step, run, spendOf)),
         }
       : null;
-  return { spent, budget, raise: step && !run.cancelledAt && !run.pruned && !run.hold ? raiseOf(run, step, steps, views, spendOf) : null };
+  return { spent, budget, raise: step ? stepRaise(step, run, steps, raiseReads(run, views), spendOf) : null };
 }
 
-/**
- * The raise of a step's cap the package takes (`StepRaise`), or null. A try's, where `retryable` carries one — a settled step over its
- * budget or ended at it, that a try takes on — and it may be tried; else a round's, for a looping step over its budget or out of rounds
- * whose loop has a step over its budget (`loopOver`): `nemia retry --round --budget` has to pass the most any of them has cost, as
- * `roundAsk` refuses less.
- */
-function raiseOf(run: Run, step: Workflow, steps: readonly Workflow[], views: Views, spendOf: SpendOf): StepRaise | null {
-  const phase = (taskId: string) => phaseOfView(views.get(taskId));
-  const reader = closeoutReader(views, run);
-  const asked = closeoutAsked(views);
-  const { status, modes, raise } = retryable(step, run, phase, reader, asked, steps, () => false, spendOf, exitVerdicts(views, run));
-  if (raise && modes.length) {
-    return {
-      by: 'retry',
-      above: raise.above,
-      said: dollars(raise.above),
-      modes,
-      own: ownStatus(step, run, phase, reader, asked, steps, spendOf),
-    };
-  }
-  const over = step.loop && (status === 'over budget' || status === 'exhausted') ? loopOver(steps, step, run, spendOf) : [];
-  if (!over.length) return null;
-  const above = Math.max(0, ...over.map((o) => o.spent.usd));
-  return { by: 'round', above, said: dollars(above), modes: [], own: null };
-}
+/** What a step's raise is read from, off the views the request already read (`RaiseReads`), as `nemia decide` reads them. */
+const raiseReads = (run: Run, views: Views): RaiseReads => ({
+  phaseOf: (taskId) => phaseOfView(views.get(taskId)),
+  closeoutOf: closeoutReader(views, run),
+  askedCloseout: closeoutAsked(views),
+  verdictOf: exitVerdicts(views, run),
+});
 
 /**
  * What a round of a loop cost: the session of each try the package's `timeline` counts in that round — the steps the loop files again

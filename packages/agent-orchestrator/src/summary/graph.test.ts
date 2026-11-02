@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { DEFAULT_ROUNDS, parseWorkflow, validate, type Workflow } from '../workflow.ts';
-import { graphOf, runGraph } from './graph.ts';
+import { graphOf, inputGraphOf, runGraph } from './graph.ts';
 
 /**
  * Steps as `nemia start` freezes them, each file given `place: git`: parsed and validated, so the graph is read off what the run is judged
@@ -117,7 +117,7 @@ test("a run's graph: the judged steps' edges, and a root for each step the run s
 test('an `input` edge per step a step reads the output of, drawn after its `after` edges and before its `loop` edge', async (t) => {
   await t.test('a step reading a step it waits on draws one `input` edge beside its `after` edge', () => {
     assert.deepEqual(
-      graphOf([
+      inputGraphOf([
         { name: 'design', after: [] },
         { name: 'implement', after: ['design'], input: ['design', 'design'], loop: 'design', rounds: 2 },
       ]).edges,
@@ -129,10 +129,19 @@ test('an `input` edge per step a step reads the output of, drawn after its `afte
     );
   });
   await t.test('an `input` naming a step not given, or the step itself, draws nothing', () => {
-    assert.deepEqual(graphOf([{ name: 'review', after: [], input: ['gone', 'review'] }]), {
+    assert.deepEqual(inputGraphOf([{ name: 'review', after: [], input: ['gone', 'review'] }]), {
       roots: ['review'],
       edges: [],
     });
+  });
+  await t.test('the page and the list draw no `input` edge', () => {
+    assert.deepEqual(
+      graphOf([
+        { name: 'design', after: [] },
+        { name: 'implement', after: [], input: ['design'] },
+      ]).edges,
+      [],
+    );
   });
   await t.test('a workflow read from its files draws the edge its `input:` says', () => {
     const steps = workflow(
@@ -143,7 +152,7 @@ test('an `input` edge per step a step reads the output of, drawn after its `afte
       { 'plan.json': again },
     );
     assert.deepEqual(
-      graphOf(steps).edges.map((e) => `${e.from} ${e.kind} ${e.to}`),
+      inputGraphOf(steps).edges.map((e) => `${e.from} ${e.kind} ${e.to}`),
       ['design after implement', 'design input implement'],
     );
   });

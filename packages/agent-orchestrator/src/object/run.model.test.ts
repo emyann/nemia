@@ -8,10 +8,10 @@ import assert from 'node:assert/strict';
 import { JsonSchema, Schema, SchemaRepresentation } from 'effect';
 import { Run, RunStatus, RunStepStatus, runDocument, StepRaise, TryShort } from './run.model.ts';
 import type { judgedFields } from '../summary/summary.verb.ts';
-import type { RunGraph } from '../summary/graph.ts';
-import type { Timeline, TimelineTry } from '../timeline/timeline.ts';
+import type { ObjectGraph } from '../summary/graph.ts';
+import type { Timeline, TimelineTry } from '../timeline/index.ts';
 import type { StepStatus } from '../record/record.ts';
-import type { RetryMode } from '../retry/retry-ask.ts';
+import type { RetryMode } from '../retry/index.ts';
 
 /** Whether `A` and `B` are each assignable to the other. */
 type Same<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
@@ -20,7 +20,7 @@ type Judged = ReturnType<typeof judgedFields>;
 
 /** The status's judged fields are the list row's, by type, both ways: no field of either spelled apart. */
 const judgedSame: Same<Pick<RunStatus, keyof Judged>, Judged> = true;
-const graphSame: Same<RunStatus['graph'], RunGraph> = true;
+const graphSame: Same<RunStatus['graph'], ObjectGraph> = true;
 const timelineSame: Same<RunStatus['timeline'], Pick<Timeline, 'rounds' | 'run' | 'slot'>> = true;
 const stepTimelineSame: Same<RunStepStatus['timeline'], TimelineTry[]> = true;
 const stepWordSame: Same<RunStepStatus['status'], StepStatus> = true;

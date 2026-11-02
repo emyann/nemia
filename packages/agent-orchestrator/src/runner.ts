@@ -521,8 +521,7 @@ export { atHarness } from './summary/judged.verb.ts';
 export type { GitAsked, JudgeHow, RunHolding, RunStatus, RunToDecide, RunWaiting, Spent, StepNeeds } from './summary/judged.verb.ts';
 export { restingMemo, restingRead } from './rest/resting.verb.ts';
 export type { RestingMemo, RestingRead } from './rest/resting.verb.ts';
-export { recordMemo } from './rest/index.ts';
-export type { RecordMemo } from './rest/index.ts';
+export { recordMemo, type RecordMemo } from './rest/index.ts';
 export type { ScheduleRuns } from './schedule/listed.store.ts';
 export type { PauseRuns } from './pause/pause.ts';
 export type { InboxRuns } from './inbox/index.ts';
@@ -552,8 +551,10 @@ export type { Ask, AskAnswer, AskEvent, AskOption, AskPick, AskQuestion, CallSta
 export { nemiaChatPlace } from './nemia/level.store.ts';
 
 import * as RunModel from './record/record.model.ts';
+import * as RunObject from './object/run.model.ts';
 /**
  * Run-core's model as Schemas (`docs/model.md`): its ids, checked on create and nominal on read, its entities and the run's
- * invariants, which the Run door (S2) will decode through. One namespace, imported and exported by name.
+ * invariants, which the Run door (S2) will decode through; and the run as one object, `nemia/v1` `Run`, with its OpenAPI document
+ * (`RunObject`, object/run.model.ts). One namespace each, imported and exported by name.
  */
-export { RunModel };
+export { RunModel, RunObject };

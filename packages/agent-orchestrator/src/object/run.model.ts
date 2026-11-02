@@ -10,12 +10,11 @@ import { JsonSchema, Schema } from 'effect';
 import { ANSWER_VIA, RUN_PHASES, RUN_REASONS, STEP_PHASES, STEP_REASONS, WAIT_ON } from '../phase/phase.ts';
 import { CHECK_RESULTS } from '../check/check.ts';
 import { PLACE_KINDS, type StepStatus } from '../record/record.ts';
-import type { RetryMode } from '../retry/retry-ask.ts';
-import type { RunStatus as RunWord } from '../summary/judged.verb.ts';
-import type { TaskSpan } from '../timeline/timeline.ts';
+import type { RetryMode } from '../retry/index.ts';
+import type { TaskSpan } from '../timeline/index.ts';
 
 /** `assess`'s word for a run (`RunStatus`, judged.verb.ts), each of them. */
-const RUN_STATUSES = ['running', 'succeeded', 'failed', 'cancelled', 'awaiting approval', 'waiting'] as const satisfies readonly RunWord[];
+const RUN_STATUSES = ['running', 'succeeded', 'failed', 'cancelled', 'awaiting approval', 'waiting'] as const;
 
 /** A step's word (`StepStatus`, record.ts), each of them. */
 const STEP_STATUSES = [

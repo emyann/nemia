@@ -1,17 +1,22 @@
 import { DEFAULT_ROUNDS, type Workflow } from '../step/step.ts';
 
 /**
- * One edge of a run's graph. `after`: `to` waits on `from`. `input`: `to` is handed `from`'s declared output (its `input:`). `loop`:
- * `from` is the looping step, and `to` the step a round runs again — the one edge that points backwards — with `rounds`, how many rounds
- * the loop may run, the first included.
+ * One edge of a run's graph, as the list and the run page draw it. `after`: `to` waits on `from`. `loop`: `from` is the looping step, and
+ * `to` the step a round runs again — the one edge that points backwards — with `rounds`, how many rounds the loop may run, the first
+ * included.
  */
-export type GraphEdge =
-  | { from: string; to: string; kind: 'after' }
-  | { from: string; to: string; kind: 'input' }
-  | { from: string; to: string; kind: 'loop'; rounds: number };
+export type GraphEdge = { from: string; to: string; kind: 'after' } | { from: string; to: string; kind: 'loop'; rounds: number };
+
+/** `input`: `to` is handed `from`'s declared output (its `input:`). Drawn on the run object's graph alone until the board draws it. */
+export type InputEdge = { from: string; to: string; kind: 'input' };
 
 /** A run's steps as a graph: where the run's card leads, and every edge between its steps. */
 export type RunGraph = { roots: string[]; edges: GraphEdge[] };
+
+/** The run object's graph (`RunGraph`), its `input` edges beside `after` and `loop`. */
+export type ObjectGraph = { roots: string[]; edges: Array<GraphEdge | InputEdge> };
+
+type GraphStep = Pick<Workflow, 'name' | 'after' | 'input' | 'loop' | 'rounds'>;
 
 /**
  * The graph of a run's steps, once, for every client to draw: so none derives it from `after` on its own, and a step the
@@ -24,9 +29,9 @@ export type RunGraph = { roots: string[]; edges: GraphEdge[] };
  * reachable from the card. A loop that does not say how many rounds runs the default (`DEFAULT_ROUNDS`), as `capOf` in
  * status/status.ts reads it. Pure.
  */
-export function graphOf(steps: readonly Pick<Workflow, 'name' | 'after' | 'input' | 'loop' | 'rounds'>[]): RunGraph {
+export function inputGraphOf(steps: readonly GraphStep[]): ObjectGraph {
   const names = new Set(steps.map((s) => s.name));
-  const edges: GraphEdge[] = [];
+  const edges: ObjectGraph['edges'] = [];
   const roots: string[] = [];
   for (const step of steps) {
     const after = [...new Set(step.after)].filter((from) => names.has(from) && from !== step.name);
@@ -42,14 +47,27 @@ export function graphOf(steps: readonly Pick<Workflow, 'name' | 'after' | 'input
   return { roots, edges };
 }
 
+/** `inputGraphOf` without its `input` edges: the graph the list and the run page draw. Pure. */
+export function graphOf(steps: readonly GraphStep[]): RunGraph {
+  const { roots, edges } = inputGraphOf(steps);
+  return { roots, edges: edges.filter((e): e is GraphEdge => e.kind !== 'input') };
+}
+
+const withShown = (steps: readonly GraphStep[], names: readonly string[]): GraphStep[] => [
+  ...steps,
+  ...names.filter((name) => !steps.some((s) => s.name === name)).map((name) => ({ name, after: [] })),
+];
+
 /**
  * The graph of the steps a run is judged by (`judgedSteps`) and shown with (`stepNames`): `graphOf` over the judged workflow, then a
  * step with no `after` for each name the run shows beside it, which is a root. One function for the run's page and the list, so a card
  * draws what its page draws.
  */
-export function runGraph(
-  steps: readonly Pick<Workflow, 'name' | 'after' | 'input' | 'loop' | 'rounds'>[],
-  names: readonly string[],
-): RunGraph {
-  return graphOf([...steps, ...names.filter((name) => !steps.some((s) => s.name === name)).map((name) => ({ name, after: [] }))]);
+export function runGraph(steps: readonly GraphStep[], names: readonly string[]): RunGraph {
+  return graphOf(withShown(steps, names));
+}
+
+/** `runGraph` with the `input` edges: the run object's graph. Pure. */
+export function runInputGraph(steps: readonly GraphStep[], names: readonly string[]): ObjectGraph {
+  return inputGraphOf(withShown(steps, names));
 }

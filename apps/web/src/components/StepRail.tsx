@@ -107,7 +107,7 @@ export function StepRail({ run, flow }: { run: RunSummary; flow: Flow }) {
 /** A step's name, a person's word for its state and what that means, and its note: what hovering over it says. */
 function stepTitle(step: SummaryStep | undefined, name: string, cancelled: boolean, held: boolean): string {
   if (!step) return name;
-  const words = stateWordsOf(stepState(step, cancelled, held), step.on);
+  const words = stateWordsOf(stepState(step, cancelled, held), step.on, held);
   return `${name}: ${words.rail} — ${words.meaning}${step.note ? `\n${step.note}` : ''}`;
 }
 

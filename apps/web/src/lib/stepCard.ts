@@ -228,7 +228,7 @@ export function stepCardOf({ run, step, detail, agents, now }: StepCardInput): S
   return {
     kind,
     hue: hueOf(state),
-    tag: { word: stateWordsOf(state, codes.on).rail, ...TAGS[kind] },
+    tag: { word: stateWordsOf(state, codes.on, run.holding != null).rail, ...TAGS[kind] },
     agent: agentOf(row?.agent ?? null, agents),
     step,
     place: own && detail ? placeOf(own, detail.steps, kind) : null,

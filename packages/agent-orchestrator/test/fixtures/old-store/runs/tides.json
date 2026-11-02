@@ -1,0 +1,44 @@
+{
+  "id": "tides",
+  "repo": "@ROOT@/repo",
+  "workspace": "@ROOT@/repo",
+  "baseRef": "@BASE@",
+  "branch": "main",
+  "isolate": false,
+  "brief": "keep the tide tables",
+  "workflowDir": "@ROOT@/workflows/tides",
+  "workflow": [
+    {
+      "name": "implement",
+      "after": [],
+      "body": "You implement.\n\nDo it.",
+      "disallow": ["SendMessage", "Bash(git push)"],
+      "allow": ["Edit(**)", "Bash(npm test)"],
+      "agent": {
+        "name": "implementer",
+        "keys": ["disallow", "allow"],
+        "body": "Do it.",
+        "given": { "disallow": "SendMessage, Bash(git push)", "allow": "Edit(**), Bash(npm test)" },
+        "instructions": "You implement.",
+        "systemPrompt": "own"
+      }
+    },
+    {
+      "name": "review",
+      "after": ["implement"],
+      "body": "Read it.",
+      "harness": "codex",
+      "permissionMode": "bypassPermissions"
+    },
+    {
+      "name": "ship",
+      "after": ["review"],
+      "body": "Ship it.",
+      "workspace": "main",
+      "background": true,
+      "agent": { "name": "shipper", "keys": ["workspace"], "body": "", "given": {}, "instructions": "You ship.", "systemPrompt": "no-coding" }
+    }
+  ],
+  "steps": { "implement": { "taskId": null }, "review": { "taskId": null }, "ship": { "taskId": null } },
+  "createdAt": "2026-09-01T00:00:00.000Z"
+}

@@ -4,7 +4,7 @@
  * and anything else a defect, are the tick's rows of `faces.test.ts`; what it needs and refuses is said in the type by
  * `_tickProgramTypes` below.
  * Walked through the runtime itself, `plainEngine` over an in-memory journal
- * and a harness the test signs by hand, as unreadable-journal.test.ts does.
+ * and a harness the test signs by hand, as broken-runs.test.ts does.
  *
  * `WF_ROOT` is set before the runner is imported, which reads it as the module loads. `WF_VERIFY_REST=1` judges in full every run a pass
  * answers from its memo, sessions enough are admitted for the one run, and no cap is set on runs.

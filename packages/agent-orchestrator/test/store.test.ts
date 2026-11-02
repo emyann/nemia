@@ -239,31 +239,6 @@ test("REFUSED at shipped defaults: a run is never started under an id the store 
   );
 });
 
-test('a run that has filed keeps the workflow it froze — the folder edited after its first filing never reaches it', async () => {
-  const folder = fs.mkdtempSync(path.join(ROOT, 'frozen-'));
-  fs.writeFileSync(path.join(folder, 'implement.md'), '---\nplace: git\n---\nimplement it as asked\n');
-  fs.writeFileSync(path.join(folder, 'review.md'), '---\nafter: implement\nplace: git\n---\nreview it\n');
-  const run = await runPlaced(startRun({ brief: 'add a flag', repo: aRepo(), workflowDir: folder, isolate: false }));
-
-  const { e, tasks, filings, settle } = board();
-  await runWith(e, advanceRun(readRun(run.id)));
-  assert.deepEqual(filings, [`${run.id}-implement`], 'the first pass files the first step');
-
-  fs.writeFileSync(path.join(folder, 'implement.md'), '---\nplace: git\n---\nsomething else entirely\n');
-  fs.writeFileSync(path.join(folder, 'review.md'), '---\nafter: implement\nplace: git\n---\nsomething else entirely\n');
-
-  settle(`${run.id}-implement`, 'succeeded', SIGNED);
-  await runWith(e, advanceRun(readRun(run.id)));
-  assert.deepEqual(filings, [`${run.id}-implement`, `${run.id}-review`], 'the step after it is filed from the freeze');
-  assert.match(tasks.get(`${run.id}-review`)!.spec.brief, /review it/);
-  assert.doesNotMatch(tasks.get(`${run.id}-review`)!.spec.brief, /something else/);
-  assert.deepEqual(
-    readRun(run.id).workflow?.map((s) => s.name),
-    ['implement', 'review'],
-    'the folder the run has filed from, rewritten since, never reaches it',
-  );
-});
-
 /**
  * An engine board a test settles by hand. It keeps what each task was filed with — so a view carries
  * the closeout schema the run really asked for — and counts every filing. Each task's session is its

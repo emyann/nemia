@@ -4103,7 +4103,7 @@ spawn nothing, and import no file of the other kinds. **Store** files are the I/
 no runtime, never a controller and not the client, and load as a tree — `record/places.store.ts`, `skills/read.store.ts`
 (the skills read), `meter/tally.store.ts` (the pass's meter) and `config/config.store.ts` (the `WF_` environment) at the
 bottom, `agents/read.store.ts` (the agents read, and a person's custom instructions) on the skills read,
-`folder/folder.store.ts` on both reads, `record/record.store.ts` on the bottom, the folders and `record/steps.store.ts`,
+`folder/folder.store.ts` on both reads, `record/record.store.ts` on the bottom, the folders and the revisions,
 `workspace/worktree.store.ts` on `record.store.ts`, `places.store.ts` and `tally.store.ts`, `folder/write.store.ts` on
 `record.store.ts`, the two reads and the factories — and outside the store only the client and the
 controllers beneath the CLI import them. **Controllers** use the runtime through the client: `runner.ts`, the root, which

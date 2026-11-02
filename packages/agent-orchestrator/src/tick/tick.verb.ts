@@ -26,7 +26,9 @@ import { passRevisions } from '../revisions/pin.verb.ts';
 import { readPause } from '../pause/pause.store.ts';
 import { finishingAmong, type Finishing, type Pause, type PauseStanding } from '../pause/pause.ts';
 import { isRepositoryRun, type Run } from '../record/record.ts';
-import { stepsOrNone, unloadedFolder } from '../record/steps.store.ts';
+import { unloadedFolder } from '../record/steps.ts';
+import { stepsAmong } from '../record/steps.verb.ts';
+import type { Workflow } from '../workflow.ts';
 import { hasStarted } from '../wait/wait.ts';
 import { ceilings, recordCeilings, recordPassCost, recordRecentPass } from '../daemon/daemon.store.ts';
 import { verifiesRest } from '../config/config.store.ts';
@@ -239,7 +241,7 @@ export const tickRun = Effect.fn('tick')(function* ({ repo, memo, verifyRest, qu
  *
  * A run a read of whose task journal is refused (`unreadableJournal`), or that froze no workflow and whose folder does not load
  * (`unloadedFolder`), is left unjudged, out of the feed's `removed` and counted in flight (`judged`); a pause's reads leave it out
- * (`stepsOrNone`). An engine's report that carries no refusals — a test's fake — is read as having none.
+ * (`stepsAmong`). An engine's report that carries no refusals — a test's fake — is read as having none.
  *
  * Its span says how many runs the store listed (`runs`) and how many of them were answered from memory (`rested`), which make no span of
  * their own: a pass traces what it does, as many spans over many runs at rest as over few.
@@ -276,16 +278,28 @@ const pass = Effect.fn('pass')(function* (engine: Engine, { repo, memo, verify }
     ...(forgetting.length ? { forgetting } : {}),
     ...(pause
       ? {
-          pause: { pause, finishing: finishingReported(runs, report.views ?? []), ...(yield* heldRead(e, runs, standingReader(standing))) },
+          pause: {
+            pause,
+            finishing: finishingReported(runs, report.views ?? [], yield* stepsAmong(runs)),
+            ...(yield* heldRead(e, runs, standingReader(standing))),
+          },
         }
       : {}),
   };
 });
 
 /** Each task of `runs` still finishing under the pause (`finishingAmong`), read off the views the runtime reported on the pass. */
-const finishingReported = (runs: readonly Run[], views: readonly TaskView[]): Finishing[] => {
+const finishingReported = (
+  runs: readonly Run[],
+  views: readonly TaskView[],
+  among: ReadonlyMap<string, readonly Workflow[]>,
+): Finishing[] => {
   const reported = new Map(views.map((v) => [v.id, v]));
-  return finishingAmong(runs, (taskId) => reported.get(taskId), stepsOrNone);
+  return finishingAmong(
+    runs,
+    (taskId) => reported.get(taskId),
+    (run) => among.get(run.id) ?? [],
+  );
 };
 
 /** What a pass has judged so far: each run it advanced, and each run it left unjudged with why (`Unjudged`). */

@@ -61,7 +61,7 @@ type Telling = (run: Run, step: Workflow) => BriefPlace;
 const toldBy =
   (place: Place = builtinGitPlace): Telling =>
   (run, step) =>
-    placeTold(run, step, place);
+    placeTold(run, STEPS, step, place);
 
 /** The six briefs of a repository run, by the name of their pinned file, each told what `told` says. */
 function briefs(told: Telling): Record<string, string> {

@@ -51,10 +51,10 @@ const {
   roundRun,
   sayRun,
   startRun,
-  stepsOf,
   tickRun,
   runWith: runEngine,
 } = await import('../src/runner.ts');
+const { stepsNow: stepsOf } = await import('./steps-now.ts');
 const { isRepositoryRun } = await import('../src/run.ts');
 const { cancelFile, readRun } = await import('../src/record/record.store.ts');
 const { EngineService: Service, engineOf } = await import('../src/runtime-client.ts');

@@ -3,12 +3,12 @@
  * concluded (`parentCloseouts`) and, on the pass that files the roots, all of it in order (`handedOf`). A controller, reaching the runtime
  * through the client (`runtime-client.ts`); `handed.ts` words what it reads.
  */
-import { Cause, Effect, Exit } from 'effect';
+import { Cause, Effect, Exit, Result } from 'effect';
 import { asked, over, type Engine } from '../runtime-client.ts';
 import type { Workflow } from '../workflow.ts';
 import type { Run } from '../record/record.ts';
 import { resultSteps } from '../branches/index.ts';
-import { stepsOf } from '../record/record.store.ts';
+import { stepsOf } from '../record/steps.verb.ts';
 import { runStore } from '../record/files.store.ts';
 import { closeoutOf, parentRead } from '../views/views.verb.ts';
 import type { BranchReader } from '../branches/branches.store.ts';
@@ -59,14 +59,18 @@ export const parentCloseouts = Effect.fn('parentCloseouts')(function* (
   const out: ParentCloseout[] = [];
   for (const id of new Set(ids)) {
     let record: Run;
-    let steps: Workflow[];
     try {
       record = runStore.runs.read(id);
-      steps = stepsOf(record);
     } catch (err) {
       out.push({ run: id, unreadable: `its record cannot be read: ${(err as Error).message}`, how, landed: false });
       continue;
     }
+    const read = yield* Effect.result(stepsOf(record));
+    if (Result.isFailure(read)) {
+      out.push({ run: id, unreadable: `its record cannot be read: ${read.failure.message}`, how, landed: false });
+      continue;
+    }
+    const steps: Workflow[] = read.success;
     const said: ParentStep[] = [];
     for (const step of resultSteps(steps)) said.push(yield* stepSaid(e, record, step));
     const landed = how === 'waited' || (yield* parentRead(id, git).pipe(over(e))).landed;

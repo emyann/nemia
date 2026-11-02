@@ -30,8 +30,9 @@ import { waitedOn, type ParentRun } from '../wait/wait.ts';
 import { decision } from '../decide/decide.ts';
 import { parseCloseout, type Closeout } from '../closeout/index.ts';
 import { taskUsage } from '../timeline/index.ts';
-import { stepsOf } from '../record/record.store.ts';
-import { parentRecord, landedOf, type BranchReader } from '../branches/branches.store.ts';
+import { stepsOf } from '../record/steps.verb.ts';
+import { landedOf, type BranchReader } from '../branches/branches.store.ts';
+import { parentRecord } from '../record/steps.verb.ts';
 import { continuesFrom } from '../retry/index.ts';
 import { phaseOfView, unsignedEnd, wordOfView, type EnginePhase } from './views-words.ts';
 import { RunDoor } from '../runs/runs.store.ts';
@@ -611,16 +612,10 @@ export const closeoutReader =
  * read of the store, git or the engine failed with; dies of anything else.
  */
 export const parentRead = Effect.fn('parentOf')(function* (id: string, git: BranchReader) {
-  const known = yield* tried(() => parentRecord(id, git));
+  const known = yield* parentRecord(id, git);
   const { record } = known;
   if (!record || record.cancelledAt || known.gone) return { ...known, landed: false } satisfies ParentRun;
-  const steps = yield* tried((): Workflow[] | undefined => {
-    try {
-      return stepsOf(record);
-    } catch {
-      return undefined;
-    }
-  });
+  const steps = yield* Effect.orElseSucceed(stepsOf(record), (): Workflow[] | undefined => undefined);
   if (!steps) return { ...known, landed: false } satisfies ParentRun;
   const branches = resultSteps(steps)
     .map((s) => record.steps[s.name]?.branch)

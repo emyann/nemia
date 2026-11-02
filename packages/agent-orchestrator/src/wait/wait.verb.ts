@@ -5,12 +5,11 @@
  */
 import os from 'node:os';
 import { Effect } from 'effect';
-import { tried } from '../runtime-client.ts';
 import { type Hold, type Run } from '../record/record.ts';
 import { holdRefusal } from './wait.ts';
 import { idRefusal } from '../forget/forget.ts';
 import { assess } from '../tick/assess.ts';
-import { stepsOf } from '../record/record.store.ts';
+import { stepsOf } from '../record/steps.verb.ts';
 import { standingLiveOf } from '../standing/standing.verb.ts';
 import {
   closeoutAsked,
@@ -70,7 +69,7 @@ export const hold = Effect.fn('hold')(function* (id: string, until: readonly str
   if (until.length && !run.cancelledAt && !run.pruned && !run.hold) {
     if ((yield* parentRead(id, git)).landed) finished = 'landed';
     else {
-      const steps = yield* tried(() => stepsOf(run));
+      const steps = yield* stepsOf(run);
       const { views, phaseOf } = yield* taskPhasesRead(run);
       const { asks, rounds } = yield* (yield* RunDoor).asks.read(RunId.read(id));
       const { status } = assess(

@@ -3,7 +3,10 @@
  * off git, and every trial merge in one call of the place's trial verb (`trialMerges`). Nothing is kept: the next decision reads them
  * again.
  */
+import { Effect } from 'effect';
 import { tried } from '../runtime-client.ts';
+import { stepsOf } from '../record/steps.verb.ts';
+import type { Workflow } from '../workflow.ts';
 import { isRepositoryRun, type Run } from '../record/record.ts';
 import type { BranchStanding } from '../status/status.ts';
 import { runStore } from '../record/files.store.ts';
@@ -20,7 +23,11 @@ const ahead = (standings: readonly BranchStanding[]): string[] => standings.filt
  * read threw; dies of anything else (`tried`).
  */
 export const collisionsAt = (run: Run, ending: string, standings: readonly BranchStanding[], git: BranchReader, place: Place) =>
-  tried(() => collisionsRead(run, ending, standings, git, place));
+  Effect.gen(function* () {
+    const others = isRepositoryRun(run) && run.isolate ? othersInFlight(run, runStore.runs.list()) : [];
+    const steps = new Map(yield* Effect.forEach(others, (other) => Effect.map(stepsOf(other), (s) => [other.id, s] as const)));
+    return yield* tried(() => collisionsRead(run, ending, standings, git, place, others, steps));
+  });
 
 function collisionsRead(
   run: Run,
@@ -28,11 +35,13 @@ function collisionsRead(
   standings: readonly BranchStanding[],
   git: BranchReader,
   place: Place,
+  others: readonly Run[],
+  steps: ReadonlyMap<string, readonly Workflow[]>,
 ): Collisions | undefined {
   const ours = ahead(standings);
   if (!isRepositoryRun(run) || !run.isolate || !ours.length) return undefined;
-  const theirs: Theirs[] = othersInFlight(run, runStore.runs.list()).flatMap((other) =>
-    ahead(standingsOf(other, git)).map((branch) => ({ run: other.id, branch })),
+  const theirs: Theirs[] = others.flatMap((other) =>
+    ahead(standingsOf(other, steps.get(other.id) ?? [], git)).map((branch) => ({ run: other.id, branch })),
   );
   return collisionsOf(run, ending, ours, theirs, trialMerges(run.repo, trialsOf(run.branch, ours, theirs), place));
 }

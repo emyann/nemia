@@ -53,7 +53,8 @@ const {
 } = await import('../src/runner.ts');
 const runWith = runOver(runEngine, gitPlaceLayer);
 const runPlaced = runGiven(gitPlaceLayer);
-const { readRun, stepsOf } = await import('../src/record/record.store.ts');
+const { readRun } = await import('../src/record/record.store.ts');
+const { stepsNow: stepsOf } = await import('./steps-now.ts');
 const { roundOf } = await import('../src/run.ts');
 const { runStore } = await import('../src/record/files.store.ts');
 const { main } = await import('../src/cli/main.ts');
@@ -879,12 +880,12 @@ test('REFUSED: a landing session is denied and told what its place says — a pl
     denied.some((d) => d.includes('git commit')),
     false,
   );
-  const words = landingWords(run, ship, place)!;
+  const words = landingWords(run, stepsOf(run), ship, place)!;
   assert.deepEqual(words, { stage: `hg -R ${repo} merge ${branch}`, denied: ['Bash(hg commit:*)'] });
   const told = landingContract(ship.check!, words);
   assert.ok(told.includes(`\`hg -R ${repo} merge ${branch}\``), told);
   assert.ok(told.includes('Your fence denies `Bash(hg commit:*)`'), told);
   assert.doesNotMatch(told, /git (commit|merge)/);
   const implement = stepsOf(run).find((s) => s.name === 'implement')!;
-  assert.equal(landingWords(run, implement, place), undefined, 'a step that lands nothing is told nothing of it');
+  assert.equal(landingWords(run, stepsOf(run), implement, place), undefined, 'a step that lands nothing is told nothing of it');
 });

@@ -5,10 +5,10 @@
  * pass filed and never wrote down as the tick does (`tick/advance.verb.ts`).
  */
 import { Effect } from 'effect';
-import { EngineService, tried } from '../runtime-client.ts';
+import { EngineService } from '../runtime-client.ts';
 import { type Run } from '../record/record.ts';
 import { cancelPlan, type CancelPlan } from './cancel.ts';
-import { stepsOf } from '../record/record.store.ts';
+import { stepsOf } from '../record/steps.verb.ts';
 import { closeoutAsked, closeoutReader, exitVerdicts, spendReader, taskPhasesRead } from '../views/views.verb.ts';
 import { adoptChecks, adoptRounds, adoptTries } from '../tick/advance.verb.ts';
 import { closeWaitingTasks } from '../tick/held.verb.ts';
@@ -40,7 +40,7 @@ export type Cancelled = { run: Run; plan: CancelPlan };
 export const cancelRun = Effect.fn('cancel')(function* (id: string) {
   const e = yield* EngineService;
   const run = yield* (yield* RunDoor).runs.read(RunId.read(id));
-  const steps = yield* tried(() => stepsOf(run));
+  const steps = yield* stepsOf(run);
   const { views, phaseOf } = yield* taskPhasesRead(run);
   const { asks, rounds } = yield* (yield* RunDoor).asks.read(RunId.read(id));
   const verdictOf = exitVerdicts(views, run);

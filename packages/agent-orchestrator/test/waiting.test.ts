@@ -29,8 +29,10 @@ process.env.WF_ROOT = ROOT;
 process.env.WF_VERIFY_REST = '1';
 delete process.env.WF_MAX_CONCURRENT;
 delete process.env.WF_MAX_RUNS;
-const { advanceRun, cancelRun, decideRun, list, parentRead, standingLiveOf, startPlan, startRun, stepsOf, runWith } =
+const { advanceRun, cancelRun, decideRun, list, parentRead, standingLiveOf, startPlan, startRun, runWith } =
   await import('../src/runner.ts');
+const { stepsNow: stepsOf } = await import('./steps-now.ts');
+const { UnloadedFolder } = await import('../src/record/steps.ts');
 const { isRepositoryRun } = await import('../src/run.ts');
 const { listRuns, markCancelled, readRun } = await import('../src/record/record.store.ts');
 const { passStanding } = await import('../src/standing/standing.verb.ts');
@@ -518,7 +520,7 @@ test('a parent that will not land — cancelled, failed with nothing committed, 
       delete record.workflow;
       fs.writeFileSync(path.join(ROOT, 'runs', `${record.id}.json`), JSON.stringify(record, null, 2));
       fs.rmSync(dir, { recursive: true });
-      assert.throws(() => stepsOf(readRun(p.run.id)), 'its steps do not read');
+      assert.throws(() => stepsOf(readRun(p.run.id)), UnloadedFolder, 'its steps do not read');
       const asked: string[] = [];
       const read = await stage.runPlaced(standingLiveOf([p.run.id]));
       const git: BranchReader = {

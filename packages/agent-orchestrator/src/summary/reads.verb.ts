@@ -16,7 +16,7 @@ import { isRefusal, Missing } from '../refusal/refusal.ts';
 import { factoryFills } from '../rules/rules.store.ts';
 import { runStore } from '../record/files.store.ts';
 import { type Run, runTasks, unjudgedWords, unloadedWords } from '../record/record.ts';
-import { unloadedOf } from '../record/steps.store.ts';
+import { unloadedOf } from '../record/steps.verb.ts';
 import { triesDir } from '../try/try.store.ts';
 import type { Workflow } from '../step/step.ts';
 import { filingsRead } from '../views/views.verb.ts';
@@ -66,7 +66,7 @@ export const judgedUnlessUnreadable = Effect.fn('judgedUnlessUnreadable')(functi
   unreadable: Unreadable,
   judge: () => Effect.Effect<T, E, R>,
 ): Effect.fn.Return<JudgedOrNot<T>, E, R> {
-  const folder = unloadedOf(run);
+  const folder = yield* Effect.orDie(unloadedOf(run));
   if (folder !== undefined) return { unreadable: unloadedWords(run.id, folder, 'the board') };
   const own = unreadableOf(run, unreadable);
   if (own) return { unreadable: unjudgedWords(run.id, own.taskId, own.why, 'the board') };

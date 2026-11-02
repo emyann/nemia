@@ -19,7 +19,7 @@ import { runReady } from '../wait/wait.ts';
 import { assess } from '../tick/assess.ts';
 import type { Closeout } from '../closeout/index.ts';
 import { runStore } from '../record/files.store.ts';
-import { stepsOf } from '../record/record.store.ts';
+import { stepsOf } from '../record/steps.verb.ts';
 import { checkoutStatus, landThrough, stagedHere, type StatusMemo } from '../place/landing.store.ts';
 import { dropLandedPictures, LANDED_PICTURES } from '../artifacts/artifacts.store.ts';
 import {
@@ -110,12 +110,8 @@ const mainClaim = Effect.fnUntraced(function* (
   parents: Parents,
   memo: StatusMemo,
 ) {
-  let steps: Workflow[];
-  try {
-    steps = stepsOf(run);
-  } catch {
-    return undefined;
-  }
+  const steps = yield* Effect.orElseSucceed(stepsOf(run), () => undefined);
+  if (steps === undefined) return undefined;
   const ending = steps.find((s) => endsOnBase(s));
   if (!ending || !isRepositoryRun(run)) return undefined;
   const repo = path.resolve(run.repo);
@@ -127,7 +123,7 @@ const mainClaim = Effect.fnUntraced(function* (
     const own = ownStatus(ending, run, phaseOf, closeoutReader(views, run), closeoutAsked(views), steps, spendReader(views));
     const merging = () => {
       if (stagedHere(run) === false) return 'none';
-      const read = checkoutStatus(run, memo);
+      const read = checkoutStatus(run, steps, memo);
       return 'unread' in read ? 'ours' : read.merging;
     };
     if (landingOpen(ending, run, own, phaseOf, merging)) return { id: run.id, repo, step: ending.name, holds: true };
@@ -199,7 +195,7 @@ export function landEnding(
     typeof said === 'string' ? said : undefined,
     verdictOf(ending.name),
     stagedHere(run) ?? true,
-    () => checkoutStatus(run, memo),
+    () => checkoutStatus(run, steps, memo),
   );
   if (!due) return { notes: [], landed: false };
   const name = ending.name;

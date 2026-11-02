@@ -47,11 +47,11 @@ export function stagedHere(run: Pick<RepositoryRun, 'stagedFile'>): boolean | un
  * `run`'s checkout as its place's `status` answers it, with the run's result tips off the heads `memo` reads (`resultTips`), asked once per
  * checkout and run within one pass, of the place `memo` names. A refusal and an unread answer are `{ unread }`, in words.
  */
-export function checkoutStatus(run: RepositoryRun, memo: StatusMemo): CheckoutRead {
+export function checkoutStatus(run: RepositoryRun, steps: readonly Workflow[], memo: StatusMemo): CheckoutRead {
   const key = JSON.stringify([path.resolve(run.repo), run.id]);
   const known = memo.reads.get(key);
   if (known) return known;
-  const read = statusRead(memo.place, run.repo, resultTips(run, resultBranches(run), memo.heads(run)));
+  const read = statusRead(memo.place, run.repo, resultTips(run, resultBranches(run, steps), memo.heads(run)));
   memo.reads.set(key, read);
   return read;
 }
@@ -71,11 +71,11 @@ const statusRead = (place: Place, repo: string, tips: Readonly<Record<string, st
  * `checkoutStatus`, asked off the loop (`ask`) and kept in `memo`, so the `checkoutStatus` that follows it for the same run answers
  * from there and starts no process: for a caller the daemon's pass must not wait on.
  */
-export const askCheckoutStatus = (run: RepositoryRun, memo: StatusMemo): Effect.Effect<CheckoutRead> => {
+export const askCheckoutStatus = (run: RepositoryRun, steps: readonly Workflow[], memo: StatusMemo): Effect.Effect<CheckoutRead> => {
   const key = JSON.stringify([path.resolve(run.repo), run.id]);
   const known = memo.reads.get(key);
   if (known) return Effect.succeed(known);
-  return memo.place.ask('status', { repo: run.repo, tips: resultTips(run, resultBranches(run), memo.heads(run)) }).pipe(
+  return memo.place.ask('status', { repo: run.repo, tips: resultTips(run, resultBranches(run, steps), memo.heads(run)) }).pipe(
     Effect.map((outcome) => {
       const read = readOf(outcome);
       memo.reads.set(key, read);
@@ -97,7 +97,7 @@ export function mergeStaged(run: Run, steps: readonly Workflow[], memo: StatusMe
   const marked = stagedHere(run);
   if (marked !== undefined) return marked;
   if (!landings.some((s) => run.steps[s.name]?.taskId && !run.steps[s.name]?.landed)) return false;
-  const read = checkoutStatus(run, memo);
+  const read = checkoutStatus(run, steps, memo);
   return 'unread' in read || read.merging !== 'none';
 }
 
@@ -135,10 +135,16 @@ export function landingDenies(run: Run, place: Place): readonly string[] {
  * `{repo}` and `{branches}` filled from the run's checkout and its result branches with a tip, recorded or among `heads` (`resultTips`),
  * and its denies. Undefined for any other step.
  */
-export function landingWords(run: Run, step: Workflow, place: Place, heads?: Readonly<Record<string, string>>): LandingWords | undefined {
+export function landingWords(
+  run: Run,
+  steps: readonly Workflow[],
+  step: Workflow,
+  place: Place,
+  heads?: Readonly<Record<string, string>>,
+): LandingWords | undefined {
   if (!isRepositoryRun(run) || !landsOnCheck(step, run)) return undefined;
   const { declared } = place;
-  const branches = Object.keys(resultTips(run, resultBranches(run), heads)).join(' ') || '<result branch>';
+  const branches = Object.keys(resultTips(run, resultBranches(run, steps), heads)).join(' ') || '<result branch>';
   return { stage: declared.say.stage.replaceAll('{repo}', run.repo).replaceAll('{branches}', branches), denied: declared.denyWhileLanding };
 }
 

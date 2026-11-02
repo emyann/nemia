@@ -14,7 +14,9 @@ import { formerKeyLines } from '../folder/folder.store.ts';
 import { ignoredRepoLine } from '../inbox/index.ts';
 import { startFromInbox } from '../inbox/inbox.verb.ts';
 import { isRepositoryRun, type Run } from '../record/record.ts';
-import { inputsDir, stepsOf } from '../record/record.store.ts';
+import { inputsDir } from '../record/record.store.ts';
+import { frozenStepsOf } from '../record/steps.ts';
+import type { Workflow } from '../workflow.ts';
 import { approvedFirst, gatesOf } from '../status/status.ts';
 import { fromNote } from './inputs.ts';
 import { leftOutMounts, startRun } from './start.verb.ts';
@@ -158,12 +160,15 @@ type Started = {
   landed?: readonly string[];
 };
 
+/** The steps of a run just started: the workflow `nemia start` froze on its record, which every run it writes has (`frozenStepsOf`). */
+const startedSteps = (run: Run): Workflow[] => frozenStepsOf(run) ?? [];
+
 /**
  * The folders of its factory a run mounts, read-only, and those left out because they were no directory; none in the default factory.
  */
 function mountLines(run: Run): string[] {
   const missing = leftOutMounts(run);
-  const written = writersOf(stepsOf(run), run.mounts);
+  const written = writersOf(startedSteps(run), run.mounts);
   return [
     ...(run.mounts?.length
       ? [
@@ -179,7 +184,7 @@ function mountLines(run: Run): string[] {
 
 /** The steps of a run just started that wait on a person: each gated, and the ending a person approves before it is filed. */
 function gateLines(run: Run): string[] {
-  const steps = stepsOf(run);
+  const steps = startedSteps(run);
   const gates = gatesOf(steps, run);
   const ends = endingSteps(steps, run)
     .filter((s) => approvedFirst(s, run))
@@ -219,7 +224,7 @@ const fromLines = ({ run, card, queueLeft }: Started): string[] =>
  */
 function startedLines(started: Started): string[] {
   const { run } = started;
-  const steps = stepsOf(run);
+  const steps = startedSteps(run);
   return [
     `${run.id}  ${steps.length} step(s): ${steps.map((s) => (s.agent ? `${s.name} (${s.agent.name})` : s.name)).join(' → ')}`,
     ...fromLines(started),

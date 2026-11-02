@@ -52,7 +52,8 @@ const {
 } = await import('../src/runner.ts');
 const runWith = runOver(runEngine, gitPlaceLayer);
 const runPlaced = runGiven(gitPlaceLayer);
-const { acceptFile, askFile, asksDir, pruneFile, readAsks, readRun, roundAskFile, stepsOf } = await import('../src/record/record.store.ts');
+const { acceptFile, askFile, asksDir, pruneFile, readAsks, readRun, roundAskFile } = await import('../src/record/record.store.ts');
+const { stepsNow: stepsOf } = await import('./steps-now.ts');
 const { passRead } = await import('../src/cap/cap.verb.ts');
 const { passRevisions } = await import('../src/revisions/pin.verb.ts');
 const { StoreRoot } = await import('../src/config/root.store.ts');

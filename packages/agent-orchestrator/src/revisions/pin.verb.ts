@@ -32,7 +32,7 @@ import { DEFAULT_FACTORY, revisionsOf, type Factory } from '../factory/factory.t
 import { readFactory } from '../factory/factory.store.ts';
 import { runStore } from '../record/files.store.ts';
 import { within, withinEffect } from '../meter/tally.store.ts';
-import { stepsOf } from '../record/steps.store.ts';
+import { stepsOf } from '../record/steps.verb.ts';
 import { hasStarted } from '../wait/wait.ts';
 import { Conflict } from '../refusal/refusal.ts';
 import type { SkillsFound } from '../agents/agents.ts';
@@ -314,10 +314,10 @@ export const refreshedNow = Effect.fn('refreshedNow')(function* (run: Run, at: s
 
 /** The steps a filed run's next filing would take (`refreshedNow`'s): undefined where the folder does not load. */
 const refreshedSteps = (run: Run, read: PassRevisions): Effect.Effect<Workflow[] | undefined> =>
-  Effect.map(folderNow(run, read), (found) => {
-    if (!found) return undefined;
+  Effect.flatMap(folderNow(run, read), (found) => {
+    if (!found) return Effect.succeed(undefined);
     const byName = new Map(found.map((s) => [s.name, s]));
-    return stepsOf(run).map((s) => byName.get(s.name) ?? s);
+    return Effect.map(Effect.orDie(stepsOf(run)), (steps) => steps.map((s) => byName.get(s.name) ?? s));
   });
 
 /**

@@ -8,7 +8,7 @@ import { tried } from '../runtime-client.ts';
 import { tryOf, type Approval, type Run } from '../record/record.ts';
 import { approvedFirst } from '../status/status.ts';
 import { approvalRefusal } from './gate.ts';
-import { stepsOf } from '../record/record.store.ts';
+import { stepsOf } from '../record/steps.verb.ts';
 import { runStore } from '../record/files.store.ts';
 import { standingsOf } from '../branches/branches.store.ts';
 import { standingLive } from '../standing/standing.verb.ts';
@@ -44,10 +44,10 @@ export const approveRun = Effect.fn('approve')(function* (id: string, stepName: 
       }),
     );
   const run = yield* (yield* RunDoor).runs.read(RunId.read(id));
-  const steps = yield* tried(() => stepsOf(run));
+  const steps = yield* stepsOf(run);
   const { views, phaseOf } = yield* taskPhasesRead(run);
   const asks = steps.some((s) => s.name === stepName && approvedFirst(s, run));
-  const standings = asks ? standingsOf(run, yield* standingLive([run])) : [];
+  const standings = asks ? standingsOf(run, steps, yield* standingLive([run])) : [];
   const refusal = (now: Run) =>
     approvalRefusal(
       steps,

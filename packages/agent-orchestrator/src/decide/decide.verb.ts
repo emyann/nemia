@@ -21,7 +21,7 @@ import { acceptedLines, gateLines } from '../brief/index.ts';
 import { parseCloseout, type Closeout } from '../closeout/index.ts';
 import { answerLines, answerOf, overBudgetLine, retriesDue, retryOffers, type Retry, type RetryAsk } from '../retry/index.ts';
 import { timeline, type Timeline } from '../timeline/index.ts';
-import { stepsOf } from '../record/record.store.ts';
+import { stepsOf } from '../record/steps.verb.ts';
 import { landedOf, standingsOf, type BranchReader } from '../branches/branches.store.ts';
 import { headsOver, NOTHING_READ, standingReader, standingWhen, type StandingAsker } from '../standing/standing.verb.ts';
 import {
@@ -59,6 +59,8 @@ export type Answered = { try: number; message: string; needs?: string };
 /** What `nemia decide` answers of one run (`decideRun`). */
 export type Decided = {
   run: Run;
+  /** The run's steps, in the order they run, as the decision read them (`stepsOf`). */
+  steps: Workflow[];
   decision: Decision;
   closeouts: Record<string, Closeout | { error: string } | undefined>;
   /**
@@ -257,7 +259,7 @@ export const decideRun = Effect.fn('decide')(function* (id: string, env: NodeJS.
   const run = yield* (yield* RunDoor).runs.read(RunId.read(id));
   const runs = yield* (yield* RunDoor).runs.list();
   const live = standing ?? (yield* standingWhen(runs, id));
-  const steps = yield* tried(() => stepsOf(run));
+  const steps = yield* stepsOf(run);
   const { views, phaseOf } = yield* taskPhasesRead(run).pipe(over(e));
   const closeouts = Object.fromEntries(Object.keys(run.steps).map((name) => [name, closeoutOf(views, run, name)]));
   const checks = Object.fromEntries(
@@ -277,7 +279,7 @@ export const decideRun = Effect.fn('decide')(function* (id: string, env: NodeJS.
   const unasked = decided(standingReader(NOTHING_READ));
   const git = yield* live.when(unasked.kind !== 'running' && unasked.kind !== 'cancelled');
   const d = yield* tried(() => decided(git));
-  const standings = d.kind === 'running' || d.kind === 'cancelled' ? [] : yield* tried(() => standingsOf(run, git));
+  const standings = d.kind === 'running' || d.kind === 'cancelled' ? [] : yield* tried(() => standingsOf(run, steps, git));
   const { toDecide: decide } = assess(steps, run, phaseOf, reader, asked, verdictOf, asks, rounds, blocked, spendOf, standings);
   const ending = collisionsDue(steps, run, decide);
   const collisions = ending ? yield* collisionsAt(run, ending, standings, git, place) : undefined;
@@ -300,6 +302,7 @@ export const decideRun = Effect.fn('decide')(function* (id: string, env: NodeJS.
   const parent = yield* parentsRead(run, yield* live.when(waitedOn(run).length > 0)).pipe(over(e));
   const answer: Decided = {
     run,
+    steps,
     decision: d,
     closeouts,
     checks,

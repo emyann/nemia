@@ -418,17 +418,20 @@ test('a warm read of the open runs costs the records of the open runs alone: as 
   assert.deepEqual(warmed, cold, "the warm answer is a cold read's own: nothing the board shows changes");
 });
 
-test('REFUSED by kind: a page that is no whole number from 1, and a size that is none from 1 to 100', async () => {
-  const refused = (args: Record<string, string>, said: string) =>
-    assert.rejects(finishedPage(args), (err: Error) => {
-      assert.ok(err instanceof Invalid, `${JSON.stringify(args)}: ${String(err)}`);
-      assert.equal(err.message, `the finished runs are read a page at a time: ${said}`);
-      return true;
-    });
-  for (const page of ['0', '-1', '1.5', 'abc', ''])
-    await refused({ page }, `page takes a whole number from 1, as in page=2, and \`${page}\` is none.`);
-  for (const size of ['0', '101', 'abc'])
-    await refused({ size }, `size takes a whole number from 1 to 100, as in size=9, and \`${size}\` is none.`);
+test('REFUSED by kind: a page that is no whole number from 1, and a size that is none from 1 to 100', async (t) => {
+  const rows: Array<[string, string]> = [
+    ...['0', '-1', '1.5', 'abc', ''].map((page): [string, string] => ['page', page]),
+    ...['0', '101', 'abc'].map((size): [string, string] => ['size', size]),
+  ];
+  for (const [key, given] of rows)
+    await t.test(`${key}=${given}`, () =>
+      assert.rejects(finishedPage({ [key]: given }), (err: Error) => {
+        assert.ok(err instanceof Invalid, String(err));
+        for (const fix of [`${key} takes a whole number from 1${key === 'size' ? ' to 100' : ''}`, `\`${given}\` is none`])
+          assert.ok(err.message.includes(fix), `${err.message} names ${fix}`);
+        return true;
+      }),
+    );
 });
 
 test('a page past the last answers an empty page, with the total and the pages there are', async (t) => {

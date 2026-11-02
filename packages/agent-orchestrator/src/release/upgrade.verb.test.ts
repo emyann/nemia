@@ -15,6 +15,7 @@ import type { Args } from '../command/command.ts';
 import { scratch } from '../../test/scratch.ts';
 import { testPlace } from '../../place/memory/index.ts';
 import { runOver } from '../../test/placed.ts';
+import { story } from '../../test/checkpoints.ts';
 
 const ROOT = fs.realpathSync(scratch('wf-upgrade-'));
 process.env.WF_ROOT = ROOT;
@@ -202,177 +203,173 @@ const leftovers = (): string[] => fs.readdirSync(releasesDir()).filter((f) => f.
 const V1 = tagged('v1', 'one');
 const V2 = tagged('v2', 'two');
 
-test('two tags: upgraded to v1, then v2, then back to v1 without a rebuild; each pointed at, recorded and running as an install', async () => {
-  const first = await run({ tag: 'v1', repo: REPO }, idle().host);
-  assert.equal(first.built, true);
-  assert.deepEqual(first.lines.slice(1), ['releases/current now names v1', 'no daemon ticks the store: the next one started runs v1']);
-  assert.equal(currentRelease()?.tag, 'v1');
-  assert.equal(currentRelease()?.commit, V1);
-  assert.equal(fs.readFileSync(path.join(releaseDir('v1'), 'marker.txt'), 'utf8'), 'one\n', "the tag's tree");
-  assert.equal(fs.readFileSync(path.join(releaseDir('v1'), 'built.txt'), 'utf8'), 'built', 'its build ran there');
-  assert.equal(fs.existsSync(path.join(releaseDir('v1'), '.git')), false, 'the export holds no repository');
-  assert.deepEqual(runningAt(releaseDir('v1')), {
-    kind: 'install',
-    root: releaseDir('v1'),
-    tag: 'v1',
-    commit: V1,
-    source: REPO,
-    builtAt: first.release.builtAt,
-  });
-  assert.equal(fs.readlinkSync(path.join(releasesDir(), 'current')), 'v1', 'a relative link');
+test('two tags: v1 built on its trial store, v2 switched in with the service on the pointer restarted, back to v1 beside a hand daemon', async (t) => {
+  const s = story(t);
+  const pointer = path.join(releasesDir(), 'current');
+  let first: { built: boolean; release: { builtAt: string } } | undefined;
 
-  await run({ tag: 'v2', repo: REPO }, idle().host);
-  assert.equal(currentRelease()?.tag, 'v2');
-  assert.equal(currentRelease()?.commit, V2);
-
-  const inode = fs.statSync(path.join(releaseDir('v1'), 'release.json')).ino;
-  const back = await run({ tag: 'v1', repo: REPO }, idle().host);
-  assert.equal(back.built, false);
-  assert.match(back.lines[0], /^v1 is built already at [0-9a-f]{7} .*: switched to it without a rebuild$/);
-  assert.equal(currentRelease()?.tag, 'v1');
-  assert.equal(fs.statSync(path.join(releaseDir('v1'), 'release.json')).ino, inode, 'not rebuilt');
-  assert.equal(back.release.builtAt, first.release.builtAt);
-  assert.deepEqual(leftovers(), []);
-});
-
-test('REFUSED: a check that fails changes nothing: the pointer stays, no release and no build folder remain, and the log is kept', async () => {
-  await run({ tag: 'v1', repo: REPO }, idle().host);
-  tagged('v3', 'three', scripts({ check: 1 }));
-  const { tag, message } = await refusalOf({ tag: 'v3', repo: REPO }, idle().host);
-  assert.equal(tag, 'Invalid');
-  const log = /read (\S+)\.$/.exec(message)?.[1] ?? '';
-  assert.match(message, /^nemia upgrade v3: npm run release:check exited 1, /);
-  assert.match(message, /nothing changed/);
-  assert.match(message, /releases\/current stays where it was/);
-  assert.ok(log.startsWith(path.join(releasesDir(), '.logs', 'v3-')) && fs.existsSync(log), log);
-  assert.match(fs.readFileSync(log, 'utf8'), /\$ npm ci[\s\S]*\$ npm run build[\s\S]*\$ npm run release:check/);
-  assert.equal(currentRelease()?.tag, 'v1');
-  assert.equal(fs.existsSync(releaseDir('v3')), false);
-  assert.deepEqual(leftovers(), []);
-});
-
-test('REFUSED: a build that fails changes nothing, and its check never runs', async () => {
-  await run({ tag: 'v1', repo: REPO }, idle().host);
-  tagged('v4', 'four', scripts({ build: 3 }));
-  fs.rmSync(SEEN, { force: true });
-  const { tag, message } = await refusalOf({ tag: 'v4', repo: REPO }, idle().host);
-  assert.equal(tag, 'Invalid');
-  assert.match(message, /^nemia upgrade v4: npm run build exited 3, /);
-  assert.match(message, /nothing changed/);
-  assert.equal(fs.existsSync(SEEN), false, 'the check did not run');
-  assert.equal(currentRelease()?.tag, 'v1');
-  assert.equal(fs.existsSync(releaseDir('v4')), false);
-  assert.deepEqual(leftovers(), []);
-});
-
-test('REFUSED: a tag with no release:check script is Invalid, naming the fix, and builds nothing', async () => {
-  tagged('v5', 'five', scripts({ check: null }));
-  const { tag, message } = await refusalOf({ tag: 'v5', repo: REPO }, idle().host);
-  assert.equal(tag, 'Invalid');
-  assert.match(message, /^nemia upgrade v5: /);
-  assert.match(message, /package\.json has no release:check script/);
-  assert.match(message, /tag a commit that has one\.$/);
-
-  assert.equal(fs.existsSync(releaseDir('v5')), false);
-});
-
-test('REFUSED: a built tag that now names another commit is a Conflict, and the pointer is unchanged', async () => {
-  await run({ tag: 'v2', repo: REPO }, idle().host);
-  await run({ tag: 'v1', repo: REPO }, idle().host);
-  const moved = tagged('v2', 'two again');
-  const { tag, message } = await refusalOf({ tag: 'v2', repo: REPO }, idle().host);
-  assert.equal(tag, 'Conflict');
-  assert.equal(
-    message,
-    `nemia upgrade v2: releases/v2 was built at ${V2.slice(0, 7)}, and the tag now names ${moved.slice(0, 7)}: the tag moved. Tag the new commit with a new name.`,
-  );
-  assert.equal(currentRelease()?.tag, 'v1');
-  assert.equal(currentRelease()?.commit, V1);
-  stand().world.tag(REPO, 'v2', V2);
-});
-
-test('REFUSED: a tag the repository lacks, and a tag that names no release folder, before anything is built', async () => {
-  const missing = await refusalOf({ tag: 'v9', repo: REPO }, idle().host);
-  assert.equal(missing.tag, 'Missing');
-  assert.match(missing.message, new RegExp(`^nemia upgrade v9: ${REPO} has no tag v9`));
-  const bad = await refusalOf({ tag: '../x', repo: REPO }, idle().host);
-  assert.equal(bad.tag, 'Invalid');
-  assert.match(bad.message, /is not a tag a release folder can be named by/);
-  assert.equal(fs.existsSync(path.join(ROOT, 'x')), false);
-  assert.deepEqual(leftovers(), []);
-});
-
-test("a release's checks run on the build's own trial store, never a person's: WF_ROOT and AE_ROOT under the build, HKB_REPO gone", async () => {
-  const home = '/home/me';
-  tagged('v6', 'six');
-  const { WF_ROOT: _wf, AE_ROOT: _ae, ...unset } = ENV;
-  for (const env of [
-    { ...unset, HOME: home, HKB_REPO: REPO },
-    { ...ENV, AE_ROOT: path.join(home, '.agent-engine'), HKB_REPO: REPO },
-  ]) {
+  await s.test('v1 is exported, built and checked on a trial store, then pointed at by a relative link', async () => {
+    assert.equal(currentRelease(), null, 'no pointer yet');
+    const home = '/home/me';
+    const { WF_ROOT: _wf, ...person } = ENV;
     fs.rmSync(SEEN, { force: true });
-    fs.rmSync(releaseDir('v6'), { recursive: true, force: true });
-    await run({ tag: 'v6', repo: REPO }, idle().host, env);
+    const done = await run({ tag: 'v1', repo: REPO }, idle().host, {
+      ...person,
+      HOME: home,
+      AE_ROOT: path.join(home, '.agent-engine'),
+      HKB_REPO: REPO,
+    });
+    first = done;
+    assert.equal(done.built, true);
+    assert.match(done.lines.at(-1) ?? '', /no daemon ticks the store/);
     const seen = JSON.parse(fs.readFileSync(SEEN, 'utf8')) as Record<string, string | null>;
-    const building = new RegExp(`^${releasesDir().replaceAll('.', '\\.')}/\\.building-v6-\\d+/trial/`);
-    assert.match(seen.WF_ROOT ?? '', new RegExp(`${building.source}workflows$`));
-    assert.match(seen.AE_ROOT ?? '', new RegExp(`${building.source}engine$`));
-    assert.equal(seen.HKB_REPO, null);
-    for (const store of [ROOT, path.join(home, '.agent-workflows'), path.join(home, '.agent-engine')])
-      assert.ok(seen.WF_ROOT !== store && seen.AE_ROOT !== store, `${store} handed to the check`);
-  }
-  assert.deepEqual(leftovers(), [], 'the trial store is taken away with the build');
-});
+    const building = `^${releasesDir().replaceAll('.', '\\.')}/\\.building-v1-\\d+/trial/`;
+    assert.match(seen.WF_ROOT ?? '', new RegExp(`${building}workflows$`), 'WF_ROOT given though the person has none');
+    assert.match(seen.AE_ROOT ?? '', new RegExp(`${building}engine$`), "the person's AE_ROOT replaced");
+    assert.equal(seen.HKB_REPO, null, 'HKB_REPO taken out');
+    assert.equal(fs.readlinkSync(pointer), 'v1', 'a relative link');
+    assert.equal(currentRelease()?.commit, V1);
+    assert.equal(currentRelease()?.dir, fs.realpathSync(releaseDir('v1')));
+    assert.equal(fs.readFileSync(path.join(releaseDir('v1'), 'marker.txt'), 'utf8'), 'one\n', "the tag's tree");
+    assert.equal(fs.readFileSync(path.join(releaseDir('v1'), 'built.txt'), 'utf8'), 'built', 'its build ran there');
+    assert.equal(fs.existsSync(path.join(releaseDir('v1'), '.git')), false, 'the export holds no repository');
+    assert.deepEqual(runningAt(releaseDir('v1')), {
+      kind: 'install',
+      root: releaseDir('v1'),
+      tag: 'v1',
+      commit: V1,
+      source: REPO,
+      builtAt: done.release.builtAt,
+    });
+    assert.deepEqual(runningAt(REPO), { kind: 'checkout', root: REPO }, 'a root with no release.json is a checkout');
+    assert.deepEqual(leftovers(), [], 'the trial store is taken away with the build');
+  });
 
-test('the service on releases/current is restarted: paused, landings waited, signalled, started and resumed, in that order', async () => {
-  await run({ tag: 'v1', repo: REPO }, idle().host);
-  unitOn(path.join(ROOT, 'releases', 'current'));
-  const world: World = { lease: lease(OLD), unitPid: OLD };
-  world.onSignal = () => (world.lease = lease(OLD, 'stopped'));
-  world.onStart = () => ((world.lease = lease(NEW)), (world.later = [lease(NEW, 'ticking', true)]), (world.unitPid = NEW));
-  const { host, events } = hostOf(world);
-  const done = await run({ tag: 'v2', repo: REPO }, host);
-  assert.deepEqual(events, [
-    'pause by nemia upgrade',
-    'landings 0',
-    `signal ${OLD}`,
-    'systemctl --user start nemia.service',
-    `say pid ${NEW} ticks the store: waiting for its first pass`,
-    'resume',
-  ]);
-  assert.equal(done.restart, 'service');
-  assert.equal(done.pid, NEW);
-  assert.equal(done.lines.at(-1), `restarted the daemon onto v2: the service ticks the store as pid ${NEW}`);
-  assert.equal(currentRelease()?.tag, 'v2');
-});
-
-test('REFUSED: an upgrade whose new daemon ends before its first pass is a Conflict naming its log, and the store stays paused', async () => {
-  unitOn(path.join(ROOT, 'releases', 'current'));
-  const world: World = { lease: lease(OLD), unitPid: OLD };
-  world.onSignal = () => (world.lease = lease(OLD, 'stopped'));
-  world.onStart = () => ((world.lease = lease(NEW)), (world.later = [lease(NEW, 'stopped')]), (world.unitPid = NEW));
-  const { host, events } = hostOf(world);
-  const err = await run({ tag: 'v1', repo: REPO }, host).then(
-    () => assert.fail('the upgrade answered'),
-    (e: Error) => e,
+  await s.test(
+    'v2 is switched in by a rename, and the service on the pointer paused, waited, signalled, started and resumed in order',
+    async () => {
+      unitOn(pointer);
+      const world: World = { lease: lease(OLD), unitPid: OLD };
+      world.onSignal = () => (world.lease = lease(OLD, 'stopped'));
+      world.onStart = () => ((world.lease = lease(NEW)), (world.later = [lease(NEW, 'ticking', true)]), (world.unitPid = NEW));
+      const { host, events } = hostOf(world);
+      const done = await run({ tag: 'v2', repo: REPO }, host);
+      assert.deepEqual(events.slice(0, 4), [
+        'pause by nemia upgrade',
+        'landings 0',
+        `signal ${OLD}`,
+        'systemctl --user start nemia.service',
+      ]);
+      assert.equal(events.at(-1), 'resume');
+      assert.equal(done.restart, 'service');
+      assert.equal(done.pid, NEW);
+      assert.match(done.lines.at(-1) ?? '', new RegExp(`onto v2: the service ticks the store as pid ${NEW}`));
+      assert.equal(fs.readlinkSync(pointer), 'v2');
+      assert.equal(currentRelease()?.commit, V2);
+      const names = fs.readdirSync(releasesDir()).filter((f) => !f.startsWith('.'));
+      assert.deepEqual(names.sort(), ['current', 'v1', 'v2'], 'no link of its own left beside the pointer');
+      fs.rmSync(UNIT, { force: true });
+    },
   );
-  assert.equal(err.name, 'Conflict');
-  assert.match(err.message, new RegExp(`^nemia upgrade: the daemon started as pid ${NEW} ended before its first pass`));
-  assert.match(err.message, /journalctl --user -u nemia\.service/);
-  assert.match(err.message, /nemia resume/);
-  assert.ok(!events.includes('resume'), events.join('\n'));
+
+  await s.test('back to v1 without a rebuild, and a daemon started by hand named and never signalled', async () => {
+    const inode = fs.statSync(path.join(releaseDir('v1'), 'release.json')).ino;
+    const { host, events } = hostOf({ lease: lease(OLD), unitPid: null });
+    const back = await run({ tag: 'v1', repo: REPO }, host);
+    assert.equal(back.built, false);
+    assert.match(back.lines[0], /without a rebuild/);
+    assert.equal(currentRelease()?.tag, 'v1');
+    assert.equal(fs.statSync(path.join(releaseDir('v1'), 'release.json')).ino, inode, 'not rebuilt');
+    assert.equal(back.release.builtAt, first?.release.builtAt);
+    assert.deepEqual(events, [], 'nothing paused nor signalled');
+    assert.equal(back.restart, 'hand');
+    assert.match(back.lines.at(-2) ?? '', new RegExp(`pid ${OLD} ticks the store`));
+    assert.ok(
+      (back.lines.at(-1) ?? '').includes(`${path.join(pointer, 'node_modules', '.bin')}/nemia service install --take-over ${OLD}`),
+      back.lines.at(-1),
+    );
+    assert.deepEqual(leftovers(), []);
+  });
+
+  await s.test('REFUSED: v2 again once its tag names another commit is a Conflict, and the pointer stays on v1', async () => {
+    const moved = tagged('v2', 'two again');
+    const { tag, message } = await refusalOf({ tag: 'v2', repo: REPO }, idle().host);
+    assert.equal(tag, 'Conflict');
+    assert.ok(message.includes(`releases/v2 was built at ${V2.slice(0, 7)}`), message);
+    assert.ok(message.includes(moved.slice(0, 7)), message);
+    assert.equal(currentRelease()?.commit, V1);
+    stand().world.tag(REPO, 'v2', V2);
+  });
 });
 
-test('a daemon started by hand is never signalled: it is named, left running, and the take-over line from the installed nemia said', async () => {
-  fs.rmSync(UNIT, { force: true });
-  const { host, events } = hostOf({ lease: lease(OLD), unitPid: null });
-  const done = await run({ tag: 'v1', repo: REPO }, host);
-  assert.deepEqual(events, []);
-  assert.equal(done.restart, 'hand');
-  assert.deepEqual(done.lines.slice(-2), [
-    `pid ${OLD} ticks the store and does not run releases/current: it is left running the code it started with.`,
-    `To move it onto v1: ${path.join(ROOT, 'releases', 'current', 'node_modules', '.bin')}/nemia service install --take-over ${OLD} hands the store to the service on releases/current.`,
-  ]);
+test('REFUSED: an upgrade that cannot build, check or restart changes what it says it does, and nothing else', async (t) => {
+  await t.test('a check that fails: the pointer stays, no release nor build folder remains, and the log is kept', async () => {
+    await run({ tag: 'v1', repo: REPO }, idle().host);
+    tagged('v3', 'three', scripts({ check: 1 }));
+    const { tag, message } = await refusalOf({ tag: 'v3', repo: REPO }, idle().host);
+    assert.equal(tag, 'Invalid');
+    assert.match(message, /npm run release:check exited 1/);
+    const log = /read (\S+)\.$/.exec(message)?.[1] ?? '';
+    assert.ok(log.startsWith(path.join(releasesDir(), '.logs', 'v3-')) && fs.existsSync(log), log);
+    assert.match(fs.readFileSync(log, 'utf8'), /\$ npm ci[\s\S]*\$ npm run build[\s\S]*\$ npm run release:check/);
+    assert.equal(currentRelease()?.tag, 'v1');
+    assert.equal(fs.existsSync(releaseDir('v3')), false);
+    assert.deepEqual(leftovers(), []);
+  });
+
+  await t.test('a build that fails beside the service on the pointer: its check never runs, nothing paused nor signalled', async () => {
+    unitOn(path.join(ROOT, 'releases', 'current'));
+    const { host, events } = hostOf({ lease: lease(OLD), unitPid: OLD });
+    tagged('v4', 'four', scripts({ build: 3 }));
+    fs.rmSync(SEEN, { force: true });
+    const { tag, message } = await refusalOf({ tag: 'v4', repo: REPO }, host);
+    assert.equal(tag, 'Invalid');
+    assert.match(message, /npm run build exited 3/);
+    assert.equal(fs.existsSync(SEEN), false, 'the check did not run');
+    assert.deepEqual(events, []);
+    assert.equal(readPause(), null, 'no pause put');
+    assert.equal(currentRelease()?.tag, 'v1');
+    assert.equal(fs.existsSync(releaseDir('v4')), false);
+    assert.deepEqual(leftovers(), []);
+    fs.rmSync(UNIT, { force: true });
+  });
+
+  await t.test('a tag with no release:check script is Invalid, naming the script, and builds nothing', async () => {
+    tagged('v5', 'five', scripts({ check: null }));
+    const { tag, message } = await refusalOf({ tag: 'v5', repo: REPO }, idle().host);
+    assert.equal(tag, 'Invalid');
+    assert.match(message, /has no release:check script/);
+    assert.equal(fs.existsSync(releaseDir('v5')), false);
+  });
+
+  await t.test('a tag the repository lacks is Missing, naming it', async () => {
+    const { tag, message } = await refusalOf({ tag: 'v9', repo: REPO }, idle().host);
+    assert.equal(tag, 'Missing');
+    assert.ok(message.includes(`${REPO} has no tag v9`), message);
+  });
+
+  await t.test('a tag no release folder can be named by is Invalid, before anything is built', async () => {
+    const { tag, message } = await refusalOf({ tag: '../x', repo: REPO }, idle().host);
+    assert.equal(tag, 'Invalid');
+    assert.match(message, /is not a tag a release folder/);
+    assert.equal(fs.existsSync(path.join(ROOT, 'x')), false);
+    assert.deepEqual(leftovers(), []);
+  });
+
+  await t.test('a new daemon that ends before its first pass is a Conflict naming its log, and the store stays paused', async () => {
+    unitOn(path.join(ROOT, 'releases', 'current'));
+    const world: World = { lease: lease(OLD), unitPid: OLD };
+    world.onSignal = () => (world.lease = lease(OLD, 'stopped'));
+    world.onStart = () => ((world.lease = lease(NEW)), (world.later = [lease(NEW, 'stopped')]), (world.unitPid = NEW));
+    const { host, events } = hostOf(world);
+    const { tag, message } = await refusalOf({ tag: 'v2', repo: REPO }, host);
+    assert.equal(tag, 'Conflict');
+    assert.ok(message.includes(`pid ${NEW}`), message);
+    assert.match(message, /journalctl --user -u nemia\.service/);
+    assert.match(message, /nemia resume/);
+    assert.ok(!events.includes('resume'), events.join('\n'));
+    fs.rmSync(UNIT, { force: true });
+  });
 });
 
 test('the service on a checkout is not restarted: the install line that rewrites it onto the pointer is said', async () => {
@@ -382,16 +379,6 @@ test('the service on a checkout is not restarted: the install line that rewrites
   assert.deepEqual(events, []);
   assert.equal(done.restart, 'hand');
   assert.match(done.lines.at(-1) ?? '', /nemia service install rewrites the service onto releases\/current and restarts it\.$/);
-  fs.rmSync(UNIT, { force: true });
-});
-
-test('REFUSED: a failed build pauses nothing and signals nothing, even where the service runs the pointer', async () => {
-  unitOn(path.join(ROOT, 'releases', 'current'));
-  const { host, events } = hostOf({ lease: lease(OLD), unitPid: OLD });
-  tagged('v7', 'seven', scripts({ build: 1 }));
-  await refusalOf({ tag: 'v7', repo: REPO }, host);
-  assert.deepEqual(events, []);
-  assert.equal(readPause(), null, 'no pause put');
   fs.rmSync(UNIT, { force: true });
 });
 

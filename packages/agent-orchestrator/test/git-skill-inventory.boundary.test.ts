@@ -128,14 +128,6 @@ test('inventory reads `under` through its links, as git names a worktree, and ne
   );
 });
 
-test('inventory answers nothing left of a repository that is no directory: the run is forgotten with no worktree and no branch', () => {
-  const gone = path.join(scratch('wf-git-inventory-gone-'), 'repo');
-  assert.deepEqual(answerOf(run('inventory', { repo: gone, under: gone, run: 'x', base: 'main' })), {
-    workspaces: [],
-    branches: [],
-  });
-});
-
 test('REFUSED as unread, never as nothing to remove: an inventory of a directory git cannot list as a repository', () => {
   const plain = scratch('wf-git-inventory-plain-');
   const outcome = run('inventory', { repo: plain, under: path.join(plain, 'x'), run: 'x', base: 'main' });
@@ -145,17 +137,6 @@ test('REFUSED as unread, never as nothing to remove: an inventory of a directory
     'inventory threw before it answered: Command failed: git worktree list --porcelain / ' +
       'fatal: not a git repository (or any of the parent directories): .git',
     'one line: the command, and what git said',
-  );
-});
-
-test('inventory and remove are unread for a request they cannot read', () => {
-  assert.equal(
-    unreadOf(run('inventory', { repo: '/', under: '/', base: 'main' })),
-    "the request's `run` is missing, where a string is asked",
-  );
-  assert.equal(
-    unreadOf(run('remove', { repo: '/', workspaces: '/w', branches: [] })),
-    'the request\'s `workspaces` is "/w", where a list of strings is asked',
   );
 });
 

@@ -1,25 +1,14 @@
 /**
- * `nemia rm` and `nemia prune` as entries of the table: the runs a command line names, read in order and each once; their arguments refused
- * before any run is read, in the words `nemia` has always said them; and what the api throws in place of an answer that removed nothing.
+ * `nemia rm` and `nemia prune` as entries of the table: the runs a command line names, read in order and each once, and what the api
+ * throws in place of an answer that removed nothing. Their arguments refused before any run is read are rows of `REFUSALS`
+ * (`command.test.ts`).
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { forgetLine, type Forgot } from '../forget/forget.ts';
 import type { Pruning } from '../prune/prune.ts';
-import { commandLine, parseArgv, type CommandSpec } from './command.ts';
+import { commandLine, parseArgv } from './command.ts';
 import { PRUNE, RM } from './runs.verb.ts';
-
-/** What `command` refuses of `argv` before anything is read, its parser's words or its check's; null where it takes it. */
-function refusedBy(command: CommandSpec, argv: readonly string[]): string | null {
-  try {
-    const args = parseArgv(command.spec, argv);
-    assert.ok(args, `nemia ${command.name} ${argv.join(' ')} is given too little`);
-    return command.check?.(args) ?? null;
-  } catch (err) {
-    assert.equal((err as { exitCode?: number }).exitCode, 2);
-    return (err as Error).message;
-  }
-}
 
 test('the runs a command line names are read in the order given, each once, beside the switches in any place', () => {
   assert.deepEqual(parseArgv(RM.spec, ['a', 'b', 'a', '--delete-branches']), { runId: ['a', 'b'], deleteBranches: true });
@@ -38,41 +27,6 @@ test('the runs a command line names are read in the order given, each once, besi
   assert.deepEqual(parseArgv(PRUNE.spec, []), {}, 'bare nemia prune names no run: every run');
   assert.equal(commandLine(RM, { runId: ['a', 'b'] }), 'nemia rm a b');
   assert.equal(commandLine(RM, {}), 'nemia rm [<runId> ...]');
-});
-
-/** `nemia rm`'s form, as its refusals end on it. */
-const RM_FORM = 'nemia rm <runId> [<runId> ...] [--delete-branches [--force-unmerged]]';
-
-test("REFUSED at shipped defaults: nemia rm's arguments, before any run is read, in today's words whole", () => {
-  const unknown = (arg: string) =>
-    `nemia rm does not take ${arg}. It takes the runs to forget, then --delete-branches, and --force-unmerged beside it: ${RM_FORM}.`;
-  for (const [argv, arg] of [
-    [['a', '--bad'], '--bad'],
-    [['-x'], '-x'],
-    [['a', '-x', 'b'], '-x'],
-    [['a', '--delete-branches=yes'], '--delete-branches=yes'],
-  ] as const)
-    assert.equal(refusedBy(RM, argv), unknown(arg), argv.join(' '));
-  const force =
-    "--force-unmerged forces --delete-branches to delete a branch not merged into its run's base branch, and alone deletes nothing: nemia rm <runId> --delete-branches --force-unmerged.";
-  for (const argv of [['a', '--force-unmerged'], ['--force-unmerged']]) assert.equal(refusedBy(RM, argv), force, argv.join(' '));
-  const noRun = refusedBy(RM, ['--delete-branches']);
-  assert.ok(noRun?.includes('nemia rm <runId> [<runId> ...]'), noRun ?? 'not refused');
-  assert.ok(noRun?.includes('nemia ls'), noRun ?? 'not refused');
-  assert.equal(refusedBy(RM, []), null);
-  assert.equal(refusedBy(RM, ['a', '--delete-branches', '--force-unmerged']), null);
-});
-
-test("REFUSED at shipped defaults: nemia prune's arguments, before any run is read, in today's words whole", () => {
-  const unknown = (arg: string) =>
-    `nemia prune does not take ${arg}. It takes the runs to prune — none is every run — then --unmerged, --artifacts and --yes: nemia prune [<runId> ...] [--unmerged] [--artifacts] [--yes].`;
-  for (const [argv, arg] of [
-    [['--artifact'], '--artifact'],
-    [['a', '-x'], '-x'],
-    [['--yes=1'], '--yes=1'],
-  ] as const)
-    assert.equal(refusedBy(PRUNE, argv), unknown(arg), argv.join(' '));
-  assert.equal(refusedBy(PRUNE, ['a', '--unmerged', '--artifacts', '--yes']), null);
 });
 
 /** What `forget` answers of one run, with nothing done but what `more` says. */

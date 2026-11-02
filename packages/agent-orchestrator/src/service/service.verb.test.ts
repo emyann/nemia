@@ -17,6 +17,7 @@ import { testEngine, until, WAITED, type Waiter } from 'agent-runtime/testing';
 import { testPlace } from '../../place/memory/index.ts';
 import { eachTest, runOver } from '../../test/placed.ts';
 import { steeredClock, type Steered } from '../../test/steered.ts';
+import { story } from '../../test/checkpoints.ts';
 
 const ROOT = scratch('wf-service-');
 process.env.WF_ROOT = ROOT;
@@ -195,101 +196,316 @@ const stepped = async (t: Waiter, clock: Steered, fiber: { pollUnsafe: () => unk
   }
 };
 
+/** Set while a story is told: its checkpoints share the unit and the pause it builds, which every other test and row starts without. */
+let telling = false;
+
 beforeEach(() => {
+  if (telling) return;
   fs.rmSync(path.join(HOME, '.config'), { recursive: true, force: true });
   fs.rmSync(pauseFile(), { force: true });
 });
 
-test('install on a store nothing ticks writes the unit, enables it at login and starts it', async () => {
-  const { host, events } = hostOf({ lease: { kind: 'none' }, unitPid: null, landings: [] });
-  const done = await install({ env: ['PORT=8790'] }, host);
-  assert.equal(done.did, 'started');
-  assert.deepEqual(events, [
-    'systemctl --user daemon-reload',
-    'systemctl --user enable nemia.service',
-    'systemctl --user start nemia.service',
-  ]);
-  const text = fs.readFileSync(UNIT, 'utf8');
-  assert.match(text, /^ExecStart="\/usr\/bin\/node" "\/srv\/nemia\/apps\/api\/src\/main\.ts"$/m);
-  assert.match(text, /^WorkingDirectory=\/srv\/nemia\/apps\/api$/m);
-  assert.deepEqual(
-    text.split('\n').filter((l) => l.startsWith('Environment=')),
-    [`Environment="WF_ROOT=${ROOT}"`, 'Environment="PATH=/usr/bin:/bin"', 'Environment="PORT=8790"'],
-  );
-  assert.equal(fs.readdirSync(path.dirname(UNIT)).length, 1, 'the hidden file the unit was written through is renamed away');
-});
+/** A unit written for the service, as install leaves it, so a restart finds it installed. */
+const installed = async (): Promise<void> => {
+  await install({}, hostOf({ lease: { kind: 'none' }, unitPid: null, landings: [] }).host);
+};
 
-test('REFUSED on WSL without systemd: Invalid, naming /etc/wsl.conf, [boot], systemd=true and wsl --shutdown, and nothing written', async () => {
-  const { host, events } = hostOf({
-    lease: { kind: 'none' },
-    unitPid: null,
-    landings: [],
-    machine: { platform: 'linux', wsl: true, systemd: false },
+const restart = (args: Args, host: ServiceHost) => runWith(engineOf(engine().layer), restartService(args, host));
+
+const status = (host: ServiceHost) => runWith(engineOf(engine().layer), serviceStatus({}, host));
+
+test('a hand daemon handed to the service: install, --take-over <pid>, restarts, uninstall, and install where nothing ticks', async (t) => {
+  const s = story(t);
+  telling = true;
+  t.after(() => (telling = false));
+
+  await s.test(
+    'beside a daemon started by hand, install writes and enables the unit, starts nothing, and names the --take-over line',
+    async () => {
+      const { host, events } = hostOf({ lease: lease(OLD), unitPid: null, landings: [] });
+      assert.equal((await status(host)).service.unit, null, 'no unit before the install');
+      const done = await install({}, host);
+      assert.equal(done.did, 'written');
+      assert.equal(done.holder, OLD);
+      assert.deepEqual(events, ['systemctl --user daemon-reload', 'systemctl --user enable nemia.service']);
+      assert.ok(fs.existsSync(UNIT));
+      assert.ok(
+        done.lines.some((l) => l.includes(`pid ${OLD} holds the store`)),
+        done.lines.join('\n'),
+      );
+      assert.ok(
+        done.lines.some((l) => l.includes(`nemia service install --take-over ${OLD}`)),
+        done.lines.join('\n'),
+      );
+    },
+  );
+
+  await s.test(
+    '--take-over pauses, waits out the landing check, stops the confirmed pid, starts the service, and resumes once it passed',
+    async () => {
+      const world: World = { lease: lease(OLD), unitPid: null, landings: [[LANDING], [LANDING], []] };
+      world.onSignal = () => (world.lease = lease(OLD, 'stopped'));
+      world.onStart = () => passing(world, NEW);
+      const { host, events } = hostOf(world);
+      const done = await install({ takeOver: String(OLD) }, host);
+      assert.equal(done.did, 'taken');
+      assert.deepEqual(events.slice(0, 4), [
+        'systemctl --user daemon-reload',
+        'systemctl --user enable nemia.service',
+        'pause',
+        'landings 1',
+      ]);
+      assert.match(events[4], /^say waiting for r1's ship to land/);
+      assert.deepEqual(events.slice(5, 9), ['landings 1', 'landings 0', `signal ${OLD}`, 'systemctl --user start nemia.service']);
+      assert.match(events[9], new RegExp(`^say pid ${NEW} ticks the store`));
+      assert.deepEqual(events.slice(10), [`read ${NEW} passed`, 'resume']);
+      assert.equal(readPause(), null);
+      assert.ok(
+        done.lines.some((l) => l.includes(`took the store over from pid ${OLD}`) && l.includes(`as pid ${NEW}`)),
+        done.lines.join('\n'),
+      );
+    },
+  );
+
+  await s.test("status reads the unit back: what it runs, that the service's own process holds the store, and lingering", async () => {
+    const after = await status(hostOf({ lease: lease(NEW), unitPid: NEW, landings: [] }).host);
+    assert.equal(after.service.unit?.entry, '/srv/nemia/apps/api/src/main.ts');
+    assert.equal(after.service.unit?.node, '/usr/bin/node');
+    assert.ok(
+      after.lines.some((l) => l.includes("the service's own process holds the store")),
+      after.lines.join('\n'),
+    );
+    assert.ok(after.lines.some((l) => l.startsWith('lingering: on')));
   });
-  await assert.rejects(install({}, host), refusedWith('Invalid', /\/etc\/wsl\.conf/, /\[boot\]/, /systemd=true/, /wsl --shutdown/));
-  assert.deepEqual(events, []);
-  assert.equal(fs.existsSync(path.join(HOME, '.config')), false);
-});
 
-test('REFUSED before anything is written: a store not the default with no name, or named nemia, and a bad --env', async () => {
-  const { host, events } = hostOf({ lease: { kind: 'none' }, unitPid: null, landings: [], root: '/srv/trial-store' });
-  await assert.rejects(install({}, host), refusedWith('Invalid', /is not the default one/, /--name <name>/));
-  await assert.rejects(install({ name: 'nemia' }, host), refusedWith('Invalid', /the name nemia is the default store's service/));
-  await assert.rejects(install({ name: 'nemia-trial', env: ['WF_ROOT=/x'] }, host), refusedWith('Invalid', /--env WF_ROOT is written/));
-  await assert.rejects(install({ name: 'nemia-trial', takeOver: 'abc' }, host), refusedWith('Invalid', /--take-over takes the pid/));
-  assert.deepEqual(events, []);
-  assert.equal(fs.existsSync(path.join(HOME, '.config')), false);
-});
+  await s.test("install again where the service's own process holds the store restarts it on the unit just written", async () => {
+    const { host, events } = hostOf({ lease: lease(NEW), unitPid: NEW, landings: [] });
+    assert.equal((await install({}, host)).did, 'restarted');
+    assert.equal(events.at(-1), 'systemctl --user restart nemia.service');
+  });
 
-test('install beside a daemon started by hand writes and enables the unit, starts nothing, and names the --take-over line', async () => {
-  const { host, events } = hostOf({ lease: lease(OLD), unitPid: null, landings: [] });
-  const done = await install({}, host);
-  assert.equal(done.did, 'written');
-  assert.equal(done.holder, OLD);
-  assert.deepEqual(events, ['systemctl --user daemon-reload', 'systemctl --user enable nemia.service']);
-  assert.ok(fs.existsSync(UNIT));
-  assert.ok(
-    done.lines.some((l) => l.includes(`pid ${OLD} holds the store`)),
-    done.lines.join('\n'),
+  await s.test(
+    "restart waits on a landing check at work, stops the service's daemon, starts the unit, and resumes after the first pass",
+    async () => {
+      const world: World = { lease: lease(OLD), unitPid: OLD, landings: [[LANDING], [LANDING], []] };
+      world.onSignal = () => (world.lease = lease(OLD, 'stopped'));
+      world.onStart = () => passing(world, NEW);
+      const { host, events } = hostOf(world);
+      const done = await restart({}, host);
+      assert.deepEqual(events.slice(0, 2), ['pause', 'landings 1']);
+      assert.deepEqual(events.slice(3, 7), ['landings 1', 'landings 0', `signal ${OLD}`, 'systemctl --user start nemia.service']);
+      assert.deepEqual(events.slice(8), [`read ${NEW} passed`, 'resume']);
+      assert.equal(done.did, 'restarted');
+      assert.equal(done.pid, NEW);
+      assert.equal(readPause(), null);
+      assert.match(done.lines[0], new RegExp(`pid ${OLD} stopped, and pid ${NEW} ticks the store`));
+    },
   );
-  assert.ok(
-    done.lines.some((l) => l.includes(`nemia service install --take-over ${OLD}`)),
-    done.lines.join('\n'),
+
+  await s.test('a restart where nothing ticks starts the unit and waits for its first pass, signalling and pausing nothing', async () => {
+    const world: World = { lease: lease(OLD, 'stopped'), unitPid: null, landings: [] };
+    world.onStart = () => passing(world, NEW);
+    const { host, events } = hostOf(world);
+    const done = await restart({}, host);
+    assert.equal(events[0], 'systemctl --user start nemia.service');
+    assert.deepEqual(events.slice(2), [`read ${NEW} passed`]);
+    assert.equal(done.did, 'started');
+    assert.equal(done.pid, NEW);
+  });
+
+  await s.test(
+    'a pause a person put stands through a restart, and through one where nothing ticks: neither put again nor lifted',
+    async () => {
+      putPause({ by: 'ann', why: 'reading the night' });
+      for (const ticking of [true, false]) {
+        const world: World = ticking
+          ? { lease: lease(OLD), unitPid: OLD, landings: [[]] }
+          : { lease: lease(OLD, 'stopped'), unitPid: null, landings: [] };
+        world.onSignal = () => (world.lease = lease(OLD, 'stopped'));
+        world.onStart = () => passing(world, NEW);
+        const { host, events } = hostOf(world);
+        const done = await restart({}, host);
+        assert.ok(!events.includes('pause') && !events.includes('resume'), events.join('\n'));
+        assert.equal(readPause()?.by, 'ann');
+        assert.equal(done.did, ticking ? 'restarted' : 'started');
+        assert.equal(done.paused, true);
+        assert.ok(
+          done.lines.some((l) => l.includes('the pause that stood is left as it was')),
+          done.lines.join('\n'),
+        );
+      }
+      resumePause();
+    },
   );
+
+  await s.test('uninstall stops, disables and removes the unit, then says how the lease stands; once more it is Missing', async () => {
+    const { host, events } = hostOf({ lease: lease(NEW, 'stopped'), unitPid: null, landings: [] });
+    const done = await runWith(engineOf(engine().layer), uninstallService({}, host));
+    assert.deepEqual(events, ['systemctl --user disable --now nemia.service', 'systemctl --user daemon-reload']);
+    assert.equal(fs.existsSync(UNIT), false);
+    assert.match(done.lines[1], new RegExp(`pid ${NEW} stopped`));
+    await assert.rejects(runWith(engineOf(engine().layer), uninstallService({}, host)), refusedWith('Missing', /no service nemia/));
+  });
+
+  await s.test('install on a store nothing ticks writes the unit whole, enables it at login and starts it', async () => {
+    const { host, events } = hostOf({ lease: { kind: 'none' }, unitPid: null, landings: [] });
+    const done = await install({ env: ['PORT=8790'] }, host);
+    assert.equal(done.did, 'started');
+    assert.deepEqual(events, [
+      'systemctl --user daemon-reload',
+      'systemctl --user enable nemia.service',
+      'systemctl --user start nemia.service',
+    ]);
+    const text = fs.readFileSync(UNIT, 'utf8');
+    assert.match(text, /^ExecStart="\/usr\/bin\/node" "\/srv\/nemia\/apps\/api\/src\/main\.ts"$/m);
+    assert.match(text, /^WorkingDirectory=\/srv\/nemia\/apps\/api$/m);
+    assert.deepEqual(
+      text.split('\n').filter((l) => l.startsWith('Environment=')),
+      [`Environment="WF_ROOT=${ROOT}"`, 'Environment="PATH=/usr/bin:/bin"', 'Environment="PORT=8790"'],
+    );
+    assert.equal(fs.readdirSync(path.dirname(UNIT)).length, 1, 'the hidden file the unit was written through is renamed away');
+  });
 });
 
-test('install where the service’s own process holds the store restarts it on the unit just written', async () => {
-  const { host, events } = hostOf({ lease: lease(OLD), unitPid: OLD, landings: [] });
-  assert.equal((await install({}, host)).did, 'restarted');
-  assert.equal(events.at(-1), 'systemctl --user restart nemia.service');
-});
+test('REFUSED: install, --take-over and restart, each by its kind and naming its fix, with nothing signalled or written it should not be', async (t) => {
+  const nothingWritten = (events: string[]) => {
+    assert.deepEqual(events, []);
+    assert.equal(fs.existsSync(path.join(HOME, '.config')), false);
+  };
 
-test('a take-over pauses, waits out the landing check, stops the confirmed pid, starts the service, and resumes once it has passed', async () => {
-  const world: World = { lease: lease(OLD), unitPid: null, landings: [[LANDING], [LANDING], []] };
-  world.onSignal = () => (world.lease = lease(OLD, 'stopped'));
-  world.onStart = () => passing(world, NEW);
-  const { host, events } = hostOf(world);
-  const done = await install({ takeOver: String(OLD) }, host);
-  assert.equal(done.did, 'taken');
-  assert.deepEqual(events, [
-    'systemctl --user daemon-reload',
-    'systemctl --user enable nemia.service',
-    'pause',
-    'landings 1',
-    "say waiting for r1's ship to land: its check runs, and the daemon is stopped once it has ended",
-    'landings 1',
-    'landings 0',
-    `signal ${OLD}`,
-    'systemctl --user start nemia.service',
-    `say pid ${NEW} ticks the store: waiting for its first pass`,
-    `read ${NEW} passed`,
-    'resume',
-  ]);
-  assert.equal(readPause(), null);
-  assert.ok(
-    done.lines.some((l) => l.includes(`took the store over from pid ${OLD}`) && l.includes(`as pid ${NEW}`)),
-    done.lines.join('\n'),
+  await t.test('install on WSL without systemd: Invalid, naming how to turn it on', async () => {
+    const { host, events } = hostOf({
+      lease: { kind: 'none' },
+      unitPid: null,
+      landings: [],
+      machine: { platform: 'linux', wsl: true, systemd: false },
+    });
+    await assert.rejects(install({}, host), refusedWith('Invalid', /\/etc\/wsl\.conf/, /\[boot\]/, /systemd=true/, /wsl --shutdown/));
+    nothingWritten(events);
+  });
+
+  for (const [name, args, names] of [
+    ['a store not the default with no name', {}, /--name <name>/],
+    ['a store not the default named nemia', { name: 'nemia' }, /the name nemia is the default store's/],
+    ['an --env install writes itself', { name: 'nemia-trial', env: ['WF_ROOT=/x'] }, /--env WF_ROOT is written/],
+    ['a --take-over that names no pid', { name: 'nemia-trial', takeOver: 'abc' }, /--take-over takes the pid/],
+  ] as const)
+    await t.test(`install with ${name}: Invalid, before anything is written`, async () => {
+      const { host, events } = hostOf({ lease: { kind: 'none' }, unitPid: null, landings: [], root: '/srv/trial-store' });
+      await assert.rejects(install(args, host), refusedWith('Invalid', names));
+      nothingWritten(events);
+    });
+
+  await t.test('--take-over of a pid the lease does not name: Conflict, before the unit is written', async () => {
+    const { host, events } = hostOf({ lease: lease(OLD), unitPid: null, landings: [] });
+    await assert.rejects(install({ takeOver: '999' }, host), refusedWith('Conflict', new RegExp(`held by pid ${OLD}, not 999`)));
+    nothingWritten(events);
+  });
+
+  await t.test('--take-over of a pid the lease names but cannot confirm: Conflict, before the unit is written', async () => {
+    const { host, events } = hostOf({ lease: lease(OLD, 'ticking', 'unknown'), unitPid: null, landings: [] });
+    await assert.rejects(install({ takeOver: String(OLD) }, host), refusedWith('Conflict', /could not be confirmed/));
+    nothingWritten(events);
+  });
+
+  await t.test(
+    '--take-over where the service never ticks: Conflict naming nemia service status and nemia resume, the store left paused',
+    async () => {
+      const world: World = { lease: lease(OLD), unitPid: null, landings: [[]] };
+      world.onSignal = () => (world.lease = lease(OLD, 'stopped'));
+      const { host, events } = hostOf(world);
+      await assert.rejects(
+        install({ takeOver: String(OLD) }, { ...host, waitMs: 30 }),
+        refusedWith('Conflict', /nemia service status/, /nemia resume/),
+      );
+      assert.ok(readPause() !== null);
+      assert.ok(events.includes('systemctl --user start nemia.service') && !events.includes('resume'), events.join('\n'));
+    },
   );
+
+  await t.test('--take-over where the stopped daemon still holds the store: Conflict naming ps -p, the service not started', async () => {
+    const { host, events } = hostOf({ lease: lease(OLD), unitPid: null, landings: [[]] });
+    await assert.rejects(install({ takeOver: String(OLD) }, { ...host, stopMs: 30 }), refusedWith('Conflict', new RegExp(`ps -p ${OLD}`)));
+    assert.ok(!events.includes('systemctl --user start nemia.service'), events.join('\n'));
+    assert.ok(readPause() !== null);
+  });
+
+  for (const ended of ['stopped', 'gone'] as const)
+    await t.test(
+      `--take-over whose new daemon is ${ended} before its first pass: Conflict naming its log and nemia resume, no resume`,
+      async () => {
+        const world: World = { lease: lease(OLD), unitPid: null, landings: [[]] };
+        world.onSignal = () => (world.lease = lease(OLD, 'stopped'));
+        world.onStart = () => ((world.lease = lease(NEW)), (world.later = [lease(NEW), lease(NEW, ended)]));
+        const { host, events } = hostOf(world);
+        await assert.rejects(
+          install({ takeOver: String(OLD) }, host),
+          refusedWith(
+            'Conflict',
+            new RegExp(`pid ${NEW} ended`),
+            /journalctl --user -u nemia\.service/,
+            /nemia service status/,
+            /nemia resume/,
+          ),
+        );
+        assert.ok(!events.includes('resume'), events.join('\n'));
+        assert.ok(readPause() !== null, 'the store stays paused');
+      },
+    );
+
+  await t.test(
+    "--take-over whose new daemon's place another pid takes before its first pass: Conflict, the one waited on ended",
+    async () => {
+      const world: World = { lease: lease(OLD), unitPid: null, landings: [[]] };
+      world.onSignal = () => (world.lease = lease(OLD, 'stopped'));
+      world.onStart = () => ((world.lease = lease(NEW)), (world.later = [lease(NEW), lease(NEW + 1, 'ticking', 'same', true)]));
+      const { host } = hostOf(world);
+      await assert.rejects(install({ takeOver: String(OLD) }, host), refusedWith('Conflict', new RegExp(`pid ${NEW} ended`)));
+    },
+  );
+
+  await t.test("restart whose new daemon's first pass fails: Conflict naming its log and nemia resume, the store left paused", async () => {
+    await installed();
+    const world: World = { lease: lease(OLD), unitPid: OLD, landings: [[]] };
+    world.onSignal = () => (world.lease = lease(OLD, 'stopped'));
+    world.onStart = () => ((world.lease = lease(NEW)), (world.later = [lease(NEW), lease(NEW, 'stopped')]));
+    const { host, events } = hostOf(world);
+    await assert.rejects(
+      restart({}, host),
+      refusedWith('Conflict', /journalctl --user -u nemia\.service/, /nemia service status/, /nemia resume/),
+    );
+    assert.ok(!events.includes('resume'), events.join('\n'));
+    assert.match(readPause()?.why ?? '', new RegExp(`pid ${OLD}`));
+  });
+
+  await t.test('restart beside a daemon started by hand: Conflict naming its --take-over line, nothing signalled', async () => {
+    await installed();
+    const { host, events } = hostOf({ lease: lease(OLD), unitPid: null, landings: [] });
+    await assert.rejects(restart({}, host), refusedWith('Conflict', new RegExp(`nemia service install --take-over ${OLD}`)));
+    assert.deepEqual(events, []);
+    assert.equal(readPause(), null);
+  });
+
+  await t.test('restart with no service installed: Missing, naming nemia service install', async () => {
+    const { host, events } = hostOf({ lease: lease(OLD, 'stopped'), unitPid: null, landings: [] });
+    await assert.rejects(restart({}, host), refusedWith('Missing', /no service nemia/, /nemia service install/));
+    nothingWritten(events);
+    assert.equal(readPause(), null);
+  });
+
+  await t.test('restart with no service installed beside a daemon: Missing, naming its --take-over line', async () => {
+    const { host, events } = hostOf({ lease: lease(OLD), unitPid: null, landings: [] });
+    await assert.rejects(restart({}, host), refusedWith('Missing', new RegExp(`nemia service install --take-over ${OLD}`)));
+    nothingWritten(events);
+    assert.equal(readPause(), null);
+  });
+
+  await t.test('restart while the holder is stalled: Conflict naming it, nothing signalled', async () => {
+    await installed();
+    const { host, events } = hostOf({ lease: lease(OLD, 'stalled'), unitPid: OLD, landings: [] });
+    await assert.rejects(restart({}, host), refusedWith('Conflict', new RegExp(`stalled, pid ${OLD}`)));
+    assert.deepEqual(events, []);
+  });
 });
 
 test('a take-over drains the daemon and waits for each call in flight, naming it once, before it signals', WAITED, async (t) => {
@@ -390,15 +606,6 @@ test('a take-over interrupted while it waits on a call lifts its drain and its p
   assert.deepEqual(events.slice(-2), ['drain null', 'resume']);
 });
 
-test('REFUSED to take over a pid the lease does not name, or one it cannot confirm: Conflict, before the unit is written', async () => {
-  const other = hostOf({ lease: lease(OLD), unitPid: null, landings: [] });
-  await assert.rejects(install({ takeOver: '999' }, other.host), refusedWith('Conflict', /held by pid 4242, not 999/));
-  const unsure = hostOf({ lease: lease(OLD, 'ticking', 'unknown'), unitPid: null, landings: [] });
-  await assert.rejects(install({ takeOver: String(OLD) }, unsure.host), refusedWith('Conflict', /could not be confirmed/));
-  assert.deepEqual([...other.events, ...unsure.events], []);
-  assert.equal(fs.existsSync(UNIT), false);
-});
-
 test('a pause a person put stands through a take-over: it is neither put again nor lifted', async () => {
   putPause({ by: 'ann', why: 'reading the night' });
   const world: World = { lease: lease(OLD), unitPid: null, landings: [[]] };
@@ -422,29 +629,6 @@ test('a take-over interrupted while it waits on a landing lifts its own pause an
   assert.equal(readPause(), null);
   assert.ok(!events.some((e) => e.startsWith('signal')), events.join('\n'));
   assert.equal(events.at(-1), 'resume');
-});
-
-test('REFUSED when the service never ticks: Conflict naming nemia service status, the store left paused and nemia resume said', async () => {
-  const world: World = { lease: lease(OLD), unitPid: null, landings: [[]] };
-  world.onSignal = () => (world.lease = lease(OLD, 'stopped'));
-  const { host, events } = hostOf(world);
-  await assert.rejects(
-    install({ takeOver: String(OLD) }, { ...host, waitMs: 30 }),
-    refusedWith('Conflict', /does not tick the store yet: nemia service status says why/, /the store stays paused: nemia resume/),
-  );
-  assert.ok(readPause() !== null);
-  assert.ok(events.includes('systemctl --user start nemia.service') && !events.includes('resume'), events.join('\n'));
-});
-
-test('REFUSED when the stopped daemon still holds the store: Conflict naming ps -p, and the service is not started', async () => {
-  const world: World = { lease: lease(OLD), unitPid: null, landings: [[]] };
-  const { host, events } = hostOf(world);
-  await assert.rejects(
-    install({ takeOver: String(OLD) }, { ...host, stopMs: 30 }),
-    refusedWith('Conflict', /still holds the store: check it with ps -p 4242/),
-  );
-  assert.ok(!events.includes('systemctl --user start nemia.service'), events.join('\n'));
-  assert.ok(readPause() !== null);
 });
 
 test(
@@ -480,35 +664,6 @@ test(
   },
 );
 
-test('uninstall stops, disables and removes the unit, then says how the lease stands; one not installed is Missing', async () => {
-  const { host, events } = hostOf({ lease: lease(OLD, 'stopped'), unitPid: null, landings: [] });
-  await assert.rejects(
-    runWith(engineOf(engine().layer), uninstallService({}, host)),
-    refusedWith('Missing', /no service nemia is installed/),
-  );
-  await install({}, host);
-  events.length = 0;
-  const done = await runWith(engineOf(engine().layer), uninstallService({}, host));
-  assert.deepEqual(events, ['systemctl --user disable --now nemia.service', 'systemctl --user daemon-reload']);
-  assert.equal(fs.existsSync(UNIT), false);
-  assert.match(done.lines[1], /^api: none ticking — pid 4242 stopped/);
-});
-
-test('status reads the unit back: what it runs, from which checkout, who holds the store, and lingering', async () => {
-  const { host } = hostOf({ lease: lease(OLD), unitPid: OLD, landings: [] });
-  const before = await runWith(engineOf(engine().layer), serviceStatus({}, host));
-  assert.equal(before.service.unit, null);
-  await install({}, host);
-  const after = await runWith(engineOf(engine().layer), serviceStatus({}, host));
-  assert.equal(after.service.unit?.entry, '/srv/nemia/apps/api/src/main.ts');
-  assert.equal(after.service.unit?.node, '/usr/bin/node');
-  assert.ok(
-    after.lines.some((l) => l.includes("the service's own process holds the store")),
-    after.lines.join('\n'),
-  );
-  assert.ok(after.lines.some((l) => l.startsWith('lingering: on')));
-});
-
 test('the service commands are the CLI’s alone; Nemia’s fence asks before install and uninstall and lets status run', () => {
   assert.deepEqual(
     SERVICES.map((c) => [c.name, c.only?.side, c.class]),
@@ -524,169 +679,6 @@ test('the service commands are the CLI’s alone; Nemia’s fence asks before in
   assert.ok(!fence.allow.some((r) => r.startsWith('Bash(nemia service install') || r.startsWith('Bash(nemia service uninstall')));
   assert.ok(fence.allow.includes('Bash(nemia service status)') && fence.allow.includes('Bash(nemia service status:*)'));
 });
-
-/** A unit written for the service, as install leaves it, so a restart finds it installed. */
-const installed = async (): Promise<void> => {
-  await install({}, hostOf({ lease: { kind: 'none' }, unitPid: null, landings: [] }).host);
-};
-
-const restart = (args: Args, host: ServiceHost) => runWith(engineOf(engine().layer), restartService(args, host));
-
-test('REFUSED when the new daemon ends before its first pass: Conflict naming its log, the lease and nemia resume, and no resume', async () => {
-  for (const ended of ['stopped', 'gone'] as const) {
-    fs.rmSync(pauseFile(), { force: true });
-    const world: World = { lease: lease(OLD), unitPid: null, landings: [[]] };
-    world.onSignal = () => (world.lease = lease(OLD, 'stopped'));
-    world.onStart = () => ((world.lease = lease(NEW)), (world.later = [lease(NEW), lease(NEW, ended)]));
-    const { host, events } = hostOf(world);
-    await assert.rejects(
-      install({ takeOver: String(OLD) }, host),
-      refusedWith(
-        'Conflict',
-        new RegExp(`pid ${NEW} ended before its first pass`),
-        /journalctl --user -u nemia\.service/,
-        /nemia service status/,
-        /the store stays paused: nemia resume/,
-      ),
-    );
-    assert.ok(!events.includes('resume'), events.join('\n'));
-    assert.ok(readPause() !== null, `${ended}: the store stays paused`);
-  }
-});
-
-test('REFUSED when another pid takes the new daemon’s place before its first pass: the one waited on ended', async () => {
-  const world: World = { lease: lease(OLD), unitPid: null, landings: [[]] };
-  world.onSignal = () => (world.lease = lease(OLD, 'stopped'));
-  world.onStart = () => ((world.lease = lease(NEW)), (world.later = [lease(NEW), lease(NEW + 1, 'ticking', 'same', true)]));
-  const { host } = hostOf(world);
-  await assert.rejects(
-    install({ takeOver: String(OLD) }, host),
-    refusedWith('Conflict', new RegExp(`pid ${NEW} ended before its first pass`)),
-  );
-});
-
-test('restart waits on a landing check at work, stops the service’s daemon, starts the unit, and resumes only after the first pass', async () => {
-  await installed();
-  const world: World = { lease: lease(OLD), unitPid: OLD, landings: [[LANDING], [LANDING], []] };
-  world.onSignal = () => (world.lease = lease(OLD, 'stopped'));
-  world.onStart = () => passing(world, NEW);
-  const { host, events } = hostOf(world);
-  const done = await restart({}, host);
-  assert.deepEqual(events, [
-    'pause',
-    'landings 1',
-    "say waiting for r1's ship to land: its check runs, and the daemon is stopped once it has ended",
-    'landings 1',
-    'landings 0',
-    `signal ${OLD}`,
-    'systemctl --user start nemia.service',
-    `say pid ${NEW} ticks the store: waiting for its first pass`,
-    `read ${NEW} passed`,
-    'resume',
-  ]);
-  assert.equal(done.did, 'restarted');
-  assert.equal(done.pid, NEW);
-  assert.equal(readPause(), null);
-  assert.match(done.lines[0], new RegExp(`restarted nemia\\.service: pid ${OLD} stopped, and pid ${NEW} ticks the store`));
-});
-
-test('REFUSED: a restart whose new daemon’s first pass fails keeps the store paused and names the log, with no resume', async () => {
-  await installed();
-  const world: World = { lease: lease(OLD), unitPid: OLD, landings: [[]] };
-  world.onSignal = () => (world.lease = lease(OLD, 'stopped'));
-  world.onStart = () => ((world.lease = lease(NEW)), (world.later = [lease(NEW), lease(NEW, 'stopped')]));
-  const { host, events } = hostOf(world);
-  await assert.rejects(
-    restart({}, host),
-    refusedWith('Conflict', /^nemia service restart: /, /journalctl --user -u nemia\.service/, /nemia service status/, /nemia resume/),
-  );
-  assert.ok(!events.includes('resume'), events.join('\n'));
-  assert.match(readPause()?.why ?? '', /restarting the daemon at pid 4242/);
-});
-
-test('REFUSED: a restart beside a daemon started by hand names nemia service install --take-over <pid> and signals nothing', async () => {
-  await installed();
-  const { host, events } = hostOf({ lease: lease(OLD), unitPid: null, landings: [] });
-  await assert.rejects(restart({}, host), refusedWith('Conflict', new RegExp(`nemia service install --take-over ${OLD}`)));
-  assert.deepEqual(events, []);
-  assert.equal(readPause(), null);
-});
-
-test('REFUSED: a restart with no service installed is Missing, naming nemia service install, or its --take-over line beside a daemon', async () => {
-  const none = hostOf({ lease: lease(OLD, 'stopped'), unitPid: null, landings: [] });
-  await assert.rejects(
-    restart({}, none.host),
-    refusedWith('Missing', /no service nemia is installed/, /nemia service install writes and starts it/),
-  );
-  const byHand = hostOf({ lease: lease(OLD), unitPid: null, landings: [] });
-  await assert.rejects(
-    restart({}, byHand.host),
-    refusedWith(
-      'Missing',
-      /no service nemia is installed/,
-      new RegExp(`pid ${OLD} holds the store: nemia service install --take-over ${OLD} `),
-    ),
-  );
-  assert.deepEqual([...none.events, ...byHand.events], []);
-  assert.equal(readPause(), null);
-});
-
-test('REFUSED: a restart while the holder is stalled is Conflict, naming it, and signals nothing', async () => {
-  await installed();
-  const { host, events } = hostOf({ lease: lease(OLD, 'stalled'), unitPid: OLD, landings: [] });
-  await assert.rejects(restart({}, host), refusedWith('Conflict', /stalled, pid 4242/));
-  assert.deepEqual(events, []);
-});
-
-test('a restart where nothing ticks starts the unit and waits for its first pass, signalling and pausing nothing', async () => {
-  await installed();
-  const world: World = { lease: lease(OLD, 'stopped'), unitPid: null, landings: [] };
-  world.onStart = () => passing(world, NEW);
-  const { host, events } = hostOf(world);
-  const done = await restart({}, host);
-  assert.deepEqual(events, [
-    'systemctl --user start nemia.service',
-    `say pid ${NEW} ticks the store: waiting for its first pass`,
-    `read ${NEW} passed`,
-  ]);
-  assert.equal(done.did, 'started');
-  assert.equal(done.pid, NEW);
-});
-
-test('a pause a person put stands through a restart where nothing ticks: the unit started, the pause kept, and the answer says so', async () => {
-  await installed();
-  putPause({ by: 'ann', why: 'reading the night' });
-  const world: World = { lease: lease(OLD, 'stopped'), unitPid: null, landings: [] };
-  world.onStart = () => passing(world, NEW);
-  const { host, events } = hostOf(world);
-  const done = await restart({}, host);
-  assert.ok(!events.includes('pause') && !events.includes('resume'), events.join('\n'));
-  assert.equal(readPause()?.by, 'ann');
-  assert.equal(done.did, 'started');
-  assert.equal(done.paused, true);
-  assert.ok(
-    done.lines.some((l) => l.includes('the pause that stood is left as it was')),
-    done.lines.join('\n'),
-  );
-});
-
-test('a pause a person put stands through a restart: neither put again nor lifted, and the answer says so', async () => {
-  await installed();
-  putPause({ by: 'ann', why: 'reading the night' });
-  const world: World = { lease: lease(OLD), unitPid: OLD, landings: [[]] };
-  world.onSignal = () => (world.lease = lease(OLD, 'stopped'));
-  world.onStart = () => passing(world, NEW);
-  const { host, events } = hostOf(world);
-  const done = await restart({}, host);
-  assert.ok(!events.includes('pause') && !events.includes('resume'), events.join('\n'));
-  assert.equal(readPause()?.by, 'ann');
-  assert.equal(done.paused, true);
-  assert.ok(
-    done.lines.some((l) => l.includes('the pause that stood is left as it was')),
-    done.lines.join('\n'),
-  );
-});
-
 test('the restart is the CLI’s alone, and Nemia’s fence asks before it', () => {
   assert.deepEqual(
     RESTARTS.map((c) => [c.name, c.only?.side, c.class]),

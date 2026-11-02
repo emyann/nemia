@@ -3,10 +3,11 @@
  * factory freezes every repository of it but its own on its record, read-only (`factoryMounts`); a step's `writable:` folder is filed
  * writable for that step alone (`stepMounts`); a step whose `reads:` names the inbox is filed the store's inbox (`readsMounts`); a run
  * given an input files its inputs folder (`inputsMounts`); a step whose mode writes outside its directory only by rule its own files
- * directory (`ownMounts`); and a step after another the folder each step before it handed over (`handedMounts`). Each is read-only but the writable one, on the first filing, a try and a round, and named on the brief as it is
- * mounted (`mountsLine`, `unnamed`); a later step reads what was handed and writes none of it, as Claude Code holds a mount (`readsAt`,
- * `writesAt`, in `mounted.ts`). Then where a run mounts less: the default factory, a factory of one repository, a folder gone at start,
- * a folder team, a remote agent, a run given no input.
+ * directory (`ownMounts`); and a step after another the folder each step before it handed over (`handedMounts`). Each is read-only but the
+ * writable one, on the first filing, a try and a round, and named on the brief as it is mounted (`mountsLine`, `unnamed`); a later step
+ * reads what was handed and writes none of it, as Claude Code holds a mount (`readsAt`, `writesAt`, in `mounted.ts`). Then where a run
+ * mounts less: the default factory, a factory of one repository, a folder gone at start, a folder team, a remote agent, a run given no
+ * input.
  *
  * Beside the stories, three tables: the start refused over a factory's folders, each by kind, exit 2 and its facts with no run written;
  * the pure readers of the folders; and `writable:` as a step's file is read.

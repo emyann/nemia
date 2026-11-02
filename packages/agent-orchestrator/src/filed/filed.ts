@@ -110,9 +110,9 @@ export type FiledFolders = {
 
 /**
  * The folders a step is filed with beyond its factory's, the one source of the filing's (`filedConfig`) and of what its brief names
- * (`mountsLine`, `inputsLine`): its own files directory (`ownMounts`), the artifacts folder of each step it comes after, under `t.runArtifacts` (`handedMounts`), the store's
- * folders its `reads:` names, the inbox at `t.inbox` (`readsMounts`), and the run's inputs folder at `t.inputs`, given only for a run
- * given inputs (`inputsMounts`). Pure.
+ * (`mountsLine`, `inputsLine`): its own files directory (`ownMounts`), the artifacts folder of each step it comes after, under
+ * `t.runArtifacts` (`handedMounts`), the store's folders its `reads:` names, the inbox at `t.inbox` (`readsMounts`), and the run's inputs
+ * folder at `t.inputs`, given only for a run given inputs (`inputsMounts`). Pure.
  */
 export const filedFolders = (
   step: Workflow,
@@ -125,7 +125,7 @@ export const filedFolders = (
   inputs: inputsMounts(step, steps, t.inputs),
 });
 
-/** A step's folders beyond its factory's, in the order they are filed: its own, the handed ones, the store's, then the run's inputs folder. */
+/** A step's folders beyond its factory's, in the order they are filed: its own, the handed ones, the store's, then the run's inputs. */
 const folders = (f: FiledFolders): Mount[] => [...(f.own ?? []), ...f.handed, ...f.store, ...f.inputs];
 
 /** Whether a step's harness reads the disk only through what it is filed: neither a remote agent nor one fenced by a sandbox. */

@@ -126,9 +126,9 @@ function namedWords(step: string, files: HandedFiles | undefined): string {
 /**
  * What a step's brief says of the folders its run mounts, under what was asked for: each by its absolute path, those its `writable:` names
  * to write (`stepMounts`), the others to read and never write; then the folders it is filed with beyond them (`folders`, as `filedFolders`
- * in filed.ts files them), to read and never write: its own files directory (`own`), the artifacts folders of the steps before it (`handed`), each with how to list it, and
- * the store's folders its `reads:` names (`store`); a blank line before them. Nothing for a run that mounts none and a step given no other
- * folder, and for a step on a remote agent, which is filed none.
+ * in filed.ts files them), to read and never write: its own files directory (`own`), the artifacts folders of the steps before it
+ * (`handed`), each with how to list it, and the store's folders its `reads:` names (`store`); a blank line before them. Nothing for a run
+ * that mounts none and a step given no other folder, and for a step on a remote agent, which is filed none.
  */
 export const mountsLine = (
   step: Pick<Workflow, 'harness' | 'writable'>,

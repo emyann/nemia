@@ -119,8 +119,8 @@ export type Fills = { factory: string; workflow: string; agents: Readonly<Record
 
 /**
  * The agents a workflow's steps may name and the skills they may be given, found where a run of the folder looks: what its steps are
- * parsed against (`parseFolder`), found by the Agent and Skill doors (`agents.found`, `skills.found`) or, for a synchronous reader, by
- * `foundAt` (`folder.store.ts`).
+ * parsed against (`parseFolder`), found by the Agent and Skill doors (`agents.found`, `skills.found`), or by their files layers for a
+ * synchronous reader (`loadWorkflows`, `workflows.store.ts`).
  */
 export type Found = { readonly agents: Agents; readonly skills: SkillsFound };
 

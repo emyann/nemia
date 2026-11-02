@@ -154,7 +154,7 @@ What the `create-an-agent` skill, being generic, does not say here:
   settings and shadcn's skill allow that writes the workspace or runs the suite: shadcn's CLI in each spelling an allow reaches (`npx shadcn@latest`, `pnpm dlx`, `bunx --bun`), its one read being the
   board's pinned `npx shadcn view` the settings allow, and `npm test`; intake and the janitor, which run no test, `node --test` and `npx
   turbo run test` besides, while design and review keep the checks their notes name and are refused a build on that line
-  (`npx turbo run test *build*`). Design and review measure by the compiler and the linter, which the settings allow
+  (`npx turbo run test *build*`) and a file of the e2e's (`node --test *e2e/*`, the folder: the board's `test/e2e-*.test.ts` stay open). Design and review measure by the compiler and the linter, which the settings allow
   (`npx tsc --noEmit`, `npx oxlint`), and deny on that line what would write or watch, `tsc`'s options by their first letters in each
   case, since it reads an option's name in any case and after one dash or two; intake and the janitor deny both whole. Each of the
   four is told, in one paragraph they hold equal, to put a refused call its work needs at the top of its sign-off, never only in a risk.

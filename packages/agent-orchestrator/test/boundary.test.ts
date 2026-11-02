@@ -116,7 +116,7 @@ const STORE_BOTTOM = ['src/record/places.store.ts', 'src/skills/read.store.ts', 
  * configuration, the Feed door on the pattern beside the feed's own two, and the Subscription door on the pattern, the feed's file, the
  * run store, the tally and the configuration —
  * what a place is and how its processes are stopped, on no store file (`place.store.ts`), then a step's workspace, cut by the place, a
- * workflow folder written on the run store, the two reads, the folders (`foundAt`, for a caller with no doors) and the factories, and
+ * workflow folder written on the run store, the two reads, the folders and the factories, and
  * where a run looks and a place's workflow folders (`lookup.store.ts`) on the run store and the skills read; what a branch changed, as
  * the place says, on the place (`changes.store.ts`), a step's own agent read for a hire (`own-agent.store.ts`), on no store file, and
  * where the branches stood on the run store and the place

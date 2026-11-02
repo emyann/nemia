@@ -23,16 +23,23 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { Context, Effect, Layer, Schema } from 'effect';
-import { brokenBy, doorOf, rootedDoor, type DoorOf } from '../door/door.store.ts';
+import { brokenBy, doorOf, fromThrow, rootedDoor, type DoorOf } from '../door/door.store.ts';
 import { Conflict, Invalid, Missing, type Refusal } from '../refusal/refusal.ts';
 import { WorkflowError, type Workflow as Step } from '../step/step.ts';
 import type { StepDraft } from '../workflow/index.ts';
 import type { Places } from '../skills/read.store.ts';
 import { workflowVersionRefusal, type Fills, type Found, type WorkflowThere } from '../folder/folder.ts';
 import { StepName, Workflow, WorkflowDir, WorkflowName } from '../folder/folder.model.ts';
-import { formerKeyLines, loadWorkflowsWith, workflowsIn } from '../folder/folder.store.ts';
+import { formerKeyLines, loadWorkflowsWith, workflowDirAt, workflowsIn } from '../folder/folder.store.ts';
 import { versionDigest, versionGathered, versionNamed, type VersionGathered } from '../folder/version.store.ts';
-import { placesAroundAt, removeWorkflowAt, writeWorkflowAt, type WorkflowRemoved, type WorkflowWritten } from '../folder/write.store.ts';
+import {
+  atHome,
+  placesAroundAt,
+  removeWorkflowAt,
+  writeWorkflowAt,
+  type WorkflowRemoved,
+  type WorkflowWritten,
+} from '../folder/write.store.ts';
 import { AgentDoor, agentDoorOver, agentFiles, type AgentDoorShape } from '../agents/agent-door.store.ts';
 import { SkillDoor, skillDoorOver, skillFiles, type SkillDoorShape } from '../skills/skill-door.store.ts';
 
@@ -244,3 +251,53 @@ export const workflowDoorFiles = (root: string): Layer.Layer<never> =>
   Layer.succeed(WorkflowDoor)(
     workflowDoorOver(workflowFiles(root), { agents: agentDoorOver(agentFiles(root)), skills: skillDoorOver(skillFiles(root)) }),
   );
+
+/**
+ * The agents and skills a workflow at `dir` finds beside it or in `places`, read off the files of the Agent and Skill doors (`agentFiles`,
+ * `skillFiles`): what a synchronous reader parses a folder against. Their `found` reads `places`, never the root the layer is given.
+ */
+const foundOnDisk = (home: string, dir: string, places: Places): Found => {
+  const where = { dir, places };
+  return { agents: agentFiles(home).agents.found(where), skills: skillFiles(home).skills.found(where) };
+};
+
+/**
+ * Read a folder of steps as a start reads one, synchronously: the door's files layer (`workflowFiles`) over the store `places.home`,
+ * against the agents and skills the Agent and Skill doors' files find beside the folder or in `places`, and its hires `fills`. Refused
+ * as the folder's own read refuses it, a `WorkflowError` naming what to write, with no check of the folder as the door's id before it: a
+ * plain path is read as it is. No file of `src` calls it but this one; the root exports it, and the tests read a folder by it.
+ */
+export function loadWorkflows(dir: string, places: Places = {}, fills?: Fills): Step[] {
+  const home = places.home ?? '';
+  return workflowFiles(home).workflows.read(dir, foundOnDisk(home, dir, places), fills);
+}
+
+/**
+ * `writeWorkflowAt` with the agents and skills the doors' files find where a run of the folder would look (`placesAroundAt`), or in
+ * `places`: what a caller with no Agent and Skill doors writes with, which no file of `src` is.
+ */
+const writeWorkflowOnDisk = (
+  home: string,
+  dir: string,
+  steps: readonly StepDraft[],
+  readme?: string,
+  { anywhere, places }: { anywhere?: boolean; places?: Places } = {},
+): WorkflowWritten =>
+  writeWorkflowAt(home, dir, steps, readme, {
+    ...(anywhere !== undefined && { anywhere }),
+    ...(places !== undefined && { places }),
+    found: foundOnDisk(home, path.resolve(dir), places ?? placesAroundAt(home, dir)),
+  });
+
+/** `writeWorkflowOnDisk` the module's root (`atHome`). */
+export const writeWorkflow = atHome(writeWorkflowOnDisk);
+
+/**
+ * The steps of the draft folder `folder`, a plain path, read through the Workflow door the program is given with its agents and skills
+ * found in `places`: what `nemia workflows write` sends the builder. Refused where the folder is no workflow's (`workflowDirAt`) or
+ * does not load; anything else dies.
+ */
+export const draftSteps = Effect.fn('draftSteps')(function* (folder: string, places: Places) {
+  const dir = yield* fromThrow(() => workflowDirAt(path.resolve(folder)));
+  return yield* (yield* WorkflowDoor).workflows.read(dir, places);
+});

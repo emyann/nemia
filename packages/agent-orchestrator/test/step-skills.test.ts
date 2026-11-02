@@ -33,7 +33,8 @@ process.env.WF_ROOT = ROOT;
 const { runWith: runEngine, startRun, writeWorkflow } = await import('../src/runner.ts');
 const { engineOf } = await import('../src/runtime-client.ts');
 const { main } = await import('../src/cli/main.ts');
-const { FrozenStepSchema, loadWorkflows } = await import('../src/folder/folder.store.ts');
+const { FrozenStepSchema } = await import('../src/folder/folder.store.ts');
+const { loadWorkflows } = await import('../src/workflows/workflows.store.ts');
 const { workflowVersion } = await import('../src/folder/version.store.ts');
 const { StoreRoot } = await import('../src/config/root.store.ts');
 /** A workflow folder's version, read through the doors at this file's store. */

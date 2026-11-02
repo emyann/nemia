@@ -34,8 +34,9 @@
  * allow that writes the workspace or runs the suite each read-only step denies on its own line (`ownedDenies`): shadcn's CLI in every
  * spelling an allow reaches (`SHADCN`), whose one read a step runs is the board's pinned `view` (`SHADCN_VIEW_NOTE`), and `npm test`;
  * intake and the janitor, which run no test, a test file's run and turbo's besides (`TESTLESS_AGENTS`, `TEST_RUNS`), and design and
- * review, which run a package's tests, a build carried on turbo's test line (`TEST_BUILDS`). Design and review measure by the compiler and
- * the linter, which the settings allow (`TSC_ALLOW`, `OXLINT_ALLOW`, `MEASURES`), and deny on their own line what would write or watch
+ * review, which run a package's tests, a build carried on turbo's test line (`TEST_BUILDS`) and a file of the e2e's
+ * (`TEST_E2E_FILES`). Design and review measure by the compiler and the linter, which the settings allow (`TSC_ALLOW`, `OXLINT_ALLOW`,
+ * `MEASURES`), and deny on their own line what would write or watch
  * (`MEASURE_WRITES`, `MEASURE_DENIES`), a `tsc` without `--noEmit` first being reached by no allow (`NO_EMIT_FIRST`); intake and the
  * janitor deny both whole (`MEASURELESS_DENIES`). No tsconfig of the checkout makes `--noEmit` write (`buildInfoConfigs`). Design reads
  * what a contract proves by the verifier, which the settings allow (`VERIFY_ALLOW`, `VERIFIES`), and denies on its own line its cache,
@@ -83,7 +84,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
 import ts from 'typescript';
-import { loadWorkflows } from '../src/folder/folder.store.ts';
+import { loadWorkflows } from '../src/workflows/workflows.store.ts';
 import { parseAgent } from '../src/agents/agents.ts';
 import { stepPlace, WorkflowError, type Workflow } from '../src/step/step.ts';
 import { readSkillRules, RULES_FILE } from '../src/skills/read.store.ts';
@@ -2683,6 +2684,29 @@ const TEST_BUILDS: Call[] = [
 /** The deny that answers `TEST_BUILDS`, on the line of each read-only step that runs tests. */
 const TEST_BUILD_DENIES = ['Bash(npx turbo run test *build*)'];
 
+/**
+ * A file of the e2e's run by the settings' `node --test`: its pages and its own tests under `apps/web/test/e2e/`, which are CI's `e2e`
+ * job's, never a package's tests. Design and review, which keep a file's tests (`SCOPED_TESTS`), are refused it by a glob on the folder:
+ * the board's unit tests of the e2e's helpers (`apps/web/test/e2e-pages.test.ts`) name `e2e` with no folder after it, and stay open
+ * (`E2E_HELPER_TESTS`).
+ */
+const TEST_E2E_FILES: Call[] = [
+  'node --test apps/web/test/e2e/board.e2e.ts',
+  'node --test test/e2e/contrast.test.ts',
+  'node --test --test-timeout=120000 test/e2e/*.test.ts',
+  'node --test e2e/visit.test.ts',
+  'timeout 900 node --test apps/web/test/e2e/pages/060-run.ts',
+].map((command) => ({ tool: 'Bash', command }));
+
+/** The deny that answers `TEST_E2E_FILES`, on the line of each read-only step that runs tests. */
+const TEST_E2E_DENIES = ['Bash(node --test *e2e/*)'];
+
+/** The board's unit tests of the e2e's helpers, in its `test` script's set, which a file's run of design and review still reaches. */
+const E2E_HELPER_TESTS: Call[] = ['node --test test/e2e-pages.test.ts', 'node --test apps/web/test/e2e-serve.test.ts'].map((command) => ({
+  tool: 'Bash',
+  command,
+}));
+
 /** The settings' allows of the compiler and the linter run to measure: `tsc` with `--noEmit` first, and `oxlint` whole. */
 const TSC_ALLOW = 'Bash(npx tsc --noEmit:*)';
 const OXLINT_ALLOW = 'Bash(npx oxlint:*)';
@@ -2824,7 +2848,9 @@ const VERIFYLESS_DENIES = ['Bash(npx tsverify:*)'];
 /** The denies a read-only step's own line holds, by its agent, for what the settings and the skills allow it besides its reads. */
 const ownedDenies = (agent: string): string[] => [
   ...READ_ONLY_DENIES,
-  ...(TESTLESS_AGENTS.includes(agent) ? [...TEST_RUN_DENIES, ...MEASURELESS_DENIES] : [...TEST_BUILD_DENIES, ...MEASURE_DENIES]),
+  ...(TESTLESS_AGENTS.includes(agent)
+    ? [...TEST_RUN_DENIES, ...MEASURELESS_DENIES]
+    : [...TEST_BUILD_DENIES, ...TEST_E2E_DENIES, ...MEASURE_DENIES]),
   ...(VERIFYING_AGENTS.includes(agent) ? VERIFY_DENIES : VERIFYLESS_DENIES),
 ];
 
@@ -2832,7 +2858,9 @@ const ownedDenies = (agent: string): string[] => [
 const refusedTo = (agent: string): Call[] => [
   ...SHADCN,
   ...NPM_TEST,
-  ...(TESTLESS_AGENTS.includes(agent) ? [...TEST_RUNS, ...MEASURES, ...MEASURE_WRITES] : [...TEST_BUILDS, ...MEASURE_WRITES]),
+  ...(TESTLESS_AGENTS.includes(agent)
+    ? [...TEST_RUNS, ...MEASURES, ...MEASURE_WRITES]
+    : [...TEST_BUILDS, ...TEST_E2E_FILES, ...MEASURE_WRITES]),
   ...(VERIFYING_AGENTS.includes(agent) ? VERIFY_WRITES : [...VERIFIES, ...VERIFY_WRITES]),
 ];
 
@@ -2875,6 +2903,14 @@ test("intake and the janitor are refused a test file's run and turbo's, and desi
   for (const { named, step } of readOnlySteps())
     if (TESTLESS_AGENTS.includes(step.agent!.name)) assert.deepEqual(runs(step, [...TEST_RUNS, ...SCOPED_TESTS]), [], named);
     else assert.deepEqual(runs(step, SCOPED_TESTS), SCOPED_TESTS.map(shown), named);
+});
+
+test("design and review are refused an e2e file's run, and run the board's unit tests of the e2e's helpers", () => {
+  for (const { named, step } of readOnlySteps())
+    if (!TESTLESS_AGENTS.includes(step.agent!.name)) {
+      assert.deepEqual(runs(step, TEST_E2E_FILES), [], named);
+      assert.deepEqual(runs(step, E2E_HELPER_TESTS), E2E_HELPER_TESTS.map(shown), named);
+    }
 });
 
 test("the read of shadcn's CLI change-the-board names is the board's pinned view, the settings allow it, and design and review run it", () => {

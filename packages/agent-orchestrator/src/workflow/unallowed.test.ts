@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { unallowedRefusal } from './unallowed.ts';
-import { loadWorkflows } from '../folder/folder.store.ts';
+import { loadWorkflows } from '../workflows/workflows.store.ts';
 import { scratch } from '../../test/scratch.ts';
 
 /** An agent file's frontmatter keys, as its file writes them. */

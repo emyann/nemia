@@ -21,7 +21,7 @@ for (const name of ['claude', 'codex']) fs.writeFileSync(path.join(BIN, name), '
 process.env.PATH = `${BIN}${path.delimiter}${process.env.PATH}`;
 const { readRun } = await import('../src/record/record.store.ts');
 const { main } = await import('../src/cli/main.ts');
-const { loadWorkflows } = await import('../src/folder/folder.store.ts');
+const { loadWorkflows } = await import('../src/workflows/workflows.store.ts');
 
 /** A folder of one step `triage`, closing out the issues it sorted, that declares `tally`. */
 function triage(name: string, tally: string): string {

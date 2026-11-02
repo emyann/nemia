@@ -25,8 +25,6 @@
         "$TURBO_ROOT$/apps/*/tsconfig.json",
         "$TURBO_ROOT$/apps/*/CLAUDE.md",
         "$TURBO_ROOT$/CLAUDE.md",
-        "$TURBO_ROOT$/README.md",
-        "$TURBO_ROOT$/LICENSE",
         "$TURBO_ROOT$/workflows/**",
         "$TURBO_ROOT$/packages/agent-runtime/**",
         "!$TURBO_ROOT$/packages/agent-runtime/.turbo/**"
@@ -62,8 +60,6 @@
         "$TURBO_ROOT$/CLAUDE.md",
         "$TURBO_ROOT$/apps/*/CLAUDE.md",
         "$TURBO_ROOT$/packages/*/CLAUDE.md",
-        "$TURBO_ROOT$/README.md",
-        "$TURBO_ROOT$/LICENSE",
         "$TURBO_ROOT$/.claude/settings.json",
         "$TURBO_ROOT$/.claude/skills/**",
         "$TURBO_ROOT$/apps/web/.claude/skills/**"

@@ -310,8 +310,8 @@ export const endingSteps = (steps: readonly Workflow[], run: Pick<Run, 'gates'>)
   terminalSteps(steps).filter((s) => hasGate(s, run));
 
 /**
- * The words a step's own file says, below its frontmatter: its note alone where it names an agent, whose instructions `body` opens
- * with, and its whole body otherwise. Pure.
+ * The words a step's own file says, below its frontmatter: its note alone where it names an agent, since `body` then opens with the
+ * heading of that agent's instructions (`LAYER_HEADINGS` in `workflow/layers.ts`), and its whole body otherwise. Pure.
  */
 export const ownNote = (step: Pick<Workflow, 'body' | 'agent'>): string => (step.agent ? step.agent.body : step.body);
 

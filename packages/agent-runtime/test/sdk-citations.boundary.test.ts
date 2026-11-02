@@ -5,11 +5,12 @@
  * which is the very thing this refuses — and the files it scans are the real git listing of the checkout.
  *
  * Prose is not a constraint: a dozen comments across the runtime name a line of the SDK's own declarations, and an SDK bump rewrites
- * that file top to bottom — 0.3.270 to 0.3.308 moved every one of them, some by two hundred lines, and 0.3.308 to 0.3.316 every one again. A citation nobody can check rots
- * into a line that says something else, and a reader who follows it is misled with no warning, which is the same class of fault as a
- * lock that fell behind a range. So each citation is named here with the identifier it stands for, and the cited line — or, for a
- * range, some line of it — must hold that identifier in the installed `sdk.d.ts`. A citation this table does not name is refused too:
- * a new one is added here, at the bump that introduced it, or it is not a citation anybody can trust.
+ * that file top to bottom — 0.3.270 to 0.3.308 moved every one of them, some by two hundred lines, and 0.3.308 to 0.3.316 every one
+ * again. A citation nobody can check rots into a line that says something else, and a reader who follows it is misled with no
+ * warning, which is the same class of fault as a lock that fell behind a range. So each citation is named here with the identifier
+ * it stands for, and the cited line — or, for a range, some line of it — must hold that identifier in the installed `sdk.d.ts`. A
+ * citation this table does not name is refused too: a new one is added here, at the bump that introduced it, or it is not a citation
+ * anybody can trust.
  *
  * The line numbers belong to `test/sdk-pin.ts`'s `SDK_VERSION` alone, and are re-read at each bump. The one way to do that is to grep
  * the installed file for each identifier below.

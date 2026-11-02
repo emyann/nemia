@@ -22,7 +22,10 @@ const PKG = path.join(import.meta.dirname, '..');
 const ROOT = path.join(PKG, '..', '..');
 const DEP = '@anthropic-ai/claude-agent-sdk';
 
-/** What to type where the tree disagrees with the pin: the one command that moves all four together; without `--save-exact` npm writes `^` before the version it installs. */
+/**
+ * What to type where the tree disagrees with the pin: the one command that moves all four together. Without `--save-exact` npm writes
+ * `^` before the version it installs.
+ */
 const FIX = `npm install ${DEP}@${SDK_VERSION} --save-exact --workspace agent-runtime, from the workspace root, and commit the lock with it`;
 
 /** Whether `spec` names one version and no range: `0.3.316`, never `^0.3.316`, `~0.3.316`, `0.3.x`, `>=0.3.316` or `*`. */

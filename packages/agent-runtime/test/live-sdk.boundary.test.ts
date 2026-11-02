@@ -23,8 +23,9 @@
  * session in the same tick it reads that end from, so there is no pass of any wait at which the file is on disk — watched at 100 ms
  * through a whole session, never seen, while `ranOn` was read all the same. So the second case runs the process the worker spawns for
  * a step, `bin/ae-claude-job.ts`, itself, on the same request shape and the SDK's own Claude Code (no `AE_CLAUDE_EXECUTABLE`), and
- * keeps its stdout: the first line is the session's `system`/`init`, whose `model` and `claude_code_version` are asserted, and which
- * `claudeStreamOutput` — the reader the engine uses — reads as `ranOn`. That line is written to `WF_ARTIFACTS` as
+ * keeps its stdout, ending its stdin at the session's `result` line as the worker does (`closesOn`). The session's `system`/`init`
+ * line, whose `model` and `claude_code_version` are asserted, is the one `claudeStreamOutput` — the reader the engine uses — reads as
+ * `ranOn`. That line is written to `WF_ARTIFACTS` as
  * `sdk-<version>-init.json`, beside the engine's attempt, so the record and the line it came from are handed over together.
  *
  * Its control is the old SDK: the same job on 0.3.270 records `claude-opus-5`, which is the measurement the card was filed on.
@@ -108,7 +109,7 @@ test(
 
 /**
  * Each JSON line of a job's stdout. The `init` line is looked for rather than taken first: on 0.3.308 and 0.3.316 the SDK prints its
- * `command_lifecycle` lines for the queued prompt ahead of it, and a `result` line does not open with its `type`.
+ * command lifecycle lines for the queued prompt ahead of it, and a `result` line does not open with its `type`.
  */
 type Line = { type?: string; subtype?: string; model?: string; claude_code_version?: string };
 const linesOf = (out: string): Line[] =>
@@ -141,7 +142,6 @@ test(
       let out = '';
       let errs = '';
       child.stderr.on('data', (d: Buffer) => (errs += d.toString()));
-      // The worker ends stdin at the session's `result` line (`closesOn`); so does this.
       child.stdout.on('data', (d: Buffer) => {
         out += d.toString();
         if (linesOf(out).some((line) => line.type === 'result')) child.stdin.end();

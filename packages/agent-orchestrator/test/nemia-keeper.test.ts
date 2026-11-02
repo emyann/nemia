@@ -38,6 +38,9 @@ const { levelFile, memoryDir, nemiaDir, ownBin, promptFile, readLevel, readNemia
 const { listSubscriptions } = await import('../src/subscription/subscription.store.ts');
 const { StoreRoot } = await import('../src/config/root.store.ts');
 const { customInstructionsFile } = await import('../src/agents/read.store.ts');
+const { AgentDoor } = await import('../src/agents/agent-door.store.ts');
+const { agentDoorMemory } = await import('../src/agents/agent-memory.store.ts');
+const { AgentName } = await import('../src/agents/agents.model.ts');
 const { addFactory, factoryNames } = await import('../src/factory/factory.store.ts');
 const { factoryLevelFile } = await import('../src/level/level.store.ts');
 const { DEFAULT_HARNESS } = await import('../src/harness/harness.ts');
@@ -545,6 +548,33 @@ test("Kept, she is told what changed: the person's custom words once, never by a
     await level({ level: 'manual' });
     assert.deepEqual(await beat(), ['stop', 'drop']);
   });
+  await s.test(
+    'her custom words held by the Agent door alone, none on disk, are told to her and written into her instruction',
+    async () => {
+      const b = stage.board();
+      const task = await keptAnew(t);
+      const agents = agentDoorMemory();
+      Effect.runSync(
+        Effect.provide(
+          Effect.flatMap(AgentDoor, (d) => d.custom.write(AgentName.read('nemia'), 'Answer in Basque.', ROOT)),
+          agents,
+        ),
+      );
+      assert.equal(fs.existsSync(customInstructionsFile(ROOT, 'nemia')), false, 'her words are on no disk');
+      const doorBeat = () => stage.runWith(viewed(), Effect.provide(keepOnce(), agents));
+      const told = b.said.length;
+      assert.deepEqual(await doorBeat(), ['sayCustom']);
+      assert.deepEqual(
+        b.said.slice(told).map((one) => one.taskId),
+        [task],
+      );
+      assert.ok(b.said.at(-1)!.text.includes('Answer in Basque.'), b.said.at(-1)!.text);
+      assert.ok(fs.readFileSync(promptFile(), 'utf8').trimEnd().endsWith('Answer in Basque.'), 'her filed instruction holds them');
+      assert.deepEqual(await doorBeat(), [], 'told once');
+      await level({ level: 'manual' });
+      assert.deepEqual(await beat(), ['stop', 'drop']);
+    },
+  );
 });
 
 test('`nemia level` refuses a level that is none, a factory write that names no factory or the default one, a raise of nothing and an end of none', async (t) => {

@@ -301,6 +301,19 @@ export const AGENT_WALKS: Readonly<Record<string, readonly Walk[]>> = {
       walk: (side) => act(side.door.custom.read(named('ghost'), repoOf(side))),
       says: { refused: 'Missing' },
     },
+    {
+      name: 'given no repository, the words of a name no place names; given one, still Missing',
+      walk: (side) => {
+        const version = written(side);
+        done(side.door.custom.write(named('scribe'), 'Write in French.', repoOf(side)));
+        done(side.door.agents.remove(named('scribe'), version, yoursAt(side)));
+        return {
+          read: done(side.door.custom.read(named('scribe'))) ?? null,
+          placed: act(side.door.custom.read(named('scribe'), repoOf(side))),
+        };
+      },
+      says: { read: 'Write in French.', placed: { refused: 'Missing' } },
+    },
   ],
   'custom.write': [
     {

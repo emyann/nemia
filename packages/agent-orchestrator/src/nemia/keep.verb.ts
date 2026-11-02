@@ -9,7 +9,8 @@
  * beats, so a restart owes what the files and the engine say. A task stopped from outside is never filed again.
  *
  * A controller: it reaches the runtime through the client (`EngineService`), run by `up` (`daemon/up.verb.ts`) beside the deliverer, and
- * her subscription through the Subscription door (`SubscriptionDoor`), at the store root `up` is given.
+ * her subscription through the Subscription door (`SubscriptionDoor`) and the person's custom words for her through the Agent door
+ * (`AgentDoor`), each at the store root `up` is given.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -22,6 +23,8 @@ import { readFactories } from '../factory/factory.store.ts';
 import { FeedDoor } from '../feed/feed.store.ts';
 import { SubscriptionDoor } from '../subscription/subscription.store.ts';
 import { SubscriptionName } from '../feed/feed.model.ts';
+import { AgentDoor } from '../agents/agent-door.store.ts';
+import { AgentName } from '../agents/agents.model.ts';
 import type { Refusal } from '../refusal/refusal.ts';
 import { EngineService, asked, over, trustedFolder, type Engine } from '../runtime-client.ts';
 import { answersDue, answersOwed, closesOwed, sayOutbox, outboxOwed, recordAsks } from '../chat/say.verb.ts';
@@ -30,7 +33,6 @@ import {
   composePrompt,
   filedPrompt,
   memoryDir,
-  nemiaCustom,
   nemiaDir,
   ownBin,
   promptAllows,
@@ -112,11 +114,12 @@ const factoryFolders = (): Mount[] => {
  * folder, by her definition; with her fence derived from the command table (`nemiaFence`), less each prompt the person allowed in her
  * folder (`widened`, `promptAllows`), the store's denies (`storeDenies`) and the daemon's own bin first on her path (`ownBin`) in the
  * harness's settings, and her admission (`nemia admit`, with her floor and her rules for auto) asked before each of her shell calls. A
- * prompt allowed while she runs is widened the next time she is filed.
+ * prompt allowed while she runs is widened the next time she is filed. Her instruction is composed with the person's custom words for
+ * her, `custom` (`herCustom`).
  */
-export function nemiaSpec(id: string): Parameters<Engine['file']>[0] {
+export function nemiaSpec(id: string, custom: string | undefined): Parameters<Engine['file']>[0] {
   const step = readNemia();
-  const prompt = composePrompt(step.body);
+  const prompt = composePrompt(step.body, custom);
   const memory = `Edit(/${memoryDir()}/**)`;
   const quota = quotaUrl();
   const fence = widened(nemiaFence(TABLE), promptAllows());
@@ -149,12 +152,24 @@ export function nemiaSpec(id: string): Parameters<Engine['file']>[0] {
   };
 }
 
+/** Her name, as the Agent door takes it. */
+const NEMIA = AgentName.read('nemia');
+
+/**
+ * The person's custom words for her, as the Agent door reads them with no place checked (she is the store's own agent, whom no place
+ * names), or undefined where there are none.
+ */
+const herCustom = Effect.fnUntraced(function* () {
+  return yield* (yield* AgentDoor).custom.read(NEMIA);
+});
+
 /** Her task `id` filed, warned of where no nemia of the daemon's is first on her path. */
 const fileHer = (e: Engine, id: string) =>
   Effect.gen(function* () {
     if (ownBin() === undefined)
       yield* Effect.logWarning(`Nemia is filed with no nemia of the daemon's first on her path: none links ${SHIPPED_NEMIA}/../bin.`);
-    yield* asked('file', e.file(nemiaSpec(id)));
+    const custom = yield* herCustom();
+    yield* asked('file', e.file(nemiaSpec(id, custom)));
   });
 
 /**
@@ -164,7 +179,7 @@ const fileHer = (e: Engine, id: string) =>
  */
 const sayCustom = (e: Engine, id: string) =>
   Effect.gen(function* () {
-    const custom = nemiaCustom();
+    const custom = yield* herCustom();
     yield* asked('say', e.say(id, toldCustom(custom)));
     writePrompt(nemiaPrompt(readNemia().body, custom));
     writeTold(custom);
@@ -243,7 +258,7 @@ export const keepOnce = Effect.fn('keepOnce')(function* () {
   const keeping = { above, ...(id === undefined ? {} : { task: id }), ...(trusted === undefined ? {} : { trusted }) };
   const subscribed = yield* herSubscription();
   const kept = nemiaState(keeping, task, subscribed) === 'kept';
-  const stale = kept && customChanged(readTold(), nemiaCustom(), filedPrompt());
+  const stale = kept && customChanged(readTold(), yield* herCustom(), filedPrompt());
   const owed = nemiaDue(
     { ...keeping, stale, up, asking, closing, owed: kept && outboxOwed(nemiaDir()), answered: kept && answersOwed(nemiaDir()) },
     task,

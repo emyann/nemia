@@ -139,7 +139,7 @@ export function agentDoorMemory(): Layer.Layer<never> {
     },
     custom: {
       read: (name, repo) => {
-        refuseNoAgent(store, name, repo);
+        if (repo !== undefined) refuseNoAgent(store, name, repo);
         return custom.get(name);
       },
       write: (name, text, repo) => {

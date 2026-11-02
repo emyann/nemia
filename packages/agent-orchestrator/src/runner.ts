@@ -15,7 +15,7 @@
  *
  * What of the I/O never names the engine sits beneath the controllers, and this file re-exports what it exported of them:
  * `record.store.ts` (a run's id, its files' names, a step's check stderr, artifacts and inputs), `files.store.ts` (the run store a run's
- * record, a person's files beside it and the inbox's are read and written through, `runStore`, and the inbox's folder, `inboxDir`),
+ * record and a person's files beside it are read and written through, `runStore`, and the inbox's folder, `inboxDir`),
  * `daemon.store.ts` (`tick.json` and who ticks the store), `feed.store.ts` (the feed's file), `worktree.store.ts` (git, a step's worktree,
  * its `node_modules`, the hand-off commit), `branches.store.ts` (what git says of a run's result branches), `artifacts.store.ts` (the
  * files a step hands over), `folder.store.ts` and `write.store.ts` (a workflow folder read and written), `agents/read.store.ts` and
@@ -376,7 +376,7 @@ export type { AgentCopiedFrom, AgentFill, AgentPlace, AgentReading, AgentsRead, 
 export type { AgentSource, AgentSourcePlace } from './sources/sources.ts';
 export type { GivenRead, SkillChange, SkillCopied, SkillRead, SkillWritten } from './skills/skills.store.ts';
 export type { WorkflowWritten } from './folder/write.store.ts';
-export { addToInbox, dropFromInbox, inboxNameAt, queueInInbox, readInbox } from './inbox/inbox.store.ts';
+export { addToInbox, dropFromInbox, inboxEntries, inboxNameAt, queueInInbox, readInbox } from './inbox/inbox.store.ts';
 export type { InboxDropped, InboxQueued } from './inbox/inbox.store.ts';
 export {
   addFactory,

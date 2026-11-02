@@ -3,12 +3,16 @@
  * or taken off the queue, and a card dropped. The api serves each: the list and the filing by routes of its own, which call these
  * handlers, the queue and the drop on the routes the table generates. One card read for its page is an entry the api serves alone.
  */
-import { tried } from '../runtime-client.ts';
+import fs from 'node:fs';
 import path from 'node:path';
+import { Effect } from 'effect';
+import { rooted } from '../wiring/wire.verb.ts';
 import { leftOut, type Args, type Flag, type Spec } from '../command/command.ts';
 import type { Command } from '../command/entry.verb.ts';
 import { defaultStartsAllowed } from '../factory/factory.store.ts';
-import { inboxDir, runStore } from '../record/files.store.ts';
+import { inboxDir } from '../record/files.store.ts';
+import { CardDoor, inboxAt } from '../cards/cards.store.ts';
+import { CardName } from './inbox.model.ts';
 import { Missing } from '../refusal/refusal.ts';
 import { firstPiece } from '../piece/piece.ts';
 import { inboxLines, noCardLine, type InboxCard, type InboxListing } from './inbox.ts';
@@ -86,7 +90,12 @@ export const INBOX: Command<{ cards: InboxListing[] }> = {
   class: 'read',
   route: { method: 'GET', path: '/api/inbox', status: 200 },
   manual: INBOX_HELP,
-  handler: (_args, _env, _home, kept) => tried(() => ({ cards: readInbox(kept?.records?.inbox) })),
+  handler: (_args, _env, home, kept) =>
+    rooted(
+      home,
+      'inbox',
+      Effect.map(readInbox(kept?.records?.inbox), (cards) => ({ cards })),
+    ),
   print: ({ cards }) =>
     cards.length
       ? [
@@ -144,22 +153,26 @@ export const INBOX_ADD: Command<{ card: InboxCard; file: string }> = {
     status: 201,
     hand: 'its body names a workflow by `from` and name, which the api finds among the folders a start finds one in before the card is written: never a path sent',
   },
-  handler: (args) =>
-    tried(() => {
-      const from = textOf(args, 'from');
-      const dir = textOf(args, 'dir');
-      const workflow = textOf(args, 'workflow');
-      const repo = textOf(args, 'repo');
-      const factory = textOf(args, 'factory');
-      return addToInbox({
-        text: textOf(args, 'idea') ?? '',
-        ...(from !== undefined ? { from } : {}),
-        ...(dir !== undefined ? { dir } : {}),
-        ...(workflow !== undefined ? { workflow } : {}),
-        ...(repo !== undefined ? { repo } : {}),
-        ...(factory !== undefined ? { factory } : {}),
-      });
-    }),
+  handler: (args, _env, home) =>
+    rooted(
+      home,
+      'inbox add',
+      Effect.suspend(() => {
+        const from = textOf(args, 'from');
+        const dir = textOf(args, 'dir');
+        const workflow = textOf(args, 'workflow');
+        const repo = textOf(args, 'repo');
+        const factory = textOf(args, 'factory');
+        return addToInbox({
+          text: textOf(args, 'idea') ?? '',
+          ...(from !== undefined ? { from } : {}),
+          ...(dir !== undefined ? { dir } : {}),
+          ...(workflow !== undefined ? { workflow } : {}),
+          ...(repo !== undefined ? { repo } : {}),
+          ...(factory !== undefined ? { factory } : {}),
+        });
+      }),
+    ),
   print: ({ card, file }) => [
     `${card.name}  ${firstPiece(card.body, '\n').slice(0, 56)}${card.workflow ? `  workflow: ${card.workflow}` : ''}${card.repo ? `  repo: ${card.repo}` : ''}${card.factory ? `  factory: ${card.factory}` : ''}`,
     `filed: ${file} — start it with nemia start ${file}${card.workflow ? '' : ' --workflows <w>'}`,
@@ -230,21 +243,28 @@ export const INBOX_QUEUE: Command<Queued> = {
     { method: 'DELETE', path: '/api/inbox/:name/queue', status: 200, sets: { off: true } },
   ],
   apiKeys: ['name', 'file', 'was', 'queued', 'place', 'of'],
-  handler: (args) =>
-    tried(() => {
-      const workflow = textOf(args, 'workflow');
-      const done = queueInInbox(textOf(args, 'name') ?? '', { off: args.off === true, ...(workflow !== undefined ? { workflow } : {}) });
-      return {
-        name: done.card.name,
-        file: done.file,
-        was: done.was,
-        queued: done.card.queued ?? null,
-        place: done.place ?? null,
-        of: done.of ?? null,
-        card: done.card,
-        factoryRepo: done.factoryRepo,
-      };
-    }),
+  handler: (args, _env, home) =>
+    rooted(
+      home,
+      'inbox queue',
+      Effect.gen(function* () {
+        const workflow = textOf(args, 'workflow');
+        const done = yield* queueInInbox(textOf(args, 'name') ?? '', {
+          off: args.off === true,
+          ...(workflow !== undefined ? { workflow } : {}),
+        });
+        return {
+          name: done.card.name,
+          file: done.file,
+          was: done.was,
+          queued: done.card.queued ?? null,
+          place: done.place ?? null,
+          of: done.of ?? null,
+          card: done.card,
+          factoryRepo: done.factoryRepo,
+        };
+      }),
+    ),
   print({ name, file, was, place, of, card, factoryRepo }) {
     if (was === 'not queued') return [`${name}  not queued — nothing to take back`];
     if (was === 'taken back') return [`${name}  taken back: it no longer starts on its own — start it with nemia start ${file}`];
@@ -292,11 +312,16 @@ export const INBOX_FROM: Command<InboxFrom & { name: string; from: string[] }> =
     { method: 'DELETE', path: '/api/inbox/:name/from', status: 200, sets: { off: true } },
   ],
   apiKeys: ['name', 'file', 'from', 'was'],
-  handler: (args) =>
-    tried(() => {
-      const done = setFrom(textOf(args, 'name') ?? '', args.off === true ? [] : runsOf(args));
-      return { ...done, name: done.card.name, from: done.card.from ?? [] };
-    }),
+  handler: (args, _env, home) =>
+    rooted(
+      home,
+      'inbox from',
+      Effect.map(setFrom(textOf(args, 'name') ?? '', args.off === true ? [] : runsOf(args)), (done) => ({
+        ...done,
+        name: done.card.name,
+        from: done.card.from ?? [],
+      })),
+    ),
   print: ({ card, file, was }) =>
     card.from?.length
       ? [`${card.name}  from: ${card.from.join(', ')} — its run is handed what each concluded, as context, and waits on none (${file})`]
@@ -317,7 +342,7 @@ export const INBOX_RM: Command<InboxDropped> = {
   writes: true,
   class: 'ask',
   route: { method: 'DELETE', path: '/api/inbox/:name', status: 200 },
-  handler: (args) => tried(() => dropFromInbox(textOf(args, 'name') ?? '')),
+  handler: (args, _env, home) => rooted(home, 'inbox rm', dropFromInbox(textOf(args, 'name') ?? '')),
   apiRefusal: (dropped, args) => (dropped.removed ? null : new Missing({ message: noCardLine(textOf(args, 'name') ?? '', dropped.cards) })),
   print: (dropped, args) => [
     dropped.removed
@@ -326,14 +351,15 @@ export const INBOX_RM: Command<InboxDropped> = {
   ],
 };
 
-/** The file a card's text is read from, swallowing a read that fails: null for a card dropped since it was listed. */
-const sourceOf = (file: string): string | null => {
-  try {
-    return runStore.inbox.read(file);
-  } catch {
-    return null;
-  }
-};
+/**
+ * The text of the inbox's entry `file`, swallowing a read that fails: null for a card dropped since it was listed. A card's is read
+ * through the Card door; a stray file of the inbox, listed beside the cards (`notes`), is no card, and is read in the store's inbox.
+ */
+const sourceOf = (file: string, home: string) =>
+  Effect.gen(function* () {
+    if (file.endsWith('.md')) return yield* (yield* CardDoor).cards.read(CardName.read(file.slice(0, -'.md'.length)));
+    return fs.readFileSync(path.join(inboxAt(home), file), 'utf8');
+  }).pipe(Effect.catchCause(() => Effect.succeed(null)));
 
 /**
  * One card, for its page: the entry the inbox lists by `name` — a card before a stray file of the same name (`notes.md` and `notes` both
@@ -353,19 +379,24 @@ export const INBOX_CARD: Command<{ card: InboxListing; source: string }> = {
   class: 'read',
   route: { method: 'GET', path: '/api/inbox/:name', status: 200 },
   only: { side: 'api', why: "the board's card page reads one card with its file as written; at the command line a person opens the file" },
-  handler: (args) =>
-    tried(() => {
-      const name = textOf(args, 'name') ?? '';
-      const cards = readInbox();
-      const named = (c: InboxListing): boolean => c.name === name;
-      const card = cards.find((c) => named(c) && c.file.endsWith('.md')) ?? cards.find(named);
-      const source = card === undefined ? null : sourceOf(card.file);
-      if (card === undefined || source === null) {
-        const others = cards.filter((c) => c !== card && c.file.endsWith('.md')).map((c) => c.name);
-        throw new Missing({ message: noCardLine(name, others) });
-      }
-      return { card, source };
-    }),
+  handler: (args, _env, home) =>
+    rooted(
+      home,
+      'inbox show',
+      Effect.gen(function* () {
+        const name = textOf(args, 'name') ?? '';
+        const cards = yield* readInbox();
+        const named = (c: InboxListing): boolean => c.name === name;
+        const card = cards.find((c) => named(c) && c.file.endsWith('.md')) ?? cards.find(named);
+        const source = card === undefined ? null : yield* sourceOf(card.file, home ?? '');
+        if (card === undefined || source === null) {
+          const others = cards.filter((c) => c !== card && c.file.endsWith('.md')).map((c) => c.name);
+          return yield* Effect.fail(new Missing({ message: noCardLine(name, others) }));
+        }
+        const out: { card: InboxListing; source: string } = { card, source };
+        return out;
+      }),
+    ),
   print: () => [],
 };
 

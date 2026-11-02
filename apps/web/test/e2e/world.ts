@@ -89,3 +89,21 @@ export function unreadName(id: string): string {
   if (unread === undefined) throw new Error(`the e2e's pass read where ${repo} stands, or did not ask it: ${id} is not unread`);
   return `${id} (where it stands is unread: ${unread})`;
 }
+
+/**
+ * The runs a page started since it read `before` (the names under `runs/`) taken back by hand, each file of theirs under `runs/`, and the
+ * claim under `started/` of each card one was started from (`claimCard`), where it names one of them: what `nemia rm` removes of a run.
+ */
+export function takeBackRuns(runsDir: string, before: readonly string[]): void {
+  const made = fs.readdirSync(runsDir).filter((file) => !before.includes(file));
+  const ids = new Set(made.filter((file) => file.endsWith('.json')).map((file) => file.slice(0, -'.json'.length)));
+  for (const file of made) fs.rmSync(path.join(runsDir, file), { recursive: true, force: true });
+  const started = path.join(path.dirname(runsDir), 'started');
+  for (const file of fs.existsSync(started) ? fs.readdirSync(started) : []) {
+    const claim = path.join(started, file);
+    try {
+      if (ids.has((JSON.parse(fs.readFileSync(claim, 'utf8')) as { run?: string }).run ?? '')) fs.rmSync(claim, { force: true });
+    } catch {}
+  }
+  if (fs.existsSync(started) && !fs.readdirSync(started).length) fs.rmdirSync(started);
+}

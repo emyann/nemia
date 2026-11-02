@@ -317,7 +317,7 @@
     },
     {
       "term": "Run door",
-      "meaning": "the run's door: its record, and the asks, holds, refresh asks and forgetting markers a person keeps beside it, by `RunId`; the files by default, the memory stand-in where a test gives it. The run store (`RunStore`) is what is left of it outside: the inbox, the Card door's seam, and the callers still to move.",
+      "meaning": "the run's door: its record, and the asks, holds, refresh asks and forgetting markers a person keeps beside it, by `RunId`; the files by default, the memory stand-in where a test gives it. A run from a card is created once: its create claims the card exclusively, in the store's started folder, and refuses a second run from it as `Conflict`. The run store (`RunStore`) is what is left of it outside: the callers still to move.",
       "type": "RunDoor"
     },
     {

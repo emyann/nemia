@@ -12,7 +12,9 @@ The diagram below is printed by the code (`src/model/diagram.model.ts`, through 
 
 - **S2, the Run door.** `readRun` decodes a record through `Run` with `Schema.decodeUnknownEffect`, behind a `Context.Service` with a
   files layer and a memory layer, as the runtime's `Journal` is; a record an invariant refuses is then named, not read.
-- **S3, the Card.** The inbox's model (`src/inbox/inbox.model.ts`) behind a door of its own, as S2 puts the run's.
+- **S3, the Card door**, landed: the inbox's cards and the tick's tries behind `CardDoor` (`src/cards/cards.store.ts`), rooted, its
+  writes checked by `CardName.OnCreate`, the card's reader and `MissedStart`; one run per card held at the Run door's create by a `wx`
+  claim under `<root>/started/`.
 - **S4, the Task and its Journal**, the runtime's: its model is its own (`agent-runtime/src/core/model.ts`), and run-core keeps holding
   `TaskId` by key alone; S4 picks the pattern a task's id is checked by on create.
 - **S5, the definitions**, each read and written through a door on the Run door's pattern, its files today's. **S5a**, the Factory door

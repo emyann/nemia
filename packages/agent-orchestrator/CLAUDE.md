@@ -102,7 +102,10 @@ it holds today that is a candidate for the runtime is in `docs/architecture.md`,
   the files**: a test that only needs a run to exist gives its programs one `runDoorMemory()` (`src/runs/memory.store.ts`, imported
   by path, after the file sets `WF_ROOT`) and plants the run through it; code still on `runStore` (`test/run-door.baseline.ts`) reads
   the files whatever door a program was given, so a test whose verb reaches it stays on files. A write breaking the model's `Run` is
-  refused `Invalid`: build a fixture's task ids with `stepTaskId`.
+  refused `Invalid`: build a fixture's task ids with `stepTaskId`. A run from a card is refused `Conflict` while another run from it
+  stands: the files hold it by an exclusive claim, `<root>/started/<card>.json`, removed with the run that it names (`runs.forget`),
+  and taken over where its run has no record. A test that removes a run's files by hand removes its claim too, as the e2e's
+  `takeBackRuns` does.
 - **A factory is read and written through the Factory door (`FactoryDoor`, `src/factories/factories.store.ts`), whose default is rooted**:
   it reads the files at the `StoreRoot` a program is given, and is refused `Invalid` where none was, so a handler that yields it is run
   through `rooted(home, verb, program)` (`src/wiring/wire.verb.ts`). A test that only needs a factory to exist gives its program one
@@ -110,6 +113,11 @@ it holds today that is a candidate for the runtime is in `docs/architecture.md`,
   still on `factory.store.ts`'s spellings without a root (`test/factory-door.baseline.ts`) reads the module's root whatever door was
   given. A change of a factory's wiring is judged by `wiringRefusal` (`src/wiring/wiring.ts`), whose contract a new rule of the wiring
   is a law of, not a row of a test.
+- **A card is read and written through the Card door (`CardDoor`, `src/cards/cards.store.ts`), rooted as the Factory door is**: the
+  inbox's verbs are programs that yield it, so a test runs one with its root given (`Effect.provideService(program, StoreRoot, root)`;
+  `Effect.runSync` throws the refusal itself), or gives it `cardDoorMemory()` (`src/cards/memory.store.ts`) and files the card through
+  it (`aCard`, `test/card-walks.ts`). A verb left unyielded still typechecks and does nothing: run each one. No file of `src` but the
+  door's calls `cardFiles` (`src/cards/cards.store.test.ts`).
 - **A workflow is read and written through the Workflow door (`WorkflowDoor`, `src/workflows/workflows.store.ts`), rooted as the
   Factory door is**, and addressed by a `WorkflowDir` minted where a folder is resolved (`workflowFolder`, `workflowDirAt`), never
   branded from a plain string with `WorkflowDir.read` outside the model and a stored record. A test that only needs a workflow to exist

@@ -23,6 +23,7 @@ import {
   workflowAt,
   workflowFolder,
   type Args,
+  wfRoot,
 } from '../runner.ts';
 import { usage, placedIn, type Engine } from './flags.ts';
 
@@ -109,13 +110,13 @@ export async function startRun(args: Args, e: Engine, place: Place): Promise<voi
   const arg = textOf(args, 'brief') ?? '';
   const at = fs.statSync(arg, { throwIfNoEntry: false });
   if (at?.isDirectory()) return folderRun(arg, args, e, place);
-  const card = inboxNameAt(arg);
+  const card = inboxNameAt(wfRoot(process.env), arg);
   if (at === undefined && card === null && pathLike(arg))
     usage(
       `nemia start was given ${arg}, which reads as a path, and there is no file nor plan folder at ${path.resolve(arg)}. Make the folder of cards and start it: nemia start <folder> --repo <r>; or give the file's path as it is, or the brief in words: nemia start "<brief>".`,
     );
   const asked = card !== null ? cardArgs(card, args) : briefArgs(arg, args);
-  const data = await runWith(e, placedIn(place, START.handler(asked)));
+  const data = await runWith(e, placedIn(place, START.handler(asked, process.env, wfRoot(process.env))));
   for (const line of START.print(data, asked)) console.log(line);
 }
 
@@ -161,7 +162,7 @@ export async function inboxAddRun(args: Args, e: Engine, place: Place): Promise<
     workflow: workflow === undefined ? undefined : workflowAt(workflow, process.cwd()),
     repo: repo === undefined ? undefined : path.resolve(repo),
   };
-  const data = await runWith(e, placedIn(place, INBOX_ADD.handler(asked)));
+  const data = await runWith(e, placedIn(place, INBOX_ADD.handler(asked, process.env, wfRoot(process.env))));
   for (const line of INBOX_ADD.print(data, asked)) console.log(line);
 }
 
@@ -171,6 +172,6 @@ export async function inboxAddRun(args: Args, e: Engine, place: Place): Promise<
 export async function inboxQueueRun(args: Args, e: Engine, place: Place): Promise<void> {
   const workflow = textOf(args, 'workflow');
   const asked: Args = { ...args, workflow: workflow === undefined ? undefined : workflowAt(workflow, process.cwd()) };
-  const data = await runWith(e, placedIn(place, INBOX_QUEUE.handler(asked)));
+  const data = await runWith(e, placedIn(place, INBOX_QUEUE.handler(asked, process.env, wfRoot(process.env))));
   for (const line of INBOX_QUEUE.print(data, asked)) console.log(line);
 }

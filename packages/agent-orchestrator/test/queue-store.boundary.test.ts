@@ -28,7 +28,10 @@ process.env.WF_ROOT = ROOT;
 process.env.WF_VERIFY_REST = '1';
 delete process.env.WF_MAX_RUNS;
 delete process.env.WF_MAX_CONCURRENT;
-const { readInbox, startRun, tickRun, runWith: runEngine, gitPlaceLayer } = await import('../src/runner.ts');
+const { startRun, tickRun, runWith: runEngine, gitPlaceLayer, StoreRoot, ...verbs } = await import('../src/runner.ts');
+/** An inbox verb run at this test's store root, as `nemia` gives it one: its answer, or its refusal thrown. */
+const atRoot = <A, E>(program: Effect.Effect<A, E>): A => Effect.runSync(Effect.provideService(program, StoreRoot, ROOT));
+const readInbox = (memo?: Parameters<typeof verbs.readInbox>[0]) => atRoot(verbs.readInbox(memo));
 const runWith = runOver(runEngine, gitPlaceLayer);
 const runPlaced = runGiven(gitPlaceLayer);
 const { listRuns, readRun } = await import('../src/record/record.store.ts');

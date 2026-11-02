@@ -1,6 +1,7 @@
 /**
  * The planning model: a card, its name, and the inbox that holds the cards and the tick's tries of the queued ones, as Schemas at the
- * context's door. A declaration in S1: no read path decodes through it.
+ * context's door. The Card door (`src/cards/cards.store.ts`) decodes each try it writes through `MissedStart`; a card it writes is
+ * checked by its reader, `parseInboxCard`, where `Card` says its invariants are held.
  */
 import { Schema } from 'effect';
 import { brandedId, type Id } from '../model/brand.model.ts';
@@ -43,7 +44,7 @@ export const Card = Schema.Struct({
 export type Card = typeof Card.Type;
 
 /** A queued card's start the tick tried and did not make, as it writes it down (`MissedStart`, inbox.ts). */
-const MissedStart = Schema.Struct({
+export const MissedStart = Schema.Struct({
   at: Schema.String,
   text: Schema.String,
   repo: Schema.String,

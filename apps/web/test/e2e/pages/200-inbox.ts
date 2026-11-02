@@ -16,7 +16,7 @@ import {
   WORKFLOWS,
 } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
-import { OUT, store } from '../world.ts';
+import { OUT, store, takeBackRuns } from '../world.ts';
 
 /** A card on the Inbox page, by its name. */
 const cardIn = (page: Page, name: string): Locator => page.locator(`section[aria-label="Cards"] li[data-card="${name}"]`);
@@ -442,8 +442,7 @@ async function visit(page: Page): Promise<void> {
         );
     } finally {
       await starting.close();
-      for (const file of fs.readdirSync(runsDir))
-        if (!runsBefore.includes(file)) fs.rmSync(path.join(runsDir, file), { recursive: true, force: true });
+      takeBackRuns(runsDir, runsBefore);
       if (!fs.existsSync(cardFile)) {
         fs.writeFileSync(cardFile, cardText);
         fs.utimesSync(cardFile, cardTime, cardTime);

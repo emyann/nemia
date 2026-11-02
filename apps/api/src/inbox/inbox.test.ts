@@ -12,8 +12,22 @@ import path from 'node:path';
 import { scratch } from '../../test/scratch.ts';
 import { story } from '../../test/checkpoints.ts';
 import { app } from '../app.ts';
-import { addFactory, addToInbox, fromNote, INBOX_KEY_MEANINGS, inboxDir, startFromInbox, runStore, engine } from 'agent-orchestrator';
+import {
+  addFactory,
+  addToInbox,
+  fromNote,
+  INBOX_KEY_MEANINGS,
+  inboxDir,
+  startFromInbox,
+  runStore,
+  engine,
+  StoreRoot,
+} from 'agent-orchestrator';
 import { runWith } from '../../test/builtin-place.ts';
+import { Effect } from 'effect';
+
+/** `program`, one of the package's inbox verbs, run on the harness's store (`root`): its refusal thrown as itself. */
+const onStore = <A, E>(program: Effect.Effect<A, E>): A => Effect.runSync(Effect.provideService(program, StoreRoot, root));
 const repo = scratch('nemia-api-inbox-repo-');
 process.env.HKB_REPO = repo;
 execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: repo });
@@ -86,7 +100,7 @@ const cardPage = (name: string) => app.request(`/api/inbox/${name}`);
 /** What the package refuses `text`, `workflow` and `repo` with, filed by its own function. */
 const packageRefusal = (opts: { text: string; workflow?: string; repo?: string }): string => {
   try {
-    addToInbox(opts);
+    onStore(addToInbox(opts));
   } catch (err) {
     assert.equal((err as { exitCode?: unknown }).exitCode, 2);
     return (err as Error).message;
@@ -100,8 +114,8 @@ test('a person starts a card: the run carries where it came from, and the card s
     'POST /api/runs with `card` starts the card through the package: the brief as the person edited it, the workflow the api found, `after` — the record carries `from`, and the card stays, listed as started',
     async () => {
       clear();
-      const { card } = addToInbox({ text: 'Show what a step cost\n\nOn the run page.', workflow: 'mine', repo });
-      const other = addToInbox({ text: 'Another idea' });
+      const { card } = onStore(addToInbox({ text: 'Show what a step cost\n\nOn the run page.', workflow: 'mine', repo }));
+      const other = onStore(addToInbox({ text: 'Another idea' }));
       const parent = await runWith(
         engine(),
         startFromInbox({ name: other.card.name, callerRepo: repo, workflow: dev, brief: 'A run to wait on' }),
@@ -140,7 +154,7 @@ test('a person starts a card: the run carries where it came from, and the card s
         'both cards kept, each listed as started by the run it became',
       );
 
-      const { card: plain } = addToInbox({ text: 'Keep the brief\n\nAs the card says it.' });
+      const { card: plain } = onStore(addToInbox({ text: 'Keep the brief\n\nAs the card says it.' }));
       const bodied = await startCard({ workflow: 'mine', card: plain.name });
       assert.equal(bodied.status, 201, await bodied.clone().text());
       const bodiedRun = runStore.runs.read(((await bodied.json()) as CardStarted).id);
@@ -156,7 +170,7 @@ test('a person starts a card: the run carries where it came from, and the card s
     "GET /api/runs/:id says a run came from a card — the record's `from`, and `nemia decide`'s sentence for it — and a run started without one carries neither",
     async () => {
       clear();
-      const { card } = addToInbox({ text: 'Say where a run came from' });
+      const { card } = onStore(addToInbox({ text: 'Say where a run came from' }));
       const started = await startCard({ workflow: 'dev', card: card.name });
       assert.equal(started.status, 201, await started.clone().text());
       const { id } = (await started.json()) as CardStarted;
@@ -183,7 +197,7 @@ test('a person starts a card: the run carries where it came from, and the card s
 
 test('POST /api/runs with `card` of a card already started is refused, 409, naming its run: a card is started once, and kept', async () => {
   clear();
-  const { card } = addToInbox({ text: 'Stays in the inbox' });
+  const { card } = onStore(addToInbox({ text: 'Stays in the inbox' }));
   const res = await startCard({ workflow: 'dev', card: card.name });
   assert.equal(res.status, 201, await res.clone().text());
   const answered = (await res.json()) as CardStarted;
@@ -210,7 +224,7 @@ const startRefusal = async (name: string, extra: { brief?: string; after?: strin
 test('POST /api/runs with `card`: what a start of a card refuses, writing nothing and removing nothing', async (t) => {
   await t.test("a `card` that is not there is a 404 carrying the package's sentence word for word — and nothing is written", async () => {
     clear();
-    const { card } = addToInbox({ text: 'The card that is there' });
+    const { card } = onStore(addToInbox({ text: 'The card that is there' }));
     const expected = await startRefusal('no-such-card');
     assert.ok(expected.startsWith(`no card no-such-card in the inbox. Its cards are: ${card.name}.`), expected);
 
@@ -227,9 +241,9 @@ test('POST /api/runs with `card`: what a start of a card refuses, writing nothin
     'a card started already is a 409, a blank brief, a card that does not read and a run it cannot wait on are 422s — and nothing is written or removed',
     async () => {
       clear();
-      const { card: started } = addToInbox({ text: 'Started once' });
+      const { card: started } = onStore(addToInbox({ text: 'Started once' }));
       write(path.join(root, 'runs', 'started-once-k2q9.json'), startedFrom('started-once-k2q9', started.name));
-      const { card } = addToInbox({ text: 'Not started' });
+      const { card } = onStore(addToInbox({ text: 'Not started' }));
       write(path.join(inbox, 'broken.md'), '---\nafer: dev\n---\nMisspelt.\n');
       const before = runFiles();
 
@@ -273,7 +287,7 @@ test('POST /api/runs with `card`: what a start of a card refuses, writing nothin
         [empty, [`${empty} has no commit yet`, 'commit once']],
         [odd, [`${path.join(odd, '.worktreeinclude')} is not a file`, 'remove it']],
       ] as const) {
-        const { card } = addToInbox({ text: 'Not a repository', repo: about });
+        const { card } = onStore(addToInbox({ text: 'Not a repository', repo: about }));
         const res = await startCard({ workflow: 'dev', card: card.name, brief: 'Do it.' });
         assert.equal(res.status, 422, about);
         const words = ((await res.json()) as Refused).error;
@@ -290,7 +304,7 @@ test('POST /api/runs with `card`: what a start of a card refuses, writing nothin
     "a `card` that is not a card's name is a 400, and one that is not text or with a brief that is not a 400 in the api's — before any workflow is looked for",
     async () => {
       clear();
-      const { card } = addToInbox({ text: 'Keep this one' });
+      const { card } = onStore(addToInbox({ text: 'Keep this one' }));
       for (const name of ['', '.hidden', '../runs/r-1', 'a/b', '..']) {
         const res = await startCard({ workflow: 'nope', card: name, brief: 'Do it.' });
         assert.equal(res.status, 400, `${JSON.stringify(name)}: refused before the workflow nobody has`);
@@ -314,7 +328,7 @@ test('POST /api/runs with `card`: what a start of a card refuses, writing nothin
 
   await t.test('a card start another site could make is refused by the guard before its body is read — so the card stays', async () => {
     clear();
-    const { card } = addToInbox({ text: 'Keep this one' });
+    const { card } = onStore(addToInbox({ text: 'Keep this one' }));
     const body = { workflow: 'dev', card: card.name, brief: 'Do it.' };
     const site = await startCard(body, { 'content-type': 'application/json', 'sec-fetch-site': 'cross-site' });
     assert.equal(site.status, 403);
@@ -330,7 +344,7 @@ test("a card whose start fails without a refusal — its repository's `.worktree
   execFileSync('git', ['-c', 'user.email=t@local', '-c', 'user.name=t', 'commit', '-q', '--allow-empty', '-m', 'init'], { cwd: odd });
   fs.symlinkSync('.worktreeinclude', path.join(odd, '.worktreeinclude'));
   const said = t.mock.method(console, 'error', () => {});
-  const { card } = addToInbox({ text: 'Its include file is a link to itself', repo: odd });
+  const { card } = onStore(addToInbox({ text: 'Its include file is a link to itself', repo: odd }));
   let failure: (Error & { exitCode?: unknown }) | undefined;
   try {
     await runWith(engine(), startFromInbox({ name: card.name, callerRepo: repo, workflow: dev }));
@@ -495,7 +509,7 @@ test("a person files cards, in a factory and out of one, lists them, opens a car
       clear();
       write(path.join(inbox, 'broken.md'), '---\nafter: some-run\n---\nWait for it.\n');
       write(path.join(inbox, 'notes.txt'), 'not a card\n');
-      const { card } = addToInbox({ text: 'Started at the command line' });
+      const { card } = onStore(addToInbox({ text: 'Started at the command line' }));
       write(path.join(root, 'runs', 'started-run-k2q9.json'), startedFrom('started-run-k2q9', card.name));
 
       const entries = await listed();
@@ -577,8 +591,8 @@ test("a person files cards, in a factory and out of one, lists them, opens a car
 
   await s.test('DELETE /api/inbox/:name drops a card as `nemia inbox rm` does, and leaves the others', async () => {
     clear();
-    const kept = addToInbox({ text: 'Keep this one' });
-    const gone = addToInbox({ text: 'Drop this one' });
+    const kept = onStore(addToInbox({ text: 'Keep this one' }));
+    const gone = onStore(addToInbox({ text: 'Drop this one' }));
     const res = await drop(gone.card.name);
     assert.equal(res.status, 200);
     assert.deepEqual(await res.json(), { removed: true, file: gone.file });
@@ -639,7 +653,7 @@ test("the inbox routes: what a filing, a card's page or a drop refuses, writing 
     "a card's page for a name that is not a card's is a 400, and for a card that is not there a 404 — and nothing is read outside the inbox or written",
     async () => {
       clear();
-      const { card } = addToInbox({ text: 'Keep this one' });
+      const { card } = onStore(addToInbox({ text: 'Keep this one' }));
       write(path.join(root, 'runs', 'r-1.json'), '{"id":"r-1"}');
       const before = inboxFiles();
 
@@ -663,7 +677,7 @@ test("the inbox routes: what a filing, a card's page or a drop refuses, writing 
     "a card's page for a name that is not there, in an inbox holding more than cards, names the cards as the package does — a card that does not read among them, a stray file and a folder not — and a card is found before a stray file of its name",
     async () => {
       clear();
-      const { card } = addToInbox({ text: 'Keep this one' });
+      const { card } = onStore(addToInbox({ text: 'Keep this one' }));
       write(path.join(inbox, 'broken.md'), '---\ncolour: red\n---\nPaint it.\n');
       write(path.join(inbox, 'notes.txt'), 'not a card\n');
       fs.mkdirSync(path.join(inbox, 'sub'));
@@ -783,7 +797,7 @@ test("the inbox routes: what a filing, a card's page or a drop refuses, writing 
     "a drop of a card that is not there is a 404, and of a name that is not a card's a 400 — and nothing is removed",
     async () => {
       clear();
-      const { card } = addToInbox({ text: 'Keep this one' });
+      const { card } = onStore(addToInbox({ text: 'Keep this one' }));
 
       const missing = await drop('no-such-card');
       assert.equal(missing.status, 404);

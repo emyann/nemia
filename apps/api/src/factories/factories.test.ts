@@ -31,7 +31,12 @@ import {
   setSchedule,
   hireRefusalOf,
   unfilledRefusal,
+  StoreRoot,
 } from 'agent-orchestrator';
+import { Effect } from 'effect';
+
+/** `program`, one of the package's inbox verbs, run on the harness's store (`root`): its refusal thrown as itself. */
+const onStore = <A, E>(program: Effect.Effect<A, E>): A => Effect.runSync(Effect.provideService(program, StoreRoot, root));
 
 type WorkflowListing = import('../workflows/workflows.ts').WorkflowListing;
 type WorkflowStepPage = import('../step/step.ts').WorkflowStepPage;
@@ -299,25 +304,25 @@ test('a person works in a factory with hires: the listing names what is unfilled
   await s.test(
     'a card started in the factory: the record names the factory, its repository and the card, and the card stays, listed as started',
     async () => {
-      const { card } = addToInbox({ text: 'Cache the views' });
+      const { card } = onStore(addToInbox({ text: 'Cache the views' }));
       const res = await post('/api/runs?factory=hired', { workflow: 'alpha', card: card.name });
       assert.equal(res.status, 201, await res.clone().text());
       const { id } = (await res.json()) as { id: string };
       const run = runStore.runs.read(id);
       assert.deepEqual([run.factory, run.repo, run.from?.inbox], ['hired', repoR, card.name]);
-      assert.equal(readInbox().find((c) => c.name === card.name)?.state, 'started', 'the card is kept, listed as started');
+      assert.equal(onStore(readInbox()).find((c) => c.name === card.name)?.state, 'started', 'the card is kept, listed as started');
     },
   );
 
   await s.test(
     'REFUSED: a card started in a factory whose hires leave the workflow unfilled is a 422; the card stays, nothing written',
     async () => {
-      const { card } = addToInbox({ text: 'Cache the lists' });
+      const { card } = onStore(addToInbox({ text: 'Cache the lists' }));
       const before = runFiles();
       const res = await post('/api/runs?factory=solo', { workflow: 'alpha', card: card.name });
       assert.equal(res.status, 422);
       assert.ok(
-        readInbox().some((c) => c.name === card.name),
+        onStore(readInbox()).some((c) => c.name === card.name),
         'the card is still there',
       );
       assert.deepEqual(runFiles(), before, 'nothing written');
@@ -327,12 +332,12 @@ test('a person works in a factory with hires: the listing names what is unfilled
   await s.test(
     "the request's factory comes before the card's `factory:`: a card of hired started with ?factory=solo is refused as solo's",
     async () => {
-      const { card } = addToInbox({ text: 'Cache the pages', factory: 'hired' });
+      const { card } = onStore(addToInbox({ text: 'Cache the pages', factory: 'hired' }));
       const before = runFiles();
       const res = await post('/api/runs?factory=solo', { workflow: 'alpha', card: card.name });
       assert.equal(res.status, 422, 'started in hired, the card would have run: hired fills alpha');
       assert.ok(
-        readInbox().some((c) => c.name === card.name),
+        onStore(readInbox()).some((c) => c.name === card.name),
         'the card is still there',
       );
       assert.deepEqual(runFiles(), before, 'nothing written');
@@ -394,7 +399,7 @@ test('POST /api/runs as shipped: the factory a start with no ?factory= is filed 
     async (t) => {
       const repoT = asShipped(t);
       process.env.WF_DEFAULT_FACTORY_STARTS = '1';
-      const { card } = addToInbox({ text: 'Cache the trios', factory: 'trio' });
+      const { card } = onStore(addToInbox({ text: 'Cache the trios', factory: 'trio' }));
       const before = runFiles();
       const url = `/api/runs?factory=default&repo=${encodeURIComponent(repoT)}`;
       for (const body of [
@@ -409,7 +414,7 @@ test('POST /api/runs as shipped: the factory a start with no ?factory= is filed 
         assert.ok(words.endsWith('. Nothing was started.'), words);
       }
       assert.ok(
-        readInbox().some((c) => c.name === card.name),
+        onStore(readInbox()).some((c) => c.name === card.name),
         'the card is still there',
       );
       assert.deepEqual(runFiles(), before, 'nothing written');
@@ -420,13 +425,13 @@ test('POST /api/runs as shipped: the factory a start with no ?factory= is filed 
     'REFUSED: a card that names no factory is a 422 naming ?factory=, though one factory alone holds its repository; it stays',
     async (t) => {
       const repoT = asShipped(t);
-      const { card } = addToInbox({ text: 'Cache the trios' });
+      const { card } = onStore(addToInbox({ text: 'Cache the trios' }));
       const before = runFiles();
       const res = await post(`/api/runs?repo=${encodeURIComponent(repoT)}`, { workflow: 'delta', card: card.name });
       assert.equal(res.status, 422);
       assert.match(said(await res.json()), /: this card names no factory, .*, or name it at start: \?factory=<name>; /);
       assert.ok(
-        readInbox().some((c) => c.name === card.name),
+        onStore(readInbox()).some((c) => c.name === card.name),
         'the card is still there',
       );
       assert.deepEqual(runFiles(), before, 'nothing written');

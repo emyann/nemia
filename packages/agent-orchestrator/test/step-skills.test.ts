@@ -25,6 +25,8 @@ import { scratch } from './scratch.ts';
 import { TEAM, teamCopy } from './team.ts';
 import { names } from './assessed.ts';
 import { staged, story } from './story.ts';
+import { aSkill } from './skill-walks.ts';
+import { SkillName } from '../src/agents/agents.model.ts';
 
 const ROOT = scratch('wf-step-skills-');
 process.env.WF_ROOT = ROOT;
@@ -40,6 +42,9 @@ const versionOf = (dir: string, places: Parameters<typeof workflowVersion>[1]): 
 const { skillsFor, skillVersion } = await import('../src/skills/read.store.ts');
 const { agentFilesDir, renderedSkillVersions, skillsAgain, writeAgentFiles } = await import('../src/agents/agents.store.ts');
 const { readRun } = await import('../src/record/record.store.ts');
+const { toldOf } = await import('../src/tick/told.verb.ts');
+const { SkillDoor } = await import('../src/skills/skill-door.store.ts');
+const { MEMORY_ROOT, skillDoorMemory } = await import('../src/skills/skill-memory.store.ts');
 const stage = staged({ runWith: runEngine, main, engineOf });
 const { runPlaced } = stage;
 
@@ -230,6 +235,22 @@ test('a step given skills from four places: frozen as files under bare names, na
     }
     const ship = stepNamed(record, 'ship');
     assert.ok(!briefBody(unrendered(ship)).includes(teamBody(PRELOADED).trim()), 'with none read, none told');
+  });
+
+  await s.test("the tick tells a step whose rendered folder is gone its skills as the Skill door holds them, not the disk's", () => {
+    const implement = stepNamed(record, 'implement');
+    const step = { ...implement, agent: { ...implement.agent!, skills: ['tidy-notes'] } };
+    const gone = { ...readRun(run.id), id: 'told-gone', workflowDir: `${MEMORY_ROOT}/workflows/dev` };
+    assert.equal(fs.existsSync(agentFilesDir(gone, 'implement')), false, 'its rendered folder is not there');
+    const told = Effect.runSync(
+      Effect.gen(function* () {
+        const door = yield* SkillDoor;
+        yield* door.skills.write(SkillName.read('tidy-notes'), aSkill(), undefined, `${MEMORY_ROOT}/workflows/skills`);
+        return yield* toldOf(gone, step);
+      }).pipe(Effect.provide(skillDoorMemory())),
+    );
+    const brief = briefBody(told.step);
+    assert.ok(brief.includes(`## Skill \`tidy-notes\`\n\n${aSkill().body}`), `the memory's skill told whole\n\n${brief}`);
   });
 
   await s.test(

@@ -14,7 +14,6 @@ import path from 'node:path';
 import { Effect } from 'effect';
 import { parseAgent, renderAgent, type Agent, type AgentDraft } from '../src/workflow.ts';
 import { agentUsers } from '../src/folder/folder.store.ts';
-import { loadWorkflows } from '../src/workflows/workflows.store.ts';
 import { agentVersion, loadAgents } from '../src/agents/read.store.ts';
 import { scratch } from './scratch.ts';
 import { TEAM } from './team.ts';
@@ -23,6 +22,7 @@ import { staged, story } from './story.ts';
 
 const ROOT = scratch('wf-agent-');
 process.env.WF_ROOT = ROOT;
+const { loadWorkflows } = await import('../src/workflows/workflows.store.ts');
 const { addFactory, agentSkillsFound, isRefusal, runWith: runEngine, StoreRoot } = await import('../src/runner.ts');
 const { removeAgent, writeAgent } = await import('../src/agents/agents.store.ts');
 const { AGENTS_READ, AGENTS_REMOVE, AGENTS_WRITE } = await import('../src/agents/library.verb.ts');

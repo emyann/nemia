@@ -127,8 +127,9 @@ type FolderRun = Pick<Run, 'workflowDir' | 'repo' | 'factory'>;
 /**
  * `f` read once for each `key`, its outcome kept — a throw included, kept and thrown again — and each read of the world charged to the
  * `revisions` phase while a pass is metered (`within`): the memo of the pass's synchronous reads, the factory, the allow rules and the
- * ledger's numbers, whose stores are not yet behind a door this reader yields. The reads through a door are `Cache`s (`passRevisions`). A key is exactly what its `f` reads, so a memo never answers for a world it did
- * not read; `key` is given the same arguments as `f`, and may take fewer than it, leaving out those `f` does not read by (a stamp).
+ * ledger's numbers, whose stores are not yet behind a door this reader yields. The reads through a door are `Cache`s (`passRevisions`). A
+ * key is exactly what its `f` reads, so a memo never answers for a world it did not read; `key` is given the same arguments as `f`, and
+ * may take fewer than it, leaving out those `f` does not read by (a stamp).
  */
 function once<A extends unknown[], T>(f: (...args: A) => T, key: (...args: A) => string): (...args: A) => T {
   const held = new Map<string, { value: T } | { thrown: unknown }>();
@@ -150,14 +151,15 @@ function once<A extends unknown[], T>(f: (...args: A) => T, key: (...args: A) =>
 
 /**
  * What one pass reads once for every run whose kinds it resolves: the factory a run is in, its workflow folder loaded, the skills found
- * beside that folder (the Skill door's `found`), the allow rules that folder's repository grants a session, the digest of one kind and name
- * (through the Agent, Skill and Workflow doors), and a kind's entry in the ledger — appended where the content is new (`revision`), or only read (`looked`), which writes nothing. Ten runs waiting on one
- * folder read and digest that folder once a pass between them, not ten times, and the reads are charged to the `revisions` phase.
+ * beside that folder (the Skill door's `found`), the allow rules that folder's repository grants a session, the digest of one kind and
+ * name (through the Agent, Skill and Workflow doors), and a kind's entry in the ledger — appended where the content is new (`revision`),
+ * or only read (`looked`), which writes nothing. Ten runs waiting on one folder read and digest that folder once a pass between them, not
+ * ten times, and the reads are charged to the `revisions` phase.
  *
  * It shares a read of the world, never a judgement: what stays per run is judged per run — `stepSetRefusal` on the run's own `isolate`,
  * `refreshedNow`'s intersection with the step set the run already names, the `rules` kind named by the run's own factory, and the steps
- * each run is handed, which are its own copy. A read that fails is kept as the failure it was (a `Cache` keeps the `Exit`), so a folder that has stopped reading costs
- * one read a pass and every run on it still says `unread` for itself.
+ * each run is handed, which are its own copy. A read that fails is kept as the failure it was (a `Cache` keeps the `Exit`), so a folder
+ * that has stopped reading costs one read a pass and every run on it still says `unread` for itself.
  *
  * Made by the pass and dropped with it (`PassRead`): nothing is carried between passes, and a one-off verb that is handed none reads the
  * world for itself.
@@ -232,7 +234,7 @@ export const passRevisions = Effect.fn('passRevisions')(function* () {
   const digest = (of: KindName, run: FolderRun) => Cache.get(digestCache, JSON.stringify([of.kind, of.name, ...where(run)]));
   const revision = once(appendRevision, (kind, name, hash) => JSON.stringify([kind, name, hash]));
   const looked = once(lookedUp, (kind, name, hash) => JSON.stringify([kind, name, hash]));
-  return { factory, skills, steps, allows, digest, revision, looked } satisfies PassRevisions as PassRevisions;
+  return { factory, skills, steps, allows, digest, revision, looked } satisfies PassRevisions;
 });
 
 /** The pass's reader `read` where one was handed, else one made for this call alone. */

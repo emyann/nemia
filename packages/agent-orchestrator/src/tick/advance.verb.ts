@@ -419,18 +419,9 @@ const followedDue = Effect.fnUntraced(function* (
 ) {
   const due = admission.ready.length + assessed.retry.length + assessed.round.length > 0;
   const followed = yield* followPass(run, new Date().toISOString(), due, revisions);
-  const kept: Followed = { followed, pinned: took, ready: admission.ready, retry: assessed.retry, round: assessed.round };
-  return followed.wrote ? ({ followed, pinned: { ...took, wrote: true }, ready: [], retry: [], round: [] } satisfies Followed) : kept;
+  if (!followed.wrote) return { followed, pinned: took, ready: admission.ready, retry: assessed.retry, round: assessed.round };
+  return { followed, pinned: { ...took, wrote: true }, ready: [], retry: [], round: [] };
 });
-
-/** What `followedDue` answers: the follow's pass, what the pass owes of its pins, and what it files. */
-type Followed = {
-  followed: PinnedPass;
-  pinned: PinnedPass;
-  ready: readonly string[];
-  retry: Assessment['retry'];
-  round: Assessment['round'];
-};
 
 /**
  * What the pass hands the metrics of the run's settled tasks (`settledOnce`), off what it read of them, before it files anything over

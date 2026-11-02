@@ -46,8 +46,9 @@ export type WorkflowSaved = WorkflowWritten & { readonly version: string };
  * A layer of the Workflow door, as plain synchronous methods: the workflows a holder folder holds, by name; where a write of a folder
  * finds its agents and skills (`around`): `places`, or where the layer says a run of it would look; a workflow's steps, loaded as a start
  * loads them, against the agents and skills the door `found` and its hires `fills`; what is at a folder now and its version
- * (`WorkflowThere`), its version counting what the door `gathered` of the agents and skills its files name (`named`); a workflow written from a draft against those `found`, and removed whole (`users` the sentences of what still needs
- * it); and the lines naming each former spelling its files still hold, with the fix (`formerKeyLines`).
+ * (`WorkflowThere`), its version counting what the door `gathered` of the agents and skills its files name (`named`); a workflow written
+ * from a draft against those `found`, and removed whole (`users` the sentences of what still needs it); and the lines naming each former
+ * spelling its files still hold, with the fix (`formerKeyLines`).
  */
 export type WorkflowLayer = {
   readonly workflows: {

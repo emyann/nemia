@@ -89,8 +89,8 @@ const stepsIn = Effect.fnUntraced(function* (workflowDir: string, places: Places
 /**
  * A workflow folder's steps, refused as `start` refuses them before a run is written, with the fix. What `startPlan` asks of every card
  * before the first run is started. Refused:
- * - a folder that is not a workflow (the Workflow door's `read`), and, in a factory, a workflow it has not attached, or a step its hires leave
- *   unfilled or fill twice (`stepsIn`);
+ * - a folder that is not a workflow (the Workflow door's `read`), and, in a factory, a workflow it has not attached, or a step its hires
+ *   leave unfilled or fill twice (`stepsIn`);
  * - a step set no run may take (`stepSetRefusal`, pure, asked of a folder a waiting run takes again too): a step named for another step's
  *   check or try, and, with `isolate: false` (`--no-worktree`), a `place: folder` team, one that fans out, and an ending;
  * - a team that says `place: folder` whose agent is given the package's place skill (`placeSkillRefusal`);

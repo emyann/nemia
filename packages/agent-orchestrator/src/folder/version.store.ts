@@ -14,6 +14,7 @@ import { AgentDoor, type AgentDoorShape } from '../agents/agent-door.store.ts';
 import { SkillDoor, type SkillDoorShape } from '../skills/skill-door.store.ts';
 import { lookupRoots, type Places } from '../skills/read.store.ts';
 import type { Refusal } from '../refusal/refusal.ts';
+import type { SkillsFound } from '../agents/agents.ts';
 
 /**
  * The value a file's frontmatter gives `key`, as the parser reads it (`frontmatterKey`), so `  agent: coder` and `agent : coder` name the
@@ -60,7 +61,11 @@ function filesOf(dir: string): Array<readonly [string, string | { unreadable: st
 export type VersionFile = readonly [string, string | { unreadable: string }];
 
 /** What a folder's own files are and name, read with no door: the files, the agents its steps name and the skills they add, sorted. */
-export type VersionNamed = { readonly files: readonly VersionFile[]; readonly agents: readonly string[]; readonly added: readonly string[] };
+export type VersionNamed = {
+  readonly files: readonly VersionFile[];
+  readonly agents: readonly string[];
+  readonly added: readonly string[];
+};
 
 /** An agent a folder names, as its version counts it: where the load finds it and its version there, or missing. */
 export type VersionAgent = readonly [string, { at: string; version: string } | { missing: string }];
@@ -85,12 +90,31 @@ export function versionNamed(dir: string): VersionNamed {
   };
 }
 
-/** The version of a folder's files and what the doors gathered of what they name, as one word: unchanged from the reader before the doors. */
+/** The version of a folder's files and what the doors gathered of what they name, as one word, as the reader before the doors gave it. */
 export const versionDigest = (files: readonly VersionFile[], gathered: VersionGathered): string =>
   createHash('sha256')
     .update(JSON.stringify([...files, ...gathered.agents, ...gathered.added]))
     .digest('hex')
     .slice(0, 16);
+
+/**
+ * Where an agent a folder names is, as the version counts it: the first of `roots` whose Agent door holds it, with its version counting the
+ * skills `found` beside the workflow; missing where none does, or where the Agent door refuses its name.
+ */
+const agentAt = (
+  door: AgentDoorShape,
+  agent: string,
+  roots: readonly string[],
+  found: SkillsFound,
+): Effect.Effect<VersionAgent[1], Refusal> =>
+  Effect.gen(function* () {
+    if (brokenBy(AgentName.OnCreate, agent) !== null) return { missing: agent };
+    for (const root of roots) {
+      const there = yield* door.agents.there(AgentName.read(agent), { dir: path.join(root, AGENTS_FOLDER), skills: found });
+      if (there.kind === 'held') return { at: root, version: there.version };
+    }
+    return { missing: agent };
+  });
 
 /**
  * The agents and skills a folder names, read through the Agent and Skill doors (`defs`, else the program's): the skills found where a
@@ -110,18 +134,7 @@ export const versionGathered = (
     const skillDoor = defs?.skills ?? (yield* SkillDoor);
     const found = yield* skillDoor.skills.found({ dir, places });
     const agents: VersionAgent[] = [];
-    for (const agent of named.agents) {
-      let held: VersionAgent[1] = { missing: agent };
-      if (brokenBy(AgentName.OnCreate, agent) === null)
-        for (const root of lookupRoots(dir, places)) {
-          const there = yield* agentDoor.agents.there(AgentName.read(agent), { dir: path.join(root, AGENTS_FOLDER), skills: found });
-          if (there.kind === 'held') {
-            held = { at: root, version: there.version };
-            break;
-          }
-        }
-      agents.push([agent, held]);
-    }
+    for (const agent of named.agents) agents.push([agent, yield* agentAt(agentDoor, agent, lookupRoots(dir, places), found)]);
     const added: VersionSkill[] = [];
     for (const skill of named.added) {
       const at = found.at.get(skill);

@@ -9,7 +9,7 @@ import { tried } from '../runtime-client.ts';
 import { type Acceptance, type Run } from '../record/record.ts';
 import { type RoundAsk } from '../status/status.ts';
 import { acceptAsk, acceptWordsRefusal, roundAsk } from './round.ts';
-import { stepsOf } from '../record/record.store.ts';
+import { stepsOf } from '../steps/steps.verb.ts';
 import { runStore } from '../record/files.store.ts';
 import { strayAsk } from '../say/say.verb.ts';
 import { closeoutAsked, closeoutReader, spendReader, taskPhasesRead } from '../views/views.verb.ts';
@@ -33,7 +33,7 @@ export type RoundAsked = { run: Run; ask: RoundAsk; file: string };
  */
 export const roundRun = Effect.fn('round')(function* (id: string, stepName?: string, budget?: number) {
   const run = yield* (yield* RunDoor).runs.read(RunId.read(id));
-  const steps = yield* tried(() => stepsOf(run));
+  const steps = yield* stepsOf(run);
   const { views, phaseOf } = yield* taskPhasesRead(run);
   const answer = (asks: readonly RoundAsk[]) =>
     roundAsk(steps, run, stepName, phaseOf, closeoutReader(views, run), closeoutAsked(views), asks, spendReader(views), budget);
@@ -85,7 +85,7 @@ export const acceptRun = Effect.fn('accept')(function* (id: string, stepName?: s
       }),
     );
   const run = yield* (yield* RunDoor).runs.read(RunId.read(id));
-  const steps = yield* tried(() => stepsOf(run));
+  const steps = yield* stepsOf(run);
   const { views, phaseOf } = yield* taskPhasesRead(run);
   const answer = (now: Run, rounds: readonly RoundAsk[]) =>
     acceptAsk(steps, now, stepName, message, phaseOf, closeoutReader(views, now), closeoutAsked(views), rounds, spendReader(views));

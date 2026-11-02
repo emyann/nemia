@@ -605,7 +605,7 @@ export async function detail(run: Run, { e, placeService, home, memo, inRequest 
   const folder = workflowsOf(run, home);
   const workflows = folder.steps;
   const names = stepNames(run, workflows);
-  const { views, read } = await judgedOn(e, placeService, run, names, workflows);
+  const { views, read } = await judgedOn(e, { placeService, home }, run, names, workflows);
   if ('unreadable' in read) return { unjudged: read.unreadable };
   const judged = read.judged;
   const steps = judgedSteps(run, workflows);

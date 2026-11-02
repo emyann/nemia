@@ -59,6 +59,6 @@ export const factoryRules = new Hono<ApiEnv>().get('/api/factories/:factory/rule
     const { factory } = c.req.param();
     const wrong = factoryNameRefusal(factory);
     if (wrong !== undefined) return c.json({ error: `GET /api/factories/${factory}/rules: ${wrong}` }, 400);
-    return c.json((await runPlaced(placeService, e, FACTORY_RULES.handler({ factory }, undefined, home))) satisfies FactoryRules);
+    return c.json((await runPlaced({ placeService, home }, e, FACTORY_RULES.handler({ factory }, undefined, home))) satisfies FactoryRules);
   }),
 );

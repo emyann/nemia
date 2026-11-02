@@ -3,8 +3,7 @@
  * stands (`acceptRun`), which `nemia accept` gave. Read off the run as it stands, so the command and admission read it alike.
  */
 import { Effect } from 'effect';
-import { tried } from '../runtime-client.ts';
-import { stepsOf } from '../record/record.store.ts';
+import { stepsOf } from '../steps/steps.verb.ts';
 import { retryable } from '../retry/index.ts';
 import { hasGate } from '../status/status.ts';
 import { approveFormOf } from './gate.ts';
@@ -19,7 +18,7 @@ import { RunId } from '../record/record.model.ts';
 export const approveForm = Effect.fnUntraced(function* (id: string, stepName: string | undefined) {
   if (!(yield* (yield* RunDoor).runs.exists(RunId.read(id)))) return approveFormOf([], {}, stepName, () => true);
   const run = yield* (yield* RunDoor).runs.read(RunId.read(id));
-  const steps = yield* tried(() => stepsOf(run));
+  const steps = yield* stepsOf(run);
   const step = steps.find((s) => s.name === stepName);
   if (step === undefined || !step.loop || !hasGate(step, run)) return approveFormOf(steps, run, stepName, () => true);
   const { views, phaseOf } = yield* taskPhasesRead(run);

@@ -11,7 +11,6 @@
 
 /** Each file by its path from the package, and its uses of the run store's run groups, comments left out. */
 export const RUN_DOOR_DEBT: Readonly<Record<string, number>> = {
-  'src/branches/branches.store.ts': 1,
   'src/branches/merges.verb.ts': 1,
   'src/brief/handed.verb.ts': 1,
   'src/cap/cap.verb.ts': 2,

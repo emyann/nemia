@@ -481,7 +481,7 @@ A file at the top of `src/` is named in `PURE`, `STORE`, `CONTROLLER` or `CLIENT
   root as the service a program is given, imports config.store.ts and nothing else. agents/read.store.ts (the
   agents read, and a person's custom instructions) imports only skills/read.store.ts; folder/folder.store.ts imports only
   agents/read.store.ts and skills/read.store.ts; record/record.store.ts imports only the bottom four, folder.store.ts and
-  record/steps.store.ts; workspace/worktree.store.ts imports only record.store.ts, places.store.ts, tally.store.ts and place/place.store.ts; folder/write.store.ts
+  revisions/revisions.store.ts; workspace/worktree.store.ts imports only record.store.ts, places.store.ts, tally.store.ts and place/place.store.ts; folder/write.store.ts
   imports only record.store.ts, the two reads and factory/factory.store.ts. Any other store file imports only these, and none imports it.
   Outside the store, only the client and the controllers beneath the CLI import a store file, and one of them imports
   each.

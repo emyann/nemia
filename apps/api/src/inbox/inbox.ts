@@ -278,8 +278,12 @@ function filingOf(body: typeof FILE_BODY.Type, repo: string, home: string): Fili
 export const inbox = new Hono<ApiEnv>()
   .get('/api/inbox', (c) =>
     served(c, async ({ e, placeService, memo, home }) => {
-      const { cards } = await runPlaced(placeService, e, INBOX.handler({}, undefined, home, { records: { inbox: memo.records.inbox } }));
-      return c.json(await runPlaced(placeService, e, listInbox(cards, home)));
+      const { cards } = await runPlaced(
+        { placeService, home },
+        e,
+        INBOX.handler({}, undefined, home, { records: { inbox: memo.records.inbox } }),
+      );
+      return c.json(await runPlaced({ placeService, home }, e, listInbox(cards, home)));
     }),
   )
   .get('/api/inbox/:name', (c) => {
@@ -287,11 +291,11 @@ export const inbox = new Hono<ApiEnv>()
     const wrong = inboxNameRefusal(name);
     if (wrong) return c.json({ error: wrong }, 400);
     return served(c, async ({ e, placeService, home }) => {
-      const { card, source } = (await runPlaced(placeService, e, CARD.handler({ name }, undefined, home))) as {
+      const { card, source } = (await runPlaced({ placeService, home }, e, CARD.handler({ name }, undefined, home))) as {
         card: InboxListing;
         source: string;
       };
-      const [entry = inboxEntry(card, { filedAt: null, text: null })] = await runPlaced(placeService, e, listInbox([card], home));
+      const [entry = inboxEntry(card, { filedAt: null, text: null })] = await runPlaced({ placeService, home }, e, listInbox([card], home));
       const keys =
         entry.error === null
           ? INBOX_KEYS.map((key) => ({
@@ -312,7 +316,7 @@ export const inbox = new Hono<ApiEnv>()
       const asked = filingOf(read.body, repo, home);
       if ('status' in asked) return c.json({ error: asked.error }, asked.status);
       const { card, file } = await runPlaced(
-        placeService,
+        { placeService, home },
         e,
         INBOX_ADD.handler({ idea: asked.text, workflow: asked.workflow, repo: asked.repo, factory: asked.factory }, undefined, home),
       );

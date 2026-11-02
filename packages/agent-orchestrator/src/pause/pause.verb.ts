@@ -8,7 +8,7 @@ import { Effect } from 'effect';
 import { EngineService, asked } from '../runtime-client.ts';
 import { tryOf, type Run } from '../record/record.ts';
 import { keptRuns, runStore } from '../record/files.store.ts';
-import { stepsOf } from '../record/record.store.ts';
+import { stepsOf } from '../steps/steps.verb.ts';
 import { stopAsked } from '../tick/held.verb.ts';
 import { putPause, readPause } from './pause.store.ts';
 import { currentTasks, interruptsAmong, liveAmong, type Interrupt, type PauseRuns, type PausedNow, type RunTasks } from './pause.ts';
@@ -37,9 +37,14 @@ const interruptsRead = Effect.fnUntraced(function* (memo?: PauseRuns) {
     const run = runStore.runs.find(id);
     return run ? [run] : [];
   });
+  const steps = new Map(yield* Effect.forEach(runs, (run) => Effect.map(stepsOf(run), (s) => [run.id, s] as const)));
   return {
     runs: new Map<string, Run>(runs.map((r) => [r.id, r])),
-    interrupts: interruptsAmong(runs, (id) => views.get(id), stepsOf) satisfies Interrupt[],
+    interrupts: interruptsAmong(
+      runs,
+      (id) => views.get(id),
+      (run) => steps.get(run.id) ?? [],
+    ) satisfies Interrupt[],
   };
 });
 

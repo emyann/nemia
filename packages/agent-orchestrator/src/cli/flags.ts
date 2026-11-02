@@ -3,14 +3,20 @@
  */
 import readline from 'node:readline/promises';
 import { Effect } from 'effect';
-import { CLI_VERBS, Invalid, PlaceService, TABLE, helpOf, type engine, type Place } from '../runner.ts';
+import { CLI_VERBS, Invalid, PlaceService, TABLE, helpOf, storeRootLayer, type engine, type StoreRoot, type Place } from '../runner.ts';
 
 /** The engine the verbs talk to: the board under `WF_ROOT`, unless a test hands one of its own. */
 export type Engine = ReturnType<typeof engine>;
 
-/** `program` given `place`, and still to be run: how a command gives its program the place `main` was handed. */
-export const placedIn = <A, E, R>(place: Place, program: Effect.Effect<A, E, R>): Effect.Effect<A, E, Exclude<R, PlaceService>> =>
-  Effect.provide(program, PlaceService.layer(place));
+/**
+ * `program` given `place`, and the store's root from the process's `WF_ROOT` (`storeRootLayer`), and still to be run: how a command gives
+ * its program the place `main` was handed, and the root a read of the store asks (`StoreRoot`, a run's unfrozen steps among them).
+ */
+export const placedIn = <A, E, R>(
+  place: Place,
+  program: Effect.Effect<A, E, R>,
+): Effect.Effect<A, E, Exclude<Exclude<R, PlaceService>, StoreRoot>> =>
+  Effect.provide(Effect.provide(program, PlaceService.layer(place)), storeRootLayer(process.env));
 
 /** A verb: it takes what follows it on the command line, the engine and the place, and prints what it did, or throws a refusal. */
 export type Verb = (rest: string[], e: Engine, place: Place) => void | Promise<void>;

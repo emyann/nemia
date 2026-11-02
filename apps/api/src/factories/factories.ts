@@ -154,8 +154,8 @@ const answerOf = (listing: FactoryListing, listed: readonly ScheduleListed[], un
  *   through the entry's handler (`FACTORY`), since the default factory is the api's to add.
  */
 export const factories = new Hono<ApiEnv>().get('/api/factories', (c) =>
-  served(c, async ({ e, placeService, env, running }) => {
-    const listed = await runPlaced(placeService, e, FACTORY.handler({}));
+  served(c, async ({ e, placeService, env, running, home }) => {
+    const listed = await runPlaced({ placeService, home }, e, FACTORY.handler({}));
     return c.json([
       {
         name: DEFAULT_FACTORY,

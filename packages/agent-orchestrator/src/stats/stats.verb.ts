@@ -16,7 +16,7 @@ import { Invalid, Missing } from '../refusal/refusal.ts';
 import type { Workflow } from '../step/step.ts';
 import { timeline } from '../timeline/index.ts';
 import { runStore } from '../record/files.store.ts';
-import { stepsOf } from '../record/record.store.ts';
+import { stepsOf } from '../steps/steps.verb.ts';
 import { closeoutReader, everyTryOf, taskCloseout, taskPhasesRead, viewedOnce } from '../views/views.verb.ts';
 import { phaseOfView } from '../views/views-words.ts';
 import { renderedSkillApplies, renderedSkillRules, renderedSkillVersions } from '../agents/agents.store.ts';
@@ -37,13 +37,7 @@ function verdictOf(view: TaskView | undefined): CheckVerdict {
 }
 
 /** A run's frozen steps (`stepsOf`), or null where they do not read. */
-function stepsRead(run: Run): Workflow[] | null {
-  try {
-    return stepsOf(run);
-  } catch {
-    return null;
-  }
-}
+const stepsRead = (run: Run): Effect.Effect<Workflow[] | null> => Effect.orElseSucceed(stepsOf(run), () => null);
 
 /**
  * What a run froze (`frozenOf`): its steps, and each skill by the version of its rendered copy (`renderedSkillVersions`), where the copy
@@ -113,7 +107,7 @@ export type StatsOptions = { memo?: StatsMemo; verify?: boolean; series?: Series
 
 /** What `run` gives the stats (`RunRead`). Fails with what a read of it failed with but a journal that does not read. */
 export const factsRead = Effect.fnUntraced(function* (e: Engine, run: Run) {
-  const steps = stepsRead(run);
+  const steps = yield* stepsRead(run);
   if (!steps) return null;
   const frozen = frozenRun(run, steps);
   const read = yield* Effect.exit(runFacts(e, run, steps));

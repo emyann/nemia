@@ -5,8 +5,8 @@
  */
 import { type Interrupt, type Paused, type PauseRuns } from 'agent-orchestrator';
 import type { Engine } from '../store.ts';
+import type { Placed } from '../store.ts';
 import { commandNamed, runPlaced } from '../store.ts';
-import type { PlaceService } from 'agent-orchestrator';
 
 /** The package's read of the pause (`pausedRead`), through its entry of the command table, served on the api alone. */
 const PAUSED = commandNamed('paused');
@@ -23,12 +23,11 @@ export type PauseNowRead = { interrupts: Interrupt[]; cost: string };
  * The store's pause or null, each task still finishing under it, each landing it holds with its merge staged in its checkout
  * (MERGE_HEAD), and each other check it holds, read through `e`.
  */
-export const pauseOf = async (e: Engine['Service'], placeService: PlaceService['Service']): Promise<Paused> =>
-  (await runPlaced(placeService, e, PAUSED.handler({}))) as Paused;
+export const pauseOf = async (e: Engine['Service'], at: Placed): Promise<Paused> => (await runPlaced(at, e, PAUSED.handler({}))) as Paused;
 
 /**
  * Each task a pause at once would stop now, read through `e` and never stored, and what an interrupted step costs. `memo` is the app's
  * memo of what the pause reads of every run (`ReadMemo.records.pause`): with it, the confirm reads no finished run's record.
  */
-export const pauseNowOf = async (e: Engine['Service'], placeService: PlaceService['Service'], memo?: PauseRuns): Promise<PauseNowRead> =>
-  (await runPlaced(placeService, e, PAUSE_NOW.handler({}, undefined, undefined, { records: { pause: memo } }))) as PauseNowRead;
+export const pauseNowOf = async (e: Engine['Service'], at: Placed, memo?: PauseRuns): Promise<PauseNowRead> =>
+  (await runPlaced(at, e, PAUSE_NOW.handler({}, undefined, undefined, { records: { pause: memo } }))) as PauseNowRead;

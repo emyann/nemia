@@ -50,6 +50,6 @@ export const stats = new Hono<ApiEnv>().get('/api/stats', (c) =>
       }),
     );
     statsQueryOf(given, (key) => `?${QUERY_KEYS[key]}=`);
-    return c.json(await runPlaced(placeService, e, STATS.handler(given, env, home, { stats: memo.stats, series: memo.series })));
+    return c.json(await runPlaced({ placeService, home }, e, STATS.handler(given, env, home, { stats: memo.stats, series: memo.series })));
   }),
 );

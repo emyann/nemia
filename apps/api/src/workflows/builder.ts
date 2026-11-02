@@ -576,7 +576,7 @@ async function write(
       ...(readme !== undefined && { readme }),
       ...(changes && { version: await inRequest(workflowVersion(dir, places)) }),
     };
-    result = (await runPlaced(placeService, e, WRITE.handler(args, undefined, home))) as WorkflowWritten;
+    result = (await runPlaced({ placeService, home }, e, WRITE.handler(args, undefined, home))) as WorkflowWritten;
   } catch (err) {
     putSchemasBack(dir, written);
     if (err instanceof WorkflowError) return refused(err.message);

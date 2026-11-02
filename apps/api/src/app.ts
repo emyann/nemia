@@ -196,15 +196,21 @@ export function appOf(layer: Layer.Layer<Services>): { app: Hono<ApiEnv>; runtim
     .route('/', inbox)
     .route('/', runs)
     .route('/', stats)
-    .get('/api/ceilings', (c) => served(c, async ({ e, placeService, env }) => c.json(await ceilingsOf(e, placeService, env))))
-    .get('/api/passes', (c) => served(c, async ({ e, placeService }) => c.json(await passesOf(e, placeService, c.req.query('last')))))
+    .get('/api/ceilings', (c) =>
+      served(c, async ({ e, placeService, env, home }) => c.json(await ceilingsOf(e, { placeService, home }, env))),
+    )
+    .get('/api/passes', (c) =>
+      served(c, async ({ e, placeService, home }) => c.json(await passesOf(e, { placeService, home }, c.req.query('last')))),
+    )
     .get('/api/series', (c) =>
-      served(c, async ({ e, placeService, memo }) => c.json(await seriesOf(e, placeService, c.req.query('range'), memo.series))),
+      served(c, async ({ e, placeService, memo, home }) =>
+        c.json(await seriesOf(e, { placeService, home }, c.req.query('range'), memo.series)),
+      ),
     )
     .get('/api/metrics', async (c) => c.json(metricsOf(await runtime.runPromise(Metric.snapshot))))
-    .get('/api/pause', (c) => served(c, async ({ e, placeService }) => c.json(await pauseOf(e, placeService))))
+    .get('/api/pause', (c) => served(c, async ({ e, placeService, home }) => c.json(await pauseOf(e, { placeService, home }))))
     .get('/api/pause/now', (c) =>
-      served(c, async ({ e, placeService, memo }) => c.json(await pauseNowOf(e, placeService, memo.records.pause))),
+      served(c, async ({ e, placeService, memo, home }) => c.json(await pauseNowOf(e, { placeService, home }, memo.records.pause))),
     )
     .get('/api/daemon', (c) => c.json(readDaemon()))
     .get('/api/quota', (c) =>

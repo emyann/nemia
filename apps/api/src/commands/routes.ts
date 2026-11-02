@@ -261,7 +261,7 @@ const route = (command: Command, at: Route) => (c: Context<ApiEnv>) =>
     if (wrong) return c.json({ error: wrong }, 422);
     try {
       const args = servedRepo(command, read.args, s);
-      const data = await runPlaced(s.placeService, s.e, command.handler(args, s.env, s.home, { records: s.memo.records }));
+      const data = await runPlaced(s, s.e, command.handler(args, s.env, s.home, { records: s.memo.records }));
       const refusal = command.apiRefusal?.(data, args);
       if (refusal) throw refusal;
       const answer = answerOf(command, data);

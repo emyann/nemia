@@ -18,7 +18,7 @@
 import { Effect } from 'effect';
 import { APPROVE } from '../gate/commands.verb.ts';
 import { ANSWER_HELP, answerFlag, recheckAnswerRefusal, typedAnswers, typedOf } from '../question/asked.verb.ts';
-import { stepsOf } from '../record/record.store.ts';
+import { stepsOf } from '../steps/steps.verb.ts';
 import { messageRefusal, modeWord, type RetryHow } from '../retry/index.ts';
 import { retryRun } from '../retry/retry.verb.ts';
 import { rootGiven, StoreRoot } from '../config/root.store.ts';
@@ -293,7 +293,7 @@ const REFRESH: Command<{
     const { runId } = named(args);
     if (args.base !== true) return { drift: yield* rooted(home, 'refresh', refreshRun(runId)) };
     const { run, ask, file } = yield* mergeRun(runId, textOf(args, 'step'));
-    const looping = stepsOf(run).find((s) => s.name === ask.step);
+    const looping = (yield* stepsOf(run)).find((s) => s.name === ask.step);
     if (looping === undefined)
       throw new Error(`run ${run.id} has no step ${ask.step}, which its merge asks: report it as a defect of nemia refresh --base`);
     const { target, onto, sha } = ask.merge;

@@ -32,8 +32,9 @@ delete process.env.WF_MAX_CONCURRENT;
 delete process.env.WF_MAX_RUNS;
 process.env.WF_DEFAULT_FACTORY_STARTS = '1';
 process.env.WF_VERIFY_REST = '1';
-const { advanceRun, closeoutAsked, decideRun, exitVerdicts, list, Missing, phaseOfView, retryRun, sayRun, startRun, stepsOf, runWith } =
+const { advanceRun, closeoutAsked, decideRun, exitVerdicts, list, Missing, phaseOfView, retryRun, sayRun, startRun, runWith } =
   await import('../src/runner.ts');
+const { stepsNow: stepsOf } = await import('./steps-now.ts');
 const { askFile, asksDir, markCancelled, readAnswers, readRun } = await import('../src/record/record.store.ts');
 const { isRepositoryRun, LINE_NAME, shownNote } = await import('../src/run.ts');
 const { verdictWord } = await import('../src/check/check.ts');

@@ -1,23 +1,21 @@
 /**
  * What is said of a repository run's result branches once they are named: where each stands (`branchStandings`), whether one is on its base
- * (`landedOf`), and a run another waits on as its record and a reader say it (`parentRecord`) — each read through a `BranchReader`, which
+ * (`landedOf`) — each read through a `BranchReader`, which
  * answers off what the place's `standing` said (`standingReader`), never off a git process of its own. What a branch changed against the
  * run's base is the place's to say (`changes.store.ts`).
  *
- * Beneath the controllers, beside `record.store.ts`, reading a run through `runStore` (`files.store.ts`): it imports neither the engine nor
- * a controller, and `runner.ts` re-exports most of what it exports.
+ * Beneath the controllers, beside `record.store.ts`, handed a run's steps by the program that read them (`stepsOf`): it imports neither
+ * the engine nor a controller, and `runner.ts` re-exports most of what it exports.
  */
 import { resultSteps } from './branches.ts';
 import { isRepositoryRun, type RepositoryRun, type Run } from '../record/record.ts';
 import type { BranchStanding } from '../status/status.ts';
-import type { ParentRun } from '../wait/wait.ts';
 import type { Landed } from '../decide/decide.ts';
-import { runStore } from '../record/files.store.ts';
-import { stepsOf } from '../record/record.store.ts';
+import type { Workflow } from '../workflow.ts';
 
 /** Where a run's result branches stand, as `branchStandings` says: none for a folder run, which has no branch. */
-export const standingsOf = (run: Run, git: BranchReader): BranchStanding[] =>
-  isRepositoryRun(run) ? branchStandings(run, resultBranches(run), git) : [];
+export const standingsOf = (run: Run, steps: readonly Workflow[], git: BranchReader): BranchStanding[] =>
+  isRepositoryRun(run) ? branchStandings(run, resultBranches(run, steps), git) : [];
 
 /** Whether a branch of the run is on its base, as `git` says: never, for a folder run, which has no branch to ask about. */
 export const landedOf =
@@ -70,37 +68,12 @@ export type BranchReader = {
 };
 
 /**
- * A run another waits on, as its record and `git` say it without the engine: the record, when the store has one, and the result branches
- * it names that git no longer has and cannot find on the base by their recorded tips (`BranchReader.landed`). What `nemia start --after`
- * refuses an edge by (`afterRefusal`), and where `parentOf` starts. A record whose steps cannot be read — no frozen workflow, and its
- * folder gone — names no result branch; one whose branches were not read names none gone.
- */
-export function parentRecord(id: string, git: BranchReader): Pick<ParentRun, 'record' | 'gone'> {
-  let record: Run;
-  try {
-    record = runStore.runs.read(id);
-  } catch {
-    return {};
-  }
-  let branches: string[];
-  try {
-    branches = resultBranches(record);
-  } catch {
-    branches = [];
-  }
-  const cut = isRepositoryRun(record) ? record : undefined;
-  const gone = cut ? branches.filter((b) => git.unread(cut, b) === undefined && !git.has(cut.repo, b) && !git.landed(cut, b)) : [];
-  return { record, ...(gone.length ? { gone } : {}) };
-}
-
-/**
  * Where the run's work ended up, for a person who now has to go and look at it: the branches of its result steps that have one.
  *
  * A branch, not a directory: the worktree is scaffolding and gets removed, the branch is the result and stays in the repository. A
  * terminal step's branch is named as soon as it has one, so it is useful while the run is still going, not only afterwards.
  */
-export function resultBranches(run: Run): string[] {
-  const steps = stepsOf(run);
+export function resultBranches(run: Run, steps: readonly Workflow[]): string[] {
   return resultSteps(steps)
     .map((s) => run.steps[s.name]?.branch)
     .filter((b): b is string => Boolean(b));

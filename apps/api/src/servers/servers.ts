@@ -102,7 +102,7 @@ export const factoryServers = new Hono<ApiEnv>().get('/api/factories/:factory/se
     const { factory } = c.req.param();
     const wrong = factoryNameRefusal(factory);
     if (wrong !== undefined) return c.json({ error: `GET /api/factories/${factory}/servers: ${wrong}` }, 400);
-    const listing = await runPlaced(placeService, e, FACTORY_SERVERS.handler({ factory }, undefined, home));
+    const listing = await runPlaced({ placeService, home }, e, FACTORY_SERVERS.handler({ factory }, undefined, home));
     return c.json({ ...listing, builtin: builtinServers(BUILTIN_SERVERS) } satisfies FactoryServersRead);
   }),
 );

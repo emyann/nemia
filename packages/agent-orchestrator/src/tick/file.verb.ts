@@ -186,7 +186,7 @@ const fileTry = Effect.fnUntraced(function* (f: Filing, r: Retry, out: Tried) {
     out.rechecked.push(r.step);
     return;
   }
-  const landing = placeTold(run, step, yield* PlaceService, f.heads?.());
+  const landing = placeTold(run, f.reads.steps, step, yield* PlaceService, f.heads?.());
   const held = heldAnswered(f, r, step, record);
   const answers = held !== undefined;
   const closeRefused = answers ? undefined : yield* closeFirst(f, r.step, record.taskId);
@@ -326,7 +326,7 @@ const fileRound = Effect.fnUntraced(function* (f: Filing, r: Round, looped: stri
   const { e, run, notes } = f;
   const looping = stepNamed(f, r.step);
   const target = stepNamed(f, r.target);
-  const landing = placeTold(run, target, yield* PlaceService, f.heads?.());
+  const landing = placeTold(run, f.reads.steps, target, yield* PlaceService, f.heads?.());
   const record = recordNamed(run, r.target);
   const taskId = stepTaskId(run, r.target, tryOf(run, r.target) + 1);
   const refused = yield* closeFirst(f, r.target, record.taskId);
@@ -495,7 +495,7 @@ export const fileReady = Effect.fn('fileReady')(function* (f: Filing, ready: rea
     if (!f.mayFile()) break;
     const step = stepNamed(f, name);
     if (unsignedStep(servers, step, f.notes)) continue;
-    const landing = placeTold(run, step, placed, f.heads?.());
+    const landing = placeTold(run, f.reads.steps, step, placed, f.heads?.());
     const made = yield* withinEffect('act', workspaceFor(run, f.reads.steps, step, placed));
     f.notes.push(...cutNotes(name, made));
     if (!('cut' in made)) continue;

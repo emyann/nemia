@@ -50,7 +50,8 @@ const {
 } = await import('../src/runner.ts');
 const { recordFeed } = await import('../src/feed/feed.store.ts');
 const { isRunLine } = await import('../src/feed/feed.ts');
-const { readRun, rewriteRun, stepsOf } = await import('../src/record/record.store.ts');
+const { readRun, rewriteRun } = await import('../src/record/record.store.ts');
+const { stepsNow: stepsOf } = await import('./steps-now.ts');
 const { tryOf } = await import('../src/record/record.ts');
 const { freshRestMemo } = await import('../src/tick/tick.verb.ts');
 const { runLabels, stepLabels } = await import('../src/telemetry/telemetry.ts');

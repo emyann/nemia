@@ -299,7 +299,7 @@ const noAgentWords = (from: string, name: string, dir: string): string =>
 export const agents = new Hono<ApiEnv>()
   .get('/api/agents', (c) =>
     served(c, async ({ e, placeService, env, repo, home, factory, inRequest }) => {
-      const { agents: read } = (await runPlaced(placeService, e, AGENTS.handler({ repo }, env, home))) as AgentsRead;
+      const { agents: read } = (await runPlaced({ placeService, home }, e, AGENTS.handler({ repo }, env, home))) as AgentsRead;
       const listings = await inRequest(Effect.forEach(read, (one) => listingOf(one, repo, home)));
       const answer: LibraryAgent[] = inFactory(
         listings,
@@ -313,7 +313,7 @@ export const agents = new Hono<ApiEnv>()
   .get('/api/agents/sources', (c) =>
     served(c, async ({ e, placeService, env, home }) => {
       const at = c.req.query('path');
-      return c.json(await runPlaced(placeService, e, SOURCES.handler(at === undefined ? {} : { path: at }, env, home)));
+      return c.json(await runPlaced({ placeService, home }, e, SOURCES.handler(at === undefined ? {} : { path: at }, env, home)));
     }),
   )
   .get('/api/agents/:from/:name', (c) =>
@@ -321,7 +321,7 @@ export const agents = new Hono<ApiEnv>()
       const { from, name } = c.req.param();
       const place = placeOf(from, name, `GET /api/agents/${from}/${name}`, repo, home);
       if ('status' in place) return c.json({ error: place.error }, place.status);
-      const { agent } = (await runPlaced(placeService, e, READ.handler({ from, name, dir: place.dir, repo }, env, home))) as {
+      const { agent } = (await runPlaced({ placeService, home }, e, READ.handler({ from, name, dir: place.dir, repo }, env, home))) as {
         agent: AgentReading | null;
       };
       if (!agent) return c.json({ error: noAgentWords(from, name, place.dir) }, 404);
@@ -337,7 +337,7 @@ export const agents = new Hono<ApiEnv>()
       const agent = (await inRequest(Effect.flatMap(AgentDoor, (door) => door.agents.found({ dir: workflowIn(place.dir) })))).get(name);
       if (agent === undefined) return c.json({ error: noAgentWords(from, name, place.dir) }, 404);
       if (agent instanceof Error) return c.json({ error: agent.message }, 422);
-      const { card } = (await runPlaced(placeService, e, AGENT_CARD.handler({ name, repo, from }, env, home))) as CardRead;
+      const { card } = (await runPlaced({ placeService, home }, e, AGENT_CARD.handler({ name, repo, from }, env, home))) as CardRead;
       return c.json({
         card,
         servedOverA2A: false,
@@ -426,7 +426,7 @@ export const agents = new Hono<ApiEnv>()
       );
       if ('status' in read) return c.json({ error: read.error }, read.status);
       const run = (await runPlaced(
-        placeService,
+        { placeService, home },
         e,
         TRY.handler({ from, name, brief: read.body.brief, repo }, undefined, home),
       )) as AgentTried;
@@ -457,7 +457,7 @@ export const agents = new Hono<ApiEnv>()
       );
       if ('status' in read) return c.json({ error: read.error }, read.status);
       const { version } = read.body;
-      return c.json(await runPlaced(placeService, e, REMOVE.handler({ from, name, version, repo }, undefined, home)));
+      return c.json(await runPlaced({ placeService, home }, e, REMOVE.handler({ from, name, version, repo }, undefined, home)));
     }),
   );
 
@@ -485,7 +485,7 @@ async function saved(
     ...(version !== undefined && { version }),
     ...(name !== undefined && { name }),
   };
-  const done = (await runPlaced(placeService, e, WRITE.handler(args, undefined, home))) as AgentWritten;
+  const done = (await runPlaced({ placeService, home }, e, WRITE.handler(args, undefined, home))) as AgentWritten;
   const agent = await inRequest(listedAgent('yours', done.dir, done.agent.name, repo, home));
   if (agent === null) throw new Error(`The agent ${done.agent.name} written to ${done.dir} does not read back: GET /api/agents says why.`);
   return {

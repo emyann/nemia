@@ -32,7 +32,8 @@ import type { FeedWords } from '../feed/index.ts';
 import { roundFiled, roundsDue } from '../round/round.ts';
 import type { Closeout } from '../closeout/index.ts';
 import { nextTry, pauseAsksVoid, retriesDue, turnsOf, type RetryAsk } from '../retry/index.ts';
-import { runsDir, stepsOf } from '../record/record.store.ts';
+import { runsDir } from '../record/record.store.ts';
+import { stepsOf } from '../steps/steps.verb.ts';
 import { runStore } from '../record/files.store.ts';
 import { collectArtifacts, filesLacked, handCloseout } from '../artifacts/artifacts.store.ts';
 import {
@@ -474,7 +475,7 @@ export const mayFileOf = (run: Run): (() => boolean) => {
 
 /** A pass's reads of a run, before it adopts or files anything: the engine's views of its tasks, the readers made of them, and its asks. */
 const readPass = Effect.fnUntraced(function* (e: Engine, run: Run) {
-  const steps = stepsOf(run);
+  const steps = yield* stepsOf(run);
   const { views, phaseOf } = yield* taskPhasesRead(run, { earlierTries: underBudget(steps, run) }).pipe(over(e));
   const signedOff = closeoutReader(views, run);
   const asked = closeoutAsked(views);

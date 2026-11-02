@@ -12,7 +12,7 @@ import { Effect, JsonSchema, Schema, SchemaRepresentation } from 'effect';
 import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from 'agent-orchestrator/testing';
 import { COMMANDS, routeList, runObject, runStore } from 'agent-orchestrator';
-import { SUB_RESOURCES } from './openapi.ts';
+import { ANSWERS, SUB_RESOURCES } from './openapi.ts';
 import { appOver, beforeEachTest, eachTest, engineFor, runOver } from '../../test/placed.ts';
 
 const stand = eachTest(testPlace);
@@ -64,7 +64,10 @@ test('the OpenAPI document is 3.1.0, defines `Run`, and imports back into a Sche
   const back = SchemaRepresentation.fromJsonSchemaDocument(
     JsonSchema.fromSchemaOpenApi3_1({ $ref: '#/components/schemas/Run', $defs: doc.components.schemas }),
   ) as Schema.Decoder<unknown>;
-  const object = await runWith(engine(), runObject(runStore.runs.read(R), { memo: { filings: { filed: new Map(), cursor: 0 }, said: new Map() } }));
+  const object = await runWith(
+    engine(),
+    runObject(runStore.runs.read(R), { memo: { filings: { filed: new Map(), cursor: 0 }, said: new Map() } }),
+  );
   assert.ok(!('unjudged' in object), 'the run is judged');
   assert.deepEqual(Schema.decodeUnknownSync(back)(object), object, "the imported Schema decodes the package's object of the run");
   assert.ok(
@@ -83,4 +86,30 @@ test("the document's paths are the sub-resources' routes as the command table sa
   assert.equal(routes.length, SUB_RESOURCES.length, 'each sub-resource has its route in the table');
   assert.deepEqual(Object.keys(doc.paths).sort(), routes.sort(), 'the paths are those routes, and only those');
   for (const path of routes) assert.ok(doc.paths[path]?.get, `${path} is read with GET`);
+});
+
+test("each sub-resource's path names its answer's component, which imports back and decodes what the route answers", async () => {
+  const doc = (await (await app().request('/openapi/v3/nemia/v1')).json()) as {
+    paths: Record<string, { get: { operationId: (typeof SUB_RESOURCES)[number]; responses: Record<string, unknown> } }>;
+    components: { schemas: Record<string, JsonSchema.JsonSchema> };
+  };
+  const asked = { runId: R, step: 'design', try: '1' };
+  for (const [path, { get }] of Object.entries(doc.paths)) {
+    const name = ANSWERS[get.operationId];
+    assert.deepEqual(
+      get.responses['200'],
+      {
+        description: (get.responses['200'] as { description: string }).description,
+        content: { 'application/json': { schema: { $ref: `#/components/schemas/${name}` } } },
+      },
+      `${path} answers ${name}`,
+    );
+    const back = SchemaRepresentation.fromJsonSchemaDocument(
+      JsonSchema.fromSchemaOpenApi3_1({ $ref: `#/components/schemas/${name}`, $defs: doc.components.schemas }),
+    ) as Schema.Decoder<unknown>;
+    const res = await app().request(path.replace(/\{(\w+)\}/g, (_, key: keyof typeof asked) => asked[key]));
+    assert.equal(res.status, 200, `${path} answers the fixture run`);
+    const body: unknown = await res.json();
+    assert.deepEqual(Schema.decodeUnknownSync(back)(body), body, `${name}, imported back, decodes what ${path} answers`);
+  }
 });

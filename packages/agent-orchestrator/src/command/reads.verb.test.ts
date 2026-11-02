@@ -32,7 +32,7 @@ test('nemia closeout prints the whole closeout a person reads: its question, its
     refused: [],
     output: { again: true, findings: [{ file: 'a.ts' }] },
     missing: [],
-    replies: null,
+    replies: [{ finding: 'the flag is unnamed', answer: "won't fix", why: 'the spec names it in the next card' }],
     schema: {},
     questions: [],
     raw: {},
@@ -44,6 +44,8 @@ test('nemia closeout prints the whole closeout a person reads: its question, its
   }
   assert.ok(text.includes('again'), 'an output field is printed by its name');
   assert.ok(text.includes('a.ts'), "and with its value, a review's findings among them");
+  const reply = lines.findIndex((l) => l.includes('the flag is unnamed'));
+  assert.ok(lines[reply + 1]?.includes('the spec names it in the next card'), "each reply's why is on the line under it");
   assert.deepEqual(
     CLOSEOUT.print?.({ try: 2, closeout: null, unreadable: null }, { step: 'implement' }).length,
     1,

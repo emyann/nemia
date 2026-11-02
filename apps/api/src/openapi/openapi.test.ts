@@ -11,7 +11,8 @@ import path from 'node:path';
 import { Effect, JsonSchema, Schema, SchemaRepresentation } from 'effect';
 import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from 'agent-orchestrator/testing';
-import { runObject, runStore } from 'agent-orchestrator';
+import { COMMANDS, routeList, runObject, runStore } from 'agent-orchestrator';
+import { SUB_RESOURCES } from './openapi.ts';
 import { appOver, beforeEachTest, eachTest, engineFor, runOver } from '../../test/placed.ts';
 
 const stand = eachTest(testPlace);
@@ -71,4 +72,15 @@ test('the OpenAPI document is 3.1.0, defines `Run`, and imports back into a Sche
     'the object carries the `input` edge the record declares',
   );
   assert.equal(Schema.decodeUnknownResult(back)({ ...object, kind: 'Step' })._tag, 'Failure', 'the imported Schema keeps the kind closed');
+});
+
+test("the document's paths are the sub-resources' routes as the command table says them, each in OpenAPI's spelling", async () => {
+  const doc = (await (await app().request('/openapi/v3/nemia/v1')).json()) as { paths: Record<string, { get?: unknown }> };
+  const routes = COMMANDS.filter((c) => (SUB_RESOURCES as readonly string[]).includes(c.name))
+    .flatMap((c) => routeList(c))
+    .filter((r) => r.method === 'GET')
+    .map((r) => r.path.replace(/:(\w+)/g, '{$1}'));
+  assert.equal(routes.length, SUB_RESOURCES.length, 'each sub-resource has its route in the table');
+  assert.deepEqual(Object.keys(doc.paths).sort(), routes.sort(), 'the paths are those routes, and only those');
+  for (const path of routes) assert.ok(doc.paths[path]?.get, `${path} is read with GET`);
 });

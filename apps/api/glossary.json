@@ -77,7 +77,7 @@
     },
     {
       "term": "OpenAPI document",
-      "meaning": "the api's description of the run object and its sub-resources' routes in OpenAPI 3.1, generated from the package's Schema and served on `GET /openapi/v3/nemia/v1`, from which a client's types are generated."
+      "meaning": "the api's description of the run object in OpenAPI 3.1, generated from the package's Schema and served on `GET /openapi/v3/nemia/v1`, with the routes of its sub-resources as the command table gives them. A client's types for the object are generated from it; a sub-resource's answer has no Schema in it yet."
     },
     {
       "term": "Phase / reason / message",

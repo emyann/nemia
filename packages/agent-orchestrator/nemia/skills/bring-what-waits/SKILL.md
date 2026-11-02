@@ -21,7 +21,7 @@ Before any of them, read the factory's instruction (`nemia factory instruction <
 A step whose workflow gives it a `gate:` has signed off and waits, at its gate, for the person to let it hand on.
 
 Read it with `nemia decide <run>`: the step's closeout, what it changed, its checks and what they said, its cost. `nemia show <run>` gives
-the steps around it, `nemia logs <run> <step>` a check's words.
+the steps around it, `nemia closeout <run> <step> [--try <n>]` a try's closeout whole, `nemia logs <run> <step>` a check's words.
 
 Bring it, a short part each:
 

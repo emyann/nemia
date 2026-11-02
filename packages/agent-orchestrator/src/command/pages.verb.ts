@@ -57,7 +57,7 @@ export const RUN: Command<{ run: Run | null }> = {
   route: { method: 'GET', path: '/api/runs/:id', status: 200 },
   only: {
     side: 'api',
-    why: "the board's run page is a run judged, with its steps and their files; at the command line, nemia show reads its record",
+    why: "the board's run page is a run judged, with its steps and their files; at the command line, nemia show prints the run object, and nemia show --raw its record",
   },
   handler: (args) => tried(() => ({ run: runOf(args) ?? null })),
   print: () => [],

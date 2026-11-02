@@ -9,7 +9,7 @@ import { EngineService, asked, tried } from '../runtime-client.ts';
 import type { PlaceService } from '../place/place.store.ts';
 import type { Refusal } from '../refusal/refusal.ts';
 import { rooted } from '../wiring/wire.verb.ts';
-import type { StepTry } from '../resource/tries.verb.ts';
+import type { StepCloseout, StepTry } from '../resource/tries.verb.ts';
 import { runObject, stepCloseout, stepTold, stepTries, stepTry, type TryCloseout } from '../object/run.verb.ts';
 import { runStore } from '../record/files.store.ts';
 import type { Run } from '../record/record.ts';
@@ -111,6 +111,27 @@ export const TRY: Command<StepTry> = {
   print: (data) => [JSON.stringify(data, null, 2)],
 };
 
+/** A field's value on one line: a string as it is, anything else as JSON. */
+const valueLine = (value: unknown): string => (typeof value === 'string' ? value : JSON.stringify(value));
+
+/**
+ * A closeout as a person reads it at the command line: its outcome and summary, the question a blocked step asks (`needs`), its body,
+ * the files and values it handed on, the fields its workflow asked for (`output`, a review's findings among them) and what it left out or
+ * was refused — everything the api's route answers but the closeout as it came (`raw`) and the schema it was read by.
+ */
+const closeoutLines = (n: number, c: StepCloseout): string[] => [
+  `try ${n}: ${c.outcome}: ${c.summary}`,
+  ...(c.needs ? [`needs: ${c.needs}`] : []),
+  ...(c.body && c.body !== c.summary ? ['', c.body] : []),
+  ...(c.artifacts.length ? ['', 'artifacts:', ...c.artifacts.map((a) => `  ${a.path}`)] : []),
+  ...(c.values.length ? ['', 'values:', ...c.values.map((v) => `  ${v.name}: ${v.value}`)] : []),
+  ...(Object.keys(c.output).length ? ['', 'output:', ...Object.entries(c.output).map(([k, v]) => `  ${k}: ${valueLine(v)}`)] : []),
+  ...(c.questions.length ? ['', `questions: ${c.questions.flatMap((q) => q.questions.map((x) => x.title)).join(' · ')}`] : []),
+  ...(c.replies?.length ? ['', 'replies:', ...c.replies.map((r) => `  ${r.answer}: ${r.finding}`)] : []),
+  ...(c.missing.length ? ['', `missing: ${c.missing.join(', ')}`] : []),
+  ...(c.refused.length ? ['', 'refused:', ...c.refused.map((r) => `  ${r}`)] : []),
+];
+
 /**
  * `nemia closeout <run> <step> [--try n]`, `GET /api/runs/:runId/steps/:step/tries/:try/closeout`: what a try of a step signed off with,
  * its latest by default (`TryCloseout`).
@@ -130,10 +151,7 @@ export const CLOSEOUT: Command<TryCloseout> = {
   handler: (args, _env, home) => rooted(home, 'closeout', stepCloseout(...stepNamed(args), textOf(args, 'try'))),
   print: ({ try: n, closeout, unreadable }, args) =>
     closeout
-      ? [
-          `try ${n}: ${closeout.outcome}: ${closeout.summary}`,
-          ...(closeout.body && closeout.body !== closeout.summary ? ['', closeout.body] : []),
-        ]
+      ? closeoutLines(n, closeout)
       : [
           `try ${n} of ${textOf(args, 'step') ?? ''}: ${unreadable ? `its closeout does not read: ${unreadable.error}` : 'no closeout yet'}`,
         ],

@@ -19,7 +19,7 @@ import { runLabels } from '../telemetry/telemetry.ts';
 import type { StepCloseout, StepTry, StepUnreadable } from '../resource/tries.verb.ts';
 import { toldOf } from '../resource/told.verb.ts';
 import type { Run as RunObject, RunSpec, RunStepStatus, TryShort } from './run.model.ts';
-import { raiseReads, runReading, type RunReading, triesIn } from './read.verb.ts';
+import { raiseReads, runReading, type RunReading, stepsReading, triesIn } from './read.verb.ts';
 
 /** What `runObject` is handed beside its services: the feed's filing times it reads on from (`filedTimes`), the caller's to keep. */
 export type RunObjectReads = { readonly filings: Filings };
@@ -107,7 +107,7 @@ export const runObject = Effect.fn('runObject')(function* (run: Run, { filings }
 /** The run `runId`'s record and its one read, its step `step` named: refused where the run is not judged, or has no such step. */
 const stepRead = Effect.fnUntraced(function* (runId: string, step: string) {
   const run = yield* (yield* RunDoor).runs.read(RunId.read(runId));
-  const at = yield* runReading(run, { filed: new Map(), cursor: 0 });
+  const at = yield* stepsReading(run);
   if ('unjudged' in at)
     return yield* Effect.fail(
       new Conflict({ message: `Run ${runId} is not judged: ${at.unjudged}. Mend what that names, then ask again.` }),

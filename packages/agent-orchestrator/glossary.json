@@ -347,7 +347,7 @@
     },
     {
       "term": "Run object",
-      "meaning": "a run as one object in Kubernetes' shape, `apiVersion: nemia/v1`, `kind: Run`: `metadata` (its name, when it was made, its factory and workflow as labels), `spec` (what the record froze: its steps with their `after`, `input` and `loop`, its brief and place) and `status` (the list's judgement of it, its graph and timeline, and each step's state, raise and current try in short). An Effect Schema, exported as an OpenAPI 3.1 document; `nemia show` prints it.",
+      "meaning": "a run as one object in Kubernetes' shape, `apiVersion: nemia/v1`, `kind: Run`: `metadata` (its name, when it was made, its factory and workflow as labels), `spec` (what the record froze: its steps with their `after`, `input` and `loop`, its brief and place) and `status` (the list's judgement of it, its graph and timeline, and each step's state, raise and current try in short): all the run's page shows but each step's tries whole and what it was told, which are its sub-resources. An Effect Schema, exported as an OpenAPI 3.1 document from which the board's run mirror is generated; `nemia show` prints it.",
       "type": "Run"
     },
     {
@@ -410,7 +410,7 @@
     },
     {
       "term": "Sub-resource",
-      "meaning": "what the run object leaves out and serves on a path under its step: its `tries`, one `try`, a try's `closeout`, and what the step was `told`. Each is an entry of the command table, on the api and, for the closeout, the CLI."
+      "meaning": "what the run object leaves out and serves on a path under its step: its `tries`, one `try`, a try's `closeout`, and what the step was `told`. Each is an entry of the command table, on the api and, for the closeout, the CLI, and answers with a Schema of its own beside the object's (`StepTries`, `StepTry`, `TryCloseout`, `StepTold`, in `packages/agent-orchestrator/src/object/run.model.ts`)."
     },
     {
       "term": "TaskId",

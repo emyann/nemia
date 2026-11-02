@@ -58,7 +58,7 @@ export const SHOW: Command = {
       (run): Effect.Effect<Readonly<Record<string, unknown>>, Refusal, EngineService | PlaceService> =>
         args.raw === true
           ? Effect.succeed(rawOf(run))
-          : rooted(home, 'show', runObject(run, { filings: kept?.filings ?? { filed: new Map(), cursor: 0 } })),
+          : rooted(home, 'show', runObject(run, { memo: { filings: kept?.filings ?? { filed: new Map(), cursor: 0 }, said: new Map() } })),
     ),
   print: (data) => [JSON.stringify(data, null, 2)],
   note: (_data, args) =>
@@ -116,8 +116,9 @@ const valueLine = (value: unknown): string => (typeof value === 'string' ? value
 
 /**
  * A closeout as a person reads it at the command line: its outcome and summary, the question a blocked step asks (`needs`), its body,
- * the files and values it handed on, the fields its workflow asked for (`output`, a review's findings among them) and what it left out or
- * was refused — everything the api's route answers but the closeout as it came (`raw`) and the schema it was read by.
+ * the files and values it handed on, the fields its workflow asked for (`output`, a review's findings among them), each reply to a finding
+ * with its why under it, and what it left out or was refused — everything the api's route answers but the closeout as it came (`raw`) and
+ * the schema it was read by.
  */
 const closeoutLines = (n: number, c: StepCloseout): string[] => [
   `try ${n}: ${c.outcome}: ${c.summary}`,
@@ -127,7 +128,7 @@ const closeoutLines = (n: number, c: StepCloseout): string[] => [
   ...(c.values.length ? ['', 'values:', ...c.values.map((v) => `  ${v.name}: ${v.value}`)] : []),
   ...(Object.keys(c.output).length ? ['', 'output:', ...Object.entries(c.output).map(([k, v]) => `  ${k}: ${valueLine(v)}`)] : []),
   ...(c.questions.length ? ['', `questions: ${c.questions.flatMap((q) => q.questions.map((x) => x.title)).join(' · ')}`] : []),
-  ...(c.replies?.length ? ['', 'replies:', ...c.replies.map((r) => `  ${r.answer}: ${r.finding}`)] : []),
+  ...(c.replies?.length ? ['', 'replies:', ...c.replies.flatMap((r) => [`  ${r.answer}: ${r.finding}`, `    ${r.why}`])] : []),
   ...(c.missing.length ? ['', `missing: ${c.missing.join(', ')}`] : []),
   ...(c.refused.length ? ['', 'refused:', ...c.refused.map((r) => `  ${r}`)] : []),
 ];

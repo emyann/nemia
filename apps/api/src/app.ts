@@ -16,7 +16,7 @@ import { ApiConfig, type ApiEnv, type ApiRuntime, ReadMemo, served, type Service
 import { machines } from './machines/machines.ts';
 import { nemia, nemiaChat } from './nemia/index.ts';
 import { runs } from './runs/runs.ts';
-import { openapi } from './openapi/openapi.ts';
+import { openapi } from './openapi/index.ts';
 import { saidRequest } from './request/request.ts';
 import { stats } from './stats/stats.ts';
 import { step } from './step/step.ts';

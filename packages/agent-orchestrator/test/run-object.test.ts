@@ -82,7 +82,10 @@ const threeRuns = async () => {
 
 /** The object of the run `id`, given the store's root. */
 const object = async (id: string) =>
-  await runWith(e(), Effect.provideService(runObject(readRun(id), { filings: { filed: new Map(), cursor: 0 } }), StoreRoot, ROOT));
+  await runWith(
+    e(),
+    Effect.provideService(runObject(readRun(id), { memo: { filings: { filed: new Map(), cursor: 0 }, said: new Map() } }), StoreRoot, ROOT),
+  );
 
 const handled = <D>(entry: { handler: (...a: never[]) => unknown }, args: Record<string, string>): Promise<D> =>
   runWith(e(), (entry.handler as (a: Record<string, string>, env: NodeJS.ProcessEnv, home: string) => never)(args, process.env, ROOT));
@@ -106,6 +109,7 @@ test('runObject: the run as one object, its status the list’s judged fields, i
     const answer = await object(id);
     assert.ok(!('unjudged' in answer), `${id} is judged`);
     const run = Schema.decodeUnknownSync(RunObject.Run)(answer);
+    assert.deepEqual(run, answer, `${id}: the object decodes whole, no field outside its Schema`);
     assert.equal(run.apiVersion, 'nemia/v1');
     assert.equal(run.kind, 'Run');
     assert.equal(run.metadata.name, id);
@@ -150,8 +154,18 @@ test('the sub-resources of a step: its tries, one, its closeout and what it was 
   const closeout = await handled<{ try: number; closeout: { summary: string } | null }>(CLOSEOUT, { runId: id, step: 'work' });
   assert.equal(closeout.try, 1, 'the latest try by default');
   assert.equal(closeout.closeout?.summary, 'did it');
-  const told = await handled<{ told: string | null }>(TOLD, { runId: id, step: 'work' });
+  const told = await handled<{ told: string | null; body: string | null }>(TOLD, { runId: id, step: 'work' });
   assert.equal(typeof told.told, 'string');
+  assert.ok(told.body?.includes('work it'), 'what it was told carries its own body in the workflow');
+  const one = await handled<StepTry>(TRY, { runId: id, step: 'work' });
+  for (const [answer, schema, name] of [
+    [tries, RunObject.StepTries, 'StepTries'],
+    [one, RunObject.StepTry, 'StepTry'],
+    [closeout, RunObject.TryCloseout, 'TryCloseout'],
+    [told, RunObject.StepTold, 'StepTold'],
+  ] as const) {
+    assert.deepEqual(Schema.decodeUnknownSync(schema)(answer), answer, `the answer decodes whole through ${name}`);
+  }
   for (const asked of [
     handled(TRIES, { runId: id, step: 'ghost' }),
     handled(TRY, { runId: id, step: 'work', try: '9' }),

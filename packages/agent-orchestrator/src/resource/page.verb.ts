@@ -1,71 +1,26 @@
 /**
- * One run in full, for a person reading it (`GET /api/runs/:id` serves it): the spec, and per step what it was told and how it went. The
- * page's judgement, the api's route only serving it.
+ * One run in full, for a person reading it (`GET /api/runs/:id` serves it): the spec, and per step what it was told and how it went —
+ * projected from the run's object and its sub-resources (`runParts`), which carry all of it; the api's route only serving it.
  */
-import fs from 'node:fs';
-import path from 'node:path';
 import { Effect } from 'effect';
-import { type AtWork, atWork, runStartedAt, type RunTokens, runTokens, type Timeline } from '../timeline/index.ts';
-import type { TimelineTotal, TimelineTry } from '../timeline/index.ts';
-import { artifactsDir } from '../record/record.store.ts';
-import { budgetWord } from '../status/status.ts';
-import { consumption } from '../views/views.verb.ts';
-import { type Retry, type RetryMode, stepRaise, type StepRaise } from '../retry/index.ts';
-import { bare, type Filings, tryOf, type Views } from '../summary/reads.verb.ts';
-import {
-  atHarness,
-  needsOf,
-  type RunHolding,
-  type RunStatus,
-  type RunToDecide,
-  type RunWaiting,
-  runSaid,
-  type Spent,
-  spentOf,
-  type StepNeeds,
-} from '../summary/judged.verb.ts';
-import { PlaceService } from '../place/place.store.ts';
+import type { AtWork, RunTokens, TimelineTotal, TimelineTry } from '../timeline/index.ts';
+import type { RetryMode, StepRaise } from '../retry/index.ts';
+import type { RunHolding, RunStatus, RunToDecide, RunWaiting, Spent, StepNeeds } from '../summary/judged.verb.ts';
 import type { Drift } from '../revisions/revisions.ts';
-import { driftNow } from '../revisions/pin.verb.ts';
-import { type RunGraph, runGraph } from '../summary/graph.ts';
+import type { GraphEdge, RunGraph } from '../summary/graph.ts';
 import type { AnswerVia, RunPhase, RunReason, StepPhase, StepReason, WaitOn } from '../feed/index.ts';
 import type { CheckVerdict } from '../check/check.ts';
-import {
-  addSpend,
-  budgetOf,
-  fromNote,
-  gatesOf,
-  isRepositoryRun,
-  overBudget,
-  type PlaceKind,
-  placeOf,
-  type Run,
-  type Said,
-  type Spend,
-  type SpendOf,
-  stepSpend,
-  type ToldLayers,
-} from '../run.ts';
-import { loopSpan, type Workflow } from '../workflow.ts';
-import { folderFiles, type StepArtifact, workFolderOf } from './files.store.ts';
-import { type LastSaid, lastLineOf, type StepCheck } from './checks.verb.ts';
-import {
-  acceptedOf,
-  driftOf,
-  type StepAcceptance,
-  type StepAttempts,
-  type StepCloseout,
-  type StepGate,
-  type StepTry,
-  type StepUnreadable,
-  gateOf,
-} from './tries.verb.ts';
-import { filedOf, type StepFiled, type TaskPart, toldOf } from './told.verb.ts';
-import { readOf, type RunRead, type StepUsed, totalOf, usedOf } from './usage.ts';
-import { currentOf, raiseReads, runReading, type RunReading, triesIn } from '../object/read.verb.ts';
+import { fromNote, type PlaceKind, type Run, type Said, type ToldLayers } from '../run.ts';
+import type { StepArtifact } from './files.store.ts';
+import type { StepCheck } from './checks.verb.ts';
+import type { StepAcceptance, StepAttempts, StepCloseout, StepGate, StepTry, StepUnreadable } from './tries.verb.ts';
+import type { StepFiled, TaskPart } from './told.verb.ts';
+import type { RunRead, StepUsed } from './usage.ts';
+import { type RunParts, runParts, type RunReads } from '../object/run.verb.ts';
 import { commandLine } from '../command/command.ts';
 import { COMMANDS } from '../command/commands.verb.ts';
 import type { Command } from '../command/entry.verb.ts';
+import type { RunSpecStep, RunStepStatus, StepTold } from '../object/run.model.ts';
 
 /**
  * A step's cap, and what its tries have cost of it. `usd` is the cap in force (`budgetOf`): the `budget:` the run froze, until a person
@@ -349,120 +304,10 @@ export type StepTimelineTotal = TimelineTotal & { cost: Spent | null };
 export type StepTimelineTry = Omit<TimelineTry, 'used'> & { used: StepUsed | null };
 
 /**
- * Where the run works, as a person reads it: its repository, the kind of place its steps work in, a folder run's work directory, the
- * workflow folder it was started from, the agent a try started from an agent's page tried, and its base commit, branch and whether it cut
- * worktrees.
+ * What `runPage` is handed beside its services, as the api's handler holds it (`RunReads`): what the app's reads keep between requests,
+ * and `inRequest`, which runs the drift's program over the request's own services, so it reads the doors the app was given.
  */
-const whereOf = (
-  run: Run,
-  home: string,
-): Pick<RunDetail, 'repo' | 'place' | 'work' | 'workflowDir' | 'try' | 'baseRef' | 'branch' | 'isolate'> => ({
-  repo: run.repo ?? null,
-  place: placeOf(run),
-  work: isRepositoryRun(run) ? null : run.workspace,
-  workflowDir: run.workflowDir,
-  try: tryOf(run, home),
-  baseRef: run.baseRef ?? null,
-  branch: run.branch ?? null,
-  isolate: run.isolate ?? null,
-});
-
-/**
- * What a step's tries have cost, against its cap, and the raise of that cap the package takes (`Spent`, `StepBudget`, `StepRaise`) — off
- * the views the request already read, which hold every try's task, with no observation of its own. `steps` are the workflow the run is
- * judged by: a step it does not have has no `budget:`. No raise on a run called off, pruned or held: a raise is asked with a try or a
- * round, which the verb refuses while a hold stands (`heldRefusal`).
- */
-function costOf(
-  run: Run,
-  name: string,
-  steps: readonly Workflow[],
-  views: Views,
-  spendOf: SpendOf,
-): { spent: Spent | null; budget: StepBudget | null; raise: StepRaise | null } {
-  const step = steps.find((s) => s.name === name);
-  const spent = spentOf(stepSpend(run, name, spendOf));
-  const cap = step ? budgetOf(step, run.steps[name]) : undefined;
-  const budget =
-    step && cap !== undefined
-      ? {
-          usd: cap,
-          said: budgetWord(cap),
-          of: spent && `${spent.said} of ${budgetWord(cap)}`,
-          over: Boolean(overBudget(step, run, spendOf)),
-        }
-      : null;
-  return { spent, budget, raise: step ? stepRaise(step, run, steps, raiseReads(run, views), spendOf) : null };
-}
-
-/**
- * What a round of a loop cost: the session of each try the package's `timeline` counts in that round — the steps the loop files again
- * (`loopSpan`), a session each once, which a try a recheck reached has none of — as `taskSpend` reads it, added up (`addSpend`). The
- * package's `timeline` times a round and carries no cost of one; this adds up the sessions of its own tries, with its own functions.
- */
-function roundSpend(clock: Timeline, steps: readonly Workflow[], total: TimelineTotal, spendOf: SpendOf): Spend {
-  const looping = steps.find((s) => s.name === total.loop);
-  const names = looping ? loopSpan(steps, looping) : [];
-  return addSpend(
-    names.flatMap((name) =>
-      (clock.steps[name] ?? []).flatMap((t) => (t.round === total.round && t.session ? [spendOf(t.session.taskId)] : [])),
-    ),
-  );
-}
-
-/**
- * Every file that folder holds (`folderFiles`), for a person who never opens a terminal; empty where there is no folder. A folder the
- * api cannot read answers with why instead of a list, since the board words an empty list as the step having made nothing.
- */
-function filesOf(run: Run, step: string): { files: StepArtifact[]; filesError: string | null } {
-  const dir = workFolderOf(run, step);
-  const { files, error } = dir ? folderFiles(run, step, dir) : { files: [], error: null };
-  return { files, filesError: error };
-}
-
-/** A try asked for, as the page says it (`StepAsked`). */
-const askedOf = (r: Retry | undefined): StepAsked | null =>
-  r ? { try: r.try, mode: r.mode, model: r.model ?? null, message: r.message ?? null, stopFirst: r.stopFirst === true } : null;
-
-const specOf = (step: Workflow): StepSpec => ({
-  harness: step.harness ?? null,
-  model: step.model ?? null,
-  effort: step.effort ?? null,
-  context: step.context ?? null,
-  after: step.after,
-  workspace: step.workspace ?? null,
-  place: step.place ?? null,
-  resume: step.resume ?? null,
-  permissionMode: step.permissionMode ?? null,
-  sandbox: step.sandbox ?? null,
-  tools: step.tools ?? null,
-  deadlineSeconds: step.deadlineSeconds ?? null,
-  loop: step.loop ?? null,
-  rounds: step.rounds ?? null,
-});
-
-/** The runs a run waits on (`after`) and is handed as context (`context`), as its page shows them: none where it names none. */
-const handedRuns = (run: Run): Pick<RunDetail, 'after' | 'context'> => ({ after: run.after ?? [], context: run.context ?? [] });
-
-/** What `nemia prune` took of a run, as the page shows it: when, each worktree and what it held, and its artifacts; null for none. */
-const prunedOf = (run: Run): RunDetail['pruned'] =>
-  run.pruned
-    ? {
-        at: run.pruned.at,
-        worktrees: run.pruned.worktrees.map(({ path, bytes }) => ({ path, bytes })),
-        artifacts: run.pruned.artifacts ? { at: run.pruned.artifacts.at, bytes: run.pruned.artifacts.bytes } : null,
-      }
-    : null;
-
-/**
- * What `runPage` is handed beside its services, as the api's handler holds it: what the app's reads keep between requests (`filings`, the
- * feed's filing times; `said`, where each blocked session's conversation was last read), and `inRequest`, which runs the drift's program
- * over the request's own services, so it reads the doors the app was given.
- */
-export type RunPageReads = {
-  readonly memo: { readonly filings: Filings; readonly said: LastSaid };
-  readonly inRequest: (program: ReturnType<typeof driftNow>) => Promise<readonly Drift[]>;
-};
+export type RunPageReads = RunReads & { readonly inRequest: NonNullable<RunReads['inRequest']> };
 
 /** The run in full, or why it is not judged, in the words the list says it with (`RunSummary.unreadable`). */
 export type RunPageAnswer = RunDetail | { unjudged: string };
@@ -470,131 +315,119 @@ export type RunPageAnswer = RunDetail | { unjudged: string };
 /** A run not judged, as its page answers it: why, and nothing else. */
 const unjudgedPage = (why: string): RunPageAnswer => ({ unjudged: why });
 
-/** What `runPage` read once for the run (`RunReading`), handed to each step's part of it (`stepPage`), with what only the page reads. */
-type StepAt = RunReading & {
-  readonly placeService: PlaceService['Service'];
-  readonly used: ReturnType<typeof consumption>;
-  readonly said: LastSaid;
+/**
+ * The run's page projected from its object and every step's tries and told layers (`runParts`), with the lines a person types built off
+ * the command table: so each other field the page shows is a field of the object or of a sub-resource, and a field the object drops fails
+ * every test of the page.
+ */
+export const pageOf = ({ object, tries, told }: RunParts): RunDetail => {
+  const { metadata, spec, status } = object;
+  return {
+    id: metadata.name,
+    brief: spec.brief,
+    decide: decideLine(metadata.name),
+    repo: spec.repo,
+    place: spec.place,
+    work: spec.work,
+    workflowDir: spec.workflowDir,
+    try: spec.try,
+    baseRef: spec.baseRef,
+    branch: spec.branch,
+    isolate: spec.isolate,
+    createdAt: metadata.creationTimestamp,
+    startedAt: status.startedAt,
+    cancelledAt: status.cancelledAt,
+    pruned: status.pruned,
+    onDisk: status.onDisk,
+    after: spec.after,
+    context: spec.context,
+    ...(spec.from ? { from: spec.from, fromNote: fromNote({ from: spec.from }) } : {}),
+    waiting: status.waiting,
+    holdUntil: status.holdUntil,
+    holding: status.holding,
+    status: status.status,
+    phase: status.phase,
+    reason: status.reason,
+    on: status.on,
+    via: status.via,
+    moving: status.moving,
+    cost: status.cost,
+    atWork: status.atWork,
+    tokens: status.tokens,
+    read: status.read,
+    waitingOnYou: status.waitingOnYou,
+    waitingOnYouWords: status.waitingOnYouWords,
+    toDecide: status.toDecide,
+    gates: status.gates,
+    warning: status.warning,
+    kinds: status.kinds,
+    refresh: refreshLine(metadata.name),
+    graph: { roots: status.graph.roots, edges: status.graph.edges.filter((e): e is GraphEdge => e.kind !== 'input') },
+    steps: status.steps.map((step) => stepPageOf(metadata.name, step, spec.steps, tries[step.name] ?? [], told[step.name])),
+    timeline: { rounds: status.timeline.rounds, run: status.timeline.run },
+  };
 };
 
-/** One step of the run's page (`RunDetail['steps']`), off what `runPage` read once for the run (`StepAt`). */
-const stepPage = Effect.fnUntraced(function* (name: string, at: StepAt) {
-  const { e, placeService, run, source, steps, views, judged, used, clock, said: memoSaid } = at;
-  const step = source?.find((s) => s.name === name);
-  const taskId = run.steps[name]?.taskId ?? null;
-  const judgedContext = steps.find((s) => s.name === name)?.context;
-  const needs = needsOf(run, name, views, judged);
-  const current = currentOf(at, name);
-  const lastLine = atHarness(current) ? yield* Effect.promise(() => lastLineOf(e, views, taskId, memoSaid)) : null;
+/** The page's spec of a step (`StepSpec`), from the object's frozen step; null for a step the run froze none of. */
+const stepSpecOf = (s: RunSpecStep | undefined): StepSpec | null =>
+  s
+    ? {
+        harness: s.harness,
+        model: s.model,
+        effort: s.effort,
+        context: s.context,
+        after: s.after,
+        workspace: s.workspace,
+        place: s.place,
+        resume: s.resume,
+        permissionMode: s.fence,
+        sandbox: s.sandbox,
+        tools: s.tools,
+        deadlineSeconds: s.deadlineSeconds,
+        loop: s.loop,
+        rounds: s.rounds,
+      }
+    : null;
+
+/** One step of the page, from its status in the object, the frozen steps, its tries whole and what it was told. */
+const stepPageOf = (
+  runId: string,
+  step: RunStepStatus,
+  frozen: readonly RunSpecStep[],
+  tries: StepTry[],
+  told: StepTold | undefined,
+): RunDetail['steps'][number] => {
+  const { status: _word, current: _short, filed, ...rest } = step;
+  const latest = tries.find((t) => t.current);
   return {
-    name,
-    spec: step ? specOf(step) : null,
-    filed: filedOf(run.steps[name], views),
-    body: step?.body ?? null,
-    ...toldOf(run, name, source, views, placeService),
-    taskId,
-    workspace: run.steps[name]?.workspace ?? null,
-    ...filesOf(run, name),
-    branch: run.steps[name]?.branch ?? null,
-    note: judged.notes.get(name) ?? null,
-    roundDue: judged.roundDue.has(name),
-    commands: stepCommands(run.id, name),
-    ...needs,
-    lastLine,
-    gate: gateOf(run, steps.find((s) => s.name === name) ?? bare(name), current.reason),
-    accepted: acceptedOf(run, name),
-    said: taskId ? [...(views.get(taskId)?.state.said ?? [])] : [],
-    asked: askedOf(judged.asked.get(name)),
-    ...current,
-    used: taskId ? usedOf(used[name], judgedContext) : null,
-    ...costOf(run, name, steps, views, judged.spendOf),
-    tries: triesIn(at, name, current),
-    timeline: (clock.steps[name] ?? []).map((t) => ({ ...t, used: t.session ? usedOf(t.used, judgedContext) : null })),
+    ...rest,
+    spec: stepSpecOf(frozen.find((s) => s.name === step.name)),
+    commands: stepCommands(runId, step.name),
+    filed: filed && (({ fence, ...given }) => ({ ...given, permissionMode: fence }))(filed),
+    body: told?.body ?? null,
+    told: told?.told ?? null,
+    layers: told?.layers ?? null,
+    taskParts: told?.taskParts ?? null,
+    closeout: latest?.closeout ?? null,
+    unreadable: latest?.unreadable ?? null,
+    tries,
   };
-});
+};
 
 /**
  * A run in full, judged off the views of its tasks; or, when its unfrozen folder does not load or a task it reads does not
  * (`judgedUnlessUnreadable`), why it is not judged, in the words the list says it with (`RunSummary.unreadable`), and nothing else: the
  * page shows no step as the engine's missing record, or a folder the tick does not read, would.
  *
- * The run's tasks, every try's, are read over one look at the harnesses (`viewsFor`), as the list reads them, the record first — never a
- * `view`, an observation, for each task of each try, one after another, on a page polled every five seconds — and only the run's own. A
- * refused check's streams are read through the engine's `output`, which observes nothing (`refusedStderr`, `checksOf`), and one more
- * observation is made for each blocked session's last line (`lastLineOf`), which only a run's own detail reads. What its tries consumed and
- * cost, and its timeline, come off the same views and the feed's filing times (`filedTimes`), with no observation of their own; the
- * timeline's rounds are of the loops of the steps the run is judged by. A program over the engine, the place and the store's root
+ * The object of the run and every step's tries and told layers, off one read (`runParts`), projected to the page (`pageOf`), so the page
+ * shows nothing the object and its sub-resources do not carry. A program over the engine, the place and the store's root
  * (`EngineService`, `PlaceService`, `StoreRoot`), what it read before kept in `memo`, the app's; the kinds it is behind the files on
  * (`driftNow`) through the doors, over the request's services (`inRequest`).
  */
-export const runPage = Effect.fn('runPage')(function* (run: Run, { memo, inRequest }: RunPageReads) {
-  const placeService = yield* PlaceService;
-  const read = yield* runReading(run, memo.filings);
-  if ('unjudged' in read) return unjudgedPage(read.unjudged);
-  const { home, folder, names, steps, views, judged, clock, filed } = read;
-  const used = consumption(views, run);
-  const kinds = yield* Effect.promise(() => inRequest(driftNow(run)));
-  const at: StepAt = { ...read, placeService, used, said: memo.said };
-  const shown = yield* Effect.forEach(names, (name) => stepPage(name, at), { concurrency: 'unbounded' });
-  const page: RunDetail = {
-    id: run.id,
-    brief: run.brief,
-    decide: decideLine(run.id),
-    ...whereOf(run, home),
-    createdAt: run.createdAt,
-    startedAt: runStartedAt(run, filed),
-    cancelledAt: run.cancelledAt ?? null,
-    pruned: prunedOf(run),
-    onDisk: onDiskOf(run, home),
-    ...handedRuns(run),
-    ...(run.from ? { from: run.from, fromNote: fromNote(run) } : {}),
-    waiting: judged.waiting,
-    holdUntil: judged.holding && run.hold ? run.hold.until : [],
-    holding: judged.holding,
-    ...runSaid(judged),
-    moving: judged.moving,
-    cost: judged.cost,
-    atWork: atWork(run, views),
-    tokens: runTokens(run, views),
-    read: runRead(clock, steps, names),
-    waitingOnYou: judged.waitingOnYou,
-    waitingOnYouWords: judged.waitingOnYouWords,
-    toDecide: judged.toDecide,
-    gates: gatesOf(steps, run),
-    warning: folder.steps ? driftOf(run, folder.steps) : folder.warning,
-    kinds,
-    refresh: refreshLine(run.id),
-    graph: runGraph(steps, names),
-    steps: shown,
-    timeline: runTimeline(clock, steps, judged),
-  };
-  return page;
+export const runPage = Effect.fn('runPage')(function* (run: Run, reads: RunPageReads) {
+  const parts = yield* runParts(run, reads);
+  return 'unjudged' in parts ? unjudgedPage(parts.unjudged) : pageOf(parts);
 });
-
-/** The run's timeline: each round with what it cost, by the steps the run is judged by, and the run's own span with what it cost. */
-const runTimeline = (
-  clock: Timeline,
-  steps: readonly Workflow[],
-  judged: { spendOf: Parameters<typeof roundSpend>[3]; cost: RunDetail['timeline']['run']['cost'] },
-): RunDetail['timeline'] => ({
-  rounds: clock.rounds.map((r) => ({ ...r, cost: spentOf(roundSpend(clock, steps, r, judged.spendOf)) })),
-  run: { ...clock.run, cost: judged.cost },
-});
-
-/** What the sessions of every try of every step read, by price (`RunRead`), off the run's timeline; null where none of it was measured. */
-const runRead = (clock: Timeline, steps: readonly Workflow[], names: readonly string[]): RunRead | null =>
-  readOf(
-    totalOf(
-      steps,
-      names.flatMap((name) => (clock.steps[name] ?? []).flatMap((t) => (t.session ? [[name, t.used] as const] : []))),
-    ),
-  );
-
-/** What of a run `nemia prune` would find on disk (`RunDetail.onDisk`): two stats, and no git. */
-function onDiskOf(run: Run, home: string): RunDetail['onDisk'] {
-  const files = path.dirname(artifactsDir(run, '_'));
-  return { worktrees: isRepositoryRun(run) && fs.existsSync(path.join(home, 'worktrees', run.id)), files: fs.existsSync(files) };
-}
 
 /**
  * The command of the table (`COMMANDS`) named `name`: thrown as this module loads when the table holds none by that name, so a name the

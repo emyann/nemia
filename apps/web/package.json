@@ -13,7 +13,8 @@
     "theme:generate": "tsx src/components/ui/ds/tokens/generate-theme.mjs DESIGN.md --out theme",
     "board:serve": "node test/e2e/serve.ts serve",
     "board:stop": "node test/e2e/serve.ts stop",
-    "storybook": "storybook dev -p 6007 --no-open"
+    "storybook": "storybook dev -p 6007 --no-open",
+    "mirror": "node test/mirror.ts"
   },
   "dependencies": {
     "@blobatar/react": "2.7.0",

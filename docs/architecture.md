@@ -247,10 +247,15 @@ words the board's answer. Both sides hand a handler only what its one spec gives
 
 **In the orchestrator, moved down from the api**: the run page's judgement (`runPage`, `packages/agent-orchestrator/src/resource/`:
 a step's tries, closeouts, checks, told layers, files and usage, and `runsInOf` reading a harness's argv for a mode), and the run as
-one object (`RunObject.Run`, an Effect Schema in `src/object/run.model.ts`, built by `runObject` from the list's judged fields,
-`judgedFields`, and the one raise, `stepRaise`). `apps/api/src/detail/` keeps only type re-exports of the page for the board's mirror,
-until the board reads the object; the api serves the object's sub-resources from the command table and its OpenAPI 3.1 document,
-generated from the Schema (`apps/api/src/openapi/`).
+one object (`RunObject.Run`, an Effect Schema in `src/object/run.model.ts`, built by `runParts` in `src/object/run.verb.ts` off one
+read of the run, from the list's judged fields, `judgedFields`, and the one raise, `stepRaise`). The object carries all the page shows
+but each step's tries whole and what it was told, which are its sub-resources, each answered by a Schema of its own (`StepTries`,
+`StepTry`, `TryCloseout`, `StepTold`); until the board reads the object, `runPage` is projected from the object and those sub-resources
+(`pageOf`), so every test of the page holds the object complete. `apps/api/src/detail/` keeps only type re-exports of the page for the
+board's hand mirror, until the board reads the object; the api serves the object's sub-resources from the command table and its OpenAPI
+3.1 document, generated from the Schemas (`apps/api/src/openapi/`, printed by its `print.ts`). The board's run mirror is generated from
+that document by Effect's own modules (`apps/web/src/lib/api/run.gen.ts`, written by `npm run mirror` in `apps/web`), checked in, and
+refused when it drifts (`apps/web/test/mirror.test.ts`).
 
 **In the api today, below its layer**: `src/capabilities/reach.ts` re-implementing permission matching. Its readers that touch the machine
 are counted against a baseline that only shrinks (`MOVES` in `apps/api/test/kinds.test.ts`), each entry naming the card that moves it,

@@ -222,6 +222,7 @@ const FENCE_WORDS: Baseline = {
   'packages/agent-orchestrator/src/keys/tools.ts': { count: 22, ...MOVES.fenceFields },
   'packages/agent-orchestrator/src/nemia/keep.verb.ts': { count: 7, ...MOVES.fenceFields },
   'packages/agent-orchestrator/src/nemia/level.store.ts': { count: 7, ...MOVES.fenceFields },
+  'packages/agent-orchestrator/src/object/run.verb.ts': { count: 2, ...MOVES.fenceForm },
   'packages/agent-orchestrator/src/record/record.ts': { count: 1, ...MOVES.fenceFields },
   'packages/agent-orchestrator/src/resource/page.verb.ts': { count: 5, ...MOVES.fenceForm },
   'packages/agent-orchestrator/src/resource/told.verb.ts': { count: 8, ...MOVES.fenceForm },

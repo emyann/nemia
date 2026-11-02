@@ -348,12 +348,21 @@ test('what `nemia decide` and `nemia ls` print of a step asking no question, or 
       plain.join('\n'),
     );
   });
-  await t.test('a question field that does not decode is printed as a field, and offered `--message`', async (sub) => {
-    const half = await asking({ open: [{ title: 'Half a question' }] });
+  await t.test('a question field that does not decode is refused back once, then printed as a field, saying why', async (sub) => {
+    const open = [{ title: 'Half a question' }];
+    const half = await asking({ open });
+    assert.equal(readRun(half).steps.plan.tries?.at(-1)?.cause, 'signoff', 'the run asks the session to mend it');
+    stage
+      .board()
+      .settle(`${half}-plan-try2`, 'succeeded', { outcome: 'blocked', summary: 'Half.', artifacts: [], needs: 'Two questions.', open });
+    await stage.runWith(stage.board().e, advanceRun(readRun(half)));
     const screen = await printedBy(sub, ['decide', half]);
     assert.ok(screen.includes('    open:'), screen.join('\n'));
     assert.ok(!screen.some((l) => /^ {6}1\. /.test(l)), screen.join('\n'));
-    assert.ok(screen.includes(`    to answer it:  nemia retry ${half} plan --message "<answer>"`), screen.join('\n'));
+    const refused = screen.find((l) => l.startsWith('    !! not accepted:'));
+    assert.ok(refused, screen.join('\n'));
+    names(refused, '`open`', 'question 1');
+    assert.ok(screen.some((l) => l.includes(`nemia retry ${half} plan`)), screen.join('\n'));
   });
 });
 

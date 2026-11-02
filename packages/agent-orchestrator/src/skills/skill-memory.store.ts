@@ -18,7 +18,7 @@ import { SKILLS_FOLDER, WorkflowError } from '../step/step.ts';
 import { skillTurnCost, type SkillsFound } from '../agents/agents.ts';
 import { lookedUp } from './lookup.ts';
 import { renderSkill, skillEntryOf, withPreload } from './skills.ts';
-import { isBuiltinPlace, lookupOf, lookupRoots, PLACE_SKILLS, skillsFor, type Places } from './read.store.ts';
+import { lookupOf, lookupRoots, PLACE_SKILLS, placeSkillFolders, type Places } from './read.store.ts';
 import { SkillDoor, skillDoorOver, type SkillLayer, type SkillPage, type SkillWhere } from './skill-door.store.ts';
 
 /** Where the stand-in says a skill's folder is: the root its paths are named under, as the files' are under the store's root. */
@@ -29,13 +29,6 @@ const MEMORY_WORKFLOWS = path.posix.join(MEMORY_ROOT, 'workflows');
 
 /** The version of a SKILL.md held: a digest of its text, as `skillVersion` digests a skill's folder. */
 const versionOf = (text: string): string => createHash('sha256').update(text).digest('hex').slice(0, 16);
-
-/**
- * The package's builtin place skills, each by name with its folder, in the order `skillsFor` finds them: read through `skillsFor` itself,
- * at a folder of the stand-in's that no disk holds, so every skill it answers is a place skill (`isBuiltinPlace`).
- */
-const placeSkills = (): Array<[string, string | WorkflowError]> =>
-  [...skillsFor(path.posix.join(MEMORY_WORKFLOWS, '_')).all].filter(([, at]) => typeof at !== 'string' || isBuiltinPlace(at));
 
 /** Why a write or a copy may not go to the folder of skills `at`, as the files refuse it, or nothing. */
 function placeRefusal(at: string, where: SkillWhere | undefined): Invalid | undefined {
@@ -77,7 +70,7 @@ function foundIn(namesIn: (holder: string) => string[], dir: string, places: Pla
         : new WorkflowError(`${name} is a skill in both ${at} and ${again}, one repository's two places for skills: keep one of them.`),
     );
   }
-  for (const [name, at] of placeSkills()) if (!all.has(name)) all.set(name, at);
+  for (const [name, at] of placeSkillFolders()) if (!all.has(name)) all.set(name, at);
   return {
     at: { get: (name) => (name.includes(':') ? undefined : all.get(name)) },
     all,

@@ -114,12 +114,21 @@ function rootSkills(roots: readonly string[]): Map<string, string | WorkflowErro
         : (skillLinkRefusal(at) ?? rulesRefusal(at) ?? at),
     );
   }
-  for (const name of placeSkills().sort()) {
-    const at = path.join(PLACE_SKILLS, name);
-    if (!found.has(name)) found.set(name, skillLinkRefusal(at) ?? at);
-  }
+  for (const [name, at] of placeSkillFolders()) if (!found.has(name)) found.set(name, at);
   return found;
 }
+
+/**
+ * The package's builtin place skills (`PLACE_SKILLS`), by name in order, each its folder or the refusal of a link in it: what a lookup
+ * finds last, where no root has the name, on the files and in the Skill door's memory stand-in alike.
+ */
+export const placeSkillFolders = (): Array<[string, string | WorkflowError]> =>
+  placeSkills()
+    .sort()
+    .map((name) => {
+      const at = path.join(PLACE_SKILLS, name);
+      return [name, skillLinkRefusal(at) ?? at];
+    });
 
 /** The real path of `at`, or nothing where it cannot be reached. */
 function realOf(at: string): string | undefined {

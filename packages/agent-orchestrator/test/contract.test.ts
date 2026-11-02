@@ -164,12 +164,12 @@ test("agent-orchestrator's exports are . (runner.ts), ./run, ./workflow and ./te
     '.': './src/runner.ts',
     './run': './src/run.ts',
     './workflow': './src/workflow.ts',
-    './testing': './place/memory/index.ts',
+    './testing': './testing.ts',
     './package.json': './package.json',
   });
 });
 
-/** The entry a test alone imports: the test place, `testPlace`, and the doors' stand-ins (`place/memory`). */
+/** The entry a test alone imports: the test place, `testPlace` (`place/memory`), and the doors' stand-ins (`testing.ts`). */
 const TESTING = 'agent-orchestrator/testing';
 
 /** Where `file`, which is no test's, imports the testing entry: a program that runs is given the place its layer holds. */

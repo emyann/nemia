@@ -158,6 +158,12 @@ const lastRead = <T>(client: QueryClient, key: QueryKey): T | undefined =>
 /** The data of each of a list of reads, in order: a `combine` declared once, so the list keeps its identity while no read changes. */
 const dataOf = <T>(results: UseQueryResult<T>[]): Array<T | undefined> => results.map((r) => r.data);
 
+/** What the reads of every step answered, and the first failure among those that answered nothing, so a reader says it. */
+const readsOf = <T>(results: UseQueryResult<T>[]): { data: Array<T | undefined>; error: unknown } => ({
+  data: dataOf(results),
+  error: results.find((r) => r.data === undefined && r.error)?.error ?? null,
+});
+
 /** No steps, for a run whose object is not read yet: one array for the module's life. */
 const NO_STEPS: readonly RunStepStatus[] = [];
 
@@ -168,23 +174,23 @@ const NO_STEPS: readonly RunStepStatus[] = [];
 function useStepReads(
   id: string,
   steps: readonly RunStepStatus[],
-): { tries: Array<readonly StepTry[] | undefined>; told: Array<StepTold | null | undefined> } {
+): { tries: Array<readonly StepTry[] | undefined>; told: Array<StepTold | null | undefined>; error: unknown } {
   const client = useQueryClient();
   const tries = useQueries({
     queries: steps.map((step) => ({
       ...stepTriesQuery(id, step.name, stepStamp(step)),
       placeholderData: () => lastRead<readonly StepTry[]>(client, ['runs', id, 'steps', step.name, 'tries']),
     })),
-    combine: dataOf<readonly StepTry[]>,
+    combine: readsOf<readonly StepTry[]>,
   });
   const told = useQueries({
     queries: steps.map((step) => ({
       ...stepToldQuery(id, step.name, stepStamp(step)),
       placeholderData: () => lastRead<StepTold | null>(client, ['runs', id, 'steps', step.name, 'told']),
     })),
-    combine: dataOf<StepTold | null>,
+    combine: readsOf<StepTold | null>,
   });
-  return { tries, told };
+  return { tries: tries.data, told: told.data, error: tries.error ?? told.error };
 }
 
 /** The view of `object` with its lines and its steps' reads, each step's by its name. */
@@ -224,7 +230,7 @@ export function useRunView(id: string): { view: RunView; error: unknown } {
 export function useRunRead(id: string): { view: RunView | undefined; error: unknown } {
   const object = useQuery(runObjectQuery(id));
   const lines = useQuery(runLinesQuery(id));
-  const { tries, told } = useStepReads(id, object.data?.status.steps ?? NO_STEPS);
+  const { tries, told, error: stepError } = useStepReads(id, object.data?.status.steps ?? NO_STEPS);
   const run = object.data;
   const said = lines.data;
   const view = useMemo(
@@ -232,7 +238,7 @@ export function useRunRead(id: string): { view: RunView | undefined; error: unkn
       run && said && tries.every((t) => t !== undefined) && told.every((t) => t !== undefined) ? viewOf(run, said, tries, told) : undefined,
     [run, said, tries, told],
   );
-  return { view, error: object.error ?? lines.error };
+  return { view, error: object.error ?? lines.error ?? stepError };
 }
 
 /**

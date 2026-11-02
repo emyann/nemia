@@ -158,7 +158,7 @@ test('and what is not a route is not refused: the three entries, the wf CLI spaw
   assert.deepEqual(breaches('apps/web/test/e2e/x.ts', text, GUARDED), []);
 });
 
-test("agent-orchestrator's exports are . (runner.ts), ./run, ./workflow and ./testing (the test place), and nothing else but its package.json", () => {
+test("agent-orchestrator's exports are . (runner.ts), ./run, ./workflow and ./testing (the test place and the doors' stand-ins), and nothing else but its package.json", () => {
   const { exports } = JSON.parse(fs.readFileSync(path.join(PKG, 'package.json'), 'utf8')) as { exports: Record<string, string> };
   assert.deepEqual(exports, {
     '.': './src/runner.ts',
@@ -169,7 +169,7 @@ test("agent-orchestrator's exports are . (runner.ts), ./run, ./workflow and ./te
   });
 });
 
-/** The entry a test alone imports: the test place, `testPlace` (`place/memory`). */
+/** The entry a test alone imports: the test place, `testPlace`, and the doors' stand-ins (`place/memory`). */
 const TESTING = 'agent-orchestrator/testing';
 
 /** Where `file`, which is no test's, imports the testing entry: a program that runs is given the place its layer holds. */

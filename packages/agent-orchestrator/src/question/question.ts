@@ -89,9 +89,25 @@ const SHAPES: Record<string, object> = { questions: QUESTIONS_SCHEMA };
 
 /** A value's JSON with every object's keys sorted, so two schemas compare whatever order their keys were written in. */
 const canonical = (value: unknown): string =>
-  JSON.stringify(value, (_key, v: unknown) =>
-    isObject(v) ? Object.fromEntries(Object.entries(v).sort(([a], [b]) => a.localeCompare(b))) : v,
-  );
+  JSON.stringify(value, (_key, v: unknown) => {
+    const fields = fieldsOf(v);
+    if (!fields) return v;
+    // oxlint-disable-next-line unicorn/no-useless-spread -- the verifier sees only a spread as allocated here (`fieldsOf`)
+    const entries = [...Object.entries(fields)];
+    entries.sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+    return Object.fromEntries(entries);
+  });
+
+/**
+ * `value`'s own fields, as a fresh record, where it is an object that is no list; else undefined. Read without a type predicate or a cast,
+ * so that what a step's status reads through it (`closeoutRefusals`) is checked pure by the contracts' verifier, which also counts only a
+ * spread as an array allocated here: a key list is spread before it is sorted, where the linter would call the spread useless.
+ */
+const fieldsOf = (value: unknown): Record<string, unknown> | undefined =>
+  typeof value === 'object' && value !== null && !Array.isArray(value) ? Object.fromEntries(Object.entries(value)) : undefined;
+
+/** `value`'s items, as a fresh list, where it is a list; else undefined. */
+const itemsOf = (value: unknown): unknown[] | undefined => (Array.isArray(value) ? Array.from<unknown>(value) : undefined);
 
 /** Whether `value` holds the marker anywhere, at any depth. */
 const marked = (value: unknown): boolean =>
@@ -130,8 +146,9 @@ export function expandShapes(properties: Record<string, unknown>): { properties:
  * aside.
  */
 const isQuestionsSchema = (schema: unknown): boolean => {
-  if (!isObject(schema)) return false;
-  const { description: _, ...rest } = schema;
+  const fields = fieldsOf(schema);
+  if (!fields) return false;
+  const { description: _, ...rest } = fields;
   return [QUESTIONS_SCHEMA, ...FORMER_QUESTIONS_SCHEMAS].some((known) => canonical(rest) === canonical(known));
 };
 
@@ -141,15 +158,19 @@ export const questionFields = (step: Workflow | undefined): string[] =>
     .filter(([, schema]) => isQuestionsSchema(schema))
     .map(([name]) => name);
 
-/** Why an option is not one, or null. */
-const optionRefusal = (option: unknown, at: string): string | null => {
-  if (!isObject(option)) return `${at} is not an object`;
-  const keys = Object.keys(option).sort();
+/** An option read, or why it is not one. */
+const optionOf = (value: unknown, at: string): QuestionOption | string => {
+  const option = fieldsOf(value);
+  if (!option) return `${at} is not an object`;
+  // oxlint-disable-next-line unicorn/no-useless-spread -- the verifier sees only a spread as allocated here (`fieldsOf`)
+  const keys = [...Object.keys(option)];
+  keys.sort();
   if (keys.join() !== 'label,meaning')
     return `${at} has the keys ${keys.join(', ') || 'none'}, and an option has \`label\` and \`meaning\``;
-  if (typeof option.label !== 'string' || !option.label.trim()) return `${at}'s \`label\` is not text`;
-  if (typeof option.meaning !== 'string') return `${at}'s \`meaning\` is not text`;
-  return null;
+  const { label, meaning } = option;
+  if (typeof label !== 'string' || !label.trim()) return `${at}'s \`label\` is not text`;
+  if (typeof meaning !== 'string') return `${at}'s \`meaning\` is not text`;
+  return { label, meaning };
 };
 
 /** The keys a question has, sorted. */
@@ -159,67 +180,85 @@ const QUESTION_KEYS = ['body', 'multiple', 'options', 'recommended', 'title'];
 export const recommendedOf = (q: Pick<Question, 'recommended'>): readonly string[] =>
   q.recommended === null ? [] : typeof q.recommended === 'string' ? [q.recommended] : q.recommended;
 
-/** Why a question's `recommended` is not one label of `labels` or null, or where it takes `multiple`, a list of them; or null. */
-function recommendedRefusal(q: Record<string, unknown>, labels: readonly string[], at: string): string | null {
+/**
+ * A question's `recommended` read: one label of `labels` or null, or where it takes `multiple`, a list of them; or why it is not one.
+ */
+function recommendedRead(
+  given: unknown,
+  multiple: boolean,
+  labels: readonly string[],
+  at: string,
+): { recommended: string | string[] | null } | string {
   const offered = labels.map((l) => JSON.stringify(l)).join(', ');
-  const given = q.recommended;
-  if (given === null) return null;
-  if (Array.isArray(given)) {
-    if (!q.multiple) {
-      return `${at} recommends a list, and it takes one option (\`multiple\` is false): recommend one label, or null`;
-    }
-    if (given.some((l) => typeof l !== 'string')) return `${at}'s \`recommended\` holds something that is not a label`;
-    const stray = given.find((l: string) => !labels.includes(l));
+  if (given === null) return { recommended: null };
+  const items = itemsOf(given);
+  if (items) {
+    if (!multiple) return `${at} recommends a list, and it takes one option (\`multiple\` is false): recommend one label, or null`;
+    const named = items.flatMap((l) => (typeof l === 'string' ? [l] : []));
+    if (named.length !== items.length) return `${at}'s \`recommended\` holds something that is not a label`;
+    const stray = named.find((l) => !labels.includes(l));
     if (stray !== undefined) return `${at} recommends ${JSON.stringify(stray)}, which is none of its options (${offered})`;
-    const twice = given.find((l: string, i) => given.indexOf(l) !== i);
+    const twice = named.find((l, i) => named.indexOf(l) !== i);
     if (twice !== undefined) return `${at} recommends ${JSON.stringify(twice)} twice`;
-    return null;
+    return { recommended: named };
   }
   if (typeof given !== 'string') return `${at}'s \`recommended\` is not a label, a list of labels, or null`;
-  if (labels.includes(given)) return null;
-  return q.multiple
+  if (labels.includes(given)) return { recommended: given };
+  return multiple
     ? `${at} recommends ${JSON.stringify(given)}, which is none of its options (${offered}): to recommend several, give a list of their labels`
     : `${at} recommends ${JSON.stringify(given)}, which is none of its options (${offered})`;
 }
 
 /**
- * Why one question is not one, or null: its keys, their types, its options, and a `recommended` that names one of them, or where it
+ * One question read, or why it is not one: its keys, their types, its options, and a `recommended` that names one of them, or where it
  * takes `multiple` options, a list of them.
  */
-function questionRefusal(q: unknown, at: string): string | null {
-  if (!isObject(q)) return `${at} is not an object`;
-  const keys = Object.keys(q).sort();
+function questionOf(value: unknown, at: string): Question | string {
+  const q = fieldsOf(value);
+  if (!q) return `${at} is not an object`;
+  // oxlint-disable-next-line unicorn/no-useless-spread -- the verifier sees only a spread as allocated here (`fieldsOf`)
+  const keys = [...Object.keys(q)];
+  keys.sort();
   if (keys.join() !== QUESTION_KEYS.join())
     return `${at} has the keys ${keys.join(', ') || 'none'}, and a question has ${QUESTION_KEYS.join(', ')}`;
-  if (typeof q.title !== 'string' || !q.title.trim()) return `${at}'s \`title\` is not text`;
-  if (typeof q.body !== 'string') return `${at}'s \`body\` is not text`;
-  if (typeof q.multiple !== 'boolean') return `${at}'s \`multiple\` is not true or false`;
-  if (!Array.isArray(q.options) || !q.options.length) return `${at} offers no options`;
-  for (const [i, option] of q.options.entries()) {
-    const wrong = optionRefusal(option, `${at}'s option ${i + 1}`);
-    if (wrong) return wrong;
+  const { title, body, multiple } = q;
+  if (typeof title !== 'string' || !title.trim()) return `${at}'s \`title\` is not text`;
+  if (typeof body !== 'string') return `${at}'s \`body\` is not text`;
+  if (typeof multiple !== 'boolean') return `${at}'s \`multiple\` is not true or false`;
+  const given = itemsOf(q.options);
+  if (!given || !given.length) return `${at} offers no options`;
+  const options: QuestionOption[] = [];
+  for (const [i, item] of given.entries()) {
+    const option = optionOf(item, `${at}'s option ${i + 1}`);
+    if (typeof option === 'string') return option;
+    options.push(option);
   }
-  const labels = (q.options as QuestionOption[]).map((o) => o.label);
+  const labels = options.map((o) => o.label);
   const twice = labels.find((label, i) => labels.indexOf(label) !== i);
   if (twice !== undefined) return `${at} offers ${JSON.stringify(twice)} twice`;
-  return recommendedRefusal(q, labels, at);
+  const recommended = recommendedRead(q.recommended, multiple, labels, at);
+  if (typeof recommended === 'string') return recommended;
+  return { title, body, options, recommended: recommended.recommended, multiple };
 }
 
 /**
  * A field's value read as questions, strictly, or why it is not: an array of questions, each with exactly the keys of `QUESTIONS_SCHEMA`,
  * at least one option, no label twice, a `recommended` that is one of its labels or null — or a list of them where it takes `multiple` —
- * and no title twice.
+ * and no title twice. What it answers is read afresh from `value`, never `value` itself.
  */
 export function questionsOf(value: unknown): Question[] | { error: string } {
-  if (!Array.isArray(value)) return { error: 'the questions are not a list' };
-  for (const [i, q] of value.entries()) {
-    const wrong = questionRefusal(q, `question ${i + 1}`);
-    if (wrong) return { error: wrong };
+  const items = itemsOf(value);
+  if (!items) return { error: 'the questions are not a list' };
+  const questions: Question[] = [];
+  for (const [i, item] of items.entries()) {
+    const q = questionOf(item, `question ${i + 1}`);
+    if (typeof q === 'string') return { error: q };
+    questions.push(q);
   }
-  const titles = (value as Question[]).map((q) => q.title);
+  const titles = questions.map((q) => q.title);
   const twice = titles.find((title, i) => titles.indexOf(title) !== i);
   if (twice !== undefined) return { error: `two questions are titled ${JSON.stringify(twice)}` };
-  return value as Question[];
+  return questions;
 }
 
 /**

@@ -13,6 +13,7 @@ import type { Workflow } from '../src/step/step.ts';
 import { askedAgain, notHandedOn, overBudget, ownStatus, type SpendOf } from '../src/status/status.ts';
 import { loopSpan } from '../src/workflow/validate.ts';
 import { declaredOutput } from '../src/closeout/closeout.ts';
+import { closeoutRefusals } from '../src/question/question.ts';
 import { approved, gated } from './laws.ts';
 
 /** Where a step stands, as `standing` takes and answers it: its own status, and the one a person reads. */
@@ -32,6 +33,7 @@ export const notYetHandedOn = assume(notHandedOn, { pure: true });
 export const askedForARound = assume(askedAgain, { pure: true });
 export const theLoopsSteps = assume(loopSpan, { pure: true });
 export const whatItDeclared = assume(declaredOutput, { pure: true });
+export const whatItRefuses = assume(closeoutRefusals, { pure: true });
 
 const standingSpec = spec<Stands>({
   /** The run holds a record of the step: `nemia start` writes one for each (start.verb.ts). */

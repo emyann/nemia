@@ -18,7 +18,6 @@ import {
   askedQuestions,
   declaredOutput,
   type EarlierTry,
-  envelopeRefusals,
   parseCloseout,
   roundIn,
   type Run,
@@ -26,6 +25,7 @@ import {
   tryNote,
 } from '../run.ts';
 import { LOOP_REPLIES, outputFields, type Workflow } from '../workflow.ts';
+import { closeoutRefusals } from '../question/index.ts';
 import { artifactOf, valueOf, type StepArtifact, type StepValue } from './files.store.ts';
 import { checkIn, type CheckStderr, type StepCheck } from './checks.verb.ts';
 
@@ -62,7 +62,7 @@ export type StepReply = { finding: string; answer: string; why: string };
  *
  * `apiVersion` is the version it was given in, null for one given before v1, which is converted on read; `summary` is one line, cut
  * (`summaryLine`), and `body` the markdown beneath it, null for none. `refused` is what the run refuses of its envelope
- * (`envelopeRefusals`), each a sentence.
+ * and its question fields (`closeoutRefusals`), each a sentence.
  *
  * `schema` is the JSON Schema of each field asked about — given or missing — off the workflow the run froze, so the board can
  * draw a value by what it was declared to be and say what a field means. `raw` is the statement as the engine recorded it,
@@ -70,7 +70,7 @@ export type StepReply = { finding: string; answer: string; why: string };
  *
  * `questions` is what it asks a person through its question fields (`askedQuestions`): each field whose schema is the package's shape
  * of questions and whose value decodes as them, in the schema's order. Empty for a closeout that asks none; a field that does not decode
- * is in `output` alone, drawn as any other.
+ * is in `output` alone, drawn as any other, and `refused` says why.
  */
 export type StepCloseout = {
   apiVersion: string | null;
@@ -191,7 +191,7 @@ export function closeoutIn(
     needs: c.needs ?? null,
     artifacts: c.artifacts.map((file) => artifactOf(run, name, file)),
     values: (c.values ?? []).map(valueOf),
-    refused: envelopeRefusals(c),
+    refused: closeoutRefusals(step, c),
     output: given,
     missing,
     replies: Array.isArray(replies) ? replies.map(replyOf) : null,

@@ -148,6 +148,7 @@ const PINNED: Record<string, string[]> = {
     'closeoutAsked',
     'closeoutOf',
     'closeoutReader',
+    'closeoutRefusals',
     'commandBreaks',
     'commandLine',
     'consumption',

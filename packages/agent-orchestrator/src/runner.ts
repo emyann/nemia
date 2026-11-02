@@ -132,7 +132,7 @@ export {
   waitWord,
 } from './run.ts';
 export { envelopeRefusals, outputLines } from './closeout/index.ts';
-export { answersOr, askedQuestions, questionLines } from './question/index.ts';
+export { answersOr, askedQuestions, closeoutRefusals, questionLines } from './question/index.ts';
 export { dueNote, messageRefusal, signoffsSpent } from './retry/index.ts';
 export { atWork, firstFiledAt, runStartedAt, runTokens, timeline, timelineLines, timelineTotalLines } from './timeline/index.ts';
 export type {

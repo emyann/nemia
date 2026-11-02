@@ -18,7 +18,8 @@ import { toDecide, type ToDecide } from '../ending/ending.ts';
 import type { Workflow } from '../step/step.ts';
 import { isRemoteHarness } from '../harness/harness.ts';
 import { satisfiesAfter, stopsFollowers, type CloseoutAsked, type Run, type StepStatus, type TaskPhase } from '../record/record.ts';
-import { envelopeRefusals, type Closeout } from '../closeout/index.ts';
+import type { Closeout } from '../closeout/index.ts';
+import { closeoutRefusals } from '../question/index.ts';
 import type { Verdict } from '../check/check.ts';
 import type { CheckoutHold } from '../cap/cap.ts';
 import { roundsDue } from '../round/round.ts';
@@ -200,9 +201,9 @@ function stoppedOnWord(each: ReadonlyArray<{ status: StepStatus; own: StepStatus
   return stops.length && stops.every((s) => s.status === 'awaiting approval') ? 'awaiting approval' : 'waiting';
 }
 
-/** What the run refused of the last try's closeout's envelope (`envelopeRefusals`), as its next try is told it; nothing for none. */
-export const refusedTold = (said: Closeout | undefined): Pick<RetryBriefing, 'refused'> => {
-  const refused = said ? envelopeRefusals(said) : [];
+/** What the run refused of the last try's closeout (`closeoutRefusals`), as its next try is told it; nothing for none. */
+export const refusedTold = (step: Workflow | undefined, said: Closeout | undefined): Pick<RetryBriefing, 'refused'> => {
+  const refused = said ? closeoutRefusals(step, said) : [];
   return refused.length ? { refused } : {};
 };
 

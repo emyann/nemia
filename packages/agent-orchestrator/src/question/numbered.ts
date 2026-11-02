@@ -6,13 +6,13 @@
  */
 import type { Closeout } from '../closeout/index.ts';
 import type { Workflow } from '../step/step.ts';
-import { askedQuestions, type Answer, type Asked, type Question } from './question.ts';
+import { askedQuestions, recommendedOf, type Answer, type Asked, type Question } from './question.ts';
 
 /** The letter of the option at `index` from 0: `a` to `z`, then `aa`, `ab`… */
 export const letterOf = (index: number): string =>
   index < 26 ? String.fromCharCode(97 + index) : `${letterOf(Math.floor(index / 26) - 1)}${letterOf(index % 26)}`;
 
-/** One question as `nemia decide` prints it: its number and title, its body, each option lettered, the recommended one marked, and how. */
+/** One question as `nemia decide` prints it: its number and title, its body, each option lettered, each recommended one marked, and how. */
 const questionBlock = (q: Question, n: number): string[] => [
   `  ${n}. ${q.title}`,
   ...(q.body.trim()
@@ -22,7 +22,7 @@ const questionBlock = (q: Question, n: number): string[] => [
         .map((line) => `     ${line}`)
     : []),
   ...q.options.map(
-    (o, i) => `     ${letterOf(i)}  ${o.label}${o.meaning ? ` — ${o.meaning}` : ''}${o.label === q.recommended ? '  (recommended)' : ''}`,
+    (o, i) => `     ${letterOf(i)}  ${o.label}${o.meaning ? ` — ${o.meaning}` : ''}${recommendedOf(q).includes(o.label) ? '  (recommended)' : ''}`,
   ),
   `     ${q.multiple ? 'choose one or more' : 'choose one'}, or answer in your own words`,
 ];

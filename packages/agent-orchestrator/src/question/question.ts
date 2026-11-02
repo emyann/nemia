@@ -6,7 +6,7 @@
  * asks for it with `"x-shape": "questions"`, which the loader expands (`expandShapes`) before it checks the schema is strict, so the
  * harness is handed standard JSON Schema only.
  */
-import type { Closeout } from '../closeout/index.ts';
+import { envelopeRefusals, type Closeout } from '../closeout/index.ts';
 import { isObject, type Workflow } from '../step/step.ts';
 
 /** One option of a question: its label, which an answer names, and what choosing it means. */
@@ -14,9 +14,16 @@ export type QuestionOption = { label: string; meaning: string };
 
 /**
  * One question: its `title`, which an answer names and which is unique among its field's questions; its `body`; its `options`, at least
- * one, each label unique; the label it `recommended`, or null; and whether `multiple` options may be chosen together.
+ * one, each label unique; what it `recommended`, as the agent wrote it — one label or null, or on a question that takes `multiple`
+ * options a list of labels — and whether `multiple` options may be chosen together. `recommendedOf` reads it as a list.
  */
-export type Question = { title: string; body: string; options: QuestionOption[]; recommended: string | null; multiple: boolean };
+export type Question = {
+  title: string;
+  body: string;
+  options: QuestionOption[];
+  recommended: string | string[] | null;
+  multiple: boolean;
+};
 
 /** A question field of a closeout that decoded: the field's name, and its questions, in the order the agent gave them. */
 export type Asked = { field: string; questions: Question[] };
@@ -48,7 +55,11 @@ export const QUESTIONS_SCHEMA = {
           additionalProperties: false,
         },
       },
-      recommended: { type: ['string', 'null'], description: 'The label of the option you recommend, or null for none.' },
+      recommended: {
+        anyOf: [{ type: 'string' }, { type: 'array', items: { type: 'string' } }, { type: 'null' }],
+        description:
+          'The label of the option you recommend, or null for none. Where `multiple` is true, a list of the labels you recommend choosing together; never several labels joined in one string.',
+      },
       multiple: { type: 'boolean', description: 'Whether several options may be chosen together.' },
     },
     required: ['title', 'body', 'options', 'recommended', 'multiple'],
@@ -124,7 +135,37 @@ const optionRefusal = (option: unknown, at: string): string | null => {
 /** The keys a question has, sorted. */
 const QUESTION_KEYS = ['body', 'multiple', 'options', 'recommended', 'title'];
 
-/** Why one question is not one, or null: its keys, their types, its options, and a `recommended` that names one of them. */
+/** The labels a question recommends, as a list: none for null, one for a label. */
+export const recommendedOf = (q: Pick<Question, 'recommended'>): readonly string[] =>
+  q.recommended === null ? [] : typeof q.recommended === 'string' ? [q.recommended] : q.recommended;
+
+/** Why a question's `recommended` is not one label of `labels` or null, or where it takes `multiple`, a list of them; or null. */
+function recommendedRefusal(q: Record<string, unknown>, labels: readonly string[], at: string): string | null {
+  const offered = labels.map((l) => JSON.stringify(l)).join(', ');
+  const given = q.recommended;
+  if (given === null) return null;
+  if (Array.isArray(given)) {
+    if (!q.multiple) {
+      return `${at} recommends a list, and it takes one option (\`multiple\` is false): recommend one label, or null`;
+    }
+    if (given.some((l) => typeof l !== 'string')) return `${at}'s \`recommended\` holds something that is not a label`;
+    const stray = given.find((l: string) => !labels.includes(l));
+    if (stray !== undefined) return `${at} recommends ${JSON.stringify(stray)}, which is none of its options (${offered})`;
+    const twice = given.find((l: string, i) => given.indexOf(l) !== i);
+    if (twice !== undefined) return `${at} recommends ${JSON.stringify(twice)} twice`;
+    return null;
+  }
+  if (typeof given !== 'string') return `${at}'s \`recommended\` is not a label, a list of labels, or null`;
+  if (labels.includes(given)) return null;
+  return q.multiple
+    ? `${at} recommends ${JSON.stringify(given)}, which is none of its options (${offered}): to recommend several, give a list of their labels`
+    : `${at} recommends ${JSON.stringify(given)}, which is none of its options (${offered})`;
+}
+
+/**
+ * Why one question is not one, or null: its keys, their types, its options, and a `recommended` that names one of them, or where it
+ * takes `multiple` options, a list of them.
+ */
 function questionRefusal(q: unknown, at: string): string | null {
   if (!isObject(q)) return `${at} is not an object`;
   const keys = Object.keys(q).sort();
@@ -141,15 +182,13 @@ function questionRefusal(q: unknown, at: string): string | null {
   const labels = (q.options as QuestionOption[]).map((o) => o.label);
   const twice = labels.find((label, i) => labels.indexOf(label) !== i);
   if (twice !== undefined) return `${at} offers ${JSON.stringify(twice)} twice`;
-  if (q.recommended !== null && !labels.includes(q.recommended as string)) {
-    return `${at} recommends ${JSON.stringify(q.recommended)}, which is none of its options (${labels.map((l) => JSON.stringify(l)).join(', ')})`;
-  }
-  return null;
+  return recommendedRefusal(q, labels, at);
 }
 
 /**
  * A field's value read as questions, strictly, or why it is not: an array of questions, each with exactly the keys of `QUESTIONS_SCHEMA`,
- * at least one option, no label twice, a `recommended` that is one of its labels or null, and no title twice.
+ * at least one option, no label twice, a `recommended` that is one of its labels or null — or a list of them where it takes `multiple` —
+ * and no title twice.
  */
 export function questionsOf(value: unknown): Question[] | { error: string } {
   if (!Array.isArray(value)) return { error: 'the questions are not a list' };
@@ -177,6 +216,45 @@ export function askedQuestions(step: Workflow | undefined, said: Closeout | { er
   const titles = asked.flatMap((a) => a.questions.map((q) => q.title));
   return new Set(titles).size === titles.length ? asked : [];
 }
+
+/**
+ * Why the run does not read a closeout's question fields as questions, each a sentence that names the field, says why (`questionsOf`) and
+ * what to do: a field given that does not decode, and two fields that ask one title. None for a closeout not there or unreadable, nor of
+ * a field it did not give, which `declaredOutput` counts as missing. The run refuses such a closeout back to its agent as it refuses an
+ * envelope (`envelopeRefusals`), and a reader of one that stands says why the field is drawn as words.
+ */
+export function questionRefusals(step: Workflow | undefined, said: Closeout | { error: string } | undefined): string[] {
+  if (!said || 'error' in said) return [];
+  const read: Question[] = [];
+  const refused: string[] = [];
+  for (const field of questionFields(step)) {
+    if (said.output?.[field] === undefined) continue;
+    const questions = questionsOf(said.output[field]);
+    if (Array.isArray(questions)) read.push(...questions);
+    else {
+      refused.push(
+        `\`${field}\` is not read as questions, so nobody can answer them: ${questions.error}. Mend the field and sign off again.`,
+      );
+    }
+  }
+  const titles = read.map((q) => q.title);
+  const twice = titles.find((title, i) => titles.indexOf(title) !== i);
+  if (twice !== undefined) {
+    refused.push(
+      `Two questions are titled ${JSON.stringify(twice)}, and an answer names its question by title: retitle one, and sign off again.`,
+    );
+  }
+  return refused;
+}
+
+/**
+ * What the run refuses of a closeout a step gave, each a sentence saying what to do instead: its envelope (`envelopeRefusals`) and its
+ * question fields (`questionRefusals`). A closeout with any reads `unsigned`, and the run asks its session once a round to mend it.
+ */
+export const closeoutRefusals = (step: Workflow | undefined, said: Closeout): string[] => [
+  ...envelopeRefusals(said),
+  ...questionRefusals(step, said),
+];
 
 /** Words that say to read the step again, for an answer that does not fit the questions it asks now. */
 const READ_AGAIN = "Read the step's questions again and answer those.";

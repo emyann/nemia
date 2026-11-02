@@ -16,7 +16,9 @@ import {
   expandShapes,
   QUESTIONS_SCHEMA,
   questionFields,
+  questionRefusals,
   questionsOf,
+  recommendedOf,
   type Answer,
   type Question,
 } from './question.ts';
@@ -58,9 +60,25 @@ test('questionsOf', async (t) => {
     assert.deepEqual(questionsOf([cut, where]), [cut, where]);
     assert.deepEqual(questionsOf([]), []);
   });
+  await t.test('reads a question that takes several answers recommending a list of its labels, one label, or none', () => {
+    const many = { ...where, recommended: ['retry', 'gate'] };
+    assert.deepEqual(questionsOf([many]), [many]);
+    assert.deepEqual(questionsOf([{ ...where, recommended: 'gate' }]), [{ ...where, recommended: 'gate' }]);
+    assert.deepEqual(recommendedOf(many), ['retry', 'gate']);
+    assert.deepEqual(recommendedOf(cut), ['a']);
+    assert.deepEqual(recommendedOf(where), []);
+  });
   const { multiple: _, ...without } = cut;
   const rows: Array<[string, unknown, string[]]> = [
     ['REFUSED: a recommended option that is none of the options', [{ ...cut, recommended: 'c' }], ['question 1', '"c"', '("a", "b")']],
+    [
+      'REFUSED: several labels joined in one string, on a question that takes several',
+      [{ ...where, recommended: 'retry, gate' }],
+      ['question 1', '"retry, gate"', 'list'],
+    ],
+    ['REFUSED: a list recommended on a question that takes one', [{ ...cut, recommended: ['a'] }], ['question 1', 'list', '`multiple`']],
+    ['REFUSED: a list naming a label that is none of the options', [{ ...where, recommended: ['retry', 'x'] }], ['question 1', '"x"']],
+    ['REFUSED: a list naming a label twice', [{ ...where, recommended: ['gate', 'gate'] }], ['question 1', '"gate"', 'twice']],
     ['REFUSED: an option offered twice', [{ ...cut, options: [cut.options[0], cut.options[0]] }], ['question 1', '"a"', 'twice']],
     ['REFUSED: two questions with one title', [cut, { ...where, title: cut.title }], ['"How is the card cut?"', 'two questions']],
     ['REFUSED: a question with no options', [{ ...cut, options: [], recommended: null }], ['question 1', 'no options']],
@@ -159,6 +177,29 @@ test('askedQuestions', async (t) => {
       { field: 'open', questions: [cut] },
       { field: 'later', questions: [where] },
     ]);
+  });
+});
+
+test('questionRefusals', async (t) => {
+  const step = stepWith({ open: { 'x-shape': 'questions' }, later: { 'x-shape': 'questions' }, goal: { type: 'string' } });
+  const said = (fields: Record<string, unknown>) =>
+    parseCloseout({ outcome: 'blocked', summary: 's', artifacts: [], needs: 'Questions.', goal: 'g', ...fields });
+  await t.test('none of questions that read, of a field not given, and of a closeout not there or unreadable', () => {
+    assert.deepEqual(questionRefusals(step, said({ open: [cut], later: [{ ...where, recommended: ['retry', 'gate'] }] })), []);
+    assert.deepEqual(questionRefusals(step, said({ open: [] })), []);
+    assert.deepEqual(questionRefusals(step, undefined), []);
+    assert.deepEqual(questionRefusals(step, { error: 'not an object' }), []);
+    assert.deepEqual(questionRefusals(undefined, said({ open: 'words' })), []);
+  });
+  await t.test('REFUSED: a field that does not read as questions, naming the field and why', () => {
+    const refused = questionRefusals(step, said({ open: [cut], later: [{ ...where, recommended: 'retry, gate' }] }));
+    assert.equal(refused.length, 1);
+    names(refused[0], '`later`', 'question 1', '"retry, gate"');
+  });
+  await t.test('REFUSED: two fields that ask one title', () => {
+    const refused = questionRefusals(step, said({ open: [cut], later: [{ ...where, title: cut.title }] }));
+    assert.equal(refused.length, 1);
+    names(refused[0], JSON.stringify(cut.title));
   });
 });
 

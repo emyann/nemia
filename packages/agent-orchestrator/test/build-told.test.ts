@@ -186,13 +186,15 @@ const DESIGN_LAWS_TOLD = [
   'run `npx tsverify <file> <name>`, bare, on the file the function is written in',
 ];
 
-/** What an implement step is told of a contract, build's and quick's alike: the laws first, the verdicts said, a test deleted on proof. */
+/** What an implement step is told of a contract, build's and quick's alike: the laws first, an undecided answered, the verdicts said, a test deleted on proof. */
 const LAWS_TOLD = [
   'load the `tsverify` skill before you change the code.',
   'Write the laws into the contract first and run the verifier',
   'each new law comes back `counterexample` on the code as it is; then change the code until every law is `proved`.',
   'When the laws cannot all hold, change no law: the verifier says `unmeetable` where no result keeps them together at an input, and names the laws that leave none.',
   'Sign off `blocked`, naming the laws, the input and why no result keeps them together, so that a person amends the spec.',
+  'When the verifier says `undecided` of a contract',
+  'Never an `open` to make a hole go away.',
   "and say its verdicts in your summary: CI's `contracts` job runs every contract on the commit your check pushes.",
   'A new behaviour of a function a contract proves is a law of its contract, not a new row of its tests.',
   'Delete a test a law makes redundant only once you have planted the bug it guards, seen the law come back `counterexample`, and put the code back: name in your summary the test, the bug and the law.',

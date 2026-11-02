@@ -22,13 +22,11 @@ import path from 'node:path';
 import { Schema } from 'effect';
 import { Hono } from 'hono';
 import {
-  agentsFor,
   cardSkills,
   DEFAULT_FACTORY,
   fillsOf,
   foldersIn,
   inboxNameRefusal,
-  skillsFor,
   START as START_ENTRY,
   startFactory,
   unfilledRefusal,
@@ -43,7 +41,9 @@ import {
   isFolderTeam,
   STEP_KEY_MEANINGS,
   STEP_KEYS,
+  type Agents,
   type AgentSkill,
+  type SkillsFound,
   type StepKey,
   type Workflow,
 } from 'agent-orchestrator/workflow';
@@ -558,13 +558,14 @@ function startOf(body: typeof START_BODY.Type, repo: string, home: string, tree?
 
 /**
  * What the agent a step is read with says it can do, generated from its skills, found where the load found them (`cardSkills`): null for a
- * step with no agent, one the folder's places do not have, and one whose card the package refuses.
+ * step with no agent, one the folder's places do not have, and one whose card the package refuses. `found` is what the folder's places
+ * hold, read through the Agent and Skill doors by the handler.
  */
-export function agentSkillsOf(step: Workflow, dir: string, places: Places): AgentSkill[] | null {
-  const attached = step.agent ? agentsFor(dir, places).get(step.agent.name) : undefined;
+export function agentSkillsOf(step: Workflow, found: { readonly agents: Agents; readonly skills: SkillsFound }): AgentSkill[] | null {
+  const attached = step.agent ? found.agents.get(step.agent.name) : undefined;
   if (attached === undefined || attached instanceof Error) return null;
   try {
-    return cardSkills(attached, skillsFor(dir, places));
+    return cardSkills(attached, found.skills);
   } catch {
     return null;
   }

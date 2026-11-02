@@ -9,14 +9,14 @@
  * The repository's agents are read-only here, as its workflows are: the api writes nothing into a checkout.
  */
 import path from 'node:path';
-import { Schema } from 'effect';
+import { Effect, Schema } from 'effect';
 import { Hono } from 'hono';
 import {
+  AgentDoor,
   agentRead,
   agentSkillsFound,
   factoriesFilling,
   inFactory,
-  loadAgents,
   readFactories,
   stepsFilled,
   type AgentFill,
@@ -244,6 +244,12 @@ function placeOf(from: string, name: string | null, route: string, repo: string,
   return { dir: place.dir };
 }
 
+/**
+ * A workflow folder beside the folder of agents `dir`, whose agents found with no other place are `dir`'s alone: what the Agent door's
+ * `found` is asked for one folder's agents, each kept with the load's refusal of it, as no other of its reads keeps one.
+ */
+const workflowIn = (dir: string): string => path.join(path.dirname(dir), '_');
+
 /** Why there is no agent to answer (404): `from`'s folder, `dir`, has none named `name`. */
 const noAgentWords = (from: string, name: string, dir: string): string =>
   `${from === 'yours' ? 'Yours has' : 'The repository has'} no agent named '${name}' (${path.join(dir, `${name}.md`)}). GET /api/agents lists the agents there are.`;
@@ -315,12 +321,12 @@ export const agents = new Hono<ApiEnv>()
     }),
   )
   .get('/api/agents/:from/:name/card', (c) =>
-    served(c, async ({ e, placeService, env, repo, home }) => {
+    served(c, async ({ e, placeService, env, repo, home, inRequest }) => {
       const { from, name } = c.req.param();
       const route = `GET /api/agents/${from}/${name}/card`;
       const place = placeOf(from, name, route, repo, home);
       if ('status' in place) return c.json({ error: place.error }, place.status);
-      const agent = loadAgents(place.dir).get(name);
+      const agent = (await inRequest(Effect.flatMap(AgentDoor, (door) => door.agents.found({ dir: workflowIn(place.dir) })))).get(name);
       if (agent === undefined) return c.json({ error: noAgentWords(from, name, place.dir) }, 404);
       if (agent instanceof Error) return c.json({ error: agent.message }, 422);
       const { card } = (await runPlaced(placeService, e, AGENT_CARD.handler({ name, repo, from }, env, home))) as CardRead;

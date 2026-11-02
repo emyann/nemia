@@ -33,12 +33,23 @@ const queueInInbox = (...args: Parameters<typeof verbs.queueInInbox>) =>
   Effect.runSync(Effect.provideService(verbs.queueInInbox(...args), StoreRoot, ROOT));
 const { Conflict, Invalid, Missing } = await import('../refusal/refusal.ts');
 const { workflowDoorMemory } = await import('./memory.store.ts');
+const { AgentDoor } = await import('../agents/agent-door.store.ts');
+const { agentDoorMemory } = await import('../agents/agent-memory.store.ts');
+const { SkillDoor } = await import('../skills/skill-door.store.ts');
+const { skillDoorMemory } = await import('../skills/skill-memory.store.ts');
+const { doorFrom } = await import('../../test/door-walks.ts');
 
 const e = () => engineOf(engine().layer);
 
-/** One Workflow door's memory stand-in, given to each program the test runs: the folders it writes, the next reads. */
+/**
+ * One Workflow door's memory stand-in, given to each program the test runs: the folders it writes, the next reads; its agents and skills
+ * found through the Agent and Skill doors' own stand-ins.
+ */
 const memoryOver = () => {
-  const memory = workflowDoorMemory();
+  const memory = workflowDoorMemory({
+    agents: doorFrom(AgentDoor, agentDoorMemory()),
+    skills: doorFrom(SkillDoor, skillDoorMemory()),
+  });
   return <A, E, R>(program: Effect.Effect<A, E, R>) => Effect.provide(program, memory);
 };
 

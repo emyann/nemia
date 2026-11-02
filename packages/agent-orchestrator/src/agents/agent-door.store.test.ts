@@ -116,9 +116,16 @@ function sourcesOfSrc(): Record<string, string> {
   return out;
 }
 
+/**
+ * A call of a `SEAM` name, not a method of the same name (`x.loadAgents(`). `src`'s count passes over a spread call too
+ * (`[...loadAgents(dir)]`), as its baseline was counted; the api's (`SPREAD_TOO`) counts one, its debt being none.
+ */
+const SEAM_CALL = `(?<![\\w$.])(?:${SEAM.join('|')})\\s*\\(`;
+const SPREAD_TOO = `(?<![\\w$]|[^.]\\.)(?:${SEAM.join('|')})\\s*\\(`;
+
 /** Why the uses of `sources` break the baseline `debt`: a file it does not name, a count grown, a count fallen. */
-function debtBreaks(sources: Record<string, string>, debt: Readonly<Record<string, number>>): string[] {
-  const call = new RegExp(`(?<![\\w$.])(?:${SEAM.join('|')})\\s*\\(`, 'g');
+function debtBreaks(sources: Record<string, string>, debt: Readonly<Record<string, number>>, calls = SEAM_CALL): string[] {
+  const call = new RegExp(calls, 'g');
   const uses = new Map<string, number>();
   for (const [file, text] of Object.entries(sources)) {
     const code = text
@@ -157,4 +164,34 @@ test('REFUSED: a converted file that calls a store again, and a count the baseli
   assert.equal(debtBreaks(again, AGENT_DOOR_DEBT).length, 1);
   const [first] = Object.keys(AGENT_DOOR_DEBT);
   assert.equal(debtBreaks(sources, { ...AGENT_DOOR_DEBT, [first]: (AGENT_DOOR_DEBT[first] ?? 0) + 1 }).length, 1);
+});
+
+const API = path.join(PKG, '..', '..', 'apps', 'api');
+
+/** Every file of the api's `src` but its tests, by its path from the api. */
+function sourcesOfApi(): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const entry of fs.readdirSync(path.join(API, 'src'), { recursive: true, withFileTypes: true })) {
+    if (!entry.isFile() || !entry.name.endsWith('.ts') || entry.name.endsWith('.test.ts')) continue;
+    const file = path.relative(API, path.join(entry.parentPath, entry.name)).split(path.sep).join('/');
+    out[file] = fs.readFileSync(path.join(API, file), 'utf8');
+  }
+  return out;
+}
+
+test("no file of the api's src calls the agent and skill stores: its handlers read them through AgentDoor and SkillDoor, its debt none", () => {
+  assert.deepEqual(debtBreaks(sourcesOfApi(), {}, SPREAD_TOO), []);
+});
+
+test("REFUSED: a file of the api's src that calls an agent store is one break", () => {
+  const sources = sourcesOfApi();
+  const again = {
+    ...sources,
+    'src/workflows/builder.ts': `${sources['src/workflows/builder.ts']}\nconst x = loadAgents('a');\n`,
+  };
+  assert.equal(debtBreaks(again, {}, SPREAD_TOO).length, 1);
+  const spread = { ...sources, 'src/agents/skills.ts': `${sources['src/agents/skills.ts']}\nconst y = [...skillsFor('a')];\n` };
+  assert.equal(debtBreaks(spread, {}, SPREAD_TOO).length, 1, 'a call spread into a list is a call');
+  const method = { ...sources, 'src/agents/skills.ts': `${sources['src/agents/skills.ts']}\nconst z = door.loadAgents('a');\n` };
+  assert.deepEqual(debtBreaks(method, {}, SPREAD_TOO), [], 'a method of the same name is no call of the store');
 });

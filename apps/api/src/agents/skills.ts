@@ -16,19 +16,18 @@
  * repository's is read there, and a page says the `cp -r` that moves a skill between the two.
  */
 import path from 'node:path';
-import { Schema } from 'effect';
+import { Effect, Schema } from 'effect';
 import { Hono } from 'hono';
 import {
+  AgentDoor,
   agentSkillsFound,
   BUILTIN_SKILLS,
   givenSkills as givenRead,
   isBuiltinPlace,
   listAgents,
-  loadAgents,
   oneFolder,
+  SkillDoor,
   skillDirIn,
-  skillFolders,
-  skillsFor,
   type AgentPlace,
   type SkillChange,
   type SkillCopied,
@@ -39,15 +38,16 @@ import {
   skillCopyCommand,
 } from 'agent-orchestrator';
 import {
-  AGENTS_FOLDER,
   SKILLS_FOLDER,
   skillDraftOf,
   skillNameRefusal,
   splitFrontmatter,
   WorkflowError,
+  type Agents,
   type AgentSkill,
   type SkillCost,
   type SkillDraft,
+  type SkillsFound,
 } from 'agent-orchestrator/workflow';
 import { readBody, valueAt, type BodyIssue, type Words } from '../body.ts';
 import { refusedBeforeReading, type Guarded, type Refusal } from '../guard.ts';
@@ -98,8 +98,32 @@ const FORMER_BUILTIN = 'shipped';
 /** Your library: the store's `workflows/skills/`, where the board copies a skill. */
 export const librarySkills = (home: string): string => path.join(home, 'workflows', SKILLS_FOLDER);
 
-/** Where an agent of yours finds its skills on `repo`: the same call a start makes for it, and `agentSkillsFound` in the package. */
-const skillsOfYours = (repo: string, home: string) => skillsFor(path.join(home, 'workflows', '_'), placesOf(repo, home));
+/** A folder of yours: where an agent of yours finds what a workflow of yours finds, its places named or none. */
+const yoursFolder = (home: string): string => path.join(home, 'workflows', '_');
+
+/** Yours' agents, each found as a workflow of yours finds it with no other place, a refusal kept: read through the Agent door. */
+const yourAgentsFound = (home: string) => Effect.flatMap(AgentDoor, (door) => door.agents.found({ dir: yoursFolder(home) }));
+
+/**
+ * What the picker reads through the doors: the skills an agent of yours finds on `repo` (`found`, the same read a start makes for it, and
+ * `agentSkillsFound` in the package), yours' agents (`agents`), and the skills of the builtin place `builtin.dir` (`builtin.names`).
+ */
+export type YourSkills = {
+  readonly found: SkillsFound;
+  readonly agents: Agents;
+  readonly builtin: { readonly dir: string; readonly names: readonly string[] };
+};
+
+/** What `listSkills` lists, read through the Agent and Skill doors on the program's services: `YourSkills`. */
+export const yourSkillsRead = (repo: string, home: string, builtin: string = BUILTIN_SKILLS) =>
+  Effect.gen(function* () {
+    const door = yield* SkillDoor;
+    return {
+      found: yield* door.skills.found({ dir: yoursFolder(home), places: placesOf(repo, home) }),
+      agents: yield* yourAgentsFound(home),
+      builtin: { dir: builtin, names: yield* door.skills.list(builtin) },
+    } satisfies YourSkills;
+  });
 
 /** Which place a skill's folder is in, by the folder of skills it sits in; `null` for none of them. */
 export function sourceOf(dir: string, repo: string, home: string): SkillSource | null {
@@ -159,11 +183,9 @@ export function skillRow(
   return { name, from, dir, entry, error, preload, cost, usedBy, found };
 }
 
-/** The agents of yours, by name, each with the skills its `skills:` gives: the ones that read. */
-function yourAgentsSkills(home: string): Array<[string, string[]]> {
-  return [...loadAgents(path.join(home, 'workflows', AGENTS_FOLDER))].flatMap(([name, agent]) =>
-    agent instanceof Error ? [] : [[name, agent.skills ?? []] as [string, string[]]],
-  );
+/** The agents of yours (`agents`, `yourAgentsFound`), by name, each with the skills its `skills:` gives: the ones that read. */
+function yourAgentsSkills(agents: Agents): Array<[string, string[]]> {
+  return [...agents].flatMap(([name, agent]) => (agent instanceof Error ? [] : [[name, agent.skills ?? []] as [string, string[]]]));
 }
 
 /**
@@ -179,10 +201,11 @@ export async function listSkills(
   placeService: PlaceService['Service'],
   repo: string,
   home: string,
-  builtin: string = BUILTIN_SKILLS,
+  yoursRead: YourSkills,
 ): Promise<SkillPlace[]> {
-  const found = skillsOfYours(repo, home);
-  const agents = yourAgentsSkills(home);
+  const { found } = yoursRead;
+  const { dir: builtin, names: builtinNames } = yoursRead.builtin;
+  const agents = yourAgentsSkills(yoursRead.agents);
   const usedBy = (name: string) => agents.filter(([, skills]) => skills.includes(name)).map(([agent]) => agent);
   const yours: SkillPlace = { from: 'yours', dir: librarySkills(home), skills: [] };
   const inRepo: SkillPlace = { from: 'repo', dir: path.join(path.resolve(repo), '.claude', SKILLS_FOLDER), skills: [] };
@@ -190,7 +213,6 @@ export async function listSkills(
   const sorted = [...found.all].filter(([, at]) => typeof at !== 'string' || !isBuiltinPlace(at)).sort(([a], [b]) => a.localeCompare(b));
   const dirOf = ([name, at]: (typeof sorted)[number]) =>
     at instanceof WorkflowError ? (skillDirIn([yours.dir, inRepo.dir], name) ?? path.join(yours.dir, name)) : at;
-  const builtinNames = skillFolders(builtin);
   const reads = await readsOf(e, placeService, [...sorted.map(dirOf), ...builtinNames.map((name) => path.join(builtin, name))], home);
   const where = new Map<string, 'yours' | 'repo'>();
   for (const [name, at] of sorted) {
@@ -236,11 +258,11 @@ export type GivenSkill = {
 };
 
 /**
- * The skills an agent gives, one row each in its order, each found where a start finds it (`found`, the agent's `skillsFor`). A skill no
- * place has is a row with the refusal the card says; one found in the repository where the board pages nothing, as a skill named with
- * its folder is, reads `from: null` and its folder in `foundIn`.
+ * The skills an agent gives, one row each in its order, each found where a start finds it (`found`, as the package's `agentSkillsFound`
+ * finds them). A skill no place has is a row with the refusal the card says; one found in the repository where the board pages nothing,
+ * as a skill named with its folder is, reads `from: null` and its folder in `foundIn`.
  */
-export function givenSkills(skills: readonly string[], found: ReturnType<typeof skillsFor>, repo: string, home: string): GivenSkill[] {
+export function givenSkills(skills: readonly string[], found: SkillsFound, repo: string, home: string): GivenSkill[] {
   return givenRead(skills, found).map(({ name, dir, entry, error, preload, cost }) => ({
     name,
     from: dir === null ? null : sourceOf(dir, repo, home),
@@ -511,7 +533,11 @@ const repoRefusal = (route: string, name: string | null, repo: string, home: str
  *   otherwise: its name is its folder.
  */
 export const skills = new Hono<ApiEnv>()
-  .get('/api/skills', (c) => served(c, async ({ e, placeService, repo, home }) => c.json(await listSkills(e, placeService, repo, home))))
+  .get('/api/skills', (c) =>
+    served(c, async ({ e, placeService, repo, home, inRequest }) =>
+      c.json(await listSkills(e, placeService, repo, home, await inRequest(yourSkillsRead(repo, home)))),
+    ),
+  )
   .get('/api/skills/:from/:name', (c) =>
     served(c, async ({ e, placeService, repo, home }) => {
       const { from, name } = c.req.param();
@@ -537,7 +563,7 @@ export const skills = new Hono<ApiEnv>()
     }),
   )
   .post('/api/skills/:from', (c) =>
-    served(c, async ({ e, placeService, repo, home }) => {
+    served(c, async ({ e, placeService, repo, home, inRequest }) => {
       const { from } = c.req.param();
       const route = `POST /api/skills/${from}`;
       const refused = refusedBeforeReading(
@@ -572,7 +598,7 @@ export const skills = new Hono<ApiEnv>()
         e,
         WRITE.handler({ from, copy: name, builtin: BUILTIN_SKILLS }, undefined, home),
       )) as SkillCopied;
-      const agents = yourAgentsSkills(home)
+      const agents = yourAgentsSkills(await inRequest(yourAgentsFound(home)))
         .filter(([, given]) => given.includes(name))
         .map(([agent]) => agent);
       const reading = readAt(await readsOf(e, placeService, [copied.dir], home), copied.dir);

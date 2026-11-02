@@ -5,24 +5,36 @@
  * reader that comes late, and drops what a slow reader has not taken, so a reader reads the file for every line no item of the hub
  * brought it.
  *
- * A controller: it reaches the store's file through the client's `tried`, and is run by the tick, `up` and the api's stream.
+ * A controller: it reaches the feed through its door (`FeedDoor`), and is run by the tick, `up` and the api's stream, each given the
+ * store's root. The fold of the feed this process has read (`feedMemo`) is kept here, never in the door's layer, which carries nothing
+ * between passes.
  */
-import { Context, Effect, Layer, Metric, PubSub, Stream, type Duration } from 'effect';
+import { Cause, Context, Effect, Layer, Metric, PubSub, Stream, type Duration } from 'effect';
 import type { NonEmptyReadonlyArray } from 'effect/Array';
-import { tried } from '../runtime-client.ts';
-import { isRefusal, type Refusal } from '../refusal/refusal.ts';
+import type { Refusal } from '../refusal/refusal.ts';
+import { withinEffect } from '../meter/tally.store.ts';
 import {
   feedSaidWords,
+  freshMemo,
   isRunLine,
   isStoreLine,
   publishedOf,
   type DaemonLine,
   type FeedCloseout,
   type FeedLine,
+  type FeedMemo,
+  type FeedPause,
   type FeedPublished,
   type FeedWords,
 } from './feed.ts';
-import { feedSize, readFeedEnds, recordDaemonLine, recordFeed } from './feed.store.ts';
+import { FeedDoor, feedPass } from './feed.store.ts';
+
+/**
+ * This process's fold of the feed, as far as it has read it (`feedPass`): a restarted daemon starts from none, and reads the feed once.
+ * Reset by `feedPass` where the door's end names another generation than the one it read — a feed cut and put back — or its cursor is one
+ * the feed refuses.
+ */
+const feedMemo: FeedMemo = freshMemo();
 
 /**
  * The live readers' hub in this process: a sliding `PubSub` of the lines `emitFeed` wrote, or none. None by default: a process that
@@ -120,14 +132,18 @@ const loggedOf =
   };
 
 /**
- * A pass's words written to the feed where they changed (`recordFeed`), with the store's pause put or lifted where the pass hands the
- * pause it read (`pause`), each line written logged (`loggedOf`: a `closed out` line as its
- * closeout, every other as its words) and, where the process has a
- * hub (`FeedHub`), published to it with the bytes it was written at (`publishedOf`): none when another writer's bytes landed among them.
- * Answers with the lines written. Fails with a refusal of the store, and dies of anything else it threw.
+ * A pass's words written to the feed where they changed (`feedPass`, over this process's fold, `feedMemo`), with the store's pause put
+ * or lifted where the pass hands the pause it read (`pause`), each line written logged (`loggedOf`: a `closed out` line as its
+ * closeout, every other as its words) and, where the process has a hub (`FeedHub`), published to it with the bytes it was written at
+ * (`publishedOf`): none when another writer's bytes landed among them. Answers with the lines written. `memo` is for a test, which
+ * starts one afresh to be a restarted daemon. Fails with a refusal of the store — the door's, given no store root among them — and
+ * dies of anything else it threw.
  */
-export const emitFeed = Effect.fn('emitFeed')(function* (now: ReadonlyMap<string, FeedWords>, options?: Parameters<typeof recordFeed>[1]) {
-  const appended = yield* tried(() => recordFeed(now, options));
+export const emitFeed = Effect.fn('emitFeed')(function* (
+  now: ReadonlyMap<string, FeedWords>,
+  { memo = feedMemo, ...pass }: { at?: string; memo?: FeedMemo; unjudged?: ReadonlySet<string>; pause?: FeedPause } = {},
+) {
+  const appended = yield* withinEffect('act', feedPass(yield* FeedDoor, memo, now, pass));
   yield* Effect.forEach(appended.lines, loggedOf(now), { discard: true });
   const hub = yield* FeedHub;
   if (hub) yield* PubSub.publishAll(hub, publishedOf(appended));
@@ -135,11 +151,11 @@ export const emitFeed = Effect.fn('emitFeed')(function* (now: ReadonlyMap<string
 });
 
 /**
- * A daemon's line written to the feed (`recordDaemonLine`), logged, and published to the process's hub where it has one, as `emitFeed`
- * does a pass's. Fails with a refusal of the store, and dies of anything else it threw.
+ * A daemon's line appended to the feed through its door (`FeedDoor`), logged, and published to the process's hub where it has one, as
+ * `emitFeed` does a pass's. Fails with a refusal of the store, and dies of anything else it threw.
  */
 export const emitDaemonStarted = Effect.fn('emitDaemonStarted')(function* (line: DaemonLine) {
-  const appended = yield* tried(() => recordDaemonLine(line));
+  const appended = yield* withinEffect('act', (yield* FeedDoor).lines.append([line]));
   yield* logged(line);
   const hub = yield* FeedHub;
   if (hub) yield* PubSub.publishAll(hub, publishedOf(appended));
@@ -164,15 +180,17 @@ type Woken = Effect.Effect<readonly [Following, Followed[]], Refusal>;
  */
 const readOn = (at: Following): Woken =>
   Metric.update(FEED_FOLLOW_READS, 1).pipe(
-    Effect.andThen(Effect.try({ try: () => readFeedEnds(at.cursor), catch: (err) => err })),
-    Effect.matchEffect({
-      onFailure: (err) =>
-        isRefusal(err)
-          ? Effect.fail(err)
-          : Effect.succeed([
-              { ...at, failing: true },
-              at.failing ? [] : [{ kind: 'unreadable', error: err instanceof Error ? err.message : String(err) }],
-            ] as const),
+    Effect.andThen(Effect.flatMap(FeedDoor, (door) => door.lines.read(at.cursor))),
+    Effect.matchCauseEffect({
+      onFailure: (cause) => {
+        const refusal = cause.reasons.find(Cause.isFailReason);
+        if (refusal) return Effect.fail(refusal.error);
+        const err = Cause.squash(cause);
+        return Effect.succeed([
+          { ...at, failing: true },
+          at.failing ? [] : [{ kind: 'unreadable', error: err instanceof Error ? err.message : String(err) }],
+        ] as const);
+      },
       onSuccess: (got) =>
         Effect.succeed([
           { cursor: got.cursor, failing: false },
@@ -203,10 +221,10 @@ const wake = (at: Following, published: FeedPublished | undefined): Woken => {
     return readOn(at);
   }
   return Metric.update(FEED_FOLLOW_BEATS, 1).pipe(
-    Effect.andThen(Effect.try({ try: feedSize, catch: () => undefined })),
-    Effect.matchEffect({
+    Effect.andThen(Effect.flatMap(FeedDoor, (door) => door.lines.end())),
+    Effect.matchCauseEffect({
       onFailure: () => readOn(at),
-      onSuccess: (size) => (size === at.cursor ? Effect.succeed([at, []] as const) : readOn(at)),
+      onSuccess: (end) => ((end?.cursor ?? 0) === at.cursor ? Effect.succeed([at, []] as const) : readOn(at)),
     }),
   );
 };

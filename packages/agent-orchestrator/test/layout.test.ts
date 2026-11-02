@@ -4,7 +4,8 @@
  *
  * A feature folder holds at most six source files, tests beside them not counted. Its face is its `index.ts`, or its one pure file when
  * it has no `index.ts`; a file outside the folder imports the folder's pure code through the face alone, and a store, a verb or a model
- * by its own path. A folder holding a context's glossary leaves its one `<folder>.model.ts` out of its six. The CLI's folder,
+ * by its own path. A folder holding a context's glossary leaves its one `<folder>.model.ts` out of its six, and a door's memory stand-in
+ * (`memory.store.ts`, a test's alone: `STAND_INS`, `boundary.test.ts`) is out of them as the tests beside it are. The CLI's folder,
  * `src/cli/`, is controllers and has no face. The kinds themselves are held by `boundary.test.ts`.
  *
  * Each rule is made to refuse a planted source first: a rule that reads nothing passes too.
@@ -154,13 +155,17 @@ const isContextModel = (file: string, glossaries: ReadonlySet<string>): boolean 
   return folder !== undefined && glossaries.has(folder) && file === `${folder}/${path.posix.basename(folder)}.model.ts`;
 };
 
+/** Whether `file` is a door's memory stand-in, `<folder>/memory.store.ts`: a test's alone, so not counted in its folder's six. */
+const isStandIn = (file: string): boolean => path.posix.basename(file) === 'memory.store.ts';
+
 /**
  * Each feature folder past `FOLDER_MAX` source files, and each folder or file whose name says no feature. A folder holding a
- * glossary leaves its one `<folder>.model.ts` out of the count: the context's model stands beside its words.
+ * glossary leaves its one `<folder>.model.ts` out of the count: the context's model stands beside its words. A door's memory stand-in
+ * is out of it too (`isStandIn`).
  */
 function folderBreaks(files: readonly string[], glossaries: ReadonlySet<string> = glossaryFolders()): string[] {
   const sizes = new Map<string, number>();
-  for (const file of files.filter((f) => !isTest(f) && !isContextModel(f, glossaries))) {
+  for (const file of files.filter((f) => !isTest(f) && !isStandIn(f) && !isContextModel(f, glossaries))) {
     const folder = folderOf(file);
     if (folder !== undefined) sizes.set(folder, (sizes.get(folder) ?? 0) + 1);
   }
@@ -360,6 +365,14 @@ test('REFUSED: a seventh source file in a folder, and a folder or a file named f
     'src/utils/words.ts is named utils, which says no feature: put each part beside the feature that uses it',
   ]);
   assert.deepEqual(folderBreaks(['src/common-words/words.ts', 'src/feed/sharedness.ts']), [], 'a name that only starts so: let through');
+});
+
+test("REFUSED: a seventh file beside a door's memory stand-in; the stand-in itself is not counted", () => {
+  const six = ['a.ts', 'b.ts', 'index.ts', 'a.store.ts', 'a.verb.ts', 'b.verb.ts'].map((f) => `src/retry/${f}`);
+  assert.deepEqual(folderBreaks([...six, 'src/retry/memory.store.ts'], new Set()), [], 'six and a stand-in: let through');
+  assert.deepEqual(folderBreaks([...six, 'src/retry/memory.store.ts', 'src/retry/c.ts'], new Set()), [
+    'src/retry/ holds 7 source files, past 6: a folder that needs more holds two features — split it along them',
+  ]);
 });
 
 test("REFUSED: a seventh file beside a context's model, and a second model counted; one <folder>.model.ts beside a glossary is not", () => {

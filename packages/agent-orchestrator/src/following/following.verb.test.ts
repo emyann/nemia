@@ -11,6 +11,7 @@ import { Cause, Effect, Exit, Layer, Logger, ManagedRuntime, Stream } from 'effe
 import type { Engine } from '../runtime-client.ts';
 import { nextOf, type StepMoment } from './following.ts';
 import { scratch } from '../../test/scratch.ts';
+import { StoreRoot } from '../config/root.store.ts';
 import { eachTest } from '../../test/placed.ts';
 import type { Run } from '../record/record.ts';
 import { bell, until, WAITED } from 'agent-runtime/testing';
@@ -103,7 +104,7 @@ const followed = (t: Task) =>
 
 /** A runtime with the feed's hub and no logger, over the engine `e`: let go once the test `t` ends. */
 function runtimeOf(t: TestContext, e: Engine) {
-  const rt = ManagedRuntime.make(Layer.mergeAll(feedHubLayer(), Logger.layer([]), EngineService.layer(e), door()));
+  const rt = ManagedRuntime.make(Layer.mergeAll(feedHubLayer(), Logger.layer([]), EngineService.layer(e), door(), StoreRoot.layer(ROOT)));
   t.after(() => rt.dispose());
   return rt;
 }

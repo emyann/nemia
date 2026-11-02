@@ -37,7 +37,7 @@
     ".": "./src/runner.ts",
     "./run": "./src/run.ts",
     "./workflow": "./src/workflow.ts",
-    "./testing": "./place/memory/index.ts",
+    "./testing": "./testing.ts",
     "./package.json": "./package.json"
   }
 }

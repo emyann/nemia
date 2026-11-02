@@ -122,6 +122,12 @@ export type Served = {
   memo: ReadMemo['Service'];
   followings: Followings['Service'];
   beats: BeatsShape;
+  /**
+   * `program` run over the request's own services, its answer or its rejection with the failure itself, as `served` rejects: how a
+   * handler reads a door of the package (`AgentDoor`, `SkillDoor`). A door's default reads the files at the app's `StoreRoot`, and a door a
+   * test merged into the app's layer (`Layer.merge(liveOf(), agentDoorMemory())`) is the one the program reads.
+   */
+  inRequest: <A, E>(program: Effect.Effect<A, E, Services>) => Promise<A>;
 };
 
 /** The upper bounds of a request's reads, the files the runtime read for it, one past the last for more. */
@@ -154,6 +160,8 @@ export const served = <A>(c: RequestContext<ApiEnv>, handle: (s: Served) => A | 
   c.var.runtime.runPromise(
     Effect.gen(function* () {
       const { env, running } = yield* ApiConfig;
+      const context = yield* Effect.context<Services>();
+      const inRequest = <A, E>(program: Effect.Effect<A, E, Services>): Promise<A> => Effect.runPromiseWith(context)(program);
       const services = {
         env,
         running,
@@ -165,6 +173,7 @@ export const served = <A>(c: RequestContext<ApiEnv>, handle: (s: Served) => A | 
         memo: yield* ReadMemo,
         followings: yield* Followings,
         beats: yield* Beats,
+        inRequest,
       };
       const before = yield* readsOf(services.e);
       return yield* Effect.promise(async () =>

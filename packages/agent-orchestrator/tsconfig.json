@@ -19,7 +19,8 @@
     "src",
     "bin",
     "place",
-    "contracts"
+    "contracts",
+    "testing.ts"
   ],
   "exclude": [
     "src/**/*.test.ts"

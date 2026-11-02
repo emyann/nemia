@@ -7,7 +7,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { hireRefusalOf, skillsFor, type FactoryListing } from 'agent-orchestrator';
+import { Effect } from 'effect';
+import { hireRefusalOf, SkillDoor, type FactoryListing } from 'agent-orchestrator';
+import { StoreRoot } from '../store.ts';
 import type { Run, ToldLayers } from 'agent-orchestrator/run';
 import { scratch } from '../../test/scratch.ts';
 import { hiredInOf, hiringOf, RECENT_RUNS, recentRunsOf, skillsFromOf, unreadAgentsRefusal, workflowPageOf } from './step.ts';
@@ -200,7 +202,15 @@ test("each skill of a step's layers, the agent's then its own: one named with it
   skill(path.join(repo, 'apps', 'site', '.claude', 'skills'), 'lay-out');
   skill(path.join(repo, 'apps', 'site', '.claude', 'skills'), 'set-type');
   const layers = { agentSkills: ['apps/site:lay-out', 'review'], addedSkills: ['apps/site:set-type', 'gone', 'review'] } as ToldLayers;
-  const found = skillsFor(path.join(store, 'workflows', 'typeset'), { repo, home: store });
+  const found = Effect.runSync(
+    Effect.provideService(
+      Effect.flatMap(SkillDoor, (door) =>
+        door.skills.found({ dir: path.join(store, 'workflows', 'typeset'), places: { repo, home: store } }),
+      ),
+      StoreRoot,
+      store,
+    ),
+  );
   assert.deepEqual(skillsFromOf(layers, found, repo, store), [
     { name: 'apps/site:lay-out', from: null, foundIn: 'apps/site/.claude/skills/lay-out' },
     { name: 'review', from: 'repo', foundIn: null },

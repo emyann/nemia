@@ -167,6 +167,11 @@
       }
     },
     {
+      "term": "Ledger door",
+      "meaning": "the one way the revision ledger is read and appended to: `LedgerDoor` in `packages/agent-orchestrator/src/revisions/revisions.store.ts`, addressed by `RevisionOf` (a kind and a name), its files layer at the store's root a program is given and a memory one, each refusing an append whose kind, name, digest or time breaks the model's `Revision`.",
+      "type": "LedgerDoorShape"
+    },
+    {
       "term": "Lint",
       "meaning": "a template's folder judged against the layout's rules, every problem at its line: `nemia template lint`, as helm's lint, so that a check stays a step's. `nemia template check`, its former name, still runs with a hint.",
       "retired": [
@@ -268,6 +273,16 @@
         "label": "A step",
         "href": "/workflows/#a-step"
       }
+    },
+    {
+      "term": "Revision",
+      "meaning": "one entry of a kind and name's ledger: its number, a whole one from 1, the digest of the content it was given for, and when it was first seen — the model's `Revision` (`packages/agent-orchestrator/src/revisions/revisions.model.ts`), checked on an append and read nominally.",
+      "type": "Revision"
+    },
+    {
+      "term": "Revision ledger",
+      "meaning": "the numbers given to each content of a workflow, an agent, a skill or a factory's rules, one file per kind and name under `<WF_ROOT>/revisions/`: a content keeps the number it was first given, a new one is numbered past the highest; read and appended to through the Ledger door.",
+      "type": "LedgerLayer"
     },
     {
       "term": "Rm",

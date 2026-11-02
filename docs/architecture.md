@@ -338,7 +338,11 @@ invariants (one step at least, no name twice, every `after:` naming a step of it
 it was read at, judged by a pure function (`workflowVersionRefusal`, `src/folder/folder.ts`, which `contracts/workflow-version.contract.ts`
 proves). What still calls the folder's stores is counted per file in `test/workflow-door.baseline.ts`, which only shrinks; `write.store.ts`'s
 functions each take the store's root first (`writeWorkflowAt`, `isWorkflowsHolderAt`, `knownReposAt`, `placesAroundAt`), its old
-spellings the same functions at the module's root.
+spellings the same functions at the module's root. A read and a write parse the steps against the agents and skills the door finds
+through the Agent and Skill doors (`agents.found`, `skills.found`), at the places its layer says (`around`), and hand them to the layer:
+those of `workflowDoorOver`'s `defs` where given, else those the program is given, so a program given `agentDoorMemory()` and a store's
+root reads a workflow on the files whose step names an agent the memory holds. The version (`workflowVersion`) still reads the files'
+agents and skills, and moves with the revisions' pin.
 
 **The Template door.** A factory template — a folder that holds its `nemia.yaml`, or an archive `nemia template pack` wrote — is read,
 written as a new folder and packed as a new archive through `TemplateDoor` (`packages/agent-orchestrator/src/templates/templates.store.ts`),
@@ -365,9 +369,41 @@ from is one pure, proved decider for both layers and both doors (`lookedUp`, `sr
 the builtin place skills found last. A write checks the name on create, then what the draft renders to through the model's `Agent` or
 `Skill`, then the version it was read at, judged by `definitionVersionRefusal` (`src/agents/agents.ts`,
 `contracts/definition-version.contract.ts`) before either layer acts; the place, a link, a sidecar and a step still naming an agent stay
-the files' own refusals. What still calls the agent and skill stores — the folder's load and version, the roster, a start, the tick, the
-revisions pinned, a template, the sources — is counted per file in `test/agent-door.baseline.ts`, which only shrinks; the api's own
-reads of agents and skills are a later card's.
+the files' own refusals. What still calls the agent and skill stores — the folder's load for its synchronous readers and the version,
+the roster, a start, the tick, the revisions pinned, a template, the sources — is counted per file in `test/agent-door.baseline.ts`,
+which only shrinks. The api reads agents and skills through the two doors alone, each handler running its program over the request's
+own services (`inRequest`, `apps/api/src/layer.ts`), so the door is the app's rooted one or the stand-in a test merged into the app's
+layer; `src/agents/agent-door.store.test.ts` counts the api's calls of the stores, none allowed. The stand-ins reach the api's tests on
+the testing entry (`agent-orchestrator/testing`, `packages/agent-orchestrator/testing.ts`) beside the test place, never a program.
+
+**The Subscription door.** A subscription, and its deliverer's file beside it, are read and written through `SubscriptionDoor`
+(`packages/agent-orchestrator/src/subscription/subscription.store.ts`), by `SubscriptionName`, rooted as the Factory door is: two layers
+built the one way (`subscriptionDoorOver`), the files (`subscriptionFiles(home)`, `<root>/subscriptions/<name>.json` and
+`<name>.state.json`, the former `wake` key still read) and a memory stand-in (`subscriptionDoorMemory`,
+`src/subscription/memory.store.ts`, in `STAND_INS`), held to one table of walks (`test/subscription-walks.ts`). A subscription is put
+once, checked by `SubscriptionName.OnCreate` and the model's `Subscription` — a name taken is `Conflict` (the files' `wx`), one dropped
+that is not there `Missing` — and a delivery written is decoded through the model's `Delivery`. Its list answers the unreadable ones
+apart (`left`), and the deliverer says each once: the store writes no stderr. A delivery's cursor may fall below where its subscription
+began, since a cut feed sets it to 0. What still calls its module spellings is counted in `test/subscription-door.baseline.ts`.
+
+**The Ledger door.** The revision ledger — the numbers each content of a workflow, an agent, a skill or a factory's rules was given —
+is read and appended to through `LedgerDoor` (`packages/agent-orchestrator/src/revisions/revisions.store.ts`), by `RevisionOf`, a kind
+and a name, rooted as the Factory door is: the files (`ledgerFiles(home)`, `<root>/revisions/<kind>/<name>.json`, a lost race read
+again, `APPEND_TRIES` times) and a memory stand-in (`ledgerDoorMemory`, `src/revisions/memory.store.ts`, in `STAND_INS`), held to one
+table of walks (`test/ledger-walks.ts`). An append is checked by the model's `Revision` (`src/revisions/revisions.model.ts`) before it is
+numbered by `revisionNow`; a stored entry is read nominally and kept whole, and a file that does not read is an empty ledger. The pass's
+pins (`src/revisions/pin.verb.ts`) are synchronous and still call `ledgerOf` and `appendRevision`, counted in
+`test/ledger-door.baseline.ts`.
+
+**The Feed door.** The feed is read and appended to through `FeedDoor` (`packages/agent-orchestrator/src/feed/feed.store.ts`), one
+group of lines, append-only, rooted as the Factory door is: the files (`feedFiles(home)`, `<root>/feed.jsonl`, its end the file's size
+and inode, a line appended after a torn one on a line of its own) and a memory stand-in that keeps the lines as their bytes, so a cursor
+is a byte offset on both (`feedDoorMemory`, `src/feed/memory.store.ts`, in `STAND_INS`), held to one table of walks
+(`test/feed-walks.ts`). A read is refused `Invalid` from a cursor at no line's boundary, and an append whose line the model's `FeedLine`
+refuses writes none of it. The layer carries nothing between passes: the fold's memo is the caller's (`emitFeed`, `feedPass`), started
+afresh when the end's generation changes or its cursor no longer falls on a line. `src/feed/feed.verb.ts` reaches the store through the
+door alone and the runtime not at all, so it is the one controller that needs no client (`DOORED_ONLY`, `test/boundary.test.ts`); the
+CLI's follow and the tick's message still call the module spellings, counted in `test/feed-door.baseline.ts`.
 
 **The Task door.** A task's journal is read and written through the runtime's `Journal` (`packages/agent-runtime/src/core/engine/journal.ts`),
 which is the Task door: every store reaches the engine through `Journal.layer`, so the door holds a hand-written store as it holds the
@@ -481,7 +517,7 @@ holding a context's `glossary.json` leaves its one `<folder>.model.ts` out of it
 agent-runtime, a type included (`CLIENT` in test/boundary.test.ts). It creates the runtime (`engine()`, `HARNESSES`): the
 runtime's `Engine` service from `agent-runtime`, built once, each verb an Effect a controller's program reads with `asked`
 (`engineOf`, which a test hands a layer of its own); a caller runs a program over it with `runWith`. It passes the runtime's surface through rather than wrapping it. Every controller beneath the CLI reaches it, itself or
-through a controller it imports, and it imports no controller. The runtime's behaviour comes through the client; its vocabulary through
+through a controller it imports, but the feed's verb, which reaches no runtime (`DOORED_ONLY`), and it imports no controller. The runtime's behaviour comes through the client; its vocabulary through
 its pure door, `agent-runtime/vocabulary` (`src/vocabulary.ts`: the words each harness takes, per key (`HARNESS_CHOICES`), `fenceReach`, `unruledIn`, and the folders a
 harness reads as its own configuration in a mounted folder (`configFolderIn`), with no Effect and no I/O, held by `packages/agent-runtime/test/vocabulary-door.test.ts`), which any file of the orchestrator imports, a pure one included
 (`VOCABULARY` in test/boundary.test.ts).

@@ -23,9 +23,11 @@ import {
   writeCopyRecord,
   writeCopySchema,
   type Part,
+  type SkillJudged,
   type Source,
   type SourceSkill,
 } from './copy.store.ts';
+import type { DefinitionThere } from '../agents/agents.ts';
 
 /** What `copyAgent` did: the agent's name in the library, the parts it wrote and those it reused, by name, and the record's file. */
 export type AgentCopied = { name: string; copied: string[]; reused: string[]; record: string };
@@ -52,29 +54,47 @@ export const copyAgent = Effect.fn('copyAgent')(function* ({
   keep?: readonly string[];
   home: string;
 }) {
-  const judged = yield* tried(() => judgedCopy(file, as, keep, home));
+  const judged = yield* judgedCopy(file, as, keep, home);
   return yield* writeCopy(judged.source, judged.skills, judged.parts, home);
 });
 
-/** The copy judged whole before a byte is written (`copyAgent`): its source, its skills and its parts, or the refusal of it. */
-function judgedCopy(file: string, as: string | undefined, keep: readonly string[], home: string) {
-  const source = readSource(file, as);
-  const skills = skillsOf(source, home);
-  const parts = partsOf(source, skills, keep, home);
-  const unknown = keep.filter((k) => !parts.slice(1).some((p) => p.part === k));
-  if (unknown.length)
-    throw new Invalid({
-      message: `--keep ${unknown.join(', ')} names no skill nor schema of this copy: it keeps one of ${
-        parts
-          .slice(1)
-          .map((p) => p.part)
-          .join(', ') || 'none'
-      }.`,
+/** A skill's version where the Skill door holds one at `name` in the folder of skills `at`, else null. */
+const heldVersion = (there: DefinitionThere): string | null => (there.kind === 'held' ? there.version : null);
+
+/**
+ * The copy judged whole before a byte is written (`copyAgent`): its source, its skills and its parts, or the refusal of it. Each skill is
+ * judged by what the Skill door holds at its name in the library and at the folder it is copied from.
+ */
+const judgedCopy = Effect.fnUntraced(function* (file: string, as: string | undefined, keep: readonly string[], home: string) {
+  const { source, skills } = yield* tried(() => {
+    const read = readSource(file, as);
+    return { source: read, skills: skillsOf(read, home) };
+  });
+  const door = (yield* SkillDoor).skills;
+  const judged: SkillJudged[] = [];
+  for (const skill of skills)
+    judged.push({
+      ...skill,
+      library: yield* door.there(SkillName.read(skill.name), yourSkillsDir(home)),
+      source: heldVersion(yield* door.there(SkillName.read(path.basename(skill.dir)), path.dirname(skill.dir))),
     });
-  const differ = parts.filter((p) => !p.same && !p.kept);
-  if (differ.length) throw new Conflict({ message: `nothing was copied: ${differ.map((p) => p.differs).join(' ')}` });
-  return { source, skills, parts };
-}
+  return yield* tried(() => {
+    const parts = partsOf(source, judged, keep, home);
+    const unknown = keep.filter((k) => !parts.slice(1).some((p) => p.part === k));
+    if (unknown.length)
+      throw new Invalid({
+        message: `--keep ${unknown.join(', ')} names no skill nor schema of this copy: it keeps one of ${
+          parts
+            .slice(1)
+            .map((p) => p.part)
+            .join(', ') || 'none'
+        }.`,
+      });
+    const differ = parts.filter((p) => !p.same && !p.kept);
+    if (differ.length) throw new Conflict({ message: `nothing was copied: ${differ.map((p) => p.differs).join(' ')}` });
+    return { source, skills, parts };
+  });
+});
 
 /**
  * The parts of a copy judged by `copyAgent` written, in order — the skills through the Skill door, the agent with its schema through the

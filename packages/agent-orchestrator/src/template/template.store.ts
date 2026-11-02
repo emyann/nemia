@@ -8,7 +8,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { LineCounter, parseAllDocuments, stringify, type Document } from 'yaml';
-import { loadAgents } from '../agents/read.store.ts';
+import type { Agent, SkillsFound } from '../agents/agents.ts';
 import { outsideRefusal, type Factory } from '../factory/factory.ts';
 import { workflowDescription, workflowsIn } from '../folder/folder.store.ts';
 import { stepFiles } from '../folder/folder.ts';
@@ -16,7 +16,7 @@ import { placesOf } from '../folder/lookup.store.ts';
 import { readKeys } from '../former/former.ts';
 import { givenSkillOf } from '../keys/index.ts';
 import { Invalid, Missing } from '../refusal/refusal.ts';
-import { entriesOf, isBuiltinPlace, lookupRoots, PLACE_SKILLS, skillFiles, skillsFor } from '../skills/read.store.ts';
+import { entriesOf, isBuiltinPlace, lookupRoots, PLACE_SKILLS, skillFiles, type Places } from '../skills/read.store.ts';
 import { splitFrontmatter, WorkflowError } from '../step/step.ts';
 import { firstPiece } from '../piece/piece.ts';
 import { contentDigest, pathRefusals, type TreeFile } from '../archive/archive.ts';
@@ -167,13 +167,27 @@ function workflowSources(root: string, names: readonly string[], factory: string
   });
 }
 
-/** The loader's answer for an agent and a skill, over the roots a workflow of `root` looks in, the first root that has a name winning. */
-function lookups(root: string, from: string): Pick<Source, 'agent' | 'skill'> {
-  const workflowDir = path.join(root, '_');
-  const places = placesOf(from);
-  const roots = lookupRoots(workflowDir, places).map((r) => path.join(r, 'agents'));
-  const agents = roots.map((dir) => ({ dir, found: loadAgents(dir) }));
-  const skills = skillsFor(workflowDir, places).at;
+/**
+ * Where an export of the repository `from` looks for the agents and skills its workflows name, as a workflow of its `workflows/` looks:
+ * a workflow folder of it (`workflowDir`, a name no workflow has), its places, and each folder of agents, first root first.
+ */
+export function lookupsOf(from: string): { workflowDir: string; places: Places; agentDirs: string[] } {
+  const workflowDir = path.join(path.resolve(from), 'workflows', '_');
+  const places = placesOf(path.resolve(from));
+  return { workflowDir, places, agentDirs: lookupRoots(workflowDir, places).map((r) => path.join(r, 'agents')) };
+}
+
+/**
+ * What an export's program read through the Agent and Skill doors over the roots of `lookupsOf`: each folder of agents, first root first,
+ * with each agent it holds, read or the refusal of it; and where each skill a workflow of it may name is found.
+ */
+export type ExportFound = {
+  agents: ReadonlyArray<{ dir: string; found: ReadonlyMap<string, Agent | Error> }>;
+  skills: SkillsFound['at'];
+};
+
+/** The loader's answer for an agent and a skill, over what the doors found (`ExportFound`), the first root that has a name winning. */
+function lookups({ agents, skills }: ExportFound): Pick<Source, 'agent' | 'skill'> {
   return {
     agent: (name) => {
       const at = agents.find(({ found }) => found.has(name));
@@ -286,14 +300,16 @@ export type ExportAsk = { dir: string; from: string; factory?: FactoryParts };
 
 /**
  * The tree of a template to be written at `ask.dir` from the repository `ask.from`: each workflow of its `workflows/` (with `factory`,
- * only those it attaches), the agents and skills they name as the loader finds them, the factory's hires, instruction and rules; and
- * checked. Answers the folder, its name, its tree, and where each part came from; the Template door writes it. Refused, nothing written:
- * a folder that is no name, a factory whose repositories are not `from`, a workflow it attaches that `from` lacks, what `draftOf`
- * refuses, and a draft that does not pass its own check (Invalid), each problem by name; a `from` with no workflows/ (Missing).
+ * only those it attaches), the agents and skills they name as the Agent and Skill doors found them over `lookupsOf`'s roots (`found`),
+ * the factory's hires, instruction and rules; and checked. Answers the folder, its name, its tree, and where each part came from; the
+ * Template door writes it. Refused, nothing written: a folder that is no name, a factory whose repositories are not `from`, a workflow it
+ * attaches that `from` lacks, what `draftOf` refuses, and a draft that does not pass its own check (Invalid), each problem by name; a
+ * `from` with no workflows/ (Missing).
  */
 export function exportTree(
   ask: ExportAsk,
   placeSkills: readonly string[],
+  found: ExportFound,
 ): { dir: string; name: string; files: TreeFile[]; from: Draft['from'] } {
   const dir = path.resolve(ask.dir);
   const from = path.resolve(ask.from);
@@ -306,7 +322,7 @@ export function exportTree(
   const refusals: string[] = [];
   const factory = ask.factory === undefined ? undefined : factorySource(ask.factory, from, refusals);
   const workflows = workflowSources(root, factory?.workflows ?? workflowsIn(root), ask.factory?.factory.name, refusals);
-  const draft = draftOf({ template: name, workflows, factory: factory?.source, ...lookups(root, from) });
+  const draft = draftOf({ template: name, workflows, factory: factory?.source, ...lookups(found) });
   refusals.push(...draft.refusals);
   if (refusals.length) throw new Invalid({ message: `${dir} was not written:\n${refusals.map((r) => `  ${r}`).join('\n')}` });
   const files = treeOfDraft(draft);

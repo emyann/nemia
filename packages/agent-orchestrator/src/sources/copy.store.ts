@@ -11,9 +11,9 @@ import { frontmatterKey } from '../former/former.ts';
 import { linkRefusal } from '../folder/folder.ts';
 import { givenSkillOf } from '../keys/index.ts';
 import { yourSkillsDir, yoursOf } from '../yours/yours.ts';
-import { agentDraftOf, agentNameRefusal, renderAgent, type AgentDraft } from '../agents/agents.ts';
+import { agentDraftOf, agentNameRefusal, renderAgent, type AgentDraft, type DefinitionThere } from '../agents/agents.ts';
 import { copyRecordFile, readCopyRecord, sourceSkills, sourceVersion, type CopyRecord } from '../agents/read.store.ts';
-import { isBuiltinPlace, skillVersion } from '../skills/read.store.ts';
+import { isBuiltinPlace } from '../skills/read.store.ts';
 
 /**
  * One part of a copy: what it is called in a refusal and `--keep`, whether the library holds a file at its place, whether it holds it as
@@ -26,6 +26,12 @@ export type Source = { file: string; draft: AgentDraft; text: string; schema: { 
 
 /** A skill an agent gives: its name, and the folder it is found in. */
 export type SourceSkill = { name: string; dir: string };
+
+/**
+ * A skill an agent gives, with what the Skill door holds of it: what is at its name in the library (`library`) and the version of the
+ * one it is copied from (`source`), null where none is held there.
+ */
+export type SkillJudged = SourceSkill & { library: DefinitionThere; source: string | null };
 
 /** The fix of an agent file the copy does not read: the line deleted from a copy of the file, and that copy copied. */
 const deleteFix = (file: string): string =>
@@ -115,9 +121,11 @@ function heldOwn(file: string, whose: string): boolean {
 
 /**
  * Each part of the copy of `source` into the library of `home`, judged: the agent, its schema and each skill, each the same as the
- * library's or not there, else differing, and the fix of each that differs. A link where the agent or its schema would be is refused.
+ * library's or not there, else differing, and the fix of each that differs. A skill is judged by the versions the Skill door gave
+ * (`SkillJudged`), held where anything is at its name in the library, the same where that is at the source's version. A link where the
+ * agent or its schema would be is refused.
  */
-export function partsOf(source: Source, skills: readonly SourceSkill[], keep: readonly string[], home: string): Part[] {
+export function partsOf(source: Source, skills: readonly SkillJudged[], keep: readonly string[], home: string): Part[] {
   const agents = yoursOf('agents', home);
   const { name } = source.draft;
   const agentFile = path.join(agents, `${name}.md`);
@@ -144,11 +152,12 @@ export function partsOf(source: Source, skills: readonly SourceSkill[], keep: re
   }
   for (const skill of skills) {
     const there = path.join(yourSkillsDir(home), skill.name);
-    const held = fs.existsSync(there);
+    const held = skill.library.kind !== 'none';
+    const version = skill.library.kind === 'held' ? skill.library.version : null;
     parts.push({
       part: skill.name,
       held,
-      same: !held || skillVersion(there) === skillVersion(skill.dir),
+      same: !held || version === skill.source,
       kept: keep.includes(skill.name),
       differs: `the skill ${skill.name} in ${there} differs from the one in ${skill.dir}: keep the library's with --keep ${skill.name}.`,
     });

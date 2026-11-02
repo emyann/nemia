@@ -183,7 +183,8 @@ const askedOf = (r: SpawnRequest): AttachedOptions => ({
  * - the tools, with `TOOL_SEARCH` added to a closed list where the session has a server, the denies and allows (`claudeDenies`,
  *   `claudeAllows`), the mounts as `additionalDirectories`;
  * - `config.claude` with the admission's hook (`admittedFlags`) on `extraArgs`, its plugin folders as `plugins`, its settings on
- *   the SDK's own `settings`, the session's auto-memory and every dependency's `CLAUDE.md` off in them (`memorylessSettings`), and its prompt files as `systemPrompt`;
+ *   the SDK's own `settings`, the session's auto-memory and every dependency's `CLAUDE.md` off in them (`memorylessSettings`), and
+ *   its prompt files as `systemPrompt`;
  * - the partial messages, always asked for: the SDK emits a `stream_event` for each piece of a block only when
  *   `includePartialMessages` is set (`sdk.d.ts:1896`, `--include-partial-messages` to its CLI), and a follow of the session reads
  *   their `text_delta`s and nothing else (`attached-follow.ts`); the capture goes on dropping them;

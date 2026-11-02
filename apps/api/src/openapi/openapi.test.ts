@@ -12,7 +12,7 @@ import { Effect, JsonSchema, Schema, SchemaRepresentation } from 'effect';
 import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from 'agent-orchestrator/testing';
 import { COMMANDS, routeList, runObject, runStore } from 'agent-orchestrator';
-import { ANSWERS, SUB_RESOURCES } from './openapi.ts';
+import { ANSWERS, RUN_READS } from './openapi.ts';
 import { appOver, beforeEachTest, eachTest, engineFor, runOver } from '../../test/placed.ts';
 
 const stand = eachTest(testPlace);
@@ -61,6 +61,12 @@ test('the OpenAPI document is 3.1.0, defines `Run`, and imports back into a Sche
   assert.equal(doc.openapi, '3.1.0');
   assert.ok(doc.components.schemas.Run, 'the document defines Run');
   assert.ok(doc.paths['/api/runs/{runId}/steps/{step}/tries/{try}/closeout'], "it names the closeout's route");
+  assert.deepEqual(
+    (doc.paths['/api/runs/{runId}'] as { get?: { responses: Record<string, { content: unknown }> } } | undefined)?.get?.responses['200']
+      ?.content,
+    { 'application/json': { schema: { $ref: '#/components/schemas/Run' } } },
+    "the run's own path answers the run object",
+  );
   const back = SchemaRepresentation.fromJsonSchemaDocument(
     JsonSchema.fromSchemaOpenApi3_1({ $ref: '#/components/schemas/Run', $defs: doc.components.schemas }),
   ) as Schema.Decoder<unknown>;
@@ -77,20 +83,20 @@ test('the OpenAPI document is 3.1.0, defines `Run`, and imports back into a Sche
   assert.equal(Schema.decodeUnknownResult(back)({ ...object, kind: 'Step' })._tag, 'Failure', 'the imported Schema keeps the kind closed');
 });
 
-test("the document's paths are the sub-resources' routes as the command table says them, each in OpenAPI's spelling", async () => {
+test("the document's paths are the run's and its sub-resources' routes as the command table says them, each in OpenAPI's spelling", async () => {
   const doc = (await (await app().request('/openapi/v3/nemia/v1')).json()) as { paths: Record<string, { get?: unknown }> };
-  const routes = COMMANDS.filter((c) => (SUB_RESOURCES as readonly string[]).includes(c.name))
+  const routes = COMMANDS.filter((c) => (RUN_READS as readonly string[]).includes(c.name))
     .flatMap((c) => routeList(c))
     .filter((r) => r.method === 'GET')
     .map((r) => r.path.replace(/:(\w+)/g, '{$1}'));
-  assert.equal(routes.length, SUB_RESOURCES.length, 'each sub-resource has its route in the table');
+  assert.equal(routes.length, RUN_READS.length, 'each read has its route in the table');
   assert.deepEqual(Object.keys(doc.paths).sort(), routes.sort(), 'the paths are those routes, and only those');
   for (const path of routes) assert.ok(doc.paths[path]?.get, `${path} is read with GET`);
 });
 
-test("each sub-resource's path names its answer's component, which imports back and decodes what the route answers", async () => {
+test("each read's path names its answer's component, which imports back and decodes what the route answers", async () => {
   const doc = (await (await app().request('/openapi/v3/nemia/v1')).json()) as {
-    paths: Record<string, { get: { operationId: (typeof SUB_RESOURCES)[number]; responses: Record<string, unknown> } }>;
+    paths: Record<string, { get: { operationId: (typeof RUN_READS)[number]; responses: Record<string, unknown> } }>;
     components: { schemas: Record<string, JsonSchema.JsonSchema> };
   };
   const asked = { runId: R, step: 'design', try: '1' };

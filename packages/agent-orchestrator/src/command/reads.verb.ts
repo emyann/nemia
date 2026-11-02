@@ -52,7 +52,7 @@ export const SHOW: Command = {
         flag: '--raw',
         kind: 'switch',
         key: 'raw',
-        only: { side: 'cli', why: 'the record is the store\'s, for a person at the command line; a client reads the run object' },
+        only: { side: 'cli', why: "the record is the store's, for a person at the command line; a client reads the run object" },
       },
     ],
     unknown: takesNo('show', "one run's id, and --raw"),

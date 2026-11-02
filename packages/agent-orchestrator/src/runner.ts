@@ -528,6 +528,19 @@ export type { PauseRuns } from './pause/pause.ts';
 export type { InboxRuns } from './inbox/index.ts';
 export { judgedNow, runsSummarized } from './summary/summary.verb.ts';
 export type { RunSummary, SummaryHow } from './summary/summary.verb.ts';
+/**
+ * The run's page (`runPage`, `GET /api/runs/:id`) and the types it answers with, and of what it is built of what the api reads besides: a
+ * step's file routes (`refusedName`, `typeOf`), its log's tail (`tailOf`), its try's turn (`turnOfTry`) and `nemia decide`'s usage
+ * (`totalOf`, `usedOf`).
+ */
+export { runPage, type RunDetail, type StepAsked, type StepBudget, type StepRaise, type StepSpec } from './resource/page.verb.ts';
+export type { StepTimelineTotal, StepTimelineTry } from './resource/page.verb.ts';
+export { turnOfTry, type StepAcceptance, type StepApproval, type StepAttempts, type StepCloseout } from './resource/tries.verb.ts';
+export type { StepGate, StepReply, StepTry, StepUnreadable } from './resource/tries.verb.ts';
+export type { StepFiled, TaskPart } from './resource/told.verb.ts';
+export { totalOf, usedOf, type RunRead, type StepUsed, type Usage } from './resource/usage.ts';
+export { tailOf, type LastSaid, type StepCheck, type StepLog } from './resource/checks.verb.ts';
+export { refusedName, typeOf, type StepArtifact, type StepValue } from './resource/files.store.ts';
 export type { FinishedPage, FinishedRun, ListedRun, OpenRuns, RunClock, RunOutcome, StepCost, WaitingRun } from './runlist/runlist.verb.ts';
 export { driftWords, kindsDrift, revisionNow, REVISION_KINDS, stepsDrift } from './revisions/revisions.ts';
 export type { Drift, KindName, Pin, Revision, RevisionKind } from './revisions/revisions.ts';

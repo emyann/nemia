@@ -363,9 +363,8 @@
       }
     },
     {
-      "files": ["apps/api/src/detail/detail.ts"],
+      "files": ["packages/agent-orchestrator/src/resource/page.verb.ts"],
       "rules": {
-        "max-lines-per-function": ["error", { "max": 86, "skipBlankLines": true, "skipComments": true }],
         "complexity": ["error", { "max": 22 }]
       }
     },

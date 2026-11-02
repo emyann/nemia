@@ -13,12 +13,13 @@ import {
   type OpenRuns,
   viewsFor,
   runWith,
+  runPage,
   type RunSummary,
   type WaitingRun,
 } from 'agent-orchestrator';
 import type { Run } from 'agent-orchestrator/run';
 import { decisionOf } from '../decide/decision.ts';
-import { detail, type RunDetail } from '../detail/index.ts';
+import type { RunDetail } from '../detail/index.ts';
 import { type ApiEnv, served, type Served } from '../layer.ts';
 import { workflowPageOf, type WorkflowPageAddress } from '../step/step.ts';
 import { commandNamed, findRun, noSuchRun, runPlaced } from '../store.ts';
@@ -126,9 +127,9 @@ const CONCLUDED = commandNamed('concluded');
  *   `wallMs` and the breakdown of a finished run stands still. The page is cut before anything is read for it, so beyond what a warm
  *   `GET /api/runs` costs this read costs the records and the task journals of that page's rows alone — nine where the board asks, at
  *   most `?size=`'s hundred — and nothing for the finished runs it does not answer.
- * - `GET /api/runs/:id` — a run in full (`detail`) with the address of its workflow's page (`RunPage`), found by the package's entry
- *   (`run`): refused with a 404 when there is no such run, and with a 502 when a task it reads does not, in the words the list says it with
- *   (`RunSummary.unreadable`).
+ * - `GET /api/runs/:id` — a run in full, judged by the package (`runPage`), with the address of its workflow's page (`RunPage`), found by
+ *   the package's entry (`run`): refused with a 404 when there is no such run, and with a 502 when a task it reads does not, in the words
+ *   the list says it with (`RunSummary.unreadable`).
  * - `GET /api/runs/:runId/decision` — what `nemia decide` shows a person (`decisionOf`), the route of its entry of the command table. Not
  *   on the page's poll, since it runs `git diff`. Refused as the run's page is: a 404 with no such run, and a 502 when a task it reads does
  *   not, in the words the list says it with (`RunSummary.unreadable`).
@@ -173,7 +174,7 @@ export const runs = new Hono<ApiEnv>()
       const id = c.req.param('id');
       const { run } = (await runPlaced(s, s.e, RUN.handler({ id }))) as { run: Run | null };
       if (!run) return c.json({ error: noSuchRun(id) }, 404);
-      const full = await detail(run, s);
+      const full = await runPlaced(s, s.e, runPage(run, s));
       if ('unjudged' in full) return c.json({ error: full.unjudged }, 502);
       return c.json({ ...full, workflowPage: workflowPageOf(run, s.repo, s.home) } satisfies RunPage);
     }),

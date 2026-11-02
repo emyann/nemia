@@ -527,6 +527,13 @@ const PINNED: Record<string, string[]> = {
     'statsRun',
     'taskPhasesRead',
     'tickRun',
+    'refusedName',
+    'runPage',
+    'tailOf',
+    'totalOf',
+    'turnOfTry',
+    'typeOf',
+    'usedOf',
   ],
   'agent-orchestrator/run': [
     'BY_CAP',

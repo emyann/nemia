@@ -78,14 +78,14 @@ const stepFilesOf = (step: Pick<Workflow, 'name'>, runArtifacts: string): string
  * The step's own files directory (`stepFilesOf`), read-only, for a step whose permission mode writes outside its directory only where a
  * rule allows it (`writesOutsideByRule`): what its tools write there — a browser server's snapshots, screenshots and console logs — its
  * Read, Grep and Glob reach then, since a session reads no folder outside its working tree but a mounted one; and the mount, read-only,
- * takes no write from it, since it had none there. None for a step in a wider mode (`auto`, `bypassPermissions`): it reaches the folder
+ * takes no write from it, since it had none there. None for a step in a wider mode, one that writes outside its directory unasked: it reaches the folder
  * already and writes into it, which a read-only mount would deny, and a writable one would allow by rule what its mode judged call by
  * call — its access stays as it was. None on a harness fenced by a sandbox, which reads the disk already, nor on a remote agent, filed no
  * local field. Nor where the harness's permission rules cannot carry a character of its path (`unruledIn`, a store root holding a `(`):
  * the deny that holds it read-only could not name it, and the session runs as it did before, rather than the step being refused. No
  * other step's folder: those are the handed ones (`handedMounts`).
  */
-export const ownMounts = (step: Pick<Workflow, 'name' | 'harness' | 'permissionMode' | 'sandbox'>, runArtifacts: string): Mount[] => {
+export const ownMounts = (step: Workflow, runArtifacts: string): Mount[] => {
   const own = stepFilesOf(step, runArtifacts);
   return local(step.harness) && writesOutsideByRule(modeOf(step)) && unruledIn(step.harness ?? DEFAULT_HARNESS, own) === undefined
     ? [{ path: own, readOnly: true }]

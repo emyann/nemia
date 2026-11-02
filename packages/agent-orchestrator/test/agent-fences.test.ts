@@ -18,9 +18,9 @@
  *
  * A fence also reaches the run's artifacts folder: each step is filed the folder of every step it comes after, read-only
  * (`handedMounts`), and reads what it holds and writes none of it, in any mode; it is filed no folder of a step it does not come after.
- * A step whose mode writes outside its directory only by rule (`writesOutsideByRule`: Agora's, Seldon's, Iris's, Argus's `dontAsk`) is
- * filed its own folder too, read-only (`ownMounts`), so it reads what its tools wrote there and writes none of it; a writer's (`auto`) is
- * filed none, its reach there left as its mode gives it.
+ * A step whose mode writes outside its directory only by rule (`writesOutsideByRule`, each read-only agent's) is filed its own folder
+ * too, read-only (`ownMounts`), so it reads what its tools wrote there and writes none of it; a writer's is filed none, its reach there
+ * left as its mode gives it.
  * The reach is read off the config a filing gives the harness (`filedConfig`), as Claude Code holds a mount (`readsAt`, `writesAt`). So
  * does the store's inbox, for a step whose `reads:` names it (`readsMounts`): read-only, in any mode, and to no other step.
  *

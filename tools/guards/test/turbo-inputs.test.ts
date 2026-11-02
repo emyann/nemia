@@ -19,7 +19,7 @@
  * `remote-agent.test.ts`, the e2e's page names, the board's generated paths and every workspace's manifest
  * (`tools/guards/test/ci-workflow.test.ts`, `tools/guards/test/ci-scan.boundary.test.ts`), and `tools/guards/test/repo-guards.test.ts`
  * reads `CODEOWNERS`, under `.github/`, and the packages' manifests. The citation guard reads every `CLAUDE.md` and every test file, the
- * apps' among them (`claude-md-cites.test.ts`); the licence guard the root's `LICENSE` and `README.md` (`license.test.ts`); the team's
+ * apps' among them (`claude-md-cites.test.ts`); the licence guard every workspace's manifest (`license.test.ts`); the team's
  * guards and the git reads' guard `.claude/settings.json` and the skills (`team-words.test.ts`, `team-portable.test.ts`,
  * `git-reads.test.ts`), the five layers' guard the docs site's pages and the agents' glossary table (`agent-layers-doc.test.ts`), and the
  * glossary guard every context's table and the apps' source (`glossary.test.ts`); the orchestrator's own files, and the runtime's through
@@ -100,8 +100,6 @@ const INPUTS: Record<string, readonly string[]> = {
     ...APP_SOURCES,
     '$TURBO_ROOT$/apps/docs/src/content/docs/**',
     ...CLAUDE_FILES,
-    '$TURBO_ROOT$/README.md',
-    '$TURBO_ROOT$/LICENSE',
     '$TURBO_ROOT$/.claude/settings.json',
     '$TURBO_ROOT$/.claude/skills/**',
   ],

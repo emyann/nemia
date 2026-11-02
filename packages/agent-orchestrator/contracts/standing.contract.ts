@@ -46,7 +46,8 @@ const standingSpec = spec<Stands>({
       condition: ({ input: [step, run], output }) => output.status !== 'awaiting approval' || !approved(run, step.name),
     },
     ownIsItsOwn: {
-      description: "Its own status is the one ownStatus gives: standing reads a step's own work as ownStatus does, and holds it only above that",
+      description:
+        "Its own status is the one ownStatus gives: standing reads a step's own work as ownStatus does, and holds it only above that",
       condition: ({ input: [step, run, p, c, a, steps, s], output }) => output.own === ownStatus(step, run, p, c, a, steps, s),
     },
     ownOrHeld: {

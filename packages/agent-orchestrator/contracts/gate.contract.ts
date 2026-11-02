@@ -19,6 +19,16 @@ import { gated, tryNow } from './laws.ts';
 export const sendBack = assume(retryable, { pure: true });
 export const unfinished = assume(notHandedOn, { pure: true });
 
+/**
+ * Whether a step is an ending not yet filed whose approval would take what is not there to take: a step it comes after is sent
+ * back, or every result branch is already on the base.
+ */
+const anEndingNotToTake = (step: Workflow, run: Run, asks: readonly RetryAsk[], standings: readonly BranchStanding[]): boolean =>
+  step.workspace === 'base' &&
+  gated(step, run) &&
+  !run.steps[step.name]?.taskId &&
+  (asks.some((x) => step.after.includes(x.step)) || (standings.length > 0 && standings.every((b) => b.where === 'on')));
+
 const approvalRefusalSpec = spec<
   (
     steps: readonly Workflow[],
@@ -96,10 +106,7 @@ const approvalRefusalSpec = spec<
         if (run.hold) return true;
         const asked = asks ?? [];
         if (asked.some((x) => x.step === name && x.try === tryNow(run, name) + 1)) return true;
-        const on = standings ?? [];
-        const unfiledEnding = step.workspace === 'base' && gated(step, run) && !run.steps[name]?.taskId;
-        if (unfiledEnding && asked.some((x) => step.after.includes(x.step))) return true;
-        if (unfiledEnding && on.length > 0 && on.every((b) => b.where === 'on')) return true;
+        if (anEndingNotToTake(step, run, asked, standings ?? [])) return true;
         const waits =
           standing(step, run, p, c ?? (() => undefined), a ?? (() => false), steps, s ?? (() => undefined), v).status ===
           'awaiting approval';

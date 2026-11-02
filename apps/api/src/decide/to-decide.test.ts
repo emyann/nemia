@@ -18,7 +18,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from '../../test/scratch.ts';
 import type { RunDecision } from './decision.ts';
-import type { RunDetail } from '../detail/detail.ts';
+import { objectOf, specOf } from '../../test/run-reads.ts';
 import { app } from '../app.ts';
 import { engine, passStanding, runStore, type RunSummary } from 'agent-orchestrator';
 import { runWith } from '../../test/builtin-place.ts';
@@ -137,7 +137,8 @@ function writeRun(run: { id: string; repo: string; baseRef: string } & Record<st
   );
 }
 
-const detailOf = async (id: string) => (await (await app.request(`/api/runs/${id}`)).json()) as RunDetail;
+/** The run object of `id` (`GET /api/runs/:id`), what `nemia show` prints. */
+const detailOf = (id: string) => objectOf(app, id);
 const listedOf = async (id: string) => {
   const run = ((await (await app.request('/api/runs')).json()) as RunSummary[]).find((r) => r.id === id);
   assert.ok(run, `${id} is on the list`);
@@ -172,15 +173,15 @@ test("a run at its ending's gate: `to decide` says what the ending would do on t
       const before = gitCount();
       const detail = await detailOf(id);
       assert.deepEqual(
-        detail.steps.map((s) => [s.name, s.message]),
+        detail.status.steps.map((s) => [s.name, s.message]),
         [
           ['implement', 'unverified · done'],
           ['ship', 'awaiting approval'],
         ],
       );
-      assert.deepEqual([detail.waitingOnYou, detail.waitingOnYouWords], [['ship'], ['approve ship']]);
+      assert.deepEqual([detail.status.waitingOnYou, detail.status.waitingOnYouWords], [['ship'], ['approve ship']]);
       assert.deepEqual(
-        detail.steps.map((s) => [s.name, s.spec?.workspace ?? null]),
+        detail.status.steps.map((s) => [s.name, specOf(detail, s.name)?.workspace ?? null]),
         [
           ['implement', null],
           ['ship', 'base'],
@@ -188,7 +189,7 @@ test("a run at its ending's gate: `to decide` says what the ending would do on t
         "the key the board tells an ending's gate from another gate by: the ending runs in the repository's own checkout, and the work does not",
       );
       assert.deepEqual(
-        detail.toDecide,
+        detail.status.toDecide,
         {
           kind: 'approve',
           step: 'ship',
@@ -206,10 +207,10 @@ test("a run at its ending's gate: `to decide` says what the ending would do on t
         "the ending has not run: what there is to decide is what it would do, in the folder's own first line, and the command that runs it",
       );
       assert.ok(
-        detail.toDecide.said.endsWith(detail.toDecide.command),
-        `the whole of nemia ls's line ends with the command the board offers, so the two cannot drift apart: ${detail.toDecide.said}`,
+        detail.status.toDecide.said.endsWith(detail.status.toDecide.command),
+        `the whole of nemia ls's line ends with the command the board offers, so the two cannot drift apart: ${detail.status.toDecide.said}`,
       );
-      assert.deepEqual((await listedOf(id)).toDecide, detail.toDecide, 'the list says the same, in the same words');
+      assert.deepEqual((await listedOf(id)).toDecide, detail.status.toDecide, 'the list says the same, in the same words');
       assert.equal(
         gitCount(),
         before,
@@ -453,7 +454,7 @@ test("a finished run's `to decide`, level-triggered: its branch ahead of the bas
       noPass();
       const unread = await detailOf(id);
       assert.deepEqual(
-        [unread.status, unread.toDecide],
+        [unread.status.status, unread.status.toDecide],
         ['succeeded', null],
         'with no pass yet, where the branch stands is unread, and an unread branch decides nothing',
       );
@@ -461,15 +462,15 @@ test("a finished run's `to decide`, level-triggered: its branch ahead of the bas
 
       await aPass();
       const detail = await detailOf(id);
-      assert.equal(detail.status, 'succeeded');
-      assert.deepEqual(detail.waitingOnYou, [], 'no step waits on you: the run finished');
-      assert.deepEqual(detail.toDecide, {
+      assert.equal(detail.status.status, 'succeeded');
+      assert.deepEqual(detail.status.waitingOnYou, [], 'no step waits on you: the run finished');
+      assert.deepEqual(detail.status.toDecide, {
         kind: 'result',
         branches: [branch],
         said: `${branch} is ahead of main, and nothing has merged it — nemia decide ${id}`,
         command: `nemia decide ${id}`,
       });
-      assert.deepEqual((await listedOf(id)).toDecide, detail.toDecide, 'the list says the same, in the same words');
+      assert.deepEqual((await listedOf(id)).toDecide, detail.status.toDecide, 'the list says the same, in the same words');
 
       const { standings, commands } = await decidableOf(id);
       assert.deepEqual(
@@ -501,7 +502,7 @@ test("a finished run's `to decide`, level-triggered: its branch ahead of the bas
       git(repo, 'merge', '-q', '--no-ff', '-m', `Merge ${id}`, `wf/${id}/implement`);
       try {
         await aPass();
-        assert.equal((await detailOf(id)).toDecide, null, 'the branch is on the base: nothing left to decide');
+        assert.equal((await detailOf(id)).status.toDecide, null, 'the branch is on the base: nothing left to decide');
         assert.equal((await listedOf(id)).toDecide, null);
         assert.equal(fs.readFileSync(path.join(root, 'runs', `${id}.json`), 'utf8'), record, "and nothing is written on the run's record");
         assert.deepEqual(
@@ -534,11 +535,11 @@ test("a finished run's `to decide`, level-triggered: its branch ahead of the bas
 
       const detail = await detailOf(id);
       assert.deepEqual(
-        detail.steps.map((s) => s.message),
+        detail.status.steps.map((s) => s.message),
         ['unverified · done', 'unverified · done'],
       );
-      assert.deepEqual([detail.status, detail.waitingOnYou], ['succeeded', []]);
-      assert.equal(detail.toDecide, null, 'its ending merged it: nobody is handed the branch');
+      assert.deepEqual([detail.status.status, detail.status.waitingOnYou], ['succeeded', []]);
+      assert.equal(detail.status.toDecide, null, 'its ending merged it: nobody is handed the branch');
       assert.equal((await listedOf(id)).toDecide, null);
     },
   );
@@ -615,9 +616,9 @@ test('nothing to decide, and no `git` asked, for a run still running, one still 
 
   const before = gitCount();
   const running1 = await detailOf('r-running');
-  assert.deepEqual([running1.status, running1.toDecide], ['running', null]);
+  assert.deepEqual([running1.status.status, running1.status.toDecide], ['running', null]);
   const off = await detailOf('r-off');
-  assert.deepEqual([off.status, off.toDecide], ['cancelled', null]);
+  assert.deepEqual([off.status.status, off.status.toDecide], ['cancelled', null]);
   assert.equal(gitCount(), before, 'a run still going, and one called off, are not at their result: git is asked nothing');
 
   const ahead = 'wf/r-ahead/implement';
@@ -625,7 +626,7 @@ test('nothing to decide, and no `git` asked, for a run still running, one still 
   signedOff('r-ahead-implement', repo);
   writeRun({ id: 'r-ahead', repo, baseRef: base, workflow: PLAIN, steps: { implement: { taskId: 'r-ahead-implement', branch: ahead } } });
   await aPass();
-  assert.equal((await detailOf('r-ahead')).toDecide?.kind, 'result');
+  assert.equal((await detailOf('r-ahead')).status.toDecide?.kind, 'result');
   assert.ok(gitCount() > before, "a pass reads a finished run's branch out of git, through the same PATH: the count counts");
 });
 

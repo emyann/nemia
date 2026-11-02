@@ -15,6 +15,7 @@ import { Effect, Layer } from 'effect';
 import { engine, PlaceService, runStore, runWith as runEngine, builtinGitPlace, standingWhen, type Place } from 'agent-orchestrator';
 import { app, appOf, liveOf } from '../app.ts';
 import { diffFiles, DIFF_LINES } from './decision.ts';
+import { objectOf } from '../../test/run-reads.ts';
 
 const realGit = execFileSync('sh', ['-c', 'command -v git'], { encoding: 'utf8' }).trim();
 /**
@@ -30,7 +31,6 @@ const gitCount = () => (fs.existsSync(gitCalls) ? fs.readFileSync(gitCalls, 'utf
 type DecideCommand = import('./decision.ts').DecideCommand;
 type Decidable = import('./decision.ts').Decidable;
 type RunDecision = import('./decision.ts').RunDecision;
-type RunDetail = import('../detail/detail.ts').RunDetail;
 
 const git = (repo: string, ...args: string[]) =>
   execFileSync(
@@ -139,7 +139,8 @@ const decidable = async (id: string): Promise<Decidable> => {
   return body;
 };
 
-const detailOf = async (id: string) => (await (await app.request(`/api/runs/${id}`)).json()) as RunDetail;
+/** The run object of `id` (`GET /api/runs/:id`), what `nemia show` prints. */
+const detailOf = (id: string) => objectOf(app, id);
 
 const { repo, base } = aRepo();
 const branch = 'wf/r-d1/implement';
@@ -329,9 +330,9 @@ test("a finished run's decision: what its branch touched, the lesson, the diffs 
 
       const detail = await detailOf('r-d1');
       assert.deepEqual(
-        Object.fromEntries(detail.steps.map((s: { name: string; used: unknown }) => [s.name, s.used])),
+        Object.fromEntries(detail.status.steps.map((s) => [s.name, s.used])),
         body.used,
-        "the run's page carries the same words on each step, off the views it already reads",
+        "the run's object carries the same words on each step, off the views it already reads",
       );
     },
   );
@@ -390,9 +391,9 @@ test("a run in flight is `running` and runs not one `git`: still running, and he
       journal('t-d2-implement', [filed('t-d2-implement'), { kind: 'starting', at, attempt: 1 }, { kind: 'spawned', at, attempt: 1 }]);
       writeRun({ id: 'r-d2', repo, baseRef: base, steps: { implement: { taskId: 't-d2-implement', branch }, review: { taskId: null } } });
       const detail = await detailOf('r-d2');
-      assert.deepEqual([detail.status, detail.waitingOnYou], ['running', []]);
+      assert.deepEqual([detail.status.status, detail.status.waitingOnYou], ['running', []]);
       assert.deepEqual(
-        detail.steps.map((s: { used: unknown }) => s.used),
+        detail.status.steps.map((s) => s.used),
         [
           {
             usage: null,
@@ -514,7 +515,7 @@ test('the commands a decision offers are bare `nemia` lines, by the state the ru
         /^review: enough — go on with what is there; its findings stay on the record, and the run ends with them on the record:  nemia approve r-d9 review --message "<why>"$/,
       );
 
-      const stepsOf = async () => (await detailOf('r-d9')).steps;
+      const stepsOf = async () => (await detailOf('r-d9')).status.steps;
       assert.deepEqual(
         (await stepsOf()).map((s) => [s.name, s.accepted]),
         [
@@ -651,7 +652,10 @@ test('the commands a decision offers are bare `nemia` lines, by the state the ru
       });
 
       const detail = await detailOf('r-d11');
-      assert.deepEqual([detail.steps[0].message, detail.steps[1].message, detail.waitingOnYou], ['denied', 'pending', ['implement']]);
+      assert.deepEqual(
+        [detail.status.steps[0].message, detail.status.steps[1].message, detail.status.waitingOnYou],
+        ['denied', 'pending', ['implement']],
+      );
       const body = await decidable('r-d11');
       const once = body.commands.filter((c: DecideCommand) => c.label === 'once more');
       assert.deepEqual(
@@ -740,27 +744,27 @@ test('a decision with nothing to try, nothing to decide, or no run: pruned, call
         ['nemia retry r-d10 implement'],
         'as r-d3: implement signed off blocked, and may be tried again while the run is not pruned',
       );
-      assert.deepEqual((await detailOf('r-d10')).waitingOnYou, ['implement']);
+      assert.deepEqual((await detailOf('r-d10')).status.waitingOnYou, ['implement']);
       const pruned = { at: '2026-09-13T02:00:00.000Z', worktrees: [{ path: '/wt/r-d10/implement', bytes: 4096 }] };
       fs.writeFileSync(path.join(root, 'runs', 'r-d10.pruned'), JSON.stringify(pruned));
 
       const body = await decidable('r-d10');
       assert.deepEqual(body.commands, []);
       const page = await detailOf('r-d10');
-      assert.deepEqual(page.pruned, { ...pruned, artifacts: null }, 'its files are kept: a plain prune removes the worktrees alone');
-      assert.deepEqual(page.waitingOnYou, [], 'it waits on nobody: nothing a person does files anything for it');
+      assert.deepEqual(page.status.pruned, { ...pruned, artifacts: null }, 'its files are kept: a plain prune removes the worktrees alone');
+      assert.deepEqual(page.status.waitingOnYou, [], 'it waits on nobody: nothing a person does files anything for it');
       const asks = path.join(root, 'runs', 'r-d10.asks');
       fs.mkdirSync(asks, { recursive: true });
       fs.writeFileSync(path.join(asks, 'retry-implement-2'), JSON.stringify({ mode: 'continue' }));
       const asked = await detailOf('r-d10');
       assert.equal(
-        asked.steps.find((s) => s.name === 'implement')?.asked,
+        asked.status.steps.find((s) => s.name === 'implement')?.asked,
         null,
         'a try asked by hand, beside the verb that refuses it, is no try coming',
       );
-      assert.equal(asked.moving, false, 'the board says nothing is on its way');
+      assert.equal(asked.status.moving, false, 'the board says nothing is on its way');
       fs.rmSync(asks, { recursive: true });
-      assert.equal((await detailOf('r-d1')).pruned, null, 'a run never pruned says so with a null, not a missing field');
+      assert.equal((await detailOf('r-d1')).status.pruned, null, 'a run never pruned says so with a null, not a missing field');
     },
   );
   await t.test(
@@ -848,7 +852,7 @@ test("a run `assess` calls running while a step waits on a person is decided on:
     },
   });
   const detail = await detailOf('r-d6');
-  assert.deepEqual([detail.status, detail.waitingOnYou], ['running', ['implement']], detail.warning ?? undefined);
+  assert.deepEqual([detail.status.status, detail.status.waitingOnYou], ['running', ['implement']], detail.status.warning ?? undefined);
 
   const body = await decidable('r-d6');
   assert.ok(!('running' in body), 'waiting on you is decidable, whatever `assess` calls the run');
@@ -883,7 +887,7 @@ test("a run `assess` calls running while a step waits on a person is decided on:
     },
   });
   const fanOut = await detailOf('r-d7');
-  assert.deepEqual([fanOut.status, fanOut.moving, fanOut.waitingOnYou], ['waiting', true, ['implement']]);
+  assert.deepEqual([fanOut.status.status, fanOut.status.moving, fanOut.status.waitingOnYou], ['waiting', true, ['implement']]);
   const decided = await decidable('r-d7');
   assert.deepEqual(
     decided.touched.map((t: { branch: string }) => t.branch),

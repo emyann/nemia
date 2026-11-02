@@ -298,95 +298,148 @@ function put(args: Filling, flag: Flag, key: string, value: string | number): vo
 }
 
 /**
- * `arg`, a word that is no flag, put under the positional that takes it: a many positional's, beside the values before it unless it is one
- * of them, where it starts with no `-`; else the optional one's, once, where it starts with no `--`. Returns whether one took it.
+ * A word of a command line, as the parser reads it: a flag of the command with its value, a positional, a flag it has none of, or
+ * `--help`.
  */
-function placed(spec: Spec, arg: string, args: Filling): boolean {
+type Word =
+  | { readonly is: 'flag'; readonly flag: Flag; readonly arg: string; readonly value: string | undefined; readonly joined: boolean }
+  | { readonly is: 'positional'; readonly arg: string; readonly operand: boolean }
+  | { readonly is: 'stray'; readonly arg: string }
+  | { readonly is: 'help' };
+
+/** The word `arg` is, at `i` of `argv`, and the index of the last argument it took: a flag's value given apart is the one after it. */
+function wordAt(spec: Spec, argv: readonly string[], i: number, arg: string): { word: Word; last: number } {
+  const joined = arg.startsWith('--') && arg.includes('=');
+  const name = joined ? arg.slice(0, arg.indexOf('=')) : arg;
+  const flag = flagOf(spec, name, joined);
+  if (flag === undefined && arg === '--help') return { word: { is: 'help' }, last: i };
+  if (flag === undefined) return { word: arg.startsWith('--') ? { is: 'stray', arg } : { is: 'positional', arg, operand: false }, last: i };
+  if (flag.kind === 'switch' || flag.key === undefined) return { word: { is: 'flag', flag, arg, value: undefined, joined }, last: i };
+  if (joined) return { word: { is: 'flag', flag, arg, value: arg.slice(name.length + 1), joined }, last: i };
+  return { word: { is: 'flag', flag, arg, value: argv[i + 1], joined }, last: i + 1 };
+}
+
+/**
+ * The words of `argv`, wherever each stands, as a POSIX-style parser with permutation reads them: a flag of the command — its value the
+ * word after it, or joined with `=` — before, between or after the positionals; `--help`; a word starting `--` that is no flag of it; and
+ * every other word a positional. `--` ends the flags: each word after it is a positional (an operand), whatever it starts with.
+ */
+function wordsOf(spec: Spec, argv: readonly string[]): Word[] {
+  const words: Word[] = [];
+  for (let i = 0; i < argv.length; i++) {
+    const arg = argv[i];
+    if (arg === '--') return [...words, ...argv.slice(i + 1).map((operand): Word => ({ is: 'positional', arg: operand, operand: true }))];
+    if (arg === undefined) continue;
+    const read = wordAt(spec, argv, i, arg);
+    words.push(read.word);
+    i = read.last;
+  }
+  return words;
+}
+
+/**
+ * `arg`, a positional after the required ones, put under the positional that takes it: a many positional's, beside the values before it
+ * unless it is one of them, where it starts with no `-`; else the optional one's, once, where it starts with no `--` — an operand, given
+ * after `--`, whatever it starts with. Returns whether one took it.
+ */
+function placed(spec: Spec, arg: string, operand: boolean, args: Filling): boolean {
   const many = spec.positionals.find((p) => p.takes === 'many');
-  if (many && !arg.startsWith('-')) {
+  if (many && (operand || !arg.startsWith('-'))) {
     const before = args[many.key];
     const values = Array.isArray(before) ? before : [];
     args[many.key] = values.includes(arg) ? values : [...values, arg];
     return true;
   }
   const optional = spec.positionals.find((p) => p.takes === 'optional');
-  if (!optional || arg.startsWith('--') || args[optional.key] !== undefined) return false;
+  if (!optional || (!operand && arg.startsWith('--')) || args[optional.key] !== undefined) return false;
   args[optional.key] = arg;
   return true;
 }
 
-/**
- * Reads the argument at `i` of `argv` into `args`: a flag and its value, or a positional (`placed`), else refused in the spec's words.
- * Returns the index of the last argument it took, and whether it was one of the command's ways.
- */
-function readArg(spec: Spec, argv: readonly string[], i: number, args: Filling) {
-  const arg = argv[i];
-  if (arg === undefined) return { last: i, way: false };
-  const joined = arg.startsWith('--') && arg.includes('=');
-  const name = joined ? arg.slice(0, arg.indexOf('=')) : arg;
-  const flag = flagOf(spec, name, joined);
-  if (!flag) {
-    if (!placed(spec, arg, args)) usage(spec.unknown(arg));
-    return { last: i, way: false };
-  }
-  if (once(flag) && flag.key !== undefined && args[flag.key] !== undefined) usage(flag.twice ?? spec.unknown(arg));
+/** `word`, a flag of the command, read into `args` with its value, or refused in its words; returns whether it was one of the ways. */
+function readFlag(spec: Spec, word: Extract<Word, { is: 'flag' }>, args: Filling): boolean {
+  const { flag } = word;
+  if (once(flag) && flag.key !== undefined && args[flag.key] !== undefined) usage(flag.twice ?? spec.unknown(word.arg));
   Object.assign(args, flag.sets);
   if (flag.key === undefined || flag.kind === 'switch') {
     if (flag.key !== undefined) args[flag.key] = true;
-    return { last: i, way: flag.way === true };
+    return flag.way === true;
   }
-  const last = joined ? i : i + 1;
-  put(args, flag, flag.key, valueOf(spec, flag, joined ? arg.slice(name.length + 1) : argv[last], joined));
-  return { last, way: flag.way === true };
+  put(args, flag, flag.key, valueOf(spec, flag, word.value, word.joined));
+  return flag.way === true;
 }
 
-/** The arguments after the required ones: flags in any order, and the optional or many positional; two ways given are refused. */
-function readTail(spec: Spec, argv: readonly string[], given: Filling): Args {
-  const args = { ...given };
-  let ways = 0;
-  for (let i = 0; i < argv.length; i++) {
-    const read = readArg(spec, argv, i, args);
-    if (read.way) ways++;
-    i = read.last;
-  }
-  if (ways > 1) usage(spec.oneWay ?? spec.unknown(argv.join(' ')));
-  return { ...spec.defaults, ...args };
-}
-
-/** A word given where a required argument stands that is a flag no command takes: neither one of `spec`'s, nor `--help`. */
-const strayFlag = (spec: Spec, arg: string): boolean =>
-  arg.startsWith('--') && arg !== '--help' && !spec.flags.some((f) => f.flag === arg.split('=')[0]);
+/**
+ * Whether `word`, typed for the required positional `p`, leaves it out: a word starting `-` where the spec says its own refusal
+ * (`missing`), but for an operand given after `--`, or empty, but for a text whose spec says its refusal, which its handler is given to
+ * refuse in its own words.
+ */
+const unfilledBy = (spec: Spec, p: Positional, word: Word | undefined): boolean =>
+  word?.is === 'positional' &&
+  ((!word.operand && spec.missing !== undefined && word.arg.startsWith('-')) ||
+    (!word.arg && (spec.missing === undefined || p.kind !== 'text')));
 
 /**
- * Whether `arg`, where the required positional `p` stands, leaves it out: a flag — any word starting `-` where the spec says its own
- * refusal (`missing`) — or empty, but for a text whose spec says its refusal, which its handler is given to refuse in its own words.
+ * A command whose last positional is a rest: its required positionals the first words, and every word after them its text, flags
+ * included; a flag it has none of where a required argument stands is refused in its words.
  */
-const unfilled = (spec: Spec, p: Positional, arg: string): boolean =>
-  arg.startsWith(spec.missing === undefined ? '--' : '-') || (!arg && (spec.missing === undefined || p.kind !== 'text'));
-
-/** Whether the argument typed for the required positional `p` leaves it unfilled (`unfilled`): never where no positional is there. */
-const unfilledBy = (spec: Spec, p: Positional | undefined, arg: string): boolean => p !== undefined && unfilled(spec, p, arg);
-
-/**
- * A command line's arguments after the command's name, read against `spec` — or undefined when it is given too little to act on: a
- * required argument missing, empty, `--help` or one of its own flags, for which the CLI prints its help, unless the spec says its refusal
- * (`missing`), which a required argument starting `-` gets too, but for a flag it does not take where it says `flagFirst`. Refused, exit 2,
- * in the spec's own words: an argument it does not take — a flag it has none of among them, wherever it stands, and one the api alone
- * takes (`Flag.only`) — a value flag with no value, given twice, or with one of the command's own flags for its value, and two ways.
- */
-export function parseArgv(typed: Spec, argv: readonly string[]): Args | undefined {
-  const spec: Spec = { ...typed, flags: typed.flags.filter((f) => f.only?.side !== 'api') };
+function parseRest(spec: Spec, rest: Positional, argv: readonly string[]): Args | undefined {
   const required = spec.positionals.filter((p) => p.takes === 'required');
   const head = argv.slice(0, required.length);
   const stray = spec.missing === undefined || spec.flagFirst ? head.find((a) => strayFlag(spec, a)) : undefined;
   if (stray !== undefined) return usage(spec.unknown(stray));
-  if (head.length < required.length || head.some((a, i) => unfilledBy(spec, required[i], a))) {
+  const short = head.some(
+    (a, i) => a.startsWith(spec.missing === undefined ? '--' : '-') || (!a && (spec.missing === undefined || required[i]?.kind !== 'text')),
+  );
+  if (head.length < required.length || short) return spec.missing === undefined ? undefined : usage(spec.missing);
+  return { ...Object.fromEntries(required.map((p, i) => [p.key, head[i]])), [rest.key]: argv.slice(required.length).join(' ') };
+}
+
+/** A word that is a flag no command takes: neither one of `spec`'s, nor `--help`. */
+const strayFlag = (spec: Spec, arg: string): boolean =>
+  arg.startsWith('--') && arg !== '--help' && !spec.flags.some((f) => f.flag === arg.split('=')[0]);
+
+/**
+ * A command line's arguments after the command's name, read against `spec`, its flags taken wherever they stand among the positionals
+ * (`wordsOf`) — or undefined when it is given too little to act on: `--help`, or a required argument missing or empty, for which the CLI
+ * prints its help, unless the spec says its refusal (`missing`), which a required argument starting `-` gets too. Refused, exit 2, in the
+ * spec's own words: an argument it does not take — a flag it has none of, wherever it stands (said as `missing` where a required argument
+ * is short and the spec says it, but for `flagFirst`), one the api alone takes (`Flag.only`), and a positional past those it takes — a
+ * value flag with no value, given twice, or with one of the command's own flags for its value, and two ways.
+ */
+export function parseArgv(typed: Spec, argv: readonly string[]): Args | undefined {
+  const spec: Spec = { ...typed, flags: typed.flags.filter((f) => f.only?.side !== 'api') };
+  const rest = spec.positionals.find((p) => p.takes === 'rest');
+  if (rest) return parseRest(spec, rest, argv);
+  const required = spec.positionals.filter((p) => p.takes === 'required');
+  const words = wordsOf(spec, argv);
+  const positionals = words.filter((w) => w.is === 'positional');
+  const short = positionals.length < required.length;
+  const stray = words.find((w) => w.is === 'stray');
+  if (stray !== undefined) return usage(short && spec.missing !== undefined && !spec.flagFirst ? spec.missing : spec.unknown(stray.arg));
+  if (words.some((w) => w.is === 'help')) return undefined;
+  if (short || required.some((p, i) => unfilledBy(spec, p, positionals[i]))) {
     return spec.missing === undefined ? undefined : usage(spec.missing);
   }
-  const given = Object.fromEntries(required.map((p, i) => [p.key, head[i]]));
-  const rest = spec.positionals.find((p) => p.takes === 'rest');
-  if (rest) return { ...given, [rest.key]: argv.slice(required.length).join(' ') };
-  return readTail(spec, argv.slice(required.length), given);
+  const given: Filling = Object.fromEntries(required.map((p, i) => [p.key, positionals[i]?.arg]));
+  return readWords(spec, words, required.length, given, argv);
+}
+
+/**
+ * `words` read into the arguments after the `required` positionals, already `given`: each flag with its value, and each positional past
+ * the required put under the one that takes it (`placed`), else refused in the spec's words; two ways given are refused.
+ */
+function readWords(spec: Spec, words: readonly Word[], required: number, given: Filling, argv: readonly string[]): Args {
+  const args = { ...given };
+  let ways = 0;
+  let seen = 0;
+  for (const word of words) {
+    if (word.is === 'flag' && readFlag(spec, word, args)) ways++;
+    if (word.is !== 'positional' || seen++ < required) continue;
+    if (!placed(spec, word.arg, word.operand, args)) usage(spec.unknown(word.arg));
+  }
+  if (ways > 1) usage(spec.oneWay ?? spec.unknown(argv.join(' ')));
+  return { ...spec.defaults, ...args };
 }
 
 /** How the usage says a positional not given: `<step>`, `[<step>]` where it is optional, `[<runId> ...]` where it takes many. */

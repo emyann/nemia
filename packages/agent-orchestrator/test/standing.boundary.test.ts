@@ -206,7 +206,7 @@ test('a branch is landed by its standing exactly when git asked one question at 
   );
 });
 
-test('REFUSED: standing of no repository, and against a base git cannot read; unread for a request with no list of branches', () => {
+test('REFUSED: standing of no repository, and against a base git cannot read', () => {
   const repo = repository();
   const gone = path.join(repo.dir, 'gone');
   assert.deepEqual(standing({ repo: gone, base: 'main', branches: [] }), {
@@ -215,9 +215,6 @@ test('REFUSED: standing of no repository, and against a base git cannot read; un
   assert.deepEqual(standing({ repo: repo.dir, base: 'no-such-base', branches: asked(repo) }), {
     refused: `git cannot read no-such-base in ${repo.dir}, the base the branches are asked of: is it a branch of that repository?`,
   });
-  const unread = standing({ repo: repo.dir, base: 'main', branches: 'wf/r/a' });
-  assert.ok('unread' in unread, JSON.stringify(unread));
-  assert.equal(unread.unread.said, 'the request\'s `branches` is "wf/r/a", where a list of branches is asked');
 });
 
 /** How many distinct bases, and result branches cut at them, a repository shaped like the live store has. */

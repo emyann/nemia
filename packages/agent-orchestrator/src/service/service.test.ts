@@ -152,40 +152,48 @@ test('a plist’s values are XML-escaped and read back as given', () => {
   assert.deepEqual(plistRead(text), { node: odd.node, entry: odd.entry, cwd: odd.cwd, env: [['NOTE', 'x < y & z > "w"']] });
 });
 
-test('REFUSED: an --env with no value, no variable’s name, one install writes itself, one given twice, or a control character', () => {
-  assert.equal(envRefusal(['PORT=8790', 'OTEL_SERVICE_NAME=nemia-trial', 'EMPTY=']), null);
-  assert.match(envRefusal(['PORT'])!, /--env PORT has no value: give it as --env KEY=VALUE/);
-  assert.match(envRefusal(['1PORT=1'])!, /--env 1PORT is not a variable's name/);
-  assert.match(envRefusal(['A-B=1'])!, /--env A-B is not a variable's name/);
-  assert.match(envRefusal(['WF_ROOT=/tmp/x'])!, /--env WF_ROOT is written from the environment install runs in/);
-  assert.match(envRefusal(['PATH=/bin'])!, /--env PATH is written from the environment install runs in/);
-  assert.match(envRefusal(['PORT=1', 'PORT=2'])!, /--env PORT is given twice/);
-  assert.match(envRefusal([`X=a${String.fromCharCode(10)}ExecStart=/bin/sh`])!, /--env X's value holds a control character/);
-  assert.match(envRefusal([`X=a${String.fromCharCode(127)}`])!, /--env X's value holds a control character/);
-  assert.match(specRefusal({ ...SPEC, cwd: `/srv/a${String.fromCharCode(10)}b` })!, /the cwd path .* holds a control character/);
+test('REFUSED: an --env, a store name or a system the service cannot be installed with, each naming its fix', async (t) => {
+  const ANN = '/srv/ann/.agent-workflows';
+  const refused: readonly (readonly [string, () => string | null, RegExp])[] = [
+    ['an --env with no value', () => envRefusal(['PORT']), /--env PORT has no value/],
+    ['an --env that names no variable', () => envRefusal(['1PORT=1']), /--env 1PORT is not a variable's name/],
+    ['an --env with a dash in its name', () => envRefusal(['A-B=1']), /--env A-B is not a variable's name/],
+    ['an --env of the store', () => envRefusal(['WF_ROOT=/tmp/x']), /--env WF_ROOT is written from the environment/],
+    ['an --env of PATH', () => envRefusal(['PATH=/bin']), /--env PATH is written from the environment/],
+    ['an --env given twice', () => envRefusal(['PORT=1', 'PORT=2']), /--env PORT is given twice/],
+    [
+      'an --env value ending a line',
+      () => envRefusal([`X=a${String.fromCharCode(10)}ExecStart=/bin/sh`]),
+      /--env X's value holds a control/,
+    ],
+    ['an --env value with a DEL', () => envRefusal([`X=a${String.fromCharCode(127)}`]), /--env X's value holds a control/],
+    ['a cwd ending a line', () => specRefusal({ ...SPEC, cwd: `/srv/a${String.fromCharCode(10)}b` }), /the cwd path .* holds a control/],
+    ['a store not the default with no name', () => nameRefusal(undefined, '/srv/trial', ANN), /is not the default one.*--name <name>/],
+    ['a store not the default named nemia', () => nameRefusal('nemia', '/srv/trial', ANN), /the name nemia is the default store's/],
+    ['a name with a space', () => nameRefusal('Nemia Trial', ANN, ANN), /is not a service's name/],
+    ['a name that climbs out', () => nameRefusal('../evil', ANN, ANN), /is not a service's name/],
+    ['WSL without systemd', () => refusalOf(systemOf({ platform: 'linux', wsl: true, systemd: false })), /\/etc\/wsl\.conf/],
+    ['Linux without systemd', () => refusalOf(systemOf({ platform: 'linux', wsl: false, systemd: false })), /runs without systemd/],
+    ['Windows', () => refusalOf(systemOf({ platform: 'win32', wsl: false, systemd: false })), /win32 has no login service/],
+  ];
+  for (const [name, refusal, names] of refused) await t.test(name, () => assert.match(refusal() ?? '', names));
+  await t.test('WSL says how to turn systemd on', () => {
+    const wsl = refusalOf(systemOf({ platform: 'linux', wsl: true, systemd: false })) ?? '';
+    for (const word of ['[boot]', 'systemd=true', 'wsl --shutdown', 'npm start in apps/api']) assert.ok(wsl.includes(word), word);
+    assert.doesNotMatch(refusalOf(systemOf({ platform: 'linux', wsl: false, systemd: false })) ?? '', /wsl\.conf/);
+  });
+  await t.test('what passes: plain --envs, the default store or a named one, systemd and launchd', () => {
+    assert.equal(envRefusal(['PORT=8790', 'OTEL_SERVICE_NAME=nemia-trial', 'EMPTY=']), null);
+    assert.equal(nameRefusal(undefined, ANN, ANN), null);
+    assert.equal(nameRefusal('nemia-trial', '/srv/trial', ANN), null);
+    assert.deepEqual(systemOf({ platform: 'linux', wsl: true, systemd: true }), { system: 'systemd' });
+    assert.deepEqual(systemOf({ platform: 'linux', wsl: false, systemd: true }), { system: 'systemd' });
+    assert.deepEqual(systemOf({ platform: 'darwin', wsl: false, systemd: false }), { system: 'launchd' });
+  });
 });
 
-test('REFUSED: a store that is not the default without a name of its own, the default’s name for it, or a name that is no unit’s', () => {
-  assert.equal(nameRefusal(undefined, '/srv/ann/.agent-workflows', '/srv/ann/.agent-workflows'), null);
-  assert.equal(nameRefusal('nemia-trial', '/srv/trial', '/srv/ann/.agent-workflows'), null);
-  assert.match(nameRefusal(undefined, '/srv/trial', '/srv/ann/.agent-workflows')!, /is not the default one.*--name <name>/);
-  assert.match(nameRefusal('nemia', '/srv/trial', '/srv/ann/.agent-workflows')!, /the name nemia is the default store's service/);
-  assert.match(nameRefusal('Nemia Trial', '/srv/ann/.agent-workflows', '/srv/ann/.agent-workflows')!, /is not a service's name/);
-  assert.match(nameRefusal('../evil', '/srv/ann/.agent-workflows', '/srv/ann/.agent-workflows')!, /is not a service's name/);
-});
-
-test('REFUSED: WSL without systemd names how to turn it on; Linux with systemd and macOS each have their system', () => {
-  const wsl = systemOf({ platform: 'linux', wsl: true, systemd: false });
-  assert.ok('refusal' in wsl);
-  for (const word of ['/etc/wsl.conf', '[boot]', 'systemd=true', 'wsl --shutdown', 'npm start in apps/api'])
-    assert.ok(wsl.refusal.includes(word), word);
-  assert.deepEqual(systemOf({ platform: 'linux', wsl: true, systemd: true }), { system: 'systemd' });
-  assert.deepEqual(systemOf({ platform: 'linux', wsl: false, systemd: true }), { system: 'systemd' });
-  assert.deepEqual(systemOf({ platform: 'darwin', wsl: false, systemd: false }), { system: 'launchd' });
-  const bare = systemOf({ platform: 'linux', wsl: false, systemd: false });
-  assert.ok('refusal' in bare && !bare.refusal.includes('wsl.conf'));
-  assert.ok('refusal' in systemOf({ platform: 'win32', wsl: false, systemd: false }));
-});
+/** The refusal `systemOf` answers, or null where it names a system. */
+const refusalOf = (asked: ReturnType<typeof systemOf>): string | null => ('refusal' in asked ? asked.refusal : null);
 
 test('the service’s file: a user unit under the config folder, an agent under LaunchAgents', () => {
   const dirs = { home: '/srv/ann', configHome: '/srv/ann/.config' };

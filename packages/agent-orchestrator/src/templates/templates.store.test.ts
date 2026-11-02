@@ -1,7 +1,8 @@
 /**
  * The Template door's files layer: the door's walks (`test/template-walks.ts`) on a fresh scratch folder each, and what only the files
  * can be asked — a folder made empty by hand taken as a new one's place, no staged file left beside a write, and the default door's
- * root. What a read of a folder finds that is no file of a template (a link, a pipe) is `template.store.test.ts`'s, through the lint.
+ * root. What a read of a folder finds that is no file of a template (a link, a pipe) is `template.store.test.ts`'s and, for the
+ * pipe, `test/template-tar.boundary.test.ts`'s, through the lint.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

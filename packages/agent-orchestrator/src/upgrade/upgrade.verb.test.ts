@@ -1,10 +1,9 @@
 /**
- * A templated factory's upgrade, on disk: `nemia factory diff` writing nothing; `nemia factory upgrade` refusing with nothing written, and
- * writing only the version wanted into the factory's file; the controller merging three ways, only the status written while a conflict
- * waits, then the tree, the base and the status; `nemia factory resolve` writing the person's choices; the tree swapped only where no one
- * wrote it since the merge read it; a pass stopped between its writes; a run in flight keeping its frozen steps; and the factory's
- * rules, `RULES.md`, carried as any file of the tree is. `WF_ROOT` is set before the import, since the store's modules read it as they
- * load.
+ * A templated factory's upgrade, on disk, beyond the story of a conflict (`test/upgrade-conflict.test.ts`: the plan, the wait, the
+ * choices, the merge, a pass stopped between its writes, a run in flight and the swap only where untouched): what `nemia factory
+ * upgrade` refuses with nothing written; an upgrade with no conflict, up or down; the factory's rules, `RULES.md`, carried as any file of
+ * the tree is; choices made for another version; a status lost; and a swap whose rename fails. `WF_ROOT` is set before the import,
+ * since the store's modules read it as they load.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -29,9 +28,7 @@ const runWith = runOver(runEngine, () => stand().layer);
 const { main: cli } = await import('../cli/main.ts');
 /** `nemia`, as a person types it, its commands given this test's place. */
 const main = (argv: string[], e?: Parameters<typeof cli>[1]) => cli(argv, e, undefined, stand().place);
-const { appliedDir, digestOf, entriesIn, readStatus, replaceBase, resolutionsFile, statusFile, swapTree, treeDir } =
-  await import('../applied/applied.store.ts');
-const { readRun } = await import('../record/record.store.ts');
+const { appliedDir, digestOf, entriesIn, resolutionsFile, statusFile, swapTree, treeDir } = await import('../applied/applied.store.ts');
 
 const { engineOf } = await import('../runtime-client.ts');
 const stood = eachTest(testEngine);
@@ -130,22 +127,6 @@ async function printedBy(t: { mock: { method: Function } }, ...args: string[]): 
   return printed.flatMap((p) => p.split('\n'));
 }
 
-test('plan previews what merges cleanly and each conflict, with the line that resolves it, and writes nothing', async (t) => {
-  t.mock.method(console, 'log', () => {});
-  const { dir } = await applied('planned');
-  rewrite(treeDir('planned'), REVIEW, 'rounds: 3', 'rounds: 4');
-  rewrite(treeDir('planned'), REVIEW, 'budget: 7', 'budget: 9');
-  released(dir, '0.2.0', 5);
-  const before = bytesUnder(FACTORIES);
-  const printed = await printedBy(t, 'factory', 'diff', 'planned', '--to', '0.2.0');
-  assert.deepEqual(bytesUnder(FACTORIES), before, 'the plan writes nothing');
-  assert.equal(printed[0], 'planned: 0.1.0 → 0.2.0');
-  assert.ok(printed.includes('conflicts: 1'), printed.join('\n'));
-  assert.ok(printed.includes(`  ${REVIEW}#rounds`), printed.join('\n'));
-  assert.ok(printed.includes(`    nemia factory resolve planned '${REVIEW}#rounds' --ours|--theirs|--file <path>`), printed.join('\n'));
-  assert.equal(printed.at(-1), 'nemia factory upgrade planned --to 0.2.0 files it; the daemon merges once each conflict is resolved.');
-});
-
 test('upgrade refuses, writing nothing: no template, no render, a --to that is no version, the template at another, the same, a downgrade', async (t) => {
   t.mock.method(console, 'log', () => {});
   const { dir, repo } = await applied('kept');
@@ -178,179 +159,116 @@ test('upgrade refuses, writing nothing: no template, no render, a --to that is n
   assert.deepEqual(bytesUnder(FACTORIES), before, 'every refusal writes nothing');
 });
 
-test('a downgrade asked with --downgrade is filed, and merged as an upgrade is', async (t) => {
-  t.mock.method(console, 'log', () => {});
-  const { dir } = await applied('lowered');
-  released(dir, '0.0.9', 5);
-  await main(['factory', 'upgrade', 'lowered', '--to', '0.0.9', '--downgrade'], noEngine());
-  assert.equal(templated('lowered').template.version, '0.0.9');
-  assert.equal(reconciled(templated('lowered')).version, '0.0.9');
-  assert.match(textIn(treeDir('lowered'), REVIEW), /^rounds: 5$/m);
-});
-
-test("a clean upgrade writes the factory's file alone; the controller swaps the tree, then the base, and a second pass writes nothing", async (t) => {
-  t.mock.method(console, 'log', () => {});
-  const { dir } = await applied('clean');
-  const file = path.join(FACTORIES, 'clean.json');
-  const filedAs = JSON.parse(fs.readFileSync(file, 'utf8'));
-  rewrite(treeDir('clean'), REVIEW, 'budget: 7', 'budget: 9');
-  released(dir, '0.2.0', 5);
-  const folder = bytesUnder(path.join(FACTORIES, 'clean'));
-  const printed = await printedBy(t, 'factory', 'upgrade', 'clean', '--to', '0.2.0');
-  assert.deepEqual(printed, ['clean: 0.1.0 → 0.2.0', `filed: ${file}`, 'the daemon merges it on its next pass (nemia up)']);
-  assert.deepEqual(JSON.parse(fs.readFileSync(file, 'utf8')), { ...filedAs, template: { ...filedAs.template, version: '0.2.0' } });
-  assert.deepEqual(bytesUnder(path.join(FACTORIES, 'clean')), folder, 'the upgrade writes no tree, base nor status');
-  const status = reconciled(templated('clean'));
-  assert.equal(status.version, '0.2.0');
-  assert.deepEqual(
-    status.conditions.map((c) => [c.type, c.status, c.reason]),
-    [
-      ['Applied', 'True', 'Upgraded'],
-      ['ConflictsPending', 'False', 'Merged'],
-    ],
-  );
-  assert.match(textIn(treeDir('clean'), REVIEW), /^budget: 9\nloop: implement\nrounds: 5$/m, "the template's change and the person's");
-  assert.match(textIn(appliedDir('clean'), REVIEW), /^budget: 7\nloop: implement\nrounds: 5$/m, 'the base is the render');
-  assert.equal(status.digest, digestOf(entriesIn(appliedDir('clean'))));
-  assert.equal(fs.statSync(path.join(appliedDir('clean'), REVIEW)).mode & 0o222, 0, 'the base is read-only again');
-  const written = fs.statSync(statusFile('clean')).mtimeMs;
-  const tree = bytesUnder(treeDir('clean'));
-  assert.deepEqual(reconciled(templated('clean')), status);
-  assert.equal(fs.statSync(statusFile('clean')).mtimeMs, written, 'a second pass writes no status');
-  assert.deepEqual(bytesUnder(treeDir('clean')), tree, 'nor a tree');
-  await assert.rejects(
-    main(['factory', 'upgrade', 'clean', '--to', '0.2.0'], noEngine()),
-    refusedWith('Conflict', /clean is already applied at 0\.2\.0/),
-  );
-});
-
-test('conflicts wait for a choice with only the status written; resolve writes each, and the controller merges once each has one', async (t) => {
-  t.mock.method(console, 'log', () => {});
-  const { dir } = await applied('clash');
-  rewrite(treeDir('clash'), REVIEW, 'rounds: 3', 'rounds: 4');
-  rewrite(treeDir('clash'), README, '# dev\n', '# dev, ours\n');
-  released(dir, '0.2.0', 5);
-  rewrite(dir, README, '# dev\n', '# dev, theirs\n');
-  const printed = await printedBy(t, 'factory', 'upgrade', 'clash', '--to', '0.2.0');
-  assert.match(printed[2], /^2 conflicts wait for a choice: nemia factory diff clash --to 0\.2\.0 shows each/);
-  const tree = bytesUnder(treeDir('clash'));
-  const base = bytesUnder(appliedDir('clash'));
-  const waiting = reconciled(templated('clash'));
-  assert.deepEqual(bytesUnder(treeDir('clash')), tree, 'the tree is left as it is while a conflict waits');
-  assert.deepEqual(bytesUnder(appliedDir('clash')), base, 'and the base');
-  assert.equal(waiting.version, '0.1.0');
-  assert.deepEqual(
-    waiting.conditions.map((c) => [c.type, c.status, c.reason]),
-    [
-      ['Applied', 'False', 'UpgradePending'],
-      ['ConflictsPending', 'True', 'Conflicts'],
-    ],
-  );
-  const pending = waiting.conditions[1].message;
-  assert.ok(pending.includes(`nemia factory resolve clash '${README}:1-1' `), pending);
-  assert.ok(pending.includes('--ours|--theirs|--file <path>'), pending);
-
-  assert.deepEqual(waiting.upgrade, {
-    from: '0.1.0',
-    to: '0.2.0',
-    conflicts: [
-      { at: `${README}:1-1`, base: '# dev\n', ours: '# dev, ours\n', theirs: '# dev, theirs\n' },
-      { at: `${REVIEW}#rounds`, base: 'rounds: 3\n', ours: 'rounds: 4\n', theirs: 'rounds: 5\n' },
-    ],
+test('an upgrade with no conflict, up or down: filed alone, then merged by the controller', async (t) => {
+  await t.test('a downgrade asked with --downgrade is filed, and merged as an upgrade is', async (t) => {
+    t.mock.method(console, 'log', () => {});
+    const { dir } = await applied('lowered');
+    released(dir, '0.0.9', 5);
+    await main(['factory', 'upgrade', 'lowered', '--to', '0.0.9', '--downgrade'], noEngine());
+    assert.equal(templated('lowered').template.version, '0.0.9');
+    assert.equal(reconciled(templated('lowered')).version, '0.0.9');
+    assert.match(textIn(treeDir('lowered'), REVIEW), /^rounds: 5$/m);
   });
-  assert.deepEqual(readStatus('clash'), waiting);
-
-  const resolve = (...rest: string[]) => main(['factory', 'resolve', 'clash', ...rest], noEngine());
-  await assert.rejects(resolve('nowhere.md', '--ours'), refusedWith('Missing', /nowhere\.md is no conflict[^]*its conflicts: /));
-  await assert.rejects(resolve(`${REVIEW}#rounds`), refusedWith('Invalid', /takes one choice/));
-  await assert.rejects(resolve(`${REVIEW}#rounds`, '--ours', '--theirs'), refusedWith('Invalid', /takes one choice/));
-  await assert.rejects(resolve(`${REVIEW}#rounds`, '--file', path.join(dir, 'gone.md')), refusedWith('Invalid', /no file at/));
-  assert.ok(!fs.existsSync(resolutionsFile('clash')), 'a refused resolve writes nothing');
-
-  assert.match((await printedBy(t, 'factory', 'resolve', 'clash', `${REVIEW}#rounds`, '--theirs'))[1], /^1 conflict still wait/);
-  assert.deepEqual(
-    reconciled(templated('clash')).upgrade?.conflicts.map((c) => c.at),
-    [`${README}:1-1`],
+  await t.test(
+    "a clean upgrade writes the factory's file alone; the controller swaps the tree, then the base, and a second pass writes nothing",
+    async (t) => {
+      t.mock.method(console, 'log', () => {});
+      const { dir } = await applied('clean');
+      const file = path.join(FACTORIES, 'clean.json');
+      const filedAs = JSON.parse(fs.readFileSync(file, 'utf8'));
+      rewrite(treeDir('clean'), REVIEW, 'budget: 7', 'budget: 9');
+      released(dir, '0.2.0', 5);
+      const folder = bytesUnder(path.join(FACTORIES, 'clean'));
+      const printed = await printedBy(t, 'factory', 'upgrade', 'clean', '--to', '0.2.0');
+      assert.deepEqual(printed, ['clean: 0.1.0 → 0.2.0', `filed: ${file}`, 'the daemon merges it on its next pass (nemia up)']);
+      assert.deepEqual(JSON.parse(fs.readFileSync(file, 'utf8')), { ...filedAs, template: { ...filedAs.template, version: '0.2.0' } });
+      assert.deepEqual(bytesUnder(path.join(FACTORIES, 'clean')), folder, 'the upgrade writes no tree, base nor status');
+      const status = reconciled(templated('clean'));
+      assert.equal(status.version, '0.2.0');
+      assert.deepEqual(
+        status.conditions.map((c) => [c.type, c.status, c.reason]),
+        [
+          ['Applied', 'True', 'Upgraded'],
+          ['ConflictsPending', 'False', 'Merged'],
+        ],
+      );
+      assert.match(textIn(treeDir('clean'), REVIEW), /^budget: 9\nloop: implement\nrounds: 5$/m, "the template's change and the person's");
+      assert.match(textIn(appliedDir('clean'), REVIEW), /^budget: 7\nloop: implement\nrounds: 5$/m, 'the base is the render');
+      assert.equal(status.digest, digestOf(entriesIn(appliedDir('clean'))));
+      assert.equal(fs.statSync(path.join(appliedDir('clean'), REVIEW)).mode & 0o222, 0, 'the base is read-only again');
+      const written = fs.statSync(statusFile('clean')).mtimeMs;
+      const tree = bytesUnder(treeDir('clean'));
+      assert.deepEqual(reconciled(templated('clean')), status);
+      assert.equal(fs.statSync(statusFile('clean')).mtimeMs, written, 'a second pass writes no status');
+      assert.deepEqual(bytesUnder(treeDir('clean')), tree, 'nor a tree');
+      await assert.rejects(
+        main(['factory', 'upgrade', 'clean', '--to', '0.2.0'], noEngine()),
+        refusedWith('Conflict', /clean is already applied at 0\.2\.0/),
+      );
+    },
   );
-  assert.deepEqual(bytesUnder(treeDir('clash')), tree, 'one conflict left, nothing merged');
-  const mine = path.join(scratch('wf-upgrade-choice-'), 'head.md');
-  fs.writeFileSync(mine, '# dev, both\n');
-  assert.equal(
-    (await printedBy(t, 'factory', 'resolve', 'clash', `${README}:1-1`, '--file', mine))[1],
-    'every conflict has a choice: the daemon merges on its next pass (nemia up)',
-  );
-  assert.deepEqual(JSON.parse(fs.readFileSync(resolutionsFile('clash'), 'utf8')), {
-    to: '0.2.0',
-    choices: { [`${REVIEW}#rounds`]: 'theirs', [`${README}:1-1`]: { text: '# dev, both\n' } },
+});
+
+test("a factory's rules carried by an upgrade: taken where the tree has none, a conflict where both added them, merged by line", async (t) => {
+  await t.test("a factory's rules are carried by an upgrade: taken from a template that adds them, where the tree has none", async (t) => {
+    t.mock.method(console, 'log', () => {});
+    const { dir } = await applied('ruled');
+    assert.equal(fs.existsSync(path.join(treeDir('ruled'), RULES)), false, 'the template had none, and the tree has none');
+    released(dir, '0.2.0', 5);
+    fs.writeFileSync(path.join(dir, RULES), 'Never push on a Friday.\n');
+    await main(['factory', 'upgrade', 'ruled', '--to', '0.2.0'], noEngine());
+    const status = reconciled(templated('ruled'));
+    assert.equal(status.version, '0.2.0');
+    assert.equal(status.upgrade, undefined, 'no conflict');
+    assert.equal(textIn(treeDir('ruled'), RULES), 'Never push on a Friday.\n');
+    assert.equal(textIn(appliedDir('ruled'), RULES), 'Never push on a Friday.\n');
+    assert.deepEqual(factoryRules('ruled'), {
+      name: 'ruled',
+      file: path.join(treeDir('ruled'), RULES),
+      words: 'Never push on a Friday.',
+      error: null,
+    });
   });
-
-  const merged = reconciled(templated('clash'));
-  assert.equal(merged.version, '0.2.0');
-  assert.equal(merged.conditions[0].reason, 'Upgraded');
-  assert.equal(merged.upgrade, undefined, 'no conflict is said once merged');
-  assert.match(textIn(treeDir('clash'), REVIEW), /^rounds: 5$/m);
-  assert.match(textIn(treeDir('clash'), README), /^# dev, both\n/);
-  assert.match(textIn(appliedDir('clash'), README), /^# dev, theirs\n/);
-  await assert.rejects(resolve(`${README}:1-1`, '--ours'), refusedWith('Conflict', /no upgrade of clash is under way/));
-});
-
-test("a factory's rules are carried by an upgrade: taken from a template that adds them, where the tree has none", async (t) => {
-  t.mock.method(console, 'log', () => {});
-  const { dir } = await applied('ruled');
-  assert.equal(fs.existsSync(path.join(treeDir('ruled'), RULES)), false, 'the template had none, and the tree has none');
-  released(dir, '0.2.0', 5);
-  fs.writeFileSync(path.join(dir, RULES), 'Never push on a Friday.\n');
-  await main(['factory', 'upgrade', 'ruled', '--to', '0.2.0'], noEngine());
-  const status = reconciled(templated('ruled'));
-  assert.equal(status.version, '0.2.0');
-  assert.equal(status.upgrade, undefined, 'no conflict');
-  assert.equal(textIn(treeDir('ruled'), RULES), 'Never push on a Friday.\n');
-  assert.equal(textIn(appliedDir('ruled'), RULES), 'Never push on a Friday.\n');
-  assert.deepEqual(factoryRules('ruled'), {
-    name: 'ruled',
-    file: path.join(treeDir('ruled'), RULES),
-    words: 'Never push on a Friday.',
-    error: null,
-  });
-});
-
-test('rules the person wrote and rules the template adds, with none in the base, are one conflict at RULES.md, resolved by a choice', async (t) => {
-  t.mock.method(console, 'log', () => {});
-  const { dir } = await applied('both');
-  await runWith(noEngine(), FACTORY_RULES.handler({ factory: 'both', words: 'Ours: push whenever.' }, undefined, ROOT));
-  assert.equal(textIn(treeDir('both'), RULES), 'Ours: push whenever.\n', "a templated factory's rules are its tree's");
-  released(dir, '0.2.0', 5);
-  fs.writeFileSync(path.join(dir, RULES), 'Theirs: never push on a Friday.\n');
-  await main(['factory', 'upgrade', 'both', '--to', '0.2.0'], noEngine());
-  const waiting = reconciled(templated('both'));
-  assert.equal(waiting.version, '0.1.0');
-  assert.deepEqual(waiting.upgrade?.conflicts, [
-    { at: RULES, base: null, ours: 'Ours: push whenever.\n', theirs: 'Theirs: never push on a Friday.\n' },
-  ]);
-  assert.equal(textIn(treeDir('both'), RULES), 'Ours: push whenever.\n', 'left as it is while the conflict waits');
-  await main(['factory', 'resolve', 'both', RULES, '--theirs'], noEngine());
-  const merged = reconciled(templated('both'));
-  assert.equal(merged.version, '0.2.0');
-  assert.equal(merged.upgrade, undefined);
-  assert.equal(textIn(treeDir('both'), RULES), 'Theirs: never push on a Friday.\n');
-});
-
-test('rules changed by the person and by the template on different lines, from a common base, merge by line', async (t) => {
-  t.mock.method(console, 'log', () => {});
-  const lines = ['Never push on a Friday.', '', 'Write the tests first.', '', 'Ask before a migration.', ''];
-  const { dir } = await applied('lined', lines.join('\n'));
-  assert.equal(textIn(treeDir('lined'), RULES), lines.join('\n'));
-  rewrite(treeDir('lined'), RULES, 'on a Friday', 'on a Friday, nor on a Monday');
-  released(dir, '0.2.0', 5);
-  rewrite(dir, RULES, 'before a migration', 'before any migration');
-  await main(['factory', 'upgrade', 'lined', '--to', '0.2.0'], noEngine());
-  const status = reconciled(templated('lined'));
-  assert.equal(status.version, '0.2.0');
-  assert.equal(status.upgrade, undefined, 'no conflict');
-  assert.equal(
-    textIn(treeDir('lined'), RULES),
-    ['Never push on a Friday, nor on a Monday.', '', 'Write the tests first.', '', 'Ask before any migration.', ''].join('\n'),
+  await t.test(
+    'rules the person wrote and rules the template adds, with none in the base, are one conflict at RULES.md, resolved by a choice',
+    async (t) => {
+      t.mock.method(console, 'log', () => {});
+      const { dir } = await applied('both');
+      await runWith(noEngine(), FACTORY_RULES.handler({ factory: 'both', words: 'Ours: push whenever.' }, undefined, ROOT));
+      assert.equal(textIn(treeDir('both'), RULES), 'Ours: push whenever.\n', "a templated factory's rules are its tree's");
+      released(dir, '0.2.0', 5);
+      fs.writeFileSync(path.join(dir, RULES), 'Theirs: never push on a Friday.\n');
+      await main(['factory', 'upgrade', 'both', '--to', '0.2.0'], noEngine());
+      const waiting = reconciled(templated('both'));
+      assert.equal(waiting.version, '0.1.0');
+      assert.deepEqual(waiting.upgrade?.conflicts, [
+        { at: RULES, base: null, ours: 'Ours: push whenever.\n', theirs: 'Theirs: never push on a Friday.\n' },
+      ]);
+      assert.equal(textIn(treeDir('both'), RULES), 'Ours: push whenever.\n', 'left as it is while the conflict waits');
+      await main(['factory', 'resolve', 'both', RULES, '--theirs'], noEngine());
+      const merged = reconciled(templated('both'));
+      assert.equal(merged.version, '0.2.0');
+      assert.equal(merged.upgrade, undefined);
+      assert.equal(textIn(treeDir('both'), RULES), 'Theirs: never push on a Friday.\n');
+    },
   );
+  await t.test('rules changed by the person and by the template on different lines, from a common base, merge by line', async (t) => {
+    t.mock.method(console, 'log', () => {});
+    const lines = ['Never push on a Friday.', '', 'Write the tests first.', '', 'Ask before a migration.', ''];
+    const { dir } = await applied('lined', lines.join('\n'));
+    assert.equal(textIn(treeDir('lined'), RULES), lines.join('\n'));
+    rewrite(treeDir('lined'), RULES, 'on a Friday', 'on a Friday, nor on a Monday');
+    released(dir, '0.2.0', 5);
+    rewrite(dir, RULES, 'before a migration', 'before any migration');
+    await main(['factory', 'upgrade', 'lined', '--to', '0.2.0'], noEngine());
+    const status = reconciled(templated('lined'));
+    assert.equal(status.version, '0.2.0');
+    assert.equal(status.upgrade, undefined, 'no conflict');
+    assert.equal(
+      textIn(treeDir('lined'), RULES),
+      ['Never push on a Friday, nor on a Monday.', '', 'Write the tests first.', '', 'Ask before any migration.', ''].join('\n'),
+    );
+  });
 });
 
 test('choices made for another version are not merged, and the next resolve drops them', async (t) => {
@@ -415,24 +333,6 @@ test('a status lost while an upgrade waits leaves the version unknown, and an up
   assert.match(textIn(treeDir('lost'), REVIEW), /^rounds: 5$/m);
 });
 
-test('the tree is swapped only where no one wrote it since the merge read it', async (t) => {
-  t.mock.method(console, 'log', () => {});
-  await applied('raced');
-  const read = digestOf(entriesIn(treeDir('raced')));
-  rewrite(treeDir('raced'), REVIEW, 'budget: 7', 'budget: 8');
-  const tree = bytesUnder(treeDir('raced'));
-  const merge = entriesIn(appliedDir('raced'));
-  assert.equal(swapTree('raced', merge, read), false, 'a write since the read: refused');
-  assert.deepEqual(bytesUnder(treeDir('raced')), tree);
-  assert.equal(swapTree('raced', merge, digestOf(entriesIn(treeDir('raced')))), true);
-  assert.match(textIn(treeDir('raced'), REVIEW), /^budget: 7$/m);
-  assert.deepEqual(
-    fs.readdirSync(path.join(FACTORIES, 'raced')).sort(),
-    ['applied', 'status.json', 'tree'],
-    'no folder is left staged beside it',
-  );
-});
-
 test("a swap whose new tree cannot be renamed in puts the person's tree back, or keeps it aside and says where", async (t) => {
   t.mock.method(console, 'log', () => {});
   await applied('stuck');
@@ -466,41 +366,4 @@ test("a swap whose new tree cannot be renamed in puts the person's tree back, or
     },
   );
   assert.deepEqual(bytesUnder(kept), tree, "a tree made in between: the person's is kept aside, where the error says");
-});
-
-test('a pass stopped after the tree is swapped merges the same tree on the next; stopped after the base, the version is the render', async (t) => {
-  t.mock.method(console, 'log', () => {});
-  const { dir } = await applied('stopped');
-  rewrite(treeDir('stopped'), README, '# dev\n', '# dev, ours\n');
-  released(dir, '0.2.0', 5);
-  rewrite(dir, README, '# dev\n', '# dev, theirs\n');
-  await main(['factory', 'upgrade', 'stopped', '--to', '0.2.0'], noEngine());
-  await main(['factory', 'resolve', 'stopped', `${README}:1-1`, '--ours'], noEngine());
-  const oldBase = entriesIn(appliedDir('stopped'));
-  const oldStatus = fs.readFileSync(statusFile('stopped'));
-  reconciled(templated('stopped'));
-  const tree = bytesUnder(treeDir('stopped'));
-  const status = readStatus('stopped');
-  replaceBase('stopped', oldBase);
-  fs.writeFileSync(statusFile('stopped'), oldStatus);
-  assert.deepEqual(reconciled(templated('stopped')), status, 'the tree swapped, the base not: the next pass ends it');
-  assert.deepEqual(bytesUnder(treeDir('stopped')), tree, 'composing the same tree');
-  fs.writeFileSync(statusFile('stopped'), oldStatus);
-  const after = reconciled(templated('stopped'));
-  assert.equal(after.version, '0.2.0', 'the base swapped, the status not: the version is the render');
-  assert.equal(after.conditions[0].status, 'True');
-  assert.deepEqual(bytesUnder(treeDir('stopped')), tree);
-});
-
-test("a run in flight keeps the steps frozen on its record while its factory's tree is upgraded", async (t) => {
-  const { dir } = await applied('flying');
-  const printed: string[] = [];
-  t.mock.method(console, 'log', (...args: unknown[]) => printed.push(args.join(' ')));
-  await main(['start', 'Cache the views', '--factory', 'flying', '--workflows', 'dev'], noEngine());
-  const id = printed[0].split(' ')[0];
-  released(dir, '0.2.0', 5);
-  await main(['factory', 'upgrade', 'flying', '--to', '0.2.0'], noEngine());
-  assert.equal(reconciled(templated('flying')).conditions[0].reason, 'Upgraded');
-  assert.match(textIn(treeDir('flying'), REVIEW), /^rounds: 5$/m);
-  assert.equal(readRun(id).workflow?.find((step) => step.name === 'review')?.rounds, 3, 'its review step as it started');
 });

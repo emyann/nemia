@@ -1,10 +1,10 @@
 /**
- * The tick as an Effect program (`tickRun`, over `EngineService`) beside its plain face (`tick`): each meters its pass over every phase
- * the meter has, a refusal is the program's typed failure and the face's rejection, and anything else is a defect the
- * program dies of and the face rethrows as it was thrown. That the face is the program over the engine it is handed and adds nothing is
- * `runWith`'s own definition (`src/runtime-client.ts`), said in the type by `_tickProgramTypes` below, and no test of it can fail.
+ * The tick as an Effect program (`tickRun`, over `EngineService`): what its pass keeps of its cost — among the recent passes, in the
+ * series, beside a reading of the disk it is handed. That its program answers what its plain face answers, a refusal its typed failure
+ * and anything else a defect, are the tick's rows of `faces.test.ts`; what it needs and refuses is said in the type by
+ * `_tickProgramTypes` below.
  * Walked through the runtime itself, `plainEngine` over an in-memory journal
- * and a harness the test signs by hand, as unreadable-journal.test.ts does.
+ * and a harness the test signs by hand, as broken-runs.test.ts does.
  *
  * `WF_ROOT` is set before the runner is imported, which reads it as the module loads. `WF_VERIFY_REST=1` judges in full every run a pass
  * answers from its memo, sessions enough are admitted for the one run, and no cap is set on runs.
@@ -40,9 +40,7 @@ delete process.env.WF_MAX_RUNS;
 const { startRun, runWith: runEngine } = await import('../src/runner.ts');
 const runWith = runOver(runEngine, () => stand().layer);
 const runPlaced = runGiven(() => stand().layer);
-const { freshRestMemo, tickRun } = await import('../src/tick/tick.verb.ts');
-const { EngineService } = await import('../src/runtime-client.ts');
-const { Invalid } = await import('../src/refusal/refusal.ts');
+const { tickRun } = await import('../src/tick/tick.verb.ts');
 const { PHASES, passCost } = await import('../src/meter/meter.ts');
 const { recentPasses, recordRecentPass } = await import('../src/daemon/daemon.store.ts');
 
@@ -102,78 +100,6 @@ const signAll = () => {
         closeout: { payload: { outcome: 'done', summary: 'did it', artifacts: [], needs: null }, at: starts.get(name)! + 1 },
       });
 };
-
-/** `tickRun`, given `engine` as the service, run to a Promise as the face runs it. */
-const programOn = (engine: Engine, options: Parameters<typeof tickRun>[0] = {}) =>
-  runPlaced(tickRun(options).pipe(Effect.provide(EngineService.layer(engine))));
-
-/** The engine, but for a runtime pass that rejects with `err`. */
-const failingWith = (err: unknown): Engine => ({
-  ...e,
-  tick: () => Effect.die(err),
-});
-
-test("the tick's program and its plain face each meter their pass over every phase the meter has", async () => {
-  const run = await runPlaced(startRun({ brief: 'one run', repo: REPO, workflowDir: FOLDER }));
-  for (let k = 0; k < 3; k++) await runWith(e, tickRun({ repo: ROOT }));
-  signAll();
-  const status = async () => (await runWith(e, tickRun({ repo: ROOT }))).runs.find((a) => a.run.id === run.id)?.status;
-  let now = await status();
-  for (let k = 0; k < 4 && now !== 'succeeded'; k++) now = await status();
-  assert.equal(now, 'succeeded', 'the run finished before the pass is metered');
-
-  const { cost: faceCost, ...face } = await runWith(e, tickRun({ repo: ROOT, memo: freshRestMemo() }));
-  const { cost: programCost } = await programOn(e, { repo: ROOT, memo: freshRestMemo() });
-  assert.deepEqual(
-    face.runs.map((a) => [a.run.id, a.status]),
-    [[run.id, 'succeeded']],
-  );
-  assert.deepEqual(Object.keys(programCost?.phases ?? {}), [...PHASES], 'the program meters its pass as the face does');
-  assert.deepEqual(Object.keys(faceCost?.phases ?? {}), [...PHASES]);
-});
-
-test("REFUSED: the tick's refusal is its program's typed failure, picked out by its tag, and its face's rejection: an `Invalid`, exit code 2, in its words", async () => {
-  const was = process.env.WF_MAX_CONCURRENT;
-  process.env.WF_MAX_CONCURRENT = '-3';
-  try {
-    const recovered = await runPlaced(
-      tickRun({ repo: ROOT }).pipe(
-        Effect.catchTag('Invalid', (r) => Effect.succeed(r.message)),
-        Effect.provide(EngineService.layer(e)),
-      ),
-    );
-    assert.match(String(recovered), /^WF_MAX_CONCURRENT=-3 is not a count from 1/);
-    const err = await runWith(e, tickRun({ repo: ROOT })).then(
-      () => assert.fail('a pass under a ceiling that does not read resolved'),
-      (x: unknown) => x,
-    );
-    assert.ok(err instanceof Invalid, `an Invalid, not ${String(err)}`);
-    assert.equal(err.exitCode, 2);
-    assert.equal(err.message, recovered);
-  } finally {
-    process.env.WF_MAX_CONCURRENT = was;
-  }
-});
-
-test("REFUSED: what is not a refusal is a defect the tick's program dies of, recovered by no catch, and its face rethrows it as it was thrown", async () => {
-  const boom = new Error('boom');
-  const caught = await runPlaced(
-    tickRun({ repo: ROOT }).pipe(
-      Effect.catch(() => Effect.succeed('caught')),
-      Effect.provide(EngineService.layer(failingWith(boom))),
-    ),
-  ).then(
-    (x) => x,
-    (x: unknown) => x,
-  );
-  assert.equal(caught, boom, 'the catch of failures left the defect alone');
-  const err = await runWith(failingWith(boom), tickRun({ repo: ROOT })).then(
-    () => assert.fail('a pass whose runtime rejected resolved'),
-    (x: unknown) => x,
-  );
-  assert.equal(err, boom, 'the very object the runtime rejected with');
-  assert.deepEqual(await programOn(e, { repo: ROOT }).then((p) => p.runs.length), 1, 'the next pass reads the store as before');
-});
 
 /**
  * The tick's program says in its type what it needs and what it refuses: run without the engine, it does not typecheck, and a refusal

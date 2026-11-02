@@ -56,14 +56,18 @@ const typed = async (t: TestContext, argv: string[]) => {
   return printed;
 };
 
+/** The rows of `nemia passes`, told by the one test at the end. */
+const ROWS: Array<[string, (t: TestContext) => Promise<void>]> = [];
+const row = (name: string, claim: (t: TestContext) => Promise<void>) => ROWS.push([name, claim]);
+
 const COSTS = [cost(1, 12, 5), cost(2, 300, 6), cost(3, 40, 7)];
 
-test('`nemia passes` with no pass kept says so, and how one is kept', async (t) => {
+row('`nemia passes` with no pass kept says so, and how one is kept', async (t) => {
   fs.rmSync(recentFile(), { force: true });
   assert.match((await typed(t, ['passes']))[0], /^no pass is kept yet: nemia up, or the api, ticks the store/);
 });
 
-test('`nemia passes --json` is the whole answer, the passes oldest first; --last <n> reads the last n of them', async (t) => {
+row('`nemia passes --json` is the whole answer, the passes oldest first; --last <n> reads the last n of them', async (t) => {
   fs.rmSync(recentFile(), { force: true });
   for (const c of COSTS) recordRecentPass(c);
   const all = JSON.parse((await typed(t, ['passes', '--json'])).join('\n'));
@@ -79,7 +83,7 @@ test('`nemia passes --json` is the whole answer, the passes oldest first; --last
   assert.match(lines[0], /^3 passes since 2026-10-05T10:00:01\.000Z: 40\.0 ms a pass \(median\), slowest 300$/);
 });
 
-test('REFUSED: a --last that is not a whole number from 1, as Invalid, naming what it takes', async () => {
+row('REFUSED: a --last that is not a whole number from 1, as Invalid, naming what it takes', async () => {
   for (const last of ['0', 'x', '-1', '1.5']) {
     await assert.rejects(main(['passes', '--last', last], noEngine()), (err: Error & { exitCode?: number }) => {
       assert.equal(err.exitCode, 2);
@@ -90,4 +94,8 @@ test('REFUSED: a --last that is not a whole number from 1, as Invalid, naming wh
       return true;
     });
   }
+});
+
+test('`nemia passes`: the recent passes read whole or the last of them, as lines or JSON, and a --last refused', async (t) => {
+  for (const [name, claim] of ROWS) await t.test(name, claim);
 });

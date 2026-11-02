@@ -1,6 +1,6 @@
 /**
- * The daemon started on demand, judged: the plan for each way the lease stands, the switch and an installed service; the environment a
- * spawned daemon is given; and its lines.
+ * The daemon started on demand, judged: the environment a spawned daemon is given, and its lines. What each way the lease stands
+ * starts end to end is `demand.verb.test.ts`'s story; what `demandPlan` decides for each is the table here.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -16,37 +16,22 @@ const standing = (kind: 'ticking' | 'stalled' | 'gone' | 'stopped'): DaemonStand
   identity: 'same',
 });
 
-const NO_SERVICE = () => false;
-
-test('a daemon ticking is left alone, and the service is not even looked for', () => {
-  assert.deepEqual(
-    demandPlan(standing('ticking'), () => assert.fail('looked for a service beside a ticking daemon'), {}),
-    { kind: 'ticking' },
-  );
-});
-
-test('a lease stalled, gone, stopped, unreadable or absent is no holder: a daemon is started', () => {
-  const free: DaemonStanding[] = [
-    { kind: 'none' },
-    { kind: 'unreadable', text: '{' },
-    standing('stalled'),
-    standing('gone'),
-    standing('stopped'),
+test('demandPlan: a ticking daemon is left alone; any other lease is no holder; off starts nothing; a service before a spawn', async (t) => {
+  const NO = () => false;
+  const rows: [string, DaemonStanding, () => boolean, Record<string, string>, string][] = [
+    ['ticking, the service not looked for', standing('ticking'), () => assert.fail('looked for a service'), {}, 'ticking'],
+    ['no lease', { kind: 'none' }, NO, {}, 'spawn'],
+    ['an unreadable lease', { kind: 'unreadable', text: '{' }, NO, {}, 'spawn'],
+    ['a stalled lease', standing('stalled'), NO, {}, 'spawn'],
+    ['a gone lease', standing('gone'), NO, {}, 'spawn'],
+    ['a stopped lease', standing('stopped'), NO, {}, 'spawn'],
+    ['off', { kind: 'none' }, NO, { [DEMAND_OFF]: 'off' }, 'off'],
+    ['off, with a service installed', { kind: 'none' }, () => true, { [DEMAND_OFF]: 'off' }, 'off'],
+    ['a service installed', { kind: 'none' }, () => true, {}, 'service'],
+    ['any value but off still starts', { kind: 'none' }, NO, { [DEMAND_OFF]: 'on' }, 'spawn'],
   ];
-  for (const lease of free) assert.deepEqual(demandPlan(lease, NO_SERVICE, {}), { kind: 'spawn' }, lease.kind);
-});
-
-test('NEMIA_DAEMON_START=off starts nothing; an installed service is started before a daemon of another kind', () => {
-  assert.deepEqual(demandPlan({ kind: 'none' }, NO_SERVICE, { [DEMAND_OFF]: 'off' }), { kind: 'off' });
-  assert.deepEqual(
-    demandPlan({ kind: 'none' }, () => true, { [DEMAND_OFF]: 'off' }),
-    { kind: 'off' },
-  );
-  assert.deepEqual(
-    demandPlan({ kind: 'none' }, () => true, {}),
-    { kind: 'service' },
-  );
-  assert.deepEqual(demandPlan({ kind: 'none' }, NO_SERVICE, { [DEMAND_OFF]: 'on' }), { kind: 'spawn' });
+  for (const [name, lease, serviced, env, kind] of rows)
+    await t.test(name, () => assert.deepEqual(demandPlan(lease, serviced, env), { kind }));
 });
 
 test("the daemon's environment is the service's and the login's: nothing else of the command's shell", () => {

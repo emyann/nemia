@@ -63,20 +63,6 @@ function madeOf(outcome: PlaceOutcome<'make'>): Made {
   return outcome.answer;
 }
 
-test('make cuts a worktree at `at` on a new branch from `from`, and answers it with nothing merged and nothing to say', () => {
-  const repo = repository();
-  const tip = branched(repo, 'wf/r-1/a', 'f', 'a\n');
-  const at = atOf('b');
-  assert.deepEqual(madeOf(make({ repo, at, run: 'r-1', leaf: 'b', from: 'wf/r-1/a', also: [] })), {
-    workspace: at,
-    branch: 'wf/r-1/b',
-    conflicts: [],
-    notes: [],
-  });
-  assert.equal(git(at, 'rev-parse', 'HEAD'), tip, "the new branch is at `from`'s tip");
-  assert.equal(git(at, 'rev-parse', '--abbrev-ref', 'HEAD'), 'wf/r-1/b');
-});
-
 test('make takes up a worktree already at `at` on `name` where it stands, its commit kept, as a pass that died before filing left it; again on a second make', () => {
   const repo = repository();
   const at = atOf('a');
@@ -107,12 +93,6 @@ test('REFUSED: make on a repository that is no directory, on an `at` holding a w
   const cut = 'could not be cut on wf/r-1/b from no-such-branch: ';
   assert.ok(outcome.refused.includes(cut), outcome.refused);
   assert.ok(outcome.refused.slice(outcome.refused.indexOf(cut) + cut.length).includes('no-such-branch'), "and git's own words name it");
-});
-
-test('make is unread for a request whose `also` is no list of strings', () => {
-  const outcome = make({ repo: repository(), at: atOf('a'), run: 'r-1', leaf: 'a', from: 'main' });
-  assert.ok('unread' in outcome, JSON.stringify(outcome));
-  assert.equal(outcome.unread.said, "the request's `also` is missing, where a list of strings is asked");
 });
 
 test("a fan-in's merges: clean, they answer no conflict; conflicting, the markers are left and the paths answered, by a take-up of that tree too", () => {

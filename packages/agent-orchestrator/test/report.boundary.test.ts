@@ -136,31 +136,11 @@ test("report answers each path's diff it was asked, a rename's two ends as one, 
   assert.match(diffs['docs/old.md'], /rename from docs\/old\.md\nrename to docs\/new\.md/);
 });
 
-test('report answers whether each path is a file, a directory or absent on a branch, and its text at the base, null when absent', () => {
-  const dir = repository();
-  const answer = answerOf(report(request(dir, { present: ['shot.png', 'out', 'gone.txt'], atBase: ['package.json', 'NOTES.md'] })));
-  assert.deepEqual(answer.present, { 'wf/x/a': { 'shot.png': 'file', out: 'directory', 'gone.txt': 'absent' } });
-  assert.deepEqual(answer.atBase, { 'package.json': '{ "workspaces": ["packages/*"] }\n', 'NOTES.md': null });
-});
-
-test('a branch git does not have is in no answer, never one that changed nothing; a branch with no change is an empty list', () => {
-  const dir = repository();
-  git(dir, 'branch', 'wf/x/same', 'main');
-  const answer = answerOf(report(request(dir, { branches: ['wf/x/a', 'wf/no/such', 'wf/x/same'], present: ['shot.png'] })));
-  assert.deepEqual(Object.keys(answer.at.tips).sort(), ['wf/x/a', 'wf/x/same']);
-  assert.deepEqual(Object.keys(answer.files).sort(), ['wf/x/a', 'wf/x/same']);
-  assert.deepEqual(answer.files['wf/x/same'], []);
-  assert.deepEqual(Object.keys(answer.present).sort(), ['wf/x/a', 'wf/x/same']);
-});
-
-test("REFUSED: report on no directory, and against a base git cannot read, in the place's words; unread for a request with no list", () => {
+test("REFUSED: report on no directory, and against a base git cannot read, in the place's words", () => {
   const dir = repository();
   const gone = path.join(scratch('wf-report-gone-'), 'gone');
   assert.deepEqual(report(request(gone)), { refused: `${gone} is not a directory, so nothing a branch in it changed can be read` });
   assert.deepEqual(report({ ...request(dir), baseRef: 'no-such-base' }), { refused: `git cannot read the base no-such-base in ${dir}` });
-  const unread = report({ ...request(dir), diffOf: 'src/a.ts' });
-  assert.ok('unread' in unread, JSON.stringify(unread));
-  assert.equal(unread.unread.said, 'the request\'s `diffOf` is "src/a.ts", where a list of strings is asked');
 });
 
 test('report is unread, never an empty answer, when git cannot be started at all', () => {

@@ -37,46 +37,54 @@ beforeEach(() => {
   fs.mkdirSync(runsDir(), { recursive: true });
 });
 
-test('a listed run is found as `runs.read` reads it, and at the cost of its one record whatever the store holds', async () => {
-  put('r-one');
-  assert.deepEqual(runStore.runs.find('r-one'), runStore.runs.read('r-one'));
-  const alone = (await metered(async () => runStore.runs.find('r-one'))).tallies?.records;
-  for (let n = 0; n < 200; n++) put(`fin-${String(n).padStart(3, '0')}`);
-  const among = (await metered(async () => runStore.runs.find('r-one'))).tallies?.records;
-  assert.equal(alone, 1, 'one record read');
-  assert.equal(among, alone, 'and one still, with two hundred other records in the store');
-});
-
-test('REFUSED by `runs.find`: an id the store does not list, one climbing out with `..`, and an absolute one — each undefined, no file read outside runs/', () => {
-  put('r-one');
-  const outside = path.join(ROOT, 'outside.json');
-  fs.writeFileSync(outside, JSON.stringify(aRecord('outside')));
-  assert.equal(runStore.runs.find('r-nothing'), undefined, 'an id the store does not list');
-  assert.equal(runStore.runs.find('../outside'), undefined, 'an id climbing out of the store');
-  assert.equal(runStore.runs.find(path.join(ROOT, 'outside')), undefined, 'an absolute id');
-  assert.equal(runStore.runs.find(''), undefined, 'no id at all');
-  assert.ok(fs.existsSync(outside), 'and the file outside runs/ is untouched');
-});
-
-test('a record that does not read as a run is undefined, said with its fix, and said once a process on stderr, as `runs.list` says it', (t) => {
-  put('r-bad', '{"id": "r-bad"');
-  const said: string[] = [];
-  assert.equal(
-    runStore.runs.find('r-bad', (line) => said.push(line)),
-    undefined,
-  );
-  assert.equal(said.length, 1);
-  assert.match(said[0], /^left out: run r-bad: its record, .*is not JSON/);
-  assert.match(said[0], /Only the tick writes a record/);
-
-  const wrote: string[] = [];
-  t.mock.method(process.stderr, 'write', (line: string) => {
-    wrote.push(line);
-    return true;
+test('`runs.find`: one run by id, among the ids the store lists, never by a path made of the id', async (t) => {
+  await t.test('a listed run is found as `runs.read` reads it, and at the cost of its one record whatever the store holds', async () => {
+    put('r-one');
+    assert.deepEqual(runStore.runs.find('r-one'), runStore.runs.read('r-one'));
+    const alone = (await metered(async () => runStore.runs.find('r-one'))).tallies?.records;
+    for (let n = 0; n < 200; n++) put(`fin-${String(n).padStart(3, '0')}`);
+    const among = (await metered(async () => runStore.runs.find('r-one'))).tallies?.records;
+    assert.equal(alone, 1, 'one record read');
+    assert.equal(among, alone, 'and one still, with two hundred other records in the store');
   });
-  assert.equal(runStore.runs.find('r-bad'), undefined);
-  assert.equal(runStore.runs.find('r-bad'), undefined);
-  assert.equal(wrote.length, 1, `said once a process, not ${wrote.length} times`);
+
+  await t.test(
+    'REFUSED: an id the store does not list, one climbing out with `..`, and an absolute one — each undefined, no file read outside runs/',
+    () => {
+      put('r-one');
+      const outside = path.join(ROOT, 'outside.json');
+      fs.writeFileSync(outside, JSON.stringify(aRecord('outside')));
+      assert.equal(runStore.runs.find('r-nothing'), undefined, 'an id the store does not list');
+      assert.equal(runStore.runs.find('../outside'), undefined, 'an id climbing out of the store');
+      assert.equal(runStore.runs.find(path.join(ROOT, 'outside')), undefined, 'an absolute id');
+      assert.equal(runStore.runs.find(''), undefined, 'no id at all');
+      assert.ok(fs.existsSync(outside), 'and the file outside runs/ is untouched');
+    },
+  );
+
+  await t.test(
+    'a record that does not read as a run is undefined, said with its fix, and said once a process on stderr, as `runs.list` says it',
+    (c) => {
+      put('r-bad', '{"id": "r-bad"');
+      const said: string[] = [];
+      assert.equal(
+        runStore.runs.find('r-bad', (line) => said.push(line)),
+        undefined,
+      );
+      assert.equal(said.length, 1);
+      assert.match(said[0], /^left out: run r-bad: its record, .*is not JSON/);
+      assert.match(said[0], /Only the tick writes a record/);
+
+      const wrote: string[] = [];
+      c.mock.method(process.stderr, 'write', (line: string) => {
+        wrote.push(line);
+        return true;
+      });
+      assert.equal(runStore.runs.find('r-bad'), undefined);
+      assert.equal(runStore.runs.find('r-bad'), undefined);
+      assert.equal(wrote.length, 1, `said once a process, not ${wrote.length} times`);
+    },
+  );
 });
 
 /** Every run as `keptRuns` projects it here: its id and its brief, which a record alone says. */

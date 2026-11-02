@@ -1,8 +1,9 @@
 /**
  * The runs in two reads (`runsOpen`, `runsFinished`), through their entries of the command table (`RUNS_OPEN`, `RUNS_FINISHED`), on a
  * store of runs started and advanced over the stand-ins: together they say what the whole list says (`RUNS`), each run once; the finished
- * runs page by when their work stopped; the light answer does not grow with the finished runs, and read warm costs no record of one;
- * and a page asked wrongly is refused.
+ * runs page by when their work stopped; the light answer does not grow with the finished runs, and read warm costs no record of one,
+ * each compared whole on a seeded clock, with a waiting row among them (the big quiet store of rest-store.test.ts says the same on the
+ * runtime itself, without the clocks); and a page asked wrongly is refused.
  *
  * `WF_ROOT` is set before the package is imported, since the store reads it as it loads; each test empties the store's runs first, and
  * a test that compares two answers, or orders runs by time, seeds `Date`.
@@ -417,17 +418,20 @@ test('a warm read of the open runs costs the records of the open runs alone: as 
   assert.deepEqual(warmed, cold, "the warm answer is a cold read's own: nothing the board shows changes");
 });
 
-test('REFUSED by kind: a page that is no whole number from 1, and a size that is none from 1 to 100', async () => {
-  const refused = (args: Record<string, string>, said: string) =>
-    assert.rejects(finishedPage(args), (err: Error) => {
-      assert.ok(err instanceof Invalid, `${JSON.stringify(args)}: ${String(err)}`);
-      assert.equal(err.message, `the finished runs are read a page at a time: ${said}`);
-      return true;
-    });
-  for (const page of ['0', '-1', '1.5', 'abc', ''])
-    await refused({ page }, `page takes a whole number from 1, as in page=2, and \`${page}\` is none.`);
-  for (const size of ['0', '101', 'abc'])
-    await refused({ size }, `size takes a whole number from 1 to 100, as in size=9, and \`${size}\` is none.`);
+test('REFUSED by kind: a page that is no whole number from 1, and a size that is none from 1 to 100', async (t) => {
+  const rows: Array<[string, string]> = [
+    ...['0', '-1', '1.5', 'abc', ''].map((page): [string, string] => ['page', page]),
+    ...['0', '101', 'abc'].map((size): [string, string] => ['size', size]),
+  ];
+  for (const [key, given] of rows)
+    await t.test(`${key}=${given}`, () =>
+      assert.rejects(finishedPage({ [key]: given }), (err: Error) => {
+        assert.ok(err instanceof Invalid, String(err));
+        for (const fix of [`${key} takes a whole number from 1${key === 'size' ? ' to 100' : ''}`, `\`${given}\` is none`])
+          assert.ok(err.message.includes(fix), `${err.message} names ${fix}`);
+        return true;
+      }),
+    );
 });
 
 test('a page past the last answers an empty page, with the total and the pages there are', async (t) => {

@@ -27,6 +27,7 @@ fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
 process.env.WF_ROOT = ROOT;
 const { freshStatsMemo, statsRun } = await import('./stats.verb.ts');
 const { runWith } = await import('../runtime-client.ts');
+const { StoreRoot } = await import('../config/root.store.ts');
 
 type Event = Parameters<AsyncJournal['append']>[1];
 
@@ -164,10 +165,13 @@ const FINISHED = ['s-a', 's-b', 's-c'];
 const unverified = { verify: false };
 
 /** A call through `memo`, unverified. */
-const through = (memo: ReturnType<typeof freshStatsMemo>) => runWith(e, statsRun({}, NOW, { memo, ...unverified }));
+/** `program` given the store's root, as the CLI and the api compose a command's program. */
+const rooted = <A, E, R>(program: Effect.Effect<A, E, R>) => Effect.provideService(program, StoreRoot, ROOT);
+
+const through = (memo: ReturnType<typeof freshStatsMemo>) => runWith(e, rooted(statsRun({}, NOW, { memo, ...unverified })));
 
 /** A call with no memo, which reads every run afresh: what every call through the memo must answer. */
-const afresh = () => runWith(e, statsRun({}, NOW));
+const afresh = () => runWith(e, rooted(statsRun({}, NOW)));
 
 test("A serving process's memo: each call reads again only the runs whose inputs changed, and answers what a fresh read answers", async (t) => {
   const s = story(t);

@@ -184,7 +184,11 @@ test('needOf: what a step needs from a person — its question, its blocked sess
         true,
         'and the page draws the Decide section for that note, though the run runs and nothing waits on you',
       );
-      assert.equal(decideDrawn({ ...run([step('plan', 'running')], []), status: 'running' }), false, 'nothing asked, nothing to decide: none');
+      assert.equal(
+        decideDrawn({ ...run([step('plan', 'running')], []), status: 'running' }),
+        false,
+        'nothing asked, nothing to decide: none',
+      );
       assert.equal(stepAnchor('plan'), 'step-plan');
     },
   );

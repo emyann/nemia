@@ -58,8 +58,7 @@ type EntryKey = (typeof ENTRY_KEYS)[number];
  * has none); `examples` only when given. Pure: `file` is what a refusal calls the SKILL.md.
  *
  * Read as YAML (`readFrontmatter`), each key the card reads as its value: `tags` and `examples` a list of lines of text, the others one
- * text. A block still in the former line form is read so, each card key's line read as YAML on its own, where it reads so, as the card
- * reader read it before. Refused, with the form to write: a list where a text is read, a text where a list is, a map, an empty list or one
+ * text. Refused, with the form to write: a block still in the former line form, at its line (`readFrontmatter`), a list where a text is read, a text where a list is, a map, an empty list or one
  * with an empty item, and a card key set twice. `test/skills-rendered.test.ts` holds this reading to js-yaml's on every SKILL.md the
  * repository has. Keys the card does not read are passed over, whatever their form.
  */

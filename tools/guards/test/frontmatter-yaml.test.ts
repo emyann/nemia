@@ -1,7 +1,7 @@
 /**
  * Every frontmatter of the repository's team and skills is YAML: each markdown file git holds under `workflows/`, `.claude/skills/` and
  * `apps/web/.claude/skills/` that opens with `---` has a block a strict YAML parser reads as a map of keys. The parser is js-yaml, not
- * Nemia's own reader, so a block Nemia still reads in the former line form (`key: the rest of the line`) is refused here: what VS Code's
+ * Nemia's own reader, so a block in the former line form (`key: the rest of the line`), which Nemia refuses too, is refused here, as VS Code's
  * preview, GitHub's file view or any tool a person points at these files would refuse. The fix is `nemia frontmatter rewrite <folder>`.
  *
  * The guard is first made to refuse a planted block, and it must read more files than the team holds steps, so a scan that reads

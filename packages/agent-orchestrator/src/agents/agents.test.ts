@@ -1353,11 +1353,8 @@ test("skillEntryOf: a skill's card entry read off its SKILL.md's keys as YAML re
       },
     ],
     [
-      'a block YAML refuses is read in the former line form, each card key of it read as YAML alone',
-      () => {
-        assert.equal(entry('description: What: it does\ntags: ["code"]').description, 'What: it does');
-        assert.deepEqual(entry('description: What: it does\ntags: ["code"]').tags, ['code']);
-      },
+      'a block in the former line form is refused',
+      () => assert.throws(() => entry('description: What: it does\ntags: ["code"]'), WorkflowError),
     ],
     [
       "Claude Code's keys, in any form, are not the card's",

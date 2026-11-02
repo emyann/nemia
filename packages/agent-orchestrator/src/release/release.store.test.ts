@@ -9,7 +9,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from '../../test/scratch.ts';
 import type { ReleaseFile } from './release.ts';
-import { currentRelease, placeRelease, releaseDir, releaseFileOf, switchCurrent, writeReleaseFile } from './release.store.ts';
+import { currentRelease, placeRelease, releaseDir, releaseFileOf, switchCurrent, trialEnv, writeReleaseFile } from './release.store.ts';
 
 /** What a release of `tag` says, built from `/src`. */
 const fileOf = (tag: string): ReleaseFile => ({ tag, commit: `${tag}0000000000`, source: '/src', builtAt: '2026-10-06T07:00:00.000Z' });
@@ -47,4 +47,21 @@ test('REFUSED: a release placed where one of its tag is already moves nothing; t
   assert.equal(releaseFileOf(releaseDir('v1', root))?.commit, fileOf('v1').commit, 'the release there is unchanged');
   assert.equal(placeRelease(tree, 'v2', root), true);
   assert.ok(fs.existsSync(path.join(releaseDir('v2', root), 'mark')));
+});
+
+test("a build's commands get its trial store for WF_ROOT and AE_ROOT and no HKB_REPO, whatever the person's environment names", () => {
+  const person = {
+    PATH: '/bin',
+    HOME: '/home/me',
+    WF_ROOT: '/home/me/.agent-workflows',
+    AE_ROOT: '/home/me/.agent-engine',
+    HKB_REPO: '/r',
+  };
+  assert.deepEqual(trialEnv(person, '/b/trial'), {
+    PATH: '/bin',
+    HOME: '/home/me',
+    WF_ROOT: '/b/trial/workflows',
+    AE_ROOT: '/b/trial/engine',
+  });
+  assert.deepEqual(trialEnv({ PATH: '/bin' }, '/b/trial'), { PATH: '/bin', WF_ROOT: '/b/trial/workflows', AE_ROOT: '/b/trial/engine' });
 });

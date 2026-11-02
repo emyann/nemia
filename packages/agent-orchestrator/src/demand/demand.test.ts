@@ -1,10 +1,38 @@
 /**
  * The daemon started on demand, judged: the environment a spawned daemon is given, and its lines. What each way the lease stands
- * starts is `demand.verb.test.ts`'s story.
+ * starts end to end is `demand.verb.test.ts`'s story; what `demandPlan` decides for each is the table here.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { daemonEnv, offLine, otherTookLine, serviceStartedLine, startedLine, unstartedLine } from './demand.ts';
+import type { DaemonStanding } from '../daemon/daemon.ts';
+import { DEMAND_OFF, daemonEnv, demandPlan, offLine, otherTookLine, serviceStartedLine, startedLine, unstartedLine } from './demand.ts';
+
+/** A lease of pid 4242 standing as `kind`. */
+const standing = (kind: 'ticking' | 'stalled' | 'gone' | 'stopped'): DaemonStanding => ({
+  kind,
+  file: { pid: 4242, by: 'api', startedAt: '2026-10-06T08:00:00.000Z', cwd: '/', every: 4000, passedAt: null },
+  last: 0,
+  quiet: 0,
+  identity: 'same',
+});
+
+test('demandPlan: a ticking daemon is left alone; any other lease is no holder; off starts nothing; a service before a spawn', async (t) => {
+  const NO = () => false;
+  const rows: [string, DaemonStanding, () => boolean, Record<string, string>, string][] = [
+    ['ticking, the service not looked for', standing('ticking'), () => assert.fail('looked for a service'), {}, 'ticking'],
+    ['no lease', { kind: 'none' }, NO, {}, 'spawn'],
+    ['an unreadable lease', { kind: 'unreadable', text: '{' }, NO, {}, 'spawn'],
+    ['a stalled lease', standing('stalled'), NO, {}, 'spawn'],
+    ['a gone lease', standing('gone'), NO, {}, 'spawn'],
+    ['a stopped lease', standing('stopped'), NO, {}, 'spawn'],
+    ['off', { kind: 'none' }, NO, { [DEMAND_OFF]: 'off' }, 'off'],
+    ['off, with a service installed', { kind: 'none' }, () => true, { [DEMAND_OFF]: 'off' }, 'off'],
+    ['a service installed', { kind: 'none' }, () => true, {}, 'service'],
+    ['any value but off still starts', { kind: 'none' }, NO, { [DEMAND_OFF]: 'on' }, 'spawn'],
+  ];
+  for (const [name, lease, serviced, env, kind] of rows)
+    await t.test(name, () => assert.deepEqual(demandPlan(lease, serviced, env), { kind }));
+});
 
 test("the daemon's environment is the service's and the login's: nothing else of the command's shell", () => {
   const shell = {

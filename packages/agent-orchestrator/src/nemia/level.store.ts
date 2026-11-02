@@ -119,18 +119,35 @@ const realOf = (at: string): string | undefined => {
   }
 };
 
+/** Whether `file`, a real path, is the `nemia` bin its own package's `package.json` declares, the package found from it up. */
+const declaredNemia = (file: string): boolean => {
+  for (let dir = path.dirname(file); path.dirname(dir) !== dir; dir = path.dirname(dir)) {
+    let text: string;
+    try {
+      text = fs.readFileSync(path.join(dir, 'package.json'), 'utf8');
+    } catch {
+      continue;
+    }
+    const named = (JSON.parse(text) as { bin?: { nemia?: unknown } }).bin?.nemia;
+    return typeof named === 'string' && realOf(path.join(dir, named)) === file;
+  }
+  return false;
+};
+
 /**
- * The folder whose `nemia` is the package `root`'s own bin: from the package's real path up, at each folder its `node_modules/.bin` (a
- * checkout, a local install), then its `bin` (a global prefix), the first whose `nemia` resolves to the file the package's `package.json`
- * names. Undefined where none does: a `nemia` that is another package's is passed over.
+ * The folder whose `nemia` is the bin of the same checkout or release as the package `root`: from the package's real path up, at each
+ * folder its `node_modules/.bin` (a checkout, a local install), then its `bin` (a global prefix), the first whose `nemia` resolves to a
+ * bin its package declares and lies under that same folder — the client in `apps/cli` of this checkout, the one npm linked beside this
+ * package. Undefined where none does: a `nemia` that is another tree's is passed over.
  */
 export function ownBin(root: string = PACKAGE): string | undefined {
-  const named = (JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')) as { bin?: { nemia?: unknown } }).bin?.nemia;
-  const own = typeof named === 'string' ? realOf(path.join(root, named)) : undefined;
-  if (own === undefined) return undefined;
   let at = realOf(root);
   while (at !== undefined) {
-    const found = [path.join(at, 'node_modules', '.bin'), path.join(at, 'bin')].find((bin) => realOf(path.join(bin, 'nemia')) === own);
+    const under = at;
+    const found = [path.join(at, 'node_modules', '.bin'), path.join(at, 'bin')].find((bin) => {
+      const real = realOf(path.join(bin, 'nemia'));
+      return real !== undefined && real.startsWith(`${under}${path.sep}`) && declaredNemia(real);
+    });
     if (found !== undefined) return found;
     at = path.dirname(at) === at ? undefined : path.dirname(at);
   }

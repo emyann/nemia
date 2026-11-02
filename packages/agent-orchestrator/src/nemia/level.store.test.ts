@@ -1,6 +1,6 @@
 /**
- * Her definition and her bin, off the disk: `ownBin` finds the folder whose `nemia` is the package's own, in a workspace and under a
- * global prefix, and passes over another package's; `readNemia` refuses a hand list of her rules, which her fence derives, as
+ * Her definition and her bin, off the disk: `ownBin` finds the folder whose `nemia` is the bin of the package's own tree — the client
+ * its workspace links, a global prefix's — and passes over one of another tree; `readNemia` refuses a hand list of her rules, which her fence derives, as
  * `test/agent-fences.test.ts` refuses her a mode but `auto`. Focused on the real disk: npm's links are real symbolic links, and the
  * checkout's own is read. A store of its own, since `WF_ROOT` is read as the module loads.
  */
@@ -14,10 +14,10 @@ import { names } from '../../test/assessed.ts';
 process.env.WF_ROOT = scratch('wf-nemia-store-');
 const { nemiaDefinition, ownBin, readNemia } = await import('./level.store.ts');
 
-/** A package named `name` at `dir`, whose `package.json` says its `nemia` is `bin/nemia.ts`. */
+/** A package at `dir` whose `package.json` says its `nemia` is `bin/nemia.ts`, as the client in `apps/cli` does. */
 const pkg = (dir: string): string => {
   fs.mkdirSync(path.join(dir, 'bin'), { recursive: true });
-  fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ name: 'agent-orchestrator', bin: { nemia: 'bin/nemia.ts' } }));
+  fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ name: 'cli', bin: { nemia: 'bin/nemia.ts' } }));
   fs.writeFileSync(path.join(dir, 'bin', 'nemia.ts'), '');
   return dir;
 };
@@ -28,30 +28,40 @@ const linked = (bin: string, target: string): void => {
   fs.symlinkSync(path.relative(bin, target), path.join(bin, 'nemia'));
 };
 
-test("`ownBin`: the folder whose nemia is the package's own, and none where every one on the way is another's", async (t) => {
+test("`ownBin`: the folder whose nemia is its own tree's client, and none where every one on the way is another tree's", async (t) => {
   await t.test("a workspace's node_modules/.bin, and a global prefix's bin", () => {
     const root = scratch('wf-nemia-bin-');
-    const own = pkg(path.join(root, 'packages', 'agent-orchestrator'));
-    linked(path.join(root, 'node_modules', '.bin'), path.join(own, 'bin', 'nemia.ts'));
+    const own = path.join(root, 'packages', 'agent-orchestrator');
+    fs.mkdirSync(own, { recursive: true });
+    const client = pkg(path.join(root, 'apps', 'cli'));
+    linked(path.join(root, 'node_modules', '.bin'), path.join(client, 'bin', 'nemia.ts'));
     assert.equal(ownBin(own), path.join(fs.realpathSync(root), 'node_modules', '.bin'));
     const prefix = scratch('wf-nemia-prefix-');
-    const global = pkg(path.join(prefix, 'lib', 'node_modules', 'agent-orchestrator'));
-    linked(path.join(prefix, 'bin'), path.join(global, 'bin', 'nemia.ts'));
+    const global = path.join(prefix, 'lib', 'node_modules', 'agent-orchestrator');
+    fs.mkdirSync(global, { recursive: true });
+    const globalClient = pkg(path.join(prefix, 'lib', 'node_modules', 'cli'));
+    linked(path.join(prefix, 'bin'), path.join(globalClient, 'bin', 'nemia.ts'));
     assert.equal(ownBin(global), path.join(fs.realpathSync(prefix), 'bin'));
   });
-  await t.test("REFUSED: a nemia on the way that is another package's is passed over, and none of the package's own is undefined", () => {
+  await t.test("REFUSED: a nemia on the way that is another tree's is passed over, and none of the tree's own is undefined", () => {
     const root = scratch('wf-nemia-other-');
-    const own = pkg(path.join(root, 'checkout', 'packages', 'agent-orchestrator'));
-    const other = pkg(path.join(root, 'other', 'agent-orchestrator'));
+    const own = path.join(root, 'checkout', 'packages', 'agent-orchestrator');
+    fs.mkdirSync(own, { recursive: true });
+    const client = pkg(path.join(root, 'checkout', 'apps', 'cli'));
+    const other = pkg(path.join(root, 'other', 'cli'));
     linked(path.join(root, 'checkout', 'node_modules', '.bin'), path.join(other, 'bin', 'nemia.ts'));
     assert.equal(ownBin(own), undefined);
-    linked(path.join(root, 'node_modules', '.bin'), path.join(own, 'bin', 'nemia.ts'));
-    assert.equal(ownBin(own), path.join(fs.realpathSync(root), 'node_modules', '.bin'));
+    fs.rmSync(path.join(root, 'checkout', 'node_modules', '.bin', 'nemia'));
+    linked(path.join(root, 'checkout', 'node_modules', '.bin'), path.join(client, 'bin', 'nemia.ts'));
+    assert.equal(ownBin(own), path.join(fs.realpathSync(root), 'checkout', 'node_modules', '.bin'));
   });
-  await t.test('the checkout gives this package its own bin', () => {
+  await t.test("the checkout gives this package its own tree's client", () => {
     const bin = ownBin();
     assert.ok(bin !== undefined, 'the checkout links its nemia');
-    assert.equal(fs.realpathSync(path.join(bin, 'nemia')), fs.realpathSync(path.join(import.meta.dirname, '..', '..', 'bin', 'nemia.ts')));
+    assert.equal(
+      fs.realpathSync(path.join(bin, 'nemia')),
+      fs.realpathSync(path.join(import.meta.dirname, '..', '..', '..', '..', 'apps', 'cli', 'bin', 'nemia.ts')),
+    );
   });
 });
 

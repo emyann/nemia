@@ -23,8 +23,10 @@ import {
   workflowAt,
   workflowFolder,
   type Args,
+  StoreRoot,
   wfRoot,
 } from '../runner.ts';
+import { Effect } from 'effect';
 import { usage, placedIn, type Engine } from './flags.ts';
 
 /** The text under `key`, or undefined where none was given. */
@@ -132,7 +134,10 @@ async function folderRun(folder: string, args: Args, e: Engine, place: Place): P
   const plan = { dir: path.resolve(folder), repo: path.resolve(repo) };
   const { started, stopped, folderOf } = await runWith(
     e,
-    placedIn(place, startPlan({ ...plan, ...(factory !== undefined ? { factory } : {}) })),
+    placedIn(
+      place,
+      Effect.provideService(startPlan({ ...plan, ...(factory !== undefined ? { factory } : {}) }), StoreRoot, wfRoot(process.env)),
+    ),
   );
   for (const line of planLines(started)) console.log(line);
   if (stopped) {

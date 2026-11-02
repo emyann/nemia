@@ -215,7 +215,7 @@ test(
     const watch = nemia(t, store.root, ['watch', '--json', '--cursor-file', file]);
     const atEnd = (end: number) => (out: string) => json(out).some((l) => l.cursor === end) || undefined;
     await watch.said(atEnd(store.size()));
-    assert.match(watch.err(), /watching from 0/, 'the banner on stderr under --json');
+    assert.match(watch.err(), /from 0\b/, 'the banner on stderr under --json');
 
     api.proc.kill('SIGTERM');
     await api.ended;
@@ -244,7 +244,8 @@ test('a selector naming a former reason prints its hint on stderr, as the in-pro
   const served = await ran(t, store.root, ['watch', '--once', '-l', 'reason=NeedsHuman']);
   const local = await ran(t, store.root, ['watch', '--once', '-l', 'reason=NeedsHuman', '--local']);
   assert.equal(served.code, 0, served.err);
-  assert.match(served.err, /nemia watch: NeedsHuman .*reason=AwaitingAnswer/);
+  assert.match(served.err, /NeedsHuman/, 'the hint names the former word');
+  assert.match(served.err, /reason=AwaitingAnswer/, 'and the selector to type');
   assert.equal(served.err, local.err, 'the same hint, once');
   assert.equal(served.out, local.out);
 

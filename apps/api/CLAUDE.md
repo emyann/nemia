@@ -11,6 +11,12 @@ from the orchestrator; what it holds today below its layer is in `docs/architect
   never a cast or a default the contract does not give. A dictionary read stays a plain read, its `undefined` handled, with no
   `Object.hasOwn` guard put in front of it: that changes what a prototype key reads. The tests' own `test/tsconfig.json` leaves the
   flag off.
+- **The OpenAPI document has a page to browse it beside it**: `GET /openapi` (`src/openapi/reference.ts`) is Scalar's reference, drawn
+  in the browser from the document at `OPENAPI_PATH`, never a copy, so a route the document gains shows there with nothing to change.
+  The page reaches no host but the api: its script is the installed `@scalar/api-reference` bundle, read by `app.ts` and served at `/openapi/scalar.js`
+  (Scalar's Hono helper would load it from jsDelivr), and the viewer's fonts, telemetry, agent, MCP button, developer tools and "try
+  it" client are off; a Scalar option that calls out is turned off there, and `src/openapi/reference.test.ts` refuses a page naming
+  another host.
 - **A body read off a response is `unknown`**: name the api's own answer type (`(await res.json()) as RunAnswer`).
 - **An encoded `..` never reaches a route in a test**: `app.request` resolves `%2E%2E` before the router sees it. Send `..%2F…` to reach
   a name refusal.

@@ -10,9 +10,12 @@ claude:
   fence:
     disallowedTools: Bash(npm run build), Bash(npm run e2e), Bash(npm test), Bash(npx shadcn@latest:*), Bash(pnpm dlx shadcn@latest:*), Bash(bunx --bun shadcn@latest:*), Bash(npx turbo run test *build*), Bash(node --test *e2e/*), Bash(npx tsc *-w*), Bash(npx tsc *-W*), Bash(npx tsc *-in*), Bash(npx tsc *-iN*), Bash(npx tsc *-In*), Bash(npx tsc *-IN*), Bash(npx tsc *-i *), Bash(npx tsc *-I *), Bash(npx tsc *-ts*), Bash(npx tsc *-tS*), Bash(npx tsc *-Ts*), Bash(npx tsc *-TS*), Bash(npx tsc *-g*), Bash(npx tsc *-G*), Bash(npx tsc * false*), Bash(npx tsc *@*), Bash(npx oxlint *--fix*), Bash(npx oxlint *--init*), Bash(npx oxlint *--lsp*), Bash(npx oxlint -c*), Bash(npx oxlint * -c*), Bash(npx oxlint *--config*), Bash(npx tsverify *--cache*), Bash(npx tsverify *--watch*), mcp__playwright__browser_navigate(url:*:8787*), mcp__playwright__browser_navigate(url:*:5173*), mcp__playwright__browser_tabs(url:*:8787*), mcp__playwright__browser_tabs(url:*:5173*)
 ---
-Your brief says what recent runs of this workflow cost, per step and whole (*What runs of this workflow cost*): propose the cut and each
-step's `budget:` from those figures, not from a guess, and say which you went by. When the work you design is larger
-than one run of this workflow usually is, say so, and how to cut it into intents that each fit one.
+Your brief says what recent runs of this workflow cost, per step and whole (*What runs of this workflow cost*): propose each step's
+`budget:` from those figures, not from a guess, and say which you went by. Cut the work by its seams, never by its cost: each part is
+where it lives (a layer, a package or a door, the boundaries your placement already names), a distinct area, says what it needs of
+the others, and is ordered only where one needs another, so parts with no need of each other are built at the same time. Propose a
+second intent only for a seam of logic, where a part cannot be built until another has landed and been used, never to stay under a
+budget. When the whole costs more than one run of this workflow usually does, say so, and size each step's budget to it.
 
 Say in the spec how each part shows that what it builds holds, so the implementer's parts carry it: on a rewrite of tests, the source
 line each kept or absorbed assertion guards, broken once and seen failing; on a feature, the test written first and seen failing.

@@ -21,7 +21,11 @@ intent, so restate the intent's goal and constraints in it.
    ask it in a round.
 5. **List every change by path**, the **steps in order**, and the **tests**: for each rule the change adds, the fixture that makes it
    refuse, and the check that it fails without the rule.
-6. **Size it.** One spec is one run of work under its budget. When it is more, say so and propose how to cut it into intents.
+6. **Cut it by its seams, never by its cost.** Cut the work into parts by where each lives: a layer, a package or a door, the
+   boundaries your placement already names. Each part is a distinct area, says what it needs of the others, and is ordered only where
+   one needs another, so parts with no need of each other can be built at the same time. Propose a second intent only for a seam of
+   logic, where a part cannot be built until another has landed and been used; never cut to stay under a budget. When the whole costs
+   more than a run usually does, say so, and size each step's budget to it.
 7. **Ask what is the person's.** A choice the intent leaves open, a trade-off only they can weigh: ask it in a round, numbered, each with
    your recommended answer. Record each answer, and who gave it, in `decisions`.
 

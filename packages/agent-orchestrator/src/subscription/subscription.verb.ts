@@ -10,7 +10,7 @@
 import { Effect } from 'effect';
 import type { Args } from '../command/command.ts';
 import type { Command } from '../command/entry.verb.ts';
-import { feedSize } from '../feed/feed.store.ts';
+import { FeedDoor } from '../feed/feed.store.ts';
 import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
 import { EngineService, asked, type TaskView } from '../runtime-client.ts';
 import { SubscriptionDoor } from './subscription.store.ts';
@@ -93,7 +93,7 @@ const subscribe = Effect.fn('subscribe')(function* (args: Args) {
     task,
     selectors,
     digestEvery,
-    from: feedSize(),
+    from: (yield* (yield* FeedDoor).lines.end())?.cursor ?? 0,
     ...(atLeast === undefined ? {} : { scope: { atLeast: atLeast as Level } }),
   };
   yield* (yield* SubscriptionDoor).subscriptions.put(SubscriptionName.read(name), subscription);

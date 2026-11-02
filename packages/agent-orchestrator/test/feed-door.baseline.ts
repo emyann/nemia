@@ -13,7 +13,5 @@
 /** Each file by its path from the package, and its calls of the feed's module spellings, comments left out. */
 export const FEED_DOOR_DEBT: Readonly<Record<string, number>> = {
   'src/cli/main.ts': 4,
-  'src/nemia/keep.verb.ts': 1,
-  'src/subscription/subscription.verb.ts': 1,
   'src/tick/tick.verb.ts': 1,
 };

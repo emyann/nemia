@@ -110,7 +110,9 @@ const STORE_BOTTOM = ['src/record/places.store.ts', 'src/skills/read.store.ts', 
  * `WF_VERIFY_REST`), the door's pattern on the store's root (`door.store.ts`) and each door on it and the stores it is over — the Run
  * door on the run store's files, the Factory door on the factories and a factory's level, rules and servers, each on the run store, the
  * Workflow door on the folders, their versions (`version.store.ts`, on the two reads) and the folder written, and
- * the Template door on the pattern alone, a template being a folder outside the store —
+ * the Template door on the pattern alone, a template being a folder outside the store, the Ledger door on the pattern and the
+ * configuration, the Feed door on the pattern beside the feed's own two, and the Subscription door on the pattern, the feed's file, the
+ * run store, the tally and the configuration —
  * what a place is and how its processes are stopped, on no store file (`place.store.ts`), then a step's workspace, cut by the place, a
  * workflow folder written on the run store, the two reads and the factories, and where a run looks and a place's workflow folders
  * (`lookup.store.ts`) on the run store and the skills read; what a branch changed, as the place says, on the place (`changes.store.ts`),
@@ -130,7 +132,7 @@ const STORE_SHARED: Record<string, readonly string[]> = {
   'src/agents/read.store.ts': ['src/skills/read.store.ts'],
   'src/folder/folder.store.ts': ['src/agents/read.store.ts', 'src/skills/read.store.ts'],
   'src/record/steps.store.ts': ['src/config/config.store.ts', 'src/folder/folder.store.ts'],
-  'src/revisions/revisions.store.ts': ['src/config/config.store.ts'],
+  'src/revisions/revisions.store.ts': ['src/config/config.store.ts', 'src/door/door.store.ts'],
   'src/record/record.store.ts': [
     ...STORE_BOTTOM,
     'src/folder/folder.store.ts',
@@ -169,7 +171,7 @@ const STORE_SHARED: Record<string, readonly string[]> = {
     'src/workspace/worktree.store.ts',
   ],
   'src/branches/changes.store.ts': ['src/place/place.store.ts'],
-  'src/feed/feed.store.ts': ['src/record/record.store.ts', 'src/meter/tally.store.ts'],
+  'src/feed/feed.store.ts': ['src/record/record.store.ts', 'src/meter/tally.store.ts', 'src/door/door.store.ts'],
   'src/standing/standing.store.ts': ['src/record/record.store.ts', 'src/place/place.store.ts'],
   'src/door/door.store.ts': ['src/config/root.store.ts'],
   'src/runs/runs.store.ts': ['src/door/door.store.ts', 'src/record/files.store.ts'],
@@ -193,6 +195,13 @@ const STORE_SHARED: Record<string, readonly string[]> = {
     'src/skills/read.store.ts',
   ],
   'src/templates/templates.store.ts': ['src/door/door.store.ts'],
+  'src/subscription/subscription.store.ts': [
+    'src/config/config.store.ts',
+    'src/record/record.store.ts',
+    'src/meter/tally.store.ts',
+    'src/feed/feed.store.ts',
+    'src/door/door.store.ts',
+  ],
 };
 
 /**
@@ -205,6 +214,9 @@ const STAND_INS: readonly string[] = [
   'src/cards/memory.store.ts',
   'src/workflows/memory.store.ts',
   'src/templates/memory.store.ts',
+  'src/subscription/memory.store.ts',
+  'src/revisions/memory.store.ts',
+  'src/feed/memory.store.ts',
 ];
 
 /** The package's files the CLI may import, beside the files of its own folder. */
@@ -411,8 +423,15 @@ function cliBreaks(sources: Sources): string[] {
 }
 
 /**
+ * The controllers that reach the store through doors alone and the runtime not at all, so they have no use for the client: the feed's
+ * verb, whose every read and append is the Feed door's (`src/feed/feed.store.ts`). Named one by one, so any other controller that stops
+ * reaching the client is still refused.
+ */
+const DOORED_ONLY: readonly string[] = ['src/feed/feed.verb.ts'];
+
+/**
  * Only the client imports agent-runtime, a type included — and it does; every controller beneath the CLI imports the client or a
- * controller that reaches it, followed through controller imports, and the client imports no controller.
+ * controller that reaches it, followed through controller imports, but those of `DOORED_ONLY`; and the client imports no controller.
  */
 function clientBreaks(sources: Sources): string[] {
   const controllers = kinds(sources).CONTROLLER;
@@ -427,7 +446,7 @@ function clientBreaks(sources: Sources): string[] {
     return imports.some((m) => controllers.includes(m) && !seen.has(m) && reaches(m, seen));
   };
   for (const file of beneathCli(sources))
-    if (!reaches(file, new Set()))
+    if (!DOORED_ONLY.includes(file) && !reaches(file, new Set()))
       out.push(
         `${file} is a controller and reaches ${CLIENT} through none of its imports: the controllers reach the runtime through the client`,
       );
@@ -882,7 +901,7 @@ test('REFUSED: a store file that imports the runtime, a controller or the client
     'src/factory/factory.store.ts imports src/folder/write.store.ts, which the tree does not let it: of the store it imports src/record/record.store.ts, src/schedule/schedule.store.ts, src/applied/applied.store.ts, src/wiring/own-agent.store.ts',
   ]);
   assert.deepEqual(treeBreaks(adding('src/skills/skills.store.ts', 'src/agents/agents.store.ts')), [
-    'src/skills/skills.store.ts imports src/agents/agents.store.ts, which the tree does not let it: of the store it imports src/record/places.store.ts, src/skills/read.store.ts, src/meter/tally.store.ts, src/config/config.store.ts, src/config/root.store.ts, src/agents/read.store.ts, src/folder/folder.store.ts, src/record/steps.store.ts, src/revisions/revisions.store.ts, src/record/record.store.ts, src/pause/pause.store.ts, src/schedule/schedule.store.ts, src/applied/applied.store.ts, src/wiring/own-agent.store.ts, src/factory/factory.store.ts, src/record/files.store.ts, src/place/place.store.ts, src/workspace/worktree.store.ts, src/folder/write.store.ts, src/folder/lookup.store.ts, src/branches/branches.store.ts, src/branches/changes.store.ts, src/feed/feed.store.ts, src/standing/standing.store.ts, src/door/door.store.ts, src/runs/runs.store.ts, src/level/level.store.ts, src/rules/rules.store.ts, src/servers/servers.store.ts, src/factories/factories.store.ts, src/cards/cards.store.ts, src/folder/version.store.ts, src/workflows/workflows.store.ts, src/templates/templates.store.ts',
+    'src/skills/skills.store.ts imports src/agents/agents.store.ts, which the tree does not let it: of the store it imports src/record/places.store.ts, src/skills/read.store.ts, src/meter/tally.store.ts, src/config/config.store.ts, src/config/root.store.ts, src/agents/read.store.ts, src/folder/folder.store.ts, src/record/steps.store.ts, src/revisions/revisions.store.ts, src/record/record.store.ts, src/pause/pause.store.ts, src/schedule/schedule.store.ts, src/applied/applied.store.ts, src/wiring/own-agent.store.ts, src/factory/factory.store.ts, src/record/files.store.ts, src/place/place.store.ts, src/workspace/worktree.store.ts, src/folder/write.store.ts, src/folder/lookup.store.ts, src/branches/branches.store.ts, src/branches/changes.store.ts, src/feed/feed.store.ts, src/standing/standing.store.ts, src/door/door.store.ts, src/runs/runs.store.ts, src/level/level.store.ts, src/rules/rules.store.ts, src/servers/servers.store.ts, src/factories/factories.store.ts, src/cards/cards.store.ts, src/folder/version.store.ts, src/workflows/workflows.store.ts, src/templates/templates.store.ts, src/subscription/subscription.store.ts',
   ]);
   assert.deepEqual(treeBreaks(adding('src/record/files.store.ts', 'src/workspace/worktree.store.ts')), [
     'src/record/files.store.ts imports src/workspace/worktree.store.ts, which the tree does not let it: of the store it imports src/record/record.store.ts, src/pause/pause.store.ts, src/config/config.store.ts',
@@ -907,7 +926,7 @@ test('REFUSED: a store file that imports the runtime, a controller or the client
     'src/agents/agents.store.ts is a store file and imports src/tick/tick.verb.ts, a controller: a cycle',
   ]);
   assert.deepEqual(treeBreaks(adding('src/agents/agents.store.ts', 'src/inbox/inbox.store.ts')), [
-    'src/agents/agents.store.ts imports src/inbox/inbox.store.ts, which the tree does not let it: of the store it imports src/record/places.store.ts, src/skills/read.store.ts, src/meter/tally.store.ts, src/config/config.store.ts, src/config/root.store.ts, src/agents/read.store.ts, src/folder/folder.store.ts, src/record/steps.store.ts, src/revisions/revisions.store.ts, src/record/record.store.ts, src/pause/pause.store.ts, src/schedule/schedule.store.ts, src/applied/applied.store.ts, src/wiring/own-agent.store.ts, src/factory/factory.store.ts, src/record/files.store.ts, src/place/place.store.ts, src/workspace/worktree.store.ts, src/folder/write.store.ts, src/folder/lookup.store.ts, src/branches/branches.store.ts, src/branches/changes.store.ts, src/feed/feed.store.ts, src/standing/standing.store.ts, src/door/door.store.ts, src/runs/runs.store.ts, src/level/level.store.ts, src/rules/rules.store.ts, src/servers/servers.store.ts, src/factories/factories.store.ts, src/cards/cards.store.ts, src/folder/version.store.ts, src/workflows/workflows.store.ts, src/templates/templates.store.ts',
+    'src/agents/agents.store.ts imports src/inbox/inbox.store.ts, which the tree does not let it: of the store it imports src/record/places.store.ts, src/skills/read.store.ts, src/meter/tally.store.ts, src/config/config.store.ts, src/config/root.store.ts, src/agents/read.store.ts, src/folder/folder.store.ts, src/record/steps.store.ts, src/revisions/revisions.store.ts, src/record/record.store.ts, src/pause/pause.store.ts, src/schedule/schedule.store.ts, src/applied/applied.store.ts, src/wiring/own-agent.store.ts, src/factory/factory.store.ts, src/record/files.store.ts, src/place/place.store.ts, src/workspace/worktree.store.ts, src/folder/write.store.ts, src/folder/lookup.store.ts, src/branches/branches.store.ts, src/branches/changes.store.ts, src/feed/feed.store.ts, src/standing/standing.store.ts, src/door/door.store.ts, src/runs/runs.store.ts, src/level/level.store.ts, src/rules/rules.store.ts, src/servers/servers.store.ts, src/factories/factories.store.ts, src/cards/cards.store.ts, src/folder/version.store.ts, src/workflows/workflows.store.ts, src/templates/templates.store.ts, src/subscription/subscription.store.ts',
   ]);
   assert.deepEqual(treeBreaks(unimported('src/agents/agents.store.ts')), [
     "src/agents/agents.store.ts is imported by no controller and not by the client: a store file is the controllers' I/O",

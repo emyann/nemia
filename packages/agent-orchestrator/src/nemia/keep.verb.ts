@@ -19,7 +19,7 @@ import { ownOf } from '../tick/told.verb.ts';
 import { factoryMounts } from '../factory/factory.ts';
 import type { Mount } from '../record/record.ts';
 import { readFactories } from '../factory/factory.store.ts';
-import { feedSize } from '../feed/feed.store.ts';
+import { FeedDoor } from '../feed/feed.store.ts';
 import { SubscriptionDoor } from '../subscription/subscription.store.ts';
 import { SubscriptionName } from '../feed/feed.model.ts';
 import type { Refusal } from '../refusal/refusal.ts';
@@ -180,7 +180,7 @@ const ACTS: Record<NemiaAct, (e: Engine, id: string) => Effect.Effect<void, Refu
         task: id,
         selectors: [...NEMIA_SELECTORS],
         digestEvery: NEMIA_DIGEST_EVERY,
-        from: feedSize(),
+        from: (yield* (yield* FeedDoor).lines.end())?.cursor ?? 0,
         scope: { atLeast: NEMIA_FLOOR },
       });
     }),

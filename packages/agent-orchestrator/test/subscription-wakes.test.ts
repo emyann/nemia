@@ -24,7 +24,6 @@ import { Clock, Effect, Fiber, Layer, Logger, ManagedRuntime, Metric } from 'eff
 import { bell, until, WAITED } from 'agent-runtime/testing';
 import type { FeedLine, FeedWords } from '../src/feed/feed.ts';
 import { scratch } from './scratch.ts';
-import { StoreRoot } from '../src/config/root.store.ts';
 import { staged, story } from './story.ts';
 import { names } from './assessed.ts';
 

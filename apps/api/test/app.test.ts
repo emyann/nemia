@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from './scratch.ts';
 import { until } from './waits.ts';
-import { closeoutOf, objectOf, pageRead, specOf, stepOf, toldOf, triesOf } from './run-reads.ts';
+import { closeoutOf, linesOf, objectOf, specOf, stepOf, toldOf, triesOf } from './run-reads.ts';
 import { app } from '../src/app.ts';
 import {
   atWork,
@@ -469,19 +469,19 @@ test("a store's runs read on the list and on a run's page: each summarized with 
         timeline: oneTaskTotals(),
       },
     );
-    const page = await pageRead(app, 'r-2');
+    const lines = await linesOf(app, 'r-2');
     assert.deepEqual(
-      [page.decide, page.refresh, page.workflowPage, page.steps.map((s) => s.commands)],
+      [lines.decide, lines.refresh, lines.workflowPage, lines.steps],
       [
         'nemia decide r-2',
         'nemia refresh r-2',
         null,
-        [
-          { approve: 'nemia approve r-2 implement', retry: 'nemia retry r-2 implement', say: 'nemia say r-2 implement' },
-          { approve: 'nemia approve r-2 review', retry: 'nemia retry r-2 review', say: 'nemia say r-2 review' },
-        ],
+        {
+          implement: { approve: 'nemia approve r-2 implement', retry: 'nemia retry r-2 implement', say: 'nemia say r-2 implement' },
+          review: { approve: 'nemia approve r-2 review', retry: 'nemia retry r-2 review', say: 'nemia say r-2 review' },
+        },
       ],
-      "the lines a person types are the page's, not the object's; and a folder given by path the board pages on no address",
+      "the lines a person types are the lines read's, not the object's; and a folder given by path the board pages on no address",
     );
 
     const implementTry = {
@@ -843,7 +843,7 @@ test('a run whose workflow folder changes or vanishes after it starts is read of
       layers: null,
       taskParts: [{ kind: 'text', text: filedBrief('t-6') }],
     });
-    assert.deepEqual((await pageRead(app, 'r-6')).steps.find((s) => s.name === 'original')?.commands, {
+    assert.deepEqual((await linesOf(app, 'r-6')).steps.original, {
       approve: 'nemia approve r-6 original',
       retry: 'nemia retry r-6 original',
       say: 'nemia say r-6 original',
@@ -1792,15 +1792,15 @@ test("what a run established, read as the tick and `nemia ls` have it: each step
     },
   );
   await s.test(
-    "a run's detail answers its decide line, and each step's approve, retry and say lines, built off the command table",
+    "a run's lines read answers its decide line, and each step's approve, retry and say lines, built off the command table",
     async () => {
       seedLoop('r-34', 1, true);
       const entry = (name: string) => COMMANDS.find((c) => c.name === name)!;
-      const run = await pageRead(app, 'r-34');
+      const run = await linesOf(app, 'r-34');
       assert.equal(run.decide, commandLine(entry('decide'), { runId: 'r-34' }));
       assert.equal(run.decide, 'nemia decide r-34');
       assert.deepEqual(
-        run.steps.map((s) => [s.name, s.commands]),
+        Object.entries(run.steps),
         ['implement', 'review'].map((step) => [
           step,
           {
@@ -1810,7 +1810,7 @@ test("what a run established, read as the tick and `nemia ls` have it: each step
           },
         ]),
       );
-      assert.deepEqual(run.steps[1].commands, {
+      assert.deepEqual(run.steps.review, {
         approve: 'nemia approve r-34 review',
         retry: 'nemia retry r-34 review',
         say: 'nemia say r-34 review',

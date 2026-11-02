@@ -1,7 +1,7 @@
 /**
  * A journal that does not read is a check's, or an earlier try's, and not the step's own session's: the list marks the step whose check or
  * try it is `unreadable`, not the word its session's view would give; and the decision `nemia decide` shows (`GET
- * /api/runs/:runId/decision`) is refused as the run's page is, a 502 in the list's words — for a run waiting on such a run too — while a
+ * /api/runs/:runId/decision`) is refused as the run's object is, a 502 in the list's words — for a run waiting on such a run too — while a
  * run whose tasks read is answered. A pass has read where the runs' branches stand (`passStanding`), which the list reads off
  * `standing.json`.
  *
@@ -151,7 +151,7 @@ test("a check's or an earlier try's journal that does not read marks its step un
     },
   );
   await s.test(
-    "the decision `nemia decide` shows is refused as the run's page is, in the list's words, and answered for a run whose tasks read",
+    "the decision `nemia decide` shows is refused as the run's object is, in the list's words, and answered for a run whose tasks read",
     async () => {
       const runs = await listed();
       const child = runs.get('r-child')!.unreadable;

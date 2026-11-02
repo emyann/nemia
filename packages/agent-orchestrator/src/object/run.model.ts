@@ -109,9 +109,8 @@ export type RunMetadata = typeof RunMetadata.Type;
 
 /**
  * One step as the run froze it: what it waits on (`after`), whose declared output it is handed (`input`), and on a looping step the step
- * a round runs again and how many rounds it may run (`loop`, `rounds`; null on any other); then the rest of its frontmatter the page shows
- * (`StepSpec`, page.verb.ts), each null where the step does not set it: `fence` is the fence word the run froze for its session, said in
- * this layer's word.
+ * a round runs again and how many rounds it may run (`loop`, `rounds`; null on any other); then the rest of its frontmatter the board
+ * shows, each null where the step does not set it: `fence` is the fence word the run froze for its session, said in this layer's word.
  */
 export const RunSpecStep = Schema.Struct({
   name: Schema.String,
@@ -337,15 +336,15 @@ const Said = Schema.Struct({
   after: Schema.optionalKey(Schema.NullOr(Schema.Struct({ kind: Schema.Literals(SAID_AFTER), id: Schema.String }))),
 });
 
-/** A step's cap, and what its tries have cost of it (`StepBudget`, page.verb.ts). */
+/** A step's cap, and what its tries have cost of it. */
 const StepBudget = Schema.Struct({ usd: Schema.Finite, said: Schema.String, of: NullString, over: Schema.Boolean });
 
 /**
  * A step now: where it stands as codes and in its word, the raise of its cap the package takes (null where none), its tries on the clock
- * (`TimelineTry`), the short of its current try (null while it has none); then all the run's page shows of it but its tries whole and
- * what it was told — its task and place, its folder's files, its note, what it needs of a person, its gate, what was said to it and asked
- * of it, its current try's check and attempts, and what it used, cost and may cost (`RunDetail['steps']`, page.verb.ts). The lines a
- * person types for it are the command table's, not the step's: the page builds them.
+ * (`TimelineTry`), the short of its current try (null while it has none); then all the board shows of it but its tries whole and what
+ * it was told (its sub-resources) — its task and place, its folder's files, its note, what it needs of a person, its gate, what was said
+ * to it and asked of it, its current try's check and attempts, and what it used, cost and may cost. The lines a person types for it are
+ * the command table's, not the step's: the lines read beside the object builds them (`runLines`, lines.verb.ts).
  */
 export const RunStepStatus = Schema.Struct({
   name: Schema.String,
@@ -430,9 +429,9 @@ const Drift = Schema.Struct({
 /**
  * The run now: the runs list's judged fields (`judgedFields`) — its word and codes, whether it moves, its cost, time at work and tokens,
  * what it waits on, its hold and what a person has to decide — then its graph, where its time went as a whole (`Timeline`'s rounds, run
- * and slot), and each step; and the rest of what its page shows of it but the lines to type, which are the command table's: when it
+ * and slot), and each step; and the rest of what the board shows of it but the lines to type, which are the command table's: when it
  * started and was called off, what a prune took and would find, the runs it is held until, what its sessions read, who it waits on, its
- * gates, a warning on its folder, and the kinds it is behind the files on (`RunDetail`, page.verb.ts).
+ * gates, a warning on its folder, and the kinds it is behind the files on.
  */
 export const RunStatus = Schema.Struct({
   status: Schema.Literals(RUN_STATUSES),

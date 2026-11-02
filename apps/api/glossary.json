@@ -82,7 +82,7 @@
     {
       "term": "Phase / reason / message",
       "meaning": "what each step and each try carries at the api: its `phase` and its `reason`, the codes a reader groups and compares, and its `message`, the sentence a person reads and nothing compares.",
-      "type": "RunDetail",
+      "type": "RunAnswer",
       "see": {
         "label": "The api",
         "href": "/map/#the-api"
@@ -90,7 +90,7 @@
     },
     {
       "term": "Try cause",
-      "meaning": "a try's `cause` on a run's detail (`StepTry.cause`): why the try was moved behind, one of the run core's `TryCause`, and null on the current try.",
+      "meaning": "a try's `cause` on a step's tries (`StepTry.cause`): why the try was moved behind, one of the run core's `TryCause`, and null on the current try.",
       "see": {
         "label": "Trying again",
         "href": "/workflows/#trying-again"
@@ -108,7 +108,7 @@
     {
       "term": "Waiting on you",
       "meaning": "`waitingOnYou`: the steps of a run that wait on a person, in order; `waitingOnYouWords`, the same steps as `nemia ls` names them (`approve plan` for a step at its gate); and, on a run's `--after` wait and its hold, `waitingOnYou` whether only a person ends it.",
-      "type": "RunDetail",
+      "type": "RunAnswer",
       "retired": [
         {
           "spelling": "onYou",

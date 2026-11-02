@@ -53,7 +53,7 @@ const oneStep = (id: string, harness: string, taskId: string): Run => {
   return run as unknown as Run;
 };
 
-test("a run's detail names the remote agent a try was sent to, and where, with no query string — and no address for a name the file no longer declares", async () => {
+test("a run's object names the remote agent a try was sent to, and where, with no query string — and no address for a name the file no longer declares", async () => {
   write(path.join(root, 'a2a-agents.json'), JSON.stringify({ reviewer: { url: 'https://agents.example.com/reviewer?key=s3cret' } }));
   completed('t-remote', 'a2a:reviewer');
   oneStep('r-remote', 'a2a:reviewer', 't-remote');
@@ -64,8 +64,8 @@ test("a run's detail names the remote agent a try was sent to, and where, with n
   assert.deepEqual(ask.filed?.remote, { name: 'reviewer', address: 'https://agents.example.com/reviewer' });
   assert.equal(ask.filed?.runsIn, null, "no mode: the agent runs under its own party's fence");
   assert.equal(text.includes('s3cret'), false, 'the query string, which can carry a key, is on no answer: the object');
-  for (const sub of ['steps/ask/tries', 'steps/ask/tries/1', 'steps/ask/tries/1/closeout', 'steps/ask/told', '?view=page']) {
-    const read = await app().request(`/api/runs/r-remote${sub.startsWith('?') ? '' : '/'}${sub}`);
+  for (const sub of ['steps/ask/tries', 'steps/ask/tries/1', 'steps/ask/tries/1/closeout', 'steps/ask/told', 'lines']) {
+    const read = await app().request(`/api/runs/r-remote/${sub}`);
     assert.equal(read.status, 200, sub);
     assert.equal((await read.text()).includes('s3cret'), false, `nor on ${sub}`);
   }

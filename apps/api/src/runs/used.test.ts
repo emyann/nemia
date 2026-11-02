@@ -122,7 +122,7 @@ const statusOf = async (id: string) => (await objectOf(app(), id)).status;
 /** The step `name` of the run `R`'s object. */
 const stepNamed = async (name: string) => stepOf(await objectOf(app(), R), name);
 
-test("a run's page says what its sessions read: each step's classes, peak and rebuilt caches, and the run's own beside its cost", async (t) => {
+test("a run's object says what its sessions read: each step's classes, peak and rebuilt caches, and the run's own beside its cost", async (t) => {
   const s = story(t);
   await s.test(
     "a step's reads: its classes summed over its attempts, its peak at its `context:` cap, and the resumed session that rebuilt its cache",

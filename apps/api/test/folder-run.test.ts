@@ -20,7 +20,7 @@ import { Effect } from 'effect';
 import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from 'agent-orchestrator/testing';
 import { appOver, beforeEachTest, eachTest, engineFor } from './placed.ts';
-import { objectOf, pageRead, specOf, stepOf } from './run-reads.ts';
+import { linesOf, objectOf, specOf, stepOf } from './run-reads.ts';
 
 const stand = eachTest(testPlace);
 const standIn = eachTest(testEngine);
@@ -164,7 +164,7 @@ test("a folder run read on the board: listed by its kind and place, its page wit
       );
       const [write] = object.status.steps;
       assert.deepEqual([write.name, write.workspace, write.branch], ['write', path.join(work, 'write'), null]);
-      const { fromNote } = await pageRead(app(), 'f-notes');
+      const { fromNote } = await linesOf(app(), 'f-notes');
       for (const said of [object.status.warning, fromNote, ...object.status.steps.map((s) => s.note)]) {
         if (typeof said === 'string')
           assert.doesNotMatch(said, GIT_WORD, `the sentences it carries, what the board reads out loud, name no git: ${said}`);

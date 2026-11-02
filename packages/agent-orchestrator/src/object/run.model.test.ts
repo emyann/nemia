@@ -24,8 +24,8 @@ import {
 } from './run.model.ts';
 import type { judgedFields } from '../summary/summary.verb.ts';
 import type { ObjectGraph } from '../summary/graph.ts';
-import type { Timeline } from '../timeline/index.ts';
-import type { RunDetail, StepTimelineTotal, StepTimelineTry } from '../resource/page.verb.ts';
+import type { Timeline, TimelineTotal, TimelineTry } from '../timeline/index.ts';
+import type { Spent } from '../summary/judged.verb.ts';
 import type * as Tries from '../resource/tries.verb.ts';
 import type { StepCheck as CheckType } from '../resource/checks.verb.ts';
 import type { StepUsed as UsedType } from '../resource/usage.ts';
@@ -42,12 +42,18 @@ type Judged = ReturnType<typeof judgedFields>;
 /** The status's judged fields are the list row's, by type, both ways: no field of either spelled apart. */
 const judgedSame: Same<Pick<RunStatus, keyof Judged>, Judged> = true;
 const graphSame: Same<RunStatus['graph'], ObjectGraph> = true;
-const timelineSame: Same<RunStatus['timeline'], { rounds: StepTimelineTotal[]; run: StepTimelineTotal; slot: Timeline['slot'] }> = true;
-const stepTimelineSame: Same<RunStepStatus['timeline'], StepTimelineTry[]> = true;
+/** A round's or the run's totals, with what it cost; a try's span, with what its sessions used, as the timeline judges them. */
+type CostedTotal = TimelineTotal & { cost: Spent | null };
+type UsedTry = Omit<TimelineTry, 'used'> & { used: UsedType | null };
+const timelineSame: Same<RunStatus['timeline'], { rounds: CostedTotal[]; run: CostedTotal; slot: Timeline['slot'] }> = true;
+const stepTimelineSame: Same<RunStepStatus['timeline'], UsedTry[]> = true;
 const stepWordSame: Same<RunStepStatus['status'], StepStatus> = true;
 const modesSame: Same<StepRaise['modes'][number], RetryMode> = true;
 
-/** A sub-resource's answer, by its Schema, is what the package builds it as, both ways (tries.verb.ts, told.verb.ts and the page's). */
+/**
+ * A sub-resource's answer, by its Schema, is what the package builds it as, both ways (tries.verb.ts, told.verb.ts, usage.ts,
+ * checks.verb.ts).
+ */
 const subResourcesSame = [
   true satisfies Same<StepTry, Tries.StepTry>,
   true satisfies Same<StepTries, { tries: Tries.StepTry[] }>,
@@ -57,7 +63,6 @@ const subResourcesSame = [
   true satisfies Same<StepCheck, CheckType>,
   true satisfies Same<StepUsed, UsedType>,
   true satisfies Same<StepTold, ReturnType<typeof toldOf> & { body: string | null }>,
-  true satisfies Same<RunStatus['kinds'], RunDetail['kinds'][number][]>,
 ];
 
 /** A Schema imported from JSON Schema, typed `Top` with its services unknown, as the decoder it is: built from JSON alone, it asks none. */

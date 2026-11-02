@@ -32,6 +32,8 @@ const OWN: Readonly<Record<string, string>> = {
   'GET /api/daemon': "the daemon's standing, read off its lease file: whether anything ticks the store at all",
   'GET /api/quota': "the harness's quota, asked by the app's asker, which it keeps between requests",
   'GET /api/feed/stream': "a stream of the feed, held open for as long as the board reads it: the api's counterpart of nemia watch",
+  'GET /api/runs/:runId/lines':
+    "a run's command lines and its workflow page's address, built off the command table and the run's record: an api address and command text, no command's answer",
   'GET /api/runs/:id/steps/:step/transcript/stream': "a stream of a step's transcript, held open for as long as the board reads it",
   'GET /api/machines': 'the state machines the board draws, read off their code: no run, no store',
   'GET /api/machines/:name': "one state machine's graph, read off its code: no run, no store",

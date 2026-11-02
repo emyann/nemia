@@ -18,7 +18,9 @@
  * - `runList`, `stats`: `GET /api/runs` and `GET /api/stats`, asked of the api in this process (`app.request`), over an app built
  *   afresh for each cold call (its `ReadMemo` new) and kept for the warm ones.
  * - `finishedRun`, `openRun`: `GET /api/runs/:id` of the newest run finished and of the newest still open, by `createdAt`; null where
- *   the store has none.
+ *   the store has none. The route answers the run object (`runObject`), and only it: `baselines/s1.json` and `s2.json` timed the run's
+ *   page, which that route answered then and which is gone, so a `--compare` of these two against either sets two different answers
+ *   side by side, not one answer before and after.
  * - `feedFromCursor`: `GET /api/feed/stream` from the cursor `FEED_BACK` lines before the workflow feed's end, read until its last line
  *   came, then let go.
  *
@@ -45,7 +47,7 @@ import {
   type Refusal,
 } from './fence.ts';
 
-/** The five reads, the run's page counted twice: each a key of the report's `measures`. */
+/** The five reads, the run's object counted twice: each a key of the report's `measures`. */
 export const MEASURES = ['tickPass', 'runList', 'stats', 'finishedRun', 'openRun', 'feedFromCursor'] as const;
 
 /** A read the report measures. */
@@ -352,13 +354,13 @@ async function measure(asked: Asked, root: string, fence: Fence) {
   const finishedRun = newestOf(listing, true);
   const openRun = newestOf(listing, false);
   const feed = feedOf(wf);
-  const pageOf = (id: string | null) =>
+  const objectOf = (id: string | null) =>
     id === null ? null : overApps(fresh, (app) => getJson(app, `/api/runs/${encodeURIComponent(id)}`), repeat);
   const measures: Record<MeasureKey, Measured | null> = {
     runList: await overApps(fresh, (app) => getJson(app, '/api/runs'), repeat),
     stats: await overApps(fresh, (app) => getJson(app, '/api/stats'), repeat),
-    finishedRun: await pageOf(finishedRun),
-    openRun: await pageOf(openRun),
+    finishedRun: await objectOf(finishedRun),
+    openRun: await objectOf(openRun),
     feedFromCursor: await overApps(fresh, (app) => feedStreamed(app, feed), repeat),
     tickPass: null,
   };

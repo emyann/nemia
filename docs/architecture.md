@@ -245,15 +245,16 @@ words the board's answer. Both sides hand a handler only what its one spec gives
   `src/workflow/step-file.ts`); the refusals' words stay the orchestrator's. The board's form offers the runtime's own words per key
   and harness, `HARNESS_CHOICES` from the same door, which the root entry re-exports for the api;
 
-**In the orchestrator, moved down from the api**: the run page's judgement (`runPage`, `packages/agent-orchestrator/src/resource/`:
-a step's tries, closeouts, checks, told layers, files and usage, and `runsInOf` reading a harness's argv for a mode), and the run as
-one object (`RunObject.Run`, an Effect Schema in `src/object/run.model.ts`, built by `runParts` in `src/object/run.verb.ts` off one
-read of the run, from the list's judged fields, `judgedFields`, and the one raise, `stepRaise`). The object carries all the page shows
-but each step's tries whole and what it was told, which are its sub-resources, each answered by a Schema of its own (`StepTries`,
-`StepTry`, `TryCloseout`, `StepTold`). `GET /api/runs/:id` answers the object, the route of the run's one entry of the command table
-(`show`, served on both sides, its `--raw` record the CLI's alone), so the api's tests read the object and its sub-resources. Until the
-board reads the object, the same route answers the page under `?view=page` (`runPage`, projected from the object and those
-sub-resources by `pageOf`), and `apps/api/src/detail/` keeps only type re-exports of the page for the board's hand mirror; the api
+**In the orchestrator, moved down from the api**: the judgement of a run's steps (`packages/agent-orchestrator/src/resource/`: a
+step's tries, closeouts, checks, told layers, files and usage, and `runsInOf` reading a harness's argv for a mode), and the run as one
+object (`RunObject.Run`, an Effect Schema in `src/object/run.model.ts`, built by `runObject` in `src/object/run.verb.ts` off one read of
+the run, from the list's judged fields, `judgedFields`, and the one raise, `stepRaise`). The object carries all the board shows but
+each step's tries whole and what it was told, which are its sub-resources, each answered by a Schema of its own (`StepTries`,
+`StepTry`, `TryCloseout`, `StepTold`), and the lines a person types, which are the command table's (`runLines`, `src/object/lines.verb.ts`).
+`GET /api/runs/:id` answers the object, the route of the run's one entry of the command table (`show`, served on both sides, its
+`--raw` record the CLI's alone), and refuses any `?view=` with a 422 naming what to read instead. The board reads the object, each
+step's tries and told at `…/steps/:step/tries` and `…/steps/:step/told`, keyed by the step's stamp so a step reads again only when it
+moved, and the lines once at `GET /api/runs/:id/lines` (`RunLinesAnswer`, mirrored by hand); the api's tests read the same. The api
 serves the object's sub-resources from the command table and its OpenAPI 3.1 document, generated from the Schemas, names the run's path
 and theirs (`apps/api/src/openapi/`, printed by its `print.ts`). The board's run mirror is generated from
 that document by Effect's own modules (`apps/web/src/lib/api/run.gen.ts`, written by `npm run mirror` in `apps/web`), checked in, and
@@ -551,7 +552,7 @@ the entry files, `main.ts`, `app.ts` and `layer.ts`, which may read the environm
 which import no node:fs (nor fs/promises), node:child_process, node:http, node:https, node:net or node:os, nor `@hono/node-server`,
 and read neither `process.env` nor `fetch`. A reader that does today is listed with what it reaches (`MOVES`), and the list only
 shrinks. Its `src/` is a folder per page or verb a
-person uses — `runs/`, `detail/`, `openapi/`, `steps/`, `decide/`, `asks/`, `inbox/`, `factory/`, `capabilities/`, `workflows/`,
+person uses — `runs/`, `openapi/`, `steps/`, `decide/`, `asks/`, `inbox/`, `factory/`, `capabilities/`, `workflows/`,
 `agents/`. The root holds `main.ts`, `app.ts`, `port.ts`, `guard.ts`, `store.ts`, `layer.ts` (the services a handler reads, and
 `served`, which runs it on the app's `ManagedRuntime`) and `body.ts` (the request-body reader every folder uses) and nothing else.
 A folder holds at most six source files; one of two or more has a face, `index.ts`, which holds only re-exports by name, and one of

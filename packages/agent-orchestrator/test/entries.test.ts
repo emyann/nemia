@@ -533,7 +533,6 @@ const PINNED: Record<string, string[]> = {
     'taskPhasesRead',
     'tickRun',
     'refusedName',
-    'runPage',
     'runObject',
     'runLines',
     'tailOf',

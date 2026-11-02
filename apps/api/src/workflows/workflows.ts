@@ -60,8 +60,8 @@ import type { PlaceService } from 'agent-orchestrator';
 export type WorkflowSource = 'repo' | 'yours';
 
 /**
- * A step's frontmatter as the loader read it, before any run has frozen it: `null` where the step does not set it. The
- * run's page has `StepSpec`, the keys a run shows; this has every key, since choosing a workflow is reading them.
+ * A step's frontmatter as the loader read it, before any run has frozen it: `null` where the step does not set it. The run object has
+ * its steps' frozen spec (`spec.steps`), the keys a run shows; this has every key, since choosing a workflow is reading them.
  */
 export type WorkflowStepSpec = {
   harness: string | null;

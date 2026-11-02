@@ -1,5 +1,5 @@
 /**
- * One read of a run, shared by its page (`runPage`), its object (`runObject`) and its sub-resources (the tries, a try, its closeout, what a
+ * One read of a run, shared by its object (`runObject`) and its sub-resources (the tries, a try, its closeout, what a
  * step was told): the views of its tasks over one look at the harnesses, what the run is judged as off them, its checks, the feed's filing
  * times and its clock — each read once, and each step's current try and its tries judged off them alike.
  */

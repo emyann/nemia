@@ -4,7 +4,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { decideLine, refreshLine, runLines } from './lines.ts';
+import { decideLine, refreshLine, runLines } from './lines.verb.ts';
 import { commandLine } from '../command/command.ts';
 import { COMMANDS } from '../command/commands.verb.ts';
 import { aRun } from '../../test/run-walks.ts';

@@ -74,8 +74,9 @@ export const entryRemoved = assume(withoutEntry, {
 const wiringRefusalSpec = spec<(factory: Factory, change: WiringChange) => WiringRefused | null>({
   /**
    * Whether a hire into a workflow the factory offers is refused turns on whether its step and agent are names
-   * (`hireRefusal`), which reads a pattern the verifier does not, so it is declared and not proved pure (`hireNamed`): a law
-   * that asks it cannot say what the code was told. Left to the code, and held by `hireRefusal`'s tests
+   * (`hireRefusal`), declared not pure (`hireNamed`, `pure: false`), so a law that asks it cannot say what the code was told.
+   * It cannot be declared pure: the verifier refuses `pure: true`, since it calls `stepNameRefusal`, which calls
+   * `new TextEncoder().encode`, a method the purity check cannot see into. Left to the code, and held by `hireRefusal`'s tests
    * (`src/factory/factory.test.ts`). What a refusal is refused as is said by the laws below.
    */
   open: ['output'],

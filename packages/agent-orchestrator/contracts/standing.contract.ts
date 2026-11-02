@@ -40,8 +40,9 @@ const standingSpec = spec<Stands>({
    * Whether a step is held is left to the code where it turns on what `phaseOf`, `closeoutOf`, `askedCloseout`, `spendOf` and
    * `verdictOf` say: a blocked step whose session has settled, a check that refused, a looping step's round, an ending not
    * yet filed. The verifier reads each callback as answering anew on each call, so a law that asks one cannot say what the
-   * code was told; held by `src/status/status.test.ts` until a callback can be declared pure (tsverify's `docs/roadmap.md`,
-   * "A function the code is given, declared pure where a spec says so").
+   * code was told; held by `test/assess-retries.test.ts` and `test/assess-rounds.test.ts` (over budget) and
+   * `test/assess-gates.test.ts` and `test/assess-endings.test.ts` (awaiting approval) until a callback can be declared pure
+   * (tsverify's `docs/roadmap.md`, "A function the code is given, declared pure where a spec says so").
    */
   open: ['output.status'],
   ensures: {
@@ -152,7 +153,8 @@ const ownStatusSpec = spec<
   /**
    * Every status but pending turns on what `phaseOf`, `closeoutOf`, `askedCloseout` and `spendOf` say of its task, which the
    * verifier reads as answering anew on each call, so a law that asks one cannot say what the code was told; held by
-   * `src/status/status.test.ts` until a callback can be declared pure (tsverify's `docs/roadmap.md`, "A function the code is
+   * `test/assess-lifecycle.test.ts`, `test/assess-closeouts.test.ts`, `test/assess-retries.test.ts` and
+   * `test/assess-rounds.test.ts` until a callback can be declared pure (tsverify's `docs/roadmap.md`, "A function the code is
    * given, declared pure where a spec says so").
    */
   open: true,

@@ -66,8 +66,7 @@ export default {
       await photograph(step.other, path.join(OUT, `removed-step-${await themeOf(step.other)}.png`), { fullPage: true });
 
       const refused = `request answered 404: GET ${new URL(`/api/runs/${id}`, page.url()).href}`;
-      // The feed's `removed` reads every step's tries and told again too (`keysOf`), each a 404 of the same run gone.
-      const steps = new RegExp(
+      const stepsReadAgainOnRemoved = new RegExp(
         `^request answered 404: GET ${literal(new URL(`/api/runs/${id}/steps/`, page.url()).href)}[^/]+/(tries|told)$`,
       );
       for (const [{ problems }, where] of [
@@ -78,7 +77,7 @@ export default {
         const others = seen.filter(
           (p) =>
             p !== refused &&
-            !steps.test(p) &&
+            !stepsReadAgainOnRemoved.test(p) &&
             !/^console error: Failed to load resource: the server responded with a status of 404\b/.test(p),
         );
         if (!seen.includes(refused) || others.length)

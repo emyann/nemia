@@ -127,7 +127,11 @@ it holds today that is a candidate for the runtime is in `docs/architecture.md`,
   The door's read and write find a workflow's agents and skills through the Agent and Skill doors, so a program given
   `agentDoorMemory()` and a store's root reads a files workflow's agents from the memory; `workflowDoorMemory(defs?)` takes the agent
   and skill doors it reads through (`doorFrom`, `test/door-walks.ts`), and given none yields the program's, rooted. The version
-  (`workflowVersion`) still reads the files' agents.
+  (`workflowVersion`, a program) finds them through the same doors, an agent's skills counted as found beside the workflow
+  (`AgentAt.skills`), and so do the pass's revisions (`passRevisions`, a `Cache` per read) and the start: a test that runs a start,
+  a pin or a version gives it `StoreRoot` or the doors' memory. Its digest is the files' reader's but in two cases, each pinned run
+  reading as drifted once: an `agent:` name `AgentName` refuses reads as missing, and an added skill whose `SKILL.md` is no regular
+  file as null.
 - **An agent and a skill are read and written through the Agent and Skill doors (`AgentDoor`, `src/agents/agent-door.store.ts`;
   `SkillDoor`, `src/skills/skill-door.store.ts`), rooted as the Factory door is**: a handler that yields one runs through `rooted`, and a
   test that only needs an agent or a skill to exist gives its program `agentDoorMemory()` or `skillDoorMemory()` (`anAgent`,

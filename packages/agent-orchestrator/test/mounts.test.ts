@@ -2,8 +2,8 @@
  * The folders a step is filed beyond its workspace, on every filing — a person's stories on the stage (`story.ts`). A run started in a
  * factory freezes every repository of it but its own on its record, read-only (`factoryMounts`); a step's `writable:` folder is filed
  * writable for that step alone (`stepMounts`); a step whose `reads:` names the inbox is filed the store's inbox (`readsMounts`); a run
- * given an input files its inputs folder (`inputsMounts`); and a step after another the folder each step before it handed over
- * (`handedMounts`). Each is read-only but the writable one, on the first filing, a try and a round, and named on the brief as it is
+ * given an input files its inputs folder (`inputsMounts`); a step whose mode writes outside its directory only by rule its own files
+ * directory (`ownMounts`); and a step after another the folder each step before it handed over (`handedMounts`). Each is read-only but the writable one, on the first filing, a try and a round, and named on the brief as it is
  * mounted (`mountsLine`, `unnamed`); a later step reads what was handed and writes none of it, as Claude Code holds a mount (`readsAt`,
  * `writesAt`, in `mounted.ts`). Then where a run mounts less: the default factory, a factory of one repository, a folder gone at start,
  * a folder team, a remote agent, a run given no input.
@@ -26,6 +26,7 @@ import { factoryMounts, stepMounts } from '../src/factory/factory.ts';
 import { mountsLine } from '../src/start/index.ts';
 import { inputsMounts, readsMounts } from '../src/filed/filed.ts';
 import { handedMounts } from '../src/artifacts/artifacts.ts';
+import { writesOutsideByRule } from '../src/workflow/index.ts';
 import { parseWorkflow, agentsDir } from '../src/workflow.ts';
 import { loadAgents } from '../src/agents/read.store.ts';
 import { Invalid } from '../src/refusal/refusal.ts';
@@ -196,21 +197,25 @@ test('mounts on every filing: a factory run whose implement writes one folder of
   });
 
   await s.test(
-    'review reads every folder of the factory, what implement handed over and the inputs, and writes none; no inbox, and its own folder held by none',
+    'review reads every folder of the factory, its own folder, what implement handed over and the inputs, and writes none; no inbox',
     async () => {
       stage.board().end(tried, 'succeeded', { closeout: SIGNED, nativeId: null });
       await pass(id);
       const review = filedFor(id, 'review');
       const handed = artifactsDir({ id }, 'implement');
-      assert.deepEqual(review.config?.mounts, readOnly(web, docs, handed, inputs));
+      const ownDir = artifactsDir({ id }, 'review');
+      assert.deepEqual(
+        review.config?.mounts,
+        readOnly(web, docs, ownDir, handed, inputs),
+        'review runs in dontAsk: its own folder, read-only',
+      );
       assert.ok(fs.statSync(handed).isDirectory(), "implement's folder is there when the step after it is filed");
       const config = review.config as Filed;
-      for (const file of [path.join(web, 'a.ts'), path.join(docs, 'a.ts'), path.join(handed, 'shot.png'), path.join(inputs, 'x.md')]) {
+      const own = path.join(ownDir, 'page.yml');
+      for (const file of [path.join(web, 'a.ts'), path.join(docs, 'a.ts'), own, path.join(handed, 'shot.png'), path.join(inputs, 'x.md')]) {
         assert.ok(readsAt(config, file), file);
         assert.equal(writesAt(config, file), false, file);
       }
-      const own = path.join(artifactsDir({ id }, 'review'), 'shot.png');
-      assert.equal(mountHolds(config, own, true) || mountHolds(config, own, false), false, 'its own folder is mounted by none');
       assert.deepEqual(unnamed(review), [], review.brief);
       names(review.brief, `\`${handed}\` (implement's)`, '`template-draft.md`');
       assert.doesNotMatch(review.brief, /Folders of this factory[^\n]*artifacts/, 'no handed folder said as a factory folder');
@@ -265,7 +270,7 @@ test('where a run mounts less: the default factory and a factory of one reposito
   const { repos, team, plain, notes } = fresh();
 
   await s.test(
-    'a run in the default factory, or in a factory of one repository, given no input, mounts nothing but what implement handed over',
+    "a run in the default factory, or in a factory of one repository, given no input, mounts nothing but review's own folder and what implement handed over",
     async () => {
       addFactory({ name: 'solo', repos: [repos[0]] });
       attachWorkflow({ factory: 'solo', workflow: 'plain' });
@@ -281,7 +286,11 @@ test('where a run mounts less: the default factory and a factory of one reposito
         stage.board().settle(first.id, 'succeeded', SIGNED);
         await pass(run.id);
         const review = filedFor(run.id, 'review');
-        assert.deepEqual(review.config?.mounts, readOnly(artifactsDir(run, 'implement')), `${String(factory)}: implement's folder alone`);
+        assert.deepEqual(
+          review.config?.mounts,
+          readOnly(artifactsDir(run, 'review'), artifactsDir(run, 'implement')),
+          `${String(factory)}: review's own folder and implement's alone`,
+        );
         assert.doesNotMatch(review.brief, /Folders of this factory/, String(factory));
       }
     },
@@ -508,7 +517,7 @@ test('the folders a step is filed, read by their pure functions and by the model
   });
 
   await t.test(
-    "the tests' team: a later step reads, and never writes, what each step it comes after handed over; its own folder is held by none",
+    "the tests' team: a later step reads, and never writes, what each step it comes after handed over; its own folder only where its mode writes outside by rule",
     () => {
       const review = filed.get('review')!;
       const ship = filed.get('ship')!;
@@ -519,9 +528,11 @@ test('the folders a step is filed, read by their pure functions and by the model
         assert.equal(writesAt(ship, handedBy(by)), false, `ship writes none of ${by}'s`);
       }
       assert.equal(readsAt(filed.get('implement')!, handedBy('review')), false, 'implement comes after nothing');
+      const ruled = [...filed.keys()].filter((name) => writesOutsideByRule(team.find((s) => s.name === name)!.permissionMode));
+      assert.ok(ruled.includes('review') && !ruled.includes('implement'), ruled.join(', '));
       for (const [name, config] of filed) {
-        assert.equal(mountHolds(config, handedBy(name), true), false, `${name}'s own folder, read-only`);
-        assert.equal(mountHolds(config, handedBy(name), false), false, `${name}'s own folder, writable`);
+        assert.equal(mountHolds(config, handedBy(name), true), ruled.includes(name), `${name}'s own folder, read-only`);
+        assert.equal(mountHolds(config, handedBy(name), false), false, `${name}'s own folder, writable by none`);
       }
     },
   );
@@ -531,10 +542,11 @@ test('the folders a step is filed, read by their pure functions and by the model
     () => {
       const steps = stepsOf({ a: 'permissionMode: dontAsk', b: 'permissionMode: dontAsk', c: 'after: a', d: 'after: b, c' });
       const diamond = filedOf(steps);
-      const reads = (name: string) => ['a', 'b', 'c', 'd'].filter((by) => readsAt(diamond.get(name)!, handedBy(by)));
+      const reads = (name: string) => ['a', 'b', 'c', 'd'].filter((by) => by !== name && readsAt(diamond.get(name)!, handedBy(by)));
       assert.deepEqual(reads('c'), ['a'], "never its sibling b's nor d's after it");
       assert.deepEqual(reads('d'), ['a', 'b', 'c'], 'b and c, and a through c');
       assert.deepEqual([reads('a'), reads('b')], [[], []]);
+      assert.ok(readsAt(diamond.get('a')!, handedBy('a')), 'a, in dontAsk, reads its own folder, and no other');
       assert.deepEqual(
         handedMounts(steps[3], steps, RUN_ARTIFACTS),
         readOnly(...['a', 'b', 'c'].map((by) => path.join(RUN_ARTIFACTS, by))),

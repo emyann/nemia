@@ -201,11 +201,11 @@ test("say's words are every argument after its step, joined", () => {
 test('a flag is read wherever it stands among the positionals: a switch, a valued flag and a repeated flag, before them as after', async (t) => {
   const rows: readonly (readonly [row: string, spec: Spec, after: readonly string[], before: readonly string[]])[] = [
     ['a switch', HOLDING, ['r-1', '--off'], ['--off', 'r-1']],
-    ['a valued flag', SPEC, ['r-1', 'impl', '--who', 'ada'], ['--who', 'ada', 'r-1', 'impl']],
+    ['a valued flag', SPEC, ['r-1', 'impl', '--who', 'bo'], ['--who', 'bo', 'r-1', 'impl']],
     ['a valued flag between the positionals', SPEC, ['r-1', 'impl', '--note=hi'], ['r-1', '--note=hi', 'impl']],
     ['a repeated flag', HOLDING, ['r-1', '--until', 'a', '--until', 'b'], ['--until', 'a', 'r-1', '--until', 'b']],
     ['show --raw', entry('show').spec, ['r-1', '--raw'], ['--raw', 'r-1']],
-    ['closeout --try', entry('closeout').spec, ['r-1', 'review', '--try', '1'], ['--try', '1', 'r-1', 'review']],
+    ['closeout --try', entry('closeout').spec, ['r-1', 'impl', '--try', '1'], ['--try', '1', 'r-1', 'impl']],
     ['retry --budget', RETRY.spec, ['r-1', '--budget', '5'], ['--budget', '5', 'r-1']],
   ];
   for (const [row, spec, after, before] of rows)
@@ -217,7 +217,7 @@ test('a flag is read wherever it stands among the positionals: a switch, a value
 });
 
 test('-- ends the flags: each word after it is a positional, whatever it starts with', () => {
-  assert.deepEqual(parseArgv(SPEC, ['--who', 'ada', '--', '--slow']), { mode: 'fast', runId: '--slow', who: 'ada' });
+  assert.deepEqual(parseArgv(SPEC, ['--who', 'bo', '--', '--slow']), { mode: 'fast', runId: '--slow', who: 'bo' });
   assert.deepEqual(parseArgv(SPEC, ['r-1', '--', '--slow']), { mode: 'fast', runId: 'r-1', step: '--slow' });
   assert.deepEqual(
     parseArgv(HOLDING, ['--', '-x']),
@@ -231,7 +231,7 @@ test('a flag the command has none of, or a positional past those it takes, is re
   assert.equal(refusalOf(['--loud', 'r-1']), 'UNKNOWN --loud');
   assert.equal(refusalOf(['--fast=yes', 'r-1']), 'UNKNOWN --fast=yes');
   assert.equal(refusalOf(['--nope', 'r-1'], HOLDING), 'UNKNOWN --nope', 'its run given, the flag is what it does not take');
-  assert.equal(refusalOf(['--who', 'ada', 'r-1', 'impl', 'extra']), 'UNKNOWN extra');
+  assert.equal(refusalOf(['--who', 'bo', 'r-1', 'impl', 'extra']), 'UNKNOWN extra');
   assert.equal(refusalOf(['--raw', 'r-1', 'r-2'], entry('show').spec), entry('show').spec.unknown('r-2'));
 });
 

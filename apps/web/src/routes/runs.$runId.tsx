@@ -23,10 +23,9 @@ import { KindsBehind } from '../components/KindsBehind';
 import { factoriesQuery, runGone } from '../lib/api';
 import { loadRun, useRunView, type RunView, type StepView } from '../lib/runView';
 import { untrustedFor, type UntrustedPlace } from '../lib/factories';
-import { answersOf, askedIn, gateOffered, stepAnchor } from '../lib/asks';
+import { askedIn, decideDrawn, gateOffered, stepAnchor } from '../lib/asks';
 import { barValue } from '../lib/bar';
 import { spentTitle } from '../lib/cost';
-import { decidableRun } from '../lib/decide';
 import { duration } from '../lib/canvas';
 import { clockCounts, inFlight, runClock, waitedMs } from '../lib/factory';
 import { useNow } from '../lib/useNow';
@@ -153,7 +152,7 @@ function Run({ run }: { run: RunView }) {
         </div>
       </header>
 
-      {(decidableRun(run) || answersOf(run).length > 0) && <Decide run={run} />}
+      {decideDrawn(run) && <Decide run={run} />}
 
       <section aria-label="The run's steps as a graph">
         <RunCanvas run={run} />

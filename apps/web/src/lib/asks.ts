@@ -9,6 +9,7 @@
 import type { Question, RunSummary, RunToDecide, StepCloseout } from './api';
 import type { RunView, StepView } from './runView';
 import { stepState } from './status.ts';
+import { decidableRun } from './decide.ts';
 import type { Frozen } from './frozen.ts';
 
 /** A step as the list gives it, or as a run's detail does, with what a session the harness blocked said last. */
@@ -214,6 +215,14 @@ export function askedOf(run: Offerable, step: string): { try: number; note: stri
   const asked = run.steps.find((s) => s.name === step);
   return asked?.asked ? { try: asked.asked.try, note: asked.note } : null;
 }
+
+/**
+ * Whether a run's page draws its Decide section: there is something to decide (`decidableRun`), something to answer (`answersOf`), or a
+ * try a person asked for, which the section notes until the tick files it (`askedOf`) — a run that runs again once its step is answered
+ * waits on nobody, and its note would else go with the section the moment the run is read again.
+ */
+export const decideDrawn = (run: Offerable & Pick<RunView, 'status'>): boolean =>
+  decidableRun(run) || answersOf(run).length > 0 || run.steps.some((step) => askedOf(run, step.name) !== null);
 
 /**
  * The amount a raise's box starts at: the first whole dollar above what the package says the budget has to pass (`StepRaise.above`) — $5

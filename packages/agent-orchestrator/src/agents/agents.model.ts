@@ -47,7 +47,10 @@ const descriptionRefusal = (description: string): string | undefined =>
 /**
  * A skill as its folder holds it, `<skills>/<name>/SKILL.md` (`skillDraftOf`): its name, the folder's; the card entry its frontmatter
  * gives (`skillEntryOf`) — a one-line description, required, and its title, tags and examples; whether it is loaded every turn
- * (`preload:`); and its instructions. What the Skill door writes, checked whole before a byte is written.
+ * (`preload:`); and its instructions. What the Skill door writes, checked whole before a byte is written: the draft a skill's form
+ * sends (`SkillDraft`), so it leaves out what its folder holds that no write of the door sets — its `applies:` globs (`appliesOf`), a
+ * frontmatter line the writer keeps as written (`renderSkill`), and its traceable rules, the `rules.json` beside it (`readSkillRules`),
+ * read where a session is told the skill. A card that writes either through the door adds it here.
  */
 export const Skill = Schema.Struct({
   name: SkillName.OnRead,

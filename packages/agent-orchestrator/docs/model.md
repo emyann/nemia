@@ -29,7 +29,8 @@ The diagram below is printed by the code (`src/model/diagram.model.ts`, through 
   tree written checked by `TemplateTreeWrite`; the model's `Template` (`src/templates/templates.model.ts`) is keyed by its source, and a
   factory's `template` is an `AppliedTemplate`, whose source names it. **S5c**, the Agent and Skill doors (`AgentDoor`,
   `src/agents/agent-door.store.ts`; `SkillDoor`, `src/skills/skill-door.store.ts`): one context read through the same lookup roots, the
-  model's `Skill` beside its `Agent`, whose `skills` are `SkillName`s, rooted as S5a's, which root a name is read from decided by
+  model's `Skill` beside its `Agent`, whose `skills` are `SkillName`s (a skill as its door writes it: its `applies:` line and its
+  `rules.json`, which no write of the door sets, are left out), rooted as S5a's, which root a name is read from decided by
   `lookedUp` (`contracts/lookup.contract.ts`) and a write judged against the version it was read at by `definitionVersionRefusal`
   (`contracts/definition-version.contract.ts`); the callers still on their stores are counted in `test/agent-door.baseline.ts`. A run's `pinned` revisions, left out of `Run` today, are named there.
 - **S6, the subscription, the ledger and the feed**, each behind a door on the feed's model.

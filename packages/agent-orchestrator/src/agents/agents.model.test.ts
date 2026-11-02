@@ -35,7 +35,7 @@ test("an agent's name is checked on create by agentNameRefusal's rule and read a
 
 test("a skill's name is checked on create by skillNameRefusal's rule and read as any string", async (t) => {
   await t.test('refuses what skillNameRefusal refuses', () => {
-    for (const name of ['../agents', 'Review', 'a_b', '.hidden', '', 'x'.repeat(65)])
+    for (const name of ['../agents', 'Review', 'a_b', '.hidden', 'trailing-', '', 'x'.repeat(65)])
       assert.equal(Option.isNone(SkillName.create.option(name)), true, JSON.stringify(name));
   });
   await t.test("takes each skill of the tests' team, and one of 64 characters", () => {

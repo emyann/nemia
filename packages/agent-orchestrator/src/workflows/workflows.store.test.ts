@@ -182,7 +182,7 @@ function sourcesOfSrc(): Record<string, string> {
 
 /** The seam's calls in each file, comment lines left out: what `WORKFLOW_DOOR_DEBT` counts. */
 function seamUses(sources: Record<string, string>): Map<string, number> {
-  const call = new RegExp(`(?<![\\w$.])(?:${SEAM.join('|')})\\s*\\(`, 'g');
+  const call = new RegExp(`(?<![\\w$]|[^.]\\.)(?:${SEAM.join('|')})\\s*\\(`, 'g');
   const uses = new Map<string, number>();
   for (const [file, text] of Object.entries(sources)) {
     const code = text
@@ -229,11 +229,11 @@ test('REFUSED: a converted file that calls a store again, and a count the baseli
     'src/workflows/workflows.verb.ts': `${sources['src/workflows/workflows.verb.ts']}\nconst x = loadWorkflows('a');\n`,
   };
   assert.equal(debtBreaks(again, WORKFLOW_DOOR_DEBT).length, 1);
-  const found = {
+  const spread = {
     ...sources,
-    'src/workflows/workflows.verb.ts': `${sources['src/workflows/workflows.verb.ts']}\nconst y = foundAt('a', {});\n`,
+    'src/workflows/workflows.verb.ts': `${sources['src/workflows/workflows.verb.ts']}\nconst y = [...formerKeyLines('a')];\n`,
   };
-  assert.equal(debtBreaks(found, WORKFLOW_DOOR_DEBT).length, 1, "a read of a folder's agents and skills off the disk is the seam's");
+  assert.equal(debtBreaks(spread, WORKFLOW_DOOR_DEBT).length, 1, 'a call spread into a list is a call');
   const [first] = Object.keys(WORKFLOW_DOOR_DEBT);
   assert.equal(debtBreaks(sources, { ...WORKFLOW_DOOR_DEBT, [first]: (WORKFLOW_DOOR_DEBT[first] ?? 0) + 1 }).length, 1);
 });

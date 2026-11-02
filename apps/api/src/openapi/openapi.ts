@@ -1,8 +1,8 @@
 /**
  * The api's OpenAPI 3.1 document of the run object (`GET /openapi/v3/nemia/v1`): the package's Schema of a run (`RunObject.Run`) exported
  * in the OpenAPI dialect by Effect's own JSON Schema (`RunObject.runDocument`), its definitions under `components.schemas`, and the
- * api's routes of the run and its sub-resources under `paths`. Built from the Schema, never from Hono's routes, so a client generated from it reads
- * what the package declares.
+ * api's routes of the run and its sub-resources under `paths`. Built from the Schema, never from Hono's routes, so a client generated from
+ * it reads what the package declares.
  */
 import { Hono } from 'hono';
 import { RunObject, routeList } from 'agent-orchestrator';

@@ -62,8 +62,9 @@ test("the run's route answers the run object, nemia/v1's Run, as nemia show prin
   assert.equal(body.apiVersion, 'nemia/v1');
   assert.equal(body.kind, 'Run');
   assert.equal(body.metadata.name, R);
-  assert.ok(SHOW?.handler, 'show has a handler');
-  const shown = await runWith(engine(), SHOW.handler({ runId: R }, process.env, root));
+  const handler = SHOW?.handler?.bind(SHOW);
+  assert.ok(handler, 'show has a handler');
+  const shown = await runWith(engine(), handler({ runId: R }, process.env, root));
   assert.deepEqual(body, JSON.parse(JSON.stringify(shown)), 'one judgement serves both sides: the api answers what nemia show prints');
 });
 

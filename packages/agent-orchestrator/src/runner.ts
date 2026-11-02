@@ -528,9 +528,9 @@ export type { InboxRuns } from './inbox/index.ts';
 export { judgedNow, runsSummarized } from './summary/summary.verb.ts';
 export type { RunSummary, SummaryHow } from './summary/summary.verb.ts';
 /**
- * The run's page (`runPage`, `GET /api/runs/:id`) and the types it answers with, and of what it is built of what the api reads besides: a
- * step's file routes (`refusedName`, `typeOf`), its log's tail (`tailOf`), its try's turn (`turnOfTry`) and `nemia decide`'s usage
- * (`totalOf`, `usedOf`).
+ * The run's page (`runPage`, `GET /api/runs/:id?view=page`) and the types it answers with, and of what it is built of what the api reads
+ * besides: a step's file routes (`refusedName`, `typeOf`), its log's tail (`tailOf`), its try's turn (`turnOfTry`) and `nemia decide`'s
+ * usage (`totalOf`, `usedOf`).
  */
 export { runPage, type RunDetail, type StepAsked, type StepBudget, type StepRaise, type StepSpec } from './resource/page.verb.ts';
 export type { StepTimelineTotal, StepTimelineTry } from './resource/page.verb.ts';

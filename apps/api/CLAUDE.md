@@ -11,7 +11,7 @@ from the orchestrator; what it holds today below its layer is in `docs/architect
   never a cast or a default the contract does not give. A dictionary read stays a plain read, its `undefined` handled, with no
   `Object.hasOwn` guard put in front of it: that changes what a prototype key reads. The tests' own `test/tsconfig.json` leaves the
   flag off.
-- **A body read off a response is `unknown`**: name the api's own answer type (`(await res.json()) as RunDetail`).
+- **A body read off a response is `unknown`**: name the api's own answer type (`(await res.json()) as RunAnswer`).
 - **An encoded `..` never reaches a route in a test**: `app.request` resolves `%2E%2E` before the router sees it. Send `..%2F…` to reach
   a name refusal.
 - **The list answers a finished run from memory** (`restingRead`, the package's `rest/resting.verb.ts`) while its record, its stamps, the feed for its tasks and its branch tips

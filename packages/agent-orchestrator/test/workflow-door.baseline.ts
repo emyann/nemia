@@ -4,8 +4,9 @@
  * agents and skills found off the disk (`foundAt`, called by the folder's own stores alone) — rather than yielding the door
  * (`WorkflowDoor`, `src/workflows/workflows.store.ts`), with how many calls do (`src/workflows/workflows.store.test.ts`). A debt, and
  * nothing else: a program yields the door, whose writes are checked on every layer and whose memory stand-in a test gives it; a call
- * left on the seam is a synchronous caller S5b did not convert — the inbox, a run's steps read and the board's reads. S5b moved the board's four workflow entries (`src/workflows/workflows.verb.ts`); the start (and so
- * the plan) and the revisions pinned then read a folder through the door.
+ * left on the seam is a synchronous caller S5b did not convert — the inbox, a run's steps read and the board's reads. S5b moved the
+ * board's four workflow entries (`src/workflows/workflows.verb.ts`); the start (and so the plan) and the revisions pinned then read a
+ * folder through the door.
  *
  * It only shrinks: a file converted takes its line away, a count cut is lowered here, and a file this does not name may hold none at all.
  */

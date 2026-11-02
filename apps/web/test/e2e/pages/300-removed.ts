@@ -65,7 +65,7 @@ export default {
       await settled(step.other);
       await photograph(step.other, path.join(OUT, `removed-step-${await themeOf(step.other)}.png`), { fullPage: true });
 
-      const refused = `request answered 404: GET ${new URL(`/api/runs/${id}`, page.url()).href}`;
+      const refused = `request answered 404: GET ${new URL(`/api/runs/${id}?view=page`, page.url()).href}`;
       for (const [{ problems }, where] of [
         [run, 'the run page'],
         [step, 'the step page'],

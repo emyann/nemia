@@ -1,11 +1,10 @@
 /**
  * The board's reads of its runs, each an entry of the command table served on the api alone: every run's summary for its list (`RUNS`),
- * the runs that wait or move with the counts (`RUNS_OPEN`), a page of the finished runs (`RUNS_FINISHED`),
- * the run for its page (`RUN`), and of one of
- * its steps a file of its files directory (`STEP_ARTIFACT`) or of its own folder (`STEP_FILE`), the path of one of its tasks through the
- * runtime's lifecycle (`STEP_PATH`), and a read of that task's conversation (`STEP_TRANSCRIPT`). A run is found among those the store
- * lists, never by a path made of its id, and a file by its name, never by a path. The api resolves the task a request names, words the
- * answer for what is not there, and judges what it is handed.
+ * the runs that wait or move with the counts (`RUNS_OPEN`), a page of the finished runs (`RUNS_FINISHED`), and of one of a run's steps a
+ * file of its files directory (`STEP_ARTIFACT`) or of its own folder (`STEP_FILE`), the path of one of its tasks through the runtime's
+ * lifecycle (`STEP_PATH`), and a read of that task's conversation (`STEP_TRANSCRIPT`). A run is found among those the store lists, never
+ * by a path made of its id, and a file by its name, never by a path. The api resolves the task a request names, words the answer for what
+ * is not there, and judges what it is handed.
  */
 import { Effect } from 'effect';
 import { EngineService, asked, tried, type Engine } from '../runtime-client.ts';
@@ -41,27 +40,6 @@ const NAME: readonly Positional[] = [{ key: 'name', takes: 'required', kind: 'na
 
 /** The run `id` names, found among the ids the store lists (`runs.find`); undefined for one it does not have. */
 const runOf = (args: Args): Run | undefined => runStore.runs.find(textOf(args, 'id') ?? '');
-
-/** The run `id`, found among the runs the store lists, never read by a path made of the id; null for one the store does not have. */
-export const RUN: Command<{ run: Run | null }> = {
-  name: 'run',
-  usage: '<id>',
-  help: ['one run, read for its page'],
-  spec: {
-    positionals: [{ key: 'id', takes: 'required', kind: 'name' }],
-    flags: [],
-    unknown: (arg) => `the board's run page reads one run, and ${arg} is a second.`,
-  },
-  writes: false,
-  class: 'read',
-  route: { method: 'GET', path: '/api/runs/:id', status: 200 },
-  only: {
-    side: 'api',
-    why: "the board's run page is a run judged, with its steps and their files; at the command line, nemia show prints the run object, and nemia show --raw its record",
-  },
-  handler: (args) => tried(() => ({ run: runOf(args) ?? null })),
-  print: () => [],
-};
 
 /**
  * Every run's summary, in the store's order (`runsSummarized`): read off the memo of runs at rest and the feed's filing times the caller
@@ -247,7 +225,6 @@ export const PAGES: readonly Command[] = [
   RUNS,
   RUNS_OPEN,
   RUNS_FINISHED,
-  RUN,
   STEP_ARTIFACT,
   STEP_FILE,
   STEP_PATH,

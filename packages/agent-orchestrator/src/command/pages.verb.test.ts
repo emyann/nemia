@@ -1,6 +1,6 @@
 /**
- * The board's reads of one run as entries of the table, served on the api alone: the run for its page (`RUN`), found among the runs the
- * store lists, and none for an id it does not have. `WF_ROOT` is set before the import, since the store reads it as it loads.
+ * The board's reads of a run's steps as entries of the table, served on the api alone: a step's file, read off the run the store lists,
+ * and none for an id it does not have. `WF_ROOT` is set before the import, since the store reads it as it loads.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -14,7 +14,7 @@ import { heldUnasked } from '../../test/unasked.ts';
 
 const ROOT = scratch('wf-pages-');
 process.env.WF_ROOT = ROOT;
-const { RUN, STEP_ARTIFACT, STEP_FILE } = await import('./pages.verb.ts');
+const { STEP_ARTIFACT, STEP_FILE } = await import('./pages.verb.ts');
 const { startRun, runWith: runEngine } = await import('../runner.ts');
 const stand = eachTest(testPlace);
 const runWith = runOver(runEngine, () => stand().layer);
@@ -42,15 +42,6 @@ const aRepo = (): string => {
   stand().world.commit(repo, 'base');
   return repo;
 };
-
-test('a run is read for its page by its id, and an id the store does not have, nor a path, reads none', async () => {
-  const started = await runPlaced(startRun({ brief: 'read me', repo: aRepo(), workflowDir: oneStep() }));
-  const { run } = await runWith(noEngine(), RUN.handler({ id: started.id }));
-  assert.equal(run?.id, started.id);
-  assert.equal(run?.brief, 'read me');
-  assert.deepEqual(await runWith(noEngine(), RUN.handler({ id: 'r-nowhere' })), { run: null });
-  assert.deepEqual(await runWith(noEngine(), RUN.handler({ id: `../runs/${started.id}` })), { run: null });
-});
 
 test("a step's file is read off the run the store lists, never off a path made of its id; a repository run's step has no folder", async () => {
   const started = await runPlaced(startRun({ brief: 'files', repo: aRepo(), workflowDir: oneStep() }));

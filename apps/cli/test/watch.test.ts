@@ -147,12 +147,12 @@ test('`nemia watch --once` over the api prints what the in-process watch prints 
 
   const paused = await ran(t, store.root, ['pause', '--why', 'held for the watch']);
   assert.equal(paused.code, 0, paused.err);
-  const words = await ran(t, store.root, ['watch', '--once', ...OPERATOR]);
-  const wordsLocal = await ran(t, store.root, ['watch', '--once', ...OPERATOR, '--local']);
-  assert.equal(words.code, 0, words.err);
-  assert.equal(words.out, wordsLocal.out, 'in words: the pause standing, the lines, and `cursor: <n>`');
-  assert.match(words.out.split('\n')[0] ?? '', /held for the watch/, 'the pause first');
-  assert.match(words.out, new RegExp(`cursor: ${store.size()}\\n$`));
+  const plain = await ran(t, store.root, ['watch', '--once', ...OPERATOR]);
+  const plainLocal = await ran(t, store.root, ['watch', '--once', ...OPERATOR, '--local']);
+  assert.equal(plain.code, 0, plain.err);
+  assert.equal(plain.out, plainLocal.out, 'in words: the pause standing, the lines, and `cursor: <n>`');
+  assert.match(plain.out.split('\n')[0] ?? '', /held for the watch/, 'the pause first');
+  assert.match(plain.out, new RegExp(`cursor: ${store.size()}\\n$`));
 });
 
 test('`--once` with no api answering at the lease is refused, naming the read in process, where the in-process watch reads the file', async (t) => {
@@ -250,7 +250,7 @@ test('a selector naming a former reason prints its hint on stderr, as the in-pro
   assert.equal(served.out, local.out);
 
   const refused = await ran(t, store.root, ['watch', '--once', '-l', 'nope=x']);
-  assert.equal(refused.code, 2, 'REFUSED: a selector the grammar does not take, before a line is read');
+  assert.equal(refused.code, 2, 'REFUSED: a selector off the grammar');
   assert.match(refused.err, /nope/);
   assert.equal(refused.out, '');
 });

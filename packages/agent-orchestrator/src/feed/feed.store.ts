@@ -396,6 +396,8 @@ export const FeedLineSchema = Schema.Union([
       store: Schema.String,
       word: Schema.String,
       note: Schema.optionalKey(Schema.String),
+      by: Schema.optionalKey(Schema.String),
+      why: Schema.optionalKey(Schema.String),
       ...LINE_KEYS,
     }),
     Rest,

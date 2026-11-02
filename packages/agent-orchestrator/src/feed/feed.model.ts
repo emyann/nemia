@@ -79,12 +79,14 @@ export const DaemonLine = Schema.Struct({
 }).annotate({ identifier: 'DaemonLine' });
 export type DaemonLine = typeof DaemonLine.Type;
 
-/** The store's line (`StoreLine`): its pause put or lifted. */
+/** The store's line (`StoreLine`): its pause put or lifted, a put with who put it and why where the pause's file says. */
 export const StoreLine = Schema.Struct({
   at: Schema.String,
   store: Schema.String,
   word: Schema.String,
   note: Schema.optional(Schema.String),
+  by: Schema.optional(Schema.String),
+  why: Schema.optional(Schema.String),
   ...signed,
 }).annotate({ identifier: 'StoreLine' });
 export type StoreLine = typeof StoreLine.Type;

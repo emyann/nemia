@@ -60,6 +60,7 @@ export class Engine extends Context.Service<Engine, ReturnType<typeof engine>>()
  * means to move those sets `WF_ROOT` before it imports the package, as `test/harness.ts` does.
  */
 export { StoreRoot } from 'agent-orchestrator';
+import { StoreRoot } from 'agent-orchestrator';
 
 type Reader = Engine['Service'];
 
@@ -127,15 +128,9 @@ export function taskOfStep(id: string, step: string, home: string): { run: Run; 
  * read off `standing.json` (`standingSnapshot`): or, when its unfrozen folder does not load or a task it reads does not, why it is not
  * judged (`judgedUnlessUnreadable`). Rejects with what the engine's reads die of.
  */
-export const judgedOn = (
-  e: Engine['Service'],
-  placeService: PlaceService['Service'],
-  run: Run,
-  names: readonly string[],
-  workflows: readonly Workflow[] | null,
-) =>
+export const judgedOn = (e: Engine['Service'], at: Placed, run: Run, names: readonly string[], workflows: readonly Workflow[] | null) =>
   runPlaced(
-    placeService,
+    at,
     e,
     Effect.gen(function* () {
       const { views, reader, unreadable } = yield* viewsFor(e, [run]);
@@ -148,11 +143,14 @@ export const judgedOn = (
   );
 
 /**
- * A package program run for a request: over the engine `e` (`runWith`) and the place the app's layer gave (`Served.placeService`). Rejects
+ * A package program run for a request: over the engine `e` (`runWith`), the place the app's layer gave and the store's root (`at`). Rejects
  * with what the program failed with or died of, as `runWith` does.
  */
 export const runPlaced = <A, E>(
-  place: PlaceService['Service'],
+  at: Placed,
   e: Engine['Service'],
-  program: Effect.Effect<A, E, EngineService | PlaceService>,
-): Promise<A> => runWith(e, program.pipe(Effect.provideService(PlaceService, place)));
+  program: Effect.Effect<A, E, EngineService | PlaceService | StoreRoot>,
+): Promise<A> => runWith(e, program.pipe(Effect.provideService(PlaceService, at.placeService), Effect.provideService(StoreRoot, at.home)));
+
+/** Where a request's package program runs: the place the app's layer gave, and the store's root (`Served.placeService`, `Served.home`). */
+export type Placed = { readonly placeService: PlaceService['Service']; readonly home: string };

@@ -261,10 +261,11 @@ export const loadedOf = async (
   home: string,
   factory?: Factory,
 ) =>
-  (await runPlaced(placeService, e, LIST.handler({ dirs, repo, ...(factory && { factory: factory.name }) }, undefined, home))) as Record<
-    string,
-    FolderLoaded
-  >;
+  (await runPlaced(
+    { placeService, home },
+    e,
+    LIST.handler({ dirs, repo, ...(factory && { factory: factory.name }) }, undefined, home),
+  )) as Record<string, FolderLoaded>;
 
 /** The loading of the folder `dir` among `loaded`, which `loadedOf` gives for each folder it was asked: thrown, naming it, where none. */
 export function loadedAt(loaded: Readonly<Record<string, FolderLoaded>>, dir: string): FolderLoaded {
@@ -595,7 +596,7 @@ async function cardStarted(
   home: string,
 ) {
   const started = await runPlaced(
-    placeService,
+    { placeService, home },
     e,
     START_ENTRY.handler(
       {
@@ -674,7 +675,7 @@ export const workflows = new Hono<ApiEnv>()
       }
       const found = factory ? { factory, repo } : startFactory(named, repo, '?factory=<name>');
       const { id } = await runPlaced(
-        placeService,
+        { placeService, home },
         e,
         START_ENTRY.handler(
           {

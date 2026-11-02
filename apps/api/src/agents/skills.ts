@@ -159,7 +159,7 @@ const WRITE = commandNamed('skills write');
 
 /** Each skill folder of `dirs` read now, through the table's `skills` at the store's root `home`, by folder. */
 const readsOf = async (e: Engine['Service'], placeService: PlaceService['Service'], dirs: readonly string[], home: string) =>
-  (await runPlaced(placeService, e, LIST.handler({ skills: dirs }, undefined, home))) as Record<string, SkillRead>;
+  (await runPlaced({ placeService, home }, e, LIST.handler({ skills: dirs }, undefined, home))) as Record<string, SkillRead>;
 
 /**
  * The reading of the folder `dir` among `reads`, which the table's `skills` gives for each folder it was asked: thrown, naming the
@@ -447,7 +447,11 @@ export async function skillDetail(
   const dir = skillDirOf(from, name, repo, home, builtin);
   if (dir === null) return null;
   const users = await inRequest(skillUsers(dir, name, repo, home));
-  const { text, version, ...read } = (await runPlaced(placeService, e, READ.handler({ from, name, dir }, undefined, home))) as SkillPage;
+  const { text, version, ...read } = (await runPlaced(
+    { placeService, home },
+    e,
+    READ.handler({ from, name, dir }, undefined, home),
+  )) as SkillPage;
   const skill = skillRow(
     name,
     dir,
@@ -513,7 +517,7 @@ async function written(
     ...(version !== null && { version }),
     ...(name !== undefined && { name }),
   };
-  const wrote = (await runPlaced(placeService, e, WRITE.handler(args, undefined, home))) as SkillWritten;
+  const wrote = (await runPlaced({ placeService, home }, e, WRITE.handler(args, undefined, home))) as SkillWritten;
   const detail = await skillDetail(e, placeService, inRequest, 'yours', wrote.name, repo, home);
   if (detail === null) return { status: 500, error: `${wrote.dir} was written, and then could not be read back.` };
   return { status: version === null ? 201 : 200, body: { ...detail, written: wrote.written } };
@@ -600,7 +604,7 @@ export const skills = new Hono<ApiEnv>()
       }
       if (name === undefined) return c.json({ error: copyOrSkill(route)('neither') }, 400);
       const copied = (await runPlaced(
-        placeService,
+        { placeService, home },
         e,
         WRITE.handler({ from, copy: name, builtin: BUILTIN_SKILLS }, undefined, home),
       )) as SkillCopied;

@@ -38,7 +38,9 @@ export const customInstructions = new Hono<ApiEnv>().get('/api/custom-instructio
     const wrong = agentNameRefusal(name);
     if (wrong !== undefined) return c.json({ error: `GET /api/custom-instructions/${name}: ${wrong}` }, 400);
     try {
-      return c.json((await runPlaced(placeService, e, AGENTS_CUSTOM.handler({ name, repo }, undefined, home))) as CustomInstructionsAnswer);
+      return c.json(
+        (await runPlaced({ placeService, home }, e, AGENTS_CUSTOM.handler({ name, repo }, undefined, home))) as CustomInstructionsAnswer,
+      );
     } catch (err) {
       if (!(err instanceof WorkflowError)) throw err;
       return c.json({ name, file: customInstructionsFile(home, name), words: null, error: err.message } satisfies CustomInstructionsAnswer);

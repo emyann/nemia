@@ -14,8 +14,8 @@ import {
   slotWord,
 } from 'agent-orchestrator';
 import type { Engine } from '../store.ts';
+import type { Placed } from '../store.ts';
 import { commandNamed, runPlaced } from '../store.ts';
-import type { PlaceService } from 'agent-orchestrator';
 
 /**
  * The cap on runs in flight, as the board says it over the Factory: `2 of 4 run slots taken`, or `no cap`.
@@ -50,8 +50,8 @@ const CEILINGS = commandNamed('ceilings');
  * table's entry whose handler is `slotsOf`) — every run read as a pass reads it, off one look at the harnesses — with what the last pass
  * ran with and cost. Read through `e`; the cap, before any pass wrote one, is `WF_MAX_RUNS` of `env`, the app's environment.
  */
-export async function ceilingsOf(e: Engine['Service'], placeService: PlaceService['Service'], env: NodeJS.ProcessEnv): Promise<Ceilings> {
-  const { cap, inFlight, held } = (await runPlaced(placeService, e, CEILINGS.handler({}, env))) as Slots;
+export async function ceilingsOf(e: Engine['Service'], at: Placed, env: NodeJS.ProcessEnv): Promise<Ceilings> {
+  const { cap, inFlight, held } = (await runPlaced(at, e, CEILINGS.handler({}, env))) as Slots;
   return {
     last: lastCeilings() ?? null,
     cap,
@@ -68,11 +68,8 @@ const PASSES = commandNamed('passes');
  * What the recent passes of the tick cost (`PassesRead`), as `nemia passes --json` prints it (`PASSES`): the last `last` of them, or
  * every one kept; refused as `Invalid` for a `last` that is not a whole number from 1.
  */
-export const passesOf = async (
-  e: Engine['Service'],
-  placeService: PlaceService['Service'],
-  last: string | undefined,
-): Promise<PassesRead> => (await runPlaced(placeService, e, PASSES.handler(last === undefined ? {} : { last }))) as PassesRead;
+export const passesOf = async (e: Engine['Service'], at: Placed, last: string | undefined): Promise<PassesRead> =>
+  (await runPlaced(at, e, PASSES.handler(last === undefined ? {} : { last }))) as PassesRead;
 
 /** The series' entry of the command table, served on both sides. */
 const SERIES = commandNamed('series');
@@ -81,17 +78,8 @@ const SERIES = commandNamed('series');
  * The system's series over `range` (`SeriesRead`), as `nemia series --json` prints it (`SERIES`), a past day read off `memo` while its
  * file has not moved; refused as `Invalid` for a range that is not 24h, 7d, 30d or all.
  */
-export const seriesOf = async (
-  e: Engine['Service'],
-  placeService: PlaceService['Service'],
-  range: string | undefined,
-  memo: SeriesMemo,
-): Promise<SeriesRead> =>
-  (await runPlaced(
-    placeService,
-    e,
-    SERIES.handler(range === undefined ? {} : { range }, undefined, undefined, { series: memo }),
-  )) as SeriesRead;
+export const seriesOf = async (e: Engine['Service'], at: Placed, range: string | undefined, memo: SeriesMemo): Promise<SeriesRead> =>
+  (await runPlaced(at, e, SERIES.handler(range === undefined ? {} : { range }, undefined, undefined, { series: memo }))) as SeriesRead;
 
 /**
  * One metric as `GET /api/metrics` answers it: its name, kind, description and attributes, and its value — a counter's `count`, a gauge's

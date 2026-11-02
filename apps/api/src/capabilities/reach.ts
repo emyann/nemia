@@ -489,7 +489,7 @@ const statedByFactory = async (
   home: string,
 ): Promise<McpServer[]> => {
   if (!servers.length) return [...servers];
-  const listing = await runPlaced(placeService, e, FACTORY_SERVERS.handler({ factory: DEFAULT_FACTORY }, undefined, home)).catch(
+  const listing = await runPlaced({ placeService, home }, e, FACTORY_SERVERS.handler({ factory: DEFAULT_FACTORY }, undefined, home)).catch(
     () => undefined,
   );
   const by = new Map((listing?.servers ?? []).map((s) => [s.name, s.state]));

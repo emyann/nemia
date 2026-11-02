@@ -4,7 +4,7 @@
  * module's root. Read again on every call, never kept between passes. A controller, since the door reaches `record.store.ts`, which no
  * store beneath it may close a cycle over (`test/boundary.test.ts`); the refusal and the frozen read are pure (`steps.ts`).
  */
-import { Cause, Effect, Option } from 'effect';
+import { Cause, Effect, Exit, Option } from 'effect';
 import type { Workflow } from '../workflow.ts';
 import { orderSteps } from '../workflow.ts';
 import { StoreRoot } from '../config/root.store.ts';
@@ -12,6 +12,7 @@ import { WorkflowDoor } from '../workflows/workflows.store.ts';
 import { WorkflowDir } from '../folder/folder.model.ts';
 import { Invalid, type Refusal } from '../refusal/refusal.ts';
 import { runStore } from './files.store.ts';
+import { tried } from '../runtime-client.ts';
 import { isRepositoryRun, type Run } from './record.ts';
 import { frozenStepsOf, UnloadedFolder, unloadedFolder } from './steps.ts';
 import { resultBranches, type BranchReader } from '../branches/branches.store.ts';
@@ -93,12 +94,9 @@ export const stepsAmong = (runs: readonly Run[]): Effect.Effect<ReadonlyMap<stri
  */
 export const parentRecord = (id: string, git: BranchReader): Effect.Effect<Pick<ParentRun, 'record' | 'gone'>> =>
   Effect.gen(function* () {
-    let record: Run;
-    try {
-      record = runStore.runs.read(id);
-    } catch {
-      return {};
-    }
+    const read = yield* Effect.exit(tried(() => runStore.runs.read(id)));
+    if (Exit.isFailure(read)) return Cause.hasInterruptsOnly(read.cause) ? yield* Effect.interrupt : {};
+    const record = read.value;
     const steps = yield* Effect.orElseSucceed(stepsOf(record), (): Workflow[] => []);
     const branches = steps.length ? resultBranches(record, steps) : [];
     const cut = isRepositoryRun(record) ? record : undefined;

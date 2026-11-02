@@ -2834,7 +2834,11 @@ export const ASKED = {
           additionalProperties: false,
         },
       },
-      recommended: { type: ['string', 'null'], description: 'The label of the option you recommend, or null for none.' },
+      recommended: {
+        anyOf: [{ type: 'string' }, { type: 'array', items: { type: 'string' } }, { type: 'null' }],
+        description:
+          'The label of the option you recommend, or null for none. Where `multiple` is true, a list of the labels you recommend choosing together; never several labels joined in one string.',
+      },
       multiple: { type: 'boolean', description: 'Whether several options may be chosen together.' },
     },
     required: ['title', 'body', 'options', 'recommended', 'multiple'],

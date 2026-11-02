@@ -67,6 +67,23 @@ export const QUESTIONS_SCHEMA = {
   },
 };
 
+/**
+ * `QUESTIONS_SCHEMA` as a run frozen before a question that takes several answers could recommend several holds it, `recommended` one
+ * label or null: such a run's fields still read as questions.
+ */
+const FORMER_QUESTIONS_SCHEMAS = [
+  {
+    ...QUESTIONS_SCHEMA,
+    items: {
+      ...QUESTIONS_SCHEMA.items,
+      properties: {
+        ...QUESTIONS_SCHEMA.items.properties,
+        recommended: { type: ['string', 'null'], description: 'The label of the option you recommend, or null for none.' },
+      },
+    },
+  },
+];
+
 /** The shapes a marker may name, each with its schema. */
 const SHAPES: Record<string, object> = { questions: QUESTIONS_SCHEMA };
 
@@ -108,11 +125,11 @@ export function expandShapes(properties: Record<string, unknown>): { properties:
   return { properties: expanded };
 }
 
-/** Whether a field's schema is `QUESTIONS_SCHEMA`, its `description` aside. */
+/** Whether a field's schema is `QUESTIONS_SCHEMA`, or a former one a frozen run holds (`FORMER_QUESTIONS_SCHEMAS`), its `description` aside. */
 const isQuestionsSchema = (schema: unknown): boolean => {
   if (!isObject(schema)) return false;
   const { description: _, ...rest } = schema;
-  return canonical(rest) === canonical(QUESTIONS_SCHEMA);
+  return [QUESTIONS_SCHEMA, ...FORMER_QUESTIONS_SCHEMAS].some((known) => canonical(rest) === canonical(known));
 };
 
 /** The fields a step's `output:` declares whose schema is `QUESTIONS_SCHEMA`, in the schema's order: none for a step without `output:`. */

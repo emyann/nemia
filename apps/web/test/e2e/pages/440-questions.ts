@@ -9,7 +9,7 @@ import { OUT, store } from '../world.ts';
 
 /**
  * A run of two steps that ask a person questions as data, written for this page's visit and taken back before it ends: `design` signed off
- * done asking one, `spec` signed off blocked asking two — one that takes a single answer and recommends one, one that takes several and
+ * done asking one that takes several and recommends two, `spec` signed off blocked asking two — one that takes a single answer and recommends one, one that takes several and
  * recommends none.
  */
 const QUESTIONS = {
@@ -38,14 +38,15 @@ const QUESTIONS = {
     multiple: true,
   },
   done: {
-    title: 'Which store keeps them?',
-    body: 'The run’s asks, or a file of their own.',
+    title: 'Where are they shown?',
+    body: 'Any of them, or all.',
     options: [
-      { label: 'The asks', meaning: 'Beside every other ask.' },
-      { label: 'Their own', meaning: 'A new file to compose on read.' },
+      { label: 'The board', meaning: 'Under Decide, as choices.' },
+      { label: 'The terminal', meaning: 'Numbered, in `nemia decide`.' },
+      { label: 'The feed', meaning: 'A line of their own.' },
     ],
-    recommended: 'The asks',
-    multiple: false,
+    recommended: ['The board', 'The terminal'],
+    multiple: true,
   },
 } as const;
 
@@ -142,7 +143,7 @@ const chosenOn = (form: ReturnType<Page['locator']>, title: string): Promise<str
 
 export default {
   /**
-   * A run whose steps ask questions as data. A done step's are drawn read-only on its Output tab, the recommended option marked. A blocked
+   * A run whose steps ask questions as data. A done step's are drawn read-only on its Output tab, each option it recommends marked. A blocked
    * step's are a form under Decide: an option for each answer, radios where it takes one and checkboxes where several, nothing chosen, and
    * `Answer and continue` held until each question has an answer. `Choose the recommended answers` chooses the one recommended and leaves
    * the question without one as it was; a box ticked there and words of the person's own beside it, the answers go to the api, which writes
@@ -165,10 +166,12 @@ export default {
       await inspector.getByRole('tab', { name: 'Output' }).click();
       const asked = inspector.locator('section[data-questions="open"]');
       await expectVisible(asked.locator(`li[data-question="${done.title}"]`), "design's question is drawn under its field, read-only");
-      await expectVisible(
-        asked.locator(`li[data-option="${done.recommended}"] [data-recommended]`),
-        'its recommended option marked recommended',
-      );
+      for (const label of done.recommended)
+        await expectVisible(
+          asked.locator(`li[data-option="${label}"] [data-recommended]`),
+          `${label}, which it recommends, marked recommended`,
+        );
+      await expectCount(asked.locator('[data-recommended]'), done.recommended.length, 'each label it recommends marked, and no other');
       await expectCount(asked.locator('input, textarea, button'), 0, 'with nothing to answer it with: design is done');
       await settled(page);
       await photograph(inspector, path.join(OUT, `questions-asked-${theme}.png`));

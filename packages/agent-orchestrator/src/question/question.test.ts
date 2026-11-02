@@ -142,6 +142,16 @@ test('expandShapes and questionFields: the `x-shape` marker of a step’s `outpu
     const field = { type: 'array', items: { type: 'string' } };
     assert.deepEqual(expandShapes({ open: field }), { properties: { open: field } });
   });
+  await t.test('a field frozen with the schema as it was before a list could be recommended still reads as questions', () => {
+    const items = QUESTIONS_SCHEMA.items;
+    const recommended = { type: ['string', 'null'], description: 'The label of the option you recommend, or null for none.' };
+    const former = { ...QUESTIONS_SCHEMA, items: { ...items, properties: { ...items.properties, recommended } } };
+    const step = stepWith({ open: { 'x-shape': 'questions' } });
+    const frozen = { ...step, output: { ...step.output!, schema: { ...step.output!.schema, properties: { open: former } } } };
+    assert.deepEqual(questionFields(frozen), ['open']);
+    const said = parseCloseout({ outcome: 'blocked', summary: 's', artifacts: [], needs: 'One.', open: [cut] });
+    assert.deepEqual(askedQuestions(frozen, said), [{ field: 'open', questions: [cut] }]);
+  });
   await t.test('a question field is known by its schema, never its name', () => {
     const step = stepWith({ open: { type: 'array', items: { type: 'string' } }, asks: { 'x-shape': 'questions' } });
     assert.deepEqual(questionFields(step), ['asks']);

@@ -273,6 +273,10 @@ They write, and are yours to run unasked, on your judgement: say what you did.
                                the agent's proposal: rules from your custom instruction, as JSON,
                                with the words the machinery cannot hold kept as guidance; none is in
                                force until you confirm it (nemia policy confirm)
+  nemia daemon [--json]
+                               the store's daemon, started where none ticks it (as any command that
+                               ticks starts it, unless NEMIA_DAEMON_START=off): its state, its pid and
+                               the url the api serves at, from its lease. --json: the whole answer
 ```
 
 ## Prompts the person

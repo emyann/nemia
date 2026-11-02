@@ -17,20 +17,34 @@ export const entryOf = (entry: Entry): string =>
 /** `argv` without `--local`, which this client reads and the old path does not know. */
 export const unlocal = (argv: readonly string[]): string[] => argv.filter((word) => word !== '--local');
 
+/** How the child's stdout is taken: shown as this process's own, or kept and answered. */
+type Out = 'inherit' | 'pipe';
+
 /**
- * Runs the orchestrator's CLI on `argv` with this process's stdio and environment, and answers its exit code: 128 and the signal's number
- * when a signal ended it. A signal this process takes is passed on to it, so a Ctrl-C ends the child, which ends here.
+ * The orchestrator's CLI on `argv` with this process's stdin, stderr and `env`, its stdout shown or kept as `out` says; answers its exit
+ * code — 128 and the signal's number when a signal ended it — and what it printed where it was kept. A signal this process takes is passed
+ * on to it, so a Ctrl-C ends the child, which ends here.
  */
-export function spawned(argv: readonly string[], entry: Entry = 'nemia', env: NodeJS.ProcessEnv = process.env): Promise<number> {
-  const child = spawn(process.execPath, [entryOf(entry), ...argv], { stdio: 'inherit', env });
+function run(argv: readonly string[], entry: Entry, env: NodeJS.ProcessEnv, out: Out): Promise<{ code: number; stdout: string }> {
+  const child = spawn(process.execPath, [entryOf(entry), ...argv], { stdio: ['inherit', out, 'inherit'], env });
+  let stdout = '';
+  child.stdout?.on('data', (chunk: Buffer) => (stdout += chunk.toString()));
   const forward = (signal: NodeJS.Signals) => () => void child.kill(signal);
   const handlers = (['SIGINT', 'SIGTERM', 'SIGHUP'] as const).map((signal) => [signal, forward(signal)] as const);
   for (const [signal, handler] of handlers) process.on(signal, handler);
   return new Promise((resolve, reject) => {
     child.on('error', reject);
-    child.on('exit', (code, signal) => {
+    child.on('close', (code, signal) => {
       for (const [name, handler] of handlers) process.off(name, handler);
-      resolve(code ?? 128 + (signal === null ? 0 : os.constants.signals[signal]));
+      resolve({ code: code ?? 128 + (signal === null ? 0 : os.constants.signals[signal]), stdout });
     });
   });
 }
+
+/** Runs the orchestrator's CLI on `argv` with this process's stdio and environment, and answers its exit code (`run`). */
+export const spawned = (argv: readonly string[], entry: Entry = 'nemia', env: NodeJS.ProcessEnv = process.env): Promise<number> =>
+  run(argv, entry, env, 'inherit').then(({ code }) => code);
+
+/** Runs `nemia <argv>` in process as `spawned` does, its stdout kept and answered beside its exit code: what a command's answer is read off. */
+export const captured = (argv: readonly string[], env: NodeJS.ProcessEnv = process.env): Promise<{ code: number; stdout: string }> =>
+  run(argv, 'nemia', env, 'pipe');

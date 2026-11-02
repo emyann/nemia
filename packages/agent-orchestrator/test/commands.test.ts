@@ -12,12 +12,24 @@ test('the shipped table breaks none of its rules against the CLI’s verbs and r
   assert.deepEqual(commandBreaks(TABLE, [...VERBS.keys()], [...RUNS.keys()]), []);
 });
 
-test('the commands whose work waits on the next pass tick, and no read, nor up, tick or watch, does', () => {
+test('the commands whose work waits on the next pass tick, and the start itself (daemon), and no read, nor up, tick or watch, does', () => {
   assert.deepEqual(
     TABLE.filter((c) => c.ticks === true)
       .map((c) => c.name)
       .sort(),
-    ['agents run', 'approve', 'cancel', 'factory resolve', 'factory upgrade', 'inbox queue', 'refresh', 'resume', 'retry', 'start'],
+    [
+      'agents run',
+      'approve',
+      'cancel',
+      'daemon',
+      'factory resolve',
+      'factory upgrade',
+      'inbox queue',
+      'refresh',
+      'resume',
+      'retry',
+      'start',
+    ],
   );
   assert.deepEqual(
     TABLE.filter((c) => c.ticks === true && (!c.writes || ['up', 'tick', 'watch'].includes(c.name))).map((c) => c.name),
@@ -221,6 +233,7 @@ test('each command is served on the api where it was before the table, the lift 
       ['service restart', 'cli'],
       ['upgrade', 'cli'],
       ['version', 'cli'],
+      ['daemon', 'cli'],
       ['frontmatter rewrite', 'cli'],
       [
         'workflows write',

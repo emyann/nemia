@@ -48,7 +48,13 @@ export async function get<T>(verb: string, path: string, query: Query = {}, env:
     response = await fetch(urlOf(base, path, query));
   } catch {
     base = await daemonStarted(verb, env);
-    response = await fetch(urlOf(base, path, query));
+    try {
+      response = await fetch(urlOf(base, path, query));
+    } catch (err) {
+      throw new Refused(
+        `the daemon started at ${base} does not answer (${err instanceof Error ? err.message : String(err)}). Read in process: \`nemia ${verb} --local …\`, or restart it: \`nemia service restart\``,
+      );
+    }
   }
   const text = await response.text();
   let body: unknown;

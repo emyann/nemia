@@ -58,6 +58,7 @@ import { MEMORY } from '../nemia/memory.verb.ts';
 import { SERVICE_COMMANDS } from '../service/restart.verb.ts';
 import { RELEASES } from '../release/upgrade.verb.ts';
 import { VERSIONS } from '../release/version.verb.ts';
+import { DAEMON } from '../daemon/daemon.verb.ts';
 import { FRONTMATTER_REWRITE } from '../frontmatter/frontmatter.verb.ts';
 import { ADMIT } from '../admission/admit.verb.ts';
 import { POLICY_ENTRIES } from '../auto/auto.verb.ts';
@@ -558,6 +559,7 @@ export const COMMANDS: readonly Command[] = [
   ...SERVICE_COMMANDS,
   ...RELEASES,
   ...VERSIONS,
+  DAEMON,
   FRONTMATTER_REWRITE,
   ...WORKFLOW_ENTRIES,
 ];

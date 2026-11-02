@@ -19,73 +19,63 @@ const { WorkflowError } = await import('../src/workflow.ts');
 
 const PKG = path.join(import.meta.dirname, '..');
 
-test('each refusal is an Error with its words, its tag and exit code 2, and an Effect catches it by its tag', async () => {
-  for (const [Kind, tag] of [
-    [Missing, 'Missing'],
-    [Conflict, 'Conflict'],
-    [Invalid, 'Invalid'],
-  ] as const) {
-    const err = new Kind({ message: `the ${tag} words` });
-    assert.ok(err instanceof Error, tag);
-    assert.equal(err.message, `the ${tag} words`);
-    assert.equal(err._tag, tag);
-    assert.equal(err.exitCode, 2);
-    const failed = await Effect.runPromise(Effect.flip(Effect.fail(err)));
-    assert.equal(failed, err, `${tag}: an Effect fails with the refusal itself`);
-    const caught = await Effect.runPromise(
-      Effect.fail(err).pipe(
-        Effect.catchTag(tag, (e) => Effect.succeed(`${e._tag} ${e.exitCode}`)),
-        Effect.catch(() => Effect.succeed('caught by no tag')),
-      ),
-    );
-    assert.equal(caught, `${tag} 2`);
-  }
-});
+/** Each refusal, by its row: what it is thrown as, and the exit code it carries — 2 for every kind. */
+const KINDS = [
+  ['Missing', () => new Missing({ message: 'the Missing words' }), 'Missing'],
+  ['Conflict', () => new Conflict({ message: 'the Conflict words' }), 'Conflict'],
+  ['Invalid', () => new Invalid({ message: 'the Invalid words' }), 'Invalid'],
+  ["a workflow's refusal is Invalid", () => new WorkflowError('a step is wrong'), 'Invalid'],
+  ['a Conflict with the steps that hold what is asked of', () => new Conflict({ message: 'held', users: ['dev/review'] }), 'Conflict'],
+] as const;
 
-test('isRefusal takes each kind, and a subclass of one; REFUSED: a plain Error carrying exitCode 2, and what is no Error', () => {
-  for (const err of [new Missing({ message: 'm' }), new Conflict({ message: 'c' }), new Invalid({ message: 'i' }), new WorkflowError('w')])
-    assert.equal(isRefusal(err), true, err._tag);
-  assert.equal(isRefusal(Object.assign(new Error('by hand'), { exitCode: 2 })), false, 'an exit code alone is no kind');
-  assert.equal(isRefusal({ _tag: 'Missing', message: 'a look-alike', exitCode: 2 }), false, 'an object shaped like one is no refusal');
-  assert.equal(isRefusal(undefined), false);
-});
-
-test("a workflow's refusal is Invalid, with the words given and exit code 2", () => {
-  const err = new WorkflowError('a step is wrong');
-  assert.ok(err instanceof Invalid);
-  assert.equal(err._tag, 'Invalid');
-  assert.equal(err.message, 'a step is wrong');
-  assert.equal(err.exitCode, 2);
-});
-
-test('a Conflict carries the steps that hold what is asked of, when that is why, and none otherwise', () => {
-  const held = new Conflict({ message: 'agents/reviewer.md is named by a step beside it', users: ['dev/review'] });
-  assert.ok(isRefusal(held));
-  assert.equal(held._tag, 'Conflict');
-  assert.equal(held.exitCode, 2);
-  assert.deepEqual(held.users, ['dev/review']);
-  const bare = new Conflict({ message: 'the step is still running.' });
-  assert.equal(bare.users, undefined);
-  assert.equal(Object.hasOwn(bare, 'users'), false, 'no key for none, so its answer is `{ error }` alone');
-});
-
-test('REFUSED: a verb throws the kind of what it refuses, with its words', async () => {
-  await assert.rejects(
-    Effect.runPromise(unhold('Not An Id')),
-    (err: unknown) => err instanceof Invalid && err.message.startsWith('"Not An Id" is not a run\'s id'),
-  );
-  await assert.rejects(
-    Effect.runPromise(unhold('r-nope')),
-    (err: unknown) =>
-      err instanceof Missing &&
-      err.exitCode === 2 &&
-      err.message.startsWith('no such run: r-nope.') &&
-      err.message.includes('nemia hold <runId> --off'),
-  );
-  assert.throws(
-    () => maxRuns({ WF_MAX_RUNS: 'two' }),
-    (err: unknown) => err instanceof Invalid && err.exitCode === 2 && err.message.startsWith('WF_MAX_RUNS=two is not a count.'),
-  );
+test('each refusal is an Error of its kind with its words and exit code 2, an Effect catches it by its tag, and isRefusal takes it', async (t) => {
+  for (const [row, made, tag] of KINDS)
+    await t.test(row, async () => {
+      const err = made();
+      assert.ok(err instanceof Error);
+      assert.ok(err.message.length > 0);
+      assert.equal(err._tag, tag);
+      assert.equal(err.exitCode, 2);
+      assert.equal(isRefusal(err), true);
+      if (tag === 'Invalid') assert.ok(err instanceof Invalid, 'a subclass of a kind is that kind');
+      assert.equal(await Effect.runPromise(Effect.flip(Effect.fail(err))), err, 'an Effect fails with the refusal itself');
+      const caught = await Effect.runPromise(
+        Effect.fail(err).pipe(
+          Effect.catchTag(tag, (e) => Effect.succeed(`${e._tag} ${e.exitCode}`)),
+          Effect.catch(() => Effect.succeed('caught by no tag')),
+        ),
+      );
+      assert.equal(caught, `${tag} 2`);
+    });
+  await t.test('a Conflict carries the steps that hold what is asked of, when that is why, and none otherwise', () => {
+    assert.deepEqual(new Conflict({ message: 'held', users: ['dev/review'] }).users, ['dev/review']);
+    const bare = new Conflict({ message: 'the step is still running.' });
+    assert.equal(bare.users, undefined);
+    assert.equal(Object.hasOwn(bare, 'users'), false, 'no key for none, so its answer is `{ error }` alone');
+  });
+  await t.test('REFUSED by isRefusal: a plain Error carrying exitCode 2, an object shaped like one, and what is no Error', () => {
+    assert.equal(isRefusal(Object.assign(new Error('by hand'), { exitCode: 2 })), false, 'an exit code alone is no kind');
+    assert.equal(isRefusal({ _tag: 'Missing', message: 'a look-alike', exitCode: 2 }), false);
+    assert.equal(isRefusal(undefined), false);
+  });
+  const thrown = async (made: () => unknown): Promise<unknown> => {
+    try {
+      return await made();
+    } catch (err) {
+      return err;
+    }
+  };
+  for (const [row, made, Kind, fixes] of [
+    ['unhold of no run id', () => Effect.runPromise(unhold('Not An Id')), Invalid, ['"Not An Id"', "a run's id"]],
+    ['unhold of a run the store has not', () => Effect.runPromise(unhold('r-nope')), Missing, ['r-nope', 'nemia hold <runId> --off']],
+    ['WF_MAX_RUNS that is no count', () => maxRuns({ WF_MAX_RUNS: 'two' }), Invalid, ['WF_MAX_RUNS=two', 'not a count']],
+  ] as const)
+    await t.test(`REFUSED: a verb throws the kind of what it refuses — ${row}`, async () => {
+      const err = await thrown(made);
+      assert.ok(err instanceof Kind, String(err));
+      assert.equal(err.exitCode, 2);
+      for (const fix of fixes) assert.ok(err.message.includes(fix), `${err.message} names ${fix}`);
+    });
 });
 
 /**

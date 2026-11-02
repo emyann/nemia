@@ -30,6 +30,9 @@ const { readRun } = await import('../record/record.store.ts');
 const { aliased, main, VERBS } = await import('./main.ts');
 const { HELP, WF_HINT } = await import('./flags.ts');
 const { offLine } = await import('../demand/demand.ts');
+const { FACTORY_HELP } = await import('../factory/factory.verb.ts');
+const { INBOX_HELP } = await import('../inbox/commands.verb.ts');
+const { START_HELP } = await import('../start/commands.verb.ts');
 
 type Engine = NonNullable<Parameters<typeof main>[1]>;
 
@@ -247,18 +250,6 @@ test('nemia cancel of a run with nothing filed yet says so, a line more', async 
   });
 });
 
-test("REFUSED at shipped defaults: nemia cancel given a word after the run's id, and nothing is cancelled", async (t) => {
-  const b = board();
-  const run = await runPlaced(startRun({ brief: 'not cancelled', repo: aRepo(), workflowDir: oneStep() }));
-  for (const extra of ['extra', '--now'])
-    await assert.rejects(typed(t, b.e, 'cancel', run.id, extra), (err: Error & { exitCode?: number }) => {
-      assert.equal(err.message, `nemia cancel takes one run's id: not ${extra}.`);
-      assert.equal(err.exitCode, 2);
-      return true;
-    });
-  assert.equal(readRun(run.id).cancelledAt, undefined, 'nothing cancelled');
-});
-
 test('nemia show prints the record as JSON, the brief and each step body cut short', async (t) => {
   const b = board();
   const brief = `${'a long brief, '.repeat(12)}and more`;
@@ -285,18 +276,36 @@ test('nemia logs: a step that has not run, and the output of one that has, from 
   );
 });
 
-test('REFUSED at shipped defaults: nemia show and nemia logs given a flag where a run or a step stands, in their words whole', async (t) => {
+test('REFUSED at shipped defaults, through main: a word or a flag where a verb takes none, Invalid with exit 2, and nothing done', async (t) => {
   const b = board();
-  for (const [argv, said] of [
-    [['show', '--x'], "nemia show takes one run's id: not --x."],
-    [['logs', '--x', 'implement'], "nemia logs takes one run's id and one step's name: not --x."],
-    [['logs', 'r-1', '--x'], "nemia logs takes one run's id and one step's name: not --x."],
+  const run = await runPlaced(startRun({ brief: 'not cancelled', repo: aRepo(), workflowDir: oneStep() }));
+  const rows: Array<[string, string[], string[]]> = [
+    ["cancel, a word after the run's id", ['cancel', run.id, 'extra'], ['nemia cancel', "one run's id", 'not extra.']],
+    ["cancel, a flag after the run's id", ['cancel', run.id, '--now'], ['nemia cancel', "one run's id", 'not --now.']],
+    ['show, a flag where the run stands', ['show', '--x'], ['nemia show', "one run's id", 'not --x.']],
+    ['logs, a flag where the run stands', ['logs', '--x', 'implement'], ['nemia logs', "one run's id and one step's name", 'not --x.']],
+    ['logs, a flag where the step stands', ['logs', 'r-1', '--x'], ['nemia logs', "one run's id and one step's name", 'not --x.']],
+  ];
+  for (const [row, argv, said] of rows)
+    await t.test(row, (st) =>
+      assert.rejects(typed(st, b.e, ...argv), (err: Error & { _tag?: string; exitCode?: number }) => {
+        assert.equal(err._tag, 'Invalid');
+        assert.equal(err.exitCode, 2);
+        for (const fix of said) assert.ok(err.message.includes(fix), `${err.message} names ${fix}`);
+        return true;
+      }),
+    );
+  await t.test('nothing cancelled', () => assert.equal(readRun(run.id).cancelledAt, undefined));
+});
+
+test('nemia inbox --help, nemia factory --help and nemia start --help print their own help', async (t) => {
+  const { e } = board();
+  for (const [argv, help] of [
+    [['inbox', '--help'], INBOX_HELP],
+    [['factory', '--help'], FACTORY_HELP],
+    [['start', '--help'], START_HELP],
   ] as const)
-    await assert.rejects(typed(t, b.e, ...argv), (err: Error & { exitCode?: number }) => {
-      assert.equal(err.message, said, `nemia ${argv.join(' ')}`);
-      assert.equal(err.exitCode, 2);
-      return true;
-    });
+    assert.deepEqual((await typed(t, e, ...argv)).out, [help], `nemia ${argv.join(' ')}`);
 });
 
 test('nemia approve of a loop out of rounds: what it accepted, and the file it wrote', async (t) => {

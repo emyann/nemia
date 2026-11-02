@@ -5,8 +5,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { Missing } from '../refusal/refusal.ts';
-import { HOME } from '../record/record.store.ts';
-import { knownRepos } from '../folder/write.store.ts';
+import { knownReposAt } from '../folder/write.store.ts';
 import { agentVersion, loadAgents, repositoryRoots, sourceSkills } from '../agents/read.store.ts';
 import { AGENTS_FOLDER } from '../step/step.ts';
 import { yoursOf } from '../yours/yours.ts';
@@ -37,11 +36,11 @@ function sourcesIn(place: AgentSourcePlace, repo: string | null, dir: string, ho
  * looks (`repositoryRoots`); then the library of the store `home`; then the folder `at`, when named. A folder named that is not there is
  * refused as `Missing`.
  */
-export function agentSources({ at, home = HOME }: { at?: string; home?: string } = {}): { sources: AgentSource[] } {
+export function agentSources({ at, home }: { at?: string; home: string }): { sources: AgentSource[] } {
   const named = at === undefined ? undefined : path.resolve(at);
   if (named !== undefined && !fs.statSync(named, { throwIfNoEntry: false })?.isDirectory())
     throw new Missing({ message: `${named} is not a folder: name the folder that holds the agent files, <folder>/<name>.md.` });
-  const repos = [...knownRepos()].sort();
+  const repos = [...knownReposAt(home)].sort();
   return {
     sources: [
       ...repos.flatMap((repo) =>

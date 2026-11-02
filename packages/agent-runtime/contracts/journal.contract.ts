@@ -49,10 +49,13 @@ const appendSpec = spec<
         event.kind !== 'filed' && !held.journal ? output?.reason === 'not-filed' : true,
     },
     attemptsInOrder: {
-      description: 'A start to a filed task is refused attempt-out-of-order exactly when it is not numbered the count of starts plus one',
+      description:
+        'A start to a filed task numbered the count of starts plus one is taken, and any other start to it is refused attempt-out-of-order',
       condition: ({ input: [_idRefusal, event, held], output }) =>
         event.kind === 'starting' && held.journal
-          ? (event.attempt !== held.started + 1) === (output?.reason === 'attempt-out-of-order')
+          ? event.attempt === held.started + 1
+            ? output === undefined
+            : output?.reason === 'attempt-out-of-order'
           : true,
     },
     otherwiseTaken: {

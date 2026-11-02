@@ -133,9 +133,9 @@ const LIST = commandNamed('skills');
 const READ = commandNamed('skills show');
 const WRITE = commandNamed('skills write');
 
-/** Each skill folder of `dirs` read now, through the table's `skills`, by folder. */
-const readsOf = async (e: Engine['Service'], placeService: PlaceService['Service'], dirs: readonly string[]) =>
-  (await runPlaced(placeService, e, LIST.handler({ skills: dirs }))) as Record<string, SkillRead>;
+/** Each skill folder of `dirs` read now, through the table's `skills` at the store's root `home`, by folder. */
+const readsOf = async (e: Engine['Service'], placeService: PlaceService['Service'], dirs: readonly string[], home: string) =>
+  (await runPlaced(placeService, e, LIST.handler({ skills: dirs }, undefined, home))) as Record<string, SkillRead>;
 
 /**
  * The reading of the folder `dir` among `reads`, which the table's `skills` gives for each folder it was asked: thrown, naming the
@@ -191,7 +191,7 @@ export async function listSkills(
   const dirOf = ([name, at]: (typeof sorted)[number]) =>
     at instanceof WorkflowError ? (skillDirIn([yours.dir, inRepo.dir], name) ?? path.join(yours.dir, name)) : at;
   const builtinNames = skillFolders(builtin);
-  const reads = await readsOf(e, placeService, [...sorted.map(dirOf), ...builtinNames.map((name) => path.join(builtin, name))]);
+  const reads = await readsOf(e, placeService, [...sorted.map(dirOf), ...builtinNames.map((name) => path.join(builtin, name))], home);
   const where = new Map<string, 'yours' | 'repo'>();
   for (const [name, at] of sorted) {
     const dir = dirOf([name, at]);
@@ -420,7 +420,7 @@ export async function skillDetail(
   const dir = skillDirOf(from, name, repo, home, builtin);
   if (dir === null) return null;
   const users = skillUsers(dir, name, repo);
-  const { text, version, ...read } = (await runPlaced(placeService, e, READ.handler({ from, name, dir }))) as SkillPage;
+  const { text, version, ...read } = (await runPlaced(placeService, e, READ.handler({ from, name, dir }, undefined, home))) as SkillPage;
   const skill = skillRow(
     name,
     dir,
@@ -575,7 +575,7 @@ export const skills = new Hono<ApiEnv>()
       const agents = yourAgentsSkills(home)
         .filter(([, given]) => given.includes(name))
         .map(([agent]) => agent);
-      const reading = readAt(await readsOf(e, placeService, [copied.dir]), copied.dir);
+      const reading = readAt(await readsOf(e, placeService, [copied.dir], home), copied.dir);
       return c.json({ skill: skillRow(name, copied.dir, 'yours', reading, agents), written: copied.written } satisfies SkillAdded, 201);
     }),
   )

@@ -1,17 +1,20 @@
 /**
  * An agent copied into a person's library from its file anywhere (`copyAgent`, `AGENTS_COPY`): the agent, the result schema its `output:`
  * names and every skill it gives that is not a builtin place skill, with the record of where it came from (`writeCopyRecord`). It
- * judges the copy through its store (`copy.store.ts`) and writes it through the library's writers, the agent's (`writeAgent`) and a
- * skill's (`copySkill`), which no store may import. A part the library already holds as it is, is reused.
+ * judges the copy through its store (`copy.store.ts`) and writes it through the library's doors, the Agent door's write and the Skill
+ * door's copy, each checked there as any write is. A part the library already holds as it is, is reused.
  */
 import path from 'node:path';
+import { Effect } from 'effect';
 import { tried } from '../runtime-client.ts';
 import type { Command } from '../command/entry.verb.ts';
-import { HOME } from '../record/record.store.ts';
+import { StoreRoot } from '../config/root.store.ts';
+import { rooted } from '../wiring/wire.verb.ts';
 import { Conflict, Invalid } from '../refusal/refusal.ts';
 import { writerSpec, writerText, yourSkillsDir, yoursOf } from '../yours/yours.ts';
-import { writeAgent } from '../agents/agents.store.ts';
-import { copySkill } from '../skills/skills.store.ts';
+import { AgentDoor } from '../agents/agent-door.store.ts';
+import { SkillDoor } from '../skills/skill-door.store.ts';
+import { AgentName, SkillName } from '../agents/agents.model.ts';
 import {
   partsOf,
   readSource,
@@ -38,7 +41,23 @@ export type AgentCopied = { name: string; copied: string[]; reused: string[]; re
  * otherwise, all named in one `Conflict` with its fix — `--as` for the agent, `--keep` for a skill or the schema. A write that fails
  * removes the skills, the schema and the agent this copy wrote.
  */
-export function copyAgent({ file, as, keep = [], home = HOME }: { file: string; as?: string; keep?: readonly string[]; home?: string }) {
+export const copyAgent = Effect.fn('copyAgent')(function* ({
+  file,
+  as,
+  keep = [],
+  home,
+}: {
+  file: string;
+  as?: string;
+  keep?: readonly string[];
+  home: string;
+}) {
+  const judged = yield* tried(() => judgedCopy(file, as, keep, home));
+  return yield* writeCopy(judged.source, judged.skills, judged.parts, home);
+});
+
+/** The copy judged whole before a byte is written (`copyAgent`): its source, its skills and its parts, or the refusal of it. */
+function judgedCopy(file: string, as: string | undefined, keep: readonly string[], home: string) {
   const source = readSource(file, as);
   const skills = skillsOf(source, home);
   const parts = partsOf(source, skills, keep, home);
@@ -54,41 +73,47 @@ export function copyAgent({ file, as, keep = [], home = HOME }: { file: string; 
     });
   const differ = parts.filter((p) => !p.same && !p.kept);
   if (differ.length) throw new Conflict({ message: `nothing was copied: ${differ.map((p) => p.differs).join(' ')}` });
-  return writeCopy(source, skills, parts, home);
+  return { source, skills, parts };
 }
 
 /**
- * The parts of a copy judged by `copyAgent` written, in order — the skills, the agent with its schema through the library's writers, a
- * schema alone beside an agent the library holds, the record — and every file this copy wrote removed if one fails, the record's
- * write included. A part the library holds is not written, nor removed.
+ * The parts of a copy judged by `copyAgent` written, in order — the skills through the Skill door, the agent with its schema through the
+ * Agent door, a schema alone beside an agent the library holds, the record — and every file this copy wrote removed if one fails, the
+ * record's write included. A part the library holds is not written, nor removed.
  */
-function writeCopy(source: Source, skills: readonly SourceSkill[], parts: readonly Part[], home: string): AgentCopied {
-  const { name } = source.draft;
-  const held = (part: string): boolean => parts.some((p) => p.part === part && p.held);
-  const copied: string[] = [];
-  const made: string[] = [];
-  try {
-    for (const skill of skills) {
-      if (held(skill.name)) continue;
-      made.push(copySkill(path.dirname(skill.dir), yourSkillsDir(home), skill.name, { anywhere: true }).dir);
-      copied.push(skill.name);
-    }
-    const schema = source.schema && !held(source.schema.file) ? source.schema : null;
-    if (!held(`agents/${name}.md`)) {
-      const wrote = writeAgent(yoursOf('agents', home), source.draft, { version: null, ...(schema && { schema }), anywhere: true });
-      made.push(...wrote.written.map((f) => path.join(wrote.dir, f)));
-      copied.push(...(schema ? [schema.file] : []), `agents/${name}.md`);
-    } else if (schema) {
-      made.push(writeCopySchema(home, schema));
-      copied.push(schema.file);
-    }
-    const record = writeCopyRecord(home, name, source.file);
-    return { name, copied, reused: parts.map((p) => p.part).filter((p) => !copied.includes(p)), record };
-  } catch (err) {
-    removeWritten(made);
-    throw err;
-  }
-}
+const writeCopy = (source: Source, skills: readonly SourceSkill[], parts: readonly Part[], home: string) =>
+  Effect.gen(function* () {
+    const { name } = source.draft;
+    const held = (part: string): boolean => parts.some((p) => p.part === part && p.held);
+    const copied: string[] = [];
+    const made: string[] = [];
+    const { skills: skillDoor } = yield* SkillDoor;
+    const { agents } = yield* AgentDoor;
+    const write = Effect.gen(function* () {
+      for (const skill of skills) {
+        if (held(skill.name)) continue;
+        const one = yield* skillDoor.copy(SkillName.read(skill.name), path.dirname(skill.dir), yourSkillsDir(home), { anywhere: true });
+        made.push(one.dir);
+        copied.push(skill.name);
+      }
+      const schema = source.schema && !held(source.schema.file) ? source.schema : null;
+      if (!held(`agents/${name}.md`)) {
+        const wrote = yield* agents.write(AgentName.read(name), source.draft, undefined, {
+          dir: yoursOf('agents', home),
+          anywhere: true,
+          ...(schema && { schema }),
+        });
+        made.push(...wrote.written.map((f) => path.join(wrote.dir, f)));
+        copied.push(...(schema ? [schema.file] : []), `agents/${name}.md`);
+      } else if (schema) {
+        made.push(yield* tried(() => writeCopySchema(home, schema)));
+        copied.push(schema.file);
+      }
+      const record = yield* tried(() => writeCopyRecord(home, name, source.file));
+      return { name, copied, reused: parts.map((p) => p.part).filter((p) => !copied.includes(p)), record };
+    });
+    return yield* write.pipe(Effect.tapCause(() => Effect.sync(() => removeWritten(made))));
+  });
 
 /** The words of a copy: what it wrote, what it reused, and how the agent is given to a step. */
 const copiedLines = ({ name, copied, reused }: AgentCopied): string[] => [
@@ -128,16 +153,20 @@ export const AGENTS_COPY: Command<AgentCopied> = {
   writes: true,
   class: 'ask',
   route: { method: 'POST', path: '/api/agents/yours/copy', status: 200 },
-  handler: (args, _env, home = HOME) =>
-    tried(() => {
-      const as = writerText(args, 'as');
-      const keep = args.keep;
-      return copyAgent({
-        file: writerText(args, 'file') ?? '',
-        ...(as !== undefined && { as }),
-        keep: Array.isArray(keep) ? keep.map(String) : [],
-        home,
-      });
-    }),
+  handler: (args, _env, home) =>
+    rooted(
+      home,
+      'nemia agents copy',
+      Effect.gen(function* () {
+        const as = writerText(args, 'as');
+        const keep = args.keep;
+        return yield* copyAgent({
+          file: writerText(args, 'file') ?? '',
+          ...(as !== undefined && { as }),
+          keep: Array.isArray(keep) ? keep.map(String) : [],
+          home: yield* StoreRoot,
+        });
+      }),
+    ),
   print: copiedLines,
 };

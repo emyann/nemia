@@ -81,7 +81,7 @@ function HoverPreview({ run, step, asOf, children }: { run: RailRun; step: RailS
     <PreviewTrigger delay={warm ? 0 : undefined} onOpenChange={opened}>
       <Button
         ref={bar}
-        aria-label={barSaid(step.name, step.state, step.on)}
+        aria-label={barSaid(step.name, step.state, step.on, run.holding != null)}
         data-step-bar={step.name}
         data-step-preview="card"
         className={BAR_BUTTON}
@@ -105,7 +105,7 @@ function HoverPreview({ run, step, asOf, children }: { run: RailRun; step: RailS
 /** A bar where no pointer hovers or the window is compact: a press opens the same card in the kit's modal bottom sheet. */
 function SheetPreview({ run, step, asOf, children }: { run: RailRun; step: RailStep; asOf: Date; children: ReactNode }) {
   const [open, setOpen] = useState(false);
-  const said = barSaid(step.name, step.state, step.on);
+  const said = barSaid(step.name, step.state, step.on, run.holding != null);
   return (
     <>
       <Button aria-label={said} data-step-bar={step.name} data-step-preview="sheet" className={BAR_BUTTON} onPress={() => setOpen(true)}>

@@ -4477,7 +4477,7 @@ test('on a run a person holds, a step at its gate is drawn held — no human gat
   );
 });
 
-test("a held run's rail draws its gate and the steps not filed held, and its work at work", () => {
+test("a held run's rail draws its gate held, its steps not filed as any step to come (grey blocks read as almost done) whose hover says the hold, and its work at work", () => {
   const held = {
     ...summaryRun(),
     waitingOnYou: [],
@@ -4488,7 +4488,12 @@ test("a held run's rail draws its gate and the steps not filed held, and its wor
   } as unknown as RunSummary;
   const html = railMarkup(held);
   const pills = Object.fromEntries([...html.matchAll(/<li data-step="([^"]+)" data-state="([^"]+)"/g)].map((m) => [m[1], m[2]]));
-  assert.deepEqual(pills, { implement: 'verified', tokens: 'unverified', review: 'working', theme: 'held', respond: 'held' }, html);
+  assert.deepEqual(pills, { implement: 'verified', tokens: 'unverified', review: 'working', theme: 'held', respond: 'waiting' }, html);
+  assert.match(
+    html,
+    /<li data-step="respond" data-state="waiting" title="respond: to come — [^"]*holds the run/,
+    'its hover says the hold',
+  );
 });
 
 test('a hold is drawn between two cards as an --after edge is: from the run it is held until into the held card, dashed — and none once it landed', () => {

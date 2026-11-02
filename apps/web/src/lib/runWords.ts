@@ -111,6 +111,9 @@ export function waitTag(row: WaitingRow): string {
   return wait ? wordsOf(wait.kind).tag(wait) : ANY_WAIT.tag({ step: null, done: 0 });
 }
 
+/** The states of a step not started: on a held run, what it does now is the hold, though its step is drawn as any step to come. */
+const NOT_STARTED: readonly StepState[] = ['waiting', 'waiting-for-slot'];
+
 /** The states of a step a run is past. */
 const PAST: readonly StepState[] = ['verified', 'unverified'];
 
@@ -141,15 +144,18 @@ export type Now = { word: string; note: string };
 
 /**
  * What a run in flight does now: its first step not done, by the rail's word for its state, and its name and its place among the run's
- * steps as the note (`implement (2 of 4)`). None for a run whose every step is done. It says no duration: the row's Clock column says
- * how long the run has been at work, and a second time in the note beside it read as one word and said the same thing twice.
+ * steps as the note (`implement (2 of 4)`); on a run a person holds whose step is not started, the hold's word, which is why it has not
+ * (`held`, the step itself drawn as any step to come). None for a run whose every step is done. It says no duration: the row's Clock
+ * column says how long the run has been at work, and a second time in the note beside it read as one word and said the same thing twice.
  */
 export function nowOf(row: WaitingRow): Now | null {
-  const states = railStates(row.steps, Boolean(row.cancelledAt), row.holding != null);
+  const held = row.holding != null;
+  const states = railStates(row.steps, Boolean(row.cancelledAt), held);
   const at = states.findIndex((step) => !PAST.includes(step.state));
   const step = states[at];
   if (!step) return null;
-  return { word: stateWordsOf(step.state, step.on).rail, note: `${step.name} (${at + 1} of ${states.length})` };
+  const word = held && NOT_STARTED.includes(step.state) ? PERSON.held.rail : stateWordsOf(step.state, step.on, held).rail;
+  return { word, note: `${step.name} (${at + 1} of ${states.length})` };
 }
 
 /** How a finished run ended, as the page says it: a word, its whole sentence, and the hue it is drawn in. */
@@ -213,11 +219,12 @@ export const railSaid = (
   held: boolean,
 ): string =>
   railStates(steps, cancelled, held)
-    .map((step) => `${step.name} ${stateWordsOf(step.state, step.on).rail}`)
+    .map((step) => `${step.name} ${stateWordsOf(step.state, step.on, held).rail}`)
     .join(', ');
 
 /** A bar of the rail as a button says it: its step's name and the rail's word for its state, `implement, at work`. */
-export const barSaid = (name: string, state: StepState, on: WaitOn | null): string => `${name}, ${stateWordsOf(state, on).rail}`;
+export const barSaid = (name: string, state: StepState, on: WaitOn | null, held: boolean): string =>
+  `${name}, ${stateWordsOf(state, on, held).rail}`;
 
 /**
  * The parts of a date as a person reads it in `timeZone`, theirs by default: its year, its month in three letters and its day; each

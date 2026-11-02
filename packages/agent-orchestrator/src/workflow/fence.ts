@@ -46,6 +46,18 @@ export const editsUnasked = (mode: string | undefined): boolean => {
   return rankOf(modes, mode ?? modes.given) >= modes.writes;
 };
 
+/**
+ * Whether a session in permission mode `mode` — the runtime's default when `undefined` — writes outside its directory only where a rule
+ * allows it: every mode up to the narrowest that edits unasked (`editsUnasked`), which edits in its directory alone. Wider ones — a
+ * classifier's, or the mode that asks about nothing — may write anywhere, so a deny of a folder takes from them a write they had. False
+ * for a word the harness does not take, which the runtime refuses itself.
+ */
+export const writesOutsideByRule = (mode: string | undefined): boolean => {
+  const modes = reachOf();
+  const word = mode ?? modes.given;
+  return Object.hasOwn(modes.rank, word) && rankOf(modes, word) <= modes.writes;
+};
+
 /** The allow rules a session held to its directory keeps, as the path patterns covering every path inside it (`pathCovers`). */
 const IN_DIRECTORY = ['Edit(**)', 'Read(**)'];
 

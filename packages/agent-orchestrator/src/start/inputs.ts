@@ -126,9 +126,9 @@ function namedWords(step: string, files: HandedFiles | undefined): string {
 /**
  * What a step's brief says of the folders its run mounts, under what was asked for: each by its absolute path, those its `writable:` names
  * to write (`stepMounts`), the others to read and never write; then the folders it is filed with beyond them (`folders`, as `filedFolders`
- * in filed.ts files them), to read and never write: the artifacts folders of the steps before it (`handed`), each with how to list it, and
- * the store's folders its `reads:` names (`store`); a blank line before them. Nothing for a run that mounts none and a step given no other
- * folder, and for a step on a remote agent, which is filed none.
+ * in filed.ts files them), to read and never write: its own files directory (`own`), the artifacts folders of the steps before it
+ * (`handed`), each with how to list it, and the store's folders its `reads:` names (`store`); a blank line before them. Nothing for a run
+ * that mounts none and a step given no other folder, and for a step on a remote agent, which is filed none.
  */
 export const mountsLine = (
   step: Pick<Workflow, 'harness' | 'writable'>,
@@ -138,7 +138,8 @@ export const mountsLine = (
   const local = !isRemoteHarness(step.harness);
   const mounts = local ? stepMounts(step, run.mounts) : undefined;
   const { handed, store } = local ? folders : { handed: [], store: [] };
-  if (!mounts?.length && !handed.length && !store.length) return [];
+  const own = (local ? folders.own : undefined) ?? [];
+  if (!mounts?.length && !own.length && !handed.length && !store.length) return [];
   const writes = (mounts ?? []).filter((m) => !m.readOnly);
   const reads = (mounts ?? []).filter((m) => m.readOnly);
   return [
@@ -151,6 +152,11 @@ export const mountsLine = (
     ...(reads.length
       ? [
           `Folders of this factory you may read, and must not write: ${pathsOf(reads)}. Each is mounted read-only; your own work stays in your workspace.`,
+        ]
+      : []),
+    ...(own.length
+      ? [
+          `Your own files directory, which you may read, and must not write: ${pathsOf(own)}. It is mounted read-only, so Read, Grep and Glob reach what your tools save there, a snapshot or a screenshot.`,
         ]
       : []),
     ...(handed[0] ? [handedLine(handed[0], handed, folders.named, folders.closeouts)] : []),

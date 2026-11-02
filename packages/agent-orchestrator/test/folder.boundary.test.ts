@@ -548,8 +548,8 @@ test('a folder team with a fan-in, given files at its start: what each brief tel
   }
   assert.deepEqual(
     tasks.get(`${run.id}-c`)!.spec.config?.mounts?.map((m) => path.basename(m.path)),
-    ['a', 'b'],
-    "c is filed a's and b's artifacts folders, so its brief is held to naming them",
+    ['c', 'a', 'b'],
+    "c is filed its own files folder, read-only, and a's and b's artifacts folders, so its brief is held to naming them",
   );
   assert.match(tasks.get(`${run.id}-c`)!.spec.brief, /- a: `given\/from\/a`\n- b: `given\/from\/b`/);
   assert.match(

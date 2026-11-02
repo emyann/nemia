@@ -55,7 +55,9 @@ const paths = () =>
 /**
  * The document: the run object's Schema (`components.schemas.Run`) and each sub-resource's answer's beside it, and the routes of the run
  * and its sub-resources, read off their entries, each naming its answer's component. `GET /api/runs/:runId?view=page`, the board's page
- * until it reads the object, is not documented.
+ * until it reads the object, is not documented. Nor is `GET /api/runs/:runId/lines`, the lines read beside the object
+ * (`RunLinesAnswer`): an api address type and command text, no answer of an entry of the command table, which the board mirrors by hand
+ * (`apps/web/src/lib/api/run.ts`); the generated mirror is the object's alone.
  */
 export function openapiDocument() {
   const { definitions } = RunObject.runDocument();

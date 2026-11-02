@@ -15,6 +15,8 @@ import {
   viewsFor,
   runWith,
   runObject,
+  runLines,
+  type RunLines,
   runPage,
   type RunObject,
   type RunSummary,
@@ -39,6 +41,13 @@ export type RunAnswer = RunObject.Run;
  * A run as its page answers it, under `GET /api/runs/:id?view=page`: in full (`RunDetail`), and the address of its workflow's page, null
  * where the board pages none. The board's until it reads the run object and its sub-resources.
  */
+/**
+ * The lines read beside the run object (`GET /api/runs/:runId/lines`): the command lines a person types about the run and each of its
+ * steps (`runLines`), where it came from, and the address of its workflow's page (`workflowPageOf`), as the list gives it. Constant for a
+ * run, off its record alone: the board reads it once and never again on the feed.
+ */
+export type RunLinesAnswer = RunLines & { workflowPage: WorkflowPageAddress | null };
+
 export type RunPage = RunDetail & { workflowPage: WorkflowPageAddress | null };
 
 /** What the list adds to a row: the address of its workflow's page, null where the board pages none. */
@@ -141,6 +150,11 @@ const CONCLUDED = commandNamed('concluded');
  *   404 when there is no such run, and with a 502 when a task it reads does not, in the words the list says it with
  *   (`RunSummary.unreadable`). Under `?view=page` it answers the run's page (`runPage`, `RunPage`), the board's until it reads the
  *   object; any other `view` is a 422 naming the one it takes.
+ * - `GET /api/runs/:runId/lines` — the lines beside the object (`RunLinesAnswer`): the run's `decide` and `refresh` lines, each step's
+ *   `approve`, `retry` and `say` by its name, where it came from (`fromNote`, null for a run started from no card), and the address of
+ *   its workflow's page (`workflowPageOf`), the one the list gives the run. Off the run's record alone (`runLines`): it judges nothing and
+ *   reads no task, and it is constant for the run, so the board reads it once. Served by hand, as no entry of the command table answers
+ *   it; a 404 when there is no such run, as the object's route.
  * - `GET /api/runs/:runId/decision` — what `nemia decide` shows a person (`decisionOf`), the route of its entry of the command table. Not
  *   on the page's poll, since it runs `git diff`. Refused as the run's page is: a 404 with no such run, and a 502 when a task it reads does
  *   not, in the words the list says it with (`RunSummary.unreadable`).
@@ -214,6 +228,14 @@ export const runs = new Hono<ApiEnv>()
       const object = await runPlaced(s, s.e, runObject(run, s));
       if ('unjudged' in object) return c.json({ error: object.unjudged }, 502);
       return c.json(object satisfies RunAnswer);
+    }),
+  )
+  .get('/api/runs/:runId/lines', (c) =>
+    served(c, async ({ repo, home }) => {
+      const id = c.req.param('runId');
+      const run = findRun(id);
+      if (!run) return c.json({ error: noSuchRun(id) }, 404);
+      return c.json({ ...runLines(run), workflowPage: workflowPageOf(run, repo, home) } satisfies RunLinesAnswer);
     }),
   )
   .get('/api/runs/:runId/decision', (c) =>

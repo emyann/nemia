@@ -293,8 +293,7 @@ export {
   takeStore,
 } from './daemon/daemon.store.ts';
 export type { TakenStore } from './daemon/daemon.store.ts';
-export { holdUrl, runMain, up } from './daemon/up.verb.ts';
-export type { QuotaAsk, UpOptions } from './daemon/up.verb.ts';
+export { holdUrl, type QuotaAsk, runMain, up, type UpOptions } from './daemon/up.verb.ts';
 export { ensureDaemon, liveDemandHost } from './demand/demand.verb.ts';
 export type { DemandHost } from './demand/demand.verb.ts';
 export { telemetryLayer } from './telemetry/telemetry.store.ts';
@@ -459,6 +458,7 @@ export { admitted } from './admission/admit.verb.ts';
 export { PRUNE, RM } from './command/runs.verb.ts';
 export { CLOSEOUT, LOGS, STATS, TOLD, TRIES, TRY } from './command/reads.verb.ts';
 export { runObject, type RunObjectAnswer, type TryCloseout } from './object/run.verb.ts';
+export { runLines, type RunLines, type StepCommands } from './object/lines.ts';
 export { folderRefusal, START } from './start/commands.verb.ts';
 export { INBOX, INBOX_ADD, INBOX_QUEUE } from './inbox/commands.verb.ts';
 export { FACTORY } from './factory/factory.verb.ts';

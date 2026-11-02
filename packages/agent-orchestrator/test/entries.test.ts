@@ -535,6 +535,7 @@ const PINNED: Record<string, string[]> = {
     'refusedName',
     'runPage',
     'runObject',
+    'runLines',
     'tailOf',
     'totalOf',
     'turnOfTry',

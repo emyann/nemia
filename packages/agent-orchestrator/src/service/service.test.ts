@@ -244,7 +244,7 @@ const READ: ServiceRead = {
 };
 
 test('status names the unit, the checkout it runs, that its own process holds the store, and lingering', () => {
-  const lines = statusLines(READ, lease(4242), true, { now: 0, user: 'ann' });
+  const lines = statusLines(READ, lease(4242), true, { now: 0, user: 'ann', pause: null });
   assert.match(lines[0], /^service nemia \(systemd\): active, enabled, pid 4242 — \/srv\/ann\/\.config\/systemd\/user\/nemia\.service$/);
   assert.match(lines[1], /runs the checkout at \/srv\/ann\/nemia: .*main\.ts with .*node$/);
   assert.match(lines[2], /^daemon: the api of pid 4242 at http:\/\/127\.0\.0\.1:8787, ticking/);
@@ -256,18 +256,40 @@ test('status beside a hand daemon names its pid and the take-over line; uninstal
   const beside = statusLines({ ...READ, state: { active: 'inactive', enabled: 'enabled', pid: null } }, lease(999), false, {
     now: 0,
     user: 'ann',
+    pause: null,
   });
   assert.ok(
     beside.some((l) => /pid 999 is not the service's: nemia service install --take-over 999 hands the store/.test(l)),
     beside.join('\n'),
   );
   assert.ok(beside.some((l) => /lingering: off .* loginctl enable-linger ann/.test(l)));
-  const none = statusLines({ ...READ, name: 'nemia-trial', unit: null, state: null }, lease(999), undefined, { now: 0, user: 'ann' });
+  const none = statusLines({ ...READ, name: 'nemia-trial', unit: null, state: null }, lease(999), undefined, {
+    now: 0,
+    user: 'ann',
+    pause: null,
+  });
   assert.match(none[0], /not installed .* nemia service install writes it/);
   assert.ok(
     none.some((l) => /pid 999 is started by hand: nemia service install --name nemia-trial --take-over 999/.test(l)),
     none.join('\n'),
   );
-  const stopped = statusLines(READ, lease(4242, 'stopped'), true, { now: 0, user: 'ann' });
+  const stopped = statusLines(READ, lease(4242, 'stopped'), true, { now: 0, user: 'ann', pause: null });
   assert.match(stopped[2], /^daemon: none ticking/);
+});
+
+test('status names a pause that stands, since when, by whom and why, and says none where none stands', () => {
+  const at = '2026-11-02T20:17:21.653Z';
+  const why = 'need to put the laptop on sleep';
+  const paused = statusLines(READ, lease(4242), true, { now: 0, user: 'ann', pause: { at, by: 'yrnd1', why } });
+  const said = paused.filter((l) => l.startsWith('pause: '));
+  assert.equal(said.length, 1, paused.join('\n'));
+  assert.ok(said[0].includes(at) && said[0].includes('yrnd1') && said[0].includes(why), said[0]);
+  const byHand = statusLines(READ, lease(4242), true, { now: 0, user: 'ann', pause: { at, by: 'ann' } });
+  assert.ok(
+    byHand.some((l) => l.startsWith('pause: ') && l.includes('ann')),
+    'a pause with no why still reads, naming who put it',
+  );
+  const none = statusLines(READ, lease(4242), true, { now: 0, user: 'ann', pause: null });
+  assert.equal(none.filter((l) => l.startsWith('pause: ')).length, 0, none.join('\n'));
+  assert.equal(none.length, 5);
 });

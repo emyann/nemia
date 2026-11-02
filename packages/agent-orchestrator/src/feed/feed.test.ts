@@ -28,6 +28,7 @@ import {
   REMOVED,
   upgraded,
   type FeedLine,
+  type FeedPause,
   type FeedWords,
   type Reason,
   type RunLine,
@@ -310,11 +311,14 @@ test("recordFeed writes a one-shot once per occurrence, counted off the feed's o
       const memo = freshFeedMemo();
       const put = '2026-10-16T03:45:00.000Z';
       const again = '2026-10-16T06:00:00.000Z';
-      const pass = (pause: { at: string } | null, m = memo) => recordFeed(new Map(), { at: AT, memo: m, pause });
+      const why = 'need to put the laptop on sleep';
+      const pass = (pause: FeedPause, m = memo) => recordFeed(new Map(), { at: AT, memo: m, pause });
       const words = () => storeLines().map((l) => [l.word, l.note]);
-      await t.test('a pause that stands is one put over many passes', () => {
-        for (let i = 0; i < 10; i++) pass({ at: put });
+      const told = () => storeLines().map((l) => [l.by, l.why, l.message]);
+      await t.test('a pause that stands is one put over many passes, saying who put it and why beside its note', () => {
+        for (let i = 0; i < 10; i++) pass({ at: put, by: 'yrnd1', why });
         assert.deepEqual(words(), [['store paused', `since ${put}`]]);
+        assert.deepEqual(told(), [['yrnd1', why, `store paused by yrnd1 · ${why}`]]);
         assert.deepEqual(
           storeLines().map((l) => [l.involved, l.reason, l.type, l.source, l.waits, l.labels]),
           [[{ kind: 'Store', name: 'store' }, 'StorePaused', 'Normal', 'person', undefined, {}]],
@@ -322,7 +326,7 @@ test("recordFeed writes a one-shot once per occurrence, counted off the feed's o
         );
       });
       await t.test('a daemon with no fold writes the standing put neither again nor never', () => {
-        for (let i = 0; i < 3; i++) pass({ at: put }, freshFeedMemo());
+        for (let i = 0; i < 3; i++) pass({ at: put, by: 'yrnd1', why }, freshFeedMemo());
         assert.equal(storeLines().length, 1);
       });
       await t.test('a pause gone is one lift, sourced person, the put read back off the feed', () => {
@@ -332,9 +336,10 @@ test("recordFeed writes a one-shot once per occurrence, counted off the feed's o
           ['store resumed', `since ${put}`],
         ]);
         assert.equal(storeLines()[1].source, 'person', 'only nemia resume takes the pause away');
+        assert.deepEqual(told()[1], [undefined, undefined, `store resumed · since ${put}`], 'the lift is worded as it was');
       });
-      await t.test('a pause put again is a second put and a second lift, told apart by its moment', () => {
-        for (let i = 0; i < 3; i++) pass({ at: again });
+      await t.test('a pause put again, by hand with no why, is a second put and a second lift, told apart by its moment', () => {
+        for (let i = 0; i < 3; i++) pass({ at: again, by: 'ann' });
         for (let i = 0; i < 3; i++) pass(null);
         for (let i = 0; i < 3; i++) pass(null, freshFeedMemo());
         assert.deepEqual(words(), [
@@ -343,6 +348,13 @@ test("recordFeed writes a one-shot once per occurrence, counted off the feed's o
           ['store paused', `since ${again}`],
           ['store resumed', `since ${again}`],
         ]);
+        assert.deepEqual(told()[2], ['ann', undefined, 'store paused by ann'], 'a pause with no why says who alone');
+      });
+      await t.test('a pause whose file names nobody and gives no why reads as it always did', () => {
+        const bare = '2026-10-16T06:30:00.000Z';
+        pass({ at: bare, by: '' });
+        assert.deepEqual(told().at(-1), [undefined, undefined, `store paused · since ${bare}`]);
+        pass(null);
       });
       await t.test('a caller that read no pause says nothing of the store, however the feed stands', () => {
         pass({ at: '2026-10-16T07:00:00.000Z' });

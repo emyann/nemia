@@ -1,7 +1,8 @@
 /**
  * What `nemia ls` prints of the api's answer (`RunsListed`, `GET /api/listing`): a port of the orchestrator's `lsLines` and its helpers
  * (`list/list.ts`), with the pause it says first (`pausedLines`, `pause/pause.ts`), the daemon's line (`daemonLine`, `daemon/daemon.ts`),
- * the schedules' (`scheduleLines`, `schedule/schedule.ts`) and the words of a wait and a hold (`wait/wait.ts`), word for word. The in-process
+ * the schedules' (`scheduleLines`, `schedule/schedule.ts`) and the words of a wait and a hold
+ * (`wait/wait.ts`), word for word. The in-process
  * `nemia ls --local` prints the same lines, which `test/reads.test.ts` holds equal on a seeded store until the in-process reads retire.
  * Pure: `now` is handed in.
  */
@@ -38,8 +39,6 @@ export function durationWord(ms: number): string {
   if (h < 24) return `${h}h${two(m % 60)}m`;
   return `${Math.floor(h / 24)}d${two(h % 24)}h`;
 }
-
-// The waits and holds (wait/wait.ts).
 
 const waitName = (w: Wait): string =>
   `${w.run}${w.missing ? ' (no such run)' : w.cancelledAt ? ' (cancelled)' : w.gone?.length ? ` (${w.gone.join(', ')} gone)` : w.unread ? ` (where it stands is unread: ${w.unread})` : ''}`;
@@ -94,14 +93,10 @@ function holdAdvice(run: Run, waits: readonly Wait[]): string {
   return `${why.join('; ')} — yours to resolve: ${off}, or nemia cancel ${run.id}`;
 }
 
-// What is to decide (ending/ending.ts).
-
 const toDecideWords = (run: Pick<Run, 'id' | 'branch'>, t: ToDecide): string =>
   t.kind === 'approve'
     ? `${t.says ?? (t.filed ? `${t.step} has signed off at its gate` : `${t.step} has not run: approving runs it`)} — nemia approve ${run.id} ${t.step}`
     : `${t.branches.join(', ')} ${t.branches.length > 1 ? 'are' : 'is'} ahead of ${run.branch}, and nothing has merged ${t.branches.length > 1 ? 'them' : 'it'} — nemia decide ${run.id}`;
-
-// A run's lines (list/list.ts).
 
 const NEEDS_HUMAN = 'needs-human';
 
@@ -155,8 +150,6 @@ function runLines({ run, listed, result }: Row): string[] {
     ...asksLines(run, listed, result),
   ];
 }
-
-// The daemon (daemon/daemon.ts).
 
 const STALE_PASSES = 10;
 const STALE_FLOOR_MS = 15 * 60_000;
@@ -219,8 +212,6 @@ function standingLine(standing: RunsListed['standing'], daemon: DaemonStanding, 
   return `where branches stand: read ${durationWord(age)} ago`;
 }
 
-// The schedules (schedule/schedule.ts).
-
 function fireWord(iso: string, now: number): string {
   const ms = Date.parse(iso) - now;
   return `${iso}, ${ms >= 0 ? `in ${durationWord(ms)}` : `${durationWord(-ms)} ago`}`;
@@ -232,8 +223,6 @@ function scheduleLines(schedules: readonly ScheduleListed[], clock: (iso: string
     ...(s.refused ? [`  refused: ${s.refused}`] : []),
   ]);
 }
-
-// The pause (pause/pause.ts).
 
 const RESUME_LINE = 'nemia resume';
 

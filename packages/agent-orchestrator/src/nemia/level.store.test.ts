@@ -1,6 +1,7 @@
 /**
  * Her definition and her bin, off the disk: `ownBin` finds the folder whose `nemia` is the bin of the package's own tree — the client
- * its workspace links, a global prefix's — and passes over one of another tree; `readNemia` refuses a hand list of her rules, which her fence derives, as
+ * its workspace links, a global prefix's — and passes over one of another tree; `readNemia` refuses a hand
+ * list of her rules, which her fence derives, as
  * `test/agent-fences.test.ts` refuses her a mode but `auto`. Focused on the real disk: npm's links are real symbolic links, and the
  * checkout's own is read. A store of its own, since `WF_ROOT` is read as the module loads.
  */

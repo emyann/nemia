@@ -45,6 +45,9 @@ function run(argv: readonly string[], entry: Entry, env: NodeJS.ProcessEnv, out:
 export const spawned = (argv: readonly string[], entry: Entry = 'nemia', env: NodeJS.ProcessEnv = process.env): Promise<number> =>
   run(argv, entry, env, 'inherit').then(({ code }) => code);
 
-/** Runs `nemia <argv>` in process as `spawned` does, its stdout kept and answered beside its exit code: what a command's answer is read off. */
+/**
+ * Runs `nemia <argv>` in process as `spawned` does, its stdout kept and answered beside its exit code: what a command's answer is read
+ * off.
+ */
 export const captured = (argv: readonly string[], env: NodeJS.ProcessEnv = process.env): Promise<{ code: number; stdout: string }> =>
   run(argv, 'nemia', env, 'pipe');

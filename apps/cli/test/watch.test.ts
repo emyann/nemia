@@ -67,7 +67,6 @@ function child(t: TestContext, proc: ChildProcess) {
   let done = false;
   void ended.then(() => (done = true));
   t.after(() => void proc.kill('SIGKILL'));
-  /** Resolves once `holds` holds of what the child said; rejects when it exits before. */
   const said = <T>(holds: (out: string, err: string) => T | undefined | false): Promise<T> =>
     new Promise((resolve, reject) => {
       const check = () => {

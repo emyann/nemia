@@ -1,6 +1,7 @@
 /**
  * The daemon started on demand, for real: on a scratch store no service serves, `nemia ls` finds no daemon, starts one through the
- * in-process `nemia daemon` (`ensureDaemon`, which spawns the checkout's api in a session of its own), reads the store from it, and the test
+ * in-process `nemia daemon` (`ensureDaemon`, which spawns the checkout's api in a session of its own), reads
+ * the store from it, and the test
  * stops the daemon it started — by the pid in the store's lease, checked first to be a process of that store.
  *
  * Nothing here can reach the person's store or service: the store and the home are scratch folders, so no login service names the store

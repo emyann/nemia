@@ -1,7 +1,7 @@
 /** A step's try and the task that ran it, for the path of that task through the runtime's lifecycle (`engine.path`). */
 import type { Effect } from 'effect';
 import type { Run } from 'agent-orchestrator/run';
-import { turnOfTry } from '../detail/tries.ts';
+import { turnOfTry } from 'agent-orchestrator';
 import type { Engine } from '../store.ts';
 
 /** One transition of a task's path: the lifecycle state its journal says once an entry is on it, the entry's kind and its `at`. */

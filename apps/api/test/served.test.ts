@@ -15,6 +15,8 @@ import { app } from '../src/app.ts';
 /** The routes the api serves that are its own, each with why no entry of the command table declares it. */
 const OWN: Readonly<Record<string, string>> = {
   'GET /api/health': 'the server answering at all, which no command of the orchestrator asks',
+  'GET /openapi/v3/nemia/v1':
+    "the run object's OpenAPI document, the api's description of its own routes around the package's Schema, which no command asks",
   'GET /api/nemia/chat': "Nemia's chat paged, a program of the package's chat and no command, as its writes are none",
   'GET /api/nemia/chat/stream': "Nemia's chat followed, a stream",
   'POST /api/nemia/chat/send':

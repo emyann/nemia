@@ -5,16 +5,16 @@
  * listing (`folderFiles`), and a picture a step's browser wrote into its files directory is linked and drawn where the same picture
  * under `/tmp/playwright-mcp`, where a step's browser wrote before, is its path alone (`artifactOf`).
  */
-import '../../test/harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { artifactsDir, type Views } from 'agent-orchestrator';
-import type { Run } from 'agent-orchestrator/run';
-import type { Workflow } from 'agent-orchestrator/workflow';
-import { closeoutIn } from './tries.ts';
-import { artifactOf, folderFiles, valueOf } from '../steps/artifacts.ts';
+import { artifactsDir } from '../src/record/record.store.ts';
+import type { Views } from '../src/summary/reads.verb.ts';
+import type { Run } from '../src/run.ts';
+import type { Workflow } from '../src/workflow.ts';
+import { closeoutIn } from '../src/resource/tries.verb.ts';
+import { artifactOf, folderFiles, valueOf } from '../src/resource/files.store.ts';
 
 const RUN = { id: 'r-closeout', steps: {} } as unknown as Run;
 const STEP = { name: 'implement', after: [], body: 'x' } as unknown as Workflow;

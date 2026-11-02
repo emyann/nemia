@@ -190,7 +190,6 @@ export type Baseline = Readonly<Record<string, Entry>>;
  */
 const FENCE_WORDS: Baseline = {
   'apps/api/src/capabilities/reach.ts': { count: 17, ...MOVES.fenceForm },
-  'apps/api/src/detail/detail.ts': { count: 13, ...MOVES.fenceForm },
   'apps/api/src/workflows/builder.ts': { count: 2, ...MOVES.fenceForm },
   'apps/api/src/workflows/words.ts': { count: 5, ...MOVES.fenceForm },
   'apps/api/src/workflows/workflows.ts': { count: 13, ...MOVES.fenceForm },
@@ -224,6 +223,8 @@ const FENCE_WORDS: Baseline = {
   'packages/agent-orchestrator/src/nemia/keep.verb.ts': { count: 7, ...MOVES.fenceFields },
   'packages/agent-orchestrator/src/nemia/level.store.ts': { count: 7, ...MOVES.fenceFields },
   'packages/agent-orchestrator/src/record/record.ts': { count: 1, ...MOVES.fenceFields },
+  'packages/agent-orchestrator/src/resource/page.verb.ts': { count: 5, ...MOVES.fenceForm },
+  'packages/agent-orchestrator/src/resource/told.verb.ts': { count: 8, ...MOVES.fenceForm },
   'packages/agent-orchestrator/src/retry/retry-refusal.ts': { count: 3, ...MOVES.fenceFields },
   'packages/agent-orchestrator/src/retry/retry.ts': { count: 10, ...MOVES.fenceFields },
   'packages/agent-orchestrator/src/roster/roster.ts': { count: 1, ...MOVES.fenceFields },
@@ -255,7 +256,6 @@ const HARNESS_WORDS: Baseline = {
   'apps/api/src/app.ts': { count: 3, ...MOVES.quota },
   'apps/api/src/capabilities/capabilities.ts': { count: 27, ...MOVES.reach },
   'apps/api/src/capabilities/reach.ts': { count: 44, ...MOVES.reach },
-  'apps/api/src/detail/detail.ts': { count: 19, card: 'u42s' },
   'apps/api/src/factory/quota.ts': { count: 36, ...MOVES.quota },
   'apps/api/src/stats/stats.ts': { count: 1, card: 'u42s' },
   'apps/api/src/workflows/builder.ts': { count: 3, ...MOVES.defaults },
@@ -304,6 +304,8 @@ const HARNESS_WORDS: Baseline = {
   'packages/agent-orchestrator/src/record/places.store.ts': { count: 1, card: 'slice-2' },
   'packages/agent-orchestrator/src/record/record.store.ts': { count: 2, ...MOVES.wait },
   'packages/agent-orchestrator/src/record/record.ts': { count: 1, card: 'u42s' },
+  'packages/agent-orchestrator/src/resource/page.verb.ts': { count: 7, card: 'u42s' },
+  'packages/agent-orchestrator/src/resource/told.verb.ts': { count: 12, card: 'u42s' },
   'packages/agent-orchestrator/src/retry/retry-refusal.ts': { count: 3, ...MOVES.knobs },
   'packages/agent-orchestrator/src/try/try.ts': { count: 13, ...MOVES.reach },
   'packages/agent-orchestrator/src/try/try.verb.ts': { count: 1, ...MOVES.checkout },

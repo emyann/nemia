@@ -35,10 +35,9 @@ export { VERSION } from './version/version.ts';
 export { leaseRelease, trialRefusal, type Running } from './release/release.ts';
 export { currentRelease } from './release/release.store.ts';
 export { runningRelease } from './release/version.verb.ts';
-export { Conflict, Invalid, isRefusal, Missing } from './refusal/refusal.ts';
+export { Conflict, Invalid, isRefusal, Missing, type Refusal } from './refusal/refusal.ts';
 export { maxConcurrent, maxRuns, verifiesRest, wfRoot } from './config/config.store.ts';
 export { StoreRoot, storeRootLayer } from './config/root.store.ts';
-export type { Refusal } from './refusal/refusal.ts';
 export {
   AGENT_FACING,
   CHECK_AFFECTING,
@@ -458,7 +457,8 @@ export { sayRun } from './say/say.verb.ts';
 export { COMMANDS, TABLE } from './command/commands.verb.ts';
 export { admitted } from './admission/admit.verb.ts';
 export { PRUNE, RM } from './command/runs.verb.ts';
-export { LOGS, STATS } from './command/reads.verb.ts';
+export { CLOSEOUT, LOGS, STATS, TOLD, TRIES, TRY } from './command/reads.verb.ts';
+export { runObject, type RunObjectAnswer, type TryCloseout } from './object/run.verb.ts';
 export { folderRefusal, START } from './start/commands.verb.ts';
 export { INBOX, INBOX_ADD, INBOX_QUEUE } from './inbox/commands.verb.ts';
 export { FACTORY } from './factory/factory.verb.ts';
@@ -521,13 +521,25 @@ export { atHarness } from './summary/judged.verb.ts';
 export type { GitAsked, JudgeHow, RunHolding, RunStatus, RunToDecide, RunWaiting, Spent, StepNeeds } from './summary/judged.verb.ts';
 export { restingMemo, restingRead } from './rest/resting.verb.ts';
 export type { RestingMemo, RestingRead } from './rest/resting.verb.ts';
-export { recordMemo } from './rest/index.ts';
-export type { RecordMemo } from './rest/index.ts';
+export { recordMemo, type RecordMemo } from './rest/index.ts';
 export type { ScheduleRuns } from './schedule/listed.store.ts';
 export type { PauseRuns } from './pause/pause.ts';
 export type { InboxRuns } from './inbox/index.ts';
 export { judgedNow, runsSummarized } from './summary/summary.verb.ts';
 export type { RunSummary, SummaryHow } from './summary/summary.verb.ts';
+/**
+ * The run's page (`runPage`, `GET /api/runs/:id`) and the types it answers with, and of what it is built of what the api reads besides: a
+ * step's file routes (`refusedName`, `typeOf`), its log's tail (`tailOf`), its try's turn (`turnOfTry`) and `nemia decide`'s usage
+ * (`totalOf`, `usedOf`).
+ */
+export { runPage, type RunDetail, type StepAsked, type StepBudget, type StepRaise, type StepSpec } from './resource/page.verb.ts';
+export type { StepTimelineTotal, StepTimelineTry } from './resource/page.verb.ts';
+export { turnOfTry, type StepAcceptance, type StepApproval, type StepAttempts, type StepCloseout } from './resource/tries.verb.ts';
+export type { StepGate, StepReply, StepTry, StepUnreadable } from './resource/tries.verb.ts';
+export type { StepFiled, TaskPart } from './resource/told.verb.ts';
+export { totalOf, usedOf, type RunRead, type StepUsed, type Usage } from './resource/usage.ts';
+export { tailOf, type LastSaid, type StepCheck, type StepLog } from './resource/checks.verb.ts';
+export { refusedName, typeOf, type StepArtifact, type StepValue } from './resource/files.store.ts';
 export type { FinishedPage, FinishedRun, ListedRun, OpenRuns, RunClock, RunOutcome, StepCost, WaitingRun } from './runlist/runlist.verb.ts';
 export { driftWords, kindsDrift, revisionNow, REVISION_KINDS, stepsDrift } from './revisions/revisions.ts';
 export type { Drift, KindName, Pin, Revision, RevisionKind } from './revisions/revisions.ts';
@@ -539,8 +551,10 @@ export type { Ask, AskAnswer, AskEvent, AskOption, AskPick, AskQuestion, CallSta
 export { nemiaChatPlace } from './nemia/level.store.ts';
 
 import * as RunModel from './record/record.model.ts';
+import * as RunObject from './object/run.model.ts';
 /**
  * Run-core's model as Schemas (`docs/model.md`): its ids, checked on create and nominal on read, its entities and the run's
- * invariants, which the Run door (S2) will decode through. One namespace, imported and exported by name.
+ * invariants, which the Run door (S2) will decode through; and the run as one object, `nemia/v1` `Run`, with its OpenAPI document
+ * (`RunObject`, object/run.model.ts). One namespace each, imported and exported by name.
  */
-export { RunModel };
+export { RunModel, RunObject };

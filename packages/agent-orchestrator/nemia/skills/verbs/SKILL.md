@@ -57,8 +57,11 @@ They write nothing: run them unasked, as often as you need. One that sets with s
                                check it holds, a landing with its merge staged in the checkout
                                (MERGE_HEAD) among them; a step whose check it holds says waiting on
                                the pause
-  nemia show <runId>
-                               the run, and what each step was told
+  nemia show <runId> [--raw]
+                               the run as one object (nemia/v1 Run); --raw: its record, and
+                               what each step was told
+  nemia closeout <runId> <step> [--try <n>]
+                               what a step's try signed off with: its latest, or --try <n>
   nemia logs <runId> <step>
                                that step's session output
   nemia stats [--from <day>] [--to <day>] [--by agent|step|factory|workflow|repo] [--agent|--step|--factory|--workflow|--repo <v>] [--line|--json]

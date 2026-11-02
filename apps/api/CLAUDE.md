@@ -30,8 +30,8 @@ from the orchestrator; what it holds today below its layer is in `docs/architect
 - **A transcript of an attempt in flight asks its harness**: read it on a run's detail, never on the list the Factory polls.
 - **Read a `Wait` by the key you mean**: a hold's `Wait` carries `landed`, which an `--after` wait never does (`holdNeedsYou`, not
   `neverLands`, in the package's `summary/judged.verb.ts`).
-- **A remote agent's address is shown as origin and path, never whole** (`remoteOf` in `detail/detail.ts`): a query string can carry a key.
-- **A list a page turns into a sentence carries everything the sentence is about** (`folderFiles` in `steps/artifacts.ts` lists what it cannot
+- **A remote agent's address is shown as origin and path, never whole** (`remoteOf` in the package's `resource/told.verb.ts`): a query string can carry a key.
+- **A list a page turns into a sentence carries everything the sentence is about** (`folderFiles` in the package's `resource/files.store.ts` lists what it cannot
   serve by path), and leaves out only what the run itself put there (`GIVEN`).
 - **The list's `toDecide` is not the package's decision**: `decision` answers `awaiting` where `toDecide` says nothing.
 - **A remote step's wait is answered with `wf say`** (`answerIn` in the package's `needsOf`), never in Claude Code.

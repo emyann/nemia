@@ -245,8 +245,14 @@ words the board's answer. Both sides hand a handler only what its one spec gives
   `src/workflow/step-file.ts`); the refusals' words stay the orchestrator's. The board's form offers the runtime's own words per key
   and harness, `HARNESS_CHOICES` from the same door, which the root entry re-exports for the api;
 
-**In the api today, below its layer**: `runsInOf` in `src/detail/detail.ts` reading a
-harness's argv for a mode, and `src/capabilities/reach.ts` re-implementing permission matching. Its readers that touch the machine
+**In the orchestrator, moved down from the api**: the run page's judgement (`runPage`, `packages/agent-orchestrator/src/resource/`:
+a step's tries, closeouts, checks, told layers, files and usage, and `runsInOf` reading a harness's argv for a mode), and the run as
+one object (`RunObject.Run`, an Effect Schema in `src/object/run.model.ts`, built by `runObject` from the list's judged fields,
+`judgedFields`, and the one raise, `stepRaise`). `apps/api/src/detail/` keeps only type re-exports of the page for the board's mirror,
+until the board reads the object; the api serves the object's sub-resources from the command table and its OpenAPI 3.1 document,
+generated from the Schema (`apps/api/src/openapi/`).
+
+**In the api today, below its layer**: `src/capabilities/reach.ts` re-implementing permission matching. Its readers that touch the machine
 are counted against a baseline that only shrinks (`MOVES` in `apps/api/test/kinds.test.ts`), each entry naming the card that moves it,
 else the move and where it goes.
 
@@ -538,13 +544,12 @@ the entry files, `main.ts`, `app.ts` and `layer.ts`, which may read the environm
 which import no node:fs (nor fs/promises), node:child_process, node:http, node:https, node:net or node:os, nor `@hono/node-server`,
 and read neither `process.env` nor `fetch`. A reader that does today is listed with what it reaches (`MOVES`), and the list only
 shrinks. Its `src/` is a folder per page or verb a
-person uses — `runs/`, `detail/`, `steps/`, `decide/`, `asks/`, `inbox/`, `factory/`, `capabilities/`, `workflows/`,
+person uses — `runs/`, `detail/`, `openapi/`, `steps/`, `decide/`, `asks/`, `inbox/`, `factory/`, `capabilities/`, `workflows/`,
 `agents/`. The root holds `main.ts`, `app.ts`, `port.ts`, `guard.ts`, `store.ts`, `layer.ts` (the services a handler reads, and
 `served`, which runs it on the app's `ManagedRuntime`) and `body.ts` (the request-body reader every folder uses) and nothing else.
 A folder holds at most six source files; one of two or more has a face, `index.ts`, which holds only re-exports by name, and one of
 one file has none. `app.ts` mounts each folder through its face. An
-import between two folders names the file it needs wherever the face would close a cycle — `detail/` reads a step's artifacts
-and `steps/` a run's try — since a cycle of values passes the typecheck and fails only as the modules load. No two api
+import between two folders names the file it needs wherever the face would close a cycle — `steps/` reads a run's try — since a cycle of values passes the typecheck and fails only as the modules load. No two api
 files need each other's values, and no file or folder is named `utils`, `helpers`, `common`, `shared` or `misc`. Test:
 `apps/api/test/layout.test.ts`.
 

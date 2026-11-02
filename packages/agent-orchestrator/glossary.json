@@ -72,7 +72,7 @@
     },
     {
       "term": "Closeout",
-      "meaning": "how a step signs off: its outcome, its summary, and the fields its workflow asks of it.",
+      "meaning": "how a step signs off: its outcome, its summary, and the fields its workflow asks of it. `nemia closeout <run> <step> [--try n]` prints a try's, its latest by default, and the api serves the same on `GET /api/runs/:runId/steps/:step/tries/:try/closeout`.",
       "type": "Closeout",
       "see": {
         "label": "The closeout",
@@ -141,6 +141,11 @@
           "card": "4c: what a hold waits for is `holdUntil`"
         }
       ]
+    },
+    {
+      "term": "Input edge",
+      "meaning": "an edge of the run object's graph from a step to one that is handed its declared output (`input:`), beside its `after` and `loop` edges. The list and the run page draw no input edge.",
+      "type": "InputEdge"
     },
     {
       "term": "Landed",
@@ -266,6 +271,11 @@
       ]
     },
     {
+      "term": "Raise",
+      "meaning": "a raise of a step's budget cap the package takes, `by` a try (`nemia retry --budget`) or a round (`nemia retry --round --budget`), above what its tries cost: judged once (`stepRaise`), and read by the run object, the run page and `nemia decide`.",
+      "type": "StepRaise"
+    },
+    {
       "term": "Reason",
       "meaning": "why a step stands where it does, as the feed's closed code (`Reason`), set where the listing builds the step's row and never parsed back out of its sentence; a run's is a `RunReason`.",
       "type": "StepReason",
@@ -336,8 +346,13 @@
       "type": "RunDoor"
     },
     {
+      "term": "Run object",
+      "meaning": "a run as one object in Kubernetes' shape, `apiVersion: nemia/v1`, `kind: Run`: `metadata` (its name, when it was made, its factory and workflow as labels), `spec` (what the record froze: its steps with their `after`, `input` and `loop`, its brief and place) and `status` (the list's judgement of it, its graph and timeline, and each step's state, raise and current try in short). An Effect Schema, exported as an OpenAPI 3.1 document; `nemia show` prints it.",
+      "type": "Run"
+    },
+    {
       "term": "RunId",
-      "meaning": "a run's id, as `nemia start` mints it from the brief: lowercase letters, digits and dashes.",
+      "meaning": "a run's id, as `nemia start` mints it from the brief: lowercase letters, digits and dashes. On the run object it is `metadata.name`.",
       "type": "RunId"
     },
     {
@@ -347,7 +362,7 @@
     },
     {
       "term": "Show",
-      "meaning": "the one spelling of a read of one thing: `nemia show` of a run, the api's `skills show` and `inbox show`.",
+      "meaning": "the one spelling of a read of one thing: `nemia show` of a run, which prints the run object (`--raw` its record), the api's `skills show` and `inbox show`.",
       "retired": [
         {
           "spelling": "skills read",
@@ -392,6 +407,10 @@
       "term": "StepName",
       "meaning": "a step's name: its file's name in its workflow's folder, without its extension.",
       "type": "StepName"
+    },
+    {
+      "term": "Sub-resource",
+      "meaning": "what the run object leaves out and serves on a path under its step: its `tries`, one `try`, a try's `closeout`, and what the step was `told`. Each is an entry of the command table, on the api and, for the closeout, the CLI."
     },
     {
       "term": "TaskId",
@@ -465,17 +484,6 @@
       ]
     },
     {
-      "term": "Waiting on you",
-      "meaning": "whether a wait is the person's: `waitingOnYou` on a run's `--after` wait (`RunWaiting`) and on its hold (`RunHolding`), true where only a person's hand ends it; and the summary's `waitingOnYouWords`, the steps that wait on a person as `nemia ls` names them after `→ waiting on you:` (`onYouWords`), beside `waitingOnYou`, those steps by name.",
-      "type": "RunWaiting",
-      "retired": [
-        {
-          "spelling": "onYou",
-          "card": "4c: whether a wait is the person's is `waitingOnYou`, and its words `waitingOnYouWords`"
-        }
-      ]
-    },
-    {
       "term": "Waiting on",
       "meaning": "a wait on a thing, reason `Waiting` with what it waits on (`on`: a run, the limit, the checkout or the pause), phase pending; an assessment names the steps waiting on the repository's checkout (`waitingOnCheckout`, as `waitsOnCheckout` says of a step) and on the store's pause (`waitingOnPause`). Never called held, which is a person's hold alone.",
       "type": "WaitOn",
@@ -483,6 +491,17 @@
         {
           "spelling": "heldByCheckout",
           "card": "4b: a step waiting on the checkout `waitsOnCheckout`"
+        }
+      ]
+    },
+    {
+      "term": "Waiting on you",
+      "meaning": "whether a wait is the person's: `waitingOnYou` on a run's `--after` wait (`RunWaiting`) and on its hold (`RunHolding`), true where only a person's hand ends it; and the summary's `waitingOnYouWords`, the steps that wait on a person as `nemia ls` names them after `→ waiting on you:` (`onYouWords`), beside `waitingOnYou`, those steps by name.",
+      "type": "RunWaiting",
+      "retired": [
+        {
+          "spelling": "onYou",
+          "card": "4c: whether a wait is the person's is `waitingOnYou`, and its words `waitingOnYouWords`"
         }
       ]
     },

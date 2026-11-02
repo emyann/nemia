@@ -44,7 +44,7 @@ import {
 } from 'agent-orchestrator/run';
 import { commandNamed, type Engine, runPlaced } from '../store.ts';
 import type { Placed } from '../store.ts';
-import { type StepUsed, totalOf, usedOf } from '../detail/usage.ts';
+import { type StepUsed, totalOf, usedOf } from 'agent-orchestrator';
 
 export type { DecideCommand };
 

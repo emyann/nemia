@@ -250,11 +250,11 @@ test('nemia cancel of a run with nothing filed yet says so, a line more', async 
   });
 });
 
-test('nemia show prints the record as JSON, the brief and each step body cut short', async (t) => {
+test('nemia show --raw prints the record as JSON, the brief and each step body cut short', async (t) => {
   const b = board();
   const brief = `${'a long brief, '.repeat(12)}and more`;
   const run = await runPlaced(startRun({ brief, repo: aRepo(), workflowDir: oneStep() }));
-  const { out, err } = await typed(t, b.e, 'show', run.id);
+  const { out, err } = await typed(t, b.e, 'show', run.id, '--raw');
   assert.deepEqual(err, []);
   assert.equal(out.length, 1);
   const record = readRun(run.id);

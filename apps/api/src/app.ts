@@ -16,6 +16,7 @@ import { ApiConfig, type ApiEnv, type ApiRuntime, ReadMemo, served, type Service
 import { machines } from './machines/machines.ts';
 import { nemia, nemiaChat } from './nemia/index.ts';
 import { runs } from './runs/runs.ts';
+import { openapi } from './openapi/openapi.ts';
 import { saidRequest } from './request/request.ts';
 import { stats } from './stats/stats.ts';
 import { step } from './step/step.ts';
@@ -195,6 +196,7 @@ export function appOf(layer: Layer.Layer<Services>): { app: Hono<ApiEnv>; runtim
     .route('/', skills)
     .route('/', inbox)
     .route('/', runs)
+    .route('/', openapi)
     .route('/', stats)
     .get('/api/ceilings', (c) =>
       served(c, async ({ e, placeService, env, home }) => c.json(await ceilingsOf(e, { placeService, home }, env))),

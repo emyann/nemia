@@ -3,8 +3,9 @@
  * and what `nemia decide` shows of it.
  */
 import { Effect } from 'effect';
-import { Hono } from 'hono';
+import { type Context, Hono } from 'hono';
 import {
+  type Command,
   COMMANDS,
   type FinishedPage,
   type FinishedRun,
@@ -13,12 +14,13 @@ import {
   type OpenRuns,
   viewsFor,
   runWith,
+  runPage,
   type RunSummary,
   type WaitingRun,
 } from 'agent-orchestrator';
 import type { Run } from 'agent-orchestrator/run';
 import { decisionOf } from '../decide/decision.ts';
-import { detail, type RunDetail } from '../detail/index.ts';
+import type { RunDetail } from '../detail/index.ts';
 import { type ApiEnv, served, type Served } from '../layer.ts';
 import { workflowPageOf, type WorkflowPageAddress } from '../step/step.ts';
 import { commandNamed, findRun, noSuchRun, runPlaced } from '../store.ts';
@@ -126,16 +128,31 @@ const CONCLUDED = commandNamed('concluded');
  *   `wallMs` and the breakdown of a finished run stands still. The page is cut before anything is read for it, so beyond what a warm
  *   `GET /api/runs` costs this read costs the records and the task journals of that page's rows alone — nine where the board asks, at
  *   most `?size=`'s hundred — and nothing for the finished runs it does not answer.
- * - `GET /api/runs/:id` — a run in full (`detail`) with the address of its workflow's page (`RunPage`), found by the package's entry
- *   (`run`): refused with a 404 when there is no such run, and with a 502 when a task it reads does not, in the words the list says it with
- *   (`RunSummary.unreadable`).
+ * - `GET /api/runs/:id` — a run in full, judged by the package (`runPage`), with the address of its workflow's page (`RunPage`), found by
+ *   the package's entry (`run`): refused with a 404 when there is no such run, and with a 502 when a task it reads does not, in the words
+ *   the list says it with (`RunSummary.unreadable`).
  * - `GET /api/runs/:runId/decision` — what `nemia decide` shows a person (`decisionOf`), the route of its entry of the command table. Not
  *   on the page's poll, since it runs `git diff`. Refused as the run's page is: a 404 with no such run, and a 502 when a task it reads does
  *   not, in the words the list says it with (`RunSummary.unreadable`).
  * - `GET /api/runs/:runId/concluded` — what a run started now with `--from <runId>` would be handed of it (`nemia concluded`): the run,
  *   whether it has landed and its `## From run` section, made by the package as the tick makes it. A 404 with no such run, the package's
  *   `Missing`, answered by `app.onError`.
+ * - `GET /api/runs/:runId/steps/:step/tries`, `…/tries/:try`, `…/tries/:try/closeout` and `…/steps/:step/told` — the run object's
+ *   sub-resources (`tries`, `try`, `closeout`, `told`): a step's tries, one try, its closeout, and the layers it was told. Each binds its
+ *   path into the entry's arguments, as the CLI's flags do; a step or a try the run does not have is the package's `Missing`, a 404.
  */
+
+/** The run object's sub-resources, each a read of the package's table served on its route. */
+const TRIES = commandNamed('tries');
+const TRY = commandNamed('try');
+const CLOSEOUT = commandNamed('closeout');
+const TOLD = commandNamed('told');
+
+/** Answers a sub-resource's entry, its path's parameters bound to the argument keys of the same names. */
+const subResource = (c: Context<ApiEnv>, command: Command) =>
+  served(c, async ({ e, placeService, env, home }) =>
+    c.json(await runPlaced({ placeService, home }, e, command.handler(c.req.param(), env, home))),
+  );
 
 export const runs = new Hono<ApiEnv>()
   .get('/api/runs', (c) =>
@@ -173,7 +190,7 @@ export const runs = new Hono<ApiEnv>()
       const id = c.req.param('id');
       const { run } = (await runPlaced(s, s.e, RUN.handler({ id }))) as { run: Run | null };
       if (!run) return c.json({ error: noSuchRun(id) }, 404);
-      const full = await detail(run, s);
+      const full = await runPlaced(s, s.e, runPage(run, s));
       if ('unjudged' in full) return c.json({ error: full.unjudged }, 502);
       return c.json({ ...full, workflowPage: workflowPageOf(run, s.repo, s.home) } satisfies RunPage);
     }),
@@ -195,6 +212,10 @@ export const runs = new Hono<ApiEnv>()
       return c.json(read.judged);
     }),
   )
+  .get('/api/runs/:runId/steps/:step/tries', (c) => subResource(c, TRIES))
+  .get('/api/runs/:runId/steps/:step/tries/:try', (c) => subResource(c, TRY))
+  .get('/api/runs/:runId/steps/:step/tries/:try/closeout', (c) => subResource(c, CLOSEOUT))
+  .get('/api/runs/:runId/steps/:step/told', (c) => subResource(c, TOLD))
   .get('/api/runs/:runId/concluded', (c) =>
     served(c, async ({ e, placeService, home }) =>
       c.json(await runPlaced({ placeService, home }, e, CONCLUDED.handler({ runId: c.req.param('runId') }))),

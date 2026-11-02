@@ -24,6 +24,7 @@ import {
   StoreRoot,
 } from 'agent-orchestrator';
 import { runWith } from '../../test/builtin-place.ts';
+import { objectOf, pageRead } from '../../test/run-reads.ts';
 import { Effect } from 'effect';
 
 /** `program`, one of the package's inbox verbs, run on the harness's store (`root`): its refusal thrown as itself. */
@@ -36,7 +37,6 @@ execFileSync('git', ['-c', 'user.email=t@local', '-c', 'user.name=t', 'commit', 
 type InboxEntry = import('./inbox.ts').InboxEntry;
 type InboxCardPage = import('./inbox.ts').InboxCardPage;
 type InboxFiled = import('./inbox.ts').InboxFiled;
-type RunDetail = import('../detail/detail.ts').RunDetail;
 /** What POST /api/runs answers a card it started (201): the run and the card, which stays in the inbox. */
 type CardStarted = { id: string; card: string; ignoredRepo?: string };
 type Refused = { error: string };
@@ -174,20 +174,25 @@ test('a person starts a card: the run carries where it came from, and the card s
       const started = await startCard({ workflow: 'dev', card: card.name });
       assert.equal(started.status, 201, await started.clone().text());
       const { id } = (await started.json()) as CardStarted;
-      const res = await app.request(`/api/runs/${id}`);
-      assert.equal(res.status, 200, await res.clone().text());
-      const detail = (await res.json()) as RunDetail;
-      assert.deepEqual(detail.from, { inbox: card.name });
-      assert.equal(detail.fromNote, fromNote(runStore.runs.read(id)));
-      assert.equal(detail.fromNote, `from inbox card ${card.name}`);
+      const run = await objectOf(app, id);
+      assert.deepEqual(run.spec.from, { inbox: card.name });
+      const page = await pageRead(app, id);
+      assert.equal(
+        page.fromNote,
+        fromNote(runStore.runs.read(id)),
+        "`nemia decide`'s sentence is the page's alone: the object leaves it out",
+      );
+      assert.equal(page.fromNote, `from inbox card ${card.name}`);
 
       const typed = await startCard({ workflow: 'dev', brief: 'Typed, not parked' });
       assert.equal(typed.status, 201, await typed.clone().text());
       const typedId = ((await typed.json()) as { id: string }).id;
-      const plain = (await (await app.request(`/api/runs/${typedId}`)).json()) as RunDetail;
-      assert.equal(plain.id, typedId);
+      const plain = await objectOf(app, typedId);
+      assert.equal(plain.metadata.name, typedId);
+      assert.equal(plain.spec.from, null, "typed at the board's start, as at `nemia start`: no card, so the object's `from` is null");
+      const plainPage = await pageRead(app, typedId);
       assert.deepEqual(
-        ['from' in plain, 'fromNote' in plain],
+        ['from' in plainPage, 'fromNote' in plainPage],
         [false, false],
         "typed at the board's start, as at `nemia start`: no card, so no `from`, absent and not null, and no sentence",
       );

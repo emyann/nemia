@@ -1,6 +1,6 @@
 /**
- * One run in full, for a person reading it (`GET /api/runs/:id` serves it): the spec, and per step what it was told and how it went —
- * projected from the run's object and its sub-resources (`runParts`), which carry all of it; the api's route only serving it.
+ * One run in full, for a person reading it (`GET /api/runs/:id?view=page` serves it): the spec, and per step what it was told and how it
+ * went — projected from the run's object and its sub-resources (`runParts`), which carry all of it; the api's route only serving it.
  */
 import { Effect } from 'effect';
 import type { AtWork, RunTokens, TimelineTotal, TimelineTry } from '../timeline/index.ts';

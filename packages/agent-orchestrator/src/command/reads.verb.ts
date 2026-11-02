@@ -1,8 +1,8 @@
 /**
  * The reads of the store, each defined once: `nemia show` (a run's record), `nemia logs` (a step's session output), `nemia stats` (what
  * the store's runs add up to) and `nemia series` (what the system's passes were, kept a minute and an hour at a time; listed in the help
- * beside the passes). Their handlers answer data, and the CLI prints it; the api serves a step's log and the stats on their routes from
- * the same entries, and the board reads a run through a read of its own (`only`). The feed is `nemia watch`'s, which the CLI runs itself.
+ * beside the passes). Their handlers answer data, and the CLI prints it; the api serves the run object, a step's log and the stats on their
+ * routes from the same entries. The feed is `nemia watch`'s, which the CLI runs itself.
  */
 import { Effect } from 'effect';
 import { EngineService, asked, tried } from '../runtime-client.ts';
@@ -38,7 +38,8 @@ const rawOf = (run: Run) => {
 
 /**
  * `nemia show`: the run as one object, `nemia/v1`'s `Run` (`runObject`), as JSON, with a line on stderr pointing to `--raw`; `--raw`, the
- * run's record as it printed before, its brief cut at 120 characters and each frozen step's body at 60.
+ * run's record as it printed before, its brief cut at 120 characters and each frozen step's body at 60, the CLI's alone. The api serves the
+ * object on `GET /api/runs/:runId`, by hand, handed the app's memo, as one judgement for both sides.
  */
 export const SHOW: Command = {
   name: 'show',
@@ -46,12 +47,19 @@ export const SHOW: Command = {
   help: ['the run as one object (nemia/v1 Run); --raw: its record, and', 'what each step was told'],
   spec: {
     positionals: [{ key: 'runId', takes: 'required', kind: 'name' }],
-    flags: [{ flag: '--raw', kind: 'switch', key: 'raw' }],
+    flags: [
+      {
+        flag: '--raw',
+        kind: 'switch',
+        key: 'raw',
+        only: { side: 'cli', why: "the record is the store's, for a person at the command line; a client reads the run object" },
+      },
+    ],
     unknown: takesNo('show', "one run's id, and --raw"),
   },
   writes: false,
   class: 'read',
-  only: { side: 'cli', why: "the board's run page is the api's judged view of a run (GET /api/runs/:id), not its record" },
+  route: { method: 'GET', path: '/api/runs/:runId', status: 200 },
   handler: (args, _env, home, kept?: Kept) =>
     Effect.flatMap(
       tried(() => runStore.runs.read(textOf(args, 'runId') ?? '')),

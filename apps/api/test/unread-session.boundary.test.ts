@@ -13,7 +13,7 @@ import { app } from '../src/app.ts';
 import { Effect } from 'effect';
 import { engine } from 'agent-orchestrator';
 
-type RunDetail = import('../src/detail/detail.ts').RunDetail;
+import { objectOf, type ObjectStep } from './run-reads.ts';
 
 const NOW = Date.now();
 const at = (s: number) => new Date(NOW + s * 1000).toISOString();
@@ -62,11 +62,8 @@ write(
   }),
 );
 
-const stepsOf = async (): Promise<Map<string, RunDetail['steps'][number]>> => {
-  const res = await app.request(`/api/runs/${RUN}`);
-  assert.equal(res.status, 200);
-  return new Map(((await res.json()) as RunDetail).steps.map((s) => [s.name, s]));
-};
+/** The steps of the run object (`GET /api/runs/:id`, `status.steps`), by name: `objectOf` throws unless it answers 200. */
+const stepsOf = async (): Promise<Map<string, ObjectStep>> => new Map((await objectOf(app, RUN)).status.steps.map((s) => [s.name, s]));
 
 test("REFUSED: a run's detail says why one step's session alone could not be read, in the runtime's words, and nothing once a request reads it", async () => {
   atWork('t-build', [result('yesterday')]);

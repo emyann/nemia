@@ -1,6 +1,6 @@
 /**
  * A finished run pruned on the board (`POST /api/runs/:id/prune`), as `nemia prune <run> --yes` prunes it: its worktrees removed, and its
- * files with `artifacts`, its record and every branch kept; the list and the page say it was pruned in the package's words. And every
+ * files with `artifacts`, its record and every branch kept; the list and its object say it was pruned in the package's words. And every
  * refusal refused, in `nemia prune`'s own words, with nothing touched: a run not over, a finished run nobody merged without `unmerged`, a
  * run pruned already, a folder run, a run the store has not, a body that is not the two switches, and a request from anywhere but the
  * board.
@@ -20,7 +20,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { Pruning } from 'agent-orchestrator';
 import { runWith } from '../../test/builtin-place.ts';
-import type { RunDetail } from '../detail/detail.ts';
+import { objectOf } from '../../test/run-reads.ts';
 import { app } from '../app.ts';
 import { engine, prune, prunedKept, prunedWords, runStore, type RunSummary } from 'agent-orchestrator';
 
@@ -168,11 +168,8 @@ const listed = async (): Promise<Map<string, RunSummary>> => {
   assert.equal(res.status, 200);
   return new Map(((await res.json()) as RunSummary[]).map((r) => [r.id, r]));
 };
-const detail = async (id: string) => {
-  const res = await app.request(`/api/runs/${id}`);
-  assert.equal(res.status, 200);
-  return (await res.json()) as RunDetail;
-};
+/** The run object of `id` (`GET /api/runs/:id`, a 200 or it throws), what `nemia show` prints. */
+const detail = (id: string) => objectOf(app, id);
 /** What a prune that went through answers (`runs.ts`), the package's `Pruning` as the route words it. */
 type PruneAnswer = {
   id: string;
@@ -231,7 +228,11 @@ test('a finished run pruned on the board as `nemia prune` prunes it: what it ref
     async () => {
       const before = await listed();
       assert.equal(before.get('p-merged')!.pruned, null, 'a run nobody pruned says nothing of it');
-      assert.deepEqual((await detail('p-merged')).onDisk, { worktrees: true, files: true }, 'its page says what a prune would find');
+      assert.deepEqual(
+        (await detail('p-merged')).status.onDisk,
+        { worktrees: true, files: true },
+        'its object says what a prune would find',
+      );
       const res = await pruneOn('p-merged', { artifacts: true });
       assert.equal(res.status, 200);
       const body = (await res.json()) as PruneAnswer;
@@ -257,14 +258,14 @@ test('a finished run pruned on the board as `nemia prune` prunes it: what it ref
         run.pruned.said,
         /its worktrees were removed \(nemia prune\), and its files were removed at .* \(nemia prune --artifacts\); its branches and record are kept$/,
       );
-      const page = await detail('p-merged');
-      assert.equal(page.pruned!.artifacts!.at, pruned.artifacts.at);
+      const shown = await detail('p-merged');
+      assert.equal(shown.status.pruned!.artifacts!.at, pruned.artifacts.at);
       assert.deepEqual(
-        page.pruned!.worktrees.map((w) => w.path),
+        shown.status.pruned!.worktrees.map((w) => w.path),
         [worktreeOf('p-merged')],
       );
       assert.deepEqual(
-        page.onDisk,
+        shown.status.onDisk,
         { worktrees: false, files: false },
         'nothing left for a prune to find, so the board offers none: the prune that follows would be `nothing` (the next test)',
       );
@@ -317,7 +318,7 @@ test('a finished run pruned on the board as `nemia prune` prunes it: what it ref
       assert.deepEqual((await listed()).get('p-unmerged')!.pruned, { said: `${prunedWords(pruned)}; ${prunedKept(pruned)}` });
       assert.match((await listed()).get('p-unmerged')!.pruned!.said, /; its branches, record and files are kept$/);
       assert.deepEqual(
-        (await detail('p-unmerged')).onDisk,
+        (await detail('p-unmerged')).status.onDisk,
         { worktrees: false, files: true },
         'its files are still there to give back, and nothing else',
       );

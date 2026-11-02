@@ -20,10 +20,10 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { RunDecision } from '../src/decide/decision.ts';
-import type { RunDetail } from '../src/detail/detail.ts';
 import { app } from '../src/app.ts';
 import { decideRun, engine, list, passStanding, runStore, type RunSummary, waitAdvice, waitWord } from 'agent-orchestrator';
 import { runWith } from './builtin-place.ts';
+import { objectOf } from './run-reads.ts';
 
 type Wait = import('agent-orchestrator').Wait;
 
@@ -269,17 +269,15 @@ test('a run waiting on runs, read on the list, its page and its decision as `nem
   await s.test("a run's detail carries the same `after`, `waiting` and `moving`", async () => {
     const runs = await listedRuns();
     for (const id of ['d-waits', 'e-cancelled-parent', 'i-started']) {
-      const res = await app.request(`/api/runs/${id}`);
-      assert.equal(res.status, 200);
-      const detail = (await res.json()) as RunDetail;
+      const run = await objectOf(app, id);
       const listed = runs.get(id)!;
       assert.deepEqual(
-        { after: detail.after, waiting: detail.waiting, moving: detail.moving },
+        { after: run.spec.after, waiting: run.status.waiting, moving: run.status.moving },
         { after: listed.after, waiting: listed.waiting, moving: listed.moving },
         id,
       );
       assert.deepEqual(
-        detail.steps.map((s) => s.message),
+        run.status.steps.map((s) => s.message),
         listed.steps.map((s) => s.message),
         id,
       );
@@ -304,8 +302,7 @@ test('a run waiting on runs, read on the list, its page and its decision as `nem
           `${id}: waiting on runs that may still land or never will, or its parents landed and the tick yet to file it: not started`,
         );
       for (const id of ['b-running', 'i-started', 'a-landed', 'd-waits']) {
-        const detail = (await (await app.request(`/api/runs/${id}`)).json()) as RunDetail;
-        assert.equal(detail.startedAt, runs.get(id)!.startedAt, id);
+        assert.equal((await objectOf(app, id)).status.startedAt, runs.get(id)!.startedAt, id);
       }
     },
   );

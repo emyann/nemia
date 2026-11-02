@@ -18,6 +18,7 @@ import { ReadMemo } from '../layer.ts';
 import { Effect } from 'effect';
 import { StoreRoot, workflowVersion as versionIn } from 'agent-orchestrator';
 import { runWith } from '../../test/builtin-place.ts';
+import { objectOf } from '../../test/run-reads.ts';
 import { listWorkflows } from './workflows.ts';
 import { engine, builtinGitPlace, hireRefusalOf, loadWorkflows, passStanding, runStore } from 'agent-orchestrator';
 import { AGENTS_FOLDER, STEP_KEY_MEANINGS, STEP_KEYS } from 'agent-orchestrator/workflow';
@@ -38,7 +39,6 @@ type WorkflowStepSpec = import('./workflows.ts').WorkflowStepSpec;
 type WorkflowStepPage = import('../step/step.ts').WorkflowStepPage;
 type WorkflowListing = import('./workflows.ts').WorkflowListing;
 type RunSummary = import('agent-orchestrator').RunSummary;
-type RunDetail = import('../detail/detail.ts').RunDetail;
 
 const write = (file: string, text: string): void => {
   fs.mkdirSync(path.dirname(file), { recursive: true });
@@ -563,14 +563,14 @@ test('a person starts runs from the board: the record as `nemia start` writes it
       assert.deepEqual(runStore.runs.read(id).after, ['p-running']);
       assert.deepEqual(filedTasks(), [], 'nothing filed');
 
-      const unread = (await (await app.request(`/api/runs/${id}`)).json()) as RunDetail;
+      const unread = await objectOf(app, id);
       assert.ok(
-        unread.waiting?.word.startsWith('waiting on p-running (where it stands is unread: '),
-        `no pass has read where p-running stands since it was written: ${unread.waiting?.word}`,
+        unread.status.waiting?.word.startsWith('waiting on p-running (where it stands is unread: '),
+        `no pass has read where p-running stands since it was written: ${unread.status.waiting?.word}`,
       );
       await runWith(engine(), passStanding(runStore.runs.list()));
-      const detail = (await (await app.request(`/api/runs/${id}`)).json()) as RunDetail;
-      assert.deepEqual([detail.after, detail.waiting?.word], [['p-running'], 'waiting on p-running']);
+      const detail = await objectOf(app, id);
+      assert.deepEqual([detail.spec.after, detail.status.waiting?.word], [['p-running'], 'waiting on p-running']);
 
       const none = await post({ workflow: 'good', from: 'repo', brief: 'Right away.', after: [] });
       assert.equal(none.status, 201);
@@ -590,8 +590,8 @@ test('a person starts runs from the board: the record as `nemia start` writes it
       assert.equal(res.status, 201, await res.clone().text());
       const { id } = (await res.json()) as { id: string };
       assert.deepEqual([runStore.runs.read(id).context, runStore.runs.read(id).after], [['p-running'], undefined]);
-      const detail = (await (await app.request(`/api/runs/${id}`)).json()) as RunDetail;
-      assert.deepEqual([detail.context, detail.after, detail.waiting], [['p-running'], [], null]);
+      const detail = await objectOf(app, id);
+      assert.deepEqual([detail.spec.context, detail.spec.after, detail.status.waiting], [['p-running'], [], null]);
     },
   );
 

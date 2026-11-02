@@ -15,7 +15,7 @@
  */
 import { root } from '../../test/harness.ts';
 import type { DecideCommand, Decidable } from '../decide/decision.ts';
-import type { RunDetail } from '../detail/detail.ts';
+import { closeoutOf, objectOf, stepOf } from '../../test/run-reads.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -145,7 +145,8 @@ const approveRefuses = async (step: string, message?: string, run = R): Promise<
 
 /** What POST …/approve answers when it takes an approval (202). */
 type Approved = { step: string; try: number; at: string; message: string | null; file: string };
-const detail = async (id = R) => (await (await app().request(`/api/runs/${id}`)).json()) as RunDetail;
+/** The run object of `id` (`GET /api/runs/:id`). */
+const object = async (id = R) => objectOf(app(), id);
 const commandsOf = async (id = R): Promise<DecideCommand[]> =>
   ((await (await app().request(`/api/runs/${id}/decision`)).json()) as Decidable).commands;
 const summary = async (id = R) => {
@@ -309,10 +310,10 @@ test('a person approves a gate on the board: the need on the list and the detail
   await s.test(
     "a run's detail carries its gates and each gated step's gate — awaiting approval, or not signed off yet — and the list and the detail carry the need `approve plan`, in `nemia ls`'s words",
     async () => {
-      const run = await detail();
-      assert.deepEqual(run.gates, ['plan', 'sketch'], "the start's gate and the step's own, in the order they run");
+      const run = await object();
+      assert.deepEqual(run.status.gates, ['plan', 'sketch'], "the start's gate and the step's own, in the order they run");
       assert.deepEqual(
-        run.steps.map(({ name, message, approve, gate }) => ({ name, message, approve, gate })),
+        run.status.steps.map(({ name, message, approve, gate }) => ({ name, message, approve, gate })),
         [
           { name: 'plan', message: 'awaiting approval', approve: 'approve plan', gate: { awaiting: true, approval: null } },
           { name: 'implement', message: 'pending', approve: null, gate: null },
@@ -322,16 +323,17 @@ test('a person approves a gate on the board: the need on the list and the detail
         ],
         'sketch is gated and not signed off: nothing to approve yet',
       );
+      const planCloseout = (await closeoutOf(app(), R, 'plan'))?.closeout;
       assert.deepEqual(
-        [run.steps[0].closeout?.summary, run.steps[0].closeout?.body],
+        [planCloseout?.summary, planCloseout?.body],
         [PLAN.summary.split('\n')[0], PLAN.summary],
         "the closeout a person approves is the step's own: its first line the summary, the whole the body",
       );
-      assert.deepEqual(run.waitingOnYou, ['plan']);
-      assert.deepEqual(run.waitingOnYouWords, ['approve plan']);
+      assert.deepEqual(run.status.waitingOnYou, ['plan']);
+      assert.deepEqual(run.status.waitingOnYouWords, ['approve plan']);
 
       const words = await runWith(engine(), list(engine(), runStore.runs.read(R)));
-      assert.deepEqual(run.waitingOnYouWords, onYouWords(words), 'as `nemia ls` has it after `→ waiting on you:`');
+      assert.deepEqual(run.status.waitingOnYouWords, onYouWords(words), 'as `nemia ls` has it after `→ waiting on you:`');
       const listed = await summary();
       assert.deepEqual(listed.waitingOnYou, words.waitingOnYou);
       assert.deepEqual(listed.waitingOnYouWords, ['approve plan']);
@@ -399,12 +401,11 @@ test('a person approves a gate on the board: the need on the list and the detail
 
   await s.test('the detail reads the approval under the step, which waits on nobody, as `nemia ls` has it', async () => {
     assert.ok(took);
-    const run = await detail();
-    const plan = run.steps.find((s) => s.name === 'plan');
-    assert.ok(plan);
+    const run = await object();
+    const plan = stepOf(run, 'plan');
     assert.deepEqual(plan.gate, { awaiting: false, approval: { try: 1, at: took.at, message: 'Ship the second reading.' } });
     assert.equal(plan.approve, null);
-    assert.deepEqual([run.waitingOnYou, run.waitingOnYouWords], [[], []]);
+    assert.deepEqual([run.status.waitingOnYou, run.status.waitingOnYouWords], [[], []]);
     const words = await runWith(engine(), list(engine(), runStore.runs.read(R)));
     assert.equal(plan.message, words.steps.find((s) => s.name === 'plan')?.message, 'as `nemia ls` has it until the tick files what waits');
     assert.deepEqual((await summary()).waitingOnYou, words.waitingOnYou, 'and nobody waited on, as `nemia ls` has it');
@@ -427,7 +428,7 @@ test('a person approves a gate on the board: the need on the list and the detail
     assert.equal(wordless.message, null);
     const { at: when, ...written } = JSON.parse(fs.readFileSync(approvalFile(id, 'plan', 1), 'utf8'));
     assert.deepEqual([written, when], [{ step: 'plan', try: 1 }, wordless.at]);
-    assert.deepEqual((await detail(id)).steps[0].gate, { awaiting: false, approval: { try: 1, at: wordless.at, message: null } });
+    assert.deepEqual((await object(id)).status.steps[0].gate, { awaiting: false, approval: { try: 1, at: wordless.at, message: null } });
   });
 
   await s.test(
@@ -448,7 +449,7 @@ test('a person approves a gate on the board: the need on the list and the detail
       assert.equal(written.message, words);
       assert.ok(words.startsWith("The person's answers to design's questions:"), words);
       assert.ok(words.endsWith('Note: Go.\n\nAnswered by: person, on the board'), words);
-      assert.deepEqual((await detail(id)).steps[0].gate, { awaiting: false, approval: { try: 1, at: answered.at, message: words } });
+      assert.deepEqual((await object(id)).status.steps[0].gate, { awaiting: false, approval: { try: 1, at: answered.at, message: words } });
     },
   );
 });
@@ -480,7 +481,7 @@ test('a person sends a step back from its gate: refused without words, asked wit
       const back = await ask('plan', { mode: 'continue', message: 'Store the flag before you parse it.' }, id);
       assert.equal(back.status, 202, await back.clone().text());
       assert.deepEqual(await back.json(), { try: 2, file: askFile(id, 'plan', 2), stopFirst: false });
-      const plan = (await detail(id)).steps[0];
+      const plan = (await object(id)).status.steps[0];
       assert.deepEqual(plan.asked, {
         try: 2,
         mode: 'continue',
@@ -493,7 +494,7 @@ test('a person sends a step back from its gate: refused without words, asked wit
         ['awaiting approval', { awaiting: true, approval: null }, null],
         'still at its gate until the tick files the try',
       );
-      assert.deepEqual((await detail(id)).waitingOnYouWords, [], 'not waiting on you: what is asked of you, you asked');
+      assert.deepEqual((await object(id)).status.waitingOnYouWords, [], 'not waiting on you: what is asked of you, you asked');
       assert.deepEqual(
         await (await app().request(`/api/runs/${id}/decision`)).json(),
         { running: true },

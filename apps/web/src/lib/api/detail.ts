@@ -1,6 +1,6 @@
 /**
- * A run's detail, as its page reads it (`GET /api/runs/:id`, apps/api/src/detail/detail.ts): each step's spec, filing, gate, tries and
- * timeline. Each type has its schema beside it, which `get` decodes the api's answer with.
+ * A run's detail, as its page reads it (`GET /api/runs/:id?view=page`, apps/api/src/runs/runs.ts): each step's spec, filing, gate, tries
+ * and timeline. Each type has its schema beside it, which `get` decodes the api's answer with.
  */
 import { queryOptions, type QueryClient } from '@tanstack/react-query';
 import { Schema } from 'effect';
@@ -681,11 +681,14 @@ export const runGone = (error: unknown): boolean => error instanceof ReadRefusal
  */
 export const retryRun = (failures: number, error: unknown): boolean => !runGone(error) && failures < 3;
 
-/** A run's detail, decoded (`RunDetailSchema`). Read again every 5 s while the feed is not followed — every minute while it is. */
+/**
+ * A run's detail, decoded (`RunDetailSchema`). Read again every 5 s while the feed is not followed — every minute while it is. Asked for
+ * as the page (`?view=page`): the run's route answers the run object, which the board reads once it is ported onto it.
+ */
 export const runQuery = (id: string) =>
   queryOptions({
     queryKey: ['runs', id],
-    queryFn: () => get(`/api/runs/${encodeURIComponent(id)}`, RunDetailSchema),
+    queryFn: () => get(`/api/runs/${encodeURIComponent(id)}?view=page`, RunDetailSchema),
     refetchInterval: () => pace(5_000),
     retry: retryRun,
   });

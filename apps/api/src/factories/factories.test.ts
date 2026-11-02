@@ -17,6 +17,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from '../../test/scratch.ts';
 import { story } from '../../test/checkpoints.ts';
+import { pageRead } from '../../test/run-reads.ts';
 import { app } from '../app.ts';
 import {
   addFactory,
@@ -41,7 +42,6 @@ const onStore = <A, E>(program: Effect.Effect<A, E>): A => Effect.runSync(Effect
 type WorkflowListing = import('../workflows/workflows.ts').WorkflowListing;
 type WorkflowStepPage = import('../step/step.ts').WorkflowStepPage;
 type FactoryAnswer = import('./factories.ts').FactoryAnswer;
-type RunPage = import('../runs/runs.ts').RunPage;
 type RunListing = import('../runs/runs.ts').RunListing;
 
 const write = (file: string, text: string): void => {
@@ -287,8 +287,11 @@ test('a person works in a factory with hires: the listing names what is unfilled
         address,
         "the list gives the address of the run's workflow page, in its factory",
       );
-      const detail = await get<RunPage>(`/api/runs/${id}`);
-      assert.deepEqual(detail.body.workflowPage, address, 'and so does its page');
+      assert.deepEqual(
+        (await pageRead(app, id)).workflowPage,
+        address,
+        "and so does its page (`?view=page`), which keeps the board's address the run object leaves out",
+      );
 
       const page = await get<WorkflowStepPage>('/api/workflows/repo/alpha/implement?factory=hired');
       assert.deepEqual(

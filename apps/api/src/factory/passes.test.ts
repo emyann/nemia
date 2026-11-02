@@ -84,9 +84,9 @@ test('The board reads the passes the tick kept and the api process metrics: none
       const metric = ((await res.json()) as MetricRead[]).find((m) => m.name === 'api.poll.reads' && m.attributes.route === route);
       return metric?.count ?? 0;
     };
-    const before = await pollsOf('/api/runs/:id');
+    const before = await pollsOf('/api/runs/:runId');
     assert.equal((await app.request('/api/runs/no-such-run')).status, 404);
-    assert.equal(await pollsOf('/api/runs/:id'), before + 1, 'counted on a 404 too');
+    assert.equal(await pollsOf('/api/runs/:runId'), before + 1, 'counted on a 404 too');
     assert.equal(await pollsOf('/api/runs/no-such-run'), 0, 'no series a path');
     const metrics = (await (await app.request('/api/metrics')).json()) as MetricRead[];
     const reads = metrics.find((m) => m.name === 'api.poll.reads')!;

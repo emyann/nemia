@@ -133,7 +133,7 @@ async function aBar(page: Page): Promise<{ bar: Locator; run: string; step: stri
 async function expected(page: Page, run: string, step: string): Promise<StepCardFacts> {
   const [runs, detail, agents] = await Promise.all([
     answer<RunSummary[]>(page, '/api/runs'),
-    answer<RunDetail>(page, `/api/runs/${encodeURIComponent(run)}`),
+    answer<RunDetail>(page, `/api/runs/${encodeURIComponent(run)}?view=page`),
     answer<LibraryAgent[]>(page, '/api/agents'),
   ]);
   const row = runs.find((r) => r.id === run);

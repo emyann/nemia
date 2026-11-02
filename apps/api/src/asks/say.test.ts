@@ -20,7 +20,7 @@ import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from 'agent-orchestrator/testing';
 import type { Said } from 'agent-orchestrator';
 import { appOver, beforeEachTest, eachTest, engineFor, runOver } from '../../test/placed.ts';
-import type { RunDetail } from '../detail/detail.ts';
+import { objectOf, type ObjectStep } from '../../test/run-reads.ts';
 import { list, runStore, sayRun, type RunSummary } from 'agent-orchestrator';
 import { story } from '../../test/checkpoints.ts';
 
@@ -108,8 +108,8 @@ const sayRefuses = async (step: string, text: string, run = R): Promise<string> 
   return assert.fail(`say() took ${JSON.stringify(text)} for ${run} ${step}, and should have refused`);
 };
 
-const detailSteps = async (id = R): Promise<RunDetail['steps']> =>
-  ((await (await app().request(`/api/runs/${id}`)).json()) as RunDetail).steps;
+/** The steps of the run object of `id` (`GET /api/runs/:id`, `status.steps`). */
+const detailSteps = async (id = R): Promise<readonly ObjectStep[]> => (await objectOf(app(), id)).status.steps;
 
 /** The error a refused request answered with, its status `status`. */
 const refusedWith = async (res: Response, status: number, said: string): Promise<string> => {

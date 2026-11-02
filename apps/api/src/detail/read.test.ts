@@ -12,11 +12,11 @@ import { story } from '../../test/checkpoints.ts';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import type { RunDetail } from './detail.ts';
 import { Effect } from 'effect';
 import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from 'agent-orchestrator/testing';
 import { appOver, beforeEachTest, eachTest, engineFor } from '../../test/placed.ts';
+import { objectOf, stepOf } from '../../test/run-reads.ts';
 
 const stand = eachTest(testPlace);
 const standIn = eachTest(testEngine);
@@ -117,19 +117,17 @@ beforeEachTest(() => {
   task('t-plan', 'codex', [USAGE.plan]);
 });
 
-const detailOf = async (id: string) => (await (await app().request(`/api/runs/${id}`)).json()) as RunDetail;
-const stepOf = async (name: string) => {
-  const step = (await detailOf(R)).steps.find((s) => s.name === name);
-  assert.ok(step, name);
-  return step;
-};
+/** The status of the run object of `id`, where the run's own reads are. */
+const statusOf = async (id: string) => (await objectOf(app(), id)).status;
+/** The step `name` of the run `R`'s object. */
+const stepNamed = async (name: string) => stepOf(await objectOf(app(), R), name);
 
 test("a run's page says what its sessions read: each step's classes, peak and rebuilt caches, and the run's own beside its cost", async (t) => {
   const s = story(t);
   await s.test(
     "a step's reads: its classes summed over its attempts, its peak at its `context:` cap, and the resumed session that rebuilt its cache",
     async () => {
-      const implement = await stepOf('implement');
+      const implement = await stepNamed('implement');
       const { cost, read, peak, rebuilt } = implement.used!;
       assert.equal(cost, '$5.30', 'the cost alone: what the sessions read is beside it, not in it');
       assert.equal(
@@ -143,7 +141,7 @@ test("a run's page says what its sessions read: each step's classes, peak and re
   await s.test(
     'a peak past 200k on a step with no cap is marked, and a cold session that wrote its cache once is not a rebuild',
     async () => {
-      const review = await stepOf('review');
+      const review = await stepNamed('review');
       assert.deepEqual(
         [review.used!.read, review.used!.peak, review.used!.rebuilt],
         ['read 2.9M · wrote 100k · peak 250k, past 200k with no cap', 'large', 0],
@@ -151,7 +149,7 @@ test("a run's page says what its sessions read: each step's classes, peak and re
     },
   );
   await s.test('a runner that counted the input as one number says nothing of what it read: null, never 0', async () => {
-    const plan = await stepOf('plan');
+    const plan = await stepNamed('plan');
     assert.deepEqual([plan.used!.read, plan.used!.peak, plan.used!.rebuilt], [null, null, 0]);
     assert.deepEqual(
       plan.timeline.map((t) => t.used?.read),
@@ -161,7 +159,7 @@ test("a run's page says what its sessions read: each step's classes, peak and re
   await s.test(
     "the run's reads are every try's of every step, beside its cost — no class or peak where one session measured none of them",
     async () => {
-      const run = await detailOf(R);
+      const run = await statusOf(R);
       assert.deepEqual(
         run.read,
         {
@@ -183,7 +181,7 @@ test("a run's page says what its sessions read: each step's classes, peak and re
           steps: { implement: { taskId: 't-implement' }, review: { taskId: 't-review' } },
         }),
       );
-      const all = await detailOf(R2);
+      const all = await statusOf(R2);
       assert.deepEqual(
         all.read,
         {
@@ -235,7 +233,7 @@ test("a run's page says what its sessions read: each step's classes, peak and re
         task(`${id}-review`, 'claude', [{ ...USAGE.review, peakContextTokens: reviewPeak, compactions: 1 }]);
       };
       run(RC, 120_000);
-      const detail = await detailOf(RC);
+      const detail = await statusOf(RC);
       const implement = detail.steps.find((s) => s.name === 'implement')?.used;
       assert.ok(implement);
       assert.deepEqual(
@@ -258,7 +256,7 @@ test("a run's page says what its sessions read: each step's classes, peak and re
 
       const RL = 'r-read-compacted-larger';
       run(RL, 180_000);
-      const larger = await detailOf(RL);
+      const larger = await statusOf(RL);
       assert.deepEqual(
         larger.read,
         { said: 'read 8.6M · wrote 400k · peak 180k, compacted', peak: null, rebuilt: 0 },

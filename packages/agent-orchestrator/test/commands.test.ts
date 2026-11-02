@@ -125,7 +125,7 @@ test('each command is served on the api where it was before the table, the lift 
       ],
       ['say', { method: 'POST', path: '/api/runs/:runId/steps/:step/say', status: 202 }],
       ['ls', 'cli'],
-      ['show', 'cli'],
+      ['show', { method: 'GET', path: '/api/runs/:runId', status: 200 }],
       ['closeout', { method: 'GET', path: '/api/runs/:runId/steps/:step/tries/:try/closeout', status: 200 }],
       ['tries', { method: 'GET', path: '/api/runs/:runId/steps/:step/tries', status: 200 }],
       ['try', { method: 'GET', path: '/api/runs/:runId/steps/:step/tries/:try', status: 200 }],
@@ -135,7 +135,6 @@ test('each command is served on the api where it was before the table, the lift 
       ['runs', { method: 'GET', path: '/api/runs', status: 200 }],
       ['runs open', { method: 'GET', path: '/api/runs-open', status: 200 }],
       ['runs finished', { method: 'GET', path: '/api/runs-finished', status: 200 }],
-      ['run', { method: 'GET', path: '/api/runs/:id', status: 200 }],
       ['step artifact', { method: 'GET', path: '/api/runs/:id/steps/:step/artifacts/:name', status: 200 }],
       ['step file', { method: 'GET', path: '/api/runs/:id/steps/:step/files/:name', status: 200 }],
       ['step path', { method: 'GET', path: '/api/runs/:id/steps/:step/path', status: 200 }],
@@ -258,7 +257,6 @@ test('every command the api posts or deletes on writes, and the api guards it; t
       'runs',
       'runs open',
       'runs finished',
-      'run',
       'step artifact',
       'step file',
       'step path',
@@ -290,4 +288,10 @@ test('every command the api posts or deletes on writes, and the api guards it; t
     TABLE.filter((c) => routeList(c).some((r) => r.hand === undefined && c.writes !== (r.method !== 'GET'))).map((c) => c.name),
     [],
   );
+});
+
+test("show is the run's one entry on both sides: its --raw, the record, is the CLI's alone", () => {
+  const show = TABLE.find((c) => c.name === 'show');
+  assert.equal(show?.only, undefined);
+  assert.equal(show?.spec?.flags.find((f) => f.flag === '--raw')?.only?.side, 'cli');
 });

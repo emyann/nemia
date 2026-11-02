@@ -368,7 +368,7 @@ test("a run's reads: gone on a 404 alone, its last read kept, any other failure 
       assert.ok(result.error instanceof ReadRefusal);
       assert.equal(result.error.message, said, "in the api's words");
       assert.equal(result.data, last, 'the last read is kept by the query — the page, not the query, stops drawing it');
-      assert.deepEqual(asked, ['/api/runs/r-1'], 'read once: a run gone is said at once, not after three tries');
+      assert.deepEqual(asked, ['/api/runs/r-1?view=page'], 'read once: a run gone is said at once, not after three tries');
     },
   );
   await t.test("a run's place said `repository`, the former spelling an api not yet restarted answers, is read as `git`", async (t) => {

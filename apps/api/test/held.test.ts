@@ -17,7 +17,7 @@ import assert from 'node:assert/strict';
 import { Effect } from 'effect';
 import fs from 'node:fs';
 import path from 'node:path';
-import type { RunDetail } from '../src/detail/detail.ts';
+import { objectOf, triesOf } from './run-reads.ts';
 import { list, runStore, type RunSummary } from 'agent-orchestrator';
 import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from 'agent-orchestrator/testing';
@@ -95,7 +95,8 @@ beforeEachTest(() => {
   fs.writeFileSync(file, JSON.stringify(run));
 }
 
-const detail = async (id: string) => (await (await app().request(`/api/runs/${id}`)).json()) as RunDetail;
+/** What the run object of `id` says of it and its steps (`GET /api/runs/:id`, `status`). */
+const detail = async (id: string) => (await objectOf(app(), id)).status;
 const summary = async (id: string) => {
   const run = ((await (await app().request('/api/runs')).json()) as RunSummary[]).find((r) => r.id === id);
   assert.ok(run, `${id} is on the list`);
@@ -144,16 +145,16 @@ test('a step whose task is held open reads as waiting on a person, never as a se
   await s.test(
     "a recheck is no turn: a try after one, on the same task filed before tasks were held open, reads that task's attempts and sign-off as it did",
     async () => {
-      const plan = (await detail('h-rechecked')).steps[0];
+      const tries = await triesOf(app(), 'h-rechecked', 'plan');
       assert.deepEqual(
-        plan.tries.map((t) => [t.try, t.taskId]),
+        tries.map((t) => [t.try, t.taskId]),
         [
           [1, 'h-rechecked-plan'],
           [2, 'h-rechecked-plan'],
           [3, 'h-rechecked-plan-try3'],
         ],
       );
-      for (const t of plan.tries.slice(0, 2)) {
+      for (const t of tries.slice(0, 2)) {
         assert.deepEqual([t.attempts.count, t.attempts.latest?.ended, t.closeout?.summary], [1, 'succeeded', DONE.summary], `try ${t.try}`);
       }
     },

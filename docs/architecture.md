@@ -250,10 +250,12 @@ a step's tries, closeouts, checks, told layers, files and usage, and `runsInOf` 
 one object (`RunObject.Run`, an Effect Schema in `src/object/run.model.ts`, built by `runParts` in `src/object/run.verb.ts` off one
 read of the run, from the list's judged fields, `judgedFields`, and the one raise, `stepRaise`). The object carries all the page shows
 but each step's tries whole and what it was told, which are its sub-resources, each answered by a Schema of its own (`StepTries`,
-`StepTry`, `TryCloseout`, `StepTold`); until the board reads the object, `runPage` is projected from the object and those sub-resources
-(`pageOf`), so every test of the page holds the object complete. `apps/api/src/detail/` keeps only type re-exports of the page for the
-board's hand mirror, until the board reads the object; the api serves the object's sub-resources from the command table and its OpenAPI
-3.1 document, generated from the Schemas (`apps/api/src/openapi/`, printed by its `print.ts`). The board's run mirror is generated from
+`StepTry`, `TryCloseout`, `StepTold`). `GET /api/runs/:id` answers the object, the route of the run's one entry of the command table
+(`show`, served on both sides, its `--raw` record the CLI's alone), so the api's tests read the object and its sub-resources. Until the
+board reads the object, the same route answers the page under `?view=page` (`runPage`, projected from the object and those
+sub-resources by `pageOf`), and `apps/api/src/detail/` keeps only type re-exports of the page for the board's hand mirror; the api
+serves the object's sub-resources from the command table and its OpenAPI 3.1 document, generated from the Schemas, names the run's path
+and theirs (`apps/api/src/openapi/`, printed by its `print.ts`). The board's run mirror is generated from
 that document by Effect's own modules (`apps/web/src/lib/api/run.gen.ts`, written by `npm run mirror` in `apps/web`), checked in, and
 refused when it drifts (`apps/web/test/mirror.test.ts`).
 

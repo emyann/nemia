@@ -259,7 +259,8 @@ export function workflowDescription(dir: string): string | null {
  * A workflow's README in full, the workflow level's instruction: the text of the first README of its folder by name, any case, without a
  * leading byte order mark.
  *
- * Null when the folder has no README or it cannot be read. Never throws: the steps beside it are `loadWorkflows`' (`workflows/workflows.store.ts`) to judge.
+ * Null when the folder has no README or it cannot be read. Never throws: the steps beside it are `loadWorkflows`'
+ * (`workflows/workflows.store.ts`) to judge.
  */
 export function workflowReadme(dir: string): string | null {
   try {

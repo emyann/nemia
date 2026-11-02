@@ -178,9 +178,9 @@ function readCardKeys(file: string, block: string): Partial<Record<CardKey, stri
 
 /**
  * A card's frontmatter as key → value, for the keys `keys` a card of its kind has — a plan's (`CARD_KEYS`) or the inbox's (`INBOX_KEYS` in
- * inbox.ts) — each set once, to something. The block is read as YAML (`readFrontmatter`), and a list on
- * `after:` or `from:` (`LIST_KEYS`) as the comma string. Refused by name: a block YAML does not read, the former line form among them, a key set twice or to nothing, a list
- * on any other key (`flatValue`), and any key not in `keys`, in the words `unknown` gives for it.
+ * inbox.ts) — each set once, to something. The block is read as YAML (`readFrontmatter`), and a list on `after:` or `from:`
+ * (`LIST_KEYS`) as the comma string. Refused by name: a block YAML does not read, the former line form among them, a key set twice or
+ * to nothing, a list on any other key (`flatValue`), and any key not in `keys`, in the words `unknown` gives for it.
  */
 export function frontmatterKeys<K extends string>(
   file: string,

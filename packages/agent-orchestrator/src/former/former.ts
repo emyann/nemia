@@ -153,11 +153,11 @@ const keyNamed = (written: string): string => (Object.hasOwn(FORMER_KEYS, writte
 
 /**
  * The frontmatter as key → value: every key a key `refusal` does not refuse — a key a step has, or an agent — set once, to something. The
- * block is read as YAML (`readFrontmatter`), which refuses one in the former line form, naming its line and the YAML to write; a list on a key that holds one
- * (`LIST_KEYS`) reads as the comma string, `tools: [Read, Grep]` as `Read, Grep`, and a list on any other key is refused (`flatValue`). A
- * key under its former name (`FORMER_KEYS`) is read as the key, and `spelled` says under which name, so a refusal quotes the line as
- * written. A key set twice, under either name, is refused rather than last-one-wins: both values are something the author meant, and a
- * step would wait on half of what it was written to wait on.
+ * block is read as YAML (`readFrontmatter`), which refuses one in the former line form, naming its line and the YAML to write; a list on a
+ * key that holds one (`LIST_KEYS`) reads as the comma string, `tools: [Read, Grep]` as `Read, Grep`, and a list on any other key is refused
+ * (`flatValue`). A key under its former name (`FORMER_KEYS`) is read as the key, and `spelled` says under which name, so a refusal quotes
+ * the line as written. A key set twice, under either name, is refused rather than last-one-wins: both values are something the author
+ * meant, and a step would wait on half of what it was written to wait on.
  *
  * A harness's block, `<harness>: { fence: { permissionMode: <mode>, tools: [Read] } }`, is read into the same keys, each a key of that
  * harness's fence (`fenceKeysOf`), and handed back as `block`: whether it is the file's harness is the caller's to judge

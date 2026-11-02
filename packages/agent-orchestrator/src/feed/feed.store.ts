@@ -547,7 +547,7 @@ async function passOf(file: string, at: WatchAt, { onLine, onRead, onCut }: Watc
  * **A feed cut under the watch** — deleted, truncated, or replaced by another file — leaves the cursor pointing into a file that is not the
  * one it was handed out by (`feedCut`). Given `onCut`, the watch says so there once, in words, and reads on from the start of the feed
  * there is now. From the start and not from its end: a cut feed is one the tick has no fold of, so its next pass writes every run's words
- * again (`recordFeedFile`) — the lines a watcher that lost its place needs, and they would be skipped from the end, as would every
+ * again (`feedPass`) — the lines a watcher that lost its place needs, and they would be skipped from the end, as would every
  * transition written between the cut and the watch noticing it. The cost is a line the watcher had before may be said again, which at least
  * once already allows. Without `onCut`, the cut is refused (exit 2) to `onError` on every beat, and the caller ends the watch — the api's
  * stream does, and a reader opens it again from the feed it has now.

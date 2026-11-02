@@ -29,7 +29,14 @@ The diagram below is printed by the code (`src/model/diagram.model.ts`, through 
   tree written checked by `TemplateTreeWrite`; the model's `Template` (`src/templates/templates.model.ts`) is keyed by its source, and a
   factory's `template` is an `AppliedTemplate`, whose source names it. Still to come, its own card on S5a: **S5c**, the Agent and Skill
   doors (one context, the same lookup roots). A run's `pinned` revisions, left out of `Run` today, are named there.
-- **S6, the subscription, the ledger and the feed**, each behind a door on the feed's model.
+- **S6, the subscription, the ledger and the feed**, landed, each behind a rooted door on the pattern, its files today's. The
+  Subscription door (`SubscriptionDoor`, `src/subscription/subscription.store.ts`), by `SubscriptionName`: a subscription put once
+  (`wx`, a name taken is `Conflict`) and checked by `Subscription`, its delivery by the model's `Delivery`. The Ledger door
+  (`LedgerDoor`, `src/revisions/revisions.store.ts`), by `RevisionOf`: an append checked by `Revision`
+  (`src/revisions/revisions.model.ts`), a stored entry read nominally. The Feed door (`FeedDoor`, `src/feed/feed.store.ts`),
+  append-only: each line appended decoded by `FeedLine`, a cursor read at a line's boundary, the fold's memo its caller's
+  (`emitFeed`). The callers still on their module spellings are counted in `test/subscription-door.baseline.ts`,
+  `test/ledger-door.baseline.ts` and `test/feed-door.baseline.ts`; the store measured after them is `tools/store-measure/baselines/s6.json`.
 - **AgentOnStep** is `StepAgent` in the agents' model: the agent a step is given, and what the step overrides of it, within what the
   agent offers (`Agent.overridable`).
 - **Decision 9**: the place's model names `PlaceKind` (`git` or `folder`, as a step's `place:` says it, and `MountKind` before it), beside
@@ -178,6 +185,12 @@ erDiagram
     FeedCursor from
     object scope "optional"
   }
+  Delivery {
+    SubscriptionName name FK
+    object of
+    FeedCursor cursor
+    object since "optional"
+  }
   RunLine {
     string at
     RunId run FK
@@ -225,6 +238,13 @@ erDiagram
     string message "optional"
     string call "optional"
   }
+  Revision {
+    enum kind
+    string name
+    number n
+    string hash
+    string at
+  }
   Workflow ||--o{ Run : workflowDir
   Run ||--o{ WorkflowStep : workflow
   Run ||--o{ Run : after
@@ -258,6 +278,10 @@ erDiagram
   WorkflowStep ||--o{ StepAgent : step
   Agent ||--o{ StepAgent : agent
   TaskId ||--o{ Subscription : task
+  Subscription ||--o{ Delivery : name
+  Delivery ||--o{ RunLine : digest
+  Delivery ||--o{ DaemonLine : digest
+  Delivery ||--o{ StoreLine : digest
   Run ||--o{ RunLine : run
   WorkflowStep ||--o{ RunLine : step
   Try ||--o{ RunLine : try

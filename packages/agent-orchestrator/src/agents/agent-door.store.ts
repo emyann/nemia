@@ -9,9 +9,9 @@
  * the name written as `AgentName.OnCreate` checks them, the agent the draft renders to (`renderAgent`, `parseAgent`) as the model's
  * `Agent` (its `output:` the layer's to read, as a file beside it), a rename given the version it was read at, and then the write or
  * the removal judged at the name it changes against the version it was read at (`definitionVersionRefusal`), refused with the kind it
- * chooses. Custom instructions written are words, never blank and with no frontmatter block (`customInstructionsRefusal`). What stays
- * each layer's own: the place, a link, a sidecar, a step that still names the agent, a rename onto an agent there, and a name no place
- * has for custom instructions.
+ * chooses. Custom instructions written are words, never blank. What stays each layer's own: a frontmatter block in custom
+ * instructions (`customInstructionsRefusal`, naming the layer's file), the place, a link, a sidecar, a step that still names the agent, a
+ * rename onto an agent there, and a name no place has for custom instructions.
  *
  * The door's default is rooted (`rootedDoor`): the files at the store's root the program is given (`StoreRoot`), refused where it was
  * given none (`test/root-given.test.ts`).
@@ -23,8 +23,6 @@ import { Conflict, Invalid, Missing, type Refusal } from '../refusal/refusal.ts'
 import { AGENTS_FOLDER } from '../step/step.ts';
 import { Agent as AgentRecord, AgentName } from './agents.model.ts';
 import {
-  CUSTOM_INSTRUCTIONS_FOLDER,
-  customInstructionsRefusal,
   definitionVersionRefusal,
   parseAgent,
   renderAgent,
@@ -156,8 +154,6 @@ export function agentDoorOver(layer: AgentLayer): AgentDoorShape {
                 message: `the custom instructions for ${name} are blank. Write the words the agent is to be told, or remove them: nemia agents custom ${name} --clear.`,
               }),
             );
-          const refused = customInstructionsRefusal(`${CUSTOM_INSTRUCTIONS_FOLDER}/${name}.md`, text);
-          if (refused !== undefined) return yield* Effect.fail(new Invalid({ message: refused }));
           return yield* door.custom.write(name, text, repo);
         }),
     },

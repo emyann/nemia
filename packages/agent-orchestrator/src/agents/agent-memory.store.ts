@@ -14,7 +14,7 @@ import path from 'node:path';
 import { Layer } from 'effect';
 import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
 import { AGENTS_FOLDER, WorkflowError } from '../step/step.ts';
-import { parseAgent, renderAgent, type Agent } from './agents.ts';
+import { customInstructionsRefusal, parseAgent, renderAgent, type Agent } from './agents.ts';
 import { lookedUp } from '../skills/lookup.ts';
 import { lookupOf, lookupRoots, type Places } from '../skills/read.store.ts';
 import { customInstructionsFile } from './read.store.ts';
@@ -144,6 +144,8 @@ export function agentDoorMemory(): Layer.Layer<never> {
       },
       write: (name, text, repo) => {
         refuseNoAgent(store, name, repo);
+        const refused = customInstructionsRefusal(customInstructionsFile(MEMORY_ROOT, name), text);
+        if (refused !== undefined) throw new Invalid({ message: refused });
         custom.set(name, text.trim());
         return customInstructionsFile(MEMORY_ROOT, name);
       },

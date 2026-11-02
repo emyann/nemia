@@ -792,7 +792,7 @@ export const definitionVersionRefusal: DefinitionVersionRefusal = (what, name, d
       return { kind: 'Conflict', message: `${named} is there already. ${anew}, or open it and change it${takenAt(there.version)}.` };
     return {
       kind: 'Invalid',
-      message: `${named} is at version ${there.version}, and a removal is checked against the version it was read at, so a ${what} changed since is not removed unseen. Give that version to remove it.`,
+      message: `${named} is at version ${there.version}, and a removal is checked against the version it was read at, so ${what === 'agent' ? 'an agent' : 'a skill'} changed since is not removed unseen. Give that version to remove it.`,
     };
   }
   if (given === there.version) return null;

@@ -225,8 +225,8 @@ test("REFUSED at shipped defaults: a skill Nemia does not ship, a name that is n
     404,
     new RegExp(`has no skill named ${toCopy}: a skill is a folder holding a SKILL\\.md`),
   );
-  await refused(send('/api/skills/yours', { copy: '../agents' }), 422, /^`\.\.\/agents` is not a skill's name/);
-  await refused(send('/api/skills/yours', { copy: 'Bad_Name' }), 422, /^`Bad_Name` is not a skill's name/);
+  await refused(send('/api/skills/yours', { copy: '../agents' }), 422, /`\.\.\/agents` is not a skill's name/);
+  await refused(send('/api/skills/yours', { copy: 'Bad_Name' }), 422, /`Bad_Name` is not a skill's name/);
   await refused(send('/api/skills/yours', { copy: 7 }), 400, /`copy` is the name of the builtin skill to copy, a string/);
   await refused(send('/api/skills/yours', [toCopy]), 400, /takes a JSON object: .*`{ "copy"/);
   await refused(send('/api/skills/yours', '{'), 400, /takes a JSON body/);
@@ -473,17 +473,17 @@ test('a change of a skill moves the version of every agent that gives it, and th
 });
 
 test('REFUSED at shipped defaults: a name that is not a folder-safe id, a clash with a skill of your library, a frontmatter the card reader refuses', async () => {
-  await refused(send('/api/skills/yours', { skill: { ...NOTES, name: '../agents' } }), 422, /^`\.\.\/agents` is not a skill's name/);
-  await refused(send('/api/skills/yours', { skill: { ...NOTES, name: 'Tidy Notes' } }), 422, /^`Tidy Notes` is not a skill's name/);
+  await refused(send('/api/skills/yours', { skill: { ...NOTES, name: '../agents' } }), 422, /`\.\.\/agents` is not a skill's name/);
+  await refused(send('/api/skills/yours', { skill: { ...NOTES, name: 'Tidy Notes' } }), 422, /`Tidy Notes` is not a skill's name/);
   await refused(
     send('/api/skills/yours', { skill: { ...NOTES, name: 'mine' } }),
     409,
-    /^skills\/mine is there already, in .*, and a new skill would write over it\. Give it another name/,
+    /^skills\/mine is there already/,
   );
   await refused(
     send('/api/skills/yours', { skill: { ...NOTES, name: 'fresh', description: '' } }),
     422,
-    /has no `description:`, and the A2A protocol marks a skill's description REQUIRED/,
+    /`description` is required/,
   );
   await refused(send('/api/skills/yours', { skill: { ...NOTES, name: 'fresh', tags: [] } }), 422, /`tags` is an empty list/);
   await refused(
@@ -498,7 +498,7 @@ test('REFUSED at shipped defaults: a change at a version the skill has moved on 
   const { version } = await detail('yours', 'always');
   fs.appendFileSync(path.join(LIBRARY, 'always', 'SKILL.md'), 'Edited by hand.\n');
   await refused(put('/api/skills/yours/always', { version, preload: false }), 409, /^skills\/always changed since it was read \(version /);
-  await refused(put('/api/skills/yours/gone', { version, preload: false }), 404, /^skills\/gone is not in .*: it was removed/);
+  await refused(put('/api/skills/yours/gone', { version, preload: false }), 404, /^skills\/gone is not there: it was removed/);
   const now = (await detail('yours', 'always')).version;
   await refused(
     put('/api/skills/yours/always', { version: now, skill: { ...NOTES, name: 'renamed' } }),

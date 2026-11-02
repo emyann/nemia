@@ -39,9 +39,9 @@ export type Agent = typeof Agent.Type;
 /** Why a skill's `description:` is refused, or nothing: one line, and there, as the card reader requires (`skillEntryOf`). */
 const descriptionRefusal = (description: string): string | undefined =>
   description.trim() === ''
-    ? 'a skill has a `description:`, which the A2A protocol marks REQUIRED and Claude Code lists a skill by: write one line saying what it does.'
+    ? 'is required, as the A2A protocol marks it and Claude Code lists a skill by it: write one line saying what the skill does.'
     : /[\r\n]/.test(description)
-      ? "a skill's `description:` is one line, a card's value: write it on one line."
+      ? "holds a line break, and a card's value is one line: write it on one line."
       : undefined;
 
 /**

@@ -23,7 +23,7 @@ import { holdsOpen } from '../gate/gate.ts';
 import { checkTaskId, isRepositoryRun, stepTaskId, tryOf, type CloseoutAsked, type Run, type TaskPhase } from '../record/record.ts';
 import { budgetOf, landsOnCheck, sentBack, stepStatus, type RoundAsk, type SpendOf } from '../status/status.ts';
 import { hasStarted, runReady, waitedOn, waitsOf, type ParentRun, type Wait } from '../wait/wait.ts';
-import { behindNow, followPass, pinPass, pinsWritten, type PinnedPass } from '../revisions/pin.verb.ts';
+import { behindNow, followPass, passRevisions, pinPass, pinsWritten, type PinnedPass } from '../revisions/pin.verb.ts';
 import { handOffDue } from '../workspace/workspace.ts';
 import { filesDue } from '../artifacts/artifacts.ts';
 import { inParts } from '../brief/index.ts';
@@ -345,8 +345,8 @@ export const advanceRun = Effect.fn('advance')(function* (run: Run, slot?: RunSl
 export const advancePass = Effect.fn('advancePass')(
   function* (e: Engine, run: Run, slot?: RunSlot, pass?: PassRead) {
     yield* Effect.annotateCurrentSpan({ run: run.id });
-    const revisions = pass?.revisions;
-    const took = pinPass(run, new Date().toISOString(), revisions);
+    const revisions = pass?.revisions ?? (yield* passRevisions());
+    const took = yield* pinPass(run, new Date().toISOString(), revisions);
     const { reads, askNotes } = yield* readPass(e, run);
     const { steps, phaseOf, signedOff, asked, verdictOf, sessionBlocked, spendOf, asks, roundAsks } = reads;
     const adopted = yield* adoptAll(e, run, reads);
@@ -377,9 +377,9 @@ export const advancePass = Effect.fn('advancePass')(
       admission,
       checkout,
       lift.lifted,
-      behindNow(run, assessed.status === 'succeeded', revisions),
+      yield* behindNow(run, assessed.status === 'succeeded', revisions),
     );
-    const { followed, pinned, ...due } = followedDue(run, took, assessed, admission, revisions);
+    const { followed, pinned, ...due } = yield* followedDue(run, took, assessed, admission, revisions);
 
     const notes: string[] = [...askNotes, ...handed.collected, ...lacking.notes, ...landing.notes, ...lift.notes, ...closeNotes];
     notes.unshift(...took.notes);
@@ -410,18 +410,27 @@ export const advancePass = Effect.fn('advancePass')(
  * the pass re-pinned, nothing, so the next pass files them on the new pins; and what the pass owes the store of its pins, `took` (the head
  * of the pass's, `pinPass`) and the follow's together (`pinned`).
  */
-function followedDue(
+const followedDue = Effect.fnUntraced(function* (
   run: Run,
   took: PinnedPass,
   assessed: Assessment,
   admission: Admission,
-  revisions: PassRead['revisions'] | undefined,
-): { followed: PinnedPass; pinned: PinnedPass; ready: readonly string[]; retry: Assessment['retry']; round: Assessment['round'] } {
+  revisions: PassRead['revisions'],
+) {
   const due = admission.ready.length + assessed.retry.length + assessed.round.length > 0;
-  const followed = followPass(run, new Date().toISOString(), due, revisions);
-  if (!followed.wrote) return { followed, pinned: took, ready: admission.ready, retry: assessed.retry, round: assessed.round };
-  return { followed, pinned: { ...took, wrote: true }, ready: [], retry: [], round: [] };
-}
+  const followed = yield* followPass(run, new Date().toISOString(), due, revisions);
+  const kept: Followed = { followed, pinned: took, ready: admission.ready, retry: assessed.retry, round: assessed.round };
+  return followed.wrote ? ({ followed, pinned: { ...took, wrote: true }, ready: [], retry: [], round: [] } satisfies Followed) : kept;
+});
+
+/** What `followedDue` answers: the follow's pass, what the pass owes of its pins, and what it files. */
+type Followed = {
+  followed: PinnedPass;
+  pinned: PinnedPass;
+  ready: readonly string[];
+  retry: Assessment['retry'];
+  round: Assessment['round'];
+};
 
 /**
  * What the pass hands the metrics of the run's settled tasks (`settledOnce`), off what it read of them, before it files anything over

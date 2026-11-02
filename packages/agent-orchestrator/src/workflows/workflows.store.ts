@@ -31,7 +31,7 @@ import type { Places } from '../skills/read.store.ts';
 import { workflowVersionRefusal, type Fills, type Found, type WorkflowThere } from '../folder/folder.ts';
 import { StepName, Workflow, WorkflowDir, WorkflowName } from '../folder/folder.model.ts';
 import { formerKeyLines, loadWorkflowsWith, workflowsIn } from '../folder/folder.store.ts';
-import { workflowVersion } from '../folder/version.store.ts';
+import { versionDigest, versionGathered, versionNamed, type VersionGathered } from '../folder/version.store.ts';
 import { placesAroundAt, removeWorkflowAt, writeWorkflowAt, type WorkflowRemoved, type WorkflowWritten } from '../folder/write.store.ts';
 import { AgentDoor, agentDoorOver, agentFiles, type AgentDoorShape } from '../agents/agent-door.store.ts';
 import { SkillDoor, skillDoorOver, skillFiles, type SkillDoorShape } from '../skills/skill-door.store.ts';
@@ -39,14 +39,14 @@ import { SkillDoor, skillDoorOver, skillFiles, type SkillDoorShape } from '../sk
 /** What a workflow is written from: its steps as the builder sends them, and its README where one is given. */
 export type WorkflowDraft = { readonly steps: readonly StepDraft[]; readonly readme?: string };
 
-/** What a write answers: what was written, and the version the folder is at after it. */
+/** What a write answers: what was written, and the version the folder is at after it, which the door reads once the layer wrote. */
 export type WorkflowSaved = WorkflowWritten & { readonly version: string };
 
 /**
  * A layer of the Workflow door, as plain synchronous methods: the workflows a holder folder holds, by name; where a write of a folder
  * finds its agents and skills (`around`): `places`, or where the layer says a run of it would look; a workflow's steps, loaded as a start
  * loads them, against the agents and skills the door `found` and its hires `fills`; what is at a folder now and its version
- * (`WorkflowThere`); a workflow written from a draft against those `found`, and removed whole (`users` the sentences of what still needs
+ * (`WorkflowThere`), its version counting what the door `gathered` of the agents and skills its files name (`named`); a workflow written from a draft against those `found`, and removed whole (`users` the sentences of what still needs
  * it); and the lines naming each former spelling its files still hold, with the fix (`formerKeyLines`).
  */
 export type WorkflowLayer = {
@@ -54,8 +54,9 @@ export type WorkflowLayer = {
     readonly list: (holder: string) => readonly string[];
     readonly around: (dir: string, places?: Places) => Places;
     readonly read: (dir: string, found: Found, fills?: Fills) => Step[];
-    readonly there: (dir: string, places?: Places) => WorkflowThere;
-    readonly write: (dir: string, draft: WorkflowDraft, found: Found, places?: Places) => WorkflowSaved;
+    readonly named: (dir: string) => { readonly agents: readonly string[]; readonly added: readonly string[] };
+    readonly there: (dir: string, gathered: VersionGathered) => WorkflowThere;
+    readonly write: (dir: string, draft: WorkflowDraft, found: Found, places?: Places) => WorkflowWritten;
     readonly remove: (dir: string, users: readonly string[]) => WorkflowRemoved;
     readonly hints: (dir: string) => readonly string[];
   };
@@ -66,11 +67,13 @@ type Methods = DoorOf<WorkflowLayer, WorkflowDir>['workflows'];
 /**
  * The Workflow door's shape: each method of `WorkflowLayer` answering an Effect, a workflow's folder taken as `WorkflowDir`; but `list`,
  * which takes a holder's plain path, a read, whose agents and skills are found in `places`, and a write and a removal, each given the
- * version the folder was read at (none for a new one). The layer's `around` is the door's own to ask.
+ * version the folder was read at (none for a new one), and `there`, whose version counts the agents and skills found through the doors in
+ * `places`. The layer's `around` and `named` are the door's own to ask.
  */
 export type WorkflowDoorShape = {
-  readonly workflows: Omit<Methods, 'list' | 'around' | 'read' | 'write' | 'remove'> & {
+  readonly workflows: Omit<Methods, 'list' | 'around' | 'named' | 'read' | 'there' | 'write' | 'remove'> & {
     readonly list: (holder: string) => Effect.Effect<readonly string[], Refusal>;
+    readonly there: (dir: WorkflowDir, places?: Places) => Effect.Effect<WorkflowThere, Refusal>;
     readonly read: (dir: WorkflowDir, places?: Places, fills?: Fills) => Effect.Effect<Step[], Refusal>;
     readonly write: (dir: WorkflowDir, draft: WorkflowDraft, version?: string, places?: Places) => Effect.Effect<WorkflowSaved, Refusal>;
     readonly remove: (
@@ -147,8 +150,14 @@ export function workflowDoorOver(layer: WorkflowLayer, defs?: WorkflowDefs): Wor
       const skills = defs?.skills ?? (yield* SkillDoor);
       return { agents: yield* agents.agents.found({ dir, places }), skills: yield* skills.skills.found({ dir, places }) };
     });
+  const thereOf = (dir: WorkflowDir, places?: Places): Effect.Effect<WorkflowThere, Refusal> =>
+    Effect.gen(function* () {
+      const named = yield* door.named(dir);
+      const gathered = yield* versionGathered(dir, yield* door.around(dir, places), named, defs);
+      return yield* door.there(dir, gathered);
+    });
   const judged = (dir: WorkflowDir, does: 'write' | 'remove', version: string | undefined, places?: Places) =>
-    Effect.flatMap(door.there(dir, places), (there) => {
+    Effect.flatMap(thereOf(dir, places), (there) => {
       const refused = workflowVersionRefusal(dir, does, there, version);
       return refused === null ? Effect.void : Effect.fail(refusalOf(refused));
     });
@@ -163,7 +172,7 @@ export function workflowDoorOver(layer: WorkflowLayer, defs?: WorkflowDefs): Wor
           yield* dirChecked(dir);
           return yield* door.read(dir, yield* foundIn(dir, places ?? {}), fills);
         }),
-      there: (dir, places) => Effect.andThen(dirChecked(dir), door.there(dir, places)),
+      there: (dir, places) => Effect.andThen(dirChecked(dir), thereOf(dir, places)),
       hints: (dir) => Effect.andThen(dirChecked(dir), door.hints(dir)),
       write: (dir, draft, version, places) =>
         Effect.gen(function* () {
@@ -173,7 +182,13 @@ export function workflowDoorOver(layer: WorkflowLayer, defs?: WorkflowDefs): Wor
           yield* workflowChecked(draftedWorkflow(dir, draft));
           yield* judged(dir, 'write', version, places);
           const found = yield* foundIn(dir, yield* door.around(dir, places));
-          return yield* door.write(dir, draft, found, places);
+          const written = yield* door.write(dir, draft, found, places);
+          const after = yield* thereOf(WorkflowDir.read(written.dir), places);
+          if (after.kind !== 'folder')
+            return yield* Effect.fail(
+              new Invalid({ message: `${written.dir} is not a folder after it was written: look at what is there, and write it again.` }),
+            );
+          return { ...written, version: after.version };
         }),
       remove: (dir, version, users, places) =>
         Effect.gen(function* () {
@@ -197,15 +212,14 @@ export function workflowFiles(home: string): WorkflowLayer {
       list: (holder) => workflowsIn(holder),
       around,
       read: (dir, found, fills) => loadWorkflowsWith(dir, found, fills),
-      there: (dir, places) => {
+      named: (dir) => versionNamed(dir),
+      there: (dir, gathered) => {
         const stat = fs.lstatSync(dir, { throwIfNoEntry: false });
         if (stat === undefined) return { kind: 'none' };
-        return stat.isDirectory() ? { kind: 'folder', version: workflowVersion(dir, around(dir, places)) } : { kind: 'file' };
+        return stat.isDirectory() ? { kind: 'folder', version: versionDigest(versionNamed(dir).files, gathered) } : { kind: 'file' };
       },
-      write: (dir, draft, found, places) => {
-        const written = writeWorkflowAt(home, dir, draft.steps, draft.readme, { found, ...(places !== undefined && { places }) });
-        return { ...written, version: workflowVersion(written.dir, around(written.dir, places)) };
-      },
+      write: (dir, draft, found, places) =>
+        writeWorkflowAt(home, dir, draft.steps, draft.readme, { found, ...(places !== undefined && { places }) }),
       remove: (dir, users) => removeWorkflowAt(home, dir, users),
       hints: (dir) => formerKeyLines(dir),
     },

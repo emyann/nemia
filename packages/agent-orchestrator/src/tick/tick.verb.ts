@@ -22,6 +22,7 @@ import type { QueueStarted } from '../inbox/index.ts';
 import { tipsSeen } from '../branches/index.ts';
 import { admissionOrder, slotFree, type RunSlot } from '../cap/cap.ts';
 import { passRead, type PassRead } from '../cap/cap.verb.ts';
+import { passRevisions } from '../revisions/pin.verb.ts';
 import { readPause } from '../pause/pause.store.ts';
 import { finishingAmong, type Finishing, type Pause, type PauseStanding } from '../pause/pause.ts';
 import { isRepositoryRun, type Run } from '../record/record.ts';
@@ -256,7 +257,7 @@ const pass = Effect.fn('pass')(function* (engine: Engine, { repo, memo, verify }
   const pause = yield* tried(() => readPause());
   const judging: Judging = { done: new Map(), unjudged: new Map() };
   const standing = yield* passStanding(runs, memo.standing);
-  const read: PassRead = passRead(e, runs, process.env, standing);
+  const read: PassRead = passRead(e, runs, process.env, standing, yield* passRevisions());
   for (const run of runs.filter(hasStarted)) yield* judged(e, judging, read, run, resting);
   const counted = yield* waitingJudged(e, judging, read, resting, ran.runs);
   const queue =

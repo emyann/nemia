@@ -101,9 +101,15 @@ const team = (builder: string, files: Record<string, string>, step = "---\nagent
  */
 const AGENT_OWN = ['role', 'description', 'skills', 'harnessPrompt', 'mcp', 'overridable'];
 
-/** A Claude Code project subagent as its /agents wizard writes one: a name, a description with an example, tools, a model, a colour. */
+/**
+ * A Claude Code project subagent as its /agents wizard writes one: a name, a description with an example, tools, a model, a colour. Its
+ * description holds `: `, so it is quoted, as YAML asks: written unquoted it is the former line form, which the load refuses (`UNQUOTED`).
+ */
 const WIZARD =
-  '---\nname: code-reviewer\ndescription: Use this agent when a change needs a second look. Example: after a feature is written.\ntools: Read, Grep, Glob, Bash\nmodel: sonnet\ncolor: blue\n---\nYou are a careful code reviewer.\n';
+  '---\nname: code-reviewer\ndescription: "Use this agent when a change needs a second look. Example: after a feature is written."\ntools: Read, Grep, Glob, Bash\nmodel: sonnet\ncolor: blue\n---\nYou are a careful code reviewer.\n';
+
+/** The wizard's file with its description unquoted, `Example: ` and all: the former line form. */
+const UNQUOTED = WIZARD.replace(/description: "(.*)"/, 'description: $1');
 
 test('parseAgent: an agent file read as its role keys, its own lines and its instructions', async (t) => {
   await rows(t, [
@@ -228,6 +234,15 @@ test('parseAgent: an agent file read as its role keys, its own lines and its ins
         assert.ok(!('color' in read.keys), 'not a role key: no step inherits it');
         assert.doesNotMatch(renderAgent({ name: read.name, description: read.description, keys: read.keys, body: read.body }), /color/);
       },
+    ],
+    [
+      'the same file with its description unquoted is refused at the description, naming the line quoted',
+      () =>
+        names(
+          refusal(() => agent('code-reviewer', UNQUOTED)),
+          'code-reviewer.md:3:',
+          '`description: "Use this agent when a change needs a second look. Example: after a feature is written."`',
+        ),
     ],
   ]);
 });
@@ -385,7 +400,7 @@ test('REFUSED at shipped defaults: an agent file, one row per line it may not sa
       "not a skill's name",
     ],
     ['a skill named twice', () => agent('builder', '---\nskills: a-b, a-b\n---\nx\n'), 'names `a-b` twice'],
-    ['a `skills:` naming none', () => agent('builder', '---\nskills: ,\n---\nx\n'), 'names no skill'],
+    ['a `skills:` naming none', () => agent('builder', '---\nskills: ","\n---\nx\n'), 'names no skill'],
     [
       'a harness prompt not one of the three',
       () => agent('builder', '---\nharnessPrompt: terse\n---\nx\n'),

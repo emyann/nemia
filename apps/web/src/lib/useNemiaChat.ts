@@ -56,7 +56,8 @@ export type Reader = { setState: Dispatch<SetStateAction<ChatFollowed>>; tryAgai
 
 /**
  * Reads her chat once and follows it from the cursor it answered, and asks for another try after `CHAT_RETRY_MS` where the read did not
- * work. Returns what stops it: the read abandoned, the retry dropped, the stream closed.
+ * work. A read that did not work is the end: it fills `error` and clears the `retrying` notice an earlier stream may have left, as
+ * `follow`'s end does. Returns what stops it: the read abandoned, the retry dropped, the stream closed.
  */
 export function reading({ setState, tryAgain, follow }: Reader): () => void {
   const read = new AbortController();

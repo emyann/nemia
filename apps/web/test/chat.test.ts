@@ -594,7 +594,7 @@ test('reading her chat: a read made again that fails is the end, and clears the 
     });
   const open = reading({ setState, tryAgain: () => {}, follow: true });
   await until(() => streams.length === 1);
-  streams[0]!.send('unreadable', { error: 'Her chat is unreadable.', retrying: true });
+  streams[0].send('unreadable', { error: 'Her chat is unreadable.', retrying: true });
   assert.equal(state.retrying, 'Her chat is unreadable.', 'the panel open, the stream says the api reads her again');
 
   open();

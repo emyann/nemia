@@ -10,7 +10,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { Effect } from 'effect';
+import { Cause, Effect } from 'effect';
 import {
   ideaCard,
   inboxListing,
@@ -32,7 +32,8 @@ import { workRoot } from '../record/places.store.ts';
 import { firstPiece } from '../piece/piece.ts';
 import { WorkflowError, type Workflow } from '../step/step.ts';
 import { isFolderTeam } from '../workflow/index.ts';
-import { loadWorkflows, workflowFolder } from '../folder/folder.store.ts';
+import { workflowFolder } from '../folder/folder.store.ts';
+import { WorkflowDoor } from '../workflows/workflows.store.ts';
 import { defaultStartsAllowed, factoryNames, readFactories, treeOf } from '../factory/factory.store.ts';
 import type { Factory } from '../factory/factory.ts';
 import { HOME, isDirectory, runId, runsDir } from '../record/record.store.ts';
@@ -85,25 +86,27 @@ export const readableFactories = (): Map<string, Factory> =>
  *
  * The workflow is looked for as its start would look: in the tree of the card's factory first, where it is made from a template. Silent
  * when there is no repository to judge, when the card names no workflow, and when the workflow cannot be read from here: what a card
- * names is the start's to refuse, in the start's words, and a folder that does not load says so there.
+ * names is the start's to refuse, in the start's words, and a folder that does not load says so there. Read through the Workflow door
+ * the program is given, at the store's root.
  */
-function cardRepoRefusal(opts: { workflow?: string; repo?: string; dir?: string; factory?: string }): string | null {
-  if (opts.repo === undefined || opts.workflow === undefined) return null;
-  let steps: readonly Workflow[];
-  try {
-    steps = loadWorkflows(workflowFolder(opts.workflow, opts.dir ?? process.cwd(), opts.repo, treeOf(opts.factory)), {
-      repo: opts.repo,
-      home: HOME,
-    });
-  } catch {
-    return null;
-  }
-  if (!isFolderTeam(steps)) return null;
+const cardRepoRefusal = Effect.fn('cardRepoRefusal')(function* (opts: {
+  workflow?: string;
+  repo?: string;
+  dir?: string;
+  factory?: string;
+}) {
+  const { workflow, repo } = opts;
+  if (repo === undefined || workflow === undefined) return null;
+  const door = yield* WorkflowDoor;
+  const steps = yield* Effect.suspend(() =>
+    door.workflows.read(workflowFolder(workflow, opts.dir ?? process.cwd(), repo, treeOf(opts.factory)), { repo, home: HOME }),
+  ).pipe(Effect.catchCause((cause) => (Cause.hasInterruptsOnly(cause) ? Effect.failCause(cause) : Effect.succeed(null))));
+  if (steps === null || !isFolderTeam(steps)) return null;
   return (
-    `--repo ${opts.repo}: this card's workflow has steps that say \`place: folder\`, so a run started from it works in folders it makes under ${workRoot(runsDir(), '<run>')}, with no git repository, and would never look at ${opts.repo}.\n` +
+    `--repo ${repo}: this card's workflow has steps that say \`place: folder\`, so a run started from it works in folders it makes under ${workRoot(runsDir(), '<run>')}, with no git repository, and would never look at ${repo}.\n` +
     `File the card without a repository, or name a workflow whose steps work on one.`
   );
-}
+});
 
 /**
  * `nemia inbox add`: an idea filed as a card (`ideaCard`), under the slug `runId` makes of its body's first line, suffix and all, so two
@@ -121,7 +124,7 @@ export const addToInbox = Effect.fn('addToInbox')(function* (opts: {
   repo?: string;
   factory?: string;
 }) {
-  const refusedRepo = cardRepoRefusal(opts);
+  const refusedRepo = yield* cardRepoRefusal(opts);
   if (refusedRepo) return yield* Effect.fail(new WorkflowError(refusedRepo));
   const given = { workflow: opts.workflow, repo: opts.repo, factory: opts.factory };
   const { text, body } = ideaCard(opts.from ?? 'the idea', opts.text, given, isDirectory, opts.dir);
@@ -201,7 +204,7 @@ export const queueInInbox = Effect.fn('queueInInbox')(function* (name: string, h
   if (how.off && card.queued === undefined) return queued({ card, file, was: 'not queued', factoryRepo: null });
   if (!how.off) yield* refuseQueue(card, file, how.workflow);
   if (how.workflow !== undefined) {
-    const refusedRepo = cardRepoRefusal({ workflow: how.workflow, repo: card.repo, factory: card.factory });
+    const refusedRepo = yield* cardRepoRefusal({ workflow: how.workflow, repo: card.repo, factory: card.factory });
     if (refusedRepo) throw new WorkflowError(refusedRepo);
   }
   const written = queuedText(card, how.off ? null : new Date().toISOString(), exists, how.workflow);

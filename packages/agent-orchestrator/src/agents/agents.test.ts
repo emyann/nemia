@@ -29,7 +29,8 @@ import {
   type Agents,
   type Workflow,
 } from '../workflow.ts';
-import { FrozenStepSchema, loadWorkflows, workflowFolder, workflowsIn } from '../folder/folder.store.ts';
+import { FrozenStepSchema, workflowFolder, workflowsIn } from '../folder/folder.store.ts';
+import { loadWorkflows } from '../workflows/workflows.store.ts';
 import { agentsFor, agentVersion, loadAgents } from './read.store.ts';
 import { cardSkills, skillsFor } from '../skills/read.store.ts';
 import { filedConfig } from '../filed/filed.ts';

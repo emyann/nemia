@@ -13,7 +13,7 @@ import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { loadWorkflows } from '../src/folder/folder.store.ts';
+import { loadWorkflows } from '../src/workflows/workflows.store.ts';
 import { checkArgv } from '../src/check/check.ts';
 import { REPO, placesOf } from './team.ts';
 import { scratch } from './scratch.ts';

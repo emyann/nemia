@@ -1,5 +1,5 @@
 /**
- * A workflow folder written from its steps (`writeWorkflow`), what the board's builder saves, and one of yours removed whole
+ * A workflow folder written from its steps (`writeWorkflowAt`, which `writeWorkflow` in `workflows.store.ts` calls), what the board's builder saves, and one of yours removed whole
  * (`removeWorkflow`); where a folder's runs look for agents and skills (`placesAroundAt`); and whether a folder holds the workflows
  * the board lists (`isWorkflowsHolderAt`). A store beside `folder.store.ts`, reading through the agents and skills reads: it imports
  * neither the engine nor a controller. A run that froze its folder at `nemia start` is changed by none of it.
@@ -14,7 +14,6 @@ import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
 import { agentsFolderRefusal, linkRefusal, noStepsRefusal, parseFolder, stepNameRefusal, twiceRefusal, workflowInUse } from './folder.ts';
 import type { Agents } from '../agents/agents.ts';
 import type { Places } from '../skills/read.store.ts';
-import { foundAt } from './folder.store.ts';
 import type { Found } from './folder.ts';
 import { HOME, isDirectory } from '../record/record.store.ts';
 import { readFactoriesAt } from '../factory/factory.store.ts';
@@ -240,33 +239,14 @@ export function placesAroundAt(home: string, workflowDir: string): Places {
 }
 
 /**
- * `writeWorkflowAt` with the agents and skills found on the disk where a run of the folder would look (`foundAt`): what a caller with
- * no Agent and Skill doors writes with, which no file of `src` is.
+ * A function taking the store's root first, as the old spelling that takes none: `at` the module's root, `HOME`. The one line of this
+ * file that reads a root of its own (`test/global-roots.baseline.ts`), and so where `writeWorkflow` (`workflows.store.ts`) takes its
+ * root too.
  */
-const writeWorkflowOnDisk = (
-  home: string,
-  dir: string,
-  steps: readonly StepDraft[],
-  readme?: string,
-  { anywhere, places }: { anywhere?: boolean; places?: Places } = {},
-): WorkflowWritten =>
-  writeWorkflowAt(home, dir, steps, readme, {
-    ...(anywhere !== undefined && { anywhere }),
-    ...(places !== undefined && { places }),
-    found: foundAt(path.resolve(dir), places ?? placesAroundAt(home, dir)),
-  });
-
-/**
- * A function of this file taking the store's root first, as the old spelling that takes none: `at` the module's root, `HOME`. The one
- * line of this file that reads a root of its own (`test/global-roots.baseline.ts`); each spelling below is called by code not yet on the
- * Workflow door (`test/workflow-door.baseline.ts`).
- */
-const atHome =
+export const atHome =
   <A extends unknown[], R>(at: (home: string, ...args: A) => R) =>
   (...args: A): R =>
     at(HOME, ...args);
 
-/** `writeWorkflowOnDisk` the module's root. */
-export const writeWorkflow = atHome(writeWorkflowOnDisk);
 /** `removeWorkflowAt` the module's root. */
 export const removeWorkflow = atHome(removeWorkflowAt);

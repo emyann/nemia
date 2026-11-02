@@ -6,7 +6,8 @@
  * written back — and read nothing; this file is what reads a folder and hands its text to them. A store file two levels above the bottom
  * of the tree beneath the controllers: of the store it imports only the agents read (`agents/read.store.ts`) and the skill reads
  * (`skills/read.store.ts`, `test/boundary.test.ts`), and is exported from the package's root, not from `agent-orchestrator/workflow`
- * (`docs/architecture.md`). It keeps `agentUsers`, which reads step files through `workflowsIn`, not agents.
+ * (`docs/architecture.md`). It keeps `agentUsers`, which reads step files through `workflowsIn`, not agents. It finds no agent or skill
+ * itself: a folder is parsed against those the Workflow door found (`loadWorkflowsWith`).
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -39,29 +40,14 @@ import {
 } from './folder.ts';
 import { WorkflowDir } from './folder.model.ts';
 import { HARNESS_PROMPTS } from '../agents/agents.ts';
-import { agentsFor } from '../agents/read.store.ts';
-import { entriesOf, skillsFor, type Places } from '../skills/read.store.ts';
+import { entriesOf } from '../skills/read.store.ts';
 
 /**
- * The agents and skills a workflow at `dir` finds beside it or in `places` (`agentsFor`, `skillsFor`), read from the disk: what a
- * synchronous reader not yet on the Agent and Skill doors parses a folder against (`test/agent-door.baseline.ts`). Counted on the
- * Workflow door's seam (`src/workflows/workflows.store.test.ts`): this file and `write.store.ts` alone call it.
- */
-export const foundAt = (dir: string, places: Places): Found => ({ agents: agentsFor(dir, places), skills: skillsFor(dir, places) });
-
-/**
- * Read a folder of steps and check that they form a workflow rather than a wish. A `README.md` in the folder
- * describes the workflow (`workflowDescription`) and is not a step. The steps come back in the order they run
- * (`orderSteps`), not the folder's, each resolved against the agent it names, found beside it or in `places` (`foundAt`), and each skill
- * that agent gives found. A step `fills` hires an agent into is resolved against that agent, found the same way (`Fills`).
- */
-export function loadWorkflows(dir: string, places: Places = {}, fills?: Fills): Workflow[] {
-  return loadWorkflowsWith(dir, foundAt(dir, places), fills);
-}
-
-/**
- * `loadWorkflows` against the agents and skills already `found`: what the Workflow door's files read with, having found them through the
- * Agent and Skill doors.
+ * Read a folder of steps and check that they form a workflow rather than a wish, against the agents and skills already `found`: what the
+ * Workflow door's files read with, having found them through the Agent and Skill doors (`loadWorkflows`, `workflows.store.ts`). A
+ * `README.md` in the folder describes the workflow (`workflowDescription`) and is not a step. The steps come back in the order they run
+ * (`orderSteps`), not the folder's, each resolved against the agent it names, and each skill that agent gives found. A step `fills` hires
+ * an agent into is resolved against that agent, found the same way (`Fills`).
  */
 export function loadWorkflowsWith(dir: string, found: Found, fills?: Fills): Workflow[] {
   if (!fs.existsSync(dir)) throw new WorkflowError(`no workflow folder at ${dir}`);

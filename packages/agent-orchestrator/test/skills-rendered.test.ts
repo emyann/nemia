@@ -12,7 +12,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import yaml from 'js-yaml';
 import { skillEntryOf, splitFrontmatter } from '../src/workflow.ts';
-import { loadWorkflows } from '../src/folder/folder.store.ts';
+import { loadWorkflows } from '../src/workflows/workflows.store.ts';
 import { skillsFor } from '../src/skills/read.store.ts';
 import { appliesOf, renderSkill, skillDraftOf, withPreload } from '../src/skills/skills.ts';
 import { pluginOf } from '../src/agents/agents.ts';

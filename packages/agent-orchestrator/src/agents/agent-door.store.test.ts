@@ -162,7 +162,7 @@ test('REFUSED: a converted file that calls a store again, and a count the baseli
   const sources = sourcesOfSrc();
   const again = { ...sources, 'src/skills/skills.verb.ts': `${sources['src/skills/skills.verb.ts']}\nconst x = skillsFor('a');\n` };
   assert.equal(debtBreaks(again, AGENT_DOOR_DEBT).length, 1);
-  const [first] = Object.keys(AGENT_DOOR_DEBT);
+  const [first = 'src/skills/skills.verb.ts'] = Object.keys(AGENT_DOOR_DEBT);
   assert.equal(debtBreaks(sources, { ...AGENT_DOOR_DEBT, [first]: (AGENT_DOOR_DEBT[first] ?? 0) + 1 }).length, 1);
 });
 

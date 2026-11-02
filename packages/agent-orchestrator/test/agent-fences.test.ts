@@ -83,7 +83,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
 import ts from 'typescript';
-import { loadWorkflows } from '../src/folder/folder.store.ts';
+import { loadWorkflows } from '../src/workflows/workflows.store.ts';
 import { parseAgent } from '../src/agents/agents.ts';
 import { stepPlace, WorkflowError, type Workflow } from '../src/step/step.ts';
 import { readSkillRules, RULES_FILE } from '../src/skills/read.store.ts';

@@ -28,7 +28,7 @@ import { inputsMounts, readsMounts } from '../src/filed/filed.ts';
 import { handedMounts } from '../src/artifacts/artifacts.ts';
 import { parseWorkflow, agentsDir } from '../src/workflow.ts';
 import { loadAgents } from '../src/agents/read.store.ts';
-import { loadWorkflows } from '../src/folder/folder.store.ts';
+import { loadWorkflows } from '../src/workflows/workflows.store.ts';
 import { Invalid } from '../src/refusal/refusal.ts';
 
 const ROOT = scratch('wf-mounts-');

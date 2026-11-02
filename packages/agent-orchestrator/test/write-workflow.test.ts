@@ -13,7 +13,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { parseAgent, WorkflowError, type StepDraft, type Workflow } from '../src/workflow.ts';
 import { agentDeniesOf } from '../src/workflow/index.ts';
-import { loadWorkflows } from '../src/folder/folder.store.ts';
+import { loadWorkflows } from '../src/workflows/workflows.store.ts';
 import { scratch } from './scratch.ts';
 import { TEAM, TEAM_DEV } from './team.ts';
 

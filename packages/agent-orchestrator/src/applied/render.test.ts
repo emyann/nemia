@@ -14,7 +14,7 @@ import { teamCopy } from '../../test/team.ts';
 process.env.WF_ROOT = scratch('wf-render-');
 const { templated } = await import('../../test/templated.ts');
 const { exportTemplate, openTemplate } = templated(process.env.WF_ROOT);
-const { loadWorkflows } = await import('../folder/folder.store.ts');
+const { loadWorkflows } = await import('../workflows/workflows.store.ts');
 const { renderFactory, resolveParams } = await import('./index.ts');
 
 /** The tests' team exported into a template folder, and the repository it came from. */

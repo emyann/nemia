@@ -560,3 +560,53 @@ test('foldChat, newFrom, linksOf, drawnAs and chatItems: her events as the page 
     },
   );
 });
+
+test('reading her chat: a read made again that fails is the end, and clears the notice an earlier stream left', async (t) => {
+  const { reading } = await import('../src/lib/useNemiaChat.ts');
+  const fetchBefore = globalThis.fetch;
+  const sourceBefore = (globalThis as { EventSource?: unknown }).EventSource;
+  const streams: Stream[] = [];
+  Object.assign(globalThis, {
+    EventSource: class extends Stream {
+      constructor(_url: string) {
+        super();
+        streams.push(this);
+      }
+    },
+  });
+  t.after(() => {
+    globalThis.fetch = fetchBefore;
+    Object.assign(globalThis, { EventSource: sourceBefore });
+  });
+  let state: ChatFollowed = unreadChat(true);
+  const setState = (next: ChatFollowed | ((s: ChatFollowed) => ChatFollowed)) => {
+    state = typeof next === 'function' ? next(state) : next;
+  };
+  const until = async (done: () => boolean) => {
+    for (let i = 0; i < 200 && !done(); i++) await new Promise((r) => setImmediate(r));
+    assert.ok(done(), 'the read answers');
+  };
+
+  globalThis.fetch = async () =>
+    new Response(JSON.stringify({ events: [], before: null, cursor: 'c:1', presence: up }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    });
+  const open = reading({ setState, tryAgain: () => {}, follow: true });
+  await until(() => streams.length === 1);
+  streams[0].send('unreadable', { error: 'Her chat is unreadable.', retrying: true });
+  assert.equal(state.retrying, 'Her chat is unreadable.', 'the panel open, the stream says the api reads her again');
+
+  open();
+  globalThis.fetch = async () => {
+    throw new TypeError('fetch failed');
+  };
+  const closed = reading({ setState, tryAgain: () => {}, follow: false });
+  await until(() => state.error !== null);
+  closed();
+  assert.deepEqual(
+    [state.live, state.retrying],
+    [false, null],
+    'the panel closed and the api down, the fresh read that fails is the end, and leaves no retrying notice beside its error',
+  );
+});

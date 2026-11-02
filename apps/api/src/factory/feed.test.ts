@@ -866,3 +866,75 @@ test('the stream says where it has read to at the one cadence every surface read
   );
   assert.equal(typeof BOOKMARK_EVERY, 'string', 'the constant the package owns');
 });
+
+test(
+  '`until=end` reads the feed once to its end as the stream opened and closes it, the last event a bookmark at that end; a hint for a former reason comes first',
+  WAITED,
+  async (t) => {
+    const s = story(t);
+    await s.test(
+      'the lines present at open, then a bookmark whose id is the feed size then, and the stream ends: a line written after open is not sent',
+      async (t) => {
+        const pass = emptyFeed();
+        await pass({ 'r-a': planAt('running') });
+        await pass({ 'r-a': planAt('succeeded') });
+        const every = everySent();
+        const size = fs.statSync(feedFile()).size;
+        const { reader, text } = await open('?until=end');
+        await pass({ 'r-a': planAt('failed') });
+        assert.ok(fs.statSync(feedFile()).size > size, 'a line was written after the stream opened');
+        const said = await readUntil(t, reader, text, () => false);
+        assert.deepEqual(
+          said.map((b) => [b.event, b.id]),
+          [...every.map((l) => ['step' in l.line && l.line.step ? 'step' : 'run', l.sent.id]), ['bookmark', String(size)]],
+          'every line present at open, the bookmark at the size the feed had then, and nothing written after',
+        );
+        assert.equal(said.at(-1)!.data, '', 'the bookmark is the empty event it is everywhere else');
+      },
+    );
+    await s.test('a selector drops lines but the stream still ends at the size at open, the last line dropped included', async (t) => {
+      const pass = emptyFeed();
+      await pass({ 'r-a': planAt('running') });
+      await pass({ 'r-a': planAt('running'), 'r-b': planAt('running') });
+      const size = fs.statSync(feedFile()).size;
+      const mine = everySent().filter((l) => labelOf(l.line, 'run') === 'r-a');
+      const { reader, text } = await open('?until=end&selector=run%3Dr-a');
+      const said = await readUntil(t, reader, text, () => false);
+      assert.deepEqual(
+        sentOf(said),
+        [...mine.map((l) => l.sent), { data: '', id: String(size) }],
+        "run a's lines, then the bookmark at the end, though run b's lines were the last written",
+      );
+    });
+    await s.test('`from=end` with `until=end` sends the bookmark alone; `after` at the end does the same', async (t) => {
+      const pass = emptyFeed();
+      await pass({ 'r-a': planAt('running') });
+      const size = String(fs.statSync(feedFile()).size);
+      for (const query of ['?from=end&until=end', `?after=${size}&until=end`]) {
+        const { reader, text } = await open(query);
+        const said = await readUntil(t, reader, text, () => false);
+        assert.deepEqual(
+          said.map((b) => [b.event, b.id]),
+          [['bookmark', size]],
+          query,
+        );
+      }
+    });
+    await s.test('an `until` of any other value is refused before the stream opens, naming `end`', async () => {
+      const res = await app.request(`${STREAM}?until=later`);
+      assert.equal(res.status, 400);
+      assert.match(((await res.json()) as { error: string }).error, /until=end/);
+    });
+    await s.test('a selector naming a former reason is sent its hint first, as a `hint` event, before any line', async (t) => {
+      const pass = emptyFeed();
+      await pass({ 'r-a': planAt('running') });
+      const { reader, text } = await open(`?until=end&selector=${encodeURIComponent('reason=NeedsHuman')}&selector=run%3Dr-a`);
+      const said = await readUntil(t, reader, text, () => false);
+      assert.equal(said[0].event, 'hint', `the hint first: ${JSON.stringify(said)}`);
+      assert.match((JSON.parse(said[0].data!) as { message: string }).message, /NeedsHuman.*reason=AwaitingAnswer/);
+      assert.equal(said.filter((b) => b.event === 'hint').length, 1, 'one hint, for the one former reason named');
+      assert.ok(said.slice(1).every((b) => b.event !== 'hint'));
+      assert.equal(said.at(-1)!.event, 'bookmark');
+    });
+  },
+);

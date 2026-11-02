@@ -6,7 +6,7 @@ overridable: fence, skills, mcp
 harness: claude
 model: opus
 effort: high
-context: 200k
+context: 400k
 output: spec.schema.json
 claude:
   fence:

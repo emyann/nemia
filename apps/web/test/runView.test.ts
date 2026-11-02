@@ -230,12 +230,12 @@ test('runViewOf: the run object, its sub-resources and its lines, as the run pag
     assert.equal(implement?.closeout?.summary, 'the current try');
     assert.equal(implement?.tries.length, 2, 'every try is kept, the current one last');
   });
-  await t.test("a step's spec is the frozen step of its name, its fence said as the permission mode; null for a name not frozen", () => {
+  await t.test("a step's spec is the frozen step of its name, with its fence; null for a name not frozen", () => {
     const [implement, review] = view().steps;
     assert.equal(implement?.spec?.model, 'implement-model');
     assert.equal(review?.spec?.model, 'review-model');
-    assert.equal(implement?.spec?.permissionMode, 'acceptEdits');
-    assert.equal(implement?.filed?.permissionMode, 'bypassPermissions', 'and so is the fence it was filed with');
+    assert.equal(implement?.spec?.fence, 'acceptEdits');
+    assert.equal(implement?.filed?.fence, 'bypassPermissions', 'and so is the fence it was filed with');
     const unfrozen = object();
     const ran = runViewOf(
       { ...unfrozen, spec: { ...unfrozen.spec, steps: [frozen('implement', [])] } },

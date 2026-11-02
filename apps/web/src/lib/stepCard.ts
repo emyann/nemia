@@ -164,7 +164,7 @@ export function factsOf(step: DetailStep): Array<{ key: string; value: string }>
     { key: 'Model', value: first(filed?.model, spec?.model) },
     { key: 'Effort', value: first(filed?.effort, spec?.effort) },
     { key: 'Context', value: contextSaid(filed?.contextTokens ?? spec?.context ?? null) },
-    { key: 'Permission', value: first(filed?.permissionMode, spec?.permissionMode, spec?.sandbox) },
+    { key: 'Permission', value: first(filed?.fence, spec?.fence, spec?.sandbox) },
   ];
 }
 

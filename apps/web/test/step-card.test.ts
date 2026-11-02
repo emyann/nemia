@@ -199,8 +199,8 @@ test("stepCardOf: a step's card in each of its states, its facts, its note and i
     const card = cardOf('implement', STATUSES, [
       quiet('implement', 'running (working)', {
         tries: [aTry(1)],
-        spec: { ...step().spec!, harness: 'a2a:remote', context: 400_000, permissionMode: 'auto' },
-        filed: { ...step().filed!, effort: 'medium', contextTokens: 400_000, permissionMode: 'auto' },
+        spec: { ...step().spec!, harness: 'a2a:remote', context: 400_000, fence: 'auto' },
+        filed: { ...step().filed!, effort: 'medium', contextTokens: 400_000, fence: 'auto' },
       }),
     ]);
     assert.deepEqual(card.facts, [

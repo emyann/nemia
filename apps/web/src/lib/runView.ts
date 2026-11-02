@@ -23,11 +23,11 @@ import type { Frozen } from './frozen.ts';
 /** An edge of the run's graph as its pages draw it: what a step waits on, and a loop; never what it is handed (`input`). */
 export type RunViewEdge = Exclude<RunStatus['graph']['edges'][number], { kind: 'input' }>;
 
-/** A step as the run froze it, its fence said as the permission mode its pages name it by. Null where the run froze none of it. */
-export type StepSpecView = Omit<RunSpecStep, 'name' | 'input' | 'fence'> & { readonly permissionMode: string | null };
+/** A step as the run froze it. Null where the run froze none of it. */
+export type StepSpecView = Omit<RunSpecStep, 'name' | 'input'>;
 
-/** What the engine filed a step's current try with, its fence said as the permission mode. */
-export type StepFiledView = Omit<NonNullable<RunStepStatus['filed']>, 'fence'> & { readonly permissionMode: string | null };
+/** What the engine filed a step's current try with. */
+export type StepFiledView = NonNullable<RunStepStatus['filed']>;
 
 /**
  * One step of the view: its status in the object, its frozen spec, its lines, what it was told, and its tries whole, with its current
@@ -75,8 +75,8 @@ export type RunView = Pick<
 /** The view's spec of a step, from the object's frozen step; null for a step the run froze none of. */
 const specOf = (s: RunSpecStep | undefined): StepSpecView | null => {
   if (!s) return null;
-  const { name: _name, input: _input, fence, ...rest } = s;
-  return { ...rest, permissionMode: fence };
+  const { name: _name, input: _input, ...rest } = s;
+  return rest;
 };
 
 /** No lines for a step the lines name none of: a step not frozen, which the api builds none for. */
@@ -92,14 +92,10 @@ const stepViewOf = (
 ): StepView => {
   const { status: _word, filed, ...rest } = step;
   const current = tries.find((t) => t.current);
-  const filedView = (f: NonNullable<RunStepStatus['filed']>): StepFiledView => {
-    const { fence, ...given } = f;
-    return { ...given, permissionMode: fence };
-  };
   return {
     ...rest,
     spec: specOf(frozen.find((s) => s.name === step.name)),
-    filed: filed && filedView(filed),
+    filed,
     commands: lines.steps[step.name] ?? NO_LINES,
     body: told?.body ?? null,
     told: told?.told ?? null,

@@ -126,7 +126,7 @@ export const step = (extra: Partial<Step> = {}): Step => ({
     workspace: null,
     place: null,
     resume: null,
-    permissionMode: 'dontAsk',
+    fence: 'dontAsk',
     sandbox: null,
     tools: ['Read', 'Edit'],
     deadlineSeconds: 3600,
@@ -138,7 +138,7 @@ export const step = (extra: Partial<Step> = {}): Step => ({
     askedModel: null,
     effort: 'high',
     contextTokens: null,
-    permissionMode: 'dontAsk',
+    fence: 'dontAsk',
     runsIn: { mode: 'dontAsk', by: 'filed' },
     tools: null,
     deadlineSeconds: 3600,
@@ -543,7 +543,7 @@ export function readsOf(view: RunView): Array<[readonly unknown[], unknown]> {
       tries: _tr,
       ...own
     } = s;
-    const filed = s.filed && (({ permissionMode, ...given }) => ({ ...given, fence: permissionMode }))(s.filed);
+    const filed = s.filed;
     return { ...own, status: 'pending', filed, current: s.current ?? null };
   };
   const object = {
@@ -551,9 +551,7 @@ export function readsOf(view: RunView): Array<[readonly unknown[], unknown]> {
     kind: 'Run',
     metadata: { name: id, creationTimestamp: createdAt, labels: { factory: null, workflow: '' } },
     spec: {
-      steps: steps.flatMap((s) =>
-        s.spec ? [{ ...(({ permissionMode, ...given }) => ({ ...given, fence: permissionMode }))(s.spec), name: s.name, input: [] }] : [],
-      ),
+      steps: steps.flatMap((s) => (s.spec ? [{ ...s.spec, name: s.name, input: [] }] : [])),
       brief,
       place,
       repo,

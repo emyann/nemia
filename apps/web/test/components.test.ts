@@ -777,7 +777,7 @@ test("the inspector's Details show `loop` and `rounds` beside `after` on a loopi
     workspace: null,
     place: null,
     resume: null,
-    permissionMode: null,
+    fence: null,
     sandbox: null,
     tools: null,
     deadlineSeconds: null,
@@ -2040,7 +2040,7 @@ test("the spec says what a step runs with: the workflow's word where it sets one
     workspace: null,
     place: null,
     resume: null,
-    permissionMode: null,
+    fence: null,
     sandbox: null,
     tools: null,
     deadlineSeconds: null,
@@ -2053,7 +2053,7 @@ test("the spec says what a step runs with: the workflow's word where it sets one
     askedModel: null,
     effort: null,
     contextTokens: null,
-    permissionMode: null,
+    fence: null,
     runsIn: null,
     tools: null,
     deadlineSeconds: null,
@@ -2070,7 +2070,7 @@ test("the spec says what a step runs with: the workflow's word where it sets one
     askedModel: null,
     effort: 'high',
     contextTokens: null,
-    permissionMode: 'auto',
+    fence: 'auto',
     runsIn: { mode: 'auto', by: 'filed' },
     tools: ['Read', 'Grep'],
     deadlineSeconds: 3600,
@@ -2098,7 +2098,7 @@ test("the spec says what a step runs with: the workflow's word where it sets one
   const reviewer: StepSpec = { ...unset, harness: 'codex', sandbox: 'workspace-write', tools: ['Read', 'Grep'] };
   const narrowed: StepFiled = {
     ...bare,
-    permissionMode: 'workspace-write',
+    fence: 'workspace-write',
     tools: ['Read', 'Grep'],
     runsIn: { mode: 'read-only', by: 'tools' },
   };
@@ -2108,20 +2108,20 @@ test("the spec says what a step runs with: the workflow's word where it sets one
     "a codex step's fence is its `sandbox:`, which the engine's task files as its permission mode, as its tools narrowed it whatever was named",
   );
   assert.equal(rowsOf(reviewer, narrowed)['permission mode'], undefined, 'and no row is called `permission mode`');
-  assert.equal(rowsOf({ ...reviewer, sandbox: null }, { ...narrowed, permissionMode: null }).sandbox, 'read-only · by tools');
+  assert.equal(rowsOf({ ...reviewer, sandbox: null }, { ...narrowed, fence: null }).sandbox, 'read-only · by tools');
   const readOnly: StepSpec = { ...unset, harness: 'codex', sandbox: 'read-only' };
   assert.equal(
-    rowsOf(readOnly, { ...bare, permissionMode: 'read-only', runsIn: { mode: 'read-only', by: 'filed' } }).sandbox,
+    rowsOf(readOnly, { ...bare, fence: 'read-only', runsIn: { mode: 'read-only', by: 'filed' } }).sandbox,
     'read-only',
     "the workflow's word, as filed",
   );
   assert.equal(
-    rowsOf(readOnly, { ...bare, permissionMode: 'workspace-write', runsIn: { mode: 'workspace-write', by: 'filed' } }).sandbox,
+    rowsOf(readOnly, { ...bare, fence: 'workspace-write', runsIn: { mode: 'workspace-write', by: 'filed' } }).sandbox,
     'workspace-write · this try',
   );
   assert.equal(rowsOf(readOnly, null).sandbox, 'read-only', 'and a step not filed yet says what its workflow says');
   const widest: StepSpec = { ...unset, harness: 'codex', sandbox: 'danger-full-access' };
-  const former: StepFiled = { ...bare, permissionMode: 'bypassPermissions', runsIn: { mode: 'danger-full-access', by: 'filed' } };
+  const former: StepFiled = { ...bare, fence: 'bypassPermissions', runsIn: { mode: 'danger-full-access', by: 'filed' } };
   assert.equal(
     rowsOf(widest, former).sandbox,
     'danger-full-access',
@@ -2129,7 +2129,7 @@ test("the spec says what a step runs with: the workflow's word where it sets one
   );
   assert.equal(rowsOf(widest, { ...former, runsIn: null }).sandbox, 'danger-full-access', 'nor where the api could not ask the harness');
   assert.equal(
-    rowsOf(widest, { ...former, permissionMode: 'read-only', runsIn: { mode: 'read-only', by: 'filed' } }).sandbox,
+    rowsOf(widest, { ...former, fence: 'read-only', runsIn: { mode: 'read-only', by: 'filed' } }).sandbox,
     'read-only · this try',
     'another sandbox is still a try of its own',
   );
@@ -2145,7 +2145,7 @@ test("the spec says what a step runs with: the workflow's word where it sets one
     model: 'opus',
     effort: 'high',
     context: 200_000,
-    permissionMode: 'dontAsk',
+    fence: 'dontAsk',
     tools: [],
     deadlineSeconds: 600,
   };
@@ -2154,7 +2154,7 @@ test("the spec says what a step runs with: the workflow's word where it sets one
     askedModel: null,
     effort: 'high',
     contextTokens: 200_000,
-    permissionMode: 'dontAsk',
+    fence: 'dontAsk',
     runsIn: { mode: 'dontAsk', by: 'filed' },
     tools: [],
     deadlineSeconds: 600,
@@ -2212,7 +2212,7 @@ test('a step on a remote A2A agent says the agent and its address, and no model,
     workspace: null,
     place: null,
     resume: null,
-    permissionMode: null,
+    fence: null,
     sandbox: null,
     tools: null,
     deadlineSeconds: null,
@@ -2224,7 +2224,7 @@ test('a step on a remote A2A agent says the agent and its address, and no model,
     askedModel: null,
     effort: null,
     contextTokens: null,
-    permissionMode: null,
+    fence: null,
     runsIn: null,
     tools: null,
     deadlineSeconds: null,
@@ -2268,7 +2268,7 @@ test("a step filed bridged has a reach row: its session's web link to open in a 
     workspace: null,
     place: null,
     resume: null,
-    permissionMode: null,
+    fence: null,
     sandbox: null,
     tools: null,
     deadlineSeconds: null,
@@ -2280,7 +2280,7 @@ test("a step filed bridged has a reach row: its session's web link to open in a 
     askedModel: null,
     effort: null,
     contextTokens: null,
-    permissionMode: null,
+    fence: null,
     runsIn: null,
     tools: null,
     deadlineSeconds: null,
@@ -3140,7 +3140,7 @@ function endingRun(over: Partial<RunView> = {}): RunView {
       workspace: 'base',
       place: null,
       resume: null,
-      permissionMode: null,
+      fence: null,
       sandbox: null,
       tools: null,
       deadlineSeconds: null,

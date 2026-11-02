@@ -121,7 +121,7 @@ export const specRows = (spec: StepSpecView, filed: StepFiledView | null = null)
               ['rounds', spec.rounds],
             ] satisfies Array<[string, ReactNode]>)),
         ['resume', code(spec.resume)],
-        [fenceLabel(spec), modeRow(spec.sandbox ?? spec.permissionMode, filed)],
+        [fenceLabel(spec), modeRow(spec.sandbox ?? spec.fence, filed)],
         ['tools', ranWith(toolsWord(spec.tools), filed, (f) => toolsWord(f.tools))],
         ['deadline', ranWith(secondsWord(spec.deadlineSeconds), filed, (f) => secondsWord(f.deadlineSeconds), 'no limit')],
         ...(filed?.bridge
@@ -217,8 +217,8 @@ function modelRow(workflow: string | null, filed: StepFiledView | null): ReactNo
  */
 function modeRow(workflow: string | null, filed: StepFiledView | null): ReactNode {
   const runs = filed?.runsIn;
-  const asFiled = filed && filedFence(filed.permissionMode, workflow);
-  if (!filed || !runs) return ranWith(workflow, filed, (f) => filedFence(f.permissionMode, workflow));
+  const asFiled = filed && filedFence(filed.fence, workflow);
+  if (!filed || !runs) return ranWith(workflow, filed, (f) => filedFence(f.fence, workflow));
   if (runs.by === 'tools') {
     const named = workflow === null ? '' : `, though the workflow says ${workflow}`;
     return (
@@ -231,7 +231,7 @@ function modeRow(workflow: string | null, filed: StepFiledView | null): ReactNod
       <Marked
         value={runs.mode}
         mark="this try"
-        title={`The workflow says ${workflow}; this try was filed with ${filed.permissionMode ?? 'none'}.`}
+        title={`The workflow says ${workflow}; this try was filed with ${filed.fence ?? 'none'}.`}
       />
     );
   }

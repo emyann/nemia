@@ -100,6 +100,16 @@
         "label": "Tools and the fence",
         "href": "/agents/#tools-and-the-fence"
       }
+    },
+    {
+      "term": "Agent door",
+      "meaning": "the one way an agent and a person's custom instructions for it are read and written: `AgentDoor` in `packages/agent-orchestrator/src/agents/agent-door.store.ts`, rooted as the Factory door is, its files layer over today's agent files and a memory one, each write checked by the agent's name, the model's `Agent` and the version it was read at (`definitionVersionRefusal`) before either layer acts.",
+      "type": "AgentDoorShape"
+    },
+    {
+      "term": "Skill door",
+      "meaning": "the one way a skill is found, read, written and copied: `SkillDoor` in `packages/agent-orchestrator/src/skills/skill-door.store.ts`, rooted as the Agent door is, through the same lookup roots and the one precedence (`lookedUp`), each write checked by the skill's name, the model's `Skill` and the version it was read at.",
+      "type": "SkillDoorShape"
     }
   ]
 }

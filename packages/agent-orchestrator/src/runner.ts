@@ -337,6 +337,8 @@ export { changesOf, type BranchChanges, type Note } from './branches/changes.sto
 export { evictedBy } from './rest/index.ts';
 export { removeAgent, writeAgent } from './agents/agents.store.ts';
 export { copySkill, givenSkills, skillDirIn, skillFolders, skillRead, skillText, writeSkill } from './skills/skills.store.ts';
+export { AgentDoor, agentDoorFiles, type AgentAt, type AgentDoorShape } from './agents/agent-door.store.ts';
+export { SkillDoor, skillDoorFiles, type SkillDoorShape } from './skills/skill-door.store.ts';
 export { PlaceService, type Place } from './place/place.store.ts';
 export { builtin, builtinGitPlace, gitPlaceLayer } from './place/builtin.store.ts';
 export { briefNow } from './tick/told.verb.ts';

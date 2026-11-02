@@ -55,8 +55,6 @@ export const GLOBAL_ROOTS: Readonly<Record<string, number>> = {
   'src/schedule/schedule.store.ts': 1,
   'src/series/series.store.ts': 1,
   'src/service/service.store.ts': 1,
-  'src/sources/copy.verb.ts': 2,
-  'src/sources/sources.store.ts': 1,
   'src/standing/standing.store.ts': 3,
   'src/start/start.verb.ts': 2,
   'src/subscription/subscription.store.ts': 2,

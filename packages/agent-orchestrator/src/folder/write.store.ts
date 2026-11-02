@@ -252,5 +252,3 @@ const atHome =
 export const writeWorkflow = atHome(writeWorkflowAt);
 /** `removeWorkflowAt` the module's root. */
 export const removeWorkflow = atHome(removeWorkflowAt);
-/** `knownReposAt` the module's root. */
-export const knownRepos = atHome(knownReposAt);

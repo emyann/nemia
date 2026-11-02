@@ -4,6 +4,7 @@
  */
 import { tried } from '../runtime-client.ts';
 import type { Command } from '../command/entry.verb.ts';
+import { rootGiven } from '../config/root.store.ts';
 import { agentSources } from './sources.store.ts';
 import { sourcesLines, type AgentSource } from './sources.ts';
 
@@ -36,7 +37,7 @@ export const AGENTS_SOURCES: Command<{ sources: AgentSource[] }> = {
   handler: (args, _env, home) =>
     tried(() => {
       const at = typeof args.path === 'string' ? args.path : undefined;
-      return agentSources({ ...(at !== undefined && { at }), ...(home !== undefined && { home }) });
+      return agentSources({ ...(at !== undefined && { at }), home: rootGiven(home, 'agents sources') });
     }),
   print: sourcesLines,
 };

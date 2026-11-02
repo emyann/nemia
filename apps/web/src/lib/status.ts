@@ -5,9 +5,11 @@
  * chooses the state and its colour. `cancelled` is a fact about the run rather than the step: a step to come on a run somebody called
  * off never will, and a step the cancellation stopped is `Stopped`.
  *
- * `held` is a fact about the run too: a person holds it until other runs land (the CLI's `hold`), so a step not filed will not be until the
- * hold lifts, and a step at a human gate asks nothing of anyone while it stands — every verb that would answer it is refused. A step at
- * work, asking through its harness (`needs-human`), checking, or settled keeps its state: what is in flight runs on, and a verdict is a
+ * `held` is a fact about the run too: a person holds it until other runs land (the CLI's `hold`), and a step at a human gate asks nothing
+ * of anyone while it stands — every verb that would answer it is refused — so it is drawn `held`, never as waiting on a person. A step not
+ * started under a hold is not filed until the hold lifts, yet keeps its state (`waiting`, `waiting-for-slot`) and is drawn as any step not
+ * started: the run's own chip says why nothing moves, and the step's hover says it waits on the hold (`stateWordsOf`). A step at work,
+ * asking through its harness (`needs-human`), checking, or settled keeps its state too: what is in flight runs on, and a verdict is a
  * verdict.
  */
 import type { StepCodes, StepReason } from './api/reasons.ts';
@@ -77,16 +79,12 @@ export function stepState(codes: StepCodes, runCancelled: boolean, runHeld: bool
   return runHeld && !runCancelled && HELD_BY_A_HOLD.has(state) ? 'held' : state;
 }
 
-/** What a hold makes `held`: a step not filed yet, and one at a human gate (`waitsAtGate`), whose answer is refused while it stands. */
-const HELD_BY_A_HOLD: ReadonlySet<StepState> = new Set([
-  'waiting',
-  'waiting-for-slot',
-  'blocked',
-  'awaiting-approval',
-  'exhausted',
-  'over-budget',
-  'budget-exhausted',
-]);
+/**
+ * What a hold makes `held`: a step at a human gate (`waitsAtGate`), whose answer is refused while it stands, so that a held run's gate
+ * never reads as waiting on a person. Not a step not started (`waiting`, `waiting-for-slot`), drawn as any step not started, whose
+ * hover says the hold (`stateWordsOf`): grey blocks on a run nothing of which has started read as almost done.
+ */
+const HELD_BY_A_HOLD: ReadonlySet<StepState> = new Set(['blocked', 'awaiting-approval', 'exhausted', 'over-budget', 'budget-exhausted']);
 
 /**
  * The state each reason is drawn as, before what qualifies it narrows it (`codeState`). Total: a reason the api adds fails the typecheck

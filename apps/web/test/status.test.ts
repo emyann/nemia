@@ -23,6 +23,7 @@ import {
 } from '../src/lib/status.ts';
 import { STEP_REASONS, type StepCodes, type StepPhase, type StepReason } from '../src/lib/api/reasons.ts';
 import { container, meaningOf } from '../src/lib/meaning.ts';
+import { HELD_TO_COME, PAUSED, PERSON, stateWordsOf } from '../src/lib/words.ts';
 import { isLive, movingInto } from '../src/lib/canvas.ts';
 
 /** A step's phase, by the reason it stands in, as the orchestrator gives that reason (`PHASE_OF`). */
@@ -209,58 +210,73 @@ test('stepState, satisfiesAfter, waitsOnPerson, waitsAtGate: what is work done, 
       assert.equal(movingInto(state), false, 'nothing moves into it');
       assert.equal(satisfiesAfter(state), false, 'not work done');
       assert.equal(stateAt('Waiting on limit', true), 'cancelled', 'on a run called off');
-      assert.equal(stateAt('Waiting on limit', false, true), 'held', 'on a run a person holds');
+      assert.equal(
+        stateAt('Waiting on limit', false, true),
+        'waiting-for-slot',
+        'on a run a person holds: not started, so drawn as not started',
+      );
       assert.notEqual(stateClass['waiting-for-slot'], stateClass.working, 'drawn as the wait it is, not as a session at work');
     },
   );
+  await t.test('on a run a person holds (`wf hold`), a step at a human gate is `held`, in its own words — and nothing else moves', () => {
+    const held: Named[] = ['AwaitingAnswer via closeout', 'AwaitingApproval', 'AwaitingRound', 'OverBudget', 'BudgetExhausted'];
+    for (const reason of held) {
+      assert.equal(stateAt(reason, false, true), 'held', reason);
+      assert.equal(
+        waitsOnPerson(stateAt(reason, false, true), false),
+        false,
+        `${reason}: nobody is asked while the hold stands, and every verb that would answer the gate is refused`,
+      );
+    }
+    const unmoved: Array<[Named, StepState]> = [
+      ['Waiting on run', 'waiting'],
+      ['Pending', 'waiting'],
+      ['Waiting on checkout', 'waiting'],
+      ['Waiting on pause', 'waiting'],
+      ['Waiting on limit', 'waiting-for-slot'],
+      ['Running', 'working'],
+      ['AwaitingAnswer via session', 'needs-human'],
+      ['Checking', 'checking'],
+      ['CheckPassed', 'verified'],
+      ['Succeeded', 'unverified'],
+      ['CheckFailed', 'failed-check'],
+      ['Unsigned', 'unsigned'],
+      ['Denied', 'denied'],
+      ['Failed', 'failed'],
+      ['Stopped', 'cancelled'],
+      ['UnreadableCloseout', 'unreadable'],
+      ['Unknown', 'unknown'],
+    ];
+    for (const [reason, state] of unmoved)
+      assert.equal(
+        stateAt(reason, false, true),
+        state,
+        `${reason}: the hold stops the answers to a gate; a step not started is drawn as any step not started (grey blocks read as almost done), and what is in flight, a session asking through its harness, or a verdict keeps its state`,
+      );
+    assert.equal(stepState(plain('failed', 'Unknown'), false, true), 'unreadable', 'an unreadable step, held or not');
+    assert.equal(stateAt('Waiting on run', true, true), 'cancelled', 'a run called off is called off, held or not');
+    assert.equal(stateAt('AwaitingApproval', true, true), 'awaiting-approval');
+    assert.equal(satisfiesAfter('held'), false);
+    assert.notEqual(stateClass.held, stateClass.waiting, 'a person stops it, not the order of the steps');
+    assert.notEqual(stateClass.held, stateClass.blocked, 'it asks nobody, as a gate does');
+  });
   await t.test(
-    'on a run a person holds (`wf hold`), a step not filed and a step at a human gate are `held`, in their own words — and nothing else moves',
+    'a step not started on a held run is named as any step to come, and its hover says the hold — a step not started on a run nobody holds does not',
     () => {
-      const held: Named[] = [
-        'Waiting on run',
-        'Pending',
-        'Waiting on checkout',
-        'Waiting on pause',
-        'AwaitingAnswer via closeout',
-        'AwaitingApproval',
-        'AwaitingRound',
-        'OverBudget',
-        'BudgetExhausted',
-      ];
-      for (const reason of held) {
-        assert.equal(stateAt(reason, false, true), 'held', reason);
-        assert.equal(
-          waitsOnPerson(stateAt(reason, false, true), false),
-          false,
-          `${reason}: nobody is asked while the hold stands, and every verb that would answer the gate is refused`,
-        );
+      for (const [reason, on] of [
+        ['Waiting on run', 'run'],
+        ['Pending', null],
+        ['Waiting on limit', 'limit'],
+      ] as const) {
+        const state = stateAt(reason, false, true);
+        assert.equal(state, stateAt(reason), `${reason}: drawn as the same step on a run nobody holds`);
+        assert.equal(stateWordsOf(state, on, true), HELD_TO_COME, reason);
+        assert.notEqual(stateWordsOf(state, on, false), HELD_TO_COME, `${reason}, on a run nobody holds`);
       }
-      const unmoved: Array<[Named, StepState]> = [
-        ['Running', 'working'],
-        ['AwaitingAnswer via session', 'needs-human'],
-        ['Checking', 'checking'],
-        ['CheckPassed', 'verified'],
-        ['Succeeded', 'unverified'],
-        ['CheckFailed', 'failed-check'],
-        ['Unsigned', 'unsigned'],
-        ['Denied', 'denied'],
-        ['Failed', 'failed'],
-        ['Stopped', 'cancelled'],
-        ['UnreadableCloseout', 'unreadable'],
-        ['Unknown', 'unknown'],
-      ];
-      for (const [reason, state] of unmoved)
-        assert.equal(
-          stateAt(reason, false, true),
-          state,
-          `${reason}: the hold stops what is filed next and the answers to a gate, not what is in flight, a session asking through its harness, or a verdict`,
-        );
-      assert.equal(stepState(plain('failed', 'Unknown'), false, true), 'unreadable', 'an unreadable step, held or not');
-      assert.equal(stateAt('Waiting on run', true, true), 'cancelled', 'a run called off is called off, held or not');
-      assert.equal(stateAt('AwaitingApproval', true, true), 'awaiting-approval');
-      assert.equal(satisfiesAfter('held'), false);
-      assert.notEqual(stateClass.held, stateClass.waiting, 'a person stops it, not the order of the steps');
-      assert.notEqual(stateClass.held, stateClass.blocked, 'it asks nobody, as a gate does');
+      assert.equal(HELD_TO_COME.rail, PERSON.waiting.rail, 'its word is the word of a step to come');
+      assert.notEqual(HELD_TO_COME.meaning, PERSON.waiting.meaning, 'its hover says the hold');
+      assert.equal(stateWordsOf('waiting', 'pause', true), PAUSED, 'a check the pause holds says the pause, held or not');
+      assert.equal(stateWordsOf('held', null, true), PERSON.held, 'a gate held says the hold as before');
     },
   );
 });

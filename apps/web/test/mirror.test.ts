@@ -16,67 +16,146 @@ test('the checked-in mirror is what the served document generates', () => {
   assert.ok(checkedIn === generated, 'run `npm run mirror` in apps/web to write src/lib/api/run.gen.ts from the served document');
 });
 
-/** A run object as today's `Run` says one: two steps, the second waiting on the first, nothing measured yet. */
-const sample = () => {
-  const timeline = {
-    loop: null,
-    round: null,
-    tasks: 0,
-    inFlight: 0,
-    queuedMs: 0,
-    ranMs: 0,
-    wallMs: null,
-    queued: '0s',
-    ran: '0s',
-    wall: '0s',
-  };
-  return {
-    apiVersion: 'nemia/v1',
-    kind: 'Run',
-    metadata: { name: 'r-1', creationTimestamp: '2026-11-02T10:00:00.000Z', labels: { factory: null, workflow: 'quick' } },
-    spec: {
-      steps: [
-        { name: 'implement', after: [], input: [], loop: null, rounds: null },
-        { name: 'review', after: ['implement'], input: ['implement'], loop: null, rounds: null },
-      ],
-      brief: 'a brief',
-      place: 'git',
-      repo: '/repo',
-      branch: 'main',
-    },
-    status: {
-      status: 'running',
-      phase: 'running',
-      reason: 'Running',
-      on: null,
-      via: null,
-      moving: true,
-      cost: null,
-      atWork: null,
-      tokens: null,
-      waiting: null,
-      holding: null,
-      toDecide: null,
-      graph: { roots: ['implement'], edges: [{ from: 'implement', to: 'review', kind: 'after' }] },
-      timeline: { rounds: [], run: timeline, slot: null },
-      steps: [
-        {
-          name: 'implement',
-          phase: 'running',
-          reason: 'Running',
-          status: 'running',
-          raise: null,
-          timeline: [],
-          current: null,
-        },
-      ],
-    },
-  };
+/** The time of no task yet, as a run's timeline totals it. */
+const total = {
+  loop: null,
+  round: null,
+  tasks: 0,
+  inFlight: 0,
+  queuedMs: 0,
+  ranMs: 0,
+  wallMs: null,
+  queued: '0s',
+  ran: '0s',
+  wall: '0s',
+  cost: null,
 };
+
+/** A step as the run froze it, waiting on `after`, with none of the rest of its frontmatter set. */
+const frozen = (name: string, after: string[]) => ({
+  name,
+  after,
+  input: after,
+  loop: null,
+  rounds: null,
+  harness: 'claude',
+  model: null,
+  effort: null,
+  context: null,
+  workspace: null,
+  place: null,
+  resume: null,
+  permissionMode: null,
+  sandbox: null,
+  tools: null,
+  deadlineSeconds: null,
+});
+
+/** A step not filed yet, as the object's status says one. */
+const pending = (name: string) => ({
+  name,
+  phase: 'pending',
+  reason: 'Pending',
+  status: 'pending',
+  on: null,
+  via: null,
+  message: 'pending',
+  verdict: null,
+  raise: null,
+  timeline: [],
+  current: null,
+  filed: null,
+  taskId: null,
+  workspace: null,
+  branch: null,
+  files: [],
+  filesError: null,
+  note: null,
+  roundDue: false,
+  commands: { approve: `nemia approve r-1 ${name}`, retry: `nemia retry r-1 ${name}`, say: `nemia say r-1 ${name}` },
+  needs: null,
+  waitingFor: null,
+  approve: null,
+  denied: null,
+  sessionUnread: null,
+  lastLine: null,
+  gate: null,
+  accepted: null,
+  said: [],
+  asked: null,
+  check: null,
+  attempts: { count: 0, latest: null },
+  used: null,
+  spent: null,
+  budget: null,
+});
+
+/** What the run is judged as now: running, nothing measured, both steps pending. */
+const status = () => ({
+  status: 'running',
+  phase: 'running',
+  reason: 'Running',
+  on: null,
+  via: null,
+  moving: true,
+  cost: null,
+  atWork: null,
+  tokens: null,
+  waiting: null,
+  holding: null,
+  toDecide: null,
+  graph: {
+    roots: ['implement'],
+    edges: [
+      { from: 'implement', to: 'review', kind: 'after' },
+      { from: 'implement', to: 'review', kind: 'input' },
+    ],
+  },
+  timeline: { rounds: [], run: total, slot: null },
+  steps: [pending('implement'), pending('review')],
+  decide: 'nemia decide r-1',
+  refresh: 'nemia refresh r-1',
+  startedAt: null,
+  cancelledAt: null,
+  pruned: null,
+  onDisk: { worktrees: false, files: false },
+  holdUntil: [],
+  read: null,
+  waitingOnYou: [],
+  waitingOnYouWords: [],
+  gates: [],
+  warning: null,
+  kinds: [],
+});
+
+/** A run object as the served `Run` says one: two steps, the second waiting on the first and handed its output, nothing filed yet. */
+const sample = () => ({
+  apiVersion: 'nemia/v1',
+  kind: 'Run',
+  metadata: { name: 'r-1', creationTimestamp: '2026-11-02T10:00:00.000Z', labels: { factory: null, workflow: 'quick' } },
+  spec: {
+    steps: [frozen('implement', []), frozen('review', ['implement'])],
+    brief: 'a brief',
+    place: 'git',
+    repo: '/repo',
+    baseRef: 'abc123',
+    branch: 'main',
+    isolate: true,
+    work: null,
+    workflowDir: '/team/quick',
+    try: null,
+    after: [],
+    context: [],
+    from: null,
+  },
+  status: status(),
+});
 
 test("the mirror's Run decodes a run object and refuses another kind", async () => {
   const { Run } = await import('../src/lib/api/run.gen.ts');
   const decode = Schema.decodeUnknownExit(Run);
-  assert.equal(decode(sample())._tag, 'Success');
+  const decoded = decode(sample());
+  assert.equal(decoded._tag, 'Success');
+  assert.deepEqual(Schema.decodeUnknownSync(Run)(sample()), sample(), 'the sample decodes whole, no field outside the mirror');
   assert.equal(decode({ ...sample(), kind: 'Step' })._tag, 'Failure');
 });

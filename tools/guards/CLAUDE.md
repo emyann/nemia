@@ -16,9 +16,9 @@ code of a layer. A tool beside the layers, not a layer: no package or app import
   too): `team-words` and `team-portable` take `splitFrontmatter` from `agent-orchestrator/workflow`, which is why `package.json`
   declares `agent-orchestrator`. A config guard that imports the package deeper stays in `packages/agent-orchestrator/test/`:
   `agent-fences`, `build-told`, `frozen-step`, `mcp-config`, `nemia-shipped`, `skills-rendered`, `skill-folders`, `verbs-skill`,
-  `quick-run`, `tally-start`, `observe`, `profile`, `workflow`, and the `landing`, `pull-request`, `quick-check`, `probe` and
-  `pictures` boundaries; so do `stand-ins` and the orchestrator's own test-seat tests, and `observe-render.boundary`, a test of
-  `tools/observe`'s code rather than of the configuration.
+  `quick-run`, `tally-start`, `team-template`, `observe`, `profile`, `workflow`, and the `landing`, `pull-request`, `quick-check`,
+  `probe` and `pictures` boundaries; so do `stand-ins` and the orchestrator's own test-seat tests, and `observe-render.boundary`, a test
+  of `tools/observe`'s code rather than of the configuration.
 - **Helpers are copies, held byte for byte by `packages/agent-orchestrator/test/scratch.test.ts`**: `test/scratch.ts` (the runtime's),
   `test/repo-files.ts` and `test/workspaces.ts` (the orchestrator's). Change the original and copy it over; nothing imports a test
   helper across workspaces. A test makes its roots with `scratch(prefix)`, never under `os.tmpdir` by hand, and takes the root and

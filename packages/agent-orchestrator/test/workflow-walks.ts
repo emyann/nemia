@@ -200,6 +200,17 @@ export const WORKFLOW_WALKS: Readonly<Record<string, readonly Walk[]>> = {
       says: { write: { refused: 'Invalid' }, there: 'none' },
     },
     {
+      name: "a step with no words of its own, written with its factory's hire: written, and answered as the agent hired",
+      walk: (side) => {
+        scribeOn(side);
+        const hired = { factory: 'shop', workflow: 'dev', agents: { build: 'scribe' } };
+        const draft = aWorkflow([{ ...aStep('build'), body: '' }]);
+        const { written: files, steps } = done(side.door.workflows.write(yoursOn(side, 'dev'), draft, undefined, undefined, hired));
+        return { written: files, steps: agentOf(steps) };
+      },
+      says: { written: ['build.md'], steps: [['build', 'scribe', 'sonnet']] },
+    },
+    {
       name: 'REFUSED: a step naming an agent no door holds is Invalid, nothing written',
       walk: (side) => refusedWrite(side, scribed()),
       says: { write: { refused: 'Invalid' }, there: 'none' },

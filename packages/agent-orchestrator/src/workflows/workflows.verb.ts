@@ -15,7 +15,7 @@ import type { Args, Flag, Positional, Spec } from '../command/command.ts';
 import type { Command } from '../command/entry.verb.ts';
 import { apiKey, cliPath, factoryFlag, FROM, versionFlag, writerSpec, yoursOrRefused } from '../yours/yours.ts';
 import { workflowNameRefusal } from '../factory/factory.ts';
-import { readFactories, readFactory, templatedTree } from '../factory/factory.store.ts';
+import { readFactories, readFactory, readFactoryAt, templatedTree, templatedTreeAt } from '../factory/factory.store.ts';
 import { factoryFills } from '../rules/rules.store.ts';
 import { readInbox } from '../inbox/inbox.store.ts';
 import { inboxDir, runStore } from '../record/files.store.ts';
@@ -23,7 +23,7 @@ import { HOME, isDirectory } from '../record/record.store.ts';
 import { Invalid } from '../refusal/refusal.ts';
 import type { Workflow } from '../step/step.ts';
 import type { StepDraft } from '../workflow/index.ts';
-import { stillNeeded } from '../folder/folder.ts';
+import { stillNeeded, type Fills } from '../folder/folder.ts';
 import { workflowDirAt } from '../folder/folder.store.ts';
 import type { Places } from '../skills/read.store.ts';
 import type { WorkflowRemoved, WorkflowWritten } from '../folder/write.store.ts';
@@ -70,13 +70,24 @@ const WRITE_HAND =
 const REPO = apiKey('repo', "the board names the repository it lists a folder's agents from; the command line names none, and reads yours");
 
 /**
- * Where a write's folder looks for its agents and skills: for the place `factory`, the factory's tree as its repository (`templatedTree`);
- * else as `placesOf` says.
+ * How a write of the workflow `workflow` into the tree of the templated factory `name`, in the store `home`, is judged, as a run of it
+ * would read it: its agents and skills looked for in the factory's repository, the one a run of it works on — its tree where it names
+ * none — and in `home`, and its steps filled with the factory's hires into them and its rules (`factoryFills`). Refused as
+ * `templatedTreeAt` refuses the factory.
  */
-const writePlacesOf = (args: Args, home: string): Places =>
-  textOf(args, 'from') === 'factory' && textOf(args, 'factory') !== undefined
-    ? { repo: templatedTree(textOf(args, 'factory') ?? '', 'nemia workflows write'), home }
-    : placesOf(args, home);
+export function factoryWriteOf(home: string, name: string, workflow: string): { places: Places; fills: Fills } {
+  const tree = templatedTreeAt(home, name, 'nemia workflows write');
+  const factory = readFactoryAt(home, name, 'Nothing was written.');
+  return { places: { repo: factory.repos[0] ?? tree, home }, fills: factoryFills(factory, workflow).fills };
+}
+
+/** Where a write's folder looks for its agents and skills, and the hires it is filled with: for the place `factory`, `factoryWriteOf`. */
+const writeJudgedOf = (args: Args, home: string): { places: Places; fills?: Fills } => {
+  const factory = textOf(args, 'factory');
+  return textOf(args, 'from') === 'factory' && factory !== undefined
+    ? factoryWriteOf(home, factory, textOf(args, 'name') ?? '')
+    : { places: placesOf(args, home) };
+};
 
 /**
  * The folder of yours a writer (`who`) names, `<home>/workflows/<name>`, or of a factory's tree, `<tree>/workflows/<name>`, as the
@@ -159,7 +170,7 @@ export const WORKFLOWS_WRITE: Command<WorkflowWritten & { version: string }> = {
       Effect.gen(function* () {
         const dir = yield* tried(() => yoursWorkflowDir('nemia workflows write', args, home));
         const steps = yield* tried(() => JSON.parse(textOf(args, 'draft') ?? '[]') as StepDraft[]);
-        const places = yield* tried(() => writePlacesOf(args, home));
+        const { places, fills } = yield* tried(() => writeJudgedOf(args, home));
         const readme = textOf(args, 'readme');
         const files = yield* tried(() => carriedArg(textOf(args, 'files')));
         const door = yield* WorkflowDoor;
@@ -168,6 +179,7 @@ export const WORKFLOWS_WRITE: Command<WorkflowWritten & { version: string }> = {
           { steps, ...(readme !== undefined && { readme }), ...(files !== undefined && { files }) },
           textOf(args, 'version'),
           places,
+          fills,
         );
       }),
     ),
@@ -231,7 +243,7 @@ export const WORKFLOWS_REMOVE: Command<WorkflowRemoved> = {
       Effect.gen(function* () {
         const dir = yield* tried(() => yoursWorkflowDir('nemia workflows rm', args, home));
         const users = yield* usersOf(dir);
-        const places = yield* tried(() => writePlacesOf(args, home));
+        const { places } = yield* tried(() => writeJudgedOf(args, home));
         const door = yield* WorkflowDoor;
         return yield* door.workflows.remove(dir, textOf(args, 'version'), users, places);
       }),

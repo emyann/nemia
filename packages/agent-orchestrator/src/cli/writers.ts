@@ -10,6 +10,7 @@ import { Effect } from 'effect';
 import { draftSteps, HOME, Invalid, runWith, TABLE, type Place, templatedTree, type Args, type Command } from '../runner.ts';
 import { agentDraftOf, frontmatterKey, isReadme, skillDraftOf } from '../workflow.ts';
 import { usage, placedIn, type Engine } from './flags.ts';
+import { factoryWriteOf } from '../workflows/workflows.verb.ts';
 
 /** The table's entry named `name`. */
 const entryOf = (name: string): Command => TABLE.find((c) => c.name === name) as Command;
@@ -116,7 +117,8 @@ function carriedOf(folder: string, command: Command): { path: string; text: stri
 
 /**
  * `nemia workflows write`'s runner: the draft folder `--folder` names read as a start reads a folder, its agents looked for beside it
- * and in yours, through the Workflow door (`draftSteps`), or in the tree written for the place `factory` (`templatedTree`), into the
+ * and in yours, through the Workflow door (`draftSteps`), or in the tree written for the place `factory` (`templatedTree`) and its
+ * repository, filled with its hires (`factoryWriteOf`), into the
  * steps the builder sends, its README where it has one, and the other files it carries (`carriedOf`).
  */
 export async function workflowsWriteRun(args: Args, e: Engine, place: Place): Promise<void> {
@@ -125,8 +127,9 @@ export async function workflowsWriteRun(args: Args, e: Engine, place: Place): Pr
   if (!fs.statSync(folder, { throwIfNoEntry: false })?.isDirectory())
     usage(`nemia workflows write reads the folder ${path.resolve(folder)}, and it is not one. Name the draft folder.`);
   const factory = args.from === 'factory' && typeof args.factory === 'string' ? args.factory : undefined;
+  const judged = factory === undefined ? undefined : factoryWriteOf(HOME, factory, typeof args.name === 'string' ? args.name : '');
   const home = factory === undefined ? HOME : templatedTree(factory, 'nemia workflows write');
-  const read = draftSteps(folder, { home }).pipe(
+  const read = draftSteps(folder, { ...judged?.places, home }, judged?.fills).pipe(
     Effect.mapError((err) => new Invalid({ message: `${path.resolve(folder)} does not read: ${err.message}` })),
   );
   const steps = await runWith(e, placedIn(place, read));

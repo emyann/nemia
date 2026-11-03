@@ -16,7 +16,7 @@ import path from 'node:path';
 import { Layer } from 'effect';
 import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
 import { renderStep } from '../workflow/index.ts';
-import { parseFolder, workflowInUse } from '../folder/folder.ts';
+import { hiredLineOut, parseFolder, workflowInUse } from '../folder/folder.ts';
 import { WorkflowDoor, workflowDoorOver, type WorkflowDefs, type WorkflowDraft, type WorkflowLayer } from './workflows.store.ts';
 import type { Fills, Found } from '../folder/folder.ts';
 
@@ -75,11 +75,11 @@ export function workflowDoorMemory(defs?: WorkflowDefs): Layer.Layer<never> {
         const held = workflows.get(dir);
         return held === undefined ? { kind: 'none' } : { kind: 'folder', version: versionOf(held) };
       },
-      write: (dir, draft: WorkflowDraft, found) => {
-        const files = new Map(draft.steps.map((step) => [step.name, renderStep(step)] as const));
+      write: (dir, draft: WorkflowDraft, found, _places, fills) => {
+        const files = new Map(draft.steps.map((step) => [step.name, hiredLineOut(step.name, renderStep(step), fills)] as const));
         const before = workflows.get(dir);
         const carried = new Map([...(before?.carried ?? []), ...(draft.files ?? []).map((f) => [f.path, f.text] as const)]);
-        const steps = parseFolder([...files], (file) => carried.get(file), found.agents, found.skills);
+        const steps = parseFolder([...files], (file) => carried.get(file), found.agents, found.skills, fills);
         const readme = draft.readme ?? before?.readme;
         const held: Held = { files, carried, ...(readme !== undefined && { readme }) };
         const carriedKept = (draft.files ?? []).filter((f) => before?.carried?.get(f.path) === f.text).map((f) => f.path);

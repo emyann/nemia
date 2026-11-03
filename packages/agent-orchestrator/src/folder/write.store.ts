@@ -12,10 +12,20 @@ import { isReadme, WorkflowError, type Workflow } from '../step/step.ts';
 import { codexModeWritten } from '../former/former.ts';
 import { agentDeniesOf, parseWorkflow, renderStep, type StepDraft } from '../workflow/index.ts';
 import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
-import { agentsFolderRefusal, linkRefusal, noStepsRefusal, parseFolder, stepNameRefusal, twiceRefusal, workflowInUse } from './folder.ts';
+import {
+  agentsFolderRefusal,
+  hiredLineOut,
+  hireOf,
+  linkRefusal,
+  noStepsRefusal,
+  parseFolder,
+  stepNameRefusal,
+  twiceRefusal,
+  workflowInUse,
+} from './folder.ts';
 import type { Agents } from '../agents/agents.ts';
 import type { Places } from '../skills/read.store.ts';
-import type { Found } from './folder.ts';
+import type { Fills, Found } from './folder.ts';
 import { HOME, isDirectory } from '../record/record.store.ts';
 import { readFactoriesAt } from '../factory/factory.store.ts';
 
@@ -72,7 +82,8 @@ export function writeWorkflowAt(
     places,
     found,
     files = [],
-  }: { anywhere?: boolean; places?: Places; found: Found; files?: readonly { path: string; text: string }[] },
+    fills,
+  }: { anywhere?: boolean; places?: Places; found: Found; files?: readonly { path: string; text: string }[]; fills?: Fills },
 ): WorkflowWritten {
   const at = path.resolve(dir);
   const refuse = (why: string | undefined) => {
@@ -93,7 +104,7 @@ export function writeWorkflowAt(
   if (twice) refuse(twiceRefusal(twice.name));
   const { agents, skills } = found;
   refuse(codexModeRefusal(steps, agents));
-  const texts = steps.map((step) => [step.name, renderStep(ownLine(step, agents))] as const);
+  const texts = steps.map((step) => [step.name, hiredLineOut(step.name, renderStep(ownLine(step, agents)), fills)] as const);
   const there = (file: string): string | undefined => {
     try {
       return fs.readFileSync(path.resolve(at, file), 'utf8');
@@ -103,7 +114,7 @@ export function writeWorkflowAt(
   };
   const carried = new Map(files.map((file) => [file.path, file.text] as const));
   const read = (file: string): string | undefined => carried.get(file) ?? there(file);
-  const parsed = parseFolder(texts, read, agents, skills);
+  const parsed = parseFolder(texts, read, agents, skills, fills);
 
   fs.mkdirSync(at, { recursive: true });
   const written: string[] = [];
@@ -119,9 +130,9 @@ export function writeWorkflowAt(
   for (const file of removed) fs.rmSync(path.join(at, file));
   for (const [name, text] of texts) {
     const step = parsed.find((s) => s.name === name);
-    put(`${name}.md`, text, (there) => {
+    put(`${name}.md`, text, (now) => {
       try {
-        return isDeepStrictEqual(parseWorkflow(name, there, read, agents), step);
+        return isDeepStrictEqual(parseWorkflow(name, now, read, agents, skills, hireOf(fills, name), fills?.rules), step);
       } catch {
         return false;
       }

@@ -18,9 +18,23 @@ be touched.
 Everything else goes through [`build`](../build/README.md): a change that needs a design, or one a review is likely to send back twice.
 A card says which with `workflow: quick` or `workflow: build`.
 
+## Two ways to judge and land: in this checkout, or on GitHub
+
+The factory's `github` parameter, set when the template is applied, picks one, as in [`build`](../build/README.md): the implement and land
+steps' checks are each one shell `if` on the rendered value, and the notes of implement, review and land each open with the answer and
+hold a part for each.
+
+- **`github: false`, the default: in this checkout.** The implement step's check runs `change.ts size`, `probe.ts` and the local check, in that
+  order, and nothing else: the local check is the factory's `localCheck` parameter (the repository's lint, typecheck and test, where it
+  has them, by default), on the round's tree. Nothing is pushed and no pull request is opened. Land stages every result branch in one
+  `git merge --no-ff --no-commit`, as the git place's skill says (*Stage a landing*); its check runs `localCheck` again, on the merged
+  tree, and the run commits the merge on its exit 0 and takes it back otherwise.
+- **`github: true`: on GitHub** (`--set github=true`). What the rest of this README says of the check and the landing, a pull request
+  judged by CI and merged on GitHub, is this way's.
+
 ## The implement step's check
 
-The check is the cheap set, and CI: it runs `change.ts size`, `probe.ts`, `pull-request.ts push` and
+On GitHub, the check is the cheap set, and CI: it runs `change.ts size`, `probe.ts`, `pull-request.ts push` and
 `pull-request.ts wait --check <name>`, in that order, and nothing else.
 Each script is read from the run's frozen workflow files (`node "$WF_WORKFLOW_FILES/<script>.ts"`, the copy of this folder the run
 took when it began), never from the tree it judges; where `WF_WORKFLOW_FILES` is not set, the check says so on stderr and fails. The
@@ -37,7 +51,7 @@ run copies this folder alone, so it carries `build`'s `probe.ts`, `pull-request.
    pull request of it is at the commit the check judges; `wait` polls the CI context the factory names (its `ciCheck` parameter, `ci`
    by default) on that head and refuses a red, cancelled or missing one with the Actions URL, the failing jobs and a tail of their log.
 
-No typecheck, no lint and no test on this machine: nothing here runs Grace's tests for her before the review. Her session runs the
+On GitHub, no typecheck, no lint and no test on this machine: nothing here runs Grace's tests for her before the review. Her session runs the
 tests of what she changed, the types and the lint, as the repository's instructions say of a session's checks; CI runs the
 repository's suite on the commit the check pushed, and the check waits on it. Land then merges that same pull request through
 `build`'s `landing.ts` (quick's copy) and fast-forwards the checkout, and its check is the receipt that the merge happened —
@@ -49,8 +63,8 @@ request.
 
 `review.md` is `build`'s review with what quick says of itself: Agora's, read-only, closing the implement step's loop, with the same fence,
 skills and tally, and no `input:` — a quick run has no spec, so what
-was asked is the card. Its note names quick's own four check clauses and says that nothing ran the typecheck, the lint or a test on this
-machine, so the reviewer runs the types and the lint itself; and it says that its pass files the
+was asked is the card. Its note names quick's own check clauses in each way, and says on GitHub that nothing ran the typecheck, the lint or
+a test on this machine, so the reviewer runs the types and the lint itself, and in this checkout that the local check judged the round; and it says that its pass files the
 landing, so `again: true` is the only way back and it names no step.
 
 `rounds: 2`, where build's review has 3: a card that a review has to send back twice is a card that wanted `build`, and the
@@ -69,14 +83,17 @@ files the review again with the objection. `nemia retry <run> implement` is refu
 
 Land has no gate: the pass that ends the review files it on the next tick, and there is nothing to approve — `nemia approve <run> land`
 is refused for a quick run, "land has no gate: what waits on it is filed once it has passed its check, with nobody's approval, so there
-is nothing to approve." The landing merges this run's own green pull request and fast-forwards the checkout, as `build`'s does, and the
-run records the commit on its check's exit 0.
+is nothing to approve." The landing lands as `build`'s does — on GitHub, it merges this run's own green pull request and
+fast-forwards the checkout; in this checkout, it stages the merge, which the run commits once `localCheck` passes on it — and the run
+records the commit on its check's exit 0.
 
 A person who wants to read the change themselves before it lands puts the gate back for that run: `nemia start "<the card>"
 --workflows quick --gate land`, or `gate: land` on the inbox card. A run's own gates are read wherever a step's are (`hasGate`), so the
 landing then waits for `nemia approve <run> land` exactly as build's does.
 
-**A landing that refuses**: nothing is merged and the checkout is untouched. Where the pull request is red or unmergeable, the work goes
+**A landing that refuses**: nothing is merged and the checkout is untouched. In this checkout, a merge that conflicts is aborted by
+land, and one whose `localCheck` fails is taken back by the run: `nemia retry <run> review --message "<what failed>"` sends the work
+round the review's loop. On GitHub, where the pull request is red or unmergeable, the work goes
 back through the review's loop with what refused it (`nemia decide <run>` prints the land step's `blocked`): `nemia retry <run> review
 --message "<what failed>"` files the review again with those words, and it sends the work round implement or passes it, which files
 land again. Where it was the fast-forward that was declined, or anything else that was not the work, a person brings the checkout onto

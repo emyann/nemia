@@ -7,8 +7,9 @@
  * name is the repository's a factory is applied to, never the script's.
  *
  * The land steps' checks are read off sdlc as a factory gets it — rendered by `nemia factory apply` and the controller on a scratch
- * store — and run as the run runs one (`checkArgv`): the receipt alone, from the run's frozen workflow files, no suite and no e2e, and a
- * refusal where those files are not named.
+ * store — and run as the run runs one (`checkArgv`). On GitHub (`github=true`): the receipt alone, from the run's frozen workflow files,
+ * no suite and no e2e, and a refusal where those files are not named. In the checkout, sdlc's default: the local check, on the tree a
+ * landing staged, calling no `gh`.
  *
  * The one failure between the landing's two acts has a retry that must survive it: `gh pr merge` goes through, the fast-forward is
  * declined, the step signs off `blocked` with the retry line, a person brings the checkout onto `origin/main` as that refusal names,
@@ -647,15 +648,17 @@ test('REFUSED: a merge of a run that has one pull request merged and another sti
   assert.equal(stands(w.repo).head, w.base, 'and the checkout is untouched');
 });
 
-test("both land steps' checks, rendered, are the receipt alone, run from the run's frozen workflow files, and run no suite and no e2e", async () => {
-  const at = await renderedSdlc();
+test("both land steps' checks, rendered on GitHub, are the receipt alone, run from the run's frozen workflow files, and run no suite and no e2e", async () => {
+  const at = await renderedSdlc(['github=true']);
   for (const workflow of ['build', 'quick']) {
     const step = stepsOf(at, workflow).find((s) => s.name === 'land');
     assert.equal(typeof step?.check, 'string', `sdlc's ${workflow} has a land step with a check`);
     const frozen = step!.check!;
     assert.ok(
-      frozen.startsWith('{ if [ -n "${WF_WORKFLOW_FILES:-}" ]; then node "$WF_WORKFLOW_FILES/landing.ts" receipt --run "$WF_RUN";'),
-      `the receipt is run from the run's frozen workflow files first:\n${frozen}`,
+      frozen.startsWith(
+        'if [ "true" = true ]; then { if [ -n "${WF_WORKFLOW_FILES:-}" ]; then node "$WF_WORKFLOW_FILES/landing.ts" receipt --run "$WF_RUN";',
+      ),
+      `on GitHub, the receipt is run from the run's frozen workflow files first:\n${frozen}`,
     );
     assert.ok(frozen.includes('landing.ts" receipt --run "$WF_RUN"'), `and run on the run the check names:\n${frozen}`);
     assert.doesNotMatch(frozen, /\$WF_BASE_REF/, 'a workspace: base step is given no base ref');
@@ -699,5 +702,61 @@ test("both land steps' checks, rendered, are the receipt alone, run from the run
     const passed = check({ WF_WORKFLOW_FILES: path.join(at.tree, 'workflows', workflow) });
     assert.equal(passed.code, 0, passed.err);
     assert.match(passed.out, /nemia land: #7 is merged as [0-9a-f]{12}, a merge commit/, 'the receipt, from the frozen files');
+  }
+});
+
+/** A `local-check` in `bin` that logs to `log`, refuses a tree that lacks the result branch's file, and otherwise exits `exit`. */
+function localCheckStub(bin: string, log: string, exit: number): void {
+  fs.writeFileSync(
+    path.join(bin, 'local-check'),
+    `#!/bin/sh\nprintf 'local-check\\n' >> '${log}'\n[ -f from-branch.ts ] || exit 9\nexit ${exit}\n`,
+    { mode: 0o755 },
+  );
+}
+
+test("REFUSED at shipped defaults: both land steps' checks run the local check on the tree the landing staged, from no frozen file, and call no gh", async () => {
+  const at = await renderedSdlc(['localCheck=local-check']);
+  for (const workflow of ['build', 'quick']) {
+    const check = stepsOf(at, workflow).find((s) => s.name === 'land')?.check;
+    assert.equal(typeof check, 'string', `sdlc's ${workflow} has a land step with a check`);
+    const repo = scratch('wf-land-local-');
+    gitIn(repo, 'init', '-q', '-b', 'main');
+    fs.writeFileSync(path.join(repo, 'a.ts'), 'export const a = 1;\n');
+    gitIn(repo, 'add', '-A');
+    gitIn(repo, 'commit', '-qm', 'base');
+    gitIn(repo, 'switch', '-q', '-c', RESULT);
+    fs.writeFileSync(path.join(repo, 'from-branch.ts'), 'export const b = 2;\n');
+    gitIn(repo, 'add', '-A');
+    gitIn(repo, 'commit', '-qm', 'the work');
+    gitIn(repo, 'switch', '-q', 'main');
+    const bin = scratch('wf-land-local-bin-');
+    const log = path.join(bin, 'said.log');
+    const stub = (exit: number): void => localCheckStub(bin, log, exit);
+    fs.writeFileSync(path.join(bin, 'gh'), `#!/bin/sh\nprintf 'gh %s\\n' "$*" >> '${log}'\nexit 1\n`, { mode: 0o755 });
+    const said = (): string[] => (fs.existsSync(log) ? fs.readFileSync(log, 'utf8').split('\n').filter(Boolean) : []);
+    const run = () => {
+      fs.rmSync(log, { force: true });
+      const [cmd, ...argv] = checkArgv(check!);
+      const ran = spawnSync(cmd, argv, {
+        cwd: repo,
+        env: { PATH: `${bin}${path.delimiter}${process.env.PATH ?? ''}`, HOME: repo, WF_RUN: RUN, WF_STEP: 'land' },
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'pipe'],
+        timeout: 120_000,
+      });
+      return { code: ran.status, out: ran.stdout, err: ran.stderr, said: said() };
+    };
+
+    stub(0);
+    const unstaged = run();
+    assert.notEqual(unstaged.code, 0, `${workflow}: with nothing staged, the tree lacks the work and the local check refuses it`);
+    gitIn(repo, 'merge', '--no-ff', '--no-commit', RESULT);
+    const passed = run();
+    assert.equal(passed.code, 0, `${workflow}: ${passed.out}${passed.err}`);
+    assert.deepEqual(passed.said, ['local-check'], `${workflow}: the local check ran once on the merged tree, and no gh`);
+    stub(3);
+    const red = run();
+    assert.notEqual(red.code, 0, `${workflow}: a local check that fails on the merged tree refuses the landing`);
+    assert.deepEqual(red.said, ['local-check']);
   }
 });

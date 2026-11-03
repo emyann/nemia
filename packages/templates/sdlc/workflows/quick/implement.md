@@ -1,3 +1,8 @@
+Does this factory judge and land its work on GitHub? **${{ parameters.github }}**. Follow the part below headed with that answer,
+and only it, then the part headed *Either way*.
+
+### true — on GitHub
+
 **Open the pull request before you sign off**, once a round and after you merged the base: this run's change is judged on GitHub, and
 your fence refuses every `git push` and every `gh` call, so the push and the pull request are one frozen script, read from the run's
 frozen workflow files (`$WF_WORKFLOW_FILES`) as your check reads it. Run it:
@@ -16,6 +21,27 @@ Your check then pushes again through the same script, so CI's verdict is for the
 `${{ parameters.ciCheck }}` comes back as the check's refusal, with the Actions URL, the failing jobs and the tail of their log — your
 next try is handed that, since you may type no `gh` yourself.
 
+**Nothing runs your tests for you.** The check measures the change, proves the probes, then pushes the branch and waits on CI: it runs
+`change.ts size`, `probe.ts`, `pull-request.ts push` and `pull-request.ts wait`, in that order, and nothing else. Run them yourself
+before you sign off, as the repository's instructions say of a session's checks: the tests of what you changed, the types and the
+lint. CI's `${{ parameters.ciCheck }}` context runs the repository's suite on the commit your check pushed, before the review, and that
+is the last thing any suite reads: the landing merges that same commit and its check is only the receipt that it was merged. A red
+`${{ parameters.ciCheck }}` comes back to you, with what the check said; a landing refuses before anything is merged — a pull request
+GitHub calls unmergeable, a `${{ parameters.ciCheck }}` no longer green — and nothing landed.
+
+### false — in this checkout
+
+This factory has no remote: nothing is pushed and no pull request is opened, and you open none.
+
+**The local check is the only judge.** The check measures the change, proves the probes, then runs the repository's local check
+(`${{ parameters.localCheck }}`) on this round's tree, from the workspace's root: it runs `change.ts size`, `probe.ts` and the local
+check, in that order, and nothing else. Run the tests of what you changed, the types and the lint yourself before you sign off, as the
+repository's instructions say of a session's checks; a refusal of the local check comes back to you with the end of its output. The
+landing runs the local check again, on the base with your branch merged into it, before the merge is committed: a merge that conflicts
+or breaks it is taken back, and nothing landed.
+
+### Either way
+
 This is a quick build: no spec was written for you. You are handed a card, and a review reads your plan and your change — Agora's,
 read-only, which asks for another round or passes. Its pass lands the change: there is no person's gate after it, so the review is the
 one reader between your work and the base branch.
@@ -31,17 +57,10 @@ read, which of two behaviours), sign off `blocked` and say in `needs` what is un
 repository marks `linguist-generated`) left out, said as a fact and refused by no number. Do not trim the work, split it or drop its
 tests to make it look smaller: the review reads every line.
 
-**Nothing runs your tests for you.** The check measures the change, proves the probes, then pushes the branch and waits on CI: it runs
-`change.ts size`, `probe.ts`, `pull-request.ts push` and `pull-request.ts wait`, in that order, and nothing else. Run them yourself
-before you sign off, as the repository's instructions say of a session's checks: the tests of what you changed, the types and the
-lint. CI's `${{ parameters.ciCheck }}` context runs the repository's suite on the commit your check pushed, before the review, and that
-is the last thing any suite reads: the landing merges that same commit and its check is only the receipt that it was merged. A red
-`${{ parameters.ciCheck }}` comes back to you, with what the check said; a landing refuses before anything is merged — a pull request
-GitHub calls unmergeable, a `${{ parameters.ciCheck }}` no longer green — and nothing landed.
-
-**Merge the base before you sign off**, on every try: the base moves while you work, CI judges the commit your check pushes and
-nothing judges the merged tree afterwards — the landing's check is a receipt — so a base you did not merge is a base GitHub may call
-unmergeable at the landing, which refuses rather than lands. The measure counts your own change alone, from the base you merged last. The base is the branch the repository's own checkout is on, and from your worktree git names its tip
+**Merge the base before you sign off**, on every try: the base moves while you work, and a base you did not merge is one the
+landing refuses rather than lands: on GitHub, CI judges the commit your check pushes and nothing judges the merged tree afterwards —
+the landing's check is a receipt — so GitHub may call the pull request unmergeable; in this checkout, the landing stages your branch
+on the base as it is then, and a merge that conflicts or breaks the local check is taken back. The measure counts your own change alone, from the base you merged last. The base is the branch the repository's own checkout is on, and from your worktree git names its tip
 `main-worktree/HEAD`, whatever that branch is called. Commit your work, then `git merge main-worktree/HEAD`, made as the `git` skill
 says a merge is made: keep both meanings in each conflict, and sign off `blocked` where both cannot hold. Then run again the tests of
 what the merge touched: those of each file of yours it changed, and of each file it changed that your code or your tests read.

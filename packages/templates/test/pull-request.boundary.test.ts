@@ -8,8 +8,9 @@
  *
  * The wait's two bounds are told apart by `WF_CI_START_SECONDS` and `WF_CI_WAIT_SECONDS`, each read on its own, and the shipped numbers
  * are held against the words of `sdlc/workflows/build/README.md` and against a round check's own deadline. Build's implement check is
- * read off sdlc as a factory gets it, rendered by `nemia factory apply` and the controller on a scratch store, its round check and its
- * CI context set as parameters, and each clause that runs the script is run as the run runs a check (`checkArgv`).
+ * read off sdlc as a factory gets it, rendered by `nemia factory apply` and the controller on a scratch store, on GitHub with its round
+ * check and its CI context set as parameters, and each clause that runs the script is run as the run runs a check (`checkArgv`); at
+ * sdlc's default, in the checkout, it is run whole, and pushes nothing.
  *
  * Its subject is git and a spawned script: a boundary file.
  */
@@ -520,8 +521,8 @@ test('REFUSED: no ci context within the bound, and a ci still pending at its end
   assert.ok(unfinished.err.includes(RETRY), unfinished.err);
 });
 
-test("build's implement check, rendered, pushes through the script before the round check, waits last on the CI context it was set, and runs no suite and no e2e itself", async () => {
-  const at = await renderedSdlc(['roundCheck=round-check --all', 'ciCheck=gate']);
+test("build's implement check, rendered on GitHub, pushes through the script before the round check, waits last on the CI context it was set, and runs no suite and no e2e itself", async () => {
+  const at = await renderedSdlc(['github=true', 'roundCheck=round-check --all', 'ciCheck=gate']);
   const check = stepsOf(at, 'build').find((step) => step.name === 'implement')?.check;
   assert.equal(typeof check, 'string', "sdlc's build has an implement step with a check");
   const frozen = check as string;
@@ -581,6 +582,44 @@ test("build's implement check, rendered, pushes through the script before the ro
     assert.equal(ran.code, 0, `${verb}, from the frozen workflow files, on a red \`ci\` beside a green \`gate\`:\n${ran.err}`);
     assert.match(ran.out, verb === 'push' ? /nemia pr: #7 is at [0-9a-f]{12}/ : /nemia ci: `gate` passed on/);
   }
+});
+
+test("REFUSED at shipped defaults, in the checkout: build's implement check runs the probes, then the local check, pushes nothing and calls no gh", async () => {
+  const at = await renderedSdlc(['localCheck=local-check']);
+  const check = stepsOf(at, 'build').find((step) => step.name === 'implement')?.check;
+  assert.equal(typeof check, 'string', "sdlc's build has an implement step with a check");
+  const place = placed();
+  fs.writeFileSync(path.join(place.gh.bin, 'claude'), '#!/bin/sh\necho "[]"\n', { mode: 0o755 });
+  const run = (exit: number) => {
+    fs.writeFileSync(path.join(place.gh.bin, 'local-check'), `#!/bin/sh\necho "local check ran"\nexit ${exit}\n`, { mode: 0o755 });
+    const [cmd, ...argv] = checkArgv(check!);
+    const ran = spawnSync(cmd, argv, {
+      cwd: place.repo,
+      env: {
+        PATH: `${place.gh.bin}${path.delimiter}${process.env.PATH ?? ''}`,
+        HOME: place.repo,
+        TMPDIR: scratch('wf-pr-tmp-'),
+        GIT_CONFIG_GLOBAL: '/dev/null',
+        GIT_CONFIG_NOSYSTEM: '1',
+        WF_RUN: 'r-1',
+        WF_WORKFLOW_FILES: path.join(at.tree, 'workflows', 'build'),
+        ...place.gh.env(),
+      },
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+      timeout: 120_000,
+    });
+    return { code: ran.status, out: ran.stdout, err: ran.stderr };
+  };
+  const passed = run(0);
+  assert.equal(passed.code, 0, passed.out + passed.err);
+  const probes = passed.out.search(/no live probe of run r-1/);
+  assert.ok(probes >= 0 && probes < passed.out.indexOf('local check ran'), `the probes, then the local check:\n${passed.out}`);
+  assert.deepEqual(place.gh.calls(), [], 'no gh');
+  assert.equal(tip(place.bare!, place.branch), null, 'and nothing is pushed');
+  const red = run(3);
+  assert.notEqual(red.code, 0, red.out);
+  assert.equal(tip(place.bare!, place.branch), null);
 });
 
 /**

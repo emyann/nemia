@@ -4,7 +4,7 @@
  * reaches the person's phone (Remote Control) only when it asks for an answer, and is refused by implement's check while it is live.
  * Driven as a step and the check drive it, in a scratch repository on a run's branch, with a stub `claude` first on the PATH that
  * records each call and lists the rows it is given, a scratch `HOME` and `WF_ROOT`, each a bounded subprocess; and build's implement
- * check, as sdlc renders it for a factory (`nemia factory apply` and the controller on a scratch store, its round check set to a stub),
+ * check, as sdlc renders it for a factory (`nemia factory apply` and the controller on a scratch store, its checks set to a stub),
  * is run whole as the run runs a check (`checkArgv`), from the rendered folder as the run's frozen workflow files, with the pull
  * request's world stood up (`test/origin.ts`), so the clause is proven wired and not only written.
  */
@@ -271,7 +271,7 @@ function based(files: Record<string, string>): { repo: string; base: string } {
 }
 
 test("REFUSED at shipped defaults: implement's check, rendered, refuses a live probe of its run and passes once it is stopped; with no frozen workflow files it refuses, never skips", async () => {
-  const rendering = await renderedSdlc(['roundCheck=round-check']);
+  const rendering = await renderedSdlc(['roundCheck=round-check', 'localCheck=round-check']);
   const check = stepsOf(rendering, 'build').find((step) => step.name === 'implement')?.check;
   assert.equal(typeof check, 'string', "sdlc's build has an implement step with a check");
   const scripts = Object.fromEntries(

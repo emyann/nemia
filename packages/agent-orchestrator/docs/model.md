@@ -61,6 +61,7 @@ erDiagram
     list after FK "optional"
     list context FK "optional"
     list inputs "optional"
+    string workflowFiles "optional"
     object from "optional"
     object scheduled "optional"
     list gates FK "optional"

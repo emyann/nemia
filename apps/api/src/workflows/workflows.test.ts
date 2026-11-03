@@ -490,8 +490,14 @@ test('a person starts runs from the board: the record as `nemia start` writes it
       assert.match(id, /^add-a-cache-keep-it-small-[a-z0-9]+$/);
       assert.equal(res.headers.get('location'), `/api/runs/${id}`);
 
-      assert.deepEqual(runFiles(), [`${id}.json`], 'the record, and nothing beside it');
+      assert.deepEqual(runFiles(), [id, `${id}.json`], "the record, and the run's own folder beside it");
       const run = runStore.runs.read(id);
+      assert.deepEqual(
+        fs.readdirSync(path.join(root, 'runs', id)),
+        ['workflow'],
+        'the folder holds only the copy of the workflow folder the run took',
+      );
+      assert.deepEqual(fs.readdirSync(path.join(root, 'runs', id, 'workflow')), [run.workflowFiles]);
       assert.deepEqual(
         {
           repo: run.repo,
@@ -534,7 +540,8 @@ test('a person starts runs from the board: the record as `nemia start` writes it
   await s.test(
     "a start as the board sends it is not refused: same-origin through vite's `/api` proxy, which rewrites Host to the api's and leaves the origin header the board's page; and one from a client outside a browser, which sends no Sec-Fetch-Site",
     async () => {
-      const before = runFiles().length;
+      const records = (): number => runFiles().filter((f) => f.endsWith('.json')).length;
+      const before = records();
       for (const headers of [
         { 'content-type': 'application/json', 'sec-fetch-site': 'same-origin', origin: 'http://localhost:5173', host: '127.0.0.1:8787' },
         { 'content-type': 'application/json; charset=utf-8', host: 'localhost:8787' },
@@ -543,7 +550,7 @@ test('a person starts runs from the board: the record as `nemia start` writes it
         const res = await sentWith(headers);
         assert.equal(res.status, 201, `${JSON.stringify(headers)}: ${await res.clone().text()}`);
       }
-      assert.equal(runFiles().length, before + 3);
+      assert.equal(records(), before + 3);
     },
   );
 

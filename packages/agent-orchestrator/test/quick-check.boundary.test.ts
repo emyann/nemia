@@ -2,7 +2,8 @@
  * The quick workflow's own check script (`workflows/quick/change.ts`), run as the check runs it: `node change.ts <verb>` in a committed
  * scratch repository whose base is `WF_BASE_REF`, a bounded subprocess, with `npx` and `npm` stubs first on the path that record what
  * they are handed. The script says the size and refuses none, and the shipped check of `workflows/quick/implement.md` is run
- * whole, as frozen, so the measure is proven wired and first.
+ * whole, as frozen, so the measure is proven wired and first: from the run's frozen workflow files (`WF_WORKFLOW_FILES`, here a
+ * copy of quick's own folder) on a base that holds none of the team, and from the base, as before, where the variable is unset.
  *
  * Its `origin` is a bare repository and its `gh` a stub (`test/origin.ts`), for the two clauses that push the branch and read CI.
  *
@@ -122,7 +123,7 @@ function closeoutFile(more: Record<string, unknown>): string {
   return file;
 }
 
-/** The scripts a run's base holds, which the shipped check shows from it. */
+/** The scripts a run's base holds, which the shipped check shows from it where no frozen workflow files are named. */
 const SCRIPTS = {
   'workflows/quick/change.ts': TEXT,
   ...Object.fromEntries(
@@ -135,7 +136,7 @@ const SCRIPTS = {
 
 /**
  * Run the shipped check of quick's implement in `repo` as a check runs, its argv `checkArgv`'s, over the stubs, which exit as
- * `failing` says; `files` is the step's files directory, one of its own where none is given.
+ * `failing` says; `files` is the step's files directory, one of its own where none is given, and `more` adds to its environment.
  */
 function shipped(
   repo: string,
@@ -144,6 +145,7 @@ function shipped(
   failing: Failing = {},
   files = scratch('wf-quick-files-'),
   rules?: readonly Rule[],
+  more: Record<string, string> = {},
 ): Ran {
   const check = loadWorkflows(QUICK, placesOf(QUICK)).find((step) => step.name === 'implement')?.check;
   assert.equal(typeof check, 'string', 'workflows/quick has an implement step with a check');
@@ -152,7 +154,7 @@ function shipped(
   const [cmd, ...args] = checkArgv(check as string);
   const ran = spawnSync(cmd, args, {
     cwd: repo,
-    env: envOf(repo, base, bin, { ...gh.env(), WF_ARTIFACTS: files, WF_CLOSEOUT: closeoutFile(closeout) }),
+    env: envOf(repo, base, bin, { ...gh.env(), WF_ARTIFACTS: files, WF_CLOSEOUT: closeoutFile(closeout), ...more }),
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'pipe'],
     timeout: 120_000,
@@ -160,17 +162,32 @@ function shipped(
   return { code: ran.status, out: ran.stdout, err: ran.stderr, said: said() };
 }
 
-test("implement's check, as frozen, says a change's size first and refuses none, and a base without the script refuses", () => {
+/** A copy of quick's workflow folder, as the run freezes it when it begins: what `WF_WORKFLOW_FILES` names. */
+function frozenQuick(): string {
+  const frozen = scratch('wf-quick-frozen-');
+  fs.cpSync(QUICK, frozen, { recursive: true });
+  return frozen;
+}
+
+test("implement's check, as frozen, reaches its scripts in the run's frozen workflow files on a base that holds none of the team", () => {
+  const bare = workOn({ 'a.ts': lines(MANY) });
+  assert.equal(fs.existsSync(path.join(bare.repo, 'workflows')), false, 'the base holds none of the team');
+  const passed = shipped(bare.repo, bare.base, undefined, {}, undefined, undefined, { WF_WORKFLOW_FILES: frozenQuick() });
+  assert.equal(passed.code, 0, passed.out + passed.err);
+  assert.ok(passed.out.startsWith(`wf size: 1 files, ${MANY} lines\n`), passed.out);
+  assert.deepEqual(passed.said, [], 'no types, no lint, no test of a package');
+
+  const unset = shipped(bare.repo, bare.base);
+  assert.notEqual(unset.code, 0, unset.out);
+  assert.ok(unset.err.includes('/change.ts'), `with no frozen files it reads the base, which has none, and refuses:\n${unset.err}`);
+});
+
+test("implement's check, with no frozen workflow files named, still reads its scripts from the run's base, and refuses none by size", () => {
   const large = workOn({ 'a.ts': lines(MANY) }, SCRIPTS);
   const passed = shipped(large.repo, large.base);
   assert.equal(passed.code, 0, passed.out + passed.err);
   assert.ok(passed.out.startsWith(`wf size: 1 files, ${MANY} lines\n`), passed.out);
   assert.deepEqual(passed.said, [], 'no types, no lint, no test of a package');
-
-  const bare = workOn(files(1));
-  const old = shipped(bare.repo, bare.base);
-  assert.notEqual(old.code, 0, old.out);
-  assert.match(old.err, /has no workflows\/quick\/change\.ts/, 'a base without the script refuses, never skips');
 });
 
 /** An `npx` and an `npm` that fail whatever they are handed: a check that passes over them ran no test, no types, no lint, no page. */
@@ -332,8 +349,8 @@ test("REFUSED: a note or a README that says a bound on the size, or other clause
   assert.match('a change of at most **300 lines** changed', bound, 'a bound in the words the notes once said is caught');
   for (const file of ['implement.md', 'review.md', 'README.md']) assert.doesNotMatch(said(file), bound, `${file} bounds no size`);
   const check = loadWorkflows(QUICK, placesOf(QUICK)).find((step) => step.name === 'implement')?.check ?? '';
-  const clauses = [...check.matchAll(/node\s+"\$\w+\/([\w-]+\.ts)"\s+(size|tests|pages|push|wait)?/g)].map(([, script, verb]) =>
-    verb ? `${script} ${verb}` : script,
+  const clauses = [...check.matchAll(/node\s+"\$WF_WORKFLOW_FILES\/([\w-]+\.ts)"\s+(size|tests|pages|push|wait)?/g)].map(
+    ([, script, verb]) => (verb ? `${script} ${verb}` : script),
   );
   assert.deepEqual(clauses, ['change.ts size', 'pictures.ts', 'probe.ts', 'pull-request.ts push', 'pull-request.ts wait']);
   assert.doesNotMatch(check, /\bnpm\b|\bnpx\b/);

@@ -93,17 +93,23 @@ export type CheckEnv = {
   WF_ARTIFACTS: string;
   /** The judged step's closeout, flat, as a JSON file: absent where the step signed off none. */
   WF_CLOSEOUT?: string;
+  /**
+   * The run's own copy of its workflow folder (`workflowFilesDir`), its files at their paths from the folder, as the run took them at
+   * start or at its last move of pins: absent only where the record names no copy, a run started before the copy was taken.
+   */
+  WF_WORKFLOW_FILES?: string;
 };
 
 /**
  * What a step's check is told (`CheckEnv`): its run, its step, the workspace it judges and the step's artifacts folder (`t.files`), the
- * run's base commit where the step works on a branch of a repository run, and the file of the step's closeout (`t.closeout`) where it
- * signed off one.
+ * run's base commit where the step works on a branch of a repository run, the file of the step's closeout (`t.closeout`) where it
+ * signed off one, and the run's copy of its workflow folder (`t.workflowFiles`) wherever the record names one — a repository run's step
+ * and ending and a folder run's alike.
  */
 export const checkEnvOf = (
   run: Run,
   step: Pick<Workflow, 'name' | 'workspace'>,
-  t: { workspace: string; files: string; closeout: string | undefined },
+  t: { workspace: string; files: string; closeout: string | undefined; workflowFiles?: string },
 ): CheckEnv => ({
   WF_RUN: run.id,
   WF_STEP: step.name,
@@ -111,6 +117,7 @@ export const checkEnvOf = (
   WF_WORKSPACE: t.workspace,
   WF_ARTIFACTS: t.files,
   ...(t.closeout ? { WF_CLOSEOUT: t.closeout } : {}),
+  ...(t.workflowFiles ? { WF_WORKFLOW_FILES: t.workflowFiles } : {}),
 });
 
 /**

@@ -140,6 +140,7 @@ test('mounts on every filing: a factory run whose implement writes one folder of
   const inbox = path.join(ROOT, 'inbox');
   let id = '';
   let inputs = '';
+  let frozen = '';
   let writes: Mount[] = [];
   let tried = '';
 
@@ -161,7 +162,8 @@ test('mounts on every filing: a factory run whose implement writes one folder of
         out.some((l) => l.startsWith('not mounted')),
         false,
       );
-      writes = [{ path: web, readOnly: false }, ...readOnly(docs, inbox, inputs)];
+      frozen = path.join(ROOT, 'runs', id, 'workflow', String(run.workflowFiles));
+      writes = [{ path: web, readOnly: false }, ...readOnly(docs, inbox, inputs, frozen)];
     },
   );
 
@@ -207,8 +209,8 @@ test('mounts on every filing: a factory run whose implement writes one folder of
       const ownDir = artifactsDir({ id }, 'review');
       assert.deepEqual(
         review.config?.mounts,
-        readOnly(web, docs, ownDir, handed, inputs),
-        'review runs in dontAsk: its own folder, read-only',
+        readOnly(web, docs, ownDir, handed, inputs, frozen),
+        "review runs in dontAsk: its own folder, read-only, and the run's copy of its workflow folder",
       );
       assert.ok(fs.statSync(handed).isDirectory(), "implement's folder is there when the step after it is filed");
       const config = review.config as Filed;
@@ -271,7 +273,7 @@ test('where a run mounts less: the default factory and a factory of one reposito
   const { repos, team, plain, notes } = fresh();
 
   await s.test(
-    "a run in the default factory, or in a factory of one repository, given no input, mounts nothing but review's own folder and what implement handed over",
+    "a run in the default factory, or in a factory of one repository, given no input, mounts nothing but its workflow's files, review's own folder and what implement handed over",
     async () => {
       addFactory({ name: 'solo', repos: [repos[0]] });
       attachWorkflow({ factory: 'solo', workflow: 'plain' });
@@ -282,15 +284,16 @@ test('where a run mounts less: the default factory and a factory of one reposito
         assert.equal('mounts' in readRun(run.id), false, `${String(factory)}: no key`);
         await pass(run.id);
         const first = filedFor(run.id, 'implement');
-        assert.equal(Object.hasOwn(first.config!, 'mounts'), false, `${String(factory)}: the config as it was before mounts`);
-        assert.doesNotMatch(first.brief, /mounted read-only|nemia start --input/, String(factory));
+        const frozen = path.join(ROOT, 'runs', run.id, 'workflow', String(readRun(run.id).workflowFiles));
+        assert.deepEqual(first.config?.mounts, readOnly(frozen), `${String(factory)}: the run's copy of its workflow folder alone`);
+        assert.doesNotMatch(first.brief, /Folders of this factory|nemia start --input/, String(factory));
         stage.board().settle(first.id, 'succeeded', SIGNED);
         await pass(run.id);
         const review = filedFor(run.id, 'review');
         assert.deepEqual(
           review.config?.mounts,
-          readOnly(artifactsDir(run, 'review'), artifactsDir(run, 'implement')),
-          `${String(factory)}: review's own folder and implement's alone`,
+          readOnly(artifactsDir(run, 'review'), artifactsDir(run, 'implement'), frozen),
+          `${String(factory)}: review's own folder, implement's and the workflow's files alone`,
         );
         assert.doesNotMatch(review.brief, /Folders of this factory/, String(factory));
       }

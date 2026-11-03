@@ -207,7 +207,7 @@ test("REFUSED: the check, while a probe of the run is live, naming stop; it pass
   assert.equal(refused.code, 1, refused.out);
   assert.match(refused.err, /a probe of run r-1 is still live/);
   assert.match(refused.err, /r-1-probe-a blocked/);
-  assert.match(refused.err, /node workflows\/build\/probe\.ts stop/);
+  assert.match(refused.err, /WF_WORKFLOW_FILES[^`]*\/probe\.ts"\sstop/, 'it names stop on the frozen probe.ts');
   assert.ok(!refused.err.includes('r-2-probe-a'), refused.err);
   for (const state of ['stopped', 'done', 'failed']) {
     const ended = probe(placed({ rows: [row('r-1-probe-a', state), row('r-2-probe-a', 'working')] }), ['check'], { WF_RUN: 'r-1' });

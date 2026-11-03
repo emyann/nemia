@@ -515,6 +515,7 @@ test("a checked step, from its check's filing to `retries:` spent and the run wa
           WF_WORKSPACE: run.repo,
           WF_ARTIFACTS: path.join(ROOT, 'runs', id(), 'artifacts', 'implement'),
           WF_CLOSEOUT: path.join(ROOT, 'checks', `${check1()}.closeout.json`),
+          WF_WORKFLOW_FILES: path.join(ROOT, 'runs', id(), 'workflow', String(readRun(id()).workflowFiles)),
         },
         niceness: 10,
       });

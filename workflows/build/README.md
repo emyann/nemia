@@ -8,32 +8,37 @@ A change its card settles, which needs no design, goes through [`quick`](../quic
 design → implement ⇄ review → land
 ```
 
-Implement pushes its branch and opens the pull request through `pull-request.ts`, read from the base as the others are: it pushes this
-run's own branch, never another and never the base and never forced, and opens or updates the one pull request of the branch, never a
-draft, printing the address that goes on Grace's closeout as an artifact value. Her check pushes again through the same script and refuses
-unless the pull request's head is the commit it judges — GitHub moves that head a moment after the push, so it is read again for up to
-30 s before the refusal — then, unless GitHub says the pull request conflicts with its base (refused at once, naming the merge of the
-base, since GitHub runs no `ci` on a conflicting head), waits on the `ci` context (1800 s for it to start, 2400 s whole): CI runs
-the suite, the types, the lint, the whole e2e and the build on that commit, and a red, cancelled or missing `ci` is the check's refusal,
-with the Actions URL, the failing jobs and a bounded tail of their log — no agent of this team may type `gh`, so the script reads it for
-them.
+Each script a step runs is read from the run's frozen workflow files (`$WF_WORKFLOW_FILES`), the copy of this folder the run took
+when it began, never from the tree it judges: a step's check runs `node "$WF_WORKFLOW_FILES/<script>.ts"`. While a daemon that sets no
+`WF_WORKFLOW_FILES` runs the check, each clause falls back to the read it had before: out of the run's base (`git show
+"$WF_BASE_REF:workflows/build/<script>.ts"`), or out of `HEAD` for land.
 
-Land merges that same pull request, through `landing.ts`, which its check also reads — out of `HEAD` in the repository's own checkout,
-which a `workspace: base` step is given no base ref for. Otto copies the script out and runs `merge --run <id> --subject … --body-file
-…`: it refuses anything but this run's own green pull request — not a draft, based on the base branch, its head the commit the review
-read, `mergeable`, the `ci` context green at that commit, and no result branch of the run left out — then merges it with a merge commit
-whose subject and body are his (`gh pr merge --merge --match-head-commit <sha>`, never `--delete-branch`: GitHub deletes the head
-branch), and fast-forwards the checkout (`git fetch origin && git merge --ff-only origin/<base>`). On a refusal he changes nothing and
-signs off `blocked` with the `nemia retry` line it printed. Land's check is then the receipt alone — the pull request `MERGED` with a
-merge commit reachable from HEAD, the checkout clean on the base with no merge in progress, every commit of every branch of the run
-with an equivalent patch on HEAD (`git cherry`, so a part taken as a commit of its own counts as taken)
-— which is what the run needs to record `landed` on the commit that landed. It runs no suite and no e2e: `ci` judged both on the head
-the review read, and the merge commit's first parent is the base.
+Implement pushes its branch and opens the pull request through `pull-request.ts`, read from the frozen files as the others are: it
+pushes this run's own branch, never another and never the base and never forced, and opens or updates the one pull request of the
+branch, never a draft, printing the address that goes on Grace's closeout as an artifact value. Her check pushes again through the same
+script and refuses unless the pull request's head is the commit it judges — GitHub moves that head a moment after the push, so it is
+read again for up to 30 s before the refusal — then, unless GitHub says the pull request conflicts with its base (refused at once,
+naming the merge of the base, since GitHub runs no `ci` on a conflicting head), waits on the `ci` context (1800 s for it to start,
+2400 s whole): CI runs the suite, the types, the lint, the whole e2e and the build on that commit, and a red, cancelled or missing `ci`
+is the check's refusal, with the Actions URL, the failing jobs and a bounded tail of their log — no agent of this team may type `gh`,
+so the script reads it for them.
 
-It also runs `pictures.ts`, read from the base as well, first: a change under `apps/web/src` touches the board's pages, and refuses the
-step unless the closeout's `artifacts` names a picture, an image file (`.png`, `.jpg`, `.jpeg`, `.webp`, `.gif`, `.avif`) of more than 0
-bytes, by an absolute path in the step's files directory (`WF_ARTIFACTS`) or from the workspace root. The refusal names the command that
-takes them, `npm run e2e -- --photos --pages <name,…>`. A change only under `apps/web/test` asks for none.
+Land merges that same pull request, through `landing.ts`, which its check also reads from the frozen files — or, unset, out of `HEAD`
+in the repository's own checkout, which a `workspace: base` step is given no base ref for. Otto runs its `merge --run
+<id> --subject … --body-file …`: it refuses anything but this run's own green pull request — not a draft, based on the base branch, its
+head the commit the review read, `mergeable`, the `ci` context green at that commit, and no result branch of the run left out — then
+merges it with a merge commit whose subject and body are his (`gh pr merge --merge --match-head-commit <sha>`, never `--delete-branch`:
+GitHub deletes the head branch), and fast-forwards the checkout (`git fetch origin && git merge --ff-only origin/<base>`). On a refusal
+he changes nothing and signs off `blocked` with the `nemia retry` line it printed. Land's check is then the receipt alone — the pull
+request `MERGED` with a merge commit reachable from HEAD, the checkout clean on the base with no merge in progress, every commit of
+every branch of the run with an equivalent patch on HEAD (`git cherry`, so a part taken as a commit of its own counts as taken) — which
+is what the run needs to record `landed` on the commit that landed. It runs no suite and no e2e: `ci` judged both on the head the
+review read, and the merge commit's first parent is the base.
+
+It also runs `pictures.ts`, read from the frozen files as well, first: a change under `apps/web/src` touches the board's pages, and
+refuses the step unless the closeout's `artifacts` names a picture, an image file (`.png`, `.jpg`, `.jpeg`, `.webp`, `.gif`, `.avif`)
+of more than 0 bytes, by an absolute path in the step's files directory (`WF_ARTIFACTS`) or from the workspace root. The refusal names
+the command that takes them, `npm run e2e -- --photos --pages <name,…>`. A change only under `apps/web/test` asks for none.
 
 The same script asks a change under `tools/observe` that a dashboard reads for its dashboards rendered: each
 `tools/observe/dashboards/<name>.json` changed owes `dashboard-<name>.png` and `dashboard-<name>.txt` in `artifacts`, and any other path
@@ -41,11 +46,12 @@ there but `README.md` and `profile/`, one such pair at least. The refusal names 
 tools/observe/render/render.ts --out <files>`, which implement alone may run; implement and review are given `see-a-dashboard`, this
 repository's skill for reading them.
 
-It runs `probe.ts`, read from the base as well: a session a step starts to measure something, a probe, is named `<run>-probe-<label>`
-(`node workflows/build/probe.ts start <label> -- <prompt>`), runs in the machinery's trusted folder `$WF_ROOT/probes`, and says in its
-first message whether the person must act; it reaches the person's phone through Remote Control only with `--answer`, and the step then
-stops `blocked` on the `needs` line it prints. The check refuses while a probe named for the run is live, naming `probe.ts stop`. Grace's
-and Otto's fences refuse a bare `claude --bg` or Remote Control, and an edit of a harness's trust or local settings anywhere.
+It runs `probe.ts`, read from the frozen files as well: a session a step starts to measure something, a probe, is named
+`<run>-probe-<label>` (`node "${WF_WORKFLOW_FILES:-workflows/build}/probe.ts" start <label> -- <prompt>`), runs in the machinery's
+trusted folder `$WF_ROOT/probes`, and says in its first message whether the person must act; it reaches the person's phone through
+Remote Control only with `--answer`, and the step then stops `blocked` on the `needs` line it prints. The check refuses while a probe
+named for the run is live, naming `probe.ts stop`. Grace's and Otto's fences refuse a bare `claude --bg` or Remote Control, and an edit
+of a harness's trust or local settings anywhere.
 
 Review counts what it closes out on (`tally: findings, findings.kind=placement`): the findings of each round, and those of
 them whose `kind` is `placement` (a change in a boundary the repository's rules give to another concern). `wf stats` totals each per day, `—` on a day no review closed out.

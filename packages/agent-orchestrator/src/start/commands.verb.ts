@@ -16,6 +16,7 @@ import { ignoredRepoLine } from '../inbox/index.ts';
 import { startFromInbox } from '../inbox/inbox.verb.ts';
 import { isRepositoryRun, type Run } from '../record/record.ts';
 import { inputsDir } from '../record/record.store.ts';
+import { workflowFilesDir } from '../frozen/frozen.store.ts';
 import { frozenStepsOf } from '../steps/steps.ts';
 import type { Workflow } from '../workflow.ts';
 import { approvedFirst, gatesOf } from '../status/status.ts';
@@ -240,9 +241,9 @@ const fromLines = ({ run, card, queueLeft }: Started): string[] =>
       ];
 
 /**
- * What `nemia start` prints of a run it started: its steps, where it came from, its factory, the folders it mounts, where it works, and
- * what it waits on, what it reads as context, landed or in flight, and ends at; while the store is paused (`pausedWords`), that nothing of
- * it is filed until it resumes; and a card's `repo:` not taken.
+ * What `nemia start` prints of a run it started: its steps, where it came from, its factory, the folders it mounts, where it works, where
+ * it copied its inputs and its workflow's files, and what it waits on, what it reads as context, landed or in flight, and ends at; while
+ * the store is paused (`pausedWords`), that nothing of it is filed until it resumes; and a card's `repo:` not taken.
  */
 function startedLines(started: Started): string[] {
   const { run } = started;
@@ -254,6 +255,7 @@ function startedLines(started: Started): string[] {
     ...mountLines(run),
     `workspace: ${run.workspace}${isRepositoryRun(run) ? '' : ' — a folder per step, made as each is filed, with no git repository'}`,
     ...(run.inputs?.length ? [`inputs: ${run.inputs.join(', ')} — copied into ${inputsDir(run)}`] : []),
+    ...(run.workflowFiles === undefined ? [] : [`workflow files: copied into ${workflowFilesDir(run, run.workflowFiles)}`]),
     ...(run.after?.length
       ? [`waits on: ${run.after.join(', ')} — nothing is filed until nemia decide says each has landed on ${run.branch}`]
       : []),

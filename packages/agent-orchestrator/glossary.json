@@ -538,6 +538,11 @@
       "type": "WorkflowDoor"
     },
     {
+      "term": "Workflow files",
+      "meaning": "the run's own copy of its workflow folder, every file at its path from the folder and none writable (`runs/<id>/workflow/<hex>/`, `freezeWorkflowFiles` in `packages/agent-orchestrator/src/frozen/frozen.store.ts`): taken at `nemia start` and again wherever its pins move, named on the record as `workflowFiles`, and told to every check and session as `WF_WORKFLOW_FILES`, mounted read-only to a session.",
+      "type": "Run"
+    },
+    {
       "term": "Workflow step",
       "meaning": "a step as the model holds it (`WorkflowStep`): its name, the steps it waits on, and the keys that shape the graph — `loop`, `gate`, `check`; a run's frozen workflow is a list of them, read loosely.",
       "type": "WorkflowStep"

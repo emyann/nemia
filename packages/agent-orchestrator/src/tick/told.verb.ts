@@ -38,6 +38,7 @@ import type { Place } from '../place/place.store.ts';
 import type { PlaceSay } from '../place/place.ts';
 import { composeBrief } from '../brief/index.ts';
 import { artifactsDir, inputsDir } from '../record/record.store.ts';
+import { workflowFilesDir } from '../frozen/frozen.store.ts';
 import { DEFAULT_FACTORY } from '../factory/factory.ts';
 import { factoryServers } from '../servers/servers.store.ts';
 import type { FactoryServers } from '../servers/index.ts';
@@ -148,14 +149,18 @@ export function placeTold(
 }
 
 /**
- * The folders a step of `run` is filed from (`filedFolders`): the run's artifacts folder, the store's inbox, and the run's inputs
- * folder (`inputsDir`) only when its record names an input, so a run given none is filed and told as before. What a *brief* reads,
- * which asks for no server; `filedAt` is what a filing takes.
+ * The folders a step of `run` is filed from (`filedFolders`): the run's artifacts folder, the store's inbox, the run's inputs
+ * folder (`inputsDir`) only when its record names an input, so a run given none is filed and told as before, and the run's copy of its
+ * workflow folder (`workflowFilesDir`) only when its record names one. What a *brief* reads, which asks for no server; `filedAt` is what
+ * a filing takes.
  */
-export const filedFoldersAt = (run: Pick<Run, 'id' | 'inputs'>): { runArtifacts: string; inbox: string; inputs?: string } => ({
+export const filedFoldersAt = (
+  run: Pick<Run, 'id' | 'inputs' | 'workflowFiles'>,
+): { runArtifacts: string; inbox: string; inputs?: string; workflowFiles?: string } => ({
   runArtifacts: path.dirname(artifactsDir(run, 'step')),
   inbox: inboxDir(),
   ...(run.inputs?.length ? { inputs: inputsDir(run) } : {}),
+  ...(run.workflowFiles === undefined ? {} : { workflowFiles: workflowFilesDir(run, run.workflowFiles) }),
 });
 
 /**
@@ -164,9 +169,9 @@ export const filedFoldersAt = (run: Pick<Run, 'id' | 'inputs'>): { runArtifacts:
  * reads a store nobody named (`test/root-given.test.ts`).
  */
 export const filedAt = (
-  run: Pick<Run, 'id' | 'inputs' | 'factory'>,
+  run: Pick<Run, 'id' | 'inputs' | 'factory' | 'workflowFiles'>,
   home: string,
-): { runArtifacts: string; inbox: string; inputs?: string; servers: FactoryServers } => ({
+): { runArtifacts: string; inbox: string; inputs?: string; workflowFiles?: string; servers: FactoryServers } => ({
   ...filedFoldersAt(run),
   servers: recordedServers(run.factory, home),
 });

@@ -105,9 +105,11 @@ holds what every change needs.
 - **A workflow step never pushes, never merges into the base branch, never force-deletes a branch**, and its agent's `disallowedTools:`
   refuses the push and the delete (a `dontAsk` agent's: no allow reaches them; `packages/agent-orchestrator/test/agent-fences.test.ts`).
   `.claude/settings.json` denies none of it: pushing and opening a pull request are the person's, or done by their session when they ask.
-  What a step may not type, the run does in its place, as two frozen scripts read out of git and run with `node`, never as a tool a fence
-  could not tell apart: `workflows/build/pull-request.ts` pushes a run's own branch and opens or updates its pull request, and
-  `workflows/build/landing.ts` merges that pull request and fast-forwards the checkout. The one exception to the rule is a run's ending
+  What a step may not type, the run does in its place, as two frozen scripts read from the run's frozen workflow files
+  (`$WF_WORKFLOW_FILES`, the copy of its workflow folder the run took when it began; out of git while that is unset) and run with
+  `node`, never as a tool a fence could not tell apart: `workflows/build/pull-request.ts` pushes a run's own branch and opens or updates
+  its pull request, and `workflows/build/landing.ts` merges that pull request and fast-forwards the checkout (`quick` carries copies of
+  both, held equal by `tools/guards/test/workflow-scripts.test.ts`). The one exception to the rule is a run's ending
   step (a workflow's last step, `workspace: base`), filed once a person approves it — or, where its workflow puts before it a step that
   can send the work back (`loop:`), once that step passes, which is how `quick` lands with no gate at all; an ending with a `check:` and
   neither of the two is refused at load (`validateBaseWorkspace`, `src/workflow/validate.ts`). It runs `landing.ts merge`, which refuses

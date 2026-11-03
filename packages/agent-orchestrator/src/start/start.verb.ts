@@ -33,6 +33,7 @@ import { inboxDir, runStore } from '../record/files.store.ts';
 import { storeRootRefusal } from './store-root.ts';
 import { HOME, artifactsDir, inputsDir, runId, runsDir } from '../record/record.store.ts';
 import { writeAgentFiles } from '../agents/agents.store.ts';
+import { freezeWorkflowFiles, workflowFilesOf } from '../frozen/frozen.store.ts';
 import { PlaceService, openPlace } from '../place/place.store.ts';
 import { parentRecord } from '../steps/steps.verb.ts';
 import type { BranchReader } from '../branches/branches.store.ts';
@@ -487,18 +488,21 @@ function copyInputs(run: Run, inputs: readonly InputFile[]): void {
 }
 
 /**
- * Renders the steps' agents into the run's `agents/` (`writeAgentFiles`), with the skills the Skill door `found` in the folder's places;
- * throws with exit 1 when they cannot be, the run's directory removed.
+ * Renders the steps' agents into the run's `agents/` (`writeAgentFiles`), with the skills the Skill door `found` in the folder's places,
+ * then copies the workflow folder into the run's own `workflow/<hex>/` (`freezeWorkflowFiles`), and answers the copy's hex; throws with
+ * exit 1 when either cannot be written, the run's directory removed. A link or a file of another kind in the folder is refused before
+ * the run has an id (`workflowFilesOf`), so what fails here is a write.
  */
-function renderAgents(run: Run, steps: readonly Workflow[], found: SkillsFound): void {
+function renderAgents(run: Run, steps: readonly Workflow[], found: SkillsFound): string {
+  let what = `the steps' agents could not be rendered into ${path.join(runsDir(), run.id, 'agents')}`;
   try {
     writeAgentFiles(run, steps, found);
+    what = `the workflow's files could not be copied into ${path.join(runsDir(), run.id, 'workflow')}`;
+    return freezeWorkflowFiles(run, run.workflowDir);
   } catch (err) {
     runStore.runs.forget(run.id);
     throw Object.assign(
-      new Error(
-        `the steps' agents could not be rendered into ${path.join(runsDir(), run.id, 'agents')} — ${(err as Error).message}. Nothing was started: start it again once that directory can be written.`,
-      ),
+      new Error(`${what} — ${(err as Error).message}. Nothing was started: start it again once that directory can be written.`),
       { exitCode: 1 },
     );
   }
@@ -544,6 +548,11 @@ export const repoFor = (name: string | undefined, named: string | undefined, fal
  * The record's steps are keyed in the order the steps run, as `loadWorkflows` gives them: the order `nemia ls`, `nemia decide` and the
  * board list them in. The inputs are copied and the steps' agents rendered (`writeAgentFiles`) before the record is written, so a record
  * never names a file that is not there: a copy or a render that fails removes the run's directory, and is an `Error` with exit 1.
+ *
+ * The workflow folder is copied whole into the run's own `workflow/<hex>/` (`freezeWorkflowFiles`), its digest frozen on the record as
+ * `workflowFiles`, so each check and session reads the folder's files as they were now (`WF_WORKFLOW_FILES`), whatever repository the
+ * run is on and whatever the folder holds later. A link or a file of another kind in the folder is refused (`Invalid`) before anything
+ * is written (`workflowFilesOf`).
  *
  * `factory` names the factory the run is started in (`nemia start --factory`): its hires fill the workflow's steps (`stepsToStart`), read
  * as they are now and frozen into the run's steps, so a later hire changes no run started. Refused before anything is written when it names
@@ -603,6 +612,7 @@ export const startRun = Effect.fn('start')(function* (opts: StartOptions) {
   const inputs = yield* tried(() => inputsOf(opts.inputs ?? []));
   const refusedInputs = inputRefusal(inputs);
   if (refusedInputs) return yield* Effect.fail(new Invalid({ message: refusedInputs }));
+  yield* tried(() => workflowFilesOf(opts.workflowDir));
   let id = runId(opts.brief);
   while (runStore.runs.taken(id)) id = runId(opts.brief);
   const refusedContext = contextRefusal(opts.context ?? [], opts.after ?? [], runStore.runs.exists, id);
@@ -615,7 +625,7 @@ export const startRun = Effect.fn('start')(function* (opts: StartOptions) {
   const stepRecords = Object.fromEntries(steps.map((s) => [s.name, { taskId: null }]));
   const run = yield* folder ? folderRun(id, told, stepRecords) : repositoryRun(id, told, stepRecords, opts.repo, isolate);
   yield* tried(() => copyInputs(run, inputs));
-  yield* tried(() => renderAgents(run, steps, found));
+  run.workflowFiles = yield* tried(() => renderAgents(run, steps, found));
   const pinned = yield* pinsOf(run, steps, run.createdAt);
   if (pinned.length) run.pinned = pinned;
   yield* (yield* RunDoor).runs.create(run);

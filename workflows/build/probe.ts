@@ -185,7 +185,7 @@ function check(): string[] {
       [
         `a probe of run ${run} is still live, and a step stops its probes before it signs off:`,
         ...left.map((row) => `  ${shown(row)}`),
-        'Stop them with `node workflows/build/probe.ts stop`, then sign off again.',
+        'Stop them with `node "${WF_WORKFLOW_FILES:-workflows/build}/probe.ts" stop`, then sign off again.',
       ].join('\n'),
     );
   return [`no live probe of run ${run}`];

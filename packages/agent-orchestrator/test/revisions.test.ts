@@ -104,6 +104,27 @@ const pinOf = (pinned: readonly Pin[] | undefined, kind: Pin['kind'], name: stri
 const started = (dir: string, repo: string, how: { after?: string[]; isolate?: boolean; factory?: string } = {}) =>
   runPlaced(startRun({ brief: 'build a thing', repo, workflowDir: dir, isolate: false, ...how }));
 
+/** A script a check runs: it prints `word`. */
+const helperSaying = (word: string): string => `console.log(${JSON.stringify(word)});\n`;
+
+/** The team's step given the check `line`, and a `helper.ts` beside it printing `word`: the team, edited in place. */
+function checked(t: Team, line: string, word: string): Team {
+  fs.writeFileSync(t.stepFile, `---\nplace: git\nagent: ${t.agent}\ncheck: ${line}\n---\nBuild it.\n`);
+  fs.writeFileSync(path.join(t.dir, 'helper.ts'), helperSaying(word));
+  return t;
+}
+
+/** The run's copy of its workflow folder, as its record names it now. */
+const frozenOf = (id: string): string => path.join(ROOT, 'runs', id, 'workflow', String(readRun(id).workflowFiles));
+
+/** The environment the run's `build` check is filed with, once `build` is filed and has signed off. */
+async function checkEnvAfterBuild(b: ReturnType<typeof board>, id: string): Promise<Record<string, string>> {
+  await runWith(b.e, advanceRun(readRun(id)));
+  b.settle(`${id}-build`, 'succeeded', { closeout: SIGNED });
+  await runWith(b.e, advanceRun(readRun(id)));
+  return b.tasks.get(`${id}-build-check`)!.spec.config?.env ?? {};
+}
+
 /** `branch` merged into `repo`'s checkout and committed, as a person lands a result by hand: what `--after` waits for. */
 const shippedByHand = (repo: string, branch: string): void => {
   stage.place().world.stage(repo, branch);
@@ -371,6 +392,57 @@ test('a folder edited around a run: what it pins, what the ledger numbers, and w
       ],
       'and the retry is filed on them',
     );
+  });
+
+  await s.test('a script changed in the workflow folder after the start does not reach the run in flight', async () => {
+    const t = checked(team(), 'node "$WF_WORKFLOW_FILES/helper.ts"', 'first');
+    const run = await started(t.dir, aRepo());
+    fs.writeFileSync(path.join(t.dir, 'helper.ts'), helperSaying('second'));
+    const b = board();
+    const env = await checkEnvAfterBuild(b, run.id);
+    assert.ok(env.WF_WORKFLOW_FILES, "the check is told the run's copy of its workflow folder");
+    assert.match(fs.readFileSync(path.join(env.WF_WORKFLOW_FILES, 'helper.ts'), 'utf8'), /first/, 'the script as it was at the start');
+    assert.equal(env.WF_WORKFLOW_FILES, frozenOf(run.id), "the record's copy");
+  });
+
+  await s.test('`nemia refresh` moves the check line and its scripts together, and leaves the old copy where it was', async () => {
+    const t = checked(team(), 'node "$WF_WORKFLOW_FILES/helper.ts"', 'first');
+    const run = await started(t.dir, aRepo());
+    const before = frozenOf(run.id);
+    const b = board();
+    await runWith(b.e, advanceRun(readRun(run.id)));
+    checked(t, 'node "$WF_WORKFLOW_FILES/helper.ts" --again', 'second');
+    await runPlaced(refreshRun(run.id));
+    await runWith(b.e, advanceRun(readRun(run.id)));
+    const after = frozenOf(run.id);
+    assert.notEqual(after, before, 'the record names a new copy');
+    assert.match(fs.readFileSync(path.join(after, 'helper.ts'), 'utf8'), /second/, 'holding the new script');
+    assert.match(fs.readFileSync(path.join(before, 'helper.ts'), 'utf8'), /first/, 'and the old copy is still on disk, unchanged');
+    b.settle(`${run.id}-build`, 'succeeded', { closeout: SIGNED });
+    await runWith(b.e, advanceRun(readRun(run.id)));
+    const check = b.tasks.get(`${run.id}-build-check`)!.spec;
+    assert.match(check.brief, /--again/, 'the new check line');
+    assert.equal(check.config?.env?.WF_WORKFLOW_FILES, after, 'is told the new copy');
+  });
+
+  await s.test('a refresh can no longer give a run a check its base cannot run: the scripts ride with the line', async () => {
+    const t = team();
+    const repo = aRepo();
+    assert.equal(fs.existsSync(path.join(repo, 'workflows')), false, "the run's base holds no workflow folder");
+    const run = await started(t.dir, repo);
+    const b = board();
+    await runWith(b.e, advanceRun(readRun(run.id)));
+    checked(t, 'node "$WF_WORKFLOW_FILES/helper.ts"', 'ran');
+    await runPlaced(refreshRun(run.id));
+    await runWith(b.e, advanceRun(readRun(run.id)));
+    b.settle(`${run.id}-build`, 'succeeded', { closeout: SIGNED });
+    await runWith(b.e, advanceRun(readRun(run.id)));
+    const check = b.tasks.get(`${run.id}-build-check`)!.spec;
+    const env = check.config?.env ?? {};
+    assert.equal(check.brief, 'node "$WF_WORKFLOW_FILES/helper.ts"', 'the line the refresh took');
+    const read = check.brief.replace('"$WF_WORKFLOW_FILES/helper.ts"', path.join(String(env.WF_WORKFLOW_FILES), 'helper.ts')).slice(5);
+    assert.match(fs.readFileSync(read, 'utf8'), /ran/, 'the script its line reads is in the copy it is told, beside no checkout');
+    assert.equal(path.relative(repo, read).startsWith('..'), true, 'outside the repository its base has');
   });
 
   await s.test('a filing whose closeout schema has moved starts a fresh session; one whose schema has not resumes', async () => {

@@ -20,6 +20,8 @@ import { stepSetRefusal, unallowedRefusal } from '../workflow/index.ts';
 import { lookupRoots, type Places } from '../skills/read.store.ts';
 import { placesOf } from '../folder/lookup.store.ts';
 import { writeAgentFiles } from '../agents/agents.store.ts';
+import { freezeWorkflowFiles } from '../frozen/frozen.store.ts';
+import { isDirectory } from '../record/record.store.ts';
 import { workflowVersion } from '../folder/version.store.ts';
 import { AgentDoor } from '../agents/agent-door.store.ts';
 import { SkillDoor } from '../skills/skill-door.store.ts';
@@ -365,10 +367,21 @@ export const behindNow = Effect.fn('behindNow')(function* (run: Run, succeeded: 
   });
 });
 
-/** Render the steps' agent files again (`writeAgentFiles`), so a pin the run took reaches the prompt its next filing is given. */
+/**
+ * Render the steps' agent files again (`writeAgentFiles`), so a pin the run took reaches the prompt its next filing is given; and copy the
+ * workflow folder again (`freezeWorkflowFiles`), setting `run.workflowFiles` to the copy, so a check line the run took and the scripts it
+ * runs are the one revision: a refresh can no longer give a run a check whose scripts are not where its line reads them. The copy is
+ * taken first and the record's field set last, so a write that throws leaves the run the copy it had. A folder that is no directory on
+ * the disk — a workflow read through another door — keeps the copy the run had.
+ */
 export const renderAgain = Effect.fn('renderAgain')(function* (run: Run, steps: readonly Workflow[], given?: PassRevisions) {
   const found = yield* (yield* readOr(given)).skills(run);
+  const hex = yield* Effect.try({
+    try: () => within('act', () => (isDirectory(run.workflowDir) ? freezeWorkflowFiles(run, run.workflowDir) : run.workflowFiles)),
+    catch: (err) => err,
+  });
   yield* Effect.try({ try: () => within('act', () => writeAgentFiles(run, steps, found)), catch: (err) => err });
+  if (hex !== undefined) run.workflowFiles = hex;
 });
 
 /** What one pass did about the run's revisions: whether it changed the record, what to say, and whether a refresh ask is spent. */

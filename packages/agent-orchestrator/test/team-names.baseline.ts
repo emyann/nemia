@@ -124,7 +124,7 @@ export const TEAM_PATHS: Baseline = {
   'packages/agent-orchestrator/src/meter/step.test.ts': { count: 1, ...TEAM_MOVES.fixtures },
   'packages/agent-orchestrator/src/stats/stats-memo.test.ts': { count: 1, ...TEAM_MOVES.fixtures },
   'packages/agent-orchestrator/src/summary/reads.verb.test.ts': { count: 1, ...TEAM_MOVES.fixtures },
-  'packages/agent-orchestrator/test/agent-fences.test.ts': { count: 13, ...TEAM_MOVES.teamTests },
+  'packages/agent-orchestrator/test/agent-fences.test.ts': { count: 12, ...TEAM_MOVES.teamTests },
   'packages/agent-orchestrator/test/build-told.test.ts': { count: 1, ...TEAM_MOVES.teamTests },
   'packages/agent-orchestrator/test/check-handed.test.ts': { count: 1, ...TEAM_MOVES.fixtures },
   'packages/agent-orchestrator/test/factory-start.test.ts': { count: 2, ...TEAM_MOVES.fixtures },

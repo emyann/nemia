@@ -17,6 +17,7 @@ import {
   SELECTABLE_KEYS,
   selectorsRefusal,
   selects,
+  selectsLabels,
 } from './selector.ts';
 
 const AT = '2026-10-16T12:00:00.000Z';
@@ -86,6 +87,27 @@ const EVERY: readonly FeedLine[] = [
   STORE_RESUMED,
 ];
 
+/** A key spelled as no Kubernetes key is, or with a prefix, in each form a clause takes: the key is named, and the grammar said. */
+const MISSPELLED = [
+  ['-x=1', '-x'],
+  ['-x', '-x'],
+  ['-x in (a)', '-x'],
+  ['no/pe=1', 'no/pe'],
+  ['no/pe', 'no/pe'],
+  ['no/pe notin (a)', 'no/pe'],
+  ['a/b=c', 'a/b'],
+] as const;
+
+/** A filing stamps its run's person labels beside the closed five; `FeedLabels` names only those five, hence the cast. */
+const PERSON_LABELLED = {
+  run: 'r-10',
+  factory: 'acme',
+  workflow: 'build',
+  step: 'implement',
+  agent: 'implementer',
+  team: 'core',
+} as FeedLabels;
+
 /** The lines of `EVERY` the selectors `values` spell select, by what each line is about. */
 const selected = (values: readonly string[]): string[] => {
   assert.equal(selectorsRefusal(values), undefined, values.join(' | '));
@@ -96,11 +118,10 @@ const selected = (values: readonly string[]): string[] => {
 };
 
 test('selectorsRefusal and labelKeysRefusal: the keys a selector may name, and every malformed selector or reserved label refused by name', async (t) => {
-  await t.test('a selector names one of the twelve keys of a feed line, and the message is none of them', () => {
+  await t.test("a selector names a key of a feed line or a person's label, and the message is none of them", () => {
     assert.deepEqual([...SELECTABLE_KEYS], [...LABEL_KEYS, ...RESERVED_KEYS]);
-    const refused = selectorsRefusal(['message=hi']);
-    assert.match(refused ?? '', /^"message" is no key of a feed line/);
-    assert.match(refused ?? '', /one of run, factory, workflow, step, agent, kind/);
+    names(selectorsRefusal(['message=hi']), 'message', 'run, factory, workflow, step, agent, kind');
+    names(selectorsRefusal(['message']), 'message');
     assert.equal(ADA_IMPLEMENT.message !== undefined, true, 'the line does carry a message');
     assert.equal(selectableOf(ADA_IMPLEMENT).message, undefined, 'and no selector reads it');
   });
@@ -116,8 +137,8 @@ test('selectorsRefusal and labelKeysRefusal: the keys a selector may name, and e
       labels: every,
     });
     const on = selectableOf(carries);
-    for (const key of Object.keys(every)) assert.equal(on[key], every[key as keyof FeedLabels], key);
-    for (const key of Object.keys(every)) assert.equal(selectorsRefusal([`${key}=${every[key as keyof FeedLabels]}`]), undefined, key);
+    for (const key of Object.keys(every)) assert.equal(on[key], every[key], key);
+    for (const key of Object.keys(every)) assert.equal(selectorsRefusal([`${key}=${every[key]}`]), undefined, key);
   });
   await t.test('a label may not take a reserved name of a line, and the refusal names it', () => {
     assert.equal(labelKeysRefusal(LABEL_KEYS), undefined, 'the labels the feed ships with take none');
@@ -150,10 +171,18 @@ test('selectorsRefusal and labelKeysRefusal: the keys a selector may name, and e
     assert.match(refusal('factory=(x)'), /^"\(x\)" is no value of a selector/);
     assert.match(refusal('factory=(x)'), /reads \( \) and , itself/);
 
-    assert.match(refusal('nope=1'), /^"nope" is no key of a feed line/);
-    assert.match(refusal('nope'), /^"nope" is no key of a feed line/);
-    assert.match(refusal('nope in (a)'), /^"nope" is no key of a feed line/);
-    for (const value of ['factory=nemia', 'factory!=nemia', 'factory in (nemia,pipao)', 'reason notin (Running)', 'agent', 'kind=Step'])
+    for (const [value, key] of MISSPELLED) names(selectorsRefusal([value]), JSON.stringify(key), '-l <key>=<value>');
+    for (const value of [
+      'factory=nemia',
+      'factory!=nemia',
+      'factory in (nemia,pipao)',
+      'reason notin (Running)',
+      'agent',
+      'kind=Step',
+      'team=core',
+      'nope=1',
+      'my.key_2 in (a,b)',
+    ])
       assert.equal(selectorsRefusal([value]), undefined, value);
     assert.match(selectorsRefusal(['factory=nemia', 'bad==x']) ?? '', /compares with ==/, 'every selector given is checked');
   });
@@ -277,6 +306,46 @@ test('selects and selectableOf: what a signed line offers a selector, and the li
       'a line that carries no agent at all is still taken by !=, as of any key it does not carry',
     );
     assert.deepEqual(selected(['agent=none']), ['r-8/file'], 'and agent=none takes the agentless steps alone');
+  });
+  await t.test("a person's label on the line's run is a key a selector reads, and one no line carries selects nothing", () => {
+    const labelled = upgraded({
+      at: AT,
+      run: 'r-10',
+      step: 'implement',
+      word: 'running',
+      involved: { kind: 'Step', name: 'r-10/implement' },
+      labels: PERSON_LABELLED,
+    });
+    assert.equal(selectableOf(labelled).team, 'core');
+    assert.equal(selects(parseSelectors(['team=core']), labelled), true, 'team=core takes the line labelled so');
+    assert.equal(selects(parseSelectors(['team=web']), labelled), false, 'and another value leaves it out');
+    assert.deepEqual(selected(['team=core']), [], 'and no line that carries no team');
+    assert.deepEqual(selected(['nope=1']), [], 'a key no line carries is no refusal, and selects nothing');
+  });
+  await t.test('selectsLabels holds each operator of a clause over a flat map', () => {
+    const map = { team: 'core', workflow: 'build', factory: 'acme' };
+    for (const [typed, taken] of [
+      ['team=core', true],
+      ['team=web', false],
+      ['team!=web', true],
+      ['team!=core', false],
+      ['owner!=implementer', true],
+      ['team in (core,web)', true],
+      ['team in (web,cli)', false],
+      ['owner in (implementer)', false],
+      ['team notin (web)', true],
+      ['team notin (core)', false],
+      ['owner notin (implementer)', true],
+      ['team', true],
+      ['owner', false],
+      ['team=core,workflow=build', true],
+      ['team=core,workflow=quick', false],
+    ] as const) {
+      assert.equal(selectorsRefusal([typed]), undefined, typed);
+      assert.equal(selectsLabels(parseSelectors([typed]), map), taken, typed);
+    }
+    assert.equal(selectsLabels(parseSelectors(['team=web', 'workflow=build']), map), true, 'OR across selectors');
+    assert.equal(selectsLabels([], map), true, 'and no selector takes every map');
   });
   await t.test('no selector at all selects every line', () => {
     assert.deepEqual(parseSelectors([]), []);

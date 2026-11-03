@@ -51,6 +51,7 @@ const {
 const { recordFeed } = await import('../src/feed/feed.store.ts');
 const { isRunLine } = await import('../src/feed/feed.ts');
 const { readRun, rewriteRun } = await import('../src/record/record.store.ts');
+const { runStore } = await import('../src/record/files.store.ts');
 const { stepsNow: stepsOf } = await import('./steps-now.ts');
 const { tryOf } = await import('../src/record/record.ts');
 const { freshRestMemo } = await import('../src/tick/tick.verb.ts');
@@ -773,6 +774,40 @@ test("a step's denials, each a one-shot of the runtime counted by its step and t
     assert.ok(ofRun.length > 0, 'the run said a word of its own');
     for (const l of ofRun) assert.deepEqual(l.labels, runLabels(record), `${l.word} carries the labels the run is known by`);
   });
+  await s.test(
+    'a run a person labelled stamps its labels on every line beside the closed five, and a relabel only the lines after it',
+    async () => {
+      const run = await started('the person labels');
+      runStore.labels.put(run.id, { team: 'core' });
+      await tick();
+      settle(task(run, 'plan'), 'working');
+      await tick();
+      const record = readRun(run.id);
+      const plan = stepsOf(record).find((st) => st.name === 'plan')!;
+      const before = lines().filter((l) => l.run === run.id);
+      const ofPlan = before.filter((l) => l.step === 'plan');
+      const ofRun = before.filter((l) => l.step === undefined);
+      assert.ok(ofPlan.length > 0 && ofRun.length > 0, 'the run and its step each said a word');
+      for (const l of ofPlan)
+        assert.deepEqual(l.labels, { ...stepLabels(record, plan), team: 'core' }, `${l.word} carries the step's and the person's`);
+      for (const l of ofRun)
+        assert.deepEqual(l.labels, { ...runLabels(record), team: 'core' }, `${l.word} carries the run's and the person's`);
+      const filed = stage.board().tasks.get(task(run, 'plan'))!.spec.labels;
+      assert.deepEqual(filed, stepLabels(record, plan), 'the filed task carries the closed labels of its filing');
+      assert.equal(Object.hasOwn(filed ?? {}, 'team'), false, 'and no label of a person: a task and its spans stay closed');
+      const written = fs.readFileSync(FEED, 'utf8');
+      runStore.labels.put(run.id, { team: 'infra' });
+      settle(task(run, 'plan'), 'succeeded', SIGNED);
+      await tick();
+      assert.ok(fs.readFileSync(FEED, 'utf8').startsWith(written), 'the lines written before the relabel are unchanged in the file');
+      const after = lines()
+        .filter((l) => l.run === run.id)
+        .slice(before.length);
+      assert.ok(after.length > 0, 'the pass after the relabel wrote a line');
+      for (const l of after) assert.equal(l.labels?.team, 'infra', `${l.word} written after carries the new value`);
+      for (const l of before) assert.equal(l.labels?.team, 'core', `${l.word} written before keeps the old one`);
+    },
+  );
   await s.test('REFUSED: a recheck says no denial again — a one-shot is counted by the try its task was filed for', async () => {
     const run = await started('the recheck');
     await tick();

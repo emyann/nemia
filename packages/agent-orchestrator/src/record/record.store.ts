@@ -62,9 +62,9 @@ const StepRecordSchema = Kept({
 });
 
 /**
- * A run's record as any version of the tick writes it: `Run`, with the person's files it composes on read
- * (`approvals`, `acceptances`, `pruned`, `hold`) left to their own readers. Every key it does not name is kept, so a key a newer or an
- * older `nemia` wrote survives `rewriteRun`.
+ * A run's record as any version of the tick writes it: `Run`, with the person's files composed on read
+ * (`approvals`, `acceptances`, `pruned`, `hold`, `labels`) left to their own readers. Every key it does not name is kept, so a key a
+ * newer or an older `nemia` wrote survives `rewriteRun`.
  */
 const runBase = {
   id: Schema.String,
@@ -288,8 +288,8 @@ export const removeHold = (id: string, at: string): boolean => {
  * A run: its record, with what people own beside it composed on read — the cancellation (`cancelFile`), its pruning (`pruneFile`), its
  * hold (`holdFile`), each approval at a gate (`readApprovals`), and each loop a person ended as it stands (`readAcceptances`), off one
  * listing of its asks directory. None of them is ever written into the record (`rewriteRun`), and whatever the record carries under their
- * keys is dropped, the store's pause's (`pause`, which `runStore` composes) with them. Counted as one record read (`countRecord`) under
- * `records` while a pass is metered.
+ * keys is dropped, the store's pause's and the run's labels (`pause`, `labels`, which `runStore` composes) with them. Counted as one record
+ * read (`countRecord`) under `records` while a pass is metered.
  *
  * The frozen steps are read under the names their keys have now (`asNamed`), and written back under them (`recordText`), in their place
  * among the record's keys, so a record read and written back moves no line; a try's former `then` is read as its `cause`
@@ -310,7 +310,7 @@ const readRecord = (id: string): Run => {
   }
   if (!isRunRecord(raw)) throw new UnreadableRecord(id, recordRefusal(raw));
   const read = { ...raw };
-  for (const key of ['approvals', 'acceptances', 'pruned', 'hold', 'pause', 'cordon']) delete read[key];
+  for (const key of ['approvals', 'acceptances', 'pruned', 'hold', 'labels', 'pause', 'cordon']) delete read[key];
   const { workflow, ...unfrozen } = read;
   const run = workflow ? { ...read, workflow: workflow.map(asNamed) } : unfrozen;
   const at = fs.existsSync(cancelFile(id)) ? readText(cancelFile(id)).trim() : '';
@@ -683,7 +683,7 @@ export const listRuns = (said: (line: string) => void = sayOnce, kept?: (id: str
 /**
  * Each run's files in the store, stamped: what the tick's memo of runs at rest (`rest.ts`) compares, so that a run whose files are as they
  * were is not read again off the engine or git. One `readdir` of the store, and a `stat` of every file named `<id>.<anything>` — the
- * record, `.cancelled`, `.pruned`, `.hold`, and any other marker, as every name of that form is stamped — and of every
+ * record, `.cancelled`, `.pruned`, `.hold`, `.labels`, and any other marker, as every name of that form is stamped — and of every
  * entry of a directory so named and of the directories in it: the asks, with the approvals and acceptances among them, and `done/`, where
  * each goes once it is spent. Its inode, size and modification time to the nanosecond, so a file written in place, moved, or removed and
  * made again moves its run's stamp. The run's own directory (`<id>/`: its files and inputs) is no input of a pass, and is left out.
@@ -727,10 +727,11 @@ export const restStamps = (): Map<string, string> =>
 const recordText = (run: Omit<Run, 'approvals' | 'acceptances' | 'pruned' | 'hold' | 'pause'>): string => JSON.stringify(run, null, 2);
 
 /**
- * A new run's record: `start`'s, and the one writer that makes one. Without the store's pause, a person's file. Exclusive (`wx`): a
- * record already at the id is left as it is, and the write throws `EEXIST`, which the Run door answers as `Conflict`.
+ * A new run's record: `start`'s, and the one writer that makes one. Without the store's pause and the run's labels, each a person's file
+ * (`runs.labels.put` writes the labels, `writeLabels` in files.store.ts). Exclusive (`wx`): a record already at the id is left as it is,
+ * and the write throws `EEXIST`, which the Run door answers as `Conflict`.
  */
-export const writeRun = ({ pause: _, ...run }: Run) => {
+export const writeRun = ({ pause: _, labels: __, ...run }: Run) => {
   fs.mkdirSync(runsDir(), { recursive: true });
   fs.writeFileSync(runFile(run.id), recordText(run), { flag: 'wx' });
 };
@@ -743,12 +744,12 @@ export const writeRun = ({ pause: _, ...run }: Run) => {
  * opened `r+`, which never makes a file. Its existence is read at the moment of writing, and nothing is carried to decide it; a record
  * removed after it is opened takes the write with it.
  *
- * Without the approvals, acceptances, pruning and hold `readRun` composed onto it, nor the pause `runStore` did: they are a person's
- * files, and a copy in the record would outlive the file it was read from.
+ * Without the approvals, acceptances, pruning and hold `readRun` composed onto it, nor the pause and labels `runStore` did: they are a
+ * person's files, and a copy in the record would outlive the file it was read from.
  */
 export const rewriteRun = (run: Run): boolean => within('act', () => rewriteNow(run));
 
-const rewriteNow = ({ approvals: _, acceptances: __, pruned: ___, hold: ____, pause: _____, ...run }: Run): boolean => {
+const rewriteNow = ({ approvals: _, acceptances: __, pruned: ___, hold: ____, labels: ______, pause: _____, ...run }: Run): boolean => {
   let fd: number;
   try {
     fd = fs.openSync(runFile(run.id), 'r+');

@@ -6,13 +6,15 @@ import { FileCard } from '../components/FileCard';
 import { CardMeta, GoneItem, NoQueue, PageLink, QueueButtons, PRIMARY, Refused, SECONDARY, Tried } from '../components/InboxParts';
 import { CardFrom } from '../components/CardFrom';
 import { Instant } from '../components/Instant';
-import { dropCard, inboxQuery, queueCard, type InboxEntry, type Started } from '../lib/api';
+import { SelectorField } from '../components/SelectorField';
+import { dropCard, inboxSelectedQuery, labelSearch, queueCard, type InboxEntry, type Started } from '../lib/api';
 import { factorySearch, keptBy, shownIn } from '../lib/factories';
 import { cardLines, newestCardsFirst, queuedWord, queueOf, triedShown, unassigned, type CardRefusal } from '../lib/inbox';
 
 export const Route = createFileRoute('/inbox')({
-  validateSearch: factorySearch,
-  loader: ({ context }) => context.queryClient.ensureQueryData(inboxQuery),
+  validateSearch: (search: Record<string, unknown>) => ({ ...factorySearch(search), ...labelSearch(search) }),
+  loaderDeps: ({ search }) => ({ l: search.l }),
+  loader: ({ context, deps }) => context.queryClient.ensureQueryData(inboxSelectedQuery(deps.l)),
   component: InboxPage,
   errorComponent: ({ error }) => (
     <p className="text-body-medium text-failure">
@@ -34,8 +36,9 @@ const code = (text: string) => <code className="font-mono text-body-small">{text
  * the cards it keeps, and a factory that keeps none says so and how to show every factory's.
  */
 function InboxPage() {
-  const { data: entries } = useSuspenseQuery(inboxQuery);
-  const { factory } = Route.useSearch();
+  const { factory, l } = Route.useSearch();
+  const { data: entries } = useSuspenseQuery(inboxSelectedQuery(l));
+  const navigate = useNavigate({ from: '/inbox' });
   const [refusals, setRefusals] = useState<CardRefusal[]>([]);
   const all = newestCardsFirst(entries);
   const cards = shownIn(all, factory);
@@ -53,6 +56,7 @@ function InboxPage() {
         free: the oldest queued first.
       </p>
       <FileCard shown={factory} />
+      <SelectorField key={l ?? ''} selector={l} onSelect={(next) => void navigate({ search: (prev) => ({ ...prev, l: next }) })} />
       <section aria-label="Cards" className="space-y-3">
         <h2 className="flex items-baseline gap-2 text-title-small">
           Cards{' '}

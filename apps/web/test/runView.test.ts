@@ -89,7 +89,7 @@ const stepStatus = (name: string, extra: Partial<RunObject.RunStepStatus> = {}):
 const object = (): RunObject.Run => ({
   apiVersion: 'nemia/v1',
   kind: 'Run',
-  metadata: { name: 'r-1', creationTimestamp: '2026-11-02T10:00:00.000Z', labels: { factory: null, workflow: 'quick' } },
+  metadata: { name: 'r-1', creationTimestamp: '2026-11-02T10:00:00.000Z', labels: { workflow: 'quick' } },
   spec: {
     steps: [frozen('implement', []), frozen('review', ['implement'])],
     brief: 'a brief',

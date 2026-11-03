@@ -75,6 +75,7 @@ erDiagram
     string stagedFile "optional"
     object tips "optional"
     string cancelledAt "optional"
+    object labels "optional"
     string createdAt
   }
   Step {
@@ -131,6 +132,7 @@ erDiagram
     StepName gate FK "optional"
     FactoryName factory FK "optional"
     list from FK "optional"
+    object labels "optional"
     string body
   }
   Factory {

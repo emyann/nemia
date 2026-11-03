@@ -2,6 +2,7 @@
 import { queryOptions } from '@tanstack/react-query';
 import { Schema } from 'effect';
 import { decodes } from './decodes.ts';
+import { selectorKey, withSelector } from './selector.ts';
 import { get, send } from './read.ts';
 import { KeyRowSchema, type KeyRow } from './library.ts';
 import type { WorkflowListing } from './workflows.ts';
@@ -54,6 +55,8 @@ export type InboxEntry = {
    * its own, one whose factory has several or does not read, and an entry that does not read as a card.
    */
   factoryRepo: string | null;
+  /** The card's own labels (its frontmatter's `labels:`), `{}` for none. */
+  labels: Record<string, string>;
 };
 
 /** The keys of an `InboxEntry`, each decoded: a `gate`, a `queued` or a `tried` the api leaves out stays out. */
@@ -74,6 +77,7 @@ const inboxEntryFields = {
   queued: Schema.optionalKey(Schema.Struct({ at: Schema.String, place: Schema.NullOr(Schema.Number) })),
   tried: Schema.optionalKey(Schema.Struct({ at: Schema.String, repo: Schema.String, why: Schema.String, refused: Schema.Boolean })),
   factoryRepo: Schema.NullOr(Schema.String),
+  labels: Schema.Record(Schema.String, Schema.String),
 };
 
 /** Decodes an `InboxEntry`. */
@@ -87,6 +91,20 @@ export const inboxQuery = queryOptions({
   queryKey: ['inbox'],
   queryFn: () => get('/api/inbox', Schema.mutable(Schema.Array(InboxEntrySchema))),
 });
+
+/** The inbox's cards `selector` takes by their labels (`?selector=`), or every card for none; under `['inbox']`, read again with it. */
+export const inboxSelectedQuery = (selector: string | undefined) =>
+  queryOptions({
+    queryKey: ['inbox', ...selectorKey(selector)],
+    queryFn: () => get(withSelector('/api/inbox', selector), Schema.mutable(Schema.Array(InboxEntrySchema))),
+  });
+
+/**
+ * Reads the inbox with `selector`: resolves where the api reads it, rejects with the api's words where it refuses it (a 422 naming the
+ * key or the clause). The label filter's check before it writes the address.
+ */
+export const checkSelector = (selector: string): Promise<unknown> =>
+  get(withSelector('/api/inbox', selector), Schema.mutable(Schema.Array(InboxEntrySchema)));
 
 /**
  * Mirrors `InboxCardPage` in apps/api/src/inbox/inbox.ts: a card as the inbox lists it, its file as written, frontmatter included, and each

@@ -167,7 +167,7 @@ const used = {
 const fixture = {
   apiVersion: 'nemia/v1',
   kind: 'Run',
-  metadata: { name: 'r-1', creationTimestamp: '2026-10-14T09:00:00.000Z', labels: { factory: null, workflow: 'build' } },
+  metadata: { name: 'r-1', creationTimestamp: '2026-10-14T09:00:00.000Z', labels: { workflow: 'build', team: 'core' } },
   spec: {
     steps: [
       { name: 'build', after: [], input: [], loop: null, rounds: null, ...unset, harness: 'claude' },
@@ -276,6 +276,19 @@ test("the run's OpenAPI 3.1 document holds `Run`, and imports back into a Schema
   for (const name of ['Run', 'RunMetadata', 'RunSpec', 'RunSpecStep', 'RunStatus', 'RunStepStatus', 'TryShort', 'StepRaise']) {
     assert.ok(openapi.definitions[name], `the document defines ${name}`);
   }
+  for (const name of ['Labelled', 'LabelEdit']) {
+    assert.ok(openapi.definitions[name], `the document defines ${name}`);
+    assert.ok(
+      openapi.schemas.some((root) => JSON.stringify(root) === JSON.stringify({ $ref: `#/components/schemas/${name}` })),
+      `${name} is a root`,
+    );
+  }
+  const metadata = openapi.definitions.RunMetadata as { properties: { labels: { type: string; additionalProperties: unknown } } };
+  assert.deepEqual(
+    [metadata.properties.labels.type, metadata.properties.labels.additionalProperties],
+    ['object', { type: 'string' }],
+    "the run's labels are one map of strings",
+  );
   const document = JsonSchema.fromSchemaOpenApi3_1({ ...openapi.schemas[0], $defs: openapi.definitions });
   const back = imported(SchemaRepresentation.fromJsonSchemaDocument(document));
   assert.deepEqual(Schema.decodeUnknownSync(back)(fixture), fixture, 'the imported Schema decodes the run');

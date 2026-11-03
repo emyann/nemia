@@ -26,7 +26,7 @@ export const GLOBAL_ROOTS: Readonly<Record<string, number>> = {
   'src/cli/main.ts': 3,
   'src/cli/runs.ts': 4,
   'src/cli/writers.ts': 2,
-  'src/command/pages.verb.ts': 2,
+  'src/command/pages.verb.ts': 1,
   'src/daemon/daemon.store.ts': 15,
   'src/daemon/up.verb.ts': 1,
   'src/disk/disk.store.ts': 4,

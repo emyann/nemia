@@ -278,6 +278,7 @@ export const step = (extra: Partial<Step> = {}): Step => ({
 
 /** A run's detail, as `GET /api/runs/r-1` answers it: from an inbox card, pruned, waiting and held, its steps `step`'s. */
 export const detail = (extra: Partial<RunView> = {}): RunView => ({
+  labels: {},
   id: 'r-1',
   brief: 'Decode the reads',
   decide: 'nemia decide r-1',
@@ -438,6 +439,7 @@ export const stepPath = (extra: Partial<StepPath> = {}): StepPath => ({
 
 /** A run's row as a list answers it, in flight, with one step per `[name, word]` carrying that word's codes, and `extra` over it. */
 export const summary = (steps: ReadonlyArray<readonly [string, Word]>, extra: Partial<RunSummary> = {}): RunSummary => ({
+  labels: {},
   id: 'r-1',
   repo: '/code/app',
   factory: null,
@@ -549,7 +551,7 @@ export function readsOf(view: RunView): Array<[readonly unknown[], unknown]> {
   const object = {
     apiVersion: 'nemia/v1',
     kind: 'Run',
-    metadata: { name: id, creationTimestamp: createdAt, labels: { factory: null, workflow: '' } },
+    metadata: { name: id, creationTimestamp: createdAt, labels: { workflow: '' } },
     spec: {
       steps: steps.flatMap((s) => (s.spec ? [{ ...s.spec, name: s.name, input: [] }] : [])),
       brief,

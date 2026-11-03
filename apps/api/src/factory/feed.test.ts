@@ -450,11 +450,11 @@ test(
     });
     const howAsked = ['. A selector reaches this stream as `selector`', 'pass none to follow every line'];
     const selectors: [string, string[]][] = [
-      ['?selector=message%3Dhi', ['"message" is no key of a feed line']],
+      ['?selector=message%3Dhi', ['message', '-l <key>=<value>']],
       ['?selector=run%3D%3Da', ['compares with ==']],
       ['?selector=run%20in%20a', ['names a list', '(values)']],
       ['?selector=', ['is no selector']],
-      ['?selector=run%3Dr-1&selector=nope%3Dx', ['"nope" is no key of a feed line']],
+      ['?selector=run%3Dr-1&selector=no%2Fpe%3Dx', ['"no/pe"', '-l <key>=<value>']],
     ];
     for (const [query, facts] of selectors)
       await t.test(`a selector the grammar refuses is a 422 naming it and how this stream is asked for one: ${query}`, () =>

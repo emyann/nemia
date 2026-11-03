@@ -1,10 +1,11 @@
 import { useSuspenseQuery } from '@tanstack/react-query';
-import { createFileRoute } from '@tanstack/react-router';
+import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import type { ReactNode } from 'react';
 import { FinishedTable } from '../components/FinishedTable';
 import { FlightTable } from '../components/FlightTable';
 import { WaitingCard } from '../components/WaitingCard';
-import { finishedRunsQuery, openRunsQuery } from '../lib/api';
+import { SelectorField } from '../components/SelectorField';
+import { finishedRunsQuery, labelSearch, openRunsQuery } from '../lib/api';
 import { finishedSearch, pageAt } from '../lib/finished';
 import { ink } from '../lib/meaning';
 import { Plate, ScanLines } from '../components/look';
@@ -12,12 +13,12 @@ import { Button } from '../components/ui/ds';
 import { useBar } from '../lib/useBar';
 
 export const Route = createFileRoute('/runs/')({
-  validateSearch: finishedSearch,
-  loaderDeps: ({ search }) => ({ factory: search.factory, page: pageAt(search) }),
+  validateSearch: (search: Record<string, unknown>) => ({ ...finishedSearch(search), ...labelSearch(search) }),
+  loaderDeps: ({ search }) => ({ factory: search.factory, page: pageAt(search), l: search.l }),
   loader: ({ context, deps }) =>
     Promise.all([
-      context.queryClient.ensureQueryData(openRunsQuery(deps.factory)),
-      context.queryClient.ensureQueryData(finishedRunsQuery(deps.factory, deps.page)),
+      context.queryClient.ensureQueryData(openRunsQuery(deps.factory, deps.l)),
+      context.queryClient.ensureQueryData(finishedRunsQuery(deps.factory, deps.page, deps.l)),
     ]),
   component: Runs,
   staticData: { fullBleed: true },
@@ -105,12 +106,18 @@ function Nothing({ children }: { children: string }) {
  */
 function Runs() {
   const search = Route.useSearch();
-  const { data: open } = useSuspenseQuery(openRunsQuery(search.factory));
-  const { data: finished } = useSuspenseQuery(finishedRunsQuery(search.factory, pageAt(search)));
+  const { data: open } = useSuspenseQuery(openRunsQuery(search.factory, search.l));
+  const { data: finished } = useSuspenseQuery(finishedRunsQuery(search.factory, pageAt(search), search.l));
+  const navigate = useNavigate({ from: '/runs/' });
   const asOf = new Date(open.asOf);
   const { counts } = open;
   return (
     <Page state="loaded">
+      <SelectorField
+        key={search.l ?? ''}
+        selector={search.l}
+        onSelect={(next) => void navigate({ search: (prev) => ({ ...prev, l: next, page: undefined }) })}
+      />
       <Section
         name="waiting"
         plate={<Plate count={counts.waiting} title="Waiting on you" quiet={counts.waiting === 0} />}

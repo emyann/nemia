@@ -154,7 +154,8 @@ const afterOthers = Schema.makeFilter(
  * refused) and the steps it froze at start (`workflow`, read loosely, `FrozenWorkflowStep`). Left out, as no relation of the model: the
  * revisions pinned (the revisions' own, S5), the counters the tick keeps for the metrics (`gatesTimed`, `deniedCounted`,
  * `settlesCounted`, `runTimed`, `slotHeldAt`), and what `readRun` composes on read and never writes (`approvals`, `acceptances`,
- * `pruned`, `hold`, `pause`). Read as the store's reader reads it: a key it does not name is kept on the record, and ignored here.
+ * `pruned`, `hold`, `pause`), but a person's labels (`labels`, a key to its value), whose shape a run written back is held to. Read as
+ * the store's reader reads it: a key it does not name is kept on the record, and ignored here.
  */
 export const Run = Schema.Struct({
   id: RunId.OnRead,
@@ -180,6 +181,7 @@ export const Run = Schema.Struct({
   stagedFile: Schema.optional(Schema.String),
   tips: Schema.optional(Schema.Record(Schema.String, Schema.String)),
   cancelledAt: Schema.optional(Schema.String),
+  labels: Schema.optional(Schema.Record(Schema.String, Schema.String)),
   steps: Schema.Record(StepName.OnRead, Step),
   createdAt: Schema.String,
 })

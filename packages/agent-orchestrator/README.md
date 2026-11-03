@@ -2718,6 +2718,27 @@ as `POST /api/runs/<id>/hold`, `{ "until": ["<run>", …], "why"?: "<words>", "b
 - a circle: a run named that already waits on this one, through `--after` while it has not started or
   through a hold, however far round. Each would wait on the other for ever
 
+## Labels: following an initiative — `--label`, `nemia label` and `-l`
+
+A person puts free `key=value` labels on inbox cards and runs, in Kubernetes' spelling with no prefix (a name segment of 63 at most),
+and changes them at any time, in flight or finished. They sit in one map beside `factory` and `workflow`, which Nemia sets itself; those
+two and the keys a feed line or a selector reads itself (`run`, `step`, `agent`, `kind`, `reason`, `on`, `via`, `type`, `waits`,
+`source`, `message`) are refused, naming both lists (`src/labels/labels.ts`).
+
+- **Where they are set**: a card's `labels:` map in its frontmatter; `--label key=value` on `nemia inbox add` and `nemia start`;
+  `nemia label run <id> team=core old-` and `nemia label inbox <name> …`, kubectl's shape, a changed value taking `--overwrite`; and the
+  board, on a card's page and a run's.
+- **Where they are kept**: a card's in its own file; a run's in `runs/<id>.labels`, a person's file beside the record, composed on read
+  and never written into it, so a relabel never races the tick's rewrite of the record. `nemia rm` removes it.
+- **Inherited once, at creation**: from the card and from every `--after` and `--from` run. A key the runs agree on is copied, the
+  card's beat the runs', a typed `--label` beats both and `--label key-` drops one; a key two runs disagree on is left out, and the start
+  says so with the `nemia label run` to type.
+- **The feed**: each line is stamped with its run's labels as they stood when it was written; a task's labels and the telemetry stay
+  closed.
+- **Selecting**: `-l` (the feed's grammar, `src/watch/selector.ts`) on `nemia watch`, `ls`, `inbox` and `stats`, served by the api as
+  `?selector=` from the informer; `--show-labels` and `-L <key>` add `  labels: a=b` and `  <key>: <value>` to each head line. The
+  board filters Inbox and Runs by it, and shows a page per label value (`/labels/<key>/<value>`).
+
 ## Pausing the whole store: `wf pause`
 
 ```bash

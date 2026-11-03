@@ -16,6 +16,8 @@ import { assess, type Assessment } from '../tick/assess.ts';
 import { runSpend, type BranchStanding, type Spend, type SpendOf } from '../status/status.ts';
 import type { RetryAsk } from '../retry/index.ts';
 import { runStore } from '../record/files.store.ts';
+import { selectedRuns } from '../runlist/runlist.ts';
+import type { Selectors } from '../watch/selector.ts';
 import { unloadedFolder } from '../steps/steps.ts';
 import { stepsAmong, stepsOf } from '../steps/steps.verb.ts';
 import { resultBranches, standingsOf, type BranchReader } from '../branches/branches.store.ts';
@@ -167,11 +169,13 @@ const readOrUnjudged = Effect.fnUntraced(function* (e: Engine, run: Run, slot: R
  * whole store even for one run; each task is viewed once (`viewedOnce`), and where the branches stand is read off `standing.json`, with
  * no process. A run a task journal of which does not read, or whose unfrozen folder does not load, is answered unjudged (`unjudgedOf`),
  * the second with no result branch (`stepsAmong`); any other failure rejects. With no run named, the factories' schedules
- * (`schedulesListed`). Refuses a run named that is not in the store, as `runStore.runs.read` does.
+ * (`schedulesListed`). Refuses a run named that is not in the store, as `runStore.runs.read` does. Of the runs `selectors` takes
+ * (`selectedRuns`), off each composed record before any is judged; the cap, the pause and the schedules are still read of the whole store.
  */
-export const runsListed = Effect.fn('runsListed')(function* (runId?: string) {
+export const runsListed = Effect.fn('runsListed')(function* (runId?: string, selectors: Selectors = []) {
   const e = yield* EngineService;
-  const runs = runId ? [runStore.runs.read(runId)] : runStore.runs.list();
+  const all = runId ? [runStore.runs.read(runId)] : runStore.runs.list();
+  const runs = selectedRuns(all, selectors);
   const listed: RunsListed['runs'] = [];
   const reads: Read[] = [];
   const standing = yield* standingSnapshot();
@@ -180,7 +184,7 @@ export const runsListed = Effect.fn('runsListed')(function* (runId?: string) {
   const among = yield* stepsAmong(runs);
   if (runs.length) {
     const viewed = viewedOnce(e);
-    const held = yield* runSlots(viewed, runId ? runStore.runs.list() : runs, process.env, passParents(git));
+    const held = yield* runSlots(viewed, runId ? runStore.runs.list() : all, process.env, passParents(git));
     for (const run of runs) {
       const read = yield* readOrUnjudged(viewed, run, held.get(run.id), standing);
       const steps = among.get(run.id) ?? [];
@@ -189,9 +193,9 @@ export const runsListed = Effect.fn('runsListed')(function* (runId?: string) {
     }
   }
   const pause = readPause();
-  const paused = pause ? { paused: yield* pausedOf(e, pause, runId ? runStore.runs.list() : runs, reads) } : {};
+  const paused = pause ? { paused: yield* pausedOf(e, pause, runId ? runStore.runs.list() : all, reads) } : {};
   const read = standing.at === undefined ? { none: true as const } : { at: standing.at };
-  const schedules = runId ? [] : schedulesListed(runs);
+  const schedules = runId ? [] : schedulesListed(all);
   return {
     runs: listed,
     daemon: daemonStanding(),

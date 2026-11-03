@@ -52,6 +52,10 @@ applies: ["apps/web/**"]
 What no test of the board refuses, and the next author pays for again. `apps/web/CLAUDE.md` holds the board's facts — where each thing
 is written, the commands, and what its own code promises — and this section holds what its tools do.
 
+- The board's route files carry a `$` (`runs.$runId.tsx`), TanStack's mark of a parameter. A read-only step has `git diff` and
+  `git grep` refused for any spelling of one: the `git` skill, *Read what changed*, says which spelling passes
+  (`'apps/web/src/routes/runs.?runId.tsx'`).
+
 ### The kit, the look and the colours
 
 - A component the kit lacks is written beside it, under the board's own rules.

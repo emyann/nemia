@@ -63,10 +63,16 @@ export const FEED_VERSION = 'nemia/v1';
 export type Involved = { kind: InvolvedKind; name: string };
 
 /**
- * The labels a line carries, as a filing's do (`stepLabels`): the run, its factory and its workflow, and on a step's line the step and
- * its agent. A daemon's line is of no run and carries none.
+ * The five closed labels a line carries, as a filing's do (`stepLabels`): the run, its factory and its workflow, and on a step's line the
+ * step and its agent. A daemon's line is of no run and carries none.
  */
-export type FeedLabels = { run?: string; factory?: string; workflow?: string; step?: string; agent?: string };
+export type ClosedFeedLabels = { run?: string; factory?: string; workflow?: string; step?: string; agent?: string };
+
+/**
+ * The labels a line carries: the closed five (`ClosedFeedLabels`) and, on a run's line and its steps', the labels a person put on the
+ * run when the line was written (`Run.labels`), whose keys are never one of the five (`RESERVED_LABEL_KEYS`).
+ */
+export type FeedLabels = ClosedFeedLabels & Readonly<Record<string, string>>;
 
 /**
  * What a v1 line says besides the four fields it keeps for one release: its version, what it is about (`involved`), its labels, the

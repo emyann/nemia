@@ -4,6 +4,8 @@ export {
   cardState,
   INBOX_KEY_MEANINGS,
   INBOX_KEYS,
+  cardLabels,
+  labelledText,
   ignoredRepoLine,
   inboxLines,
   inboxNameOf,
@@ -14,5 +16,5 @@ export {
   queueOrder,
   workflowAt,
 } from './inbox.ts';
-export type { CardState, InboxCard, InboxListing, InboxRuns, QueueStarted, MissedStart } from './inbox.ts';
+export type { CardState, InboxCard, InboxListing, InboxRuns, LabelsShown, QueueStarted, MissedStart } from './inbox.ts';
 export { queueFactoryRefusal } from './queue-factory.ts';

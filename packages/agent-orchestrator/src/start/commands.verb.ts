@@ -21,7 +21,8 @@ import { frozenStepsOf } from '../steps/steps.ts';
 import type { Workflow } from '../workflow.ts';
 import { approvedFirst, gatesOf } from '../status/status.ts';
 import { fromNote } from './inputs.ts';
-import { leftOutMounts, startRun } from './start.verb.ts';
+import { leftOutMounts, startRun, type StartedRun } from './start.verb.ts';
+import { labelsText } from '../labels/labels.ts';
 import { pausedRead } from '../list/list.verb.ts';
 import { pausedWords, type Paused } from '../pause/pause.ts';
 import { parentRead } from '../views/views.verb.ts';
@@ -123,6 +124,12 @@ const START_SPEC: Spec = {
       { many: true, cli: "the board gates a step by its workflow's own gate: true, or a card's gate:" },
     ),
     startFlag(
+      '--label',
+      'label',
+      'a label the run is created with, key=value to set one or key- to drop one it would inherit: nemia start <brief> --label team=core [--label <edit> ...]',
+      { many: true },
+    ),
+    startFlag(
       '--brief',
       'instead',
       'what the run is asked to do in place of an inbox card\'s body, as text or a file: nemia start <inbox>/<name>.md --brief "<brief>"',
@@ -141,7 +148,7 @@ const START_SPEC: Spec = {
   ],
   unknown: (arg) =>
     arg.startsWith('-')
-      ? `nemia start does not take ${arg}. It takes the brief, then --workflows <dir>, --repo <r>, --no-worktree, and --after <runId> once per run to wait on; --from <runId> once per run to read as context; --input <file> once per file to hand its steps; --gate <step> once per step to gate; --factory <name>; and, for an inbox card, --brief "<brief>".`
+      ? `nemia start does not take ${arg}. It takes the brief, then --workflows <dir>, --repo <r>, --no-worktree, and --after <runId> once per run to wait on; --from <runId> once per run to read as context; --input <file> once per file to hand its steps; --gate <step> once per step to gate; --label key=value (or key-) once per label; --factory <name>; and, for an inbox card, --brief "<brief>".`
       : `nemia start takes one brief, and ${arg} is a second. Quote a brief with spaces — nemia start "<brief>" — or give it as a file: nemia start ./brief.md.`,
   apart: (_value, flag) => START_SPEC.flags.find((f) => f.flag === flag)?.takes ?? '',
 };
@@ -155,7 +162,7 @@ const START_SPEC: Spec = {
  */
 type Started = {
   id: string;
-  run: Run;
+  run: StartedRun;
   card?: string;
   queueLeft?: string;
   ignoredRepo?: string;
@@ -208,6 +215,18 @@ function gateLines(run: Run): string[] {
   ];
 }
 
+/**
+ * The labels a run was created with, and a line per key it was not given since the runs it names disagree on it: the key, each run with
+ * its value, and how to set it.
+ */
+const labelLines = (run: StartedRun): string[] => [
+  ...(run.labels !== undefined && Object.keys(run.labels).length ? [`labels: ${labelsText(run.labels)}`] : []),
+  ...(run.labelsLeftOut ?? []).map(
+    ({ key, values }) =>
+      `label ${key} not inherited: ${values.map((v) => `${v.run} has ${key}=${v.value}`).join(', ')} — set it with nemia label run ${run.id} ${key}=<value>`,
+  ),
+];
+
 /** Where an inbox card's run came from, the card kept in the inbox as started, as `nemia start` says it. */
 const fromLines = ({ run, card, queueLeft }: Started): string[] =>
   card === undefined
@@ -242,6 +261,7 @@ function startedLines(started: Started): string[] {
       : []),
     ...contextLines(run.context ?? [], (id) => started.landed?.includes(id) === true),
     ...gateLines(run),
+    ...labelLines(run),
     `run 'nemia tick' (or 'nemia up') to start it`,
     ...(started.paused ? [`${pausedWords(started.paused)}: nothing of this run is filed until then`] : []),
     ...(started.hints ?? []),
@@ -275,6 +295,7 @@ const cardStart = Effect.fnUntraced(function* (card: string, args: Args) {
     context: listOf(args, 'context'),
     inputs: listOf(args, 'inputs'),
     gates: listOf(args, 'gates'),
+    labels: listOf(args, 'label'),
     ...(factory !== undefined ? { factory } : {}),
     fix: textOf(args, 'fix') ?? '--factory <name>',
   });
@@ -426,6 +447,7 @@ const startOf = Effect.fnUntraced(function* (args: Args, home: string | undefine
       context: listOf(args, 'context'),
       inputs: listOf(args, 'inputs'),
       gates: listOf(args, 'gates'),
+      labels: { edits: listOf(args, 'label') },
       ...(factory !== undefined ? { factory } : {}),
     }),
   );
@@ -446,6 +468,8 @@ const FOLDER_REFUSES: Readonly<Record<string, string>> = {
     "nemia start <folder> does not take --gate: a plan's cards are gated by their workflows' own gate: true. To gate one card's run at a step, start that card by hand: nemia start <card.md> --workflows <dir> --gate <step>.",
   '--brief':
     'nemia start <folder> does not take --brief: each card\'s body is its run\'s brief. To start one card with other words, start it by hand: nemia start <card.md> --brief "<brief>".',
+  '--label':
+    "nemia start <folder> does not take --label: a plan's cards are started as they are written. Label each card's run once it is started: nemia label run <runId> <key>=<value>.",
   '--no-worktree':
     'nemia start <folder> does not take --no-worktree: a card another waits on lands through a result branch, and a run that works on its base branch has none, so every card after it would wait for ever.',
 };

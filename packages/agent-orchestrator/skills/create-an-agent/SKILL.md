@@ -105,7 +105,7 @@ instructions say what holds for the role everywhere, and nothing about one workf
 ## Its skills
 
 `skills: <a>, <b>` names folders holding a `SKILL.md`, looked for in `skills/` beside the agents folder, then in the repository's
-`.claude/skills/`, then the store's. `tools:` must allow `Skill`. The repository's `.claude/skills/` is found only when the repository is
+`.claude/skills/`, then the store's, then Nemia's own skills, last. `tools:` must allow `Skill`. The repository's `.claude/skills/` is found only when the repository is
 the step's place, as a start gives it: a test that loads a folder passes the place too. A step with an agent may add skills with its
 own `skills:`: the session gets the agent's, then the step's, each once. The agent's fence must already load them; a step never widens it.
 

@@ -396,7 +396,7 @@ and `list`, given a holder's path. Their files layers (`agentFiles(home)`, `skil
 is the very bytes today's writers write and no database is its source; their memory stand-ins (`agentDoorMemory`, `skillDoorMemory`, in
 `STAND_INS`) are held to the files by one table of walks each (`test/agent-walks.ts`, `test/skill-walks.ts`). Which root a name is read
 from is one pure, proved decider for both layers and both doors (`lookedUp`, `src/skills/skills.ts`, `contracts/lookup.contract.ts`),
-the builtin place skills found last. A write checks the name on create, then what the draft renders to through the model's `Agent` or
+the place's skills, then Nemia's builtin skills, found last. A write checks the name on create, then what the draft renders to through the model's `Agent` or
 `Skill`, then the version it was read at, judged by `definitionVersionRefusal` (`src/agents/agents.ts`,
 `contracts/definition-version.contract.ts`) before either layer acts; the place, a link, a sidecar and a step still naming an agent stay
 the files' own refusals. What still calls the agent and skill stores — the folder's load for its synchronous readers and the version,

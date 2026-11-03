@@ -288,7 +288,7 @@ test('REFUSED: a package below the api or a harness SDK, imported by any route',
 
 test('REFUSED: a relative path out of apps/cli, and one into packages/', () => {
   assert.deepEqual(ruled(importBreaks(plantedIn('src/x.ts', "import { x } from '../../web/src/lib/api.ts';"))), ['src/x.ts leaves']);
-  assert.deepEqual(ruled(importBreaks(plantedIn('src/x.ts', "import { x } from '../../../tools/test-costs/probe.ts';"))), [
+  assert.deepEqual(ruled(importBreaks(plantedIn('src/x.ts', "import { x } from '../../../tools/coverage/record.ts';"))), [
     'src/x.ts leaves',
   ]);
   for (const [file, spec] of [

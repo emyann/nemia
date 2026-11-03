@@ -36,10 +36,13 @@ holds what every change needs.
   judged was merged (`workflows/build/landing.ts`) — so the commit `ci` passed on is the last thing any suite reads; a session runs the
   whole suite only to measure it, as the e2e's rule says. A failing test it did not run is the check's refusal, answered in the next try. Outside a
   run no check follows you: run the whole suite before you commit.
-- `npm run typecheck` — `tsc --noEmit` per package, over its `src` and its `test/` (the web's `test/e2e/` under its own tsconfig, and the
+- `npm run typecheck` — `tsrs --noEmit` per package, over its `src` and its `test/` (the web's `test/e2e/` under its own tsconfig, and the
   tests of the runtime, the orchestrator and the api each under their package's `test/tsconfig.json`, which leaves the source's
   `noUncheckedIndexedAccess` off);
-  `tools/guards/test/suite.test.ts` refuses a test file no typecheck reads.
+  `tools/guards/test/suite.test.ts` refuses a test file no typecheck reads. tsrs, the Rust port of TypeScript 7.1's compiler, pinned
+  exactly at the root, checks the same files as tsc 6 in about a third of its memory (the seven packages' peaks ~2.3 GB against ~8.3
+  GB, measured 2026-11-02), so runs reaching their checks together no longer run the machine out of it. `typescript@6` stays, for
+  the 27 files that import its compiler API, the editor, and the steps' own `npx tsc` measures.
 - `npm run lint` — oxlint (`.oxlintrc.json`) and `oxfmt --check` (`.oxfmtrc.json`); `npm run format` writes the layout. Every shipped
   `check:` runs it after the types. A rule turned off, or a line allowed with `oxlint-disable-next-line`, says why beside it.
 - `npm run build`, then `npm run e2e -- --pages <the pages the change touches>` (and `--photos` when pictures are due), when you touch

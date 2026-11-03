@@ -21,7 +21,7 @@ import { checked, doorOf, rootedDoor, type DoorOf } from '../door/door.store.ts'
 import { Conflict, Invalid, Missing, type Refusal } from '../refusal/refusal.ts';
 import { ARCHIVE_LIMIT, contentDigest, packArchive, pathRefusals, unpackArchive, type TreeFile } from '../archive/archive.ts';
 import { TemplateSource, TemplateTreeWrite } from '../templates/templates.model.ts';
-import type { Problem } from './templates.ts';
+import { templateNameRefusal, type Problem } from './templates.ts';
 
 /** A template's tree as read: its name (its folder's, or an archive's top folder), its files, what stops one being read, its digest. */
 export type TemplateTree = { name: string; files: TreeFile[]; problems: Problem[]; digest: string | undefined };
@@ -209,3 +209,42 @@ export const TemplateDoor = Context.Reference<TemplateDoorShape>('agent-orchestr
 
 /** The Template door over the files, as a layer: for a program that names the door rather than a `StoreRoot`. */
 export const templateDoorFiles = (): Layer.Layer<never> => Layer.succeed(TemplateDoor)(templateDoorOver(templateFiles()));
+
+/**
+ * The builtin templates: the templates workspace beside this package, found by its path and never imported, as the package's own
+ * skills and servers are found (`BUILTIN_SKILLS`, `BUILTIN_SERVERS`).
+ */
+export const BUILTIN_TEMPLATES = path.join(import.meta.dirname, '..', '..', '..', 'templates');
+
+/** The folder a template's name is looked for in: `BUILTIN_TEMPLATES`, unless a program is given another (a test, its scratch folder). */
+export const BuiltinTemplates = Context.Reference<string>('agent-orchestrator/BuiltinTemplates', {
+  defaultValue: () => BUILTIN_TEMPLATES,
+});
+
+/** The names of the templates `folder` holds, sorted: each folder in it whose `nemia.yaml` is a file. None where `folder` is not there. */
+export function builtinTemplatesIn(folder: string): string[] {
+  if (!fs.statSync(folder, { throwIfNoEntry: false })?.isDirectory()) return [];
+  return fs
+    .readdirSync(folder, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory() && fs.statSync(path.join(folder, entry.name, 'nemia.yaml'), { throwIfNoEntry: false })?.isFile())
+    .map((entry) => entry.name)
+    .sort();
+}
+
+/**
+ * The whole path a template's source is read at: a path as it is, and a template's name its folder among the builtin templates
+ * (`BuiltinTemplates`). Refused `Missing` where no builtin template has that name, naming those there are and the `./<name>` spelling
+ * of a folder.
+ */
+export const templatePlace = Effect.fn('templatePlace')(function* (source: string) {
+  if (templateNameRefusal(source) !== null) return source;
+  const folder = yield* BuiltinTemplates;
+  const builtins = builtinTemplatesIn(folder);
+  if (builtins.includes(source)) return path.join(folder, source);
+  const has = builtins.length ? `its builtin templates are ${builtins.join(', ')}` : 'it has no builtin template';
+  return yield* Effect.fail(
+    new Missing({
+      message: `Nemia has no builtin template named ${source} (looked in ${folder}): ${has}. Name one of them, or a folder of that name by its path, ./${source}.`,
+    }),
+  );
+});

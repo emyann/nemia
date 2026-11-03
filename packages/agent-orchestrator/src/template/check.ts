@@ -8,7 +8,7 @@ import { HARNESS_KNOBS } from 'agent-runtime/vocabulary';
 import { DEFAULT_HARNESS, isRemoteHarness, REMOTE_PREFIX } from '../harness/harness.ts';
 import { givenSkillOf, PLACES, STORE_READS, WORKSPACES } from '../keys/index.ts';
 import { baseSpelled } from '../former/former.ts';
-import { OVERRIDABLE } from '../workflow/fence.ts';
+import { OVERRIDABLE } from '../workflow/index.ts';
 import {
   documentFile,
   documentRefusals,

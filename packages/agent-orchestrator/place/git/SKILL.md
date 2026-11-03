@@ -36,7 +36,7 @@ Each of these reads and writes nothing, so a read-only step may ask any of them.
 
 **A path with a `$` in its name** (`posts.$id.tsx`) reads to the shell as a variable. A step that runs in `dontAsk` mode, where only
 its allow rules let a command through, has `git diff` and `git grep` refused for any spelling of a `$`: bare, single-quoted,
-escaped (`\$`) or double-quoted. Single-quoted, the path passes for `git log`, `git show`, `git diff-tree`, `git blame` and `git ls-files`.
+escaped (`\$`) or double-quoted. Single-quoted, the path passes for git's other reads: `log`, `show`, `diff-tree`, `blame` and `ls-files`.
 For `git diff` and `git grep`, name the file by a pathspec with no `$` in it, since git matches a pathspec as a glob itself: put `?`
 where the `$` is, single-quoted (`git diff <base>...HEAD -- 'src/posts.?id.tsx'`), or give its folder. `git show <commit>:'<path>'`
 reads the file whole.

@@ -11,14 +11,15 @@
  * (`names.test.ts`, `others.test.ts`) read the root's and the apps' `CLAUDE.md` among every file. The orchestrator's tests read the side
  * Grafana's files and the guards' manifest (`observe.test.ts`, `profile.test.ts`, `contract.test.ts`), the runtime's contract test a
  * file of `tools/observe/render/`, and the docs' name test every file under `tools/` (`names.test.ts`), so those three tasks and the
- * guards' list `tools/`. The docs' tests read the packages'
- * docs for the diagrams they draw, every source for the names their pages cite, and the paths those pages cite, at the root and under
- * `docs/` and `workflows/`. The api's test of what `npm run dev` watches reads every workspace package's `package.json` and sources
+ * guards' list `tools/`. The docs' tests read the packages' docs for the diagrams they draw, every source for the names their pages
+ * cite, and the paths those pages cite, at the root and under `docs/` and `workflows/`. The api's test of what `npm run dev` watches
+ * reads every workspace package's `package.json` and sources
  * (`dev-watch.test.ts`). The api's tests read Nemia's builtin servers and skills, the orchestrator's `servers/` and `skills/`
  * (`servers.test.ts`, `sign-in.boundary.test.ts`, `skills.test.ts`). The board's test of the look's parts reads the trigger skill of a
  * change to the board, which names each part (`apps/web/test/look.test.ts`), and its test of a merge reads the root's `CLAUDE.md` and
- * `.gitattributes` (`apps/web/test/e2e-merge.test.ts`), so the web's test lists all three; the client's reads nothing outside it, and needs no task of its own,
- * since the api and the orchestrator it runs reach its hash through its dependencies (`^transit`). The repository's own guards read
+ * `.gitattributes` (`apps/web/test/e2e-merge.test.ts`), so the web's test lists all three; the client's reads nothing outside it,
+ * and needs no task of its own, since the api and the orchestrator it runs reach its hash through its dependencies (`^transit`). The
+ * repository's own guards read
  * the files they hold (`guards#test`): the CI guard reads the Actions workflow, the secret scan's allowlist, the stub secrets of the
  * runtime's `remote-agent.test.ts`, the e2e's page names, the board's generated paths and every workspace's manifest
  * (`tools/guards/test/ci-workflow.test.ts`, `tools/guards/test/ci-scan.boundary.test.ts`), and `tools/guards/test/repo-guards.test.ts`

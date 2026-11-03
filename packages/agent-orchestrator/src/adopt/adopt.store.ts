@@ -11,14 +11,16 @@ import { Effect } from 'effect';
 import { Invalid } from '../refusal/refusal.ts';
 import { CardDoor } from '../cards/cards.store.ts';
 import { RunDoor } from '../runs/runs.store.ts';
-import { parseInboxCard } from '../inbox/inbox.ts';
+import { parseInboxCard } from '../inbox/index.ts';
 import { factoriesDirAt } from '../factory/factory.store.ts';
-import type { Factory } from '../factory/factory.ts';
+import type { Factory, FactoryTemplate } from '../factory/factory.ts';
 import { readRules, rulesAtHome } from '../rules/rules.store.ts';
 import { appliedDirAt, digestOf, entriesIn, stageFolder, treeDirAt, treeWiringOf, type Entry } from '../applied/applied.store.ts';
-import type { RenderedAt } from '../applied/applied.verb.ts';
 import type { Run } from '../record/record.ts';
 import type { Adoption, AdoptedCard } from './adopt.ts';
+
+/** A template rendered with a factory's parameters, as `renderedAt` answers it: its version, its parameters, and its files. */
+type RenderedAt = { version: string; params: FactoryTemplate['params']; entries: readonly Entry[] };
 
 /**
  * What a takeover of a factory reads besides its judgement's input: the runs on record in it, and its store rules' file where they say

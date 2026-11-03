@@ -153,9 +153,8 @@ function Run({ run }: { run: RunView }) {
           <HoldRun run={run} />
           <PruneRun run={run} />
         </div>
+        <Labels labels={run.labels} edit={(edits) => labelRun(run.id, edits).then(() => runsMoved(queryClient, run.id))} />
       </header>
-
-      <Labels labels={run.labels} edit={(edits) => labelRun(run.id, edits).then(() => runsMoved(queryClient, run.id))} />
 
       {decideDrawn(run) && <Decide run={run} />}
 

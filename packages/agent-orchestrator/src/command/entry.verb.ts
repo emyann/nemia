@@ -7,24 +7,23 @@ import type { PlaceService } from '../place/place.store.ts';
 import type { EngineService } from '../runtime-client.ts';
 import type { Conflict, Missing, Refusal } from '../refusal/refusal.ts';
 import type { StatsMemo } from '../stats/stats.verb.ts';
-import type { RestingMemo } from '../rest/resting.verb.ts';
+import type { InformerMemo } from '../rest/informer.verb.ts';
 import type { ScheduleRuns } from '../schedule/listed.store.ts';
 import type { PauseRuns } from '../pause/pause.ts';
 import type { InboxRuns } from '../inbox/index.ts';
 import type { SeriesMemo } from '../series/series.ts';
 import type { Filings } from '../summary/reads.verb.ts';
-import type { RunSummary } from '../summary/summary.verb.ts';
 import type { Args, CommandSpec } from './command.ts';
 
 /**
- * What a caller that lives long keeps between its calls of the table's handlers: the stats' memo of each run's facts (`stats`), the list's
- * memo of runs at rest (`runs`), the feed's filing times (`filings`), the series' days read (`series`), and `records`, a memo per read
- * that wants a little of every run (`keptRecords`), each keyed by the run's stamp alone.
+ * What a caller that lives long keeps between its calls of the table's handlers: the stats' memo of each run's facts (`stats`), the
+ * informer of each run's judgement (`runs`), the feed's filing times (`filings`), the series' days read (`series`), and `records`, a memo
+ * per read that wants a little of every run (`keptRecords`), each keyed by the run's stamp alone.
  */
 export type Kept = {
   readonly stats?: StatsMemo;
   readonly series?: SeriesMemo;
-  readonly runs?: RestingMemo<Omit<RunSummary, 'startedAt'>>;
+  readonly runs?: InformerMemo;
   readonly filings?: Filings;
   readonly records?: KeptRecords;
 };

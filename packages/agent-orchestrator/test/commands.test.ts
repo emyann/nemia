@@ -12,12 +12,24 @@ test('the shipped table breaks none of its rules against the CLI’s verbs and r
   assert.deepEqual(commandBreaks(TABLE, [...VERBS.keys()], [...RUNS.keys()]), []);
 });
 
-test('the commands whose work waits on the next pass tick, and no read, nor up, tick or watch, does', () => {
+test('the commands whose work waits on the next pass tick, and the start itself (daemon), and no read, nor up, tick or watch, does', () => {
   assert.deepEqual(
     TABLE.filter((c) => c.ticks === true)
       .map((c) => c.name)
       .sort(),
-    ['agents run', 'approve', 'cancel', 'factory resolve', 'factory upgrade', 'inbox queue', 'refresh', 'resume', 'retry', 'start'],
+    [
+      'agents run',
+      'approve',
+      'cancel',
+      'daemon',
+      'factory resolve',
+      'factory upgrade',
+      'inbox queue',
+      'refresh',
+      'resume',
+      'retry',
+      'start',
+    ],
   );
   assert.deepEqual(
     TABLE.filter((c) => c.ticks === true && (!c.writes || ['up', 'tick', 'watch'].includes(c.name))).map((c) => c.name),
@@ -124,7 +136,13 @@ test('each command is served on the api where it was before the table, the lift 
         ],
       ],
       ['say', { method: 'POST', path: '/api/runs/:runId/steps/:step/say', status: 202 }],
-      ['ls', 'cli'],
+      [
+        'ls',
+        [
+          { method: 'GET', path: '/api/listing', status: 200 },
+          { method: 'GET', path: '/api/listing/:runId', status: 200 },
+        ],
+      ],
       ['show', { method: 'GET', path: '/api/runs/:runId', status: 200 }],
       ['closeout', { method: 'GET', path: '/api/runs/:runId/steps/:step/tries/:try/closeout', status: 200 }],
       ['tries', { method: 'GET', path: '/api/runs/:runId/steps/:step/tries', status: 200 }],
@@ -215,6 +233,7 @@ test('each command is served on the api where it was before the table, the lift 
       ['service restart', 'cli'],
       ['upgrade', 'cli'],
       ['version', 'cli'],
+      ['daemon', 'cli'],
       ['frontmatter rewrite', 'cli'],
       [
         'workflows write',
@@ -290,8 +309,8 @@ test('every command the api posts or deletes on writes, and the api guards it; t
   );
 });
 
-test("show is the run's one entry on both sides: its --raw, the record, is the CLI's alone", () => {
+test("show is the run's one entry on both sides: its --raw, the record, too, which the api answers on ?raw=true for nemia", () => {
   const show = TABLE.find((c) => c.name === 'show');
   assert.equal(show?.only, undefined);
-  assert.equal(show?.spec?.flags.find((f) => f.flag === '--raw')?.only?.side, 'cli');
+  assert.equal(show?.spec?.flags.find((f) => f.flag === '--raw')?.only, undefined);
 });

@@ -8,6 +8,7 @@ import {
   type FeedLine,
   feedSize,
   followFeed,
+  formerHints,
   type Followed,
   Invalid,
   parseSelectors,
@@ -61,6 +62,25 @@ function feedStartOf(raw: string | undefined): number | { error: string } {
 }
 
 /**
+ * Where a reader that reads the feed once stops: the feed's end as the stream opens (`feedSize`) on `until=end`, none on no `until` — the
+ * stream follows the feed until its reader goes — or why `until` cannot be read.
+ *
+ * @param raw the `until` asked for, none to follow the feed
+ * @returns the byte of the feed to stop at, none to follow it, or why `until` cannot be read
+ */
+function feedEndOf(raw: string | undefined): number | undefined | { error: string } {
+  if (raw === undefined) return undefined;
+  if (raw !== END)
+    return {
+      error: `\`${raw}\` is not an end this feed takes: \`until=${END}\` reads the feed to its end as the stream opens and closes it, which is the one value \`until\` takes; pass none to follow the feed.`,
+    };
+  return feedSize();
+}
+
+/** A hint for a selector a reader typed (`formerHints`), as an event of its own: its data the sentence a person reads. */
+const hinted = (message: string): SSEMessage => ({ event: 'hint', data: JSON.stringify({ message }) });
+
+/**
  * How a selector reaches this stream, said after the package's refusal of one and a full stop, since the package's words end on its
  * key list: the query key, that it is given again for another selector, and that none follows every line. The package's words are the
  * grammar's and spell it as `nemia watch` takes it; this says how a reader of this surface spells the same thing.
@@ -111,6 +131,8 @@ export const OPENED = ': open\n\n';
  * @param selectors the selectors a line must be taken by, none for every line
  * @param bookmarkEvery how often the stream says where it has read to, the one cadence every surface reads by default
  * @param beat how often the reader reads the file for the lines no hub brought: `Beats.feed`, none for the package's own beat
+ * @param until the byte of the feed to stop at, the feed's size as the stream opened (`until=end`): the stream ends once it has read the
+ * line that reaches it, whether its selectors take that line or not, with a last bookmark there; none follows the feed
  * @returns the stream's events, in the order the reader hands them on, with a bookmark between them
  */
 export const feedEvents = (
@@ -118,9 +140,16 @@ export const feedEvents = (
   selectors: Selectors = [],
   bookmarkEvery: Duration.Input = BOOKMARK_EVERY,
   beat?: Duration.Input,
+  until?: number,
 ) => {
   const at = { cursor: from };
-  const lines = followFeed(from, beat === undefined ? {} : { beat }).pipe(
+  const followed =
+    until === undefined
+      ? followFeed(from, beat === undefined ? {} : { beat })
+      : from >= until
+        ? Stream.empty
+        : followFeed(from, beat === undefined ? {} : { beat }).pipe(Stream.takeUntil((f) => f.kind === 'line' && f.cursor >= until));
+  const lines = followed.pipe(
     Stream.tap((f) =>
       Effect.sync(() => {
         if (f.kind === 'line') at.cursor = f.cursor;
@@ -133,7 +162,13 @@ export const feedEvents = (
     Stream.drop(1),
     Stream.map(() => bookmark(at.cursor)),
   );
-  return Stream.merge(lines, bookmarks, { haltStrategy: 'left' });
+  const merged = Stream.merge(lines, bookmarks, { haltStrategy: 'left' });
+  return until === undefined
+    ? merged
+    : Stream.concat(
+        merged,
+        Stream.suspend(() => Stream.make(bookmark(at.cursor))),
+      );
 };
 
 /**
@@ -158,6 +193,13 @@ export const feedEvents = (
  * reconnect resumes where it was, and `from` of any other value is refused before the stream opens, saying `end` is the one it takes.
  * None given reads the feed from the start, as `nemia watch` and `ae watch` do.
  *
+ * `until=end` reads the feed once: the stream ends once it has read to the feed's size as it opened (`feedSize`), the lines its selectors
+ * take sent and a last `bookmark` at that size, so a line written after it opened is not sent — `nemia watch --once`. With `from=end`, or a
+ * cursor at that size, it sends the bookmark alone. `until` of any other value is refused before the stream opens.
+ *
+ * A selector that names a former reason (`formerHints`) is sent its hint first, a `hint` event whose data carries the sentence as
+ * `message`, before any line: the code is still read, and the hint says what to type instead.
+ *
  * A cursor the feed never gave is refused with 400 before the stream opens, an answer with a status, not an event. A selector the grammar
  * refuses is the package's `Invalid` with `SELECTOR_ASKED` after it, 422 before the stream opens, and no reader is started for it. On the
  * stream, a refusal (exit 2) — the feed truncated or replaced under the cursor, including between the check and the reader's first
@@ -175,18 +217,22 @@ export const feed = new Hono<ApiEnv>().get('/api/feed/stream', (c) => {
   const cursor = c.req.header('Last-Event-ID') || c.req.query('after') || undefined;
   const from = cursor === undefined ? start : feedCursorOf(cursor);
   if (typeof from !== 'number') return c.json({ error: from.error }, 400);
+  const until = feedEndOf(c.req.query('until'));
+  if (typeof until === 'object') return c.json({ error: until.error }, 400);
   const asked = c.req.queries('selector') ?? [];
   const refused = selectorsRefusal(asked);
   if (refused) throw new Invalid({ message: `${refused}. ${SELECTOR_ASKED}` });
   const selectors = parseSelectors(asked);
+  const hints = asked.flatMap(formerHints);
   return streamSSE(c, async (stream) => {
     const gone = new AbortController();
     stream.onAbort(() => gone.abort());
     if (stream.aborted) gone.abort();
     await stream.write(OPENED);
+    for (const hint of hints) await stream.writeSSE(hinted(hint));
     const relayed = Effect.gen(function* () {
       const beats = yield* Beats;
-      return yield* feedEvents(from, selectors, BOOKMARK_EVERY, beats.feed).pipe(
+      return yield* feedEvents(from, selectors, BOOKMARK_EVERY, beats.feed, until).pipe(
         Stream.runForEach((message) => Effect.promise(() => stream.writeSSE(message))),
       );
     }).pipe(Effect.catch((err) => Effect.promise(() => stream.writeSSE(unreadable(err, false)))));

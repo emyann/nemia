@@ -17,14 +17,13 @@ import {
   type Factory,
   type StatsMemo,
   type Filings,
-  type RestingMemo,
-  restingMemo,
+  Informer,
+  type InformerMemo,
   recordMemo,
   type InboxRuns,
   type PauseRuns,
   type RecordMemo,
   type ScheduleRuns,
-  type RunSummary,
   PlaceService,
 } from 'agent-orchestrator';
 import { McpAsker } from './capabilities/capabilities.ts';
@@ -49,8 +48,8 @@ export class ApiConfig extends Context.Service<ApiConfig, { readonly env: NodeJS
 }
 
 /**
- * What an app's reads keep between requests, each read through its engine: the list's memo of runs at rest (`resting`, the package's
- * `RestingMemo`), the stats' memo of each run's facts (`stats`, the package's `StatsMemo`), the feed's filing times (`filings`,
+ * What an app's reads keep between requests, each read through its engine, beside its informer of each run's judgement (`Informer`, given
+ * in `liveOf`): the stats' memo of each run's facts (`stats`, the package's `StatsMemo`), the feed's filing times (`filings`,
  * `filedTimes`), where each blocked session's conversation was last read (`said`), the series' days read (`series`, the
  * package's `SeriesMemo`), and `records`, one memo per read that wants a little of every run (the package's `RecordMemo`, keyed by the
  * run's stamp alone): the inbox's listing, the factories' schedules, the pause's current tasks and a step's recent runs. One for an app,
@@ -59,7 +58,6 @@ export class ApiConfig extends Context.Service<ApiConfig, { readonly env: NodeJS
 export class ReadMemo extends Context.Service<
   ReadMemo,
   {
-    readonly resting: RestingMemo<Omit<RunSummary, 'startedAt'>>;
     readonly stats: StatsMemo;
     readonly filings: Filings;
     readonly said: LastSaid;
@@ -73,7 +71,6 @@ export class ReadMemo extends Context.Service<
   }
 >()('api/ReadMemo') {
   static readonly live: Layer.Layer<ReadMemo> = Layer.sync(ReadMemo)(() => ({
-    resting: restingMemo(),
     stats: freshStatsMemo(),
     filings: { filed: new Map(), cursor: 0 },
     said: new Map(),
@@ -120,6 +117,12 @@ export type Served = {
   mcp: McpAsker['Service'];
   quota: QuotaAsker['Service'];
   memo: ReadMemo['Service'];
+  /**
+   * This app's informer of each run's judgement (`Informer`, the package's): what the store's daemon's pass judged of each run, read by
+   * the run object, its sub-resources and the runs list, and kept by them on a miss; none in an app whose layer gives none, which judges
+   * every run on demand.
+   */
+  informer: InformerMemo | undefined;
   followings: Followings['Service'];
   beats: BeatsShape;
   /**
@@ -171,6 +174,7 @@ export const served = <A>(c: RequestContext<ApiEnv>, handle: (s: Served) => A | 
         mcp: yield* McpAsker,
         quota: yield* QuotaAsker,
         memo: yield* ReadMemo,
+        informer: yield* Informer,
         followings: yield* Followings,
         beats: yield* Beats,
         inRequest,

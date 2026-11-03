@@ -12,6 +12,7 @@
  */
 import type { Run } from '../record/record.ts';
 import type { Assessment } from '../tick/assess.ts';
+import type { Informed } from '../../contracts/informed.contract.ts';
 
 /**
  * What one pass of a run read and did, as `advance` knows it once it has decided — every fact that says the next pass, with the same
@@ -95,3 +96,11 @@ export function evictedBy(taskIds: Iterable<string>, ids: ReadonlySet<string>): 
   }
   return out;
 }
+
+/**
+ * Whether the informer serves a kept judgement of a run or judges the run again (`informed.contract.ts`): served while the run's
+ * stamp, its tasks' feed and its branch tips hold, across passes for a run at rest and within the pass that judged it for one still
+ * moving. Pure.
+ */
+export const informedOf: Informed = ({ stampHeld, quiet, tipsHeld, atRest, samePass }) =>
+  stampHeld && quiet && tipsHeld && (atRest || samePass) ? 'serve' : 'judge';

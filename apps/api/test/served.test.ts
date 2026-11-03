@@ -89,15 +89,15 @@ test('every route the api serves is declared by an entry of the command table, o
   assert.deepEqual(servedBreaks(app.routes, COMMANDS, OWN), []);
 });
 
-test("the runs' list is declared by runs, an entry the api serves alone, and ls routes nothing: the CLI serves it alone", () => {
+test("the runs' list is declared by runs, an entry the api serves alone; ls's answer, which nemia prints, is ls's own, on /api/listing", () => {
   const runs = COMMANDS.find((c) => c.name === 'runs');
   const ls = COMMANDS.find((c) => c.name === 'ls');
   assert.equal(declaredBy(COMMANDS).get('GET /api/runs'), 'runs');
   assert.equal(runs?.only?.side, 'api', 'the runs entry is served on the api alone');
   assert.ok(runs?.only?.why.trim(), 'and says why');
-  assert.deepEqual(routeList(ls!), [], 'ls has no route');
-  assert.equal(ls?.only?.side, 'cli', 'ls is served on the CLI alone');
-  assert.ok(ls?.only?.why.trim(), 'and says why');
+  assert.equal(declaredBy(COMMANDS).get('GET /api/listing'), 'ls', 'every run, as nemia ls lists them');
+  assert.equal(declaredBy(COMMANDS).get('GET /api/listing/:runId'), 'ls', 'the one named');
+  assert.equal(ls?.only, undefined, 'ls is served on both sides');
 });
 
 test('REFUSED: a route no entry declares and OWN does not list, matched whole; middleware and a route mounted twice are none', () => {

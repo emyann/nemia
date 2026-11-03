@@ -21,6 +21,8 @@
         "$TURBO_ROOT$/apps/*/src/**",
         "$TURBO_ROOT$/apps/*/test/**",
         "$TURBO_ROOT$/apps/*/*.ts",
+        "$TURBO_ROOT$/apps/*/bin/**",
+        "$TURBO_ROOT$/apps/*/contracts/**",
         "$TURBO_ROOT$/apps/*/package.json",
         "$TURBO_ROOT$/apps/*/tsconfig.json",
         "$TURBO_ROOT$/apps/*/CLAUDE.md",
@@ -54,6 +56,8 @@
         "$TURBO_ROOT$/apps/*/tsconfig.json",
         "$TURBO_ROOT$/apps/*/src/**",
         "$TURBO_ROOT$/apps/*/*.ts",
+        "$TURBO_ROOT$/apps/*/bin/**",
+        "$TURBO_ROOT$/apps/*/contracts/**",
         "$TURBO_ROOT$/apps/web/.storybook/**",
         "$TURBO_ROOT$/apps/*/glossary.json",
         "$TURBO_ROOT$/apps/docs/src/content/docs/**",
@@ -74,6 +78,8 @@
         "$TURBO_ROOT$/apps/*/src/**",
         "$TURBO_ROOT$/apps/*/test/**",
         "$TURBO_ROOT$/apps/*/*.ts",
+        "$TURBO_ROOT$/apps/*/bin/**",
+        "$TURBO_ROOT$/apps/*/contracts/**",
         "$TURBO_ROOT$/packages/agent-orchestrator/src/**",
         "$TURBO_ROOT$/packages/agent-orchestrator/bin/**",
         "$TURBO_ROOT$/packages/agent-orchestrator/test/**",
@@ -101,6 +107,10 @@
         "$TURBO_ROOT$/CLAUDE.md",
         "$TURBO_ROOT$/.gitattributes"
       ]
+    },
+    "cli#test": {
+      "dependsOn": ["^transit"],
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/tools/**"]
     },
     "docs#test": {
       "dependsOn": ["^transit"],

@@ -1,6 +1,6 @@
 # Architecture
 
-Two packages and two apps, in layers. Each layer owns one thing and is reached through a
+Two packages and three apps, in layers. Each layer owns one thing and is reached through a
 short list of entries, its public contract. Four rules keep it that way, and each is a test that fails the suite when
 broken. This page says what the tests hold; the tests are the rules.
 
@@ -9,17 +9,22 @@ broken. This page says what the tests hold; the tests are the rules.
 | Layer | Owns | Public contract |
 |---|---|---|
 | `packages/agent-runtime` | Agent sessions on a harness, durably: a job that runs to its end, and a long-lived session that runs until stopped (`restartPolicy: 'Always'`, attached, the runtime's README, *A long-lived session*). How a session runs: its command, mounts, restart and spend, the journal, the attempts, the harnesses' vocabulary. The `ae` command. | `agent-runtime` → `src/index.ts`, the runtime in Effect. `agent-runtime/testing` → `src/testing.ts`, the engine's stand-in and the wait a test makes on its event (`until`, `bell`, `WAITED`), for test files alone. `agent-runtime/vocabulary` → `src/vocabulary.ts`, the harnesses' words, what their fence words reach (`fenceReach`), the first character of a path a harness's permission rule cannot carry (`unruledIn`) and the folders a harness reads as its own configuration in a mounted folder (`configFolderIn`), pure. `decide` is exported by none. |
-| `packages/agent-orchestrator` | A folder of markdown as a workflow, and a run of its steps: which task to file next, what a person must decide, what the run's record says. The revisions of each kind a run resolves — a ledger of (number, hash, when) per kind and name under `revisions/<kind>/<name>.json`, and the numbers pinned on the run and on each filed step. The `wf` command, to become `nemia`. | `agent-orchestrator` → `src/runner.ts`: the controllers, everything that reads or writes the disk, and the refusals by kind, `Missing`, `Conflict` and `Invalid`, re-exported by name. `agent-orchestrator/run` → `src/run.ts`: `assess` (`src/tick/assess.ts`), and the words a run is described in, re-exported by name. `agent-orchestrator/workflow` → `src/workflow.ts`: the format, pure. `agent-orchestrator/testing` → `place/memory/index.ts`, the test place (`testPlace`), for test files alone. |
+| `packages/agent-orchestrator` | A folder of markdown as a workflow, and a run of its steps: which task to file next, what a person must decide, what the run's record says. The revisions of each kind a run resolves — a ledger of (number, hash, when) per kind and name under `revisions/<kind>/<name>.json`, and the numbers pinned on the run and on each filed step. Each run's judgement, held in memory by the daemon that judged it (the informer, *Who owns what*). The in-process `nemia` command (`bin/nemia.ts`, and `bin/wf.ts`, the alias), which the client spawns. | `agent-orchestrator` → `src/runner.ts`: the controllers, everything that reads or writes the disk, and the refusals by kind, `Missing`, `Conflict` and `Invalid`, re-exported by name. `agent-orchestrator/run` → `src/run.ts`: `assess` (`src/tick/assess.ts`), and the words a run is described in, re-exported by name. `agent-orchestrator/workflow` → `src/workflow.ts`: the format, pure. `agent-orchestrator/testing` → `place/memory/index.ts`, the test place (`testPlace`), for test files alone. `agent-orchestrator/bin` → `bin/nemia.ts` and `agent-orchestrator/bin/wf` → `bin/wf.ts`, the CLI's entries, resolved and spawned by `apps/cli/src/local.ts` alone and imported by no file. |
 | `apps/api` | The workflows behind HTTP, and the feed as a stream, read through the orchestrator's live reader (`followFeed`) on the hub its daemon publishes to. | Its routes. |
 | `apps/web` | The board people look at. It talks to the api over HTTP, decodes each answer it reads with a schema of its own (`effect`), imports none of our packages, names no store path, and builds no command of its own: a command or a store folder it shows is text the api answered (`STORE_PATHS` and `COMMAND_TEXT` in `apps/web/test/structure.test.ts`, both empty). | Its pages. |
+| `apps/cli` | `nemia` and `wf`, as a client of the api, beside the board: the moved reads (`show`, `closeout`, `ls`, the inbox's read and `watch`, `READ_VERBS` in `apps/cli/contracts/route.contract.ts`) asked of the api serving the store over HTTP, a daemon started on demand where none serves; every other verb, a help, and a read typed with `--local` run on the orchestrator's own CLI, spawned with the same words. It imports no package of ours, and from the api only its client door's types. | Its commands. |
 
 `apps/docs`, the documentation site, sits beside the layers and is none of them: it imports no workspace package and depends on
 none (`apps/docs/test/structure.test.ts`), and reads the repository's text at build, by path from its root. Its pages draw each state
 machine from between its `diagram:<name>` markers in the package docs, never from a copy (`apps/docs/src/mermaid.ts`).
 
-Each layer reaches exactly the one below it, and nothing reaches up or skips one:
+The order is `web, cli → api → orchestrator → runtime`. Each layer reaches exactly the one below it, and nothing reaches up or skips one:
 
 - the web reaches the api over HTTP alone (`apps/web/test/structure.test.ts`, and the web's lint block);
+- the cli reaches the api over HTTP alone, the shapes of its answers by `import type` from `apps/api/src/client/client.ts`, the store's
+  daemon by its lease (`daemon.json`'s `url`) in `src/where.ts`, and the in-process path by spawning `agent-orchestrator/bin` from
+  `src/local.ts` (`apps/cli/test/structure.test.ts`, the cli's lint block, and the resolve in
+  `packages/agent-orchestrator/test/contract.test.ts`). What it does not move — `decide` and every write — stays on that path;
 - the api reaches the orchestrator's public entries alone (the entries: `packages/agent-orchestrator/test/contract.test.ts` and the
   api's lint block; that its source imports no runtime: the api's lint block, proven by
   `packages/agent-orchestrator/test/imports.boundary.test.ts`). The api's source reaches only the orchestrator; its tests may import the
@@ -28,7 +33,8 @@ Each layer reaches exactly the one below it, and nothing reaches up or skips one
   `packages/agent-orchestrator/test/boundary.test.ts`), and its vocabulary through its pure door, `agent-runtime/vocabulary`, from
   any file.
 
-Spawning a package's `bin/` — `nemia watch --once` in the web app's e2e test, say — is using its CLI, not importing it.
+Spawning a package's `bin/` — `nemia watch --once` in the web app's e2e test, say, or the client's old path — is using its CLI, not
+importing it.
 
 ## Who owns what
 
@@ -38,6 +44,15 @@ runtime's.
 
 **Above the runtime by design**: run slots, checkout holds, worktrees and landing, what a check means, budgets across tries, gates, the
 inbox, factories, stats, agent definitions.
+
+**Each run's judgement is the orchestrator's, held in memory by the daemon that serves it — the informer** (`Informer`,
+`src/rest/informer.verb.ts`): a per-daemon cache of each run's judgement, filled by the tick's pass as it judges each run it reads, and
+read by the api's run object, its list and its sub-resources (tries, a try, a closeout, told), so a request and the tick never judge one
+run twice in a pass. An entry is served while the inputs it was judged on still stand — the run's stamp, its tasks on the engine's
+feed, its branches' tips — and a write made through the api drops its run's entry, so the run is judged again at once. Nothing of it
+is on disk: a restarted daemon rebuilds it from its first pass, and a cold answer equals a warm one. Where no pass holds a run — a
+read of the CLI in process, `--local` — the run is judged on demand. The api holds one per app (`apps/api/src/layer.ts`); the tests
+that tick judge every answer from it afresh too (`WF_VERIFY_REST`).
 
 **A long-lived Claude Code session runs attached, by the runtime's own rule** (`attachedLongLived`,
 `agent-runtime/src/harness/claude/code.ts`): a task filed `restartPolicy: 'Always'` is spawned on the Agent SDK's streaming input
@@ -444,11 +459,13 @@ its run's `baseRef`, keyed by two commit ids — the commit judged and the `base
 only while the branch's commit is still the one judged, and a restart asks every `baseRef` once (`StandingMemo` in
 `src/standing/standing.verb.ts`). The stats keep one more, on the same key, in the process that serves them: each finished run's facts,
 while its files in the store stamp the same and nothing of its tasks is on the feed (`StatsMemo` in
-`src/stats/stats.verb.ts`), and the board's list of runs one more: each finished run's summary, while its record, its files in the
-store, its tasks on the feed and its branches' tips stand (`RestingMemo` in `src/rest/resting.verb.ts`, read by the list's `runs` entry
-through `runsSummarized` in `src/summary/summary.verb.ts`), every memo brought up to the feed by `src/rest/rest.verb.ts`. The `runs open`
+`src/stats/stats.verb.ts`), and the api one more: the informer (*Who owns what*, `Informer` in `src/rest/informer.verb.ts`), each run's judgement while
+its record, its files in the store, its tasks on the feed and its branches' tips stand — a run at rest across passes, a moving run
+within the pass that judged it — read by the run object, its sub-resources and the list's `runs` entry through `runsSummarized` in
+`src/summary/summary.verb.ts`, every memo brought up to the feed by `src/rest/rest.verb.ts`. The `runs open`
 and `runs finished` entries (`src/runlist/runlist.verb.ts`) answer through the same memo and keep nothing of their own. The api holds
 both for an app; `wf stats` and `wf ls` keep none, and the api's tests read every answer from them afresh as well (`WF_VERIFY_REST`).
+The stats' memo and the informer are each a cache of a pure function, in memory only, which a restart rebuilds.
 
 ## The rules
 
@@ -458,7 +475,9 @@ import `agent-runtime/testing`, the engine's stand-in (`testingBreaches` in the 
 any route: a subpath not in its `exports`, a relative path, `import.meta.resolve`, or a path built with path.join. `decide` is exported
 by no entry, and the stand-in by the testing entry alone. The apps
 reach packages/agent-orchestrator through `agent-orchestrator`, `agent-orchestrator/run`,
-and `agent-orchestrator/workflow` alone; a test file, and no file of a `src` or a `bin`, may also import `agent-orchestrator/testing`,
+and `agent-orchestrator/workflow` alone; `apps/cli/src/local.ts`, and no other file, resolves `agent-orchestrator/bin` and
+`agent-orchestrator/bin/wf` to the file it spawns, and no file imports either (`binBreaches` in the orchestrator's `contract.test.ts`);
+a test file, and no file of a `src` or a `bin`, may also import `agent-orchestrator/testing`,
 the test place (`testingBreaches` in the orchestrator's `contract.test.ts`). `./workflow` is the pure format, and what reads a folder from disk, and the
 refusals by kind, are exported from `agent-orchestrator`. XState is a dependency
 of the runtime alone: `src/core/lifecycle.ts` is the one file of any workspace that imports it, and neither entry exports it,
@@ -468,7 +487,8 @@ caller runs over the engine with `runWith`, and `ae` runs each verb of `Engine.l
 a function that answers a Promise (`packages/agent-runtime/test/plain-faces.test.ts`).
 
 Lint holds the layers' imports as they are typed: `.oxlintrc.json` sets `no-restricted-imports` in one block per layer, over its
-source. The web's imports no workspace package, no harness SDK and no path into `packages/`; the api's imports the orchestrator
+source. The web's imports no workspace package, no harness SDK and no path into `packages/`; the cli's (`apps/cli/src` and `apps/cli/bin`)
+imports none of them either, and from the api only `import type` (`allowTypeImports`), of its client door alone; the api's imports the orchestrator
 through its three entries alone, and no runtime or harness SDK; the orchestrator's imports no harness SDK; the runtime's imports no
 layer above it. A harness SDK (`@anthropic-ai/claude-agent-sdk`, `@a2a-js/sdk`) is the runtime's alone.
 

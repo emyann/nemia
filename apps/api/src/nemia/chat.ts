@@ -73,8 +73,13 @@ const wordsOf =
       ? `${route} takes a JSON object: ${shape}.`
       : `${route}: \`${key}\` is a string with something in it, and this request's was ${JSON.stringify(input)}. Send ${shape}.`;
 
-/** How her chat reads the runs that wait on the person: as the board's list does, off the app's memo. */
-const readsOf = ({ home, memo, env }: Served): ChatReads => ({ home, runs: memo.resting, filings: memo.filings, env });
+/** How her chat reads the runs that wait on the person: as the board's list does, off the app's informer. */
+const readsOf = ({ home, memo, informer, env }: Served): ChatReads => ({
+  home,
+  ...(informer ? { runs: informer } : {}),
+  filings: memo.filings,
+  env,
+});
 
 /** One read's changes written to `stream`: the presence where it changed since `shown`, then each event, the cursor on the last. */
 async function sent(stream: SSEStreamingApi, read: ChatChanges, shown: string): Promise<string> {

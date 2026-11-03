@@ -20,8 +20,10 @@ from the orchestrator; what it holds today below its layer is in `docs/architect
 - **A body read off a response is `unknown`**: name the api's own answer type (`(await res.json()) as RunAnswer`).
 - **An encoded `..` never reaches a route in a test**: `app.request` resolves `%2E%2E` before the router sees it. Send `..%2F…` to reach
   a name refusal.
-- **The list answers a finished run from memory** (`restingRead`, the package's `rest/resting.verb.ts`) while its record, its stamps, the feed for its tasks and its branch tips
-  stand. A new input `summarize` reads for a finished run goes into one of those, or a poll answers it stale. The memo keeps the run it
+- **The run object, its sub-resources and the list answer from the app's informer** (`Informer`, one per app from `liveOf`; the
+  package's `informerRead` in `rest/informer.verb.ts`): a run at rest while its record, its stamps, the feed for its tasks and its
+  branch tips stand, and a moving run within the pass that judged it. A write through the api drops its run (`uninformed`,
+  `commands/routes.ts`). A new input `summaryOf` reads for a run goes into one of those, or a poll answers it stale. The informer keeps the run it
   judged and hands it to the store in place of a read of its record (`given`), so a warm list reads no record of a run at rest.
   `WF_VERIFY_REST=1` (set by the harness) judges every kept answer afresh and is handed nothing from memory, so every record is read
   again; a test that counts reads turns that off for its request (`unverified`). Requests overlap

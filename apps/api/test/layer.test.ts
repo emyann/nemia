@@ -13,7 +13,7 @@ import type { WorkflowListing } from '../src/workflows/workflows.ts';
 import { app, appOf, liveOf, runtime } from '../src/app.ts';
 import { ReadMemo } from '../src/layer.ts';
 import { Engine, StoreRoot } from '../src/store.ts';
-import { engine } from 'agent-orchestrator';
+import { engine, Informer } from 'agent-orchestrator';
 
 /** The names of the workflows `GET /api/workflows` lists as yours, through `on`. */
 const yoursOn = async (on: typeof app): Promise<string[]> => {
@@ -62,7 +62,17 @@ test("appOf: a mounted router reads the engine and the store's root of the app i
       const { app: own, runtime: ownRuntime } = appOf(Layer.merge(liveOf(), Layer.succeed(Engine)(engine())));
       const mine = await memoOf(ownRuntime);
       assert.notEqual(mine, theProcess, "an app's memo is its own");
-      assert.deepEqual([mine.filings.cursor, mine.filings.filed.size, mine.resting.runs.size, mine.said.size], [0, 0, 0, 0]);
+      const informerOf = (on: typeof runtime) =>
+        on.runPromise(
+          Effect.gen(function* () {
+            return yield* Informer;
+          }),
+        );
+      assert.notEqual(await informerOf(ownRuntime), await informerOf(runtime), "an app's informer is its own");
+      assert.deepEqual(
+        [mine.filings.cursor, mine.filings.filed.size, (await informerOf(ownRuntime))?.runs.size, mine.said.size],
+        [0, 0, 0, 0],
+      );
       assert.equal((await own.request('/api/runs')).status, 200);
       assert.ok(mine.filings.filed.has('t-layer-filed'), "read from the feed's start, not from where the process's app stopped");
     },

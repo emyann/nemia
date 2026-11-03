@@ -154,6 +154,7 @@ test('the repository’s page lists every table in the map’s order, and every 
     'commands',
     'api',
     'board',
+    'cli',
     'place',
     'planning',
     'factory',

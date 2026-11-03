@@ -26,3 +26,14 @@ export const treePathRefusal = (at: string): string | null =>
 
 /** A problem of a template: its file, the line and column it stands on where it is in a document, and the words. */
 export type Problem = { file: string; line?: number; col?: number; message: string };
+
+/**
+ * A `--template` as a person gives it, as a factory records it: a template's name (`templateNameRefusal` takes it) is a builtin template,
+ * kept as the name and resolved on every read (`templatePlace`); anything else is a folder or archive, resolved from the working
+ * directory. A folder whose name is a template's is named as a path, `./<name>`.
+ */
+export const sourceGiven = (given: string): string => (templateNameRefusal(given) === null ? given : path.resolve(given));
+
+/** The folder a recorded source is read from, for a line that cannot fail: a name's folder in `builtins`, a path as it is. */
+export const builtinPlace = (source: string, builtins: string): string =>
+  templateNameRefusal(source) === null ? path.join(builtins, source) : source;

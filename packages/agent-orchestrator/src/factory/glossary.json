@@ -103,8 +103,13 @@
     },
     {
       "term": "Applied template",
-      "meaning": "the template a factory was made from by `nemia factory apply`, as its file records it under `template`: the template's source, the version the factory wants, and the parameters given with `--set`.",
+      "meaning": "the template a factory was made from by `nemia factory apply`, as its file records it under `template`: the template's source (a folder or archive by its whole path, or the name of a builtin template, resolved on every read), the version the factory wants, and the parameters given with `--set`.",
       "type": "AppliedTemplate"
+    },
+    {
+      "term": "Builtin template",
+      "meaning": "a template that comes with Nemia: a folder holding its nemia.yaml in the templates workspace (`packages/templates/<name>`), found by path from the orchestrator's own folder (`BUILTIN_TEMPLATES` in `packages/agent-orchestrator/src/templates/templates.store.ts`) and never imported; named by its folder's name alone at `--template` and on a factory's file, where `templatePlace` resolves it on every read.",
+      "type": "BuiltinTemplates"
     }
   ]
 }

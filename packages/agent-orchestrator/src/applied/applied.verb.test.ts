@@ -115,7 +115,7 @@ test('what apply and a start of a templated factory refuse, by kind and exit 2, 
       await assert.rejects(apply('refused', dir, repo), refusedWith('Invalid', /budget has no default, and no --set gives it/));
       await assert.rejects(
         main(['factory', 'apply', 'refused', '--repo', repo], noEngine()),
-        refusedNaming('Invalid', '--template <folder|archive>'),
+        refusedNaming('Invalid', '--template <name|folder|archive>'),
       );
       fs.writeFileSync(path.join(dir, 'nemia.yaml'), fs.readFileSync(path.join(dir, 'nemia.yaml'), 'utf8').replace('v1alpha1', 'v2'));
       await assert.rejects(
@@ -407,3 +407,83 @@ const trustedIn = (dir: string): string[] => {
   const { projects } = JSON.parse(fs.readFileSync(file, 'utf8')) as { projects: Record<string, { hasTrustDialogAccepted?: boolean }> };
   return Object.keys(projects).filter((key) => projects[key].hasTrustDialogAccepted === true);
 };
+
+const { FACTORY_APPLY } = await import('./applied.verb.ts');
+const { FACTORY_UPGRADE } = await import('../upgrade/upgrade.verb.ts');
+const { runWith: runEngine } = await import('../runtime-client.ts');
+const { withBuiltins } = await import('../../test/templated.ts');
+
+/** `nemia factory apply`'s handler, its template the word `given`, with `builtins` as the folder of the templates Nemia ships. */
+const applyNamed = (builtins: string, name: string, given: string, repo: string, ...sets: string[]) =>
+  runEngine(
+    noEngine(),
+    withBuiltins(FACTORY_APPLY.handler({ name, template: given, repos: [repo], sets, noTrust: true }, undefined, ROOT), builtins).pipe(
+      Effect.provide(stand().layer),
+    ),
+  );
+
+test('a template Nemia ships, named: applied, recorded by its name, read wherever Nemia keeps it, and upgraded when it moves', async (t) => {
+  const s = { builtins: '', repo: '', file: path.join(FACTORIES, 'named.json') };
+  await t.test('applied by its name: the factory records the name and the version, and a pass renders it', async () => {
+    const { dir, repo } = template();
+    Object.assign(s, { builtins: path.dirname(dir), repo });
+    const done = await applyNamed(s.builtins, 'named', 'team', repo, 'budget=3');
+    assert.deepEqual([done.template.source, done.template.version, done.place], ['team', '0.1.0', dir]);
+    assert.deepEqual(JSON.parse(fs.readFileSync(s.file, 'utf8')).template, {
+      source: 'team',
+      version: '0.1.0',
+      params: done.template.params,
+    });
+    const status = programsAt(ROOT, s.builtins).reconciled(templated('named'));
+    assert.deepEqual([status.conditions[0].reason, status.version], ['Rendered', '0.1.0']);
+    assert.ok(fs.existsSync(path.join(treeDir('named'), 'workflows/dev/review.md')), 'the tree is seeded');
+  });
+  await t.test(
+    'the name, not the folder: the templates moved elsewhere, the old folder gone, read the same, and the file is unchanged',
+    async () => {
+      const moved = scratch('wf-applied-moved-');
+      fs.cpSync(s.builtins, moved, { recursive: true });
+      fs.rmSync(s.builtins, { recursive: true });
+      const before = fs.readFileSync(s.file, 'utf8');
+      assert.equal(programsAt(ROOT, moved).reconciled(templated('named')).conditions[0].reason, 'Rendered');
+      assert.equal(fs.readFileSync(s.file, 'utf8'), before);
+      s.builtins = moved;
+    },
+  );
+  await t.test('the shipped template moved to 0.2.0 is drift, and upgrade --to with no --template takes it by its name', async () => {
+    const dir = path.join(s.builtins, 'team');
+    edit(dir, 'nemia.yaml', (spec) => {
+      spec.version = '0.2.0';
+    });
+    edit(dir, 'workflows/dev/workflow.yaml', (spec) => {
+      spec.steps[1].rounds = 5;
+    });
+    const drift = programsAt(ROOT, s.builtins).reconciled(templated('named'));
+    assert.equal(drift.conditions[0].reason, 'VersionDrift');
+    await runEngine(
+      noEngine(),
+      withBuiltins(FACTORY_UPGRADE.handler({ factory: 'named', to: '0.2.0' }, undefined, ROOT), s.builtins).pipe(
+        Effect.provide(stand().layer),
+      ),
+    );
+    const { source, version } = JSON.parse(fs.readFileSync(s.file, 'utf8')).template;
+    assert.deepEqual([source, version], ['team', '0.2.0']);
+    assert.equal(programsAt(ROOT, s.builtins).reconciled(templated('named')).conditions[0].reason, 'Upgraded');
+  });
+  await t.test('REFUSED by the controller: a recorded name Nemia no longer ships is TemplateInvalid, its base and tree kept', async () => {
+    const digest = readStatus('named')?.digest;
+    const gone = programsAt(ROOT, scratch('wf-applied-none-')).reconciled(templated('named'));
+    const { message, ...applied } = gone.conditions[0];
+    assert.deepEqual(applied, { type: 'Applied', status: 'False', reason: 'TemplateInvalid' });
+    assert.ok(message.includes('./team'), message);
+    assert.equal(gone.digest, digest);
+    assert.ok(fs.existsSync(path.join(treeDir('named'), 'workflows/dev/review.md')));
+  });
+  await t.test('REFUSED Missing, nothing filed: a name Nemia does not ship, and any name where it ships none', async () => {
+    const before = filed();
+    await assert.rejects(applyNamed(s.builtins, 'nope', 'nope', s.repo, 'budget=3'), refusedNaming('Missing', 'team', './nope'));
+    const none = path.join(scratch('wf-applied-none-'), 'templates');
+    await assert.rejects(applyNamed(none, 'nope', 'team', s.repo, 'budget=3'), refusedNaming('Missing', 'no template', './team'));
+    assert.deepEqual(filed(), before);
+  });
+});

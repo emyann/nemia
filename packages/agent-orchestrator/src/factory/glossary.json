@@ -110,6 +110,10 @@
       "term": "Builtin template",
       "meaning": "a template that comes with Nemia: a folder holding its nemia.yaml in the templates workspace (`packages/templates/<name>`), found by path from the orchestrator's own folder (`BUILTIN_TEMPLATES` in `packages/agent-orchestrator/src/templates/templates.store.ts`) and never imported; named by its folder's name alone at `--template` and on a factory's file, where `templatePlace` resolves it on every read.",
       "type": "BuiltinTemplates"
+    },
+    {
+      "term": "Parameter expression",
+      "meaning": "`${{ parameters.<name> }}`, written in a template's text: a render writes it with the parameter's value in every string of a document and in every text it writes — a step's and an agent's instructions, NEMIA.md, RULES.md (`substitute` and `interpolated` in `packages/agent-orchestrator/src/applied/params.ts`) — and copies a carried file (a script, a skill's files, a schema) byte for byte; `nemia template lint` refuses a name nemia.yaml does not declare (`packages/agent-orchestrator/src/template/check.ts`). A shell's `$VAR` and `${VAR}` are none."
     }
   ]
 }

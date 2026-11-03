@@ -110,12 +110,14 @@ function refusalsOf(
   edit: (docs: Record<string, any>) => void = () => {},
   files: (others: string[]) => string[] = (others) => others,
   placeSkills: readonly string[] = ['git'],
+  texts: Readonly<Record<string, string>> = {},
 ): Refusal[] {
   const docs = documents();
   edit(docs);
   return checkTemplate(
     { name: 'software-team', files: [...Object.keys(docs), ...files([...OTHER_FILES])].sort(), documents: new Map(Object.entries(docs)) },
     placeSkills,
+    (file) => texts[file] ?? '',
   );
 }
 
@@ -424,6 +426,34 @@ test('the check of a template folder: the whole folder passes, and each rule bro
     };
     assert.deepEqual(refusalsOf(declared), []);
   });
+
+  await t.test(
+    'a ${{ parameters.<name> }} nemia.yaml does not declare is refused, in a check at its key and in a text the render writes at its file, and a declared one passes',
+    () => {
+      const workflow = 'workflows/dev/workflow.yaml';
+      const named = (d: Record<string, any>) => (d[workflow].spec.steps[1].check = 'go --check ${{ parameters.nope }}');
+      assertRefused(refusalsOf(named), workflow, ['spec', 'steps', 1, 'check'], 'nope');
+      const texts = {
+        'RULES.md': 'A card says what it is.\nIts areas: ${{parameters.nope}}.\n',
+        'workflows/dev/review.md': 'Wait on ${{ parameters.nope }}.',
+        'agents/reviewer/instructions.md': 'Read ${{ parameters.nope }}.',
+        'NEMIA.md': 'Operate ${{ parameters.nope }}.',
+      };
+      const withRules = (others: string[]) => [...others, 'RULES.md'];
+      const inTexts = refusalsOf(undefined, withRules, ['git'], texts);
+      for (const file of Object.keys(texts)) assertRefused(inTexts, file, [], 'nope');
+      assert.deepEqual([inTexts.find((r) => r.file === 'RULES.md')?.line, inTexts.find((r) => r.file === 'RULES.md')?.col], [2, 12]);
+      const carried = refusalsOf(undefined, withRules, ['git'], {
+        'skills/implement-a-change/scripts/coverage.ts': '${{ parameters.nope }}',
+      });
+      assert.deepEqual(carried, [], 'a carried file is copied as it is, and the check reads none of it');
+      const declared = (d: Record<string, any>) => {
+        named(d);
+        d['nemia.yaml'].spec.parameters.nope = { type: 'string', description: 'Declared now.', default: 'ci' };
+      };
+      assert.deepEqual(refusalsOf(declared, withRules, ['git'], texts), []);
+    },
+  );
 
   await t.test("an effort, a fence key or word, a context and an option the harness lacks are refused, through the runtime's knobs", () => {
     const block = (harness: string, profile: Record<string, unknown>) => refusalsOf((d) => (d[AGENT].spec[harness] = profile));

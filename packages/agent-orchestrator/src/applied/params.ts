@@ -1,8 +1,10 @@
 /**
  * A template's parameters given values: each `--set <key>=<value>` read against the manifest's `parameters`, typed as declared, a default
- * filling a value not given (`resolveParams`); and each `{param: <name>}` of a document replaced by its value (`substitute`). Pure.
+ * filling a value not given (`resolveParams`); each `{param: <name>}` of a document replaced by its value, and each
+ * `${{ parameters.<name> }}` inside one of its strings written with it (`substitute`); and each expression of a text written the same
+ * way (`interpolated`). A shell's `$VAR` and `${VAR}` are no expression, and stay as they are. Pure.
  */
-import { isMap, isParam, type Parameter } from '../template/index.ts';
+import { isMap, isParam, writeExpressions, type Parameter } from '../template/index.ts';
 
 /** A parameter's value: a string, a number or a boolean, as its declaration types it. */
 export type ParamValue = string | number | boolean;
@@ -75,8 +77,23 @@ export function resolveParams(
   return { params, refusals };
 }
 
-/** `value` with each `{param: <name>}` in it, at any depth, replaced by the value `params` gives. Refused: a name `params` lacks. */
+/** `text` with each `${{ parameters.<name> }}` in it written with the value `params` gives. Refused: a name `params` lacks. */
+export function interpolated(text: string, params: Params): string {
+  return writeExpressions(text, (name) => {
+    if (!Object.hasOwn(params, name))
+      throw new Error(
+        `\${{ parameters.${name} }} names a parameter the template does not declare: declare ${name} in nemia.yaml's parameters, or remove the expression.`,
+      );
+    return String(params[name]);
+  });
+}
+
+/**
+ * `value` with each `{param: <name>}` in it, at any depth, replaced by the value `params` gives, and each `${{ parameters.<name> }}`
+ * inside a string written with it (`interpolated`). Refused: a name `params` lacks.
+ */
 export function substitute(value: unknown, params: Params): unknown {
+  if (typeof value === 'string') return interpolated(value, params);
   if (isParam(value)) {
     if (!Object.hasOwn(params, value.param))
       throw new Error(`{param: ${value.param}} names a parameter the template does not declare: declare it in nemia.yaml's parameters.`);

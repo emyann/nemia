@@ -6,13 +6,14 @@
  * and the orchestrator's guard of its flag reads the apps' `tsconfig.json` (`index-reads.test.ts`).
  * The declared-imports scan here reads every workspace package's `package.json` and source, the apps' configs and the runtime's files
  * among them, and the runtime's contract test reads the `.ts` files at each app's root too, and both contract scans an app's code beside
- * its `src/`, the client's `bin/` and `contracts/` (`APP_BESIDE`). The vocabulary test here reads this
- * repository's team from `workflows/`, its agents and its workflows' folders (`words.test.ts`), and its whole-repository scans
+ * its `src/`, the client's `bin/` and `contracts/` (`APP_BESIDE`). The vocabulary test here reads the
+ * names of the agents and workflows sdlc ships, under `packages/templates/sdlc/` (`words.test.ts`, `nemia-shipped.test.ts`), which
+ * the orchestrator's own files do not reach, and its whole-repository scans
  * (`names.test.ts`, `others.test.ts`) read the root's and the apps' `CLAUDE.md` among every file. The orchestrator's tests read the side
  * Grafana's files and the guards' manifest (`observe.test.ts`, `profile.test.ts`, `contract.test.ts`), the runtime's contract test a
  * file of `tools/observe/render/`, and the docs' name test every file under `tools/` (`names.test.ts`), so those three tasks and the
  * guards' list `tools/`. The docs' tests read the packages' docs for the diagrams they draw, every source for the names their pages
- * cite, and the paths those pages cite, at the root and under `docs/` and `workflows/`. The api's test of what `npm run dev` watches
+ * cite, and the paths those pages cite, at the root and under `docs/`. The api's test of what `npm run dev` watches
  * reads every workspace package's `package.json` and sources
  * (`dev-watch.test.ts`). The api's tests read Nemia's builtin servers and skills, the orchestrator's `servers/` and `skills/`
  * (`servers.test.ts`, `sign-in.boundary.test.ts`, `skills.test.ts`). The board's test of the look's parts reads the trigger skill of a
@@ -87,7 +88,7 @@ const INPUTS: Record<string, readonly string[]> = {
     '$TURBO_ROOT$/apps/*/tsconfig.json',
     '$TURBO_ROOT$/apps/*/CLAUDE.md',
     '$TURBO_ROOT$/CLAUDE.md',
-    '$TURBO_ROOT$/workflows/**',
+    '$TURBO_ROOT$/packages/templates/sdlc/**',
     '$TURBO_ROOT$/packages/agent-runtime/**',
     '!$TURBO_ROOT$/packages/agent-runtime/.turbo/**',
   ],
@@ -95,7 +96,6 @@ const INPUTS: Record<string, readonly string[]> = {
     '$TURBO_DEFAULT$',
     '$TURBO_ROOT$/.github/**',
     '$TURBO_ROOT$/.gitleaks.toml',
-    '$TURBO_ROOT$/workflows/**',
     '$TURBO_ROOT$/docs/**',
     '$TURBO_ROOT$/tools/**',
     '$TURBO_ROOT$/package.json',
@@ -139,7 +139,6 @@ const INPUTS: Record<string, readonly string[]> = {
     '$TURBO_ROOT$/packages/**',
     '!$TURBO_ROOT$/packages/*/.turbo/**',
     '$TURBO_ROOT$/docs/**',
-    '$TURBO_ROOT$/workflows/**',
     '$TURBO_ROOT$/README.md',
     '$TURBO_ROOT$/CLAUDE.md',
   ],
@@ -164,7 +163,7 @@ test('each test that reads files outside its package lists them among its inputs
   assert.deepEqual(missingInputs(readTurbo()), []);
 });
 
-test("REFUSED: a task that drops the apps' tests, sources or tables, or root files, the team, the repository's tools, its own files, or its whole inputs", () => {
+test("REFUSED: a task that drops the apps' tests, sources or tables, or root files, sdlc's team, the repository's tools, its own files, or its whole inputs", () => {
   const dropping = (task: string, glob: string): Turbo => {
     const turbo = readTurbo();
     const inputs = turbo.tasks[task]?.inputs ?? [];
@@ -189,8 +188,8 @@ test("REFUSED: a task that drops the apps' tests, sources or tables, or root fil
   assert.deepEqual(missingInputs(dropping('guards#test', '$TURBO_ROOT$/.gitleaks.toml')), [
     'guards#test does not list $TURBO_ROOT$/.gitleaks.toml among its inputs in turbo.json: add it, or turbo replays it from its cache',
   ]);
-  assert.deepEqual(missingInputs(dropping('agent-orchestrator#test', '$TURBO_ROOT$/workflows/**')), [
-    'agent-orchestrator#test does not list $TURBO_ROOT$/workflows/** among its inputs in turbo.json: add it, or turbo replays it from its cache',
+  assert.deepEqual(missingInputs(dropping('agent-orchestrator#test', '$TURBO_ROOT$/packages/templates/sdlc/**')), [
+    'agent-orchestrator#test does not list $TURBO_ROOT$/packages/templates/sdlc/** among its inputs in turbo.json: add it, or turbo replays it from its cache',
   ]);
   assert.deepEqual(missingInputs(dropping('agent-runtime#test', '$TURBO_ROOT$/apps/*/*.ts')), [
     'agent-runtime#test does not list $TURBO_ROOT$/apps/*/*.ts among its inputs in turbo.json: add it, or turbo replays it from its cache',

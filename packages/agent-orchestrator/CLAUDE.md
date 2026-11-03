@@ -77,7 +77,7 @@ too, which holds parity with this one until the in-process reads retire.
   package's readers (`splitFrontmatter` for the block, `readFrontmatter` for its YAML, both from `agent-orchestrator/workflow`), never a
   parser of its own.
 - **A test that needs a realistic folder reads the tests' team** (`test/fixtures/team`, `test/team.ts`), never a shipped one: a
-  person's factories get no workflow or agent from the package, and a guard over what ships reads `shippedFolders()`.
+  person's factories get no workflow or agent from the package.
 - **The api reads `agent-orchestrator`, `agent-orchestrator/run` and `agent-orchestrator/workflow`**, its tests with
   `await import`: the api's typecheck fails on a name a subpath no longer exports, so before moving a name out of `run.ts` or
   `workflow.ts`, re-export from `run.ts` what the api reads there.

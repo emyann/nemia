@@ -15,16 +15,18 @@
  *   Refused in the runtime's `src` and `bin`, but a word the runtime's glossary retires (`RETIRED`), which its own guard counts
  *   (`tools/guards/test/glossary.test.ts`) so that no file is held to the same word twice. A sign-in is no end: `signed` or `signs`
  *   before `in`, `out` or `into` is not counted (`SIGN_IN`), so "signed in to a server" is said and "the session that signed" is not.
- * - **This repository's team stays out of the product** (`teamOf`): the name of each agent of `workflows/agents/`, read as the test
- *   runs, so a new agent is refused with no edit here, and the owner's factory's name (`FACTORY_NAMES`), which no team file holds.
+ * - **The nemia factory's team stays out of the product** (`teamOf`): the name of each agent of `packages/templates/sdlc/agents/`, the
+ *   team the factory runs on, read as the test runs, so a new agent is refused with no edit here; an agent that left it
+ *   (`FORMER_TEAM`, in the team's baseline), and the owner's factory's name (`FACTORY_NAMES`), which no team file holds.
  *   Refused in every package's `src`, `test`, `bin` and `place` and every app's `src` and `test`, tests and their text fixtures
  *   (`teamRead`) included: a product test that
- *   passes only with our team present is the same debt as product code that names it. A name that is plain English (`PLAIN_NAMES`)
+ *   passes only with the team present is the same debt as product code that names it. A name that is plain English (`PLAIN_NAMES`)
  *   counts only as a quoted literal or a path segment.
- * - **Nor does the product read the team's folder** (`teamPathsIn`): a path into `workflows/<a team workflow>` of this checkout (the
- *   folders `workflowsIn` finds there, read as the test runs, and `servers`, which was the team's), spelt as a path or as the segments
- *   of a join, and the checkout's `workflows/` reached from `REPO`, `HOME_REPO` or `import.meta.dirname`. Refused where the team's names
- *   are. A product's own `workflows/` — a store's library, a fixture repository's — is no path into the team's, and is not counted.
+ * - **Nor does the product read the team's folder** (`teamPathsIn`): a path into `workflows/<a team workflow>` (the folders
+ *   `workflowsIn` finds in sdlc's `workflows/`, read as the test runs, and `servers`, which was the team's), spelt as a path or as the
+ *   segments of a join, and the checkout's `workflows/` reached from `REPO`, `HOME_REPO` or `import.meta.dirname`. Refused where the
+ *   team's names are. A product's own `workflows/` — a store's library, a fixture repository's — is no path into the team's, and is not
+ *   counted.
  *
  * A word is matched whole and in any case, comments included (`wordsIn`): a hyphen or a dot ends it, so `claude-code` and
  * `CLAUDE.md` say it, and a longer name (`claudeArgs`, `$claude`) does not. The board's vendored components and its generated route
@@ -37,8 +39,8 @@
  * an entry with no card, an unknown card, or a move with nowhere to go. A change that takes a word out of a file lowers its count in the
  * same commit.
  *
- * The test reads files outside this package: `turbo.json` makes the apps' sources and tests, the runtime and `workflows/` inputs of this
- * package's tests; after a change to `workflows/`, `npx turbo run test --force`.
+ * The test reads files outside this package: `turbo.json` makes the apps' sources and tests, the runtime and the templates inputs of
+ * this package's tests; after a change to sdlc's agents or workflows, `npx turbo run test --force`.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -47,7 +49,7 @@ import path from 'node:path';
 import { CLAUDE_PERMISSION_MODES, CODEX_SANDBOXES } from 'agent-runtime';
 import { workflowsIn } from '../src/folder/folder.store.ts';
 import { scratch } from './scratch.ts';
-import { TEAM_NAMES, TEAM_PATHS } from './team-names.baseline.ts';
+import { FORMER_TEAM, TEAM_NAMES, TEAM_PATHS } from './team-names.baseline.ts';
 
 const ROOT = path.join(import.meta.dirname, '..', '..', '..');
 
@@ -98,8 +100,8 @@ const SIGN_IN = /(?<![\w$])(signed|signs)[\s-]+(?:in|out|into)(?![\w$])/gi;
 const PLAIN_NAMES: readonly string[] = ['grace'];
 
 /**
- * The owner's factory, named in no file of `workflows/` (a factory is a person's record in their store, not a file of the team), so
- * held here: the one team word this guard cannot read from the team.
+ * The owner's factory, named in no file of the team (a factory is a person's record in their store, not a file of the team), so
+ * held here: a team word this guard cannot read from the team.
  */
 const FACTORY_NAMES: readonly string[] = ['pipao'];
 
@@ -398,13 +400,13 @@ const TEAM_RULE: Rule = {
       .flatMap((p) => ['src', 'test', 'bin', 'place'].map((d) => `packages/${p}/${d}`)),
     ...fs.readdirSync(path.join(ROOT, 'apps')).flatMap((a) => ['src', 'test'].map((d) => `apps/${a}/${d}`)),
   ],
-  fix: "the team is this repository's, never the product's: name a fixture agent of test/fixtures/team (implementer, reviewer, shipper) and a factory no team holds (acme), or move the test beside the team's script in workflows/",
+  fix: "the team is the nemia factory's, never the product's: name a fixture agent of test/fixtures/team (implementer, reviewer, shipper) and a factory no team holds (acme), or move the test beside the team's script in packages/templates/sdlc",
 };
 
 const TEAM_PATHS_RULE: Rule = {
   what: "paths into the team's workflows/",
   dirs: TEAM_RULE.dirs,
-  fix: "the product reads no file of this repository's team: build the folder the test needs from test/fixtures/team, or move the test beside the team's script in workflows/",
+  fix: "the product reads no file of the nemia factory's team: build the folder the test needs from test/fixtures/team, or move the test beside the team's script in packages/templates/sdlc",
 };
 
 /** This guard and the team's baseline, whose fixtures and entries say the team's names and paths on purpose. */
@@ -448,12 +450,12 @@ const textsOf = (dirs: readonly string[], skip: (file: string) => boolean = skip
       .map((f) => [f, fs.readFileSync(path.join(ROOT, f), 'utf8')]),
   );
 
-/** The team: the name of each agent file in `agentsDir`, without its `.md`. */
+/** The team: the name of each agent in `agentsDir`, laid out as a template's are, a folder each. */
 const teamOf = (agentsDir: string): string[] =>
   fs
-    .readdirSync(agentsDir)
-    .filter((f) => f.endsWith('.md'))
-    .map((f) => f.slice(0, -'.md'.length))
+    .readdirSync(agentsDir, { withFileTypes: true })
+    .filter((e) => e.isDirectory())
+    .map((e) => e.name)
     .sort();
 
 const escaped = (word: string): string => word.replace(/[.*+?^${}()|[\]\\-]/g, '\\$&');
@@ -578,7 +580,7 @@ function breaches(
     ...ratchetBreaks(HARNESS_RULE, measured(texts.harness, HARNESS), HARNESS_WORDS, onDisk),
     ...ratchetBreaks(WORKFLOW_RULE, measured(texts.workflow, WORKFLOW), WORKFLOW_WORDS, onDisk),
     ...ratchetBreaks(LAYER_ABOVE_RULE, measuredBy(texts.workflow, layerAboveIn), LAYER_ABOVE_WORDS, onDisk),
-    ...ratchetBreaks(TEAM_RULE, measured(texts.team, [...team, ...FACTORY_NAMES], PLAIN_NAMES), TEAM_NAMES, onDisk),
+    ...ratchetBreaks(TEAM_RULE, measured(texts.team, [...team, ...FORMER_TEAM, ...FACTORY_NAMES], PLAIN_NAMES), TEAM_NAMES, onDisk),
     ...ratchetBreaks(
       TEAM_PATHS_RULE,
       measuredBy(texts.team, (text) => teamPathsIn(text, folders)),
@@ -595,10 +597,13 @@ const repository = () => ({
   fence: new Map([...textsOf(FENCE_RULE.dirs)].filter(([file]) => !file.startsWith(OWN_FENCE))),
 });
 
-const TEAM = teamOf(path.join(ROOT, 'workflows', 'agents'));
+/** sdlc, the template the nemia factory runs on: its agents are the team's. */
+const SDLC = path.join(ROOT, 'packages', 'templates', 'sdlc');
 
-/** The team's folders under `workflows/`: each workflow of it, read as the test runs, and `servers`, which it held until it moved. */
-const TEAM_FOLDERS = [...workflowsIn(path.join(ROOT, 'workflows')), 'servers'];
+const TEAM = teamOf(path.join(SDLC, 'agents'));
+
+/** The team's workflows: each of sdlc's, read as the test runs, and `servers`, which the team held until it moved. */
+const TEAM_FOLDERS = [...workflowsIn(path.join(SDLC, 'workflows')), 'servers'];
 
 /** Each word of `plain` that none of the runtime's `lists` holds: a plain word left behind when the runtime dropped it. */
 const stalePlain = (plain: readonly string[], lists: readonly (readonly string[])[]): string[] =>
@@ -637,8 +642,8 @@ test("the lists: the runtime's harness words but the plain ones, every plain one
   assert.deepEqual(stalePlain([...PLAIN_HARNESS, 'yolo'], [CLAUDE_PERMISSION_MODES, CODEX_SANDBOXES]), [
     'PLAIN_HARNESS holds yolo, which the runtime no longer lists: take it off',
   ]);
-  assert.ok(TEAM.includes('ada') && TEAM.includes('seldon'), `the team read is ${TEAM.join(', ')}`);
-  assert.ok(!TEAM.some((n) => n.endsWith('.schema')), 'a schema beside the agents is no agent');
+  assert.ok(TEAM.includes('seldon') && TEAM.includes('grace'), `the team read is ${TEAM.join(', ')}`);
+  assert.ok(!TEAM.includes('ada') && FORMER_TEAM.includes('ada'), 'an agent that left the team is held beside it');
   assert.deepEqual(
     PLAIN_NAMES.filter((n) => !TEAM.includes(n)),
     [],
@@ -693,11 +698,11 @@ test('REFUSED: a new file in each layer that says a word of another', () => {
 });
 
 test('REFUSED: a new agent of the team, with no edit to the test', () => {
-  const root = scratch('words-team-');
-  const agents = path.join(root, 'workflows', 'agents');
-  fs.mkdirSync(agents, { recursive: true });
-  for (const name of [...TEAM, 'quillon']) fs.writeFileSync(path.join(agents, `${name}.md`), `---\nname: ${name}\n---\n`);
-  fs.writeFileSync(path.join(agents, 'quillon.schema.json'), '{}');
+  const agents = path.join(scratch('words-team-'), 'agents');
+  fs.cpSync(path.join(SDLC, 'agents'), agents, { recursive: true });
+  fs.mkdirSync(path.join(agents, 'quillon'));
+  fs.writeFileSync(path.join(agents, 'quillon', 'agent.yaml'), 'name: quillon\n');
+  fs.writeFileSync(path.join(agents, 'notes.md'), 'A file beside the agents is no agent.\n');
   const team = teamOf(agents);
   assert.deepEqual(team, [...TEAM, 'quillon'].sort());
   const texts = repository();
@@ -784,6 +789,9 @@ test("REFUSED: a product test that names the team, the owner's factory or a path
     'packages/agent-orchestrator/test/x.test.ts holds 1 team names',
   ]);
   assert.deepEqual(planted('packages/agent-orchestrator/src/x/x.ts', '/** Started in pipao. */\n'), [
+    'packages/agent-orchestrator/src/x/x.ts holds 1 team names',
+  ]);
+  assert.deepEqual(planted('packages/agent-orchestrator/src/x/x.ts', "export const engineer = 'ada';\n"), [
     'packages/agent-orchestrator/src/x/x.ts holds 1 team names',
   ]);
   assert.deepEqual(planted('apps/web/test/x.test.ts', "const script = 'workflows/build/landing.ts';\n"), [

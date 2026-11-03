@@ -1,11 +1,11 @@
 /**
- * This repository's team is another software factory's as it is: its agents (`workflows/agents/*.md`, frontmatter and body), the closeout
- * schemas beside them, and the skills that are their own (`OWN_SKILLS`, each `SKILL.md` and its `rules.json`) say no word of this
- * repository (`REPOSITORY_WORDS`): no path of it, no command or tool of its check, no file of its lint, no step of its workflows, none of
- * its owner's settings. What is this repository's is told by the layer that owns it: a step of its workflows, its `.claude/settings.json`,
- * its `CLAUDE.md` files, its factory's rules. A link to Anthropic's own documentation is not a path of this repository, and no word is
- * read inside one (`DOCUMENTATION`). An agent's `skills:` names only its own skills, the place's and the vendored interview
- * (`ROLE_SKILLS`): a skill about this repository is added by the step that needs it.
+ * The role skills under `.claude/skills` (`OWN_SKILLS`, each `SKILL.md` and its `rules.json`), the ones sdlc ships for its agents to
+ * write, build, review and land a change and read the stats, are another software factory's as they are: they say no word of this
+ * repository (`REPOSITORY_WORDS`): no path of it, no command or tool of its check, no file of its lint, no step of its workflows, none
+ * of its owner's settings. What is this repository's is told by the layer that owns it: a step of the nemia factory's workflows, its
+ * `.claude/settings.json`, its `CLAUDE.md` files, its factory's rules. A link to Anthropic's own documentation is not a path of this
+ * repository, and no word is read inside one (`DOCUMENTATION`). sdlc's agents, and the rest of its tree, are held the same way by
+ * `packages/templates/test/portable.test.ts`.
  *
  * Each word is first refused in planted text (`PLANTED`), and each file is read for a name it must hold, so a file moved or emptied
  * cannot make the guard pass by reading nothing.
@@ -14,14 +14,13 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { splitFrontmatter } from 'agent-orchestrator/workflow';
 import { REPO } from './workspaces.ts';
 
-/** This repository's words, which no agent of the team, no schema beside one, no skill of theirs may say, each with text that says it. */
+/** This repository's words, which no role skill may say, each with text that says it. */
 const PLANTED: Record<string, string> = {
   'apps/': 'When the change touches `apps/web`, picture its pages.',
   'packages/': 'Read packages/agent-runtime/README.md first.',
-  'workflows/': 'Try it first: `node workflows/build/pictures.ts`.',
+  'workflows/': 'the steps are under workflows/build/, read them first',
   '.claude/skills': 'read `.claude/skills/board/SKILL.md` with Read',
   'docs/': 'the layers are in docs/architecture.md',
   npm: 'allowedTools: Agent, Bash(npm run lint)',
@@ -62,14 +61,8 @@ const oursIn = (files: Map<string, string>, words: readonly string[] = REPOSITOR
     words.filter((word) => wholeWord(word).test(text.replace(DOCUMENTATION, ''))).map((word) => `${file}: ${word}`),
   );
 
-/** The skills that are the team's own, written for its roles. */
+/** The skills written for the roles of a team. */
 const OWN_SKILLS = ['write-a-spec', 'implement-a-change', 'review-a-change', 'land-a-branch', 'read-the-stats'];
-
-/** The skills an agent of the team may name itself: its own, the place's, and the vendored interview. */
-const ROLE_SKILLS = [...OWN_SKILLS, 'git', 'grilling'];
-
-/** The team's agents folder, from the repository's root. */
-const AGENTS = 'workflows/agents';
 
 /** Every file of `folder` whose name ends in `suffix`, by its path from the repository's root. */
 const filesOf = (folder: string, suffix: string): string[] =>
@@ -79,38 +72,22 @@ const filesOf = (folder: string, suffix: string): string[] =>
     .sort()
     .map((name) => `${folder}/${name}`);
 
-/** Each file of the team the guard reads, by its path from the repository's root, with a name it must hold. */
-const TEAM_FILES: Array<{ file: string; holds: string }> = [
-  ...filesOf(AGENTS, '.md').map((file) => ({ file, holds: 'role:' })),
-  ...filesOf(AGENTS, '.schema.json').map((file) => ({ file, holds: '"properties"' })),
-  ...OWN_SKILLS.flatMap((skill) => [
-    { file: `.claude/skills/${skill}/SKILL.md`, holds: `name: ${skill}\n` },
-    ...filesOf(`.claude/skills/${skill}`, 'rules.json').map((file) => ({ file, holds: '"breaks"' })),
-  ]),
-];
+/** Each file the guard reads, by its path from the repository's root, with a name it must hold. */
+const SKILL_FILES: Array<{ file: string; holds: string }> = OWN_SKILLS.flatMap((skill) => [
+  { file: `.claude/skills/${skill}/SKILL.md`, holds: `name: ${skill}\n` },
+  ...filesOf(`.claude/skills/${skill}`, 'rules.json').map((file) => ({ file, holds: '"breaks"' })),
+]);
 
-/** The team's files as they are on disk, by path. */
-const team = (): Map<string, string> => new Map(TEAM_FILES.map(({ file }) => [file, fs.readFileSync(path.join(REPO, file), 'utf8')]));
+/** The skills' files as they are on disk, by path. */
+const roleSkills = (): Map<string, string> =>
+  new Map(SKILL_FILES.map(({ file }) => [file, fs.readFileSync(path.join(REPO, file), 'utf8')]));
 
-/** Each skill an agent file of `files` names in its `skills:` that is not a role's (`ROLE_SKILLS`): a line each, `<file>: <skill>`. */
-const foreignSkills = (files: Map<string, string>): string[] =>
-  [...files]
-    .filter(([file]) => file.endsWith('.md') && file.startsWith(`${AGENTS}/`))
-    .flatMap(([file, text]) => {
-      const line = /^skills:(.*)$/m.exec(splitFrontmatter(file, text).block ?? '')?.[1] ?? '';
-      return line
-        .split(',')
-        .map((skill) => skill.trim())
-        .filter((skill) => skill !== '' && !ROLE_SKILLS.includes(skill))
-        .map((skill) => `${file}: ${skill}`);
-    });
-
-test("REFUSED: each of this repository's words, planted in an agent's body, in its fence and in a skill", () => {
+test("REFUSED: each of this repository's words, planted in a skill's body, in its frontmatter and in its rules", () => {
   for (const [word, says] of Object.entries(PLANTED)) {
     const files = new Map([
-      ['workflows/agents/x.md', `---\nrole: X\n---\nYou are X. ${says}\n`],
-      ['workflows/agents/y.md', `---\nrole: Y\nallowedTools: Agent\nnote: ${says}\n---\nYou are Y.\n`],
-      ['.claude/skills/x/SKILL.md', `# X\n\n1. ${says}\n`],
+      ['.claude/skills/x/SKILL.md', `---\nname: x\n---\n# X\n\n1. ${says}\n`],
+      ['.claude/skills/y/SKILL.md', `---\nname: y\ndescription: ${says}\n---\n# Y\n`],
+      ['.claude/skills/x/rules.json', JSON.stringify({ rules: [{ breaks: says }] })],
     ]);
     assert.deepEqual(
       oursIn(files, [word]),
@@ -145,50 +122,13 @@ test('the matcher takes a word whole, and lets through what any factory says', (
   assert.deepEqual(oursIn(generic), []);
 });
 
-test('every file of the team is read, and holds a name it must', () => {
-  const files = team();
-  assert.deepEqual(filesOf(AGENTS, '.md').length, 7, 'the seven agents');
-  for (const { file, holds } of TEAM_FILES) assert.ok(files.get(file)?.includes(holds), `${file} holds ${holds}`);
+test('every file of the role skills is read, and holds a name it must', () => {
+  const files = roleSkills();
+  for (const { file, holds } of SKILL_FILES) assert.ok(files.get(file)?.includes(holds), `${file} holds ${holds}`);
   for (const skill of ['write-a-spec', 'review-a-change'])
     assert.ok(files.has(`.claude/skills/${skill}/rules.json`), `${skill}'s rules are read`);
 });
 
-test('no agent of the team, no schema beside one and no skill of theirs says a word of this repository', () => {
-  assert.deepEqual(oursIn(team()), []);
-});
-
-test('REFUSED: an agent whose `skills:` names a skill that is not a role’s own', () => {
-  const files = new Map([
-    ['workflows/agents/x.md', '---\nrole: X\nskills: implement-a-change, git, look\n---\nYou are X.\n'],
-    ['workflows/agents/y.md', '---\nrole: Y\nskills: grilling\n---\nYou are Y. Mind your skills: look, board.\n'],
-    ['workflows/agents/z.md', '---\nrole: Z\nskills: implement-a-change, apps/web:ds-build\n---\nYou are Z.\n'],
-    ['.claude/skills/x/SKILL.md', '---\nname: x\nskills: look\n---\n# X\n'],
-  ]);
-  assert.deepEqual(foreignSkills(files), ['workflows/agents/x.md: look', 'workflows/agents/z.md: apps/web:ds-build']);
-});
-
-test("each agent of the team names only its role's skills", () => {
-  assert.deepEqual(foreignSkills(team()), []);
-});
-
-/** Each agent file of `files` whose frontmatter has an `mcp:` line, a server of one repository's `.mcp.json`: a line each, as written. */
-const namedServers = (files: Map<string, string>): string[] =>
-  [...files]
-    .filter(([file]) => file.endsWith('.md') && file.startsWith(`${AGENTS}/`))
-    .flatMap(([file, text]) => {
-      const line = /^mcp:.*$/m.exec(splitFrontmatter(file, text).block ?? '')?.[0];
-      return line === undefined ? [] : [`${file}: ${line}`];
-    });
-
-test("REFUSED: an MCP server named in an agent's file, which the step that needs it names", () => {
-  const files = new Map([
-    ['workflows/agents/x.md', '---\nrole: X\nmcp: playwright\n---\nYou are X.\n'],
-    ['workflows/agents/y.md', '---\nrole: Y\n---\nYou are Y, and mcp: playwright is no line of yours.\n'],
-    ['workflows/build/implement.md', '---\nplace: git\nagent: x\nmcp: playwright\n---\nBuild.\n'],
-  ]);
-  assert.deepEqual(namedServers(files), ['workflows/agents/x.md: mcp: playwright']);
-});
-
-test('no agent of the team names an MCP server', () => {
-  assert.deepEqual(namedServers(team()), []);
+test('no role skill says a word of this repository', () => {
+  assert.deepEqual(oursIn(roleSkills()), []);
 });

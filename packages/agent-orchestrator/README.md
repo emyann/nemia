@@ -1581,7 +1581,7 @@ nothing that waits on the step ever runs. A step with no `check:` has nothing ru
   and a space, at the start of the line — whole, from the stdout the runtime kept and not only the tail
   (`reportedLines`, at most `REPORTED_LINES`). A check whose stdout the runtime did not keep — filed before it kept
   streams — has those lines read from the end of the log alone, and the section says so, with
-  `"partial": true`: a line absent from it proves nothing. That is how a check marks what the next step must read: `workflows/build`'s pictures
+  `"partial": true`: a line absent from it proves nothing. That is how a check marks what the next step must read: the nemia factory's pictures
   print `wf pictures: …`, and a reviewer whose fence reaches no log reads them in its brief. The step reads
   the check of the try or round it follows, read on the pass that files it.
 

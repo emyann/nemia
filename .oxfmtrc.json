@@ -22,7 +22,6 @@
     "apps/web/.claude/**",
     "apps/web/src/components/ui/ds/**",
     "apps/web/theme/**",
-    "workflows/**",
     "packages/*/workflows/**"
   ]
 }

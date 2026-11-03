@@ -32,11 +32,11 @@ import { endsOnBase, type Workflow } from '../step/step.ts';
  *
  * A guard against a hang, not a budget, so it is set well above the slowest round check: the pictures, the probe, the push of the round's
  * commit, the typecheck, the lint, and last the wait on
- * GitHub's `ci` context, which carries a bound of its own (`WHOLE_SECONDS`, 2400 s in `workflows/build/pull-request.ts`) so that a red or
- * missing verdict comes back as the script's refusal in words — the Actions URL, the failing jobs, the retry line — and not as a check
- * this deadline killed. So the number is above the clauses before the wait plus the wait itself: with 3300 those clauses have 900 s, which
- * `pull-request.boundary.test.ts` holds against the script's number. The suite, the types, the lint, the whole e2e and the build run in
- * `ci`, on the pushed commit, and no longer here.
+ * GitHub's `ci` context, which carries a bound of its own (`WHOLE_SECONDS`, 2400 s in the `pull-request.ts` of the sdlc template's build)
+ * so that a red or missing verdict comes back as the script's refusal in words — the Actions URL, the failing jobs, the retry line — and
+ * not as a check this deadline killed. So the number is above the clauses before the wait plus the wait itself: with 3300 those clauses
+ * have 900 s, which the templates' `pull-request.boundary.test.ts` holds against the script's number. The suite, the types, the lint,
+ * the whole e2e and the build run in `ci`, on the pushed commit, and no longer here.
  *
  * The history of the figure, which is where 3300 comes from and the only measurement anyone has made of it: it was measured from the
  * round checks' journals while the check still ran the suite and the e2e itself, and ran a mutant trial per rule a closeout named,

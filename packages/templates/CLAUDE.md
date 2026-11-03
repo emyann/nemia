@@ -25,7 +25,7 @@ layout gives a place sits inside a template's folder: the workspace's own files 
 - **Never import `agent-orchestrator/src`.** The tests reach the orchestrator through its entries (`agent-orchestrator`,
   `agent-orchestrator/run`, `agent-orchestrator/workflow`) and its CLI (`agent-orchestrator/bin`), and run a step's check as the run
   does, by `checkArgv`. The orchestrator never imports this workspace either: it finds a builtin template by path.
-- **The test helpers `test/scratch.ts` and `test/origin.ts` are byte copies** of the orchestrator's, held equal by its
-  `test/scratch.test.ts`: change the orchestrator's and copy it here.
+- **The test helper `test/scratch.ts` is a byte copy** of the runtime's, held equal by the orchestrator's `test/scratch.test.ts`: change
+  the runtime's and copy it here. `test/origin.ts` is this workspace's own, for its script boundaries.
 - **Run one test** from this folder: `node --test test/<file>.test.ts`; the whole workspace: `npx turbo run test --force --continue
   --filter=templates`.

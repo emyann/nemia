@@ -1,10 +1,10 @@
 /**
- * Every SKILL.md there is, read as a session's harness reads it, and the board's skill as build's implement step is given it. How a
- * step's skills are rendered by `nemia start` — named, a preloaded one told whole, every one told whole in the brief when the rendered
- * folder is gone — is the story of `step-skills.test.ts`.
+ * Every SKILL.md there is, read as a session's harness reads it. How a step's skills are rendered by `nemia start` — named, a preloaded
+ * one told whole, every one told whole in the brief when the rendered folder is gone — is the story of `step-skills.test.ts`.
  *
  * A SKILL.md whose frontmatter is not YAML is dropped by Claude Code with nothing said — the session is simply not given it — so every
- * SKILL.md there is, the team's, whatever is shipped, Nemia's and the repository's own, is parsed here as YAML, as a card entry reads it.
+ * SKILL.md there is, the tests' team's, the package's builtin ones, Nemia's and the repository's own, is parsed here as YAML, as a card
+ * entry reads it.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -12,27 +12,15 @@ import fs from 'node:fs';
 import path from 'node:path';
 import yaml from 'js-yaml';
 import { skillEntryOf, splitFrontmatter } from '../src/workflow.ts';
-import { loadWorkflows } from '../src/workflows/workflows.store.ts';
-import { skillsFor } from '../src/skills/read.store.ts';
 import { appliesOf, renderSkill, skillDraftOf, withPreload } from '../src/skills/skills.ts';
-import { pluginOf } from '../src/agents/agents.ts';
-import { scratch } from './scratch.ts';
-import { placesOf, SHIPPED_HOLDERS, TEAM } from './team.ts';
+import { REPO, TEAM } from './team.ts';
 
-const ROOT = scratch('wf-skills-rendered-');
-process.env.WF_ROOT = ROOT;
-const { agentFilesDir, writeAgentFiles } = await import('../src/agents/agents.store.ts');
-
-const REPO = path.join(import.meta.dirname, '..', '..', '..');
+/** The package's builtin skills, which a step that names one finds last. */
+const BUILTIN_SKILLS = path.join(import.meta.dirname, '..', 'skills');
 /** Nemia's own skills, her plugin's. */
 const NEMIA_SKILLS = path.join(import.meta.dirname, '..', 'nemia', 'skills');
-/** Every folder of skills there is: the team's, whatever is shipped, Nemia's own, and the repository's own for Claude Code. */
-const SKILL_FOLDERS = [
-  path.join(TEAM, 'skills'),
-  ...SHIPPED_HOLDERS.map((holder) => path.join(holder, 'skills')),
-  NEMIA_SKILLS,
-  path.join(REPO, '.claude', 'skills'),
-];
+/** Every folder of skills there is: the tests' team's, the package's builtin ones, Nemia's own, and the repository's for Claude Code. */
+const SKILL_FOLDERS = [path.join(TEAM, 'skills'), BUILTIN_SKILLS, NEMIA_SKILLS, path.join(REPO, '.claude', 'skills')];
 
 /** A SKILL.md's frontmatter as YAML reads it, or a throw saying why it does not read: what a skill that Claude Code would drop fails on. */
 function frontmatterOf(file: string, text: string): Record<string, unknown> {
@@ -43,11 +31,11 @@ function frontmatterOf(file: string, text: string): Record<string, unknown> {
   return read as Record<string, unknown>;
 }
 
-test("a card entry and a skill's paths read a SKILL.md's frontmatter as YAML does, on every SKILL.md there is: the team's, shipped, or the repository's own", () => {
+test("a card entry and a skill's paths read a SKILL.md's frontmatter as YAML does, on every SKILL.md there is: the tests' team's, builtin, Nemia's or the repository's own", () => {
   const files = SKILL_FOLDERS.flatMap((dir) =>
     fs.existsSync(dir) ? fs.readdirSync(dir).map((name) => path.join(dir, name, 'SKILL.md')) : [],
   ).filter((file) => fs.existsSync(file));
-  for (const dir of [path.join(TEAM, 'skills'), NEMIA_SKILLS, path.join(REPO, '.claude', 'skills')])
+  for (const dir of SKILL_FOLDERS)
     assert.ok(
       files.some((file) => file.startsWith(dir)),
       `${dir} is read: ${files.join('\n')}`,
@@ -90,96 +78,4 @@ test('every SKILL.md there is, written again from its draft or its preload switc
     const { preload: __, ...before } = frontmatterOf(file, text);
     assert.deepEqual(switched, before, `${file}: its preload switched`);
   }
-});
-
-/** The order to load shadcn's skill, as a SKILL.md gives it, across line breaks. */
-const LOADS_SHADCN = /load\s+`shadcn`\s+with\s+the\s+Skill\s+tool/i;
-/** The files a step that only reads is sent to, from the repository's root: the vendored skill's text, and the board's facts. */
-const READ_INSTEAD = ['.claude/skills/shadcn/SKILL.md', 'apps/web/components.json', 'apps/web/src/components/ui'];
-
-/**
- * What breaks in the board's skill `text`, judged against the repository at `root`: an order to load `shadcn` that is missing, or given
- * before the shell is moved into `apps/web`; a file a reading step is sent to that the text does not name or the root does not hold; and
- * a `components.json` that is not in `apps/web` alone, which is why the folder matters. Empty when a session at the root is sent right.
- */
-function boardSkillBreaks(text: string, root: string): string[] {
-  const { body } = splitFrontmatter('SKILL.md', text);
-  const load = LOADS_SHADCN.exec(body);
-  const order = !load
-    ? ['no order to load `shadcn` with the Skill tool']
-    : body.slice(0, load.index).includes('`cd apps/web`')
-      ? []
-      : ['the load of `shadcn` is ordered before `cd apps/web`'];
-  const names = READ_INSTEAD.flatMap((file) => [
-    ...(body.includes(`\`${file}\``) ? [] : [`${file} is not named`]),
-    ...(fs.existsSync(path.join(root, file)) ? [] : [`${file} is not there`]),
-  ]);
-  const folder = fs.existsSync(path.join(root, 'components.json')) ? ['components.json is at the root'] : [];
-  return [...order, ...names, ...folder];
-}
-
-/** The board's skill as it was shipped when a load from the root refused: the load first, the folder after. */
-const LOAD_FIRST = `---
-name: change-the-board
-description: "Any change under apps/web/."
-applies: ["apps/web/**"]
----
-
-# Change the board
-
-1. **Load \`shadcn\` with the Skill tool now**, before you read or write a component: the board is shadcn's components on React Aria.
-2. **Its CLI runs from \`apps/web\`**, where \`components.json\` is.
-3. **Read \`apps/web/CLAUDE.md\`** before you change a page.
-`;
-
-test("the board's skill, as build's implement step is given it, moves the shell into apps/web before it orders the load of shadcn, and names files that are there", () => {
-  const build = path.join(REPO, 'workflows', 'build');
-  const places = placesOf(build);
-  const step = loadWorkflows(build, places).find((s) => s.name === 'implement')!;
-  const run = { id: 'r-board' };
-  writeAgentFiles(run, [step], skillsFor(build, places));
-  const given = fs.readFileSync(
-    path.join(agentFilesDir(run, 'implement'), pluginOf(step.agent!.name), 'skills', 'change-the-board', 'SKILL.md'),
-    'utf8',
-  );
-  assert.deepEqual(boardSkillBreaks(given, REPO), []);
-  assert.equal(given, fs.readFileSync(path.join(REPO, '.claude', 'skills', 'change-the-board', 'SKILL.md'), 'utf8'));
-
-  const unnamed = READ_INSTEAD.map((file) => `${file} is not named`);
-  assert.deepEqual(boardSkillBreaks(LOAD_FIRST, REPO), ['the load of `shadcn` is ordered before `cd apps/web`', ...unnamed]);
-  assert.deepEqual(boardSkillBreaks(given.replace(LOADS_SHADCN, 'have `shadcn` at hand'), REPO), [
-    'no order to load `shadcn` with the Skill tool',
-  ]);
-  assert.deepEqual(
-    boardSkillBreaks(given, scratch('wf-board-empty-')),
-    READ_INSTEAD.map((file) => `${file} is not there`),
-  );
-  const rooted = scratch('wf-board-rooted-');
-  fs.cpSync(path.join(REPO, 'apps', 'web', 'components.json'), path.join(rooted, 'components.json'));
-  assert.ok(boardSkillBreaks(given, rooted).includes('components.json is at the root'));
-});
-
-/** What the board's skill's description, in every session's list of skills, says of when to load it and where it sends you next. */
-const SENDS_FIRST = [
-  /load\s+it\s+before\s+reading,\s+writing\s+or\s+judging\s+a\s+file\s+there/,
-  /It\s+sends\s+you\s+to\s+the\s+board's\s+components\s+\(shadcn\)/,
-];
-
-/** What the board's skill `text` does not say in its description of `SENDS_FIRST`, a pattern's source each. */
-const unsentFirst = (text: string): string[] => {
-  const { description } = skillEntryOf('change-the-board/SKILL.md', 'change-the-board', text);
-  return SENDS_FIRST.filter((pattern) => !pattern.test(description)).map((pattern) => pattern.source);
-};
-
-test("build's implement step is given the board's skill, whose description sends its agent there before shadcn's", () => {
-  const build = path.join(REPO, 'workflows', 'build');
-  const step = loadWorkflows(build, placesOf(build)).find((s) => s.name === 'implement')!;
-  assert.ok(step.agent?.addedSkills?.includes('change-the-board'), 'implement adds change-the-board');
-  const text = fs.readFileSync(path.join(REPO, '.claude', 'skills', 'change-the-board', 'SKILL.md'), 'utf8');
-  assert.deepEqual(unsentFirst(text), []);
-  assert.deepEqual(
-    unsentFirst(text.replace('(shadcn)', '(its components)')),
-    [SENDS_FIRST[1].source],
-    'REFUSED: one that names shadcn no more',
-  );
 });

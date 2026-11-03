@@ -76,8 +76,7 @@ test("the repository's own guards#test inputs, which turbo caches by, are the on
   assert.ok(inputs.length > 0, `turbo.json lists inputs for ${TASK}`);
   for (const input of inputs) assert.doesNotThrow(() => patternOf(input), input);
   const folders = dependencyFolders(ROOT);
-  for (const file of ['workflows/x.md', '.github/workflows/ci.yml', 'docs/x.md'])
-    assert.equal(dueOf([file], inputs, folders).due, true, file);
+  for (const file of ['.github/workflows/ci.yml', 'docs/x.md']) assert.equal(dueOf([file], inputs, folders).due, true, file);
   for (const file of ['tools/store-measure/report.ts', 'tools/store-measure/fence.ts'])
     assert.equal(dueOf([file], inputs, folders).due, true, `${file}: store-measure.test.ts reads it`);
   for (const file of [

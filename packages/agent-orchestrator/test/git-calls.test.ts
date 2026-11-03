@@ -155,7 +155,7 @@ const isTest = (file: string): boolean => /\.test\.tsx?$/.test(file) || file.spl
 
 /**
  * Every `.ts` and `.tsx` under the `src` of each workspace the root package.json of `root` names, by its path from `root`, but the tests.
- * A workspace with no `src`, as `tools/guards` (a CI tool, which asks git as `workflows/build/landing.ts` does), has none.
+ * A workspace with no `src`, as `tools/guards` (a CI tool, which asks git as the sdlc template's `landing.ts` does), has none.
  */
 function sourcesOf(root: string): string[] {
   const srcs = workspaces(root).map((dir) => `${dir}/src`);

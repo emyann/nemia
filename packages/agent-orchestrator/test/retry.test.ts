@@ -614,7 +614,7 @@ const CHECK_SAID = "## What implement's check said";
 const NO_PAGES = 'wf check: nothing under apps/web/ or apps/api/ was touched: no build, no e2e';
 const NAMED_1 = '#1 run-dark.png, for apps/web/src/routes/run.tsx (0.4 s)';
 const NAMED_2 = '#2 factory-light.png, for apps/web/src/routes/factory.tsx (0.3 s)';
-/** A check's stdout as `workflows/build`'s prints it: turbo's prefixed lines, the pictures' `wf pictures:` lines, then a long tail. */
+/** A check's stdout as the nemia factory's build check prints it: turbo's prefixed lines, the pictures' lines, then a long tail. */
 const PICTURES = [
   'agent-orchestrator:test: ✔ files a step (12 ms)',
   'agent-orchestrator:test: wf pictures: a line a test printed, prefixed by turbo',

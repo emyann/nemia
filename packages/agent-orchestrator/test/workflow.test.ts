@@ -31,7 +31,7 @@ import { Schema } from 'effect';
 import { WorkflowDir } from '../src/folder/folder.model.ts';
 import { baseLine, formerFenceLine, placeLine } from '../src/former/former.ts';
 import { scratch } from './scratch.ts';
-import { placesOf, shippedFolders, TEAM_DEV, teamCopy } from './team.ts';
+import { TEAM_DEV, teamCopy } from './team.ts';
 
 /**
  * That `message` opens on `at` — the step or file it is about — and names each of `named`: the line as written, and the key, line or
@@ -813,11 +813,10 @@ const readIn =
     }
   };
 
-/** Every workflow folder there is to read: whatever is shipped (`team.ts`), the tests' team's `dev`, and the examples. */
+/** Every workflow folder there is to read: the tests' team's `dev`, and the package's examples. */
 const everyFolder = (): string[] => {
   const examples = path.join(import.meta.dirname, '..', 'wf-examples');
   return [
-    ...shippedFolders(),
     TEAM_DEV,
     ...fs
       .readdirSync(examples)
@@ -831,7 +830,7 @@ test('`renderStep` is the parser run backwards: every step of every folder there
   const root = path.dirname(TEAM_DEV);
   assert.ok(folders.length > 1, `the team and the examples are read: ${folders.join(', ')}`);
   for (const dir of folders) {
-    const steps = loadWorkflows(dir, placesOf(dir));
+    const steps = loadWorkflows(dir);
     const read = readIn(dir);
     const agents = loadAgents(agentsDir(dir));
     for (const step of steps) {
@@ -848,7 +847,7 @@ test('`renderStep` is the parser run backwards: every step of every folder there
         steps.map((step) => [step.name, renderStep(step)]),
         read,
         agents,
-        skillsFor(dir, placesOf(dir)),
+        skillsFor(dir),
       ),
       steps,
       dir,

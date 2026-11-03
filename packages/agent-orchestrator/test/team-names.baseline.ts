@@ -1,33 +1,31 @@
 /**
- * Our team's debt in the product, file by file, held by the team's two rules of `words.test.ts`: each product file that names an agent
- * of `workflows/agents/` or the owner's factory today (`TEAM_NAMES`), and each that names a path into the team's `workflows/`
- * (`TEAM_PATHS`), with its count and the move that clears it (`TEAM_MOVES`). The counts only shrink: a change that takes a name or a
- * path out of a file lowers its entry in the same commit, and the entry goes once its file is clean. Once both records are empty, the
- * team can leave the repository.
+ * The team's debt in the product, file by file, held by the team's two rules of `words.test.ts`: each product file that names an agent
+ * of the nemia factory's team (the agents of `packages/templates/sdlc/agents/` and `FORMER_TEAM`) or the owner's factory today
+ * (`TEAM_NAMES`), and each that names a path into one of the team's workflows (`TEAM_PATHS`), with its count and the move that clears it
+ * (`TEAM_MOVES`). The counts only shrink: a change that takes a name or a path out of a file lowers its entry in the same commit, and the
+ * entry goes once its file is clean.
  */
 import type { Baseline } from './words.test.ts';
+
+/**
+ * The agents that left the team, whose names stay out of the product all the same: no file of sdlc names them, so they are held here,
+ * in a file the team's rules do not read.
+ */
+export const FORMER_TEAM: readonly string[] = ['ada'];
 
 /** The moves that clear the team's debt, each with where it goes: the later cards of decision 5. */
 const TEAM_MOVES = {
   fixtures: {
-    move: "a product test's fixture or comment that names our team's agent, factory or workflow",
+    move: "a product test's fixture or comment that names the team's agent, factory or workflow",
     to: "the tests' team (test/fixtures/team): the agents implementer, reviewer and shipper, the workflow dev, the factory acme",
   },
   teamTests: {
-    move: "a test of our team's own files: its agents' fences, its workflows' steps, and its scripts landing, pull-request, quick-check, probe and pictures",
-    to: "workflows/, beside the team's scripts, a workspace with its own test script, turbo task and CI leg",
-  },
-  deadline: {
-    move: "our team's numbers held as the product's: the check's deadlines and INSTALL",
-    to: 'a step key or a factory setting, read by packages/agent-orchestrator',
-  },
-  shipped: {
-    move: "the tests' reading of what ships, which finds our team's folders as the shipped ones (SHIPPED_HOLDERS, shippedFolders)",
-    to: "the product's own templates, which a factory is made from",
+    move: "a test of the team's own files: its agents' fences",
+    to: 'packages/templates/test, beside sdlc, where the tests of its scripts and fences already are',
   },
 } as const;
 
-/** Each product file that names an agent of our team or the owner's factory today, with its count and the move that clears it. */
+/** Each product file that names an agent of the team or the owner's factory today, with its count and the move that clears it. */
 export const TEAM_NAMES: Baseline = {
   'apps/api/src/agents/fills.test.ts': { count: 28, ...TEAM_MOVES.fixtures },
   'apps/api/src/runs/hired-folder.test.ts': { count: 3, ...TEAM_MOVES.fixtures },
@@ -88,10 +86,9 @@ export const TEAM_NAMES: Baseline = {
   'packages/agent-orchestrator/src/trust/trust.test.ts': { count: 3, ...TEAM_MOVES.fixtures },
   'packages/agent-orchestrator/src/watch/selector.test.ts': { count: 26, ...TEAM_MOVES.fixtures },
   'packages/agent-orchestrator/src/workflow/unallowed.test.ts': { count: 23, ...TEAM_MOVES.fixtures },
-  'packages/agent-orchestrator/test/agent-fences.test.ts': { count: 179, ...TEAM_MOVES.teamTests },
+  'packages/agent-orchestrator/test/agent-fences.test.ts': { count: 4, ...TEAM_MOVES.teamTests },
   'packages/agent-orchestrator/test/assess-endings.test.ts': { count: 7, ...TEAM_MOVES.fixtures },
   'packages/agent-orchestrator/test/auto-rules.test.ts': { count: 7, ...TEAM_MOVES.fixtures },
-  'packages/agent-orchestrator/test/build-told.test.ts': { count: 15, ...TEAM_MOVES.teamTests },
   'packages/agent-orchestrator/test/decide.test.ts': { count: 3, ...TEAM_MOVES.fixtures },
   'packages/agent-orchestrator/test/factory-rules.test.ts': { count: 53, ...TEAM_MOVES.fixtures },
   'packages/agent-orchestrator/test/factory-start.test.ts': { count: 129, ...TEAM_MOVES.fixtures },
@@ -101,15 +98,13 @@ export const TEAM_NAMES: Baseline = {
   'packages/agent-orchestrator/test/fixtures/former-frontmatter/quick-implement.md': { count: 1, ...TEAM_MOVES.fixtures },
   'packages/agent-orchestrator/test/fixtures/former-frontmatter/quick-land.md': { count: 1, ...TEAM_MOVES.fixtures },
   'packages/agent-orchestrator/test/nemia-keeper.test.ts': { count: 41, ...TEAM_MOVES.fixtures },
-  'packages/agent-orchestrator/test/quick-run.test.ts': { count: 4, ...TEAM_MOVES.teamTests },
-  'packages/agent-orchestrator/test/skill-folders.test.ts': { count: 3, ...TEAM_MOVES.teamTests },
   'packages/agent-orchestrator/test/stats.test.ts': { count: 5, ...TEAM_MOVES.fixtures },
   'packages/agent-orchestrator/test/subscription-wakes.test.ts': { count: 5, ...TEAM_MOVES.fixtures },
   'packages/agent-runtime/src/harness/settings.test.ts': { count: 1, ...TEAM_MOVES.fixtures },
   'packages/agent-runtime/test/reader-streams.ts': { count: 2, ...TEAM_MOVES.fixtures },
 };
 
-/** Each product file that names a path into our team's `workflows/` today, with its count and the move that clears it. */
+/** Each product file that names a path into one of the team's workflows today, with its count and the move that clears it. */
 export const TEAM_PATHS: Baseline = {
   'apps/api/src/runs/hired-folder.test.ts': { count: 1, ...TEAM_MOVES.fixtures },
   'apps/api/src/factories/hires.test.ts': { count: 2, ...TEAM_MOVES.fixtures },
@@ -118,34 +113,16 @@ export const TEAM_PATHS: Baseline = {
   'apps/web/test/library-fixtures.ts': { count: 2, ...TEAM_MOVES.fixtures },
   'apps/web/test/read.test.ts': { count: 1, ...TEAM_MOVES.fixtures },
   'apps/web/test/run-fixtures.ts': { count: 1, ...TEAM_MOVES.fixtures },
-  'packages/agent-orchestrator/src/check/check.ts': { count: 1, ...TEAM_MOVES.deadline },
   'packages/agent-orchestrator/src/factory/factory.store.test.ts': { count: 2, ...TEAM_MOVES.fixtures },
   'packages/agent-orchestrator/src/frontmatter/frontmatter.verb.test.ts': { count: 3, ...TEAM_MOVES.fixtures },
   'packages/agent-orchestrator/src/meter/step.test.ts': { count: 1, ...TEAM_MOVES.fixtures },
   'packages/agent-orchestrator/src/stats/stats-memo.test.ts': { count: 1, ...TEAM_MOVES.fixtures },
   'packages/agent-orchestrator/src/summary/reads.verb.test.ts': { count: 1, ...TEAM_MOVES.fixtures },
-  'packages/agent-orchestrator/test/agent-fences.test.ts': { count: 12, ...TEAM_MOVES.teamTests },
-  'packages/agent-orchestrator/test/build-told.test.ts': { count: 1, ...TEAM_MOVES.teamTests },
-  'packages/agent-orchestrator/test/check-handed.test.ts': { count: 1, ...TEAM_MOVES.fixtures },
   'packages/agent-orchestrator/test/factory-start.test.ts': { count: 2, ...TEAM_MOVES.fixtures },
   'packages/agent-orchestrator/test/fixtures/former-frontmatter/build-implement.md': { count: 8, ...TEAM_MOVES.fixtures },
   'packages/agent-orchestrator/test/fixtures/former-frontmatter/build-land.md': { count: 2, ...TEAM_MOVES.fixtures },
   'packages/agent-orchestrator/test/fixtures/former-frontmatter/janitor-argus.md': { count: 2, ...TEAM_MOVES.fixtures },
   'packages/agent-orchestrator/test/fixtures/former-frontmatter/quick-implement.md': { count: 10, ...TEAM_MOVES.fixtures },
   'packages/agent-orchestrator/test/fixtures/former-frontmatter/quick-land.md': { count: 2, ...TEAM_MOVES.fixtures },
-  'packages/agent-orchestrator/test/git-calls.test.ts': { count: 1, ...TEAM_MOVES.fixtures },
-  'packages/agent-orchestrator/test/landing.boundary.test.ts': { count: 4, ...TEAM_MOVES.teamTests },
-  'packages/agent-orchestrator/test/nemia-shipped.test.ts': { count: 1, ...TEAM_MOVES.teamTests },
-  'packages/agent-orchestrator/test/origin.ts': { count: 1, ...TEAM_MOVES.teamTests },
-  'packages/agent-orchestrator/test/pictures.test.ts': { count: 8, ...TEAM_MOVES.teamTests },
-  'packages/agent-orchestrator/test/probe.boundary.test.ts': { count: 7, ...TEAM_MOVES.teamTests },
-  'packages/agent-orchestrator/test/pull-request.boundary.test.ts': { count: 5, ...TEAM_MOVES.teamTests },
-  'packages/agent-orchestrator/test/quick-check.boundary.test.ts': { count: 7, ...TEAM_MOVES.teamTests },
-  'packages/agent-orchestrator/test/quick-run.test.ts': { count: 2, ...TEAM_MOVES.teamTests },
-  'packages/agent-orchestrator/test/retry.test.ts': { count: 1, ...TEAM_MOVES.fixtures },
-  'packages/agent-orchestrator/test/skill-folders.test.ts': { count: 1, ...TEAM_MOVES.teamTests },
-  'packages/agent-orchestrator/test/skills-rendered.test.ts': { count: 2, ...TEAM_MOVES.teamTests },
-  'packages/agent-orchestrator/test/tally-start.test.ts': { count: 1, ...TEAM_MOVES.teamTests },
-  'packages/agent-orchestrator/test/team.ts': { count: 2, ...TEAM_MOVES.shipped },
   'packages/agent-runtime/test/live-sdk.boundary.test.ts': { count: 1, ...TEAM_MOVES.fixtures },
 };

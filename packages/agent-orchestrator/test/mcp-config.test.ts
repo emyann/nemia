@@ -14,8 +14,7 @@
  * A step's session loads only the servers its agent's `mcp:` line and its own name: a step is a Claude Code job, which runs on the Agent
  * SDK, so the argv read here is the one the SDK itself gives Claude Code — a fake `claude` the engine is handed as its executable
  * records it, and the servers come inline on it. A session of a step and an agent that name none is named no MCP config in a checkout
- * that has one, a step that names one over an agent that names none is named that one alone and no rule that allows a tool of it, and
- * every shipped step given the `look` skill names `playwright`, itself or by its agent.
+ * that has one, and a step that names one over an agent that names none is named that one alone and no rule that allows a tool of it.
  *
  * The last test runs against the real harness — skipped unless `AE_LIVE=1`, because it spends money. It files a task at shipped defaults:
  * the engine's built-in harnesses, `claude` first, a job on the Agent SDK, with no `mcp` on the task, so the only servers it can have
@@ -34,9 +33,7 @@ import { Engine as EngineService } from 'agent-runtime';
 import { type Engine } from '../src/runtime-client.ts';
 import { parseAgent, parseWorkflow } from '../src/workflow.ts';
 import { filedConfig, STEP_FILES } from '../src/filed/filed.ts';
-import { loadWorkflows } from '../src/workflows/workflows.store.ts';
 import { scratch } from './scratch.ts';
-import { placesOf, shippedFolders } from './team.ts';
 import { plainEngine } from './promised.ts';
 import { until, WAITED } from 'agent-runtime/testing';
 import { sdkArgValue } from './sdk-argv.ts';
@@ -286,40 +283,6 @@ test('the server starts as configured, from the repository root, and offers brow
     child.removeAllListeners('exit');
     child.kill();
   }
-});
-
-/** The steps of the folder `dir` given the `look` skill that load no `playwright`, by their line or their agent's: each could not look. */
-const blindLookers = (dir: string, places = placesOf(dir)): string[] =>
-  loadWorkflows(dir, places)
-    .filter((step) => step.agent?.skills?.includes('look') && !step.agent.mcp?.includes('playwright'))
-    .map((step) => `${path.basename(dir)}/${step.name}`);
-
-test('every shipped step given the look skill names playwright, itself or by its agent, whose tools the skill uses', () => {
-  const lookers = shippedFolders().flatMap((dir) => loadWorkflows(dir, placesOf(dir)).filter((s) => s.agent?.skills?.includes('look')));
-  assert.ok(lookers.length > 0, 'a step of this repository is given look');
-  assert.deepEqual(
-    shippedFolders().flatMap((dir) => blindLookers(dir)),
-    [],
-  );
-  const root = scratch('wf-mcp-look-');
-  fs.mkdirSync(path.join(root, 'agents'));
-  fs.mkdirSync(path.join(root, 'dev'));
-  fs.mkdirSync(path.join(root, 'skills', 'look'), { recursive: true });
-  fs.writeFileSync(path.join(root, 'skills', 'look', 'SKILL.md'), '---\nname: look\ndescription: Looks.\n---\nLook.\n');
-  fs.writeFileSync(path.join(root, 'agents', 'sighted.md'), '---\nmcp: playwright\n---\nYou look.\n');
-  fs.writeFileSync(path.join(root, 'agents', 'blind.md'), '---\nmcp: docs\n---\nYou look.\n');
-  fs.writeFileSync(path.join(root, 'agents', 'plain.md'), '---\ndescription: Looks.\n---\nYou look.\n');
-  const step = (name: string, agent: string, lines = '') =>
-    fs.writeFileSync(path.join(root, 'dev', `${name}.md`), `---\nplace: git\nagent: ${agent}\nskills: look\n${lines}---\nLook.\n`);
-  step('sighted', 'sighted');
-  step('blind', 'blind');
-  step('named', 'plain', 'mcp: playwright\n');
-  step('unnamed', 'plain');
-  assert.deepEqual(
-    blindLookers(path.join(root, 'dev'), {}),
-    ['dev/blind', 'dev/unnamed'],
-    'a step given look is refused where neither it nor its agent names playwright, and passes where the step alone does',
-  );
 });
 
 /** A fake `claude` in a new folder, first on PATH while `f` runs: it writes the argv of the session it is started for to `args`. */

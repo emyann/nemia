@@ -12,6 +12,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { REPO } from './team.ts';
+import { FORMER_TEAM } from './team-names.baseline.ts';
 import { DENIED, feedLineWords, upgraded } from '../src/feed/index.ts';
 import { skillFolders, skillRead } from '../src/skills/skills.store.ts';
 import { WAITS_ON_PERSON } from '../src/retry/waits.ts';
@@ -28,11 +29,14 @@ const shipped = (dir = SHIPPED): Map<string, string> =>
       .map((f) => [f.split(path.sep).join('/'), fs.readFileSync(path.join(dir, f), 'utf8')]),
   );
 
-/** This repository's team, by the agent files of `workflows/agents/`. */
-const TEAM = fs
-  .readdirSync(path.join(REPO, 'workflows', 'agents'))
-  .filter((f) => f.endsWith('.md'))
-  .map((f) => f.slice(0, -'.md'.length));
+/** The nemia factory's team: the agent folders of sdlc, the template it runs on, and the agents that left it (`FORMER_TEAM`). */
+const TEAM = [
+  ...fs
+    .readdirSync(path.join(REPO, 'packages', 'templates', 'sdlc', 'agents'), { withFileTypes: true })
+    .filter((e) => e.isDirectory())
+    .map((e) => e.name),
+  ...FORMER_TEAM,
+];
 
 /** The settings of this repository's owner, which what ships must not say: their city, its zone and their cost line. */
 const OWNER = ['Montreal', 'America/Montreal', 'EDT', '$80'];

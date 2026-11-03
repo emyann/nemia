@@ -40,7 +40,13 @@ export type WorkflowWritten = { dir: string; steps: Workflow[]; written: string[
  * macOS's, Windows's — `Plan.md` and `plan.md` are one file, and a step renamed by case would otherwise be written and then removed under
  * its old name, which is the same file. After that each step's `<name>.md` is written, but for one whose file already reads as the step,
  * which is left as it is, comments and all, since a render has none. A `*.schema.json` is left as it is: a step names one, and the builder
- * writes none. The README is written only when `readme` is given, to the name the folder's README already has.
+ * writes none — but one the draft carries. The README is written only when `readme` is given, to the name the folder's README already has.
+ *
+ * The other files a draft folder carries (`files`, each by its name in the folder: a script its check runs, a schema an `output:` names)
+ * are read before the folder's own copies when the folder is judged, so an `output:` is judged against the schema the draft carries, and
+ * each is written after the steps, or kept where its bytes are there already. A file of the folder the draft does not carry is left as it
+ * is: no removal is asked for. Which names a draft may carry is the door's to judge (`carriedNameRefusal`, `workflows.store.ts`); a
+ * carried name that is a link in the folder is refused here, before any of it, as a linked step is.
  *
  * A `.md` in the folder that is a link is refused by name, before any of it: a write follows a link, so a step would be rendered into
  * whatever it points at, outside the folder, and a link is not a file the write removes, so it would be left behind where its step went. A
@@ -61,7 +67,12 @@ export function writeWorkflowAt(
   dir: string,
   steps: readonly StepDraft[],
   readme: string | undefined,
-  { anywhere = false, places, found }: { anywhere?: boolean; places?: Places; found: Found },
+  {
+    anywhere = false,
+    places,
+    found,
+    files = [],
+  }: { anywhere?: boolean; places?: Places; found: Found; files?: readonly { path: string; text: string }[] },
 ): WorkflowWritten {
   const at = path.resolve(dir);
   const refuse = (why: string | undefined) => {
@@ -75,15 +86,7 @@ export function writeWorkflowAt(
   try {
     entries = fs.readdirSync(at, { withFileTypes: true });
   } catch {}
-  const linked = entries.find((e) => e.isSymbolicLink() && e.name.endsWith('.md') && (readme !== undefined || !isReadme(e.name)));
-  if (linked) {
-    refuse(
-      linkRefusal(
-        path.join(at, linked.name),
-        "a workflow's files are its own. Writing this workflow would follow it and write into whatever it points at, outside the folder, and would not remove it when its step goes.",
-      ),
-    );
-  }
+  refuse(linkedRefusal(at, entries, readme !== undefined, files));
   if (!steps.length) refuse(noStepsRefusal(at));
   for (const step of steps) refuse(stepNameRefusal(step?.name));
   const twice = steps.find((step, i) => steps.findIndex((other) => other.name === step.name) !== i);
@@ -91,21 +94,23 @@ export function writeWorkflowAt(
   const { agents, skills } = found;
   refuse(codexModeRefusal(steps, agents));
   const texts = steps.map((step) => [step.name, renderStep(ownLine(step, agents))] as const);
-  const read = (file: string): string | undefined => {
+  const there = (file: string): string | undefined => {
     try {
       return fs.readFileSync(path.resolve(at, file), 'utf8');
     } catch {
       return undefined;
     }
   };
+  const carried = new Map(files.map((file) => [file.path, file.text] as const));
+  const read = (file: string): string | undefined => carried.get(file) ?? there(file);
   const parsed = parseFolder(texts, read, agents, skills);
 
   fs.mkdirSync(at, { recursive: true });
   const written: string[] = [];
   const kept: string[] = [];
-  const put = (file: string, text: string, same: (there: string) => boolean) => {
-    const there = read(file);
-    if (there !== undefined && same(there)) return kept.push(file);
+  const put = (file: string, text: string, same: (now: string) => boolean) => {
+    const now = there(file);
+    if (now !== undefined && same(now)) return kept.push(file);
     fs.writeFileSync(path.join(at, file), text);
     return written.push(file);
   };
@@ -122,9 +127,35 @@ export function writeWorkflowAt(
       }
     });
   }
+  for (const [file, text] of carried) put(file, text, (now) => now === text);
   if (readme !== undefined)
     put(entries.find((e) => e.isFile() && isReadme(e.name))?.name ?? 'README.md', readme, (there) => there === readme);
   return { dir: at, steps: parsed, written: written.sort(), kept: kept.sort(), removed: removed.sort() };
+}
+
+/**
+ * Why a write of the folder `at` follows a link, or undefined where it follows none: a carried file's name, or a `.md` — the README only
+ * where one is written (`withReadme`) — that is a link among its `entries`. A write follows a link, so it would write into whatever it
+ * points at, outside the folder, and a link is not a file the write removes, so it would be left behind where its step went.
+ */
+function linkedRefusal(
+  at: string,
+  entries: readonly fs.Dirent[],
+  withReadme: boolean,
+  files: readonly { path: string }[],
+): string | undefined {
+  const carried = entries.find((e) => e.isSymbolicLink() && files.some((file) => file.path === e.name));
+  if (carried)
+    return linkRefusal(
+      path.join(at, carried.name),
+      "a workflow's files are its own. Writing the file the draft carries would follow it and write into whatever it points at, outside the folder.",
+    );
+  const linked = entries.find((e) => e.isSymbolicLink() && e.name.endsWith('.md') && (withReadme || !isReadme(e.name)));
+  if (!linked) return undefined;
+  return linkRefusal(
+    path.join(at, linked.name),
+    "a workflow's files are its own. Writing this workflow would follow it and write into whatever it points at, outside the folder, and would not remove it when its step goes.",
+  );
 }
 
 /**

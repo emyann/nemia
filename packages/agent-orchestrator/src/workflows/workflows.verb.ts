@@ -9,7 +9,7 @@ import path from 'node:path';
 import { Cause, Effect, Exit } from 'effect';
 import { tried } from '../runtime-client.ts';
 import { rooted } from '../wiring/wire.verb.ts';
-import { WorkflowDoor } from './workflows.store.ts';
+import { WorkflowDoor, type CarriedFile } from './workflows.store.ts';
 import type { WorkflowDir } from '../folder/folder.model.ts';
 import type { Args, Flag, Positional, Spec } from '../command/command.ts';
 import type { Command } from '../command/entry.verb.ts';
@@ -96,17 +96,36 @@ function yoursWorkflowDir(who: string, args: Args, home: string): WorkflowDir {
 }
 
 /**
+ * The files a draft carries, from `files`, the JSON text the command line reads off `--folder`: none where it is not given, each a
+ * name and its text, or refused `Invalid` naming what to send.
+ */
+function carriedArg(text: string | undefined): CarriedFile[] | undefined {
+  if (text === undefined) return undefined;
+  const files: unknown = JSON.parse(text);
+  const isFile = (f: unknown): f is CarriedFile =>
+    typeof f === 'object' && f !== null && typeof (f as CarriedFile).path === 'string' && typeof (f as CarriedFile).text === 'string';
+  if (!Array.isArray(files) || !files.every(isFile))
+    throw new Invalid({
+      message: 'files is a JSON array of { "path", "text" }, one per file a draft carries: send it so, or leave it out.',
+    });
+  return files;
+}
+
+/**
  * A folder of yours, `<home>/workflows/<name>`, or of the tree of the factory `--factory` names (the place `factory`), written from its
  * steps through the Workflow door, which judges the whole folder before a byte is written and checks it against the version it was read
  * at (`workflowVersionRefusal`): `draft`, the steps as JSON text, which the command line reads off `--folder`; `readme`, the folder's
- * README where one is given. Answers what was written, and the version the folder is at now.
+ * README where one is given; `files`, the other files the draft folder carries — a script, a schema — which the command line reads off
+ * `--folder` too, and a file the folder holds that the draft does not carry is left. Answers what was written, and the version the folder
+ * is at now.
  */
 export const WORKFLOWS_WRITE: Command<WorkflowWritten & { version: string }> = {
   name: 'workflows write',
   usage: '(yours | factory) <name> --folder <draft> [--factory <name>] [--version <v>]',
   help: [
     'a workflow folder of yours, or of a templated --factory, written from',
-    'a draft folder; one there already, at the --version it was read at',
+    'a draft folder, its steps, README, scripts and schemas, leaving a file',
+    'it does not carry; one there already, at the --version it was read at',
   ],
   spec: writerSpec(
     'workflows write',
@@ -123,6 +142,7 @@ export const WORKFLOWS_WRITE: Command<WorkflowWritten & { version: string }> = {
       factoryFlag('workflows write'),
       apiKey('draft', 'the command line reads the steps off --folder, into the form the builder sends'),
       apiKey('readme', 'the command line reads the README off --folder, as the builder sends the one written'),
+      apiKey('files', "the command line reads the draft folder's other files off --folder, which the builder never sends"),
       REPO,
     ],
   ),
@@ -141,8 +161,14 @@ export const WORKFLOWS_WRITE: Command<WorkflowWritten & { version: string }> = {
         const steps = yield* tried(() => JSON.parse(textOf(args, 'draft') ?? '[]') as StepDraft[]);
         const places = yield* tried(() => writePlacesOf(args, home));
         const readme = textOf(args, 'readme');
+        const files = yield* tried(() => carriedArg(textOf(args, 'files')));
         const door = yield* WorkflowDoor;
-        return yield* door.workflows.write(dir, { steps, ...(readme !== undefined && { readme }) }, textOf(args, 'version'), places);
+        return yield* door.workflows.write(
+          dir,
+          { steps, ...(readme !== undefined && { readme }), ...(files !== undefined && { files }) },
+          textOf(args, 'version'),
+          places,
+        );
       }),
     ),
   print: ({ dir, version, written, kept, removed }) => [

@@ -43,6 +43,25 @@ const scribeOn = (side: Side): void => {
 /** A workflow of one step, `build`, naming the agent `scribe`. */
 const scribed = (): WorkflowDraft => aWorkflow([{ ...aStep('build'), agent: 'scribe' }]);
 
+/** The strict schema of one required string field, `field`, as a step's `output:` file holds it. */
+export const schemaOf = (field: string): string =>
+  `${JSON.stringify({ type: 'object', properties: { [field]: { type: 'string' } }, required: [field], additionalProperties: false })}\n`;
+
+/** A workflow of one step, `build`, whose `output:` names the schema it carries beside a script, `check.ts`. */
+export const carried = (field = 'pages'): WorkflowDraft => ({
+  steps: [{ ...aStep('build'), output: { file: 'build.schema.json' } }],
+  files: [
+    { path: 'build.schema.json', text: schemaOf(field) },
+    { path: 'check.ts', text: 'process.exit(0);\n' },
+  ],
+});
+
+/** `carried()` carrying `file` besides: what a refusal of that one file is proven on, the rest of the draft writing. */
+const withFile = (file: { path: string; text: string }): WorkflowDraft => {
+  const draft = carried();
+  return { ...draft, files: [...(draft.files ?? []), file] };
+};
+
 /** Of a step read or written, what a walk compares of its agent: its name, and the model it gives the step. */
 const agentOf = (steps: readonly { name: string; agent?: { name: string }; model?: string }[]) =>
   steps.map((s) => [s.name, s.agent?.name, s.model]);
@@ -154,6 +173,14 @@ export const WORKFLOW_WALKS: Readonly<Record<string, readonly Walk[]>> = {
       says: { written: [], kept: ['plan.md'], removed: ['build.md'] },
     },
     {
+      name: "a draft carrying a script and the schema its step's output names: both written, the step's output read from the draft's",
+      walk: (side) => {
+        const { written: files, steps } = done(side.door.workflows.write(yoursOn(side, 'dev'), carried()));
+        return { written: files, fields: steps.map((s) => s.output?.schema.required) };
+      },
+      says: { written: ['build.md', 'build.schema.json', 'check.ts'], fields: [['pages']] },
+    },
+    {
       name: "a step naming an agent the side's Agent door holds: written, and answered resolved with its keys",
       walk: (side) => {
         scribeOn(side);
@@ -161,6 +188,16 @@ export const WORKFLOW_WALKS: Readonly<Record<string, readonly Walk[]>> = {
         return { written: files, steps: agentOf(steps) };
       },
       says: { written: ['build.md'], steps: [['build', 'scribe', 'sonnet']] },
+    },
+    {
+      name: 'REFUSED: a carried file that is markdown, which the folder reads as a step or its README, is Invalid, nothing written',
+      walk: (side) => refusedWrite(side, withFile({ path: 'notes.md', text: '# Notes\n' })),
+      says: { write: { refused: 'Invalid' }, there: 'none' },
+    },
+    {
+      name: 'REFUSED: a carried file named by a path rather than a name in the folder is Invalid, nothing written',
+      walk: (side) => refusedWrite(side, withFile({ path: 'sub/check.ts', text: 'process.exit(0);\n' })),
+      says: { write: { refused: 'Invalid' }, there: 'none' },
     },
     {
       name: 'REFUSED: a step naming an agent no door holds is Invalid, nothing written',

@@ -43,8 +43,14 @@ import {
 import { AgentDoor, agentDoorOver, agentFiles, type AgentDoorShape } from '../agents/agent-door.store.ts';
 import { SkillDoor, skillDoorOver, skillFiles, type SkillDoorShape } from '../skills/skill-door.store.ts';
 
-/** What a workflow is written from: its steps as the builder sends them, and its README where one is given. */
-export type WorkflowDraft = { readonly steps: readonly StepDraft[]; readonly readme?: string };
+/** A file a draft folder carries beside its steps and README — a script its check runs, a schema an `output:` names — by its name in it. */
+export type CarriedFile = { readonly path: string; readonly text: string };
+
+/**
+ * What a workflow is written from: its steps as the builder sends them, its README where one is given, and the other files its draft
+ * folder carries where given (`files`), which the command line reads off `--folder` and the builder never sends.
+ */
+export type WorkflowDraft = { readonly steps: readonly StepDraft[]; readonly readme?: string; readonly files?: readonly CarriedFile[] };
 
 /** What a write answers: what was written, and the version the folder is at after it, which the door reads once the layer wrote. */
 export type WorkflowSaved = WorkflowWritten & { readonly version: string };
@@ -113,6 +119,31 @@ const nameChecked = inWritersWords(WorkflowName.OnCreate);
 
 /** A step's name, as `StepName.OnCreate` checks it. */
 const stepChecked = inWritersWords(StepName.OnCreate);
+
+/**
+ * Why a draft may not carry the file named `name`, or undefined where it may: a name in the folder, never a path, and no markdown, which
+ * the folder reads as a step or its README. Pure, and asked by the door before either layer, so both refuse the same names.
+ */
+export function carriedNameRefusal(name: string): string | undefined {
+  if (name === '' || name === '.' || name === '..' || name.includes('/') || name.includes('\\'))
+    return `${JSON.stringify(name)} is not a file's name in the workflow's folder: a draft carries the files directly in it. Move the file up into the draft folder, or leave it out.`;
+  if (name.toLowerCase().endsWith('.md'))
+    return `${name} is markdown, which a workflow's folder reads as a step or its README: write a step as a step of the draft, its README as the README, and carry no other .md.`;
+  return undefined;
+}
+
+/** A draft's carried files, each name as `carriedNameRefusal` judges it, refused `Invalid` in its words; no name twice. */
+const carriedChecked = (files: readonly CarriedFile[] = []): Effect.Effect<void, Invalid> => {
+  for (const [i, file] of files.entries()) {
+    const why =
+      carriedNameRefusal(file.path) ??
+      (files.findIndex((other) => other.path === file.path) !== i
+        ? `${file.path} is carried twice: give the draft one file of that name.`
+        : undefined);
+    if (why) return Effect.fail(new Invalid({ message: why }));
+  }
+  return Effect.void;
+};
 
 /** The model's `Workflow`, refused `Invalid` in the words of the invariant it breaks. */
 const workflowChecked = inWritersWords(Workflow);
@@ -188,6 +219,7 @@ export function workflowDoorOver(layer: WorkflowLayer, defs?: WorkflowDefs): Wor
           yield* nameChecked(path.basename(dir));
           for (const step of draft.steps) yield* stepChecked(step?.name);
           yield* workflowChecked(draftedWorkflow(dir, draft));
+          yield* carriedChecked(draft.files);
           yield* judged(dir, 'write', version, places);
           const found = yield* foundIn(dir, yield* door.around(dir, places));
           const written = yield* door.write(dir, draft, found, places);
@@ -227,7 +259,11 @@ export function workflowFiles(home: string): WorkflowLayer {
         return stat.isDirectory() ? { kind: 'folder', version: versionDigest(versionNamed(dir).files, gathered) } : { kind: 'file' };
       },
       write: (dir, draft, found, places) =>
-        writeWorkflowAt(home, dir, draft.steps, draft.readme, { found, ...(places !== undefined && { places }) }),
+        writeWorkflowAt(home, dir, draft.steps, draft.readme, {
+          found,
+          ...(places !== undefined && { places }),
+          ...(draft.files !== undefined && { files: draft.files }),
+        }),
       remove: (dir, users) => removeWorkflowAt(home, dir, users),
       hints: (dir) => formerKeyLines(dir),
     },

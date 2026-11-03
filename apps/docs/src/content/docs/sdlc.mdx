@@ -108,7 +108,30 @@ that should stay on GitHub is given `github: true` before it upgrades. `nemia fa
 to the parameters the factory's file records (`template.params` in `factories/<name>.json` of your store), then upgrade it with
 `nemia factory upgrade <name> --to 2.0.0`. A new factory is given it at apply, `--set github=true`.
 
+## Fit it to your repository
+
+Once the daemon has rendered the factory, its tree is yours to change. Four changes a repository often needs are already possible:
+
+- **Leave a workflow out.** `nemia factory fire myapp --step janitor/argus` takes back the janitor's hire, then
+  `nemia factory detach myapp janitor` takes the workflow back. A detach is refused while the factory still hires someone into one
+  of the workflow's steps, so fire first.
+- **Keep every step from a command.** A step's file in the tree takes a `disallowedTools` line of its own, which adds to its agent's
+  fence, and a deny beats any allow. Take a suite too heavy for a machine other work shares: deny `npm test` on each step, say in your
+  repository's CLAUDE.md how a step runs the one test file it changed, and let your CI run the whole suite as the judge. A rule is
+  matched as it is typed, so it holds against the usual spellings and not against a quoted one.
+- **Let the reading agents run your checks.** Seldon, Agora, Iris and Argus run in `dontAsk` mode, and run only what they are allowed.
+  A step's own `allowedTools` may only narrow its agent's, never widen them, so allow their read-only checks (the linter, the
+  typecheck, one test file, `gh pr view` and `gh pr checks`) in your repository's `.claude/settings.json`, where they travel with it.
+- **Commit before a landing.** The landing runs in your checkout, on your base branch, either way. It refuses a checkout with
+  uncommitted changes before it merges anything, and leaves them as they are: on GitHub, its script refuses changes to tracked
+  files; in your checkout, the land step checks it first, as the git place's _Stage a landing_ says, and signs off blocked with
+  nothing staged. A person commits them or sets them aside, then retries the step. A run starts from your checkout's last commit,
+  so work you have not committed is not in it.
+
 ## Sources
 
-This page is written from `packages/templates/CLAUDE.md`, `packages/templates/sdlc/nemia.yaml`, and from `packages/agent-orchestrator/src/templates/templates.store.ts`
-(`templatePlace` and `BUILTIN_TEMPLATES`).
+This page is written from `packages/templates/CLAUDE.md`, `packages/templates/sdlc/nemia.yaml` and
+`packages/agent-orchestrator/src/templates/templates.store.ts` (`templatePlace` and `BUILTIN_TEMPLATES`). _Fit it to your repository_
+is written from `packages/agent-orchestrator/src/factory/factory.verb.ts`, `packages/agent-orchestrator/src/step/step.ts`,
+`packages/agent-orchestrator/src/agents/agents.ts`, `packages/templates/sdlc/workflows/build/landing.ts`,
+`packages/templates/sdlc/workflows/build/land.md` and `packages/agent-orchestrator/place/git/SKILL.md`.

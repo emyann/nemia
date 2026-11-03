@@ -6,7 +6,8 @@
  * store's root: your library is `<MEMORY_ROOT>/workflows/skills`.
  *
  * A skill is found as a start finds one: the roots' precedence decided by `lookedUp`, the one decider the files read too, and the
- * package's builtin place skills (`PLACE_SKILLS`) last, as `skillsFor` reads them — the stand-in holds none of its own. A skill held is
+ * package's own skills last, the place's (`PLACE_SKILLS`) then the builtin ones (`BUILTIN_SKILLS`), as `skillsFor` reads them — the
+ * stand-in holds none of its own. A skill held is
  * its SKILL.md alone, written through the renders the files write through (`renderSkill`, `withPreload`); a link, a file beside SKILL.md
  * and a skill named with its repository's folder (`folder:name`) are the files' to read.
  */
@@ -18,7 +19,7 @@ import { SKILLS_FOLDER, WorkflowError } from '../step/step.ts';
 import { skillTurnCost, type SkillsFound } from '../agents/agents.ts';
 import { lookedUp } from './skills.ts';
 import { renderSkill, skillEntryOf, withPreload } from './skills.ts';
-import { lookupOf, lookupRoots, PLACE_SKILLS, placeSkillFolders, type Places } from './read.store.ts';
+import { BUILTIN_SKILLS, lookupOf, lookupRoots, packageSkillFolders, PLACE_SKILLS, type Places } from './read.store.ts';
 import { SkillDoor, skillDoorOver, type SkillLayer, type SkillPage, type SkillWhere } from './skill-door.store.ts';
 
 /** Where the stand-in says a skill's folder is: the root its paths are named under, as the files' are under the store's root. */
@@ -52,7 +53,7 @@ function asRefusal<A>(act: () => A): A {
 
 /**
  * The skills of the workflow folder `dir` and its places, as a start finds them, each root's names read by `namesIn`: the roots'
- * precedence decided by `lookedUp`, a name one repository holds in both places refused, and the builtin place skills last.
+ * precedence decided by `lookedUp`, a name one repository holds in both places refused, and the package's own skills last.
  */
 function foundIn(namesIn: (holder: string) => string[], dir: string, places: Places | undefined): SkillsFound {
   const roots = lookupRoots(dir, places);
@@ -70,11 +71,11 @@ function foundIn(namesIn: (holder: string) => string[], dir: string, places: Pla
         : new WorkflowError(`${name} is a skill in both ${at} and ${again}, one repository's two places for skills: keep one of them.`),
     );
   }
-  for (const [name, at] of placeSkillFolders()) if (!all.has(name)) all.set(name, at);
+  for (const [name, at] of packageSkillFolders()) if (!all.has(name)) all.set(name, at);
   return {
     at: { get: (name) => (name.includes(':') ? undefined : all.get(name)) },
     all,
-    looked: [...roots.map((root) => path.posix.join(root, SKILLS_FOLDER)), PLACE_SKILLS],
+    looked: [...roots.map((root) => path.posix.join(root, SKILLS_FOLDER)), PLACE_SKILLS, BUILTIN_SKILLS],
   };
 }
 

@@ -273,9 +273,9 @@ test('copy from a repository: its places listed by nemia agents sources, each ag
   });
 
   await s.test(
-    'the place skill Nemia ships, and a skill named with its folder, are not copied: the agent keeps the name, the library holds none',
+    'the place skill and a builtin skill Nemia ships, and a skill named with its folder, are not copied: the agent keeps the name, the library holds none',
     async () => {
-      for (const line of ['git', 'app:y']) {
+      for (const line of ['git', 'grilling', 'app:y']) {
         const home = scratch('wf-agents-copy-home-');
         const from = scratch('wf-agents-copy-hand-');
         fs.mkdirSync(path.join(from, 'agents'));

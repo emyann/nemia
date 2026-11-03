@@ -32,9 +32,9 @@ export type AgentSource = { name: string; file: string; agent: Agent; output: st
 
 /**
  * Where a skill named is: its folder, the folder of one named with its folder (`named`, which a template never carries), a builtin
- * place skill, or why it is not found (a refusal in the loader's words, or none).
+ * place skill, one of Nemia's builtin skills (`builtin`), or why it is not found (a refusal in the loader's words, or none).
  */
-export type SkillFound = { dir: string } | { named: string } | 'place' | { refused: string } | undefined;
+export type SkillFound = { dir: string } | { named: string } | 'place' | 'builtin' | { refused: string } | undefined;
 
 /**
  * A factory's parts the draft holds: its name, its file, its hires, and its instruction's words and its rules', each with the file they
@@ -281,13 +281,14 @@ function gatherAgents(source: Source, into: Gathered): void {
 }
 
 /**
- * The skills gathered, each carried whole, a place skill left out and said, one named with its folder left out and said too, with where
- * it was read, or refused: none found, or the loader's refusal of it.
+ * The skills gathered, each carried whole, a place skill and a builtin skill of Nemia left out and said, one named with its folder left
+ * out and said too, with where it was read, or refused: none found, or the loader's refusal of it.
  */
 function gatherSkills(source: Source, into: Gathered): void {
   for (const [name, by] of [...into.skills].sort(([a], [b]) => a.localeCompare(b))) {
     const found = source.skill(name);
     if (found === 'place') into.from.push({ part: `skills/${name}/`, from: 'left out: a builtin place skill' });
+    else if (found === 'builtin') into.from.push({ part: `skills/${name}/`, from: 'left out: a builtin skill of Nemia' });
     else if (found !== undefined && 'named' in found)
       into.from.push({ part: name, from: `left out: a skill of the repository's folder, named and not carried, read from ${found.named}` });
     else if (found === undefined || 'refused' in found)
@@ -301,8 +302,8 @@ function gatherSkills(source: Source, into: Gathered): void {
 
 /**
  * The draft of the template `source.template`: each workflow, the agents its steps are filled by, the skills those agents and steps name
- * (a place skill left out), and the manifest with every hire, a factory's and the steps' own, and the factory's revisions policy where it
- * says one; NEMIA.md from the factory's instruction,
+ * (a place skill and a builtin skill of Nemia left out), and the manifest with every hire, a factory's and the steps' own, and the
+ * factory's revisions policy where it says one; NEMIA.md from the factory's instruction,
  * and RULES.md from its rules.
  * Refused, each by name, nothing to write: a key the template has no place for, a step filled twice, an agent or a skill not found.
  */

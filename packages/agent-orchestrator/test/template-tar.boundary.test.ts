@@ -15,7 +15,7 @@ import type { StoreRoot as Root } from '../src/config/root.store.ts';
 
 const ROOT = scratch('wf-template-tar-');
 process.env.WF_ROOT = ROOT;
-const { checkedTree, placeSkillNames } = await import('../src/template/template.store.ts');
+const { checkedTree, packageSkillNames } = await import('../src/template/template.store.ts');
 const { TemplateDoor } = await import('../src/templates/templates.store.ts');
 const { TemplateSource } = await import('../src/templates/templates.model.ts');
 const { StoreRoot } = await import('../src/config/root.store.ts');
@@ -73,7 +73,7 @@ test('a folder entry that is neither a file nor a folder is refused by name, nev
       return yield* (yield* TemplateDoor).templates.read(TemplateSource.read(path.resolve(dir)));
     }),
   );
-  const problems = checkedTree(read, placeSkillNames()).problems;
+  const problems = checkedTree(read, packageSkillNames()).problems;
   assert.deepEqual(
     problems.map((p) => p.file),
     ['workflows/dev/pipe.yaml'],

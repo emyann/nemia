@@ -114,7 +114,7 @@ function slice(file: string, from: string, to: RegExp): string {
 
 const README = (): string =>
   slice('packages/agent-orchestrator/README.md', "### An agent is a node's attachment", /^#### What an agent says it can do/m);
-const SKILL = (): string => slice('.claude/skills/create-an-agent/SKILL.md', '## The five layers', /^## /m);
+const SKILL = (): string => slice('packages/agent-orchestrator/skills/create-an-agent/SKILL.md', '## The five layers', /^## /m);
 const PAGE = (): string => slice('apps/docs/src/content/docs/agents.mdx', '## What an agent is told: five layers', /^## Sources/m);
 /** The `meaning` of the term `Instruction layers` in the agents' glossary table. */
 const GLOSSARY = (): string => {

@@ -121,7 +121,7 @@ holds what every change needs.
 
 ## Agents in this repository
 
-What the `create-an-agent` skill, being generic, does not say here:
+What the `create-an-agent` skill (`packages/agent-orchestrator/skills/create-an-agent/SKILL.md`), being generic, does not say here:
 
 - Read `packages/agent-orchestrator/README.md`, *An agent is a node's attachment*, for the format, the five layers numbered by
   precedence, and the routing rule that says which layer owns a new instruction (*Where a new instruction goes*).
@@ -172,11 +172,11 @@ What the `create-an-agent` skill, being generic, does not say here:
 - `packages/agent-orchestrator/docs/features.md` — what is still to build, in order.
 - `packages/agent-runtime/docs/open-issues.md` — what is still wrong or half-verified.
 - `.claude/skills/` — the repository's skills. Ours: `look`, `see-a-dashboard` (a dashboard of the side Grafana, rendered and read),
-  `effect` (how we write Effect 4), `create-an-agent` (how an agent is made here), `change-a-contract` (what a contract asks of a design,
-  an implement and a review) and `change-the-board` (the trigger of shadcn and of the kit's skills, and the board's own traps, for a
-  change under apps/web). Vendored unchanged, pinned in `skills-lock.json`
+  `effect` (how we write Effect 4), `change-a-contract` (what a contract asks of a design, an implement and a review) and
+  `change-the-board` (the trigger of shadcn and of the kit's skills, and the board's own traps, for a change under apps/web). Vendored
+  unchanged, pinned in `skills-lock.json`
   and credited in `THIRD_PARTY_NOTICES.md`: `shadcn` (it is loaded, and its CLI runs, from `apps/web`, where `components.json` is:
-  loaded from the root it refuses with `monorepo_root`), `grilling` and `grill-me` (Iris's interview), and `react-aria` (Adobe's
+  loaded from the root it refuses with `monorepo_root`), and `react-aria` (Adobe's
   documentation of React Aria, for the board's own parts: taken from the root by `npx skills add https://react-aria.adobe.com -a
   claude-code --copy -y`, refreshed by `npx skills update`, and it describes the library's latest release, which may be ahead of the
   board's pin), and `tsverify` (the verifier's, for a contract under a package's `contracts/` and the function it proves: taken by `npx
@@ -196,7 +196,9 @@ What the `create-an-agent` skill, being generic, does not say here:
   `intake` (an idea to an intent), `build` (an intent to main, started `--after` the intake run), `quick` (a card that settles its change, whatever its size, to main: implement, then a review
   whose pass files an ungated land, as `workflows/quick/README.md` says) and `janitor` (on demand: the stats to inbox cards, none started). What Nemia has built in:
   the git place `place/git` (`packages/agent-orchestrator/place/git`: its skill, and its code, given as `gitPlaceLayer`), the skills the api lists as builtin
-  (`BUILTIN_SKILLS`, the package's own `skills/`, none today), the MCP servers it offers a factory (`BUILTIN_SERVERS`,
+  (`BUILTIN_SKILLS`, the package's own `skills/`: `create-an-agent`, and `grilling` and `grill-me`, Iris's interview, vendored
+  unchanged, pinned in the package's `skills-lock.json` and credited in its `THIRD_PARTY_NOTICES.md`), which a step that names one finds
+  last, after every place and the place's skills, the MCP servers it offers a factory (`BUILTIN_SERVERS`,
   `packages/agent-orchestrator/servers/`), and Nemia's own agent once the Nemia slices build it. A person's
   factories get no workflow or agent from the package.
 - `apps/cli/` — `nemia` and `wf`, the client of the api: the moved reads over HTTP, every other verb and `--local` on the

@@ -25,7 +25,7 @@ const MECHANISM: Array<{ file: string; holds: string; body: boolean }> = [
   { file: '.claude/skills/write-a-spec/SKILL.md', holds: '# Write a spec', body: true },
   { file: '.claude/skills/review-a-change/SKILL.md', holds: '# Review a change', body: true },
   { file: '.claude/skills/implement-a-change/SKILL.md', holds: '# Implement a change', body: true },
-  { file: '.claude/skills/create-an-agent/SKILL.md', holds: '# Create an agent in Nemia', body: true },
+  { file: 'packages/agent-orchestrator/skills/create-an-agent/SKILL.md', holds: '# Create an agent in Nemia', body: true },
 ];
 
 /** The text of `file` the guard reads: an agent's or a skill's body after its frontmatter, a schema whole. */

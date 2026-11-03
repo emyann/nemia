@@ -1,7 +1,8 @@
 /**
  * The board's skill picker (skills.ts): the skills an agent of yours can be given, by place, in the order a start finds a name, and what
- * is built into Nemia beside them — nothing today, so what a builtin row says is read off the tests' team (`team.ts`) handed to
- * `listSkills` as the builtin place — in a scratch store and a scratch repository. Every refusal is made to refuse, asserted on its words,
+ * is built into Nemia beside them — the package's own, found by name by an agent of yours and so listed under no other place; where a
+ * row's `found` is read, the tests' team (`team.ts`) is handed to `listSkills` as the builtin place — in a scratch store and a scratch
+ * repository. Every refusal is made to refuse, asserted on its words,
  * with the library as it was. And one skill on its own page, and one of yours
  * written on the board: made, changed at its version, its preload switched — each moving the version of every agent that gives it.
  *
@@ -35,7 +36,7 @@ const inRoot = <A, E>(program: Effect.Effect<A, E, StoreRoot>): Promise<A> =>
 type SkillPlace = import('./skills.ts').SkillPlace;
 type SkillRow = import('./skills.ts').SkillRow;
 
-/** Nemia's builtin skills: the orchestrator package's `skills/`, none while it has no such folder. Read, never written. */
+/** Nemia's builtin skills: the orchestrator package's `skills/`. Read, never written. */
 const BUILTIN = BUILTIN_SKILLS;
 const builtin = fs.existsSync(BUILTIN)
   ? fs
@@ -131,12 +132,27 @@ test("the skills are listed by place — yours, the repository's, then what is b
     places[2].skills.map((s) => s.name),
     builtin,
   );
+  assert.ok(builtin.length > 0, 'Nemia ships builtin skills');
   assert.equal(rowOf(places, 'yours', 'shared')!.entry?.description, 'Mine.', 'your library wins a name the repository has too');
   assert.equal(rowOf(places, 'yours', 'shared')!.dir, path.join(LIBRARY, 'shared'));
   assert.ok(
     !places.some((p) => p.skills.some((s) => s.name === 'beside')),
     "the repository's workflows/skills is no place an agent of yours looks",
   );
+});
+
+test('a builtin skill an agent of yours gives, which no place has, lists that agent beside it', async () => {
+  const [name] = builtin;
+  assert.ok(name !== undefined, 'Nemia ships a builtin skill');
+  const asker = path.join(root, 'workflows', 'agents', 'asker.md');
+  fs.writeFileSync(asker, `---\ndescription: Asks.\nskills: ${name}\n---\nAsk.\n`);
+  try {
+    const row = rowOf(await listed(), 'builtin', name)!;
+    assert.deepEqual(row.usedBy, ['asker']);
+    assert.equal(row.found, null, 'no place of yours has its name');
+  } finally {
+    fs.rmSync(asker);
+  }
 });
 
 test('a skill is listed with its card entry, whether it is loaded every turn, what it costs a turn, and the agents of yours that give it', async () => {

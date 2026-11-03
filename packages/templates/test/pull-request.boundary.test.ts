@@ -1,0 +1,730 @@
+/**
+ * sdlc's pull-request door (`sdlc/workflows/build/pull-request.ts`, which `quick/` carries byte for byte): the one act that pushes a
+ * run's branch and opens the pull request CI judges. Driven as its three owners drive it — `open` by the engineer's session, `push` and
+ * `wait --check <name>` by the round's check — in a scratch repository whose `origin` is a bare repository, so a push is a real push
+ * and a diverged tip a real rejection, with a stub `gh` first on the PATH that records each call and answers from a fixture
+ * (`test/origin.ts`), each a bounded subprocess. The CI context the wait reads is the one `--check` names, since that name is the
+ * repository's a factory is applied to, never the script's.
+ *
+ * The wait's two bounds are told apart by `WF_CI_START_SECONDS` and `WF_CI_WAIT_SECONDS`, each read on its own, and the shipped numbers
+ * are held against the words of `sdlc/workflows/build/README.md` and against a round check's own deadline. Build's implement check is
+ * read off sdlc as a factory gets it, rendered by `nemia factory apply` and the controller on a scratch store, its round check and its
+ * CI context set as parameters, and each clause that runs the script is run as the run runs a check (`checkArgv`).
+ *
+ * Its subject is git and a spawned script: a boundary file.
+ */
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { execFileSync, spawn, spawnSync } from 'node:child_process';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { loadWorkflows } from 'agent-orchestrator';
+import { CHECK_DEADLINE_SECONDS, checkArgv } from 'agent-orchestrator/run';
+import { scratch } from './scratch.ts';
+import { CI_URL, GREEN, type Called, type Gh, type Rule, bareOrigin, ghStub, gitIn, listed, passing, rollup, tip } from './origin.ts';
+
+/** The template these scripts ship in. */
+const SDLC = path.join(import.meta.dirname, '..', 'sdlc');
+
+const BUILD = path.join(SDLC, 'workflows', 'build');
+
+const SCRIPT = path.join(BUILD, 'pull-request.ts');
+
+/** The wait's flag, naming the CI context `origin.ts`'s rollups report. */
+const CI = ['--check', 'ci'];
+
+/** The orchestrator's CLI, `nemia`, reached through its package's entry. */
+const BIN = fileURLToPath(import.meta.resolve('agent-orchestrator/bin'));
+
+/** sdlc as a factory gets it: the factory's rendered tree, and the scratch store it is in. */
+type Rendered = { tree: string; store: string };
+
+/**
+ * Iris's `grilling` carried in the template copy `template` as a stub, where `nemia template lint` refuses the name: a builtin skill
+ * Nemia does not ship yet, and a template lint refuses is never rendered. Once lint passes sdlc as it is, nothing is written, and this
+ * goes.
+ */
+function grillingStubbed(template: string, lints: (folder: string) => boolean): void {
+  if (lints(template)) return;
+  fs.mkdirSync(path.join(template, 'skills', 'grilling'), { recursive: true });
+  fs.writeFileSync(path.join(template, 'skills', 'grilling', 'SKILL.md'), '---\nname: grilling\ndescription: A stub.\n---\nA stub.\n');
+}
+
+/**
+ * The template copy `template`'s agents without their `Write(<storeRoot>/…)` denies, which sdlc writes beside the `Edit(…)` ones and
+ * the agent reader refuses (Claude Code matches a write against `Edit` rules alone), so that no hired step of the rendered tree loads.
+ * Nothing is dropped once sdlc writes none, and this goes.
+ */
+function writeDeniesDropped(template: string): void {
+  for (const agent of fs.readdirSync(path.join(template, 'agents'))) {
+    const file = path.join(template, 'agents', agent, 'agent.yaml');
+    fs.writeFileSync(file, fs.readFileSync(file, 'utf8').replace(/^\s*- Write\(\$\{\{ parameters\.storeRoot \}\}\/.*\n/gm, ''));
+  }
+}
+
+/**
+ * sdlc rendered as a person's factory gets it: a copy of the template applied by `nemia factory apply` with `sets`, on a scratch store,
+ * and rendered by the controller of a `nemia up` on that store, stopped once it has written the factory's status and seeded its tree.
+ */
+async function rendered(sets: readonly string[] = []): Promise<Rendered> {
+  const root = scratch('wf-sdlc-render-');
+  const template = path.join(root, 'sdlc');
+  fs.cpSync(SDLC, template, { recursive: true });
+  const store = path.join(root, 'store');
+  const env = {
+    ...process.env,
+    HOME: root,
+    WF_ROOT: store,
+    AE_ROOT: path.join(root, 'engine'),
+    CLAUDE_CONFIG_DIR: path.join(root, 'claude'),
+    OTEL_EXPORTER_OTLP_ENDPOINT: '',
+    WF_MAX_CONCURRENT: '1',
+    WF_MAX_RUNS: '1',
+  };
+  const nemia = (...args: string[]) => spawnSync(process.execPath, [BIN, ...args], { cwd: root, env, encoding: 'utf8', timeout: 60_000 });
+  grillingStubbed(template, (folder) => nemia('template', 'lint', folder).status === 0);
+  writeDeniesDropped(template);
+  const repo = path.join(root, 'repo');
+  fs.mkdirSync(repo);
+  gitIn(repo, 'init', '-q');
+  const applied = nemia(
+    'factory',
+    'apply',
+    'sdlc',
+    '--template',
+    template,
+    '--repo',
+    repo,
+    '--no-trust',
+    ...sets.flatMap((s) => ['--set', s]),
+  );
+  assert.equal(applied.status, 0, applied.stderr);
+  const folder = path.join(store, 'factories', 'sdlc');
+  const done = () => fs.existsSync(path.join(folder, 'status.json')) && fs.existsSync(path.join(folder, 'tree', 'factory.json'));
+  const up = spawn(process.execPath, [BIN, 'up'], { cwd: root, env, stdio: 'ignore' });
+  const ended = new Promise((resolve) => up.once('exit', resolve));
+  try {
+    for (const bound = performance.now() + 60_000; !done(); await new Promise((r) => setTimeout(r, 50)))
+      assert.ok(performance.now() < bound && up.exitCode === null, 'the controller renders the tree within 60 s');
+  } finally {
+    up.kill('SIGTERM');
+    const killer = setTimeout(() => up.kill('SIGKILL'), 10_000);
+    await ended;
+    clearTimeout(killer);
+  }
+  const status = JSON.parse(fs.readFileSync(path.join(folder, 'status.json'), 'utf8')) as { conditions: { status: string }[] };
+  assert.equal(status.conditions[0]?.status, 'True', JSON.stringify(status));
+  return { tree: path.join(folder, 'tree'), store };
+}
+
+/** The steps of the rendered tree's `workflow`, read as a start of it in the factory reads them: with the factory's hires. */
+function stepsOf(at: Rendered, workflow: string) {
+  const { hires } = JSON.parse(fs.readFileSync(path.join(at.tree, 'factory.json'), 'utf8')) as { hires: Record<string, string> };
+  const agents = Object.fromEntries(
+    Object.entries(hires).flatMap(([step, agent]) => (step.startsWith(`${workflow}/`) ? [[step.slice(workflow.length + 1), agent]] : [])),
+  );
+  return loadWorkflows(path.join(at.tree, 'workflows', workflow), { home: at.store }, { factory: 'sdlc', workflow, agents });
+}
+
+/**
+ * The retry line a refusal of the wait must print: the run the branch names, and the step `WF_STEP` says — or, with it unset, the
+ * constant fallback. The branch cannot say it: a run's line of work is `wf/<run>/run`, which names no step.
+ */
+const RETRY = 'nemia retry r-1 implement --recheck';
+
+/** A place to push from: a scratch repository on `branch`, its `origin` a bare repository, and a stub `gh` answering `rules`. */
+function placed({ branch = 'wf/r-1/run', remote = true } = {}): { repo: string; bare: string | undefined; branch: string; gh: Gh } {
+  const repo = scratch('wf-pr-repo-');
+  gitIn(repo, 'init', '-q', '-b', branch);
+  fs.writeFileSync(path.join(repo, 'a.ts'), 'export const a = 1;\n');
+  gitIn(repo, 'add', '-A');
+  gitIn(repo, 'commit', '-qm', 'work');
+  const bare = remote ? bareOrigin(repo) : undefined;
+  return { repo, bare, branch, gh: ghStub(passing(repo)) };
+}
+
+type Ran = { code: number | null; out: string; err: string; calls: Called[] };
+
+/** Run the script's `verb` in `at` with `args`, bounded; its exit, its streams and the calls the stub `gh` was given. */
+function pr(at: ReturnType<typeof placed>, verb: string, args: string[] = [], more: Record<string, string> = {}): Ran {
+  const ran = spawnSync(process.execPath, [SCRIPT, verb, ...args], {
+    cwd: at.repo,
+    env: {
+      PATH: `${at.gh.bin}${path.delimiter}${process.env.PATH ?? ''}`,
+      HOME: at.repo,
+      GIT_CONFIG_GLOBAL: '/dev/null',
+      GIT_CONFIG_NOSYSTEM: '1',
+      GIT_AUTHOR_NAME: 't',
+      GIT_AUTHOR_EMAIL: 't@t',
+      GIT_COMMITTER_NAME: 't',
+      GIT_COMMITTER_EMAIL: 't@t',
+      ...at.gh.env(),
+      ...more,
+    },
+    encoding: 'utf8',
+    timeout: 60_000,
+  });
+  return { code: ran.status, out: ran.stdout, err: ran.stderr, calls: at.gh.calls() };
+}
+
+/** The calls of the stub `gh` that begin with `words`. */
+const asked = (calls: readonly Called[], ...words: string[]): Called[] =>
+  calls.filter((call) => words.every((word, i) => call.argv[i] === word));
+
+/** A file written and committed in `repo`: the commit it made. */
+function commit(repo: string, name: string): string {
+  fs.writeFileSync(path.join(repo, name), `export const ${name.replace(/\W/g, '')} = 1;\n`);
+  gitIn(repo, 'add', '-A');
+  gitIn(repo, 'commit', '-qm', name);
+  return gitIn(repo, 'rev-parse', 'HEAD').trim();
+}
+
+/** A body file to open the pull request with: its path. */
+function body(text = 'What this round changed.\n'): string {
+  const file = path.join(scratch('wf-pr-files-'), 'pr-body.md');
+  fs.writeFileSync(file, text);
+  return file;
+}
+
+test("open pushes the run's branch and creates the pull request with the title and body it was given, never a draft", () => {
+  const at = placed();
+  at.gh.answers([
+    { when: 'auth status' },
+    { when: 'repo view', out: JSON.stringify({ defaultBranchRef: { name: 'main' } }) },
+    { when: 'pr list', out: '[]' },
+    { when: 'pr create', out: 'https://github.com/o/r/pull/7' },
+  ]);
+  const file = body();
+  const r = pr(at, 'open', ['--title', "A run's change is a pull request", '--body-file', file]);
+  assert.equal(r.code, 0, r.err);
+  assert.equal(tip(at.bare!, at.branch), gitIn(at.repo, 'rev-parse', 'HEAD').trim(), 'the branch is on origin at HEAD');
+  const created = asked(r.calls, 'pr', 'create');
+  assert.equal(created.length, 1, JSON.stringify(r.calls));
+  assert.deepEqual(created[0].argv, [
+    'pr',
+    'create',
+    '--base',
+    'main',
+    '--head',
+    'wf/r-1/run',
+    '--title',
+    "A run's change is a pull request",
+    '--body-file',
+    file,
+  ]);
+  assert.ok(!r.calls.some((call) => call.argv.includes('--draft')), 'never a draft');
+  assert.equal(asked(r.calls, 'api').length, 0, 'the fields of a pull request it just created are not patched');
+  assert.match(r.out, /nemia pr: https:\/\/github\.com\/o\/r\/pull\/7/);
+});
+
+test('open on a branch whose pull request is already open updates its title and body, and creates no second one', () => {
+  const at = placed();
+  const file = body('A second round.\n');
+  const r = pr(at, 'open', ['--title', 'The same card', '--body-file', file]);
+  assert.equal(r.code, 0, r.err);
+  assert.equal(asked(r.calls, 'pr', 'create').length, 0, 'never a second pull request');
+  assert.equal(asked(r.calls, 'pr', 'edit').length, 0, 'never `gh pr edit`, whose GraphQL query GitHub refuses');
+  assert.deepEqual(asked(r.calls, 'api')[0].argv, [
+    'api',
+    '-X',
+    'PATCH',
+    'repos/{owner}/{repo}/pulls/7',
+    '-f',
+    'title=The same card',
+    '-F',
+    `body=@${file}`,
+  ]);
+  assert.match(r.out, /nemia pr: https:\/\/github\.com\/o\/r\/pull\/7/);
+});
+
+test('REFUSED: open with no title or no body file, and a verb the script has not; nothing is pushed', () => {
+  const at = placed();
+  for (const args of [[], ['--title', 'x'], ['--body-file', body()], ['--title', 'x', '--draft', 'y']]) {
+    const r = pr(at, 'open', args);
+    assert.equal(r.code, 1, args.join(' '));
+    assert.equal(tip(at.bare!, at.branch), null, 'nothing is pushed');
+  }
+  const unknown = pr(at, 'merge');
+  assert.equal(unknown.code, 1);
+  assert.match(unknown.err, /`merge` is no verb: give open, push or wait/);
+  assert.deepEqual(unknown.calls, []);
+});
+
+test("REFUSED: a HEAD that is on no run's branch, or on the remote's default branch; nothing is pushed and no gh is called", () => {
+  for (const branch of ['main', 'feature/x', 'wf/r-1']) {
+    const at = placed({ branch });
+    const r = pr(at, 'push');
+    assert.equal(r.code, 1, branch);
+    assert.match(r.err, /not a run's `wf\/<run>\/<leaf>`/);
+    assert.match(r.err, /git switch wf\/<run>\/run/);
+    assert.equal(tip(at.bare!, branch), null, 'nothing is pushed');
+    assert.deepEqual(r.calls, [], 'no gh is called');
+  }
+  const named = placed();
+  named.gh.answers([{ when: 'auth status' }, { when: 'repo view', out: JSON.stringify({ defaultBranchRef: { name: 'wf/r-1/run' } }) }]);
+  const base = pr(named, 'push');
+  assert.equal(base.code, 1, base.out);
+  assert.ok(base.err.includes("HEAD is on `wf/r-1/run`, the remote's default branch"), base.err);
+  assert.ok(base.err.includes('git switch wf/r-1/run'), base.err);
+  assert.equal(tip(named.bare!, 'wf/r-1/run'), null, 'nothing is pushed');
+});
+
+test('REFUSED: no origin remote, no gh on the PATH, and a gh that is not authenticated, each naming what to type', () => {
+  const none = placed({ remote: false });
+  const r = pr(none, 'push');
+  assert.equal(r.code, 1, r.out);
+  assert.match(r.err, /has no `origin` remote/);
+  assert.match(r.err, /git remote -v/);
+  assert.deepEqual(r.calls, [], 'the remote is read before gh');
+
+  const at = placed();
+  at.gh.answers([{ when: 'auth status', status: 1, err: 'You are not logged into any GitHub hosts.' }, ...passing(at.repo)]);
+  const unauthed = pr(at, 'push');
+  assert.equal(unauthed.code, 1, unauthed.out);
+  assert.match(unauthed.err, /is not authenticated here: run `gh auth login`/);
+  assert.equal(tip(at.bare!, at.branch), null, 'nothing is pushed');
+
+  const gitAlone = scratch('wf-pr-nogh-');
+  fs.symlinkSync(execFileSync('sh', ['-c', 'command -v git'], { encoding: 'utf8' }).trim(), path.join(gitAlone, 'git'));
+  const missing = spawnSync(process.execPath, [SCRIPT, 'push'], {
+    cwd: at.repo,
+    env: { PATH: gitAlone, HOME: at.repo, GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_NOSYSTEM: '1' },
+    encoding: 'utf8',
+    timeout: 60_000,
+  });
+  assert.equal(missing.status, 1, missing.stdout);
+  assert.match(missing.stderr, /no `gh` on the PATH/);
+  assert.match(missing.stderr, /gh auth login/);
+});
+
+test('REFUSED, never forced: a tip on origin that HEAD does not hold; origin keeps it, and the refusal names the merge', () => {
+  const at = placed();
+  gitIn(at.repo, 'push', '-q', 'origin', at.branch);
+  const theirs = commit(at.repo, 'theirs.ts');
+  gitIn(at.repo, 'push', '-q', 'origin', at.branch);
+  gitIn(at.repo, 'reset', '-q', '--hard', 'HEAD~1');
+  const mine = commit(at.repo, 'mine.ts');
+  at.gh.answers(passing(at.repo));
+  const r = pr(at, 'push');
+  assert.equal(r.code, 1, r.out);
+  assert.match(r.err, /was rejected, and this script never forces a push/);
+  assert.match(r.err, /git merge main-worktree\/HEAD/);
+  assert.equal(tip(at.bare!, at.branch), theirs, "origin's tip is the one it had");
+  assert.notEqual(mine, theirs);
+});
+
+test('REFUSED: a draft pull request, or one based on another branch than the remote default; a draft names gh pr ready', () => {
+  const at = placed();
+  const head = gitIn(at.repo, 'rev-parse', 'HEAD').trim();
+  at.gh.answers([...passing(at.repo).filter((rule) => rule.when !== 'pr list'), { when: 'pr list', out: listed(head, { isDraft: true }) }]);
+  const draft = pr(at, 'open', ['--title', 'x', '--body-file', body()]);
+  assert.equal(draft.code, 1, draft.out);
+  assert.match(draft.err, /#7 is a draft/);
+  assert.match(draft.err, /gh pr ready 7/);
+  assert.equal(tip(at.bare!, at.branch), null, 'no push follows a draft');
+  assert.equal(asked(draft.calls, 'api').length, 0);
+
+  const other = placed();
+  const at2 = gitIn(other.repo, 'rev-parse', 'HEAD').trim();
+  other.gh.answers([
+    ...passing(other.repo).filter((rule) => rule.when !== 'pr list'),
+    { when: 'pr list', out: listed(at2, { baseRefName: 'release' }) },
+  ]);
+  const based = pr(other, 'open', ['--title', 'x', '--body-file', body()]);
+  assert.equal(based.code, 1, based.out);
+  assert.ok(based.err.includes('#7 is based on `release`'), based.err);
+  assert.ok(based.err.includes("the remote's default branch `main`"), based.err);
+  assert.match(based.err, /gh pr edit 7 --base main/);
+  assert.ok(based.err.includes('gh api -X PATCH repos/{owner}/{repo}/pulls/7 -f base=main'), based.err);
+});
+
+test('REFUSED: two open pull requests for one branch, naming the close a person types', () => {
+  const at = placed();
+  const head = gitIn(at.repo, 'rev-parse', 'HEAD').trim();
+  const two = JSON.stringify([
+    { number: 7, url: 'https://github.com/o/r/pull/7', isDraft: false, baseRefName: 'main', headRefOid: head },
+    { number: 8, url: 'https://github.com/o/r/pull/8', isDraft: false, baseRefName: 'main', headRefOid: head },
+  ]);
+  at.gh.answers([...passing(at.repo).filter((rule) => rule.when !== 'pr list'), { when: 'pr list', out: two }]);
+  const r = pr(at, 'push');
+  assert.equal(r.code, 1, r.out);
+  assert.ok(r.err.includes('2 open pull requests have wf/r-1/run'), r.err);
+  assert.ok(r.err.includes('(#7, #8)'), r.err);
+  assert.match(r.err, /gh pr close <number>/);
+});
+
+test("push pushes the hand-off commit and proves the pull request's head is the commit the check judges", () => {
+  const at = placed();
+  const handed = commit(at.repo, 'handed-off.ts');
+  at.gh.answers(passing(at.repo));
+  const r = pr(at, 'push');
+  assert.equal(r.code, 0, r.err);
+  assert.equal(tip(at.bare!, at.branch), handed, 'the hand-off commit is on origin');
+  assert.match(r.out, new RegExp(`nemia pr: #7 is at ${handed.slice(0, 12)}, the commit this check judges`));
+});
+
+test("push reads the pull request's head again for a bounded few seconds, since GitHub moves it a moment after the push", () => {
+  const at = placed();
+  const was = gitIn(at.repo, 'rev-parse', 'HEAD').trim();
+  const pushed = commit(at.repo, 'handed-off.ts');
+  at.gh.answers([
+    ...passing(at.repo).filter((rule) => rule.when !== 'pr list'),
+    { when: 'pr list', outs: [listed(was), listed(was), listed(pushed)] },
+  ]);
+  const r = pr(at, 'push', [], { WF_PR_HEAD_SECONDS: '600', WF_PR_HEAD_POLL_SECONDS: '0' });
+  assert.equal(r.code, 0, r.err);
+  assert.equal(asked(r.calls, 'pr', 'list').length, 3, 'it read the head again until GitHub had caught up with the push');
+  assert.match(r.out, new RegExp(`nemia pr: #7 is at ${pushed.slice(0, 12)}, the commit this check judges`));
+  assert.equal(tip(at.bare!, at.branch), pushed, 'and the branch was pushed once, before the reads');
+  assert.equal(r.calls.filter((call) => call.argv[0] === 'pr' && call.argv[1] === 'create').length, 0);
+});
+
+test('REFUSED: a pull request whose head is another commit, and none open at all; each names the open line', () => {
+  const at = placed();
+  const was = gitIn(at.repo, 'rev-parse', 'HEAD').trim();
+  at.gh.answers(passing(at.repo));
+  const now = commit(at.repo, 'later.ts');
+  const stale = pr(at, 'push', [], { WF_PR_HEAD_SECONDS: '0' });
+  assert.equal(stale.code, 1, stale.out);
+  assert.ok(stale.err.includes(`#7 has ${was.slice(0, 12)} as its head and this workspace is on ${now.slice(0, 12)}`), stale.err);
+  assert.match(stale.err, /0 s after the push/, 'a head elsewhere for the bound is refused, saying how long');
+  assert.ok(stale.err.includes('pull-request.ts" open --title'), stale.err);
+  assert.ok(stale.err.includes('--body-file "$WF_STEP_FILES/pr-body.md"'), stale.err);
+
+  const none = placed();
+  none.gh.answers([...passing(none.repo).filter((rule) => rule.when !== 'pr list'), { when: 'pr list', out: '[]' }]);
+  const unopened = pr(none, 'push');
+  assert.equal(unopened.code, 1, unopened.out);
+  assert.ok(unopened.err.includes('no open pull request has wf/r-1/run as its head'), unopened.err);
+  assert.ok(unopened.err.includes('pull-request.ts" open --title'), unopened.err);
+  assert.ok(unopened.err.includes('--body-file "$WF_STEP_FILES/pr-body.md"'), unopened.err);
+});
+
+test('wait reads mergeable again while GitHub computes it, polls the ci context until it has a verdict, and passes on a green one; REFUSED at once: a conflicting head', () => {
+  const at = placed();
+  const head = gitIn(at.repo, 'rev-parse', 'HEAD').trim();
+  const computing = (then: string): Rule => ({
+    when: 'pr list',
+    outs: [listed(head, { mergeable: 'UNKNOWN' }), listed(head, { mergeable: then })],
+  });
+  const pending: Rule = { when: 'pr view', outs: [rollup({ status: 'QUEUED' }), rollup({ status: 'IN_PROGRESS' }), GREEN] };
+  const others = passing(at.repo).filter((rule) => rule.when !== 'pr view' && rule.when !== 'pr list');
+  const quick = { WF_CI_POLL_SECONDS: '0', WF_PR_MERGEABLE_POLL_SECONDS: '0' };
+  at.gh.answers([...others, computing('MERGEABLE'), pending]);
+  const r = pr(at, 'wait', CI, quick);
+  assert.equal(r.code, 0, r.err);
+  assert.equal(asked(r.calls, 'pr', 'list').length, 2, 'an UNKNOWN mergeable is read again until GitHub has computed it');
+  assert.equal(asked(r.calls, 'pr', 'view').length, 3, 'it polled until the verdict');
+  assert.match(r.out, /nemia ci: `ci` passed on/);
+  assert.equal(tip(at.bare!, at.branch), null, 'the wait pushes nothing');
+
+  const torn = placed();
+  torn.gh.answers([...others, computing('CONFLICTING'), pending]);
+  const conflicting = pr(torn, 'wait', CI, { ...quick, WF_CI_START_SECONDS: '600', WF_CI_WAIT_SECONDS: '600' });
+  assert.equal(conflicting.code, 1, conflicting.out);
+  assert.equal(asked(conflicting.calls, 'pr', 'view').length, 0, 'no ci is waited for on a head that conflicts with its base');
+  assert.ok(conflicting.err.includes('git merge main-worktree/HEAD'), `it names the merge of the base:\n${conflicting.err}`);
+  assert.ok(conflicting.err.includes('pull-request.ts" open --title'), `and the push of the round again:\n${conflicting.err}`);
+});
+
+/** `lines` as a job's log GitHub serves: each line stamped with the time it was printed. */
+const stamped = (lines: string[]): string => lines.map((line) => `2026-10-24T09:00:00.0000000Z ${line}`).join('\n');
+
+test('REFUSED: a red ci, with the Actions URL, the failing jobs, the lines that failed each job, and the retry line', () => {
+  const at = placed();
+  const TESTS_URL = CI_URL.replace('/job/5678', '/job/9012');
+  const CHECKS_URL = CI_URL.replace('/job/5678', '/job/3456');
+  const cleanup = [
+    'Post job cleanup.',
+    '[command]/usr/bin/git version',
+    "Temporarily overriding HOME='<runner>/_temp/x' before making global git config changes",
+    'Cleaning up orphan processes',
+  ];
+  const pastSpawnBuffer = `[w1] visiting page ${'x'.repeat(1024 * 1024)}`;
+  const LATE = "src/late.ts(9,1): error TS2304: Cannot find name 'late'.";
+  const checks = stamped([
+    "web:typecheck: src/a.ts(3,7): error TS2322: Type 'string' is not assignable to type 'number'.",
+    "  x eslint(no-unused-vars): Variable 'b' is declared but never used.",
+    '   ,-[src/b.ts:1:7]',
+    ' 1 | const b = 1;',
+    ...Array.from({ length: 40 }, (_, i) => `[w1] visiting page ${i}`),
+    pastSpawnBuffer,
+    `web:typecheck: ${LATE}`,
+    LATE,
+    'Process completed with exit code 1.',
+    ...cleanup,
+  ]);
+  const tests = stamped([
+    ...Array.from({ length: 50 }, (_, i) => `agent-orchestrator:test: ✔ a passing test ${i} (1ms)`),
+    'agent-orchestrator:test: ✖ the export is pinned (2ms)',
+    'agent-orchestrator:test: ✔ a later pass (1ms)',
+    'agent-orchestrator:test: ℹ fail 1',
+    'agent-orchestrator:test: ✖ failing tests:',
+    'agent-orchestrator:test: test at test/a.test.ts:3:1',
+    'agent-orchestrator:test: ✖ the export is pinned (2ms)',
+    'agent-orchestrator:test:   AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:',
+    'agent-orchestrator:test:   + actual - expected',
+    "agent-orchestrator:test:   + 'pinned'",
+    "agent-orchestrator:test:   - 'moved'",
+    'agent-orchestrator:test:       at TestContext.<anonymous> (file:///a.test.ts:3:33)',
+  ]);
+  const gathered = stamped(['Every job succeeded', 'test: failure', 'Process completed with exit code 1.', ...cleanup]);
+  at.gh.answers([
+    ...passing(at.repo).filter((rule) => rule.when !== 'pr view'),
+    {
+      when: 'pr view',
+      out: rollup(
+        { status: 'COMPLETED', conclusion: 'FAILURE' },
+        { name: 'test agent-orchestrator on node 22', status: 'COMPLETED', conclusion: 'FAILURE', detailsUrl: TESTS_URL },
+        { name: 'lint', status: 'COMPLETED', conclusion: 'SUCCESS', detailsUrl: CI_URL },
+        { name: 'e2e and types', status: 'COMPLETED', conclusion: 'FAILURE', detailsUrl: CHECKS_URL },
+      ),
+    },
+    { when: 'actions/jobs/9012/logs', out: tests },
+    { when: 'actions/jobs/3456/logs', out: checks },
+    { when: 'actions/jobs/5678/logs', out: gathered },
+  ]);
+  const r = pr(at, 'wait', CI, { WF_CI_POLL_SECONDS: '0', WF_STEP: 'implement' });
+  assert.equal(r.code, 1, r.out);
+  assert.ok(r.err.includes('`ci` for #7 is failure'), r.err);
+  assert.ok(r.err.includes(`The Actions URL: ${CI_URL}`), r.err);
+  assert.match(r.err, /the jobs that did not pass:/);
+  assert.match(r.err, /test agent-orchestrator on node 22: FAILURE/);
+  assert.ok(!r.err.includes('  lint: '), `a job that passed is not named:\n${r.err}`);
+  assert.match(r.err, /test agent-orchestrator on node 22 \(job 9012\)/, "the job's lines are headed by its name");
+  for (const told of ['✖ the export is pinned', 'AssertionError [ERR_ASSERTION]', '+ actual - expected', "+ 'pinned'", "- 'moved'"])
+    assert.ok(r.err.includes(told), `the failure and its diff: ${told}\n${r.err}`);
+  assert.ok(!r.err.includes('✔'), `no pass is handed on:\n${r.err}`);
+  assert.ok(!r.err.includes('2026-10-24T09'), `GitHub's stamps are stripped:\n${r.err}`);
+  assert.equal(r.err.split('✖ the export is pinned').length - 1, 1, 'a failure repeated in the summary is told once');
+  assert.match(r.err, /Process completed with exit code 1\./, 'a job that names no failing test gives its tail');
+  for (const told of ['error TS2322', 'x eslint(no-unused-vars)', ',-[src/b.ts:1:7]'])
+    assert.ok(r.err.includes(told), `a type or lint error, with its place: ${told}\n${r.err}`);
+  assert.equal(r.err.split(LATE).length - 1, 1, 'one failing line past 1 MiB, told once');
+  assert.ok(!r.err.includes('visiting page'), `a job with a failing line gives no tail:\n${r.err}`);
+  for (const noise of ['Post job cleanup', '[command]/usr/bin/git', 'Temporarily overriding HOME', 'Cleaning up orphan processes'])
+    assert.ok(!r.err.includes(noise), `GitHub's post-job lines are no reason: ${noise}\n${r.err}`);
+  assert.ok(r.err.includes(RETRY), r.err);
+  assert.deepEqual(
+    asked(r.calls, 'api').map((call) => call.argv),
+    [
+      ['api', 'repos/{owner}/{repo}/actions/jobs/9012/logs'],
+      ['api', 'repos/{owner}/{repo}/actions/jobs/3456/logs'],
+      ['api', 'repos/{owner}/{repo}/actions/jobs/5678/logs'],
+    ],
+    'each failing job is read by its id, the gathering `ci` last',
+  );
+
+  for (const conclusion of ['CANCELLED', 'SKIPPED', 'TIMED_OUT']) {
+    const other = placed();
+    other.gh.answers([
+      ...passing(other.repo).filter((rule) => rule.when !== 'pr view'),
+      { when: 'pr view', out: rollup({ status: 'COMPLETED', conclusion }) },
+    ]);
+    const refused = pr(other, 'wait', CI, { WF_CI_POLL_SECONDS: '0' });
+    assert.equal(refused.code, 1, `${conclusion}: ${refused.out}`);
+    assert.ok(refused.err.includes(conclusion.toLowerCase()), refused.err);
+    assert.ok(refused.err.includes(RETRY), refused.err);
+  }
+});
+
+test('wait reads the CI context --check names and no other: a green `ci` is no verdict for `--check gate`, a green `gate` is', () => {
+  const quick = { WF_CI_WAIT_SECONDS: '0', WF_CI_POLL_SECONDS: '0' };
+  const ciAlone = placed();
+  const refused = pr(ciAlone, 'wait', ['--check', 'gate'], quick);
+  assert.equal(refused.code, 1, refused.out);
+  assert.match(refused.err, /no `gate` context was reported for #7/);
+
+  const gated = placed();
+  gated.gh.answers([
+    ...passing(gated.repo).filter((rule) => rule.when !== 'pr view'),
+    {
+      when: 'pr view',
+      out: rollup({ status: 'COMPLETED', conclusion: 'FAILURE' }, { name: 'gate', status: 'COMPLETED', conclusion: 'SUCCESS' }),
+    },
+  ]);
+  const passed = pr(gated, 'wait', ['--check', 'gate'], quick);
+  assert.equal(passed.code, 0, `a red \`ci\` beside a green \`gate\` is not what --check gate reads:\n${passed.err}`);
+  assert.match(passed.out, /nemia ci: `gate` passed on/);
+});
+
+test('REFUSED: a wait with no --check, a --check with no name, or more after it, before anything calls gh', () => {
+  const at = placed();
+  for (const given of [[], ['--check'], ['--check', '--x'], ['--check', 'ci', 'more']]) {
+    const r = pr(at, 'wait', given, { WF_CI_WAIT_SECONDS: '0', WF_CI_POLL_SECONDS: '0' });
+    assert.equal(r.code, 1, `${given.join(' ')}: ${r.out}`);
+    assert.ok(r.err.startsWith('nemia ci: '), `a refusal of the script's, not a crash:\n${r.err}`);
+    assert.match(r.err, /--check/, 'naming the flag');
+    assert.deepEqual(r.calls, [], 'gh is not called at all');
+  }
+});
+
+test('the retry line a red ci prints names the step the check is of, which the branch no longer says: `WF_STEP`, or the fallback without it', () => {
+  const red = (more: Record<string, string>) => {
+    const at = placed();
+    at.gh.answers([
+      ...passing(at.repo).filter((rule) => rule.when !== 'pr view'),
+      { when: 'pr view', out: rollup({ status: 'COMPLETED', conclusion: 'FAILURE' }) },
+      { when: 'actions/jobs', out: 'boom' },
+    ]);
+    const r = pr(at, 'wait', CI, { WF_CI_POLL_SECONDS: '0', ...more });
+    assert.equal(r.code, 1, r.out);
+    return r.err;
+  };
+  assert.ok(red({ WF_STEP: 'review' }).includes('nemia retry r-1 review --recheck'), "the check's own step, as the run set it");
+  assert.ok(red({}).includes(RETRY), 'and the fallback with WF_STEP unset: `implement`, the pushing step of both build and quick');
+  assert.ok(!red({}).includes('nemia retry r-1 run --recheck'), "never the branch's leaf, which names no step a person could retry");
+});
+
+test('REFUSED: no ci context within the bound, and a ci still pending at its end, each by the name of the context', () => {
+  const at = placed();
+  at.gh.answers([
+    ...passing(at.repo).filter((rule) => rule.when !== 'pr view'),
+    { when: 'pr view', out: JSON.stringify({ statusCheckRollup: [{ name: 'lint', status: 'COMPLETED', conclusion: 'SUCCESS' }] }) },
+  ]);
+  const absent = pr(at, 'wait', CI, { WF_CI_WAIT_SECONDS: '0', WF_CI_POLL_SECONDS: '0' });
+  assert.equal(absent.code, 1, absent.out);
+  assert.match(absent.err, /no `ci` context was reported for #7 within 0 s/);
+  assert.ok(absent.err.includes('https://github.com/o/r/pull/7/checks'), absent.err);
+  assert.ok(absent.err.includes(RETRY), absent.err);
+
+  const slow = placed();
+  slow.gh.answers([
+    ...passing(slow.repo).filter((rule) => rule.when !== 'pr view'),
+    { when: 'pr view', out: rollup({ status: 'IN_PROGRESS' }) },
+  ]);
+  const unfinished = pr(slow, 'wait', CI, { WF_CI_WAIT_SECONDS: '0', WF_CI_POLL_SECONDS: '0' });
+  assert.equal(unfinished.code, 1, unfinished.out);
+  assert.match(unfinished.err, /`ci` for #7 was still in_progress after 0 s/);
+  assert.ok(unfinished.err.includes(CI_URL), unfinished.err);
+  assert.ok(unfinished.err.includes(RETRY), unfinished.err);
+});
+
+test("build's implement check, rendered, pushes through the script before the round check, waits last on the CI context it was set, and runs no suite and no e2e itself", async () => {
+  const at = await rendered(['roundCheck=round-check --all', 'ciCheck=gate']);
+  const check = stepsOf(at, 'build').find((step) => step.name === 'implement')?.check;
+  assert.equal(typeof check, 'string', "sdlc's build has an implement step with a check");
+  const frozen = check as string;
+  const clauses = [...frozen.matchAll(/node\s+"\$WF_WORKFLOW_FILES\/([\w-]+\.ts)"\s+(check|push|wait)?/g)].map(([, script, verb]) =>
+    verb ? `${script} ${verb}` : script,
+  );
+  assert.deepEqual(clauses, ['probe.ts check', 'pull-request.ts push', 'pull-request.ts wait']);
+  const round = frozen.indexOf('{ round-check --all; }');
+  assert.ok(round > 0, `the round check the factory set is a clause of its own:\n${frozen}`);
+  assert.ok(
+    frozen.indexOf('pull-request.ts" push') < round,
+    `the push is before the round check, so CI's wall time overlaps the local gates:\n${frozen}`,
+  );
+  assert.ok(round < frozen.indexOf('pull-request.ts" wait'), `and CI is waited on last:\n${frozen}`);
+  assert.doesNotMatch(frozen, /npm test/, "the suite is CI's now, on the pushed commit");
+  assert.doesNotMatch(frozen, /npm run e2e/, 'and so is the whole e2e');
+  assert.ok(clauseOf(frozen, 'wait').includes('pull-request.ts" wait --check "gate";'), 'the wait reads the CI context the factory set');
+  for (const verb of ['push', 'wait']) {
+    const clause = clauseOf(frozen, verb);
+    assert.ok(
+      clause.startsWith(`{ if [ -n "\${WF_WORKFLOW_FILES:-}" ]; then node "$WF_WORKFLOW_FILES/pull-request.ts" ${verb}`),
+      `${verb} runs the script from the run's frozen workflow files first, in its own clause:\n${clause}`,
+    );
+    const at2 = placed();
+    at2.gh.answers([
+      ...passing(at2.repo).filter((rule) => rule.when !== 'pr view'),
+      {
+        when: 'pr view',
+        out: rollup({ status: 'COMPLETED', conclusion: 'FAILURE' }, { name: 'gate', status: 'COMPLETED', conclusion: 'SUCCESS' }),
+      },
+    ]);
+    const run = (more: Record<string, string>) => {
+      const [cmd, ...argv] = checkArgv(`${clause}fi; }`);
+      const ran = spawnSync(cmd, argv, {
+        cwd: at2.repo,
+        env: {
+          PATH: `${at2.gh.bin}${path.delimiter}${process.env.PATH ?? ''}`,
+          HOME: at2.repo,
+          GIT_CONFIG_GLOBAL: '/dev/null',
+          GIT_CONFIG_NOSYSTEM: '1',
+          WF_CI_POLL_SECONDS: '0',
+          ...at2.gh.env(),
+          ...more,
+        },
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'pipe'],
+        timeout: 120_000,
+      });
+      return { code: ran.status, out: ran.stdout, err: ran.stderr };
+    };
+    const unset = run({});
+    assert.notEqual(unset.code, 0, `${verb}, where the frozen workflow files are not named, refuses rather than read the script elsewhere`);
+    assert.match(unset.err, /WF_WORKFLOW_FILES/, 'naming the variable');
+    assert.deepEqual(at2.gh.calls(), [], 'and runs no script');
+    assert.equal(tip(at2.bare!, at2.branch), null, 'nothing is pushed');
+    const ran = run({ WF_WORKFLOW_FILES: path.join(at.tree, 'workflows', 'build') });
+    assert.equal(ran.code, 0, `${verb}, from the frozen workflow files, on a red \`ci\` beside a green \`gate\`:\n${ran.err}`);
+    assert.match(ran.out, verb === 'push' ? /nemia pr: #7 is at [0-9a-f]{12}/ : /nemia ci: `gate` passed on/);
+  }
+});
+
+/**
+ * The clause of the frozen check `frozen` that runs the pull-request script's `verb`: from the `{` that opens it to the `fi; }` that
+ * closes it, so what the clause holds is read against that verb alone and not against another's.
+ */
+function clauseOf(frozen: string, verb: string): string {
+  const named = frozen.indexOf(`/pull-request.ts" ${verb}`);
+  assert.ok(named > 0, `the check runs the script's ${verb}:\n${frozen}`);
+  const opens = frozen.lastIndexOf('{ if [ -n "${WF_WORKFLOW_FILES:-}" ]', named);
+  assert.ok(opens >= 0, `the ${verb} clause opens on the frozen workflow files:\n${frozen}`);
+  const closes = frozen.indexOf('fi; }', named);
+  assert.ok(closes > named, `the ${verb} clause closes:\n${frozen}`);
+  return frozen.slice(opens, closes);
+}
+
+test('the wait tells its two bounds apart: the start is its own, and what is left of the check deadline bounds the whole', () => {
+  const at = placed();
+  at.gh.answers([
+    ...passing(at.repo).filter((rule) => rule.when !== 'pr view'),
+    { when: 'pr view', out: JSON.stringify({ statusCheckRollup: [{ name: 'lint', status: 'COMPLETED', conclusion: 'SUCCESS' }] }) },
+  ]);
+  const absent = pr(at, 'wait', CI, { WF_CI_START_SECONDS: '0', WF_CI_WAIT_SECONDS: '5', WF_CI_POLL_SECONDS: '0' });
+  assert.equal(absent.code, 1, absent.out);
+  assert.match(absent.err, /no `ci` context was reported for #7 within 0 s/, 'a `ci` never reported is refused on the start bound');
+
+  const slow = placed();
+  slow.gh.answers([
+    ...passing(slow.repo).filter((rule) => rule.when !== 'pr view'),
+    { when: 'pr view', outs: [JSON.stringify({ statusCheckRollup: [] }), rollup({ status: 'IN_PROGRESS' }), GREEN] },
+  ]);
+  const late = pr(slow, 'wait', CI, { WF_CI_START_SECONDS: '600', WF_CI_WAIT_SECONDS: '600', WF_CI_POLL_SECONDS: '0' });
+  assert.equal(late.code, 0, late.err);
+  assert.equal(asked(late.calls, 'pr', 'view').length, 3, 'a `ci` that has not been reported yet is waited for, within the start bound');
+
+  const started = placed();
+  started.gh.answers([
+    ...passing(started.repo).filter((rule) => rule.when !== 'pr view'),
+    { when: 'pr view', out: rollup({ status: 'IN_PROGRESS' }) },
+  ]);
+  const unfinished = pr(started, 'wait', CI, { WF_CI_START_SECONDS: '600', WF_CI_WAIT_SECONDS: '0', WF_CI_POLL_SECONDS: '0' });
+  assert.equal(unfinished.code, 1, unfinished.out);
+  assert.match(unfinished.err, /was still in_progress after 0 s/, 'a started `ci` is bounded by the whole');
+});
+
+/** The number the script's constant `name` holds, read from its shipped text; it must be there. */
+function shippedSeconds(name: 'START_SECONDS' | 'WHOLE_SECONDS'): number {
+  const found = new RegExp(`const\\s+${name}\\s*=\\s*(\\d+);`).exec(fs.readFileSync(SCRIPT, 'utf8'));
+  assert.ok(found, `pull-request.ts declares ${name}`);
+  return Number(found[1]);
+}
+
+test("the wait's two bounds are the numbers the README states, and both fit under a round check's own deadline", () => {
+  const start = shippedSeconds('START_SECONDS');
+  const whole = shippedSeconds('WHOLE_SECONDS');
+  assert.ok(start < whole, `the start bound ${start} is within the whole ${whole}: the wait has two stages`);
+  const readme = fs.readFileSync(path.join(BUILD, 'README.md'), 'utf8');
+  assert.match(readme, new RegExp(`${start}\\s*s\\s+for\\s+it\\s+to\\s+start`), "build's README states the start bound");
+  assert.match(readme, new RegExp(`${whole}\\s*s\\s+whole`), "build's README states the whole bound");
+  assert.ok(
+    CHECK_DEADLINE_SECONDS - whole >= 900,
+    `the round check's deadline is ${CHECK_DEADLINE_SECONDS} s and the wait takes up to ${whole} s of it: the clauses before it — the ` +
+      'probe, the push and the round check — have what is left, and 900 s is the least that is honest. Re-measure the ' +
+      'deadline (CHECK_DEADLINE_SECONDS, agent-orchestrator/run) before you raise the wait.',
+  );
+});

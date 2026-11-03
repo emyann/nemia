@@ -5,7 +5,7 @@ context: 400k
 check: |-
   { if [ -n "${WF_WORKFLOW_FILES:-}" ]; then node "$WF_WORKFLOW_FILES/change.ts" size; elif [ -n "${WF_BASE_REF:-}" ]; then s=$(mktemp -d) && { git show "$WF_BASE_REF:workflows/quick/change.ts" > "$s/change.ts" 2>/dev/null || { echo "wf check: the run's base $WF_BASE_REF has no workflows/quick/change.ts, so the change cannot be measured; start the run on a base that has it" >&2; false; }; } && node "$s/change.ts" size; c=$?; rm -rf "$s"; [ "$c" -eq 0 ]; else echo "wf check: a change is measured only in a run's check, where WF_BASE_REF names the base the work began on"; fi; } && { if [ -n "${WF_WORKFLOW_FILES:-}" ]; then node "$WF_WORKFLOW_FILES/pictures.ts" "${WF_CLOSEOUT:-}"; elif [ -n "${WF_BASE_REF:-}" ]; then p=$(mktemp -d) && { git show "$WF_BASE_REF:workflows/build/pictures.ts" > "$p/pictures.ts" 2>/dev/null || { echo "wf check: the run's base $WF_BASE_REF has no workflows/build/pictures.ts, so no picture can be asked for; start the run on a base that has it" >&2; false; }; } && node "$p/pictures.ts" "${WF_CLOSEOUT:-}"; c=$?; rm -rf "$p"; [ "$c" -eq 0 ]; else echo "wf check: pictures are asked only in a run's check, where WF_BASE_REF names the base the work began on"; fi; } && { if [ -n "${WF_WORKFLOW_FILES:-}" ]; then node "$WF_WORKFLOW_FILES/probe.ts" check; elif [ -n "${WF_BASE_REF:-}" ]; then q=$(mktemp -d) && { git show "$WF_BASE_REF:workflows/build/probe.ts" > "$q/probe.ts" 2>/dev/null || { echo "wf check: the run's base $WF_BASE_REF has no workflows/build/probe.ts, so no probe can be read; start the run on a base that has it" >&2; false; }; } && node "$q/probe.ts" check; c=$?; rm -rf "$q"; [ "$c" -eq 0 ]; else echo "wf check: probes are read only in a run's check, where WF_BASE_REF and WF_RUN name the run"; fi; } && { if [ -n "${WF_WORKFLOW_FILES:-}" ]; then node "$WF_WORKFLOW_FILES/pull-request.ts" push; elif [ -n "${WF_BASE_REF:-}" ]; then r=$(mktemp -d) && { git show "$WF_BASE_REF:workflows/build/pull-request.ts" > "$r/pull-request.ts" 2>/dev/null || { echo "wf check: the run's base $WF_BASE_REF has no workflows/build/pull-request.ts, so the branch cannot be pushed and no pull request can be proven; start the run on a base that has it" >&2; false; }; } && node "$r/pull-request.ts" push; c=$?; rm -rf "$r"; [ "$c" -eq 0 ]; else echo "wf check: the branch is pushed, and its pull request proven to be at the commit this check judges, only in a run's check, where WF_BASE_REF names the base the work began on"; fi; } && { if [ -n "${WF_WORKFLOW_FILES:-}" ]; then node "$WF_WORKFLOW_FILES/pull-request.ts" wait; elif [ -n "${WF_BASE_REF:-}" ]; then w=$(mktemp -d) && { git show "$WF_BASE_REF:workflows/build/pull-request.ts" > "$w/pull-request.ts" 2>/dev/null || { echo "wf check: the run's base $WF_BASE_REF has no workflows/build/pull-request.ts, so CI's verdict cannot be read; start the run on a base that has it" >&2; false; }; } && node "$w/pull-request.ts" wait; c=$?; rm -rf "$w"; [ "$c" -eq 0 ]; else echo "wf check: CI's verdict is waited for only in a run's check, where WF_BASE_REF names the base the work began on"; fi; }
 budget: 20
-skills: effect, shadcn, change-the-board, look, react-aria, see-a-dashboard, tsverify, apps/web:ds-build, apps/web:ds-theme, apps/web:ds-spec
+skills: effect, shadcn, change-the-board, look, react-aria, see-a-dashboard, tsverify, change-a-contract, apps/web:ds-build, apps/web:ds-theme, apps/web:ds-spec
 mcp: playwright
 output: implement.schema.json
 claude:
@@ -66,33 +66,6 @@ The check refuses a change under `apps/web/src` whose `artifacts` names no pictu
 `apps/web/test` asks for none. Run the e2e on the pages the change touches, `npm run e2e -- --pages <name,…>`, never the whole suite
 but to measure it: CI runs every page on the commit your check pushes, before the review.
 
-When the change edits a context's `glossary.json`, cite each path in its rows from the repository's root
-(`packages/agent-orchestrator/src/folder/folder.model.ts`, never `src/folder/folder.model.ts`), and run the docs' tests after it, `node
---test test/*.test.ts` in `apps/docs`: they read every table by a glob, so grepping the tests for its path does not find them.
-
-When the change touches a file that imports from `effect`, load the `effect` skill before you read, write or judge it: it says how this
-repository writes Effect 4, and sends you to the docs installed with Effect first.
-
-When the change touches a function a contract proves, or writes a contract for one (its type is imported from its package's
-`contracts/`), load the `tsverify` skill before you change the code. Write the laws into the contract first and run the verifier: each
-new law comes back `counterexample` on the code as it is; then change the code until every law is `proved`. When the laws cannot all
-hold, change no law: the verifier says `unmeetable` where no result keeps them together at an input, and names the laws that leave none.
-Sign off `blocked`, naming the laws, the input and why no result keeps them together, so that a person amends the spec. When the
-verifier says `undecided` of a contract (two results of different kinds keep every law at an input `requires` allows, so the laws do not
-say which the code answers), add the law that picks one, or, where the choice is the code's on purpose, an `open` on that part (`open:
-["output.<part>"]`, or `open: true` for the whole result) with a line beside it saying why. Never an `open` to make a hole go away. Run
-`npx tsverify <file>` on each file you changed that holds a function a contract proves, and say its verdicts in your summary: CI's
-`contracts` job runs every contract on the commit your check pushes. A new behaviour of a function a contract proves is a law of its
-contract, not a new row of its tests. Delete a test a law makes redundant only once you have planted the bug it guards, seen the law
-come back `counterexample`, and put the code back: name in your summary the test, the bug and the law.
-No spec names the laws in a quick run: name each in your `plan`, with its sentence, before you write it.
-
-When the change touches `apps/web`, load `shadcn` for the board's components, and load `change-the-board` before `shadcn`: it says
-where your shell must be for that load.
-
-When the change touches `apps/web`, a change that draws a cut, a plate, a tile or a rail on the board takes the look's part for it from
-`apps/web/src/components/look`, through its door, before it draws one of its own: `change-the-board` says which part.
-
 When the change touches `tools/observe` — a dashboard, the collector's or Tempo's file, the compose file, the render — see it rendered
 before you sign off: `node tools/observe/render/render.ts --out <your files directory>` starts a throwaway stack from this workspace
 with fake data, never the live one, and writes `dashboard-<name>.png` and `dashboard-<name>.txt` for each dashboard. Read them as the
@@ -116,8 +89,3 @@ It names the session for the run, runs it in the machinery's trusted folder (`$W
 needed; pass `--settings` rather than edit a folder's settings. Only when the measurement needs the person's answer, add `--answer
 "<what to press>"`: the session then reaches their phone, and you stop `blocked` with the `needs` line it prints. Read your probes with
 `list`, and stop them with `stop` before you sign off: the check refuses a live one.
-
-When a measurement needs a collector, hold a throwaway stack and use its own: `node tools/observe/render/render.ts --hold` prints the
-collector's address as the `OTEL_EXPORTER_OTLP_ENDPOINT` to give what you start, and `--stop <name>` ends it. The live collector, on
-`:4318` and `:4317`, takes the factory's real work alone: a command that names either port is refused to you, a commit message or a
-search that spells one included.

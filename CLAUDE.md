@@ -78,7 +78,10 @@ holds what every change needs.
   holds it, the spellings it retired, each with its card), which the docs' Glossary page draws one section per context
   (`apps/docs/src/glossary.ts`). Read the table of the context you change before you name something there. A renamed word keeps its
   old spelling as `retired` on its row, and `tools/guards/test/glossary.test.ts` counts that spelling in each file under the table's
-  paths, a count that only shrinks (`tools/guards/test/glossary.baseline.ts`).
+  paths, a count that only shrinks (`tools/guards/test/glossary.baseline.ts`). A row cites each path from the repository's root
+  (`packages/agent-orchestrator/src/folder/folder.model.ts`, never `src/folder/folder.model.ts`), and a change to a table runs the
+  docs' tests, `node --test test/*.test.ts` in `apps/docs`: they read every table by a glob, so grepping the tests for its path does
+  not find them.
 - **A field that says a state or a kind at a door is a closed union of its words, never `string`**: a `phase`, `status`, `state`,
   `kind`, `type` or `reason` an entry of a package's `exports` or a type of the api reaches. A sentence a person reads is a `message`.
   Held by `tools/guards/test/closed-state.test.ts`, through the TypeScript checker, whose baseline only shrinks.
@@ -171,6 +174,9 @@ What the `create-an-agent` skill (`packages/agent-orchestrator/skills/create-an-
 - `.claude/skills/` — the repository's skills. Ours: `look`, `see-a-dashboard` (a dashboard of the side Grafana, rendered and read),
   `effect` (how we write Effect 4) and `change-the-board` (the trigger of shadcn and of the
   kit's skills, and the board's own traps, for a change under apps/web). Vendored unchanged, pinned in `skills-lock.json`
+  `effect` (how we write Effect 4), `create-an-agent` (how an agent is made here), `change-a-contract` (what a contract asks of a design,
+  an implement and a review) and `change-the-board` (the trigger of shadcn and of the kit's skills, and the board's own traps, for a
+  change under apps/web). Vendored unchanged, pinned in `skills-lock.json`
   and credited in `THIRD_PARTY_NOTICES.md`: `shadcn` (it is loaded, and its CLI runs, from `apps/web`, where `components.json` is:
   loaded from the root it refuses with `monorepo_root`), and `react-aria` (Adobe's
   documentation of React Aria, for the board's own parts: taken from the root by `npx skills add https://react-aria.adobe.com -a
@@ -212,8 +218,9 @@ What the `create-an-agent` skill (`packages/agent-orchestrator/skills/create-an-
   Run door is `tools/store-measure/baselines/s1.json`, the measure after it `s2.json`, and their comparison `s2-vs-s1.txt`. A
   session's measure, held by `tools/guards/test/store-measure.test.ts`.
 - `tools/observe/` — the side Grafana for building Nemia, never shipped: `docker compose -f tools/observe/compose.yaml up -d`, the daemon
-  started with `OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318` (the live daemon alone: a probe goes to a held throwaway,
-  `node tools/observe/render/render.ts --hold`, at the collector address it prints), and its six dashboards held to the code's names by
+  started with `OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318` (the live daemon alone: a probe or a measurement goes to a held throwaway,
+  `node tools/observe/render/render.ts --hold`, at the collector address it prints, and `--stop <name>` ends it; a step's command that
+  names the live collector's ports, a commit message or a search included, is refused it), and its six dashboards held to the code's names by
   `agent-orchestrator/test/observe.test.ts`, and its timing of a step (the collector's command head and test scope, Tempo's span metrics and
   retention) by `tools/guards/test/observe-time.test.ts`. Its profiler preload, `tools/observe/profile/` (installed there alone), is off unless
   `PYROSCOPE_SERVER_ADDRESS` is set, held by `agent-orchestrator/test/profile.test.ts`.

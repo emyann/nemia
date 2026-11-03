@@ -159,8 +159,27 @@ test("the board's skill, as build's implement step is given it, moves the shell 
   assert.ok(boardSkillBreaks(given, rooted).includes('components.json is at the root'));
 });
 
-test("build's implement step sends its agent to the board's skill before shadcn's", () => {
+/** What the board's skill's description, in every session's list of skills, says of when to load it and where it sends you next. */
+const SENDS_FIRST = [
+  /load\s+it\s+before\s+reading,\s+writing\s+or\s+judging\s+a\s+file\s+there/,
+  /It\s+sends\s+you\s+to\s+the\s+board's\s+components\s+\(shadcn\)/,
+];
+
+/** What the board's skill `text` does not say in its description of `SENDS_FIRST`, a pattern's source each. */
+const unsentFirst = (text: string): string[] => {
+  const { description } = skillEntryOf('change-the-board/SKILL.md', 'change-the-board', text);
+  return SENDS_FIRST.filter((pattern) => !pattern.test(description)).map((pattern) => pattern.source);
+};
+
+test("build's implement step is given the board's skill, whose description sends its agent there before shadcn's", () => {
   const build = path.join(REPO, 'workflows', 'build');
-  const { body } = splitFrontmatter('implement.md', fs.readFileSync(path.join(build, 'implement.md'), 'utf8'));
-  assert.match(body, /load\s+`change-the-board`\s+before\s+`shadcn`/);
+  const step = loadWorkflows(build, placesOf(build)).find((s) => s.name === 'implement')!;
+  assert.ok(step.agent?.addedSkills?.includes('change-the-board'), 'implement adds change-the-board');
+  const text = fs.readFileSync(path.join(REPO, '.claude', 'skills', 'change-the-board', 'SKILL.md'), 'utf8');
+  assert.deepEqual(unsentFirst(text), []);
+  assert.deepEqual(
+    unsentFirst(text.replace('(shadcn)', '(its components)')),
+    [SENDS_FIRST[1].source],
+    'REFUSED: one that names shadcn no more',
+  );
 });

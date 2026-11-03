@@ -88,7 +88,7 @@ export const TEAM_NAMES: Baseline = {
   'packages/agent-orchestrator/src/trust/trust.test.ts': { count: 3, ...TEAM_MOVES.fixtures },
   'packages/agent-orchestrator/src/watch/selector.test.ts': { count: 26, ...TEAM_MOVES.fixtures },
   'packages/agent-orchestrator/src/workflow/unallowed.test.ts': { count: 23, ...TEAM_MOVES.fixtures },
-  'packages/agent-orchestrator/test/agent-fences.test.ts': { count: 180, ...TEAM_MOVES.teamTests },
+  'packages/agent-orchestrator/test/agent-fences.test.ts': { count: 179, ...TEAM_MOVES.teamTests },
   'packages/agent-orchestrator/test/assess-endings.test.ts': { count: 7, ...TEAM_MOVES.fixtures },
   'packages/agent-orchestrator/test/auto-rules.test.ts': { count: 7, ...TEAM_MOVES.fixtures },
   'packages/agent-orchestrator/test/build-told.test.ts': { count: 15, ...TEAM_MOVES.teamTests },

@@ -45,7 +45,7 @@
  * what a contract proves by the verifier, which the settings allow (`VERIFY_ALLOW`, `VERIFIES`), and denies on its own line its cache,
  * which writes, and its watch, which never ends (`VERIFY_WRITES`, `VERIFY_DENIES`); review, intake and the janitor deny it whole
  * (`VERIFYLESS_DENIES`), review reading CI's verdict of every contract. Every command
- * a read-only step's note tells it to run is one its fence allows (`toldOf`), and each read-only agent is told, in one paragraph the
+ * a read-only step's note, or a skill section it is given (`TOLD_HOMES`), tells it to run is one its fence allows (`toldOf`), and each read-only agent is told, in one paragraph the
  * four hold equal, to say a refused call its work needs at the top of its sign-off (`REFUSAL_SAID`).
  * The render of a checkout's dashboards (`tools/observe/render/render.ts`) starts a container, so it is the implementer's alone: design
  * and review are refused each form of it and Docker by hand, since no allow reaches one (`RENDERS`, `DOCKER`).
@@ -65,10 +65,10 @@
  * and lets the rest through (`misjudged`); her admission asks every answer to what waits on the person, whatever the person allows
  * (`verdictOf`); and an edit of the store outside her folder is denied her (`editVerdictOf`).
  *
- * The build workflow's design, implement and review steps each list `effect`, `shadcn` and `change-the-board` to their sessions
- * (`workSkillsMissing`), and every path a repository skill says its work is on matches a file of the checkout (`appliesUnmatched`).
- * A dontAsk job given a skill whose SKILL.md grants tools is told to read that file with Read, since its fence refuses the Skill tool's
- * load (`grantingSkillsUnread`). Each call a shipped skill's rule says it breaks is one the stats count against it (`rulesOfTry`).
+ * The build workflow's design, implement and review steps each list `effect`, `shadcn`, `change-the-board` and `change-a-contract`
+ * to their sessions (`workSkillsMissing`), and every path a repository skill says its work is on matches a file of the checkout
+ * (`appliesUnmatched`). A dontAsk job given a skill whose SKILL.md grants tools is told to read that file with Read, since its fence
+ * refuses the Skill tool's load: by its note, or by a skill it is given that grants nothing, which it loads (`grantingSkillsUnread`). Each call a shipped skill's rule says it breaks is one the stats count against it (`rulesOfTry`).
  *
  * Every shipped step's `tools:` is callable under its own fence (`unallowedRefusal`), judged against this checkout's own allow rules:
  * a step held to its rules and given a tool no rule names could never call it, and the refusals would read in the feed like a fence
@@ -78,8 +78,8 @@
  *
  * A skill a shipped step names with its folder (`apps/web:ds-build`) is read where the line says: the folders those lines name
  * (`NESTED`) are among the folders of skills whose grants, files and rules are read (`SKILL_FOLDERS`, `skillFileOf`, `lineNameOf`).
- * The reader of the kit's `ds-spec` is a command design's and review's notes name (`reader` in `CHECKERS`), the one the trigger skill
- * names (`KIT_COMMAND`), and the settings allow it (`KIT_ALLOW`).
+ * The reader of the kit's `ds-spec` is a command the trigger skill names (`KIT_COMMAND`), which design and review are given and no
+ * step's note names again (`readerNamedIn`), and the settings allow it (`KIT_ALLOW`).
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -654,16 +654,10 @@ const shippedStepOf = (agent: string): Step => {
 /** The line of the build workflow's review that names its checks. */
 const REVIEW_CHECKS = 'Run the typecheck and the lint yourself';
 
-/** The first words of the sentence of a fenced step's note that names the command of the kit's `ds-spec` reader. */
-const READER = "`ds-spec`'s reader runs from the root";
-
-/**
- * Each dontAsk agent whose step names the checks it runs, with the step's file and the line those checks are on, and for a step given
- * the kit's skills the first words of the sentence its reader's command is on (`reader`).
- */
-const CHECKERS: { agent: string; step: string; from: string; reader?: string }[] = [
-  { agent: 'seldon', step: 'workflows/build/design.md', from: 'The checks you may run here', reader: READER },
-  { agent: 'agora', step: 'workflows/build/review.md', from: REVIEW_CHECKS, reader: READER },
+/** Each dontAsk agent whose step names the checks it runs, with the step's file and the line those checks are on. */
+const CHECKERS: { agent: string; step: string; from: string }[] = [
+  { agent: 'seldon', step: 'workflows/build/design.md', from: 'The checks you may run here' },
+  { agent: 'agora', step: 'workflows/build/review.md', from: REVIEW_CHECKS },
   { agent: 'argus', step: 'workflows/janitor/argus.md', from: '**Run each read bare**' },
 ];
 
@@ -686,48 +680,47 @@ const KIT_ALLOW = 'Bash(node apps/web/.claude/skills/ds-spec/md3.mjs:*)';
 /** A backticked command that starts with `node`, as `checksOf` reads its spans. */
 const NODE_SPANS = /`(node\s[^`]*)`/g;
 
-/** Each fenced step whose note names the reader's command, with its agent, its file and the command its note names. */
-const readers = (): { agent: string; file: string; commands: string[] }[] =>
-  CHECKERS.flatMap(({ agent, step, reader }) =>
-    reader === undefined ? [] : [{ agent, file: step, commands: checksOf(step, reader, NODE_SPANS) }],
-  );
+/** The agents of the fenced steps given the kit's skills, which run the reader's command the trigger skill names. */
+const READERS_OF_THE_KIT = ['seldon', 'agora'];
 
-test("the command design's and review's notes name for the kit's ds-spec is change-the-board's, a script of the checkout their fences allow", () => {
+/** The reader's script, as a step's note would name it. */
+const READER_SCRIPT = 'apps/web/.claude/skills/ds-spec/md3.mjs';
+
+/** Each shipped step of `steps` whose note names the reader's script, as `<step>: names the ds-spec reader`: the trigger skill says it. */
+const readerNamedIn = (steps: readonly Step[]): string[] =>
+  steps.filter((step) => step.body.includes(READER_SCRIPT)).map((step) => `${step.name}: names the ds-spec reader`);
+
+test("the command change-the-board names for the kit's ds-spec is a script of the checkout design's and review's fences allow, and no step's note names it", () => {
   const named = checksOf(KIT_COMMAND.file, KIT_COMMAND.from, NODE_SPANS);
   assert.deepEqual(named, ['node apps/web/.claude/skills/ds-spec/md3.mjs <command>']);
   assert.ok(fs.statSync(path.join(REPO, named[0].split(' ')[1])).isFile(), 'its script is a file of the checkout');
-  assert.deepEqual(
-    readers().map(({ agent }) => agent),
-    ['seldon', 'agora'],
-  );
-  for (const { agent, file, commands } of readers()) {
+  for (const agent of READERS_OF_THE_KIT) {
     const step = shippedStepOf(agent);
     assert.equal(step.permissionMode, 'dontAsk', `${agent} runs dontAsk`);
-    assert.deepEqual(commands, named, `${file} names the command change-the-board names, and no other`);
-    assert.deepEqual(unallowed(step, commands), [], `${agent}'s fence refuses the command ${file} names`);
+    assert.ok(step.agent?.skills?.includes('change-the-board'), `${agent}'s step is given change-the-board`);
+    assert.deepEqual(unallowed(step, named), [], `${agent}'s fence refuses the command change-the-board names`);
   }
+  assert.deepEqual(readerNamedIn(shipped().map(({ step }) => step)), []);
 });
 
-test("REFUSED: the kit's ds-spec command without the settings' allow of it is named for Seldon and Agora, and a note that names it no more throws", () => {
+test("REFUSED: the kit's ds-spec command without the settings' allow of it is named for Seldon and Agora, a skill that names it no more throws, and a note that names it again is named", () => {
   assert.ok(SETTINGS_ALLOWS.includes(KIT_ALLOW), `${KIT_ALLOW} is in the settings`);
   const without = SETTINGS_ALLOWS.filter((rule) => rule !== KIT_ALLOW);
-  for (const { agent, file, commands } of readers()) {
-    assert.equal(commands.length, 1, file);
+  const commands = checksOf(KIT_COMMAND.file, KIT_COMMAND.from, NODE_SPANS);
+  for (const agent of READERS_OF_THE_KIT) {
     assert.deepEqual(unallowed(shippedStepOf(agent), commands, without), commands, agent);
     assert.deepEqual(
       unallowed(shippedStepOf(agent), commands, [...without, KIT_ALLOW.replace(':*', '')]),
       commands,
       `${agent}, the bare name`,
     );
-    assert.throws(
-      () => checksOf(file, "`ds-spec`'s reader runs from its own folder", NODE_SPANS),
-      (err: Error) => err.message.includes(`${file}: no "\`ds-spec\`'s reader runs from its own folder"`),
-    );
   }
   assert.throws(
     () => checksOf(KIT_COMMAND.file, 'The project they speak of is the root', NODE_SPANS),
     (err: Error) => err.message.includes(`${KIT_COMMAND.file}: no "The project they speak of is the root"`),
   );
+  const named = shippedEdited('agora', 'build', 'its note', (text) => `${text}\nRun \`node ${READER_SCRIPT} <command>\`.\n`, 'build/review.md');
+  assert.deepEqual(readerNamedIn([named]), ['review: names the ds-spec reader']);
 });
 
 test("REFUSED: a step's check that neither its fence nor the settings allow is named", () => {
@@ -1313,7 +1306,7 @@ test('design and review name the two commands of a served board, the settings al
 
 /** The steps that design, write or judge a change, by workflow, and the skills each gives its session to list. */
 const WORK_STEPS: Record<string, string[]> = { build: ['design', 'implement', 'review'], quick: ['implement', 'review'] };
-const WORK_SKILLS = ['effect', 'shadcn', 'change-the-board'];
+const WORK_SKILLS = ['effect', 'shadcn', 'change-the-board', 'change-a-contract'];
 
 /**
  * Each skill of `WORK_SKILLS` a work step of `steps`, the workflow `workflow`'s, does not give, as `<step>: <skill>`, read off the
@@ -1340,7 +1333,7 @@ function buildWith(step: string, line: string, workflow = 'build'): Step[] {
   return loadWorkflows(path.join(root, workflow), { repo: REPO });
 }
 
-test("build's design, implement and review, and quick's implement, each give effect, shadcn and change-the-board, whatever their agents give", () => {
+test("build's design, implement and review, and quick's implement and review, each give effect, shadcn, change-the-board and change-a-contract, whatever their agents give", () => {
   for (const workflow of Object.keys(WORK_STEPS)) {
     const dir = FOLDERS.find((folder) => path.basename(folder) === workflow);
     assert.ok(dir, `the ${workflow} workflow is shipped`);
@@ -1348,10 +1341,16 @@ test("build's design, implement and review, and quick's implement, each give eff
   }
 });
 
-test('REFUSED: a work step that gives one of the three skills no more is named, read from its file as a run reads it', () => {
-  assert.deepEqual(workSkillsMissing(buildWith('review', 'skills: effect, shadcn\n')), ['review: change-the-board']);
-  assert.deepEqual(workSkillsMissing(buildWith('design', '')), ['design: effect', 'design: shadcn', 'design: change-the-board']);
-  assert.deepEqual(workSkillsMissing(buildWith('implement', 'skills: shadcn, change-the-board\n', 'quick'), 'quick'), [
+test('REFUSED: a work step that gives one of the four skills no more is named, read from its file as a run reads it', () => {
+  assert.deepEqual(workSkillsMissing(buildWith('review', 'skills: effect, shadcn, change-the-board\n')), ['review: change-a-contract']);
+  assert.deepEqual(workSkillsMissing(buildWith('review', 'skills: effect, shadcn, change-a-contract\n')), ['review: change-the-board']);
+  assert.deepEqual(workSkillsMissing(buildWith('design', '')), [
+    'design: effect',
+    'design: shadcn',
+    'design: change-the-board',
+    'design: change-a-contract',
+  ]);
+  assert.deepEqual(workSkillsMissing(buildWith('implement', 'skills: shadcn, change-the-board, change-a-contract\n', 'quick'), 'quick'), [
     'implement: effect',
   ]);
 });
@@ -1495,17 +1494,24 @@ const grantingFileOf = (skill: string, root = REPO): string | undefined => {
 };
 
 /**
- * Each skill a step is given whose SKILL.md grants tools (`grantingFileOf`), when the step's instructions do not say to read that file,
- * by its path from the checkout, with Read. Each as `<step>: <skill>`. A skill named with its folder is read in the checkout `root`.
+ * Each skill a step is given whose SKILL.md grants tools (`grantingFileOf`), when neither the step's instructions nor a skill it is
+ * given that grants nothing — which its Skill tool loads — say to read that file, by its path from the checkout, with Read. Each as
+ * `<step>: <skill>`. A skill named with its folder is read in the checkout `root`; `read` reads a given skill's SKILL.md.
  */
-function grantingSkillsUnread(step: Step, root = REPO): string[] {
-  return (step.agent?.skills ?? [])
+function grantingSkillsUnread(step: Step, root = REPO, read: (file: string) => string = (file) => fs.readFileSync(file, 'utf8')): string[] {
+  const skills = step.agent?.skills ?? [];
+  const loaded = skills.flatMap((skill) => {
+    const file = skillFileOf(skill, root);
+    return file === undefined || grantingFileOf(skill, root) !== undefined ? [] : [read(file)];
+  });
+  const told = [step.body, ...loaded].join('\n');
+  return skills
     .filter((skill) => {
       const file = grantingFileOf(skill, root);
       if (file === undefined) return false;
       const from = file.startsWith(root + path.sep) ? root : REPO;
       const named = path.relative(from, file).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      return !new RegExp(`read\\s+\`${named}\`\\s+with\\s+Read`).test(step.body);
+      return !new RegExp(`read\\s+\`${named}\`\\s+with\\s+Read`).test(told);
     })
     .map((skill) => `${step.name}: ${skill}`);
 }
@@ -1567,11 +1573,24 @@ test('REFUSED: a kit skill that grants a tool design and review are fenced from 
   }
 });
 
-test('REFUSED: design or review with no line naming shadcn’s SKILL.md to read with Read is named, read from its file as a run reads it', () => {
-  const unread = (text: string): string => text.replace(/read\s+`\.claude\/skills\/shadcn\/SKILL\.md`\s+with\s+Read/, 'read it');
-  const named = 'a line naming shadcn’s SKILL.md';
-  assert.deepEqual(grantingSkillsUnread(shippedEdited('seldon', 'build', named, unread, 'build/design.md')), ['design: shadcn']);
-  assert.deepEqual(grantingSkillsUnread(shippedEdited('agora', 'build', named, unread, 'build/review.md')), ['review: shadcn']);
+test('REFUSED: design and both reviews, given a change-the-board with no line naming shadcn’s SKILL.md to read with Read, are named', () => {
+  const trigger = path.join(REPO, '.claude', 'skills', 'change-the-board', 'SKILL.md');
+  const unread = (file: string): string => {
+    const text = fs.readFileSync(file, 'utf8');
+    if (file !== trigger) return text;
+    const changed = text.replace(/read\s+`\.claude\/skills\/shadcn\/SKILL\.md`\s+with\s+Read/, 'read it');
+    assert.notEqual(changed, text, 'change-the-board names shadcn’s SKILL.md to read with Read');
+    return changed;
+  };
+  const jobs = shipped()
+    .map(({ step }) => step)
+    .filter(dontAskJob);
+  assert.deepEqual(jobs.flatMap((step) => grantingSkillsUnread(step, REPO, unread)).sort(), ['design: shadcn', 'review: shadcn', 'review: shadcn']);
+  assert.deepEqual(
+    jobs.flatMap((step) => grantingSkillsUnread(step)),
+    [],
+    'and none with change-the-board as shipped',
+  );
 });
 
 /** The folders a walk of the checkout leaves out: what an install, a build or git writes, none of them a file a change is on. */
@@ -2958,6 +2977,32 @@ test("REFUSED: a read-only step's file that drops its denies is named, rule by r
   }
 });
 
+/**
+ * The part of the skill `file` (from the repository's root) that opens at `from` and runs to its next heading or numbered item.
+ * Throws, naming the file, when `from` is not in it.
+ */
+function sectionOf(file: string, from: string): string {
+  const text = fs.readFileSync(path.join(REPO, file), 'utf8');
+  const start = text.indexOf(from);
+  if (start < 0) throw new Error(`${file}: no "${from}" to read a step's commands from; name the section they are in, here`);
+  const rest = text.slice(start + from.length);
+  return from + rest.slice(0, /\n(?:#{1,6} |\d+\.\s)/.exec(rest)?.index ?? rest.length);
+}
+
+/**
+ * The sections of the skills a read-only step is given that tell it what to run, by `<workflow>/<step>`: what moved out of its note
+ * into a home of this repository's (`build-told.test.ts`, `HOMES`). Design's verifier read is `change-a-contract`'s *Design*, and the
+ * kit's reader is `change-the-board`'s item 7, for design and both reviews.
+ */
+const TOLD_HOMES: Readonly<Record<string, readonly { file: string; from: string }[]>> = {
+  'build/design': [
+    { file: '.claude/skills/change-a-contract/SKILL.md', from: '## Design' },
+    { file: '.claude/skills/change-the-board/SKILL.md', from: '**The project they speak of is `apps/web`**' },
+  ],
+  'build/review': [{ file: '.claude/skills/change-the-board/SKILL.md', from: '**The project they speak of is `apps/web`**' }],
+  'quick/review': [{ file: '.claude/skills/change-the-board/SKILL.md', from: '**The project they speak of is `apps/web`**' }],
+};
+
 /** A command a step's note names: a backticked span that opens with a verb a read-only step's Bash runs. */
 const TOLD_SPANS = /`((?:npm|npx|node|git|gh)\s[^`]*)`/g;
 
@@ -2968,7 +3013,8 @@ const TOLD_SPANS = /`((?:npm|npx|node|git|gh)\s[^`]*)`/g;
  */
 function toldOf(file: string, root = SHIPPED_HOLDERS[0]): Call[] {
   const text = fs.readFileSync(path.join(root, file), 'utf8');
-  const body = text.slice(text.indexOf('\n---\n', 3) + 5);
+  const homes = (TOLD_HOMES[file.replace(/\.md$/, '')] ?? []).map(({ file: home, from }) => sectionOf(home, from));
+  const body = [text.slice(text.indexOf('\n---\n', 3) + 5), ...homes].join('\n\n');
   const spans = [...new Set([...body.matchAll(TOLD_SPANS)].map((span) => span[1].replace(/\s+/g, ' ').replace(/<[^<>]+>/g, 'x')))];
   return spans
     .filter((span) => !spans.some((other) => other.startsWith(`${span} `)))
@@ -3054,7 +3100,7 @@ test("REFUSED: without the settings' allow of tsc or of oxlint, design and revie
   }
 });
 
-test('design reads a verdict by the verifier its note names, which the settings allow, and REFUSED without that allow it reads none', () => {
+test('design reads a verdict by the verifier change-a-contract’s Design names, which the settings allow, and REFUSED without that allow it reads none', () => {
   assert.ok(SETTINGS_ALLOWS.includes(VERIFY_ALLOW), `${VERIFY_ALLOW} is in the settings`);
   const without = { permissions: { allow: SETTINGS_ALLOWS.filter((rule) => rule !== VERIFY_ALLOW) } };
   const verifying = readOnlySteps().filter(({ step }) => VERIFYING_AGENTS.includes(step.agent!.name));
@@ -3067,7 +3113,11 @@ test('design reads a verdict by the verifier its note names, which the settings 
       toldOf(`${named}.md`)
         .map(shown)
         .some((call) => call.startsWith('Bash(npx tsverify ')),
-      `${named}'s note names a read by the verifier`,
+      `${named}'s note or its homes name a read by the verifier`,
+    );
+    assert.ok(
+      /`npx tsverify [^`]*`/.test(sectionOf('.claude/skills/change-a-contract/SKILL.md', '## Design')),
+      "change-a-contract's Design names the read",
     );
     assert.deepEqual(runs(step, VERIFIES), VERIFIES.map(shown), named);
     assert.deepEqual(runs(step, VERIFIES, without), [], `${named} without ${VERIFY_ALLOW}`);

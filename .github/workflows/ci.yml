@@ -469,7 +469,7 @@ jobs:
           fi
 
   guards:
-    # The repository's own guards (tools/guards): tests of this file, the docs and the workflows, run only when the push or the pull
+    # The repository's own guards (tools/guards): tests of this file, the docs and the skills, run only when the push or the pull
     # request touched what they read — the guards#test inputs in turbo.json, or a workspace they depend on — which due.ts decides.
     # The job runs on every event and its suite step alone is skipped: a skipped step leaves the job success, so the gate's whitelist
     # below stands. A workflow-level paths: would skip the whole of ci, the gate with it, and its required context would never report.

@@ -27,10 +27,10 @@ export const OWNERS = '.github/CODEOWNERS';
 export const OWNER = '@emyann';
 
 /**
- * What `OWNERS` must give that owner, each written as the file must write it. Four are anchored at the root; the manifest is not, so
+ * What `OWNERS` must give that owner, each written as the file must write it. Three are anchored at the root; the manifest is not, so
  * that it reaches every workspace's own (the person's answer to how wide CODEOWNERS goes on `package.json`).
  */
-export const OWNED = ['/.github/', '/.claude/settings.json', '/workflows/', '/packages/templates/', 'package.json'];
+export const OWNED = ['/.github/', '/.claude/settings.json', '/packages/templates/', 'package.json'];
 
 /** The packages that are published from nowhere, so that an accidental `npm publish -w` is refused by npm itself. */
 export const PRIVATE = ['packages/agent-orchestrator', 'packages/agent-runtime', 'packages/templates', 'tools/guards'];

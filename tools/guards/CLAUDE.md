@@ -1,6 +1,6 @@
 # tools/guards — the repository's own guards
 
-The tests that hold this repository itself — its CI configuration, its docs, its workflows, its test infrastructure — rather than the
+The tests that hold this repository itself — its CI configuration, its docs, its skills, its test infrastructure — rather than the
 code of a layer. A tool beside the layers, not a layer: no package or app imports it, and it is never shipped.
 
 - **Its suite is its `test` script**: `npm test` from `tools/guards`, or `npx turbo run test --force --filter=guards`. One file:
@@ -13,12 +13,12 @@ code of a layer. A tool beside the layers, not a layer: no package or app import
   CI's filter are one list, and `test/due.test.ts` reads the real one. The apps' whole `src/`, their `.ts` beside their manifest, the
   board's `.storybook/` and their `glossary.json` are in it, for the glossary guard, so a change to the board's code makes them due.
 - **It reaches the orchestrator only through its three entries** (rule 1, `docs/architecture.md`; `contract.test.ts` holds it, here
-  too): `team-words` and `team-portable` take `splitFrontmatter` from `agent-orchestrator/workflow`, which is why `package.json`
-  declares `agent-orchestrator`. A config guard that imports the package deeper stays in `packages/agent-orchestrator/test/`:
-  `agent-fences`, `build-told`, `frozen-step`, `mcp-config`, `nemia-shipped`, `skills-rendered`, `skill-folders`, `verbs-skill`,
-  `quick-run`, `tally-start`, `team-template`, `observe`, `profile`, `workflow`, and the `landing`, `pull-request`, `quick-check`,
-  `probe` and `pictures` boundaries; so do `stand-ins` and the orchestrator's own test-seat tests, and `observe-render.boundary`, a test
-  of `tools/observe`'s code rather than of the configuration.
+  too): `team-words` takes `splitFrontmatter` from `agent-orchestrator/workflow`, and `store-measure` its `Place` type, which is why
+  `package.json` declares `agent-orchestrator`. `team-words` and `team-portable` read the role skills under `.claude/skills`; sdlc's
+  agents and workflows are held by `packages/templates/test`. A config guard that imports the package deeper stays in
+  `packages/agent-orchestrator/test/`: `agent-fences`, `frozen-step`, `mcp-config`, `nemia-shipped`, `skills-rendered`,
+  `skill-folders`, `verbs-skill`, `quick-run`, `tally-start`, `observe`, `profile`, `workflow`; so do `stand-ins` and the
+  orchestrator's own test-seat tests, and `observe-render.boundary`, a test of `tools/observe`'s code rather than of the configuration.
 - **Helpers are copies, held byte for byte by `packages/agent-orchestrator/test/scratch.test.ts`**: `test/scratch.ts` (the runtime's),
   `test/repo-files.ts` and `test/workspaces.ts` (the orchestrator's). Change the original and copy it over; nothing imports a test
   helper across workspaces. A test makes its roots with `scratch(prefix)`, never under `os.tmpdir` by hand, and takes the root and

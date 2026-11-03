@@ -59,8 +59,8 @@ export type RunSummary = {
   /** The workflow folder the run was started from, as `nemia start` resolved it: its last segment names the workflow. */
   workflowDir: string;
   /**
-   * The run's whole map (`runLabelMap`): the labels a person put on it (`nemia label run`), its `workflow`, and its `factory` where its
-   * record names one — what a selector reads of the run, and `{ workflow }` alone for a run nobody labelled.
+   * The run's whole map (`runLabelMap`): the labels a person put on it (`nemia label run`), its `workflow`, and its `factory`, `default`
+   * for the default factory — what a selector reads of the run, and `{ workflow, factory }` alone for a run nobody labelled.
    */
   labels: Labels;
   /** The agent it tried, for a try started from an agent's page (`tryOf`); null for every other run. */

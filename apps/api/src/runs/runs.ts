@@ -149,9 +149,9 @@ const CONCLUDED = commandNamed('concluded');
  *   is handed nothing from memory and reads every record again.
  * - `?selector=` on `GET /api/runs`, `GET /api/runs-open`, `GET /api/runs-finished` and `GET /api/listing[/:runId]` — a selector of the
  *   runs' labels (`team=core`, `team in (core,infra)`, `!team`), as `nemia ls -l` takes it, given again for another, of which one must
- *   take a run (OR): each row carries its whole map, `labels` (the person's keys, `workflow`, and `factory` where named), and a selector
- *   reads that. The runs are selected before any is judged, the counts and the page cut over those taken. A selector the package's
- *   grammar refuses (`selectorsRefusal`) is its `Invalid`, a 422 naming the key or the clause.
+ *   take a run (OR): each row carries its whole map, `labels` (the person's keys, `workflow`, and `factory`, `default` for the default
+ *   factory), and a selector reads that. The runs are selected before any is judged, the counts and the page cut over those taken. A
+ *   selector the package's grammar refuses (`selectorsRefusal`) is its `Invalid`, a 422 naming the key or the clause.
  * - `GET /api/runs-open` — the light answer (`OpenListing`), by the package's entry (`runs open`): the runs that wait on a person
  *   (`waiting`) and the runs in flight (`inFlight`), each in the store's order, and `counts` of each and of the finished runs; a run that
  *   moves and also waits is among the waiting, once. Each row is the list's own (`RunListing`) with its `wallMs`, created until now, and

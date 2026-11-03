@@ -7,7 +7,8 @@
     "packages/agent-orchestrator/src/template",
     "packages/agent-orchestrator/src/factories",
     "packages/agent-orchestrator/src/templates",
-    "packages/agent-orchestrator/src/wiring"
+    "packages/agent-orchestrator/src/wiring",
+    "packages/agent-orchestrator/src/adopt"
   ],
   "terms": [
     {
@@ -103,8 +104,13 @@
     },
     {
       "term": "Applied template",
-      "meaning": "the template a factory was made from by `nemia factory apply`, as its file records it under `template`: the template's source, the version the factory wants, and the parameters given with `--set`.",
+      "meaning": "the template a factory was made from by `nemia factory apply`, or taken over by `nemia factory adopt`, as its file records it under `template`: the template's source, the version the factory wants, and the parameters given with `--set`.",
       "type": "AppliedTemplate"
+    },
+    {
+      "term": "Adoption",
+      "meaning": "a factory made by hand taken over in place by a template: `nemia factory diff <name> --template …` previews it as a plan with its digest, and `nemia factory adopt … --plan <digest>` writes it, the render staged as the factory's base and tree and the template named in its file; its name, repositories, schedules, instruction, cards, runs and stats stay. The plan is `AdoptPlan`, judged by `adoptRefusal` in `packages/agent-orchestrator/src/adopt/adopt.ts`.",
+      "type": "AdoptPlan"
     }
   ]
 }

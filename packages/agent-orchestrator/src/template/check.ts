@@ -8,6 +8,7 @@ import { HARNESS_KNOBS } from 'agent-runtime/vocabulary';
 import { DEFAULT_HARNESS, isRemoteHarness, REMOTE_PREFIX } from '../harness/harness.ts';
 import { givenSkillOf, PLACES, STORE_READS, WORKSPACES } from '../keys/index.ts';
 import { baseSpelled } from '../former/former.ts';
+import { OVERRIDABLE } from '../workflow/fence.ts';
 import {
   documentFile,
   documentRefusals,
@@ -211,12 +212,30 @@ function stepFileRefusals(folder: ReadFolder, held: Held): Refusal[] {
   });
 }
 
-/** What an agent breaks: a skill the folder lacks, and its blocks. */
+/** What an agent breaks: a skill the folder lacks, a word of its `overridable` that no step may override, and its blocks. */
 const agentRefusals = (held: Held): Refusal[] =>
   [...held.agents].flatMap(([name, spec]) => {
     const file = `agents/${name}/agent.yaml`;
-    return [...skillRefusals(file, ['spec', 'skills'], spec.skills, held), ...harnessRefusals(file, ['spec'], spec, undefined)];
+    return [
+      ...skillRefusals(file, ['spec', 'skills'], spec.skills, held),
+      ...overridableRefusals(file, spec.overridable),
+      ...harnessRefusals(file, ['spec'], spec, undefined),
+    ];
   });
+
+/** Each word of an agent's `overridable` that is none of `OVERRIDABLE`, refused at its place, as the agent's file refuses it. */
+const overridableRefusals = (file: string, offered: unknown): Refusal[] =>
+  (Array.isArray(offered) ? offered : []).flatMap((word, i) =>
+    typeof word === 'string' && !(OVERRIDABLE as readonly string[]).includes(word)
+      ? [
+          {
+            file,
+            at: ['spec', 'overridable', i],
+            message: `\`${word}\` is not something a step may override: name those of ${OVERRIDABLE.join(', ')} this agent offers, or remove \`overridable\`, and a step may override all of them.`,
+          },
+        ]
+      : [],
+  );
 
 /**
  * What the harness and blocks of `holder`, an agent's spec or a step's overrides at `at`, break: a harness that is none, any block where

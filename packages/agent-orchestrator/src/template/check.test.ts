@@ -254,6 +254,19 @@ test('the check of a template folder: the whole folder passes, and each rule bro
     );
   });
 
+  await t.test("an agent's overridable words are what a step may override: one that is none is refused at its place", () => {
+    assert.deepEqual(
+      refusalsOf((d) => (d[AGENT].spec.overridable = ['fence', 'skills'])),
+      [],
+    );
+    assertRefused(
+      refusalsOf((d) => (d[AGENT].spec.overridable = ['fence', 'wiring'])),
+      AGENT,
+      ['spec', 'overridable', 1],
+      'wiring',
+    );
+  });
+
   await t.test('a hire naming no workflow, no step or no agent is refused', () => {
     const hire = (key: string, agent: string) => refusalsOf((d) => (d['nemia.yaml'].spec.hires[key] = agent));
     assertRefused(hire('dev/nope', 'implementer'), 'nemia.yaml', ['spec', 'hires', 'dev/nope'], 'names no step of dev');

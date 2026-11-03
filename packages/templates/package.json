@@ -1,0 +1,21 @@
+{
+  "name": "templates",
+  "version": "1.0.0",
+  "private": true,
+  "description": "The factory templates Nemia ships, each in the template layout, with the tests that hold them.",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "test": "node --test --test-concurrency=2 --test-timeout=120000 'test/*.test.ts'",
+    "typecheck": "tsrs --noEmit"
+  },
+  "dependencies": {
+    "agent-orchestrator": "*"
+  },
+  "devDependencies": {
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "^24.19.2",
+    "js-yaml": "^4.3.2",
+    "typescript": "^6.0.3"
+  }
+}

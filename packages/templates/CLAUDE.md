@@ -17,6 +17,11 @@ layout gives a place sits inside a template's folder: the workspace's own files 
   lint <folder>` prints: `test/released.test.ts` refuses changed content under a recorded version.
 - **No word of this repository in a template**: none of its paths, its tools or its owner's settings. `test/portable.test.ts` holds
   the list; a word it refuses goes in the factory's own overlay, not here.
+- **sdlc lands two ways, picked by its `github` parameter** (false, in the checkout, by default; true, on GitHub). A parameter replaces
+  a value and cannot change a step, so what differs by way is written in each file that differs: a check line is one shell `if [
+  "${{ parameters.github }}" = true ]; then <the GitHub clauses, byte for byte>; else { ${{ parameters.localCheck }}; }; fi`, and a
+  rendered note opens with the answer and holds a `### true` part and a `### false` part, then an *Either way* part where the two share one. A carried file (a README,
+  a skill, a script) is never rendered, so it says both ways in words. The tests render each way: on GitHub with `github=true`.
 - **Never import `agent-orchestrator/src`.** The tests reach the orchestrator through its entries (`agent-orchestrator`,
   `agent-orchestrator/run`, `agent-orchestrator/workflow`) and its CLI (`agent-orchestrator/bin`), and run a step's check as the run
   does, by `checkArgv`. The orchestrator never imports this workspace either: it finds a builtin template by path.

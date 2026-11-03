@@ -13,6 +13,21 @@ when it began, never from the tree it judges: a step's check runs `node "$WF_WOR
 is not set, the check says so on stderr and fails: a factory's scripts are not in the repository it works on, so there is nowhere else
 to read them from.
 
+## Two ways to judge and land: in this checkout, or on GitHub
+
+The factory's `github` parameter, set when the template is applied, picks one. A parameter replaces a value and cannot change a
+workflow's steps, so both ways are in each file: the implement and land steps' checks are each one shell `if` on the rendered value, and the
+notes of implement, review and land each open with the answer and hold a part for each.
+
+- **`github: false`, the default: in this checkout.** No remote is read or written. The implement step's check runs `probe.ts`, then the
+  factory's `localCheck` parameter (the repository's lint, typecheck and test, where it has them, by default) on the round's tree; no
+  pull request is opened. Land checks the checkout and stages every result branch in one `git merge --no-ff --no-commit`, as the git
+  place's skill says (*Stage a landing*), and signs off with the merge's message; the land step's check runs `localCheck` again, on the merged
+  tree, and the run commits the merge on its exit 0 and takes it back otherwise. `localCheck` is the only judge, so it runs the tests.
+- **`github: true`: on GitHub** (`nemia factory apply … --set github=true`). Implement pushes and opens a pull request, its check runs
+  `roundCheck` and waits on the CI context `ciCheck` names, and land merges that pull request on GitHub; the land step's check is a receipt.
+  The rest of this README, but where it says otherwise, is this way's.
+
 The CI context the scripts wait on and land on is the factory's `ciCheck` parameter (`ci` by default), handed to each script as
 `--check <name>`; the implement step's round check runs the factory's `roundCheck` parameter (the repository's lint and typecheck, where it has
 them, by default).
@@ -49,14 +64,15 @@ Review counts what it closes out on (`tally: findings, findings.kind=placement`)
 them whose `kind` is `placement` (a change in a boundary the repository's rules give to another concern). `nemia stats` totals each per
 day, `—` on a day no review closed out.
 
-The implement step's check runs no suite itself: CI runs it on the pushed commit, on clean runners and with no cache of this machine's, and
+On GitHub, the implement step's check runs no suite itself: CI runs it on the pushed commit, on clean runners and with no cache of this machine's, and
 Grace's session runs only the tests of what she changed.
 
 Implement merges the base into its branch before each sign-off (`git merge main-worktree/HEAD`: the tip of the branch the repository's
 own checkout is on, whatever it is called), so its check runs on the merged tree, and measures again what its change wrote by a measure.
 Review says in its summary whether the branch holds the base as it is then, and sends back a branch behind only where the base moved
-under the change: a file both changed, a file the change reads, or a measure it wrote. GitHub's own `mergeable` and the required CI
-context stay the guard for the rest, and a base that moved under a green pull request makes the merge refuse rather than land. Land's
+under the change: a file both changed, a file the change reads, or a measure it wrote. On GitHub, its own `mergeable` and the required CI
+context stay the guard for the rest, and a base that moved under a green pull request makes the merge refuse rather than land; in this
+checkout, the land step's check runs `localCheck` on the merged tree, and a merge that conflicts or breaks it is taken back. Land's
 note says nothing of it: the ending signs off before the run executes its check. On a merge round (`## Merge` in the brief) the step
 merges the commit the brief names instead.
 

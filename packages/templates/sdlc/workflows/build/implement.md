@@ -1,3 +1,8 @@
+Does this factory judge and land its work on GitHub? **${{ parameters.github }}**. Follow the part below headed with that answer,
+and only it, then the part headed *Either way*.
+
+### true — on GitHub
+
 **Open the pull request before you sign off**, once a round and after you merged the base: this run's change is judged on GitHub, and
 your fence refuses every `git push` and every `gh` call, so the push and the pull request are one frozen script, read from the run's
 frozen workflow files (`$WF_WORKFLOW_FILES`) as your check reads it. Run it:
@@ -16,9 +21,19 @@ Your check then pushes again through the same script, so CI's verdict is for the
 and a red, cancelled or missing `${{ parameters.ciCheck }}` comes back as the check's refusal, with the Actions URL, the failing jobs
 and the tail of their log — your next try is handed that, since you may type no `gh` yourself.
 
-**Merge the base before you sign off**, on every try: the base moves while you work, CI judges the commit your check pushes and
-nothing judges the merged tree afterwards — the landing's check is a receipt — so a base you did not merge is a base GitHub may call
-unmergeable at the landing, which refuses rather than lands. The base is the branch the repository's own checkout is on, and from your worktree git names its tip
+### false — in this checkout
+
+This factory has no remote: nothing is pushed and no pull request is opened, and you open none. Your check runs `probe.ts`, then the
+repository's local check (`${{ parameters.localCheck }}`) on this round's tree, from the workspace's root, and nothing else: a refusal
+of it comes back to you with the end of its output, as the next try's brief. That command is the only judge of the change before it
+lands, and the landing runs it again, on the base with your branch merged into it, before the merge is committed.
+
+### Either way
+
+**Merge the base before you sign off**, on every try: the base moves while you work, and a base you did not merge is one the
+landing refuses rather than lands: on GitHub, CI judges the commit your check pushes and nothing judges the merged tree afterwards —
+the landing's check is a receipt — so GitHub may call the pull request unmergeable; in this checkout, the landing stages your branch
+on the base as it is then, and a merge that conflicts or breaks the local check is taken back. The base is the branch the repository's own checkout is on, and from your worktree git names its tip
 `main-worktree/HEAD`, whatever that branch is called. Commit your work, then `git merge main-worktree/HEAD`, made as the `git` skill
 says a merge is made: keep both meanings in each conflict, and sign off `blocked` where both cannot hold. Then run again the tests of
 what the merge touched: those of each file of yours it changed, and of each file it changed that your code or your tests read.

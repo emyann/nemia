@@ -3,17 +3,25 @@ kind: FactoryTemplate
 metadata:
   name: sdlc
 spec:
-  version: 1.0.0
+  version: 2.0.0
   rules:
     path: RULES.md
   parameters:
+    github:
+      type: boolean
+      description: "How the factory judges and lands its work. false (the default): with no remote, the implement step's check runs localCheck on each round's tree, and the landing merges the run's result in the repository's own checkout, judged by localCheck on the merged tree. true: the implement step pushes its branch and opens a pull request, its check runs roundCheck and waits on the CI context ciCheck names, and the landing merges that pull request on GitHub; set it with --set github=true."
+      default: false
+    localCheck:
+      type: string
+      description: "The command that judges the work where github is false, from the workspace's root: the implement step's check runs it on each round's tree, and the landing's check on the merged tree. It is the only judge there, so it runs the tests. Not read where github is true."
+      default: npm run --if-present lint && npm run --if-present typecheck && npm run --if-present test
     ciCheck:
       type: string
-      description: The CI status context branch protection requires of the base branch, which the implement step's check waits on and the landing merges on.
+      description: "The CI status context branch protection requires of the base branch, which the implement step's check waits on and the landing merges on. Read only where github is true."
       default: ci
     roundCheck:
       type: string
-      description: The command the implement step's check runs on each round's tree before it waits on CI, from the workspace's root.
+      description: "The command the implement step's check runs on each round's tree before it waits on CI, from the workspace's root: the quick refusal before CI judges. Read only where github is true; where it is false, localCheck judges."
       default: npm run --if-present lint && npm run --if-present typecheck
     areas:
       type: string

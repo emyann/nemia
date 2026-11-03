@@ -1,31 +1,32 @@
 /**
- * `node pull-request.ts <verb>` — the one door through which a run's change reaches GitHub: the push of this run's own branch, and the
- * pull request CI judges. A Bash prefix rule cannot tell `git push origin wf/…` from `git push origin main`, and no agent may type
- * either, so the act is this script, read from the run's frozen workflow files (`$WF_WORKFLOW_FILES`) as `probe.ts` is, and `gh` is
- * denied whole to the agents that run it.
+ * `node pull-request.ts <verb>` — the one door through which a run's change reaches GitHub: the push of this run's own branch, and the pull
+ * request CI judges. A Bash prefix rule cannot tell `git push origin wf/…` from `git push origin main`, and no agent may type either, so
+ * the act is this script, read from the run's frozen workflow files (`$WF_WORKFLOW_FILES`) as `probe.ts` is, and `gh` is denied whole to
+ * the agents that run it.
  *
- * - `open --title <t> --body-file <f>`, which the engineer types once a round after merging the base: it pushes her branch to `origin`
- *   and opens the pull request with the title and body she wrote, or updates the one that is open, never a draft and never forced. It
- *   prints `nemia pr: <url>`, which goes on her closeout as an artifact value.
+ * - `open --title <t> --body-file <f>`, which the engineer types once a round after merging the base: it pushes her branch to `origin` and
+ *   opens the pull request with the title and body she wrote, or updates the one that is open, never a draft and never forced. It prints
+ *   `nemia pr: <url>`, which goes on her closeout as an artifact value.
  * - `push`, which the round's check runs first: it pushes again, so the commit CI judges is the commit the check judges, then refuses
- *   unless an open, non-draft pull request for this branch, based on the remote's default branch, has `headRefOid` equal to `HEAD`.
- *   GitHub moves a pull request's head a moment after the push it follows, so that head is read again for a bounded few seconds
- *   (`HEAD_SECONDS`) before the refusal: a head that stays elsewhere is still refused, and says how long it was read for.
- * - `wait --check <name>`, which the round's check runs last, `<name>` the CI context branch protection requires of the base branch
- *   (the repository's, so the check gives it): it refuses at once a pull request GitHub says is `CONFLICTING` with its base, on which
- *   no CI would come, naming the merge of the base that answers it (`mergeable`, read again for up to 15 s while GitHub says
- *   `UNKNOWN`, `WF_PR_MERGEABLE_SECONDS`); then it polls the `<name>` context of that head (`gh pr view --json statusCheckRollup`), 1800 s
- *   for it to start (`WF_CI_START_SECONDS`) and 2400 s whole (`WF_CI_WAIT_SECONDS`), `WF_CI_POLL_SECONDS` the interval; on a red, cancelled or
- *   absent context refuses by name with the Actions URL, the failing jobs, and from each failing job's log the lines that failed it — a
- *   test with its diff, a type or lint error — or a bounded tail where none is, GitHub's post-job lines left out — the next try reads why CI went red here, since no agent may call `gh` itself — and the `nemia retry <run> <step> --recheck` line, whose step is the
- *   check's own (`WF_STEP`).
+ *   unless an open, non-draft pull request for this branch, based on the remote's default branch, has `headRefOid` equal to `HEAD`. GitHub
+ *   moves a pull request's head a moment after the push it follows, so that head is read again for a bounded few seconds (`HEAD_SECONDS`)
+ *   before the refusal: a head that stays elsewhere is still refused, and says how long it was read for.
+ * - `wait --check <name>`, which the round's check runs last, `<name>` the CI context branch protection requires of the base branch (the
+ *   repository's, so the check gives it): it refuses at once a pull request GitHub says is `CONFLICTING` with its base, on which no CI
+ *   would come, naming the merge of the base that answers it (`mergeable`, read again for up to 15 s while GitHub says `UNKNOWN`,
+ *   `WF_PR_MERGEABLE_SECONDS`); then it polls the `<name>` context of that head (`gh pr view --json statusCheckRollup`), 1800 s for it to
+ *   start (`WF_CI_START_SECONDS`) and 2400 s whole (`WF_CI_WAIT_SECONDS`), `WF_CI_POLL_SECONDS` the interval; on a red, cancelled or absent
+ *   context refuses by name with the Actions URL, the failing jobs, and from each failing job's log the lines that failed it — a test with
+ *   its diff, a type or lint error — or a bounded tail where none is, GitHub's post-job lines left out — the next try reads why CI went red
+ *   here, since no agent may call `gh` itself — and the `nemia retry <run> <step> --recheck` line, whose step is the check's own
+ *   (`WF_STEP`).
  *
  * The branch is read from `HEAD`, never given: a run's branch is `wf/<run>/<leaf>` — `wf/<run>/run` for the run's own line of work, one
  * branch per card, and `wf/<run>/<step>` for a fork beside it or a fan-in's merge — and the run it names is what the refusals print.
- * Refuses, exit 1 on stderr with what to do next: a HEAD that is on no such branch or on the remote's default branch; no `origin`; no
- * `gh` on the PATH or none authenticated; a push git rejects, which is answered by merging the base and never by a force; a draft pull
- * request, or one based on another branch; no open pull request where one is owed; a `headRefOid` that is not `HEAD`; a pull request
- * that conflicts with its base; a `wait` with no `--check`; and a CI context that is red, cancelled, skipped or never reported.
+ * Refuses, exit 1 on stderr with what to do next: a HEAD that is on no such branch or on the remote's default branch; no `origin`; no `gh`
+ * on the PATH or none authenticated; a push git rejects, which is answered by merging the base and never by a force; a draft pull request,
+ * or one based on another branch; no open pull request where one is owed; a `headRefOid` that is not `HEAD`; a pull request that conflicts
+ * with its base; a `wait` with no `--check`; and a CI context that is red, cancelled, skipped or never reported.
  */
 import { spawnSync } from 'node:child_process';
 
@@ -60,7 +61,7 @@ const POLL_SECONDS = 15;
 
 /**
  * How long, in seconds, the push reads the pull request's head again for before it refuses one that is not `HEAD`: GitHub moves the head
- * a moment after the push, and a read straight away has refused a round whose push had landed (`#448`, 2026-10-21). It is bounded and
+ * a moment after the push, and a read straight away can refuse a round whose push had landed. It is bounded and
  * short — the check waits on CI for far longer after it — and `WF_PR_HEAD_SECONDS` lowers it for a test.
  */
 const HEAD_SECONDS = 30;
@@ -365,8 +366,8 @@ function failures(log: string): { lines: string[]; tests: boolean } {
  * Why CI went red, for the next try to read: each entry of `entries` that did not pass, by name and verdict with its URL; then, for each
  * that names a job, its log read by the job's id (`gh api repos/{owner}/{repo}/actions/jobs/<id>/logs`, which answers where `gh run view
  * --log-failed` prints nothing), headed by the job's name: the lines that failed it with what tells why (`failures`), or its tail where it
- * names none, bounded by `LOG_LINES` in all. The `check` context itself, which may only gather the others, comes last. No agent of this team may call
- * `gh`, so this is the whole of what the next try is handed.
+ * names none, bounded by `LOG_LINES` in all. The `check` context itself, which may only gather the others, comes last. No agent of this
+ * team may call `gh`, so this is the whole of what the next try is handed.
  */
 function why(entries: readonly Entry[], check: string): string[] {
   const failed = entries.filter((entry) => !pending(entry) && verdict(entry) !== PASSED);

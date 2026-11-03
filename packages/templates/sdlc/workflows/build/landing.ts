@@ -1,30 +1,30 @@
 /**
  * `node landing.ts <verb>` — the two acts a landing is made of, which no agent may type: the merge of this run's own pull request on
- * GitHub, and the receipt that it happened. A Bash prefix rule cannot tell `gh pr merge 7` from `gh pr merge 9`, and `gh` is denied
- * whole to the agents that land, so the act is this script, read from the run's frozen workflow files (`$WF_WORKFLOW_FILES`) and run
- * with `node`, as `pull-request.ts` carries the push and the pull request. It imports nothing: a frozen clause copies one file. It is
- * told the name of the CI context it reads (`--check <name>`), since that name is the repository's, never the script's.
+ * GitHub, and the receipt that it happened. A Bash prefix rule cannot tell `gh pr merge 7` from `gh pr merge 9`, and `gh` is denied whole
+ * to the agents that land, so the act is this script, read from the run's frozen workflow files (`$WF_WORKFLOW_FILES`) and run with `node`,
+ * as `pull-request.ts` carries the push and the pull request. It imports nothing: a frozen clause copies one file. It is told the name of
+ * the CI context it reads (`--check <name>`), since that name is the repository's, never the script's.
  *
- * - `merge --run <id> --subject <line> --body-file <f> --check <name>`, which the landing session types once its step has been filed — on a person's
- *   approval in `build`, or by the workflow in `quick`, where the review's pass files it: it refuses
- *   anything but this run's own green pull request — not a draft, based on the remote's default branch, its head the tip of the run's
- *   result branch and the sha the reviewer read, `mergeable` MERGEABLE, the CI context `--check` names SUCCESS at that sha, and every other
- *   `wf/<id>/*` branch taken by it, every commit of the branch having an equivalent patch on the head (`git cherry`) — then merges it with a merge commit whose subject and body are the ones it was given
- *   (`gh pr merge --merge --match-head-commit <sha>`, never `--delete-branch`: the repository auto-deletes the head branch), and
- *   fast-forwards the checkout (`git fetch origin && git merge --ff-only origin/<base>`). **Level-triggered**: it reads the world
- *   rather than what a last try left, so a retry after a merge that went through and a fast-forward that was then declined — the one
- *   failure between the two acts — does the fast-forward alone and merges nothing a second time.
- * - `receipt --run <id>`, which the land step's `check:` runs: it refuses unless the pull request is `MERGED` with a merge commit that
- *   is reachable from HEAD, the checkout is clean on the base with no merge in progress, and every commit of every `wf/<id>/*` branch
- *   has an equivalent patch on HEAD — the three facts the run's own `landingDue` needs to record `landed: {commit}` on the commit that landed.
+ * - `merge --run <id> --subject <line> --body-file <f> --check <name>`, which the landing session types once its step has been filed — on a
+ *   person's approval in `build`, or by the workflow in `quick`, where the review's pass files it: it refuses anything but this run's own
+ *   green pull request — not a draft, based on the remote's default branch, its head the tip of the run's result branch and the sha the
+ *   reviewer read, `mergeable` MERGEABLE, the CI context `--check` names SUCCESS at that sha, and every other `wf/<id>/*` branch taken by
+ *   it, every commit of the branch having an equivalent patch on the head (`git cherry`) — then merges it with a merge commit whose subject
+ *   and body are the ones it was given (`gh pr merge --merge --match-head-commit <sha>`, never `--delete-branch`: the repository
+ *   auto-deletes the head branch), and fast-forwards the checkout (`git fetch origin && git merge --ff-only origin/<base>`).
+ *   **Level-triggered**: it reads the world rather than what a last try left, so a retry after a merge that went through and a fast-forward
+ *   that was then declined — the one failure between the two acts — does the fast-forward alone and merges nothing a second time.
+ * - `receipt --run <id>`, which the land step's `check:` runs: it refuses unless the pull request is `MERGED` with a merge commit that is
+ *   reachable from HEAD, the checkout is clean on the base with no merge in progress, and every commit of every `wf/<id>/*` branch has an
+ *   equivalent patch on HEAD — the three facts the run's own `landingDue` needs to record `landed: {commit}` on the commit that landed.
  *
- * The run is given, never read from HEAD: the checkout a landing runs in is on the base branch, not on a run's branch. Refuses, exit 1
- * on stderr with what to do next — the exact `nemia retry` line where a person must act: a run with no result branch here; a dirty
- * checkout, one with a merge in progress, or one not on the base; no `origin`; no `gh` on the PATH or none authenticated; no open pull
- * request for the run, or two, or one merged beside one open; a draft, another base, a head that is not the branch's tip, a `mergeable`
- * that is not MERGEABLE, a CI context that is not SUCCESS, a result branch the head leaves out; a `gh pr merge` GitHub declines; and a
- * fast-forward git declines. The receipt takes the merged pull request among whatever the run has — a closed one beside it is no
- * refusal, a second merged one is — and refuses where none is merged.
+ * The run is given, never read from HEAD: the checkout a landing runs in is on the base branch, not on a run's branch. Refuses, exit 1 on
+ * stderr with what to do next — the exact `nemia retry` line where a person must act: a run with no result branch here; a dirty checkout,
+ * one with a merge in progress, or one not on the base; no `origin`; no `gh` on the PATH or none authenticated; no open pull request for
+ * the run, or two, or one merged beside one open; a draft, another base, a head that is not the branch's tip, a `mergeable` that is not
+ * MERGEABLE, a CI context that is not SUCCESS, a result branch the head leaves out; a `gh pr merge` GitHub declines; and a fast-forward git
+ * declines. The receipt takes the merged pull request among whatever the run has — a closed one beside it is no refusal, a second merged
+ * one is — and refuses where none is merged.
  */
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';

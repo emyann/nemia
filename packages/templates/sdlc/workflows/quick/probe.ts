@@ -1,19 +1,19 @@
 /**
- * `node probe.ts <verb>` — the one door through which a step of this team starts a Claude Code session of its own to measure something,
- * a probe, and the check that none is left running when the step signs off.
+ * `node probe.ts <verb>` — the one door through which a step of this team starts a Claude Code session of its own to measure something, a
+ * probe, and the check that none is left running when the step signs off.
  *
  * - `start <label> [--answer "<what to press>"] [--settings <file or json>] -- <prompt>` starts a background session named
  *   `<run>-probe-<label>`, the run read from the branch (`wf/<run>/<leaf>`), in the machinery's folder `$WF_ROOT/probes` (`WF_ROOT`
  *   `~/.agent-workflows` by default). Its first message opens with `[nemia probe] run <run>:` and says `no action needed`, or, with
- *   `--answer`, what the person must press. Remote Control, which reaches the person's phone, is given only with `--answer`; the step
- *   then stops `blocked` on the `needs` line it prints. `--settings` is passed to the session, so a measurement of rules or hooks edits
- *   no folder's settings.
+ *   `--answer`, what the person must press. Remote Control, which reaches the person's phone, is given only with `--answer`; the step then
+ *   stops `blocked` on the `needs` line it prints. `--settings` is passed to the session, so a measurement of rules or hooks edits no
+ *   folder's settings.
  * - `list` prints this run's probes and their state; `stop [label]` stops this run's live probes, or the one named.
  * - `check`, for a run's check: refuses while a probe named for `WF_RUN` is live, naming `stop`. No `claude` on the PATH is no probe.
  *
- * Refuses, exit 1 on stderr with what to do next: a branch that is not a run's `wf/<run>/<leaf>`, a label that is not lower-case letters and
- * digits, a probe folder Claude Code has not trusted (trust is read from its `.claude.json`, never written: a person runs `claude` there
- * once), and a listing `claude agents` cannot give.
+ * Refuses, exit 1 on stderr with what to do next: a branch that is not a run's `wf/<run>/<leaf>`, a label that is not lower-case letters
+ * and digits, a probe folder Claude Code has not trusted (trust is read from its `.claude.json`, never written: a person runs `claude`
+ * there once), and a listing `claude agents` cannot give.
  */
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';

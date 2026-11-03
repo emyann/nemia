@@ -1,0 +1,16 @@
+apiVersion: nemia.dev/v1alpha1
+kind: FactoryTemplate
+metadata:
+  name: sdlc
+spec:
+  version: 0.1.0
+  hires:
+    build/design: seldon
+    build/implement: grace
+    build/land: otto
+    build/review: agora
+    intake/intake: iris
+    janitor/argus: argus
+    quick/implement: grace
+    quick/land: otto
+    quick/review: agora

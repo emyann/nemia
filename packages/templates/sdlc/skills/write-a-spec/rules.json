@@ -1,0 +1,33 @@
+{
+  "rules": [
+    {
+      "id": "read-with-read",
+      "says": "Read a file with Read, list a folder with Glob and search with Grep; never find, grep, awk, sed or a pipe in Bash; cat, head, tail, wc, cut and ls run inside the workspace",
+      "breaks": [
+        "Bash(find:*)",
+        "Bash(grep:*)",
+        "Bash(awk:*)",
+        "Bash(sed:*)"
+      ]
+    },
+    {
+      "id": "checks-bare",
+      "says": "Run each check bare, one command per call: never wrapped in timeout, never cd, git -C or a for loop",
+      "breaks": [
+        "Bash(timeout:*)",
+        "Bash(cd:*)",
+        "Bash(git:*)",
+        "Bash(for:*)"
+      ]
+    },
+    {
+      "id": "read-within-reach",
+      "says": "Read, Grep and Glob reach the workspace and the folders the brief says you may read; never another run's folder, the store, ~/.claude, ~/.cache or a system path",
+      "breaks": [
+        "Glob",
+        "Grep",
+        "Read"
+      ]
+    }
+  ]
+}

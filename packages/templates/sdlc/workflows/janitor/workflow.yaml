@@ -1,0 +1,27 @@
+apiVersion: nemia.dev/v1alpha1
+kind: Workflow
+metadata:
+  name: janitor
+  description: "Read how the factory's work went and say what to correct. Argus, the janitor, reads `wf stats` since the janitor's last run, against the same length of time before it, writes a short report, and proposes one correction per card: an allow or a deny by name, a line in an agent's body or a skill, or a refusal kept on purpose, each with the numbers behind it. Argus proposes and never acts."
+spec:
+  steps:
+    - name: argus
+      place: git
+      check: "{ if [ -n \"${WF_WORKFLOW_FILES:-}\" ]; then node \"$WF_WORKFLOW_FILES/cards.ts\" \"${WF_CLOSEOUT:-}\"; elif [ -n \"${WF_BASE_REF:-}\" ]; then m=$(mktemp -d) && { git show \"$WF_BASE_REF:workflows/janitor/cards.ts\" > \"$m/cards.ts\" 2>/dev/null || { echo \"wf check: the run's base $WF_BASE_REF has no workflows/janitor/cards.ts, so no card can be filed; start the run on a base that has it\" >&2; false; }; } && node \"$m/cards.ts\" \"${WF_CLOSEOUT:-}\"; c=$?; rm -rf \"$m\"; [ \"$c\" -eq 0 ]; else echo \"wf check: Argus's cards are filed only in a run's check, where WF_BASE_REF names the base whose cards.ts files them; start the janitor on a repository\" >&2; false; fi; }"
+      reads:
+        - inbox
+      overrides:
+        claude:
+          fence:
+            disallowedTools:
+              - Bash(npm run build)
+              - Bash(npm run e2e)
+              - Bash(npm test)
+              - Bash(npx shadcn@latest:*)
+              - Bash(pnpm dlx shadcn@latest:*)
+              - Bash(bunx --bun shadcn@latest:*)
+              - Bash(node --test:*)
+              - Bash(npx turbo run test:*)
+              - Bash(npx tsc:*)
+              - Bash(npx oxlint:*)
+              - Bash(npx tsverify:*)

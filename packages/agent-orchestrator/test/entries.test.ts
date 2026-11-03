@@ -554,6 +554,7 @@ const PINNED: Record<string, string[]> = {
   ],
   'agent-orchestrator/run': [
     'BY_CAP',
+    'CHECK_DEADLINE_SECONDS',
     'GIVEN',
     'HANDED_CLOSEOUT',
     'LINE_NAME',
@@ -594,6 +595,7 @@ const PINNED: Record<string, string[]> = {
     'cancelPlan',
     'capOf',
     'ceilingLines',
+    'checkArgv',
     'checkLogsOf',
     'checkTaskId',
     'checkoutLine',

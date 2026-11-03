@@ -498,6 +498,28 @@ test('each problem of a folder stands at its file and line, every one at once, s
     assert.match(problems[2].message, /does not parse/);
     assert.match(problems[3].message, /outside the template's layout/);
   });
+  await t.test("an undeclared ${{ parameters.<name> }} stands at its line, in a step's check and in RULES.md", () => {
+    const dir = target();
+    exportTemplate({ dir, from: repoWithTeam() });
+    const workflow = path.join(dir, 'workflows', 'dev', 'workflow.yaml');
+    const lines = fs.readFileSync(workflow, 'utf8').split('\n');
+    const check = lines.findIndex((line) => line.trim().startsWith('check: '));
+    lines[check] = lines[check].replace(/check: .*/, 'check: go --check ${{ parameters.nope }}');
+    fs.writeFileSync(workflow, lines.join('\n'));
+    fs.writeFileSync(path.join(dir, 'RULES.md'), 'A card says what it is.\nIts areas:  ${{parameters.nope}}.\n');
+    const problems = checkTemplateAt(dir);
+    assert.deepEqual(
+      problems.map((p) => [p.file, p.line, p.col]),
+      [
+        ['RULES.md', 2, 13],
+        ['workflows/dev/workflow.yaml', check + 1, lines[check].indexOf('check: ') + 8],
+      ],
+    );
+    assert.ok(
+      problems.every((p) => p.message.includes('nope')),
+      problems.map(problemLine).join('\n'),
+    );
+  });
   await t.test('a link in a folder is refused by name, and so is a file of two documents, at the second', () => {
     const dir = target();
     exportTemplate({ dir, from: repoWithTeam() });

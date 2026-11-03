@@ -12,8 +12,11 @@ import { REVISIONS_POLICIES, type RevisionsPolicy } from '../factory/factory.ts'
 /** The schema every document of a template is written in. */
 export const API_VERSION = 'nemia.dev/v1alpha1';
 
-/** A problem of a template: the file, the keys and indexes leading to the value in its document (none for the file), and the words. */
-export type Refusal = { file: string; at: ReadonlyArray<string | number>; message: string };
+/**
+ * A problem of a template: the file, the keys and indexes leading to the value in its document (none for the file), the line and column
+ * it stands at in a file that is no document, where it has one, and the words.
+ */
+export type Refusal = { file: string; at: ReadonlyArray<string | number>; line?: number; col?: number; message: string };
 
 /**
  * A template's folder as read: its name, each file by its path from the folder with `/` between parts, and each document that parsed, by
@@ -311,6 +314,20 @@ export const isMap = (value: unknown): value is Record<string, unknown> =>
 /** Whether `value` is a `{ param }` and nothing more. */
 export const isParam = (value: unknown): value is ParamRef =>
   isMap(value) && Object.keys(value).length === 1 && typeof value.param === 'string';
+
+/**
+ * A parameter's value written inside a string or a text: `${{ parameters.<name> }}`, spaces inside the braces optional. A shell's `$VAR`
+ * and `${VAR}` are none.
+ */
+const PARAMETER_EXPRESSION = /\$\{\{\s*parameters\.([A-Za-z_][A-Za-z0-9_]*)\s*\}\}/g;
+
+/** The name of each `${{ parameters.<name> }}` in `text`, with the offset it stands at, in order. */
+export const expressionsIn = (text: string): Array<{ name: string; index: number }> =>
+  [...text.matchAll(PARAMETER_EXPRESSION)].flatMap((match) => (match[1] === undefined ? [] : [{ name: match[1], index: match.index }]));
+
+/** `text` with each `${{ parameters.<name> }}` in it replaced by what `write` gives its name. */
+export const writeExpressions = (text: string, write: (name: string) => string): string =>
+  text.replace(PARAMETER_EXPRESSION, (_, name: string) => write(name));
 
 /** A key path as a person reads it: `spec.steps[1].budget`. */
 export const spelled = (at: ReadonlyArray<string | number>): string =>

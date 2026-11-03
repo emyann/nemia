@@ -101,9 +101,15 @@ export type CheckedTemplate = TemplateTree & { folder: ReadFolder; version: unkn
 export function checkedTree(tree: TemplateTree, packageSkills: readonly string[]): CheckedTemplate {
   const problems = [...tree.problems];
   const { folder, parsed } = readTemplateFolder(tree.name, tree.files, problems);
-  for (const refusal of checkTemplate(folder, [...packageSkills])) {
+  const byPath = new Map(tree.files.map((f) => [f.path, f]));
+  const text = (file: string): string => {
+    const found = byPath.get(file);
+    return found === undefined ? '' : Buffer.from(found.bytes).toString('utf8');
+  };
+  for (const refusal of checkTemplate(folder, [...packageSkills], text)) {
     const doc = parsed.get(refusal.file);
-    problems.push({ file: refusal.file, ...(doc ? lineOf(doc, refusal.at) : {}), message: refusal.message });
+    const at = doc ? lineOf(doc, refusal.at) : { line: refusal.line, col: refusal.col };
+    problems.push({ file: refusal.file, ...at, message: refusal.message });
   }
   problems.sort((a, b) => a.file.localeCompare(b.file) || (a.line ?? 0) - (b.line ?? 0) || (a.col ?? 0) - (b.col ?? 0));
   const manifest = folder.documents.get('nemia.yaml') as { spec?: { version?: unknown } } | null | undefined;

@@ -218,6 +218,52 @@ test("what a render writes into a factory's tree, read back as today's folder re
     assert.match(fs.readFileSync(path.join(other, 'workflows/agents/reviewer.md'), 'utf8'), /^model: haiku$/m);
   });
   await t.test(
+    'a ${{ parameters.<name> }} is written with its value in a check, a step, an agent, NEMIA.md and RULES.md, and a carried file is left as it is',
+    () => {
+      const { dir } = exported();
+      const expression = '${{ parameters.c }}';
+      edit(dir, 'nemia.yaml', (spec) => {
+        spec.parameters = { c: { type: 'string', description: 'the check', default: 'ci' } };
+      });
+      edit(dir, 'workflows/dev/workflow.yaml', (spec) => {
+        spec.steps.find((step: { name: string }) => step.name === 'implement').check = `go --check ${expression}`;
+      });
+      const append = (file: string, words: string) => fs.appendFileSync(path.join(dir, file), words);
+      append('workflows/dev/review.md', `\nWait on ${expression}.\n`);
+      append('agents/reviewer/instructions.md', `\nRead ${expression}.\n`);
+      fs.writeFileSync(path.join(dir, 'RULES.md'), `A card waits on ${expression}.\n`);
+      fs.writeFileSync(path.join(dir, 'NEMIA.md'), `Operate on ${expression}.\n`);
+      const tool = `const check = '${expression}';\n`;
+      fs.writeFileSync(path.join(dir, 'workflows/dev/tool.ts'), tool);
+      const schemaFile = path.join(dir, 'agents/reviewer/output.schema.json');
+      const schema = fs.readFileSync(schemaFile, 'utf8').replace('{', `{ "$comment": "${expression}",`);
+      fs.writeFileSync(schemaFile, schema);
+      const { tree, out } = rendered(dir, ['c=checks']);
+      assert.deepEqual(out.refusals, []);
+      const at = (file: string) => fs.readFileSync(path.join(tree, file), 'utf8');
+      assert.match(at('workflows/dev/implement.md'), /^check: go --check checks$/m);
+      assert.match(at('workflows/dev/review.md'), /^Wait on checks\.$/m);
+      assert.match(at('workflows/agents/reviewer.md'), /^Read checks\.$/m);
+      assert.equal(at('RULES.md'), 'A card waits on checks.\n');
+      assert.equal(at('NEMIA.md'), 'Operate on checks.\n');
+      assert.ok(
+        out.copies.some((copy) => copy.path === 'workflows/dev/tool.ts'),
+        'the script is carried, never rendered',
+      );
+      assert.equal(
+        out.files.some((file) => file.path === 'workflows/dev/tool.ts'),
+        false,
+      );
+      assert.equal(at('workflows/dev/tool.ts'), tool);
+      assert.equal(at('workflows/agents/reviewer.schema.json'), schema, "an agent's schema is carried as it is");
+      assert.match(
+        fs.readFileSync(path.join(rendered(dir).tree, 'workflows/dev/implement.md'), 'utf8'),
+        /^check: go --check ci$/m,
+        'its default',
+      );
+    },
+  );
+  await t.test(
     "a template's RULES.md, or its manifest's rules, is rendered as the tree's RULES.md; a template with neither renders none",
     () => {
       const { dir } = exported();

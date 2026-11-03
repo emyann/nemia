@@ -28,9 +28,9 @@ holds what every change needs.
   changed (beside it, or under its package's `test/` naming it), and for a doc, a skill or a workflow file the tests that read it (grep
   the tests for its path), each from its package's folder as its `test` script loads it: `node --import ./test/ambient.ts --test <file>`
   in `packages/agent-orchestrator`, `node --import ./test/harness.ts --test <file>` in `apps/api`, `node --test <file>` in
-  `packages/agent-runtime`, `apps/web`, `apps/cli` and `tools/guards`. Where a file alone does not say enough (a shared helper, a type many files read, a package's
+  `packages/agent-runtime`, `apps/web`, `apps/cli`, `packages/templates` and `tools/guards`. Where a file alone does not say enough (a shared helper, a type many files read, a package's
   test setup), the packages it touched: `npx turbo run test --force --continue --filter=<package>`, the package by its `name`
-  (`agent-orchestrator`, `agent-runtime`, `api`, `web`, `cli`, `guards`). Typecheck and lint run whole: they are cheap. Implement's round check runs the
+  (`agent-orchestrator`, `agent-runtime`, `api`, `web`, `cli`, `guards`, `templates`). Typecheck and lint run whole: they are cheap. Implement's round check runs the
   declarations, the typecheck and the lint, and pushes the round's commit and waits on GitHub's `ci` context, which runs the whole
   suite on it (`workflows/build/implement.md`); the landing's check runs no suite at all — it is the receipt that the pull request `ci`
   judged was merged (`workflows/build/landing.ts`) — so the commit `ci` passed on is the last thing any suite reads; a session runs the
@@ -201,6 +201,9 @@ What the `create-an-agent` skill (`packages/agent-orchestrator/skills/create-an-
   last, after every place and the place's skills, the MCP servers it offers a factory (`BUILTIN_SERVERS`,
   `packages/agent-orchestrator/servers/`), and Nemia's own agent once the Nemia slices build it. A person's
   factories get no workflow or agent from the package.
+- `packages/templates/` — the templates Nemia ships (npm name `templates`), each in the template layout: `sdlc`, the team that builds
+  Nemia with this repository's words taken out, under its own semver recorded in `released.json`, and the tests that hold it
+  (`packages/templates/CLAUDE.md`). The orchestrator never imports it: it finds a builtin template by path.
 - `apps/cli/` — `nemia` and `wf`, the client of the api: the moved reads over HTTP, every other verb and `--local` on the
   orchestrator's own CLI, spawned (`apps/cli/CLAUDE.md`).
 - `apps/docs/` — the documentation site (Astro Starlight) for a person who will use Nemia: landed material only, the state diagrams read

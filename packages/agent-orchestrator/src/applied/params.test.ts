@@ -1,7 +1,7 @@
 /** A template's parameters given values: typed as declared, a default filling a gap, every wrong `--set` refused at once by name. */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { resolveParams, substitute } from './index.ts';
+import { interpolated, resolveParams, substitute } from './index.ts';
 
 const DECLARED = {
   model: { type: 'string', description: 'the model', default: 'sonnet' },
@@ -40,5 +40,31 @@ test("a template's parameters given values: typed, defaulted, substituted, and e
       () => substitute({ a: { param: 'm' } }, {}),
       (err: Error) => err instanceof Error && err.message.startsWith('{param: m}') && err.message.includes("nemia.yaml's parameters"),
     );
+  });
+  await t.test('a ${{ parameters.<name> }} inside a string is written with its value, at any depth, and in a text', () => {
+    assert.deepEqual(substitute({ a: 'x ${{ parameters.n }} y' }, { n: 3 }), { a: 'x 3 y' });
+    assert.deepEqual(substitute({ a: [{ b: ['go --check ${{ parameters.c }}'] }] }, { c: 'gate' }), { a: [{ b: ['go --check gate'] }] });
+    assert.deepEqual(
+      substitute('${{ parameters.a }}-${{parameters.b}}', { a: 'one', b: false }),
+      'one-false',
+      'two in one string, one with no spaces',
+    );
+    assert.equal(interpolated('Run ${{ parameters.c }}, then ${{parameters.c}}.\n', { c: 'it' }), 'Run it, then it.\n');
+  });
+  await t.test("a shell's $VAR and ${VAR}, and words that only look like an expression, are left as they are", () => {
+    const shell = '$WF_RUN ${HOME} ${{ HOME }} ${{ parameters.a-b }} {{ parameters.n }}';
+    assert.deepEqual(substitute({ a: shell }, { n: 3 }), { a: shell });
+    assert.equal(interpolated(shell, { n: 3 }), shell);
+  });
+  await t.test('an expression naming a parameter the template does not declare is refused, in a string and in a text', () => {
+    assert.throws(
+      () => substitute({ a: ['${{ parameters.m }}'] }, { n: 3 }),
+      (err: Error) => err instanceof Error && err.message.includes('m'),
+    );
+    assert.throws(
+      () => interpolated('x ${{ parameters.m }}', { n: 3 }),
+      (err: Error) => err instanceof Error && err.message.includes('m'),
+    );
+    assert.throws(() => interpolated('${{ parameters.toString }}', {}), Error, "a prototype's key is no parameter");
   });
 });

@@ -1,0 +1,87 @@
+---
+title: sdlc, the builtin template
+description: sdlc is the team that builds Nemia, made generic, a template Nemia has built in, and how to apply it to a repository of your own.
+---
+
+sdlc is a factory template that comes with Nemia: the team that builds Nemia, with Nemia's own repository taken out of it. Applied to
+a repository of yours, it makes a factory that takes an idea to an intent, an intent to a change merged into your base branch, and
+reads its own stats to propose what to correct.
+
+**It owns** six agents, four workflows, the skills their steps name, the scripts their checks run, and the rules every agent hired
+into the factory is told.
+
+**It never touches** your repository's history but through a pull request: a step never pushes or merges, and the run does it in
+its place, through the scripts the template carries.
+
+**It is reached through** its name: `nemia factory apply` takes a bare word at its template flag as a template Nemia has built in, and
+the factory's file records that name. Its folder is in the templates workspace, `packages/templates/`.
+
+## Its agents
+
+| Agent  | Its role               |
+| ------ | ---------------------- |
+| Iris   | product engineer       |
+| Seldon | software architect     |
+| Grace  | lead software engineer |
+| Agora  | code reviewer          |
+| Otto   | release engineer       |
+| Argus  | janitor                |
+
+Seldon, Agora, Iris and Argus read the repository and never write it; Grace and Otto write it, and are refused a push. Every agent's
+fence refuses an edit of your store's factories, workflows and inbox.
+
+## Its workflows
+
+- **intake** turns an idea into an intent, Iris asking you what it leaves open.
+- **build** takes an intent to your base branch: a design, an implement in rounds, a review, and a landing a person approves.
+- **quick** takes a card that settles its change to your base branch: an implement, then a review whose pass lands it, with no gate.
+- **janitor**, on demand, reads the factory's stats and files what it proposes as cards in your inbox, starting none.
+
+## Its parameters
+
+What your repository decides is a parameter, given with `--set` when you apply the template; one you do not give takes its default.
+
+| Parameter  | What it says                                                     | Its default                                                 |
+| ---------- | ---------------------------------------------------------------- | ----------------------------------------------------------- |
+| ciCheck    | the name of the CI status check a pull request waits on          | ci                                                          |
+| roundCheck | the command implement's check runs after each round              | npm run --if-present lint && npm run --if-present typecheck |
+| areas      | the areas of the repository a card names, in the factory's rules | the top-level folders of the repository                     |
+| storeRoot  | the store the agents' fences keep them out of                    | ~/.agent-workflows                                          |
+
+storeRoot is written as Claude Code reads a path in a permission rule: `~/` for a store under your home, and two slashes for any
+other absolute path, `--set storeRoot=//srv/nemia` for a store at `/srv/nemia`. With one slash Claude Code reads the path from the
+settings' folder, so the fence would deny nothing.
+
+## Apply it
+
+```bash
+nemia factory apply myapp --template sdlc --repo ~/code/myapp \
+  --set ciCheck=build \
+  --set roundCheck='npm run lint && npm test' \
+  --set areas='src, docs and scripts'
+```
+
+That files the factory `myapp` on the repository, made from sdlc with your parameters, and trusts the repository for the harness, as
+[a factory's repositories](/factories/#its-repositories) says (`--no-trust` trusts nothing). The daemon renders the template into the
+factory, its workflows and agents yours to change after. A `--set` may be repeated, one per parameter, and `--repo` too, for a factory
+on more than one repository. `nemia factory diff` and `nemia factory upgrade` take the same name at their template flag.
+
+## Before you apply it: GitHub
+
+sdlc lands a change through a pull request on GitHub, and waits on your CI to judge it. Before a run of build or quick can land:
+
+- **`gh` is logged in** on the machine the daemon runs on, to the account that may push your repository's branches and open and merge
+  its pull requests.
+- **Your base branch is protected, requiring the CI check named by ciCheck**, so a pull request merges only once that check passes on
+  it. The landing refuses a pull request whose check is not green at the head the review read.
+
+Under GitHub, CI is the judge. The round check between implement's rounds is a quick refusal of what is plainly broken, not the
+verdict: a repository with neither a `lint` nor a `typecheck` script passes the default round check having checked nothing, and its
+CI is then the only check its changes meet. Give roundCheck the commands your repository has.
+
+A way to run sdlc on a repository with no GitHub, its changes checked and merged on your machine alone, is still to come.
+
+## Sources
+
+This page is written from `packages/templates/CLAUDE.md` and from `packages/agent-orchestrator/src/templates/templates.store.ts`
+(`templatePlace` and `BUILTIN_TEMPLATES`).

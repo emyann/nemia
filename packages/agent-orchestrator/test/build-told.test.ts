@@ -9,9 +9,16 @@
  *
  * The design system kit's skills sit in a folder of the board's (`KIT_SKILLS`): build's design, implement and review are each given
  * every one on their `skills:` line, named with the folder, and `kitDrift` holds the names given to the folders that are there and to
- * what the trigger skill `change-the-board` says of each (`KIT_SKILLS_SAID`). Design and review, which are fenced, are told to load
- * the trigger skill first and where `ds-spec`'s reader runs from (`KIT_READER_TOLD`). The three are told of the look's own parts too,
- * by the folder's name (`LOOK_PARTS_TOLD`).
+ * what the trigger skill `change-the-board` says of each (`KIT_SKILLS_SAID`).
+ *
+ * What is true of this repository for anyone working in it is no step's to say (`HOMES`): each block the steps were told of it is said
+ * by its home — a skill of `.claude/skills/` the step is given on its own `skills:` line, or the root `CLAUDE.md`, which every session
+ * reads — and by no shipped step again. `effect` says when to load it; `change-the-board` says to load it first, where `ds-spec`'s
+ * reader runs from (`KIT_READER_SAID`), shadcn's path and load order, and the look's own parts (`LOOK_PARTS_SAID`); `change-a-contract`
+ * says what a contract asks of design, implement and review (`DESIGN_LAWS_TOLD`, `LAWS_TOLD`, `REVIEW_LAWS_TOLD`); and `CLAUDE.md`
+ * says how a glossary row cites a path and the docs' tests that read it (`GLOSSARY_SAID`), and the throwaway collector
+ * (`COLLECTOR_SAID`). What stays in a step is this factory's: its fence, its check, its pictures, and the checks and measures design
+ * and review run, each kept with the fence that allows it.
  *
  * Both implement steps are told how the pull request is opened (`OPENS_THE_PULL_REQUEST`): the frozen script read from the base, the
  * address named on the closeout, and what the check then does with it; review is told what its check did run and the two reads of the
@@ -27,9 +34,9 @@
  * `react-aria`, this
  * repository's vendored skill for the board's own parts, on their `skills:` line and not on a team-portable agent's.
  *
- * The same five are each given `tsverify`, the verifier's own skill, and told what a contract asks of them (`DESIGN_LAWS_TOLD`,
- * `LAWS_TOLD`, `REVIEW_LAWS_TOLD`): design names the laws a change adds or changes, implement writes them first and deletes a test only
- * once its bug is planted and a law refuses it, and review judges the laws and reads CI's verdict of every contract.
+ * The same five are each given `tsverify`, the verifier's own skill, and `change-a-contract`, which says what a contract asks of them:
+ * design names the laws a change adds or changes, implement writes them first and deletes a test only once its bug is planted and a
+ * law refuses it, and review judges the laws and reads CI's verdict of every contract.
  *
  * And what becomes of Claude Code's own prompt for each agent of the team (`PROMPTS`, `promptsWrong`): no `harnessPrompt:` line on any,
  * so each keeps it whole, coding section included. An agent the table does not name is refused, so a new one says its value.
@@ -143,8 +150,8 @@ const KIT_SKILLS_SAID = [
 const KIT_NAMED = /`(ds-[a-z0-9]+(?:-[a-z0-9]+)*)`/g;
 
 /**
- * What design and review, the fenced steps, are told of the kit: to load the trigger skill first, and the command of `ds-spec`'s
- * reader from the repository's root, the workspace's script and not the copy the step is given.
+ * What design and review, the fenced steps, were told of the kit in their notes, which the trigger skill now says (`KIT_READER_SAID`):
+ * to load it first, and the command of `ds-spec`'s reader from the repository's root, the workspace's script and not the copy given.
  */
 const KIT_READER_TOLD = [
   'When the change touches `apps/web`, load `change-the-board` first',
@@ -152,14 +159,30 @@ const KIT_READER_TOLD = [
   "this workspace's script, never the copy your skills hold, nor the path the skill's own text prints, which is no file here.",
 ];
 
-/**
- * What design, implement and review are told of the look's own parts: where they are, to take one before drawing one, and that the
- * trigger skill says which.
- */
+/** What the trigger skill says of the kit: to load it first, and the command of `ds-spec`'s reader, the workspace's script. */
+const KIT_READER_SAID = [
+  'load it before reading, writing or judging a file there',
+  "From the root, `ds-spec`'s command is `node apps/web/.claude/skills/ds-spec/md3.mjs <command>`, typed whole and alone",
+  "It is the workspace's script in a run too: the copy of `ds-spec` a step is given is read, never run.",
+];
+
+/** What design, implement and review were told of the look's own parts in their notes, which the trigger skill now says. */
 const LOOK_PARTS_TOLD = [
   "a change that draws a cut, a plate, a tile or a rail on the board takes the look's part for it from `apps/web/src/components/look`",
   'through its door, before it draws one of its own: `change-the-board` says which part.',
 ];
+
+/** What the trigger skill says of the look's own parts: to take one before drawing one, and where, through its door. */
+const LOOK_PARTS_SAID = [
+  "**For a cut, a plate, a tile or a rail, take the look's own part** before you draw one",
+  '`apps/web/src/components/look`, taken through its door (`@/components/look`), never from a part\'s own file.',
+];
+
+/** What implement was told of shadcn in its note, which the trigger skill's first two items now say. */
+const SHADCN_LOAD_TOLD = "load `shadcn` for the board's components, and load `change-the-board` before `shadcn`";
+
+/** What the trigger skill says of shadcn: where the shell must be to load it, the load, and the read of a step whose fence refuses both. */
+const SHADCN_SAID = ['**Move your shell into `apps/web` first**', '**Then load `shadcn` with the Skill tool**', SHADCN_READ];
 
 /**
  * What implement is told of the pull request: to open it through the frozen script, read from the run's frozen workflow files (out of
@@ -177,11 +200,18 @@ const OPENS_THE_PULL_REQUEST = [
   "a red, cancelled or missing `ci` comes back as the check's refusal, with the Actions URL, the failing jobs and the tail of their log",
 ];
 
-/** What each step given the `effect` skill is told: when to load it, and why. */
+/** What each step given the `effect` skill was told in its note, which the skill's own description now says. */
 const EFFECT_TOLD =
   'When the change touches a file that imports from `effect`, load the `effect` skill before you read, write or judge it: it says how this repository writes Effect 4, and sends you to the docs installed with Effect first.';
 
-/** What design is told of a contract: when to load the verifier's skill, what its spec names, and the read its fence allows. */
+/** What the `effect` skill's description says of when to load it, and why. */
+const EFFECT_SAID = [
+  'Any change to a file that imports from effect',
+  'load it before reading, writing or judging such a file',
+  'How this repository writes Effect 4: read the docs installed with it first',
+];
+
+/** What `change-a-contract` says to design: when to load the verifier's skill, what its spec names, and the read its fence allows. */
 const DESIGN_LAWS_TOLD = [
   'load the `tsverify` skill, and name in the spec each law the change adds or changes: its name, its sentence, and its condition in words.',
   'The implementer writes them first and sees each fail on the code as it is.',
@@ -189,7 +219,7 @@ const DESIGN_LAWS_TOLD = [
 ];
 
 /**
- * What an implement step is told of a contract, build's and quick's alike: the laws first, an undecided answered, the verdicts said,
+ * What `change-a-contract` says to an implement step, build's and quick's alike: the laws first, an undecided answered, the verdicts said,
  * a test deleted on proof.
  */
 const LAWS_TOLD = [
@@ -205,32 +235,49 @@ const LAWS_TOLD = [
   'Delete a test a law makes redundant only once you have planted the bug it guards, seen the law come back `counterexample`, and put the code back: name in your summary the test, the bug and the law.',
 ];
 
-/** What a review is told of a contract, build's and quick's alike: the skill to judge laws by, CI's verdict, and the findings. */
+/** What `change-a-contract` says to a review, build's and quick's alike: the skill to judge laws by, CI's verdict, and the findings. */
 const REVIEW_LAWS_TOLD = [
   'load the `tsverify` skill to judge its laws.',
   "CI's `contracts` job verified every contract on the commit implement pushed, and its verdict is in the `ci` you read",
+  'you run no verifier, which your fence refuses.',
   'a law loosened or removed with no reason the card or the spec gives',
   "a law that restates the code rather than say the domain's fact",
   'a new behaviour of a function a contract proves held by a new test row where a law could state it',
   'a test deleted where the summary names no bug planted and no law that refused it.',
 ];
 
-/** What an implement step is told of a glossary table: its rows cite paths from the root, and the docs' tests, found by no grep, run. */
+/** Where no spec names the laws, `change-a-contract` says, they are named in the plan: what quick's implement was told of its own run. */
+const LAWS_IN_PLAN_SAID = 'Where no spec names the laws (a run with no design), name each in your plan, with its sentence, before you write it.';
+const LAWS_IN_PLAN_TOLD = 'No spec names the laws in a quick run: name each in your `plan`, with its sentence, before you write it.';
+
+/** What an implement step was told in its note of a glossary table: its rows cite paths from the root, and the docs' tests run. */
 const GLOSSARY_TOLD =
   "When the change edits a context's `glossary.json`, cite each path in its rows from the repository's root (`packages/agent-orchestrator/src/folder/folder.model.ts`, never `src/folder/folder.model.ts`), and run the docs' tests after it, `node --test test/*.test.ts` in `apps/docs`: they read every table by a glob, so grepping the tests for its path does not find them.";
 
-/** What an implement step is told, build's and quick's alike: the base, the board's components, a dashboard, a glossary, a contract. */
+/** What the root `CLAUDE.md` says of a glossary table, beside the rule of the tables: the rows' paths, and the docs' tests, found by no grep. */
+const GLOSSARY_SAID = [
+  "A row cites each path from the repository's root (`packages/agent-orchestrator/src/folder/folder.model.ts`, never `src/folder/folder.model.ts`), and a change to a table runs the docs' tests, `node --test test/*.test.ts` in `apps/docs`: they read every table by a glob, so grepping the tests for its path does not find them.",
+];
+
+/** What an implement step was told in its note of a collector to measure by, which the root `CLAUDE.md` now says. */
+const COLLECTOR_TOLD = [
+  'When a measurement needs a collector, hold a throwaway stack and use its own',
+  "takes the factory's real work alone: a command that names either port is refused to you",
+];
+
+/** What the root `CLAUDE.md` says of a collector, on its `tools/observe/` line: the throwaway, its end, and the live one's ports refused. */
+const COLLECTOR_SAID = [
+  'a probe or a measurement goes to a held throwaway, `node tools/observe/render/render.ts --hold`, at the collector address it prints, and `--stop <name>` ends it',
+  "a step's command that names the live collector's ports, a commit message or a search included, is refused it",
+];
+
+/** What an implement step is told, build's and quick's alike: the base, the pull request and a dashboard. */
 const IMPLEMENT_TOLD = [
   ...MERGES_THE_BASE,
-  EFFECT_TOLD,
-  GLOSSARY_TOLD,
   ...OPENS_THE_PULL_REQUEST,
-  "load `shadcn` for the board's components",
   'When the change touches `tools/observe`',
   '`node tools/observe/render/render.ts --out <your files directory>` starts a throwaway stack from this workspace',
   'the check refuses a changed dashboard whose picture and',
-  ...LOOK_PARTS_TOLD,
-  ...LAWS_TOLD,
 ];
 
 /** What quick's implement is told that build's is not: to plan first, to decide nothing, no size bound, to run its tests, its pages. */
@@ -248,7 +295,6 @@ const QUICK_TOLD = [
   "**Name the pages** the change touches in your closeout's `pages`",
   '**Nothing runs your tests for you.**',
   "Run them yourself before you sign off, as `CLAUDE.md`, *Check your work*, says of a step's session",
-  'No spec names the laws in a quick run: name each in your `plan`, with its sentence, before you write it.',
 ];
 
 /**
@@ -271,13 +317,26 @@ const QUICK_REVIEW_TOLD = [
   'A page or a state the change touches with no picture of it is a finding: nobody else will look at the board before this lands.',
 ];
 
+/** The checks design is told it may run, kept in its note with the fence that allows them. */
+const DESIGN_CHECKS =
+  'The checks you may run here, each bare: `npx turbo run test --force --continue`, `npm run typecheck`, `npm run lint`.';
+
+/** What design and the reviews are told of measuring by the compiler and the linter, kept in their notes with the fence that holds it. */
+const MEASURES_TOLD = [
+  'run the compiler and the linter with any options that write nothing, each bare and one command per call, `--noEmit` first',
+  'Your fence refuses what would write or watch',
+];
+
+/** The skills each step that designs, writes or judges a change adds to its agent's: among them the homes of what it was told. */
+const WORK_SKILLS = ['effect', 'shadcn', 'change-the-board', 'tsverify', 'change-a-contract'];
+
 const TOLD: Told[] = [
   {
     workflow: 'build',
     step: 'design',
     says: [
-      SHADCN_READ,
-      'The checks you may run here, each bare: `npx turbo run test --force --continue`, `npm run typecheck`, `npm run lint`.',
+      DESIGN_CHECKS,
+      ...MEASURES_TOLD,
       'Cut the work by its seams, never by its cost',
       'Propose a second intent only for a seam of logic, where a part cannot be built until another has landed and been used, never to stay under a budget.',
       "propose each step's `budget:` from those figures, not from a guess, and say which you went by.",
@@ -285,12 +344,8 @@ const TOLD: Told[] = [
       NO_LIVE_BOARD,
       NO_FILENAME,
       STOP_BOARD,
-      ...KIT_READER_TOLD,
-      ...LOOK_PARTS_TOLD,
-      EFFECT_TOLD,
-      ...DESIGN_LAWS_TOLD,
     ],
-    adds: ['shadcn', 'look', 'react-aria', 'tsverify'],
+    adds: [...WORK_SKILLS, 'look', 'react-aria'],
     denies: ['Bash(cd:*)', ...NO_BUILD, ...BROWSER_FENCE],
     declares: [],
   },
@@ -298,7 +353,7 @@ const TOLD: Told[] = [
     workflow: 'build',
     step: 'implement',
     says: IMPLEMENT_TOLD,
-    adds: ['shadcn', 'look', 'react-aria', 'see-a-dashboard', 'tsverify'],
+    adds: [...WORK_SKILLS, 'look', 'react-aria', 'see-a-dashboard'],
     denies: [],
     declares: [],
   },
@@ -307,9 +362,8 @@ const TOLD: Told[] = [
     step: 'review',
     says: [
       ...HOLDS_THE_BASE,
-      EFFECT_TOLD,
-      SHADCN_READ,
       ...READS_THE_PULL_REQUEST,
+      ...MEASURES_TOLD,
       ...BUILD_REVIEW_TOLD,
       'Run the typecheck and the lint yourself, each bare and one command per call: `npx turbo run typecheck --force`, `npm run lint`.',
       "Run a package's tests, `npx turbo run test --force --continue --filter=<package>`, only where a finding needs a run to stand on.",
@@ -323,11 +377,8 @@ const TOLD: Told[] = [
       STOP_BOARD,
       "When the change touches `tools/observe`, read each dashboard's picture and text the implement step named in its `artifacts`",
       'You do not render one yourself: your fence refuses the command and Docker.',
-      ...KIT_READER_TOLD,
-      ...LOOK_PARTS_TOLD,
-      ...REVIEW_LAWS_TOLD,
     ],
-    adds: ['shadcn', 'look', 'react-aria', 'see-a-dashboard', 'tsverify'],
+    adds: [...WORK_SKILLS, 'look', 'react-aria', 'see-a-dashboard'],
     denies: ['Bash(cd:*)', ...NO_BUILD, ...WHOLE_SUITE, ...BROWSER_FENCE],
     declares: ['findings', 'again'],
   },
@@ -336,9 +387,8 @@ const TOLD: Told[] = [
     step: 'review',
     says: [
       ...HOLDS_THE_BASE,
-      EFFECT_TOLD,
-      SHADCN_READ,
       ...READS_THE_PULL_REQUEST,
+      ...MEASURES_TOLD,
       'Run the typecheck and the lint yourself, each bare and one command per call: `npx turbo run typecheck --force`, `npm run lint`.',
       "Run a package's tests, `npx turbo run test --force --continue --filter=<package>`, only where a finding needs a run to stand on.",
       'Never build or run the e2e',
@@ -346,11 +396,8 @@ const TOLD: Told[] = [
       NO_LIVE_BOARD,
       NO_FILENAME,
       STOP_BOARD,
-      ...KIT_READER_TOLD,
-      ...LOOK_PARTS_TOLD,
-      ...REVIEW_LAWS_TOLD,
     ],
-    adds: ['shadcn', 'look', 'react-aria', 'see-a-dashboard', 'tsverify'],
+    adds: [...WORK_SKILLS, 'look', 'react-aria', 'see-a-dashboard'],
     denies: ['Bash(cd:*)', ...NO_BUILD, ...WHOLE_SUITE, ...BROWSER_FENCE],
     declares: ['findings', 'again'],
   },
@@ -358,7 +405,7 @@ const TOLD: Told[] = [
     workflow: 'quick',
     step: 'implement',
     says: [...IMPLEMENT_TOLD, ...QUICK_TOLD],
-    adds: ['shadcn', 'look', 'react-aria', 'see-a-dashboard', 'tsverify'],
+    adds: [...WORK_SKILLS, 'look', 'react-aria', 'see-a-dashboard'],
     denies: [],
     declares: ['plan', 'pages'],
   },
@@ -548,7 +595,7 @@ test('REFUSED: a step that denies a command no more is named', () => {
 
 test('REFUSED: a step whose note says a sentence no more is named, whatever line the sentence broke on', () => {
   const design = shippedEdited('build', 'design', (text) => text.replace(/^The checks you may run here.*\n/m, ''));
-  assert.deepEqual(untold('build', design), [`build/design: says "${TOLD[0].says[1]}"`]);
+  assert.deepEqual(untold('build', design), [`build/design: says "${DESIGN_CHECKS}"`]);
   const review = shippedEdited('build', 'review', (text) => text.replace('Never build or run the e2e', 'Build and run the e2e'));
   assert.deepEqual(untold('build', review), ['build/review: says "Never build or run the e2e"']);
   assert.match('Run a\n   check   bare.', across('Run a check bare.'));
@@ -780,29 +827,112 @@ test("REFUSED: quick's implement told no more what build's is told, or what make
   assert.deepEqual(new Set(declared.required), new Set(['plan', 'pages']), 'each is required of the closeout');
 });
 
-test("REFUSED: design or review told no more to load change-the-board first, or where ds-spec's reader runs from, is named", () => {
-  for (const step of ['design', 'review'])
-    for (const sentence of KIT_READER_TOLD)
-      assert.deepEqual(
-        untold(
-          'build',
-          shippedEdited('build', step, (text) => text.replace(across(sentence), '')),
+/** The steps that design, write or judge a change, each given the skills `HOMES` names, as `<workflow>/<step>`. */
+const WORK_STEPS = ['build/design', 'build/implement', 'build/review', 'quick/implement', 'quick/review'];
+
+/**
+ * A home of what the steps were told of this repository: its file from the repository's root, the skill it is when it is one, the
+ * sentences it says (`says`), what the steps' notes said of it before it moved (`was`), and the steps given it, by `<workflow>/<step>`.
+ * The root `CLAUDE.md` is given to none: every session reads it.
+ */
+type Home = { file: string; skill?: string; says: readonly string[]; was: readonly string[]; steps: readonly string[] };
+
+const HOMES: readonly Home[] = [
+  { file: '.claude/skills/effect/SKILL.md', skill: 'effect', says: EFFECT_SAID, was: [EFFECT_TOLD], steps: WORK_STEPS },
+  {
+    file: TRIGGER,
+    skill: 'change-the-board',
+    says: [...SHADCN_SAID, ...KIT_READER_SAID, ...LOOK_PARTS_SAID],
+    was: [SHADCN_READ, SHADCN_LOAD_TOLD, ...KIT_READER_TOLD, ...LOOK_PARTS_TOLD],
+    steps: WORK_STEPS,
+  },
+  {
+    file: '.claude/skills/change-a-contract/SKILL.md',
+    skill: 'change-a-contract',
+    says: [...DESIGN_LAWS_TOLD, ...LAWS_TOLD, LAWS_IN_PLAN_SAID, ...REVIEW_LAWS_TOLD],
+    was: [LAWS_IN_PLAN_TOLD],
+    steps: WORK_STEPS,
+  },
+  { file: 'CLAUDE.md', says: [...GLOSSARY_SAID, ...COLLECTOR_SAID], was: [GLOSSARY_TOLD, ...COLLECTOR_TOLD], steps: [] },
+];
+
+/** The workflows of this repository's team whose steps `HOMES` reads. */
+const TEAM_WORKFLOWS = ['build', 'quick', 'intake', 'janitor'];
+
+/** The shipped steps of each workflow of `TEAM_WORKFLOWS`, as a start in this checkout reads them. */
+const teamSteps = (): Record<string, Step[]> =>
+  Object.fromEntries(TEAM_WORKFLOWS.map((workflow) => [workflow, loadWorkflows(path.join(HOLDER, workflow), { repo: REPO })]));
+
+/** A file of the checkout, by its path from the repository's root. */
+const checkoutText = (file: string): string => fs.readFileSync(path.join(REPO, file), 'utf8');
+
+/**
+ * What `HOMES` does not hold, a line each: `<file>: says "<sentence>"` for a sentence its home says no more, `<workflow>/<step>: skill
+ * <name>` for a step not given a home that is a skill, and `<workflow>/<step>: says again "<sentence>"` for a step of `steps` whose
+ * note still says what moved to a home, in its home's words or in its own old ones. `read` reads a home's file.
+ */
+function unhomed(steps: Readonly<Record<string, readonly Step[]>>, read: (file: string) => string = checkoutText): string[] {
+  return HOMES.flatMap((home) => {
+    const text = read(home.file);
+    const ungiven = (at: string): boolean => {
+      const [workflow, name] = at.split('/');
+      const step = steps[workflow]?.find((s) => s.name === name);
+      return home.skill !== undefined && !(step?.agent?.addedSkills ?? []).includes(home.skill);
+    };
+    const moved = [...new Set([...home.says, ...home.was])];
+    return [
+      ...home.says.filter((sentence) => !across(sentence).test(text)).map((sentence) => `${home.file}: says "${sentence}"`),
+      ...home.steps.filter(ungiven).map((at) => `${at}: skill ${home.skill}`),
+      ...Object.entries(steps).flatMap(([workflow, list]) =>
+        list.flatMap((step) =>
+          moved.filter((sentence) => across(sentence).test(step.body)).map((sentence) => `${workflow}/${step.name}: says again "${sentence}"`),
         ),
-        [`build/${step}: says "${sentence}"`],
-      );
+      ),
+    ];
+  });
+}
+
+test('each block a step was told of this repository is said by its home, the step is given the home, and no step says it again', () => {
+  assert.deepEqual(unhomed(teamSteps()), []);
 });
 
-test("REFUSED: design, implement or review told of the look's parts no more is named", () => {
-  for (const step of ['design', 'implement', 'review'])
-    for (const sentence of LOOK_PARTS_TOLD)
-      assert.deepEqual(
-        untold(
-          'build',
-          shippedEdited('build', step, (text) => text.replace(across(sentence), '')),
-        ),
-        [`build/${step}: says "${sentence}"`],
-      );
-  assert.match(fs.readFileSync(path.join(REPO, TRIGGER), 'utf8'), /`apps\/web\/src\/components\/look`,\s+taken\s+through\s+its\s+door/);
+test('REFUSED: a home that says one of its sentences no more is named, the trigger skill’s kit reader and look parts among them', () => {
+  for (const home of HOMES)
+    for (const sentence of home.says) {
+      const cut = (file: string): string => {
+        const text = checkoutText(file);
+        if (file !== home.file) return text;
+        const changed = text.replace(across(sentence), '');
+        assert.notEqual(changed, text, `${file} says "${sentence}"`);
+        return changed;
+      };
+      assert.deepEqual(unhomed(teamSteps(), cut), [`${home.file}: says "${sentence}"`], sentence);
+    }
+});
+
+test('REFUSED: a step whose note says again what moved to a home is named, in the home’s words or in its own old ones', () => {
+  const planted = (workflow: string, step: string, sentence: string): string[] =>
+    unhomed({ ...teamSteps(), [workflow]: shippedEdited(workflow, step, (text) => `${text}\n${sentence}\n`) });
+  for (const [workflow, step, sentence] of [
+    ['build', 'design', EFFECT_TOLD],
+    ['build', 'review', KIT_READER_TOLD[1]],
+    ['quick', 'review', SHADCN_READ],
+    ['build', 'implement', LAWS_TOLD[0]],
+    ['quick', 'implement', GLOSSARY_TOLD],
+    ['janitor', 'argus', COLLECTOR_TOLD[0]],
+  ])
+    assert.deepEqual(planted(workflow, step, sentence), [`${workflow}/${step}: says again "${sentence}"`], sentence);
+});
+
+test('REFUSED: a work step whose `skills:` line gives a home no more is named', () => {
+  for (const [workflow, step, skill] of [
+    ['build', 'review', 'change-a-contract'],
+    ['quick', 'implement', 'change-the-board'],
+    ['build', 'design', 'effect'],
+  ]) {
+    const dropped = shippedEdited(workflow, step, (text) => text.replace(new RegExp(`^(skills: .*)\\b${skill}, `, 'm'), '$1'));
+    assert.deepEqual(unhomed({ ...teamSteps(), [workflow]: dropped }), [`${workflow}/${step}: skill ${skill}`], `${workflow}/${step}`);
+  }
 });
 
 test("the shipped review declares no closeout of its own: Agora's schema gives `findings` and `again`, each field with one owner", () => {

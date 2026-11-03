@@ -95,7 +95,10 @@ function LabelPage() {
             The inbox filtered by {selector}
           </TextLink>
         </Section>
-        <Section name="runs" plate={<Plate count={runs.length} title="Runs" hue="alive" quiet={runs.length === 0} />}>
+        <Section
+          name="runs"
+          plate={<Plate count={runs.length} title={runs.length === 1 ? 'Run' : 'Runs'} hue="alive" quiet={runs.length === 0} />}
+        >
           <div data-buckets className="flex flex-wrap gap-3">
             {BUCKETS.map(({ bucket, hue }) => (
               <span key={bucket} data-bucket={bucket}>

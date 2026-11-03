@@ -225,11 +225,11 @@ test("every package's test script records what its tests cost", () => {
   assert.deepEqual(refused, []);
 });
 
-/** Every file the tsconfigs named by a `typecheck` script (`tsc --noEmit`, `tsc --noEmit -p <dir or file>`, joined by `&&`) check. */
+/** Every file the tsconfigs named by a `typecheck` script (`tsrs --noEmit`, `tsrs --noEmit -p <dir or file>`, joined by `&&`) check. */
 function typecheckedBy(dir: string, script: string): string[] {
   return script.split('&&').flatMap((command) => {
     const words = command.trim().split(/\s+/);
-    if (words[0] !== 'tsc') return [];
+    if (words[0] !== 'tsrs') return [];
     const project = words.includes('-p') ? words[words.indexOf('-p') + 1] : '.';
     const file = project.endsWith('.json') ? path.join(dir, project) : path.join(dir, project, 'tsconfig.json');
     const read = ts.readConfigFile(file, (f) => ts.sys.readFile(f));

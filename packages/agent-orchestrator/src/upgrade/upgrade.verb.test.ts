@@ -1,9 +1,9 @@
 /**
  * A templated factory's upgrade, on disk, beyond the story of a conflict (`test/upgrade-conflict.test.ts`: the plan, the wait, the
  * choices, the merge, a pass stopped between its writes, a run in flight and the swap only where untouched): what `nemia factory
- * upgrade` refuses with nothing written; an upgrade with no conflict, up or down; the factory's rules, `RULES.md`, carried as any file of
- * the tree is; choices made for another version; a status lost; and a swap whose rename fails. `WF_ROOT` is set before the import,
- * since the store's modules read it as they load.
+ * upgrade` refuses with nothing written; an upgrade with no conflict, up or down; a step's own closeout schema; the factory's rules,
+ * `RULES.md`, carried as any file of the tree is; choices made for another version; a status lost; and a swap whose rename fails.
+ * `WF_ROOT` is set before the import, since the store's modules read it as they load.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -12,7 +12,7 @@ import path from 'node:path';
 import { parse, stringify } from 'yaml';
 import { scratch } from '../../test/scratch.ts';
 import { testEngine } from 'agent-runtime/testing';
-import { teamCopy } from '../../test/team.ts';
+import { STEP_OUTPUT_SCHEMA, teamCopy } from '../../test/team.ts';
 import { testPlace } from '../../place/memory/index.ts';
 import { eachTest, runOver } from '../../test/placed.ts';
 import { heldUnasked } from '../../test/unasked.ts';
@@ -207,6 +207,29 @@ test('an upgrade with no conflict, up or down: filed alone, then merged by the c
       );
     },
   );
+});
+
+test("a step's own closeout schema carried by an upgrade: its line merged into a step the person changed, its file beside it", async (t) => {
+  t.mock.method(console, 'log', () => {});
+  const { dir } = await applied('schemed');
+  const IMPLEMENT = 'workflows/dev/implement.md';
+  const SCHEMA = 'workflows/dev/implement.schema.json';
+  assert.doesNotMatch(textIn(treeDir('schemed'), IMPLEMENT), /^output:/m, 'the template at 0.1.0 names no schema of the step');
+  fs.appendFileSync(path.join(treeDir('schemed'), IMPLEMENT), '\nKeep the commits small.\n');
+  released(dir, '0.2.0', 5);
+  edit(dir, 'workflows/dev/workflow.yaml', (spec) => {
+    spec.steps[0].output = { path: SCHEMA };
+  });
+  fs.writeFileSync(path.join(dir, SCHEMA), STEP_OUTPUT_SCHEMA);
+  await main(['factory', 'upgrade', 'schemed', '--to', '0.2.0'], noEngine());
+  const status = reconciled(templated('schemed'));
+  assert.equal(status.version, '0.2.0');
+  assert.equal(status.upgrade, undefined, 'no conflict');
+  const step = textIn(treeDir('schemed'), IMPLEMENT);
+  assert.match(step, /^output: implement\.schema\.json$/m, "the template's line");
+  assert.match(step, /^Keep the commits small\.$/m, "the person's words");
+  assert.equal(textIn(treeDir('schemed'), SCHEMA), STEP_OUTPUT_SCHEMA);
+  assert.equal(textIn(appliedDir('schemed'), SCHEMA), STEP_OUTPUT_SCHEMA);
 });
 
 test("a factory's rules carried by an upgrade: taken where the tree has none, a conflict where both added them, merged by line", async (t) => {

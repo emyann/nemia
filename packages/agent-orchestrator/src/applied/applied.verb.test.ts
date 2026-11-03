@@ -126,7 +126,7 @@ test('what apply and a start of a templated factory refuse, by kind and exit 2, 
     },
   );
   await t.test(
-    "REFUSED: apply of a template whose step declares an `output:` of its own: a templated step's output is its agent's alone",
+    "REFUSED: apply of a template whose step names its own `output:` as a bare file, not the {path:} from the template's root it takes",
     async () => {
       const { dir, repo } = template();
       edit(dir, 'workflows/dev/workflow.yaml', (spec) => {
@@ -139,7 +139,7 @@ test('what apply and a start of a templated factory refuse, by kind and exit 2, 
       const before = filed();
       await assert.rejects(
         apply('owned', dir, repo, '--set', 'budget=3'),
-        refusedWith('Invalid', /spec\.steps\[2\]\.output is no key of spec\.steps\[2\]/),
+        refusedWith('Invalid', /spec\.steps\[2\]\.output is a map of keys/),
       );
       assert.deepEqual(filed(), before);
     },

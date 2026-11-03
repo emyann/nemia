@@ -25,7 +25,7 @@
     },
     {
       "term": "--show-labels",
-      "meaning": "every label of each run or card listed, `  labels: a=b,c=d` at the end of its head line, `<none>` where it has none: the run's whole map (the person's keys, `workflow`, and `factory` where named), the card's labels with its `workflow:` and `factory:`."
+      "meaning": "every label of each run or card listed, `  labels: a=b,c=d` at the end of its head line, `<none>` where it has none: the run's whole map (the person's keys, `workflow`, and `factory`, `default` for the default factory), the card's labels with its `workflow:` and `factory:`."
     },
     {
       "term": "-L",

@@ -123,7 +123,10 @@ test('REFUSED: a byte of a step changed under the version recorded', () => {
 });
 
 test('REFUSED: a version bumped and not recorded', () => {
-  const root = workspaceWith({ 'sdlc/nemia.yaml': (text) => text.replace(/^ {2}version: 1\.0\.0$/m, '  version: 1.0.1') });
+  const root = workspaceWith({
+    'sdlc/nemia.yaml': (text) =>
+      text.replace(/^ {2}version: (\d+)\.(\d+)\.(\d+)$/m, (_, major, minor, patch) => `  version: ${major}.${minor}.${Number(patch) + 1}`),
+  });
   assert.deepEqual(kinds(root), ['sdlc: unrecorded']);
 });
 

@@ -10,6 +10,7 @@
  * it to an OpenAPI 3.1 document that imports back into a Schema decoding the same object.
  */
 import { JsonSchema, Schema, SchemaRepresentation } from 'effect';
+import { LabelEdit, Labelled } from '../labels/labels.model.ts';
 import { ANSWER_VIA, RUN_PHASES, RUN_REASONS, STEP_PHASES, STEP_REASONS, WAIT_ON } from '../phase/phase.ts';
 import { CHECK_RESULTS } from '../check/check.ts';
 import { PLACE_KINDS, type StepStatus } from '../record/record.ts';
@@ -97,13 +98,13 @@ const StepPhase = Schema.Literals(STEP_PHASES);
 const StepReason = Schema.Literals(STEP_REASONS);
 
 /**
- * The run's name, when it was made, and the labels it is found by: the factory it was started in (null for the default) and its
- * workflow.
+ * The run's name, when it was made, and the labels it is found by, one map (`metadataLabels`): its `workflow`, the `factory` it was
+ * started in where it is not the default, and a person's labels on it (`nemia label run`), as `-l` selects them.
  */
 export const RunMetadata = Schema.Struct({
   name: Schema.String,
   creationTimestamp: Schema.String,
-  labels: Schema.Struct({ factory: NullString, workflow: Schema.String }),
+  labels: Schema.Record(Schema.String, Schema.String),
 }).annotate({ identifier: 'RunMetadata' });
 export type RunMetadata = typeof RunMetadata.Type;
 
@@ -632,10 +633,19 @@ export type StepTold = typeof StepTold.Type;
 
 /**
  * The run object and its sub-resources' answers as an OpenAPI 3.1 multi-document: its roots references to `Run`, `StepTries`, `StepTry`,
- * `TryCloseout` and `StepTold`, and each struct named above a component of its own (`#/components/schemas/<name>`), every object closed
- * (`onExcessProperty: 'error'`), so a client generated from it reads structs and no index of extra keys. Pure.
+ * `TryCloseout` and `StepTold`, then a label edit's answer and body (`Labelled`, `LabelEdit`), and each struct named above a component
+ * of its own (`#/components/schemas/<name>`), every object closed (`onExcessProperty: 'error'`), so a client generated from it reads
+ * structs and no index of extra keys but a label map's. Pure.
  */
 export function runDocument(): JsonSchema.MultiDocument<'openapi-3.1'> {
-  const roots = SchemaRepresentation.toRepresentations([Run.ast, StepTries.ast, StepTry.ast, TryCloseout.ast, StepTold.ast]);
+  const roots = SchemaRepresentation.toRepresentations([
+    Run.ast,
+    StepTries.ast,
+    StepTry.ast,
+    TryCloseout.ast,
+    StepTold.ast,
+    Labelled.ast,
+    LabelEdit.ast,
+  ]);
   return JsonSchema.toMultiDocumentOpenApi3_1(SchemaRepresentation.toJsonSchemaMultiDocument(roots, { onExcessProperty: 'error' }));
 }

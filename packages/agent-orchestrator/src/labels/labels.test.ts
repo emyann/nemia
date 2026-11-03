@@ -83,16 +83,16 @@ test('parseLabelEdits: key=value sets, key- removes, and anything else, or one k
 test('labelEdits: the map after the edits, every key no edit names kept', async (t) => {
   const current = { team: 'core', tier: 'one', constructor: 'c' };
   const cases: ReadonlyArray<{ law: string; edits: readonly LabelEdit[]; overwrite: boolean; labels: Record<string, string> }> = [
-    { law: 'setHolds: a new key is set', edits: edits('owner=ada'), overwrite: false, labels: { ...current, owner: 'ada' } },
+    { law: 'setHolds: a new key is set', edits: edits('owner=kim'), overwrite: false, labels: { ...current, owner: 'kim' } },
     { law: 'setHolds: the same value is no change', edits: edits('team=core'), overwrite: false, labels: current },
     { law: 'setHolds: --overwrite changes a value', edits: edits('team=web'), overwrite: true, labels: { ...current, team: 'web' } },
     { law: 'removedIsGone: a key- removes it', edits: edits('tier-'), overwrite: false, labels: { team: 'core', constructor: 'c' } },
     { law: 'removedIsGone: a key- of an absent key is no change', edits: edits('owner-'), overwrite: false, labels: current },
     {
       law: 'untouchedKept: only the keys the edits name change',
-      edits: edits('owner=ada', 'tier-'),
+      edits: edits('owner=kim', 'tier-'),
       overwrite: false,
-      labels: { team: 'core', constructor: 'c', owner: 'ada' },
+      labels: { team: 'core', constructor: 'c', owner: 'kim' },
     },
   ];
   for (const c of cases) await t.test(c.law, () => assert.deepEqual(labelEdits(current, c.edits, c.overwrite), { labels: c.labels }));
@@ -114,10 +114,10 @@ test('labelEdits: the map after the edits, every key no edit names kept', async 
 test('inheritedLabels: what a start copies, once — the runs it names, the card over them, the typed edits over those', async (t) => {
   const parents: readonly ParentLabels[] = [
     { run: 'r-1', labels: { team: 'core', tier: 'one', area: 'web' } },
-    { run: 'r-2', labels: { team: 'core', tier: 'two', owner: 'ada' } },
+    { run: 'r-2', labels: { team: 'core', tier: 'two', owner: 'kim' } },
   ];
   await t.test('agreedInherited: a key every run carrying it gives one value has that value', () =>
-    assert.deepEqual(inheritedLabels({ parents }).labels, { team: 'core', area: 'web', owner: 'ada' }),
+    assert.deepEqual(inheritedLabels({ parents }).labels, { team: 'core', area: 'web', owner: 'kim' }),
   );
   await t.test('disagreedLeftOut: a key two runs give different values is absent, and named with each run and its value', () => {
     const out = inheritedLabels({ parents });
@@ -151,12 +151,12 @@ test('inheritedLabels: what a start copies, once — the runs it names, the card
   });
   await t.test('typedWins: a key typed key=value at the start has that value, over the card and the runs', () => {
     const out = inheritedLabels({ parents, card: { team: 'web' }, edits: edits('team=cli', 'tier=four', 'new=yes') });
-    assert.deepEqual(out.labels, { team: 'cli', tier: 'four', area: 'web', owner: 'ada', new: 'yes' });
+    assert.deepEqual(out.labels, { team: 'cli', tier: 'four', area: 'web', owner: 'kim', new: 'yes' });
     assert.deepEqual(out.leftOut, []);
   });
   await t.test('droppedAtStart: a key typed key- is absent, whatever the card or the runs say', () => {
     const out = inheritedLabels({ parents, card: { area: 'cli' }, edits: edits('area-', 'tier-', 'team-') });
-    assert.deepEqual(out.labels, { owner: 'ada' });
+    assert.deepEqual(out.labels, { owner: 'kim' });
     assert.deepEqual(out.leftOut, [], 'a key dropped at the start is no disagreement to report');
   });
   await t.test("a key Object's prototype names is inherited like any other, and a card's own keys alone are the card's", () => {

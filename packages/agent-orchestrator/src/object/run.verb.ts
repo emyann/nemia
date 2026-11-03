@@ -33,6 +33,7 @@ import { bare, type Filings, tryOf } from '../summary/reads.verb.ts';
 import { atHarness, needsOf, spentOf, stepSaid } from '../summary/judged.verb.ts';
 import { judgedFields } from '../summary/summary.verb.ts';
 import { runLabels } from '../telemetry/telemetry.ts';
+import { metadataLabels } from '../labels/labels.ts';
 import { runStartedAt, type Timeline, type TimelineTotal } from '../timeline/index.ts';
 import { consumption } from '../views/views.verb.ts';
 import type { Drift } from '../revisions/revisions.ts';
@@ -278,7 +279,8 @@ const restOf = (run: Run, at: RunReading, kinds: readonly Drift[]) => {
 };
 
 /**
- * The run as one object, `nemia/v1`'s `Run`: its name, when it was made and its labels (`runLabels`, the feed's); the record it was started
+ * The run as one object, `nemia/v1`'s `Run`: its name, when it was made and its whole map of labels (`metadataLabels`: its `workflow`,
+ * its `factory` but the default, and a person's labels); the record it was started
  * with (`spec`); and what the package judges of it now (`status`) — the runs list's judged fields (`judgedFields`), the graph with its
  * `input` edges (`runInputGraph`), its time as a whole and each step, and the rest the board shows (`restOf`). Off one read of the run
  * (`runReading`) — never a sub-resource's verb per step, each of which reads the run again — or, when its unfrozen folder does not load
@@ -296,7 +298,11 @@ export const runObject = Effect.fn('runObject')(function* (run: Run, { memo, inR
   const object: RunObject = {
     apiVersion: 'nemia/v1',
     kind: 'Run',
-    metadata: { name: run.id, creationTimestamp: run.createdAt, labels: { factory, workflow } },
+    metadata: {
+      name: run.id,
+      creationTimestamp: run.createdAt,
+      labels: metadataLabels({ workflow, factory: factory ?? undefined, ...(run.labels !== undefined ? { labels: run.labels } : {}) }),
+    },
     spec: specOf(run, at),
     status: {
       ...judgedFields(run, at.judged, at.views),

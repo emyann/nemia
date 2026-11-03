@@ -12,7 +12,7 @@ import { runId } from '../record/record.store.ts';
 /** The card the tests' inbox files most: every key set, the repository a directory. */
 const CARD = parseInboxCard(
   'cache-the-views-k2q9.md',
-  '---\nworkflow: dev\nrepo: /home/me/code/app\nqueued: 2026-09-16T10:00:00.000Z\ngate: plan\nfactory: pipao\nfrom: a-k2q9, b-3z4w\n---\nCache the views.\n',
+  '---\nworkflow: dev\nrepo: /home/me/code/app\nqueued: 2026-09-16T10:00:00.000Z\ngate: plan\nfactory: pipao\nfrom: a-k2q9, b-3z4w\nlabels: { team: core }\n---\nCache the views.\n',
   () => true,
 );
 

@@ -172,11 +172,9 @@ What the `create-an-agent` skill (`packages/agent-orchestrator/skills/create-an-
 - `packages/agent-orchestrator/docs/features.md` — what is still to build, in order.
 - `packages/agent-runtime/docs/open-issues.md` — what is still wrong or half-verified.
 - `.claude/skills/` — the repository's skills. Ours: `look`, `see-a-dashboard` (a dashboard of the side Grafana, rendered and read),
-  `effect` (how we write Effect 4) and `change-the-board` (the trigger of shadcn and of the
-  kit's skills, and the board's own traps, for a change under apps/web). Vendored unchanged, pinned in `skills-lock.json`
-  `effect` (how we write Effect 4), `create-an-agent` (how an agent is made here), `change-a-contract` (what a contract asks of a design,
-  an implement and a review) and `change-the-board` (the trigger of shadcn and of the kit's skills, and the board's own traps, for a
-  change under apps/web). Vendored unchanged, pinned in `skills-lock.json`
+  `effect` (how we write Effect 4), `change-a-contract` (what a contract asks of a design, an implement and a review) and
+  `change-the-board` (the trigger of shadcn and of the kit's skills, and the board's own traps, for a change under apps/web). Vendored
+  unchanged, pinned in `skills-lock.json`
   and credited in `THIRD_PARTY_NOTICES.md`: `shadcn` (it is loaded, and its CLI runs, from `apps/web`, where `components.json` is:
   loaded from the root it refuses with `monorepo_root`), and `react-aria` (Adobe's
   documentation of React Aria, for the board's own parts: taken from the root by `npx skills add https://react-aria.adobe.com -a

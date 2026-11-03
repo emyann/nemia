@@ -79,7 +79,10 @@ export type AgentSpec = {
 /** What a step changes of the agent it hires: its harness, skills and MCP servers added, and one block per harness (`Profile`). */
 export type Overrides = { harness?: string; skills?: readonly string[]; mcp?: readonly string[] } & { readonly [harness: string]: unknown };
 
-/** A step of a workflow, in order: its wiring, what it reads of the store, what is tallied of its closeout, and its overrides. */
+/**
+ * A step of a workflow, in order: its wiring, what it reads of the store, its own closeout schema, what is tallied of its closeout, and its
+ * overrides.
+ */
 export type Step = {
   name: string;
   instruction?: Text;
@@ -95,6 +98,8 @@ export type Step = {
   retries?: number;
   deadlineSeconds?: number;
   reads?: readonly string[];
+  /** The step's own closeout schema, a file of its workflow's folder, by its path from the template's root. */
+  output?: { path: string };
   tally?: readonly string[];
   overrides?: Overrides;
 };
@@ -246,6 +251,7 @@ const STEP: Shape = {
     retries: 'number',
     deadlineSeconds: 'number',
     reads: 'strings',
+    output: { fields: { path: 'string' }, required: ['path'] },
     tally: 'strings',
     overrides: OVERRIDES,
   },

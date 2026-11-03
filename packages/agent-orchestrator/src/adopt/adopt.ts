@@ -204,7 +204,7 @@ export function adoptLines(plan: AdoptPlan, digest: string, adopt: string): stri
     ...stranded.schedules.map(
       (w) => `stranded: the schedule of ${w}, which the template does not offer — nemia factory unschedule ${factory} ${w}`,
     ),
-    blocked ? 'adopt refuses this takeover until nothing is stranded.' : `plan: ${digest}`,
-    ...(blocked ? [] : [`to take it over: ${adopt}`]),
+    `plan: ${digest}`,
+    blocked ? 'nemia factory adopt refuses this takeover until nothing is stranded.' : `to take it over: ${adopt}`,
   ];
 }

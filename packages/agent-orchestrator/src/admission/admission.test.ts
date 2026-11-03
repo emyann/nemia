@@ -81,6 +81,7 @@ test('`admissionOf` with no floor and no rules: what answers the person is asked
     'nemia show r && nemia policy confirm nemia tries',
     'nemia factory apply made --template /t --repo /r',
     'nemia factory upgrade made --to 0.2.0',
+    'nemia factory adopt made --template /t --plan sha256:0a1b',
     "nemia factory resolve made 'workflows/dev/review.md#rounds' --theirs",
   ])
     await t.test(`REFUSED: asked every time, with no list: ${line}`, () => {
@@ -202,23 +203,28 @@ test('`admissionOf` under her floor and at auto: below the floor denied, unread 
     assert.equal(decidedAt('nemia retry r gate --budget 5', atAuto([DEFAULT_AUTO, TRIES])), 'ask');
     assert.equal(decidedAt('nemia retry r gate --budget=5', atAuto([DEFAULT_AUTO, TRIES])), 'ask');
   });
-  await t.test("REFUSED at auto: a confirm or a drop of a rule, and a factory's apply, upgrade and resolve, are asked every time", () => {
-    for (const line of [
-      'nemia policy confirm nemia tries',
-      "nemia policy confirm nemia tries --words 'Try again the step implement unasked when its check passed and the run has cost under $20.'",
-      'nemia policy confirm nemia tries --words "Try again the step implement unasked."',
-      'nemia policy rm nemia default',
-      'nemia show r && nemia policy confirm nemia tries',
-      'nemia auto drop nemia default',
-      'nemia factory apply made --template /t --repo /r',
-      'nemia factory upgrade made --to 0.2.0',
-      "nemia factory resolve made 'workflows/dev/review.md#rounds' --theirs",
-    ])
-      assert.equal(decidedAt(line, atAuto([DEFAULT_AUTO, TRIES])), 'ask', line);
-  });
+  await t.test(
+    "REFUSED at auto: a confirm or a drop of a rule, and a factory's apply, adopt, upgrade and resolve, are asked every time",
+    () => {
+      for (const line of [
+        'nemia policy confirm nemia tries',
+        "nemia policy confirm nemia tries --words 'Try again the step implement unasked when its check passed and the run has cost under $20.'",
+        'nemia policy confirm nemia tries --words "Try again the step implement unasked."',
+        'nemia policy rm nemia default',
+        'nemia show r && nemia policy confirm nemia tries',
+        'nemia auto drop nemia default',
+        'nemia factory apply made --template /t --repo /r',
+        'nemia factory upgrade made --to 0.2.0',
+        'nemia factory adopt made --template /t --plan sha256:0a1b',
+        "nemia factory resolve made 'workflows/dev/review.md#rounds' --theirs",
+      ])
+        assert.equal(decidedAt(line, atAuto([DEFAULT_AUTO, TRIES])), 'ask', line);
+    },
+  );
   await t.test("the rules' read and a factory's plan are no ask, at auto", () => {
     assert.equal(decidedAt('nemia policy nemia', atAuto([DEFAULT_AUTO])), undefined, 'the read is no ask');
     assert.equal(decidedAt('nemia factory diff made --to 0.2.0', atAuto([DEFAULT_AUTO])), undefined, 'the plan is no ask');
+    assert.equal(decidedAt('nemia factory diff made --template /t', atAuto([DEFAULT_AUTO])), undefined, "a takeover's plan is no ask");
   });
 });
 

@@ -1,0 +1,207 @@
+/**
+ * A hand-made factory taken over in place by a template, as the command line asks it: `nemia factory diff <name> --template …` previews
+ * the takeover and writes nothing (`adoptPreview`, run by `FACTORY_PLAN` on a factory made from no template), printing the plan's digest;
+ * `nemia factory adopt <name> --template … --plan <digest>` writes it (`FACTORY_ADOPT`), refused where the digest is not the plan's now.
+ * The takeover stages the render as the factory's base and tree, then gives its file the template: its name, repositories, schedules,
+ * instruction, cards, runs and stats stay, and a run in flight keeps the workflow frozen on its record. The daemon writes its status on its
+ * next pass. Judged by `adopt.ts`, read and staged by `adopt.store.ts`.
+ */
+import path from 'node:path';
+import { Effect } from 'effect';
+import { tried } from '../runtime-client.ts';
+import { leftOut, type Args, type Spec } from '../command/command.ts';
+import type { Command } from '../command/entry.verb.ts';
+import { Conflict, Invalid } from '../refusal/refusal.ts';
+import { refuseName } from '../factory/factory.store.ts';
+import { FactoryName } from '../factory/factory.model.ts';
+import { FactoryDoor } from '../factories/factories.store.ts';
+import { rooted } from '../wiring/wire.verb.ts';
+import { StoreRoot } from '../config/root.store.ts';
+import type { Factory, FactoryTemplate } from '../factory/factory.ts';
+import { renderedAt } from '../applied/applied.verb.ts';
+import { treeDirAt } from '../applied/applied.store.ts';
+import { adopted, adoptPlan, adoptRefusal, templatedAdoptRefusal, type AdoptPlan } from './adopt.ts';
+import { adoptionAt, planDigest, stageAdoption } from './adopt.store.ts';
+
+const HERE = { side: 'cli', why: 'a template is a folder on the machine nemia runs on; the board takes over no factory' } as const;
+
+/** The words under `key`, or none. */
+const textOf = (args: Args, key: string): string | undefined => {
+  const value = args[key];
+  return typeof value === 'string' ? value : undefined;
+};
+
+/** The words given under the flag `key` that takes many, in order. */
+const manyOf = (args: Args, key: string): string[] => {
+  const value = args[key];
+  return Array.isArray(value) ? value.map(String) : [];
+};
+
+/** A command line's word, quoted for a shell where it holds anything but plain characters. */
+const shellWord = (word: string): string => (/^[\w./:=@+-]+$/.test(word) ? word : `'${word.replaceAll("'", "'\\''")}'`);
+
+/** The line that takes `name` over by the template at `source` with `sets`, carrying the plan's `digest`. */
+const adoptLine = (name: string, source: string, sets: readonly string[], digest: string): string =>
+  `nemia factory adopt ${[name, '--template', source, ...sets.flatMap((s) => ['--set', s]), '--plan', digest].map(shellWord).join(' ')}`;
+
+/** The line that previews the takeover of `name` by the template at `source` with `sets`. */
+export const diffLine = (name: string, source: string, sets: readonly string[]): string =>
+  `nemia factory diff ${[name, '--template', source, ...sets.flatMap((s) => ['--set', s])].map(shellWord).join(' ')}`;
+
+/** What a takeover is asked of: the factory as it is, the template's source and `--set` words, and its render. */
+type Asked = {
+  factory: Factory;
+  source: string;
+  sets: string[];
+  render: Extract<Effect.Success<ReturnType<typeof renderedAt>>, { entries: unknown }>;
+};
+
+/**
+ * The takeover `args` ask, as `verb` reads it, refused in order before anything is written: the name (`refuseName`, the default
+ * factory a `Conflict`); no `--template` (`Invalid`); the factory (`Missing`, naming those there are); one made from a template already
+ * (`Conflict`, naming the upgrade); and a template that does not render with the `--set` words given (`Invalid`, every problem).
+ */
+const takeoverAsked = Effect.fn('takeoverAsked')(function* (args: Args, verb: string, notDone: string) {
+  const name = textOf(args, 'factory') ?? '';
+  yield* tried(() => refuseName(name, 'adopt'));
+  const given = textOf(args, 'template');
+  if (given === undefined)
+    return yield* Effect.fail(
+      new Invalid({
+        message: `${verb}: ${name} is made from no template, so name the template to take it over with: ${verb} ${name} --template <folder|archive> [--set <key>=<value> ...]. ${notDone}`,
+      }),
+    );
+  const factory = yield* (yield* FactoryDoor).factories.read(FactoryName.read(name));
+  if (factory.template !== undefined)
+    return yield* Effect.fail(new Conflict({ message: `${verb}: ${templatedAdoptRefusal(name)} ${notDone}` }));
+  const source = path.resolve(given);
+  const sets = manyOf(args, 'sets');
+  const render = yield* renderedAt(source, sets);
+  if ('problems' in render)
+    return yield* Effect.fail(
+      new Invalid({
+        message: `${verb}: ${source} cannot take ${name} over, with ${render.problems.length} problem${render.problems.length === 1 ? '' : 's'}:\n${render.problems.join('\n')}\n${notDone}`,
+      }),
+    );
+  return { factory, source, sets, render } satisfies Asked;
+});
+
+/** What `nemia factory diff` previews of a hand-made factory: the plan, its digest, and the line that takes it over. */
+export type AdoptPreview = { kind: 'adopt'; plan: AdoptPlan; digest: string; line: string };
+
+/**
+ * `nemia factory diff <name> --template <folder|archive> [--set …] [--to <x.y.z>]` on a factory made from no template: what taking it
+ * over would change (`adoptPlan`), its digest, and the adopt line; nothing written. Run with the store's root given (`rooted`). Refused as `takeoverAsked` refuses, and a `--to`
+ * other than the template's version (`Conflict`).
+ */
+export const adoptPreview = Effect.fn('adoptPreview')(function* (args: Args) {
+  const home = yield* StoreRoot;
+  const verb = 'nemia factory diff';
+  const notDone = 'Nothing was written.';
+  const { factory, source, sets, render } = yield* takeoverAsked(args, verb, notDone);
+  const to = textOf(args, 'to');
+  if (to !== undefined && to !== render.version)
+    return yield* Effect.fail(
+      new Conflict({
+        message: `${verb}: ${source} is at version ${render.version}, not ${to}: a takeover takes the template as it is, so leave --to out, or name a folder or archive at ${to} with --template. ${notDone}`,
+      }),
+    );
+  const read = yield* adoptionAt(home, factory, render, notDone);
+  const digest = yield* tried(() => planDigest(home, factory.name, render, source));
+  const plan = adoptPlan(factory, read.adoption, read.runs, read.rules);
+  return { kind: 'adopt', plan, digest, line: adoptLine(factory.name, source, sets, digest) } satisfies AdoptPreview;
+});
+
+/** `nemia factory adopt`'s spec: the factory, `--template`, a `--set` per parameter, and `--plan`. */
+const ADOPT_SPEC: Spec = {
+  positionals: [{ key: 'factory', takes: 'required', kind: 'name' }],
+  flags: [
+    {
+      flag: '--template',
+      kind: 'text',
+      key: 'template',
+      takes: "--template takes the template's folder, the one that holds its nemia.yaml, or an archive nemia template pack wrote",
+      twice: 'take --template once: a factory is taken over by one template.',
+    },
+    {
+      flag: '--set',
+      kind: 'text',
+      key: 'sets',
+      many: true,
+      takes: '--set takes a parameter of the template and its value: --set <key>=<value>',
+    },
+    {
+      flag: '--plan',
+      kind: 'text',
+      key: 'plan',
+      takes: '--plan takes the digest nemia factory diff printed for the takeover: --plan sha256:<hex>',
+      twice: 'take --plan once: a takeover carries the one plan it was previewed by.',
+    },
+  ],
+  unknown: (arg) =>
+    arg.startsWith('-')
+      ? `nemia factory adopt does not take ${arg}. It takes the factory, --template <folder|archive>, --set <key>=<value> once per parameter, and --plan <digest>.`
+      : `nemia factory adopt takes one factory over, and ${arg} is a second: nemia factory adopt <name> --template <folder|archive> --plan <digest>.`,
+  missing:
+    'nemia factory adopt takes the factory to take over: nemia factory diff <name> --template <folder|archive> previews it, then nemia factory adopt <name> --template <folder|archive> --plan <digest>.',
+};
+
+/** What `nemia factory adopt` wrote: the factory, its file, the template it is now made from, and the tree it runs from. */
+type Adopted = { name: string; file: string; template: FactoryTemplate; tree: string };
+
+/**
+ * The takeover `args` ask, written: refused as `takeoverAsked` refuses; then no `--plan` (`Invalid`, naming the preview) and a `--plan`
+ * that is not the digest of the plan now (`Conflict`, naming the preview again); then what `adoptRefusal` refuses (`Conflict`). Then the
+ * render staged as the base and the tree, and the factory's file given the template (`adopted`), through the Factory door.
+ */
+const adoptedNow = Effect.fn('adoptedNow')(function* (args: Args) {
+  const home = yield* StoreRoot;
+  const verb = 'nemia factory adopt';
+  const notDone = 'Nothing was taken over.';
+  const { factory, source, sets, render } = yield* takeoverAsked(args, verb, notDone);
+  const preview = diffLine(factory.name, source, sets);
+  const plan = textOf(args, 'plan');
+  if (plan === undefined)
+    return yield* Effect.fail(
+      new Invalid({
+        message: `${verb} takes over only a plan a person previewed: ${preview} prints it and its digest, then ${verb} … --plan <digest>. ${notDone}`,
+      }),
+    );
+  const digest = yield* tried(() => planDigest(home, factory.name, render, source));
+  if (plan !== digest)
+    return yield* Effect.fail(
+      new Conflict({
+        message: `${verb}: --plan ${plan} is not the plan of ${factory.name}'s takeover now — the factory's file, the template, its version, its parameters or its render changed since it was previewed: preview it again, ${preview}. ${notDone}`,
+      }),
+    );
+  const read = yield* adoptionAt(home, factory, render, notDone);
+  const refused = adoptRefusal(factory, read.adoption);
+  if (refused !== null) return yield* Effect.fail(new Conflict({ message: `${verb}: ${refused.message} ${notDone}` }));
+  yield* tried(() => stageAdoption(home, factory.name, render.entries));
+  const template: FactoryTemplate = { source, version: render.version, params: render.params };
+  const tree = treeDirAt(home, factory.name);
+  const file = yield* (yield* FactoryDoor).factories.rewrite(adopted(factory, read.adoption.wiring, template, tree));
+  return { name: factory.name, file, template, tree } satisfies Adopted;
+});
+
+/** `nemia factory adopt`: a hand-made factory taken over in place by the template whose takeover `nemia factory diff` previewed. */
+export const FACTORY_ADOPT: Command<Adopted> = {
+  name: 'factory adopt',
+  usage: '<name> --template <folder|archive> [--set <key>=<value> ...] --plan <digest>',
+  help: [
+    'take a hand-made factory over by a template, in place, as nemia factory',
+    'diff previewed it: its name, cards, runs and stats stay',
+  ],
+  spec: ADOPT_SPEC,
+  check: (args) => leftOut(ADOPT_SPEC, args),
+  writes: true,
+  class: 'ask',
+  asksAlways: true,
+  only: HERE,
+  handler: (args, _env, home) => rooted(home, 'factory adopt', adoptedNow(args)),
+  print: ({ name, file, template, tree }) => [
+    `${name}: taken over by ${template.source} at ${template.version}`,
+    `filed: ${file}`,
+    `runs from ${tree}; the daemon writes its status on its next pass (nemia up)`,
+  ],
+};

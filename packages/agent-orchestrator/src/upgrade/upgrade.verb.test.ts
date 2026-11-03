@@ -127,7 +127,7 @@ async function printedBy(t: { mock: { method: Function } }, ...args: string[]): 
   return printed.flatMap((p) => p.split('\n'));
 }
 
-test('upgrade refuses, writing nothing: no template, no render, a --to that is no version, the template at another, the same, a downgrade', async (t) => {
+test('upgrade refuses, writing nothing: no template, no render, a --to that is no version, the template at another, the same, a downgrade; and diff a --set on a templated factory, and no --template on a hand-made one', async (t) => {
   t.mock.method(console, 'log', () => {});
   const { dir, repo } = await applied('kept');
   await main(['factory', 'add', 'plain', '--repo', repo], noEngine());
@@ -152,6 +152,9 @@ test('upgrade refuses, writing nothing: no template, no render, a --to that is n
   released(dir, '0.0.9', 5);
   await assert.rejects(upgrade('kept', '--to', '0.0.9'), refusedWith('Conflict', /0\.0\.9 is below 0\.1\.0[^]*--to 0\.0\.9 --downgrade/));
   released(dir, '0.2.0', 5);
+  const diff = (name: string, ...rest: string[]) => main(['factory', 'diff', name, ...rest], noEngine());
+  await assert.rejects(diff('kept', '--to', '0.2.0', '--set', 'budget=9'), refusedWith('Invalid', /--set/));
+  await assert.rejects(diff('plain', '--to', '0.2.0'), refusedWith('Invalid', /--template <folder\|archive>/));
   edit(dir, 'nemia.yaml', (spec) => {
     spec.parameters.gated = { type: 'boolean', description: 'a gate before the ship' };
   });

@@ -27,6 +27,7 @@ import { removeInstructionFolder } from './instruction.store.ts';
 import { FACTORY_INSTRUCT, FACTORY_INSTRUCTION } from './instruction.verb.ts';
 import { FACTORY_RULES } from '../rules/rules.verb.ts';
 import { FACTORY_APPLY } from '../applied/applied.verb.ts';
+import { FACTORY_ADOPT } from '../adopt/adopt.verb.ts';
 import { FACTORY_PLAN, FACTORY_RESOLVE, FACTORY_UPGRADE } from '../upgrade/upgrade.verb.ts';
 import { FACTORY_SCHEDULE, FACTORY_UNSCHEDULE } from '../schedule/schedule.verb.ts';
 import { schedulesListed, type ScheduleRun, type ScheduleRuns } from '../schedule/listed.store.ts';
@@ -40,7 +41,9 @@ import { FACTORY_SERVER_ADD, FACTORY_SERVER_RM, FACTORY_SERVERS } from '../serve
 export const FACTORY_HELP = `nemia factory [ls]
 nemia factory add <name> --repo <path> [--repo <path> ...] [--no-trust]
 nemia factory apply <name> --template <folder|archive> --repo <path> [--repo <path> ...] [--set <key>=<value> ...] [--no-trust]
+nemia factory adopt <name> --template <folder|archive> [--set <key>=<value> ...] --plan <digest>
 nemia factory diff <name> --to <x.y.z> [--template <folder|archive>]
+nemia factory diff <name> --template <folder|archive> [--set <key>=<value> ...]
 nemia factory upgrade <name> --to <x.y.z> [--template <folder|archive>] [--downgrade]
 nemia factory resolve <name> <conflict> --ours|--theirs|--file <path>
 nemia factory attach <factory> <workflow>
@@ -85,6 +88,17 @@ factory, naming the repositories its work is on, the workflows it offers and the
                  conditions Applied and ConflictsPending. Its attach, detach, hire, fire and instruct write the
                  tree, and nemia workflows, agents and skills write into it with --factory <name>. Its places
                  are trusted as nemia factory add trusts them, unless --no-trust.
+  nemia factory adopt takes a factory you made by hand over by a template, in place, as nemia factory diff
+                 <name> --template <folder|archive> [--set ...] previewed it: --plan carries the digest the
+                 preview printed, and a plan that changed since — the factory's file, the template, its version,
+                 its parameters or its render — is refused. It writes the render into factories/<name>/applied/
+                 and tree/, then names the template in the factory's file: the tree's workflows, hires and
+                 revisions policy are read from then on, the file's own left in it, unread. Its name,
+                 repositories, schedules, instruction, cards, runs and stats stay; a run in flight keeps the
+                 workflow frozen on its record. The store's RULES.md is no longer read: the preview prints the
+                 nemia factory rules line that writes it into the tree. Refused: a factory made from a template
+                 already (upgrade it), a card filed and not started or a schedule naming a workflow the
+                 template does not offer, and a base or tree already there that is not the render.
   nemia factory diff previews an upgrade of a templated factory to --to: the template, at its place or at --template,
                  rendered at that version with the factory's parameters and merged three ways — the base, your
                  tree, the render — each file whole first, factory.json by key, a step's frontmatter by key and
@@ -221,7 +235,7 @@ export const FACTORY: Command<Listed> = {
     positionals: [],
     flags: [],
     unknown: (arg) =>
-      `nemia factory does not take ${arg}. It lists the factories — nemia factory ls — files one with nemia factory add <name> --repo <path>, trusts its places again with nemia factory trust <name>, attaches a workflow with nemia factory attach <factory> <workflow>, detaches it with nemia factory detach <factory> <workflow>, hires an agent into a step with nemia factory hire <factory> <agent> --step <workflow>/<step>, fires it with nemia factory fire <factory> --step <workflow>/<step>, schedules a workflow's runs with nemia factory schedule <factory> <workflow> --cron <expr> --brief <text>, takes the schedule back with nemia factory unschedule <factory> <workflow>, writes the rules its agents are told with nemia factory rules <name> --file <path>, says where Nemia's instruction for it is kept with nemia factory instruction <name>, writes it with nemia factory instruct <name> --file <path>, and removes one with nemia factory rm <name> (nemia factory --help).`,
+      `nemia factory does not take ${arg}. It lists the factories — nemia factory ls — files one with nemia factory add <name> --repo <path>, takes a hand-made one over by a template with nemia factory diff <name> --template <folder|archive>, then nemia factory adopt, trusts its places again with nemia factory trust <name>, attaches a workflow with nemia factory attach <factory> <workflow>, detaches it with nemia factory detach <factory> <workflow>, hires an agent into a step with nemia factory hire <factory> <agent> --step <workflow>/<step>, fires it with nemia factory fire <factory> --step <workflow>/<step>, schedules a workflow's runs with nemia factory schedule <factory> <workflow> --cron <expr> --brief <text>, takes the schedule back with nemia factory unschedule <factory> <workflow>, writes the rules its agents are told with nemia factory rules <name> --file <path>, says where Nemia's instruction for it is kept with nemia factory instruction <name>, writes it with nemia factory instruct <name> --file <path>, and removes one with nemia factory rm <name> (nemia factory --help).`,
   },
   writes: false,
   class: 'read',
@@ -563,6 +577,7 @@ export const FACTORIES: readonly Command[] = [
   FACTORY_LS,
   FACTORY_ADD,
   FACTORY_APPLY,
+  FACTORY_ADOPT,
   FACTORY_PLAN,
   FACTORY_UPGRADE,
   FACTORY_RESOLVE,

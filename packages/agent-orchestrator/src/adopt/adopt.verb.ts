@@ -91,7 +91,8 @@ export type AdoptPreview = { kind: 'adopt'; plan: AdoptPlan; digest: string; lin
 
 /**
  * `nemia factory diff <name> --template <folder|archive> [--set …] [--to <x.y.z>]` on a factory made from no template: what taking it
- * over would change (`adoptPlan`), its digest, and the adopt line; nothing written. Run with the store's root given (`rooted`). Refused as `takeoverAsked` refuses, and a `--to`
+ * over would change (`adoptPlan`), its digest, and the adopt line; nothing written. Run with the store's root given
+ * (`rooted`). Refused as `takeoverAsked` refuses, and a `--to`
  * other than the template's version (`Conflict`).
  */
 export const adoptPreview = Effect.fn('adoptPreview')(function* (args: Args) {
@@ -111,6 +112,23 @@ export const adoptPreview = Effect.fn('adoptPreview')(function* (args: Args) {
   const plan = adoptPlan(factory, read.adoption, read.runs, read.rules);
   return { kind: 'adopt', plan, digest, line: adoptLine(factory.name, source, sets, digest) } satisfies AdoptPreview;
 });
+
+/** `nemia factory adopt --help`: the takeover's manual. */
+export const ADOPT_HELP = `nemia factory diff <name> --template <folder|archive> [--set <key>=<value> ...]
+nemia factory adopt <name> --template <folder|archive> [--set <key>=<value> ...] --plan <digest>
+
+nemia factory adopt takes a factory you made by hand over by a template, in place, as nemia factory diff
+<name> --template <folder|archive> [--set ...] previewed it: --plan carries the digest the
+preview printed, and a plan that changed since — the factory's file, the template, its version,
+its parameters or its render — is refused. It writes the render into factories/<name>/applied/
+and tree/, then names the template in the factory's file: the tree's workflows, hires and
+revisions policy are read from then on, the file's own left in it, unread. Its name,
+repositories, schedules, instruction, cards, runs and stats stay; a run in flight keeps the
+workflow frozen on its record. The store's RULES.md is no longer read: the preview prints the
+nemia factory rules line that writes it into the tree. Refused: a factory made from a template
+already (upgrade it), a card filed and not started or a schedule naming a workflow the
+template does not offer, and a base or tree already there that is not the render.
+`;
 
 /** `nemia factory adopt`'s spec: the factory, `--template`, a `--set` per parameter, and `--plan`. */
 const ADOPT_SPEC: Spec = {
@@ -193,6 +211,7 @@ export const FACTORY_ADOPT: Command<Adopted> = {
     'diff previewed it: its name, cards, runs and stats stay',
   ],
   spec: ADOPT_SPEC,
+  manual: ADOPT_HELP,
   check: (args) => leftOut(ADOPT_SPEC, args),
   writes: true,
   class: 'ask',

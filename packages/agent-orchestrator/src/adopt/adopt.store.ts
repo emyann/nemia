@@ -20,7 +20,10 @@ import type { RenderedAt } from '../applied/applied.verb.ts';
 import type { Run } from '../record/record.ts';
 import type { Adoption, AdoptedCard } from './adopt.ts';
 
-/** What a takeover of a factory reads besides its judgement's input: the runs on record in it, and its store rules' file where they say words. */
+/**
+ * What a takeover of a factory reads besides its judgement's input: the runs on record in it, and its store rules' file where they say
+ * words.
+ */
 export type AdoptionRead = { adoption: Adoption; runs: string[]; rules: string | null };
 
 /** The digest of the folder `dir`, or null where it is not there. */
@@ -54,7 +57,7 @@ export const adoptionAt = Effect.fn('adoptionAt')(function* (home: string, facto
       }),
     );
   const runs = yield* (yield* RunDoor).runs.list();
-  const startedFrom = new Set(runs.flatMap((r) => (r.from?.inbox === undefined ? [] : [r.from.inbox as string])));
+  const startedFrom = new Set(runs.flatMap((r) => (r.from?.inbox === undefined ? [] : [r.from.inbox])));
   const cards: AdoptedCard[] = (yield* (yield* CardDoor).cards.entries()).flatMap(({ file, text }) => {
     const card = cardIn(file, text);
     if (card === undefined || card.factory !== factory.name) return [];
@@ -75,7 +78,7 @@ export const adoptionAt = Effect.fn('adoptionAt')(function* (home: string, facto
   };
   return {
     adoption,
-    runs: runs.filter((r) => r.factory === factory.name && !ended(r)).map((r) => r.id as string),
+    runs: runs.filter((r) => r.factory === factory.name && !ended(r)).map((r) => r.id),
     rules: readRules(rulesFile).words === null ? null : rulesFile,
   } satisfies AdoptionRead;
 });

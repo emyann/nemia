@@ -8,8 +8,8 @@
  *
  * **The keys are the line's own vocabulary and a person's labels, never its message**: the five labels a filing carries
  * (`FeedLabels`), every label a person put on the line's run (any key spelled as Kubernetes spells one, with no prefix), and the
- * reserved keys a signed line names — `kind`, `reason`, `on` (what a `Waiting` line waits on), `via` (where an `AwaitingAnswer` line's answer is
- * asked), `type`, `waits` and `source`. The message a person reads is prose, worded anew whenever a
+ * reserved keys a signed line names — `kind`, `reason`, `on` (what a `Waiting` line waits on), `via` (where an `AwaitingAnswer` line's
+ * answer is asked), `type`, `waits` and `source`. The message a person reads is prose, worded anew whenever a
  * status is reworded, so nothing selects on it: `-l message=…` is refused. A key no line carries is no refusal, as in Kubernetes: it
  * selects nothing.
  *
@@ -20,17 +20,17 @@
  * their meaning in a selector typed or stored before the codes were renamed, which is never rewritten.
  */
 import { formerOf, isFormerReason } from '../former-reason/former-reason.ts';
-import { involvedOf, upgraded, type Codes, type FeedLabels, type FeedLine } from '../feed/index.ts';
+import { involvedOf, upgraded, type ClosedFeedLabels, type Codes, type FeedLine } from '../feed/index.ts';
 
 /**
- * Every label key of a feed line, each named once. A `Record` of `keyof FeedLabels`, whose keys are required however optional the
- * labels themselves are, so a label added to `FeedLabels` fails the typecheck here until it is named — and a selector reaches it the
+ * Every label key of a feed line, each named once. A `Record` of `keyof ClosedFeedLabels`, whose keys are required however optional the
+ * labels themselves are, so a label added to `ClosedFeedLabels` fails the typecheck here until it is named — and a selector reaches it the
  * day it exists, rather than being refused as no key of a line.
  */
-const EVERY_LABEL: Record<keyof FeedLabels, true> = { run: true, factory: true, workflow: true, step: true, agent: true };
+const EVERY_LABEL: Record<keyof ClosedFeedLabels, true> = { run: true, factory: true, workflow: true, step: true, agent: true };
 
-/** The label keys a selector may name, in the order `FeedLabels` declares them: every one of them (`EVERY_LABEL`). */
-export const LABEL_KEYS: readonly (keyof FeedLabels)[] = Object.keys(EVERY_LABEL) as (keyof FeedLabels)[];
+/** The label keys a selector may name, in the order `ClosedFeedLabels` declares them: every one of them (`EVERY_LABEL`). */
+export const LABEL_KEYS: readonly (keyof ClosedFeedLabels)[] = Object.keys(EVERY_LABEL) as (keyof ClosedFeedLabels)[];
 
 /** The keys a signed line names of itself, which a selector reads beside the labels: what it is about, and how its writer judged it. */
 export const RESERVED_KEYS: readonly string[] = ['kind', 'reason', 'on', 'via', 'type', 'waits', 'source'];
@@ -42,7 +42,7 @@ export const SELECTABLE_KEYS: readonly string[] = [...LABEL_KEYS, ...RESERVED_KE
 export const SELECTOR_FORM =
   '-l <key>=<value>, -l <key>!=<value>, -l "<key> in (<a>,<b>)", -l "<key> notin (<a>,<b>)" or -l <key> for a line that carries it; ' +
   `commas between clauses, which all must hold, and -l again for another selector, of which one must. The keys: ${SELECTABLE_KEYS.join(', ')}, ` +
-  "and any label a person put";
+  'and any label a person put';
 
 /**
  * Why `keys` cannot be the label keys — a label named as a reserved key, which would decide for a selector what that key means — or

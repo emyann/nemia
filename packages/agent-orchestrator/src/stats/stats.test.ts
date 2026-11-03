@@ -952,6 +952,17 @@ test('`statsOf`: the facts bucketed by UTC day and by a key, filtered, totalled 
       },
     },
     {
+      name: 'the runs a selector takes keep their facts, and a run it does not take adds none of its tries or its run',
+      check: () => {
+        const kept = readOf('kept', [step('implement', [])], { implement: [{ end: at(1) }, { end: at(2) }] });
+        const left = readOf('left', [step('implement', [])], { implement: [{ end: at(3) }] });
+        const facts = factsOfAll(kept, left);
+        const every = statsOf(facts, {}, NOW).all.total;
+        const taken = statsOf(facts, {}, NOW, [], undefined, (run) => run === 'kept').all.total;
+        assert.deepEqual([every.tries, taken.tries], [3, 2], 'the tries of the run taken alone');
+      },
+    },
+    {
       name: 'a day whose runs never recorded their landing has no landed count',
       check: () => {
         const old = (id: string) =>

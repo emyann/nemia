@@ -28,6 +28,7 @@ const { RUNS, RUNS_FINISHED, RUNS_OPEN } = await import('../command/pages.verb.t
 const { advanceRun, approveRun, startRun, runWith: runEngine } = await import('../runner.ts');
 const { Invalid } = await import('../refusal/refusal.ts');
 const { readRun } = await import('../record/record.store.ts');
+const { runStore } = await import('../record/files.store.ts');
 const { engineOf } = await import('../runtime-client.ts');
 const { metered } = await import('../meter/tally.store.ts');
 const { informerMemo } = await import('../rest/informer.verb.ts');
@@ -439,4 +440,57 @@ test('a page past the last answers an empty page, with the total and the pages t
   await aFinished();
   const past = await finishedPage({ page: '7' });
   assert.deepEqual([past.runs, past.total, past.page, past.pages], [[], 1, 7, 1]);
+});
+
+/** The labels a person put on the run `id`, planted through the Run door as `nemia label run` puts them. */
+const labelled = (id: string, labels: Record<string, string>): void => runStore.labels.put(id, labels);
+
+test('a selector keeps the runs whose labels it takes, before the finished page is cut and the open runs are counted', async (t) => {
+  seeded(t);
+  const core = await aFinished();
+  await aFinished();
+  const waiting = await aWaiting();
+  await anInFlight();
+  labelled(core, { team: 'core' });
+  labelled(waiting, { team: 'core' });
+  const selected = { selector: ['team=core'] };
+  const page = await runWith(e(), RUNS_FINISHED.handler({ ...selected, size: '1' }, process.env));
+  assert.deepEqual([page.runs.map((r) => r.id), page.total, page.pages], [[core], 1, 1], 'the finished page, counted after the selection');
+  const light = await runWith(e(), RUNS_OPEN.handler(selected, process.env));
+  assert.deepEqual(
+    [light.waiting.map((r) => r.id), light.inFlight.map((r) => r.id), light.counts],
+    [[waiting], [], { waiting: 1, inFlight: 0, finished: 1 }],
+    'the open runs and their counts, of the runs selected alone',
+  );
+  assert.deepEqual(
+    (await runWith(e(), RUNS.handler(selected, process.env))).map((r) => r.id).sort(),
+    [core, waiting].sort(),
+    'the whole list',
+  );
+  const either = await runWith(e(), RUNS.handler({ selector: ['team=core', 'team notin (core)'] }, process.env));
+  assert.equal(either.length, 4, 'two selectors are either: every run is one or the other');
+  const whole = await wholeList();
+  assert.equal(whole.length, 4, 'with no selector, every run');
+  const workflow = (id: string) => path.basename(readRun(id).workflowDir);
+  assert.deepEqual(whole.find((r) => r.id === core)?.labels, { team: 'core', workflow: workflow(core) }, 'a row carries the whole map');
+  const bare = whole.find((r) => r.id !== core && r.id !== waiting);
+  assert.deepEqual(bare?.labels, { workflow: workflow(bare?.id ?? '') }, 'and its workflow alone where nobody labelled it');
+});
+
+test('REFUSED by kind: a selector that is none, on each read of the list', async (t) => {
+  const asked = { selector: ['no/pe=x'] };
+  const reads: Array<[string, () => Promise<unknown>]> = [
+    ['runs', () => runWith(e(), RUNS.handler(asked, process.env))],
+    ['runs open', () => runWith(e(), RUNS_OPEN.handler(asked, process.env))],
+    ['runs finished', () => runWith(e(), RUNS_FINISHED.handler(asked, process.env))],
+  ];
+  for (const [name, read] of reads)
+    await t.test(name, () =>
+      assert.rejects(read(), (err: Error & { exitCode?: number }) => {
+        assert.ok(err instanceof Invalid, String(err));
+        assert.equal(err.exitCode, 2);
+        assert.ok(err.message.includes('no/pe'), `${err.message} names the key`);
+        return true;
+      }),
+    );
 });

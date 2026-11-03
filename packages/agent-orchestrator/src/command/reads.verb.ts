@@ -19,6 +19,7 @@ import { statsRun } from '../stats/stats.verb.ts';
 import { RANGE_TAKES, seriesRead } from '../series/series.store.ts';
 import { seriesLines, type SeriesRead } from '../series/series.ts';
 import type { Args } from './command.ts';
+import { selectorCheck, selectorFlag, selectorsIn } from './pages.verb.ts';
 import type { Command, Kept } from './entry.verb.ts';
 
 /** The text under `key`, or undefined where none was given. */
@@ -219,7 +220,7 @@ const KEYS = Object.keys(TAKES) as QueryKey[];
 const statsTakes = (key: string): string => `--${key} takes ${TAKES[key as QueryKey]}`;
 
 /** What `nemia stats --help` prints: what it counts, each flag and what it takes, and how it prints. */
-export const STATS_HELP = `nemia stats [--from <day>] [--to <day>] [--by <key>] [--agent|--step|--factory|--workflow|--repo <value>] [--line|--json]
+export const STATS_HELP = `nemia stats [--from <day>] [--to <day>] [--by <key>] [--agent|--step|--factory|--workflow|--repo <value>] [-l <selector>] [--line|--json]
 
 The flow numbers of every run in the store, of every factory and repository: the runs finished and landed, the rounds
 a loop took to be accepted, the share of landed runs that landed on their first try, the cost and wall time of a landed
@@ -228,6 +229,7 @@ last 14 days against the 14 before, a row per UTC day, and a row per step and ag
 absent, "—" in words and null in JSON, never 0.
 
 ${KEYS.map((key) => `  --${key.padEnd(10)}${TAKES[key]}`).join('\n')}
+  -l          the runs whose labels a selector takes, given again for another (-l team=core)
   --line      one line, for a recap
   --json      the whole answer, as GET /api/stats gives it`;
 
@@ -245,6 +247,8 @@ function statsRefusal(args: Args): string | null {
     return value !== undefined && (!value || value.startsWith('--'));
   });
   if (left) return statsTakes(left);
+  const selector = selectorCheck(args);
+  if (selector !== null) return selector;
   try {
     statsQueryOf(givenOf(args), (key) => `--${key}`);
     return null;
@@ -260,14 +264,15 @@ function statsRefusal(args: Args): string | null {
 export const STATS: Command<Stats> = {
   name: 'stats',
   usage:
-    '[--from <day>] [--to <day>] [--by agent|step|factory|workflow|repo] [--agent|--step|--factory|--workflow|--repo <v>] [--line|--json]',
+    '[--from <day>] [--to <day>] [--by agent|step|factory|workflow|repo] [--agent|--step|--factory|--workflow|--repo <v>] [-l <selector>] [--line|--json]',
   help: [
     'what every run in the store adds up to, by UTC day: rounds to',
     'acceptance of each loop: step, landings of the workspace: base step',
     "and on which try, cost and time per landed run, and each step's",
     'tries, time, cost, checks and gate waits; first the last 14 days',
     'against the 14 before. A number nothing measured reads —, never 0.',
-    '--line: one line, for a recap; --json: the whole answer',
+    '--line: one line, for a recap; --json: the whole answer; -l: the',
+    'runs whose labels a selector takes, as nemia ls -l takes them',
   ],
   manual: STATS_HELP,
   spec: {
@@ -280,26 +285,27 @@ export const STATS: Command<Stats> = {
         takes: statsTakes(key),
         twice: `nemia stats takes --${key} once.`,
       })),
+      selectorFlag('nemia stats'),
       { flag: '--line', kind: 'switch', key: 'line' },
       { flag: '--json', kind: 'switch', key: 'json' },
     ],
-    unknown: (arg) => `nemia stats does not take ${arg}. It takes ${KEYS.map((k) => `--${k}`).join(', ')}, and --line or --json.`,
-    apart: (_value, flag) => statsTakes(flag.slice(2)),
+    unknown: (arg) =>
+      `nemia stats does not take ${arg}. It takes ${KEYS.map((k) => `--${k}`).join(', ')}, -l <selector>, and --line or --json.`,
+    apart: (_value, flag) => (flag === '-l' ? selectorFlag('nemia stats').takes : undefined) ?? statsTakes(flag.slice(2)),
   },
   check: statsRefusal,
   writes: false,
   class: 'read',
   route: { method: 'GET', path: '/api/stats', status: 200 },
-  handler: (args, env, _home, kept?: Kept) =>
-    statsRun(
-      statsQueryOf(givenOf(args), (key) => `--${key}`),
-      new Date(),
-      {
-        memo: kept?.stats,
-        verify: env ? verifiesRest(env) : undefined,
-        series: kept?.series,
-      },
-    ),
+  handler: Effect.fnUntraced(function* (args: Args, env?: NodeJS.ProcessEnv, _home?: string, kept?: Kept) {
+    const selectors = yield* selectorsIn(args);
+    const query = yield* tried(() => statsQueryOf(givenOf(args), (key) => `--${key}`));
+    return yield* statsRun(selectors.length ? { ...query, selectors } : query, new Date(), {
+      memo: kept?.stats,
+      verify: env ? verifiesRest(env) : undefined,
+      series: kept?.series,
+    });
+  }),
   print: (s, args) => (args.json === true ? [JSON.stringify(s, null, 2)] : args.line === true ? [statsLine(s)] : statsLines(s)),
 };
 

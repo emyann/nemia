@@ -31,6 +31,7 @@ import { decideRun, type Decided } from '../decide/decide.verb.ts';
 import { slotsRead, type Slots } from '../cap/cap.verb.ts';
 import { runsListed } from '../list/list.verb.ts';
 import { lsLines, type RunsListed } from '../list/list.ts';
+import { labelFlags, runsShown, selectorCheck, selectorsIn } from './pages.verb.ts';
 import { pausedLines } from '../pause/pause.ts';
 import { agentCardRead, agentsRead } from '../roster/roster.store.ts';
 import { agentsLines, cardNote, type AgentsRead, type CardRead } from '../roster/roster.ts';
@@ -363,7 +364,7 @@ const SAY: Command<{
  */
 const LS: Command<RunsListed> = {
   name: 'ls',
-  usage: '[<runId>]',
+  usage: '[<runId>] [-l <selector>] [--show-labels] [-L <key>]',
   help: [
     'runs and their steps — a run waiting on another says waiting on <run>,',
     'one the cap on runs in flight holds waiting for a run slot (2 of 2 in',
@@ -373,21 +374,24 @@ const LS: Command<RunsListed> = {
     'session, check or landing at work, or Paused once none is, then each',
     'check it holds, a landing with its merge staged in the checkout',
     '(MERGE_HEAD) among them; a step whose check it holds says waiting on',
-    'the pause',
+    'the pause. -l: the runs whose labels a selector takes (team=core,',
+    'given again for another); --show-labels: each run with its labels;',
+    '-L <key>: that label beside each run, given again for another',
   ],
   spec: {
     positionals: [{ key: 'runId', takes: 'optional', kind: 'name' }],
-    flags: [],
-    unknown: (arg) => `nemia ls takes one run's id, or none: not ${arg}.`,
+    flags: labelFlags('nemia ls'),
+    unknown: (arg) => `nemia ls takes one run's id, or none, -l <selector>, --show-labels and -L <key>: not ${arg}.`,
   },
+  check: selectorCheck,
   writes: false,
   class: 'read',
   route: [
     { method: 'GET', path: '/api/listing', status: 200 },
     { method: 'GET', path: '/api/listing/:runId', status: 200 },
   ],
-  handler: (args) => runsListed(textOf(args, 'runId')),
-  print: (listed) => [...(listed.paused ? pausedLines(listed.paused) : []), ...lsLines(listed, Date.now())],
+  handler: (args) => Effect.flatMap(selectorsIn(args), (selectors) => runsListed(textOf(args, 'runId'), selectors)),
+  print: (listed, args) => [...(listed.paused ? pausedLines(listed.paused) : []), ...lsLines(listed, Date.now(), runsShown(args))],
 };
 
 const DECIDE: Command<Decided> = {

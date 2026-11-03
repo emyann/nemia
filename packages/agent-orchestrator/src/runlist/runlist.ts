@@ -6,7 +6,11 @@
  * Pure: a run's summary in, as the whole list answers it, and a word, a time or a page out. Each rule reads the fields it names
  * (`Listed`), so the list's own summary is handed as it is.
  */
+import path from 'node:path';
 import { DEFAULT_FACTORY } from '../factory/factory.ts';
+import { labelsText, metadataLabels, type Labels } from '../labels/labels.ts';
+import type { Run } from '../record/record.ts';
+import { selectsLabels, type Selectors } from '../watch/selector.ts';
 
 /** What the rules read of a run's summary, as the whole list answers it. */
 export type Listed = {
@@ -132,3 +136,24 @@ export const pageOf = <R>(rows: readonly R[], page: number, size: number): Page<
   pages: Math.max(1, Math.ceil(rows.length / size)),
   runs: rows.slice((page - 1) * size, page * size),
 });
+
+/** The run's whole map, as a selector reads it and a list's row carries it: the person's keys, `workflow`, and `factory` where named. */
+export const runLabelMap = (run: Pick<Run, 'workflowDir' | 'factory' | 'labels'>): Labels =>
+  metadataLabels({ workflow: path.basename(run.workflowDir), factory: run.factory, labels: run.labels });
+
+/**
+ * The runs of `runs` whose whole map `selectors` takes (`selectsLabels`), in their order: every one where none is given. The lists select
+ * off the composed record before they judge a run (`runsSummarized`, `runsListed`), and the stats before they sum a run's facts.
+ */
+export const selectedRuns = <R extends Pick<Run, 'workflowDir' | 'factory' | 'labels'>>(
+  runs: readonly R[],
+  selectors: Selectors = [],
+): readonly R[] => (selectors.length ? runs.filter((run) => selectsLabels(selectors, runLabelMap(run))) : runs);
+
+/**
+ * What a printer appends to a line of `map`'s, as `nemia ls` its runs' head lines and `nemia inbox` its cards': with `--show-labels`,
+ * `  labels: <the map>` (`labelsText`); then, for each `-L <key>` in the order given, `  <key>: <its value>`, `<none>` where the map has
+ * none. Nothing with neither, so the line is as it was. Pure.
+ */
+export const labelSegments = (map: Labels, shown: { readonly all: boolean; readonly columns: readonly string[] }): string =>
+  `${shown.all ? `  labels: ${labelsText(map)}` : ''}${shown.columns.map((key) => `  ${key}: ${map[key] ?? '<none>'}`).join('')}`;

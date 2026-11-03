@@ -47,7 +47,7 @@ They write nothing: run them unasked, as often as you need. One that sets with s
   nemia template lint <folder|archive>
                                check a template's folder or archive: every problem at once, each at its
                                file and line
-  nemia ls [<runId>]
+  nemia ls [<runId>] [-l <selector>] [--show-labels] [-L <key>]
                                runs and their steps — a run waiting on another says waiting on <run>,
                                one the cap on runs in flight holds waiting for a run slot (2 of 2 in
                                flight); what each step's tries and the run have cost, where measured;
@@ -56,7 +56,9 @@ They write nothing: run them unasked, as often as you need. One that sets with s
                                session, check or landing at work, or Paused once none is, then each
                                check it holds, a landing with its merge staged in the checkout
                                (MERGE_HEAD) among them; a step whose check it holds says waiting on
-                               the pause
+                               the pause. -l: the runs whose labels a selector takes (team=core,
+                               given again for another); --show-labels: each run with its labels;
+                               -L <key>: that label beside each run, given again for another
   nemia show <runId> [--raw]
                                the run as one object (nemia/v1 Run); --raw: its record, and
                                what each step was told
@@ -64,13 +66,14 @@ They write nothing: run them unasked, as often as you need. One that sets with s
                                what a step's try signed off with: its latest, or --try <n>
   nemia logs <runId> <step>
                                that step's session output
-  nemia stats [--from <day>] [--to <day>] [--by agent|step|factory|workflow|repo] [--agent|--step|--factory|--workflow|--repo <v>] [--line|--json]
+  nemia stats [--from <day>] [--to <day>] [--by agent|step|factory|workflow|repo] [--agent|--step|--factory|--workflow|--repo <v>] [-l <selector>] [--line|--json]
                                what every run in the store adds up to, by UTC day: rounds to
                                acceptance of each loop: step, landings of the workspace: base step
                                and on which try, cost and time per landed run, and each step's
                                tries, time, cost, checks and gate waits; first the last 14 days
                                against the 14 before. A number nothing measured reads —, never 0.
-                               --line: one line, for a recap; --json: the whole answer
+                               --line: one line, for a recap; --json: the whole answer; -l: the
+                               runs whose labels a selector takes, as nemia ls -l takes them
   nemia passes [--last <n>] [--json]
                                what the recent passes of the tick cost: their median and slowest
                                time, a histogram of their times, where the time went phase by

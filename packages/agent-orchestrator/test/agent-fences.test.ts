@@ -1125,16 +1125,19 @@ test('REFUSED: a skill that applies to a path no file of the checkout has is nam
   assert.deepEqual(appliesUnmatched(skills, REPO), ['typo: apps/webb/**']);
 });
 
-/** The rules of the repository's skill `skill`, read as a run reads them (`readSkillRules`). */
-const repoRulesOf = (skill: string) => {
-  assert.ok(fs.existsSync(path.join(REPO_SKILLS, skill, RULES_FILE)), `${skill} declares its rules`);
-  return readSkillRules(path.join(REPO_SKILLS, skill));
+/** sdlc's role skills, which the nemia factory's steps load. */
+const SDLC_SKILLS = path.join(REPO, 'packages', 'templates', 'sdlc', 'skills');
+
+/** The rules of sdlc's skill `skill`, read as a run reads them (`readSkillRules`). */
+const sdlcRulesOf = (skill: string) => {
+  assert.ok(fs.existsSync(path.join(SDLC_SKILLS, skill, RULES_FILE)), `${skill} declares its rules`);
+  return readSkillRules(path.join(SDLC_SKILLS, skill));
 };
 
-test("the repository's read-within-reach rule is broken by a denied Glob, Grep or Read, as nemia stats counts it, and kept by a denied npm", () => {
+test("sdlc's read-within-reach rule is broken by a denied Glob, Grep or Read, as nemia stats counts it, and kept by a denied npm", () => {
   const outside = 'Read(/srv/.agent-workflows/runs/r/artifacts/a.md)';
   for (const skill of ['write-a-spec', 'review-a-change']) {
-    const declared = new Map([[skill, repoRulesOf(skill)]]);
+    const declared = new Map([[skill, sdlcRulesOf(skill)]]);
     const reach = (denied: string[]) => {
       const fact = rulesOfTry(denied, declared)?.find((rule) => rule.rule === 'read-within-reach');
       assert.ok(fact, `${skill} declares read-within-reach`);

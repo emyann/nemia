@@ -72,7 +72,7 @@ export type RetryBriefing = {
    * file, says why and gives a near name that is there (`lackLines`).
    */
   lacks?: readonly string[];
-  /** What the run refused of the last try's closeout's envelope (`envelopeRefusals`), when that is why it is tried again. */
+  /** What the run refused of the last try's closeout (`closeoutRefusals`), when that is why it is tried again. */
   refused?: readonly string[];
   /** What the last try's sessions were denied, in the runtime's words (`deniedOf`), when that is why it is tried again: `denied`. */
   denied?: readonly string[];
@@ -151,7 +151,7 @@ const lacksSaid = (lacks: readonly string[]): string =>
     'its name off `artifacts`. The rest of your work stands: change nothing else, and sign off again.',
   ].join('\n');
 
-/** What the run refused of a closeout's envelope (`envelopeRefusals`), and to sign off again once mended. */
+/** What the run refused of a closeout (`closeoutRefusals`), and to sign off again once mended. */
 const refusedSaid = (refused: readonly string[]): string =>
   [
     'The run did not accept the closeout of the last try: nothing that waits on this step started.',

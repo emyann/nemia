@@ -519,7 +519,7 @@ const Asked = Schema.Struct({
       title: Schema.String,
       body: Schema.String,
       options: List(Schema.Struct({ label: Schema.String, meaning: Schema.String })),
-      recommended: NullString,
+      recommended: Schema.NullOr(Schema.Union([Schema.String, List(Schema.String)])),
       multiple: Schema.Boolean,
     }),
   ),

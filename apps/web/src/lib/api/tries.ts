@@ -70,10 +70,17 @@ export type QuestionOption = { label: string; meaning: string };
 export const QuestionOptionSchema = decodes<QuestionOption>()(Schema.Struct({ label: Schema.String, meaning: Schema.String }));
 
 /**
- * Mirrors `Question` in agent-orchestrator's question/question.ts: its `title`, which an answer names; its `body`; its `options`; the label
- * it `recommended`, or null; and whether `multiple` options may be chosen together.
+ * Mirrors `Question` in agent-orchestrator's question/question.ts: its `title`, which an answer names; its `body`; its `options`; what
+ * it `recommended` — one label or null, or, on a question that takes `multiple` options, a list of labels — and whether `multiple` options
+ * may be chosen together.
  */
-export type Question = { title: string; body: string; options: QuestionOption[]; recommended: string | null; multiple: boolean };
+export type Question = {
+  title: string;
+  body: string;
+  options: QuestionOption[];
+  recommended: string | string[] | null;
+  multiple: boolean;
+};
 
 /** Decodes a `Question`. */
 export const QuestionSchema = decodes<Question>()(
@@ -81,7 +88,7 @@ export const QuestionSchema = decodes<Question>()(
     title: Schema.String,
     body: Schema.String,
     options: Schema.mutable(Schema.Array(QuestionOptionSchema)),
-    recommended: Schema.NullOr(Schema.String),
+    recommended: Schema.NullOr(Schema.Union([Schema.String, Schema.mutable(Schema.Array(Schema.String))])),
     multiple: Schema.Boolean,
   }),
 );

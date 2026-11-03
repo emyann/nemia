@@ -22,13 +22,6 @@ export const SDLC = path.join(TEMPLATES, 'sdlc');
 /** The orchestrator's CLI, `nemia`, at the entry its package exports for a spawn (`agent-orchestrator/bin`). */
 export const BIN = fileURLToPath(import.meta.resolve('agent-orchestrator/bin'));
 
-/**
- * Iris's interview skill, which sdlc names and does not carry: Nemia is to ship it builtin, and until then `nemia template
- * lint` refuses sdlc for it. A test that needs a passing lint or a render carries this stub in its scratch copy (`copyOf`). Once Nemia
- * ships it, this goes, and `copyOf` copies the folder as it is.
- */
-const GRILLING_STUB = '---\nname: grilling\ndescription: A stand-in for the builtin interview skill until it ships.\n---\nAsk.\n';
-
 /** An environment on its own scratch store and home, with nothing of the test runner's. */
 export function storeEnv(root: string): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = {
@@ -51,15 +44,10 @@ export function nemia(env: NodeJS.ProcessEnv, ...args: string[]): { code: number
   return { code: ran.status, out: ran.stdout, err: ran.stderr };
 }
 
-/**
- * A scratch copy of the template `from`, as a folder of its own name, with Iris's interview skill carried as a stub
- * (`GRILLING_STUB`), each file of it then changed by `edit`, which must change it: the copy's folder.
- */
+/** A scratch copy of the template `from`, as a folder of its own name, each file of it then changed by `edit`, which must change it. */
 export function copyOf(from: string, edit: Record<string, (text: string) => string> = {}): string {
   const folder = path.join(scratch('nemia-template-'), path.basename(from));
   fs.cpSync(from, folder, { recursive: true });
-  fs.mkdirSync(path.join(folder, 'skills', 'grilling'), { recursive: true });
-  fs.writeFileSync(path.join(folder, 'skills', 'grilling', 'SKILL.md'), GRILLING_STUB);
   for (const [file, change] of Object.entries(edit)) {
     const at = path.join(folder, file);
     const text = fs.readFileSync(at, 'utf8');

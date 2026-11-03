@@ -26,9 +26,10 @@ They write nothing: run them unasked, as often as you need. One that sets with s
                                repositories (nemia factory --help)
   nemia factory ls
                                the same, by its name
-  nemia factory diff <name> --to <x.y.z> [--template <name|folder|archive>]
+  nemia factory diff <name> --to <x.y.z> [--template <name|folder|archive>] | <name> --template <name|folder|archive> [--set <key>=<value> ...]
                                preview a templated factory's upgrade: what merges cleanly, and each
-                               conflict with its sides; nothing is written
+                               conflict with its sides; or a hand-made factory's takeover by a
+                               template, and the plan nemia factory adopt takes; nothing is written
   nemia factory servers <factory>
                                a factory's own MCP servers, each with the state its harness reports
   nemia factory rules <name> [--file <path>|- | --clear]
@@ -304,6 +305,9 @@ Each asks the person at a prompt every time it runs: say what it does before you
   nemia factory apply <name> --template <name|folder|archive> --repo <path> [--repo <path> ...] [--set <key>=<value> ...] [--no-trust]
                                make a factory from a template that passes its check, its parameters
                                given with --set; the daemon renders its tree
+  nemia factory adopt <name> --template <name|folder|archive> [--set <key>=<value> ...] --plan <digest>
+                               take a hand-made factory over by a template, in place, as nemia factory
+                               diff previewed it: its name, cards, runs and stats stay
   nemia factory upgrade <name> --to <x.y.z> [--template <name|folder|archive>] [--downgrade]
                                upgrade a templated factory: its file wants --to, and the daemon merges
                                the template's change into its tree once each conflict is resolved

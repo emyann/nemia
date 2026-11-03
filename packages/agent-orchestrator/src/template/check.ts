@@ -55,8 +55,8 @@ const foldersOf = (files: readonly string[], holder: string): string[] => [
   ),
 ];
 
-/** What `folder` holds, read off its files and documents; `placeSkills` count as skills it holds. */
-function heldOf(folder: ReadFolder, placeSkills: readonly string[]): Held {
+/** What `folder` holds, read off its files and documents; `packageSkills`, Nemia's own, count as skills it holds. */
+function heldOf(folder: ReadFolder, packageSkills: readonly string[]): Held {
   const workflows = new Map(
     foldersOf(folder.files, 'workflows').map((name): [string, ReadWorkflow] => {
       const file = `workflows/${name}/workflow.yaml`;
@@ -69,7 +69,7 @@ function heldOf(folder: ReadFolder, placeSkills: readonly string[]): Held {
   return {
     workflows,
     agents,
-    skills: new Set([...foldersOf(folder.files, 'skills'), ...placeSkills]),
+    skills: new Set([...foldersOf(folder.files, 'skills'), ...packageSkills]),
     manifest,
     parameters: new Set(isMap(manifest.parameters) ? Object.keys(manifest.parameters) : []),
   };
@@ -97,8 +97,8 @@ function hireRefusals(held: Held): Refusal[] {
 }
 
 /**
- * What a list of skills at `at` names that the folder lacks and no place skill is; a skill named with its folder (`givenSkillOf`) is
- * the repository's a run is started on, which a template names and never carries, and passes.
+ * What a list of skills at `at` names that the folder lacks and no skill of Nemia's own is; a skill named with its folder
+ * (`givenSkillOf`) is the repository's a run is started on, which a template names and never carries, and passes.
  */
 const skillRefusals = (file: string, at: At, skills: unknown, held: Held): Refusal[] =>
   stringsOf(skills)
@@ -106,7 +106,7 @@ const skillRefusals = (file: string, at: At, skills: unknown, held: Held): Refus
     .map(([name, i]) => ({
       file,
       at: [...at, i],
-      message: `skill ${name} is not in skills/, nor a place skill: carry it as skills/${name}/SKILL.md, or name one there is.`,
+      message: `skill ${name} is not in skills/, nor one of Nemia's own skills: carry it as skills/${name}/SKILL.md, or name one there is.`,
     }));
 
 /** The agent hired into `<workflow>/<step>`: its spec, or an empty one where none is. */
@@ -406,11 +406,11 @@ function textRefusals(folder: ReadFolder, held: Held, text: (file: string) => st
 /**
  * Every problem of the template `folder`, by file in order: the layout's and each document's (`layout.ts`), a hire, skill, sibling step,
  * parameter or file named that the folder lacks, a step's words, each harness's block against the runtime's knobs for it, and an
- * undeclared parameter's expression in a text the render writes, at its line. `placeSkills`: nemia's builtin place skills, each a skill
- * the folder need not carry; `text`, the words of one of its files, by its path. None for a template that passes.
+ * undeclared parameter's expression in a text the render writes, at its line. `packageSkills`: Nemia's place and builtin skills, each a
+ * skill the folder need not carry; `text`, the words of one of its files, by its path. None for a template that passes.
  */
-export function checkTemplate(folder: ReadFolder, placeSkills: readonly string[], text: (file: string) => string): Refusal[] {
-  const held = heldOf(folder, placeSkills);
+export function checkTemplate(folder: ReadFolder, packageSkills: readonly string[], text: (file: string) => string): Refusal[] {
+  const held = heldOf(folder, packageSkills);
   const documents = [...folder.documents].flatMap(([file, doc]) =>
     documentFile(file, folder.name) ? documentRefusals(file, doc, folder.name) : [],
   );

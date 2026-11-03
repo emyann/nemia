@@ -251,6 +251,17 @@ test("REFUSED: a folder team whose agent is given the git place's skill, which h
   assert.deepEqual(gitAsked(), []);
 });
 
+test("a folder team whose agent is given one of Nemia's builtin skills starts: it acts on no repository, and is found by name", async () => {
+  const team = path.join(ROOT, 'workflows', 'grilled-note');
+  fs.mkdirSync(team, { recursive: true });
+  fs.mkdirSync(path.join(ROOT, 'workflows', 'agents'), { recursive: true });
+  fs.writeFileSync(path.join(ROOT, 'workflows', 'agents', 'asker.md'), '---\ndescription: Asks.\nskills: grilling\n---\nAsk.\n');
+  fs.writeFileSync(path.join(team, 'ask.md'), '---\nworkspace: folder\nagent: asker\n---\nask about the note\n');
+  const run = await runPlaced(startRun({ brief: 'x', repo: NOT_A_REPO, workflowDir: team }));
+  assert.ok(readRun(run.id), 'started: a skill no place had would refuse the start');
+  assert.deepEqual(gitAsked(), []);
+});
+
 test('a git team is still a repository run: from a directory that is no repository, it is refused by git', async () => {
   const GIT_TEAM = path.join(ROOT, 'workflows', 'plain');
   fs.mkdirSync(GIT_TEAM, { recursive: true });

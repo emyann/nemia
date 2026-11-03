@@ -105,18 +105,18 @@ const OTHER_FILES = [
   'workflows/dev/review.md',
 ];
 
-/** The refusals of `software-team/` once `edit` has changed its documents and `files` its other files; `placeSkills` are shipped. */
+/** The refusals of `software-team/` once `edit` has changed its documents and `files` its other files; `packageSkills` are shipped. */
 function refusalsOf(
   edit: (docs: Record<string, any>) => void = () => {},
   files: (others: string[]) => string[] = (others) => others,
-  placeSkills: readonly string[] = ['git'],
+  packageSkills: readonly string[] = ['git'],
   texts: Readonly<Record<string, string>> = {},
 ): Refusal[] {
   const docs = documents();
   edit(docs);
   return checkTemplate(
     { name: 'software-team', files: [...Object.keys(docs), ...files([...OTHER_FILES])].sort(), documents: new Map(Object.entries(docs)) },
-    placeSkills,
+    packageSkills,
     (file) => texts[file] ?? '',
   );
 }

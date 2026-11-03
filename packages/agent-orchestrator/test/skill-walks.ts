@@ -16,7 +16,7 @@ import { act, done } from './door-walks.ts';
 import type { SkillDoorShape } from '../src/skills/skill-door.store.ts';
 import { SkillName } from '../src/agents/agents.model.ts';
 import { renderSkill, type SkillDraft } from '../src/skills/skills.ts';
-import { PLACE_SKILLS } from '../src/skills/read.store.ts';
+import { BUILTIN_SKILLS, PLACE_SKILLS } from '../src/skills/read.store.ts';
 import { WorkflowError } from '../src/step/step.ts';
 
 type Walk = DoorWalk<SkillDoorShape>;
@@ -75,14 +75,23 @@ export const SKILL_WALKS: Readonly<Record<string, readonly Walk[]>> = {
       says: {
         git: path.join(PLACE_SKILLS, 'git'),
         nothing: undefined,
-        looked: ['<root>/workflows/skills', PLACE_SKILLS],
+        looked: ['<root>/workflows/skills', PLACE_SKILLS, BUILTIN_SKILLS],
       },
+    },
+    {
+      name: "a builtin skill of Nemia no root holds, found after the place's; a skill of yours of its name comes first",
+      walk: (side) => {
+        const builtin = shown(foundOn(side).at.get('grilling'));
+        made(side, aSkill('grilling'));
+        return { builtin, yours: shown(foundOn(side).at.get('grilling')) };
+      },
+      says: { builtin: path.join(BUILTIN_SKILLS, 'grilling'), yours: '<root>/workflows/skills/grilling' },
     },
     {
       name: 'a skill of yours, before the builtin place skill of its name, which is found after every root',
       walk: (side) => {
         made(side, aSkill('zeta'));
-        const before = [...foundOn(side).all.keys()];
+        const before = [...foundOn(side).all.keys()].filter((name) => name === 'zeta' || name === 'git');
         made(side, aSkill('git'));
         return { before, git: shown(foundOn(side).at.get('git')) };
       },

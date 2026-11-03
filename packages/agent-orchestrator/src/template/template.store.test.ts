@@ -24,7 +24,7 @@ import { packArchive } from '../archive/archive.ts';
 
 const ROOT = scratch('wf-template-');
 process.env.WF_ROOT = ROOT;
-const { checkedTree, placeSkillNames, problemLine } = await import('./template.store.ts');
+const { checkedTree, packageSkillNames, problemLine } = await import('./template.store.ts');
 const { TemplateDoor } = await import('../templates/templates.store.ts');
 const { TemplateSource } = await import('../templates/templates.model.ts');
 const { StoreRoot } = await import('../config/root.store.ts');
@@ -65,7 +65,7 @@ const readTemplate = (source: string) =>
   );
 
 /** Every problem of the template at `source`, as `nemia template lint` finds them. */
-const checkTemplateAt = (source: string) => checkedTree(readTemplate(source), placeSkillNames()).problems;
+const checkTemplateAt = (source: string) => checkedTree(readTemplate(source), packageSkillNames()).problems;
 
 /**
  * Refused by kind, exit 2, and what the message names — the fix, the file, the key — each a pattern it matches or a token it holds;

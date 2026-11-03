@@ -4,10 +4,6 @@
  * the round's check in build's implement check, the areas in RULES.md, and no expression left in any file. Each step that writes its
  * own `output:` has its schema beside it in the tree, the template's own bytes; the team is six agents, Ada none of them. Applied with no
  * `--set`, each parameter takes its default.
- *
- * While Nemia does not ship Iris's interview skill builtin, the lint refuses sdlc for that skill alone, which the first test holds;
- * the lint that passes and the render read a scratch copy that carries a stub of it (`copyOf`, `./template.ts`). Once Nemia ships
- * it, the first test asserts the lint passes, and `copyOf` carries no stub.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -18,7 +14,7 @@ import { splitFrontmatter } from 'agent-orchestrator/workflow';
 import { scratch } from './scratch.ts';
 import { copyOf, filesUnder, nemia, rendered, SDLC, storeEnv } from './template.ts';
 
-/** The template, copied once with its stub, and applied twice on one store: with every parameter set, and with none. */
+/** The template, copied once, and applied twice on one store: with every parameter set, and with none. */
 const COPY = copyOf(SDLC);
 const TREES = await rendered([
   { name: 'set', template: COPY, sets: ['ciCheck=gate', 'roundCheck=echo round', 'areas=a, b'] },
@@ -45,18 +41,11 @@ const checkOf = (tree: string, workflow: string, step: string): string => String
 /** `--check` with the CI context `name`, quoted or bare. */
 const ciCheck = (name: string): RegExp => new RegExp(`--check "?${name}"?(?=[\\s;]|$)`, 'm');
 
-test('nemia template lint refuses sdlc for nothing but the interview skill Nemia is to ship, and passes a copy that carries it', () => {
+test('nemia template lint passes sdlc and prints its digest', () => {
   const env = storeEnv(scratch('nemia-sdlc-lint-'));
   const real = nemia(env, 'template', 'lint', SDLC);
-  if (real.code !== 0) {
-    assert.equal(real.code, 2, real.err);
-    const problems = real.err.split('\n').filter((line) => /^\S+:\d+:\d+: /.test(line));
-    assert.ok(problems.length > 0, real.err);
-    for (const line of problems) assert.ok(line.startsWith('agents/iris/agent.yaml:') && line.includes('grilling'), line);
-  }
-  const copy = nemia(env, 'template', 'lint', COPY);
-  assert.equal(copy.code, 0, copy.err);
-  assert.match(copy.out, /^digest of the content: sha256:[0-9a-f]{64}$/m);
+  assert.equal(real.code, 0, real.err);
+  assert.match(real.out, /^digest of the content: sha256:[0-9a-f]{64}$/m);
 });
 
 test('applied with every parameter set, each is written where the template says, and no expression is left', () => {

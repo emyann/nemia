@@ -89,7 +89,8 @@ no wider than the agent's. From narrowest, the modes are `plan`; then `dontAsk`,
 
 A skill is a folder of instructions and files for one kind of work, with a SKILL.md file at its head (this repository's `.claude/skills/look/SKILL.md` is one). An agent lists the skills it is
 given (`skills`), and a step may add more for its own position, but never take one of the agent's away. A skill is found in a
-`skills` folder beside the agents, or in the repository's `.claude/skills/`; the first place that has the name wins.
+`skills` folder beside the agents, in the repository's `.claude/skills/`, in your store's library, then among the skills built into
+Nemia; the first place that has the name wins.
 
 On Claude Code, each step's agent is rendered when the run starts: its instructions, your custom instructions and the factory's rules
 go after Claude Code's own prompt, and its skills

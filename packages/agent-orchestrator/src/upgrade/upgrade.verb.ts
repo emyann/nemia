@@ -32,6 +32,8 @@ import {
   type Entry,
 } from '../applied/applied.store.ts';
 import { compareVersions, compose, mergeTrees, planLines, resolveLine, type Choice, type TreeMerge } from './index.ts';
+import { adoptPreview, type AdoptPreview } from '../adopt/adopt.verb.ts';
+import { adoptLines } from '../adopt/adopt.ts';
 
 /** A factory made from a template. */
 type Templated = Factory & { template: FactoryTemplate };
@@ -64,7 +66,7 @@ function rendered(name: string, verb: string, notDone: string): { factory: Templ
   const factory = readFactory(name, notDone);
   if (factory.template === undefined)
     throw new Invalid({
-      message: `${verb}: ${name} is not made from a template, so it has none to upgrade; nemia factory apply makes one from a template. ${notDone}`,
+      message: `${verb}: ${name} is not made from a template, so it has none to upgrade; to put one onto it in place, nemia factory diff ${name} --template <name|folder|archive> previews the takeover, then nemia factory adopt. ${notDone}`,
     });
   const base = entriesIn(appliedDir(name));
   if (!base.length)
@@ -157,25 +159,44 @@ const FROM_TEMPLATE: Flag = {
   twice: 'take --template once: a factory is made from one template.',
 };
 
-/** `nemia factory diff`'s spec: the factory, `--to` and `--template`. */
+/** `nemia factory diff`'s spec: the factory, `--to`, `--template`, and a `--set` per parameter, which only a takeover takes. */
 const PLAN_SPEC: Spec = {
   positionals: [{ key: 'factory', takes: 'required', kind: 'name' }],
-  flags: [TO, FROM_TEMPLATE],
+  flags: [
+    TO,
+    FROM_TEMPLATE,
+    {
+      flag: '--set',
+      kind: 'text',
+      key: 'sets',
+      many: true,
+      takes: '--set takes a parameter of the template and its value: --set <key>=<value>',
+    },
+  ],
   unknown: (arg) =>
     arg.startsWith('-')
-      ? `nemia factory diff does not take ${arg}. It takes the factory, --to <x.y.z> and --template <name|folder|archive>.`
+      ? `nemia factory diff does not take ${arg}. It takes the factory, --to <x.y.z>, --template <name|folder|archive> and, to preview a takeover, --set <key>=<value> once per parameter.`
       : `nemia factory diff previews one factory, and ${arg} is a second: nemia factory diff <name> --to <x.y.z>.`,
-  missing: 'nemia factory diff takes the factory to preview: nemia factory diff <name> --to <x.y.z> [--template <name|folder|archive>].',
+  missing:
+    'nemia factory diff takes the factory to preview: nemia factory diff <name> --to <x.y.z> [--template <name|folder|archive>], or, made by hand, nemia factory diff <name> --template <name|folder|archive> [--set <key>=<value> ...].',
 };
 
-/** What `nemia factory diff` previews: the factory, the versions, and the merge. */
-type Planned = { name: string; from: string | undefined; to: string; merge: TreeMerge };
+/** What `nemia factory diff` previews of a templated factory: the factory, the versions, and the merge. */
+type Planned = { kind: 'upgrade'; name: string; from: string | undefined; to: string; merge: TreeMerge };
 
-/** `nemia factory diff`: the merge an upgrade would make, what merges cleanly and each conflict; nothing written. */
-export const FACTORY_PLAN: Command<Planned> = {
+/**
+ * `nemia factory diff`: on a templated factory, the merge an upgrade would make, what merges cleanly and each conflict, a `--set`
+ * refused (`Invalid`: an upgrade takes no parameter yet); on one made by hand, the takeover a template would make (`adoptPreview`).
+ * Nothing written.
+ */
+export const FACTORY_PLAN: Command<Planned | AdoptPreview> = {
   name: 'factory diff',
-  usage: '<name> --to <x.y.z> [--template <name|folder|archive>]',
-  help: ["preview a templated factory's upgrade: what merges cleanly, and each", 'conflict with its sides; nothing is written'],
+  usage: '<name> --to <x.y.z> [--template <name|folder|archive>] | <name> --template <name|folder|archive> [--set <key>=<value> ...]',
+  help: [
+    "preview a templated factory's upgrade: what merges cleanly, and each",
+    "conflict with its sides; or a hand-made factory's takeover by a",
+    'template, and the plan nemia factory adopt takes; nothing is written',
+  ],
   spec: PLAN_SPEC,
   check: (args) => leftOut(PLAN_SPEC, args),
   writes: false,
@@ -186,11 +207,26 @@ export const FACTORY_PLAN: Command<Planned> = {
       home,
       'factory diff',
       Effect.gen(function* () {
-        const { factory, from, to, render, base } = yield* upgradeAsked(args, 'nemia factory diff', 'Nothing was written.', false);
-        return { name: factory.name, from, to, merge: yield* tried(() => mergeOf(factory.name, base, render)) };
+        const verb = 'nemia factory diff';
+        const notDone = 'Nothing was written.';
+        const name = textOf(args, 'factory') ?? '';
+        const now = yield* (yield* FactoryDoor).factories.read(FactoryName.read(name));
+        if (now.template === undefined) return yield* adoptPreview(args);
+        if (Array.isArray(args.sets) && args.sets.length)
+          return yield* Effect.fail(
+            new Invalid({
+              message: `${verb}: ${name} is made from a template, and an upgrade takes no --set yet: its parameters are those its file names. Leave --set out: ${verb} ${name} --to <x.y.z>. ${notDone}`,
+            }),
+          );
+        const { factory, from, to, render, base } = yield* upgradeAsked(args, verb, notDone, false);
+        const merge = yield* tried(() => mergeOf(factory.name, base, render));
+        return { kind: 'upgrade', name: factory.name, from, to, merge } satisfies Planned;
       }),
     ),
-  print: ({ name, from, to, merge }) => planLines(name, from ?? UNKNOWN, to, merge),
+  print: (planned) =>
+    planned.kind === 'adopt'
+      ? adoptLines(planned.plan, planned.digest, planned.line)
+      : planLines(planned.name, planned.from ?? UNKNOWN, planned.to, planned.merge),
 };
 
 /** `nemia factory upgrade`'s spec: the factory, `--to`, `--template` and `--downgrade`. */

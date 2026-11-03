@@ -31,7 +31,7 @@ import {
   folderAsked,
   lookupsOf,
   packOut,
-  placeSkillNames,
+  packageSkillNames,
   problemLine,
   type ExportFound,
   type FactoryParts,
@@ -57,7 +57,7 @@ it. Each .yaml holds one document, of apiVersion nemia.dev/v1alpha1.
   nemia template export writes a new folder from the repository --from: each workflow of its workflows/ —
                  with --factory, only those the factory attaches, and its hires, instruction and rules — the
                  agents their steps name and the skills those agents and steps name, found where a run finds them;
-                 a builtin place skill is left out. It prints each part and where it came from, and writes
+                 a builtin place skill or skill of Nemia's is left out. It prints each part and where it came from, and writes
                  nothing while a key has no place in a template, or the draft does not pass its own check.
   nemia template pack   writes a folder that passes its check into one archive, a gzipped tar of the folder
                  any tar opens (tar xzf), at --out, by default <name>-<version>.tgz here; it prints the
@@ -91,7 +91,7 @@ const digestLine = (digest: string | undefined): string => `digest of the conten
 /** The folder or archive `folder`, read through the Template door and checked: it passes with its digest, or every problem is refused. */
 export const lintedTemplate = Effect.fn('templateLint')(function* (folder: string) {
   const read = yield* (yield* TemplateDoor).templates.read(TemplateSource.read(path.resolve(folder)));
-  const { problems, digest } = checkedTree(read, placeSkillNames());
+  const { problems, digest } = checkedTree(read, packageSkillNames());
   if (problems.length)
     return yield* Effect.fail(
       new Invalid({
@@ -185,7 +185,7 @@ const exportFound = Effect.fnUntraced(function* (from: string) {
 export const exportedTemplate = Effect.fn('templateExport')(function* (dir: string, from: string, factory: string | undefined) {
   const parts = factory === undefined ? undefined : yield* factoryParts(factory);
   const found = yield* exportFound(from);
-  const tree = yield* tried(() => exportTree({ dir, from, factory: parts }, placeSkillNames(), found));
+  const tree = yield* tried(() => exportTree({ dir, from, factory: parts }, packageSkillNames(), found));
   yield* (yield* TemplateDoor).templates.create(TemplateSource.read(tree.dir), tree);
   return { dir: tree.dir, from: tree.from };
 });
@@ -195,7 +195,7 @@ export const packedTemplate = Effect.fn('templatePack')(function* (dir: string, 
   const door = yield* TemplateDoor;
   const source = yield* tried(() => folderAsked(dir));
   const read = yield* door.templates.read(TemplateSource.read(source));
-  const at = yield* tried(() => packOut({ dir, out, cwd }, checkedTree(read, placeSkillNames())));
+  const at = yield* tried(() => packOut({ dir, out, cwd }, checkedTree(read, packageSkillNames())));
   const written = yield* door.templates.pack(TemplateSource.read(at), read);
   return { out: written.source, digest: written.digest };
 });

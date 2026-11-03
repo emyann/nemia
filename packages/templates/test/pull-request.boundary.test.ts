@@ -40,17 +40,6 @@ const CI = ['--check', 'ci'];
 type Rendered = { tree: string; store: string };
 
 /**
- * Iris's `grilling` carried in the template copy `template` as a stub, where `nemia template lint` refuses the name: a builtin skill
- * Nemia does not ship yet, and a template lint refuses is never rendered. Once lint passes sdlc as it is, nothing is written, and this
- * goes.
- */
-function grillingStubbed(template: string, lints: (folder: string) => boolean): void {
-  if (lints(template)) return;
-  fs.mkdirSync(path.join(template, 'skills', 'grilling'), { recursive: true });
-  fs.writeFileSync(path.join(template, 'skills', 'grilling', 'SKILL.md'), '---\nname: grilling\ndescription: A stub.\n---\nA stub.\n');
-}
-
-/**
  * sdlc rendered as a person's factory gets it: a copy of the template applied by `nemia factory apply` with `sets`, on a scratch store,
  * and rendered by the controller of a `nemia up` on that store, stopped once it has written the factory's status and seeded its tree.
  */
@@ -70,7 +59,6 @@ async function rendered(sets: readonly string[] = []): Promise<Rendered> {
     WF_MAX_RUNS: '1',
   };
   const nemia = (...args: string[]) => spawnSync(process.execPath, [BIN, ...args], { cwd: root, env, encoding: 'utf8', timeout: 60_000 });
-  grillingStubbed(template, (folder) => nemia('template', 'lint', folder).status === 0);
   const repo = path.join(root, 'repo');
   fs.mkdirSync(repo);
   gitIn(repo, 'init', '-q');

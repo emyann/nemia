@@ -9,7 +9,7 @@ import { Cause, Effect, Exit } from 'effect';
 import { StoreRoot } from '../src/config/root.store.ts';
 import { BuiltinTemplates, TemplateDoor } from '../src/templates/templates.store.ts';
 import { TemplateSource } from '../src/templates/templates.model.ts';
-import { openedTree, placeSkillNames } from '../src/template/template.store.ts';
+import { openedTree, packageSkillNames } from '../src/template/template.store.ts';
 import { exportedTemplate } from '../src/template/template.verb.ts';
 import { reconcileFactory } from '../src/applied/applied.verb.ts';
 
@@ -34,7 +34,7 @@ export function templated(root: string, builtins?: string) {
     /** `nemia template export`'s program: the folder `dir` written from the repository `from`. */
     exportTemplate: (ask: { dir: string; from: string; factory?: string }) => run(exportedTemplate(ask.dir, ask.from, ask.factory)),
     /** The template at `source`, read through the door and opened for a render. */
-    openTemplate: (source: string) => openedTree(source, read(source), placeSkillNames()),
+    openTemplate: (source: string) => openedTree(source, read(source), packageSkillNames()),
     /** One pass of the factory controller over `factory`: the status it observed. */
     reconciled: (factory: Parameters<typeof reconcileFactory>[0]) => run(reconcileFactory(factory)),
   };

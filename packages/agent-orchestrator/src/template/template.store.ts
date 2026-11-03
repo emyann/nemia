@@ -16,7 +16,15 @@ import { placesOf } from '../folder/lookup.store.ts';
 import { readKeys } from '../former/former.ts';
 import { givenSkillOf } from '../keys/index.ts';
 import { Invalid, Missing } from '../refusal/refusal.ts';
-import { entriesOf, isBuiltinPlace, lookupRoots, PLACE_SKILLS, skillFiles, type Places } from '../skills/read.store.ts';
+import {
+  entriesOf,
+  isBuiltinPlace,
+  isBuiltinSkill,
+  lookupRoots,
+  packageSkillFolders,
+  skillFiles,
+  type Places,
+} from '../skills/read.store.ts';
 import { splitFrontmatter, WorkflowError } from '../step/step.ts';
 import { firstPiece } from '../piece/piece.ts';
 import { contentDigest, pathRefusals, type TreeFile } from '../archive/archive.ts';
@@ -76,9 +84,8 @@ function readTemplateFolder(
   return { folder: { name, files: files.map((f) => f.path), documents }, parsed };
 }
 
-/** The names of nemia's builtin place skills, each present to a template that names it. */
-export const placeSkillNames = (): string[] =>
-  entriesOf(PLACE_SKILLS).filter((name) => fs.existsSync(path.join(PLACE_SKILLS, name, 'SKILL.md')));
+/** The names of Nemia's own skills, the place's and the builtin ones (`packageSkillFolders`), each present to a template that names it. */
+export const packageSkillNames = (): string[] => packageSkillFolders().map(([name]) => name);
 
 /** A problem as a person reads it: `<file>:<line>:<col>: <words>`, or `<file>: <words>` where it has no line. */
 export const problemLine = (p: Problem): string => `${p.file}${p.line === undefined ? '' : `:${p.line}:${p.col ?? 1}`}: ${p.message}`;
@@ -88,10 +95,10 @@ export type CheckedTemplate = TemplateTree & { folder: ReadFolder; version: unkn
 
 /**
  * The tree `tree` checked: every problem at once, sorted by file then line — what its read found (a link, a path longer than an archive
- * holds), a document that does not parse, and each that `checkTemplate` refuses, at the line its value stands on. `placeSkills` names
- * the builtin place skills a template may name (`placeSkillNames`). Pure.
+ * holds), a document that does not parse, and each that `checkTemplate` refuses, at the line its value stands on. `packageSkills` names
+ * Nemia's own skills, the place's and the builtin ones, a template may name (`packageSkillNames`). Pure.
  */
-export function checkedTree(tree: TemplateTree, placeSkills: readonly string[]): CheckedTemplate {
+export function checkedTree(tree: TemplateTree, packageSkills: readonly string[]): CheckedTemplate {
   const problems = [...tree.problems];
   const { folder, parsed } = readTemplateFolder(tree.name, tree.files, problems);
   const byPath = new Map(tree.files.map((f) => [f.path, f]));
@@ -99,7 +106,7 @@ export function checkedTree(tree: TemplateTree, placeSkills: readonly string[]):
     const found = byPath.get(file);
     return found === undefined ? '' : Buffer.from(found.bytes).toString('utf8');
   };
-  for (const refusal of checkTemplate(folder, [...placeSkills], text)) {
+  for (const refusal of checkTemplate(folder, [...packageSkills], text)) {
     const doc = parsed.get(refusal.file);
     const at = doc ? lineOf(doc, refusal.at) : { line: refusal.line, col: refusal.col };
     problems.push({ file: refusal.file, ...at, message: refusal.message });
@@ -116,8 +123,8 @@ export type OpenTemplate = CheckedTemplate & { file: (at: string) => TreeFile; t
  * The tree read from `source`, checked (`checkedTree`), each of its files then read off the tree. Refused: a file asked for that is no
  * file of the template (Invalid), so a `{path}` cannot reach out. Pure.
  */
-export function openedTree(source: string, tree: TemplateTree, placeSkills: readonly string[]): OpenTemplate {
-  const checked = checkedTree(tree, placeSkills);
+export function openedTree(source: string, tree: TemplateTree, packageSkills: readonly string[]): OpenTemplate {
+  const checked = checkedTree(tree, packageSkills);
   const byPath = new Map(checked.files.map((f) => [f.path, f]));
   const file = (at: string): TreeFile => {
     const found = byPath.get(at);
@@ -213,7 +220,7 @@ function lookups({ agents, skills }: ExportFound): Pick<Source, 'agent' | 'skill
       if (dir === undefined) return undefined;
       if (dir instanceof Error) return { refused: dir.message };
       if (givenSkillOf(name)?.folder !== undefined) return { named: dir };
-      return isBuiltinPlace(dir) ? 'place' : { dir };
+      return isBuiltinPlace(dir) ? 'place' : isBuiltinSkill(dir) ? 'builtin' : { dir };
     },
   };
 }
@@ -314,7 +321,7 @@ export type ExportAsk = { dir: string; from: string; factory?: FactoryParts };
  */
 export function exportTree(
   ask: ExportAsk,
-  placeSkills: readonly string[],
+  packageSkills: readonly string[],
   found: ExportFound,
 ): { dir: string; name: string; files: TreeFile[]; from: Draft['from'] } {
   const dir = path.resolve(ask.dir);
@@ -332,7 +339,7 @@ export function exportTree(
   refusals.push(...draft.refusals);
   if (refusals.length) throw new Invalid({ message: `${dir} was not written:\n${refusals.map((r) => `  ${r}`).join('\n')}` });
   const files = treeOfDraft(draft);
-  const { problems } = checkedTree(folderTreeOf(name, files), placeSkills);
+  const { problems } = checkedTree(folderTreeOf(name, files), packageSkills);
   if (problems.length)
     throw new Invalid({
       message: `${dir} was not written, since the draft does not pass:\n${problems.map((p) => `  ${problemLine(p)}`).join('\n')}`,

@@ -5,10 +5,7 @@
  *
  * The digest is the one `nemia template lint <folder>` prints, of the folder's files with their modes. A checkout's modes are its
  * umask's, so the digest is read over a scratch copy whose modes are git's (100644 a 0o644, 100755 a 0o755: `modesOf`), never over the
- * checkout as it is. While Nemia does not ship Iris's interview skill builtin, `nemia template lint` refuses sdlc for it and prints
- * no digest, so the digest is read through `nemia template unpack`, which prints the same digest of the folder an archive holds and
- * runs no check (`digestOf`): the copy is packed by `tar` as ustar, which the unpack reads. That the two print one digest is held on a
- * copy that passes the lint. Once Nemia ships the skill, `digestOf` reads `nemia template lint` over the copy and that test goes.
+ * checkout as it is (`digestOf`).
  *
  * Each refusal is first made on a scratch copy of the workspace, a byte changed or a version bumped, then the workspace as it is read.
  */
@@ -19,7 +16,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import yaml from 'js-yaml';
 import { scratch } from './scratch.ts';
-import { copyOf, nemia, SDLC, storeEnv, TEMPLATES } from './template.ts';
+import { nemia, storeEnv, TEMPLATES } from './template.ts';
 
 /** The record of what is released: by template, its version and the digest of its content. */
 const RELEASED = 'released.json';
@@ -50,24 +47,20 @@ const MODES = modesOf(TEMPLATES);
 
 /**
  * The digest of the content of the template `folder` (a folder of `root`), its files' modes set from `MODES` (0o644 for a file git does
- * not track yet): packed as ustar by `tar` in a scratch folder, and read back by `nemia template unpack`, which prints the digest of the
- * folder the archive holds.
+ * not track yet), as `nemia template lint` prints it over a scratch copy.
  */
 function digestOf(root: string, folder: string): string {
   const work = scratch('nemia-released-');
-  const copy = path.join(work, 'in', folder);
+  const copy = path.join(work, folder);
   fs.cpSync(path.join(root, folder), copy, { recursive: true });
   for (const file of fs.readdirSync(copy, { recursive: true, encoding: 'utf8' })) {
     const at = path.join(copy, file);
     fs.chmodSync(at, fs.statSync(at).isDirectory() ? 0o755 : (MODES.get(`${folder}/${file.split(path.sep).join('/')}`) ?? 0o644));
   }
-  const archive = path.join(work, `${folder}.tgz`);
-  const packed = spawnSync('tar', ['-C', path.join(work, 'in'), '--format=ustar', '-czf', archive, folder], { encoding: 'utf8' });
-  assert.equal(packed.status, 0, packed.stderr);
-  const unpacked = nemia(storeEnv(work), 'template', 'unpack', archive, path.join(work, 'out'));
-  assert.equal(unpacked.code, 0, unpacked.err);
-  const digest = /^digest of the content: (sha256:[0-9a-f]{64})$/m.exec(unpacked.out)?.[1];
-  assert.ok(digest, `nemia template unpack printed a digest: ${unpacked.out}`);
+  const linted = nemia(storeEnv(work), 'template', 'lint', copy);
+  assert.equal(linted.code, 0, linted.err);
+  const digest = /^digest of the content: (sha256:[0-9a-f]{64})$/m.exec(linted.out)?.[1];
+  assert.ok(digest, `nemia template lint printed a digest: ${linted.out}`);
   return digest;
 }
 
@@ -140,16 +133,4 @@ test('each template of the workspace is at the version and the digest released.j
     apart(TEMPLATES).map(({ message }) => message),
     [],
   );
-});
-
-test('the digest read through nemia template unpack is the one nemia template lint prints, on a copy that passes it', () => {
-  const folder = copyOf(SDLC);
-  const root = path.dirname(folder);
-  for (const file of fs.readdirSync(folder, { recursive: true, encoding: 'utf8' })) {
-    const at = path.join(folder, file);
-    fs.chmodSync(at, fs.statSync(at).isDirectory() ? 0o755 : (MODES.get(`sdlc/${file.split(path.sep).join('/')}`) ?? 0o644));
-  }
-  const linted = nemia(storeEnv(scratch('nemia-released-lint-')), 'template', 'lint', folder);
-  assert.equal(linted.code, 0, linted.err);
-  assert.equal(/^digest of the content: (sha256:[0-9a-f]{64})$/m.exec(linted.out)?.[1], digestOf(root, 'sdlc'));
 });

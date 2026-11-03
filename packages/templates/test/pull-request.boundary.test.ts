@@ -15,13 +15,13 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { execFileSync, spawn, spawnSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { loadWorkflows } from 'agent-orchestrator';
 import { CHECK_DEADLINE_SECONDS, checkArgv } from 'agent-orchestrator/run';
 import { scratch } from './scratch.ts';
-import { BIN } from './template.ts';
+import { renderedSdlc } from './template.ts';
 import { CI_URL, GREEN, type Called, type Gh, type Rule, bareOrigin, ghStub, gitIn, listed, passing, rollup, tip } from './origin.ts';
 
 /** The template these scripts ship in. */
@@ -34,63 +34,8 @@ const SCRIPT = path.join(BUILD, 'pull-request.ts');
 /** The wait's flag, naming the CI context `origin.ts`'s rollups report. */
 const CI = ['--check', 'ci'];
 
-/** The orchestrator's CLI, `nemia`, reached through its package's entry. */
-
 /** sdlc as a factory gets it: the factory's rendered tree, and the scratch store it is in. */
 type Rendered = { tree: string; store: string };
-
-/**
- * sdlc rendered as a person's factory gets it: a copy of the template applied by `nemia factory apply` with `sets`, on a scratch store,
- * and rendered by the controller of a `nemia up` on that store, stopped once it has written the factory's status and seeded its tree.
- */
-async function rendered(sets: readonly string[] = []): Promise<Rendered> {
-  const root = scratch('wf-sdlc-render-');
-  const template = path.join(root, 'sdlc');
-  fs.cpSync(SDLC, template, { recursive: true });
-  const store = path.join(root, 'store');
-  const env = {
-    ...process.env,
-    HOME: root,
-    WF_ROOT: store,
-    AE_ROOT: path.join(root, 'engine'),
-    CLAUDE_CONFIG_DIR: path.join(root, 'claude'),
-    OTEL_EXPORTER_OTLP_ENDPOINT: '',
-    WF_MAX_CONCURRENT: '1',
-    WF_MAX_RUNS: '1',
-  };
-  const nemia = (...args: string[]) => spawnSync(process.execPath, [BIN, ...args], { cwd: root, env, encoding: 'utf8', timeout: 60_000 });
-  const repo = path.join(root, 'repo');
-  fs.mkdirSync(repo);
-  gitIn(repo, 'init', '-q');
-  const applied = nemia(
-    'factory',
-    'apply',
-    'sdlc',
-    '--template',
-    template,
-    '--repo',
-    repo,
-    '--no-trust',
-    ...sets.flatMap((s) => ['--set', s]),
-  );
-  assert.equal(applied.status, 0, applied.stderr);
-  const folder = path.join(store, 'factories', 'sdlc');
-  const done = () => fs.existsSync(path.join(folder, 'status.json')) && fs.existsSync(path.join(folder, 'tree', 'factory.json'));
-  const up = spawn(process.execPath, [BIN, 'up'], { cwd: root, env, stdio: 'ignore' });
-  const ended = new Promise((resolve) => up.once('exit', resolve));
-  try {
-    for (const bound = performance.now() + 60_000; !done(); await new Promise((r) => setTimeout(r, 50)))
-      assert.ok(performance.now() < bound && up.exitCode === null, 'the controller renders the tree within 60 s');
-  } finally {
-    up.kill('SIGTERM');
-    const killer = setTimeout(() => up.kill('SIGKILL'), 10_000);
-    await ended;
-    clearTimeout(killer);
-  }
-  const status = JSON.parse(fs.readFileSync(path.join(folder, 'status.json'), 'utf8')) as { conditions: { status: string }[] };
-  assert.equal(status.conditions[0]?.status, 'True', JSON.stringify(status));
-  return { tree: path.join(folder, 'tree'), store };
-}
 
 /** The steps of the rendered tree's `workflow`, read as a start of it in the factory reads them: with the factory's hires. */
 function stepsOf(at: Rendered, workflow: string) {
@@ -576,7 +521,7 @@ test('REFUSED: no ci context within the bound, and a ci still pending at its end
 });
 
 test("build's implement check, rendered, pushes through the script before the round check, waits last on the CI context it was set, and runs no suite and no e2e itself", async () => {
-  const at = await rendered(['roundCheck=round-check --all', 'ciCheck=gate']);
+  const at = await renderedSdlc(['roundCheck=round-check --all', 'ciCheck=gate']);
   const check = stepsOf(at, 'build').find((step) => step.name === 'implement')?.check;
   assert.equal(typeof check, 'string', "sdlc's build has an implement step with a check");
   const frozen = check as string;

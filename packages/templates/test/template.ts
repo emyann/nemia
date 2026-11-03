@@ -29,6 +29,7 @@ export function storeEnv(root: string): NodeJS.ProcessEnv {
     WF_ROOT: path.join(root, 'store'),
     AE_ROOT: path.join(root, 'engine'),
     HOME: path.join(root, 'home'),
+    CLAUDE_CONFIG_DIR: path.join(root, 'claude'),
     WF_MAX_CONCURRENT: '2',
     WF_MAX_RUNS: '2',
   };
@@ -60,8 +61,8 @@ export function copyOf(from: string, edit: Record<string, (text: string) => stri
 /** A factory to apply: its name, the template's folder, and its `--set` words, each `<key>=<value>`. */
 export type Applied = { name: string; template: string; sets?: string[] };
 
-/** A factory as the controller left it: its tree's folder where it was seeded, and the conditions of its status. */
-export type Tree = { tree: string | undefined; conditions: Array<{ type: string; status: string; reason: string }> };
+/** A factory as the controller left it: its tree's folder where it was seeded, the conditions of its status, and the store it is in. */
+export type Tree = { tree: string | undefined; conditions: Array<{ type: string; status: string; reason: string }>; store: string };
 
 /**
  * Each of `factories` applied on one scratch store, each over a scratch repository of its own, then rendered by `nemia up`, stopped once
@@ -113,8 +114,18 @@ export async function rendered(factories: readonly Applied[]): Promise<Record<st
     await exited;
   }
   return Object.fromEntries(
-    factories.map(({ name }) => [name, { tree: appliedOf(name) ? treeOf(name) : undefined, conditions: statusOf(name)?.conditions ?? [] }]),
+    factories.map(({ name }) => [
+      name,
+      { tree: appliedOf(name) ? treeOf(name) : undefined, conditions: statusOf(name)?.conditions ?? [], store: env.WF_ROOT! },
+    ]),
   );
+}
+
+/** sdlc as one factory gets it, a copy applied with `sets` and rendered (`rendered`): its tree, and the scratch store it is in. */
+export async function renderedSdlc(sets: readonly string[] = []): Promise<{ tree: string; store: string }> {
+  const { sdlc } = await rendered([{ name: 'sdlc', template: copyOf(SDLC), sets: [...sets] }]);
+  if (sdlc?.tree === undefined) throw new Error(`nemia up did not apply sdlc: ${JSON.stringify(sdlc?.conditions)}`);
+  return { tree: sdlc.tree, store: sdlc.store };
 }
 
 /** Every file under `dir`, by its path from it, in order. */

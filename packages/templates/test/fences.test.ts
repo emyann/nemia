@@ -22,8 +22,11 @@ import yaml from 'js-yaml';
 import { splitFrontmatter } from 'agent-orchestrator/workflow';
 import { copyOf, rendered, SDLC } from './template.ts';
 
-/** The store a factory names, set so the rendered rules show it. */
-const STORE = '/srv/nemia-store';
+/**
+ * The store a factory names, set so the rendered rules show it: absolute, and so written with two slashes, as Claude Code reads an
+ * absolute path in a rule.
+ */
+const STORE = '//srv/nemia-store';
 
 /** The agents of the team that read the repository and never write it. */
 const READ_ONLY = ['agora', 'argus', 'iris', 'seldon'];

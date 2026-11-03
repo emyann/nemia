@@ -48,6 +48,10 @@ What your repository decides is a parameter, given with `--set` when you apply t
 | areas      | the areas of the repository a card names, in the factory's rules | the top-level folders of the repository                     |
 | storeRoot  | the store the agents' fences keep them out of                    | ~/.agent-workflows                                          |
 
+storeRoot is written as Claude Code reads a path in a permission rule: `~/` for a store under your home, and two slashes for any
+other absolute path, `--set storeRoot=//srv/nemia` for a store at `/srv/nemia`. With one slash Claude Code reads the path from the
+settings' folder, so the fence would deny nothing.
+
 ## Apply it
 
 ```bash

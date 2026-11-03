@@ -21,7 +21,7 @@ spec:
       default: the top-level folders of the repository
     storeRoot:
       type: string
-      description: The Nemia store whose factories, workflows and inbox every agent's fence refuses to edit or write.
+      description: "The Nemia store whose factories, workflows and inbox every agent's fence refuses to edit, written as Claude Code reads a path in a permission rule: ~/ for one under your home, and two slashes for any other absolute path (//srv/nemia), since one slash reads from the settings' folder and the deny would match nothing."
       default: ~/.agent-workflows
   hires:
     build/design: seldon

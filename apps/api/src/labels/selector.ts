@@ -4,7 +4,7 @@
  * hands it at the command line; a malformed one is the entry's `Invalid`, a 422 by `app.onError`.
  */
 import type { Context } from 'hono';
-import type { ApiEnv } from './layer.ts';
+import type { ApiEnv } from '../layer.ts';
 
 /** `{ selector }`, every `?selector=` the request gives in its order, or nothing where it gives none. */
 export const selectorOf = (c: Context<ApiEnv>): { selector?: string[] } => {

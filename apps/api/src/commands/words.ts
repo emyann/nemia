@@ -8,7 +8,7 @@ import { decodeBody, valueAt, type BodyIssue, type Words } from '../body.ts';
 import type { Guarded } from '../guard.ts';
 import { AGENTS_COPY, AGENTS_CUSTOM, POLICY_CONFIRM, POLICY_DROP } from './library.ts';
 import { LEVEL, SUBSCRIBE, UNSUBSCRIBE } from './sessions.ts';
-import { LABEL_WORDS } from './labels.ts';
+import { LABEL_WORDS } from '../labels/index.ts';
 import { FACTORY_RULES_WORDS } from '../factories/rules.ts';
 import { FACTORY_SCHEDULE, FACTORY_UNSCHEDULE } from '../factories/schedules.ts';
 import { FACTORY_SERVER_WORDS } from '../servers/index.ts';

@@ -40,7 +40,7 @@ import { readBody, type BodyIssue } from '../body.ts';
 import { refusedBeforeReading, type Guarded, type Refusal } from '../guard.ts';
 import { type ApiEnv, served } from '../layer.ts';
 import { folderOf, type KeyRow } from '../workflows/workflows.ts';
-import { selectorOf } from '../selector.ts';
+import { selectorOf } from '../labels/index.ts';
 import { commandNamed, runPlaced } from '../store.ts';
 
 /**

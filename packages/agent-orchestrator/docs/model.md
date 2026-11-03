@@ -132,6 +132,7 @@ erDiagram
     StepName gate FK "optional"
     FactoryName factory FK "optional"
     list from FK "optional"
+    object labels "optional"
     string body
   }
   Factory {

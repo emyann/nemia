@@ -4,7 +4,7 @@
  */
 import { inboxNameRefusal } from 'agent-orchestrator';
 import type { Words } from '../body.ts';
-import type { RouteWords } from './words.ts';
+import type { RouteWords } from '../commands/words.ts';
 
 /** The body `POST …/labels` takes, on a run and on a card: `nemia label`'s edits and `--overwrite`, as JSON (`LabelEdit`). */
 const LABEL_SHAPE = '`{ "labels": ["<key>=<value>", "<key>-", …], "overwrite"?: true }`';

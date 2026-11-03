@@ -16,6 +16,7 @@ import { Invalid, Missing } from '../refusal/refusal.ts';
 import type { Workflow } from '../step/step.ts';
 import { timeline } from '../timeline/index.ts';
 import { runStore } from '../record/files.store.ts';
+import { RunDoor } from '../runs/runs.store.ts';
 import { stepsOf } from '../steps/steps.verb.ts';
 import { closeoutReader, everyTryOf, taskCloseout, taskPhasesRead, viewedOnce } from '../views/views.verb.ts';
 import { phaseOfView } from '../views/views-words.ts';
@@ -192,16 +193,16 @@ const statsOver = Effect.fnUntraced(function* (e: Engine, query: StatsQuery, now
     facts.runs.push(...read.facts.runs);
     if (read.unreadable) unreadable.push(read.id);
   }
-  const taken = query.selectors?.length ? takenBy(query.selectors) : undefined;
+  const taken = query.selectors?.length ? takenBy(yield* (yield* RunDoor).runs.list(), query.selectors) : undefined;
   return statsOf(facts, query, now, unreadable, (from, to) => seriesHealth(from, to, series), taken);
 });
 
 /**
- * Whether a run is one `selectors` takes, off the labels of every run the store lists (`selectedRuns`): read only where a selector was
+ * Whether a run is one `selectors` takes, off the labels of every run the Run door lists (`selectedRuns`): read only where a selector was
  * given, since it reads every record the memo would not.
  */
-function takenBy(selectors: Selectors): (run: string) => boolean {
-  const ids = new Set(selectedRuns(runStore.runs.list(), selectors).map((run) => run.id));
+function takenBy(listed: readonly Run[], selectors: Selectors): (run: string) => boolean {
+  const ids = new Set(selectedRuns(listed, selectors).map((run) => run.id));
   return (run) => ids.has(run);
 }
 

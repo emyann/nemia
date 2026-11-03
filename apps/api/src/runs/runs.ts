@@ -25,7 +25,7 @@ import {
 import { decisionOf } from '../decide/decision.ts';
 import { type ApiEnv, served, type Served } from '../layer.ts';
 import { workflowPageOf, type WorkflowPageAddress } from '../step/step.ts';
-import { selectorOf } from '../selector.ts';
+import { selectorOf } from '../labels/index.ts';
 import { commandNamed, findRun, noSuchRun, runPlaced } from '../store.ts';
 
 /**

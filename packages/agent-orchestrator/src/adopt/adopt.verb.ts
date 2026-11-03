@@ -37,16 +37,16 @@ const manyOf = (args: Args, key: string): string[] => {
   return Array.isArray(value) ? value.map(String) : [];
 };
 
-/** A command line's word, quoted for a shell where it holds anything but plain characters. */
-const shellWord = (word: string): string => (/^[\w./:=@+-]+$/.test(word) ? word : `'${word.replaceAll("'", "'\\''")}'`);
+/** An argument of a command line, quoted for a shell where it holds anything but plain characters. */
+const shellArg = (arg: string): string => (/^[\w./:=@+-]+$/.test(arg) ? arg : `'${arg.replaceAll("'", "'\\''")}'`);
 
 /** The line that takes `name` over by the template at `source` with `sets`, carrying the plan's `digest`. */
 const adoptLine = (name: string, source: string, sets: readonly string[], digest: string): string =>
-  `nemia factory adopt ${[name, '--template', source, ...sets.flatMap((s) => ['--set', s]), '--plan', digest].map(shellWord).join(' ')}`;
+  `nemia factory adopt ${[name, '--template', source, ...sets.flatMap((s) => ['--set', s]), '--plan', digest].map(shellArg).join(' ')}`;
 
 /** The line that previews the takeover of `name` by the template at `source` with `sets`. */
 export const diffLine = (name: string, source: string, sets: readonly string[]): string =>
-  `nemia factory diff ${[name, '--template', source, ...sets.flatMap((s) => ['--set', s])].map(shellWord).join(' ')}`;
+  `nemia factory diff ${[name, '--template', source, ...sets.flatMap((s) => ['--set', s])].map(shellArg).join(' ')}`;
 
 /** What a takeover is asked of: the factory as it is, the template's source and `--set` words, and its render. */
 type Asked = {

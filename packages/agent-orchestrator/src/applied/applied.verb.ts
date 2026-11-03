@@ -54,9 +54,10 @@ export type Unrendered = { problems: string[]; version?: string };
 
 /**
  * The template at `source`, a folder or an archive by its whole path or the name of a builtin template (`templatePlace`), read
- * through the Template door and rendered with `params`, each `<key>=<value>`, its files read off its tree; or why it is not: its problems (`nemia template lint`), a parameter refused (`resolveParams`) and what
- * the render refuses (`renderFactory`), every one a line, with the template's version where it was read. Nothing is written. Refused as
- * `templatePlace` refuses a name, and as the door refuses a read.
+ * through the Template door and rendered with `params`, each `<key>=<value>`, its files read off its tree; or why it is not: its
+ * problems (`nemia template lint`), a parameter refused (`resolveParams`) and what the render refuses (`renderFactory`), every one a
+ * line, with the template's version where it was read. Nothing is written. Refused as `templatePlace` refuses a name, and as the door
+ * refuses a read.
  */
 export const renderedAt = Effect.fn('renderedAt')(function* (source: string, sets: readonly string[]) {
   const place = yield* templatePlace(source);

@@ -45,9 +45,9 @@ const commandsOf = (name: string): FactoryCommands => ({
 });
 
 /**
- * The template a factory was made from, as the board reads it: its folder or archive, or the name of a builtin template (`source`), its version and the parameters given at
- * `nemia factory apply`; the version its base holds (`applied`), null until the daemon renders it; and the conditions the daemon last
- * wrote, `Applied` and `ConflictsPending`, none until then.
+ * The template a factory was made from, as the board reads it: its folder or archive, or the name of a builtin template (`source`),
+ * its version and the parameters given at `nemia factory apply`; the version its base holds (`applied`), null until the daemon renders
+ * it; and the conditions the daemon last wrote, `Applied` and `ConflictsPending`, none until then.
  */
 export type FactoryTemplateAnswer = {
   source: string;

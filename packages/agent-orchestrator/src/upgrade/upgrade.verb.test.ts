@@ -16,6 +16,8 @@ import { STEP_OUTPUT_SCHEMA, teamCopy } from '../../test/team.ts';
 import { testPlace } from '../../place/memory/index.ts';
 import { eachTest, runOver } from '../../test/placed.ts';
 import { heldUnasked } from '../../test/unasked.ts';
+import type { Command } from '../command/entry.verb.ts';
+import type { Args } from '../command/command.ts';
 
 const ROOT = scratch('wf-upgrade-');
 process.env.WF_ROOT = ROOT;
@@ -393,14 +395,10 @@ test("a swap whose new tree cannot be renamed in puts the person's tree back, or
 
 const { FACTORY_PLAN, FACTORY_UPGRADE } = await import('./upgrade.verb.ts');
 const { withBuiltins } = await import('../../test/templated.ts');
-const { Effect } = await import('effect');
 
 /** The handler of `command` over `args`, with `builtins` as the folder of the builtin templates. */
-const handledWith = <D>(
-  builtins: string,
-  command: { handler: (args: Record<string, unknown>, env: undefined, home: string) => import('effect').Effect.Effect<D, unknown, any> },
-  args: Record<string, unknown>,
-) => runWith(noEngine(), withBuiltins(command.handler(args, undefined, ROOT), builtins));
+const handledWith = <D extends object>(builtins: string, command: Command<D>, args: Args) =>
+  runWith(noEngine(), withBuiltins(command.handler(args, undefined, ROOT), builtins));
 
 test('--template names a builtin template by its name: an upgrade records the name, and a name no builtin has is refused', async (t) => {
   t.mock.method(console, 'log', () => {});
@@ -408,9 +406,9 @@ test('--template names a builtin template by its name: an upgrade records the na
   const builtins = scratch('wf-upgrade-builtins-');
   fs.cpSync(dir, path.join(builtins, 'team'), { recursive: true });
   released(path.join(builtins, 'team'), '0.2.0', 5);
-  await t.test('REFUSED Missing, nothing written: diff and upgrade to a name Nemia does not ship', async () => {
+  await t.test('REFUSED Missing, nothing written: diff and upgrade to a name no builtin template has', async () => {
     const before = bytesUnder(ROOT);
-    for (const command of [FACTORY_PLAN, FACTORY_UPGRADE])
+    for (const command of [FACTORY_PLAN, FACTORY_UPGRADE] as Command<object>[])
       await assert.rejects(
         handledWith(builtins, command, { factory: 'from-folder', to: '0.2.0', template: 'nope' }),
         refusedWith('Missing', /\bteam\b/, /\.\/nope/),

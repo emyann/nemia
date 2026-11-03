@@ -75,6 +75,7 @@ erDiagram
     string stagedFile "optional"
     object tips "optional"
     string cancelledAt "optional"
+    object labels "optional"
     string createdAt
   }
   Step {

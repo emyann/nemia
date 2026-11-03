@@ -64,7 +64,6 @@ export const REAL_REACH: Baseline = {
   'packages/agent-orchestrator/test/names.test.ts': ['git', 'process'],
   'packages/agent-orchestrator/test/observe.test.ts': ['engine'],
   'packages/agent-orchestrator/test/others.test.ts': ['git', 'process'],
-  'packages/agent-orchestrator/test/pictures.test.ts': ['git', 'process'],
   'packages/agent-orchestrator/test/pool.test.ts': ['engine'],
   'packages/agent-orchestrator/test/profile.test.ts': ['process'],
   'packages/agent-orchestrator/test/refusal.test.ts': ['process'],

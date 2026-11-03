@@ -584,7 +584,8 @@ agent: delete the step's line, or add the word to the agent's. This is judged on
 names its agent by `agent:` and one a factory hires it into: what the step overrides is its side of the agent on a step
 (`StepAgent`, `overridesOf`). The keys a step sets over its agent's fence and composition are `OVERRIDE_KEYS`. An agent with no line
 offers everything, as before the line, and `nemia start` prints a line for its file saying to add one. `overridable:` is the agent's
-own key: no step takes it.
+own key: no step takes it. A template carries it as the agent's spec's `overridable`, written back as the line when the template is
+applied, and its lint refuses there a word not in the list.
 
 #### Five layers: what shapes an agent, apart from its task
 

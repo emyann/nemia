@@ -136,6 +136,11 @@ test("what a render writes into a factory's tree, read back as today's folder re
       fs.renameSync(teamCopy(), path.join(repo, 'workflows'));
       const step = path.join(repo, 'workflows', 'dev', 'review.md');
       fs.writeFileSync(step, fs.readFileSync(step, 'utf8').replace('---\n', '---\nmcp: docs, playwright\n'));
+      const reviewer = path.join(repo, 'workflows', 'agents', 'reviewer.md');
+      fs.writeFileSync(
+        reviewer,
+        fs.readFileSync(reviewer, 'utf8').replace('overridable: output, skills', 'overridable: output, skills, mcp'),
+      );
       const dir = path.join(scratch('wf-render-out-'), 'team');
       exportTemplate({ dir, from: repo });
       const yaml = path.join(dir, 'workflows/dev/workflow.yaml');
@@ -161,6 +166,32 @@ test("what a render writes into a factory's tree, read back as today's folder re
         (err: Error) =>
           err instanceof Error && err.message.includes('review: `mcp: docs server, playwright`') && err.message.includes('`docs server`'),
         "a name the template writes that is no server's is refused as the step file is read, as its own line would be",
+      );
+    },
+  );
+  await t.test(
+    "an agent's overridable: line has its place in a template: exported in the agent's spec, rendered back as the line it was, and none stays none",
+    () => {
+      const repo = scratch('wf-render-repo-');
+      fs.renameSync(teamCopy(), path.join(repo, 'workflows'));
+      const implementer = path.join(repo, 'workflows', 'agents', 'implementer.md');
+      fs.writeFileSync(implementer, fs.readFileSync(implementer, 'utf8').replace(/^overridable: .*\n/m, ''));
+      const dir = path.join(scratch('wf-render-out-'), 'team');
+      exportTemplate({ dir, from: repo });
+      const specOf = (name: string) => parse(fs.readFileSync(path.join(dir, `agents/${name}/agent.yaml`), 'utf8')).spec;
+      assert.deepEqual(specOf('reviewer').overridable, ['output', 'skills']);
+      assert.deepEqual(specOf('shipper').overridable, ['fence']);
+      assert.equal(Object.hasOwn(specOf('implementer'), 'overridable'), false, 'an agent with no line offers everything, and says none');
+      const { tree, out } = rendered(dir);
+      assert.deepEqual(out.refusals, []);
+      const agentFile = (name: string) => fs.readFileSync(path.join(tree, `workflows/agents/${name}.md`), 'utf8');
+      assert.match(agentFile('reviewer'), /^overridable: output, skills$/m);
+      assert.match(agentFile('shipper'), /^overridable: fence$/m);
+      assert.doesNotMatch(agentFile('implementer'), /^overridable:/m);
+      const fills = { factory: 'team', workflow: 'dev', agents: { implement: 'implementer', review: 'reviewer', ship: 'shipper' } };
+      assert.deepEqual(
+        stepsOf(loadWorkflows(path.join(tree, 'workflows', 'dev'), {}, fills)),
+        stepsOf(loadWorkflows(path.join(repo, 'workflows', 'dev'))),
       );
     },
   );
@@ -249,6 +280,16 @@ test('what a render refuses by name, with nothing of it to write', async (t) => 
       spec.rules = '---\nmodel: opus\n---\n';
     });
     assert.match(renderFactory(openTemplate(dir), {}).refusals.join('\n'), /^RULES\.md opens with a frontmatter block/);
+  });
+  await t.test("REFUSED by name: a step's output.path outside its workflow's folder", () => {
+    const { dir } = exported();
+    edit(dir, 'workflows/dev/workflow.yaml', (spec) => {
+      spec.steps.find((step: { name: string }) => step.name === 'implement').output = { path: 'agents/implementer/output.schema.json' };
+    });
+    const out = renderFactory(openTemplate(dir), {});
+    assert.equal(out.refusals.length, 1, out.refusals.join('\n'));
+    assert.ok(out.refusals[0].startsWith('workflows/dev/workflow.yaml, step implement:'), out.refusals[0]);
+    assert.ok(out.refusals[0].includes('`output.path`'), out.refusals[0]);
   });
   await t.test("a harness's options, and a block of a harness it does not run on, are refused by name", () => {
     const { dir } = exported();

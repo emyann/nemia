@@ -179,6 +179,7 @@ function agentFiles(found: AgentSource): DraftFile[] {
     description: agent.description ?? agent.role ?? agent.name,
     ...(agent.skills?.length ? { skills: agent.skills } : {}),
     ...(agent.mcp?.length ? { mcp: agent.mcp } : {}),
+    ...(agent.overridable !== undefined ? { overridable: agent.overridable } : {}),
     ...(agent.keys.harness !== undefined ? { harness: agent.keys.harness } : {}),
     ...(found.output !== undefined ? { output: { path: `agents/${agent.name}/output.schema.json` } } : {}),
     ...(block ? { [harness]: block } : {}),

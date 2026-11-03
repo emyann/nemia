@@ -7,6 +7,7 @@
  * itself and a person may not set (`CLOSED_LABEL_KEYS`). Nor may a label take a key a feed line or a selector already gives a meaning
  * to (`RESERVED_LABEL_KEYS`): a label named `reason` would decide what `-l reason=…` selects.
  */
+import type { LabelEdits } from '../../contracts/labels.contract.ts';
 import { LABEL_KEYS, RESERVED_KEYS } from '../watch/selector.ts';
 
 /** A person's labels: a key to its value, Kubernetes' `map[string]string`. */
@@ -34,11 +35,13 @@ const LISTS = `the closed keys are ${CLOSED_LABEL_KEYS.join(', ')} and the reser
 export function labelKeyRefusal(key: string): string | undefined {
   if (key.includes('/'))
     return `${JSON.stringify(key)} has a prefix, and a label takes none for now: drop what is before the /, as in ${key.slice(key.lastIndexOf('/') + 1) || 'team'}=…`;
-  if (key.length > LABEL_CAP) return `the label key ${JSON.stringify(key)} is ${key.length} characters long: keep it to ${LABEL_CAP} at most`;
+  if (key.length > LABEL_CAP)
+    return `the label key ${JSON.stringify(key)} is ${key.length} characters long: keep it to ${LABEL_CAP} at most`;
   if (!LABEL_NAME.test(key))
     return `${JSON.stringify(key)} is no label key: begin and end it with a letter or a digit, with - _ . between, as in team or my.key_2`;
   if (CLOSED_LABEL_KEYS.includes(key)) return `${key} is a key Nemia sets itself and no label of a person's: ${LISTS}`;
-  if (RESERVED_LABEL_KEYS.includes(key)) return `${key} is a key a feed line or a selector reads itself: name the label otherwise — ${LISTS}`;
+  if (RESERVED_LABEL_KEYS.includes(key))
+    return `${key} is a key a feed line or a selector reads itself: name the label otherwise — ${LISTS}`;
   return undefined;
 }
 
@@ -64,7 +67,9 @@ export function labelsRefusal(labels: Labels): string | undefined {
 }
 
 /** One edit of a map, as kubectl spells it: `key=value` sets the key, `key-` removes it. */
-export type LabelEdit = { readonly key: string; readonly op: 'set'; readonly value: string } | { readonly key: string; readonly op: 'remove' };
+export type LabelEdit =
+  | { readonly key: string; readonly op: 'set'; readonly value: string }
+  | { readonly key: string; readonly op: 'remove' };
 
 /** The command words that end a refusal of an edit's spelling. */
 const EDIT_FORM = 'label edits are key=value to set a key and key- to remove one';
@@ -86,8 +91,7 @@ export function parseLabelEdits(texts: readonly string[]): { readonly edits: rea
     if (edit === undefined) return { refused: `${JSON.stringify(text)} is no label edit: ${EDIT_FORM}` };
     const refusal = edit.op === 'set' ? labelRefusal(edit.key, edit.value) : labelKeyRefusal(edit.key);
     if (refusal) return { refused: refusal };
-    if (edits.some((e) => e.key === edit.key))
-      return { refused: `${edit.key} is edited twice in one list: give each key one edit` };
+    if (edits.some((e) => e.key === edit.key)) return { refused: `${edit.key} is edited twice in one list: give each key one edit` };
     edits.push(edit);
   }
   return { edits };
@@ -101,19 +105,21 @@ export type Edited = { readonly labels: Labels } | { readonly refused: string };
  * is absent), and every key no edit names keeps its value. Without `overwrite`, an edit that would change a key's value is refused,
  * naming the key, its value and `--overwrite`; with it, or where the value is the same, it is taken. Pure.
  */
-export function labelEdits(current: Labels, edits: readonly LabelEdit[], overwrite: boolean): Edited {
+export const labelEdits: LabelEdits = (current, edits, overwrite) => {
+  const clash = edits.find((e) => e.op === 'set' && Object.hasOwn(current, e.key) && current[e.key] !== e.value);
+  if (!overwrite && clash !== undefined && clash.op === 'set')
+    return { refused: `${clash.key} is already ${clash.key}=${current[clash.key] ?? ''}: add --overwrite to set it to ${clash.value}` };
+  return { labels: applied(current, edits) };
+};
+
+/** `current` with each edit applied: a set writes its key, a remove deletes it. */
+function applied(current: Labels, edits: readonly LabelEdit[]): Labels {
   const out: Record<string, string> = { ...current };
   for (const edit of edits) {
-    if (edit.op === 'remove') {
-      delete out[edit.key];
-      continue;
-    }
-    const was = current[edit.key];
-    if (!overwrite && was !== undefined && was !== edit.value)
-      return { refused: `${edit.key} is already ${edit.key}=${was}: add --overwrite to set it to ${edit.value}` };
-    out[edit.key] = edit.value;
+    if (edit.op === 'set') out[edit.key] = edit.value;
+    else delete out[edit.key];
   }
-  return { labels: out };
+  return out;
 }
 
 /** A run a start names, `--after` or `--from`, and the labels it carries. */
@@ -137,14 +143,14 @@ export function inheritedLabels(input: {
 }): Inherited {
   const card = input.card ?? {};
   const edits = input.edits ?? [];
-  const named = (key: string): boolean => key in card || edits.some((e) => e.key === key);
+  const named = (key: string): boolean => Object.hasOwn(card, key) || edits.some((e) => e.key === key);
   const out: Record<string, string> = {};
   const leftOut: LeftOut[] = [];
   const keys = [...new Set(input.parents.flatMap((p) => Object.keys(p.labels)))].sort();
   for (const key of keys) {
     if (named(key)) continue;
     const values = input.parents.flatMap((p) => {
-      const value = p.labels[key];
+      const value = Object.hasOwn(p.labels, key) ? p.labels[key] : undefined;
       return value === undefined ? [] : [{ run: p.run, value }];
     });
     const first = values[0];
@@ -170,7 +176,11 @@ export const labelsText = (labels: Labels): string => {
  * A run's whole map, as its object's `metadata.labels` says it and a selector reads it: `workflow`, `factory` where the run is in a
  * named one, and the person's keys, which never take a closed key (`labelKeyRefusal`). Pure.
  */
-export const metadataLabels = (of: { readonly workflow: string; readonly factory?: string | undefined; readonly labels?: Labels }): Labels => ({
+export const metadataLabels = (of: {
+  readonly workflow: string;
+  readonly factory?: string | undefined;
+  readonly labels?: Labels;
+}): Labels => ({
   ...of.labels,
   workflow: of.workflow,
   ...(of.factory ? { factory: of.factory } : {}),

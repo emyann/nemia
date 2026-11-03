@@ -1030,7 +1030,8 @@ const REFUSALS: readonly Refused[] = [
   ["watch, a typo'd short flag is no cursor", 'watch', ['-L'], ['nemia watch does not take -L']],
   ['watch, a cursor', 'watch', ['12'], null],
   ['watch, every flag', 'watch', ['--once', '12', '-l', 'factory=nemia', '--json'], null],
-  ['watch, a selector on no key of a feed line', 'watch', ['-l', 'message=hi'], ['"message" is no key of a feed line']],
+  ['watch, a selector on the message, which nothing selects on', 'watch', ['-l', 'message=hi'], ['message', '-l <key>=<value>']],
+  ['watch, a selector on a prefixed key', 'watch', ['-l', 'no/pe=x'], ['"no/pe"', '-l <key>=<value>']],
   ['watch, an empty selector', 'watch', ['-l', 'factory=nemia', '-l', ''], ['"" is no selector']],
   ['watch, --cursor-file given nothing', 'watch', ['--cursor-file'], ['nemia watch --cursor-file takes the path']],
   ['watch, --cursor-file twice', 'watch', ['--cursor-file', 'a', '--cursor-file', 'b'], ['nemia watch takes --cursor-file once']],
@@ -1140,7 +1141,7 @@ test('REFUSED at shipped defaults: what each command refuses of its command line
       names(words, ...said);
       for (const word of not) assert.ok(!words!.includes(word), `${words} names ${word}`);
     });
-  await t.test('watch, -l given no selector: the forms, then every key of a feed line, in order', () => {
+  await t.test("watch, -l given no selector: the forms, then every key of a feed line, in order, and a person's labels", () => {
     const words = refusedBy(entry('watch'), ['-l', '--json']);
     names(words, 'nemia watch -l takes', '-l <key>=<value>', '-l <key>!=<value>', '-l "<key> in (<a>,<b>)"', '-l "<key> notin (<a>,<b>)"');
     assert.deepEqual(words!.split('The keys: ')[1].split(', '), [
@@ -1156,6 +1157,7 @@ test('REFUSED at shipped defaults: what each command refuses of its command line
       'type',
       'waits',
       'source',
+      'and any label a person put',
     ]);
   });
 });

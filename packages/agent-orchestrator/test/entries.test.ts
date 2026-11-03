@@ -220,6 +220,7 @@ const PINNED: Record<string, string[]> = {
     'exitVerdicts',
     'factoriesDir',
     'factoriesFilling',
+    'factoryDraftOf',
     'factoryInstruction',
     'factoryLines',
     'factoryNameRefusal',

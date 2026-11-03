@@ -17,7 +17,7 @@
  * package.json names, `tools/guards` among them.
  *
  * No file of this package's `src`, `bin` or `place` imports the templates workspace (`packages/templates`), by its name or by a path:
- * the templates Nemia ships are found by path (`BuiltinTemplates`, `src/templates/templates.store.ts`), as its skills and servers are.
+ * the builtin templates are found by path (`BuiltinTemplates`, `src/templates/templates.store.ts`), as its skills and servers are.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -293,12 +293,12 @@ test('no file that is no test imports the testing entry, in this package or outs
   );
 });
 
-/** The templates workspace: Nemia's shipped templates, which this package finds by path (`BuiltinTemplates`) and never imports. */
+/** The templates workspace: Nemia's builtin templates, which this package finds by path (`BuiltinTemplates`) and never imports. */
 const TEMPLATES = { name: 'templates', dir: 'packages/templates' } as const;
 
 /** Where `file`, of this package, imports the templates workspace, by its name or by a relative path into its folder. */
 function templateBreaches(file: string, text: string): string[] {
-  const instead = `find a template Nemia ships by path, through BuiltinTemplates (src/templates/templates.store.ts)`;
+  const instead = `find a builtin template by path, through BuiltinTemplates (src/templates/templates.store.ts)`;
   return specifiersIn(withoutComments(text)).flatMap((spec) => {
     const named = spec === TEMPLATES.name || spec.startsWith(`${TEMPLATES.name}/`);
     const into =

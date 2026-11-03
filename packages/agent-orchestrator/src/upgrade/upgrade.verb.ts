@@ -98,7 +98,7 @@ const renderTo = Effect.fn('renderTo')(function* (verb: string, factory: Templat
 /**
  * The upgrade of the factory `args` name to `--to`, as `verb` asks it, refused in order before anything is written: the factory, one made
  * from no template (`Invalid`) and one not rendered (`Conflict`); a `--to` that is no `x.y.z` (`Invalid`); a `--template` naming no
- * template Nemia ships (`Missing`, `templatePlace`); a template at another version
+ * builtin template (`Missing`, `templatePlace`); a template at another version
  * than `--to` (`Conflict`, naming `--template`); the version its base holds asked again, the same content or another (`Conflict`); a
  * downgrade without `--downgrade` where `downgrades` (`Conflict`); and a template that does not render (`Invalid`). Where no status
  * names the version its base holds, any `--to` is taken: the controller checks it against the base.
@@ -153,7 +153,7 @@ const FROM_TEMPLATE: Flag = {
   kind: 'text',
   key: 'template',
   takes:
-    "--template takes the name of a template Nemia ships, a template's folder, the one that holds its nemia.yaml, or an archive nemia template pack wrote",
+    "--template takes the name of a builtin template, a template's folder, the one that holds its nemia.yaml, or an archive nemia template pack wrote",
   twice: 'take --template once: a factory is made from one template.',
 };
 

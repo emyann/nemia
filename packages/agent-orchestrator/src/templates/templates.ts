@@ -28,8 +28,8 @@ export const treePathRefusal = (at: string): string | null =>
 export type Problem = { file: string; line?: number; col?: number; message: string };
 
 /**
- * A `--template` as a person gives it, as a factory records it: a template's name (`templateNameRefusal` takes it) is a template Nemia
- * ships, kept as the name and resolved on every read (`templatePlace`); anything else is a folder or archive, resolved from the working
+ * A `--template` as a person gives it, as a factory records it: a template's name (`templateNameRefusal` takes it) is a builtin template,
+ * kept as the name and resolved on every read (`templatePlace`); anything else is a folder or archive, resolved from the working
  * directory. A folder whose name is a template's is named as a path, `./<name>`.
  */
 export const sourceGiven = (given: string): string => (templateNameRefusal(given) === null ? given : path.resolve(given));

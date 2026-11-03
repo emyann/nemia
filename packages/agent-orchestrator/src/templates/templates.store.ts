@@ -211,7 +211,7 @@ export const TemplateDoor = Context.Reference<TemplateDoorShape>('agent-orchestr
 export const templateDoorFiles = (): Layer.Layer<never> => Layer.succeed(TemplateDoor)(templateDoorOver(templateFiles()));
 
 /**
- * The templates Nemia ships: the templates workspace beside this package, found by its path and never imported, as the package's own
+ * The builtin templates: the templates workspace beside this package, found by its path and never imported, as the package's own
  * skills and servers are found (`BUILTIN_SKILLS`, `BUILTIN_SERVERS`).
  */
 export const BUILTIN_TEMPLATES = path.join(import.meta.dirname, '..', '..', '..', 'templates');
@@ -222,7 +222,7 @@ export const BuiltinTemplates = Context.Reference<string>('agent-orchestrator/Bu
 });
 
 /** The names of the templates `folder` holds, sorted: each folder in it whose `nemia.yaml` is a file. None where `folder` is not there. */
-export function shippedTemplates(folder: string): string[] {
+export function builtinTemplatesIn(folder: string): string[] {
   if (!fs.statSync(folder, { throwIfNoEntry: false })?.isDirectory()) return [];
   return fs
     .readdirSync(folder, { withFileTypes: true })
@@ -232,19 +232,19 @@ export function shippedTemplates(folder: string): string[] {
 }
 
 /**
- * The whole path a template's source is read at: a path as it is, and a template's name its folder among the templates Nemia ships
- * (`BuiltinTemplates`). Refused `Missing` where Nemia ships no template of that name, naming those it ships and the `./<name>` spelling
+ * The whole path a template's source is read at: a path as it is, and a template's name its folder among the builtin templates
+ * (`BuiltinTemplates`). Refused `Missing` where no builtin template has that name, naming those there are and the `./<name>` spelling
  * of a folder.
  */
 export const templatePlace = Effect.fn('templatePlace')(function* (source: string) {
   if (templateNameRefusal(source) !== null) return source;
   const folder = yield* BuiltinTemplates;
-  const shipped = shippedTemplates(folder);
-  if (shipped.includes(source)) return path.join(folder, source);
-  const has = shipped.length ? `the templates it ships are ${shipped.join(', ')}` : 'it ships no template';
+  const builtins = builtinTemplatesIn(folder);
+  if (builtins.includes(source)) return path.join(folder, source);
+  const has = builtins.length ? `its builtin templates are ${builtins.join(', ')}` : 'it has no builtin template';
   return yield* Effect.fail(
     new Missing({
-      message: `Nemia ships no template named ${source} (looked in ${folder}): ${has}. Name one of them, or a folder of that name by its path, ./${source}.`,
+      message: `Nemia has no builtin template named ${source} (looked in ${folder}): ${has}. Name one of them, or a folder of that name by its path, ./${source}.`,
     }),
   );
 });

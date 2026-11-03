@@ -395,14 +395,14 @@ const { FACTORY_PLAN, FACTORY_UPGRADE } = await import('./upgrade.verb.ts');
 const { withBuiltins } = await import('../../test/templated.ts');
 const { Effect } = await import('effect');
 
-/** The handler of `command` over `args`, with `builtins` as the folder of the templates Nemia ships. */
+/** The handler of `command` over `args`, with `builtins` as the folder of the builtin templates. */
 const handledWith = <D>(
   builtins: string,
   command: { handler: (args: Record<string, unknown>, env: undefined, home: string) => import('effect').Effect.Effect<D, unknown, any> },
   args: Record<string, unknown>,
 ) => runWith(noEngine(), withBuiltins(command.handler(args, undefined, ROOT), builtins));
 
-test('--template names a template Nemia ships by its name: an upgrade records the name, and a name it does not ship is refused', async (t) => {
+test('--template names a builtin template by its name: an upgrade records the name, and a name no builtin has is refused', async (t) => {
   t.mock.method(console, 'log', () => {});
   const { dir } = await applied('from-folder');
   const builtins = scratch('wf-upgrade-builtins-');

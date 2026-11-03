@@ -12,7 +12,7 @@ import { Effect } from 'effect';
 import { scratch } from '../../test/scratch.ts';
 import { act, done, doorFrom, walksOn } from '../../test/door-walks.ts';
 import { aTree, TEMPLATE_WALKS } from '../../test/template-walks.ts';
-import { BuiltinTemplates, shippedTemplates, TemplateDoor, templateDoorFiles, templatePlace } from './templates.store.ts';
+import { BuiltinTemplates, builtinTemplatesIn, TemplateDoor, templateDoorFiles, templatePlace } from './templates.store.ts';
 import { builtinPlace, sourceGiven } from './templates.ts';
 import { TemplateSource } from '../templates/templates.model.ts';
 import { StoreRoot } from '../config/root.store.ts';
@@ -46,7 +46,7 @@ test('the default door reads the files where the program was given a store root,
   assert.deepEqual(act(read), { refused: 'Invalid' });
 });
 
-test('a --template is a template Nemia ships where it is a name, and a folder or archive by its whole path where it is not', async (t) => {
+test('a --template is a builtin template where it is a name, and a folder or archive by its whole path where it is not', async (t) => {
   for (const name of ['team', 'my-team-2']) await t.test(`${name}, a name, is kept as given`, () => assert.equal(sourceGiven(name), name));
   for (const given of ['./team', '../x/team', '/abs/team', 'team.tgz', 'Team', 'a/b', 'team_x'])
     await t.test(`${given}, no name, is a path resolved from here`, () => assert.equal(sourceGiven(given), path.resolve(given)));
@@ -57,7 +57,7 @@ test('a --template is a template Nemia ships where it is a name, and a folder or
 });
 
 /** A folder of builtin templates: `team` and `other` and `link` (whose nemia.yaml is a file), `test` with none, and a file. */
-function shipped(): string {
+function builtins(): string {
   const dir = scratch('wf-builtin-templates-');
   for (const name of ['team', 'other', 'link']) {
     fs.mkdirSync(path.join(dir, name));
@@ -72,14 +72,14 @@ function shipped(): string {
 const placed = (source: string, builtins: string) =>
   Effect.runSync(Effect.result(templatePlace(source).pipe(Effect.provideService(BuiltinTemplates, builtins))));
 
-test('the templates a folder ships are its folders that hold a nemia.yaml, sorted, and none where it is not there', () => {
-  const dir = shipped();
-  assert.deepEqual(shippedTemplates(dir), ['link', 'other', 'team']);
-  assert.deepEqual(shippedTemplates(path.join(dir, 'gone')), []);
+test('the builtin templates in a folder are its folders that hold a nemia.yaml, sorted, and none where it is not there', () => {
+  const dir = builtins();
+  assert.deepEqual(builtinTemplatesIn(dir), ['link', 'other', 'team']);
+  assert.deepEqual(builtinTemplatesIn(path.join(dir, 'gone')), []);
 });
 
-test("a template's name is read at its folder among those Nemia ships, a path where it is, and REFUSED Missing where none is", () => {
-  const dir = shipped();
+test("a template's name is read at its folder among the builtin templates, a path where it is, and REFUSED Missing where none is", () => {
+  const dir = builtins();
   const at = placed('team', dir);
   assert.ok(at._tag === 'Success' && at.success === path.join(dir, 'team'));
   const gone = path.join(dir, 'gone');
@@ -87,7 +87,7 @@ test("a template's name is read at its folder among those Nemia ships, a path wh
   assert.ok(whole._tag === 'Success' && whole.success === '/abs/x', 'a path is not looked for among the builtins');
   for (const [builtins, tokens] of [
     [dir, ['team', 'other', dir, './nope']],
-    [gone, ['no template', './nope']],
+    [gone, ['no builtin template', './nope']],
   ] as const) {
     const refused = placed('nope', builtins);
     assert.ok(refused._tag === 'Failure', `nope is refused at ${builtins}`);

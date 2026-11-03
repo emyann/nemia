@@ -105,7 +105,7 @@ A factory made from a template is upgraded when its template has a new version. 
 conflict it raises: their tree and the template both changed the same part.
 
 When they ask for one, or the template has moved past the version the factory was applied at, preview it first with
-`nemia factory diff <factory> --to <version>` (`--template <name|folder|archive>` where the new version is elsewhere; a factory applied from a template Nemia ships, by its name, reads it where that Nemia keeps it and needs none). It writes nothing.
+`nemia factory diff <factory> --to <version>` (`--template <name|folder|archive>` where the new version is elsewhere; a factory applied from a builtin template, by its name, reads it where that Nemia keeps it and needs none). It writes nothing.
 
 Bring it:
 

@@ -53,7 +53,7 @@ export const setsOf = (params: FactoryTemplate['params']): string[] =>
 export type Unrendered = { problems: string[]; version?: string };
 
 /**
- * The template at `source`, a folder or an archive by its whole path or the name of a template Nemia ships (`templatePlace`), read
+ * The template at `source`, a folder or an archive by its whole path or the name of a builtin template (`templatePlace`), read
  * through the Template door and rendered with `params`, each `<key>=<value>`, its files read off its tree; or why it is not: its problems (`nemia template lint`), a parameter refused (`resolveParams`) and what
  * the render refuses (`renderFactory`), every one a line, with the template's version where it was read. Nothing is written. Refused as
  * `templatePlace` refuses a name, and as the door refuses a read.
@@ -341,7 +341,7 @@ const APPLY_SPEC: Spec = {
       kind: 'text',
       key: 'template',
       takes:
-        "--template takes the name of a template Nemia ships, a template's folder, the one that holds its nemia.yaml, or an archive nemia template pack wrote: nemia factory apply <name> --template <name|folder|archive>",
+        "--template takes the name of a builtin template, a template's folder, the one that holds its nemia.yaml, or an archive nemia template pack wrote: nemia factory apply <name> --template <name|folder|archive>",
       twice: 'nemia factory apply takes --template once: a factory is made from one template.',
     },
     {
@@ -386,7 +386,7 @@ const applied = Effect.fn('applied')(function* (args: Args) {
   if (given === undefined)
     return yield* Effect.fail(
       new Invalid({
-        message: `nemia factory apply makes a factory from a template: name a template Nemia ships, or its folder or archive, with --template <name|folder|archive>. Nothing was filed.`,
+        message: `nemia factory apply makes a factory from a template: name a builtin template, or a template's folder or archive, with --template <name|folder|archive>. Nothing was filed.`,
       }),
     );
   const repos = yield* tried(() => factoryRepos(name, manyOf(args, 'repos')));
@@ -426,7 +426,7 @@ export const FACTORY_APPLY: Command<Applied & { trusts: readonly PlaceTrust[] }>
   print: ({ name, repos, file, template, place, tree, trusts }) => [
     `${name}  ${repos.join(', ')}`,
     `filed: ${file}`,
-    `made from ${place === template.source ? template.source : `the template Nemia ships, ${template.source} (${place})`} at ${template.version}; the daemon renders its tree into ${tree} on its next pass (nemia up)`,
+    `made from ${place === template.source ? template.source : `the builtin template ${template.source} (${place})`} at ${template.version}; the daemon renders its tree into ${tree} on its next pass (nemia up)`,
     ...trustedLines(name, trusts),
   ],
 };

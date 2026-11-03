@@ -1,7 +1,7 @@
 /**
  * A template's programs run as a test runs them, at the store's root `root` the test set as `WF_ROOT`: export and a read through the
  * Template door's files, a template opened for a render, and the factory controller's pass over one factory (`reconcileFactory`), each
- * given `builtins` as the folder of the templates Nemia ships where the test names one (`BuiltinTemplates`), never the package's own.
+ * given `builtins` as the folder of the builtin templates where the test names one (`BuiltinTemplates`), never the package's own.
  * Imported with `await import` after the file sets `WF_ROOT`, as the store's modules are.
  */
 import path from 'node:path';

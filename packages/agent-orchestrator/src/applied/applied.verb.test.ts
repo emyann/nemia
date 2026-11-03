@@ -413,7 +413,7 @@ const { FACTORY_UPGRADE } = await import('../upgrade/upgrade.verb.ts');
 const { runWith: runEngine } = await import('../runtime-client.ts');
 const { withBuiltins } = await import('../../test/templated.ts');
 
-/** `nemia factory apply`'s handler, its template the word `given`, with `builtins` as the folder of the templates Nemia ships. */
+/** `nemia factory apply`'s handler, its template the word `given`, with `builtins` as the folder of the builtin templates. */
 const applyNamed = (builtins: string, name: string, given: string, repo: string, ...sets: string[]) =>
   runEngine(
     noEngine(),
@@ -422,7 +422,7 @@ const applyNamed = (builtins: string, name: string, given: string, repo: string,
     ),
   );
 
-test('a template Nemia ships, named: applied, recorded by its name, read wherever Nemia keeps it, and upgraded when it moves', async (t) => {
+test('a builtin template, named: applied, recorded by its name, read wherever Nemia keeps it, and upgraded when it moves', async (t) => {
   const s = { builtins: '', repo: '', file: path.join(FACTORIES, 'named.json') };
   await t.test('applied by its name: the factory records the name and the version, and a pass renders it', async () => {
     const { dir, repo } = template();
@@ -450,7 +450,7 @@ test('a template Nemia ships, named: applied, recorded by its name, read whereve
       s.builtins = moved;
     },
   );
-  await t.test('the shipped template moved to 0.2.0 is drift, and upgrade --to with no --template takes it by its name', async () => {
+  await t.test('the builtin template moved to 0.2.0 is drift, and upgrade --to with no --template takes it by its name', async () => {
     const dir = path.join(s.builtins, 'team');
     edit(dir, 'nemia.yaml', (spec) => {
       spec.version = '0.2.0';
@@ -470,20 +470,23 @@ test('a template Nemia ships, named: applied, recorded by its name, read whereve
     assert.deepEqual([source, version], ['team', '0.2.0']);
     assert.equal(programsAt(ROOT, s.builtins).reconciled(templated('named')).conditions[0].reason, 'Upgraded');
   });
-  await t.test('REFUSED by the controller: a recorded name Nemia no longer ships is TemplateInvalid, its base and tree kept', async () => {
-    const digest = readStatus('named')?.digest;
-    const gone = programsAt(ROOT, scratch('wf-applied-none-')).reconciled(templated('named'));
-    const { message, ...applied } = gone.conditions[0];
-    assert.deepEqual(applied, { type: 'Applied', status: 'False', reason: 'TemplateInvalid' });
-    assert.ok(message.includes('./team'), message);
-    assert.equal(gone.digest, digest);
-    assert.ok(fs.existsSync(path.join(treeDir('named'), 'workflows/dev/review.md')));
-  });
-  await t.test('REFUSED Missing, nothing filed: a name Nemia does not ship, and any name where it ships none', async () => {
+  await t.test(
+    'REFUSED by the controller: a recorded name no builtin template has any longer is TemplateInvalid, its base and tree kept',
+    async () => {
+      const digest = readStatus('named')?.digest;
+      const gone = programsAt(ROOT, scratch('wf-applied-none-')).reconciled(templated('named'));
+      const { message, ...applied } = gone.conditions[0];
+      assert.deepEqual(applied, { type: 'Applied', status: 'False', reason: 'TemplateInvalid' });
+      assert.ok(message.includes('./team'), message);
+      assert.equal(gone.digest, digest);
+      assert.ok(fs.existsSync(path.join(treeDir('named'), 'workflows/dev/review.md')));
+    },
+  );
+  await t.test('REFUSED Missing, nothing filed: a name no builtin template has, and any name where there is none', async () => {
     const before = filed();
     await assert.rejects(applyNamed(s.builtins, 'nope', 'nope', s.repo, 'budget=3'), refusedNaming('Missing', 'team', './nope'));
     const none = path.join(scratch('wf-applied-none-'), 'templates');
-    await assert.rejects(applyNamed(none, 'nope', 'team', s.repo, 'budget=3'), refusedNaming('Missing', 'no template', './team'));
+    await assert.rejects(applyNamed(none, 'nope', 'team', s.repo, 'budget=3'), refusedNaming('Missing', 'no builtin template', './team'));
     assert.deepEqual(filed(), before);
   });
 });

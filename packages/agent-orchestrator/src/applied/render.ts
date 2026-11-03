@@ -127,7 +127,7 @@ function stepFile(workflow: string, step: Spec, harness: string, read: TemplateR
   if (typeof output === 'string' && output.startsWith(folder)) keys.output = output.slice(folder.length);
   else if (output !== undefined)
     refusals.push(
-      `${where}: \`output.path\` is ${String(output)}, no file of ${folder}: carry the schema there, name it from the template's root, and apply again.`,
+      `${where}: \`output.path\` is ${JSON.stringify(output)}, no file of ${folder}: carry the schema there, name it from the template's root, and apply again.`,
     );
   const overrides = isMap(step.overrides) ? step.overrides : {};
   if (typeof overrides.harness === 'string') keys.harness = overrides.harness;

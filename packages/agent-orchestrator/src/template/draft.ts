@@ -1,9 +1,9 @@
 /**
  * `nemia template export`'s mapping of today's folders onto a template (`draftOf`): each step's own lines, as its file writes them, onto a
- * workflow's step, its own closeout schema named from the template's root, its harness keys onto the block of the harness it runs on; each agent onto an agent's folder; each skill a step or an
- * agent names, carried whole; and a factory's hires, instruction and rules onto the manifest, NEMIA.md and RULES.md. Pure: the store
- * reads with the loader's own readers, hands the parts in, and writes what comes back. A key the template has no place for is refused by
- * name.
+ * workflow's step, its own closeout schema named from the template's root, its harness keys onto the block of the harness it runs on;
+ * each agent onto an agent's folder; each skill a step or an agent names, carried whole; and a factory's hires, instruction and rules onto
+ * the manifest, NEMIA.md and RULES.md. Pure: the store reads with the loader's own readers, hands the parts in, and writes what comes
+ * back. A key the template has no place for is refused by name.
  */
 import path from 'node:path';
 import { HARNESS_KNOBS } from 'agent-runtime/vocabulary';
@@ -142,10 +142,16 @@ function wiringOf(workflow: string, step: StepSource): Partial<Step> {
   if (keys.budget !== undefined) wired.budget = budgetOf(step.file, keys.budget);
   for (const key of WORDS.slice(2)) if (keys[key] !== undefined) wired[key] = keys[key];
   for (const key of COUNTED) if (keys[key] !== undefined) wired[key] = countOf(step.file, key, keys[key]);
-  if (keys.reads !== undefined) wired.reads = readsNamesOf(step.file, keys.reads);
-  if (keys.output !== undefined) wired.output = { path: `workflows/${workflow}/${path.posix.normalize(keys.output)}` };
-  if (keys.tally !== undefined) wired.tally = listOf(keys.tally);
-  return wired;
+  return { ...wired, ...closeoutOf(workflow, step.file, keys) };
+}
+
+/** What `keys` of a step of `workflow` say of the store and its closeout: its reads, its own schema from the template's root, its tally. */
+function closeoutOf(workflow: string, file: string, keys: Readonly<Partial<Record<string, string>>>): Partial<Step> {
+  return {
+    ...(keys.reads === undefined ? {} : { reads: readsNamesOf(file, keys.reads) }),
+    ...(keys.output === undefined ? {} : { output: { path: `workflows/${workflow}/${path.posix.normalize(keys.output)}` } }),
+    ...(keys.tally === undefined ? {} : { tally: listOf(keys.tally) }),
+  };
 }
 
 /**

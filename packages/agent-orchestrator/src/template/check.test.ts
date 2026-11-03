@@ -377,16 +377,18 @@ test('the check of a template folder: the whole folder passes, and each rule bro
     );
   });
 
-  await t.test("a step's own closeout schema is a {path:} to a file of its workflow's folder, and refused anywhere else", () => {
-    const workflow = 'workflows/dev/workflow.yaml';
-    const at = ['spec', 'steps', 1, 'output', 'path'];
-    const output = (value: unknown) => refusalsOf((d) => (d[workflow].spec.steps[1].output = value));
-    assertRefused(output({ path: 'workflows/dev/missing.schema.json' }), workflow, at.slice(0, -1), 'is not in the template');
-    assertRefused(output({ path: 'agents/implementer/output.schema.json' }), workflow, at, 'workflows/dev/');
-    assertRefused(output({ path: 'workflows/dev/implement.md' }), workflow, at, 'workflows/dev/');
-    // A bare file name, as a step's frontmatter writes it, passed on purpose to prove the shape refuses it.
-    assertRefused(output('implement.schema.json'), workflow, ['spec', 'steps', 1, 'output'], 'is a map');
-  });
+  await t.test(
+    "a step's own closeout schema is a {path:} to a file of its workflow's folder, refused anywhere else and as a bare file name",
+    () => {
+      const workflow = 'workflows/dev/workflow.yaml';
+      const at = ['spec', 'steps', 1, 'output', 'path'];
+      const output = (value: unknown) => refusalsOf((d) => (d[workflow].spec.steps[1].output = value));
+      assertRefused(output({ path: 'workflows/dev/missing.schema.json' }), workflow, at.slice(0, -1), 'is not in the template');
+      assertRefused(output({ path: 'agents/implementer/output.schema.json' }), workflow, at, 'workflows/dev/');
+      assertRefused(output({ path: 'workflows/dev/implement.md' }), workflow, at, 'workflows/dev/');
+      assertRefused(output('implement.schema.json'), workflow, ['spec', 'steps', 1, 'output'], 'is a map');
+    },
+  );
 
   await t.test('a {param:} nemia.yaml does not declare is refused, a budget or a check, and a declared one passes', () => {
     const workflow = 'workflows/dev/workflow.yaml';

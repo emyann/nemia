@@ -12,3 +12,9 @@ CLAUDE.md merge=union
 # side by side would conflict there as they did on the one array of pages this replaced. Union keeps both lines; the order of the lines means
 # nothing, and the loader refuses the list and the page files when they differ (apps/web/test/e2e-merge.test.ts).
 /apps/web/test/e2e/pages/NAMES merge=union
+
+# The board's theme, written by the design system kit's generator from apps/web/DESIGN.md (`ds-theme`), and its route tree, written by
+# TanStack Router's plugin from apps/web/src/routes: no person writes a line of either. Marked generated so that GitHub folds them in a
+# diff and a quick run's `change.ts size`, which leaves out each file marked so, measures the change a person wrote and not its output.
+/apps/web/theme/** linguist-generated
+/apps/web/src/routeTree.gen.ts linguist-generated

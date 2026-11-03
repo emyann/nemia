@@ -26,6 +26,7 @@ function answering(t: { after: (fn: () => void) => void }, body: unknown, status
 
 /** A row of `GET /api/runs` as the api answers it: every key the board reads, each shape the unions have. */
 const row = (extra: object = {}): RunSummary => ({
+  labels: {},
   id: 'r-1',
   repo: '/work/repo',
   factory: 'nemia',

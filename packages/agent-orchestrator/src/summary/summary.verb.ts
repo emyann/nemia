@@ -13,6 +13,9 @@ import { type AtWork, atWork, runStartedAt, type RunTokens, runTokens } from '..
 import { UNREADABLE, unjudgedWord, type UnjudgedWord } from '../views/views.verb.ts';
 import { isRepositoryRun, type PlaceKind, placeOf, prunedWords, type Run } from '../record/record.ts';
 import { runStore } from '../record/files.store.ts';
+import type { Labels } from '../labels/labels.ts';
+import type { Selectors } from '../watch/selector.ts';
+import { runLabelMap, selectedRuns } from '../runlist/runlist.ts';
 import { prunedKept } from '../prune/prune.ts';
 import { standingReader, standingSnapshot } from '../standing/standing.verb.ts';
 import { informedJudgements, type InformerMemo, informerRead } from '../rest/informer.verb.ts';
@@ -55,6 +58,11 @@ export type RunSummary = {
   brief: string;
   /** The workflow folder the run was started from, as `nemia start` resolved it: its last segment names the workflow. */
   workflowDir: string;
+  /**
+   * The run's whole map (`runLabelMap`): the labels a person put on it (`nemia label run`), its `workflow`, and its `factory` where its
+   * record names one — what a selector reads of the run, and `{ workflow }` alone for a run nobody labelled.
+   */
+  labels: Labels;
   /** The agent it tried, for a try started from an agent's page (`tryOf`); null for every other run. */
   try: { agent: string } | null;
   createdAt: string;
@@ -267,6 +275,7 @@ export function summaryOf({ run, names, steps, views, judged }: Judgement, home:
     work: isRepositoryRun(run) ? null : run.workspace,
     brief: run.brief,
     workflowDir: run.workflowDir,
+    labels: runLabelMap(run),
     try: tryOf(run, home),
     createdAt: run.createdAt,
     cancelledAt: run.cancelledAt ?? null,
@@ -327,6 +336,7 @@ function unjudged(run: Run, views: Views, unreadable: Unreadable, said: string, 
     work: isRepositoryRun(run) ? null : run.workspace,
     brief: run.brief,
     workflowDir: run.workflowDir,
+    labels: runLabelMap(run),
     try: tryOf(run, home),
     createdAt: run.createdAt,
     cancelledAt: run.cancelledAt ?? null,
@@ -390,13 +400,15 @@ export const judgedNow = Effect.fn('judgedNow')(function* (e: Engine, home: stri
 /**
  * How the list reads: `home`, the store a person's files are read from; `memo`, the informer it answers from and keeps in (a fresh one
  * for a caller that keeps none, which judges every run); `filings`, the feed's filing times it reads on from; and `verify`, whether each
- * answer from memory is judged afresh too (`WF_VERIFY_REST`).
+ * answer from memory is judged afresh too (`WF_VERIFY_REST`); and `selectors`, the runs it lists, those whose whole map one of them
+ * takes (`selectedRuns`), every run where none is given.
  */
 export type SummaryHow = {
   home: string;
   memo: InformerMemo;
   filings: Filings;
   verify: boolean;
+  selectors?: Selectors;
 };
 
 /**
@@ -408,13 +420,14 @@ export type SummaryHow = {
  * read, so a warm read costs the stamp walk and the records of the runs still moving alone. A verified read is given nothing and reads
  * every record afresh.
  */
-export const runsSummarized = Effect.fn('runsSummarized')(function* (e: Engine, { home, memo, filings, verify }: SummaryHow) {
+export const runsSummarized = Effect.fn('runsSummarized')(function* (e: Engine, { home, memo, filings, verify, selectors }: SummaryHow) {
   const git = standingReader(yield* standingSnapshot());
   const read = yield* informerRead(e, memo, verify, git, sameJudgement);
-  const runs = runStore.runs.list(undefined, read.given);
-  read.only(runs.map((run) => run.id));
+  const all = runStore.runs.list(undefined, read.given);
+  read.only(all.map((run) => run.id));
   const filed = yield* filedTimes(e, filings);
-  const summaries = summariesOf(runs, yield* informedJudgements(e, home, runs, read, git, () => runs), home);
+  const runs = selectedRuns(all, selectors);
+  const summaries = summariesOf(runs, yield* informedJudgements(e, home, runs, read, git, () => all), home);
   return runs.flatMap((run): RunSummary[] => {
     const summary = summaries.get(run.id);
     return summary ? [{ ...summary, startedAt: runStartedAt(run, filed) }] : [];

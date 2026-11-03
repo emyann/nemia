@@ -9,12 +9,15 @@
  *   prints, of which `StepCloseout` is the closeout itself.
  * - `RunsListed` — `GET /api/listing` and `GET /api/listing/:runId`, what `nemia ls` prints, with the pause it says first (`Paused`).
  * - `FeedLine` — a line of `GET /api/feed/stream`, what `nemia watch` prints.
- * - `InboxEntry` — each card of `GET /api/inbox`, what `nemia inbox` prints.
+ * - `InboxEntry` — each card of `GET /api/inbox`, what `nemia inbox` prints, its person `labels` among its keys; a run's whole map is
+ *   `labels` on each row of `RunsListed` and of the board's lists.
+ * - `Labelled` — what `POST /api/runs/:runId/labels` and `POST /api/inbox/:name/labels` answer: the run or the card, its labels after
+ *   and before.
  * - `ErrorBody` — what any route refuses with: its words, naming the fix.
  */
 import type { Refusal } from '../guard.ts';
 
 export type { RawRecord, RunAnswer } from '../runs/runs.ts';
 export type { InboxEntry } from '../inbox/inbox.ts';
-export type { FeedLine, Paused, RunsListed, StepCloseout, StepTry, TryCloseout } from 'agent-orchestrator';
+export type { FeedLine, Labelled, Paused, RunsListed, StepCloseout, StepTry, TryCloseout } from 'agent-orchestrator';
 export type ErrorBody = Pick<Refusal, 'error'>;

@@ -161,7 +161,7 @@ export type {
   Wait,
 } from './run.ts';
 export type { AtWork, RunTokens, SlotWait, TaskSpan, Timeline, TimelineTotal, TimelineTry } from './timeline/index.ts';
-export type { Retry, RetryAsk, RetryHow, RetryMode } from './retry/index.ts';
+export type { Retry, RetryAsk, RetryHow, RetryMode, StepRaise } from './retry/index.ts';
 export { agentUsers, formerKeyLines, workflowDescription, workflowFolder, workflowReadme, workflowsIn } from './folder/folder.store.ts';
 export { cardSkills, isBuiltinPlace, lookupRoots, oneFolder, preloads, skillsFor, skillVersion } from './skills/read.store.ts';
 export { BUILTIN_SKILLS, type Places } from './skills/read.store.ts';
@@ -182,7 +182,7 @@ export {
   queueOrder,
   workflowAt,
 } from './inbox/index.ts';
-export type { CardState, InboxCard, InboxListing, QueueStarted, MissedStart } from './inbox/index.ts';
+export type { CardState, InboxCard, InboxListing, InboxRuns, QueueStarted, MissedStart } from './inbox/index.ts';
 export {
   DEFAULT_FACTORY,
   factoryLines,
@@ -237,7 +237,11 @@ export {
   SELECTOR_FORM,
   selectorsRefusal,
   selects,
+  selectsLabels,
 } from './watch/selector.ts';
+export { labelsText, metadataLabels, type Labels } from './labels/labels.ts';
+export { LabelEdit, Labelled } from './labels/labels.model.ts';
+export { LABEL_CARD, LABEL_RUN } from './labels/commands.verb.ts';
 export type { Clause, Selectors } from './watch/selector.ts';
 export type { Watched } from './subscription/index.ts';
 export {
@@ -489,12 +493,10 @@ export type { Told } from './say/say.verb.ts';
 export { forgetRun, runsForgetting } from './forget/forget.verb.ts';
 export { freeingMany, judgingMany, prune, type Listed, type Turned } from './prune/prune.verb.ts';
 export { decideRun } from './decide/decide.verb.ts';
-export { freshStatsMemo, statsRun } from './stats/stats.verb.ts';
-export type { StatsMemo, StatsOptions } from './stats/stats.verb.ts';
+export { freshStatsMemo, statsRun, type StatsMemo, type StatsOptions } from './stats/stats.verb.ts';
 export { seriesMemo } from './series/series.ts';
 export type { Health, SeriesMemo, SeriesPoint, SeriesRead } from './series/series.ts';
-export { BY_KEYS, statsLine, statsLines, statsQueryOf } from './stats/index.ts';
-export type { ByKey, QueryKey, Stats, StatsQuery } from './stats/index.ts';
+export { BY_KEYS, statsLine, statsLines, statsQueryOf, type ByKey, type QueryKey, type Stats, type StatsQuery } from './stats/index.ts';
 export { list, pausedRead, runReading, unjudgedOf } from './list/list.verb.ts';
 export type { ReadingHow, RunReading } from './list/list.verb.ts';
 export type { Answered, Decided } from './decide/decide.verb.ts';
@@ -525,7 +527,6 @@ export type { Judgement } from './summary/judgement.verb.ts';
 export { recordMemo, type RecordMemo } from './rest/index.ts';
 export type { ScheduleRuns } from './schedule/listed.store.ts';
 export type { PauseRuns } from './pause/pause.ts';
-export type { InboxRuns } from './inbox/index.ts';
 export { judgedNow, runsSummarized } from './summary/summary.verb.ts';
 export type { RunSummary, SummaryHow } from './summary/summary.verb.ts';
 /**
@@ -533,7 +534,6 @@ export type { RunSummary, SummaryHow } from './summary/summary.verb.ts';
  * api reads besides: a step's file routes (`refusedName`, `typeOf`), its log's tail (`tailOf`), its try's turn (`turnOfTry`) and
  * `nemia decide`'s usage (`totalOf`, `usedOf`).
  */
-export type { StepRaise } from './retry/index.ts';
 export { turnOfTry, type StepAcceptance, type StepApproval, type StepAttempts, type StepCloseout } from './resource/tries.verb.ts';
 export type { StepGate, StepReply, StepTry, StepUnreadable } from './resource/tries.verb.ts';
 export type { StepFiled, TaskPart } from './resource/told.verb.ts';

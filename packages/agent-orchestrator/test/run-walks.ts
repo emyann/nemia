@@ -3,9 +3,10 @@
  * `run-store.test.ts` and on the memory stand-in by `src/runs/memory.store.test.ts`. A run made is read back with a person's files composed
  * onto it and written back with none; a record gone is not made again; whether a run is there, taken and called off; the stamps a pass
  * compares; an ask of each kind written once at its name, read, consumed and answered from; a hold, a refresh ask and a prune marker put
- * and taken back; a cancellation kept as first written; a run forgotten; the markers of what `nemia rm` forgets. And the write check:
- * a new run or one written back that breaks an invariant of the model's `Run` is refused `Invalid` and nothing is written, and a new run
- * at an id already made is refused `Conflict`, the first left as it was, as is a second run from one card while the first stands.
+ * and taken back; a run's labels put whole and taken away by an empty map; a cancellation kept as first written; a run forgotten; the
+ * markers of what `nemia rm` forgets. And the write check: a new run or one written back that breaks an invariant of the model's `Run` is
+ * refused `Invalid` and nothing is written, and a new run at an id already made is refused `Conflict`, the first left as it was, as is a
+ * second run from one card while the first stands.
  *
  * Each row's ids are its own: the files side is one store for the whole file.
  */
@@ -187,14 +188,16 @@ const REWRITE: Walk[] = [
       const run = made(door, 'w-one-writer');
       act(door.holds.put(idOf(run.id), ['other-run'], {}));
       act(door.runs.prune(idOf(run.id), { at, worktrees: [] }));
+      act(door.labels.put(idOf(run.id), { team: 'core' }));
       const read = act(door.runs.read(idOf(run.id))) as Run;
       act(door.runs.rewrite({ ...read, brief: 'changed' }));
       act(door.holds.lift(idOf(run.id), read.hold!.at));
       act(door.runs.prune(idOf(run.id), undefined));
+      act(door.labels.put(idOf(run.id), {}));
       const again = act(door.runs.read(idOf(run.id))) as Run;
-      return { brief: again.brief, hold: again.hold, pruned: again.pruned };
+      return { brief: again.brief, hold: again.hold, pruned: again.pruned, labels: again.labels };
     },
-    says: { brief: 'changed', hold: undefined, pruned: undefined },
+    says: { brief: 'changed', hold: undefined, pruned: undefined, labels: undefined },
   },
   {
     name: 'REFUSED: a run written back whose try ran under a task no filing names is not written, and the record is left as it was',
@@ -313,6 +316,7 @@ const RUNS: Record<string, Walk[]> = {
           act(door.runs.prune(idOf(id), { at, worktrees: [] }));
           act(door.holds.put(idOf(id), ['x'], {}));
           act(door.refresh.put(idOf(id)));
+          act(door.labels.put(idOf(id), { team: 'core' }));
           act(door.asks.write(idOf(id), { kind: 'approve', of: 'gate', ask: { step: 'implement', try: 1, at } }));
         }
         const removed = act(door.runs.forget(idOf('w-forget')));
@@ -320,7 +324,7 @@ const RUNS: Record<string, Walk[]> = {
         return {
           removed,
           taken: act(door.runs.taken(idOf('w-forget'))),
-          kept: Boolean(kept.cancelledAt && kept.pruned && kept.hold && kept.approvals),
+          kept: Boolean(kept.cancelledAt && kept.pruned && kept.hold && kept.labels && kept.approvals),
           again: act(door.runs.forget(idOf('w-forget'))),
         };
       },
@@ -331,6 +335,7 @@ const RUNS: Record<string, Walk[]> = {
           'runs/w-forget.pruned',
           'runs/w-forget.hold',
           'runs/w-forget.refresh',
+          'runs/w-forget.labels',
           'runs/w-forget.asks/',
         ],
         taken: false,
@@ -569,6 +574,45 @@ const HOLDS: Record<string, Walk[]> = {
   ],
 };
 
+const LABELS: Record<string, Walk[]> = {
+  'labels.put': [
+    {
+      name: "a run's labels are put whole, read back composed onto the run, replaced whole by the next put, and taken away by an empty one",
+      walk: ({ door }) => {
+        made(door, 'w-labels');
+        const plain = (act(door.runs.read(idOf('w-labels'))) as Run).labels;
+        act(door.labels.put(idOf('w-labels'), { team: 'core', tier: 'gold' }));
+        const first = (act(door.runs.read(idOf('w-labels'))) as Run).labels;
+        act(door.labels.put(idOf('w-labels'), { team: 'web' }));
+        const second = (act(door.runs.read(idOf('w-labels'))) as Run).labels;
+        const found = (act(door.runs.find(idOf('w-labels'))) as Run | undefined)?.labels;
+        act(door.labels.put(idOf('w-labels'), {}));
+        const gone = (act(door.runs.read(idOf('w-labels'))) as Run).labels;
+        return { plain, first, second, found, gone };
+      },
+      says: { plain: undefined, first: { team: 'core', tier: 'gold' }, second: { team: 'web' }, found: { team: 'web' }, gone: undefined },
+    },
+    {
+      name: "a relabel moves its run's stamp, and another run's stands",
+      walk: ({ door }) => {
+        made(door, 'w-labels-stamp');
+        made(door, 'w-labels-stamp-other');
+        const before = act(door.runs.stamps()) as Map<string, string>;
+        act(door.labels.put(idOf('w-labels-stamp'), { team: 'core' }));
+        const put = act(door.runs.stamps()) as Map<string, string>;
+        act(door.labels.put(idOf('w-labels-stamp'), {}));
+        const removed = act(door.runs.stamps()) as Map<string, string>;
+        return [
+          before.get('w-labels-stamp') === put.get('w-labels-stamp'),
+          put.get('w-labels-stamp') === removed.get('w-labels-stamp'),
+          before.get('w-labels-stamp-other') === removed.get('w-labels-stamp-other'),
+        ];
+      },
+      says: [false, false, true],
+    },
+  ],
+};
+
 const FORGETTING: Record<string, Walk[]> = {
   'forgetting.write': [
     {
@@ -623,4 +667,4 @@ const FORGETTING: Record<string, Walk[]> = {
 };
 
 /** The Run door's walks, by method: every method of `RunDoorShape` has one, or `walksOn`'s first test fails. */
-export const RUN_WALKS: Readonly<Record<string, readonly Walk[]>> = { ...RUNS, ...ASK_WALKS, ...HOLDS, ...FORGETTING };
+export const RUN_WALKS: Readonly<Record<string, readonly Walk[]>> = { ...RUNS, ...ASK_WALKS, ...HOLDS, ...LABELS, ...FORGETTING };

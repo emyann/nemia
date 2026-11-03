@@ -26,6 +26,7 @@ import { Route as RunsRunIdRouteImport } from './routes/runs.$runId'
 import { Route as AgentsFromAgentRouteImport } from './routes/agents_.$from.$agent'
 import { Route as AgentsSkillsNewRouteImport } from './routes/agents_.skills.new'
 import { Route as FactoriesFactorySettingsRouteImport } from './routes/factories.$factory_.settings'
+import { Route as LabelsKeyValueRouteImport } from './routes/labels.$key.$value'
 import { Route as WorkflowsFromWorkflowRouteImport } from './routes/workflows_.$from.$workflow'
 import { Route as AgentsSkillsFromSkillRouteImport } from './routes/agents_.skills.$from.$skill'
 import { Route as RunsRunIdStepsStepRouteImport } from './routes/runs.$runId_.steps.$step'
@@ -117,6 +118,11 @@ const FactoriesFactorySettingsRoute =
     path: '/factories/$factory/settings',
     getParentRoute: () => rootRouteImport,
   } as any)
+const LabelsKeyValueRoute = LabelsKeyValueRouteImport.update({
+  id: '/labels/$key/$value',
+  path: '/labels/$key/$value',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const WorkflowsFromWorkflowRoute = WorkflowsFromWorkflowRouteImport.update({
   id: '/workflows_/$from/$workflow',
   path: '/workflows/$from/$workflow',
@@ -157,6 +163,7 @@ export interface FileRoutesByFullPath {
   '/agents/$from/$agent': typeof AgentsFromAgentRoute
   '/agents/skills/new': typeof AgentsSkillsNewRoute
   '/factories/$factory/settings': typeof FactoriesFactorySettingsRoute
+  '/labels/$key/$value': typeof LabelsKeyValueRoute
   '/workflows/$from/$workflow': typeof WorkflowsFromWorkflowRoute
   '/agents/skills/$from/$skill': typeof AgentsSkillsFromSkillRoute
   '/runs/$runId/steps/$step': typeof RunsRunIdStepsStepRoute
@@ -180,6 +187,7 @@ export interface FileRoutesByTo {
   '/agents/$from/$agent': typeof AgentsFromAgentRoute
   '/agents/skills/new': typeof AgentsSkillsNewRoute
   '/factories/$factory/settings': typeof FactoriesFactorySettingsRoute
+  '/labels/$key/$value': typeof LabelsKeyValueRoute
   '/workflows/$from/$workflow': typeof WorkflowsFromWorkflowRoute
   '/agents/skills/$from/$skill': typeof AgentsSkillsFromSkillRoute
   '/runs/$runId/steps/$step': typeof RunsRunIdStepsStepRoute
@@ -204,6 +212,7 @@ export interface FileRoutesById {
   '/agents_/$from/$agent': typeof AgentsFromAgentRoute
   '/agents_/skills/new': typeof AgentsSkillsNewRoute
   '/factories/$factory_/settings': typeof FactoriesFactorySettingsRoute
+  '/labels/$key/$value': typeof LabelsKeyValueRoute
   '/workflows_/$from/$workflow': typeof WorkflowsFromWorkflowRoute
   '/agents_/skills/$from/$skill': typeof AgentsSkillsFromSkillRoute
   '/runs/$runId_/steps/$step': typeof RunsRunIdStepsStepRoute
@@ -229,6 +238,7 @@ export interface FileRouteTypes {
     | '/agents/$from/$agent'
     | '/agents/skills/new'
     | '/factories/$factory/settings'
+    | '/labels/$key/$value'
     | '/workflows/$from/$workflow'
     | '/agents/skills/$from/$skill'
     | '/runs/$runId/steps/$step'
@@ -252,6 +262,7 @@ export interface FileRouteTypes {
     | '/agents/$from/$agent'
     | '/agents/skills/new'
     | '/factories/$factory/settings'
+    | '/labels/$key/$value'
     | '/workflows/$from/$workflow'
     | '/agents/skills/$from/$skill'
     | '/runs/$runId/steps/$step'
@@ -275,6 +286,7 @@ export interface FileRouteTypes {
     | '/agents_/$from/$agent'
     | '/agents_/skills/new'
     | '/factories/$factory_/settings'
+    | '/labels/$key/$value'
     | '/workflows_/$from/$workflow'
     | '/agents_/skills/$from/$skill'
     | '/runs/$runId_/steps/$step'
@@ -299,6 +311,7 @@ export interface RootRouteChildren {
   AgentsFromAgentRoute: typeof AgentsFromAgentRoute
   AgentsSkillsNewRoute: typeof AgentsSkillsNewRoute
   FactoriesFactorySettingsRoute: typeof FactoriesFactorySettingsRoute
+  LabelsKeyValueRoute: typeof LabelsKeyValueRoute
   WorkflowsFromWorkflowRoute: typeof WorkflowsFromWorkflowRoute
   AgentsSkillsFromSkillRoute: typeof AgentsSkillsFromSkillRoute
   RunsRunIdStepsStepRoute: typeof RunsRunIdStepsStepRoute
@@ -426,6 +439,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof FactoriesFactorySettingsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/labels/$key/$value': {
+      id: '/labels/$key/$value'
+      path: '/labels/$key/$value'
+      fullPath: '/labels/$key/$value'
+      preLoaderRoute: typeof LabelsKeyValueRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/workflows_/$from/$workflow': {
       id: '/workflows_/$from/$workflow'
       path: '/workflows/$from/$workflow'
@@ -475,6 +495,7 @@ const rootRouteChildren: RootRouteChildren = {
   AgentsFromAgentRoute: AgentsFromAgentRoute,
   AgentsSkillsNewRoute: AgentsSkillsNewRoute,
   FactoriesFactorySettingsRoute: FactoriesFactorySettingsRoute,
+  LabelsKeyValueRoute: LabelsKeyValueRoute,
   WorkflowsFromWorkflowRoute: WorkflowsFromWorkflowRoute,
   AgentsSkillsFromSkillRoute: AgentsSkillsFromSkillRoute,
   RunsRunIdStepsStepRoute: RunsRunIdStepsStepRoute,

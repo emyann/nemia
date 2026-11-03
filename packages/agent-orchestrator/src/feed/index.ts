@@ -31,6 +31,7 @@ export type {
   FeedCloseout,
   FeedDenial,
   FeedFold,
+  ClosedFeedLabels,
   FeedLabels,
   FeedLine,
   FeedMemo,

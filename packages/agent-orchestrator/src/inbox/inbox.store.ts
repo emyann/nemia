@@ -14,6 +14,7 @@ import { Cause, Effect } from 'effect';
 import {
   ideaCard,
   inboxListing,
+  labelledText,
   inboxNameRefusal,
   noCardLine,
   parseInboxCard,
@@ -25,7 +26,10 @@ import {
   type InboxRuns,
 } from './inbox.ts';
 import { queueFactoryRefusal } from './queue-factory.ts';
-import { Conflict, Missing } from '../refusal/refusal.ts';
+import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
+import { RunDoor } from '../runs/runs.store.ts';
+import { RunId } from '../record/record.model.ts';
+import { inheritedLabels, parseLabelEdits, type LeftOut } from '../labels/labels.ts';
 import { CardDoor, cardNameAt, inboxAt } from '../cards/cards.store.ts';
 import { CardName } from './inbox.model.ts';
 import { workRoot } from '../record/places.store.ts';
@@ -115,6 +119,10 @@ const cardRepoRefusal = Effect.fn('cardRepoRefusal')(function* (opts: {
  * (`ideaCard`). `workflow`, `repo` and `factory` are written as the card's keys, over the text's own: `repo` an absolute path to a
  * directory, `workflow` a name or an absolute path (`workflowAt`), as a start would be given it, and `factory` a factory's name, whose
  * factory the start judges. The card is filed exclusively (`cards.add`): a name another card took meanwhile (`Conflict`) is drawn again.
+ *
+ * `labels` are label edits (`--label`, `key=value` / `key-`), refused `Invalid` before anything is written where one does not parse
+ * (`parseLabelEdits`). The card is filed with the labels its `from:` runs agree on, its text's own `labels:` over them, and the edits over
+ * those (`inheritedLabels`); a key two of those runs disagree on is left out, and answered on `labelsLeftOut`.
  */
 export const addToInbox = Effect.fn('addToInbox')(function* (opts: {
   text: string;
@@ -123,18 +131,38 @@ export const addToInbox = Effect.fn('addToInbox')(function* (opts: {
   workflow?: string;
   repo?: string;
   factory?: string;
+  labels?: readonly string[];
 }) {
+  const edits = parseLabelEdits(opts.labels ?? []);
+  if ('refused' in edits) return yield* Effect.fail(new Invalid({ message: `--label: ${edits.refused}. Nothing was filed.` }));
   const refusedRepo = yield* cardRepoRefusal(opts);
   if (refusedRepo) return yield* Effect.fail(new WorkflowError(refusedRepo));
   const given = { workflow: opts.workflow, repo: opts.repo, factory: opts.factory };
-  const { text, body } = ideaCard(opts.from ?? 'the idea', opts.text, given, isDirectory, opts.dir);
+  const idea = ideaCard(opts.from ?? 'the idea', opts.text, given, isDirectory, opts.dir);
+  const { body } = idea;
+  const read = parseInboxCard(opts.from ?? 'the idea', idea.text, isDirectory);
+  const runDoor = yield* RunDoor;
+  const parents = yield* Effect.forEach(read.from ?? [], (run) =>
+    Effect.map(
+      runDoor.runs.find(RunId.read(run), () => {}),
+      (found) => ({ run, labels: found?.labels ?? {} }),
+    ),
+  );
+  const inherited = inheritedLabels({ parents, ...(read.labels !== undefined ? { card: read.labels } : {}), edits: edits.edits });
+  const labelled = parents.length > 0 || edits.edits.length > 0;
+  const text = labelled ? labelledText(read, inherited.labels, isDirectory) : idea.text;
+  const leftOut: readonly LeftOut[] = inherited.leftOut;
   const door = yield* CardDoor;
   for (;;) {
     const name = CardName.read(runId(firstPiece(body, '\n')));
     const filed = yield* Effect.result(door.cards.add(name, text));
     if (filed._tag === 'Failure' && filed.failure._tag === 'Conflict') continue;
     if (filed._tag === 'Failure') return yield* Effect.fail(filed.failure);
-    const out: { card: InboxCard; file: string } = { card: parseInboxCard(`${name}.md`, text, isDirectory), file: filed.success };
+    const out: { card: InboxCard; file: string; labelsLeftOut?: readonly LeftOut[] } = {
+      card: parseInboxCard(`${name}.md`, text, isDirectory),
+      file: filed.success,
+      ...(leftOut.length ? { labelsLeftOut: leftOut } : {}),
+    };
     return out;
   }
 });

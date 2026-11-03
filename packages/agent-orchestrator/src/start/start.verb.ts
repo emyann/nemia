@@ -55,6 +55,8 @@ import { readFactory } from '../factory/factory.store.ts';
 import { factoryFills } from '../rules/rules.store.ts';
 import { Context, Effect } from 'effect';
 import { RunDoor } from '../runs/runs.store.ts';
+import { RunId } from '../record/record.model.ts';
+import { inheritedLabels, parseLabelEdits, type Inherited, type LabelEdit, type Labels, type LeftOut } from '../labels/labels.ts';
 
 /**
  * A workflow folder's steps, as a run in `factory` runs them: each step its hires fill (`factoryFills`, by the folder's name) resolved
@@ -279,7 +281,18 @@ export type StartOptions = {
   scheduled?: { factory: string; workflow: string; due: string };
   gates?: readonly string[];
   factory?: string;
+  /**
+   * The labels the run is created with, beside what its `after` and `context` runs agree on: the card's own (`card`), and the start's
+   * typed edits (`nemia start --label`, `key=value` / `key-`), each over the last (`inheritedLabels`).
+   */
+  labels?: { card?: Labels; edits?: readonly string[] };
 };
+
+/**
+ * A run as `startRun` answers it: its record, its person labels as they were written (`labels`, absent for none), and each key its
+ * named runs disagreed on, which it was not given (`labelsLeftOut`, absent for none): said by `nemia start`, never written in the record.
+ */
+export type StartedRun = Run & { readonly labelsLeftOut?: readonly LeftOut[] };
 
 /** What a run is told at `nemia start` and frozen on its record, whatever its place: the brief, the steps, and each option given. */
 type Told = Pick<
@@ -550,11 +563,18 @@ export const repoFor = (name: string | undefined, named: string | undefined, fal
  * the ledger and pinned on the record as `pinned` (`pinsOf`); a run that has filed nothing resolves them again on every pass, so an
  * edit made while it waits `--after` reaches its first filing.
  *
+ * `labels` are the run's person labels, copied once, at creation (`inheritedLabels`): every key the `after` and `context` runs agree on,
+ * the card's own over them, and the typed edits over those. A key two of those runs disagree on that neither the card nor an edit sets is
+ * left out, and answered on `labelsLeftOut` for `nemia start` to say. Refused before anything is written: an edit that is not `key=value`
+ * or `key-`, or names a key or value a label cannot hold (`parseLabelEdits`). Written beside the record (`runs.labels.put`) only when
+ * there are any.
+ *
  * Fails with the refusal it met, every one before anything is written (`stepsToStart`, the place's `open` — a `.worktreeinclude` it
  * refuses among them, for a run that cuts worktrees — and those above); dies of anything else, an `open` not heard and the copy's and the
  * render's `Error` included (`tried`).
  */
 export const startRun = Effect.fn('start')(function* (opts: StartOptions) {
+  const edits = yield* labelEditsOf(opts);
   const isolate = opts.isolate ?? true;
   const places = placesOf(opts.repo);
   const factory = yield* tried(() => factoryNamed(opts.factory));
@@ -587,6 +607,7 @@ export const startRun = Effect.fn('start')(function* (opts: StartOptions) {
   while (runStore.runs.taken(id)) id = runId(opts.brief);
   const refusedContext = contextRefusal(opts.context ?? [], opts.after ?? [], runStore.runs.exists, id);
   if (refusedContext) return yield* Effect.fail(refusedContext);
+  const inherited = yield* inheritedOf(opts, edits);
   const mounts = mountsAt(factory, folder ? undefined : opts.repo);
   const unmounted = mountRefusal(opts, steps, places, factory, folder ? undefined : opts.repo, mounts, denied);
   if (unmounted) return yield* Effect.fail(new Invalid({ message: unmounted }));
@@ -598,5 +619,38 @@ export const startRun = Effect.fn('start')(function* (opts: StartOptions) {
   const pinned = yield* pinsOf(run, steps, run.createdAt);
   if (pinned.length) run.pinned = pinned;
   yield* (yield* RunDoor).runs.create(run);
-  return run;
+  return yield* labelled(run, inherited);
+});
+
+/** The start's `--label` edits, parsed: refused `Invalid`, naming `--label`, where one does not parse (`parseLabelEdits`). */
+const labelEditsOf = Effect.fnUntraced(function* (opts: StartOptions) {
+  const parsed = parseLabelEdits(opts.labels?.edits ?? []);
+  if ('refused' in parsed) return yield* Effect.fail(new Invalid({ message: `--label: ${parsed.refused}` }));
+  return parsed.edits;
+});
+
+/** The labels a run of `opts` is created with (`inheritedLabels`): its `after` and `context` runs' read through the Run door. */
+const inheritedOf = Effect.fnUntraced(function* (opts: StartOptions, edits: readonly LabelEdit[]) {
+  const door = yield* RunDoor;
+  const named = [...new Set([...(opts.after ?? []), ...(opts.context ?? [])])];
+  const parents = yield* Effect.forEach(named, (parent) =>
+    Effect.map(
+      door.runs.find(RunId.read(parent), () => {}),
+      (found) => ({ run: parent, labels: found?.labels ?? {} }),
+    ),
+  );
+  const card = opts.labels?.card;
+  return inheritedLabels({ parents, ...(card !== undefined ? { card } : {}), edits });
+});
+
+/** `run`, just created, with its labels written beside it when it has any, and answered with them and what was left out. */
+const labelled = Effect.fnUntraced(function* (run: Run, inherited: Inherited) {
+  const any = Object.keys(inherited.labels).length > 0;
+  if (any) yield* (yield* RunDoor).labels.put(RunId.read(run.id), inherited.labels);
+  const started: StartedRun = {
+    ...run,
+    ...(any ? { labels: inherited.labels } : {}),
+    ...(inherited.leftOut.length ? { labelsLeftOut: inherited.leftOut } : {}),
+  };
+  return started;
 });

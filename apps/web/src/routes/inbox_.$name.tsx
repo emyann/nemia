@@ -1,9 +1,10 @@
-import { useSuspenseQuery } from '@tanstack/react-query';
+import { useQueryClient, useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { AsWritten, KeyTable } from '../components/FilePage';
 import { Instant } from '../components/Instant';
 import { Markdown } from '../components/Markdown';
-import { cardQuery, workflowNameOf } from '../lib/api';
+import { Labels } from '../components/Labels';
+import { cardQuery, labelCard, workflowNameOf } from '../lib/api';
 
 /** The page of an inbox card, at /inbox/$name: `inbox_` draws it on its own, not inside the Inbox page, which has no outlet for it. */
 export const Route = createFileRoute('/inbox_/$name')({
@@ -24,6 +25,7 @@ export const Route = createFileRoute('/inbox_/$name')({
 function CardPage() {
   const { name } = Route.useParams();
   const { data: card } = useSuspenseQuery(cardQuery(name));
+  const queryClient = useQueryClient();
 
   return (
     <article className="space-y-6">
@@ -45,6 +47,13 @@ function CardPage() {
           )}
         </p>
       </header>
+
+      {card.error === null && (
+        <Labels
+          labels={card.labels}
+          edit={(edits) => labelCard(card.name, edits).then(() => queryClient.invalidateQueries({ queryKey: ['inbox'] }))}
+        />
+      )}
 
       {card.state === 'started' && (
         <p data-started-as className="text-body-medium text-muted-foreground">

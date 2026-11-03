@@ -12,6 +12,7 @@ import { waitsOnYou } from '../src/lib/factory.ts';
 
 /** A run of the default factory with a step per name in `steps`, nobody waited on, and `extra` over it. */
 const run = (id: string, extra: Partial<RunSummary> = {}, steps: readonly string[] = ['plan', 'build', 'ship']): RunSummary => ({
+  labels: {},
   id,
   repo: '/code/app',
   factory: null,

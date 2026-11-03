@@ -178,7 +178,8 @@ test('REFUSED: nemia watch refuses what was typed, by name, before a line is rea
       fs.writeFileSync(FEED, `${JSON.stringify(line('running'))}\n`);
       const end = fs.statSync(FEED).size;
       const log = sub.mock.method(console, 'log', () => {});
-      names(await refused(['watch', '--once', '-l', 'message=hi']), '"message" is no key of a feed line');
+      names(await refused(['watch', '--once', '-l', 'message=hi']), 'message', '-l <key>=<value>');
+      names(await refused(['watch', '--once', '-l', 'no/pe=x']), '"no/pe"', '-l <key>=<value>');
       names(await refused(['watch', '-l', 'factory==nemia']), '"factory==nemia"', '==');
       names(await refused(['watch', '--once', '-l', 'factory in nemia']), 'no (values) after in');
       names(await refused(['watch', '--once', '-l', '']), '"" is no selector');

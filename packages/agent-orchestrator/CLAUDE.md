@@ -97,6 +97,7 @@ too, which holds parity with this one until the in-process reads retire.
 - **A revision answered for a kind nobody has resolved has no ledger entry, and the ledger's last entry is not what the files hold**:
   compare against a fresh resolve (`driftNow`, which numbers without a write), by digest, never against the ledger's top, or an edit
   reads as no drift and a reverted one as behind.
+- **A run's labels are a person's file, `runs/<id>.labels`, composed on read and never written into the record** (`src/record/files.store.ts`): `runs.create` drops them, so a start writes them with `runs.labels.put` after it, and a test plants them the same way.
 - **A person's fact that stops a run's asks is read by `assess`**, not only by the verbs and the tick; a line that offers a verb says that
   verb's refusal itself (each producer reads `run.pruned`).
 - **A level-triggered ask cannot simply be deleted once acted on**: the verb it would let through refuses the state the deletion makes.

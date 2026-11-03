@@ -57,6 +57,8 @@ export type RunView = Pick<
   'brief' | 'repo' | 'place' | 'work' | 'workflowDir' | 'try' | 'baseRef' | 'branch' | 'isolate' | 'after' | 'context'
 > &
   Omit<RunStatus, 'graph' | 'steps' | 'timeline'> & {
+    /** The run's whole label map, as its record's `metadata.labels` says it: its own, `workflow`, and `factory` when it names one. */
+    labels: Readonly<Record<string, string>>;
     readonly id: string;
     readonly createdAt: string;
     /** The line that prints what there is to decide on the run. */
@@ -123,6 +125,7 @@ export const runViewOf = (
     ...judged,
     id: metadata.name,
     createdAt: metadata.creationTimestamp,
+    labels: metadata.labels,
     brief: spec.brief,
     repo: spec.repo,
     place: spec.place,

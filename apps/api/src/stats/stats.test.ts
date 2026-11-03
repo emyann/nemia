@@ -17,6 +17,7 @@ import type { Stats } from './stats.ts';
 import { app, runtime } from '../app.ts';
 import { Engine } from '../store.ts';
 import { ReadMemo } from '../layer.ts';
+import { names } from '../../test/named.ts';
 
 const e = await runtime.runPromise(Engine.useSync((engine) => engine));
 
@@ -103,6 +104,7 @@ function finished(id: string, repo: string, costUsd: number, factory?: string, s
 
 finished('r-home', '/repos/home', 1);
 finished('r-away', '/repos/away', 2, 'other', ['look', 'look']);
+write(path.join(root, 'runs', 'r-home.labels'), JSON.stringify({ team: 'core' }));
 
 /** A run of the review workflow on `/repos/home`, created at `createdAt`, its skill rendered as `text`: nothing of it ran. */
 function reviewed(id: string, createdAt: string, text: string) {
@@ -301,6 +303,22 @@ async function unverified<T>(f: () => Promise<T>): Promise<T> {
     process.env.WF_VERIFY_REST = '1';
   }
 }
+
+test('GET /api/stats?selector= keeps the facts of the runs one of its selectors takes by their labels, and a malformed one is a 422', async () => {
+  const day = '?from=2026-09-28&to=2026-09-28';
+  const tries = async (query: string) => {
+    const { status, body } = await asked(`${day}${query}`);
+    assert.equal(status, 200, body.error);
+    return body.all.total.tries;
+  };
+  assert.equal(await tries('&selector=team%3Dcore'), 1, 'the try of r-home, labelled team=core by a person');
+  assert.equal(await tries('&selector=factory%3Dother'), 1, 'a closed key selects as a person key does');
+  assert.equal(await tries('&selector=team%3Dcore&selector=factory%3Dother'), 2, 'two selectors are either');
+  assert.equal(await tries('&selector=team%3Dinfra'), 0, 'and none where it takes no run');
+  const refused = await asked(`${day}&selector=no%2Fpe%3Dx`);
+  assert.equal(refused.status, 422);
+  names(refused.body.error, 'no/pe');
+});
 
 test("GET /api/stats reads no run's journal again while the store is as it was, and reads again only the run whose record changed", async () => {
   const first = await asked('');

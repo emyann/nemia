@@ -7,6 +7,7 @@ import type { Capabilities, Ceilings, Daemon, InboxCardPage, InboxEntry, PassCos
 
 /** A queued card whose start the tick tried and did not make, `queued` and `tried` both set, and which a record names: `started`. */
 export const inboxEntry = (extra: Partial<InboxEntry> = {}): InboxEntry => ({
+  labels: {},
   name: 'decode-the-reads',
   file: 'decode-the-reads.md',
   title: 'Decode the reads',

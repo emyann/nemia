@@ -340,19 +340,23 @@ const Rest = [Schema.Record(Schema.String, Schema.Unknown)] as const;
  *
  * Every one of them is as loose as the JSON it came from — a string where this version writes a literal — on purpose: a `nemia` newer
  * than this one may name a reason, a type or a source this one does not, and a closed literal here would drop its line whole and leave
- * the fold reading a feed with a hole in it.
+ * the fold reading a feed with a hole in it. Its `labels` are the closed five and the labels a person put on the run (`FeedLabels`),
+ * the rest a `Record` a `Struct` alone would strip.
  */
 const LINE_KEYS = {
   apiVersion: Schema.optionalKey(Schema.String),
   involved: Schema.optionalKey(Schema.Struct({ kind: Schema.String, name: Schema.String })),
   labels: Schema.optionalKey(
-    Schema.Struct({
-      run: Schema.optionalKey(Schema.String),
-      factory: Schema.optionalKey(Schema.String),
-      workflow: Schema.optionalKey(Schema.String),
-      step: Schema.optionalKey(Schema.String),
-      agent: Schema.optionalKey(Schema.String),
-    }),
+    Schema.StructWithRest(
+      Schema.Struct({
+        run: Schema.optionalKey(Schema.String),
+        factory: Schema.optionalKey(Schema.String),
+        workflow: Schema.optionalKey(Schema.String),
+        step: Schema.optionalKey(Schema.String),
+        agent: Schema.optionalKey(Schema.String),
+      }),
+      [Schema.Record(Schema.String, Schema.String)],
+    ),
   ),
   reason: Schema.optionalKey(Schema.String),
   type: Schema.optionalKey(Schema.String),

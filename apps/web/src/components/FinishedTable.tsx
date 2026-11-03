@@ -6,6 +6,7 @@ import { ink } from '@/lib/meaning';
 import { agoWords, endedWords } from '@/lib/runWords';
 import { instantWhole } from '@/lib/instant';
 import { cn } from '@/components/ui/ds/utils';
+import { LabelTags } from './Labels';
 import { RunClockCell } from './RunClockCell';
 import { RunCostCell } from './RunCostCell';
 import { workflowTarget } from './WorkflowLink';
@@ -36,6 +37,7 @@ function FinishedRow({ run, asOf }: { run: FinishedPage['runs'][number]; asOf: D
         <TextLink to="/runs/$runId" params={{ runId: run.id }} title={titleOf(run)} className="block truncate text-body-medium">
           {titleOf(run)}
         </TextLink>
+        <LabelTags labels={run.labels} />
       </Cell>
       <Cell truncate data-factory={factoryOf(run)} className="text-label-small uppercase text-on-surface-variant">
         {factoryOf(run)}

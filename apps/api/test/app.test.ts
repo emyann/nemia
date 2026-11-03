@@ -329,6 +329,7 @@ test("a store's runs read on the list and on a run's page: each summarized with 
         work: null,
         brief: 'Do the thing',
         workflowDir: '/code/app/workflows',
+        labels: { workflow: 'workflows', factory: 'default' },
         try: null,
         createdAt: '2026-09-12T00:00:00.000Z',
         /** Started, and none of its filings on the feed (there is none here): when it was created. */

@@ -68,6 +68,8 @@ test('each command is served on the api where it was before the table, the lift 
       ],
       ['inbox rm', { method: 'DELETE', path: '/api/inbox/:name', status: 200 }],
       ['inbox show', { method: 'GET', path: '/api/inbox/:name', status: 200 }],
+      ['label run', { method: 'POST', path: '/api/runs/:runId/labels', status: 200 }],
+      ['label inbox', { method: 'POST', path: '/api/inbox/:name/labels', status: 200 }],
       ['factory', { method: 'GET', path: '/api/factories', status: 200 }],
       ['factory ls', 'cli'],
       ['factory add', 'cli'],

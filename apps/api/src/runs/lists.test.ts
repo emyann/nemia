@@ -232,3 +232,57 @@ test('GET /api/runs-finished refuses with a 422 a page that is no whole number f
       names(body.error, `${field} takes`, `as in ${field}=`, `\`${value}\``);
     });
 });
+
+test('?selector= keeps the runs one of its selectors takes by their labels, on every read of the list, and a malformed one is a 422', async (t) => {
+  const labelled = (id: string, labels: Record<string, string>) =>
+    fs.writeFileSync(path.join(root, 'runs', `${id}.labels`), JSON.stringify(labels));
+  labelled('l-second', { team: 'core' });
+  labelled('l-asks', { team: 'infra' });
+  await t.test('a person key selects, and each row carries its whole map', async () => {
+    const page = await read<FinishedListing>('/api/runs-finished?selector=team%3Dcore');
+    assert.deepEqual(
+      page.runs.map((r) => r.id),
+      ['l-second'],
+    );
+    assert.equal(page.total, 1, 'the page is cut over the runs taken');
+    assert.deepEqual(
+      page.runs[0]?.labels,
+      { team: 'core', workflow: 'no-such-workflow', factory: 'default' },
+      "the person's keys and the closed ones",
+    );
+    const open = await read<OpenListing>('/api/runs-open?selector=team%3Dinfra');
+    assert.deepEqual(
+      open.waiting.map((r) => r.id),
+      ['l-asks'],
+      'the waiting run labelled infra',
+    );
+    assert.deepEqual(open.inFlight, [], 'and no run in flight carries it');
+    const all = await read<RunListing[]>('/api/runs?selector=team%3Dcore');
+    assert.deepEqual(
+      all.map((r) => r.id),
+      ['l-second'],
+      'the whole list too',
+    );
+    const ceilings = { WF_MAX_RUNS: process.env.WF_MAX_RUNS, WF_MAX_CONCURRENT: process.env.WF_MAX_CONCURRENT };
+    Object.assign(process.env, { WF_MAX_RUNS: '2', WF_MAX_CONCURRENT: '2' });
+    const listed = await read<{ runs: { run: { id: string } }[] }>('/api/listing?selector=team%3Dcore').finally(() =>
+      Object.assign(process.env, ceilings),
+    );
+    assert.deepEqual(
+      listed.runs.map((r) => r.run.id),
+      ['l-second'],
+      "and nemia ls's answer",
+    );
+  });
+  await t.test('two selectors are either: a run one of them takes is kept', async () => {
+    const page = await read<FinishedListing>('/api/runs-finished?selector=team%3Dcore&selector=factory%3Dpipao');
+    assert.deepEqual(page.runs.map((r) => r.id).sort(), ['l-fifth', 'l-second']);
+  });
+  for (const address of ['/api/runs', '/api/runs-open', '/api/runs-finished', '/api/listing', '/api/listing/l-second'])
+    await t.test(`REFUSED: ${address} with a selector of a misspelled key, 422`, async () => {
+      const res = await app().request(`${address}?selector=no%2Fpe%3Dx`);
+      const body = (await res.json()) as { error?: string };
+      assert.equal(res.status, 422, JSON.stringify(body));
+      names(body.error, 'no/pe');
+    });
+});

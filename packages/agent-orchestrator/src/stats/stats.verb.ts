@@ -16,6 +16,7 @@ import { Invalid, Missing } from '../refusal/refusal.ts';
 import type { Workflow } from '../step/step.ts';
 import { timeline } from '../timeline/index.ts';
 import { runStore } from '../record/files.store.ts';
+import { RunDoor } from '../runs/runs.store.ts';
 import { stepsOf } from '../steps/steps.verb.ts';
 import { closeoutReader, everyTryOf, taskCloseout, taskPhasesRead, viewedOnce } from '../views/views.verb.ts';
 import { phaseOfView } from '../views/views-words.ts';
@@ -26,6 +27,8 @@ import { seriesHealth } from '../series/series.store.ts';
 import { dayOf, factsOf, keysOf, statsOf, type CheckVerdict, type Facts, type RunFact, type StatsQuery, type TryFact } from './stats.ts';
 import { frozenOf, type RunFrozen } from './marks.ts';
 import { deniedCallsOf, filesTouchedOf, skillsLoadedOf } from './discipline.ts';
+import { selectedRuns } from '../runlist/runlist.ts';
+import type { Selectors } from '../watch/selector.ts';
 
 /** How a check's task ended (`CheckVerdict`): passed, refused (it ran to its end and exited non-zero, `refusedCheck`), or unfinished. */
 function verdictOf(view: TaskView | undefined): CheckVerdict {
@@ -190,8 +193,18 @@ const statsOver = Effect.fnUntraced(function* (e: Engine, query: StatsQuery, now
     facts.runs.push(...read.facts.runs);
     if (read.unreadable) unreadable.push(read.id);
   }
-  return statsOf(facts, query, now, unreadable, (from, to) => seriesHealth(from, to, series));
+  const taken = query.selectors?.length ? takenBy(yield* (yield* RunDoor).runs.list(), query.selectors) : undefined;
+  return statsOf(facts, query, now, unreadable, (from, to) => seriesHealth(from, to, series), taken);
 });
+
+/**
+ * Whether a run is one `selectors` takes, off the labels of every run the Run door lists (`selectedRuns`): read only where a selector was
+ * given, since it reads every record the memo would not.
+ */
+function takenBy(listed: readonly Run[], selectors: Selectors): (run: string) => boolean {
+  const ids = new Set(selectedRuns(listed, selectors).map((run) => run.id));
+  return (run) => ids.has(run);
+}
 
 /**
  * `nemia stats`: the flow numbers of every run in the store for `query`, as of `now`, through the memo `options` hands it, if any. Fails

@@ -34,7 +34,7 @@ import { CardDoor } from '../cards/cards.store.ts';
 import { RunDoor } from '../runs/runs.store.ts';
 import { CardName } from './inbox.model.ts';
 import { inboxCards, readableFactories } from './inbox.store.ts';
-import { repoFor, startRun } from '../start/start.verb.ts';
+import { repoFor, startRun, type StartedRun } from '../start/start.verb.ts';
 import { contextRefusal } from '../start/index.ts';
 import { placesOf } from '../folder/lookup.store.ts';
 import { defaultStartsAllowed, factoryNames, treeOf } from '../factory/factory.store.ts';
@@ -74,6 +74,8 @@ export type InboxStart = {
   inputs?: readonly string[];
   /** The steps its run is gated at (`nemia start --gate`), beside the card's own `gate:`. */
   gates?: readonly string[];
+  /** The start's label edits (`nemia start --label`), over the card's own `labels:` and what its runs agree on. */
+  labels?: readonly string[];
 };
 
 /**
@@ -86,7 +88,7 @@ export type InboxStart = {
  * looked at: said, not refused, since a card on disk cannot be edited from the board. A `repo` a person gives for such a team is refused by
  * `start()`.
  */
-export type InboxStarted = { run: Run; card: InboxCard; ignoredRepo?: string; queueLeft?: string };
+export type InboxStarted = { run: StartedRun; card: InboxCard; ignoredRepo?: string; queueLeft?: string };
 
 /**
  * The workflow folder a card is started on, found in the factory's `tree` where it has one, then in `repo`: `opts.workflow`, from
@@ -189,6 +191,7 @@ export const startFromInbox = Effect.fn('startFromInbox')(function* (opts: Inbox
     from: { inbox: card.name },
     ...(gates.length ? { gates } : {}),
     ...(factory !== undefined ? { factory } : {}),
+    labels: { ...(card.labels !== undefined ? { card: card.labels } : {}), edits: opts.labels ?? [] },
   });
   const ignoredRepo = card.repo !== undefined && !isRepositoryRun(run) ? { ignoredRepo: card.repo } : {};
   const queueLeft = card.queued === undefined ? undefined : yield* takeQueueOff(name, file);

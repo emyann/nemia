@@ -2,6 +2,7 @@
 import { Hono } from 'hono';
 import { STATS, statsQueryOf, type QueryKey, type Stats } from 'agent-orchestrator';
 import { type ApiEnv, served } from '../layer.ts';
+import { selectorOf } from '../labels/index.ts';
 import { runPlaced } from '../store.ts';
 
 export type { Stats };
@@ -39,7 +40,9 @@ const QUERY_KEYS: Record<QueryKey, string> = {
  *   that passed in more than half the deadline its task was filed with, its `checkMs`, that `deadlineMs` and the `share`. A query the
  *   package refuses (`statsQueryOf`) is a 422 naming the key and what it takes. A run is read again only when its files in the store or its
  *   tasks' journals changed: each finished run's facts are answered from the app's memo (`ReadMemo`) while they stand, and read afresh too
- *   under `WF_VERIFY_REST=1`.
+ *   under `WF_VERIFY_REST=1`. `?selector=`, given again for another, keeps the facts of the runs one of them takes by their labels, as
+ *   `nemia stats -l` keeps them (OR across repeats, the run's whole map read as `GET /api/runs` reads it); a selector the package's
+ *   grammar refuses is a 422 naming the key or the clause.
  */
 export const stats = new Hono<ApiEnv>().get('/api/stats', (c) =>
   served(c, async ({ e, placeService, env, home, memo }) => {
@@ -50,6 +53,12 @@ export const stats = new Hono<ApiEnv>().get('/api/stats', (c) =>
       }),
     );
     statsQueryOf(given, (key) => `?${QUERY_KEYS[key]}=`);
-    return c.json(await runPlaced({ placeService, home }, e, STATS.handler(given, env, home, { stats: memo.stats, series: memo.series })));
+    return c.json(
+      await runPlaced(
+        { placeService, home },
+        e,
+        STATS.handler({ ...given, ...selectorOf(c) }, env, home, { stats: memo.stats, series: memo.series }),
+      ),
+    );
   }),
 );

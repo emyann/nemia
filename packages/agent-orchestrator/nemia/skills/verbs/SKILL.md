@@ -18,7 +18,8 @@ They write nothing: run them unasked, as often as you need. One that sets with s
                                what a run started with --from <runId> would be handed of it, now
   nemia inbox
                                the cards parked before they are started: name, first line, workflow
-                               and repo when set, and started as <runId> (nemia inbox --help)
+                               and repo when set, and started as <runId> (nemia inbox --help); -l: the
+                               cards a selector takes; --show-labels, -L <key>: their labels on each line
   nemia factory
                                the store's factories: the default first — every run and card that
                                names no factory, read, never written — then each by name with its
@@ -47,7 +48,7 @@ They write nothing: run them unasked, as often as you need. One that sets with s
   nemia template lint <folder|archive>
                                check a template's folder or archive: every problem at once, each at its
                                file and line
-  nemia ls [<runId>]
+  nemia ls [<runId>] [-l <selector>] [--show-labels] [-L <key>]
                                runs and their steps — a run waiting on another says waiting on <run>,
                                one the cap on runs in flight holds waiting for a run slot (2 of 2 in
                                flight); what each step's tries and the run have cost, where measured;
@@ -56,7 +57,9 @@ They write nothing: run them unasked, as often as you need. One that sets with s
                                session, check or landing at work, or Paused once none is, then each
                                check it holds, a landing with its merge staged in the checkout
                                (MERGE_HEAD) among them; a step whose check it holds says waiting on
-                               the pause
+                               the pause. -l: the runs whose labels a selector takes (team=core,
+                               given again for another); --show-labels: each run with its labels;
+                               -L <key>: that label beside each run, given again for another
   nemia show <runId> [--raw]
                                the run as one object (nemia/v1 Run); --raw: its record, and
                                what each step was told
@@ -64,13 +67,14 @@ They write nothing: run them unasked, as often as you need. One that sets with s
                                what a step's try signed off with: its latest, or --try <n>
   nemia logs <runId> <step>
                                that step's session output
-  nemia stats [--from <day>] [--to <day>] [--by agent|step|factory|workflow|repo] [--agent|--step|--factory|--workflow|--repo <v>] [--line|--json]
+  nemia stats [--from <day>] [--to <day>] [--by agent|step|factory|workflow|repo] [--agent|--step|--factory|--workflow|--repo <v>] [-l <selector>] [--line|--json]
                                what every run in the store adds up to, by UTC day: rounds to
                                acceptance of each loop: step, landings of the workspace: base step
                                and on which try, cost and time per landed run, and each step's
                                tries, time, cost, checks and gate waits; first the last 14 days
                                against the 14 before. A number nothing measured reads —, never 0.
-                               --line: one line, for a recap; --json: the whole answer
+                               --line: one line, for a recap; --json: the whole answer; -l: the
+                               runs whose labels a selector takes, as nemia ls -l takes them
   nemia passes [--last <n>] [--json]
                                what the recent passes of the tick cost: their median and slowest
                                time, a histogram of their times, where the time went phase by
@@ -196,7 +200,7 @@ They write, and are yours to run unasked, on your judgement: say what you did.
                                inbox, listed as started: --workflows is its workflow:
                                unless given, --repo its repo:, --factory its factory:, and a card
                                that names no factory either way is refused
-  nemia inbox add "<idea>"|<file> [--workflow <name>] [--repo <path>] [--factory <name>]
+  nemia inbox add "<idea>"|<file> [--workflow <name>] [--repo <path>] [--factory <name>] [--label <key=value>]...
                                park an idea as a card in the inbox, named from its first line
   nemia inbox queue <name> [--workflow <w>] [--off]
                                mark a card to start on its own: the tick starts the oldest queued
@@ -204,6 +208,14 @@ They write, and are yours to run unasked, on your judgement: say what you did.
   nemia inbox from <name> <run>... | --off
                                set the runs a card is handed as context (from:), read and
                                never waited on; --off takes them off
+  nemia label run <runId> <key=value|key->... [--overwrite]
+                               edit a run's labels: key=value sets a key, key- removes it; changing a
+                               value takes --overwrite. nemia ls -l selects by them, and the feed's
+                               lines written after carry them
+  nemia label inbox <name> <key=value|key->... [--overwrite]
+                               edit an inbox card's labels: key=value sets a key, key- removes it;
+                               changing a value takes --overwrite. nemia inbox -l selects by them, and
+                               the run the card starts is created with them
   nemia refresh <runId> [<step>] [--base]
                                take the new revisions: a run keeps the workflow, agents, skills and
                                factory rules it resolved when it started, and this pins it to the

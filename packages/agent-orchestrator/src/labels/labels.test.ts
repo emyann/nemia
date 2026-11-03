@@ -1,8 +1,8 @@
 /**
  * A person's labels: every rule of a key's and a value's spelling refused (a row each), kubectl's edits of a map, what a start copies,
- * and how a printer and a selector read a run's map. When `labelEdits` refuses is proved (`contracts/labels.contract.ts`); what the
- * edited map holds and what `inheritedLabels` copies build a map at keys the code computes, which tsverify does not read, so each of
- * their sentences is a row here.
+ * and how a printer and a selector read a run's map. When `labelEdits` refuses, and what `inheritedLabels` holds of the typed edits, the
+ * card and the keys it leaves out, are proved (`contracts/labels.contract.ts`); what the edited map holds and which keys the runs agree
+ * on `inheritedLabels` copies, which tsverify does not prove, are a row here each.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -132,33 +132,15 @@ test('inheritedLabels: what a start copies, once — the runs it names, the card
       },
     ]);
   });
-  await t.test('leftOutOnlyDisagreed: nothing is left out where the runs agree', () =>
-    assert.deepEqual(
-      inheritedLabels({
-        parents: [
-          { run: 'r-1', labels: { team: 'core', area: 'web' } },
-          { run: 'r-3', labels: { team: 'core' } },
-        ],
-      }).leftOut,
-      [],
-    ),
-  );
-  await t.test("cardOverRuns: the card's value is taken over the runs', and settles a key they disagree on", () => {
-    const out = inheritedLabels({ parents, card: { team: 'web', tier: 'three' } });
-    assert.equal(out.labels.team, 'web');
-    assert.equal(out.labels.tier, 'three');
-    assert.deepEqual(out.leftOut, []);
-  });
-  await t.test('typedWins: a key typed key=value at the start has that value, over the card and the runs', () => {
+  await t.test("agreedInherited and nothingElse, beside a card and typed edits: the keys no one names are the runs' agreed ones", () => {
     const out = inheritedLabels({ parents, card: { team: 'web' }, edits: edits('team=cli', 'tier=four', 'new=yes') });
-    assert.deepEqual(out.labels, { team: 'cli', tier: 'four', area: 'web', owner: 'kim', new: 'yes' });
-    assert.deepEqual(out.leftOut, []);
+    assert.equal(out.labels.area, 'web');
+    assert.equal(out.labels.owner, 'kim');
+    assert.deepEqual(Object.keys(out.labels).sort(), ['area', 'new', 'owner', 'team', 'tier']);
   });
-  await t.test('droppedAtStart: a key typed key- is absent, whatever the card or the runs say', () => {
-    const out = inheritedLabels({ parents, card: { area: 'cli' }, edits: edits('area-', 'tier-', 'team-') });
-    assert.deepEqual(out.labels, { owner: 'kim' });
-    assert.deepEqual(out.leftOut, [], 'a key dropped at the start is no disagreement to report');
-  });
+  await t.test('agreedInherited and nothingElse, beside keys dropped at the start: only the agreed key no one names is left', () =>
+    assert.deepEqual(inheritedLabels({ parents, card: { area: 'cli' }, edits: edits('area-', 'tier-', 'team-') }).labels, { owner: 'kim' }),
+  );
   await t.test("a key Object's prototype names is inherited like any other, and a card's own keys alone are the card's", () => {
     const out = inheritedLabels({
       parents: [

@@ -7,7 +7,7 @@
  * itself and a person may not set (`CLOSED_LABEL_KEYS`). Nor may a label take a key a feed line or a selector already gives a meaning
  * to (`RESERVED_LABEL_KEYS`): a label named `reason` would decide what `-l reason=…` selects.
  */
-import type { LabelEdits } from '../../contracts/labels.contract.ts';
+import type { InheritedLabels, LabelEdits } from '../../contracts/labels.contract.ts';
 import { LABEL_KEYS, RESERVED_KEYS } from '../watch/selector.ts';
 
 /** A person's labels: a key to its value, Kubernetes' `map[string]string`. */
@@ -136,11 +136,7 @@ export type Inherited = { readonly labels: Labels; readonly leftOut: readonly Le
  * labels over them, then the start's typed edits over those — `key=value` sets, `key-` drops an inherited one. A key two runs give
  * different values that neither the card nor the start sets is left out, and named in `leftOut`. Pure.
  */
-export function inheritedLabels(input: {
-  readonly parents: readonly ParentLabels[];
-  readonly card?: Labels;
-  readonly edits?: readonly LabelEdit[];
-}): Inherited {
+export const inheritedLabels: InheritedLabels = (input) => {
   const card = input.card ?? {};
   const edits = input.edits ?? [];
   const named = (key: string): boolean => Object.hasOwn(card, key) || edits.some((e) => e.key === key);
@@ -164,7 +160,7 @@ export function inheritedLabels(input: {
     else delete out[edit.key];
   }
   return { labels: out, leftOut };
-}
+};
 
 /** `labels` as a printer shows them: `a=b,c=d` in key order, or `<none>` for none, as kubectl's LABELS column. Pure. */
 export const labelsText = (labels: Labels): string => {

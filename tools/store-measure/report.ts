@@ -23,6 +23,9 @@
  *   side by side, not one answer before and after.
  * - `feedFromCursor`: `GET /api/feed/stream` from the cursor `FEED_BACK` lines before the workflow feed's end, read until its last line
  *   came, then let go.
+ * - `tickPassInformed`: the same pass with an informer given (`Informer`), as the daemon's pass runs: it judges each run the informer
+ *   does not hold and keeps it, every moving run on every pass among them. Cold, a fresh engine and a fresh informer per pass; warm, both
+ *   kept.
  * - `runListAfterPass`, `openRunAfterPass`: `GET /api/runs` and `GET /api/runs/:id` of the newest open run, each asked after a pass of
  *   the tick has filled the app's informer (`Informer`, given by `liveOf`), as the daemon's pass fills it: the pass is not timed, the read
  *   is. Cold over an app built afresh and one pass for each call; warm, called again within the same pass, which serves even a moving
@@ -54,6 +57,7 @@ import {
 /** The five reads, the run's object counted twice, and the list and an open run read again after a pass: each a key of `measures`. */
 export const MEASURES = [
   'tickPass',
+  'tickPassInformed',
   'runList',
   'stats',
   'finishedRun',
@@ -320,10 +324,12 @@ async function feedStreamed(app: App, feed: FeedRead): Promise<void> {
  * at rest per engine), then warm over one engine kept, after a first pass that is not counted; each pass with the fence armed for a
  * pass. Answers the measure and the last pass.
  */
-async function tickMeasured(orch: Orchestrator, place: Place, fence: Fence, wf: string, repeat: number) {
-  const program = orch
+async function tickMeasured(orch: Orchestrator, place: Place, fence: Fence, wf: string, repeat: number, informed = false) {
+  const base = orch
     .tickRun({ repo: wf, verifyRest: false })
     .pipe(Effect.provide(Layer.merge(orch.PlaceService.layer(place), orch.storeRootLayer(process.env))));
+  let informer = orch.informerMemo();
+  const program = Effect.suspend(() => (informed ? base.pipe(Effect.provideService(orch.Informer, informer)) : base));
   let pass: Pass | undefined;
   const passOf = async (e: ReturnType<Orchestrator['engine']>) => {
     fence.arm('pass');
@@ -336,9 +342,11 @@ async function tickMeasured(orch: Orchestrator, place: Place, fence: Fence, wf: 
   const cold: Timed[] = [];
   for (let i = 0; i < repeat; i++) {
     const e = passEngine(orch.engine(), fence);
+    informer = orch.informerMemo();
     cold.push(await timed(() => passOf(e)));
   }
   const kept = passEngine(orch.engine(), fence);
+  informer = orch.informerMemo();
   await passOf(kept);
   const warm: Timed[] = [];
   for (let i = 0; i < repeat; i++) warm.push(await timed(() => passOf(kept)));
@@ -399,12 +407,14 @@ async function measure(asked: Asked, root: string, fence: Fence) {
     openRun: await objectOf(openRun),
     feedFromCursor: await overApps(fresh, (app) => feedStreamed(app, feed), repeat),
     tickPass: null,
+    tickPassInformed: null,
     runListAfterPass: await overApps(passed, (app) => getJson(app, '/api/runs'), repeat),
     openRunAfterPass:
       openRun === null ? null : await overApps(passed, (app) => getJson(app, `/api/runs/${encodeURIComponent(openRun)}`), repeat),
   };
   const { measured, pass } = await tickMeasured(orch, place, fence, wf, repeat);
   measures.tickPass = measured;
+  measures.tickPassInformed = (await tickMeasured(orch, place, fence, wf, repeat, true)).measured;
   fence.disarm();
   const tasks = filesOf(path.join(wf, 'engine', 'tasks'), '.jsonl');
   return {

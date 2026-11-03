@@ -5,17 +5,17 @@
     "memoryBytes": 16770076672,
     "node": "v24.20.0",
     "platform": "linux",
-    "load": 3.61
+    "load": 1.49
   },
-  "commit": "c4f63339404b369791c37e944188ec5f21c1719b",
-  "date": "2026-11-02T23:13:28.396Z",
+  "commit": "68e273002459568743ce9eb6701e26adff337de6",
+  "date": "2026-11-03T00:05:48.236Z",
   "repeat": 5,
   "from": "~/.agent-workflows",
   "engine": "~/.agent-engine",
   "copy": {
-    "files": 508283,
-    "bytes": 8739401334,
-    "ms": 150718.37105999998,
+    "files": 131428,
+    "bytes": 3067977728,
+    "ms": 39653.606047,
     "leftOut": [
       "api.log",
       "daemon.json",
@@ -25,12 +25,12 @@
     ]
   },
   "counts": {
-    "runs": 153,
-    "finishedRuns": 149,
-    "openRuns": 4,
-    "tasks": 7620,
-    "journalBytes": 118947105,
-    "feedLines": 38614,
+    "runs": 154,
+    "finishedRuns": 151,
+    "openRuns": 3,
+    "tasks": 7629,
+    "journalBytes": 119061348,
+    "feedLines": 38667,
     "unreadable": {
       "runs": 0,
       "passLines": 0
@@ -38,95 +38,105 @@
     "invariantRefusals": 0
   },
   "asked": {
-    "finishedRun": "the-api-serves-a-page-to-bro-ohns",
-    "openRun": "a-question-that-takes-severa-3gov",
-    "feedCursor": 9214361,
+    "finishedRun": "a-step-can-read-and-search-i-l4z4",
+    "openRun": "labels-on-cards-and-runs-to-0tvg",
+    "feedCursor": 9237389,
     "feedLinesRead": 1000
   },
   "measures": {
     "runList": {
       "cold": {
-        "ms": 2184.9898310000135,
-        "heapMb": 179.992968
+        "ms": 2197.2673339999965,
+        "heapMb": 180.889008
       },
       "warm": {
-        "ms": 58.20482700000866,
-        "heapMb": 1.559512
+        "ms": 60.976346000003105,
+        "heapMb": 1.5292
       }
     },
     "stats": {
       "cold": {
-        "ms": 7258.519702999998,
-        "heapMb": 86.062
+        "ms": 7778.898534000007,
+        "heapMb": 86.768912
       },
       "warm": {
-        "ms": 134.750881999993,
-        "heapMb": 0.288704
+        "ms": 110.07414199999766,
+        "heapMb": 0.296368
       }
     },
     "finishedRun": {
       "cold": {
-        "ms": 965.8910479999904,
-        "heapMb": 89.332784
+        "ms": 1103.9198109999998,
+        "heapMb": 89.537536
       },
       "warm": {
-        "ms": 72.14451499999268,
-        "heapMb": 0.152584
+        "ms": 74.46950500000094,
+        "heapMb": 0.165696
       }
     },
     "openRun": {
       "cold": {
-        "ms": 971.7660069999984,
-        "heapMb": 88.990128
+        "ms": 1127.2535520000092,
+        "heapMb": 89.857208
       },
       "warm": {
-        "ms": 69.1105830000015,
-        "heapMb": 0.17788
+        "ms": 116.1206419999944,
+        "heapMb": 0.112224
       }
     },
     "feedFromCursor": {
       "cold": {
-        "ms": 22.610820000001695,
-        "heapMb": 0.18768
+        "ms": 25.58347899999353,
+        "heapMb": 0.183616
       },
       "warm": {
-        "ms": 21.096925999998348,
-        "heapMb": 0.08056
+        "ms": 24.577590000000782,
+        "heapMb": 0.083552
       }
     },
     "tickPass": {
       "cold": {
-        "ms": 955.1622610000195,
-        "heapMb": 0.195336
+        "ms": 1214.0896659999853,
+        "heapMb": 0.205256
       },
       "warm": {
-        "ms": 71.11609700002009,
-        "heapMb": 0.076696
+        "ms": 141.30132400000002,
+        "heapMb": 0.18968
+      }
+    },
+    "tickPassInformed": {
+      "cold": {
+        "ms": 2149.811378000013,
+        "heapMb": 2.211688
+      },
+      "warm": {
+        "ms": 180.89722399998573,
+        "heapMb": 0.163688
       }
     },
     "runListAfterPass": {
       "cold": {
-        "ms": 949.9178149999934,
-        "heapMb": 66.07824
+        "ms": 1074.482971999998,
+        "heapMb": 66.011944
       },
       "warm": {
-        "ms": 25.574644000036642,
-        "heapMb": 1.40384
+        "ms": 28.692110000003595,
+        "heapMb": 1.407016
       }
     },
     "openRunAfterPass": {
       "cold": {
-        "ms": 957.2832259999705,
-        "heapMb": 64.981624
+        "ms": 1036.0339769999846,
+        "heapMb": 64.826272
       },
       "warm": {
-        "ms": 63.49662200000603,
-        "heapMb": 0.122512
+        "ms": 20.489051999989897,
+        "heapMb": 0.067832
       }
     }
   },
   "spawned": {
-    "git read (pass)": 23
+    "git read (pass)": 34
   },
   "placeRefused": {},
   "refusals": []

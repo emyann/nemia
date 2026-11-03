@@ -1,42 +1,45 @@
-# S3 (stage 2: a run's judgement made once per pass and served from the informer, on c4f633394 with Part A's changes uncommitted) against S2 (after the Run door, 8462ca324)
+# S3 (stage 2: a run's judgement made once per pass and served from the informer, at 68e273002 after the round-2 review) against S2 (after the Run door, 8462ca324)
 # node --expose-gc tools/store-measure/report.ts --repeat 5 --json tools/store-measure/baselines/s3.json --compare tools/store-measure/baselines/s2.json, on a copy of the store, never the live one
-# 1-minute load average 3.61 at the run (s2 was taken near 1). The store grew from 100 runs and 7234 tasks at s2 to 153 runs and 7620 tasks, 38614 feed lines,
-# and the copy to 8739.4 MB, so the two compare different stores on a machine shared with other runs: a cold read of the list or the stats,
-# which reads every run, is dearer for the store's size alone. No control of the base on the same store was taken.
-# The two reads new at S3 have no baseline: runListAfterPass and openRunAfterPass are the list and the open run's object asked after one pass
-# of the tick filled the app's informer, as the daemon's pass fills it, the pass not timed. Against runList and openRun on the same copy:
-# the list after a pass costs 949.9 ms cold (×0.43 of 2185.0, its judgements the pass's) and 25.6 ms warm (×0.44 of 58.2); the open run's
-# object 957.3 cold and 63.5 warm (×0.99 and ×0.92 of openRun): what is left of a request for one run is its feed's filing times, its drift
-# and its checks' streams, which the informer does not hold. The heap a warm read leaves held stays under 2 MB with the informer full.
+# 1-minute load average 1.49 at the run (s2 was taken near 1). The store grew from 100 runs and 7234 tasks at s2 to 154 runs and 7629 tasks,
+# so a cold read of the list or the stats, which reads every run, is dearer for the store's size alone. No control of the base on the same store was taken.
+# Three reads are new at S3 and have no baseline:
+# - tickPassInformed is the tick's pass with an informer given, as the daemon runs it: the pass judges and keeps each run the informer does
+#   not hold, every moving run on every pass among them. Against tickPass on the same copy: 2149.8 ms cold (×1.77 of 1214.1) and 180.9 ms warm
+#   (×1.28 of 141.3), about 40 ms more on each warm pass, every 4 s, which is what the reads below save.
+# - runListAfterPass and openRunAfterPass are the list and the open run's object asked after one informed pass, the pass not timed. Against
+#   runList and openRun on the same copy: the list 1074.5 ms cold (×0.49 of 2197.3) and 28.7 warm (×0.47 of 61.0); the open run's object
+#   1036.0 cold (×0.92 of 1127.3) and 20.5 warm (×0.18 of 116.1). The heap a warm read leaves held stays under 2 MB with the informer full.
 # No threshold is fixed: the numbers are the owner's to judge.
 
-store measure of ~/.agent-workflows (~/.agent-engine), copied: 508283 files, 8739.4 MB in 151 s, without api.log, daemon.json, engine/a2a, wf-up.log, worktrees
-153 runs (149 finished, 4 open), 7620 tasks, 118.9 MB of journals, 38614 feed lines; unreadable: 0 runs, 0 pass lines; invariant refusals: 0
-Intel(R) Core(TM) Ultra 9 275HX, 12 cores, 16770.1 MB, node v24.20.0, load 3.61; commit c4f63339404b; 2026-11-02T23:13:28.396Z; median of 5
-runs read: finished the-api-serves-a-page-to-bro-ohns, open a-question-that-takes-severa-3gov; feed from byte 9214361, 1000 lines
+store measure of ~/.agent-workflows (~/.agent-engine), copied: 131428 files, 3068.0 MB in 40 s, without api.log, daemon.json, engine/a2a, wf-up.log, worktrees
+154 runs (151 finished, 3 open), 7629 tasks, 119.1 MB of journals, 38667 feed lines; unreadable: 0 runs, 0 pass lines; invariant refusals: 0
+Intel(R) Core(TM) Ultra 9 275HX, 12 cores, 16770.1 MB, node v24.20.0, load 1.49; commit 68e273002459; 2026-11-03T00:05:48.236Z; median of 5
+runs read: finished a-step-can-read-and-search-i-l4z4, open labels-on-cards-and-runs-to-0tvg; feed from byte 9237389, 1000 lines
 
 | read | cold ms | cold heap MB | warm ms | warm heap MB |
 | --- | ---: | ---: | ---: | ---: |
-| tickPass | 955.2 | 0.2 | 71.1 | 0.1 |
-| runList | 2185.0 | 180.0 | 58.2 | 1.6 |
-| stats | 7258.5 | 86.1 | 134.8 | 0.3 |
-| finishedRun | 965.9 | 89.3 | 72.1 | 0.2 |
-| openRun | 971.8 | 89.0 | 69.1 | 0.2 |
-| feedFromCursor | 22.6 | 0.2 | 21.1 | 0.1 |
-| runListAfterPass | 949.9 | 66.1 | 25.6 | 1.4 |
-| openRunAfterPass | 957.3 | 65.0 | 63.5 | 0.1 |
+| tickPass | 1214.1 | 0.2 | 141.3 | 0.2 |
+| tickPassInformed | 2149.8 | 2.2 | 180.9 | 0.2 |
+| runList | 2197.3 | 180.9 | 61.0 | 1.5 |
+| stats | 7778.9 | 86.8 | 110.1 | 0.3 |
+| finishedRun | 1103.9 | 89.5 | 74.5 | 0.2 |
+| openRun | 1127.3 | 89.9 | 116.1 | 0.1 |
+| feedFromCursor | 25.6 | 0.2 | 24.6 | 0.1 |
+| runListAfterPass | 1074.5 | 66.0 | 28.7 | 1.4 |
+| openRunAfterPass | 1036.0 | 64.8 | 20.5 | 0.1 |
 
-spawned: git read (pass) ×23; place writes refused: none
+spawned: git read (pass) ×34; place writes refused: none
 
-against 8462ca324737 of 2026-11-01T00:28:33.120Z: 153 runs now, 100 then; 7620 tasks now, 7234 then
+against 8462ca324737 of 2026-11-01T00:28:33.120Z: 154 runs now, 100 then; 7629 tasks now, 7234 then
 
 | read | cold ms | baseline | ratio | warm ms | baseline | ratio |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| tickPass | 955.2 | 665.0 | ×1.44 | 71.1 | 108.2 | ×0.66 |
-| runList | 2185.0 | 1334.0 | ×1.64 | 58.2 | 41.4 | ×1.41 |
-| stats | 7258.5 | 4116.7 | ×1.76 | 134.8 | 148.6 | ×0.91 |
-| finishedRun | 965.9 | 864.1 | ×1.12 | 72.1 | 106.4 | ×0.68 |
-| openRun | 971.8 | 861.4 | ×1.13 | 69.1 | 111.9 | ×0.62 |
-| feedFromCursor | 22.6 | 21.7 | ×1.04 | 21.1 | 19.2 | ×1.10 |
+| tickPass | 1214.1 | 665.0 | ×1.83 | 141.3 | 108.2 | ×1.31 |
+| tickPassInformed | — | — | — | — | — | — |
+| runList | 2197.3 | 1334.0 | ×1.65 | 61.0 | 41.4 | ×1.47 |
+| stats | 7778.9 | 4116.7 | ×1.89 | 110.1 | 148.6 | ×0.74 |
+| finishedRun | 1103.9 | 864.1 | ×1.28 | 74.5 | 106.4 | ×0.70 |
+| openRun | 1127.3 | 861.4 | ×1.31 | 116.1 | 111.9 | ×1.04 |
+| feedFromCursor | 25.6 | 21.7 | ×1.18 | 24.6 | 19.2 | ×1.28 |
 | runListAfterPass | — | — | — | — | — | — |
 | openRunAfterPass | — | — | — | — | — | — |

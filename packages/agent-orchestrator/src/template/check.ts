@@ -95,8 +95,8 @@ function hireRefusals(held: Held): Refusal[] {
 }
 
 /**
- * What a list of skills at `at` names that the folder lacks and no skill of Nemia's own is; a skill named with its folder (`givenSkillOf`) is
- * the repository's a run is started on, which a template names and never carries, and passes.
+ * What a list of skills at `at` names that the folder lacks and no skill of Nemia's own is; a skill named with its folder
+ * (`givenSkillOf`) is the repository's a run is started on, which a template names and never carries, and passes.
  */
 const skillRefusals = (file: string, at: At, skills: unknown, held: Held): Refusal[] =>
   stringsOf(skills)

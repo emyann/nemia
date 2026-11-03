@@ -257,7 +257,9 @@ test('a step whose rendered folder is gone is told its layers and its skills who
         /Write about tides\.\n\nNo skill is loaded with the Skill tool for this step[^\n]*\n\n## Skill `write-a-note`\n\nHow to write a note\./,
       );
       assert.ok(
-        write.brief.includes(`/workflows/skills, ${PLACE_SKILLS}, ${BUILTIN_SKILLS}. Sign off blocked if you need it.\n\n## What was asked for`),
+        write.brief.includes(
+          `/workflows/skills, ${PLACE_SKILLS}, ${BUILTIN_SKILLS}. Sign off blocked if you need it.\n\n## What was asked for`,
+        ),
         write.brief,
       );
       assert.match(

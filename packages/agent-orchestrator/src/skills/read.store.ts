@@ -189,10 +189,10 @@ function folderSkill(written: string, given: Required<GivenSkill>, repo: string 
  * `<root>/skills/<name>`, holding a `SKILL.md` — or its refusal: a link in it that is not followed (`skillLinkRefusal`), rules that do
  * not read, or a name one repository has in both `workflows/skills/` and `.claude/skills/` as two folders. One folder under both, the
  * one a link to the other, is one skill, given from the first. The first root that has a name wins, and Nemia's own skills are found
- * last, where no root has the name: the place's (`PLACE_SKILLS`), then the builtin skills (`BUILTIN_SKILLS`). `at` answers a bare name from `all`, and a skill named with its folder
- * (`givenSkillOf`) from that folder of the repository `places.repo` alone (`folderSkill`), read when it is first asked and never by a
- * walk: a bare name is never a nested folder's. The roots and the package's two folders are named for the refusal of a name none has
- * (`skillAt`).
+ * last, where no root has the name: the place's (`PLACE_SKILLS`), then the builtin skills (`BUILTIN_SKILLS`). `at` answers a bare
+ * name from `all`, and a skill named with its folder (`givenSkillOf`) from that folder of the repository `places.repo` alone
+ * (`folderSkill`), read when it is first asked and never by a walk: a bare name is never a nested folder's. The roots and the package's
+ * two folders are named for the refusal of a name none has (`skillAt`).
  */
 export function skillsFor(workflowDir: string, places: Places = {}): SkillsFound {
   const roots = lookupRoots(workflowDir, places);

@@ -16,7 +16,15 @@ import { placesOf } from '../folder/lookup.store.ts';
 import { readKeys } from '../former/former.ts';
 import { givenSkillOf } from '../keys/index.ts';
 import { Invalid, Missing } from '../refusal/refusal.ts';
-import { entriesOf, isBuiltinPlace, isBuiltinSkill, lookupRoots, packageSkillFolders, skillFiles, type Places } from '../skills/read.store.ts';
+import {
+  entriesOf,
+  isBuiltinPlace,
+  isBuiltinSkill,
+  lookupRoots,
+  packageSkillFolders,
+  skillFiles,
+  type Places,
+} from '../skills/read.store.ts';
 import { splitFrontmatter, WorkflowError } from '../step/step.ts';
 import { firstPiece } from '../piece/piece.ts';
 import { contentDigest, pathRefusals, type TreeFile } from '../archive/archive.ts';

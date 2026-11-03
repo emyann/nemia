@@ -281,8 +281,8 @@ function gatherAgents(source: Source, into: Gathered): void {
 }
 
 /**
- * The skills gathered, each carried whole, a place skill and a builtin skill of Nemia left out and said, one named with its folder left out and said too, with where
- * it was read, or refused: none found, or the loader's refusal of it.
+ * The skills gathered, each carried whole, a place skill and a builtin skill of Nemia left out and said, one named with its folder left
+ * out and said too, with where it was read, or refused: none found, or the loader's refusal of it.
  */
 function gatherSkills(source: Source, into: Gathered): void {
   for (const [name, by] of [...into.skills].sort(([a], [b]) => a.localeCompare(b))) {
@@ -302,8 +302,8 @@ function gatherSkills(source: Source, into: Gathered): void {
 
 /**
  * The draft of the template `source.template`: each workflow, the agents its steps are filled by, the skills those agents and steps name
- * (a place skill and a builtin skill of Nemia left out), and the manifest with every hire, a factory's and the steps' own, and the factory's revisions policy where it
- * says one; NEMIA.md from the factory's instruction,
+ * (a place skill and a builtin skill of Nemia left out), and the manifest with every hire, a factory's and the steps' own, and the
+ * factory's revisions policy where it says one; NEMIA.md from the factory's instruction,
  * and RULES.md from its rules.
  * Refused, each by name, nothing to write: a key the template has no place for, a step filled twice, an agent or a skill not found.
  */

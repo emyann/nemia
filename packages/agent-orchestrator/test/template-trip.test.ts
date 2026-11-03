@@ -109,7 +109,10 @@ test("a template's round trip: the team exported, checked, packed, unpacked, app
     stage.place().world.repository(repo, {});
     stage.place().world.commit(repo, 'base');
     const reviewer = path.join(repo, 'workflows', 'agents', 'reviewer.md');
-    fs.writeFileSync(reviewer, fs.readFileSync(reviewer, 'utf8').replace('skills: review-a-change,', 'skills: git, grilling, review-a-change,'));
+    fs.writeFileSync(
+      reviewer,
+      fs.readFileSync(reviewer, 'utf8').replace('skills: review-a-change,', 'skills: git, grilling, review-a-change,'),
+    );
     fs.writeFileSync(path.join(repo, 'workflows', 'skills', 'review-a-change', 'look.sh'), '#!/bin/sh\n', { mode: 0o755 });
     const { from } = exportTemplate({ dir, from: repo });
     assert.deepEqual(checked(dir), []);

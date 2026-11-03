@@ -13,7 +13,17 @@ import path from 'node:path';
 import { scratch } from '../../test/scratch.ts';
 import { names } from '../../test/assessed.ts';
 import { WorkflowError } from '../step/step.ts';
-import { copySkillFiles, oneFolder, skillFiles, skillLinkRefusal, skillsFor, skillVersion } from './read.store.ts';
+import { skillEntryOf } from './skills.ts';
+import {
+  BUILTIN_SKILLS,
+  copySkillFiles,
+  oneFolder,
+  PLACE_SKILLS,
+  skillFiles,
+  skillLinkRefusal,
+  skillsFor,
+  skillVersion,
+} from './read.store.ts';
 
 const SKILL = '---\nname: x\ndescription: Do the thing.\n---\nDo it.\n';
 
@@ -367,4 +377,21 @@ test("a skill's version and its copy as files: digested off its real files, move
     assert.equal(fs.statSync(path.join(to, 'bin', 'run.sh')).mode & 0o777, 0o755);
     assert.equal(skillVersion(to), skillVersion(given(repo)));
   });
+});
+
+test("Nemia's builtin skills share no name with the place's, and each reads as a skill: which of the two is first never decides", () => {
+  const skillsOf = (dir: string) => fs.readdirSync(dir).filter((name) => fs.existsSync(path.join(dir, name, 'SKILL.md')));
+  const builtin = skillsOf(BUILTIN_SKILLS);
+  assert.ok(builtin.length > 0, `${BUILTIN_SKILLS} holds Nemia's builtin skills`);
+  assert.deepEqual(
+    builtin.filter((name) => skillsOf(PLACE_SKILLS).includes(name)),
+    [],
+    'a name both hold: rename one',
+  );
+  for (const name of builtin) {
+    const at = path.join(BUILTIN_SKILLS, name);
+    assert.equal(skillLinkRefusal(at), undefined, at);
+    const file = path.join(at, 'SKILL.md');
+    assert.equal(skillEntryOf(file, name, fs.readFileSync(file, 'utf8')).id, name, at);
+  }
 });

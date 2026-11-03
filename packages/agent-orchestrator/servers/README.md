@@ -2,7 +2,8 @@
 
 One `<name>.json` per server, each the facts a factory would record of it, so a person adds it to a factory of theirs without typing
 an address or a client id. The package holds this folder and names it `BUILTIN_SERVERS` (`src/servers/servers.store.ts`), beside
-`BUILTIN_SKILLS`, the package's `skills/` (`src/skills/read.store.ts`); the api offers what it holds on a factory's settings page.
+`BUILTIN_SKILLS`, the package's `skills/` (`src/skills/read.store.ts`), whose skills every step that names one finds last; the api
+offers what this folder holds on a factory's settings page.
 
 **`github.json`** is the first: GitHub's hosted server, signed in to through Nemia's own GitHub App, Nemia Factory. Its toolsets header
 names every toolset a factory's agents need before anyone signs in — `pull_requests`, and `actions`, without which a red `ci` cannot be

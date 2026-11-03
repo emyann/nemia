@@ -3,7 +3,7 @@ place: git
 agent: seldon
 gate: true
 budget: 12
-skills: effect, shadcn, change-the-board, look, react-aria, tsverify, apps/web:ds-build, apps/web:ds-theme, apps/web:ds-spec
+skills: effect, shadcn, change-the-board, look, react-aria, tsverify, change-a-contract, apps/web:ds-build, apps/web:ds-theme, apps/web:ds-spec
 mcp: playwright
 reads: costs
 claude:
@@ -19,25 +19,6 @@ budget. When the whole costs more than one run of this workflow usually does, sa
 
 Say in the spec how each part shows that what it builds holds, so the implementer's parts carry it: on a rewrite of tests, the source
 line each kept or absorbed assertion guards, broken once and seen failing; on a feature, the test written first and seen failing.
-
-When the change adds a pure function that decides — a status, an action, a refusal, from what it is handed — or changes one a contract
-proves (its type is imported from its package's `contracts/`), load the `tsverify` skill, and name in the spec each law the change adds
-or changes: its name, its sentence, and its condition in words. The implementer writes them first and sees each fail on the code as it
-is. To read what a contract proves today, run `npx tsverify <file> <name>`, bare, on the file the function is written in: your fence
-refuses its `--cache`, which writes, and its `--watch`, which never ends.
-
-When the change touches a file that imports from `effect`, load the `effect` skill before you read, write or judge it: it says how this
-repository writes Effect 4, and sends you to the docs installed with Effect first.
-
-When the change touches `apps/web`, read `.claude/skills/shadcn/SKILL.md` with Read for how the board's components are meant to be used,
-never with the Skill tool, which your fence refuses.
-
-When the change touches `apps/web`, load `change-the-board` first: it says which of the design system kit's skills you are given the
-work is for. `ds-spec`'s reader runs from the root as `node apps/web/.claude/skills/ds-spec/md3.mjs <command>`, typed whole and alone:
-this workspace's script, never the copy your skills hold, nor the path the skill's own text prints, which is no file here.
-
-When the change touches `apps/web`, a change that draws a cut, a plate, a tile or a rail on the board takes the look's part for it from
-`apps/web/src/components/look`, through its door, before it draws one of its own: `change-the-board` says which part.
 
 The checks you may run here, each bare: `npx turbo run test --force --continue`, `npm run typecheck`, `npm run lint`.
 

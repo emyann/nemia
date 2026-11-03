@@ -3,9 +3,9 @@
  *
  * An agent of yours finds a skill as a start finds it (`lookupRoots`): the store's `workflows/skills/` — your library — then the
  * `.claude/skills/` of the repository the board serves. The first that has a name wins, so a name in both is listed once, in your library.
- * Nemia's builtin skills, the orchestrator package's `skills/`, are not among them: an agent of the store never finds one
- * there, so a builtin skill is copied into your library first (`copySkill`, a write of its own, before and apart from any save of the
- * agent).
+ * Nemia's builtin skills, the orchestrator package's `skills/`, are found last, by name, where neither has the name: an agent of yours
+ * gives one as it is, and a builtin skill is copied into your library (`copySkill`, a write of its own, before and apart from any save
+ * of the agent) only to be changed there.
  *
  * Each skill is listed with its card entry or the package's refusal of it (a SKILL.md with no description can be given to no agent),
  * whether it is loaded every turn (`preload: true`), what it costs a turn (`skillTurnCost`: about, at four characters a token), and the
@@ -190,8 +190,9 @@ function yourAgentsSkills(agents: Agents): Array<[string, string[]]> {
 
 /**
  * Every skill the picker lists, by place: yours, then the repository's — each name where an agent of yours finds it, so a name in both is
- * in yours alone — then Nemia's builtin skills, each marked where an agent of yours already finds a skill of its name. The package's
- * builtin place skill (`isBuiltinPlace`), which an agent finds where no place has its name, is in neither of the first two. A name both
+ * in yours alone — then Nemia's builtin skills, each marked where an agent of yours already finds a skill of its name, and listing the
+ * agents of yours that give it where none does. The package's builtin place skill (`isBuiltinPlace`) and its builtin skills, which an
+ * agent finds where no place has the name, are in neither of the first two. A name both
  * of one repository's places for skills have, which happens only when the store is in that repository and nothing says which is given, is
  * listed in yours with the package's refusal as its `error`. Any other skill the package refuses — a link in it that is not followed, rules
  * that do not read — is listed in the place its folder is in (`skillDirIn`, `sourceOf`), unread where a link is refused, with that refusal.
@@ -210,7 +211,9 @@ export async function listSkills(
   const yours: SkillPlace = { from: 'yours', dir: librarySkills(home), skills: [] };
   const inRepo: SkillPlace = { from: 'repo', dir: path.join(path.resolve(repo), '.claude', SKILLS_FOLDER), skills: [] };
   const places: SkillPlace[] = [yours, inRepo];
-  const sorted = [...found.all].filter(([, at]) => typeof at !== 'string' || !isBuiltinPlace(at)).sort(([a], [b]) => a.localeCompare(b));
+  const sorted = [...found.all]
+    .filter(([, at]) => typeof at !== 'string' || !(isBuiltinPlace(at) || sourceOf(at, repo, home) === 'builtin'))
+    .sort(([a], [b]) => a.localeCompare(b));
   const dirOf = ([name, at]: (typeof sorted)[number]) =>
     at instanceof WorkflowError ? (skillDirIn([yours.dir, inRepo.dir], name) ?? path.join(yours.dir, name)) : at;
   const reads = await readsOf(e, placeService, [...sorted.map(dirOf), ...builtinNames.map((name) => path.join(builtin, name))], home);
@@ -236,7 +239,8 @@ export async function listSkills(
     dir: builtin,
     skills: builtinNames.map((name) => {
       const dir = path.join(builtin, name);
-      return skillRow(name, dir, 'builtin', readAt(reads, dir), [], where.get(name) ?? null);
+      const shadowed = where.get(name) ?? null;
+      return skillRow(name, dir, 'builtin', readAt(reads, dir), shadowed === null ? usedBy(name) : [], shadowed);
     }),
   });
   return places;

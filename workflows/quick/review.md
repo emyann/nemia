@@ -6,7 +6,7 @@ loop: implement
 rounds: 2
 budget: 12
 tally: findings, findings.kind=placement
-skills: effect, shadcn, change-the-board, look, react-aria, see-a-dashboard, tsverify, apps/web:ds-build, apps/web:ds-theme, apps/web:ds-spec
+skills: effect, shadcn, change-the-board, look, react-aria, see-a-dashboard, tsverify, change-a-contract, apps/web:ds-build, apps/web:ds-theme, apps/web:ds-spec
 mcp: playwright
 claude:
   fence:
@@ -46,26 +46,9 @@ Your fence refuses what would write or watch: a `tsc` whose first option is not 
 any case and after one dash or two, so the refusal goes by its first letters and takes `--inlineSourceMap` and `--inlineSources` with
 `--incremental`.
 
-When the change touches a file that imports from `effect`, load the `effect` skill before you read, write or judge it: it says how this
-repository writes Effect 4, and sends you to the docs installed with Effect first.
-
-When the change touches a contract under a package's `contracts/`, or a function one proves, load the `tsverify` skill to judge its
-laws. CI's `contracts` job verified every contract on the commit implement pushed, and its verdict is in the `ci` you read: you run no
-verifier, which your fence refuses. A finding, each: a law loosened or removed with no reason the card or the spec gives; a law that
-restates the code rather than say the domain's fact; a new behaviour of a function a contract proves held by a new test row where a law
-could state it; a test deleted where the summary names no bug planted and no law that refused it.
-
 When the change touches `apps/web`, read the pictures the implement step named in its `artifacts`, by their paths in its folder's
 `closeout.json`, in light and dark, with the `look` skill. A page or a state the change touches with no picture of it is a finding:
 nobody else will look at the board before this lands.
-When the change touches `apps/web`, read `.claude/skills/shadcn/SKILL.md` with Read for how the board's components are meant to be used.
-
-When the change touches `apps/web`, load `change-the-board` first: it says which of the design system kit's skills you are given the
-work is for. `ds-spec`'s reader runs from the root as `node apps/web/.claude/skills/ds-spec/md3.mjs <command>`, typed whole and alone:
-this workspace's script, never the copy your skills hold, nor the path the skill's own text prints, which is no file here.
-
-When the change touches `apps/web`, a change that draws a cut, a plate, a tile or a rail on the board takes the look's part for it from
-`apps/web/src/components/look`, through its door, before it draws one of its own: `change-the-board` says which part.
 
 When the change touches `tools/observe`, read each dashboard's picture and text the implement step named in its `artifacts`,
 `dashboard-<name>.png` and `dashboard-<name>.txt`, with the `see-a-dashboard` skill: the text first. A dashboard the change touches

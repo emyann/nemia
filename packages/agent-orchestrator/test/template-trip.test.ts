@@ -29,7 +29,7 @@ process.env.CLAUDE_CONFIG_DIR = CONFIG;
 const FACTORIES = path.join(ROOT, 'factories');
 const { templated: programsAt } = await import('./templated.ts');
 const { exportTemplate, reconciled } = programsAt(ROOT);
-const { checkedTree, placeSkillNames } = await import('../src/template/template.store.ts');
+const { checkedTree, packageSkillNames } = await import('../src/template/template.store.ts');
 const { readFactories, readFactory } = await import('../src/runner.ts');
 const { appliedDir, readStatus, statusFile, treeDir } = await import('../src/applied/applied.store.ts');
 const { reconcileOnce } = await import('../src/applied/applied.verb.ts');
@@ -103,13 +103,16 @@ test("a template's round trip: the team exported, checked, packed, unpacked, app
   const dir = path.join(scratch('wf-template-trip-out-'), 'team');
   const archive = path.join(scratch('wf-template-trip-pack-'), 'team.tgz');
   const parent = scratch('wf-template-trip-unpack-');
-  const checked = (source: string) => checkedTree(readTemplate(source), placeSkillNames()).problems;
+  const checked = (source: string) => checkedTree(readTemplate(source), packageSkillNames()).problems;
 
   await s.test("the tests' team exports into a folder that passes its check, each part said with where it came from", () => {
     stage.place().world.repository(repo, {});
     stage.place().world.commit(repo, 'base');
     const reviewer = path.join(repo, 'workflows', 'agents', 'reviewer.md');
-    fs.writeFileSync(reviewer, fs.readFileSync(reviewer, 'utf8').replace('skills: review-a-change,', 'skills: git, review-a-change,'));
+    fs.writeFileSync(
+      reviewer,
+      fs.readFileSync(reviewer, 'utf8').replace('skills: review-a-change,', 'skills: git, grilling, review-a-change,'),
+    );
     fs.writeFileSync(path.join(repo, 'workflows', 'skills', 'review-a-change', 'look.sh'), '#!/bin/sh\n', { mode: 0o755 });
     const { from } = exportTemplate({ dir, from: repo });
     assert.deepEqual(checked(dir), []);
@@ -120,6 +123,8 @@ test("a template's round trip: the team exported, checked, packed, unpacked, app
     assert.equal(said.get('nemia.yaml hires dev/review: reviewer'), `${path.join(repo, 'workflows', 'dev', 'review.md')}, its agent: line`);
     assert.match(said.get('skills/git/') ?? '', /left out: a builtin place skill/);
     assert.equal(fs.existsSync(path.join(dir, 'skills', 'git')), false, 'a builtin place skill is not carried');
+    assert.match(said.get('skills/grilling/') ?? '', /left out: a builtin skill of Nemia/);
+    assert.equal(fs.existsSync(path.join(dir, 'skills', 'grilling')), false, 'a builtin skill is not carried');
     assert.deepEqual(parse(fs.readFileSync(path.join(dir, 'nemia.yaml'), 'utf8')).spec, {
       version: '0.1.0',
       hires: { 'dev/implement': 'implementer', 'dev/review': 'reviewer', 'dev/ship': 'shipper' },

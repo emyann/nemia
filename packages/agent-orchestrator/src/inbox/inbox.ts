@@ -38,7 +38,7 @@
  */
 import path from 'node:path';
 import { bodyOf, frontmatterKeys, type PlanFile } from '../plan/plan.ts';
-import { factoryNameRefusal, type Factory } from '../factory/factory.ts';
+import { DEFAULT_FACTORY, factoryNameRefusal, type Factory } from '../factory/factory.ts';
 import type { Run } from '../record/record.ts';
 import type { RecordMemo } from '../rest/index.ts';
 import { isReadme, splitFrontmatter, WorkflowError } from '../step/step.ts';
@@ -593,13 +593,13 @@ const labelSegments = (map: Labels, show: LabelsShown): string =>
   `${show.showLabels ? `  labels: ${labelsText(map)}` : ''}${(show.columns ?? []).map((key) => `  ${key}: ${map[key] ?? '<none>'}`).join('')}`;
 
 /**
- * The map a selector reads of an inbox entry: its person labels, then its `workflow:` and `factory:` where it sets them, as a run's
- * whole map (`metadataLabels`) carries its own. Pure.
+ * The map a selector reads of an inbox entry: its person labels, then its `workflow:` where it sets one, and its `factory:` —
+ * `default` where it names none, the factory it starts in — as a run's whole map (`metadataLabels`) carries its own. Pure.
  */
 export const cardLabels = (l: Pick<InboxListing, 'labels' | 'workflow' | 'factory'>): Labels => ({
   ...l.labels,
   ...(l.workflow ? { workflow: l.workflow } : {}),
-  ...(l.factory ? { factory: l.factory } : {}),
+  factory: l.factory || DEFAULT_FACTORY,
 });
 
 /**

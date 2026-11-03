@@ -91,6 +91,19 @@ function RunRead({ runId }: { runId: string }) {
 }
 
 /**
+ * The run's labels, a person's edited in place: an edit reads the run's object again (`exact`, as a hold does) and every list it is on
+ * (`runsMoved`), so the chip shows with no reload.
+ */
+function RunLabels({ run }: { run: RunView }) {
+  const queryClient = useQueryClient();
+  const edit = (edits: readonly string[]) =>
+    labelRun(run.id, edits).then(() =>
+      Promise.all([queryClient.invalidateQueries({ queryKey: ['runs', run.id], exact: true }), runsMoved(queryClient, run.id)]),
+    );
+  return <Labels labels={run.labels} edit={edit} />;
+}
+
+/**
  * One run, top to bottom: what is left to decide about its result, above who else it waits on, as the CLI's `ls` prints the two; the runs
  * it waits on and a person's hold; its warning; its id (`RunHeading`), with what it has cost, every step's tries, once a cost
  * was measured (`≥` where an ended attempt has none on it), what the same sessions read, by price, where every one of them measured it,
@@ -106,8 +119,6 @@ function RunRead({ runId }: { runId: string }) {
  */
 function Run({ run }: { run: RunView }) {
   const runCancelled = run.cancelledAt !== null;
-  const queryClient = useQueryClient();
-
   return (
     <article className="space-y-6">
       <BackToRuns />
@@ -153,7 +164,7 @@ function Run({ run }: { run: RunView }) {
           <HoldRun run={run} />
           <PruneRun run={run} />
         </div>
-        <Labels labels={run.labels} edit={(edits) => labelRun(run.id, edits).then(() => runsMoved(queryClient, run.id))} />
+        <RunLabels run={run} />
       </header>
 
       {decideDrawn(run) && <Decide run={run} />}

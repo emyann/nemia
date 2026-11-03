@@ -25,14 +25,29 @@ export const labelCard = (name: string, edits: readonly string[], overwrite = fa
     may: 'The labels may be set: read the card again before sending it again.',
   });
 
-/** What the label page reads of `GET /api/stats`: the headline of every run the selector takes. */
-export type LabelStats = { all: { total: { runs: number; landed: number | null; costPerLanded: number | null } } };
+/**
+ * What the label page reads of `GET /api/stats`: the headline of every run the selector takes, and each step's cost summed over every
+ * try of those runs, landed, failed, stopped or in flight, over every day the stats hold (no range asked: from the first fact's day).
+ */
+export type LabelStats = {
+  all: {
+    total: { runs: number; landed: number | null; costPerLanded: number | null };
+    steps: readonly { costUsd: number | null }[];
+  };
+};
 
 const LabelStatsSchema = Schema.Struct({
   all: Schema.Struct({
     total: Schema.Struct({ runs: Schema.Number, landed: Schema.NullOr(Schema.Number), costPerLanded: Schema.NullOr(Schema.Number) }),
+    steps: Schema.Array(Schema.Struct({ costUsd: Schema.NullOr(Schema.Number) })),
   }),
 });
+
+/** What the runs `stats` covers have spent, every try's cost summed, or null where no try's cost was measured. */
+export const spentOf = (stats: LabelStats): number | null => {
+  const known = stats.all.steps.flatMap((step) => (step.costUsd === null ? [] : [step.costUsd]));
+  return known.length === 0 ? null : known.reduce((sum, cost) => sum + cost, 0);
+};
 
 /** The stats of the runs `selector` takes. */
 export const labelStatsQuery = (selector: string) =>

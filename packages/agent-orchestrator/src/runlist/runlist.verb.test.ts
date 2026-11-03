@@ -472,9 +472,17 @@ test('a selector keeps the runs whose labels it takes, before the finished page 
   const whole = await wholeList();
   assert.equal(whole.length, 4, 'with no selector, every run');
   const workflow = (id: string) => path.basename(readRun(id).workflowDir);
-  assert.deepEqual(whole.find((r) => r.id === core)?.labels, { team: 'core', workflow: workflow(core) }, 'a row carries the whole map');
+  assert.deepEqual(
+    whole.find((r) => r.id === core)?.labels,
+    { team: 'core', workflow: workflow(core), factory: 'default' },
+    'a row carries the whole map',
+  );
   const bare = whole.find((r) => r.id !== core && r.id !== waiting);
-  assert.deepEqual(bare?.labels, { workflow: workflow(bare?.id ?? '') }, 'and its workflow alone where nobody labelled it');
+  assert.deepEqual(
+    bare?.labels,
+    { workflow: workflow(bare?.id ?? ''), factory: 'default' },
+    'its closed keys alone where nobody labelled it',
+  );
 });
 
 test('REFUSED by kind: a selector that is none, on each read of the list', async (t) => {

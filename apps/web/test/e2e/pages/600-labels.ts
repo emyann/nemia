@@ -25,8 +25,8 @@ async function load(page: Page, route: string): Promise<void> {
 export default {
   /**
    * A card filed with `team: core` and a landed run labelled `team=core`: the Inbox and Runs filters keep them alone, a label added on the
-   * card's page is written to its frontmatter and removed again, and the label's page counts the card not started and the run landed. The
-   * card, and the run's labels file, are taken back.
+   * card's page is written to its frontmatter and removed again, one added on the run's page is shown and removed with no reload, and
+   * the label's page counts the card not started and the run landed. The card, and the run's labels file, are taken back.
    */
   name: 'labels',
   route: '/inbox',
@@ -62,16 +62,29 @@ export default {
       await edit.getByRole('textbox', { name: 'Add a label' }).fill('size=wide');
       await edit.getByRole('button', { name: 'Add' }).click();
       await expectVisible(edit.locator('[data-label="size=wide"]'), 'a label added on the card page is shown');
+      await settled(page);
+      await photograph(page, path.join(OUT, `labels-card-${theme}.png`), { fullPage: true });
       if (!fs.readFileSync(cardFile, 'utf8').includes('size: wide'))
         throw new Refused(`the label added is written to the card's frontmatter — ${cardFile} holds no size: wide`);
       await edit.getByRole('button', { name: 'Remove size' }).click();
       await expectCount(edit.locator('[data-label="size=wide"]'), 0, 'and removed again');
       if (fs.readFileSync(cardFile, 'utf8').includes('size:')) throw new Refused(`the label removed leaves the card's file — ${cardFile}`);
 
+      await load(page, `/runs/${LANDED.id}`);
+      const runEdit = page.locator('[data-labels-edit]');
+      await runEdit.getByRole('textbox', { name: 'Add a label' }).fill('size=wide');
+      await runEdit.getByRole('button', { name: 'Add' }).click();
+      await expectVisible(runEdit.locator('[data-label="size=wide"]'), 'a label added on the run page is shown with no reload');
+      await settled(page);
+      await photograph(page, path.join(OUT, `labels-run-${theme}.png`));
+      await runEdit.getByRole('button', { name: 'Remove size' }).click();
+      await expectCount(runEdit.locator('[data-label="size=wide"]'), 0, 'and removed again with no reload');
+
       await load(page, '/labels/team/core');
       await expectVisible(page.locator('[data-page-name]', { hasText: LABEL }), 'the label page is named by its label');
       await expectVisible(page.locator(`[data-section="not started"] [data-card="${CARD}"]`), 'it lists the card no run started');
       await expectVisible(page.locator('[data-bucket="landed"]', { hasText: '1' }), 'and counts the landed run');
+      await expectVisible(page.locator('[data-label-spent]'), 'and says what its runs spent, landed or not');
       await settled(page);
       await photograph(page, path.join(OUT, `labels-page-${theme}.png`), { fullPage: true });
     } finally {

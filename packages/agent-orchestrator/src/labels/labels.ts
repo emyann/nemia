@@ -173,15 +173,13 @@ export const labelsText = (labels: Labels): string => {
 };
 
 /**
- * A run's whole map, as its object's `metadata.labels` says it and a selector reads it: `workflow`, `factory` where the run is in a
- * named one, and the person's keys, which never take a closed key (`labelKeyRefusal`). Pure.
+ * A run's whole map, as its object's `metadata.labels` says it, a selector reads it and the feed's lines carry it: `workflow`, `factory`
+ * — `default` for a run in the default factory, as the feed and the telemetry say it, so `-l factory=default` selects the same runs on
+ * every surface — and the person's keys, which never take a closed key (`labelKeyRefusal`). The caller names the factory: there is no
+ * default here to forget. Pure.
  */
-export const metadataLabels = (of: {
-  readonly workflow: string;
-  readonly factory?: string | undefined;
-  readonly labels?: Labels;
-}): Labels => ({
+export const metadataLabels = (of: { readonly workflow: string; readonly factory: string; readonly labels?: Labels }): Labels => ({
   ...of.labels,
   workflow: of.workflow,
-  ...(of.factory ? { factory: of.factory } : {}),
+  factory: of.factory,
 });

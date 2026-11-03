@@ -301,7 +301,7 @@ export const runObject = Effect.fn('runObject')(function* (run: Run, { memo, inR
     metadata: {
       name: run.id,
       creationTimestamp: run.createdAt,
-      labels: metadataLabels({ workflow, factory: factory ?? undefined, ...(run.labels !== undefined ? { labels: run.labels } : {}) }),
+      labels: metadataLabels({ workflow, factory, ...(run.labels !== undefined ? { labels: run.labels } : {}) }),
     },
     spec: specOf(run, at),
     status: {

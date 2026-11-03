@@ -245,7 +245,11 @@ test('?selector= keeps the runs one of its selectors takes by their labels, on e
       ['l-second'],
     );
     assert.equal(page.total, 1, 'the page is cut over the runs taken');
-    assert.deepEqual(page.runs[0]?.labels, { team: 'core', workflow: 'no-such-workflow' }, "the person's keys and the closed ones");
+    assert.deepEqual(
+      page.runs[0]?.labels,
+      { team: 'core', workflow: 'no-such-workflow', factory: 'default' },
+      "the person's keys and the closed ones",
+    );
     const open = await read<OpenListing>('/api/runs-open?selector=team%3Dinfra');
     assert.deepEqual(
       open.waiting.map((r) => r.id),

@@ -99,7 +99,7 @@ const StepReason = Schema.Literals(STEP_REASONS);
 
 /**
  * The run's name, when it was made, and the labels it is found by, one map (`metadataLabels`): its `workflow`, the `factory` it was
- * started in where it is not the default, and a person's labels on it (`nemia label run`), as `-l` selects them.
+ * started in (`default` for the default one, as the feed says it), and a person's labels on it (`nemia label run`), as `-l` selects them.
  */
 export const RunMetadata = Schema.Struct({
   name: Schema.String,

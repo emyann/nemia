@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
 import { PageName, Plate, ScanLines, StatTile, Sticker, TextLink } from '../components/look';
-import { inboxSelectedQuery, labelStatsQuery, runsSelectedQuery, type RunSummary } from '../lib/api';
+import { inboxSelectedQuery, labelStatsQuery, runsSelectedQuery, spentOf, type RunSummary } from '../lib/api';
 import type { Hue } from '../lib/meaning';
 
 /** A bucket a run of the label page is counted in, by its phase and whether it waits on a person. */
@@ -59,7 +59,8 @@ function Section({ name, plate, children }: { name: string; plate: ReactNode; ch
 
 /**
  * The page of one label value, `key=value`: the cards of the inbox it holds that no run has started, then the runs it holds counted by
- * where each stands, and what the runs that landed cost — each linking to its list filtered by it.
+ * where each stands, and what they cost: every try of every run summed, whatever became of it, and the mean of those that landed — each
+ * linking to its list filtered by it.
  */
 function LabelPage() {
   const { key, value } = Route.useParams();
@@ -70,6 +71,7 @@ function LabelPage() {
   const notStarted = cards.filter((card) => card.state !== 'started');
   const counts = new Map<Bucket, number>();
   for (const run of runs) counts.set(bucketOf(run), (counts.get(bucketOf(run)) ?? 0) + 1);
+  const spent = spentOf(stats);
   const cost = stats.all.total.costPerLanded;
   return (
     <ScanLines className="min-h-full px-4 py-6 sm:px-8">
@@ -102,6 +104,9 @@ function LabelPage() {
                 </Sticker>
               </span>
             ))}
+            <span data-label-spent>
+              <StatTile hue="money" label="Spent" value={spent === null ? '—' : `$${spent.toFixed(2)}`} breakdown={null} />
+            </span>
             <span data-label-cost>
               <StatTile hue="money" label="Cost per landed run" value={cost === null ? '—' : `$${cost.toFixed(2)}`} breakdown={null} />
             </span>

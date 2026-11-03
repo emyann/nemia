@@ -66,10 +66,10 @@ test('nemia ls selects by -l, and adds the labels to each run’s head line by -
   const shown = await printed('--show-labels', '-L', 'team', '-L', 'workflow');
   assert.equal(
     headOf(shown, core.id),
-    `${headOf(plain, core.id)}  labels: team=core,tier=gold,workflow=build  team: core  workflow: build`,
+    `${headOf(plain, core.id)}  labels: factory=default,team=core,tier=gold,workflow=build  team: core  workflow: build`,
     'the whole map, then each column in the order given',
   );
-  assert.equal(headOf(shown, bare.id), `${headOf(plain, bare.id)}  labels: workflow=build  team: <none>  workflow: build`);
+  assert.equal(headOf(shown, bare.id), `${headOf(plain, bare.id)}  labels: factory=default,workflow=build  team: <none>  workflow: build`);
   assert.deepEqual(
     shown.filter((l) => !l.startsWith(`${core.id}  `) && !l.startsWith(`${bare.id}  `)),
     plain.filter((l) => !l.startsWith(`${core.id}  `) && !l.startsWith(`${bare.id}  `)),

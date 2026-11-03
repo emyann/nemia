@@ -177,13 +177,12 @@ test('labelsText and metadataLabels: a run’s map as a printer shows it and a s
     assert.equal(labelsText({ tier: '', team: 'core', area: 'web' }), 'area=web,team=core,tier=');
     assert.equal(labelsText({}), '<none>');
   });
-  await t.test('metadataLabels: the person’s keys beside workflow, and factory where the run is in one', () => {
+  await t.test('metadataLabels: the person’s keys beside workflow and factory, which the caller always names', () => {
     assert.deepEqual(metadataLabels({ workflow: 'build', factory: 'nemia', labels: { team: 'core' } }), {
       team: 'core',
       workflow: 'build',
       factory: 'nemia',
     });
-    assert.deepEqual(metadataLabels({ workflow: 'build' }), { workflow: 'build' });
-    assert.deepEqual(metadataLabels({ workflow: 'build', factory: undefined, labels: {} }), { workflow: 'build' });
+    assert.deepEqual(metadataLabels({ workflow: 'build', factory: 'default', labels: {} }), { workflow: 'build', factory: 'default' });
   });
 });

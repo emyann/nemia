@@ -26,11 +26,14 @@ function triedClause(l: InboxEntry, unfactoredStarts: boolean): string {
   return ` — not started at ${t.at}${on}${why} Edit the card, or take it back and queue it again${elsewhere}, and the tick tries it again`;
 }
 
-/** The map a selector reads of an entry: its person labels, then its `workflow:` and `factory:` where set — the in-process `cardLabels`. */
+/**
+ * The map a selector reads of an entry: its person labels, then its `workflow:` where set, and its `factory:` (`default` where it names
+ * none) — the in-process `cardLabels`.
+ */
 const cardLabels = (l: Pick<InboxEntry, 'labels' | 'workflow' | 'factory'>): LabelMap => ({
   ...l.labels,
   ...(l.workflow ? { workflow: l.workflow } : {}),
-  ...(l.factory ? { factory: l.factory } : {}),
+  factory: l.factory || 'default',
 });
 
 /** No label asked shown: the lines as they were. */

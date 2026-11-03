@@ -137,9 +137,12 @@ export const pageOf = <R>(rows: readonly R[], page: number, size: number): Page<
   runs: rows.slice((page - 1) * size, page * size),
 });
 
-/** The run's whole map, as a selector reads it and a list's row carries it: the person's keys, `workflow`, and `factory` where named. */
+/**
+ * The run's whole map, as a selector reads it and a list's row carries it: the person's keys, `workflow`, and `factory` (`default` for the
+ * default one).
+ */
 export const runLabelMap = (run: Pick<Run, 'workflowDir' | 'factory' | 'labels'>): Labels =>
-  metadataLabels({ workflow: path.basename(run.workflowDir), factory: run.factory, labels: run.labels });
+  metadataLabels({ workflow: path.basename(run.workflowDir), factory: run.factory ?? DEFAULT_FACTORY, labels: run.labels });
 
 /**
  * The runs of `runs` whose whole map `selectors` takes (`selectsLabels`), in their order: every one where none is given. The lists select

@@ -871,7 +871,7 @@ test("a card's labels: filed with --label, inherited from its from: runs, select
   );
   assert.equal(cards.length, 1, selected.join('\n'));
   assert.ok(cards[0]?.startsWith(typed.card.name), cards[0]);
-  assert.ok(cards[0]?.endsWith('  labels: team=core,tier=one,workflow=dev  tier: one'), cards[0]);
+  assert.ok(cards[0]?.endsWith('  labels: factory=default,team=core,tier=one,workflow=dev  tier: one'), cards[0]);
   const plain = await printedBy(t, 'inbox');
   assert.equal(
     plain.some((line) => line.includes('labels:')),

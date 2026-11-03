@@ -187,7 +187,11 @@ const READS: ReadonlyArray<readonly [readonly string[], RegExp]> = [
 
 test('the labels the parity seeds show on the lines a person asks them on', async () => {
   const listed = await nemia(['ls', '-l', 'team=core', '--show-labels']);
-  assert.match(listed.out, /^r-parity .*  labels: team=core,workflow=no-such-workflow$/m, "the run's whole map on its head line");
+  assert.match(
+    listed.out,
+    /^r-parity .*  labels: factory=default,team=core,workflow=no-such-workflow$/m,
+    "the run's whole map on its head line",
+  );
   assert.doesNotMatch(listed.out, /^r-held /m, 'a run the selector does not take is not listed: it reached the api');
   const either = await nemia(['inbox', '-l', 'team=core', '-l', 'team=docs']);
   assert.match(either.out, /^cache-the-views /m, 'one selector takes a card');

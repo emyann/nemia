@@ -807,7 +807,7 @@ test("`labels:` is a card's map of a person's labels: read as a map, listed, sel
   );
   assert.deepEqual([listed.labels, bare.labels], [{ team: 'core' }, {}], 'an entry carries its person labels, none as {}');
   assert.deepEqual(cardLabels(listed), { team: 'core', workflow: 'build', factory: 'acme' });
-  assert.deepEqual(cardLabels(bare), {}, 'only the keys the card sets');
+  assert.deepEqual(cardLabels(bare), { factory: 'default' }, 'only the keys the card sets, and the default factory it starts in');
 
   const plain = inboxLines([listed, bare]);
   assert.deepEqual(inboxLines([listed, bare], false, {}), plain, 'no flag: the lines as before');
@@ -817,7 +817,7 @@ test("`labels:` is a card's map of a person's labels: read as a map, listed, sel
   );
   const shown = inboxLines([listed, bare], false, { showLabels: true, columns: ['team', 'area'] });
   assert.ok(shown[0]?.endsWith('  labels: factory=acme,team=core,workflow=build  team: core  area: <none>'), shown[0]);
-  assert.ok(shown[1]?.endsWith('  labels: <none>  team: <none>  area: <none>'), shown[1]);
+  assert.ok(shown[1]?.endsWith('  labels: factory=default  team: <none>  area: <none>'), shown[1]);
 
   const text = '---\n# what runs it\nworkflow: build\nfrom: a-1x2y\n---\nCache the views.\n\nBetween passes.\n';
   const relabelled = labelledText(read(text), { team: 'core' }, isDirectory);

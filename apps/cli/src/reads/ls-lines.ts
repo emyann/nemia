@@ -273,13 +273,13 @@ export const pausedLines = (paused: Paused): string[] => {
 };
 
 /**
- * The run's whole map, as a selector reads it: the person's keys, `workflow` (its folder's name), and `factory` where named — the
- * orchestrator's `runLabelMap`.
+ * The run's whole map, as a selector reads it: the person's keys, `workflow` (its folder's name), and `factory` (`default` for the
+ * default one) — the orchestrator's `runLabelMap`.
  */
 export const runLabelMap = (run: Pick<Run, 'workflowDir' | 'factory' | 'labels'>): LabelMap => ({
   ...run.labels,
   workflow: path.basename(run.workflowDir),
-  ...(run.factory ? { factory: run.factory } : {}),
+  factory: run.factory ?? 'default',
 });
 
 /**

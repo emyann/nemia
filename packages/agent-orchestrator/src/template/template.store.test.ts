@@ -228,6 +228,19 @@ test('what export writes from a repository and a factory, read back as it was wr
       });
     },
   );
+  await t.test("a step's input:, reads: and tally: are written as lists, and the check passes", () => {
+    const repo = repoWithTeam();
+    const review = path.join(repo, 'workflows', 'dev', 'review.md');
+    fs.writeFileSync(
+      review,
+      fs.readFileSync(review, 'utf8').replace('budget: 20', 'budget: 20\ninput: implement\nreads: inbox\ntally: findings'),
+    );
+    const dir = target();
+    exportTemplate({ dir, from: repo });
+    assert.deepEqual(checkTemplateAt(dir), []);
+    const step = stepsOf(dir, 'dev').get('review');
+    assert.deepEqual([step?.input, step?.reads, step?.tally], [['implement'], ['inbox'], ['findings']]);
+  });
   await t.test("a step's own output: is written as a {path:} from the template's root, its schema carried beside it", () => {
     const repo = repoWithTeam();
     plantStepOutput(path.join(repo, 'workflows'));

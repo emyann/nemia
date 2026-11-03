@@ -2,7 +2,9 @@
   "context": "cli",
   "title": "The client",
   "about": "`apps/cli` is `nemia` and `wf` as a person types them: a client of the api, which spawns the orchestrator's own CLI for every verb it has not moved.",
-  "paths": ["apps/cli"],
+  "paths": [
+    "apps/cli"
+  ],
   "terms": [
     {
       "term": "Route",
@@ -16,6 +18,18 @@
     {
       "term": "Daemon on demand",
       "meaning": "a read that finds no daemon serving its store starts one, as a ticking command does, and asks again (`apps/cli/src/daemon.ts`); where none comes up it is refused, naming `nemia <verb> … --local` and `nemia service install`. Which daemon serves a store is the `url` of its lease, read in `apps/cli/src/where.ts` alone."
+    },
+    {
+      "term": "-l",
+      "meaning": "a selector of the labels of the runs `nemia ls` lists or the cards `nemia inbox` lists (`team=core`), given again for another, of which one must take each; sent to the api as `selector`, a query key given once per selector (`apps/cli/src/reads/labels.ts`)."
+    },
+    {
+      "term": "--show-labels",
+      "meaning": "every label of each run or card listed, `  labels: a=b,c=d` at the end of its head line, `<none>` where it has none: the run's whole map (the person's keys, `workflow`, and `factory` where named), the card's labels with its `workflow:` and `factory:`."
+    },
+    {
+      "term": "-L",
+      "meaning": "a column of one label key on each run or card listed, `  <key>: <value>` at the end of its head line, `<none>` where it has none; given again for another, in the order typed."
     }
   ]
 }

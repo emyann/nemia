@@ -2,8 +2,9 @@
  * `nemia watch` over the api's stream (`GET /api/feed/stream`), against the in-process watch on the same feed (`--local`): a store of the
  * test's own, its feed written by the package's own writer as another process writes it (`emitFeed`, no hub), served by the api spawned
  * with `--no-tick` on a free port, whose url the test writes into the store's lease as a daemon's would be. What `--once` prints, with
- * the operator's selectors, in JSON and in words with the pause standing; a cursor file resumed, and one holding a cursor the feed cannot
- * be read from; the api killed under a running watch and started again; and a selector naming a former reason.
+ * the operator's selectors and a label a person put on a run (`team=core`), in JSON and in words with the pause standing; a cursor file
+ * resumed, and one holding a cursor the feed cannot be read from; the api killed under a running watch and started again; and a selector
+ * naming a former reason.
  *
  * Every child is bounded (`timeout`) and killed when its test is done; every wait is on the output it counts, never on a length of time.
  */
@@ -115,19 +116,32 @@ const json = (out: string): Array<Record<string, unknown>> =>
     .filter((l) => l.trim())
     .map((l) => JSON.parse(l) as Record<string, unknown>);
 
-/** A store with the operator's lines among others: a gate that waits on a person, the pause put and lifted, and runs at work. */
+/** `words` of the run `id` stamped with the label a person put on it, `team=core`, as the tick stamps a run's lines with its labels. */
+const teamCore = (id: string, words: FeedWords): FeedWords => ({
+  ...words,
+  labels: { run: id, team: 'core' },
+  steps: words.steps.map((s) => ({ ...s, labels: { run: id, step: s.name, team: 'core' } })),
+});
+
+/**
+ * A store with the operator's lines among others: a gate that waits on a person, the pause put and lifted, and runs at work, `r-2`'s
+ * lines labelled `team=core` by a person.
+ */
 async function seeded() {
   const store = storeOf();
-  await store.pass({ 'r-1': planAt('running'), 'r-2': planAt('running') });
+  await store.pass({ 'r-1': planAt('running'), 'r-2': teamCore('r-2', planAt('running')) });
   await store.pass(
-    { 'r-1': planAt('awaiting approval', 'approve it: nemia approve r-1 plan'), 'r-2': planAt('running') },
+    { 'r-1': planAt('awaiting approval', 'approve it: nemia approve r-1 plan'), 'r-2': teamCore('r-2', planAt('running')) },
     {
       at: '2026-11-01T10:00:00.000Z',
       by: 'ann',
       why: 'merging by hand',
     },
   );
-  await store.pass({ 'r-1': planAt('awaiting approval', 'approve it: nemia approve r-1 plan'), 'r-2': planAt('succeeded') }, null);
+  await store.pass(
+    { 'r-1': planAt('awaiting approval', 'approve it: nemia approve r-1 plan'), 'r-2': teamCore('r-2', planAt('succeeded')) },
+    null,
+  );
   return store;
 }
 
@@ -144,6 +158,17 @@ test('`nemia watch --once` over the api prints what the in-process watch prints 
   const lines = json(served.out);
   assert.equal(lines.length, 4, `the gate, the pause put and lifted, and the bookmark: ${served.out}`);
   assert.deepEqual(lines.at(-1), { cursor: store.size() }, "the bookmark at the feed's end");
+
+  const team = await ran(t, store.root, ['watch', '--once', '-l', 'team=core', '--json']);
+  const teamLocal = await ran(t, store.root, ['watch', '--once', '-l', 'team=core', '--json', '--local']);
+  assert.equal(team.code, 0, `a person's key is a selector the api takes: ${team.err}`);
+  assert.equal(team.out, teamLocal.out, "the same lines of a person's key");
+  const taken = json(team.out).filter((l) => !('cursor' in l && Object.keys(l).length === 1));
+  assert.ok(taken.length > 0, `the lines of the run labelled team=core: ${team.out}`);
+  assert.ok(
+    taken.every((l) => (l as { labels?: { run?: string } }).labels?.run === 'r-2'),
+    `only the labelled run's lines: ${team.out}`,
+  );
 
   const paused = await ran(t, store.root, ['pause', '--why', 'held for the watch']);
   assert.equal(paused.code, 0, paused.err);
@@ -173,7 +198,7 @@ test('`--cursor-file` resumes from the saved cursor, no line twice; a cursor typ
   const first = await ran(t, store.root, ['watch', '--once', '--json', '--cursor-file', file]);
   assert.equal(first.code, 0, first.err);
   assert.equal(fs.readFileSync(file, 'utf8'), `${store.size()}\n`, "the file at the feed's end");
-  await store.pass({ 'r-1': planAt('succeeded'), 'r-2': planAt('succeeded') });
+  await store.pass({ 'r-1': planAt('succeeded'), 'r-2': teamCore('r-2', planAt('succeeded')) });
   const second = await ran(t, store.root, ['watch', '--once', '--json', '--cursor-file', file]);
   assert.equal(second.code, 0, second.err);
   const whole = await ran(t, store.root, ['watch', '--once', '--json', '--local']);
@@ -220,7 +245,7 @@ test(
     api.proc.kill('SIGTERM');
     await api.ended;
     await watch.said((out) => json(out).some((l) => l.liveness === 'down') || undefined);
-    await store.pass({ 'r-1': planAt('failed'), 'r-2': planAt('succeeded') });
+    await store.pass({ 'r-1': planAt('failed'), 'r-2': teamCore('r-2', planAt('succeeded')) });
     api = await apiOver(t, store.root);
     await watch.said((out) => json(out).some((l) => l.liveness === 'up') || undefined);
     await watch.said(atEnd(store.size()));
@@ -249,8 +274,8 @@ test('a selector naming a former reason prints its hint on stderr, as the in-pro
   assert.equal(served.err, local.err, 'the same hint, once');
   assert.equal(served.out, local.out);
 
-  const refused = await ran(t, store.root, ['watch', '--once', '-l', 'nope=x']);
-  assert.equal(refused.code, 2, 'REFUSED: a selector off the grammar');
-  assert.match(refused.err, /nope/);
+  const refused = await ran(t, store.root, ['watch', '--once', '-l', 'no/pe=x']);
+  assert.equal(refused.code, 2, 'REFUSED: a key no label is spelled');
+  assert.match(refused.err, /no\/pe/);
   assert.equal(refused.out, '');
 });

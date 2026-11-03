@@ -12,7 +12,7 @@ import { Effect, JsonSchema, Schema, SchemaRepresentation } from 'effect';
 import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from 'agent-orchestrator/testing';
 import { COMMANDS, routeList, runObject, runStore } from 'agent-orchestrator';
-import { ANSWERS, RUN_READS } from './openapi.ts';
+import { ANSWERS, LABEL_WRITES, RUN_READS } from './openapi.ts';
 import { appOver, beforeEachTest, eachTest, engineFor, runOver } from '../../test/placed.ts';
 
 const stand = eachTest(testPlace);
@@ -90,17 +90,63 @@ test("the document's paths are the run's and its sub-resources' routes as the co
     .filter((r) => r.method === 'GET')
     .map((r) => r.path.replace(/:(\w+)/g, '{$1}'));
   assert.equal(routes.length, RUN_READS.length, 'each read has its route in the table');
-  assert.deepEqual(Object.keys(doc.paths).sort(), routes.sort(), 'the paths are those routes, and only those');
+  const writes = COMMANDS.filter((c) => (LABEL_WRITES as readonly string[]).includes(c.name))
+    .flatMap((c) => routeList(c))
+    .filter((r) => r.method === 'POST')
+    .map((r) => r.path.replace(/:(\w+)/g, '{$1}'));
+  assert.equal(writes.length, LABEL_WRITES.length, 'each label write has its route in the table');
+  assert.deepEqual(Object.keys(doc.paths).sort(), [...routes, ...writes].sort(), 'the paths are those routes, and only those');
   for (const path of routes) assert.ok(doc.paths[path]?.get, `${path} is read with GET`);
+});
+
+test("the two label writes are POSTs whose body is a LabelEdit and whose answer a Labelled, and a run's labels an object of strings", async () => {
+  type Op = {
+    parameters: { name: string; in: string }[];
+    requestBody: { content: { 'application/json': { schema: unknown } } };
+    responses: Record<string, { content: { 'application/json': { schema: unknown } } }>;
+  };
+  const doc = (await (await app().request('/openapi/v3/nemia/v1')).json()) as {
+    paths: Record<string, { post?: Op }>;
+    components: { schemas: Record<string, { properties?: Record<string, unknown> }> };
+  };
+  for (const [path, param] of [
+    ['/api/runs/{runId}/labels', 'runId'],
+    ['/api/inbox/{name}/labels', 'name'],
+  ] as const) {
+    const post = doc.paths[path]?.post;
+    assert.ok(post, `${path} is written with POST`);
+    assert.deepEqual(
+      post.parameters.map((p) => [p.name, p.in]),
+      [[param, 'path']],
+      `${path} names its path's parameter`,
+    );
+    assert.deepEqual(
+      post.requestBody.content['application/json'].schema,
+      { $ref: '#/components/schemas/LabelEdit' },
+      `${path} is sent a LabelEdit`,
+    );
+    assert.deepEqual(
+      post.responses['200']?.content['application/json'].schema,
+      { $ref: '#/components/schemas/Labelled' },
+      `${path} answers a Labelled`,
+    );
+  }
+  for (const name of ['LabelEdit', 'Labelled']) assert.ok(doc.components.schemas[name], `${name} is a component`);
+  assert.deepEqual(
+    doc.components.schemas['RunMetadata']?.properties?.['labels'],
+    { type: 'object', additionalProperties: { type: 'string' } },
+    "a run's labels are a map of strings, the one index of extra keys the document allows",
+  );
 });
 
 test("each read's path names its answer's component, which imports back and decodes what the route answers", async () => {
   const doc = (await (await app().request('/openapi/v3/nemia/v1')).json()) as {
-    paths: Record<string, { get: { operationId: (typeof RUN_READS)[number]; responses: Record<string, unknown> } }>;
+    paths: Record<string, { get?: { operationId: (typeof RUN_READS)[number]; responses: Record<string, unknown> } }>;
     components: { schemas: Record<string, JsonSchema.JsonSchema> };
   };
   const asked = { runId: R, step: 'design', try: '1' };
   for (const [path, { get }] of Object.entries(doc.paths)) {
+    if (get === undefined) continue;
     const name = ANSWERS[get.operationId];
     assert.deepEqual(
       get.responses['200'],

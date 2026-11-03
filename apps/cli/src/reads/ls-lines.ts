@@ -6,7 +6,9 @@
  * `nemia ls --local` prints the same lines, which `test/reads.test.ts` holds equal on a seeded store until the in-process reads retire.
  * Pure: `now` is handed in.
  */
+import path from 'node:path';
 import type { Paused, RunsListed } from '../../../api/src/client/client.ts';
+import type { LabelMap } from './labels.ts';
 import { LEASE_FILE as DAEMON_FILE } from '../where.ts';
 
 type Row = RunsListed['runs'][number];
@@ -128,12 +130,12 @@ function asksLines(run: Run, { steps, waitingOnYou, waiting, holding, toDecide }
   return lines;
 }
 
-function runLines({ run, listed, result }: Row): string[] {
+function runLines({ run, listed, result }: Row, more: string): string[] {
   const calledOff = `${run.cancelledAt ? '  (cancelled)' : ''}${run.pruned ? '  (pruned)' : ''}`;
   if ('said' in listed) {
     const width = Math.max(20, ...listed.steps.map((s) => s.message.length));
     return [
-      `${run.id}  ${firstPiece(run.brief, '\n').slice(0, 56)}${calledOff}`,
+      `${run.id}  ${firstPiece(run.brief, '\n').slice(0, 56)}${calledOff}${more}`,
       ...listed.steps.map((s) => `   ${s.name.padEnd(14)} ${s.message.padEnd(width)} ${s.branch ?? ''}`),
       `   → unreadable: ${listed.said}`,
     ];
@@ -142,7 +144,7 @@ function runLines({ run, listed, result }: Row): string[] {
   const said = steps.map((s) => ({ s, word: `${shownStatus(s)}${s.cost ? `  ${s.cost}` : ''}` }));
   const width = Math.max(20, ...said.map(({ word }) => word.length));
   return [
-    `${run.id}  ${firstPiece(run.brief, '\n').slice(0, 56)}${calledOff}${cost ? `  ${cost}` : ''}`,
+    `${run.id}  ${firstPiece(run.brief, '\n').slice(0, 56)}${calledOff}${cost ? `  ${cost}` : ''}${more}`,
     ...said.map(({ s, word }) => {
       const note = shownNote(s);
       return `   ${s.name.padEnd(14)} ${word.padEnd(width)} ${s.branch ?? ''}${note ? `  · ${note}` : ''}`;
@@ -271,11 +273,31 @@ export const pausedLines = (paused: Paused): string[] => {
 };
 
 /**
- * Every line `nemia ls` prints of its answer at `now`: `no runs` for none, each run's lines, how old what it shows of where the branches
- * stand is, the factories' schedules, and last whether a daemon ticks the store.
+ * The run's whole map, as a selector reads it: the person's keys, `workflow` (its folder's name), and `factory` where named — the
+ * orchestrator's `runLabelMap`.
  */
-export const lsLines = ({ runs, daemon, standing, schedules }: RunsListed, now: number): string[] => {
+export const runLabelMap = (run: Pick<Run, 'workflowDir' | 'factory' | 'labels'>): LabelMap => ({
+  ...run.labels,
+  workflow: path.basename(run.workflowDir),
+  ...(run.factory ? { factory: run.factory } : {}),
+});
+
+/**
+ * Every line `nemia ls` prints of its answer at `now`: `no runs` for none, each run's lines, how old what it shows of where the branches
+ * stand is, the factories' schedules, and last whether a daemon ticks the store. `more` is what each run's head line ends on (the
+ * labels' segments, `labelSegments`): nothing by default, so the lines are as they were.
+ */
+export const lsLines = (
+  { runs, daemon, standing, schedules }: RunsListed,
+  now: number,
+  more: (run: Run) => string = () => '',
+): string[] => {
   const stood = standingLine(standing, daemon, now);
   const scheduled = scheduleLines(schedules ?? [], (iso) => fireWord(iso, now));
-  return [...(runs.length ? runs.flatMap(runLines) : ['no runs']), ...(stood ? [stood] : []), ...scheduled, daemonLine(daemon, now)];
+  return [
+    ...(runs.length ? runs.flatMap((row) => runLines(row, more(row.run))) : ['no runs']),
+    ...(stood ? [stood] : []),
+    ...scheduled,
+    daemonLine(daemon, now),
+  ];
 };

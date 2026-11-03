@@ -1,7 +1,8 @@
 /**
  * The moved reads over HTTP, held to the old path: on one seeded store, served by an api started with `--no-tick` on a free port, `nemia
- * show`, `show --raw`, `closeout`, `closeout --try`, `ls`, `ls <run>` and `inbox` print the same stdout and exit with the same code as
- * the same command typed with `--local`, which runs the orchestrator's own CLI in process (the parity guard: the printers live twice
+ * show`, `show --raw`, `closeout`, `closeout --try`, `ls`, `ls <run>` and `inbox`, and `ls` and `inbox` with `-l`, `--show-labels` and
+ * `-L` on a labelled run and card, print the same stdout and exit with the same code as the same command typed with `--local`, which
+ * runs the orchestrator's own CLI in process (the parity guard: the printers live twice
  * until the in-process reads retire). Each read is seen asking the api, by the request line the api says. A bare 404 — an api older than
  * this client — exits 2 naming the restart; an unknown run exits 2 with the api's refusal; no api serving the store, and none started
  * (`NEMIA_DAEMON_START=off`), exits 2 naming `--local`.
@@ -107,7 +108,12 @@ waitingRun('r-cancelled', { cancelledAt: at(80) });
 settled('t-build-1', { outcome: 'done', summary: 'A first cut.', needs: null, artifacts: [] }, 10);
 settled('t-build-2', { outcome: 'done', summary: 'Built it.', needs: null, artifacts: ['NOTES.md'] }, 30);
 settled('t-review', { outcome: 'blocked', summary: 'Half reviewed.', needs: 'Which database?', artifacts: [] }, 50);
-write(path.join(root, 'inbox', 'cache-the-views.md'), "---\nworkflow: dev\n---\nCache the engine's views between passes.\n");
+write(path.join(root, 'runs', `${RUN}.labels`), JSON.stringify({ team: 'core' }));
+write(
+  path.join(root, 'inbox', 'cache-the-views.md'),
+  "---\nworkflow: dev\nlabels:\n  team: core\n---\nCache the engine's views between passes.\n",
+);
+write(path.join(root, 'inbox', 'tidy-the-docs.md'), '---\nlabels:\n  team: docs\n---\nTidy the docs.\n');
 write(path.join(root, 'inbox', 'notes.txt'), 'not a card\n');
 
 /** How a child ended, and what it said on each stream. */
@@ -171,7 +177,26 @@ const READS: ReadonlyArray<readonly [readonly string[], RegExp]> = [
   [['ls'], /\/api\/listing\b/],
   [['ls', RUN], /\/api\/listing\/r-parity\b/],
   [['inbox'], /\/api\/inbox\b/],
+  [['ls', '-l', 'team=core', '--show-labels', '-L', 'team'], /\/api\/listing\b/],
+  [['ls', '-l', 'team=core', '-l', 'team', '-L', 'workflow'], /\/api\/listing\b/],
+  [['ls', RUN, '--show-labels'], /\/api\/listing\/r-parity\b/],
+  [['inbox', '-l', 'team=core', '-l', 'team=docs', '--show-labels', '-L', 'team'], /\/api\/inbox\b/],
+  [['inbox', '-L', 'team', '-L', 'workflow'], /\/api\/inbox\b/],
+  [['inbox', '-l', 'team=nope'], /\/api\/inbox\b/],
 ];
+
+test('the labels the parity seeds show on the lines a person asks them on', async () => {
+  const listed = await nemia(['ls', '-l', 'team=core', '--show-labels']);
+  assert.match(listed.out, /^r-parity .*  labels: team=core,workflow=no-such-workflow$/m, "the run's whole map on its head line");
+  assert.doesNotMatch(listed.out, /^r-held /m, 'a run the selector does not take is not listed: it reached the api');
+  const either = await nemia(['inbox', '-l', 'team=core', '-l', 'team=docs']);
+  assert.match(either.out, /^cache-the-views /m, 'one selector takes a card');
+  assert.match(either.out, /^tidy-the-docs /m, 'and another takes another');
+  assert.doesNotMatch(either.out, /^notes\.txt /m, 'and neither takes an entry with no labels');
+  const cards = await nemia(['inbox', '-L', 'team']);
+  assert.match(cards.out, /^cache-the-views .*  team: core$/m, "a card's column");
+  assert.match(cards.out, /^notes\.txt .*  team: <none>$/m, 'an entry with no such key says none');
+});
 
 for (const [argv, route] of READS)
   test(`\`nemia ${argv.join(' ')}\` over HTTP prints what \`--local\` prints, and exits the same`, async () => {

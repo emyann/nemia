@@ -25,6 +25,7 @@ import {
 import { decisionOf } from '../decide/decision.ts';
 import { type ApiEnv, served, type Served } from '../layer.ts';
 import { workflowPageOf, type WorkflowPageAddress } from '../step/step.ts';
+import { selectorOf } from '../selector.ts';
 import { commandNamed, findRun, noSuchRun, runPlaced } from '../store.ts';
 
 /**
@@ -86,14 +87,16 @@ const RUNS_FINISHED = commandNamed('runs finished');
  */
 const LIST_KEYS = { factory: 'ofFactory', page: 'page', size: 'size' } as const;
 
-/** The arguments a request gives a read of the list: each key of `LIST_KEYS` its query says, and no other. */
-const listArgs = (query: (name: string) => string | undefined): Record<string, string> =>
-  Object.fromEntries(
+/** The arguments a request gives a read of the list: each key of `LIST_KEYS` its query says, its `?selector=`s, and no other. */
+const listArgs = (c: Context<ApiEnv>): Record<string, string | string[]> => ({
+  ...selectorOf(c),
+  ...Object.fromEntries(
     Object.entries(LIST_KEYS).flatMap(([key, name]) => {
-      const value = query(name);
+      const value = c.req.query(name);
       return value === undefined ? [] : [[key, value]];
     }),
-  );
+  ),
+});
 
 /**
  * `program` over the app's informer of each run's judgement (`Informer`, the package's), which the store's daemon's pass fills: what the
@@ -106,7 +109,7 @@ const informed = <A, E, R>({ informer }: Served, program: Effect.Effect<A, E, R>
 const keptOf = ({ informer, memo }: Served) => ({ ...(informer ? { runs: informer } : {}), filings: memo.filings });
 
 /** What the read `entry` answers `args`, handed the app's informer and its feed's filing times, as `GET /api/runs` hands them. */
-const listRead = (s: Served, entry: (typeof COMMANDS)[number], args: Record<string, string>) =>
+const listRead = (s: Served, entry: (typeof COMMANDS)[number], args: Record<string, string | string[]>) =>
   runPlaced(s, s.e, entry.handler(args, s.env, s.home, keptOf(s)));
 
 /** `rows`, each with the address of its workflow's page (`workflowPageOf`), as the whole list gives it. */
@@ -144,6 +147,11 @@ const CONCLUDED = commandNamed('concluded');
  *   still moving and of none other; the rest are read through the request's own engine and the tick's last standing (`viewsFor`,
  *   `standingSnapshot`). With `WF_VERIFY_REST` a kept answer is judged afresh too, and one that differs fails the request: such a read
  *   is handed nothing from memory and reads every record again.
+ * - `?selector=` on `GET /api/runs`, `GET /api/runs-open`, `GET /api/runs-finished` and `GET /api/listing[/:runId]` — a selector of the
+ *   runs' labels (`team=core`, `team in (core,infra)`, `!team`), as `nemia ls -l` takes it, given again for another, of which one must
+ *   take a run (OR): each row carries its whole map, `labels` (the person's keys, `workflow`, and `factory` where named), and a selector
+ *   reads that. The runs are selected before any is judged, the counts and the page cut over those taken. A selector the package's
+ *   grammar refuses (`selectorsRefusal`) is its `Invalid`, a 422 naming the key or the clause.
  * - `GET /api/runs-open` — the light answer (`OpenListing`), by the package's entry (`runs open`): the runs that wait on a person
  *   (`waiting`) and the runs in flight (`inFlight`), each in the store's order, and `counts` of each and of the finished runs; a run that
  *   moves and also waits is among the waiting, once. Each row is the list's own (`RunListing`) with its `wallMs`, created until now, and
@@ -196,34 +204,29 @@ const TRY = commandNamed('try');
 const CLOSEOUT = commandNamed('closeout');
 const TOLD = commandNamed('told');
 
-/** Answers a sub-resource's entry, its path's parameters bound to the argument keys of the same names. */
-const subResource = (c: Context<ApiEnv>, command: Command) =>
-  served(c, async (s) => c.json(await runPlaced(s, s.e, informed(s, command.handler(c.req.param(), s.env, s.home)))));
+/**
+ * Answers a sub-resource's entry, its path's parameters bound to the argument keys of the same names, and `query`'s arguments beside
+ * them (the listing's `?selector=`).
+ */
+const subResource = (c: Context<ApiEnv>, command: Command, query: Record<string, string[]> = {}) =>
+  served(c, async (s) => c.json(await runPlaced(s, s.e, informed(s, command.handler({ ...query, ...c.req.param() }, s.env, s.home)))));
 
 export const runs = new Hono<ApiEnv>()
   .get('/api/runs', (c) =>
     served(c, async (s) => {
-      const summaries = (await runPlaced(s, s.e, RUNS.handler({}, s.env, s.home, keptOf(s)))) as unknown as RunSummary[];
+      const summaries = (await runPlaced(s, s.e, RUNS.handler(selectorOf(c), s.env, s.home, keptOf(s)))) as unknown as RunSummary[];
       return c.json(summaries.map((run): RunListing => ({ ...run, workflowPage: workflowPageOf(run, s.repo, s.home) })));
     }),
   )
   .get('/api/runs-open', (c) =>
     served(c, async (s) => {
-      const open = (await listRead(
-        s,
-        RUNS_OPEN,
-        listArgs((name) => c.req.query(name)),
-      )) as unknown as OpenRuns;
+      const open = (await listRead(s, RUNS_OPEN, listArgs(c))) as unknown as OpenRuns;
       return c.json({ ...open, waiting: paged(open.waiting, s), inFlight: paged(open.inFlight, s) } satisfies OpenListing);
     }),
   )
   .get('/api/runs-finished', (c) =>
     served(c, async (s) => {
-      const page = (await listRead(
-        s,
-        RUNS_FINISHED,
-        listArgs((name) => c.req.query(name)),
-      )) as unknown as FinishedPage;
+      const page = (await listRead(s, RUNS_FINISHED, listArgs(c))) as unknown as FinishedPage;
       return c.json({ ...page, runs: paged(page.runs, s) } satisfies FinishedListing);
     }),
   )
@@ -275,8 +278,8 @@ export const runs = new Hono<ApiEnv>()
       c.json(await runPlaced({ placeService, home }, e, CONCLUDED.handler({ runId: c.req.param('runId') }))),
     ),
   )
-  .get('/api/listing', (c) => subResource(c, LS))
-  .get('/api/listing/:runId', (c) => subResource(c, LS));
+  .get('/api/listing', (c) => subResource(c, LS, selectorOf(c)))
+  .get('/api/listing/:runId', (c) => subResource(c, LS, selectorOf(c)));
 
 /**
  * The reads `nemia` prints from, a client of the api, beside the board's: what `nemia ls` lists and a run's record as `nemia show --raw`

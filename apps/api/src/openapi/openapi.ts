@@ -1,8 +1,8 @@
 /**
  * The api's OpenAPI 3.1 document of the run object (`GET /openapi/v3/nemia/v1`): the package's Schema of a run (`RunObject.Run`) exported
  * in the OpenAPI dialect by Effect's own JSON Schema (`RunObject.runDocument`), its definitions under `components.schemas`, and the
- * api's routes of the run and its sub-resources under `paths`. Built from the Schema, never from Hono's routes, so a client generated from
- * it reads what the package declares.
+ * api's routes of the run and its sub-resources under `paths`, and the two label writes beside them (`LABEL_WRITES`). Built from the
+ * Schema, never from Hono's routes, so a client generated from it reads what the package declares.
  */
 import { Hono } from 'hono';
 import { RunObject, routeList } from 'agent-orchestrator';
@@ -27,6 +27,12 @@ export const ANSWERS = {
   told: 'StepTold',
 } as const satisfies Record<(typeof RUN_READS)[number], string>;
 
+/**
+ * The label edits of a run and of a card (`nemia label run`, `nemia label inbox`), by their entries in the package's table: each a `POST`
+ * whose body is a `LabelEdit` and whose answer a `Labelled`, the document's components.
+ */
+export const LABEL_WRITES = ['label run', 'label inbox'] as const;
+
 /** A route's path in OpenAPI's spelling, each `:param` a `{param}`, and its parameters, each a string of the path. */
 const pathOf = (path: string) => ({
   path: path.replace(/:(\w+)/g, '{$1}'),
@@ -37,7 +43,10 @@ const pathOf = (path: string) => ({
  * Each read's GET route, from its entry's own `route`: its path, its operation, and what it answers — its help's words and its
  * component.
  */
-const paths = () =>
+const paths = () => ({ ...readPaths(), ...writePaths() });
+
+/** Each read's GET route, as `paths` lists it. */
+const readPaths = () =>
   Object.fromEntries(
     RUN_READS.flatMap((name) => {
       const command = commandNamed(name);
@@ -48,6 +57,26 @@ const paths = () =>
           const answer = { $ref: `#/components/schemas/${ANSWERS[name]}` };
           const ok = { description: command.help[0] ?? name, content: { 'application/json': { schema: answer } } };
           return [path, { get: { operationId: name, parameters, responses: { '200': ok } } }];
+        });
+    }),
+  );
+
+/** Each label write's POST route, from its entry's own `route`: its body a `LabelEdit`, its answer a `Labelled`. */
+const writePaths = () =>
+  Object.fromEntries(
+    LABEL_WRITES.flatMap((name) => {
+      const command = commandNamed(name);
+      return routeList(command)
+        .filter((r) => r.method === 'POST')
+        .map((r) => {
+          const { path, parameters } = pathOf(r.path);
+          const content = (component: string) => ({ 'application/json': { schema: { $ref: `#/components/schemas/${component}` } } });
+          const ok = { description: command.help.join(' '), content: content('Labelled') };
+          const operationId = name.replace(' ', '-');
+          return [
+            path,
+            { post: { operationId, parameters, requestBody: { required: true, content: content('LabelEdit') }, responses: { '200': ok } } },
+          ];
         });
     }),
   );

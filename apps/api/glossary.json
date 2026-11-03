@@ -89,6 +89,10 @@
       }
     },
     {
+      "term": "Selector",
+      "meaning": "the `?selector=` query of a read of runs or cards (`GET /api/runs`, `/api/runs-open`, `/api/runs-finished`, `/api/listing`, `/api/inbox`, `/api/stats`) and of the feed (`GET /api/feed/stream`): a selector of their labels in the orchestrator's grammar (`team=core`, `team in (core,infra)`, `!team`), given again for another, of which one must take a run or a card; handed to the entry as `selector` (`apps/api/src/selector.ts`), and a malformed one a 422 naming the key."
+    },
+    {
       "term": "Try cause",
       "meaning": "a try's `cause` on a step's tries (`StepTry.cause`): why the try was moved behind, one of the run core's `TryCause`, and null on the current try.",
       "see": {

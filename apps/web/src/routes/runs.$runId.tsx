@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { createFileRoute, Link, redirect } from '@tanstack/react-router';
 import { Values } from '../components/Artifacts';
 import { Artifacts, bytesWord, ClosedNeeds, Statement } from '../components/Closeout';
@@ -20,7 +20,9 @@ import { LiftHold } from '../components/LiftHold';
 import { HoldRun } from '../components/HoldRun';
 import { PruneRun } from '../components/PruneRun';
 import { KindsBehind } from '../components/KindsBehind';
-import { factoriesQuery, runGone } from '../lib/api';
+import { Labels } from '../components/Labels';
+import { runsMoved } from '../lib/runWrites';
+import { factoriesQuery, labelRun, runGone } from '../lib/api';
 import { loadRun, useRunView, type RunView, type StepView } from '../lib/runView';
 import { untrustedFor, type UntrustedPlace } from '../lib/factories';
 import { askedIn, decideDrawn, gateOffered, stepAnchor } from '../lib/asks';
@@ -104,6 +106,7 @@ function RunRead({ runId }: { runId: string }) {
  */
 function Run({ run }: { run: RunView }) {
   const runCancelled = run.cancelledAt !== null;
+  const queryClient = useQueryClient();
 
   return (
     <article className="space-y-6">
@@ -151,6 +154,8 @@ function Run({ run }: { run: RunView }) {
           <PruneRun run={run} />
         </div>
       </header>
+
+      <Labels labels={run.labels} edit={(edits) => labelRun(run.id, edits).then(() => runsMoved(queryClient, run.id))} />
 
       {decideDrawn(run) && <Decide run={run} />}
 

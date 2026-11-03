@@ -34,6 +34,8 @@ const FILES = [
   'components/look/ScanLines.tsx',
   'components/StepPreview.tsx',
   'components/StepCard.tsx',
+  'components/Labels.tsx',
+  'components/SelectorField.tsx',
 ];
 
 /** The files a folder's door exports from, when `at` is a folder with a door (`index.ts`): each sibling it names, as a component's file. */

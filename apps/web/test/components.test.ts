@@ -134,6 +134,7 @@ const UNMEASURED: StepUsed = {
 function runWith(note: string | null): RunView {
   return {
     id: 'r-1',
+    labels: {},
     kinds: [],
     refresh: 'nemia refresh r-1',
     brief: 'Go round again',
@@ -7097,6 +7098,7 @@ const { UnassignedStart } = await import('../src/components/FactoryCardStart.tsx
 const inboxCard = (extra: Record<string, unknown> = {}) =>
   ({
     name: 'idea',
+    labels: {},
     file: 'idea.md',
     title: 'An idea',
     workflow: null,

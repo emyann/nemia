@@ -2,6 +2,7 @@ import { Cell, Column, Row, Table, TableBody, TableHeader, Tag } from '@/compone
 import type { ListedRun } from '@/lib/api';
 import { factoryOf } from '@/lib/factories';
 import { titleOf } from '@/lib/factory';
+import { LabelTags } from './Labels';
 import { ink } from '@/lib/meaning';
 import { nowOf } from '@/lib/runWords';
 import { cn } from '@/components/ui/ds/utils';
@@ -81,6 +82,7 @@ export function FlightTable({ runs, asOf }: { runs: readonly ListedRun[]; asOf: 
                       <span data-factory={factoryOf(run)} className="text-label-small uppercase text-on-surface-variant">
                         {factoryOf(run)}
                       </span>
+                      <LabelTags labels={run.labels} />
                     </span>
                   </span>
                 </Cell>

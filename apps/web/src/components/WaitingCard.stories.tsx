@@ -47,6 +47,7 @@ const step = (name: string, codes: typeof VERIFIED | typeof APPROVAL, i: number)
 
 /** A run at its last gate, its title long enough to run over the copy control under it on one line of the wide card. */
 const RUN: WaitingRun = {
+  labels: {},
   id: 'lay-the-diamond-top-e2e4',
   repo: '/code/app',
   factory: 'nemia',

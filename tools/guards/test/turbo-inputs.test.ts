@@ -8,14 +8,16 @@
  * among them, and the runtime's contract test reads the `.ts` files at each app's root too, and both contract scans an app's code beside
  * its `src/`, the client's `bin/` and `contracts/` (`APP_BESIDE`). The vocabulary test here reads this
  * repository's team from `workflows/`, its agents and its workflows' folders (`words.test.ts`), and its whole-repository scans
- * (`names.test.ts`, `others.test.ts`) read the root's and the apps' `CLAUDE.md` among every file. Every package's test script loads the
- * test-cost probe and reporter from `tools/test-costs/`, so each package's test lists `tools/` too. The docs' tests read the packages'
+ * (`names.test.ts`, `others.test.ts`) read the root's and the apps' `CLAUDE.md` among every file. The orchestrator's tests read the side
+ * Grafana's files and the guards' manifest (`observe.test.ts`, `profile.test.ts`, `contract.test.ts`), the runtime's contract test a
+ * file of `tools/observe/render/`, and the docs' name test every file under `tools/` (`names.test.ts`), so those three tasks and the
+ * guards' list `tools/`. The docs' tests read the packages'
  * docs for the diagrams they draw, every source for the names their pages cite, and the paths those pages cite, at the root and under
  * `docs/` and `workflows/`. The api's test of what `npm run dev` watches reads every workspace package's `package.json` and sources
  * (`dev-watch.test.ts`). The api's tests read Nemia's builtin servers and skills, the orchestrator's `servers/` and `skills/`
  * (`servers.test.ts`, `sign-in.boundary.test.ts`, `skills.test.ts`). The board's test of the look's parts reads the trigger skill of a
  * change to the board, which names each part (`apps/web/test/look.test.ts`), and its test of a merge reads the root's `CLAUDE.md` and
- * `.gitattributes` (`apps/web/test/e2e-merge.test.ts`), so the web's test lists all three; the client's lists the test-cost tooling alone,
+ * `.gitattributes` (`apps/web/test/e2e-merge.test.ts`), so the web's test lists all three; the client's reads nothing outside it, and needs no task of its own,
  * since the api and the orchestrator it runs reach its hash through its dependencies (`^transit`). The repository's own guards read
  * the files they hold (`guards#test`): the CI guard reads the Actions workflow, the secret scan's allowlist, the stub secrets of the
  * runtime's `remote-agent.test.ts`, the e2e's page names, the board's generated paths and every workspace's manifest
@@ -124,12 +126,10 @@ const INPUTS: Record<string, readonly string[]> = {
   ],
   'api#test': [
     '$TURBO_DEFAULT$',
-    '$TURBO_ROOT$/tools/**',
     ...['src', 'place', 'servers', 'skills'].map((dir) => `$TURBO_ROOT$/packages/*/${dir}/**`),
     '$TURBO_ROOT$/packages/*/package.json',
   ],
-  'web#test': ['$TURBO_DEFAULT$', '$TURBO_ROOT$/tools/**', BOARD_SKILL, '$TURBO_ROOT$/CLAUDE.md', '$TURBO_ROOT$/.gitattributes'],
-  'cli#test': ['$TURBO_DEFAULT$', '$TURBO_ROOT$/tools/**'],
+  'web#test': ['$TURBO_DEFAULT$', BOARD_SKILL, '$TURBO_ROOT$/CLAUDE.md', '$TURBO_ROOT$/.gitattributes'],
   'docs#test': [
     '$TURBO_DEFAULT$',
     '$TURBO_ROOT$/tools/**',
@@ -163,7 +163,7 @@ test('each test that reads files outside its package lists them among its inputs
   assert.deepEqual(missingInputs(readTurbo()), []);
 });
 
-test("REFUSED: a task that drops the apps' tests, sources or tables, or root files, the team, the test-cost tooling, its own files, or its whole inputs", () => {
+test("REFUSED: a task that drops the apps' tests, sources or tables, or root files, the team, the repository's tools, its own files, or its whole inputs", () => {
   const dropping = (task: string, glob: string): Turbo => {
     const turbo = readTurbo();
     const inputs = turbo.tasks[task]?.inputs ?? [];
@@ -194,7 +194,7 @@ test("REFUSED: a task that drops the apps' tests, sources or tables, or root fil
   assert.deepEqual(missingInputs(dropping('agent-runtime#test', '$TURBO_ROOT$/apps/*/*.ts')), [
     'agent-runtime#test does not list $TURBO_ROOT$/apps/*/*.ts among its inputs in turbo.json: add it, or turbo replays it from its cache',
   ]);
-  for (const task of ['agent-orchestrator#test', 'guards#test', 'agent-runtime#test', 'api#test', 'web#test', 'cli#test', 'docs#test'])
+  for (const task of ['agent-orchestrator#test', 'guards#test', 'agent-runtime#test', 'docs#test'])
     assert.deepEqual(missingInputs(dropping(task, '$TURBO_ROOT$/tools/**')), [
       `${task} does not list $TURBO_ROOT$/tools/** among its inputs in turbo.json: add it, or turbo replays it from its cache`,
     ]);

@@ -8,7 +8,7 @@
     "build": "ASTRO_TELEMETRY_DISABLED=1 astro build && node built.ts",
     "preview": "ASTRO_TELEMETRY_DISABLED=1 astro preview",
     "typecheck": "tsrs --noEmit",
-    "test": "node --import=../../tools/test-costs/probe.ts --test --test-concurrency=2 --test-timeout=120000 --test-reporter=spec --test-reporter-destination=stdout --test-reporter=../../tools/test-costs/reporter.ts --test-reporter-destination=stderr test/*.test.ts"
+    "test": "node --test --test-concurrency=2 --test-timeout=120000 test/*.test.ts"
   },
   "dependencies": {
     "@astrojs/markdown-remark": "7.3.2",

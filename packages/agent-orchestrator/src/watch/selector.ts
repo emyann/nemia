@@ -6,10 +6,12 @@
  * carries it at all. Clauses of one selector are separated by commas and all must hold (AND); `-l` given more than once selects a line
  * any one of them holds for (OR). It is read by `nemia watch` here, and by every other surface that selects the feed's lines.
  *
- * **The keys are the line's own vocabulary, never its message**: the five labels a filing carries (`FeedLabels`) and the five reserved
- * keys a signed line names — `kind`, `reason`, `on` (what a `Waiting` line waits on), `via` (where an `AwaitingAnswer` line's answer is
+ * **The keys are the line's own vocabulary and a person's labels, never its message**: the five labels a filing carries
+ * (`FeedLabels`), every label a person put on the line's run (any key spelled as Kubernetes spells one, with no prefix), and the
+ * reserved keys a signed line names — `kind`, `reason`, `on` (what a `Waiting` line waits on), `via` (where an `AwaitingAnswer` line's answer is
  * asked), `type`, `waits` and `source`. The message a person reads is prose, worded anew whenever a
- * status is reworded, so nothing selects on it: `-l message=…` is refused as a key the feed has none of.
+ * status is reworded, so nothing selects on it: `-l message=…` is refused. A key no line carries is no refusal, as in Kubernetes: it
+ * selects nothing.
  *
  * A label may not take a reserved name (`labelKeysRefusal`), or a line's label would decide what `reason` means to a selector.
  *
@@ -39,7 +41,8 @@ export const SELECTABLE_KEYS: readonly string[] = [...LABEL_KEYS, ...RESERVED_KE
 /** The command line a selector's refusals end on, so a person reads what the grammar takes from any one of them. */
 export const SELECTOR_FORM =
   '-l <key>=<value>, -l <key>!=<value>, -l "<key> in (<a>,<b>)", -l "<key> notin (<a>,<b>)" or -l <key> for a line that carries it; ' +
-  `commas between clauses, which all must hold, and -l again for another selector, of which one must. The keys: ${SELECTABLE_KEYS.join(', ')}`;
+  `commas between clauses, which all must hold, and -l again for another selector, of which one must. The keys: ${SELECTABLE_KEYS.join(', ')}, ` +
+  "and any label a person put";
 
 /**
  * Why `keys` cannot be the label keys — a label named as a reserved key, which would decide for a selector what that key means — or
@@ -63,8 +66,11 @@ export type Clause =
 /** Every selector given, parsed: the clauses of one all hold, and one selector of them does (AND within, OR across). */
 export type Selectors = readonly (readonly Clause[])[];
 
-/** A key as a selector spells one: a letter, then letters and digits. */
-const KEY = /^[A-Za-z][A-Za-z0-9]*$/;
+/** A key as a selector spells one: Kubernetes' name segment, with no prefix — alphanumerics at both ends, `-`, `_` and `.` between. */
+const KEY = /^[A-Za-z0-9]([-A-Za-z0-9_.]*[A-Za-z0-9])?$/;
+
+/** The one key a selector refuses however it is spelled: the message, prose a person reads, which nothing selects on. */
+const PROSE_KEYS: readonly string[] = ['message'];
 
 /** A clause naming a list: its key, `in` or `notin`, and the values between its parentheses. */
 const LISTED = /^([^\s=!()]+)\s+(in|notin)\s*\(([^()]*)\)$/;
@@ -99,10 +105,15 @@ function clausesOf(text: string): string[] | undefined {
 }
 
 /** The refusal of `key`, where a selector may not name it, or undefined. */
-const keyRefusal = (key: string): string | undefined =>
-  KEY.test(key) && SELECTABLE_KEYS.includes(key)
+const keyRefusal = (key: string): string | undefined => {
+  if (PROSE_KEYS.includes(key))
+    return `${key} is prose a person reads, and nothing selects on it: a selector names a key such as ${SELECTABLE_KEYS.join(', ')} — ${SELECTOR_FORM}`;
+  if (key.includes('/'))
+    return `${JSON.stringify(key)} has a prefix, and a label takes none for now: drop what is before the / — ${SELECTOR_FORM}`;
+  return KEY.test(key)
     ? undefined
-    : `${JSON.stringify(key)} is no key of a feed line: a selector names one of ${SELECTABLE_KEYS.join(', ')} — ${SELECTOR_FORM}`;
+    : `${JSON.stringify(key)} is no key a selector can name: begin and end it with a letter or a digit, with - _ . between — ${SELECTOR_FORM}`;
+};
 
 /** The refusal of a value a selector cannot hold: empty, or spelling a comma or a parenthesis, which the grammar reads itself. */
 const valueRefusal = (key: string, op: string, value: string): string | undefined => {
@@ -186,12 +197,9 @@ export const parseSelectors = (values: readonly string[]): Selectors =>
  */
 export function selectableOf(line: FeedLine): Readonly<Record<string, string>> {
   const signed = upgraded(line);
-  const labels: FeedLabels = signed.labels ?? {};
+  const labels: Readonly<Record<string, string | undefined>> = signed.labels ?? {};
   const on: Record<string, string> = {};
-  for (const key of LABEL_KEYS) {
-    const value = labels[key];
-    if (value !== undefined) on[key] = value;
-  }
+  for (const [key, value] of Object.entries(labels)) if (value !== undefined) on[key] = value;
   on.kind = involvedOf(signed).kind;
   for (const [key, value] of [
     ['reason', signed.reason],
@@ -240,4 +248,13 @@ export function selects(selectors: Selectors, line: FeedLine): boolean {
   if (selectors.length === 0) return true;
   const on = selectableOf(line);
   return selectors.some((clauses) => clauses.every((clause) => holdsOf(clause, line, on)));
+}
+
+/**
+ * Whether `labels`, a flat map such as a run's `metadata.labels` or a card's, is selected by `selectors`: the same clauses as a feed
+ * line's, held of the map's keys alone (AND within a selector, OR across them), and every map where none was given. Pure.
+ */
+export function selectsLabels(selectors: Selectors, labels: Readonly<Record<string, string>>): boolean {
+  if (selectors.length === 0) return true;
+  return selectors.some((clauses) => clauses.every((clause) => holds(clause, labels[clause.key])));
 }

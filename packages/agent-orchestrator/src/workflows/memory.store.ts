@@ -8,14 +8,15 @@
  * A draft is held as its steps render (`renderStep`) and read back as a folder on disk is (`parseFolder`), against the agents and skills
  * the door found through the Agent and Skill doors (`defs`, else those the program is given), in the places given or beside the folder
  * alone: a step naming an agent is resolved as the files resolve it, so a test gives `agentDoorMemory()`'s door beside it. Its files are
- * rendered today, so it holds no former spelling and gives no hint.
+ * rendered today, so it holds no former spelling and gives no hint. The files a draft carries are held beside its steps, read where an
+ * `output:` names one, and kept until carried again, as the files leave one the draft does not carry.
  */
 import { createHash } from 'node:crypto';
 import path from 'node:path';
 import { Layer } from 'effect';
 import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
 import { renderStep } from '../workflow/index.ts';
-import { parseFolder, workflowInUse } from '../folder/folder.ts';
+import { hiredLineOut, parseFolder, workflowInUse } from '../folder/folder.ts';
 import { WorkflowDoor, workflowDoorOver, type WorkflowDefs, type WorkflowDraft, type WorkflowLayer } from './workflows.store.ts';
 import type { Fills, Found } from '../folder/folder.ts';
 
@@ -25,13 +26,21 @@ export const MEMORY_ROOT = '/memory';
 /** Yours, under the stand-in's root: the folder a workflow of yours is directly in, as `<home>/workflows` is on disk. */
 export const MEMORY_WORKFLOWS = path.posix.join(MEMORY_ROOT, 'workflows');
 
-/** A workflow held: each step's file, by its name, and its README where one was written. */
-type Held = { readonly files: ReadonlyMap<string, string>; readonly readme?: string };
+/**
+ * A workflow held: each step's file, by its name, its README where one was written, and the other files its drafts carried, by name in
+ * the folder (`carried`), each kept until a draft carries it again.
+ */
+type Held = { readonly files: ReadonlyMap<string, string>; readonly readme?: string; readonly carried?: ReadonlyMap<string, string> };
 
 /** The version of what is held: a digest of every file, as `workflowVersion` digests a folder's. */
 const versionOf = (held: Held): string =>
   createHash('sha256')
-    .update(JSON.stringify([[...held.files].sort(([a], [b]) => (a < b ? -1 : 1)), held.readme ?? null]))
+    .update(
+      JSON.stringify([
+        ...[held.files, held.carried ?? new Map()].map((m) => [...m].sort(([a], [b]) => (a < b ? -1 : 1))),
+        held.readme ?? null,
+      ]),
+    )
     .digest('hex')
     .slice(0, 12);
 
@@ -44,7 +53,7 @@ export function workflowDoorMemory(defs?: WorkflowDefs): Layer.Layer<never> {
   const read = (dir: string, found: Found, fills?: Fills) =>
     parseFolder(
       [...(workflows.get(dir)?.files ?? new Map<string, string>())],
-      (file) => (file === 'README.md' ? workflows.get(dir)?.readme : undefined),
+      (file) => (file === 'README.md' ? workflows.get(dir)?.readme : workflows.get(dir)?.carried?.get(file)),
       found.agents,
       found.skills,
       fills,
@@ -66,12 +75,15 @@ export function workflowDoorMemory(defs?: WorkflowDefs): Layer.Layer<never> {
         const held = workflows.get(dir);
         return held === undefined ? { kind: 'none' } : { kind: 'folder', version: versionOf(held) };
       },
-      write: (dir, draft: WorkflowDraft, found) => {
-        const files = new Map(draft.steps.map((step) => [step.name, renderStep(step)] as const));
-        const steps = parseFolder([...files], undefined, found.agents, found.skills);
+      write: (dir, draft: WorkflowDraft, found, _places, fills) => {
+        const files = new Map(draft.steps.map((step) => [step.name, hiredLineOut(step.name, renderStep(step), fills)] as const));
         const before = workflows.get(dir);
+        const carried = new Map([...(before?.carried ?? []), ...(draft.files ?? []).map((f) => [f.path, f.text] as const)]);
+        const steps = parseFolder([...files], (file) => carried.get(file), found.agents, found.skills, fills);
         const readme = draft.readme ?? before?.readme;
-        const held: Held = readme === undefined ? { files } : { files, readme };
+        const held: Held = { files, carried, ...(readme !== undefined && { readme }) };
+        const carriedKept = (draft.files ?? []).filter((f) => before?.carried?.get(f.path) === f.text).map((f) => f.path);
+        const carriedWritten = (draft.files ?? []).map((f) => f.path).filter((file) => !carriedKept.includes(file));
         workflows.set(dir, held);
         const names = (m: ReadonlyMap<string, string> | undefined) => [...(m?.keys() ?? [])].map((name) => `${name}.md`);
         const now = new Set(names(files));
@@ -79,8 +91,12 @@ export function workflowDoorMemory(defs?: WorkflowDefs): Layer.Layer<never> {
         return {
           dir,
           steps,
-          written: [...names(files).filter((file) => !kept.includes(file)), ...(draft.readme !== undefined ? ['README.md'] : [])].sort(),
-          kept: kept.sort(),
+          written: [
+            ...names(files).filter((file) => !kept.includes(file)),
+            ...carriedWritten,
+            ...(draft.readme !== undefined ? ['README.md'] : []),
+          ].sort(),
+          kept: [...kept, ...carriedKept].sort(),
           removed: names(before?.files)
             .filter((file) => !now.has(file))
             .sort(),
@@ -95,7 +111,11 @@ export function workflowDoorMemory(defs?: WorkflowDefs): Layer.Layer<never> {
         workflows.delete(dir);
         return {
           dir,
-          removed: [...[...held.files.keys()].map((name) => `${name}.md`), ...(held.readme !== undefined ? ['README.md'] : [])].sort(),
+          removed: [
+            ...[...held.files.keys()].map((name) => `${name}.md`),
+            ...(held.carried?.keys() ?? []),
+            ...(held.readme !== undefined ? ['README.md'] : []),
+          ].sort(),
         };
       },
       hints: () => [],

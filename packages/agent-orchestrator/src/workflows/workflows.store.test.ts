@@ -11,7 +11,7 @@ import path from 'node:path';
 import { Effect, Layer } from 'effect';
 import { scratch } from '../../test/scratch.ts';
 import { act, done, doorFrom, walksOn } from '../../test/door-walks.ts';
-import { aWorkflow, WORKFLOW_WALKS, yoursOn, type WorkflowSide } from '../../test/workflow-walks.ts';
+import { aStep, aWorkflow, carried, schemaOf, WORKFLOW_WALKS, yoursOn, type WorkflowSide } from '../../test/workflow-walks.ts';
 import { WorkflowDoor, workflowDoorFiles } from './workflows.store.ts';
 import { placesAroundAt, writeWorkflowAt } from '../folder/write.store.ts';
 import { StoreRoot } from '../config/root.store.ts';
@@ -253,4 +253,35 @@ test("the door's version moves with an agent the folder names, and a write answe
   fs.writeFileSync(path.join(agents, 'scribe.md'), '---\ndescription: Writes notes.\n---\nOther words.\n');
   const moved = done(side.door.workflows.there(dir));
   assert.notDeepEqual(moved, there, 'an edit of the agent the folder names moves its version');
+});
+
+test("a draft's carried schema replaces the folder's own before the folder is judged, and a file it does not carry is left", () => {
+  const { root, side } = store();
+  done(side.door.workflows.write(yoursOn(side, 'dev'), carried('size')));
+  const dir = path.join(root, 'workflows', 'dev');
+  fs.writeFileSync(path.join(dir, 'landing.ts'), 'process.exit(1);\n');
+  const { version } = done(side.door.workflows.there(yoursOn(side, 'dev'))) as { version: string };
+  const saved = done(side.door.workflows.write(yoursOn(side, 'dev'), carried('pages'), version));
+  assert.deepEqual(
+    saved.steps.map((s) => s.output?.schema.required),
+    [['pages']],
+  );
+  assert.deepEqual({ written: saved.written, kept: saved.kept }, { written: ['build.schema.json'], kept: ['build.md', 'check.ts'] });
+  assert.equal(fs.readFileSync(path.join(dir, 'build.schema.json'), 'utf8'), schemaOf('pages'));
+  assert.equal(fs.readFileSync(path.join(dir, 'landing.ts'), 'utf8'), 'process.exit(1);\n');
+});
+
+test('REFUSED: a carried file whose name in the folder is a link is Invalid, and the folder is byte for byte as it was', () => {
+  const { root, side } = store();
+  const { version } = done(side.door.workflows.write(yoursOn(side, 'dev'), carried('size')));
+  const dir = path.join(root, 'workflows', 'dev');
+  const outside = path.join(root, 'outside.ts');
+  fs.writeFileSync(outside, 'outside\n');
+  fs.rmSync(path.join(dir, 'check.ts'));
+  fs.symlinkSync(outside, path.join(dir, 'check.ts'));
+  const before = bytes(dir);
+  const draft = { ...carried('pages'), steps: [{ ...aStep('build'), body: 'Do it now.', output: { file: 'build.schema.json' } }] };
+  assert.deepEqual(act(side.door.workflows.write(yoursOn(side, 'dev'), draft, version)), { refused: 'Invalid' });
+  assert.deepEqual(bytes(dir), before);
+  assert.equal(fs.readFileSync(outside, 'utf8'), 'outside\n');
 });

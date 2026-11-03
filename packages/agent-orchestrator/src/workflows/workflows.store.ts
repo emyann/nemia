@@ -43,18 +43,24 @@ import {
 import { AgentDoor, agentDoorOver, agentFiles, type AgentDoorShape } from '../agents/agent-door.store.ts';
 import { SkillDoor, skillDoorOver, skillFiles, type SkillDoorShape } from '../skills/skill-door.store.ts';
 
-/** What a workflow is written from: its steps as the builder sends them, and its README where one is given. */
-export type WorkflowDraft = { readonly steps: readonly StepDraft[]; readonly readme?: string };
+/** A file a draft folder carries beside its steps and README — a script its check runs, a schema an `output:` names — by its name in it. */
+export type CarriedFile = { readonly path: string; readonly text: string };
+
+/**
+ * What a workflow is written from: its steps as the builder sends them, its README where one is given, and the other files its draft
+ * folder carries where given (`files`), which the command line reads off `--folder` and the builder never sends.
+ */
+export type WorkflowDraft = { readonly steps: readonly StepDraft[]; readonly readme?: string; readonly files?: readonly CarriedFile[] };
 
 /** What a write answers: what was written, and the version the folder is at after it, which the door reads once the layer wrote. */
 export type WorkflowSaved = WorkflowWritten & { readonly version: string };
 
 /**
- * A layer of the Workflow door, as plain synchronous methods: the workflows a holder folder holds, by name; where a write of a folder
- * finds its agents and skills (`around`): `places`, or where the layer says a run of it would look; a workflow's steps, loaded as a start
- * loads them, against the agents and skills the door `found` and its hires `fills`; what is at a folder now and its version
- * (`WorkflowThere`), its version counting what the door `gathered` of the agents and skills its files name (`named`); a workflow written
- * from a draft against those `found`, and removed whole (`users` the sentences of what still needs it); and the lines naming each former
+ * A layer of the Workflow door, as plain synchronous methods: the workflows a holder folder holds, by name; where a write of a folder finds
+ * its agents and skills (`around`): `places`, or where the layer says a run of it would look; a workflow's steps, loaded as a start loads
+ * them, against the agents and skills the door `found` and its hires `fills`; what is at a folder now and its version (`WorkflowThere`),
+ * its version counting what the door `gathered` of the agents and skills its files name (`named`); a workflow written from a draft against
+ * those `found` and its hires `fills`, and removed whole (`users` the sentences of what still needs it); and the lines naming each former
  * spelling its files still hold, with the fix (`formerKeyLines`).
  */
 export type WorkflowLayer = {
@@ -64,7 +70,7 @@ export type WorkflowLayer = {
     readonly read: (dir: string, found: Found, fills?: Fills) => Step[];
     readonly named: (dir: string) => { readonly agents: readonly string[]; readonly added: readonly string[] };
     readonly there: (dir: string, gathered: VersionGathered) => WorkflowThere;
-    readonly write: (dir: string, draft: WorkflowDraft, found: Found, places?: Places) => WorkflowWritten;
+    readonly write: (dir: string, draft: WorkflowDraft, found: Found, places?: Places, fills?: Fills) => WorkflowWritten;
     readonly remove: (dir: string, users: readonly string[]) => WorkflowRemoved;
     readonly hints: (dir: string) => readonly string[];
   };
@@ -75,15 +81,22 @@ type Methods = DoorOf<WorkflowLayer, WorkflowDir>['workflows'];
 /**
  * The Workflow door's shape: each method of `WorkflowLayer` answering an Effect, a workflow's folder taken as `WorkflowDir`; but `list`,
  * which takes a holder's plain path, a read, whose agents and skills are found in `places`, and a write and a removal, each given the
- * version the folder was read at (none for a new one), and `there`, whose version counts the agents and skills found through the doors in
- * `places`. The layer's `around` and `named` are the door's own to ask.
+ * version the folder was read at (none for a new one), a write judged with the hires `fills` of the factory it is written for, as a read
+ * is, and `there`, whose version counts the agents and skills found through the doors in `places`. The layer's `around` and `named` are
+ * the door's own to ask.
  */
 export type WorkflowDoorShape = {
   readonly workflows: Omit<Methods, 'list' | 'around' | 'named' | 'read' | 'there' | 'write' | 'remove'> & {
     readonly list: (holder: string) => Effect.Effect<readonly string[], Refusal>;
     readonly there: (dir: WorkflowDir, places?: Places) => Effect.Effect<WorkflowThere, Refusal>;
     readonly read: (dir: WorkflowDir, places?: Places, fills?: Fills) => Effect.Effect<Step[], Refusal>;
-    readonly write: (dir: WorkflowDir, draft: WorkflowDraft, version?: string, places?: Places) => Effect.Effect<WorkflowSaved, Refusal>;
+    readonly write: (
+      dir: WorkflowDir,
+      draft: WorkflowDraft,
+      version?: string,
+      places?: Places,
+      fills?: Fills,
+    ) => Effect.Effect<WorkflowSaved, Refusal>;
     readonly remove: (
       dir: WorkflowDir,
       version: string | undefined,
@@ -113,6 +126,31 @@ const nameChecked = inWritersWords(WorkflowName.OnCreate);
 
 /** A step's name, as `StepName.OnCreate` checks it. */
 const stepChecked = inWritersWords(StepName.OnCreate);
+
+/**
+ * Why a draft may not carry the file named `name`, or undefined where it may: a name in the folder, never a path, and no markdown, which
+ * the folder reads as a step or its README. Pure, and asked by the door before either layer, so both refuse the same names.
+ */
+export function carriedNameRefusal(name: string): string | undefined {
+  if (name === '' || name === '.' || name === '..' || name.includes('/') || name.includes('\\'))
+    return `${JSON.stringify(name)} is not a file's name in the workflow's folder: a draft carries the files directly in it. Move the file up into the draft folder, or leave it out.`;
+  if (name.toLowerCase().endsWith('.md'))
+    return `${name} is markdown, which a workflow's folder reads as a step or its README: write a step as a step of the draft, its README as the README, and carry no other .md.`;
+  return undefined;
+}
+
+/** A draft's carried files, each name as `carriedNameRefusal` judges it, refused `Invalid` in its words; no name twice. */
+const carriedChecked = (files: readonly CarriedFile[] = []): Effect.Effect<void, Invalid> => {
+  for (const [i, file] of files.entries()) {
+    const why =
+      carriedNameRefusal(file.path) ??
+      (files.findIndex((other) => other.path === file.path) !== i
+        ? `${file.path} is carried twice: give the draft one file of that name.`
+        : undefined);
+    if (why) return Effect.fail(new Invalid({ message: why }));
+  }
+  return Effect.void;
+};
 
 /** The model's `Workflow`, refused `Invalid` in the words of the invariant it breaks. */
 const workflowChecked = inWritersWords(Workflow);
@@ -182,15 +220,16 @@ export function workflowDoorOver(layer: WorkflowLayer, defs?: WorkflowDefs): Wor
         }),
       there: (dir, places) => Effect.andThen(dirChecked(dir), thereOf(dir, places)),
       hints: (dir) => Effect.andThen(dirChecked(dir), door.hints(dir)),
-      write: (dir, draft, version, places) =>
+      write: (dir, draft, version, places, fills) =>
         Effect.gen(function* () {
           yield* dirChecked(dir);
           yield* nameChecked(path.basename(dir));
           for (const step of draft.steps) yield* stepChecked(step?.name);
           yield* workflowChecked(draftedWorkflow(dir, draft));
+          yield* carriedChecked(draft.files);
           yield* judged(dir, 'write', version, places);
           const found = yield* foundIn(dir, yield* door.around(dir, places));
-          const written = yield* door.write(dir, draft, found, places);
+          const written = yield* door.write(dir, draft, found, places, fills);
           const after = yield* thereOf(WorkflowDir.read(written.dir), places);
           if (after.kind !== 'folder')
             return yield* Effect.fail(
@@ -226,8 +265,13 @@ export function workflowFiles(home: string): WorkflowLayer {
         if (stat === undefined) return { kind: 'none' };
         return stat.isDirectory() ? { kind: 'folder', version: versionDigest(versionNamed(dir).files, gathered) } : { kind: 'file' };
       },
-      write: (dir, draft, found, places) =>
-        writeWorkflowAt(home, dir, draft.steps, draft.readme, { found, ...(places !== undefined && { places }) }),
+      write: (dir, draft, found, places, fills) =>
+        writeWorkflowAt(home, dir, draft.steps, draft.readme, {
+          found,
+          ...(fills !== undefined && { fills }),
+          ...(places !== undefined && { places }),
+          ...(draft.files !== undefined && { files: draft.files }),
+        }),
       remove: (dir, users) => removeWorkflowAt(home, dir, users),
       hints: (dir) => formerKeyLines(dir),
     },
@@ -294,10 +338,10 @@ export const writeWorkflow = atHome(writeWorkflowOnDisk);
 
 /**
  * The steps of the draft folder `folder`, a plain path, read through the Workflow door the program is given with its agents and skills
- * found in `places`: what `nemia workflows write` sends the builder. Refused where the folder is no workflow's (`workflowDirAt`) or
- * does not load; anything else dies.
+ * found in `places`, filled with the hires `fills` where it is written for a factory: what `nemia workflows write` sends the builder.
+ * Refused where the folder is no workflow's (`workflowDirAt`) or does not load; anything else dies.
  */
-export const draftSteps = Effect.fn('draftSteps')(function* (folder: string, places: Places) {
+export const draftSteps = Effect.fn('draftSteps')(function* (folder: string, places: Places, fills?: Fills) {
   const dir = yield* fromThrow(() => workflowDirAt(path.resolve(folder)));
-  return yield* (yield* WorkflowDoor).workflows.read(dir, places);
+  return yield* (yield* WorkflowDoor).workflows.read(dir, places, fills);
 });

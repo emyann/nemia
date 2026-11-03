@@ -175,6 +175,51 @@ test('a person writes their library at the command line: an agent, a skill and a
   );
 
   await s.test(
+    'nemia workflows write writes the scripts and the schemas a draft folder carries, its step judged against the schema carried, and leaves a file it does not carry',
+    async (sub) => {
+      const folder = path.join(DRAFTS, 'workflows', 'carry');
+      fs.mkdirSync(folder, { recursive: true });
+      fs.writeFileSync(path.join(folder, 'only.md'), '---\nplace: git\noutput: only.schema.json\n---\nDo it.\n');
+      const schema = (field: string) =>
+        `${JSON.stringify({ type: 'object', additionalProperties: false, required: [field], properties: { [field]: { type: 'string' } } })}\n`;
+      fs.writeFileSync(path.join(folder, 'only.schema.json'), schema('size'));
+      fs.writeFileSync(path.join(folder, 'pictures.ts'), 'process.exit(0);\n');
+      const made = await done(sub, 'workflows', 'write', 'yours', 'carry', '--folder', folder);
+      const there = path.join(YOURS, 'carry');
+      assert.deepEqual(Object.keys(snapshot(there)), Object.keys(snapshot(folder)));
+      fs.writeFileSync(path.join(there, 'landing.ts'), 'process.exit(1);\n');
+      fs.writeFileSync(path.join(folder, 'only.schema.json'), schema('pages'));
+      await done(sub, 'workflows', 'write', 'yours', 'carry', '--folder', folder, '--version', versionIn(made));
+      assert.equal(fs.readFileSync(path.join(there, 'only.schema.json'), 'utf8'), schema('pages'));
+      assert.equal(fs.readFileSync(path.join(there, 'pictures.ts'), 'utf8'), 'process.exit(0);\n');
+      assert.equal(fs.readFileSync(path.join(there, 'landing.ts'), 'utf8'), 'process.exit(1);\n');
+    },
+  );
+
+  await s.test(
+    "nemia workflows write into a templated factory's tree judges its draft as a run of the factory reads it: with its hires, and the skills of its repository",
+    async (sub) => {
+      const repo = scratch('wf-writers-cli-shop-repo-');
+      fs.mkdirSync(path.join(repo, '.claude', 'skills', 'tidy'), { recursive: true });
+      fs.writeFileSync(path.join(repo, '.claude', 'skills', 'tidy', 'SKILL.md'), TIDY);
+      const factories = path.join(ROOT, 'factories');
+      const tree = path.join(factories, 'shop', 'tree');
+      fs.mkdirSync(path.join(tree, 'workflows', 'agents'), { recursive: true });
+      fs.writeFileSync(path.join(tree, 'workflows', 'agents', 'scribe.md'), SCRIBE.replace('output: scribe.schema.json\n', ''));
+      fs.writeFileSync(path.join(tree, 'factory.json'), JSON.stringify({ workflows: ['hired'], hires: { 'hired/only': 'scribe' } }));
+      const template = { source: path.join(DRAFTS, 'shop.tgz'), version: '1.0.0', params: {} };
+      fs.writeFileSync(path.join(factories, 'shop.json'), JSON.stringify({ repos: [repo], template }));
+      const folder = path.join(DRAFTS, 'workflows', 'hired');
+      fs.mkdirSync(folder, { recursive: true });
+      fs.writeFileSync(path.join(folder, 'only.md'), '---\nplace: git\nskills: [tidy]\n---\n');
+      await done(sub, 'workflows', 'write', 'factory', 'hired', '--folder', folder, '--factory', 'shop');
+      const written = fs.readFileSync(path.join(tree, 'workflows', 'hired', 'only.md'), 'utf8');
+      assert.match(written, /skills:/);
+      assert.doesNotMatch(written, /^agent:/m, "the hire is the factory's, never written into the step");
+    },
+  );
+
+  await s.test(
     'nemia agents run starts a try of an agent of yours with no repository; REFUSED while it moves, with no brief, for none there, in the repository',
     async (sub) => {
       const taster = drafted('agents/taster.md', '---\ndescription: Use this to taste it.\nmodel: sonnet\n---\nTaste it.\n');

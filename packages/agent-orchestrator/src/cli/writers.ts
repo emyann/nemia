@@ -1,12 +1,13 @@
 /**
  * The runners of the library's writers that read what a person wrote: `nemia agents write` (an agent's file, and the result schema its
- * `output:` names beside it), `nemia skills write` (a SKILL.md) and `nemia workflows write` (a draft folder's steps and README). Each reads
- * its file or folder into the form the board sends, hands it to its entry's handler in the store, and prints what the entry says of it.
+ * `output:` names beside it), `nemia skills write` (a SKILL.md) and `nemia workflows write` (a draft folder's steps, README and the files
+ * it carries). Each reads its file or folder into the form the board sends, hands it to its entry's handler in the store, and prints what
+ * the entry says of it.
  */
 import fs from 'node:fs';
 import path from 'node:path';
 import { Effect } from 'effect';
-import { draftSteps, HOME, Invalid, runWith, TABLE, type Place, templatedTree, type Args, type Command } from '../runner.ts';
+import { draftSteps, factoryDraftOf, HOME, Invalid, runWith, TABLE, type Place, type Args, type Command } from '../runner.ts';
 import { agentDraftOf, frontmatterKey, isReadme, skillDraftOf } from '../workflow.ts';
 import { usage, placedIn, type Engine } from './flags.ts';
 
@@ -95,9 +96,29 @@ export async function skillsWriteRun(args: Args, e: Engine, place: Place): Promi
 }
 
 /**
+ * The files the draft folder `folder` carries beside its steps and README, each by its name and with its text: every regular file directly
+ * in it that is not markdown, which the folder reads as a step or its README. A subfolder is not read; a link is refused by name, since
+ * what it points at is not the draft's own.
+ */
+function carriedOf(folder: string, command: Command): { path: string; text: string }[] {
+  const entries = fs.readdirSync(folder, { withFileTypes: true }).filter((entry) => !entry.name.toLowerCase().endsWith('.md'));
+  const linked = entries.find((entry) => entry.isSymbolicLink());
+  if (linked)
+    usage(
+      `nemia ${command.name} reads the draft folder's own files, and ${path.resolve(folder, linked.name)} is a link. Copy the file it points at into the draft folder, or remove the link.`,
+    );
+  return entries
+    .filter((entry) => entry.isFile())
+    .map((entry) => entry.name)
+    .sort()
+    .map((name) => ({ path: name, text: textOf(path.join(folder, name), command) }));
+}
+
+/**
  * `nemia workflows write`'s runner: the draft folder `--folder` names read as a start reads a folder, its agents looked for beside it
- * and in yours, through the Workflow door (`draftSteps`), or in the tree written for the place `factory` (`templatedTree`), into the
- * steps the builder sends, and its README where it has one.
+ * and in yours, through the Workflow door (`draftSteps`), or in the tree written for the place `factory` (`templatedTree`) and its
+ * repository, filled with its hires (`factoryDraftOf`), into the
+ * steps the builder sends, its README where it has one, and the other files it carries (`carriedOf`).
  */
 export async function workflowsWriteRun(args: Args, e: Engine, place: Place): Promise<void> {
   const command = entryOf('workflows write');
@@ -105,16 +126,19 @@ export async function workflowsWriteRun(args: Args, e: Engine, place: Place): Pr
   if (!fs.statSync(folder, { throwIfNoEntry: false })?.isDirectory())
     usage(`nemia workflows write reads the folder ${path.resolve(folder)}, and it is not one. Name the draft folder.`);
   const factory = args.from === 'factory' && typeof args.factory === 'string' ? args.factory : undefined;
-  const home = factory === undefined ? HOME : templatedTree(factory, 'nemia workflows write');
-  const read = draftSteps(folder, { home }).pipe(
+  const workflow = typeof args.name === 'string' ? args.name : '';
+  const { places, fills } = factory === undefined ? { places: { home: HOME } } : factoryDraftOf(HOME, factory, workflow);
+  const read = draftSteps(folder, places, fills).pipe(
     Effect.mapError((err) => new Invalid({ message: `${path.resolve(folder)} does not read: ${err.message}` })),
   );
   const steps = await runWith(e, placedIn(place, read));
   const readme = fs.readdirSync(folder).find(isReadme);
+  const files = carriedOf(folder, command);
   const asked = {
     ...args,
     draft: JSON.stringify(steps),
     ...(readme !== undefined && { readme: textOf(path.join(folder, readme), command) }),
+    ...(files.length > 0 && { files: JSON.stringify(files) }),
   };
   await ran(command, asked, e, place);
 }

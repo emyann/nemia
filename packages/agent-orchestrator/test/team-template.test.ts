@@ -19,7 +19,7 @@ const ROOT = scratch('wf-team-template-');
 process.env.WF_ROOT = ROOT;
 const { templated } = await import('./templated.ts');
 const { exportTemplate, openTemplate } = templated(ROOT);
-const { checkedTree, placeSkillNames } = await import('../src/template/template.store.ts');
+const { checkedTree, packageSkillNames } = await import('../src/template/template.store.ts');
 const { TemplateDoor } = await import('../src/templates/templates.store.ts');
 const { TemplateSource } = await import('../src/templates/templates.model.ts');
 const { StoreRoot } = await import('../src/config/root.store.ts');
@@ -63,7 +63,7 @@ test("this repository's team exports through a factory nemia, passes its check, 
       ROOT,
     ),
   );
-  assert.deepEqual(checkedTree(tree, placeSkillNames()).problems, []);
+  assert.deepEqual(checkedTree(tree, packageSkillNames()).problems, []);
 
   const out = renderFactory(openTemplate(dir), {});
   assert.deepEqual(out.refusals, []);

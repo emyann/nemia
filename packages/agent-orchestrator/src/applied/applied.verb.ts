@@ -17,7 +17,7 @@ import type { Command } from '../command/entry.verb.ts';
 import { Invalid } from '../refusal/refusal.ts';
 import { addFactory, factoryRepos, readFactories } from '../factory/factory.store.ts';
 import type { Factory, FactoryConditionReason, FactoryConditionType, FactoryTemplate } from '../factory/factory.ts';
-import { openedTree, placeSkillNames, problemLine, type OpenTemplate } from '../template/template.store.ts';
+import { openedTree, packageSkillNames, problemLine, type OpenTemplate } from '../template/template.store.ts';
 import { TemplateSource } from '../templates/templates.model.ts';
 import { TemplateDoor } from '../templates/templates.store.ts';
 import { rooted } from '../wiring/wire.verb.ts';
@@ -60,7 +60,7 @@ export type Unrendered = { problems: string[]; version?: string };
  */
 export const renderedAt = Effect.fn('renderedAt')(function* (source: string, sets: readonly string[]) {
   const tree = yield* (yield* TemplateDoor).templates.read(TemplateSource.read(source));
-  return yield* tried(() => renderOpened(openedTree(source, tree, placeSkillNames()), sets));
+  return yield* tried(() => renderOpened(openedTree(source, tree, packageSkillNames()), sets));
 });
 
 /** The template opened as `read`, rendered with `sets`, or why it is not (`renderedAt`). */

@@ -50,6 +50,7 @@ import { WORKFLOW_ENTRIES } from '../workflows/workflows.verb.ts';
 import { FACTORIES } from '../factory/factory.verb.ts';
 import { TEMPLATES } from '../template/template.verb.ts';
 import { INBOXES } from '../inbox/commands.verb.ts';
+import { LABEL_CARD, LABEL_RUN } from '../labels/commands.verb.ts';
 import { CONCLUDED, START } from '../start/commands.verb.ts';
 import { CANCEL, PAUSE, PAUSED, PAUSE_NOW, HOLD, PRUNE, RAN, RM, RESUME } from './runs.verb.ts';
 import { SUBSCRIBE, UNSUBSCRIBE } from '../subscription/subscription.verb.ts';
@@ -527,6 +528,8 @@ export const COMMANDS: readonly Command[] = [
   START,
   CONCLUDED,
   ...INBOXES,
+  LABEL_RUN,
+  LABEL_CARD,
   ...FACTORIES,
   ...TEMPLATES,
   RETRY,

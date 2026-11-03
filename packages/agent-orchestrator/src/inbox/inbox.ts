@@ -713,7 +713,7 @@ export const fromText = (card: InboxCard, runs: readonly string[], isDirectory: 
   cardText(card, { from: fromLine(runs) }, isDirectory);
 
 /**
- * A card's text with `labels:` set to `labels`, in key order — or taken off, for none — every other key kept: what `nemia label card`
+ * A card's text with `labels:` set to `labels`, in key order — or taken off, for none — every other key kept: what `nemia label inbox`
  * writes. Written again as `queuedText` writes it; pure, and the text reads back as a card (`parseInboxCard`).
  */
 export const labelledText = (card: InboxCard, labels: Labels, isDirectory: (at: string) => boolean): string =>

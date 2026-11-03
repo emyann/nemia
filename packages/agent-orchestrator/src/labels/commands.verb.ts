@@ -1,5 +1,5 @@
 /**
- * `nemia label run` and `nemia label card`, entries of the command table: a person's labels on a run or a card edited, as `kubectl label`
+ * `nemia label run` and `nemia label inbox`, entries of the command table: a person's labels on a run or a card edited, as `kubectl label`
  * spells it. The api serves each on a route of its own, its body a `LabelEdit` — `labels`, the edits, and `overwrite` — under the keys
  * the command line gives them, so one handler reads both.
  */
@@ -52,7 +52,7 @@ const labelSpec = (command: string, what: string, key: string, lists: string): S
 });
 
 const RUN_SPEC = labelSpec('nemia label run', 'run', 'runId', 'nemia ls');
-const CARD_SPEC = labelSpec('nemia label card', 'card', 'name', 'nemia inbox');
+const CARD_SPEC = labelSpec('nemia label inbox', 'card', 'name', 'nemia inbox');
 
 /** The refusal of a label command given no edit. */
 const noEdits = (command: string, key: string) => (args: Args) =>
@@ -84,9 +84,9 @@ export const LABEL_RUN: Command<Labelled> = {
   print: labelledLines,
 };
 
-/** `nemia label card`: an inbox card's `labels:` edited, every other key and its body kept; the run it starts is created with them. */
+/** `nemia label inbox`: an inbox card's `labels:` edited, every other key and its body kept; the run it starts is created with them. */
 export const LABEL_CARD: Command<Labelled> = {
-  name: 'label card',
+  name: 'label inbox',
   usage: '<name> <key=value|key->... [--overwrite]',
   help: [
     "edit an inbox card's labels: key=value sets a key, key- removes it;",
@@ -94,14 +94,14 @@ export const LABEL_CARD: Command<Labelled> = {
     'the run the card starts is created with them',
   ],
   spec: CARD_SPEC,
-  check: noEdits('nemia label card', 'card'),
+  check: noEdits('nemia label inbox', 'card'),
   writes: true,
   class: 'act',
   route: { method: 'POST', path: '/api/inbox/:name/labels', status: 200 },
   handler: (args, _env, home) =>
     rooted(
       home,
-      'label card',
+      'label inbox',
       Effect.suspend(() => labelCard(textOf(args, 'name'), editsOf(args), args.overwrite === true)),
     ),
   print: labelledLines,

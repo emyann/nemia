@@ -146,7 +146,7 @@ test('REFUSED: a record with no selector at all is left out with its words, neve
   const fixtures: Array<[string, object, string]> = [
     ['empty', { ...SUB, selectors: [] }, 'its selectors '],
     ['neither', { task: 'nemia-1', digestEvery: 60, from: 0 }, 'names no selectors'],
-    ['nokey', { ...SUB, selectors: ['message=boom'] }, '"message"'],
+    ['nokey', { ...SUB, selectors: ['message=boom'] }, 'message'],
     ['nowords', { task: 'nemia-1', digestEvery: 60, from: 0, wake: ['verified'] }, '"verified" alone'],
   ];
   for (const [name, record] of fixtures) fs.writeFileSync(file(name), JSON.stringify(record));

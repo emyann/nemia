@@ -95,7 +95,7 @@ const LABEL_COLUMN_TAKES = 'nemia inbox -L takes the label key whose value each 
 const leftOutLines = (name: string, leftOut: readonly LeftOut[]): string[] =>
   leftOut.map(
     ({ key, values }) =>
-      `label ${key} not inherited: ${values.map((v) => `${v.run} has ${key}=${v.value}`).join(', ')} — set it with nemia label card ${name} ${key}=<value>`,
+      `label ${key} not inherited: ${values.map((v) => `${v.run} has ${key}=${v.value}`).join(', ')} — set it with nemia label inbox ${name} ${key}=<value>`,
   );
 
 /** `nemia inbox`: each card, a line each, and how to start, queue or drop one; or that the inbox is empty. */

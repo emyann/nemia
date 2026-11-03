@@ -1,5 +1,5 @@
 /**
- * `nemia label run` and `nemia label card` over the Run and Card doors' memory: a key set, a change refused without `--overwrite` and
+ * `nemia label run` and `nemia label inbox` over the Run and Card doors' memory: a key set, a change refused without `--overwrite` and
  * taken with it, a key removed, an absent one said as no change (the verb reads no status, so a finished run is labelled as any), a
  * card's other keys and body kept, and the refusals — each by its kind, exit 2 and the facts it names.
  */
@@ -79,7 +79,7 @@ test('`nemia label run`: set, change refused without --overwrite and taken with 
   );
 });
 
-test('`nemia label card`: its labels: written, every other key and the body kept, and edited again', () => {
+test('`nemia label inbox`: its labels: written, every other key and the body kept, and edited again', () => {
   const read = value(
     over(
       Effect.gen(function* () {

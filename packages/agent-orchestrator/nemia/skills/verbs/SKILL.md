@@ -18,7 +18,8 @@ They write nothing: run them unasked, as often as you need. One that sets with s
                                what a run started with --from <runId> would be handed of it, now
   nemia inbox
                                the cards parked before they are started: name, first line, workflow
-                               and repo when set, and started as <runId> (nemia inbox --help)
+                               and repo when set, and started as <runId> (nemia inbox --help); -l: the
+                               cards a selector takes; --show-labels, -L <key>: their labels on each line
   nemia factory
                                the store's factories: the default first — every run and card that
                                names no factory, read, never written — then each by name with its
@@ -199,7 +200,7 @@ They write, and are yours to run unasked, on your judgement: say what you did.
                                inbox, listed as started: --workflows is its workflow:
                                unless given, --repo its repo:, --factory its factory:, and a card
                                that names no factory either way is refused
-  nemia inbox add "<idea>"|<file> [--workflow <name>] [--repo <path>] [--factory <name>]
+  nemia inbox add "<idea>"|<file> [--workflow <name>] [--repo <path>] [--factory <name>] [--label <key=value>]...
                                park an idea as a card in the inbox, named from its first line
   nemia inbox queue <name> [--workflow <w>] [--off]
                                mark a card to start on its own: the tick starts the oldest queued
@@ -207,6 +208,14 @@ They write, and are yours to run unasked, on your judgement: say what you did.
   nemia inbox from <name> <run>... | --off
                                set the runs a card is handed as context (from:), read and
                                never waited on; --off takes them off
+  nemia label run <runId> <key=value|key->... [--overwrite]
+                               edit a run's labels: key=value sets a key, key- removes it; changing a
+                               value takes --overwrite. nemia ls -l selects by them, and the feed's
+                               lines written after carry them
+  nemia label inbox <name> <key=value|key->... [--overwrite]
+                               edit an inbox card's labels: key=value sets a key, key- removes it;
+                               changing a value takes --overwrite. nemia inbox -l selects by them, and
+                               the run the card starts is created with them
   nemia refresh <runId> [<step>] [--base]
                                take the new revisions: a run keeps the workflow, agents, skills and
                                factory rules it resolved when it started, and this pins it to the

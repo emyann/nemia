@@ -1,5 +1,5 @@
 /**
- * `nemia label run` and `nemia label card`: a person's labels on a run or a card edited at any time, as `kubectl label` edits a
+ * `nemia label run` and `nemia label inbox`: a person's labels on a run or a card edited at any time, as `kubectl label` edits a
  * resource's — `key=value` sets a key, `key-` removes it, and a set that would change a value is refused without `--overwrite`. A run's
  * labels are written whole through the Run door (`runs.labels.put`), beside its record and never in it; a card's in its own frontmatter
  * through the Card door (`cards.rewrite`), every other key kept, as `nemia inbox from` writes `from:`. The rules are `labels.ts`'s.
@@ -48,14 +48,14 @@ export const labelRun = Effect.fn('labelRun')(function* (id: string, edits: read
 });
 
 /**
- * `nemia label card <name> <edit>... [--overwrite]`: the card's `labels:` edited and written back into its frontmatter, every other key
+ * `nemia label inbox <name> <edit>... [--overwrite]`: the card's `labels:` edited and written back into its frontmatter, every other key
  * and its body kept (`labelledText`), a started card's too. Refused before anything is written: a name that is not a card's (`Invalid`),
  * a card the inbox does not have (`Missing`, naming `nemia inbox` and the cards there are), a card that does not read (`tried`, its
  * reader's refusal as the failure), and an edit
  * `parseLabelEdits` or `labelEdits` refuses (`Invalid`).
  */
 export const labelCard = Effect.fn('labelCard')(function* (name: string, edits: readonly string[], overwrite = false) {
-  const command = `nemia label card ${name}`;
+  const command = `nemia label inbox ${name}`;
   const notName = inboxNameRefusal(name);
   if (notName) return yield* Effect.fail(new Invalid({ message: notName }));
   const door = yield* CardDoor;

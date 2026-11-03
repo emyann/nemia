@@ -99,7 +99,7 @@ const MISSPELLED = [
 ] as const;
 
 /** A filing stamps its run's person labels beside the closed five; `FeedLabels` names only those five, hence the cast. */
-const PERSON_LABELLED = { run: 'r-10', factory: 'nemia', workflow: 'build', step: 'implement', agent: 'ada', team: 'core' } as FeedLabels;
+const PERSON_LABELLED = { run: 'r-10', factory: 'acme', workflow: 'build', step: 'implement', agent: 'implementer', team: 'core' } as FeedLabels;
 
 /** The lines of `EVERY` the selectors `values` spell select, by what each line is about. */
 const selected = (values: readonly string[]): string[] => {
@@ -316,19 +316,19 @@ test('selects and selectableOf: what a signed line offers a selector, and the li
     assert.deepEqual(selected(['nope=1']), [], 'a key no line carries is no refusal, and selects nothing');
   });
   await t.test('selectsLabels holds each operator of a clause over a flat map', () => {
-    const map = { team: 'core', workflow: 'build', factory: 'nemia' };
+    const map = { team: 'core', workflow: 'build', factory: 'acme' };
     for (const [typed, taken] of [
       ['team=core', true],
       ['team=web', false],
       ['team!=web', true],
       ['team!=core', false],
-      ['owner!=ada', true],
+      ['owner!=implementer', true],
       ['team in (core,web)', true],
       ['team in (web,cli)', false],
-      ['owner in (ada)', false],
+      ['owner in (implementer)', false],
       ['team notin (web)', true],
       ['team notin (core)', false],
-      ['owner notin (ada)', true],
+      ['owner notin (implementer)', true],
       ['team', true],
       ['owner', false],
       ['team=core,workflow=build', true],

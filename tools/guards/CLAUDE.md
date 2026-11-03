@@ -13,7 +13,7 @@ code of a layer. A tool beside the layers, not a layer: no package or app import
   CI's filter are one list, and `test/due.test.ts` reads the real one. The apps' whole `src/`, their `.ts` beside their manifest, the
   board's `.storybook/` and their `glossary.json` are in it, for the glossary guard, so a change to the board's code makes them due.
 - **It reaches the orchestrator only through its three entries** (rule 1, `docs/architecture.md`; `contract.test.ts` holds it, here
-  too): `team-words` takes `splitFrontmatter` from `agent-orchestrator/workflow`, and `store-measure` its `Place` type, which is why
+  too): `team-words` takes `splitFrontmatter` from `agent-orchestrator/workflow`, `board-skill` that and `skillEntryOf`, and `store-measure` its `Place` type, which is why
   `package.json` declares `agent-orchestrator`. `team-words` reads sdlc's role skills (`packages/templates/sdlc/skills`); sdlc's
   agents, workflows and skills are held whole by `packages/templates/test`. A config guard that imports the package deeper stays in
   `packages/agent-orchestrator/test/`: `agent-fences`, `frozen-step`, `mcp-config`, `nemia-shipped`, `skills-rendered`,

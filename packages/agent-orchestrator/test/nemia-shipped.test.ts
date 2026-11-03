@@ -155,7 +155,7 @@ const SECTIONS: Record<string, string[]> = {
   'skills/recruit-or-create/SKILL.md': ['When', 'Search', 'Read each against the need', 'Propose', 'Recruit', 'Create'],
   'skills/first-meeting/SKILL.md': ['When', 'Introduce yourself', 'The offer', 'Never unasked'],
   'nemia.md': ['What you learn of the person'],
-  'skills/bring-what-waits/SKILL.md': ["A factory's upgrade"],
+  'skills/bring-what-waits/SKILL.md': ["A factory's upgrade", "A factory's takeover"],
 };
 
 /** The sections of `SECTIONS` that `files` miss, a file not there missing them all: a line each, `<file>: <heading>`. */

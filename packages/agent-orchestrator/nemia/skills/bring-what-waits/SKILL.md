@@ -1,11 +1,11 @@
 ---
 name: bring-what-waits
-description: Bring what waits on the person — a step at its gate, a step's question to them, a loop out of rounds, a step at its cap, a factory's upgrade — in chat with a recommendation, then run the verb they choose with their words as --message, so its prompt is their decision, asked once.
+description: Bring what waits on the person — a step at its gate, a step's question to them, a loop out of rounds, a step at its cap, a factory's upgrade or takeover — in chat with a recommendation, then run the verb they choose with their words as --message, so its prompt is their decision, asked once.
 ---
 # Bring what waits
 
 Five things wait on the person, and only these: a step at its gate, a step's question to them, a loop out of rounds, a step at its cap,
-and a factory's upgrade. Each is theirs to decide. Bring it in chat so they can decide in one read, with the verb you recommend; then run the verb they
+and a factory's upgrade, or its takeover by a template. Each is theirs to decide. Bring it in chat so they can decide in one read, with the verb you recommend; then run the verb they
 choose, with their words as `--message` where the verb takes it. The verb prompts them as it runs: that prompt is their decision, asked
 once, since they just gave it in chat. When they decline the prompt, ask what they want instead, and run that verb, which prompts again.
 Two verbs answer what waits: `nemia approve`, of a step at its gate or, with `--message`, of a loop out of rounds; and `nemia retry`,
@@ -120,6 +120,31 @@ Bring it:
 
 The daemon merges once every conflict has a choice; until then the factory's tree and base stay as they are, and its runs in flight
 keep their own folders. After each resolve, say what it answered: the conflicts still waiting, or that the merge is next.
+
+## A factory's takeover
+
+A factory made by hand can be taken over by a template, in place: its name, repositories, schedules, instruction, cards, runs and stats
+stay, and its workflows, hires and revisions policy become the template's. The takeover is the person's.
+
+When they ask for one, preview it first with `nemia factory diff <factory> --template <name|folder|archive>` (`--set <key>=<value>` once per
+parameter the template takes). It writes nothing, and prints the plan and its digest.
+
+Bring it:
+
+- **What stays**: the factory, its repositories, its schedules and its instruction.
+- **What is rewired**: the workflows added and dropped, each hire added, dropped or changed, and the revisions policy before and after.
+- **The rules no longer read**: where the factory keeps rules of its own, the plan says they stop being told once the tree's are, and
+  prints the `nemia factory rules <factory> --file <path>` line that writes them into the tree after the takeover; ask whether they want it.
+- **The runs waiting or in flight**, as the board's list counts them, one that finished left off: each keeps the workflow frozen on its
+  record; under `follow` they take the tree's hires and rules at their next step.
+- **What it would strand**: a card filed and not started, or a schedule, whose workflow the template does not offer. The takeover is
+  refused while one is: start the card or change its `workflow:` line, or `nemia factory unschedule <factory> <workflow>`, then preview
+  again.
+- **Recommendation**: one, with its reason in a sentence: take it over with the line the plan printed, `nemia factory adopt <factory>
+  --template <name|folder|archive> [--set …] --plan <digest>`, which prompts them. A plan that changed since the preview is refused: preview
+  again and bring the new one.
+
+After it, say what it answered: the factory taken over and the tree it runs from; the daemon writes its status on its next pass.
 
 ## Carry the answer back
 

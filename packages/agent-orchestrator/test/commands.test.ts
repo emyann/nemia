@@ -74,6 +74,7 @@ test('each command is served on the api where it was before the table, the lift 
       ['factory ls', 'cli'],
       ['factory add', 'cli'],
       ['factory apply', 'cli'],
+      ['factory adopt', 'cli'],
       ['factory diff', 'cli'],
       ['factory upgrade', 'cli'],
       ['factory resolve', 'cli'],

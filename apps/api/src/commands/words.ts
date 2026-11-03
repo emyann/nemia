@@ -8,6 +8,7 @@ import { decodeBody, valueAt, type BodyIssue, type Words } from '../body.ts';
 import type { Guarded } from '../guard.ts';
 import { AGENTS_COPY, AGENTS_CUSTOM, POLICY_CONFIRM, POLICY_DROP } from './library.ts';
 import { LEVEL, SUBSCRIBE, UNSUBSCRIBE } from './sessions.ts';
+import { LABEL_WORDS } from '../labels/index.ts';
 import { FACTORY_RULES_WORDS } from '../factories/rules.ts';
 import { FACTORY_SCHEDULE, FACTORY_UNSCHEDULE } from '../factories/schedules.ts';
 import { FACTORY_SERVER_WORDS } from '../servers/index.ts';
@@ -649,6 +650,7 @@ export const WORDS: Readonly<Record<string, RouteWords>> = {
   'inbox queue': INBOX_QUEUE,
   'inbox from': INBOX_FROM,
   'inbox rm': INBOX_RM,
+  ...LABEL_WORDS,
   'agents custom': AGENTS_CUSTOM,
   'agents copy': AGENTS_COPY,
   'factory rules': FACTORY_RULES_WORDS,

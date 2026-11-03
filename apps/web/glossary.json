@@ -131,6 +131,14 @@
           "card": "4c: a human gate is read by `waitsAtGate`, of the states `waitsOnPerson` reads"
         }
       ]
+    },
+    {
+      "term": "Label filter",
+      "meaning": "the field over the Inbox and the Runs (`SelectorField`, `apps/web/src/components/SelectorField.tsx`) that keeps the cards or the runs a label selector takes (`team=core`, Kubernetes' spelling), written to the address as `?l=` and sent to the api as `?selector=`; a selector the api refuses is said in its words under the field."
+    },
+    {
+      "term": "Label page",
+      "meaning": "the page of one label value, `/labels/<key>/<value>` (`apps/web/src/routes/labels.$key.$value.tsx`): the cards that carry it no run started, the runs that carry it counted by where each stands (waiting, running, needs a person, landed, failed, stopped), and what a landed one cost, each linking to its list filtered by it."
     }
   ]
 }

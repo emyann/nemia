@@ -641,12 +641,12 @@ function asksLines(run: Run, { steps, waitingOnYou, waiting, holding, toDecide }
  * (`shownStatus`), its cost, its branch, and its note with what it was denied (`shownNote`) — and what it asks; unjudged, its steps and
  * why.
  */
-function runLines({ run, listed, result }: RunsListed['runs'][number]): string[] {
+function runLines({ run, listed, result }: RunsListed['runs'][number], more: string): string[] {
   const calledOff = `${run.cancelledAt ? '  (cancelled)' : ''}${run.pruned ? '  (pruned)' : ''}`;
   if ('said' in listed) {
     const width = Math.max(20, ...listed.steps.map((s) => s.message.length));
     return [
-      `${run.id}  ${firstPiece(run.brief, '\n').slice(0, 56)}${calledOff}`,
+      `${run.id}  ${firstPiece(run.brief, '\n').slice(0, 56)}${calledOff}${more}`,
       ...listed.steps.map((s) => `   ${s.name.padEnd(14)} ${s.message.padEnd(width)} ${s.branch ?? ''}`),
       `   → unreadable: ${listed.said}`,
     ];
@@ -655,7 +655,7 @@ function runLines({ run, listed, result }: RunsListed['runs'][number]): string[]
   const said = steps.map((s) => ({ s, word: `${shownStatus(s)}${s.cost ? `  ${s.cost}` : ''}` }));
   const width = Math.max(20, ...said.map(({ word }) => word.length));
   return [
-    `${run.id}  ${firstPiece(run.brief, '\n').slice(0, 56)}${calledOff}${cost ? `  ${cost}` : ''}`,
+    `${run.id}  ${firstPiece(run.brief, '\n').slice(0, 56)}${calledOff}${cost ? `  ${cost}` : ''}${more}`,
     ...said.map(({ s, word }) => {
       const note = shownNote(s);
       return `   ${s.name.padEnd(14)} ${word.padEnd(width)} ${s.branch ?? ''}${note ? `  · ${note}` : ''}`;
@@ -666,10 +666,20 @@ function runLines({ run, listed, result }: RunsListed['runs'][number]): string[]
 
 /**
  * Every line `nemia ls` prints of its answer at `now`: `no runs` for none, each run's lines, how old what it shows of where the branches
- * stand is (`standingLine`), the factories' schedules (`scheduleLines`), and last whether a nemia up ticks the store.
+ * stand is (`standingLine`), the factories' schedules (`scheduleLines`), and last whether a nemia up ticks the store. `more` is what each
+ * run's head line ends on (the labels' segments, `labelSegments`): nothing by default, so the lines are as they were.
  */
-export const lsLines = ({ runs, daemon, standing, schedules }: RunsListed, now: number): string[] => {
+export const lsLines = (
+  { runs, daemon, standing, schedules }: RunsListed,
+  now: number,
+  more: (run: Run) => string = () => '',
+): string[] => {
   const stood = standingLine(standing, daemon, now);
   const scheduled = scheduleLines(schedules ?? [], (iso) => fireWord(iso, now));
-  return [...(runs.length ? runs.flatMap(runLines) : ['no runs']), ...(stood ? [stood] : []), ...scheduled, daemonLine(daemon, now)];
+  return [
+    ...(runs.length ? runs.flatMap((row) => runLines(row, more(row.run))) : ['no runs']),
+    ...(stood ? [stood] : []),
+    ...scheduled,
+    daemonLine(daemon, now),
+  ];
 };

@@ -3,6 +3,7 @@ import { queryOptions } from '@tanstack/react-query';
 import { Schema } from 'effect';
 import { decodes } from './decodes.ts';
 import { pace } from '../feed.ts';
+import { selectorKey, withSelector } from './selector.ts';
 import { get, send } from './read.ts';
 import { RunGraphSchema, type RunGraph } from './graph.ts';
 import { WorkflowPageAddressSchema, type WorkflowPageAddress } from './address.ts';
@@ -156,6 +157,8 @@ export type RunSummary = {
    * tasks read. Such a run is answered off its record alone: `running`, moving, the unreadable step's status `unreadable`.
    */
   unreadable: string | null;
+  /** The run's whole label map: its own labels, `workflow`, and `factory` when it names one. */
+  labels: Record<string, string>;
 };
 
 /** Decodes a `RunSummary`: each key the board reads, of its type and words; a key it does not know is dropped. */
@@ -209,6 +212,7 @@ const RunSummarySchema = decodes<RunSummary>()(
     waitingOnYouWords: StringsSchema,
     toDecide: Schema.NullOr(RunToDecideSchema),
     unreadable: Schema.NullOr(Schema.String),
+    labels: Schema.Record(Schema.String, Schema.String),
   }),
 );
 
@@ -221,6 +225,14 @@ export const runsQuery = queryOptions({
   queryFn: () => get('/api/runs', Schema.mutable(Schema.Array(RunSummarySchema))),
   refetchInterval: () => pace(5_000),
 });
+
+/** The runs `selector` takes by their labels (`GET /api/runs?selector=`), under `['runs']`, read again as it is. */
+export const runsSelectedQuery = (selector: string) =>
+  queryOptions({
+    queryKey: ['runs', ...selectorKey(selector)],
+    queryFn: () => get(withSelector('/api/runs', selector), Schema.mutable(Schema.Array(RunSummarySchema))),
+    refetchInterval: () => pace(5_000),
+  });
 
 /**
  * Mirrors `ListedRun` in agent-orchestrator: the list's own row, its wall time (`wallMs`), when its work stopped, null while it has
@@ -304,10 +316,14 @@ const OpenRunsSchema = decodes<OpenRuns>()(
  * (`?ofFactory=`), `default` naming the runs of none. What the board's frame reads on every page. Keyed `['runs-open']`, and
  * `['runs-open', factory]` for one factory; read again on each event of the workflow feed (`useFeed`), and paced as `runsQuery` is.
  */
-export const openRunsQuery = (factory?: string) =>
+export const openRunsQuery = (factory?: string, selector?: string) =>
   queryOptions({
-    queryKey: factory === undefined ? ['runs-open'] : ['runs-open', factory],
-    queryFn: () => get(`/api/runs-open${factory === undefined ? '' : `?ofFactory=${encodeURIComponent(factory)}`}`, OpenRunsSchema),
+    queryKey: [...(factory === undefined ? ['runs-open'] : ['runs-open', factory]), ...selectorKey(selector)],
+    queryFn: () =>
+      get(
+        withSelector(`/api/runs-open${factory === undefined ? '' : `?ofFactory=${encodeURIComponent(factory)}`}`, selector),
+        OpenRunsSchema,
+      ),
     refetchInterval: () => pace(5_000),
   });
 
@@ -357,12 +373,15 @@ export const FINISHED_SIZE = 9;
  * (`?ofFactory=`). Keyed `['runs-finished', factory, page]`, the factory null for every factory's; read again on each event of the
  * workflow feed (`useFeed`), and paced as `runsQuery` is.
  */
-export const finishedRunsQuery = (factory: string | undefined, page: number) =>
+export const finishedRunsQuery = (factory: string | undefined, page: number, selector?: string) =>
   queryOptions({
-    queryKey: ['runs-finished', factory ?? null, page],
+    queryKey: ['runs-finished', factory ?? null, page, ...selectorKey(selector)],
     queryFn: () =>
       get(
-        `/api/runs-finished?page=${page}&size=${FINISHED_SIZE}${factory === undefined ? '' : `&ofFactory=${encodeURIComponent(factory)}`}`,
+        withSelector(
+          `/api/runs-finished?page=${page}&size=${FINISHED_SIZE}${factory === undefined ? '' : `&ofFactory=${encodeURIComponent(factory)}`}`,
+          selector,
+        ),
         FinishedPageSchema,
       ),
     refetchInterval: () => pace(5_000),

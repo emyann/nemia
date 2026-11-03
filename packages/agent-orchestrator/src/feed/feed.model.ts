@@ -36,18 +36,24 @@ export const Subscription = Schema.Struct({
 }).annotate({ identifier: 'Subscription' });
 export type Subscription = typeof Subscription.Type;
 
-/** What a v1 line signs itself with (`Line`, feed.ts), as loose as the store reads it (`LINE_KEYS`): a newer `nemia` may name more. */
+/**
+ * What a v1 line signs itself with (`Line`, feed.ts), as loose as the store reads it (`LINE_KEYS`): a newer `nemia` may name more. Its
+ * `labels` are the closed five and the labels a person put on the run (`FeedLabels`), the rest a `Record` a `Struct` alone would strip.
+ */
 const signed = {
   apiVersion: Schema.optional(Schema.String),
   involved: Schema.optional(Schema.Struct({ kind: Schema.String, name: Schema.String })),
   labels: Schema.optional(
-    Schema.Struct({
-      run: Schema.optional(Schema.String),
-      factory: Schema.optional(FactoryName.OnRead),
-      workflow: Schema.optional(Schema.String),
-      step: Schema.optional(Schema.String),
-      agent: Schema.optional(Schema.String),
-    }),
+    Schema.StructWithRest(
+      Schema.Struct({
+        run: Schema.optional(Schema.String),
+        factory: Schema.optional(FactoryName.OnRead),
+        workflow: Schema.optional(Schema.String),
+        step: Schema.optional(Schema.String),
+        agent: Schema.optional(Schema.String),
+      }),
+      [Schema.Record(Schema.String, Schema.String)],
+    ),
   ),
   reason: Schema.optional(Schema.String),
   type: Schema.optional(Schema.String),

@@ -93,6 +93,12 @@ test('each kind of line decodes as the feed’s writers write it, and as a line 
       assert.equal(Schema.is(schema)(line), true);
       assert.equal(Schema.is(FeedLine)(line), true);
     });
+  await t.test("a run's line keeps the labels a person put on the run beside the closed five, and refuses one that is no string", () => {
+    const line = { ...upgraded({ at: AT, run: 'r-1', word: 'running' }), labels: { run: 'r-1', workflow: 'build', team: 'core' } };
+    const read = Schema.decodeUnknownSync(RunLine)(line);
+    assert.deepEqual(read.labels, { run: 'r-1', workflow: 'build', team: 'core' });
+    assert.equal(Schema.is(RunLine)({ ...line, labels: { run: 'r-1', team: 3 } }), false);
+  });
   await t.test('REFUSED: a daemon line of another word', () =>
     assert.equal(Schema.is(DaemonLine)({ at: AT, daemon: 1, word: `not ${DAEMON_STARTED}` }), false),
   );

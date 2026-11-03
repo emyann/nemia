@@ -842,3 +842,64 @@ test("a warm read of the inbox reads no finished run's record, however many ther
   assert.deepEqual(readInbox(memo), readInbox(), "the warm answer is a cold read's own: nothing the board shows changes");
   assert.deepEqual(readInbox(memo).find((l) => l.name === card.name)?.startedAs, ['r-started'], 'and it still says what started the card');
 });
+
+test("a card's labels: filed with --label, inherited from its from: runs, selected with -l, shown with --show-labels and -L, and copied to the run it starts", async (t) => {
+  emptyInbox();
+  const repo = aRepoWith('dev');
+  const a = await runPlaced(startRun({ brief: 'parent a', repo, workflowDir: path.join(repo, 'workflows', 'dev') }));
+  const b = await runPlaced(startRun({ brief: 'parent b', repo, workflowDir: path.join(repo, 'workflows', 'dev') }));
+  runStore.labels.put(a.id, { team: 'core', area: 'inbox' });
+  runStore.labels.put(b.id, { team: 'infra', area: 'inbox' });
+
+  const typed = addToInbox({ text: 'Cache the views', workflow: 'dev', repo, labels: ['team=core', 'tier=one'] });
+  assert.deepEqual(typed.card.labels, { team: 'core', tier: 'one' });
+  assert.match(fs.readFileSync(typed.file, 'utf8'), /\nlabels:\n {2}team: core\n {2}tier: one\n---\n/, 'written as labels:');
+
+  const fromRuns = addToInbox({ text: `---\nfrom: ${a.id}, ${b.id}\n---\nShow the flag\n`, workflow: 'dev', repo });
+  assert.deepEqual(fromRuns.card.labels, { area: 'inbox' }, 'what its from: runs agree on');
+  assert.deepEqual(
+    fromRuns.labelsLeftOut?.map((l) => l.key),
+    ['team'],
+    'the key they disagree on, left out and said',
+  );
+  const bare = addToInbox({ text: 'Plain idea', workflow: 'dev', repo });
+  assert.equal(fs.readFileSync(bare.file, 'utf8').includes('labels'), false, 'none given, none written');
+
+  const selected = await printedBy(t, 'inbox', '-l', 'team=core', '--show-labels', '-L', 'tier');
+  const cards = selected.filter(
+    (line) => line.includes('Cache the views') || line.includes('Show the flag') || line.includes('Plain idea'),
+  );
+  assert.equal(cards.length, 1, selected.join('\n'));
+  assert.ok(cards[0]?.startsWith(typed.card.name), cards[0]);
+  assert.ok(cards[0]?.endsWith('  labels: factory=default,team=core,tier=one,workflow=dev  tier: one'), cards[0]);
+  const plain = await printedBy(t, 'inbox');
+  assert.equal(
+    plain.some((line) => line.includes('labels:')),
+    false,
+    'with neither flag, the lines as before',
+  );
+  const listed = readInbox();
+  assert.deepEqual(listed.find((l) => l.name === bare.card.name)?.labels, {}, 'an entry with none carries {}');
+
+  const run = await runPlaced(startFromInbox({ name: typed.card.name, callerRepo: repo, labels: ['tier-', 'size=s'] }));
+  assert.deepEqual(run.run.labels, { team: 'core', size: 's' }, "the card's labels, the start's edits over them");
+  assert.deepEqual(runStore.runs.read(run.run.id).labels, { team: 'core', size: 's' });
+});
+
+test('REFUSED: `nemia inbox -l` with a malformed selector, and `nemia inbox add --label` with a reserved key — Invalid, exit 2, nothing filed', async (t) => {
+  emptyInbox();
+  const repo = aRepoWith('dev');
+  await t.test('a malformed selector', () =>
+    assert.throws(
+      () => atRoot(verbs.INBOX.handler({ selector: ['team==core=x'] }) as Effect.Effect<unknown, unknown>),
+      refusedWith('Invalid', '-l'),
+    ),
+  );
+  await t.test('a reserved key', () => {
+    assert.throws(
+      () => addToInbox({ text: 'Cache the views', workflow: 'dev', repo, labels: ['reason=x'] }),
+      refusedWith('Invalid', '--label', 'reason'),
+    );
+    assert.equal(fs.existsSync(INBOX) ? fs.readdirSync(INBOX).length : 0, 0, 'nothing filed');
+  });
+});

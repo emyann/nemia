@@ -50,6 +50,7 @@ import type { Point } from '../src/lib/layout.ts';
  * `wf ls`'s words for who it waits on, is the steps `waitingOnYou` names unless `extra` gives it.
  */
 const run = (statuses: readonly Word[], extra: Partial<RunSummary> = {}): RunSummary => ({
+  labels: {},
   id: 'r-1',
   repo: '/code/app',
   factory: null,

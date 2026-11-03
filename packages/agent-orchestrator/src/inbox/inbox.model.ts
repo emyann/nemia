@@ -27,6 +27,8 @@ export const Card = Schema.Struct({
   gate: Schema.optional(StepName.OnRead),
   factory: Schema.optional(FactoryName.OnRead),
   from: Schema.optional(Schema.Array(RunId.OnRead)),
+  /** A person's labels on the card (`labels:`), each pair as `labelRefusal` takes one: its reader's invariant. */
+  labels: Schema.optional(Schema.Record(Schema.String, Schema.String)),
   body: Schema.String,
 })
   .check(

@@ -50,6 +50,8 @@ export * from './api/builder.ts';
 export * from './api/agents.ts';
 export * from './api/skills.ts';
 export * from './api/inbox.ts';
+export * from './api/labels.ts';
+export * from './api/selector.ts';
 export * from './api/ceilings.ts';
 export * from './api/daemon.ts';
 export * from './api/quota.ts';

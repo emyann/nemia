@@ -143,7 +143,7 @@ test('REFUSED: nemia subscribe and unsubscribe refuse what they cannot put, by n
       assert.match(await refusal(() => typed(SUBSCRIBE, ['taken', 'nemia'])), /already named taken: nemia unsubscribe taken/);
       assert.match(await refusal(() => typed(SUBSCRIBE, ['../up', 'nemia'])), /is no subscription's name/);
       assert.match(await refusal(() => typed(UNSUBSCRIBE, ['../up'])), /is no subscription's name/);
-      assert.match(await refusal(() => typed(SUBSCRIBE, ['n', 'nemia', '-l', 'message=boom'])), /is no key of a feed line/);
+      assert.match(await refusal(() => typed(SUBSCRIBE, ['n', 'nemia', '-l', 'message=boom'])), /\bmessage\b.*-l <key>=<value>/);
       assert.match(await refusal(() => typed(SUBSCRIBE, ['n', 'nemia', '-l', ' '])), /is no selector: it holds no clause/);
       assert.match(
         await refusal(() => typed(SUBSCRIBE, ['n', 'nemia', '--digest-every', '0'])),

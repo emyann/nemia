@@ -17,6 +17,7 @@ import { Effect, Layer } from 'effect';
 import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from 'agent-orchestrator/testing';
 import { Informer, informerMemo, type InformerMemo } from 'agent-orchestrator';
+import type { Labelled } from '../client/client.ts';
 import type { RunAnswer, RunListing } from './runs.ts';
 import { appOver, beforeEachTest, eachTest, engineFor } from '../../test/placed.ts';
 
@@ -93,6 +94,30 @@ test('a word said through the api to a session at work, which moves no stamp and
     ['Widen the scope.'],
     'the word said, on the next request',
   );
+});
+
+test("a run's labels set through the api are its object's on the very next request, the informer warm and its check off", async () => {
+  process.env.WF_VERIFY_REST = '0';
+  try {
+    assert.equal((await object(GATED)).metadata.labels['team'], undefined, 'the fixture carries no team');
+    assert.ok(informer().runs.has(GATED), 'and the informer keeps it');
+    const res = await post(`/api/runs/${GATED}/labels`, { labels: ['team=core'] });
+    assert.equal(res.status, 200, await res.clone().text());
+    const labelled = (await res.json()) as Labelled;
+    assert.deepEqual([labelled.kind, labelled.name, labelled.labels, labelled.was], ['Run', GATED, { team: 'core' }, {}]);
+    assert.ok(!informer().runs.has(GATED), 'the write mount took it out');
+    assert.equal((await object(GATED)).metadata.labels['team'], 'core', 'labelled, on the next request');
+    assert.equal((await listing()).find((r) => r.id === GATED)?.labels['team'], 'core', 'and on its row of the list');
+    const changed = await post(`/api/runs/${GATED}/labels`, { labels: ['team=infra'] });
+    assert.equal(changed.status, 422, 'REFUSED: a value changed without overwrite');
+    const over = await post(`/api/runs/${GATED}/labels`, { labels: ['team=infra'], overwrite: true });
+    assert.equal(over.status, 200, await over.clone().text());
+    assert.equal((await object(GATED)).metadata.labels['team'], 'infra', 'overwritten, on the next request');
+    const wrong = await post(`/api/runs/${GATED}/labels`, { labels: 'team=core' });
+    assert.equal(wrong.status, 400, 'REFUSED: labels that are no list');
+  } finally {
+    process.env.WF_VERIFY_REST = '1';
+  }
 });
 
 test('a cold app and a warm app answer the run object and the runs list alike', async () => {

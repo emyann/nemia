@@ -37,6 +37,7 @@ import {
 } from '../src/lib/inbox.ts';
 
 const entry = (name: string, filedAt: string | null, extra: Partial<InboxEntry> = {}): InboxEntry => ({
+  labels: {},
   name,
   file: `${name}.md`,
   title: name,

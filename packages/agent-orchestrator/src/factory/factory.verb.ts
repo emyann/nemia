@@ -39,9 +39,9 @@ import { FACTORY_SERVER_ADD, FACTORY_SERVER_RM, FACTORY_SERVERS } from '../serve
 
 export const FACTORY_HELP = `nemia factory [ls]
 nemia factory add <name> --repo <path> [--repo <path> ...] [--no-trust]
-nemia factory apply <name> --template <folder|archive> --repo <path> [--repo <path> ...] [--set <key>=<value> ...] [--no-trust]
-nemia factory diff <name> --to <x.y.z> [--template <folder|archive>]
-nemia factory upgrade <name> --to <x.y.z> [--template <folder|archive>] [--downgrade]
+nemia factory apply <name> --template <name|folder|archive> --repo <path> [--repo <path> ...] [--set <key>=<value> ...] [--no-trust]
+nemia factory diff <name> --to <x.y.z> [--template <name|folder|archive>]
+nemia factory upgrade <name> --to <x.y.z> [--template <name|folder|archive>] [--downgrade]
 nemia factory resolve <name> <conflict> --ours|--theirs|--file <path>
 nemia factory attach <factory> <workflow>
 nemia factory detach <factory> <workflow>

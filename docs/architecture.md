@@ -385,7 +385,10 @@ is where the template is read from, `TemplateSource`, checked whole on a write a
 pattern for every definition door. The template's lint is the verbs', never the door's: `nemia template export` and `pack` check the
 tree (`checkedTree`, pure, in `src/template/template.store.ts`) before they write it, and `unpack` writes what an archive holds. The
 factory controller reads a template through the door on every pass (`renderedAt`), and a factory's `template` is the model's
-`AppliedTemplate`, whose source names the `Template` it was applied from.
+`AppliedTemplate`, whose source names the `Template` it was applied from. A builtin template is named by its folder's name alone
+(`--template sdlc`, and a factory's file records the name): `templatePlace` resolves it to a folder of the templates workspace
+(`BuiltinTemplates`, found by path) before the door, which reads whole paths alone, and the orchestrator imports nothing of that
+workspace (`test/contract.test.ts`).
 
 **The Agent and Skill doors.** An agent and a skill, one context read through the same lookup roots, are each read and written through
 a door of its own, on the Workflow door's pattern and rooted as it is: `AgentDoor` (`packages/agent-orchestrator/src/agents/agent-door.store.ts`),

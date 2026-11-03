@@ -84,6 +84,7 @@ export default {
       await expectVisible(page.locator('[data-page-name]', { hasText: LABEL }), 'the label page is named by its label');
       await expectVisible(page.locator(`[data-section="not started"] [data-card="${CARD}"]`), 'it lists the card no run started');
       await expectVisible(page.locator('[data-bucket="landed"]', { hasText: '1' }), 'and counts the landed run');
+      await expectVisible(page.locator('[data-section="runs"] h2', { hasText: /^Run$/ }), 'one run is said in the singular');
       await expectVisible(page.locator('[data-label-spent]'), 'and says what its runs spent, landed or not');
       await settled(page);
       await photograph(page, path.join(OUT, `labels-page-${theme}.png`), { fullPage: true });

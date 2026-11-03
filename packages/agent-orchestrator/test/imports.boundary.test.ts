@@ -1,7 +1,9 @@
 /**
  * The layers' import rules, held by lint (`docs/architecture.md`, "The rules"): the board imports no workspace package, no harness
- * SDK and no path into `packages/`; the api imports the orchestrator through `agent-orchestrator`, `/run`, `/workflow` and `/effect`
- * alone, and never the runtime or a harness SDK; the orchestrator imports no harness SDK; the runtime imports no layer above it.
+ * SDK and no path into `packages/`; the client (`apps/cli`) imports none either, and from the api only `import type` of its client
+ * door, `apps/api/src/client/client.ts` (a plant named `type:<spec>` is written as a type-only re-export); the api imports the
+ * orchestrator through `agent-orchestrator`, `/run`, `/workflow` and `/effect` alone, and never the runtime or a harness SDK; the
+ * orchestrator imports no harness SDK; the runtime imports no layer above it.
  *
  * `.oxlintrc.json` sets `no-restricted-imports` in one override block per layer, over its source alone. Oxlint accepts an option it does
  * not understand without a word, so these tests read the blocks out of the config, run oxlint with them on files planted in a scratch
@@ -44,6 +46,34 @@ const LAYERS: { name: string; at: string[]; refused: string[]; allowed: string[]
     allowed: ['react', 'effect', '@tanstack/react-query', './lib/api.ts', '../test/fixtures.ts'],
   },
   {
+    name: 'cli',
+    at: ['apps/cli/src', 'apps/cli/src/reads', 'apps/cli/bin'],
+    refused: [
+      'agent-orchestrator',
+      'agent-orchestrator/run',
+      'agent-orchestrator/bin',
+      'agent-runtime',
+      'agent-runtime/vocabulary',
+      ...SDKS,
+      '../../../packages/agent-orchestrator/src/run.ts',
+      '../../api/src/client/client.ts',
+      '../../../api/src/client/client.ts',
+      'api/src/client/client.ts',
+      'api',
+      'type:../../api/src/runs/runs.ts',
+      'type:api/src/app.ts',
+    ],
+    allowed: [
+      'effect',
+      'node:fs',
+      './route.ts',
+      '../src/main.ts',
+      'type:../../api/src/client/client.ts',
+      'type:../../../api/src/client/client.ts',
+      'type:api/src/client/client.ts',
+    ],
+  },
+  {
     name: 'api',
     at: ['apps/api/src', 'apps/api/src/runs'],
     refused: [
@@ -80,7 +110,19 @@ const LAYERS: { name: string; at: string[]; refused: string[]; allowed: string[]
 ];
 
 /** Where a test sits beside each layer: no block covers it, so what its layer refuses passes there — the api's beside its source too. */
-const TESTS = ['apps/web/test', 'apps/api/test', 'apps/api/src/runs', 'packages/agent-orchestrator/test', 'packages/agent-runtime/test'];
+const TESTS = [
+  'apps/web/test',
+  'apps/cli/test',
+  'apps/cli/src/reads',
+  'apps/api/test',
+  'apps/api/src/runs',
+  'packages/agent-orchestrator/test',
+  'packages/agent-runtime/test',
+];
+
+/** A plant's one line: a type-only re-export for a spec named `type:<spec>`, else a re-export of its values. */
+const plantText = (spec: string): string =>
+  spec.startsWith('type:') ? `export type { X } from '${spec.slice('type:'.length)}';\n` : `export * from '${spec}';\n`;
 
 type Block = { files: string[]; excludeFiles?: string[]; rules: Record<string, unknown> };
 type Config = { rules?: Record<string, unknown>; overrides: Block[]; [key: string]: unknown };
@@ -120,7 +162,7 @@ function refusedBy(config: object, planted: Plant[]): Set<string> {
   const dir = scratch('imports-');
   for (const plant of planted) {
     fs.mkdirSync(path.join(dir, path.dirname(plant.file)), { recursive: true });
-    fs.writeFileSync(path.join(dir, plant.file), `export * from '${plant.spec}';\n`);
+    fs.writeFileSync(path.join(dir, plant.file), plantText(plant.spec));
   }
   fs.writeFileSync(path.join(dir, 'oxlintrc.json'), JSON.stringify(config));
   const ran = spawnSync(OXLINT, ['-c', 'oxlintrc.json', '-f', 'json', 'apps', 'packages'], {
@@ -187,6 +229,21 @@ test('REFUSED: a block that reaches too far refuses what its layer allows', () =
   const leaked = leaks({ ...config, overrides: tight });
   assert.ok(
     leaked.some((line) => /^the api refuses apps\/api\/src\/p\d+\.ts its import of agent-orchestrator\/run: narrow its block/.test(line)),
+    leaked.join('\n'),
+  );
+});
+
+test("REFUSED: the client's door group put before its value pattern lets a value import of the door through, as oxlint reads a negation", () => {
+  const config = importRules(readConfig()) as { overrides: Block[] };
+  type Options = [string, { patterns: unknown[] }];
+  const swapped = config.overrides.map((block) => {
+    if (!block.files.includes('apps/cli/src/**')) return block;
+    const [level, { patterns }] = block.rules[RULE] as Options;
+    return { ...block, rules: { [RULE]: [level, { patterns: [...patterns.slice(1), patterns[0]] }] } };
+  });
+  const leaked = leaks({ ...config, overrides: swapped });
+  assert.ok(
+    leaked.some((line) => /^the cli lets apps\/cli\/src\/p\d+\.ts import api\/src\/client\/client\.ts:/.test(line)),
     leaked.join('\n'),
   );
 });

@@ -1,6 +1,7 @@
 /**
  * `GET /api/runs/:runId` answers the run as one object (`nemia show`'s, the package's `Run`), the run's one entry served on both sides;
- * any `view`, the page's `?view=page` among them, is refused.
+ * any `view`, the page's `?view=page` among them, is refused. `?raw=true` answers the record as `nemia show --raw` prints it, and
+ * `GET /api/listing[/:runId]` what `nemia ls` lists, the two reads `nemia` prints from as a client of the api.
  *
  * On the stand-ins: the runtime's test engine, its task filed and settled by hand, and the test place, under the records this file seeds.
  */
@@ -74,4 +75,36 @@ test('REFUSED: ?view=page is gone, a 422 like any view: the route answers the ob
   assert.equal(res.status, 422, 'the page is no view the route takes');
   const body = (await res.json()) as { error?: unknown };
   assert.equal(typeof body.error, 'string', 'a refusal, in words');
+});
+
+test("?raw=true answers the run's record as nemia show --raw prints it; raw=false the object; any other raw a 422", async () => {
+  const res = await app().request(`/api/runs/${R}?raw=true`);
+  assert.equal(res.status, 200);
+  const handler = SHOW?.handler?.bind(SHOW);
+  assert.ok(handler, 'show has a handler');
+  const printed = await runWith(engine(), handler({ runId: R, raw: true }, process.env, root));
+  assert.deepEqual(await res.json(), JSON.parse(JSON.stringify(printed)), 'the record nemia show --raw prints');
+  const object = (await (await app().request(`/api/runs/${R}?raw=false`)).json()) as RunAnswer;
+  assert.equal(object.kind, 'Run', 'raw=false is the object');
+  assert.equal((await app().request(`/api/runs/${R}?raw=yes`)).status, 422, 'raw takes true or false');
+  assert.equal((await app().request('/api/runs/r-nowhere?raw=true')).status, 404, 'no such run');
+});
+
+test("GET /api/listing answers nemia ls's whole answer, every run or the one named; a run the store does not have is a 404", async (t) => {
+  const ceilings = { WF_MAX_RUNS: process.env.WF_MAX_RUNS, WF_MAX_CONCURRENT: process.env.WF_MAX_CONCURRENT };
+  Object.assign(process.env, { WF_MAX_RUNS: '2', WF_MAX_CONCURRENT: '2' });
+  t.after(() => Object.assign(process.env, ceilings));
+  const LS = COMMANDS.find((c) => c.name === 'ls');
+  const handler = LS?.handler?.bind(LS);
+  assert.ok(handler, 'ls has a handler');
+  const all = (await (await app().request('/api/listing')).json()) as { runs: Array<{ run: { id: string } }>; daemon: unknown };
+  assert.ok(
+    all.runs.some((r) => r.run.id === R),
+    'every run',
+  );
+  const one = await app().request(`/api/listing/${R}`);
+  assert.equal(one.status, 200);
+  const listed = await runWith(engine(), handler({ runId: R }, process.env, root));
+  assert.deepEqual(await one.json(), JSON.parse(JSON.stringify(listed)), 'what nemia ls lists of it');
+  assert.equal((await app().request('/api/listing/r-nowhere')).status, 404, 'no such run');
 });

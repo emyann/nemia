@@ -34,7 +34,17 @@ import { ceilings, recordCeilings, recordPassCost, recordRecentPass } from '../d
 import { verifiesRest } from '../config/config.store.ts';
 import { feedFile } from '../feed/feed.store.ts';
 import { emitFeed } from '../feed/feed.verb.ts';
-import { freshStandingMemo, headsFor, passStanding, standingReader, type StandingMemo } from '../standing/standing.verb.ts';
+import {
+  freshStandingMemo,
+  headsFor,
+  passStanding,
+  standingReader,
+  standingSnapshot,
+  type StandingMemo,
+} from '../standing/standing.verb.ts';
+import { informedJudgements, Informer, type InformerMemo, informerRead, passStarted } from '../rest/informer.verb.ts';
+import { sameJudgement } from '../summary/judgement.verb.ts';
+import { StoreRoot } from '../config/root.store.ts';
 import { followedFeed } from '../rest/rest.verb.ts';
 import { reportedEngine } from '../views/views.verb.ts';
 import { startQueued } from '../inbox/inbox.verb.ts';
@@ -236,6 +246,8 @@ export const tickRun = Effect.fn('tick')(function* ({ repo, memo, verifyRest, qu
  * - every run that has started is judged, finished ones included (`advanceResting`); then each run with nothing filed, oldest first, with
  *   its slot (`waitingJudged`); then one queued card, while a slot is free and the store is not paused, read again; else, on the same
  *   terms, one schedule's due fire (`startDue`).
+ * - where the process keeps an informer (`Informer`, the api's daemon), the pass begins its number first (`passStarted`), and once every
+ *   run is advanced, judges each as the api serves it and keeps it there (`informed`), so a request reads what the pass judged.
  * - then the tasks of runs `nemia rm` removed that had not settled are forgotten (`finishForgetting`), and what it says is the pass's.
  * - last, and apart, the feed is written where it changed: a feed that cannot be written costs the report (`feedError`), never the pass.
  *
@@ -247,6 +259,8 @@ export const tickRun = Effect.fn('tick')(function* ({ repo, memo, verifyRest, qu
  * their own: a pass traces what it does, as many spans over many runs at rest as over few.
  */
 const pass = Effect.fn('pass')(function* (engine: Engine, { repo, memo, verify }: PassOptions) {
+  const informer = yield* Informer;
+  if (informer) passStarted(informer);
   const report = yield* asked('tick', engine.tick());
   noteSeen({ ...sessionsOf(report, Date.now()), load: loadNow() });
   const e = reportedEngine(engine, report.views ?? []);
@@ -262,6 +276,7 @@ const pass = Effect.fn('pass')(function* (engine: Engine, { repo, memo, verify }
   const read: PassRead = passRead(e, runs, process.env, standing, yield* passRevisions());
   for (const run of runs.filter(hasStarted)) yield* judged(e, judging, read, run, resting);
   const counted = yield* waitingJudged(e, judging, read, resting, ran.runs);
+  if (informer) yield* informed(e, informer, runs, judging, verify);
   const queue =
     slotFree({ inFlight: counted, cap: ran.runs }) && !(yield* tried(() => readPause()))
       ? yield* withinEffect('act', startQueued(repo, runs))
@@ -301,6 +316,33 @@ const finishingReported = (
     (run) => among.get(run.id) ?? [],
   );
 };
+
+/**
+ * Each run of the pass's listing judged as the api serves it (`informedJudgements`), once the pass has advanced it, and kept in this
+ * process's informer for the requests that read it until the next pass: a run at rest the informer still holds is not judged again, a run
+ * the pass left unjudged leaves it, and so does a run gone from the store. Its branches as the pass wrote where they stand
+ * (`standingSnapshot`), which a request reads them by too.
+ */
+const informed = Effect.fnUntraced(function* (
+  e: Engine,
+  informer: InformerMemo,
+  runs: readonly Run[],
+  { unjudged }: Judging,
+  verify: boolean,
+) {
+  const git = standingReader(yield* standingSnapshot());
+  const read = yield* informerRead(e, informer, verify, git, sameJudgement);
+  read.only(runs.map((run) => run.id));
+  for (const run of runs) if (unjudged.has(run.id)) read.drop(run);
+  yield* informedJudgements(
+    e,
+    yield* StoreRoot,
+    runs.filter((run) => !unjudged.has(run.id)),
+    read,
+    git,
+    () => runs,
+  );
+});
 
 /** What a pass has judged so far: each run it advanced, and each run it left unjudged with why (`Unjudged`). */
 type Judging = { done: Map<string, Advanced>; unjudged: Map<string, Pick<Unjudged, 'why' | 'by'>> };

@@ -58,6 +58,7 @@ import { MEMORY } from '../nemia/memory.verb.ts';
 import { SERVICE_COMMANDS } from '../service/restart.verb.ts';
 import { RELEASES } from '../release/upgrade.verb.ts';
 import { VERSIONS } from '../release/version.verb.ts';
+import { DAEMON } from '../daemon/daemon.verb.ts';
 import { FRONTMATTER_REWRITE } from '../frontmatter/frontmatter.verb.ts';
 import { ADMIT } from '../admission/admit.verb.ts';
 import { POLICY_ENTRIES } from '../auto/auto.verb.ts';
@@ -357,7 +358,8 @@ const SAY: Command<{
 
 /**
  * `nemia ls`: every run, or the one named, and its steps, as the package reads each (`runsListed`). The board's list is the runs'
- * summaries, judged off the same reading of each (`runReading`), on the entry the api serves alone (`RUNS`).
+ * summaries, judged off the same reading of each (`runReading`), on the entry the api serves alone (`RUNS`). The api serves this answer
+ * whole on `GET /api/listing` and `GET /api/listing/:runId`, which `nemia` reads and prints with this entry's lines, as a client of it.
  */
 const LS: Command<RunsListed> = {
   name: 'ls',
@@ -380,10 +382,10 @@ const LS: Command<RunsListed> = {
   },
   writes: false,
   class: 'read',
-  only: {
-    side: 'cli',
-    why: "its lines are each run's for a person at a terminal; the board reads every run judged into a summary, kept between its polls, off the runs entry",
-  },
+  route: [
+    { method: 'GET', path: '/api/listing', status: 200 },
+    { method: 'GET', path: '/api/listing/:runId', status: 200 },
+  ],
   handler: (args) => runsListed(textOf(args, 'runId')),
   print: (listed) => [...(listed.paused ? pausedLines(listed.paused) : []), ...lsLines(listed, Date.now())],
 };
@@ -557,6 +559,7 @@ export const COMMANDS: readonly Command[] = [
   ...SERVICE_COMMANDS,
   ...RELEASES,
   ...VERSIONS,
+  DAEMON,
   FRONTMATTER_REWRITE,
   ...WORKFLOW_ENTRIES,
 ];

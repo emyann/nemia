@@ -29,15 +29,13 @@
     "js-yaml": "^4.3.2",
     "typescript": "^6.0.3"
   },
-  "bin": {
-    "nemia": "bin/nemia.ts",
-    "wf": "bin/wf.ts"
-  },
   "exports": {
     ".": "./src/runner.ts",
     "./run": "./src/run.ts",
     "./workflow": "./src/workflow.ts",
     "./testing": "./testing.ts",
+    "./bin": "./bin/nemia.ts",
+    "./bin/wf": "./bin/wf.ts",
     "./package.json": "./package.json"
   }
 }

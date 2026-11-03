@@ -1,13 +1,14 @@
 # Nemia — contributor guide
 
-Two packages and two apps, each a layer that owns one thing. `packages/agent-runtime` runs agent sessions on a harness, durably: a job
-that runs to its end, and a long-lived session that runs until stopped (`restartPolicy: 'Always'`); the `ae` CLI, and
+Two packages and three apps, each a layer that owns one thing. `packages/agent-runtime` runs agent sessions on a harness, durably: a
+job that runs to its end, and a long-lived session that runs until stopped (`restartPolicy: 'Always'`); the `ae` CLI, and
 `src/core/domain.ts` is the whole judgement. `packages/agent-orchestrator` owns workflows and the runs of their steps — a folder of
-markdown is a workflow (the `wf` CLI). `apps/api` puts the workflows behind HTTP; `apps/web`, the board, shows them to a person.
+markdown is a workflow (its in-process CLI). `apps/api` puts the workflows behind HTTP; `apps/web`, the board, shows them to a person;
+`apps/cli`, beside it, is `nemia` and `wf`, a client of the api that spawns the orchestrator's CLI for every verb it has not moved.
 
-Each layer reaches exactly the one below it, and nothing reaches up or skips one. Which layer owns what, the public contract of each and
+The order is `web, cli → api → orchestrator → runtime`: each layer reaches exactly the one below it, and nothing reaches up or skips one. Which layer owns what, the public contract of each and
 the four rules and the tests that hold them are in `docs/architecture.md`: read it before you place a change. Read `README.md` and each
-package's README for the model before changing behaviour. `wf` becomes `nemia` (the Nemia intent); `ae` stays the runtime's CLI. The stores
+package's README for the model before changing behaviour. `wf` becomes `nemia` (the Nemia intent), and both bins live in `apps/cli`; `ae` stays the runtime's CLI. The stores
 `~/.agent-workflows` (`WF_ROOT`) and `~/.agent-engine` (`AE_ROOT`) keep their names on purpose: a new default would orphan every
 record there.
 
@@ -27,9 +28,9 @@ holds what every change needs.
   changed (beside it, or under its package's `test/` naming it), and for a doc, a skill or a workflow file the tests that read it (grep
   the tests for its path), each from its package's folder as its `test` script loads it: `node --import ./test/ambient.ts --test <file>`
   in `packages/agent-orchestrator`, `node --import ./test/harness.ts --test <file>` in `apps/api`, `node --test <file>` in
-  `packages/agent-runtime`, `apps/web` and `tools/guards`. Where a file alone does not say enough (a shared helper, a type many files read, a package's
+  `packages/agent-runtime`, `apps/web`, `apps/cli` and `tools/guards`. Where a file alone does not say enough (a shared helper, a type many files read, a package's
   test setup), the packages it touched: `npx turbo run test --force --continue --filter=<package>`, the package by its `name`
-  (`agent-orchestrator`, `agent-runtime`, `api`, `web`, `guards`). Typecheck and lint run whole: they are cheap. Implement's round check runs the
+  (`agent-orchestrator`, `agent-runtime`, `api`, `web`, `cli`, `guards`). Typecheck and lint run whole: they are cheap. Implement's round check runs the
   declarations, the typecheck and the lint, and pushes the round's commit and waits on GitHub's `ci` context, which runs the whole
   suite on it (`workflows/build/implement.md`); the landing's check runs no suite at all — it is the receipt that the pull request `ci`
   judged was merged (`workflows/build/landing.ts`) — so the commit `ci` passed on is the last thing any suite reads; a session runs the
@@ -191,6 +192,8 @@ What the `create-an-agent` skill, being generic, does not say here:
   (`BUILTIN_SKILLS`, the package's own `skills/`, none today), the MCP servers it offers a factory (`BUILTIN_SERVERS`,
   `packages/agent-orchestrator/servers/`), and Nemia's own agent once the Nemia slices build it. A person's
   factories get no workflow or agent from the package.
+- `apps/cli/` — `nemia` and `wf`, the client of the api: the moved reads over HTTP, every other verb and `--local` on the
+  orchestrator's own CLI, spawned (`apps/cli/CLAUDE.md`).
 - `apps/docs/` — the documentation site (Astro Starlight) for a person who will use Nemia: landed material only, the state diagrams read
   from their markers at build; it imports no package (`apps/docs/CLAUDE.md`).
 - `tools/guards/` — the repository's own guards, never shipped: the tests that hold its CI, docs, workflows and test infrastructure

@@ -183,12 +183,13 @@ test('on an empty store the report counts no run and holds every measure, the ma
   for (const key of ['cpu', 'cores', 'memoryBytes', 'node', 'load']) assert.ok(key in written.machine, key);
   assert.match(written.commit, /^[0-9a-f]{40}$/);
   assert.ok(Number.isFinite(Date.parse(written.date)));
-  for (const key of ['tickPass', 'runList', 'stats'] as const) {
+  for (const key of ['tickPass', 'tickPassInformed', 'runList', 'stats', 'runListAfterPass'] as const) {
     const measured = written.measures[key];
     assert.ok(measured !== null && Number.isFinite(measured.cold.ms) && Number.isFinite(measured.warm.ms), key);
   }
   assert.equal(written.measures.finishedRun, null, 'no finished run to read');
   assert.equal(written.measures.openRun, null, 'no open run to read');
+  assert.equal(written.measures.openRunAfterPass, null, 'no open run to read after a pass either');
   assert.deepEqual(written.refusals, []);
   assert.deepEqual(fs.readdirSync(from), [], 'the store itself was not written');
 });

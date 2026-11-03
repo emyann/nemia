@@ -49,6 +49,14 @@
       "type": "DiskKind"
     },
     {
+      "term": "Informer",
+      "meaning": "the daemon's memory of each run's judgement: what its pass judged of a run, served to the run's object, its sub-resources and the runs list while every input it was judged on holds — a run at rest across passes, a moving run within the pass that judged it — and judged again once one moves or a write through the api names the run. In memory alone: a restarted daemon starts with none.",
+      "see": {
+        "label": "Two loops",
+        "href": "/how-a-run-lives/#two-loops-both-level-triggered"
+      }
+    },
+    {
       "term": "Limit",
       "meaning": "the most runs in flight; a step a run over it holds back is pending, reason `Waiting`, `on` limit.",
       "type": "WaitOn"

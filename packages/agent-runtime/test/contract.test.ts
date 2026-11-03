@@ -90,6 +90,8 @@ test('the scan reads the packages and apps above this one — or it would pass b
     'apps/api/test',
     'apps/web/src',
     'apps/web/test/e2e',
+    'apps/cli/src',
+    'apps/cli/bin',
   ]) {
     assert.ok(
       files.some((f) => f.startsWith(`${dir}/`)),

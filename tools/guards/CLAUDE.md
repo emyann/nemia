@@ -14,8 +14,8 @@ code of a layer. A tool beside the layers, not a layer: no package or app import
   board's `.storybook/` and their `glossary.json` are in it, for the glossary guard, so a change to the board's code makes them due.
 - **It reaches the orchestrator only through its three entries** (rule 1, `docs/architecture.md`; `contract.test.ts` holds it, here
   too): `team-words` takes `splitFrontmatter` from `agent-orchestrator/workflow`, and `store-measure` its `Place` type, which is why
-  `package.json` declares `agent-orchestrator`. `team-words` and `team-portable` read the role skills under `.claude/skills`; sdlc's
-  agents and workflows are held by `packages/templates/test`. A config guard that imports the package deeper stays in
+  `package.json` declares `agent-orchestrator`. `team-words` reads sdlc's role skills (`packages/templates/sdlc/skills`); sdlc's
+  agents, workflows and skills are held whole by `packages/templates/test`. A config guard that imports the package deeper stays in
   `packages/agent-orchestrator/test/`: `agent-fences`, `frozen-step`, `mcp-config`, `nemia-shipped`, `skills-rendered`,
   `skill-folders`, `verbs-skill`, `quick-run`, `tally-start`, `observe`, `profile`, `workflow`; so do `stand-ins` and the
   orchestrator's own test-seat tests, and `observe-render.boundary`, a test of `tools/observe`'s code rather than of the configuration.

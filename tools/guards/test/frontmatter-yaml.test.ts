@@ -1,13 +1,14 @@
 /**
- * Every frontmatter of the repository's skills is YAML: each markdown file git holds under `.claude/skills/`, `apps/web/.claude/skills/`
- * and the orchestrator's builtin `packages/agent-orchestrator/skills/` that opens with `---` has a block a
+ * Every frontmatter of the repository's skills is YAML: each markdown file git holds under `.claude/skills/`, `apps/web/.claude/skills/`,
+ * the orchestrator's builtin `packages/agent-orchestrator/skills/` and sdlc's role skills `packages/templates/sdlc/skills/` that opens
+ * with `---` has a block a
  * strict YAML parser reads as a map of keys. The parser is js-yaml, not Nemia's own reader, so a block in the former line form
  * (`key: the rest of the line`), which Nemia refuses too, is refused here, as VS Code's preview, GitHub's file view or any tool a person
  * points at these files would refuse. The fix is `nemia frontmatter rewrite <folder>`.
  *
  * The guard is first made to refuse a planted block, and it must read more than 15 framed files, so a scan that reads nothing cannot
- * pass. The floor was 30 while the repository kept its team under `workflows/`; with the team gone to `packages/templates/sdlc`,
- * which this guard does not read, the skills alone frame 19 files.
+ * pass. The floor was 30 while the repository kept its team under `workflows/`; with the team gone to `packages/templates/sdlc`, the
+ * skills alone frame 19 files, the five role skills among them since they left `.claude/skills/` for sdlc's `skills/`.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -18,7 +19,7 @@ import { files, REPO } from './repo-files.ts';
 import { scratch } from './scratch.ts';
 
 /** The folders whose markdown is read by a harness or by Nemia as frontmatter and a body. */
-const HELD = ['.claude/skills/', 'apps/web/.claude/skills/', 'packages/agent-orchestrator/skills/'];
+const HELD = ['.claude/skills/', 'apps/web/.claude/skills/', 'packages/agent-orchestrator/skills/', 'packages/templates/sdlc/skills/'];
 
 /** A file's frontmatter block, between the `---` that opens its first line and the next line that is just `---`; null for none. */
 const blockOf = (text: string): string | null => {
@@ -53,7 +54,7 @@ test('REFUSED: a planted frontmatter a strict YAML parser refuses, and one that 
   );
 });
 
-test('every frontmatter under .claude/skills/, apps/web/.claude/skills/ and packages/agent-orchestrator/skills/ is YAML a strict parser reads', () => {
+test('every frontmatter under .claude/skills/, apps/web/.claude/skills/, packages/agent-orchestrator/skills/ and packages/templates/sdlc/skills/ is YAML a strict parser reads', () => {
   const held = files().filter((file) => file.endsWith('.md') && HELD.some((dir) => file.startsWith(dir)));
   const framed = held.filter((file) => blockOf(fs.readFileSync(path.join(REPO, file), 'utf8')) !== null);
   assert.ok(framed.length > 15, `the scan reads the repository's frontmatter, or it would pass by reading nothing: ${framed.length}`);

@@ -26,7 +26,7 @@
  * (`tools/guards/test/ci-workflow.test.ts`, `tools/guards/test/ci-scan.boundary.test.ts`), and `tools/guards/test/repo-guards.test.ts`
  * reads `CODEOWNERS`, under `.github/`, and the packages' manifests. The citation guard reads every `CLAUDE.md` and every test file, the
  * apps' among them (`claude-md-cites.test.ts`); the licence guard every workspace's manifest (`license.test.ts`); the team's
- * guards and the git reads' guard `.claude/settings.json` and the skills (`team-words.test.ts`, `team-portable.test.ts`,
+ * guards and the git reads' guard `.claude/settings.json`, the repository's skills and sdlc's role skills (`team-words.test.ts`,
  * `git-reads.test.ts`), the five layers' guard the docs site's pages and the agents' glossary table (`agent-layers-doc.test.ts`), and the
  * glossary guard every context's table and the apps' source (`glossary.test.ts`); the orchestrator's own files, and the runtime's through
  * it, reach this task through its dependency on `agent-orchestrator`. The same list is what `tools/guards/due.ts` reads to say whether CI
@@ -115,6 +115,7 @@ const INPUTS: Record<string, readonly string[]> = {
     ...CLAUDE_FILES,
     '$TURBO_ROOT$/.claude/settings.json',
     '$TURBO_ROOT$/.claude/skills/**',
+    '$TURBO_ROOT$/packages/templates/sdlc/skills/**',
   ],
   'agent-runtime#test': [
     '$TURBO_DEFAULT$',

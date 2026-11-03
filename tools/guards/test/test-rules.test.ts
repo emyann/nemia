@@ -1,8 +1,8 @@
 /**
  * The two rules about how a test is written that a machine can check, so that neither is prose (root `CLAUDE.md`, *Rules the code
  * keeps*: "**Prose is not a constraint.** If the packages need an agent to do something, the machinery refuses the alternative").
- * Both are stated for the engineer in `.claude/skills/implement-a-change/SKILL.md`, step 2, and looked for by the reviewer in
- * `.claude/skills/review-a-change/SKILL.md`, step 5; here they are held.
+ * Both are stated for the engineer in `packages/templates/sdlc/skills/implement-a-change/SKILL.md`, step 2, and looked for by the
+ * reviewer in `packages/templates/sdlc/skills/review-a-change/SKILL.md`, step 5; here they are held.
  *
  * - **A refusal's words are nobody's to check** — root `CLAUDE.md` says it already: "what a refusal is thrown as and the exit code it
  *   carries are refused when they are wrong, its words are nobody's to check". `pinnedWords` finds an assertion over what the code
@@ -442,7 +442,7 @@ test('no test of the repository pins a sentence of what the code said but those 
     owingOf(
       held,
       PINNED_WORDS,
-      'assert the fact, its kind and the exit code, never the sentence (`.claude/skills/implement-a-change/SKILL.md`, step 2)',
+      'assert the fact, its kind and the exit code, never the sentence (`packages/templates/sdlc/skills/implement-a-change/SKILL.md`, step 2)',
     ),
     [],
   );
@@ -455,7 +455,7 @@ test('no test of the repository floors a measured duration at a bound the shippe
     owingOf(
       sweep(files, waitedOut),
       WAITED_OUT,
-      'shorten the bound at the seam the code gives for it and measure the floor there (`.claude/skills/implement-a-change/SKILL.md`, step 2)',
+      'shorten the bound at the seam the code gives for it and measure the floor there (`packages/templates/sdlc/skills/implement-a-change/SKILL.md`, step 2)',
     ),
     [],
   );

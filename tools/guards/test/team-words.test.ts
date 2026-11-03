@@ -18,9 +18,9 @@ const REPOSITORY_WORDS = /agent-runtime|agent-orchestrator|apps\/api|runtime-cli
 
 /** Each file of the mechanism, by path from the repository's root, with a name it must hold, and whether its body alone is read. */
 const MECHANISM: Array<{ file: string; holds: string; body: boolean }> = [
-  { file: '.claude/skills/write-a-spec/SKILL.md', holds: '# Write a spec', body: true },
-  { file: '.claude/skills/review-a-change/SKILL.md', holds: '# Review a change', body: true },
-  { file: '.claude/skills/implement-a-change/SKILL.md', holds: '# Implement a change', body: true },
+  { file: 'packages/templates/sdlc/skills/write-a-spec/SKILL.md', holds: '# Write a spec', body: true },
+  { file: 'packages/templates/sdlc/skills/review-a-change/SKILL.md', holds: '# Review a change', body: true },
+  { file: 'packages/templates/sdlc/skills/implement-a-change/SKILL.md', holds: '# Implement a change', body: true },
   { file: 'packages/agent-orchestrator/skills/create-an-agent/SKILL.md', holds: '# Create an agent in Nemia', body: true },
 ];
 

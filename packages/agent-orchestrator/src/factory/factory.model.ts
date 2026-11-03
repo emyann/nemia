@@ -26,7 +26,8 @@ const Schedule = Schema.Struct({
 
 /**
  * The template a factory was applied from (`nemia factory apply`), as its file records it under `template`: the template's source, the
- * version its file wants, and the parameters given with `--set`. Its source is read by name alone (Q22), as the file wrote it.
+ * version its file wants, and the parameters given with `--set`. Its source is read by name alone (Q22), as the file wrote it: a
+ * template's whole path, or the name of a builtin template, which `templatePlace` resolves to its folder on each read.
  */
 export const AppliedTemplate = Schema.Struct({
   source: TemplateSource.OnRead,

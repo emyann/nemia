@@ -266,3 +266,36 @@ test('what nemia factory adopt refuses, each with nothing written', async (t) =>
     );
   });
 });
+
+const { Effect } = await import('effect');
+const { FACTORY_PLAN } = await import('../upgrade/upgrade.verb.ts');
+const { FACTORY_ADOPT } = await import('./adopt.verb.ts');
+const { withBuiltins } = await import('../../test/templated.ts');
+
+test('--template names a builtin template by its name: the takeover records the name, and a name no builtin has is refused', async (t) => {
+  const { repo, dir } = repoAndTemplate();
+  const builtins = scratch('wf-adopt-builtins-');
+  fs.cpSync(dir, path.join(builtins, 'team'), { recursive: true });
+  await madeByHand(t, 'named', repo);
+  const handled = <D extends object>(command: { handler: (...a: never[]) => unknown }, args: Record<string, unknown>) =>
+    Effect.runPromise(withBuiltins((command.handler as Function)(args, undefined, ROOT), builtins)) as Promise<D>;
+
+  await t.test('REFUSED Missing, nothing written: a preview and a takeover by a name no builtin template has', async () => {
+    const before = bytesUnder(ROOT);
+    await assert.rejects(handled(FACTORY_PLAN, { factory: 'named', template: 'nope' }), refusedWith('Missing', /\bteam\b/, /\.\/nope/));
+    await assert.rejects(
+      handled(FACTORY_ADOPT, { factory: 'named', template: 'nope', plan: 'sha256:0' }),
+      refusedWith('Missing', /\bteam\b/, /\.\/nope/),
+    );
+    assert.deepEqual(bytesUnder(ROOT), before);
+  });
+
+  await t.test("a factory taken over by --template <name> records the name, and the controller's pass finds it applied", async () => {
+    const preview = await handled<{ digest: string; line: string }>(FACTORY_PLAN, { factory: 'named', template: 'team' });
+    assert.ok(preview.line.includes('--template team '), preview.line);
+    await handled(FACTORY_ADOPT, { factory: 'named', template: 'team', plan: preview.digest });
+    assert.equal((fileOf('named').template as { source: string }).source, 'team');
+    const status = programsAt(ROOT, builtins).reconciled(readFactory('named') as Parameters<typeof reconciled>[0]);
+    assert.equal(status.conditions[0]?.reason, 'Rendered');
+  });
+});

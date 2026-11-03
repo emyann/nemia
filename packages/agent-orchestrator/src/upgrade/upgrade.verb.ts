@@ -15,6 +15,8 @@ import { readFactory } from '../factory/factory.store.ts';
 import { FactoryName } from '../factory/factory.model.ts';
 import { FactoryDoor } from '../factories/factories.store.ts';
 import { rooted } from '../wiring/wire.verb.ts';
+import { templatePlace } from '../templates/templates.store.ts';
+import { sourceGiven } from '../templates/templates.ts';
 import { Effect } from 'effect';
 import type { Factory, FactoryTemplate } from '../factory/factory.ts';
 import { renderedAt, renderedOrNot, setsOf, type RenderedAt } from '../applied/applied.verb.ts';
@@ -64,7 +66,7 @@ function rendered(name: string, verb: string, notDone: string): { factory: Templ
   const factory = readFactory(name, notDone);
   if (factory.template === undefined)
     throw new Invalid({
-      message: `${verb}: ${name} is not made from a template, so it has none to upgrade; to put one onto it in place, nemia factory diff ${name} --template <folder|archive> previews the takeover, then nemia factory adopt. ${notDone}`,
+      message: `${verb}: ${name} is not made from a template, so it has none to upgrade; to put one onto it in place, nemia factory diff ${name} --template <name|folder|archive> previews the takeover, then nemia factory adopt. ${notDone}`,
     });
   const base = entriesIn(appliedDir(name));
   if (!base.length)
@@ -83,7 +85,7 @@ const renderTo = Effect.fn('renderTo')(function* (verb: string, factory: Templat
   if (read.version !== undefined && read.version !== to)
     return yield* Effect.fail(
       new Conflict({
-        message: `${verb}: ${source} is at version ${read.version}, not ${to}: put the template at ${to}, or name a folder or archive at ${to} with --template <folder|archive>. ${notDone}`,
+        message: `${verb}: ${source} is at version ${read.version}, not ${to}: put the template at ${to}, or name a template, folder or archive at ${to} with --template <name|folder|archive>. ${notDone}`,
       }),
     );
   if ('problems' in read)
@@ -97,7 +99,8 @@ const renderTo = Effect.fn('renderTo')(function* (verb: string, factory: Templat
 
 /**
  * The upgrade of the factory `args` name to `--to`, as `verb` asks it, refused in order before anything is written: the factory, one made
- * from no template (`Invalid`) and one not rendered (`Conflict`); a `--to` that is no `x.y.z` (`Invalid`); a template at another version
+ * from no template (`Invalid`) and one not rendered (`Conflict`); a `--to` that is no `x.y.z` (`Invalid`); a `--template` naming no
+ * builtin template (`Missing`, `templatePlace`); a template at another version
  * than `--to` (`Conflict`, naming `--template`); the version its base holds asked again, the same content or another (`Conflict`); a
  * downgrade without `--downgrade` where `downgrades` (`Conflict`); and a template that does not render (`Invalid`). Where no status
  * names the version its base holds, any `--to` is taken: the controller checks it against the base.
@@ -112,7 +115,8 @@ const upgradeAsked = Effect.fn('upgradeAsked')(function* (args: Args, verb: stri
       }),
     );
   const given = textOf(args, 'template');
-  const source = given === undefined ? factory.template.source : path.resolve(given);
+  const source = given === undefined ? factory.template.source : sourceGiven(given);
+  if (given !== undefined) yield* templatePlace(source);
   const render = yield* renderTo(verb, factory, source, to, notDone);
   return yield* tried(() => upgradeChecked({ factory, from, to, source, render, base }, verb, notDone, downgrades, args));
 });
@@ -150,7 +154,8 @@ const FROM_TEMPLATE: Flag = {
   flag: '--template',
   kind: 'text',
   key: 'template',
-  takes: "--template takes the template's folder, the one that holds its nemia.yaml, or an archive nemia template pack wrote",
+  takes:
+    "--template takes the name of a builtin template, a template's folder, the one that holds its nemia.yaml, or an archive nemia template pack wrote",
   twice: 'take --template once: a factory is made from one template.',
 };
 
@@ -170,10 +175,10 @@ const PLAN_SPEC: Spec = {
   ],
   unknown: (arg) =>
     arg.startsWith('-')
-      ? `nemia factory diff does not take ${arg}. It takes the factory, --to <x.y.z>, --template <folder|archive> and, to preview a takeover, --set <key>=<value> once per parameter.`
+      ? `nemia factory diff does not take ${arg}. It takes the factory, --to <x.y.z>, --template <name|folder|archive> and, to preview a takeover, --set <key>=<value> once per parameter.`
       : `nemia factory diff previews one factory, and ${arg} is a second: nemia factory diff <name> --to <x.y.z>.`,
   missing:
-    'nemia factory diff takes the factory to preview: nemia factory diff <name> --to <x.y.z> [--template <folder|archive>], or, made by hand, nemia factory diff <name> --template <folder|archive> [--set <key>=<value> ...].',
+    'nemia factory diff takes the factory to preview: nemia factory diff <name> --to <x.y.z> [--template <name|folder|archive>], or, made by hand, nemia factory diff <name> --template <name|folder|archive> [--set <key>=<value> ...].',
 };
 
 /** What `nemia factory diff` previews of a templated factory: the factory, the versions, and the merge. */
@@ -186,7 +191,7 @@ type Planned = { kind: 'upgrade'; name: string; from: string | undefined; to: st
  */
 export const FACTORY_PLAN: Command<Planned | AdoptPreview> = {
   name: 'factory diff',
-  usage: '<name> --to <x.y.z> [--template <folder|archive>] | <name> --template <folder|archive> [--set <key>=<value> ...]',
+  usage: '<name> --to <x.y.z> [--template <name|folder|archive>] | <name> --template <name|folder|archive> [--set <key>=<value> ...]',
   help: [
     "preview a templated factory's upgrade: what merges cleanly, and each",
     "conflict with its sides; or a hand-made factory's takeover by a",
@@ -230,9 +235,10 @@ const UPGRADE_SPEC: Spec = {
   flags: [TO, FROM_TEMPLATE, { flag: '--downgrade', kind: 'switch', key: 'downgrade' }],
   unknown: (arg) =>
     arg.startsWith('-')
-      ? `nemia factory upgrade does not take ${arg}. It takes the factory, --to <x.y.z>, --template <folder|archive> and --downgrade.`
+      ? `nemia factory upgrade does not take ${arg}. It takes the factory, --to <x.y.z>, --template <name|folder|archive> and --downgrade.`
       : `nemia factory upgrade upgrades one factory, and ${arg} is a second: nemia factory upgrade <name> --to <x.y.z>.`,
-  missing: 'nemia factory upgrade takes the factory to upgrade: nemia factory upgrade <name> --to <x.y.z> [--template <folder|archive>].',
+  missing:
+    'nemia factory upgrade takes the factory to upgrade: nemia factory upgrade <name> --to <x.y.z> [--template <name|folder|archive>].',
 };
 
 /** What `nemia factory upgrade` filed: the factory, the versions, its file, and the conflicts the merge waits on. */
@@ -241,7 +247,7 @@ type Upgraded = { name: string; from: string | undefined; to: string; file: stri
 /** `nemia factory upgrade`: the version wanted written into the factory's file; the daemon merges it. */
 export const FACTORY_UPGRADE: Command<Upgraded> = {
   name: 'factory upgrade',
-  usage: '<name> --to <x.y.z> [--template <folder|archive>] [--downgrade]',
+  usage: '<name> --to <x.y.z> [--template <name|folder|archive>] [--downgrade]',
   help: [
     'upgrade a templated factory: its file wants --to, and the daemon merges',
     "the template's change into its tree once each conflict is resolved",
@@ -264,7 +270,7 @@ export const FACTORY_UPGRADE: Command<Upgraded> = {
         const door = yield* FactoryDoor;
         const now = yield* door.factories.read(FactoryName.read(factory.name));
         const template = now.template ?? factory.template;
-        const source = given === undefined ? template.source : path.resolve(given);
+        const source = given === undefined ? template.source : sourceGiven(given);
         const file = yield* door.factories.rewrite({ ...now, template: { ...template, version: to, source } });
         return { name: factory.name, from, to, file, conflicts };
       }),
@@ -331,7 +337,7 @@ const resolved = Effect.fn('resolved')(function* (args: Args) {
   if (from === undefined)
     return yield* Effect.fail(
       new Conflict({
-        message: `${verb}: no status names the version ${factory.name}'s base was applied at, so no upgrade of it can be merged: name it, nemia factory upgrade ${factory.name} --to <it> [--template <folder|archive>], and upgrade again once nemia factory ls shows it applied. ${notDone}`,
+        message: `${verb}: no status names the version ${factory.name}'s base was applied at, so no upgrade of it can be merged: name it, nemia factory upgrade ${factory.name} --to <it> [--template <name|folder|archive>], and upgrade again once nemia factory ls shows it applied. ${notDone}`,
       }),
     );
   if (to === from)

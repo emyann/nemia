@@ -105,7 +105,7 @@ A factory made from a template is upgraded when its template has a new version. 
 conflict it raises: their tree and the template both changed the same part.
 
 When they ask for one, or the template has moved past the version the factory was applied at, preview it first with
-`nemia factory diff <factory> --to <version>` (`--template <folder|archive>` where the new version is elsewhere). It writes nothing.
+`nemia factory diff <factory> --to <version>` (`--template <name|folder|archive>` where the new version is elsewhere; a factory applied from a builtin template, by its name, reads it where that Nemia keeps it and needs none). It writes nothing.
 
 Bring it:
 
@@ -126,7 +126,7 @@ keep their own folders. After each resolve, say what it answered: the conflicts 
 A factory made by hand can be taken over by a template, in place: its name, repositories, schedules, instruction, cards, runs and stats
 stay, and its workflows, hires and revisions policy become the template's. The takeover is the person's.
 
-When they ask for one, preview it first with `nemia factory diff <factory> --template <folder|archive>` (`--set <key>=<value>` once per
+When they ask for one, preview it first with `nemia factory diff <factory> --template <name|folder|archive>` (`--set <key>=<value>` once per
 parameter the template takes). It writes nothing, and prints the plan and its digest.
 
 Bring it:
@@ -141,7 +141,7 @@ Bring it:
   refused while one is: start the card or change its `workflow:` line, or `nemia factory unschedule <factory> <workflow>`, then preview
   again.
 - **Recommendation**: one, with its reason in a sentence: take it over with the line the plan printed, `nemia factory adopt <factory>
-  --template <folder|archive> [--set …] --plan <digest>`, which prompts them. A plan that changed since the preview is refused: preview
+  --template <name|folder|archive> [--set …] --plan <digest>`, which prompts them. A plan that changed since the preview is refused: preview
   again and bring the new one.
 
 After it, say what it answered: the factory taken over and the tree it runs from; the daemon writes its status on its next pass.

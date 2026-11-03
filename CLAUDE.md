@@ -59,8 +59,6 @@ holds what every change needs.
   outside a run, type `npx turbo run test --force --continue` after touching one. The tests that read files of every package —
   `tools/guards`' `claude-md-cites.test.ts` over every `CLAUDE.md` and `test-rules.test.ts` over every test file, and
   `agent-orchestrator`'s `comments.test.ts` — are re-run the same way after a test, a doc or a name moves anywhere.
-- A run's check leaves what its tests cost in `WF_ARTIFACTS`, a `test-costs-<package>-<stamp>.json` per package and try; `node
-  tools/test-costs/report.ts <dir>...` ranks them. A package's peak is its largest process, not the sum of the files running at once.
 - A change to tests alone shows that no source file's coverage dropped: `node tools/coverage/record.ts <package-dir> --out
   before.json` before it and `after.json` after, then `node tools/coverage/compare.ts before.json after.json`, which exits 1 naming
   each file whose hit lines or branches fell; records on each side of a `--` say apart, as varying, a line they disagree on. A session's measure, never run by the suite or CI: it runs the package's whole suite.
@@ -204,12 +202,8 @@ What the `create-an-agent` skill, being generic, does not say here:
 - `tools/guards/` — the repository's own guards, never shipped: the tests that hold its CI, docs, workflows and test infrastructure
   rather than a layer's code, a workspace of their own (`guards`) whose `ci` job runs them only when `tools/guards/due.ts` says a push
   touched what they read (`tools/guards/CLAUDE.md`). A config guard that imports the orchestrator past its three entries stays in it.
-- `tools/test-costs/` — the repository's test-cost recorder, on every package's `test` script: a probe in each test file's process, a
-  reporter beside spec, and `report.ts`; held by `tools/guards/test/test-costs.test.ts` and `suite.test.ts`.
 - `tools/coverage/` — a package's line and branch coverage per source file (`record.ts`) and the comparison of two records
   (`compare.ts`), a session's measure; held by `tools/guards/test/coverage.test.ts` and its boundary.
-- `tools/journal-bytes/` — what a copy of a runtime store's journals cost, by event kind, the share that is a copy, and the heap a
-  full read holds, before and after a refile through bodies (`node --expose-gc tools/journal-bytes/report.ts <root> [--refile <dir>]`).
 - `tools/store-measure/` — what the store's reads cost, cold and warm: a tick pass, the run list, the stats, a run's page and the feed from
   a cursor, on a copy of both stores in a temp folder with the run count beside them, never the live store
   (`node --expose-gc tools/store-measure/report.ts [--repeat N] [--json <file>] [--compare <baseline.json>]`); the baseline before the

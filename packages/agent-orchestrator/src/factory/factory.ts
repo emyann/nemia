@@ -616,7 +616,7 @@ export const unscheduledRefusal = (factory: string, workflow: string, scheduled:
 
 /** Why a factory `name` is not filed: there is one already, at `file`, left as it was. */
 export const takenFactoryRefusal = (name: string, file: string): string =>
-  `There is a factory ${name} already, at ${file}, and it was left as it was. See it with nemia factory ls; to name other repositories, nemia factory rm ${name}, then add it again; to put a template onto it in place, keeping its cards and runs, nemia factory diff ${name} --template <folder|archive>, then nemia factory adopt.`;
+  `There is a factory ${name} already, at ${file}, and it was left as it was. See it with nemia factory ls; to name other repositories, nemia factory rm ${name}, then add it again; to put a template onto it in place, keeping its cards and runs, nemia factory diff ${name} --template <name|folder|archive>, then nemia factory adopt.`;
 
 /** Why the wiring of a templated factory `name` is not written: its tree, at `tree`, is not rendered yet; then what was not done. */
 export const unrenderedTreeRefusal = (name: string, tree: string, notDone: string): string =>

@@ -30,7 +30,7 @@ its root. A page holds landed material only; a term designed and not built sits 
 - `node --test test/<file>.test.ts` from here runs one test file. **No test builds the real site**: `npm run build` runs `astro build`
   and then `built.ts` over `dist/`, which is where the pages and the one home of each code-drawn machine are asserted.
   `test/build.test.ts` builds this site's own configuration pointed at scratch pages with a broken link (`srcDir`) and nothing else;
-  that build is a child process near 1.2 GB that test-costs does not count, since it measures the test's own process. That is the
+  that build is a child process near 1.2 GB, apart from the test's own process. That is the
   toolchain's native floor, not the site's: search off, the mermaid plugin off or a heap cap leaves it over 1 GB, and the links
   validator has no entry to call outside a build.
 - That build writes this folder's `.astro/`, ignored: a test build and a `npm run dev` at once overwrite each other's types. A test

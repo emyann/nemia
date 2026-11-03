@@ -16,7 +16,7 @@ import { asNamed, autoDropped, modeOf, parseAgent, parseWorkflow, WorkflowError,
 import { FrozenStepSchema } from '../src/folder/folder.store.ts';
 import { loadWorkflows } from '../src/workflows/workflows.store.ts';
 import { agentsFor, agentVersion } from '../src/agents/read.store.ts';
-import { PLACE_SKILLS, isBuiltinPlace, lookupRoots, skillsFor } from '../src/skills/read.store.ts';
+import { BUILTIN_SKILLS, PLACE_SKILLS, isBuiltinPlace, isBuiltinSkill, lookupRoots, skillsFor } from '../src/skills/read.store.ts';
 import { BUILTIN_PLACE } from '../src/place/builtin.store.ts';
 import {
   briefBody,
@@ -690,12 +690,28 @@ test("where a skill or an agent is found: the workflow's own root, the repositor
         const repo = tree({});
         const found = skillsFor(team('---\nskills: git\n---\nYou build.\n', {}), { repo, home });
         assert.equal(found.at.get('git'), BUILTIN_PLACE);
-        assert.equal(found.looked.at(-1), PLACE_SKILLS);
+        assert.equal(found.looked.at(-2), PLACE_SKILLS);
         assert.ok(isBuiltinPlace(BUILTIN_PLACE));
         const own = team('---\nskills: git\n---\nYou build.\n', { 'workflows/skills/git/SKILL.md': SKILL('git') });
         const ownGit = path.join(path.dirname(own), 'skills', 'git');
         assert.equal(skillsFor(own, { repo, home }).at.get('git'), ownGit);
         assert.equal(isBuiltinPlace(ownGit), false);
+      },
+    ],
+    [
+      "a builtin skill of Nemia after every place and the place's skills, where none has its name: a place's own comes first",
+      () => {
+        const home = tree({});
+        const repo = tree({});
+        const found = skillsFor(team('---\nskills: grilling\n---\nYou build.\n', {}), { repo, home });
+        assert.equal(found.at.get('grilling'), path.join(BUILTIN_SKILLS, 'grilling'));
+        assert.equal(found.looked.at(-1), BUILTIN_SKILLS);
+        assert.equal(found.looked.at(-2), PLACE_SKILLS);
+        assert.ok(isBuiltinSkill(path.join(BUILTIN_SKILLS, 'grilling')));
+        const own = team('---\nskills: grilling\n---\nYou build.\n', { 'workflows/skills/grilling/SKILL.md': SKILL('grilling') });
+        const ownGrilling = path.join(path.dirname(own), 'skills', 'grilling');
+        assert.equal(skillsFor(own, { repo, home }).at.get('grilling'), ownGrilling);
+        assert.equal(isBuiltinSkill(ownGrilling), false);
       },
     ],
     [

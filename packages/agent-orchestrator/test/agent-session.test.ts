@@ -25,7 +25,7 @@ const { readRun } = await import('../src/record/record.store.ts');
 const { agentFilesDir } = await import('../src/agents/agents.store.ts');
 const { loadWorkflows } = await import('../src/workflows/workflows.store.ts');
 const { noCodingStyle, pluginOf } = await import('../src/agents/agents.ts');
-const { PLACE_SKILLS } = await import('../src/skills/read.store.ts');
+const { BUILTIN_SKILLS, PLACE_SKILLS } = await import('../src/skills/read.store.ts');
 const { PRECEDENCE } = await import('../src/brief/index.ts');
 const { headedLayers } = await import('../src/workflow/index.ts');
 const { WorkflowError } = await import('../src/workflow.ts');
@@ -257,7 +257,7 @@ test('a step whose rendered folder is gone is told its layers and its skills who
         /Write about tides\.\n\nNo skill is loaded with the Skill tool for this step[^\n]*\n\n## Skill `write-a-note`\n\nHow to write a note\./,
       );
       assert.ok(
-        write.brief.includes(`/workflows/skills, ${PLACE_SKILLS}. Sign off blocked if you need it.\n\n## What was asked for`),
+        write.brief.includes(`/workflows/skills, ${PLACE_SKILLS}, ${BUILTIN_SKILLS}. Sign off blocked if you need it.\n\n## What was asked for`),
         write.brief,
       );
       assert.match(

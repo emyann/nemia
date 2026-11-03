@@ -66,19 +66,22 @@ export function entriesOf(dir: string): string[] {
 export const PLACE_SKILLS = path.join(import.meta.dirname, '..', '..', 'place');
 
 /**
- * The folder of Nemia's builtin skills, built into the package (`skills/`), which the board offers to copy into a person's library:
- * none while the package has no such folder, which reads as no skill (`skillFolders`), never as a refusal.
+ * The folder of Nemia's builtin skills, built into the package (`skills/`): each found by name, last, by a step whose agent gives it
+ * and no root nor the place has its name (`skillsFor`), and offered on the board to copy into a person's library to change it.
  */
 export const BUILTIN_SKILLS = path.join(import.meta.dirname, '..', '..', SKILLS_FOLDER);
 
 /** Whether the skill folder `dir` is a builtin place skill of the package (`PLACE_SKILLS`). */
 export const isBuiltinPlace = (dir: string): boolean => path.dirname(path.resolve(dir)) === path.resolve(PLACE_SKILLS);
 
+/** Whether the skill folder `dir` is one of Nemia's builtin skills (`BUILTIN_SKILLS`). */
+export const isBuiltinSkill = (dir: string): boolean => path.dirname(path.resolve(dir)) === path.resolve(BUILTIN_SKILLS);
+
 /** Whether `dir` holds a skill: a `SKILL.md` that is a file. */
 const holdsSkill = (dir: string): boolean => fs.statSync(path.join(dir, 'SKILL.md'), { throwIfNoEntry: false })?.isFile() === true;
 
-/** The names of the package's builtin place skills: each folder of `PLACE_SKILLS` that holds a skill. */
-const placeSkills = (): string[] => entriesOf(PLACE_SKILLS).filter((name) => holdsSkill(path.join(PLACE_SKILLS, name)));
+/** The names of the skills of the package's folder `dir`: each folder of it that holds a skill. */
+const packageSkills = (dir: string): string[] => entriesOf(dir).filter((name) => holdsSkill(path.join(dir, name)));
 
 /** Whether the folders `a` and `b` are one folder by real path; false where either cannot be reached. */
 export function oneFolder(a: string, b: string): boolean {
@@ -90,7 +93,8 @@ export function oneFolder(a: string, b: string): boolean {
 }
 
 /**
- * The skills of the roots `roots`, by bare name, each the folder it is or its refusal, a builtin place skill found last. One folder under
+ * The skills of the roots `roots`, by bare name, each the folder it is or its refusal, the package's skills found last
+ * (`packageSkillFolders`). One folder under
  * both of a repository's places, the one a link to the other, is one skill, given from the first.
  */
 function rootSkills(roots: readonly string[]): Map<string, string | WorkflowError> {
@@ -114,21 +118,30 @@ function rootSkills(roots: readonly string[]): Map<string, string | WorkflowErro
         : (skillLinkRefusal(at) ?? rulesRefusal(at) ?? at),
     );
   }
-  for (const [name, at] of placeSkillFolders()) if (!found.has(name)) found.set(name, at);
+  for (const [name, at] of packageSkillFolders()) if (!found.has(name)) found.set(name, at);
   return found;
 }
 
-/**
- * The package's builtin place skills (`PLACE_SKILLS`), by name in order, each its folder or the refusal of a link in it: what a lookup
- * finds last, where no root has the name, on the files and in the Skill door's memory stand-in alike.
- */
-export const placeSkillFolders = (): Array<[string, string | WorkflowError]> =>
-  placeSkills()
+/** The skills of the package's folder `dir`, by name in order, each its folder or the refusal of a link in it. */
+function skillFoldersOf(dir: string): Array<[string, string | WorkflowError]> {
+  return packageSkills(dir)
     .sort()
     .map((name) => {
-      const at = path.join(PLACE_SKILLS, name);
+      const at = path.join(dir, name);
       return [name, skillLinkRefusal(at) ?? at];
     });
+}
+
+/**
+ * The skills Nemia holds itself, found last where no root has the name: the place's (`PLACE_SKILLS`), then its builtin skills
+ * (`BUILTIN_SKILLS`) whose name the place has not, each its folder or the refusal of a link in it: on the files and in the Skill door's
+ * memory stand-in alike. The two share no name (`read.store.test.ts` holds them apart), so which comes first never decides.
+ */
+export function packageSkillFolders(): Array<[string, string | WorkflowError]> {
+  const place = skillFoldersOf(PLACE_SKILLS);
+  const named = new Set(place.map(([name]) => name));
+  return [...place, ...skillFoldersOf(BUILTIN_SKILLS).filter(([name]) => !named.has(name))];
+}
 
 /** The real path of `at`, or nothing where it cannot be reached. */
 function realOf(at: string): string | undefined {
@@ -175,15 +188,15 @@ function folderSkill(written: string, given: Required<GivenSkill>, repo: string 
  * Every skill a workflow's agents may give. `all` is each name of the folders looked in (`lookupRoots`): the folder it is —
  * `<root>/skills/<name>`, holding a `SKILL.md` — or its refusal: a link in it that is not followed (`skillLinkRefusal`), rules that do
  * not read, or a name one repository has in both `workflows/skills/` and `.claude/skills/` as two folders. One folder under both, the
- * one a link to the other, is one skill, given from the first. The first root that has a name wins, and a builtin place skill
- * (`PLACE_SKILLS`) is found last, where no root has its name. `at` answers a bare name from `all`, and a skill named with its folder
+ * one a link to the other, is one skill, given from the first. The first root that has a name wins, and Nemia's own skills are found
+ * last, where no root has the name: the place's (`PLACE_SKILLS`), then the builtin skills (`BUILTIN_SKILLS`). `at` answers a bare name from `all`, and a skill named with its folder
  * (`givenSkillOf`) from that folder of the repository `places.repo` alone (`folderSkill`), read when it is first asked and never by a
- * walk: a bare name is never a nested folder's. The roots and the package's place folder are named for the refusal of a name none has
+ * walk: a bare name is never a nested folder's. The roots and the package's two folders are named for the refusal of a name none has
  * (`skillAt`).
  */
 export function skillsFor(workflowDir: string, places: Places = {}): SkillsFound {
   const roots = lookupRoots(workflowDir, places);
-  const looked = [...roots.map((root) => path.join(root, SKILLS_FOLDER)), PLACE_SKILLS];
+  const looked = [...roots.map((root) => path.join(root, SKILLS_FOLDER)), PLACE_SKILLS, BUILTIN_SKILLS];
   const all = rootSkills(roots);
   const nested = new Map<string, string | WorkflowError>();
   const get = (name: string): string | WorkflowError | undefined => {

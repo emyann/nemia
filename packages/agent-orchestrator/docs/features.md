@@ -5928,10 +5928,11 @@ the stream its read — is a later intent's.
 ## Shipped: a run's change is a pull request (2026-10-19/20)
 
 The intent `a-run-s-change-is-a-pull-req-t452`, 25 decisions signed by the owner on 2026-10-19, in two build cards. Card 1, *the pull
-request opens*: implement pushes its own branch and opens or updates the one pull request of it through `workflows/build/pull-request.ts`,
-read out of the run's base, and its round check pushes again and waits on the `ci` context of that head. Card 2, *the landing merges it*:
+request opens*: implement pushes its own branch and opens or updates the one pull request of it through `workflows/build/pull-request.ts`
+(now `packages/templates/sdlc/workflows/build/pull-request.ts`), read out of the run's base, and its round check pushes again and waits on the `ci` context of that head. Card 2, *the landing merges it*:
 the land step merges that pull request on GitHub with `--merge --match-head-commit <sha>` at the head the review read and fast-forwards
-`main` in the owner's checkout, through `workflows/build/landing.ts`, and its `check:` is the receipt alone. Neither card touched
+`main` in the owner's checkout, through `workflows/build/landing.ts` (now
+`packages/templates/sdlc/workflows/build/landing.ts`), and its `check:` is the receipt alone. Neither card touched
 `landingDue` nor the git place: `onHead` already records a landing whose result is on HEAD with nothing staged, which is exactly what the
 fast-forward leaves.
 

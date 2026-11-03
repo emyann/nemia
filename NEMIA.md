@@ -1,7 +1,7 @@
 # The nemia factory — what Nemia is to know of it
 
 This repository is Nemia's own: the factory `nemia` builds it. Its contributor rules are `CLAUDE.md` and `docs/architecture.md`; the
-team that works it is in `workflows/agents/`. What follows is for the operator of its runs.
+team that works it is the `sdlc` template's, `packages/templates/sdlc/agents/`, with the factory's own overlays in its tree. What follows is for the operator of its runs.
 
 ## Starting work
 
@@ -9,7 +9,7 @@ team that works it is in `workflows/agents/`. What follows is for the operator o
 - An idea that changes the model or needs more than one card goes to `intake` first (Iris interviews the person), and its build is
   started `--after` the intake run: `nemia start "<brief>" --workflows build --factory nemia --after <intake run>`.
 - A change its card settles, needing no design whatever its size, goes to `quick` (`--workflows quick`, or `workflow: quick` on its card): implement, then a review,
-  then a landing nobody is asked to approve — Agora's pass files it. `workflows/quick/README.md` says what goes through it; a card that
+  then a landing nobody is asked to approve — Agora's pass files it. `packages/templates/sdlc/workflows/quick/README.md` says what goes through it; a card that
   leaves a decision open goes straight to `build`.
 - A quick run is read by Agora, not by the person: there is nothing to bring you for its landing, and `nemia approve` is refused
   there (*What waits on the person*, below, says what is still yours on such a run, and how to ask to read one yourself).
@@ -84,7 +84,7 @@ a run that passes it is the person's to continue.
 
 ## Never
 
-- Push, open a pull request or merge into `main` by hand: a run opens its pull request through `workflows/build/pull-request.ts` and
-  merges it through `workflows/build/landing.ts`, at its ending step — after the person approves it, or, on `quick`, once its review
+- Push, open a pull request or merge into `main` by hand: a run opens its pull request through `packages/templates/sdlc/workflows/build/pull-request.ts`
+  and merges it through `packages/templates/sdlc/workflows/build/landing.ts`, at its ending step — after the person approves it, or, on `quick`, once its review
   passes.
 - Stop a process by its name: a run is cancelled with `nemia cancel`, held with `nemia hold`.

@@ -3,7 +3,26 @@ kind: FactoryTemplate
 metadata:
   name: sdlc
 spec:
-  version: 0.1.0
+  version: 1.0.0
+  rules:
+    path: RULES.md
+  parameters:
+    ciCheck:
+      type: string
+      description: The CI status context branch protection requires of the base branch, which the implement step's check waits on and the landing merges on.
+      default: ci
+    roundCheck:
+      type: string
+      description: The command the implement step's check runs on each round's tree before it waits on CI, from the workspace's root.
+      default: npm run --if-present lint && npm run --if-present typecheck
+    areas:
+      type: string
+      description: The areas a card's title and its area= label name, in the words RULES.md writes them in.
+      default: the top-level folders of the repository
+    storeRoot:
+      type: string
+      description: The Nemia store whose factories, workflows and inbox every agent's fence refuses to edit or write.
+      default: ~/.agent-workflows
   hires:
     build/design: seldon
     build/implement: grace

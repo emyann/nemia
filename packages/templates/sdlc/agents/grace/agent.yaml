@@ -61,3 +61,9 @@ spec:
         - mcp__github__actions_run_trigger
         - mcp__github__assign_copilot_to_issue
         - mcp__github__request_copilot_review
+        - Edit(${{ parameters.storeRoot }}/factories/**)
+        - Edit(${{ parameters.storeRoot }}/workflows/**)
+        - Edit(${{ parameters.storeRoot }}/inbox/**)
+        - Write(${{ parameters.storeRoot }}/factories/**)
+        - Write(${{ parameters.storeRoot }}/workflows/**)
+        - Write(${{ parameters.storeRoot }}/inbox/**)

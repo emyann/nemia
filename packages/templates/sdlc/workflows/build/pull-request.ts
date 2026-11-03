@@ -1,22 +1,23 @@
 /**
  * `node pull-request.ts <verb>` — the one door through which a run's change reaches GitHub: the push of this run's own branch, and the
  * pull request CI judges. A Bash prefix rule cannot tell `git push origin wf/…` from `git push origin main`, and no agent may type
- * either, so the act is this script, read from the run's base as `pictures.ts` and `probe.ts` are, and `gh` is denied whole to the
- * agents that run it.
+ * either, so the act is this script, read from the run's frozen workflow files (`$WF_WORKFLOW_FILES`) as `probe.ts` is, and `gh` is
+ * denied whole to the agents that run it.
  *
  * - `open --title <t> --body-file <f>`, which the engineer types once a round after merging the base: it pushes her branch to `origin`
  *   and opens the pull request with the title and body she wrote, or updates the one that is open, never a draft and never forced. It
- *   prints `wf pr: <url>`, which goes on her closeout as an artifact value.
+ *   prints `nemia pr: <url>`, which goes on her closeout as an artifact value.
  * - `push`, which the round's check runs first: it pushes again, so the commit CI judges is the commit the check judges, then refuses
  *   unless an open, non-draft pull request for this branch, based on the remote's default branch, has `headRefOid` equal to `HEAD`.
  *   GitHub moves a pull request's head a moment after the push it follows, so that head is read again for a bounded few seconds
  *   (`HEAD_SECONDS`) before the refusal: a head that stays elsewhere is still refused, and says how long it was read for.
- * - `wait`, which the round's check runs last: it refuses at once a pull request GitHub says is `CONFLICTING` with its base, on which
- *   no `ci` would come, naming the merge of the base that answers it (`mergeable`, read again for up to 15 s while GitHub says
- *   `UNKNOWN`, `WF_PR_MERGEABLE_SECONDS`); then it polls the `ci` context of that head (`gh pr view --json statusCheckRollup`), 1800 s
+ * - `wait --check <name>`, which the round's check runs last, `<name>` the CI context branch protection requires of the base branch
+ *   (the repository's, so the check gives it): it refuses at once a pull request GitHub says is `CONFLICTING` with its base, on which
+ *   no CI would come, naming the merge of the base that answers it (`mergeable`, read again for up to 15 s while GitHub says
+ *   `UNKNOWN`, `WF_PR_MERGEABLE_SECONDS`); then it polls the `<name>` context of that head (`gh pr view --json statusCheckRollup`), 1800 s
  *   for it to start (`WF_CI_START_SECONDS`) and 2400 s whole (`WF_CI_WAIT_SECONDS`), `WF_CI_POLL_SECONDS` the interval; on a red, cancelled or
- *   absent `ci` refuses by name with the Actions URL, the failing jobs, and from each failing job's log the lines that failed it — a
- *   test with its diff, an e2e page, a type or lint error — or a bounded tail where none is, GitHub's post-job lines left out — the next try reads why CI went red here, since no agent may call `gh` itself — and the `nemia retry <run> <step> --recheck` line, whose step is the
+ *   absent context refuses by name with the Actions URL, the failing jobs, and from each failing job's log the lines that failed it — a
+ *   test with its diff, a type or lint error — or a bounded tail where none is, GitHub's post-job lines left out — the next try reads why CI went red here, since no agent may call `gh` itself — and the `nemia retry <run> <step> --recheck` line, whose step is the
  *   check's own (`WF_STEP`).
  *
  * The branch is read from `HEAD`, never given: a run's branch is `wf/<run>/<leaf>` — `wf/<run>/run` for the run's own line of work, one
@@ -24,35 +25,30 @@
  * Refuses, exit 1 on stderr with what to do next: a HEAD that is on no such branch or on the remote's default branch; no `origin`; no
  * `gh` on the PATH or none authenticated; a push git rejects, which is answered by merging the base and never by a force; a draft pull
  * request, or one based on another branch; no open pull request where one is owed; a `headRefOid` that is not `HEAD`; a pull request
- * that conflicts with its base; and a `ci` that is
- * red, cancelled, skipped or never reported.
+ * that conflicts with its base; a `wait` with no `--check`; and a CI context that is red, cancelled, skipped or never reported.
  */
 import { spawnSync } from 'node:child_process';
 
 /** A reason the verb is refused: said on stderr, exit 1. */
 class Refusal extends Error {}
 
-/** The one context branch protection requires of the base branch, and the only verdict this script reads (`.github/workflows/ci.yml`). */
-const CONTEXT = 'ci';
-
 /**
- * How long `ci` has to be reported at all, in seconds: a queue longer than this is a refusal, answered by a `--recheck`.
+ * How long the CI context has to be reported at all, in seconds: a queue longer than this is a refusal, answered by a `--recheck`.
  * `WF_CI_START_SECONDS` lowers it for a test, on its own, so the two stages of the wait are told apart by a fixture.
  */
 const START_SECONDS = 1800;
 
 /**
  * How long the whole wait may take, in seconds, the start included; `WF_CI_WAIT_SECONDS` lowers it for a test. It must stay well under
- * the round check's own deadline (`CHECK_DEADLINE_SECONDS`, 3300 s), which is the whole of the clauses before it as well: a wait longer
- * than what is left of that deadline would be killed by the engine, and the person would get no refusal in words.
- * `pull-request.boundary.test.ts` holds the two numbers against each other.
+ * the round check's own deadline, which is the whole of the clauses before it as well: a wait longer than what is left of that
+ * deadline would be killed by the engine, and the person would get no refusal in words.
  */
 const WHOLE_SECONDS = 2400;
 
 /**
  * How long, in seconds, the wait reads the pull request's `mergeable` again while GitHub answers `UNKNOWN`, which it does while it
- * computes, before it waits on `ci` all the same; `WF_PR_MERGEABLE_SECONDS` lowers it for a test. A `CONFLICTING` head is refused at
- * once: GitHub runs no `pull_request` workflow on it, so no `ci` would come.
+ * computes, before it waits on CI all the same; `WF_PR_MERGEABLE_SECONDS` lowers it for a test. A `CONFLICTING` head is refused at
+ * once: GitHub runs no `pull_request` workflow on it, so no CI would come.
  */
 const MERGEABLE_SECONDS = 15;
 
@@ -100,7 +96,7 @@ const BOUND = 120_000;
 /** The states of a check that is not over: anything else is a verdict. */
 const PENDING = new Set(['QUEUED', 'IN_PROGRESS', 'WAITING', 'PENDING', 'REQUESTED', 'EXPECTED']);
 
-/** The one conclusion that is a pass: a skipped, cancelled or neutral `ci` is no verdict to land on. */
+/** The one conclusion that is a pass: a skipped, cancelled or neutral CI context is no verdict to land on. */
 const PASSED = 'SUCCESS';
 
 /** An entry of a head's check rollup, as `gh pr view --json statusCheckRollup` gives one: a check run, or a status context. */
@@ -143,7 +139,7 @@ function gh(...args: string[]): string {
   const ran = run('gh', args);
   if (ran.missing)
     throw new Refusal(
-      'no `gh` on the PATH, and the pull request is GitHub\'s CLI\'s to open. Install it (https://cli.github.com) and run `gh auth login`',
+      "no `gh` on the PATH, and the pull request is GitHub's CLI's to open. Install it (https://cli.github.com) and run `gh auth login`",
     );
   if (ran.status !== 0) throw new Refusal(`\`gh ${args.join(' ')}\` failed: ${ran.err}`);
   return ran.out.trim();
@@ -182,7 +178,7 @@ function authed(): void {
   const status = read('auth', 'status');
   if (status.missing)
     throw new Refusal(
-      'no `gh` on the PATH, and the pull request is GitHub\'s CLI\'s to open. Install it (https://cli.github.com) and run `gh auth login`',
+      "no `gh` on the PATH, and the pull request is GitHub's CLI's to open. Install it (https://cli.github.com) and run `gh auth login`",
     );
   if (status.status !== 0) throw new Refusal(`\`gh\` is not authenticated here: run \`gh auth login\`. It said: ${status.err}`);
 }
@@ -218,7 +214,7 @@ function pulls(branch: string): Pr[] {
 }
 
 /** The line the engineer types to open the pull request, for a refusal that asks for one. */
-const OPEN_LINE = 'node pull-request.ts open --title "<the card\'s line>" --body-file "$WF_STEP_FILES/pr-body.md"';
+const OPEN_LINE = 'node "$WF_WORKFLOW_FILES/pull-request.ts" open --title "<the card\'s line>" --body-file "$WF_STEP_FILES/pr-body.md"';
 
 /** The `gh api` form of an edit of a pull request's own fields, for a refusal that asks a person to type one. */
 const API_LINE = (n: number, field: string) => `gh api -X PATCH repos/{owner}/{repo}/pulls/${n} -f ${field}`;
@@ -228,17 +224,17 @@ function sole(open: readonly Pr[], branch: string, onto: string): Pr {
   if (open.length === 0)
     throw new Refusal(
       `no open pull request has ${branch} as its head, and CI judges a pull request's head. Open it in your session, after you ` +
-        `merged the base, with the script read from the base:\n  ${OPEN_LINE}`,
+        `merged the base, with the script of the run's workflow files:\n  ${OPEN_LINE}`,
     );
   if (open.length > 1)
     throw new Refusal(
       `${open.length} open pull requests have ${branch} as its head (${open.map((pr) => `#${pr.number}`).join(', ')}), and a run has ` +
-        'one: close all but one with `gh pr close <number>`, which is a person\'s to type, then retry the step with `--recheck`',
+        "one: close all but one with `gh pr close <number>`, which is a person's to type, then retry the step with `--recheck`",
     );
   const [pr] = open;
   if (pr.isDraft)
     throw new Refusal(
-      `#${pr.number} is a draft, and a draft is not judged by the \`${CONTEXT}\` context branch protection requires. A person marks it ` +
+      `#${pr.number} is a draft, and a draft is not judged by the CI context branch protection requires. A person marks it ` +
         `ready: \`gh pr ready ${pr.number}\`. Then retry the step with \`--recheck\`.`,
     );
   if (pr.baseRefName !== onto)
@@ -306,23 +302,19 @@ const unstamped = (line: string): string =>
     .replace(BOM, '')
     .replace(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z ?/, '');
 
-/** A line without the prefix a tool gave it (turbo's `pkg:test: `), as `failingLines` in `src/check/check.ts` reads one. */
+/** A line without the prefix a monorepo's task runner gave it (`pkg:test: `), as Nemia's own check reads one. */
 const bare = (line: string): string => line.replace(/^\S+:\S+: /, '');
-
-/** A line without the worker's prefix the e2e gives it (`[w1] `), on top of a tool's (`bare`). */
-const unworked = (line: string): string => bare(line).replace(/^\[w\d+\] /, '');
 
 /**
  * Whether `line` fails a job: a test node's reporters name, `✖` (spec) or `not ok ` (TAP) after its indent — never the heading
- * `✖ failing tests:` the spec reporter lists them again under, the rule of `failingLines` (`src/check/check.ts`), copied, since this
- * script imports nothing of the package — or the e2e's `e2e: FAILED — <page>` (`exitOn`, `apps/web/test/e2e/visit.ts`), a TypeScript
- * error (`<path>(<line>,<col>): error TS<n>: …`) or oxlint's ` x <rule>: …` (`×` where it draws).
+ * `✖ failing tests:` the spec reporter lists them again under, the rule of Nemia's own check, copied, since this script imports
+ * nothing — a TypeScript error (`<path>(<line>,<col>): error TS<n>: …`) or oxlint's ` x <rule>: …` (`×` where it draws).
  */
 const failing = (line: string): boolean => {
-  const said = unworked(line);
+  const said = bare(line);
   const test = /^\s*((?:✖|not ok ).*)$/.exec(said);
   if (test !== null) return !test[1].startsWith('✖ failing tests:');
-  return said.startsWith('e2e: FAILED — ') || /^\s*\S.*?(?:\(\d+,\d+\)|:\d+:\d+)(?::| -) error TS\d+: /.test(said) || /^\s*[x×] \S+: /.test(said);
+  return /^\s*\S.*?(?:\(\d+,\d+\)|:\d+:\d+)(?::| -) error TS\d+: /.test(said) || /^\s*[x×] \S+: /.test(said);
 };
 
 /** Whether `line` ends the lines that tell one failing test: the next test, a pass, a summary, the spec reporter's location line. */
@@ -341,12 +333,13 @@ const detail = (line: string): boolean => {
  * Whether `line` is GitHub's own after the job's steps ran: the post-job cleanup, the git commands it runs there, the orphans it ends.
  * A tail drops them, and everything from `Post job cleanup.` on: none of it says why the job failed.
  */
-const postJob = (line: string): boolean => /^(?:Post job cleanup\.?|\[command\]\/usr\/bin\/git |Cleaning up orphan processes)/.test(line.trim());
+const postJob = (line: string): boolean =>
+  /^(?:Post job cleanup\.?|\[command\]\/usr\/bin\/git |Cleaning up orphan processes)/.test(line.trim());
 
 /**
  * What a failing job's log says of why it failed: each line that fails it (`failing`) once, in order, with the lines after it that tell
  * why (`detail`) — the occurrence that tells most, since the spec reporter prints the test bare where it ran and with its error under
- * `✖ failing tests:`, and the e2e prints its headline again on each stream — bounded by `JOB_LINES`. A log with no such line gives its
+ * `✖ failing tests:` — bounded by `JOB_LINES`. A log with no such line gives its
  * last `TAIL_LINES` before GitHub's post-job lines (`postJob`) instead.
  */
 function failures(log: string): { lines: string[]; tests: boolean } {
@@ -359,7 +352,7 @@ function failures(log: string): { lines: string[]; tests: boolean } {
       if (ends(next)) break;
       if (detail(next) && after.length < DETAIL_LINES) after.push(next);
     }
-    const key = unworked(line).trim();
+    const key = bare(line).trim();
     if ((told.get(key)?.length ?? -1) <= after.length) told.set(key, [line, ...after]);
   });
   if (told.size) return { lines: [...told.values()].flat().slice(0, JOB_LINES), tests: true };
@@ -372,15 +365,15 @@ function failures(log: string): { lines: string[]; tests: boolean } {
  * Why CI went red, for the next try to read: each entry of `entries` that did not pass, by name and verdict with its URL; then, for each
  * that names a job, its log read by the job's id (`gh api repos/{owner}/{repo}/actions/jobs/<id>/logs`, which answers where `gh run view
  * --log-failed` prints nothing), headed by the job's name: the lines that failed it with what tells why (`failures`), or its tail where it
- * names none, bounded by `LOG_LINES` in all. The `ci` context itself, which only gathers the others, comes last. No agent of this team may call
+ * names none, bounded by `LOG_LINES` in all. The `check` context itself, which may only gather the others, comes last. No agent of this team may call
  * `gh`, so this is the whole of what the next try is handed.
  */
-function why(entries: readonly Entry[]): string[] {
+function why(entries: readonly Entry[], check: string): string[] {
   const failed = entries.filter((entry) => !pending(entry) && verdict(entry) !== PASSED);
   const named = failed.slice(0, JOBS).map((entry) => `  ${nameOf(entry)}: ${verdict(entry) || 'no verdict'} ${linkOf(entry)}`.trimEnd());
   const more = failed.length > named.length ? [`  … and ${failed.length - named.length} more`] : [];
   const jobs = new Map<string, string>();
-  const ordered = [...failed.filter((entry) => nameOf(entry) !== CONTEXT), ...failed.filter((entry) => nameOf(entry) === CONTEXT)];
+  const ordered = [...failed.filter((entry) => nameOf(entry) !== check), ...failed.filter((entry) => nameOf(entry) === check)];
   for (const entry of ordered.slice(0, JOBS)) {
     const id = jobIdOf(entry);
     if (id && !jobs.has(id)) jobs.set(id, nameOf(entry));
@@ -400,7 +393,10 @@ function why(entries: readonly Entry[]): string[] {
     }
     const said = failures(log.out);
     const lines = said.lines.slice(0, left - 1).map((line) => `  ${line}`);
-    logs.push(said.tests ? `${name} (job ${id}), the lines that failed it:` : `${name} (job ${id}), the last ${lines.length} lines of its log:`, ...lines);
+    logs.push(
+      said.tests ? `${name} (job ${id}), the lines that failed it:` : `${name} (job ${id}), the last ${lines.length} lines of its log:`,
+      ...lines,
+    );
   }
   return ['the jobs that did not pass:', ...named, ...more, ...logs];
 }
@@ -492,39 +488,47 @@ function push(): string[] {
   return [said, `#${pr.number} is at ${at.slice(0, 12)}, the commit this check judges: ${pr.url}`];
 }
 
-/** How the wait reads the `ci` entries of a head: none reported, none over yet, every one passed, or one that did not. */
+/** How the wait reads the CI context's entries of a head: none reported, none over yet, every one passed, or one that did not. */
 type Seen = 'absent' | 'pending' | 'passed' | 'failed';
 
-/** How `ours`, the `ci` entries of the head, read now. */
+/** How `ours`, the CI context's entries of the head, read now. */
 function seenOf(ours: readonly Entry[]): Seen {
   if (ours.length === 0) return 'absent';
   if (ours.every(pending)) return 'pending';
   return ours.every((entry) => verdict(entry) === PASSED) ? 'passed' : 'failed';
 }
 
-/** The refusal of a `ci` that gave a verdict this round cannot land on: what it said, why, and what to type next. */
-const redly = (pr: Pr, ours: readonly Entry[], entries: readonly Entry[], retry: string): string =>
+/** The refusal of a CI context `check` that gave a verdict this round cannot land on: what it said, why, and what to type next. */
+const redly = (pr: Pr, check: string, ours: readonly Entry[], entries: readonly Entry[], retry: string): string =>
   [
-    `\`${CONTEXT}\` for #${pr.number} is ${ours.map(verdict).join(', ').toLowerCase()}, so this round is red where it is judged.`,
+    `\`${check}\` for #${pr.number} is ${ours.map(verdict).join(', ').toLowerCase()}, so this round is red where it is judged.`,
     `  The Actions URL: ${linkOf(ours[0]) || `${pr.url}/checks`}`,
-    ...why(entries),
+    ...why(entries, check),
     retry,
   ].join('\n');
 
-/** The refusal of a `ci` that never came, or never finished, within the bound the wait carries. */
-function unanswered(seen: Seen, pr: Pr, ours: readonly Entry[], entries: readonly Entry[], secs: number, retry: string): string {
+/** The refusal of a CI context `check` that never came, or never finished, within the bound the wait carries. */
+function unanswered(
+  seen: Seen,
+  pr: Pr,
+  check: string,
+  ours: readonly Entry[],
+  entries: readonly Entry[],
+  secs: number,
+  retry: string,
+): string {
   const checks = `${pr.url}/checks`;
   if (seen === 'pending')
     return [
-      `\`${CONTEXT}\` for #${pr.number} was still ${ours.map((entry) => (entry.status ?? entry.state ?? '').toLowerCase()).join(', ')} after ${secs} s.`,
+      `\`${check}\` for #${pr.number} was still ${ours.map((entry) => (entry.status ?? entry.state ?? '').toLowerCase()).join(', ')} after ${secs} s.`,
       `  The Actions URL: ${linkOf(ours[0]) || checks}`,
       retry,
     ].join('\n');
   return [
-    `no \`${CONTEXT}\` context was reported for #${pr.number} within ${secs} s, and \`${CONTEXT}\` is the one context the base branch ` +
+    `no \`${check}\` context was reported for #${pr.number} within ${secs} s, and \`${check}\` is the one context the base branch ` +
       'requires: nothing has judged this commit.',
     `  The Actions URL: ${checks}`,
-    ...(entries.length ? why(entries) : ['no check at all was reported for this head']),
+    ...(entries.length ? why(entries, check) : ['no check at all was reported for this head']),
     retry,
   ].join('\n');
 }
@@ -533,7 +537,7 @@ function unanswered(seen: Seen, pr: Pr, ours: readonly Entry[], entries: readonl
  * The one open pull request of `branch`, read again while GitHub says its `mergeable` is `UNKNOWN` and the bound is not out; refuses one
  * GitHub says is `CONFLICTING`, naming the merge that answers it. Any other answer, `UNKNOWN` to the end included, is waited on as before.
  */
-function unconflicted(branch: string, onto: string): Pr {
+function unconflicted(branch: string, onto: string, check: string): Pr {
   const whole = seconds('WF_PR_MERGEABLE_SECONDS', MERGEABLE_SECONDS);
   const poll = seconds('WF_PR_MERGEABLE_POLL_SECONDS', MERGEABLE_POLL_SECONDS);
   const began = Date.now();
@@ -544,8 +548,8 @@ function unconflicted(branch: string, onto: string): Pr {
       throw new Refusal(
         [
           `GitHub says #${pr.number} conflicts with its base \`${onto}\`, and it runs no \`pull_request\` workflow on a conflicting ` +
-            `head, so no \`${CONTEXT}\` would come. Merge the base into the run's branch in your session, resolve the conflicts, ` +
-            'commit, and open the round again with the script read from the base:',
+            `head, so no \`${check}\` would come. Merge the base into the run's branch in your session, resolve the conflicts, ` +
+            "commit, and open the round again with the script of the run's workflow files:",
           '  git merge main-worktree/HEAD',
           `  ${OPEN_LINE}`,
         ].join('\n'),
@@ -555,11 +559,23 @@ function unconflicted(branch: string, onto: string): Pr {
   }
 }
 
-/** `wait`: the `ci` context of the pull request's head, waited out and read; its refusal says why CI went red. */
-function wait(): string[] {
+/** The CI context `wait` reads, from `--check <name>`; refuses a wait given none, or given anything else. */
+function checkOf(args: readonly string[]): string {
+  const [flag, name, ...rest] = args;
+  if (flag !== '--check' || !name || name.startsWith('--') || rest.length)
+    throw new Refusal(
+      'wait takes `--check <name>`, the CI context branch protection requires of the base branch, and nothing else: give it as ' +
+        'the step\'s check gives it, `node "$WF_WORKFLOW_FILES/pull-request.ts" wait --check <name>`',
+    );
+  return name;
+}
+
+/** `wait --check <name>`: that context of the pull request's head, waited out and read; its refusal says why CI went red. */
+function wait(args: string[]): string[] {
+  const check = checkOf(args);
   const { branch, run: ofRun, onto } = placed();
   const retry = `  Then: nemia retry ${ofRun} ${process.env.WF_STEP || STEP} --recheck`;
-  const pr = unconflicted(branch, onto);
+  const pr = unconflicted(branch, onto, check);
   const whole = seconds('WF_CI_WAIT_SECONDS', WHOLE_SECONDS);
   const start = Math.min(seconds('WF_CI_START_SECONDS', START_SECONDS), whole);
   const poll = seconds('WF_CI_POLL_SECONDS', POLL_SECONDS);
@@ -567,28 +583,28 @@ function wait(): string[] {
   const over = (secs: number): boolean => Date.now() - began >= secs * 1000;
   for (;;) {
     const entries = rollup(pr.number);
-    const ours = entries.filter((entry) => nameOf(entry) === CONTEXT);
+    const ours = entries.filter((entry) => nameOf(entry) === check);
     const seen = seenOf(ours);
-    if (seen === 'passed') return [`\`${CONTEXT}\` passed on ${pr.headRefOid.slice(0, 12)}: ${pr.url}`];
-    if (seen === 'failed') throw new Refusal(redly(pr, ours, entries, retry));
+    if (seen === 'passed') return [`\`${check}\` passed on ${pr.headRefOid.slice(0, 12)}: ${pr.url}`];
+    if (seen === 'failed') throw new Refusal(redly(pr, check, ours, entries, retry));
     const bound = seen === 'absent' ? start : whole;
-    if (over(bound)) throw new Refusal(unanswered(seen, pr, ours, entries, bound, retry));
+    if (over(bound)) throw new Refusal(unanswered(seen, pr, check, ours, entries, bound, retry));
     sleep(poll);
   }
 }
 
 /** The verbs, by name, each with the tag its lines are printed under. */
 const VERBS: Record<string, { tag: string; act: (args: string[]) => string[] }> = {
-  open: { tag: 'wf pr', act: open },
-  push: { tag: 'wf pr', act: () => push() },
-  wait: { tag: 'wf ci', act: () => wait() },
+  open: { tag: 'nemia pr', act: open },
+  push: { tag: 'nemia pr', act: () => push() },
+  wait: { tag: 'nemia ci', act: wait },
 };
 
 /** The whole run: exit 0 with what was done on stdout, 1 with the refusal on stderr, each line under the verb's tag. */
 function main(): number {
   const [verb = '', ...args] = process.argv.slice(2);
   const named = Object.hasOwn(VERBS, verb) ? VERBS[verb] : undefined;
-  const tag = named?.tag ?? 'wf pr';
+  const tag = named?.tag ?? 'nemia pr';
   try {
     if (!named) throw new Refusal(`\`${verb}\` is no verb: give open, push or wait`);
     for (const line of named.act(args)) process.stdout.write(`${tag}: ${line}\n`);

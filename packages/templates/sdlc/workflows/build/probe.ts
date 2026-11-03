@@ -133,7 +133,8 @@ function startArgs(args: string[]): { label: string; answer?: string; settings?:
       throw new Refusal(`\`${flag}\` is not an option of start: give --answer "<what to press>" or --settings <file>, each with a value`);
     opts[flag === '--answer' ? 'answer' : 'settings'] = value;
   }
-  if (!label || !LABEL.test(label)) throw new Refusal(`the label \`${label ?? ''}\` is not lower-case letters and digits: name the probe so`);
+  if (!label || !LABEL.test(label))
+    throw new Refusal(`the label \`${label ?? ''}\` is not lower-case letters and digits: name the probe so`);
   if (!prompt.trim()) throw new Refusal('no prompt: give it after `--`, as `start <label> -- <prompt>`');
   return { label, prompt, ...opts };
 }
@@ -185,7 +186,7 @@ function check(): string[] {
       [
         `a probe of run ${run} is still live, and a step stops its probes before it signs off:`,
         ...left.map((row) => `  ${shown(row)}`),
-        'Stop them with `node "${WF_WORKFLOW_FILES:-workflows/build}/probe.ts" stop`, then sign off again.',
+        'Stop them with `node "$WF_WORKFLOW_FILES/probe.ts" stop`, then sign off again.',
       ].join('\n'),
     );
   return [`no live probe of run ${run}`];
@@ -208,11 +209,11 @@ function main(): number {
   try {
     const act = Object.hasOwn(VERBS, verb) ? VERBS[verb] : undefined;
     if (!act) throw new Refusal(`\`${verb}\` is no verb: give start, list, stop or check`);
-    for (const line of act(args)) process.stdout.write(`wf probe: ${line}\n`);
+    for (const line of act(args)) process.stdout.write(`nemia probe: ${line}\n`);
     return 0;
   } catch (err) {
     if (!(err instanceof Refusal)) throw err;
-    process.stderr.write(`wf probe: ${err.message}\n`);
+    process.stderr.write(`nemia probe: ${err.message}\n`);
     return 1;
   }
 }

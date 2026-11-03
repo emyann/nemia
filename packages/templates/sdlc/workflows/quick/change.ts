@@ -5,10 +5,11 @@
  * or, once the branch merged a newer base, on the base it merged last: the second parent of the newest merge on the branch's first
  * parent. A line added then removed counts for nothing, and a renamed file is one file.
  *
- * `size` counts the files changed and the lines added plus removed, tests and docs included, a generated file (`GENERATED`) left out,
+ * `size` counts the files changed and the lines added plus removed, tests and docs included, a generated file left out — one of
+ * `GENERATED`, or one git says is `linguist-generated` (`git check-attr`, read from the repository's `.gitattributes`) —
  * and refuses nothing by either number: the review reads the change whatever its size.
  *
- * Prints a `wf size:` line and exits 0. Exits 1, on stderr, when `WF_BASE_REF` is not set, git cannot say what changed, or the verb is
+ * Prints a `nemia size:` line and exits 0. Exits 1, on stderr, when `WF_BASE_REF` is not set, git cannot say what changed, or the verb is
  * another than `size`.
  */
 import { spawnSync } from 'node:child_process';
@@ -16,8 +17,11 @@ import { spawnSync } from 'node:child_process';
 /** A reason the step is refused: said on stderr, exit 1. */
 class Refusal extends Error {}
 
-/** The paths a tool writes, which the count leaves out: a file, or a folder by its closing slash. */
-const GENERATED = ['package-lock.json', 'apps/web/theme/', 'apps/web/src/routeTree.gen.ts'];
+/**
+ * The paths a tool writes in any repository, which the count leaves out: a file, or a folder by its closing slash. A repository says its
+ * own by marking them `linguist-generated` in its `.gitattributes`, which the count reads too.
+ */
+const GENERATED = ['package-lock.json'];
 
 /** One file of the change: its path, a renamed file's new one, and its lines added plus removed, none for a binary file. */
 type Change = { path: string; lines: number };
@@ -58,14 +62,35 @@ function changes(): Change[] {
   return found;
 }
 
-/** Whether a tool writes `path`. */
+/** Whether a tool writes `path` in any repository. */
 const generated = (path: string): boolean => GENERATED.some((made) => (made.endsWith('/') ? path.startsWith(made) : path === made));
+
+/** The paths of `paths` git says are `linguist-generated`, set or true; refuses, as `git` does, when git cannot tell. */
+function marked(paths: readonly string[]): Set<string> {
+  if (paths.length === 0) return new Set();
+  const ran = spawnSync('git', ['check-attr', '-z', '--stdin', 'linguist-generated'], {
+    encoding: 'utf8',
+    input: paths.map((path) => `${path}\0`).join(''),
+    stdio: ['pipe', 'pipe', 'pipe'],
+  });
+  if (ran.status !== 0)
+    throw new Refusal(
+      `cannot tell which files are generated, since git check-attr failed (${(ran.stderr ?? '').trim() || ran.error?.message}); ` +
+        'nothing is measured on a guess',
+    );
+  const found = new Set<string>();
+  const fields = ran.stdout.split('\0');
+  for (let i = 0; i + 2 < fields.length; i += 3) if (fields[i + 2] === 'set' || fields[i + 2] === 'true') found.add(fields[i]);
+  return found;
+}
 
 /** `size`: says the count, and refuses nothing by it. */
 function size(say: (line: string) => void): number {
-  const counted = changes().filter((change) => !generated(change.path));
+  const all = changes();
+  const made = marked(all.map((change) => change.path));
+  const counted = all.filter((change) => !generated(change.path) && !made.has(change.path));
   const lines = counted.reduce((sum, change) => sum + change.lines, 0);
-  say(`wf size: ${counted.length} files, ${lines} lines`);
+  say(`nemia size: ${counted.length} files, ${lines} lines`);
   return 0;
 }
 
@@ -78,7 +103,7 @@ function main(): number {
     throw new Refusal(`usage: node change.ts size, not ${JSON.stringify(verb)}`);
   } catch (err) {
     if (!(err instanceof Refusal)) throw err;
-    process.stderr.write(`wf change: ${err.message}\n`);
+    process.stderr.write(`nemia change: ${err.message}\n`);
     return 1;
   }
 }

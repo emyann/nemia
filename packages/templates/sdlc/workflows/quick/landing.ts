@@ -1,13 +1,14 @@
 /**
  * `node landing.ts <verb>` — the two acts a landing is made of, which no agent may type: the merge of this run's own pull request on
  * GitHub, and the receipt that it happened. A Bash prefix rule cannot tell `gh pr merge 7` from `gh pr merge 9`, and `gh` is denied
- * whole to the agents that land, so the act is this script, read out of git into a directory of its own and run with `node`, as
- * `pull-request.ts` carries the push and the pull request card 1 opens. It imports nothing: a frozen clause copies one file.
+ * whole to the agents that land, so the act is this script, read from the run's frozen workflow files (`$WF_WORKFLOW_FILES`) and run
+ * with `node`, as `pull-request.ts` carries the push and the pull request. It imports nothing: a frozen clause copies one file. It is
+ * told the name of the CI context it reads (`--check <name>`), since that name is the repository's, never the script's.
  *
- * - `merge --run <id> --subject <line> --body-file <f>`, which the landing session types once its step has been filed — on a person's
+ * - `merge --run <id> --subject <line> --body-file <f> --check <name>`, which the landing session types once its step has been filed — on a person's
  *   approval in `build`, or by the workflow in `quick`, where the review's pass files it: it refuses
  *   anything but this run's own green pull request — not a draft, based on the remote's default branch, its head the tip of the run's
- *   result branch and the sha the reviewer read, `mergeable` MERGEABLE, the `ci` context SUCCESS at that sha, and every other
+ *   result branch and the sha the reviewer read, `mergeable` MERGEABLE, the CI context `--check` names SUCCESS at that sha, and every other
  *   `wf/<id>/*` branch taken by it, every commit of the branch having an equivalent patch on the head (`git cherry`) — then merges it with a merge commit whose subject and body are the ones it was given
  *   (`gh pr merge --merge --match-head-commit <sha>`, never `--delete-branch`: the repository auto-deletes the head branch), and
  *   fast-forwards the checkout (`git fetch origin && git merge --ff-only origin/<base>`). **Level-triggered**: it reads the world
@@ -21,7 +22,7 @@
  * on stderr with what to do next — the exact `nemia retry` line where a person must act: a run with no result branch here; a dirty
  * checkout, one with a merge in progress, or one not on the base; no `origin`; no `gh` on the PATH or none authenticated; no open pull
  * request for the run, or two, or one merged beside one open; a draft, another base, a head that is not the branch's tip, a `mergeable`
- * that is not MERGEABLE, a `ci` that is not SUCCESS, a result branch the head leaves out; a `gh pr merge` GitHub declines; and a
+ * that is not MERGEABLE, a CI context that is not SUCCESS, a result branch the head leaves out; a `gh pr merge` GitHub declines; and a
  * fast-forward git declines. The receipt takes the merged pull request among whatever the run has — a closed one beside it is no
  * refusal, a second merged one is — and refuses where none is merged.
  */
@@ -31,10 +32,7 @@ import fs from 'node:fs';
 /** A reason the verb is refused: said on stderr, exit 1. */
 class Refusal extends Error {}
 
-/** The one context branch protection requires of the base branch, and the only verdict this script reads (`.github/workflows/ci.yml`). */
-const CONTEXT = 'ci';
-
-/** The one conclusion that is a pass: a skipped, cancelled or neutral `ci` is no verdict to land on. */
+/** The one conclusion that is a pass: a skipped, cancelled or neutral CI context is no verdict to land on. */
 const PASSED = 'SUCCESS';
 
 /** The one `mergeable` GitHub gives a pull request that can be merged now; `CONFLICTING` and `UNKNOWN` are both refusals. */
@@ -92,7 +90,7 @@ function gh(...args: string[]): string {
 
 /** What a person types where there is no `gh` to merge with. */
 const MISSING_GH =
-  'no `gh` on the PATH, and the merge of the pull request is GitHub\'s CLI\'s. Install it (https://cli.github.com) and run `gh auth login`';
+  "no `gh` on the PATH, and the merge of the pull request is GitHub's CLI's. Install it (https://cli.github.com) and run `gh auth login`";
 
 /** `text` parsed as JSON; refuses, naming what was read, when it does not parse. */
 function parsed<T>(what: string, text: string): T {
@@ -152,12 +150,7 @@ const withCommits = (left: readonly { branch: string; commits: string[] }[]): st
 
 /** The run's result branches in this checkout, each with its tip: `refs/heads/wf/<id>/*`. Refuses a run with none. */
 function tips(id: string): { branch: string; tip: string }[] {
-  const listed = git(
-    `the result branches of ${id}`,
-    'for-each-ref',
-    '--format=%(refname:short) %(objectname)',
-    `refs/heads/wf/${id}/`,
-  );
+  const listed = git(`the result branches of ${id}`, 'for-each-ref', '--format=%(refname:short) %(objectname)', `refs/heads/wf/${id}/`);
   const found = listed
     .split('\n')
     .filter(Boolean)
@@ -260,31 +253,34 @@ function sole(found: readonly Pr[], id: string, state: string, open: string): Pr
 /** The verdict of a rollup entry, a check run's conclusion or a status context's state, upper-cased; empty where it has neither. */
 const verdict = (entry: Entry): string => (entry.conclusion ?? entry.state ?? '').toUpperCase();
 
-/** The `ci` context of `number`'s head, read as it is now; refuses a head nothing judged, or one it did not pass. */
-function green(pr: Pr): void {
+/**
+ * The CI context `check` of `number`'s head — the one the base branch's protection requires, named by `--check` — read as it is now;
+ * refuses a head nothing judged, or one it did not pass.
+ */
+function green(pr: Pr, check: string): void {
   const text = gh('pr', 'view', String(pr.number), '--json', 'statusCheckRollup');
   const entries = parsed<{ statusCheckRollup?: Entry[] }>(`the checks of #${pr.number}`, text).statusCheckRollup ?? [];
-  const ours = entries.filter((entry) => (entry.name ?? entry.context ?? '') === CONTEXT);
+  const ours = entries.filter((entry) => (entry.name ?? entry.context ?? '') === check);
   if (ours.length === 0)
     throw new Refusal(
-      `no \`${CONTEXT}\` context was reported for #${pr.number} at ${pr.headRefOid.slice(0, 12)}, and \`${CONTEXT}\` is the one ` +
+      `no \`${check}\` context was reported for #${pr.number} at ${pr.headRefOid.slice(0, 12)}, and \`${check}\` is the one ` +
         `context the base branch requires: nothing has judged the commit that would land. Read ${pr.url}/checks, and retry the step ` +
         'once it is green.',
     );
   const unpassed = ours.filter((entry) => verdict(entry) !== PASSED);
   if (unpassed.length)
     throw new Refusal(
-      `\`${CONTEXT}\` for #${pr.number} is ${unpassed.map((entry) => verdict(entry).toLowerCase() || 'without a verdict').join(', ')} ` +
+      `\`${check}\` for #${pr.number} is ${unpassed.map((entry) => verdict(entry).toLowerCase() || 'without a verdict').join(', ')} ` +
         `at ${pr.headRefOid.slice(0, 12)}, and only a green pull request lands. Read ${pr.url}/checks: the work goes round again, ` +
         'and nothing is merged here.',
     );
 }
 
 /** The pull request read as the merge requires it: this run's own, green, and at the sha the reviewer read. */
-function judged(pr: Pr, onto: string, named: readonly { branch: string; tip: string }[]): void {
+function judged(pr: Pr, onto: string, named: readonly { branch: string; tip: string }[], check: string): void {
   if (pr.isDraft)
     throw new Refusal(
-      `#${pr.number} is a draft, and a draft is not judged by the \`${CONTEXT}\` context branch protection requires: a person marks ` +
+      `#${pr.number} is a draft, and a draft is not judged by the \`${check}\` context branch protection requires: a person marks ` +
         `it ready (\`gh pr ready ${pr.number}\`), then the step is retried`,
     );
   if (pr.baseRefName !== onto)
@@ -309,7 +305,7 @@ function judged(pr: Pr, onto: string, named: readonly { branch: string; tip: str
       `GitHub says #${pr.number} is \`${pr.mergeable ?? 'unknown'}\`, not \`${MERGEABLE}\`, so it cannot be merged as it stands: the ` +
         `work merges its base again and goes round, or a person reads ${pr.url}. Nothing is merged here.`,
     );
-  green(pr);
+  green(pr, check);
   const left = leftOut(named, pr.headRefOid);
   if (left.length)
     throw new Refusal(
@@ -325,7 +321,10 @@ function judged(pr: Pr, onto: string, named: readonly { branch: string; tip: str
 const andThe = (branches: readonly { branch: string }[]): string =>
   branches.length === 1
     ? `\`${branches[0].branch}\``
-    : `${branches.slice(0, -1).map((b) => `\`${b.branch}\``).join(', ')} and \`${branches.at(-1)!.branch}\``;
+    : `${branches
+        .slice(0, -1)
+        .map((b) => `\`${b.branch}\``)
+        .join(', ')} and \`${branches.at(-1)!.branch}\``;
 
 /** The line a person types where the landing refused and the step must be run again. */
 const retryLine = (id: string): string => `  Then: nemia retry ${id} ${process.env.WF_STEP || STEP}`;
@@ -360,8 +359,8 @@ function bodyOf(file: string): void {
 
 /** `merge`: this run's own green pull request merged with a merge commit, and the checkout fast-forwarded onto it. */
 function merge(args: string[]): string[] {
-  const opts = options('merge', args, ['--run', '--subject', '--body-file']);
-  const [id, subject, file] = [opts['--run'], opts['--subject'], opts['--body-file']];
+  const opts = options('merge', args, ['--run', '--subject', '--body-file', '--check']);
+  const [id, subject, file, check] = [opts['--run'], opts['--subject'], opts['--body-file'], opts['--check']];
   bodyOf(file);
   const named = tips(id);
   const branch = settled();
@@ -391,7 +390,7 @@ function merge(args: string[]): string[] {
     'The implement step opens it, so a run with none goes round again; a person reopens one that was closed ' +
       '(`gh pr reopen <number>`), then the step is retried.',
   );
-  judged(pr, onto, named);
+  judged(pr, onto, named, check);
   const merged = run('gh', [
     'pr',
     'merge',
@@ -410,10 +409,7 @@ function merge(args: string[]): string[] {
       `GitHub declined to merge #${pr.number} at ${pr.headRefOid.slice(0, 12)}: ${merged.err}\n` +
         `  Nothing landed and this checkout is untouched. Read ${pr.url}.\n${retryLine(id)}`,
     );
-  return [
-    `#${pr.number} merged at ${pr.headRefOid.slice(0, 12)} with a merge commit: ${pr.url}`,
-    ...forwarded(pr, onto, id),
-  ];
+  return [`#${pr.number} merged at ${pr.headRefOid.slice(0, 12)} with a merge commit: ${pr.url}`, ...forwarded(pr, onto, id)];
 }
 
 /**
@@ -454,12 +450,14 @@ function receipt(args: string[]): string[] {
       `no pull request of \`wf/${id}/\` is merged${
         all.length ? ` — ${all.map((pr) => `#${pr.number} is \`${(pr.state ?? 'unknown').toLowerCase()}\``).join(', ')} — ` : ', '
       }so nothing of this run landed: the merge is made with ` +
-        `\`landing.ts merge --run ${id} --subject … --body-file …\`${all.length ? `, and ${all[0].url} says why it was not` : ''}.`,
+        `\`landing.ts merge --run ${id} --subject … --body-file … --check <name>\`${all.length ? `, and ${all[0].url} says why it was not` : ''}.`,
     );
   const pr = merged[0];
   const oid = pr.mergeCommit?.oid;
   if (!oid) throw new Refusal(`#${pr.number} is merged but names no merge commit, so there is nothing to record: read ${pr.url}`);
-  const parents = git(`the parents of ${oid.slice(0, 12)}`, 'rev-list', '--parents', '-n', '1', oid).split(' ').slice(1);
+  const parents = git(`the parents of ${oid.slice(0, 12)}`, 'rev-list', '--parents', '-n', '1', oid)
+    .split(' ')
+    .slice(1);
   if (parents.length < 2)
     throw new Refusal(
       `#${pr.number} landed as ${oid.slice(0, 12)}, which has ${parents.length} parent${parents.length === 1 ? '' : 's'} and not the ` +
@@ -495,11 +493,11 @@ function main(): number {
   const act = Object.hasOwn(VERBS, verb) ? VERBS[verb] : undefined;
   try {
     if (!act) throw new Refusal(`\`${verb}\` is no verb: give merge or receipt`);
-    for (const line of act(args)) process.stdout.write(`wf land: ${line}\n`);
+    for (const line of act(args)) process.stdout.write(`nemia land: ${line}\n`);
     return 0;
   } catch (err) {
     if (!(err instanceof Refusal)) throw err;
-    process.stderr.write(`wf land: ${err.message}\n`);
+    process.stderr.write(`nemia land: ${err.message}\n`);
     return 1;
   }
 }

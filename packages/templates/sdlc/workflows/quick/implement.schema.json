@@ -4,18 +4,10 @@
     "plan": {
       "type": "string",
       "description": "The plan you wrote before you built, in a few lines: what changes, where, and what proves it. The review reads it against the change, and a plan the work went past without saying so is a finding."
-    },
-    "pages": {
-      "type": "array",
-      "items": {
-        "type": "string"
-      },
-      "description": "The e2e pages the change touches, each by the name `npm run e2e -- --pages <name,\u2026>` takes: the check runs those. Empty when the change touches no page of the board."
     }
   },
   "required": [
-    "plan",
-    "pages"
+    "plan"
   ],
   "additionalProperties": false
 }

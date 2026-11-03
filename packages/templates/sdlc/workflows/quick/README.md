@@ -18,50 +18,46 @@ be touched.
 Everything else goes through [`build`](../build/README.md): a change that needs a design, or one a review is likely to send back twice.
 A card says which with `workflow: quick` or `workflow: build`.
 
-## Implement's check
+## The implement step's check
 
-The check is the cheap set, and CI: it runs `change.ts size`, `pictures.ts`, `probe.ts`, `pull-request.ts push` and
-`pull-request.ts wait`, in that order, and nothing else.
+The check is the cheap set, and CI: it runs `change.ts size`, `probe.ts`, `pull-request.ts push` and
+`pull-request.ts wait --check <name>`, in that order, and nothing else.
 Each script is read from the run's frozen workflow files (`node "$WF_WORKFLOW_FILES/<script>.ts"`, the copy of this folder the run
-took when it began), never from the tree it judges; while a daemon that sets no `WF_WORKFLOW_FILES` runs the check, each clause falls
-back to the read it had before, out of the run's base (`git show "$WF_BASE_REF:…"`). The run copies this folder alone, so it carries
-`build`'s `pictures.ts`, `probe.ts`, `pull-request.ts` and `landing.ts` as copies of its own, which
-`tools/guards/test/workflow-scripts.test.ts` holds equal to `build`'s byte for byte: an edit to one is made to both.
+took when it began), never from the tree it judges; where `WF_WORKFLOW_FILES` is not set, the check says so on stderr and fails. The
+run copies this folder alone, so it carries `build`'s `probe.ts`, `pull-request.ts` and `landing.ts` as copies of its own, equal to
+`build`'s byte for byte: an edit to one is made to both.
 
 1. `change.ts size`, first: the net change from the base the branch holds to `HEAD` (`git diff --numstat -M`, so a line added then
-   removed counts for nothing and a rename is one file). It says the files and the lines, a generated file
-   (`package-lock.json`, `apps/web/theme/`, `apps/web/src/routeTree.gen.ts`, `GENERATED` in `change.ts`) left out, and refuses
-   nothing by them. Its `wf size:` line is the review's measure of the change; the `touched` list is the place's report, and may count
-   a rename as two. The step has no `retries:`: a refusal of any clause waits on a person.
-2. `build`'s `pictures.ts` and `probe.ts`, quick's copies of them: a change under `apps/web/src` owes a picture, and
-   no probe is left live.
+   removed counts for nothing and a rename is one file). It says the files and the lines, a generated file (`package-lock.json`,
+   `GENERATED` in `change.ts`, and each file the repository marks `linguist-generated` in its `.gitattributes`) left out, and refuses
+   nothing by them. Its `nemia size:` line is the review's measure of the change; the `touched` list is the place's report, and may
+   count a rename as two. The step has no `retries:`: a refusal of any clause waits on a person.
+2. `build`'s `probe.ts`, quick's copy of it: no probe is left live.
 3. `build`'s `pull-request.ts`, quick's copy of it: `push` pushes the branch and refuses unless the one open, non-draft
-   pull request of it is at the commit the check judges; `wait` polls the `ci` context of that head and refuses a red, cancelled or
-   missing one with the Actions URL, the failing jobs and a tail of their log.
+   pull request of it is at the commit the check judges; `wait` polls the CI context the factory names (its `ciCheck` parameter, `ci`
+   by default) on that head and refuses a red, cancelled or missing one with the Actions URL, the failing jobs and a tail of their log.
 
-No typecheck, no lint, no test of a package and no e2e page on this machine: nothing here runs Grace's tests for her before the review.
-Her session runs the tests of what she changed, the types, the lint and the e2e pages a change to the board touches, as `CLAUDE.md`,
-*Check your work*, says of a step's session; CI's `ci` context runs the suite, the types, the lint and the whole e2e on the commit the
-check pushed, and the check waits on it. Land then merges that same pull request through `build`'s `landing.ts` (quick's copy) and
-fast-forwards the checkout, and its check is the receipt that the merge happened — `build`'s land step to the letter but its `after:`
-and its gate (`agent-fences.test.ts` holds the two equal in everything else), note, check, fence and budget. Main has one guard,
-whatever the workflow: GitHub's required `ci` context on the head the review read, and a merge that refuses anything but this run's own
-green pull request.
+No typecheck, no lint and no test on this machine: nothing here runs Grace's tests for her before the review. Her session runs the
+tests of what she changed, the types and the lint, as the repository's instructions say of a session's checks; CI runs the
+repository's suite on the commit the check pushed, and the check waits on it. Land then merges that same pull request through
+`build`'s `landing.ts` (quick's copy) and fast-forwards the checkout, and its check is the receipt that the merge happened —
+`build`'s land step to the letter but its `after:` and its gate (note, check, fence and budget). Main has one guard, whatever the
+workflow: the required CI context on the head the review read, and a merge that refuses anything but this run's own green pull
+request.
 
 ## The review
 
-`review.md` is `build`'s review with what quick says of itself: Agora's, read-only, closing implement's loop, with the same fence,
-skills, mcp servers and tally (`agent-fences.test.ts` holds the two equal there), and no `input:` — a quick run has no spec, so what
-was asked is the card. Its note names quick's own five check scripts and says that nothing ran the typecheck, the lint or a package's
-tests on this machine, so the reviewer runs the types and the lint itself; and it says that its pass files the
+`review.md` is `build`'s review with what quick says of itself: Agora's, read-only, closing the implement step's loop, with the same fence,
+skills and tally, and no `input:` — a quick run has no spec, so what
+was asked is the card. Its note names quick's own four check clauses and says that nothing ran the typecheck, the lint or a test on this
+machine, so the reviewer runs the types and the lint itself; and it says that its pass files the
 landing, so `again: true` is the only way back and it names no step.
 
 `rounds: 2`, where build's review has 3: a card that a review has to send back twice is a card that wanted `build`, and the
 second objection leaves the step `exhausted` with the run waiting on a person, who types `nemia retry <run> review --round` for a third or
 `nemia approve <run> review --message "<why>"` to take the work as it stands. `budget: 12`, where build's has 16: there is no spec to read, and the review reads
-one step's closeout rather than two. It held before the line bound went and holds without it: quick's 15 review tries to 2026-10-22
-cost $0.67 each on average, and build's 32, which read larger changes beside a spec, $3.85 against their 16 (`nemia stats --workflow
-<workflow> --by step`). A long mechanical diff costs reading, not judgement; a review that runs out on one says so in the run's
+one step's closeout rather than two. What review tries cost, per workflow, is `nemia stats --workflow
+<workflow> --by step`. A long mechanical diff costs reading, not judgement; a review that runs out on one says so in the run's
 figures, and the budget is a quick card then.
 
 **A finding sends the work back** to implement, on the same branch, with the findings in its brief — the workflow routes that, not the
@@ -78,8 +74,7 @@ run records the commit on its check's exit 0.
 
 A person who wants to read the change themselves before it lands puts the gate back for that run: `nemia start "<the card>"
 --workflows quick --gate land`, or `gate: land` on the inbox card. A run's own gates are read wherever a step's are (`hasGate`), so the
-landing then waits for `nemia approve <run> land` exactly as build's does. Nothing refuses a quick card that owes pictures without
-one: the review reads implement's pictures in light and dark, and a page or a state with no picture of it is a finding of its own.
+landing then waits for `nemia approve <run> land` exactly as build's does.
 
 **A landing that refuses**: nothing is merged and the checkout is untouched. Where the pull request is red or unmergeable, the work goes
 back through the review's loop with what refused it (`nemia decide <run>` prints the land step's `blocked`): `nemia retry <run> review
@@ -90,12 +85,12 @@ itself — but an ending its review routes is filed by the tick, with no person 
 
 ## The closeouts
 
-Implement declares two fields of its own (`implement.schema.json`), where `build`'s steps declare none: `plan`, what changes, where
-and what proves it, written before the work; and `pages`, the e2e pages she ran. The review reads both, and its own closeout is
+Implement declares a field of its own (`implement.schema.json`), where `build`'s steps declare none: `plan`, what changes, where
+and what proves it, written before the work. The review reads it, and its own closeout is
 Agora's: `findings` and `again`. `nemia decide <run>` and the run's page show them. The board does not show the change itself: read it
-in a terminal, `git diff main...wf/<run>/run`, until it does.
+in a terminal, `git diff main...<the run's branch>`, until it does.
 
 ## Start one
 
-`nemia start "<the card>" --workflows quick --factory nemia`, or a card of the inbox with `workflow: quick`. The factory lists the
-workflow once it is attached, a step by hand after this folder lands: `nemia factory attach nemia quick`.
+`nemia start "<the card>" --workflows quick --factory <factory>`, or a card of the inbox with `workflow: quick`. The factory lists
+the workflow once it is attached: `nemia factory attach <factory> quick`.

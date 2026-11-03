@@ -46,3 +46,9 @@ spec:
         - mcp__github__create_repository
         - mcp__github__fork_repository
         - mcp__github__actions_run_trigger
+        - Edit(${{ parameters.storeRoot }}/factories/**)
+        - Edit(${{ parameters.storeRoot }}/workflows/**)
+        - Edit(${{ parameters.storeRoot }}/inbox/**)
+        - Write(${{ parameters.storeRoot }}/factories/**)
+        - Write(${{ parameters.storeRoot }}/workflows/**)
+        - Write(${{ parameters.storeRoot }}/inbox/**)

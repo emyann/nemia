@@ -1,16 +1,16 @@
 /**
- * `node cards.ts <closeout.json>` — the janitor's cards filed in the inbox, each through `wf inbox add`, never one already there.
+ * `node cards.ts <closeout.json>` — the janitor's cards filed in the inbox, each through `nemia inbox add`, never one already there.
  *
  * Takes the path of Argus's closeout, flat (`WF_CLOSEOUT`): its `period` and `against`, each a `from` and a `to` day, and its `cards`,
  * each a `title`, a `kind`, a `correction`, its `evidence`, the `agent` it is about, and the `factory`, `workflow` and `repo` it is started
  * with. It checks the whole closeout first, then reads the first line of every card in `${WF_ROOT:-~/.agent-workflows}/inbox`, and files
- * each card whose title none has, compared without case or spacing, with `npx --no wf inbox add` run in `WF_WORKSPACE`. It starts,
+ * each card whose title none has, compared without case or spacing, with `nemia inbox add` run in `WF_WORKSPACE`. It starts,
  * queues and drops nothing, and never writes in the inbox itself.
  *
  * Prints a line per card, filed or already there, and exits 0. Exits 1, naming the fix on stderr and filing nothing, when no closeout
  * reached it, a card is not text where text is due, names no factory, workflow or repository or a relative one, two cards share a
  * title, or `against` is not as long as `period` or does not end the day before it starts; and, having filed the cards before it, when
- * `wf inbox add` fails.
+ * `nemia inbox add` fails.
  */
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -33,7 +33,12 @@ const KINDS = ['fence', 'body', 'skill', 'on-purpose'];
 const DAY_MS = 86_400_000;
 
 /** A title as two cards are compared on: no heading mark, no case, its spacing one space. */
-const normal = (title: string): string => title.replace(/^#+\s*/, '').replace(/\s+/g, ' ').trim().toLowerCase();
+const normal = (title: string): string =>
+  title
+    .replace(/^#+\s*/, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
 
 /** The closeout at `file`, parsed; refuses a missing argument, a file that does not read, or one that is not a JSON object. */
 function readCloseout(file: string | undefined): Record<string, unknown> {
@@ -119,7 +124,7 @@ function cardsOf(closeout: Record<string, unknown>): Card[] {
   return cards;
 }
 
-/** The first line of a card's body, past its frontmatter: what `wf inbox` lists as its title. */
+/** The first line of a card's body, past its frontmatter: what `nemia inbox` lists as its title. */
 function firstLine(text: string): string {
   const body = text
     .replace(/^\uFEFF/, '')
@@ -137,7 +142,7 @@ function inboxTitles(): Set<string> {
   return new Set(files.map((f) => normal(firstLine(fs.readFileSync(path.join(dir, f), 'utf8')))));
 }
 
-/** The card's text as `wf inbox add` files it: its title first, then the correction, the evidence and who filed it. */
+/** The card's text as `nemia inbox add` files it: its title first, then the correction, the evidence and who filed it. */
 const textOf = (card: Card, { period, against }: { period: Period; against: Period }): string =>
   [
     card.title.trim(),
@@ -150,23 +155,23 @@ const textOf = (card: Card, { period, against }: { period: Period; against: Peri
     '',
   ].join('\n');
 
-/** Files `card` through `wf inbox add`, from a file in `dir`; refuses, naming the card, when the command fails. */
+/** Files `card` through `nemia inbox add`, from a file in `dir`; refuses, naming the card, when the command fails. */
 function file(card: Card, text: string, dir: string, i: number): void {
   const at = path.join(dir, `card-${i + 1}.md`);
   fs.writeFileSync(at, text);
-  const args = ['--no', 'wf', 'inbox', 'add', at, '--workflow', card.workflow.trim(), '--repo', card.repo.trim()];
-  const ran = spawnSync('npx', [...args, '--factory', card.factory.trim()], {
+  const args = ['inbox', 'add', at, '--workflow', card.workflow.trim(), '--repo', card.repo.trim()];
+  const ran = spawnSync('nemia', [...args, '--factory', card.factory.trim()], {
     cwd: process.env.WF_WORKSPACE || process.cwd(),
     encoding: 'utf8',
     timeout: 60_000,
   });
   if (ran.status !== 0)
     throw new Refusal(
-      `card #${i + 1}, "${card.title.trim()}": wf inbox add failed (${ran.error?.message ?? `exit ${ran.status}`}): ` +
+      `card #${i + 1}, "${card.title.trim()}": nemia inbox add failed (${ran.error?.message ?? `exit ${ran.status}`}): ` +
         `${(ran.stderr ?? '').trim()}; ` +
         'the cards before it are filed, and the check run again files the rest',
     );
-  console.log(`wf janitor: filed ${ran.stdout.split('\n')[0].trim()}`);
+  console.log(`nemia janitor: filed ${ran.stdout.split('\n')[0].trim()}`);
 }
 
 /** Checks the closeout, then files each card the inbox has no title of. */
@@ -174,12 +179,12 @@ function main(): void {
   const closeout = readCloseout(process.argv[2]);
   const periods = checkPeriods(closeout);
   const cards = cardsOf(closeout);
-  if (!cards.length) return console.log('wf janitor: Argus proposed no correction, so no card is filed');
+  if (!cards.length) return console.log('nemia janitor: Argus proposed no correction, so no card is filed');
   const there = inboxTitles();
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'wf-janitor-'));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'nemia-janitor-'));
   try {
     cards.forEach((card, i) => {
-      if (there.has(normal(card.title))) return console.log(`wf janitor: already in the inbox: ${card.title.trim()}`);
+      if (there.has(normal(card.title))) return console.log(`nemia janitor: already in the inbox: ${card.title.trim()}`);
       file(card, textOf(card, periods), dir, i);
     });
   } finally {
@@ -191,6 +196,6 @@ try {
   main();
 } catch (err) {
   if (!(err instanceof Refusal)) throw err;
-  console.error(`wf janitor: ${err.message}`);
+  console.error(`nemia janitor: ${err.message}`);
   process.exitCode = 1;
 }

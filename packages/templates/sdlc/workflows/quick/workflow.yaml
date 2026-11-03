@@ -8,43 +8,19 @@ spec:
     - name: implement
       place: git
       budget: 20
-      check: "{ if [ -n \"${WF_WORKFLOW_FILES:-}\" ]; then node \"$WF_WORKFLOW_FILES/change.ts\" size; elif [ -n \"${WF_BASE_REF:-}\" ]; then s=$(mktemp -d) && { git show \"$WF_BASE_REF:workflows/quick/change.ts\" > \"$s/change.ts\" 2>/dev/null || { echo \"wf check: the run's base $WF_BASE_REF has no workflows/quick/change.ts, so the change cannot be measured; start the run on a base that has it\" >&2; false; }; } && node \"$s/change.ts\" size; c=$?; rm -rf \"$s\"; [ \"$c\" -eq 0 ]; else echo \"wf check: a change is measured only in a run's check, where WF_BASE_REF names the base the work began on\"; fi; } && { if [ -n \"${WF_WORKFLOW_FILES:-}\" ]; then node \"$WF_WORKFLOW_FILES/pictures.ts\" \"${WF_CLOSEOUT:-}\"; elif [ -n \"${WF_BASE_REF:-}\" ]; then p=$(mktemp -d) && { git show \"$WF_BASE_REF:workflows/build/pictures.ts\" > \"$p/pictures.ts\" 2>/dev/null || { echo \"wf check: the run's base $WF_BASE_REF has no workflows/build/pictures.ts, so no picture can be asked for; start the run on a base that has it\" >&2; false; }; } && node \"$p/pictures.ts\" \"${WF_CLOSEOUT:-}\"; c=$?; rm -rf \"$p\"; [ \"$c\" -eq 0 ]; else echo \"wf check: pictures are asked only in a run's check, where WF_BASE_REF names the base the work began on\"; fi; } && { if [ -n \"${WF_WORKFLOW_FILES:-}\" ]; then node \"$WF_WORKFLOW_FILES/probe.ts\" check; elif [ -n \"${WF_BASE_REF:-}\" ]; then q=$(mktemp -d) && { git show \"$WF_BASE_REF:workflows/build/probe.ts\" > \"$q/probe.ts\" 2>/dev/null || { echo \"wf check: the run's base $WF_BASE_REF has no workflows/build/probe.ts, so no probe can be read; start the run on a base that has it\" >&2; false; }; } && node \"$q/probe.ts\" check; c=$?; rm -rf \"$q\"; [ \"$c\" -eq 0 ]; else echo \"wf check: probes are read only in a run's check, where WF_BASE_REF and WF_RUN name the run\"; fi; } && { if [ -n \"${WF_WORKFLOW_FILES:-}\" ]; then node \"$WF_WORKFLOW_FILES/pull-request.ts\" push; elif [ -n \"${WF_BASE_REF:-}\" ]; then r=$(mktemp -d) && { git show \"$WF_BASE_REF:workflows/build/pull-request.ts\" > \"$r/pull-request.ts\" 2>/dev/null || { echo \"wf check: the run's base $WF_BASE_REF has no workflows/build/pull-request.ts, so the branch cannot be pushed and no pull request can be proven; start the run on a base that has it\" >&2; false; }; } && node \"$r/pull-request.ts\" push; c=$?; rm -rf \"$r\"; [ \"$c\" -eq 0 ]; else echo \"wf check: the branch is pushed, and its pull request proven to be at the commit this check judges, only in a run's check, where WF_BASE_REF names the base the work began on\"; fi; } && { if [ -n \"${WF_WORKFLOW_FILES:-}\" ]; then node \"$WF_WORKFLOW_FILES/pull-request.ts\" wait; elif [ -n \"${WF_BASE_REF:-}\" ]; then w=$(mktemp -d) && { git show \"$WF_BASE_REF:workflows/build/pull-request.ts\" > \"$w/pull-request.ts\" 2>/dev/null || { echo \"wf check: the run's base $WF_BASE_REF has no workflows/build/pull-request.ts, so CI's verdict cannot be read; start the run on a base that has it\" >&2; false; }; } && node \"$w/pull-request.ts\" wait; c=$?; rm -rf \"$w\"; [ \"$c\" -eq 0 ]; else echo \"wf check: CI's verdict is waited for only in a run's check, where WF_BASE_REF names the base the work began on\"; fi; }"
+      check: "{ if [ -n \"${WF_WORKFLOW_FILES:-}\" ]; then node \"$WF_WORKFLOW_FILES/change.ts\" size; else echo \"nemia check: WF_WORKFLOW_FILES is not set, so change.ts is read from the run's frozen workflow files alone: this check runs in a run, which sets it\" >&2; false; fi; } && { if [ -n \"${WF_WORKFLOW_FILES:-}\" ]; then node \"$WF_WORKFLOW_FILES/probe.ts\" check; else echo \"nemia check: WF_WORKFLOW_FILES is not set, so probe.ts is read from the run's frozen workflow files alone: this check runs in a run, which sets it\" >&2; false; fi; } && { if [ -n \"${WF_WORKFLOW_FILES:-}\" ]; then node \"$WF_WORKFLOW_FILES/pull-request.ts\" push; else echo \"nemia check: WF_WORKFLOW_FILES is not set, so pull-request.ts is read from the run's frozen workflow files alone: this check runs in a run, which sets it\" >&2; false; fi; } && { if [ -n \"${WF_WORKFLOW_FILES:-}\" ]; then node \"$WF_WORKFLOW_FILES/pull-request.ts\" wait --check \"${{ parameters.ciCheck }}\"; else echo \"nemia check: WF_WORKFLOW_FILES is not set, so pull-request.ts is read from the run's frozen workflow files alone: this check runs in a run, which sets it\" >&2; false; fi; }"
       output:
         path: workflows/quick/implement.schema.json
       overrides:
-        skills:
-          - effect
-          - shadcn
-          - change-the-board
-          - look
-          - react-aria
-          - see-a-dashboard
-          - tsverify
-          - change-a-contract
-          - apps/web:ds-build
-          - apps/web:ds-theme
-          - apps/web:ds-spec
-        mcp:
-          - playwright
         claude:
           context: 400k
-          fence:
-            disallowedTools:
-              - Bash(*:4318*)
-              - Bash(*:4317*)
     - name: land
       after:
         - review
       place: git
       workspace: base
       budget: 10
-      check: "{ if [ -n \"${WF_WORKFLOW_FILES:-}\" ]; then node \"$WF_WORKFLOW_FILES/landing.ts\" receipt --run \"$WF_RUN\"; else r=$(mktemp -d) && { git show \"HEAD:workflows/build/landing.ts\" > \"$r/landing.ts\" || { echo \"wf check: this checkout's HEAD has no workflows/build/landing.ts, so the landing this step made cannot be proven; land on a base that has it\" >&2; false; }; } && node \"$r/landing.ts\" receipt --run \"$WF_RUN\"; c=$?; rm -rf \"$r\"; [ \"$c\" -eq 0 ]; fi; }"
-      overrides:
-        claude:
-          fence:
-            disallowedTools:
-              - Bash(*:4318*)
-              - Bash(*:4317*)
+      check: "{ if [ -n \"${WF_WORKFLOW_FILES:-}\" ]; then node \"$WF_WORKFLOW_FILES/landing.ts\" receipt --run \"$WF_RUN\"; else echo \"nemia check: WF_WORKFLOW_FILES is not set, so landing.ts is read from the run's frozen workflow files alone: this check runs in a run, which sets it\" >&2; false; fi; }"
     - name: review
       after:
         - implement
@@ -55,61 +31,3 @@ spec:
       tally:
         - findings
         - findings.kind=placement
-      overrides:
-        skills:
-          - effect
-          - shadcn
-          - change-the-board
-          - look
-          - react-aria
-          - see-a-dashboard
-          - tsverify
-          - change-a-contract
-          - apps/web:ds-build
-          - apps/web:ds-theme
-          - apps/web:ds-spec
-        mcp:
-          - playwright
-        claude:
-          fence:
-            disallowedTools:
-              - Bash(npm run build)
-              - Bash(npm run e2e)
-              - Bash(npm test)
-              - Bash(npx shadcn@latest:*)
-              - Bash(pnpm dlx shadcn@latest:*)
-              - Bash(bunx --bun shadcn@latest:*)
-              - Bash(npx turbo run test *build*)
-              - Bash(node --test *e2e/*)
-              - Bash(npx tsc *-w*)
-              - Bash(npx tsc *-W*)
-              - Bash(npx tsc *-in*)
-              - Bash(npx tsc *-iN*)
-              - Bash(npx tsc *-In*)
-              - Bash(npx tsc *-IN*)
-              - Bash(npx tsc *-i *)
-              - Bash(npx tsc *-I *)
-              - Bash(npx tsc *-ts*)
-              - Bash(npx tsc *-tS*)
-              - Bash(npx tsc *-Ts*)
-              - Bash(npx tsc *-TS*)
-              - Bash(npx tsc *-g*)
-              - Bash(npx tsc *-G*)
-              - Bash(npx tsc * false*)
-              - Bash(npx tsc *@*)
-              - Bash(npx oxlint *--fix*)
-              - Bash(npx oxlint *--init*)
-              - Bash(npx oxlint *--lsp*)
-              - Bash(npx oxlint -c*)
-              - Bash(npx oxlint * -c*)
-              - Bash(npx oxlint *--config*)
-              - Bash(npx tsverify:*)
-              - Bash(npx turbo run test)
-              - Bash(npx turbo run test --force)
-              - Bash(npx turbo run test --continue)
-              - Bash(npx turbo run test --force --continue)
-              - Bash(npx turbo run test --continue --force)
-              - mcp__playwright__browser_navigate(url:*:8787*)
-              - mcp__playwright__browser_navigate(url:*:5173*)
-              - mcp__playwright__browser_tabs(url:*:8787*)
-              - mcp__playwright__browser_tabs(url:*:5173*)

@@ -1,0 +1,149 @@
+/**
+ * What the tests of a template share: its folder, the orchestrator's CLI spawned on a scratch store (`nemia`), a scratch copy of a
+ * template (`copyOf`), and a template applied and rendered as a factory's tree (`rendered`): filed by `nemia factory apply`, then
+ * rendered by the factory controller of a `nemia up` stopped as soon as each tree is seeded, since only the daemon renders a tree.
+ *
+ * Every spawn runs on a scratch store and a scratch home (`WF_ROOT`, `AE_ROOT`, `HOME`), so nothing of the person's is read or written.
+ * The orchestrator is reached by its CLI alone, found as a dependency is, in the nearest `node_modules`, at the place its package's
+ * `exports` give its entry `./bin` (`BIN`): only the client (`apps/cli/src/local.ts`) may resolve that entry by its name
+ * (`packages/agent-orchestrator/test/contract.test.ts`), and nothing here takes a path into the package of its own.
+ */
+import { spawn, spawnSync } from 'node:child_process';
+import fs from 'node:fs';
+import path from 'node:path';
+import { scratch } from './scratch.ts';
+
+/** This workspace: the folder each template is a folder of. */
+export const TEMPLATES = path.join(import.meta.dirname, '..');
+
+/** The template this workspace ships. */
+export const SDLC = path.join(TEMPLATES, 'sdlc');
+
+/** The orchestrator's package.json, in the nearest `node_modules` above this workspace that holds it, as node finds a dependency. */
+const ORCHESTRATOR = ((): string => {
+  for (let dir = TEMPLATES; ; dir = path.dirname(dir)) {
+    const manifest = path.join(dir, 'node_modules', 'agent-orchestrator', 'package.json');
+    if (fs.existsSync(manifest)) return manifest;
+    if (path.dirname(dir) === dir) throw new Error('agent-orchestrator is not installed above packages/templates: npm install');
+  }
+})();
+
+/** The orchestrator's CLI, `nemia`, where its package's exports put it (`./bin`). */
+const CLI_ENTRY = (JSON.parse(fs.readFileSync(ORCHESTRATOR, 'utf8')) as { exports: Record<string, string> }).exports['./bin'];
+if (CLI_ENTRY === undefined) throw new Error("agent-orchestrator's package.json exports no ./bin: say here where its CLI is");
+export const BIN = path.join(path.dirname(ORCHESTRATOR), CLI_ENTRY);
+
+/**
+ * Iris's interview skill, which sdlc names and does not carry: Nemia is to ship it builtin, and until then `nemia template
+ * lint` refuses sdlc for it. A test that needs a passing lint or a render carries this stub in its scratch copy (`copyOf`). Once Nemia
+ * ships it, this goes, and `copyOf` copies the folder as it is.
+ */
+const GRILLING_STUB = '---\nname: grilling\ndescription: A stand-in for the builtin interview skill until it ships.\n---\nAsk.\n';
+
+/** An environment on its own scratch store and home, with nothing of the test runner's. */
+export function storeEnv(root: string): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = {
+    ...process.env,
+    WF_ROOT: path.join(root, 'store'),
+    AE_ROOT: path.join(root, 'engine'),
+    HOME: path.join(root, 'home'),
+    WF_MAX_CONCURRENT: '2',
+    WF_MAX_RUNS: '2',
+  };
+  delete env.NODE_TEST_CONTEXT;
+  delete env.OTEL_EXPORTER_OTLP_ENDPOINT;
+  fs.mkdirSync(env.HOME!, { recursive: true });
+  return env;
+}
+
+/** `nemia <args>` on the store of `env`, bounded: its exit and its streams. */
+export function nemia(env: NodeJS.ProcessEnv, ...args: string[]): { code: number | null; out: string; err: string } {
+  const ran = spawnSync(process.execPath, [BIN, ...args], { env, encoding: 'utf8', timeout: 120_000 });
+  return { code: ran.status, out: ran.stdout, err: ran.stderr };
+}
+
+/**
+ * A scratch copy of the template `from`, as a folder of its own name, with Iris's interview skill carried as a stub
+ * (`GRILLING_STUB`), each file of it then changed by `edit`, which must change it: the copy's folder.
+ */
+export function copyOf(from: string, edit: Record<string, (text: string) => string> = {}): string {
+  const folder = path.join(scratch('nemia-template-'), path.basename(from));
+  fs.cpSync(from, folder, { recursive: true });
+  fs.mkdirSync(path.join(folder, 'skills', 'grilling'), { recursive: true });
+  fs.writeFileSync(path.join(folder, 'skills', 'grilling', 'SKILL.md'), GRILLING_STUB);
+  for (const [file, change] of Object.entries(edit)) {
+    const at = path.join(folder, file);
+    const text = fs.readFileSync(at, 'utf8');
+    if (change(text) === text) throw new Error(`${file} does not hold what the fixture changes: change the fixture`);
+    fs.writeFileSync(at, change(text));
+  }
+  return folder;
+}
+
+/** A factory to apply: its name, the template's folder, and its `--set` words, each `<key>=<value>`. */
+export type Applied = { name: string; template: string; sets?: string[] };
+
+/** A factory as the controller left it: its tree's folder where it was seeded, and the conditions of its status. */
+export type Tree = { tree: string | undefined; conditions: Array<{ type: string; status: string; reason: string }> };
+
+/**
+ * Each of `factories` applied on one scratch store, each over a scratch repository of its own, then rendered by `nemia up`, stopped once
+ * each factory has its status written: by name, its tree and its conditions. Throws where `nemia factory apply` refuses one.
+ */
+export async function rendered(factories: readonly Applied[]): Promise<Record<string, Tree>> {
+  const root = scratch('nemia-applied-');
+  const env = storeEnv(root);
+  for (const { name, template, sets = [] } of factories) {
+    const repo = path.join(root, 'repos', name);
+    fs.mkdirSync(repo, { recursive: true });
+    spawnSync('git', ['init', '-q'], { cwd: repo, env });
+    const applied = nemia(
+      env,
+      'factory',
+      'apply',
+      name,
+      '--template',
+      template,
+      '--repo',
+      repo,
+      '--no-trust',
+      ...sets.flatMap((s) => ['--set', s]),
+    );
+    if (applied.code !== 0) throw new Error(`nemia factory apply ${name} exited ${applied.code}: ${applied.err}`);
+  }
+  const folderOf = (name: string): string => path.join(env.WF_ROOT!, 'factories', name);
+  const statusOf = (name: string): Pick<Tree, 'conditions'> | undefined => {
+    const file = path.join(folderOf(name), 'status.json');
+    return fs.existsSync(file) ? (JSON.parse(fs.readFileSync(file, 'utf8')) as Pick<Tree, 'conditions'>) : undefined;
+  };
+  const appliedOf = (name: string): boolean => statusOf(name)?.conditions.some((c) => c.type === 'Applied' && c.status === 'True') ?? false;
+  const treeOf = (name: string): string => path.join(folderOf(name), 'tree');
+  const settled = (): boolean =>
+    factories.every(
+      ({ name }) => statusOf(name) !== undefined && (!appliedOf(name) || fs.existsSync(path.join(treeOf(name), 'factory.json'))),
+    );
+  const up = spawn(process.execPath, [BIN, 'up'], { env, stdio: ['ignore', 'ignore', 'pipe'] });
+  let said = '';
+  up.stderr.on('data', (chunk: Buffer) => (said += chunk.toString()));
+  const exited = new Promise((resolve) => up.once('exit', resolve));
+  try {
+    for (let polls = 0; !settled(); polls++) {
+      if (polls > 600 || up.exitCode !== null) throw new Error(`nemia up wrote no status for every factory: ${said}`);
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+  } finally {
+    up.kill('SIGTERM');
+    await exited;
+  }
+  return Object.fromEntries(
+    factories.map(({ name }) => [name, { tree: appliedOf(name) ? treeOf(name) : undefined, conditions: statusOf(name)?.conditions ?? [] }]),
+  );
+}
+
+/** Every file under `dir`, by its path from it, in order. */
+export const filesUnder = (dir: string): string[] =>
+  fs
+    .readdirSync(dir, { recursive: true, encoding: 'utf8' })
+    .filter((file) => fs.statSync(path.join(dir, file)).isFile())
+    .map((file) => file.split(path.sep).join('/'))
+    .sort();

@@ -16,7 +16,7 @@ import { testEngine } from 'agent-runtime/testing';
 import { eachTest } from '../../test/placed.ts';
 import { heldUnasked } from '../../test/unasked.ts';
 import { rawTar } from '../../test/tar.ts';
-import { teamCopy } from '../../test/team.ts';
+import { plantStepOutput, STEP_OUTPUT_SCHEMA, teamCopy } from '../../test/team.ts';
 import { anAgent } from '../../test/agent-walks.ts';
 import { Cause, Effect, Exit } from 'effect';
 import type { StoreRoot as Root } from '../config/root.store.ts';
@@ -228,6 +228,15 @@ test('what export writes from a repository and a factory, read back as it was wr
       });
     },
   );
+  await t.test("a step's own output: is written as a {path:} from the template's root, its schema carried beside it", () => {
+    const repo = repoWithTeam();
+    plantStepOutput(path.join(repo, 'workflows'));
+    const dir = target();
+    exportTemplate({ dir, from: repo });
+    assert.deepEqual(stepsOf(dir, 'dev').get('implement')?.output, { path: 'workflows/dev/implement.schema.json' });
+    assert.equal(fs.readFileSync(path.join(dir, 'workflows/dev/implement.schema.json'), 'utf8'), STEP_OUTPUT_SCHEMA);
+    assert.deepEqual(checkTemplateAt(dir), []);
+  });
   await t.test("a workflow's README and its files that are no .md or .yaml are carried with their modes, and so is a skill's", () => {
     const repo = repoWithTeam();
     const script = path.join(repo, 'workflows', 'dev', 'tools', 'gate.sh');

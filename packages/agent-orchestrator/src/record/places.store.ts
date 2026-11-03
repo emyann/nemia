@@ -35,6 +35,14 @@ export const workRoot = (runs: string, id: string): string => path.join(runs, id
 export const inputsRoot = (runs: string, id: string): string => path.join(runs, id, 'inputs');
 
 /**
+ * Where a run keeps its own copies of its workflow folder: `runs/<id>/workflow`, and with `hex` the one copy under that digest
+ * (`Run.workflowFiles`), written once by `freezeWorkflowFiles` (frozen.store.ts) and never again, so a check or a session told it as
+ * `WF_WORKFLOW_FILES` reads the files as the run took them, whatever the folder holds now. Beside the run's record, removed with it.
+ */
+export const workflowFilesRoot = (runs: string, id: string, hex?: string): string =>
+  hex === undefined ? path.join(runs, id, 'workflow') : path.join(runs, id, 'workflow', hex);
+
+/**
  * Replaces `to` with a copy of the directory `from`, taken now, or with nothing when `from` is not there. The copy leaves out:
  * - every symlink, unfollowed: a link in a step's folder pointing out of it undoes the fence, as `writeWorkflow` refuses by name;
  * - the source's own `given/` directory, which the run made for that step: what a step waits on is what that step made. A regular file

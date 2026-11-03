@@ -37,6 +37,7 @@ const { anAgent } = await import('./agent-walks.ts');
 const { loadWorkflows } = await import('../src/workflows/workflows.store.ts');
 const { configRefusal, engineOf } = await import('../src/runtime-client.ts');
 const { main } = await import('../src/cli/main.ts');
+const { runStore } = await import('../src/record/files.store.ts');
 const stage = staged({ runWith, main, engineOf });
 type ConfigRefused = import('../src/start/start.verb.ts').ConfigRefused;
 type Workflow = import('../src/step/step.ts').Workflow;
@@ -378,5 +379,34 @@ test("REFUSED at nemia start: a store whose path holds a `(`, which no permissio
     const prompt = fs.readFileSync(path.join(agentFilesDir(run, 'implement'), 'prompt.md'), 'utf8');
     assert.ok(prompt.includes('Write the notes, scribe.'), 'its instructions are rendered from the memory');
     assert.deepEqual(run.pinned?.find((p) => p.kind === 'agent')?.hash, version, "its pin carries the Agent door's version of it");
+  });
+});
+
+test("nemia start copies the workflow folder whole into the run's own, read-only, and refuses a link in it before anything is written", async (t) => {
+  await t.test('every file, at any depth, byte for byte and not writable, under the digest the record names', () => {
+    const dir = folder('frozen', lines({ implement: '' }));
+    fs.writeFileSync(path.join(dir, 'helper.ts'), 'console.log("first");\n');
+    fs.mkdirSync(path.join(dir, 'sub'));
+    fs.writeFileSync(path.join(dir, 'sub', 'x.json'), '{"x":1}\n');
+    const id = started(dir);
+    const record = JSON.parse(fs.readFileSync(path.join(ROOT, 'runs', `${id}.json`), 'utf8')) as { workflowFiles?: string };
+    assert.equal(typeof record.workflowFiles, 'string', 'the record names the copy');
+    const copy = path.join(ROOT, 'runs', id, 'workflow', String(record.workflowFiles));
+    for (const file of ['implement.md', 'helper.ts', path.join('sub', 'x.json')]) {
+      assert.deepEqual(fs.readFileSync(path.join(copy, file)), fs.readFileSync(path.join(dir, file)), `${file}: byte-equal`);
+      assert.equal(fs.statSync(path.join(copy, file)).mode & 0o222, 0, `${file}: no write bit`);
+    }
+    assert.deepEqual(fs.readdirSync(path.join(ROOT, 'runs', id, 'workflow')), [record.workflowFiles], 'one copy, no sibling left');
+    runStore.runs.forget(id);
+    assert.equal(fs.existsSync(path.join(ROOT, 'runs', id)), false, '`nemia rm` removes the copy with the run, its files unwritable');
+  });
+
+  await t.test('REFUSED: a link in the folder, named, and neither a run directory nor a record is left', async () => {
+    const dir = folder('linked', lines({ implement: '' }));
+    fs.symlinkSync(path.join(ROOT, 'notes.md'), path.join(dir, 'helper.ts'));
+    const dirs = () => (fs.existsSync(path.join(ROOT, 'runs')) ? fs.readdirSync(path.join(ROOT, 'runs')).sort() : []);
+    const before = dirs();
+    await refused(() => started(dir), path.join(dir, 'helper.ts'));
+    assert.deepEqual(dirs(), before, 'no run directory either');
   });
 });

@@ -65,6 +65,12 @@ const EXCEPTIONS: Readonly<Record<string, Exception>> = {
       "a run's rendered agents, runs/<id>/agents/<step>, are written once at nemia start and read by the tick: neither its record, a " +
       "person's file nor the inbox, which are runStore's",
   },
+  'packages/agent-orchestrator/src/frozen/frozen.store.ts': {
+    through: ['workflowFilesDir'],
+    why:
+      "a run's copy of its workflow folder, runs/<id>/workflow/<hex>, is written once per content at nemia start and where its pins " +
+      "move, and read by its checks and sessions as WF_WORKFLOW_FILES: neither its record, a person's file nor the inbox",
+  },
 };
 
 /** `node` without the parentheses, `as`, `satisfies` and `!` around it. */

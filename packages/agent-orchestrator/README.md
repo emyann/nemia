@@ -1559,6 +1559,17 @@ nothing that waits on the step ever runs. A step with no `check:` has nothing ru
   to read (`checks/<task>.closeout.json`). Its stdout and its stderr are the runtime's, each kept whole beside its
   attempt and read through the engine's `output` (`ae output <task> stdout`), since the engine's log of a task keeps
   only its last 8,000 characters.
+- **The command reads its workflow's own files as the run took them**, in `WF_WORKFLOW_FILES`: the absolute path of the
+  run's copy of its workflow folder (`runs/<id>/workflow/<hex>/`, every file at its path from the folder, none
+  writable), set for every check — a step's, an ending's and a folder run's — and in every session's environment beside
+  `WF_STEP_FILES`, its folder mounted read-only there and named on the brief. So a check line runs
+  `node "$WF_WORKFLOW_FILES/<script>.ts"`, whatever repository the run is on, and a script edited in the folder after
+  `nemia start` does not reach the run in flight. The copy is taken at `nemia start` (a link or a file of another kind
+  in the folder is refused there, before anything is written) and again wherever the run's pins move — its first
+  filing, `nemia refresh`, a factory that follows revisions (`renderAgain`) — so a check line and the scripts it runs
+  are always the one revision: a refresh cannot hand a run a check whose scripts are not where its line reads them.
+  The record names the copy as `workflowFiles`; a run started before it has none, and its checks are not told the
+  variable. A script edited alone is still no new revision of the workflow, which digests its `.md` and `.json` files.
 - The run commits what a step left **before** filing its check and never after, so what a suite leaves
   behind is not committed under the step's name.
 - **The step filed after a checked step is handed what the check said**, in its brief, under

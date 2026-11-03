@@ -510,7 +510,7 @@ A file at the top of `src/` is named in `PURE`, `STORE`, `CONTROLLER` or `CLIENT
 - **store** is the I/O beneath the controllers. It imports no agent-runtime, never a controller and not the client:
   branches and artifacts at the top, and record.store, folder.store, write.store, worktree.store, agents.store,
   custom.store, read.store (in agents and in skills), skills.store, plan.store, daemon.store, feed.store, inbox.store, tally.store,
-  places.store, config.store, series.store, subscription.store, level.store, disk.store and a2a.store in the folders. They load as a tree. At
+  places.store, config.store, series.store, subscription.store, level.store, disk.store, a2a.store and frozen.store in the folders. They load as a tree. At
   the bottom are record/places.store.ts, skills/read.store.ts (where agents and skills are looked for, and the skills read there),
   meter/tally.store.ts (the pass's meter) and config/config.store.ts, which import no store file; config/root.store.ts, the store's
   root as the service a program is given, imports config.store.ts and nothing else. agents/read.store.ts (the

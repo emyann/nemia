@@ -463,8 +463,11 @@ test("a run waits at its ending's gate, is approved, stages its merge, lands it 
       assert.ok(!allows(`${id}-implement`).some((r) => /^Read\(.*\)$/.test(r)), 'a step in a worktree is filed with its own rules only');
       assert.deepEqual(
         (tasks.get(`${id}-ship`)!.spec.config as { mounts?: unknown }).mounts,
-        [{ path: artifactsDir({ id }, 'implement'), readOnly: true }],
-        'and the ending is filed the folder of the step it comes after, read-only, and not its own',
+        [
+          { path: artifactsDir({ id }, 'implement'), readOnly: true },
+          { path: path.join(ROOT, 'runs', id, 'workflow', String(readRun(id).workflowFiles)), readOnly: true },
+        ],
+        "and the ending is filed the folder of the step it comes after and the run's copy of its workflow folder, read-only, and not its own",
       );
     },
   );

@@ -56,6 +56,7 @@ import { filedOn, resumeOn } from '../pinned/pinned.ts';
 import { closeoutSchemaOf, parseCloseout, type Closeout } from '../closeout/index.ts';
 import { modeWord, nextTry, sessionModel, tryWord, type Retry, type RetryAsk } from '../retry/index.ts';
 import { artifactsDir, inputsDir } from '../record/record.store.ts';
+import { workflowFilesDir } from '../frozen/frozen.store.ts';
 import { checkCloseout, writeCheckCloseout } from '../check/check.store.ts';
 import { checkoutParts, cutNotes, workspaceFor, type Cut } from '../workspace/worktree.store.ts';
 import { checksHandedRead, landingSaidRead, refusalRead, reportedEngine, saidIn, sessionIn } from '../views/views.verb.ts';
@@ -459,7 +460,12 @@ const fileCheck = Effect.fnUntraced(function* (f: Filing, name: string) {
       f.notes.push(
         `${name}: the merge's package-lock.json asks for ${install}, which the checkout's node_modules does not have: its check runs npm install there first`,
       );
-    const env = checkEnvOf(run, step, { workspace, files, closeout: closeout && writeCheckCloseout(taskId, closeout) });
+    const env = checkEnvOf(run, step, {
+      workspace,
+      files,
+      closeout: closeout && writeCheckCloseout(taskId, closeout),
+      ...(run.workflowFiles === undefined ? {} : { workflowFiles: workflowFilesDir(run, run.workflowFiles) }),
+    });
     yield* asked(
       'file',
       e.file({

@@ -72,8 +72,8 @@ const decided = async (id: string) => (await stage.runWith(board().e, decideRun(
 const statuses = async (id: string) => (await stage.runWith(board().e, list(board().e, readRun(id)))).steps.map((s) => s.message);
 /** The brief the engine was filed with for the task `id`. */
 const briefOf = (id: string): string => board().tasks.get(id)!.spec.brief;
-/** The runs in the store, by their files: a refused start writes none. */
-const runsWritten = () => fs.readdirSync(path.join(ROOT, 'runs')).length;
+/** The runs in the store, by their records (a run's own folder beside each): a refused start writes none. */
+const runsWritten = () => fs.readdirSync(path.join(ROOT, 'runs')).filter((name) => name.endsWith('.json')).length;
 
 /** A repository with one commit, so `nemia start` has a base to record. */
 const aRepo = (): string => {
@@ -325,7 +325,14 @@ test('a diamond plan: a, then b and c after it, then d after both — each files
     async () => {
       for (const card of ['b', 'c']) {
         const brief = briefOf(`${ids[card]}-implement`);
-        assert.ok(brief.includes(`## What was asked for\n\n${record(card).brief}\n\n## From run ${ids.a}\n`), brief);
+        const asked = brief.indexOf(`## What was asked for\n\n${record(card).brief}\n\n`);
+        const from = brief.indexOf(`\n\n## From run ${ids.a}\n`);
+        assert.ok(asked >= 0 && from > asked, brief);
+        assert.equal(
+          brief.slice(asked, from).includes('\n## '),
+          false,
+          'handed after what was asked for, and its folders, with no section between',
+        );
         const fromA = sectionOf(brief, ids.a);
         assert.ok(fromA.includes('What it was asked, the first line:\n\n```text\nParse the flag\n```'), fromA);
         assert.ok(

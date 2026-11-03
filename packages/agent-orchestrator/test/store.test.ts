@@ -222,6 +222,7 @@ test("REFUSED at shipped defaults: a run is never started under an id the store 
 
   const runs = path.join(ROOT, 'runs');
   fs.rmSync(path.join(runs, `${first.id}.json`));
+  fs.rmSync(path.join(runs, first.id), { recursive: true });
   fs.mkdirSync(path.join(runs, `${first.id}.asks`));
   draws = 0;
   const third = await runPlaced(startRun({ brief: 'add a flag', repo: aRepo(), workflowDir: WORKFLOW, isolate: false }));

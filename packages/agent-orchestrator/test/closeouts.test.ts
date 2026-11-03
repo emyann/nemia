@@ -372,7 +372,8 @@ test('files a closeout names', async (t) => {
   let gone = '';
   await s.test("implement is filed its files directory, made outside the workspace, in its session's env and in its brief", async () => {
     ({ id, files, task } = await filed());
-    assert.deepEqual(taskOf(task).spec.config?.env, { [STEP_FILES]: files });
+    const frozen = path.join(ROOT, 'runs', id, 'workflow', String(readRun(id).workflowFiles));
+    assert.deepEqual(taskOf(task).spec.config?.env, { [STEP_FILES]: files, WF_WORKFLOW_FILES: frozen });
     assert.ok(fs.statSync(files).isDirectory(), 'made before the step was filed');
     assert.ok(!files.startsWith(readRun(id).steps.implement.workspace! + path.sep), 'not in the workspace, where it would ride the branch');
     const brief = briefOf(task);
@@ -717,11 +718,11 @@ test('a run given inputs', async (t) => {
     const screen = (await printedBy(sub, ['decide', id])).split('\n');
     assert.deepEqual(screen.slice(0, 2), [`${id}  add a flag`, `  inputs  mock.png, brief notes.md  —  in ${dir}`]);
   });
-  await s.test('a run given none has no key on its record, no directory, and a brief without the line', async () => {
+  await s.test('a run given none has no key on its record, no inputs directory, and a brief without the line', async () => {
     const plain = await stage.runPlaced(startRun({ brief: 'add a flag', repo, workflowDir: twoSteps(), isolate: false }));
     const record = JSON.parse(fs.readFileSync(path.join(ROOT, 'runs', `${plain.id}.json`), 'utf8'));
     assert.equal(Object.hasOwn(record, 'inputs'), false);
-    assert.equal(fs.existsSync(path.join(ROOT, 'runs', plain.id)), false, 'no directory');
+    assert.equal(fs.existsSync(path.join(ROOT, 'runs', plain.id, 'inputs')), false, 'no inputs directory');
     await pass(plain.id);
     assert.doesNotMatch(briefOf(`${plain.id}-implement`), /nemia start --input/);
   });

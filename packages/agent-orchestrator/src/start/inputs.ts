@@ -127,7 +127,8 @@ function namedWords(step: string, files: HandedFiles | undefined): string {
  * What a step's brief says of the folders its run mounts, under what was asked for: each by its absolute path, those its `writable:` names
  * to write (`stepMounts`), the others to read and never write; then the folders it is filed with beyond them (`folders`, as `filedFolders`
  * in filed.ts files them), to read and never write: its own files directory (`own`), the artifacts folders of the steps before it
- * (`handed`), each with how to list it, and the store's folders its `reads:` names (`store`); a blank line before them. Nothing for a run
+ * (`handed`), each with how to list it, the store's folders its `reads:` names (`store`), and the run's copy of its workflow folder
+ * (`workflow`), by its path and its variable (`WF_WORKFLOW_FILES`); a blank line before them. Nothing for a run
  * that mounts none and a step given no other folder, and for a step on a remote agent, which is filed none.
  */
 export const mountsLine = (
@@ -139,7 +140,8 @@ export const mountsLine = (
   const mounts = local ? stepMounts(step, run.mounts) : undefined;
   const { handed, store } = local ? folders : { handed: [], store: [] };
   const own = (local ? folders.own : undefined) ?? [];
-  if (!mounts?.length && !own.length && !handed.length && !store.length) return [];
+  const workflow = workflowLines(local, folders.workflow);
+  if (!mounts?.length && !own.length && !handed.length && !store.length && !workflow.length) return [];
   const writes = (mounts ?? []).filter((m) => !m.readOnly);
   const reads = (mounts ?? []).filter((m) => m.readOnly);
   return [
@@ -165,8 +167,21 @@ export const mountsLine = (
           `Folders of the store you may read, and must not write, as this step's \`reads:\` names them: ${pathsOf(store)}. Each is mounted read-only; read it with Read, Grep and Glob.`,
         ]
       : []),
+    ...workflow,
   ];
 };
+
+/**
+ * What a brief says of the run's copy of its workflow folder (`workflow`, as `workflowMounts` files it, read-only), for a local step: its
+ * path and its variable (`WORKFLOW_FILES` in filed.ts, spelled out here so that the brief's module loads none of the filing's), to read
+ * and never write. Nothing where it is not mounted, and for a remote agent.
+ */
+const workflowLines = (local: boolean, workflow: readonly Mount[] | undefined): string[] =>
+  local && workflow?.length
+    ? [
+        `This workflow's own files, as the run took them, which you may read and must not write: ${pathsOf(workflow)}, named \`$WF_WORKFLOW_FILES\` in your environment. It is mounted read-only; run a script of the workflow from there (\`node "$WF_WORKFLOW_FILES/<script>.ts"\`), never from the folder it was started on, which may have changed since.`,
+      ]
+    : [];
 
 /**
  * What `nemia decide` says under a run's line of where the run came from: the inbox card it was started from. Undefined for a run typed at

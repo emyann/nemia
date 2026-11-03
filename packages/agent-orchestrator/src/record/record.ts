@@ -117,6 +117,13 @@ type RunBase = {
    */
   inputs?: string[];
   /**
+   * The digest's hex of the run's own copy of its workflow folder (`workflowFilesDir` in frozen.store.ts), which its next filings take:
+   * every check and session is told the folder as `WF_WORKFLOW_FILES`. Taken at `nemia start` (`freezeWorkflowFiles`) and again wherever
+   * the run's pins move (`renderAgain`), so a check line and the scripts it runs are the one revision. Absent on a run started before
+   * the copy was taken.
+   */
+  workflowFiles?: string;
+  /**
    * Where the run came from, when it was not typed at `nemia start`: `{ inbox: <name> }` for a card started out of the inbox
    * (`startFromInbox` in inbox.verb.ts), which keeps the card. The inbox's listing reads it to give the card its state, `started` while
    * this record stands, and `nemia inbox` to say it was `started as` this run, and `nemia decide` names the card under the run's line.

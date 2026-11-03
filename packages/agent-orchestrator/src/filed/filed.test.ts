@@ -12,7 +12,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { parseWorkflow, type Workflow } from '../workflow.ts';
-import { filedConfig, STEP_FILES } from './filed.ts';
+import { filedConfig, STEP_FILES, WORKFLOW_FILES, workflowMounts } from './filed.ts';
 import type { FactoryServers } from '../servers/servers.ts';
 import { configRefusal } from '../runtime-client.ts';
 import { filedRefusal, lineOf, type FiledFlags, type FiledStep } from '../keys/index.ts';
@@ -110,6 +110,46 @@ test('filedConfig: what a local step is filed beside its fence, its files direct
       assert.equal(Object.hasOwn(filed(stepOf('permissionMode: auto\n')), 'mounts'), false);
       assert.equal(Object.hasOwn(filed(stepOf('permissionMode: bypassPermissions\n')), 'mounts'), false);
       assert.equal(Object.hasOwn(filed(stepOf()), 'mounts'), false, "a step naming no mode runs in the runtime's default, auto");
+    },
+  );
+
+  await t.test(
+    "a local step is filed the run's copy of its workflow folder as WF_WORKFLOW_FILES, mounted read-only; given none, nothing changes",
+    () => {
+      const frozen = '/runs/r/workflow/ab12';
+      const withCopy = (step: Workflow) =>
+        filedConfig(
+          step,
+          [step],
+          { gates: [] },
+          {
+            model: undefined,
+            budgetUsd: undefined,
+            runArtifacts: '/runs/r/artifacts',
+            inbox: '/inbox',
+            workflowFiles: frozen,
+            own: {},
+            landingDenied: () => [],
+          },
+        );
+      assert.equal(WORKFLOW_FILES, 'WF_WORKFLOW_FILES');
+      const writer = withCopy(stepOf());
+      assert.deepEqual(writer.env, { WF_STEP_FILES: '/runs/r/artifacts/look', WF_WORKFLOW_FILES: frozen });
+      assert.deepEqual(writer.mounts, [{ path: frozen, readOnly: true }], "a writer's session reads it, and writes none of it");
+      const folderStep = parseWorkflow('draft', '---\nplace: folder\npermissionMode: dontAsk\n---\nDraft.\n');
+      assert.deepEqual(
+        withCopy(folderStep).mounts,
+        [
+          { path: '/runs/r/artifacts/draft', readOnly: true },
+          { path: frozen, readOnly: true },
+        ],
+        "a folder team's dontAsk step, fenced to its own folder, reads the copy through the mount",
+      );
+      assert.deepEqual(workflowMounts({ harness: 'a2a:far' }, frozen), [], 'a remote agent is filed no local field');
+      assert.deepEqual(workflowMounts({ harness: 'codex' }, frozen), [], 'a sandbox reads the disk already');
+      assert.deepEqual(workflowMounts({ harness: 'claude' }, '/runs (old)/r/workflow/ab12'), [], 'a path no rule carries is not mounted');
+      assert.deepEqual(filed(stepOf()).env, { WF_STEP_FILES: '/runs/r/artifacts/look' }, 'no copy: the key is absent');
+      assert.equal(Object.hasOwn(filed(stepOf()), 'mounts'), false, 'and no mount');
     },
   );
 

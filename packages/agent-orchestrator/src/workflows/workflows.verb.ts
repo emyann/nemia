@@ -81,6 +81,16 @@ export function factoryWriteOf(home: string, name: string, workflow: string): { 
   return { places: { repo: factory.repos[0] ?? tree, home }, fills: factoryFills(factory, workflow).fills };
 }
 
+/**
+ * Where `nemia workflows write` reads the draft folder of the workflow `workflow` for the templated factory `name` from, in the store
+ * `home`: as `factoryWriteOf` judges the write, but with the factory's tree as the store, whose `workflows/` holds the agents its hires
+ * name.
+ */
+export function factoryDraftOf(home: string, name: string, workflow: string): { places: Places; fills: Fills } {
+  const { places, fills } = factoryWriteOf(home, name, workflow);
+  return { places: { ...places, home: templatedTreeAt(home, name, 'nemia workflows write') }, fills };
+}
+
 /** Where a write's folder looks for its agents and skills, and the hires it is filled with: for the place `factory`, `factoryWriteOf`. */
 const writeJudgedOf = (args: Args, home: string): { places: Places; fills?: Fills } => {
   const factory = textOf(args, 'factory');

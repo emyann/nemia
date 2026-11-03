@@ -49,3 +49,30 @@ export const shippedFolders = (): string[] =>
     ...(fs.existsSync(holder) && stepFiles(fs.readdirSync(holder)).length > 0 ? [holder] : []),
     ...workflowsIn(holder).map((name) => path.join(holder, name)),
   ]);
+
+/** The strict schema `plantStepOutput` writes beside the team's `dev/implement.md`. */
+export const STEP_OUTPUT_SCHEMA = `${JSON.stringify(
+  {
+    type: 'object',
+    properties: { tests: { type: 'array', items: { type: 'string' } } },
+    required: ['tests'],
+    additionalProperties: false,
+  },
+  null,
+  2,
+)}\n`;
+
+/**
+ * The team's `dev/implement` in the copy `workflows` given a closeout schema of its own: `output: implement.schema.json` on its line, the
+ * schema beside it (`STEP_OUTPUT_SCHEMA`), and `output` offered on its agent's `overridable:` line, which a step's own `output:` needs.
+ */
+export function plantStepOutput(workflows: string): void {
+  const agent = path.join(workflows, 'agents', 'implementer.md');
+  fs.writeFileSync(agent, fs.readFileSync(agent, 'utf8').replace('overridable: fence, skills\n', 'overridable: output, fence, skills\n'));
+  const step = path.join(workflows, 'dev', 'implement.md');
+  fs.writeFileSync(
+    step,
+    fs.readFileSync(step, 'utf8').replace('agent: implementer\n', 'agent: implementer\noutput: implement.schema.json\n'),
+  );
+  fs.writeFileSync(path.join(workflows, 'dev', 'implement.schema.json'), STEP_OUTPUT_SCHEMA);
+}

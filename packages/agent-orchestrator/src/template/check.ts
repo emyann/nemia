@@ -1,7 +1,8 @@
 /**
  * `nemia template lint`'s judgement of a folder already read (`ReadFolder`): the layout's and each document's rules (`layout.ts`), then
- * what the folder's parts say of each other — a hire, a skill, a sibling step, a parameter or a file named that the folder lacks — and
- * each harness's block against the words the runtime gives that harness (`HARNESS_KNOBS`). Pure: every problem comes back at once.
+ * what the folder's parts say of each other — a hire, a skill, a sibling step, a parameter or a file named that the folder lacks, a step's
+ * own schema outside its workflow's folder — and each harness's block against the words the runtime gives that harness (`HARNESS_KNOBS`).
+ * Pure: every problem comes back at once.
  */
 import { HARNESS_KNOBS } from 'agent-runtime/vocabulary';
 import { DEFAULT_HARNESS, isRemoteHarness, REMOTE_PREFIX } from '../harness/harness.ts';
@@ -156,7 +157,27 @@ function wordRefusals(file: string, at: At, step: Record<string, unknown>): Refu
   return refusals;
 }
 
-/** What each step of each workflow breaks: a name used twice, a sibling it lacks, its words, its skills and its blocks. */
+/**
+ * What a step's own closeout schema (`output.path`) names that is no file of its workflow's folder: one of another folder, or a step's or
+ * the workflow's own `.md` or `.yaml`, as the loader holds it (`outputOf`). A file the template lacks, and a path absolute or through `..`,
+ * are `refRefusals`'.
+ */
+function outputRefusals(file: string, at: At, workflow: string, step: Record<string, unknown>): Refusal[] {
+  const named = isMap(step.output) ? step.output.path : undefined;
+  if (typeof named !== 'string') return [];
+  const folder = `workflows/${workflow}/`;
+  if (named.startsWith(folder) && named.length > folder.length && !/\.(md|yaml)$/.test(named)) return [];
+  const where = [...at, 'output', 'path'];
+  return [
+    {
+      file,
+      at: where,
+      message: `${spelled(where)} is ${named}, no schema of ${folder}: carry the step's schema beside it, as ${folder}${String(step.name)}.schema.json, and name that.`,
+    },
+  ];
+}
+
+/** What each step of each workflow breaks: a name used twice, a sibling it lacks, its words, its schema, its skills and its blocks. */
 function stepRefusals(held: Held): Refusal[] {
   return [...held.workflows].flatMap(([workflow, { file, steps }]) => {
     const names = steps.map((step) => step.name);
@@ -171,6 +192,7 @@ function stepRefusals(held: Held): Refusal[] {
           : []),
         ...siblingRefusals(file, at, step, names),
         ...wordRefusals(file, at, step),
+        ...outputRefusals(file, at, workflow, step),
         ...skillRefusals(file, [...at, 'overrides', 'skills'], overrides.skills, held),
         ...harnessRefusals(file, [...at, 'overrides'], overrides, typeof hired.harness === 'string' ? hired.harness : undefined),
       ];

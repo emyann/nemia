@@ -1,11 +1,11 @@
 /**
  * A checked template rendered into a factory's own folder, in today's format (`renderFactory`): the inverse of `nemia template export`'s
- * `draftOf`. Each workflow's steps become step files (`renderStep`), each agent an agent file (`renderAgent`) with its output schema
- * beside it, each skill's folder is carried as it is, and the manifest's hires, its revisions policy and the workflows become the
- * factory's wiring (`factory.json`), its instruction `NEMIA.md`, its rules `RULES.md`. The tree is laid out as yours is:
- * `workflows/<workflow>/`, `workflows/agents/` and `workflows/skills/`, so today's readers load it unchanged. Pure: the store reads the
- * folder and the files a document names, and writes what comes back. A key today's format has no place for is refused by name, never
- * dropped.
+ * `draftOf`. Each workflow's steps become step files (`renderStep`), a step's own closeout schema named beside it, each agent an agent
+ * file (`renderAgent`) with its output schema beside it, each skill's folder is carried as it is, and the manifest's hires, its revisions
+ * policy and the workflows become the factory's wiring (`factory.json`), its instruction `NEMIA.md`, its rules `RULES.md`. The tree is
+ * laid out as yours is: `workflows/<workflow>/`, `workflows/agents/` and `workflows/skills/`, so today's readers load it unchanged. Pure:
+ * the store reads the folder and the files a document names, and writes what comes back. A key today's format has no place for is refused
+ * by name, never dropped.
  */
 import { renderAgent, type AgentDraft } from '../agents/agents.ts';
 import { DEFAULT_HARNESS } from '../harness/harness.ts';
@@ -122,6 +122,13 @@ function stepFile(workflow: string, step: Spec, harness: string, read: TemplateR
   for (const key of STEP_WORDS) if (step[key] !== undefined) keys[key] = lineOf(step[key]);
   if (step.gate === true) keys.gate = 'true';
   Object.assign(keys, baseSpelled(keys));
+  const output = isMap(step.output) ? step.output.path : undefined;
+  const folder = `${WORKFLOWS}/${workflow}/`;
+  if (typeof output === 'string' && output.startsWith(folder)) keys.output = output.slice(folder.length);
+  else if (output !== undefined)
+    refusals.push(
+      `${where}: \`output.path\` is ${JSON.stringify(output)}, no file of ${folder}: carry the schema there, name it from the template's root, and apply again.`,
+    );
   const overrides = isMap(step.overrides) ? step.overrides : {};
   if (typeof overrides.harness === 'string') keys.harness = overrides.harness;
   if (overrides.skills !== undefined) keys.skills = lineOf(overrides.skills);

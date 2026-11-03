@@ -9,7 +9,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { parse, stringify } from 'yaml';
 import { scratch } from '../../test/scratch.ts';
-import { teamCopy } from '../../test/team.ts';
+import { plantStepOutput, STEP_OUTPUT_SCHEMA, teamCopy } from '../../test/team.ts';
 
 process.env.WF_ROOT = scratch('wf-render-');
 const { templated } = await import('../../test/templated.ts');
@@ -86,6 +86,21 @@ test("what a render writes into a factory's tree, read back as today's folder re
       );
     },
   );
+  await t.test("a step's own closeout schema is rendered back as its output: line, the schema beside it, and loads as it did", () => {
+    const repo = scratch('wf-render-repo-');
+    fs.renameSync(teamCopy(), path.join(repo, 'workflows'));
+    plantStepOutput(path.join(repo, 'workflows'));
+    const dir = path.join(scratch('wf-render-out-'), 'team');
+    exportTemplate({ dir, from: repo });
+    const { tree, out } = rendered(dir);
+    assert.deepEqual(out.refusals, []);
+    assert.match(fs.readFileSync(path.join(tree, 'workflows/dev/implement.md'), 'utf8'), /^output: implement\.schema\.json$/m);
+    assert.equal(fs.readFileSync(path.join(tree, 'workflows/dev/implement.schema.json'), 'utf8'), STEP_OUTPUT_SCHEMA);
+    const fills = { factory: 'team', workflow: 'dev', agents: { implement: 'implementer', review: 'reviewer', ship: 'shipper' } };
+    const loaded = loadWorkflows(path.join(tree, 'workflows', 'dev'), {}, fills);
+    assert.deepEqual(stepsOf(loaded), stepsOf(loadWorkflows(path.join(repo, 'workflows', 'dev'))));
+    assert.deepEqual(loaded.find((step) => step.name === 'implement')?.output?.schema, JSON.parse(STEP_OUTPUT_SCHEMA));
+  });
   await t.test("a manifest's revisions policy is rendered into the tree's wiring, and a manifest that says none renders none", () => {
     const { dir } = exported();
     assert.equal(Object.hasOwn(rendered(dir).out.wiring, 'revisions'), false, 'a manifest that says nothing leaves the factory pinned');

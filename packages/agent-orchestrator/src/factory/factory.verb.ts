@@ -41,6 +41,7 @@ nemia factory add <name> --repo <path> [--repo <path> ...] [--no-trust]
 nemia factory apply <name> --template <name|folder|archive> --repo <path> [--repo <path> ...] [--set <key>=<value> ...] [--no-trust]
 nemia factory adopt <name> --template <name|folder|archive> [--set <key>=<value> ...] --plan <digest>
 nemia factory diff <name> --to <x.y.z> [--template <name|folder|archive>]
+nemia factory diff <name> --template <name|folder|archive> [--set <key>=<value> ...]
 nemia factory upgrade <name> --to <x.y.z> [--template <name|folder|archive>] [--downgrade]
 nemia factory resolve <name> <conflict> --ours|--theirs|--file <path>
 nemia factory attach <factory> <workflow>
@@ -85,7 +86,8 @@ factory, naming the repositories its work is on, the workflows it offers and the
                  conditions Applied and ConflictsPending. Its attach, detach, hire, fire and instruct write the
                  tree, and nemia workflows, agents and skills write into it with --factory <name>. Its places
                  are trusted as nemia factory add trusts them, unless --no-trust.
-  nemia factory adopt takes a factory you made by hand over by a template, in place (nemia factory adopt --help).
+  nemia factory adopt takes a factory you made by hand over by a template, in place (nemia factory adopt --help). On
+                 such a factory, nemia factory diff previews the takeover and prints the digest --plan takes.
   nemia factory diff previews an upgrade of a templated factory to --to: the template, at its place or at --template,
                  rendered at that version with the factory's parameters and merged three ways — the base, your
                  tree, the render — each file whole first, factory.json by key, a step's frontmatter by key and

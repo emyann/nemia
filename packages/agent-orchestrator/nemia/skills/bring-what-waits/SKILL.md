@@ -135,8 +135,8 @@ Bring it:
 - **What is rewired**: the workflows added and dropped, each hire added, dropped or changed, and the revisions policy before and after.
 - **The rules no longer read**: where the factory keeps rules of its own, the plan says they stop being told once the tree's are, and
   prints the `nemia factory rules <factory> --file <path>` line that writes them into the tree after the takeover; ask whether they want it.
-- **The runs on record**: each keeps the workflow frozen on its record; under `follow` they take the tree's hires and rules at their next
-  step.
+- **The runs waiting or in flight**, as the board's list counts them, one that finished left off: each keeps the workflow frozen on its
+  record; under `follow` they take the tree's hires and rules at their next step.
 - **What it would strand**: a card filed and not started, or a schedule, whose workflow the template does not offer. The takeover is
   refused while one is: start the card or change its `workflow:` line, or `nemia factory unschedule <factory> <workflow>`, then preview
   again.

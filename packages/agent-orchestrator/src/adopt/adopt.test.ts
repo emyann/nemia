@@ -1,7 +1,7 @@
 /**
  * A takeover's plan, row by row: the workflows the template adds and drops, each hire it changes, the revisions policy before and after,
- * the store's rules it leaves unread with the line that writes them into the tree, the runs on record by the policy after, and the cards
- * and schedules it would strand. Its refusals are laws of `contracts/adopt.contract.ts`, not rows here.
+ * the store's rules it leaves unread with the line that writes them into the tree, the runs waiting or in flight by the policy after,
+ * and the cards and schedules it would strand. Its refusals are laws of `contracts/adopt.contract.ts`, not rows here.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -56,7 +56,7 @@ test("a takeover's plan, row by row", async (t) => {
     assert.ok(!adoptLines(adoptPlan(made, adoption(), [], null), 'sha256:d', 'adopt').some((l) => l.includes('nemia factory rules')));
   });
 
-  await t.test('the runs on record are counted under the policy after', () => {
+  await t.test('the runs waiting or in flight are counted under the policy after', () => {
     const plan = adoptPlan(made, adoption({ wiring: { workflows: ['a'], hires: {}, revisions: 'follow' } }), ['r2', 'r1'], null);
     assert.deepEqual(plan.runs, { ids: ['r1', 'r2'], policy: 'follow' });
   });

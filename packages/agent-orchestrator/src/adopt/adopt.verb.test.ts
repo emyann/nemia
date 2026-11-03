@@ -24,6 +24,7 @@ const { exportTemplate, reconciled } = programsAt(ROOT);
 const { readFactory } = await import('../runner.ts');
 const { appliedDir, treeDir } = await import('../applied/applied.store.ts');
 const { readRun } = await import('../record/record.store.ts');
+const { advanceRun, startRun } = await import('../runner.ts');
 const { main } = await import('../cli/main.ts');
 const { engineOf, runWith } = await import('../runtime-client.ts');
 const stage = staged({ runWith, main, engineOf });
@@ -85,6 +86,23 @@ async function madeByHand(t: { mock: { method: Function } }, name: string, repo:
   await printedBy(t, 'factory', 'attach', name, 'dev');
 }
 
+/**
+ * A run of `factory` that finished, as an intake's does: its one step signed off, no commit landed. Started on a folder of its own,
+ * its record then naming `factory`, as a run started there names it.
+ */
+async function aFinished(repo: string, factory: string): Promise<string> {
+  const steps = scratch('wf-adopt-once-');
+  fs.writeFileSync(path.join(steps, 'work.md'), '---\nplace: git\n---\nname it\n');
+  const board = stage.board();
+  const { id } = await stage.runPlaced(startRun({ brief: 'Name it', repo, workflowDir: steps, isolate: false }));
+  const file = path.join(ROOT, 'runs', `${id}.json`);
+  fs.writeFileSync(file, `${JSON.stringify({ ...JSON.parse(fs.readFileSync(file, 'utf8')), factory }, null, 2)}\n`);
+  await stage.runWith(board.e, advanceRun(readRun(id)));
+  board.settle(`${id}-work`, 'succeeded', { outcome: 'done', summary: 'named it', artifacts: [], needs: null });
+  await stage.runWith(board.e, advanceRun(readRun(id)));
+  return id;
+}
+
 /** A card filed for the factory `factory` and the workflow `workflow`, by its file in the inbox. */
 function card(name: string, factory: string, workflow: string): string {
   fs.mkdirSync(INBOX, { recursive: true });
@@ -98,12 +116,13 @@ test('a hand-made factory taken over by a template: previewed, written, its card
   let repo = '';
   let dir = '';
   let run = '';
+  let finished = '';
   let digest = '';
   let cardFile = '';
   let runBefore = '';
 
   await s.test(
-    'a factory made by hand: a repository, a schedule, an instruction, a later key, a filed card and a run in flight',
+    'a factory made by hand: a repository, a schedule, an instruction, a later key, a filed card, a run in flight and one finished',
     async (t) => {
       ({ repo, dir } = repoAndTemplate());
       await madeByHand(t, 'crew', repo);
@@ -112,6 +131,7 @@ test('a hand-made factory taken over by a template: previewed, written, its card
       fs.writeFileSync(path.join(FACTORIES, 'crew.json'), `${JSON.stringify({ ...fileOf('crew'), later: { kept: true } }, null, 2)}\n`);
       run = (await printedBy(t, 'start', 'Cache the views', '--factory', 'crew', '--workflows', 'dev'))[0].split(' ')[0];
       runBefore = JSON.stringify(readRun(run));
+      finished = await aFinished(repo, 'crew');
       cardFile = card('views', 'crew', 'dev');
     },
   );
@@ -122,10 +142,10 @@ test('a hand-made factory taken over by a template: previewed, written, its card
     assert.deepEqual(bytesUnder(ROOT), before, 'the preview writes nothing');
     assert.equal(fs.existsSync(appliedDir('crew')), false);
     assert.equal(fs.existsSync(treeDir('crew')), false);
-    assert.ok(
-      printed.some((l) => l.includes(run)),
-      'it names the run on record',
-    );
+    const runs = printed.find((l) => l.startsWith('runs waiting or in flight: '));
+    assert.ok(runs, printed.join('\n'));
+    assert.ok(runs.includes(run), `it names the run in flight: ${runs}`);
+    assert.equal(runs.includes(finished), false, 'it leaves off the run that finished');
     digest = digestIn(printed);
     assert.ok(
       printed.some((l) => l.includes(`nemia factory adopt crew --template ${dir} --plan ${digest}`)),
@@ -267,7 +287,6 @@ test('what nemia factory adopt refuses, each with nothing written', async (t) =>
   });
 });
 
-const { Effect } = await import('effect');
 const { FACTORY_PLAN } = await import('../upgrade/upgrade.verb.ts');
 const { FACTORY_ADOPT } = await import('./adopt.verb.ts');
 const { withBuiltins } = await import('../../test/templated.ts');
@@ -278,7 +297,7 @@ test('--template names a builtin template by its name: the takeover records the 
   fs.cpSync(dir, path.join(builtins, 'team'), { recursive: true });
   await madeByHand(t, 'named', repo);
   const handled = <D extends object>(command: { handler: (...a: never[]) => unknown }, args: Record<string, unknown>) =>
-    Effect.runPromise(withBuiltins((command.handler as Function)(args, undefined, ROOT), builtins)) as Promise<D>;
+    stage.runWith(stage.board().e, withBuiltins((command.handler as Function)(args, undefined, ROOT), builtins)) as Promise<D>;
 
   await t.test('REFUSED Missing, nothing written: a preview and a takeover by a name no builtin template has', async () => {
     const before = bytesUnder(ROOT);

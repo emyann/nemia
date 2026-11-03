@@ -7,7 +7,10 @@
  * next pass. Judged by `adopt.ts`, read and staged by `adopt.store.ts`.
  */
 import { Effect } from 'effect';
-import { tried } from '../runtime-client.ts';
+import { EngineService, tried } from '../runtime-client.ts';
+import { informerMemo } from '../rest/informer.verb.ts';
+import { runsSummarized } from '../summary/summary.verb.ts';
+import { inFactory, kindOf } from '../runlist/runlist.ts';
 import { leftOut, type Args, type Spec } from '../command/command.ts';
 import type { Command } from '../command/entry.verb.ts';
 import { Conflict, Invalid } from '../refusal/refusal.ts';
@@ -93,7 +96,8 @@ export type AdoptPreview = { kind: 'adopt'; plan: AdoptPlan; digest: string; lin
 
 /**
  * `nemia factory diff <name> --template <name|folder|archive> [--set …] [--to <x.y.z>]` on a factory made from no template: what taking it
- * over would change (`adoptPlan`), its digest, and the adopt line; nothing written. Run with the store's root given
+ * over would change (`adoptPlan`) — its runs those the run list counts waiting or in flight (`kindOf`) — its digest, and the adopt
+ * line; nothing written. Run with the store's root given
  * (`rooted`). Refused as `takeoverAsked` refuses, and a `--to`
  * other than the template's version (`Conflict`).
  */
@@ -111,7 +115,14 @@ export const adoptPreview = Effect.fn('adoptPreview')(function* (args: Args) {
     );
   const read = yield* adoptionAt(home, factory, render, notDone);
   const digest = yield* tried(() => planDigest(home, factory.name, render, source));
-  const plan = adoptPlan(factory, read.adoption, read.runs, read.rules);
+  const summaries = yield* runsSummarized(yield* EngineService, {
+    home,
+    memo: informerMemo(),
+    filings: { filed: new Map(), cursor: 0 },
+    verify: false,
+  });
+  const open = summaries.filter((r) => inFactory(factory.name)(r) && kindOf(r) !== 'finished').map((r) => r.id);
+  const plan = adoptPlan(factory, read.adoption, open, read.rules);
   return { kind: 'adopt', plan, digest, line: adoptLine(factory.name, source, sets, digest) } satisfies AdoptPreview;
 });
 

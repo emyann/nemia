@@ -1,9 +1,10 @@
 /**
  * A hand-made factory taken over in place by a template, judged: why a takeover is refused (`adoptRefusal`), the factory after one it
  * accepts (`adopted`), and what it will change, as the person previews it before anything is written (`adoptPlan`). Pure: what is on
- * disk — the render's wiring, the cards and runs naming the factory, the digests of a base or tree already there — is gathered by
- * `adopt.store.ts`, and the verbs are `adopt.verb.ts`'s. `contracts/adopt.contract.ts` proves that a takeover which would leave a filed
- * card or a schedule with no workflow, or write over a folder that is not the render, is refused, and what the factory keeps and takes.
+ * disk — the render's wiring, the cards naming the factory, the digests of a base or tree already there — is gathered by `adopt.store.ts`,
+ * its runs waiting or in flight by the run list, and the verbs are `adopt.verb.ts`'s. `contracts/adopt.contract.ts` proves that a
+ * takeover which would leave a filed card or a schedule with no workflow, or write over a folder that is not the render, is refused,
+ * and what the factory keeps and takes.
  */
 import type { Adopted, AdoptRefusal } from '../../contracts/adopt.contract.ts';
 import { DEFAULT_REVISIONS, type Factory, type Hires, type RevisionsPolicy } from '../factory/factory.ts';
@@ -110,8 +111,8 @@ export type HireChange = {
 
 /**
  * What a takeover of a factory will change, as the person previews it: what stays, the workflows added and dropped, each hire changed,
- * the revisions policy before and after, the store's rules that will no longer be read (their file, where they hold words), the runs on
- * record and the policy they follow after, and each card and schedule it would strand.
+ * the revisions policy before and after, the store's rules that will no longer be read (their file, where they hold words), the runs that
+ * wait on a person or are in flight and the policy they follow after, and each card and schedule it would strand.
  */
 export type AdoptPlan = {
   readonly factory: string;
@@ -140,7 +141,7 @@ function hireChanges(was: Hires, now: Hires): HireChange[] {
 }
 
 /**
- * What taking `factory` over as `adoption` says will change (`AdoptPlan`): `runs`, the runs on record in it that have not ended, and
+ * What taking `factory` over as `adoption` says will change (`AdoptPlan`): `runs`, its runs that wait on a person or are in flight, and
  * `rules`, the store's rules file of it where it holds words, which the tree's take the place of.
  */
 export function adoptPlan(factory: Factory, adoption: Adoption, runs: readonly string[], rules: string | null): AdoptPlan {
@@ -179,8 +180,8 @@ const hireLine = (h: HireChange): string =>
 
 /**
  * `plan` as `nemia factory diff` prints it for a hand-made factory: what stays, what the template rewires, the rules no longer read and
- * the line that writes them into the tree, the runs on record and the policy they follow after, what it would strand, and the line to
- * type, `adopt`, which carries the plan's `digest`. Nothing is written.
+ * the line that writes them into the tree, the runs waiting or in flight and the policy they follow after, what it would strand, and
+ * the line to type, `adopt`, which carries the plan's `digest`. Nothing is written.
  */
 export function adoptLines(plan: AdoptPlan, digest: string, adopt: string): string[] {
   const { factory, kept, workflows, hires, revisions, rules, runs, stranded } = plan;
@@ -198,8 +199,8 @@ export function adoptLines(plan: AdoptPlan, digest: string, adopt: string): stri
           `rules: ${rules} will no longer be read; the tree's are. To keep them, write them into the tree once it is taken over: nemia factory rules ${factory} --file ${rules}`,
         ]),
     runs.ids.length
-      ? `runs on record: ${runs.ids.join(', ')} — each keeps the workflow frozen on its record; ${runs.policy === 'follow' ? "under follow, each takes the tree's hires and rules at its next step" : 'under pinned, each keeps what it resolved'}`
-      : 'runs on record: none',
+      ? `runs waiting or in flight: ${runs.ids.join(', ')} — each keeps the workflow frozen on its record; ${runs.policy === 'follow' ? "under follow, each takes the tree's hires and rules at its next step" : 'under pinned, each keeps what it resolved'}`
+      : 'runs waiting or in flight: none',
     ...stranded.cards.map((c) => `stranded: the card ${c.name}, filed for ${c.workflow ?? ''}, which the template does not offer`),
     ...stranded.schedules.map(
       (w) => `stranded: the schedule of ${w}, which the template does not offer — nemia factory unschedule ${factory} ${w}`,

@@ -913,6 +913,9 @@ test('REFUSED: a home that says one of its sentences no more is named, the trigg
     }
 });
 
+/** The janitor's one step, as `TOLD` names it. */
+const JANITOR_STEP = TOLD.find((told) => told.workflow === 'janitor')!.step;
+
 test('REFUSED: a step whose note says again what moved to a home is named, in the home’s words or in its own old ones', () => {
   const planted = (workflow: string, step: string, sentence: string): string[] =>
     unhomed({ ...teamSteps(), [workflow]: shippedEdited(workflow, step, (text) => `${text}\n${sentence}\n`) });
@@ -922,7 +925,7 @@ test('REFUSED: a step whose note says again what moved to a home is named, in th
     ['quick', 'review', SHADCN_READ],
     ['build', 'implement', LAWS_TOLD[0]],
     ['quick', 'implement', GLOSSARY_TOLD],
-    ['janitor', 'argus', COLLECTOR_TOLD[0]],
+    ['janitor', JANITOR_STEP, COLLECTOR_TOLD[0]],
   ])
     assert.deepEqual(planted(workflow, step, sentence), [`${workflow}/${step}: says again "${sentence}"`], sentence);
 });

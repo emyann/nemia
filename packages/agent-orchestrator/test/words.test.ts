@@ -382,10 +382,20 @@ const LAYER_ABOVE_RULE: Rule = {
   fix: 'the runtime says it in its own words: a session that ended, the store, an attempt',
 };
 
+/**
+ * The package of the templates Nemia ships, which the team's rules do not read: a shipped template is a team in its own right, whose
+ * tests name its agents and its own `workflows/` by design, and what keeps this repository's words out of it is its own guard
+ * (`packages/templates/test/portable.test.ts`).
+ */
+const TEMPLATE_PACKAGES = ['templates'];
+
 const TEAM_RULE: Rule = {
   what: 'team names',
   dirs: [
-    ...fs.readdirSync(path.join(ROOT, 'packages')).flatMap((p) => ['src', 'test', 'bin', 'place'].map((d) => `packages/${p}/${d}`)),
+    ...fs
+      .readdirSync(path.join(ROOT, 'packages'))
+      .filter((p) => !TEMPLATE_PACKAGES.includes(p))
+      .flatMap((p) => ['src', 'test', 'bin', 'place'].map((d) => `packages/${p}/${d}`)),
     ...fs.readdirSync(path.join(ROOT, 'apps')).flatMap((a) => ['src', 'test'].map((d) => `apps/${a}/${d}`)),
   ],
   fix: "the team is this repository's, never the product's: name a fixture agent of test/fixtures/team (implementer, reviewer, shipper) and a factory no team holds (acme), or move the test beside the team's script in workflows/",
@@ -738,6 +748,7 @@ test("the team's rules read every package's and app's source and tests, but this
     assert.ok(read.includes(file), `${file} is read`);
   for (const file of TEAM_GUARD_FILES) assert.ok(!read.includes(file), `${file} says the names on purpose and is not read`);
   assert.ok(!read.some(vendored), "the board's vendored components and route tree are not read");
+  assert.ok(!read.some((file) => file.startsWith('packages/templates/')), 'the shipped templates, each a team of its own, are not read');
   assert.ok(TEAM_FOLDERS.includes('build') && TEAM_FOLDERS.includes('servers'), `the team's folders read are ${TEAM_FOLDERS.join(', ')}`);
   assert.ok(!TEAM_FOLDERS.includes('agents'), "the team's agents folder is no workflow of it");
   assert.ok(read.includes('packages/agent-orchestrator/test/fixtures/team/agents/implementer.md'), "a test's text fixture is read");

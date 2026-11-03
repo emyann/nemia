@@ -475,7 +475,7 @@ test("build's implement check pushes through the script before the typecheck, wa
   const check = loadWorkflows(BUILD, placesOf(BUILD)).find((step) => step.name === 'implement')?.check;
   assert.equal(typeof check, 'string', 'workflows/build has an implement step with a check');
   const frozen = check as string;
-  const clauses = [...frozen.matchAll(/node\s+"\$\w+\/([\w-]+\.ts)"\s+(check|push|wait)?/g)].map(([, script, verb]) =>
+  const clauses = [...frozen.matchAll(/node\s+"\$WF_WORKFLOW_FILES\/([\w-]+\.ts)"\s+(check|push|wait)?/g)].map(([, script, verb]) =>
     verb ? `${script} ${verb}` : script,
   );
   assert.deepEqual(clauses, ['pictures.ts', 'probe.ts check', 'pull-request.ts push', 'pull-request.ts wait']);
@@ -488,23 +488,30 @@ test("build's implement check pushes through the script before the typecheck, wa
   for (const verb of ['push', 'wait']) {
     const clause = clauseOf(frozen, verb);
     assert.ok(
-      clause.includes('git show "$WF_BASE_REF:workflows/build/pull-request.ts"'),
-      `${verb} reads the script from the run's base, in its own clause:\n${clause}`,
+      clause.startsWith(`{ if [ -n "\${WF_WORKFLOW_FILES:-}" ]; then node "$WF_WORKFLOW_FILES/pull-request.ts" ${verb};`),
+      `${verb} runs the script from the run's frozen workflow files first, in its own clause:\n${clause}`,
     );
-    assert.match(clause, /mktemp -d/, `${verb} reads it into a directory of its own:\n${clause}`);
+    const fallback = clause.slice(clause.indexOf('elif [ -n "${WF_BASE_REF:-}" ]'));
+    assert.ok(
+      fallback.includes('git show "$WF_BASE_REF:workflows/build/pull-request.ts"'),
+      `and, where they are unset, from the run's base:\n${clause}`,
+    );
+    assert.match(fallback, /mktemp -d/, `${verb} reads it into a directory of its own there:\n${clause}`);
   }
 });
 
 /**
- * The clause of the frozen check `frozen` that runs the pull-request script's `verb`: from the `{` that opens it to the `node … <verb>`
- * that ends it, so what the clause holds is read against that verb alone and not against another's.
+ * The clause of the frozen check `frozen` that runs the pull-request script's `verb`: from the `{` that opens it to the `fi; }` that
+ * closes it, so what the clause holds is read against that verb alone and not against another's.
  */
 function clauseOf(frozen: string, verb: string): string {
-  const ends = frozen.indexOf(`/pull-request.ts" ${verb}`);
-  assert.ok(ends > 0, `the check runs the script's ${verb}:\n${frozen}`);
-  const opens = frozen.lastIndexOf('{ if [ -n "${WF_BASE_REF:-}" ]', ends);
-  assert.ok(opens >= 0, `the ${verb} clause opens on the base:\n${frozen}`);
-  return frozen.slice(opens, ends);
+  const named = frozen.indexOf(`/pull-request.ts" ${verb}`);
+  assert.ok(named > 0, `the check runs the script's ${verb}:\n${frozen}`);
+  const opens = frozen.lastIndexOf('{ if [ -n "${WF_WORKFLOW_FILES:-}" ]', named);
+  assert.ok(opens >= 0, `the ${verb} clause opens on the frozen workflow files:\n${frozen}`);
+  const closes = frozen.indexOf('fi; }', named);
+  assert.ok(closes > named, `the ${verb} clause closes:\n${frozen}`);
+  return frozen.slice(opens, closes);
 }
 
 test('the wait tells its two bounds apart: the start is its own, and what is left of the check deadline bounds the whole', () => {

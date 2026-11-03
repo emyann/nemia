@@ -8,11 +8,12 @@ agent's body or a skill, or a refusal kept on purpose, each with the numbers beh
 argus
 ```
 
-The step's check files the cards (`cards.ts`, read from the run's base, never from the tree): each through `wf inbox add`, with its
-factory, workflow and repository, so it is ready to start. It refuses the whole closeout, filing nothing, when a card names no factory,
-workflow or repository, when two cards share a title, or when the period compared with is not as long as the period read and does not
-end the day before it. A card whose title the inbox already has is not filed again, so the check run again files only what is missing.
-Nothing is started: the inbox is where a person decides.
+The step's check files the cards (`cards.ts`, read from the run's frozen workflow files, `$WF_WORKFLOW_FILES`, or out of the run's base
+while that is unset; never from the tree): each through `wf inbox add`, with its factory, workflow and repository, so it is ready to
+start. It refuses the whole closeout, filing nothing, when a card names no factory, workflow or repository, when two cards share a
+title, or when the period compared with is not as long as the period read and does not end the day before it. A card whose title the
+inbox already has is not filed again, so the check run again files only what is missing. Nothing is started: the inbox is where a
+person decides.
 
 Schedule it in the nemia factory, and the daemon starts it every Monday morning, at every level, Nemia off:
 `nemia factory schedule nemia janitor --cron "0 9 * * 1" --brief "Read the stats" --tz America/Montreal`. Then `nemia factory ls` and

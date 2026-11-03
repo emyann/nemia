@@ -5,7 +5,7 @@ place: git
 agent: grace
 context: 400k
 check: |-
-  { if [ -n "${WF_BASE_REF:-}" ]; then p=$(mktemp -d) && { git show "$WF_BASE_REF:workflows/build/pictures.ts" > "$p/pictures.ts" 2>/dev/null || { echo "wf check: the run's base $WF_BASE_REF has no workflows/build/pictures.ts, so no picture can be asked for; start the run on a base that has it" >&2; false; }; } && node "$p/pictures.ts" "${WF_CLOSEOUT:-}"; c=$?; rm -rf "$p"; [ "$c" -eq 0 ]; else echo "wf check: pictures are asked only in a run's check, where WF_BASE_REF names the base the work began on"; fi; } && { if [ -n "${WF_BASE_REF:-}" ]; then q=$(mktemp -d) && { git show "$WF_BASE_REF:workflows/build/probe.ts" > "$q/probe.ts" 2>/dev/null || { echo "wf check: the run's base $WF_BASE_REF has no workflows/build/probe.ts, so no probe can be read; start the run on a base that has it" >&2; false; }; } && node "$q/probe.ts" check; c=$?; rm -rf "$q"; [ "$c" -eq 0 ]; else echo "wf check: probes are read only in a run's check, where WF_BASE_REF and WF_RUN name the run"; fi; } && { if [ -n "${WF_BASE_REF:-}" ]; then r=$(mktemp -d) && { git show "$WF_BASE_REF:workflows/build/pull-request.ts" > "$r/pull-request.ts" 2>/dev/null || { echo "wf check: the run's base $WF_BASE_REF has no workflows/build/pull-request.ts, so the branch cannot be pushed and no pull request can be proven; start the run on a base that has it" >&2; false; }; } && node "$r/pull-request.ts" push; c=$?; rm -rf "$r"; [ "$c" -eq 0 ]; else echo "wf check: the branch is pushed, and its pull request proven to be at the commit this check judges, only in a run's check, where WF_BASE_REF names the base the work began on"; fi; } && npm run typecheck && npm run lint && { if [ -n "${WF_BASE_REF:-}" ]; then w=$(mktemp -d) && { git show "$WF_BASE_REF:workflows/build/pull-request.ts" > "$w/pull-request.ts" 2>/dev/null || { echo "wf check: the run's base $WF_BASE_REF has no workflows/build/pull-request.ts, so CI's verdict cannot be read; start the run on a base that has it" >&2; false; }; } && node "$w/pull-request.ts" wait; c=$?; rm -rf "$w"; [ "$c" -eq 0 ]; else echo "wf check: CI's verdict is waited for only in a run's check, where WF_BASE_REF names the base the work began on"; fi; }
+  { if [ -n "${WF_WORKFLOW_FILES:-}" ]; then node "$WF_WORKFLOW_FILES/pictures.ts" "${WF_CLOSEOUT:-}"; elif [ -n "${WF_BASE_REF:-}" ]; then p=$(mktemp -d) && { git show "$WF_BASE_REF:workflows/build/pictures.ts" > "$p/pictures.ts" 2>/dev/null || { echo "wf check: the run's base $WF_BASE_REF has no workflows/build/pictures.ts, so no picture can be asked for; start the run on a base that has it" >&2; false; }; } && node "$p/pictures.ts" "${WF_CLOSEOUT:-}"; c=$?; rm -rf "$p"; [ "$c" -eq 0 ]; else echo "wf check: pictures are asked only in a run's check, where WF_BASE_REF names the base the work began on"; fi; } && { if [ -n "${WF_WORKFLOW_FILES:-}" ]; then node "$WF_WORKFLOW_FILES/probe.ts" check; elif [ -n "${WF_BASE_REF:-}" ]; then q=$(mktemp -d) && { git show "$WF_BASE_REF:workflows/build/probe.ts" > "$q/probe.ts" 2>/dev/null || { echo "wf check: the run's base $WF_BASE_REF has no workflows/build/probe.ts, so no probe can be read; start the run on a base that has it" >&2; false; }; } && node "$q/probe.ts" check; c=$?; rm -rf "$q"; [ "$c" -eq 0 ]; else echo "wf check: probes are read only in a run's check, where WF_BASE_REF and WF_RUN name the run"; fi; } && { if [ -n "${WF_WORKFLOW_FILES:-}" ]; then node "$WF_WORKFLOW_FILES/pull-request.ts" push; elif [ -n "${WF_BASE_REF:-}" ]; then r=$(mktemp -d) && { git show "$WF_BASE_REF:workflows/build/pull-request.ts" > "$r/pull-request.ts" 2>/dev/null || { echo "wf check: the run's base $WF_BASE_REF has no workflows/build/pull-request.ts, so the branch cannot be pushed and no pull request can be proven; start the run on a base that has it" >&2; false; }; } && node "$r/pull-request.ts" push; c=$?; rm -rf "$r"; [ "$c" -eq 0 ]; else echo "wf check: the branch is pushed, and its pull request proven to be at the commit this check judges, only in a run's check, where WF_BASE_REF names the base the work began on"; fi; } && npm run typecheck && npm run lint && { if [ -n "${WF_WORKFLOW_FILES:-}" ]; then node "$WF_WORKFLOW_FILES/pull-request.ts" wait; elif [ -n "${WF_BASE_REF:-}" ]; then w=$(mktemp -d) && { git show "$WF_BASE_REF:workflows/build/pull-request.ts" > "$w/pull-request.ts" 2>/dev/null || { echo "wf check: the run's base $WF_BASE_REF has no workflows/build/pull-request.ts, so CI's verdict cannot be read; start the run on a base that has it" >&2; false; }; } && node "$w/pull-request.ts" wait; c=$?; rm -rf "$w"; [ "$c" -eq 0 ]; else echo "wf check: CI's verdict is waited for only in a run's check, where WF_BASE_REF names the base the work began on"; fi; }
 budget: 40
 skills: effect, shadcn, change-the-board, look, react-aria, see-a-dashboard, tsverify, apps/web:ds-build, apps/web:ds-theme, apps/web:ds-spec
 mcp: playwright
@@ -14,12 +14,12 @@ claude:
     disallowedTools: Bash(*:4318*), Bash(*:4317*)
 ---
 **Open the pull request before you sign off**, once a round and after you merged the base: this run's change is judged on GitHub, and
-your fence refuses every `git push` and every `gh` call, so the push and the pull request are one frozen script, read from the base as
-your check reads it. Copy it out and run it:
+your fence refuses every `git push` and every `gh` call, so the push and the pull request are one frozen script, read from the run's
+frozen workflow files (`$WF_WORKFLOW_FILES`) as your check reads it, and out of the base only while that is unset. Run it:
 
 ```
-p=$(mktemp -d) && git show main-worktree/HEAD:workflows/build/pull-request.ts > "$p/pull-request.ts"
-node "$p/pull-request.ts" open --title "<the card's line>" --body-file "$WF_STEP_FILES/pr-body.md"
+if [ -n "${WF_WORKFLOW_FILES:-}" ]; then s="$WF_WORKFLOW_FILES/pull-request.ts"; else p=$(mktemp -d) && git show main-worktree/HEAD:workflows/build/pull-request.ts > "$p/pull-request.ts" && s="$p/pull-request.ts"; fi
+node "$s" open --title "<the card's line>" --body-file "$WF_STEP_FILES/pr-body.md"
 ```
 
 Write that body first, in a file of your files directory: what the change does and what proves it, a few paragraphs, amended as the
@@ -83,12 +83,12 @@ Measure again whatever your change wrote by a measure, a baseline or a count tha
 the merge. Say in your summary the commit you merged, or that git answered `Already up to date`. You merge the base into your
 branch, never your branch into the base. On a try whose brief is headed `## Merge`, merge the commit it names and no other.
 
-When you start a Claude Code session of your own to measure something, a probe, start it through `node workflows/build/probe.ts start
-<label> -- <prompt>`: a bare `claude --bg` or Remote Control is refused to you. It names the session for the run, runs it in the
-machinery's trusted folder (`$WF_ROOT/probes`), and tells the person no action is needed; pass `--settings` rather than edit a folder's
-settings. Only when the measurement needs the person's answer, add `--answer "<what to press>"`: the session then reaches their phone,
-and you stop `blocked` with the `needs` line it prints. Read your probes with `list`, and stop them with `stop` before you sign off:
-the check refuses a live one.
+When you start a Claude Code session of your own to measure something, a probe, start it through the run's frozen copy, `node
+"${WF_WORKFLOW_FILES:-workflows/build}/probe.ts" start <label> -- <prompt>`: a bare `claude --bg` or Remote Control is refused to you.
+It names the session for the run, runs it in the machinery's trusted folder (`$WF_ROOT/probes`), and tells the person no action is
+needed; pass `--settings` rather than edit a folder's settings. Only when the measurement needs the person's answer, add `--answer
+"<what to press>"`: the session then reaches their phone, and you stop `blocked` with the `needs` line it prints. Read your probes with
+`list`, and stop them with `stop` before you sign off: the check refuses a live one.
 
 When a measurement needs a collector, hold a throwaway stack and use its own: `node tools/observe/render/render.ts --hold` prints the
 collector's address as the `OTEL_EXPORTER_OTLP_ENDPOINT` to give what you start, and `--stop <name>` ends it. The live collector, on

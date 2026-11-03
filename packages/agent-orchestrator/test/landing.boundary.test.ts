@@ -594,14 +594,19 @@ test('REFUSED: a merge of a run that has one pull request merged and another sti
   assert.equal(stands(w.repo).head, w.base, 'and the checkout is untouched');
 });
 
-test("both land steps' checks are the receipt alone, frozen out of HEAD in the checkout, and run no suite and no e2e", () => {
+test("both land steps' checks are the receipt alone, run from the run's frozen workflow files, and run no suite and no e2e", () => {
   for (const workflow of ['build', 'quick']) {
     const root = path.join(REPO, 'workflows', workflow);
     const step = loadWorkflows(root, placesOf(root)).find((s) => s.name === 'land');
     assert.equal(typeof step?.check, 'string', `workflows/${workflow} has a land step with a check`);
     const frozen = step!.check!;
-    assert.ok(frozen.includes('git show "HEAD:workflows/build/landing.ts"'), `the receipt is frozen out of HEAD:\n${frozen}`);
-    assert.match(frozen, /mktemp -d/, `into a directory of its own:\n${frozen}`);
+    assert.ok(
+      frozen.startsWith('{ if [ -n "${WF_WORKFLOW_FILES:-}" ]; then node "$WF_WORKFLOW_FILES/landing.ts" receipt --run "$WF_RUN";'),
+      `the receipt is run from the run's frozen workflow files first:\n${frozen}`,
+    );
+    const fallback = frozen.slice(frozen.indexOf('; else '));
+    assert.ok(fallback.includes('git show "HEAD:workflows/build/landing.ts"'), `and out of HEAD where they are unset:\n${frozen}`);
+    assert.match(fallback, /mktemp -d/, `into a directory of its own:\n${frozen}`);
     assert.ok(frozen.includes('landing.ts" receipt --run "$WF_RUN"'), `and run on the run the check names:\n${frozen}`);
     assert.doesNotMatch(frozen, /\$WF_BASE_REF/, 'a workspace: base step is given no base ref');
     assert.doesNotMatch(frozen, /turbo run test|npm test/, "the suite is ci's, on the head the review read");

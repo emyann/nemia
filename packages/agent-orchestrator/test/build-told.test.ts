@@ -162,13 +162,15 @@ const LOOK_PARTS_TOLD = [
 ];
 
 /**
- * What implement is told of the pull request: to open it through the frozen script, read from the base, since it may type neither a push
- * nor a `gh` call; to name its address on its closeout; and what its check then does with it.
+ * What implement is told of the pull request: to open it through the frozen script, read from the run's frozen workflow files (out of
+ * the base while they are unset), since it may type neither a push nor a `gh` call; to name its address on its closeout; and what its
+ * check then does with it.
  */
 const OPENS_THE_PULL_REQUEST = [
   '**Open the pull request before you sign off**, once a round and after you merged the base',
+  'if [ -n "${WF_WORKFLOW_FILES:-}" ]; then s="$WF_WORKFLOW_FILES/pull-request.ts"; else',
   'git show main-worktree/HEAD:workflows/build/pull-request.ts',
-  'node "$p/pull-request.ts" open --title "<the card\'s line>" --body-file "$WF_STEP_FILES/pr-body.md"',
+  'node "$s" open --title "<the card\'s line>" --body-file "$WF_STEP_FILES/pr-body.md"',
   'The script pushes your own branch, never another and never the base and never forced',
   'Name the address it prints (`wf pr: <url>`) in your `artifacts` as a value',
   "Your check then pushes again through the same script, so CI's verdict is for the commit it judges, and waits on the `ci` context",

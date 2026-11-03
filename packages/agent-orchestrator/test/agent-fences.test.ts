@@ -1455,7 +1455,7 @@ test("REFUSED: a quick review whose skills, mcp, tally or fence is no more build
 test("REFUSED: a quick land whose check, workspace, gate, fence or budget is no more build's is unequal to it", () => {
   const edits: [string, (text: string) => string][] = [
     ['check', (text) => text.replace('receipt --run "$WF_RUN"', 'receipt --run "$WF_STEP"')],
-    ['check', (text) => text.replace('git show "HEAD:workflows/build/landing.ts"', 'cat workflows/build/landing.ts')],
+    ['check', (text) => text.replace('node "$WF_WORKFLOW_FILES/landing.ts" receipt', 'cat workflows/build/landing.ts | node - receipt')],
     ['note', (text) => text.replace('It deletes no branch and stages no merge here.', '')],
     ['workspace', (text) => text.replace('workspace: base\n', '')],
     ['fence', (text) => text.replace(', Bash(*:4317*)', '')],

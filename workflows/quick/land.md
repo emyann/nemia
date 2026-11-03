@@ -4,7 +4,7 @@ place: git
 workspace: base
 agent: otto
 check: |-
-  { r=$(mktemp -d) && { git show "HEAD:workflows/build/landing.ts" > "$r/landing.ts" || { echo "wf check: this checkout's HEAD has no workflows/build/landing.ts, so the landing this step made cannot be proven; land on a base that has it" >&2; false; }; } && node "$r/landing.ts" receipt --run "$WF_RUN"; c=$?; rm -rf "$r"; [ "$c" -eq 0 ]; }
+  { if [ -n "${WF_WORKFLOW_FILES:-}" ]; then node "$WF_WORKFLOW_FILES/landing.ts" receipt --run "$WF_RUN"; else r=$(mktemp -d) && { git show "HEAD:workflows/build/landing.ts" > "$r/landing.ts" || { echo "wf check: this checkout's HEAD has no workflows/build/landing.ts, so the landing this step made cannot be proven; land on a base that has it" >&2; false; }; } && node "$r/landing.ts" receipt --run "$WF_RUN"; c=$?; rm -rf "$r"; [ "$c" -eq 0 ]; fi; }
 budget: 10
 claude:
   fence:
@@ -12,11 +12,11 @@ claude:
 ---
 Land this run's result: merge its own pull request on GitHub, with a merge commit whose message you write, and fast-forward the base
 branch in this checkout. Both acts are the one frozen script this step's check also reads, so your fence can refuse every `gh` call and
-every `git push`. Copy it out and run it:
+every `git push`. Run it from the run's frozen workflow files (`$WF_WORKFLOW_FILES`), copied out of `HEAD` only while that is unset:
 
 ```
-p=$(mktemp -d) && git show "HEAD:workflows/build/landing.ts" > "$p/landing.ts"
-node "$p/landing.ts" merge --run "<this run's id>" --subject "<the subject line>" --body-file "$WF_STEP_FILES/merge-message.md"
+if [ -n "${WF_WORKFLOW_FILES:-}" ]; then l="$WF_WORKFLOW_FILES/landing.ts"; else p=$(mktemp -d) && git show "HEAD:workflows/build/landing.ts" > "$p/landing.ts" && l="$p/landing.ts"; fi
+node "$l" merge --run "<this run's id>" --subject "<the subject line>" --body-file "$WF_STEP_FILES/merge-message.md"
 ```
 
 Write that body first, in a file of your files directory: what landed and why, read off `git log` and `git diff --stat` of the result

@@ -22,27 +22,31 @@ A card says which with `workflow: quick` or `workflow: build`.
 
 The check is the cheap set, and CI: it runs `change.ts size`, `pictures.ts`, `probe.ts`, `pull-request.ts push` and
 `pull-request.ts wait`, in that order, and nothing else.
-Each script is read from the run's base (`git show "$WF_BASE_REF:…"`), never from the tree it judges:
+Each script is read from the run's frozen workflow files (`node "$WF_WORKFLOW_FILES/<script>.ts"`, the copy of this folder the run
+took when it began), never from the tree it judges; while a daemon that sets no `WF_WORKFLOW_FILES` runs the check, each clause falls
+back to the read it had before, out of the run's base (`git show "$WF_BASE_REF:…"`). The run copies this folder alone, so it carries
+`build`'s `pictures.ts`, `probe.ts`, `pull-request.ts` and `landing.ts` as copies of its own, which
+`tools/guards/test/workflow-scripts.test.ts` holds equal to `build`'s byte for byte: an edit to one is made to both.
 
 1. `change.ts size`, first: the net change from the base the branch holds to `HEAD` (`git diff --numstat -M`, so a line added then
    removed counts for nothing and a rename is one file). It says the files and the lines, a generated file
    (`package-lock.json`, `apps/web/theme/`, `apps/web/src/routeTree.gen.ts`, `GENERATED` in `change.ts`) left out, and refuses
    nothing by them. Its `wf size:` line is the review's measure of the change; the `touched` list is the place's report, and may count
    a rename as two. The step has no `retries:`: a refusal of any clause waits on a person.
-2. `build`'s `pictures.ts` and `probe.ts`, where they are in `workflows/build/`: a change under `apps/web/src` owes a picture, and
+2. `build`'s `pictures.ts` and `probe.ts`, quick's copies of them: a change under `apps/web/src` owes a picture, and
    no probe is left live.
-3. `build`'s `pull-request.ts`, where it is in `workflows/build/`: `push` pushes the branch and refuses unless the one open, non-draft
+3. `build`'s `pull-request.ts`, quick's copy of it: `push` pushes the branch and refuses unless the one open, non-draft
    pull request of it is at the commit the check judges; `wait` polls the `ci` context of that head and refuses a red, cancelled or
    missing one with the Actions URL, the failing jobs and a tail of their log.
 
 No typecheck, no lint, no test of a package and no e2e page on this machine: nothing here runs Grace's tests for her before the review.
 Her session runs the tests of what she changed, the types, the lint and the e2e pages a change to the board touches, as `CLAUDE.md`,
 *Check your work*, says of a step's session; CI's `ci` context runs the suite, the types, the lint and the whole e2e on the commit the
-check pushed, and the check waits on it. Land then merges that same pull request through `build`'s `landing.ts` and fast-forwards the
-checkout, and its check is the receipt that the merge happened — `build`'s land step to the letter but its `after:` and its gate
-(`agent-fences.test.ts` holds the two equal in everything else), note, check, fence and budget. Main has one guard, whatever the
-workflow: GitHub's required `ci` context on the head the review read, and a merge that refuses anything but this run's own green pull
-request.
+check pushed, and the check waits on it. Land then merges that same pull request through `build`'s `landing.ts` (quick's copy) and
+fast-forwards the checkout, and its check is the receipt that the merge happened — `build`'s land step to the letter but its `after:`
+and its gate (`agent-fences.test.ts` holds the two equal in everything else), note, check, fence and budget. Main has one guard,
+whatever the workflow: GitHub's required `ci` context on the head the review read, and a merge that refuses anything but this run's own
+green pull request.
 
 ## The review
 

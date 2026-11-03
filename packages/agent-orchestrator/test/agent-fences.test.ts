@@ -44,8 +44,8 @@
  * janitor deny both whole (`MEASURELESS_DENIES`). No tsconfig of the checkout makes `--noEmit` write (`buildInfoConfigs`). Design reads
  * what a contract proves by the verifier, which the settings allow (`VERIFY_ALLOW`, `VERIFIES`), and denies on its own line its cache,
  * which writes, and its watch, which never ends (`VERIFY_WRITES`, `VERIFY_DENIES`); review, intake and the janitor deny it whole
- * (`VERIFYLESS_DENIES`), review reading CI's verdict of every contract. Every command
- * a read-only step's note, or a skill section it is given (`TOLD_HOMES`), tells it to run is one its fence allows (`toldOf`), and each read-only agent is told, in one paragraph the
+ * (`VERIFYLESS_DENIES`), review reading CI's verdict of every contract. Every command a read-only step's note, or a section of a skill
+ * it is given (`TOLD_HOMES`), tells it to run is one its fence allows (`toldOf`), and each read-only agent is told, in one paragraph the
  * four hold equal, to say a refused call its work needs at the top of its sign-off (`REFUSAL_SAID`).
  * The render of a checkout's dashboards (`tools/observe/render/render.ts`) starts a container, so it is the implementer's alone: design
  * and review are refused each form of it and Docker by hand, since no allow reaches one (`RENDERS`, `DOCKER`).
@@ -68,7 +68,8 @@
  * The build workflow's design, implement and review steps each list `effect`, `shadcn`, `change-the-board` and `change-a-contract`
  * to their sessions (`workSkillsMissing`), and every path a repository skill says its work is on matches a file of the checkout
  * (`appliesUnmatched`). A dontAsk job given a skill whose SKILL.md grants tools is told to read that file with Read, since its fence
- * refuses the Skill tool's load: by its note, or by a skill it is given that grants nothing, which it loads (`grantingSkillsUnread`). Each call a shipped skill's rule says it breaks is one the stats count against it (`rulesOfTry`).
+ * refuses the Skill tool's load: by its note, or by a skill it is given that grants nothing, which it loads (`grantingSkillsUnread`).
+ * Each call a shipped skill's rule says it breaks is one the stats count against it (`rulesOfTry`).
  *
  * Every shipped step's `tools:` is callable under its own fence (`unallowedRefusal`), judged against this checkout's own allow rules:
  * a step held to its rules and given a tool no rule names could never call it, and the refusals would read in the feed like a fence
@@ -719,7 +720,13 @@ test("REFUSED: the kit's ds-spec command without the settings' allow of it is na
     () => checksOf(KIT_COMMAND.file, 'The project they speak of is the root', NODE_SPANS),
     (err: Error) => err.message.includes(`${KIT_COMMAND.file}: no "The project they speak of is the root"`),
   );
-  const named = shippedEdited('agora', 'build', 'its note', (text) => `${text}\nRun \`node ${READER_SCRIPT} <command>\`.\n`, 'build/review.md');
+  const named = shippedEdited(
+    'agora',
+    'build',
+    'its note',
+    (text) => `${text}\nRun \`node ${READER_SCRIPT} <command>\`.\n`,
+    'build/review.md',
+  );
   assert.deepEqual(readerNamedIn([named]), ['review: names the ds-spec reader']);
 });
 
@@ -1585,7 +1592,11 @@ test('REFUSED: design and both reviews, given a change-the-board with no line na
   const jobs = shipped()
     .map(({ step }) => step)
     .filter(dontAskJob);
-  assert.deepEqual(jobs.flatMap((step) => grantingSkillsUnread(step, REPO, unread)).sort(), ['design: shadcn', 'review: shadcn', 'review: shadcn']);
+  assert.deepEqual(jobs.flatMap((step) => grantingSkillsUnread(step, REPO, unread)).sort(), [
+    'design: shadcn',
+    'review: shadcn',
+    'review: shadcn',
+  ]);
   assert.deepEqual(
     jobs.flatMap((step) => grantingSkillsUnread(step)),
     [],

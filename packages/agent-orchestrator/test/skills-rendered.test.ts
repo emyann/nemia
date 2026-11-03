@@ -160,7 +160,10 @@ test("the board's skill, as build's implement step is given it, moves the shell 
 });
 
 /** What the board's skill's description, in every session's list of skills, says of when to load it and where it sends you next. */
-const SENDS_FIRST = [/load\s+it\s+before\s+reading,\s+writing\s+or\s+judging\s+a\s+file\s+there/, /It\s+sends\s+you\s+to\s+the\s+board's\s+components\s+\(shadcn\)/];
+const SENDS_FIRST = [
+  /load\s+it\s+before\s+reading,\s+writing\s+or\s+judging\s+a\s+file\s+there/,
+  /It\s+sends\s+you\s+to\s+the\s+board's\s+components\s+\(shadcn\)/,
+];
 
 /** What the board's skill `text` does not say in its description of `SENDS_FIRST`, a pattern's source each. */
 const unsentFirst = (text: string): string[] => {
@@ -174,5 +177,9 @@ test("build's implement step is given the board's skill, whose description sends
   assert.ok(step.agent?.addedSkills?.includes('change-the-board'), 'implement adds change-the-board');
   const text = fs.readFileSync(path.join(REPO, '.claude', 'skills', 'change-the-board', 'SKILL.md'), 'utf8');
   assert.deepEqual(unsentFirst(text), []);
-  assert.deepEqual(unsentFirst(text.replace('(shadcn)', '(its components)')), [SENDS_FIRST[1].source], 'REFUSED: one that names shadcn no more');
+  assert.deepEqual(
+    unsentFirst(text.replace('(shadcn)', '(its components)')),
+    [SENDS_FIRST[1].source],
+    'REFUSED: one that names shadcn no more',
+  );
 });

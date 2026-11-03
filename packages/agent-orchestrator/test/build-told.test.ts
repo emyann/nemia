@@ -175,7 +175,7 @@ const LOOK_PARTS_TOLD = [
 /** What the trigger skill says of the look's own parts: to take one before drawing one, and where, through its door. */
 const LOOK_PARTS_SAID = [
   "**For a cut, a plate, a tile or a rail, take the look's own part** before you draw one",
-  '`apps/web/src/components/look`, taken through its door (`@/components/look`), never from a part\'s own file.',
+  "`apps/web/src/components/look`, taken through its door (`@/components/look`), never from a part's own file.",
 ];
 
 /** What implement was told of shadcn in its note, which the trigger skill's first two items now say. */
@@ -247,14 +247,15 @@ const REVIEW_LAWS_TOLD = [
 ];
 
 /** Where no spec names the laws, `change-a-contract` says, they are named in the plan: what quick's implement was told of its own run. */
-const LAWS_IN_PLAN_SAID = 'Where no spec names the laws (a run with no design), name each in your plan, with its sentence, before you write it.';
+const LAWS_IN_PLAN_SAID =
+  'Where no spec names the laws (a run with no design), name each in your plan, with its sentence, before you write it.';
 const LAWS_IN_PLAN_TOLD = 'No spec names the laws in a quick run: name each in your `plan`, with its sentence, before you write it.';
 
 /** What an implement step was told in its note of a glossary table: its rows cite paths from the root, and the docs' tests run. */
 const GLOSSARY_TOLD =
   "When the change edits a context's `glossary.json`, cite each path in its rows from the repository's root (`packages/agent-orchestrator/src/folder/folder.model.ts`, never `src/folder/folder.model.ts`), and run the docs' tests after it, `node --test test/*.test.ts` in `apps/docs`: they read every table by a glob, so grepping the tests for its path does not find them.";
 
-/** What the root `CLAUDE.md` says of a glossary table, beside the rule of the tables: the rows' paths, and the docs' tests, found by no grep. */
+/** What the root `CLAUDE.md` says of a glossary table, beside the tables' rule: the rows' paths, and the docs' tests, found by no grep. */
 const GLOSSARY_SAID = [
   "A row cites each path from the repository's root (`packages/agent-orchestrator/src/folder/folder.model.ts`, never `src/folder/folder.model.ts`), and a change to a table runs the docs' tests, `node --test test/*.test.ts` in `apps/docs`: they read every table by a glob, so grepping the tests for its path does not find them.",
 ];
@@ -265,7 +266,7 @@ const COLLECTOR_TOLD = [
   "takes the factory's real work alone: a command that names either port is refused to you",
 ];
 
-/** What the root `CLAUDE.md` says of a collector, on its `tools/observe/` line: the throwaway, its end, and the live one's ports refused. */
+/** What the root `CLAUDE.md` says of a collector, on its `tools/observe/` line: the throwaway, its end, the live one's ports refused. */
 const COLLECTOR_SAID = [
   'a probe or a measurement goes to a held throwaway, `node tools/observe/render/render.ts --hold`, at the collector address it prints, and `--stop <name>` ends it',
   "a step's command that names the live collector's ports, a commit message or a search included, is refused it",
@@ -885,7 +886,9 @@ function unhomed(steps: Readonly<Record<string, readonly Step[]>>, read: (file: 
       ...home.steps.filter(ungiven).map((at) => `${at}: skill ${home.skill}`),
       ...Object.entries(steps).flatMap(([workflow, list]) =>
         list.flatMap((step) =>
-          moved.filter((sentence) => across(sentence).test(step.body)).map((sentence) => `${workflow}/${step.name}: says again "${sentence}"`),
+          moved
+            .filter((sentence) => across(sentence).test(step.body))
+            .map((sentence) => `${workflow}/${step.name}: says again "${sentence}"`),
         ),
       ),
     ];

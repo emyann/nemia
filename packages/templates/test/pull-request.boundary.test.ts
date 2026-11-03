@@ -18,10 +18,10 @@ import assert from 'node:assert/strict';
 import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { loadWorkflows } from 'agent-orchestrator';
 import { CHECK_DEADLINE_SECONDS, checkArgv } from 'agent-orchestrator/run';
 import { scratch } from './scratch.ts';
+import { BIN } from './template.ts';
 import { CI_URL, GREEN, type Called, type Gh, type Rule, bareOrigin, ghStub, gitIn, listed, passing, rollup, tip } from './origin.ts';
 
 /** The template these scripts ship in. */
@@ -35,7 +35,6 @@ const SCRIPT = path.join(BUILD, 'pull-request.ts');
 const CI = ['--check', 'ci'];
 
 /** The orchestrator's CLI, `nemia`, reached through its package's entry. */
-const BIN = fileURLToPath(import.meta.resolve('agent-orchestrator/bin'));
 
 /** sdlc as a factory gets it: the factory's rendered tree, and the scratch store it is in. */
 type Rendered = { tree: string; store: string };
@@ -49,18 +48,6 @@ function grillingStubbed(template: string, lints: (folder: string) => boolean): 
   if (lints(template)) return;
   fs.mkdirSync(path.join(template, 'skills', 'grilling'), { recursive: true });
   fs.writeFileSync(path.join(template, 'skills', 'grilling', 'SKILL.md'), '---\nname: grilling\ndescription: A stub.\n---\nA stub.\n');
-}
-
-/**
- * The template copy `template`'s agents without their `Write(<storeRoot>/…)` denies, which sdlc writes beside the `Edit(…)` ones and
- * the agent reader refuses (Claude Code matches a write against `Edit` rules alone), so that no hired step of the rendered tree loads.
- * Nothing is dropped once sdlc writes none, and this goes.
- */
-function writeDeniesDropped(template: string): void {
-  for (const agent of fs.readdirSync(path.join(template, 'agents'))) {
-    const file = path.join(template, 'agents', agent, 'agent.yaml');
-    fs.writeFileSync(file, fs.readFileSync(file, 'utf8').replace(/^\s*- Write\(\$\{\{ parameters\.storeRoot \}\}\/.*\n/gm, ''));
-  }
 }
 
 /**
@@ -84,7 +71,6 @@ async function rendered(sets: readonly string[] = []): Promise<Rendered> {
   };
   const nemia = (...args: string[]) => spawnSync(process.execPath, [BIN, ...args], { cwd: root, env, encoding: 'utf8', timeout: 60_000 });
   grillingStubbed(template, (folder) => nemia('template', 'lint', folder).status === 0);
-  writeDeniesDropped(template);
   const repo = path.join(root, 'repo');
   fs.mkdirSync(repo);
   gitIn(repo, 'init', '-q');

@@ -4,13 +4,13 @@
  * rendered by the factory controller of a `nemia up` stopped as soon as each tree is seeded, since only the daemon renders a tree.
  *
  * Every spawn runs on a scratch store and a scratch home (`WF_ROOT`, `AE_ROOT`, `HOME`), so nothing of the person's is read or written.
- * The orchestrator is reached by its CLI alone, found as a dependency is, in the nearest `node_modules`, at the place its package's
- * `exports` give its entry `./bin` (`BIN`): only the client (`apps/cli/src/local.ts`) may resolve that entry by its name
- * (`packages/agent-orchestrator/test/contract.test.ts`), and nothing here takes a path into the package of its own.
+ * The orchestrator is reached by its CLI alone, resolved by its entry (`BIN`): this file and the client (`apps/cli/src/local.ts`) are
+ * the two that may name it (`packages/agent-orchestrator/test/contract.test.ts`), and nothing here takes a path into the package.
  */
 import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { scratch } from './scratch.ts';
 
 /** This workspace: the folder each template is a folder of. */
@@ -19,19 +19,8 @@ export const TEMPLATES = path.join(import.meta.dirname, '..');
 /** The template this workspace ships. */
 export const SDLC = path.join(TEMPLATES, 'sdlc');
 
-/** The orchestrator's package.json, in the nearest `node_modules` above this workspace that holds it, as node finds a dependency. */
-const ORCHESTRATOR = ((): string => {
-  for (let dir = TEMPLATES; ; dir = path.dirname(dir)) {
-    const manifest = path.join(dir, 'node_modules', 'agent-orchestrator', 'package.json');
-    if (fs.existsSync(manifest)) return manifest;
-    if (path.dirname(dir) === dir) throw new Error('agent-orchestrator is not installed above packages/templates: npm install');
-  }
-})();
-
-/** The orchestrator's CLI, `nemia`, where its package's exports put it (`./bin`). */
-const CLI_ENTRY = (JSON.parse(fs.readFileSync(ORCHESTRATOR, 'utf8')) as { exports: Record<string, string> }).exports['./bin'];
-if (CLI_ENTRY === undefined) throw new Error("agent-orchestrator's package.json exports no ./bin: say here where its CLI is");
-export const BIN = path.join(path.dirname(ORCHESTRATOR), CLI_ENTRY);
+/** The orchestrator's CLI, `nemia`, at the entry its package exports for a spawn (`agent-orchestrator/bin`). */
+export const BIN = fileURLToPath(import.meta.resolve('agent-orchestrator/bin'));
 
 /**
  * Iris's interview skill, which sdlc names and does not carry: Nemia is to ship it builtin, and until then `nemia template

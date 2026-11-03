@@ -81,9 +81,11 @@ const READ_SET_DENIES = [
   'Bash(wc *--f*)',
 ];
 
-/** The store's folders no agent edits or writes, under `root`: its factories, its workflows and its inbox. */
-const storeDenies = (root: string): string[] =>
-  ['Edit', 'Write'].flatMap((tool) => ['factories', 'workflows', 'inbox'].map((folder) => `${tool}(${root}/${folder}/**)`));
+/**
+ * The store's folders no agent edits or writes, under `root`: its factories, its workflows and its inbox. An `Edit` rule alone, since
+ * Claude Code matches every file-editing tool, `Write` with it, against `Edit` rules, and the agent reader refuses a `Write(…)` rule.
+ */
+const storeDenies = (root: string): string[] => ['factories', 'workflows', 'inbox'].map((folder) => `Edit(${root}/${folder}/**)`);
 
 /** What each writer denies, Grace's and Otto's alike. */
 const WRITER_DENIES = [
@@ -180,7 +182,7 @@ const TREES = await rendered([
   {
     name: 'cut',
     template: copyOf(SDLC, {
-      'agents/otto/agent.yaml': (text) => text.replace('        - Write(${{ parameters.storeRoot }}/inbox/**)\n', ''),
+      'agents/otto/agent.yaml': (text) => text.replace('        - Edit(${{ parameters.storeRoot }}/inbox/**)\n', ''),
       'agents/agora/agent.yaml': (text) => text.replace('        - Bash(git *--output*)\n', ''),
       'agents/iris/agent.yaml': (text) => text.replace('        - Bash(git merge-base:*)\n', ''),
       'agents/grace/agent.yaml': (text) => text.replace('        - Bash(git push:*)\n', ''),
@@ -201,7 +203,7 @@ test('REFUSED: an agent with a line of its fence cut is named, with the rule it 
     `agora: denies no Bash(git *--output*)`,
     `grace: denies no Bash(git push:*)`,
     `iris: allows no Bash(git merge-base:*)`,
-    `otto: denies no Write(${STORE}/inbox/**)`,
+    `otto: denies no Edit(${STORE}/inbox/**)`,
   ]);
 });
 

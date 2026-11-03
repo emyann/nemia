@@ -79,6 +79,3 @@ spec:
         - Edit(${{ parameters.storeRoot }}/factories/**)
         - Edit(${{ parameters.storeRoot }}/workflows/**)
         - Edit(${{ parameters.storeRoot }}/inbox/**)
-        - Write(${{ parameters.storeRoot }}/factories/**)
-        - Write(${{ parameters.storeRoot }}/workflows/**)
-        - Write(${{ parameters.storeRoot }}/inbox/**)

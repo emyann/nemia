@@ -435,7 +435,7 @@ function placed(): { branch: string; run: string; leaf: string; onto: string } {
 
 /**
  * `pr`'s title and body set to `title` and the contents of `bodyFile`, through REST rather than `gh pr edit`: that command's GraphQL
- * query asks for `repository.pullRequest.projectCards`, which GitHub refuses since it deprecated Projects (classic), so it fails on a
+ * query asks for the pull request's project cards, which GitHub refuses since it deprecated Projects (classic), so it fails on a
  * pull request this script has every right to edit. `-F body=@<file>` has `gh` read the file, as `--body-file` did.
  */
 function edited(n: number, title: string, bodyFile: string): void {

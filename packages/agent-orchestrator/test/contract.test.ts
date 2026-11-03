@@ -5,7 +5,8 @@
  * alone. `./workflow` is the pure format, and what reads a folder from disk, the controllers and the refusals by kind are exported from
  * `agent-orchestrator`. Spawning `bin/wf.ts` is the package's CLI, not an import, and prose that names a file in src/ is not a route
  * to it. The client (`apps/cli`) spawns that CLI through two entries of its own, `agent-orchestrator/bin` and
- * `agent-orchestrator/bin/wf`, which are resolved, never imported, and by `apps/cli/src/local.ts` alone (`binBreaches`).
+ * `agent-orchestrator/bin/wf`, which are resolved, never imported, and by `apps/cli/src/local.ts` and the templates' test helper alone
+ * (`binBreaches`, `SPAWNERS`).
  *
  * The scan reads every file git lists outside this package, tracked or not yet added. Turbo caches this package's pass by this package's
  * files alone: after a change elsewhere, `npx turbo run test --force`, or turbo replays a pass that read none of it. The scanner is a copy
@@ -59,8 +60,14 @@ type Guarded = { name: string; dir: string; entries: readonly string[] };
 /** The CLI's entries: resolved to the file the client spawns, never imported (`binBreaches`), and so no entry `breaches` reads. */
 const SPAWNED = ['agent-orchestrator/bin', 'agent-orchestrator/bin/wf'];
 
-/** The one file that resolves `SPAWNED`: the client's one reach of the orchestrator, a process and no import. */
+/** The client's file that resolves `SPAWNED`: its one reach of the orchestrator, a process and no import. */
 const SPAWNER = 'apps/cli/src/local.ts';
+
+/**
+ * Every file that may resolve `SPAWNED`: the client's, and the templates' tests' helper, which applies and renders a shipped template
+ * through the CLI as a person does, the templates being reached by no import of the orchestrator's.
+ */
+const SPAWNERS = [SPAWNER, 'packages/templates/test/template.ts'];
 
 /** What in `file` reaches `guarded` other than by its entries: each breach, worded with what to do instead. */
 function breaches(file: string, text: string, guarded: Guarded): string[] {
@@ -202,12 +209,13 @@ function spawnedNames(text: string): { line: number; spec: string; imported: boo
 function binBreaches(file: string, text: string): string[] {
   return spawnedNames(text).flatMap(({ line, spec, imported }) => {
     if (imported) return [`${file}:${line} imports ${spec}, the orchestrator's CLI: spawn it from ${SPAWNER} (spawned), never import it`];
-    if (file !== SPAWNER) return [`${file}:${line} names ${spec} outside ${SPAWNER}: run the old path through its spawned`];
+    if (!SPAWNERS.includes(file))
+      return [`${file}:${line} names ${spec} outside ${SPAWNERS.join(' and ')}: run the old path through its spawned`];
     return [];
   });
 }
 
-test('the CLI entries are resolved by apps/cli/src/local.ts alone, and imported by no file', () => {
+test("the CLI entries are resolved by apps/cli/src/local.ts and the templates' test helper alone, and imported by no file", () => {
   const files = workspaceFiles(GUARDED);
   assert.ok(files.includes(SPAWNER), `the scan reads ${SPAWNER}`);
   const spawner = spawnedNames(fs.readFileSync(path.join(ROOT, SPAWNER), 'utf8'));
@@ -232,6 +240,8 @@ test('REFUSED: a CLI entry resolved outside apps/cli/src/local.ts, and one impor
     assert.ok(binBreaches(SPAWNER, imported)[0].includes(' imports '), imported);
   }
   assert.deepEqual(binBreaches(SPAWNER, resolve), [], 'the resolve in the spawner');
+  assert.deepEqual(binBreaches(SPAWNERS[1], resolve), [], "the resolve in the templates' helper");
+  assert.equal(binBreaches('packages/templates/test/x.test.ts', resolve).length, 1, "a templates' test beside the helper");
   assert.deepEqual(
     binBreaches(SPAWNER, "import.meta.resolve(entry === 'wf' ? 'agent-orchestrator/bin/wf' : 'agent-orchestrator/bin')"),
     [],

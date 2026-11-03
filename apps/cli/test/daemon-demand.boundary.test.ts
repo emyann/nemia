@@ -15,11 +15,11 @@ import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import net from 'node:net';
-import os from 'node:os';
 import path from 'node:path';
+import { scratch } from '../../api/test/scratch.ts';
 
 const BIN = path.join(import.meta.dirname, '..', 'bin', 'nemia.ts');
-const SCRATCH = fs.mkdtempSync(path.join(os.tmpdir(), 'nemia-demand-'));
+const SCRATCH = scratch('nemia-demand-');
 const ROOT = path.join(SCRATCH, 'store');
 const HOME = path.join(SCRATCH, 'home');
 fs.mkdirSync(ROOT, { recursive: true });

@@ -459,13 +459,13 @@ its run's `baseRef`, keyed by two commit ids — the commit judged and the `base
 only while the branch's commit is still the one judged, and a restart asks every `baseRef` once (`StandingMemo` in
 `src/standing/standing.verb.ts`). The stats keep one more, on the same key, in the process that serves them: each finished run's facts,
 while its files in the store stamp the same and nothing of its tasks is on the feed (`StatsMemo` in
-`src/stats/stats.verb.ts`), and the board's list of runs one more: each finished run's summary, while its record, its files in the
-store, its tasks on the feed and its branches' tips stand (`RestingMemo` in `src/rest/resting.verb.ts`, read by the list's `runs` entry
-through `runsSummarized` in `src/summary/summary.verb.ts`), every memo brought up to the feed by `src/rest/rest.verb.ts`. The `runs open`
+`src/stats/stats.verb.ts`), and the api one more: the informer (*Who owns what*, `Informer` in `src/rest/informer.verb.ts`), each run's judgement while
+its record, its files in the store, its tasks on the feed and its branches' tips stand — a run at rest across passes, a moving run
+within the pass that judged it — read by the run object, its sub-resources and the list's `runs` entry through `runsSummarized` in
+`src/summary/summary.verb.ts`, every memo brought up to the feed by `src/rest/rest.verb.ts`. The `runs open`
 and `runs finished` entries (`src/runlist/runlist.verb.ts`) answer through the same memo and keep nothing of their own. The api holds
 both for an app; `wf stats` and `wf ls` keep none, and the api's tests read every answer from them afresh as well (`WF_VERIFY_REST`).
-The informer (*Who owns what*) is the same kind of cache, of every run's judgement rather than a finished run's summary, on the same
-inputs.
+The stats' memo and the informer are each a cache of a pure function, in memory only, which a restart rebuilds.
 
 ## The rules
 

@@ -183,7 +183,8 @@ too, which holds parity with this one until the in-process reads retire.
   hands the runtime the ceiling and the pools. A new engine verb goes into `ENGINE_PHASES`, and into `ENGINE_WRITES`, or `ENGINE_READS`
   where it changes no task (`views/views.verb.ts`); an admitted task starts on the runtime's next pass.
 - **Every test file that ticks a store sets `WF_VERIFY_REST=1`**, and a new input of a finished run's pass goes into `restStamps` (and
-  into the list's own memo, `restingRead`): what the stamps miss is missed for good. The informer beside it (`src/rest/`) holds every
+  into the informer's read of it, `informerRead` in `src/rest/informer.verb.ts`, whose `informedOf` decides): what the stamps miss is
+  missed for good. The informer beside it (`src/rest/`) holds every
   run's judgement for a daemon, filled by the pass and read by the api's run object, list and sub-resources, checked against the same
   inputs before it is served and rebuilt on a restart: a new input of a run's judgement goes into what it checks too.
 - **A test that starts a daemon and reads a finished run's worktree afterwards sets `WF_KEEP_WORKTREES=1`**: the daemon frees a finished

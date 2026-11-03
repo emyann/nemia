@@ -99,7 +99,14 @@ const MISSPELLED = [
 ] as const;
 
 /** A filing stamps its run's person labels beside the closed five; `FeedLabels` names only those five, hence the cast. */
-const PERSON_LABELLED = { run: 'r-10', factory: 'acme', workflow: 'build', step: 'implement', agent: 'implementer', team: 'core' } as FeedLabels;
+const PERSON_LABELLED = {
+  run: 'r-10',
+  factory: 'acme',
+  workflow: 'build',
+  step: 'implement',
+  agent: 'implementer',
+  team: 'core',
+} as FeedLabels;
 
 /** The lines of `EVERY` the selectors `values` spell select, by what each line is about. */
 const selected = (values: readonly string[]): string[] => {
@@ -130,8 +137,8 @@ test('selectorsRefusal and labelKeysRefusal: the keys a selector may name, and e
       labels: every,
     });
     const on = selectableOf(carries);
-    for (const key of Object.keys(every)) assert.equal(on[key], every[key as keyof FeedLabels], key);
-    for (const key of Object.keys(every)) assert.equal(selectorsRefusal([`${key}=${every[key as keyof FeedLabels]}`]), undefined, key);
+    for (const key of Object.keys(every)) assert.equal(on[key], every[key], key);
+    for (const key of Object.keys(every)) assert.equal(selectorsRefusal([`${key}=${every[key]}`]), undefined, key);
   });
   await t.test('a label may not take a reserved name of a line, and the refusal names it', () => {
     assert.equal(labelKeysRefusal(LABEL_KEYS), undefined, 'the labels the feed ships with take none');

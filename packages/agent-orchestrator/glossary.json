@@ -143,9 +143,21 @@
       ]
     },
     {
+      "term": "Inherited",
+      "meaning": "the labels a run or a card is created with, copied once from its card and every `--after` and `--from` run: what the runs agree on, the card's over them, the typed `--label` over those; a key two runs disagree on is left out and said.",
+      "type": "Inherited",
+      "retired": []
+    },
+    {
       "term": "Input edge",
       "meaning": "an edge of the run object's graph from a step to one that is handed its declared output (`input:`), beside its `after` and `loop` edges. The list and the run page draw no input edge.",
       "type": "InputEdge"
+    },
+    {
+      "term": "Label",
+      "meaning": "a person's free `key=value` on an inbox card or a run, in Kubernetes' spelling with no prefix, beside the closed `factory` and `workflow`: set in a card's `labels:`, with `--label` at `nemia inbox add` and `nemia start`, and changed at any time with `nemia label run` and `nemia label inbox`. A run's are kept in `runs/<id>.labels`, never in its record.",
+      "type": "Labels",
+      "retired": []
     },
     {
       "term": "Landed",
@@ -354,6 +366,12 @@
       "term": "RunId",
       "meaning": "a run's id, as `nemia start` mints it from the brief: lowercase letters, digits and dashes. On the run object it is `metadata.name`.",
       "type": "RunId"
+    },
+    {
+      "term": "Selector",
+      "meaning": "Kubernetes' grammar over labels — `key=value`, `key!=value`, `key in (a,b)`, `key notin (a,b)` and a bare `key` — its clauses all holding, `-l` given again for another of which one must: `nemia watch`, `ls`, `inbox` and `stats` select by it, and the api as `?selector=`.",
+      "type": "Selectors",
+      "retired": []
     },
     {
       "term": "Session state",

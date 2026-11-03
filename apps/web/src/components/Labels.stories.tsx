@@ -6,7 +6,7 @@ const meta: Meta = { title: 'Board/Labels' };
 export default meta;
 
 const BOX = { maxWidth: 640, padding: 24 };
-const MAP = { factory: 'pipao', workflow: 'build', team: 'core', size: 'wide' };
+const MAP = { factory: 'acme', workflow: 'build', team: 'core', size: 'wide' };
 
 export const Tags: StoryObj = {
   render: () => (

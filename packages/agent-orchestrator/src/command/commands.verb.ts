@@ -31,7 +31,7 @@ import { decideRun, type Decided } from '../decide/decide.verb.ts';
 import { slotsRead, type Slots } from '../cap/cap.verb.ts';
 import { runsListed } from '../list/list.verb.ts';
 import { lsLines, type RunsListed } from '../list/list.ts';
-import { labelFlags, runsShown, selectorCheck, selectorsIn } from './pages.verb.ts';
+import { PAGES, labelFlags, runsShown, selectorCheck, selectorsIn } from './pages.verb.ts';
 import { pausedLines } from '../pause/pause.ts';
 import { agentCardRead, agentsRead } from '../roster/roster.store.ts';
 import { agentsLines, cardNote, type AgentsRead, type CardRead } from '../roster/roster.ts';
@@ -39,7 +39,6 @@ import { AGENTS_SOURCES } from '../sources/sources.verb.ts';
 import { amountIn, commandLine, type Args, type CommandSpec, type Flag } from './command.ts';
 import type { Command, Ran } from './entry.verb.ts';
 import { READS, SERIES } from './reads.verb.ts';
-import { PAGES } from './pages.verb.ts';
 import { AGENTS_CUSTOM } from '../custom/custom.verb.ts';
 import { LIBRARY_ENTRIES } from '../agents/library.verb.ts';
 import { SKILL_ENTRIES } from '../skills/skills.verb.ts';
@@ -50,7 +49,7 @@ import { WORKFLOW_ENTRIES } from '../workflows/workflows.verb.ts';
 import { FACTORIES } from '../factory/factory.verb.ts';
 import { TEMPLATES } from '../template/template.verb.ts';
 import { INBOXES } from '../inbox/commands.verb.ts';
-import { LABEL_CARD, LABEL_RUN } from '../labels/commands.verb.ts';
+import { LABELS } from '../labels/commands.verb.ts';
 import { CONCLUDED, START } from '../start/commands.verb.ts';
 import { CANCEL, PAUSE, PAUSED, PAUSE_NOW, HOLD, PRUNE, RAN, RM, RESUME } from './runs.verb.ts';
 import { SUBSCRIBE, UNSUBSCRIBE } from '../subscription/subscription.verb.ts';
@@ -528,8 +527,7 @@ export const COMMANDS: readonly Command[] = [
   START,
   CONCLUDED,
   ...INBOXES,
-  LABEL_RUN,
-  LABEL_CARD,
+  ...LABELS,
   ...FACTORIES,
   ...TEMPLATES,
   RETRY,

@@ -122,10 +122,10 @@ test('a run whose record is rewritten is read again, and one removed leaves the 
 const stderrOf = <T>(body: () => T): { lines: string[]; value: T } => {
   const lines: string[] = [];
   const write = process.stderr.write.bind(process.stderr);
-  process.stderr.write = ((chunk: string | Uint8Array) => {
+  process.stderr.write = (chunk: string | Uint8Array) => {
     lines.push(...String(chunk).split('\n').filter(Boolean));
     return true;
-  }) as typeof process.stderr.write;
+  };
   try {
     return { lines, value: body() };
   } finally {

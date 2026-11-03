@@ -75,6 +75,13 @@ test('questionLines', async (t) => {
     ]);
     assert.ok(!questionLines([{ field: 'later', questions: [when] }]).some((l) => l.includes('(recommended)')));
   });
+  await t.test('marks each option a question that takes several recommends as a list', () => {
+    const lines = questionLines([{ field: 'open', questions: [{ ...where, recommended: ['retry', 'gate'] }] }]);
+    assert.deepEqual(
+      lines.filter((l) => l.includes('(recommended)')),
+      ['     a  retry — Into the next try.  (recommended)', '     b  gate — With the approval.  (recommended)'],
+    );
+  });
   await t.test('letters a twenty-seventh option aa', () => {
     const many: Question = {
       ...when,

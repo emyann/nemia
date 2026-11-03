@@ -18,11 +18,21 @@ export type Draft = Readonly<Record<string, { chose: readonly string[]; own: str
 
 const said = (draft: Draft, q: Frozen<Question>) => draft[q.title] ?? { chose: [], own: '' };
 
+/**
+ * The labels `q` recommends, as a list: none for null, one for a label, and every label of a list, which a question that takes several
+ * may recommend.
+ */
+export const recommendedOf = (q: Frozen<Question>): readonly string[] =>
+  q.recommended === null ? [] : typeof q.recommended === 'string' ? [q.recommended] : q.recommended;
+
 /** `draft` with every question that has a recommendation set to it, and their words kept; a question without one is left as it was. */
 export const recommendedDraft = (questions: readonly Frozen<Question>[], draft: Draft): Draft =>
   Object.fromEntries([
     ...Object.entries(draft),
-    ...questions.flatMap((q) => (q.recommended === null ? [] : [[q.title, { ...said(draft, q), chose: [q.recommended] }]])),
+    ...questions.flatMap((q) => {
+      const chose = recommendedOf(q);
+      return chose.length ? [[q.title, { ...said(draft, q), chose }]] : [];
+    }),
   ]);
 
 /**
@@ -45,12 +55,12 @@ export const answersFrom = (questions: readonly Frozen<Question>[], draft: Draft
     return own.trim() ? { question: q.title, chose, own: own.trim() } : { question: q.title, chose };
   });
 
-/** One option as a question shows it: its label, what choosing it means, and whether it is the one recommended. */
+/** One option as a question shows it: its label, what choosing it means, and whether it is recommended. */
 function OptionText({ q, label, meaning }: { q: Frozen<Question>; label: string; meaning: string }) {
   return (
     <span className="min-w-0">
       <strong className="font-medium">{label}</strong> <span className="text-muted-foreground">— {meaning}</span>
-      {q.recommended === label && (
+      {recommendedOf(q).includes(label) && (
         <span data-recommended className="ml-1.5 rounded bg-surface-variant px-1 py-px text-body-small font-medium text-on-surface-variant">
           recommended
         </span>
@@ -59,7 +69,7 @@ function OptionText({ q, label, meaning }: { q: Frozen<Question>; label: string;
   );
 }
 
-/** The questions of one field of a closeout, read-only: each question, its body, and its options, the one recommended marked. */
+/** The questions of one field of a closeout, read-only: each question, its body, and its options, each recommended one marked. */
 export function Questions({ field, questions }: { field: string; questions: readonly Frozen<Question>[] }) {
   return (
     <section data-questions={field} aria-label={field} className="min-w-0 space-y-2">
@@ -168,7 +178,7 @@ export function RecommendButton({
   draft: Draft;
   onDraft: (next: Draft) => void;
 }) {
-  if (!questions.some((q) => q.recommended !== null)) return null;
+  if (!questions.some((q) => recommendedOf(q).length)) return null;
   return (
     <button
       type="button"

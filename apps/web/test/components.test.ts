@@ -1884,7 +1884,7 @@ test("a plan's files are a table, its path over its change; its steps a list; a 
   );
 });
 
-const { answersFrom, chosenDraft, recommendedDraft, unanswered } = await import('../src/components/Questions.tsx');
+const { answersFrom, chosenDraft, RecommendButton, recommendedDraft, unanswered } = await import('../src/components/Questions.tsx');
 type Question = import('../src/lib/api.ts').Question;
 
 const cut: Question = {
@@ -2607,6 +2607,18 @@ test('Choose the recommended answers chooses each recommended option, keeps word
   assert.deepEqual(filled, { [cut.title]: { chose: ['a'], own: 'Mine.' } });
   assert.deepEqual(unanswered([cut, where], filled), [where.title], 'a question without a recommendation still waits for the person');
   assert.deepEqual(recommendedDraft([where], {}), {});
+  const many = { ...where, recommended: ['retry', 'gate'] };
+  assert.deepEqual(recommendedDraft([many], {}), { [where.title]: { chose: ['retry', 'gate'], own: '' } }, 'a list chooses each label');
+});
+
+test('a question that takes several marks each label it recommends as a list, and offers to choose them', () => {
+  const many: Question = { ...where, recommended: ['retry', 'gate'] };
+  const html = renderToStaticMarkup(createElement(RecommendButton, { questions: [many], draft: {}, onDraft: () => {} }));
+  assert.match(html, /data-recommend-all/);
+  const said = closeoutSaying('A design.', { output: { open: [many] }, questions: [{ field: 'open', questions: [many] }] });
+  const tries = [{ ...threeTries[2], attempts: ranOnce, closeout: said }];
+  const read = renderToStaticMarkup(createElement(TryCloseouts, { tries, selected: tries[0], none: '-' }));
+  assert.equal([...read.matchAll(/data-recommended="true"/g)].length, 2);
 });
 
 test('choosing takes the one option of a question that takes one, and adds or drops one of a question that takes several; the answers go as the api takes them', () => {

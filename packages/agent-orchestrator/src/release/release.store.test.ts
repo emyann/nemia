@@ -1,5 +1,6 @@
 /**
- * The store's releases on disk where no upgrade leads: a pointer at nothing or at a half-written release, and a release placed once.
+ * The store's releases on disk where no upgrade leads: a pointer at nothing or at a half-written release, a release placed once, and
+ * what the retention reads and removes: the installed releases, a build under way, and a release moved aside.
  * The pointer's switch, an install read back and a build's trial store are `upgrade.verb.test.ts`'s story. Each on a scratch
  * store of its own, passed as the root, so no test reads `WF_ROOT`.
  */
@@ -7,9 +8,23 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import { spawn } from 'node:child_process';
 import { scratch } from '../../test/scratch.ts';
 import type { ReleaseFile } from './release.ts';
-import { currentRelease, placeRelease, releaseDir, releaseFileOf, switchCurrent, trialEnv, writeReleaseFile } from './release.store.ts';
+import {
+  buildUnderWay,
+  currentRelease,
+  installedReleases,
+  leftRemovals,
+  placeRelease,
+  releaseDir,
+  releaseFileOf,
+  releasesDir,
+  removeRelease,
+  switchCurrent,
+  trialEnv,
+  writeReleaseFile,
+} from './release.store.ts';
 
 /** What a release of `tag` says, built from `/src`. */
 const fileOf = (tag: string): ReleaseFile => ({ tag, commit: `${tag}0000000000`, source: '/src', builtAt: '2026-10-06T07:00:00.000Z' });
@@ -64,4 +79,54 @@ test("a build's commands get its trial store for WF_ROOT and AE_ROOT and no HKB_
     AE_ROOT: '/b/trial/engine',
   });
   assert.deepEqual(trialEnv({ PATH: '/bin' }, '/b/trial'), { PATH: '/bin', WF_ROOT: '/b/trial/workflows', AE_ROOT: '/b/trial/engine' });
+});
+
+test('the installed releases are the folders under releases/ with a release.json that reads, and nothing else there', () => {
+  const root = storeWith('v1', 'v2');
+  switchCurrent('v2', root);
+  fs.mkdirSync(path.join(releasesDir(root), '.logs'));
+  fs.mkdirSync(path.join(releasesDir(root), '.building-x-1'));
+  writeReleaseFile(path.join(releasesDir(root), '.building-x-1'), fileOf('x'));
+  fs.mkdirSync(releaseDir('bare', root));
+  fs.symlinkSync('v1', path.join(releasesDir(root), 'alias'));
+  assert.deepEqual(
+    installedReleases(root)
+      .map((r) => r.tag)
+      .sort(),
+    ['v1', 'v2'],
+  );
+  assert.equal(installedReleases(root)[0]?.builtAt, fileOf('v1').builtAt);
+  assert.deepEqual(installedReleases(scratch('wf-release-none-')), [], 'no releases/ at all');
+});
+
+test('a build is under way while the process its folder names lives, and not once it has exited', async () => {
+  const root = storeWith('v1');
+  assert.equal(buildUnderWay(root), false, 'no build folder');
+  const child = spawn(process.execPath, ['-e', '0']);
+  const gone = await new Promise<number>((resolve) => child.on('exit', () => resolve(child.pid ?? 0)));
+  fs.mkdirSync(path.join(releasesDir(root), `.building-v9-${gone}`));
+  assert.equal(buildUnderWay(root), false, 'the pid has exited');
+  fs.mkdirSync(path.join(releasesDir(root), `.building-v9-${process.pid}`));
+  assert.equal(buildUnderWay(root), true, 'this process');
+});
+
+test('REFUSED: a release is not removed while the pointer names it or a build is under way; else it is moved aside, then listed', () => {
+  const root = storeWith('v1', 'v2');
+  switchCurrent('v2', root);
+  assert.equal(removeRelease(root, 'v2'), false, 'the current');
+  assert.ok(fs.existsSync(releaseDir('v2', root)));
+  const building = path.join(releasesDir(root), `.building-v3-${process.pid}`);
+  fs.mkdirSync(building);
+  assert.equal(removeRelease(root, 'v1'), false, 'a build under way');
+  assert.ok(fs.existsSync(releaseDir('v1', root)));
+  fs.rmSync(building, { recursive: true });
+  const aside = removeRelease(root, 'v1');
+  assert.equal(aside, path.join(releasesDir(root), `.removing-v1-${process.pid}`));
+  assert.equal(fs.existsSync(releaseDir('v1', root)), false);
+  assert.deepEqual(leftRemovals(root), [aside]);
+  assert.deepEqual(
+    installedReleases(root).map((r) => r.tag),
+    ['v2'],
+    'a release moved aside is no installed one',
+  );
 });

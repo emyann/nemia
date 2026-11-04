@@ -4,15 +4,19 @@
  * the act is this script, read from the run's frozen workflow files (`$WF_WORKFLOW_FILES`) as `probe.ts` is, and `gh` is denied whole to
  * the agents that run it.
  *
- * - `open --title <t> --body-file <f>`, which the engineer types once a round after merging the base: it pushes her branch to `origin` and
- *   opens the pull request with the title and body she wrote, or updates the one that is open, never a draft and never forced. It prints
- *   `nemia pr: <url>`, which goes on her closeout as an artifact value.
+ * - `open --title <t> --body-file <f> --labels "<rules>"`, which the engineer types once a round after merging the base: it pushes her
+ *   branch to `origin` and opens the pull request with the title and body she wrote, or updates the one that is open, never a draft and
+ *   never forced, and labels it by the rules from the run's labels as `push --labels` does, in the same call: GitHub has no labelled
+ *   create, so the labels are set through REST the moment it answers, before a CI job that reads them can start, and a check that
+ *   reads a pull request's labels never sees the run's unlabelled. The rules are her step's note's, rendered from the factory's
+ *   parameter, never her own; `--labels` is required, its empty value labelling nothing, and every refusal of the labels comes before
+ *   the push. It prints `nemia pr: <url>` last, which goes on her closeout as an artifact value.
  * - `push`, which the round's check runs first: it pushes again, so the commit CI judges is the commit the check judges, then refuses
  *   unless an open, non-draft pull request for this branch, based on the remote's default branch, has `headRefOid` equal to `HEAD`. GitHub
  *   moves a pull request's head a moment after the push it follows, so that head is read again for a bounded few seconds (`HEAD_SECONDS`)
  *   before the refusal: a head that stays elsewhere is still refused, and says how long it was read for.
  *   `push --labels "<rules>"` labels that pull request too, from the run's own labels (`WF_LABELS`, a JSON object of strings the run
- *   gives every check): each rule, the rules apart by whitespace, is `<key>=<value>:<label>`, and gives `<label>` to a run whose label
+ *   gives every check and every session): each rule, the rules apart by whitespace, is `<key>=<value>:<label>`, and gives `<label>` to a run whose label
  *   `<key>` is `<value>`. The labels the rules give the run are added, and any other label a rule could give is removed, so a run
  *   relabelled is followed and a label no rule gives — a person's — is left as it is; each through REST (`issues/<n>/labels`), never
  *   `gh pr edit`, and the labels set are printed. A malformed rule, a `WF_LABELS` that is no JSON object of strings, and a label a rule
@@ -21,7 +25,8 @@
  * - `wait --check <name>`, which the round's check runs last, `<name>` the CI context branch protection requires of the base branch (the
  *   repository's, so the check gives it): it refuses at once a pull request GitHub says is `CONFLICTING` with its base, on which no CI
  *   would come, naming the merge of the base that answers it (`mergeable`, read again for up to 15 s while GitHub says `UNKNOWN`,
- *   `WF_PR_MERGEABLE_SECONDS`); then it polls the `<name>` context of that head (`gh pr view --json statusCheckRollup`), 1800 s for it to
+ *   `WF_PR_MERGEABLE_SECONDS`); then it polls the `<name>` context of that head (`gh pr view --json statusCheckRollup`), reading only the
+ *   latest run of each check there (`latest`), so a failure a later run of its check superseded is neither judged nor listed, 1800 s for it to
  *   start (`WF_CI_START_SECONDS`) and 2400 s whole (`WF_CI_WAIT_SECONDS`), `WF_CI_POLL_SECONDS` the interval; on a red, cancelled or absent
  *   context refuses by name with the Actions URL, the failing jobs, and from each failing job's log the lines that failed it — a test with
  *   its diff, a type or lint error — or a bounded tail where none is, GitHub's post-job lines left out — the next try reads why CI went red
@@ -118,6 +123,8 @@ type Entry = {
   detailsUrl?: string;
   targetUrl?: string;
   workflowName?: string;
+  /** When a check run started; Go's zero time (`0001-01-01T00:00:00Z`) for one still queued, absent where gh exports none. */
+  startedAt?: string;
 };
 
 /** A pull request as this script reads one. */
@@ -240,7 +247,9 @@ function pulls(branch: string): Pr[] {
 }
 
 /** The line the engineer types to open the pull request, for a refusal that asks for one. */
-const OPEN_LINE = 'node "$WF_WORKFLOW_FILES/pull-request.ts" open --title "<the card\'s line>" --body-file "$WF_STEP_FILES/pr-body.md"';
+const OPEN_LINE =
+  'node "$WF_WORKFLOW_FILES/pull-request.ts" open --title "<the card\'s line>" --body-file "$WF_STEP_FILES/pr-body.md" ' +
+  '--labels "<the rules your step\'s note gives>"';
 
 /** The `gh api` form of an edit of a pull request's own fields, for a refusal that asks a person to type one. */
 const API_LINE = (n: number, field: string) => `gh api -X PATCH repos/{owner}/{repo}/pulls/${n} -f ${field}`;
@@ -365,7 +374,9 @@ function labelPlan(rules: readonly LabelRule[]): { want: Set<string>; givable: S
   if (rules.length === 0) return undefined;
   const ofRun = runLabels();
   if (ofRun === undefined)
-    return { note: "no label is set: this check was given no WF_LABELS, the run's labels, which a run of a later Nemia gives it" };
+    return {
+      note: "no label is set: this was given no WF_LABELS, the run's labels, which a later Nemia gives every check and session of a run",
+    };
   const givable = new Set(rules.map((rule) => rule.label));
   const has = repoLabels();
   const lacking = [...givable].filter((label) => !has.has(label));
@@ -393,6 +404,32 @@ function relabelled(pr: Pr, plan: { want: Set<string>; givable: Set<string> }): 
   const set = plan.want.size ? [...plan.want].join(', ') : 'none';
   const moved = [...adding.map((label) => `+${label}`), ...removing.map((label) => `-${label}`)];
   return `#${pr.number} carries the labels its run's give: ${set}${moved.length ? ` (${moved.join(' ')})` : ''}`;
+}
+
+/** When `entry` started, in milliseconds; a run not started yet — no time, one that does not parse, or Go's zero time — is the newest. */
+const startOf = (entry: Entry): number => {
+  const at = Date.parse(entry.startedAt ?? '');
+  return Number.isNaN(at) || at < 0 ? Number.POSITIVE_INFINITY : at;
+};
+
+/** What makes two rollup entries runs of one check: a status context's name, or a check run's name within its workflow. */
+const checkKey = (entry: Entry): string =>
+  entry.context !== undefined ? `status ${entry.context}` : `run ${entry.name ?? ''}\u0000${entry.workflowName ?? ''}`;
+
+/**
+ * The latest run of each check in `entries`, in the rollup's order: a check re-run, or run again on another event of the same head (a
+ * `labeled` after an `opened`), leaves its earlier runs in the rollup, and only the newest is its verdict, as GitHub's branch protection
+ * and `gh pr checks` read it. The newest by `startedAt`, one not started counting as newest; of two that tie, the later in the rollup.
+ */
+function latest(entries: readonly Entry[]): Entry[] {
+  const newest = new Map<string, number>();
+  entries.forEach((entry, i) => {
+    const was = newest.get(checkKey(entry));
+    const prior = was === undefined ? undefined : entries[was];
+    if (prior === undefined || startOf(entry) >= startOf(prior)) newest.set(checkKey(entry), i);
+  });
+  const kept = new Set(newest.values());
+  return entries.filter((_, i) => kept.has(i));
 }
 
 /** The `statusCheckRollup` of `number`, as it is now. */
@@ -526,13 +563,14 @@ function why(entries: readonly Entry[], check: string): string[] {
   return ['the jobs that did not pass:', ...named, ...more, ...logs];
 }
 
-/** The options of `open`: the title and the file its body is read from. */
-function openArgs(args: string[]): { title: string; bodyFile: string } {
+/** The options of `open`: the title, the file its body is read from, and the rules it labels by, `--labels ""` giving none. */
+function openArgs(args: string[]): { title: string; bodyFile: string; rules: LabelRule[] } {
   const opts: Record<string, string> = {};
   for (let i = 0; i < args.length; i += 2) {
     const [flag, value] = [args[i], args[i + 1]];
-    if ((flag !== '--title' && flag !== '--body-file') || !value)
-      throw new Refusal(`\`${flag}\` is not an option of open: give --title "<the card's line>" --body-file <file>, each with a value`);
+    const known = flag === '--title' || flag === '--body-file' || flag === '--labels';
+    if (!known || value === undefined || (flag !== '--labels' && !value))
+      throw new Refusal(`\`${flag}\` is not an option of open, or has no value: type the line your step's note gives,\n  ${OPEN_LINE}`);
     opts[flag] = value;
   }
   if (!opts['--title'] || !opts['--body-file'])
@@ -540,7 +578,13 @@ function openArgs(args: string[]): { title: string; bodyFile: string } {
       'open takes the title and the body you wrote, and writes neither itself: ' +
         'give `--title "<the card\'s line>" --body-file <a file in your files directory>`',
     );
-  return { title: opts['--title'], bodyFile: opts['--body-file'] };
+  const labels = opts['--labels'];
+  if (labels === undefined)
+    throw new Refusal(
+      "open labels the pull request it opens by the factory's rules, and was given none: add the `--labels` your step's note " +
+        `gives, \`--labels ""\` where it gives none,\n  ${OPEN_LINE}`,
+    );
+  return { title: opts['--title'], bodyFile: opts['--body-file'], rules: labelRules(['--labels', labels]) };
 }
 
 /** The branch, the run it names and its leaf, with the remote's default branch, every guard of the act passed. */
@@ -566,20 +610,32 @@ function edited(n: number, title: string, bodyFile: string): void {
   gh('api', '-X', 'PATCH', `repos/{owner}/{repo}/pulls/${n}`, '-f', `title=${title}`, '-F', `body=@${bodyFile}`);
 }
 
-/** `open`: the branch pushed and the pull request opened or brought up to date, and its address for the closeout. */
+/**
+ * `open`: the branch pushed and the pull request opened or brought up to date, labelled by the rules from the run's labels, and its
+ * address last, for the closeout. Every refusal of the labels comes before the push.
+ */
 function open(args: string[]): string[] {
-  const { title, bodyFile } = openArgs(args);
+  const { title, bodyFile, rules } = openArgs(args);
   const { branch, onto } = placed();
+  const plan = labelPlan(rules);
   const already = pulls(branch);
   const standing = already.length ? sole(already, branch, onto) : undefined;
   const said = [pushing(branch)];
+  const labelling = (pr: () => Pr): string[] => (plan === undefined ? [] : ['note' in plan ? plan.note : relabelled(pr(), plan)]);
   if (standing) {
     const pr = standing;
     edited(pr.number, title, bodyFile);
-    return [...said, `#${pr.number} brought up to date with the title and body you wrote`, pr.url];
+    return [...said, `#${pr.number} brought up to date with the title and body you wrote`, ...labelling(() => pr), pr.url];
   }
-  const url = gh('pr', 'create', '--base', onto, '--head', branch, '--title', title, '--body-file', bodyFile).split('\n').at(-1) ?? '';
-  return [...said, 'opened', url.trim()];
+  const url = (
+    gh('pr', 'create', '--base', onto, '--head', branch, '--title', title, '--body-file', bodyFile).split('\n').at(-1) ?? ''
+  ).trim();
+  const number = Number(/\/pull\/(\d+)$/.exec(url)?.[1]);
+  const created = (): Pr =>
+    Number.isInteger(number)
+      ? { number, url, isDraft: false, baseRefName: onto, headRefOid: '', labels: [] }
+      : sole(pulls(branch), branch, onto);
+  return [...said, 'opened', ...labelling(created), url];
 }
 
 /**
@@ -714,7 +770,7 @@ function wait(args: string[]): string[] {
   const began = Date.now();
   const over = (secs: number): boolean => Date.now() - began >= secs * 1000;
   for (;;) {
-    const entries = rollup(pr.number);
+    const entries = latest(rollup(pr.number));
     const ours = entries.filter((entry) => nameOf(entry) === check);
     const seen = seenOf(ours);
     if (seen === 'passed') return [`\`${check}\` passed on ${pr.headRefOid.slice(0, 12)}: ${pr.url}`];

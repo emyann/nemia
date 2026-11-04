@@ -38,17 +38,22 @@ branch, never a draft, printing the address that goes on Grace's closeout as an 
 script and refuses unless the pull request's head is the commit it judges — GitHub moves that head a moment after the push, so it is
 read again for up to 30 s before the refusal — then runs the round check, then, unless GitHub says the pull request conflicts with its
 base (refused at once, naming the merge of the base, since GitHub runs no CI on a conflicting head), waits on the CI context (1800 s
-for it to start, 2400 s whole): CI runs the repository's suite on that commit, and a red, cancelled or missing context is the check's
+for it to start, 2400 s whole), reading only the latest run of each check on the head, so a failure a later run of the same check
+superseded is neither judged nor listed: CI runs the repository's suite on that commit, and a red, cancelled or missing context is the check's
 refusal, with the Actions URL, the failing jobs and a bounded tail of their log — no writer of this team may type `gh`, so the script
 reads it for them. The reviewer alone reads the pull request and its checks itself (`gh pr view`, `gh pr checks`), its fence allowing
 those two and refusing every other form: a browser, `--watch`, a jq query or a template, another repository, and an assignment before
 `gh`.
 
-The push labels the pull request too, from the run's own labels, by the rules the factory's `pullRequestLabels` parameter sets (each
+The open labels the pull request as it creates or updates it, and the push again each round, from the run's own labels (`WF_LABELS`,
+which the run gives every session and check), by the rules the factory's `pullRequestLabels` parameter sets (each
 `<key>=<value>:<label>`, the rules apart by spaces; empty, the default, labels nothing): it adds the labels the rules give the run and
 removes any other a rule could give, so a relabelled card is followed and a label a person put on that no rule gives is left alone,
 through REST and never `gh pr edit`. A malformed rule, or a label a rule gives that the repository lacks, is the check's refusal before
-anything is pushed. A card with no label a rule reads, or a pull request opened by hand, gets no label from it.
+anything is pushed. GitHub has no labelled create, so the open sets the labels through REST the moment the pull request exists, in the
+same call, before a CI job that reads them can start: a check that reads a pull request's labels never sees the run's unlabelled.
+The rules reach the open as `--labels` on the line implement's note renders from the parameter, and an open without the flag is
+refused. A card with no label a rule reads, or a pull request opened by hand, gets no label from it.
 
 Land merges that same pull request, through `landing.ts`, which its check also reads from the frozen files. Otto runs its `merge --run
 <id> --subject … --body-file … --check <name>`: it refuses anything but this run's own green pull request — not a draft, based on the

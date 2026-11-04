@@ -175,6 +175,8 @@ checked under the store (`src/release/`): `nemia upgrade <tag>` exports it clean
 and restarts the service onto it; `nemia version` says what runs and what the pointer names, and the lease keeps its daemon's `release`.
 A release that is not current, not among the two newest, and that no running Nemia process nor session in flight runs on is removed
 after `nemia upgrade` and on a sweep of the daemon's every five minutes (`retain`, `src/retention/retention.verb.ts`).
+The same sweep removes what a crashed upgrade left — a build's folder or a pointer link whose process is gone — and build logs older
+than 30 days (`sweptLeftovers`).
 A checkout is refused a store whose pointer names an install, but for `version` and a help, unless `NEMIA_ON_INSTALLED=1`
 (`trialRefusal`, in the CLI's `main` and the api's). Where nothing ticks the store, a command whose work waits on the next pass (`ticks`
 in the command table) starts the daemon before it runs (`ensureDaemon`, `src/demand/demand.verb.ts`): the store's login service where

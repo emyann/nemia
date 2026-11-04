@@ -7,7 +7,7 @@
  */
 import type { UpgradeLeftovers } from '../../contracts/leftovers.contract.ts';
 
-/** How many days a build log is kept after it was last written, as Claude Code keeps a transcript a number of days. */
+/** How many days a build log is kept after it was last written, long enough to read why an upgrade failed. */
 export const LOGS_KEPT_DAYS = 30;
 
 /** `LOGS_KEPT_DAYS` in milliseconds. */

@@ -27,7 +27,8 @@ const leftoversSpec = spec<(entries: readonly PidEntry[], logs: readonly BuildLo
     onlyWhatIsFound: {
       description: 'Only a leftover that was found is removed',
       condition: ({ input: [entries, logs], output }) =>
-        output.entries.every((name) => entries.some((e) => e.name === name)) && output.logs.every((name) => logs.some((l) => l.name === name)),
+        output.entries.every((name) => entries.some((e) => e.name === name)) &&
+        output.logs.every((name) => logs.some((l) => l.name === name)),
     },
     aFreshLogIsKept: {
       description: 'A build log written within the last 30 days is never removed',

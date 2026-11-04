@@ -12,8 +12,7 @@ import { spawnSync } from 'node:child_process';
 import { Result, Schema } from 'effect';
 import { wfRoot } from '../config/config.store.ts';
 import { CURRENT, RELEASE_FILE, type Current, type ReleaseFile, type Running } from './release.ts';
-import type { Installed } from '../retention/retention.ts';
-import type { BuildLog, PidEntry } from '../retention/leftovers.ts';
+import type { BuildLog, Installed, PidEntry } from '../retention/index.ts';
 
 /** `release.json` as an upgrade writes it (`ReleaseFile`). */
 const ReleaseFileSchema = Schema.Struct({

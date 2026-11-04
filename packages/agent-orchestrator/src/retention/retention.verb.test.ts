@@ -144,7 +144,11 @@ test("a crashed first upgrade's leftovers are swept on a store with no pointer, 
     assert.ok(fs.existsSync(at(`.building-v2-${process.pid}/tree`)), 'a live build is never touched');
     assert.ok(fs.existsSync(at('.logs/new.log')));
     assert.ok(done.lines.some((line) => line.includes(`.building-v1-${dead}`)));
-    assert.deepEqual(fs.readdirSync(releases).filter((n) => n.startsWith('.removing-')), [], 'deleted, not only moved aside');
+    assert.deepEqual(
+      fs.readdirSync(releases).filter((n) => n.startsWith('.removing-')),
+      [],
+      'deleted, not only moved aside',
+    );
   });
 
   await s.test('a second sweep removes nothing more', async () => {

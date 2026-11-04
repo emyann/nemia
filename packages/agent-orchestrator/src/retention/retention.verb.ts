@@ -3,7 +3,8 @@
  * loop the daemon forks; `nemia upgrade` runs one sweep after its restart). Which go is `retention`'s rule (`retention.ts`); this reads
  * what it is given afresh on every sweep — the pointer, the folders, the engine's attempts in flight, the releases the running Nemia
  * processes run on — and carries nothing a restart must not lose: a sweep stopped mid-removal is finished by the next. The same sweep
- * removes what a crashed upgrade left (`sweptLeftovers`, by `leftovers`' rule): a dead build's folder, a dead pointer link, an old build log.
+ * removes what a crashed upgrade left (`sweptLeftovers`, by `leftovers`' rule): a dead build's folder, a dead pointer link, an old
+ * build log.
  */
 import fs from 'node:fs';
 import path from 'node:path';

@@ -156,7 +156,7 @@ test("the pid-named entries under releases/ are each build's folder and each poi
   assert.deepEqual(pidEntries(scratch('wf-release-none-'), live), [], 'no releases/ folder');
 });
 
-test("a leftover is moved aside with what it holds, once; a pointer link is moved as a link, and the release it named stands", () => {
+test('a leftover is moved aside with what it holds, once; a pointer link is moved as a link, and the release it named stands', () => {
   const root = storeWith('v1');
   const releases = releasesDir(root);
   const dead = path.join(releases, '.building-v9-4141');
@@ -175,7 +175,7 @@ test("a leftover is moved aside with what it holds, once; a pointer link is move
   assert.ok(fs.existsSync(path.join(releaseDir('v1', root), 'release.json')), 'deleting the link leaves the release it named');
 });
 
-test("the build logs are each file under releases/.logs with when it was last written, in whole milliseconds; none with no folder", () => {
+test('the build logs are each file under releases/.logs with when it was last written, in whole milliseconds; none with no folder', () => {
   const root = storeWith();
   assert.deepEqual(buildLogs(root), [], 'no releases/ folder');
   const logs = path.join(releasesDir(root), '.logs');

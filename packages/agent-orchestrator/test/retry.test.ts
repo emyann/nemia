@@ -480,6 +480,9 @@ test("a checked step, from its check's filing to `retries:` spent and the run wa
     await tick(id());
     fs.writeFileSync(path.join(dir, 'implement.md'), '---\nplace: git\ncheck: true\n---\nimplement it\n');
   });
+  await s.test("implement's session is told the run's labels as its check will be, by the pass that filed it", () => {
+    assert.equal(b.tasks.get(`${id()}-implement`)?.spec.config?.env?.WF_LABELS, '{"work":"fix"}');
+  });
   await s.test(
     'implement signs off, and the run files its check itself: the frozen command, in its workspace, on the check harness, the follower unfiled',
     async () => {

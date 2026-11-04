@@ -1560,7 +1560,8 @@ nothing that waits on the step ever runs. A step with no `check:` has nothing ru
   step's files directory, where a check that takes screenshots puts them (*A step's files*, below) — and
   `WF_CLOSEOUT`: the step's closeout as a JSON file, flat, its declared fields beside the four, the check's own data
   to read (`checks/<task>.closeout.json`), and `WF_LABELS`: the run's labels as a JSON object of strings, `{}` where it has
-  none, as Kubernetes' Downward API gives a container its Pod's labels. Its stdout and its stderr are the runtime's, each kept whole beside its
+  none, as Kubernetes' Downward API gives a container its Pod's labels; every session of the run's steps is told `WF_LABELS`
+  too, beside `WF_STEP_FILES`, read when the session is filed (`RUN_LABELS`, `src/filed/filed.ts`). Its stdout and its stderr are the runtime's, each kept whole beside its
   attempt and read through the engine's `output` (`ae output <task> stdout`), since the engine's log of a task keeps
   only its last 8,000 characters.
 - **The command reads its workflow's own files as the run took them**, in `WF_WORKFLOW_FILES`: the absolute path of the

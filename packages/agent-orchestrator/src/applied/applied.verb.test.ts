@@ -287,6 +287,13 @@ test("what a templated factory's verbs read and write: its tree's wiring, instru
         "the policy is the tree wiring's, read back",
       );
       assert.equal(fs.readFileSync(path.join(FACTORIES, 'wired.json'), 'utf8'), own, "the factory's own file is not written");
+      const tree = fs.readFileSync(path.join(treeDir('wired'), 'factory.json'), 'utf8');
+      const notes = scratch('wf-applied-volume-');
+      await main(['factory', 'volume', 'add', 'wired', `${notes}:ro`], noEngine());
+      const file = JSON.parse(fs.readFileSync(path.join(FACTORIES, 'wired.json'), 'utf8'));
+      assert.deepEqual(file.volumes, [{ path: notes, readOnly: true }], "a volume is the factory's own, in its file");
+      assert.equal(fs.readFileSync(path.join(treeDir('wired'), 'factory.json'), 'utf8'), tree, 'and never in its tree');
+      assert.deepEqual(readFactory('wired').volumes, [{ path: notes, readOnly: true }]);
     },
   );
   await t.test(
@@ -460,6 +467,8 @@ test('a builtin template, named: applied, recorded by its name, read wherever Ne
     });
     const drift = programsAt(ROOT, s.builtins).reconciled(templated('named'));
     assert.equal(drift.conditions[0].reason, 'VersionDrift');
+    const volumes = [{ path: scratch('wf-applied-kept-'), readOnly: false }];
+    fs.writeFileSync(s.file, JSON.stringify({ ...JSON.parse(fs.readFileSync(s.file, 'utf8')), volumes }));
     await runEngine(
       noEngine(),
       withBuiltins(FACTORY_UPGRADE.handler({ factory: 'named', to: '0.2.0' }, undefined, ROOT), s.builtins).pipe(
@@ -468,6 +477,7 @@ test('a builtin template, named: applied, recorded by its name, read wherever Ne
     );
     const { source, version } = JSON.parse(fs.readFileSync(s.file, 'utf8')).template;
     assert.deepEqual([source, version], ['team', '0.2.0']);
+    assert.deepEqual(JSON.parse(fs.readFileSync(s.file, 'utf8')).volumes, volumes, 'an upgrade keeps the volumes');
     assert.equal(programsAt(ROOT, s.builtins).reconciled(templated('named')).conditions[0].reason, 'Upgraded');
   });
   await t.test(

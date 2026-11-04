@@ -3123,6 +3123,14 @@ not what: the key widens where a step's writes reach, never what it may do. Refu
 (`writableRefusal`): a name no folder of the factory has, one two share, one that is no directory now, a `writable:` in a run in no
 factory, and a step whose harness holds no writable mount, Codex's, in the runtime's words (`writableMountRefusal`).
 
+A factory's volumes ride beside them: folders of the person's machine apart from its repositories, each marked read-only or writable
+(`nemia factory volume add <factory> <path>:ro|:rw`, kept as `volumes` in the factory's own file, never in a template, and kept by
+adopt and upgrade). A run copies them at start onto its record as `volumes`, apart from `mounts`, so that `writable:` never widens one
+by its folder's name; each local step is filed them after the factory's repositories, a writable one writable only where the step's
+fence writes (`volumeMounts`, by `writesNothing`, the judgement `refuseUnwritable` holds `writable:` to). A step whose harness cannot
+hold one is refused at `wf start` (`volumeMountRefusal`). A writable volume is not the run's workspace: nothing commits, lands or
+reverts what a step writes there, and the brief, `wf start` and `nemia factory` say so.
+
 The same mounts carry what the steps before a step handed over: the artifacts folder of each step it comes after, read-only, after the
 factory's (`handedMounts`, in `filedConfig`), on a harness fenced by a permission mode. A new session's brief names each by its path
 and step, read-only, and says to list one under its own path, since the run's artifacts folder above it is not mounted (`mountsLine`,

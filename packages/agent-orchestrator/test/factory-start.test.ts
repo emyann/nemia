@@ -339,6 +339,64 @@ test('a factory from nothing to a run: filed, given workflows, hires and a sched
     hired();
   });
 
+  await s.test(
+    '`nemia factory volume add` writes a marked volume into the file, a second of its path replacing it; REFUSED unmarked or on default',
+    async () => {
+      const f = path.basename(file, '.json');
+      const [notes, scratchpad] = [scratch('wf-volume-notes-'), scratch('wf-volume-pad-')];
+      assert.deepEqual(await typedFrom(ROOT, ['factory', 'volume', 'add', f, `${notes}:rw`]), [
+        `${f}  volume ${notes} :rw`,
+        "writable for each step whose fence writes; a step's writes there are not the run's workspace: nothing commits, lands or reverts them",
+        `changed: ${file} — runs started from now on mount it; a run in flight keeps what it was started with`,
+      ]);
+      assert.equal((await typedFrom(ROOT, ['factory', 'volume', 'add', f, `${notes}:ro`]))[0], `${f}  volume ${notes} :ro (was :rw)`);
+      await typedFrom(ROOT, ['factory', 'volume', 'add', f, `${scratchpad}:rw`]);
+      const volumes = [
+        { path: notes, readOnly: true },
+        { path: scratchpad, readOnly: false },
+      ].sort((x, y) => x.path.localeCompare(y.path));
+      assert.deepEqual((fileOf(f) as { volumes: unknown }).volumes, volumes);
+      assert.deepEqual((fileOf(f) as { later: unknown }).later, { kept: true }, 'every other key kept');
+      await typedFrom(ROOT, ['factory', 'detach', f, 'notes']);
+      await typedFrom(ROOT, ['factory', 'attach', f, 'notes']);
+      assert.deepEqual((fileOf(f) as { volumes: unknown }).volumes, volumes, 'a wiring change keeps the volumes');
+      await refusedBy(() => typedFrom(ROOT, ['factory', 'volume', 'add', f, notes]), 'Invalid', notes);
+      await refusedBy(() => typedFrom(ROOT, ['factory', 'volume', 'add', 'default', `${notes}:ro`]), 'Conflict');
+      await refusedBy(() => typedFrom(ROOT, ['factory', 'volume', 'add', f, `${ROOT}:ro`]), 'Invalid', ROOT);
+      const listed = (await typedFrom(ROOT, ['factory', 'ls'])).filter((l) => l.includes(' volume '));
+      assert.deepEqual(
+        listed.map((l) => l.trim().split(' ').slice(0, 3).join(' ')),
+        volumes.map((v) => `volume ${v.path} ${v.readOnly ? ':ro' : ':rw'}`),
+      );
+    },
+  );
+
+  await s.test(
+    'a run started then mounts the volumes, frozen on its record and said at its start; a volume removed after changes no run started',
+    async () => {
+      const f = path.basename(file, '.json');
+      const volumes = readFactory(f).volumes ?? [];
+      const out = await typedFrom(b, ['start', 'x', '--workflows', build, '--factory', f, '--no-worktree']);
+      const id = startedId(out);
+      assert.deepEqual(readRun(id).volumes, volumes);
+      const writable = volumes.find((v) => !v.readOnly);
+      assert.ok(writable);
+      assert.ok(
+        out.some((l) => l.startsWith(`volume: ${writable.path} — writable for `) && l.includes("not the run's workspace")),
+        out.join('\n'),
+      );
+      const before = fs.readFileSync(path.join(ROOT, 'runs', `${id}.json`), 'utf8');
+      for (const v of volumes)
+        assert.deepEqual(await typedFrom(ROOT, ['factory', 'volume', 'rm', f, v.path]), [
+          `${f}  volume ${v.path} removed`,
+          `changed: ${file}`,
+        ]);
+      assert.equal('volumes' in fileOf(f), false, 'the key is gone once none is left');
+      assert.equal(fs.readFileSync(path.join(ROOT, 'runs', `${id}.json`), 'utf8'), before);
+      await refusedBy(() => typedFrom(ROOT, ['factory', 'volume', 'rm', f, writable.path]), 'Missing', writable.path);
+    },
+  );
+
   await s.test('of two repositories: the one named, else the one it is typed in; REFUSED elsewhere, naming both', async () => {
     const inside = await typedFrom(b, ['start', 'x', '--workflows', build, '--factory', 'pipao', '--no-worktree']);
     assert.equal(readRun(startedId(inside)).repo, b);

@@ -87,6 +87,8 @@ test('each command is served on the api where it was before the table, the lift 
       ['factory servers', { method: 'GET', path: '/api/factories/:factory/servers', status: 200 }],
       ['factory server add', { method: 'PUT', path: '/api/factories/:factory/servers/:server', status: 200 }],
       ['factory server rm', { method: 'DELETE', path: '/api/factories/:factory/servers/:server', status: 200 }],
+      ['factory volume add', 'cli'],
+      ['factory volume rm', 'cli'],
       [
         'factory rules',
         [

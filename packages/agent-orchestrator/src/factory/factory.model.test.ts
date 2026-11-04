@@ -6,7 +6,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Option, Schema } from 'effect';
-import { AppliedTemplate, Factory, FactoryName, factoryModel, Hire } from './factory.model.ts';
+import { AppliedTemplate, Factory, FactoryName, factoryModel, Hire, Volume } from './factory.model.ts';
 
 /** A factory as `readFactory` answers one: attached, hiring and scheduling, its instruction in the store. */
 const PIPAO = {
@@ -61,5 +61,24 @@ test('a hire names its factory, its workflow and step, and its agent, each by id
   assert.equal(Schema.is(Hire)({ factory: 'pipao', workflow: 'build', step: 'implement', agent: 'ada' }), true);
   assert.equal(Schema.is(Hire)({ factory: 'pipao', step: 'build/implement', agent: 'ada' }), false, 'the workflow is its own field');
   assert.deepEqual(factoryModel.ids, { FactoryName: 'Factory' });
-  assert.deepEqual(factoryModel.entities, [Factory, AppliedTemplate, Hire]);
+  assert.deepEqual(factoryModel.entities, [Factory, AppliedTemplate, Hire, Volume]);
+});
+
+test('a factory mounts volumes beside its repositories, and one that is a repository or named twice is refused', async (t) => {
+  const acme = { name: 'acme', repos: ['/r'], workflows: [], hires: {}, schedules: {} };
+  await t.test('a folder beside its repositories', () =>
+    assert.equal(Schema.is(Factory)({ ...acme, volumes: [{ path: '/notes', readOnly: true }] }), true),
+  );
+  const rows: Record<string, object> = {
+    'a volume that is one of its repositories': { ...acme, volumes: [{ path: '/r', readOnly: true }] },
+    'a volume named twice': {
+      ...acme,
+      volumes: [
+        { path: '/notes', readOnly: true },
+        { path: '/notes', readOnly: false },
+      ],
+    },
+  };
+  for (const [row, factory] of Object.entries(rows))
+    await t.test(`REFUSED: ${row}`, () => assert.equal(Schema.is(Factory)(factory), false));
 });

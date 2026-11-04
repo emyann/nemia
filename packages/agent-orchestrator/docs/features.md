@@ -2275,7 +2275,31 @@ Tested in `src/retention/retention.test.ts` (the order and the words), `retentio
 store and the engine's stand-in), `src/release/release.store.test.ts` (the installed releases, a build under way, a release moved
 aside) and `upgrade.verb.test.ts` (an upgrade's removal, a session's pin, a build that holds, a rollback). The contract proves every
 law, its accepting side narrowed to `somethingGoes` (unheld, where a release can go, something is removed): that every such release goes
-waits on tsverify proving a filter keeps every element that passes, and `retention.test.ts` holds it until then. Still to come: removing what a crashed upgrade leaves (a dead `.building-*`) and old build logs, a card of its own.
+waits on tsverify proving a filter keeps every element that passes, and `retention.test.ts` holds it until then. What a crashed upgrade leaves, and old build logs, are swept since: the next section.
+
+## Shipped: a crashed upgrade's leftovers are swept (harness-updates)
+
+An upgrade killed mid-build left its `releases/.building-<tag>-<pid>/` folder, with its exported tree and its trial store, for good, and
+a crash between the two calls of `switchCurrent` left `releases/.current-<pid>`; every build's log under `releases/.logs/` stayed
+forever. What was built, in `src/retention/` and `src/release/`:
+
+- **The rule** (`leftovers`, `src/retention/leftovers.ts`, proved by `contracts/leftovers.contract.ts`): a build folder or a pointer link
+  whose pid is no live process goes, one whose pid lives stays; a build log goes once its modification time is more than
+  `LOGS_KEPT_DAYS` (30) days old, long enough for a person to read why an upgrade failed, as Claude Code keeps a transcript a number of
+  days (`cleanupPeriodDays`). A live build writes its log, so its log is always fresh. Its times are whole milliseconds, so the age is
+  reckoned exactly.
+- **The same sweep** (`sweptLeftovers`, run by `retainOnce` before it reads the pointer, so a crashed first upgrade on a store with no
+  pointer is swept too, and asking the engine nothing): it reads the pid-named entries (`pidEntries`, over which `buildUnderWay` is now
+  written) and the logs (`buildLogs`) afresh, moves each dead entry aside to `releases/.removing-<name>-<pid>` (`asideLeftover`, a link
+  as a link), then deletes it off the event loop, a removal stopped by a crash finished by the next sweep (`leftRemovals`); a log is one
+  unlink. `Retained.swept` names what went, and `nemia upgrade` says it.
+- **No rule for trial stores**: each lives inside its build's folder, which a refused build deletes (`prepared`'s `finally`), so only a
+  crash leaves one, and it goes with its folder.
+
+Tested in `src/retention/leftovers.test.ts` (the accepting side the contract narrows to "something goes", the 30 days' edge, the
+words), `src/release/release.store.test.ts` (the entries, the logs, a leftover moved aside), `retention.verb.test.ts` (a crashed first
+upgrade swept with no pointer and an engine with no verbs, a live build kept) and `upgrade.verb.test.ts` (the next upgrade removes a
+dead build and an old log, and keeps the fresh ones).
 
 ## Shipped: the daemon started on demand (card 4e, from the command line)
 

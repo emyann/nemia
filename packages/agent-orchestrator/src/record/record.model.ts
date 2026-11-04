@@ -172,6 +172,7 @@ export const Run = Schema.Struct({
   gates: Schema.optional(Schema.Array(StepName.OnRead)),
   factory: Schema.optional(FactoryName.OnRead),
   mounts: Schema.optional(Schema.Array(Schema.Struct({ path: Schema.String, readOnly: Schema.Boolean }))),
+  volumes: Schema.optional(Schema.Array(Schema.Struct({ path: Schema.String, readOnly: Schema.Boolean }))),
   place: Schema.optional(Schema.Struct({ kind: Schema.Literal('folder') })),
   repo: Schema.optional(Schema.String),
   baseRef: Schema.optional(Schema.String),

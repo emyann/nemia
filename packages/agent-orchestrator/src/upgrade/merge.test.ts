@@ -233,27 +233,27 @@ test('a template switch merged with no common base, row by row: nothing the tree
     },
   );
   await t.test('a file only the tree holds is a conflict whose template side is none: --ours keeps it, --theirs drops it', () => {
-    const merge = switchTrees(tree({ 'agents/ada.md': 'Ada.\n' }), []);
-    assert.deepEqual(merge.conflicts, [{ at: 'agents/ada.md', base: null, ours: 'Ada.\n', theirs: null }]);
-    assert.deepEqual(composed(merge, { 'agents/ada.md': 'ours' }), { 'agents/ada.md': 'Ada.\n' });
-    assert.deepEqual(composed(merge, { 'agents/ada.md': 'theirs' }), {});
+    const merge = switchTrees(tree({ 'agents/alma.md': 'Alma.\n' }), []);
+    assert.deepEqual(merge.conflicts, [{ at: 'agents/alma.md', base: null, ours: 'Alma.\n', theirs: null }]);
+    assert.deepEqual(composed(merge, { 'agents/alma.md': 'ours' }), { 'agents/alma.md': 'Alma.\n' });
+    assert.deepEqual(composed(merge, { 'agents/alma.md': 'theirs' }), {});
   });
   await t.test(
     'factory.json by key: a hire set apart and a hire only the tree sets conflict by step, one only the template sets is added',
     () => {
       const wiring = (workflows: string[], hires: Record<string, string>) => `${JSON.stringify({ workflows, hires }, null, 2)}\n`;
-      const ours = tree({ 'factory.json': wiring(['build'], { 'build/implement': 'ada', 'build/lint': 'lin' }) });
-      const theirs = tree({ 'factory.json': wiring(['build', 'quick'], { 'build/implement': 'grace', 'build/land': 'otto' }) });
+      const ours = tree({ 'factory.json': wiring(['build'], { 'build/implement': 'alma', 'build/lint': 'lin' }) });
+      const theirs = tree({ 'factory.json': wiring(['build', 'quick'], { 'build/implement': 'bruno', 'build/land': 'cleo' }) });
       const merge = switchTrees(ours, theirs);
       assert.deepEqual(merge.conflicts, [
-        { at: 'factory.json#hires.build/implement', base: null, ours: 'ada', theirs: 'grace' },
+        { at: 'factory.json#hires.build/implement', base: null, ours: 'alma', theirs: 'bruno' },
         { at: 'factory.json#hires.build/lint', base: null, ours: 'lin', theirs: null },
       ]);
       assert.deepEqual(
         JSON.parse(
           composed(merge, { 'factory.json#hires.build/implement': 'ours', 'factory.json#hires.build/lint': 'theirs' })['factory.json'],
         ),
-        { workflows: ['build', 'quick'], hires: { 'build/implement': 'ada', 'build/land': 'otto' } },
+        { workflows: ['build', 'quick'], hires: { 'build/implement': 'alma', 'build/land': 'cleo' } },
         "the template's workflows taken, as they hold the tree's; its new hire added",
       );
     },
@@ -288,9 +288,9 @@ test('a template switch merged with no common base, row by row: nothing the tree
   });
   await t.test('the plan of a switch names both templates, says there is no common base, and quotes no base side', () => {
     const merge = switchTrees(tree({ 'a.md': 'x\n' }), tree({ 'a.md': 'A\n' }));
-    const next = { line: 'nemia factory upgrade made --to 2.0.0 --template sdlc --plan sha256:d', digest: 'sha256:d', dropped: [] };
-    const lines = planLines('made', '0.1.7', '2.0.0', merge, next, { from: 'mine', to: 'sdlc' });
-    assert.equal(lines[0], 'made: mine 0.1.7 → sdlc 2.0.0');
+    const next = { line: 'nemia factory upgrade made --to 2.0.0 --template later --plan sha256:d', digest: 'sha256:d', dropped: [] };
+    const lines = planLines('made', '0.1.7', '2.0.0', merge, next, { from: 'mine', to: 'later' });
+    assert.equal(lines[0], 'made: mine 0.1.7 → later 2.0.0');
     assert.match(lines[1] ?? '', /^switch: .*no common base/);
     assert.ok(!lines.some((l) => l.trim().startsWith('base:')), lines.join('\n'));
     assert.ok(lines.includes('    theirs:') && lines.includes('    ours:'), lines.join('\n'));

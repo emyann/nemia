@@ -95,11 +95,11 @@ function cleanIn(printed: readonly string[]): string[] {
 }
 
 const RULES = 'RULES.md';
-const ADA = 'workflows/agents/ada.md';
+const ALMA = 'workflows/agents/alma.md';
 const HIRE = 'factory.json#hires.dev/implement';
 
 /**
- * Two templates from the tests' team: `team` at 0.1.0, with rules and an agent `ada` the other holds none of; and `other` at 1.0.0, its
+ * Two templates from the tests' team: `team` at 0.1.0, with rules and an agent `alma` the other holds none of; and `other` at 1.0.0, its
  * own name, other rules, `dev/implement` hired to the reviewer, and other words for the ship step. Each folder named as its template.
  */
 function templates(): { team: string; other: string; repo: string } {
@@ -112,10 +112,10 @@ function templates(): { team: string; other: string; repo: string } {
   const other = path.join(scratch('wf-upgrade-switch-other-'), 'other');
   fs.cpSync(team, other, { recursive: true });
   fs.writeFileSync(path.join(team, RULES), 'Never touch the database.\n\nNever push.\n');
-  fs.cpSync(path.join(team, 'agents/implementer'), path.join(team, 'agents/ada'), { recursive: true });
-  fs.writeFileSync(path.join(team, 'agents/ada/instructions.md'), 'You are Ada; run npm run md3 before you sign off.\n');
-  edit(team, 'agents/ada/agent.yaml', (doc) => {
-    doc.metadata.name = 'ada';
+  fs.cpSync(path.join(team, 'agents/implementer'), path.join(team, 'agents/alma'), { recursive: true });
+  fs.writeFileSync(path.join(team, 'agents/alma/instructions.md'), 'You are Alma; run npm run md3 before you sign off.\n');
+  edit(team, 'agents/alma/agent.yaml', (doc) => {
+    doc.metadata.name = 'alma';
   });
   edit(other, 'nemia.yaml', (doc) => {
     doc.metadata.name = 'other';
@@ -140,7 +140,7 @@ test('a switch onto another template: previewed with no common base, held to its
     await printedBy(t, 'factory', 'apply', 'crew', '--template', dirs.team, '--repo', dirs.repo);
     const status = reconciled(factory('crew'));
     assert.deepEqual([status.conditions[0]?.reason, status.template, status.version], ['Rendered', 'team', '0.1.0']);
-    assert.ok(fs.existsSync(path.join(tree(), ADA)), 'the tree holds the agent only team has');
+    assert.ok(fs.existsSync(path.join(tree(), ALMA)), 'the tree holds the agent only team has');
     applied = bytesUnder(appliedDir('crew'));
   });
 
@@ -154,7 +154,7 @@ test('a switch onto another template: previewed with no common base, held to its
       assert.match(printed[1] ?? '', /^switch: .*other.*team.*no common base/);
       assert.ok(!printed.some((line) => line.trim().startsWith('base:')), 'no base side is quoted: there is none');
       conflicts = conflictsIn(printed);
-      for (const at of [HIRE, ADA]) assert.ok(conflicts.includes(at), `${at} asks:\n${printed.join('\n')}`);
+      for (const at of [HIRE, ALMA]) assert.ok(conflicts.includes(at), `${at} asks:\n${printed.join('\n')}`);
       assert.ok(
         conflicts.some((at) => at.startsWith(`${RULES}:`)),
         `the rules ask:\n${printed.join('\n')}`,
@@ -164,7 +164,7 @@ test('a switch onto another template: previewed with no common base, held to its
         `the ship step's words ask:\n${printed.join('\n')}`,
       );
       const theirsOf = (at: string) => printed.slice(printed.indexOf(`  ${at}`)).find((line) => line.startsWith('    theirs'));
-      assert.equal(theirsOf(ADA), '    theirs: none', "the agent only the tree holds: the template's side is none");
+      assert.equal(theirsOf(ALMA), '    theirs: none', "the agent only the tree holds: the template's side is none");
       const tree = entriesIn(treeDir('crew')).map((e) => e.path);
       for (const line of cleanIn(printed)) {
         const [at, from] = line.split('  ');
@@ -210,7 +210,7 @@ test('a switch onto another template: previewed with no common base, held to its
     const mine = path.join(scratch('wf-upgrade-switch-choice-'), 'rules.md');
     for (const at of conflicts) {
       const choice =
-        at === ADA
+        at === ALMA
           ? ['--ours']
           : at.startsWith(`${RULES}:`)
             ? (fs.writeFileSync(mine, 'Never touch the database.\n'), ['--file', mine])
@@ -224,10 +224,10 @@ test('a switch onto another template: previewed with no common base, held to its
   await s.test('the controller merges: each choice in the tree, the base the new render, the status naming other', () => {
     const merged = reconciled(factory('crew'));
     assert.deepEqual([merged.version, merged.template, merged.conditions[0]?.reason], ['1.0.0', 'other', 'Upgraded']);
-    assert.ok(textIn(tree(), ADA).includes('You are Ada; run npm run md3 before you sign off.'), 'the agent the tree alone held, kept');
+    assert.ok(textIn(tree(), ALMA).includes('You are Alma; run npm run md3 before you sign off.'), 'the agent the tree alone held, kept');
     assert.equal(JSON.parse(textIn(tree(), 'factory.json')).hires['dev/implement'], 'reviewer', "the template's hire");
     assert.ok(textIn(tree(), RULES).includes('Never touch the database.\n'), 'the rule written by hand');
-    assert.ok(!fs.existsSync(path.join(appliedDir('crew'), ADA)), 'the base is the new render, which holds no ada');
+    assert.ok(!fs.existsSync(path.join(appliedDir('crew'), ALMA)), 'the base is the new render, which holds no alma');
     assert.equal(digestOf(entriesIn(appliedDir('crew'))), merged.digest);
   });
 
@@ -297,5 +297,5 @@ test('a factory whose template changed under its version is named after that tem
   assert.equal(printed[0], 'kit: team 0.1.0 → other 1.0.0');
   assert.match(printed[1] ?? '', /^switch: /);
   const conflicts = conflictsIn(printed);
-  assert.ok(conflicts.includes(ADA) && conflicts.some((at) => at.startsWith(`${RULES}:`)), printed.join('\n'));
+  assert.ok(conflicts.includes(ALMA) && conflicts.some((at) => at.startsWith(`${RULES}:`)), printed.join('\n'));
 });

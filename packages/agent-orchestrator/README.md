@@ -3134,9 +3134,9 @@ reverts what a step writes there, and the brief, `wf start` and `nemia factory` 
 A factory's harness settings ride beside them too: settings of a harness every session of its runs' steps on it is given, on top of
 the repository's own (`nemia factory setting set <factory> <harness>.<key> <json>`, kept as `harnessSettings` in the factory's own file,
 never in a template, and kept by adopt and upgrade). A factory sets `claude.attribution`, `claude.includeGitInstructions` and
-`claude.language` alone (`CLAUDE_FACTORY_SETTINGS`, `src/harness-settings/harness-settings.ts`): each changes what a session writes or
+`claude.language` alone (`SETTABLE`, `src/harness-settings/harness-settings.ts`): each changes what a session writes or
 says and none what it may reach or run, and every other key is refused at the Factory door, at `wf start` and at each filing
-(`harnessSettingsRefusal`, `filedClaudeSettings`), since a list of what is allowed makes each new Claude Code setting a decision. A run
+(`harnessSettingsRefusal`, `filedSettings`), since a list of what is allowed makes each new Claude Code setting a decision. A run
 copies them at start onto its record as `harnessSettings`, and `filedConfig` lays each Claude Code step's own rendered settings over
 them in `config.claude.settings`, which the runtime hands the Agent SDK as `Options.settings`: the factory names them, the runtime
 carries them, as a Pod gives a container its configuration.

@@ -1,9 +1,9 @@
 /**
  * What Claude Code's runner reads off a job's hold file into its sighting (`heldSighting`, `harness/claude/code.ts`): the call it is
- * in and the call it holds back while it works, its end under the jobs' drain once it has ended, and — for a job whose worker died
+ * in and the call it holds back while it works, its end under the sessions' drain once it has ended, and — for a job whose worker died
  * with no end written (a stale lease) — whether it is read `parked`, to be continued, or failed, as an ordinary crash is.
  *
- * Over the files a worker and a job's process leave: a run file, the hold file beside it and the store's jobs' drain, each written
+ * Over the files a worker and a job's process leave: a run file, the hold file beside it and the store's sessions' drain, each written
  * here, read through the runner's own look (`observe`). No process runs.
  */
 import { test } from 'node:test';
@@ -13,7 +13,7 @@ import path from 'node:path';
 import { Effect } from 'effect';
 import { scratch } from './scratch.ts';
 import { claudeCodeOps } from '../src/harness/claude/code.ts';
-import { putJobDrain, writeJobHold, type JobHold } from '../src/harness/claude/job-hold.ts';
+import { putSessionDrain, writeJobHold, type JobHold } from '../src/harness/claude/job-hold.ts';
 import { STALE_MS } from '../src/harness/detached/detached.ts';
 import type { Sighting } from '../src/core/index.ts';
 
@@ -23,7 +23,7 @@ const CALL = { tool: 'Bash', since: '2026-11-03T10:00:00.000Z' };
 
 /**
  * The runner's sighting of one job whose worker wrote `run` (its state, its heartbeat's age, its session id), with `hold` beside it
- * and the jobs' drain put where `drained`.
+ * and the sessions' drain put where `drained`.
  */
 const sightingOf = async (run: { state: string; staleMs?: number; nativeId?: string }, hold?: JobHold, drained = false) => {
   const root = scratch('ae-hold-look-');
@@ -45,7 +45,7 @@ const sightingOf = async (run: { state: string; staleMs?: number; nativeId?: str
     }),
   );
   if (hold) writeJobHold(path.join(dir, 'ae_h1_1.hold'), hold);
-  if (drained) putJobDrain(root, { graceMs: 60_000 });
+  if (drained) putSessionDrain(root, { graceMs: 60_000 });
   const seen = await Effect.runPromise(claudeCodeOps({ root }).observe);
   const s = seen.get(name);
   assert.ok(s, `the job is seen: ${JSON.stringify([...seen.keys()])}`);

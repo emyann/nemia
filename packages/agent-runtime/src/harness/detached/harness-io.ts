@@ -41,13 +41,13 @@ export type HarnessIO = {
    */
   bridgeFile?: string;
   /**
-   * Where a Claude Code job's own process writes what it is doing about the jobs' drain (`JobHold`, `harness/claude/job-hold.ts`): its
+   * Where a Claude Code job's own process writes what it is doing about the sessions' drain (`JobHold`, `harness/claude/job-hold.ts`): its
    * call in flight, the drain it read standing, a call it holds back, and its end under the drain. Named by its spec's `prepare` beside
    * the run's own files, cleared there at each spawn, and read into the job's sighting by its runner. Absent, with `drainFile`: the
    * job has no hold.
    */
   holdFile?: string;
-  /** The store's jobs' drain (`jobDrainFile`), which a job's own process reads on every poll. Absent, with `holdFile`: no hold. */
+  /** The store's sessions' drain (`sessionDrainFile`), which a job's own process reads on every poll. Absent, with `holdFile`: no hold. */
   drainFile?: string;
   /** How long a job is held under a drain before it parks, in milliseconds: a test's shortening of `JOB_HOLD_MS`. Absent: that bound. */
   holdMs?: number;

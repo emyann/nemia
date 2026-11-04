@@ -15,4 +15,4 @@ export {
 export type { ClaudeFlags } from './vocabulary.ts';
 export { attachedSessions, LET_GO_MS, type Attached } from './attached.ts';
 export { putDrain, liftDrain } from './attached-file.ts';
-export { jobDrainFile, jobDrainOf, liftJobDrain, putJobDrain, type JobDrain } from './job-hold.ts';
+export { sessionDrainFile, sessionDrainOf, liftSessionDrain, putSessionDrain, type SessionDrain } from './job-hold.ts';

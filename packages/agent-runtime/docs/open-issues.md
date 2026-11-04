@@ -1629,7 +1629,7 @@ prose is a former shape: what a job was before 2026-10-21, or a measurement's pr
 
 ## A job's hold is measured on the stand-in alone
 
-**What.** A Claude Code job held under the jobs' drain (`bin/ae-claude-job.ts`) relies on two facts read only on the stand-in Claude
+**What.** A Claude Code job held under the sessions' drain (`bin/ae-claude-job.ts`) relies on two facts read only on the stand-in Claude
 Code of `test/job-hold.boundary.test.ts`: that a real Claude Code 2.1.316 waits on an unanswered `PreToolUse` hook under
 `--permission-prompts=none`, and that `interrupt()` then the end of the prompt saves the cut turn's cost. What it does when the hook
 passes its own `timeout` (`HOOK_HOLD_S`, 24 h) is unknown: if it let the call run, a job held past the bound would act under a pause,

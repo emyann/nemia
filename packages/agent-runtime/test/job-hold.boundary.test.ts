@@ -1,5 +1,5 @@
 /**
- * A Claude Code job held by the jobs' drain, in its own process: the real `bin/ae-claude-job.ts`, run as the worker runs it — a spawn
+ * A Claude Code job held by the sessions' drain, in its own process: the real `bin/ae-claude-job.ts`, run as the worker runs it — a spawn
  * request's path on its argv, the brief's line on its stdin, its stdin ended once its result is printed — the real `query()`, and the
  * stand-in Claude Code the SDK spawns through `AE_CLAUDE_EXECUTABLE` (`fixtures/stand-in-claude.ts`).
  *
@@ -21,7 +21,7 @@ import { fileURLToPath } from 'node:url';
 import { scratch } from './scratch.ts';
 import { story } from './checkpoints.ts';
 import { until, WAITED } from '../src/waits/index.ts';
-import { jobDrainFile, liftJobDrain, putJobDrain, readJobHold } from '../src/harness/claude/job-hold.ts';
+import { sessionDrainFile, liftSessionDrain, putSessionDrain, readJobHold } from '../src/harness/claude/job-hold.ts';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const BIN = path.join(HERE, '..', 'bin', 'ae-claude-job.ts');
@@ -77,7 +77,7 @@ const job = (t: { after: (f: () => void) => void }, plan: object, io: { holdMs?:
         cwd: dir,
         config: { env: { STANDIN_DIR: dir, STANDIN_PLAN: JSON.stringify(plan), STANDIN_NO_BRIDGE: '1' } },
       },
-      io: { holdFile, drainFile: jobDrainFile(root), holdPollMs: 20, ...io },
+      io: { holdFile, drainFile: sessionDrainFile(root), holdPollMs: 20, ...io },
     }),
   );
   const child = spawn(process.execPath, [BIN, at], {
@@ -134,7 +134,7 @@ test(
         () => `the call in flight on the hold file: ${JSON.stringify(a.hold())}`,
         { everyMs: 20 },
       );
-      putJobDrain(a.root, { graceMs: LONG_GRACE_MS });
+      putSessionDrain(a.root, { graceMs: LONG_GRACE_MS });
       await until(
         c,
         () => a.hold()?.draining !== undefined,
@@ -168,7 +168,7 @@ test(
     });
 
     await s.test('lifted: the held call runs, and draining and heldBack clear', async (c) => {
-      liftJobDrain(a.root);
+      liftSessionDrain(a.root);
       await until(
         c,
         () => a.hold()?.calling?.tool === 'Edit',
@@ -192,7 +192,7 @@ test(
         () => `the call in flight: ${JSON.stringify(b.hold())}`,
         { everyMs: 20 },
       );
-      putJobDrain(b.root, { graceMs: 0 });
+      putSessionDrain(b.root, { graceMs: 0 });
       const { code } = await b.done;
       assert.notEqual(code, null, 'it left by itself, killed by nobody');
       assert.equal(b.hold()?.parked?.calling?.tool, 'Bash', `parked with the call it cut: ${JSON.stringify(b.hold())}`);
@@ -219,7 +219,7 @@ test(
       );
       d.release('release');
       await until(c, () => answered(d.dir, 'PostToolUse') === 1 && d.hold()?.calling === undefined, 'the first call over', { everyMs: 20 });
-      putJobDrain(d.root, { graceMs: LONG_GRACE_MS });
+      putSessionDrain(d.root, { graceMs: LONG_GRACE_MS });
       d.release('next');
       const { code } = await d.done;
       assert.notEqual(code, null, 'it left by itself');
@@ -232,7 +232,7 @@ test(
     await s.test('a sub-agent’s call is answered while the job’s calls are held', async (c) => {
       const e = job(t, { nested: 'Read', fromSubAgent: true, hold: true });
       await until(c, () => wrote(e.dir, 'said.jsonl').length === 1, 'the session took its brief', { everyMs: 20 });
-      putJobDrain(e.root, { graceMs: LONG_GRACE_MS });
+      putSessionDrain(e.root, { graceMs: LONG_GRACE_MS });
       await until(
         c,
         () => e.hold()?.draining !== undefined,
@@ -246,7 +246,7 @@ test(
         () => `the sub-agent’s call answered: ${JSON.stringify(e.hold())}`,
         { everyMs: 20 },
       );
-      liftJobDrain(e.root);
+      liftSessionDrain(e.root);
       e.release('end');
       const { code } = await e.done;
       assert.equal(code, 0, e.err());
@@ -254,7 +254,7 @@ test(
 
     await s.test('a SIGTERM still ends a held job, and its Claude Code with it', async (c) => {
       const f = job(t, { call: 'Bash' });
-      putJobDrain(f.root, { graceMs: LONG_GRACE_MS });
+      putSessionDrain(f.root, { graceMs: LONG_GRACE_MS });
       await until(
         c,
         () => f.hold()?.heldBack !== undefined,

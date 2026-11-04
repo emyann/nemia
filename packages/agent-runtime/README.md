@@ -1864,8 +1864,8 @@ itself detached and listed in `claude agents`; and a job could run as `claude -p
 
 ### A job's drain: held at its next call, continued within its cap
 
-`Engine.drainJobs({ graceMs })` puts the jobs' drain, one file for the whole store (`jobDrainFile`, `src/harness/claude/job-hold.ts`),
-and `drainJobs(null)` lifts it; anything else is refused `DrainRefused`. It is a fact apart from the holder's drain (`drain`), so a
+`Engine.drainSessions({ graceMs })` puts the sessions' drain, one file for the whole store (`sessionDrainFile`, `src/harness/claude/job-hold.ts`),
+and `drainSessions(null)` lifts it; anything else is refused `DrainRefused`. It is a fact apart from the holder's drain (`drain`), so a
 daemon's restart, which puts and lifts that one, never holds or releases a job. Every job's own process reads it on each poll
 (`bin/ae-claude-job.ts`): a call in flight finishes, and the next call of the main thread waits at its `PreToolUse` hook, as an
 attached session's does under a let-go; a sub-agent's call is never held. The job writes what it does beside its run (`<name>.hold`:
@@ -1880,7 +1880,7 @@ prompt, so Claude Code saves its total as it leaves. Its end is journalled with 
 nothing ends failed with `limit: 'budget'` instead, and nothing continues it.
 
 A crash takes the same road only for a job that was held or draining: a job whose worker's lease is gone and that has a session is
-read `parked` where its hold file says `heldBack`, `draining` or `parked`, or a jobs' drain stands at the look (`heldSighting`). Any
+read `parked` where its hold file says `heldBack`, `draining` or `parked`, or a sessions' drain stands at the look (`heldSighting`). Any
 other crash ends failed as before, for the layer above to judge. Everything here is read off files on each pass, so it survives a
 restart of the daemon.
 
@@ -2024,7 +2024,7 @@ of pure code sits beside it.
 | `src/harness/index.ts` | the face of the seam, as the A2A seam and the face take it; `core/` imports `seam.ts` and `args.ts` by their own path |
 | `src/harness/claude/trust.ts` | Claude Code's trust of a folder in its `.claude.json` (`claudeConfigFile`, in `CLAUDE_CONFIG_DIR` when set): read by `claudeTrusts`, and one key set by `claudeTrust`, which keeps every other key and a write that lands meanwhile |
 | `src/harness/claude/code.ts` | Claude Code as the engine runs it by default: every session on the Agent SDK: a task as a job on its own process (`claudeJobSpec`, the bin), holder or not, and a long-lived one attached (`withAttached`), refused `unstartable` with no holder (`LONG_LIVED_UNHELD`); a job's bridge file and hold file read into its sighting (`heldSighting`) |
-| `src/harness/claude/job-hold.ts` | what a held session and a held job share: the hook's hold, a sub-agent's call, the calls in flight, and the two files a job is held by — the store's jobs' drain (`putJobDrain`, `liftJobDrain`, `jobDrainOf`) and the job's own hold file (`readJobHold`, `writeJobHold`) |
+| `src/harness/claude/job-hold.ts` | what a held session and a held job share: the hook's hold, a sub-agent's call, the calls in flight, and the two files a job is held by — the store's sessions' drain (`putSessionDrain`, `liftSessionDrain`, `sessionDrainOf`) and the job's own hold file (`readJobHold`, `writeJobHold`) |
 | `src/harness/claude/job-env.ts` | the environment a session run to its end is given, a job's or an attached one's (`CLAUDE_JOB_ENV`) |
 | `src/harness/claude/attached.ts` | Claude Code attached on the Agent SDK (`attachedSessions`): the holder's `hold`, adoption and resume, and the runner's verbs over the run files |
 | `src/harness/claude/attached-bridge.ts` | the claude.ai bridge of an attached session, behind one door: the SDK's undeclared `enableRemoteControl` read off the `query()` object, its answer decoded, and refused in words where it is absent |
@@ -2054,7 +2054,7 @@ of pure code sits beside it.
 | `src/harness/detached/follow.ts` | a detached session followed live (`followOf`): its run file, its whole stdout lines read for the text being written, and its transcript, each read on from where the last read stopped, on a watch's wake or each second |
 | `src/harness/detached/carried.ts` | a resumed session's own share where its harness prints its parent's totals on: the parent's cost, API time and whole session's tokens (`carriedOf`) taken off the resume's, falling back to its own `usage` (`lessCarried`) |
 | `src/harness/detached/output.ts` | what a detached session's output says: a Claude Code job's result and stream, decoded by `stream.ts` or refused, read for closeout, usage (every model's, `modelUsage`, else the main thread's), cost, a spent budget and denials, and the stream for the skills loaded and the files touched |
-| `src/harness/detached/harness-io.ts` | what a detached harness's command is told of the files its runner named for it (`HarnessIO`): the closeout's schema and answer, the MCP config, the spawn request, a Claude Code job's bridge file, and its hold file, the jobs' drain and the hold's bounds |
+| `src/harness/detached/harness-io.ts` | what a detached harness's command is told of the files its runner named for it (`HarnessIO`): the closeout's schema and answer, the MCP config, the spawn request, a Claude Code job's bridge file, and its hold file, the sessions' drain and the hold's bounds |
 | `src/harness/detached/spawn-files.ts` | the files a spawn clears and writes beside a run before the worker is launched, and what they say to the harness (`spawnFiles`, `HarnessIO`): the closeout's schema, the MCP config, what the spec prepares, and the spawn request a spec that reads one is given (`needsRequest`); and the stdin the worker writes (`spawnInput`) |
 | `src/harness/detached/run-file.ts` | a detached run's file as the worker and the spawn write it: its schema (`RunFileSchema`), its read (`runFileIn`), the first one a spawn writes, and its state as a sighting says it, its heartbeat's lease (`STALE_MS`) included |
 | `src/harness/detached/said.ts` | what was read of a finished run's output, kept beside its log keyed by the log's size and mtime and the readers' version — or a former one they only added fields to (`SAID_EXTENDED`) — so each process reads a log once per change of it; and an ended run's capture rewritten there to what its spec keeps (`keepOutput`, `keepCapture`), only when it reads the same |
@@ -2077,7 +2077,7 @@ of pure code sits beside it.
 | `src/a2a/sending.ts` | a send under way: its lease (`sendHeld`), `SEND_MS` on the monotonic clock from its stamp within a boot and on the wall clock from `sentAt` otherwise, and whether the process making it lives |
 | `src/a2a/said.ts` | the remote harness's own words told from another party's: the errors it throws in its own words, the A2A errors that refuse a send, and any other error's words quoted to 200 characters (`wordsOf`) |
 | `src/a2a/index.ts` | the face of `a2a/`, as the face takes it: it imports no name of the SDK's |
-| `src/service/drain.ts` | the two drains' refusals (`DrainRefused`): the holder's (`drainRefusalOf`) and the jobs' (`drainJobsRefusalOf`), and what each pass reads of the engine's options and store: its admission and whether the jobs' drain stands (`passReadsOf`) |
+| `src/service/drain.ts` | the two drains' refusals (`DrainRefused`): the holder's (`drainRefusalOf`) and the jobs' (`drainSessionsRefusalOf`), and what each pass reads of the engine's options and store: its admission and whether the sessions' drain stands (`passReadsOf`) |
 | `src/service/engine.ts` | the engine as an Effect service, `Engine`: `Engine.layer(options)` assembles each harness behind its A2A agent, the store and the memo, and its verbs are Effects that fail with tagged errors (`ListRefused`, `TranscriptRefused`, `say.ts`'s `SayRefused` and `SayUnsent`, and the core's) |
 | `src/service/test-engine.ts` | the engine's stand-in, `testEngine()`: the `Engine` service kept by hand in a layer, with what it was asked to read back and `settle` to move a task; it keeps `file`, `view`, `stop`, `logs`, `feed`, `output`, `say`, `answer`, `forget` and `kept`, held to the real engine by `test/engine-walks.ts`; an answer is the task's input, and the next `settle` begins its turn |
 | `src/service/forget.ts` | the engine's `forget` verb, `forgetVerbOf`, and `ForgetRefused`: every guard asked of every id first, then each session's files through its harness, the feed's lines and the journal; without `yes`, a count (`ForgetReport`) |

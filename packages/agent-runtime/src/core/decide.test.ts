@@ -319,7 +319,7 @@ test('decide: how a job starts and settles — each end its harness, a person or
   });
 });
 
-test("decide: a job parked under a jobs' drain — held while it stands, then continued as the next attempt of its task, resumed and told the call that did not finish; settled as today when stopped, unparked or long-lived", async (t) => {
+test("decide: a job parked under a sessions' drain — held while it stands, then continued as the next attempt of its task, resumed and told the call that did not finish; settled as today when stopped, unparked or long-lived", async (t) => {
   const END = 200_000;
   const job = (parked?: { calling?: { tool: string; since: string } }, longLived = false): Event[] => [
     { kind: 'filed', at: at(0), brief: 'b', cwd: '/r', queued: false, ...(longLived ? { restartPolicy: 'Always' as const } : {}) },
@@ -387,7 +387,7 @@ test("decide: a job parked under a jobs' drain — held while it stands, then co
       assert.deepEqual(decide(fold(TASK, job()), new Map(), n), { do: 'settle', outcome: 'failed', note: '1 attempt(s), none succeeded' });
   });
 
-  await t.test("a long-lived task's restart is unchanged, and the jobs' drain does not hold it", () => {
+  await t.test("a long-lived task's restart is unchanged, and the sessions' drain does not hold it", () => {
     for (const n of [now(END + 10_000), drained(END + 10_000)])
       assert.deepEqual(decide(fold(TASK, job(undefined, true)), new Map(), n), {
         do: 'start',

@@ -42,7 +42,7 @@ const inFlight = (state: State): Attempt | undefined => {
   const last = state.attempts.at(-1);
   return last !== undefined && last.ended === null ? last : undefined;
 };
-/** Whether the last attempt, of the current turn, was parked under a jobs' drain (`Attempt.parked`, which only an end carries). */
+/** Whether the last attempt, of the current turn, was parked under a sessions' drain (`Attempt.parked`, which only an end carries). */
 const parkedLast = (state: State): boolean => {
   const last = state.attempts.at(-1);
   return last !== undefined && last.parked !== undefined && (last.turn ?? 0) === state.inputs.length;
@@ -175,7 +175,7 @@ const observeSpec = spec<(state: State, observed: ReadonlyMap<string, Sighting>,
         state.restartPolicy === 'Always' || !['SESSION_IDLE', 'SESSION_RESPAWNING', 'RESPAWN_OVERDUE'].includes(output.type),
     },
     /**
-     * A job parked under a jobs' drain is continued as a restart inside its task (the card "a job stops at its tool call's end"),
+     * A job parked under a sessions' drain is continued as a restart inside its task (the card "a job stops at its tool call's end"),
      * so a restart is no longer the long-lived task's alone.
      */
     onlyALongLivedTaskOrAParkedJobRestarts: {
@@ -188,12 +188,12 @@ const observeSpec = spec<(state: State, observed: ReadonlyMap<string, Sighting>,
       condition: ({ input: [state], output }) => output.type !== 'ATTEMPT_ENDED' || !parkedLast(state),
     },
     aParkedJobIsHeldWhileDrained: {
-      description: "While a jobs' drain stands, a job is never continued",
+      description: "While a sessions' drain stands, a job is never continued",
       condition: ({ input: [state, , now], output }) =>
         now.drained !== true || state.restartPolicy === 'Always' || output.type !== 'RESTART_DUE',
     },
     heldOnlyWhenParkedAndDrained: {
-      description: "A job is held parked only while a jobs' drain stands and its last attempt ended parked",
+      description: "A job is held parked only while a sessions' drain stands and its last attempt ended parked",
       condition: ({ input: [state, , now], output }) => output.type !== 'PARK_HELD' || (now.drained === true && parkedLast(state)),
     },
     queuedOnlyWhenQueued: {

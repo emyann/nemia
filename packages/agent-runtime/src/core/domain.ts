@@ -173,13 +173,13 @@ export type Sighting = {
    */
   calling?: { tool: string; since: string };
   /**
-   * The main-thread tool call its session made that waits at its hook, held while a jobs' drain stands, and since when (ISO), for a
+   * The main-thread tool call its session made that waits at its hook, held while a sessions' drain stands, and since when (ISO), for a
    * harness whose job holds its calls (Claude Code's job on the Agent SDK). Absent while no call waits, and from a harness that cannot
    * say. **Carried, never judged**: `decide` does not read it; a person learns from it that the job is held, not stalled.
    */
   heldBack?: { since: string };
   /**
-   * The job ended itself under a jobs' drain — past the drain's grace with a call in flight, or held past its bound — or crashed while
+   * The job ended itself under a sessions' drain — past the drain's grace with a call in flight, or held past its bound — or crashed while
    * it was held or draining, as its runner read it (`Parked`). Read by `decide` on an ended attempt alone, where its end carries it.
    */
   parked?: Parked;
@@ -215,7 +215,7 @@ export type AskQuestion = { question: string; header: string; options: AskOption
 export type AskOption = { label: string; description: string; preview?: string };
 
 /**
- * A job parked under a jobs' drain: what its end says beside its state, so that the runtime continues it once the drain is lifted.
+ * A job parked under a sessions' drain: what its end says beside its state, so that the runtime continues it once the drain is lifted.
  * `calling`, the tool call it was in that did not finish, and since when (ISO); absent where it was parked between two calls.
  */
 export type Parked = { calling?: { tool: string; since: string } };
@@ -353,7 +353,7 @@ export type EndReason = 'harness' | 'lost' | 'unstartable' | 'operator' | 'deadl
  *   find out.
  * - `ended`: an attempt reached a terminal state, as observed — never as assumed. `usage`, `exitCode`, `denials`, `skills`,
  *   `files`, `ranOn` and `limit` come from the same sighting, when its runner measured them; `decide` reads none of them. `parked`,
- *   from the same sighting, says the job ended itself under a jobs' drain (`Parked`): `decide` reads it, and continues the job.
+ *   from the same sighting, says the job ended itself under a sessions' drain (`Parked`): `decide` reads it, and continues the job.
  *   `closedOut`, on an end read off a sighting of a task that asked for a closing statement: whether one came. A fact, never a
  *   verdict — `decide` does not read it, and the layer above judges what a missing statement means. Absent from an end an older runtime
  *   wrote, and from an end with no sighting behind it (`lost`, `unstartable`, a cut). `former`, on an end an older runtime gave a
@@ -565,7 +565,7 @@ export type Attempt = {
   /** The limit its configuration set that its harness says it ended the session at — `budget` — when it said one. Carried, never read. */
   limit?: string;
   /**
-   * The job was parked under a jobs' drain, as its end said (`Parked`): `decide` continues it as the next attempt of its task, resumed
+   * The job was parked under a sessions' drain, as its end said (`Parked`): `decide` continues it as the next attempt of its task, resumed
    * in its session, once the drain is lifted — unless a stop was asked. Absent from every other end.
    */
   parked?: Parked;
@@ -868,7 +868,7 @@ export type Now = {
    */
   unread?: ReadonlySet<string>;
   /**
-   * A jobs' drain stands at this pass: a parked job is held (`PARK_HELD`) rather than continued. Absent or false, none stands.
+   * A sessions' drain stands at this pass: a parked job is held (`PARK_HELD`) rather than continued. Absent or false, none stands.
    */
   drained?: boolean;
 };
@@ -978,7 +978,7 @@ export const lifecycleOf: LifecycleOf = (state) => {
  * 4. `DEADLINE_SPENT`, when it is overdue and its last attempt ended at the deadline.
  * 5. For a long-lived task whose attempt ended, no stop asked: its restart (`restartOf`) — unless its harness refused the
  *    spawn (`unstartable`), which waiting would not change, and it settles on that end, as a job does. For a job whose attempt
- *    ended parked, no stop asked: its continuation, by the same road — `PARK_HELD` while a jobs' drain stands (`Now.drained`).
+ *    ended parked, no stop asked: its continuation, by the same road — `PARK_HELD` while a sessions' drain stands (`Now.drained`).
  * 6. `ATTEMPT_ENDED`, judged on the current turn's attempts, which are all of them for a task not held open. One attempt
  *    per start. For an `unstartable` end, the harness's words (`error`).
  * 7. `NO_SESSION_TO_CONTINUE`, for a later turn with no session to continue.
@@ -1117,7 +1117,7 @@ export function needsHuman(state: State, observed: ReadonlyMap<string, Sighting>
 /**
  * The restart of a long-lived task whose last attempt, `last`, ended with no stop asked, and not refused at its spawn (that settles),
  * or of a task whose last attempt was `parked` (its end's), `observe`'s fifth rule with nothing in flight: `PARK_HELD` for a parked
- * one while a jobs' drain stands; `UNREAD` while its harness could not read the old name, `PREVIOUS_LIVE` while it still holds the
+ * one while a sessions' drain stands; `UNREAD` while its harness could not read the old name, `PREVIOUS_LIVE` while it still holds the
  * old session, `BACKING_OFF` within `backoffOf` the end, then `RESTART_DUE` — continuing the latest session an attempt recorded,
  * told `RESTART_WORDS`, or, parked, the call that did not finish (`cutWords`) or `PARKED_WORDS` (`restartWords`, `restart.ts`); with
  * none recorded, what the turn continues, told the brief.

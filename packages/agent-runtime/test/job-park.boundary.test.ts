@@ -1,5 +1,5 @@
 /**
- * A Claude Code job stopped by the jobs' drain and continued, through the engine: `drainJobs` puts the drain, the job's own process
+ * A Claude Code job stopped by the sessions' drain and continued, through the engine: `drainSessions` puts the drain, the job's own process
  * parks itself past its bound, the engine holds the parked attempt while the drain stands (`PARK_HELD`), and once it is lifted starts
  * attempt 2 of the same task after its back-off, resuming the same session, told the call that did not finish and handed what is left
  * of the task's cap. A parked attempt that spent the cap whole settles failed, `limit: 'budget'`. A worker killed — with its job's
@@ -129,7 +129,7 @@ const passesPast = async (c: TestContext, engine: Built, ms: number, passes = 1)
   }
 };
 
-/** What decide reads of `id`'s record, seen nowhere, the jobs' drain standing: the event its pass moves it by. */
+/** What decide reads of `id`'s record, seen nowhere, the sessions' drain standing: the event its pass moves it by. */
 const heldEvent = async (engine: Built, id: string) =>
   observe((await viewNow(engine, id)).state, new Map(), { at: new Date(), graceMs: 30_000, unread: new Set(), drained: true }).type;
 
@@ -167,7 +167,7 @@ test('a Claude Code job stopped by the jobs’ drain parks, is held while it sta
 
   await s.test('drained, a job in a call parks past its shortened bound, with the call it was in', async (c) => {
     await viewWhen(c, a.engine, first.id, (v) => v.calling?.tool === 'Bash', 'the call in flight, on the view');
-    await Effect.runPromise(a.engine.drainJobs({ graceMs: LONG_GRACE_MS }));
+    await Effect.runPromise(a.engine.drainSessions({ graceMs: LONG_GRACE_MS }));
     const v = await viewWhen(c, a.engine, first.id, (v) => v.state.attempts[0]?.ended != null, 'attempt 1 ended');
     const one = v.state.attempts[0];
     assert.equal(one?.ended, 'failed', `it ended itself: ${JSON.stringify(one)}`);
@@ -184,7 +184,7 @@ test('a Claude Code job stopped by the jobs’ drain parks, is held while it sta
   });
 
   await s.test('lifted: attempt 2 after the back-off resumes the session, told the call, handed the cap less what 1 spent', async (c) => {
-    await Effect.runPromise(a.engine.drainJobs(null));
+    await Effect.runPromise(a.engine.drainSessions(null));
     await Effect.runPromise(a.engine.tick());
     assert.equal((await viewNow(a.engine, first.id)).state.attempts.length, 1, 'not before its back-off');
     await passesPast(c, a.engine, PAST_BACKOFF_MS);
@@ -210,7 +210,7 @@ test('a Claude Code job stopped by the jobs’ drain parks, is held while it sta
     await viewWhen(c, a.engine, spent.id, (v) => v.calling?.tool === 'Bash', 'the first call in flight');
     fs.writeFileSync(path.join(spent.dir, 'release'), '');
     await viewWhen(c, a.engine, spent.id, (v) => v.calling === undefined, 'the first call over', false);
-    await Effect.runPromise(a.engine.drainJobs({ graceMs: LONG_GRACE_MS }));
+    await Effect.runPromise(a.engine.drainSessions({ graceMs: LONG_GRACE_MS }));
     fs.writeFileSync(path.join(spent.dir, 'next'), '');
     const held = await viewWhen(c, a.engine, spent.id, (v) => v.heldBack !== undefined, 'the next call held back, on the view', false);
     assert.equal(typeof held.heldBack?.since, 'string');
@@ -218,7 +218,7 @@ test('a Claude Code job stopped by the jobs’ drain parks, is held while it sta
     const one = v.state.attempts[0];
     assert.deepEqual([one?.ended, one?.limit, one?.parked], ['failed', 'budget', undefined], JSON.stringify(one));
     assert.equal(v.state.settled, 'failed');
-    await Effect.runPromise(a.engine.drainJobs(null));
+    await Effect.runPromise(a.engine.drainSessions(null));
     await passesPast(c, a.engine, PAST_BACKOFF_MS, 2);
     assert.equal((await viewNow(a.engine, spent.id)).state.attempts.length, 1, 'no attempt 2');
   });
@@ -227,7 +227,7 @@ test('a Claude Code job stopped by the jobs’ drain parks, is held while it sta
   await s.test('a worker killed under a drain: read parked, held while the drain stands', async (c) => {
     const lost = await b.file({ id: '5e551011-0000-4000-8000-0000000000e3', call: 'Bash', cost: 0.25 }, 1);
     await viewWhen(c, b.engine, lost.id, (v) => v.calling?.tool === 'Bash', 'the call in flight');
-    await Effect.runPromise(b.engine.drainJobs({ graceMs: LONG_GRACE_MS }));
+    await Effect.runPromise(b.engine.drainSessions({ graceMs: LONG_GRACE_MS }));
     await until(c, () => readJobHold(besideRunOf(b.root, lost.id, 1, 'hold'))?.draining !== undefined, 'draining, on its hold file', {
       everyMs: 20,
     });
@@ -240,7 +240,7 @@ test('a Claude Code job stopped by the jobs’ drain parks, is held while it sta
     assert.deepEqual([v.state.attempts.length, v.state.settled], [1, null], 'nothing started, nothing settled');
     assert.equal(await heldEvent(b.engine, lost.id), 'PARK_HELD');
 
-    await Effect.runPromise(b.engine.drainJobs(null));
+    await Effect.runPromise(b.engine.drainSessions(null));
     await passesPast(c, b.engine, PAST_LEASE_MS + PAST_BACKOFF_MS);
     const two = (await viewNow(b.engine, lost.id)).state.attempts[1];
     assert.deepEqual(

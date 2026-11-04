@@ -216,12 +216,14 @@ export const writeRun = (root: string, run: AttachedRun): void => {
   fs.renameSync(tmp, file);
 };
 
-/** Every attached run file under `root`, by its session's name: neither drain's file (`DRAIN`, the jobs' `jobDrainFile`) is one. */
+/** Every attached run file under `root`, by its session's name: neither drain's file (`DRAIN`, the jobs' `sessionDrainFile`) is one. */
 export const everyRun = (root: string): Map<string, AttachedRun> => {
   const dir = attachedDir(root);
   let names: string[];
   try {
-    names = fs.readdirSync(dir).filter((f) => f.endsWith('.json') && !f.endsWith('.mcp.json') && f !== DRAIN && f !== 'jobs-drain.json');
+    names = fs
+      .readdirSync(dir)
+      .filter((f) => f.endsWith('.json') && !f.endsWith('.mcp.json') && f !== DRAIN && f !== 'sessions-drain.json');
   } catch {
     return new Map();
   }

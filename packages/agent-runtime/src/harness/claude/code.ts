@@ -16,7 +16,7 @@
  * session's bridge is on its run file, a job's on the bridge file its own process writes beside its run (`HarnessIO.bridgeFile`),
  * which this runner reads into the job's sighting on every look.
  *
- * A job is held by the store's jobs' drain (`job-hold.ts`): its own process holds its next main-thread call at its hook while the drain
+ * A job is held by the store's sessions' drain (`job-hold.ts`): its own process holds its next main-thread call at its hook while the drain
  * stands, and parks past the drain's grace or its bound, saying so on the hold file it writes beside its run (`HarnessIO.holdFile`),
  * which this runner reads into the job's sighting on every look (`withHoldFiles`): the call it is in, the call it holds back, and its
  * end under the drain (`parked`), which the engine continues as a new attempt once the drain is lifted.
@@ -41,7 +41,7 @@ import {
   type HarnessSpec,
   type StartEvent,
 } from '../detached/detached.ts';
-import { jobDrainFile, jobDrainOf, readJobHold, type JobHold } from './job-hold.ts';
+import { sessionDrainFile, sessionDrainOf, readJobHold, type JobHold } from './job-hold.ts';
 import { claudeTranscriptEvents, claudeTranscriptFile, claudeTranscriptRecords } from './transcript.ts';
 import { CLAUDE_CONTEXT_TOKENS, bridgeAsked, claudeCodeRefuses, claudeRefuses } from './vocabulary.ts';
 import { claudePartials, claudeStreamKept, claudeStreamOutput } from '../detached/output.ts';
@@ -62,13 +62,13 @@ export type ClaudeOptions = {
    * process as `AE_CLAUDE_EXECUTABLE` (`claudeJobSpec`). Absent: the SDK's own.
    */
   claudeExecutable?: string;
-  /** How long a job is held under the jobs' drain before it parks, in milliseconds: a test's shortening. Absent: `JOB_HOLD_MS`. */
+  /** How long a job is held under the sessions' drain before it parks, in milliseconds: a test's shortening. Absent: `JOB_HOLD_MS`. */
   holdMs?: number;
-  /** How often a job's own process reads the jobs' drain, in milliseconds: a test's shortening. Absent: `JOB_HOLD_POLL_MS`. */
+  /** How often a job's own process reads the sessions' drain, in milliseconds: a test's shortening. Absent: `JOB_HOLD_POLL_MS`. */
   holdPollMs?: number;
 };
 
-/** What a job's process is handed to be held by the jobs' drain: the store whose drain it reads, and the bounds a test shortens. */
+/** What a job's process is handed to be held by the sessions' drain: the store whose drain it reads, and the bounds a test shortens. */
 export type JobHoldOptions = { root: string; holdMs?: number; holdPollMs?: number };
 
 export { CLAUDE_JOB_ENV } from './job-env.ts';
@@ -87,7 +87,7 @@ const HOLD_END = 'hold';
  * of what it is given — none for a task that says which of its servers it loads (`projectMcp`), those being in the task's own config
  * — and, where the task asks for a bridge (`bridgeAsked`), the file its process writes the bridge's facts on (`bridgeFile`), beside its
  * run, a former attempt's under the name cleared first so a look never reads its bridge as this one's. Where it is handed the store a
- * job is held by (`hold`), the job's hold file beside its run (`holdFile`), cleared the same way, the store's jobs' drain
+ * job is held by (`hold`), the job's hold file beside its run (`holdFile`), cleared the same way, the store's sessions' drain
  * (`drainFile`), and the bounds a test shortened (`holdMs`, `holdPollMs`), each only where given.
  */
 export const claudePrepare = (r: SpawnRequest, beside?: (end: string) => string, hold?: JobHoldOptions): Partial<HarnessIO> => {
@@ -106,7 +106,7 @@ const holdIo = (beside: (end: string) => string, hold?: JobHoldOptions): Partial
   fs.rmSync(holdFile, { force: true });
   return {
     holdFile,
-    drainFile: jobDrainFile(hold.root),
+    drainFile: sessionDrainFile(hold.root),
     ...(hold.holdMs !== undefined ? { holdMs: hold.holdMs } : {}),
     ...(hold.holdPollMs !== undefined ? { holdPollMs: hold.holdPollMs } : {}),
   };
@@ -145,7 +145,7 @@ export const CLAUDE_JOB_BIN = path.join(path.dirname(fileURLToPath(import.meta.u
  *   `claudePartials`).
  * - `keepOutput`: once the job has ended, its capture keeps only what the readers read (`claudeStreamKept`); the conversation is
  *   Claude Code's own transcript's (`transcript`).
- * - `prepare`: for the bridge file it names where the task asks for one, and the hold file and the jobs' drain where it is handed a
+ * - `prepare`: for the bridge file it names where the task asks for one, and the hold file and the sessions' drain where it is handed a
  *   store to be held by (`hold`, `claudePrepare`), and for what it throws — the servers ride
  *   `Options.mcpServers`, read by `everyMcpServer` inside the bin, and a job writes no MCP config file: a checkout whose `.mcp.json`
  *   is not JSON refuses the spawn here, before the worker starts, so the attempt ends `unstartable` in those words rather than
@@ -236,7 +236,7 @@ const withBridgeFiles = (job: RunnerOps, root: string): RunnerOps => ({
  * - while it works, the call it is in (`calling`) and the call it holds back at its hook (`heldBack`);
  * - once it ended parked, `parked` with the call it cut, read `failed`, so a parked end the engine does not continue settles failed;
  * - once its worker is gone with no end written (`lost`, a stale lease) and its session is known (`nativeId`), `parked` with the call
- *   it was last in, only where it was held or draining — its hold file says `heldBack`, `draining` or `parked`, or a jobs' drain stands
+ *   it was last in, only where it was held or draining — its hold file says `heldBack`, `draining` or `parked`, or a sessions' drain stands
  *   at this look (`drained`) — and read failed as before otherwise, for the layer above to judge: an ordinary crash is not continued.
  *
  * A job stopped by a person (`canceled`) is read as its worker wrote it.
@@ -259,12 +259,12 @@ const workingWith = (s: Sighting, hold: JobHold | null): Sighting => ({
 const callOf = (calling: JobHold['calling']): Parked => (calling ? { calling: { tool: calling.tool, since: calling.since } } : {});
 
 /**
- * A job's sightings, each with what its process wrote on its hold file beside its run (`heldSighting`): the jobs' drain read once per
+ * A job's sightings, each with what its process wrote on its hold file beside its run (`heldSighting`): the sessions' drain read once per
  * look, and only where a job's lease is gone.
  */
 const heldJobs = (spec: HarnessSpec, root: string, seen: ReadonlyMap<string, Sighting>): Map<string, Sighting> => {
   let drain: boolean | undefined;
-  const drained = () => (drain ??= jobDrainOf(jobDrainFile(root)) !== null);
+  const drained = () => (drain ??= sessionDrainOf(sessionDrainFile(root)) !== null);
   return new Map(
     [...seen].map(([name, s]) => [
       name,
@@ -293,7 +293,7 @@ const verbOf = <K extends keyof RunnerOps>(ops: RunnerOps, verb: K): NonNullable
 };
 
 /**
- * Claude Code's runner: each task a job (`claudeJobSpec`), on its own process, held by the store's jobs' drain, whether or not this
+ * Claude Code's runner: each task a job (`claudeJobSpec`), on its own process, held by the store's sessions' drain, whether or not this
  * process holds the attached sessions; a long-lived task attached beside them (`withAttached`), refused `unstartable` with no holder
  * (`LONG_LIVED_UNHELD`). Every verb is the jobs' runner's, each look reading a job's bridge file and hold file into its sighting
  * (`withBridgeFiles`, `withHoldFiles`). `quota` asks Claude Code for the

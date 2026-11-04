@@ -115,7 +115,7 @@ export const JOURNALS: Record<string, Event[]> = {
   'long-lived, lost cold': [filed({ restartPolicy: 'Always' }), starting(1), spawned(1), ended(1, 'failed', 'lost')],
 };
 
-/** A job parked under a jobs' drain, its end saying so (`Attempt.parked`): in a call, or between two. */
+/** A job parked under a sessions' drain, its end saying so (`Attempt.parked`): in a call, or between two. */
 const parkedEnd = (n: number, calling?: boolean): Event => ({
   kind: 'ended',
   at: at(2 * S),
@@ -154,7 +154,7 @@ export type Case = {
  * sighting more, `unread`: the last attempt's name on none, its harness not read this pass (`Now.unread`). Asked
  * for by `lifecycle.test.ts` alone, so the corpus `session-state.test.ts` holds to its recording stays the one recorded. With
  * `late`, one time more (`LATE`), on the same terms. With `parked`, the journals of a parked job (`PARKED`), and every case read
- * twice more, under a jobs' drain (`Now.drained`), on the same terms.
+ * twice more, under a sessions' drain (`Now.drained`), on the same terms.
  */
 export const corpusOf = (
   SIGHTINGS: Record<string, Omit<Sighting, 'sessionId'> | undefined>,

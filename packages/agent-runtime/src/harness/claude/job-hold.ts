@@ -1,9 +1,9 @@
 /**
  * What a held session and a held job share: how long a call may wait at its `PreToolUse` hook, which call belongs to a sub-agent and is
- * never held, the calls in flight a session keeps, and the two files a Claude Code job holds by — the store's jobs' drain, which says
+ * never held, the calls in flight a session keeps, and the two files a Claude Code job holds by — the store's sessions' drain, which says
  * every job is to stop at its call's end, and the job's own hold file, which says what it is doing about it.
  *
- * The jobs' drain is apart from the holder's (`putDrain`, `attached-file.ts`): a restart drains and lifts its holder, and must neither
+ * The sessions' drain is apart from the holder's (`putDrain`, `attached-file.ts`): a restart drains and lifts its holder, and must neither
  * hold nor release the jobs (two facts, two files). It carries when it was put and its grace, so a job that reads it judges by itself,
  * on every poll, whether its call has outlived the grace or its hold the bound (`bin/ae-claude-job.ts`): nothing is carried between two
  * reads but the file.
@@ -54,15 +54,15 @@ export const callStarted = (calls: CallsInFlight, id: string | undefined, input:
 
 const CallSchema = Schema.Struct({ tool: Schema.String, since: Schema.String });
 
-const JobDrainSchema = Schema.Struct({
+const SessionDrainSchema = Schema.Struct({
   /** When the drain was put (ISO), what its grace and a job's hold bound are counted from. */
   at: Schema.String,
   /** How long a call in flight is given to finish once the drain is put, in milliseconds, before the job cuts it. */
   graceMs: Schema.Finite,
 });
 
-/** The jobs' drain, as its file holds it. */
-export type JobDrain = typeof JobDrainSchema.Type;
+/** The sessions' drain, as its file holds it. */
+export type SessionDrain = typeof SessionDrainSchema.Type;
 
 const JobHoldSchema = Schema.Struct({
   calling: Schema.optional(CallSchema),
@@ -74,8 +74,8 @@ const JobHoldSchema = Schema.Struct({
 /** A job's hold file: its call in flight, the drain it read standing, a call waiting at its hook, and its end under the drain. */
 export type JobHold = typeof JobHoldSchema.Type;
 
-/** The jobs' drain file of the store at `root`, beside the attached sessions' files and apart from the holder's drain. */
-export const jobDrainFile = (root: string): string => path.join(attachedDir(root), 'jobs-drain.json');
+/** The sessions' drain file of the store at `root`, beside the attached sessions' files and apart from the holder's drain. */
+export const sessionDrainFile = (root: string): string => path.join(attachedDir(root), 'sessions-drain.json');
 
 /** Writes `value` whole on `file`, through a file beside it renamed over it, so a reader never reads half of it. */
 const writeWhole = (file: string, value: unknown): void => {
@@ -100,18 +100,18 @@ const readDecoded = <A>(file: string, decode: (u: unknown) => Option.Option<A>):
   }
 };
 
-const decodeDrain = Schema.decodeUnknownOption(JobDrainSchema);
+const decodeDrain = Schema.decodeUnknownOption(SessionDrainSchema);
 const decodeHold = Schema.decodeUnknownOption(JobHoldSchema);
 
-/** The jobs' drain put on the store at `root`, stamped now: every job's next call waits, and a call in flight has `graceMs`. */
-export const putJobDrain = (root: string, { graceMs }: { graceMs: number }): void =>
-  writeWhole(jobDrainFile(root), { at: new Date(instantNow().at).toISOString(), graceMs } satisfies JobDrain);
+/** The sessions' drain put on the store at `root`, stamped now: every job's next call waits, and a call in flight has `graceMs`. */
+export const putSessionDrain = (root: string, { graceMs }: { graceMs: number }): void =>
+  writeWhole(sessionDrainFile(root), { at: new Date(instantNow().at).toISOString(), graceMs } satisfies SessionDrain);
 
-/** The jobs' drain lifted: no job waits. */
-export const liftJobDrain = (root: string): void => fs.rmSync(jobDrainFile(root), { force: true });
+/** The sessions' drain lifted: no job waits. */
+export const liftSessionDrain = (root: string): void => fs.rmSync(sessionDrainFile(root), { force: true });
 
-/** The jobs' drain `file` says stands; `null` where none does, or the file does not decode. */
-export const jobDrainOf = (file: string): JobDrain | null => readDecoded(file, decodeDrain);
+/** The sessions' drain `file` says stands; `null` where none does, or the file does not decode. */
+export const sessionDrainOf = (file: string): SessionDrain | null => readDecoded(file, decodeDrain);
 
 /** The job's hold file `file`; `null` where it is absent or does not decode. */
 export const readJobHold = (file: string): JobHold | null => readDecoded(file, decodeHold);

@@ -49,8 +49,14 @@
     },
     {
       "term": "Drain",
-      "meaning": "a word that holds new tool calls at their hook, read off a file on every look: the holder's drain (`drain`), put for the attached sessions of one holding process across its restart, and the jobs' drain, store-wide, which every Claude Code job reads on each poll and the engine's pass on each pass (`Now.drained`). A job's call in flight finishes within the drain's grace; a parked job is continued only once the jobs' drain is lifted. Two independent facts: lifting one never lifts the other.",
-      "type": "Now"
+      "meaning": "a word that holds new tool calls at their hook, read off a file on every look: the holder's drain (`drain`), put for the attached sessions of one holding process across its restart, and the sessions' drain (`drainSessions`), store-wide, which every Claude Code job reads on each poll, every holder for its attached sessions, and the engine's pass on each pass (`Now.drained`). A call in flight finishes within the sessions' drain's grace and is cut past it; a parked job is continued, and a cut attached session told, only once the sessions' drain is lifted; a re-put with the same grace keeps its start. Two independent facts: lifting one never lifts the other.",
+      "type": "Now",
+      "retired": [
+        {
+          "spelling": "drainJobs",
+          "card": "harness-updates: pause and restart park at a tool call's end"
+        }
+      ]
     },
     {
       "term": "End reason",
@@ -106,7 +112,7 @@
     },
     {
       "term": "Held back",
-      "meaning": "a job's main-thread tool call waiting at its hook while a jobs' drain stands, and since when: carried on its sighting, never judged, so a person sees the job is held and not stalled.",
+      "meaning": "a session's main-thread tool call waiting at its hook while a drain stands, and since when, with the call it stopped after (`after`): carried on its sighting, never judged, so a person sees the session is held and not stalled. The engine journals when an attempt is first seen held and when it is seen released (`held`, `released`), and a deadline counts again from the release.",
       "type": "Sighting"
     },
     {

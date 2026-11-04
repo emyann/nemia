@@ -24,7 +24,7 @@ test('pauseWords: what the pause says, from none to Pausing to Paused', async (t
     assert.equal(words.state, 'running');
     assert.equal(words.text, null);
     assert.equal(words.label, 'Pause all factories');
-    assert.equal(words.line, 'Pause all factories: nothing new starts, and what runs finishes.');
+    assert.match(words.line, /^Pause all factories: nothing new starts, and each working session stops when its current tool call ends/);
   });
   await t.test(
     'a pause with tasks at work is Pausing with their count and the checks it holds, and names each, each landing staged and each check held',
@@ -43,10 +43,13 @@ test('pauseWords: what the pause says, from none to Pausing to Paused', async (t
       );
       assert.equal(words.state, 'pausing');
       assert.equal(words.text, 'Pausing · 2');
-      assert.equal(
+      assert.ok(
+        words.line.startsWith(
+          `Pausing: 2 finishing, 2 checks held — paused since ${clockWord(new Date(AT), NOW)} by ann: merging by hand. `,
+        ),
         words.line,
-        `Pausing: 2 finishing, 2 checks held — paused since ${clockWord(new Date(AT), NOW)} by ann: merging by hand. Nothing new starts, and what runs finishes.`,
       );
+      assert.match(words.line, /each working session runs on to its end/, 'a pause with no timeout lets each session run on');
       assert.deepEqual(words.finishing, [
         "r-1's plan is finishing: its session is at work",
         "r-2's ship is finishing: the check of its landing runs",
@@ -136,10 +139,13 @@ test('pauseWords under a pause with a timeout: sessions finishing a call and whe
     );
     assert.equal(words.state, 'pausing');
     assert.equal(words.text, 'Pausing · 3');
-    assert.equal(
+    assert.ok(
+      words.line.startsWith(
+        `Pausing: 2 sessions finishing a tool call, cut in 1 min, 1 check held — paused since ${clockWord(new Date(NOW.getTime() - 570_000), NOW)} by ann: merging by hand. `,
+      ),
       words.line,
-      `Pausing: 2 sessions finishing a tool call, cut in 1 min, 1 check held — paused since ${clockWord(new Date(NOW.getTime() - 570_000), NOW)} by ann: merging by hand. Nothing new starts, and what runs finishes.`,
     );
+    assert.match(words.line, /each working session stops when its current tool call ends, cut once the timeout passes/);
     assert.deepEqual(words.parked, parked.map(parkedSentence));
   });
   await t.test('the minutes left are rounded up, "cut now" once none is left, and one session is said so', () => {

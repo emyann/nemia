@@ -123,7 +123,10 @@ test('the pause in words: as put, Pausing while some finish, Paused once none do
     ];
     const staged = [{ run: 'r-3', step: 'ship', repo: '/repo' }];
     const [line, ...rest] = pausedLines({ pause: PAUSE, finishing, parked: [], staged, held: [{ run: 'r-4', step: 'land' }] });
-    assert.match(line ?? '', /^Pausing: 2 finishing, 2 checks held — the store is paused since 2026-10-04T12:00:00\.000Z by ann: merging by hand; /);
+    assert.match(
+      line ?? '',
+      /^Pausing: 2 finishing, 2 checks held — the store is paused since 2026-10-04T12:00:00\.000Z by ann: merging by hand; /,
+    );
     assert.match(line ?? '', /; nemia resume resumes it$/);
     assert.deepEqual(rest, [
       "   r-1's implement is finishing: its session is at work",

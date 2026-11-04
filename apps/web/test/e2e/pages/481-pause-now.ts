@@ -181,7 +181,7 @@ export default {
       await popover.getByRole('button', { name: 'Pause', exact: true }).click();
       await expectCount(popover, 0, 'the plain pause put');
       const plain = pauseFile();
-      await expectVisible(button.and(page.locator('[data-pause="pausing"]')), 'Pausing while what runs finishes');
+      await expectVisible(button.and(page.locator('[data-pause="pausing"]')), "Pausing while each session stops at its tool call's end");
       await button.click();
       await expectTexts(popover.locator('[data-pause-actions] li'), ['Pause now…', 'Resume'], 'pausing, Pause now… beside Resume');
       await page.keyboard.press('Escape');

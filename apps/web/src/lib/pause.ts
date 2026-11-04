@@ -1,10 +1,24 @@
 /**
- * The words of the pause of all factories on the board (`PauseButton`): whether they run, are Pausing while what runs finishes, or are
- * Paused once nothing does, as the package says it (`pausedWords`), read off `GET /api/pause` on each poll and never kept. Pure: the time
- * is handed in. The board neither shows nor sets a pause's timeout: it pauses with the store's, and says only when what finishes is cut.
+ * The words of the pause of all factories on the board (`PauseButton`): whether they run, are Pausing while each working session stops at
+ * its current tool call's end, or are Paused once nothing does, as the package says it (`pausedWords`), read off `GET /api/pause` on each
+ * poll and never kept. Pure: the time is handed in. The board neither shows nor sets a pause's timeout: it pauses with the store's, and
+ * says only when what finishes is cut.
  */
 import type { Finishing, Interrupt, Parked, Pause, Paused, PauseHeld, PauseStaged } from './api';
 import { clockWord } from './quota.ts';
+
+/** What a timed pause does, the package's words: each working session stops at its call's end, cut once the timeout passes. */
+export const PAUSE_PARKS =
+  'nothing new starts, and each working session stops when its current tool call ends, cut once the timeout passes';
+
+/** What a pause with no timeout does (a restart's take-over), the package's words: each working session runs on. */
+export const PAUSE_RUNS_ON = 'nothing new starts, and each working session runs on to its end';
+
+/** What `pause` does, as the package says it: `PAUSE_PARKS` under a timeout, `PAUSE_RUNS_ON` under none. */
+export const pauseDoes = ({ timeoutMs }: Pause): string => (timeoutMs !== undefined ? PAUSE_PARKS : PAUSE_RUNS_ON);
+
+/** The same words opening a sentence. */
+const opening = (words: string): string => `${words.charAt(0).toUpperCase()}${words.slice(1)}`;
 
 /** What the button shows: all factories run, a pause stands while tasks still finish, or nothing runs under it; or nothing is read yet. */
 export type PauseState = 'running' | 'pausing' | 'paused' | 'reading';
@@ -103,14 +117,14 @@ export function pauseWords(paused: Paused | undefined, error: Error | null, now:
     return { state: 'reading', text: null, label: 'The pause of all factories, not read', line, ...lists };
   }
   if (!paused.pause) {
-    const line = 'Pause all factories: nothing new starts, and what runs finishes.';
+    const line = `Pause all factories: ${PAUSE_PARKS}.`;
     return { state: 'running', text: null, label: 'Pause all factories', line, ...lists };
   }
   const since = pauseSince(paused.pause, now);
   const count = paused.finishing.length;
   if (count > 0) {
     const head = pausingHead({ ...paused, pause: paused.pause }, now);
-    const line = `${head}${heldCount(paused)} — paused ${since}. Nothing new starts, and what runs finishes.`;
+    const line = `${head}${heldCount(paused)} — paused ${since}. ${opening(pauseDoes(paused.pause))}.`;
     return { state: 'pausing', text: `Pausing · ${count}`, label: `Pausing, ${count} finishing`, line, ...lists };
   }
   const line = `Paused ${since}. Nothing runs and nothing new starts${heldCount(paused)}.`;

@@ -203,7 +203,7 @@ const staged = (repo: string) => {
   stand().world.stage(repo, 'side');
 };
 
-test('while the store is paused nothing new starts and what is at work goes on; the pass after the lift files what waits', WAITED, async (t) => {
+test('while the store is paused nothing new starts and the work goes on; the pass after the lift files what waits', WAITED, async (t) => {
   const running = await begun(TWO);
   const checked = await begun(CHECKED);
   const refused = await begun(ONE);

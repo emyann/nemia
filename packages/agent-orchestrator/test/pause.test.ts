@@ -1,12 +1,12 @@
 /**
- * The store paused, then paused at once, then resumed — a person's story on the stage (`story.ts`): `nemia pause --now` alone says what
- * it would stop and writes nothing; `nemia pause --yes` pauses as a plain pause does; a pass under it starts nothing — no step, try or
- * check, and no due schedule — while each working session stops at its current tool call's end, and `nemia watch --once`, `nemia start` and `nemia up` say it; `nemia pause
- * --now --yes` keeps the pause as it was put, its timeout cut to 0 so the sessions' drain cuts each session's call, asks no session a try
- * nor a stop, and asks each check at work but a landing's to stop, its ask on disk first, a step already asked of left at work; and
- * `nemia resume` lifts it and the drain, each session parked going on as the same try, the pass after running again each check the
- * pause stopped and starting the schedule's fire. The stand-in parks no session: its list says a session held at its hook where the
- * story parks it, as the runtime would under the drain.
+ * The store paused, then paused at once, then resumed — a person's story on the stage (`story.ts`): `nemia pause --now` alone says what it
+ * would stop and writes nothing; `nemia pause --yes` pauses as a plain pause does; a pass under it starts nothing — no step, try or check,
+ * and no due schedule — while each working session stops at its current tool call's end, and `nemia watch --once`, `nemia start` and `nemia
+ * up` say it; `nemia pause --now --yes` keeps the pause as it was put, its timeout cut to 0 so the sessions' drain cuts each session's
+ * call, asks no session a try nor a stop, and asks each check at work but a landing's to stop, its ask on disk first, a step already asked
+ * of left at work; and `nemia resume` lifts it and the drain, each session parked going on as the same try, the pass after running again
+ * each check the pause stopped and starting the schedule's fire. The stand-in parks no session: its list says a session held at its hook
+ * where the story parks it, as the runtime would under the drain.
  *
  * What the pause holds back and how each line says it is pure, in `src/pause/pause.test.ts`; the pause's file in
  * `src/pause/pause.store.test.ts`. The runtime's own admission under the pause — a task filed and not admitted while it stands — is

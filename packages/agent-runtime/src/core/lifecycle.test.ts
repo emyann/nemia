@@ -67,7 +67,7 @@ const SIGHTINGS: Record<string, Omit<Sighting, 'sessionId'> | undefined> = {
 };
 
 /** The corpus under every sighting a harness can give, and one more: a pass that could not read the harness; at a time more, late. */
-const corpus = (): Case[] => corpusOf(SIGHTINGS, { unread: true, late: true });
+const corpus = (): Case[] => corpusOf(SIGHTINGS, { unread: true, late: true, parked: true });
 
 /** What the engine journals for an action, and nothing for one that writes nothing (`step` in `engine.ts`). */
 const journalled = (action: Action, ms: number): Event[] => {

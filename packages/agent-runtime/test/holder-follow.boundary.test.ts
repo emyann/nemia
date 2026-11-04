@@ -50,7 +50,7 @@ const HAND: RunnerOps = {
   logs: () => Effect.succeed('printed'),
 };
 
-/** A holder: an engine that runs Claude Code attached, holding before it files anything, so its session spawns attached. */
+/** A holder: an engine that runs Claude Code attached, holding before it files anything, so its long-lived session spawns attached. */
 const holder = async () => {
   const root = scratch('ae-holder-');
   const cwd = path.join(root, 'work');
@@ -114,6 +114,7 @@ test(
         brief: 'say it',
         cwd,
         harness: 'claude',
+        restartPolicy: 'Always',
         config: { env: { STANDIN_DIR: cwd, STANDIN_PLAN: JSON.stringify(PLAN) } },
       }),
     );

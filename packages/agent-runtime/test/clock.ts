@@ -27,3 +27,22 @@ export const stepClock = (t: TestContext, ms: number): void => {
     globalThis.Date = Real;
   });
 };
+
+/**
+ * Step this process's monotonic clock by `ms` — `process.hrtime.bigint()`, which `instantNow` reads (`core/engine/now.ts`) — until the
+ * step is taken back: the answer is that undo, and the test's end takes it back too. A bound measured on the monotonic clock (a
+ * long-lived task's back-off, a worker's lease) is passed by this, as one on the wall clock is by `stepClock`. Another process's
+ * clock does not move with it: a worker beating now reads as beaten `ms` ago, so a step is taken back once the pass that reads past
+ * the bound has run.
+ */
+export const stepMono = (t: TestContext, ms: number): (() => void) => {
+  const real = Object.getOwnPropertyDescriptor(process.hrtime, 'bigint');
+  const read = process.hrtime.bigint.bind(process.hrtime);
+  const by = BigInt(ms) * 1_000_000n;
+  process.hrtime.bigint = () => read() + by;
+  const undo = () => {
+    if (real) Object.defineProperty(process.hrtime, 'bigint', real);
+  };
+  t.after(undo);
+  return undo;
+};

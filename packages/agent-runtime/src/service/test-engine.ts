@@ -3,11 +3,12 @@
  * for a test of a layer above the runtime. A test settles a task itself (`settle`), leaving with its end the text its session printed
  * (`printed`), which `output` then answers stream by stream, and reads back what the engine was asked: each task (`tasks`), every filing
  * by id (`filings`) and by what it was filed with (`specs`), each stop taken (`stopped`), each word said (`said`), each interrupt asked
- * (`interrupts`) and each `forget` call by call (`forgets`); `refuseSay(n)` refuses the next `n` says as the runtime refuses a session
- * not running; `keeps(id, sizes)` plants what `kept` answers of a task, and `failKept(n)` fails the next `n` as a store that does not
- * list fails one; `plantTranscript(id, n, events)` plants what `transcript` reads of an attempt, and `restart(id)` starts a task's next;
- * `plantMcpState(name, state)` plants the state a server reads as, `failMcpState(why)` makes the next read a look that failed, and
- * `mcpReads` counts the reads asked, which is how a test proves a pass read a record's states once rather than once per task.
+ * (`interrupts`), each drain and jobs' drain put or lifted (`drains`, `jobDrains`) and each `forget` call by call (`forgets`);
+ * `refuseSay(n)` refuses the next `n` says as the runtime refuses a session not running; `keeps(id, sizes)` plants what `kept` answers of
+ * a task, and `failKept(n)` fails the next `n` as a store that does not list fails one; `plantTranscript(id, n, events)` plants what
+ * `transcript` reads of an attempt, and `restart(id)` starts a task's next; `plantMcpState(name, state)` plants the state a server reads
+ * as, `failMcpState(why)` makes the next read a look that failed, and `mcpReads` counts the reads asked, which is how a test proves a pass
+ * read a record's states once rather than once per task.
  *
  * It keeps `file`, `view`, `list`, `stop`, `logs`, `feed`, `output`, `say`, `interrupt`, `answer`, `transcript`, `forget`, `kept`,
  * `mcpState`, the three sign-in verbs (`signIns`, `signOuts` and `settleSignIn` read and move them) and `io`, each
@@ -21,6 +22,7 @@ import { answerRefusalOf, InputRefused, StopRefused, type TaskView } from '../co
 import {
   attemptRefusal,
   drainChecked,
+  drainJobsChecked,
   Engine,
   isTranscriptCursor,
   ListRefused,
@@ -285,6 +287,21 @@ const answerVerbOf =
       return input;
     });
 
+/** The two drains as the stand-in keeps them: each put or lifted recorded in `held`, refused as the engine refuses it. */
+const drainsOf = (held: Pick<TestEngine, 'drains' | 'jobDrains'>): Pick<EngineShape, 'drain' | 'drainJobs'> => ({
+  drain: (holder) =>
+    Effect.andThen(
+      drainChecked(holder),
+      Effect.sync(() => void held.drains.push(holder)),
+    ),
+  drainJobs: function (given) {
+    return Effect.andThen(
+      drainJobsChecked([...arguments]),
+      Effect.sync(() => void held.jobDrains.push(given === null ? null : { graceMs: given.graceMs })),
+    );
+  },
+});
+
 /** What a test reads back and moves by hand, beside the layer: see the file's head. */
 export type TestEngine = {
   readonly layer: Layer.Layer<Engine>;
@@ -300,6 +317,8 @@ export type TestEngine = {
   readonly answered: TestAnswer[];
   /** Each holder a drain was put for, or null where one was lifted, in order. */
   readonly drains: (number | null)[];
+  /** Each jobs' drain put, by its grace, or null where it was lifted, in order (`drainJobs`); a refused one is not recorded. */
+  readonly jobDrains: ({ graceMs: number } | null)[];
   /** Refuses the next `times` says, whatever the task. */
   readonly refuseSay: (times: number) => void;
   /**
@@ -583,6 +602,7 @@ export const testEngine = (): TestEngine => {
     interrupts: [] as string[],
     answered: [] as TestAnswer[],
     drains: [] as (number | null)[],
+    jobDrains: [] as ({ graceMs: number } | null)[],
   };
   const sayRefusals = { left: 0 };
   const sizes = new Map<string, TestKeeps>();
@@ -607,11 +627,7 @@ export const testEngine = (): TestEngine => {
       removeBody: unkept('removeBody'),
       compact: unkept('compact'),
       hold: () => Effect.succeed(null),
-      drain: (holder) =>
-        Effect.andThen(
-          drainChecked(holder),
-          Effect.sync(() => void held.drains.push(holder)),
-        ),
+      ...drainsOf(held),
     }),
   );
   const settle = (id: string, phase: TaskPhase, end?: TestEnd): TestTask => {

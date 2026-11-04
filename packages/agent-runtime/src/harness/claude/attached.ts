@@ -15,8 +15,8 @@
  * - **Taken up.** On each look, a holder adopts a session parked, or one whose holder's process is gone: it kills what is left of its
  *   Claude Code's process group, unless that pid is another process's now (`childOf`), and resumes it under the same session id, told
  *   it was paused (`CARRY_ON`), or, when its holder ended mid-call, which call did not finish (`crashNote`). It is handed what is
- *   left of its attempt's spend cap, never the whole cap again (`capLeft`), and one that has spent it all is ended `failed` at its
- *   budget rather than resumed.
+ *   left of its attempt's spend cap, never the whole cap again (`capLeft`, `src/core/cap.ts`), and one that has spent it all is
+ *   ended `failed` at its budget rather than resumed.
  * - **The drain.** A file naming the holder's pid and when it started (`putDrain`): while it names this process, the new calls of each
  *   session with none in flight wait at their hook, so a restart can wait for the calls in flight before it signals.
  * - **What it keeps.** Its run file, and a capture of the messages a reader reads (denials as they come, the result's statement and
@@ -27,6 +27,7 @@ import { Effect, Option, Schedule, type Scope } from 'effect';
 import fs from 'node:fs';
 import { instantNow } from '../../core/engine/now.ts';
 import { purseOf, type Purse } from '../../core/clock.ts';
+import { capLeft, capSpent } from '../../core/cap.ts';
 import type { Sighting, Usage } from '../../core/index.ts';
 import { RunnerError } from '../error.ts';
 import type { Observation, RunnerOps, SpawnRequest } from '../seam.ts';
@@ -129,16 +130,6 @@ const carriedFrom = (root: string, resumeFrom: string): NonNullable<AttachedRun[
 const ownUsage = (told: ReturnType<typeof saidBy>, run: AttachedRun): Usage | undefined =>
   told.usage && run.carried ? lessCarried(told.usage, run.carried, told.ownTokens) : told.usage;
 
-/**
- * What an attempt whose cap is `cap` may still spend once it has spent `spent`: what its next Claude Code is handed as its own cap.
- * The Agent SDK counts `maxBudgetUsd` from its own `query()` alone (`sdk.d.ts:1989-1993`), while a resume's running total carries on its
- * parent's (`sdk.d.ts:6100-6103`), so the cap less the attempt's spend so far is the right cap for the next process either way. No cap:
- * none. Spend unknown — no result yet, or one whose totals were zeroed or reset and taken off as nothing — the whole cap, an
- * undercount like a killed process's lost spend, never a double count. At or below nothing where the cap is spent.
- */
-export const capLeft = (cap: number | undefined, spent: number | undefined): number | undefined =>
-  cap === undefined ? undefined : cap - (spent ?? 0);
-
 /** The spend cap a run file's request asked for, where it asked one. */
 const capOf = (run: AttachedRun): number | undefined => {
   const cap = (run.request as { config?: { budgetUsd?: unknown } }).config?.budgetUsd;
@@ -151,7 +142,7 @@ const capOf = (run: AttachedRun): number | undefined => {
  */
 const resumedRequest = (root: string, run: AttachedRun): SpawnRequest | undefined => {
   const left = capLeft(capOf(run), ownUsage(saidBy(root, run.name), run)?.costUsd);
-  if (left !== undefined && left <= 0) return undefined;
+  if (capSpent(left)) return undefined;
   const request = run.request as Omit<SpawnRequest, 'brief'>;
   const config = left === undefined ? request.config : { ...request.config, budgetUsd: left };
   return { ...request, ...(config ? { config } : {}), brief: '' };

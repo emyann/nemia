@@ -27,6 +27,7 @@ import type { FormerReason } from './event-schema.ts';
 import type { TranscriptMark } from '../harness/seam.ts';
 import { transition, VERBS, type LifecycleEvent, type Move, type Refusal, type VerbGuard, type VerbName } from './lifecycle.ts';
 import { elapsedMs, type Instant, type Monotonic } from './clock.ts';
+import { backoffOf, endedWhen, restartWords, startedWhen } from './restart.ts';
 import { endOf, isLive, NEEDS_HUMAN, RUNNING, waitsOnPerson, type Outcome, type SessionState } from './session.ts';
 import { foldInto } from './attempt-fold.ts';
 import type { Decide } from '../../contracts/decide.contract.ts';
@@ -172,6 +173,17 @@ export type Sighting = {
    */
   calling?: { tool: string; since: string };
   /**
+   * The main-thread tool call its session made that waits at its hook, held while a jobs' drain stands, and since when (ISO), for a
+   * harness whose job holds its calls (Claude Code's job on the Agent SDK). Absent while no call waits, and from a harness that cannot
+   * say. **Carried, never judged**: `decide` does not read it; a person learns from it that the job is held, not stalled.
+   */
+  heldBack?: { since: string };
+  /**
+   * The job ended itself under a jobs' drain — past the drain's grace with a call in flight, or held past its bound — or crashed while
+   * it was held or draining, as its runner read it (`Parked`). Read by `decide` on an ended attempt alone, where its end carries it.
+   */
+  parked?: Parked;
+  /**
    * The questions the session is waiting on a person for, each held open where its task may ask one (`config.mayAsk`), for a harness
    * that holds such a call (Claude Code attached on the Agent SDK). `[]` from such a harness while none waits, and absent from one
    * that cannot say. **Carried, never judged**: `decide` does not read it; a layer above draws each question and answers it
@@ -201,6 +213,12 @@ export type AskQuestion = { question: string; header: string; options: AskOption
 
 /** One choice of a question: what it reads as, what it means, and the mock-up it carries where it has one. Carried, never judged. */
 export type AskOption = { label: string; description: string; preview?: string };
+
+/**
+ * A job parked under a jobs' drain: what its end says beside its state, so that the runtime continues it once the drain is lifted.
+ * `calling`, the tool call it was in that did not finish, and since when (ISO); absent where it was parked between two calls.
+ */
+export type Parked = { calling?: { tool: string; since: string } };
 
 /** A session's bridge: the link that opens it, or no link and why, in words that say what to do. */
 export type Bridge = { url: string } | { url: null; why: string };
@@ -334,7 +352,8 @@ export type EndReason = 'harness' | 'lost' | 'unstartable' | 'operator' | 'deadl
  *   failed without the harness vouching that nothing started: whether a session exists is then the grace window's to
  *   find out.
  * - `ended`: an attempt reached a terminal state, as observed — never as assumed. `usage`, `exitCode`, `denials`, `skills`,
- *   `files`, `ranOn` and `limit` come from the same sighting, when its runner measured them; `decide` reads none of them.
+ *   `files`, `ranOn` and `limit` come from the same sighting, when its runner measured them; `decide` reads none of them. `parked`,
+ *   from the same sighting, says the job ended itself under a jobs' drain (`Parked`): `decide` reads it, and continues the job.
  *   `closedOut`, on an end read off a sighting of a task that asked for a closing statement: whether one came. A fact, never a
  *   verdict — `decide` does not read it, and the layer above judges what a missing statement means. Absent from an end an older runtime
  *   wrote, and from an end with no sighting behind it (`lost`, `unstartable`, a cut). `former`, on an end an older runtime gave a
@@ -453,6 +472,7 @@ export type Event =
       files?: string[];
       ranOn?: string;
       limit?: string;
+      parked?: Parked;
       error?: string;
       mono?: Monotonic;
     }
@@ -545,6 +565,11 @@ export type Attempt = {
   /** The limit its configuration set that its harness says it ended the session at — `budget` — when it said one. Carried, never read. */
   limit?: string;
   /**
+   * The job was parked under a jobs' drain, as its end said (`Parked`): `decide` continues it as the next attempt of its task, resumed
+   * in its session, once the drain is lifted — unless a stop was asked. Absent from every other end.
+   */
+  parked?: Parked;
+  /**
    * Which turn of a task held open it belongs to: how many `input`s were journalled before it started. Absent for turn 0,
    * so every attempt of a task not held open — and of a journal an older runtime wrote — folds as turn 0.
    */
@@ -620,6 +645,7 @@ function endAttempt(a: Attempt, e: Extract<Event, { kind: 'ended' }>): void {
   if (e.files) a.files = e.files;
   if (e.ranOn) a.ranOn = e.ranOn;
   if (e.limit) a.limit = e.limit;
+  if (e.parked) a.parked = e.parked;
   a.error = e.error ?? a.error;
 }
 
@@ -841,6 +867,10 @@ export type Now = {
    * name here that no sighting has is neither there nor gone. Absent, every name was read.
    */
   unread?: ReadonlySet<string>;
+  /**
+   * A jobs' drain stands at this pass: a parked job is held (`PARK_HELD`) rather than continued. Absent or false, none stands.
+   */
+  drained?: boolean;
 };
 
 /**
@@ -849,14 +879,7 @@ export type Now = {
  */
 export const RESPAWN_GAP_MS = 120_000;
 
-/**
- * How long a long-lived task waits to restart a session that ended, a kubelet's back-off: `initialMs` after one end,
- * `factor` times longer after each end in a row, never past `maxMs`; an attempt that ran `resetAfterMs` counts them again.
- */
-export const RESTART_BACKOFF = { initialMs: 10_000, factor: 2, maxMs: 300_000, resetAfterMs: 600_000 } as const;
-
-/** What a restarted session is told instead of the brief, on the conversation it continues. */
-export const RESTART_WORDS = 'Your session was restarted after its process ended. Carry on where you left off.';
+export { backoffOf, cutWords, PARKED_WORDS, RESTART_BACKOFF, RESTART_WORDS } from './restart.ts';
 
 /**
  * A settled task: nothing is observed of it and nothing is decided, on any pass. `decide`'s first question, ahead of the
@@ -954,7 +977,8 @@ export const lifecycleOf: LifecycleOf = (state) => {
  *    the deadline, which times work, not a person reading it.
  * 4. `DEADLINE_SPENT`, when it is overdue and its last attempt ended at the deadline.
  * 5. For a long-lived task whose attempt ended, no stop asked: its restart (`restartOf`) — unless its harness refused the
- *    spawn (`unstartable`), which waiting would not change, and it settles on that end, as a job does.
+ *    spawn (`unstartable`), which waiting would not change, and it settles on that end, as a job does. For a job whose attempt
+ *    ended parked, no stop asked: its continuation, by the same road — `PARK_HELD` while a jobs' drain stands (`Now.drained`).
  * 6. `ATTEMPT_ENDED`, judged on the current turn's attempts, which are all of them for a task not held open. One attempt
  *    per start. For an `unstartable` end, the harness's words (`error`).
  * 7. `NO_SESSION_TO_CONTINUE`, for a later turn with no session to continue.
@@ -981,7 +1005,8 @@ export const observe: Observe = (state, observed, now) => {
   if (waitsForInput(state)) return { type: 'AWAITING_INPUT' };
   if (overdue && last?.reason === 'deadline') return { type: 'DEADLINE_SPENT', seconds: Math.round(ranFor / 1000) };
   const ended = turn.attempts.at(-1);
-  if (ended && restarts(state, ended)) return restartOf(state, ended, sighting, now);
+  const restart = restartFrom(state, last, ended);
+  if (restart) return restartOf(state, restart.from, sighting, now, restart.parked);
   if (ended) return attemptEnded(ended, turn.attempts.length, turn.n);
   if (turn.n > 0 && !turn.continues) return { type: 'NO_SESSION_TO_CONTINUE', turn: turn.n };
   if (awaitsAdmission(state)) return { type: 'QUEUED' };
@@ -990,10 +1015,14 @@ export const observe: Observe = (state, observed, now) => {
 };
 
 /**
- * Whether `ended`, the last attempt of a task with nothing in flight and no stop asked, is restarted: for a long-lived task,
- * unless its harness refused the spawn (`unstartable`), which waiting would not change.
+ * The ended attempt a task with nothing in flight and no stop asked restarts from, and the park it continues, or none: its `last`,
+ * where that attempt of the current turn was parked — a restart inside the task, never a new try; else, for a long-lived task, the
+ * current turn's `ended`, unless its harness refused the spawn (`unstartable`), which waiting would not change.
  */
-const restarts = (state: State, ended: Attempt): boolean => state.restartPolicy === 'Always' && ended.reason !== 'unstartable';
+const restartFrom = (state: State, last?: Attempt, ended?: Attempt): { from: Attempt; parked?: Parked } | undefined => {
+  if (last?.parked && (last.turn ?? 0) === state.inputs.length) return { from: last, parked: last.parked };
+  return ended && state.restartPolicy === 'Always' && ended.reason !== 'unstartable' ? { from: ended } : undefined;
+};
 
 /**
  * `ATTEMPT_ENDED` for `ended`, the last of `attempts` in turn `turn`: with the harness's words (`error`) only when it
@@ -1087,43 +1116,25 @@ export function needsHuman(state: State, observed: ReadonlyMap<string, Sighting>
 
 /**
  * The restart of a long-lived task whose last attempt, `last`, ended with no stop asked, and not refused at its spawn (that settles),
- * `observe`'s fifth rule with nothing in flight:
- * `UNREAD` while its harness could not read the old name, `PREVIOUS_LIVE` while it still holds the old session, `BACKING_OFF`
- * within `backoffOf` the end, then `RESTART_DUE` — continuing the latest session an attempt recorded, told `RESTART_WORDS`;
- * with none recorded, what the turn continues, told the brief.
+ * or of a task whose last attempt was `parked` (its end's), `observe`'s fifth rule with nothing in flight: `PARK_HELD` for a parked
+ * one while a jobs' drain stands; `UNREAD` while its harness could not read the old name, `PREVIOUS_LIVE` while it still holds the
+ * old session, `BACKING_OFF` within `backoffOf` the end, then `RESTART_DUE` — continuing the latest session an attempt recorded,
+ * told `RESTART_WORDS`, or, parked, the call that did not finish (`cutWords`) or `PARKED_WORDS` (`restartWords`, `restart.ts`); with
+ * none recorded, what the turn continues, told the brief.
  */
-function restartOf(state: State, last: Attempt, sighting: Sighting | undefined, now: Now): LifecycleEvent {
+function restartOf(state: State, last: Attempt, sighting: Sighting | undefined, now: Now, parked?: Parked): LifecycleEvent {
+  if (parked && now.drained === true) return { type: 'PARK_HELD', attempt: last.n };
   if (now.unread?.has(nameFor(state.taskId, last.n))) return { type: 'UNREAD', attempt: last.n, overdue: false };
   if (sighting && (sighting.held === true || isLive(sighting.state))) return { type: 'PREVIOUS_LIVE', sessionId: sighting.sessionId };
   const backoffMs = backoffOf(state.attempts);
   if (elapsedMs(endedWhen(last), instantOf(now)) < backoffMs) return { type: 'BACKING_OFF', attempt: last.n, backoffMs };
   const session = [...state.attempts].reverse().find((a) => a.nativeId !== null)?.nativeId ?? undefined;
-  const from = session ? { resumeFrom: session, nudge: RESTART_WORDS } : { resumeFrom: turnOf(state).continues };
+  const from = session ? { resumeFrom: session, nudge: restartWords(parked) } : { resumeFrom: turnOf(state).continues };
   return { type: 'RESTART_DUE', attempt: state.attempts.length + 1, ...from };
 }
 
-/** When an attempt started, on both clocks it was stamped on. */
-const startedWhen = (a: Attempt): Instant => ({ at: Date.parse(a.startedAt), mono: a.startedMono });
-
-/** When an attempt ended, on both clocks; one not ended yet reads as its start. The one reading of an end's time `decide` makes. */
-const endedWhen = (a: Attempt): Instant => (a.endedAt === null ? startedWhen(a) : { at: Date.parse(a.endedAt), mono: a.endedMono });
-
 /** Now as `decide` is handed it, as an `Instant`. */
 const instantOf = (now: Now): Instant => ({ at: now.at.getTime(), mono: now.mono });
-
-/**
- * How long a long-lived task waits after its last end before restarting (`RESTART_BACKOFF`): the initial wait, doubled for each
- * attempt before it that ended in a row too soon to reset it, up to the cap. Pure arithmetic over the attempts' times.
- */
-export function backoffOf(attempts: readonly Attempt[]): number {
-  const { initialMs, factor, maxMs, resetAfterMs } = RESTART_BACKOFF;
-  let ends = 0;
-  for (const a of [...attempts].reverse()) {
-    if (a.ended === null || elapsedMs(startedWhen(a), endedWhen(a)) >= resetAfterMs) break;
-    ends++;
-  }
-  return Math.min(initialMs * factor ** Math.max(0, ends - 1), maxMs);
-}
 
 /**
  * What the engine journals of a long-lived attempt in flight off its sighting, before it decides: a `gap` the first time its

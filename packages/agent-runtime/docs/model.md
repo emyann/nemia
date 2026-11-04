@@ -68,6 +68,7 @@ erDiagram
     string image "optional"
     string harnessVersion "optional"
     string limit "optional"
+    object parked "optional"
     number turn "optional"
     string error "optional"
     string gapSince "optional"

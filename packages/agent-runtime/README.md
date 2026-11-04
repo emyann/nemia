@@ -249,6 +249,7 @@ stateDiagram-v2
   ending --> ending: UNREAD / nothing
   ending --> ending: PREVIOUS_LIVE / stop
   ending --> ending: BACKING_OFF / nothing
+  ending --> ending: PARK_HELD / nothing
   ending --> starting: RESTART_DUE / start
   submitted --> stopping: requestStop [stoppable] (by person)
   starting --> stopping: requestStop [stoppable] (by person)
@@ -351,7 +352,7 @@ Bring your own harness — three ways, in order of how much you have to write:
 
 | | |
 |---|---|
-| `'claude'` | Claude Code as the engine runs it: every session on the Agent SDK — a task as a job (in a process of its own, or attached in the daemon's holder while it holds), and a long-lived session (`restartPolicy: 'Always'`) attached |
+| `'claude'` | Claude Code as the engine runs it: every session on the Agent SDK — a task as a job, always in a process of its own, and a long-lived session (`restartPolicy: 'Always'`) attached in the daemon's holder |
 | a `HarnessSpec` | any CLI that runs a prompt and exits — a command and an exit code |
 | a `RunnerOps` | four Effect methods, and six optional ones, `find`, `output`, `release`, `transcript`, `say` and `refuses`, for anything else at all; its own `refuses` is asked by `file` |
 
@@ -388,7 +389,7 @@ Three are wired:
 
 | harness | how it runs | who keeps the registry |
 |---|---|---|
-| `claude` | a job: `query()` in `bin/ae-claude-job.ts`, in a worker we detach, printing the SDK's messages as a stream of JSON lines; attached in the daemon's holder while it holds, and a long-lived session there alone | **us**, a run file |
+| `claude` | a job: `query()` in `bin/ae-claude-job.ts`, in a worker we detach, printing the SDK's messages as a stream of JSON lines, holder or not; a long-lived session attached in the daemon's holder alone | **us**, a run file |
 | `codex` | `codex exec --json`, in a worker we detach | **us** — a directory of run files |
 | `command` | the process a task's `config.command` names, same worker — no agent at all | us |
 
@@ -1829,7 +1830,8 @@ what a step leaves behind. The rule is what lets Codex do it itself.
 
 **Every Claude Code session runs on the Agent SDK.** `ae`, and `Engine.layer` until its process takes `hold()`, run a Claude Code
 task as a job: `query()` in a process of its own (`bin/ae-claude-job.ts`), which the engine's worker detaches, so the session
-outlives the engine. Once the process holds, a task runs attached in it (*Attached*, below), and a long-lived one there alone. No
+outlives the engine, and a restart or an upgrade of the daemon never touches it. Once the process holds, a long-lived task runs
+attached in it (*Attached*, below), and only a long-lived one: a job keeps its own process. No
 environment variable selects another. `sdkRunner()` exists too, but only as a `Layer`: you compose it yourself, and tick in the same
 long-lived process that spawned the sessions, because they die with it.
 
@@ -1849,6 +1851,7 @@ reason `Runner` is a seam and not an import.
 |---|---|---|
 | owns the session | a job: **its own process**, detached; attached: **the holder**, durable by resume | **this process** |
 | engine dies mid-session | a job runs on, the next tick adopts it; a held session is parked and taken up by the next holder | session dies with it |
+| told to stop for a while | a job finishes its call and is held at its next one (*A job's drain*, below) | not wired |
 | run state | a run file per session | an in-memory map |
 | narrow the tools, a spend cap, MCP servers | `tools`, `disallowedTools`, `budgetUsd`, strict MCP (`attachedOptions`) | not wired: it passes only `model` and `permissionMode` |
 | the conversation, one session by its name, telling it something | `transcript`, `find`, `say` | not wired |
@@ -1859,12 +1862,34 @@ or background sessions that outlive the calling process"). So a job's own proces
 the holder's resume is what lets a long-lived one outlive its holder. Until 2026-10-24 that was `claude --bg`, a session Claude Code
 itself detached and listed in `claude agents`; and a job could run as `claude -p` (`claude-detached`). Neither runs now.
 
+### A job's drain: held at its next call, continued within its cap
+
+`Engine.drainJobs({ graceMs })` puts the jobs' drain, one file for the whole store (`jobDrainFile`, `src/harness/claude/job-hold.ts`),
+and `drainJobs(null)` lifts it; anything else is refused `DrainRefused`. It is a fact apart from the holder's drain (`drain`), so a
+daemon's restart, which puts and lifts that one, never holds or releases a job. Every job's own process reads it on each poll
+(`bin/ae-claude-job.ts`): a call in flight finishes, and the next call of the main thread waits at its `PreToolUse` hook, as an
+attached session's does under a let-go; a sub-agent's call is never held. The job writes what it does beside its run (`<name>.hold`:
+`calling`, `draining`, `heldBack`), which each look reads into its sighting (`heldBack` on the view).
+
+Past the drain's grace with a call still in flight, or held past `JOB_HOLD_MS` (23 h, under Claude Code's 24 h hook timeout,
+`HOOK_HOLD_S`), the job **parks**: `parked` on its hold file with the call it cut, then the SDK's `interrupt()` and the end of its
+prompt, so Claude Code saves its total as it leaves. Its end is journalled with `parked` beside it, never as a reason of its own, and
+`decide` continues it as the next attempt of the same task — a restart inside one task, never a new try — once the drain is lifted
+(`PARK_HELD` while it stands), after the restart's back-off, resumed in its session and told the call that did not finish
+(`cutWords`, else `PARKED_WORDS`). It is handed what is left of its turn's cap (`parkedCapLeft`, `src/core/cap.ts`); a park that left
+nothing ends failed with `limit: 'budget'` instead, and nothing continues it.
+
+A crash takes the same road only for a job that was held or draining: a job whose worker's lease is gone and that has a session is
+read `parked` where its hold file says `heldBack`, `draining` or `parked`, or a jobs' drain stands at the look (`heldSighting`). Any
+other crash ends failed as before, for the layer above to judge. Everything here is read off files on each pass, so it survives a
+restart of the daemon.
+
 ### Attached: Claude Code on the Agent SDK, durable by resume
 
 Beside the job, `query()` in the process that holds the engine's attached sessions (`harness/claude/attached.ts`). The process
-takes `hold()` in a scope; while it holds, a `claude` task spawns attached, a long-lived one (`restartPolicy: 'Always'`) only so,
-and any other engine, or the same one before `hold`, runs a task as a job in a process of its own and refuses a long-lived one
-`unstartable`. The Claude Code either road drives is the Agent SDK's own bundled CLI, or the command
+takes `hold()` in a scope; while it holds, a long-lived `claude` task (`restartPolicy: 'Always'`) spawns attached, and a job still
+runs in a process of its own (`withAttached`, `src/harness/claude/code.ts`); any other engine, or the same one before `hold`, refuses
+a long-lived one `unstartable`. The Claude Code either road drives is the Agent SDK's own bundled CLI, or the command
 `EngineOptions.claudeExecutable` names — a held session is given it here, a job's own process as `AE_CLAUDE_EXECUTABLE`.
 
 - **Who holds them.** One process: the one whose engine took `hold()`. It spawns, adopts and resumes; another engine reads the
@@ -1946,6 +1971,8 @@ of pure code sits beside it.
 | `src/core/session.ts` | a session's state in A2A's names, the end each records and the phase a person reads (`endOf`, `TaskPhase`, `LIVE_PHASE`): read by both `domain.ts` and `lifecycle.ts`, so neither imports the other's values |
 | `src/core/domain.ts` | events, `fold`, **`decide`** and what it reads — `lifecycleOf`, `observe` — pure, no I/O, the whole judgement, and the session name read back (`nameParts`) |
 | `src/core/attempt-fold.ts` | an event about one attempt written into that attempt's fold (`foldInto`), for `fold`: pure |
+| `src/core/cap.ts` | a spend cap handed on, pure: the cap less what was spent (`capLeft`) and whether that is a cap spent whole (`capSpent`), for a holder's take-up of an attached session and for a parked job's continuation, whose cap is its turn's less what the parked attempts it continues spent (`parkedCapLeft`) — asked by the engine and the holder, so `decide` reads no spend |
+| `src/core/restart.ts` | how a task restarts inside itself, pure: a long-lived task's back-off, a kubelet's (`RESTART_BACKOFF`, `backoffOf`), and the words a restarted session or a parked job's continuation is told (`RESTART_WORDS`, `PARKED_WORDS`, `cutWords`), re-exported by `domain.ts` |
 | `src/core/lifecycle.ts` | the lifecycle as an XState statechart, used as a pure transition function: its states, the edge for each event and the one action it names, the refusal of an event with no edge, and the diagram generated from it |
 | `src/core/path.ts` | a task's path through the lifecycle, replayed off its journal (`pathOf`): the state after each entry, the entry's kind and its time, for the `path` verb — pure, a reader's, never a pass's |
 | `src/core/event-schema.ts` | every event a runtime has written, as an Effect Schema, former shapes included: `Journal.layer` checks what any store gives back against it before `upgrade`, and fails a task's read with a `JournalError` naming its file, the entry and the field (`entryWords`); a feed entry it refuses is skipped and said (`FeedRefusal`) |
@@ -1959,6 +1986,7 @@ of pure code sits beside it.
 | `src/core/labels.ts` | a task's labels, a Pod's `metadata.labels`: what the runtime refuses of them (`labelsRefusalOf`), and the key it says itself beside them, the task's id (`TASK_LABEL`) |
 | `src/core/index.ts` | the face of `core/`: what the other folders and the entries take of it; nothing of `core/engine/` |
 | `src/core/engine/engine.ts` | applies one decision, then the pass over every task |
+| `src/core/engine/reconcile-refusal.ts` | what `reconcile` and `settleTask` refuse past the task and the observation (`ReconcileRefused`) |
 | `src/core/engine/counted.ts` | what a long-lived attempt in flight has consumed so far, journalled as it grows (`counted`), off the pass's sighting |
 | `src/core/engine/denied.ts` | what the harness denied an attempt in flight, each call journalled once as the sighting names it (`denied`) |
 | `src/core/engine/image.ts` | the code an attempt in flight runs on and its harness's version, journalled whenever its sighting says other than the record (`image`, `imageFacts`) |
@@ -1995,7 +2023,8 @@ of pure code sits beside it.
 | `src/harness/sdk.ts` | the same four verbs on the Agent SDK, with the tradeoff written down |
 | `src/harness/index.ts` | the face of the seam, as the A2A seam and the face take it; `core/` imports `seam.ts` and `args.ts` by their own path |
 | `src/harness/claude/trust.ts` | Claude Code's trust of a folder in its `.claude.json` (`claudeConfigFile`, in `CLAUDE_CONFIG_DIR` when set): read by `claudeTrusts`, and one key set by `claudeTrust`, which keeps every other key and a write that lands meanwhile |
-| `src/harness/claude/code.ts` | Claude Code as the engine runs it by default: every session on the Agent SDK: a task as a job (`claudeJobSpec`, the bin), attached while the process holds (`withAttached`), and a long-lived one attached alone, refused `unstartable` with no holder (`LONG_LIVED_UNHELD`); a job's bridge file read into its sighting |
+| `src/harness/claude/code.ts` | Claude Code as the engine runs it by default: every session on the Agent SDK: a task as a job on its own process (`claudeJobSpec`, the bin), holder or not, and a long-lived one attached (`withAttached`), refused `unstartable` with no holder (`LONG_LIVED_UNHELD`); a job's bridge file and hold file read into its sighting (`heldSighting`) |
+| `src/harness/claude/job-hold.ts` | what a held session and a held job share: the hook's hold, a sub-agent's call, the calls in flight, and the two files a job is held by — the store's jobs' drain (`putJobDrain`, `liftJobDrain`, `jobDrainOf`) and the job's own hold file (`readJobHold`, `writeJobHold`) |
 | `src/harness/claude/job-env.ts` | the environment a session run to its end is given, a job's or an attached one's (`CLAUDE_JOB_ENV`) |
 | `src/harness/claude/attached.ts` | Claude Code attached on the Agent SDK (`attachedSessions`): the holder's `hold`, adoption and resume, and the runner's verbs over the run files |
 | `src/harness/claude/attached-bridge.ts` | the claude.ai bridge of an attached session, behind one door: the SDK's undeclared `enableRemoteControl` read off the `query()` object, its answer decoded, and refused in words where it is absent |
@@ -2025,6 +2054,7 @@ of pure code sits beside it.
 | `src/harness/detached/follow.ts` | a detached session followed live (`followOf`): its run file, its whole stdout lines read for the text being written, and its transcript, each read on from where the last read stopped, on a watch's wake or each second |
 | `src/harness/detached/carried.ts` | a resumed session's own share where its harness prints its parent's totals on: the parent's cost, API time and whole session's tokens (`carriedOf`) taken off the resume's, falling back to its own `usage` (`lessCarried`) |
 | `src/harness/detached/output.ts` | what a detached session's output says: a Claude Code job's result and stream, decoded by `stream.ts` or refused, read for closeout, usage (every model's, `modelUsage`, else the main thread's), cost, a spent budget and denials, and the stream for the skills loaded and the files touched |
+| `src/harness/detached/harness-io.ts` | what a detached harness's command is told of the files its runner named for it (`HarnessIO`): the closeout's schema and answer, the MCP config, the spawn request, a Claude Code job's bridge file, and its hold file, the jobs' drain and the hold's bounds |
 | `src/harness/detached/spawn-files.ts` | the files a spawn clears and writes beside a run before the worker is launched, and what they say to the harness (`spawnFiles`, `HarnessIO`): the closeout's schema, the MCP config, what the spec prepares, and the spawn request a spec that reads one is given (`needsRequest`); and the stdin the worker writes (`spawnInput`) |
 | `src/harness/detached/run-file.ts` | a detached run's file as the worker and the spawn write it: its schema (`RunFileSchema`), its read (`runFileIn`), the first one a spawn writes, and its state as a sighting says it, its heartbeat's lease (`STALE_MS`) included |
 | `src/harness/detached/said.ts` | what was read of a finished run's output, kept beside its log keyed by the log's size and mtime and the readers' version — or a former one they only added fields to (`SAID_EXTENDED`) — so each process reads a log once per change of it; and an ended run's capture rewritten there to what its spec keeps (`keepOutput`, `keepCapture`), only when it reads the same |
@@ -2047,6 +2077,7 @@ of pure code sits beside it.
 | `src/a2a/sending.ts` | a send under way: its lease (`sendHeld`), `SEND_MS` on the monotonic clock from its stamp within a boot and on the wall clock from `sentAt` otherwise, and whether the process making it lives |
 | `src/a2a/said.ts` | the remote harness's own words told from another party's: the errors it throws in its own words, the A2A errors that refuse a send, and any other error's words quoted to 200 characters (`wordsOf`) |
 | `src/a2a/index.ts` | the face of `a2a/`, as the face takes it: it imports no name of the SDK's |
+| `src/service/drain.ts` | the two drains' refusals (`DrainRefused`): the holder's (`drainRefusalOf`) and the jobs' (`drainJobsRefusalOf`), and what each pass reads of the engine's options and store: its admission and whether the jobs' drain stands (`passReadsOf`) |
 | `src/service/engine.ts` | the engine as an Effect service, `Engine`: `Engine.layer(options)` assembles each harness behind its A2A agent, the store and the memo, and its verbs are Effects that fail with tagged errors (`ListRefused`, `TranscriptRefused`, `say.ts`'s `SayRefused` and `SayUnsent`, and the core's) |
 | `src/service/test-engine.ts` | the engine's stand-in, `testEngine()`: the `Engine` service kept by hand in a layer, with what it was asked to read back and `settle` to move a task; it keeps `file`, `view`, `stop`, `logs`, `feed`, `output`, `say`, `answer`, `forget` and `kept`, held to the real engine by `test/engine-walks.ts`; an answer is the task's input, and the next `settle` begins its turn |
 | `src/service/forget.ts` | the engine's `forget` verb, `forgetVerbOf`, and `ForgetRefused`: every guard asked of every id first, then each session's files through its harness, the feed's lines and the journal; without `yes`, a count (`ForgetReport`) |

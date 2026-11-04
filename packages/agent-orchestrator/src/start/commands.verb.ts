@@ -198,10 +198,10 @@ function mountLines(run: Run): string[] {
   ];
 }
 
-/** The harness settings a run froze from its factory, by name, as each of its Claude Code steps is given them. */
+/** The harness settings a run froze from its factory, by name, as each of its steps on their harness is given them. */
 function settingsLine(run: Run): string[] {
   const named = settingsNamed(run.harnessSettings).map((s) => s.name);
-  return named.length ? [`harness settings: ${named.join(', ')} — for every Claude Code step, beneath its agent's own`] : [];
+  return named.length ? [`harness settings: ${named.join(', ')} — for every step on their harness, beneath its agent's own`] : [];
 }
 
 /**

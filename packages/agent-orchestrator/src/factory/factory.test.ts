@@ -294,14 +294,14 @@ test('factoryLines: `nemia factory ls`, the default first, then each factory by 
     ]);
   });
   await t.test('its harness settings, each by its key with its value, and none for a factory that sets none', () => {
-    const pipao = { name: 'pipao', file: '/s/factories/pipao.json', repos: ['/code/pipao'], workflows: [], hires: {}, schedules: {} };
+    const acme = { name: 'acme', file: '/s/factories/acme.json', repos: ['/code/acme'], workflows: [], hires: {}, schedules: {} };
     const harnessSettings = { claude: { attribution: { commit: '', pr: '' } } };
-    assert.deepEqual(factoryLines([{ ...pipao, harnessSettings }]), [
+    assert.deepEqual(factoryLines([{ ...acme, harnessSettings }]), [
       DEFAULT_LINE,
-      'pipao    /code/pipao',
+      'acme     /code/acme',
       '         setting claude.attribution {"commit":"","pr":""}',
     ]);
-    assert.deepEqual(factoryLines([pipao]), [DEFAULT_LINE, 'pipao    /code/pipao']);
+    assert.deepEqual(factoryLines([acme]), [DEFAULT_LINE, 'acme     /code/acme']);
   });
   await t.test('its hires, sorted by step, whatever order its file has them in', () =>
     assert.deepEqual(

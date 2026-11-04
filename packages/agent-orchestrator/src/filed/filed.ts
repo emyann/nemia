@@ -10,7 +10,7 @@ import { volumeMounts } from '../volume/volume.ts';
 import { handedMounts, type HandedFiles } from '../artifacts/artifacts.ts';
 import { DEFAULT_HARNESS, isRemoteHarness } from '../harness/harness.ts';
 import { fenceReach, unruledIn } from 'agent-runtime/vocabulary';
-import { filedClaudeSettings } from '../harness-settings/harness-settings.ts';
+import { filedSettings, SETTINGS_HARNESS } from '../harness-settings/harness-settings.ts';
 import { splitServers, type FactoryServer, type FactoryServers } from '../servers/index.ts';
 
 /**
@@ -26,7 +26,7 @@ import { splitServers, type FactoryServer, type FactoryServers } from '../server
  * at `t.workflowFiles`, read-only (`workflowMounts`); the key left out with none, the MCP servers
  * its sessions load, its factory's record first and the checkout's `.mcp.json` for the rest (`serversOf`), the step's files directory and
  * the run's copy of its workflow folder in its session's environment (`stepFilesEnv`), and the
- * harness's own arguments (`own`) last, a Claude Code step's settings given its factory's harness settings beneath its own (`ownWith`). The
+ * harness's own arguments (`own`) last, a step's settings given its factory's harness settings beneath its own (`ownWith`). The
  * runtime judges no budget:
  * `budgetUsd` is the harness's own cap, and whether the step went over is this package's (`ownStatus`). Pure.
  */
@@ -68,19 +68,18 @@ export const filedConfig = <Own extends object>(
 });
 
 /**
- * A step's own harness arguments with its factory's harness settings (`frozen`, the run's) given on a step on Claude Code: its rendered
- * `claude.settings` laid over the allowed ones (`filedClaudeSettings`), a step with no agent given a `claude` key for them. As they were
- * for a run that froze none, on another harness, and on a remote agent.
+ * A step's own harness arguments with its factory's harness settings (`frozen`, the run's) given on a step on the harness they are for
+ * (`SETTINGS_HARNESS`): its rendered `settings` laid over the allowed ones (`filedSettings`), a step with no agent given the harness's key
+ * for them. As they were for a run that froze none, on another harness, and on a remote agent.
  */
 function ownWith<Own extends object>(step: Pick<Workflow, 'harness'>, frozen: Run['harnessSettings'], own: Own): Own {
-  if ((step.harness ?? DEFAULT_HARNESS) !== 'claude' || frozen?.claude === undefined) return own;
-  const rendered: unknown = 'claude' in own ? own.claude : undefined;
+  const harness = step.harness ?? DEFAULT_HARNESS;
+  const given = frozen?.[SETTINGS_HARNESS];
+  if (harness !== SETTINGS_HARNESS || given === undefined) return own;
+  const rendered: unknown = Reflect.get(own, harness);
   const flags = typeof rendered === 'object' && rendered !== null ? rendered : {};
-  const settings = filedClaudeSettings(
-    frozen.claude,
-    'settings' in flags && typeof flags.settings === 'string' ? flags.settings : undefined,
-  );
-  return settings === undefined ? own : { ...own, claude: { ...flags, settings } };
+  const settings = filedSettings(given, 'settings' in flags && typeof flags.settings === 'string' ? flags.settings : undefined);
+  return settings === undefined ? own : { ...own, [harness]: { ...flags, settings } };
 }
 
 /**

@@ -167,7 +167,7 @@ type RunBase = {
    * The factory's harness settings, frozen at start from its file once judged (`harnessSettingsRefusal`): the settings of a harness each
    * step of the run on it is given on top of the repository's own, its own agent's laid over them (`filedConfig`), so a later change to
    * the factory changes no run started. Read as the record holds it, among the keys the store keeps unnamed, and judged again key by key
-   * at each filing (`filedClaudeSettings`), so a hand-edited record files no key a factory may not set. Absent: none, and in the
+   * at each filing (`filedSettings`), so a hand-edited record files no key a factory may not set. Absent: none, and in the
    * default factory.
    */
   harnessSettings?: HarnessSettings;

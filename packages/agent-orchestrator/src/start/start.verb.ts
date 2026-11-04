@@ -362,7 +362,8 @@ const volumesAt = (factory: Factory | undefined): Mount[] => (factory ? factoryV
  */
 const settingsAt = (factory: Factory | undefined): Effect.Effect<HarnessSettings | undefined, Invalid> => {
   const settings = factory?.harnessSettings;
-  if (factory === undefined || settings === undefined || isHarnessSettings(settings)) return Effect.succeed(settings);
+  if (factory === undefined || settings === undefined) return Effect.succeed(undefined);
+  if (isHarnessSettings(settings)) return Effect.succeed(settings);
   return Effect.fail(new Invalid({ message: harnessSettingsRefusal(settings, factory.name) ?? 'its harness settings do not read' }));
 };
 

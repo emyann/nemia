@@ -13,7 +13,8 @@ import { Invalid, Missing } from '../refusal/refusal.ts';
 import { FactoryName } from '../factory/factory.model.ts';
 import { refuseName } from '../factory/factory.store.ts';
 import {
-  CLAUDE_FACTORY_SETTINGS,
+  SETTABLE,
+  SETTINGS_HARNESS,
   harnessSettingsRefusal,
   settingKeyOf,
   settingsNamed,
@@ -39,23 +40,23 @@ const SETTING_HELP = `${SETTING_FORMS}
 
 A harness setting is a setting of a harness a factory gives every session of its runs' steps on that
 harness, on top of the repository's own settings, as a container is given its configuration by its
-Pod: for Claude Code, the Agent SDK's settings option, never a file written into the repository.
-Its value is JSON: nemia factory setting set f claude.attribution '{"commit":"","pr":""}' writes no
+Pod: the Agent SDK's settings option, never a file written into the repository. Its value is
+JSON: nemia factory setting set f ${SETTINGS_HARNESS}.attribution '{"commit":"","pr":""}' writes no
 Co-Authored-By trailer and no pull request line. A step's own agent's settings win a key both name.
 
-A factory sets claude.${CLAUDE_FACTORY_SETTINGS.join(', claude.')} alone: each changes what a session
-writes or says, and none what it may reach or run. Every other key is refused, those that widen a
-fence (permissions, hooks, MCP servers, the sandbox, env) or run a program among them: each keeps
-its own field or fence, which the refusal names.
+A factory sets these alone: ${SETTABLE.map((k) => `${SETTINGS_HARNESS}.${k}`).join(', ')}.
+Each changes what a session writes or says, and none what it may reach or run. Every other key is
+refused, those that widen a fence (permissions, hooks, MCP servers, the sandbox, env) or run a
+program among them: each keeps its own field or fence, which the refusal names.
 
 Kept in the factory's own file (factories/<name>.json, "harnessSettings"), never in a template, and
 kept by nemia factory adopt and upgrade. Frozen on a run at its start, so a run in flight keeps what
 it began with; a key written into the file by hand that a factory may not set refuses the start.
 nemia factory lists them under the factory.
 
-Refused, and nothing written: a key that is not <harness>.<key>, a harness other than claude, a key
-or a value a factory may not set, a value that is not JSON, the default factory, and a setting rm of
-a key it does not set.`;
+Refused, and nothing written: a key that is not <harness>.<key>, a harness other than the default
+one (${SETTINGS_HARNESS}), a key or a value a factory may not set, a value that is not JSON, the default
+factory, and a setting rm of a key it does not set.`;
 
 /** A spec of `nemia factory setting <verb>`: the factory, the setting, and its value where `valued`. */
 const specOf = (verb: string, usage: string, valued: boolean): Spec => ({
@@ -96,7 +97,10 @@ const jsonOf = (text: string): Effect.Effect<unknown, Invalid> =>
 export const FACTORY_SETTING_SET: Command<{ file: string; name: string; value: unknown }> = {
   name: 'factory setting set',
   usage: SET_USAGE,
-  help: ["give every session of a factory's runs on a harness one of its settings,", 'claude.attribution among them; its value is JSON'],
+  help: [
+    "give every session of a factory's runs on a harness one of its settings,",
+    `${SETTINGS_HARNESS}.attribution among them; its value is JSON`,
+  ],
   spec: specOf('set', SET_USAGE, true),
   manual: SETTING_HELP,
   writes: true,

@@ -6,8 +6,8 @@
  * - `check`: the `release-label` check. Exactly one of `LABELS` on the pull request, read from `LABELS` (a JSON array of names, the
  *   pull_request payload's) or, unset, from the open pull request whose head is `BRANCH`.
  * - `labels`: makes the five labels in the repository, and puts back the colour or description of one that drifted.
- * - `tag`: where the root `package.json` names a version `V` that has no tag `vV`, makes the GitHub release `vV` on the first-parent
- *   commit of main that set `V`, with the notes GitHub generates since the previous release.
+ * - `tag`: where the root `package.json` names a version that has no tag `v<version>`, makes that GitHub release on the first-parent
+ *   commit of main that set the version, with the notes GitHub generates since the previous release.
  * - `pr`: keeps the release pull request (`release` into `main`) open while a pull request merged since the last release carries a label
  *   that releases, rebuilt from main when main moves, and dispatches `ci.yml` and `release-label.yml` on its head; closes it when
  *   nothing is to release.

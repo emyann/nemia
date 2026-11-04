@@ -2273,9 +2273,9 @@ it would crash that session. What was built, in `src/retention/` and `src/releas
 
 Tested in `src/retention/retention.test.ts` (the order and the words), `retention.verb.test.ts` (the sweep's story over a scratch
 store and the engine's stand-in), `src/release/release.store.test.ts` (the installed releases, a build under way, a release moved
-aside) and `upgrade.verb.test.ts` (an upgrade's removal, a session's pin, a build that holds, a rollback). The contract's laws are proved but one,
-`everyOtherGoes`, which tsverify answers `bounded`: its proof side does not know a `.filter` keeps every element that matches. Still to
-come: removing what a crashed upgrade leaves (a dead `.building-*`) and old build logs, a card of its own.
+aside) and `upgrade.verb.test.ts` (an upgrade's removal, a session's pin, a build that holds, a rollback). The contract proves every
+law, its accepting side narrowed to `somethingGoes` (unheld, where a release can go, something is removed): that every such release goes
+waits on tsverify proving a filter keeps every element that passes, and `retention.test.ts` holds it until then. Still to come: removing what a crashed upgrade leaves (a dead `.building-*`) and old build logs, a card of its own.
 
 ## Shipped: the daemon started on demand (card 4e, from the command line)
 

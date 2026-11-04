@@ -1,6 +1,7 @@
 /**
  * The retention's order and words: `newestFirst`, which the contract takes as given (`contracts/retention.contract.ts` proves which
- * releases go), and `retentionLines`, matched on the tags and counts they name, never a whole sentence.
+ * releases are kept), `retentionLines`, matched on the tags and counts they name, never a whole sentence, and the rule's accepting
+ * side, which the contract proves only as "something goes" until tsverify proves a filter keeps every element that passes.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -49,5 +50,17 @@ test('retentionLines names each release removed, the sessions a held sweep waits
   });
   await t.test('no pointer: nothing said', () => {
     assert.deepEqual(retentionLines(retention(installed, { current: null, pinned: [], unrecorded: 0 }), 0), []);
+  });
+});
+
+test('unheld, every installed release that is not current, not running and not among the two newest is removed', async (t) => {
+  const installed = newestFirst(
+    ['v1', 'v2', 'v3', 'v4', 'v5', 'v6'].map((tag, i) => ({ tag, builtAt: `2026-11-0${i + 1}T00:00:00.000Z` })),
+  );
+  await t.test('each old one goes, whatever its place among them', () => {
+    assert.deepEqual(retention(installed, { current: 'v6', pinned: [], unrecorded: 0 }).remove, ['v4', 'v3', 'v2', 'v1']);
+  });
+  await t.test('around a current and a pinned one in the middle', () => {
+    assert.deepEqual(retention(installed, { current: 'v3', pinned: ['v2'], unrecorded: 0 }).remove, ['v4', 'v1']);
   });
 });

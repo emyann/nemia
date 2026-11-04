@@ -12,8 +12,8 @@ import { pausedRead } from '../list/list.verb.ts';
 import { putPause, readPause, resumePause } from '../pause/pause.store.ts';
 import { Invalid, Missing, type Refusal } from '../refusal/refusal.ts';
 import { asked, drained, EngineService, tried, type TaskView } from '../runtime-client.ts';
-import { DEFAULT_GRACE_MS, graceOf, graceRefusal, type Finishing, type Pause } from '../pause/pause.ts';
-import { graceAt } from '../pause/grace.store.ts';
+import { DEFAULT_TIMEOUT_MS, timeoutOf, timeoutRefusal, type Finishing, type Pause } from '../pause/pause.ts';
+import { timeoutAt } from '../pause/pause-timeout.store.ts';
 import { rootGiven } from '../config/root.store.ts';
 import { pointedEntry } from '../release/release.ts';
 import { runningRelease } from '../release/version.verb.ts';
@@ -109,41 +109,41 @@ export const attachedCalls = <E, R>(list: (ids?: readonly string[]) => Effect.Ef
 const engineList = (ids?: readonly string[]) => Effect.flatMap(EngineService, (e) => asked('list', e.list(ids)));
 
 /**
- * The grace a take-over gives the calls in flight: `--grace` where given (`graceOf`), else the store's at `home` (`graceAt`). Refused
- * (`Invalid`): a `--grace` that does not read, naming `by`'s flag, or a grace file that does not read.
+ * The timeout a take-over gives the calls in flight: `--timeout` where given (`timeoutOf`), else the store's at `home` (`timeoutAt`). Refused
+ * (`Invalid`): a `--timeout` that does not read, naming `by`'s flag, or a timeout file that does not read.
  */
-export const graceGiven = (args: Args, home: string, by: string): Effect.Effect<number, Refusal> =>
+export const timeoutGiven = (args: Args, home: string, by: string): Effect.Effect<number, Refusal> =>
   tried(() => {
-    if (typeof args.graceText !== 'string') return graceAt(home).ms;
-    const ms = graceOf(args.graceText);
-    if (ms === undefined) throw new Invalid({ message: `${by}: --grace takes ${graceRefusal(args.graceText)}, like --grace 10m.` });
+    if (typeof args.timeoutText !== 'string') return timeoutAt(home).ms;
+    const ms = timeoutOf(args.timeoutText);
+    if (ms === undefined) throw new Invalid({ message: `${by}: --timeout takes ${timeoutRefusal(args.timeoutText)}, like --timeout 10m.` });
     return ms;
   });
 
-/** The live host of `nemia <verb>`, its take-over given the grace `graceGiven` reads off `args` and the store at `home`. */
-export const gracedHost = (args: Args, home: string | undefined, verb: string): Effect.Effect<ServiceHost, Refusal> =>
+/** The live host of `nemia <verb>`, its take-over given the timeout `timeoutGiven` reads off `args` and the store at `home`. */
+export const timedHost = (args: Args, home: string | undefined, verb: string): Effect.Effect<ServiceHost, Refusal> =>
   Effect.map(
     Effect.flatMap(
       tried(() => rootGiven(home, verb)),
-      (root) => graceGiven(args, root, `nemia ${verb}`),
+      (root) => timeoutGiven(args, root, `nemia ${verb}`),
     ),
     liveHost,
   );
 
-/** `--grace <d>`, which a restart and an upgrade take: how long the daemon's calls in flight are given before they are cut. */
-export const graceFlag = (shape: string): Flag => ({
-  flag: '--grace',
+/** `--timeout <d>`, which a restart and an upgrade take: how long the daemon's calls in flight are given before they are cut. */
+export const timeoutFlag = (shape: string): Flag => ({
+  flag: '--timeout',
   kind: 'text',
-  key: 'graceText',
-  takes: `--grace takes a duration, like --grace 10m: ${shape}.`,
+  key: 'timeoutText',
+  takes: `--timeout takes a duration, like --timeout 10m: ${shape}.`,
 });
 
 /**
  * The machine as it is: the process's node, the store's lease and pause, `systemctl` and `launchctl` themselves. The daemon an install
  * runs is under `releases/current` (`pointedEntry`), so the service follows the pointer. A take-over gives the daemon's calls in
- * flight `graceMs` (`graceGiven`), ten minutes where none is given.
+ * flight `timeoutMs` (`timeoutGiven`), ten minutes where none is given.
  */
-export const liveHost = (graceMs: number = DEFAULT_GRACE_MS): ServiceHost => ({
+export const liveHost = (timeoutMs: number = DEFAULT_TIMEOUT_MS): ServiceHost => ({
   machine: machineOf,
   dirs: serviceDirs,
   roots: storeRoots,
@@ -164,7 +164,7 @@ export const liveHost = (graceMs: number = DEFAULT_GRACE_MS): ServiceHost => ({
   say: (line) => console.error(line),
   pollMs: 2_000,
   waitMs: 60_000,
-  graceMs,
+  timeoutMs,
   stopMs: 90_000,
 });
 
@@ -475,7 +475,7 @@ const INSTALL: Command<Installed> = {
   handler: (args, _env, home) =>
     args.takeOver === undefined
       ? installService(args)
-      : Effect.flatMap(gracedHost(args, home, 'service install'), (host) => installService(args, host)),
+      : Effect.flatMap(timedHost(args, home, 'service install'), (host) => installService(args, host)),
   print: (data) => data.lines,
 };
 

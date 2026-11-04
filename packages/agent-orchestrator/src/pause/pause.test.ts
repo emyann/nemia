@@ -13,8 +13,8 @@ import {
   callsOf,
   finishingAmong,
   finishingOf,
-  graceOf,
-  graceRefusal,
+  timeoutOf,
+  timeoutRefusal,
   interruptsAmong,
   interruptsOf,
   NOW_COST,
@@ -348,32 +348,32 @@ test('a parked session under the pause: it finishes nothing, it is named parked,
       ["   r-1's implement is paused after its call to Read", "   r-1's review is paused, its call to Bash cut"],
     );
   });
-  await t.test('a graced pause says how many sessions finish a call and when they are cut, then Paused once none does', () => {
-    const graced: Pause = { ...PAUSE, graceMs: 600_000 };
+  await t.test('a timed pause says how many sessions finish a call and when they are cut, then Paused once none does', () => {
+    const timed: Pause = { ...PAUSE, timeoutMs: 600_000 };
     const finishing: Finishing[] = [
       { run: 'r-1', step: 'a', kind: 'session', calling: 'Bash' },
       { run: 'r-2', step: 'b', kind: 'session' },
       { run: 'r-3', step: 'c', kind: 'check' },
     ];
     const now = new Date(Date.parse(PAUSE.at) + 61_000);
-    const words = pausedWords({ pause: graced, finishing, staged: [], held: [{ run: 'r-4', step: 'land' }] }, now) ?? '';
-    assert.ok(words.startsWith('Pausing: 2 sessions finishing a tool call, cut in 9 min, 1 check held'), words);
+    const line = pausedWords({ pause: timed, finishing, staged: [], held: [{ run: 'r-4', step: 'land' }] }, now) ?? '';
+    assert.ok(line.startsWith('Pausing: 2 sessions finishing a tool call, cut in 9 min, 1 check held'), line);
     assert.match(
-      pausedWords({ pause: graced, finishing: [], staged: [], held: [] }, now) ?? '',
+      pausedWords({ pause: timed, finishing: [], staged: [], held: [] }, now) ?? '',
       /^Paused since /,
       'Paused once nothing finishes',
     );
     assert.match(
       pausedWords({ pause: PAUSE, finishing, staged: [], held: [] }, now) ?? '',
       /^Pausing: 3 finishing/,
-      'a pause with no grace counts as before',
+      'a pause with no timeout counts as before',
     );
   });
-  await t.test('a grace is digits and one unit, from 1s to 23h', () => {
-    assert.deepEqual(['90s', '10m', '2h', '23h', '1s'].map(graceOf), [90_000, 600_000, 7_200_000, 82_800_000, 1_000]);
+  await t.test('a timeout is digits and one unit, from 1s to 23h', () => {
+    assert.deepEqual(['90s', '10m', '2h', '23h', '1s'].map(timeoutOf), [90_000, 600_000, 7_200_000, 82_800_000, 1_000]);
     for (const bad of ['0s', '24h', 'ten', '10', '10d', '']) {
-      assert.equal(graceOf(bad), undefined, bad);
-      assert.equal(typeof graceRefusal(bad), 'string', bad);
+      assert.equal(timeoutOf(bad), undefined, bad);
+      assert.equal(typeof timeoutRefusal(bad), 'string', bad);
     }
   });
 });

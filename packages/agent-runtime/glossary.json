@@ -49,7 +49,7 @@
     },
     {
       "term": "Drain",
-      "meaning": "a word that holds new tool calls at their hook, read off a file on every look: the holder's drain (`drain`), put for the attached sessions of one holding process across its restart, and the sessions' drain (`drainSessions`), store-wide, which every Claude Code job reads on each poll, every holder for its attached sessions, and the engine's pass on each pass (`Now.drained`). A call in flight finishes within the sessions' drain's grace and is cut past it; a parked job is continued, and a cut attached session told, only once the sessions' drain is lifted; a re-put with the same grace keeps its start. Two independent facts: lifting one never lifts the other.",
+      "meaning": "a word that holds new tool calls at their hook, read off a file on every look: the holder's drain (`drain`), put for the attached sessions of one holding process across its restart, and the sessions' drain (`drainSessions`), store-wide, which every Claude Code job reads on each poll, every holder for its attached sessions, and the engine's pass on each pass (`Now.drained`). A call in flight finishes within the sessions' drain's grace (`graceMs`: the store's pause timeout, as the orchestrator hands it on) and is cut past it; a parked job is continued, and a cut attached session told, only once the sessions' drain is lifted; a re-put with the same grace keeps its start. Two independent facts: lifting one never lifts the other.",
       "type": "Now",
       "retired": [
         {

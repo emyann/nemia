@@ -23,7 +23,7 @@ import { readPause, resumePause } from '../pause/pause.store.ts';
 import { nowRead, pauseNow, pauseParked } from '../pause/pause.verb.ts';
 import {
   NOW_COST,
-  pauseGraceRefusal,
+  pauseTimeoutRefusal,
   nowLines,
   pausedNowLines,
   pauseWords,
@@ -338,7 +338,7 @@ export const PRUNE: Command<{
 };
 
 /** `nemia pause`'s form, as each of its refusals ends on it. */
-const PAUSE_SHAPE = 'nemia pause [--why "<words>"] [--by <name>] [--grace <d> | --now [--yes]]';
+const PAUSE_SHAPE = 'nemia pause [--why "<words>"] [--by <name>] [--timeout <d> | --now [--yes]]';
 
 /** `nemia pause`'s `--why` and `--by`. */
 const PAUSE_SAID: readonly Said[] = [
@@ -358,29 +358,29 @@ type PauseNowRead = { pause: Pause | null; interrupts: Interrupt[] };
 type PauseAnswer = { pause: Pause } | PausedNow | PauseNowRead;
 
 /**
- * `nemia pause`'s handler, by its flags: a plain pause, which parks every session at its call's end within `--grace` or the store's grace
- * (`graceAt`), refused while one stands; `--now`, which only reads; `--now --yes`, which acts.
+ * `nemia pause`'s handler, by its flags: a plain pause, which parks every session at its call's end within `--timeout` or the store's timeout
+ * (`timeoutAt`), refused while one stands; `--now`, which only reads; `--now --yes`, which acts.
  */
 const pauseBy = Effect.fnUntraced(function* (args: Args, home?: string) {
   const said = { why: saidOf(args, 'why'), by: saidOf(args, 'by') };
-  if (args.now !== true) return { pause: yield* pauseParked(said, textOf(args, 'grace'), home) } satisfies PauseAnswer;
+  if (args.now !== true) return { pause: yield* pauseParked(said, textOf(args, 'timeout'), home) } satisfies PauseAnswer;
   if (args.yes !== true) return { pause: readPause(), interrupts: yield* nowRead() } satisfies PauseAnswer;
   return (yield* pauseNow(said)) satisfies PauseAnswer;
 });
 
 /**
- * `nemia pause`: the store paused, every session parked at its tool call's end within the grace (`pauseParked`), on `POST /api/pause` too;
- * the pause as written, its grace `--grace` (`grace` in the body) or the store's. Refused while a pause stands (`Conflict`). `--now` says
+ * `nemia pause`: the store paused, every session parked at its tool call's end within the timeout (`pauseParked`), on `POST /api/pause` too;
+ * the pause as written, its timeout `--timeout` (`timeout` in the body) or the store's. Refused while a pause stands (`Conflict`). `--now` says
  * what a pause at once would cut and writes nothing; `--now --yes`, as the route always does, pauses at once (`pauseNow`).
  */
 export const PAUSE: Command<PauseAnswer> = {
   name: 'pause',
-  usage: '[--why "<words>"] [--by <name>] [--grace <d> | --now [--yes]]',
+  usage: '[--why "<words>"] [--by <name>] [--timeout <d> | --now [--yes]]',
   help: [
     'pause the store: no pass starts new work — no step, try, round or',
     'check filed, no queued task admitted, no queued card started — and',
     "every session, job or attached, parks at its tool call's end: a call",
-    'still in flight once the grace has passed is cut. A check runs on, its',
+    'still in flight once the timeout has passed is cut. A check runs on, its',
     'end recorded; a landing whose check has ended commits or aborts.',
     'Pausing: N sessions finishing a tool call, cut in M min while they',
     'do, Paused once none does; nemia ls says each step paused.',
@@ -390,8 +390,8 @@ export const PAUSE: Command<PauseAnswer> = {
     'Refused while a pause stands.',
     '--why: the reason, said wherever the pause is; --by: who pauses it',
     '(default: your OS user)',
-    '--grace: how long a call in flight is given to end, for this pause',
-    "(90s, 10m, 2h; from 1s to 23h); default: the store's, nemia grace",
+    '--timeout: how long a call in flight is given to end, for this pause',
+    "(90s, 10m, 2h; from 1s to 23h); default: the store's, nemia pause-timeout",
     "--now: pause at once — each step session at work, but a landing's,",
     'has its call cut and parks, going on as the same try on nemia resume;',
     'each check is asked to stop and run again. A pause that stands is kept.',
@@ -402,7 +402,12 @@ export const PAUSE: Command<PauseAnswer> = {
     positionals: [],
     flags: [
       ...saidFlags(PAUSE_SAID, 'nemia pause', 'a pause', PAUSE_TAKES, PAUSE_SHAPE),
-      { flag: '--grace', kind: 'name', key: 'grace', takes: `--grace takes how long a call in flight is given, as 10m: ${PAUSE_SHAPE}.` },
+      {
+        flag: '--timeout',
+        kind: 'name',
+        key: 'timeout',
+        takes: `--timeout takes how long a call in flight is given, as 10m: ${PAUSE_SHAPE}.`,
+      },
       { flag: '--now', kind: 'switch', key: 'now' },
       { flag: '--yes', kind: 'switch', key: 'yes' },
     ],
@@ -411,7 +416,7 @@ export const PAUSE: Command<PauseAnswer> = {
   },
   check: (args) =>
     PAUSE_SAID.map((s) => saidRefusal(args, s, PAUSE_TAKES)).find((r) => r !== null) ??
-    pauseGraceRefusal(textOf(args, 'grace'), args.now === true, PAUSE_SHAPE),
+    pauseTimeoutRefusal(textOf(args, 'timeout'), args.now === true, PAUSE_SHAPE),
   writes: true,
   class: 'act',
   route: { method: 'POST', path: '/api/pause', status: 200, sets: { yes: true } },

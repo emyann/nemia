@@ -52,7 +52,7 @@ import { INBOXES } from '../inbox/commands.verb.ts';
 import { LABELS } from '../labels/commands.verb.ts';
 import { CONCLUDED, START } from '../start/commands.verb.ts';
 import { CANCEL, HOLD, PRUNE, RAN, RM } from './runs.verb.ts';
-import { PAUSE_ENTRIES } from '../pause/grace.verb.ts';
+import { PAUSE_ENTRIES } from '../pause/pause-timeout.verb.ts';
 import { SUBSCRIBE, UNSUBSCRIBE } from '../subscription/subscription.verb.ts';
 import { PASSES } from '../meter/passes.verb.ts';
 import { LEVEL } from '../nemia/level.verb.ts';

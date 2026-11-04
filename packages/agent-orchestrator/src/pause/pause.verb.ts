@@ -1,7 +1,7 @@
 /**
  * The store's pause that parks every session at its tool call's end (`pauseParked`), and the pause at once (`nemia pause --now`): what it
  * would cut, read off one view of every run's current tasks and never stored (`nowRead`), and the verb that puts the pause, or keeps the
- * one that stands, cuts its grace to 0 so every session's call is cut and the session parked, then writes for each check at work the ask
+ * one that stands, cuts its timeout to 0 so every session's call is cut and the session parked, then writes for each check at work the ask
  * that runs it again on the resume and asks the engine to stop it (`pauseNow`). A controller: it reaches the engine through the client,
  * and writes a person's files — the pause through `putPause` and `cutPause`, each ask through `runStore.asks.write` — never a run's
  * record.
@@ -13,13 +13,13 @@ import { keptRuns, runStore } from '../record/files.store.ts';
 import { stepsOf } from '../steps/steps.verb.ts';
 import { stopAsked } from '../tick/held.verb.ts';
 import { cutPause, putPause, readPause } from './pause.store.ts';
-import { graceAt } from './grace.store.ts';
+import { timeoutAt } from './pause-timeout.store.ts';
 import { rootGiven } from '../config/root.store.ts';
 import { Invalid } from '../refusal/refusal.ts';
 import {
   currentTasks,
-  graceOf,
-  graceRefusal,
+  timeoutOf,
+  timeoutRefusal,
   interruptsAmong,
   liveAmong,
   type Interrupt,
@@ -28,10 +28,10 @@ import {
   type RunTasks,
 } from './pause.ts';
 
-/** The grace `text` says, in milliseconds; refused `Invalid` where it is out of its form. */
-const graceGiven = (text: string): number => {
-  const ms = graceOf(text);
-  if (ms === undefined) throw new Invalid({ message: `--grace: ${graceRefusal(text)}: as nemia pause --grace 10m` });
+/** The timeout `text` says, in milliseconds; refused `Invalid` where it is out of its form. */
+const timeoutGiven = (text: string): number => {
+  const ms = timeoutOf(text);
+  if (ms === undefined) throw new Invalid({ message: `--timeout: ${timeoutRefusal(text)}: as nemia pause --timeout 10m` });
   return ms;
 };
 
@@ -76,9 +76,9 @@ export const nowRead = Effect.fn('nowRead')(function* (memo?: PauseRuns) {
 });
 
 /**
- * Pauses the store, parking every session, job or attached, at its tool call's end: puts the pause with its grace (`putPause`) — `given`,
- * else the store's at `home` (`graceAt`) — then the sessions' drain (`sessionsDrained`), so the pause takes hold before the next pass,
- * which puts the drain again from the file. Refused (`Conflict`) while a pause stands, as `putPause` refuses it; a grace `given` out of
+ * Pauses the store, parking every session, job or attached, at its tool call's end: puts the pause with its timeout (`putPause`) — `given`,
+ * else the store's at `home` (`timeoutAt`) — then the sessions' drain (`sessionsDrained`), so the pause takes hold before the next pass,
+ * which puts the drain again from the file. Refused (`Conflict`) while a pause stands, as `putPause` refuses it; a timeout `given` out of
  * its form (`Invalid`), as the command's check refuses it first.
  */
 export const pauseParked = Effect.fn('pauseParked')(function* (
@@ -87,15 +87,15 @@ export const pauseParked = Effect.fn('pauseParked')(function* (
   home: string | undefined,
   now: Date = new Date(),
 ) {
-  const graceMs = yield* tried(() => (given === undefined ? graceAt(rootGiven(home, 'pause')).ms : graceGiven(given)));
-  const pause = yield* tried(() => putPause(said, now, graceMs));
-  yield* sessionsDrained({ graceMs });
+  const timeoutMs = yield* tried(() => (given === undefined ? timeoutAt(rootGiven(home, 'pause')).ms : timeoutGiven(given)));
+  const pause = yield* tried(() => putPause(said, now, timeoutMs));
+  yield* sessionsDrained({ graceMs: timeoutMs });
   return pause;
 });
 
 /**
  * Pauses the store at once: puts the pause (`putPause`), or keeps the one that stands as it was put — its since, its by and its why, so
- * `said` is then not written — and cuts its grace to 0 (`cutPause`), and puts the sessions' drain at that grace, which cuts every
+ * `said` is then not written — and cuts its timeout to 0 (`cutPause`), and puts the sessions' drain at that timeout, which cuts every
  * session's tool call in flight at once: each session parks and goes on as the same try once the store is resumed, so it is asked no try
  * and no stop. For each check at work but a landing's (`interruptsOf`), it writes the ask that runs it again once the store is resumed,
  * naming the task (`interrupted`), and only then asks the engine to stop it (`stopAsked`), so a stop is never taken with no ask to pick

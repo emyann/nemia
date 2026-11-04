@@ -307,15 +307,15 @@ const pass = Effect.fn('pass')(function* (engine: Engine, { repo, memo, verify }
 
 /**
  * The sessions' drain as the store's pause says it, put again on each pass before the engine's tick, so a pause put or lifted by any hand
- * — or a daemon restarted under one — is honoured by the next pass: a pause with a grace puts the drain at that grace, which the runtime
- * keeps as it stands when the grace is the same; no pause lifts it; a pause with no grace — the take-over's own, or one put before the
- * grace was written — leaves it as it stands. An engine with no such verb (a test's hand-made fake, as `ioOf` reads one) is left as it is.
+ * — or a daemon restarted under one — is honoured by the next pass: a pause with a timeout puts the drain at that timeout, which the runtime
+ * keeps as it stands when the timeout is the same; no pause lifts it; a pause with no timeout — the take-over's own, or one put before the
+ * timeout was written — leaves it as it stands. An engine with no such verb (a test's hand-made fake, as `ioOf` reads one) is left as it is.
  */
 const drainFromPause = Effect.fnUntraced(function* (engine: Engine) {
   if (typeof engine.drainSessions !== 'function') return;
   const pause = yield* tried(() => readPause());
   if (pause === null) yield* asked('drainSessions', engine.drainSessions(null));
-  else if (pause.graceMs !== undefined) yield* asked('drainSessions', engine.drainSessions({ graceMs: pause.graceMs }));
+  else if (pause.timeoutMs !== undefined) yield* asked('drainSessions', engine.drainSessions({ graceMs: pause.timeoutMs }));
 });
 
 /** Each session of `runs` the pause has parked (`parkedAmong`), read off the views the runtime reported on the pass. */

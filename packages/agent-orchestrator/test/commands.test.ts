@@ -211,7 +211,7 @@ test('each command is served on the api where it was before the table, the lift 
       ['rm', { method: 'DELETE', path: '/api/runs/:runId', status: 200 }],
       ['prune', { method: 'POST', path: '/api/runs/:runId/prune', status: 200, sets: { yes: true } }],
       ['pause', { method: 'POST', path: '/api/pause', status: 200, sets: { yes: true } }],
-      ['grace', 'cli'],
+      ['pause-timeout', 'cli'],
       ['resume', { method: 'DELETE', path: '/api/pause', status: 200 }],
       ['paused', { method: 'GET', path: '/api/pause', status: 200 }],
       ['pause now', { method: 'GET', path: '/api/pause/now', status: 200 }],

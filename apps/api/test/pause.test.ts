@@ -44,7 +44,7 @@ function refused(answer: { status: number; body: Record<string, unknown> }, stat
 }
 
 test('POST /api/pause refuses, before the store is written: a body that is not a pause, words nemia pause refuses, a page on another site, the cordon gone', async (t) => {
-  const shape = '`{ "why"?: "<words>", "by"?: "<name>", "grace"?: "<d>", "now"?: true }`';
+  const shape = '`{ "why"?: "<words>", "by"?: "<name>", "timeout"?: "<d>", "now"?: true }`';
   const ROWS: { name: string; ask: () => Promise<{ status: number; body: Record<string, unknown> }>; status: number; facts: string[] }[] = [
     { name: 'a body that is not JSON: 400, with the shape', ask: () => asked('POST', 'not json'), status: 400, facts: [shape] },
     {
@@ -61,22 +61,22 @@ test('POST /api/pause refuses, before the store is written: a body that is not a
       facts: ['`now`', 'nemia pause --now --yes', '"yes"', shape],
     },
     {
-      name: 'a `grace` that is no text: 400, naming it and its value',
-      ask: () => asked('POST', { grace: 15 }),
+      name: 'a `timeout` that is no text: 400, naming it and its value',
+      ask: () => asked('POST', { timeout: 15 }),
       status: 400,
-      facts: ['`grace`', 'nemia pause --grace', '15', shape],
+      facts: ['`timeout`', 'nemia pause --timeout', '15', shape],
     },
     {
-      name: "a `grace` out of its form: the package's 422, naming --grace and the form",
-      ask: () => asked('POST', { grace: 'x' }),
+      name: "a `timeout` out of its form: the package's 422, naming --timeout and the form",
+      ask: () => asked('POST', { timeout: 'x' }),
       status: 422,
-      facts: ['--grace', '1s to 23h'],
+      facts: ['--timeout', '1s to 23h'],
     },
     {
-      name: "a `grace` with `now`: the package's 422, naming both",
-      ask: () => asked('POST', { grace: '15m', now: true }),
+      name: "a `timeout` with `now`: the package's 422, naming both",
+      ask: () => asked('POST', { timeout: '15m', now: true }),
       status: 422,
-      facts: ['--grace', '--now'],
+      facts: ['--timeout', '--now'],
     },
     {
       name: 'a pause asked by a page on another site: 403',
@@ -134,11 +134,11 @@ test('the board pauses the store and lifts it, refused a second of each; then re
       assert.deepEqual(await asked('GET'), { status: 200, body: { pause: null, finishing: [], parked: [], staged: [], held: [] } });
       const put = await asked('POST', { why: 'merging by hand', by: 'ann' });
       assert.equal(put.status, 200);
-      const pause = put.body.pause as { at: string; by: string; why: string; graceMs: number };
+      const pause = put.body.pause as { at: string; by: string; why: string; timeoutMs: number };
       assert.deepEqual(
         { ...pause, at: typeof pause.at },
-        { at: 'string', by: 'ann', why: 'merging by hand', graceMs: 600_000 },
-        "the store's grace, 10m with none set",
+        { at: 'string', by: 'ann', why: 'merging by hand', timeoutMs: 600_000 },
+        "the store's timeout, 10m with none set",
       );
       assert.deepEqual(JSON.parse(fs.readFileSync(FILE, 'utf8')), pause, "the store's pause file holds it");
       assert.deepEqual(await asked('GET'), { status: 200, body: { pause, finishing: [], parked: [], staged: [], held: [] } });
@@ -147,10 +147,10 @@ test('the board pauses the store and lifts it, refused a second of each; then re
       assert.equal(fs.existsSync(FILE), false, 'the file removed');
       assert.deepEqual(await asked('GET'), { status: 200, body: { pause: null, finishing: [], parked: [], staged: [], held: [] } });
       refused(await asked('DELETE'), 404, 'nemia pause');
-      const graced = await asked('POST', { grace: '15m', by: 'ann' });
-      assert.equal(graced.status, 200, JSON.stringify(graced.body));
-      assert.equal((graced.body.pause as { graceMs: number }).graceMs, 900_000, 'the grace given, for this pause');
-      assert.equal(JSON.parse(fs.readFileSync(FILE, 'utf8')).graceMs, 900_000);
+      const timed = await asked('POST', { timeout: '15m', by: 'ann' });
+      assert.equal(timed.status, 200, JSON.stringify(timed.body));
+      assert.equal((timed.body.pause as { timeoutMs: number }).timeoutMs, 900_000, 'the timeout given, for this pause');
+      assert.equal(JSON.parse(fs.readFileSync(FILE, 'utf8')).timeoutMs, 900_000);
       assert.equal((await asked('DELETE')).status, 200);
     },
   );
@@ -182,14 +182,14 @@ test('the board pauses the store and lifts it, refused a second of each; then re
       assert.equal(fs.existsSync(FILE), false, 'a read pauses nothing');
       const put = await asked('POST', { now: true, why: 'the bill', by: 'ann' }, BOARD, on);
       assert.equal(put.status, 200);
-      const pause = put.body.pause as { at: string; by: string; why: string; graceMs: number };
+      const pause = put.body.pause as { at: string; by: string; why: string; timeoutMs: number };
       assert.deepEqual(put.body, {
         pause,
         kept: false,
         interrupted: [{ run: id, step: 'implement', kind: 'session', taskId: 't-now' }],
         skipped: [],
       });
-      assert.deepEqual({ by: pause.by, why: pause.why, graceMs: pause.graceMs }, { by: 'ann', why: 'the bill', graceMs: 0 });
+      assert.deepEqual({ by: pause.by, why: pause.why, timeoutMs: pause.timeoutMs }, { by: 'ann', why: 'the bill', timeoutMs: 0 });
       assert.deepEqual(stops, [], "a session is not stopped: the sessions' drain cuts its call, and it goes on as the same try");
       assert.deepEqual(runStore.asks.read(id).asks, [], 'and it is asked no try');
       assert.equal((await asked('POST', { why: 'again' }, BOARD, on)).status, 409, 'a plain pause on one that stands');

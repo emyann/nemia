@@ -113,9 +113,9 @@
       }
     },
     {
-      "term": "Grace",
-      "meaning": "how long a pause, a restart and an upgrade give each session's tool call in flight before it is cut: a file of the store's (`graceFile`), ten minutes where none is set, set by `nemia grace <d>` and given once by `--grace <d>` (`graceAt`, `graceGiven`). A restart waits on the daemon's own sessions alone, up to it; the jobs run on.",
-      "type": "GraceAt"
+      "term": "Timeout",
+      "meaning": "how long a pause, a restart and an upgrade give each session's tool call in flight before it is cut: a file of the store's (`timeoutFile`), ten minutes where none is set, set by `nemia pause-timeout <d>` and given once by `--timeout <d>` (`timeoutAt`, `timeoutGiven`). A restart waits on the daemon's own sessions alone, up to it; the jobs run on. Handed to the runtime's sessions' drain as its grace (`graceMs`), the runtime's own word for the same span.",
+      "type": "TimeoutAt"
     },
     {
       "term": "Group list",

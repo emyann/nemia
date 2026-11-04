@@ -14,23 +14,23 @@ import { parkedOf, phaseOfView, type WordView } from '../views/views-words.ts';
 
 /**
  * A person's pause on the store, as its file says it: when it was put, who put it, and the person's words for why (`why`, absent when none
- * were given), each one line; and the grace a call in flight is given before it is cut (`graceMs`), absent on a pause that parks no
- * session — the take-over's own, or one put before the grace was written. A file that does not read gives each field empty, and still
+ * were given), each one line; and the timeout a call in flight is given before it is cut (`timeoutMs`), absent on a pause that parks no
+ * session — the take-over's own, or one put before the timeout was written. A file that does not read gives each field empty, and still
  * pauses.
  */
-export type Pause = { at: string; by: string; why?: string; graceMs?: number };
+export type Pause = { at: string; by: string; why?: string; timeoutMs?: number };
 
-/** The grace a store's pause gives a call in flight when nothing sets one: ten minutes (`pause-grace.json`, `nemia grace`). */
-export const DEFAULT_GRACE_MS = 600_000;
+/** The timeout a store's pause gives a call in flight when nothing sets one: ten minutes (`pause-timeout.json`, `nemia pause-timeout`). */
+export const DEFAULT_TIMEOUT_MS = 600_000;
 
-/** The shortest grace a pause takes: one second. */
-export const MIN_GRACE_MS = 1_000;
+/** The shortest timeout a pause takes: one second. */
+export const MIN_TIMEOUT_MS = 1_000;
 
-/** The longest grace a pause takes: 23 hours, the runtime's bound on a held job (`JOB_HOLD_MS`), under its hook's own (`HOOK_HOLD_S`). */
-export const MAX_GRACE_MS = 23 * 3_600_000;
+/** The longest timeout a pause takes: 23 hours, the runtime's bound on a held job (`JOB_HOLD_MS`), under its hook's own (`HOOK_HOLD_S`). */
+export const MAX_TIMEOUT_MS = 23 * 3_600_000;
 
-/** How a grace is typed, as every refusal of one says it. */
-export const GRACE_FORM = 'digits and s, m or h, from 1s to 23h, as 90s, 10m or 2h';
+/** How a timeout is typed, as every refusal of one says it. */
+export const TIMEOUT_FORM = 'digits and s, m or h, from 1s to 23h, as 90s, 10m or 2h';
 
 const UNIT_MS = { s: 1_000, m: 60_000, h: 3_600_000 } as const;
 
@@ -40,28 +40,28 @@ const formOf = (text: string): number | undefined => {
   return m ? Number(m[1]) * UNIT_MS[m[2] as keyof typeof UNIT_MS] : undefined;
 };
 
-/** Why `text` is no grace, naming the form, or undefined for one that reads. */
-export const graceRefusal = (text: string): string | undefined => {
+/** Why `text` is no timeout, naming the form, or undefined for one that reads. */
+export const timeoutRefusal = (text: string): string | undefined => {
   const ms = formOf(text);
-  if (ms === undefined) return `a grace is ${GRACE_FORM}; it was given ${JSON.stringify(text)}`;
-  return ms < MIN_GRACE_MS || ms > MAX_GRACE_MS
-    ? `a grace is from 1s to 23h (${GRACE_FORM}); it was given ${JSON.stringify(text)}`
+  if (ms === undefined) return `a timeout is ${TIMEOUT_FORM}; it was given ${JSON.stringify(text)}`;
+  return ms < MIN_TIMEOUT_MS || ms > MAX_TIMEOUT_MS
+    ? `a timeout is from 1s to 23h (${TIMEOUT_FORM}); it was given ${JSON.stringify(text)}`
     : undefined;
 };
 
-/** The grace `text` says, in milliseconds, or undefined where `graceRefusal` refuses it. */
-export const graceOf = (text: string): number | undefined => (graceRefusal(text) === undefined ? formOf(text) : undefined);
+/** The timeout `text` says, in milliseconds, or undefined where `timeoutRefusal` refuses it. */
+export const timeoutOf = (text: string): number | undefined => (timeoutRefusal(text) === undefined ? formOf(text) : undefined);
 
-/** Why `nemia pause`'s `--grace` is refused: a grace out of its form, or one given with `--now`, which cuts at once; null when none. */
-export const pauseGraceRefusal = (grace: string | undefined, now: boolean, shape: string): string | null => {
-  if (grace === undefined) return null;
-  if (now) return `--grace gives each call in flight a while to end, and --now cuts them at once: give one, ${shape}.`;
-  const wrong = graceRefusal(grace);
-  return wrong === undefined ? null : `--grace: ${wrong}: ${shape}, as nemia pause --grace 10m.`;
+/** Why `nemia pause`'s `--timeout` is refused: a timeout out of its form, or one given with `--now`, which cuts at once; null when none. */
+export const pauseTimeoutRefusal = (timeout: string | undefined, now: boolean, shape: string): string | null => {
+  if (timeout === undefined) return null;
+  if (now) return `--timeout gives each call in flight a while to end, and --now cuts them at once: give one, ${shape}.`;
+  const wrong = timeoutRefusal(timeout);
+  return wrong === undefined ? null : `--timeout: ${wrong}: ${shape}, as nemia pause --timeout 10m.`;
 };
 
-/** A grace in words, by its largest whole unit: `10m`, `90s`, `2h`. */
-export const graceWords = (ms: number): string =>
+/** A timeout in words, by its largest whole unit: `10m`, `90s`, `2h`. */
+export const timeoutWords = (ms: number): string =>
   ms % 3_600_000 === 0 ? `${ms / 3_600_000}h` : ms % 60_000 === 0 ? `${ms / 60_000}m` : `${Math.round(ms / 1_000)}s`;
 
 /**
@@ -104,7 +104,7 @@ export type Interrupt = { run: string; step: string; kind: 'session' | 'check'; 
 
 /**
  * A session the pause has parked at a tool call's end: `run`'s `step`, held at its hook `after` its call to that tool where its harness
- * says it, or with its call to `cut` cut at the grace's end. It continues as the same try once the store is resumed.
+ * says it, or with its call to `cut` cut at the timeout's end. It continues as the same try once the store is resumed.
  */
 export type Parked = { run: string; step: string; after?: string; cut?: string };
 
@@ -280,7 +280,7 @@ const heldCount = ({ staged, held }: Pick<Paused, 'staged' | 'held'>): string =>
 
 /**
  * The pause as it stands, in one line: "Pausing" with how many tasks still finish, or "Paused" once none does, each with how many checks
- * it holds back (`staged` and `held`), when any. Under a pause with a grace, while sessions finish, how many finish a tool call and in how
+ * it holds back (`staged` and `held`), when any. Under a pause with a timeout, while sessions finish, how many finish a tool call and in how
  * many minutes from `now` what is left is cut (`pausingWords`). Null when no pause stands.
  */
 export const pausedWords = (paused: Pick<Paused, 'pause' | 'finishing' | 'staged' | 'held'>, now: Date = new Date()): string | null => {
@@ -288,8 +288,8 @@ export const pausedWords = (paused: Pick<Paused, 'pause' | 'finishing' | 'staged
   if (!pause) return null;
   const sessions = finishing.filter((f) => f.kind === 'session').length;
   const head =
-    pause.graceMs !== undefined && sessions
-      ? pausingWords(sessions, Date.parse(pause.at) + pause.graceMs - now.getTime())
+    pause.timeoutMs !== undefined && sessions
+      ? pausingWords(sessions, Date.parse(pause.at) + pause.timeoutMs - now.getTime())
       : `Pausing: ${finishing.length} finishing`;
   return finishing.length
     ? `${head}${heldCount(paused)} — the store is paused ${sinceWords(pause)}; nothing new starts, and what runs finishes; ${RESUME_LINE} resumes it`

@@ -359,7 +359,7 @@ test('while the store is paused nothing new starts and what runs finishes; the p
   assert.notEqual((await Effect.runPromise(h.e.view(queuedTask))).admission, 'queued', 'the queued task admitted');
 });
 
-test("each pass sets the sessions' drain from the pause before the engine's tick: a graced pause puts it, no pause lifts it, a pause with no grace leaves it", async () => {
+test("each pass sets the sessions' drain from the pause before the engine's tick: a timed pause puts it, no pause lifts it, a pause with no timeout leaves it", async () => {
   const stand = testEngine();
   const seenAtTick: number[] = [];
   const e = engineOf(stand.layer);
@@ -375,7 +375,7 @@ test("each pass sets the sessions' drain from the pause before the engine's tick
   putPause({ by: 'ann' }, new Date(), 900_000);
   try {
     await pass();
-    assert.deepEqual(stand.sessionDrains, [{ graceMs: 900_000 }], 'a graced pause puts the drain at its grace');
+    assert.deepEqual(stand.sessionDrains, [{ graceMs: 900_000 }], 'a timed pause puts the drain at its timeout');
     assert.deepEqual(seenAtTick, [1], "before the engine's tick");
   } finally {
     resumePause();
@@ -385,7 +385,7 @@ test("each pass sets the sessions' drain from the pause before the engine's tick
   putPause({ by: 'the take-over' });
   try {
     await pass();
-    assert.deepEqual(stand.sessionDrains, [{ graceMs: 900_000 }, null], 'a pause with no grace leaves the drain as it stands');
+    assert.deepEqual(stand.sessionDrains, [{ graceMs: 900_000 }, null], 'a pause with no timeout leaves the drain as it stands');
   } finally {
     resumePause();
   }

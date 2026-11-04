@@ -74,21 +74,21 @@ test('the pause on disk: put, read back, refused, lifted, read when it does not 
     assert.equal(fs.existsSync(path.join(ROOT, 'cordon')), false, 'nemia resume removes it');
     assert.equal(storeAdmission().unschedulable(), false);
   });
-  await t.test('a pause put with a grace keeps it on its file; an old file of `{at, by}` has none', () => {
+  await t.test('a pause put with a timeout keeps it on its file; an old file of `{at, by}` has none', () => {
     const put = putPause({ by: 'ann' }, new Date('2026-10-04T12:00:00.000Z'), 900_000);
-    assert.deepEqual(put, { at: '2026-10-04T12:00:00.000Z', by: 'ann', graceMs: 900_000 });
+    assert.deepEqual(put, { at: '2026-10-04T12:00:00.000Z', by: 'ann', timeoutMs: 900_000 });
     assert.deepEqual(readPause(), put);
     resumePause();
     fs.writeFileSync(pauseFile(), `${JSON.stringify({ at: '2026-10-03T08:00:00.000Z', by: 'ann' })}\n`);
-    assert.deepEqual(readPause(), { at: '2026-10-03T08:00:00.000Z', by: 'ann' }, 'no grace: the pause parks nothing');
-    fs.writeFileSync(pauseFile(), `${JSON.stringify({ at: '2026-10-03T08:00:00.000Z', by: 'ann', graceMs: 'ten' })}\n`);
-    assert.deepEqual(readPause(), { at: '2026-10-03T08:00:00.000Z', by: 'ann' }, 'a grace that is no count of milliseconds is none');
+    assert.deepEqual(readPause(), { at: '2026-10-03T08:00:00.000Z', by: 'ann' }, 'no timeout: the pause parks nothing');
+    fs.writeFileSync(pauseFile(), `${JSON.stringify({ at: '2026-10-03T08:00:00.000Z', by: 'ann', timeoutMs: 'ten' })}\n`);
+    assert.deepEqual(readPause(), { at: '2026-10-03T08:00:00.000Z', by: 'ann' }, 'a timeout that is no count of milliseconds is none');
     resumePause();
   });
-  await t.test('cutPause sets the grace to 0, keeping when, by whom and why; with no pause it is refused', () => {
+  await t.test('cutPause sets the timeout to 0, keeping when, by whom and why; with no pause it is refused', () => {
     putPause({ by: 'ann', why: 'the bill' }, new Date('2026-10-04T12:00:00.000Z'), 600_000);
-    assert.deepEqual(cutPause(), { at: '2026-10-04T12:00:00.000Z', by: 'ann', why: 'the bill', graceMs: 0 });
-    assert.deepEqual(readPause(), { at: '2026-10-04T12:00:00.000Z', by: 'ann', why: 'the bill', graceMs: 0 });
+    assert.deepEqual(cutPause(), { at: '2026-10-04T12:00:00.000Z', by: 'ann', why: 'the bill', timeoutMs: 0 });
+    assert.deepEqual(readPause(), { at: '2026-10-04T12:00:00.000Z', by: 'ann', why: 'the bill', timeoutMs: 0 });
     resumePause();
     refusedAs(() => cutPause(), 'Missing', 'nemia pause');
   });

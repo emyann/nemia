@@ -20,7 +20,7 @@ const PAUSE_NOW = commandNamed('pause now');
 export type PauseNowRead = { interrupts: Interrupt[]; cost: string };
 
 /**
- * The store's pause or null, with its grace (`graceMs`) where it parks sessions; each task still finishing under it; each session it has
+ * The store's pause or null, with its timeout (`timeoutMs`) where it parks sessions; each task still finishing under it; each session it has
  * parked at a tool call's end (`parked`: its run, its step, and the call it stopped `after` or the call `cut`); each landing it holds with
  * its merge staged in its checkout (MERGE_HEAD); and each other check it holds, read through `e`.
  */

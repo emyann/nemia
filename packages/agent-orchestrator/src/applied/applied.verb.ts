@@ -37,13 +37,16 @@ import {
   type Entry,
   type Status,
 } from './applied.store.ts';
-import { renderFactory, resolveParams, type Params } from './index.ts';
+import { overlaid, renderFactory, resolveParams, type Params } from './index.ts';
 import { trustedLines, type PlaceTrust } from '../trust/trust.ts';
 import { NO_TRUST, trustPlaces } from '../trust/trust.verb.ts';
 import { compose, conflictCut, mergeTrees, resolveLine, type Conflict } from '../upgrade/index.ts';
 
-/** A template rendered with a factory's parameters: its version, and the files of a tree, each with its bytes. */
-export type RenderedAt = { version: string; params: Params; entries: Entry[] };
+/**
+ * A template rendered with a factory's parameters: its version, the parameters it rendered with, the files of a tree, each with its
+ * bytes, and the parameters held that it declares none of, dropped (none where nothing was held).
+ */
+export type RenderedAt = { version: string; params: Params; entries: Entry[]; dropped: readonly string[] };
 
 /** The `--set` words that give `params`, each `<key>=<value>`. */
 export const setsOf = (params: FactoryTemplate['params']): string[] =>
@@ -54,22 +57,25 @@ export type Unrendered = { problems: string[]; version?: string };
 
 /**
  * The template at `source`, a folder or an archive by its whole path or the name of a builtin template (`templatePlace`), read
- * through the Template door and rendered with `params`, each `<key>=<value>`, its files read off its tree; or why it is not: its
+ * through the Template door and rendered with `sets`, each `<key>=<value>`, over `held` where it is given — a factory's own parameters,
+ * those the template declares kept and the others dropped (`overlaid`) — its files read off its tree; or why it is not: its
  * problems (`nemia template lint`), a parameter refused (`resolveParams`) and what the render refuses (`renderFactory`), every one a
  * line, with the template's version where it was read. Nothing is written. Refused as `templatePlace` refuses a name, and as the door
  * refuses a read.
  */
-export const renderedAt = Effect.fn('renderedAt')(function* (source: string, sets: readonly string[]) {
+export const renderedAt = Effect.fn('renderedAt')(function* (source: string, sets: readonly string[], held?: Params) {
   const place = yield* templatePlace(source);
   const tree = yield* (yield* TemplateDoor).templates.read(TemplateSource.read(place));
-  return yield* tried(() => renderOpened(openedTree(place, tree, packageSkillNames()), sets));
+  return yield* tried(() => renderOpened(openedTree(place, tree, packageSkillNames()), sets, held));
 });
 
-/** The template opened as `read`, rendered with `sets`, or why it is not (`renderedAt`). */
-function renderOpened(read: OpenTemplate, sets: readonly string[]): RenderedAt | Unrendered {
+/** The template opened as `read`, rendered with `sets` over `held` where it is given, or why it is not (`renderedAt`). */
+function renderOpened(read: OpenTemplate, given: readonly string[], held: Params | undefined): RenderedAt | Unrendered {
   if (read.problems.length) return { problems: read.problems.map(problemLine) };
   const spec = (read.folder.documents.get('nemia.yaml') as { spec: FactorySpec }).spec;
-  const { params, refusals } = resolveParams(spec.parameters ?? {}, sets);
+  const declared = spec.parameters ?? {};
+  const { sets, dropped } = held === undefined ? { sets: given, dropped: [] } : overlaid(declared, held, given);
+  const { params, refusals } = resolveParams(declared, sets);
   if (refusals.length) return { problems: refusals, version: spec.version };
   const rendered = renderFactory(read, params);
   if (rendered.refusals.length) return { problems: rendered.refusals, version: spec.version };
@@ -80,7 +86,7 @@ function renderOpened(read: OpenTemplate, sets: readonly string[]): RenderedAt |
       return { path: copy.path, bytes: Buffer.from(from.bytes), mode: from.mode };
     }),
   ];
-  return { version: spec.version, params, entries };
+  return { version: spec.version, params, entries, dropped };
 }
 
 /** A condition, as Kubernetes words one. */

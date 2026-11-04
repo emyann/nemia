@@ -1,7 +1,7 @@
 /** A template's parameters given values: typed as declared, a default filling a gap, every wrong `--set` refused at once by name. */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { interpolated, resolveParams, substitute } from './index.ts';
+import { interpolated, overlaid, resolveParams, substitute } from './index.ts';
 
 const DECLARED = {
   model: { type: 'string', description: 'the model', default: 'sonnet' },
@@ -32,6 +32,44 @@ test("a template's parameters given values: typed, defaulted, substituted, and e
       assert.ok(refusals[4].includes('true or false'), refusals[4]);
       assert.match(resolveParams(DECLARED, ['budget=lots']).refusals.join('\n'), /--set budget=lots: budget is a number, and lots is none/);
       assert.match(resolveParams(DECLARED, ['budget=']).refusals.join('\n'), /--set budget=: budget is a number, and nothing is none/);
+    },
+  );
+  await t.test(
+    "a factory's held parameters under the --set words: those the template declares kept, the others dropped by name",
+    async (t) => {
+      const rows: { name: string; held: Record<string, string | number | boolean>; sets: string[]; words: string[]; dropped: string[] }[] =
+        [
+          { name: 'a held key the template declares is kept', held: { budget: 7 }, sets: [], words: ['budget=7'], dropped: [] },
+          {
+            name: 'a held key it does not declare is dropped and named',
+            held: { budget: 7, check: 'npm test' },
+            sets: [],
+            words: ['budget=7'],
+            dropped: ['check'],
+          },
+          {
+            name: 'the --set words come after the held ones',
+            held: { budget: 7 },
+            sets: ['budget=9'],
+            words: ['budget=7', 'budget=9'],
+            dropped: [],
+          },
+          { name: 'nothing held gives the --set words alone', held: {}, sets: ['gated=true'], words: ['gated=true'], dropped: [] },
+          {
+            name: 'the dropped are named sorted',
+            held: { zeta: 1, alpha: 2, model: 'opus' },
+            sets: [],
+            words: ['model=opus'],
+            dropped: ['alpha', 'zeta'],
+          },
+        ];
+      for (const row of rows)
+        await t.test(row.name, () => {
+          assert.deepEqual(overlaid(DECLARED, row.held, row.sets), { sets: row.words, dropped: row.dropped });
+        });
+      await t.test('a --set wins over the value held for its key', () => {
+        assert.equal(resolveParams(DECLARED, overlaid(DECLARED, { budget: 7 }, ['budget=9']).sets).params.budget, 9);
+      });
     },
   );
   await t.test('a {param} is replaced at any depth, and one the parameters lack is refused by name', () => {

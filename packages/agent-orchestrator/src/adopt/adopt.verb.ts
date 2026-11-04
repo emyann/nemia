@@ -41,7 +41,7 @@ const manyOf = (args: Args, key: string): string[] => {
 };
 
 /** An argument of a command line, quoted for a shell where it holds anything but plain characters. */
-const shellArg = (arg: string): string => (/^[\w./:=@+-]+$/.test(arg) ? arg : `'${arg.replaceAll("'", "'\\''")}'`);
+export const shellArg = (arg: string): string => (/^[\w./:=@+-]+$/.test(arg) ? arg : `'${arg.replaceAll("'", "'\\''")}'`);
 
 /** The line that takes `name` over by the template at `source` with `sets`, carrying the plan's `digest`. */
 const adoptLine = (name: string, source: string, sets: readonly string[], digest: string): string =>

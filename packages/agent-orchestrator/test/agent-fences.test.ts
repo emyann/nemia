@@ -24,6 +24,10 @@
  * where a settings file allows those reads to a step that allows none itself, which the checkout's no longer does. The planted lists
  * may drift from sdlc's: what sdlc writes is held where it is written.
  *
+ * A writer of one kind of file: the read set with the allows of a contract (`CONTRACT_WRITES`), each a path from the session's working
+ * folder (`WORK`), is planted the same way and writes exactly the checkout's contracts and no other file; spelled with a leading `*` it
+ * writes none, and on a step over an agent that lacks them the same lines are refused at load, a step's fence only narrowing its agent's.
+ *
  * Every path a repository skill says its work is on matches a file of the checkout (`appliesUnmatched`), the read-within-reach rule of
  * the repository's skills is counted as `nemia stats` counts it (`rulesOfTry`), and no tsconfig of the checkout makes `tsc --noEmit`
  * write (`buildInfoConfigs`).
@@ -49,6 +53,7 @@ import { admissionOf, nemiaFence, widened } from '../src/admission/index.ts';
 import { TABLE } from '../src/command/commands.verb.ts';
 import { rulesOfTry } from '../src/stats/discipline.ts';
 import { REPO, TEAM, TEAM_DEV, teamCopy } from './team.ts';
+import { files } from './repo-files.ts';
 
 /** The repository's own folder of skills, which a step run in this checkout may load. */
 const REPO_SKILLS = path.join(REPO, '.claude', 'skills');
@@ -117,6 +122,9 @@ const PROBES: Call[] = [
 
 /** The home folder `~` is in an edit rule, for the paths the calls below write. */
 const HOME = '/home/u';
+
+/** The folder a planted session works in, where an edit rule's path from the working folder starts. */
+const WORK = '/work/checkout';
 
 /** A call as a rule would name it, for a message. */
 const shown = (call: Call): string => {
@@ -189,11 +197,20 @@ const globbed = (words: string, open: boolean): RegExp =>
 
 /**
  * Whether the path of a file rule covers the absolute path `file`: `//<glob>` from the root, `~/<glob>` from `HOME`; in the glob `**\/`
- * is any run of folders, none included, `**` any run of characters, and `*` any run within a folder's name. Throws on a path from the
- * project or the working folder, which this matcher does not model.
+ * is any run of folders, none included, `**` any run of characters, and `*` any run within a folder's name. A path with no leading `/`,
+ * `.` or `~` that holds a `/` before its last name is anchored at the session's working folder, `WORK`, as gitignore anchors a pattern
+ * with a slash inside it. Throws on a path from the project (`/x`), on a bare name, which gitignore matches at any depth, and on
+ * `<name>/**`, whose depth Claude Code reads differently by rule type: this matcher does not model them.
  */
 function covers(rulePath: string, file: string): boolean {
-  const from = rulePath.startsWith('//') ? rulePath.slice(1) : rulePath.startsWith('~/') ? `${HOME}${rulePath.slice(1)}` : undefined;
+  const fromWork = !/^[/.~]/.test(rulePath) && /\/[^/]+$/.test(rulePath) && !/^[^/]+\/\*\*$/.test(rulePath);
+  const from = rulePath.startsWith('//')
+    ? rulePath.slice(1)
+    : rulePath.startsWith('~/')
+      ? `${HOME}${rulePath.slice(1)}`
+      : fromWork
+        ? `${WORK}/${rulePath}`
+        : undefined;
   if (from === undefined)
     throw new Error(`${rulePath}: a path from the project or the working folder is not modelled; say how it reads, here`);
   const pattern = from
@@ -572,7 +589,7 @@ test('REFUSED: a dontAsk step an allow of pkill reaches is open on each kill by 
   assert.deepEqual(unfenced(reviewer), []);
 });
 
-test('the matcher reads an edit rule by the path it covers, from the root or the home folder, and throws on one it does not model', () => {
+test('the matcher reads an edit rule by the path it covers, from the root, the home or the working folder, and throws on one it does not model', () => {
   const local = 'Edit(//**/.claude/settings.local.json)';
   assert.equal(reaches(local, { tool: 'Edit', path: '/home/u/projects/.claude/settings.local.json' }), true);
   assert.equal(reaches(local, { tool: 'Write', path: '/.claude/settings.local.json' }), true, 'a write too, and **/ is no folder as well');
@@ -584,11 +601,24 @@ test('the matcher reads an edit rule by the path it covers, from the root or the
   assert.equal(reaches('Edit(//a/*/c)', { tool: 'Edit', path: '/a/b/d/c' }), false, 'a * stays within a folder');
   assert.equal(reaches('Read(//**)', { tool: 'Edit', path: '/a' }), false);
   assert.equal(reaches('Edit', { tool: 'Write', path: '/a' }), true);
-  assert.throws(
-    () => reaches('Edit(src/**)', { tool: 'Edit', path: '/a/src/b' }),
-    (err: Error) =>
-      err.message.startsWith('src/**:') && err.message.includes('is not modelled') && err.message.includes('say how it reads'),
+  const contract = 'Edit(packages/*/contracts/*.contract.ts)';
+  assert.equal(reaches(contract, { tool: 'Write', path: `${WORK}/packages/a/contracts/x.contract.ts` }), true, 'from the session');
+  assert.equal(reaches(contract, { tool: 'Edit', path: `${WORK}/packages/a/contracts/x.contract.ts` }), true);
+  assert.equal(reaches(contract, { tool: 'Write', path: `${WORK}/packages/a/contracts/laws.ts` }), false);
+  assert.equal(reaches(contract, { tool: 'Write', path: `${WORK}/packages/a/contracts/n/x.contract.ts` }), false, 'one folder deep');
+  assert.equal(reaches(contract, { tool: 'Write', path: `${WORK}/packages/a/b/contracts/x.contract.ts` }), false, 'a * is one name');
+  assert.equal(reaches(contract, { tool: 'Write', path: '/elsewhere/packages/a/contracts/x.contract.ts' }), false, 'anchored');
+  assert.equal(
+    reaches('Edit(*/contracts/*.contract.ts)', { tool: 'Write', path: `${WORK}/packages/a/contracts/x.contract.ts` }),
+    false,
+    'a leading * is one folder, not two',
   );
+  for (const odd of ['Edit(src/**)', 'Edit(x.ts)'])
+    assert.throws(
+      () => reaches(odd, { tool: 'Edit', path: `${WORK}/src/b` }),
+      (err: Error) => err.message.includes('is not modelled') && err.message.includes('say how it reads'),
+      odd,
+    );
 });
 
 /** A list of a fence that a file's frontmatter writes on one line, as a comma string. */
@@ -1118,6 +1148,59 @@ test("REFUSED: a step's own deny line cut to one rule lifts none of its agent's,
     GIT_RUNS_A_PROGRAM.map(shown),
     "the line alone, as it once replaced its agent's",
   );
+});
+
+/**
+ * The allows that let a dontAsk agent write one kind of file and nothing else: a contract, `*.contract.ts` directly under a package's or
+ * an app's `contracts/`, each path read from the session's working folder, gitignore's `*` being one name. The nemia factory's own copy
+ * of its designer carries them, out of git (root `CLAUDE.md`, *Agents in this repository*); planted here, they may drift from it.
+ */
+const CONTRACT_WRITES = ['Edit(packages/*/contracts/*.contract.ts)', 'Edit(apps/*/contracts/*.contract.ts)'];
+
+/** A write of each file of the checkout, at the planted session's working folder. */
+const WRITES_OF_THE_CHECKOUT: Call[] = files().map((file) => ({ tool: 'Write', path: `${WORK}/${file}` }));
+
+/** The files of the checkout, each by its path from the root, that `step` writes: each write run on its own, `runs` showing no path. */
+const writtenBy = (step: Step): string[] =>
+  WRITES_OF_THE_CHECKOUT.filter((call) => runs(step, [call], {}, []).length > 0).map((call) => call.path!.slice(WORK.length + 1));
+
+test('a dontAsk step with the read set and the contract allows planted writes exactly the contracts of the checkout, and still asks each read', () => {
+  const step = planted({ allows: [...READ_SET_ALLOWS, ...CONTRACT_WRITES] });
+  const written = writtenBy(step);
+  const contracts = files().filter((file) => /^(?:packages|apps)\/[^/]+\/contracts\/[^/]+\.contract\.ts$/.test(file));
+  assert.ok(contracts.length > 0, 'the checkout holds contracts to write');
+  assert.deepEqual(written, contracts);
+  assert.ok(files().includes('packages/agent-orchestrator/contracts/laws.ts'), 'the shared helpers are a file of the checkout');
+  assert.ok(!written.includes('packages/agent-orchestrator/contracts/laws.ts'), 'and refused, a contract file alone being allowed');
+  assert.ok(!written.some((file) => file.includes('/src/')), 'no source file');
+  assert.deepEqual(runs(step, GIT_READS, {}, []), GIT_READS.map(shown));
+  assert.deepEqual(runs(step, GIT_WRITES, {}, []), []);
+  assert.deepEqual(writtenBy(planted()), [], 'without them, the read set writes no file');
+});
+
+test("REFUSED: the contract allows spelled with a leading * in place of the package's folder write no contract of the checkout", () => {
+  assert.deepEqual(writtenBy(planted({ allows: [...READ_SET_ALLOWS, 'Edit(*/contracts/*.contract.ts)'] })), []);
+});
+
+test('REFUSED: the contract writes on a step over an agent that lacks them are refused at load, so they go on the agent', () => {
+  const root = teamCopy('wf-fences-contract-');
+  const agent = path.join(root, 'agents', 'reviewer.md');
+  fs.writeFileSync(agent, fs.readFileSync(agent, 'utf8').replace(/^overridable: (.*)$/m, 'overridable: $1, fence'));
+  const file = path.join(root, 'dev', 'review.md');
+  const step = fs.readFileSync(file, 'utf8');
+  const fence = (lines: string) => step.replace(/\n---\n/, `\nclaude:\n  fence:\n${lines}---\n`);
+  fs.writeFileSync(file, fence('    tools: Read, Bash, Skill\n'));
+  assert.ok(
+    loadWorkflows(path.join(root, 'dev')).some((one) => one.name === 'review'),
+    'a narrower fence on the step loads',
+  );
+  for (const lines of [
+    '    tools: Read, Bash, Skill, Write, Edit\n',
+    `    tools: Read, Bash, Skill\n    allowedTools: ${CONTRACT_WRITES.join(', ')}\n`,
+  ]) {
+    fs.writeFileSync(file, fence(lines));
+    assert.throws(() => loadWorkflows(path.join(root, 'dev')), lines);
+  }
 });
 
 /** The pull request's reads the reviewer allows itself, planted beside the read set. sdlc's own is held as written there. */

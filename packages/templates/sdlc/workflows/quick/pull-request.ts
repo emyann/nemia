@@ -14,32 +14,32 @@
  * - `push`, which the round's check runs first: it pushes again, so the commit CI judges is the commit the check judges, then refuses
  *   unless an open, non-draft pull request for this branch, based on the remote's default branch, has `headRefOid` equal to `HEAD`. GitHub
  *   moves a pull request's head a moment after the push it follows, so that head is read again for a bounded few seconds (`HEAD_SECONDS`)
- *   before the refusal: a head that stays elsewhere is still refused, and says how long it was read for.
- *   `push --labels "<rules>"` labels that pull request too, from the run's own labels (`WF_LABELS`, a JSON object of strings the run
- *   gives every check and every session): each rule, the rules apart by whitespace, is `<key>=<value>:<label>`, and gives `<label>` to a run whose label
- *   `<key>` is `<value>`. The labels the rules give the run are added, and any other label a rule could give is removed, so a run
- *   relabelled is followed and a label no rule gives — a person's — is left as it is; each through REST (`issues/<n>/labels`), never
- *   `gh pr edit`, and the labels set are printed. A malformed rule, a `WF_LABELS` that is no JSON object of strings, and a label a rule
- *   gives that the repository lacks are refused before anything is pushed. An empty or absent `--labels` labels nothing, and so does a
- *   check with no `WF_LABELS` at all, a run of an older Nemia, saying so.
+ *   before the refusal: a head that stays elsewhere is still refused, and says how long it was read for. `push --labels "<rules>"` labels
+ *   that pull request too, from the run's own labels (`WF_LABELS`, a JSON object of strings the run gives every check and every session):
+ *   each rule, the rules apart by whitespace, is `<key>=<value>:<label>`, and gives `<label>` to a run whose label `<key>` is `<value>`.
+ *   The labels the rules give the run are added, and any other label a rule could give is removed, so a run relabelled is followed and a
+ *   label no rule gives — a person's — is left as it is; each through REST (`issues/<n>/labels`), never `gh pr edit`, and the labels set
+ *   are printed. A malformed rule, a `WF_LABELS` that is no JSON object of strings, and a label a rule gives that the repository lacks are
+ *   refused before anything is pushed. An empty or absent `--labels` labels nothing, and so does a check with no `WF_LABELS` at all, a run
+ *   of an older Nemia, saying so.
  * - `wait --check <name>`, which the round's check runs last, `<name>` the CI context branch protection requires of the base branch (the
  *   repository's, so the check gives it): it refuses at once a pull request GitHub says is `CONFLICTING` with its base, on which no CI
  *   would come, naming the merge of the base that answers it (`mergeable`, read again for up to 15 s while GitHub says `UNKNOWN`,
  *   `WF_PR_MERGEABLE_SECONDS`); then it polls the `<name>` context of that head (`gh pr view --json statusCheckRollup`), reading only the
- *   latest run of each check there (`latest`), so a failure a later run of its check superseded is neither judged nor listed, 1800 s for it to
- *   start (`WF_CI_START_SECONDS`) and 2400 s whole (`WF_CI_WAIT_SECONDS`), `WF_CI_POLL_SECONDS` the interval; on a red, cancelled or absent
- *   context refuses by name with the Actions URL, the failing jobs, and from each failing job's log the lines that failed it — a test with
- *   its diff, a type or lint error — or a bounded tail where none is, GitHub's post-job lines left out — the next try reads why CI went red
- *   here, since no agent may call `gh` itself — and the `nemia retry <run> <step> --recheck` line, whose step is the check's own
- *   (`WF_STEP`).
+ *   latest run of each check there (`latest`), so a failure a later run of its check superseded is neither judged nor listed, 1800 s for it
+ *   to start (`WF_CI_START_SECONDS`) and 2400 s whole (`WF_CI_WAIT_SECONDS`), `WF_CI_POLL_SECONDS` the interval; on a red, cancelled or
+ *   absent context refuses by name with the Actions URL, the failing jobs, and from each failing job's log the lines that failed it — a
+ *   test with its diff, a type or lint error — or a bounded tail where none is, GitHub's post-job lines left out — the next try reads why
+ *   CI went red here, since no agent may call `gh` itself — and the `nemia retry <run> <step> --recheck` line, whose step is the check's
+ *   own (`WF_STEP`).
  *
  * The branch is read from `HEAD`, never given: a run's branch is `wf/<run>/<leaf>` — `wf/<run>/run` for the run's own line of work, one
  * branch per card, and `wf/<run>/<step>` for a fork beside it or a fan-in's merge — and the run it names is what the refusals print.
  * Refuses, exit 1 on stderr with what to do next: a HEAD that is on no such branch or on the remote's default branch; no `origin`; no `gh`
  * on the PATH or none authenticated; a push git rejects, which is answered by merging the base and never by a force; a draft pull request,
  * or one based on another branch; no open pull request where one is owed; a `headRefOid` that is not `HEAD`; a pull request that conflicts
- * with its base; a `push --labels` whose rules, `WF_LABELS` or the repository's labels are not as above; a `wait` with no `--check`;
- * and a CI context that is red, cancelled, skipped or never reported.
+ * with its base; an `open` with no `--labels`; an `open --labels` or a `push --labels` whose rules, `WF_LABELS` or the repository's
+ * labels are not as above; a `wait` with no `--check`; and a CI context that is red, cancelled, skipped or never reported.
  */
 import { spawnSync } from 'node:child_process';
 
@@ -233,17 +233,8 @@ const head = (): string => git('what commit HEAD is', 'rev-parse', 'HEAD');
 
 /** The open pull requests whose head is `branch`. */
 function pulls(branch: string): Pr[] {
-  const text = gh(
-    'pr',
-    'list',
-    '--head',
-    branch,
-    '--state',
-    'open',
-    '--json',
-    'number,url,isDraft,baseRefName,headRefOid,mergeable,labels',
-  );
-  return parsed<Pr[]>(`the pull requests of ${branch}`, text);
+  const fields = 'number,url,isDraft,baseRefName,headRefOid,mergeable,labels';
+  return parsed<Pr[]>(`the pull requests of ${branch}`, gh('pr', 'list', '--head', branch, '--state', 'open', '--json', fields));
 }
 
 /** The line the engineer types to open the pull request, for a refusal that asks for one. */
@@ -358,12 +349,7 @@ function runLabels(): Record<string, string> | undefined {
 /** The labels the repository has, every page of them. */
 function repoLabels(): Set<string> {
   const names = gh('api', '--paginate', 'repos/{owner}/{repo}/labels?per_page=100', '--jq', '.[].name');
-  return new Set(
-    names
-      .split('\n')
-      .map((name) => name.trim())
-      .filter(Boolean),
-  );
+  return new Set(names.split(/\s*\n\s*/).filter(Boolean));
 }
 
 /**
@@ -373,10 +359,7 @@ function repoLabels(): Set<string> {
 function labelPlan(rules: readonly LabelRule[]): { want: Set<string>; givable: Set<string> } | { note: string } | undefined {
   if (rules.length === 0) return undefined;
   const ofRun = runLabels();
-  if (ofRun === undefined)
-    return {
-      note: "no label is set: this was given no WF_LABELS, the run's labels, which a later Nemia gives every check and session of a run",
-    };
+  if (ofRun === undefined) return { note: "no label is set: this was given no WF_LABELS, the run's labels, which a later Nemia gives it" };
   const givable = new Set(rules.map((rule) => rule.label));
   const has = repoLabels();
   const lacking = [...givable].filter((label) => !has.has(label));
@@ -458,11 +441,7 @@ const jobIdOf = (entry: Entry): string | undefined => /\/job\/(\d+)/.exec(linkOf
 const BOM = String.fromCharCode(0xfeff);
 
 /** A line of a job's log as GitHub serves it, without the timestamp it prefixes each with and the mark it opens the log with. */
-const unstamped = (line: string): string =>
-  line
-    .replace(/\r$/, '')
-    .replace(BOM, '')
-    .replace(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z ?/, '');
+const unstamped = (line: string): string => line.replace(BOM, '').replace(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z ?|\r$/g, '');
 
 /** A line without the prefix a monorepo's task runner gave it (`pkg:test: `), as Nemia's own check reads one. */
 const bare = (line: string): string => line.replace(/^\S+:\S+: /, '');
@@ -565,26 +544,15 @@ function why(entries: readonly Entry[], check: string): string[] {
 
 /** The options of `open`: the title, the file its body is read from, and the rules it labels by, `--labels ""` giving none. */
 function openArgs(args: string[]): { title: string; bodyFile: string; rules: LabelRule[] } {
-  const opts: Record<string, string> = {};
-  for (let i = 0; i < args.length; i += 2) {
-    const [flag, value] = [args[i], args[i + 1]];
-    const known = flag === '--title' || flag === '--body-file' || flag === '--labels';
-    if (!known || value === undefined || (flag !== '--labels' && !value))
-      throw new Refusal(`\`${flag}\` is not an option of open, or has no value: type the line your step's note gives,\n  ${OPEN_LINE}`);
-    opts[flag] = value;
-  }
-  if (!opts['--title'] || !opts['--body-file'])
+  const opts = new Map<string, string>();
+  for (let i = 0; i < args.length; i += 2) opts.set(args[i] ?? '', args[i + 1] ?? '');
+  const [title, bodyFile, labels] = ['--title', '--body-file', '--labels'].map((flag) => opts.get(flag));
+  if (!title || !bodyFile || labels === undefined || opts.size !== 3 || args.length !== 6)
     throw new Refusal(
-      'open takes the title and the body you wrote, and writes neither itself: ' +
-        'give `--title "<the card\'s line>" --body-file <a file in your files directory>`',
+      "open takes the title and the body you wrote, which it writes neither of, and the rules your step's note gives, " +
+        `\`--labels ""\` where it gives none, each once and nothing else: type the line your note gives,\n  ${OPEN_LINE}`,
     );
-  const labels = opts['--labels'];
-  if (labels === undefined)
-    throw new Refusal(
-      "open labels the pull request it opens by the factory's rules, and was given none: add the `--labels` your step's note " +
-        `gives, \`--labels ""\` where it gives none,\n  ${OPEN_LINE}`,
-    );
-  return { title: opts['--title'], bodyFile: opts['--body-file'], rules: labelRules(['--labels', labels]) };
+  return { title, bodyFile, rules: labelRules(['--labels', labels]) };
 }
 
 /** The branch, the run it names and its leaf, with the remote's default branch, every guard of the act passed. */
@@ -623,19 +591,15 @@ function open(args: string[]): string[] {
   const said = [pushing(branch)];
   const labelling = (pr: () => Pr): string[] => (plan === undefined ? [] : ['note' in plan ? plan.note : relabelled(pr(), plan)]);
   if (standing) {
-    const pr = standing;
-    edited(pr.number, title, bodyFile);
-    return [...said, `#${pr.number} brought up to date with the title and body you wrote`, ...labelling(() => pr), pr.url];
+    edited(standing.number, title, bodyFile);
+    const updated = `#${standing.number} brought up to date with the title and body you wrote`;
+    return [...said, updated, ...labelling(() => standing), standing.url];
   }
-  const url = (
-    gh('pr', 'create', '--base', onto, '--head', branch, '--title', title, '--body-file', bodyFile).split('\n').at(-1) ?? ''
-  ).trim();
+  const printed = gh('pr', 'create', '--base', onto, '--head', branch, '--title', title, '--body-file', bodyFile);
+  const url = printed.split('\n').at(-1)?.trim() ?? '';
   const number = Number(/\/pull\/(\d+)$/.exec(url)?.[1]);
-  const created = (): Pr =>
-    Number.isInteger(number)
-      ? { number, url, isDraft: false, baseRefName: onto, headRefOid: '', labels: [] }
-      : sole(pulls(branch), branch, onto);
-  return [...said, 'opened', ...labelling(created), url];
+  const made: Pr = { number, url, isDraft: false, baseRefName: onto, headRefOid: '', labels: [] };
+  return [...said, 'opened', ...labelling(() => (number > 0 ? made : sole(pulls(branch), branch, onto))), url];
 }
 
 /**

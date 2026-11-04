@@ -2,8 +2,8 @@
  * `tools/release/release.ts` run for real on a scratch repository — a bare origin and a clone of it, with the tags this repository has
  * (`v0.3.0`, `v1-final`, `legacy/v1-final`) and the operator's local `nemia-2026.11.03` — and a stub `gh` first on PATH that logs each
  * call and answers GitHub's part from a state file: the merged pull requests (more than one page of them), the open ones, one pull
- * request by its number, the generated notes, and a workflow's dispatched runs on a head, which a dispatch it records adds to. What it asserts is the exit code, the calls made and positions in a body, never a
- * sentence.
+ * request by its number, the generated notes, and a workflow's dispatched runs on a head, which a dispatch it records adds to. What it
+ * asserts is the exit code, the calls made and positions in a body, never a sentence.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -39,8 +39,8 @@ type State = {
 
 /**
  * The stub `gh`: logs its argv as one JSON line to `STUB_LOG`, reads and writes `STUB_STATE`, and answers as GitHub would the calls
- * the tool makes; a call it has no answer for exits 9. A dispatch records a queued run on the origin's \`release\` head as it is then, and a
- * pull request opened takes that head too.
+ * the tool makes; a call it has no answer for exits 9. A dispatch records a queued run on the origin's \`release\` head as it is
+ * then, and a pull request opened takes that head too.
  */
 const STUB = `
 const fs = require('node:fs');
@@ -261,7 +261,8 @@ test('pr rebuilds release from main at 1.0.0, opens its pull request labelled in
   assert.ok(notes[0].args.includes('tag_name=v1.0.0'));
   const body = named(ran.calls, 'pr', 'create')[0].stdin ?? '';
   assert.ok(body.includes('#3'), 'the unlabelled pull request is listed apart in the body');
-  for (const { check } of DISPATCHED) assert.ok(at(body, `\`${check}\``) < at(body, '## Fixes'), `the body names ${check} ahead of the notes`);
+  for (const { check } of DISPATCHED)
+    assert.ok(at(body, `\`${check}\``) < at(body, '## Fixes'), `the body names ${check} ahead of the notes`);
   assert.deepEqual(dispatched(ran.calls), BOTH(900), 'ci and release-label are dispatched on release, the label check given #900');
   const label = ran.calls.findIndex((call) => call.args.includes('repos/{owner}/{repo}/issues/900/labels'));
   const labelCheck = ran.calls.findIndex((call) => call.args[0] === 'workflow' && call.args[2] === 'release-label.yml');
@@ -269,7 +270,9 @@ test('pr rebuilds release from main at 1.0.0, opens its pull request labelled in
   const head = w.git(w.origin, 'rev-parse', 'refs/heads/release');
   assert.deepEqual(
     runReads(ran.calls).map((call) => call.args[3]),
-    DISPATCHED.map(({ file }) => `repos/{owner}/{repo}/actions/workflows/${file}/runs?head_sha=${head}&event=workflow_dispatch&per_page=100`),
+    DISPATCHED.map(
+      ({ file }) => `repos/{owner}/{repo}/actions/workflows/${file}/runs?head_sha=${head}&event=workflow_dispatch&per_page=100`,
+    ),
     "each workflow's dispatched runs are read on the head",
   );
   assert.deepEqual(
@@ -308,7 +311,10 @@ test('a second pr with nothing moved pushes, patches and dispatches nothing; wit
   for (const { check } of DISPATCHED) assert.ok(at(body, `\`${check}\``) < at(body, '## Fixes'), `the new body names ${check} first`);
   assert.deepEqual(dispatched(moved.calls), BOTH(900), 'each is dispatched once on the new head');
   assert.deepEqual(
-    w.read().runs?.filter((run) => run.head === second).map((run) => run.file),
+    w
+      .read()
+      .runs?.filter((run) => run.head === second)
+      .map((run) => run.file),
     DISPATCHED.map(({ file }) => file),
   );
 });

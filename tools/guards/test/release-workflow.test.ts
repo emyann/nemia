@@ -5,9 +5,10 @@
  * `release-label` check; `.github/release.yml` groups the notes by label. Nothing here can run them: their first real verdict is on
  * GitHub. What drifts is held instead — a job granted a write it does not make, a job outside the concurrency that keeps two runs from
  * writing the release branch at once, a check that takes the labels into its command line, a label check that cannot be dispatched
- * with the pull request's number or that does not say the commit it checks, a category for a label the tool no longer has — each a pure function returning a sentence that names the fix, run once on the shipped files and broken once per clause on a
- * planted copy. The clauses every workflow of the repository keeps (GitHub's own actions, a bound on every job and network step, no
- * trigger that hands a fork a writable token) are `ci-workflow.ts`'s, the ones `ci-workflow.test.ts` holds `ci.yml` to.
+ * with the pull request's number or that does not say the commit it checks, a category for a label the tool no longer has — each a
+ * pure function returning a sentence that names the fix, run once on the shipped files and broken once per clause on a planted copy.
+ * The clauses every workflow of the repository keeps (GitHub's own actions, a bound on every job and network step, no trigger that
+ * hands a fork a writable token) are `ci-workflow.ts`'s, the ones `ci-workflow.test.ts` holds `ci.yml` to.
  *
  * The files are under `.github/`, among the `guards#test` task's inputs in `turbo.json`, so an edit to one makes this suite due.
  */
@@ -31,11 +32,13 @@ const parse = (source: string): Workflow => yaml.load(source) as Workflow;
 /** The command every job of the release runs, followed by its verb. */
 const TOOL = 'node tools/release/release.ts';
 
-/** What each job of the release is: the verb it runs, the jobs it waits for, its token's grants, and its concurrency. */
+/**
+ * What each job of the release is: the verb it runs, the jobs it waits for, its token's grants, and its concurrency. `pr`'s
+ * `actions: write` is the dispatch of `DISPATCHED` (`release.ts`) on the release head.
+ */
 const JOBS: Record<string, { needs: string[]; permissions: Record<string, string>; group: string; cancel: boolean }> = {
   labels: { needs: [], permissions: { contents: 'read', issues: 'write' }, group: 'release', cancel: false },
   tag: { needs: ['labels'], permissions: { contents: 'write' }, group: 'release', cancel: false },
-  // actions: write is the dispatch of ci.yml and release-label.yml on the release head (DISPATCHED in release.ts).
   pr: { needs: ['tag'], permissions: { actions: 'write', contents: 'write', 'pull-requests': 'write' }, group: 'release', cancel: false },
 };
 
@@ -127,7 +130,9 @@ function labelDrift(workflow: Workflow): string[] {
         `the ${CHECK_JOB} job in ${LABEL_CHECK} does not run ${TOOL} check with env PR_NUMBER and GH_TOKEN and no LABELS: ` +
           'pass those, so a run reads the labels the pull request has then, not its payload',
       );
-    else if (!checks.every((step) => step.env?.PR_NUMBER.includes('github.event.pull_request.number') && step.env.PR_NUMBER.includes('inputs.pr')))
+    else if (
+      !checks.every((step) => step.env?.PR_NUMBER.includes('github.event.pull_request.number') && step.env.PR_NUMBER.includes('inputs.pr'))
+    )
       sentences.push(
         `the ${CHECK_JOB} job's PR_NUMBER in ${LABEL_CHECK} does not read both github.event.pull_request.number and inputs.pr: ` +
           'write ${{ github.event.pull_request.number || inputs.pr }}, so a dispatched run names its pull request',
@@ -223,7 +228,11 @@ test('REFUSED: a missing release-label job, the check not dispatchable with its 
   );
   refused(all(planted(LABEL_CHECK, '        required: true\n', '        required: false\n')), 'input pr', 'the pr input not required');
   refused(all(planted(LABEL_CHECK, ' || inputs.pr }}', ' }}')), 'inputs.pr', 'a dispatched run given no number');
-  refused(all(planted(LABEL_CHECK, /^ {10}HEAD_SHA:.*\n/m.exec(text(LABEL_CHECK))?.[0] ?? 'HEAD_SHA', '')), 'HEAD_SHA', 'no head to compare');
+  refused(
+    all(planted(LABEL_CHECK, /^ {10}HEAD_SHA:.*\n/m.exec(text(LABEL_CHECK))?.[0] ?? 'HEAD_SHA', '')),
+    'HEAD_SHA',
+    'no head to compare',
+  );
   refused(
     all(
       planted(

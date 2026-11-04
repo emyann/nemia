@@ -163,35 +163,41 @@ const addCommand = (number: string | undefined): string =>
   `gh api -X POST repos/{owner}/{repo}/issues/${number ?? '<number>'}/labels -f 'labels[]=<label>'`;
 
 /**
- * `check`: exactly one release label. The labels are read live by `PR_NUMBER`, so a run that starts after the pull request was
- * labelled reads the label it has then, never the payload of the event that started it. A dispatched run passes `HEAD_SHA`, the commit
- * it reports on, and the pull request's head must be that commit: a dispatch elsewhere cannot borrow a labelled pull request's number.
+ * The labels `check` judges: `LABELS` parsed where it is set, else the pull request numbered `PR_NUMBER` as it is now. A dispatched run
+ * passes `HEAD_SHA`, the commit it reports on, and the pull request's head must be that commit: a dispatch elsewhere cannot borrow a
+ * labelled pull request's number.
  */
-const check = (env: Env, out: Out, r: Reach): number => {
-  let labels: unknown;
+const labelsToCheck = (env: Env, r: Reach): unknown => {
   const number = env.PR_NUMBER;
   const head = env.HEAD_SHA ?? '';
-  if (env.LABELS !== undefined && head !== '')
-    throw new Refusal('release-label: HEAD_SHA is compared with the live pull request: unset LABELS, and pass PR_NUMBER');
   if (env.LABELS !== undefined) {
+    if (head !== '') throw new Refusal('release-label: HEAD_SHA is compared with the live pull request: unset LABELS, and pass PR_NUMBER');
     try {
-      labels = JSON.parse(env.LABELS);
+      return JSON.parse(env.LABELS);
     } catch {
-      labels = undefined;
+      return undefined;
     }
-  } else {
-    if (!number || !/^\d+$/.test(number))
-      throw new Refusal(
-        'release-label: set PR_NUMBER to the pull request number (github.event.pull_request.number), or LABELS to its labels as a JSON array',
-      );
-    const pull = r.api<Pull>('GET', `repos/{owner}/{repo}/pulls/${number}`);
-    if (head !== '' && pull.head?.sha !== head)
-      throw new Refusal(
-        `release-label: pull request #${number}'s head is ${pull.head?.sha ?? 'unknown'}, not ${head}, the commit this run checks. ` +
-          `Check its head with gh workflow run release-label.yml --ref ${pull.head?.ref ?? '<its head branch>'} -f pr=${number}`,
-      );
-    labels = pull.labels.map((label) => label.name);
   }
+  if (!number || !/^\d+$/.test(number))
+    throw new Refusal(
+      'release-label: set PR_NUMBER to the pull request number (github.event.pull_request.number), or LABELS to its labels as a JSON array',
+    );
+  const pull = r.api<Pull>('GET', `repos/{owner}/{repo}/pulls/${number}`);
+  if (head !== '' && pull.head?.sha !== head)
+    throw new Refusal(
+      `release-label: pull request #${number}'s head is ${pull.head?.sha ?? 'unknown'}, not ${head}, the commit this run checks. ` +
+        `Check its head with gh workflow run release-label.yml --ref ${pull.head?.ref ?? '<its head branch>'} -f pr=${number}`,
+    );
+  return pull.labels.map((label) => label.name);
+};
+
+/**
+ * `check`: exactly one release label. The labels are read live by `PR_NUMBER`, so a run that starts after the pull request was
+ * labelled reads the label it has then, never the payload of the event that started it.
+ */
+const check = (env: Env, out: Out, r: Reach): number => {
+  const number = env.PR_NUMBER;
+  const labels = labelsToCheck(env, r);
   if (!Array.isArray(labels) || labels.some((label) => typeof label !== 'string'))
     throw new Refusal('release-label: LABELS is no JSON array of names: unset it, and pass PR_NUMBER so the labels are read live');
   const given = releaseLabels(labels as string[]);

@@ -4,9 +4,11 @@
  * `status.ts` reads a step's codes into its state, `runWords.ts` and `stepCard.ts` compose; each reads its words from here. No word here is
  * the runtime's: a person hovering over a chip reads what the state means to them, never how it is kept.
  */
+import type { CardState } from './api/inbox.ts';
 import type { RunOutcome } from './api/runs.ts';
 import type { CheckVerdict, WaitOn } from './api/reasons.ts';
 import type { OfferCase } from './asks.ts';
+import type { Hue } from './meaning.ts';
 import type { StepState } from './status.ts';
 
 /** A wait on a person, as its words read it: the step that waits, none for a wait of the run's own, and how many steps are done. */
@@ -204,6 +206,24 @@ export const ENDED: Record<RunOutcome, { word: string; title: string }> = {
   cancelled: { word: 'called off', title: 'Somebody called it off.' },
   failed: { word: 'failed', title: 'It stopped on a step that failed.' },
   undecided: { word: 'undecided', title: 'Nobody has decided its result.' },
+};
+
+/**
+ * A person's word for each state of an inbox card (`CardState`), its whole sentence on hover, and the hue its chip is drawn in: the card's
+ * own three until it starts, and its run's phase from then on, said as the runs pages say it — `waits on you` for a run waiting on a
+ * person, and `called off`, never `cancelled`, for one called off (`ENDED`).
+ */
+export const CARD_WORDS: Record<CardState, { word: string; title: string; hue: Hue }> = {
+  filed: { word: 'filed', title: 'Filed, and not started: Start it, or queue it to start on its own.', hue: 'grey' },
+  queued: { word: 'queued', title: 'Queued: it starts on its own when a run slot is free.', hue: 'grey' },
+  refused: { word: 'refused', title: 'Queued, and its start was refused: edit the card, or take it off the queue.', hue: 'failure' },
+  pending: { word: 'waiting its turn', title: 'Its run is started and waits its turn: nothing of it is at work yet.', hue: 'grey' },
+  running: { word: 'at work', title: 'Its run is at work.', hue: 'alive' },
+  waiting: { word: 'waits on you', title: 'Its run waits on you: open it to see what it asks.', hue: 'yours' },
+  succeeded: { word: ENDED.succeeded.word, title: `Its run is done. ${ENDED.succeeded.title}`, hue: 'sage' },
+  failed: { word: ENDED.failed.word, title: `Its run failed. ${ENDED.failed.title}`, hue: 'failure' },
+  stopped: { word: 'stopped', title: 'Its run was stopped before it ended.', hue: 'grey' },
+  cancelled: { word: ENDED.cancelled.word, title: `Its run was called off. ${ENDED.cancelled.title}`, hue: 'grey' },
 };
 
 /** A sentence a try is given in its box, the same for each case that asks for one: something to tell it, if anything. */

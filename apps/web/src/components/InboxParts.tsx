@@ -1,10 +1,15 @@
-/** The parts of an inbox card the Inbox page draws: its line under the title, its page's link, a card gone, a tick's try and a refusal. */
+/**
+ * The parts of an inbox card the Inbox page draws: its line under the title, its page's link, its state's chip and the runs it was started
+ * as, a card gone, a tick's try and a refusal.
+ */
 import { LabelTags } from './Labels';
 import type { ReactNode } from 'react';
 import { Link } from '@tanstack/react-router';
-import { workflowNameOf, type InboxEntry } from '../lib/api';
+import { workflowNameOf, type CardState, type InboxEntry } from '../lib/api';
 import { hasPage, queueable, queueNeedsFactory, triedLine, unassigned, type CardRefusal } from '../lib/inbox';
 import { instantWords } from '../lib/instant';
+import { container } from '../lib/meaning';
+import { CARD_WORDS } from '../lib/words';
 import { useNow } from '../lib/useNow';
 import { FactoryTag } from './FactoryTag';
 import { Instant } from './Instant';
@@ -105,6 +110,48 @@ export function PageLink({ entry, entries, children }: { entry: InboxEntry; entr
     >
       {children}
     </Link>
+  );
+}
+
+/**
+ * A card's state as a chip: its word (`CARD_WORDS`), drawn in its hue's tonal form, and its sentence on hover. `data-card-state` is the
+ * state the chip was drawn for, so a check reads it without reading a colour.
+ */
+export function CardStateChip({ state }: { state: CardState }) {
+  const { word, title, hue } = CARD_WORDS[state];
+  return (
+    <span
+      data-card-state={state}
+      title={title}
+      className={`inline-flex items-center whitespace-nowrap rounded px-1.5 py-0.5 font-mono text-body-small leading-none ${container[hue]}`}
+    >
+      {word}
+    </span>
+  );
+}
+
+/**
+ * The runs a card was started as, each linked to its page, then the chip of its state (`CardStateChip`) — its run's phase — where it has
+ * one: none while a start made from the page waits for the inbox to say so. In rest itself, a started card being no fault; what it is
+ * worth to a person is its chip's. `after` is said after the runs, on the Inbox page what Remove does to it.
+ */
+export function StartedAs({ startedAs, state, after }: { startedAs: readonly string[]; state: CardState | null; after?: ReactNode }) {
+  return (
+    <p data-started-as className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-body-medium text-muted-foreground">
+      <span>
+        Started as{' '}
+        {startedAs.map((id, i) => (
+          <span key={id}>
+            {i > 0 && ', '}
+            <Link to="/runs/$runId" params={{ runId: id }} className="font-mono underline underline-offset-2">
+              {id}
+            </Link>
+          </span>
+        ))}
+      </span>{' '}
+      {state !== null && <CardStateChip state={state} />}
+      {after !== undefined && <span>{after}</span>}
+    </p>
   );
 }
 

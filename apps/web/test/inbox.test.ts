@@ -6,18 +6,37 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { UnreadAnswer, WriteRefusal } from '../src/lib/api/read.ts';
-import { dropCard, fileCard, queueCard, startRun, type Factory, type InboxEntry, type WorkflowListing } from '../src/lib/api.ts';
+import { CARD_WORDS } from '../src/lib/words.ts';
+import {
+  CARD_STATES,
+  cardQuery,
+  dropCard,
+  fileCard,
+  inboxAllQuery,
+  inboxQuery,
+  queueCard,
+  startRun,
+  type CardState,
+  type Factory,
+  type InboxEntry,
+  type WorkflowListing,
+} from '../src/lib/api.ts';
 import {
   afterFor,
   capLine,
+  CARD_KIND,
   cardFiling,
   cardLines,
   cardPlace,
+  cardsEnded,
+  cardsInPlay,
+  cardsSearch,
   factoriesOffered,
   factoryPreset,
   hasPage,
   ignoredRepoNote,
   inboxBadgeTitle,
+  inPlay,
   namedElsewhere,
   newestCardsFirst,
   notStarted,
@@ -27,6 +46,7 @@ import {
   queueNeedsFactory,
   queuedWord,
   queueOf,
+  startedCard,
   startPlace,
   triedLine,
   triedShown,
@@ -124,7 +144,7 @@ test('newestCardsFirst, hasPage, namedElsewhere: the cards in order, a refusal o
       const newest = entry('newest-c3d4', '2026-09-16T09:00:00.000Z');
       const middle = entry('dropped-k2q9', '2026-09-15T12:00:00.000Z');
       const oldest = entry('oldest-a1b2', '2026-09-15T10:00:00.000Z');
-      const kept = entry('started-e5f6', '2026-09-14T10:00:00.000Z', { startedAs: ['started-run-e5f6'], state: 'started' });
+      const kept = entry('started-e5f6', '2026-09-14T10:00:00.000Z', { startedAs: ['started-run-e5f6'], state: 'running' });
       const refusals: CardRefusal[] = [
         { entry: middle, action: 'start', message: 'no card dropped-k2q9 in the inbox.' },
         { entry: oldest, action: 'remove', message: 'no card oldest-a1b2 in the inbox.' },
@@ -515,7 +535,7 @@ test('ordinal, queueOf, queueable, triedLine, capLine: the queue as the page and
         entry('a-third', at, { workflow: 'dev', state: 'queued', queued: { at, place: 3 } }),
         entry('b-parked', at, { workflow: 'dev' }),
         entry('c-first', at, { workflow: 'dev', state: 'queued', queued: { at, place: 1 } }),
-        entry('d-started', at, { workflow: 'dev', state: 'started', queued: { at, place: null }, startedAs: ['r-1'] }),
+        entry('d-started', at, { workflow: 'dev', state: 'running', queued: { at, place: null }, startedAs: ['r-1'] }),
         entry('e-refused', at, {
           workflow: 'gone',
           state: 'refused',
@@ -536,7 +556,8 @@ test('ordinal, queueOf, queueable, triedLine, capLine: the queue as the page and
     assert.equal(triedShown(entry('refused', at, { state: 'refused', queued: { at, place: 1 }, tried })), true);
     assert.equal(triedShown(entry('failed', at, { state: 'queued', queued: { at, place: 1 }, tried: { ...tried, refused: false } })), true);
     assert.equal(triedShown(entry('queued', at, { state: 'queued', queued: { at, place: 1 } })), false, 'no try');
-    assert.equal(triedShown(entry('started', at, { state: 'started', startedAs: ['r-1'], queued: { at, place: null }, tried })), false);
+    for (const state of ['pending', 'running', 'waiting', 'succeeded', 'failed', 'stopped', 'cancelled'] as const)
+      assert.equal(triedShown(entry('started', at, { state, startedAs: ['r-1'], queued: { at, place: null }, tried })), false, state);
   });
   await t.test('Queue is offered on a card that names a factory and a workflow, reads, is not queued and was not started', () => {
     assert.equal(queueable(entry('named', null, { factory: 'solo', workflow: 'dev' })), true);
@@ -561,7 +582,8 @@ test('ordinal, queueOf, queueable, triedLine, capLine: the queue as the page and
           false,
           'queued: Unqueue',
         );
-        assert.equal(queueNeedsFactory(loose('started', { workflow: 'dev', state: 'started', startedAs: ['r-1'] })), false, 'started');
+        assert.equal(queueNeedsFactory(loose('started', { workflow: 'dev', state: 'running', startedAs: ['r-1'] })), false, 'started');
+        assert.equal(queueNeedsFactory(loose('ended', { workflow: 'dev', state: 'succeeded', startedAs: ['r-1'] })), false, 'ended');
         assert.equal(queueNeedsFactory(loose('broken', { workflow: 'dev', error: 'broken.md: not a card.' })), false, 'unread');
       }
     },
@@ -573,8 +595,10 @@ test('ordinal, queueOf, queueable, triedLine, capLine: the queue as the page and
       const solo = (name: string, extra: Partial<InboxEntry> = {}) => entry(name, null, { factory: 'solo', ...extra });
       assert.equal(queueable(solo('bare')), false, 'no workflow');
       assert.equal(queueable(solo('queued', { workflow: 'dev', state: 'queued', queued: { at, place: 1 } })), false, 'queued already');
-      assert.equal(queueable(solo('started', { workflow: 'dev', state: 'started', startedAs: ['r-1'] })), false, 'started');
-      assert.equal(queueable(solo('started', { workflow: 'dev', state: 'started' })), false, 'started, read off its state alone');
+      for (const state of ['pending', 'running', 'waiting', 'succeeded', 'failed', 'stopped', 'cancelled'] as const) {
+        assert.equal(queueable(solo('started', { workflow: 'dev', state, startedAs: ['r-1'] })), false, `started, its run ${state}`);
+        assert.equal(queueable(solo('started', { workflow: 'dev', state })), false, `started, its run ${state}, read off its state alone`);
+      }
       assert.equal(queueable(solo('refused', { workflow: 'dev', state: 'refused' })), false, 'refused, read off its state alone');
       assert.equal(
         queueable(solo('broken', { workflow: 'dev', error: 'broken.md: `after` is not a key an inbox card has.' })),
@@ -725,19 +749,61 @@ test("cardPlace, cardFiling, factoriesOffered, notStarted: a card's factory and 
       const cards = [
         entry('waits-a1', null, { factory: 'nemia' }),
         entry('queued-b2', null, { factory: 'nemia', state: 'queued', queued: { at: '2026-10-01T00:00:00.000Z', place: 1 } }),
-        entry('started-c3', null, { factory: 'nemia', state: 'started', startedAs: ['r-1'] }),
-        entry('started-g7', null, { factory: 'nemia', state: 'started' }),
+        ...(['pending', 'running', 'waiting', 'succeeded', 'failed', 'stopped', 'cancelled'] as const).map((state) =>
+          entry(`started-${state}`, null, { factory: 'nemia', state, startedAs: ['r-1'] }),
+        ),
+        entry('started-g7', null, { factory: 'nemia', state: 'waiting' }),
+        entry('refused-h8', null, { factory: 'nemia', state: 'refused', queued: { at: '2026-10-01T00:00:00.000Z', place: 2 } }),
         entry('broken-d4', null, { factory: 'nemia', error: 'the card has no front matter' }),
         entry('hiring-e5', null, { factory: 'hiring' }),
         entry('default-f6', null),
       ];
       const names = (picked: string | undefined) => notStarted(cards, picked).map((card) => card.name);
-      assert.deepEqual(names('nemia'), ['waits-a1', 'queued-b2']);
-      assert.deepEqual(names(undefined), ['waits-a1', 'queued-b2', 'hiring-e5', 'default-f6'], 'every factory under All factories');
+      assert.deepEqual(names('nemia'), ['waits-a1', 'queued-b2', 'refused-h8'], 'never a card at any run phase, in flight or ended');
+      assert.deepEqual(
+        names(undefined),
+        ['waits-a1', 'queued-b2', 'refused-h8', 'hiring-e5', 'default-f6'],
+        'every factory under All factories',
+      );
       assert.deepEqual(names('default'), ['default-f6'], "a card naming no factory is the default factory's");
       assert.equal(names('quay').length, 0);
     },
   );
+  await t.test('every card state has its kind: its own three unstarted, a run in flight, a run ended — the in play the api lists', () => {
+    const kinds: Record<CardState, 'unstarted' | 'in flight' | 'ended'> = {
+      filed: 'unstarted',
+      queued: 'unstarted',
+      refused: 'unstarted',
+      pending: 'in flight',
+      running: 'in flight',
+      waiting: 'in flight',
+      succeeded: 'ended',
+      failed: 'ended',
+      stopped: 'ended',
+      cancelled: 'ended',
+    };
+    assert.deepEqual(Object.keys(CARD_KIND).sort(), [...CARD_STATES].sort(), 'one row for every state the api sends');
+    for (const state of CARD_STATES) {
+      assert.equal(CARD_KIND[state], kinds[state], state);
+      assert.equal(startedCard({ state }), kinds[state] !== 'unstarted', `${state}: started`);
+      assert.equal(inPlay({ state }), kinds[state] !== 'ended', `${state}: in play`);
+    }
+  });
+  await t.test('REFUSED: the cards in play and the ended ones split the list, each in its order, none in both and none left out', () => {
+    const cards = CARD_STATES.map((state, i) => entry(`card-${state}`, `2026-10-0${(i % 9) + 1}T00:00:00.000Z`, { state }));
+    const playing = cardsInPlay(cards).map((card) => card.state);
+    const ended = cardsEnded(cards).map((card) => card.state);
+    assert.deepEqual(playing, ['filed', 'queued', 'refused', 'pending', 'running', 'waiting']);
+    assert.deepEqual(ended, ['succeeded', 'failed', 'stopped', 'cancelled']);
+    const broken = entry('broken', null, { error: 'broken.md: not a card.' });
+    assert.deepEqual(cardsInPlay([broken]), [broken], 'an entry that does not read is filed, so in play');
+  });
+  await t.test("the Inbox page's ?cards= keeps ended alone; any other value, or none, is in play", () => {
+    assert.deepEqual(cardsSearch({ cards: 'ended' }), { cards: 'ended' });
+    assert.deepEqual(cardsSearch({}), {});
+    assert.deepEqual(cardsSearch({ cards: 'in play' }), {});
+    assert.deepEqual(cardsSearch({ cards: ['ended'] }), {});
+  });
   await t.test("the Inbox badge's title says what it counts whole: in the factory picked, or in every factory", () => {
     assert.equal(inboxBadgeTitle(3, undefined), '3 cards not yet started, in every factory');
     assert.equal(inboxBadgeTitle(1, 'nemia'), '1 card not yet started, in nemia');
@@ -836,4 +902,30 @@ test("cardPlace, cardFiling, factoriesOffered, notStarted: a card's factory and 
       });
     },
   );
+  await t.test(
+    'every card is read with ?all=true, composed with a selector, under a key of its own beneath the inbox that no card page has',
+    async (t) => {
+      const sent = sending(t, () => answered(200, [entry('ended', null, { state: 'cancelled', startedAs: ['r-1'] })]));
+      const all = inboxAllQuery(undefined);
+      const read = (await (all.queryFn as unknown as () => Promise<InboxEntry[]>)()).map((card) => card.state);
+      assert.deepEqual(read, ['cancelled'], 'a card whose run ended decodes');
+      await (inboxAllQuery('team=core').queryFn as unknown as () => Promise<InboxEntry[]>)();
+      assert.deepEqual(
+        sent.map((r) => r.url),
+        ['/api/inbox?all=true', '/api/inbox?all=true&selector=team%3Dcore'],
+      );
+      assert.equal(all.queryKey[0], inboxQuery.queryKey[0], "under ['inbox'], so every write and the feed read it again");
+      assert.notDeepEqual(all.queryKey, cardQuery('all').queryKey, 'a card named all keeps its page');
+    },
+  );
+  await t.test("each card state has a person's word, its sentence and a hue: a run called off is never said cancelled", () => {
+    for (const state of CARD_STATES) {
+      assert.ok(CARD_WORDS[state].word.trim() !== '', state);
+      assert.ok(CARD_WORDS[state].title.trim() !== '', state);
+    }
+    assert.equal(CARD_WORDS.cancelled.word, 'called off');
+    assert.equal(CARD_WORDS.waiting.hue, 'yours', 'a run waiting on a person is yours');
+    assert.equal(CARD_WORDS.running.hue, 'alive');
+    assert.equal(CARD_WORDS.failed.hue, 'failure');
+  });
 });

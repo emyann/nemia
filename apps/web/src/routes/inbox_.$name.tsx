@@ -2,9 +2,11 @@ import { useQueryClient, useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { AsWritten, KeyTable } from '../components/FilePage';
 import { Instant } from '../components/Instant';
+import { StartedAs } from '../components/InboxParts';
 import { Markdown } from '../components/Markdown';
 import { Labels } from '../components/Labels';
 import { cardQuery, labelCard, workflowNameOf } from '../lib/api';
+import { startedCard } from '../lib/inbox';
 
 /** The page of an inbox card, at /inbox/$name: `inbox_` draws it on its own, not inside the Inbox page, which has no outlet for it. */
 export const Route = createFileRoute('/inbox_/$name')({
@@ -20,7 +22,8 @@ export const Route = createFileRoute('/inbox_/$name')({
 
 /**
  * One inbox card, to read: its body rendered, then each key a card may set with its value and what it means — or, with Source, its file as
- * written. It starts and drops nothing: the Inbox page does. It ends on room as tall as Nemia's dock at the bottom right (her face and its
+ * written. A started card says the runs it was started as, beside its run's phase (`StartedAs`), whether that run is in flight or ended.
+ * It starts and drops nothing: the Inbox page does. It ends on room as tall as Nemia's dock at the bottom right (her face and its
  * cues), so the dock covers none of its last key row once it is scrolled to its end.
  */
 function CardPage() {
@@ -56,20 +59,7 @@ function CardPage() {
         />
       )}
 
-      {card.state === 'started' && (
-        <p data-started-as className="text-body-medium text-muted-foreground">
-          Started as{' '}
-          {card.startedAs.map((id, i) => (
-            <span key={id}>
-              {i > 0 && ', '}
-              <Link to="/runs/$runId" params={{ runId: id }} className="font-mono underline underline-offset-2">
-                {id}
-              </Link>
-            </span>
-          ))}
-          .
-        </p>
-      )}
+      {startedCard(card) && <StartedAs startedAs={card.startedAs} state={card.state} />}
 
       {card.error !== null && (
         <div className="space-y-1 rounded border border-failure bg-failure-container px-3 py-2">

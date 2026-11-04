@@ -231,12 +231,13 @@ rm "$S"/node_modules; git worktree remove "$S"
      before it merges.
   2. The `release` workflow keeps one pull request open, `release: v<x.y.z>` from branch `release`, whenever a pull request with a
      label other than `internal` has merged since the last `v<x.y.z>` tag. The bump is the highest of their labels; the first release
-     is `v1.0.0`. Its body is GitHub's notes, grouped by label, and lists the unlabelled pull requests apart. The workflow rebuilds it
-     when main moves, and dispatches `ci` and `release-label` on it. After relabelling a merged pull request, run
-     `gh workflow run release.yml` to rebuild it.
-  3. Read its `proof` job. Green means the dispatched `ci` counts for main's protection. Red means press "Approve workflows to run" in
-     the pull request's merge box, which runs the waiting `pull_request` `ci` that counts. Otherwise leave those waiting runs alone.
-  4. Merge it, with the owner. The merge sets the root `package.json` version on main, and the `release` workflow's `tag` job tags
+     is `v1.0.0`. Its body opens with what to do, then GitHub's notes, grouped by label, and lists the unlabelled pull requests apart.
+     The workflow rebuilds it when main moves. After relabelling a merged pull request, run `gh workflow run release.yml` to rebuild
+     it.
+  3. Press "Approve workflows to run" in the release pull request's merge box. That starts its `ci` and `release-label`, the checks
+     main requires, which wait because the workflow's own token pushed `release`; a rebuild after main moves asks for the click again.
+     Leave other waiting runs alone.
+  4. Merge it, with the owner, once both are green. The merge sets the root `package.json` version on main, and the `release` workflow's `tag` job tags
      `v<x.y.z>` on that commit and makes the GitHub release with the same notes.
   5. **Once, after the change that made this lands**, in this order: `nemia upgrade`, so the checks pass `WF_LABELS`; move the factory
      onto sdlc 2.1.0 with `pullRequestLabels="work=feature:feature work=fix:fix work=docs:docs work=cleanup:internal

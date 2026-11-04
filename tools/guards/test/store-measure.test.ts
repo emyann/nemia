@@ -2,7 +2,7 @@
  * The store's measure (`tools/store-measure/`): what it refuses to be called with, the copy it measures on — never the store itself,
  * never a destination inside it, and without the checkouts — the place that answers its reads and refuses every write, the fence that
  * makes it refuse itself where a read spawns anything but a read of git or writes outside its copy, and the report it writes on an
- * empty store: every measure's key, with no run counted.
+ * empty store: every measure's key, with no run and no card counted.
  *
  * The usage refusals, the refused destination and the empty store's report spawn `report.ts` in a child of its own, under a timeout;
  * the rest are its functions, called here.
@@ -179,11 +179,12 @@ test('on an empty store the report counts no run and holds every measure, the ma
   assert.equal(written.counts.runs, 0);
   assert.equal(written.counts.tasks, 0);
   assert.equal(written.counts.invariantRefusals, 0);
+  assert.deepEqual(written.counts.cards, { listed: 0, started: 0 }, 'no card in the inbox, and none started');
   assert.deepEqual(Object.keys(written.measures).sort(), [...MEASURES].sort());
   for (const key of ['cpu', 'cores', 'memoryBytes', 'node', 'load']) assert.ok(key in written.machine, key);
   assert.match(written.commit, /^[0-9a-f]{40}$/);
   assert.ok(Number.isFinite(Date.parse(written.date)));
-  for (const key of ['tickPass', 'tickPassInformed', 'runList', 'stats', 'runListAfterPass'] as const) {
+  for (const key of ['tickPass', 'tickPassInformed', 'runList', 'stats', 'runListAfterPass', 'inbox', 'inboxAfterPass'] as const) {
     const measured = written.measures[key];
     assert.ok(measured !== null && Number.isFinite(measured.cold.ms) && Number.isFinite(measured.warm.ms), key);
   }

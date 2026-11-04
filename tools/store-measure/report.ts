@@ -5,7 +5,7 @@
  * It copies the workflows' store (`--from`, `WF_ROOT` or `~/.agent-workflows`, its runtime's journals under `engine/` with it) and the
  * runtime's own (`--engine`, `AE_ROOT` or `~/.agent-engine`) into a fresh temp folder, leaving out what no read opens and what would tie
  * the copy to the live machine (`LEFT_OUT` in `fence.ts`), and refusing a temp folder inside either store; points `WF_ROOT` and `AE_ROOT`
- * at the copy before the orchestrator loads (it pins its root as it loads); and times seven reads there, each cold — the first call over
+ * at the copy before the orchestrator loads (it pins its root as it loads); and times nine reads there, each cold — the first call over
  * memos that hold nothing — and warm — called again with what the memos kept — as the median over `--repeat` calls and the heap each
  * left held after a collection:
  *
@@ -30,12 +30,16 @@
  *   the tick has filled the app's informer (`Informer`, given by `liveOf`), as the daemon's pass fills it: the pass is not timed, the read
  *   is. Cold over an app built afresh and one pass for each call; warm, called again within the same pass, which serves even a moving
  *   run's judgement.
+ * - `inbox`, `inboxAfterPass`: `GET /api/inbox?all=true`, every card, over an app built afresh for each cold call and kept for the warm
+ *   ones, and the same asked after a pass has filled the app's informer, as `runListAfterPass` is. The route ignores a query it does not
+ *   read, so before `all` is one it lists every card all the same, and a `--compare` sets the same request side by side.
  *
- * Beside the numbers: the runs, finished and open, the runtime's tasks and their journals' bytes, the runs whose tasks did not read
- * and the pass's unreadable lines, and `invariantRefusals`, the records the Run model refuses. A markdown table on stdout; with
- * `--json`, the report as JSON with the machine, the commit and the date; with `--compare`, each number beside the baseline's and
- * their ratio. It refuses itself, exit 1 and no JSON, where the fence refused anything; exit 2 for a call it cannot run. The copy is
- * removed at the end. No threshold is fixed: the numbers are the owner's to judge.
+ * Beside the numbers: the runs, finished and open, the inbox's cards and those a run was started from, the runtime's tasks and their
+ * journals' bytes, the runs whose tasks did not read and the pass's unreadable lines, and `invariantRefusals`, the records the Run model
+ * refuses. A markdown table on stdout; with `--json`, the report as JSON with the machine, the commit and the date; with `--compare`,
+ * each number beside the baseline's and their ratio, a read or a count the baseline lacks shown as `—`. It refuses itself, exit 1 and no
+ * JSON, where the fence refused anything; exit 2 for a call it cannot run. The copy is removed at the end. No threshold is fixed: the
+ * numbers are the owner's to judge.
  */
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -54,7 +58,7 @@ import {
   type Refusal,
 } from './fence.ts';
 
-/** The five reads, the run's object counted twice, and the list and an open run read again after a pass: each a key of `measures`. */
+/** The six reads, the run's object counted twice, and the list, an open run and the inbox read again after a pass: `measures`' keys. */
 export const MEASURES = [
   'tickPass',
   'tickPassInformed',
@@ -65,6 +69,8 @@ export const MEASURES = [
   'feedFromCursor',
   'runListAfterPass',
   'openRunAfterPass',
+  'inbox',
+  'inboxAfterPass',
 ] as const;
 
 /** A read the report measures. */
@@ -96,6 +102,8 @@ export type StoreMeasure = {
     tasks: number;
     journalBytes: number;
     feedLines: number;
+    /** The entries `GET /api/inbox?all=true` lists, and those of them a run was started from (a `startedAs` that is not empty). */
+    cards: { listed: number; started: number };
     /** Runs the list answered off their record because a task's journal did not read, and the lines the pass said were unreadable. */
     unreadable: { runs: number; passLines: number };
     /** The records the Run model refuses (`invariantRefusals`). */
@@ -355,7 +363,8 @@ async function tickMeasured(orch: Orchestrator, place: Place, fence: Fence, wf: 
 
 /**
  * A fresh app whose informer (`Informer`, the app's own) a pass of the tick on the copy at `wf` filled, the fence armed for a pass: what
- * `overApps` reads `runListAfterPass` and `openRunAfterPass` over, so the pass is not timed and the read is, the warm calls within it.
+ * `overApps` reads `runListAfterPass`, `openRunAfterPass` and `inboxAfterPass` over, so the pass is not timed and the read is, the warm
+ * calls within it.
  */
 const passedOver = (orch: Orchestrator, place: Place, fence: Fence, wf: string, fresh: () => Promise<Built>) => async () => {
   const built = await fresh();
@@ -375,6 +384,9 @@ const passedOver = (orch: Orchestrator, place: Place, fence: Fence, wf: string, 
   return built;
 };
 
+/** The inbox, every card: the route ignores `all` where it does not read it, and lists every card then too. */
+const INBOX_URL = '/api/inbox?all=true';
+
 /** The newest run of `listing`, by `createdAt`, finished or not; null where there is none. */
 const newestOf = (listing: readonly RunSummary[], finished: boolean): string | null =>
   listing
@@ -393,9 +405,10 @@ async function measure(asked: Asked, root: string, fence: Fence) {
   const { repeat } = asked;
   const first = await fresh();
   const listing = (await getJson(first.app, '/api/runs')) as RunSummary[];
-  await first.runtime.dispose();
   const finishedRun = newestOf(listing, true);
   const openRun = newestOf(listing, false);
+  const cards = (await getJson(first.app, INBOX_URL)) as { startedAs: readonly string[] }[];
+  await first.runtime.dispose();
   const feed = feedOf(wf);
   const passed = passedOver(orch, place, fence, wf, fresh);
   const objectOf = (id: string | null) =>
@@ -411,6 +424,8 @@ async function measure(asked: Asked, root: string, fence: Fence) {
     runListAfterPass: await overApps(passed, (app) => getJson(app, '/api/runs'), repeat),
     openRunAfterPass:
       openRun === null ? null : await overApps(passed, (app) => getJson(app, `/api/runs/${encodeURIComponent(openRun)}`), repeat),
+    inbox: await overApps(fresh, (app) => getJson(app, INBOX_URL), repeat),
+    inboxAfterPass: await overApps(passed, (app) => getJson(app, INBOX_URL), repeat),
   };
   const { measured, pass } = await tickMeasured(orch, place, fence, wf, repeat);
   measures.tickPass = measured;
@@ -425,6 +440,7 @@ async function measure(asked: Asked, root: string, fence: Fence) {
       tasks: tasks.length,
       journalBytes: tasks.reduce((sum, name) => sum + fs.statSync(path.join(wf, 'engine', 'tasks', name)).size, 0),
       feedLines: feed.lines,
+      cards: { listed: cards.length, started: cards.filter((c) => c.startedAs.length > 0).length },
       unreadable: { runs: listing.filter((r) => r.unreadable !== null).length, passLines: pass?.unreadable?.length ?? 0 },
       invariantRefusals: await invariantRefusals(wf),
     },
@@ -479,7 +495,7 @@ export function rendered(report: StoreMeasure): string {
   };
   return [
     `store measure of ${report.from} (${report.engine}), copied: ${report.copy.files} files, ${mb(report.copy.bytes)} MB in ${(report.copy.ms / 1000).toFixed(0)} s, without ${report.copy.leftOut.join(', ') || 'nothing'}`,
-    `${counts.runs} runs (${counts.finishedRuns} finished, ${counts.openRuns} open), ${counts.tasks} tasks, ${mb(counts.journalBytes)} MB of journals, ${counts.feedLines} feed lines; unreadable: ${counts.unreadable.runs} runs, ${counts.unreadable.passLines} pass lines; invariant refusals: ${counts.invariantRefusals}`,
+    `${counts.runs} runs (${counts.finishedRuns} finished, ${counts.openRuns} open), ${counts.tasks} tasks, ${mb(counts.journalBytes)} MB of journals, ${counts.feedLines} feed lines, ${counts.cards.listed} cards (${counts.cards.started} started); unreadable: ${counts.unreadable.runs} runs, ${counts.unreadable.passLines} pass lines; invariant refusals: ${counts.invariantRefusals}`,
     `${report.machine.cpu}, ${report.machine.cores} cores, ${mb(report.machine.memoryBytes)} MB, node ${report.machine.node}, load ${report.machine.load}; commit ${report.commit.slice(0, 12)}; ${report.date}; median of ${report.repeat}`,
     `runs read: finished ${report.asked.finishedRun ?? '—'}, open ${report.asked.openRun ?? '—'}; feed from byte ${report.asked.feedCursor}, ${report.asked.feedLinesRead} lines`,
     '',
@@ -499,13 +515,13 @@ export function rendered(report: StoreMeasure): string {
   ].join('\n');
 }
 
-/** Each number of `now` beside `baseline`'s, and their ratio, as markdown. */
+/** Each number of `now` beside `baseline`'s, and their ratio, as markdown: `—` for a read or a count the baseline lacks. */
 export function comparedWith(now: StoreMeasure, baseline: StoreMeasure): string {
-  const ratio = (a: number, b: number) => (b > 0 ? `×${(a / b).toFixed(2)}` : '—');
+  const ratio = (a: number, b: number | undefined) => (b !== undefined && b > 0 ? `×${(a / b).toFixed(2)}` : '—');
   const cell = (n: Measured | null, b: Measured | null | undefined, side: 'cold' | 'warm') =>
-    n === null || !b ? '— | — | —' : `${ms(n[side].ms)} | ${ms(b[side].ms)} | ${ratio(n[side].ms, b[side].ms)}`;
+    n === null ? '— | — | —' : `${ms(n[side].ms)} | ${b ? ms(b[side].ms) : '—'} | ${ratio(n[side].ms, b?.[side].ms)}`;
   return [
-    `against ${baseline.commit.slice(0, 12)} of ${baseline.date}: ${now.counts.runs} runs now, ${baseline.counts.runs} then; ${now.counts.tasks} tasks now, ${baseline.counts.tasks} then`,
+    `against ${baseline.commit.slice(0, 12)} of ${baseline.date}: ${now.counts.runs} runs now, ${baseline.counts.runs} then; ${now.counts.tasks} tasks now, ${baseline.counts.tasks} then; ${now.counts.cards.listed} cards now, ${baseline.counts.cards?.listed ?? '—'} then`,
     '',
     '| read | cold ms | baseline | ratio | warm ms | baseline | ratio |',
     '| --- | ---: | ---: | ---: | ---: | ---: | ---: |',

@@ -50,6 +50,7 @@ const ENV: CheckEnv = {
   WF_BASE_REF: 'abc123',
   WF_WORKSPACE: '/wt',
   WF_ARTIFACTS: '/wf/runs/r-1/artifacts/implement',
+  WF_LABELS: '{}',
 };
 
 test('checkArgv: the line the run froze, run by sh', async (t) => {

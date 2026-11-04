@@ -3,10 +3,11 @@
  * (`restartPolicy: 'Always'`) is held attached.
  *
  * A job is one session on the Agent SDK, in a process of its own (`bin/ae-claude-job.ts`), detached by the engine's worker
- * (`harness/detached/detached.ts`), or attached in the process that holds this runtime's sessions while one does (`attached.ts`): it
- * runs its brief to completion and exits, so its end is its exit and its result — no registry to read, no quiet rule, a spend cap it
- * keeps. Nobody is there to ask (`permissionPrompts: 'none'`); a call it may not make is denied and the session carries on, and the
- * result says what was denied. It reads its brief on its stdin, and words a person says while it works after it, until its result.
+ * (`harness/detached/detached.ts`), whether or not a process holds this runtime's sessions: it runs its brief to completion and exits,
+ * so its end is its exit and its result — no registry to read, no quiet rule, a spend cap it keeps — and it lives through a restart of
+ * the engine, on the release it started on. Only a long-lived session runs attached (`attachedLongLived`). Nobody is there to ask
+ * (`permissionPrompts: 'none'`); a call it may not make is denied and the session carries on, and the result says what was denied. It
+ * reads its brief on its stdin, and words a person says while it works after it, until its result.
  *
  * A long-lived session runs attached, in the process that holds the sessions (a daemon), and nowhere else: with no holder its spawn
  * is refused, `unstartable`, in words naming the holder to start (`LONG_LIVED_UNHELD`).
@@ -14,6 +15,11 @@
  * Either is bridged to claude.ai where its task asks (`claude.remoteControl`), on its first message (`attached-bridge.ts`): a held
  * session's bridge is on its run file, a job's on the bridge file its own process writes beside its run (`HarnessIO.bridgeFile`),
  * which this runner reads into the job's sighting on every look.
+ *
+ * A job is held by the store's jobs' drain (`job-hold.ts`): its own process holds its next main-thread call at its hook while the drain
+ * stands, and parks past the drain's grace or its bound, saying so on the hold file it writes beside its run (`HarnessIO.holdFile`),
+ * which this runner reads into the job's sighting on every look (`withHoldFiles`): the call it is in, the call it holds back, and its
+ * end under the drain (`parked`), which the engine continues as a new attempt once the drain is lifted.
  *
  * A job's own options are the attached road's, fact for fact (`attachedOptions`), built in its process from the spawn request the
  * runner wrote for it: one translation of a task into a Claude Code session, whether a daemon holds it or nothing does. It runs with
@@ -23,10 +29,19 @@ import { Effect, Schema } from 'effect';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { Sighting } from '../../core/index.ts';
+import type { Parked, Sighting } from '../../core/index.ts';
 import { claudeQuota } from './quota.ts';
 import type { Observation, RunnerOps, SpawnRequest } from '../seam.ts';
-import { besideRun, detachedFind, detachedOps, type HarnessIO, type HarnessSpec, type StartEvent } from '../detached/detached.ts';
+import {
+  besideRun,
+  detachedFind,
+  detachedOps,
+  leaseGone,
+  type HarnessIO,
+  type HarnessSpec,
+  type StartEvent,
+} from '../detached/detached.ts';
+import { jobDrainFile, jobDrainOf, readJobHold, type JobHold } from './job-hold.ts';
 import { claudeTranscriptEvents, claudeTranscriptFile, claudeTranscriptRecords } from './transcript.ts';
 import { CLAUDE_CONTEXT_TOKENS, bridgeAsked, claudeCodeRefuses, claudeRefuses } from './vocabulary.ts';
 import { claudePartials, claudeStreamKept, claudeStreamOutput } from '../detached/output.ts';
@@ -47,7 +62,14 @@ export type ClaudeOptions = {
    * process as `AE_CLAUDE_EXECUTABLE` (`claudeJobSpec`). Absent: the SDK's own.
    */
   claudeExecutable?: string;
+  /** How long a job is held under the jobs' drain before it parks, in milliseconds: a test's shortening. Absent: `JOB_HOLD_MS`. */
+  holdMs?: number;
+  /** How often a job's own process reads the jobs' drain, in milliseconds: a test's shortening. Absent: `JOB_HOLD_POLL_MS`. */
+  holdPollMs?: number;
 };
+
+/** What a job's process is handed to be held by the jobs' drain: the store whose drain it reads, and the bounds a test shortens. */
+export type JobHoldOptions = { root: string; holdMs?: number; holdPollMs?: number };
 
 export { CLAUDE_JOB_ENV } from './job-env.ts';
 
@@ -57,19 +79,37 @@ export const CLAUDE_INIT_START: StartEvent = { event: { type: 'system', subtype:
 /** The end of the file a job's process writes its bridge on, beside its run (`besideRun`). */
 const BRIDGE_END = 'bridge';
 
+/** The end of the file a job's process writes its hold on, beside its run (`besideRun`). */
+const HOLD_END = 'hold';
+
 /**
  * What a job is given of the machine before it runs: the checkout's `.mcp.json`, found on disk here so that `command` stays a function
  * of what it is given — none for a task that says which of its servers it loads (`projectMcp`), those being in the task's own config
  * — and, where the task asks for a bridge (`bridgeAsked`), the file its process writes the bridge's facts on (`bridgeFile`), beside its
- * run, a former attempt's under the name cleared first so a look never reads its bridge as this one's.
+ * run, a former attempt's under the name cleared first so a look never reads its bridge as this one's. Where it is handed the store a
+ * job is held by (`hold`), the job's hold file beside its run (`holdFile`), cleared the same way, the store's jobs' drain
+ * (`drainFile`), and the bounds a test shortened (`holdMs`, `holdPollMs`), each only where given.
  */
-export const claudePrepare = (r: SpawnRequest, beside?: (end: string) => string): Partial<HarnessIO> => {
+export const claudePrepare = (r: SpawnRequest, beside?: (end: string) => string, hold?: JobHoldOptions): Partial<HarnessIO> => {
   const found = r.config?.projectMcp ? undefined : projectMcpConfig(r.cwd);
-  const io: Partial<HarnessIO> = found ? { projectMcpConfig: found } : {};
+  const io: Partial<HarnessIO> = { ...(found ? { projectMcpConfig: found } : {}), ...(beside ? holdIo(beside, hold) : {}) };
   if (!bridgeAsked(r) || beside === undefined) return io;
   const bridgeFile = beside(BRIDGE_END);
   fs.rmSync(bridgeFile, { force: true });
   return { ...io, bridgeFile };
+};
+
+/** The hold a job's process is handed (`claudePrepare`): none without a store, its hold file cleared of a former attempt's. */
+const holdIo = (beside: (end: string) => string, hold?: JobHoldOptions): Partial<HarnessIO> => {
+  if (hold === undefined) return {};
+  const holdFile = beside(HOLD_END);
+  fs.rmSync(holdFile, { force: true });
+  return {
+    holdFile,
+    drainFile: jobDrainFile(hold.root),
+    ...(hold.holdMs !== undefined ? { holdMs: hold.holdMs } : {}),
+    ...(hold.holdPollMs !== undefined ? { holdPollMs: hold.holdPollMs } : {}),
+  };
 };
 
 /** The process one Claude Code job's session runs in, `bin/ae-claude-job.ts`, found from this file's own folder as `WORKER` is. */
@@ -105,13 +145,14 @@ export const CLAUDE_JOB_BIN = path.join(path.dirname(fileURLToPath(import.meta.u
  *   `claudePartials`).
  * - `keepOutput`: once the job has ended, its capture keeps only what the readers read (`claudeStreamKept`); the conversation is
  *   Claude Code's own transcript's (`transcript`).
- * - `prepare`: for the bridge file it names where the task asks for one (`claudePrepare`), and for what it throws — the servers ride
+ * - `prepare`: for the bridge file it names where the task asks for one, and the hold file and the jobs' drain where it is handed a
+ *   store to be held by (`hold`, `claudePrepare`), and for what it throws — the servers ride
  *   `Options.mcpServers`, read by `everyMcpServer` inside the bin, and a job writes no MCP config file: a checkout whose `.mcp.json`
  *   is not JSON refuses the spawn here, before the worker starts, so the attempt ends `unstartable` in those words rather than
  *   failing inside the bin.
  * - `refuses`: what Claude Code cannot be asked for (`claudeRefuses`); a bridge it opens itself.
  */
-export const claudeJobSpec = (executable?: string): HarnessSpec => ({
+export const claudeJobSpec = (executable?: string, hold?: JobHoldOptions): HarnessSpec => ({
   name: 'claude',
   command: (_r, io) => {
     const requestFile = io?.requestFile;
@@ -134,7 +175,7 @@ export const claudeJobSpec = (executable?: string): HarnessSpec => ({
   transcript: { file: claudeTranscriptFile, events: claudeTranscriptEvents, records: claudeTranscriptRecords },
   streams: true,
   partials: claudePartials,
-  prepare: claudePrepare,
+  prepare: (r, beside) => claudePrepare(r, beside, hold),
   refuses: claudeRefuses,
   contextTokens: CLAUDE_CONTEXT_TOKENS,
   projectMcp: true,
@@ -190,6 +231,57 @@ const withBridgeFiles = (job: RunnerOps, root: string): RunnerOps => ({
 });
 
 /**
+ * A job's sighting `s` with what its process wrote on its hold file (`hold`), as the job's own word on what it was doing:
+ *
+ * - while it works, the call it is in (`calling`) and the call it holds back at its hook (`heldBack`);
+ * - once it ended parked, `parked` with the call it cut, read `failed`, so a parked end the engine does not continue settles failed;
+ * - once its worker is gone with no end written (`lost`, a stale lease) and its session is known (`nativeId`), `parked` with the call
+ *   it was last in, only where it was held or draining — its hold file says `heldBack`, `draining` or `parked`, or a jobs' drain stands
+ *   at this look (`drained`) — and read failed as before otherwise, for the layer above to judge: an ordinary crash is not continued.
+ *
+ * A job stopped by a person (`canceled`) is read as its worker wrote it.
+ */
+export const heldSighting = (s: Sighting, hold: JobHold | null, lost: () => boolean, drained: () => boolean): Sighting => {
+  if (s.state === 'working') return workingWith(s, hold);
+  if (hold?.parked && s.state !== 'canceled') return { ...s, state: 'failed', parked: callOf(hold.parked.calling) };
+  const held = () => hold?.heldBack !== undefined || hold?.draining !== undefined || drained();
+  return s.state === 'failed' && s.nativeId && lost() && held() ? { ...s, parked: callOf(hold?.calling) } : s;
+};
+
+/** A working job's sighting `s` with the call its hold file says it is in, and the call it holds back. */
+const workingWith = (s: Sighting, hold: JobHold | null): Sighting => ({
+  ...s,
+  ...(hold?.calling && !s.calling ? { calling: hold.calling } : {}),
+  ...(hold?.heldBack ? { heldBack: hold.heldBack } : {}),
+});
+
+/** A park's facts with the call it cut, where there was one. */
+const callOf = (calling: JobHold['calling']): Parked => (calling ? { calling: { tool: calling.tool, since: calling.since } } : {});
+
+/**
+ * A job's sightings, each with what its process wrote on its hold file beside its run (`heldSighting`): the jobs' drain read once per
+ * look, and only where a job's lease is gone.
+ */
+const heldJobs = (spec: HarnessSpec, root: string, seen: ReadonlyMap<string, Sighting>): Map<string, Sighting> => {
+  let drain: boolean | undefined;
+  const drained = () => (drain ??= jobDrainOf(jobDrainFile(root)) !== null);
+  return new Map(
+    [...seen].map(([name, s]) => [
+      name,
+      heldSighting(s, readJobHold(besideRun(spec, root, name, HOLD_END)), () => leaseGone(spec, root, name), drained),
+    ]),
+  );
+};
+
+/** The jobs' runner `job`, its looks reading each job's hold file into its sighting (`heldJobs`). */
+const withHoldFiles = (job: RunnerOps, spec: HarnessSpec, root: string): RunnerOps => ({
+  ...job,
+  observe: job.observe.pipe(Effect.map((seen) => heldJobs(spec, root, seen))),
+  observeFor: (expected) =>
+    verbOf(job, 'observeFor')(expected).pipe(Effect.map((o): Observation => ({ ...o, seen: heldJobs(spec, root, o.seen) }))),
+});
+
+/**
  * The verb `verb` of `ops`, one of the runners this module composes, each of which gives it: a runner without it was composed
  * wrong, and is thrown naming the verb rather than called as absent.
  */
@@ -201,15 +293,21 @@ const verbOf = <K extends keyof RunnerOps>(ops: RunnerOps, verb: K): NonNullable
 };
 
 /**
- * Claude Code's runner: each task a job (`claudeJobSpec`), on its own process or, while this process holds the sessions, attached
- * beside them (`withAttached`); a long-lived task attached, refused `unstartable` with no holder (`LONG_LIVED_UNHELD`). Every verb is
- * the jobs' runner's, each look reading a job's bridge file into its sighting (`withBridgeFiles`). `quota` asks Claude Code for the
+ * Claude Code's runner: each task a job (`claudeJobSpec`), on its own process, held by the store's jobs' drain, whether or not this
+ * process holds the attached sessions; a long-lived task attached beside them (`withAttached`), refused `unstartable` with no holder
+ * (`LONG_LIVED_UNHELD`). Every verb is the jobs' runner's, each look reading a job's bridge file and hold file into its sighting
+ * (`withBridgeFiles`, `withHoldFiles`). `quota` asks Claude Code for the
  * plan's usage through the Agent SDK (`claudeQuota`), and `answer` is the holder's, where this engine holds the sessions.
  */
 export const claudeCodeOps = (options: ClaudeOptions, attached?: Attached): RunnerOps => {
   const root = options.root;
-  const spec = claudeJobSpec(options.claudeExecutable);
-  const plain = withBridgeFiles(detachedOps(spec, root), root);
+  const { holdMs, holdPollMs } = options;
+  const spec = claudeJobSpec(options.claudeExecutable, {
+    root,
+    ...(holdMs !== undefined ? { holdMs } : {}),
+    ...(holdPollMs !== undefined ? { holdPollMs } : {}),
+  });
+  const plain = withHoldFiles(withBridgeFiles(detachedOps(spec, root), root), spec, root);
   const job = attached ? withAttached(plain, attached) : plain;
   const plainFind = detachedFind(spec, root);
   return {
@@ -249,25 +347,26 @@ const interruptThrough = (ops: RunnerOps, session: { name: string; sessionId: st
 const answerOf = (attached?: Attached): Pick<RunnerOps, 'answer'> => (attached ? { answer: attached.ops.answer } : {});
 
 /**
- * Whether a long-lived request runs attached: one filed `restartPolicy: 'Always'` while this process holds the attached sessions. A
- * session that stays open until it is stopped runs attached whenever a holder is there — durable by resume, its turns' ends seen, its
- * calls caught and its turn stoppable — and is refused `unstartable` when nothing holds it (`LONG_LIVED_UNHELD`). Read off the world,
+ * Whether a request runs attached: one filed `restartPolicy: 'Always'` while this process holds the attached sessions, and no other.
+ * A session that stays open until it is stopped runs attached whenever a holder is there — durable by resume, its turns' ends seen,
+ * its calls caught and its turn stoppable — and is refused `unstartable` when nothing holds it (`LONG_LIVED_UNHELD`). A job runs on
+ * its own process holder or not, so a restart of the holder neither ends it nor moves it to the new release. Read off the world,
  * never off a word invented for one kind of task: every long-lived Claude Code task goes attached without knowing it.
  */
 export const attachedLongLived = (r: Pick<SpawnRequest, 'restartPolicy'>, attached?: Pick<Attached, 'holding'>): boolean =>
   r.restartPolicy === 'Always' && attached?.holding() === true;
 
 /**
- * The jobs' runner `job`, with the sessions `attached` runs beside them, both named by the engine (`ae/<task>/<n>`): a spawn runs
- * attached while this process holds them, a job otherwise; each verb given a name goes to the one whose run file it has, so a job
- * spawned before goes on being read; a look lists both.
+ * The jobs' runner `job`, with the sessions `attached` runs beside them, both named by the engine (`ae/<task>/<n>`): a long-lived
+ * spawn runs attached while this process holds them (`attachedLongLived`), a job on its own process always; each verb given a name
+ * goes to the one whose run file it has, so a job spawned before goes on being read; a look lists both.
  */
 const withAttached = (job: RunnerOps, attached: Attached): RunnerOps => {
   const a = attached.ops;
   const to = (name: string) => (attached.has(name) ? a : job);
   return {
     ...job,
-    spawn: (r) => (attached.holding() ? a.spawn(r) : job.spawn(r)),
+    spawn: (r) => (attachedLongLived(r, attached) ? a.spawn(r) : job.spawn(r)),
     observe: Effect.all([job.observe, a.observe]).pipe(Effect.map(([jobs, ours]) => new Map([...jobs, ...ours]))),
     observeFor: (expected) => {
       const ours = expected.filter((e) => attached.has(e.name));

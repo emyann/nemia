@@ -9,10 +9,24 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { decide, fold, nameFor, turnOf, waitsForInput, type Event, type Sighting } from './domain.ts';
+import {
+  cutWords,
+  decide,
+  fold,
+  nameFor,
+  observe,
+  PARKED_WORDS,
+  RESTART_WORDS,
+  turnOf,
+  waitsForInput,
+  type Event,
+  type Sighting,
+} from './domain.ts';
 import type { Outcome, SessionState } from './session.ts';
 import type { HarnessArgs } from '../harness/args.ts';
 import { story } from '../../test/checkpoints.ts';
+import { Result, Schema } from 'effect';
+import { StoredEventSchema } from './event-schema.ts';
 
 const T0 = new Date('2026-01-01T00:00:00Z');
 const at = (ms: number) => new Date(T0.getTime() + ms).toISOString();
@@ -302,6 +316,85 @@ test('decide: how a job starts and settles — each end its harness, a person or
     );
     assert.deepEqual(decide(s, seen(), now(9)), { do: 'settle', outcome: 'failed', note: '1 attempt(s), none succeeded' });
     assert.equal(s.attempts[0].nativeId, 'native-1');
+  });
+});
+
+test("decide: a job parked under a jobs' drain — held while it stands, then continued as the next attempt of its task, resumed and told the call that did not finish; settled as today when stopped, unparked or long-lived", async (t) => {
+  const END = 200_000;
+  const job = (parked?: { calling?: { tool: string; since: string } }, longLived = false): Event[] => [
+    { kind: 'filed', at: at(0), brief: 'b', cwd: '/r', queued: false, ...(longLived ? { restartPolicy: 'Always' as const } : {}) },
+    { kind: 'starting', at: at(1), attempt: 1 },
+    { kind: 'spawned', at: at(2), attempt: 1 },
+    {
+      kind: 'ended',
+      at: at(END),
+      attempt: 1,
+      sessionId: 's0',
+      observed: 'failed',
+      reason: 'harness',
+      nativeId: 'n1',
+      ...(parked ? { parked } : {}),
+    },
+  ];
+  const drained = (ms: number) => ({ ...now(ms), drained: true });
+  const cut = { calling: { tool: 'Bash', since: at(END - 5) } };
+
+  await t.test(
+    'parked with a call cut, no drain: waits out the backoff, then starts attempt 2 resumed from its session, told the tool',
+    () => {
+      const state = fold(TASK, job(cut));
+      assert.deepEqual(state.attempts[0]?.parked, cut, 'the fold keeps the park');
+      assert.equal(decide(state, new Map(), now(END + 9_999)).do, 'nothing');
+      const a = decide(state, new Map(), now(END + 10_000));
+      assert.deepEqual(a, { do: 'start', attempt: 2, resumeFrom: 'n1', nudge: cutWords('Bash') });
+      assert.ok(a.do === 'start' && a.nudge?.includes('Bash'), 'the nudge names the call that did not finish');
+    },
+  );
+
+  await t.test("the park reads back through the journal's schema, and a park of another shape does not decode", () => {
+    const decoded = Schema.decodeUnknownResult(StoredEventSchema);
+    const end = job(cut).at(-1);
+    assert.ok(end && Result.isSuccess(decoded(end)));
+    assert.deepEqual(Result.getOrThrow(decoded(end)), end);
+    assert.ok(Result.isFailure(decoded({ ...end, parked: { calling: { tool: 3 } } })));
+  });
+
+  await t.test('parked between calls: told PARKED_WORDS', () => {
+    assert.deepEqual(decide(fold(TASK, job({})), new Map(), now(END + 10_000)), {
+      do: 'start',
+      attempt: 2,
+      resumeFrom: 'n1',
+      nudge: PARKED_WORDS,
+    });
+  });
+
+  await t.test('parked while the drain stands: PARK_HELD, nothing started, however long it stands', () => {
+    for (const later of [1, 10_000, 3_600_000]) {
+      assert.equal(observe(fold(TASK, job(cut)), new Map(), drained(END + later)).type, 'PARK_HELD', `${later} ms on`);
+      assert.equal(decide(fold(TASK, job(cut)), new Map(), drained(END + later)).do, 'nothing', `${later} ms on`);
+    }
+  });
+
+  await t.test('parked with a stop asked: settles canceled, drained or not', () => {
+    for (const n of [now(END + 10_000), drained(END + 10_000)]) {
+      const a = decide(fold(TASK, [...job(cut), { kind: 'stop-requested', at: at(END + 1) }]), new Map(), n);
+      assert.equal(a.do === 'settle' && a.outcome, 'stopped');
+    }
+  });
+
+  await t.test('a job that ended unparked settles failed as today, drained or not', () => {
+    for (const n of [now(END + 10_000), drained(END + 10_000)])
+      assert.deepEqual(decide(fold(TASK, job()), new Map(), n), { do: 'settle', outcome: 'failed', note: '1 attempt(s), none succeeded' });
+  });
+
+  await t.test("a long-lived task's restart is unchanged, and the jobs' drain does not hold it", () => {
+    for (const n of [now(END + 10_000), drained(END + 10_000)])
+      assert.deepEqual(decide(fold(TASK, job(undefined, true)), new Map(), n), {
+        do: 'start',
+        attempt: 2,
+        resumeFrom: 'n1',
+        nudge: RESTART_WORDS,
+      });
   });
 });
 

@@ -29,21 +29,45 @@
  *   (`bridgeStateOf`), so the runner's look reads the bridge off the file (`claudeCodeOps`), never off this process's memory. The
  *   request is awaited before the next message is printed: a job's one turn ends after its bridge is up, as measured on Agent SDK
  *   0.3.308 (`docs/harness.md`, *The claude.ai bridge*). No bridge never fails the job: the session runs on, and the file says why.
+ * - Where the runner names a hold file and the store's jobs' drain (`io.holdFile`, `io.drainFile`), the job is held by that drain as
+ *   an attached session is by its holder's (`holdOf`, through what the two share in `job-hold.ts`): a call in flight when it is put
+ *   finishes, and the next call of the main thread waits at its `PreToolUse` hook (the SDK's `HookCallbackMatcher`, its timeout
+ *   `HOOK_HOLD_S`) until it is lifted; a sub-agent's call is never held. The drain is read off its file on every poll (`io.holdPollMs`)
+ *   and at every new call, and the hold file says what the job is doing about it (`calling`, `draining`, `heldBack`). Past the drain's
+ *   grace with a call in flight, or past its `at` plus `io.holdMs`, the job parks: `parked` on its hold file, with the call it cut,
+ *   then the SDK's `Query.interrupt()` and the end of its prompt (`inputOf`'s `close`), so Claude Code prints the turn it cut as a
+ *   result and saves its running total as it exits, which a resume carries on — never a kill, which saves nothing. Absent either
+ *   file, the job has no hooks and is never held. Parked or not, it leaves as its last result says: a cut turn's is an error.
  *
  * Leaves 0 when the session's last result is no error, and 1 — with the reason on stderr, which the worker tees into the run's log
  * — when it is one, when the messages end with no result at all, when the request cannot be read, and when the options cannot be
  * built (`attachedOptions` refuses a flag given twice and the two prompt files together, in words that say what to do). It leaves
  * only once its stdout is on the worker's pipe: a line printed and dropped would be a session that said something nobody read.
  *
- * argv: <requestFile>  — JSON: { request: SpawnRequest, io: HarnessIO }
+ * argv: <requestFile>  — JSON: { request: SpawnRequest, io: HarnessIO } (`bridgeFile`, `holdFile`, `drainFile`, `holdMs`, `holdPollMs`)
  */
 import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
 import readline from 'node:readline';
-import { query, type SDKMessage } from '@anthropic-ai/claude-agent-sdk';
+import { query, type HookCallbackMatcher, type HookEvent, type SDKMessage } from '@anthropic-ai/claude-agent-sdk';
 import { attachedOptions } from '../src/harness/claude/attached-options.ts';
 import { bridgeDue, bridgeStateOf, enableBridge, type AttachedBridge } from '../src/harness/claude/attached-bridge.ts';
 import { bridgeAsked } from '../src/harness/claude/vocabulary.ts';
+import {
+  callStarted,
+  firstCall,
+  HOOK_HOLD_S,
+  inside,
+  JOB_HOLD_MS,
+  JOB_HOLD_POLL_MS,
+  jobDrainOf,
+  writeJobHold,
+  type Call,
+  type CallsInFlight,
+  type JobHold,
+} from '../src/harness/claude/job-hold.ts';
+import { elapsedMs } from '../src/core/clock.ts';
+import { instantNow } from '../src/core/engine/now.ts';
 import type { SpawnRequest } from '../src/harness/seam.ts';
 
 /** Why the session cannot go on, thrown so that whatever is printed is flushed before the process leaves. */
@@ -80,6 +104,12 @@ const inputOf = () => {
     ring();
   });
   return {
+    /** Ends the prompt here, whatever stdin still brings: the session ends once its turn in flight has printed its result. */
+    close: () => {
+      closed = true;
+      lines.close();
+      ring();
+    },
     async *[Symbol.asyncIterator]() {
       for (;;) {
         for (let content = items.shift(); content !== undefined; content = items.shift()) {
@@ -98,20 +128,131 @@ const inputOf = () => {
   };
 };
 
-/** What the runner wrote for this job at its spawn: the request whole, and the files it named for it (`HarnessIO`). */
-type Requested = { request: SpawnRequest; io: { bridgeFile?: string } };
+/** The files and bounds a job is held by (`HarnessIO`): its hold file, the store's jobs' drain, its hold's bound and its poll. */
+type HoldIO = { holdFile: string; drainFile: string; holdMs: number; holdPollMs: number };
 
-/** The spawn request the runner wrote at `at`, whole, and the bridge file it named, where it named one. */
+/** What the runner wrote for this job at its spawn: the request whole, and the files it named for it (`HarnessIO`). */
+type Requested = { request: SpawnRequest; io: { bridgeFile?: string; hold?: HoldIO } };
+
+/** `value` where it is a whole number of milliseconds above 0; `otherwise` where it is absent or anything else. */
+const msOr = (value: unknown, otherwise: number): number =>
+  typeof value === 'number' && Number.isSafeInteger(value) && value > 0 ? value : otherwise;
+
+/**
+ * The spawn request the runner wrote at `at`, whole, the bridge file it named, where it named one, and the hold, where it named both
+ * a hold file and the jobs' drain: its bound and poll as the request gives them (`holdMs`, `holdPollMs`), the shipped ones otherwise.
+ */
 const requestAt = (at: string | undefined): Requested => {
   if (!at)
     throw new Refused('no spawn request file was given. The runner writes one for a spec with `needsRequest` and names it on the argv.');
   try {
-    const read = JSON.parse(fs.readFileSync(at, 'utf8')) as { request: SpawnRequest; io?: { bridgeFile?: unknown } };
-    const bridgeFile = read.io?.bridgeFile;
-    return { request: read.request, io: typeof bridgeFile === 'string' ? { bridgeFile } : {} };
+    const read = JSON.parse(fs.readFileSync(at, 'utf8')) as {
+      request: SpawnRequest;
+      io?: { bridgeFile?: unknown; holdFile?: unknown; drainFile?: unknown; holdMs?: unknown; holdPollMs?: unknown };
+    };
+    const { bridgeFile, holdFile, drainFile, holdMs, holdPollMs } = read.io ?? {};
+    return {
+      request: read.request,
+      io: {
+        ...(typeof bridgeFile === 'string' ? { bridgeFile } : {}),
+        ...(typeof holdFile === 'string' && typeof drainFile === 'string'
+          ? { hold: { holdFile, drainFile, holdMs: msOr(holdMs, JOB_HOLD_MS), holdPollMs: msOr(holdPollMs, JOB_HOLD_POLL_MS) } }
+          : {}),
+      },
+    };
   } catch (e) {
     throw new Refused(`${at} is not a spawn request this runtime reads (${(e as Error).message}).`);
   }
+};
+
+/**
+ * The job's hold: its calls in flight, kept by its hooks, and the jobs' drain, read off its file on every poll and at every new call.
+ *
+ * - A new call of the main thread waits at its `PreToolUse` hook while the drain stands and none of the session's calls is in flight
+ *   (the attached sessions' rule, `attached.ts`), reading the drain again every `holdPollMs`; a call that belongs to a call in flight —
+ *   a sub-agent's (`inside`) — is never held, or the call it belongs to could never end. Its hook's timeout is `HOOK_HOLD_S`, over the
+ *   job's own bound, so Claude Code never answers for it first.
+ * - Every `holdPollMs`, the drain read: past its `at` plus its `graceMs` with a call in flight, the call is cut; past its `at` plus
+ *   `holdMs`, the job gives up its hold. Either way it parks (`park`): `parked` written on the hold file, with the call it cut as its
+ *   `calling`, and `ended` told to end the session.
+ * - The hold file says, as it changes: the earliest call in flight (`calling`), the drain read standing (`draining`, since this process
+ *   first read it), a call waiting at its hook (`heldBack`, since the first of them began to wait); the last two gone once the drain
+ *   is read lifted. Once parked it says `parked`, and nothing after.
+ */
+const holdOf = (io: HoldIO, ended: () => void) => {
+  const calls: CallsInFlight = new Map();
+  const waiting: string[] = [];
+  let draining: string | undefined;
+  let parked: JobHold['parked'];
+  let written: string | undefined;
+  const write = (): void => {
+    const first = firstCall(calls);
+    const hold: JobHold = {
+      ...(first && !parked ? { calling: first } : {}),
+      ...(draining ? { draining: { since: draining } } : {}),
+      ...(waiting[0] && !parked ? { heldBack: { since: waiting[0] } } : {}),
+      ...(parked ? { parked } : {}),
+    };
+    const text = JSON.stringify(hold);
+    if (text === written) return;
+    writeJobHold(io.holdFile, hold);
+    written = text;
+  };
+  const drain = () => {
+    const read = jobDrainOf(io.drainFile);
+    draining = read === null ? undefined : (draining ?? new Date().toISOString());
+    return read;
+  };
+  const park = (calling: Call | undefined): void => {
+    parked = { at: new Date().toISOString(), ...(calling ? { calling } : {}) };
+    write();
+    ended();
+  };
+  const look = (): void => {
+    if (parked) return;
+    const read = drain();
+    if (read !== null) {
+      const since = elapsedMs({ at: Date.parse(read.at) }, instantNow());
+      if (calls.size > 0 && since >= read.graceMs) return park(firstCall(calls));
+      if (since >= io.holdMs) return park(firstCall(calls));
+    }
+    write();
+  };
+  const held = (): boolean => !parked && drain() !== null && calls.size === 0;
+  const over = async (_input: unknown, id: string | undefined) => {
+    if (id && calls.delete(id) && !parked) write();
+    return {};
+  };
+  const hooks: Partial<Record<HookEvent, HookCallbackMatcher[]>> = {
+    PreToolUse: [
+      {
+        timeout: HOOK_HOLD_S,
+        hooks: [
+          async (input, id, { signal }) => {
+            if (!inside(input) && held()) {
+              const since = new Date().toISOString();
+              waiting.push(since);
+              try {
+                while (held() && !signal.aborted) {
+                  write();
+                  await new Promise((r) => setTimeout(r, io.holdPollMs));
+                }
+              } finally {
+                waiting.splice(waiting.indexOf(since), 1);
+              }
+              if (parked) return await new Promise<object>((r) => (signal.aborted ? r({}) : signal.addEventListener('abort', () => r({}))));
+            }
+            callStarted(calls, id, input);
+            write();
+            return {};
+          },
+        ],
+      },
+    ],
+    PostToolUse: [{ hooks: [over] }],
+    PostToolUseFailure: [{ hooks: [over] }],
+  };
+  return { hooks, look };
 };
 
 /** Writes `bridge` whole on `file`, through a file beside it renamed over it, so a look never reads half of it. */
@@ -159,15 +300,26 @@ const ran = async ({ request, io }: Requested): Promise<boolean> => {
   } catch (e) {
     throw new Refused((e as Error).message);
   }
+  const input = inputOf();
+  let ends: () => void = () => {};
+  const hold = io.hold === undefined ? undefined : holdOf(io.hold, () => ends());
   const session = query({
-    prompt: inputOf(),
+    prompt: input,
     options: {
       ...given,
       permissionPrompts: 'none',
       abortController: abort,
+      ...(hold ? { hooks: hold.hooks } : {}),
       ...(executable ? { pathToClaudeCodeExecutable: executable } : {}),
     },
   });
+  ends = () =>
+    void Promise.resolve()
+      .then(() => session.interrupt())
+      .catch(() => undefined)
+      .finally(() => input.close());
+  const polls = hold && io.hold ? setInterval(hold.look, io.hold.holdPollMs) : undefined;
+  hold?.look();
   const bridged = bridgeOf(request, io.bridgeFile);
   let failed: boolean | undefined;
   try {
@@ -178,6 +330,8 @@ const ran = async ({ request, io }: Requested): Promise<boolean> => {
     }
   } catch (e) {
     if (failed === undefined) throw new Refused(`the session ended in an error: ${(e as Error).message}`);
+  } finally {
+    clearInterval(polls);
   }
   if (failed === undefined) throw new Refused('the session ended with no result line, so nothing says how it went.');
   return failed;

@@ -73,7 +73,7 @@ const RunFileSchema = Schema.StructWithRest(
     heard: Schema.optional(Schema.Finite),
     /**
      * The limit the session was ended at without being resumed: `budget`, where a holder taking it up found its attempt had already
-     * spent its whole cap (`capLeft`, `attached.ts`). Carried onto its sighting as the harness's own end at its cap would be.
+     * spent its whole cap (`capSpent`, `src/core/cap.ts`). Carried onto its sighting as the harness's own end at its cap would be.
      */
     limit: Schema.optional(Schema.Literal('budget')),
     /** What its claude.ai bridge came to, where one was asked for: its facts, or why there is none. */
@@ -216,12 +216,12 @@ export const writeRun = (root: string, run: AttachedRun): void => {
   fs.renameSync(tmp, file);
 };
 
-/** Every attached run file under `root`, by its session's name. */
+/** Every attached run file under `root`, by its session's name: neither drain's file (`DRAIN`, the jobs' `jobDrainFile`) is one. */
 export const everyRun = (root: string): Map<string, AttachedRun> => {
   const dir = attachedDir(root);
   let names: string[];
   try {
-    names = fs.readdirSync(dir).filter((f) => f.endsWith('.json') && !f.endsWith('.mcp.json') && f !== DRAIN);
+    names = fs.readdirSync(dir).filter((f) => f.endsWith('.json') && !f.endsWith('.mcp.json') && f !== DRAIN && f !== 'jobs-drain.json');
   } catch {
     return new Map();
   }

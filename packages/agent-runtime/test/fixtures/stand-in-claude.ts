@@ -28,7 +28,10 @@ import readline from 'node:readline';
  * a `can_use_tool` request for that tool; `call`, run that tool, its `PreToolUse` hooks asked first, held until the file `release`
  * appears in its folder or until an `interrupt` request comes, which ends the turn with that call still held and unanswered, as
  * Claude Code leaves it; `nested`, once the file `nest` appears, ask the `PreToolUse` hooks of a second call of that tool, while
- * `call`'s is still in flight and before its release, carrying `agent_id` as a sub-agent's call does where `fromSubAgent`; `hold`,
+ * `call`'s is still in flight and before its release, carrying `agent_id` as a sub-agent's call does where `fromSubAgent` — or, with
+ * no `call`, while no call of the main thread is in flight, as a background sub-agent's call comes; `next`, once `call` is over and
+ * the file `next` appears, a second call of that tool (`call-next`), its `PreToolUse` hooks asked and the call held until the file
+ * `release-next` appears or an interrupt comes, as `call` is; `hold`,
  * wait until the file `end` appears, or until an `interrupt` request comes; then its result, `output` as its `structured_output`, and
  * `cost` what the turn adds to the running total its `total_cost_usd` prints (0.01 when absent).
  *
@@ -57,6 +60,7 @@ type Plan = {
   callInput?: unknown;
   nested?: string;
   fromSubAgent?: boolean;
+  next?: string;
   hold?: boolean;
   fold?: boolean;
   output?: unknown;
@@ -206,6 +210,18 @@ const work = async () => {
   if (plan.call && !interrupted) {
     await hooked('PostToolUse', plan.call, 'call-1');
     print({ type: 'user', session_id: sessionId, message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: 'call-1', content: 'ok' }] } });
+  }
+  if (plan.next && !interrupted) {
+    await appears('next');
+    if (!interrupted) {
+      print({ type: 'assistant', session_id: sessionId, message: { role: 'assistant', content: [{ type: 'tool_use', id: 'call-next', name: plan.next, input: {} }] } });
+      await cutOff(hooked('PreToolUse', plan.next, 'call-next'));
+    }
+    if (!interrupted) await appears('release-next');
+    if (!interrupted) {
+      await hooked('PostToolUse', plan.next, 'call-next');
+      print({ type: 'user', session_id: sessionId, message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: 'call-next', content: 'ok' }] } });
+    }
   }
   if (plan.stream && argv.includes('--include-partial-messages')) await streamed();
   if (plan.transcript) wrote();

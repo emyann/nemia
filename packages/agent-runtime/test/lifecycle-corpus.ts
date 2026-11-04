@@ -115,6 +115,24 @@ export const JOURNALS: Record<string, Event[]> = {
   'long-lived, lost cold': [filed({ restartPolicy: 'Always' }), starting(1), spawned(1), ended(1, 'failed', 'lost')],
 };
 
+/** A job parked under a jobs' drain, its end saying so (`Attempt.parked`): in a call, or between two. */
+const parkedEnd = (n: number, calling?: boolean): Event => ({
+  kind: 'ended',
+  at: at(2 * S),
+  attempt: n,
+  sessionId: `s${n}`,
+  observed: 'failed',
+  reason: 'harness',
+  nativeId: `native-${n}`,
+  parked: calling ? { calling: { tool: 'Bash', since: at(S) } } : {},
+});
+/** Journal shapes of a parked job, asked for by `lifecycle.test.ts` alone (`parked`), as `unread` is. */
+const PARKED: Record<string, Event[]> = {
+  'job, parked in a call': [filed(), starting(1), spawned(1), parkedEnd(1, true)],
+  'job, parked between calls': [filed(), starting(1), spawned(1), parkedEnd(1)],
+  'job, parked, stop asked': [filed(), starting(1), spawned(1), parkedEnd(1), { kind: 'stop-requested', at: at(2 * S) }],
+};
+
 /** When the pass reads it: in the grace window and before a deadline of 40 s, or past both. */
 export const TIMES = { 'in grace': 2 * S, 'past grace': 45 * S } as const;
 /** A time more, `late`: past a respawn's gap (`RESPAWN_GAP_MS`) opened at 1 s. Asked for by `lifecycle.test.ts` alone, as `unread` is. */
@@ -128,33 +146,34 @@ export type Case = {
   name: string;
   events: Event[];
   observed: Map<string, Sighting>;
-  now: { at: Date; graceMs: number; unread?: ReadonlySet<string> };
+  now: { at: Date; graceMs: number; unread?: ReadonlySet<string>; drained?: boolean };
 };
 
 /**
  * Every journal shape, under every deadline, sighting and time: `SIGHTINGS` keyed by the name a case takes. With `unread`, one
  * sighting more, `unread`: the last attempt's name on none, its harness not read this pass (`Now.unread`). Asked
  * for by `lifecycle.test.ts` alone, so the corpus `session-state.test.ts` holds to its recording stays the one recorded. With
- * `late`, one time more (`LATE`), on the same terms.
+ * `late`, one time more (`LATE`), on the same terms. With `parked`, the journals of a parked job (`PARKED`), and every case read
+ * twice more, under a jobs' drain (`Now.drained`), on the same terms.
  */
 export const corpusOf = (
   SIGHTINGS: Record<string, Omit<Sighting, 'sessionId'> | undefined>,
-  options: { unread?: boolean; late?: boolean } = {},
+  options: { unread?: boolean; late?: boolean; parked?: boolean } = {},
 ): Case[] =>
-  Object.entries(JOURNALS).flatMap(([j, base]) =>
+  Object.entries({ ...JOURNALS, ...(options.parked ? PARKED : {}) }).flatMap(([j, base]) =>
     Object.entries(DEADLINES).flatMap(([d, deadlineSeconds]) =>
       [...Object.entries(SIGHTINGS), ...(options.unread ? [[UNREAD, undefined] as const] : [])].flatMap(([s, sighting]) =>
-        Object.entries({ ...TIMES, ...(options.late ? LATE : {}) }).map(([t, ms]) => {
+        Object.entries({ ...TIMES, ...(options.late ? LATE : {}) }).flatMap(([t, ms]) => {
           const events = base.map((e) => (e.kind === 'filed' && deadlineSeconds !== undefined ? { ...e, deadlineSeconds } : e));
           const last = fold(TASK, events).attempts.at(-1);
           const observed = new Map(sighting && last ? [[nameFor(TASK, last.n), { sessionId: `seen-${last.n}`, ...sighting }]] : []);
           const unread = s === UNREAD && last ? { unread: new Set([nameFor(TASK, last.n)]) } : {};
-          return {
-            name: `${j} · ${d} · ${s} · ${t}`,
-            events,
-            observed,
-            now: { at: new Date(T0.getTime() + ms), graceMs: 30_000, ...unread },
-          };
+          const now = { at: new Date(T0.getTime() + ms), graceMs: 30_000, ...unread };
+          const name = `${j} · ${d} · ${s} · ${t}`;
+          return [
+            { name, events, observed, now },
+            ...(options.parked ? [{ name: `${name} · drained`, events, observed, now: { ...now, drained: true } }] : []),
+          ];
         }),
       ),
     ),

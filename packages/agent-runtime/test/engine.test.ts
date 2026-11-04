@@ -1231,7 +1231,8 @@ test("decide never reads tools, effort, MCP servers, a budget, a context window,
   const source = fs.readFileSync(new URL('../src/core/domain.ts', import.meta.url), 'utf8');
   const from = source.indexOf('export const decide: ');
   assert.ok(from >= 0, 'found decide');
-  const body = source.slice(from);
+  const restart = fs.readFileSync(new URL('../src/core/restart.ts', import.meta.url), 'utf8');
+  const body = `${source.slice(from)}\n${restart}`;
   for (const name of [
     'export const lifecycleOf: ',
     'export const observe: ',

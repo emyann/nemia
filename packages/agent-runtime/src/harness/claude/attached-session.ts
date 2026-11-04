@@ -25,6 +25,7 @@ import {
 } from './attached-file.ts';
 import { bridgeDue, bridgeStateOf, enableBridge } from './attached-bridge.ts';
 import { bridgeAsked } from './vocabulary.ts';
+import { firstCall, HOOK_HOLD_S, inside, type CallsInFlight } from './job-hold.ts';
 import { claudeStreamKept } from '../detached/output.ts';
 import type { SpawnRequest } from '../seam.ts';
 import type { AskOption, AskQuestion } from '../../core/index.ts';
@@ -85,7 +86,7 @@ export type Live = {
   run: AttachedRun;
   abort: AbortController;
   input: ReturnType<typeof inputOf>;
-  calls: Map<string, { tool: string; since: string }>;
+  calls: CallsInFlight;
   letGo: boolean;
   waiting: number;
   open: boolean;
@@ -108,9 +109,6 @@ export const interruptTurn = async (live: Live | undefined): Promise<boolean> =>
   return true;
 };
 
-/** How long a call is held at its hook before Claude Code answers for it, in seconds: a day, longer than any drain. */
-const HOOK_HOLD_S = 86_400;
-
 /** Waits until `held` lets go of `live`, the call's signal aborts, or the session is let go. */
 const waitWhile = async (held: Held, signal: AbortSignal, live: Live): Promise<void> => {
   while (held(live) && !signal.aborted && !live.letGo) await new Promise((r) => setTimeout(r, 250));
@@ -128,12 +126,6 @@ const cutWhileHeld = (signal: AbortSignal, live: Live): Promise<object> =>
     signal.addEventListener('abort', over, { once: true });
     live.abort.signal.addEventListener('abort', over, { once: true });
   });
-
-/**
- * Whether the call a `PreToolUse` hook was given belongs to a call already in flight: the SDK marks a sub-agent's call with
- * `agent_id`, and absent for the main thread (the SDK's hook input), so such a call is answered however the session's calls are held.
- */
-const inside = (input: unknown): boolean => typeof (input as { agent_id?: unknown }).agent_id === 'string';
 
 /** The tool a session calls to ask a person a question, as Claude Code names it. */
 export const ASK_TOOL = 'AskUserQuestion';
@@ -249,7 +241,7 @@ export const DENIED_HERE =
  */
 const rewrite = (root: string, live: Live, patch: Partial<AttachedRun> = {}): void => {
   if (live.letGo) return;
-  const first = [...live.calls.values()].sort((a, b) => a.since.localeCompare(b.since))[0];
+  const first = firstCall(live.calls);
   const { calling: _, heldBack: __, ...rest } = live.run;
   live.run = { ...rest, ...patch, ...(first ? { calling: first } : {}), ...(live.waiting ? { heldBack: live.waiting } : {}) };
   writeRun(root, live.run);

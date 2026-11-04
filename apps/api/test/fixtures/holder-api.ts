@@ -3,7 +3,8 @@
  *
  * It is the daemon's half of the two — the process that ticks the store and holds the attached Claude Code sessions. It takes the
  * store's lease as an api does (`takeStore`), holds its engine's attached sessions in a scope of its own (`hold`), writes what that
- * hold serves onto the lease (`heldServes`), as `up` does at the same point, then files one attached session and ticks it into life.
+ * hold serves onto the lease (`heldServes`), as `up` does at the same point, then files one long-lived session — the one kind a
+ * holder runs attached, a job running on a process of its own — and ticks it into life.
  * It says `held <json>` on its stdout — the task's id, the port's address and the cards — and stays up until its stdin closes, when it
  * lets the hold and the lease go in that order, as the daemon's scope does, when it is sent a SIGTERM.
  *
@@ -59,6 +60,7 @@ const taskId = await Effect.runPromise(
     brief: 'say it',
     cwd: told.cwd,
     harness: 'claude',
+    restartPolicy: 'Always',
     config: { env: { STANDIN_DIR: told.cwd, STANDIN_PLAN: JSON.stringify(told.plan) } },
   }),
 );

@@ -39,6 +39,7 @@ const KINDS: Record<LifecycleEvent['type'], true> = {
   DEADLINE_SPENT: true,
   ATTEMPT_ENDED: true,
   BACKING_OFF: true,
+  PARK_HELD: true,
   SETTLED: true,
 };
 
@@ -69,7 +70,11 @@ const events = (): LifecycleEvent[] => {
     for (const reason of [null, 'harness', 'deadline', 'operator', 'lost', 'unstartable'] as const)
       all.push({ type: 'ATTEMPT_ENDED', ended, reason, attempts: 1, turn: 0 });
   }
-  all.push({ type: 'BACKING_OFF', attempt: 1, backoffMs: 10 }, { type: 'SETTLED', outcome: 'succeeded' });
+  all.push(
+    { type: 'BACKING_OFF', attempt: 1, backoffMs: 10 },
+    { type: 'PARK_HELD', attempt: 1 },
+    { type: 'SETTLED', outcome: 'succeeded' },
+  );
   return all;
 };
 

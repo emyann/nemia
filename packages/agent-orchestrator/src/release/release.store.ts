@@ -22,6 +22,19 @@ const ReleaseFileSchema = Schema.Struct({
 /** The store's releases folder. */
 export const releasesDir = (root: string = wfRoot()): string => path.join(root, 'releases');
 
+/**
+ * The store's releases folder as a real path, which an image a session recorded is compared with (`sessionRelease`): through
+ * `fs.realpathSync`, so a store reached through a link compares as the folder it is; resolved as it stands where it does not exist yet.
+ */
+export function realReleasesDir(home: string): string {
+  const dir = releasesDir(home);
+  try {
+    return fs.realpathSync(dir);
+  } catch {
+    return path.resolve(dir);
+  }
+}
+
 /** The folder `tag` is built into. */
 export const releaseDir = (tag: string, root: string = wfRoot()): string => path.join(releasesDir(root), tag);
 

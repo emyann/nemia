@@ -32,7 +32,7 @@
 export { attemptVerdict, CHECK_RESULTS, checkVerdictOf, verdictWord } from './check/check.ts';
 export type { CheckResult, CheckVerdict } from './check/check.ts';
 export { VERSION } from './version/version.ts';
-export { leaseRelease, trialRefusal, type Running } from './release/release.ts';
+export { leaseRelease, trialRefusal, checkoutPromiseLine, type Running } from './release/release.ts';
 export { currentRelease } from './release/release.store.ts';
 export { runningRelease } from './release/version.verb.ts';
 export { Conflict, Invalid, isRefusal, Missing, type Refusal } from './refusal/refusal.ts';

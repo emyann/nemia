@@ -744,6 +744,15 @@ session read or wrote through its file tools (`Read`, `Edit`, `Write`, `MultiEdi
 relative to the folder its `init` line names, a denied call and a file outside that folder left out. `[]` is a session that
 touched none; absent where `skills` is, and where the `init` line names no folder.
 
+**An attempt says what it runs on.** Each attempt carries `image`, the code its session's process runs — the real folder of the runtime
+package that spawned a job or holds a long-lived session, a Pod's container image — and `harnessVersion`, the version its harness says
+it runs: Claude Code's `claude_code_version`, off the last `init` line, since the SDK prints one per turn and a resumed process its own.
+Both are journalled while the attempt runs, an `image` entry written off its sighting whenever either differs from the record
+(`imageFacts`), so a long-lived session a new holder takes up on other code is recorded again, and a job first seen already over still
+is, before its end. A spawn writes its `image` on the job's run file, and each holder on the session's as it writes itself its owner.
+Carried, never judged: which release that code is, is the layer above's to say. Absent from an attempt an older runtime recorded,
+and `harnessVersion` from a harness that says none (Codex).
+
 The lists are exported, from `agent-runtime` and from the pure door `agent-runtime/vocabulary` (no Effect, no I/O):
 `CLAUDE_PERMISSION_MODES`, `CLAUDE_EFFORTS` and `CLAUDE_CONTEXT_TOKENS`, `CODEX_SANDBOXES` and `CODEX_EFFORTS`, with
 `CLAUDE_AUTO_DROPPED`, the models Claude Code drops `auto` on. agent-orchestrator keeps no copy: `wf start` asks `configRefusal` of every
@@ -1949,6 +1958,7 @@ of pure code sits beside it.
 | `src/core/engine/engine.ts` | applies one decision, then the pass over every task |
 | `src/core/engine/counted.ts` | what a long-lived attempt in flight has consumed so far, journalled as it grows (`counted`), off the pass's sighting |
 | `src/core/engine/denied.ts` | what the harness denied an attempt in flight, each call journalled once as the sighting names it (`denied`) |
+| `src/core/engine/image.ts` | the code an attempt in flight runs on and its harness's version, journalled whenever its sighting says other than the record (`image`, `imageFacts`) |
 | `src/core/engine/filing.ts` | filing a task, admitting, stopping, answering and closing it, each with what it refuses (`refusalOf`): a fact journalled for the pass to act on |
 | `src/core/engine/append-refusal.ts` | the Task door's rules for one append, pure and proved (`contracts/journal.contract.ts`): a task filed once, under an id a file can be named by, written to only once filed, and started at `attempts.length + 1` |
 | `src/core/engine/stamped.ts` | the moment an entry is journalled (`stamped`), on the wall clock and the monotonic one, and a spawn's entry stamped with it |
@@ -1968,6 +1978,7 @@ of pure code sits beside it.
 | `src/harness/reach.ts` | what a harness's fence words reach, `fenceReach`: each word's rank, the one a task naming none runs in, the held and unasking modes, the modes Claude Code drops on a model, the words that refuse what no allow rule reaches and the tools that need none; and `unruledIn`, the first character of a path its permission rules cannot carry |
 | `src/harness/choices.ts` | the words each default harness takes per key of a task's config, `HARNESS_CHOICES`: its efforts, its permission modes or its sandboxes, the lists `configRefusal` judges by |
 | `src/harness/config-folders.ts` | the folders a harness reads as its own configuration inside a folder it is given to read, `CONFIG_FOLDERS`, and the first a path passes through, `configFolderIn`: pure, for a caller that puts files into a mounted folder |
+| `src/harness/image.ts` | the code a runner's process runs, `IMAGE`: the real folder of this package, a Pod's container image, written on a session's run file and recorded on its attempt |
 | `src/harness/mounts.ts` | a task's mounts, `Mount`: the folders beyond its `cwd` a session may reach, each read-only or writable, and the check of their shape every harness shares (`mountsRefusalOf`) |
 | `src/harness/admission.ts` | a task's admission, `Admission`: the command run before each call to the tools it names, the call it reads and the answer it gives (`AdmissionCall`, `AdmissionAnswer`), and the check of its shape every harness shares (`admissionRefusalOf`) |
 | `src/harness/settings.ts` | a harness's own project configuration in a directory, as a session started there gets it: `projectAllows`, the allow rules it grants, `[]` where the file is absent or names none and `undefined` for a harness that reads none |

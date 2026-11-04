@@ -6,7 +6,8 @@
  * upgrade` is held to its `--plan`; the controller waits with the status alone; each conflict is resolved, and the merge keeps each
  * choice. After it, `other` at 1.1.0 read from another folder of the same name merges three ways again.
  *
- * Beside the story: a base whose status names no template yet is refused a switch until a pass names it, an upgrade already under way
+ * Beside the story: a base whose status names no template yet is refused a switch until a pass names it, or, where its template
+ * cannot be read, until it is put back; an upgrade already under way
  * keeps its three-way merge, and a factory whose template changed under its version (`ContentChanged`) is named and switched. The merge
  * with no base itself is `src/upgrade/merge.test.ts`; the naming of a base, `src/applied/applied.verb.test.ts`. `WF_ROOT` is set before
  * `src` is imported, which reads it as it loads.
@@ -279,6 +280,30 @@ test('a base whose status names no template is refused a switch until a pass nam
   const underWay = await printedBy(t, ...diff);
   assert.equal(underWay[0], 'later: 0.1.0 → 1.0.0', 'an upgrade under way, its base unnamed, is previewed three ways');
   assert.equal(readStatus('later')?.template, undefined);
+});
+
+test('a base unnamed whose template cannot be read is named by no pass, and the refusal says to put the template back', async (t) => {
+  t.mock.method(console, 'log', () => {});
+  const dirs = templates();
+  await stage.main(['factory', 'apply', 'moved', '--template', dirs.team, '--repo', dirs.repo]);
+  reconciled(factory('moved'));
+  const { template: _named, ...status } = JSON.parse(fs.readFileSync(statusFile('moved'), 'utf8'));
+  fs.writeFileSync(statusFile('moved'), JSON.stringify(status));
+  const aside = path.join(scratch('wf-upgrade-switch-aside-'), 'team');
+  fs.renameSync(dirs.team, aside);
+  const gone = reconciled(factory('moved'));
+  assert.deepEqual([gone.conditions[0]?.reason, gone.template], ['TemplateInvalid', undefined], 'a folder gone names nothing');
+  const before = bytesUnder(FACTORIES);
+  const diff = ['factory', 'diff', 'moved', '--to', '1.0.0', '--template', dirs.other];
+  await assert.rejects(
+    stage.main(diff),
+    (err: Error & { exitCode?: number; _tag?: string }) =>
+      refusedWith('Conflict', /put the template back/i)(err) && err.message.includes(dirs.team),
+  );
+  assert.deepEqual(bytesUnder(FACTORIES), before, 'refused, nothing written');
+  fs.renameSync(aside, dirs.team);
+  assert.equal(reconciled(factory('moved')).template, 'team', 'put back, one pass names it');
+  assert.equal((await printedBy(t, ...diff))[0], 'moved: team 0.1.0 → other 1.0.0');
 });
 
 test('a factory whose template changed under its version is named after that template, and switched from it with no base', async (t) => {

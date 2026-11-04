@@ -34,6 +34,12 @@ export type Problem = { file: string; line?: number; col?: number; message: stri
  */
 export const sourceGiven = (given: string): string => (templateNameRefusal(given) === null ? given : path.resolve(given));
 
+/**
+ * The name a recorded source fixes with no read of it: a builtin template's is the name it is recorded by; a folder's or an archive's is
+ * read off it (an archive's is the top folder inside it), so none is said where it cannot be read.
+ */
+export const nameOfSource = (source: string): string | undefined => (templateNameRefusal(source) === null ? source : undefined);
+
 /** The folder a recorded source is read from, for a line that cannot fail: a name's folder in `builtins`, a path as it is. */
 export const builtinPlace = (source: string, builtins: string): string =>
   templateNameRefusal(source) === null ? path.join(builtins, source) : source;

@@ -19,7 +19,7 @@ import type { Factory, FactoryConditionReason, FactoryConditionType, FactoryTemp
 import { openedTree, packageSkillNames, problemLine, type OpenTemplate } from '../template/template.store.ts';
 import { TemplateSource } from '../templates/templates.model.ts';
 import { BuiltinTemplates, TemplateDoor, templatePlace } from '../templates/templates.store.ts';
-import { builtinPlace, sourceGiven } from '../templates/templates.ts';
+import { builtinPlace, nameOfSource, sourceGiven } from '../templates/templates.ts';
 import { rooted } from '../wiring/wire.verb.ts';
 import type { FactorySpec } from '../template/index.ts';
 import {
@@ -123,13 +123,14 @@ const messageOf = (err: unknown): string => (err instanceof Error ? err.message 
 
 /**
  * The template `source` as `factory` reads it: rendered, or the `Applied` condition that says why it is not; and the template's name,
- * wherever it was read, even where it does not render or is at another version.
+ * wherever it was read, even where it does not render or is at another version, else where its source fixes it (`nameOfSource`, a
+ * builtin's), so a builtin gone or renamed still names the base it rendered.
  */
 const templateNow = Effect.fn('templateNow')(function* (factory: Factory & { template: FactoryTemplate }) {
   const { source, version, params } = factory.template;
   const fix = `nemia template lint ${builtinPlace(source, yield* BuiltinTemplates)}`;
   const read = yield* renderedOrNot(renderedAt(source, setsOf(params)));
-  return { now: conditionOf(factory, version, fix, read), named: read.name };
+  return { now: conditionOf(factory, version, fix, read), named: read.name ?? nameOfSource(source) };
 });
 
 /** The render `read` as `factory`, applied at `version`, takes it: rendered, or the `Applied` condition that says why it is not. */

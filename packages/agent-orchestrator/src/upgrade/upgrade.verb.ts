@@ -18,7 +18,7 @@ import { FactoryName } from '../factory/factory.model.ts';
 import { FactoryDoor } from '../factories/factories.store.ts';
 import { rooted } from '../wiring/wire.verb.ts';
 import { templatePlace } from '../templates/templates.store.ts';
-import { sourceGiven } from '../templates/templates.ts';
+import { nameOfSource, sourceGiven } from '../templates/templates.ts';
 import { Effect } from 'effect';
 import type { Factory, FactoryTemplate } from '../factory/factory.ts';
 import { renderedAt, renderedOrNot, setsOf, type RenderedAt } from '../applied/applied.verb.ts';
@@ -171,13 +171,25 @@ const upgradeAsked = Effect.fn('upgradeAsked')(function* (args: Args, verb: stri
   if (given !== undefined) yield* templatePlace(source);
   const render = yield* renderTo(verb, factory, source, to, notDone, setsGiven(args));
   if (given !== undefined && typeof status?.version === 'string' && status.template === undefined && status.upgrade === undefined)
-    return yield* Effect.fail(
-      new Conflict({
-        message: `${verb}: ${factory.name}'s status does not name the template its base was rendered from yet, so whether ${given} is another template, to merge with no common base, cannot be told: start the daemon, nemia up, whose next pass names it, then ${verb} again. ${notDone}`,
-      }),
-    );
+    return yield* Effect.fail(yield* unnamedBase(verb, factory, given, notDone));
   const switched = switchOf(status, render);
   return yield* tried(() => upgradeChecked({ factory, from, to, source, render, base, switched }, verb, notDone, downgrades, args));
+});
+
+/**
+ * The refusal of an upgrade naming `given` while `factory`'s status names no template its base holds: where the template its file names
+ * cannot be read, and its source fixes no name, no pass can name it, so the fix is to put it back, then `nemia up`; else the next pass
+ * names it, `nemia up`.
+ */
+const unnamedBase = Effect.fn('unnamedBase')(function* (verb: string, factory: Templated, given: string, notDone: string) {
+  const { source, params } = factory.template;
+  const own = yield* renderedOrNot(renderedAt(source, setsOf(params)));
+  const why = `${factory.name}'s status does not name the template its base was rendered from yet, so whether ${given} is another template, to merge with no common base, cannot be told`;
+  if ('problems' in own && own.name === undefined && nameOfSource(source) === undefined)
+    return new Conflict({
+      message: `${verb}: ${why}, and no pass can name it: ${source}, the template ${factory.name}'s file names, cannot be read (${own.problems[0] ?? 'it is not there'}). Put the template back at ${source}, then start the daemon, nemia up, whose next pass names it, and ${verb} again. ${notDone}`,
+    });
+  return new Conflict({ message: `${verb}: ${why}: start the daemon, nemia up, whose next pass names it, then ${verb} again. ${notDone}` });
 });
 
 /** The upgrade `asked`, refused where it asks the version its base holds again, or a downgrade not asked for (`upgradeAsked`). */

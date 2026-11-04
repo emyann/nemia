@@ -556,7 +556,10 @@ test('a builtin template, named: applied, recorded by its name, read wherever Ne
     'REFUSED by the controller: a recorded name no builtin template has any longer is TemplateInvalid, its base and tree kept',
     async () => {
       const digest = readStatus('named')?.digest;
+      const { template: _named, ...unnamed } = JSON.parse(fs.readFileSync(statusFile('named'), 'utf8'));
+      fs.writeFileSync(statusFile('named'), JSON.stringify(unnamed));
       const gone = programsAt(ROOT, scratch('wf-applied-none-')).reconciled(templated('named'));
+      assert.equal(gone.template, 'team', 'a builtin is named by the name it is recorded by, even where none has it any longer');
       const { message, ...applied } = gone.conditions[0];
       assert.deepEqual(applied, { type: 'Applied', status: 'False', reason: 'TemplateInvalid' });
       assert.ok(message.includes('./team'), message);

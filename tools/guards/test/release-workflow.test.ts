@@ -4,10 +4,11 @@
  * `.github/workflows/release.yml` keeps the release pull request and makes the release its merge asks for; `release-label.yml` is the
  * `release-label` check; `.github/release.yml` groups the notes by label. Nothing here can run them: their first real verdict is on
  * GitHub. What drifts is held instead — a job granted a write it does not make, a job outside the concurrency that keeps two runs from
- * writing the release branch at once, a check that takes the labels into its command line, a category for a label the tool no longer
- * has — each a pure function returning a sentence that names the fix, run once on the shipped files and broken once per clause on a
- * planted copy. The clauses every workflow of the repository keeps (GitHub's own actions, a bound on every job and network step, no
- * trigger that hands a fork a writable token) are `ci-workflow.ts`'s, the ones `ci-workflow.test.ts` holds `ci.yml` to.
+ * writing the release branch at once, a check that takes the labels into its command line, a label check that cannot be dispatched
+ * with the pull request's number or that does not say the commit it checks, a category for a label the tool no longer has — each a
+ * pure function returning a sentence that names the fix, run once on the shipped files and broken once per clause on a planted copy.
+ * The clauses every workflow of the repository keeps (GitHub's own actions, a bound on every job and network step, no trigger that
+ * hands a fork a writable token) are `ci-workflow.ts`'s, the ones `ci-workflow.test.ts` holds `ci.yml` to.
  *
  * The files are under `.github/`, among the `guards#test` task's inputs in `turbo.json`, so an edit to one makes this suite due.
  */
@@ -31,11 +32,14 @@ const parse = (source: string): Workflow => yaml.load(source) as Workflow;
 /** The command every job of the release runs, followed by its verb. */
 const TOOL = 'node tools/release/release.ts';
 
-/** What each job of the release is: the verb it runs, the jobs it waits for, its token's grants, and its concurrency. */
+/**
+ * What each job of the release is: the verb it runs, the jobs it waits for, its token's grants, and its concurrency. `pr`'s
+ * `actions: write` is the dispatch of `DISPATCHED` (`release.ts`) on the release head.
+ */
 const JOBS: Record<string, { needs: string[]; permissions: Record<string, string>; group: string; cancel: boolean }> = {
   labels: { needs: [], permissions: { contents: 'read', issues: 'write' }, group: 'release', cancel: false },
   tag: { needs: ['labels'], permissions: { contents: 'write' }, group: 'release', cancel: false },
-  pr: { needs: ['tag'], permissions: { contents: 'write', 'pull-requests': 'write' }, group: 'release', cancel: false },
+  pr: { needs: ['tag'], permissions: { actions: 'write', contents: 'write', 'pull-requests': 'write' }, group: 'release', cancel: false },
 };
 
 /** The pull_request events that can change a pull request's labels or its head, each of which reruns the check. */
@@ -105,9 +109,10 @@ function labelDrift(workflow: Workflow): string[] {
       `${LABEL_CHECK} does not run on the pull_request types ${TYPES.join(', ')}: list them all, or a label change is never checked`,
     );
   if (!same(pr?.branches, ['main'])) sentences.push(`${LABEL_CHECK} does not run on pull requests into main alone: write branches: [main]`);
-  if (workflow.on !== undefined && 'workflow_dispatch' in workflow.on)
+  const input = workflow.on?.workflow_dispatch?.inputs?.pr;
+  if (input?.required !== true || input.type !== 'string')
     sentences.push(
-      `${LABEL_CHECK} has a workflow_dispatch trigger: take it out, since a dispatched run never counts for a pull request's required check`,
+      `${LABEL_CHECK} has no workflow_dispatch trigger with a required string input pr: add it, so the release can dispatch the check on its head with the pull request's number`,
     );
   if (!same(sortedKeys(workflow.permissions), { contents: 'read', 'pull-requests': 'read' }))
     sentences.push(
@@ -123,7 +128,19 @@ function labelDrift(workflow: Workflow): string[] {
     if (checks.length === 0 || !checks.every((step) => live(step.env)))
       sentences.push(
         `the ${CHECK_JOB} job in ${LABEL_CHECK} does not run ${TOOL} check with env PR_NUMBER and GH_TOKEN and no LABELS: ` +
-          'pass those, so an approved run reads the labels the pull request has then, not its payload',
+          'pass those, so a run reads the labels the pull request has then, not its payload',
+      );
+    else if (
+      !checks.every((step) => step.env?.PR_NUMBER.includes('github.event.pull_request.number') && step.env.PR_NUMBER.includes('inputs.pr'))
+    )
+      sentences.push(
+        `the ${CHECK_JOB} job's PR_NUMBER in ${LABEL_CHECK} does not read both github.event.pull_request.number and inputs.pr: ` +
+          'write ${{ github.event.pull_request.number || inputs.pr }}, so a dispatched run names its pull request',
+      );
+    if (checks.length > 0 && !checks.every((step) => step.env?.HEAD_SHA?.includes('github.sha') === true))
+      sentences.push(
+        `the ${CHECK_JOB} job in ${LABEL_CHECK} passes no HEAD_SHA from github.sha: ` +
+          "write ${{ github.event_name == 'workflow_dispatch' && github.sha || '' }}, so a dispatched run checks only the pull request whose head it is on",
       );
   }
   return sentences;
@@ -202,17 +219,19 @@ test("REFUSED: a third party's action, a job with no bound, a network step with 
   );
 });
 
-test('REFUSED: a missing release-label job, a dispatch trigger on the check, labels from the payload, labels interpolated into a command, and a type unlisted', () => {
+test('REFUSED: a missing release-label job, the check not dispatchable with its pull request, no head to compare, labels from the payload, labels interpolated into a command, and a type unlisted', () => {
   const all = (label: string, release = text(RELEASE)) => drift(release, label, text(NOTES));
   refused(
     all(planted(LABEL_CHECK, '  release-label:\n    name: release-label\n', '  label:\n    name: label\n')),
     CHECK_JOB,
     'no release-label job',
   );
+  refused(all(planted(LABEL_CHECK, '        required: true\n', '        required: false\n')), 'input pr', 'the pr input not required');
+  refused(all(planted(LABEL_CHECK, ' || inputs.pr }}', ' }}')), 'inputs.pr', 'a dispatched run given no number');
   refused(
-    all(planted(LABEL_CHECK, '    branches: [main]\n', '    branches: [main]\n  workflow_dispatch:\n')),
-    'workflow_dispatch',
-    'the label check dispatched again',
+    all(planted(LABEL_CHECK, /^ {10}HEAD_SHA:.*\n/m.exec(text(LABEL_CHECK))?.[0] ?? 'HEAD_SHA', '')),
+    'HEAD_SHA',
+    'no head to compare',
   );
   refused(
     all(
@@ -248,11 +267,7 @@ test('REFUSED: a job granted a write it does not make, a job the release does no
     'the labels job',
     'labels granted contents: write',
   );
-  refused(
-    all(planted(RELEASE, '      pull-requests: write\n', '      pull-requests: write\n      actions: write\n')),
-    'the pr job',
-    'pr granted the dispatch it no longer makes',
-  );
+  refused(all(planted(RELEASE, '      actions: write\n', '')), 'the pr job', 'pr not granted the dispatch it makes');
   refused(
     all(
       `${text(RELEASE)}\n  proof:\n    needs: [pr]\n    runs-on: ubuntu-latest\n    timeout-minutes: 45\n    steps:\n      - run: ${TOOL} proof\n        timeout-minutes: 42\n`,

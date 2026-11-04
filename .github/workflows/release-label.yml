@@ -4,14 +4,21 @@
 # holds this file.
 name: release-label
 
-# The check runs on every event that can change the labels, and reads them live by the pull request's number: a run a person approves
-# later (the release pull request's, whose head the workflow's own token pushed) reads the labels it has then, not its event's
-# payload. No dispatch: a dispatched run never counts for a pull request. The sibling trigger that would run a fork's code against a
-# writable token is named nowhere here.
+# The check runs on every event that can change the labels, and reads them live by the pull request's number, so a run reads the
+# labels the pull request has then, not its event's payload. The release workflow dispatches it on the release pull request's head,
+# whose pull_request runs wait for approval since its own token pushed it, giving the number as pr; a dispatched run checks only a
+# pull request whose head is the commit it runs on. The sibling trigger that would run a fork's code against a writable token is
+# named nowhere here.
 on:
   pull_request:
     types: [opened, reopened, synchronize, labeled, unlabeled]
     branches: [main]
+  workflow_dispatch:
+    inputs:
+      pr:
+        description: The number of the pull request whose head this run checks
+        required: true
+        type: string
 
 # The check reads the code and the pull request's labels, and writes nothing.
 permissions:
@@ -37,8 +44,10 @@ jobs:
       - name: Check the pull request's release label
         timeout-minutes: 3
         # The number comes through env, never interpolated into the command line, and the labels are read from the API with it.
+        # HEAD_SHA is the commit a dispatched run reports on, and empty on a pull_request event.
         env:
-          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_NUMBER: ${{ github.event.pull_request.number || inputs.pr }}
+          HEAD_SHA: ${{ github.event_name == 'workflow_dispatch' && github.sha || '' }}
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: node tools/release/release.ts check

@@ -81,7 +81,16 @@ export type Job = {
 
 export type Workflow = {
   name?: string;
-  on?: Record<string, { branches?: string[]; types?: string[]; paths?: string[]; 'paths-ignore'?: string[] } | null>;
+  on?: Record<
+    string,
+    {
+      branches?: string[];
+      types?: string[];
+      paths?: string[];
+      'paths-ignore'?: string[];
+      inputs?: Record<string, { required?: boolean; type?: string; description?: string }>;
+    } | null
+  >;
   permissions?: Record<string, string>;
   concurrency?: { group?: string; 'cancel-in-progress'?: unknown };
   jobs: Record<string, Job>;

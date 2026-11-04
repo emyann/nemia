@@ -86,7 +86,7 @@ test("`INBOX`: the cards in play by default — a card whose run ended left out 
     await Effect.runPromise(e.file({ id: `t-${id}`, brief: 'Do it.', cwd: '/code/app', harness: 'claude' }));
   own.settle('t-r-at-work', 'working');
   own.settle('t-r-ended', 'failed', { exitCode: 1 });
-  const listed = async (args: Record<string, unknown>) => {
+  const listed = async (args: Parameters<typeof INBOX.handler>[0]) => {
     const { cards, ended } = await runWith(e, INBOX.handler(args, undefined, ROOT));
     return { cards: cards.map((c) => [c.name, c.state]), ended };
   };

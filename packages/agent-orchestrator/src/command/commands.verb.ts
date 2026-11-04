@@ -390,7 +390,7 @@ const LS: Command<RunsListed> = {
     { method: 'GET', path: '/api/listing', status: 200 },
     { method: 'GET', path: '/api/listing/:runId', status: 200 },
   ],
-  handler: (args) => Effect.flatMap(selectorsIn(args), (selectors) => runsListed(textOf(args, 'runId'), selectors)),
+  handler: (args, _env, home) => Effect.flatMap(selectorsIn(args), (s) => runsListed(textOf(args, 'runId'), s, rootGiven(home, 'ls'))),
   print: (listed, args) => [...(listed.paused ? pausedLines(listed.paused) : []), ...lsLines(listed, Date.now(), runsShown(args))],
 };
 

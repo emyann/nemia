@@ -25,7 +25,8 @@
  * a step, `bin/ae-claude-job.ts`, itself, on the same request shape and the SDK's own Claude Code (no `AE_CLAUDE_EXECUTABLE`), and
  * keeps its stdout, ending its stdin at the session's `result` line as the worker does (`closesOn`). The session's `system`/`init`
  * line, whose `model` and `claude_code_version` are asserted, is the one `claudeStreamOutput` — the reader the engine uses — reads as
- * `ranOn`. That line is written to `WF_ARTIFACTS` as
+ * `ranOn`, and its version as `harnessVersion`, which the engine records on the attempt with the runtime's own folder (`image`). That line
+ * is written to `WF_ARTIFACTS` as
  * `sdk-<version>-init.json`, beside the engine's attempt, so the record and the line it came from are handed over together.
  *
  * Its control is the old SDK: the same job on 0.3.270 records `claude-opus-5`, which is the measurement the card was filed on.
@@ -96,6 +97,8 @@ test(
         `a session asked for \`opus\`, on the Claude Code ${SDK_VERSION} bundles, ran on ${attempt.ranOn}; it ended ${attempt.reason}`,
       );
       assert.equal(attempt.ended, 'succeeded', `and it ran: ${view?.phase}`);
+      assert.equal(attempt.harnessVersion, CLAUDE_CODE_VERSION, 'the attempt records the Claude Code its init line names');
+      assert.equal(attempt.image, fs.realpathSync(path.join(import.meta.dirname, '..')), 'and the real folder of the runtime that ran it');
     } finally {
       const session = view?.sessionId;
       if (session)
@@ -156,6 +159,7 @@ test(
     assert.equal(init.model, OPUS_TODAY, `\`opus\` on the Claude Code ${SDK_VERSION} bundles started on ${init.model}`);
     assert.equal(init.claude_code_version, CLAUDE_CODE_VERSION, `the session ran the Claude Code ${SDK_VERSION} bundles`);
     assert.equal(claudeStreamOutput(stdout).ranOn, init.model, 'the reader the engine uses records the model the init line says');
+    assert.equal(claudeStreamOutput(stdout).harnessVersion, init.claude_code_version, 'and the Claude Code it names');
     assert.equal(code, 0, `and the session ran to a result: ${err}`);
   },
 );

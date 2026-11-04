@@ -669,6 +669,36 @@ test('decode: an entry no runtime wrote fails its read, naming the task, the ent
   );
 
   await t.test(
+    'the code and harness version an image entry names are read back as written and fold onto the attempt, the latest winning; a journal with none folds with neither',
+    async () => {
+      const starting = (attempt: number) => ({ kind: 'starting', at: '2026-09-24T00:00:00Z', attempt });
+      const image = (o: object) => ({ kind: 'image', at: '2026-09-24T00:00:01Z', attempt: 2, ...o });
+      const read = await run(
+        legacyStore({
+          't-image': [
+            TODAY,
+            starting(1),
+            end(1, {}),
+            starting(2),
+            image({ image: '/r/v1', harnessVersion: '2.1.315' }),
+            image({ image: '/r/v2' }),
+          ],
+        }),
+        readOf('t-image'),
+      );
+      assert.deepEqual(
+        fold('t-image', read).attempts.map((a) => [a.image, a.harnessVersion]),
+        [
+          [undefined, undefined],
+          ['/r/v2', '2.1.315'],
+        ],
+      );
+      const error = await refusedRead([TODAY, starting(1), { kind: 'image', at: '2026-09-24T00:00:01Z', attempt: 1, image: 5 }]);
+      naming(error.message, 'entry 3', '`image`');
+    },
+  );
+
+  await t.test(
     'the files an end names are read back as written, an empty list kept; a list of anything but paths fails the read',
     async () => {
       const read = await run(

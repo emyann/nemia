@@ -135,6 +135,7 @@ const KINDS: Record<string, string> = {
   measured: 'measured',
   counted: 'counted',
   denied: 'denied',
+  image: 'image',
   settled: 'SETTLED',
   'stop-requested': 'stop asked',
   said: 'said',
@@ -149,6 +150,7 @@ const EXTRAS: { [K in Event['kind']]?: (event: Extract<Event, { kind: K }>) => s
   measured: (e) => `  attempt ${e.attempt}: ${costLine(e.usage)}`,
   counted: (e) => `  attempt ${e.attempt}: ${runningLine(e.usage)}`,
   denied: (e) => `  attempt ${e.attempt}: ${denialText(e)}`,
+  image: (e) => `  attempt ${e.attempt}: ${[e.image, e.harnessVersion].filter(Boolean).join(', ')}`,
   ended: (e) =>
     `  ${e.observed}${e.limit ? ` (${e.limit})` : e.reason === 'harness' ? noStatement(e.closedOut) : ` (${e.reason})`}${e.error ? `: ${firstLine(e.error).slice(0, 160)}` : ''}`,
   spawned: (e) => (e.error ? `  but the call failed: ${firstLine(e.error).slice(0, 160)}` : ''),

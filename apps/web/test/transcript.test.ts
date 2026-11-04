@@ -250,7 +250,7 @@ test("the transcript's helpers: a call's detail, events merged, the session to r
   await t.test(
     'a step has a conversation to read once a session of its current task has started, on its turn or one before, and none before it or before it is filed',
     () => {
-      const latest = { startedAt: at(), ended: null, endedAt: null, reason: null };
+      const latest = { startedAt: at(), ended: null, endedAt: null, reason: null, release: null, harness: null };
       const none = { count: 0, latest: null };
       assert.equal(sessionToRead({ taskId: 'run-review', attempts: { count: 1, latest }, tries: [] }), 'run-review');
       assert.equal(sessionToRead({ taskId: 'run-review', attempts: { count: 3, latest }, tries: [] }), 'run-review');

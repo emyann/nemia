@@ -135,7 +135,9 @@ They write nothing: run them unasked, as often as you need. One that sets with s
   nemia version [--json]
                                this nemia's release, an install's tag or a checkout, and its folder;
                                the release the store's releases/current names; and the release the
-                               daemon runs, from its lease. --json: the whole answer
+                               daemon runs, from its lease, and whether it promises to keep a running
+                               session on its files; and the sessions at work by release and harness
+                               version, off their records. --json: the whole answer
   nemia watch [cursor] [--once] [-l <selector>]... [--cursor-file <path>] [--json]
                                the feed's lines, followed as the tick writes them, until ^C, and a
                                daemon down line when nothing ticks the store, daemon up when it does

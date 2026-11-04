@@ -35,6 +35,7 @@ import { compactOps } from './compact.ts';
 import { lookedFor } from './looked.ts';
 import { detachedStateOf, firstRunFile, leased, runFileIn, type Carried, type Run, type RunFile } from './run-file.ts';
 import { carriedOf, lessCarried } from './carried.ts';
+import { sightedOf } from './sighted.ts';
 import { workerBoundsOf, type DetachedOptions } from './detached-options.ts';
 import { spawnFiles, spawnInput } from './spawn-files.ts';
 
@@ -268,6 +269,11 @@ export type HarnessOutput = {
    * this is what happened, and the two are different facts. Absent when the harness does not say.
    */
   ranOn?: string;
+  /**
+   * The version of the harness the session runs, as its own start line said it — Claude Code's `claude_code_version`. Absent when it
+   * does not say.
+   */
+  harnessVersion?: string;
 };
 
 /** The worker a detached run is spawned with, `bin/ae-worker.ts`, found from this file's own folder. */
@@ -292,7 +298,7 @@ export type RunInput = { first: string; inbox: string; from: number; closesOn: {
  * (`statement`), else what its output says, with no time: the spawn cleared both before it launched the run, so either was written by
  * the run's own process, and the engine keeps it whatever the clock says; its exit code once it has one, never the worker's -1; and
  * what its output says it used, reached and was denied, and the skills it loaded and the files it touched: an empty list kept, since it
- * says they were counted.
+ * says they were counted; the harness's version its output says, and the code its spawn wrote it runs (`image`).
  */
 const sightingOf = (
   name: string,
@@ -309,11 +315,8 @@ const sightingOf = (
   closeout: statement ?? (output?.read.closeout && { payload: output.read.closeout.payload }),
   ...(typeof run.exitCode === 'number' && run.exitCode >= 0 ? { exitCode: run.exitCode } : {}),
   ...(usage ? { usage } : {}),
-  ...(output?.read.limit ? { limit: output.read.limit } : {}),
-  ...(output?.read.denials?.length ? { denials: output.read.denials } : {}),
-  ...(output?.read.skills ? { skills: output.read.skills } : {}),
-  ...(output?.read.files ? { files: output.read.files } : {}),
-  ...(output?.read.ranOn ? { ranOn: output.read.ranOn } : {}),
+  ...(output ? sightedOf(output.read) : {}),
+  ...(run.image ? { image: run.image } : {}),
 });
 
 /** What a spec's reader said of a run's output (`outputIn`): what it read, why it refused it, or nothing, with no output yet. */

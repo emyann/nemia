@@ -43,6 +43,8 @@ export type {
   StepUnreadable,
 } from 'agent-orchestrator';
 export type { StepFiled, StepRaise, TaskPart, RunRead, StepUsed, Usage } from 'agent-orchestrator';
+/** What a step's latest attempt ran on (`StepAttempts.latest`): its release and its harness, where the board's mirrors read them. */
+export type { SessionHarness, SessionRelease } from 'agent-orchestrator';
 
 /** A person's hold on a run, as `PUT /api/runs/:id/hold` answers it beside the run (`{ id, lifted: false, hold }`). */
 export type { Hold } from 'agent-orchestrator/run';

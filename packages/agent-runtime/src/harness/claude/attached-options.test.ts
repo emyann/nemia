@@ -7,7 +7,7 @@
  * to it.
  *
  * Which keys are on which is the subject: the servers and their fence, the agent's prompt and the context window are typed options,
- * and `extraArgs` holds exactly the two flags the SDK 0.3.308 has no option for beside whatever `config.claude` gives of its own, with
+ * and `extraArgs` holds exactly the two flags the SDK 0.3.316 has no option for beside whatever `config.claude` gives of its own, with
  * the window beside them for the one task whose settings are a file the runtime will not rewrite. So each typed
  * option is asserted by its own name, and the whole of `extraArgs` is read in one `deepEqual`: a key moved back onto the command line
  * fails by its own name, and a key added to the bag fails as a question — has the SDK an option for it?
@@ -162,7 +162,7 @@ test('attachedOptions: a rich task is fenced on the SDK’s own options, each fa
     assert.deepEqual(
       given.extraArgs,
       { 'mcp-debug': null, 'no-chrome': null, worktree: 'tree' },
-      'the task’s own unmapped flag, and the two of 0.3.308: no Chrome and the worktree',
+      'the task’s own unmapped flag, and the two of 0.3.316: no Chrome and the worktree',
     );
   });
 });

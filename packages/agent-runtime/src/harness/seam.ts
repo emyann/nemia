@@ -75,7 +75,7 @@ export type LocalMcpServer = { type?: 'stdio'; command: string; args?: string[];
 /**
  * A server the harness connects to, as a `.mcp.json` entry gives it, with the facts of an OAuth client where one signs in.
  *
- * `oauth` is **still not declared** on the SDK's type for an HTTP server (`sdk.d.ts:1205-1220`), so it rides the untyped seam and
+ * `oauth` is **still not declared** on the SDK's type for an HTTP server (`sdk.d.ts:1219-1234`), so it rides the untyped seam and
  * no typecheck of ours reads it. It is **validated and kept** by the SDK all the same, measured on 0.3.308
  * (`docs/harness.md`, *The MCP sign-in affordances*): a server handed inline with it comes back from `mcpServerStatus()` with its own
  * `oauth` echoed on `config`, and the SDK's undeclared authenticate method answers an authorize URL built from that `clientId` and

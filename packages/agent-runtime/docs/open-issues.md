@@ -46,7 +46,7 @@ of a held session on its `system`/`init` message, and `bin/ae-claude-job.ts`, wh
 file beside the run (`bridgeDue`).
 
 **What is known.** `@anthropic-ai/claude-agent-sdk` declares no `enableRemoteControl` on its `Query` type — not on 0.3.270, and not
-on 0.3.308, where `sdk.d.ts` still has no such name and `sdk.mjs` still carries the method (re-read 2026-10-22 at the bump) — yet the object
+on 0.3.316, where `sdk.d.ts` still has no such name and `sdk.mjs` still carries the method (re-read 2026-11-01 at the bump) — yet the object
 `query()` answers carries it: `enableRemoteControl(enabled, name?, { reattachSessionId?, keepSessionOnExit?, workSecret? })`, which
 sends a `remote_control` control request with `reattach_session_id` and `keep_session_on_exit` at its top level, answers the bridge's
 facts (`session_url`, `connect_url`, `environment_id`, `bridge_epoch`, `bridge_session_id`), and drives `system`/`bridge_state`
@@ -1595,7 +1595,7 @@ it, and was refused at design (2026-10-23) as a second cost source drifting from
 bites.
 
 The step's spend cap does not hold across those processes either: the SDK's `maxBudgetUsd` counts only the spend since its `query()`
-call started (`sdk.d.ts:6034-6037`), and `adopt` resumes with the task's whole `config.budgetUsd`, so every restart of the holder
+call started (`sdk.d.ts:6100-6103`), and `adopt` resumes with the task's whole `config.budgetUsd`, so every restart of the holder
 hands the session its whole cap again. Left to an intent of its own by the person's answer at the design gate (2026-10-23).
 
 ## `claude-detached` still spells `claude -p`, and is the only road that does (closed 2026-10-24)

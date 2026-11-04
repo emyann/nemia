@@ -145,7 +145,7 @@ test(
       assert.equal(
         init.appendSystemPrompt,
         'you are the agent',
-        "the agent's own prompt is appended on the initialize request (`sdk.d.ts:4687`), as its text and not its file's path",
+        "the agent's own prompt is appended on the initialize request (`sdk.d.ts:4728`), as its text and not its file's path",
       );
       const [argv] = lines(dir, 'argv.jsonl') as string[][];
       assert.ok(!argv.includes('--append-system-prompt-file'), "the prompt is no flag: the SDK carries it in the session's init");

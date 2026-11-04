@@ -1,6 +1,6 @@
 /**
  * A stand-in for Claude Code as the Agent SDK runs it (`pathToClaudeCodeExecutable`), speaking the SDK's stdio protocol as
- * `@anthropic-ai/claude-agent-sdk` 0.3.308 does: control requests both ways (`initialize`, `hook_callback`, `can_use_tool`,
+ * `@anthropic-ai/claude-agent-sdk` 0.3.316 does: control requests both ways (`initialize`, `hook_callback`, `can_use_tool`,
  * `interrupt`, `remote_control`, `get_usage` — that one answered by `usageAnswer` from the recorded answer `STANDIN_USAGE` names,
  * after `STANDIN_USAGE_MS`), and stream-json lines out. What it does is its plan, `STANDIN_PLAN` (`Plan`), and what it saw it
  * writes into `STANDIN_DIR`: `argv.jsonl` (each start's arguments), `initialize.jsonl` (each `initialize` request's payload, the
@@ -13,7 +13,7 @@
  *
  * Its session id is `stand-in-session`, its plan's `id` where it gives one, or the one `--resume=<id>` names, as the SDK writes it.
  *
- * Its cost is Claude Code's as the SDK documents `total_cost_usd` (`sdk.d.ts:6034-6037`) and `docs/harness.md` measures it: a running
+ * Its cost is Claude Code's as the SDK documents `total_cost_usd` (`sdk.d.ts:6100-6103`) and `docs/harness.md` measures it: a running
  * total of this process, each turn charged its plan's `cost` as it starts — so an interrupted turn has spent it — and each result
  * printing the total so far. Once its stdin ends, after the turn an interrupt cut prints its result, it saves that total as a
  * `cost-state` line in `cost-state.jsonl` of its folder, where Claude Code saves one in its transcript; a `--resume=<id>` starts

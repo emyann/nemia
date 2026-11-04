@@ -152,7 +152,7 @@ export type McpSignInAsk = (
 ) => Promise<McpSignInSession>;
 
 /**
- * The SDK's authenticate method, which `sdk.mjs` 0.3.308 defines on `query()`'s object (`mcpAuthenticate(e,t)`, a control request of the
+ * The SDK's authenticate method, which `sdk.mjs` 0.3.316 defines on `query()`'s object (`mcpAuthenticate(e,t)`, a control request of the
  * subtype mcp_authenticate) and `sdk.d.ts` does not declare: called through this one type, so an SDK that renames it fails here, by name.
  */
 type Authenticating = {

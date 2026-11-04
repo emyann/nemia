@@ -5,7 +5,7 @@
  *
  * What it holds, each a rule the bin states and nothing else proves:
  *
- * - a job's session is denied by Claude Code itself (`permissionPrompts: 'none'`, `sdk.d.ts:2054`) — the argv the SDK gives it
+ * - a job's session is denied by Claude Code itself (`permissionPrompts: 'none'`, `sdk.d.ts:2081`) — the argv the SDK gives it
  *   carries `--permission-prompts=none` (the joined form from SDK 0.3.295; read through `sdkArgValue`, which takes either and
  *   refuses an absent flag), so no decision of this process is asked for, which is the point: a decision held here would die with
  *   this process, unanswered;

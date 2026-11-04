@@ -208,11 +208,14 @@ rm "$S"/node_modules; git worktree remove "$S"
   2. `nemia upgrade <tag>`. It exports the tag into `releases/<tag>` beside the running one and runs `npm ci`, `npm run build` and
      `npm run release:check` there on a trial store: minutes, and about 850 MB a release. Where a command fails it is refused with
      nothing changed, naming the command, its exit and its log. Otherwise it points `releases/current` at the tag and restarts the
-     service through the take-over: it pauses the store unless a person's pause stands, lets each landing check finish, waits for each
-     attached session's call in flight, stops the daemon by SIGTERM, starts the unit, and resumes once the new daemon has made its first
-     pass (`packages/agent-orchestrator/src/service/takeover.verb.ts`).
-  3. Jobs and their checks run on, on the release they started on: the restart signals the daemon alone (`KillMode=process`). Every
-     new try, round or resume starts on the new release.
+     service through the take-over: it puts its pause unless a person's pause stands, lets each landing check finish, holds the
+     daemon's attached sessions at their next tool call and waits up to the grace (`nemia grace`, 10m by default; `--grace <d>` on
+     `nemia upgrade` for this one) for their calls in flight, printing `Pausing: N sessions finishing a tool call, cut in M min`, cuts
+     what is left, sends SIGTERM, starts the unit, and resumes once the new daemon has made its first pass. The new daemon resumes each
+     of those sessions as the same try, told it was paused between two calls (or which call was cut), on the new release
+     (`packages/agent-orchestrator/src/service/takeover.verb.ts`).
+  3. Jobs and their checks are not paused: they run on, on the release they started on, since the take-over's pause has no grace and
+     the restart signals the daemon alone (`KillMode=process`). Every new try, round or resume starts on the new release.
   4. Read `nemia version`: `current:` and `daemon:` name the tag, and `sessions:` counts the sessions at work by release and Claude Code
      version; the old release's count falls to none as its sessions end. `nemia ls` says `on <tag>, claude <version>` beside a step
      at work, and the board's step inspector says what the latest attempt ran on. Report it to the person in one line.
@@ -276,8 +279,9 @@ step that is refused, stop, read what the refusal names, and tell the owner; the
 6. **Put the installed bin first** on the PATH, in the operator's shell profile and in the shell that runs the steps below:
    `export PATH="$HOME/.agent-workflows/releases/current/node_modules/.bin:$PATH"`. `command -v nemia` names it, and `nemia version` says
    `this nemia: <tag> (install, …)`.
-7. **Pause the live store** (`nemia pause --why "moving the daemon onto a release"`) and wait until no landing is checking on two looks
-   in a row.
+7. **Pause the live store** (`nemia pause --why "moving the daemon onto a release" [--grace <d>]`). It parks every session, a job or
+   an attached one, at its tool call's end, and `nemia ls` says such a step `paused` (with the call it stopped after). Wait until
+   `nemia pause` says `Paused` and no landing is checking on two looks in a row.
 8. **Re-point the unit**, from that shell: `nemia service install --env WF_MAX_CONCURRENT=50 --env WF_MAX_RUNS=7 --env
    OTEL_EXPORTER_OTLP_ENDPOINT="$OTEL_EXPORTER_OTLP_ENDPOINT" --env NEMIA_TOOL_DETAILS=1 --env NEMIA_DAEMON_START=off`, one `--env` per
    line recorded in step 2, the collector's address set in that shell first. The installed `nemia` writes the unit onto
@@ -290,7 +294,7 @@ step that is refused, stop, read what the refusal names, and tell the owner; the
      sessions still at work and no new ones on it.
    - `systemctl --user cat nemia.service`: the `Environment=` lines of step 2, the release's bin first on PATH, and the drop-in still
      listed after the file.
-   - `nemia resume`; the janitor's next run files its cards.
+   - `nemia resume`: each parked session goes on as the same try, and the janitor's next run files its cards.
 10. **Approve no landing** until `nemia version`'s `sessions:` names no `checkout` session: a landing's fast-forward still moves the
     files under them.
 11. **If the new unit does not hold the store** (step 9 fails, or `nemia service status` says it stopped): `journalctl --user -u
@@ -421,7 +425,9 @@ English; never push or open a pull request unless asked.
 - **Reads:** `nemia ls`, `nemia decide`, `nemia inbox`, `nemia stats`, `nemia passes`, `GET /api/quota`, the task journals, the check
   logs, the session transcripts; `git log`, `git diff`, `git merge-tree`, `git grep` on any branch.
 - **Acts:** `nemia start` (`--after`, later `--from`), `nemia approve`, `nemia retry` (`--message`, `--recheck`), `nemia say`,
-  `nemia hold` (`--until`, `--why`, `--off`), `nemia pause` and `nemia resume`, `nemia inbox add`, `nemia retry --round`, `nemia refresh --base`; `nemia upgrade` and `nemia version`;
+  `nemia hold` (`--until`, `--why`, `--off`), `nemia pause` (`--grace <d>`; `--now` cuts the calls at once, no try spent) and
+  `nemia resume`, `nemia grace`, `nemia inbox add`, `nemia retry --round`, `nemia refresh --base`; `nemia upgrade` (`--grace <d>`) and
+  `nemia version`;
   scratch worktrees for verification.
 - **Asks:** a channel to the person that carries questions as data and waits for the answer, on the board and on a phone.
 - **Wakes:** on a subscription to the feed filtered at the source to what needs judgement, with a digest of the rest (slice 5a), never

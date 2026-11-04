@@ -429,18 +429,24 @@ Each asks the person at a prompt every time it runs: say what it does before you
   nemia service uninstall [--name <name>]
                                stop the login service, disable it and remove its file; a daemon
                                started by hand is left alone
-  nemia service restart [--name <name>]
+  nemia service restart [--name <name>] [--grace <d>]
                                restart the service's daemon on the code it runs: pause the store, wait
-                               for landing checks, stop it, start the service, and resume once the new
-                               daemon has completed its first pass; refused, naming the log, when that
-                               pass fails. A pause a person put stands. Starts the service where
-                               nothing ticks; a daemon started by hand is named with --take-over's line
-  nemia upgrade <tag> [--repo <path>] [--name <name>]
+                               for landing checks, give the daemon's sessions up to the grace to end
+                               their tool calls (--grace <d>, else nemia grace), stop it, start the
+                               service, and resume once the new daemon has completed its first pass;
+                               refused, naming the log, when that pass fails. Jobs run on; each
+                               session parks and resumes as the same try. A pause a person put stands.
+                               Starts the service where nothing ticks; a daemon started by hand is
+                               named with --take-over's line
+  nemia upgrade <tag> [--repo <path>] [--name <name>] [--grace <d>]
                                build the tag from a clean export into the store's releases/<tag>:
                                npm ci, npm run build and npm run release:check there, on a trial
                                store; then point releases/current at it and restart the daemon onto
-                               it where the login service runs the pointer. A tag built already is
-                               switched to without a rebuild, so an older tag rolls back. --repo:
+                               it where the login service runs the pointer: jobs run on, and the
+                               daemon's sessions are given up to the grace to end their tool calls
+                               (--grace <d>, else nemia grace), park, and resume as the same try on
+                               the new release. A tag built already is switched to without a
+                               rebuild, so an older tag rolls back. --repo:
                                the repository the tag is in (the running release's source);
                                --name: the service (nemia). Then it removes each release that is
                                not current, not among the two newest, and that no session or

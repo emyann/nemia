@@ -213,6 +213,12 @@ export interface ListingInput {
    */
   readonly ranOnOf?: (taskId: string) => string | undefined;
   /**
+   * Whether each task's session is parked (`parkedOf` in views-words.ts): held at its hook with the call it stopped `after`, or ended
+   * with the call it `cut`. A parked step at work says `paused` (`pausedWord`), reason `Paused`, in place of the engine's word. Left out,
+   * none is.
+   */
+  readonly parkedOf?: (taskId: string) => { after?: string; cut?: string } | undefined;
+  /**
    * The runs a held run waits on to land, as `holdsOf` reads them: said where `waiting on you` would be (`holdWord`). Left out,
    * the runs the hold names, each taken as one that may still land.
    */
@@ -275,6 +281,7 @@ export function listing({
   waitingOf = () => undefined,
   deniedOf = () => [],
   ranOnOf = () => undefined,
+  parkedOf = () => undefined,
   holds,
 }: ListingInput): Listing {
   const waiting = gated(run) ? [...waits] : [];
@@ -386,12 +393,7 @@ export function listing({
     const judged = judgedRow(status, () => verdictOf(name), assessed.waitingOnPause?.checks.includes(name) === true);
     if (judged) return { name, ...judged, branch };
 
-    const c = closeoutOf(name);
-    const said = !c ? '' : 'error' in c ? ' · closeout unreadable' : ` · ${c.outcome === 'blocked' ? 'BLOCKED' : 'done'}`;
-    const word = status === 'unsigned' || status === 'unverified' || !taskId ? status : phaseOf(taskId);
-    const waitsFor = taskId && word === 'needs-human' ? waitingOf(taskId) : undefined;
-    const waits = waitsFor ? { waits: waitingWords(waitsFor) } : {};
-    return { name, message: `${word}${said}`, ...coded(saidReason(word, c)), branch, ...waits };
+    return { name, ...taskWord(status, taskId, closeoutOf(name), { phaseOf, parkedOf, waitingOf }), branch };
   }
 
   function budgetStatus(step: Workflow, status: StepStatus): string {
@@ -433,6 +435,26 @@ function unfiled(step: Workflow, waits: readonly Wait[], held: RunSlot | undefin
 
 /** A row's codes: its reason and what qualifies it, and the phase that reason stands in (`codedStep`). */
 const coded = codedStep;
+
+/**
+ * The word of a step the run has no verdict of its own on, its closeout `c` beside it: the status it is shown by where it has no task or
+ * the record says `unsigned` or `unverified`; else `paused` where its session is parked (`pausedWord`, reason `Paused`), or the engine's
+ * word for its task, with what a session at `needs-human` waits for (`waitingWords`).
+ */
+function taskWord(
+  status: StepStatus,
+  taskId: string | null | undefined,
+  c: Closeout | { error: string } | undefined,
+  read: Required<Pick<ListingInput, 'phaseOf' | 'parkedOf' | 'waitingOf'>>,
+): CodedStep & { message: string; waits?: string } {
+  const said = !c ? '' : 'error' in c ? ' · closeout unreadable' : ` · ${c.outcome === 'blocked' ? 'BLOCKED' : 'done'}`;
+  const engine = typeof taskId === 'string' && taskId !== '' && status !== 'unsigned' && status !== 'unverified';
+  const parked = engine ? read.parkedOf(taskId) : undefined;
+  if (parked) return { message: `${pausedWord(parked)}${said}`, ...coded({ reason: 'Paused' }) };
+  const word = engine ? read.phaseOf(taskId) : status;
+  const waitsFor = engine && word === 'needs-human' ? read.waitingOf(taskId) : undefined;
+  return { message: `${word}${said}`, ...coded(saidReason(word, c)), ...(waitsFor ? { waits: waitingWords(waitsFor) } : {}) };
+}
 
 /**
  * The reason of a step's word where nothing narrower is known of it: `AwaitingAnswer` by the closeout where its closeout `c` signed off
@@ -496,6 +518,10 @@ export const PAUSE_WAIT = 'waiting on the pause';
 
 /** The note beside `PAUSE_WAIT`: when the check it waits for is filed, on `nemia resume`. */
 const PAUSE_WAIT_NOTE = 'its check is filed on nemia resume';
+
+/** A parked step's word: `paused`, `paused after its call to <tool>`, or `paused, its call to <tool> cut`. */
+export const pausedWord = (parked: { after?: string; cut?: string }): string =>
+  parked.cut ? `paused, its call to ${parked.cut} cut` : parked.after ? `paused after its call to ${parked.after}` : 'paused';
 
 /** A word that already names its own thing. `permission prompt` does not, and reads as `a permission prompt`; `the login dialog` does. */
 const DETERMINED = /^(a|an|the|its|their|another|some|one|no)\b/i;

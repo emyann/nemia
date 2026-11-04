@@ -162,6 +162,7 @@ function hostOf(world: World): { host: ServiceHost; events: string[] } {
     say: (line) => events.push(`say ${line}`),
     pollMs: 1,
     waitMs: 200,
+    graceMs: 200,
     stopMs: 200,
   };
   return { host, events };

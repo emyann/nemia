@@ -113,6 +113,11 @@
       }
     },
     {
+      "term": "Grace",
+      "meaning": "how long a pause, a restart and an upgrade give each session's tool call in flight before it is cut: a file of the store's (`graceFile`), ten minutes where none is set, set by `nemia grace <d>` and given once by `--grace <d>` (`graceAt`, `graceGiven`). A restart waits on the daemon's own sessions alone, up to it; the jobs run on.",
+      "type": "GraceAt"
+    },
+    {
       "term": "Group list",
       "meaning": "the list of a group of commands is the group's bare name: `nemia agents`, `nemia inbox`, and the api's `skills` and `workflows`; `ls` is the runs'.",
       "retired": [
@@ -232,6 +237,11 @@
       "term": "Pass phase",
       "meaning": "a part of a tick's pass its time is counted in (`PHASES`): records, asks, journals, revisions, observe, runtime, place, assess, act, the `phase` label of a series line (`pass.phase.ms`). The place phase was `git` while the place was git's alone; a stored line that still says `git` reads as `place` (`FORMER_PHASES`). Never a step's phase.",
       "type": "Phase"
+    },
+    {
+      "term": "Paused",
+      "meaning": "a step whose session is parked at a tool call's end — held at its hook, or stopped with its call cut — until the pause is lifted or the new daemon resumes it as the same try: `paused`, `paused after its call to <tool>` or `paused, its call to <tool> cut` (`pausedWord`, read through `parkedOf`), reason `Paused`, phase running.",
+      "type": "StepReason"
     },
     {
       "term": "Pending",

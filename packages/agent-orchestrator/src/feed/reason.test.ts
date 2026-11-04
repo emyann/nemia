@@ -30,7 +30,7 @@ import { upgraded, type FeedLine } from './feed.ts';
 import { FORMER_REASONS } from '../former-reason/former-reason.ts';
 import { codedStep, PHASE_OF, runCodes, STEP_REASONS, type AnswerVia, type QualifiedStep, type WaitOn } from '../phase/phase.ts';
 import { SLOT_WAIT, slotWord } from '../cap/cap.ts';
-import { PAUSE_WAIT, waitingWords } from '../list/list.ts';
+import { PAUSE_WAIT, pausedWord, waitingWords } from '../list/list.ts';
 import { checkoutWord } from '../ending/ending.ts';
 import { holdWord, waitWord } from '../wait/wait.ts';
 import { FORMER_DEFAULT_WAKE, FORMER_NEMIA_WAKE, selectorsOfWake } from '../subscription/index.ts';
@@ -163,6 +163,14 @@ const STORE_LINES: readonly Case[] = [
   { kind: 'Store', word: 'store resumed', note: 'since 2026-10-16T04:00:00.000Z', reason: 'StoreResumed' },
 ];
 
+/** A parked step's words (`pausedWord`): paused between two calls, after the call it stopped after, or with the call it cut. */
+const PAUSED_WORDS: readonly Case[] = [
+  { kind: 'Step', word: pausedWord({}), reason: 'Paused' },
+  { kind: 'Step', word: pausedWord({ after: 'Read' }), reason: 'Paused' },
+  { kind: 'Step', word: 'paused after its call to Read', reason: 'Paused' },
+  { kind: 'Step', word: pausedWord({ cut: 'Bash' }), reason: 'Paused' },
+];
+
 /** Every word the package can write, each with the reason the table must name for it. */
 const CASES: readonly Case[] = [
   ...RUN_LINES,
@@ -170,6 +178,7 @@ const CASES: readonly Case[] = [
   ...PHASE_WORDS,
   ...SAID_WORDS,
   ...WAIT_WORDS,
+  ...PAUSED_WORDS,
   ...FORMER_WORDS,
   ...ONE_SHOTS,
   ...ACT_WORDS,
@@ -230,8 +239,8 @@ test('reasonOf names a reason for every word the package writes, only of a kind 
         `${runCodes('waiting', false, [codedStep(reason === 'AwaitingAnswer' ? { reason, via: 'session' } : ({ reason } as QualifiedStep))]).reason}/Run`,
       );
     const entries = REASON_CODES.flatMap((reason) => kindsOf(reason).map((kind) => `${reason}/${kind}`));
-    assert.equal(entries.length, 43, 'the table the owner named has 43 entries');
-    assert.equal(REASON_CODES.length, 32, 'of 32 distinct codes');
+    assert.equal(entries.length, 44, 'the table the owner named has 44 entries');
+    assert.equal(REASON_CODES.length, 33, 'of 33 distinct codes');
     assert.deepEqual(
       entries.filter((entry) => !reached.has(entry)),
       [],

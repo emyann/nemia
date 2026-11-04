@@ -10,9 +10,11 @@ import { daemonLine } from '../daemon/daemon.ts';
 import { daemonStanding } from '../daemon/daemon.store.ts';
 import { pausedRead } from '../list/list.verb.ts';
 import { putPause, readPause, resumePause } from '../pause/pause.store.ts';
-import { Invalid, Missing } from '../refusal/refusal.ts';
-import { drained, tried } from '../runtime-client.ts';
-import { callsOf, type Pause } from '../pause/pause.ts';
+import { Invalid, Missing, type Refusal } from '../refusal/refusal.ts';
+import { asked, drained, EngineService, tried, type TaskView } from '../runtime-client.ts';
+import { DEFAULT_GRACE_MS, graceOf, graceRefusal, type Finishing, type Pause } from '../pause/pause.ts';
+import { graceAt } from '../pause/grace.store.ts';
+import { rootGiven } from '../config/root.store.ts';
 import { pointedEntry } from '../release/release.ts';
 import { runningRelease } from '../release/version.verb.ts';
 import {
@@ -76,11 +78,72 @@ export type ServiceHost = TakeoverHost & {
   readonly standing: () => Pause | null;
 };
 
+/** What the take-over reads of a task the engine lists: its id, whether it lives in the daemon and is settled, its labels, its call. */
+export type ListedTask = Pick<TaskView, 'id' | 'calling'> & {
+  readonly state: Pick<TaskView['state'], 'settled' | 'restartPolicy' | 'labels'>;
+};
+
+/**
+ * The calls in flight of the sessions living in the daemon (`restartPolicy: 'Always'`), each read off `list`: the whole store once, for
+ * the live sessions among it, then those sessions alone on each read after. A job is never among them: it runs on through a restart.
+ * Each call is named by its task's run and step labels, or its id where it carries none.
+ */
+export const attachedCalls = <E, R>(list: (ids?: readonly string[]) => Effect.Effect<{ views: readonly ListedTask[] }, E, R>) => {
+  let ids: readonly string[] | undefined;
+  return (): Effect.Effect<readonly Finishing[], E, R> =>
+    Effect.map(
+      Effect.suspend(() => (ids === undefined ? list() : ids.length ? list(ids) : Effect.succeed({ views: [] }))),
+      ({ views }) => {
+        const live = views.filter((v) => v.state.restartPolicy === 'Always' && v.state.settled === null);
+        ids ??= live.map((v) => v.id);
+        return live.flatMap((v): Finishing[] =>
+          v.calling
+            ? [{ run: v.state.labels?.run ?? v.id, step: v.state.labels?.step ?? v.id, kind: 'session', calling: v.calling.tool }]
+            : [],
+        );
+      },
+    );
+};
+
+/** The engine's list, as the live host reads the attached calls through it (`attachedCalls`). */
+const engineList = (ids?: readonly string[]) => Effect.flatMap(EngineService, (e) => asked('list', e.list(ids)));
+
+/**
+ * The grace a take-over gives the calls in flight: `--grace` where given (`graceOf`), else the store's at `home` (`graceAt`). Refused
+ * (`Invalid`): a `--grace` that does not read, naming `by`'s flag, or a grace file that does not read.
+ */
+export const graceGiven = (args: Args, home: string, by: string): Effect.Effect<number, Refusal> =>
+  tried(() => {
+    if (typeof args.graceText !== 'string') return graceAt(home).ms;
+    const ms = graceOf(args.graceText);
+    if (ms === undefined) throw new Invalid({ message: `${by}: --grace takes ${graceRefusal(args.graceText)}, like --grace 10m.` });
+    return ms;
+  });
+
+/** The live host of `nemia <verb>`, its take-over given the grace `graceGiven` reads off `args` and the store at `home`. */
+export const gracedHost = (args: Args, home: string | undefined, verb: string): Effect.Effect<ServiceHost, Refusal> =>
+  Effect.map(
+    Effect.flatMap(
+      tried(() => rootGiven(home, verb)),
+      (root) => graceGiven(args, root, `nemia ${verb}`),
+    ),
+    liveHost,
+  );
+
+/** `--grace <d>`, which a restart and an upgrade take: how long the daemon's calls in flight are given before they are cut. */
+export const graceFlag = (shape: string): Flag => ({
+  flag: '--grace',
+  kind: 'text',
+  key: 'graceText',
+  takes: `--grace takes a duration, like --grace 10m: ${shape}.`,
+});
+
 /**
  * The machine as it is: the process's node, the store's lease and pause, `systemctl` and `launchctl` themselves. The daemon an install
- * runs is under `releases/current` (`pointedEntry`), so the service follows the pointer.
+ * runs is under `releases/current` (`pointedEntry`), so the service follows the pointer. A take-over gives the daemon's calls in
+ * flight `graceMs` (`graceGiven`), ten minutes where none is given.
  */
-export const liveHost = (): ServiceHost => ({
+export const liveHost = (graceMs: number = DEFAULT_GRACE_MS): ServiceHost => ({
   machine: machineOf,
   dirs: serviceDirs,
   roots: storeRoots,
@@ -96,11 +159,12 @@ export const liveHost = (): ServiceHost => ({
   pause: putPause,
   resume: resumePause,
   landings: () => Effect.map(pausedRead(), landingsOf),
-  calls: () => Effect.map(pausedRead(), callsOf),
+  calls: attachedCalls(engineList),
   drain: drained,
   say: (line) => console.error(line),
   pollMs: 2_000,
   waitMs: 60_000,
+  graceMs,
   stopMs: 90_000,
 });
 
@@ -408,7 +472,10 @@ const INSTALL: Command<Installed> = {
   writes: true,
   class: 'ask',
   only: CLI_ONLY,
-  handler: (args) => installService(args),
+  handler: (args, _env, home) =>
+    args.takeOver === undefined
+      ? installService(args)
+      : Effect.flatMap(gracedHost(args, home, 'service install'), (host) => installService(args, host)),
   print: (data) => data.lines,
 };
 

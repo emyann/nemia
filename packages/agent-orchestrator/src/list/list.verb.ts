@@ -42,7 +42,7 @@ import {
   viewedOnce,
   waitingOf,
 } from '../views/views.verb.ts';
-import { engineWord, phaseOfView } from '../views/views-words.ts';
+import { engineWord, parkedOf, phaseOfView } from '../views/views-words.ts';
 import { checkoutHold } from '../ending/ending.verb.ts';
 import { landsOnCheck } from '../status/status.ts';
 import { mergeStaged, statusMemo } from '../place/landing.store.ts';
@@ -142,6 +142,7 @@ export const runReading = Effect.fn('runReading')(function* (e: Engine, run: Run
     waitingOf: waitingOf(views),
     deniedOf: deniedOf(views),
     ...(how.releases === undefined ? {} : { ranOnOf: ranOnOf(views, how.releases) }),
+    parkedOf: (taskId) => parkedOf(views.get(taskId)),
     holds: holdsOf(run, parent),
   });
   return { ...listed, assessed, assessOf, phaseOf, answers, spendOf, spend: runSpend(run, spendOf) } satisfies RunReading;

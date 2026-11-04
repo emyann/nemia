@@ -168,9 +168,14 @@ pass keeps in the series and no pass walks; it asks the runtime what it keeps by
 sessions' records by the factory of the run that filed each task). A person may run it as a login service (`nemia service install`, `src/service/`), which runs the same daemon and hands the
 lease over only when told: from the checkout, or, run from an install, from `releases/current`. `nemia service restart`
 (`src/service/restart.verb.ts`) restarts the service's daemon as a take-over does (`takeOver`, `src/service/takeover.verb.ts`, shared with
-`nemia service install --take-over` and `nemia upgrade`): the store paused unless a person's pause stands, each landing check let
-finish, SIGTERM, the unit started, and the store resumed once the new daemon has completed its first pass — refused, naming its log,
-when it does not; a daemon started by hand is named with the take-over that hands it to the service. A release is a tag built and
+`nemia service install --take-over` and `nemia upgrade`): the store paused unless a person's pause stands — a pause with no grace,
+so nothing new is filed and the jobs run on, untouched — each landing check let finish, the daemon's own sessions (`restartPolicy:
+'Always'`) held by the holder's drain and their calls in flight waited for up to the grace (`--grace <d>`, else the store's, `nemia
+grace`), SIGTERM, the holder's let-go parking each session for the next, the unit started, and the store resumed once the new daemon
+has completed its first pass, which resumes each parked session as the same try on the release it runs — refused, naming its log,
+when it does not; a daemon started by hand is named with the take-over that hands it to the service. A person's pause (`nemia pause`)
+parks every session, a job or one living in the daemon, at its tool call's end through the runtime's sessions' drain
+(`drainSessions`), the grace bounding the calls in flight; `nemia ls` and the board say such a step `paused` (reason `Paused`). A release is a tag built and
 checked under the store (`src/release/`): `nemia upgrade <tag>` exports it clean, builds it into `$WF_ROOT/releases/<tag>` on a trial store, switches the pointer `releases/current` by a rename
 and restarts the service onto it; `nemia version` says what runs and what the pointer names, and the lease keeps its daemon's `release`.
 A release that is not current, not among the two newest, and that no running Nemia process nor session in flight runs on is removed

@@ -144,7 +144,9 @@ What the `create-an-agent` skill (`packages/agent-orchestrator/skills/create-an-
   command on the files that matched (every short spelling carries a capital `O`, git bundling it after other short options; every long
   one carries `--op`, since git takes any unambiguous abbreviation and `--o` alone it refuses), and `Bash(*GIT_*)` for every assignment
   of git's environment — `GIT_EXTERNAL_DIFF`, and `diff.external` through `GIT_CONFIG_COUNT` — which is the fence under the "never
-  `VAR=`" these roles' skills already say. The leading `*` is the point of that last one, as it is for the collector's `Bash(*:4318*)`:
+  `VAR=`" these roles' skills already say. `Bash(*=* git *)` beside it refuses any assignment before git, an `=` anywhere before ` git` in the part as typed: `HOME`
+  and `XDG_CONFIG_HOME` name no variable of git's, yet move the configuration git reads to a folder the change under review can carry,
+  whose `diff.external` or `core.pager` git runs; a search for a word holding `=` stays open, its `=` after `git`. The leading `*` is the point of that last one, as it is for the collector's `Bash(*:4318*)`:
   a deny is matched against the part as typed, and without it the rule reaches only a part that *opens* `GIT_`, so a first assignment
   naming something else, or a `nohup` or `timeout` before it, would carry the whole of git's environment through. `Bash(git
   *--output*)` refuses `--output=<file>`, which `diff`, `diff-tree`, `log`, `show`, `rev-list`, `blame` and `shortlog` take and which
@@ -156,7 +158,14 @@ What the `create-an-agent` skill (`packages/agent-orchestrator/skills/create-an-
   the two files with no option typed, and a bundled `git grep -nf <file>` is a word no glob tells from a pattern. These denies hold
   the forms as typed and no other: a Bash rule matches the text, so a spelling the shell rejoins — quoted (`--out''put`), escaped
   (`--out\put`), brace-split or put together from a `$` — passes each of them, and what the set writes or runs by such a spelling is open until something reads the line as the shell does. Adding a verb to the set means asking
-  what file it can be made to write and what program it can be made to run. The set is on the agents rather than in `.claude/settings.json` so
+  what file it can be made to write and what program it can be made to run. **Agora alone allows `gh pr view` and `gh pr checks`**, the
+  pull request its review reads on GitHub, rendered on either way sdlc lands, and the four deny beside the set every other form they
+  reach: `Bash(gh *--web*)` and `Bash(gh * -w*)` for a browser, `Bash(gh *--watch*)`, which never returns, `Bash(gh *--jq*)` and
+  `Bash(gh * -q*)`, whose jq reads the process's environment, `Bash(gh *--template*)` and `Bash(gh * -t*)`, `Bash(gh *--repo*)`,
+  `Bash(gh * -R*)` and `Bash(gh *//*)` for another repository, `Bash(gh * -c*)`, after which a short option bundles, and `Bash(*=* gh
+  *)` for any assignment before gh (`GH_PAGER`, `PAGER`, `BROWSER`, `GH_CONFIG_DIR`, `HOME`). They are on all four because a settings
+  allow of gh reaches every step: this checkout's `.claude/settings.json` keeps its two until the nemia factory runs sdlc 2.2.0, and
+  a spelling the shell rejoins passes these as it passes git's. The set is on the agents rather than in `.claude/settings.json` so
   that the team travels to a factory that is not this checkout; `packages/templates/test/fences.test.ts` holds sdlc's rules as written
   and the four lines equal, and `packages/agent-orchestrator/test/agent-fences.test.ts`, on planted lines, every read open, every write
   refused and every spelling of `--output` and of a read outside it can read refused. The nemia factory's overlays, in its own tree

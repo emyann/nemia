@@ -19,6 +19,9 @@ const { retainOnce, freshRetainMemory } = await import('./retention.verb.ts');
 const { releaseDir, releasesDir, realReleasesDir, switchCurrent, writeReleaseFile } = await import('../release/release.store.ts');
 const engine = eachTest(testEngine);
 
+/** A pid no process has: past the highest Linux allows (2^22) and macOS's. */
+const DEAD = 4_194_305;
+
 /** Plants a built release of `tag` in `home`, built on day `day` of November. */
 function planted(home: string, tag: string, day: number): void {
   fs.mkdirSync(releaseDir(tag, home), { recursive: true });
@@ -117,13 +120,11 @@ test("a crashed first upgrade's leftovers are swept on a store with no pointer, 
   const s = story(t);
   const home = scratch('wf-retain-crashed-');
   const releases = releasesDir(home);
-  /** A pid no process has: past the highest Linux allows (2^22) and macOS's. */
-  const dead = 4_194_305;
   const at = (name: string) => path.join(releases, name);
-  fs.mkdirSync(at(`.building-v1-${dead}/trial/engine`), { recursive: true });
-  fs.writeFileSync(at(`.building-v1-${dead}/trial/engine/x`), 'x');
+  fs.mkdirSync(at(`.building-v1-${DEAD}/trial/engine`), { recursive: true });
+  fs.writeFileSync(at(`.building-v1-${DEAD}/trial/engine/x`), 'x');
   fs.mkdirSync(at(`.building-v2-${process.pid}/tree`), { recursive: true });
-  fs.symlinkSync('v1', at(`.current-${dead}`));
+  fs.symlinkSync('v1', at(`.current-${DEAD}`));
   fs.mkdirSync(at('.logs'));
   fs.writeFileSync(at('.logs/old.log'), 'npm ci failed\n');
   const longAgo = (Date.now() - 31 * 24 * 60 * 60 * 1000) / 1000;
@@ -135,14 +136,14 @@ test("a crashed first upgrade's leftovers are swept on a store with no pointer, 
   await s.test('the dead build, its trial store and the dead link go, and the old log; the live build and the fresh log stay', async () => {
     const done = await sweep();
     assert.equal(done.held, 'no pointer');
-    assert.deepEqual([...done.swept.entries].sort(), [`.building-v1-${dead}`, `.current-${dead}`]);
+    assert.deepEqual([...done.swept.entries].sort(), [`.building-v1-${DEAD}`, `.current-${DEAD}`]);
     assert.deepEqual(done.swept.logs, ['old.log']);
-    assert.equal(fs.existsSync(at(`.building-v1-${dead}`)), false);
-    assert.equal(fs.lstatSync(at(`.current-${dead}`), { throwIfNoEntry: false }), undefined);
+    assert.equal(fs.existsSync(at(`.building-v1-${DEAD}`)), false);
+    assert.equal(fs.lstatSync(at(`.current-${DEAD}`), { throwIfNoEntry: false }), undefined);
     assert.equal(fs.existsSync(at('.logs/old.log')), false);
     assert.ok(fs.existsSync(at(`.building-v2-${process.pid}/tree`)), 'a live build is never touched');
     assert.ok(fs.existsSync(at('.logs/new.log')));
-    assert.ok(done.lines.some((line) => line.includes(`.building-v1-${dead}`)));
+    assert.ok(done.lines.some((line) => line.includes(`.building-v1-${DEAD}`)));
     assert.deepEqual(
       fs.readdirSync(releases).filter((n) => n.startsWith('.removing-')),
       [],

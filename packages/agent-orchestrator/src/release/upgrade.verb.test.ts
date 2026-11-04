@@ -188,6 +188,9 @@ function unitOn(checkout: string): void {
 }
 
 const engine = eachTest(testEngine);
+
+/** A pid no process has: past the highest Linux allows (2^22) and macOS's. */
+const DEAD = 4_194_305;
 const run = (args: Args, host: ServiceHost, env: NodeJS.ProcessEnv = ENV) => runWith(engineOf(engine().layer), upgrade(args, host, env));
 
 /** The refusal an upgrade fails with: its tag and message. */
@@ -458,9 +461,7 @@ test('an upgrade removes the releases no one needs: not the two newest, not one 
   await s.test(
     "a crashed upgrade's build folder is removed by the next upgrade, which says so, and only a log over 30 days old goes",
     async () => {
-      /** A pid no process has: past the highest Linux allows (2^22) and macOS's. */
-      const dead = 4_194_305;
-      const crashed = path.join(releasesDir(), `.building-v9-${dead}`);
+      const crashed = path.join(releasesDir(), `.building-v9-${DEAD}`);
       fs.mkdirSync(path.join(crashed, 'trial', 'engine'), { recursive: true });
       const logs = path.join(releasesDir(), '.logs');
       const old = path.join(logs, 'v9-old.log');
@@ -472,7 +473,7 @@ test('an upgrade removes the releases no one needs: not the two newest, not one 
       const done = await runOn({ tag: 'v8', repo: REPO });
       assert.equal(fs.existsSync(crashed), false);
       assert.ok(
-        done.lines.some((l) => l.includes(`.building-v9-${dead}`)),
+        done.lines.some((l) => l.includes(`.building-v9-${DEAD}`)),
         done.lines.join('\n'),
       );
       assert.ok(

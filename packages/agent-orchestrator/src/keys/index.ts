@@ -35,7 +35,7 @@ export {
 } from './keys.ts';
 export { bareSkillOf, givenSkillOf, ONE_BARE_NAME, SKILL_NAME, sameBareIn } from './given-skill.ts';
 export type { GivenSkill } from './given-skill.ts';
-export { ALLOW_EXAMPLE, allowRuleOf, DISALLOW_EXAMPLE, disallowedBy, rulesOf, TOOLS_EXAMPLE, toolsOf } from './tools.ts';
+export { ALLOW_EXAMPLE, allowRuleOf, DISALLOW_EXAMPLE, disallowedBy, EDITING_TOOLS, rulesOf, TOOLS_EXAMPLE, toolsOf } from './tools.ts';
 export type { DeniedAt } from './tools.ts';
 export { FILED_AS, filedRefusal, lineOf } from './filed-as.ts';
 export type { FiledFlags, FiledStep } from './filed-as.ts';

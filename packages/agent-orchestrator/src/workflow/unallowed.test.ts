@@ -143,3 +143,20 @@ test('the first step of the set is the one refused, and a set whose every step i
   assert.match(unallowedRefusal(steps, NO_WEB) ?? '', /^design: /);
   assert.equal(unallowedRefusal(steps, REPO_ALLOWS), undefined);
 });
+
+test('an `Edit` rule, bare or with a path, names every file-editing tool, as Claude Code matches a write: `Write` passes on `Edit(…)` alone', () => {
+  const writer = { ...HELD, tools: 'Read, Skill, Write, Edit', allowedTools: 'Edit(packages/*/contracts/*.contract.ts)' };
+  assert.equal(unallowedRefusal(stepsOf({ agent: 'seldon' }, writer), []), undefined);
+  assert.equal(unallowedRefusal(stepsOf({ agent: 'seldon' }, { ...writer, allowedTools: 'Bash' }), ['Edit']), undefined);
+});
+
+test('a file-editing tool no `Edit` rule reaches is refused, its fix an `Edit(…)` path rule: never `Write(…)`, which Claude Code never matches, nor a bare tool', () => {
+  const why = unallowedRefusal(stepsOf({ agent: 'seldon' }, { ...HELD, tools: 'Read, Skill, Write', allowedTools: 'Bash' }), []);
+  assert.match(why ?? '', /gives its session `Write`/);
+  assert.match(why ?? '', /`allowedTools: Edit\(…\)`/);
+  assert.equal(
+    /Write\(|allowedTools: Write\b|allowedTools: Edit`/.test(why ?? ''),
+    false,
+    'no rule that never matches, no rule over every path',
+  );
+});

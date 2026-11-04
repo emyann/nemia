@@ -172,6 +172,23 @@ test('nemia start judges what a session may call: a tool no rule names refused, 
       assert.ok(written(started(held, { repo })), 'the same folder and the same repository, with the rule added');
     },
   );
+
+  await s.test(
+    'a factory architect given `Write, Edit` in `dontAsk` and allowed two `Edit(…)` path rules starts: they reach its `Write`',
+    () => {
+      const contracts = folder(
+        'contracts',
+        { design: '---\nplace: git\nagent: seldon\n---\nWrite the spec and its contracts.\n' },
+        {
+          seldon:
+            '---\nrole: Architect\npermissionMode: dontAsk\ntools: Read, Grep, Glob, Bash, Skill, Agent, WebFetch, WebSearch, Write, Edit\n' +
+            'allowedTools: Bash(git log:*), Agent, WebFetch, WebSearch, Edit(packages/*/contracts/*.contract.ts), ' +
+            'Edit(apps/*/contracts/*.contract.ts)\n---\nDesign it.\n',
+        },
+      );
+      assert.ok(written(started(contracts)), 'an `Edit` path rule allows the `Write` of the files it names');
+    },
+  );
 });
 
 /** What a place denies a landing session, as a start hands it on: a commit, as the git place denies one, given here by hand. */

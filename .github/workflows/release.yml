@@ -1,0 +1,128 @@
+# Nemia's releases: a pull request this workflow keeps open, and the tag and GitHub release its merge makes (tools/release/README.md).
+# Each job runs one verb of tools/release/release.ts, which decides from the tags, main, the release branch, the merged pull requests
+# and the head's runs as they are, so a rerun with nothing changed does nothing. Nothing is published to npm and no artifact is
+# attached. tools/guards/test/release-workflow.test.ts holds this file.
+name: release
+
+# Every landing on main, and by hand (gh workflow run release.yml) after a pull request's label is changed. The sibling trigger that
+# would run a fork's code against a writable token is named nowhere here.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# The token reads the code and no more; each job grants itself the one write it makes, and a read where it reads more than the code.
+permissions:
+  contents: read
+
+# Every job and every step that reaches the network (an action, gh, git's push and fetch, which the release tool calls) carries a
+# timeout-minutes of its own, under its job's. labels, tag and pr share the job concurrency release and are never cancelled: two runs
+# never write the labels, the tag or the release branch at once, and a run waiting behind another is the newer one. proof waits on
+# the release pull request's checks, up to 40 minutes, in a group of its own a newer run cancels, so it never holds a tag back.
+jobs:
+  labels:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+    concurrency:
+      group: release
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v7
+        timeout-minutes: 3
+      - uses: actions/setup-node@v7
+        timeout-minutes: 3
+        with:
+          node-version: '24.16.0'
+      - name: Make the release labels
+        timeout-minutes: 3
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: node tools/release/release.ts labels
+
+  tag:
+    needs: [labels]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    concurrency:
+      group: release
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v7
+        timeout-minutes: 5
+        with:
+          # The whole history and its tags: the commit that set the version is found on main's first parents, and the previous
+          # release among the tags.
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        timeout-minutes: 3
+        with:
+          node-version: '24.16.0'
+      - name: Release the version main names, where it has no tag
+        timeout-minutes: 5
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: node tools/release/release.ts tag
+
+  pr:
+    needs: [tag]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      pull-requests: write
+      actions: write
+    concurrency:
+      group: release
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v7
+        timeout-minutes: 5
+        with:
+          # The whole history and its tags: the range since the last release, and the release branch rebuilt on main and force-pushed,
+          # the one branch this workflow pushes, with the token checkout keeps for git.
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        timeout-minutes: 3
+        with:
+          node-version: '24.16.0'
+      - name: Keep the release pull request as main is
+        # Opening the pull request with this token needs the repository's "Allow GitHub Actions to create and approve pull requests";
+        # without it the step fails naming that setting.
+        timeout-minutes: 10
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: node tools/release/release.ts pr
+
+  proof:
+    needs: [pr]
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      pull-requests: read
+      checks: read
+    concurrency:
+      group: release-proof
+      cancel-in-progress: true
+    steps:
+      - uses: actions/checkout@v7
+        timeout-minutes: 3
+      - uses: actions/setup-node@v7
+        timeout-minutes: 3
+        with:
+          node-version: '24.16.0'
+      - name: Show that the dispatched ci counts for main's protection
+        # Red names the merge box's "Approve workflows to run", whose pull_request ci counts where the dispatched one does not.
+        timeout-minutes: 42
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: node tools/release/release.ts proof

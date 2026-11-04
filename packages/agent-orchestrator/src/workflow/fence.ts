@@ -397,8 +397,8 @@ function unwrittenBy(step: Fenced): string | undefined {
   return undefined;
 }
 
-/** The lines of a step its fence is resolved from: what `unwrittenBy` reads. */
-export type Fenced = Pick<Workflow, 'harness' | 'sandbox' | 'permissionMode' | 'tools' | 'allowedTools'>;
+/** A step as `unwrittenBy` reads it: any of its lines, its fence's among them. */
+export type Fenced = Partial<Workflow>;
 
 /**
  * Whether `step`'s fence, as resolved with its agent's, writes nothing (`unwrittenBy`): the one judgement `refuseUnwritable` refuses

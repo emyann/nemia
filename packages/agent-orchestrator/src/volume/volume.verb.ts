@@ -52,7 +52,7 @@ with. A second add of one path replaces it; nemia factory lists them under the f
 Refused, and nothing written: no :ro or :rw, a folder that is no directory, one of the factory's
 repositories, a folder at or inside the store, a writable one holding the store, the default factory,
 and a volume rm of a path it does not mount. A start is refused where a step's harness cannot hold a
-volume's mount: Codex holds no writable one.`;
+volume's mount, as one that holds only read-only mounts cannot hold a writable one.`;
 
 const ADD_SPEC: Spec = {
   positionals: [

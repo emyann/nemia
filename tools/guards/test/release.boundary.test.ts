@@ -98,15 +98,19 @@ process.stderr.write('stub gh: no answer for ' + args.join(' ')); process.exit(9
 
 type Call = { args: string[]; stdin?: string };
 
-/** A scratch world: the origin, the clone the tool runs in, the stub's state and log. */
+/**
+ * A scratch world: the origin, the clone the tool runs in, the stub's state and log. Its environment leaves out an inherited `LABELS`,
+ * the check's payload path, so a `check` given `BRANCH` reads the pull request as a dispatch does.
+ */
 const world = () => {
   const root = scratch('release-');
   const origin = path.join(root, 'origin.git');
   const seed = path.join(root, 'seed');
   const clone = path.join(root, 'clone');
   const bin = path.join(root, 'bin');
+  const { LABELS: _payload, ...inherited } = process.env;
   const env = {
-    ...process.env,
+    ...inherited,
     GIT_AUTHOR_NAME: 't',
     GIT_AUTHOR_EMAIL: 't@t',
     GIT_COMMITTER_NAME: 't',
@@ -260,16 +264,41 @@ test('a second pr with nothing moved pushes and dispatches nothing; with main mo
   for (const file of ['ci.yml', 'release-label.yml']) assert.ok(has(moved.calls, 'workflow', 'run', file, '--ref', 'release'));
 });
 
-test('with every merged pull request internal, pr opens none and closes the one open', () => {
+test('with every pull request merged since the last release internal, pr opens none and closes the one open', () => {
   const w = world();
   const cleanup = w.land('a cleanup');
   const open: Pull = { ...merged(900, ['internal'], null), title: 'release: v1.0.0', head: { ref: 'release' } };
-  w.state({ pulls: [merged(1, ['internal'], cleanup), open], runs: {}, labels: [], next: 901 });
+  const mergedAsV030 = merged(5, ['breaking'], w.git(w.clone, 'rev-parse', 'v0.3.0^{commit}'));
+  w.state({ pulls: [mergedAsV030, merged(1, ['internal'], cleanup), open], runs: {}, labels: [], next: 901 });
   const ran = w.run('pr');
   assert.equal(ran.status, 0, ran.out);
   assert.ok(!has(ran.calls, 'pr', 'create'));
   assert.ok(has(ran.calls, 'PATCH', 'repos/{owner}/{repo}/pulls/900', 'state=closed'), 'the open release pull request is closed');
   assert.ok(!has(ran.calls, 'workflow', 'run'));
+});
+
+test('check, dispatched on a branch, reads the labels of the open pull request that branch heads', async (t) => {
+  await t.test('the release pull request, labelled internal, passes', () => {
+    const w = world();
+    const open: Pull = { ...merged(900, ['internal'], null), title: 'release: v1.0.0', head: { ref: 'release' } };
+    w.state({ pulls: [merged(1, ['fix'], w.legacy), open], runs: {}, labels: [], next: 901 });
+    const ran = w.run('check', { BRANCH: 'release' });
+    assert.equal(ran.status, 0, ran.out);
+    const reads = named(ran.calls, 'GET').filter((call) => call.args[3].includes('state=open'));
+    assert.equal(reads.length, 1);
+    assert.ok(reads[0].args[3].includes('head={owner}:release'), 'the open pull request is read by its head branch');
+  });
+  await t.test('REFUSED: no open pull request heads the branch, exit 1', () => {
+    const w = world();
+    w.state({ pulls: [merged(1, ['fix'], w.legacy)], runs: {}, labels: [], next: 901 });
+    assert.equal(w.run('check', { BRANCH: 'release' }).status, 1);
+  });
+  await t.test('REFUSED: the open pull request carries no release label, exit 1', () => {
+    const w = world();
+    const open: Pull = { ...merged(900, ['dependencies'], null), title: 'release: v1.0.0', head: { ref: 'release' } };
+    w.state({ pulls: [open], runs: {}, labels: [], next: 901 });
+    assert.equal(w.run('check', { BRANCH: 'release' }).status, 1);
+  });
 });
 
 test('REFUSED: GitHub refusing the token a pull request exits 1 naming the setting that allows it', () => {

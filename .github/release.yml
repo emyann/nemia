@@ -1,0 +1,24 @@
+# GitHub's generated release notes (POST /repos/{owner}/{repo}/releases/generate-notes), read for the release pull request's body and
+# for the release its merge makes (tools/release/release.ts). A category per release label but internal, in LABELS' order, internal
+# left out, and every pull request with no release label under the catch-all, last. tools/guards/test/release-workflow.test.ts holds
+# these to LABELS.
+changelog:
+  exclude:
+    labels:
+      - internal
+  categories:
+    - title: Breaking changes
+      labels:
+        - breaking
+    - title: Features
+      labels:
+        - feature
+    - title: Fixes
+      labels:
+        - fix
+    - title: Docs
+      labels:
+        - docs
+    - title: Not labelled
+      labels:
+        - '*'

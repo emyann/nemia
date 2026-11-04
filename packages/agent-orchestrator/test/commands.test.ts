@@ -89,6 +89,8 @@ test('each command is served on the api where it was before the table, the lift 
       ['factory server rm', { method: 'DELETE', path: '/api/factories/:factory/servers/:server', status: 200 }],
       ['factory volume add', 'cli'],
       ['factory volume rm', 'cli'],
+      ['factory setting set', 'cli'],
+      ['factory setting rm', 'cli'],
       [
         'factory rules',
         [

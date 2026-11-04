@@ -407,3 +407,6 @@ export const unsignedStep = (
   if (why !== null) notes.push(`${step.name}: not filed — ${why}`);
   return why !== null;
 };
+
+/** `nemia factory servers` and `server add|rm`'s entries, in the order `nemia`'s help lists them. */
+export const FACTORY_SERVER_VERBS: readonly Command[] = [FACTORY_SERVERS, FACTORY_SERVER_ADD, FACTORY_SERVER_RM] as readonly Command[];

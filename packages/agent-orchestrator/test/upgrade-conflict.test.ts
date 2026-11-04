@@ -137,6 +137,7 @@ test('an upgrade with a conflict: previewed, filed, waited on with the status al
         assert.ok(printed.includes(`  ${at}`), printed.join('\n'));
         assert.ok(printed.includes(`    nemia factory resolve crew '${at}' --ours|--theirs|--file <path>`), printed.join('\n'));
       }
+      assert.match(printed.at(-2) ?? '', /^plan: sha256:[0-9a-f]{64}$/, 'the digest the upgrade is held to, where one is');
       assert.equal(printed.at(-1), 'nemia factory upgrade crew --to 0.2.0 files it; the daemon merges once each conflict is resolved.');
     },
   );
@@ -203,6 +204,7 @@ test('an upgrade with a conflict: previewed, filed, waited on with the status al
     );
     assert.deepEqual(JSON.parse(fs.readFileSync(resolutionsFile('crew'), 'utf8')), {
       to: '0.2.0',
+      template: 'team',
       choices: { [ROUNDS]: 'theirs', [LINE]: { text: 'Never push on a Friday, nor on a weekend.\n' } },
     });
   });

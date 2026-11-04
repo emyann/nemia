@@ -3,7 +3,7 @@
  * (`GET`, `PUT` and `DELETE` on `/api/factories/<name>/rules`, apps/api/src/factories/rules.ts and the routes the api generates beside
  * it); its instruction, Nemia's, which no step is told (`GET`, `PUT` and `DELETE` on `/api/factories/<name>/instruction`,
  * apps/api/src/factories/instruction.ts and the routes the api generates beside it); its hires (`PUT` and `DELETE` on
- * `/api/factories/<name>/hires/<workflow>%2F<step>`, routes the api generates); and its schedules, read-only.
+ * `/api/factories/<name>/hires/<workflow>%2F<step>`, routes the api generates); and its schedules and volumes, read-only.
  */
 import { queryOptions } from '@tanstack/react-query';
 import { Schema } from 'effect';
@@ -89,11 +89,18 @@ const FactoryScheduleSchema = decodes<FactorySchedule>()(
 export type FactoryUntrusted = { place: string; harness: string; withheld: string; never: string | null };
 
 /**
+ * Mirrors `VolumeAnswer` in apps/api/src/factories/factories.ts: a folder of the person's machine a factory's runs reach beside its
+ * repositories, its path as the api resolved it, whether it is read-only (`:ro`) or writable (`:rw`), and the line that takes it back.
+ */
+export type FactoryVolume = { path: string; readOnly: boolean; commands: { rm: string } };
+
+/**
  * Mirrors `FactoryAnswer` in apps/api/src/factories/factories.ts: a factory's name, whether it is the default factory, the repositories it
  * works on, the workflows it offers — null for the default factory, which offers every workflow found — its hires, `<workflow>/<step>`
  * to an agent's name, and its schedules, none for the default factory. A factory whose file does not read has none of them, and `error`
  * says why, naming the file; null for every other. `template` is the template it is made from, null for one that is not. `untrusted` is
- * each of its places a harness does not trust now (`FactoryUntrusted`), none for the default factory.
+ * each of its places a harness does not trust now (`FactoryUntrusted`), none for the default factory. `volumes` is each folder its
+ * runs reach beside its repositories, in the api's order (`FactoryVolume`), none for the default factory.
  */
 export type Factory = {
   name: string;
@@ -103,10 +110,14 @@ export type Factory = {
   hires: Record<string, string>;
   error: string | null;
   schedules: FactorySchedule[];
-  /** The lines a person types for it: a workflow attached, its file removed, filed again, a workflow scheduled, its places trusted. */
-  commands: { attach: string; rm: string; add: string; schedule: string; trust: string };
+  /**
+   * The lines a person types for it: a workflow attached, its file removed, filed again, a workflow scheduled, its places trusted, a
+   * volume mounted.
+   */
+  commands: { attach: string; rm: string; add: string; schedule: string; trust: string; volume: string };
   template: FactoryTemplate | null;
   untrusted: FactoryUntrusted[];
+  volumes: FactoryVolume[];
 };
 
 /** Decodes a `Factory`. */
@@ -125,7 +136,11 @@ const FactorySchema = decodes<Factory>()(
       add: Schema.String,
       schedule: Schema.String,
       trust: Schema.String,
+      volume: Schema.String,
     }),
+    volumes: Schema.mutable(
+      Schema.Array(Schema.Struct({ path: Schema.String, readOnly: Schema.Boolean, commands: Schema.Struct({ rm: Schema.String }) })),
+    ),
     untrusted: Schema.mutable(
       Schema.Array(
         Schema.Struct({ place: Schema.String, harness: Schema.String, withheld: Schema.String, never: Schema.NullOr(Schema.String) }),

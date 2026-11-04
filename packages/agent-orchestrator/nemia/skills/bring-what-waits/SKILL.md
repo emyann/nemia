@@ -106,20 +106,35 @@ conflict it raises: their tree and the template both changed the same part.
 
 When they ask for one, or the template has moved past the version the factory was applied at, preview it first with
 `nemia factory diff <factory> --to <version>` (`--template <name|folder|archive>` where the new version is elsewhere; a factory applied from a builtin template, by its name, reads it where that Nemia keeps it and needs none). It writes nothing.
+Where the new version requires a parameter the factory does not hold, the diff refuses, naming it: give it with `--set <key>=<value>`,
+once per parameter, asking the person its value. It prints `dropped:` naming each parameter the factory holds that the new version
+does not declare, `plan:` its digest, and last the upgrade line to type.
 
 Bring it:
 
 - **Factory and versions**: the factory, the version it was applied at, and the one offered.
+- **Parameters**: each `--set` you gave and the value they chose, and each parameter the upgrade drops (the `dropped:` line), which
+  their factory's file no longer holds once it is filed.
 - **What merges cleanly**: the files, by area, and whether each comes from the template, from their tree, or both.
 - **Each conflict**: its address, as the diff names it, and its three sides quoted under the diff's own labels — `base`, the
   template as applied; `ours`, the factory's tree, the person's side; `theirs`, the template's new version.
 - **Recommendation**: one, with its reason in a sentence:
-  - upgrade: `nemia factory upgrade <factory> --to <version>`, which prompts them; `--downgrade` only where they asked for a lower one;
+  - upgrade: the line the diff printed last, as it printed it (with its `--set` and its `--plan` where it carries them), which prompts
+    them; `--downgrade` only where they asked for a lower one;
   - for each conflict, a choice: `nemia factory resolve <factory> '<conflict>' --ours` to keep their tree's side, `--theirs` to take the
     template's, or `--file <path>` with the text you would write for it, shown to them first.
 
 The daemon merges once every conflict has a choice; until then the factory's tree and base stay as they are, and its runs in flight
 keep their own folders. After each resolve, say what it answered: the conflicts still waiting, or that the merge is next.
+
+An upgrade onto a template of another name than the factory's base, such as a factory applied from a hand-made template moving onto
+sdlc, is a template switch: the two share no base. The diff says so on its `switch:` line and names both templates on its first, so
+say it in **Factory and versions**. There is no `base` side to quote. A file only their tree holds is a conflict whose template side
+is none: `--ours` keeps it, `--theirs` drops it, and nothing tells their own file from the old template's leftover, so ask. Every
+differing run of lines is a choice, even one only the new template holds. The upgrade line is always filed with its `--plan`.
+Recommend each conflict with that in mind: usually keep their own rules and prose (`--ours`), take the template's new files, and drop
+the old template's files they never changed (`--theirs`). The same-named template read from another folder or archive is an ordinary
+upgrade, merged three ways.
 
 ## A factory's takeover
 

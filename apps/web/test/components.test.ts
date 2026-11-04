@@ -5913,8 +5913,10 @@ const filed = (name: string, extra: Partial<import('../src/lib/api.ts').Factory>
     add: `nemia factory add ${name} --repo <path>`,
     schedule: `nemia factory schedule ${name} <workflow> --cron <expr> --brief <text>`,
     trust: `nemia factory trust ${name}`,
+    volume: `nemia factory volume add ${name} <path>:ro|:rw`,
   },
   untrusted: [],
+  volumes: [],
   template: null,
   ...extra,
 });
@@ -7110,6 +7112,31 @@ test("FactoryTrust says each place that is not trusted, what is withheld and the
   const two = renderToStaticMarkup(createElement(FactoryTrust, { factory: filed('nemia', { untrusted: [place, home] }) }));
   assert.match(two, /2 places are not trusted/);
   assert.match(two, /Trust them:/);
+});
+
+test("REFUSED: FactoryVolumes says the caveat on a writable volume alone — each path with its mark and the api's line; with none, the line that adds one", async () => {
+  const { FactoryVolumes } = await import('../src/components/FactoryVolumes.tsx');
+  const volume = (path: string, readOnly: boolean) => ({ path, readOnly, commands: { rm: `nemia factory volume rm nemia ${path}` } });
+  const factory = filed('nemia', { volumes: [volume('/home/me/notes', true), volume('/home/me/scratch', false)] });
+  const html = renderToStaticMarkup(createElement(FactoryVolumes, { factory }));
+  assert.match(html, /data-factory-volumes="nemia"/);
+  assert.deepEqual(
+    [...html.matchAll(/data-factory-volume="([^"]*)"/g)].map((m) => m[1]),
+    ['/home/me/notes', '/home/me/scratch'],
+    "each volume, in the api's order",
+  );
+  const [, notes = '', scratch = ''] = html.split(/data-factory-volume="/);
+  assert.match(notes, /data-volume-mark="ro"[^>]*>:ro</);
+  assert.match(scratch, /data-volume-mark="rw"[^>]*>:rw</);
+  assert.doesNotMatch(notes, /data-volume-caveat/, 'a read-only volume carries no caveat');
+  assert.match(scratch, /data-volume-caveat/, "the writable one says it is not the run's workspace");
+  assert.ok(notes.includes('nemia factory volume rm nemia /home/me/notes'), "the api's line that takes it back");
+  assert.ok(scratch.includes('nemia factory volume rm nemia /home/me/scratch'));
+  assert.doesNotMatch(html, /data-no-volumes/);
+  const none = renderToStaticMarkup(createElement(FactoryVolumes, { factory: filed('nemia') }));
+  assert.match(none, /data-no-volumes/);
+  assert.ok(none.includes('nemia factory volume add nemia &lt;path&gt;:ro|:rw'), `the api's line that adds one: ${none}`);
+  assert.doesNotMatch(none, /data-factory-volume=/);
 });
 
 const InboxParts = await import('../src/components/InboxParts.tsx');

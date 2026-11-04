@@ -71,7 +71,9 @@ const ScheduleSchema = Schema.StructWithRest(
  * `<workflow>/<step>` to an agent's name, and its schedules, by workflow, when it has any, and where its instruction is kept, a path or the
  * store, when it says; whether its runs follow merged revisions, `follow` or `pinned`, when it says (a templated factory says it in its
  * tree's wiring, and this key is not read); the folders it mounts beside its repositories (`volumes`), each `{ path, readOnly }`, kept in
- * this file whether or not it is made from a template, since they are the person's and never the template's; and the template it was made
+ * this file whether or not it is made from a template, since they are the person's and never the template's; the settings of a harness
+ * its runs' sessions are given (`harnessSettings`), kept here for the same reason and judged by the model at the door, not on read; and the
+ * template it was made
  * from, when it was (`nemia factory apply`): its folder, its version and the parameters given. A key a later `nemia` writes beside them is
  * kept, not refused.
  */
@@ -90,6 +92,7 @@ const FactoryFileSchema = Schema.StructWithRest(
         ]),
       ),
     ),
+    harnessSettings: Schema.optionalKey(Schema.Record(Schema.String, Schema.Unknown)),
     template: Schema.optionalKey(
       Schema.StructWithRest(
         Schema.Struct({
@@ -167,6 +170,7 @@ function factoryOf(home: string, name: string, content: FactoryFile): Factory | 
     ...(content.instruction === undefined ? {} : { instruction: content.instruction }),
     ...(template === undefined ? {} : { template, tree: treeDirAt(home, name) }),
     ...(content.volumes?.length ? { volumes: content.volumes.map((v) => ({ path: v.path, readOnly: v.readOnly })) } : {}),
+    ...(content.harnessSettings === undefined ? {} : { harnessSettings: content.harnessSettings }),
   };
 }
 
@@ -273,7 +277,7 @@ export function createFactoryAt(home: string, factory: Factory): string {
  * repositories; its workflows, hires and schedules where the file named the key or the factory names one (made from a template, its
  * workflows, hires and revisions policy are its tree's, and the file's are left as they were); where its instruction is kept and its
  * revisions policy where it says, the key gone where it does not; its volumes where it has any, in this file even where it is made from a
- * template; and its template, the keys a later `nemia` wrote beside it kept.
+ * template; its harness settings where it names any; and its template, the keys a later `nemia` wrote beside it kept.
  */
 function fileContentOf(content: FactoryFile | undefined, factory: Factory): FactoryFile {
   const next: Record<string, unknown> = { ...content, repos: factory.repos };
@@ -297,6 +301,7 @@ function fileContentOf(content: FactoryFile | undefined, factory: Factory): Fact
       ? factory.volumes.map((v) => ({ ...content?.volumes?.find((was) => was.path === v.path), path: v.path, readOnly: v.readOnly }))
       : undefined,
   );
+  kept('harnessSettings', factory.harnessSettings);
   kept('template', factory.template === undefined ? undefined : { ...content?.template, ...factory.template });
   return next as FactoryFile;
 }

@@ -77,6 +77,23 @@ export function resolveParams(
   return { params, refusals };
 }
 
+/**
+ * A factory's `held` parameters as `--set` words a template that `declared` its parameters takes, followed by `sets`, so a `--set` of
+ * the same key wins (`givenOf`); and the held keys it does not declare, sorted, which the words leave out. A key of `sets` is not
+ * filtered: one the template does not declare is refused by `resolveParams`, never dropped.
+ */
+export function overlaid(
+  declared: Readonly<Record<string, Parameter>>,
+  held: Params,
+  sets: readonly string[],
+): { sets: string[]; dropped: string[] } {
+  const kept = Object.entries(held).filter(([key]) => Object.hasOwn(declared, key));
+  const dropped = Object.keys(held)
+    .filter((key) => !Object.hasOwn(declared, key))
+    .sort();
+  return { sets: [...kept.map(([key, value]) => `${key}=${String(value)}`), ...sets], dropped };
+}
+
 /** `text` with each `${{ parameters.<name> }}` in it written with the value `params` gives. Refused: a name `params` lacks. */
 export function interpolated(text: string, params: Params): string {
   return writeExpressions(text, (name) => {

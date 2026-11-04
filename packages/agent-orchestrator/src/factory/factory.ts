@@ -13,6 +13,7 @@ import { fireWord, type ScheduleListed } from '../schedule/schedule.ts';
 import { untrustedLines, type Untrusted } from '../trust/trust.ts';
 import { Invalid } from '../refusal/refusal.ts';
 import { firstPiece } from '../piece/piece.ts';
+import { settingLines, type SettingsAsRead } from '../harness-settings/harness-settings.ts';
 
 /** The one default factory's name: listed by `nemia factory ls`, refused to `nemia factory add` and `nemia factory rm`. */
 export const DEFAULT_FACTORY = 'default';
@@ -65,6 +66,8 @@ export const DEFAULT_REVISIONS: RevisionsPolicy = 'pinned';
  * revisions, when it says (`revisionsOf`). `template` and `tree`: the template it was made from, and the folder it runs from, its
  * workflows, agents, skills, wiring and instruction, when it was made from one. `volumes`: the folders of the person's machine its runs
  * mount for every local step beside its repositories, each read-only or writable as it was named (`Volume`), when it names any.
+ * `harnessSettings`: the settings of a harness every session of its runs' steps on it is given, when it names any (`HarnessSettings`), as
+ * the file holds them: judged at a start and at the door's write, not on read.
  */
 export type Factory = {
   name: string;
@@ -77,6 +80,7 @@ export type Factory = {
   template?: FactoryTemplate;
   tree?: string;
   volumes?: readonly Volume[];
+  harnessSettings?: SettingsAsRead;
 };
 
 /**
@@ -208,7 +212,8 @@ export type FactoryWrite =
   | 'unschedule'
   | 'upgrade'
   | 'adopt'
-  | 'volume';
+  | 'volume'
+  | 'setting';
 
 /** What to do in place of `nemia factory <verb>` on the default factory. */
 const INSTEAD: Record<FactoryWrite, string> = {
@@ -227,6 +232,7 @@ const INSTEAD: Record<FactoryWrite, string> = {
   unschedule: 'It schedules nothing: unschedule in a factory nemia factory ls lists.',
   upgrade: 'It is made from no template: upgrade a factory nemia factory apply made.',
   volume: 'It mounts no volume, and no run is started in it: add one to a factory nemia factory ls lists.',
+  setting: 'It holds no harness settings, and no run is started in it: set one on a factory nemia factory ls lists.',
   adopt:
     'It holds every run and card that names no factory: take over a factory nemia factory ls lists, or make one with nemia factory apply.',
 };
@@ -616,6 +622,7 @@ export function factoryLines(
             ...templateLines(l.template, l.status, width),
             ...workflowLine(l.workflows, width),
             ...volumeLines(l.volumes, width),
+            ...settingLines(l.harnessSettings, width),
             ...hireLines(l.hires, width),
             ...scheduleLines(l, listed, width, now),
             ...instructionLine(l.instruction, width),

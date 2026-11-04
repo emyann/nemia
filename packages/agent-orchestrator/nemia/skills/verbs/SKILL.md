@@ -26,9 +26,10 @@ They write nothing: run them unasked, as often as you need. One that sets with s
                                repositories (nemia factory --help)
   nemia factory ls
                                the same, by its name
-  nemia factory diff <name> --to <x.y.z> [--template <name|folder|archive>] | <name> --template <name|folder|archive> [--set <key>=<value> ...]
+  nemia factory diff <name> --to <x.y.z> [--template <name|folder|archive>] [--set <key>=<value> ...] | <name> --template <name|folder|archive> [--set <key>=<value> ...]
                                preview a templated factory's upgrade: what merges cleanly, and each
-                               conflict with its sides; or a hand-made factory's takeover by a
+                               conflict with its sides; onto a template of another name, a switch
+                               with no common base; or a hand-made factory's takeover by a
                                template, and the plan nemia factory adopt takes; nothing is written
   nemia factory servers <factory>
                                a factory's own MCP servers, each with the state its harness reports
@@ -315,12 +316,13 @@ Each asks the person at a prompt every time it runs: say what it does before you
   nemia factory adopt <name> --template <name|folder|archive> [--set <key>=<value> ...] --plan <digest>
                                take a hand-made factory over by a template, in place, as nemia factory
                                diff previewed it: its name, cards, runs and stats stay
-  nemia factory upgrade <name> --to <x.y.z> [--template <name|folder|archive>] [--downgrade]
+  nemia factory upgrade <name> --to <x.y.z> [--template <name|folder|archive>] [--set <key>=<value> ...] [--plan <digest>] [--downgrade]
                                upgrade a templated factory: its file wants --to, and the daemon merges
                                the template's change into its tree once each conflict is resolved
   nemia factory resolve <name> <conflict> --ours|--theirs|--file <path>
-                               choose for one conflict of a templated factory's upgrade: your tree, the
-                               template, or the text of a file; the daemon merges once each has one
+                               choose for one conflict of a templated factory's upgrade or switch: your
+                               tree, the template (none: drop the file), or the text of a file; the
+                               daemon merges once each has one
   nemia factory attach <factory> <workflow>
                                offer a workflow in a factory, by its folder's name: a factory offers
                                only the workflows attached to it
@@ -345,6 +347,11 @@ Each asks the person at a prompt every time it runs: say what it does before you
                                read-only (:ro) or writable (:rw); a writable one is not a run's workspace
   nemia factory volume rm <factory> <path>
                                take a volume off a factory, by its path
+  nemia factory setting set <factory> <harness>.<key> <json>
+                               give every session of a factory's runs on a harness one of its settings,
+                               claude.attribution among them; its value is JSON
+  nemia factory setting rm <factory> <harness>.<key>
+                               take a harness setting off a factory, by its key
   nemia factory instruct <name> --file <path>|- | --clear
                                write the instruction the store keeps for a factory (- for stdin), what
                                Nemia is to know of it and no step is told, or remove it with --clear

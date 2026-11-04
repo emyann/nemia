@@ -9,7 +9,8 @@
     "packages/agent-orchestrator/src/templates",
     "packages/agent-orchestrator/src/wiring",
     "packages/agent-orchestrator/src/adopt",
-    "packages/agent-orchestrator/src/volume"
+    "packages/agent-orchestrator/src/volume",
+    "packages/agent-orchestrator/src/harness-settings"
   ],
   "terms": [
     {
@@ -28,6 +29,15 @@
       "see": {
         "label": "Factories",
         "href": "/factories/#its-volumes"
+      }
+    },
+    {
+      "term": "Harness settings",
+      "meaning": "the settings of a harness a factory gives every session of its runs' steps on it, on top of the repository's own: for Claude Code, through the Agent SDK's settings option, never a file written into the repository. A factory sets `attribution`, `includeGitInstructions` and `language` alone, each changing what a session writes or says and none what it may reach or run; kept in the factory's own file, never in its template, and frozen on a run at its start.",
+      "type": "HarnessSettings",
+      "see": {
+        "label": "Factories",
+        "href": "/factories/#its-harness-settings"
       }
     },
     {
@@ -121,6 +131,15 @@
       "term": "Adoption",
       "meaning": "a factory made by hand taken over in place by a template: `nemia factory diff <name> --template …` previews it as a plan with its digest, and `nemia factory adopt … --plan <digest>` writes it, the render staged as the factory's base and tree and the template named in its file; its name, repositories, schedules, instruction, cards, runs and stats stay. The plan is `AdoptPlan`, judged by `adoptRefusal` in `packages/agent-orchestrator/src/adopt/adopt.ts`.",
       "type": "AdoptPlan"
+    },
+    {
+      "term": "Template switch",
+      "meaning": "an upgrade of a factory onto a template of another name than the one its base was rendered from (the template's own `metadata.name`, never its source): the factory's tree and the new render merge with no common base, by `switchTrees` in `packages/agent-orchestrator/src/upgrade/merge.ts`, chosen by `mergeBaseOf` beside it. A file both hold alike is clean, a file only the template holds is added, and a file only the tree holds, or each run of lines that differs, is a conflict for the person; it is always filed with its plan's `--plan`, and the new render is the base later upgrades merge three ways from.",
+      "type": "TreeMerge",
+      "see": {
+        "label": "Moving onto sdlc from another template",
+        "href": "/sdlc/#moving-onto-it-from-another-template"
+      }
     },
     {
       "term": "Builtin template",

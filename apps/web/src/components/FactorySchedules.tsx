@@ -15,7 +15,7 @@ import { routeLink } from './routeLink';
 const RouterLinkButton = routeLink(LinkButton);
 
 /** A line a person types, as the api answered it, and the button that copies it. */
-function CommandText({ text }: { text: string }) {
+export function CommandText({ text }: { text: string }) {
   return (
     <div className="flex w-full min-w-0 items-center gap-2">
       <code className="min-w-0 flex-1 rounded bg-muted px-2 py-1 text-left font-mono text-body-small [overflow-wrap:anywhere]">{text}</code>

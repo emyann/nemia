@@ -127,10 +127,11 @@ export default {
       if (fs.existsSync(file)) throw new Refused(`no pause before the page puts one — ${file} is there`);
       await opened(page, 'running');
       await headed(page, 'Running');
-      await expectTexts(
-        popover.locator('[data-pause-line]'),
-        ['Pause all factories: nothing new starts, and what runs finishes.'],
-        'its popover says what pausing does, to all factories',
+      await expectVisible(
+        popover
+          .locator('[data-pause-line]')
+          .getByText(/^Pause all factories: nothing new starts, and each working session stops when its current tool call ends/),
+        "its popover says what pausing does, to all factories: each session stops at its tool call's end",
       );
       await expectTexts(
         popover.locator('[data-pause-actions] li'),
@@ -167,7 +168,7 @@ export default {
           .locator('[data-pause-line]')
           .getByText(
             new RegExp(
-              `^Pausing: ${sessions} sessions? finishing a tool call, cut in (?:9|10) min — paused since .+ by ${put.by}: ${WHY}\\. Nothing new starts`,
+              `^Pausing: ${sessions} sessions? finishing a tool call, cut in (?:9|10) min — paused since .+ by ${put.by}: ${WHY}\\. Nothing new starts, and each working session stops when its current tool call ends`,
             ),
           ),
         'its popover says how many sessions finish a tool call, when they are cut, since when, by whom and why',
@@ -176,7 +177,7 @@ export default {
       await expectTexts(
         popover.locator('[data-pause-actions] li'),
         ['Pause now…', 'Resume'],
-        'its actions: Pause now… and Resume, a pause standing while what runs finishes',
+        "its actions: Pause now… and Resume, a pause standing while each session stops at its tool call's end",
       );
       await page.keyboard.press('Escape');
       await expectCount(popover, 0, 'Escape closes the popover');

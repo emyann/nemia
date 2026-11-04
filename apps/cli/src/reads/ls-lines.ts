@@ -240,6 +240,12 @@ const heldCount = ({ staged, held }: Pick<Paused, 'staged' | 'held'>): string =>
 const pausingWords = (sessions: number, leftMs: number): string =>
   `Pausing: ${sessions} session${sessions === 1 ? '' : 's'} finishing a tool call, cut ${leftMs > 0 ? `in ${Math.ceil(leftMs / 60_000)} min` : 'now'}`;
 
+/** What the pause does, as the orchestrator's `pauseDoes` says it: a timed pause parks each session at its call's end; none runs on. */
+const pauseDoes = ({ timeoutMs }: NonNullable<Paused['pause']>): string =>
+  timeoutMs !== undefined
+    ? 'nothing new starts, and each working session stops when its current tool call ends, cut once the timeout passes'
+    : 'nothing new starts, and each working session runs on to its end';
+
 const pausedWords = (paused: Paused, now: Date = new Date()): string | null => {
   const { pause, finishing } = paused;
   if (!pause) return null;
@@ -249,7 +255,7 @@ const pausedWords = (paused: Paused, now: Date = new Date()): string | null => {
       ? pausingWords(sessions, Math.min(pause.timeoutMs, Date.parse(pause.at) + pause.timeoutMs - now.getTime()))
       : `Pausing: ${finishing.length} finishing`;
   return finishing.length
-    ? `${head}${heldCount(paused)} — the store is paused ${sinceWords(pause)}; nothing new starts, and what runs finishes; ${RESUME_LINE} resumes it`
+    ? `${head}${heldCount(paused)} — the store is paused ${sinceWords(pause)}; ${pauseDoes(pause)}; ${RESUME_LINE} resumes it`
     : `Paused ${sinceWords(pause)} — nothing runs and nothing new starts${heldCount(paused)}; ${RESUME_LINE} resumes it`;
 };
 

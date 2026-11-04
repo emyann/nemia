@@ -1,6 +1,7 @@
 /**
  * The store's pause, which the runtime calls unschedulable: while it stands no pass starts new work — no step, try, round or check
- * filed, no queued task admitted, no queued card started — and what runs finishes. What still finishes under it (`finishingOf`), read off
+ * filed, no queued task admitted, no queued card started — and under a timeout each working session stops when its current tool call
+ * ends, cut once the timeout passes, while under none it runs on to its end. What still finishes under it (`finishingOf`), read off
  * the views on each pass and never stored, and its words: "Pausing" while anything finishes, "Paused" once nothing does, as `nemia ls`,
  * `nemia watch --once`, `nemia start`, `nemia up` and the board say it. Pure: its file is `pause.store.ts`'s, and the gates that honour
  * it are `assess` and the tick's `pass`.
@@ -269,9 +270,18 @@ const atWork = (view: FinishingView): boolean => {
 const sinceWords = ({ at, by, why }: Pause): string =>
   `since ${at || 'a time its file no longer says'} by ${by || 'someone its file no longer names'}${why ? `: ${why}` : ''}`;
 
+/**
+ * What the pause does, in words: nothing new starts, and under a timeout each working session stops when its current tool call ends, cut
+ * once the timeout passes; under none (a restart's take-over) each runs on to its end. The client's printers copy it word for word.
+ */
+const pauseDoes = ({ timeoutMs }: Pause): string =>
+  timeoutMs !== undefined
+    ? 'nothing new starts, and each working session stops when its current tool call ends, cut once the timeout passes'
+    : 'nothing new starts, and each working session runs on to its end';
+
 /** The pause as it was put, in one line: since when, by whom and why, what it stops, and the verb that resumes. */
 export const pauseWords = (pause: Pause): string =>
-  `the store is paused ${sinceWords(pause)} — nothing new starts, and what runs finishes; ${RESUME_LINE} resumes it`;
+  `the store is paused ${sinceWords(pause)} — ${pauseDoes(pause)}; ${RESUME_LINE} resumes it`;
 
 /** How many checks the pause holds back, staged landings among them, in words: `, 2 checks held`, or nothing for none. */
 const heldCount = ({ staged, held }: Pick<Paused, 'staged' | 'held'>): string => {
@@ -293,7 +303,7 @@ export const pausedWords = (paused: Pick<Paused, 'pause' | 'finishing' | 'staged
       ? pausingWords(sessions, Math.min(pause.timeoutMs, Date.parse(pause.at) + pause.timeoutMs - now.getTime()))
       : `Pausing: ${finishing.length} finishing`;
   return finishing.length
-    ? `${head}${heldCount(paused)} — the store is paused ${sinceWords(pause)}; nothing new starts, and what runs finishes; ${RESUME_LINE} resumes it`
+    ? `${head}${heldCount(paused)} — the store is paused ${sinceWords(pause)}; ${pauseDoes(pause)}; ${RESUME_LINE} resumes it`
     : `Paused ${sinceWords(pause)} — nothing runs and nothing new starts${heldCount(paused)}; ${RESUME_LINE} resumes it`;
 };
 

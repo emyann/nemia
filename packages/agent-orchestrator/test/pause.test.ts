@@ -259,8 +259,8 @@ test('the store paused, then paused at once, then resumed: nothing new starts, w
       const standing = await stage.runWith(b.e, pausedRead());
       assert.match(
         pausedWords(standing) ?? '',
-        /^Pausing: 5 sessions finishing a tool call, cut in \d+ min/,
-        "what runs finishes: four sessions, the landing's and the session of a run called off, and a check",
+        /^Pausing: 5 sessions finishing a tool call, cut now/,
+        "what runs finishes: four sessions, the landing's and the session of a run called off, and a check; the clock is past the timeout, so their calls are being cut",
       );
       assert.deepEqual(b.sessionDrains.at(-1), { graceMs: 600_000 }, "the pass puts the sessions' drain again at the pause's timeout");
     },

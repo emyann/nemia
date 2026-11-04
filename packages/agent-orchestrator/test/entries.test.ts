@@ -227,6 +227,7 @@ const PINNED: Record<string, string[]> = {
     'factoryNameRefusal',
     'factoryRepo',
     'factoryRules',
+    'factoryVolumes',
     'emitFeed',
     'FEED_FOLLOW_BEATS',
     'FEED_FOLLOW_READS',

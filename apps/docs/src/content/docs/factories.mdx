@@ -38,6 +38,30 @@ meant to allow. The command prints the place, what the trust grants and how to t
 A place that is not trusted — added before, opted out, or taken back — is said by `nemia factory` and on the factory's page, with the
 line that trusts it: `nemia factory trust <name>`. A run's denied calls on such a place name it as the likely cause.
 
+## Its volumes
+
+A factory can name volumes too: folders on your machine its steps may reach beyond the run's workspace, apart from the repositories it
+works on, as a container is given a volume. Each is marked as docker compose marks one, read-only or writable, and the mark is required:
+a volume left unmarked would be writable without anyone having said so, and Nemia's runtime refuses an unmarked mount for that reason.
+
+```sh
+nemia factory volume add pipao /home/me/notes:ro    # every local step reads it
+nemia factory volume add pipao /home/me/scratch:rw  # a step whose fence writes may write it
+nemia factory volume rm pipao /home/me/scratch
+```
+
+- Every local step of a run in the factory is given the volumes, beside the read-only mounts of its other repositories. A writable
+  volume is writable only for a step whose fence writes; a step that writes nothing reads it.
+- **A writable volume is not the run's workspace.** Nothing commits, lands or reverts what a step writes there, and every run of the
+  factory reaches it at once.
+- A volume never makes the factory work on its folder: which factory a start, a card or a schedule lands in does not change.
+- A run copies the volumes at its start, so a later change reaches only the runs started after it.
+- Refused: a folder that is no directory, one of the factory's repositories, a folder at or inside Nemia's store, and a writable one
+  that holds the store. A start is refused, before anything is written, where a step's harness cannot hold a volume's mount: Codex holds
+  no writable one.
+- Volumes are yours: they live in the factory's own file (`"volumes"`, each `{ "path", "readOnly" }`), never in a template, and
+  `nemia factory adopt` and `nemia factory upgrade` keep them. `nemia factory` lists them under the factory.
+
 ## Attached workflows
 
 A factory offers only the workflows attached to it, and none until one is. Attaching records the workflow's folder name in the

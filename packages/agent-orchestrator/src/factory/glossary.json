@@ -21,6 +21,15 @@
       }
     },
     {
+      "term": "Volume",
+      "meaning": "a folder of the person's machine a factory mounts for every local step of its runs, beside its repositories, marked read-only (`:ro`) or writable (`:rw`) as docker compose marks one; kept in the factory's own file, never in its template. A writable one is writable only where a step's fence writes, and is not the run's workspace: nothing commits or lands what a step writes there.",
+      "type": "Volume",
+      "see": {
+        "label": "Factories",
+        "href": "/factories/#its-volumes"
+      }
+    },
+    {
       "term": "Factory door",
       "meaning": "the one way a factory is read and written — its file, and the level, rules and servers the store keeps beside it: `FactoryDoor` in `packages/agent-orchestrator/src/factories/factories.store.ts`, its files layer at the store's root a program is given and a memory one, each refusing a write that breaks the model's `Factory`.",
       "type": "FactoryDoorShape"

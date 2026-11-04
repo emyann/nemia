@@ -14,7 +14,9 @@
  *   told which call did not finish.
  * - **Taken up.** On each look, a holder adopts a session parked, or one whose holder's process is gone: it kills what is left of its
  *   Claude Code's process group, unless that pid is another process's now (`childOf`), and resumes it under the same session id, told
- *   it was paused (`CARRY_ON`), or, when its holder ended mid-call, which call did not finish (`crashNote`).
+ *   it was paused (`CARRY_ON`), or, when its holder ended mid-call, which call did not finish (`crashNote`). It is handed what is
+ *   left of its attempt's spend cap, never the whole cap again (`capLeft`), and one that has spent it all is ended `failed` at its
+ *   budget rather than resumed.
  * - **The drain.** A file naming the holder's pid and when it started (`putDrain`): while it names this process, the new calls of each
  *   session with none in flight wait at their hook, so a restart can wait for the calls in flight before it signals.
  * - **What it keeps.** Its run file, and a capture of the messages a reader reads (denials as they come, the result's statement and
@@ -25,7 +27,7 @@ import { Effect, Option, Schedule, type Scope } from 'effect';
 import fs from 'node:fs';
 import { instantNow } from '../../core/engine/now.ts';
 import { purseOf, type Purse } from '../../core/clock.ts';
-import type { Sighting } from '../../core/index.ts';
+import type { Sighting, Usage } from '../../core/index.ts';
 import { RunnerError } from '../error.ts';
 import type { Observation, RunnerOps, SpawnRequest } from '../seam.ts';
 import { readTranscript } from '../transcript.ts';
@@ -121,6 +123,41 @@ const carriedFrom = (root: string, resumeFrom: string): NonNullable<AttachedRun[
 };
 
 /**
+ * What the attempt of `run` has spent so far, as its capture `told` says it: the last result's running totals, the parent's it
+ * carried on taken off (`lessCarried`). What a sighting counts, and what a take-up takes off the cap.
+ */
+const ownUsage = (told: ReturnType<typeof saidBy>, run: AttachedRun): Usage | undefined =>
+  told.usage && run.carried ? lessCarried(told.usage, run.carried, told.ownTokens) : told.usage;
+
+/**
+ * What an attempt whose cap is `cap` may still spend once it has spent `spent`: what its next Claude Code is handed as its own cap.
+ * The Agent SDK counts `maxBudgetUsd` from its own `query()` alone (`sdk.d.ts:1989-1993`), while a resume's running total carries on its
+ * parent's (`sdk.d.ts:6100-6103`), so the cap less the attempt's spend so far is the right cap for the next process either way. No cap:
+ * none. Spend unknown — no result yet, or one whose totals were zeroed or reset and taken off as nothing — the whole cap, an
+ * undercount like a killed process's lost spend, never a double count. At or below nothing where the cap is spent.
+ */
+export const capLeft = (cap: number | undefined, spent: number | undefined): number | undefined =>
+  cap === undefined ? undefined : cap - (spent ?? 0);
+
+/** The spend cap a run file's request asked for, where it asked one. */
+const capOf = (run: AttachedRun): number | undefined => {
+  const cap = (run.request as { config?: { budgetUsd?: unknown } }).config?.budgetUsd;
+  return typeof cap === 'number' ? cap : undefined;
+};
+
+/**
+ * What a holder taking `run` up resumes it with: the request its run file kept, its brief left out and its cap what is left of it
+ * (`capLeft`); the run file keeps the whole cap, for the next take-up to count from. Nothing where its attempt has spent its cap.
+ */
+const resumedRequest = (root: string, run: AttachedRun): SpawnRequest | undefined => {
+  const left = capLeft(capOf(run), ownUsage(saidBy(root, run.name), run)?.costUsd);
+  if (left !== undefined && left <= 0) return undefined;
+  const request = run.request as Omit<SpawnRequest, 'brief'>;
+  const config = left === undefined ? request.config : { ...request.config, budgetUsd: left };
+  return { ...request, ...(config ? { config } : {}), brief: '' };
+};
+
+/**
  * A run file's sighting: its state, whether a process still holds the session and which (`held`, `pid`), the code its holder runs
  * (`image`), its bridge, its call in flight, and what its capture says it closed out with, used and was denied, and the Claude Code
  * it runs (`harnessVersion`).
@@ -130,8 +167,9 @@ const carriedFrom = (root: string, resumeFrom: string): NonNullable<AttachedRun[
  * restarted under its feet. A session that has ended says nothing of a process, as it did before.
  */
 const sightingOf = (root: string, run: AttachedRun): Sighting => {
-  const { denials, usage, ownTokens, ...said } = saidBy(root, run.name);
-  const own = usage && run.carried ? lessCarried(usage, run.carried, ownTokens) : usage;
+  const told = saidBy(root, run.name);
+  const { denials, usage: _, ownTokens: __, ...said } = told;
+  const own = ownUsage(told, run);
   const held = isOpen(run.state) ? !holderGone(run) : undefined;
   return {
     sessionId: run.name,
@@ -145,6 +183,7 @@ const sightingOf = (root: string, run: AttachedRun): Sighting => {
     ...(run.image ? { image: run.image } : {}),
     ...bridgeOf(run.bridge),
     ...(run.calling && run.state === 'working' ? { calling: run.calling } : {}),
+    ...(run.limit ? { limit: run.limit } : {}),
     ...asksOf(root, run),
   };
 };
@@ -265,6 +304,30 @@ export const letGoOf = (
   });
 
 /**
+ * How a holder takes up a session left behind under `root` (*Taken up*): what is left of its Claude Code's process group killed, then
+ * ended `canceled` where it was stopped, `failed` where it never named its session, `failed` with `limit: 'budget'` where its attempt
+ * has spent its cap (`resumedRequest`), and else resumed by `start` under the same session id, with what is left of its cap.
+ */
+const adoptIn =
+  (
+    root: string,
+    start: (r: SpawnRequest, run: AttachedRun, first: string, resume?: string) => void,
+    stopped: (run: AttachedRun) => boolean,
+  ) =>
+  async (run: AttachedRun): Promise<void> => {
+    cutAsks(root, run.name);
+    const child = childOf(run);
+    killGroup(child);
+    await gone(child);
+    const { childPid: _, childStart: __, calling: ___, ownerStart: ____, ...rest } = run;
+    const mine: AttachedRun = { ...rest, ...thisHolder() };
+    if (stopped(run) || !run.sessionId) return writeRun(root, { ...mine, state: stopped(run) ? 'canceled' : 'failed' });
+    const resumed = resumedRequest(root, run);
+    if (resumed === undefined) return writeRun(root, { ...mine, state: 'failed', limit: 'budget' });
+    start(resumed, { ...mine, state: 'working' }, noteOf(run), run.sessionId);
+  };
+
+/**
  * The attached sessions under `root`: `executable` the Claude Code they run, the SDK's own when absent (a test's stand-in otherwise).
  *
  * A session's interrupt file is read on every look, never as a transition: another process's ask survives a restart of the holder,
@@ -304,16 +367,7 @@ export const attachedSessions = (root: string, executable?: string, options: { l
       .catch(() => undefined);
   };
 
-  const adopt = async (run: AttachedRun): Promise<void> => {
-    cutAsks(root, run.name);
-    const child = childOf(run);
-    killGroup(child);
-    await gone(child);
-    const { childPid: _, childStart: __, calling: ___, ownerStart: ____, ...rest } = run;
-    const mine: AttachedRun = { ...rest, ...thisHolder() };
-    if (stopped(run) || !run.sessionId) return writeRun(root, { ...mine, state: stopped(run) ? 'canceled' : 'failed' });
-    start({ ...(run.request as Omit<SpawnRequest, 'brief'>), brief: '' }, { ...mine, state: 'working' }, noteOf(run), run.sessionId);
-  };
+  const adopt = adoptIn(root, start, stopped);
 
   const looked = (run: AttachedRun): AttachedRun => {
     const at = live.get(run.name);

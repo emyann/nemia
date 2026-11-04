@@ -100,10 +100,21 @@ test('`assess` under the pause: nothing is due that would start new work, each n
 
 test('the pause in words: as put, Pausing while some finish, Paused once none does, and what `nemia pause --now` would stop', async (t) => {
   await t.test('the pause as put says since when, by whom, why, and how it is resumed', () => {
-    assert.equal(
-      pauseWords(PAUSE),
-      'the store is paused since 2026-10-04T12:00:00.000Z by ann: merging by hand — nothing new starts, and what runs finishes; nemia resume resumes it',
-    );
+    const words = pauseWords(PAUSE);
+    assert.match(words, /^the store is paused since 2026-10-04T12:00:00\.000Z by ann: merging by hand — nothing new starts/);
+    assert.match(words, /; nemia resume resumes it$/);
+  });
+  await t.test("a pause with a timeout says each session stops at its tool call's end; one with none, that each runs on", () => {
+    const finishing: Finishing[] = [{ run: 'r-1', step: 'implement', kind: 'session' }];
+    const timed = { ...PAUSE, timeoutMs: 600_000 };
+    for (const words of [pauseWords(timed), pausedWords({ pause: timed, finishing, staged: [], held: [] }) ?? '']) {
+      assert.match(words, /each working session stops when its current tool call ends, cut once the timeout passes/);
+      assert.doesNotMatch(words, /what runs finishes|runs on to its end/);
+    }
+    for (const words of [pauseWords(PAUSE), pausedWords({ pause: PAUSE, finishing, staged: [], held: [] }) ?? '']) {
+      assert.match(words, /nothing new starts, and each working session runs on to its end/);
+      assert.doesNotMatch(words, /what runs finishes|tool call ends/);
+    }
   });
   await t.test('the pause says Pausing with how many still finish, names each and each check it holds; Paused once none finishes', () => {
     const finishing: Finishing[] = [
@@ -111,8 +122,10 @@ test('the pause in words: as put, Pausing while some finish, Paused once none do
       { run: 'r-2', step: 'review', kind: 'check' },
     ];
     const staged = [{ run: 'r-3', step: 'ship', repo: '/repo' }];
-    assert.deepEqual(pausedLines({ pause: PAUSE, finishing, parked: [], staged, held: [{ run: 'r-4', step: 'land' }] }), [
-      'Pausing: 2 finishing, 2 checks held — the store is paused since 2026-10-04T12:00:00.000Z by ann: merging by hand; nothing new starts, and what runs finishes; nemia resume resumes it',
+    const [line, ...rest] = pausedLines({ pause: PAUSE, finishing, parked: [], staged, held: [{ run: 'r-4', step: 'land' }] });
+    assert.match(line ?? '', /^Pausing: 2 finishing, 2 checks held — the store is paused since 2026-10-04T12:00:00\.000Z by ann: merging by hand; /);
+    assert.match(line ?? '', /; nemia resume resumes it$/);
+    assert.deepEqual(rest, [
       "   r-1's implement is finishing: its session is at work",
       "   r-2's review is finishing: its check runs",
       "   r-3's ship has its merge staged in /repo (MERGE_HEAD), and its check waits on nemia resume",

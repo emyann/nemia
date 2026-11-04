@@ -193,6 +193,11 @@ type StreamFacts = {
   cwd?: string;
   /** The model the session really started on, as its `init` line resolved the alias it was asked for. */
   model?: string;
+  /**
+   * The version of Claude Code its last `init` line names: the SDK prints one per turn, and a resumed process its own, so the
+   * last is the process that runs now.
+   */
+  harnessVersion?: string;
   skills: Map<string, unknown>;
   files: Map<string, [string, unknown]>;
   denied: Set<string>;
@@ -220,6 +225,7 @@ const gather = (facts: StreamFacts, printed: PrintedLine): void => {
     facts.started = true;
     facts.cwd ??= printed.line.cwd;
     facts.model ??= printed.line.model;
+    if (printed.line.claude_code_version) facts.harnessVersion = printed.line.claude_code_version;
   } else if (printed.kind === 'assistant') gatherCalls(facts, printed.line);
 };
 
@@ -236,7 +242,8 @@ const gather = (facts: StreamFacts, printed: PrintedLine): void => {
  * The skills it loaded are read off the stream alone (`loadedSkills`), and said only by a stream with its `init` line; the files
  * it read or wrote (`touchedFiles`), only by one whose `init` line names its folder; the model it really started on, only by one
  * whose `init` line names a model, which is the alias — `opus` — already resolved to the model id the harness chose for it; what it
- * answers it `ranOn`, so no field of a recorded fact is spelt as the harness argument that asked for it.
+ * answers it `ranOn`, so no field of a recorded fact is spelt as the harness argument that asked for it. The version of Claude
+ * Code it runs, `harnessVersion`, is the last `init` line's `claude_code_version`, said only by a stream with one that names it.
  *
  * Throws an `Error` naming the line, its field and the fix when a line of a kind it reads does not decode (`printedLinesOf`).
  */
@@ -250,6 +257,7 @@ export const claudeStreamOutput = (output: string): HarnessOutput => {
     ...(skills ? { skills } : {}),
     ...(files ? { files } : {}),
     ...(facts.model ? { ranOn: facts.model } : {}),
+    ...(facts.harnessVersion ? { harnessVersion: facts.harnessVersion } : {}),
   };
 };
 

@@ -220,12 +220,28 @@ export const ATTEMPT_ENDS = ['harness', 'lost', 'unstartable', 'operator', 'dead
 export type AttemptEnd = (typeof ATTEMPT_ENDS)[number];
 
 /**
+ * The release a session ran on: an install's tag, or a checkout's folder. Mirrors `SessionRelease` in agent-orchestrator (`release.ts`).
+ */
+export type SessionRelease = { kind: 'install'; tag: string } | { kind: 'checkout'; root: string };
+
+/** The harness a session ran on, by name, and the version it said it runs. Mirrors `SessionHarness` in agent-orchestrator. */
+export type SessionHarness = { name: string; version: string };
+
+/**
  * Mirrors `StepAttempts` in apps/api/src/runs/runs.ts. `endedAt` is when the latest attempt ended — the
- * engine's `Attempt.endedAt` — and null while it runs, or where the engine's record has none.
+ * engine's `Attempt.endedAt` — and null while it runs, or where the engine's record has none. `release` and `harness` are what its
+ * session ran on, each null where the attempt recorded none.
  */
 export type StepAttempts = {
   count: number;
-  latest: { startedAt: string; ended: AttemptOutcome | null; endedAt: string | null; reason: AttemptEnd | null } | null;
+  latest: {
+    startedAt: string;
+    ended: AttemptOutcome | null;
+    endedAt: string | null;
+    reason: AttemptEnd | null;
+    release: SessionRelease | null;
+    harness: SessionHarness | null;
+  } | null;
 };
 
 /** Decodes a `StepAttempts`. */
@@ -238,6 +254,13 @@ export const StepAttemptsSchema = decodes<StepAttempts>()(
         ended: Schema.NullOr(Schema.Literals(ATTEMPT_OUTCOMES)),
         endedAt: Schema.NullOr(Schema.String),
         reason: Schema.NullOr(Schema.Literals(ATTEMPT_ENDS)),
+        release: Schema.NullOr(
+          Schema.Union([
+            Schema.Struct({ kind: Schema.Literal('install'), tag: Schema.String }),
+            Schema.Struct({ kind: Schema.Literal('checkout'), root: Schema.String }),
+          ]),
+        ),
+        harness: Schema.NullOr(Schema.Struct({ name: Schema.String, version: Schema.String })),
       }),
     ),
   }),

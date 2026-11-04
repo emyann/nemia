@@ -95,6 +95,16 @@
       "type": "HarnessArgs"
     },
     {
+      "term": "Harness version",
+      "meaning": "the version of the harness a session's process runs, as the harness says it: Claude Code's init message's `claude_code_version`, the last one it printed. Recorded on the attempt while it works (`harnessVersion`), carried and never judged.",
+      "type": "Attempt"
+    },
+    {
+      "term": "Image",
+      "meaning": "the code a session's process runs, as that process reports it: the real folder of the runtime package that spawned or holds it, a Pod's container image. Recorded on the attempt while it works (`image`), a long-lived session's rewritten by each new holder; what release it is, is the layer above's to say.",
+      "type": "Attempt"
+    },
+    {
       "term": "Journal",
       "meaning": "the runtime's durable record of a task, an event a line, which every pass reads again; read and written through the Task door alone.",
       "type": "Journal",

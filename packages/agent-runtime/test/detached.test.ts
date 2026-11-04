@@ -46,7 +46,7 @@ import {
   type HarnessOutput,
   type HarnessSpec,
 } from '../src/harness/detached/detached.ts';
-import { claudeResultOutput, claudeStreamOutput } from '../src/harness/detached/output.ts';
+import { claudeResultOutput, claudeStreamKept, claudeStreamOutput } from '../src/harness/detached/output.ts';
 import { carriedOf } from '../src/harness/detached/carried.ts';
 import { H4SJ_IMPLEMENT, H4SJ_IMPLEMENT_TRY2, UV7V_IMPLEMENT } from './session-results.ts';
 import { codex, trustedProjects } from '../src/harness/codex/codex.ts';
@@ -61,7 +61,17 @@ import { runningIn, scratch } from './scratch.ts';
 import { warned } from './warned.ts';
 import { stepClock } from './clock.ts';
 import { story } from './checkpoints.ts';
-import { FILES_STREAM, MODEL, resultLine, SESSION, SKILLS_STREAM, stream } from './reader-streams.ts';
+import {
+  CLAUDE_CODE_VERSIONS,
+  FILES_STREAM,
+  MODEL,
+  resultLine,
+  SESSION,
+  SKILLS_STREAM,
+  stream,
+  VERSIONED_STREAM,
+} from './reader-streams.ts';
+import { IMAGE } from '../src/harness/image.ts';
 import { ioCounts } from '../src/core/engine/tally.ts';
 import { monoNow } from '../src/core/engine/now.ts';
 import { builtEngine } from './engine.ts';
@@ -1258,6 +1268,24 @@ test('a Codex stream refused is refused once per change of its output: an unchan
   assert.equal(reads, 2, 'read again once its output changed');
 });
 
+test('a run file names the code its worker runs: the spawn writes this runtime’s IMAGE and the sighting carries it; one written before reads none', async () => {
+  const dir = root();
+  const ops = detachedOps(sh('sleep 5'), dir, QUICK);
+  await Effect.runPromise(ops.spawn(req('ae/im1/1', dir)));
+  try {
+    const plan = JSON.parse(fs.readFileSync(runFileOf(dir, 'sh', 'ae/im1/1'), 'utf8')) as { image?: string };
+    assert.equal(plan.image, IMAGE);
+    assert.equal(IMAGE, fs.realpathSync(path.join(import.meta.dirname, '..')), 'the real folder of the runtime package');
+    assert.equal((await Effect.runPromise(ops.observe)).get('ae/im1/1')?.image, IMAGE);
+  } finally {
+    await Effect.runPromise(ops.stop('ae/im1/1'));
+  }
+  claudeRun(dir, 'ae/im2/1', [stream.init, resultLine({})]);
+  const before = (await Effect.runPromise(detachedOps(claudeJob, dir).observe)).get('ae/im2/1');
+  assert.ok(before, 'the run written before is listed');
+  assert.equal('image' in before, false);
+});
+
 test('a claude job whose output has stderr before its result and a line torn mid-write after it still says what its result says', async () => {
   const dir = root();
   const torn = stream.calls(['toolu_r', 'Read', { file_path: '/w/a.ts' }]).slice(0, -12);
@@ -2347,6 +2375,26 @@ test("claudeStreamOutput: what claude -p's stream says as it happens — its den
         'no init line: no session known to have started, nothing measured',
       );
       assert.equal('ranOn' in claudeResultOutput(resultLine({})), false, '--output-format json has no events: it cannot say');
+    },
+  );
+
+  await t.test(
+    "claude -p's stream says the Claude Code it runs off its last `init` line; a line naming none, or none at all, says none",
+    () => {
+      assert.equal(
+        claudeStreamOutput(VERSIONED_STREAM).harnessVersion,
+        CLAUDE_CODE_VERSIONS[1],
+        'the last init line: the process that runs now',
+      );
+      const first = VERSIONED_STREAM.split('\n').slice(0, 1);
+      assert.equal(claudeStreamOutput([...first, resultLine({})].join('\n')).harnessVersion, CLAUDE_CODE_VERSIONS[0]);
+      assert.equal('harnessVersion' in claudeStreamOutput([stream.init, resultLine({})].join('\n')), false, 'an init line naming none');
+      assert.equal('harnessVersion' in claudeResultOutput(VERSIONED_STREAM.split('\n').at(-1) ?? ''), false, 'json output has no events');
+      assert.equal(
+        claudeStreamOutput(claudeStreamKept(VERSIONED_STREAM)).harnessVersion,
+        CLAUDE_CODE_VERSIONS[1],
+        'a kept capture reads the same',
+      );
     },
   );
 

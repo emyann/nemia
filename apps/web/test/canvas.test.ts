@@ -66,13 +66,20 @@ test("duration and attemptLine: an attempt's time", async (t) => {
   await t.test('an attempt that runs counts its time; one that is over says when it started', () => {
     const now = Date.parse('2026-09-13T01:00:00.000Z');
     const startedAt = '2026-09-13T00:47:56.000Z';
-    assert.equal(attemptLine({ count: 2, latest: { startedAt, ended: null, endedAt: null, reason: null } }, true, now), '#2 · 12m 04s');
     assert.equal(
-      attemptLine({ count: 1, latest: { startedAt, ended: 'succeeded', endedAt: null, reason: 'harness' } }, false, now),
+      attemptLine({ count: 2, latest: { startedAt, ended: null, endedAt: null, reason: null, release: null, harness: null } }, true, now),
+      '#2 · 12m 04s',
+    );
+    assert.equal(
+      attemptLine(
+        { count: 1, latest: { startedAt, ended: 'succeeded', endedAt: null, reason: 'harness', release: null, harness: null } },
+        false,
+        now,
+      ),
       '#1 · started 12m 04s ago',
     );
     assert.equal(
-      attemptLine({ count: 1, latest: { startedAt, ended: null, endedAt: null, reason: null } }, false, now),
+      attemptLine({ count: 1, latest: { startedAt, ended: null, endedAt: null, reason: null, release: null, harness: null } }, false, now),
       '#1 · started 12m 04s ago',
       'no end on the record, and no session going either: counting on would claim it is still at work',
     );
@@ -83,21 +90,33 @@ test("duration and attemptLine: an attempt's time", async (t) => {
     const startedAt = '2026-09-13T00:30:00.000Z';
     const endedAt = '2026-09-13T00:59:04.000Z';
     assert.equal(
-      attemptLine({ count: 1, latest: { startedAt, ended: 'succeeded', endedAt, reason: 'harness' } }, false, now),
+      attemptLine(
+        { count: 1, latest: { startedAt, ended: 'succeeded', endedAt, reason: 'harness', release: null, harness: null } },
+        false,
+        now,
+      ),
       '#1 · 29m 04s',
     );
     assert.equal(
-      attemptLine({ count: 2, latest: { startedAt, ended: 'failed', endedAt, reason: 'harness' } }, true, now),
+      attemptLine(
+        { count: 2, latest: { startedAt, ended: 'failed', endedAt, reason: 'harness', release: null, harness: null } },
+        true,
+        now,
+      ),
       '#2 · 29m 04s',
       'ended, and the step still live behind it between attempts: the attempt shown took what it took',
     );
     assert.equal(
-      attemptLine({ count: 3, latest: { startedAt, ended: null, endedAt: null, reason: null } }, true, now),
+      attemptLine({ count: 3, latest: { startedAt, ended: null, endedAt: null, reason: null, release: null, harness: null } }, true, now),
       '#3 · 30m 00s',
       'still running: the time counts',
     );
     assert.equal(
-      attemptLine({ count: 1, latest: { startedAt, ended: 'succeeded', endedAt: null, reason: 'harness' } }, false, now),
+      attemptLine(
+        { count: 1, latest: { startedAt, ended: 'succeeded', endedAt: null, reason: 'harness', release: null, harness: null } },
+        false,
+        now,
+      ),
       '#1 · started 30m 00s ago',
       'a record over and with no end: no clock to stop, so it says when it started',
     );

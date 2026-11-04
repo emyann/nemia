@@ -32,7 +32,8 @@
 export { attemptVerdict, CHECK_RESULTS, checkVerdictOf, verdictWord } from './check/check.ts';
 export type { CheckResult, CheckVerdict } from './check/check.ts';
 export { VERSION } from './version/version.ts';
-export { leaseRelease, trialRefusal, type Running } from './release/release.ts';
+export { leaseRelease, trialRefusal, checkoutPromiseLine, type Running } from './release/release.ts';
+export type { SessionHarness, SessionRelease } from './release/release.ts';
 export { currentRelease } from './release/release.store.ts';
 export { runningRelease } from './release/version.verb.ts';
 export { Conflict, Invalid, isRefusal, Missing, type Refusal } from './refusal/refusal.ts';
@@ -433,7 +434,7 @@ export type { Advanced } from './tick/advance.verb.ts';
 export type { Pass } from './tick/tick.verb.ts';
 export { acceptRun, roundRun } from './round/round.verb.ts';
 export { mergeRun } from './merge/merge.verb.ts';
-export { approveRun } from './gate/gate.verb.ts';
+export { approveRun, type Approved } from './gate/gate.verb.ts';
 export { askedNow } from './question/asked.verb.ts';
 export { cancelRun, type Cancelled } from './cancel/cancel.verb.ts';
 export { hold, unhold } from './wait/wait.verb.ts';
@@ -486,7 +487,6 @@ export { CLI, CLI_VERBS, commandBreaks, commandLine, generated, helpOf, leftOut,
 export { renamedIn, renamedValues } from './command/command.ts';
 export type { Args, CommandSpec, Flag, Positional, Route, Spec } from './command/command.ts';
 export type { Accepted, RoundAsked } from './round/round.verb.ts';
-export type { Approved } from './gate/gate.verb.ts';
 export type { Asked } from './retry/retry.verb.ts';
 export type { Holding } from './wait/wait.verb.ts';
 export type { Told } from './say/say.verb.ts';

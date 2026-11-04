@@ -5,6 +5,8 @@
  * said of the try a step is on: its gate's approval (`gateOf`) and a loop's acceptance (`acceptedOf`).
  */
 import { endWords, type AttemptEnd, type EngineOutcome } from '../views/views-words.ts';
+import { DEFAULT_HARNESS } from '../harness/harness.ts';
+import { sessionRanOn, type SessionHarness, type SessionRelease } from '../release/release.ts';
 import type { RetryAsk } from '../retry/index.ts';
 import { bare, type TaskView, type Views } from '../summary/reads.verb.ts';
 import { wordOf } from '../summary/judged.verb.ts';
@@ -151,6 +153,13 @@ export type StepAttempts = {
      * engine stopped seeing it — or `budget` and `unsigned`, the orchestrator's; null while it runs.
      */
     reason: AttemptEnd | null;
+    /**
+     * The release its session ran on, off the image its attempt recorded (`sessionRelease`): an install's tag, or a checkout; null where
+     * the attempt recorded none — one an older runtime ran, or one its runner could not say.
+     */
+    release: SessionRelease | null;
+    /** Its harness, by the name its task was filed with, and the version the harness said it runs; null where it said none. */
+    harness: SessionHarness | null;
   } | null;
 };
 
@@ -248,6 +257,7 @@ export function triesOf(
   },
   answers: readonly RetryAsk[],
   stderr: CheckStderr,
+  releases: string,
 ): StepTry[] {
   const { verdict: _stepVerdict, ...now } = current;
   const step = steps.find((s) => s.name === name) ?? bare(name);
@@ -272,7 +282,7 @@ export function triesOf(
       taskId: t.taskId,
       note: noteOf(i + 1),
       ...earlierSaid(t, i),
-      attempts: attemptsIn(t.taskId, views, turnAt(t, i)),
+      attempts: attemptsIn(t.taskId, views, releases, turnAt(t, i)),
       check: step.check ? checkIn(step.check, t.check?.taskId, views, stderr) : null,
       closeout: closeoutIn(run, name, step, t.taskId, views, turnAt(t, i)),
       unreadable: unreadableIn(t.taskId, views, turnAt(t, i)),
@@ -294,15 +304,25 @@ export function triesOf(
 /**
  * A try's attempts (`StepAttempts`), off the engine's view of its task, on the turn it was (`attemptsOn`). A try with no task, or one the
  * engine has lost, has had none. How the latest ended is read through `endWords`: an end without the statement its task asked for is
- * `failed · unsigned`, the orchestrator's word, the runtime not judging it, and never the harness's `done` that the runtime records.
+ * `failed · unsigned`, the orchestrator's word, the runtime not judging it, and never the harness's `done` that the runtime records. What
+ * it
+ * ran on is its recorded image placed under `releases`, the store's real releases folder, and its harness's version (`sessionRanOn`).
  */
-export function attemptsIn(taskId: string | null, views: Views, turn?: number): StepAttempts {
+export function attemptsIn(taskId: string | null, views: Views, releases: string, turn?: number): StepAttempts {
   const state = taskId ? views.get(taskId)?.state : undefined;
   const attempts = attemptsOn(state, turn);
   const latest = attempts.at(-1);
   return {
     count: attempts.length,
-    latest: state && latest ? { startedAt: latest.startedAt, ...endWords(state, latest), endedAt: latest.endedAt ?? null } : null,
+    latest:
+      state && latest
+        ? {
+            startedAt: latest.startedAt,
+            ...endWords(state, latest),
+            endedAt: latest.endedAt ?? null,
+            ...sessionRanOn(latest, state.harness ?? DEFAULT_HARNESS, releases),
+          }
+        : null,
   };
 }
 

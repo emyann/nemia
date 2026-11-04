@@ -8,6 +8,7 @@ import { timeline, type Timeline } from '../timeline/index.ts';
 import { closeoutAsked, closeoutReader, exitVerdicts } from '../views/views.verb.ts';
 import { phaseOfView } from '../views/views-words.ts';
 import { type Engine, EngineService, tried } from '../runtime-client.ts';
+import { realReleasesDir } from '../release/release.store.ts';
 import type { RaiseReads } from '../retry/index.ts';
 import { bare, filedTimes, type Filings, type Views, workflowsOf } from '../summary/reads.verb.ts';
 import { stepSaid } from '../summary/judged.verb.ts';
@@ -49,6 +50,8 @@ export type StepsReading = Judgement & {
   readonly source: readonly Workflow[] | null;
   readonly checks: ReadonlyMap<string, StepCheck>;
   readonly stderr: CheckStderr;
+  /** The store's real releases folder, which a step's attempt is placed under to say the release it ran on (`realReleasesDir`). */
+  readonly releases: string;
 };
 
 /** What `runReading` read once of a run: its steps (`StepsReading`), and its timeline off the feed's filing times. */
@@ -77,7 +80,7 @@ export const stepsReading = Effect.fnUntraced(function* (run: Run) {
   const stderr = yield* Effect.promise(() => refusedStderr(e, run, judgement.views));
   const checks = yield* Effect.promise(() => checksOf(e, run, judgement.steps, judgement.views, stderr));
   const source = shownWorkflow(run, folder.steps);
-  const at: StepsReading = { ...judgement, run, e, home, folder, source, checks, stderr };
+  const at: StepsReading = { ...judgement, run, e, home, folder, source, checks, stderr, releases: realReleasesDir(home) };
   return at;
 });
 
@@ -102,7 +105,7 @@ export const raiseReads = (run: Run, views: Views): RaiseReads => ({
 });
 
 /** The step `name`'s current try as judged: its codes and word, its check, its closeout or why it does not read, and its attempts. */
-export const currentOf = ({ run, source, views, judged, checks }: StepsReading, name: string) => {
+export const currentOf = ({ run, source, views, judged, checks, releases }: StepsReading, name: string) => {
   const taskId = run.steps[name]?.taskId ?? null;
   const step = source?.find((s) => s.name === name);
   return {
@@ -110,10 +113,10 @@ export const currentOf = ({ run, source, views, judged, checks }: StepsReading, 
     check: checks.get(name) ?? null,
     closeout: closeoutIn(run, name, step ?? bare(name), taskId, views),
     unreadable: unreadableIn(taskId, views),
-    attempts: attemptsIn(taskId, views),
+    attempts: attemptsIn(taskId, views, releases),
   };
 };
 
 /** The step `name`'s tries, earliest first, the current one last (`triesOf`), with its current try as judged (`currentOf`). */
 export const triesIn = (at: StepsReading, name: string, current = currentOf(at, name)): StepTry[] =>
-  triesOf(at.run, name, at.steps, at.views, current, at.judged.answers, at.stderr);
+  triesOf(at.run, name, at.steps, at.views, current, at.judged.answers, at.stderr, at.releases);

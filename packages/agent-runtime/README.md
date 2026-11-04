@@ -744,6 +744,15 @@ session read or wrote through its file tools (`Read`, `Edit`, `Write`, `MultiEdi
 relative to the folder its `init` line names, a denied call and a file outside that folder left out. `[]` is a session that
 touched none; absent where `skills` is, and where the `init` line names no folder.
 
+**An attempt says what it runs on.** Each attempt carries `image`, the code its session's process runs — the real folder of the runtime
+package that spawned a job or holds a long-lived session, a Pod's container image — and `harnessVersion`, the version its harness says
+it runs: Claude Code's `claude_code_version`, off the last `init` line, since the SDK prints one per turn and a resumed process its own.
+Both are journalled while the attempt runs, an `image` entry written off its sighting whenever either differs from the record
+(`imageFacts`), so a long-lived session a new holder takes up on other code is recorded again, and a job first seen already over still
+is, before its end. A spawn writes its `image` on the job's run file, and each holder on the session's as it writes itself its owner.
+Carried, never judged: which release that code is, is the layer above's to say. Absent from an attempt an older runtime recorded,
+and `harnessVersion` from a harness that says none (Codex).
+
 The lists are exported, from `agent-runtime` and from the pure door `agent-runtime/vocabulary` (no Effect, no I/O):
 `CLAUDE_PERMISSION_MODES`, `CLAUDE_EFFORTS` and `CLAUDE_CONTEXT_TOKENS`, `CODEX_SANDBOXES` and `CODEX_EFFORTS`, with
 `CLAUDE_AUTO_DROPPED`, the models Claude Code drops `auto` on. agent-orchestrator keeps no copy: `wf start` asks `configRefusal` of every
@@ -1936,6 +1945,7 @@ of pure code sits beside it.
 | `src/index.ts` | the export list of `agent-runtime`, by name, all Effect — the boundary; `decide` is not on it |
 | `src/core/session.ts` | a session's state in A2A's names, the end each records and the phase a person reads (`endOf`, `TaskPhase`, `LIVE_PHASE`): read by both `domain.ts` and `lifecycle.ts`, so neither imports the other's values |
 | `src/core/domain.ts` | events, `fold`, **`decide`** and what it reads — `lifecycleOf`, `observe` — pure, no I/O, the whole judgement, and the session name read back (`nameParts`) |
+| `src/core/attempt-fold.ts` | an event about one attempt written into that attempt's fold (`foldInto`), for `fold`: pure |
 | `src/core/lifecycle.ts` | the lifecycle as an XState statechart, used as a pure transition function: its states, the edge for each event and the one action it names, the refusal of an event with no edge, and the diagram generated from it |
 | `src/core/path.ts` | a task's path through the lifecycle, replayed off its journal (`pathOf`): the state after each entry, the entry's kind and its time, for the `path` verb — pure, a reader's, never a pass's |
 | `src/core/event-schema.ts` | every event a runtime has written, as an Effect Schema, former shapes included: `Journal.layer` checks what any store gives back against it before `upgrade`, and fails a task's read with a `JournalError` naming its file, the entry and the field (`entryWords`); a feed entry it refuses is skipped and said (`FeedRefusal`) |
@@ -1951,6 +1961,8 @@ of pure code sits beside it.
 | `src/core/engine/engine.ts` | applies one decision, then the pass over every task |
 | `src/core/engine/counted.ts` | what a long-lived attempt in flight has consumed so far, journalled as it grows (`counted`), off the pass's sighting |
 | `src/core/engine/denied.ts` | what the harness denied an attempt in flight, each call journalled once as the sighting names it (`denied`) |
+| `src/core/engine/image.ts` | the code an attempt in flight runs on and its harness's version, journalled whenever its sighting says other than the record (`image`, `imageFacts`) |
+| `src/core/engine/noted.ts` | what a task's sighting says of its attempt in flight, gathered for the record before `decide` reads the fold (`notedOf`) |
 | `src/core/engine/filing.ts` | filing a task, admitting, stopping, answering and closing it, each with what it refuses (`refusalOf`): a fact journalled for the pass to act on |
 | `src/core/engine/append-refusal.ts` | the Task door's rules for one append, pure and proved (`contracts/journal.contract.ts`): a task filed once, under an id a file can be named by, written to only once filed, and started at `attempts.length + 1` |
 | `src/core/engine/stamped.ts` | the moment an entry is journalled (`stamped`), on the wall clock and the monotonic one, and a spawn's entry stamped with it |
@@ -1970,6 +1982,7 @@ of pure code sits beside it.
 | `src/harness/reach.ts` | what a harness's fence words reach, `fenceReach`: each word's rank, the one a task naming none runs in, the held and unasking modes, the modes Claude Code drops on a model, the words that refuse what no allow rule reaches and the tools that need none; and `unruledIn`, the first character of a path its permission rules cannot carry |
 | `src/harness/choices.ts` | the words each default harness takes per key of a task's config, `HARNESS_CHOICES`: its efforts, its permission modes or its sandboxes, the lists `configRefusal` judges by |
 | `src/harness/config-folders.ts` | the folders a harness reads as its own configuration inside a folder it is given to read, `CONFIG_FOLDERS`, and the first a path passes through, `configFolderIn`: pure, for a caller that puts files into a mounted folder |
+| `src/harness/image.ts` | the code a runner's process runs, `IMAGE`: the real folder of this package, a Pod's container image, written on a session's run file and recorded on its attempt |
 | `src/harness/mounts.ts` | a task's mounts, `Mount`: the folders beyond its `cwd` a session may reach, each read-only or writable, and the check of their shape every harness shares (`mountsRefusalOf`) |
 | `src/harness/admission.ts` | a task's admission, `Admission`: the command run before each call to the tools it names, the call it reads and the answer it gives (`AdmissionCall`, `AdmissionAnswer`), and the check of its shape every harness shares (`admissionRefusalOf`) |
 | `src/harness/settings.ts` | a harness's own project configuration in a directory, as a session started there gets it: `projectAllows`, the allow rules it grants, `[]` where the file is absent or names none and `undefined` for a harness that reads none |
@@ -2015,6 +2028,7 @@ of pure code sits beside it.
 | `src/harness/detached/spawn-files.ts` | the files a spawn clears and writes beside a run before the worker is launched, and what they say to the harness (`spawnFiles`, `HarnessIO`): the closeout's schema, the MCP config, what the spec prepares, and the spawn request a spec that reads one is given (`needsRequest`); and the stdin the worker writes (`spawnInput`) |
 | `src/harness/detached/run-file.ts` | a detached run's file as the worker and the spawn write it: its schema (`RunFileSchema`), its read (`runFileIn`), the first one a spawn writes, and its state as a sighting says it, its heartbeat's lease (`STALE_MS`) included |
 | `src/harness/detached/said.ts` | what was read of a finished run's output, kept beside its log keyed by the log's size and mtime and the readers' version — or a former one they only added fields to (`SAID_EXTENDED`) — so each process reads a log once per change of it; and an ended run's capture rewritten there to what its spec keeps (`keepOutput`, `keepCapture`), only when it reads the same |
+| `src/harness/detached/sighted.ts` | the facts a detached sighting takes from what its output said — a limit, denials, skills, files, the model and the harness version — each only when said (`sightedOf`) |
 | `src/harness/detached/compact.ts` | the captures already on disk rewritten once to what their readers read (`compactRuns`), a detached runner's `compact`: a run whose worker ended, one capture at a time, each left whole and named where it is at work, has no run file, or does not read the same |
 | `src/a2a/map.ts` | the runtime's words in A2A's and back, pure: a session is a Task named for it, a spawn a user Message marked with the runtime's extension and `config` in its metadata, words said to a session a follow-up on its Task, a sighting or a journalled attempt a Task, its context the harness's id for the conversation and its closeout its one Artifact |
 | `src/a2a/follow.ts` | a session followed through A2A's `SubscribeToTask`: the handler's answer over a driver's `follow` (`subscription`), each moment a status or an artifact update, and the client's read of it back (`followThrough`) |

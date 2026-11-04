@@ -6,7 +6,20 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { DaemonStanding } from '../daemon/daemon.ts';
-import { leaseRelease, pointedEntry, restartPlan, tagRefusal, trialRefusal, versionLines, type Current, type Running } from './release.ts';
+import {
+  checkoutPromiseLine,
+  leaseRelease,
+  pointedEntry,
+  ranOnWords,
+  restartPlan,
+  sessionCounts,
+  sessionRelease,
+  tagRefusal,
+  trialRefusal,
+  versionLines,
+  type Current,
+  type Running,
+} from './release.ts';
 
 const CHECKOUT: Running = { kind: 'checkout', root: '/home/me/nemia' };
 const INSTALL: Running = {
@@ -104,16 +117,88 @@ test("the lease records an install's kind, folder, tag and commit, never its sou
 });
 
 test("nemia version says this nemia's release, the store's pointer and the daemon's, each as it stands", () => {
-  assert.deepEqual(versionLines('1.0.0', CHECKOUT, CURRENT, lease('ticking', 4242, INSTALL)), [
+  assert.deepEqual(versionLines('1.0.0', CHECKOUT, CURRENT, lease('ticking', 4242, INSTALL), []), [
     'nemia 1.0.0',
     'this nemia: checkout at /home/me/nemia',
     `current: v1.2.0 (abcdef1) at ${INSTALL.root}`,
     `daemon: pid 4242, v1.2.0 (install, abcdef1) at ${INSTALL.root}`,
+    'sessions: none at work',
   ]);
-  assert.deepEqual(versionLines('1.0.0', INSTALL, null, lease('ticking', 7, undefined)).slice(1), [
+  assert.deepEqual(versionLines('1.0.0', INSTALL, null, lease('ticking', 7, undefined), []).slice(1, 4), [
     `this nemia: v1.2.0 (install, abcdef1) at ${INSTALL.root}`,
     'current: none — no release is installed for this store',
     'daemon: pid 7, from before releases were recorded',
   ]);
-  assert.equal(versionLines('1.0.0', CHECKOUT, null, lease('stopped')).at(-1), 'daemon: no daemon ticks the store');
+  assert.equal(versionLines('1.0.0', CHECKOUT, null, lease('stopped'), []).at(-2), 'daemon: no daemon ticks the store');
+});
+
+const RELEASES = '/home/me/.agent-workflows/releases';
+
+test('sessionRelease: an image under the store’s releases/<tag> is that install; anywhere else, a checkout at the image', async (t) => {
+  const rows: Array<[string, string, ReturnType<typeof sessionRelease>]> = [
+    ['a tag’s runtime', `${RELEASES}/v1.2.0/packages/agent-runtime`, { kind: 'install', tag: 'v1.2.0' }],
+    [
+      'a build under way',
+      `${RELEASES}/.building-v1.3.0-42/tree/packages/agent-runtime`,
+      { kind: 'checkout', root: `${RELEASES}/.building-v1.3.0-42/tree/packages/agent-runtime` },
+    ],
+    [
+      'the pointer, which a real path never passes through',
+      `${RELEASES}/current/packages/agent-runtime`,
+      { kind: 'checkout', root: `${RELEASES}/current/packages/agent-runtime` },
+    ],
+    ['the releases folder itself', RELEASES, { kind: 'checkout', root: RELEASES }],
+    [
+      'a sibling whose name begins the same',
+      `${RELEASES}-old/v1/packages/agent-runtime`,
+      { kind: 'checkout', root: `${RELEASES}-old/v1/packages/agent-runtime` },
+    ],
+    ['a checkout', '/home/me/nemia/packages/agent-runtime', { kind: 'checkout', root: '/home/me/nemia/packages/agent-runtime' }],
+  ];
+  for (const [name, image, want] of rows) await t.test(name, () => assert.deepEqual(sessionRelease(image, RELEASES), want));
+});
+
+test('a session’s release and harness in words: the tag or checkout, then the harness and its version; nothing where neither was recorded', () => {
+  const claude = { name: 'claude', version: '2.1.316' };
+  assert.equal(ranOnWords({ kind: 'install', tag: 'v1.2.0' }, claude), 'on v1.2.0, claude 2.1.316');
+  assert.equal(ranOnWords({ kind: 'checkout', root: '/c' }, claude), 'on checkout, claude 2.1.316');
+  assert.equal(ranOnWords({ kind: 'checkout', root: '/c' }, null), 'on checkout');
+  assert.equal(ranOnWords(null, null), null);
+});
+
+test('a daemon running a checkout says it makes no promise to keep a running session on its files; an install says nothing', () => {
+  assert.ok(checkoutPromiseLine(leaseRelease(CHECKOUT))?.includes(CHECKOUT.root));
+  assert.equal(checkoutPromiseLine(leaseRelease(INSTALL)), null);
+  const lines = versionLines('1.0.0', INSTALL, null, lease('ticking', 7, CHECKOUT), []);
+  assert.equal(lines.at(-2), checkoutPromiseLine(leaseRelease(CHECKOUT)), 'nemia version says it under a checkout daemon');
+  assert.equal(
+    versionLines('1.0.0', CHECKOUT, null, lease('ticking', 7, INSTALL), []).includes(checkoutPromiseLine(leaseRelease(CHECKOUT)) ?? ''),
+    false,
+  );
+  assert.equal(
+    versionLines('1.0.0', CHECKOUT, null, lease('stopped', 7, CHECKOUT), []).some((l) => l === checkoutPromiseLine(leaseRelease(CHECKOUT))),
+    false,
+    'nor with no daemon ticking',
+  );
+});
+
+test('nemia version counts the sessions at work by release and harness version, most first, and says those it cannot place', () => {
+  const v12 = { kind: 'install', tag: 'v1.2.0' } as const;
+  const c315 = { name: 'claude', version: '2.1.315' };
+  const c316 = { name: 'claude', version: '2.1.316' };
+  const counts = sessionCounts([
+    { release: v12, harness: c316 },
+    { release: { kind: 'checkout', root: '/c' }, harness: c315 },
+    { release: v12, harness: c316 },
+    { release: null, harness: null },
+  ]);
+  assert.deepEqual(counts, [
+    { release: v12, harness: c316, count: 2 },
+    { release: { kind: 'checkout', root: '/c' }, harness: c315, count: 1 },
+    { release: null, harness: null, count: 1 },
+  ]);
+  assert.equal(
+    versionLines('1.0.0', INSTALL, null, lease('stopped'), counts).at(-1),
+    'sessions: 2 on v1.2.0, claude 2.1.316; 1 on checkout, claude 2.1.315; 1 not recorded',
+  );
 });

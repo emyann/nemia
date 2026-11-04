@@ -10,6 +10,9 @@ export const SESSION = '5e551011-0000-4000-8000-000000000001';
 /** The model every Claude Code `init` line here names: what the session really started on, as a reader reads it back. */
 export const MODEL = 'claude-haiku-4-5';
 
+/** The Claude Code versions the `init` lines of `VERSIONED_STREAM` name, the first turn's and then a resumed process's. */
+export const CLAUDE_CODE_VERSIONS = ['2.1.315', '2.1.316'] as const;
+
 /** A `result` object as `claude -p --output-format json` prints it, on one line (keys trimmed), with `o` over its fields. */
 export const resultLine = (o: object) =>
   JSON.stringify({ type: 'result', subtype: 'success', is_error: false, num_turns: 2, result: 'ok', session_id: SESSION, ...o });
@@ -195,6 +198,12 @@ export const CONVERSATION_STREAM = [
   '',
 ].join('\n');
 
+/** A session whose `init` lines name the Claude Code it runs, a second turn's on another: its last is the process that runs now. */
+export const VERSIONED_STREAM = [
+  ...CLAUDE_CODE_VERSIONS.map((v) => JSON.stringify({ ...JSON.parse(stream.init), claude_code_version: v })),
+  resultLine({}),
+].join('\n');
+
 const LONE = [stream.init, stream.denied('toolu_b', 'Bash')].join('\n');
 
 const STREAMS = [
@@ -221,6 +230,7 @@ const STREAMS = [
   [stream.init, JSON.stringify({ ...JSON.parse(stream.denied('toolu_b', 'Bash')), tool_use_id: 7 }), resultLine({})].join('\n'),
   [stream.init, stream.calls(['toolu_b', 'Bash', { command: 'ls' }]).replace('"toolu_b"', '5'), resultLine({})].join('\n'),
   [JSON.stringify({ ...JSON.parse(stream.init), cwd: 5 }), resultLine({})].join('\n'),
+  VERSIONED_STREAM,
 ];
 
 const CODEX = [

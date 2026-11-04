@@ -79,14 +79,16 @@ export const adoptionAt = Effect.fn('adoptionAt')(function* (home: string, facto
 /**
  * The digest of a takeover's plan: the factory's file as it is now, the template's source, its version and parameters, and its render.
  * Any of them changed between the preview and the takeover changes it. The cards and runs, which change by the minute, are judged again
- * at the takeover instead.
+ * at the takeover instead. An upgrade's plan gives `from`, the name of the template its base holds, where it is a switch onto another,
+ * hashed after the rest only then: a takeover's digest, and a same-template upgrade's, are the bytes they were.
  */
-export function planDigest(home: string, name: string, render: RenderedAt, source: string): string {
+export function planDigest(home: string, name: string, render: RenderedAt, source: string, from?: string): string {
   const file = path.join(factoriesDirAt(home), `${name}.json`);
   const hash = createHash('sha256');
   hash.update(JSON.stringify([source, render.version, render.params, digestOf(render.entries)]));
   hash.update('\0');
   hash.update(fs.readFileSync(file));
+  if (from !== undefined) hash.update(`\0switch from ${from}`);
   return `sha256:${hash.digest('hex')}`;
 }
 

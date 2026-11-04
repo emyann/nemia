@@ -204,6 +204,7 @@ test('an upgrade with a conflict: previewed, filed, waited on with the status al
     );
     assert.deepEqual(JSON.parse(fs.readFileSync(resolutionsFile('crew'), 'utf8')), {
       to: '0.2.0',
+      template: 'team',
       choices: { [ROUNDS]: 'theirs', [LINE]: { text: 'Never push on a Friday, nor on a weekend.\n' } },
     });
   });

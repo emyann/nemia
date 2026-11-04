@@ -28,7 +28,8 @@ They write nothing: run them unasked, as often as you need. One that sets with s
                                the same, by its name
   nemia factory diff <name> --to <x.y.z> [--template <name|folder|archive>] [--set <key>=<value> ...] | <name> --template <name|folder|archive> [--set <key>=<value> ...]
                                preview a templated factory's upgrade: what merges cleanly, and each
-                               conflict with its sides; or a hand-made factory's takeover by a
+                               conflict with its sides; onto a template of another name, a switch
+                               with no common base; or a hand-made factory's takeover by a
                                template, and the plan nemia factory adopt takes; nothing is written
   nemia factory servers <factory>
                                a factory's own MCP servers, each with the state its harness reports
@@ -314,8 +315,9 @@ Each asks the person at a prompt every time it runs: say what it does before you
                                upgrade a templated factory: its file wants --to, and the daemon merges
                                the template's change into its tree once each conflict is resolved
   nemia factory resolve <name> <conflict> --ours|--theirs|--file <path>
-                               choose for one conflict of a templated factory's upgrade: your tree, the
-                               template, or the text of a file; the daemon merges once each has one
+                               choose for one conflict of a templated factory's upgrade or switch: your
+                               tree, the template (none: drop the file), or the text of a file; the
+                               daemon merges once each has one
   nemia factory attach <factory> <workflow>
                                offer a workflow in a factory, by its folder's name: a factory offers
                                only the workflows attached to it

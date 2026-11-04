@@ -84,3 +84,31 @@ export function diff3Lines(base: readonly string[], ours: readonly string[], the
   }
   return joined(segments);
 }
+
+/**
+ * `ours` and `theirs`, two files' lines with no common base, merged two ways: the runs a longest common subsequence pairs are clean, and
+ * every run between is a conflict, one only one side holds included, addressed by the lines of `ours` it spans (`b` = `a` − 1 where ours
+ * holds none). Its `base` is empty: there is none.
+ */
+export function diff2Lines(ours: readonly string[], theirs: readonly string[]): Segment[] {
+  const toTheirs = matched(ours, theirs);
+  const segments: Segment[] = [];
+  let j = 0;
+  let k = 0;
+  while (j < ours.length || k < theirs.length) {
+    const line = ours[j];
+    if (line !== undefined && toTheirs[j] === k) {
+      segments.push({ clean: [line] });
+      j++;
+      k++;
+      continue;
+    }
+    let s = j;
+    while (s < ours.length && toTheirs[s] === -1) s++;
+    const t = toTheirs[s] ?? theirs.length;
+    segments.push({ conflict: { a: j + 1, b: s, base: [], ours: ours.slice(j, s), theirs: theirs.slice(k, t) } });
+    j = s;
+    k = t;
+  }
+  return joined(segments);
+}

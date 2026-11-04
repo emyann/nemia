@@ -133,6 +133,15 @@
       "type": "AdoptPlan"
     },
     {
+      "term": "Template switch",
+      "meaning": "an upgrade of a factory onto a template of another name than the one its base was rendered from (the template's own `metadata.name`, never its source): the factory's tree and the new render merge with no common base, by `switchTrees` in `packages/agent-orchestrator/src/upgrade/merge.ts`, chosen by `mergeBaseOf` beside it. A file both hold alike is clean, a file only the template holds is added, and a file only the tree holds, or each run of lines that differs, is a conflict for the person; it is always filed with its plan's `--plan`, and the new render is the base later upgrades merge three ways from.",
+      "type": "TreeMerge",
+      "see": {
+        "label": "Moving onto sdlc from another template",
+        "href": "/sdlc/#moving-onto-it-from-another-template"
+      }
+    },
+    {
       "term": "Builtin template",
       "meaning": "a template that comes with Nemia: a folder holding its nemia.yaml in the templates workspace (`packages/templates/<name>`), found by path from the orchestrator's own folder (`BUILTIN_TEMPLATES` in `packages/agent-orchestrator/src/templates/templates.store.ts`) and never imported; named by its folder's name alone at `--template` and on a factory's file, where `templatePlace` resolves it on every read.",
       "type": "BuiltinTemplates"

@@ -213,6 +213,34 @@ test('an upgrade with no conflict, up or down: filed alone, then merged by the c
   );
 });
 
+test('a switch onto a template of another name is judged by no version: neither already applied at the same number nor a downgrade', async (t) => {
+  for (const [name, version] of [
+    ['level', '0.1.0'],
+    ['below', '0.0.9'],
+  ] as const)
+    await t.test(
+      `the other template at ${version}, the base at 0.1.0: previewed, then filed with its plan and no --downgrade`,
+      async (t) => {
+        t.mock.method(console, 'log', () => {});
+        const { dir } = await applied(name);
+        const other = path.join(scratch('wf-upgrade-other-'), 'renamed');
+        fs.cpSync(dir, other, { recursive: true });
+        const manifest = parse(fs.readFileSync(path.join(other, 'nemia.yaml'), 'utf8'));
+        manifest.metadata.name = 'renamed';
+        fs.writeFileSync(path.join(other, 'nemia.yaml'), stringify(manifest, { lineWidth: 0 }));
+        released(other, version, 5);
+        const printed = await printedBy(t, 'factory', 'diff', name, '--to', version, '--template', other);
+        assert.equal(printed[0], `${name}: team 0.1.0 → renamed ${version}`);
+        const line = printed.at(-1) ?? '';
+        assert.doesNotMatch(line, /--downgrade/);
+        const plan = /--plan (sha256:[0-9a-f]{64})/.exec(line)?.[1];
+        assert.ok(plan, line);
+        await main(['factory', 'upgrade', name, '--to', version, '--template', other, '--plan', plan], noEngine());
+        assert.deepEqual([templated(name).template.version, templated(name).template.source], [version, other]);
+      },
+    );
+});
+
 test('an upgrade onto a template that declares other parameters: --set given, the undeclared dropped and named, held to the previewed plan', async (t) => {
   t.mock.method(console, 'log', () => {});
   const { dir } = await applied('onto');
@@ -392,6 +420,7 @@ test('choices made for another version are not merged, and the next resolve drop
   await main(['factory', 'resolve', 'stale', `${README}:1-1`, '--theirs'], noEngine());
   assert.deepEqual(JSON.parse(fs.readFileSync(resolutionsFile('stale'), 'utf8')), {
     to: '0.3.0',
+    template: 'team',
     choices: { [`${README}:1-1`]: 'theirs' },
   });
   assert.deepEqual(

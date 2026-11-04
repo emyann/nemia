@@ -127,6 +127,15 @@ Bring it:
 The daemon merges once every conflict has a choice; until then the factory's tree and base stay as they are, and its runs in flight
 keep their own folders. After each resolve, say what it answered: the conflicts still waiting, or that the merge is next.
 
+An upgrade onto a template of another name than the factory's base, such as a factory applied from a hand-made template moving onto
+sdlc, is a template switch: the two share no base. The diff says so on its `switch:` line and names both templates on its first, so
+say it in **Factory and versions**. There is no `base` side to quote. A file only their tree holds is a conflict whose template side
+is none: `--ours` keeps it, `--theirs` drops it, and nothing tells their own file from the old template's leftover, so ask. Every
+differing run of lines is a choice, even one only the new template holds. The upgrade line is always filed with its `--plan`.
+Recommend each conflict with that in mind: usually keep their own rules and prose (`--ours`), take the template's new files, and drop
+the old template's files they never changed (`--theirs`). The same-named template read from another folder or archive is an ordinary
+upgrade, merged three ways.
+
 ## A factory's takeover
 
 A factory made by hand can be taken over by a template, in place: its name, repositories, schedules, instruction, cards, runs and stats

@@ -19,7 +19,7 @@ import type { Factory, FactoryConditionReason, FactoryConditionType, FactoryTemp
 import { openedTree, packageSkillNames, problemLine, type OpenTemplate } from '../template/template.store.ts';
 import { TemplateSource } from '../templates/templates.model.ts';
 import { BuiltinTemplates, TemplateDoor, templatePlace } from '../templates/templates.store.ts';
-import { builtinPlace, sourceGiven } from '../templates/templates.ts';
+import { builtinPlace, nameOfSource, sourceGiven } from '../templates/templates.ts';
 import { rooted } from '../wiring/wire.verb.ts';
 import type { FactorySpec } from '../template/index.ts';
 import {
@@ -33,6 +33,7 @@ import {
   swapTree,
   treeDir,
   writeStatus,
+  choicesFor,
   type Condition,
   type Entry,
   type Status,
@@ -40,20 +41,31 @@ import {
 import { overlaid, renderFactory, resolveParams, type Params } from './index.ts';
 import { trustedLines, type PlaceTrust } from '../trust/trust.ts';
 import { NO_TRUST, trustPlaces } from '../trust/trust.verb.ts';
-import { compose, conflictCut, mergeTrees, resolveLine, type Conflict } from '../upgrade/index.ts';
+import {
+  baseTemplateOf,
+  compose,
+  conflictCut,
+  mergeBaseOf,
+  mergeTrees,
+  resolveLine,
+  switchTrees,
+  type Conflict,
+  type Switched,
+} from '../upgrade/index.ts';
 
 /**
- * A template rendered with a factory's parameters: its version, the parameters it rendered with, the files of a tree, each with its
- * bytes, and the parameters held that it declares none of, dropped (none where nothing was held).
+ * A template rendered with a factory's parameters: its name (its tree's, which the lint holds equal to its manifest's), its version, the
+ * parameters it rendered with, the files of a tree, each with its bytes, and the parameters held that it declares none of, dropped (none
+ * where nothing was held).
  */
-export type RenderedAt = { version: string; params: Params; entries: Entry[]; dropped: readonly string[] };
+export type RenderedAt = { name: string; version: string; params: Params; entries: Entry[]; dropped: readonly string[] };
 
 /** The `--set` words that give `params`, each `<key>=<value>`. */
 export const setsOf = (params: FactoryTemplate['params']): string[] =>
   Object.entries(params).map(([key, value]) => `${key}=${String(value)}`);
 
-/** What a render answers where it does not render: every problem a line, with the template's version where it was read. */
-export type Unrendered = { problems: string[]; version?: string };
+/** What a render answers where it does not render: every problem a line, with the template's name and version where they were read. */
+export type Unrendered = { problems: string[]; version?: string; name?: string };
 
 /**
  * The template at `source`, a folder or an archive by its whole path or the name of a builtin template (`templatePlace`), read
@@ -71,14 +83,14 @@ export const renderedAt = Effect.fn('renderedAt')(function* (source: string, set
 
 /** The template opened as `read`, rendered with `sets` over `held` where it is given, or why it is not (`renderedAt`). */
 function renderOpened(read: OpenTemplate, given: readonly string[], held: Params | undefined): RenderedAt | Unrendered {
-  if (read.problems.length) return { problems: read.problems.map(problemLine) };
+  if (read.problems.length) return { problems: read.problems.map(problemLine), name: read.name };
   const spec = (read.folder.documents.get('nemia.yaml') as { spec: FactorySpec }).spec;
   const declared = spec.parameters ?? {};
   const { sets, dropped } = held === undefined ? { sets: given, dropped: [] } : overlaid(declared, held, given);
   const { params, refusals } = resolveParams(declared, sets);
-  if (refusals.length) return { problems: refusals, version: spec.version };
+  if (refusals.length) return { problems: refusals, version: spec.version, name: read.name };
   const rendered = renderFactory(read, params);
-  if (rendered.refusals.length) return { problems: rendered.refusals, version: spec.version };
+  if (rendered.refusals.length) return { problems: rendered.refusals, version: spec.version, name: read.name };
   const entries: Entry[] = [
     ...rendered.files.map((file) => ({ path: file.path, bytes: Buffer.from(file.text) })),
     ...rendered.copies.map((copy) => {
@@ -86,7 +98,7 @@ function renderOpened(read: OpenTemplate, given: readonly string[], held: Params
       return { path: copy.path, bytes: Buffer.from(from.bytes), mode: from.mode };
     }),
   ];
-  return { version: spec.version, params, entries, dropped };
+  return { name: read.name, version: spec.version, params, entries, dropped };
 }
 
 /** A condition, as Kubernetes words one. */
@@ -109,12 +121,16 @@ export const renderedOrNot = <R>(
 /** The words of what was thrown or failed. */
 const messageOf = (err: unknown): string => (err instanceof Error ? err.message : String(err));
 
-/** The template `source` as `factory` reads it: rendered, or the `Applied` condition that says why it is not. */
+/**
+ * The template `source` as `factory` reads it: rendered, or the `Applied` condition that says why it is not; and the template's name,
+ * wherever it was read, even where it does not render or is at another version, else where its source fixes it (`nameOfSource`, a
+ * builtin's), so a builtin gone or renamed still names the base it rendered.
+ */
 const templateNow = Effect.fn('templateNow')(function* (factory: Factory & { template: FactoryTemplate }) {
   const { source, version, params } = factory.template;
   const fix = `nemia template lint ${builtinPlace(source, yield* BuiltinTemplates)}`;
   const read = yield* renderedOrNot(renderedAt(source, setsOf(params)));
-  return conditionOf(factory, version, fix, read);
+  return { now: conditionOf(factory, version, fix, read), named: read.name ?? nameOfSource(source) };
 });
 
 /** The render `read` as `factory`, applied at `version`, takes it: rendered, or the `Applied` condition that says why it is not. */
@@ -186,48 +202,69 @@ const upgraded = (factory: Factory & { template: FactoryTemplate }, version: str
   condition('ConflictsPending', false, 'Merged', `The upgrade to ${version} is merged, so no change waits to be merged.`),
 ];
 
-/** The conditions of an upgrade from `from` waiting on the person's choice for each conflict of `pending`. */
-function waiting(factory: Factory & { template: FactoryTemplate }, from: string, pending: readonly Conflict[]): Condition[] {
+/**
+ * The conditions of an upgrade from `from` waiting on the person's choice for each conflict of `pending`; where it is a switch onto
+ * another template (`switched`), saying so, and that it has no common base.
+ */
+function waiting(
+  factory: Factory & { template: FactoryTemplate },
+  from: string,
+  pending: readonly Conflict[],
+  switched: Switched | undefined,
+): Condition[] {
   const { name, template } = factory;
   const count = `${pending.length} conflict${pending.length === 1 ? '' : 's'}`;
+  const what =
+    switched === undefined
+      ? `upgraded from ${from} to ${template.version}`
+      : `switched from ${switched.from} ${from} to ${switched.to} ${template.version}, another template, with no common base`;
+  const diff = `nemia factory diff ${name} --to ${template.version}${switched === undefined ? '' : ` --template ${template.source}`}`;
   return [
     condition(
       'Applied',
       false,
       'UpgradePending',
-      `${name} waits to be upgraded from ${from} to ${template.version}: ${count} wait for a choice (nemia factory diff ${name} --to ${template.version} shows each). Its base and tree are left as they are until each has one.`,
+      `${name} waits to be ${what}: ${count} wait for a choice (${diff} shows each). Its base and tree are left as they are until each has one.`,
     ),
     condition(
       'ConflictsPending',
       true,
       'Conflicts',
-      `${count} of the upgrade to ${template.version} wait for a choice: ${pending.map((c) => resolveLine(name, c.at)).join('; ')}.`,
+      `${count} of the ${switched === undefined ? 'upgrade' : 'switch'} to ${template.version} wait for a choice: ${pending.map((c) => resolveLine(name, c.at)).join('; ')}.`,
     ),
   ];
 }
 
-/** Whether an upgrade is due: the base was applied at a known version other than the one wanted, and does not hold the template now. */
+/**
+ * Whether an upgrade is due: the base was applied at a known version, does not hold the template now, and the version wanted is
+ * another, or the template now is another than the one the base holds (a switch, whatever the versions).
+ */
 const upgradeDue = (factory: Factory & { template: FactoryTemplate }, now: RenderedAt, digest: string, last?: Status): boolean =>
-  typeof last?.version === 'string' && last.version !== factory.template.version && digest !== digestOf(now.entries);
+  typeof last?.version === 'string' &&
+  digest !== digestOf(now.entries) &&
+  (last.version !== factory.template.version || mergeBaseOf(last.template, now.name) === 'none');
 
 /**
  * The upgrade of a factory from the version its base holds (`last`) to the one its file wants, the template rendered at it (`now`): its
- * tree merged three ways with its base, and the person's choices for the version composed into it. While a conflict has none, only the
+ * tree merged three ways with its base, or with no base where the template now is another than the base's (`switchTrees`), and the
+ * person's choices for the version and the template composed into it. While a conflict has none, only the
  * status is written, naming each; once every one has, the tree is swapped for the merge where no one wrote it since it was read, then the
  * base for the render, then the status. A pass that stops between them composes the same tree on the next.
  */
 function upgradePass(factory: Factory & { template: FactoryTemplate }, now: RenderedAt, base: Entry[], last: Status & { version: string }) {
   const { name, template } = factory;
   const ours = entriesIn(treeDir(name));
-  const merge = mergeTrees(base, ours, now.entries);
-  const resolutions = readResolutions(name);
-  const composed = compose(merge, resolutions?.to === template.version ? resolutions.choices : {});
+  const switched =
+    last.template !== undefined && mergeBaseOf(last.template, now.name) === 'none' ? { from: last.template, to: now.name } : undefined;
+  const merge = switched === undefined ? mergeTrees(base, ours, now.entries) : switchTrees(ours, now.entries);
+  const composed = compose(merge, choicesFor(readResolutions(name), template.version, now.name));
   if ('pending' in composed) {
     const status: Status = {
       version: last.version,
+      ...(last.template === undefined ? {} : { template: last.template }),
       digest: digestOf(base),
       params: last.params,
-      conditions: waiting(factory, last.version, composed.pending),
+      conditions: waiting(factory, last.version, composed.pending, switched),
       upgrade: { from: last.version, to: template.version, conflicts: composed.pending.map((c) => conflictCut(c)) },
     };
     writeStatus(name, status);
@@ -237,6 +274,7 @@ function upgradePass(factory: Factory & { template: FactoryTemplate }, now: Rend
   replaceBase(name, now.entries);
   const status: Status = {
     version: now.version,
+    template: now.name,
     digest: digestOf(now.entries),
     params: template.params,
     conditions: upgraded(factory, now.version),
@@ -268,12 +306,32 @@ const cameByUpgrade = (last: Status | undefined, version: string): boolean =>
  * wherever the base is its render, else the one last written, else unknown, said by its own condition. The status it observed.
  */
 export const reconcileFactory = Effect.fn('reconcileFactory')(function* (factory: Factory & { template: FactoryTemplate }) {
-  const now = yield* templateNow(factory);
-  return reconciledWith(factory, now);
+  const { now, named } = yield* templateNow(factory);
+  return reconciledWith(factory, now, named);
 });
 
-/** `factory` brought to its template as rendered now (`now`), or as the condition that says why it is not (`reconcileFactory`). */
-function reconciledWith(factory: Factory & { template: FactoryTemplate }, now: RenderedAt | Condition): Status {
+/**
+ * The name of the template a base holds (`baseTemplateOf`): `rendered` where the base is the render; else the status's `last`; else, while
+ * no upgrade is under way, `named`, the template the factory's file names.
+ */
+const namedBase = (
+  factory: Factory & { template: FactoryTemplate },
+  rendered: string | undefined,
+  last: Status | undefined,
+  named: string | undefined,
+): string | undefined =>
+  baseTemplateOf({
+    rendered,
+    recorded: last?.template,
+    idle: typeof last?.version === 'string' && last.version === factory.template.version && last.upgrade === undefined,
+    named,
+  });
+
+/**
+ * `factory` brought to its template as rendered now (`now`), or as the condition that says why it is not, `named` the name of the
+ * template its file names where it was read (`reconcileFactory`). The status names the template the base holds (`baseTemplateOf`).
+ */
+function reconciledWith(factory: Factory & { template: FactoryTemplate }, now: RenderedAt | Condition, named: string | undefined): Status {
   const last = readStatus(factory.name);
   if (!('type' in now)) stageFolder(appliedDir(factory.name), now.entries, true);
   const base = entriesIn(appliedDir(factory.name));
@@ -281,10 +339,27 @@ function reconciledWith(factory: Factory & { template: FactoryTemplate }, now: R
   const digest = base.length ? digestOf(base) : null;
   if (!('type' in now) && digest !== null && upgradeDue(factory, now, digest, last))
     return upgradePass(factory, now, base, last as Status & { version: string });
+  return observed(factory, now, base, digest, last, named);
+}
+
+/**
+ * The status of a pass that merges nothing, written where it changed: the version and the template its base holds, its digest, its
+ * parameters and its conditions (`reconciledWith`).
+ */
+function observed(
+  factory: Factory & { template: FactoryTemplate },
+  now: RenderedAt | Condition,
+  base: readonly Entry[],
+  digest: string | null,
+  last: Status | undefined,
+  named: string | undefined,
+): Status {
   const current = !('type' in now) && digest === digestOf(now.entries);
   const version = base.length ? (current ? now.version : (last?.version ?? null)) : null;
+  const template = base.length ? namedBase(factory, current ? now.name : undefined, last, named) : undefined;
   const status: Status = {
     version,
+    ...(template === undefined ? {} : { template }),
     digest,
     params: current ? factory.template.params : (last?.params ?? factory.template.params),
     conditions:

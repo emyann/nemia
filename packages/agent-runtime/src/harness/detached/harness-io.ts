@@ -7,12 +7,12 @@ import type { McpServer } from '../seam.ts';
 /**
  * Where a harness that can take a structured final answer should put it.
  *
- * Chosen by the runner, per run, OUTSIDE the workspace: anything written inside a step's worktree
- * travels down its git branch, and the next step would be cut a directory that already says it is
+ * Chosen by the runner, per run, OUTSIDE the workspace: anything written inside a task's worktree
+ * travels down its git branch, and the next task would be cut a directory that already says it is
  * finished.
  */
 export type HarnessIO = {
-  /** Present when the task asked for a closeout: its JSON Schema, written to a file. */
+  /** Present when the task asked for a structured final answer: its JSON Schema, written to a file. */
   closeoutSchemaFile?: string;
   /** Where the harness should write the final answer that satisfies the schema. */
   closeoutFile?: string;

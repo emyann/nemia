@@ -7,7 +7,8 @@
  * for a hire, `<path>:<a>-<b>` for base lines. The person's choices are composed into the tree's files (`compose`), and the merge said as
  * `nemia factory diff` prints it (`planLines`). Pure.
  */
-import { diff3Lines, linesOf } from './lines.ts';
+import { diff2Lines, diff3Lines, linesOf } from './lines.ts';
+import type { BaseTemplateOf, MergeBaseOf, UnrelatedKey, UnrelatedSet } from '../../contracts/switch.contract.ts';
 
 /** One file of a tree: its path in it, its bytes, and its mode where it keeps one. */
 export type TreeFile = { path: string; bytes: Buffer; mode?: number };
@@ -29,8 +30,11 @@ type FileMerge = {
 /** Where a merged file's change came from: the template's side, the factory's, or both alike. */
 export type Merged = { at: string; from: 'template' | 'factory' | 'both' };
 
-/** A tree's merge: each file's, what merged cleanly and from which side, and each conflict, in the order of the paths. */
-export type TreeMerge = { files: FileMerge[]; merged: Merged[]; conflicts: Conflict[] };
+/**
+ * A tree's merge: whether it had a common base (`none` for a template switch), each file's, what merged cleanly and from which side, and
+ * each conflict, in the order of the paths.
+ */
+export type TreeMerge = { base: 'common' | 'none'; files: FileMerge[]; merged: Merged[]; conflicts: Conflict[] };
 
 /** The file merged as `bytes`, with no conflict. */
 const fixed = (path: string, bytes: Buffer | null, mode?: number): FileMerge => ({ path, mode, conflicts: [], build: () => bytes });
@@ -289,9 +293,99 @@ export function mergeTrees(base: readonly TreeFile[], ours: readonly TreeFile[],
   const index = (files: readonly TreeFile[]) => new Map(files.map((file) => [file.path, file]));
   const [b, o, t] = [index(base), index(ours), index(theirs)];
   const paths = [...new Set([...b.keys(), ...o.keys(), ...t.keys()])].sort();
-  const out: TreeMerge = { files: [], merged: [], conflicts: [] };
+  const out: TreeMerge = { base: 'common', files: [], merged: [], conflicts: [] };
   for (const path of paths) {
     const { file, merged } = mergeFile(path, b.get(path), o.get(path), t.get(path));
+    out.files.push(file);
+    if (merged) out.merged.push(merged);
+    out.conflicts.push(...file.conflicts);
+  }
+  return out;
+}
+
+/** Two sides' lines merged two ways by `diff2Lines`, each conflict addressed `<path>:<a>-<b>` by the tree's lines after `offset`. */
+function unrelatedLines(path: string, ours: string, theirs: string, offset: number): Part[] {
+  return diff2Lines(linesOf(ours), linesOf(theirs)).map((segment) => {
+    if ('clean' in segment) return segment.clean.join('');
+    const { a, b } = segment.conflict;
+    return {
+      at: `${path}:${a + offset}-${b + offset}`,
+      base: null,
+      ours: segment.conflict.ours.join(''),
+      theirs: segment.conflict.theirs.join(''),
+    };
+  });
+}
+
+/** A frontmatter merged by key with no base (`unrelatedKey`), each conflict addressed `<path>#<key>`. */
+function unrelatedHead(path: string, ours: string, theirs: string): Part[] {
+  const [o, t] = [entriesOf(ours), entriesOf(theirs)];
+  return keyOrder([...o.keys()], [...t.keys()]).map((key): Part => {
+    const merged = unrelatedKey(o.get(key), t.get(key));
+    return 'taken' in merged ? merged.taken : { at: `${path}#${key}`, base: null, ours: o.get(key) ?? null, theirs: t.get(key) ?? null };
+  });
+}
+
+/** A text both sides hold differently, merged with no base: by frontmatter key and body line where both open with one, else by line. */
+function unrelatedText(path: string, ours: string, theirs: string): Part[] {
+  const [o, t] = [frontmatterOf(ours), frontmatterOf(theirs)];
+  if (!path.endsWith('.md') || o === undefined || t === undefined) return unrelatedLines(path, ours, theirs, 0);
+  return ['---\n', ...unrelatedHead(path, o.head, t.head), '---\n', ...unrelatedLines(path, o.body, t.body, o.lines)];
+}
+
+/** `factory.json` merged by key with no base: its workflows as a set (`unrelatedSet`), its hires by step, any other key whole (`unrelatedKey`). */
+function unrelatedWiring(ours: string, theirs: string): FileMerge | undefined {
+  const [o, t] = [objectOf(ours), objectOf(theirs)];
+  if (o === undefined || t === undefined) return undefined;
+  const slots: Slot[] = [];
+  const json = (value: unknown): string | undefined => (value === undefined ? undefined : JSON.stringify(value));
+  const add = (key: string, hire: boolean, sides: [unknown, unknown, unknown], asked: boolean) => {
+    const at = hire ? `factory.json#hires.${key}` : `factory.json#${key}`;
+    if (!asked) slots.push({ key, hire, value: sides[2] });
+    else slots.push({ key, hire, conflict: { at, ...sidesQuoted(sides, hire) }, sides });
+  };
+  for (const key of keyOrder(Object.keys(o), Object.keys(t))) {
+    if (key === 'workflows') {
+      const merged = unrelatedSet(namesIn(o[key]), namesIn(t[key]));
+      if ('taken' in merged) slots.push({ key, hire: false, value: [...merged.taken].sort() });
+      else add(key, false, [undefined, o[key], t[key]], true);
+    } else if (key !== 'hires') add(key, false, [undefined, o[key], t[key]], 'ask' in unrelatedKey(json(o[key]), json(t[key])));
+    else
+      for (const step of keyOrder(Object.keys(mapOf(o.hires)), Object.keys(mapOf(t.hires)))) {
+        const sides: [unknown, unknown, unknown] = [undefined, mapOf(o.hires)[step], mapOf(t.hires)[step]];
+        add(step, true, sides, 'ask' in unrelatedKey(json(sides[1]), json(sides[2])));
+      }
+  }
+  const conflicts = slots.flatMap((slot) => (slot.conflict ? [slot.conflict] : []));
+  return { path: 'factory.json', conflicts, build: (choices) => Buffer.from(wiringText(slots, choices)) };
+}
+
+/**
+ * One path merged with no base: the same on both sides taken, one only the template holds added, one only the tree holds a conflict
+ * whose template side is none, and two texts merged by kind, two ways; a binary that differs conflicts whole.
+ */
+function switchFile(path: string, ours?: TreeFile, theirs?: TreeFile): { file: FileMerge; merged?: Merged } {
+  const [o, t] = [ours?.bytes ?? null, theirs?.bytes ?? null];
+  const mode = ours === undefined ? theirs?.mode : ours.mode;
+  if (sameBytes(o, t)) return { file: fixed(path, o, mode) };
+  if (o === null) return { file: fixed(path, t, mode), merged: { at: path, from: 'template' } };
+  const [ot, tt] = [textOf(o), textOf(t)];
+  if (ot === null || tt === null) return { file: wholeConflict(path, [null, o, t], mode) };
+  const wiring = path === 'factory.json' ? unrelatedWiring(ot, tt) : undefined;
+  const file = wiring ?? partsMerge(path, unrelatedText(path, ot, tt), mode);
+  return { file, merged: file.conflicts.length ? undefined : { at: path, from: 'both' } };
+}
+
+/**
+ * The tree `ours` merged with `theirs`, a render of another template than the one its base holds, with no common base: every path of
+ * either, in order, its file's merge (`switchFile`); what merged cleanly and from which side; and each conflict, its base side none.
+ */
+export function switchTrees(ours: readonly TreeFile[], theirs: readonly TreeFile[]): TreeMerge {
+  const index = (files: readonly TreeFile[]) => new Map(files.map((file) => [file.path, file]));
+  const [o, t] = [index(ours), index(theirs)];
+  const out: TreeMerge = { base: 'none', files: [], merged: [], conflicts: [] };
+  for (const path of [...new Set([...o.keys(), ...t.keys()])].sort()) {
+    const { file, merged } = switchFile(path, o.get(path), t.get(path));
     out.files.push(file);
     if (merged) out.merged.push(merged);
     out.conflicts.push(...file.conflicts);
@@ -377,18 +471,29 @@ function sideLines(name: string, text: string | null): string[] {
 /** What files the upgrade a preview printed: its line, the plan's digest, and the parameters it drops from the factory's file. */
 export type PlanNext = { line: string; digest: string; dropped: readonly string[] };
 
+/** The templates of a switch, by name: the one the base holds, and the one it switches onto. */
+export type Switched = { from: string; to: string };
+
 /**
- * What `nemia factory diff` prints of the merge of `name`'s upgrade from `from` to `to`: what merges cleanly, then each conflict, the
- * parameters the upgrade drops where any, the plan's digest, and `next`'s line, which files it.
+ * What `nemia factory diff` prints of the merge of `name`'s upgrade from `from` to `to`: where it is a switch (`switched`), both templates
+ * and that it has no common base; what merges cleanly, then each conflict, its base side where it has one, the parameters the upgrade
+ * drops where any, the plan's digest, and `next`'s line, which files it.
  */
-export function planLines(name: string, from: string, to: string, merge: TreeMerge, next: PlanNext): string[] {
-  const lines = [`${name}: ${from} → ${to}`, `merges cleanly: ${merge.merged.length}`];
+export function planLines(name: string, from: string, to: string, merge: TreeMerge, next: PlanNext, switched?: Switched): string[] {
+  const lines =
+    switched === undefined
+      ? [`${name}: ${from} → ${to}`]
+      : [
+          `${name}: ${switched.from} ${from} → ${switched.to} ${to}`,
+          `switch: ${switched.to} is another template than ${switched.from}, the one ${name}'s base was rendered from, so the merge has no common base: nothing tells your own work from what ${switched.from} left, and each conflict below, a file only your tree holds among them, asks your choice`,
+        ];
+  lines.push(`merges cleanly: ${merge.merged.length}`);
   for (const merged of merge.merged) lines.push(`  ${merged.at}  from ${FROM[merged.from]}`);
   lines.push(`conflicts: ${merge.conflicts.length}`);
   for (const conflict of merge.conflicts)
     lines.push(
       `  ${conflict.at}`,
-      ...sideLines('base', conflict.base),
+      ...(merge.base === 'none' ? [] : sideLines('base', conflict.base)),
       ...sideLines('ours', conflict.ours),
       ...sideLines('theirs', conflict.theirs),
       `    ${resolveLine(name, conflict.at)}`,
@@ -402,3 +507,27 @@ export function planLines(name: string, from: string, to: string, merge: TreeMer
   );
   return lines;
 }
+
+/** Whether an upgrade from a base of the template `recorded` onto the template `now`, each by name, has a common base. */
+export const mergeBaseOf: MergeBaseOf = (recorded, now) => (recorded === undefined || recorded === now ? 'common' : 'none');
+
+/**
+ * The name of the template a base holds, from what a pass has seen of it: the render's, where the base is the render; else the name
+ * recorded; else, where no upgrade is under way, the template the factory's file names, which wrote the base; else none.
+ */
+export const baseTemplateOf: BaseTemplateOf = (seen) => {
+  if (seen.rendered !== undefined) return seen.rendered;
+  if (seen.recorded !== undefined) return seen.recorded;
+  return seen.idle ? seen.named : undefined;
+};
+
+/** A key merged with no base: taken where the sides agree or only the template sets it, else asked. */
+export const unrelatedKey: UnrelatedKey = (ours, theirs) => {
+  if (ours === theirs) return { taken: theirs ?? '' };
+  if (ours === undefined && theirs !== undefined) return { taken: theirs };
+  return { ask: true };
+};
+
+/** A set of names merged with no base: the template's where it holds every name the tree's does, else asked. */
+export const unrelatedSet: UnrelatedSet = (ours, theirs) =>
+  ours.every((name) => theirs.includes(name)) ? { taken: theirs } : { ask: true };

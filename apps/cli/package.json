@@ -1,0 +1,24 @@
+{
+  "name": "cli",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "description": "nemia, a client of the api: the moved reads over HTTP, every other verb on the orchestrator's own CLI, spawned",
+  "bin": {
+    "nemia": "bin/nemia.ts",
+    "wf": "bin/wf.ts"
+  },
+  "scripts": {
+    "test": "node --test --test-concurrency=2 --test-timeout=120000 'test/*.test.ts' 'src/**/*.test.ts'",
+    "typecheck": "tsrs --noEmit && tsrs --noEmit -p test"
+  },
+  "dependencies": {
+    "agent-orchestrator": "*",
+    "effect": "4.0.6"
+  },
+  "devDependencies": {
+    "@types/node": "^24.19.2",
+    "api": "*",
+    "typescript": "^6.0.3"
+  }
+}

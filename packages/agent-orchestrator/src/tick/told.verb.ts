@@ -5,6 +5,7 @@
  * run's rendered agent folder, the skills where a start of the run's folder finds them, and the run's place.
  */
 import path from 'node:path';
+import { Effect, Result } from 'effect';
 import { refusedTold } from './assess.ts';
 import { mcpServerOf, type ClaudeFlags, type CodexArgs, type TaskView } from '../runtime-client.ts';
 import {
@@ -24,18 +25,20 @@ import type { EndingStopped, RetryBriefing } from '../brief/index.ts';
 import { ownStatus, type SpendOf } from '../status/status.ts';
 import type { Retry } from '../retry/index.ts';
 import { saidIn } from '../views/views.verb.ts';
-import type { Workflow } from '../step/step.ts';
+import { splitFrontmatter, type Workflow } from '../step/step.ts';
 import { realRepoOf } from '../workspace/worktree.store.ts';
-import { agentFilesDir, renderedIn, skillsAgain } from '../agents/agents.store.ts';
+import { agentFilesDir, renderedIn } from '../agents/agents.store.ts';
 import { placesOf } from '../folder/lookup.store.ts';
-import { skillsFor } from '../skills/read.store.ts';
-import { enabledSkillsOf, renderedFlags, rendersAgent, unrendered } from '../agents/agents.ts';
+import { SkillDoor } from '../skills/skill-door.store.ts';
+import { SkillName } from '../agents/agents.model.ts';
+import { enabledSkillsOf, renderedFlags, rendersAgent, unrendered, type SkillAgain } from '../agents/agents.ts';
 import type { LandingWords } from '../check/check.ts';
 import { landingWords, placeSay } from '../place/landing.store.ts';
 import type { Place } from '../place/place.store.ts';
 import type { PlaceSay } from '../place/place.ts';
 import { composeBrief } from '../brief/index.ts';
 import { artifactsDir, inputsDir } from '../record/record.store.ts';
+import { workflowFilesDir } from '../frozen/frozen.store.ts';
 import { DEFAULT_FACTORY } from '../factory/factory.ts';
 import { factoryServers } from '../servers/servers.store.ts';
 import type { FactoryServers } from '../servers/index.ts';
@@ -46,7 +49,8 @@ import { inboxDir } from '../record/files.store.ts';
  * `nemia start` rendered them (`rendersAgent`, `renderedFlags`); a step it does not render — a codex step, a record that gives no agent —
  * is filed with no flags and told everything in its brief. Where the rendered folder is not there as its flags name it (`unrendered`,
  * `renderedIn`) — gone, or rendered under the plugin's former name — a flag naming a file that is not there would end the session at its
- * start, so its brief tells it its skills whole, read again from where a start of this run's folder finds them (`skillsAgain`). Bridged to
+ * start, so its brief tells it its skills whole, read again through the Skill door from where a start of this run's folder finds them
+ * (`skillsTold`), asked only of such a step. Bridged to
  * claude.ai, where anyone signed in can drive it, only when the step says `remote: true`, never by default: as Claude Code's own flag,
  * first among its others (`claude.remoteControl`). A codex step of a repository run is filed with its repository's real path as the
  * directory Codex's trust extends from (`codex.trustFrom`), so a `--repo` given through a symlink names what the operator's Codex config
@@ -55,16 +59,50 @@ import { inboxDir } from '../record/files.store.ts';
  * off the step as it is told: one whose rendered folder is gone holds none, and is told them in its brief. All are the harness's own
  * arguments (`own`), which the first filing, a try and a round each spread into its `config`.
  */
-export function toldOf(
-  run: Run,
-  step: Workflow,
-): { step: Workflow; own: { claude?: ClaudeFlags; codex?: CodexArgs; enabledSkills: string[] | 'default' } } {
+export const toldOf = Effect.fnUntraced(function* (run: Run, step: Workflow) {
   const dir = agentFilesDir(run, step.name);
-  const told =
-    rendersAgent(step) && !renderedIn(dir, step)
-      ? unrendered(step, step.agent?.skills?.length ? skillsAgain(step, skillsFor(run.workflowDir, placesOf(run.repo))) : [])
-      : step;
-  return { step: told, own: { ...ownOf(told, renderedFlags(told, dir), () => realRepoOf(run)), enabledSkills: enabledSkillsOf(told) } };
+  const told: Workflow =
+    rendersAgent(step) && !renderedIn(dir, step) ? unrendered(step, step.agent?.skills?.length ? yield* skillsTold(step, run) : []) : step;
+  return {
+    step: told,
+    own: { ...ownOf(told, renderedFlags(told, dir), () => realRepoOf(run)), enabledSkills: enabledSkillsOf(told) },
+  } satisfies StepTold;
+});
+
+/**
+ * The skills of `step`, each read again through the Skill door from where a start of `run`'s folder finds it (`SkillDoor.skills.found`):
+ * its body, or why it could not be told — none found, refused, or a SKILL.md the door reads none of. The one read of a skill after a run
+ * started, since the copy `nemia start` froze went with the folder; asked of the door, so a program given its memory tells what it holds.
+ */
+const skillsTold = Effect.fnUntraced(function* (step: Workflow, run: Run) {
+  const door = (yield* SkillDoor).skills;
+  const found = yield* door.found({ dir: run.workflowDir, places: placesOf(run.repo) });
+  const told: SkillAgain[] = [];
+  for (const name of step.agent?.skills ?? []) {
+    const from = found.at.get(name);
+    if (typeof from !== 'string') {
+      told.push({ name, missing: from ? from.message : `no folder holds it in ${found.looked.join(', ')}.` });
+      continue;
+    }
+    const read = yield* Effect.result(door.read(SkillName.read(path.basename(from)), path.dirname(from)));
+    told.push(
+      Result.isSuccess(read)
+        ? skillAgainOf(name, from, read.success.text, read.success.error ?? 'it holds nothing')
+        : skillAgainOf(name, from, '', read.failure.message),
+    );
+  }
+  return told;
+});
+
+/** The skill `name` of the folder `from` as its brief tells it: the body of its SKILL.md's `text`, or why it could not be read. Pure. */
+function skillAgainOf(name: string, from: string, text: string, why: string): SkillAgain {
+  const file = path.join(from, 'SKILL.md');
+  if (!text) return { name, missing: `${file} could not be read — ${why}.` };
+  try {
+    return { name, text: splitFrontmatter(`${name}/SKILL.md`, text).body };
+  } catch (err) {
+    return { name, missing: `${file} could not be read — ${err instanceof Error ? err.message : String(err)}.` };
+  }
 }
 
 /**
@@ -85,25 +123,44 @@ export const ownOf = (step: Pick<Workflow, 'harness' | 'remote'>, rendered: Clau
  */
 export type PlaceTold = { readonly words: LandingWords | undefined; readonly say: PlaceSay | undefined };
 
+/**
+ * A step as the tick tells it (`toldOf`): the step its brief is composed for, and the harness's own arguments it is filed with.
+ */
+export type StepTold = {
+  readonly step: Workflow;
+  readonly own: { claude?: ClaudeFlags; codex?: CodexArgs; enabledSkills: string[] | 'default' };
+};
+
 /** A step as a try files it (`toldOf`), with what its place says to it (`PlaceTold`). */
-export type Told = ReturnType<typeof toldOf> & PlaceTold;
+export type Told = StepTold & PlaceTold;
 
 /**
- * What `step` of `run` is told and denied by `place` (`landingWords`, `placeSay`), its branches named off `heads` where given.
+ * What `step` of `run`, among its `steps`, is told and denied by `place` (`landingWords`, `placeSay`), its branches named off `heads`
+ * where given.
  */
-export function placeTold(run: Run, step: Workflow, place: Place, heads?: Readonly<Record<string, string>>): PlaceTold {
-  return { words: landingWords(run, step, place, heads), say: placeSay(run, place) };
+export function placeTold(
+  run: Run,
+  steps: readonly Workflow[],
+  step: Workflow,
+  place: Place,
+  heads?: Readonly<Record<string, string>>,
+): PlaceTold {
+  return { words: landingWords(run, steps, step, place, heads), say: placeSay(run, place) };
 }
 
 /**
- * The folders a step of `run` is filed from (`filedFolders`): the run's artifacts folder, the store's inbox, and the run's inputs
- * folder (`inputsDir`) only when its record names an input, so a run given none is filed and told as before. What a *brief* reads,
- * which asks for no server; `filedAt` is what a filing takes.
+ * The folders a step of `run` is filed from (`filedFolders`): the run's artifacts folder, the store's inbox, the run's inputs
+ * folder (`inputsDir`) only when its record names an input, so a run given none is filed and told as before, and the run's copy of its
+ * workflow folder (`workflowFilesDir`) only when its record names one. What a *brief* reads, which asks for no server; `filedAt` is what
+ * a filing takes.
  */
-export const filedFoldersAt = (run: Pick<Run, 'id' | 'inputs'>): { runArtifacts: string; inbox: string; inputs?: string } => ({
+export const filedFoldersAt = (
+  run: Pick<Run, 'id' | 'inputs' | 'workflowFiles'>,
+): { runArtifacts: string; inbox: string; inputs?: string; workflowFiles?: string } => ({
   runArtifacts: path.dirname(artifactsDir(run, 'step')),
   inbox: inboxDir(),
   ...(run.inputs?.length ? { inputs: inputsDir(run) } : {}),
+  ...(run.workflowFiles === undefined ? {} : { workflowFiles: workflowFilesDir(run, run.workflowFiles) }),
 });
 
 /**
@@ -112,9 +169,9 @@ export const filedFoldersAt = (run: Pick<Run, 'id' | 'inputs'>): { runArtifacts:
  * reads a store nobody named (`test/root-given.test.ts`).
  */
 export const filedAt = (
-  run: Pick<Run, 'id' | 'inputs' | 'factory'>,
+  run: Pick<Run, 'id' | 'inputs' | 'factory' | 'workflowFiles'>,
   home: string,
-): { runArtifacts: string; inbox: string; inputs?: string; servers: FactoryServers } => ({
+): { runArtifacts: string; inbox: string; inputs?: string; workflowFiles?: string; servers: FactoryServers } => ({
   ...filedFoldersAt(run),
   servers: recordedServers(run.factory, home),
 });
@@ -141,7 +198,7 @@ const recordedServers = (factory: string | undefined, home: string): FactoryServ
  * what the board shows of a step to come. Where the place gives no words, the brief sends the step to its place's skill.
  */
 export function briefNow(step: Workflow, run: Run, steps: readonly Workflow[], place: Place): string {
-  const told = placeTold(run, step, place);
+  const told = placeTold(run, steps, step, place);
   const none = [undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined] as const;
   return composeBrief(step, run, steps, ...none, told);
 }
@@ -247,6 +304,6 @@ export const tryTold = (
   ...(t.refusal ? { refusal: t.refusal } : {}),
   ...(t.status === 'denied' ? { denied: (record.taskId === null ? undefined : f.reads.spendOf(record.taskId))?.denied ?? [] } : {}),
   ...(t.status === 'unsigned' ? lacksTold(f.run, r.step, record) : {}),
-  ...(t.status === 'unsigned' ? refusedTold(f.reads.signedOff(r.step)) : {}),
+  ...(t.status === 'unsigned' ? refusedTold(stepNamed(f, r.step), f.reads.signedOff(r.step)) : {}),
   ...(r.back?.[0] !== undefined ? { ending: endingSaid(f, stepNamed(f, r.back[0])) } : {}),
 });

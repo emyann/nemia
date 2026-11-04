@@ -28,6 +28,7 @@ import {
   INBOX_KEYS,
   inboxNameRefusal,
   Invalid,
+  labelsText,
   parseInboxCard,
   readFactory,
   inboxEntries,
@@ -39,6 +40,7 @@ import { readBody, type BodyIssue } from '../body.ts';
 import { refusedBeforeReading, type Guarded, type Refusal } from '../guard.ts';
 import { type ApiEnv, served } from '../layer.ts';
 import { folderOf, type KeyRow } from '../workflows/workflows.ts';
+import { selectorOf } from '../labels/index.ts';
 import { commandNamed, runPlaced } from '../store.ts';
 
 /**
@@ -113,8 +115,19 @@ function inboxEntry(entry: InboxListing, read: { filedAt: string | null; text: s
   return { ...entry, body, filedAt: read.filedAt };
 }
 
+/**
+ * The value a card's page shows for `key` of the entry: when it was queued, the runs its `from:` names, its labels as `a=b,c=d`
+ * (`labelsText`), or what the card writes; null for a key it does not set.
+ */
+const keyValue = (entry: InboxEntry, key: (typeof INBOX_KEYS)[number]): string | null => {
+  if (key === 'queued') return entry.queued?.at ?? null;
+  if (key === 'from') return entry.from.join(', ') || null;
+  if (key === 'labels') return Object.keys(entry.labels).length ? labelsText(entry.labels) : null;
+  return entry[key] ?? null;
+};
+
 const FILE_SHAPE =
-  '`{ "body": "<the idea>" }`, with `"workflow": "<name>"` for what runs it — `"from": "repo"` or `"yours"` when both have a workflow of that name — `"repo": "<absolute path>"` for the repository it is about, and `"factory": "<name>"` for the factory it is filed in';
+  '`{ "body": "<the idea>" }`, with `"workflow": "<name>"` for what runs it — `"from": "repo"` or `"yours"` when both have a workflow of that name — `"repo": "<absolute path>"` for the repository it is about, `"factory": "<name>"` for the factory it is filed in, and `"label": ["<key>=<value>", …]` for the labels it carries';
 
 /**
  * `POST /api/inbox`'s body, its keys in the order they are refused: a workflow is a folder's name, never a path, `from` says where it
@@ -126,6 +139,7 @@ const FILE_BODY = Schema.Struct({
   from: Schema.optionalKey(Schema.Literals(['repo', 'yours'])),
   repo: Schema.optionalKey(Schema.String),
   factory: Schema.optionalKey(Schema.String.check(Schema.makeFilter((name: string) => name !== DEFAULT_FACTORY))),
+  label: Schema.optionalKey(Schema.Array(Schema.String)),
 });
 
 /** Why `POST /api/inbox`'s body is not a filing (400), by the first key its schema refused. */
@@ -142,6 +156,8 @@ function fileWords({ path: [key], input }: BodyIssue): string {
     return `\`factory\` names the factory the card is filed in, and \`${DEFAULT_FACTORY}\` is none to file into: it holds what names no factory. Leave \`factory\` out for a card that gets its factory when it is started.`;
   if (key === 'factory')
     return `\`factory\` names the factory the card is filed in, as \`nemia inbox add --factory <name>\` takes it: a factory's name, as GET /api/factories lists them, or left out for a card that gets its factory when it is started. This request's was ${JSON.stringify(input)}.`;
+  if (key === 'label')
+    return `\`label\` is the labels the card carries, as \`nemia inbox add --label <key>=<value>\` takes each: a list, such as \`"label": ["team=core"]\`, or left out. This request's was ${JSON.stringify(input)}.`;
   return `POST /api/inbox takes a JSON object: ${FILE_SHAPE}.`;
 }
 
@@ -157,7 +173,7 @@ const FILE: Guarded = {
 };
 
 /** What `POST /api/inbox` hands the package: the idea, and the keys the card writes. */
-type Filing = { text: string; workflow?: string; repo?: string; factory?: string };
+type Filing = { text: string; workflow?: string; repo?: string; factory?: string; label?: string[] };
 
 /** Why `factory` does not take a card about `repo`, not one of its repositories: an `Invalid`, naming them. */
 const outsideFactory = (factory: Factory, repo: string): Invalid =>
@@ -206,7 +222,12 @@ function filingIn(factory: Factory, body: typeof FILE_BODY.Type, home: string): 
   const repos = factory.repos.map((r) => path.resolve(r));
   const sent = body.repo === undefined ? undefined : path.resolve(body.repo);
   if (body.repo !== undefined && sent !== undefined && !repos.includes(sent)) throw outsideFactory(factory, body.repo);
-  const filing: Filing = { text: body.body, factory: factory.name, ...(sent !== undefined ? { repo: sent } : {}) };
+  const filing: Filing = {
+    text: body.body,
+    factory: factory.name,
+    ...(sent !== undefined ? { repo: sent } : {}),
+    ...(body.label !== undefined ? { label: [...body.label] } : {}),
+  };
   if (body.workflow === undefined) return filing;
   const about = sent ?? (repos.length === 1 ? repos[0] : undefined);
   const folder = folderAmong(body.workflow, body.from, about === undefined ? repos : [about], home, factory);
@@ -241,6 +262,7 @@ function filingOf(body: typeof FILE_BODY.Type, repo: string, home: string): Fili
   if (body.factory !== undefined) return filingIn(readFactory(body.factory, 'Nothing was filed.'), body, home);
   const filing: Filing = {
     text,
+    ...(body.label !== undefined ? { label: [...body.label] } : {}),
     ...(about !== undefined ? { repo: path.isAbsolute(about) ? path.resolve(about) : about } : {}),
   };
   if (workflow === undefined) return filing;
@@ -255,7 +277,9 @@ function filingOf(body: typeof FILE_BODY.Type, repo: string, home: string): Fili
  *
  * - `GET /api/inbox` — `nemia inbox`'s cards, through its entry's handler, and every entry of the folder that does not read as one, with
  *   why: never hidden, as a workflow that does not load is not. 500 for a run's record that does not parse: the listing reads them all,
- *   for the runs a card was started as.
+ *   for the runs a card was started as. Each entry carries its person `labels` (`{}` where it sets none). `?selector=`, given again
+ *   for another, keeps the cards one of them takes (OR), over the card's labels with its `workflow:` and `factory:` where it sets them,
+ *   as `nemia inbox -l` keeps them; a selector the package's grammar refuses is a 422 naming the key or the clause.
  * - `GET /api/inbox/:name` — one card, for its page (`InboxCardPage`). A name that would leave the inbox, or a hidden one, is refused in
  *   the package's words (400) before anything is read; a card is found among the entries the inbox lists, never by a path joined from what
  *   was sent, and a card before a stray file of the same name (`notes.md` and `notes` both list as `notes`), through the package's entry
@@ -278,8 +302,12 @@ function filingOf(body: typeof FILE_BODY.Type, repo: string, home: string): Fili
 export const inbox = new Hono<ApiEnv>()
   .get('/api/inbox', (c) =>
     served(c, async ({ e, placeService, memo, home }) => {
-      const { cards } = await runPlaced(placeService, e, INBOX.handler({}, undefined, home, { records: { inbox: memo.records.inbox } }));
-      return c.json(await runPlaced(placeService, e, listInbox(cards, home)));
+      const { cards } = await runPlaced(
+        { placeService, home },
+        e,
+        INBOX.handler(selectorOf(c), undefined, home, { records: { inbox: memo.records.inbox } }),
+      );
+      return c.json(await runPlaced({ placeService, home }, e, listInbox(cards, home)));
     }),
   )
   .get('/api/inbox/:name', (c) => {
@@ -287,16 +315,16 @@ export const inbox = new Hono<ApiEnv>()
     const wrong = inboxNameRefusal(name);
     if (wrong) return c.json({ error: wrong }, 400);
     return served(c, async ({ e, placeService, home }) => {
-      const { card, source } = (await runPlaced(placeService, e, CARD.handler({ name }, undefined, home))) as {
+      const { card, source } = (await runPlaced({ placeService, home }, e, CARD.handler({ name }, undefined, home))) as {
         card: InboxListing;
         source: string;
       };
-      const [entry = inboxEntry(card, { filedAt: null, text: null })] = await runPlaced(placeService, e, listInbox([card], home));
+      const [entry = inboxEntry(card, { filedAt: null, text: null })] = await runPlaced({ placeService, home }, e, listInbox([card], home));
       const keys =
         entry.error === null
           ? INBOX_KEYS.map((key) => ({
               key,
-              value: key === 'queued' ? (entry.queued?.at ?? null) : key === 'from' ? entry.from.join(', ') || null : (entry[key] ?? null),
+              value: keyValue(entry, key),
               meaning: INBOX_KEY_MEANINGS[key],
             }))
           : null;
@@ -312,9 +340,13 @@ export const inbox = new Hono<ApiEnv>()
       const asked = filingOf(read.body, repo, home);
       if ('status' in asked) return c.json({ error: asked.error }, asked.status);
       const { card, file } = await runPlaced(
-        placeService,
+        { placeService, home },
         e,
-        INBOX_ADD.handler({ idea: asked.text, workflow: asked.workflow, repo: asked.repo, factory: asked.factory }, undefined, home),
+        INBOX_ADD.handler(
+          { idea: asked.text, workflow: asked.workflow, repo: asked.repo, factory: asked.factory, label: asked.label },
+          undefined,
+          home,
+        ),
       );
       const filed: InboxFiled = {
         name: card.name,

@@ -1,0 +1,28 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "lib": [
+      "ES2022"
+    ],
+    "strict": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "verbatimModuleSyntax": true,
+    "erasableSyntaxOnly": true,
+    "types": [
+      "node"
+    ],
+    "noUncheckedIndexedAccess": true
+  },
+  "include": [
+    "src",
+    "bin",
+    "contracts"
+  ],
+  "exclude": [
+    "src/**/*.test.ts"
+  ]
+}

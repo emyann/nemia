@@ -122,15 +122,24 @@ test('keysOf, polled and filterOf: what each event reads again, and what is poll
         ['runs-open'],
         ['runs-finished'],
         ['runs', 'r-1'],
+        ['runs', 'r-1', 'steps'],
         ['ceilings'],
         ['inbox'],
         ['daemon'],
       ]);
-      assert.deepEqual(keysOf('removed', 'r-1'), [['runs'], ['runs-open'], ['runs-finished'], ['runs', 'r-1'], ['ceilings'], ['daemon']]);
+      assert.deepEqual(keysOf('removed', 'r-1'), [
+        ['runs'],
+        ['runs-open'],
+        ['runs-finished'],
+        ['runs', 'r-1'],
+        ['runs', 'r-1', 'steps'],
+        ['ceilings'],
+        ['daemon'],
+      ]);
       for (const event of ['step', 'run', 'removed'] as const) {
         assert.ok(
-          keysOf(event, 'r-1').every((key) => key.length <= 2),
-          `${event} names no decision: a decision is keyed by the run's state, read again under a key of its own when the record moves`,
+          keysOf(event, 'r-1').every((key) => key[2] !== 'decision' && key[2] !== 'path' && key[2] !== 'lines'),
+          `${event} names no decision, path or lines: each is keyed by the run's state, or never moves`,
         );
       }
     },
@@ -157,9 +166,13 @@ test('keysOf, polled and filterOf: what each event reads again, and what is poll
   await t.test(
     'the polled queries are the runs, a run, the cap, and whether a daemon ticks — never a decision, the inbox, or anything else',
     () => {
-      for (const key of [['runs'], ['runs', 'r-1'], ['ceilings'], ['daemon']]) assert.equal(polled(key), true, JSON.stringify(key));
+      for (const key of [['runs'], ['runs', 'r-1'], ['ceilings'], ['daemon']]) {
+        assert.equal(polled(key), true, JSON.stringify(key));
+      }
       for (const key of [
         ['runs', 'r-1', 'decision', 'stamp'],
+        ['runs', 'r-1', 'steps', 'a', 'tries', 'stamp'],
+        ['runs', 'r-1', 'lines'],
         ['inbox'],
         ['inbox', 'card'],
         ['quota'],
@@ -216,8 +229,31 @@ test('keysOf, polled and filterOf: what each event reads again, and what is poll
     );
     assert.deepEqual(filterOf(['runs']), { queryKey: ['runs'], exact: true });
     assert.deepEqual(filterOf(['runs', 'a']), { queryKey: ['runs', 'a'], exact: true });
+    assert.deepEqual(filterOf(['runs', 'a', 'lines']), { queryKey: ['runs', 'a', 'lines'], exact: true });
+    assert.deepEqual(filterOf(['runs', 'a', 'steps']), { queryKey: ['runs', 'a', 'steps'], exact: false });
     assert.deepEqual(filterOf(['runs-open']), { queryKey: ['runs-open'], exact: false });
   });
+  await t.test(
+    "a step's tries and told are read again by a run's event and a removal, by prefix, and never by a step's: it moves their stamp",
+    async () => {
+      const subs: QueryKey[] = [
+        ['runs', 'a', 'steps', 'plan', 'tries', 's'],
+        ['runs', 'a', 'steps', 'plan', 'told', 's'],
+      ];
+      const seeded: QueryKey[] = [...subs, ['runs', 'a', 'lines'], ['runs', 'b', 'steps', 'plan', 'tries', 's']];
+      const marked = async (event: 'step' | 'run' | 'removed') => {
+        const client = new QueryClient();
+        for (const key of seeded) client.setQueryData(key, {});
+        await Promise.all(keysOf(event, 'a').map((key) => client.invalidateQueries(filterOf(key))));
+        const keys = seeded.filter((key) => client.getQueryState(key)?.isInvalidated);
+        client.clear();
+        return keys;
+      };
+      assert.deepEqual(await marked('step'), [], "a step's event reads the object, whose stamp says which step moved");
+      assert.deepEqual(await marked('run'), subs, "a run's event: an artifact pruned moves no stamp");
+      assert.deepEqual(await marked('removed'), subs);
+    },
+  );
 });
 
 test('followFeed: how the stream is kept, opened again, and stopped', async (t) => {
@@ -365,8 +401,11 @@ test("followFeed: what the stream's events read again, a frame or a second at a 
       assert.ok(keys.includes(JSON.stringify(['runs', 'r-1'])), `the run's record is read again: ${keys.join(' ')}`);
       assert.deepEqual(
         keysOf('removed', 'r-1').filter((key) => key[0] === 'runs' && key.length > 1),
-        [['runs', 'r-1']],
-        "its record, and never its decision or another run's: invalidated exactly, a key of two",
+        [
+          ['runs', 'r-1'],
+          ['runs', 'r-1', 'steps'],
+        ],
+        "its record and its steps' reads, and never its decision or another run's",
       );
       f.stop();
     },
@@ -417,12 +456,20 @@ test("followFeed: what the stream's events read again, a frame or a second at a 
     assert.deepEqual(
       new Set(f.invalidated[0].map((k) => JSON.stringify(k))),
       new Set(
-        [['runs'], ['runs-open'], ['runs-finished'], ['runs', 'r-1'], ['ceilings'], ['inbox'], ['daemon'], ['runs', 'r-2']].map((k) =>
-          JSON.stringify(k),
-        ),
+        [
+          ['runs'],
+          ['runs-open'],
+          ['runs-finished'],
+          ['runs', 'r-1'],
+          ['runs', 'r-1', 'steps'],
+          ['ceilings'],
+          ['inbox'],
+          ['daemon'],
+          ['runs', 'r-2'],
+        ].map((k) => JSON.stringify(k)),
       ),
     );
-    assert.equal(f.invalidated[0].length, 8, 'each key once');
+    assert.equal(f.invalidated[0].length, 9, 'each key once');
     f.frame();
     assert.equal(f.invalidated.length, 1, 'an empty frame invalidates nothing');
     f.stop();

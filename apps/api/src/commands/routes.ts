@@ -10,6 +10,7 @@ import {
   type Command,
   COMMANDS,
   type CommandSpec,
+  dropInformed,
   type Flag,
   generated,
   type Positional,
@@ -242,7 +243,7 @@ const namedBy = (c: Context<ApiEnv>): Named => ({
  * memos of the runs each read projects handed with them (`ReadMemo.records`), so a read that polls
  * — the factories' listing — answers a run whose record has not moved from memory — or, where the command throws a refusal in place
  * of data that did nothing (`apiRefusal`), that refusal, answered by `app.onError`; or 502 in its words, where it has words for a
- * failure (`RouteWords.failed`).
+ * failure (`RouteWords.failed`). A write that names a run (`:runId`) takes it out of the app's informer once it has run (`uninformed`).
  */
 const route = (command: Command, at: Route) => (c: Context<ApiEnv>) =>
   served(c, async (s) => {
@@ -261,7 +262,7 @@ const route = (command: Command, at: Route) => (c: Context<ApiEnv>) =>
     if (wrong) return c.json({ error: wrong }, 422);
     try {
       const args = servedRepo(command, read.args, s);
-      const data = await runPlaced(s.placeService, s.e, command.handler(args, s.env, s.home, { records: s.memo.records }));
+      const data = await runPlaced(s, s.e, command.handler(args, s.env, s.home, { records: s.memo.records }));
       const refusal = command.apiRefusal?.(data, args);
       if (refusal) throw refusal;
       const answer = answerOf(command, data);
@@ -269,8 +270,19 @@ const route = (command: Command, at: Route) => (c: Context<ApiEnv>) =>
     } catch (err) {
       if (isRefusal(err) || !words.failed) throw err;
       return c.json({ error: words.failed(named, err instanceof Error ? err.message : String(err)) }, 502);
+    } finally {
+      if (command.writes) uninformed(s, c.req.param('runId'));
     }
   });
+
+/**
+ * The run a write named by its path (`:runId`) taken out of the app's informer (`dropInformed`), whatever the write did: the next read
+ * judges it again at once, whether or not the write moved anything the informer keeps it against (its stamp, its tasks' feed, its tips).
+ * Nothing for a write that names no run.
+ */
+const uninformed = ({ informer }: Served, runId: string | undefined): void => {
+  if (informer && runId !== undefined) dropInformed(informer, runId);
+};
 
 /**
  * The routes the table generates (`generated`): every route of a command of `table` the api posts, puts or deletes on that it serves by

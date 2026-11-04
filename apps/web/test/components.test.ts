@@ -7,7 +7,19 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { behind, coded, detail as detailOf, EXIT_1, listed, PASSED, summary, triedAs, unpinned, type Word } from './run-fixtures.ts';
+import {
+  behind,
+  coded,
+  detail as detailOf,
+  EXIT_1,
+  listed,
+  PASSED,
+  readsOf,
+  summary,
+  triedAs,
+  unpinned,
+  type Word,
+} from './run-fixtures.ts';
 import './tsx.ts';
 
 const { createElement } = await import('react');
@@ -35,7 +47,7 @@ const { BreakdownRows } = await import('../src/components/look/Breakdown.tsx');
 const { clockBreakdown } = await import('../src/lib/breakdown.ts');
 const { instantWhole, instantWords } = await import('../src/lib/instant.ts');
 const { timeOfDay, timeToTheSecond } = await import('../src/lib/timeOfDay.ts');
-type RunDetail = import('../src/lib/api.ts').RunDetail;
+type RunView = import('../src/lib/runView.ts').RunView;
 type StepReach = import('../src/lib/api.ts').StepReach;
 type ReadOnlyCommands = import('../src/lib/api.ts').ReadOnlyCommands;
 type StepAttempts = import('../src/lib/api.ts').StepAttempts;
@@ -119,9 +131,10 @@ const UNMEASURED: StepUsed = {
 };
 
 /** A run of one looping step out of rounds, as GET /api/runs/:id gives it, with `note` on its step. */
-function runWith(note: string | null): RunDetail {
+function runWith(note: string | null): RunView {
   return {
     id: 'r-1',
+    labels: {},
     kinds: [],
     refresh: 'nemia refresh r-1',
     brief: 'Go round again',
@@ -252,7 +265,7 @@ test("the inspector's Details show a step's note under its chip", () => {
 function runOf(
   status: Word,
   { note = null, waitingOnYou, cancelledAt = null }: { note?: string | null; waitingOnYou: string[]; cancelledAt?: string | null },
-): RunDetail {
+): RunView {
   const run = runWith(note);
   return { ...run, cancelledAt, waitingOnYou, waitingOnYouWords: waitingOnYou, steps: [{ ...run.steps[0], ...coded(status) }] };
 }
@@ -262,7 +275,7 @@ function runOf(
  * both read it — inside the provider its handles read. A server render of the whole canvas draws no node: React Flow puts
  * its nodes in its store in an effect.
  */
-function nodeMarkup(run: RunDetail): string {
+function nodeMarkup(run: RunView): string {
   const props = {
     id: 'review',
     type: 'step' as const,
@@ -329,7 +342,7 @@ test('a step a person has sent round or asked to retry is no gate from the momen
  * `reviewDue` says. Neither step has a spec — as when the api could not read one — so what is drawn is the api's graph, and nothing a
  * step's spec says.
  */
-function loopRun(notes: { implement: string | null; review: string | null }, reviewDue = false): RunDetail {
+function loopRun(notes: { implement: string | null; review: string | null }, reviewDue = false): RunView {
   const base = runWith(null);
   const step = { ...base.steps[0], ...coded('unverified · done'), spec: null };
   return {
@@ -475,7 +488,7 @@ test("a loop's edge is drawn from under its looping step, dashed, into its targe
 });
 
 /** A run of steps, each its name, the word `wf ls` gives it, and the step it comes after, if any: the roots are the rest. */
-function runOfSteps(steps: Array<[name: string, status: Word, after?: string]>): RunDetail {
+function runOfSteps(steps: Array<[name: string, status: Word, after?: string]>): RunView {
   const base = runWith(null);
   const edges = steps.flatMap(([name, , from]): GraphEdge[] => (from ? [{ from, to: name, kind: 'after' }] : []));
   return {
@@ -765,7 +778,7 @@ test("the inspector's Details show `loop` and `rounds` beside `after` on a loopi
     workspace: null,
     place: null,
     resume: null,
-    permissionMode: null,
+    fence: null,
     sandbox: null,
     tools: null,
     deadlineSeconds: null,
@@ -1506,7 +1519,7 @@ test('the Decide section copies its commands and runs none: a button per command
 
 test("the inspector's Details say what a step used and what it cost beside its sessions — `not measured`, never 0", () => {
   const run = runWith(null);
-  const rows = (step: RunDetail['steps'][number]) =>
+  const rows = (step: RunView['steps'][number]) =>
     [...renderToStaticMarkup(createElement(StepTabs, { run, step })).matchAll(/<dt[^>]*>([^<]+)<\/dt>\s*<dd[^>]*>(.*?)<\/dd>/g)].map(
       (m) => [m[1], m[2].replace(/<[^>]+>/g, '')],
     );
@@ -1568,8 +1581,8 @@ const facts = await import('../src/components/Facts.tsx');
 const { Facts, specRows, unreadRows, when } = facts;
 type StepTry = import('../src/lib/api.ts').StepTry;
 type StepCloseout = import('../src/lib/api.ts').StepCloseout;
-type StepSpec = import('../src/lib/api.ts').StepSpec;
-type StepFiled = import('../src/lib/api.ts').StepFiled;
+type StepSpec = import('../src/lib/runView.ts').StepSpecView;
+type StepFiled = import('../src/lib/runView.ts').StepFiledView;
 
 /** A markup's text, tags taken for separators: each run of text between two tags, trimmed, and none of the empty ones. */
 const textsOf = (html: string): string[] =>
@@ -1871,7 +1884,7 @@ test("a plan's files are a table, its path over its change; its steps a list; a 
   );
 });
 
-const { answersFrom, chosenDraft, recommendedDraft, unanswered } = await import('../src/components/Questions.tsx');
+const { answersFrom, chosenDraft, RecommendButton, recommendedDraft, unanswered } = await import('../src/components/Questions.tsx');
 type Question = import('../src/lib/api.ts').Question;
 
 const cut: Question = {
@@ -2028,7 +2041,7 @@ test("the spec says what a step runs with: the workflow's word where it sets one
     workspace: null,
     place: null,
     resume: null,
-    permissionMode: null,
+    fence: null,
     sandbox: null,
     tools: null,
     deadlineSeconds: null,
@@ -2041,7 +2054,7 @@ test("the spec says what a step runs with: the workflow's word where it sets one
     askedModel: null,
     effort: null,
     contextTokens: null,
-    permissionMode: null,
+    fence: null,
     runsIn: null,
     tools: null,
     deadlineSeconds: null,
@@ -2058,7 +2071,7 @@ test("the spec says what a step runs with: the workflow's word where it sets one
     askedModel: null,
     effort: 'high',
     contextTokens: null,
-    permissionMode: 'auto',
+    fence: 'auto',
     runsIn: { mode: 'auto', by: 'filed' },
     tools: ['Read', 'Grep'],
     deadlineSeconds: 3600,
@@ -2086,7 +2099,7 @@ test("the spec says what a step runs with: the workflow's word where it sets one
   const reviewer: StepSpec = { ...unset, harness: 'codex', sandbox: 'workspace-write', tools: ['Read', 'Grep'] };
   const narrowed: StepFiled = {
     ...bare,
-    permissionMode: 'workspace-write',
+    fence: 'workspace-write',
     tools: ['Read', 'Grep'],
     runsIn: { mode: 'read-only', by: 'tools' },
   };
@@ -2096,20 +2109,20 @@ test("the spec says what a step runs with: the workflow's word where it sets one
     "a codex step's fence is its `sandbox:`, which the engine's task files as its permission mode, as its tools narrowed it whatever was named",
   );
   assert.equal(rowsOf(reviewer, narrowed)['permission mode'], undefined, 'and no row is called `permission mode`');
-  assert.equal(rowsOf({ ...reviewer, sandbox: null }, { ...narrowed, permissionMode: null }).sandbox, 'read-only · by tools');
+  assert.equal(rowsOf({ ...reviewer, sandbox: null }, { ...narrowed, fence: null }).sandbox, 'read-only · by tools');
   const readOnly: StepSpec = { ...unset, harness: 'codex', sandbox: 'read-only' };
   assert.equal(
-    rowsOf(readOnly, { ...bare, permissionMode: 'read-only', runsIn: { mode: 'read-only', by: 'filed' } }).sandbox,
+    rowsOf(readOnly, { ...bare, fence: 'read-only', runsIn: { mode: 'read-only', by: 'filed' } }).sandbox,
     'read-only',
     "the workflow's word, as filed",
   );
   assert.equal(
-    rowsOf(readOnly, { ...bare, permissionMode: 'workspace-write', runsIn: { mode: 'workspace-write', by: 'filed' } }).sandbox,
+    rowsOf(readOnly, { ...bare, fence: 'workspace-write', runsIn: { mode: 'workspace-write', by: 'filed' } }).sandbox,
     'workspace-write · this try',
   );
   assert.equal(rowsOf(readOnly, null).sandbox, 'read-only', 'and a step not filed yet says what its workflow says');
   const widest: StepSpec = { ...unset, harness: 'codex', sandbox: 'danger-full-access' };
-  const former: StepFiled = { ...bare, permissionMode: 'bypassPermissions', runsIn: { mode: 'danger-full-access', by: 'filed' } };
+  const former: StepFiled = { ...bare, fence: 'bypassPermissions', runsIn: { mode: 'danger-full-access', by: 'filed' } };
   assert.equal(
     rowsOf(widest, former).sandbox,
     'danger-full-access',
@@ -2117,7 +2130,7 @@ test("the spec says what a step runs with: the workflow's word where it sets one
   );
   assert.equal(rowsOf(widest, { ...former, runsIn: null }).sandbox, 'danger-full-access', 'nor where the api could not ask the harness');
   assert.equal(
-    rowsOf(widest, { ...former, permissionMode: 'read-only', runsIn: { mode: 'read-only', by: 'filed' } }).sandbox,
+    rowsOf(widest, { ...former, fence: 'read-only', runsIn: { mode: 'read-only', by: 'filed' } }).sandbox,
     'read-only · this try',
     'another sandbox is still a try of its own',
   );
@@ -2133,7 +2146,7 @@ test("the spec says what a step runs with: the workflow's word where it sets one
     model: 'opus',
     effort: 'high',
     context: 200_000,
-    permissionMode: 'dontAsk',
+    fence: 'dontAsk',
     tools: [],
     deadlineSeconds: 600,
   };
@@ -2142,7 +2155,7 @@ test("the spec says what a step runs with: the workflow's word where it sets one
     askedModel: null,
     effort: 'high',
     contextTokens: 200_000,
-    permissionMode: 'dontAsk',
+    fence: 'dontAsk',
     runsIn: { mode: 'dontAsk', by: 'filed' },
     tools: [],
     deadlineSeconds: 600,
@@ -2200,7 +2213,7 @@ test('a step on a remote A2A agent says the agent and its address, and no model,
     workspace: null,
     place: null,
     resume: null,
-    permissionMode: null,
+    fence: null,
     sandbox: null,
     tools: null,
     deadlineSeconds: null,
@@ -2212,7 +2225,7 @@ test('a step on a remote A2A agent says the agent and its address, and no model,
     askedModel: null,
     effort: null,
     contextTokens: null,
-    permissionMode: null,
+    fence: null,
     runsIn: null,
     tools: null,
     deadlineSeconds: null,
@@ -2256,7 +2269,7 @@ test("a step filed bridged has a reach row: its session's web link to open in a 
     workspace: null,
     place: null,
     resume: null,
-    permissionMode: null,
+    fence: null,
     sandbox: null,
     tools: null,
     deadlineSeconds: null,
@@ -2268,7 +2281,7 @@ test("a step filed bridged has a reach row: its session's web link to open in a 
     askedModel: null,
     effort: null,
     contextTokens: null,
-    permissionMode: null,
+    fence: null,
     runsIn: null,
     tools: null,
     deadlineSeconds: null,
@@ -2320,9 +2333,9 @@ const WAIT = { words: 'waiting for a permission prompt', advice: 'answer it in C
 /** The run of one step, `review`, in `status`, with what the api says it needs and who it says is waited on. */
 function needing(
   status: Word,
-  needs: Partial<Pick<RunDetail['steps'][number], 'needs' | 'waitingFor' | 'lastLine' | 'denied'>>,
+  needs: Partial<Pick<RunView['steps'][number], 'needs' | 'waitingFor' | 'lastLine' | 'denied'>>,
   over: { waitingOnYou: string[]; cancelledAt?: string | null },
-): RunDetail {
+): RunView {
   const run = runOf(status, over);
   return {
     ...run,
@@ -2594,6 +2607,18 @@ test('Choose the recommended answers chooses each recommended option, keeps word
   assert.deepEqual(filled, { [cut.title]: { chose: ['a'], own: 'Mine.' } });
   assert.deepEqual(unanswered([cut, where], filled), [where.title], 'a question without a recommendation still waits for the person');
   assert.deepEqual(recommendedDraft([where], {}), {});
+  const many = { ...where, recommended: ['retry', 'gate'] };
+  assert.deepEqual(recommendedDraft([many], {}), { [where.title]: { chose: ['retry', 'gate'], own: '' } }, 'a list chooses each label');
+});
+
+test('a question that takes several marks each label it recommends as a list, and offers to choose them', () => {
+  const many: Question = { ...where, recommended: ['retry', 'gate'] };
+  const html = renderToStaticMarkup(createElement(RecommendButton, { questions: [many], draft: {}, onDraft: () => {} }));
+  assert.match(html, /data-recommend-all/);
+  const said = closeoutSaying('A design.', { output: { open: [many] }, questions: [{ field: 'open', questions: [many] }] });
+  const tries = [{ ...threeTries[2], attempts: ranOnce, closeout: said }];
+  const read = renderToStaticMarkup(createElement(TryCloseouts, { tries, selected: tries[0], none: '-' }));
+  assert.equal([...read.matchAll(/data-recommended="true"/g)].length, 2);
 });
 
 test('choosing takes the one option of a question that takes one, and adds or drops one of a question that takes several; the answers go as the api takes them', () => {
@@ -2738,7 +2763,7 @@ test('the tries say `your answer` beside a try a person answered, and above its 
 });
 
 /** The banner, rendered inside the query client its Continue asks with. */
-const bannerMarkup = (run: RunDetail) =>
+const bannerMarkup = (run: RunView) =>
   renderToStaticMarkup(createElement(QueryClientProvider, { client: new QueryClient() }, createElement(NeedsBanner, { run })));
 
 test("the banner continues a session the harness blocked: Continue, and a box for anything to tell it, where the commands to copy were — and once asked, the step's note in `wf ls`'s words", () => {
@@ -2752,7 +2777,7 @@ test("the banner continues a session the harness blocked: Continue, and a box fo
     waitingFor: null,
     lastLine: null,
   };
-  const run: RunDetail = { ...base, waitingOnYou: ['implement'], waitingOnYouWords: ['implement'], steps: [asks, base.steps[0]] };
+  const run: RunView = { ...base, waitingOnYou: ['implement'], waitingOnYouWords: ['implement'], steps: [asks, base.steps[0]] };
   const html = bannerMarkup(run);
 
   assert.match(html, /^<section aria-label="Waiting on you"/);
@@ -2879,7 +2904,7 @@ test('REFUSED: the banner offers no Continue for a session still at work, which 
 const Gates = await import('../src/components/Gate.tsx');
 
 /** The run of one step, `review`, waiting at its gate on you — as the api gives it: its word, the need, and its gate. */
-const atGate = (over: Partial<RunDetail['steps'][number]> = {}, run: Partial<RunDetail> = {}): RunDetail => {
+const atGate = (over: Partial<RunView['steps'][number]> = {}, run: Partial<RunView> = {}): RunView => {
   const base = runOf('awaiting approval', { waitingOnYou: ['review'] });
   return {
     ...base,
@@ -2916,7 +2941,7 @@ test('a step at its gate is a human gate on the canvas, and its node says what i
     `<span class="font-semibold">${PERSON['awaiting-approval'].rail}</span><span data-need="approve"> · approve review&#x27;s hand-off</span>`,
     'what approving does, in a line that names the step as `wf ls` does: a step that ran hands on',
   );
-  const spec = { ...atGate().steps[0].spec, workspace: 'base' } as RunDetail['steps'][number]['spec'];
+  const spec = { ...atGate().steps[0].spec, workspace: 'base' } as RunView['steps'][number]['spec'];
   const ending = nodeMarkup(atGate({ taskId: null, spec, attempts: { count: 0, latest: null } }));
   assert.match(ending, /<span data-need="approve"> · approve review to run it<\/span>/, 'an ending not filed runs');
   assert.match(ending, />not filed yet</, 'an ending at its gate has not been filed: not `no session yet`');
@@ -3093,7 +3118,7 @@ const toShip = {
  * unfiled and `awaiting approval`, and the run carries what there is to decide. Ship's `spec`, off the workflow the run froze, is what the
  * board tells an ending's gate from another gate by.
  */
-function endingRun(over: Partial<RunDetail> = {}): RunDetail {
+function endingRun(over: Partial<RunView> = {}): RunView {
   const run = runWith(null);
   const base = run.steps[0];
   const implement = {
@@ -3128,7 +3153,7 @@ function endingRun(over: Partial<RunDetail> = {}): RunDetail {
       workspace: 'base',
       place: null,
       resume: null,
-      permissionMode: null,
+      fence: null,
       sandbox: null,
       tools: null,
       deadlineSeconds: null,
@@ -3165,7 +3190,7 @@ const decidedAs = (standings: unknown[]) => ({
 /**
  * A component rendered with the run's decision already read, as the Decide section on the same page has read it for this state of the run.
  */
-function withDecision(run: RunDetail, decision: unknown, element: ReturnType<typeof createElement>): string {
+function withDecision(run: RunView, decision: unknown, element: ReturnType<typeof createElement>): string {
   const client = new QueryClient();
   client.setQueryData(['runs', run.id, 'decision', decisionStamp(run)], decision);
   return renderToStaticMarkup(createElement(QueryClientProvider, { client }, element));
@@ -3334,7 +3359,7 @@ test('the gate of an ending step says approving is what files it, and its send-b
 test("REFUSED: an ending's gate brief quotes the package's `toDecide.says` alone — never its step's body, which opens with its agent's instructions", () => {
   const led = endingRun();
   const ship = { ...led.steps[1], body: "You are Otto, a release engineer. You land a run's result.\n\nNever push." };
-  const brief = (toDecide: RunDetail['toDecide']) =>
+  const brief = (toDecide: RunView['toDecide']) =>
     textsOf(withClient(createElement(StepTabs, { run: { ...led, toDecide, steps: [led.steps[0], ship] }, step: ship }))).join(' ');
   for (const toDecide of [null, { ...toShip, step: 'implement' }]) {
     const said = brief(toDecide);
@@ -3346,7 +3371,7 @@ test("REFUSED: an ending's gate brief quotes the package's `toDecide.says` alone
 
 test("a step's facts say `workspace` only where the step says it: the step that ends the run in the checkout, and no empty row for the rest", () => {
   const [implement, ship] = endingRun().steps;
-  const rowsOf = (step: RunDetail['steps'][number]) => specRows(step.spec!).map(([key, value]) => [key, value === null ? null : 'set']);
+  const rowsOf = (step: RunView['steps'][number]) => specRows(step.spec!).map(([key, value]) => [key, value === null ? null : 'set']);
   assert.ok(
     rowsOf(ship).some(([key]) => key === 'workspace'),
     JSON.stringify(rowsOf(ship)),
@@ -3504,8 +3529,8 @@ test('the edges between cards are drawn only for live waits: dashed, out of one 
 
 test("the run page's timeline: a row per try's session and per check, in the api's words — a recheck, a check still running, a task with no record — and the totals", async () => {
   const { Timeline } = await import('../src/components/Timeline.tsx');
-  type TaskSpan = import('../src/lib/api.ts').TaskSpan;
-  type TimelineTotal = import('../src/lib/api.ts').TimelineTotal;
+  type TaskSpan = NonNullable<RunView['steps'][number]['timeline'][number]['session']>;
+  type TimelineTotal = RunView['timeline']['run'];
   const T = (m: number, s = 0) => new Date(Date.UTC(2026, 8, 13, 8, m, s)).toISOString();
   const span = (taskId: string, at: TaskSpan['at'], queued: string, ran: string, times: Partial<TaskSpan> = {}): TaskSpan => ({
     taskId,
@@ -3533,7 +3558,7 @@ test("the run page's timeline: a row per try's session and per check, in the api
     usage: { responses: 54 },
     used: '54 responses · tool calls not measured · tokens in not measured · tokens out not measured',
   };
-  const run: RunDetail = {
+  const run: RunView = {
     ...base,
     steps: [
       {
@@ -3673,7 +3698,7 @@ const pricedRun = (
   cost: ReturnType<typeof priced>,
   waitingOnYou: string[] = [],
   cancelledAt: string | null = null,
-): RunDetail => {
+): RunView => {
   const run = runOf(status, { waitingOnYou, cancelledAt });
   return { ...run, steps: [{ ...run.steps[0], ...cost }] };
 };
@@ -3721,8 +3746,8 @@ test('REFUSED: a step past its budget is no gate where the api does not say it w
 
 test("the inspector's Details say what every try cost of its cap — `spent`, red once past it — and add nothing for a step on its one try with no cap", () => {
   const run = runWith(null);
-  const markup = (step: RunDetail['steps'][number]) => renderToStaticMarkup(createElement(StepTabs, { run, step }));
-  const rows = (step: RunDetail['steps'][number]) =>
+  const markup = (step: RunView['steps'][number]) => renderToStaticMarkup(createElement(StepTabs, { run, step }));
+  const rows = (step: RunView['steps'][number]) =>
     Object.fromEntries(
       [...markup(step).matchAll(/<dt[^>]*>([^<]+)<\/dt>\s*<dd[^>]*>(.*?)<\/dd>/g)].map((m) => [m[1], m[2].replace(/<[^>]+>/g, '')]),
     );
@@ -3771,7 +3796,7 @@ test("the timeline has a cost column: what each session cost, `not measured` whe
   });
   const base = runWith(null);
   const total = { ...base.timeline.run, loop: 'review', tasks: 2 };
-  const run: RunDetail = {
+  const run: RunView = {
     ...base,
     steps: [
       {
@@ -4477,7 +4502,7 @@ test('on a run a person holds, a step at its gate is drawn held — no human gat
   );
 });
 
-test("a held run's rail draws its gate and the steps not filed held, and its work at work", () => {
+test("a held run's rail draws its gate held, its steps not filed as any step to come (grey blocks read as almost done) whose hover says the hold, and its work at work", () => {
   const held = {
     ...summaryRun(),
     waitingOnYou: [],
@@ -4488,7 +4513,12 @@ test("a held run's rail draws its gate and the steps not filed held, and its wor
   } as unknown as RunSummary;
   const html = railMarkup(held);
   const pills = Object.fromEntries([...html.matchAll(/<li data-step="([^"]+)" data-state="([^"]+)"/g)].map((m) => [m[1], m[2]]));
-  assert.deepEqual(pills, { implement: 'verified', tokens: 'unverified', review: 'working', theme: 'held', respond: 'held' }, html);
+  assert.deepEqual(pills, { implement: 'verified', tokens: 'unverified', review: 'working', theme: 'held', respond: 'waiting' }, html);
+  assert.match(
+    html,
+    /<li data-step="respond" data-state="waiting" title="respond: to come — [^"]*holds the run/,
+    'its hover says the hold',
+  );
 });
 
 test('a hold is drawn between two cards as an --after edge is: from the run it is held until into the held card, dashed — and none once it landed', () => {
@@ -4546,7 +4576,7 @@ const planCloseout: StepCloseout = {
 };
 
 /** The looping run's one step, at plan's gate with that closeout — or signed off with none, or still running. */
-function gatedRun(closeout: StepCloseout | null, status: Word = 'awaiting approval'): RunDetail {
+function gatedRun(closeout: StepCloseout | null, status: Word = 'awaiting approval'): RunView {
   const run = runOf(status, { waitingOnYou: closeout ? ['review'] : [] });
   const [step] = run.steps;
   return {
@@ -4598,7 +4628,7 @@ test('what the run did not accept of a closeout is drawn under its words, each u
 });
 
 test('the inspector opens on Output for a step that has a closeout — at its gate, blocked or done — and on Details for one that has none', () => {
-  const inspect = (run: RunDetail) => withClient(createElement(StepTabs, { run, step: run.steps[0] }));
+  const inspect = (run: RunView) => withClient(createElement(StepTabs, { run, step: run.steps[0] }));
   const atGate = inspect(gatedRun(planCloseout));
   assert.equal(tabSelected(atGate), 'Output');
   assert.match(atGate, /data-field="approach"/, 'the Output tab is drawn: the approach is there without a press');
@@ -5163,7 +5193,7 @@ const tried = (id: string, fields: Record<string, unknown> = {}) => ({
 });
 
 /** A try's run as its page reads it: one step, `try`, filed, with what it spent of its dollar and the files its folder holds. */
-function tryDetail(fields: Record<string, unknown> = {}): RunDetail {
+function tryDetail(fields: Record<string, unknown> = {}): RunView {
   const run = runWith(null);
   return {
     ...run,
@@ -5214,7 +5244,7 @@ test('REFUSED: a second try while one moves — the button is held, and the late
   ];
   const html = await routedWith(createElement(TryAgent, { agent: composing as never }), [
     [['runs'], runs],
-    [['runs', 'r-t'], tryDetail({ status: 'running' })],
+    ...readsOf(tryDetail({ status: 'running' })),
   ]);
   assert.match(html, /data-try-held[^>]*>A try is still running \(r-t\): one at a time\./);
   assert.match(html, /<button type="submit" disabled=""/);
@@ -5229,7 +5259,7 @@ test("a try stopped where no step broke says what stopped it, in its run's own w
   const { TryAgent } = await import('../src/components/TryAgent.tsx');
   const html = await routedWith(createElement(TryAgent, { agent: composing as never }), [
     [['runs'], [tried('r-t', { status: 'running' })]],
-    [['runs', 'r-t'], tryDetail({ status: 'blocked' })],
+    ...readsOf(tryDetail({ status: 'blocked' })),
   ]);
   assert.match(html, /data-try-status[^>]*>blocked</);
 });
@@ -5238,7 +5268,7 @@ test('a try not filed yet says so in place of its files', async () => {
   const { TryRun } = await import('../src/components/TryAgent.tsx');
   const unfiled = tryDetail();
   (unfiled.steps[0] as { taskId: string | null }).taskId = null;
-  const html = await routedWith(createElement(TryRun, { id: 'r-t' }), [[['runs', 'r-t'], unfiled]]);
+  const html = await routedWith(createElement(TryRun, { id: 'r-t' }), readsOf(unfiled));
   assert.match(html, /Not filed yet/);
   assert.doesNotMatch(html, /data-try-files/);
 });
@@ -5588,7 +5618,7 @@ test('REFUSED: a character card draws no stats line for an agent that sets none,
 });
 
 /** A run's card on the floor, inside the router its title links with, as the floor draws it: shown in the bar or not (`inspected`). */
-async function cardMarkup(run: RunDetail, inspected: boolean, reads: string[] = []): Promise<string> {
+async function cardMarkup(run: RunView, inspected: boolean, reads: string[] = []): Promise<string> {
   const { RunNode } = await import('../src/components/RunNode.tsx');
   const data = {
     run,
@@ -5658,7 +5688,7 @@ test("the run bar: the run's title and id, what it asks of a person, its steps e
     { waitingOnYou: ['review', 'theme'], waitingOnYouWords: ['approve review', 'theme'], brief: 'Make the **floor** clear.' },
   );
   const run = { ...base, steps: [base.steps[0], theme] };
-  const html = await pagedWith(createElement(RunBar, { run: run.id }), [[['runs', run.id], run]]);
+  const html = await pagedWith(createElement(RunBar, { run: run.id }), readsOf(run));
   assert.ok(html.includes(`>${runTitle(run)}</h2>`), html);
   assert.ok(html.includes(`<span class="font-mono text-body-small">${run.id}</span>`), html);
   assert.match(html, /<section aria-label="Waiting on you"/);
@@ -5673,7 +5703,7 @@ test("the run bar: the run's title and id, what it asks of a person, its steps e
   );
   assert.match(/<section aria-label="Brief"[\s\S]*?<\/section>/.exec(html)![0], /<strong>floor<\/strong>/);
 
-  const decide = await pagedWith(createElement(RunBar, { run: 'r-1' }), [[['runs', 'r-1'], endingRun()]]);
+  const decide = await pagedWith(createElement(RunBar, { run: 'r-1' }), readsOf(endingRun()));
   assert.match(decide, /<section aria-label="To decide"[^>]*>[\s\S]*?<button type="button" data-approve="ship"/);
 });
 
@@ -5681,7 +5711,7 @@ test('the run bar says a run not read yet, a read that failed, and a run gone fr
   const { RunBody } = await import('../src/components/RunBar.tsx');
   const { ReadRefusal } = await import('../src/lib/api/read.ts');
   const run = atGate();
-  const body = (props: { run: RunDetail | undefined; error: unknown }) => pagedWith(createElement(RunBody, { id: run.id, ...props }));
+  const body = (props: { run: RunView | undefined; error: unknown }) => pagedWith(createElement(RunBody, { id: run.id, ...props }));
   assert.match(await body({ run: undefined, error: null }), />Reading the run…</);
   assert.match(await body({ run: undefined, error: new Error('the api is down') }), /Could not read the run r-1: the api is down/);
   const gone = await body({ run, error: new ReadRefusal('gone', 404) });
@@ -7080,6 +7110,7 @@ const { UnassignedStart } = await import('../src/components/FactoryCardStart.tsx
 const inboxCard = (extra: Record<string, unknown> = {}) =>
   ({
     name: 'idea',
+    labels: {},
     file: 'idea.md',
     title: 'An idea',
     workflow: null,

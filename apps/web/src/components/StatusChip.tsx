@@ -11,7 +11,8 @@ import { stateWordsOf } from '../lib/words';
  * and the mark says it is not one — it signed off, and nothing but its own word says it worked.
  * `data-state` is the state the colour was chosen for, so a check can read it without reading a colour.
  *
- * `runHeld` is whether a person holds the run (the CLI's `hold`): a gate or a step not filed is drawn `held`.
+ * `runHeld` is whether a person holds the run (the CLI's `hold`): a gate is drawn `held`, and a step not
+ * started is drawn as one to come whose hover says the hold.
  *
  * `note` is what the CLI's `ls` prints beside the status — `try 2, by retries: 1`, `round 2 of 3` — on its own line after
  * the meaning, on hover: for where there is no room under the chip, on a canvas or in a list. Where there is, `StepNote`.
@@ -30,7 +31,7 @@ export function StatusChip({
   note?: string | null;
 }) {
   const state = stepState(codes, runCancelled, runHeld);
-  const { rail, meaning } = stateWordsOf(state, codes.on);
+  const { rail, meaning } = stateWordsOf(state, codes.on, runHeld);
   return (
     <span
       title={note ? `${meaning}\n${note}` : meaning}

@@ -1,9 +1,9 @@
 /**
  * A templated factory's upgrade, on disk, beyond the story of a conflict (`test/upgrade-conflict.test.ts`: the plan, the wait, the
  * choices, the merge, a pass stopped between its writes, a run in flight and the swap only where untouched): what `nemia factory
- * upgrade` refuses with nothing written; an upgrade with no conflict, up or down; the factory's rules, `RULES.md`, carried as any file of
- * the tree is; choices made for another version; a status lost; and a swap whose rename fails. `WF_ROOT` is set before the import,
- * since the store's modules read it as they load.
+ * upgrade` refuses with nothing written; an upgrade with no conflict, up or down; a step's own closeout schema; the factory's rules,
+ * `RULES.md`, carried as any file of the tree is; choices made for another version; a status lost; and a swap whose rename fails.
+ * `WF_ROOT` is set before the import, since the store's modules read it as they load.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -12,10 +12,12 @@ import path from 'node:path';
 import { parse, stringify } from 'yaml';
 import { scratch } from '../../test/scratch.ts';
 import { testEngine } from 'agent-runtime/testing';
-import { teamCopy } from '../../test/team.ts';
+import { STEP_OUTPUT_SCHEMA, teamCopy } from '../../test/team.ts';
 import { testPlace } from '../../place/memory/index.ts';
 import { eachTest, runOver } from '../../test/placed.ts';
 import { heldUnasked } from '../../test/unasked.ts';
+import type { Command } from '../command/entry.verb.ts';
+import type { Args } from '../command/command.ts';
 
 const ROOT = scratch('wf-upgrade-');
 process.env.WF_ROOT = ROOT;
@@ -127,7 +129,7 @@ async function printedBy(t: { mock: { method: Function } }, ...args: string[]): 
   return printed.flatMap((p) => p.split('\n'));
 }
 
-test('upgrade refuses, writing nothing: no template, no render, a --to that is no version, the template at another, the same, a downgrade', async (t) => {
+test('upgrade refuses, writing nothing: no template, no render, a --to that is no version, the template at another, the same, a downgrade; and diff a --set on a templated factory, and no --template on a hand-made one', async (t) => {
   t.mock.method(console, 'log', () => {});
   const { dir, repo } = await applied('kept');
   await main(['factory', 'add', 'plain', '--repo', repo], noEngine());
@@ -139,7 +141,7 @@ test('upgrade refuses, writing nothing: no template, no render, a --to that is n
   await assert.rejects(upgrade('kept', '--to', '2'), refusedWith('Invalid', /--to <x\.y\.z>/));
   await assert.rejects(
     upgrade('kept', '--to', '0.2.0'),
-    refusedWith('Conflict', /is at version 0\.1\.0, not 0\.2\.0: /, /--template <folder\|archive>/),
+    refusedWith('Conflict', /is at version 0\.1\.0, not 0\.2\.0: /, /--template <name\|folder\|archive>/),
   );
   await assert.rejects(upgrade('kept', '--to', '0.1.0'), refusedWith('Conflict', /kept is already applied at 0\.1\.0/));
   edit(dir, 'workflows/dev/workflow.yaml', (spec) => {
@@ -152,6 +154,9 @@ test('upgrade refuses, writing nothing: no template, no render, a --to that is n
   released(dir, '0.0.9', 5);
   await assert.rejects(upgrade('kept', '--to', '0.0.9'), refusedWith('Conflict', /0\.0\.9 is below 0\.1\.0[^]*--to 0\.0\.9 --downgrade/));
   released(dir, '0.2.0', 5);
+  const diff = (name: string, ...rest: string[]) => main(['factory', 'diff', name, ...rest], noEngine());
+  await assert.rejects(diff('kept', '--to', '0.2.0', '--set', 'budget=9'), refusedWith('Invalid', /--set/));
+  await assert.rejects(diff('plain', '--to', '0.2.0'), refusedWith('Invalid', /--template </));
   edit(dir, 'nemia.yaml', (spec) => {
     spec.parameters.gated = { type: 'boolean', description: 'a gate before the ship' };
   });
@@ -207,6 +212,29 @@ test('an upgrade with no conflict, up or down: filed alone, then merged by the c
       );
     },
   );
+});
+
+test("a step's own closeout schema carried by an upgrade: its line merged into a step the person changed, its file beside it", async (t) => {
+  t.mock.method(console, 'log', () => {});
+  const { dir } = await applied('schemed');
+  const IMPLEMENT = 'workflows/dev/implement.md';
+  const SCHEMA = 'workflows/dev/implement.schema.json';
+  assert.doesNotMatch(textIn(treeDir('schemed'), IMPLEMENT), /^output:/m, 'the template at 0.1.0 names no schema of the step');
+  fs.appendFileSync(path.join(treeDir('schemed'), IMPLEMENT), '\nKeep the commits small.\n');
+  released(dir, '0.2.0', 5);
+  edit(dir, 'workflows/dev/workflow.yaml', (spec) => {
+    spec.steps[0].output = { path: SCHEMA };
+  });
+  fs.writeFileSync(path.join(dir, SCHEMA), STEP_OUTPUT_SCHEMA);
+  await main(['factory', 'upgrade', 'schemed', '--to', '0.2.0'], noEngine());
+  const status = reconciled(templated('schemed'));
+  assert.equal(status.version, '0.2.0');
+  assert.equal(status.upgrade, undefined, 'no conflict');
+  const step = textIn(treeDir('schemed'), IMPLEMENT);
+  assert.match(step, /^output: implement\.schema\.json$/m, "the template's line");
+  assert.match(step, /^Keep the commits small\.$/m, "the person's words");
+  assert.equal(textIn(treeDir('schemed'), SCHEMA), STEP_OUTPUT_SCHEMA);
+  assert.equal(textIn(appliedDir('schemed'), SCHEMA), STEP_OUTPUT_SCHEMA);
 });
 
 test("a factory's rules carried by an upgrade: taken where the tree has none, a conflict where both added them, merged by line", async (t) => {
@@ -366,4 +394,33 @@ test("a swap whose new tree cannot be renamed in puts the person's tree back, or
     },
   );
   assert.deepEqual(bytesUnder(kept), tree, "a tree made in between: the person's is kept aside, where the error says");
+});
+
+const { FACTORY_PLAN, FACTORY_UPGRADE } = await import('./upgrade.verb.ts');
+const { withBuiltins } = await import('../../test/templated.ts');
+
+/** The handler of `command` over `args`, with `builtins` as the folder of the builtin templates. */
+const handledWith = <D extends object>(builtins: string, command: Command<D>, args: Args) =>
+  runWith(noEngine(), withBuiltins(command.handler(args, undefined, ROOT), builtins));
+
+test('--template names a builtin template by its name: an upgrade records the name, and a name no builtin has is refused', async (t) => {
+  t.mock.method(console, 'log', () => {});
+  const { dir } = await applied('from-folder');
+  const builtins = scratch('wf-upgrade-builtins-');
+  fs.cpSync(dir, path.join(builtins, 'team'), { recursive: true });
+  released(path.join(builtins, 'team'), '0.2.0', 5);
+  await t.test('REFUSED Missing, nothing written: diff and upgrade to a name no builtin template has', async () => {
+    const before = bytesUnder(ROOT);
+    for (const command of [FACTORY_PLAN, FACTORY_UPGRADE] as Command<object>[])
+      await assert.rejects(
+        handledWith(builtins, command, { factory: 'from-folder', to: '0.2.0', template: 'nope' }),
+        refusedWith('Missing', /\bteam\b/, /\.\/nope/),
+      );
+    assert.deepEqual(bytesUnder(ROOT), before);
+  });
+  await t.test('a factory applied from a folder, upgraded with --template <name>, records the name', async () => {
+    await handledWith(builtins, FACTORY_UPGRADE, { factory: 'from-folder', to: '0.2.0', template: 'team' });
+    assert.deepEqual(templated('from-folder').template.source, 'team');
+    assert.equal(programsAt(ROOT, builtins).reconciled(templated('from-folder')).conditions[0].reason, 'Upgraded');
+  });
 });

@@ -46,7 +46,7 @@ export function useAsk(runId: string, step: string, onAsked: () => void) {
     onSuccess: () => {
       onAsked();
       void queryClient.invalidateQueries({ queryKey: ['runs', runId], exact: true });
-      void runsMoved(queryClient);
+      void runsMoved(queryClient, runId);
     },
   });
 }
@@ -62,7 +62,7 @@ export function useApprove(runId: string, step: string) {
     mutationFn: (how: { message: string }) => approveStep(runId, step, how),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['runs', runId], exact: true });
-      void runsMoved(queryClient);
+      void runsMoved(queryClient, runId);
     },
   });
 }

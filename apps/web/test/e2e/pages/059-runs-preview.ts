@@ -2,7 +2,8 @@ import path from 'node:path';
 import type { Locator, Page } from 'playwright';
 import { photograph, reachClock, themeOf } from '../board.ts';
 import { expectCount, expectNone, expectVisible, idle, Refused } from '../checks.ts';
-import type { LibraryAgent, RunDetail, RunSummary } from '../../../src/lib/api.ts';
+import type { LibraryAgent, RunLines, RunObject, RunSummary } from '../../../src/lib/api.ts';
+import { runViewOf } from '../../../src/lib/runView.ts';
 import { stepCardOf, type StepCardFacts } from '../../../src/lib/stepCard.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT } from '../world.ts';
@@ -129,15 +130,32 @@ async function aBar(page: Page): Promise<{ bar: Locator; run: string; step: stri
   return { bar: page.locator(`${FLIGHT} tr[data-run="${run}"] [data-step-bar="${step}"]`), run, step };
 }
 
-/** The card the board's rule gives for the step, from the api's own answers. */
+/**
+ * The card the board's rule gives for the step, from the api's own answers: the run's object, its lines and each of its steps' tries and
+ * told, composed as the board composes them (`runViewOf`): a step the api has none of reads as none, as the board's reads do.
+ */
 async function expected(page: Page, run: string, step: string): Promise<StepCardFacts> {
-  const [runs, detail, agents] = await Promise.all([
+  const at = `/api/runs/${encodeURIComponent(run)}`;
+  const [runs, object, lines, agents] = await Promise.all([
     answer<RunSummary[]>(page, '/api/runs'),
-    answer<RunDetail>(page, `/api/runs/${encodeURIComponent(run)}`),
+    answer<RunObject.Run>(page, at),
+    answer<RunLines>(page, `${at}/lines`),
     answer<LibraryAgent[]>(page, '/api/agents'),
   ]);
   const row = runs.find((r) => r.id === run);
   if (!row) throw new Refused(`the api lists the run in flight ${run}`);
+  const names = object.status.steps.map((s) => s.name);
+  const sub = (name: string, what: 'tries' | 'told') => `${at}/steps/${encodeURIComponent(name)}/${what}`;
+  const [tries, told] = await Promise.all([
+    Promise.all(names.map((name) => answer<Partial<RunObject.StepTries>>(page, sub(name, 'tries')))),
+    Promise.all(names.map((name) => answer<RunObject.StepTold | { error: string }>(page, sub(name, 'told')))),
+  ]);
+  const detail = runViewOf(
+    object,
+    lines,
+    Object.fromEntries(names.map((name, i) => [name, tries[i].tries ?? []])),
+    Object.fromEntries(names.map((name, i) => [name, 'error' in told[i] ? null : told[i]])),
+  );
   return stepCardOf({ run: row, step, detail, agents, now: new Date() });
 }
 

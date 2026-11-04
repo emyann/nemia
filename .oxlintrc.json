@@ -153,6 +153,20 @@
       }
     },
     {
+      "files": ["apps/cli/**"],
+      "rules": {
+        "comments/no-code-comments": "error",
+        "comments/no-history-in-comments": "error",
+        "comments/no-deferral-in-comments": "error",
+        "comments/no-wide-comment-lines": "error",
+        "no-warning-comments": [
+          "error",
+          { "terms": ["todo", "fixme", "xxx", "hack", "workaround", "work around", "stopgap", "learned by"], "location": "anywhere" }
+        ],
+        "no-inline-comments": ["error", { "ignorePattern": "^\\s*(oxlint|eslint)-(disable|enable)" }]
+      }
+    },
+    {
       "files": ["apps/docs/**"],
       "rules": {
         "comments/no-code-comments": "error",
@@ -182,6 +196,20 @@
     },
     {
       "files": ["packages/agent-orchestrator/**"],
+      "rules": {
+        "comments/no-code-comments": "error",
+        "comments/no-history-in-comments": "error",
+        "comments/no-deferral-in-comments": "error",
+        "comments/no-wide-comment-lines": "error",
+        "no-warning-comments": [
+          "error",
+          { "terms": ["todo", "fixme", "xxx", "hack", "workaround", "work around", "stopgap", "learned by"], "location": "anywhere" }
+        ],
+        "no-inline-comments": ["error", { "ignorePattern": "^\\s*(oxlint|eslint)-(disable|enable)" }]
+      }
+    },
+    {
+      "files": ["packages/templates/**"],
       "rules": {
         "comments/no-code-comments": "error",
         "comments/no-history-in-comments": "error",
@@ -229,6 +257,42 @@
                 "message": "Only agent-runtime reaches a harness: ask the api for what this import gives"
               },
               { "group": ["**/packages/**"], "message": "The board imports no package's file: ask the api for what this import gives" }
+            ]
+          }
+        ]
+      }
+    },
+    // The client reaches the api over HTTP alone, and its answers' shapes by their types: no workspace package, no harness SDK, no path into
+    // packages/, and from the api nothing but `import type` of its client door, apps/api/src/client/client.ts. The value pattern comes first
+    // and the door's after it, since oxlint lets through, for every pattern after it, an import a negated group matches. Its one reach of
+    // the orchestrator is a resolve of agent-orchestrator/bin in src/local.ts, which is no import: the orchestrator's contract.test.ts
+    // holds it, and apps/cli/test/structure.test.ts the rest. A test beside its source is of no layer.
+    {
+      "files": ["apps/cli/src/**", "apps/cli/bin/**"],
+      "excludeFiles": ["apps/cli/src/**/*.test.ts"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "regex": "^(?:api|(?:\\.\\.?/)+api)(?:/|$)",
+                "allowTypeImports": true,
+                "message": "The client imports the api's types alone: import type it from apps/api/src/client/client.ts, and ask the api over HTTP"
+              },
+              {
+                "group": ["agent-orchestrator", "agent-orchestrator/**", "agent-runtime", "agent-runtime/**"],
+                "message": "The client reaches the api over HTTP alone: ask the api, or spawn the orchestrator's CLI from src/local.ts"
+              },
+              {
+                "group": ["@anthropic-ai/claude-agent-sdk", "@anthropic-ai/claude-agent-sdk/**", "@a2a-js/sdk", "@a2a-js/sdk/**"],
+                "message": "Only agent-runtime reaches a harness: ask the api for what this import gives"
+              },
+              { "group": ["**/packages/**"], "message": "The client imports no package's file: ask the api for what this import gives" },
+              {
+                "group": ["api", "api/**", "**/api/**", "!api/src/client/client.ts", "!**/api/src/client/client.ts"],
+                "message": "The client reads the api's types from its client door alone: import type them from apps/api/src/client/client.ts"
+              }
             ]
           }
         ]
@@ -303,6 +367,11 @@
       "excludeFiles": ["apps/api/src/**/*.test.ts"],
       "rules": { "typescript/no-non-null-assertion": "error" }
     },
+    {
+      "files": ["apps/cli/src/**", "apps/cli/bin/**"],
+      "excludeFiles": ["apps/cli/src/**/*.test.ts"],
+      "rules": { "typescript/no-non-null-assertion": "error" }
+    },
     // The runtime is the bottom layer: it reaches no layer above it.
     {
       "files": ["packages/agent-runtime/src/**", "packages/agent-runtime/bin/**"],
@@ -360,13 +429,6 @@
         "max-lines-per-function": ["error", { "max": 137, "skipBlankLines": true, "skipComments": true }],
         "complexity": ["error", { "max": 25 }],
         "sonarjs/cognitive-complexity": ["error", 26]
-      }
-    },
-    {
-      "files": ["apps/api/src/detail/detail.ts"],
-      "rules": {
-        "max-lines-per-function": ["error", { "max": 86, "skipBlankLines": true, "skipComments": true }],
-        "complexity": ["error", { "max": 22 }]
       }
     },
     {
@@ -535,15 +597,9 @@
     {
       "files": ["packages/agent-orchestrator/src/agents/agents.store.ts"],
       "rules": {
-        "max-lines-per-function": ["error", { "max": 136, "skipBlankLines": true, "skipComments": true }],
-        "complexity": ["error", { "max": 40 }],
-        "sonarjs/cognitive-complexity": ["error", 57]
-      }
-    },
-    {
-      "files": ["packages/agent-orchestrator/src/skills/skills.store.ts"],
-      "rules": {
-        "sonarjs/cognitive-complexity": ["error", 17]
+        "max-lines-per-function": ["error", { "max": 124, "skipBlankLines": true, "skipComments": true }],
+        "complexity": ["error", { "max": 38 }],
+        "sonarjs/cognitive-complexity": ["error", 50]
       }
     },
     {
@@ -640,7 +696,7 @@
     {
       "files": ["packages/agent-orchestrator/src/status/status.ts"],
       "rules": {
-        "complexity": ["error", { "max": 35 }],
+        "complexity": ["error", { "max": 34 }],
         "sonarjs/cognitive-complexity": ["error", 26]
       }
     },
@@ -654,7 +710,7 @@
     {
       "files": ["packages/agent-orchestrator/src/record/record.store.ts"],
       "rules": {
-        "max-lines": ["error", { "max": 517, "skipBlankLines": true, "skipComments": true }]
+        "max-lines": ["error", { "max": 516, "skipBlankLines": true, "skipComments": true }]
       }
     },
     {

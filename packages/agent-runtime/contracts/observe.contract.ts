@@ -7,6 +7,7 @@ import { assume, type Implementation, spec } from '@emyann/tsverify';
 import type { Monotonic } from '../src/core/clock.ts';
 import {
   type Attempt,
+  awaitsAdmission,
   backoffOf,
   nameFor,
   RESTART_BACKOFF,
@@ -88,6 +89,14 @@ const observeSpec = spec<(state: State, observed: ReadonlyMap<string, Sighting>,
     (state.deadlineSeconds === undefined ||
       (Number.isInteger(state.deadlineSeconds) && state.deadlineSeconds >= 0 && state.deadlineSeconds <= 2 ** 31)) &&
     state.attempts.every(attemptStamped),
+  /**
+   * The order of the rest of the doc comment's rules is left to the code and held by its tests (`test/engine.test.ts`): the
+   * laws say each rule that keeps a session from being started twice, started while queued, lost, or held past a person's
+   * close, and stop there. The pairs left: `NO_SESSION_TO_CONTINUE` against `READY` for a later turn whose session is gone,
+   * which would say `turnOf`'s arithmetic again as a law, and `UNREAD` for a restart's unread harness, whose name the
+   * verifier cannot tell equal to itself for an attempt numbered `NaN`, which `requires` does not refuse.
+   */
+  open: ['output.type'],
   ensures: {
     settledExactly: {
       description: 'A settled task is seen settled, and only a settled one',
@@ -178,6 +187,39 @@ const observeSpec = spec<(state: State, observed: ReadonlyMap<string, Sighting>,
       description: 'A start, or a restart, is the next attempt',
       condition: ({ input: [state], output }) =>
         (output.type !== 'READY' && output.type !== 'RESTART_DUE') || output.attempt === state.attempts.length + 1,
+    },
+    aQueuedTaskIsNeverStarted: {
+      description: "A turn waiting for the layer above's word is never started",
+      condition: ({ input: [state], output }) => output.type !== 'READY' || !awaitsAdmission(state),
+    },
+    aWaitingTurnIsQueued: {
+      description: "A turn waiting for the layer above's word is seen queued, unless it is a later turn with no session to continue",
+      condition: ({ input: [state], output }) =>
+        !awaitsAdmission(state) || output.type === 'QUEUED' || output.type === 'NO_SESSION_TO_CONTINUE',
+    },
+    queuedOnlyWhileWaiting: {
+      description: "Queued only while the turn waits for the layer above's word: once given, the turn is not held",
+      condition: ({ input: [state], output }) => output.type !== 'QUEUED' || awaitsAdmission(state),
+    },
+    aClosedTaskIsSeenClosed: {
+      description: 'With nothing in flight and no stop asked, a task held open and closed by a person is seen closed',
+      condition: ({ input: [state], output }) =>
+        state.settled !== null ||
+        inFlight(state) !== undefined ||
+        state.stopRequested ||
+        !(state.holdOpen === true && state.closed) ||
+        output.type === 'CLOSED',
+    },
+    previousLiveOnlyWhenSeen: {
+      description: "The session a turn continues is seen live only when the pass saw it, under the last attempt's name",
+      condition: ({ input: [state, observed], output }) => {
+        const last = state.attempts.at(-1);
+        return output.type !== 'PREVIOUS_LIVE' || (last !== undefined && observed.has(nameFor(state.taskId, last.n)));
+      },
+    },
+    noSessionToContinueOnlyInALaterTurn: {
+      description: 'No session to continue only for a later turn: the first turn starts with or without one',
+      condition: ({ input: [state], output }) => output.type !== 'NO_SESSION_TO_CONTINUE' || state.inputs.length > 0,
     },
   },
 });

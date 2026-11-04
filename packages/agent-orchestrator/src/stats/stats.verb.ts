@@ -16,7 +16,8 @@ import { Invalid, Missing } from '../refusal/refusal.ts';
 import type { Workflow } from '../step/step.ts';
 import { timeline } from '../timeline/index.ts';
 import { runStore } from '../record/files.store.ts';
-import { stepsOf } from '../record/record.store.ts';
+import { RunDoor } from '../runs/runs.store.ts';
+import { stepsOf } from '../steps/steps.verb.ts';
 import { closeoutReader, everyTryOf, taskCloseout, taskPhasesRead, viewedOnce } from '../views/views.verb.ts';
 import { phaseOfView } from '../views/views-words.ts';
 import { renderedSkillApplies, renderedSkillRules, renderedSkillVersions } from '../agents/agents.store.ts';
@@ -26,6 +27,8 @@ import { seriesHealth } from '../series/series.store.ts';
 import { dayOf, factsOf, keysOf, statsOf, type CheckVerdict, type Facts, type RunFact, type StatsQuery, type TryFact } from './stats.ts';
 import { frozenOf, type RunFrozen } from './marks.ts';
 import { deniedCallsOf, filesTouchedOf, skillsLoadedOf } from './discipline.ts';
+import { selectedRuns } from '../runlist/runlist.ts';
+import type { Selectors } from '../watch/selector.ts';
 
 /** How a check's task ended (`CheckVerdict`): passed, refused (it ran to its end and exited non-zero, `refusedCheck`), or unfinished. */
 function verdictOf(view: TaskView | undefined): CheckVerdict {
@@ -37,13 +40,7 @@ function verdictOf(view: TaskView | undefined): CheckVerdict {
 }
 
 /** A run's frozen steps (`stepsOf`), or null where they do not read. */
-function stepsRead(run: Run): Workflow[] | null {
-  try {
-    return stepsOf(run);
-  } catch {
-    return null;
-  }
-}
+const stepsRead = (run: Run): Effect.Effect<Workflow[] | null> => Effect.orElseSucceed(stepsOf(run), () => null);
 
 /**
  * What a run froze (`frozenOf`): its steps, and each skill by the version of its rendered copy (`renderedSkillVersions`), where the copy
@@ -113,7 +110,7 @@ export type StatsOptions = { memo?: StatsMemo; verify?: boolean; series?: Series
 
 /** What `run` gives the stats (`RunRead`). Fails with what a read of it failed with but a journal that does not read. */
 export const factsRead = Effect.fnUntraced(function* (e: Engine, run: Run) {
-  const steps = stepsRead(run);
+  const steps = yield* stepsRead(run);
   if (!steps) return null;
   const frozen = frozenRun(run, steps);
   const read = yield* Effect.exit(runFacts(e, run, steps));
@@ -196,8 +193,18 @@ const statsOver = Effect.fnUntraced(function* (e: Engine, query: StatsQuery, now
     facts.runs.push(...read.facts.runs);
     if (read.unreadable) unreadable.push(read.id);
   }
-  return statsOf(facts, query, now, unreadable, (from, to) => seriesHealth(from, to, series));
+  const taken = query.selectors?.length ? takenBy(yield* (yield* RunDoor).runs.list(), query.selectors) : undefined;
+  return statsOf(facts, query, now, unreadable, (from, to) => seriesHealth(from, to, series), taken);
 });
+
+/**
+ * Whether a run is one `selectors` takes, off the labels of every run the Run door lists (`selectedRuns`): read only where a selector was
+ * given, since it reads every record the memo would not.
+ */
+function takenBy(listed: readonly Run[], selectors: Selectors): (run: string) => boolean {
+  const ids = new Set(selectedRuns(listed, selectors).map((run) => run.id));
+  return (run) => ids.has(run);
+}
 
 /**
  * `nemia stats`: the flow numbers of every run in the store for `query`, as of `now`, through the memo `options` hands it, if any. Fails

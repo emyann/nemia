@@ -1,5 +1,5 @@
 import { MarkerType } from '@xyflow/react';
-import type { RunDetail } from '../lib/api';
+import type { RunView } from '../lib/runView';
 import { edgesOf, edgeStroke, LOOP_SOURCE, LOOP_TARGET, type EdgeState } from '../lib/canvas';
 import { contextEdges, runEdges } from '../lib/factory';
 import { statePaint, stepState, type StepState } from '../lib/status';
@@ -10,7 +10,7 @@ import type { StepNodeData } from './StepNode';
  * What a step's node shows, on its run's page and on the Factory alike: read off the run as the api gives it, whose
  * `waitingOnYou` decides the human gate beside the step's own word.
  */
-export const stepData = (run: RunDetail, index: number): StepNodeData => ({
+export const stepData = (run: RunView, index: number): StepNodeData => ({
   step: run.steps[index],
   index,
   runCancelled: run.cancelledAt !== null,
@@ -46,7 +46,7 @@ function drawn(id: string, source: string, target: string, state: EdgeState, loo
  * `prefix` goes before every node's id, for a floor that draws two runs' steps, which may each have an
  * `implement`: nothing on the run's page and the workflow's, which draw one.
  */
-export function stepEdges(run: RunDetail, prefix = ''): StateFlowEdge[] {
+export function stepEdges(run: RunView, prefix = ''): StateFlowEdge[] {
   const runCancelled = run.cancelledAt !== null;
   const runHeld = run.holding != null;
   const steps = run.steps.map((s) => ({

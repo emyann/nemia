@@ -11,7 +11,6 @@ import path from 'node:path';
 import { Result, Schema } from 'effect';
 import { CONFIG_FOLDERS } from 'agent-runtime/vocabulary';
 import { wfRoot } from '../config/config.store.ts';
-import { readCustomInstructions } from '../agents/read.store.ts';
 import { parseAgent } from '../agents/agents.ts';
 import { stepFrom } from '../workflow/index.ts';
 import type { Workflow } from '../step/step.ts';
@@ -120,18 +119,35 @@ const realOf = (at: string): string | undefined => {
   }
 };
 
+/** Whether `file`, a real path, is the `nemia` bin its own package's `package.json` declares, the package found from it up. */
+const declaredNemia = (file: string): boolean => {
+  for (let dir = path.dirname(file); path.dirname(dir) !== dir; dir = path.dirname(dir)) {
+    let text: string;
+    try {
+      text = fs.readFileSync(path.join(dir, 'package.json'), 'utf8');
+    } catch {
+      continue;
+    }
+    const named = (JSON.parse(text) as { bin?: { nemia?: unknown } }).bin?.nemia;
+    return typeof named === 'string' && realOf(path.join(dir, named)) === file;
+  }
+  return false;
+};
+
 /**
- * The folder whose `nemia` is the package `root`'s own bin: from the package's real path up, at each folder its `node_modules/.bin` (a
- * checkout, a local install), then its `bin` (a global prefix), the first whose `nemia` resolves to the file the package's `package.json`
- * names. Undefined where none does: a `nemia` that is another package's is passed over.
+ * The folder whose `nemia` is the bin of the same checkout or release as the package `root`: from the package's real path up, at each
+ * folder its `node_modules/.bin` (a checkout, a local install), then its `bin` (a global prefix), the first whose `nemia` resolves to a
+ * bin its package declares and lies under that same folder — the client in `apps/cli` of this checkout, the one npm linked beside this
+ * package. Undefined where none does: a `nemia` that is another tree's is passed over.
  */
 export function ownBin(root: string = PACKAGE): string | undefined {
-  const named = (JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')) as { bin?: { nemia?: unknown } }).bin?.nemia;
-  const own = typeof named === 'string' ? realOf(path.join(root, named)) : undefined;
-  if (own === undefined) return undefined;
   let at = realOf(root);
   while (at !== undefined) {
-    const found = [path.join(at, 'node_modules', '.bin'), path.join(at, 'bin')].find((bin) => realOf(path.join(bin, 'nemia')) === own);
+    const under = at;
+    const found = [path.join(at, 'node_modules', '.bin'), path.join(at, 'bin')].find((bin) => {
+      const real = realOf(path.join(bin, 'nemia'));
+      return real !== undefined && real.startsWith(`${under}${path.sep}`) && declaredNemia(real);
+    });
     if (found !== undefined) return found;
     at = path.dirname(at) === at ? undefined : path.dirname(at);
   }
@@ -168,9 +184,6 @@ export function storeDenies(root: string = ROOT): string[] {
 
 /** Her chat as the chat's verbs and its delivery are given it: the task her session is filed under, if any, and her folder. */
 export const nemiaChatPlace = (): { task: string | undefined; dir: string } => ({ task: readLevel()?.task, dir: nemiaDir() });
-
-/** The person's custom words for her in the store `home`, or undefined where there are none (`readCustomInstructions`). */
-export const nemiaCustom = (home: string = ROOT): string | undefined => readCustomInstructions(home, 'nemia');
 
 /** Writes `text` as the instruction her session is filed with (`promptFile`), and answers the file. */
 export function writePrompt(text: string): string {
@@ -209,11 +222,10 @@ export function readTold(): ToldCustom | undefined {
 }
 
 /**
- * Writes the instruction her session is filed with (`promptFile`): her builtin instruction, then the person's custom words for her from
- * the store `home`, where there are any, and records those words (`writeTold`). Answers the file.
+ * Writes the instruction her session is filed with (`promptFile`): her builtin instruction, then the person's custom words for her,
+ * `custom`, where there are any (read through the Agent door, `keep.verb.ts`), and records those words (`writeTold`). Answers the file.
  */
-export function composePrompt(body: string, home: string = ROOT): string {
-  const custom = nemiaCustom(home);
+export function composePrompt(body: string, custom: string | undefined): string {
   const file = writePrompt(nemiaPrompt(body, custom));
   writeTold(custom);
   return file;

@@ -1,11 +1,10 @@
 /**
- * A run of the shipped quick workflow (`workflows/quick`) on the stand-ins: `implement → review → land`, with no spec before it and no
- * gate anywhere. Implement signs off its plan, its check answers, the review reads the change, and its pass files the landing with
- * nobody's approval on disk — the run waits on no person. A review that asks again files implement again instead, on the run's own
- * branch, and files no land. A check that refuses leaves the run to a person: the step declares no `retries:`, so no try answers a
- * refusal by itself, which a copy given one shows.
- *
- * The repository the run works on holds the checkout's skill folders, as a start in this checkout finds them.
+ * A run of a quick-shaped workflow on the stand-ins: `implement → review → land`, with no spec before it and no gate anywhere, planted
+ * as `quick/` in a copy of the tests' team (`teamCopy`). Implement signs off, its check answers, the review reads the change, and its
+ * pass files the landing with nobody's approval on disk — the run waits on no person, since a step that can send the work back
+ * (`loop:`) stands before the ungated ending. A review that asks again files implement again instead, on the run's own branch, and files
+ * no land. A check that refuses leaves the run to a person: the step declares no `retries:`, so no try answers a refusal by itself, which
+ * a copy given one shows.
  *
  * `WF_ROOT` is set before the runner is imported: the module reads it as it loads.
  */
@@ -17,7 +16,7 @@ import { testPlace } from '../place/memory/index.ts';
 import { testEngine } from 'agent-runtime/testing';
 import { eachTest, runGiven, runOver } from './placed.ts';
 import { scratch } from './scratch.ts';
-import { REPO } from './team.ts';
+import { teamCopy } from './team.ts';
 
 const ROOT = scratch('wf-quick-run-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
@@ -36,33 +35,31 @@ const engine = eachTest(testEngine);
 const runWith = runOver(runEngine, () => stand().layer);
 const runPlaced = runGiven(() => stand().layer);
 
-/** A copy of the shipped team, which `edit` may change: its `quick` folder. */
+/** The steps of the planted `quick/`: implement, a review that can send it back, and an ending in the checkout nobody gates. */
+const QUICK: Readonly<Record<string, string>> = {
+  'implement.md': '---\nplace: git\nagent: implementer\ncheck: npm test\n---\n',
+  'review.md': '---\nafter: implement\nplace: git\nagent: reviewer\nloop: implement\nrounds: 3\n---\n',
+  'land.md': '---\nafter: review\nplace: git\nworkspace: base\nagent: shipper\ncheck: npm test\n---\nLand the change.\n',
+};
+
+/** A copy of the tests' team with `quick/` planted beside its `dev/`, which `edit` may change: its `quick` folder. */
 function quickFolder(edit: (dir: string) => void = () => {}): string {
-  const root = fs.mkdtempSync(path.join(ROOT, 'team-'));
-  fs.cpSync(path.join(REPO, 'workflows'), root, { recursive: true });
-  edit(path.join(root, 'quick'));
-  return path.join(root, 'quick');
+  const quick = path.join(teamCopy('wf-quick-team-'), 'quick');
+  fs.mkdirSync(quick);
+  for (const [file, text] of Object.entries(QUICK)) fs.writeFileSync(path.join(quick, file), text);
+  edit(quick);
+  return quick;
 }
 
-/** A repository of the test place that holds the checkout's skill folders, where a start looks for the skills a step names. */
+/** A repository of the test place, with one file to change. */
 function repository(): string {
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
-  for (const skills of ['.claude/skills', 'apps/web/.claude/skills'])
-    fs.cpSync(path.join(REPO, skills), path.join(repo, skills), { recursive: true, dereference: true });
   stand().world.repository(repo, { 'a.ts': 'export const a = 1;\n' });
   return repo;
 }
 
-/** A closeout of quick's implement, flat, with every field its schema requires. */
-const SIGNED = {
-  outcome: 'done',
-  summary: 'removed the rule',
-  artifacts: [],
-  needs: null,
-  plan: 'Remove the rule beside each plate in Section; the runs page proves it.',
-  pages: ['runs'],
-  replies: [],
-};
+/** A closeout of quick's implement, flat. */
+const SIGNED = { outcome: 'done', summary: 'removed the rule', artifacts: [], needs: null };
 
 /** A run of the quick folder `dir`, its implement signed off and its check asked: the run's id and the engine it is on. */
 async function toTheCheck(dir: string) {
@@ -72,9 +69,9 @@ async function toTheCheck(dir: string) {
   assert.deepEqual(
     (readRun(run.id).workflow ?? []).map((step) => [step.name, step.agent?.name, step.gate === true]),
     [
-      ['implement', 'grace', false],
-      ['review', 'agora', false],
-      ['land', 'otto', false],
+      ['implement', 'implementer', false],
+      ['review', 'reviewer', false],
+      ['land', 'shipper', false],
     ],
     'implement, then a review that can send it back, then a landing nobody gates',
   );
@@ -87,16 +84,8 @@ async function toTheCheck(dir: string) {
   return { id: run.id, b, e };
 }
 
-/** The closeout of quick's review, flat, as Agora's schema requires it: `again` as given, and no finding. */
-const REVIEWED = (again: boolean) => ({
-  outcome: 'done',
-  summary: 'read it',
-  artifacts: [],
-  needs: null,
-  findings: [],
-  again,
-  replies: [],
-});
+/** The closeout of quick's review, flat, as the reviewer's schema requires it: `again` as given, and no finding. */
+const REVIEWED = (again: boolean) => ({ outcome: 'done', summary: 'read it', artifacts: [], needs: null, findings: [], again });
 
 test("a quick run whose check passes reaches its review, and the review's pass files the landing with nobody's approval", async () => {
   const { id, b, e } = await toTheCheck(quickFolder());
@@ -147,7 +136,7 @@ test('REFUSED: a quick run whose check refuses files no land and no second try; 
 
   const retried = quickFolder((dir) => {
     const file = path.join(dir, 'implement.md');
-    fs.writeFileSync(file, fs.readFileSync(file, 'utf8').replace(/^budget: 20$/m, 'budget: 20\nretries: 1'));
+    fs.writeFileSync(file, fs.readFileSync(file, 'utf8').replace(/^check: npm test$/m, 'check: npm test\nretries: 1'));
   });
   const again = await toTheCheck(retried);
   again.b.settle(`${again.id}-implement-check`, 'failed', { exitCode: 1 });

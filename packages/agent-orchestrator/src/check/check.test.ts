@@ -21,6 +21,7 @@ import {
   attemptVerdict,
   checkArgv,
   checkContract,
+  checkEnvOf,
   lastLines,
   refusalSection,
   REPORTED_LINES,
@@ -65,6 +66,28 @@ test('checkArgv: the line the run froze, run by sh', async (t) => {
     assert.match(lines[1], /kill -s KILL \$\$; \}$/, 'an install that fails ends the process by a signal: no exit code, no verdict');
     assert.equal(lines.at(-1), 'npm test # the suite', 'the command last, alone on its line');
     assert.equal(lines.length, 3);
+  });
+});
+
+test("checkEnvOf: every check is told the run's copy of its workflow folder, wherever the record names one", async (t) => {
+  const told = {
+    workspace: '/wt',
+    files: '/wf/runs/r-1/artifacts/implement',
+    closeout: undefined,
+    workflowFiles: '/wf/runs/r-1/workflow/ab',
+  };
+  const { repo: _repo, baseRef: _base, branch: _branch, isolate: _isolate, placeSkill: _skill, stagedFile: _staged, ...common } = run({});
+  const folderRun: Run = { ...common, place: { kind: 'folder' }, workspace: '/wf/runs/r-1/work' };
+  const rows: Array<[string, Run, { name: string; workspace?: 'base' }]> = [
+    ["a repository run's step", run({}), { name: 'implement' }],
+    ["a repository run's ending, told no base ref", run({}), { name: 'land', workspace: 'base' }],
+    ["a folder run's step", folderRun, { name: 'draft' }],
+  ];
+  for (const [name, r, step] of rows)
+    await t.test(name, () => assert.equal(checkEnvOf(r, step, told).WF_WORKFLOW_FILES, '/wf/runs/r-1/workflow/ab'));
+  await t.test('given no copy — a run started before the copy was taken — the key is absent', () => {
+    const { workflowFiles: _, ...none } = told;
+    assert.equal('WF_WORKFLOW_FILES' in checkEnvOf(run({}), { name: 'implement' }, none), false);
   });
 });
 

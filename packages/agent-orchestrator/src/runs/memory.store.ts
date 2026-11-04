@@ -15,6 +15,7 @@ import { spentRoundAsks } from '../round/round.ts';
 import { spentAsks, type RetryAsk } from '../retry/index.ts';
 import { spentAcceptances, spentApprovals, type RoundAsk } from '../status/status.ts';
 import type { AskKey, AskOf, Hold, PersonRequest, Pruned, Run } from '../record/record.ts';
+import type { Labels } from '../labels/labels.ts';
 import { RunDoor, cardStartedTwice, runDoorOver, runTaken, type RunsLayer } from './runs.store.ts';
 
 /** Where the stand-in says a run's files are: the root its paths are named under, as the files' are under `WF_ROOT`. */
@@ -31,7 +32,7 @@ const nameOf = ({ of, step, n }: AskKey): string => `${of}-${step}-${n}`;
 const runsAt = (...parts: string[]): string => path.posix.join(MEMORY_ROOT, 'runs', ...parts);
 
 /** The keys a record holds that are a person's, composed on read and never written into it (`rewriteRun`). */
-const COMPOSED = ['approvals', 'acceptances', 'pruned', 'hold', 'pause'] as const;
+const COMPOSED = ['approvals', 'acceptances', 'pruned', 'hold', 'labels', 'pause'] as const;
 const recordOf = (run: Run): Run => {
   const kept: Record<string, unknown> = { ...run };
   for (const key of COMPOSED) delete kept[key];
@@ -47,6 +48,7 @@ type State = {
   cancelled: Map<string, string>;
   pruned: Map<string, Pruned>;
   holds: Map<string, Hold>;
+  labels: Map<string, Labels>;
   refresh: Map<string, { at: string }>;
   asks: Map<string, Map<string, Held>>;
   forgetting: Map<string, string[]>;
@@ -58,6 +60,7 @@ const stateOf = (): State => ({
   cancelled: new Map(),
   pruned: new Map(),
   holds: new Map(),
+  labels: new Map(),
   refresh: new Map(),
   asks: new Map(),
   forgetting: new Map(),
@@ -75,12 +78,13 @@ function readOf(st: State, id: string): Run {
   const record = st.records.get(id);
   if (!record) throw new Missing({ message: `no such run: ${id}  (try 'nemia ls')` });
   const [approvals, acceptances] = [waiting(st, id, 'gate'), waiting(st, id, 'loop')];
-  const [pruned, hold] = [st.pruned.get(id), st.holds.get(id)];
+  const [pruned, hold, labels] = [st.pruned.get(id), st.holds.get(id), st.labels.get(id)];
   return {
     ...structuredClone(record),
     ...(st.cancelled.has(id) ? { cancelledAt: st.cancelled.get(id) } : {}),
     ...(pruned !== undefined ? { pruned: structuredClone(pruned) } : {}),
     ...(hold !== undefined ? { hold: structuredClone(hold) } : {}),
+    ...(labels !== undefined ? { labels: { ...labels } } : {}),
     ...(approvals.length ? { approvals } : {}),
     ...(acceptances.length ? { acceptances } : {}),
   } as Run;
@@ -99,6 +103,7 @@ function forgetOf(st: State, id: string): string[] {
     [st.pruned, `${id}.pruned`],
     [st.holds, `${id}.hold`],
     [st.refresh, `${id}.refresh`],
+    [st.labels, `${id}.labels`],
     [st.asks, `${id}.asks/`],
   ];
   for (const [held, name] of named) if (held.delete(id)) removed.push(`runs/${name}`);
@@ -130,7 +135,7 @@ function runsOf(st: State): RunsLayer['runs'] {
     },
     stamps: () => new Map([...st.versions].filter(([id]) => st.records.has(id)).map(([id, v]) => [id, String(v)])),
     exists: (id) => st.records.has(id),
-    taken: (id) => [st.records, st.cancelled, st.pruned, st.holds, st.refresh, st.asks].some((m) => m.has(id)),
+    taken: (id) => [st.records, st.cancelled, st.pruned, st.holds, st.labels, st.refresh, st.asks].some((m) => m.has(id)),
     calledOff: (id) => st.cancelled.has(id) || st.pruned.has(id) || st.holds.has(id),
     cancel: (id) => {
       const at = st.cancelled.get(id);
@@ -246,6 +251,16 @@ function holdsOf(st: State): RunsLayer['holds'] {
   };
 }
 
+function labelsOf(st: State): RunsLayer['labels'] {
+  return {
+    put: (id, labels) => {
+      if (Object.keys(labels).length) st.labels.set(id, { ...labels });
+      else if (!st.labels.delete(id)) return;
+      touch(st, id);
+    },
+  };
+}
+
 function refreshOf(st: State): RunsLayer['refresh'] {
   return {
     put: (id) => {
@@ -280,7 +295,14 @@ function forgettingOf(st: State): RunsLayer['forgetting'] {
 /** A fresh stand-in's plain methods: the `RunsLayer` the door is over. */
 function memoryRuns(): RunsLayer {
   const st = stateOf();
-  return { runs: runsOf(st), asks: asksGroup(st), holds: holdsOf(st), refresh: refreshOf(st), forgetting: forgettingOf(st) };
+  return {
+    runs: runsOf(st),
+    asks: asksGroup(st),
+    holds: holdsOf(st),
+    labels: labelsOf(st),
+    refresh: refreshOf(st),
+    forgetting: forgettingOf(st),
+  };
 }
 
 /** A fresh Run door in memory: no run, and nothing kept between two calls (a test makes one per test). */

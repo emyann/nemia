@@ -9,7 +9,8 @@ import type { Verdict } from '../check/check.ts';
 import { DEFAULT_ROUNDS, endsOnBase, LOOP_REPLIES, outputFields, type Workflow } from '../step/step.ts';
 import { loopSpan } from '../workflow/index.ts';
 import type { TaskClock } from '../timeline/index.ts';
-import { declaredOutput, envelopeRefusals, isLoopTarget, type Closeout } from '../closeout/index.ts';
+import { declaredOutput, isLoopTarget, type Closeout } from '../closeout/index.ts';
+import { closeoutRefusals } from '../question/index.ts';
 import type { Retry, RetryHow } from '../retry/index.ts';
 import {
   lackedOf,
@@ -437,9 +438,19 @@ function roundWanted(
 }
 
 /**
+ * Whether `said` signs off `blocked` and the run accepts it: a blocked closeout whose questions do not read is refused
+ * (`closeoutRefusals`).
+ */
+const blockedAccepted = (step: Workflow, said: Closeout | undefined): boolean =>
+  said?.outcome === 'blocked' && !closeoutRefusals(step, said).length;
+
+/**
  * Where a step stands on its own work, its budget aside: `stepStatus`, but never `over budget` — `budget exhausted` is the harness's end of
  * the session, and its own. What a try's brief says the last try ended as (`retrySection`): being over budget is why nothing was filed, not
  * how the try ended.
+ *
+ * `blocked` for a closeout signed `blocked`, unless the run refuses it (`closeoutRefusals`: questions that do not read), which reads as any
+ * refused closeout does, `unsigned` once its session ended, so the run asks it to mend them.
  *
  * `budget exhausted` for a task its harness cut off at its cap, settled `failed` or `succeeded`: cut off, not concluded, and no attempt
  * follows (agent-runtime's README). `denied` for a signed step denied a call under `denials: fail`, before its check, which would judge
@@ -451,7 +462,7 @@ export const ownStatus: OwnStatus = (step, run, phaseOf, closeoutOf, askedCloseo
   const st = run.steps[step.name];
   if (!st?.taskId) return 'pending';
   const said = closeoutOf(step.name);
-  if (said?.outcome === 'blocked') return 'blocked';
+  if (blockedAccepted(step, said)) return 'blocked';
 
   const phase = phaseOf(st.taskId);
   if ((phase === 'failed' || phase === 'succeeded') && spendOf(st.taskId)?.budgetEnded) return 'budget exhausted';
@@ -479,13 +490,13 @@ export const ownStatus: OwnStatus = (step, run, phaseOf, closeoutOf, askedCloseo
 /**
  * Whether a closeout a step gave is one the run does not accept, which reads `unsigned`: short of a field the step owes (`owedFields`), a
  * looping step's with no yes or no for `again`, one that named a file the run did not have when it signed off, as the tick read it
- * (`lackedOf`), or one whose envelope the run refuses (`envelopeRefusals`: a `needs` on a `done` v1 closeout).
+ * (`lackedOf`), or one the run refuses (`closeoutRefusals`: a `needs` on a `done` v1 closeout, a question field that does not read).
  */
 const unaccepted = (step: Workflow, run: Run, steps: readonly Workflow[], said: Closeout): boolean =>
   declaredOutput(step, said, owedFields(step, run, steps)).missing.length > 0 ||
   (Boolean(step.loop) && typeof said.output?.again !== 'boolean') ||
   lackedOf(run.steps[step.name]).length > 0 ||
-  envelopeRefusals(said).length > 0;
+  closeoutRefusals(step, said).length > 0;
 
 /**
  * What sessions cost, as the engine measured them: the dollars of the attempts that ended with a cost on them, how many did (`measured`),

@@ -16,14 +16,15 @@ import { testEngine } from 'agent-runtime/testing';
 import { eachTest } from '../../test/placed.ts';
 import { heldUnasked } from '../../test/unasked.ts';
 import { rawTar } from '../../test/tar.ts';
-import { teamCopy } from '../../test/team.ts';
+import { plantStepOutput, STEP_OUTPUT_SCHEMA, teamCopy } from '../../test/team.ts';
+import { anAgent } from '../../test/agent-walks.ts';
 import { Cause, Effect, Exit } from 'effect';
 import type { StoreRoot as Root } from '../config/root.store.ts';
 import { packArchive } from '../archive/archive.ts';
 
 const ROOT = scratch('wf-template-');
 process.env.WF_ROOT = ROOT;
-const { checkedTree, placeSkillNames, problemLine } = await import('./template.store.ts');
+const { checkedTree, packageSkillNames, problemLine } = await import('./template.store.ts');
 const { TemplateDoor } = await import('../templates/templates.store.ts');
 const { TemplateSource } = await import('../templates/templates.model.ts');
 const { StoreRoot } = await import('../config/root.store.ts');
@@ -35,6 +36,9 @@ const { engineOf } = await import('../runtime-client.ts');
 const engine = eachTest(testEngine);
 heldUnasked(engine);
 const { exportedTemplate, packedTemplate, unpackedTemplate } = await import('./template.verb.ts');
+const { AgentDoor } = await import('../agents/agent-door.store.ts');
+const { agentDoorMemory } = await import('../agents/agent-memory.store.ts');
+const { AgentName } = await import('../agents/agents.model.ts');
 
 /** `program` run at the store's root, as the CLI runs a verb's: what it answers, or the refusal it failed with, thrown. */
 function run<A>(program: Effect.Effect<A, unknown, Root>): A {
@@ -61,7 +65,7 @@ const readTemplate = (source: string) =>
   );
 
 /** Every problem of the template at `source`, as `nemia template lint` finds them. */
-const checkTemplateAt = (source: string) => checkedTree(readTemplate(source), placeSkillNames()).problems;
+const checkTemplateAt = (source: string) => checkedTree(readTemplate(source), packageSkillNames()).problems;
 
 /**
  * Refused by kind, exit 2, and what the message names — the fix, the file, the key — each a pattern it matches or a token it holds;
@@ -141,6 +145,22 @@ function exported(): string {
 }
 
 test('what export writes from a repository and a factory, read back as it was written, each draft passing its check', async (t) => {
+  await t.test("an export whose workflow names an agent only the Agent door's memory holds writes that agent into the tree", () => {
+    const repo = scratch('wf-template-repo-');
+    fs.mkdirSync(path.join(repo, 'workflows', 'solo'), { recursive: true });
+    fs.writeFileSync(path.join(repo, 'workflows', 'solo', 'work.md'), '---\nplace: git\nagent: scribe\n---\nDo the work.\n');
+    const agents = path.join(repo, 'workflows', 'agents');
+    const dir = target();
+    run(
+      Effect.gen(function* () {
+        yield* (yield* AgentDoor).agents.write(AgentName.read('scribe'), anAgent('scribe'), undefined, { dir: agents, anywhere: true });
+        return yield* exportedTemplate(dir, repo, undefined);
+      }).pipe(Effect.provide(agentDoorMemory())),
+    );
+    assert.equal(fs.existsSync(path.join(agents, 'scribe.md')), false, 'the agent is on no disk');
+    assert.equal(fs.existsSync(path.join(dir, 'agents', 'scribe', 'agent.yaml')), true);
+    assert.deepEqual(checkTemplateAt(dir), []);
+  });
   await t.test('an export carries the real files of a skill linked inside the repository, and writes no link', () => {
     const repo = repoGivenLinked(() => '../../skills/x');
     const dir = target();
@@ -178,7 +198,7 @@ test('what export writes from a repository and a factory, read back as it was wr
       const repo = repoWithTeam();
       const long = `npm test && ${Array.from({ length: 12 }, (_, i) => `node "scripts/check-${i}.ts" --mode: 'strict' # ${i}`).join(' && ')}`;
       const ship = path.join(repo, 'workflows', 'dev', 'ship.md');
-      fs.writeFileSync(ship, fs.readFileSync(ship, 'utf8').replace(/^check: .*$/m, `check: ${long}`));
+      fs.writeFileSync(ship, fs.readFileSync(ship, 'utf8').replace(/^check: .*$/m, `check: ${JSON.stringify(long)}`));
       const review = path.join(repo, 'workflows', 'dev', 'review.md');
       fs.writeFileSync(
         review,
@@ -208,6 +228,28 @@ test('what export writes from a repository and a factory, read back as it was wr
       });
     },
   );
+  await t.test("a step's input:, reads: and tally: are written as lists, and the check passes", () => {
+    const repo = repoWithTeam();
+    const review = path.join(repo, 'workflows', 'dev', 'review.md');
+    fs.writeFileSync(
+      review,
+      fs.readFileSync(review, 'utf8').replace('budget: 20', 'budget: 20\ninput: implement\nreads: inbox\ntally: findings'),
+    );
+    const dir = target();
+    exportTemplate({ dir, from: repo });
+    assert.deepEqual(checkTemplateAt(dir), []);
+    const step = stepsOf(dir, 'dev').get('review');
+    assert.deepEqual([step?.input, step?.reads, step?.tally], [['implement'], ['inbox'], ['findings']]);
+  });
+  await t.test("a step's own output: is written as a {path:} from the template's root, its schema carried beside it", () => {
+    const repo = repoWithTeam();
+    plantStepOutput(path.join(repo, 'workflows'));
+    const dir = target();
+    exportTemplate({ dir, from: repo });
+    assert.deepEqual(stepsOf(dir, 'dev').get('implement')?.output, { path: 'workflows/dev/implement.schema.json' });
+    assert.equal(fs.readFileSync(path.join(dir, 'workflows/dev/implement.schema.json'), 'utf8'), STEP_OUTPUT_SCHEMA);
+    assert.deepEqual(checkTemplateAt(dir), []);
+  });
   await t.test("a workflow's README and its files that are no .md or .yaml are carried with their modes, and so is a skill's", () => {
     const repo = repoWithTeam();
     const script = path.join(repo, 'workflows', 'dev', 'tools', 'gate.sh');
@@ -468,6 +510,28 @@ test('each problem of a folder stands at its file and line, every one at once, s
     assert.match(problemLine(problems[1]), new RegExp(`^agents/reviewer/agent\\.yaml:${effort + 1}:\\d+: .*no effort`));
     assert.match(problems[2].message, /does not parse/);
     assert.match(problems[3].message, /outside the template's layout/);
+  });
+  await t.test("an undeclared ${{ parameters.<name> }} stands at its line, in a step's check and in RULES.md", () => {
+    const dir = target();
+    exportTemplate({ dir, from: repoWithTeam() });
+    const workflow = path.join(dir, 'workflows', 'dev', 'workflow.yaml');
+    const lines = fs.readFileSync(workflow, 'utf8').split('\n');
+    const check = lines.findIndex((line) => line.trim().startsWith('check: '));
+    lines[check] = lines[check].replace(/check: .*/, 'check: go --check ${{ parameters.nope }}');
+    fs.writeFileSync(workflow, lines.join('\n'));
+    fs.writeFileSync(path.join(dir, 'RULES.md'), 'A card says what it is.\nIts areas:  ${{parameters.nope}}.\n');
+    const problems = checkTemplateAt(dir);
+    assert.deepEqual(
+      problems.map((p) => [p.file, p.line, p.col]),
+      [
+        ['RULES.md', 2, 13],
+        ['workflows/dev/workflow.yaml', check + 1, lines[check].indexOf('check: ') + 8],
+      ],
+    );
+    assert.ok(
+      problems.every((p) => p.message.includes('nope')),
+      problems.map(problemLine).join('\n'),
+    );
   });
   await t.test('a link in a folder is refused by name, and so is a file of two documents, at the second', () => {
     const dir = target();

@@ -45,9 +45,9 @@ const commandsOf = (name: string): FactoryCommands => ({
 });
 
 /**
- * The template a factory was made from, as the board reads it: its folder (`source`), its version and the parameters given at
- * `nemia factory apply`; the version its base holds (`applied`), null until the daemon renders it; and the conditions the daemon last
- * wrote, `Applied` and `ConflictsPending`, none until then.
+ * The template a factory was made from, as the board reads it: its folder or archive, or the name of a builtin template (`source`),
+ * its version and the parameters given at `nemia factory apply`; the version its base holds (`applied`), null until the daemon renders
+ * it; and the conditions the daemon last wrote, `Applied` and `ConflictsPending`, none until then.
  */
 export type FactoryTemplateAnswer = {
   source: string;
@@ -154,8 +154,8 @@ const answerOf = (listing: FactoryListing, listed: readonly ScheduleListed[], un
  *   through the entry's handler (`FACTORY`), since the default factory is the api's to add.
  */
 export const factories = new Hono<ApiEnv>().get('/api/factories', (c) =>
-  served(c, async ({ e, placeService, env, running }) => {
-    const listed = await runPlaced(placeService, e, FACTORY.handler({}));
+  served(c, async ({ e, placeService, env, running, home }) => {
+    const listed = await runPlaced({ placeService, home }, e, FACTORY.handler({}));
     return c.json([
       {
         name: DEFAULT_FACTORY,

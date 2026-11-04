@@ -178,6 +178,7 @@ async function following(t: TestContext, agent: string, url: string) {
       EngineService.layer(e),
       stage.place().layer,
       Layer.succeed(References.MinimumLogLevel, 'Warn'),
+      storeRootLayer(process.env),
     ),
   );
   t.after(() => rt.dispose());

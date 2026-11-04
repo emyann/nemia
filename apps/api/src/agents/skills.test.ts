@@ -1,7 +1,8 @@
 /**
  * The board's skill picker (skills.ts): the skills an agent of yours can be given, by place, in the order a start finds a name, and what
- * is built into Nemia beside them — nothing today, so what a builtin row says is read off the tests' team (`team.ts`) handed to
- * `listSkills` as the builtin place — in a scratch store and a scratch repository. Every refusal is made to refuse, asserted on its words,
+ * is built into Nemia beside them — the package's own, found by name by an agent of yours and so listed under no other place; where a
+ * row's `found` is read, the tests' team (`team.ts`) is handed to `listSkills` as the builtin place — in a scratch store and a scratch
+ * repository. Every refusal is made to refuse, asserted on its words,
  * with the library as it was. And one skill on its own page, and one of yours
  * written on the board: made, changed at its version, its preload switched — each moving the version of every agent that gives it.
  *
@@ -17,17 +18,25 @@ import path from 'node:path';
 import { engine, builtinGitPlace, skillCopyCommand } from 'agent-orchestrator';
 import { skillTurnCost } from 'agent-orchestrator/workflow';
 import { scratch } from '../../test/scratch.ts';
-import { app } from '../app.ts';
-import { foundInOf, listSkills, BUILTIN_SKILLS, skillDetail } from './skills.ts';
+import { Effect, Layer } from 'effect';
+import { AgentDoor, SkillDoor, type AgentDoorShape, type SkillDoorShape } from 'agent-orchestrator';
+import { agentDoorMemory, skillDoorMemory } from 'agent-orchestrator/testing';
+import { app, appOf, liveOf } from '../app.ts';
+import { foundInOf, listSkills, BUILTIN_SKILLS, skillDetail, yourSkillsRead } from './skills.ts';
+import { StoreRoot } from '../store.ts';
 import { TEAM } from '../../test/team.ts';
 const repo = scratch('nemia-api-skills-repo-');
 process.env.HKB_REPO = repo;
 execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: repo });
 
+/** A program that reads the store, run over the harness's root (`WF_ROOT`), as a request's services give it. */
+const inRoot = <A, E>(program: Effect.Effect<A, E, StoreRoot>): Promise<A> =>
+  Effect.runPromise(program.pipe(Effect.provideService(StoreRoot, root)));
+
 type SkillPlace = import('./skills.ts').SkillPlace;
 type SkillRow = import('./skills.ts').SkillRow;
 
-/** Nemia's builtin skills: the orchestrator package's `skills/`, none while it has no such folder. Read, never written. */
+/** Nemia's builtin skills: the orchestrator package's `skills/`. Read, never written. */
 const BUILTIN = BUILTIN_SKILLS;
 const builtin = fs.existsSync(BUILTIN)
   ? fs
@@ -123,12 +132,27 @@ test("the skills are listed by place — yours, the repository's, then what is b
     places[2].skills.map((s) => s.name),
     builtin,
   );
+  assert.ok(builtin.length > 0, 'Nemia ships builtin skills');
   assert.equal(rowOf(places, 'yours', 'shared')!.entry?.description, 'Mine.', 'your library wins a name the repository has too');
   assert.equal(rowOf(places, 'yours', 'shared')!.dir, path.join(LIBRARY, 'shared'));
   assert.ok(
     !places.some((p) => p.skills.some((s) => s.name === 'beside')),
     "the repository's workflows/skills is no place an agent of yours looks",
   );
+});
+
+test('a builtin skill an agent of yours gives, which no place has, lists that agent beside it', async () => {
+  const [name] = builtin;
+  assert.ok(name !== undefined, 'Nemia ships a builtin skill');
+  const asker = path.join(root, 'workflows', 'agents', 'asker.md');
+  fs.writeFileSync(asker, `---\ndescription: Asks.\nskills: ${name}\n---\nAsk.\n`);
+  try {
+    const row = rowOf(await listed(), 'builtin', name)!;
+    assert.deepEqual(row.usedBy, ['asker']);
+    assert.equal(row.found, null, 'no place of yours has its name');
+  } finally {
+    fs.rmSync(asker);
+  }
 });
 
 test('a skill is listed with its card entry, whether it is loaded every turn, what it costs a turn, and the agents of yours that give it', async () => {
@@ -177,7 +201,7 @@ test('a repository skill linked inside the repository lists under repo, read, wi
     const inside = rowOf(places, 'repo', 'inside')!;
     assert.equal(inside.error, null);
     assert.equal(inside.entry?.description, 'Kept inside.');
-    const page = await skillDetail(engine(), builtinGitPlace, 'repo', 'inside', repo, root);
+    const page = await skillDetail(engine(), builtinGitPlace, inRoot, 'repo', 'inside', repo, root);
     assert.equal(page?.skill.entry?.description, 'Kept inside.');
     assert.match(page?.version ?? '', /^[0-9a-f]{16}$/);
 
@@ -186,7 +210,7 @@ test('a repository skill linked inside the repository lists under repo, read, wi
     assert.equal(apart.entry, null);
     assert.equal(apart.cost, null, 'nothing of what it points at is read');
     assert.match(apart.error ?? '', /^apart is a link, and what it points at is outside the folder of skills/);
-    const refused = await skillDetail(engine(), builtinGitPlace, 'repo', 'apart', repo, root);
+    const refused = await skillDetail(engine(), builtinGitPlace, inRoot, 'repo', 'apart', repo, root);
     assert.equal(refused?.skill.entry, null);
     const res = await app.request('/api/skills/repo/apart');
     assert.equal(res.status, 200, 'its page answers, and says the refusal');
@@ -203,7 +227,8 @@ test('a repository skill linked inside the repository lists under repo, read, wi
 });
 
 test('a builtin skill says where an agent of yours already finds its name: in your library, in the repository, or nowhere yet', async () => {
-  const places = await listSkills(engine(), builtinGitPlace, repo, root, TEAM_SKILLS);
+  const yoursRead = await Effect.runPromise(Effect.provideService(yourSkillsRead(repo, root, TEAM_SKILLS), StoreRoot, root));
+  const places = await listSkills(engine(), builtinGitPlace, repo, root, yoursRead);
   assert.equal(rowOf(places, 'builtin', inLibrary)!.found, 'yours');
   assert.equal(rowOf(places, 'builtin', inRepo)!.found, 'repo');
   assert.equal(rowOf(places, 'builtin', toCopy)!.found, null);
@@ -225,8 +250,8 @@ test("REFUSED at shipped defaults: a skill Nemia does not ship, a name that is n
     404,
     new RegExp(`has no skill named ${toCopy}: a skill is a folder holding a SKILL\\.md`),
   );
-  await refused(send('/api/skills/yours', { copy: '../agents' }), 422, /^`\.\.\/agents` is not a skill's name/);
-  await refused(send('/api/skills/yours', { copy: 'Bad_Name' }), 422, /^`Bad_Name` is not a skill's name/);
+  await refused(send('/api/skills/yours', { copy: '../agents' }), 422, /`\.\.\/agents` is not a skill's name/);
+  await refused(send('/api/skills/yours', { copy: 'Bad_Name' }), 422, /`Bad_Name` is not a skill's name/);
   await refused(send('/api/skills/yours', { copy: 7 }), 400, /`copy` is the name of the builtin skill to copy, a string/);
   await refused(send('/api/skills/yours', [toCopy]), 400, /takes a JSON object: .*`{ "copy"/);
   await refused(send('/api/skills/yours', '{'), 400, /takes a JSON body/);
@@ -398,7 +423,7 @@ test("a skill's page says what it says, what it costs a turn, the agents of eith
     assert.equal(broken.body, '# Scratch\n\nNo frontmatter.');
     assert.match(broken.skill.error ?? '', /has no frontmatter/);
     assert.equal(
-      (await skillDetail(engine(), builtinGitPlace, 'builtin', toCopy, repo, root, TEAM_SKILLS))?.copyHint,
+      (await skillDetail(engine(), builtinGitPlace, inRoot, 'builtin', toCopy, repo, root, TEAM_SKILLS))?.copyHint,
       null,
       'a builtin skill is copied with the board, not by hand',
     );
@@ -473,18 +498,10 @@ test('a change of a skill moves the version of every agent that gives it, and th
 });
 
 test('REFUSED at shipped defaults: a name that is not a folder-safe id, a clash with a skill of your library, a frontmatter the card reader refuses', async () => {
-  await refused(send('/api/skills/yours', { skill: { ...NOTES, name: '../agents' } }), 422, /^`\.\.\/agents` is not a skill's name/);
-  await refused(send('/api/skills/yours', { skill: { ...NOTES, name: 'Tidy Notes' } }), 422, /^`Tidy Notes` is not a skill's name/);
-  await refused(
-    send('/api/skills/yours', { skill: { ...NOTES, name: 'mine' } }),
-    409,
-    /^skills\/mine is there already, in .*, and a new skill would write over it\. Give it another name/,
-  );
-  await refused(
-    send('/api/skills/yours', { skill: { ...NOTES, name: 'fresh', description: '' } }),
-    422,
-    /has no `description:`, and the A2A protocol marks a skill's description REQUIRED/,
-  );
+  await refused(send('/api/skills/yours', { skill: { ...NOTES, name: '../agents' } }), 422, /`\.\.\/agents` is not a skill's name/);
+  await refused(send('/api/skills/yours', { skill: { ...NOTES, name: 'Tidy Notes' } }), 422, /`Tidy Notes` is not a skill's name/);
+  await refused(send('/api/skills/yours', { skill: { ...NOTES, name: 'mine' } }), 409, /^skills\/mine is there already/);
+  await refused(send('/api/skills/yours', { skill: { ...NOTES, name: 'fresh', description: '' } }), 422, /`description` is required/);
   await refused(send('/api/skills/yours', { skill: { ...NOTES, name: 'fresh', tags: [] } }), 422, /`tags` is an empty list/);
   await refused(
     send('/api/skills/yours', { skill: { ...NOTES, name: 'fresh', description: 'one\npreload: true' } }),
@@ -498,7 +515,7 @@ test('REFUSED at shipped defaults: a change at a version the skill has moved on 
   const { version } = await detail('yours', 'always');
   fs.appendFileSync(path.join(LIBRARY, 'always', 'SKILL.md'), 'Edited by hand.\n');
   await refused(put('/api/skills/yours/always', { version, preload: false }), 409, /^skills\/always changed since it was read \(version /);
-  await refused(put('/api/skills/yours/gone', { version, preload: false }), 404, /^skills\/gone is not in .*: it was removed/);
+  await refused(put('/api/skills/yours/gone', { version, preload: false }), 404, /^skills\/gone is not there: it was removed/);
   const now = (await detail('yours', 'always')).version;
   await refused(
     put('/api/skills/yours/always', { version: now, skill: { ...NOTES, name: 'renamed' } }),
@@ -613,3 +630,35 @@ function snapshotOf(dir: string): Record<string, string> {
       .map((f) => [f, fs.readFileSync(path.join(dir, f), 'utf8')]),
   );
 }
+
+test("the picker finds a skill and the agents of yours that give it through the app's Agent and Skill doors: one held only by the doors is listed in yours, given by its agent", async () => {
+  const { app: own, runtime: ownRuntime } = appOf(Layer.mergeAll(liveOf(), agentDoorMemory(), skillDoorMemory()));
+  const agent = 'keeper' as Parameters<AgentDoorShape['agents']['write']>[0];
+  const kept = 'kept-notes' as Parameters<SkillDoorShape['skills']['write']>[0];
+  await ownRuntime.runPromise(
+    Effect.gen(function* () {
+      yield* (yield* SkillDoor).skills.write(
+        kept,
+        { name: kept, description: 'Keeps a note, one fact a line.', body: 'Keep it.' },
+        undefined,
+        LIBRARY,
+        { anywhere: true },
+      );
+      yield* (yield* AgentDoor).agents.write(
+        agent,
+        { name: agent, description: 'Use it when a note is to be kept.', skills: kept, keys: {}, body: 'Keep the note.' },
+        undefined,
+        { dir: path.join(root, 'workflows', 'agents'), anywhere: true },
+      );
+    }),
+  );
+  assert.equal(fs.existsSync(path.join(LIBRARY, kept)), false, 'the skill is held by the door, not on disk');
+  const res = await own.request('/api/skills');
+  assert.equal(res.status, 200);
+  const places = (await res.json()) as SkillPlace[];
+  assert.deepEqual(
+    places.find((p) => p.from === 'yours')?.skills.map((s) => [s.name, s.usedBy]),
+    [[kept, [agent]]],
+    "yours are the door's skills alone, each with the door's agents that give it",
+  );
+});

@@ -4,6 +4,7 @@
  * for (`appliesOf`, `appliesMatch`): its `applies:` line, globs from the folder a session runs in, which `nemia stats` reads to tell a try
  * that touched them; the harness ignores it.
  */
+import type { LookedUp, LookupRoot } from '../../contracts/lookup.contract.ts';
 import { FRONTMATTER, refuse, SKILLS_FOLDER, splitFrontmatter } from '../step/step.ts';
 import { frontmatterKey } from '../former/former.ts';
 import { skillNameRefusal } from '../agents/agents.ts';
@@ -57,10 +58,9 @@ type EntryKey = (typeof ENTRY_KEYS)[number];
  * has none); `examples` only when given. Pure: `file` is what a refusal calls the SKILL.md.
  *
  * Read as YAML (`readFrontmatter`), each key the card reads as its value: `tags` and `examples` a list of lines of text, the others one
- * text. A block still in the former line form is read so, each card key's line read as YAML on its own, where it reads so, as the card
- * reader read it before. Refused, with the form to write: a list where a text is read, a text where a list is, a map, an empty list or one
- * with an empty item, and a card key set twice. `test/skills-rendered.test.ts` holds this reading to js-yaml's on every SKILL.md the
- * repository has. Keys the card does not read are passed over, whatever their form.
+ * text. Refused, with the form to write: a block still in the former line form, at its line (`readFrontmatter`), a list where a text is
+ * read, a text where a list is, a map, an empty list or one with an empty item, and a card key set twice. `test/skills-rendered.test.ts`
+ * holds this reading to js-yaml's on every SKILL.md the repository has. Keys the card does not read are passed over, whatever their form.
  */
 export function skillEntryOf(file: string, id: string, text: string): AgentSkill {
   const { words, list } = entryValuesOf(file, text);
@@ -94,14 +94,14 @@ function entryValuesOf(
       `${file} has no frontmatter, and a skill's card entry is read from it: Claude Code lists a skill by its description. Open the file with \`---\`, \`description: <what it does, one line>\` and \`---\`.`,
     );
   }
-  const { entries, former } = readFrontmatter(file, block);
+  const { entries } = readFrontmatter(file, block);
   const values: Partial<Record<EntryKey, FrontmatterValue>> = {};
   for (const { key, value } of entries) {
     if (!(ENTRY_KEYS as readonly string[]).includes(key)) continue;
     const reading = key as EntryKey;
     if (Object.hasOwn(values, reading))
       refuse(`${file}: \`${reading}\` is set twice, and YAML reads no file that says two things. Keep one line.`);
-    values[reading] = former && typeof value === 'string' ? formerValue(reading, value) : value;
+    values[reading] = value;
   }
   const words = (key: EntryKey): string | undefined => {
     const value = values[key];
@@ -128,16 +128,6 @@ function entryValuesOf(
     return (items as readonly string[]).map((item) => item.trim());
   };
   return { words, list };
-}
-
-/**
- * A key's value in a block read in the former line form: its line, `key: value`, read as YAML on its own — a quoted text, a list —
- * where it reads so, and the value as written where it does not.
- */
-function formerValue(key: string, value: string): FrontmatterValue {
-  const alone = frontmatterOrNull(`${key}: ${value}\n`);
-  const only = alone !== null && !alone.former && alone.entries.length === 1 ? alone.entries[0] : undefined;
-  return only === undefined ? value : only.value;
 }
 
 /**
@@ -257,8 +247,8 @@ export function withPreload(file: string, text: string, on: boolean): string {
 
 /**
  * The globs a SKILL.md's `applies:` key names (`text`, the whole file): a YAML list of globs, or one glob, each from the folder a session
- * runs in (`apps/web/**`). `[]` where it names none, or holds anything else — a map, an empty item — or the frontmatter does not read;
- * in a block read in the former line form, its line is read as YAML on its own, and `[]` where it does not read so.
+ * runs in (`apps/web/**`). `[]` where it names none, or holds anything else — a map, an empty item — or the frontmatter does not read,
+ * a block in the former line form among them.
  */
 export function appliesOf(text: string): string[] {
   let block: string | null;
@@ -270,9 +260,7 @@ export function appliesOf(text: string): string[] {
   const read = block === null ? null : frontmatterOrNull(block);
   const entry = read?.entries.find(({ key }) => key === 'applies');
   if (read == null || entry === undefined) return [];
-  const alone = read.former && typeof entry.value === 'string' ? frontmatterOrNull(`applies: ${entry.value}\n`) : null;
-  if (alone !== null && (alone.former || alone.entries.length !== 1)) return [];
-  const value = alone === null ? entry.value : alone.entries[0]?.value;
+  const value = entry.value;
   const globs = Array.isArray(value) ? value : [value];
   return globs.every((g) => typeof g === 'string' && g.trim()) ? globs.map((g: string) => g.trim()) : [];
 }
@@ -298,3 +286,23 @@ const globPattern = (glob: string): RegExp =>
 
 /** Whether the file `file`, a path from the folder a session ran in, is one of the paths `globs` name (`appliesOf`). */
 export const appliesMatch = (file: string, globs: readonly string[]): boolean => globs.some((g) => globPattern(g).test(file));
+
+/**
+ * The precedence of the lookup roots (`lookupRoots`), pure: which of them — three at most — a name is read from, or the refusal of a
+ * name one repository holds in both of its places. Agents and skills are found through it, on the files (`agentsFor`, `skillsFor`)
+ * and in the doors' memory stand-ins, so the four cannot disagree. Its laws are `contracts/lookup.contract.ts`'s.
+ */
+export type { Looked, LookupRoot } from '../../contracts/lookup.contract.ts';
+
+/** Whether the root `at` of `roots` holds the name, and is a place of `repo` where one is named. */
+const holdsAt = (roots: readonly LookupRoot[], at: number, repo?: string): boolean =>
+  roots.at(at)?.has === true && (repo === undefined || roots.at(at)?.repo === repo);
+
+export const lookedUp: LookedUp = (roots) => {
+  const at = holdsAt(roots, 0) ? 0 : holdsAt(roots, 1) ? 1 : holdsAt(roots, 2) ? 2 : -1;
+  if (at < 0) return { kind: 'none' };
+  const repo = roots.at(at)?.repo;
+  if (repo === undefined) return { kind: 'found', at };
+  const again = at < 1 && holdsAt(roots, 1, repo) ? 1 : at < 2 && holdsAt(roots, 2, repo) ? 2 : -1;
+  return again < 0 ? { kind: 'found', at } : { kind: 'both', at, again };
+};

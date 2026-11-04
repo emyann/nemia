@@ -4,7 +4,7 @@
  * records, journals read on disk, observes, questions of its place and spans — and never what has finished, nor how long the runtime's
  * feed has grown; the board's light list and a warm read of it alike. And a table of every input of a run at rest (`restStamps`, the feed,
  * its result branches) and every refusal of `verifyRest`, each row on a small store of its own, made for it and emptied by the next, so no
- * row reads what another changed; the list's own memo (`restingRead`) has its rows there too. What makes a run at rest is pure, and lives
+ * row reads what another changed; the informer (`informerRead`) has its rows there too. What makes a run at rest is pure, and lives
  * in rest.test.ts.
  *
  * Walked through the runtime itself, `plainEngine` over its own journal on disk, whose reads it counts, and a harness the test signs by
@@ -53,10 +53,9 @@ const { PlaceService } = await import('../place/place.store.ts');
 const { meteredPlace } = await import('../place/builtin.store.ts');
 const { RUNS_FINISHED, RUNS_OPEN } = await import('../command/pages.verb.ts');
 const { metered } = await import('../meter/tally.store.ts');
-const { restingMemo, restingRead } = await import('../rest/resting.verb.ts');
+const { informerMemo, informerRead } = await import('../rest/informer.verb.ts');
 const { NOTHING_READ, standingReader } = await import('../standing/standing.verb.ts');
 const { filingsRead } = await import('../views/views.verb.ts');
-type RunSummary = import('../summary/summary.verb.ts').RunSummary;
 const made = testPlace();
 /** The file's test place, each question of it counted as the pass's `place` phase, as the shipped place counts its own. */
 const place = { ...made, place: meteredPlace(made.place), layer: PlaceService.layer(meteredPlace(made.place)) };
@@ -300,7 +299,7 @@ test('a big quiet store: two hundred finished runs beside three in flight cost a
     return traced(false);
   };
   const unverified = { ...process.env, WF_VERIFY_REST: '0' };
-  const kept = { runs: restingMemo<Omit<RunSummary, 'startedAt'>>(), filings: { filed: new Map(), cursor: 0 } };
+  const kept = { runs: informerMemo(), filings: { filed: new Map(), cursor: 0 } };
   const warm = async (): Promise<number | undefined> => {
     await runWith(h.e, RUNS_OPEN.handler({}, unverified, ROOT, kept));
     return (await metered(() => runWith(h.e, RUNS_OPEN.handler({}, unverified, ROOT, kept)))).tallies?.records;
@@ -697,7 +696,7 @@ const measuredEvent = (usage: object): Event => ({ kind: 'measured', at: new Dat
 const pruned = (run: Run) => fs.writeFileSync(pruneFile(run.id), `${JSON.stringify({ at: new Date().toISOString(), worktrees: [] })}\n`);
 
 /**
- * The list's own memo (`restingRead`, resting.verb.ts), which the board's reads keep: an answer kept for a run is given back while its
+ * The informer (`informerRead`, informer.verb.ts), which the board's reads keep: an answer kept for a run at rest is given back while its
  * files in the store, its record and the engine's feed for its tasks stand. Folder runs written by hand on a small store of their own,
  * over the runtime's feed held in memory.
  */
@@ -727,16 +726,20 @@ const listMemo = () => {
     fs.writeFileSync(runFile(id), JSON.stringify(run));
     return run;
   };
-  const read = (memo: ReturnType<typeof restingMemo<{ said: string }>>, verify = false) =>
-    runWith(e, restingRead<{ said: string }>(e, memo, verify, git));
+  const read = (memo: ReturnType<typeof informerMemo<{ said: string }>>, verify = false) =>
+    runWith(e, informerRead<{ said: string }>(e, memo, verify, git));
+  const kept = (at: Awaited<ReturnType<typeof read>>, run: Run, said: string) => {
+    at.keep(run, { said }, [], () => new Map(), true);
+    return runWith(e, at.commit());
+  };
   const memoOf = async (run: Run, said: string) => {
-    const memo = restingMemo<{ said: string }>();
+    const memo = informerMemo<{ said: string }>();
     await read(memo);
-    (await read(memo)).keep(run, { said }, [], () => new Map());
+    await kept(await read(memo), run, said);
     return memo;
   };
   const line = (taskId: string) => lines.push({ taskId, event: measuredEvent({ responses: 1 }) });
-  return { stored, read, memoOf, line, breakFeed: (to: boolean) => (broken = to) };
+  return { stored, read, kept, memoOf, line, breakFeed: (to: boolean) => (broken = to) };
 };
 
 /**
@@ -1066,19 +1069,25 @@ test('every input of a run at rest takes it, and it alone, out of the memo; a me
     async () => {
       const l = listMemo();
       const run = l.stored('raced');
-      const memo = restingMemo<{ said: string }>();
+      const memo = informerMemo<{ said: string }>();
       await l.read(memo);
       const slow = await l.read(memo);
       l.line('raced-work-1');
       await l.read(memo);
-      slow.keep(run, { said: 'done' }, [], () => new Map());
+      await l.kept(slow, run, 'done');
       assert.equal(memo.runs.has('raced'), false, 'its answer may stand on a journal from before the line the other read');
+      const calm = l.stored('calm');
+      const overtaken = await l.read(memo);
+      l.line('raced-work-1');
+      await l.read(memo);
+      await l.kept(overtaken, calm, 'done');
+      assert.equal(memo.runs.has('calm'), true, 'overtaken, it reads the feed again from where it read to: no line names this run');
 
       const kept = await l.memoOf(run, 'done');
       l.breakFeed(true);
       const unfed = await l.read(kept);
       assert.equal(kept.runs.size, 0, 'emptied');
-      unfed.keep(run, { said: 'done' }, [], () => new Map());
+      await l.kept(unfed, run, 'done');
       assert.equal(kept.runs.size, 0, 'nothing kept by a read made without the feed');
     },
   );

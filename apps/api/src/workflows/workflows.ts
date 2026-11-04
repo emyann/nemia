@@ -19,16 +19,14 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { Schema } from 'effect';
+import { Effect, Schema } from 'effect';
 import { Hono } from 'hono';
 import {
-  agentsFor,
   cardSkills,
   DEFAULT_FACTORY,
   fillsOf,
   foldersIn,
   inboxNameRefusal,
-  skillsFor,
   START as START_ENTRY,
   startFactory,
   unfilledRefusal,
@@ -43,7 +41,9 @@ import {
   isFolderTeam,
   STEP_KEY_MEANINGS,
   STEP_KEYS,
+  type Agents,
   type AgentSkill,
+  type SkillsFound,
   type StepKey,
   type Workflow,
 } from 'agent-orchestrator/workflow';
@@ -51,7 +51,7 @@ import { toldLayers, type ToldLayers } from 'agent-orchestrator/run';
 import { NotBlank, readBody, valueAt, type BodyIssue } from '../body.ts';
 import { refusedBeforeReading, type Guarded, type Refusal } from '../guard.ts';
 import { type ApiEnv, served } from '../layer.ts';
-import type { Engine } from '../store.ts';
+import { StoreRoot, type Engine } from '../store.ts';
 import { graphOf, workflowVersion, type RunGraph } from 'agent-orchestrator';
 import { commandNamed, runPlaced } from '../store.ts';
 import type { PlaceService } from 'agent-orchestrator';
@@ -60,8 +60,8 @@ import type { PlaceService } from 'agent-orchestrator';
 export type WorkflowSource = 'repo' | 'yours';
 
 /**
- * A step's frontmatter as the loader read it, before any run has frozen it: `null` where the step does not set it. The
- * run's page has `StepSpec`, the keys a run shows; this has every key, since choosing a workflow is reading them.
+ * A step's frontmatter as the loader read it, before any run has frozen it: `null` where the step does not set it. The run object has
+ * its steps' frozen spec (`spec.steps`), the keys a run shows; this has every key, since choosing a workflow is reading them.
  */
 export type WorkflowStepSpec = {
   harness: string | null;
@@ -261,10 +261,11 @@ export const loadedOf = async (
   home: string,
   factory?: Factory,
 ) =>
-  (await runPlaced(placeService, e, LIST.handler({ dirs, repo, ...(factory && { factory: factory.name }) }, undefined, home))) as Record<
-    string,
-    FolderLoaded
-  >;
+  (await runPlaced(
+    { placeService, home },
+    e,
+    LIST.handler({ dirs, repo, ...(factory && { factory: factory.name }) }, undefined, home),
+  )) as Record<string, FolderLoaded>;
 
 /** The loading of the folder `dir` among `loaded`, which `loadedOf` gives for each folder it was asked: thrown, naming it, where none. */
 export function loadedAt(loaded: Readonly<Record<string, FolderLoaded>>, dir: string): FolderLoaded {
@@ -276,13 +277,15 @@ export function loadedAt(loaded: Readonly<Record<string, FolderLoaded>>, dir: st
 /**
  * Every workflow `repo` and `home` have that `factory` offers: each folder in each source, by name — in a factory, only those attached to
  * it, and in one made from a template, its tree's first (`sourcesOf`). Loads every folder, so each can say whether it reads, and, in a
- * factory, which steps its hires leave unfilled.
+ * factory, which steps its hires leave unfilled. Each folder's version is read through the doors over `inRequest`, the request's services
+ * (`Served`), or a test's root given.
  */
 export async function listWorkflows(
   e: Engine['Service'],
   placeService: PlaceService['Service'],
   repo: string,
   home: string,
+  inRequest: InRequest,
   factory?: Factory,
 ): Promise<WorkflowListing[]> {
   const folders = unshadowed(
@@ -301,8 +304,16 @@ export async function listWorkflows(
     home,
     factory,
   );
-  return folders.map(({ name, from, dir }) => listed(name, from, dir, { repo, home }, loadedAt(loaded, dir), factory));
+  const versioned = await inRequest(
+    Effect.forEach(folders, (f) => Effect.map(workflowVersion(f.dir, placesOf(repo, home)), (version) => ({ ...f, version }))),
+  );
+  return versioned.map(({ name, from, dir, version }) => listed(name, from, dir, loadedAt(loaded, dir), version, factory));
 }
+
+/**
+ * How a read runs a program that needs the store's root: the request's `inRequest` (`Served`), or, in a test, one with the root given.
+ */
+export type InRequest = <A, E>(program: Effect.Effect<A, E, StoreRoot>) => Promise<A>;
 
 /**
  * Where a folder's agents and skills are looked for beyond its own `agents/` and `skills/`, as `nemia start --repo <repo>` looks: the
@@ -314,20 +325,19 @@ export const placesOf = (repo: string, home: string): Places => ({ repo, home })
 /**
  * One folder as the board lists it, read from disk now, its steps as the table's `workflows` loaded them (`loaded`): what the listing
  * has for it, and what the builder answers a write with. In `factory`, its steps are read with the factory's hires, and those left with no
- * agent named (`unfilled`).
+ * agent named (`unfilled`). Its `version` is the folder's now (`workflowVersion`), read by the caller over the request's services.
  */
 export function listed(
   name: string,
   from: WorkflowSource,
   dir: string,
-  places: Places,
   loaded: FolderLoaded,
+  version: string,
   factory?: Factory,
 ): WorkflowListing {
   const description = workflowDescription(dir);
   const readme = workflowReadme(dir);
   const schemas = schemasIn(dir);
-  const version = workflowVersion(dir, places);
   if ('error' in loaded) {
     return {
       name,
@@ -437,7 +447,7 @@ export const specOf = (step: Workflow): WorkflowStepSpec => ({
 });
 
 const SHAPE =
-  '`{ "workflow": "<name>", "brief": "<what to do>" }`, with `"from": "repo"` or `"yours"` when both have a workflow of that name, `"after": ["<runId>", …]` for the runs it waits on, `"context": ["<runId>", …]` for the runs it reads as context, and `"card": "<name>"` for an inbox card it starts';
+  '`{ "workflow": "<name>", "brief": "<what to do>" }`, with `"from": "repo"` or `"yours"` when both have a workflow of that name, `"after": ["<runId>", …]` for the runs it waits on, `"context": ["<runId>", …]` for the runs it reads as context, `"card": "<name>"` for an inbox card it starts, and `"label": ["<key>=<value>", "<key>-", …]` for the labels it is started with';
 
 /** Why a start with no card and no brief is not one (422). */
 const NO_BRIEF = `A run needs a brief: what to do, as \`nemia start <brief>\` takes it. Write it in \`brief\` — the run's steps are told it, under "What was asked for".`;
@@ -453,6 +463,7 @@ const START_BODY = Schema.Struct({
   context: Schema.optionalKey(Schema.Array(NotBlank)),
   card: Schema.optionalKey(Schema.String.check(Schema.makeFilter((card: string) => inboxNameRefusal(card) === undefined))),
   brief: Schema.optionalKey(Schema.String),
+  label: Schema.optionalKey(Schema.Array(NotBlank)),
 });
 
 /** Why `POST /api/runs`'s body is not a start, by the first key its schema refused: a `context` that is not a list of run ids is a 422. */
@@ -474,6 +485,8 @@ function startWords({ path: [key], input }: BodyIssue, body: unknown): string | 
   if (key === 'brief' && valueAt(body, ['card']) !== undefined)
     return `\`brief\` is what the run is asked to do in place of the card's body, as \`nemia start <card> --brief "<brief>"\` takes it: text, or left out for the card's body. This request's was ${JSON.stringify(input)}.`;
   if (key === 'brief') return { status: 422, error: NO_BRIEF };
+  if (key === 'label')
+    return `\`label\` is the labels the run is started with, as \`nemia start --label <key>=<value>\` takes each: a list of edits, such as \`"label": ["team=core"]\`, \`"<key>-"\` taking off one it would inherit, or left out. This request's was ${JSON.stringify(input)}.`;
   return `POST /api/runs takes a JSON object: ${SHAPE}.`;
 }
 
@@ -530,8 +543,22 @@ export function folderOf(
  * body.
  */
 export type Asked =
-  | { dir: string; brief: string; after: string[] | undefined; context: string[] | undefined; card?: undefined }
-  | { dir: string; brief: string | undefined; after: string[] | undefined; context: string[] | undefined; card: string };
+  | {
+      dir: string;
+      brief: string;
+      after: string[] | undefined;
+      context: string[] | undefined;
+      label: string[] | undefined;
+      card?: undefined;
+    }
+  | {
+      dir: string;
+      brief: string | undefined;
+      after: string[] | undefined;
+      context: string[] | undefined;
+      label: string[] | undefined;
+      card: string;
+    };
 
 /**
  * What `POST /api/runs` starts off its decoded body, or why it does not: the workflow it names (404, 409), and the brief (422) — the api's
@@ -539,7 +566,9 @@ export type Asked =
  *
  * `after` is only shaped here: a list of run ids, as `nemia start --after <runId>` takes each, and never a blank one, which the CLI refuses
  * too (`--after=`). Whether this run may wait on each is `startRun`'s to say (`afterRefusal`), in its words. `context` is shaped the same,
- * as `nemia start --from <runId>` takes each; whether each may be handed is `startRun`'s to say (`contextRefusal`).
+ * as `nemia start --from <runId>` takes each; whether each may be handed is `startRun`'s to say (`contextRefusal`). `label` is shaped the
+ * same, as `nemia start --label <edit>` takes each (`key=value`, or `key-` to take off one inherited); whether each is a label is
+ * `startRun`'s to say (`parseLabelEdits`, a 422).
  *
  * `card` names an inbox card to start, as `nemia inbox` lists it: refused here only for a name that is not a card's (`inboxNameRefusal`,
  * 400, in the package's words), before any folder is read. Whether the card is there, and may start, is `startFromInbox`'s to say. With a
@@ -547,10 +576,10 @@ export type Asked =
  * as `nemia start <card> --brief ""` is.
  */
 function startOf(body: typeof START_BODY.Type, repo: string, home: string, tree?: string): Asked | Refusal {
-  const { workflow, brief, from, after, context, card } = body;
+  const { workflow, brief, from, after, context, card, label } = body;
   const folder = folderOf(workflow, from, repo, home, tree);
   if ('status' in folder) return folder;
-  const handed = { after: after && [...after], context: context && [...context] };
+  const handed = { after: after && [...after], context: context && [...context], label: label && [...label] };
   if (card !== undefined) return { dir: folder.dir, brief, ...handed, card };
   if (brief === undefined || !brief.trim()) return { status: 422, error: NO_BRIEF };
   return { dir: folder.dir, brief: brief.trim(), ...handed };
@@ -558,13 +587,14 @@ function startOf(body: typeof START_BODY.Type, repo: string, home: string, tree?
 
 /**
  * What the agent a step is read with says it can do, generated from its skills, found where the load found them (`cardSkills`): null for a
- * step with no agent, one the folder's places do not have, and one whose card the package refuses.
+ * step with no agent, one the folder's places do not have, and one whose card the package refuses. `found` is what the folder's places
+ * hold, read through the Agent and Skill doors by the handler.
  */
-export function agentSkillsOf(step: Workflow, dir: string, places: Places): AgentSkill[] | null {
-  const attached = step.agent ? agentsFor(dir, places).get(step.agent.name) : undefined;
+export function agentSkillsOf(step: Workflow, found: { readonly agents: Agents; readonly skills: SkillsFound }): AgentSkill[] | null {
+  const attached = step.agent ? found.agents.get(step.agent.name) : undefined;
   if (attached === undefined || attached instanceof Error) return null;
   try {
-    return cardSkills(attached, skillsFor(dir, places));
+    return cardSkills(attached, found.skills);
   } catch {
     return null;
   }
@@ -585,7 +615,7 @@ async function cardStarted(
   home: string,
 ) {
   const started = await runPlaced(
-    placeService,
+    { placeService, home },
     e,
     START_ENTRY.handler(
       {
@@ -597,6 +627,7 @@ async function cardStarted(
         instead: asked.brief,
         after: asked.after,
         context: asked.context,
+        label: asked.label,
       },
       undefined,
       home,
@@ -643,7 +674,9 @@ async function cardStarted(
  */
 export const workflows = new Hono<ApiEnv>()
   .get('/api/workflows', (c) =>
-    served(c, async ({ e, placeService, repo, home, factory }) => c.json(await listWorkflows(e, placeService, repo, home, factory))),
+    served(c, async ({ e, placeService, repo, home, factory, inRequest }) =>
+      c.json(await listWorkflows(e, placeService, repo, home, inRequest, factory)),
+    ),
   )
   .get('/api/repository', (c) => served(c, ({ repo }) => c.json({ repo })))
   .post('/api/runs', (c) =>
@@ -662,7 +695,7 @@ export const workflows = new Hono<ApiEnv>()
       }
       const found = factory ? { factory, repo } : startFactory(named, repo, '?factory=<name>');
       const { id } = await runPlaced(
-        placeService,
+        { placeService, home },
         e,
         START_ENTRY.handler(
           {
@@ -671,6 +704,7 @@ export const workflows = new Hono<ApiEnv>()
             workflows: asked.dir,
             after: asked.after,
             context: asked.context,
+            label: asked.label,
             factory: found.factory?.name,
           },
           undefined,

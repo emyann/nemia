@@ -1,4 +1,5 @@
 /** The parts of an inbox card the Inbox page draws: its line under the title, its page's link, a card gone, a tick's try and a refusal. */
+import { LabelTags } from './Labels';
 import type { ReactNode } from 'react';
 import { Link } from '@tanstack/react-router';
 import { workflowNameOf, type InboxEntry } from '../lib/api';
@@ -31,6 +32,7 @@ export function CardMeta({ entry }: { entry: InboxEntry }) {
       ) : (
         <FactoryTag name={entry.factory!} linked />
       )}
+      <LabelTags labels={entry.labels} />
       {entry.workflow && (
         <span data-workflow={entry.workflow} title={entry.workflow}>
           workflow <span className="font-mono text-foreground">{workflowNameOf(entry.workflow)}</span>

@@ -85,3 +85,30 @@ test('a step at work says its agent and when its own task started; one given no 
   const done = await stepOf(id, 'build');
   assert.deepEqual([done.agent, done.since], ['ada', null], 'a settled step keeps its agent and is at work since nothing');
 });
+
+test("a run's judged fields: the judgement's run-level words, its time at work and tokens off the views, and the same keys left unjudged", async () => {
+  const { judgedFields, unjudgedFields } = await import('./summary.verb.ts');
+  const id = await started();
+  const run = readRun(id);
+  const judged = {
+    status: 'running',
+    phase: 'running',
+    reason: 'Running',
+    on: null,
+    via: null,
+    moving: true,
+    cost: null,
+    waiting: null,
+    holding: null,
+    toDecide: null,
+  } as const;
+  const fields = judgedFields(run, judged, new Map());
+  assert.deepEqual(fields, { ...judged, atWork: { ms: 0, since: null, endedAt: null }, tokens: null }, 'no view read: no time, no tokens');
+  assert.deepEqual(Object.keys(unjudgedFields()).sort(), Object.keys(fields).sort(), 'a run left unjudged carries the same fields');
+
+  engine().settle(`${id}-build`, 'working', { startedAt: AT, spawnedAt: AT });
+  const list: RunSummary[] = await runWith(e(), RUNS.handler({}, process.env));
+  const row = list.find((r) => r.id === id);
+  assert.ok(row, `the run ${id} is listed`);
+  assert.equal(row.atWork?.since, AT, "the list's row carries the judged time at work");
+});

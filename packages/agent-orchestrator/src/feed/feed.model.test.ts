@@ -1,11 +1,12 @@
 /**
  * The feed model: a cursor is a whole byte from 0, a subscription's name refuses what `subscriptionNameRefusal` refuses and takes what
- * `nemia subscribe` is given, a subscription decodes as its store reads one, and each kind of line decodes as the feed's writers write it.
+ * `nemia subscribe` is given, a subscription decodes as its store reads one, a delivery as the deliverer writes one, and each kind of line
+ * decodes as the feed's writers write it.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Option, Schema } from 'effect';
-import { DaemonLine, FeedCursor, FeedLine, feedModel, RunLine, StoreLine, Subscription, SubscriptionName } from './feed.model.ts';
+import { DaemonLine, Delivery, FeedCursor, FeedLine, feedModel, RunLine, StoreLine, Subscription, SubscriptionName } from './feed.model.ts';
 import { DAEMON_STARTED, startedLine, STORE, upgraded } from './feed.ts';
 import { DEFAULT_DIGEST_EVERY, DEFAULT_SELECTORS } from '../subscription/subscription.ts';
 
@@ -56,6 +57,30 @@ test('a subscription decodes as its store lists one, and one its writer would re
   for (const [row, sub] of Object.entries(rows)) await t.test(`REFUSED: ${row}`, () => assert.equal(Schema.is(Subscription)(sub), false));
 });
 
+test('a delivery decodes as the deliverer writes one, a stored one read as it is, and one the deliverer would not write is refused', async (t) => {
+  const kept = {
+    name: 'nemia',
+    of: { task: 'nemia-1', from: 120 },
+    cursor: 300,
+    digest: [upgraded({ at: AT, run: 'r-1', word: 'running' }), startedLine(5151, { kind: 'none' }, AT, 0)],
+    since: { at: 1_000, mono: { boot: 'b', ms: 5 } },
+  };
+  await t.test('with a digest and its time', () => assert.equal(Schema.decodeUnknownResult(Delivery)(kept)._tag, 'Success'));
+  await t.test('as a file of today holds one, a cursor cut back to 0 under its from, an empty digest and no time', () =>
+    assert.equal(Schema.is(Delivery)({ name: 'nemia', of: { task: 'nemia-1', from: 120 }, cursor: 0, digest: [] }), true),
+  );
+  await t.test('nominal on read: a cursor written before the check', () =>
+    assert.equal(Schema.is(Delivery)({ ...kept, cursor: -1 }), true),
+  );
+  const rows: Record<string, object> = {
+    'no subscription it was written for': { ...kept, of: undefined },
+    'a digest of what is no line': { ...kept, digest: [{ word: 'running' }] },
+    'a time that is no instant': { ...kept, since: { at: 'now' } },
+  };
+  for (const [row, delivery] of Object.entries(rows))
+    await t.test(`REFUSED: ${row}`, () => assert.equal(Schema.is(Delivery)(delivery), false));
+});
+
 test('each kind of line decodes as the feed’s writers write it, and as a line of the feed', async (t) => {
   const rows: Record<string, [Schema.Constraint, unknown]> = {
     "a run's": [RunLine, upgraded({ at: AT, run: 'r-1', word: 'running' })],
@@ -68,11 +93,17 @@ test('each kind of line decodes as the feed’s writers write it, and as a line 
       assert.equal(Schema.is(schema)(line), true);
       assert.equal(Schema.is(FeedLine)(line), true);
     });
+  await t.test("a run's line keeps the labels a person put on the run beside the closed five, and refuses one that is no string", () => {
+    const line = { ...upgraded({ at: AT, run: 'r-1', word: 'running' }), labels: { run: 'r-1', workflow: 'build', team: 'core' } };
+    const read = Schema.decodeUnknownSync(RunLine)(line);
+    assert.deepEqual(read.labels, { run: 'r-1', workflow: 'build', team: 'core' });
+    assert.equal(Schema.is(RunLine)({ ...line, labels: { run: 'r-1', team: 3 } }), false);
+  });
   await t.test('REFUSED: a daemon line of another word', () =>
     assert.equal(Schema.is(DaemonLine)({ at: AT, daemon: 1, word: `not ${DAEMON_STARTED}` }), false),
   );
   await t.test('the model', () => {
     assert.deepEqual(feedModel.ids, { SubscriptionName: 'Subscription' });
-    assert.deepEqual(feedModel.entities, [Subscription, RunLine, DaemonLine, StoreLine]);
+    assert.deepEqual(feedModel.entities, [Subscription, Delivery, RunLine, DaemonLine, StoreLine]);
   });
 });

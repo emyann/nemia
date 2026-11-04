@@ -8,19 +8,28 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { Effect } from 'effect';
+import { Effect, Layer } from 'effect';
 import { scratch } from '../../test/scratch.ts';
 import { act, done, doorFrom, walksOn } from '../../test/door-walks.ts';
-import { aWorkflow, WORKFLOW_WALKS, yoursOn } from '../../test/workflow-walks.ts';
+import { aStep, aWorkflow, carried, schemaOf, WORKFLOW_WALKS, yoursOn, type WorkflowSide } from '../../test/workflow-walks.ts';
 import { WorkflowDoor, workflowDoorFiles } from './workflows.store.ts';
-import { writeWorkflowAt } from '../folder/write.store.ts';
+import { placesAroundAt, writeWorkflowAt } from '../folder/write.store.ts';
 import { StoreRoot } from '../config/root.store.ts';
+import { WorkflowDir } from '../folder/folder.model.ts';
+import { AgentDoor, agentDoorFiles, agentFiles } from '../agents/agent-door.store.ts';
+import { agentDoorMemory } from '../agents/agent-memory.store.ts';
+import { AgentName, SkillName } from '../agents/agents.model.ts';
+import { SkillDoor, skillDoorFiles, skillFiles } from '../skills/skill-door.store.ts';
+import { skillDoorMemory } from '../skills/skill-memory.store.ts';
+import { anAgent } from '../../test/agent-walks.ts';
+import { aSkill } from '../../test/skill-walks.ts';
 
 const PKG = path.join(import.meta.dirname, '..', '..');
 
-for (const [name, body] of walksOn(WORKFLOW_WALKS, () => {
+for (const [name, body] of walksOn(WORKFLOW_WALKS, (): WorkflowSide => {
   const root = scratch('wf-workflow-door-');
-  return { door: doorFrom(WorkflowDoor, workflowDoorFiles(root)), root, layer: 'files' };
+  const defs = { agents: doorFrom(AgentDoor, agentDoorFiles(root)), skills: doorFrom(SkillDoor, skillDoorFiles(root)) };
+  return { door: doorFrom(WorkflowDoor, workflowDoorFiles(root)), root, layer: 'files', defs };
 }))
   test(name, body);
 
@@ -44,7 +53,9 @@ test("a folder written through the door is, byte for byte, the folder today's wr
   const draft = aWorkflow(undefined, '# Dev\n\nPlans, then builds.\n');
   done(side.door.workflows.write(yoursOn(side, 'dev'), draft));
   const theirs = path.join(root, 'workflows', 'theirs');
-  writeWorkflowAt(root, theirs, draft.steps, draft.readme);
+  const where = { dir: theirs, places: placesAroundAt(root, theirs) };
+  const found = { agents: agentFiles(root).agents.found(where), skills: skillFiles(root).skills.found(where) };
+  writeWorkflowAt(root, theirs, draft.steps, draft.readme, { found });
   assert.deepEqual(bytes(path.join(root, 'workflows', 'dev')), bytes(theirs));
 });
 
@@ -72,7 +83,83 @@ test('the default door reads the files at the store root the program is given, a
   assert.deepEqual(act(list), { refused: 'Invalid' });
 });
 
-/** The functions of the stores the Workflow door is over that `src`'s code still calls rather than yielding the door. */
+/**
+ * A store with the agent `scribe`, which may load a skill, held only by a fresh `agentDoorMemory()`, in the folder of agents a workflow
+ * of yours looks in, and `tidy-notes` only by a fresh `skillDoorMemory()`, in your library: the store, the folder `dev` of yours, and
+ * `over`, which gives a program both doors and the store's root, so the rooted Workflow door reads the files through them.
+ */
+const heldApart = () => {
+  const root = scratch('wf-workflow-door-');
+  const agents = agentDoorMemory();
+  const skills = skillDoorMemory();
+  done(
+    doorFrom(AgentDoor, agents).agents.write(
+      AgentName.read('scribe'),
+      anAgent('scribe', { keys: { model: 'sonnet', tools: 'Read, Write, Skill' } }),
+      undefined,
+      {
+        dir: path.join(root, 'workflows', 'agents'),
+        anywhere: true,
+      },
+    ),
+  );
+  done(
+    doorFrom(SkillDoor, skills).skills.write(SkillName.read('tidy-notes'), aSkill(), undefined, path.join(root, 'workflows', 'skills'), {
+      anywhere: true,
+    }),
+  );
+  const over = <A, E>(program: Effect.Effect<A, E>) =>
+    Effect.provide(Effect.provideService(program, StoreRoot, root), Layer.mergeAll(agents, skills));
+  return { root, dir: WorkflowDir.read(path.join(root, 'workflows', 'dev')), over };
+};
+
+/** A step file of `dev` that names its agent, and the skills it adds where given. */
+const plantStep = (dir: string, skills?: string) => {
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(path.join(dir, 'build.md'), `---\nplace: git\nagent: scribe\n${skills ? `skills: ${skills}\n` : ''}---\nBuild it.\n`);
+};
+
+test('a files workflow whose step names an agent only the agent door holds reads resolved with its keys', () => {
+  const { dir, over } = heldApart();
+  plantStep(dir);
+  const steps = done(over(Effect.flatMap(WorkflowDoor, (door) => door.workflows.read(dir))));
+  assert.deepEqual(
+    steps.map((s) => [s.name, s.agent?.name, s.model, s.tools]),
+    [['build', 'scribe', 'sonnet', ['Read', 'Write', 'Skill']]],
+  );
+});
+
+test('a files workflow written naming an agent only the agent door holds is written and answers its steps resolved', () => {
+  const { dir, over } = heldApart();
+  const saved = done(
+    over(
+      Effect.flatMap(WorkflowDoor, (door) =>
+        door.workflows.write(dir, aWorkflow([{ name: 'build', after: [], place: 'git', agent: 'scribe', body: 'Build it.' }])),
+      ),
+    ),
+  );
+  assert.deepEqual(saved.written, ['build.md']);
+  assert.deepEqual(
+    saved.steps.map((s) => [s.name, s.agent?.name, s.model]),
+    [['build', 'scribe', 'sonnet']],
+  );
+  assert.ok(fs.existsSync(path.join(dir, 'build.md')), 'written to the files');
+});
+
+test("a step's own skills: line adding a skill only the skill door holds reads resolved", () => {
+  const { dir, over } = heldApart();
+  plantStep(dir, 'tidy-notes');
+  const steps = done(over(Effect.flatMap(WorkflowDoor, (door) => door.workflows.read(dir))));
+  assert.deepEqual(
+    steps.map((s) => [s.name, s.skills, s.agent?.skills]),
+    [['build', ['tidy-notes'], ['tidy-notes']]],
+  );
+});
+
+/**
+ * The functions of the stores the Workflow door is over that `src`'s code still calls rather than yielding the door, a call spread into a
+ * list (`...formerKeyLines(dir)`) counted as any other.
+ */
 const SEAM = ['loadWorkflows', 'writeWorkflow', 'writeWorkflowAt', 'removeWorkflow', 'removeWorkflowAt', 'formerKeyLines'];
 
 /** The stores the door is over, and the door's own files: where the seam is defined, not a debt. */
@@ -96,7 +183,7 @@ function sourcesOfSrc(): Record<string, string> {
 
 /** The seam's calls in each file, comment lines left out: what `WORKFLOW_DOOR_DEBT` counts. */
 function seamUses(sources: Record<string, string>): Map<string, number> {
-  const call = new RegExp(`(?<![\\w$.])(?:${SEAM.join('|')})\\s*\\(`, 'g');
+  const call = new RegExp(`(?<![\\w$]|[^.]\\.)(?:${SEAM.join('|')})\\s*\\(`, 'g');
   const uses = new Map<string, number>();
   for (const [file, text] of Object.entries(sources)) {
     const code = text
@@ -143,6 +230,58 @@ test('REFUSED: a converted file that calls a store again, and a count the baseli
     'src/workflows/workflows.verb.ts': `${sources['src/workflows/workflows.verb.ts']}\nconst x = loadWorkflows('a');\n`,
   };
   assert.equal(debtBreaks(again, WORKFLOW_DOOR_DEBT).length, 1);
-  const [first] = Object.keys(WORKFLOW_DOOR_DEBT);
+  const spread = {
+    ...sources,
+    'src/workflows/workflows.verb.ts': `${sources['src/workflows/workflows.verb.ts']}\nconst y = [...formerKeyLines('a')];\n`,
+  };
+  assert.equal(debtBreaks(spread, WORKFLOW_DOOR_DEBT).length, 1, 'a call spread into a list is a call');
+  const [first = 'src/workflows/workflows.verb.ts'] = Object.keys(WORKFLOW_DOOR_DEBT);
   assert.equal(debtBreaks(sources, { ...WORKFLOW_DOOR_DEBT, [first]: (WORKFLOW_DOOR_DEBT[first] ?? 0) + 1 }).length, 1);
+});
+
+test("the door's version moves with an agent the folder names, and a write answers the version of the folder as written", () => {
+  const { root, side } = store();
+  const dir = WorkflowDir.read(path.join(root, 'workflows', 'notes'));
+  const agents = path.join(root, 'workflows', 'agents');
+  fs.mkdirSync(agents, { recursive: true });
+  fs.writeFileSync(path.join(agents, 'scribe.md'), '---\ndescription: Writes notes.\n---\nWrite them.\n');
+  const saved = done(
+    side.door.workflows.write(dir, aWorkflow([{ name: 'build', after: [], place: 'git', agent: 'scribe', body: 'Build.' }])),
+  );
+  const there = done(side.door.workflows.there(dir));
+  assert.deepEqual(there, { kind: 'folder', version: saved.version }, 'the write answers what the door reads after it');
+  fs.writeFileSync(path.join(agents, 'scribe.md'), '---\ndescription: Writes notes.\n---\nOther words.\n');
+  const moved = done(side.door.workflows.there(dir));
+  assert.notDeepEqual(moved, there, 'an edit of the agent the folder names moves its version');
+});
+
+test("a draft's carried schema replaces the folder's own before the folder is judged, and a file it does not carry is left", () => {
+  const { root, side } = store();
+  done(side.door.workflows.write(yoursOn(side, 'dev'), carried('size')));
+  const dir = path.join(root, 'workflows', 'dev');
+  fs.writeFileSync(path.join(dir, 'landing.ts'), 'process.exit(1);\n');
+  const { version } = done(side.door.workflows.there(yoursOn(side, 'dev'))) as { version: string };
+  const saved = done(side.door.workflows.write(yoursOn(side, 'dev'), carried('pages'), version));
+  assert.deepEqual(
+    saved.steps.map((s) => s.output?.schema.required),
+    [['pages']],
+  );
+  assert.deepEqual({ written: saved.written, kept: saved.kept }, { written: ['build.schema.json'], kept: ['build.md', 'check.ts'] });
+  assert.equal(fs.readFileSync(path.join(dir, 'build.schema.json'), 'utf8'), schemaOf('pages'));
+  assert.equal(fs.readFileSync(path.join(dir, 'landing.ts'), 'utf8'), 'process.exit(1);\n');
+});
+
+test('REFUSED: a carried file whose name in the folder is a link is Invalid, and the folder is byte for byte as it was', () => {
+  const { root, side } = store();
+  const { version } = done(side.door.workflows.write(yoursOn(side, 'dev'), carried('size')));
+  const dir = path.join(root, 'workflows', 'dev');
+  const outside = path.join(root, 'outside.ts');
+  fs.writeFileSync(outside, 'outside\n');
+  fs.rmSync(path.join(dir, 'check.ts'));
+  fs.symlinkSync(outside, path.join(dir, 'check.ts'));
+  const before = bytes(dir);
+  const draft = { ...carried('pages'), steps: [{ ...aStep('build'), body: 'Do it now.', output: { file: 'build.schema.json' } }] };
+  assert.deepEqual(act(side.door.workflows.write(yoursOn(side, 'dev'), draft, version)), { refused: 'Invalid' });
+  assert.deepEqual(bytes(dir), before);
+  assert.equal(fs.readFileSync(outside, 'utf8'), 'outside\n');
 });

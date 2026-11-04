@@ -40,7 +40,7 @@ const typed = async <D extends object>(command: typeof SUBSCRIBE | typeof UNSUBS
   assert.ok(args, `${argv.join(' ')} reads`);
   const refused = command.check?.(args);
   if (refused) throw Object.assign(new Error(refused), { exitCode: 2 });
-  return (await runWith(e, command.handler(args) as never)) as D;
+  return (await runWith(e, command.handler(args, process.env, ROOT) as never)) as D;
 };
 
 /** The message `f` refuses with, at exit 2. */
@@ -63,7 +63,7 @@ const feed = path.join(ROOT, 'feed.jsonl');
 const handed = async <D extends object>(args: Record<string, unknown>): Promise<D> => {
   const refused = SUBSCRIBE.check?.(args as never);
   if (refused) throw Object.assign(new Error(refused), { exitCode: 2 });
-  return (await runWith(e, SUBSCRIBE.handler(args as never) as never)) as D;
+  return (await runWith(e, SUBSCRIBE.handler(args as never, process.env, ROOT) as never)) as D;
 };
 
 test("nemia subscribe and unsubscribe: a long-lived task subscribed from the feed's end, by the default or its own selectors, a floor, and taken away", async (t) => {
@@ -143,7 +143,7 @@ test('REFUSED: nemia subscribe and unsubscribe refuse what they cannot put, by n
       assert.match(await refusal(() => typed(SUBSCRIBE, ['taken', 'nemia'])), /already named taken: nemia unsubscribe taken/);
       assert.match(await refusal(() => typed(SUBSCRIBE, ['../up', 'nemia'])), /is no subscription's name/);
       assert.match(await refusal(() => typed(UNSUBSCRIBE, ['../up'])), /is no subscription's name/);
-      assert.match(await refusal(() => typed(SUBSCRIBE, ['n', 'nemia', '-l', 'message=boom'])), /is no key of a feed line/);
+      assert.match(await refusal(() => typed(SUBSCRIBE, ['n', 'nemia', '-l', 'message=boom'])), /\bmessage\b.*-l <key>=<value>/);
       assert.match(await refusal(() => typed(SUBSCRIBE, ['n', 'nemia', '-l', ' '])), /is no selector: it holds no clause/);
       assert.match(
         await refusal(() => typed(SUBSCRIBE, ['n', 'nemia', '--digest-every', '0'])),

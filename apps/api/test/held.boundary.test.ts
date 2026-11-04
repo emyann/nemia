@@ -17,7 +17,7 @@ import assert from 'node:assert/strict';
 import { Effect } from 'effect';
 import fs from 'node:fs';
 import path from 'node:path';
-import type { RunDetail } from '../src/detail/detail.ts';
+import { objectOf, triesOf } from './run-reads.ts';
 import { app } from '../src/app.ts';
 import { approveRun, engine, list, runStore, type RunSummary } from 'agent-orchestrator';
 import { runWith } from './builtin-place.ts';
@@ -89,7 +89,8 @@ fs.appendFileSync(
   fs.writeFileSync(file, JSON.stringify(run));
 }
 
-const detail = async (id: string) => (await (await app.request(`/api/runs/${id}`)).json()) as RunDetail;
+/** What the run object of `id` says of it and its steps (`GET /api/runs/:id`, `status`). */
+const detail = async (id: string) => (await objectOf(app, id)).status;
 const summary = async (id: string) => {
   const run = ((await (await app.request('/api/runs')).json()) as RunSummary[]).find((r) => r.id === id);
   assert.ok(run, `${id} is on the list`);
@@ -114,16 +115,16 @@ test("a held step closed and not yet settled reads as it signed, never the engin
 });
 
 test('each try of a held task a person answered is its own turn: the try answered keeps its sign-off and its end, and the turn it started reads none of them', async () => {
-  const plan = (await detail('h-answered')).steps[0];
+  const tries = await triesOf(app, 'h-answered', 'plan');
   assert.deepEqual(
-    plan.tries.map((t) => [t.try, t.current, t.taskId]),
+    tries.map((t) => [t.try, t.current, t.taskId]),
     [
       [1, false, 'h-answered-plan'],
       [2, true, 'h-answered-plan'],
     ],
     'one task, two tries',
   );
-  const [answered, going] = plan.tries;
+  const [answered, going] = tries;
   assert.deepEqual(
     [answered.message, answered.attempts.count, answered.attempts.latest?.ended, answered.closeout?.needs],
     ['succeeded', 1, 'succeeded', BLOCKED.needs],

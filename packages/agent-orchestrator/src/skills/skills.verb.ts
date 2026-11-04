@@ -1,27 +1,24 @@
 /**
- * The skill library as entries of the command table: the skill folders the board lists, each read (`SKILLS_LIST`, `skillRead`), and one
- * skill read for its page (`SKILLS_READ`), on the api alone; and a skill of yours written from its SKILL.md or form, or copied from Nemia's
- * builtin skills (`SKILLS_WRITE`, `writeSkill`, `copySkill`), served on both sides. The api resolves which folders a read names, guards
- * each write, and words the board's answer around what each entry answers.
+ * The skill library as entries of the command table, each through the Skill door (`SkillDoor`, run `rooted` at the store's root the
+ * handler is given): the skill folders the board lists, each read (`SKILLS_LIST`), and one skill read for its page (`SKILLS_READ`), on
+ * the api alone; and a skill of yours written from its SKILL.md or form, or copied from Nemia's builtin skills (`SKILLS_WRITE`), served on
+ * both sides. The api resolves which folders a read names, guards each write, and words the board's answer around what each entry
+ * answers.
  */
-import { tried } from '../runtime-client.ts';
 import path from 'node:path';
+import { Effect } from 'effect';
+import { tried } from '../runtime-client.ts';
 import type { Args, Flag, Positional, Spec } from '../command/command.ts';
 import type { Command } from '../command/entry.verb.ts';
 import { apiKey, cliPath, factoryFlag, FROM, versionFlag, writerSpec, writerText, yoursOrRefused } from '../yours/yours.ts';
 import { templatedTree } from '../factory/factory.store.ts';
-import { HOME } from '../record/record.store.ts';
-import { skillVersion } from './read.store.ts';
-import {
-  copySkill,
-  skillRead,
-  skillText,
-  writeSkill,
-  type SkillChange,
-  type SkillCopied,
-  type SkillRead,
-  type SkillWritten,
-} from './skills.store.ts';
+import { rooted } from '../wiring/wire.verb.ts';
+import { StoreRoot } from '../config/root.store.ts';
+import { SkillName } from '../agents/agents.model.ts';
+import { SkillDoor, type SkillPage } from './skill-door.store.ts';
+import type { SkillChange, SkillCopied, SkillRead, SkillWritten } from './skills.store.ts';
+
+export type { SkillPage } from './skill-door.store.ts';
 
 /** The text under `key`, or undefined where none was given. */
 const textOf = (args: Args, key: string): string | undefined => {
@@ -39,7 +36,7 @@ const apiSpec = (positionals: readonly Positional[], keys: readonly string[]): S
   unknown: (arg) => `the board's skills take no ${arg}.`,
 });
 
-/** Each skill folder `skills` names read now (`skillRead`, the skill named by its folder), by folder. */
+/** Each skill folder `skills` names read now through the door (the skill named by its folder), by folder. */
 export const SKILLS_LIST: Command<Record<string, SkillRead>> = {
   name: 'skills',
   usage: '[<skills> ...]',
@@ -49,18 +46,29 @@ export const SKILLS_LIST: Command<Record<string, SkillRead>> = {
   class: 'read',
   route: { method: 'GET', path: '/api/skills', status: 200 },
   only: { side: 'api', why: "the board's skill picker lists every skill by place; at the command line a person lists the folders" },
-  handler: (args) =>
-    tried(() => {
-      const dirs = Array.isArray(args.skills) ? args.skills : [];
-      return Object.fromEntries(dirs.map((dir) => [dir, skillRead(path.basename(dir), dir)]));
-    }),
+  handler: (args, _env, home) =>
+    rooted(
+      home,
+      'skills',
+      Effect.gen(function* () {
+        const door = yield* SkillDoor;
+        const dirs = Array.isArray(args.skills) ? args.skills : [];
+        const reads = yield* Effect.forEach(dirs, (dir) =>
+          Effect.map(
+            door.skills.read(SkillName.read(path.basename(dir)), path.dirname(dir)),
+            ({ text: _text, version: _version, ...read }) => [dir, read] as const,
+          ),
+        );
+        return Object.fromEntries(reads) as Record<string, SkillRead>;
+      }),
+    ),
   print: () => [],
 };
 
-/** One skill read for its page: its reading (`skillRead`), its SKILL.md as written (`text`) and its version (`skillVersion`). */
-export type SkillPage = SkillRead & { text: string; version: string | null };
-
-/** The skill `name` whose folder is `dir`, as the api resolved it in the place `from`, read for its page (`SkillPage`). */
+/**
+ * The skill `name` whose folder is `dir`, as the api resolved it in the place `from`, read for its page (`SkillPage`) through the door,
+ * in the folder of skills `dir` is in.
+ */
 export const SKILLS_READ: Command<SkillPage> = {
   name: 'skills show',
   usage: '<from> <name>',
@@ -79,11 +87,15 @@ export const SKILLS_READ: Command<SkillPage> = {
     side: 'api',
     why: "the board's skill page reads one skill with its form and its users; at the command line a person reads its SKILL.md",
   },
-  handler: (args) =>
-    tried(() => {
-      const dir = textOf(args, 'dir') ?? '';
-      return { ...skillRead(textOf(args, 'name') ?? '', dir), text: skillText(dir), version: skillVersion(dir) };
-    }),
+  handler: (args, _env, home) =>
+    rooted(
+      home,
+      'skills show',
+      Effect.gen(function* () {
+        const door = yield* SkillDoor;
+        return yield* door.skills.read(SkillName.read(textOf(args, 'name') ?? ''), path.dirname(textOf(args, 'dir') ?? ''));
+      }),
+    ),
   print: () => [],
 };
 
@@ -97,9 +109,9 @@ const writtenLines = (data: SkillWritten | SkillCopied): string[] => [
 ];
 
 /**
- * A skill of yours written into your library (`yourSkillsDir`): copied whole from the folder of builtin skills (`builtin`) under the
- * name `copy` (`copySkill`), or else written from its change (`change`, as JSON text, which the command line reads off `--file`) at the
- * `version` it was read at, none for a skill made (`writeSkill`). Written to the tree of the factory `--factory` names for the place
+ * A skill of yours written into your library (`yourSkillsDir`) through the door: copied whole from the folder of builtin skills
+ * (`builtin`) under the name `copy`, or else written from its change (`change`, as JSON text, which the command line reads off `--file`)
+ * at the `version` it was read at, none for a skill made. Written to the tree of the factory `--factory` names for the place
  * `factory`. Refused, as `Invalid`, for a place but those two (`yoursOrRefused`).
  */
 export const SKILLS_WRITE: Command<SkillWritten | SkillCopied> = {
@@ -134,22 +146,25 @@ export const SKILLS_WRITE: Command<SkillWritten | SkillCopied> = {
     { method: 'POST', path: '/api/skills/:from', status: 201, hand: WRITE_HAND },
     { method: 'PUT', path: '/api/skills/:from/:name', status: 200, hand: WRITE_HAND },
   ],
-  handler: (args, _env, home = HOME) =>
-    tried(() => {
-      const library = yoursOrRefused(
-        'nemia skills write',
-        'skills',
-        writerText(args, 'from') ?? '',
-        writerText(args, 'name') ?? null,
-        '',
-        home,
-        { factory: writerText(args, 'factory'), treeOf: (factory) => templatedTree(factory, 'nemia skills write') },
-      );
-      const copy = writerText(args, 'copy');
-      if (copy !== undefined) return copySkill(writerText(args, 'builtin') ?? '', library, copy);
-      const change = JSON.parse(writerText(args, 'change') ?? 'null') as SkillChange;
-      return writeSkill(library, change, { version: writerText(args, 'version') ?? null });
-    }),
+  handler: (args, _env, home) =>
+    rooted(
+      home,
+      'skills write',
+      Effect.gen(function* () {
+        const root = yield* StoreRoot;
+        const library = yield* tried(() =>
+          yoursOrRefused('nemia skills write', 'skills', writerText(args, 'from') ?? '', writerText(args, 'name') ?? null, '', root, {
+            factory: writerText(args, 'factory'),
+            treeOf: (factory) => templatedTree(factory, 'nemia skills write'),
+          }),
+        );
+        const door = yield* SkillDoor;
+        const copy = writerText(args, 'copy');
+        if (copy !== undefined) return yield* door.skills.copy(SkillName.read(copy), writerText(args, 'builtin') ?? '', library);
+        const change = yield* tried(() => JSON.parse(writerText(args, 'change') ?? 'null') as SkillChange);
+        return yield* door.skills.write(SkillName.read(change?.name), change, writerText(args, 'version'), library);
+      }),
+    ),
   print: writtenLines,
 };
 

@@ -4,7 +4,7 @@ import type { Page } from 'playwright';
 import { fed, photograph, themeOf } from '../board.ts';
 import { cardOf, expectClearOfEachOther, expectClearOfPanels, holdEdgeOf, photographCard } from '../canvas.ts';
 import { expectCount, expectVisible, idle, literal, Refused, settled } from '../checks.ts';
-import { GATED, HELD } from '../seed.ts';
+import { DIAMOND, GATED, HELD } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT, store, unreadName } from '../world.ts';
 
@@ -12,12 +12,13 @@ export default {
   /**
    * A run a person holds until another lands (`wf hold`), on the board, its floor laid out by Reset layout whatever the page before left
    * open: GATED, at plan's gate, held until HELD, a run in flight on the same repository and branch, which `wf hold` takes (`holdRefusal`).
-   * Its card says the hold's word where its gate was, with how to lift it on hover, no Approve and not waiting on you; its steps read held;
+   * Its card says the hold's word where its gate was, with how to lift it on hover, no Approve and not waiting on you; its gate reads held,
+   * and its step not filed reads as any step to come, its hover saying the hold;
    * an edge comes into it from HELD's card, drawn as an `--after` edge is. Its page says the hold and how to lift it, links HELD, and
    * offers no answer. The hold is written as `wf hold` writes it, then taken back as `wf hold --off` does and said on the feed, so every
    * page after reads the store as seeded — and the card, read again, offers its gate as it did. That hold is one older code wrote, with
    * no why and no name, and reads the plain line; the one written next has both (`heldWithWords`). HELD's repository is one no machine
-   * has: the hold names it unread, in its place's words (`unreadName`).
+   * has: the hold names it unread, in its place's words (`unreadName`). Last, a held run nothing of which has started (`heldNotStarted`).
    */
   name: 'hold',
   route: '/factories/default',
@@ -48,11 +49,14 @@ export default {
       await expectCount(card.locator(`[data-gate-line="${gated}"]`), 0, 'nor says what approving would do');
       await expectCount(card.getByText('waiting on you', { exact: true }), 0, 'and does not say it waits on you');
       await expectVisible(card.getByText('held', { exact: true }), 'its badge says held');
-      for (const step of GATED.steps) {
-        await expectVisible(
-          card.locator(`ul[aria-label="Steps"] [data-step="${step}"][data-state="held"]`),
-          `${step}'s pill on its rail is held`,
-        );
+      await expectVisible(card.locator(`ul[aria-label="Steps"] [data-step="${gated}"][data-state="held"]`), `${gated}'s pill is held`);
+      for (const step of GATED.steps.filter((name) => name !== gated)) {
+        const pill = card.locator(`ul[aria-label="Steps"] [data-step="${step}"][data-state="waiting"]`);
+        await expectVisible(pill, `${step}, not filed, is drawn as any step to come`);
+        if (!(await pill.getAttribute('title'))?.includes('holds the run'))
+          throw new Refused(
+            `${step}'s pill says on hover that it waits on the hold — it says ${JSON.stringify(await pill.getAttribute('title'))}`,
+          );
       }
       await expectCount(edge, 1, `an edge comes into ${id}'s card from ${until}'s, which it is held until`);
       if ((await edge.locator('path').count()) < 1)
@@ -95,6 +99,7 @@ export default {
     await expectCount(card.locator('[data-holding]'), 0, 'and says no hold');
     await expectCount(edge, 0, 'and no hold edge comes into it');
     await heldWithWords(page);
+    await heldNotStarted(page);
   },
 } satisfies PageSpec;
 
@@ -155,4 +160,48 @@ async function heldWithWords(page: Page): Promise<void> {
     fed(id, gated, 'awaiting approval');
   }
   await expectCount(page.locator('section[aria-label="Held"]'), 0, 'with the hold with words lifted, the run page says no hold');
+}
+
+/**
+ * DIAMOND's bottom, nothing of it filed, held until HELD: on Runs its row's Now says held, and its one step is drawn as any step to
+ * come, never grey as if nearly done; on its page the step's chip is to come too, its hover saying the hold. The hold is then taken
+ * back.
+ */
+async function heldNotStarted(page: Page): Promise<void> {
+  const { id } = DIAMOND.bottom;
+  const hold = path.join(store!, 'runs', `${id}.hold`);
+  try {
+    if (fs.existsSync(hold)) throw new Refused(`no hold on ${id} before the page writes one — ${hold} is there`);
+    fs.writeFileSync(hold, JSON.stringify({ at: new Date().toISOString(), until: [HELD.id] }, null, 2), { flag: 'wx' });
+    fed(id, 'held');
+    const theme = await themeOf(page);
+
+    await page.goto(new URL('/runs', page.url()).href, { waitUntil: 'load' });
+    await idle(page);
+    const rail = page.locator(`[data-runs-page] [data-run="${id}"] [data-run-steps]`);
+    await expectVisible(
+      rail.locator('[data-step="implement"][data-state="waiting"]'),
+      `on Runs, ${id}'s step not started is drawn to come`,
+    );
+    await expectCount(rail.locator('[data-state="held"]'), 0, 'and none of its steps is drawn held');
+    await expectVisible(
+      page.locator(`[data-runs-page] [data-run="${id}"] [data-now-word]`, { hasText: /^held$/i }),
+      'and what it does now is the hold, said by the run',
+    );
+    await settled(page);
+    await photograph(page, path.join(OUT, `hold-not-started-runs-${theme}.png`), { fullPage: true });
+
+    await page.goto(new URL(`/runs/${id}`, page.url()).href, { waitUntil: 'load' });
+    await idle(page);
+    await expectVisible(page.locator('section[aria-label="Held"]'), `${id}'s page says it is held`);
+    const chip = page.locator('article > section#step-implement [data-state="waiting"]').first();
+    await expectVisible(chip, 'and its step not started has the chip of a step to come');
+    if (!(await chip.getAttribute('title'))?.includes('holds the run'))
+      throw new Refused(`the chip says on hover that it waits on the hold — it says ${JSON.stringify(await chip.getAttribute('title'))}`);
+    await settled(page);
+    await photograph(page, path.join(OUT, `hold-not-started-run-${theme}.png`), { fullPage: true });
+  } finally {
+    fs.rmSync(hold, { force: true });
+    fed(id, 'waiting');
+  }
 }

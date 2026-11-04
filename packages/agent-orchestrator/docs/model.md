@@ -27,9 +27,20 @@ The diagram below is printed by the code (`src/model/diagram.model.ts`, through 
   loosely); the callers still on the folder's stores are counted in `test/workflow-door.baseline.ts`. **S5d**, the Template door
   (`TemplateDoor`, `src/templates/templates.store.ts`): a template's folder or archive read, written and packed, rooted as S5a's, each
   tree written checked by `TemplateTreeWrite`; the model's `Template` (`src/templates/templates.model.ts`) is keyed by its source, and a
-  factory's `template` is an `AppliedTemplate`, whose source names it. Still to come, its own card on S5a: **S5c**, the Agent and Skill
-  doors (one context, the same lookup roots). A run's `pinned` revisions, left out of `Run` today, are named there.
-- **S6, the subscription, the ledger and the feed**, each behind a door on the feed's model.
+  factory's `template` is an `AppliedTemplate`, whose source names it. **S5c**, the Agent and Skill doors (`AgentDoor`,
+  `src/agents/agent-door.store.ts`; `SkillDoor`, `src/skills/skill-door.store.ts`): one context read through the same lookup roots, the
+  model's `Skill` beside its `Agent`, whose `skills` are `SkillName`s (a skill as its door writes it: its `applies:` line and its
+  `rules.json`, which no write of the door sets, are left out), rooted as S5a's, which root a name is read from decided by
+  `lookedUp` (`contracts/lookup.contract.ts`) and a write judged against the version it was read at by `definitionVersionRefusal`
+  (`contracts/definition-version.contract.ts`); the callers still on their stores are counted in `test/agent-door.baseline.ts`. A run's `pinned` revisions, left out of `Run` today, are named there.
+- **S6, the subscription, the ledger and the feed**, landed, each behind a rooted door on the pattern, its files today's. The
+  Subscription door (`SubscriptionDoor`, `src/subscription/subscription.store.ts`), by `SubscriptionName`: a subscription put once
+  (`wx`, a name taken is `Conflict`) and checked by `Subscription`, its delivery by the model's `Delivery`. The Ledger door
+  (`LedgerDoor`, `src/revisions/revisions.store.ts`), by `RevisionOf`: an append checked by `Revision`
+  (`src/revisions/revisions.model.ts`), a stored entry read nominally. The Feed door (`FeedDoor`, `src/feed/feed.store.ts`),
+  append-only: each line appended decoded by `FeedLine`, a cursor read at a line's boundary, the fold's memo its caller's
+  (`emitFeed`). The callers still on their module spellings are counted in `test/subscription-door.baseline.ts`,
+  `test/ledger-door.baseline.ts` and `test/feed-door.baseline.ts`; the store measured after them is `tools/store-measure/baselines/s6.json`.
 - **AgentOnStep** is `StepAgent` in the agents' model: the agent a step is given, and what the step overrides of it, within what the
   agent offers (`Agent.overridable`).
 - **Decision 9**: the place's model names `PlaceKind` (`git` or `folder`, as a step's `place:` says it, and `MountKind` before it), beside
@@ -50,6 +61,7 @@ erDiagram
     list after FK "optional"
     list context FK "optional"
     list inputs "optional"
+    string workflowFiles "optional"
     object from "optional"
     object scheduled "optional"
     list gates FK "optional"
@@ -64,6 +76,7 @@ erDiagram
     string stagedFile "optional"
     object tips "optional"
     string cancelledAt "optional"
+    object labels "optional"
     string createdAt
   }
   Step {
@@ -120,6 +133,7 @@ erDiagram
     StepName gate FK "optional"
     FactoryName factory FK "optional"
     list from FK "optional"
+    object labels "optional"
     string body
   }
   Factory {
@@ -156,13 +170,22 @@ erDiagram
     AgentName name PK
     string role "optional"
     string description "optional"
-    list skills "optional"
+    list skills FK "optional"
     enum harnessPrompt "optional"
     list mcp "optional"
     list overridable "optional"
     object keys
     string body
     string customInstructions "optional"
+  }
+  Skill {
+    SkillName name PK
+    string title "optional"
+    string description
+    list tags "optional"
+    list examples "optional"
+    boolean preload
+    string body
   }
   StepAgent {
     WorkflowName workflow FK
@@ -177,6 +200,12 @@ erDiagram
     number digestEvery
     FeedCursor from
     object scope "optional"
+  }
+  Delivery {
+    SubscriptionName name FK
+    object of
+    FeedCursor cursor
+    object since "optional"
   }
   RunLine {
     string at
@@ -215,6 +244,8 @@ erDiagram
     string store
     string word
     string note "optional"
+    string by "optional"
+    string why "optional"
     string apiVersion "optional"
     object involved "optional"
     object labels "optional"
@@ -224,6 +255,13 @@ erDiagram
     string source "optional"
     string message "optional"
     string call "optional"
+  }
+  Revision {
+    enum kind
+    string name
+    number n
+    string hash
+    string at
   }
   Workflow ||--o{ Run : workflowDir
   Run ||--o{ WorkflowStep : workflow
@@ -254,10 +292,15 @@ erDiagram
   Agent ||--o{ Hire : agent
   Agent ||--o{ Template : hires
   Workflow ||--o{ Template : workflows
+  Skill ||--o{ Agent : skills
   Workflow ||--o{ StepAgent : workflow
   WorkflowStep ||--o{ StepAgent : step
   Agent ||--o{ StepAgent : agent
   TaskId ||--o{ Subscription : task
+  Subscription ||--o{ Delivery : name
+  Delivery ||--o{ RunLine : digest
+  Delivery ||--o{ DaemonLine : digest
+  Delivery ||--o{ StoreLine : digest
   Run ||--o{ RunLine : run
   WorkflowStep ||--o{ RunLine : step
   Try ||--o{ RunLine : try

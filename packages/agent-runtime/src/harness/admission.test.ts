@@ -105,14 +105,14 @@ test("admission is a PreToolUse hook merged into the caller's settings, matched 
   for (const [what, settings] of settingsGiven({ callAdmission: ADMISSION })) {
     assert.deepEqual(
       Object.keys(settings),
-      ['hooks', 'autoMemoryEnabled'],
-      `${what}: no settings of the caller's, the hook and the session's auto-memory off`,
+      ['hooks', 'autoMemoryEnabled', 'claudeMdExcludes'],
+      `${what}: no settings of the caller's, the hook, the session's auto-memory off and no dependency's CLAUDE.md`,
     );
   }
   assert.deepEqual(
     attachedOptions({ name: 'ae/t/1', brief: 'b', cwd: '/r', config: { claude } }).settings,
-    { ...(JSON.parse(claude.settings) as object), autoMemoryEnabled: false },
-    "no admission: the settings as given, the session's auto-memory off beside them",
+    { ...(JSON.parse(claude.settings) as object), autoMemoryEnabled: false, claudeMdExcludes: ['**/node_modules/**/CLAUDE.md'] },
+    "no admission: the settings as given, the session's auto-memory and dependencies' CLAUDE.md off beside them",
   );
 });
 

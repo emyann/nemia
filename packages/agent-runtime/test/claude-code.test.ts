@@ -393,7 +393,11 @@ test("Claude Code's road, pinned: a job's command and options — its own flags,
         flagged.plugins?.map((p) => p.path),
         [path.resolve('/r', '/a/nemia-x'), path.resolve('/r', '/a/nemia-y')],
       );
-      assert.deepEqual(flagged.settings, { outputStyle: 'nemia-x:no-coding', autoMemoryEnabled: false });
+      assert.deepEqual(flagged.settings, {
+        outputStyle: 'nemia-x:no-coding',
+        autoMemoryEnabled: false,
+        claudeMdExcludes: ['**/node_modules/**/CLAUDE.md'],
+      });
       assert.equal(flagged.extraArgs?.bare, null, 'what the SDK has no option for is on `extraArgs`, the rest on its own option');
       const none = attachedOptions({ name: 'ae/t/1', brief: 'b', cwd: '/r' });
       const empty = attachedOptions({ name: 'ae/t/1', brief: 'b', cwd: '/r', config: { claude: {} } });
@@ -693,7 +697,7 @@ const PINNED_JOB_OPTIONS = {
   includePartialMessages: true,
   permissionMode: 'dontAsk',
   settingSources: ['project'],
-  settings: { autoMemoryEnabled: false },
+  settings: { autoMemoryEnabled: false, claudeMdExcludes: ['**/node_modules/**/CLAUDE.md'] },
   systemPrompt: { type: 'preset', preset: 'claude_code' },
   strictMcpConfig: true,
   model: 'opus',

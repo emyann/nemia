@@ -16,13 +16,13 @@
  * serves alone and runs itself, with no handler: `nemia tick`, `nemia up` and `nemia watch` (`RAN`).
  */
 import { Effect } from 'effect';
-import { tried } from '../runtime-client.ts';
 import { APPROVE } from '../gate/commands.verb.ts';
 import { ANSWER_HELP, answerFlag, recheckAnswerRefusal, typedAnswers, typedOf } from '../question/asked.verb.ts';
-import { stepsOf } from '../record/record.store.ts';
+import { stepsOf } from '../steps/steps.verb.ts';
 import { messageRefusal, modeWord, type RetryHow } from '../retry/index.ts';
 import { retryRun } from '../retry/retry.verb.ts';
 import { rootGiven, StoreRoot } from '../config/root.store.ts';
+import { rooted } from '../wiring/wire.verb.ts';
 import { roundRun } from '../round/round.verb.ts';
 import { saidLines } from '../say/say.ts';
 import { sayRun } from '../say/say.verb.ts';
@@ -31,6 +31,7 @@ import { decideRun, type Decided } from '../decide/decide.verb.ts';
 import { slotsRead, type Slots } from '../cap/cap.verb.ts';
 import { runsListed } from '../list/list.verb.ts';
 import { lsLines, type RunsListed } from '../list/list.ts';
+import { PAGES, labelFlags, runsShown, selectorCheck, selectorsIn } from './pages.verb.ts';
 import { pausedLines } from '../pause/pause.ts';
 import { agentCardRead, agentsRead } from '../roster/roster.store.ts';
 import { agentsLines, cardNote, type AgentsRead, type CardRead } from '../roster/roster.ts';
@@ -38,8 +39,7 @@ import { AGENTS_SOURCES } from '../sources/sources.verb.ts';
 import { amountIn, commandLine, type Args, type CommandSpec, type Flag } from './command.ts';
 import type { Command, Ran } from './entry.verb.ts';
 import { READS, SERIES } from './reads.verb.ts';
-import { PAGES } from './pages.verb.ts';
-import { AGENTS_CUSTOM } from '../agents/custom.verb.ts';
+import { AGENTS_CUSTOM } from '../custom/custom.verb.ts';
 import { LIBRARY_ENTRIES } from '../agents/library.verb.ts';
 import { SKILL_ENTRIES } from '../skills/skills.verb.ts';
 import { MERGES } from '../branches/merges.verb.ts';
@@ -49,6 +49,7 @@ import { WORKFLOW_ENTRIES } from '../workflows/workflows.verb.ts';
 import { FACTORIES } from '../factory/factory.verb.ts';
 import { TEMPLATES } from '../template/template.verb.ts';
 import { INBOXES } from '../inbox/commands.verb.ts';
+import { LABELS } from '../labels/commands.verb.ts';
 import { CONCLUDED, START } from '../start/commands.verb.ts';
 import { CANCEL, PAUSE, PAUSED, PAUSE_NOW, HOLD, PRUNE, RAN, RM, RESUME } from './runs.verb.ts';
 import { SUBSCRIBE, UNSUBSCRIBE } from '../subscription/subscription.verb.ts';
@@ -58,6 +59,7 @@ import { MEMORY } from '../nemia/memory.verb.ts';
 import { SERVICE_COMMANDS } from '../service/restart.verb.ts';
 import { RELEASES } from '../release/upgrade.verb.ts';
 import { VERSIONS } from '../release/version.verb.ts';
+import { DAEMON } from '../daemon/daemon.verb.ts';
 import { FRONTMATTER_REWRITE } from '../frontmatter/frontmatter.verb.ts';
 import { ADMIT } from '../admission/admit.verb.ts';
 import { POLICY_ENTRIES } from '../auto/auto.verb.ts';
@@ -289,11 +291,11 @@ const REFRESH: Command<{
     { method: 'POST', path: '/api/runs/:runId/merge', status: 202, sets: { base: true } },
   ],
   apiKeys: ['drift', 'step', 'target', 'onto', 'sha', 'round', 'file'],
-  handler: Effect.fnUntraced(function* (args: Args) {
+  handler: Effect.fnUntraced(function* (args: Args, _env?: NodeJS.ProcessEnv, home?: string) {
     const { runId } = named(args);
-    if (args.base !== true) return { drift: yield* refreshRun(runId) };
+    if (args.base !== true) return { drift: yield* rooted(home, 'refresh', refreshRun(runId)) };
     const { run, ask, file } = yield* mergeRun(runId, textOf(args, 'step'));
-    const looping = stepsOf(run).find((s) => s.name === ask.step);
+    const looping = (yield* stepsOf(run)).find((s) => s.name === ask.step);
     if (looping === undefined)
       throw new Error(`run ${run.id} has no step ${ask.step}, which its merge asks: report it as a defect of nemia refresh --base`);
     const { target, onto, sha } = ask.merge;
@@ -357,11 +359,12 @@ const SAY: Command<{
 
 /**
  * `nemia ls`: every run, or the one named, and its steps, as the package reads each (`runsListed`). The board's list is the runs'
- * summaries, judged off the same reading of each (`runReading`), on the entry the api serves alone (`RUNS`).
+ * summaries, judged off the same reading of each (`runReading`), on the entry the api serves alone (`RUNS`). The api serves this answer
+ * whole on `GET /api/listing` and `GET /api/listing/:runId`, which `nemia` reads and prints with this entry's lines, as a client of it.
  */
 const LS: Command<RunsListed> = {
   name: 'ls',
-  usage: '[<runId>]',
+  usage: '[<runId>] [-l <selector>] [--show-labels] [-L <key>]',
   help: [
     'runs and their steps — a run waiting on another says waiting on <run>,',
     'one the cap on runs in flight holds waiting for a run slot (2 of 2 in',
@@ -371,21 +374,24 @@ const LS: Command<RunsListed> = {
     'session, check or landing at work, or Paused once none is, then each',
     'check it holds, a landing with its merge staged in the checkout',
     '(MERGE_HEAD) among them; a step whose check it holds says waiting on',
-    'the pause',
+    'the pause. -l: the runs whose labels a selector takes (team=core,',
+    'given again for another); --show-labels: each run with its labels;',
+    '-L <key>: that label beside each run, given again for another',
   ],
   spec: {
     positionals: [{ key: 'runId', takes: 'optional', kind: 'name' }],
-    flags: [],
-    unknown: (arg) => `nemia ls takes one run's id, or none: not ${arg}.`,
+    flags: labelFlags('nemia ls'),
+    unknown: (arg) => `nemia ls takes one run's id, or none, -l <selector>, --show-labels and -L <key>: not ${arg}.`,
   },
+  check: selectorCheck,
   writes: false,
   class: 'read',
-  only: {
-    side: 'cli',
-    why: "its lines are each run's for a person at a terminal; the board reads every run judged into a summary, kept between its polls, off the runs entry",
-  },
-  handler: (args) => runsListed(textOf(args, 'runId')),
-  print: (listed) => [...(listed.paused ? pausedLines(listed.paused) : []), ...lsLines(listed, Date.now())],
+  route: [
+    { method: 'GET', path: '/api/listing', status: 200 },
+    { method: 'GET', path: '/api/listing/:runId', status: 200 },
+  ],
+  handler: (args) => Effect.flatMap(selectorsIn(args), (selectors) => runsListed(textOf(args, 'runId'), selectors)),
+  print: (listed, args) => [...(listed.paused ? pausedLines(listed.paused) : []), ...lsLines(listed, Date.now(), runsShown(args))],
 };
 
 const DECIDE: Command<Decided> = {
@@ -461,7 +467,7 @@ function agentsRefusal(args: Args): string | null {
   return `nemia agents --from takes repo or yours, not ${from}: repo is <repo>/workflows/agents, yours is your store's.`;
 }
 
-/** `nemia agents`: every agent of both places, the repository's then yours, each read now from disk. */
+/** `nemia agents`: every agent of both places, the repository's then yours, each read now through the Agent door. */
 const AGENTS: Command<AgentsRead> = {
   name: 'agents',
   usage: '[--repo .]',
@@ -475,7 +481,12 @@ const AGENTS: Command<AgentsRead> = {
   writes: false,
   class: 'read',
   route: { method: 'GET', path: '/api/agents', status: 200 },
-  handler: (args, _env, home) => tried(() => agentsRead({ repo: textOf(args, 'repo') ?? '.', ...(home !== undefined && { home }) })),
+  handler: (args, _env, home) =>
+    rooted(
+      home,
+      'agents',
+      Effect.flatMap(StoreRoot, (root) => agentsRead({ repo: textOf(args, 'repo') ?? '.', home: root })),
+    ),
   print: agentsLines,
 };
 
@@ -495,14 +506,18 @@ const AGENT_CARD: Command<CardRead> = {
   class: 'read',
   route: { method: 'GET', path: '/api/agents/:from/:name/card', status: 200 },
   handler: (args, _env, home) =>
-    tried(() => {
-      const from = textOf(args, 'from');
-      return agentCardRead(textOf(args, 'name') ?? '', {
-        repo: textOf(args, 'repo') ?? '.',
-        ...(home !== undefined && { home }),
-        ...((from === 'repo' || from === 'yours') && { from }),
-      });
-    }),
+    rooted(
+      home,
+      'agents card',
+      Effect.flatMap(StoreRoot, (root) => {
+        const from = textOf(args, 'from');
+        return agentCardRead(textOf(args, 'name') ?? '', {
+          repo: textOf(args, 'repo') ?? '.',
+          home: root,
+          ...((from === 'repo' || from === 'yours') && { from }),
+        });
+      }),
+    ),
   print: ({ card }) => [JSON.stringify(card, null, 2)],
   note: (data, args) => cardNote(data, textOf(args, 'name') ?? ''),
 };
@@ -512,6 +527,7 @@ export const COMMANDS: readonly Command[] = [
   START,
   CONCLUDED,
   ...INBOXES,
+  ...LABELS,
   ...FACTORIES,
   ...TEMPLATES,
   RETRY,
@@ -548,6 +564,7 @@ export const COMMANDS: readonly Command[] = [
   ...SERVICE_COMMANDS,
   ...RELEASES,
   ...VERSIONS,
+  DAEMON,
   FRONTMATTER_REWRITE,
   ...WORKFLOW_ENTRIES,
 ];

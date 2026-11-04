@@ -15,8 +15,10 @@ import { scratch } from '../../test/scratch.ts';
 import { story } from '../../test/checkpoints.ts';
 import { app, runtime } from '../app.ts';
 import { ReadMemo } from '../layer.ts';
-import { workflowVersion as versionIn } from 'agent-orchestrator';
+import { Effect } from 'effect';
+import { StoreRoot, workflowVersion as versionIn } from 'agent-orchestrator';
 import { runWith } from '../../test/builtin-place.ts';
+import { objectOf } from '../../test/run-reads.ts';
 import { listWorkflows } from './workflows.ts';
 import { engine, builtinGitPlace, hireRefusalOf, loadWorkflows, passStanding, runStore } from 'agent-orchestrator';
 import { AGENTS_FOLDER, STEP_KEY_MEANINGS, STEP_KEYS } from 'agent-orchestrator/workflow';
@@ -27,13 +29,16 @@ execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: repo });
 execFileSync('git', ['-c', 'user.email=t@local', '-c', 'user.name=t', 'commit', '-q', '--allow-empty', '-m', 'init'], { cwd: repo });
 
 /** A folder's version as the board lists it: its agents and skills looked for in the repository's `.claude/` and in yours too. */
-const versionOf = (dir: string): string => versionIn(dir, { repo, home: root });
+/** A program that reads the store, run over the harness's root (`WF_ROOT`), as a request's services give it. */
+const inRoot = <A, E>(program: Effect.Effect<A, E, StoreRoot>): Promise<A> =>
+  Effect.runPromise(program.pipe(Effect.provideService(StoreRoot, root)));
+const versionOf = (dir: string): string =>
+  Effect.runSync(versionIn(dir, { repo, home: root }).pipe(Effect.provideService(StoreRoot, root)));
 
 type WorkflowStepSpec = import('./workflows.ts').WorkflowStepSpec;
 type WorkflowStepPage = import('../step/step.ts').WorkflowStepPage;
 type WorkflowListing = import('./workflows.ts').WorkflowListing;
 type RunSummary = import('agent-orchestrator').RunSummary;
-type RunDetail = import('../detail/detail.ts').RunDetail;
 
 const write = (file: string, text: string): void => {
   fs.mkdirSync(path.dirname(file), { recursive: true });
@@ -485,8 +490,14 @@ test('a person starts runs from the board: the record as `nemia start` writes it
       assert.match(id, /^add-a-cache-keep-it-small-[a-z0-9]+$/);
       assert.equal(res.headers.get('location'), `/api/runs/${id}`);
 
-      assert.deepEqual(runFiles(), [`${id}.json`], 'the record, and nothing beside it');
+      assert.deepEqual(runFiles(), [id, `${id}.json`], "the record, and the run's own folder beside it");
       const run = runStore.runs.read(id);
+      assert.deepEqual(
+        fs.readdirSync(path.join(root, 'runs', id)),
+        ['workflow'],
+        'the folder holds only the copy of the workflow folder the run took',
+      );
+      assert.deepEqual(fs.readdirSync(path.join(root, 'runs', id, 'workflow')), [run.workflowFiles]);
       assert.deepEqual(
         {
           repo: run.repo,
@@ -529,7 +540,8 @@ test('a person starts runs from the board: the record as `nemia start` writes it
   await s.test(
     "a start as the board sends it is not refused: same-origin through vite's `/api` proxy, which rewrites Host to the api's and leaves the origin header the board's page; and one from a client outside a browser, which sends no Sec-Fetch-Site",
     async () => {
-      const before = runFiles().length;
+      const records = (): number => runFiles().filter((f) => f.endsWith('.json')).length;
+      const before = records();
       for (const headers of [
         { 'content-type': 'application/json', 'sec-fetch-site': 'same-origin', origin: 'http://localhost:5173', host: '127.0.0.1:8787' },
         { 'content-type': 'application/json; charset=utf-8', host: 'localhost:8787' },
@@ -538,7 +550,7 @@ test('a person starts runs from the board: the record as `nemia start` writes it
         const res = await sentWith(headers);
         assert.equal(res.status, 201, `${JSON.stringify(headers)}: ${await res.clone().text()}`);
       }
-      assert.equal(runFiles().length, before + 3);
+      assert.equal(records(), before + 3);
     },
   );
 
@@ -558,14 +570,14 @@ test('a person starts runs from the board: the record as `nemia start` writes it
       assert.deepEqual(runStore.runs.read(id).after, ['p-running']);
       assert.deepEqual(filedTasks(), [], 'nothing filed');
 
-      const unread = (await (await app.request(`/api/runs/${id}`)).json()) as RunDetail;
+      const unread = await objectOf(app, id);
       assert.ok(
-        unread.waiting?.word.startsWith('waiting on p-running (where it stands is unread: '),
-        `no pass has read where p-running stands since it was written: ${unread.waiting?.word}`,
+        unread.status.waiting?.word.startsWith('waiting on p-running (where it stands is unread: '),
+        `no pass has read where p-running stands since it was written: ${unread.status.waiting?.word}`,
       );
       await runWith(engine(), passStanding(runStore.runs.list()));
-      const detail = (await (await app.request(`/api/runs/${id}`)).json()) as RunDetail;
-      assert.deepEqual([detail.after, detail.waiting?.word], [['p-running'], 'waiting on p-running']);
+      const detail = await objectOf(app, id);
+      assert.deepEqual([detail.spec.after, detail.status.waiting?.word], [['p-running'], 'waiting on p-running']);
 
       const none = await post({ workflow: 'good', from: 'repo', brief: 'Right away.', after: [] });
       assert.equal(none.status, 201);
@@ -585,8 +597,8 @@ test('a person starts runs from the board: the record as `nemia start` writes it
       assert.equal(res.status, 201, await res.clone().text());
       const { id } = (await res.json()) as { id: string };
       assert.deepEqual([runStore.runs.read(id).context, runStore.runs.read(id).after], [['p-running'], undefined]);
-      const detail = (await (await app.request(`/api/runs/${id}`)).json()) as RunDetail;
-      assert.deepEqual([detail.context, detail.after, detail.waiting], [['p-running'], [], null]);
+      const detail = await objectOf(app, id);
+      assert.deepEqual([detail.spec.context, detail.spec.after, detail.status.waiting], [['p-running'], [], null]);
     },
   );
 
@@ -714,7 +726,7 @@ test('POST /api/runs: what a start refuses, writing nothing, and the name two pl
       write(path.join(clash, 'build.md'), '---\nplace: git\ncheck: npm run build\n---\nBuild it.\n');
       write(path.join(clash, 'build-check.md'), '---\nafter: build\nplace: git\n---\nCheck the build by hand.\n');
       assert.equal(
-        (await listWorkflows(engine(), builtinGitPlace, repo, root)).find((w) => w.name === 'clash')?.error,
+        (await listWorkflows(engine(), builtinGitPlace, repo, root, inRoot)).find((w) => w.name === 'clash')?.error,
         null,
         "the loader reads this folder; `nemia start` refuses it, as the run files build's check as `build-check`",
       );

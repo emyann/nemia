@@ -61,7 +61,7 @@ export const serverSignIns = new Hono<ApiEnv>()
         server,
       );
       if (refused) return refused;
-      return c.json(await runPlaced(placeService, e, serverSignIn(factory, server, home)));
+      return c.json(await runPlaced({ placeService, home }, e, serverSignIn(factory, server, home)));
     }),
   )
   .get(PATH, (c) =>
@@ -69,7 +69,7 @@ export const serverSignIns = new Hono<ApiEnv>()
       const { factory, server } = c.req.param();
       const wrong = misnamed(routeOf('GET', factory, server), factory, server);
       if (wrong !== null) return c.json({ error: wrong }, 400);
-      return c.json(await runPlaced(placeService, e, serverSignInState(factory, server, home)));
+      return c.json(await runPlaced({ placeService, home }, e, serverSignInState(factory, server, home)));
     }),
   )
   .delete(PATH, (c) =>
@@ -82,6 +82,6 @@ export const serverSignIns = new Hono<ApiEnv>()
         server,
       );
       if (refused) return refused;
-      return c.json(await runPlaced(placeService, e, serverSignOut(factory, server, home)));
+      return c.json(await runPlaced({ placeService, home }, e, serverSignOut(factory, server, home)));
     }),
   );

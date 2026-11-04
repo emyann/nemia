@@ -11,10 +11,10 @@ import { DEFAULT_HARNESS, isRemoteHarness } from '../harness/harness.ts';
 import { filedRefusal, lineOf } from '../keys/index.ts';
 import { filedConfig, tryModel } from '../filed/filed.ts';
 import { budgetOf, budgetUsdFor, stepSpend, type SpendOf } from '../status/status.ts';
-import { filedAt, toldOf } from '../tick/told.verb.ts';
+import { filedAt, toldOf, type StepTold } from '../tick/told.verb.ts';
 import type { Workflow } from '../workflow.ts';
 import { retryable, retryRefusal, type RetryAsk, type RetryHow } from './index.ts';
-import { stepsOf } from '../record/record.store.ts';
+import { stepsOf } from '../steps/steps.verb.ts';
 import { runStore } from '../record/files.store.ts';
 import { strayAsk } from '../say/say.verb.ts';
 import { closeoutAsked, closeoutReader, exitVerdicts, harnessBlocked, spendReader, taskPhasesRead } from '../views/views.verb.ts';
@@ -53,7 +53,7 @@ export const retryRun = Effect.fn('retry')(function* (
   { stopBlocked = false }: { stopBlocked?: boolean } = {},
 ) {
   const run = yield* (yield* RunDoor).runs.read(RunId.read(id));
-  const steps = yield* tried(() => stepsOf(run));
+  const steps = yield* stepsOf(run);
   const { views, phaseOf } = yield* taskPhasesRead(run);
   const blocked = stopBlocked ? harnessBlocked(views) : () => false;
   const spendOf = spendReader(views);
@@ -81,7 +81,8 @@ export const retryRun = Effect.fn('retry')(function* (
   }
   const denied = landingDenies(run, yield* PlaceService);
   const home = yield* StoreRoot;
-  const refusedConfig = yield* tried(() => tryRefused(run, steps, step, how, spendOf, denied, home));
+  const { own } = yield* toldOf(run, step);
+  const refusedConfig = yield* tried(() => tryRefused(run, steps, step, how, spendOf, denied, home, own));
   if (refusedConfig) return yield* Effect.fail(new Invalid({ message: refusedConfig }));
   const ask: RetryAsk = {
     step: stepName,
@@ -115,7 +116,8 @@ export const retryRun = Effect.fn('retry')(function* (
 /**
  * The runtime's refusal of the config the try asked for would be filed with (`filedConfig`, as the tick files a try: on the model the
  * try runs on and with its cap), said as the step's after the line it comes from: the flag the retry typed where it chose the field
- * (`--model`, on a fresh try, and `--budget`), else the step's own (`filedRefusal`). A recheck files no session, and a step on a remote
+ * (`--model`, on a fresh try, and `--budget`), else the step's own (`filedRefusal`); `own` is the harness's own arguments the
+ * tick tells the step with (`toldOf`), which the caller yields. A recheck files no session, and a step on a remote
  * agent is configured by its operator: neither is asked.
  */
 function tryRefused(
@@ -126,6 +128,7 @@ function tryRefused(
   spendOf: SpendOf,
   denied: readonly string[],
   home: string,
+  own: StepTold['own'],
 ): string | undefined {
   if (how.mode === 'recheck' || isRemoteHarness(step.harness)) return undefined;
   const record = run.steps[step.name];
@@ -134,7 +137,7 @@ function tryRefused(
     model: tryModel(step, record, how),
     budgetUsd,
     ...filedAt(run, home),
-    own: toldOf(run, step).own,
+    own,
     landingDenied: () => denied,
   });
   const flags = { ...(how.mode === 'fresh' && how.model !== undefined && { model: how.model }), budget: how.budget };

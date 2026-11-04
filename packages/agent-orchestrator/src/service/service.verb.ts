@@ -9,10 +9,10 @@ import type { Args, Flag } from '../command/command.ts';
 import { daemonLine } from '../daemon/daemon.ts';
 import { daemonStanding } from '../daemon/daemon.store.ts';
 import { pausedRead } from '../list/list.verb.ts';
-import { putPause, resumePause } from '../pause/pause.store.ts';
+import { putPause, readPause, resumePause } from '../pause/pause.store.ts';
 import { Invalid, Missing } from '../refusal/refusal.ts';
 import { drained, tried } from '../runtime-client.ts';
-import { callsOf } from '../pause/pause.ts';
+import { callsOf, type Pause } from '../pause/pause.ts';
 import { pointedEntry } from '../release/release.ts';
 import { runningRelease } from '../release/version.verb.ts';
 import {
@@ -72,6 +72,8 @@ export type ServiceHost = TakeoverHost & {
   readonly user: () => { name: string; uid: number };
   readonly call: (argv: readonly string[]) => string;
   readonly linger: (user: string) => boolean | undefined;
+  /** The store's pause as its file says it (`readPause`), or null where none stands: what `nemia service status` says of it. */
+  readonly standing: () => Pause | null;
 };
 
 /**
@@ -88,6 +90,7 @@ export const liveHost = (): ServiceHost => ({
   user: userOf,
   call: systemCall,
   linger: lingerOf,
+  standing: readPause,
   lease: () => daemonStanding(),
   signal: (pid) => process.kill(pid, 'SIGTERM'),
   pause: putPause,
@@ -353,7 +356,11 @@ export const serviceStatus = Effect.fn('serviceStatus')(function* (args: Args, h
     const unit = installedRead(at);
     const service: ServiceRead = { name: at.name, system: at.system, file: at.file, unit, state: unit === null ? null : stateOf(at, host) };
     const user = host.user().name;
-    const lines = statusLines(service, host.lease(), at.system === 'systemd' ? host.linger(user) : undefined, { now: Date.now(), user });
+    const lines = statusLines(service, host.lease(), at.system === 'systemd' ? host.linger(user) : undefined, {
+      now: Date.now(),
+      user,
+      pause: host.standing(),
+    });
     return { service, lines } satisfies ServiceStatus;
   });
 });

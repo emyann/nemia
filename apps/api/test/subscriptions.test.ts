@@ -95,7 +95,7 @@ test('A person subscribes a long-lived task: given by its words or the defaults,
       assert.match(String(zero.body.error), /^--digest-every takes the minutes a digest waits for a wake/);
       const nokey = await asked('POST', 'a', { task: 'nemia', selectors: ['message=boom'] });
       assert.equal(nokey.status, 422);
-      assert.match(String(nokey.body.error), /is no key of a feed line/);
+      assert.match(String(nokey.body.error), /\bmessage\b/, 'the refusal names the key no selector reads');
       assert.equal(fs.existsSync(file('a')), false, 'nothing written');
     },
   );

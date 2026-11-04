@@ -4,6 +4,11 @@ A workflow is **a folder of markdown files**. One file is one step. It runs on
 [`agent-runtime`](../agent-runtime), and it is the proof that the engine's boundary is real: this
 package uses the runtime's `Engine` service, `file`, `tick`, `view`, `stop`, `logs` and nothing else.
 
+`nemia` (and `wf`, its alias) is the client in [`apps/cli`](../../apps/cli): a moved read — `show`, `closeout`, `ls`, the inbox's
+read, `watch` — asks the api serving the store, starting its daemon on demand; every other verb, a help, and a read typed with
+`--local` run on this package's own CLI, `bin/nemia.ts`, which the client spawns with the same words. The commands below read the
+same either way.
+
 ```bash
 wf start ./brief.md --repo ~/code/myapp --workflows ./workflows
 wf start ./next.md --repo ~/code/myapp --after r-xyz   # file nothing of it until r-xyz has landed
@@ -94,7 +99,10 @@ own — its pid and `word: "daemon started"`, `reason: "DaemonStarted"`, and how
 — so a follower sees a restart, and a crash before it, in the feed it already reads. It is routine to a
 subscription, and no run's: the fold and a run's `removed` leave it out. The store has lines of its own, about `Store/store`:
 `nemia pause` (and the board's pause, which calls it) is one `store paused`, `reason: "StorePaused"`, and `nemia resume` one
-`store resumed`, `reason: "StoreResumed"`, each `source: "person"`, its note `since <the moment the pause was put>`. The verbs write
+`store resumed`, `reason: "StoreResumed"`, each `source: "person"`, its note `since <the moment the pause was put>`, which pairs a put
+with its lift. A put says who paused and why, as the pause's file does, in fields of its own (`by`, `why`) and in its message
+(`store paused by ann · merging by hand`, who alone where no why was given), never in its note; `nemia service status` says a pause that
+stands the same way. The verbs write
 no line: the tick's pass, which reads the store's pause (`$WF_ROOT/cordon`) already, offers the put while the pause stands and the lift
 for each put the feed holds that no longer stands (`storeOnce`), each counted off the feed's own lines, so a second daemon or a restart
 says neither again; a pause put and lifted between two passes leaves no line, since a pass reads what stands. `nemia watch -l
@@ -387,10 +395,10 @@ check: |-
 ```
 
 A frontmatter written before the reader was YAML is in the former line form, `key: the rest of the line`, split at its first colon and
-never quoted, which YAML may read otherwise or refuse (`check: [ -f out.md ]`, `description: Reviews: the diff`). A block YAML refuses
-whose every line is `key: rest` is still read the former way, every value as it was, and `nemia start` prints a line naming each such
-file with the fix. A block in neither form is refused, naming its line and what to write. The fallback goes once no store holds a
-former file (`docs/features.md`, §14).
+never quoted, which YAML may read otherwise or refuse (`check: [ -f out.md ]`, `description: Reviews: the diff`). Such a block is no
+longer read (`docs/features.md`, §14): a block YAML refuses, or reads as a flow collection on a key that holds one value, whose every
+line is `key: rest`, is refused at load, naming its first line YAML reads otherwise and that line written as YAML, or the command that
+rewrites the folder. A block in neither form is refused, naming its line and what to write.
 
 `nemia frontmatter rewrite [<folder>...]` rewrites a former frontmatter as YAML, every value byte for byte, the body as it was. Given no
 folder it walks the store's own: `workflows/`, `inbox/`, and each factory's `tree/` and `applied/`. It says each file rewritten, each it
@@ -576,7 +584,8 @@ agent: delete the step's line, or add the word to the agent's. This is judged on
 names its agent by `agent:` and one a factory hires it into: what the step overrides is its side of the agent on a step
 (`StepAgent`, `overridesOf`). The keys a step sets over its agent's fence and composition are `OVERRIDE_KEYS`. An agent with no line
 offers everything, as before the line, and `nemia start` prints a line for its file saying to add one. `overridable:` is the agent's
-own key: no step takes it.
+own key: no step takes it. A template carries it as the agent's spec's `overridable`, written back as the line when the template is
+applied, and its lint refuses there a word not in the list.
 
 #### Five layers: what shapes an agent, apart from its task
 
@@ -702,7 +711,7 @@ name as its tag. An agent with no description has no card. The frontmatter is re
 `description` each one text, a block scalar among them, and `tags` and `examples` each a YAML list of text, written in brackets or one
 item a line under the key. A list where a text is read, a text where a list is, a map, an empty list or an empty item, and a card key
 set twice are refused with the form to write; `skills-rendered.test.ts` holds this reading to js-yaml's on every SKILL.md the
-repository has. A SKILL.md still in the former line form is read each card key's line on its own, as the card was read before. A skill that no place has, or whose SKILL.md cannot be read, is refused where a card is asked for, never at load.
+repository has. A SKILL.md still in the former line form is refused at its line, as every frontmatter is. A skill that no place has, or whose SKILL.md cannot be read, is refused where a card is asked for, never at load.
 
 The card was a hand-written `.json` beside the agent, named by `card:` (by `skills:` before 2026-09-25), until agents card 2. Both
 lines are refused now, at load and on the board's save, saying what replaced them: delete the line and the file.
@@ -788,7 +797,10 @@ carries it. A rule goes in the repository's `.claude/settings.json` or on the st
 itself (`workspace: base`) is given one rule by the run: a read of its own run's artifacts folder, where the steps before it left their
 files, and of no other run's (`filedAllows`). Every step on a harness fenced by a permission mode is filed the artifacts folder of each
 step it comes after, through `after:` and on, mounted read-only (`handedMounts`): it reads what they handed over, a picture included,
-and writes none of it in any mode, and its brief names each by its path (`mountsLine`). Its own folder is as it was, and the folder of a step it does not come after is not mounted. A step's
+and writes none of it in any mode, and its brief names each by its path (`mountsLine`). Its own folder, where `WF_STEP_FILES` points
+and its tools save their snapshots and screenshots, is mounted read-only for a step whose mode writes outside its directory only by
+rule, so its Read, Grep and Glob reach them (`ownMounts`); a step in a wider mode, which writes there already, is filed none, its access
+as it was. The folder of a step it does not come after is not mounted. A step's
 `model:` and `effort:` go on
 the step or its agent, or it gets Claude Code's default rather than whatever the person running `wf up` set. And a repository whose commits
 must carry no `Co-Authored-By` trailer says `attribution` in its settings, as this one does. The skills a step is listed are its plugin's alone: none of Claude
@@ -798,7 +810,9 @@ Code's bundled ones, none of the repository's, none from `~/.claude/skills` and 
 beside `agents/` in each place agents are, in order: the workflow's own folder of agents' parent, then the repository's `.claude/`
 (`.claude/agents/`, `.claude/skills/`), then the store's `workflows/`. The first place that has a name wins, so the repository's
 wins over the store's, and a workflow of the store finds its own first. A name one repository has in both `workflows/` and `.claude/`
-is refused, naming both. A folder team, which has no repository, reads the `.claude/` of the directory it was started from.
+is refused, naming both. A folder team, which has no repository, reads the `.claude/` of the directory it was started from. Where no
+place has a name, Nemia's own skills are looked in last: the place's (`place/`, `PLACE_SKILLS`), then its builtin skills (`skills/`,
+`BUILTIN_SKILLS`), the two sharing no name. A step still names every skill it takes: nothing of Nemia's loads unnamed.
 `agentVersion` digests each skill it gives, every file of its folder, so an edit moves the agent's version and the board's save
 refuses a stale read.
 
@@ -848,7 +862,7 @@ agent's fence (`addedSkillsRefusal`); and one no place has, naming each place lo
 A run whose rendered folder was removed by hand is filed as a step was before: the instructions in its brief, and no flag naming a
 file that is not there. With no plugin there is nothing to load, so the brief tells each of the agent's skills whole after the
 instructions, read again from where a start of the run's folder finds them — an edit made since `wf start` reaches it, and a folder run,
-which keeps no repository, finds none in the one it was started in — or says which it could not tell and why (`unrendered`, `skillsAgain`).
+which keeps no repository, finds none in the one it was started in — or says which it could not tell and why (`unrendered`, `toldOf`, through the Skill door).
 
 An agent that gives skills keeps its role and its limits in its body and says when to load each; each entry of its card is a skill,
 the procedure the entry describes, as the tests' team does (`test/fixtures/team/`). `test/skills-rendered.test.ts` reads every
@@ -1548,6 +1562,17 @@ nothing that waits on the step ever runs. A step with no `check:` has nothing ru
   to read (`checks/<task>.closeout.json`). Its stdout and its stderr are the runtime's, each kept whole beside its
   attempt and read through the engine's `output` (`ae output <task> stdout`), since the engine's log of a task keeps
   only its last 8,000 characters.
+- **The command reads its workflow's own files as the run took them**, in `WF_WORKFLOW_FILES`: the absolute path of the
+  run's copy of its workflow folder (`runs/<id>/workflow/<hex>/`, every file at its path from the folder, none
+  writable), set for every check — a step's, an ending's and a folder run's — and in every session's environment beside
+  `WF_STEP_FILES`, its folder mounted read-only there and named on the brief. So a check line runs
+  `node "$WF_WORKFLOW_FILES/<script>.ts"`, whatever repository the run is on, and a script edited in the folder after
+  `nemia start` does not reach the run in flight. The copy is taken at `nemia start` (a link or a file of another kind
+  in the folder is refused there, before anything is written) and again wherever the run's pins move — its first
+  filing, `nemia refresh`, a factory that follows revisions (`renderAgain`) — so a check line and the scripts it runs
+  are always the one revision: a refresh cannot hand a run a check whose scripts are not where its line reads them.
+  The record names the copy as `workflowFiles`; a run started before it has none, and its checks are not told the
+  variable. A script edited alone is still no new revision of the workflow, which digests its `.md` and `.json` files.
 - The run commits what a step left **before** filing its check and never after, so what a suite leaves
   behind is not committed under the step's name.
 - **The step filed after a checked step is handed what the check said**, in its brief, under
@@ -1556,7 +1581,7 @@ nothing that waits on the step ever runs. A step with no `check:` has nothing ru
   and a space, at the start of the line — whole, from the stdout the runtime kept and not only the tail
   (`reportedLines`, at most `REPORTED_LINES`). A check whose stdout the runtime did not keep — filed before it kept
   streams — has those lines read from the end of the log alone, and the section says so, with
-  `"partial": true`: a line absent from it proves nothing. That is how a check marks what the next step must read: `workflows/build`'s pictures
+  `"partial": true`: a line absent from it proves nothing. That is how a check marks what the next step must read: the nemia factory's pictures
   print `wf pictures: …`, and a reviewer whose fence reaches no log reads them in its brief. The step reads
   the check of the try or round it follows, read on the pass that files it.
 
@@ -2696,6 +2721,27 @@ as `POST /api/runs/<id>/hold`, `{ "until": ["<run>", …], "why"?: "<words>", "b
 - a circle: a run named that already waits on this one, through `--after` while it has not started or
   through a hold, however far round. Each would wait on the other for ever
 
+## Labels: following an initiative — `--label`, `nemia label` and `-l`
+
+A person puts free `key=value` labels on inbox cards and runs, in Kubernetes' spelling with no prefix (a name segment of 63 at most),
+and changes them at any time, in flight or finished. They sit in one map beside `factory` and `workflow`, which Nemia sets itself; those
+two and the keys a feed line or a selector reads itself (`run`, `step`, `agent`, `kind`, `reason`, `on`, `via`, `type`, `waits`,
+`source`, `message`) are refused, naming both lists (`src/labels/labels.ts`).
+
+- **Where they are set**: a card's `labels:` map in its frontmatter; `--label key=value` on `nemia inbox add` and `nemia start`;
+  `nemia label run <id> team=core old-` and `nemia label inbox <name> …`, kubectl's shape, a changed value taking `--overwrite`; and the
+  board, on a card's page and a run's.
+- **Where they are kept**: a card's in its own file; a run's in `runs/<id>.labels`, a person's file beside the record, composed on read
+  and never written into it, so a relabel never races the tick's rewrite of the record. `nemia rm` removes it.
+- **Inherited once, at creation**: from the card and from every `--after` and `--from` run. A key the runs agree on is copied, the
+  card's beat the runs', a typed `--label` beats both and `--label key-` drops one; a key two runs disagree on is left out, and the start
+  says so with the `nemia label run` to type.
+- **The feed**: each line is stamped with its run's labels as they stood when it was written; a task's labels and the telemetry stay
+  closed.
+- **Selecting**: `-l` (the feed's grammar, `src/watch/selector.ts`) on `nemia watch`, `ls`, `inbox` and `stats`, served by the api as
+  `?selector=` from the informer; `--show-labels` and `-L <key>` add `  labels: a=b` and `  <key>: <value>` to each head line. The
+  board filters Inbox and Runs by it, and shows a page per label value (`/labels/<key>/<value>`).
+
 ## Pausing the whole store: `wf pause`
 
 ```bash
@@ -2806,7 +2852,7 @@ run 'wf tick' (or 'wf up') to start them
   frontmatter, so neither the run's id nor any step's brief carries a `workflow:` line. `--workflows` defaults to the
   card's `workflow:`, found from its plan folder as `wf start <folder>` finds it. A card whose `after:` names cards is refused
   without `--after`, and the refusal names the ids to give; `wf start` checks the ids given, as it checks any `--after`.
-  A file that opens with a closed frontmatter block that reads, as YAML or in the former line form, as a map of keys, each a word
+  A file that opens with a closed frontmatter block that reads as YAML as a map of keys, each a word
   (`KEY_WORD`), is a plan's card, and a block of keys is never taken into a brief: a key a plan's card lacks — an inbox card's `repo:` or `factory:`, a `title:` — is
   refused by name, exit 2, naming `wf inbox add <file>`, whose cards read those keys. A file whose block has a line of
   prose, is empty, or opens with a `---` it never closes is not a card, and is taken whole.
@@ -3080,7 +3126,9 @@ factory, and a step whose harness holds no writable mount, Codex's, in the runti
 The same mounts carry what the steps before a step handed over: the artifacts folder of each step it comes after, read-only, after the
 factory's (`handedMounts`, in `filedConfig`), on a harness fenced by a permission mode. A new session's brief names each by its path
 and step, read-only, and says to list one under its own path, since the run's artifacts folder above it is not mounted (`mountsLine`,
-fed by `filedFolders`, as the filing is). A store whose path
+fed by `filedFolders`, as the filing is). They carry its own artifacts folder too, read-only, before the handed ones, for a step whose
+mode writes outside its directory only by rule (`ownMounts`), and none in a store whose path no permission rule can name, where the
+step runs as it did. A store whose path
 no permission rule can name refuses `wf start` of a workflow with such a later step, in the runtime's words, before anything is written.
 
 ### What a step reads of the store: `reads:`
@@ -3965,7 +4013,7 @@ holding a concurrency slot forever.
 | `src/keys/keys.ts` | a step's keys read one each — pure: a value as written, the value the step carries, or the refusal that names the fix (`wordOf`, `contextOf`, `budgetOf`, `gateOf`, `workspaceOf`, `slotOf`, `outputOf`), and skills or a system prompt a step's sessions cannot reach (`composedRefusal`) |
 | `src/keys/tools.ts` | a step's tool rules — pure: its `tools` (`toolsOf`), its allow and deny rules, a write named as anything but `Edit` refused (`rulesOf`), and the rule offered for a call a fenced step was denied (`allowRuleOf`, `disallowedBy`) |
 | `src/former/former.ts` | a key under the name it had before — pure: `FORMER_KEYS`, and an agent's own `FORMER_OWN_KEYS` with its words (`harnessPromptNamed`), read in a file (`readKeys`) and on a frozen record (`asNamed`), written back in the form the file has (`formerKeyWritten`), and the fence a step asks for under either key (`modeOf`) |
-| `src/frontmatter/frontmatter.ts`, `frontmatter.verb.ts` | a frontmatter block as YAML 1.2 — pure: the one reader of every step, agent, skill and card (`readFrontmatter`, `frontmatterOrNull`), the former line form still read and marked, a list key's value as its one string (`flatValue`), the one writer (`renderFrontmatter`), a key set or taken out (`withKey`), a former file rewritten (`rewriteFormer`); and `nemia frontmatter rewrite` (`FRONTMATTER_REWRITE`) |
+| `src/frontmatter/frontmatter.ts`, `frontmatter.verb.ts` | a frontmatter block as YAML 1.2 — pure: the one reader of every step, agent, skill and card (`readFrontmatter`, `frontmatterOrNull`), the former line form refused at its line, the YAML to write named (`inFormerForm`), a list key's value as its one string (`flatValue`), the one writer (`renderFrontmatter`), a key set or taken out (`withKey`), a former file rewritten (`rewriteFormer`); and `nemia frontmatter rewrite` (`FRONTMATTER_REWRITE`) |
 | `src/workflow/step-file.ts` | one step file — pure: read into a `Workflow` through each key's reader, an unknown key refused (`parseWorkflow`), and written back, the parser run backwards (`renderStep`) |
 | `src/workflow/validate.ts` | a folder's steps checked together — pure: a cycle, a dangling `after`, an `input:` on work that has not finished, a workspace, a mode or a loop the team cannot run (`validate`), and the graph the `after` edges draw (`orderSteps`, `upstreamOf`, `fansOut`, `terminalSteps`) |
 | `src/folder/folder.ts` | a folder of markdown from its text — pure: its step files (`stepFiles`), the names a step and the folders beside it may take, and every step read and checked together (`parseFolder`) |
@@ -4009,7 +4057,7 @@ holding a concurrency slot forever.
 | `src/check/check.ts` | the check — pure: the command the run files on the command harness, the verdict, the contract |
 | `src/workspace/workspace.ts` | what a worktree is given — pure: the `node_modules` plan, `.worktreeinclude`, and the line a step is told; where a step works and what a folder step is given (`workspacePlan`, `givenPlan`), and which finished steps hand their work off on a pass (`handOffDue`) |
 | `src/record/record.store.ts` | the run store under `WF_ROOT`: a run's id (`runId`), its record read and written (`readRun`, `listRuns`), the files a person owns beside it — a cancellation, a pruning, each ask, approval and acceptance — and where a check's stderr, a step's artifacts and a run's inputs are kept |
-| `src/agents/agents.store.ts` | a run's agent files: where a step's agent is rendered under `runs/<id>/agents/<step>` (`agentFilesDir`), the render at `wf start` (`writeAgentFiles`), a skill read again once its rendered folder is gone (`skillsAgain`), and what the board's Agents page writes: an agent and its files (`writeAgent`, `removeAgent`, refused as `Missing`, `Conflict` — with the steps that still name the agent as `users` — or `Invalid`), and the agents it lists (`agentPlaces`, `listAgents`, `findAgent`) |
+| `src/agents/agents.store.ts` | a run's agent files: where a step's agent is rendered under `runs/<id>/agents/<step>` (`agentFilesDir`), the render at `wf start` (`writeAgentFiles`), and what the board's Agents page writes: an agent and its files (`writeAgent`, `removeAgent`, refused as `Missing`, `Conflict` — with the steps that still name the agent as `users` — or `Invalid`), and the agents it lists (`agentPlaces`, `listAgents`, `findAgent`) |
 | `src/agents/read.store.ts` | the agents read: every agent a workflow's steps may name, in its own folder and its places (`agentsFor`), the agents of one folder (`loadAgents`) and an agent's version (`agentVersion`), with a person's custom instructions for each (`customInstructionsFile`, `readCustomInstructions`); one level above the bottom of the store's tree, on the skills read alone |
 | `src/daemon/daemon.store.ts` | `tick.json` (the two ceilings, `ceilings` and `lastCeilings`), `tick-stats.json` (what the last pass cost, `recordPassCost` and `lastPassCost`), `tick-recent.json` (the recent passes, `recordRecentPass` and `recentPasses`) and `daemon.json` read, judged by `src/daemon/daemon.ts`, and written: the store taken, held, beaten and let go (`takeStore`, `beat`, `releaseStore`), each stamp with its monotonic reading (`instantNow`) |
 | `src/feed/feed.store.ts` | the feed's file: the store's `feed.jsonl` read, appended to and followed, a cursor refused where it falls inside a line or past the end, and this process's one fold of it (`recordFeed`, `recordDaemonLine`, `readFeed`, `watchFeed`, `feedCursorRefusal`), its size and the ends of its lines from a cursor (`feedSize`, `readFeedEnds`) |
@@ -4025,9 +4073,9 @@ holding a concurrency slot forever.
 | `src/standing/standing.store.ts` | `standing.json`, what the last pass read of where the branches stand, written whole by the tick alone (`writeStanding`), and decoded by its schema, a file that does not decode refused (`Invalid`) naming it (`readStanding`) |
 | `src/branches/changes.store.ts` | what a repository run's branches changed, as its place's `report` says on each read (`changesOf`), and what is at a path on a branch (`presentOn`): nothing kept between reads, and an answer the place does not give said as not known |
 | `src/artifacts/artifacts.store.ts` | the files a step hands over, copied out of its workspace (`collectArtifacts`), each it named that the run does not have (`missingArtifacts`; off the disk alone as the step signs off, `filesLacked`; those there for the step after, `filesHanded`), what its files directory holds (`artifactFiles`), a landed ending's check pictures removed (`dropLandedPictures`), and one file of that directory or of a step's folder, read by its name and never by a path (`artifactFile`, `fileIn`) |
-| `src/folder/write.store.ts` | what the board's builder writes: a workflow folder from its steps (`writeWorkflow`), refused where it is no place the board lists (`workflowPlaceRefusal`) |
+| `src/folder/write.store.ts` | what the board's builder writes: a workflow folder from its steps (`writeWorkflowAt`, which `writeWorkflow` in `workflows.store.ts` calls), refused where it is no place the board lists (`workflowPlaceRefusal`) |
 | `src/skills/skills.store.ts` | what the board's skill picker and skill page write: a skill copied from another folder of skills (`copySkill`), and a skill made or changed (`writeSkill`), refused as `Missing`, `Conflict` or `Invalid` |
-| `src/skills/read.store.ts` | the skills read: where a workflow's agents and skills are looked for (`lookupRoots`), each skill an agent may give (`skillsFor`, with the package's builtin place skills, `PLACE_SKILLS`), a skill's rules (`readSkillRules`), its version (`skillVersion`), an agent card's entries (`cardSkills`) and whether a skill is told whole (`preloads`); at the bottom of the store's tree |
+| `src/skills/read.store.ts` | the skills read: where a workflow's agents and skills are looked for (`lookupRoots`), each skill an agent may give (`skillsFor`, with the package's builtin place skills, `PLACE_SKILLS`, then its builtin skills, `BUILTIN_SKILLS`, found last), a skill's rules (`readSkillRules`), its version (`skillVersion`), an agent card's entries (`cardSkills`) and whether a skill is told whole (`preloads`); at the bottom of the store's tree |
 | `src/plan/plan.store.ts` | a plan folder's cards read from disk (`readPlan`) |
 | `src/config/config.store.ts` | the `WF_` environment, each variable an Effect `Config` with its default, read by a plain reader that refuses a value the variable does not take by name, exit 2 (`wfRoot`, `maxConcurrent`, `maxRuns`, `verifiesRest`); at the bottom of the store's tree, and reads no disk |
 | `src/inbox/inbox.store.ts` | the inbox's cards read, filed, queued, dropped (`readInbox`, `addToInbox`, `queueInInbox`, `dropFromInbox`) through `runStore.inbox`, and a path named as a card (`inboxNameAt`, which asks `runStore.inbox.nameAt`) |
@@ -4058,7 +4106,7 @@ holding a concurrency slot forever.
 | `src/cli/main.ts` | the verbs' table: `main`, which looks up the command in the table or the verb in `VERBS` and runs it, or prints the help; and the runners of the commands the CLI runs itself (`RUNS`): `wf tick`, `wf up` and `wf watch` — with its liveness (`livenessLines`) — and `wf rm` and `wf prune` |
 | `src/daemon/up.verb.ts` | the daemon's loop, one for its two kinds, the api's process and `wf up`: `up`, which takes the store's lease in its scope and lets it go as the scope closes; `holdUrl`, which writes into the lease where the api serves; and `runMain`, which runs either as the process's command |
 | `src/cli/flags.ts`, `src/cli/start.ts`, `src/cli/runs.ts` | what the CLI's verbs and runners share: the help, a verb's shape (`Verb`), a usage refusal, a person's yes; the runners of `wf start` (a brief, or a folder of cards) and `wf inbox add`, which read the files and folders their command line names; and the runners of `wf agents custom`, `wf rm` and `wf prune` |
-| `src/start/commands.verb.ts`, `src/inbox/commands.verb.ts`, `src/factory/factory.verb.ts`, `src/agents/custom.verb.ts` | entries of the command table: `wf start`, a folder or a brief (`START`); `wf inbox`, bare, `add`, `queue` and `rm`, and a card's page, which the api alone serves (`INBOXES`); `wf factory`, bare, `ls`, `add`, `attach`, `detach`, `hire`, `fire` and `rm` (`FACTORIES`); `wf agents custom` (`AGENTS_CUSTOM`) — each its usage, help, arguments, handler and route |
+| `src/start/commands.verb.ts`, `src/inbox/commands.verb.ts`, `src/factory/factory.verb.ts`, `src/custom/custom.verb.ts` | entries of the command table: `wf start`, a folder or a brief (`START`); `wf inbox`, bare, `add`, `queue` and `rm`, and a card's page, which the api alone serves (`INBOXES`); `wf factory`, bare, `ls`, `add`, `attach`, `detach`, `hire`, `fire` and `rm` (`FACTORIES`); `wf agents custom` (`AGENTS_CUSTOM`) — each its usage, help, arguments, handler and route |
 | `src/branches/merges.verb.ts`, `src/command/pages.verb.ts`, `src/agents/library.verb.ts`, `src/skills/skills.verb.ts`, `src/workflows/workflows.verb.ts` | entries of the command table the api alone serves, each with why (`only`): whether a run's branches still merge (`MERGES`); a run's page and its steps' files, path and conversation (`PAGES`); the agent library's writes, removal, try and read (`LIBRARY_ENTRIES`); the skill library's list, read and writes (`SKILL_ENTRIES`); the workflow builder's reads and writes (`WORKFLOW_ENTRIES`) |
 | `src/cli/decide/decide.ts` | `wf decide`: its help, its one flag, and the screen it prints (`decideVerb`) |
 | `src/cli/exit.ts` | what `nemia` exits with (`exitCodeOf`), imported by each bin, `bin/nemia.ts` and its alias `bin/wf.ts`, before the package |
@@ -4103,7 +4151,7 @@ spawn nothing, and import no file of the other kinds. **Store** files are the I/
 no runtime, never a controller and not the client, and load as a tree — `record/places.store.ts`, `skills/read.store.ts`
 (the skills read), `meter/tally.store.ts` (the pass's meter) and `config/config.store.ts` (the `WF_` environment) at the
 bottom, `agents/read.store.ts` (the agents read, and a person's custom instructions) on the skills read,
-`folder/folder.store.ts` on both reads, `record/record.store.ts` on the bottom, the folders and `record/steps.store.ts`,
+`folder/folder.store.ts` on both reads, `record/record.store.ts` on the bottom, the folders and the revisions,
 `workspace/worktree.store.ts` on `record.store.ts`, `places.store.ts` and `tally.store.ts`, `folder/write.store.ts` on
 `record.store.ts`, the two reads and the factories — and outside the store only the client and the
 controllers beneath the CLI import them. **Controllers** use the runtime through the client: `runner.ts`, the root, which

@@ -11,7 +11,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { Effect, Logger, References } from 'effect';
+import { Effect, Layer, Logger, References } from 'effect';
+import { StoreRoot } from '../config/root.store.ts';
 import { parseCloseout } from '../closeout/closeout.ts';
 import type { FeedCloseout, FeedWords } from './feed.ts';
 import { scratch } from '../../test/scratch.ts';
@@ -34,7 +35,7 @@ async function logsOf<A>(program: Effect.Effect<A, unknown>): Promise<Kept[]> {
       annotations: { ...fiber.getRef(References.CurrentLogAnnotations) },
     });
   });
-  await Effect.runPromise(program.pipe(Effect.provide(Logger.layer([keeper]))));
+  await Effect.runPromise(program.pipe(Effect.provide(Layer.merge(Logger.layer([keeper]), StoreRoot.layer(ROOT)))));
   return logs;
 }
 

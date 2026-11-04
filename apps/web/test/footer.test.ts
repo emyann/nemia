@@ -26,6 +26,7 @@ const win = (extra: Partial<QuotaWindow> = {}): QuotaWindow => ({
 
 /** A run in flight with one step per status, in `factory`, and `extra` over it. */
 const run = (statuses: readonly Word[], extra: Partial<RunSummary> = {}): RunSummary => ({
+  labels: {},
   id: 'r-1',
   repo: '/code/app',
   factory: null,

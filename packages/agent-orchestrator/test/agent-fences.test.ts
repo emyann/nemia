@@ -1,58 +1,30 @@
 /**
- * Every shipped step is refused `git push`, a forced branch delete, a kill by name (`pkill`, `killall`) and Playwright's
- * `browser_run_code_unsafe` by its own fence, and the checkout's `.claude/settings.json` refuses none of them: the settings bind a
- * person's own session in this checkout too, and a person may ask their session to push.
+ * What a permission rule reaches, proven on rules this suite writes or reads: a matcher of Claude Code's rule shapes, the fence of the
+ * tests' team, the read set's denies planted on it, and Nemia's own fence. sdlc's agents and their rules as written are
+ * `packages/templates/test/fences.test.ts`'s; this file says what such a rule reaches.
  *
- * The guard reads every workflow folder `shippedFolders` finds under `SHIPPED_HOLDERS`: the repository's `workflows/`, this repository's
- * own team, and the package's own, none on disk. It holds the tests' team (`team.ts`) to the same fence: each refusal below is made on
- * the team, cut back, and on a watcher's step written here, so whatever is shipped is held by a guard proven to refuse.
+ * The matcher is Claude Code's rule shapes this suite relies on (`reaches`), and throws on a wildcard it does not model, so an allow it
+ * cannot read fails the test rather than passing it. A command is matched part by part, as Claude Code matches it (`partsOf`): a deny of
+ * any part refuses the whole, and a dontAsk step runs it only when an allow reaches every part. A deny is matched against a part as typed
+ * too, its leading assignment kept (`deniedPartsOfCall`), as Claude Code was measured to match one; an allow against the unwrapped part
+ * alone.
  *
- * Each step is read at shipped defaults, as `wf start` freezes it (`loadWorkflows`). A step in `auto` — the engine's default — runs
- * whatever no deny names, so its own `disallowedTools` must name each call. A step in `dontAsk` runs only what an allow reaches, so
- * no rule of its `allowedTools`, of the settings' allow or of a skill's `allowed-tools` may reach one. A step that reads settings the
- * repository does not ship — a job in the checkout itself reads that checkout's working-tree `.claude/settings.json`, which a person
- * may have edited — may be allowed anything there, so it too must name each call itself. A step on codex is fenced by a
- * read-only sandbox. The matcher is Claude Code's rule shapes this suite relies on, and throws on a wildcard it does not model, so an
- * allow it cannot read fails the test rather than passing it. A command is matched part by part, as Claude Code matches it (`partsOf`):
- * a deny of any part refuses the whole, and a dontAsk step runs it only when an allow reaches every part.
+ * The tests' team (`team.ts`) is fenced as a team must be: each step is refused `git push`, a forced branch delete, a kill by name, every
+ * `gh` write and Playwright's `browser_run_code_unsafe` (`FENCED`), by its own deny in `auto`, by no allow in `dontAsk`, by a read-only
+ * sandbox on codex (`unfenced`). Each refusal is made on the team cut back, and on a watcher's step written here. The checkout's
+ * `.claude/settings.json` refuses none of it: the settings bind a person's own session in this checkout too, and a person may ask their
+ * session to push or start a probe (`PROBES`).
  *
- * A fence also reaches the run's artifacts folder: each step is filed the folder of every step it comes after, read-only
- * (`handedMounts`), and reads what it holds and writes none of it, in any mode; it is filed no folder of a step it does not come after.
- * The reach is read off the config a filing gives the harness (`filedConfig`), as Claude Code holds a mount (`readsAt`, `writesAt`). So
- * does the store's inbox, for a step whose `reads:` names it (`readsMounts`): read-only, in any mode, and to no other step.
+ * The read set is git's read-only questions and the text tools a read-only agent allows itself (`READ_SET_ALLOWS`), and the denies
+ * beside it of what that set would let git run a program by (`RUNS_A_PROGRAM_DENIES`), write a file by (`WRITES_A_FILE_DENY`) or read
+ * outside the repository by (`READS_OUTSIDE_DENIES`), and `wc` read a list of paths by (`WC_READS_A_LIST_DENY`). Both are planted here
+ * on the tests' reviewer, a dontAsk agent, in a copy of the team (`planted`), and read as a run reads it. Each deny is proven to be the one
+ * that refuses its own spellings, and each plain read still asked. The planted lists may drift from sdlc's: what sdlc writes is held
+ * where it is written.
  *
- * Every read-only agent of the team (`READ_ONLY_AGENTS`) asks each of git's read-only questions by its own allow, whatever the settings
- * say, and runs no git write (`GIT_READS`, `GIT_WRITES`, `runs`); the four carry one and the same set of rules, each names the place's
- * own skill, which grants no tool so their Skill tool loads it (`placeSkillUnnamed`, `allowedToolsOf`), and git whole, `git worktree`
- * whole or `git branch` whole in place of a rule of the set opens a write. Each call of the set that would run a program of its own —
- * `git grep`'s pager option in every spelling git takes, and an assignment of git's environment that names a program git runs — is
- * denied by each of them beside the allow (`GIT_RUNS_A_PROGRAM`), each deny proven to be the one that refuses its own spellings. Every
- * git question Agora's skill names is one that allow reaches (`askedGit`). Its step is refused the whole suite its round's check
- * already ran by a deny of its own of each spelling (`WHOLE_SUITE`), and runs a package's tests and a file's
- * (`SCOPED_TESTS`). An agent's fence names no command of this repository: the checks a step names in its note are allowed by the
- * settings (`CHECKERS`, `unallowed`), and the denies that answer those allows are the step's own. What else the settings and a skill
- * allow that writes the workspace or runs the suite each read-only step denies on its own line (`ownedDenies`): shadcn's CLI in every
- * spelling an allow reaches (`SHADCN`), whose one read a step runs is the board's pinned `view` (`SHADCN_VIEW_NOTE`), and `npm test`;
- * intake and the janitor, which run no test, a test file's run and turbo's besides (`TESTLESS_AGENTS`, `TEST_RUNS`), and design and
- * review, which run a package's tests, a build carried on turbo's test line (`TEST_BUILDS`). Design and review measure by the compiler and
- * the linter, which the settings allow (`TSC_ALLOW`, `OXLINT_ALLOW`, `MEASURES`), and deny on their own line what would write or watch
- * (`MEASURE_WRITES`, `MEASURE_DENIES`), a `tsc` without `--noEmit` first being reached by no allow (`NO_EMIT_FIRST`); intake and the
- * janitor deny both whole (`MEASURELESS_DENIES`). No tsconfig of the checkout makes `--noEmit` write (`buildInfoConfigs`). Design reads
- * what a contract proves by the verifier, which the settings allow (`VERIFY_ALLOW`, `VERIFIES`), and denies on its own line its cache,
- * which writes, and its watch, which never ends (`VERIFY_WRITES`, `VERIFY_DENIES`); review, intake and the janitor deny it whole
- * (`VERIFYLESS_DENIES`), review reading CI's verdict of every contract. Every command
- * a read-only step's note tells it to run is one its fence allows (`toldOf`), and each read-only agent is told, in one paragraph the
- * four hold equal, to say a refused call its work needs at the top of its sign-off (`REFUSAL_SAID`).
- * The render of a checkout's dashboards (`tools/observe/render/render.ts`) starts a container, so it is the implementer's alone: design
- * and review are refused each form of it and Docker by hand, since no allow reaches one (`RENDERS`, `DOCKER`).
- * Implement and land, which run what no deny names, deny the live collector by its two ports on their own line, each beside every deny
- * of its agent's (`LIVE_COLLECTOR`, `COLLECTOR_FENCED`). A deny is matched against a part as typed too, its leading assignment kept
- * (`deniedPartsOfCall`), as Claude Code was measured to match one; an allow against the unwrapped part alone.
- *
- * Seldon and Agora drive the browser: each allows every tool of its server by name on its own file (`BROWSER_TOOLS`), never the server
- * whole (`wholeServers`), and denies `browser_run_code_unsafe`; the design and review steps name the server, deny the live board by its
- * address (`LIVE_BOARD`) and name the two commands that serve a board of the change (`BOARD_CHECKS`), which the settings allow. Agent
- * and step alike deny a `filename` to each browser tool that takes one (`NAMED_FILES`): a file named could be the workspace's.
+ * Every path a repository skill says its work is on matches a file of the checkout (`appliesUnmatched`), the read-within-reach rule of
+ * the repository's skills is counted as `nemia stats` counts it (`rulesOfTry`), and no tsconfig of the checkout makes `tsc --noEmit`
+ * write (`buildInfoConfigs`).
  *
  * Nemia, the store's own agent, ships outside any workflow folder (`nemia/nemia.md`) and runs long-lived, outside any checkout this
  * suite reads: she is held to the same fence by her own deny, and to `git merge` and a pull request merged by `gh` besides; a mode but
@@ -60,76 +32,27 @@
  * (`nemiaFence`) asks every write that prompts and every write form of a command that reads bare, denies her what is out of her reach,
  * and lets the rest through (`misjudged`); her admission asks every answer to what waits on the person, whatever the person allows
  * (`verdictOf`); and an edit of the store outside her folder is denied her (`editVerdictOf`).
- *
- * The build workflow's design, implement and review steps each list `effect`, `shadcn` and `change-the-board` to their sessions
- * (`workSkillsMissing`), and every path a repository skill says its work is on matches a file of the checkout (`appliesUnmatched`).
- * A dontAsk job given a skill whose SKILL.md grants tools is told to read that file with Read, since its fence refuses the Skill tool's
- * load (`grantingSkillsUnread`). Each call a shipped skill's rule says it breaks is one the stats count against it (`rulesOfTry`).
- *
- * Every shipped step's `tools:` is callable under its own fence (`unallowedRefusal`), judged against this checkout's own allow rules:
- * a step held to its rules and given a tool no rule names could never call it, and the refusals would read in the feed like a fence
- * doing its job. The same steps with no project rule refuse, naming which agents the checkout's settings are covering
- * (`COVERED_BY_SETTINGS`): what makes them pass here is the repository, not the folder, so a factory elsewhere must allow those calls
- * itself.
- *
- * A skill a shipped step names with its folder (`apps/web:ds-build`) is read where the line says: the folders those lines name
- * (`NESTED`) are among the folders of skills whose grants, files and rules are read (`SKILL_FOLDERS`, `skillFileOf`, `lineNameOf`).
- * The reader of the kit's `ds-spec` is a command design's and review's notes name (`reader` in `CHECKERS`), the one the trigger skill
- * names (`KIT_COMMAND`), and the settings allow it (`KIT_ALLOW`).
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { isDeepStrictEqual } from 'node:util';
 import ts from 'typescript';
-import { loadWorkflows } from '../src/folder/folder.store.ts';
-import { parseAgent } from '../src/agents/agents.ts';
-import { stepPlace, WorkflowError, type Workflow } from '../src/step/step.ts';
+import { loadWorkflows } from '../src/workflows/workflows.store.ts';
 import { readSkillRules, RULES_FILE } from '../src/skills/read.store.ts';
-import { appliesMatch, appliesOf, type SkillRule } from '../src/skills/skills.ts';
-import { filedConfig, inputsMounts, readsMounts } from '../src/filed/filed.ts';
-import { handedMounts } from '../src/artifacts/artifacts.ts';
-import { isFolderTeam, sandboxed, unallowedRefusal, upstreamOf } from '../src/workflow/index.ts';
+import { appliesMatch, appliesOf } from '../src/skills/skills.ts';
 import { scratch } from './scratch.ts';
-import { declared } from '../place/git/declared.ts';
 import { levelFile, promptFile, readNemia, storeDenies, toldFile } from '../src/nemia/level.store.ts';
 import { admissionOf, nemiaFence, widened } from '../src/admission/index.ts';
 import { TABLE } from '../src/command/commands.verb.ts';
 import { rulesOfTry } from '../src/stats/discipline.ts';
-import { givenSkillOf } from '../src/keys/given-skill.ts';
-import { placesOf, shippedFolders, SHIPPED_HOLDERS, TEAM, TEAM_DEV, teamCopy } from './team.ts';
+import { REPO, TEAM, TEAM_DEV, teamCopy } from './team.ts';
 
-const REPO = path.join(import.meta.dirname, '..', '..', '..');
+/** The repository's own folder of skills, which a step run in this checkout may load. */
+const REPO_SKILLS = path.join(REPO, '.claude', 'skills');
 
-/** Every shipped workflow folder, read off the disk: this repository's own team's, under its `workflows/`. */
-const FOLDERS = shippedFolders();
-
-/** Every shipped agents folder there is: each agent in it is named by a step of a shipped folder. */
-const AGENT_FOLDERS = SHIPPED_HOLDERS.map((holder) => path.join(holder, 'agents')).filter((dir) => fs.existsSync(dir));
-
-/** Each folder of the repository a shipped step's skills name before a skill's name (`folder:name`), once: `apps/web`. */
-const NESTED = [
-  ...new Set(
-    FOLDERS.flatMap((dir) => loadWorkflows(dir, placesOf(dir)))
-      .flatMap((step) => step.agent?.skills ?? [])
-      .flatMap((skill) => givenSkillOf(skill)?.folder ?? []),
-  ),
-];
-
-/** The folders of skills of `NESTED` in the checkout `root`, each where a session there finds it. */
-const nestedSkillFolders = (root: string): string[] => NESTED.map((folder) => path.join(root, folder, '.claude', 'skills'));
-
-/**
- * Every folder of skills a step may load, whose `allowed-tools` a loaded skill grants the session: the repository's, those of its
- * folders a shipped step names (`NESTED`), shipped, the team's.
- */
-const SKILL_FOLDERS = [
-  path.join(REPO, '.claude', 'skills'),
-  ...nestedSkillFolders(REPO),
-  ...SHIPPED_HOLDERS.map((holder) => path.join(holder, 'skills')),
-  path.join(TEAM, 'skills'),
-].filter((dir) => fs.existsSync(dir));
+/** Every folder of skills a step of the tests' team may load, whose `allowed-tools` a loaded skill grants the session. */
+const SKILL_FOLDERS = [REPO_SKILLS, path.join(TEAM, 'skills')].filter((dir) => fs.existsSync(dir));
 
 type Settings = { permissions?: { allow?: string[]; deny?: string[] } };
 const SETTINGS = JSON.parse(fs.readFileSync(path.join(REPO, '.claude', 'settings.json'), 'utf8')) as Settings;
@@ -148,7 +71,7 @@ const MCP_PARAMS = ['url', 'filename'] as const;
 /** Every parameter a rule may name here: an MCP tool's, and the host `WebFetch` reads. */
 const PARAMS = [...MCP_PARAMS, 'domain'] as const;
 
-/** What no shipped step may run, in the spellings a session types. */
+/** What no step of a team may run, in the spellings a session types. */
 const FENCED: Call[] = [
   { tool: 'Bash', command: 'git push' },
   { tool: 'Bash', command: 'git push origin main' },
@@ -177,7 +100,7 @@ const FENCED: Call[] = [
 
 /**
  * A session a step could start of its own by hand, its name no run's, in the spellings a session types: in the background, or reaching
- * the person's phone through Remote Control. A step starts a probe through `workflows/build/probe.ts`, which names it for its run.
+ * the person's phone through Remote Control. A step starts a probe through its run, which names it.
  */
 const PROBES: Call[] = [
   { tool: 'Bash', command: 'claude --bg --remote-control -n probe-A "x"' },
@@ -192,12 +115,6 @@ const PROBES: Call[] = [
 
 /** The home folder `~` is in an edit rule, for the paths the calls below write. */
 const HOME = '/home/u';
-
-/** A file outside every worktree that a harness reads as its trust or its settings: no step of this team edits it to make a probe run. */
-const HARNESS_FILES = [`${HOME}/projects/.claude/settings.local.json`, `${HOME}/.claude.json`, `${HOME}/.claude/settings.json`];
-
-/** A file of a step's own worktree. */
-const OWN_FILE = `${HOME}/.agent-workflows/worktrees/r-1/design/src/a.ts`;
 
 /** A call as a rule would name it, for a message. */
 const shown = (call: Call): string => {
@@ -364,7 +281,7 @@ const grantsOf = (folders: readonly string[]): string[] =>
       .flatMap(allowedToolsOf),
   );
 
-/** Every skill's grants, from every folder a shipped step may load one from. */
+/** Every skill's grants, from every folder a step of the tests' team may load one from. */
 const SKILL_GRANTS = grantsOf(SKILL_FOLDERS);
 
 type Step = ReturnType<typeof loadWorkflows>[number];
@@ -389,20 +306,6 @@ function unfenced(step: Step, settings: Settings = SETTINGS, calls: Call[] = FEN
     .map((call) => `${step.name}: ${shown(call)}`);
 }
 
-/**
- * The commands a step's file or a skill's names, `file` by its path from the repository's root: every backticked span `spans` matches (an
- * `npm …` or `npx …` one by default) in its paragraph that starts at `from`, up to the next blank line or numbered item. Throws, naming
- * the file, when `from` is not in it.
- */
-function checksOf(file: string, from: string, spans = /`(np[mx]\s[^`]*)`/g): string[] {
-  const text = fs.readFileSync(path.join(REPO, file), 'utf8');
-  const start = text.indexOf(from);
-  if (start < 0) throw new Error(`${file}: no "${from}" to read its checks from; name the line its checks are on, here`);
-  const rest = text.slice(start);
-  const end = /\n\s*\n|\n\d+\.\s/.exec(rest)?.index ?? rest.length;
-  return [...rest.slice(0, end).matchAll(spans)].map((span) => span[1].replace(/\s+/g, ' '));
-}
-
 /** The settings' allows, which name this repository's commands for every session in it: an agent's own fence names none. */
 const SETTINGS_ALLOWS = SETTINGS.permissions?.allow ?? [];
 
@@ -414,10 +317,6 @@ function unallowed(step: Step, commands: string[], allowed: readonly string[] = 
     return !allows.some((rule) => reaches(rule, call)) || (step.disallowedTools ?? []).some((rule) => reaches(rule, call));
   });
 }
-
-/** Every step of every shipped folder, by its folder. */
-const shipped = (): { dir: string; step: Step }[] =>
-  FOLDERS.flatMap((dir) => loadWorkflows(dir, placesOf(dir)).map((step) => ({ dir, step })));
 
 /** The step of the tests' team that names an agent, as its folder resolves it. */
 const stepOf = (agent: string): Step => loadWorkflows(TEAM_DEV).find((step) => step.agent?.name === agent)!;
@@ -561,68 +460,6 @@ test('the matcher splits a command into the parts Claude Code matches, strips th
   assert.deepEqual(deniedPartsOfCall({ tool: 'Edit' }), [{ tool: 'Edit' }]);
 });
 
-/**
- * The agents of the team no shipped step names, each with the agent whose fence is theirs: Ada fills implement in no shipped workflow since
- * Grace does, and her file stays for a factory that hires her, her fence Grace's, so every test here of Grace's fence holds hers.
- */
-const FENCED_AS: Readonly<Record<string, string>> = { ada: 'grace' };
-
-/** An agent's own fence, as its file in `dir` says it: its permission mode and its deny list. */
-const ownFenceOf = (name: string, dir: string): { permissionMode?: string; disallowedTools?: string } => {
-  const { keys } = parseAgent(name, fs.readFileSync(path.join(dir, `${name}.md`), 'utf8'));
-  return { permissionMode: keys.permissionMode, disallowedTools: keys.disallowedTools };
-};
-
-/** A line for each agent of `FENCED_AS` in `dir` whose own fence is not its twin's. */
-const fencesApart = (dir: string): string[] =>
-  Object.entries(FENCED_AS)
-    .filter(([name, twin]) => !isDeepStrictEqual(ownFenceOf(name, dir), ownFenceOf(twin, dir)))
-    .map(([name, twin]) => `${name}: fenced apart from ${twin}`);
-
-test('every shipped agent is named by a shipped step, so the fence below reads each one, or is fenced as one that is', () => {
-  const named = new Set(shipped().flatMap(({ step }) => (step.agent ? [step.agent.name] : [])));
-  for (const [name, twin] of Object.entries(FENCED_AS)) {
-    assert.ok(!named.has(name), `${name} is named by a shipped step now: take it off FENCED_AS`);
-    assert.ok(named.has(twin), `${twin}, whose fence ${name} keeps, is named by a shipped step`);
-  }
-  for (const dir of AGENT_FOLDERS) {
-    for (const file of fs.readdirSync(dir).filter((f) => f.endsWith('.md') && f !== 'README.md')) {
-      const name = path.basename(file, '.md');
-      assert.ok(named.has(name) || Object.hasOwn(FENCED_AS, name), `${path.join(dir, file)} is named by no shipped step`);
-    }
-    assert.deepEqual(fencesApart(dir), [], "each keeps its twin's permission mode and deny list, rule for rule");
-  }
-});
-
-test("REFUSED: Ada without one rule of Grace's deny list, or in another mode, is named", () => {
-  const edited = (edit: (text: string) => string): string[] => {
-    const root = scratch('wf-fences-ada-');
-    fs.cpSync(path.join(SHIPPED_HOLDERS[0], 'agents'), root, { recursive: true });
-    const file = path.join(root, 'ada.md');
-    const text = fs.readFileSync(file, 'utf8');
-    assert.notEqual(edit(text), text, 'ada.md has what the edit changes');
-    fs.writeFileSync(file, edit(text));
-    return fencesApart(root);
-  };
-  assert.deepEqual(
-    edited((text) => text.replace(', mcp__github__merge_pull_request', '')),
-    ['ada: fenced apart from grace'],
-  );
-  assert.deepEqual(
-    edited((text) => text.replace('permissionMode: auto', 'permissionMode: bypassPermissions')),
-    ['ada: fenced apart from grace'],
-  );
-});
-
-test('every shipped step is refused git push, a forced branch delete, a kill by name, every gh write and browser_run_code_unsafe: by its own deny in auto, by no allow in dontAsk, by a read-only sandbox on codex', () => {
-  const open = shipped().flatMap(({ dir, step }) => unfenced(step).map((what) => `${path.relative(REPO, dir)}/${what}`));
-  assert.deepEqual(open, []);
-  assert.ok(
-    FOLDERS.every((dir) => !['agents', 'skills'].includes(path.basename(dir))),
-    'agents and skills are no workflow of their own',
-  );
-});
-
 test("the tests' team is fenced as a shipped team must be: every step of its dev, auto and dontAsk", () => {
   const steps = loadWorkflows(TEAM_DEV);
   assert.deepEqual(
@@ -640,115 +477,6 @@ test('the settings deny none of them: the refusal is each worker’s own, and a 
       [],
       `${shown(call)} is denied by .claude/settings.json, which binds a person's own session too`,
     );
-});
-
-/** The shipped step an agent runs, as `wf start` freezes it. */
-const shippedStepOf = (agent: string): Step => {
-  const found = shipped().find(({ step }) => step.agent?.name === agent);
-  assert.ok(found, `no shipped step runs ${agent}`);
-  return found.step;
-};
-
-/** The line of the build workflow's review that names its checks. */
-const REVIEW_CHECKS = 'Run the typecheck and the lint yourself';
-
-/** The first words of the sentence of a fenced step's note that names the command of the kit's `ds-spec` reader. */
-const READER = "`ds-spec`'s reader runs from the root";
-
-/**
- * Each dontAsk agent whose step names the checks it runs, with the step's file and the line those checks are on, and for a step given
- * the kit's skills the first words of the sentence its reader's command is on (`reader`).
- */
-const CHECKERS: { agent: string; step: string; from: string; reader?: string }[] = [
-  { agent: 'seldon', step: 'workflows/build/design.md', from: 'The checks you may run here', reader: READER },
-  { agent: 'agora', step: 'workflows/build/review.md', from: REVIEW_CHECKS, reader: READER },
-  { agent: 'argus', step: 'workflows/janitor/argus.md', from: '**Run each read bare**' },
-];
-
-test('every check the steps of Seldon, Agora and Argus name is one their fence allows', () => {
-  for (const { agent, step: file, from } of CHECKERS) {
-    const step = shippedStepOf(agent);
-    assert.equal(step.permissionMode, 'dontAsk', `${agent} runs dontAsk`);
-    const checks = checksOf(file, from);
-    assert.ok(checks.length >= 3, `${file} names its checks: ${checks.join(', ')}`);
-    assert.deepEqual(unallowed(step, checks), [], `${agent}'s fence refuses a check ${file} names`);
-  }
-});
-
-/** The numbered item of the trigger skill of a change to the board that names the command of the kit's `ds-spec` skill. */
-const KIT_COMMAND = { file: '.claude/skills/change-the-board/SKILL.md', from: '**The project they speak of is `apps/web`**' };
-
-/** The settings' allow of that command, whatever follows the script's name. */
-const KIT_ALLOW = 'Bash(node apps/web/.claude/skills/ds-spec/md3.mjs:*)';
-
-/** A backticked command that starts with `node`, as `checksOf` reads its spans. */
-const NODE_SPANS = /`(node\s[^`]*)`/g;
-
-/** Each fenced step whose note names the reader's command, with its agent, its file and the command its note names. */
-const readers = (): { agent: string; file: string; commands: string[] }[] =>
-  CHECKERS.flatMap(({ agent, step, reader }) =>
-    reader === undefined ? [] : [{ agent, file: step, commands: checksOf(step, reader, NODE_SPANS) }],
-  );
-
-test("the command design's and review's notes name for the kit's ds-spec is change-the-board's, a script of the checkout their fences allow", () => {
-  const named = checksOf(KIT_COMMAND.file, KIT_COMMAND.from, NODE_SPANS);
-  assert.deepEqual(named, ['node apps/web/.claude/skills/ds-spec/md3.mjs <command>']);
-  assert.ok(fs.statSync(path.join(REPO, named[0].split(' ')[1])).isFile(), 'its script is a file of the checkout');
-  assert.deepEqual(
-    readers().map(({ agent }) => agent),
-    ['seldon', 'agora'],
-  );
-  for (const { agent, file, commands } of readers()) {
-    const step = shippedStepOf(agent);
-    assert.equal(step.permissionMode, 'dontAsk', `${agent} runs dontAsk`);
-    assert.deepEqual(commands, named, `${file} names the command change-the-board names, and no other`);
-    assert.deepEqual(unallowed(step, commands), [], `${agent}'s fence refuses the command ${file} names`);
-  }
-});
-
-test("REFUSED: the kit's ds-spec command without the settings' allow of it is named for Seldon and Agora, and a note that names it no more throws", () => {
-  assert.ok(SETTINGS_ALLOWS.includes(KIT_ALLOW), `${KIT_ALLOW} is in the settings`);
-  const without = SETTINGS_ALLOWS.filter((rule) => rule !== KIT_ALLOW);
-  for (const { agent, file, commands } of readers()) {
-    assert.equal(commands.length, 1, file);
-    assert.deepEqual(unallowed(shippedStepOf(agent), commands, without), commands, agent);
-    assert.deepEqual(
-      unallowed(shippedStepOf(agent), commands, [...without, KIT_ALLOW.replace(':*', '')]),
-      commands,
-      `${agent}, the bare name`,
-    );
-    assert.throws(
-      () => checksOf(file, "`ds-spec`'s reader runs from its own folder", NODE_SPANS),
-      (err: Error) => err.message.includes(`${file}: no "\`ds-spec\`'s reader runs from its own folder"`),
-    );
-  }
-  assert.throws(
-    () => checksOf(KIT_COMMAND.file, 'The project they speak of is the root', NODE_SPANS),
-    (err: Error) => err.message.includes(`${KIT_COMMAND.file}: no "The project they speak of is the root"`),
-  );
-});
-
-test("REFUSED: a step's check that neither its fence nor the settings allow is named", () => {
-  const [design, review, janitor] = CHECKERS.map(({ agent, step, from }) => ({ step: shippedStepOf(agent), checks: checksOf(step, from) }));
-  const without = (rule: string): string[] => SETTINGS_ALLOWS.filter((r) => r !== rule);
-  assert.deepEqual(unallowed(design.step, design.checks, without('Bash(npm run lint)')), ['npm run lint']);
-  assert.deepEqual(unallowed(review.step, review.checks, without('Bash(npx turbo run typecheck --force)')), [
-    'npx turbo run typecheck --force',
-  ]);
-  const stats = janitor.checks.filter((check) => check.startsWith('npx nemia stats '));
-  assert.equal(stats.length, 3, janitor.checks.join(', '));
-  assert.deepEqual(unallowed(janitor.step, janitor.checks, without('Bash(npx nemia stats:*)')), stats);
-  assert.deepEqual(unallowed(janitor.step, janitor.checks, without('Bash(npx nemia inbox)')), ['npx nemia inbox']);
-  assert.deepEqual(unallowed(design.step, design.checks, []), design.checks, 'Seldon allows none of them itself');
-  assert.deepEqual(
-    unallowed({ ...review.step, disallowedTools: ['Bash(npm run lint)'] }, ['npm run lint']),
-    ['npm run lint'],
-    'a deny wins',
-  );
-  assert.throws(
-    () => checksOf('workflows/build/design.md', 'Run no check'),
-    (err: Error) => err.message.includes('workflows/build/design.md: no "Run no check"'),
-  );
 });
 
 test('REFUSED: an auto step without its own deny, and a dontAsk step an allow reaches, are open', () => {
@@ -822,60 +550,6 @@ test("REFUSED: the team's implementer with its deny line cut back to the four it
   assert.equal(unfenced(implement).length, FENCED.length, unfenced(implement).join('\n'));
 });
 
-/** Every call of `FENCED` that runs `pkill` or `killall` in some part, as `unfenced` names it for `step`. */
-const killsByName = (step: string): string[] =>
-  FENCED.filter((call) => partsOfCall(call).some((part) => /^(?:pkill|killall)\b/.test(part.command ?? ''))).map(
-    (call) => `${step}: ${shown(call)}`,
-  );
-
-test("REFUSED: Grace without its deny of pkill and killall, read from its file as a run reads it, is open on each kill by name, the compound's too", () => {
-  const grace = shippedStepOf('grace');
-  const line = grace.disallowedTools!.filter((rule) => rule !== 'Bash(pkill:*)' && rule !== 'Bash(killall:*)');
-  assert.equal(line.length, grace.disallowedTools!.length - 2, 'Grace denies both by name');
-  const bare = shippedWith('grace', 'build', 'disallowedTools', line.join(', '));
-  assert.equal(bare.permissionMode, 'auto');
-  assert.deepEqual(unfenced(bare), killsByName(bare.name));
-  assert.ok(
-    unfenced(bare).includes(`${bare.name}: Bash(cd packages/agent-orchestrator && pkill -f "turbo run test")`),
-    'the form that killed a landing check',
-  );
-});
-
-/** Every call of `FENCED` that writes through `gh`, as `unfenced` names it for `step`: the whole of `gh` is denied, so each is every. */
-const ghWrites = (step: string): string[] =>
-  FENCED.filter((call) => /^gh\b/.test(call.command ?? '')).map((call) => `${step}: ${shown(call)}`);
-
-test('REFUSED: Grace and Otto without their deny of gh, read from their files as a run reads them, are open on every gh write', () => {
-  for (const agent of ['grace', 'otto']) {
-    const step = shippedStepOf(agent);
-    const line = step.disallowedTools!.filter((rule) => rule !== 'Bash(gh)' && rule !== 'Bash(gh:*)');
-    assert.equal(line.length, step.disallowedTools!.length - 2, `${agent} denies gh whole, bare and with arguments`);
-    const bare = shippedWith(agent, 'build', 'disallowedTools', line.join(', '));
-    assert.equal(bare.permissionMode, 'auto', `${agent} runs auto, so its own deny is its fence`);
-    assert.deepEqual(unfenced(bare), ghWrites(bare.name));
-    assert.ok(ghWrites(bare.name).length >= 12, 'every gh write a session could type is a call here');
-  }
-});
-
-/** The two reads of the pull request review's note names, and the settings' allows that reach them and nothing else. */
-const PR_READS = ['gh pr view <n> --json state,mergeable,headRefOid,title,body,url', 'gh pr checks <n>'];
-const PR_READ_ALLOWS = ['Bash(gh pr view:*)', 'Bash(gh pr checks:*)'];
-
-test("the two gh reads review's note names are allowed Agora by the settings, and REFUSED with either allow dropped", () => {
-  const review = shippedStepOf('agora');
-  assert.equal(review.permissionMode, 'dontAsk', 'nothing reaches Agora but an allow');
-  const named = checksOf('workflows/build/review.md', '**Read the pull request and its checks**', /`(gh\s[^`]*)`/g);
-  assert.deepEqual(named, PR_READS, "review's note names the two reads and no other gh call");
-  assert.deepEqual(unallowed(review, named), [], "Agora's fence refuses neither read");
-  for (const allow of PR_READ_ALLOWS) {
-    assert.ok(SETTINGS_ALLOWS.includes(allow), `${allow} is in the settings`);
-    const without = SETTINGS_ALLOWS.filter((rule) => rule !== allow);
-    assert.equal(unallowed(review, named, without).length, 1, `${allow} is what reaches one of them`);
-  }
-  assert.deepEqual(unallowed(review, named, []), named, 'Agora allows neither itself');
-  assert.deepEqual(unfenced(review), [], 'and neither allow reaches a gh write');
-});
-
 test('REFUSED: a dontAsk step an allow of pkill reaches is open on each kill by pkill whose every part some allow reaches', () => {
   const reviewer = stepOf('reviewer');
   assert.equal(reviewer.permissionMode, 'dontAsk');
@@ -915,75 +589,6 @@ test('the matcher reads an edit rule by the path it covers, from the root or the
   );
 });
 
-test('every shipped step is refused a session of its own started by hand, in the background or through Remote Control: by its own deny in auto, by no allow in dontAsk', () => {
-  const open = shipped().flatMap(({ dir, step }) => unfenced(step, SETTINGS, PROBES).map((what) => `${path.relative(REPO, dir)}/${what}`));
-  assert.deepEqual(open, []);
-});
-
-/** The rules of Grace's and Otto's fence that refuse a session started by hand: a deny of `claude` with a flag or a subcommand. */
-const probeRule = (rule: string): boolean => rule.startsWith('Bash(claude ');
-
-for (const agent of ['grace', 'otto'])
-  test(`REFUSED: ${agent} without its deny of a background session and Remote Control, read from its file as a run reads it, is open on each`, () => {
-    const step = shippedStepOf(agent);
-    assert.equal(step.permissionMode, 'auto');
-    const line = step.disallowedTools!.filter((rule) => !probeRule(rule));
-    assert.ok(line.length < step.disallowedTools!.length, `${agent} denies a session started by hand`);
-    const bare = shippedWith(agent, 'build', 'disallowedTools', line.join(', '));
-    assert.deepEqual(
-      unfenced(bare, SETTINGS, PROBES),
-      PROBES.map((call) => `${bare.name}: ${shown(call)}`),
-    );
-  });
-
-/** Which of `files` a step's own deny refuses it to edit, by the Edit tool and by the Write tool alike. */
-const editsDenied = (step: Step, files: string[]): string[] =>
-  files.filter((file) =>
-    ['Edit', 'Write'].every((tool) => (step.disallowedTools ?? []).some((rule) => reaches(rule, { tool, path: file }))),
-  );
-
-test("Grace and Otto are refused an edit of a harness's trust or local settings anywhere, and not one in their own worktree", () => {
-  for (const agent of ['grace', 'otto']) {
-    const step = shippedStepOf(agent);
-    assert.deepEqual(editsDenied(step, HARNESS_FILES), HARNESS_FILES, agent);
-    assert.deepEqual(editsDenied(step, [OWN_FILE]), [], agent);
-  }
-});
-
-for (const agent of ['grace', 'otto'])
-  test(`REFUSED: ${agent} without its deny of a folder's local settings, read from its file as a run reads it, may edit the owner's`, () => {
-    const step = shippedStepOf(agent);
-    const line = step.disallowedTools!.filter((rule) => rule !== 'Edit(//**/.claude/settings.local.json)');
-    assert.equal(line.length, step.disallowedTools!.length - 1, `${agent} denies an edit of a folder's local settings`);
-    const bare = shippedWith(agent, 'build', 'disallowedTools', line.join(', '));
-    assert.deepEqual(editsDenied(bare, HARNESS_FILES), HARNESS_FILES.slice(1), 'the rule cut leaves the projects folder open');
-    const none = shippedWith(agent, 'build', 'disallowedTools', line.filter((rule) => !rule.startsWith('Edit(')).join(', '));
-    assert.deepEqual(editsDenied(none, HARNESS_FILES), [], 'and the trust and user settings with theirs');
-  });
-
-/** Each verb that acts, typed after the command `cli`: start, file, queue or drop a card, approve or retry a step. */
-const actsBy = (cli: string): Call[] =>
-  ['start x', 'inbox add x', 'inbox queue x', 'inbox rm x', 'approve r s', 'retry r s'].map((verb) => ({
-    tool: 'Bash',
-    command: `${cli} ${verb}`,
-  }));
-
-/** What a janitor must never do, in the spellings a session types: a verb that acts, by the command's name or its alias, or an edit. */
-const ACTS: Call[] = [...['npx nemia', 'nemia', 'npx wf', 'wf'].flatMap(actsBy), { tool: 'Edit' }, { tool: 'Write' }];
-
-/**
- * What of `ACTS` a step could run: in a dontAsk job, each that a rule of its own, of the settings or of a skill allows and none of its
- * own denies; any other step runs every call no deny names.
- */
-function acting(step: Step): string[] {
-  if (step.permissionMode !== 'dontAsk' || step.workspace === 'base')
-    return [`${step.name}: not a dontAsk job, so every call no deny names runs`];
-  const allows = [...(step.allowedTools ?? []), ...(SETTINGS.permissions?.allow ?? []), ...SKILL_GRANTS];
-  return ACTS.filter(
-    (call) => allows.some((rule) => reaches(rule, call)) && !(step.disallowedTools ?? []).some((rule) => reaches(rule, call)),
-  ).map(shown);
-}
-
 /** A list of a fence that a file's frontmatter writes on one line, as a comma string. */
 type FenceList = 'tools' | 'allowedTools' | 'disallowedTools';
 
@@ -1002,11 +607,6 @@ function fenceLineIn(text: string, key: FenceList): { start: number; at: number;
   return { start: text.lastIndexOf('\n', at) + 1, at, end: found.index + whole.length, head, value };
 }
 
-/** The rules of the fence list `key` in the frontmatter of `text`, in either form (`fenceLineIn`); none where it has no such list. */
-function fenceListOf(text: string, key: FenceList): string[] {
-  return fenceLineIn(text, key)?.value.split(', ') ?? [];
-}
-
 /**
  * `text` with its fence list `key`'s value rewritten by `edit`, in either form (`fenceLineIn`), or the list's line taken out where `edit`
  * gives `undefined`, and its block with it once the block holds nothing. `text` as it was where it has no such list, which each caller's
@@ -1020,800 +620,8 @@ function withFenceList(text: string, key: FenceList, edit: (value: string) => st
   return (text.slice(0, found.start) + text.slice(found.end + 1)).replace(/^\w+:\n  fence:\n(?! {4})/m, '');
 }
 
-/**
- * The step of the shipped `workflow` that `agent` runs, read from a scratch copy of the shipped team, the `key` line replaced by `line`
- * in each file of `of`, the agent's alone by default.
- */
-function shippedWith(agent: string, workflow: string, key: 'allowedTools' | 'disallowedTools', line: string, ...of: string[]): Step {
-  return shippedEdited(agent, workflow, `a ${key} line to replace`, (text) => withFenceList(text, key, () => line), ...of);
-}
-
-/** The steps that run what no deny names, each with its file under the shipped holder: the two whose own line denies the collector. */
-const COLLECTOR_FENCED = [
-  { agent: 'grace', workflow: 'build', file: 'build/implement.md' },
-  { agent: 'otto', workflow: 'build', file: 'build/land.md' },
-  { agent: 'grace', workflow: 'quick', file: 'quick/implement.md' },
-  { agent: 'otto', workflow: 'quick', file: 'quick/land.md' },
-];
-
-/** The rules on the `disallowedTools:` line of the file `file` of the holder `root`, none where it has no such line. */
-const denyLineOf = (file: string, root = SHIPPED_HOLDERS[0]): string[] =>
-  fenceListOf(fs.readFileSync(path.join(root, file), 'utf8'), 'disallowedTools');
-
-/** The step of the shipped `workflow` that `agent` runs, as `wf start` freezes it. */
-const shippedStepIn = (agent: string, workflow: string): Step => {
-  const found = shipped().find(({ dir, step }) => path.basename(dir) === workflow && step.agent?.name === agent);
-  assert.ok(found, `no step of the shipped ${workflow} runs ${agent}`);
-  return found.step;
-};
-
-/**
- * The step of the shipped `workflow` that `agent` runs, read from a scratch copy of the shipped team in which `edit` rewrote each file
- * of `of`, the agent's alone by default. Fails, saying which file has no `what`, when the edit changes nothing in one.
- */
-function shippedEdited(agent: string, workflow: string, what: string, edit: (text: string) => string, ...of: string[]): Step {
-  const root = scratch(`wf-fences-${agent}-`);
-  fs.cpSync(SHIPPED_HOLDERS[0], root, { recursive: true });
-  for (const name of of.length ? of : [`agents/${agent}.md`]) {
-    const file = path.join(root, name);
-    const text = fs.readFileSync(file, 'utf8');
-    const changed = edit(text);
-    assert.notEqual(changed, text, `${name} has ${what}`);
-    fs.writeFileSync(file, changed);
-  }
-  return loadWorkflows(path.join(root, workflow), { repo: REPO }).find((step) => step.agent?.name === agent)!;
-}
-
-/**
- * The step of the shipped `workflow` that `agent` runs from its file `file`, that file's own `disallowedTools:` line cut to one rule of
- * its own, and, where `allowed` is given, its agent's file allowing it besides. A step's line adds to its agent's denies, so a line cut
- * lifts none of them.
- */
-function stepLineCut(agent: string, workflow: string, file: string, allowed?: string): Step {
-  const ownLine = (text: string) => withFenceList(text, 'disallowedTools', () => 'Bash(npm run build)');
-  const allowing = (text: string) => withFenceList(text, 'allowedTools', (value) => `${value}, ${allowed}`);
-  if (allowed === undefined) return shippedEdited(agent, workflow, 'a disallowedTools line', ownLine, file);
-  const edit = (text: string) => (/^agent: /m.test(text) ? ownLine(text) : allowing(text));
-  return shippedEdited(agent, workflow, 'a disallowedTools or an allowedTools line', edit, `agents/${agent}.md`, file);
-}
-
-/** The step of the shipped `workflow` that `agent` runs, its agent's `allowedTools` line replaced by `allowed` (`shippedWith`). */
-const shippedAllowed = (agent: string, workflow: string, allowed: string): Step => shippedWith(agent, workflow, 'allowedTools', allowed);
-
-/** The janitor's step, its agent's `allowedTools` line replaced by `allowed` (`shippedAllowed`). */
-const argusAllowed = (allowed: string): Step => shippedAllowed('argus', 'janitor', allowed);
-
-/** Every tool of the browser's server a step given the browser drives: all of the pinned server's but `browser_run_code_unsafe`. */
-const BROWSER_TOOLS = [
-  'click',
-  'close',
-  'console_messages',
-  'drag',
-  'drop',
-  'evaluate',
-  'file_upload',
-  'fill_form',
-  'find',
-  'handle_dialog',
-  'hover',
-  'navigate',
-  'navigate_back',
-  'network_request',
-  'network_requests',
-  'press_key',
-  'resize',
-  'select_option',
-  'snapshot',
-  'tabs',
-  'take_screenshot',
-  'type',
-  'wait_for',
-].map((name) => `mcp__playwright__browser_${name}`);
-
-/** A page of a board served for the step (`npm run board:serve`), opened in the tab or in a new one. */
-const SERVED_BOARD: Call[] = [
-  { tool: 'mcp__playwright__browser_navigate', url: 'http://127.0.0.1:41234/runs' },
-  { tool: 'mcp__playwright__browser_tabs', url: 'http://127.0.0.1:41234/' },
-];
-
-/** The live board, the person's own on :8787 and :5173, in the spellings a session types: what a step given the browser never opens. */
-const LIVE_BOARD: Call[] = [
-  'http://127.0.0.1:8787/',
-  'http://localhost:8787/runs',
-  'localhost:8787',
-  'http://[::1]:8787/',
-  'http://127.0.0.1:5173/',
-  'http://localhost:5173/factory',
-].flatMap((url) => [
-  { tool: 'mcp__playwright__browser_navigate', url },
-  { tool: 'mcp__playwright__browser_tabs', url },
-]);
-
-/**
- * A browser tool told the file to write, in the workspace or out of it: each tool of the pinned server that takes a `filename` but
- * `browser_run_code_unsafe`. A step that writes nothing gives none, and the tool then saves in the server's own output directory.
- */
-const FILE_TOOLS = ['console_messages', 'evaluate', 'network_request', 'network_requests', 'snapshot', 'take_screenshot'];
-const NAMED_FILES: Call[] = FILE_TOOLS.flatMap((name) =>
-  ['x.png', 'notes/x.png', '/tmp/playwright-mcp/x.png'].map((filename) => ({ tool: `mcp__playwright__browser_${name}`, filename })),
-);
-
-/** The dontAsk agents given the browser, each with its workflow and the file of the step that names the server and the live board. */
-const BROWSERS = [
-  { agent: 'seldon', workflow: 'build', file: 'build/design.md' },
-  { agent: 'agora', workflow: 'build', file: 'build/review.md' },
-];
-
-/** The rules of a step's `allowedTools` that allow a whole MCP server: a tool its pinned server gains later would be allowed unnamed. */
-const wholeServers = (step: Step): string[] =>
-  (step.allowedTools ?? []).filter((rule) => /^mcp__[^_(]+(?:_[^_(]+)*(?:__\*)?$/.test(rule)).map((rule) => `${step.name}: ${rule}`);
-
-test('Seldon and Agora drive the browser by their own allow, each tool by name, on a served board, and are refused the live board by address', () => {
-  const tools = BROWSER_TOOLS.map((tool) => ({ tool }));
-  assert.equal(BROWSER_TOOLS.length, 23);
-  for (const { agent, workflow, file } of BROWSERS) {
-    const step = shippedStepOf(agent);
-    assert.equal(step.permissionMode, 'dontAsk', agent);
-    assert.ok(step.agent?.mcp?.includes('playwright'), `${agent}'s step loads the browser's server, or its allows reach no tool`);
-    assert.deepEqual(runs(step, tools, {}, []), BROWSER_TOOLS, `${agent}: by its own allow, no settings read`);
-    assert.deepEqual(runs(step, SERVED_BOARD, {}, []), SERVED_BOARD.map(shown), `${agent} opens a served board`);
-    assert.deepEqual(unfenced(step, SETTINGS, LIVE_BOARD), [], `${agent} is refused the live board`);
-    assert.deepEqual(unfenced(step, SETTINGS, NAMED_FILES), [], `${agent} names no file a browser tool writes`);
-    assert.deepEqual(unfenced(step), [], agent);
-    const hired = shippedEdited(
-      agent,
-      workflow,
-      'a deny line of its own',
-      (text) => withFenceList(text, 'disallowedTools', () => undefined),
-      file,
-    );
-    assert.ok(
-      hired.disallowedTools?.includes('mcp__playwright__browser_run_code_unsafe'),
-      `${agent}'s own file denies browser_run_code_unsafe by name, for a step that hires it and denies nothing itself`,
-    );
-    assert.deepEqual(unfenced(hired, SETTINGS, NAMED_FILES), [], `${agent}'s own file denies a named file too`);
-  }
-  assert.deepEqual(
-    shipped().flatMap(({ step }) => wholeServers(step)),
-    [],
-    'no shipped step allows a whole server',
-  );
-});
-
-test('REFUSED: a browser tool an agent allows no more is reached no more, and browser_run_code_unsafe allowed without its deny is open', () => {
-  for (const { agent, workflow, file } of BROWSERS) {
-    const cut = shippedEdited(agent, workflow, 'an allow of browser_click', (text) => text.replace(', mcp__playwright__browser_click', ''));
-    const reached = runs(
-      cut,
-      BROWSER_TOOLS.map((tool) => ({ tool })),
-      {},
-      [],
-    );
-    assert.deepEqual(
-      BROWSER_TOOLS.filter((tool) => !reached.includes(tool)),
-      ['mcp__playwright__browser_click'],
-      agent,
-    );
-    const unsafe = shippedEdited(agent, workflow, 'a deny of browser_run_code_unsafe', (text) =>
-      withFenceList(
-        text.replace(', mcp__playwright__browser_run_code_unsafe', ''),
-        'allowedTools',
-        (value) => `${value}, mcp__playwright__browser_run_code_unsafe`,
-      ),
-    );
-    assert.deepEqual(unfenced(unsafe), [`${unsafe.name}: mcp__playwright__browser_run_code_unsafe`], agent);
-    assert.deepEqual(
-      unfenced(stepLineCut(agent, workflow, file, 'mcp__playwright__browser_run_code_unsafe')),
-      [],
-      `${file}'s own line cannot lift what its agent denies`,
-    );
-    const allowedAlone = shippedEdited(agent, workflow, 'an allowedTools line', (text) =>
-      withFenceList(text, 'allowedTools', (value) => `${value}, mcp__playwright__browser_run_code_unsafe`),
-    );
-    assert.deepEqual(unfenced(allowedAlone), [], `${agent}: its own deny wins over an allow`);
-  }
-});
-
-test('REFUSED: a whole server allowed on an agent is named, in either spelling, and a tool or a rule on one is not', () => {
-  for (const [rule, named] of [
-    ['mcp__playwright', true],
-    ['mcp__playwright__*', true],
-    ['mcp__my_server', true],
-    ['mcp__playwright__browser_click', false],
-    ['mcp__playwright__browser_navigate(url:*:8787*)', false],
-  ] as const) {
-    const step = shippedEdited('agora', 'build', 'an allowedTools line', (text) =>
-      withFenceList(text, 'allowedTools', (value) => `${value}, ${rule}`),
-    );
-    assert.deepEqual(wholeServers(step), named ? [`review: ${rule}`] : [], rule);
-  }
-});
-
-test('REFUSED: design or review with one of its four address rules cut opens the live board on that port by that tool', () => {
-  for (const { agent, workflow, file } of BROWSERS)
-    for (const tool of ['mcp__playwright__browser_navigate', 'mcp__playwright__browser_tabs'])
-      for (const port of ['8787', '5173']) {
-        const rule = `${tool}(url:*:${port}*)`;
-        const cut = shippedEdited(agent, workflow, `the rule ${rule}`, (text) => text.replace(`, ${rule}`, ''), file);
-        const open = LIVE_BOARD.filter((call) => call.tool === tool && call.url?.includes(`:${port}`));
-        assert.equal(open.length, port === '8787' ? 4 : 2);
-        assert.deepEqual(
-          unfenced(cut, SETTINGS, LIVE_BOARD),
-          open.map((call) => `${cut.name}: ${shown(call)}`),
-          `${file} without ${rule}`,
-        );
-      }
-});
-
-test("REFUSED: a step or an agent that denies a browser tool its filename no more may have it write a file, the workspace's too", () => {
-  for (const { agent, workflow } of BROWSERS)
-    for (const name of FILE_TOOLS) {
-      const tool = `mcp__playwright__browser_${name}`;
-      const cut = (text: string) => text.replace(`, ${tool}(filename:*)`, '');
-      const open = NAMED_FILES.filter((call) => call.tool === tool);
-      assert.equal(open.length, 3);
-      const dropped = shippedEdited(agent, workflow, `a deny of a filename to ${tool}`, cut);
-      assert.deepEqual(
-        unfenced(dropped, SETTINGS, NAMED_FILES),
-        open.map((call) => `${dropped.name}: ${shown(call)}`),
-        `agents/${agent}.md without it`,
-      );
-      const narrowed = shippedEdited(agent, workflow, `a deny of a filename to ${tool}`, (text) =>
-        text.replace(`${tool}(filename:*)`, `${tool}(filename:/tmp/*)`),
-      );
-      assert.deepEqual(
-        unfenced(narrowed, SETTINGS, NAMED_FILES),
-        open.filter((call) => !call.filename?.startsWith('/tmp/')).map((call) => `${narrowed.name}: ${shown(call)}`),
-        `agents/${agent}.md denying only a file under /tmp leaves the workspace's open`,
-      );
-    }
-  for (const { agent, workflow, file } of BROWSERS)
-    assert.deepEqual(unfenced(stepLineCut(agent, workflow, file), SETTINGS, NAMED_FILES), [], `${file}'s own line cannot lift them`);
-});
-
-/** The line of a step's note that names the two commands of a served board. */
-const BOARD_CHECKS = '`npm run board:serve`';
-
-test('design and review name the two commands of a served board, the settings allow each by its exact name, and neither may build', () => {
-  for (const { agent, file } of BROWSERS) {
-    const step = shippedStepOf(agent);
-    const checks = checksOf(`workflows/${file}`, BOARD_CHECKS);
-    assert.deepEqual([...new Set(checks)].sort(), ['npm run board:serve', 'npm run board:stop'], file);
-    assert.deepEqual(unallowed(step, checks), [], `${agent}'s fence refuses a command ${file} names`);
-    for (const command of ['npm run board:serve', 'npm run board:stop']) {
-      assert.ok(SETTINGS_ALLOWS.includes(`Bash(${command})`), `${command} is allowed by its exact name`);
-      assert.deepEqual(
-        unallowed(
-          step,
-          [command],
-          SETTINGS_ALLOWS.filter((rule) => rule !== `Bash(${command})`),
-        ),
-        [command],
-        `REFUSED: ${agent} without the settings' allow of ${command}`,
-      );
-      assert.deepEqual(runs(step, [{ tool: 'Bash', command: `${command} --workspace api` }]), [], 'and no longer command');
-    }
-    assert.deepEqual(
-      runs(
-        step,
-        ['npm run build', 'npm run e2e', 'npm run board:serve && npm run build'].map((command) => ({ tool: 'Bash', command })),
-      ),
-      [],
-      `${agent} still builds nothing in the workspace`,
-    );
-  }
-  assert.throws(
-    () => checksOf('workflows/build/implement.md', BOARD_CHECKS),
-    (err: Error) => err.message.includes('workflows/build/implement.md: no "`npm run board:serve`"'),
-    'REFUSED: a note that names the commands no more',
-  );
-});
-
-/** The steps that design, write or judge a change, by workflow, and the skills each gives its session to list. */
-const WORK_STEPS: Record<string, string[]> = { build: ['design', 'implement', 'review'], quick: ['implement', 'review'] };
-const WORK_SKILLS = ['effect', 'shadcn', 'change-the-board'];
-
-/**
- * Each skill of `WORK_SKILLS` a work step of `steps`, the workflow `workflow`'s, does not give, as `<step>: <skill>`, read off the
- * agent each step froze.
- */
-const workSkillsMissing = (steps: readonly Step[], workflow = 'build'): string[] =>
-  WORK_STEPS[workflow].flatMap((name) => {
-    const given = steps.find((step) => step.name === name)?.agent?.skills ?? [];
-    return WORK_SKILLS.filter((skill) => !given.includes(skill)).map((skill) => `${name}: ${skill}`);
-  });
-
-/**
- * The steps of `workflow`, the build workflow by default, read from a scratch copy of the shipped team whose step `step` has its
- * `skills:` line replaced by `line`.
- */
-function buildWith(step: string, line: string, workflow = 'build'): Step[] {
-  const root = scratch('wf-fences-build-');
-  fs.cpSync(SHIPPED_HOLDERS[0], root, { recursive: true });
-  const file = path.join(root, workflow, `${step}.md`);
-  const text = fs.readFileSync(file, 'utf8');
-  const changed = text.replace(/^skills: .*\n/m, line);
-  assert.notEqual(changed, text, `${step} has a skills: line to replace`);
-  fs.writeFileSync(file, changed);
-  return loadWorkflows(path.join(root, workflow), { repo: REPO });
-}
-
-test("build's design, implement and review, and quick's implement, each give effect, shadcn and change-the-board, whatever their agents give", () => {
-  for (const workflow of Object.keys(WORK_STEPS)) {
-    const dir = FOLDERS.find((folder) => path.basename(folder) === workflow);
-    assert.ok(dir, `the ${workflow} workflow is shipped`);
-    assert.deepEqual(workSkillsMissing(loadWorkflows(dir, placesOf(dir)), workflow), [], workflow);
-  }
-});
-
-test('REFUSED: a work step that gives one of the three skills no more is named, read from its file as a run reads it', () => {
-  assert.deepEqual(workSkillsMissing(buildWith('review', 'skills: effect, shadcn\n')), ['review: change-the-board']);
-  assert.deepEqual(workSkillsMissing(buildWith('design', '')), ['design: effect', 'design: shadcn', 'design: change-the-board']);
-  assert.deepEqual(workSkillsMissing(buildWith('implement', 'skills: shadcn, change-the-board\n', 'quick'), 'quick'), [
-    'implement: effect',
-  ]);
-});
-
-/**
- * What makes a landing step what it is, its `after` and its gate apart: where it works, its agent, its check, its budget, its fence and
- * its note. The gate is read on its own (`quick`'s land has none: its review files it), so that everything else is held equal.
- */
-const landingOf = (step: Step | undefined): unknown[] => [
-  step?.workspace,
-  step?.agent?.name,
-  step?.check,
-  step?.budget,
-  step?.disallowedTools,
-  step?.body,
-];
-
-/** The landing step of the workflow `workflow`, read from `root`, a holder laid out as the shipped one. */
-const landIn = (workflow: string, root = SHIPPED_HOLDERS[0]): Step | undefined =>
-  loadWorkflows(path.join(root, workflow), { repo: REPO }).find((step) => step.name === 'land');
-
-test("quick's land is build's land but its after and its gate: main has one guard, whatever the workflow", () => {
-  const [build, quick] = [landIn('build'), landIn('quick')];
-  assert.ok(build?.check && build.gate === true && build.workspace === 'base', 'build lands at a gate, in the checkout, on a check');
-  assert.deepEqual(landingOf(quick), landingOf(build));
-  assert.deepEqual([build.after, quick?.after], [['review'], ['review']], "each waits on its workflow's review");
-  assert.deepEqual(
-    [build.gate, quick?.gate],
-    [true, undefined],
-    "build's landing waits for a person; quick's is filed by its review's pass, and nobody reads the change between",
-  );
-});
-
-/**
- * What a judging step is fenced and equipped by, its own words apart: its agent, the loop it closes, its fence, its skills, its mcp
- * servers and what it tallies. Its `input:`, its `rounds:`, its `budget:` and its note are each workflow's own.
- */
-const judgingOf = (step: Step | undefined): unknown[] => [
-  step?.agent?.name,
-  step?.loop,
-  step?.disallowedTools,
-  step?.agent?.skills,
-  step?.mcp,
-  step?.tally,
-];
-
-/** The review step of the workflow `workflow`, read from `root`, a holder laid out as the shipped one. */
-const reviewIn = (workflow: string, root = SHIPPED_HOLDERS[0]): Step | undefined =>
-  loadWorkflows(path.join(root, workflow), { repo: REPO }).find((step) => step.name === 'review');
-
-test("quick's review is build's review but what each workflow says of its own: the same agent, loop, fence, skills, mcp and tally", () => {
-  const [build, quick] = [reviewIn('build'), reviewIn('quick')];
-  assert.ok(build?.loop === 'implement' && build.agent?.name === 'agora', "build's review is Agora's, closing implement's loop");
-  assert.deepEqual(judgingOf(quick), judgingOf(build));
-  assert.deepEqual(
-    [build.input, quick?.input],
-    [['design'], undefined],
-    "build's review reads the spec; a quick run has none, so the card is what was asked",
-  );
-  assert.deepEqual([build.rounds, quick?.rounds], [3, 2], "quick's loop caps tighter: a card that asks twice is a build card");
-  assert.deepEqual([build.budget, quick?.budget], [16, 12], 'and a review with no spec to read costs less');
-  assert.equal(quick?.gate, undefined, "nothing waits on a person at quick's review: its pass files the landing");
-});
-
-/** Quick's review, read from a scratch copy of the shipped team whose `quick/review.md` is `edit`ed; `what` names what the edit changes. */
-function withReview(what: string, edit: (text: string) => string): Step | undefined {
-  const root = scratch('wf-fences-review-');
-  fs.cpSync(SHIPPED_HOLDERS[0], root, { recursive: true });
-  const file = path.join(root, 'quick', 'review.md');
-  const text = fs.readFileSync(file, 'utf8');
-  assert.notEqual(edit(text), text, `quick's review has the ${what} the edit changes`);
-  fs.writeFileSync(file, edit(text));
-  return reviewIn('quick', root);
-}
-
-test("REFUSED: a quick review whose skills, mcp, tally or fence is no more build's is unequal to it; one with no loop or no agora refuses the load", () => {
-  const edits: [string, (text: string) => string][] = [
-    ['skills', (text) => text.replace(', apps/web:ds-spec', '')],
-    ['mcp', (text) => text.replace('mcp: playwright\n', '')],
-    ['tally', (text) => text.replace(', findings.kind=placement', '')],
-    ['fence', (text) => text.replace(', Bash(npm run e2e)', '')],
-  ];
-  assert.throws(
-    () => withReview('loop', (text) => text.replace('loop: implement\n', '').replace('rounds: 2\n', '')),
-    (e: Error) =>
-      e instanceof WorkflowError &&
-      e.message.includes('land: ') &&
-      e.message.includes('(it waits on review)') &&
-      e.message.includes('Add `gate: true`') &&
-      e.message.includes('a `loop:`'),
-    "the loop needs no fixture here either: without it nothing can send the work back, so the whole folder is refused at load — quick's land has no gate and is filed by the review's pass",
-  );
-  assert.throws(
-    () => withReview('agent', (text) => text.replace('agent: agora', 'agent: ada')),
-    /declares no `output:`/,
-    "the agent needs no fixture here: no other shipped agent declares the `findings` its `tally:` counts, so a swap is refused at load — and that it is Agora's is held by the count of each read-only agent's steps",
-  );
-  for (const [what, edit] of edits) assert.notDeepEqual(judgingOf(withReview(what, edit)), judgingOf(reviewIn('build')), what);
-});
-
-test("REFUSED: a quick land whose check, workspace, gate, fence or budget is no more build's is unequal to it", () => {
-  const edits: [string, (text: string) => string][] = [
-    ['check', (text) => text.replace('receipt --run "$WF_RUN"', 'receipt --run "$WF_STEP"')],
-    ['check', (text) => text.replace('git show "HEAD:workflows/build/landing.ts"', 'cat workflows/build/landing.ts')],
-    ['note', (text) => text.replace('It deletes no branch and stages no merge here.', '')],
-    ['workspace', (text) => text.replace('workspace: base\n', '')],
-    ['fence', (text) => text.replace(', Bash(*:4317*)', '')],
-    ['budget', (text) => text.replace('budget: 10', 'budget: 11')],
-  ];
-  for (const [what, edit] of edits) {
-    const root = scratch('wf-fences-land-');
-    fs.cpSync(SHIPPED_HOLDERS[0], root, { recursive: true });
-    const file = path.join(root, 'quick', 'land.md');
-    const text = fs.readFileSync(file, 'utf8');
-    assert.notEqual(edit(text), text, `quick's land has the ${what} the edit changes`);
-    fs.writeFileSync(file, edit(text));
-    assert.notDeepEqual(landingOf(landIn('quick', root)), landingOf(landIn('build', root)), what);
-  }
-});
-
-/**
- * The SKILL.md of a skill a step is given, as its line writes it: one named with its folder (`folder:name`) from that folder's skills
- * in the checkout `root`, a bare one from the first of `SKILL_FOLDERS` that holds it; undefined where none does.
- */
-const skillFileOf = (skill: string, root = REPO): string | undefined => {
-  const given = givenSkillOf(skill);
-  const files =
-    given?.folder === undefined
-      ? SKILL_FOLDERS.map((dir) => path.join(dir, skill, 'SKILL.md'))
-      : [path.join(root, given.folder, '.claude', 'skills', given.name, 'SKILL.md')];
-  return files.find((file) => fs.existsSync(file));
-};
-
-/**
- * The SKILL.md of `skill`, read in the checkout `root`, when it declares `allowed-tools` (`allowedToolsOf`), which a dontAsk job's
- * Skill tool is refused to load.
- */
-const grantingFileOf = (skill: string, root = REPO): string | undefined => {
-  const file = skillFileOf(skill, root);
-  return file !== undefined && allowedToolsOf(file).length > 0 ? file : undefined;
-};
-
-/**
- * Each skill a step is given whose SKILL.md grants tools (`grantingFileOf`), when the step's instructions do not say to read that file,
- * by its path from the checkout, with Read. Each as `<step>: <skill>`. A skill named with its folder is read in the checkout `root`.
- */
-function grantingSkillsUnread(step: Step, root = REPO): string[] {
-  return (step.agent?.skills ?? [])
-    .filter((skill) => {
-      const file = grantingFileOf(skill, root);
-      if (file === undefined) return false;
-      const from = file.startsWith(root + path.sep) ? root : REPO;
-      const named = path.relative(from, file).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      return !new RegExp(`read\\s+\`${named}\`\\s+with\\s+Read`).test(step.body);
-    })
-    .map((skill) => `${step.name}: ${skill}`);
-}
-
-test('every shipped dontAsk job given a skill that grants tools is told to read its SKILL.md with Read', () => {
-  const jobs = shipped()
-    .map(({ step }) => step)
-    .filter(dontAskJob);
-  const granted = jobs.filter((step) => (step.agent?.skills ?? []).some((skill) => grantingFileOf(skill) !== undefined));
-  assert.deepEqual(
-    granted.map((step) => step.name).sort(),
-    ['design', 'review', 'review'],
-    "design and both reviews — build's and quick's — are given shadcn, which grants",
-  );
-  assert.deepEqual(
-    jobs.flatMap((step) => grantingSkillsUnread(step)),
-    [],
-  );
-});
-
-/** A scratch checkout holding a copy of the kit's skills where a session finds them, its `ds-spec` granting `grant`: the checkout. */
-function kitGranting(grant: string): string {
-  const root = scratch('wf-fences-kit-');
-  const [kit] = nestedSkillFolders(root);
-  fs.cpSync(nestedSkillFolders(REPO)[0], kit, { recursive: true });
-  const file = path.join(kit, 'ds-spec', 'SKILL.md');
-  const text = fs.readFileSync(file, 'utf8');
-  assert.ok(text.startsWith('---\nname: ds-spec\n'), file);
-  fs.writeFileSync(file, text.replace('---\nname: ds-spec\n', `---\nname: ds-spec\nallowed-tools: ${grant}\n`));
-  return root;
-}
-
-test('the fence reads the folders of skills a shipped step names with a skill: the board’s, whose skills grant no tool today', () => {
-  assert.deepEqual(NESTED, ['apps/web']);
-  assert.ok(SKILL_FOLDERS.includes(path.join(REPO, 'apps', 'web', '.claude', 'skills')), SKILL_FOLDERS.join(', '));
-  assert.deepEqual(grantsOf(nestedSkillFolders(REPO)), []);
-  for (const agent of ['seldon', 'agora']) {
-    const given = (shippedStepOf(agent).agent?.skills ?? []).filter((skill) => givenSkillOf(skill)?.folder !== undefined);
-    assert.deepEqual(given, ['apps/web:ds-build', 'apps/web:ds-theme', 'apps/web:ds-spec'], agent);
-    for (const skill of given) assert.ok(skillFileOf(skill)?.startsWith(nestedSkillFolders(REPO)[0] + path.sep), skill);
-  }
-  assert.equal(skillFileOf('apps/web:ds-none'), undefined);
-});
-
-test('REFUSED: a kit skill that grants a tool design and review are fenced from opens it to both, and is named as unread by each', () => {
-  const root = kitGranting('Bash(git push:*)');
-  const grants = [...SKILL_GRANTS, ...grantsOf(nestedSkillFolders(root))];
-  for (const agent of ['seldon', 'agora']) {
-    const step = shippedStepOf(agent);
-    assert.deepEqual(unfenced(step, SETTINGS, FENCED), [], `${agent}, with the skills as shipped`);
-    const open = unfenced(step, SETTINGS, FENCED, grants);
-    assert.ok(open.includes(`${step.name}: Bash(git push)`), open.join('\n'));
-    assert.ok(
-      open.every((what) => what.includes('git push')),
-      open.join('\n'),
-    );
-    assert.deepEqual(grantingSkillsUnread(step, root), [`${step.name}: apps/web:ds-spec`]);
-    assert.deepEqual(grantingSkillsUnread(step), []);
-  }
-});
-
-test('REFUSED: design or review with no line naming shadcn’s SKILL.md to read with Read is named, read from its file as a run reads it', () => {
-  const unread = (text: string): string => text.replace(/read\s+`\.claude\/skills\/shadcn\/SKILL\.md`\s+with\s+Read/, 'read it');
-  const named = 'a line naming shadcn’s SKILL.md';
-  assert.deepEqual(grantingSkillsUnread(shippedEdited('seldon', 'build', named, unread, 'build/design.md')), ['design: shadcn']);
-  assert.deepEqual(grantingSkillsUnread(shippedEdited('agora', 'build', named, unread, 'build/review.md')), ['review: shadcn']);
-});
-
-/** The folders a walk of the checkout leaves out: what an install, a build or git writes, none of them a file a change is on. */
-const NOT_CHECKOUT = new Set(['node_modules', '.git', 'dist', '.turbo']);
-
-/** Every file under the checkout `repo`, by its path from it, but under `NOT_CHECKOUT`. */
-function checkoutFiles(repo: string, under = ''): string[] {
-  return fs
-    .readdirSync(path.join(repo, under), { withFileTypes: true })
-    .filter((entry) => !NOT_CHECKOUT.has(entry.name))
-    .flatMap((entry) => {
-      const file = under ? `${under}/${entry.name}` : entry.name;
-      return entry.isDirectory() ? checkoutFiles(repo, file) : [file];
-    });
-}
-
-/** Each glob a skill of `skillsDir` applies to (`applies:`) that no file of the checkout `repo` matches, as `<skill>: <glob>`. */
-function appliesUnmatched(skillsDir: string, repo: string): string[] {
-  const files = checkoutFiles(repo);
-  return fs
-    .readdirSync(skillsDir)
-    .filter((skill) => fs.existsSync(path.join(skillsDir, skill, 'SKILL.md')))
-    .flatMap((skill) =>
-      appliesOf(fs.readFileSync(path.join(skillsDir, skill, 'SKILL.md'), 'utf8'))
-        .filter((glob) => !files.some((file) => appliesMatch(file, [glob])))
-        .map((glob) => `${skill}: ${glob}`),
-    );
-}
-
-test('every path a repository skill applies to matches a file of the checkout, and the two that say so are read', () => {
-  const skills = path.join(REPO, '.claude', 'skills');
-  assert.deepEqual(appliesUnmatched(skills, REPO), []);
-  assert.deepEqual(appliesOf(fs.readFileSync(path.join(skills, 'change-the-board', 'SKILL.md'), 'utf8')), ['apps/web/**']);
-  assert.equal(appliesOf(fs.readFileSync(path.join(skills, 'effect', 'SKILL.md'), 'utf8')).length, 7);
-});
-
-test('REFUSED: a skill that applies to a path no file of the checkout has is named, beside one that matches', () => {
-  const skills = scratch('wf-fences-applies-');
-  for (const [name, applies] of [
-    ['typo', '["apps/webb/**", "apps/web/**"]'],
-    ['none', ''],
-  ]) {
-    fs.mkdirSync(path.join(skills, name));
-    const line = applies ? `applies: ${applies}\n` : '';
-    fs.writeFileSync(path.join(skills, name, 'SKILL.md'), `---\nname: ${name}\ndescription: Do it.\n${line}---\nDo it.\n`);
-  }
-  assert.deepEqual(appliesUnmatched(skills, REPO), ['typo: apps/webb/**']);
-});
-
-test('Argus is refused every verb that acts and every edit: it runs dontAsk, and no allow reaches one', () => {
-  assert.deepEqual(acting(shippedStepOf('argus')), []);
-});
-
-test('REFUSED: Argus allowed every verb, the inbox whole or an edit, read from its file as a run reads it, could act', () => {
-  assert.deepEqual(acting(argusAllowed('Bash(npx nemia:*)')), actsBy('npx nemia').map(shown));
-  assert.deepEqual(acting(argusAllowed('Bash(npx wf:*)')), actsBy('npx wf').map(shown));
-  assert.deepEqual(acting(argusAllowed('Bash(nemia stats:*), Bash(nemia inbox:*)')), [
-    'Bash(nemia inbox add x)',
-    'Bash(nemia inbox queue x)',
-    'Bash(nemia inbox rm x)',
-  ]);
-  assert.deepEqual(acting(argusAllowed('Bash(wf:*), Edit(**)')), [...actsBy('wf').map(shown), 'Edit', 'Write']);
-  assert.deepEqual(acting({ ...shippedStepOf('argus'), permissionMode: 'auto' }), [
-    'argus: not a dontAsk job, so every call no deny names runs',
-  ]);
-});
-
-/**
- * The skill `name` of the folder of skills `dir` as a `skills:` line names it: with its folder (`folder:name`) when `dir` is the
- * skills of a folder of `NESTED`, bare for any other.
- */
-const lineNameOf = (dir: string, name: string): string => {
-  const folder = NESTED.find((nested) => path.join(REPO, nested, '.claude', 'skills') === dir);
-  return folder === undefined ? name : `${folder}:${name}`;
-};
-
-/**
- * Every shipped skill that declares rules (`RULES_FILE`), by the name a line gives it (`lineNameOf`), each rule read as a run reads it
- * (`readSkillRules`).
- */
-const SHIPPED_RULES = SKILL_FOLDERS.filter((dir) => dir !== path.join(TEAM, 'skills')).flatMap((dir) =>
-  fs
-    .readdirSync(dir)
-    .filter((name) => fs.existsSync(path.join(dir, name, RULES_FILE)))
-    .map((name) => ({ skill: lineNameOf(dir, name), rules: readSkillRules(path.join(dir, name)) })),
-);
-
-/** The call a `breaks` pattern names, as the runtime records a denial of it: a command by its first word, any other tool by its name. */
-function brokenBy(pattern: string): Call {
-  const written = /^([^()]+)\((.*)\)$/s.exec(pattern);
-  if (!written) return { tool: pattern };
-  if (written[1] !== 'Bash') return { tool: written[1] };
-  return {
-    tool: 'Bash',
-    command: written[2]
-      .replace(/(?::\*| \*)$/, '')
-      .trim()
-      .split(/\s+/)[0],
-  };
-}
-
-/**
- * Each pattern of `rules` that a dontAsk job's fence lets through, so no denial of it is ever recorded and the rule could never break:
- * reached by an allow of the step's, of the settings' or of a skill's, and by no deny of its own. Each as `<step>: <rule> <pattern>`.
- */
-function unbreakable(step: Step, rules: readonly SkillRule[]): string[] {
-  const allows = [...(step.allowedTools ?? []), ...(SETTINGS.permissions?.allow ?? []), ...SKILL_GRANTS];
-  const denies = [...(step.disallowedTools ?? []), ...(SETTINGS.permissions?.deny ?? [])];
-  return rules.flatMap((rule) =>
-    rule.breaks
-      .filter((pattern) => {
-        const call = brokenBy(pattern);
-        return allows.some((r) => reaches(r, call)) && !denies.some((r) => reaches(r, call));
-      })
-      .map((pattern) => `${step.name}: ${rule.id} ${pattern}`),
-  );
-}
-
-/** Whether a step is a dontAsk job, which runs only what an allow reaches: what a denial of its is recorded for. */
+/** Whether a step is a dontAsk job, which runs only what an allow reaches. */
 const dontAskJob = (step: Step): boolean => step.permissionMode === 'dontAsk' && step.workspace !== 'base';
-
-test("every shipped skill's rules.json reads, and every call that breaks one of its rules is refused to each dontAsk step given it", () => {
-  assert.ok(SHIPPED_RULES.length > 0, 'a skill ships its rules');
-  assert.equal(lineNameOf(path.join(REPO, 'apps', 'web', '.claude', 'skills'), 'ds-build'), 'apps/web:ds-build');
-  assert.equal(lineNameOf(path.join(REPO, '.claude', 'skills'), 'write-a-spec'), 'write-a-spec', 'a skill of the root stays bare');
-  for (const { skill, rules } of SHIPPED_RULES) {
-    const steps = shipped()
-      .map(({ step }) => step)
-      .filter((step) => step.agent?.skills?.includes(skill) && dontAskJob(step));
-    assert.ok(steps.length > 0, `${skill} declares rules, and no shipped dontAsk step is given it to refuse a call that breaks one`);
-    for (const step of steps) assert.deepEqual(unbreakable(step, rules), [], `${skill}: a call that breaks a rule is allowed`);
-  }
-});
-
-test('REFUSED: a call that breaks a shipped rule, allowed to the step given the skill, is named — by its own allow or the settings', () => {
-  const [spec] = SHIPPED_RULES.filter(({ skill }) => skill === 'write-a-spec');
-  assert.ok(spec, 'write-a-spec declares its rules');
-  const seldon = shippedAllowed('seldon', 'build', 'Agent, Bash(sed:*)');
-  assert.deepEqual(unbreakable(seldon, spec.rules), ['design: read-with-read Bash(sed:*)']);
-  const cd = [{ id: 'checks-bare', says: 'never cd', breaks: ['Bash(cd:*)'] }];
-  const ownDenies = shippedStepOf('seldon').disallowedTools ?? [];
-  assert.ok(ownDenies.includes('Bash(cd:*)'), 'Seldon denies cd itself');
-  assert.deepEqual(unbreakable(shippedStepOf('seldon'), cd), [], 'its own deny refuses cd');
-  const unDenied = { ...shippedStepOf('seldon'), disallowedTools: ownDenies.filter((rule) => rule !== 'Bash(cd:*)') };
-  assert.deepEqual(unbreakable(unDenied, cd), ['design: checks-bare Bash(cd:*)'], "without it, the settings' allow reaches cd");
-  assert.deepEqual(
-    unbreakable({ ...seldon, disallowedTools: [...ownDenies, 'Bash(sed:*)'] }, spec.rules),
-    [],
-    'a deny of its own refuses it',
-  );
-  assert.deepEqual(brokenBy('Bash(git -C:*)'), { tool: 'Bash', command: 'git' }, "a denial keeps a command's first word");
-  assert.deepEqual(brokenBy('Read(//etc/**)'), { tool: 'Read' });
-  assert.deepEqual(brokenBy('Glob'), { tool: 'Glob' });
-  const outside = shippedAllowed('seldon', 'build', 'Agent, Glob, Read(//home/**)');
-  assert.deepEqual(unbreakable(outside, spec.rules), ['design: read-within-reach Glob', 'design: read-within-reach Read']);
-  const [review] = SHIPPED_RULES.filter(({ skill }) => skill === 'review-a-change');
-  assert.ok(review, 'review-a-change declares its rules');
-  const line = (shippedStepOf('agora').allowedTools ?? []).join(', ');
-  assert.deepEqual(unbreakable(agoraAllowed(`${line}, Grep`), review.rules), ['review: read-within-reach Grep']);
-});
-
-test('the shipped read-within-reach rule is broken by a denied Glob, Grep or Read, as nemia stats counts it, and kept by a denied npm', () => {
-  const outside = 'Read(/srv/.agent-workflows/runs/r/artifacts/a.md)';
-  for (const skill of ['write-a-spec', 'review-a-change']) {
-    const [shipped] = SHIPPED_RULES.filter((rules) => rules.skill === skill);
-    assert.ok(shipped, `${skill} declares its rules`);
-    const declared = new Map([[skill, shipped.rules]]);
-    const reach = (denied: string[]) => {
-      const fact = rulesOfTry(denied, declared)?.find((rule) => rule.rule === 'read-within-reach');
-      assert.ok(fact, `${skill} declares read-within-reach`);
-      return { broken: fact.broken, by: fact.by };
-    };
-    assert.deepEqual(reach(['Glob', outside, 'Bash(npm)']), { broken: true, by: ['Glob', outside] }, skill);
-    assert.deepEqual(reach(['Grep']), { broken: true, by: ['Grep'] }, skill);
-    assert.deepEqual(reach(['Bash(npm)']), { broken: false, by: [] }, skill);
-  }
-});
-
-test("REFUSED: cd to Seldon, Agora and Iris, each by a deny of its own, where the settings' allow would reach it", () => {
-  const cd = [{ id: 'never-cd', says: 'never cd', breaks: ['Bash(cd:*)'] }];
-  for (const agent of ['seldon', 'agora', 'iris']) {
-    const step = shippedStepOf(agent);
-    assert.deepEqual(unbreakable(step, cd), [], `${agent} is refused cd`);
-    const unDenied = { ...step, disallowedTools: (step.disallowedTools ?? []).filter((rule) => rule !== 'Bash(cd:*)') };
-    assert.deepEqual(unbreakable(unDenied, cd), [`${step.name}: never-cd Bash(cd:*)`], `${agent}: without its deny, cd is open`);
-  }
-});
-
-/** The agents that review and interview, each of which reads Anthropic's documentation by host. */
-const READERS = ['agora', 'iris'];
-
-/** The agent that designs: a spec is only as good as the documents it reads, so Seldon fetches any site. */
-const DESIGNER = 'seldon';
-
-/** Anthropic's documentation, by the host a fetch reads: the only hosts the readers open. */
-const DOCUMENTATION: Call[] = ['code.claude.com', 'docs.claude.com', 'platform.claude.com', 'docs.anthropic.com'].map((domain) => ({
-  tool: 'WebFetch',
-  domain,
-}));
-
-/** Another site, in the spellings a session reaches one: a host near Anthropic's, and a host of its own. */
-const ELSEWHERE: Call[] = ['claude.com', 'code.claude.com.example.test', 'example.com', 'github.com'].map((domain) => ({
-  tool: 'WebFetch',
-  domain,
-}));
-
-test('Seldon fetches any site and searches the web by his own allow, a fetch that names no host included', () => {
-  const step = shippedStepOf(DESIGNER);
-  assert.ok(step.tools?.includes('WebFetch') && step.tools.includes('WebSearch'), 'seldon is given WebFetch and WebSearch');
-  assert.deepEqual(
-    runs(step, [...DOCUMENTATION, ...ELSEWHERE, { tool: 'WebFetch' }, { tool: 'WebSearch' }], {}, []),
-    [...DOCUMENTATION.map(shown), ...ELSEWHERE.map(shown), 'WebFetch', 'WebSearch'],
-    'seldon: by his own allow, no settings read',
-  );
-});
-
-test("Agora and Iris read Anthropic's documentation and search the web by their own allow, each host by name, and no other host", () => {
-  for (const agent of READERS) {
-    const step = shippedStepOf(agent);
-    assert.ok(step.tools?.includes('WebFetch') && step.tools.includes('WebSearch'), `${agent} is given WebFetch and WebSearch`);
-    assert.deepEqual(
-      runs(step, [...DOCUMENTATION, { tool: 'WebSearch' }], {}, []),
-      [...DOCUMENTATION.map(shown), 'WebSearch'],
-      `${agent}: by its own allow, no settings read`,
-    );
-    assert.deepEqual(runs(step, ELSEWHERE, {}, []), [], `${agent} opens no other host`);
-    assert.deepEqual(runs(step, [{ tool: 'WebFetch' }], {}, []), [], `${agent} reaches no fetch that names no host`);
-  }
-});
-
-test('REFUSED: a host an agent allows no more is read no more, and a bare WebFetch allowed opens every site', () => {
-  for (const agent of READERS) {
-    const cut = shippedEdited(agent, agent === 'iris' ? 'intake' : 'build', 'an allow of docs.claude.com', (text) =>
-      text.replace(' WebFetch(domain:docs.claude.com),', ''),
-    );
-    assert.deepEqual(
-      runs(cut, DOCUMENTATION, {}, []),
-      DOCUMENTATION.filter((call) => call.domain !== 'docs.claude.com').map(shown),
-      `${agent}: without its allow, docs.claude.com is refused`,
-    );
-    const bare = shippedAllowed(agent, agent === 'iris' ? 'intake' : 'build', 'Agent, WebFetch, WebSearch');
-    assert.deepEqual(runs(bare, ELSEWHERE, {}, []), ELSEWHERE.map(shown), `${agent}: a bare WebFetch opens every site`);
-  }
-});
 
 /**
  * Git's read-only questions a read-only step asks, in the spellings a session types: a form for each rule of the set its agent's
@@ -1848,15 +656,6 @@ const GIT_READS: Call[] = [
   'git branch --contains 4c8a05b',
   'git worktree list',
 ].map((command) => ({ tool: 'Bash', command }));
-
-/**
- * The agents of the team that read the repository and never write it: each runs dontAsk, so only an allow of its own reaches a call, and
- * each carries the read set itself rather than leaning on a folder's settings, which do not travel to another factory.
- */
-const READ_ONLY_AGENTS = ['seldon', 'agora', 'iris', 'argus'];
-
-/** The shipped workflow whose step each read-only agent runs. */
-const WORKFLOW_OF: Record<string, string> = { seldon: 'build', agora: 'build', iris: 'intake', argus: 'janitor' };
 
 /**
  * Git's writes a read-only step must never run, in the spellings a session types: the working tree's, the index's, a ref's, a remote's,
@@ -1909,20 +708,6 @@ function runs(
     )
     .map(shown);
 }
-
-/**
- * The git questions review-a-change names in its step 2, on the line that says which Bash runs, each placeholder (`<commit>`) filled in
- * with an argument a session types.
- */
-const askedGit = (from = 'Bash runs only the checks and reads your step names'): string[] =>
-  checksOf('.claude/skills/review-a-change/SKILL.md', from, /`(git\s[^`]*)`/g).map((command) => command.replace(/<[^<>]+>/g, '4c8a05b'));
-
-/** Agora's step, its agent's `allowedTools` line cut back to what it allowed before git's questions, or replaced by `allowed`. */
-const agoraAllowed = (allowed = 'Agent'): Step => shippedAllowed('agora', 'build', allowed);
-
-/** The step of `agent`'s shipped workflow, its agent's `allowedTools` line rewritten by `edit`. */
-const gitAllowed = (agent: string, edit: (line: string) => string): Step =>
-  shippedAllowed(agent, WORKFLOW_OF[agent], edit((shippedStepOf(agent).allowedTools ?? []).join(', ')));
 
 /**
  * The plain text tools each read-only agent allows beside git's questions, by its own allow. None of them writes a file or runs a
@@ -1991,51 +776,8 @@ const WC_READS_A_LIST: Call[] = ['wc --files0-from=list0', 'wc --f=list0', 'wc -
   (command) => ({ tool: 'Bash', command }),
 );
 
-/** The deny that answers `wc --files0-from`, on each read-only agent's line, and so on each of its steps. */
+/** The deny that answers `wc --files0-from`, planted beside the read set. */
 const WC_READS_A_LIST_DENY = 'Bash(wc *--f*)';
-
-/** The rules of the read set on a step's own allow, git's and the text tools', in the order its agent writes them. */
-const readRulesOf = (step: Step): string[] =>
-  (step.allowedTools ?? []).filter((rule) => rule.startsWith('Bash(git') || TEXT_ALLOWS.includes(rule));
-
-test("every read-only agent asks each of git's read-only questions by its own allow, whatever the settings say", () => {
-  for (const agent of READ_ONLY_AGENTS) {
-    const step = shippedStepOf(agent);
-    assert.deepEqual(runs(step, GIT_READS, {}, []), GIT_READS.map(shown), `${agent}: by its own allow, no settings read`);
-    assert.deepEqual(runs(step, GIT_READS), GIT_READS.map(shown), `${agent}: with the shipped settings`);
-  }
-});
-
-test("the read-only agents carry one and the same read set, git's and the text tools', so no line of them drifts from another", () => {
-  const [first, ...rest] = READ_ONLY_AGENTS.map((agent) => readRulesOf(shippedStepOf(agent)));
-  assert.ok(first.length >= 24, `the set is written out on each line: ${first.join(', ')}`);
-  for (const [index, rules] of rest.entries()) assert.deepEqual(rules, first, READ_ONLY_AGENTS[index + 1]);
-});
-
-test('every read-only step reads with the text tools inside the working tree, and is refused each read outside it', () => {
-  for (const { named, step } of readOnlySteps()) {
-    for (const rule of TEXT_ALLOWS) assert.ok(step.allowedTools?.includes(rule), `${named} allows ${rule}`);
-    assert.deepEqual(runs(step, TEXT_READS, {}, []), TEXT_READS.map(shown), `${named}: by its own allow, no settings read`);
-    assert.deepEqual(runs(step, TEXT_READS_OUTSIDE), [], `${named}: by Claude Code's own check`);
-    assert.deepEqual(runs(step, WC_READS_A_LIST), [], `${named}: by its own deny`);
-  }
-});
-
-test('REFUSED: without Claude Code’s check of a path, or without the deny of wc --files0-from, a read-only step reads outside', () => {
-  const step = shippedStepOf('agora');
-  assert.deepEqual(runs(step, TEXT_READS_OUTSIDE, SETTINGS, SKILL_GRANTS, false), TEXT_READS_OUTSIDE.map(shown), 'the allows alone');
-  const open = { ...step, disallowedTools: (step.disallowedTools ?? []).filter((rule) => rule !== WC_READS_A_LIST_DENY) };
-  assert.deepEqual(runs(open, WC_READS_A_LIST), WC_READS_A_LIST.map(shown), 'its check reads no path in the list');
-  for (const verb of ['sed', 'awk', 'find', 'sort', 'uniq', 'tee'])
-    assert.ok(
-      !(step.allowedTools ?? []).some((rule) => rule.startsWith(`Bash(${verb}`)),
-      `${verb} writes a file or runs a program, and stays out`,
-    );
-});
-
-test('every read-only agent is refused every git write: no allow of its own, of the settings or of a skill reaches one', () => {
-  for (const agent of READ_ONLY_AGENTS) assert.deepEqual(runs(shippedStepOf(agent), GIT_WRITES), [], agent);
-});
 
 /**
  * Every call of the read set that would run a program of its own, in the spellings a session types, each measured in a checkout to run
@@ -2049,10 +791,10 @@ test('every read-only agent is refused every git write: no allow of its own, of 
  * - An assignment before a git command names a program git then runs: `GIT_EXTERNAL_DIFF` once per changed path for every diff git
  *   shows, and `diff.external` through `GIT_CONFIG_COUNT`/`GIT_CONFIG_KEY_0`. An allow is matched against the part with every leading
  *   wrapper stripped (`unwrapped`), so no allow of the set can refuse one; a deny is matched against the part as typed too, with its
- *   wrappers kept, so the deny is of `GIT_` anywhere in that part — `Bash(*GIT_*)`, the repository's own shape for a deny of what an
- *   assignment says (`LIVE_COLLECTOR`). Without the leading `*` the deny reaches only a part that opens `GIT_`, and a first assignment
- *   that names something else, or a `nohup` or a `timeout` before it, carries the whole of git's environment through. It is the fence
- *   under what each of these roles' skills already says in prose: never `VAR=`.
+ *   wrappers kept, so the deny is of `GIT_` anywhere in that part — `Bash(*GIT_*)`, the shape of a deny of what an assignment says
+ *   (the matcher's test denies an address so). Without the leading `*` the deny reaches only a part that opens `GIT_`, and a first
+ *   assignment that names something else, or a `nohup` or a `timeout` before it, carries the whole of git's environment through. It is
+ *   the fence under what each of these roles' skills already says in prose: never `VAR=`.
  */
 const GIT_RUNS_A_PROGRAM: Call[] = [
   'git grep -Osh foo HEAD',
@@ -2079,33 +821,8 @@ const STILL_ASKED: Call[] = ['git grep -n foo HEAD', 'git diff HEAD', 'git show 
   command,
 }));
 
-/** The three denies that answer the allow of a read, by the rule each is written as, on each read-only agent and on each of its steps. */
+/** The three denies that answer the allow of a read, by the rule each is written as, planted beside the read set. */
 const RUNS_A_PROGRAM_DENIES = ['Bash(git grep *O*)', 'Bash(git grep *--op*)', 'Bash(*GIT_*)'];
-
-/**
- * Every read-only step there is, as `<workflow>/<step>`: each step of a shipped folder whose agent is one of `READ_ONLY_AGENTS`, as it
- * resolves, never the first step of each agent alone (`shippedStepOf`): each step's own `disallowedTools:` adds to its agent's, and what
- * its session is refused is read whole on each.
- */
-const readOnlySteps = (): Array<{ named: string; step: Step }> =>
-  shipped()
-    .filter(({ step }) => READ_ONLY_AGENTS.includes(step.agent?.name ?? '') && dontAskJob(step))
-    .map(({ dir, step }) => ({ named: `${path.basename(dir)}/${step.name}`, step }));
-
-test('every read-only step is refused every call of the set that would run a program of its own, and asks each plain read all the same', () => {
-  const steps = readOnlySteps();
-  assert.deepEqual(
-    [...new Set(steps.map(({ step }) => step.agent?.name ?? step.name))].sort(),
-    [...READ_ONLY_AGENTS].sort(),
-    'every read-only agent has a step here',
-  );
-  for (const { named, step } of steps) {
-    assert.deepEqual(runs(step, GIT_RUNS_A_PROGRAM), [], named);
-    assert.deepEqual(runs(step, STILL_ASKED, {}, []), STILL_ASKED.map(shown), named);
-    assert.deepEqual(runs(step, GIT_READS, {}, []), GIT_READS.map(shown), named);
-    assert.deepEqual(runs(step, GIT_WRITES), [], named);
-  }
-});
 
 /**
  * The verbs of the read set that take git's `--output=<file>`, which creates or truncates the file it names; each measured on git 2.43 to
@@ -2127,7 +844,7 @@ const GIT_WRITES_A_FILE: Call[] = [
   'timeout 5 git show HEAD --output=/tmp/x',
 ].map((command) => ({ tool: 'Bash', command }));
 
-/** The deny that answers `--output` anywhere in a git command, on each read-only agent and on each of its steps. */
+/** The deny that answers `--output` anywhere in a git command, planted beside the read set. */
 const WRITES_A_FILE_DENY = 'Bash(git *--output*)';
 
 /**
@@ -2153,29 +870,135 @@ const GIT_READS_OUTSIDE: Call[] = [
   'timeout 5 git blame CLAUDE.md --contents /etc/hostname',
 ].map((command) => ({ tool: 'Bash', command }));
 
-/** The denies that answer a read outside the repository, on each read-only agent's line, and so on each of its steps. */
+/** The denies that answer a read outside the repository, planted beside the read set. */
 const READS_OUTSIDE_DENIES = ['Bash(git *--no-ind*)', 'Bash(git blame *--con*)', 'Bash(git grep -f*)', 'Bash(git grep * -f*)'];
 
-/** Every deny a read-only agent's line carries beside the read set, which each of its steps is refused with its own. */
+/**
+ * Every deny planted beside the read set, on the agent's own line: a step's own line adds to it, so each step is refused it. sdlc's own
+ * list as written is `packages/templates/test/fences.test.ts`'s.
+ */
 const READ_SET_DENIES = [...RUNS_A_PROGRAM_DENIES, WRITES_A_FILE_DENY, ...READS_OUTSIDE_DENIES, WC_READS_A_LIST_DENY];
 
-test('every read-only step is refused every spelling of a read outside the repository the fence can read, and still asks each read', () => {
-  for (const { named, step } of readOnlySteps()) {
-    assert.deepEqual(runs(step, GIT_READS_OUTSIDE), [], named);
-    assert.deepEqual(runs(step, GIT_READS, {}, []), GIT_READS.map(shown), named);
+/**
+ * Git's read-only questions as rules, one for each form of `GIT_READS`: the git half of the read set planted here. Planted, it may
+ * drift from sdlc's; `packages/templates/test/fences.test.ts` holds sdlc's rules as written.
+ */
+const GIT_ALLOWS = [
+  'Bash(git diff:*)',
+  'Bash(git diff-tree:*)',
+  'Bash(git log:*)',
+  'Bash(git show:*)',
+  'Bash(git show-ref:*)',
+  'Bash(git status:*)',
+  'Bash(git blame:*)',
+  'Bash(git grep:*)',
+  'Bash(git ls-files:*)',
+  'Bash(git ls-tree:*)',
+  'Bash(git cat-file:*)',
+  'Bash(git rev-parse:*)',
+  'Bash(git rev-list:*)',
+  'Bash(git merge-base:*)',
+  'Bash(git merge-tree:*)',
+  'Bash(git shortlog:*)',
+  'Bash(git describe:*)',
+  'Bash(git name-rev:*)',
+  'Bash(git for-each-ref:*)',
+  'Bash(git check-ignore:*)',
+  'Bash(git branch)',
+  'Bash(git branch --list:*)',
+  'Bash(git branch --contains:*)',
+  'Bash(git worktree list:*)',
+];
+
+/** The read set planted on a read-only agent's allow: git's questions and the text tools. */
+const READ_SET_ALLOWS = [...GIT_ALLOWS, ...TEXT_ALLOWS];
+
+/**
+ * The review step of the tests' team, read as a run reads it, from a copy of the team (`teamCopy`) whose reviewer — a dontAsk agent —
+ * allows `allows` and denies `denies`, each on its own line of the agent's fence; and the step file's own `disallowedTools:` written as
+ * `own`, where it is given, the agent then offering its fence to override. The lines are planted here, so they may drift from sdlc's:
+ * `packages/templates/test/fences.test.ts` holds sdlc's rules as written.
+ */
+function planted({
+  allows = READ_SET_ALLOWS,
+  denies = READ_SET_DENIES,
+  own,
+}: { allows?: readonly string[]; denies?: readonly string[]; own?: string } = {}): Step {
+  const root = teamCopy('wf-fences-planted-');
+  const agent = path.join(root, 'agents', 'reviewer.md');
+  const text = fs.readFileSync(agent, 'utf8');
+  const allowing = withFenceList(text, 'allowedTools', () => allows.join(', '));
+  assert.notEqual(allowing, text, 'the reviewer has an allowedTools line to plant on');
+  const denying = denies.length ? `\n    disallowedTools: ${denies.join(', ')}` : '';
+  const fenced = allowing.replace(/^ {4}allowedTools: .*$/m, (line) => `${line}${denying}`);
+  fs.writeFileSync(agent, own === undefined ? fenced : fenced.replace(/^overridable: (.*)$/m, 'overridable: $1, fence'));
+  if (own !== undefined) {
+    const file = path.join(root, 'dev', 'review.md');
+    const step = fs.readFileSync(file, 'utf8');
+    fs.writeFileSync(file, step.replace(/\n---\n/, `\nclaude:\n  fence:\n    disallowedTools: ${own}\n---\n`));
   }
+  const review = loadWorkflows(path.join(root, 'dev')).find((step) => step.name === 'review')!;
+  assert.equal(review.agent?.name, 'reviewer');
+  assert.ok(dontAskJob(review), 'the review is a dontAsk job, which runs only what an allow reaches');
+  return review;
+}
+
+/** `rules` less `rule`, which it holds, so taking it off says something. */
+const less = (rules: readonly string[], ...rule: string[]): string[] => {
+  for (const one of rule) assert.ok(rules.includes(one), `${one} is planted, so taking it off says something`);
+  return rules.filter((kept) => !rule.includes(kept));
+};
+
+test('a dontAsk step with the read set and its denies planted asks each read by its own allow, and is refused each write, program and read outside', () => {
+  const step = planted();
+  assert.deepEqual(runs(step, GIT_READS, {}, []), GIT_READS.map(shown), 'by its own allow, no settings read');
+  assert.deepEqual(runs(step, TEXT_READS, {}, []), TEXT_READS.map(shown));
+  assert.deepEqual(runs(step, STILL_ASKED, {}, []), STILL_ASKED.map(shown));
+  assert.deepEqual(runs(step, GIT_WRITES, {}, []), [], 'no rule of the set reaches a git write');
+  assert.deepEqual(runs(step, GIT_RUNS_A_PROGRAM, {}, []), []);
+  assert.deepEqual(runs(step, GIT_WRITES_A_FILE, {}, []), []);
+  assert.deepEqual(runs(step, GIT_READS_OUTSIDE, {}, []), []);
+  assert.deepEqual(runs(step, WC_READS_A_LIST, {}, []), []);
+  assert.deepEqual(runs(step, TEXT_READS_OUTSIDE, {}, []), [], "by Claude Code's own check");
+  for (const verb of ['sed', 'awk', 'find', 'sort', 'uniq', 'tee'])
+    assert.ok(
+      !(step.allowedTools ?? []).some((rule) => rule.startsWith(`Bash(${verb}`)),
+      `${verb} writes a file or runs a program, and stays out`,
+    );
 });
 
-test('REFUSED: a read-only step without the denies of a read outside reads one by each, and each deny refuses its own spellings', () => {
-  for (const { named, step } of readOnlySteps()) {
-    const denies = step.disallowedTools ?? [];
-    for (const rule of READS_OUTSIDE_DENIES) assert.ok(denies.includes(rule), `${named} denies ${rule}, so taking it off says something`);
-    const open = { ...step, disallowedTools: denies.filter((rule) => !READS_OUTSIDE_DENIES.includes(rule)) };
-    assert.deepEqual(runs(open, GIT_READS_OUTSIDE), GIT_READS_OUTSIDE.map(shown), named);
-  }
-  const step = shippedStepOf('agora');
-  const without = (rule: string): string[] =>
-    runs({ ...step, disallowedTools: (step.disallowedTools ?? []).filter((kept) => kept !== rule) }, GIT_READS_OUTSIDE);
+test('REFUSED: git whole, git worktree whole or git branch whole in place of a rule of the set runs a write, and a rule dropped loses its question', () => {
+  assert.deepEqual(
+    runs(planted({ allows: [...READ_SET_ALLOWS, 'Bash(git:*)'] }), GIT_WRITES, {}, []),
+    GIT_WRITES.map(shown),
+    'git whole opens every write',
+  );
+  const swapped = (from: string, to: string): string[] =>
+    runs(planted({ allows: [...less(READ_SET_ALLOWS, from), to] }), GIT_WRITES, {}, []);
+  assert.deepEqual(swapped('Bash(git worktree list:*)', 'Bash(git worktree:*)'), [
+    'Bash(git worktree add ../x)',
+    'Bash(git worktree remove x)',
+    'Bash(git worktree prune)',
+  ]);
+  assert.deepEqual(swapped('Bash(git branch --contains:*)', 'Bash(git branch:*)'), ['Bash(git branch -D x)']);
+  const reached = runs(planted({ allows: less(READ_SET_ALLOWS, 'Bash(git diff:*)') }), GIT_READS, {}, []);
+  assert.deepEqual(
+    GIT_READS.map(shown).filter((call) => !reached.includes(call)),
+    ['Bash(git diff main...HEAD)'],
+  );
+  assert.deepEqual(runs(planted({ allows: ['Agent'] }), GIT_READS, {}, []), [], 'the questions are its own allow');
+});
+
+test('REFUSED: without Claude Code’s check of a path, or without the deny of wc --files0-from, a dontAsk step reads outside', () => {
+  assert.deepEqual(runs(planted(), TEXT_READS_OUTSIDE, {}, [], false), TEXT_READS_OUTSIDE.map(shown), 'the allows alone');
+  const open = planted({ denies: less(READ_SET_DENIES, WC_READS_A_LIST_DENY) });
+  assert.deepEqual(runs(open, WC_READS_A_LIST, {}, []), WC_READS_A_LIST.map(shown), 'its check reads no path in the list');
+});
+
+test('REFUSED: without the denies of a read outside a dontAsk step reads one by each, and each deny refuses its own spellings', () => {
+  const open = planted({ denies: less(READ_SET_DENIES, ...READS_OUTSIDE_DENIES) });
+  assert.deepEqual(runs(open, GIT_READS_OUTSIDE, {}, []), GIT_READS_OUTSIDE.map(shown));
+  const without = (rule: string): string[] => runs(planted({ denies: less(READ_SET_DENIES, rule) }), GIT_READS_OUTSIDE, {}, []);
   assert.deepEqual(without('Bash(git *--no-ind*)'), [
     'Bash(git diff --no-index /etc/hostname CLAUDE.md)',
     'Bash(git diff --stat --no-index /etc/hostname CLAUDE.md)',
@@ -2194,150 +1017,32 @@ test('REFUSED: a read-only step without the denies of a read outside reads one b
     tool: 'Bash',
     command,
   }));
-  assert.deepEqual(runs(step, flags, {}, []), flags.map(shown), 'a long option that holds -f is still asked');
+  assert.deepEqual(runs(planted(), flags, {}, []), flags.map(shown), 'a long option that holds -f is still asked');
 });
 
-test('every read-only step is refused every spelling of --output the fence can read, and still asks each read', () => {
-  for (const { named, step } of readOnlySteps()) {
-    assert.deepEqual(runs(step, GIT_WRITES_A_FILE), [], named);
-    assert.deepEqual(runs(step, GIT_READS, {}, []), GIT_READS.map(shown), named);
-  }
+test('REFUSED: without the deny of --output a dontAsk step writes a file by each verb, and one narrowed to right after the verb misses it later', () => {
+  const open = planted({ denies: less(READ_SET_DENIES, WRITES_A_FILE_DENY) });
+  assert.deepEqual(runs(open, GIT_WRITES_A_FILE, {}, []), GIT_WRITES_A_FILE.map(shown));
+  const narrow = planted({ denies: [...less(READ_SET_DENIES, WRITES_A_FILE_DENY), 'Bash(git diff --output*)'] });
+  assert.ok(runs(narrow, GIT_WRITES_A_FILE, {}, []).includes('Bash(git diff --stat HEAD --output /tmp/x)'), 'written late, it runs');
 });
 
-test('REFUSED: a read-only step without the deny of --output writes a file by each verb, and one narrowed to right after the verb misses it later', () => {
-  for (const { named, step } of readOnlySteps()) {
-    const denies = step.disallowedTools ?? [];
-    assert.ok(denies.includes(WRITES_A_FILE_DENY), `${named} denies ${WRITES_A_FILE_DENY}, so taking it off says something`);
-    const open = { ...step, disallowedTools: denies.filter((rule) => rule !== WRITES_A_FILE_DENY) };
-    assert.deepEqual(runs(open, GIT_WRITES_A_FILE), GIT_WRITES_A_FILE.map(shown), named);
-  }
-  const step = shippedStepOf('agora');
-  const narrow = {
-    ...step,
-    disallowedTools: (step.disallowedTools ?? []).map((rule) => (rule === WRITES_A_FILE_DENY ? 'Bash(git diff --output*)' : rule)),
-  };
-  assert.ok(runs(narrow, GIT_WRITES_A_FILE).includes('Bash(git diff --stat HEAD --output /tmp/x)'), 'written late, it runs');
-});
-
-/**
- * Every read-only agent's file of the holder `root` that falls short of the read set's denies (`READ_SET_DENIES`), as `<file>: <rule>`.
- * A step's own `disallowedTools:` adds to its agent's, so a step file is nothing to say: each step is refused them by its agent's.
- */
-function runsAProgramUndenied(root = SHIPPED_HOLDERS[0]): string[] {
-  const files = READ_ONLY_AGENTS.map((agent) => `agents/${agent}.md`);
-  return files.flatMap((file) => {
-    const line = denyLineOf(file, root);
-    return READ_SET_DENIES.filter((rule) => !line.includes(rule)).map((rule) => `${file}: ${rule}`);
-  });
-}
-
-test("each read-only agent's file names the read set's denies, and each of its steps is refused them", () => {
-  assert.deepEqual(runsAProgramUndenied(), []);
-  for (const { named, step } of readOnlySteps())
-    assert.deepEqual(
-      READ_SET_DENIES.filter((rule) => !step.disallowedTools?.includes(rule)),
-      [],
-      `${named} is refused its agent's`,
-    );
-  assert.equal(
-    shipped().filter(({ step }) => READ_ONLY_AGENTS.includes(step.agent?.name ?? '')).length,
-    5,
-    "one step per read-only agent today but Agora, who reviews in build and in quick: each step's line is its own, and each is read resolved above",
-  );
-});
-
-test("REFUSED: a read-only agent's file that drops one of the read set's denies is named", () => {
-  for (const file of READ_ONLY_AGENTS.map((agent) => `agents/${agent}.md`))
-    for (const rule of READ_SET_DENIES) {
-      const root = scratch('wf-fences-denies-');
-      fs.cpSync(SHIPPED_HOLDERS[0], root, { recursive: true });
-      const at = path.join(root, file);
-      const text = fs.readFileSync(at, 'utf8');
-      const dropped = text.replace(`${rule}, `, '').replace(`, ${rule}`, '');
-      assert.notEqual(dropped, text, `${file} names ${rule}`);
-      fs.writeFileSync(at, dropped);
-      assert.ok(runsAProgramUndenied(root).includes(`${file}: ${rule}`), `${file} dropping ${rule} is named`);
-    }
-});
-
-/**
- * Every rule a step file of the holder `root` writes on its own `disallowedTools:` that its agent's file denies already, as
- * `<file>: <rule>`: a step's line adds to its agent's, so a repeat is a copy that the next change to the agent leaves behind.
- */
-function repeatedDenies(root = SHIPPED_HOLDERS[0]): string[] {
-  return shipped()
-    .filter(({ step }) => step.agent !== undefined)
-    .flatMap(({ dir, step }) => {
-      const file = `${path.basename(dir)}/${step.name}.md`;
-      const agents = denyLineOf(`agents/${step.agent!.name}.md`, root);
-      return denyLineOf(file, root)
-        .filter((rule) => agents.includes(rule))
-        .map((rule) => `${file}: ${rule}`);
-    });
-}
-
-test("no shipped step file repeats a deny of its agent's, which its own line adds to", () => {
-  assert.deepEqual(repeatedDenies(), []);
-});
-
-test("REFUSED: a step file that writes one of its agent's denies back onto its own line is named", () => {
-  const root = scratch('wf-fences-repeated-');
-  fs.cpSync(SHIPPED_HOLDERS[0], root, { recursive: true });
-  for (const [file, rule] of [
-    ['build/design.md', WRITES_A_FILE_DENY],
-    ['build/land.md', 'Bash(git push:*)'],
-  ]) {
-    const at = path.join(root, file);
-    const text = fs.readFileSync(at, 'utf8');
-    const added = withFenceList(text, 'disallowedTools', (value) => `${value}, ${rule}`);
-    assert.notEqual(added, text, `${file} has a disallowedTools line`);
-    fs.writeFileSync(at, added);
-  }
-  assert.deepEqual(repeatedDenies(root), [`build/design.md: ${WRITES_A_FILE_DENY}`, 'build/land.md: Bash(git push:*)']);
-});
-
-test("REFUSED: a read-only step's own line cut to one rule lifts none of its agent's, though the line alone would leave them open", () => {
-  const cut = stepLineCut('seldon', 'build', 'build/design.md');
-  assert.deepEqual(cut.disallowedTools?.[0], 'Bash(npm run build)', 'the line is cut');
-  assert.deepEqual(runs(cut, GIT_RUNS_A_PROGRAM), [], 'its agent still refuses every program the set would run');
-  assert.deepEqual(runs(cut, GIT_WRITES_A_FILE), [], 'and every --output');
-  const alone = { ...cut, disallowedTools: ['Bash(npm run build)'] };
-  assert.deepEqual(runs(alone, GIT_RUNS_A_PROGRAM), GIT_RUNS_A_PROGRAM.map(shown), "the line alone, as it once replaced its agent's");
-});
-
-test('REFUSED: a read-only step without those denies runs a program by each of them, and without any one of them a spelling runs', () => {
-  for (const { named, step } of readOnlySteps()) {
-    const open = { ...step, disallowedTools: (step.disallowedTools ?? []).filter((rule) => !RUNS_A_PROGRAM_DENIES.includes(rule)) };
-    assert.deepEqual(runs(open, GIT_RUNS_A_PROGRAM), GIT_RUNS_A_PROGRAM.map(shown), named);
-  }
-  for (const { named, step } of readOnlySteps())
-    for (const rule of RUNS_A_PROGRAM_DENIES) {
-      const denies = step.disallowedTools ?? [];
-      assert.ok(denies.includes(rule), `${named} denies ${rule}, so taking it off says something`);
-      const one = { ...step, disallowedTools: denies.filter((kept) => kept !== rule) };
-      assert.notDeepEqual(runs(one, GIT_RUNS_A_PROGRAM), [], `${named}: without ${rule}, a spelling of it runs`);
-    }
-});
-
-test('REFUSED: each deny on its own, so none of the three is carried by another and each spelling has the one that refuses it', () => {
-  const step = shippedStepOf('agora');
-  const without = (rule: string): Step => {
-    const denies = step.disallowedTools ?? [];
-    assert.ok(denies.includes(rule), `Agora denies ${rule}, so taking it off says something`);
-    return { ...step, disallowedTools: denies.filter((kept) => kept !== rule) };
-  };
-  assert.deepEqual(runs(without('Bash(git grep *O*)'), GIT_RUNS_A_PROGRAM), [
+test('REFUSED: without the denies of a program a dontAsk step runs one by each, and each of the three refuses its own spellings', () => {
+  const open = planted({ denies: less(READ_SET_DENIES, ...RUNS_A_PROGRAM_DENIES) });
+  assert.deepEqual(runs(open, GIT_RUNS_A_PROGRAM, {}, []), GIT_RUNS_A_PROGRAM.map(shown));
+  const without = (rule: string): string[] => runs(planted({ denies: less(READ_SET_DENIES, rule) }), GIT_RUNS_A_PROGRAM, {}, []);
+  assert.deepEqual(without('Bash(git grep *O*)'), [
     'Bash(git grep -Osh foo HEAD)',
     'Bash(git grep -n -Osh foo HEAD)',
     'Bash(git grep -nOsh foo HEAD)',
   ]);
-  assert.deepEqual(runs(without('Bash(git grep *--op*)'), GIT_RUNS_A_PROGRAM), [
+  assert.deepEqual(without('Bash(git grep *--op*)'), [
     'Bash(git grep --open-files-in-pager=sh foo HEAD)',
     'Bash(git grep --open=sh foo HEAD)',
     'Bash(git grep --ope=sh foo HEAD)',
     'Bash(git grep --op=sh foo HEAD)',
   ]);
-  assert.deepEqual(runs(without('Bash(*GIT_*)'), GIT_RUNS_A_PROGRAM), [
+  assert.deepEqual(without('Bash(*GIT_*)'), [
     'Bash(GIT_EXTERNAL_DIFF=sh git diff HEAD)',
     'Bash(GIT_EXTERNAL_DIFF=sh git show HEAD)',
     'Bash(GIT_EXTERNAL_DIFF=sh git log -p)',
@@ -2347,9 +1052,9 @@ test('REFUSED: each deny on its own, so none of the three is carried by another 
     'Bash(nohup GIT_EXTERNAL_DIFF=sh git diff HEAD)',
     'Bash(timeout 5 GIT_EXTERNAL_DIFF=sh git diff HEAD)',
   ]);
-  const narrow = { ...step, disallowedTools: (step.disallowedTools ?? []).map((rule) => (rule === 'Bash(*GIT_*)' ? 'Bash(GIT_*)' : rule)) };
+  const narrow = planted({ denies: [...less(READ_SET_DENIES, 'Bash(*GIT_*)'), 'Bash(GIT_*)'] });
   assert.deepEqual(
-    runs(narrow, GIT_RUNS_A_PROGRAM),
+    runs(narrow, GIT_RUNS_A_PROGRAM, {}, []),
     [
       'Bash(FOO=1 GIT_EXTERNAL_DIFF=sh git diff HEAD)',
       'Bash(FOO=1 GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=diff.external GIT_CONFIG_VALUE_0=sh git diff HEAD)',
@@ -2360,680 +1065,87 @@ test('REFUSED: each deny on its own, so none of the three is carried by another 
   );
 });
 
-test('REFUSED: a read-only agent allowed git whole, git worktree whole or git branch whole runs a write', () => {
+test("REFUSED: a step's own deny line cut to one rule lifts none of its agent's, though the line alone would leave them open", () => {
+  const cut = planted({ own: 'Bash(npm run build)' });
+  assert.ok(cut.disallowedTools?.includes('Bash(npm run build)'), 'the step writes its own line');
+  assert.deepEqual(runs(cut, GIT_RUNS_A_PROGRAM, {}, []), [], 'its agent still refuses every program the set would run');
+  assert.deepEqual(runs(cut, GIT_WRITES_A_FILE, {}, []), [], 'and every --output');
+  const alone = { ...cut, disallowedTools: ['Bash(npm run build)'] };
   assert.deepEqual(
-    runs(
-      gitAllowed('seldon', (line) => `${line}, Bash(git:*)`),
-      GIT_WRITES,
-    ),
-    GIT_WRITES.map(shown),
-    'git whole opens every write',
-  );
-  assert.deepEqual(
-    runs(
-      gitAllowed('agora', (line) => line.replace('Bash(git worktree list:*)', 'Bash(git worktree:*)')),
-      GIT_WRITES,
-    ),
-    ['Bash(git worktree add ../x)', 'Bash(git worktree remove x)', 'Bash(git worktree prune)'],
-  );
-  assert.deepEqual(
-    runs(
-      gitAllowed('argus', (line) => line.replace('Bash(git branch --contains:*)', 'Bash(git branch:*)')),
-      GIT_WRITES,
-    ),
-    ['Bash(git branch -D x)'],
+    runs(alone, GIT_RUNS_A_PROGRAM, {}, []),
+    GIT_RUNS_A_PROGRAM.map(shown),
+    "the line alone, as it once replaced its agent's",
   );
 });
 
-test('REFUSED: a read-only agent whose set drops a rule asks that question no more, and the form it loses is named', () => {
-  for (const agent of READ_ONLY_AGENTS) {
-    const cut = gitAllowed(agent, (line) => line.replace('Bash(git diff:*), ', ''));
-    const reached = runs(cut, GIT_READS, {}, []);
-    assert.deepEqual(
-      GIT_READS.map(shown).filter((call) => !reached.includes(call)),
-      ['Bash(git diff main...HEAD)'],
-      agent,
-    );
-  }
-});
+/** The folders a walk of the checkout leaves out: what an install, a build or git writes, none of them a file a change is on. */
+const NOT_CHECKOUT = new Set(['node_modules', '.git', 'dist', '.turbo']);
 
-test('REFUSED: Agora cut back to its sub-agents asks no git question with no settings read', () => {
-  assert.deepEqual(runs(agoraAllowed(), GIT_READS, {}, []), [], 'the questions are its own allow, not the settings');
-});
-
-/** The shipped git place's SKILL.md, the skill every step of a git place is sent to by section. */
-const GIT_PLACE_SKILL = path.join(REPO, 'packages', 'agent-orchestrator', 'place', 'git', 'SKILL.md');
-
-/** Each dontAsk job of a git place whose agent does not name the place's own skill, as `<step>: <agent>`. */
-const placeSkillUnnamed = (steps: readonly Step[]): string[] =>
-  steps
-    .filter((step) => dontAskJob(step) && stepPlace(step) === 'git' && !(step.agent?.skills ?? []).includes('git'))
-    .map((step) => `${step.name}: ${step.agent?.name ?? step.name}`);
-
-test("every read-only step of a git place names the place's own skill, which grants no tool, so its Skill tool loads it", () => {
-  assert.deepEqual(allowedToolsOf(GIT_PLACE_SKILL), [], 'a grant would make the skill unloadable by a dontAsk job');
-  assert.deepEqual(placeSkillUnnamed(shipped().map(({ step }) => step)), []);
-  for (const agent of READ_ONLY_AGENTS) assert.deepEqual(grantingSkillsUnread(shippedStepOf(agent)), [], agent);
-});
-
-test("REFUSED: a read-only agent of a git place that drops git from its skills is named, and a grant planted in the place's skill is read", () => {
-  for (const agent of READ_ONLY_AGENTS) {
-    const step = shippedEdited(agent, WORKFLOW_OF[agent], 'git last on its skills line', (text) =>
-      text.replace(/^(skills:.*), git$/m, '$1'),
-    );
-    assert.deepEqual(placeSkillUnnamed([step]), [`${step.name}: ${agent}`]);
-  }
-  const planted = path.join(scratch('wf-fences-git-place-'), 'SKILL.md');
-  const text = fs.readFileSync(GIT_PLACE_SKILL, 'utf8');
-  assert.ok(text.startsWith('---\nname: git\n'), GIT_PLACE_SKILL);
-  fs.writeFileSync(planted, text.replace('---\nname: git\n', '---\nname: git\nallowed-tools: Bash(git push:*)\n'));
-  assert.deepEqual(allowedToolsOf(planted), ['Bash(git push:*)'], 'the reader finds a grant where there is one');
-});
-
-test('every git question review-a-change names is one Agora asks by its own allow', () => {
-  const asked = askedGit();
-  assert.ok(asked.length >= 7, `review-a-change names its git questions: ${asked.join(', ')}`);
-  const calls = asked.map((command) => ({ tool: 'Bash', command }) as const);
-  assert.deepEqual(runs(shippedStepOf('agora'), calls, {}, []), calls.map(shown));
-});
-
-/** The line of the build workflow's review that says how the reviewer asks whether the branch holds its base. */
-const HOLDS_BASE_NOTE = '**Say whether the branch holds the base**';
-
-/** The git questions the build workflow's review names in that paragraph of its note. */
-const askedOfTheBase = (): string[] => checksOf('workflows/build/review.md', HOLDS_BASE_NOTE, /`(git\s[^`]*)`/g);
-
-test("every git question review's note asks of the base is one Agora asks by its own allow", () => {
-  const asked = askedOfTheBase();
-  assert.ok(asked.length >= 6, `review's note names its questions of the base: ${asked.join(', ')}`);
-  const calls = asked.map((command) => ({ tool: 'Bash', command }) as const);
-  assert.deepEqual(runs(shippedStepOf('agora'), calls, {}, []), calls.map(shown));
-});
-
-test("REFUSED: a question of the base that Agora's own allow does not reach is named", () => {
-  const line = (shippedStepOf('agora').allowedTools ?? []).filter((rule) => rule !== 'Bash(git merge-base:*)').join(', ');
-  const calls = askedOfTheBase().map((command) => ({ tool: 'Bash', command }) as const);
-  const reached = runs(agoraAllowed(line), calls, {}, []);
-  assert.deepEqual(
-    calls.map(shown).filter((call) => !reached.includes(call)),
-    ['Bash(git merge-base --is-ancestor main-worktree/HEAD HEAD)'],
-  );
-});
-
-/** The denies of a step's fence that reach the merge of the base into its own branch, as its note types it. */
-const deniesMerge = (step: Step): string[] =>
-  (step.disallowedTools ?? []).filter((rule) => reaches(rule, { tool: 'Bash', command: 'git merge main-worktree/HEAD' }));
-
-test('implement merges the base into its branch by no allow, and no deny of its fence reaches the merge', () => {
-  const grace = shippedStepOf('grace');
-  assert.equal(grace.permissionMode, 'auto');
-  assert.deepEqual(deniesMerge(grace), []);
-  const fenced = { ...grace, disallowedTools: [...(grace.disallowedTools ?? []), 'Bash(git merge:*)', 'Bash(git:*)'] };
-  assert.deepEqual(deniesMerge(fenced), ['Bash(git merge:*)', 'Bash(git:*)']);
-});
-
-/** The line of the build workflow's implement that names the render of a checkout's dashboards. */
-const RENDER_NOTE = 'When the change touches `tools/observe`';
-
-/** The render (`tools/observe/render/render.ts`) in each form a session types: bare, with its files, held for a browser, and stopped. */
-const RENDERS: Call[] = [
-  'node tools/observe/render/render.ts',
-  'node tools/observe/render/render.ts --out /s/runs/r-1/artifacts/implement --dashboards steps',
-  'node tools/observe/render/render.ts --hold 600',
-  'node tools/observe/render/render.ts --stop nemia-render-1-ab',
-].map((command) => ({ tool: 'Bash', command }));
-
-/** Docker by hand, which only the render talks to. */
-const DOCKER: Call[] = ['docker run -d --rm grafana/otel-lgtm', 'docker rm -f nemia-lgtm', 'docker ps'].map((command) => ({
-  tool: 'Bash',
-  command,
-}));
-
-test('the render of a dashboard is the implementer’s alone: design and review are refused each form of it, and Docker by hand', () => {
-  const grace = shippedStepOf('grace');
-  assert.equal(grace.name, 'implement');
-  assert.notEqual(grace.permissionMode, 'dontAsk', 'the implementer runs what no deny names');
-  assert.deepEqual(
-    unfenced(grace, SETTINGS, RENDERS),
-    RENDERS.map((call) => `implement: ${shown(call)}`),
-  );
-  const named = checksOf('workflows/build/implement.md', RENDER_NOTE, /`(node tools\/observe\/[^`]*)`/g);
-  assert.ok(named.length >= 2, `implement's note names the render: ${named.join(', ')}`);
-  for (const command of named) assert.ok(command.startsWith('node tools/observe/render/render.ts'), command);
-  for (const agent of ['seldon', 'agora']) assert.deepEqual(runs(shippedStepOf(agent), [...RENDERS, ...DOCKER]), [], agent);
-});
-
-test('REFUSED: design or review that an allow of the render reaches, by the settings or its own line, runs each form of it', () => {
-  const allow = 'Bash(node tools/observe/render/render.ts:*)';
-  const settings = { permissions: { allow: [...SETTINGS_ALLOWS, allow] } };
-  for (const agent of ['seldon', 'agora']) assert.deepEqual(runs(shippedStepOf(agent), RENDERS, settings), RENDERS.map(shown), agent);
-  const own = { ...shippedStepOf('agora'), allowedTools: [...(shippedStepOf('agora').allowedTools ?? []), allow, 'Bash(docker:*)'] };
-  assert.deepEqual(runs(own, [...RENDERS, ...DOCKER]), [...RENDERS, ...DOCKER].map(shown));
-  const fenced = { ...shippedStepOf('grace'), disallowedTools: [...(shippedStepOf('grace').disallowedTools ?? []), allow] };
-  assert.deepEqual(unfenced(fenced, SETTINGS, RENDERS), [], 'a deny of its own would refuse the implementer');
-});
-
-/**
- * The live collector, the side Grafana's own on :4318 (OTLP/HTTP) and :4317 (gRPC), in the spellings a session types to export or post
- * there: what a step that runs what no deny names never points a process of its own at.
- */
-const LIVE_COLLECTOR: Call[] = [
-  'OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318 node src/main.ts',
-  'export OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:4318',
-  'env OTEL_EXPORTER_OTLP_ENDPOINT=http://[::1]:4318 nemia up',
-  'curl -s -X POST http://localhost:4318/v1/traces -d @spans.json',
-  'cd apps/api && OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318 timeout 60 node src/main.ts',
-  'OTEL_EXPORTER_OTLP_PROTOCOL=grpc OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317 node src/main.ts',
-].map((command) => ({ tool: 'Bash', command }));
-
-test('every shipped step is refused the live collector by address: implement and land by their own deny, a dontAsk step by no allow', () => {
-  for (const { step } of shipped()) assert.deepEqual(unfenced(step, SETTINGS, LIVE_COLLECTOR), [], step.name);
-  for (const { agent, workflow, file } of COLLECTOR_FENCED) {
-    const step = shippedStepIn(agent, workflow);
-    assert.notEqual(step.permissionMode, 'dontAsk', `${file} runs what no deny names`);
-    for (const port of ['4318', '4317']) assert.ok(step.disallowedTools?.includes(`Bash(*:${port}*)`), `${file} denies :${port}`);
-    const agents = denyLineOf(`agents/${agent}.md`);
-    assert.ok(agents.length > 0, `${agent} denies of its own`);
-    assert.deepEqual(
-      agents.filter((rule) => !step.disallowedTools?.includes(rule)),
-      [],
-      `${file}'s own line adds to each deny of ${agent}'s`,
-    );
-  }
-  assert.deepEqual(
-    unfenced(shippedStepOf('grace'), SETTINGS, RENDERS),
-    RENDERS.map((call) => `implement: ${shown(call)}`),
-    'and the render, which holds a throwaway collector, still runs',
-  );
-  const deny = SETTINGS.permissions?.deny ?? [];
-  for (const call of LIVE_COLLECTOR)
-    assert.deepEqual(
-      deny.filter((rule) => deniedPartsOfCall(call).some((part) => reaches(rule, part))),
-      [],
-      `${shown(call)} is denied by .claude/settings.json, which binds the person's session that starts the live daemon`,
-    );
-});
-
-test('REFUSED: implement or land with one of its two address rules cut is open on the live collector by that port', () => {
-  for (const { agent, workflow, file } of COLLECTOR_FENCED)
-    for (const port of ['4318', '4317']) {
-      const rule = `Bash(*:${port}*)`;
-      const cut = shippedEdited(
-        agent,
-        workflow,
-        `the rule ${rule}`,
-        (text) => text.replace(`${rule}, `, '').replace(`, ${rule}`, ''),
-        file,
-      );
-      const open = LIVE_COLLECTOR.filter((call) => call.command?.includes(`:${port}`));
-      assert.equal(open.length, port === '4318' ? 5 : 1);
-      assert.deepEqual(
-        unfenced(cut, SETTINGS, LIVE_COLLECTOR),
-        open.map((call) => `${cut.name}: ${shown(call)}`),
-        `${file} without ${rule}`,
-      );
-    }
-});
-
-test("REFUSED: a deny read against the unwrapped part alone leaves the collector's address in a leading assignment open", () => {
-  const assigned = LIVE_COLLECTOR.filter((call) => /^(?:cd \S+ && )?[A-Z_]+=/.test(call.command ?? ''));
-  assert.equal(assigned.length, 3);
-  const denies = shippedStepOf('grace').disallowedTools ?? [];
-  for (const call of assigned) {
-    assert.ok(!partsOfCall(call).some((part) => denies.some((rule) => reaches(rule, part))), `${shown(call)}, unwrapped, names no port`);
-    assert.ok(
-      deniedPartsOfCall(call).some((part) => denies.some((rule) => reaches(rule, part))),
-      `${shown(call)}, as typed, does`,
-    );
-  }
-});
-
-/** The whole suite in the spellings a session types: what implement's check already ran on the round's tree. */
-const WHOLE_SUITE: Call[] = [
-  'npx turbo run test --force --continue',
-  'npx turbo run test',
-  'npx turbo run test --force',
-  'npx turbo run test --continue',
-  'npx turbo run test --continue --force',
-  'npm test',
-  'timeout 900 npx turbo run test --force --continue',
-].map((command) => ({ tool: 'Bash', command }));
-
-/** A package's tests and a file's, which a reviewer runs where a finding needs a run to stand on. */
-const SCOPED_TESTS: Call[] = [
-  'npx turbo run test --force --continue --filter=agent-orchestrator',
-  'npx turbo run test --filter=web --force',
-  'node --test test/a.test.ts',
-].map((command) => ({ tool: 'Bash', command }));
-
-test("Agora is refused the whole suite by its own deny, and runs a package's tests and a file's", () => {
-  const agora = shippedStepOf('agora');
-  assert.deepEqual(runs(agora, WHOLE_SUITE), []);
-  assert.deepEqual(runs(agora, SCOPED_TESTS), SCOPED_TESTS.map(shown));
-});
-
-test("REFUSED: Agora without its denies of the whole suite, read from its file as a run reads it, runs each the settings' allow reaches", () => {
-  const agora = shippedStepOf('agora');
-  const whole = new Set(WHOLE_SUITE.map(shown));
-  const open = { ...agora, disallowedTools: (agora.disallowedTools ?? []).filter((rule) => !whole.has(rule)) };
-  assert.deepEqual(runs(open, WHOLE_SUITE), WHOLE_SUITE.map(shown));
-});
-
-/**
- * shadcn's CLI in each spelling an allow reaches a read-only step by: the settings' `npx shadcn@latest`, and the three runners shadcn's
- * own skill grants (`npx`, `pnpm dlx`, `bunx --bun`). `add`, `init` and `apply` write the workspace, and a glob cannot tell a subcommand
- * after an option (`-c apps/web add`) from one that writes nothing, so each spelling is denied whole, its `view` with it: the read a
- * step that designs or reviews runs is the board's pinned CLI (`SHADCN_VIEW_NOTE`), a spelling no deny of these reaches.
- */
-const SHADCN: Call[] = [
-  'npx shadcn@latest add button',
-  'npx shadcn@latest -c apps/web add button',
-  'npx shadcn@latest init --preset base-nova',
-  'npx shadcn@latest apply a2r6bw',
-  'npx shadcn@latest view button',
-  'timeout 60 npx shadcn@latest add button',
-  'pnpm dlx shadcn@latest add button',
-  'bunx --bun shadcn@latest add button',
-].map((command) => ({ tool: 'Bash', command }));
-
-/** The whole suite by the settings' exact allow of it. */
-const NPM_TEST: Call[] = ['npm test', 'timeout 900 npm test'].map((command) => ({ tool: 'Bash', command }));
-
-/**
- * The denies that answer `SHADCN` and `NPM_TEST`, on the line of each read-only step's own file: no agent's file names a command of
- * this repository.
- */
-const READ_ONLY_DENIES = [
-  'Bash(npx shadcn@latest:*)',
-  'Bash(pnpm dlx shadcn@latest:*)',
-  'Bash(bunx --bun shadcn@latest:*)',
-  'Bash(npm test)',
-];
-
-/**
- * The read-only agents whose steps run no test: intake's and the janitor's. Design and review run the checks their notes name
- * (`CHECKERS`, `SCOPED_TESTS`), which the settings allow.
- */
-const TESTLESS_AGENTS = ['iris', 'argus'];
-
-/** A test file's run and turbo's, in the spellings the settings' `node --test` and `npx turbo run test` reach. */
-const TEST_RUNS: Call[] = [
-  'node --test test/a.test.ts',
-  'node --test apps/web/test/e2e/board.e2e.ts',
-  'npx turbo run test',
-  'npx turbo run test --force --continue',
-  'npx turbo run test build',
-  'npx turbo run test --filter=web',
-  'timeout 900 npx turbo run test --force --continue',
-].map((command) => ({ tool: 'Bash', command }));
-
-/** The denies that answer `TEST_RUNS`, on the line of each step of `TESTLESS_AGENTS`. */
-const TEST_RUN_DENIES = ['Bash(node --test:*)', 'Bash(npx turbo run test:*)'];
-
-/**
- * A build carried on the line of turbo's test, which the settings' `npx turbo run test` reaches: it runs the whole suite and writes each
- * package's output. Design and review, which keep a package's tests (`SCOPED_TESTS`), are refused it by a glob of its own.
- */
-const TEST_BUILDS: Call[] = [
-  'npx turbo run test build',
-  'npx turbo run test --force --continue build',
-  'npx turbo run test --filter=web build',
-  'npx turbo run test docs#build',
-  'timeout 900 npx turbo run test build',
-].map((command) => ({ tool: 'Bash', command }));
-
-/** The deny that answers `TEST_BUILDS`, on the line of each read-only step that runs tests. */
-const TEST_BUILD_DENIES = ['Bash(npx turbo run test *build*)'];
-
-/** The settings' allows of the compiler and the linter run to measure: `tsc` with `--noEmit` first, and `oxlint` whole. */
-const TSC_ALLOW = 'Bash(npx tsc --noEmit:*)';
-const OXLINT_ALLOW = 'Bash(npx oxlint:*)';
-
-/** The compiler and the linter run to measure, with options that write nothing: what design and review may run. */
-const MEASURES: Call[] = [
-  'npx tsc --noEmit',
-  'npx tsc --noEmit -p packages/agent-orchestrator --noUncheckedIndexedAccess',
-  'npx tsc --noEmit -p apps/web --exactOptionalPropertyTypes --isolatedDeclarations --target es2024',
-  'npx tsc --noEmit --project apps/api --strict --listFilesOnly',
-  'timeout 300 npx tsc --noEmit -p packages/agent-orchestrator',
-  'npx oxlint',
-  'npx oxlint -D no-unused-vars --type-aware packages/agent-runtime/src',
-  'npx oxlint --format json --disable-nested-config --type-check apps/web/src',
-].map((command) => ({ tool: 'Bash', command }));
-
-/**
- * The compiler and the linter with an option that writes or watches, each after the `--noEmit` the settings' allow reaches: `tsc`'s
- * build-info file (`--incremental`, `--tsBuildInfoFile`), its config (`--init`), its trace and profile, its watch, an emit turned back on
- * by `false` or by a file of options (`@<file>`); `oxlint`'s fixes, its config (`--init`), its language server (`--lsp`), and a config
- * given by `-c` or `--config`, which runs a script one. `tsc` reads an option's name in any case and after one dash or two, so each
- * spelling is one a session may type, and each is reached by exactly one rule of `MEASURE_DENIES`.
- */
-const MEASURE_WRITES: Call[] = [
-  'npx tsc --noEmit --watch',
-  'npx tsc --noEmit -p packages/agent-runtime -w',
-  'npx tsc --noEmit --WATCH',
-  'npx tsc --noEmit -W',
-  'npx tsc --noEmit --incremental',
-  'npx tsc --noEmit -incremental -p apps/api',
-  'npx tsc --noEmit --iNCREMENTAL',
-  'npx tsc --noEmit --Incremental',
-  'npx tsc --noEmit --INIT',
-  'npx tsc --noEmit --init',
-  'npx tsc --noEmit -i',
-  'npx tsc --noEmit --i -p apps/api',
-  'npx tsc --noEmit -I',
-  'npx tsc --noEmit --tsBuildInfoFile x',
-  'npx tsc --noEmit --tSBuildInfoFile x',
-  'npx tsc --noEmit -Tsbuildinfofile x',
-  'npx tsc --noEmit --TSBUILDINFOFILE x',
-  'npx tsc --noEmit --generateTrace trace',
-  'npx tsc --noEmit --generateCpuProfile p.cpuprofile',
-  'npx tsc --noEmit --GenerateTrace trace',
-  'npx tsc --noEmit false',
-  'npx tsc --noEmit -p apps/api --NOEMIT false',
-  'npx tsc --noEmit @options.txt',
-  'timeout 300 npx tsc --noEmit --incremental',
-  'npx oxlint --fix',
-  'npx oxlint --fix-suggestions apps/web/src',
-  'npx oxlint apps/web/src --fix-dangerously',
-  'npx oxlint --init',
-  'npx oxlint --lsp',
-  'npx oxlint -c tools/observe/render/render.ts',
-  'npx oxlint -c=oxlint.config.ts apps/web/src',
-  'npx oxlint apps/web/src -c oxlint.config.ts',
-  'npx oxlint --config oxlint.config.ts',
-  'npx oxlint --config=oxlint.config.ts',
-  'timeout 60 npx oxlint --fix',
-].map((command) => ({ tool: 'Bash', command }));
-
-/**
- * The denies that answer `MEASURE_WRITES`, on the line of each read-only step that measures: each of `tsc`'s by the first letters of the
- * options it refuses, in each case (`-i` alone, its short `--incremental`, as a word), and `oxlint`'s by name.
- */
-const MEASURE_DENIES = [
-  'Bash(npx tsc *-w*)',
-  'Bash(npx tsc *-W*)',
-  'Bash(npx tsc *-in*)',
-  'Bash(npx tsc *-iN*)',
-  'Bash(npx tsc *-In*)',
-  'Bash(npx tsc *-IN*)',
-  'Bash(npx tsc *-i *)',
-  'Bash(npx tsc *-I *)',
-  'Bash(npx tsc *-ts*)',
-  'Bash(npx tsc *-tS*)',
-  'Bash(npx tsc *-Ts*)',
-  'Bash(npx tsc *-TS*)',
-  'Bash(npx tsc *-g*)',
-  'Bash(npx tsc *-G*)',
-  'Bash(npx tsc * false*)',
-  'Bash(npx tsc *@*)',
-  'Bash(npx oxlint *--fix*)',
-  'Bash(npx oxlint *--init*)',
-  'Bash(npx oxlint *--lsp*)',
-  'Bash(npx oxlint -c*)',
-  'Bash(npx oxlint * -c*)',
-  'Bash(npx oxlint *--config*)',
-];
-
-/** The denies that keep intake and the janitor, which measure nothing, from the settings' allows of the compiler and the linter. */
-const MEASURELESS_DENIES = ['Bash(npx tsc:*)', 'Bash(npx oxlint:*)'];
-
-/** The read-only step that runs the verifier: design, which reads what a contract proves before it names a law. */
-const VERIFYING_STEP = 'build/design';
-
-/** The agent of `VERIFYING_STEP`, whose steps run the verifier. */
-const VERIFYING_AGENTS = readOnlySteps()
-  .filter(({ named }) => named === VERIFYING_STEP)
-  .map(({ step }) => step.agent!.name);
-
-/** The settings' allow of the verifier. */
-const VERIFY_ALLOW = 'Bash(npx tsverify:*)';
-
-/** The verifier run to read a verdict, with options that write nothing: what design may run. */
-const VERIFIES: Call[] = [
-  'npx tsverify packages/agent-orchestrator/src/gate/gate.ts',
-  'npx tsverify packages/agent-orchestrator/src/gate/gate.ts holdsOpen --verbose',
-  'npx tsverify packages/agent-runtime/src --json --bound 3 --work 1000000',
-  'npx tsverify packages/agent-runtime/src/core/domain.ts decide --project packages/agent-runtime/tsconfig.json',
-  'timeout 600 npx tsverify packages/agent-runtime/src/core/domain.ts decide',
-].map((command) => ({ tool: 'Bash', command }));
-
-/**
- * The verifier with an option that writes or never ends: `--cache`, which keeps each verdict in a folder (the nearest package's
- * `node_modules/.cache/tsverify`, or the one `--cache-location` names), and `--watch`. Each is reached by exactly one rule of
- * `VERIFY_DENIES`.
- */
-const VERIFY_WRITES: Call[] = [
-  'npx tsverify --cache',
-  'npx tsverify packages/agent-runtime/src --cache',
-  'npx tsverify packages/agent-runtime/src --cache --cache-location /tmp/verdicts',
-  'npx tsverify packages/agent-runtime/src --cache-location=/tmp/verdicts --cache',
-  'timeout 600 npx tsverify packages/agent-runtime/src --cache',
-  'npx tsverify --watch',
-  'npx tsverify packages/agent-runtime/src/core/domain.ts decide --watch',
-  'timeout 60 npx tsverify --watch --json',
-].map((command) => ({ tool: 'Bash', command }));
-
-/** The denies that answer `VERIFY_WRITES`, on design's line. */
-const VERIFY_DENIES = ['Bash(npx tsverify *--cache*)', 'Bash(npx tsverify *--watch*)'];
-
-/**
- * The deny that keeps review, intake and the janitor from the settings' allow of the verifier: review reads CI's verdict of every
- * contract.
- */
-const VERIFYLESS_DENIES = ['Bash(npx tsverify:*)'];
-
-/** The denies a read-only step's own line holds, by its agent, for what the settings and the skills allow it besides its reads. */
-const ownedDenies = (agent: string): string[] => [
-  ...READ_ONLY_DENIES,
-  ...(TESTLESS_AGENTS.includes(agent) ? [...TEST_RUN_DENIES, ...MEASURELESS_DENIES] : [...TEST_BUILD_DENIES, ...MEASURE_DENIES]),
-  ...(VERIFYING_AGENTS.includes(agent) ? VERIFY_DENIES : VERIFYLESS_DENIES),
-];
-
-/** What a read-only agent's steps are refused of what the settings and the skills allow, by `ownedDenies`. */
-const refusedTo = (agent: string): Call[] => [
-  ...SHADCN,
-  ...NPM_TEST,
-  ...(TESTLESS_AGENTS.includes(agent) ? [...TEST_RUNS, ...MEASURES, ...MEASURE_WRITES] : [...TEST_BUILDS, ...MEASURE_WRITES]),
-  ...(VERIFYING_AGENTS.includes(agent) ? VERIFY_WRITES : [...VERIFIES, ...VERIFY_WRITES]),
-];
-
-/** The file of each read-only step, `<workflow>/<step>.md` from the holder, with its agent. */
-const readOnlyStepFiles = (): Array<{ file: string; agent: string }> =>
-  readOnlySteps().map(({ named, step }) => ({ file: `${named}.md`, agent: step.agent!.name }));
-
-/** Each rule of `ownedDenies` the file of a read-only step of the holder `root` does not name, as `<file>: <rule>`. */
-const ownedUndenied = (root = SHIPPED_HOLDERS[0]): string[] =>
-  readOnlyStepFiles().flatMap(({ file, agent }) => {
-    const line = denyLineOf(file, root);
-    return ownedDenies(agent)
-      .filter((rule) => !line.includes(rule))
-      .map((rule) => `${file}: ${rule}`);
-  });
-
-/** The item of change-the-board that names the read of shadcn's CLI, the reference of a component on the board. */
-const SHADCN_VIEW_NOTE = '**Its CLI runs from `apps/web`**';
-
-/** The settings' allow of that read, the board's pinned CLI's `view`. */
-const SHADCN_VIEW_ALLOW = 'Bash(npx shadcn view:*)';
-
-/** The read change-the-board names, its placeholder filled in. */
-const shadcnView = (): Call[] =>
-  checksOf(KIT_COMMAND.file, SHADCN_VIEW_NOTE).map((command) => ({ tool: 'Bash', command: command.replace('<component>', 'button') }));
-
-test("every read-only step is refused shadcn's CLI in every spelling an allow reaches it by, npm test, a build on turbo's test and a measure that writes, by its own deny", () => {
-  assert.deepEqual(
-    readOnlyStepFiles()
-      .map(({ file }) => file)
-      .sort(),
-    ['build/design.md', 'build/review.md', 'intake/intake.md', 'janitor/argus.md', 'quick/review.md'],
-  );
-  for (const { file } of readOnlyStepFiles()) assert.ok(fs.existsSync(path.join(SHIPPED_HOLDERS[0], file)), file);
-  assert.deepEqual(ownedUndenied(), []);
-  for (const { named, step } of readOnlySteps()) assert.deepEqual(runs(step, refusedTo(step.agent!.name)), [], named);
-});
-
-test("intake and the janitor are refused a test file's run and turbo's, and design and review run a package's tests and a file's", () => {
-  for (const { named, step } of readOnlySteps())
-    if (TESTLESS_AGENTS.includes(step.agent!.name)) assert.deepEqual(runs(step, [...TEST_RUNS, ...SCOPED_TESTS]), [], named);
-    else assert.deepEqual(runs(step, SCOPED_TESTS), SCOPED_TESTS.map(shown), named);
-});
-
-test("the read of shadcn's CLI change-the-board names is the board's pinned view, the settings allow it, and design and review run it", () => {
-  const view = shadcnView();
-  assert.deepEqual(view.map(shown), ['Bash(npx shadcn view button -c apps/web)']);
-  assert.ok(SETTINGS_ALLOWS.includes(SHADCN_VIEW_ALLOW), `${SHADCN_VIEW_ALLOW} is in the settings`);
-  const writes = ['npx shadcn add button -c apps/web', 'npx shadcn init'].map((command) => ({ tool: 'Bash', command }) as const);
-  for (const { named, step } of readOnlySteps()) {
-    assert.deepEqual(runs(step, view), view.map(shown), named);
-    assert.deepEqual(runs(step, writes), [], `${named}: the pinned CLI writes by no allow`);
-  }
-});
-
-test('REFUSED: a read-only step without any one of its denies runs each spelling that deny refuses, and no other', () => {
-  for (const { named, step } of readOnlySteps())
-    for (const rule of ownedDenies(step.agent!.name)) {
-      const denies = step.disallowedTools ?? [];
-      assert.ok(denies.includes(rule), `${named} denies ${rule}, so taking it off says something`);
-      const calls = refusedTo(step.agent!.name);
-      const its = calls.filter((call) => deniedPartsOfCall(call).some((part) => reaches(rule, part))).map(shown);
-      assert.ok(its.length > 0, `${rule} reaches a spelling of ${named}'s`);
-      assert.deepEqual(runs({ ...step, disallowedTools: denies.filter((kept) => kept !== rule) }, calls), its, `${named} without ${rule}`);
-    }
-});
-
-test("REFUSED: a read-only step's file that drops its denies is named, rule by rule", () => {
-  for (const { file, agent } of readOnlyStepFiles()) {
-    const root = scratch('wf-fences-owned-');
-    fs.cpSync(SHIPPED_HOLDERS[0], root, { recursive: true });
-    const at = path.join(root, file);
-    let text = fs.readFileSync(at, 'utf8');
-    for (const rule of ownedDenies(agent)) {
-      const dropped = text.replace(`, ${rule}`, '');
-      assert.notEqual(dropped, text, `${file} names ${rule}`);
-      text = dropped;
-    }
-    fs.writeFileSync(at, text);
-    assert.deepEqual(
-      ownedUndenied(root),
-      ownedDenies(agent).map((rule) => `${file}: ${rule}`),
-    );
-  }
-});
-
-/** A command a step's note names: a backticked span that opens with a verb a read-only step's Bash runs. */
-const TOLD_SPANS = /`((?:npm|npx|node|git|gh)\s[^`]*)`/g;
-
-/**
- * Each command the note of the step file `file` (`<workflow>/<step>.md`) of the holder `root` tells its session to run: every span
- * `TOLD_SPANS` matches in the file's body, each placeholder (`<package>`) filled in with a word a session types, but a span another of
- * the note's extends, which names the tool the others run (the janitor's `npx nemia`).
- */
-function toldOf(file: string, root = SHIPPED_HOLDERS[0]): Call[] {
-  const text = fs.readFileSync(path.join(root, file), 'utf8');
-  const body = text.slice(text.indexOf('\n---\n', 3) + 5);
-  const spans = [...new Set([...body.matchAll(TOLD_SPANS)].map((span) => span[1].replace(/\s+/g, ' ').replace(/<[^<>]+>/g, 'x')))];
-  return spans
-    .filter((span) => !spans.some((other) => other.startsWith(`${span} `)))
-    .map((command) => ({ tool: 'Bash', command }) as const);
+/** Every file under the checkout `repo`, by its path from it, but under `NOT_CHECKOUT`. */
+function checkoutFiles(repo: string, under = ''): string[] {
+  return fs
+    .readdirSync(path.join(repo, under), { withFileTypes: true })
+    .filter((entry) => !NOT_CHECKOUT.has(entry.name))
+    .flatMap((entry) => {
+      const file = under ? `${under}/${entry.name}` : entry.name;
+      return entry.isDirectory() ? checkoutFiles(repo, file) : [file];
+    });
 }
 
-/** The read-only steps that measure, design's and the reviews': each whose agent runs tests. */
-const measuringSteps = (): Array<{ named: string; step: Step }> =>
-  readOnlySteps().filter(({ step }) => !TESTLESS_AGENTS.includes(step.agent!.name));
+/** Each glob a skill of `skillsDir` applies to (`applies:`) that no file of the checkout `repo` matches, as `<skill>: <glob>`. */
+function appliesUnmatched(skillsDir: string, repo: string): string[] {
+  const files = checkoutFiles(repo);
+  return fs
+    .readdirSync(skillsDir)
+    .filter((skill) => fs.existsSync(path.join(skillsDir, skill, 'SKILL.md')))
+    .flatMap((skill) =>
+      appliesOf(fs.readFileSync(path.join(skillsDir, skill, 'SKILL.md'), 'utf8'))
+        .filter((glob) => !files.some((file) => appliesMatch(file, [glob])))
+        .map((glob) => `${skill}: ${glob}`),
+    );
+}
 
-test("every command a read-only step's note tells it to run is one its frozen fence allows, and design and review measure by tsc and oxlint", () => {
-  for (const { named, step } of readOnlySteps()) {
-    const told = toldOf(`${named}.md`);
-    assert.deepEqual(runs(step, told), told.map(shown), named);
-  }
-  for (const { named, step } of measuringSteps()) {
-    const told = toldOf(`${named}.md`).map(shown);
-    assert.ok(
-      told.some((call) => call.startsWith('Bash(npx tsc --noEmit ')),
-      `${named}'s note names a measure by tsc`,
-    );
-    assert.ok(
-      told.some((call) => call.startsWith('Bash(npx oxlint ')),
-      `${named}'s note names a measure by oxlint`,
-    );
-    assert.deepEqual(runs(step, MEASURES), MEASURES.map(shown), named);
-  }
-  assert.deepEqual(
-    measuringSteps()
-      .map(({ named }) => named)
-      .sort(),
-    ['build/design', 'build/review', 'quick/review'],
-  );
+test('every path a repository skill applies to matches a file of the checkout, and the two that say so are read', () => {
+  const skills = path.join(REPO, '.claude', 'skills');
+  assert.deepEqual(appliesUnmatched(skills, REPO), []);
+  assert.deepEqual(appliesOf(fs.readFileSync(path.join(skills, 'change-the-board', 'SKILL.md'), 'utf8')), ['apps/web/**']);
+  assert.equal(appliesOf(fs.readFileSync(path.join(skills, 'effect', 'SKILL.md'), 'utf8')).length, 7);
 });
 
-test("REFUSED: a step's note that names a command its fence refuses is named, a measure's write and the janitor's tsc among them", () => {
-  const root = scratch('wf-fences-told-');
-  fs.cpSync(SHIPPED_HOLDERS[0], root, { recursive: true });
-  const added: Record<string, string> = { 'build/design.md': 'npx tsc --noEmit --watch', 'janitor/argus.md': 'npx tsc --noEmit' };
-  for (const [file, command] of Object.entries(added)) {
-    fs.appendFileSync(path.join(root, file), `\nRun \`${command}\`.\n`);
-    const step = readOnlySteps().find(({ named }) => `${named}.md` === file)!.step;
-    const told = toldOf(file, root);
-    const reached = runs(step, told);
-    assert.deepEqual(
-      told.map(shown).filter((call) => !reached.includes(call)),
-      [`Bash(${command})`],
-      file,
-    );
-  }
-});
-
-/** `tsc` with a first option that is not `--noEmit`, which emits, builds or watches: reached by no allow of the settings'. */
-const NO_EMIT_FIRST: Call[] = [
-  'npx tsc',
-  'npx tsc -p packages/agent-runtime',
-  'npx tsc --build',
-  'npx tsc -b packages/agent-runtime',
-  'npx tsc --project apps/api --strict',
-].map((command) => ({ tool: 'Bash', command }));
-
-test('REFUSED: design and review run no tsc whose first option is not --noEmit, and with tsc allowed whole each runs', () => {
-  assert.ok(SETTINGS_ALLOWS.includes(TSC_ALLOW), `${TSC_ALLOW} is in the settings`);
-  const whole = { permissions: { allow: SETTINGS_ALLOWS.map((rule) => (rule === TSC_ALLOW ? 'Bash(npx tsc:*)' : rule)) } };
-  for (const { named, step } of measuringSteps()) {
-    assert.deepEqual(runs(step, NO_EMIT_FIRST), [], named);
-    assert.deepEqual(runs(step, NO_EMIT_FIRST, whole), NO_EMIT_FIRST.map(shown), `${named}, tsc allowed whole`);
-  }
-});
-
-test("REFUSED: without the settings' allow of tsc or of oxlint, design and review measure nothing by it", () => {
-  for (const [allow, tool] of [
-    [TSC_ALLOW, 'npx tsc '],
-    [OXLINT_ALLOW, 'npx oxlint'],
+test('REFUSED: a skill that applies to a path no file of the checkout has is named, beside one that matches', () => {
+  const skills = scratch('wf-fences-applies-');
+  for (const [name, applies] of [
+    ['typo', '["apps/webb/**", "apps/web/**"]'],
+    ['none', ''],
   ]) {
-    assert.ok(SETTINGS_ALLOWS.includes(allow), `${allow} is in the settings`);
-    const without = { permissions: { allow: SETTINGS_ALLOWS.filter((rule) => rule !== allow) } };
-    const its = MEASURES.filter((call) => partsOf(call.command!).some((part) => part.startsWith(tool)));
-    const rest = MEASURES.filter((call) => !its.includes(call));
-    assert.ok(its.length > 0, allow);
-    for (const { named, step } of measuringSteps())
-      assert.deepEqual(runs(step, MEASURES, without), rest.map(shown), `${named} without ${allow}`);
+    fs.mkdirSync(path.join(skills, name));
+    const line = applies ? `applies: ${applies}\n` : '';
+    fs.writeFileSync(path.join(skills, name, 'SKILL.md'), `---\nname: ${name}\ndescription: Do it.\n${line}---\nDo it.\n`);
   }
+  assert.deepEqual(appliesUnmatched(skills, REPO), ['typo: apps/webb/**']);
 });
 
-test('design reads a verdict by the verifier its note names, which the settings allow, and REFUSED without that allow it reads none', () => {
-  assert.ok(SETTINGS_ALLOWS.includes(VERIFY_ALLOW), `${VERIFY_ALLOW} is in the settings`);
-  const without = { permissions: { allow: SETTINGS_ALLOWS.filter((rule) => rule !== VERIFY_ALLOW) } };
-  const verifying = readOnlySteps().filter(({ step }) => VERIFYING_AGENTS.includes(step.agent!.name));
-  assert.deepEqual(
-    verifying.map(({ named }) => named),
-    [VERIFYING_STEP],
-  );
-  for (const { named, step } of verifying) {
-    assert.ok(
-      toldOf(`${named}.md`)
-        .map(shown)
-        .some((call) => call.startsWith('Bash(npx tsverify ')),
-      `${named}'s note names a read by the verifier`,
-    );
-    assert.deepEqual(runs(step, VERIFIES), VERIFIES.map(shown), named);
-    assert.deepEqual(runs(step, VERIFIES, without), [], `${named} without ${VERIFY_ALLOW}`);
+/** sdlc's role skills, which the nemia factory's steps load. */
+const SDLC_SKILLS = path.join(REPO, 'packages', 'templates', 'sdlc', 'skills');
+
+/** The rules of sdlc's skill `skill`, read as a run reads them (`readSkillRules`). */
+const sdlcRulesOf = (skill: string) => {
+  assert.ok(fs.existsSync(path.join(SDLC_SKILLS, skill, RULES_FILE)), `${skill} declares its rules`);
+  return readSkillRules(path.join(SDLC_SKILLS, skill));
+};
+
+test("sdlc's read-within-reach rule is broken by a denied Glob, Grep or Read, as nemia stats counts it, and kept by a denied npm", () => {
+  const outside = 'Read(/srv/.agent-workflows/runs/r/artifacts/a.md)';
+  for (const skill of ['write-a-spec', 'review-a-change']) {
+    const declared = new Map([[skill, sdlcRulesOf(skill)]]);
+    const reach = (denied: string[]) => {
+      const fact = rulesOfTry(denied, declared)?.find((rule) => rule.rule === 'read-within-reach');
+      assert.ok(fact, `${skill} declares read-within-reach`);
+      return { broken: fact.broken, by: fact.by };
+    };
+    assert.deepEqual(reach(['Glob', outside, 'Bash(npm)']), { broken: true, by: ['Glob', outside] }, skill);
+    assert.deepEqual(reach(['Grep']), { broken: true, by: ['Grep'] }, skill);
+    assert.deepEqual(reach(['Bash(npm)']), { broken: false, by: [] }, skill);
   }
 });
 
@@ -3075,293 +1187,6 @@ test('REFUSED: a tsconfig that sets incremental, or extends one that sets compos
   write('b/tsconfig.json', { extends: './base.json', files: [] });
   write('c/tsconfig.json', { compilerOptions: { strict: true }, files: [] });
   assert.deepEqual(buildInfoConfigs(repo).sort(), ['a/tsconfig.json', 'b/tsconfig.json']);
-});
-
-/** The first words of the paragraph each read-only agent is told what to do when a call its work needs is refused. */
-const REFUSAL_SAID = 'When a call your work needs is refused';
-
-/** Each read-only agent's paragraph that opens with `REFUSAL_SAID`, in the holder `root`, by agent; `undefined` where it has none. */
-const refusalSaidOf = (root = SHIPPED_HOLDERS[0]): Record<string, string | undefined> =>
-  Object.fromEntries(
-    READ_ONLY_AGENTS.map((agent) => {
-      const text = fs.readFileSync(path.join(root, 'agents', `${agent}.md`), 'utf8');
-      const start = text.indexOf(REFUSAL_SAID);
-      if (start < 0) return [agent, undefined];
-      const rest = text.slice(start);
-      return [agent, rest.slice(0, /\n\s*\n/.exec(rest)?.index ?? rest.length).trim()];
-    }),
-  );
-
-test('each read-only agent is told, in one and the same paragraph, to say a refused call its work needs at the top of its sign-off', () => {
-  const said = refusalSaidOf();
-  assert.deepEqual(
-    READ_ONLY_AGENTS.filter((agent) => said[agent] === undefined),
-    [],
-  );
-  assert.equal(new Set(Object.values(said)).size, 1, 'the four paragraphs are equal');
-});
-
-test('REFUSED: a read-only agent without the paragraph is named, and one whose paragraph drifts makes the four unequal', () => {
-  const root = scratch('wf-fences-refusal-said-');
-  fs.cpSync(SHIPPED_HOLDERS[0], root, { recursive: true });
-  const edit = (agent: string, change: (text: string) => string) => {
-    const file = path.join(root, 'agents', `${agent}.md`);
-    const text = fs.readFileSync(file, 'utf8');
-    assert.notEqual(change(text), text, `${agent} has the paragraph to change`);
-    fs.writeFileSync(file, change(text));
-  };
-  edit('iris', (text) => text.replace(REFUSAL_SAID, 'When a call is refused'));
-  edit('agora', (text) => text.replace('A risk noted in passing', 'A risk noted'));
-  const said = refusalSaidOf(root);
-  assert.deepEqual(
-    READ_ONLY_AGENTS.filter((agent) => said[agent] === undefined),
-    ['iris'],
-  );
-  assert.equal(new Set(READ_ONLY_AGENTS.filter((agent) => agent !== 'iris').map((agent) => said[agent])).size, 2);
-});
-
-test("REFUSED: without the settings' allow of the pinned view, design and review read no reference, and a note that names it no more throws", () => {
-  const without = { permissions: { allow: SETTINGS_ALLOWS.filter((rule) => rule !== SHADCN_VIEW_ALLOW) } };
-  for (const agent of ['seldon', 'agora']) assert.deepEqual(runs(shippedStepOf(agent), shadcnView(), without), [], agent);
-  assert.throws(
-    () => checksOf(KIT_COMMAND.file, '**Its CLI runs from the root**'),
-    (err: Error) => err.message.includes(`${KIT_COMMAND.file}: no "**Its CLI runs from the root**"`),
-  );
-});
-
-test("REFUSED: a git question review-a-change names that Agora's own allow does not reach is named", () => {
-  const line = (shippedStepOf('agora').allowedTools ?? []).filter((rule) => rule !== 'Bash(git merge-base:*)').join(', ');
-  const calls = askedGit().map((command) => ({ tool: 'Bash', command }) as const);
-  const reached = runs(agoraAllowed(line), calls, {}, []);
-  assert.deepEqual(
-    calls.map(shown).filter((call) => !reached.includes(call)),
-    ['Bash(git merge-base)', 'Bash(git merge-base --is-ancestor 4c8a05b HEAD)'],
-  );
-  assert.throws(
-    () => askedGit('Bash runs no git'),
-    (err: Error) => err.message.includes('review-a-change/SKILL.md: no "Bash runs no git"'),
-  );
-});
-
-/** The run's artifacts folder the reach below is filed against, one folder per step under it. */
-const RUN_ARTIFACTS = '/s/runs/r-1/artifacts';
-
-/** The store's inbox the reach below is filed against, and a card in it. */
-const INBOX = '/s/inbox';
-const CARD = path.join(INBOX, 'card.md');
-
-/** A file the step `by` handed over, in its own folder of the run's artifacts. */
-const handedBy = (by: string): string => path.join(RUN_ARTIFACTS, by, 'shot.png');
-
-/** The run's inputs folder the reach below is filed against, and a file `nemia start --input` gave the run in it. */
-const INPUTS = '/s/runs/r-1/inputs';
-const INPUT_FILE = path.join(INPUTS, 'template-draft.md');
-
-/**
- * Each step of `steps` by its name, with the config its first filing gives its harness (`filedConfig`), in a run that mounts nothing, and
- * is given no input unless `inputs` names its inputs folder.
- */
-const filedOf = (steps: readonly Step[], inputs?: string): Map<string, Filed> =>
-  new Map(
-    steps.map((step) => [
-      step.name,
-      filedConfig(
-        step,
-        steps,
-        { gates: [] },
-        {
-          model: undefined,
-          budgetUsd: undefined,
-          runArtifacts: RUN_ARTIFACTS,
-          inbox: INBOX,
-          ...(inputs === undefined ? {} : { inputs }),
-          own: {},
-          landingDenied: () => declared.denyWhileLanding,
-        },
-      ),
-    ]),
-  );
-
-type Filed = ReturnType<typeof filedConfig>;
-
-/** Whether `file` is under the folder a rule `Tool(//<folder>/**)` of the tool `tool` names, for a rule of that shape. */
-const ruleCovers = (rule: string, tool: string, file: string): boolean => {
-  const folder = new RegExp(`^${tool}\\(/(/.*)/\\*\\*\\)$`).exec(rule)?.[1];
-  return folder !== undefined && file.startsWith(`${folder}/`);
-};
-
-/** Whether a mount of a filed config holds `file`, read-only or writable as `readOnly` says. */
-const mountHolds = (config: Filed, file: string, readOnly: boolean): boolean =>
-  (config.mounts ?? []).some((m) => m.readOnly === readOnly && file.startsWith(`${m.path}/`));
-
-/** Whether a session filed with `config` reads `file` outside its workspace: a mount holds it, or a `Read(//<folder>/**)` allow does. */
-const readsAt = (config: Filed, file: string): boolean =>
-  mountHolds(config, file, true) ||
-  mountHolds(config, file, false) ||
-  (config.allowedTools ?? []).some((rule) => ruleCovers(rule, 'Read', file));
-
-/**
- * Whether a session filed with `config` may write `file` outside its workspace: a writable mount or an `Edit(//<folder>/**)` allow names
- * it, and neither a read-only mount, whose deny beats every allow and mode, nor an `Edit(//<folder>/**)` deny holds it.
- */
-const writesAt = (config: Filed, file: string): boolean =>
-  (mountHolds(config, file, false) || (config.allowedTools ?? []).some((rule) => ruleCovers(rule, 'Edit', file))) &&
-  !mountHolds(config, file, true) &&
-  !(config.disallowedTools ?? []).some((rule) => ruleCovers(rule, 'Edit', file));
-
-test('a later step reads, and never writes, what each step it comes after handed over; its own folder is held by none', () => {
-  const filed = filedOf(loadWorkflows(TEAM_DEV));
-  const review = filed.get('review')!;
-  const ship = filed.get('ship')!;
-  const implement = filed.get('implement')!;
-  assert.ok(readsAt(review, handedBy('implement')), "review reads implement's pictures");
-  assert.equal(writesAt(review, handedBy('implement')), false, "review writes none of implement's");
-  for (const by of ['implement', 'review']) {
-    assert.ok(readsAt(ship, handedBy(by)), `ship reads ${by}'s`);
-    assert.equal(writesAt(ship, handedBy(by)), false, `ship writes none of ${by}'s`);
-  }
-  assert.equal(readsAt(implement, handedBy('review')), false, 'implement comes after nothing, and reads no folder of the run');
-  for (const [name, config] of filed) {
-    assert.equal(mountHolds(config, handedBy(name), true), false, `${name}'s own folder is not mounted read-only`);
-    assert.equal(mountHolds(config, handedBy(name), false), false, `${name}'s own folder is not mounted`);
-  }
-});
-
-test('REFUSED: a step does not read the folder of a step it does not come after', () => {
-  const steps = loadWorkflows(folderOf({ a: 'permissionMode: dontAsk', b: 'permissionMode: dontAsk', c: 'after: a', d: 'after: b, c' }));
-  const filed = filedOf(steps);
-  const reads = (name: string): string[] => ['a', 'b', 'c', 'd'].filter((by) => readsAt(filed.get(name)!, handedBy(by)));
-  assert.deepEqual(reads('c'), ['a'], "c reads a's, never its sibling b's nor d's after it");
-  assert.deepEqual(reads('d'), ['a', 'b', 'c'], 'd reads b and c, and a through c');
-  assert.deepEqual(reads('a'), [], 'a comes after nothing');
-  assert.deepEqual(reads('b'), [], 'b comes after nothing');
-  assert.deepEqual(
-    handedMounts(
-      steps.find((s) => s.name === 'd')!,
-      steps,
-      RUN_ARTIFACTS,
-    ),
-    ['a', 'b', 'c'].map((by) => ({ path: path.join(RUN_ARTIFACTS, by), readOnly: true })),
-    "in the workflow's order",
-  );
-});
-
-test('REFUSED: a handed folder mounted writable is open to a write, and an Edit allow on it is no write while it is mounted read-only', () => {
-  const review = filedOf(loadWorkflows(TEAM_DEV)).get('review')!;
-  const opened = { ...review, mounts: review.mounts!.map((m) => ({ ...m, readOnly: false })) };
-  assert.ok(writesAt(opened, handedBy('implement')), 'the model sees a writable mount as a write');
-  const allowed = { ...review, allowedTools: [...(review.allowedTools ?? []), `Edit(/${path.join(RUN_ARTIFACTS, 'implement')}/**)`] };
-  assert.ok(writesAt({ ...allowed, mounts: [] }, handedBy('implement')), 'the model sees an Edit allow as a write');
-  assert.equal(writesAt(allowed, handedBy('implement')), false, "the read-only mount's deny beats the allow");
-});
-
-test('a step on a sandboxed or a remote harness is filed no handed mount', () => {
-  const steps = loadWorkflows(TEAM_DEV);
-  const review = steps.find((s) => s.name === 'review')!;
-  const codex = { ...review, harness: 'codex', permissionMode: 'read-only' };
-  assert.deepEqual(handedMounts(codex, steps, RUN_ARTIFACTS), [], 'codex reads the disk in its sandbox already');
-  assert.equal(Object.hasOwn(filedOf(steps.map((s) => (s.name === 'review' ? codex : s))).get('review')!, 'mounts'), false, 'no key');
-  assert.deepEqual(handedMounts({ ...review, harness: 'a2a:peer' }, steps, RUN_ARTIFACTS), [], 'a remote agent is filed no local field');
-  assert.deepEqual(handedMounts({ ...review, harness: 'claude' }, steps, RUN_ARTIFACTS), [
-    { path: path.join(RUN_ARTIFACTS, 'implement'), readOnly: true },
-  ]);
-});
-
-test('every shipped step on a harness fenced by a permission mode reads, and never writes, what each step it comes after handed over', () => {
-  const checked: string[] = [];
-  for (const dir of FOLDERS) {
-    const steps = loadWorkflows(dir, placesOf(dir));
-    const filed = filedOf(steps);
-    for (const step of steps.filter((s) => !sandboxed(s.harness ?? 'claude') && !s.harness?.startsWith('a2a:'))) {
-      for (const by of upstreamOf(steps, step.name)) {
-        const config = filed.get(step.name)!;
-        assert.ok(readsAt(config, handedBy(by)), `${path.basename(dir)}/${step.name} reads ${by}'s`);
-        assert.equal(writesAt(config, handedBy(by)), false, `${path.basename(dir)}/${step.name} writes none of ${by}'s`);
-        checked.push(`${path.basename(dir)}/${step.name} <- ${by}`);
-      }
-    }
-  }
-  assert.ok(checked.includes('build/review <- implement'), checked.join('\n'));
-});
-
-test('the janitor reads the inbox, and writes none of it: every shipped step whose `reads:` names it', () => {
-  const readers = shipped().filter(({ step }) => step.reads?.includes('inbox'));
-  assert.ok(
-    readers.some(({ dir, step }) => `${path.basename(dir)}/${step.name}` === 'janitor/argus'),
-    readers.map(({ dir, step }) => `${path.basename(dir)}/${step.name}`).join('\n'),
-  );
-  for (const { dir, step } of readers) {
-    const config = filedOf(loadWorkflows(dir, placesOf(dir))).get(step.name)!;
-    assert.ok(readsAt(config, CARD), `${path.basename(dir)}/${step.name} reads the inbox's cards`);
-    assert.equal(writesAt(config, CARD), false, `${path.basename(dir)}/${step.name} writes none of them`);
-  }
-});
-
-test('REFUSED: a step whose `reads:` does not name the inbox reads none of it', () => {
-  const at = (workflow: string, name: string): Filed => {
-    const found = shipped().find(({ dir, step }) => path.basename(dir) === workflow && step.name === name);
-    assert.ok(found, `${workflow}/${name} is shipped`);
-    return filedOf(loadWorkflows(found.dir, placesOf(found.dir))).get(name)!;
-  };
-  for (const [workflow, name] of [
-    ['build', 'design'],
-    ['build', 'review'],
-    ['intake', 'intake'],
-  ])
-    assert.equal(readsAt(at(workflow, name), CARD), false, `${workflow}/${name} names no store folder, and reads no card`);
-  const argus = shippedStepOf('argus');
-  assert.equal(readsAt(filedOf([{ ...argus, reads: undefined }]).get(argus.name)!, CARD), false, 'Argus without the line reads none');
-  assert.deepEqual(readsMounts({ ...argus, harness: 'codex' }, INBOX), [], 'codex reads the disk in its sandbox already');
-  assert.deepEqual(readsMounts({ ...argus, harness: 'a2a:peer' }, INBOX), [], 'a remote agent is filed no local field');
-  assert.deepEqual(readsMounts(argus, INBOX), [{ path: INBOX, readOnly: true }]);
-});
-
-test('REFUSED: the inbox mounted writable is open to a write, and an Edit allow on it is no write while it is mounted read-only', () => {
-  const argus = shippedStepOf('argus');
-  const config = filedOf([argus]).get(argus.name)!;
-  const opened = { ...config, mounts: config.mounts!.map((m) => ({ ...m, readOnly: false })) };
-  assert.ok(writesAt(opened, CARD), 'the model sees a writable mount as a write');
-  const allowed = { ...config, allowedTools: [...(config.allowedTools ?? []), `Edit(/${INBOX}/**)`] };
-  assert.ok(writesAt({ ...allowed, mounts: [] }, CARD), 'the model sees an Edit allow as a write');
-  assert.equal(writesAt(allowed, CARD), false, "the read-only mount's deny beats the allow");
-});
-
-test("every shipped step of a repository run on a harness fenced by a permission mode reads, and never writes, its run's inputs", () => {
-  const checked: string[] = [];
-  for (const dir of FOLDERS) {
-    const steps = loadWorkflows(dir, placesOf(dir));
-    if (isFolderTeam(steps)) continue;
-    const filed = filedOf(steps, INPUTS);
-    for (const step of steps.filter((s) => !sandboxed(s.harness ?? 'claude') && !s.harness?.startsWith('a2a:'))) {
-      const config = filed.get(step.name)!;
-      assert.ok(readsAt(config, INPUT_FILE), `${path.basename(dir)}/${step.name} reads the run's inputs`);
-      assert.equal(writesAt(config, INPUT_FILE), false, `${path.basename(dir)}/${step.name} writes none of them`);
-      checked.push(`${path.basename(dir)}/${step.name}`);
-    }
-  }
-  assert.ok(checked.includes('intake/intake') && checked.includes('build/design'), checked.join('\n'));
-});
-
-test('REFUSED: a run given no input reads none; the inputs mounted writable are open to a write, and an Edit allow is no write while they are read-only', () => {
-  const steps = loadWorkflows(TEAM_DEV);
-  for (const [name, config] of filedOf(steps)) assert.equal(readsAt(config, INPUT_FILE), false, `${name} is given no input`);
-  const implement = filedOf(steps, INPUTS).get('implement')!;
-  const opened = { ...implement, mounts: implement.mounts!.map((m) => ({ ...m, readOnly: false })) };
-  assert.ok(writesAt(opened, INPUT_FILE), 'the model sees a writable mount as a write');
-  const allowed = { ...implement, allowedTools: [...(implement.allowedTools ?? []), `Edit(/${INPUTS}/**)`] };
-  assert.ok(writesAt({ ...allowed, mounts: [] }, INPUT_FILE), 'the model sees an Edit allow as a write');
-  assert.equal(writesAt(allowed, INPUT_FILE), false, "the read-only mount's deny beats the allow");
-});
-
-test("a step on a sandboxed or a remote harness, and a folder team's, is filed no inputs mount; a run given none mounts nothing", () => {
-  const repo = [{ place: 'git' as const }];
-  const folder = [{ place: 'folder' as const }];
-  assert.deepEqual(inputsMounts({ harness: 'claude' }, repo, INPUTS), [{ path: INPUTS, readOnly: true }]);
-  assert.deepEqual(inputsMounts({ harness: undefined }, repo, INPUTS), [{ path: INPUTS, readOnly: true }], 'the default harness');
-  assert.deepEqual(inputsMounts({ harness: 'codex' }, repo, INPUTS), [], 'codex reads the disk in its sandbox already');
-  assert.deepEqual(inputsMounts({ harness: 'a2a:peer' }, repo, INPUTS), [], 'a remote agent is filed no local field');
-  assert.deepEqual(inputsMounts({ harness: 'claude' }, folder, INPUTS), [], "a folder team's steps read the copy in their own folder");
-  assert.deepEqual(inputsMounts({ harness: 'claude' }, repo, undefined), [], 'a run given none');
 });
 
 /** Nemia as her keeper files her: her shipped definition, long-lived. */
@@ -3589,157 +1414,4 @@ test("REFUSED: a confirm or a drop of the person's rules for auto is asked over 
   assert.equal(fs.existsSync(path.join(root, 'auto')), false, 'denied before the folder is there');
   for (const file of ['nemia.json', 'nemia.proposed.json'])
     assert.equal(editVerdictOf(herRules(root), path.join(root, 'auto', file)), 'deny', file);
-});
-
-/**
- * The agent of each shipped or tests' step whose `tools:` only the checkout's own allow rules make callable, and the tool: the fence
- * travels with the folder, and these calls do not. Each is a step that must allow them itself before its folder runs anywhere else.
- * Empty: every agent given Bash now carries its own allow for what it runs — the read-only ones the git read set — so the whole team
- * travels, and a factory elsewhere needs no project rule of its own for these calls. The test below still reports whatever is left, so
- * the next agent given a tool no allow of its own reaches is named rather than passing on this repository's settings.
- */
-const COVERED_BY_SETTINGS: ReadonlyArray<readonly [string, string, string]> = [];
-
-/** Every step of every shipped folder, and of the tests' team, with the folder it came from. */
-const allSteps = (): Array<{ dir: string; step: Workflow }> =>
-  [...FOLDERS, TEAM_DEV].flatMap((dir) => loadWorkflows(dir, placesOf(dir)).map((step) => ({ dir, step })));
-
-test("every shipped step can call each tool it is given, judged against this checkout's own allow rules", () => {
-  for (const { dir, step } of allSteps()) {
-    assert.equal(unallowedRefusal([step], SETTINGS_ALLOWS), undefined, `${path.basename(dir)}/${step.name}`);
-  }
-});
-
-test("the same steps with no project rule refuse, and only those the checkout's settings cover: what makes them pass here is the repository", () => {
-  const refused = allSteps().flatMap(({ step }) => {
-    const why = unallowedRefusal([step], []);
-    return why === undefined ? [] : [[step.name, step.agent?.name ?? step.name, /gives its session `([^`]+)`/.exec(why)![1]] as const];
-  });
-  assert.deepEqual(refused, COVERED_BY_SETTINGS);
-  for (const [name, agent, tool] of COVERED_BY_SETTINGS) {
-    const step = allSteps().find((s) => s.step.name === name && s.step.agent?.name === agent)!.step;
-    const why = unallowedRefusal([step], []);
-    assert.match(why ?? '', new RegExp(`^${name}: `), name);
-    assert.match(why ?? '', new RegExp(`agents/${agent}\\.md`), name);
-    assert.ok(why?.includes(`take \`${tool}\` off \`tools:\``), `${name}: the refusal names taking ${tool} off the line`);
-  }
-});
-
-/** GitHub's tools Agora reads by its own allow, each by name: a pull request, its commits and files, its issues, and its checks' logs. */
-const GITHUB_READS = [
-  'pull_request_read',
-  'list_pull_requests',
-  'search_pull_requests',
-  'get_commit',
-  'list_commits',
-  'get_file_contents',
-  'issue_read',
-  'list_issues',
-  'actions_get',
-  'actions_list',
-  'get_job_logs',
-].map((tool) => `mcp__github__${tool}`);
-
-/** GitHub's tools that write what Otto may not: a file, a branch, a repository, a workflow run. */
-const GITHUB_FILE_WRITES = [
-  'push_files',
-  'create_or_update_file',
-  'delete_file',
-  'create_branch',
-  'create_repository',
-  'fork_repository',
-  'actions_run_trigger',
-].map((tool) => `mcp__github__${tool}`);
-
-/** Every GitHub tool that writes, which Grace, read-only on GitHub in this card, is denied by name. */
-const GITHUB_WRITES = [
-  ...GITHUB_FILE_WRITES,
-  ...[
-    'merge_pull_request',
-    'create_pull_request',
-    'update_pull_request',
-    'update_pull_request_branch',
-    'pull_request_review_write',
-    'add_comment_to_pending_review',
-    'add_reply_to_pull_request_comment',
-    'add_issue_comment',
-    'update_issue_comment',
-    'issue_write',
-    'sub_issue_write',
-    'assign_copilot_to_issue',
-    'request_copilot_review',
-  ].map((tool) => `mcp__github__${tool}`),
-];
-
-/** The tools of `tools` an auto step's own deny list refuses: in auto, a tool no deny names runs. */
-const deniedTo = (step: Step, tools: readonly string[]): string[] =>
-  tools.filter((tool) => deniedPartsOfCall({ tool }).some((part) => (step.disallowedTools ?? []).some((rule) => reaches(rule, part))));
-
-/** The shipped steps that run `agent`, each as its folder resolves it. */
-const stepsOf = (agent: string): Step[] => shipped().flatMap(({ step }) => (step.agent?.name === agent ? [step] : []));
-
-test("GitHub's tools are fenced per agent: Agora reads, Grace reads and writes nothing, Otto merges and writes no file, the rest reach none", () => {
-  for (const step of stepsOf('agora')) {
-    assert.deepEqual(
-      runs(
-        step,
-        GITHUB_READS.map((tool) => ({ tool })),
-      ),
-      GITHUB_READS,
-      `${step.name}: Agora reads by its own allow`,
-    );
-    assert.deepEqual(
-      runs(
-        step,
-        GITHUB_WRITES.map((tool) => ({ tool })),
-      ),
-      [],
-      `${step.name}: and no write reaches Agora`,
-    );
-  }
-  for (const step of stepsOf('grace')) {
-    assert.equal(step.permissionMode, 'auto', step.name);
-    assert.deepEqual(deniedTo(step, GITHUB_WRITES), GITHUB_WRITES, `${step.name}: every write denied by name`);
-    assert.deepEqual(deniedTo(step, GITHUB_READS), [], `${step.name}: every read left open`);
-  }
-  for (const step of stepsOf('otto')) {
-    assert.equal(step.permissionMode, 'auto', step.name);
-    assert.deepEqual(deniedTo(step, GITHUB_FILE_WRITES), GITHUB_FILE_WRITES, `${step.name}: no file, branch or repository`);
-    assert.deepEqual(deniedTo(step, ['mcp__github__merge_pull_request']), [], `${step.name}: Otto alone may merge`);
-  }
-  for (const agent of ['seldon', 'iris', 'argus'])
-    for (const step of stepsOf(agent))
-      assert.deepEqual(
-        runs(
-          step,
-          [...GITHUB_READS, ...GITHUB_WRITES].map((tool) => ({ tool })),
-        ),
-        [],
-        `${agent}: no GitHub tool`,
-      );
-  assert.deepEqual(
-    shipped().flatMap(({ step }) => (step.mcp ?? []).filter((name) => name === 'github').map(() => step.name)),
-    [],
-    'no shipped step loads GitHub yet: each later card names it for its own step, so no run waits on a sign-in today',
-  );
-});
-
-test('REFUSED: Grace without her deny of merge_pull_request, read from her files as a run reads them, may merge; Agora allowed a write may write', () => {
-  const grace = shippedEdited('grace', 'build', 'a deny of merge_pull_request', (text) =>
-    text.replace(', mcp__github__merge_pull_request', ''),
-  );
-  assert.deepEqual(
-    GITHUB_WRITES.filter((tool) => !deniedTo(grace, GITHUB_WRITES).includes(tool)),
-    ['mcp__github__merge_pull_request'],
-  );
-  const agora = shippedEdited('agora', 'build', 'an allowedTools line', (text) =>
-    withFenceList(text, 'allowedTools', (value) => `${value}, mcp__github__merge_pull_request`),
-  );
-  assert.deepEqual(
-    runs(
-      agora,
-      GITHUB_WRITES.map((tool) => ({ tool })),
-    ),
-    ['mcp__github__merge_pull_request'],
-  );
 });

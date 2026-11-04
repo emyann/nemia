@@ -1,15 +1,19 @@
 /**
  * `nemia template lint`'s judgement of a folder already read (`ReadFolder`): the layout's and each document's rules (`layout.ts`), then
- * what the folder's parts say of each other — a hire, a skill, a sibling step, a parameter or a file named that the folder lacks — and
- * each harness's block against the words the runtime gives that harness (`HARNESS_KNOBS`). Pure: every problem comes back at once.
+ * what the folder's parts say of each other — a hire, a skill, a sibling step, a parameter or a file named that the folder lacks, a step's
+ * own schema outside its workflow's folder, a `${{ parameters.<name> }}` naming no declared parameter in a document's string or in a
+ * text the render writes (`renderedTexts`) — and each harness's block against the words the runtime gives that harness
+ * (`HARNESS_KNOBS`). Pure: every problem comes back at once, the texts read through the function the store hands in.
  */
 import { HARNESS_KNOBS } from 'agent-runtime/vocabulary';
 import { DEFAULT_HARNESS, isRemoteHarness, REMOTE_PREFIX } from '../harness/harness.ts';
 import { givenSkillOf, PLACES, STORE_READS, WORKSPACES } from '../keys/index.ts';
 import { baseSpelled } from '../former/former.ts';
+import { OVERRIDABLE } from '../workflow/index.ts';
 import {
   documentFile,
   documentRefusals,
+  expressionsIn,
   HARNESS_FENCE_KEYS,
   isMap,
   isParam,
@@ -51,8 +55,8 @@ const foldersOf = (files: readonly string[], holder: string): string[] => [
   ),
 ];
 
-/** What `folder` holds, read off its files and documents; `placeSkills` count as skills it holds. */
-function heldOf(folder: ReadFolder, placeSkills: readonly string[]): Held {
+/** What `folder` holds, read off its files and documents; `packageSkills`, Nemia's own, count as skills it holds. */
+function heldOf(folder: ReadFolder, packageSkills: readonly string[]): Held {
   const workflows = new Map(
     foldersOf(folder.files, 'workflows').map((name): [string, ReadWorkflow] => {
       const file = `workflows/${name}/workflow.yaml`;
@@ -65,7 +69,7 @@ function heldOf(folder: ReadFolder, placeSkills: readonly string[]): Held {
   return {
     workflows,
     agents,
-    skills: new Set([...foldersOf(folder.files, 'skills'), ...placeSkills]),
+    skills: new Set([...foldersOf(folder.files, 'skills'), ...packageSkills]),
     manifest,
     parameters: new Set(isMap(manifest.parameters) ? Object.keys(manifest.parameters) : []),
   };
@@ -93,8 +97,8 @@ function hireRefusals(held: Held): Refusal[] {
 }
 
 /**
- * What a list of skills at `at` names that the folder lacks and no place skill is; a skill named with its folder (`givenSkillOf`) is
- * the repository's a run is started on, which a template names and never carries, and passes.
+ * What a list of skills at `at` names that the folder lacks and no skill of Nemia's own is; a skill named with its folder
+ * (`givenSkillOf`) is the repository's a run is started on, which a template names and never carries, and passes.
  */
 const skillRefusals = (file: string, at: At, skills: unknown, held: Held): Refusal[] =>
   stringsOf(skills)
@@ -102,7 +106,7 @@ const skillRefusals = (file: string, at: At, skills: unknown, held: Held): Refus
     .map(([name, i]) => ({
       file,
       at: [...at, i],
-      message: `skill ${name} is not in skills/, nor a place skill: carry it as skills/${name}/SKILL.md, or name one there is.`,
+      message: `skill ${name} is not in skills/, nor one of Nemia's own skills: carry it as skills/${name}/SKILL.md, or name one there is.`,
     }));
 
 /** The agent hired into `<workflow>/<step>`: its spec, or an empty one where none is. */
@@ -156,7 +160,27 @@ function wordRefusals(file: string, at: At, step: Record<string, unknown>): Refu
   return refusals;
 }
 
-/** What each step of each workflow breaks: a name used twice, a sibling it lacks, its words, its skills and its blocks. */
+/**
+ * What a step's own closeout schema (`output.path`) names that is no file of its workflow's folder: one of another folder, or a step's or
+ * the workflow's own `.md` or `.yaml`, as the loader holds it (`outputOf`). A file the template lacks, and a path absolute or through `..`,
+ * are `refRefusals`'.
+ */
+function outputRefusals(file: string, at: At, workflow: string, step: Record<string, unknown>): Refusal[] {
+  const named = isMap(step.output) ? step.output.path : undefined;
+  if (typeof named !== 'string') return [];
+  const folder = `workflows/${workflow}/`;
+  if (named.startsWith(folder) && named.length > folder.length && !/\.(md|yaml)$/.test(named)) return [];
+  const where = [...at, 'output', 'path'];
+  return [
+    {
+      file,
+      at: where,
+      message: `${spelled(where)} is ${named}, no schema of ${folder}: carry the step's schema beside it, as ${folder}${String(step.name)}.schema.json, and name that.`,
+    },
+  ];
+}
+
+/** What each step of each workflow breaks: a name used twice, a sibling it lacks, its words, its schema, its skills and its blocks. */
 function stepRefusals(held: Held): Refusal[] {
   return [...held.workflows].flatMap(([workflow, { file, steps }]) => {
     const names = steps.map((step) => step.name);
@@ -171,6 +195,7 @@ function stepRefusals(held: Held): Refusal[] {
           : []),
         ...siblingRefusals(file, at, step, names),
         ...wordRefusals(file, at, step),
+        ...outputRefusals(file, at, workflow, step),
         ...skillRefusals(file, [...at, 'overrides', 'skills'], overrides.skills, held),
         ...harnessRefusals(file, [...at, 'overrides'], overrides, typeof hired.harness === 'string' ? hired.harness : undefined),
       ];
@@ -189,12 +214,30 @@ function stepFileRefusals(folder: ReadFolder, held: Held): Refusal[] {
   });
 }
 
-/** What an agent breaks: a skill the folder lacks, and its blocks. */
+/** What an agent breaks: a skill the folder lacks, a word of its `overridable` that no step may override, and its blocks. */
 const agentRefusals = (held: Held): Refusal[] =>
   [...held.agents].flatMap(([name, spec]) => {
     const file = `agents/${name}/agent.yaml`;
-    return [...skillRefusals(file, ['spec', 'skills'], spec.skills, held), ...harnessRefusals(file, ['spec'], spec, undefined)];
+    return [
+      ...skillRefusals(file, ['spec', 'skills'], spec.skills, held),
+      ...overridableRefusals(file, spec.overridable),
+      ...harnessRefusals(file, ['spec'], spec, undefined),
+    ];
   });
+
+/** Each word of an agent's `overridable` that is none of `OVERRIDABLE`, refused at its place, as the agent's file refuses it. */
+const overridableRefusals = (file: string, offered: unknown): Refusal[] =>
+  (Array.isArray(offered) ? offered : []).flatMap((word, i) =>
+    typeof word === 'string' && !(OVERRIDABLE as readonly string[]).includes(word)
+      ? [
+          {
+            file,
+            at: ['spec', 'overridable', i],
+            message: `\`${word}\` is not something a step may override: name those of ${OVERRIDABLE.join(', ')} this agent offers, or remove \`overridable\`, and a step may override all of them.`,
+          },
+        ]
+      : [],
+  );
 
 /**
  * What the harness and blocks of `holder`, an agent's spec or a step's overrides at `at`, break: a harness that is none, any block where
@@ -274,9 +317,10 @@ function optionRefusal(harness: string, flags: Knobs['flags'], key: string): str
   return undefined;
 }
 
-/** Every `{ param }` and every `{ path }` in `value`, each where it stands. */
+/** Every `{ param }`, every `${{ parameters.<name> }}` of a string and every `{ path }` in `value`, each where it stands. */
 function refsIn(value: unknown, at: At, found: { params: Array<[string, At]>; paths: Array<[string, At]> }): void {
-  if (isParam(value)) found.params.push([value.param, at]);
+  if (typeof value === 'string') for (const { name } of expressionsIn(value)) found.params.push([name, at]);
+  else if (isParam(value)) found.params.push([value.param, at]);
   else if (isMap(value) && Object.keys(value).length === 1 && typeof value.path === 'string') found.paths.push([value.path, at]);
   else if (Array.isArray(value)) value.forEach((item, i) => refsIn(item, [...at, i], found));
   else if (isMap(value)) for (const [key, held] of Object.entries(value)) refsIn(held, [...at, key], found);
@@ -320,13 +364,53 @@ function refRefusals(folder: ReadFolder, held: Held): Refusal[] {
   });
 }
 
+/** The file a `Text` value names (`{ path }`), else `file`, the one the render reads in its place. */
+const textFile = (value: unknown, file: string): string | undefined =>
+  value === undefined ? file : isMap(value) && typeof value.path === 'string' ? value.path : undefined;
+
+/**
+ * The files of `folder` the render writes as text, each expression in it written with its value: each step's instruction, each agent's,
+ * `NEMIA.md` and `RULES.md`, or the file each names in its place. A carried file (a script, a skill's files, a schema) is none.
+ */
+function renderedTexts(folder: ReadFolder, held: Held): string[] {
+  const named = [
+    ...[...held.workflows].flatMap(([workflow, { steps }]) =>
+      steps.map((step) => textFile(step.instruction, `workflows/${workflow}/${String(step.name)}.md`)),
+    ),
+    ...[...held.agents].map(([name, spec]) => textFile(spec.instructions, `agents/${name}/instructions.md`)),
+    textFile(held.manifest.instruction, 'NEMIA.md'),
+    textFile(held.manifest.rules, 'RULES.md'),
+  ];
+  return [...new Set(named.filter((file): file is string => file !== undefined && folder.files.includes(file)))];
+}
+
+/** Each `${{ parameters.<name> }}` of the texts the render writes that names no parameter the manifest declares, at its line. */
+function textRefusals(folder: ReadFolder, held: Held, text: (file: string) => string): Refusal[] {
+  return renderedTexts(folder, held).flatMap((file) => {
+    const words = text(file);
+    return expressionsIn(words)
+      .filter(({ name }) => !held.parameters.has(name))
+      .map(({ name, index }) => {
+        const before = words.slice(0, index).split('\n');
+        return {
+          file,
+          at: [],
+          line: before.length,
+          col: (before.at(-1)?.length ?? 0) + 1,
+          message: `\${{ parameters.${name} }} names the parameter ${name}, which nemia.yaml does not declare: declare it under spec.parameters, or remove the expression.`,
+        };
+      });
+  });
+}
+
 /**
  * Every problem of the template `folder`, by file in order: the layout's and each document's (`layout.ts`), a hire, skill, sibling step,
- * parameter or file named that the folder lacks, a step's words, and each harness's block against the runtime's knobs for it.
- * `placeSkills`: nemia's builtin place skills, each a skill the folder need not carry. None for a template that passes.
+ * parameter or file named that the folder lacks, a step's words, each harness's block against the runtime's knobs for it, and an
+ * undeclared parameter's expression in a text the render writes, at its line. `packageSkills`: Nemia's place and builtin skills, each a
+ * skill the folder need not carry; `text`, the words of one of its files, by its path. None for a template that passes.
  */
-export function checkTemplate(folder: ReadFolder, placeSkills: readonly string[]): Refusal[] {
-  const held = heldOf(folder, placeSkills);
+export function checkTemplate(folder: ReadFolder, packageSkills: readonly string[], text: (file: string) => string): Refusal[] {
+  const held = heldOf(folder, packageSkills);
   const documents = [...folder.documents].flatMap(([file, doc]) =>
     documentFile(file, folder.name) ? documentRefusals(file, doc, folder.name) : [],
   );
@@ -338,6 +422,7 @@ export function checkTemplate(folder: ReadFolder, placeSkills: readonly string[]
     ...stepRefusals(held),
     ...stepFileRefusals(folder, held),
     ...refRefusals(folder, held),
+    ...textRefusals(folder, held, text),
   ];
   return all.sort((a, b) => (a.file < b.file ? -1 : a.file > b.file ? 1 : 0));
 }

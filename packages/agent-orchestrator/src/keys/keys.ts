@@ -359,7 +359,7 @@ export function outputOf(
   }
   if (!read)
     refuse(
-      `${named} names a file beside the step, and this step was read without its folder. Load it with \`loadWorkflows(<folder>)\`, which reads the file.`,
+      `${named} names a file beside the step, and this step was read without its folder. Read it with its folder, as a start reads one (the Workflow door's \`read\`), which reads the file.`,
     );
   const text = read(file);
   if (text === undefined) {

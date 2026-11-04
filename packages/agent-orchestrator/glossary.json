@@ -72,7 +72,7 @@
     },
     {
       "term": "Closeout",
-      "meaning": "how a step signs off: its outcome, its summary, and the fields its workflow asks of it.",
+      "meaning": "how a step signs off: its outcome, its summary, and the fields its workflow asks of it. `nemia closeout <run> <step> [--try n]` prints a try's, its latest by default, and the api serves the same on `GET /api/runs/:runId/steps/:step/tries/:try/closeout`.",
       "type": "Closeout",
       "see": {
         "label": "The closeout",
@@ -133,7 +133,7 @@
     },
     {
       "term": "Hold",
-      "meaning": "only a person's hold of a run until other runs land (`nemia hold`): the run is pending, reason `Waiting`, `on` run; the runs the hold waits for are its `holdUntil`, on the assessment, the summary and the api's `RunDetail`.",
+      "meaning": "only a person's hold of a run until other runs land (`nemia hold`): the run is pending, reason `Waiting`, `on` run; the runs the hold waits for are its `holdUntil`, on the assessment, the summary and the run object's status (`RunStatus`).",
       "type": "Run",
       "retired": [
         {
@@ -141,6 +141,23 @@
           "card": "4c: what a hold waits for is `holdUntil`"
         }
       ]
+    },
+    {
+      "term": "Inherited",
+      "meaning": "the labels a run or a card is created with, copied once from its card and every `--after` and `--from` run: what the runs agree on, the card's over them, the typed `--label` over those; a key two runs disagree on is left out and said.",
+      "type": "Inherited",
+      "retired": []
+    },
+    {
+      "term": "Input edge",
+      "meaning": "an edge of the run object's graph from a step to one that is handed its declared output (`input:`), beside its `after` and `loop` edges. The list and the run page draw no input edge.",
+      "type": "InputEdge"
+    },
+    {
+      "term": "Label",
+      "meaning": "a person's free `key=value` on an inbox card or a run, in Kubernetes' spelling with no prefix, beside the closed `factory` and `workflow`: set in a card's `labels:`, with `--label` at `nemia inbox add` and `nemia start`, and changed at any time with `nemia label run` and `nemia label inbox`. A run's are kept in `runs/<id>.labels`, never in its record.",
+      "type": "Labels",
+      "retired": []
     },
     {
       "term": "Landed",
@@ -165,6 +182,11 @@
         "label": "The landing",
         "href": "/workflows/#the-landing"
       }
+    },
+    {
+      "term": "Ledger door",
+      "meaning": "the one way the revision ledger is read and appended to: `LedgerDoor` in `packages/agent-orchestrator/src/revisions/revisions.store.ts`, addressed by `RevisionOf` (a kind and a name), its files layer at the store's root a program is given and a memory one, each refusing an append whose kind, name, digest or time breaks the model's `Revision`.",
+      "type": "LedgerDoorShape"
     },
     {
       "term": "Lint",
@@ -261,6 +283,11 @@
       ]
     },
     {
+      "term": "Raise",
+      "meaning": "a raise of a step's budget cap the package takes, `by` a try (`nemia retry --budget`) or a round (`nemia retry --round --budget`), above what its tries cost: judged once (`stepRaise`), and read by the run object, the run page and `nemia decide`.",
+      "type": "StepRaise"
+    },
+    {
       "term": "Reason",
       "meaning": "why a step stands where it does, as the feed's closed code (`Reason`), set where the listing builds the step's row and never parsed back out of its sentence; a run's is a `RunReason`.",
       "type": "StepReason",
@@ -268,6 +295,16 @@
         "label": "A step",
         "href": "/workflows/#a-step"
       }
+    },
+    {
+      "term": "Revision",
+      "meaning": "one entry of a kind and name's ledger: its number, a whole one from 1, the digest of the content it was given for, and when it was first seen — the model's `Revision` (`packages/agent-orchestrator/src/revisions/revisions.model.ts`), checked on an append and read nominally.",
+      "type": "Revision"
+    },
+    {
+      "term": "Revision ledger",
+      "meaning": "the numbers given to each content of a workflow, an agent, a skill or a factory's rules, one file per kind and name under `<WF_ROOT>/revisions/`: a content keeps the number it was first given, a new one is numbered past the highest; read and appended to through the Ledger door.",
+      "type": "LedgerLayer"
     },
     {
       "term": "Rm",
@@ -321,9 +358,20 @@
       "type": "RunDoor"
     },
     {
+      "term": "Run object",
+      "meaning": "a run as one object in Kubernetes' shape, `apiVersion: nemia/v1`, `kind: Run`: `metadata` (its name, when it was made, its factory and workflow as labels), `spec` (what the record froze: its steps with their `after`, `input` and `loop`, its brief and place) and `status` (the list's judgement of it, its graph and timeline, and each step's state, raise and current try in short): all the run's page shows but each step's tries whole and what it was told, which are its sub-resources. An Effect Schema, exported as an OpenAPI 3.1 document from which the board's run mirror is generated; `nemia show` prints it.",
+      "type": "Run"
+    },
+    {
       "term": "RunId",
-      "meaning": "a run's id, as `nemia start` mints it from the brief: lowercase letters, digits and dashes.",
+      "meaning": "a run's id, as `nemia start` mints it from the brief: lowercase letters, digits and dashes. On the run object it is `metadata.name`.",
       "type": "RunId"
+    },
+    {
+      "term": "Selector",
+      "meaning": "Kubernetes' grammar over labels — `key=value`, `key!=value`, `key in (a,b)`, `key notin (a,b)` and a bare `key` — its clauses all holding, `-l` given again for another of which one must: `nemia watch`, `ls`, `inbox` and `stats` select by it, and the api as `?selector=`.",
+      "type": "Selectors",
+      "retired": []
     },
     {
       "term": "Session state",
@@ -332,7 +380,7 @@
     },
     {
       "term": "Show",
-      "meaning": "the one spelling of a read of one thing: `nemia show` of a run, the api's `skills show` and `inbox show`.",
+      "meaning": "the one spelling of a read of one thing: `nemia show` of a run, which prints the run object (`--raw` its record), the api's `skills show` and `inbox show`.",
       "retired": [
         {
           "spelling": "skills read",
@@ -377,6 +425,10 @@
       "term": "StepName",
       "meaning": "a step's name: its file's name in its workflow's folder, without its extension.",
       "type": "StepName"
+    },
+    {
+      "term": "Sub-resource",
+      "meaning": "what the run object leaves out and serves on a path under its step: its `tries`, one `try`, a try's `closeout`, and what the step was `told`. Each is an entry of the command table, on the api and, for the closeout, the CLI, and answers with a Schema of its own beside the object's (`StepTries`, `StepTry`, `TryCloseout`, `StepTold`, in `packages/agent-orchestrator/src/object/run.model.ts`)."
     },
     {
       "term": "TaskId",
@@ -450,17 +502,6 @@
       ]
     },
     {
-      "term": "Waiting on you",
-      "meaning": "whether a wait is the person's: `waitingOnYou` on a run's `--after` wait (`RunWaiting`) and on its hold (`RunHolding`), true where only a person's hand ends it; and the summary's `waitingOnYouWords`, the steps that wait on a person as `nemia ls` names them after `→ waiting on you:` (`onYouWords`), beside `waitingOnYou`, those steps by name.",
-      "type": "RunWaiting",
-      "retired": [
-        {
-          "spelling": "onYou",
-          "card": "4c: whether a wait is the person's is `waitingOnYou`, and its words `waitingOnYouWords`"
-        }
-      ]
-    },
-    {
       "term": "Waiting on",
       "meaning": "a wait on a thing, reason `Waiting` with what it waits on (`on`: a run, the limit, the checkout or the pause), phase pending; an assessment names the steps waiting on the repository's checkout (`waitingOnCheckout`, as `waitsOnCheckout` says of a step) and on the store's pause (`waitingOnPause`). Never called held, which is a person's hold alone.",
       "type": "WaitOn",
@@ -468,6 +509,17 @@
         {
           "spelling": "heldByCheckout",
           "card": "4b: a step waiting on the checkout `waitsOnCheckout`"
+        }
+      ]
+    },
+    {
+      "term": "Waiting on you",
+      "meaning": "whether a wait is the person's: `waitingOnYou` on a run's `--after` wait (`RunWaiting`) and on its hold (`RunHolding`), true where only a person's hand ends it; and the summary's `waitingOnYouWords`, the steps that wait on a person as `nemia ls` names them after `→ waiting on you:` (`onYouWords`), beside `waitingOnYou`, those steps by name.",
+      "type": "RunWaiting",
+      "retired": [
+        {
+          "spelling": "onYou",
+          "card": "4c: whether a wait is the person's is `waitingOnYou`, and its words `waitingOnYouWords`"
         }
       ]
     },
@@ -484,6 +536,11 @@
       "term": "Workflow door",
       "meaning": "the one way a workflow is read and written — its folder of markdown, its steps and its README: `WorkflowDoor` in `packages/agent-orchestrator/src/workflows/workflows.store.ts`, addressed by `WorkflowDir`, its files layer at the store's root a program is given and a memory one, each refusing a write that breaks the model's `Workflow` or the version it was read at.",
       "type": "WorkflowDoor"
+    },
+    {
+      "term": "Workflow files",
+      "meaning": "the run's own copy of its workflow folder, every file at its path from the folder and none writable (`runs/<id>/workflow/<hex>/`, `freezeWorkflowFiles` in `packages/agent-orchestrator/src/frozen/frozen.store.ts`): taken at `nemia start` and again wherever its pins move, named on the record as `workflowFiles`, and told to every check and session as `WF_WORKFLOW_FILES`, mounted read-only to a session.",
+      "type": "Run"
     },
     {
       "term": "Workflow step",

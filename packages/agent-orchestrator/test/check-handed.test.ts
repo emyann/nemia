@@ -57,7 +57,10 @@ const MARKED = [
   'wf check: no e2e in a round check; it runs once, on the merged tree',
 ];
 
-/** `workflows/build`'s check, in shape: the pictures' lines, then a web build longer than the log the engine keeps, then the last word. */
+/**
+ * The nemia factory's build check, in shape: the pictures' lines, then a web build longer than the log the engine keeps, then the last
+ * word.
+ */
 const COMMAND = [
   ...MARKED.slice(0, -1).map((line) => `echo ${JSON.stringify(line)}`),
   'i=0; while [ $i -lt 300 ]; do echo "web:build: dist/assets/chunk-$i.js  41.20 kB | gzip: 12.80 kB, and a line long enough"; i=$((i+1)); done',

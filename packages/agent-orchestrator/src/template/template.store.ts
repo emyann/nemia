@@ -8,7 +8,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { LineCounter, parseAllDocuments, stringify, type Document } from 'yaml';
-import { loadAgents } from '../agents/read.store.ts';
+import type { Agent, SkillsFound } from '../agents/agents.ts';
 import { outsideRefusal, type Factory } from '../factory/factory.ts';
 import { workflowDescription, workflowsIn } from '../folder/folder.store.ts';
 import { stepFiles } from '../folder/folder.ts';
@@ -16,7 +16,15 @@ import { placesOf } from '../folder/lookup.store.ts';
 import { readKeys } from '../former/former.ts';
 import { givenSkillOf } from '../keys/index.ts';
 import { Invalid, Missing } from '../refusal/refusal.ts';
-import { entriesOf, isBuiltinPlace, lookupRoots, PLACE_SKILLS, skillFiles, skillsFor } from '../skills/read.store.ts';
+import {
+  entriesOf,
+  isBuiltinPlace,
+  isBuiltinSkill,
+  lookupRoots,
+  packageSkillFolders,
+  skillFiles,
+  type Places,
+} from '../skills/read.store.ts';
 import { splitFrontmatter, WorkflowError } from '../step/step.ts';
 import { firstPiece } from '../piece/piece.ts';
 import { contentDigest, pathRefusals, type TreeFile } from '../archive/archive.ts';
@@ -76,9 +84,8 @@ function readTemplateFolder(
   return { folder: { name, files: files.map((f) => f.path), documents }, parsed };
 }
 
-/** The names of nemia's builtin place skills, each present to a template that names it. */
-export const placeSkillNames = (): string[] =>
-  entriesOf(PLACE_SKILLS).filter((name) => fs.existsSync(path.join(PLACE_SKILLS, name, 'SKILL.md')));
+/** The names of Nemia's own skills, the place's and the builtin ones (`packageSkillFolders`), each present to a template that names it. */
+export const packageSkillNames = (): string[] => packageSkillFolders().map(([name]) => name);
 
 /** A problem as a person reads it: `<file>:<line>:<col>: <words>`, or `<file>: <words>` where it has no line. */
 export const problemLine = (p: Problem): string => `${p.file}${p.line === undefined ? '' : `:${p.line}:${p.col ?? 1}`}: ${p.message}`;
@@ -88,15 +95,21 @@ export type CheckedTemplate = TemplateTree & { folder: ReadFolder; version: unkn
 
 /**
  * The tree `tree` checked: every problem at once, sorted by file then line — what its read found (a link, a path longer than an archive
- * holds), a document that does not parse, and each that `checkTemplate` refuses, at the line its value stands on. `placeSkills` names
- * the builtin place skills a template may name (`placeSkillNames`). Pure.
+ * holds), a document that does not parse, and each that `checkTemplate` refuses, at the line its value stands on. `packageSkills` names
+ * Nemia's own skills, the place's and the builtin ones, a template may name (`packageSkillNames`). Pure.
  */
-export function checkedTree(tree: TemplateTree, placeSkills: readonly string[]): CheckedTemplate {
+export function checkedTree(tree: TemplateTree, packageSkills: readonly string[]): CheckedTemplate {
   const problems = [...tree.problems];
   const { folder, parsed } = readTemplateFolder(tree.name, tree.files, problems);
-  for (const refusal of checkTemplate(folder, [...placeSkills])) {
+  const byPath = new Map(tree.files.map((f) => [f.path, f]));
+  const text = (file: string): string => {
+    const found = byPath.get(file);
+    return found === undefined ? '' : Buffer.from(found.bytes).toString('utf8');
+  };
+  for (const refusal of checkTemplate(folder, [...packageSkills], text)) {
     const doc = parsed.get(refusal.file);
-    problems.push({ file: refusal.file, ...(doc ? lineOf(doc, refusal.at) : {}), message: refusal.message });
+    const at = doc ? lineOf(doc, refusal.at) : { line: refusal.line, col: refusal.col };
+    problems.push({ file: refusal.file, ...at, message: refusal.message });
   }
   problems.sort((a, b) => a.file.localeCompare(b.file) || (a.line ?? 0) - (b.line ?? 0) || (a.col ?? 0) - (b.col ?? 0));
   const manifest = folder.documents.get('nemia.yaml') as { spec?: { version?: unknown } } | null | undefined;
@@ -110,8 +123,8 @@ export type OpenTemplate = CheckedTemplate & { file: (at: string) => TreeFile; t
  * The tree read from `source`, checked (`checkedTree`), each of its files then read off the tree. Refused: a file asked for that is no
  * file of the template (Invalid), so a `{path}` cannot reach out. Pure.
  */
-export function openedTree(source: string, tree: TemplateTree, placeSkills: readonly string[]): OpenTemplate {
-  const checked = checkedTree(tree, placeSkills);
+export function openedTree(source: string, tree: TemplateTree, packageSkills: readonly string[]): OpenTemplate {
+  const checked = checkedTree(tree, packageSkills);
   const byPath = new Map(checked.files.map((f) => [f.path, f]));
   const file = (at: string): TreeFile => {
     const found = byPath.get(at);
@@ -167,13 +180,27 @@ function workflowSources(root: string, names: readonly string[], factory: string
   });
 }
 
-/** The loader's answer for an agent and a skill, over the roots a workflow of `root` looks in, the first root that has a name winning. */
-function lookups(root: string, from: string): Pick<Source, 'agent' | 'skill'> {
-  const workflowDir = path.join(root, '_');
-  const places = placesOf(from);
-  const roots = lookupRoots(workflowDir, places).map((r) => path.join(r, 'agents'));
-  const agents = roots.map((dir) => ({ dir, found: loadAgents(dir) }));
-  const skills = skillsFor(workflowDir, places).at;
+/**
+ * Where an export of the repository `from` looks for the agents and skills its workflows name, as a workflow of its `workflows/` looks:
+ * a workflow folder of it (`workflowDir`, a name no workflow has), its places, and each folder of agents, first root first.
+ */
+export function lookupsOf(from: string): { workflowDir: string; places: Places; agentDirs: string[] } {
+  const workflowDir = path.join(path.resolve(from), 'workflows', '_');
+  const places = placesOf(path.resolve(from));
+  return { workflowDir, places, agentDirs: lookupRoots(workflowDir, places).map((r) => path.join(r, 'agents')) };
+}
+
+/**
+ * What an export's program read through the Agent and Skill doors over the roots of `lookupsOf`: each folder of agents, first root first,
+ * with each agent it holds, read or the refusal of it; and where each skill a workflow of it may name is found.
+ */
+export type ExportFound = {
+  agents: ReadonlyArray<{ dir: string; found: ReadonlyMap<string, Agent | Error> }>;
+  skills: SkillsFound['at'];
+};
+
+/** The loader's answer for an agent and a skill, over what the doors found (`ExportFound`), the first root that has a name winning. */
+function lookups({ agents, skills }: ExportFound): Pick<Source, 'agent' | 'skill'> {
   return {
     agent: (name) => {
       const at = agents.find(({ found }) => found.has(name));
@@ -193,7 +220,7 @@ function lookups(root: string, from: string): Pick<Source, 'agent' | 'skill'> {
       if (dir === undefined) return undefined;
       if (dir instanceof Error) return { refused: dir.message };
       if (givenSkillOf(name)?.folder !== undefined) return { named: dir };
-      return isBuiltinPlace(dir) ? 'place' : { dir };
+      return isBuiltinPlace(dir) ? 'place' : isBuiltinSkill(dir) ? 'builtin' : { dir };
     },
   };
 }
@@ -286,14 +313,16 @@ export type ExportAsk = { dir: string; from: string; factory?: FactoryParts };
 
 /**
  * The tree of a template to be written at `ask.dir` from the repository `ask.from`: each workflow of its `workflows/` (with `factory`,
- * only those it attaches), the agents and skills they name as the loader finds them, the factory's hires, instruction and rules; and
- * checked. Answers the folder, its name, its tree, and where each part came from; the Template door writes it. Refused, nothing written:
- * a folder that is no name, a factory whose repositories are not `from`, a workflow it attaches that `from` lacks, what `draftOf`
- * refuses, and a draft that does not pass its own check (Invalid), each problem by name; a `from` with no workflows/ (Missing).
+ * only those it attaches), the agents and skills they name as the Agent and Skill doors found them over `lookupsOf`'s roots (`found`),
+ * the factory's hires, instruction and rules; and checked. Answers the folder, its name, its tree, and where each part came from; the
+ * Template door writes it. Refused, nothing written: a folder that is no name, a factory whose repositories are not `from`, a workflow it
+ * attaches that `from` lacks, what `draftOf` refuses, and a draft that does not pass its own check (Invalid), each problem by name; a
+ * `from` with no workflows/ (Missing).
  */
 export function exportTree(
   ask: ExportAsk,
-  placeSkills: readonly string[],
+  packageSkills: readonly string[],
+  found: ExportFound,
 ): { dir: string; name: string; files: TreeFile[]; from: Draft['from'] } {
   const dir = path.resolve(ask.dir);
   const from = path.resolve(ask.from);
@@ -306,11 +335,11 @@ export function exportTree(
   const refusals: string[] = [];
   const factory = ask.factory === undefined ? undefined : factorySource(ask.factory, from, refusals);
   const workflows = workflowSources(root, factory?.workflows ?? workflowsIn(root), ask.factory?.factory.name, refusals);
-  const draft = draftOf({ template: name, workflows, factory: factory?.source, ...lookups(root, from) });
+  const draft = draftOf({ template: name, workflows, factory: factory?.source, ...lookups(found) });
   refusals.push(...draft.refusals);
   if (refusals.length) throw new Invalid({ message: `${dir} was not written:\n${refusals.map((r) => `  ${r}`).join('\n')}` });
   const files = treeOfDraft(draft);
-  const { problems } = checkedTree(folderTreeOf(name, files), placeSkills);
+  const { problems } = checkedTree(folderTreeOf(name, files), packageSkills);
   if (problems.length)
     throw new Invalid({
       message: `${dir} was not written, since the draft does not pass:\n${problems.map((p) => `  ${problemLine(p)}`).join('\n')}`,

@@ -1,7 +1,8 @@
 /**
  * The questions a closeout asks, on a run's detail (`StepCloseout.questions`), and a person's answers to them on POST …/retry
  * (`answeredHow`): checked against the questions the step's current closeout asks, written as the words the package gives them
- * (`answerText`), and refused (400) when they do not fit or ride on a recheck. A closeout that asks in free text is answered as before.
+ * (`answerText`), and refused (400) when they do not fit or ride on a recheck. A closeout that asks in free text is answered as before;
+ * one whose question fields do not read says why (`refused`), and the run asks its session to mend them before a person's word.
  *
  * One table of what the route refuses, then the story of a person reading the questions and answering them.
  *
@@ -18,7 +19,7 @@ import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from 'agent-orchestrator/testing';
 import { appOver, beforeEachTest, eachTest, engineFor } from '../../test/placed.ts';
 import { story } from '../../test/checkpoints.ts';
-import type { RunDetail } from '../detail/detail.ts';
+import { closeoutOf, objectOf, stepOf } from '../../test/run-reads.ts';
 import { askFile } from 'agent-orchestrator';
 import { answerText, type Question } from 'agent-orchestrator/run';
 import { parseWorkflow } from 'agent-orchestrator/workflow';
@@ -176,23 +177,27 @@ test('a person reads the questions a closeout asks on the run’s detail and ans
   await s.test(
     "a closeout's questions are on the run's detail, blocked or done; a field that asks in free text, or does not decode, has none",
     async () => {
-      const run = (await (await app().request(`/api/runs/${R}`)).json()) as RunDetail;
-      const questions = (name: string) => run.steps.find((s) => s.name === name)!.closeout!.questions;
-      assert.deepEqual(questions('design'), [{ field: 'open', questions: [cut, where] }]);
-      assert.deepEqual(questions('spec'), [{ field: 'open', questions: [cut] }], 'a done step’s questions, drawn read-only');
-      assert.deepEqual(questions('plain'), []);
-      assert.deepEqual(questions('broken'), [], 'drawn as any other field');
+      const run = await objectOf(app(), R);
+      const questions = async (name: string) => (await closeoutOf(app(), R, name))!.closeout!.questions;
+      assert.deepEqual(await questions('design'), [{ field: 'open', questions: [cut, where] }]);
+      assert.deepEqual(await questions('spec'), [{ field: 'open', questions: [cut] }], 'a done step’s questions, drawn read-only');
+      assert.deepEqual(await questions('plain'), []);
+      assert.deepEqual(await questions('broken'), [], 'drawn as any other field');
       assert.deepEqual(
-        questions('twice'),
+        await questions('twice'),
         [],
         'two fields asking one title: an answer names its question by title alone, so it is answered in words',
       );
-      assert.equal(run.steps.find((s) => s.name === 'design')!.needs, 'Two questions.', '`needs` stays the one line it was');
+      const refused = async (name: string) => (await closeoutOf(app(), R, name))!.closeout!.refused;
+      assert.equal((await refused('design')).length, 0, 'questions that read are accepted');
+      assert.match((await refused('broken'))[0] ?? '', /`open`[\s\S]*"z"/, 'why `open` was not read as questions');
+      assert.match((await refused('twice'))[0] ?? '', /"How is the card cut\?"/, 'which title two questions share');
+      assert.equal(stepOf(run, 'design').needs, 'Two questions.', '`needs` stays the one line it was');
     },
   );
 
   await s.test(
-    'answers that fit are the try’s message, in the package’s words, their note the message beside them; a free-text question still takes a message',
+    'answers that fit are the try’s message, in the package’s words, their note the message beside them; a free-text question still takes a message, and questions that do not read wait on the run',
     async () => {
       const answers = [
         { question: cut.title, chose: [], own: 'Three ways.' },
@@ -209,7 +214,7 @@ test('a person reads the questions a closeout asks on the run’s detail and ans
       assert.equal(plain.status, 202, await plain.clone().text());
       assert.equal((JSON.parse(fs.readFileSync(askFile(R, 'plain', 2), 'utf8')) as { message: string }).message, 'Postgres.');
       const twice = await ask('twice', { mode: 'continue', message: 'Shape first, into the retry.' });
-      assert.equal(twice.status, 202, await twice.clone().text());
+      assert.equal(twice.status, 409, 'questions that do not read are refused back to the session first: the run asks it to mend them');
     },
   );
 });

@@ -493,7 +493,7 @@ function nameDrift(workflow: Workflow): string[] {
 
 /**
  * A run of the suite that does not filter to the leg's own workspace. `legDrift` proves the matrix names every workspace; this proves the
- * leg runs the one it is named for, and without it twelve legs could run one package's suite while eleven of them report another's.
+ * leg runs the one it is named for, and without it sixteen legs could run one package's suite while fifteen of them report another's.
  */
 function filterDrift(workflow: Workflow): string[] {
   return (workflow.jobs[LEGS]?.steps ?? [])
@@ -965,8 +965,8 @@ test('the shipped CI workflow agrees with the repository it checks', () => {
   );
   assert.equal(
     legs(readWorkflow()).length,
-    12,
-    'the matrix expands to twelve legs today: four workspaces on two nodes, and the orchestrator in two shards on each — a clause reading an empty matrix or an unexpanded include would bless the file having read nothing',
+    16,
+    'the matrix expands to sixteen legs today: six workspaces on two nodes, and the orchestrator in two shards on each — a clause reading an empty matrix or an unexpanded include would bless the file having read nothing',
   );
   const pages = readPages();
   assert.ok(pages.length > 100, `${NAMES_PATH} names ${pages.length} pages: the shard clause reads a list that is not the e2e's`);

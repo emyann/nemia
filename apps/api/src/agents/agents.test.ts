@@ -395,6 +395,14 @@ test('the listing of an agent that does not read: its refusal, and its lines as 
       } finally {
         fs.rmSync(path.join(AGENTS, 'nameless.md'));
       }
+      fs.writeFileSync(path.join(AGENTS, 'unread.md'), '---\nloop: build\n---\nWired wrong.\n');
+      try {
+        const res = await app.request('/api/agents/yours/unread/card');
+        assert.equal(res.status, 422, 'an agent the load refuses is there, and answered in the load’s words, not as one missing');
+        assert.match(((await res.json()) as { error: string }).error, /\bunread\b/);
+      } finally {
+        fs.rmSync(path.join(AGENTS, 'unread.md'));
+      }
     },
   );
 });

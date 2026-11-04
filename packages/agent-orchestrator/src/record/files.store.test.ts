@@ -1,7 +1,8 @@
 /**
  * The run store's two reads of a store that holds hundreds: `runs.find`, one run by id, found among the ids the store lists and never
  * read by a path made of the id; and `keptRuns`, every run projected off a memo keyed by the run's stamp, which every read that wants
- * a little of every run goes through.
+ * a little of every run goes through. And a run's labels, a person's file beside the record (`runs/<id>.labels`): composed onto every
+ * read, never written into the record, written whole and removed by an empty map or with the run, and in the run's stamp.
  *
  * `WF_ROOT` is set before the import, since the store reads it as it loads.
  */
@@ -13,8 +14,8 @@ import { scratch } from '../../test/scratch.ts';
 
 const ROOT = scratch('wf-files-store-');
 process.env.WF_ROOT = ROOT;
-const { runStore, keptRuns } = await import('./files.store.ts');
-const { runsDir, runFile } = await import('./record.store.ts');
+const { runStore, keptRuns, labelsFile, writeLabels } = await import('./files.store.ts');
+const { runsDir, runFile, restStamps } = await import('./record.store.ts');
 const { recordMemo } = await import('../rest/index.ts');
 const { metered } = await import('../meter/tally.store.ts');
 
@@ -115,4 +116,121 @@ test('a run whose record is rewritten is read again, and one removed leaves the 
   assert.equal(after, 1, 'the record that was rewritten, and no other');
   assert.deepEqual(briefs(memo), [{ id: 'r-edit', brief: 'edited' }]);
   assert.deepEqual([...memo.runs.keys()], ['r-edit']);
+});
+
+/** What `body` wrote to stderr while it ran, line by line, and what it answered. */
+const stderrOf = <T>(body: () => T): { lines: string[]; value: T } => {
+  const lines: string[] = [];
+  const write = process.stderr.write.bind(process.stderr);
+  process.stderr.write = (chunk: string | Uint8Array) => {
+    lines.push(...String(chunk).split('\n').filter(Boolean));
+    return true;
+  };
+  try {
+    return { lines, value: body() };
+  } finally {
+    process.stderr.write = write;
+  }
+};
+
+test("a run's labels are a person's file beside the record: composed on every read, never written into it, and their write moves the stamp", async (t) => {
+  await t.test(
+    '`runs/<id>.labels` is read onto the run as `labels` by read, find, list and keptRuns; a run with none reads no `labels` key',
+    () => {
+      put('r-labelled');
+      put('r-unlabelled');
+      assert.equal(labelsFile('r-labelled'), path.join(runsDir(), 'r-labelled.labels'));
+      fs.writeFileSync(labelsFile('r-labelled'), JSON.stringify({ team: 'core', tier: 'gold' }));
+      const labels = { team: 'core', tier: 'gold' };
+      assert.deepEqual(runStore.runs.read('r-labelled').labels, labels);
+      assert.deepEqual(runStore.runs.find('r-labelled')?.labels, labels);
+      assert.deepEqual(runStore.runs.list(() => {}).find((r) => r.id === 'r-labelled')?.labels, labels);
+      assert.deepEqual(
+        keptRuns(undefined, (r) => [r.id, r.labels]),
+        [
+          ['r-labelled', labels],
+          ['r-unlabelled', undefined],
+        ],
+      );
+      assert.equal('labels' in runStore.runs.read('r-unlabelled'), false);
+    },
+  );
+
+  await t.test('a run the memo keeps is listed as the very run given, its labels not read again', () => {
+    put('r-kept');
+    fs.writeFileSync(labelsFile('r-kept'), JSON.stringify({ team: 'core' }));
+    const kept = { ...runStore.runs.read('r-kept'), brief: 'kept' };
+    const listed = runStore.runs.list(
+      () => {},
+      (id) => (id === 'r-kept' ? kept : undefined),
+    );
+    assert.equal(
+      listed.find((r) => r.id === 'r-kept'),
+      kept,
+    );
+  });
+
+  await t.test('`rewrite` writes no `labels` key into the record, and a `labels` key the record carries is not read as labels', () => {
+    put('r-labelled');
+    writeLabels('r-labelled', { team: 'core' });
+    assert.ok(runStore.runs.rewrite({ ...runStore.runs.read('r-labelled'), brief: 'changed' }));
+    const written = JSON.parse(fs.readFileSync(runFile('r-labelled'), 'utf8')) as Record<string, unknown>;
+    assert.equal(written.brief, 'changed');
+    assert.equal('labels' in written, false);
+    assert.deepEqual(runStore.runs.read('r-labelled').labels, { team: 'core' });
+    put('r-labels-in-record', { ...aRecord('r-labels-in-record'), labels: { team: 'stale' } });
+    assert.equal('labels' in runStore.runs.read('r-labels-in-record'), false, 'only the file says a run is labelled');
+  });
+
+  await t.test('`writeLabels` writes the whole map over the one there, an empty map removes the file, and no hidden file is left', () => {
+    put('r-labelled');
+    runStore.labels.put('r-labelled', { a: '1', b: '2' });
+    runStore.labels.put('r-labelled', { b: '3' });
+    assert.deepEqual(JSON.parse(fs.readFileSync(labelsFile('r-labelled'), 'utf8')), { b: '3' });
+    assert.deepEqual(runStore.runs.read('r-labelled').labels, { b: '3' });
+    runStore.labels.put('r-labelled', {});
+    assert.equal(fs.existsSync(labelsFile('r-labelled')), false);
+    assert.equal('labels' in runStore.runs.read('r-labelled'), false);
+    runStore.labels.put('r-labelled', {});
+    assert.equal(fs.existsSync(labelsFile('r-labelled')), false, 'removing none is no refusal');
+    assert.deepEqual(fs.readdirSync(runsDir()), ['r-labelled.json']);
+  });
+
+  await t.test(
+    'a labels file that is no JSON object of strings reads as no labels, and is said, naming the file and the verb that mends it',
+    () => {
+      for (const [id, text] of [
+        ['r-labels-text', 'not json'],
+        ['r-labels-list', '["team"]'],
+        ['r-labels-number', '{"team": 3}'],
+      ] as const) {
+        put(id);
+        fs.writeFileSync(labelsFile(id), text);
+        const { lines, value } = stderrOf(() => runStore.runs.read(id));
+        assert.equal('labels' in value, false, id);
+        assert.equal(lines.length, 1, `${id} said once: ${lines.join('\n')}`);
+        assert.ok(lines[0].includes(labelsFile(id)), lines[0]);
+        assert.ok(lines[0].includes(`nemia label run ${id}`), lines[0]);
+      }
+    },
+  );
+
+  await t.test("the run's rest stamp moves when its labels are written, and again when they are removed", () => {
+    put('r-labels-stamp');
+    const before = restStamps().get('r-labels-stamp');
+    runStore.labels.put('r-labels-stamp', { team: 'core' });
+    const written = restStamps().get('r-labels-stamp');
+    runStore.labels.put('r-labels-stamp', {});
+    const removed = restStamps().get('r-labels-stamp');
+    assert.ok(before);
+    assert.notEqual(written, before);
+    assert.notEqual(removed, written);
+  });
+
+  await t.test('`nemia rm` removes the labels file with the run', () => {
+    put('r-labels-rm');
+    runStore.labels.put('r-labels-rm', { team: 'core' });
+    assert.ok(runStore.runs.forget('r-labels-rm').includes(path.join('runs', 'r-labels-rm.labels')));
+    assert.equal(fs.existsSync(labelsFile('r-labels-rm')), false);
+  });
 });

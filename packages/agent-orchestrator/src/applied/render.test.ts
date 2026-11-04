@@ -9,12 +9,12 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { parse, stringify } from 'yaml';
 import { scratch } from '../../test/scratch.ts';
-import { teamCopy } from '../../test/team.ts';
+import { plantStepOutput, STEP_OUTPUT_SCHEMA, teamCopy } from '../../test/team.ts';
 
 process.env.WF_ROOT = scratch('wf-render-');
 const { templated } = await import('../../test/templated.ts');
 const { exportTemplate, openTemplate } = templated(process.env.WF_ROOT);
-const { loadWorkflows } = await import('../folder/folder.store.ts');
+const { loadWorkflows } = await import('../workflows/workflows.store.ts');
 const { renderFactory, resolveParams } = await import('./index.ts');
 
 /** The tests' team exported into a template folder, and the repository it came from. */
@@ -86,6 +86,21 @@ test("what a render writes into a factory's tree, read back as today's folder re
       );
     },
   );
+  await t.test("a step's own closeout schema is rendered back as its output: line, the schema beside it, and loads as it did", () => {
+    const repo = scratch('wf-render-repo-');
+    fs.renameSync(teamCopy(), path.join(repo, 'workflows'));
+    plantStepOutput(path.join(repo, 'workflows'));
+    const dir = path.join(scratch('wf-render-out-'), 'team');
+    exportTemplate({ dir, from: repo });
+    const { tree, out } = rendered(dir);
+    assert.deepEqual(out.refusals, []);
+    assert.match(fs.readFileSync(path.join(tree, 'workflows/dev/implement.md'), 'utf8'), /^output: implement\.schema\.json$/m);
+    assert.equal(fs.readFileSync(path.join(tree, 'workflows/dev/implement.schema.json'), 'utf8'), STEP_OUTPUT_SCHEMA);
+    const fills = { factory: 'team', workflow: 'dev', agents: { implement: 'implementer', review: 'reviewer', ship: 'shipper' } };
+    const loaded = loadWorkflows(path.join(tree, 'workflows', 'dev'), {}, fills);
+    assert.deepEqual(stepsOf(loaded), stepsOf(loadWorkflows(path.join(repo, 'workflows', 'dev'))));
+    assert.deepEqual(loaded.find((step) => step.name === 'implement')?.output?.schema, JSON.parse(STEP_OUTPUT_SCHEMA));
+  });
   await t.test("a manifest's revisions policy is rendered into the tree's wiring, and a manifest that says none renders none", () => {
     const { dir } = exported();
     assert.equal(Object.hasOwn(rendered(dir).out.wiring, 'revisions'), false, 'a manifest that says nothing leaves the factory pinned');
@@ -121,6 +136,11 @@ test("what a render writes into a factory's tree, read back as today's folder re
       fs.renameSync(teamCopy(), path.join(repo, 'workflows'));
       const step = path.join(repo, 'workflows', 'dev', 'review.md');
       fs.writeFileSync(step, fs.readFileSync(step, 'utf8').replace('---\n', '---\nmcp: docs, playwright\n'));
+      const reviewer = path.join(repo, 'workflows', 'agents', 'reviewer.md');
+      fs.writeFileSync(
+        reviewer,
+        fs.readFileSync(reviewer, 'utf8').replace('overridable: output, skills', 'overridable: output, skills, mcp'),
+      );
       const dir = path.join(scratch('wf-render-out-'), 'team');
       exportTemplate({ dir, from: repo });
       const yaml = path.join(dir, 'workflows/dev/workflow.yaml');
@@ -149,6 +169,32 @@ test("what a render writes into a factory's tree, read back as today's folder re
       );
     },
   );
+  await t.test(
+    "an agent's overridable: line has its place in a template: exported in the agent's spec, rendered back as the line it was, and none stays none",
+    () => {
+      const repo = scratch('wf-render-repo-');
+      fs.renameSync(teamCopy(), path.join(repo, 'workflows'));
+      const implementer = path.join(repo, 'workflows', 'agents', 'implementer.md');
+      fs.writeFileSync(implementer, fs.readFileSync(implementer, 'utf8').replace(/^overridable: .*\n/m, ''));
+      const dir = path.join(scratch('wf-render-out-'), 'team');
+      exportTemplate({ dir, from: repo });
+      const specOf = (name: string) => parse(fs.readFileSync(path.join(dir, `agents/${name}/agent.yaml`), 'utf8')).spec;
+      assert.deepEqual(specOf('reviewer').overridable, ['output', 'skills']);
+      assert.deepEqual(specOf('shipper').overridable, ['fence']);
+      assert.equal(Object.hasOwn(specOf('implementer'), 'overridable'), false, 'an agent with no line offers everything, and says none');
+      const { tree, out } = rendered(dir);
+      assert.deepEqual(out.refusals, []);
+      const agentFile = (name: string) => fs.readFileSync(path.join(tree, `workflows/agents/${name}.md`), 'utf8');
+      assert.match(agentFile('reviewer'), /^overridable: output, skills$/m);
+      assert.match(agentFile('shipper'), /^overridable: fence$/m);
+      assert.doesNotMatch(agentFile('implementer'), /^overridable:/m);
+      const fills = { factory: 'team', workflow: 'dev', agents: { implement: 'implementer', review: 'reviewer', ship: 'shipper' } };
+      assert.deepEqual(
+        stepsOf(loadWorkflows(path.join(tree, 'workflows', 'dev'), {}, fills)),
+        stepsOf(loadWorkflows(path.join(repo, 'workflows', 'dev'))),
+      );
+    },
+  );
   await t.test('a parameter is given where a document names it, and a default where no --set gives it', () => {
     const { dir } = exported();
     edit(dir, 'nemia.yaml', (spec) => {
@@ -171,6 +217,52 @@ test("what a render writes into a factory's tree, read back as today's folder re
     const { tree: other } = rendered(dir, ['budget=9', 'model=haiku']);
     assert.match(fs.readFileSync(path.join(other, 'workflows/agents/reviewer.md'), 'utf8'), /^model: haiku$/m);
   });
+  await t.test(
+    'a ${{ parameters.<name> }} is written with its value in a check, a step, an agent, NEMIA.md and RULES.md, and a carried file is left as it is',
+    () => {
+      const { dir } = exported();
+      const expression = '${{ parameters.c }}';
+      edit(dir, 'nemia.yaml', (spec) => {
+        spec.parameters = { c: { type: 'string', description: 'the check', default: 'ci' } };
+      });
+      edit(dir, 'workflows/dev/workflow.yaml', (spec) => {
+        spec.steps.find((step: { name: string }) => step.name === 'implement').check = `go --check ${expression}`;
+      });
+      const append = (file: string, words: string) => fs.appendFileSync(path.join(dir, file), words);
+      append('workflows/dev/review.md', `\nWait on ${expression}.\n`);
+      append('agents/reviewer/instructions.md', `\nRead ${expression}.\n`);
+      fs.writeFileSync(path.join(dir, 'RULES.md'), `A card waits on ${expression}.\n`);
+      fs.writeFileSync(path.join(dir, 'NEMIA.md'), `Operate on ${expression}.\n`);
+      const tool = `const check = '${expression}';\n`;
+      fs.writeFileSync(path.join(dir, 'workflows/dev/tool.ts'), tool);
+      const schemaFile = path.join(dir, 'agents/reviewer/output.schema.json');
+      const schema = fs.readFileSync(schemaFile, 'utf8').replace('{', `{ "$comment": "${expression}",`);
+      fs.writeFileSync(schemaFile, schema);
+      const { tree, out } = rendered(dir, ['c=checks']);
+      assert.deepEqual(out.refusals, []);
+      const at = (file: string) => fs.readFileSync(path.join(tree, file), 'utf8');
+      assert.match(at('workflows/dev/implement.md'), /^check: go --check checks$/m);
+      assert.match(at('workflows/dev/review.md'), /^Wait on checks\.$/m);
+      assert.match(at('workflows/agents/reviewer.md'), /^Read checks\.$/m);
+      assert.equal(at('RULES.md'), 'A card waits on checks.\n');
+      assert.equal(at('NEMIA.md'), 'Operate on checks.\n');
+      assert.ok(
+        out.copies.some((copy) => copy.path === 'workflows/dev/tool.ts'),
+        'the script is carried, never rendered',
+      );
+      assert.equal(
+        out.files.some((file) => file.path === 'workflows/dev/tool.ts'),
+        false,
+      );
+      assert.equal(at('workflows/dev/tool.ts'), tool);
+      assert.equal(at('workflows/agents/reviewer.schema.json'), schema, "an agent's schema is carried as it is");
+      assert.match(
+        fs.readFileSync(path.join(rendered(dir).tree, 'workflows/dev/implement.md'), 'utf8'),
+        /^check: go --check ci$/m,
+        'its default',
+      );
+    },
+  );
   await t.test(
     "a template's RULES.md, or its manifest's rules, is rendered as the tree's RULES.md; a template with neither renders none",
     () => {
@@ -234,6 +326,16 @@ test('what a render refuses by name, with nothing of it to write', async (t) => 
       spec.rules = '---\nmodel: opus\n---\n';
     });
     assert.match(renderFactory(openTemplate(dir), {}).refusals.join('\n'), /^RULES\.md opens with a frontmatter block/);
+  });
+  await t.test("REFUSED by name: a step's output.path outside its workflow's folder", () => {
+    const { dir } = exported();
+    edit(dir, 'workflows/dev/workflow.yaml', (spec) => {
+      spec.steps.find((step: { name: string }) => step.name === 'implement').output = { path: 'agents/implementer/output.schema.json' };
+    });
+    const out = renderFactory(openTemplate(dir), {});
+    assert.equal(out.refusals.length, 1, out.refusals.join('\n'));
+    assert.ok(out.refusals[0].startsWith('workflows/dev/workflow.yaml, step implement:'), out.refusals[0]);
+    assert.ok(out.refusals[0].includes('`output.path`'), out.refusals[0]);
   });
   await t.test("a harness's options, and a block of a harness it does not run on, are refused by name", () => {
     const { dir } = exported();

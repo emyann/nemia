@@ -11,10 +11,12 @@ import { runStore } from '../record/files.store.ts';
 import { tryOf } from '../summary/reads.verb.ts';
 import { judgedNow } from '../summary/summary.verb.ts';
 import { startRun } from '../start/start.verb.ts';
+import { StoreRoot } from '../config/root.store.ts';
 import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
 import { skillNamesIn } from '../agents/read.store.ts';
 import { agentRead, agentSkillsFound } from '../roster/roster.store.ts';
 import type { AgentReading } from '../roster/roster.ts';
+import type { SkillsFound } from '../agents/agents.ts';
 import { repoSkillsRefusal, untriedOf, yourAgentsDir } from './try.ts';
 import { tryFolder } from './try.store.ts';
 import { yourSkillsDir, yoursOnlyRefusal } from '../yours/yours.ts';
@@ -25,44 +27,55 @@ import { yourSkillsDir, yoursOnlyRefusal } from '../yours/yours.ts';
  */
 export type TryAsked = { who: string; from: string; name: string; brief: string; repo: string; home: string };
 
-/** The skills the agent `reading` gives that only the repository `repo` has: each its name and folder. None when no repository is named. */
-function repoOnlySkills(reading: AgentReading, repo: string, home: string): Array<{ name: string; dir: string }> {
+/**
+ * The skills the agent `reading` gives that only the repository `repo` has, each its name and folder, found where `found` says a start
+ * finds them. None when no repository is named.
+ */
+function repoOnlySkills(reading: AgentReading, repo: string, found: SkillsFound): Array<{ name: string; dir: string }> {
   if (!repo) return [];
   const theirs = [path.join(path.resolve(repo), '.claude', 'skills'), path.join(path.resolve(repo), 'workflows', 'skills')];
-  const found = agentSkillsFound(reading.dir, repo, home).at;
   return skillNamesIn(reading.source).flatMap((name) => {
-    const dir = found.get(name);
+    const dir = found.at.get(name);
     return typeof dir === 'string' && theirs.includes(path.dirname(path.resolve(dir))) ? [{ name, dir }] : [];
   });
 }
 
-/** The agent to try, read now, or the refusal of the brief, of an agent there is not, or of one that does not read or cannot be tried. */
-function triedAgent({ who, from, name, brief, repo, home }: TryAsked): AgentReading {
+/**
+ * The agent to try, read now through the Agent door, or the refusal of the brief, of an agent there is not, or of one that does not read
+ * or cannot be tried.
+ */
+const triedAgent = Effect.fnUntraced(function* ({ who, from, name, brief, repo, home }: TryAsked) {
   const where = yoursOnlyRefusal(who, 'agents', from, name, repo, home);
-  if (where) throw new Invalid({ message: where });
+  if (where) return yield* Effect.fail(new Invalid({ message: where }));
   if (!brief.trim()) {
-    throw new Invalid({
-      message: `The brief is empty, and a try asks the agent to do something. Write what it should do — a sentence is enough.`,
-    });
+    return yield* Effect.fail(
+      new Invalid({
+        message: `The brief is empty, and a try asks the agent to do something. Write what it should do — a sentence is enough.`,
+      }),
+    );
   }
   const dir = yourAgentsDir(home);
-  const reading = agentRead('yours', dir, name, { repo, home });
+  const reading = yield* agentRead('yours', dir, name, { repo, home });
   if (!reading) {
-    throw new Missing({
-      message: `Yours has no agent named '${name}' (${path.join(dir, `${name}.md`)}). nemia agents lists the agents there are.`,
-    });
+    return yield* Effect.fail(
+      new Missing({
+        message: `Yours has no agent named '${name}' (${path.join(dir, `${name}.md`)}). nemia agents lists the agents there are.`,
+      }),
+    );
   }
-  if (reading.error) throw new Invalid({ message: `${name} cannot be tried while its file does not read: ${reading.error}` });
+  if (reading.error)
+    return yield* Effect.fail(new Invalid({ message: `${name} cannot be tried while its file does not read: ${reading.error}` }));
   const untried = untriedOf({ ...reading, from: 'yours', schemaFile: reading.schema?.file ?? null }, home);
-  if (untried) throw new Invalid({ message: untried.why });
-  const theirs = repoSkillsRefusal(name, repoOnlySkills(reading, repo, home), yourSkillsDir(home));
-  if (theirs) throw new Invalid({ message: theirs });
+  if (untried) return yield* Effect.fail(new Invalid({ message: untried.why }));
+  const found = repo ? yield* agentSkillsFound(reading.dir, repo, home) : undefined;
+  const theirs = repoSkillsRefusal(name, found ? repoOnlySkills(reading, repo, found) : [], yourSkillsDir(home));
+  if (theirs) return yield* Effect.fail(new Invalid({ message: theirs }));
   return reading;
-}
+});
 
 /** The try asked (`TryAsked`) started: the run's id. Refuses, by kind, as the file's head says. */
 export const tryAgent = Effect.fnUntraced(function* (asked: TryAsked) {
-  const reading = yield* tried(() => triedAgent(asked));
+  const reading = yield* Effect.provideService(triedAgent(asked), StoreRoot, asked.home);
   const e = yield* EngineService;
   const tries = runStore.runs.list().filter((run) => tryOf(run, asked.home)?.agent === asked.name);
   const moving = (yield* judgedNow(e, asked.home, tries)).find((run) => run.moving);
@@ -74,6 +87,6 @@ export const tryAgent = Effect.fnUntraced(function* (asked: TryAsked) {
     );
   }
   const workflowDir = yield* tried(() => tryFolder(asked.name, reading.version, reading.keys, asked.home));
-  const run = yield* startRun({ brief: asked.brief.trim(), repo: '', workflowDir });
+  const run = yield* Effect.provideService(startRun({ brief: asked.brief.trim(), repo: '', workflowDir }), StoreRoot, asked.home);
   return { id: run.id };
 });

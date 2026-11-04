@@ -39,16 +39,16 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     strategy:
-      # Every leg runs: one package's failure on one node says nothing about the other eleven.
+      # Every leg runs: one package's failure on one node says nothing about the other fifteen.
       fail-fast: false
       matrix:
         # The orchestrator is not here: its suite is run in halves, and a matrix cannot split one combination, so its four legs arrive
         # through include below.
-        workspace: [agent-runtime, api, web, docs]
+        workspace: [agent-runtime, api, cli, web, docs, templates]
         # Quoted, both of them: YAML reads 24.16 as a number and setup-node then installs the wrong Node. 24.16.0 is the floor
         # engines.node claims; 24 is its line's latest.
         node: ['24.16.0', '24']
-        # The orchestrator's suite is the longest of the five (766 s for its leg's two passes, measured over 8 ci runs on 2026-10-21),
+        # The orchestrator's suite is the longest of the seven (766 s for its leg's two passes, measured over 8 ci runs on 2026-10-21),
         # so it runs in two halves. An include entry whose workspace the axis above does not name cannot be added to a combination, so
         # GitHub makes a leg of its own of it: four legs here, two nodes by two halves. Each half is named <i>/2, which is what
         # node --test-shard takes, and the fractions must tile 1..n of n or a half of the suite is run by nobody.
@@ -140,7 +140,10 @@ jobs:
 
   contracts:
     # The contracts under each package's contracts/, verified by tsverify (npm run contracts): any law or obligation not proved,
-    # or a contract it cannot read, exits 1. A verdict is decided by the solver's work, not the clock, so one leg on the floor is enough.
+    # or a contract it cannot read, exits 1. One leg on the floor, though a verdict is not yet the same on every run: a law near the
+    # solver's work limit can be proved on one run and stop "canceled" on the next, the first item of tsverify's roadmap ("The same
+    # verdict on every run", its docs/roadmap.md). So every law a contract here keeps is one proved on each of three runs of
+    # npm run contracts, without --cache; and the verdict cache below keeps a proof until a file it is keyed by changes.
     runs-on: ubuntu-latest
     timeout-minutes: 35
     steps:
@@ -209,7 +212,7 @@ jobs:
           WF_ARTIFACTS: ${{ github.workspace }}/.e2e
       - name: Upload this shard's page times
         # On a pass alone: run.ts writes the file after the pages passed, so a failing shard has none to upload — and the bound job
-        # below then names that shard and the command to run again, rather than summing less than the whole silently. if-no-files-found:
+        # below then names that shard as failed or cancelled, rather than summing less than the whole silently. if-no-files-found:
         # error — a shard that passed and wrote no times is a broken runner, not a quiet success.
         if: success()
         uses: actions/upload-artifact@v7
@@ -239,8 +242,8 @@ jobs:
     needs: [e2e]
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    # Whatever the shards did: a shard that failed still uploaded its times, and this job names a shard that wrote none rather than
-    # summing less than the whole.
+    # Whatever the shards did: a shard that failed or was cancelled uploaded no times (the upload above is on a pass alone), so this job
+    # names each such shard as failed or cancelled, its own failure being the verdict, rather than summing less than the whole.
     if: always()
     steps:
       - uses: actions/checkout@v7
@@ -466,7 +469,7 @@ jobs:
           fi
 
   guards:
-    # The repository's own guards (tools/guards): tests of this file, the docs and the workflows, run only when the push or the pull
+    # The repository's own guards (tools/guards): tests of this file, the docs and the skills, run only when the push or the pull
     # request touched what they read — the guards#test inputs in turbo.json, or a workspace they depend on — which due.ts decides.
     # The job runs on every event and its suite step alone is skipped: a skipped step leaves the job success, so the gate's whitelist
     # below stands. A workflow-level paths: would skip the whole of ci, the gate with it, and its required context would never report.

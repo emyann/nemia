@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { decisionQuery, type RunDetail } from '../lib/api';
+import { decisionQuery } from '../lib/api';
+import type { RunView, StepView } from '../lib/runView';
 import { askedIn, needOf, stepAnchor } from '../lib/asks';
 import { decidableRun, decisionStamp, isDecidable } from '../lib/decide';
 import { gateBrief, gateFacts, gateOfStep, needWords } from '../lib/gate';
@@ -11,7 +12,7 @@ import { Gate } from './Gate';
 import { Markdown } from './Markdown';
 import { StepPolicy } from './Told';
 
-type Step = RunDetail['steps'][number];
+type Step = StepView;
 
 /**
  * What a run asks of a person at this step, first in its inspector, above everything else: at a gate, which step waits, what approving does
@@ -19,7 +20,7 @@ type Step = RunDetail['steps'][number];
  * blocked session, what is asked and a link to the run's page where it is answered; for a result nobody decided, the same, on whichever
  * step is open. Nothing where the run waits on nobody.
  */
-export function Asked({ run, step }: { run: RunDetail; step: Step }) {
+export function Asked({ run, step }: { run: RunView; step: Step }) {
   const gate = gateOfStep(run, step);
   if (gate) return <GateBrief run={run} step={step} />;
   const need = needOf(step, run.waitingOnYou.includes(step.name), run.cancelledAt !== null);
@@ -42,7 +43,7 @@ export function Asked({ run, step }: { run: RunDetail; step: Step }) {
  * state of the run, as the run page's Decide section does — what it touched, and whether each branch still merges onto the base — on the
  * detail the inspector has, never on the list the Factory polls.
  */
-function GateBrief({ run, step }: { run: RunDetail; step: Step }) {
+function GateBrief({ run, step }: { run: RunView; step: Step }) {
   const gate = gateOfStep(run, step)!;
   const next = run.graph.edges.filter((e) => e.kind === 'after' && e.from === step.name).map((e) => e.to);
   const says = run.toDecide?.kind === 'approve' && run.toDecide.step === step.name ? run.toDecide.says : null;
@@ -95,7 +96,7 @@ function Waits({
   said,
   children,
 }: {
-  run: RunDetail;
+  run: RunView;
   anchor: string | null;
   kind: string;
   said?: string;

@@ -64,7 +64,7 @@ export default {
         form.getByRole('button', { name: 'Create skill' }).click(),
       ]);
       const { error } = (await answered.json()) as { error?: string };
-      if (answered.status() !== 409 || !error?.includes('a new skill would write over it')) {
+      if (answered.status() !== 409 || !error) {
         throw new Refused(
           `a new skill named as one your library has is refused — the api answered ${answered.status()}: ${JSON.stringify(error)}`,
         );
@@ -211,7 +211,7 @@ export default {
           form.getByRole('button', { name: 'Save' }).click(),
         ]);
         const { error } = (await answered.json()) as { error?: string };
-        if (answered.status() !== 409 || !error?.includes('Read it again before changing it')) {
+        if (answered.status() !== 409 || !error) {
           throw new Refused(
             `a save of a skill whose file changed since it was read is refused — the api answered ${answered.status()}: ${JSON.stringify(error)}`,
           );

@@ -52,9 +52,13 @@ const {
 } = await import('../src/runner.ts');
 const runWith = runOver(runEngine, gitPlaceLayer);
 const runPlaced = runGiven(gitPlaceLayer);
-const { acceptFile, askFile, asksDir, pruneFile, readAsks, readRun, roundAskFile, stepsOf } = await import('../src/record/record.store.ts');
+const { acceptFile, askFile, asksDir, pruneFile, readAsks, readRun, roundAskFile } = await import('../src/record/record.store.ts');
+const { stepsNow: stepsOf } = await import('./steps-now.ts');
 const { passRead } = await import('../src/cap/cap.verb.ts');
 const { passRevisions } = await import('../src/revisions/pin.verb.ts');
+const { StoreRoot } = await import('../src/config/root.store.ts');
+/** A pass's reader of what a resolve reads, made at this file's store. */
+const aPassRevisions = () => Effect.runSync(passRevisions().pipe(Effect.provideService(StoreRoot, ROOT)));
 const { checkoutHold } = await import('../src/ending/ending.verb.ts');
 const { passParents, reportedEngine } = await import('../src/views/views.verb.ts');
 const { metered } = await import('../src/meter/tally.store.ts');
@@ -265,7 +269,7 @@ row(ONCE, "a pass reads each task's view once, and once more after a write of th
 
 row(ONCE, "the cap's slots are read once for the pass, however many claims ask", async () => {
   const { b } = await theStore();
-  const read = passRead(b.e, runStore.runs.list(), process.env, NOTHING_READ);
+  const read = passRead(b.e, runStore.runs.list(), process.env, NOTHING_READ, aPassRevisions());
   b.lists.calls = 0;
   const first = await Effect.runPromise(read.slots);
   const second = await Effect.runPromise(read.slots);
@@ -320,7 +324,7 @@ row(ONCE, "a run's own claim on the checkout reads the slot its pass gave it, an
           slots,
           parents: passParents(standingReader(NOTHING_READ)),
           standing: NOTHING_READ,
-          revisions: passRevisions(),
+          revisions: aPassRevisions(),
         },
         slot: undefined,
       },

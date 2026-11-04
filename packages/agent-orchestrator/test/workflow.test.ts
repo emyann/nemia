@@ -10,7 +10,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fansOut, parseWorkflow, WorkflowError } from '../src/workflow.ts';
-import { loadWorkflows, workflowDescription, workflowFolder, workflowReadme } from '../src/folder/folder.store.ts';
+import { workflowDescription, workflowFolder, workflowReadme } from '../src/folder/folder.store.ts';
+import { loadWorkflows } from '../src/workflows/workflows.store.ts';
 import { CLOSEOUT_FIELDS, outputFields, STEP_KEY_MEANINGS, STEP_KEYS, type StepKey } from '../src/workflow.ts';
 import { agentsDir, parseFolder, renderStep, type StepDraft } from '../src/workflow.ts';
 import { skillsFor } from '../src/skills/read.store.ts';
@@ -28,9 +29,9 @@ import {
 import { formerKeyLines } from '../src/folder/folder.store.ts';
 import { Schema } from 'effect';
 import { WorkflowDir } from '../src/folder/folder.model.ts';
-import { baseLine, formerFenceLine, formerFormLine, placeLine } from '../src/former/former.ts';
+import { baseLine, formerFenceLine, placeLine } from '../src/former/former.ts';
 import { scratch } from './scratch.ts';
-import { placesOf, shippedFolders, TEAM_DEV, teamCopy } from './team.ts';
+import { TEAM_DEV, teamCopy } from './team.ts';
 
 /**
  * That `message` opens on `at` — the step or file it is about — and names each of `named`: the line as written, and the key, line or
@@ -248,10 +249,10 @@ test('every key a step has is read — none is accepted and then dropped', () =>
   assert.equal(
     attached.agent?.name,
     'implementer',
-    'agent: names an agent the step is resolved with, and test/agents.test.ts reads it too',
+    'agent: names an agent the step is resolved with, and src/agents/agents.test.ts reads it too',
   );
   assert.deepEqual(attached.skills, ['look'], 'skills: is read on a step with an agent, and test/step-skills.test.ts reads it too');
-  assert.deepEqual(attached.mcp, ['docs'], 'mcp: is read on a step with an agent, and test/agent-mcp.test.ts reads it too');
+  assert.deepEqual(attached.mcp, ['docs'], 'mcp: is read on a step with an agent, and src/agents/agents.test.ts reads it too');
   const fenced = fm('review', 'harness: codex\nsandbox: read-only');
   assert.equal(fenced.sandbox, 'read-only', "sandbox: is read on a step of its own: it is Codex's, and the step above runs on Claude Code");
   const all = {
@@ -608,6 +609,28 @@ test("`workflowFolder`: a path from where it is written first, then a name under
     });
 });
 
+test('a folder whose step or agent is in the former line form does not load: refused naming the file and its line', async (t) => {
+  for (const [row, files, file, line] of [
+    ['a step', { 'team/write.md': '---\nplace: git\ncheck: { npm test; npm run lint: x; }\n---\nWrite.\n' }, 'write', 3],
+    [
+      'an agent a step names',
+      {
+        'team/write.md': '---\nplace: git\nagent: writer\n---\nWrite.\n',
+        'agents/writer.md': '---\nmodel: opus\ndisallowedTools: Bash(echo a: b)\n---\nWrite.\n',
+      },
+      'agents/writer.md',
+      3,
+    ],
+  ] as const)
+    await t.test(row, () => {
+      const root = folder(files);
+      assert.throws(
+        () => loadWorkflows(path.join(root, 'team')),
+        (e: unknown) => e instanceof WorkflowError && e.exitCode === 2 && e.message.includes(`${file}:${line}:`),
+      );
+    });
+});
+
 test('`nemia start` is told which files of a folder still say a former line, which reads as it did — and nothing of one on the new', async (t) => {
   const rows: Array<[row: string, files: Record<string, string>, dir: string, lines: (root: string, dir: string) => string[]]> = [
     [
@@ -631,18 +654,14 @@ test('`nemia start` is told which files of a folder still say a former line, whi
       () => [],
     ],
     [
-      'the former line form, and the fence keys at the top',
+      'the fence keys at the top',
       {
-        'team/write.md': '---\nplace: git\nagent: writer\ncheck: { npm test; npm run lint: x; }\n---\nWrite.\n',
+        'team/write.md': '---\nplace: git\nagent: writer\ncheck: "{ npm test; npm run lint: x; }"\n---\nWrite.\n',
         'team/review.md': '---\nafter: write\nplace: git\ncheck: "npm test # all of it"\n---\nReview.\n',
-        'agents/writer.md': '---\nmodel: opus\noverridable: model\ndisallowedTools: Bash(git push:*), Bash(echo a: b)\n---\nWrite.\n',
+        'agents/writer.md': '---\nmodel: opus\noverridable: model\ndisallowedTools: "Bash(git push:*), Bash(echo a: b)"\n---\nWrite.\n',
       },
       'team',
-      (root, dir) => [
-        formerFormLine(path.join(dir, 'write.md')),
-        formerFormLine(path.join(root, 'agents', 'writer.md')),
-        formerFenceLine(path.join(root, 'agents', 'writer.md'), 'disallowedTools'),
-      ],
+      (root) => [formerFenceLine(path.join(root, 'agents', 'writer.md'), 'disallowedTools')],
     ],
     [
       'systemPrompt: an agent a step names, and not one on harnessPrompt or one nobody names',
@@ -704,16 +723,15 @@ test('`nemia start` is told which files of a folder still say a former line, whi
       assert.deepEqual(formerKeyLines(dir), lines(root, dir));
     });
   await t.test('the files a line is about, and what it names', () => {
-    assert.deepEqual(formerKeysIn('---\nallow: Edit(**)\n# disallow: Bash\n  disallow : SendMessage\n---\nallow: is in the body\n'), [
+    assert.deepEqual(formerKeysIn('---\nallow: Edit(**)\n# disallow: Bash\ndisallow : SendMessage\n---\nallow: is in the body\n'), [
       'allow',
       'disallow',
     ]);
     assert.deepEqual(formerKeysIn('no frontmatter\nallow: x\n'), []);
     assert.deepEqual(formerKeyLines(path.join(scratch('wf-none-'), 'nope')), [], 'no folder: nothing to say');
-    assert.match(formerFormLine('w/write.md'), /^w\/write\.md: /);
     assert.ok(baseLine('w/ship.md').includes('`workspace: base`'));
     const [write, review] = loadWorkflows(path.join(folder(rows[2][1]), 'team'));
-    assert.equal(write.check, '{ npm test; npm run lint: x; }', 'a former line reads as the rest of the line, as it did');
+    assert.equal(write.check, '{ npm test; npm run lint: x; }', 'a quoted value reads as written');
     assert.equal(review.check, 'npm test # all of it', 'a quoted value is YAML');
   });
 });
@@ -795,11 +813,10 @@ const readIn =
     }
   };
 
-/** Every workflow folder there is to read: whatever is shipped (`team.ts`), the tests' team's `dev`, and the examples. */
+/** Every workflow folder there is to read: the tests' team's `dev`, and the package's examples. */
 const everyFolder = (): string[] => {
   const examples = path.join(import.meta.dirname, '..', 'wf-examples');
   return [
-    ...shippedFolders(),
     TEAM_DEV,
     ...fs
       .readdirSync(examples)
@@ -813,7 +830,7 @@ test('`renderStep` is the parser run backwards: every step of every folder there
   const root = path.dirname(TEAM_DEV);
   assert.ok(folders.length > 1, `the team and the examples are read: ${folders.join(', ')}`);
   for (const dir of folders) {
-    const steps = loadWorkflows(dir, placesOf(dir));
+    const steps = loadWorkflows(dir);
     const read = readIn(dir);
     const agents = loadAgents(agentsDir(dir));
     for (const step of steps) {
@@ -830,7 +847,7 @@ test('`renderStep` is the parser run backwards: every step of every folder there
         steps.map((step) => [step.name, renderStep(step)]),
         read,
         agents,
-        skillsFor(dir, placesOf(dir)),
+        skillsFor(dir),
       ),
       steps,
       dir,

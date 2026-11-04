@@ -395,7 +395,7 @@ const workFiled = (run: Run, steps: readonly Workflow[]): string =>
  *
  * `git` is the request's reader (`standingReader`, off `standing.json`). `asked`, where given, is told what was read of — the branches not
  * on the base, which only their tips can move, a branch on the base staying there as `onTheBase` has it; and whether a branch was unread or
- * the read failed (`failed`) — which is what the list's memo of runs at rest watches (`RestingMemo`).
+ * the read failed (`failed`) — which is what the informer of each run's judgement watches (`InformerMemo`).
  */
 export function standingsOf(
   run: Run,

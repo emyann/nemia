@@ -73,8 +73,13 @@ const wordsOf =
       ? `${route} takes a JSON object: ${shape}.`
       : `${route}: \`${key}\` is a string with something in it, and this request's was ${JSON.stringify(input)}. Send ${shape}.`;
 
-/** How her chat reads the runs that wait on the person: as the board's list does, off the app's memo. */
-const readsOf = ({ home, memo, env }: Served): ChatReads => ({ home, runs: memo.resting, filings: memo.filings, env });
+/** How her chat reads the runs that wait on the person: as the board's list does, off the app's informer. */
+const readsOf = ({ home, memo, informer, env }: Served): ChatReads => ({
+  home,
+  ...(informer ? { runs: informer } : {}),
+  filings: memo.filings,
+  env,
+});
 
 /** One read's changes written to `stream`: the presence where it changed since `shown`, then each event, the cursor on the last. */
 async function sent(stream: SSEStreamingApi, read: ChatChanges, shown: string): Promise<string> {
@@ -120,14 +125,14 @@ export const nemiaChat = new Hono<ApiEnv>()
     served(c, async (s) => {
       const limit = c.req.query('limit');
       const page = { before: c.req.query('before') || undefined, ...(limit ? { limit: Number(limit) } : {}) };
-      return c.json(await runPlaced(s.placeService, s.e, chatHistory(nemiaChatPlace(), page, readsOf(s))));
+      return c.json(await runPlaced(s, s.e, chatHistory(nemiaChatPlace(), page, readsOf(s))));
     }),
   )
   .get('/api/nemia/chat/stream', (c) =>
     served(c, async (s) => {
       const place = nemiaChatPlace();
       const after = c.req.header('Last-Event-ID') || c.req.query('after') || undefined;
-      const first = await runPlaced(s.placeService, s.e, chatSince(place, after, readsOf(s)));
+      const first = await runPlaced(s, s.e, chatSince(place, after, readsOf(s)));
       return streamSSE(c, async (stream) => {
         let read = first;
         let shown = '';
@@ -137,7 +142,7 @@ export const nemiaChat = new Hono<ApiEnv>()
           await stream.sleep(s.beats.chat ?? CHAT_BEAT_MS);
           if (stream.aborted) break;
           try {
-            read = await runPlaced(s.placeService, s.e, chatSince(nemiaChatPlace(), read.cursor, readsOf(s)));
+            read = await runPlaced(s, s.e, chatSince(nemiaChatPlace(), read.cursor, readsOf(s)));
             if (unread) {
               unread = false;
               await stream.writeSSE({ event: 'readable', data: '{}' });
@@ -164,7 +169,7 @@ export const nemiaChat = new Hono<ApiEnv>()
       if (refused) return c.json({ error: refused.error }, refused.status);
       const read = await readBody(c.req, SEND_BODY, `${route} takes a JSON body: ${SEND_SHAPE}.`, wordsOf(route, 'text', SEND_SHAPE));
       if ('status' in read) return c.json({ error: read.error }, read.status);
-      return c.json(await runPlaced(s.placeService, s.e, chatSay(nemiaChatPlace(), read.body.text)), 201);
+      return c.json(await runPlaced(s, s.e, chatSay(nemiaChatPlace(), read.body.text)), 201);
     }),
   )
   .post('/api/nemia/chat/stop', (c) =>
@@ -177,7 +182,7 @@ export const nemiaChat = new Hono<ApiEnv>()
         c.req.header('content-type'),
       );
       if (refused) return c.json({ error: refused.error }, refused.status);
-      return c.json(await runPlaced(s.placeService, s.e, chatStop(nemiaChatPlace())));
+      return c.json(await runPlaced(s, s.e, chatStop(nemiaChatPlace())));
     }),
   )
   .post('/api/nemia/chat/answer', (c) =>
@@ -192,7 +197,7 @@ export const nemiaChat = new Hono<ApiEnv>()
       if (refused) return c.json({ error: refused.error }, refused.status);
       const read = await readBody(c.req, ANSWER_BODY, `${route} takes a JSON body: ${ANSWER_SHAPE}.`, wordsOf(route, 'id', ANSWER_SHAPE));
       if ('status' in read) return c.json({ error: read.error }, read.status);
-      return c.json(await runPlaced(s.placeService, s.e, chatAnswer(nemiaChatPlace(), read.body)));
+      return c.json(await runPlaced(s, s.e, chatAnswer(nemiaChatPlace(), read.body)));
     }),
   )
   .post('/api/nemia/chat/read', (c) =>
@@ -207,6 +212,6 @@ export const nemiaChat = new Hono<ApiEnv>()
       if (refused) return c.json({ error: refused.error }, refused.status);
       const read = await readBody(c.req, READ_BODY, `${route} takes a JSON body: ${READ_SHAPE}.`, wordsOf(route, 'through', READ_SHAPE));
       if ('status' in read) return c.json({ error: read.error }, read.status);
-      return c.json(await runPlaced(s.placeService, s.e, chatRead(nemiaChatPlace(), read.body.through)));
+      return c.json(await runPlaced(s, s.e, chatRead(nemiaChatPlace(), read.body.through)));
     }),
   );

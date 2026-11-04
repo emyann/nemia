@@ -257,10 +257,11 @@ export default {
       cardOf(page, running.id).locator(`time[title*="${DIAMOND.words.running}"]`, { hasText: /^\d+m \d{2}s at work$/ }),
       `${running.id}'s card counts its time at work from its first filing, and says on hover that it ${DIAMOND.words.running}`,
     );
-    const times = (await (await page.request.get(new URL(`/api/runs/${running.id}`, page.url()).href)).json()) as {
-      createdAt: string;
-      startedAt: string | null;
+    const object = (await (await page.request.get(new URL(`/api/runs/${running.id}`, page.url()).href)).json()) as {
+      metadata: { creationTimestamp: string };
+      status: { startedAt: string | null };
     };
+    const times = { createdAt: object.metadata.creationTimestamp, startedAt: object.status.startedAt };
     if (!times.startedAt || Date.parse(times.startedAt) - Date.parse(times.createdAt) !== 60_000) {
       throw new Refused(
         `${running.id} was seeded filed a minute after it was created; the api says created ${times.createdAt}, started ${times.startedAt}`,

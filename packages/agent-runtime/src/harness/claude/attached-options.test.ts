@@ -101,7 +101,7 @@ test('attachedOptions: a rich task is fenced on the SDK’s own options, each fa
   await s.test('every deny, allow, tool and added folder of the task is in the options, a mount an edit denied or allowed under it', () => {
     assert.deepEqual(given.disallowedTools, ['Bash(git push:*)', 'WebFetch', 'Edit(//ro/**)']);
     assert.deepEqual(given.allowedTools, ['Edit(**)', 'Bash(npm test)', 'Edit(//rw/**)']);
-    assert.deepEqual(given.tools, ['Read', 'Bash']);
+    assert.deepEqual(given.tools, ['Read', 'Bash', 'ToolSearch'], 'a closed list with servers, given the tool that defers theirs');
     assert.deepEqual(given.additionalDirectories, ['/ro', '/rw']);
   });
 
@@ -120,7 +120,7 @@ test('attachedOptions: a rich task is fenced on the SDK’s own options, each fa
     );
     assert.deepEqual(
       given.settings,
-      { env: {}, autoMemoryEnabled: false, autoCompactWindow: 200_000 },
+      { env: {}, autoMemoryEnabled: false, claudeMdExcludes: ['**/node_modules/**/CLAUDE.md'], autoCompactWindow: 200_000 },
       "the task's settings, on the SDK's own option, auto-memory off and the window in them",
     );
     assert.deepEqual(given.plugins, [{ type: 'local', path: path.resolve(CWD, 'plug') }]);
@@ -183,6 +183,26 @@ const ROWS: { name: string; check: () => void }[] = [
       for (const open of [RICH, { ...RICH, config: { ...RICH.config, enabledSkills: 'default' as const } }]) {
         assert.equal(Object.hasOwn(attachedOptions(open), 'skills'), false, "left out, which is Claude Code's own set, never 'all'");
       }
+    },
+  },
+  {
+    name: 'a closed tool list is given ToolSearch only where the session has a server, once, and no list is left no list',
+    check: () => {
+      const bare = scratch('ae-attached-options-tools-');
+      const unserved = { name: 'ae/t/1', brief: 'work', cwd: bare };
+      assert.deepEqual(attachedOptions({ ...unserved, config: { tools: ['Read'] } }).tools, ['Read'], 'no server: nothing to defer');
+      assert.deepEqual(
+        attachedOptions({ ...RICH, config: { ...RICH.config, tools: ['ToolSearch', 'Read'] } }).tools,
+        ['ToolSearch', 'Read'],
+        'a list that names it already is left as it is',
+      );
+      const open = attachedOptions({ ...RICH, config: { ...RICH.config, tools: undefined } });
+      assert.equal(Object.hasOwn(open, 'tools'), false, "no list is Claude Code's own set, which has ToolSearch already");
+      assert.deepEqual(
+        attachedOptions({ ...RICH, config: { ...RICH.config, disallowedTools: ['ToolSearch'] } }).disallowedTools,
+        ['ToolSearch', 'Edit(//ro/**)'],
+        'a task that denies it keeps its deny, which wins over the list',
+      );
     },
   },
   {

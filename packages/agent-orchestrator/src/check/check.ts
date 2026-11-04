@@ -32,11 +32,11 @@ import { endsOnBase, type Workflow } from '../step/step.ts';
  *
  * A guard against a hang, not a budget, so it is set well above the slowest round check: the pictures, the probe, the push of the round's
  * commit, the typecheck, the lint, and last the wait on
- * GitHub's `ci` context, which carries a bound of its own (`WHOLE_SECONDS`, 2400 s in `workflows/build/pull-request.ts`) so that a red or
- * missing verdict comes back as the script's refusal in words — the Actions URL, the failing jobs, the retry line — and not as a check
- * this deadline killed. So the number is above the clauses before the wait plus the wait itself: with 3300 those clauses have 900 s, which
- * `pull-request.boundary.test.ts` holds against the script's number. The suite, the types, the lint, the whole e2e and the build run in
- * `ci`, on the pushed commit, and no longer here.
+ * GitHub's `ci` context, which carries a bound of its own (`WHOLE_SECONDS`, 2400 s in the `pull-request.ts` of the sdlc template's build)
+ * so that a red or missing verdict comes back as the script's refusal in words — the Actions URL, the failing jobs, the retry line — and
+ * not as a check this deadline killed. So the number is above the clauses before the wait plus the wait itself: with 3300 those clauses
+ * have 900 s, which the templates' `pull-request.boundary.test.ts` holds against the script's number. The suite, the types, the lint,
+ * the whole e2e and the build run in `ci`, on the pushed commit, and no longer here.
  *
  * The history of the figure, which is where 3300 comes from and the only measurement anyone has made of it: it was measured from the
  * round checks' journals while the check still ran the suite and the e2e itself, and ran a mutant trial per rule a closeout named,
@@ -93,17 +93,23 @@ export type CheckEnv = {
   WF_ARTIFACTS: string;
   /** The judged step's closeout, flat, as a JSON file: absent where the step signed off none. */
   WF_CLOSEOUT?: string;
+  /**
+   * The run's own copy of its workflow folder (`workflowFilesDir`), its files at their paths from the folder, as the run took them at
+   * start or at its last move of pins: absent only where the record names no copy, a run started before the copy was taken.
+   */
+  WF_WORKFLOW_FILES?: string;
 };
 
 /**
  * What a step's check is told (`CheckEnv`): its run, its step, the workspace it judges and the step's artifacts folder (`t.files`), the
- * run's base commit where the step works on a branch of a repository run, and the file of the step's closeout (`t.closeout`) where it
- * signed off one.
+ * run's base commit where the step works on a branch of a repository run, the file of the step's closeout (`t.closeout`) where it
+ * signed off one, and the run's copy of its workflow folder (`t.workflowFiles`) wherever the record names one — a repository run's step
+ * and ending and a folder run's alike.
  */
 export const checkEnvOf = (
   run: Run,
   step: Pick<Workflow, 'name' | 'workspace'>,
-  t: { workspace: string; files: string; closeout: string | undefined },
+  t: { workspace: string; files: string; closeout: string | undefined; workflowFiles?: string },
 ): CheckEnv => ({
   WF_RUN: run.id,
   WF_STEP: step.name,
@@ -111,6 +117,7 @@ export const checkEnvOf = (
   WF_WORKSPACE: t.workspace,
   WF_ARTIFACTS: t.files,
   ...(t.closeout ? { WF_CLOSEOUT: t.closeout } : {}),
+  ...(t.workflowFiles ? { WF_WORKFLOW_FILES: t.workflowFiles } : {}),
 });
 
 /**

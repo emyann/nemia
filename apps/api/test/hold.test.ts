@@ -19,7 +19,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import type { RunDecision } from '../src/decide/decision.ts';
-import type { RunDetail } from '../src/detail/detail.ts';
+import type { RunAnswer } from '../src/runs/runs.ts';
 import { app } from '../src/app.ts';
 import {
   decideRun,
@@ -35,6 +35,7 @@ import {
   unhold,
 } from 'agent-orchestrator';
 import { runWith } from './builtin-place.ts';
+import { objectOf } from './run-reads.ts';
 
 type Wait = import('agent-orchestrator').Wait;
 
@@ -245,11 +246,8 @@ const listed = async (): Promise<Map<string, RunSummary>> => {
   assert.equal(res.status, 200);
   return new Map(((await res.json()) as RunSummary[]).map((r) => [r.id, r]));
 };
-const detail = async (id: string): Promise<RunDetail> => {
-  const res = await app.request(`/api/runs/${id}`);
-  assert.equal(res.status, 200);
-  return (await res.json()) as RunDetail;
-};
+/** The run object's `status` (`GET /api/runs/:id`, a 200 or it throws): its hold, its steps and what waits on you. */
+const detail = async (id: string): Promise<RunAnswer['status']> => (await objectOf(app, id)).status;
 const decisionOf = async (id: string) => {
   const res = await app.request(`/api/runs/${id}/decision`);
   assert.equal(res.status, 200);
@@ -309,9 +307,9 @@ test('a person holds a run until another lands: the list, the page and the decis
           cli.steps.map((s) => [s.name, s.message, s.note ?? null]),
           `${id}: each step as nemia ls words it`,
         );
-        const page = await detail(id);
+        const status = await detail(id);
         assert.deepEqual(
-          { holdUntil: page.holdUntil, holding: page.holding, moving: page.moving },
+          { holdUntil: status.holdUntil, holding: status.holding, moving: status.moving },
           { holdUntil: api.holdUntil, holding: api.holding, moving: api.moving },
           id,
         );
@@ -338,10 +336,10 @@ test('a person holds a run until another lands: the list, the page and the decis
       for (const id of HELD) {
         const api = runs.get(id)!;
         assert.deepEqual([api.waitingOnYou, api.waitingOnYouWords, api.toDecide], [[], [], null], id);
-        const page = await detail(id);
+        const status = await detail(id);
         assert.deepEqual(
-          page.steps.map((s) => [s.approve, s.raise, s.asked]),
-          page.steps.map(() => [null, null, null]),
+          status.steps.map((s) => [s.approve, s.raise, s.asked]),
+          status.steps.map(() => [null, null, null]),
           id,
         );
         assert.doesNotMatch(JSON.stringify(api.steps.map((s) => s.note)), VERBS, id);
@@ -366,8 +364,8 @@ test('a person holds a run until another lands: the list, the page and the decis
           write(holdFile(id), hold);
         }
       }
-      const page = await detail(BUDGET);
-      assert.equal(page.steps[0].message, 'over budget $1.50 of $1');
+      const status = await detail(BUDGET);
+      assert.equal(status.steps[0].message, 'over budget $1.50 of $1');
     },
   );
   await s.test(
@@ -415,9 +413,9 @@ test('a person holds a run until another lands: the list, the page and the decis
       assert.deepEqual(said.decision, { kind: 'running', waiting: [] });
       assert.doesNotMatch(said.overBudgetLine ?? '', /waiting on you/);
       assert.doesNotMatch(said.overBudgetLine ?? '', VERBS);
-      const page = await detail(BUDGET);
-      assert.equal(page.steps[0].raise, null);
-      assert.deepEqual(page.waitingOnYou, []);
+      const status = await detail(BUDGET);
+      assert.equal(status.steps[0].raise, null);
+      assert.deepEqual(status.waitingOnYou, []);
     },
   );
   await s.test(
@@ -480,15 +478,15 @@ test('a person holds a run until another lands: the list, the page and the decis
       const ask = path.join(root, 'runs', `${BLOCKS}.asks`, 'retry-implement-2');
       write(ask, JSON.stringify({ mode: 'continue' }));
       try {
-        const page = await detail(BLOCKS);
+        const status = await detail(BLOCKS);
         assert.equal(
-          page.steps.find((s) => s.name === 'implement')!.asked,
+          status.steps.find((s) => s.name === 'implement')!.asked,
           null,
           'a try asked by hand beside the verb that refuses it is not asked yet',
         );
-        assert.deepEqual(page.waitingOnYou, []);
-        assert.equal(page.moving, true, 'it is filed once the hold lifts, so the run moves while it may');
-        assert.deepEqual(await decisionOf(BLOCKS), { holding: page.holding });
+        assert.deepEqual(status.waitingOnYou, []);
+        assert.equal(status.moving, true, 'it is filed once the hold lifts, so the run moves while it may');
+        assert.deepEqual(await decisionOf(BLOCKS), { holding: status.holding });
         holdOn(BLOCKS, ['no-such-run']);
         assert.equal((await detail(BLOCKS)).moving, false, 'on a hold only a person lifts, it does not');
       } finally {
@@ -500,8 +498,8 @@ test('a person holds a run until another lands: the list, the page and the decis
   await s.test('a held run called off reads as called off: no hold, nothing waiting on you, and nothing to decide', async () => {
     const run = (await listed()).get(CANCELLED)!;
     assert.deepEqual([run.status, run.holdUntil, run.holding, run.waitingOnYou, run.moving], ['cancelled', [], null, [], false]);
-    const page = await detail(CANCELLED);
-    assert.deepEqual([page.holdUntil, page.holding], [[], null]);
+    const status = await detail(CANCELLED);
+    assert.deepEqual([status.holdUntil, status.holding], [[], null]);
     assert.deepEqual(await decisionOf(CANCELLED), { nothing: `cancelled at ${at(40)} — nothing to decide` });
     assert.equal((await runWith(engine(), list(engine(), runStore.runs.read(CANCELLED)))).holding, undefined);
   });
@@ -583,9 +581,9 @@ test('a hold lifted on the board is lifted as `nemia hold --off` lifts it, a han
       assert.equal(fs.existsSync(holdFile(LIFT)), false);
       const run = (await listed()).get(LIFT)!;
       assert.deepEqual([run.holdUntil, run.holding, run.waitingOnYouWords], [[], null, ['approve plan']]);
-      const page = await detail(LIFT);
-      assert.deepEqual([page.holdUntil, page.holding], [[], null]);
-      assert.equal(page.steps.find((s) => s.name === 'plan')!.approve !== null, true);
+      const status = await detail(LIFT);
+      assert.deepEqual([status.holdUntil, status.holding], [[], null]);
+      assert.equal(status.steps.find((s) => s.name === 'plan')!.approve !== null, true);
       const decided = await decisionOf(LIFT);
       assert.ok('commands' in decided, JSON.stringify(decided));
       assert.ok(decided.commands.some((c) => c.command === `nemia approve ${LIFT} plan`));

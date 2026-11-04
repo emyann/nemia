@@ -1,8 +1,9 @@
 /**
- * What a step was told, by layer, as the run page reads it (`GET /api/runs/:id`, `layers`): each layer from what the run froze at
- * `nemia start` — the agent's instructions and skills, the person's custom instructions, the factory's rules, the step's note, the skill
- * and the deny its line adds, and the task — never from the agent's, the custom instructions', the rules' or the step's file as it is
- * now; and none for a record that froze no workflow. On the stand-ins: the runtime's test engine and the test place.
+ * What a step was told, by layer, as the run object's sub-resource answers it (`GET /api/runs/:id/steps/:step/told`, `layers`): each
+ * layer from what the run froze at `nemia start` — the agent's instructions and skills, the person's custom instructions, the factory's
+ * rules, the step's note, the skill and the deny its line adds, and the task — never from the agent's, the custom instructions', the
+ * rules' or the step's file as it is now; and none for a record that froze no workflow. On the stand-ins: the runtime's test engine and
+ * the test place.
  */
 import { root } from './harness.ts';
 import { test } from 'node:test';
@@ -10,7 +11,7 @@ import { story } from './checkpoints.ts';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import type { RunDetail } from '../src/detail/detail.ts';
+import { toldOf } from './run-reads.ts';
 import { addFactory, attachWorkflow, startRun } from 'agent-orchestrator';
 import { PRECEDENCE } from 'agent-orchestrator/run';
 import { scratch } from './scratch.ts';
@@ -44,12 +45,8 @@ fs.writeFileSync(CUSTOM, 'Be terse.\n');
 fs.mkdirSync(TEAM, { recursive: true });
 fs.writeFileSync(STEP, '---\nworkspace: folder\nagent: layered\nskills: alpha, gamma\ndisallowedTools: WebFetch\n---\nWrite the note.\n');
 
-/** The run `id` in full, as the board reads it. */
-const detailOf = async (id: string): Promise<RunDetail> => {
-  const res = await app().request(`/api/runs/${id}`);
-  assert.equal(res.status, 200);
-  return (await res.json()) as RunDetail;
-};
+/** What the step `write` of the run `id` was told (`…/steps/write/told`): `toldOf` throws unless it answers 200. */
+const toldWrite = (id: string) => toldOf(app(), id, 'write');
 
 test('what a step was told reads, layer by layer, as the run froze it: no later edit of the agent, custom instructions, step or rules reaches it, and a record that froze none answers none', async (t) => {
   const s = story(t);
@@ -60,7 +57,7 @@ test('what a step was told reads, layer by layer, as the run froze it: no later 
       fs.writeFileSync(AGENT, '---\ndescription: Use this to write.\n---\nYou are someone else now.\n');
       fs.writeFileSync(CUSTOM, 'Be verbose.\n');
       fs.writeFileSync(STEP, '---\nworkspace: folder\nagent: layered\n---\nWrite an essay.\n');
-      const [write] = (await detailOf(run.id)).steps;
+      const write = await toldWrite(run.id);
       assert.deepEqual(write.layers && { ...write.layers, task: undefined }, {
         agent: 'layered',
         instructions: 'You are the writer.',
@@ -99,13 +96,13 @@ test('what a step was told reads, layer by layer, as the run froze it: no later 
       const run = await start();
       for (const edit of [() => rules('PUT', 'Push whenever.'), () => rules('DELETE')]) {
         assert.equal((await edit()).status, 200);
-        const [write] = (await detailOf(run.id)).steps;
+        const write = await toldWrite(run.id);
         assert.equal(write.layers?.factory, 'Never push on a Friday.');
         assert.equal(write.layers?.custom, 'Be verbose.');
         assert.equal(write.layers?.policy, 'Write the note.');
         assert.equal(write.layers?.task?.includes('Never push'), false, 'the rules are not said again in the task');
       }
-      const [after] = (await detailOf((await start()).id)).steps;
+      const after = await toldWrite((await start()).id);
       assert.equal(after.layers?.factory, null, 'a run started once they are removed is told none');
     },
   );
@@ -124,7 +121,7 @@ test('what a step was told reads, layer by layer, as the run froze it: no later 
         steps: { write: { taskId: null } },
       }),
     );
-    const [write] = (await detailOf(id)).steps;
+    const write = await toldWrite(id);
     assert.equal(write.layers, null);
     assert.ok(write.told?.includes('## What was asked for'), write.told ?? 'null');
   });

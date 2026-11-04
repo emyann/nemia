@@ -16,8 +16,11 @@ import { budgetUsdFor } from '../status/status.ts';
 import { renderedFlags } from '../agents/agents.ts';
 import { ownOf } from '../tick/told.verb.ts';
 import { isFolderTeam, stepSetRefusal, unallowedRefusal } from '../workflow/index.ts';
-import { formerModesWritten, loadWorkflows } from '../folder/folder.store.ts';
-import { isBuiltinPlace, skillsFor, type Places } from '../skills/read.store.ts';
+import { formerModesWritten, workflowDirAt } from '../folder/folder.store.ts';
+import { isBuiltinPlace, type Places } from '../skills/read.store.ts';
+import { SkillDoor } from '../skills/skill-door.store.ts';
+import { WorkflowDoor } from '../workflows/workflows.store.ts';
+import type { SkillsFound } from '../agents/agents.ts';
 import { placesOf } from '../folder/lookup.store.ts';
 import { pinsOf } from '../revisions/pin.verb.ts';
 import { workRoot } from '../record/places.store.ts';
@@ -30,8 +33,10 @@ import { inboxDir, runStore } from '../record/files.store.ts';
 import { storeRootRefusal } from './store-root.ts';
 import { HOME, artifactsDir, inputsDir, runId, runsDir } from '../record/record.store.ts';
 import { writeAgentFiles } from '../agents/agents.store.ts';
+import { freezeWorkflowFiles, workflowFilesOf } from '../frozen/frozen.store.ts';
 import { PlaceService, openPlace } from '../place/place.store.ts';
-import { parentRecord } from '../branches/branches.store.ts';
+import { parentRecord } from '../steps/steps.verb.ts';
+import type { BranchReader } from '../branches/branches.store.ts';
 import { standingLiveOf } from '../standing/standing.verb.ts';
 import { Invalid } from '../refusal/refusal.ts';
 import { NO_ALLOWS, repoAllows, type Allows } from '../trust/allows.verb.ts';
@@ -51,6 +56,8 @@ import { readFactory } from '../factory/factory.store.ts';
 import { factoryFills } from '../rules/rules.store.ts';
 import { Context, Effect } from 'effect';
 import { RunDoor } from '../runs/runs.store.ts';
+import { RunId } from '../record/record.model.ts';
+import { inheritedLabels, parseLabelEdits, type Inherited, type LabelEdit, type Labels, type LeftOut } from '../labels/labels.ts';
 
 /**
  * A workflow folder's steps, as a run in `factory` runs them: each step its hires fill (`factoryFills`, by the folder's name) resolved
@@ -63,27 +70,31 @@ import { RunDoor } from '../runs/runs.store.ts';
  * steps. Refused (`Invalid`), naming the file, before a run is written: a rules file that cannot be told — a link, anything that is no
  * file, one that does not read, and a frontmatter block, since rules only add words.
  */
-function stepsIn(workflowDir: string, places: Places, factory: Factory | undefined): Workflow[] {
-  if (!factory) return loadWorkflows(workflowDir, places);
+const stepsIn = Effect.fnUntraced(function* (workflowDir: string, places: Places, factory: Factory | undefined) {
+  const workflows = (yield* WorkflowDoor).workflows;
+  const dir = yield* tried(() => workflowDirAt(workflowDir));
+  if (!factory) return yield* workflows.read(dir, places);
   const workflow = path.basename(path.resolve(workflowDir));
   const unattached = unattachedRefusal(factory, workflow);
-  if (unattached) throw new Invalid({ message: unattached });
+  if (unattached) return yield* Effect.fail(new Invalid({ message: unattached }));
   const { fills, error } = factoryFills(factory, workflow);
   if (error !== null)
-    throw new Invalid({
-      message: `${error} Or remove the rules: nemia factory rules ${factory.name} --clear. Nothing was started.`,
-    });
-  const steps = loadWorkflows(workflowDir, places, fills);
+    return yield* Effect.fail(
+      new Invalid({
+        message: `${error} Or remove the rules: nemia factory rules ${factory.name} --clear. Nothing was started.`,
+      }),
+    );
+  const steps = yield* workflows.read(dir, places, fills);
   const unfilled = unfilledRefusal(steps, factory.name, workflow);
-  if (unfilled) throw new Invalid({ message: unfilled });
+  if (unfilled) return yield* Effect.fail(new Invalid({ message: unfilled }));
   return steps;
-}
+});
 
 /**
  * A workflow folder's steps, refused as `start` refuses them before a run is written, with the fix. What `startPlan` asks of every card
  * before the first run is started. Refused:
- * - a folder that is not a workflow (`loadWorkflows`), and, in a factory, a workflow it has not attached, or a step its hires leave
- *   unfilled or fill twice (`stepsIn`);
+ * - a folder that is not a workflow (the Workflow door's `read`), and, in a factory, a workflow it has not attached, or a step its hires
+ *   leave unfilled or fill twice (`stepsIn`);
  * - a step set no run may take (`stepSetRefusal`, pure, asked of a folder a waiting run takes again too): a step named for another step's
  *   check or try, and, with `isolate: false` (`--no-worktree`), a `place: folder` team, one that fans out, and an ending;
  * - a team that says `place: folder` whose agent is given the package's place skill (`placeSkillRefusal`);
@@ -95,8 +106,11 @@ function stepsIn(workflowDir: string, places: Places, factory: Factory | undefin
  *   `gates` beside the workflow's own: a word, a window, a cap or a bridge (`remote: true`) its harness does not take;
  * - a step whose `tools:` names a tool nothing its session would be allowed (`unallowedRefusal`, pure, asked of a folder a waiting run
  *   takes again too), judged against `allows`, the allow rules the run's own repository grants a session started in it (`repoAllows`).
+ *
+ * The skills a folder team's place skills are judged against are `known` where given — the start's own read, which renders the agents
+ * too, so a start asks the Skill door once — else read from the Skill door for a folder team alone.
  */
-export function stepsToStart(
+export const stepsToStart = Effect.fn('stepsToStart')(function* (
   workflowDir: string,
   isolate: boolean,
   places: Places,
@@ -106,13 +120,31 @@ export function stepsToStart(
   refused: ConfigRefused = configRefused,
   given = false,
   allows: Allows = NO_ALLOWS,
+  known?: SkillsFound,
+) {
+  const steps = yield* stepsIn(workflowDir, places, factory);
+  const found = known ?? (isFolderTeam(steps) ? yield* (yield* SkillDoor).skills.found({ dir: workflowDir, places }) : undefined);
+  return yield* tried(() => startable(steps, workflowDir, isolate, places, denied, found, gates, refused, given, allows));
+});
+
+/** `stepsToStart`'s judgement of the steps read, past the folder's load: each refusal it names thrown as `Invalid`. */
+function startable(
+  steps: Workflow[],
+  workflowDir: string,
+  isolate: boolean,
+  places: Places,
+  denied: readonly string[],
+  found: SkillsFound | undefined,
+  gates: readonly string[],
+  refused: ConfigRefused,
+  given: boolean,
+  allows: Allows,
 ): Workflow[] {
-  const steps = stepsIn(workflowDir, places, factory);
   const set = stepSetRefusal(steps, isolate);
   if (set) throw new Invalid({ message: set });
   const unallowed = unallowedRefusal(steps, allows.rules, allows.untrusted);
   if (unallowed) throw new Invalid({ message: unallowed });
-  const placeSkill = placeSkillRefusal(steps, workflowDir, places);
+  const placeSkill = placeSkillRefusal(steps, found);
   if (placeSkill) throw new Invalid({ message: placeSkill });
   const undeclared = undeclaredRefusal(steps);
   if (undeclared) throw new Invalid({ message: undeclared });
@@ -129,14 +161,14 @@ export function stepsToStart(
 
 /**
  * Why a team that says `place: folder` cannot start: a step whose session is given a skill its places resolve to a builtin place skill
- * (`isBuiltinPlace`), which acts on a repository a folder run does not have; undefined for a repository team, or where none is.
+ * (`isBuiltinPlace`), which acts on a repository a folder run does not have; undefined for a repository team, or where none is. The skills
+ * are those the Skill door `found` in the folder's places, read only for a folder team.
  */
-function placeSkillRefusal(steps: readonly Workflow[], workflowDir: string, places: Places): string | undefined {
-  if (!isFolderTeam(steps)) return undefined;
-  const found = skillsFor(workflowDir, places).at;
+function placeSkillRefusal(steps: readonly Workflow[], found: SkillsFound | undefined): string | undefined {
+  if (!isFolderTeam(steps) || found === undefined) return undefined;
   for (const step of steps) {
     const skill = step.agent?.skills?.find((name) => {
-      const at = found.get(name);
+      const at = found.at.get(name);
       return typeof at === 'string' && isBuiltinPlace(at);
     });
     if (skill)
@@ -250,7 +282,18 @@ export type StartOptions = {
   scheduled?: { factory: string; workflow: string; due: string };
   gates?: readonly string[];
   factory?: string;
+  /**
+   * The labels the run is created with, beside what its `after` and `context` runs agree on: the card's own (`card`), and the start's
+   * typed edits (`nemia start --label`, `key=value` / `key-`), each over the last (`inheritedLabels`).
+   */
+  labels?: { card?: Labels; edits?: readonly string[] };
 };
+
+/**
+ * A run as `startRun` answers it: its record, its person labels as they were written (`labels`, absent for none), and each key its
+ * named runs disagreed on, which it was not given (`labelsLeftOut`, absent for none): said by `nemia start`, never written in the record.
+ */
+export type StartedRun = Run & { readonly labelsLeftOut?: readonly LeftOut[] };
 
 /** What a run is told at `nemia start` and frozen on its record, whatever its place: the brief, the steps, and each option given. */
 type Told = Pick<
@@ -372,13 +415,21 @@ function toldOf(opts: StartOptions, steps: Workflow[], inputs: readonly InputFil
   };
 }
 
+/** Each run an `--after` names, as its record and `git` say it (`parentRecord`), read before the edges are judged. */
+const parentsOf = (after: readonly string[], git: BranchReader) =>
+  Effect.map(
+    Effect.forEach(new Set(after), (id) => Effect.map(parentRecord(id, git), (parent) => [id, parent] as const)),
+    (pairs) => new Map(pairs),
+  );
+
 /**
  * A folder run's record, its workspace its own directory in the store: fails with an `--after`'s refusal (`afterRefusal`), where the runs
  * it waits on stand read now (`standingLiveOf`).
  */
 const folderRun = Effect.fn('folderRun')(function* (id: string, told: Told, steps: Run['steps']) {
   const git = yield* standingLiveOf(told.after ?? []);
-  const refusedAfter = yield* tried(() => afterRefusal(told.after ?? [], { place: { kind: 'folder' } }, (id) => parentRecord(id, git)));
+  const parents = yield* parentsOf(told.after ?? [], git);
+  const refusedAfter = yield* tried(() => afterRefusal(told.after ?? [], { place: { kind: 'folder' } }, (id) => parents.get(id) ?? {}));
   if (refusedAfter) return yield* Effect.fail(new Invalid({ message: refusedAfter }));
   const run: Run = {
     id,
@@ -400,7 +451,8 @@ const repositoryRun = Effect.fn('repositoryRun')(function* (id: string, told: To
   const place = yield* PlaceService;
   const { baseRef, branch, inProgressFile: staged } = yield* tried(() => openPlace(place, repo, isolate));
   const git = yield* standingLiveOf(told.after ?? []);
-  const refusedAfter = yield* tried(() => afterRefusal(told.after ?? [], { repo, branch }, (id) => parentRecord(id, git)));
+  const parents = yield* parentsOf(told.after ?? [], git);
+  const refusedAfter = yield* tried(() => afterRefusal(told.after ?? [], { repo, branch }, (id) => parents.get(id) ?? {}));
   if (refusedAfter) return yield* Effect.fail(new Invalid({ message: refusedAfter }));
   const run: Run = {
     id,
@@ -436,18 +488,21 @@ function copyInputs(run: Run, inputs: readonly InputFile[]): void {
 }
 
 /**
- * Renders the steps' agents into the run's `agents/` (`writeAgentFiles`), with the skills the folder's places hold (`skillsFor`); throws
- * with exit 1 when they cannot be, the run's directory removed.
+ * Renders the steps' agents into the run's `agents/` (`writeAgentFiles`), with the skills the Skill door `found` in the folder's places,
+ * then copies the workflow folder into the run's own `workflow/<hex>/` (`freezeWorkflowFiles`), and answers the copy's hex; throws with
+ * exit 1 when either cannot be written, the run's directory removed. A link or a file of another kind in the folder is refused before
+ * the run has an id (`workflowFilesOf`), so what fails here is a write.
  */
-function renderAgents(run: Run, steps: readonly Workflow[], workflowDir: string, places: Places): void {
+function renderAgents(run: Run, steps: readonly Workflow[], found: SkillsFound): string {
+  let what = `the steps' agents could not be rendered into ${path.join(runsDir(), run.id, 'agents')}`;
   try {
-    writeAgentFiles(run, steps, skillsFor(workflowDir, places));
+    writeAgentFiles(run, steps, found);
+    what = `the workflow's files could not be copied into ${path.join(runsDir(), run.id, 'workflow')}`;
+    return freezeWorkflowFiles(run, run.workflowDir);
   } catch (err) {
     runStore.runs.forget(run.id);
     throw Object.assign(
-      new Error(
-        `the steps' agents could not be rendered into ${path.join(runsDir(), run.id, 'agents')} — ${(err as Error).message}. Nothing was started: start it again once that directory can be written.`,
-      ),
+      new Error(`${what} — ${(err as Error).message}. Nothing was started: start it again once that directory can be written.`),
       { exitCode: 1 },
     );
   }
@@ -494,6 +549,11 @@ export const repoFor = (name: string | undefined, named: string | undefined, fal
  * board list them in. The inputs are copied and the steps' agents rendered (`writeAgentFiles`) before the record is written, so a record
  * never names a file that is not there: a copy or a render that fails removes the run's directory, and is an `Error` with exit 1.
  *
+ * The workflow folder is copied whole into the run's own `workflow/<hex>/` (`freezeWorkflowFiles`), its digest frozen on the record as
+ * `workflowFiles`, so each check and session reads the folder's files as they were now (`WF_WORKFLOW_FILES`), whatever repository the
+ * run is on and whatever the folder holds later. A link or a file of another kind in the folder is refused (`Invalid`) before anything
+ * is written (`workflowFilesOf`).
+ *
  * `factory` names the factory the run is started in (`nemia start --factory`): its hires fill the workflow's steps (`stepsToStart`), read
  * as they are now and frozen into the run's steps, so a later hire changes no run started. Refused before anything is written when it names
  * no factory, or one whose file does not read (`readFactory`), when it has not attached the workflow (`stepsIn`), and, for a repository
@@ -512,29 +572,36 @@ export const repoFor = (name: string | undefined, named: string | undefined, fal
  * the ledger and pinned on the record as `pinned` (`pinsOf`); a run that has filed nothing resolves them again on every pass, so an
  * edit made while it waits `--after` reaches its first filing.
  *
+ * `labels` are the run's person labels, copied once, at creation (`inheritedLabels`): every key the `after` and `context` runs agree on,
+ * the card's own over them, and the typed edits over those. A key two of those runs disagree on that neither the card nor an edit sets is
+ * left out, and answered on `labelsLeftOut` for `nemia start` to say. Refused before anything is written: an edit that is not `key=value`
+ * or `key-`, or names a key or value a label cannot hold (`parseLabelEdits`). Written beside the record (`runs.labels.put`) only when
+ * there are any.
+ *
  * Fails with the refusal it met, every one before anything is written (`stepsToStart`, the place's `open` — a `.worktreeinclude` it
  * refuses among them, for a run that cuts worktrees — and those above); dies of anything else, an `open` not heard and the copy's and the
  * render's `Error` included (`tried`).
  */
 export const startRun = Effect.fn('start')(function* (opts: StartOptions) {
+  const edits = yield* labelEditsOf(opts);
   const isolate = opts.isolate ?? true;
   const places = placesOf(opts.repo);
   const factory = yield* tried(() => factoryNamed(opts.factory));
   const refused = yield* StartRefusal;
   const { declared } = yield* PlaceService;
   const denied = declared.denyWhileLanding;
-  const steps = yield* tried(() =>
-    stepsToStart(
-      opts.workflowDir,
-      isolate,
-      places,
-      denied,
-      factory,
-      opts.gates,
-      refused,
-      Boolean(opts.inputs?.length),
-      repoAllows(opts.repo, opts.factory),
-    ),
+  const found = yield* (yield* SkillDoor).skills.found({ dir: opts.workflowDir, places });
+  const steps = yield* stepsToStart(
+    opts.workflowDir,
+    isolate,
+    places,
+    denied,
+    factory,
+    opts.gates,
+    refused,
+    Boolean(opts.inputs?.length),
+    yield* tried(() => repoAllows(opts.repo, opts.factory)),
+    found,
   );
   const folder = isFolderTeam(steps);
   if (folder && opts.repoNamed) return yield* Effect.fail(new Invalid({ message: repoNamedRefusal(opts.repo) }));
@@ -545,10 +612,12 @@ export const startRun = Effect.fn('start')(function* (opts: StartOptions) {
   const inputs = yield* tried(() => inputsOf(opts.inputs ?? []));
   const refusedInputs = inputRefusal(inputs);
   if (refusedInputs) return yield* Effect.fail(new Invalid({ message: refusedInputs }));
+  yield* tried(() => workflowFilesOf(opts.workflowDir));
   let id = runId(opts.brief);
   while (runStore.runs.taken(id)) id = runId(opts.brief);
   const refusedContext = contextRefusal(opts.context ?? [], opts.after ?? [], runStore.runs.exists, id);
   if (refusedContext) return yield* Effect.fail(refusedContext);
+  const inherited = yield* inheritedOf(opts, edits);
   const mounts = mountsAt(factory, folder ? undefined : opts.repo);
   const unmounted = mountRefusal(opts, steps, places, factory, folder ? undefined : opts.repo, mounts, denied);
   if (unmounted) return yield* Effect.fail(new Invalid({ message: unmounted }));
@@ -556,11 +625,42 @@ export const startRun = Effect.fn('start')(function* (opts: StartOptions) {
   const stepRecords = Object.fromEntries(steps.map((s) => [s.name, { taskId: null }]));
   const run = yield* folder ? folderRun(id, told, stepRecords) : repositoryRun(id, told, stepRecords, opts.repo, isolate);
   yield* tried(() => copyInputs(run, inputs));
-  yield* tried(() => renderAgents(run, steps, opts.workflowDir, places));
-  yield* tried(() => {
-    const pinned = pinsOf(run, steps, run.createdAt);
-    if (pinned.length) run.pinned = pinned;
-  });
+  run.workflowFiles = yield* tried(() => renderAgents(run, steps, found));
+  const pinned = yield* pinsOf(run, steps, run.createdAt);
+  if (pinned.length) run.pinned = pinned;
   yield* (yield* RunDoor).runs.create(run);
-  return run;
+  return yield* labelled(run, inherited);
+});
+
+/** The start's `--label` edits, parsed: refused `Invalid`, naming `--label`, where one does not parse (`parseLabelEdits`). */
+const labelEditsOf = Effect.fnUntraced(function* (opts: StartOptions) {
+  const parsed = parseLabelEdits(opts.labels?.edits ?? []);
+  if ('refused' in parsed) return yield* Effect.fail(new Invalid({ message: `--label: ${parsed.refused}` }));
+  return parsed.edits;
+});
+
+/** The labels a run of `opts` is created with (`inheritedLabels`): its `after` and `context` runs' read through the Run door. */
+const inheritedOf = Effect.fnUntraced(function* (opts: StartOptions, edits: readonly LabelEdit[]) {
+  const door = yield* RunDoor;
+  const named = [...new Set([...(opts.after ?? []), ...(opts.context ?? [])])];
+  const parents = yield* Effect.forEach(named, (parent) =>
+    Effect.map(
+      door.runs.find(RunId.read(parent), () => {}),
+      (found) => ({ run: parent, labels: found?.labels ?? {} }),
+    ),
+  );
+  const card = opts.labels?.card;
+  return inheritedLabels({ parents, ...(card !== undefined ? { card } : {}), edits });
+});
+
+/** `run`, just created, with its labels written beside it when it has any, and answered with them and what was left out. */
+const labelled = Effect.fnUntraced(function* (run: Run, inherited: Inherited) {
+  const any = Object.keys(inherited.labels).length > 0;
+  if (any) yield* (yield* RunDoor).labels.put(RunId.read(run.id), inherited.labels);
+  const started: StartedRun = {
+    ...run,
+    ...(any ? { labels: inherited.labels } : {}),
+    ...(inherited.leftOut.length ? { labelsLeftOut: inherited.leftOut } : {}),
+  };
+  return started;
 });

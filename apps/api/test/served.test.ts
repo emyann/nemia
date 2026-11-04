@@ -15,6 +15,10 @@ import { app } from '../src/app.ts';
 /** The routes the api serves that are its own, each with why no entry of the command table declares it. */
 const OWN: Readonly<Record<string, string>> = {
   'GET /api/health': 'the server answering at all, which no command of the orchestrator asks',
+  'GET /openapi/v3/nemia/v1':
+    "the run object's OpenAPI document, the api's description of its own routes around the package's Schema, which no command asks",
+  'GET /openapi': "the page to browse the OpenAPI document, a view of the api's own document, which no command asks",
+  'GET /openapi/scalar.js': "the OpenAPI page's viewer script, served from the installed package so the page reaches no other host",
   'GET /api/nemia/chat': "Nemia's chat paged, a program of the package's chat and no command, as its writes are none",
   'GET /api/nemia/chat/stream': "Nemia's chat followed, a stream",
   'POST /api/nemia/chat/send':
@@ -30,6 +34,8 @@ const OWN: Readonly<Record<string, string>> = {
   'GET /api/daemon': "the daemon's standing, read off its lease file: whether anything ticks the store at all",
   'GET /api/quota': "the harness's quota, asked by the app's asker, which it keeps between requests",
   'GET /api/feed/stream': "a stream of the feed, held open for as long as the board reads it: the api's counterpart of nemia watch",
+  'GET /api/runs/:runId/lines':
+    "a run's command lines and its workflow page's address, built off the command table and the run's record: an api address and command text, no command's answer",
   'GET /api/runs/:id/steps/:step/transcript/stream': "a stream of a step's transcript, held open for as long as the board reads it",
   'GET /api/machines': 'the state machines the board draws, read off their code: no run, no store',
   'GET /api/machines/:name': "one state machine's graph, read off its code: no run, no store",
@@ -83,15 +89,15 @@ test('every route the api serves is declared by an entry of the command table, o
   assert.deepEqual(servedBreaks(app.routes, COMMANDS, OWN), []);
 });
 
-test("the runs' list is declared by runs, an entry the api serves alone, and ls routes nothing: the CLI serves it alone", () => {
+test("the runs' list is declared by runs, an entry the api serves alone; ls's answer, which nemia prints, is ls's own, on /api/listing", () => {
   const runs = COMMANDS.find((c) => c.name === 'runs');
   const ls = COMMANDS.find((c) => c.name === 'ls');
   assert.equal(declaredBy(COMMANDS).get('GET /api/runs'), 'runs');
   assert.equal(runs?.only?.side, 'api', 'the runs entry is served on the api alone');
   assert.ok(runs?.only?.why.trim(), 'and says why');
-  assert.deepEqual(routeList(ls!), [], 'ls has no route');
-  assert.equal(ls?.only?.side, 'cli', 'ls is served on the CLI alone');
-  assert.ok(ls?.only?.why.trim(), 'and says why');
+  assert.equal(declaredBy(COMMANDS).get('GET /api/listing'), 'ls', 'every run, as nemia ls lists them');
+  assert.equal(declaredBy(COMMANDS).get('GET /api/listing/:runId'), 'ls', 'the one named');
+  assert.equal(ls?.only, undefined, 'ls is served on both sides');
 });
 
 test('REFUSED: a route no entry declares and OWN does not list, matched whole; middleware and a route mounted twice are none', () => {

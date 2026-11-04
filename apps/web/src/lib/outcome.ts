@@ -1,5 +1,6 @@
 import type { StepArtifact, StepTry } from './api';
 import type { AttemptEnd } from './api/tries.ts';
+import type { Frozen } from './frozen.ts';
 
 /**
  * How the Output tab draws one field of a closeout. A closed set, and `json` is the answer for anything it does not recognise:
@@ -116,7 +117,7 @@ const CUT_WORDS: Readonly<Partial<Record<AttemptEnd, string>>> = {
  * reason `MACHINE_WORDS` does not name but a harness's `failed` or `stopped`: the orchestrator reports a harness's `done` with no statement
  * as `unsigned` (`endWords`).
  */
-export function outcomeOf(t: Pick<StepTry, 'closeout' | 'unreadable' | 'attempts'>, none: string): Outcome {
+export function outcomeOf(t: Frozen<Pick<StepTry, 'closeout' | 'unreadable' | 'attempts'>>, none: string): Outcome {
   const latest = t.attempts.latest;
   if (t.closeout) return { by: 'agent', outcome: t.closeout.outcome, cut: (latest?.reason && CUT_WORDS[latest.reason]) || null };
   if (t.unreadable)

@@ -358,7 +358,8 @@ const { staged, story } = await import('./story.ts');
 const { engineOf } = await import('../src/runtime-client.ts');
 const stage = staged({ runWith: runEngine, main: cli, engineOf });
 const at = await endings(stage, ROOT);
-const { readRun, stepsOf } = await import('../src/record/record.store.ts');
+const { readRun } = await import('../src/record/record.store.ts');
+const { stepsNow: stepsOf } = await import('./steps-now.ts');
 const { runStore } = await import('../src/record/files.store.ts');
 const { resumePause, putPause } = await import('../src/pause/pause.store.ts');
 type Place = import('../src/place/place.store.ts').Place;
@@ -462,8 +463,11 @@ test("a run waits at its ending's gate, is approved, stages its merge, lands it 
       assert.ok(!allows(`${id}-implement`).some((r) => /^Read\(.*\)$/.test(r)), 'a step in a worktree is filed with its own rules only');
       assert.deepEqual(
         (tasks.get(`${id}-ship`)!.spec.config as { mounts?: unknown }).mounts,
-        [{ path: artifactsDir({ id }, 'implement'), readOnly: true }],
-        'and the ending is filed the folder of the step it comes after, read-only, and not its own',
+        [
+          { path: artifactsDir({ id }, 'implement'), readOnly: true },
+          { path: path.join(ROOT, 'runs', id, 'workflow', String(readRun(id).workflowFiles)), readOnly: true },
+        ],
+        "and the ending is filed the folder of the step it comes after and the run's copy of its workflow folder, read-only, and not its own",
       );
     },
   );

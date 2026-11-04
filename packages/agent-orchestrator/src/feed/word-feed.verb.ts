@@ -1,6 +1,8 @@
 /**
  * What a pass judged of one run, in the feed's words (`wordFeed`): the listing `nemia ls` prints, worded for the feed (`feedWords`), with
- * the labels a filing gives the run and each of its steps, and the calls their sessions have been denied so far.
+ * the labels a filing gives the run and each of its steps, stamped beside them with the labels a person put on the run as the pass read
+ * them (`Run.labels`, whose keys are never one of the closed five), and the calls their sessions have been denied so far. A person's
+ * labels go on the feed's lines alone: the filing's labels (`stepLabels`, `runLabels`), which a task and a span carry, stay closed.
  *
  * A controller of the feed, called by the tick's pass (`advance.verb.ts`): the pass gathers, this words, and `emitFeed` writes. It reads
  * what the pass already read — the engine's views, the run's record, the person's answers — and asks the runtime nothing of its own.
@@ -62,10 +64,10 @@ export function wordFeed(
     assessed,
     (name) => closeoutOf(views, run, name),
     {
-      run: runLabels(run),
+      run: { ...runLabels(run), ...run.labels },
       step: (name) => {
         const step = steps.find((s) => s.name === name);
-        return step ? stepLabels(run, step) : { run: run.id, step: name };
+        return { ...(step ? stepLabels(run, step) : { run: run.id, step: name }), ...run.labels };
       },
       denials: denialsOf(run, r),
       acts: [...actsOf(run), ...behindOf(behind)],

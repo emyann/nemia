@@ -32,8 +32,9 @@ delete process.env.WF_MAX_CONCURRENT;
 delete process.env.WF_MAX_RUNS;
 process.env.WF_DEFAULT_FACTORY_STARTS = '1';
 process.env.WF_VERIFY_REST = '1';
-const { advanceRun, closeoutAsked, decideRun, exitVerdicts, list, Missing, phaseOfView, retryRun, sayRun, startRun, stepsOf, runWith } =
+const { advanceRun, closeoutAsked, decideRun, exitVerdicts, list, Missing, phaseOfView, retryRun, sayRun, startRun, runWith } =
   await import('../src/runner.ts');
+const { stepsNow: stepsOf } = await import('./steps-now.ts');
 const { askFile, asksDir, markCancelled, readAnswers, readRun } = await import('../src/record/record.store.ts');
 const { isRepositoryRun, LINE_NAME, shownNote } = await import('../src/run.ts');
 const { verdictWord } = await import('../src/check/check.ts');
@@ -347,12 +348,24 @@ test('what `nemia decide` and `nemia ls` print of a step asking no question, or 
       plain.join('\n'),
     );
   });
-  await t.test('a question field that does not decode is printed as a field, and offered `--message`', async (sub) => {
-    const half = await asking({ open: [{ title: 'Half a question' }] });
+  await t.test('a question field that does not decode is refused back once, then printed as a field, saying why', async (sub) => {
+    const open = [{ title: 'Half a question' }];
+    const half = await asking({ open });
+    assert.equal(readRun(half).steps.plan.tries?.at(-1)?.cause, 'signoff', 'the run asks the session to mend it');
+    stage
+      .board()
+      .settle(`${half}-plan-try2`, 'succeeded', { outcome: 'blocked', summary: 'Half.', artifacts: [], needs: 'Two questions.', open });
+    await stage.runWith(stage.board().e, advanceRun(readRun(half)));
     const screen = await printedBy(sub, ['decide', half]);
     assert.ok(screen.includes('    open:'), screen.join('\n'));
     assert.ok(!screen.some((l) => /^ {6}1\. /.test(l)), screen.join('\n'));
-    assert.ok(screen.includes(`    to answer it:  nemia retry ${half} plan --message "<answer>"`), screen.join('\n'));
+    const refused = screen.find((l) => l.startsWith('    !! not accepted:'));
+    assert.ok(refused, screen.join('\n'));
+    names(refused, '`open`', 'question 1');
+    assert.ok(
+      screen.some((l) => l.includes(`nemia retry ${half} plan`)),
+      screen.join('\n'),
+    );
   });
 });
 
@@ -502,6 +515,7 @@ test("a checked step, from its check's filing to `retries:` spent and the run wa
           WF_WORKSPACE: run.repo,
           WF_ARTIFACTS: path.join(ROOT, 'runs', id(), 'artifacts', 'implement'),
           WF_CLOSEOUT: path.join(ROOT, 'checks', `${check1()}.closeout.json`),
+          WF_WORKFLOW_FILES: path.join(ROOT, 'runs', id(), 'workflow', String(readRun(id()).workflowFiles)),
         },
         niceness: 10,
       });
@@ -600,7 +614,7 @@ const CHECK_SAID = "## What implement's check said";
 const NO_PAGES = 'wf check: nothing under apps/web/ or apps/api/ was touched: no build, no e2e';
 const NAMED_1 = '#1 run-dark.png, for apps/web/src/routes/run.tsx (0.4 s)';
 const NAMED_2 = '#2 factory-light.png, for apps/web/src/routes/factory.tsx (0.3 s)';
-/** A check's stdout as `workflows/build`'s prints it: turbo's prefixed lines, the pictures' `wf pictures:` lines, then a long tail. */
+/** A check's stdout as the nemia factory's build check prints it: turbo's prefixed lines, the pictures' lines, then a long tail. */
 const PICTURES = [
   'agent-orchestrator:test: ✔ files a step (12 ms)',
   'agent-orchestrator:test: wf pictures: a line a test printed, prefixed by turbo',

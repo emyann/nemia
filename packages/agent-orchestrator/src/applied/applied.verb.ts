@@ -9,7 +9,6 @@
  * write of theirs made since the merge read it.
  */
 import fs from 'node:fs';
-import path from 'node:path';
 import { Cause, Duration, Effect } from 'effect';
 import { tried } from '../runtime-client.ts';
 import { leftOut, type Args, type Flag, type Spec } from '../command/command.ts';
@@ -17,9 +16,10 @@ import type { Command } from '../command/entry.verb.ts';
 import { Invalid } from '../refusal/refusal.ts';
 import { addFactory, factoryRepos, readFactories } from '../factory/factory.store.ts';
 import type { Factory, FactoryConditionReason, FactoryConditionType, FactoryTemplate } from '../factory/factory.ts';
-import { openedTree, placeSkillNames, problemLine, type OpenTemplate } from '../template/template.store.ts';
+import { openedTree, packageSkillNames, problemLine, type OpenTemplate } from '../template/template.store.ts';
 import { TemplateSource } from '../templates/templates.model.ts';
-import { TemplateDoor } from '../templates/templates.store.ts';
+import { BuiltinTemplates, TemplateDoor, templatePlace } from '../templates/templates.store.ts';
+import { builtinPlace, sourceGiven } from '../templates/templates.ts';
 import { rooted } from '../wiring/wire.verb.ts';
 import type { FactorySpec } from '../template/index.ts';
 import {
@@ -53,14 +53,16 @@ export const setsOf = (params: FactoryTemplate['params']): string[] =>
 export type Unrendered = { problems: string[]; version?: string };
 
 /**
- * The template at `source`, a folder or an archive, read through the Template door and rendered with `params`, each `<key>=<value>`,
- * its files read off its tree; or why it is not: its problems (`nemia template lint`), a parameter refused (`resolveParams`) and what
- * the render refuses (`renderFactory`), every one a line, with the template's version where it was read. Nothing is written. Refused as
- * the door refuses a read.
+ * The template at `source`, a folder or an archive by its whole path or the name of a builtin template (`templatePlace`), read
+ * through the Template door and rendered with `params`, each `<key>=<value>`, its files read off its tree; or why it is not: its
+ * problems (`nemia template lint`), a parameter refused (`resolveParams`) and what the render refuses (`renderFactory`), every one a
+ * line, with the template's version where it was read. Nothing is written. Refused as `templatePlace` refuses a name, and as the door
+ * refuses a read.
  */
 export const renderedAt = Effect.fn('renderedAt')(function* (source: string, sets: readonly string[]) {
-  const tree = yield* (yield* TemplateDoor).templates.read(TemplateSource.read(source));
-  return yield* tried(() => renderOpened(openedTree(source, tree, placeSkillNames()), sets));
+  const place = yield* templatePlace(source);
+  const tree = yield* (yield* TemplateDoor).templates.read(TemplateSource.read(place));
+  return yield* tried(() => renderOpened(openedTree(place, tree, packageSkillNames()), sets));
 });
 
 /** The template opened as `read`, rendered with `sets`, or why it is not (`renderedAt`). */
@@ -104,7 +106,7 @@ const messageOf = (err: unknown): string => (err instanceof Error ? err.message 
 /** The template `source` as `factory` reads it: rendered, or the `Applied` condition that says why it is not. */
 const templateNow = Effect.fn('templateNow')(function* (factory: Factory & { template: FactoryTemplate }) {
   const { source, version, params } = factory.template;
-  const fix = `nemia template lint ${source}`;
+  const fix = `nemia template lint ${builtinPlace(source, yield* BuiltinTemplates)}`;
   const read = yield* renderedOrNot(renderedAt(source, setsOf(params)));
   return conditionOf(factory, version, fix, read);
 });
@@ -164,7 +166,7 @@ const unknownOf = ({ name, template }: Factory & { template: FactoryTemplate }):
     'Applied',
     false,
     'VersionUnknown',
-    `${name}'s base is not ${template.source} at ${template.version}, and no status names the version it was applied at: its base and tree are left as they are. Name that version, nemia factory upgrade ${name} --to <it> [--template <folder|archive>], and the next pass checks it against the base.`,
+    `${name}'s base is not ${template.source} at ${template.version}, and no status names the version it was applied at: its base and tree are left as they are. Name that version, nemia factory upgrade ${name} --to <it> [--template <name|folder|archive>], and the next pass checks it against the base.`,
   );
 
 /** The conditions of a factory whose base holds the template as an upgrade merged it, the tree holding the merge. */
@@ -340,7 +342,7 @@ const APPLY_SPEC: Spec = {
       kind: 'text',
       key: 'template',
       takes:
-        "--template takes the template's folder, the one that holds its nemia.yaml, or an archive nemia template pack wrote: nemia factory apply <name> --template <folder|archive>",
+        "--template takes the name of a builtin template, a template's folder, the one that holds its nemia.yaml, or an archive nemia template pack wrote: nemia factory apply <name> --template <name|folder|archive>",
       twice: 'nemia factory apply takes --template once: a factory is made from one template.',
     },
     {
@@ -349,7 +351,7 @@ const APPLY_SPEC: Spec = {
       key: 'repos',
       many: true,
       takes:
-        "--repo takes a repository's directory: nemia factory apply <name> --template <folder|archive> --repo <path> [--repo <path> ...]",
+        "--repo takes a repository's directory: nemia factory apply <name> --template <name|folder|archive> --repo <path> [--repo <path> ...]",
     },
     {
       flag: '--set',
@@ -362,14 +364,17 @@ const APPLY_SPEC: Spec = {
   ],
   unknown: (arg) =>
     arg.startsWith('-')
-      ? `nemia factory apply does not take ${arg}. It takes the name, --template <folder|archive>, --repo <path> once per repository, --set <key>=<value> once per parameter, and --no-trust.`
-      : `nemia factory apply makes one factory, and ${arg} is a second name: nemia factory apply <name> --template <folder|archive> --repo <path>.`,
+      ? `nemia factory apply does not take ${arg}. It takes the name, --template <name|folder|archive>, --repo <path> once per repository, --set <key>=<value> once per parameter, and --no-trust.`
+      : `nemia factory apply makes one factory, and ${arg} is a second name: nemia factory apply <name> --template <name|folder|archive> --repo <path>.`,
   missing:
-    "nemia factory apply takes the new factory's name: nemia factory apply <name> --template <folder|archive> --repo <path> [--set <key>=<value> ...].",
+    "nemia factory apply takes the new factory's name: nemia factory apply <name> --template <name|folder|archive> --repo <path> [--set <key>=<value> ...].",
 };
 
-/** What `nemia factory apply` filed: the factory, its repositories, its file, the template it was made from, and the tree it runs from. */
-type Applied = { name: string; repos: readonly string[]; file: string; template: FactoryTemplate; tree: string };
+/**
+ * What `nemia factory apply` filed: the factory, its repositories, its file, the template it was made from and the folder or archive it
+ * was read at, and the tree it runs from.
+ */
+type Applied = { name: string; repos: readonly string[]; file: string; template: FactoryTemplate; place: string; tree: string };
 
 /**
  * The factory `args` name, made from the template in `--template` with `--set`'s parameters. Refused, before anything is written: no
@@ -382,11 +387,11 @@ const applied = Effect.fn('applied')(function* (args: Args) {
   if (given === undefined)
     return yield* Effect.fail(
       new Invalid({
-        message: `nemia factory apply makes a factory from a template: name its folder or archive with --template <folder|archive>. Nothing was filed.`,
+        message: `nemia factory apply makes a factory from a template: name a builtin template, or a template's folder or archive, with --template <name|folder|archive>. Nothing was filed.`,
       }),
     );
   const repos = yield* tried(() => factoryRepos(name, manyOf(args, 'repos')));
-  const source = path.resolve(given);
+  const source = sourceGiven(given);
   const read = yield* renderedAt(source, manyOf(args, 'sets'));
   if ('problems' in read)
     return yield* Effect.fail(
@@ -396,7 +401,8 @@ const applied = Effect.fn('applied')(function* (args: Args) {
     );
   const template = { source, version: read.version, params: read.params };
   const { factory, file } = yield* tried(() => addFactory({ name, repos, template }));
-  return { name: factory.name, repos: factory.repos, file, template, tree: treeDir(name) } satisfies Applied;
+  const place = builtinPlace(source, yield* BuiltinTemplates);
+  return { name: factory.name, repos: factory.repos, file, template, place, tree: treeDir(name) } satisfies Applied;
 });
 
 /**
@@ -405,7 +411,7 @@ const applied = Effect.fn('applied')(function* (args: Args) {
  */
 export const FACTORY_APPLY: Command<Applied & { trusts: readonly PlaceTrust[] }> = {
   name: 'factory apply',
-  usage: '<name> --template <folder|archive> --repo <path> [--repo <path> ...] [--set <key>=<value> ...] [--no-trust]',
+  usage: '<name> --template <name|folder|archive> --repo <path> [--repo <path> ...] [--set <key>=<value> ...] [--no-trust]',
   help: ['make a factory from a template that passes its check, its parameters', 'given with --set; the daemon renders its tree'],
   spec: APPLY_SPEC,
   check: (args) => leftOut(APPLY_SPEC, args),
@@ -418,10 +424,10 @@ export const FACTORY_APPLY: Command<Applied & { trusts: readonly PlaceTrust[] }>
       const filed = yield* rooted(home, 'factory apply', applied(args));
       return { ...filed, trusts: args.noTrust === true ? [] : yield* trustPlaces(filed.repos) };
     }),
-  print: ({ name, repos, file, template, tree, trusts }) => [
+  print: ({ name, repos, file, template, place, tree, trusts }) => [
     `${name}  ${repos.join(', ')}`,
     `filed: ${file}`,
-    `made from ${template.source} at ${template.version}; the daemon renders its tree into ${tree} on its next pass (nemia up)`,
+    `made from ${place === template.source ? template.source : `the builtin template ${template.source} (${place})`} at ${template.version}; the daemon renders its tree into ${tree} on its next pass (nemia up)`,
     ...trustedLines(name, trusts),
   ],
 };

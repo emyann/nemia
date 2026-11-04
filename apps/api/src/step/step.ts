@@ -4,19 +4,21 @@
  * hire into it, where each of its skills is found, and its recent runs. And the address of a run's workflow page (`workflowPageOf`),
  * which a run's page links back to: the board builds no address from a store path.
  *
- * Everything here is read now, from the files: a run freezes its workflow and its hires as it starts, and what a run was told is its own
- * page's (`toldOf` in detail/told.ts).
+ * Everything here is read now, from the files: a run freezes its workflow and its hires as it starts, and what a run was told is its
+ * step's own sub-resource (`GET /api/runs/:runId/steps/:step/told`, the package's `toldOf`).
  */
 import path from 'node:path';
+import { Effect } from 'effect';
 import { Hono } from 'hono';
 import {
+  AgentDoor,
   DEFAULT_FACTORY,
   fillsOf,
   hireRefusalOf,
   keptRuns,
   Missing,
   readFactories,
-  skillsFor,
+  SkillDoor,
   unattachedRefusal,
 } from 'agent-orchestrator';
 import type { AgentReading, AgentsRead, Factory, FactoryListing } from 'agent-orchestrator';
@@ -230,7 +232,7 @@ const AGENTS = commandNamed('agents');
  *   into it, with those it can (`hiring`).
  */
 export const step = new Hono<ApiEnv>().get('/api/workflows/:from/:name/:step', (c) =>
-  served(c, async ({ e, placeService, env, repo, home, factory, memo }) => {
+  served(c, async ({ e, placeService, env, repo, home, factory, memo, inRequest }) => {
     const { from, name, step: asked } = c.req.param();
     if (from !== 'repo' && from !== 'yours') {
       return c.json(
@@ -245,7 +247,7 @@ export const step = new Hono<ApiEnv>().get('/api/workflows/:from/:name/:step', (
     const folder = folderOf(name, from, repo, home, factory?.tree);
     if ('status' in folder) return c.json({ error: folder.error }, folder.status);
     const args = { from, name, step: asked, dir: folder.dir, repo, ...(factory && { factory: factory.name }) };
-    const { step: found, steps } = (await runPlaced(placeService, e, STEP.handler(args, undefined, home))) as {
+    const { step: found, steps } = (await runPlaced({ placeService, home }, e, STEP.handler(args, undefined, home))) as {
       step: Workflow | null;
       steps: string[];
     };
@@ -253,9 +255,15 @@ export const step = new Hono<ApiEnv>().get('/api/workflows/:from/:name/:step', (
       return c.json({ error: `No step '${asked}' in workflow ${name} (${folder.dir}). Its steps are: ${steps.join(', ')}.` }, 404);
     }
     const places = placesOf(repo, home);
+    const defs = await inRequest(
+      Effect.all({
+        agents: Effect.flatMap(AgentDoor, (door) => door.agents.found({ dir: folder.dir, places })),
+        skills: Effect.flatMap(SkillDoor, (door) => door.skills.found({ dir: folder.dir, places })),
+      }),
+    );
     const layers = toldLayers(found, null);
     const hired = factory ? (fillsOf(factory.hires, name)[found.name] ?? null) : null;
-    const agents = async () => ((await runPlaced(placeService, e, AGENTS.handler({ repo }, env, home))) as AgentsRead).agents;
+    const agents = async () => ((await runPlaced({ placeService, home }, e, AGENTS.handler({ repo }, env, home))) as AgentsRead).agents;
     return c.json({
       workflow: name,
       from,
@@ -264,13 +272,13 @@ export const step = new Hono<ApiEnv>().get('/api/workflows/:from/:name/:step', (
       body: found.body,
       source: stepSourceOf(folder.dir, found.name),
       keys: keyRows(found),
-      agentSkills: agentSkillsOf(found, folder.dir, places),
+      agentSkills: agentSkillsOf(found, defs),
       factory: factory?.name ?? null,
       layers,
       hired,
       hiredIn: factory ? [] : hiredInOf(readFactories(), name, found.name, from, repo),
       hiring: await hiringOf(factory, name, found, hired, from, agents),
-      skillsFrom: skillsFromOf(layers, skillsFor(folder.dir, places), repo, home),
+      skillsFrom: skillsFromOf(layers, defs.skills, repo, home),
       recentRuns: recentRunsOf(keptRuns(memo.records.step, stepRun), folder.dir, found.name, factory?.name ?? null),
     } satisfies WorkflowStepPage);
   }),

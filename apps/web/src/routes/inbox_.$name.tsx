@@ -1,9 +1,10 @@
-import { useSuspenseQuery } from '@tanstack/react-query';
+import { useQueryClient, useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { AsWritten, KeyTable } from '../components/FilePage';
 import { Instant } from '../components/Instant';
 import { Markdown } from '../components/Markdown';
-import { cardQuery, workflowNameOf } from '../lib/api';
+import { Labels } from '../components/Labels';
+import { cardQuery, labelCard, workflowNameOf } from '../lib/api';
 
 /** The page of an inbox card, at /inbox/$name: `inbox_` draws it on its own, not inside the Inbox page, which has no outlet for it. */
 export const Route = createFileRoute('/inbox_/$name')({
@@ -19,14 +20,16 @@ export const Route = createFileRoute('/inbox_/$name')({
 
 /**
  * One inbox card, to read: its body rendered, then each key a card may set with its value and what it means — or, with Source, its file as
- * written. It starts and drops nothing: the Inbox page does.
+ * written. It starts and drops nothing: the Inbox page does. It ends on room as tall as Nemia's dock at the bottom right (her face and its
+ * cues), so the dock covers none of its last key row once it is scrolled to its end.
  */
 function CardPage() {
   const { name } = Route.useParams();
   const { data: card } = useSuspenseQuery(cardQuery(name));
+  const queryClient = useQueryClient();
 
   return (
-    <article className="space-y-6">
+    <article className="space-y-6 pb-24">
       <BackToInbox />
 
       <header className="space-y-1">
@@ -45,6 +48,13 @@ function CardPage() {
           )}
         </p>
       </header>
+
+      {card.error === null && (
+        <Labels
+          labels={card.labels}
+          edit={(edits) => labelCard(card.name, edits).then(() => queryClient.invalidateQueries({ queryKey: ['inbox'] }))}
+        />
+      )}
 
       {card.state === 'started' && (
         <p data-started-as className="text-body-medium text-muted-foreground">

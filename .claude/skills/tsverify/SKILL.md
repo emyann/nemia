@@ -54,8 +54,11 @@ export const shipping: Shipping = (total) => (total >= 50 ? 0 : 5)
 - **`requires` is what every caller promises**, and the laws are proved only where it holds. Read the function's real
   callers: an input they pass that `requires` rules out is an input nothing proves. A default parameter is proved only as
   `requires` lets it vary.
-- **Say both sides.** Most laws forbid ("refused when …"); a function that refuses everything keeps every such law. Where it
-  matters that the function also succeeds, say when: a law of the form "exactly when", or one for the accepting side.
+- **Say both sides.** Most laws forbid ("refused when …"); a function that refuses everything keeps every such law. Say when
+  it succeeds too: a law of the form "exactly when", or one for the accepting side. The verifier asks it of every spec:
+  where two results of different kinds, a refusal and none, or two strings of a union, both keep every law at some input,
+  the contract is `undecided`. A choice the code makes on purpose is named in the spec, `open: ["output.reason"]`, or
+  `open: true` for the whole result.
 - **Name the domain's words once**, as small pure helpers beside the spec, and read them in the laws. A law may call a function
   of the code that has its own spec: it then says that the two agree, and leans on that spec's proof. A law that calls code
   with no spec leans on code nothing states.
@@ -85,12 +88,13 @@ export const shipping: Shipping = (total) => (total >= 50 ? 0 : 5)
 | `counterexample` | Run the function on `e.g.`'s input; the `where` line says what each call returned. Fix the code, the law or `requires`. |
 | `unmeetable` | No code could keep the law at `e.g.`'s input: the laws it names leave no result together there. Change the spec, not the code: loosen one of them, or narrow `requires`. |
 | `vacuous` | The law says nothing of the function: rewrite it. |
+| `undecided` | Of the contract: at `e.g.`'s input, both results it names keep every law. Add the law that picks one; where the choice is the code's on purpose, say `open: ["<the part>"]` in the spec, or `open: true`. |
 | `bounded` | No proof, and no counterexample with arrays of up to 4 elements. The reason says what stands in the way, often a loop's invariant (`docs/proofs.md`). |
 | `unsupported` | The code or the law uses what tsverify does not read. The reason says what to write instead. |
 | `unknown` | The solver gave no answer: split the law, or narrow what it ranges over. |
 | `inconsistent` | A bug of tsverify, not a verdict on your code. |
 
-The command exits 0 only when every law is proved.
+The command exits 0 only when every law is proved and no contract is undecided.
 
 ## Running it
 

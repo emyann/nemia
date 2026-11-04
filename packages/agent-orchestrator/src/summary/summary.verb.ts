@@ -1,8 +1,9 @@
 /**
  * Each run's summary, as the board's list gives it (`RunSummary`): its record, its steps judged in `nemia ls`'s words (`judge`), its graph,
  * what it cost and how long it has been at work; a run whose task's journal does not read answered off its record alone (`unjudged`). A
- * run at rest is answered from the list's memo (`restingRead`) while nothing it was judged on has moved, so a poll reads the journals of
- * the runs still moving and of none other. A controller: it reads the store, the engine's journals and feed through the client, and where
+ * run is judged once (`Judgement`) and read through the informer (`informerRead`), which the daemon's pass fills: a run at rest is answered
+ * from it while nothing it was judged on has moved, a moving one within the pass that judged it, so a poll reads the journals of the runs
+ * still moving and of none other. A controller: it reads the store, the engine's journals and feed through the client, and where
  * branches stand off `standing.json` (`standingSnapshot`).
  */
 import { Effect } from 'effect';
@@ -12,10 +13,13 @@ import { type AtWork, atWork, runStartedAt, type RunTokens, runTokens } from '..
 import { UNREADABLE, unjudgedWord, type UnjudgedWord } from '../views/views.verb.ts';
 import { isRepositoryRun, type PlaceKind, placeOf, prunedWords, type Run } from '../record/record.ts';
 import { runStore } from '../record/files.store.ts';
+import type { Labels } from '../labels/labels.ts';
+import type { Selectors } from '../watch/selector.ts';
+import { runLabelMap, selectedRuns } from '../runlist/runlist.ts';
 import { prunedKept } from '../prune/prune.ts';
-import type { BranchReader } from '../branches/branches.store.ts';
 import { standingReader, standingSnapshot } from '../standing/standing.verb.ts';
-import { type RestingMemo, restingRead } from '../rest/resting.verb.ts';
+import { informedJudgements, type InformerMemo, informerRead } from '../rest/informer.verb.ts';
+import { type Judgement, type Judgements, judgementsOf, sameJudgement } from './judgement.verb.ts';
 import { type RunGraph, runGraph } from './graph.ts';
 import {
   codedStep,
@@ -28,29 +32,14 @@ import {
   type WaitOn,
 } from '../feed/index.ts';
 import type { CheckVerdict } from '../check/check.ts';
+import { filedTimes, type Filings, judgedSteps, stepNames, tryOf, type Unreadable, type Views, workflowsOf } from './reads.verb.ts';
 import {
-  filedTimes,
-  type Filings,
-  judgedSteps,
-  judgedUnlessUnreadable,
-  stepNames,
-  tryOf,
-  type Unreadable,
-  type Views,
-  viewsFor,
-  viewsOf,
-  workflowsOf,
-} from './reads.verb.ts';
-import {
-  type GitAsked,
-  judge,
   needsOf,
   type RunHolding,
   type RunStatus,
   type RunToDecide,
   type RunWaiting,
   type Spent,
-  standingsOf,
   runSaid,
   stepSaid,
   type StepNeeds,
@@ -69,6 +58,11 @@ export type RunSummary = {
   brief: string;
   /** The workflow folder the run was started from, as `nemia start` resolved it: its last segment names the workflow. */
   workflowDir: string;
+  /**
+   * The run's whole map (`runLabelMap`): the labels a person put on it (`nemia label run`), its `workflow`, and its `factory`, `default`
+   * for the default factory — what a selector reads of the run, and `{ workflow, factory }` alone for a run nobody labelled.
+   */
+  labels: Labels;
   /** The agent it tried, for a try started from an agent's page (`tryOf`); null for every other run. */
   try: { agent: string } | null;
   createdAt: string;
@@ -204,6 +198,57 @@ export type RunSummary = {
   unreadable: string | null;
 };
 
+/**
+ * The fields of a run's row that are its judgement and not its record: where it stands (`status`, `phase`, `reason`, `on`, `via`), whether
+ * it still moves, what it cost, how long it has been at work and the tokens it used, what it waits on and is held until, and what a person
+ * has to decide. The list's row (`RunSummary`) and the run's object carry them from here alone (`judgedFields`).
+ */
+export type JudgedFields = Pick<
+  RunSummary,
+  'status' | 'phase' | 'reason' | 'on' | 'via' | 'moving' | 'cost' | 'atWork' | 'tokens' | 'waiting' | 'holding' | 'toDecide'
+>;
+
+/** What `judgedFields` reads of a run's judgement (`judge`). */
+export type JudgedRun = Omit<JudgedFields, 'atWork' | 'tokens'>;
+
+/**
+ * A run's judged fields (`JudgedFields`): `judge`'s reading of the run as a door carries it (`runSaid`), and its time at work and tokens
+ * off the views the judgement read (`atWork`, `runTokens`). The one assembly of them: the list's row and the run's object each call it.
+ */
+export function judgedFields(run: Pick<Run, 'steps'>, judged: JudgedRun, views: Views): JudgedFields {
+  return {
+    waiting: judged.waiting,
+    holding: judged.holding,
+    ...runSaid(judged),
+    moving: judged.moving,
+    cost: judged.cost,
+    atWork: atWork(run, views),
+    tokens: runTokens(run, views),
+    toDecide: judged.toDecide,
+  };
+}
+
+/**
+ * A run's judged fields when nothing judges it (`unjudged`): `running` and moving, as the tick counts it in flight, with nothing measured,
+ * waited on, held or to decide.
+ */
+export function unjudgedFields(): JudgedFields {
+  return {
+    waiting: null,
+    holding: null,
+    status: 'running',
+    phase: 'running',
+    reason: 'Running',
+    on: null,
+    via: null,
+    moving: true,
+    cost: null,
+    atWork: null,
+    tokens: null,
+    toDecide: null,
+  };
+}
+
 /** The agent each step of a run is given, by its name, off the workflow it is judged by (`judgedSteps`); null for a step given none. */
 function agentsOf(run: Run, folder: readonly Workflow[] | null): (name: string) => string | null {
   const steps = judgedSteps(run, folder);
@@ -216,20 +261,13 @@ function stepSince(run: Run, name: string, views: Views): string | null {
   return step ? atWork({ steps: { [name]: step } }, views).since : null;
 }
 
-/** A run's summary but when it started, which is read off the feed on each request, and what git was asked for it. */
-type Judged = { summary: Omit<RunSummary, 'startedAt'>; asked: GitAsked };
-
-const summarize = Effect.fnUntraced(function* (run: Run, views: Views, reader: Engine, git: BranchReader, home: string) {
-  const folder = workflowsOf(run, home).steps;
-  const names = stepNames(run, folder);
-  const asked: GitAsked = { branches: [], failed: false };
-  const agentOf = agentsOf(run, folder);
-  const judged = yield* judge(run, names, folder, views, {
-    reader,
-    git,
-    standings: (status, steps) => standingsOf(run, steps, status, git, asked),
-  });
-  const summary = {
+/**
+ * A run's summary but when it started, which is read off the feed on each request: off its judgement (`Judgement`), the one the run's
+ * object reads too, so the list's row and the object say the run alike (Q18). Pure but for `home`, where a try's agent is read from.
+ */
+export function summaryOf({ run, names, steps, views, judged }: Judgement, home: string): Omit<RunSummary, 'startedAt'> {
+  const agentOf = (name: string) => steps.find((step) => step.name === name)?.agent?.name ?? null;
+  return {
     id: run.id,
     repo: run.repo ?? null,
     factory: run.factory ?? null,
@@ -237,20 +275,15 @@ const summarize = Effect.fnUntraced(function* (run: Run, views: Views, reader: E
     work: isRepositoryRun(run) ? null : run.workspace,
     brief: run.brief,
     workflowDir: run.workflowDir,
+    labels: runLabelMap(run),
     try: tryOf(run, home),
     createdAt: run.createdAt,
     cancelledAt: run.cancelledAt ?? null,
     pruned: run.pruned ? { said: `${prunedWords(run.pruned)}; ${prunedKept(run.pruned)}` } : null,
     after: run.after ?? [],
     context: run.context ?? [],
-    waiting: judged.waiting,
+    ...judgedFields(run, judged, views),
     holdUntil: judged.holding && run.hold ? run.hold.until : [],
-    holding: judged.holding,
-    ...runSaid(judged),
-    moving: judged.moving,
-    cost: judged.cost,
-    atWork: atWork(run, views),
-    tokens: runTokens(run, views),
     steps: names.map((name) => ({
       name,
       taskId: run.steps[name]?.taskId ?? null,
@@ -262,14 +295,12 @@ const summarize = Effect.fnUntraced(function* (run: Run, views: Views, reader: E
       since: stepSince(run, name, views),
       ...needsOf(run, name, views, judged),
     })),
-    graph: runGraph(judgedSteps(run, folder), names),
+    graph: runGraph(steps, names),
     waitingOnYou: judged.waitingOnYou,
     waitingOnYouWords: judged.waitingOnYouWords,
-    toDecide: judged.toDecide,
     unreadable: null,
   };
-  return { summary, asked } satisfies Judged;
-});
+}
 
 /**
  * A step's codes on a run left unjudged, off its word (`unjudgedWord`): `failed` with `Unknown` for the step a task of which does not read
@@ -305,24 +336,15 @@ function unjudged(run: Run, views: Views, unreadable: Unreadable, said: string, 
     work: isRepositoryRun(run) ? null : run.workspace,
     brief: run.brief,
     workflowDir: run.workflowDir,
+    labels: runLabelMap(run),
     try: tryOf(run, home),
     createdAt: run.createdAt,
     cancelledAt: run.cancelledAt ?? null,
     pruned: run.pruned ? { said: `${prunedWords(run.pruned)}; ${prunedKept(run.pruned)}` } : null,
     after: run.after ?? [],
     context: run.context ?? [],
-    waiting: null,
+    ...unjudgedFields(),
     holdUntil: run.hold && !run.cancelledAt ? run.hold.until : [],
-    holding: null,
-    status: 'running',
-    phase: 'running',
-    reason: 'Running',
-    on: null,
-    via: null,
-    moving: true,
-    cost: null,
-    atWork: null,
-    tokens: null,
     steps: names.map((name) => ({
       name,
       taskId: run.steps[name]?.taskId ?? null,
@@ -343,110 +365,71 @@ function unjudged(run: Run, views: Views, unreadable: Unreadable, said: string, 
     graph: runGraph(judgedSteps(run, folder), names),
     waitingOnYou: [],
     waitingOnYouWords: [],
-    toDecide: null,
     unreadable: said,
   };
 }
 
-/**
- * A run judged, or answered off its record (`unjudged`) when its unfrozen folder does not load or a task it reads does not
- * (`judgedUnlessUnreadable`).
- */
-const judgedOrNot = Effect.fnUntraced(function* (
-  run: Run,
-  views: Views,
-  unreadable: Unreadable,
-  reader: Engine,
-  git: BranchReader,
-  home: string,
-) {
-  const one = yield* judgedUnlessUnreadable(run, unreadable, () => summarize(run, views, reader, git, home));
-  return 'judged' in one ? one.judged : { unjudged: unjudged(run, views, unreadable, one.unreadable, home) };
-});
+/** Each of `runs` summarized off what was judged of it, or off its record where it was not judged (`unjudged`). */
+const summariesOf = (runs: readonly Run[], judged: Judgements, home: string): Map<string, Omit<RunSummary, 'startedAt'>> =>
+  new Map(
+    runs.flatMap((run) => {
+      const one = judged.runs.get(run.id);
+      if (one === undefined) return [];
+      return [
+        [
+          run.id,
+          'judgement' in one ? summaryOf(one.judgement, home) : unjudged(run, judged.views, judged.unreadable, one.unjudged, home),
+        ] as const,
+      ];
+    }),
+  );
 
 /**
- * Runs judged now, as the list judges them and never from its memo: for a write that must know whether one still moves (a try started
- * from an agent's page).
+ * Runs judged now, as the list judges them and never from the informer: for a write that must know whether one still moves (a try
+ * started from an agent's page).
  */
 export const judgedNow = Effect.fn('judgedNow')(function* (e: Engine, home: string, some: readonly Run[]) {
-  const { views, reader, unreadable } = yield* viewsFor(e, some);
   const git = standingReader(yield* standingSnapshot());
-  const out: Array<Omit<RunSummary, 'startedAt'>> = [];
-  for (const run of some) {
-    const one = yield* judgedOrNot(run, views, unreadable, reader, git, home);
-    out.push('unjudged' in one ? one.unjudged : one.summary);
-  }
-  return out;
+  const summaries = summariesOf(some, yield* judgementsOf(e, home, some, git), home);
+  return some.flatMap((run) => {
+    const summary = summaries.get(run.id);
+    return summary ? [summary] : [];
+  });
 });
 
 /**
- * Whether a run's summary may be kept (`restingRead`): a run at rest, which nothing but a person, git or the engine's journals can move.
- * Its status not `running` or the run pruned, nothing of it moving, waited on or held, every task it has filed settled, the workflow it is
- * judged by frozen on its record — a folder on disk is watched by nothing — and git's every answer given. The tick's own test (`atRest`
- * in the package's rest.ts) reads what a pass would file; this reads what the list says, which is what it keeps.
- */
-const atRest = Effect.fnUntraced(function* (run: Run, judged: Judged, reader: Engine) {
-  const { summary, asked } = judged;
-  if (!run.workflow || run.hold || asked.failed || summary.moving || summary.waiting || summary.holding) return false;
-  if (!run.pruned && summary.status === 'running') return false;
-  return [...(yield* viewsOf(run, reader)).values()].every((view) => view.state.settled);
-});
-
-/**
- * How the list reads: `home`, the store a person's files are read from; `memo`, the memo of runs at rest it answers from and keeps in;
- * `filings`, the feed's filing times it reads on from; and `verify`, whether each answer from memory is judged afresh too
- * (`WF_VERIFY_REST`).
+ * How the list reads: `home`, the store a person's files are read from; `memo`, the informer it answers from and keeps in (a fresh one
+ * for a caller that keeps none, which judges every run); `filings`, the feed's filing times it reads on from; and `verify`, whether each
+ * answer from memory is judged afresh too (`WF_VERIFY_REST`); and `selectors`, the runs it lists, those whose whole map one of them
+ * takes (`selectedRuns`), every run where none is given.
  */
 export type SummaryHow = {
   home: string;
-  memo: RestingMemo<Omit<RunSummary, 'startedAt'>>;
+  memo: InformerMemo;
   filings: Filings;
   verify: boolean;
+  selectors?: Selectors;
 };
 
 /**
- * Every run's summary, in the store's order, as the board's list answers it: through `e`, off `how.memo` (`restingRead`), verified as
- * `how.verify` says. Dies where a verified answer differs from the memo's (`answered`).
+ * Every run's summary, in the store's order, as the board's list answers it: through `e`, each run's judgement read through the informer
+ * `how.memo` (`informedJudgements`) — the one the daemon's pass fills and the run's object reads — and summarized off it (`summaryOf`),
+ * verified as `how.verify` says. Dies where a verified answer differs from the informer's (`answered`).
  *
- * The store is listed through the memo (`given`): a run whose files stamp as they did is listed as the run the memo kept, its record not
+ * The store is listed through the informer (`given`): a run whose files stamp as they did is listed as the run it kept, its record not
  * read, so a warm read costs the stamp walk and the records of the runs still moving alone. A verified read is given nothing and reads
  * every record afresh.
  */
-export const runsSummarized = Effect.fn('runsSummarized')(function* (e: Engine, { home, memo, filings, verify }: SummaryHow) {
+export const runsSummarized = Effect.fn('runsSummarized')(function* (e: Engine, { home, memo, filings, verify, selectors }: SummaryHow) {
   const git = standingReader(yield* standingSnapshot());
-  const read = yield* restingRead(e, memo, verify, git);
-  const runs = runStore.runs.list(undefined, read.given);
-  read.only(runs.map((run) => run.id));
+  const read = yield* informerRead(e, memo, verify, git, sameJudgement);
+  const all = runStore.runs.list(undefined, read.given);
+  read.only(all.map((run) => run.id));
   const filed = yield* filedTimes(e, filings);
-  const kept = new Map<string, Omit<RunSummary, 'startedAt'>>();
-  const toJudge: Run[] = [];
-  for (const run of runs) {
-    const answer = read.kept(run);
-    if (answer) kept.set(run.id, answer);
-    if (!answer || read.verify) toJudge.push(run);
-  }
-  const { views, reader, unreadable } = yield* viewsFor(e, toJudge, () => runs);
-  const judged = new Map<string, Judged>();
-  const notJudged = new Map<string, Omit<RunSummary, 'startedAt'>>();
-  for (const run of toJudge) {
-    const one = yield* judgedOrNot(run, views, unreadable, reader, git, home);
-    if ('unjudged' in one) {
-      notJudged.set(run.id, one.unjudged);
-      kept.delete(run.id);
-      read.drop(run);
-      continue;
-    }
-    judged.set(run.id, one);
-    read.answered(run, one.summary);
-    if (kept.has(run.id)) continue;
-    if (yield* atRest(run, one, reader)) read.keep(run, one.summary, one.asked.branches, git.heads);
-    else read.drop(run);
-  }
-  const summaries: RunSummary[] = runs.flatMap((run) => {
-    const summary = judged.get(run.id)?.summary ?? notJudged.get(run.id) ?? kept.get(run.id);
-    if (summary === undefined) return [];
-    if (kept.has(run.id)) read.hit();
-    return [{ ...summary, startedAt: runStartedAt(run, filed) }];
+  const runs = selectedRuns(all, selectors);
+  const summaries = summariesOf(runs, yield* informedJudgements(e, home, runs, read, git, () => all), home);
+  return runs.flatMap((run): RunSummary[] => {
+    const summary = summaries.get(run.id);
+    return summary ? [{ ...summary, startedAt: runStartedAt(run, filed) }] : [];
   });
-  return summaries;
 });

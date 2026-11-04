@@ -153,11 +153,11 @@ const keyNamed = (written: string): string => (Object.hasOwn(FORMER_KEYS, writte
 
 /**
  * The frontmatter as key → value: every key a key `refusal` does not refuse — a key a step has, or an agent — set once, to something. The
- * block is read as YAML, or in the former line form (`readFrontmatter`), which refuses a block in neither; a list on a key that holds one
- * (`LIST_KEYS`) reads as the comma string, `tools: [Read, Grep]` as `Read, Grep`, and a list on any other key is refused (`flatValue`). A
- * key under its former name (`FORMER_KEYS`) is read as the key, and `spelled` says under which name, so a refusal quotes the line as
- * written. A key set twice, under either name, is refused rather than last-one-wins: both values are something the author meant, and a
- * step would wait on half of what it was written to wait on.
+ * block is read as YAML (`readFrontmatter`), which refuses one in the former line form, naming its line and the YAML to write; a list on a
+ * key that holds one (`LIST_KEYS`) reads as the comma string, `tools: [Read, Grep]` as `Read, Grep`, and a list on any other key is refused
+ * (`flatValue`). A key under its former name (`FORMER_KEYS`) is read as the key, and `spelled` says under which name, so a refusal quotes
+ * the line as written. A key set twice, under either name, is refused rather than last-one-wins: both values are something the author
+ * meant, and a step would wait on half of what it was written to wait on.
  *
  * A harness's block, `<harness>: { fence: { permissionMode: <mode>, tools: [Read] } }`, is read into the same keys, each a key of that
  * harness's fence (`fenceKeysOf`), and handed back as `block`: whether it is the file's harness is the caller's to judge
@@ -320,8 +320,8 @@ const noValue = (step: string, key: string, written: string): string =>
             ? `${step}: \`budget\` has no value, which reads as no cap to one person and as nothing to spend to another. Give the most the step's tries may cost together, in dollars — ${BUDGET_EXAMPLE} — or delete the line, and the step has no budget.`
             : `${step}: \`${key}\` has no value. Delete the line rather than leaving it blank — an empty key is not the same as an absent one.`;
 
-/** A file's frontmatter as it reads (`readFrontmatter`), or null for a file with none, one that never closes, or one in neither form. */
-function frontmatterOf(text: string): { entries: FrontmatterEntry[]; former: boolean } | null {
+/** A file's frontmatter as it reads (`readFrontmatter`), or null for a file with none, one that never closes, or one it refuses. */
+function frontmatterOf(text: string): { entries: FrontmatterEntry[] } | null {
   try {
     const { block } = splitFrontmatter('', text);
     return block === null ? null : frontmatterOrNull(block);
@@ -403,7 +403,7 @@ export function fenceMoved(name: string, text: string, harness: string | undefin
   if (block === null) return { text, changed: false, kept: [] };
   const read = readFrontmatter(name, block);
   const top = read.entries.filter(({ key }) => FORMER_FENCE_KEYS.includes(key));
-  if (read.former || !top.length) return { text, changed: false, kept: [] };
+  if (!top.length) return { text, changed: false, kept: [] };
   const fences = new Map<string, Record<string, FrontmatterValue>>();
   for (const entry of read.entries.filter(({ key }) => isHarnessBlock(key))) fences.set(entry.key, { ...fenceOfBlock(entry.value) });
   const kept: string[] = [];
@@ -436,9 +436,6 @@ export function formerKeysIn(text: string): string[] {
   return (frontmatterOf(text)?.entries ?? []).flatMap(({ key }) => (Object.hasOwn(FORMER_KEYS, key) ? [key] : []));
 }
 
-/** Whether a file's frontmatter is read in the former line form (`readFrontmatter` marks it `former`): what `formerFormLine` names. */
-export const inFormerForm = (text: string): boolean => frontmatterOf(text)?.former === true;
-
 /**
  * Why a former name is not written: read from a file, it is never put in one (`renderStep`, `renderAgent`). What sends one is a stale form
  * — a board page drawn when the key had its former name — and its save is refused rather than written under a name the file would then
@@ -470,13 +467,6 @@ export const codexModeLine = (file: string, word: string): string =>
  */
 export const formerKeyLine = (file: string, former: string): string =>
   `${file}: \`${former}:\` is read as \`${FORMER_KEYS[former]}:\`, Claude Code's name for it. The former name is still read; rename the line, or save the file from the board, which writes the new name.`;
-
-/**
- * What `nemia start` says of a file whose frontmatter is still in the former line form (`inFormerForm`), `key: the rest of the line`,
- * never quoted: that it is still read, and the fix. The one writer of it.
- */
-export const formerFormLine = (file: string): string =>
-  `${file}: the frontmatter is in the former line form, \`key: the rest of the line\`, which is still read, and is not YAML. Rewrite it as YAML, every value the same: nemia frontmatter rewrite <folder>, or save the file from the board.`;
 
 /**
  * What `nemia start` says of an agent file that still says `systemPrompt:` (`FORMER_OWN_KEYS`), and as what it is read. The one writer of

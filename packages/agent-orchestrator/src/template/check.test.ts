@@ -73,6 +73,7 @@ const documents = (): Record<string, any> => ({
           place: 'git',
           budget: 40,
           check: { param: 'check' },
+          output: { path: 'workflows/dev/implement.schema.json' },
           overrides: { skills: ['change-the-board'], claude: { fence: { disallowedTools: ['Bash(npm publish:*)'] } } },
         },
         { name: 'review', after: ['implement'], loop: 'implement', rounds: 3, budget: 16, overrides: { claude: { model: 'sonnet' } } },
@@ -99,21 +100,24 @@ const OTHER_FILES = [
   'skills/write-a-spec/SKILL.md',
   'workflows/dev/design.md',
   'workflows/dev/implement.md',
+  'workflows/dev/implement.schema.json',
   'workflows/dev/land.md',
   'workflows/dev/review.md',
 ];
 
-/** The refusals of `software-team/` once `edit` has changed its documents and `files` its other files; `placeSkills` are shipped. */
+/** The refusals of `software-team/` once `edit` has changed its documents and `files` its other files; `packageSkills` are shipped. */
 function refusalsOf(
   edit: (docs: Record<string, any>) => void = () => {},
   files: (others: string[]) => string[] = (others) => others,
-  placeSkills: readonly string[] = ['git'],
+  packageSkills: readonly string[] = ['git'],
+  texts: Readonly<Record<string, string>> = {},
 ): Refusal[] {
   const docs = documents();
   edit(docs);
   return checkTemplate(
     { name: 'software-team', files: [...Object.keys(docs), ...files([...OTHER_FILES])].sort(), documents: new Map(Object.entries(docs)) },
-    placeSkills,
+    packageSkills,
+    (file) => texts[file] ?? '',
   );
 }
 
@@ -252,6 +256,19 @@ test('the check of a template folder: the whole folder passes, and each rule bro
     );
   });
 
+  await t.test("an agent's overridable words are what a step may override: one that is none is refused at its place", () => {
+    assert.deepEqual(
+      refusalsOf((d) => (d[AGENT].spec.overridable = ['fence', 'skills'])),
+      [],
+    );
+    assertRefused(
+      refusalsOf((d) => (d[AGENT].spec.overridable = ['fence', 'wiring'])),
+      AGENT,
+      ['spec', 'overridable', 1],
+      'wiring',
+    );
+  });
+
   await t.test('a hire naming no workflow, no step or no agent is refused', () => {
     const hire = (key: string, agent: string) => refusalsOf((d) => (d['nemia.yaml'].spec.hires[key] = agent));
     assertRefused(hire('dev/nope', 'implementer'), 'nemia.yaml', ['spec', 'hires', 'dev/nope'], 'names no step of dev');
@@ -375,6 +392,19 @@ test('the check of a template folder: the whole folder passes, and each rule bro
     );
   });
 
+  await t.test(
+    "a step's own closeout schema is a {path:} to a file of its workflow's folder, refused anywhere else and as a bare file name",
+    () => {
+      const workflow = 'workflows/dev/workflow.yaml';
+      const at = ['spec', 'steps', 1, 'output', 'path'];
+      const output = (value: unknown) => refusalsOf((d) => (d[workflow].spec.steps[1].output = value));
+      assertRefused(output({ path: 'workflows/dev/missing.schema.json' }), workflow, at.slice(0, -1), 'is not in the template');
+      assertRefused(output({ path: 'agents/implementer/output.schema.json' }), workflow, at, 'workflows/dev/');
+      assertRefused(output({ path: 'workflows/dev/implement.md' }), workflow, at, 'workflows/dev/');
+      assertRefused(output('implement.schema.json'), workflow, ['spec', 'steps', 1, 'output'], 'is a map');
+    },
+  );
+
   await t.test('a {param:} nemia.yaml does not declare is refused, a budget or a check, and a declared one passes', () => {
     const workflow = 'workflows/dev/workflow.yaml';
     const at = (i: number, key: string) => ['spec', 'steps', i, key];
@@ -396,6 +426,34 @@ test('the check of a template folder: the whole folder passes, and each rule bro
     };
     assert.deepEqual(refusalsOf(declared), []);
   });
+
+  await t.test(
+    'a ${{ parameters.<name> }} nemia.yaml does not declare is refused, in a check at its key and in a text the render writes at its file, and a declared one passes',
+    () => {
+      const workflow = 'workflows/dev/workflow.yaml';
+      const named = (d: Record<string, any>) => (d[workflow].spec.steps[1].check = 'go --check ${{ parameters.nope }}');
+      assertRefused(refusalsOf(named), workflow, ['spec', 'steps', 1, 'check'], 'nope');
+      const texts = {
+        'RULES.md': 'A card says what it is.\nIts areas: ${{parameters.nope}}.\n',
+        'workflows/dev/review.md': 'Wait on ${{ parameters.nope }}.',
+        'agents/reviewer/instructions.md': 'Read ${{ parameters.nope }}.',
+        'NEMIA.md': 'Operate ${{ parameters.nope }}.',
+      };
+      const withRules = (others: string[]) => [...others, 'RULES.md'];
+      const inTexts = refusalsOf(undefined, withRules, ['git'], texts);
+      for (const file of Object.keys(texts)) assertRefused(inTexts, file, [], 'nope');
+      assert.deepEqual([inTexts.find((r) => r.file === 'RULES.md')?.line, inTexts.find((r) => r.file === 'RULES.md')?.col], [2, 12]);
+      const carried = refusalsOf(undefined, withRules, ['git'], {
+        'skills/implement-a-change/scripts/coverage.ts': '${{ parameters.nope }}',
+      });
+      assert.deepEqual(carried, [], 'a carried file is copied as it is, and the check reads none of it');
+      const declared = (d: Record<string, any>) => {
+        named(d);
+        d['nemia.yaml'].spec.parameters.nope = { type: 'string', description: 'Declared now.', default: 'ci' };
+      };
+      assert.deepEqual(refusalsOf(declared, withRules, ['git'], texts), []);
+    },
+  );
 
   await t.test("an effort, a fence key or word, a context and an option the harness lacks are refused, through the runtime's knobs", () => {
     const block = (harness: string, profile: Record<string, unknown>) => refusalsOf((d) => (d[AGENT].spec[harness] = profile));

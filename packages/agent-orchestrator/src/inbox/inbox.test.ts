@@ -8,8 +8,10 @@ import { test } from 'node:test';
 import { queueFactoryRefusal } from './queue-factory.ts';
 import assert from 'node:assert/strict';
 import {
+  cardLabels,
   fromText,
   ideaCard,
+  labelledText,
   INBOX_KEY_MEANINGS,
   INBOX_KEYS,
   inboxLines,
@@ -73,7 +75,7 @@ test("each of an inbox card's keys has one line of meaning, in the keys' order",
 });
 
 test('an inbox card is its file: the name without .md, `workflow:` and `repo:` from its frontmatter when set — each optional — and the body', () => {
-  assert.deepEqual(INBOX_KEYS, ['workflow', 'repo', 'queued', 'gate', 'factory', 'from']);
+  assert.deepEqual(INBOX_KEYS, ['workflow', 'repo', 'queued', 'gate', 'factory', 'from', 'labels']);
   assert.deepEqual(read('---\nworkflow: dev\nrepo: /home/me/code/app\n---\nCache the views.\n\nBetween passes.\n'), {
     name: 'cache-the-views-k2q9',
     file: 'cache-the-views-k2q9.md',
@@ -228,6 +230,7 @@ test("`inboxListing`: each card by file name, with the runs whose record's `from
         repo: null,
         factory: null,
         startedAs: ['broken-gh78'],
+        labels: {},
         state: 'started',
         from: [],
         factoryRepo: null,
@@ -241,6 +244,7 @@ test("`inboxListing`: each card by file name, with the runs whose record's `from
         repo: '/home/me/code/app',
         factory: null,
         startedAs: [],
+        labels: {},
         state: 'filed',
         from: [],
         factoryRepo: null,
@@ -254,6 +258,7 @@ test("`inboxListing`: each card by file name, with the runs whose record's `from
         repo: null,
         factory: null,
         startedAs: [],
+        labels: {},
         state: 'filed',
         from: [],
         factoryRepo: null,
@@ -267,6 +272,7 @@ test("`inboxListing`: each card by file name, with the runs whose record's `from
         repo: null,
         factory: null,
         startedAs: [],
+        labels: {},
         state: 'filed',
         from: [],
         factoryRepo: null,
@@ -280,6 +286,7 @@ test("`inboxListing`: each card by file name, with the runs whose record's `from
         repo: null,
         factory: null,
         startedAs: ['parse-the-flag-ab12', 'parse-the-flag-ef56'],
+        labels: {},
         state: 'started',
         from: [],
         factoryRepo: null,
@@ -784,6 +791,46 @@ test("`from:` names the runs a card's run is handed as context, in the order wri
   assert.equal(fromText(card, [], isDirectory), '---\nworkflow: build\n---\nCache the views.\n', 'taken back: the line goes');
 });
 
+test("`labels:` is a card's map of a person's labels: read as a map, listed, selectable beside workflow and factory, shown on request, written back with every other key kept", () => {
+  const card = read('---\nworkflow: build\nlabels:\n  team: core\n  area: inbox\n---\nCache the views.\n');
+  assert.deepEqual(card.labels, { team: 'core', area: 'inbox' });
+  assert.deepEqual(read('---\nlabels: { team: core }\n---\nx\n').labels, { team: 'core' }, 'in flow form too');
+  assert.equal(Object.hasOwn(read('---\nworkflow: dev\n---\nx\n'), 'labels'), false, 'none unless it says so');
+
+  const [listed, bare] = inboxListing(
+    [
+      { file: 'a-1x2y.md', text: '---\nworkflow: build\nfactory: acme\nlabels: { team: core }\n---\nCache the views.\n' },
+      { file: 'b-3z4w.md', text: 'Show the flag.\n' },
+    ],
+    [],
+    isDirectory,
+  );
+  assert.deepEqual([listed.labels, bare.labels], [{ team: 'core' }, {}], 'an entry carries its person labels, none as {}');
+  assert.deepEqual(cardLabels(listed), { team: 'core', workflow: 'build', factory: 'acme' });
+  assert.deepEqual(cardLabels(bare), { factory: 'default' }, 'only the keys the card sets, and the default factory it starts in');
+
+  const plain = inboxLines([listed, bare]);
+  assert.deepEqual(inboxLines([listed, bare], false, {}), plain, 'no flag: the lines as before');
+  assert.equal(
+    plain.some((line) => line.includes('team')),
+    false,
+  );
+  const shown = inboxLines([listed, bare], false, { showLabels: true, columns: ['team', 'area'] });
+  assert.ok(shown[0]?.endsWith('  labels: factory=acme,team=core,workflow=build  team: core  area: <none>'), shown[0]);
+  assert.ok(shown[1]?.endsWith('  labels: factory=default  team: <none>  area: <none>'), shown[1]);
+
+  const text = '---\n# what runs it\nworkflow: build\nfrom: a-1x2y\n---\nCache the views.\n\nBetween passes.\n';
+  const relabelled = labelledText(read(text), { team: 'core' }, isDirectory);
+  assert.equal(relabelled, '---\nworkflow: build\nfrom: a-1x2y\nlabels:\n  team: core\n---\nCache the views.\n\nBetween passes.\n');
+  assert.deepEqual(read(relabelled), { ...read(text), labels: { team: 'core' } }, 'every other key and the body kept');
+  assert.equal(
+    labelledText(read(relabelled), {}, isDirectory),
+    '---\nworkflow: build\nfrom: a-1x2y\n---\nCache the views.\n\nBetween passes.\n',
+  );
+  assert.deepEqual(read(fromText(read(relabelled), ['c-5v6u'], isDirectory)).labels, { team: 'core' }, '`from:` written keeps them');
+  assert.match(ideaCard('the idea', 'x', { labels: { team: 'core' } }, isDirectory).text, /labels:\n {2}team: core\n/, 'filed with them');
+});
+
 /** Refused as `Invalid`, exit 2, its words naming each of `facts`: the file or idea, the key at fault, the fix. */
 const refusedNaming =
   (...facts: string[]) =>
@@ -857,6 +904,13 @@ test("REFUSED by name at shipped defaults: `parseInboxCard` refuses a card's key
     ],
     '`from:` with a blank run': ['---\nfrom: a-1x2y, \n---\nx\n', ['`from:` names runs by id, comma-separated']],
     '`from:` naming a run twice': ['---\nfrom: a-1x2y, a-1x2y\n---\nx\n', ['names a-1x2y twice']],
+    '`labels:` that is not a map': ['---\nlabels: team\n---\nx\n', [F, '`labels`', 'team: core']],
+    '`labels:` with no value': ['---\nlabels:\n---\nx\n', [F, '`labels`']],
+    '`labels:` holding a list': ['---\nlabels: { team: [a, b] }\n---\nx\n', [F, '`labels`', 'team']],
+    '`labels:` with a reserved key': ['---\nlabels: { reason: x }\n---\nx\n', [F, 'reason']],
+    '`labels:` with a closed key': ['---\nlabels: { workflow: x }\n---\nx\n', [F, 'workflow']],
+    '`labels:` with a prefixed key': ['---\nlabels: { a/b: x }\n---\nx\n', [F, '"a/b"', 'prefix']],
+    '`labels:` twice': ['---\nlabels: { a: x }\nlabels: { b: y }\n---\nx\n', [F, '`labels` is set twice']],
   };
   for (const [name, [text, facts]] of Object.entries(rows))
     await t.test(name, () => assert.throws(() => read(text), refusedNaming(...facts)));

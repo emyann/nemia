@@ -13,6 +13,7 @@ import { isFolderTeam } from '../workflow/index.ts';
 import { placesOf } from '../folder/lookup.store.ts';
 import { readFactory } from '../factory/factory.store.ts';
 import { Invalid } from '../refusal/refusal.ts';
+import { tried as lifted } from '../runtime-client.ts';
 
 /**
  * What `startPlan` did: the cards it started, in order; the workflow folder each card's `workflow:` was found at; and, when a start
@@ -47,9 +48,9 @@ export const startPlan = Effect.fn('startPlan')(function* (opts: { dir: string; 
   const folders = new Map<string, string>();
   let onRepo = false;
   for (const card of cards) {
-    try {
-      const folder = workflowFolder(card.workflow, opts.dir, opts.repo, factory?.tree);
-      const steps = stepsToStart(
+    const { folder, steps } = yield* Effect.gen(function* () {
+      const folder = yield* lifted(() => workflowFolder(card.workflow, opts.dir, opts.repo, factory?.tree));
+      const steps = yield* stepsToStart(
         folder,
         true,
         placesOf(opts.repo),
@@ -58,13 +59,19 @@ export const startPlan = Effect.fn('startPlan')(function* (opts: { dir: string; 
         [],
         undefined,
         false,
-        repoAllows(opts.repo, opts.factory),
+        yield* lifted(() => repoAllows(opts.repo, opts.factory)),
       );
-      onRepo = onRepo || !isFolderTeam(steps);
-      folders.set(card.name, folder);
-    } catch (err) {
-      throw new Invalid({ message: `${card.file}: \`workflow: ${card.workflow}\` — ${(err as Error).message}` });
-    }
+      return { folder, steps };
+    }).pipe(
+      Effect.catchCause((cause) => {
+        const err = Cause.squash(cause);
+        return Effect.fail(
+          new Invalid({ message: `${card.file}: \`workflow: ${card.workflow}\` — ${err instanceof Error ? err.message : String(err)}` }),
+        );
+      }),
+    );
+    onRepo = onRepo || !isFolderTeam(steps);
+    folders.set(card.name, folder);
   }
   if (onRepo) openPlace(place, opts.repo, true);
   const folderOf = (card: Card): string => folders.get(card.name) ?? workflowFolder(card.workflow, opts.dir, opts.repo, factory?.tree);

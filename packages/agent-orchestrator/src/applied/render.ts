@@ -1,11 +1,13 @@
 /**
  * A checked template rendered into a factory's own folder, in today's format (`renderFactory`): the inverse of `nemia template export`'s
- * `draftOf`. Each workflow's steps become step files (`renderStep`), each agent an agent file (`renderAgent`) with its output schema
- * beside it, each skill's folder is carried as it is, and the manifest's hires, its revisions policy and the workflows become the
- * factory's wiring (`factory.json`), its instruction `NEMIA.md`, its rules `RULES.md`. The tree is laid out as yours is:
- * `workflows/<workflow>/`, `workflows/agents/` and `workflows/skills/`, so today's readers load it unchanged. Pure: the store reads the
- * folder and the files a document names, and writes what comes back. A key today's format has no place for is refused by name, never
- * dropped.
+ * `draftOf`. Each workflow's steps become step files (`renderStep`), a step's own closeout schema named beside it, each agent an agent
+ * file (`renderAgent`) with its output schema beside it, each skill's folder is carried as it is, and the manifest's hires, its revisions
+ * policy and the workflows become the factory's wiring (`factory.json`), its instruction `NEMIA.md`, its rules `RULES.md`. The tree is
+ * laid out as yours is: `workflows/<workflow>/`, `workflows/agents/` and `workflows/skills/`, so today's readers load it unchanged. Pure:
+ * the store reads the folder and the files a document names, and writes what comes back. A key today's format has no place for is refused
+ * by name, never dropped. A parameter's value reaches inside text: each `${{ parameters.<name> }}` is written with it in every string of a
+ * document (`substitute`) and in every text the render writes — a step's and an agent's instructions, `NEMIA.md`, `RULES.md`
+ * (`interpolated`) — while a carried file (a script, a skill's files, a schema) is copied byte for byte.
  */
 import { renderAgent, type AgentDraft } from '../agents/agents.ts';
 import { DEFAULT_HARNESS } from '../harness/harness.ts';
@@ -15,7 +17,7 @@ import { AGENTS_FOLDER, SKILLS_FOLDER } from '../step/step.ts';
 import { isMap, type ReadFolder } from '../template/index.ts';
 import { renderStep } from '../workflow/index.ts';
 import { baseSpelled } from '../former/former.ts';
-import { substitute, type Params } from './params.ts';
+import { interpolated, substitute, type Params } from './params.ts';
 
 /** A checked template as the store hands it in: its folder as read, and the text of one of its files by its path. */
 export type TemplateRead = { folder: ReadFolder; text: (file: string) => string };
@@ -49,15 +51,25 @@ const BLOCK_WORDS = ['model', 'effort', 'context'] as const;
 /** A value as a frontmatter line writes it: a list as `a, b`, anything else as its words. */
 const lineOf = (value: unknown): string => (Array.isArray(value) ? value.map(String).join(', ') : String(value));
 
-/** The text a `Text` value gives: the words, or the file of the template it names (`{path}`). */
-function textOf(value: unknown, read: TemplateRead): string {
-  if (isMap(value) && typeof value.path === 'string') return read.text(value.path);
+/**
+ * The text a `Text` value gives, each `${{ parameters.<name> }}` in it written with its value: the words, already written as a document's
+ * string is (`substitute`), or the file of the template it names (`{path}`).
+ */
+function textOf(value: unknown, read: TemplateRead, params: Params): string {
+  if (isMap(value) && typeof value.path === 'string') return interpolated(read.text(value.path), params);
   return String(value);
 }
 
-/** The words of `value` when present, else of `file` when the template holds it, else none. */
-function textOr(value: unknown, file: string, read: TemplateRead): string | undefined {
-  if (value !== undefined) return textOf(value, read);
+/** The words of `value` when present, else of `file` when the template holds it, else none; each expression written with its value. */
+function textOr(value: unknown, file: string, read: TemplateRead, params: Params): string | undefined {
+  if (value !== undefined) return textOf(value, read, params);
+  return read.folder.files.includes(file) ? interpolated(read.text(file), params) : undefined;
+}
+
+/** The bytes of `value`'s file (`{path}`), else of `file` when the template holds it, else none: a schema, carried as it is. */
+function carriedOr(value: unknown, file: string, read: TemplateRead): string | undefined {
+  if (isMap(value) && typeof value.path === 'string') return read.text(value.path);
+  if (value !== undefined) return typeof value === 'string' ? value : JSON.stringify(value);
   return read.folder.files.includes(file) ? read.text(file) : undefined;
 }
 
@@ -115,19 +127,33 @@ const STEP_WORDS = [
  * The step `step` of `workflow` as its file: its wiring, a former `workspace: main` written as `base` (`baseSpelled`), its overrides on
  * the harness it runs on (`harness`), and its instruction.
  */
-function stepFile(workflow: string, step: Spec, harness: string, read: TemplateRead, refusals: string[]): string | undefined {
+function stepFile(
+  workflow: string,
+  step: Spec,
+  harness: string,
+  read: TemplateRead,
+  params: Params,
+  refusals: string[],
+): string | undefined {
   const name = String(step.name);
   const where = `${WORKFLOWS}/${workflow}/workflow.yaml, step ${name}`;
   const keys: Record<string, string> = {};
   for (const key of STEP_WORDS) if (step[key] !== undefined) keys[key] = lineOf(step[key]);
   if (step.gate === true) keys.gate = 'true';
   Object.assign(keys, baseSpelled(keys));
+  const output = isMap(step.output) ? step.output.path : undefined;
+  const folder = `${WORKFLOWS}/${workflow}/`;
+  if (typeof output === 'string' && output.startsWith(folder)) keys.output = output.slice(folder.length);
+  else if (output !== undefined)
+    refusals.push(
+      `${where}: \`output.path\` is ${JSON.stringify(output)}, no file of ${folder}: carry the schema there, name it from the template's root, and apply again.`,
+    );
   const overrides = isMap(step.overrides) ? step.overrides : {};
   if (typeof overrides.harness === 'string') keys.harness = overrides.harness;
   if (overrides.skills !== undefined) keys.skills = lineOf(overrides.skills);
   if (overrides.mcp !== undefined) keys.mcp = lineOf(overrides.mcp);
   Object.assign(keys, blockKeys(where, blocksOf(overrides, ['harness', 'skills', 'mcp']), harness, refusals));
-  const body = textOr(step.instruction, `${WORKFLOWS}/${workflow}/${name}.md`, read) ?? '';
+  const body = textOr(step.instruction, `${WORKFLOWS}/${workflow}/${name}.md`, read, params) ?? '';
   try {
     return renderStep({ name, body, ...keys } as never);
   } catch (err) {
@@ -143,13 +169,20 @@ function agentHarness(specs: ReadonlyMap<string, Spec>, name: string | undefined
 }
 
 /** The workflow `name`'s step files and carried files, into `out`. */
-function renderWorkflow(name: string, read: TemplateRead, specs: ReadonlyMap<string, Spec>, hires: Wiring['hires'], out: Rendered): void {
+function renderWorkflow(
+  name: string,
+  read: TemplateRead,
+  params: Params,
+  specs: ReadonlyMap<string, Spec>,
+  hires: Wiring['hires'],
+  out: Rendered,
+): void {
   const folder = `${WORKFLOWS}/${name}`;
   const spec = (read.folder.documents.get(`${folder}/workflow.yaml`) as { spec?: { steps?: Spec[] } } | null)?.spec;
   for (const step of spec?.steps ?? []) {
     const overrides = isMap(step.overrides) ? step.overrides : {};
     const harness = typeof overrides.harness === 'string' ? overrides.harness : agentHarness(specs, hires[`${name}/${String(step.name)}`]);
-    const text = stepFile(name, step, harness, read, out.refusals);
+    const text = stepFile(name, step, harness, read, params, out.refusals);
     if (text !== undefined) out.files.push({ path: `${folder}/${String(step.name)}.md`, text });
   }
   for (const file of read.folder.files) {
@@ -160,17 +193,17 @@ function renderWorkflow(name: string, read: TemplateRead, specs: ReadonlyMap<str
 }
 
 /** The agent `name` as its file, and its output schema beside it, into `out`. */
-function renderAgentOf(name: string, spec: Spec, read: TemplateRead, out: Rendered): void {
+function renderAgentOf(name: string, spec: Spec, read: TemplateRead, params: Params, out: Rendered): void {
   const where = `agents/${name}/agent.yaml`;
   const harness = typeof spec.harness === 'string' ? spec.harness : DEFAULT_HARNESS;
   const keys: Record<string, string> = blockKeys(
     where,
-    blocksOf(spec, ['role', 'description', 'instructions', 'skills', 'mcp', 'output', 'harness']),
+    blocksOf(spec, ['role', 'description', 'instructions', 'skills', 'mcp', 'overridable', 'output', 'harness']),
     harness,
     out.refusals,
   );
   if (typeof spec.harness === 'string') keys.harness = spec.harness;
-  const output = textOr(spec.output, `agents/${name}/output.schema.json`, read);
+  const output = carriedOr(spec.output, `agents/${name}/output.schema.json`, read);
   if (output !== undefined) {
     keys.output = `${name}.schema.json`;
     out.files.push({ path: `${WORKFLOWS}/${AGENTS_FOLDER}/${name}.schema.json`, text: output });
@@ -181,8 +214,9 @@ function renderAgentOf(name: string, spec: Spec, read: TemplateRead, out: Render
     description: String(spec.description),
     skills: spec.skills === undefined ? null : lineOf(spec.skills),
     mcp: spec.mcp === undefined ? null : lineOf(spec.mcp),
+    overridable: spec.overridable === undefined ? null : lineOf(spec.overridable),
     keys,
-    body: textOr(spec.instructions, `agents/${name}/instructions.md`, read) ?? '',
+    body: textOr(spec.instructions, `agents/${name}/instructions.md`, read, params) ?? '',
   };
   try {
     out.files.push({ path: `${WORKFLOWS}/${AGENTS_FOLDER}/${name}.md`, text: renderAgent(draft) });
@@ -238,16 +272,16 @@ export function renderFactory(read: TemplateRead, params: Params): Rendered {
       documents: new Map([...read.folder.documents].map(([file, doc]) => [file, substitute(doc, params)])),
     },
   };
-  for (const workflow of workflows) renderWorkflow(workflow, substituted, agents, hires, out);
-  for (const [name, spec] of agents) renderAgentOf(name, spec, read, out);
+  for (const workflow of workflows) renderWorkflow(workflow, substituted, params, agents, hires, out);
+  for (const [name, spec] of agents) renderAgentOf(name, spec, read, params, out);
   for (const file of read.folder.files) {
     const [holder, , leaf] = file.split('/');
     if (holder === SKILLS_FOLDER && !(leaf === 'skill.yaml' && file.split('/').length === 3))
       out.copies.push({ path: `${WORKFLOWS}/${file}`, from: file });
   }
-  const instruction = textOr(manifest.instruction, 'NEMIA.md', read);
+  const instruction = textOr(manifest.instruction, 'NEMIA.md', read, params);
   if (instruction !== undefined) out.files.push({ path: 'NEMIA.md', text: `${instruction.trim()}\n` });
-  renderRules(textOr(manifest.rules, FACTORY_RULES_FILE, read), out);
+  renderRules(textOr(manifest.rules, FACTORY_RULES_FILE, read, params), out);
   out.files.push({ path: 'factory.json', text: `${JSON.stringify(out.wiring, null, 2)}\n` });
   return out;
 }

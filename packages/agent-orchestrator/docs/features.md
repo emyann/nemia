@@ -470,7 +470,7 @@ What it leaves:
   load (`mcp:`), a step's own `mcp:` line adds to them as its `skills:` does, and the runtime leaves the rest of
   the file out (`projectMcp`): a session loads what its agent and its step name and no other. A server only one
   repository has is named by the step that needs it, and no agent of this repository's team names one
-  (`tools/guards/test/team-portable.test.ts`). The line only adds; one that takes a server of the agent's away is not built.
+  (`packages/templates/test/portable.test.ts`). The line only adds; one that takes a server of the agent's away is not built.
 - **`--tools` does not narrow a server's tools, measured.** `claude --help` (2.1.270) says the list is "from the
   built-in set", and a `claude -p` with `--tools Read,Grep,Glob,Bash` and `.mcp.json` listed every `browser_*`
   tool (2026-09-13, *Shipped: looking is a skill*). What keeps a server's tool from such a step is its permission
@@ -5661,15 +5661,16 @@ most of `test/run.test.ts`'s cases out into its stories and tables, and its 9,40
 
 ## 14. The former frontmatter form, no longer read
 
-**Registered** 2026-10-23, once the frontmatter was read as YAML. A block in the former line form, `key: the rest of the line`, never
-quoted, is still read so where YAML refuses it (`readFrontmatter`, `former: true`), and `nemia start` names each such file with the fix.
-That fallback is a second reader beside the YAML one, and a value it reads YAML would read otherwise.
-
-**Waits on** `nemia frontmatter rewrite --check` coming back clean on the owner's machine: the store's own folders, and
-`~/nemia-templates`. Then the card takes out the former reading (`formerShaped`, `formerEntries`, the `former` mark and the readers that
-branch on it, `formerFormLine` at `nemia start`), so such a block is refused naming its line and the YAML to write; `rewriteFormer` and
-the verb stay, for a folder written before that is brought in later. A run frozen before keeps its steps as records, which no
-frontmatter reader reads.
+Shipped 2026-11-02, once `nemia frontmatter rewrite --check` came back clean on the owner's machine, on the store's own folders and on
+`~/nemia-templates` (2026-10-23). A block in the former line form, `key: the rest of the line`, never quoted, where YAML refuses it or
+reads a flow collection on a key that holds one value, is refused at load (`readFrontmatter`, `Invalid`, exit 2), naming its first
+line YAML reads otherwise, that line written as YAML with its value the same, and `nemia frontmatter rewrite <folder>` for the whole
+folder. The `former` mark is gone from `Frontmatter` with the readers that branched on it (a skill's card key and `applies:` read alone,
+`withKey`'s rewrite, `fenceMoved`), and so is `formerFormLine` at `nemia start`: the load says it instead. `nemia frontmatter rewrite`
+and `rewriteFormer` stay, for a folder written before that is brought in later. The form is still recognised in two places, by the same
+helpers (`formerForm`, `formerShaped`, `formerEntries`; `inFormerForm` exported for the rewrite's caller and its tests): the load
+recognises it to refuse it, and the rewrite to write it as YAML. No reader takes a value from it. A run frozen before keeps its steps as
+records, which no frontmatter reader reads.
 
 ## 15. The runtime's `HarnessArgs` take a generic `fence` (decision 12, slice 2)
 
@@ -5927,10 +5928,11 @@ the stream its read — is a later intent's.
 ## Shipped: a run's change is a pull request (2026-10-19/20)
 
 The intent `a-run-s-change-is-a-pull-req-t452`, 25 decisions signed by the owner on 2026-10-19, in two build cards. Card 1, *the pull
-request opens*: implement pushes its own branch and opens or updates the one pull request of it through `workflows/build/pull-request.ts`,
-read out of the run's base, and its round check pushes again and waits on the `ci` context of that head. Card 2, *the landing merges it*:
+request opens*: implement pushes its own branch and opens or updates the one pull request of it through `workflows/build/pull-request.ts`
+(now `packages/templates/sdlc/workflows/build/pull-request.ts`), read out of the run's base, and its round check pushes again and waits on the `ci` context of that head. Card 2, *the landing merges it*:
 the land step merges that pull request on GitHub with `--merge --match-head-commit <sha>` at the head the review read and fast-forwards
-`main` in the owner's checkout, through `workflows/build/landing.ts`, and its `check:` is the receipt alone. Neither card touched
+`main` in the owner's checkout, through `workflows/build/landing.ts` (now
+`packages/templates/sdlc/workflows/build/landing.ts`), and its `check:` is the receipt alone. Neither card touched
 `landingDue` nor the git place: `onHead` already records a landing whose result is on HEAD with nothing staged, which is exactly what the
 fast-forward leaves.
 

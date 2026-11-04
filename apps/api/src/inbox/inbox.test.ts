@@ -24,6 +24,8 @@ import {
   StoreRoot,
 } from 'agent-orchestrator';
 import { runWith } from '../../test/builtin-place.ts';
+import { objectOf, linesOf } from '../../test/run-reads.ts';
+import { names } from '../../test/named.ts';
 import { Effect } from 'effect';
 
 /** `program`, one of the package's inbox verbs, run on the harness's store (`root`): its refusal thrown as itself. */
@@ -36,7 +38,6 @@ execFileSync('git', ['-c', 'user.email=t@local', '-c', 'user.name=t', 'commit', 
 type InboxEntry = import('./inbox.ts').InboxEntry;
 type InboxCardPage = import('./inbox.ts').InboxCardPage;
 type InboxFiled = import('./inbox.ts').InboxFiled;
-type RunDetail = import('../detail/detail.ts').RunDetail;
 /** What POST /api/runs answers a card it started (201): the run and the card, which stays in the inbox. */
 type CardStarted = { id: string; card: string; ignoredRepo?: string };
 type Refused = { error: string };
@@ -174,22 +175,26 @@ test('a person starts a card: the run carries where it came from, and the card s
       const started = await startCard({ workflow: 'dev', card: card.name });
       assert.equal(started.status, 201, await started.clone().text());
       const { id } = (await started.json()) as CardStarted;
-      const res = await app.request(`/api/runs/${id}`);
-      assert.equal(res.status, 200, await res.clone().text());
-      const detail = (await res.json()) as RunDetail;
-      assert.deepEqual(detail.from, { inbox: card.name });
-      assert.equal(detail.fromNote, fromNote(runStore.runs.read(id)));
-      assert.equal(detail.fromNote, `from inbox card ${card.name}`);
+      const run = await objectOf(app, id);
+      assert.deepEqual(run.spec.from, { inbox: card.name });
+      const lines = await linesOf(app, id);
+      assert.equal(
+        lines.fromNote,
+        fromNote(runStore.runs.read(id)),
+        "`nemia decide`'s sentence is the lines read's alone: the object leaves it out",
+      );
+      assert.equal(lines.fromNote, `from inbox card ${card.name}`);
 
       const typed = await startCard({ workflow: 'dev', brief: 'Typed, not parked' });
       assert.equal(typed.status, 201, await typed.clone().text());
       const typedId = ((await typed.json()) as { id: string }).id;
-      const plain = (await (await app.request(`/api/runs/${typedId}`)).json()) as RunDetail;
-      assert.equal(plain.id, typedId);
-      assert.deepEqual(
-        ['from' in plain, 'fromNote' in plain],
-        [false, false],
-        "typed at the board's start, as at `nemia start`: no card, so no `from`, absent and not null, and no sentence",
+      const plain = await objectOf(app, typedId);
+      assert.equal(plain.metadata.name, typedId);
+      assert.equal(plain.spec.from, null, "typed at the board's start, as at `nemia start`: no card, so the object's `from` is null");
+      assert.equal(
+        (await linesOf(app, typedId)).fromNote,
+        null,
+        "typed at the board's start, as at `nemia start`: no card, so no sentence of where it came from",
       );
     },
   );
@@ -459,6 +464,7 @@ test("a person files cards, in a factory and out of one, lists them, opens a car
           body: 'Cache the views between passes\n\nThe tick reads each task twice.',
           filedAt: old.toISOString(),
           factoryRepo: null,
+          labels: {},
         },
         'listed with its body and a filing time, and started as none',
       );
@@ -558,6 +564,7 @@ test("a person files cards, in a factory and out of one, lists them, opens a car
         { key: 'gate', value: null, meaning: INBOX_KEY_MEANINGS.gate },
         { key: 'factory', value: null, meaning: INBOX_KEY_MEANINGS.factory },
         { key: 'from', value: null, meaning: INBOX_KEY_MEANINGS.from },
+        { key: 'labels', value: null, meaning: INBOX_KEY_MEANINGS.labels },
       ]);
 
       const bare = (await (await cardPage('bare-idea-a1b2')).json()) as InboxCardPage;
@@ -571,6 +578,7 @@ test("a person files cards, in a factory and out of one, lists them, opens a car
           { key: 'gate', value: null, meaning: INBOX_KEY_MEANINGS.gate },
           { key: 'factory', value: null, meaning: INBOX_KEY_MEANINGS.factory },
           { key: 'from', value: null, meaning: INBOX_KEY_MEANINGS.from },
+          { key: 'labels', value: null, meaning: INBOX_KEY_MEANINGS.labels },
         ],
         'a card that sets no key: every key, none set',
       );
@@ -879,4 +887,74 @@ test("the inbox routes: what a filing, a card's page or a drop refuses, writing 
       assert.deepEqual(cards(), []);
     },
   );
+});
+
+test("a card's labels: filed with them, listed with them, selected by them with ?selector=, shown on its page, and edited", async (t) => {
+  const s = story(t);
+  const asked = async (address: string) => {
+    const res = await app.request(address);
+    assert.equal(res.status, 200, `${address}: ${await res.clone().text()}`);
+    return ((await res.json()) as InboxEntry[]).map((e) => e.name).sort();
+  };
+  let core = '';
+  let docs = '';
+  await s.test('POST /api/inbox files a card with `label`, and GET /api/inbox lists each card with its labels', async () => {
+    clear();
+    const one = await file({ body: 'Cache the views', label: ['team=core'] });
+    assert.equal(one.status, 201, await one.clone().text());
+    core = ((await one.json()) as InboxFiled).name;
+    docs = ((await (await file({ body: 'Tidy the docs', label: ['team=docs', 'tier=1'] })).json()) as InboxFiled).name;
+    const bare = ((await (await file({ body: 'A bare idea' })).json()) as InboxFiled).name;
+    const entries = await listed();
+    assert.deepEqual(entries.find((e) => e.name === core)?.labels, { team: 'core' });
+    assert.deepEqual(entries.find((e) => e.name === docs)?.labels, { team: 'docs', tier: '1' });
+    assert.deepEqual(entries.find((e) => e.name === bare)?.labels, {}, 'none, `{}`, on a card that carries none');
+    const refused = await file({ body: 'Labelled wrong', label: 'team=core' });
+    assert.equal(refused.status, 400, 'REFUSED: a `label` that is no list');
+    names(((await refused.json()) as { error: string }).error, '`label`');
+  });
+  await s.test('?selector= keeps the cards one of its selectors takes, OR across repeats; a malformed one is a 422', async () => {
+    assert.deepEqual(await asked('/api/inbox?selector=team%3Dcore'), [core]);
+    assert.deepEqual(await asked('/api/inbox?selector=team%3Dcore&selector=tier'), [core, docs].sort(), 'either selector');
+    assert.deepEqual(await asked('/api/inbox?selector=team%3Dnone'), [], 'none taken');
+    const res = await app.request('/api/inbox?selector=no%2Fpe%3Dx');
+    assert.equal(res.status, 422);
+    names(((await res.json()) as { error: string }).error, 'no/pe');
+  });
+  await s.test("the card's page shows its labels as one key, and POST /api/inbox/:name/labels edits them", async () => {
+    const row = async () => ((await (await cardPage(docs)).json()) as InboxCardPage).keys?.find((k) => k.key === 'labels')?.value;
+    assert.equal(await row(), 'team=docs,tier=1', 'in key order');
+    const res = await app.request(`/api/inbox/${docs}/labels`, {
+      method: 'POST',
+      headers: JSON_TYPE,
+      body: JSON.stringify({ labels: ['tier-', 'area=site'] }),
+    });
+    assert.equal(res.status, 200, await res.clone().text());
+    assert.deepEqual(await res.json(), {
+      kind: 'Card',
+      name: docs,
+      labels: { area: 'site', team: 'docs' },
+      was: { team: 'docs', tier: '1' },
+    });
+    assert.equal(await row(), 'area=site,team=docs', 'the page reads the edit');
+    const changed = await app.request(`/api/inbox/${docs}/labels`, {
+      method: 'POST',
+      headers: JSON_TYPE,
+      body: JSON.stringify({ labels: ['team=core'] }),
+    });
+    assert.equal(changed.status, 422, 'REFUSED: a value changed without overwrite');
+  });
+  await s.test("POST /api/runs with `label` starts the card with the card's labels and the edits sent", async () => {
+    const res = await startCard({ workflow: 'dev', from: 'repo', card: core, label: ['tier=2'] });
+    assert.equal(res.status, 201, await res.clone().text());
+    const { id } = (await res.json()) as CardStarted;
+    assert.deepEqual(
+      JSON.parse(fs.readFileSync(path.join(root, 'runs', `${id}.labels`), 'utf8')),
+      { team: 'core', tier: '2' },
+      "the card's labels, and the one sent",
+    );
+    const refused = await startCard({ workflow: 'dev', from: 'repo', card: docs, label: 'tier=2' });
+    assert.equal(refused.status, 400, 'REFUSED: a `label` that is no list');
+    names(((await refused.json()) as { error: string }).error, '`label`');
+  });
 });

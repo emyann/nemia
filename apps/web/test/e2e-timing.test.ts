@@ -169,13 +169,10 @@ test('the shards together are held to the bound a whole run is, naming the slowe
   assert.equal(overBound(shardsOf(4, SEVEN)[0].pages, true), null, 'and one shard alone is far under it: a shard is never the whole');
 });
 
-test('REFUSED: a shard that did not write its page times, by name and by the command that writes it', () => {
-  const three = shardsOf(4, SEVEN).filter((shard) => shard.shard !== 3);
-  assert.equal(
-    shardsMissing(three),
-    'shard 3 of 4 wrote no page times here, so the pages it visited are in no sum and the e2e is held to less than the whole: ' +
-      'run `npm run e2e -- --shard 3 --of 4` and put pages-3-of-4.json here',
-  );
+test('REFUSED: a shard that did not write its page times, by name, as a shard that failed rather than one to run again', () => {
+  const three = String(shardsMissing(shardsOf(4, SEVEN).filter((shard) => shard.shard !== 3)));
+  assert.match(three, /^shard 3 of 4 wrote no page times here/);
+  assert.doesNotMatch(three, /npm run e2e/, `a shard with no times failed or was cancelled, and is not to be run by hand: ${three}`);
   assert.match(
     String(shardsMissing(shardsOf(4, SEVEN).filter((shard) => shard.shard > 2))),
     /^shards 1 and 2 of 4 wrote no page times here/,
@@ -184,10 +181,9 @@ test('REFUSED: a shard that did not write its page times, by name and by the com
 });
 
 test('REFUSED: no shard file at all, a shard written twice, a shard out of range, and two runs’ files together', () => {
-  assert.match(
-    String(shardsMissing([])),
-    /^no shard of the e2e wrote its page times here: run `npm run e2e -- --shard <i> --of <n>` for every shard of n/,
-  );
+  const none = String(shardsMissing([]));
+  assert.match(none, /^no shard of the e2e wrote its page times here/);
+  assert.doesNotMatch(none, /npm run e2e/, `every shard with no times failed or was cancelled, and is not to be run by hand: ${none}`);
   const [one, two] = shardsOf(4, SEVEN);
   assert.equal(
     shardsMissing([one, two, two, ...shardsOf(4, SEVEN).slice(2)]),

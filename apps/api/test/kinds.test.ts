@@ -48,10 +48,6 @@ const FOLDER_STORE: Move = {
   move: "reading and writing a workflow's folder",
   to: "packages/agent-orchestrator's folder store, read and written through its entry",
 };
-const RUN_STORE: Move = {
-  move: 'reading what a run left on disk',
-  to: "packages/agent-orchestrator's runStore, read through its entry",
-};
 
 /** Each reader that reaches the machine today, with what it reaches and what moves it. */
 const MOVES: Readonly<Record<string, Entry>> = {
@@ -60,7 +56,6 @@ const MOVES: Readonly<Record<string, Entry>> = {
     move: "reading a harness's settings and servers off the machine",
     to: 'packages/agent-runtime, answered per harness through the orchestrator',
   },
-  'src/detail/detail.ts': { reaches: ['node:fs'], ...RUN_STORE },
   'src/factory/quota.ts': {
     reaches: ['global:process.env'],
     move: "the quota asker's default environment, read off the process",
@@ -71,7 +66,6 @@ const MOVES: Readonly<Record<string, Entry>> = {
     move: "reading the inbox's files",
     to: "packages/agent-orchestrator's runStore inbox, read through its entry",
   },
-  'src/steps/artifacts.ts': { reaches: ['node:fs'], ...RUN_STORE },
   'src/workflows/builder.ts': { reaches: ['node:fs'], ...FOLDER_STORE },
   'src/workflows/workflows.ts': { reaches: ['node:fs'], ...FOLDER_STORE },
 };

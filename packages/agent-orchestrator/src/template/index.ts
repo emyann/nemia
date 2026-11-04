@@ -3,6 +3,7 @@ export {
   API_VERSION,
   documentFile,
   documentRefusals,
+  expressionsIn,
   isMap,
   isParam,
   layoutRefusals,
@@ -13,6 +14,7 @@ export {
   type ReadFolder,
   type Refusal,
   type Step,
+  writeExpressions,
 } from './layout.ts';
 export { checkTemplate } from './check.ts';
 export { draftOf, type Draft, type DraftFile, type Source, type StepSource } from './draft.ts';

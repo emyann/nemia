@@ -76,10 +76,10 @@ export default {
       if (heard.length !== before + 1 || JSON.stringify(heard.at(-1)) !== inbox) {
         throw new Refused(`the words reached the session's say file once, as given — it heard ${JSON.stringify(heard.slice(before))}`);
       }
-      const detail = (await (await page.request.get(new URL(`/api/runs/${SAYING.run}`, page.url()).href)).json()) as {
-        steps: Array<{ name: string; said?: unknown }>;
+      const object = (await (await page.request.get(new URL(`/api/runs/${SAYING.run}`, page.url()).href)).json()) as {
+        status: { steps: Array<{ name: string; said?: unknown }> };
       };
-      const onRecord = detail.steps.find((s) => s.name === SAYING.step)?.said;
+      const onRecord = object.status.steps.find((s) => s.name === SAYING.step)?.said;
       if (JSON.stringify(onRecord) !== JSON.stringify([entry])) {
         throw new Refused(`the step's detail carries what was said, off the engine's journal — it carries ${JSON.stringify(onRecord)}`);
       }

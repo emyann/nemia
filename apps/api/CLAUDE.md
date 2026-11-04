@@ -11,11 +11,19 @@ from the orchestrator; what it holds today below its layer is in `docs/architect
   never a cast or a default the contract does not give. A dictionary read stays a plain read, its `undefined` handled, with no
   `Object.hasOwn` guard put in front of it: that changes what a prototype key reads. The tests' own `test/tsconfig.json` leaves the
   flag off.
-- **A body read off a response is `unknown`**: name the api's own answer type (`(await res.json()) as RunDetail`).
+- **The OpenAPI document has a page to browse it beside it**: `GET /openapi` (`src/openapi/reference.ts`) is Scalar's reference, drawn
+  in the browser from the document at `OPENAPI_PATH`, never a copy, so a route the document gains shows there with nothing to change.
+  The page reaches no host but the api: its script is the installed `@scalar/api-reference` bundle, read by `app.ts` and served at `/openapi/scalar.js`
+  (Scalar's Hono helper would load it from jsDelivr), and the viewer's fonts, telemetry, agent, MCP button, developer tools and "try
+  it" client are off; a Scalar option that calls out is turned off there, and `src/openapi/reference.test.ts` refuses a page naming
+  another host.
+- **A body read off a response is `unknown`**: name the api's own answer type (`(await res.json()) as RunAnswer`).
 - **An encoded `..` never reaches a route in a test**: `app.request` resolves `%2E%2E` before the router sees it. Send `..%2F…` to reach
   a name refusal.
-- **The list answers a finished run from memory** (`restingRead`, the package's `rest/resting.verb.ts`) while its record, its stamps, the feed for its tasks and its branch tips
-  stand. A new input `summarize` reads for a finished run goes into one of those, or a poll answers it stale. The memo keeps the run it
+- **The run object, its sub-resources and the list answer from the app's informer** (`Informer`, one per app from `liveOf`; the
+  package's `informerRead` in `rest/informer.verb.ts`): a run at rest while its record, its stamps, the feed for its tasks and its
+  branch tips stand, and a moving run within the pass that judged it. A write through the api drops its run (`uninformed`,
+  `commands/routes.ts`). A new input `summaryOf` reads for a run goes into one of those, or a poll answers it stale. The informer keeps the run it
   judged and hands it to the store in place of a read of its record (`given`), so a warm list reads no record of a run at rest.
   `WF_VERIFY_REST=1` (set by the harness) judges every kept answer afresh and is handed nothing from memory, so every record is read
   again; a test that counts reads turns that off for its request (`unverified`). Requests overlap
@@ -30,8 +38,8 @@ from the orchestrator; what it holds today below its layer is in `docs/architect
 - **A transcript of an attempt in flight asks its harness**: read it on a run's detail, never on the list the Factory polls.
 - **Read a `Wait` by the key you mean**: a hold's `Wait` carries `landed`, which an `--after` wait never does (`holdNeedsYou`, not
   `neverLands`, in the package's `summary/judged.verb.ts`).
-- **A remote agent's address is shown as origin and path, never whole** (`remoteOf` in `detail/detail.ts`): a query string can carry a key.
-- **A list a page turns into a sentence carries everything the sentence is about** (`folderFiles` in `steps/artifacts.ts` lists what it cannot
+- **A remote agent's address is shown as origin and path, never whole** (`remoteOf` in the package's `resource/told.verb.ts`): a query string can carry a key.
+- **A list a page turns into a sentence carries everything the sentence is about** (`folderFiles` in the package's `resource/files.store.ts` lists what it cannot
   serve by path), and leaves out only what the run itself put there (`GIVEN`).
 - **The list's `toDecide` is not the package's decision**: `decision` answers `awaiting` where `toDecide` says nothing.
 - **A remote step's wait is answered with `wf say`** (`answerIn` in the package's `needsOf`), never in Claude Code.
@@ -65,6 +73,11 @@ from the orchestrator; what it holds today below its layer is in `docs/architect
 - **A package program that asks the place is run with `runPlaced(placeService, e, program)`** (`src/store.ts`), the place the app's layer
   holds (`PlaceService` in `Services`, `gitPlaceLayer` in `liveOf`, `Served.placeService`); a test replaces it with
   `Layer.merge(liveOf(), PlaceService.layer(…))`, and runs a package program itself with the `runOver` of `test/placed.ts`.
+- **A handler reads an agent or a skill through the package's `AgentDoor` and `SkillDoor`, run with `inRequest`** (`Served`, `layer.ts`),
+  never a store of them (`loadAgents`, `agentsFor`, `skillsFor`, …; the orchestrator's `src/agents/agent-door.store.test.ts` counts the
+  api's calls, none allowed): `inRequest` runs a program over the request's own services, so the door reads the app's `StoreRoot`, or
+  the door a test merged into the app's layer. A test merges `agentDoorMemory()` or `skillDoorMemory()` (`agent-orchestrator/testing`)
+  only where the route makes no `runPlaced` read of agents or skills, which runs outside the app's runtime and reads the files.
 - **A request's factory and repository are resolved in `served`** (`placeFor`, `factories/place.ts`): a handler reads `repo` and `factory`
   off `Served`, never `?repo=` itself.
 - **An agent fills a step by the file a start would run it with** (`stepsFilled`, the package's `roster/fills.store.ts`), never by its

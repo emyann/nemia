@@ -20,9 +20,9 @@ import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from 'agent-orchestrator/testing';
 import { appOver, beforeEachTest, eachTest, engineFor, runOver } from '../../test/placed.ts';
 import type { RunDecision } from '../decide/decision.ts';
-import type { RunDetail } from '../detail/detail.ts';
 import { acceptFile, acceptRun, list, roundRun, runStore } from 'agent-orchestrator';
 import { story } from '../../test/checkpoints.ts';
+import { objectOf, stepOf } from '../../test/run-reads.ts';
 
 const stand = eachTest(testPlace);
 const standIn = eachTest(testEngine);
@@ -259,14 +259,14 @@ test('a person accepts a loop out of rounds on the board: the acceptance written
     'the detail reads it under the loop, as `nemia ls` has it, waiting on nobody, and the decision offers accept no more',
     async () => {
       assert.ok(took);
-      const run = (await (await app().request(`/api/runs/${R}`)).json()) as RunDetail;
-      const review = run.steps.find((s) => s.name === 'review')!;
+      const run = await objectOf(app(), R);
+      const review = stepOf(run, 'review');
       assert.deepEqual(review.accepted, { try: 2, at: took.at, message: WHY });
       const words = await runWith(engine(), list(engine(), runStore.runs.read(R)));
       const listed = words.steps.find((s) => s.name === 'review')!;
       assert.equal(review.message, listed.message, 'as `nemia ls` has it until the tick files what waits');
       assert.notEqual(review.message, 'exhausted', "the loop over on the person's word");
-      assert.deepEqual(run.waitingOnYou, [], 'and nobody waited on');
+      assert.deepEqual(run.status.waitingOnYou, [], 'and nobody waited on');
       const decision = (await (await app().request(`/api/runs/${R}/decision`)).json()) as RunDecision;
       const commands = 'commands' in decision ? decision.commands : [];
       assert.ok(!commands.some((c) => c.label === 'approve'), `the loop's approve is offered no more: ${JSON.stringify(commands)}`);

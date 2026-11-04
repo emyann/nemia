@@ -19,7 +19,7 @@ import { runReady } from '../wait/wait.ts';
 import { assess } from '../tick/assess.ts';
 import type { Closeout } from '../closeout/index.ts';
 import { runStore } from '../record/files.store.ts';
-import { stepsOf } from '../record/record.store.ts';
+import { stepsOf } from '../steps/steps.verb.ts';
 import { checkoutStatus, landThrough, stagedHere, type StatusMemo } from '../place/landing.store.ts';
 import { dropLandedPictures, LANDED_PICTURES } from '../artifacts/artifacts.store.ts';
 import {
@@ -34,6 +34,7 @@ import {
 } from '../views/views.verb.ts';
 import { phaseOfView } from '../views/views-words.ts';
 import { passRead, type PassRead } from '../cap/cap.verb.ts';
+import { passRevisions } from '../revisions/pin.verb.ts';
 import type { PassStanding } from '../standing/standing.verb.ts';
 
 /**
@@ -66,7 +67,7 @@ export const checkoutHold = Effect.fn('checkoutHold')(function* (
 ) {
   const ending = steps.find((s) => endsOnBase(s));
   if (!ending || run.cancelledAt || endingAsked(run, ending, runStore.asks.read(run.id).asks) === undefined) return undefined;
-  const read = 'read' in from ? from.read : passRead(e, runStore.runs.list(), env, yield* from.standing);
+  const read = 'read' in from ? from.read : passRead(e, runStore.runs.list(), env, yield* from.standing, yield* passRevisions());
   const slotOf = (id: string) => read.slots.pipe(Effect.map((slots) => slots.get(id)));
   const mine = yield* mainClaim(e, run, 'read' in from ? Effect.succeed(from.slot) : slotOf(run.id), read.parents, memo);
   if (!mine || mine.holds) return undefined;
@@ -109,12 +110,8 @@ const mainClaim = Effect.fnUntraced(function* (
   parents: Parents,
   memo: StatusMemo,
 ) {
-  let steps: Workflow[];
-  try {
-    steps = stepsOf(run);
-  } catch {
-    return undefined;
-  }
+  const steps = yield* Effect.orElseSucceed(stepsOf(run), () => undefined);
+  if (steps === undefined) return undefined;
   const ending = steps.find((s) => endsOnBase(s));
   if (!ending || !isRepositoryRun(run)) return undefined;
   const repo = path.resolve(run.repo);
@@ -126,7 +123,7 @@ const mainClaim = Effect.fnUntraced(function* (
     const own = ownStatus(ending, run, phaseOf, closeoutReader(views, run), closeoutAsked(views), steps, spendReader(views));
     const merging = () => {
       if (stagedHere(run) === false) return 'none';
-      const read = checkoutStatus(run, memo);
+      const read = checkoutStatus(run, steps, memo);
       return 'unread' in read ? 'ours' : read.merging;
     };
     if (landingOpen(ending, run, own, phaseOf, merging)) return { id: run.id, repo, step: ending.name, holds: true };
@@ -198,7 +195,7 @@ export function landEnding(
     typeof said === 'string' ? said : undefined,
     verdictOf(ending.name),
     stagedHere(run) ?? true,
-    () => checkoutStatus(run, memo),
+    () => checkoutStatus(run, steps, memo),
   );
   if (!due) return { notes: [], landed: false };
   const name = ending.name;

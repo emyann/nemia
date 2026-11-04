@@ -2,7 +2,7 @@
  * The cap on runs in flight as it holds between passes (`slotsOf`, `runSlots`): every run read as a pass reads it, for `nemia ls`, `nemia
  * decide`, the repository's checkout and the board's ceilings. A controller, reaching the runtime through the client (`runtime-client.ts`).
  */
-import { Cause, Deferred, Effect, Exit } from 'effect';
+import { Cause, Deferred, Effect, Exit, Result } from 'effect';
 import { EngineService, asked, over, unreadableJournal, type Engine, type TaskView } from '../runtime-client.ts';
 import type { Workflow } from '../workflow.ts';
 import type { Refusal } from '../refusal/refusal.ts';
@@ -11,7 +11,8 @@ import { runTasks, type Run } from '../record/record.ts';
 import { hasStarted } from '../wait/wait.ts';
 import { assess } from '../tick/assess.ts';
 import { runStore } from '../record/files.store.ts';
-import { stepsOf, unloadedFolder } from '../record/steps.store.ts';
+import { unloadedFolder } from '../steps/steps.ts';
+import { stepsOf } from '../steps/steps.verb.ts';
 import { lastCeilings } from '../daemon/daemon.store.ts';
 import { maxRuns } from '../config/config.store.ts';
 import {
@@ -25,7 +26,7 @@ import {
   type Parents,
 } from '../views/views.verb.ts';
 import { standingReader, standingSnapshot, type PassStanding } from '../standing/standing.verb.ts';
-import { passRevisions, type PassRevisions } from '../revisions/pin.verb.ts';
+import type { PassRevisions } from '../revisions/pin.verb.ts';
 import { phaseOfView } from '../views/views-words.ts';
 
 /** A run a task of which does not read (`unreadableJournal`), as a pass counts it: in flight, and asking the cap for nothing more. */
@@ -100,13 +101,12 @@ export const slotsOf = Effect.fn('slotsOf')(function* (
   const seen = seenIn(e, listed);
   const needs: Array<Pick<Run, 'id' | 'createdAt'> & { inFlight: boolean; wants: boolean }> = [];
   for (const run of runs) {
-    let steps: Workflow[];
-    try {
-      steps = stepsOf(run);
-    } catch (err) {
-      if (unloadedFolder(err) !== undefined) needs.push({ id: run.id, createdAt: run.createdAt, ...UNJUDGED });
+    const read = yield* Effect.result(stepsOf(run));
+    if (Result.isFailure(read)) {
+      if (unloadedFolder(read.failure) !== undefined) needs.push({ id: run.id, createdAt: run.createdAt, ...UNJUDGED });
       continue;
     }
+    const steps: Workflow[] = read.success;
     let need: { inFlight: boolean; wants: boolean } = UNJUDGED;
     if (!runTasks(run).some((taskId) => unreadable.has(taskId))) {
       const judged = yield* Effect.exit(needOf(seen, listed, run, steps, parents));
@@ -156,9 +156,15 @@ export type PassRead = {
 
 /**
  * What one pass reads once (`PassRead`), over `e` and the pass's listing `runs`, the cap read from `env` as `runSlots` reads it, and the
- * runs others wait on read off `standing`.
+ * runs others wait on read off `standing`, and what resolving each run's kinds reads, which the caller made for the pass (`passRevisions`).
  */
-export const passRead = (e: Engine, runs: readonly Run[], env: NodeJS.ProcessEnv, standing: PassStanding): PassRead => {
+export const passRead = (
+  e: Engine,
+  runs: readonly Run[],
+  env: NodeJS.ProcessEnv,
+  standing: PassStanding,
+  revisions: PassRevisions,
+): PassRead => {
   const parents = passParents(standingReader(standing));
   type Held = Deferred.Deferred<Map<string, RunSlot>, Refusal>;
   let held: Held | undefined;
@@ -173,5 +179,5 @@ export const passRead = (e: Engine, runs: readonly Run[], env: NodeJS.ProcessEnv
       }),
     );
   });
-  return { runs, slots, parents, standing, revisions: passRevisions() };
+  return { runs, slots, parents, standing, revisions };
 };

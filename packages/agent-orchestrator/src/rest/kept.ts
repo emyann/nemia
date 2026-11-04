@@ -1,17 +1,16 @@
 /**
- * A stamp-keyed memo of a projection of each run's record, shared by every read that wants a little of every run: the inbox's listing,
- * the factories' schedules, the pause's current tasks and a step's recent runs. A read hands in what it needs of a run (`project`), and
- * a run whose files in the store stamp as they did is answered from memory, so a poll reads no finished run's record however many the
- * store holds.
+ * A stamp-keyed memo of a projection of each run's record, shared by every read that wants a little of every run: the inbox's listing, the
+ * factories' schedules, the pause's current tasks and a step's recent runs. A read hands in what it needs of a run (`project`), and a run
+ * whose files in the store stamp as they did is answered from memory, so a poll reads no finished run's record however many the store
+ * holds.
  *
- * It keys on the stamp alone — no feed cursor, no branch tips, unlike the list's memo of runs at rest (`resting.verb.ts`) and the stats'
- * — because a projection of the record has no other input: what a pass reads of a run beside its record is a person's file beside it,
- * and the stamp is a `stat` of the record and of every such file (`restStamps` in record.store.ts), which is exactly what `readRun`
+ * It keys on the stamp alone — no feed cursor, no branch tips, unlike the informer of each run's judgement (`informer.verb.ts`) and the
+ * stats' — because a projection of the record has no other input: what a pass reads of a run beside its record is a person's file beside
+ * it, and the stamp is a `stat` of the record and of every such file (`restStamps` in record.store.ts), which is exactly what `readRun`
  * composes. A projection that read the engine's feed, git or the store's pause would belong in one of those memos instead.
  *
- * A cache of a pure function, never a source of truth: a caller that hands no memo reads every record, which is what the command line
- * and a cold test do, and a process started again starts with none. Pure: the stamps and the reader are handed in, and it touches no
- * disk.
+ * A cache of a pure function, never a source of truth: a caller that hands no memo reads every record, which is what the command line and a
+ * cold test do, and a process started again starts with none. Pure: the stamps and the reader are handed in, and it touches no disk.
  */
 import { isDeepStrictEqual } from 'node:util';
 import type { Run } from '../record/record.ts';

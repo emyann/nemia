@@ -6,8 +6,11 @@
  * engine's. The words that join the first two to a step, `asks` and `blocked by the harness`, are the board's: the package has none for
  * them.
  */
-import type { Question, RunDetail, RunSummary, RunToDecide, StepCloseout } from './api';
+import type { Question, RunSummary, RunToDecide, StepCloseout } from './api';
+import type { RunView, StepView } from './runView';
 import { stepState } from './status.ts';
+import { decidableRun } from './decide.ts';
+import type { Frozen } from './frozen.ts';
 
 /** A step as the list gives it, or as a run's detail does, with what a session the harness blocked said last. */
 type NeedsStep = Pick<RunSummary['steps'][number], 'name' | 'needs' | 'reason' | 'via' | 'waitingFor' | 'approve'> & {
@@ -53,7 +56,7 @@ export function needOf(step: NeedsStep, waitingOnYou: boolean, runCancelled: boo
  * (cli/main.ts): that line names the step and the command that approves it, and the same step is not asked for twice.
  */
 export const needsOf = (
-  run: Pick<RunSummary, 'cancelledAt' | 'waitingOnYou'> & { steps: readonly NeedsStep[]; toDecide?: RunToDecide | null },
+  run: Frozen<Pick<RunSummary, 'cancelledAt' | 'waitingOnYou'> & { steps: readonly NeedsStep[]; toDecide?: RunToDecide | null }>,
 ): Need[] => {
   const decided = run.toDecide?.kind === 'approve' ? run.toDecide.step : null;
   return run.steps.flatMap((step) => {
@@ -102,21 +105,20 @@ export const needLine = (need: Need): string =>
 /**
  * Whether a step's section offers its gate — Approve and Send back — beside what it handed on: it waits at its gate on you, as the CLI's
  * `ls` asks it (`approve plan`), on a run nobody called off. Only words offer it: a step approved or sent back carries none, and neither
- * does a detail from an api that has no approve route, whose `approve` is not there at all (the read refuses such a detail first,
- * `runQuery`).
+ * does a run from an api that has no approve route, whose `approve` is not there at all (the read refuses such an object first,
+ * `runObjectQuery`).
  */
-export const gateOffered = (step: Pick<RunDetail['steps'][number], 'approve'>, runCancelled: boolean): boolean =>
-  Boolean(step.approve) && !runCancelled;
+export const gateOffered = (step: Pick<StepView, 'approve'>, runCancelled: boolean): boolean => Boolean(step.approve) && !runCancelled;
 
 /** Where a step's section is on its run's page, as a URL's hash: what the banner's `approve plan` links to, where Approve is. */
 export const stepAnchor = (step: string): string => `step-${step}`;
 
 /** The questions a step's closeout asks as data, each of its question fields in turn, in the schema's order; none without a closeout. */
-export const askedIn = (closeout: Pick<StepCloseout, 'questions'> | null | undefined): Question[] =>
+export const askedIn = (closeout: Frozen<Pick<StepCloseout, 'questions'>> | null | undefined): Frozen<Question>[] =>
   closeout?.questions.flatMap((a) => a.questions) ?? [];
 
 /** What an offer presses: a key of the step's `commands`, the api's line for it (`commands.retry`, `commands.approve`, `commands.say`). */
-export type OfferKind = keyof RunDetail['steps'][number]['commands'];
+export type OfferKind = keyof StepView['commands'];
 
 /**
  * What a run's page offers for a step, by why it waits (`case`), each with the command it presses (`kind`), whose line is the api's
@@ -143,7 +145,7 @@ export type OfferKind = keyof RunDetail['steps'][number]['commands'];
  * closeout asks as data, which a raise of a step that signed off blocked answers by choosing, beside the budget, rather than in words.
  */
 export type Offer =
-  | { step: string; case: 'answer'; kind: 'retry'; needs: string | null; questions: Question[] }
+  | { step: string; case: 'answer'; kind: 'retry'; needs: string | null; questions: readonly Frozen<Question>[] }
   | { step: string; case: 'try-again'; kind: 'retry'; recheck: boolean; unfinished: boolean }
   | { step: string; case: 'denied'; kind: 'retry'; calls: string | null }
   | ({
@@ -153,8 +155,8 @@ export type Offer =
       message: string;
       needs: string | null;
       unfinished: boolean;
-      questions: Question[];
-    } & NonNullable<RunDetail['steps'][number]['raise']>)
+      questions: readonly Frozen<Question>[];
+    } & NonNullable<StepView['raise']>)
   | { step: string; case: 'continue'; kind: 'retry' }
   | { step: string; case: 'enough'; kind: 'approve' };
 
@@ -165,7 +167,7 @@ export type OfferCase = Offer['case'];
 export type Answer = Exclude<Offer, { case: 'continue' }>;
 
 /** A run that can be offered anything: called off or held by a person, it is offered nothing. */
-type Offerable = Pick<RunDetail, 'cancelledAt' | 'waitingOnYou' | 'steps'> & { holding?: RunDetail['holding'] };
+type Offerable = Pick<RunView, 'cancelledAt' | 'waitingOnYou' | 'steps'> & { holding?: RunView['holding'] };
 
 /**
  * The offers of a run's page, in the run's order: one per step waiting on you that a try or an approval can answer, and one per session
@@ -213,6 +215,14 @@ export function askedOf(run: Offerable, step: string): { try: number; note: stri
   const asked = run.steps.find((s) => s.name === step);
   return asked?.asked ? { try: asked.asked.try, note: asked.note } : null;
 }
+
+/**
+ * Whether a run's page draws its Decide section: there is something to decide (`decidableRun`), something to answer (`answersOf`), or a
+ * try a person asked for, which the section notes until the tick files it (`askedOf`) — a run that runs again once its step is answered
+ * waits on nobody, and its note would else go with the section the moment the run is read again.
+ */
+export const decideDrawn = (run: Offerable & Pick<RunView, 'status'>): boolean =>
+  decidableRun(run) || answersOf(run).length > 0 || run.steps.some((step) => askedOf(run, step.name) !== null);
 
 /**
  * The amount a raise's box starts at: the first whole dollar above what the package says the budget has to pass (`StepRaise.above`) — $5

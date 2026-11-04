@@ -3,8 +3,10 @@
  *
  * The apps reach packages/agent-orchestrator through `agent-orchestrator`, `agent-orchestrator/run` and `agent-orchestrator/workflow`
  * alone. `./workflow` is the pure format, and what reads a folder from disk, the controllers and the refusals by kind are exported from
- * `agent-orchestrator`. Spawning `bin/wf.ts` is the package's CLI, not an import, and prose that
- * names a file in src/ is not a route to it.
+ * `agent-orchestrator`. Spawning `bin/wf.ts` is the package's CLI, not an import, and prose that names a file in src/ is not a route
+ * to it. The client (`apps/cli`) spawns that CLI through two entries of its own, `agent-orchestrator/bin` and
+ * `agent-orchestrator/bin/wf`, which are resolved, never imported, and by `apps/cli/src/local.ts` and the templates' test helper alone
+ * (`binBreaches`, `SPAWNERS`).
  *
  * The scan reads every file git lists outside this package, tracked or not yet added. Turbo caches this package's pass by this package's
  * files alone: after a change elsewhere, `npx turbo run test --force`, or turbo replays a pass that read none of it. The scanner is a copy
@@ -14,6 +16,9 @@
  * Every workspace package, this one included, declares in its package.json the workspace packages it imports: its source in
  * `dependencies`, its tests in `dependencies` or `devDependencies`. That scan reads every file git lists under each workspace the root
  * package.json names, `tools/guards` among them.
+ *
+ * No file of this package's `src`, `bin` or `place` imports the templates workspace (`packages/templates`), by its name or by a path:
+ * the builtin templates are found by path (`BuiltinTemplates`, `src/templates/templates.store.ts`), as its skills and servers are.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -52,12 +57,25 @@ function specifiersIn(text: string): string[] {
 
 type Guarded = { name: string; dir: string; entries: readonly string[] };
 
+/** The CLI's entries: resolved to the file the client spawns, never imported (`binBreaches`), and so no entry `breaches` reads. */
+const SPAWNED = ['agent-orchestrator/bin', 'agent-orchestrator/bin/wf'];
+
+/** The client's file that resolves `SPAWNED`: its one reach of the orchestrator, a process and no import. */
+const SPAWNER = 'apps/cli/src/local.ts';
+
+/**
+ * Every file that may resolve `SPAWNED`: the client's, and the templates' tests' helper, which applies and renders a shipped template
+ * through the CLI as a person does, the templates being reached by no import of the orchestrator's.
+ */
+const SPAWNERS = [SPAWNER, 'packages/templates/test/template.ts'];
+
 /** What in `file` reaches `guarded` other than by its entries: each breach, worded with what to do instead. */
 function breaches(file: string, text: string, guarded: Guarded): string[] {
   const code = withoutComments(text);
   const out: string[] = [];
   const instead = `reach it through ${guarded.entries.join(' or ')}`;
   for (const spec of specifiersIn(code)) {
+    if (SPAWNED.includes(spec)) continue;
     if ((spec === guarded.name || spec.startsWith(`${guarded.name}/`)) && !guarded.entries.includes(spec)) {
       out.push(`${file} imports ${spec}, which is not an entry of ${guarded.name}: ${instead}`);
     }
@@ -65,7 +83,7 @@ function breaches(file: string, text: string, guarded: Guarded): string[] {
       out.push(`${file} imports ${spec}, a path into ${guarded.dir}: ${instead}`);
     }
   }
-  const resolver = new RegExp(`\\b(?:import\\.meta|require)\\.resolve\\s*\\(\\s*['"\`]${guarded.name}\\b`);
+  const resolver = new RegExp(`\\b(?:import\\.meta|require)\\.resolve\\s*\\(\\s*['"\`]${guarded.name}\\b(?!/bin(?:/wf)?['"\`])`);
   const src = new RegExp(`${guarded.name}(?:['"\`]\\s*,\\s*['"\`]|/)src\\b`);
   code.split('\n').forEach((line, i) => {
     if (resolver.test(line)) out.push(`${file}:${i + 1} resolves ${guarded.name} to build a path beside its entry: ${instead}`);
@@ -87,7 +105,7 @@ function workspaceFiles(guarded: Guarded): string[] {
 
 test('the scan reads the apps above this package — or it would pass by reading nothing', () => {
   const files = workspaceFiles(GUARDED);
-  for (const dir of ['apps/api/src', 'apps/api/test', 'apps/web/src', 'apps/web/test'])
+  for (const dir of ['apps/api/src', 'apps/api/test', 'apps/web/src', 'apps/web/test', 'apps/cli/src', 'apps/cli/bin'])
     assert.ok(
       files.some((f) => f.startsWith(`${dir}/`)),
       `the scan reads ${dir}`,
@@ -158,18 +176,91 @@ test('and what is not a route is not refused: the three entries, the wf CLI spaw
   assert.deepEqual(breaches('apps/web/test/e2e/x.ts', text, GUARDED), []);
 });
 
-test("agent-orchestrator's exports are . (runner.ts), ./run, ./workflow and ./testing (the test place), and nothing else but its package.json", () => {
+test("agent-orchestrator's exports are . (runner.ts), ./run, ./workflow, ./testing (the test place and the doors' stand-ins) and the CLI's two entries the client spawns, ./bin and ./bin/wf, and nothing else but its package.json", () => {
   const { exports } = JSON.parse(fs.readFileSync(path.join(PKG, 'package.json'), 'utf8')) as { exports: Record<string, string> };
   assert.deepEqual(exports, {
     '.': './src/runner.ts',
     './run': './src/run.ts',
     './workflow': './src/workflow.ts',
-    './testing': './place/memory/index.ts',
+    './testing': './testing.ts',
+    './bin': './bin/nemia.ts',
+    './bin/wf': './bin/wf.ts',
     './package.json': './package.json',
   });
 });
 
-/** The entry a test alone imports: the test place, `testPlace` (`place/memory`). */
+/** Each string of `text`'s code that names an entry of `SPAWNED`, with its line, and whether it is a module an import loads. */
+function spawnedNames(text: string): { line: number; spec: string; imported: boolean }[] {
+  return withoutComments(text)
+    .split('\n')
+    .flatMap((row, i) =>
+      [...row.matchAll(/['"`](agent-orchestrator\/bin(?:\/wf)?)['"`]/g)].map((m) => ({
+        line: i + 1,
+        spec: m[1],
+        imported: new RegExp(`(?:\\bfrom\\s*|^\\s*import\\s*|(?<!\\.)\\b(?:import|require)\\s*\\(\\s*)['"\`]${m[1]}['"\`]`).test(row),
+      })),
+    );
+}
+
+/**
+ * Where `file` names the CLI's entries other than as the client spawns them: an import of one, from any file, since the CLI is a process
+ * and never a module; and a name of one outside `SPAWNER`, which alone resolves it.
+ */
+function binBreaches(file: string, text: string): string[] {
+  return spawnedNames(text).flatMap(({ line, spec, imported }) => {
+    if (imported) return [`${file}:${line} imports ${spec}, the orchestrator's CLI: spawn it from ${SPAWNER} (spawned), never import it`];
+    if (!SPAWNERS.includes(file))
+      return [`${file}:${line} names ${spec} outside ${SPAWNERS.join(' and ')}: run the old path through its spawned`];
+    return [];
+  });
+}
+
+test("the CLI entries are resolved by apps/cli/src/local.ts and the templates' test helper alone, and imported by no file", () => {
+  const files = workspaceFiles(GUARDED);
+  assert.ok(files.includes(SPAWNER), `the scan reads ${SPAWNER}`);
+  const spawner = spawnedNames(fs.readFileSync(path.join(ROOT, SPAWNER), 'utf8'));
+  assert.deepEqual([...new Set(spawner.map((n) => n.spec))].sort(), SPAWNED, `${SPAWNER} resolves both entries`);
+  assert.deepEqual(
+    files.flatMap((f) => binBreaches(f, fs.readFileSync(path.join(ROOT, f), 'utf8'))),
+    [],
+  );
+});
+
+test('REFUSED: a CLI entry resolved outside apps/cli/src/local.ts, and one imported, even there; the resolve there and prose let through', () => {
+  const resolve = "const at = fileURLToPath(import.meta.resolve('agent-orchestrator/bin'));";
+  assert.equal(binBreaches('apps/cli/src/reads/ls.ts', resolve).length, 1, 'resolved in another file of the client');
+  assert.equal(binBreaches('apps/api/src/x.ts', "spawn(process.execPath, [require.resolve('agent-orchestrator/bin/wf')]);").length, 1);
+  assert.equal(binBreaches('apps/cli/test/x.test.ts', "const entry = 'agent-orchestrator/bin';").length, 1, 'a test names it');
+  for (const imported of [
+    "import 'agent-orchestrator/bin';",
+    "import { x } from 'agent-orchestrator/bin/wf';",
+    "const m = await import('agent-orchestrator/bin');",
+  ]) {
+    assert.equal(binBreaches(SPAWNER, imported).length, 1, `imported in ${SPAWNER}: ${imported}`);
+    assert.ok(binBreaches(SPAWNER, imported)[0].includes(' imports '), imported);
+  }
+  assert.deepEqual(binBreaches(SPAWNER, resolve), [], 'the resolve in the spawner');
+  assert.deepEqual(binBreaches(SPAWNERS[1], resolve), [], "the resolve in the templates' helper");
+  assert.equal(binBreaches('packages/templates/test/x.test.ts', resolve).length, 1, "a templates' test beside the helper");
+  assert.deepEqual(
+    binBreaches(SPAWNER, "import.meta.resolve(entry === 'wf' ? 'agent-orchestrator/bin/wf' : 'agent-orchestrator/bin')"),
+    [],
+    'the two in one resolve',
+  );
+  assert.deepEqual(
+    binBreaches('apps/cli/src/main.ts', " * spawns `agent-orchestrator/bin` from local.ts, 'agent-orchestrator/bin'"),
+    [],
+    'prose',
+  );
+  assert.deepEqual(breaches(SPAWNER, resolve, GUARDED), [], 'no breach of the entries: it is no import, and binBreaches judges it');
+  assert.equal(
+    breaches(SPAWNER, "const f = import.meta.resolve('agent-orchestrator/package.json');", GUARDED).length,
+    2,
+    'another subpath resolved there is still refused',
+  );
+});
+
+/** The entry a test alone imports: the test place, `testPlace` (`place/memory`), and the doors' stand-ins (`testing.ts`). */
 const TESTING = 'agent-orchestrator/testing';
 
 /** Where `file`, which is no test's, imports the testing entry: a program that runs is given the place its layer holds. */
@@ -208,6 +299,37 @@ test('no file that is no test imports the testing entry, in this package or outs
   );
   assert.deepEqual(
     files.flatMap(([f, text]) => testingBreaches(f, text)),
+    [],
+  );
+});
+
+/** The templates workspace: Nemia's builtin templates, which this package finds by path (`BuiltinTemplates`) and never imports. */
+const TEMPLATES = { name: 'templates', dir: 'packages/templates' } as const;
+
+/** Where `file`, of this package, imports the templates workspace, by its name or by a relative path into its folder. */
+function templateBreaches(file: string, text: string): string[] {
+  const instead = `find a builtin template by path, through BuiltinTemplates (src/templates/templates.store.ts)`;
+  return specifiersIn(withoutComments(text)).flatMap((spec) => {
+    const named = spec === TEMPLATES.name || spec.startsWith(`${TEMPLATES.name}/`);
+    const into =
+      spec.startsWith('.') && `${path.posix.normalize(path.posix.join(path.posix.dirname(file), spec))}/`.startsWith(`${TEMPLATES.dir}/`);
+    return named || into ? [`${file} imports ${spec}, the templates workspace: ${instead}`] : [];
+  });
+}
+
+test('REFUSED: a file of this package that imports the templates workspace, by its name or by a path; its own templates folder is not it', () => {
+  const file = 'packages/agent-orchestrator/src/applied/x.ts';
+  assert.equal(templateBreaches(file, "import x from 'templates/sdlc/nemia.ts';").length, 1, 'by its name');
+  assert.equal(templateBreaches(file, "import y from '../../../templates/sdlc/nemia.ts';").length, 1, 'by a path into its folder');
+  assert.deepEqual(templateBreaches(file, "import { templatePlace } from '../templates/templates.store.ts';"), [], 'its own folder');
+});
+
+test("no file of this package's src, bin or place imports the templates workspace, and the scan reads src/templates", () => {
+  const listed = execFileSync('git', ['ls-files', '-co', '--exclude-standard', 'src', 'bin', 'place'], { cwd: PKG, encoding: 'utf8' });
+  const files = listed.split('\n').filter((f) => SOURCE.test(f) && fs.existsSync(path.join(PKG, f)));
+  assert.ok(files.includes('src/templates/templates.store.ts'), 'the scan reads the store that finds the templates by path');
+  assert.deepEqual(
+    files.flatMap((f) => templateBreaches(`${GUARDED.dir}/${f}`, fs.readFileSync(path.join(PKG, f), 'utf8'))),
     [],
   );
 });
@@ -307,7 +429,7 @@ test('the declared-imports scan reads every workspace package, and finds workspa
   const all = manifests();
   const names = all.map((m) => m.name);
   const files = packageFiles(all);
-  for (const dir of ['apps/api', 'apps/web', 'packages/agent-orchestrator', 'packages/agent-runtime', 'tools/guards'])
+  for (const dir of ['apps/api', 'apps/cli', 'apps/web', 'packages/agent-orchestrator', 'packages/agent-runtime', 'tools/guards'])
     assert.ok(
       files.some(({ manifest }) => manifest.dir === dir),
       `the scan reads ${dir}`,

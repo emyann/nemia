@@ -35,7 +35,9 @@ export default {
     await expectCount(lane.locator(`a[data-ghost="${QUEUE.refused.name}"] [data-ghost-tried="refused"]`), 1, 'and it is on that card');
     const file = seedChained(store!, path.join(store!, 'checkout'));
     try {
-      const said = (await (await page.request.get(new URL(`/api/runs/${parent}`, page.url()).href)).json()) as { status: string };
+      const said = (
+        (await (await page.request.get(new URL(`/api/runs/${parent}`, page.url()).href)).json()) as { status: { status: string } }
+      ).status;
       if (said.status !== 'running')
         throw new Refused(
           `${parent}, which ${CHAINED.id} waits on, must still be running for it to wait; the api says it is ${said.status}`,

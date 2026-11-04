@@ -245,7 +245,7 @@ test("REFUSED: a subscription whose name is no file name, a selector the feed's 
   assert.equal(subscribeRefusalOf({ name: 'nemia', selectors: [...DEFAULT_SELECTORS], digestEvery: 60 }), undefined);
   for (const name of ['', '../x', 'a b', 'x.state', '-x'])
     assert.match(subscribeRefusalOf({ name, selectors: [] }) ?? '', /is no subscription's name/, JSON.stringify(name));
-  assert.match(subscribeRefusalOf({ name: 'n', selectors: ['waits=person', 'message=boom'] }) ?? '', /is no key of a feed line/);
+  assert.match(subscribeRefusalOf({ name: 'n', selectors: ['waits=person', 'message=boom'] }) ?? '', /\bmessage\b.*-l <key>=<value>/);
   assert.match(subscribeRefusalOf({ name: 'n', selectors: [' '] }) ?? '', /is no selector: it holds no clause/);
   for (const digestEvery of [0, -1, Number.NaN])
     assert.match(

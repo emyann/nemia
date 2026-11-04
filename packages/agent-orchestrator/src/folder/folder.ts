@@ -117,8 +117,31 @@ export const stepFiles = (entries: readonly string[]): string[] => entries.filte
  */
 export type Fills = { factory: string; workflow: string; agents: Readonly<Record<string, string>>; rules?: string };
 
+/**
+ * The agents a workflow's steps may name and the skills they may be given, found where a run of the folder looks: what its steps are
+ * parsed against (`parseFolder`), found by the Agent and Skill doors (`agents.found`, `skills.found`), or by their files layers for a
+ * synchronous reader (`loadWorkflows`, `workflows.store.ts`).
+ */
+export type Found = { readonly agents: Agents; readonly skills: SkillsFound };
+
+/**
+ * The step `name` rendered as `text`, without its `agent:` line where it names the very agent `fills` hires into it: a draft read with
+ * its factory's hires is resolved with the hired agent, and a step whose own file named it too would be refused as hired twice
+ * (`attachedAgent`), so the line can only be the hire's. Any other step as it is.
+ */
+export function hiredLineOut(name: string, text: string, fills: Fills | undefined): string {
+  const hire = hireOf(fills, name);
+  if (hire === undefined) return text;
+  const end = text.startsWith('---\n') ? text.indexOf('\n---\n', 3) : -1;
+  if (end < 0) return text;
+  const lines = text.slice(4, end + 1).split('\n');
+  const kept = lines.filter((line) => line !== `agent: ${hire.agent}`);
+  if (kept.length === lines.length) return text;
+  return `---\n${kept.join('\n')}${text.slice(end + 1)}`;
+}
+
 /** The hire `fills` makes into the step `step`, or undefined for none. */
-function hireOf(fills: Fills | undefined, step: string): Hire | undefined {
+export function hireOf(fills: Fills | undefined, step: string): Hire | undefined {
   if (!fills || !Object.hasOwn(fills.agents, step)) return undefined;
   const agent = fills.agents[step];
   if (agent === undefined) return undefined;

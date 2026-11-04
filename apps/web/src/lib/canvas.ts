@@ -6,6 +6,7 @@
 import type { GraphEdge, RunGraph, StepAttempts } from './api';
 import type { Point } from './layout';
 import { satisfiesAfter, type StepState } from './status.ts';
+import type { Frozen } from './frozen.ts';
 
 /** A session is going, so its attempt's time is still counting. */
 export const isLive = (state: StepState): boolean => state === 'working' || state === 'needs-human';
@@ -80,7 +81,7 @@ export type EdgeStep = { name: string; state: StepState; note: string | null; ro
  * The run's graph as the api gives it, between the steps the run has: an `after` edge done when the work at both ends is
  * done — verified, or on its own word — and a `loop` edge from the looping step back to its target.
  */
-export function edgesOf(graph: RunGraph, steps: readonly EdgeStep[]): CanvasEdge[] {
+export function edgesOf(graph: Frozen<RunGraph>, steps: readonly EdgeStep[]): CanvasEdge[] {
   const of = new Map(steps.map((s) => [s.name, s]));
   const seen = new Set<string>();
   return graph.edges.flatMap((edge): CanvasEdge[] => {

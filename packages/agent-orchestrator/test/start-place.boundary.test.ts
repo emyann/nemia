@@ -18,6 +18,7 @@ import { placeOver } from './place-over.ts';
 const ROOT = scratch('wf-start-place-');
 process.env.WF_ROOT = ROOT;
 const { startRun } = await import('../src/start/start.verb.ts');
+const { StoreRoot } = await import('../src/config/root.store.ts');
 const { PlaceService } = await import('../src/place/place.store.ts');
 const { gitPlaceLayer, builtinGitPlace } = await import('../src/place/builtin.store.ts');
 const { runFile } = await import('../src/record/record.store.ts');
@@ -67,7 +68,7 @@ const written = (): { runs: string[]; dirs: string[] } => {
  */
 function started(workflowDir: string, repo: string, layer = gitPlaceLayer) {
   const program = startRun({ brief: 'add a flag', repo, workflowDir, isolate: true });
-  const exit = Effect.runSyncExit(program.pipe(Effect.provide(layer)));
+  const exit = Effect.runSyncExit(program.pipe(Effect.provide(layer), Effect.provideService(StoreRoot, ROOT)));
   if (exit._tag === 'Success') return exit.value;
   throw Effect.runSync(Effect.flip(Effect.failCause(exit.cause)));
 }

@@ -1,0 +1,111 @@
+/**
+ * `node change.ts size` — what a quick build's check says of the change itself: its size, as a fact.
+ *
+ * Reads the net change in the working directory: `git diff --numstat -M` from where the work began to `HEAD`. It began on `WF_BASE_REF`,
+ * or, once the branch merged a newer base, on the base it merged last: the second parent of the newest merge on the branch's first
+ * parent. A line added then removed counts for nothing, and a renamed file is one file.
+ *
+ * `size` counts the files changed and the lines added plus removed, tests and docs included, a generated file left out — one of
+ * `GENERATED`, or one git says is `linguist-generated` (`git check-attr`, read from the repository's `.gitattributes`) —
+ * and refuses nothing by either number: the review reads the change whatever its size.
+ *
+ * Prints a `nemia size:` line and exits 0. Exits 1, on stderr, when `WF_BASE_REF` is not set, git cannot say what changed, or the verb is
+ * another than `size`.
+ */
+import { spawnSync } from 'node:child_process';
+
+/** A reason the step is refused: said on stderr, exit 1. */
+class Refusal extends Error {}
+
+/**
+ * The paths a tool writes in any repository, which the count leaves out: a file, or a folder by its closing slash. A repository says its
+ * own by marking them `linguist-generated` in its `.gitattributes`, which the count reads too.
+ */
+const GENERATED = ['package-lock.json'];
+
+/** One file of the change: its path, a renamed file's new one, and its lines added plus removed, none for a binary file. */
+type Change = { path: string; lines: number };
+
+/** What git prints for `args`; refuses, saying `what` could not be told, when git fails. */
+function git(what: string, ...args: string[]): string {
+  const ran = spawnSync('git', ['-c', 'core.quotePath=false', ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+  if (ran.status !== 0)
+    throw new Refusal(
+      `cannot tell ${what}, since git ${args.join(' ')} failed (${(ran.stderr ?? '').trim() || ran.error?.message}); ` +
+        'nothing is measured on a guess',
+    );
+  return ran.stdout;
+}
+
+/**
+ * The commit the work is measured from: where `HEAD` left `base`, or the base the branch merged last, the second parent of the newest
+ * merge on its first parent since.
+ */
+function startOf(base: string): string {
+  const left = git('where the work began', 'merge-base', 'HEAD', base).trim();
+  const [merge] = git('what the branch merged', 'rev-list', '--first-parent', '--merges', `${left}..HEAD`).split('\n');
+  return merge ? git('the base the branch merged', 'rev-parse', `${merge}^2`).trim() : left;
+}
+
+/** The net change from `WF_BASE_REF` to `HEAD`, a file each, a rename once; refuses where `WF_BASE_REF` is not set. */
+function changes(): Change[] {
+  const base = process.env.WF_BASE_REF;
+  if (!base) throw new Refusal("WF_BASE_REF is not set: a change is measured in a run's check, where it names the base the work began on");
+  const fields = git('what the work changed', 'diff', '--numstat', '-M', '-z', startOf(base), 'HEAD', '--').split('\0');
+  const found: Change[] = [];
+  for (let i = 0; i < fields.length - 1; i += 1) {
+    const [added, removed, path] = fields[i].split('\t');
+    const lines = (Number(added) || 0) + (Number(removed) || 0);
+    if (path) found.push({ path, lines });
+    else found.push({ path: fields[(i += 2)], lines });
+  }
+  return found;
+}
+
+/** Whether a tool writes `path` in any repository. */
+const generated = (path: string): boolean => GENERATED.some((made) => (made.endsWith('/') ? path.startsWith(made) : path === made));
+
+/** The paths of `paths` git says are `linguist-generated`, set or true; refuses, as `git` does, when git cannot tell. */
+function marked(paths: readonly string[]): Set<string> {
+  if (paths.length === 0) return new Set();
+  const ran = spawnSync('git', ['check-attr', '-z', '--stdin', 'linguist-generated'], {
+    encoding: 'utf8',
+    input: paths.map((path) => `${path}\0`).join(''),
+    stdio: ['pipe', 'pipe', 'pipe'],
+  });
+  if (ran.status !== 0)
+    throw new Refusal(
+      `cannot tell which files are generated, since git check-attr failed (${(ran.stderr ?? '').trim() || ran.error?.message}); ` +
+        'nothing is measured on a guess',
+    );
+  const found = new Set<string>();
+  const fields = ran.stdout.split('\0');
+  for (let i = 0; i + 2 < fields.length; i += 3) if (fields[i + 2] === 'set' || fields[i + 2] === 'true') found.add(fields[i]);
+  return found;
+}
+
+/** `size`: says the count, and refuses nothing by it. */
+function size(say: (line: string) => void): number {
+  const all = changes();
+  const made = marked(all.map((change) => change.path));
+  const counted = all.filter((change) => !generated(change.path) && !made.has(change.path));
+  const lines = counted.reduce((sum, change) => sum + change.lines, 0);
+  say(`nemia size: ${counted.length} files, ${lines} lines`);
+  return 0;
+}
+
+/** The whole run: the exit of the verb asked for, 1 with the refusal on stderr. */
+function main(): number {
+  const say = (line: string): void => void process.stdout.write(`${line}\n`);
+  const [verb] = process.argv.slice(2);
+  try {
+    if (verb === 'size') return size(say);
+    throw new Refusal(`usage: node change.ts size, not ${JSON.stringify(verb)}`);
+  } catch (err) {
+    if (!(err instanceof Refusal)) throw err;
+    process.stderr.write(`nemia change: ${err.message}\n`);
+    return 1;
+  }
+}
+
+process.exitCode = main();

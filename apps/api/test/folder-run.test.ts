@@ -20,6 +20,7 @@ import { Effect } from 'effect';
 import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from 'agent-orchestrator/testing';
 import { appOver, beforeEachTest, eachTest, engineFor } from './placed.ts';
+import { linesOf, objectOf, specOf, stepOf } from './run-reads.ts';
 
 const stand = eachTest(testPlace);
 const standIn = eachTest(testEngine);
@@ -137,7 +138,7 @@ test("a folder run read on the board: listed by its kind and place, its page wit
             ['r-repo', 'git'],
           ],
         );
-        assert.equal(((await (await app().request('/api/runs/r-repo')).json()) as { place: unknown }).place, 'git');
+        assert.equal((await objectOf(app(), 'r-repo')).spec.place, 'git');
       } finally {
         fs.rmSync(record);
       }
@@ -146,21 +147,13 @@ test("a folder run read on the board: listed by its kind and place, its page wit
   await s.test(
     "a folder run's detail has no repository, base, branch or isolation — where its work is instead, and its step's folder",
     async () => {
-      const res = await app().request('/api/runs/f-notes');
-      assert.equal(res.status, 200);
-      const run = (await res.json()) as Record<string, unknown> & {
-        steps: {
-          name: string;
-          workspace: string | null;
-          branch: string | null;
-          note: string | null;
-          status: string;
-          spec: { place: string | null; workspace: string | null };
-        }[];
-      };
+      const object = await objectOf(app(), 'f-notes');
+      const run = object.spec;
       assert.deepEqual([run.repo, run.baseRef, run.branch, run.isolate, run.place], [null, null, null, null, 'folder']);
+      const spec = specOf(object, 'write');
+      assert.ok(spec, 'the run froze the spec of its step `write`');
       assert.deepEqual(
-        [run.steps[0].spec.place, run.steps[0].spec.workspace],
+        [spec.place, spec.workspace],
         ['folder', null],
         'a step frozen as `workspace: folder`, the former spelling, is shown as `place: folder`',
       );
@@ -169,9 +162,10 @@ test("a folder run read on the board: listed by its kind and place, its page wit
         work,
         'the one thing a person needs to find what it made, where a repository run has a repository and a branch',
       );
-      const [write] = run.steps;
+      const [write] = object.status.steps;
       assert.deepEqual([write.name, write.workspace, write.branch], ['write', path.join(work, 'write'), null]);
-      for (const said of [run.warning, run.fromNote, ...run.steps.map((s) => s.note)]) {
+      const { fromNote } = await linesOf(app(), 'f-notes');
+      for (const said of [object.status.warning, fromNote, ...object.status.steps.map((s) => s.note)]) {
         if (typeof said === 'string')
           assert.doesNotMatch(said, GIT_WORD, `the sentences it carries, what the board reads out loud, name no git: ${said}`);
       }
@@ -205,10 +199,7 @@ test("a folder run read on the board: listed by its kind and place, its page wit
   await s.test(
     'a folder step carries everything its folder holds: what a name reaches with its size and url, the rest by its path',
     async () => {
-      const run = (await (await app().request('/api/runs/f-notes')).json()) as {
-        steps: { files: { path: string; name?: string; url?: string; kind?: string; size?: number }[] }[];
-      };
-      const [write] = run.steps;
+      const write = stepOf(await objectOf(app(), 'f-notes'), 'write');
       assert.deepEqual(
         write.files,
         [
@@ -270,17 +261,15 @@ test("a folder run read on the board: listed by its kind and place, its page wit
       }),
     );
 
-    const run = (await (await app().request('/api/runs/f-gone')).json()) as {
-      steps: { name: string; files: unknown[]; filesError: string | null }[];
-    };
-    const write = run.steps.find((s) => s.name === 'write')!;
+    const run = await objectOf(app(), 'f-gone');
+    const write = stepOf(run, 'write');
     assert.deepEqual(write.files, [], 'nothing to list');
     assert.equal(
       write.filesError,
       'Its folder could not be read (ENOTDIR).',
       'and why — an empty list here is the board saying the step made nothing when nobody could look',
     );
-    const review = run.steps.find((s) => s.name === 'review')!;
+    const review = stepOf(run, 'review');
     assert.deepEqual([review.files, review.filesError], [[], null], 'a folder the run has not made yet is empty, and no error');
   });
   await s.test("a folder step's file is served by name, and a name that is a path, or not in the folder, is refused", async () => {
@@ -340,9 +329,9 @@ test("a folder run read on the board: listed by its kind and place, its page wit
         }),
       );
 
-      const run = (await (await app().request('/api/runs/f-given')).json()) as { steps: { files: { path: string; name?: string }[] }[] };
+      const write = stepOf(await objectOf(app(), 'f-given'), 'write');
       assert.deepEqual(
-        run.steps[0].files.map((f) => f.name ?? f.path),
+        write.files.map((f) => ('name' in f ? f.name : f.path)),
         ['given', 'note.md'],
         "what the run makes is a directory, so a regular file named given is the step's: hiding it would be work made invisible on the one surface a person who never opens a terminal has",
       );
@@ -421,7 +410,7 @@ test('a folder team as the board finds and files for it, the repository a plain 
         [named, notARepo],
         "the api says what `nemia start` prints and a tick's line carries: the card's `repo:` was not looked at",
       );
-      const run = (await (await app().request(`/api/runs/${started.id}`)).json()) as { repo: unknown; place: unknown };
+      const run = (await objectOf(app(), started.id)).spec;
       assert.deepEqual(
         [run.repo, run.place],
         [null, 'folder'],

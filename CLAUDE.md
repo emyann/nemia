@@ -1,13 +1,14 @@
 # Nemia — contributor guide
 
-Two packages and two apps, each a layer that owns one thing. `packages/agent-runtime` runs agent sessions on a harness, durably: a job
-that runs to its end, and a long-lived session that runs until stopped (`restartPolicy: 'Always'`); the `ae` CLI, and
+Two packages and three apps, each a layer that owns one thing. `packages/agent-runtime` runs agent sessions on a harness, durably: a
+job that runs to its end, and a long-lived session that runs until stopped (`restartPolicy: 'Always'`); the `ae` CLI, and
 `src/core/domain.ts` is the whole judgement. `packages/agent-orchestrator` owns workflows and the runs of their steps — a folder of
-markdown is a workflow (the `wf` CLI). `apps/api` puts the workflows behind HTTP; `apps/web`, the board, shows them to a person.
+markdown is a workflow (its in-process CLI). `apps/api` puts the workflows behind HTTP; `apps/web`, the board, shows them to a person;
+`apps/cli`, beside it, is `nemia` and `wf`, a client of the api that spawns the orchestrator's CLI for every verb it has not moved.
 
-Each layer reaches exactly the one below it, and nothing reaches up or skips one. Which layer owns what, the public contract of each and
+The order is `web, cli → api → orchestrator → runtime`: each layer reaches exactly the one below it, and nothing reaches up or skips one. Which layer owns what, the public contract of each and
 the four rules and the tests that hold them are in `docs/architecture.md`: read it before you place a change. Read `README.md` and each
-package's README for the model before changing behaviour. `wf` becomes `nemia` (the Nemia intent); `ae` stays the runtime's CLI. The stores
+package's README for the model before changing behaviour. `wf` becomes `nemia` (the Nemia intent), and both bins live in `apps/cli`; `ae` stays the runtime's CLI. The stores
 `~/.agent-workflows` (`WF_ROOT`) and `~/.agent-engine` (`AE_ROOT`) keep their names on purpose: a new default would orphan every
 record there.
 
@@ -27,18 +28,22 @@ holds what every change needs.
   changed (beside it, or under its package's `test/` naming it), and for a doc, a skill or a workflow file the tests that read it (grep
   the tests for its path), each from its package's folder as its `test` script loads it: `node --import ./test/ambient.ts --test <file>`
   in `packages/agent-orchestrator`, `node --import ./test/harness.ts --test <file>` in `apps/api`, `node --test <file>` in
-  `packages/agent-runtime`, `apps/web` and `tools/guards`. Where a file alone does not say enough (a shared helper, a type many files read, a package's
+  `packages/agent-runtime`, `apps/web`, `apps/cli`, `packages/templates` and `tools/guards`. Where a file alone does not say enough (a shared helper, a type many files read, a package's
   test setup), the packages it touched: `npx turbo run test --force --continue --filter=<package>`, the package by its `name`
-  (`agent-orchestrator`, `agent-runtime`, `api`, `web`, `guards`). Typecheck and lint run whole: they are cheap. Implement's round check runs the
+  (`agent-orchestrator`, `agent-runtime`, `api`, `web`, `cli`, `guards`, `templates`). Typecheck and lint run whole: they are cheap. Implement's round check runs the
   declarations, the typecheck and the lint, and pushes the round's commit and waits on GitHub's `ci` context, which runs the whole
-  suite on it (`workflows/build/implement.md`); the landing's check runs no suite at all — it is the receipt that the pull request `ci`
-  judged was merged (`workflows/build/landing.ts`) — so the commit `ci` passed on is the last thing any suite reads; a session runs the
-  whole suite only to measure it, as the e2e's rule says. A failing test it did not run is the check's refusal, answered in the next try. Outside a
-  run no check follows you: run the whole suite before you commit.
-- `npm run typecheck` — `tsc --noEmit` per package, over its `src` and its `test/` (the web's `test/e2e/` under its own tsconfig, and the
+  suite on it (`packages/templates/sdlc/workflows/build/implement.md`); the landing's check runs no suite at all — it is the receipt that
+  the pull request `ci` judged was merged (`packages/templates/sdlc/workflows/build/landing.ts`) — so the commit `ci` passed on is the
+  last thing any suite reads; a session runs the whole suite only to measure it, as the e2e's rule says.
+  A failing test it did not run is the check's refusal, answered in the next try. Outside a run no check
+  follows you: run the whole suite before you commit.
+- `npm run typecheck` — `tsrs --noEmit` per package, over its `src` and its `test/` (the web's `test/e2e/` under its own tsconfig, and the
   tests of the runtime, the orchestrator and the api each under their package's `test/tsconfig.json`, which leaves the source's
   `noUncheckedIndexedAccess` off);
-  `tools/guards/test/suite.test.ts` refuses a test file no typecheck reads.
+  `tools/guards/test/suite.test.ts` refuses a test file no typecheck reads. tsrs, the Rust port of TypeScript 7.1's compiler, pinned
+  exactly at the root, checks the same files as tsc 6 in about a third of its memory (the seven packages' peaks ~2.3 GB against ~8.3
+  GB, measured 2026-11-02), so runs reaching their checks together no longer run the machine out of it. `typescript@6` stays, for
+  the 27 files that import its compiler API, the editor, and the steps' own `npx tsc` measures.
 - `npm run lint` — oxlint (`.oxlintrc.json`) and `oxfmt --check` (`.oxfmtrc.json`); `npm run format` writes the layout. Every shipped
   `check:` runs it after the types. A rule turned off, or a line allowed with `oxlint-disable-next-line`, says why beside it.
 - `npm run build`, then `npm run e2e -- --pages <the pages the change touches>` (and `--photos` when pictures are due), when you touch
@@ -50,13 +55,11 @@ holds what every change needs.
   It needs `docker`, takes a minute and a half, and is never run by the suite.
 - Run them before you commit, a step's session scoped as above. Green is the floor, not the bar: a change that makes the suite pass by
   weakening a test is a finding to report, not a fix.
-- Turbo sees `workflows/` and the docs only through `guards#test`'s inputs, though tests elsewhere read them too: a step's session runs the tests that read the doc or workflow
-  file it touched, and `ci` runs them all, on clean runners with no cache of this machine's, on the commit the round's check pushed;
-  outside a run, type `npx turbo run test --force --continue` after touching one. The tests that read files of every package —
+- Turbo sees the docs only through `guards#test`'s inputs, though tests elsewhere read them too: a step's session runs the tests that
+  read the doc it touched, and `ci` runs them all, on clean runners with no cache of this machine's, on the commit the round's check
+  pushed; outside a run, type `npx turbo run test --force --continue` after touching one. The tests that read files of every package —
   `tools/guards`' `claude-md-cites.test.ts` over every `CLAUDE.md` and `test-rules.test.ts` over every test file, and
   `agent-orchestrator`'s `comments.test.ts` — are re-run the same way after a test, a doc or a name moves anywhere.
-- A run's check leaves what its tests cost in `WF_ARTIFACTS`, a `test-costs-<package>-<stamp>.json` per package and try; `node
-  tools/test-costs/report.ts <dir>...` ranks them. A package's peak is its largest process, not the sum of the files running at once.
 - A change to tests alone shows that no source file's coverage dropped: `node tools/coverage/record.ts <package-dir> --out
   before.json` before it and `after.json` after, then `node tools/coverage/compare.ts before.json after.json`, which exits 1 naming
   each file whose hit lines or branches fell; records on each side of a `--` say apart, as varying, a line they disagree on. A session's measure, never run by the suite or CI: it runs the package's whole suite.
@@ -76,7 +79,10 @@ holds what every change needs.
   holds it, the spellings it retired, each with its card), which the docs' Glossary page draws one section per context
   (`apps/docs/src/glossary.ts`). Read the table of the context you change before you name something there. A renamed word keeps its
   old spelling as `retired` on its row, and `tools/guards/test/glossary.test.ts` counts that spelling in each file under the table's
-  paths, a count that only shrinks (`tools/guards/test/glossary.baseline.ts`).
+  paths, a count that only shrinks (`tools/guards/test/glossary.baseline.ts`). A row cites each path from the repository's root
+  (`packages/agent-orchestrator/src/folder/folder.model.ts`, never `src/folder/folder.model.ts`), and a change to a table runs the
+  docs' tests, `node --test test/*.test.ts` in `apps/docs`: they read every table by a glob, so grepping the tests for its path does
+  not find them.
 - **A field that says a state or a kind at a door is a closed union of its words, never `string`**: a `phase`, `status`, `state`,
   `kind`, `type` or `reason` an entry of a package's `exports` or a type of the api reaches. A sentence a person reads is a `message`.
   Held by `tools/guards/test/closed-state.test.ts`, through the TypeScript checker, whose baseline only shrinks.
@@ -99,13 +105,15 @@ holds what every change needs.
 - Commit on your branch, in small coherent commits with plain messages: a short imperative subject, an optional body saying why. **No
   attribution trailers**, no session URLs.
 - **A workflow step never pushes, never merges into the base branch, never force-deletes a branch**, and its agent's `disallowedTools:`
-  refuses the push and the delete (a `dontAsk` agent's: no allow reaches them; `packages/agent-orchestrator/test/agent-fences.test.ts`).
+  refuses the push and the delete (a `dontAsk` agent's: no allow reaches them; `packages/templates/test/fences.test.ts`).
   `.claude/settings.json` denies none of it: pushing and opening a pull request are the person's, or done by their session when they ask.
-  What a step may not type, the run does in its place, as two frozen scripts read out of git and run with `node`, never as a tool a fence
-  could not tell apart: `workflows/build/pull-request.ts` pushes a run's own branch and opens or updates its pull request, and
-  `workflows/build/landing.ts` merges that pull request and fast-forwards the checkout. The one exception to the rule is a run's ending
-  step (a workflow's last step, `workspace: base`), filed once a person approves it — or, where its workflow puts before it a step that
-  can send the work back (`loop:`), once that step passes, which is how `quick` lands with no gate at all; an ending with a `check:` and
+  What a step may not type, the run does in its place, as two frozen scripts read from the run's frozen workflow files
+  (`$WF_WORKFLOW_FILES`, the copy of its workflow folder the run took when it began; out of git while that is unset) and run with
+  `node`, never as a tool a fence could not tell apart: `packages/templates/sdlc/workflows/build/pull-request.ts` pushes a run's own
+  branch and opens or updates its pull request, and `packages/templates/sdlc/workflows/build/landing.ts` merges that pull request
+  and fast-forwards the checkout (`quick` carries copies of both, held equal by `packages/templates/test/scripts-equal.test.ts`). The
+  one exception to the rule is a run's ending step (a workflow's last step, `workspace: base`), filed once a person approves it — or,
+  where its workflow puts before it a step that can send the work back (`loop:`), once that step passes, which is how `quick` lands with no gate at all; an ending with a `check:` and
   neither of the two is refused at load (`validateBaseWorkspace`, `src/workflow/validate.ts`). It runs `landing.ts merge`, which refuses
   anything but this run's own green pull request — `mergeable`, `ci` green at the head the review read, no result branch left out — then
   merges it with a merge commit whose message the step wrote and fast-forwards the base branch here; the run then executes the step's
@@ -114,19 +122,20 @@ holds what every change needs.
 
 ## Agents in this repository
 
-What the `create-an-agent` skill, being generic, does not say here:
+What the `create-an-agent` skill (`packages/agent-orchestrator/skills/create-an-agent/SKILL.md`), being generic, does not say here:
 
 - Read `packages/agent-orchestrator/README.md`, *An agent is a node's attachment*, for the format, the five layers numbered by
   precedence, and the routing rule that says which layer owns a new instruction (*Where a new instruction goes*).
 - An agent's questions are an output field `{ "x-shape": "questions" }`, expanded by `packages/agent-orchestrator/src/question/question.ts`.
-- Its checks are *Check your work*, forced for `workflows/`; a new agent is named in *Where things are*.
-- **Every agent of the team reads the repository through git.** The four read-only ones (Seldon, Agora, Iris, Argus, each `dontAsk`, which
-  no allow from a step reaches) carry the same read-only git set on their own `allowedTools:` in `workflows/agents/`, a list of their
-  `claude:` block's fence (`claude: { fence: … }`) as is each `disallowedTools:` below, and each holds the place's `git` skill on its
-  `skills:`; the three writers (Ada, Grace, Otto) run `auto` and need no allow. Nothing in the set writes
+- Its checks are *Check your work*; a new agent of sdlc is named in *Where things are*.
+- **Every agent of sdlc's team reads the repository through git.** The four read-only ones (Seldon, Agora, Iris, Argus, each `dontAsk`,
+  which no allow from a step reaches) carry the same read-only git set on their own `allowedTools:` in
+  `packages/templates/sdlc/agents/`, a list of their `claude:` block's fence (`claude: { fence: … }`) as is each `disallowedTools:` below,
+  and each holds the place's `git` skill on its
+  `skills:`; the two writers (Grace, Otto) run `auto` and need no allow. Nothing in the set writes
   the repository's history, its refs or its configuration — `git merge-tree` writes a loose object and no ref, and `git status` and
   `git describe --dirty` refresh the worktree's index and rewrite it when they can take its lock — and `git push` stays refused by the
-  writers' `disallowedTools:`, Grace's held equal to Ada's. The set holds `cat`, `head`, `tail`, `wc`, `cut` and `ls` too, each kept
+  writers' `disallowedTools:`, Grace's held equal to Otto's. The set holds `cat`, `head`, `tail`, `wc`, `cut` and `ls` too, each kept
   inside the working tree by Claude Code's own check of a path and `wc --files0-from` by `Bash(wc *--f*)`; `sed`, `awk`, `find`, `sort`,
   `uniq` and `tee` stay out, each able to write a file or run a program. **What the set would let git write a file or run a program by is denied
   beside it**, on each of the four, and so on every step of theirs, whose `disallowedTools:` adds to its agent's, since no allow rule
@@ -148,13 +157,14 @@ What the `create-an-agent` skill, being generic, does not say here:
   the forms as typed and no other: a Bash rule matches the text, so a spelling the shell rejoins — quoted (`--out''put`), escaped
   (`--out\put`), brace-split or put together from a `$` — passes each of them, and what the set writes or runs by such a spelling is open until something reads the line as the shell does. Adding a verb to the set means asking
   what file it can be made to write and what program it can be made to run. The set is on the agents rather than in `.claude/settings.json` so
-  that the team travels to a factory that is not this checkout; `packages/agent-orchestrator/test/agent-fences.test.ts` holds every read
-  open to each of the four, every write refused, every spelling of `--output` and of a read outside it can read refused, and the four
-  lines equal. Each step of the four denies too, on its own file's line (an agent's names no command of this repository), what the
-  settings and shadcn's skill allow that writes the workspace or runs the suite: shadcn's CLI in each spelling an allow reaches (`npx shadcn@latest`, `pnpm dlx`, `bunx --bun`), its one read being the
+  that the team travels to a factory that is not this checkout; `packages/templates/test/fences.test.ts` holds sdlc's rules as written
+  and the four lines equal, and `packages/agent-orchestrator/test/agent-fences.test.ts`, on planted lines, every read open, every write
+  refused and every spelling of `--output` and of a read outside it can read refused. The nemia factory's overlays, in its own tree
+  out of git (sdlc names no command of this repository), deny too on each step of the four what the settings and shadcn's skill allow
+  that writes the workspace or runs the suite: shadcn's CLI in each spelling an allow reaches (`npx shadcn@latest`, `pnpm dlx`, `bunx --bun`), its one read being the
   board's pinned `npx shadcn view` the settings allow, and `npm test`; intake and the janitor, which run no test, `node --test` and `npx
   turbo run test` besides, while design and review keep the checks their notes name and are refused a build on that line
-  (`npx turbo run test *build*`). Design and review measure by the compiler and the linter, which the settings allow
+  (`npx turbo run test *build*`) and a file of the e2e's (`node --test *e2e/*`, the folder: the board's `test/e2e-*.test.ts` stay open). Design and review measure by the compiler and the linter, which the settings allow
   (`npx tsc --noEmit`, `npx oxlint`), and deny on that line what would write or watch, `tsc`'s options by their first letters in each
   case, since it reads an option's name in any case and after one dash or two; intake and the janitor deny both whole. Each of the
   four is told, in one paragraph they hold equal, to put a refused call its work needs at the top of its sign-off, never only in a risk.
@@ -165,51 +175,57 @@ What the `create-an-agent` skill, being generic, does not say here:
 - `packages/agent-orchestrator/docs/features.md` — what is still to build, in order.
 - `packages/agent-runtime/docs/open-issues.md` — what is still wrong or half-verified.
 - `.claude/skills/` — the repository's skills. Ours: `look`, `see-a-dashboard` (a dashboard of the side Grafana, rendered and read),
-  `effect` (how we write Effect 4), `create-an-agent` (how an agent is made here) and `change-the-board` (the trigger of shadcn and of the
-  kit's skills, and the board's own traps, for a change under apps/web). Vendored unchanged, pinned in `skills-lock.json`
+  `effect` (how we write Effect 4), `change-a-contract` (what a contract asks of a design, an implement and a review) and
+  `change-the-board` (the trigger of shadcn and of the kit's skills, and the board's own traps, for a change under apps/web). Vendored
+  unchanged, pinned in `skills-lock.json`
   and credited in `THIRD_PARTY_NOTICES.md`: `shadcn` (it is loaded, and its CLI runs, from `apps/web`, where `components.json` is:
-  loaded from the root it refuses with `monorepo_root`), `grilling` and `grill-me` (Iris's interview), and `react-aria` (Adobe's
+  loaded from the root it refuses with `monorepo_root`), and `react-aria` (Adobe's
   documentation of React Aria, for the board's own parts: taken from the root by `npx skills add https://react-aria.adobe.com -a
   claude-code --copy -y`, refreshed by `npx skills update`, and it describes the library's latest release, which may be ahead of the
   board's pin), and `tsverify` (the verifier's, for a contract under a package's `contracts/` and the function it proves: taken by `npx
-  skills add emyann/tsverify -a claude-code --copy -y`, given to build's and quick's steps by their `skills:` lines).
+  skills add emyann/tsverify -a claude-code --copy -y`, given to build's and quick's steps by the nemia factory's overlays).
 - `apps/web/src/components/ui/ds` — the design system kit (french-tech-homies/design-system, the `@ds` registry), vendored as shipped
   and credited in `THIRD_PARTY_NOTICES.md`, with its skills `ds-theme`, `ds-build` and `ds-spec` in `apps/web/.claude/skills/`: a nested
-  folder, given to the build's design, implement and review steps by their `skills:` lines as `apps/web:<name>`, and said to a session
-  outside a run by `change-the-board`; a kit update that adds or renames one names it on the three lines and in the skill
-  (`packages/agent-orchestrator/test/build-told.test.ts`); the
-  board's look is `apps/web/DESIGN.md`, its generated theme `apps/web/theme/` (`apps/web/CLAUDE.md`, *The design system kit*).
+  folder, given to the build's design, implement and review steps as `apps/web:<name>` by the nemia factory's overlays, and said to a
+  session outside a run by `change-the-board`; a kit update that adds or renames one names it there and in the skill; the board's look
+  is `apps/web/DESIGN.md`, its generated theme `apps/web/theme/` (`apps/web/CLAUDE.md`, *The design system kit*).
 - `apps/web/src/components/look` — the look's own parts (the cut frame, tag and button, the plate, the sticker and stat tile, the
   breakdown and its preview, the rail, the scan lines, the pager, the text link, the copy id) behind one door, each with its stories beside it; Nemia's Storybook
   (`npm run storybook`, from `apps/web`) shows them to a person, and `change-the-board` says which to take (`apps/web/CLAUDE.md`).
-- `workflows/` — this repository's own team, `agents/`: Iris (product engineer), Seldon (software architect), Ada (software engineer),
-  Grace (lead software engineer, who builds a wide card through subagents), Agora (code reviewer), Otto (release engineer), Argus
-  (janitor). Grace fills implement in `build` and `quick`; Ada's file stays, for a factory that hires her. And four workflows:
-  `intake` (an idea to an intent), `build` (an intent to main, started `--after` the intake run), `quick` (a card that settles its change, whatever its size, to main: implement, then a review
-  whose pass files an ungated land, as `workflows/quick/README.md` says) and `janitor` (on demand: the stats to inbox cards, none started). What Nemia has built in:
-  the git place `place/git` (`packages/agent-orchestrator/place/git`: its skill, and its code, given as `gitPlaceLayer`), the skills the api lists as builtin
-  (`BUILTIN_SKILLS`, the package's own `skills/`, none today), the MCP servers it offers a factory (`BUILTIN_SERVERS`,
+- What Nemia has built in: the git place `place/git` (`packages/agent-orchestrator/place/git`: its skill, and its code, given as
+  `gitPlaceLayer`), the skills the api lists as builtin
+  (`BUILTIN_SKILLS`, the package's own `skills/`: `create-an-agent`, and `grilling` and `grill-me`, Iris's interview, vendored
+  unchanged, pinned in the package's `skills-lock.json` and credited in its `THIRD_PARTY_NOTICES.md`), which a step that names one finds
+  last, after every place and the place's skills, the MCP servers it offers a factory (`BUILTIN_SERVERS`,
   `packages/agent-orchestrator/servers/`), and Nemia's own agent once the Nemia slices build it. A person's
   factories get no workflow or agent from the package.
+- `packages/templates/` — the templates Nemia ships (npm name `templates`), each in the template layout: `sdlc`, the team that builds
+  Nemia with this repository's words taken out, under its own semver recorded in `released.json`, and the tests that hold it
+  (`packages/templates/CLAUDE.md`). The nemia factory runs on it; its overlays (pictures, this repository's fences, checks and
+  skills) live in the factory's own tree, out of git. sdlc's `agents/`: Iris (product engineer), Seldon (software architect), Grace
+  (lead software engineer, who builds a wide card through subagents and fills implement in `build` and `quick`), Agora (code
+  reviewer), Otto (release engineer), Argus (janitor). And four workflows: `intake` (an idea to an intent), `build` (an intent to main,
+  started `--after` the intake run), `quick` (a card that settles its change, whatever its size, to main: implement, then a review whose
+  pass files an ungated land, as `packages/templates/sdlc/workflows/quick/README.md` says) and `janitor` (on demand: the stats to inbox
+  cards, none started). The orchestrator never imports it: it finds a builtin template by path.
+- `apps/cli/` — `nemia` and `wf`, the client of the api: the moved reads over HTTP, every other verb and `--local` on the
+  orchestrator's own CLI, spawned (`apps/cli/CLAUDE.md`).
 - `apps/docs/` — the documentation site (Astro Starlight) for a person who will use Nemia: landed material only, the state diagrams read
   from their markers at build; it imports no package (`apps/docs/CLAUDE.md`).
 - `tools/guards/` — the repository's own guards, never shipped: the tests that hold its CI, docs, workflows and test infrastructure
   rather than a layer's code, a workspace of their own (`guards`) whose `ci` job runs them only when `tools/guards/due.ts` says a push
   touched what they read (`tools/guards/CLAUDE.md`). A config guard that imports the orchestrator past its three entries stays in it.
-- `tools/test-costs/` — the repository's test-cost recorder, on every package's `test` script: a probe in each test file's process, a
-  reporter beside spec, and `report.ts`; held by `tools/guards/test/test-costs.test.ts` and `suite.test.ts`.
 - `tools/coverage/` — a package's line and branch coverage per source file (`record.ts`) and the comparison of two records
   (`compare.ts`), a session's measure; held by `tools/guards/test/coverage.test.ts` and its boundary.
-- `tools/journal-bytes/` — what a copy of a runtime store's journals cost, by event kind, the share that is a copy, and the heap a
-  full read holds, before and after a refile through bodies (`node --expose-gc tools/journal-bytes/report.ts <root> [--refile <dir>]`).
 - `tools/store-measure/` — what the store's reads cost, cold and warm: a tick pass, the run list, the stats, a run's page and the feed from
   a cursor, on a copy of both stores in a temp folder with the run count beside them, never the live store
   (`node --expose-gc tools/store-measure/report.ts [--repeat N] [--json <file>] [--compare <baseline.json>]`); the baseline before the
   Run door is `tools/store-measure/baselines/s1.json`, the measure after it `s2.json`, and their comparison `s2-vs-s1.txt`. A
   session's measure, held by `tools/guards/test/store-measure.test.ts`.
 - `tools/observe/` — the side Grafana for building Nemia, never shipped: `docker compose -f tools/observe/compose.yaml up -d`, the daemon
-  started with `OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318` (the live daemon alone: a probe goes to a held throwaway,
-  `node tools/observe/render/render.ts --hold`, at the collector address it prints), and its six dashboards held to the code's names by
+  started with `OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318` (the live daemon alone: a probe or a measurement goes to a held throwaway,
+  `node tools/observe/render/render.ts --hold`, at the collector address it prints, and `--stop <name>` ends it; a step's command that
+  names the live collector's ports, a commit message or a search included, is refused it), and its six dashboards held to the code's names by
   `agent-orchestrator/test/observe.test.ts`, and its timing of a step (the collector's command head and test scope, Tempo's span metrics and
   retention) by `tools/guards/test/observe-time.test.ts`. Its profiler preload, `tools/observe/profile/` (installed there alone), is off unless
   `PYROSCOPE_SERVER_ADDRESS` is set, held by `agent-orchestrator/test/profile.test.ts`.

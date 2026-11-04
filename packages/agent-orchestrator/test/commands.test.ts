@@ -12,12 +12,24 @@ test('the shipped table breaks none of its rules against the CLI’s verbs and r
   assert.deepEqual(commandBreaks(TABLE, [...VERBS.keys()], [...RUNS.keys()]), []);
 });
 
-test('the commands whose work waits on the next pass tick, and no read, nor up, tick or watch, does', () => {
+test('the commands whose work waits on the next pass tick, and the start itself (daemon), and no read, nor up, tick or watch, does', () => {
   assert.deepEqual(
     TABLE.filter((c) => c.ticks === true)
       .map((c) => c.name)
       .sort(),
-    ['agents run', 'approve', 'cancel', 'factory resolve', 'factory upgrade', 'inbox queue', 'refresh', 'resume', 'retry', 'start'],
+    [
+      'agents run',
+      'approve',
+      'cancel',
+      'daemon',
+      'factory resolve',
+      'factory upgrade',
+      'inbox queue',
+      'refresh',
+      'resume',
+      'retry',
+      'start',
+    ],
   );
   assert.deepEqual(
     TABLE.filter((c) => c.ticks === true && (!c.writes || ['up', 'tick', 'watch'].includes(c.name))).map((c) => c.name),
@@ -56,10 +68,13 @@ test('each command is served on the api where it was before the table, the lift 
       ],
       ['inbox rm', { method: 'DELETE', path: '/api/inbox/:name', status: 200 }],
       ['inbox show', { method: 'GET', path: '/api/inbox/:name', status: 200 }],
+      ['label run', { method: 'POST', path: '/api/runs/:runId/labels', status: 200 }],
+      ['label inbox', { method: 'POST', path: '/api/inbox/:name/labels', status: 200 }],
       ['factory', { method: 'GET', path: '/api/factories', status: 200 }],
       ['factory ls', 'cli'],
       ['factory add', 'cli'],
       ['factory apply', 'cli'],
+      ['factory adopt', 'cli'],
       ['factory diff', 'cli'],
       ['factory upgrade', 'cli'],
       ['factory resolve', 'cli'],
@@ -124,14 +139,23 @@ test('each command is served on the api where it was before the table, the lift 
         ],
       ],
       ['say', { method: 'POST', path: '/api/runs/:runId/steps/:step/say', status: 202 }],
-      ['ls', 'cli'],
-      ['show', 'cli'],
+      [
+        'ls',
+        [
+          { method: 'GET', path: '/api/listing', status: 200 },
+          { method: 'GET', path: '/api/listing/:runId', status: 200 },
+        ],
+      ],
+      ['show', { method: 'GET', path: '/api/runs/:runId', status: 200 }],
+      ['closeout', { method: 'GET', path: '/api/runs/:runId/steps/:step/tries/:try/closeout', status: 200 }],
+      ['tries', { method: 'GET', path: '/api/runs/:runId/steps/:step/tries', status: 200 }],
+      ['try', { method: 'GET', path: '/api/runs/:runId/steps/:step/tries/:try', status: 200 }],
+      ['told', { method: 'GET', path: '/api/runs/:runId/steps/:step/told', status: 200 }],
       ['logs', { method: 'GET', path: '/api/runs/:runId/steps/:step/log', status: 200 }],
       ['stats', { method: 'GET', path: '/api/stats', status: 200 }],
       ['runs', { method: 'GET', path: '/api/runs', status: 200 }],
       ['runs open', { method: 'GET', path: '/api/runs-open', status: 200 }],
       ['runs finished', { method: 'GET', path: '/api/runs-finished', status: 200 }],
-      ['run', { method: 'GET', path: '/api/runs/:id', status: 200 }],
       ['step artifact', { method: 'GET', path: '/api/runs/:id/steps/:step/artifacts/:name', status: 200 }],
       ['step file', { method: 'GET', path: '/api/runs/:id/steps/:step/files/:name', status: 200 }],
       ['step path', { method: 'GET', path: '/api/runs/:id/steps/:step/path', status: 200 }],
@@ -212,6 +236,7 @@ test('each command is served on the api where it was before the table, the lift 
       ['service restart', 'cli'],
       ['upgrade', 'cli'],
       ['version', 'cli'],
+      ['daemon', 'cli'],
       ['frontmatter rewrite', 'cli'],
       [
         'workflows write',
@@ -245,12 +270,15 @@ test('every command the api posts or deletes on writes, and the api guards it; t
       'template lint',
       'ls',
       'show',
+      'closeout',
+      'tries',
+      'try',
+      'told',
       'logs',
       'stats',
       'runs',
       'runs open',
       'runs finished',
-      'run',
       'step artifact',
       'step file',
       'step path',
@@ -282,4 +310,10 @@ test('every command the api posts or deletes on writes, and the api guards it; t
     TABLE.filter((c) => routeList(c).some((r) => r.hand === undefined && c.writes !== (r.method !== 'GET'))).map((c) => c.name),
     [],
   );
+});
+
+test("show is the run's one entry on both sides: its --raw, the record, too, which the api answers on ?raw=true for nemia", () => {
+  const show = TABLE.find((c) => c.name === 'show');
+  assert.equal(show?.only, undefined);
+  assert.equal(show?.spec?.flags.find((f) => f.flag === '--raw')?.only, undefined);
 });

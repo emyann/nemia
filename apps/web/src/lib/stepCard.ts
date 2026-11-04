@@ -1,11 +1,11 @@
 /**
- * What a step's card says, read from the run's own answer (`RunDetail`), the run's row on the list and the agents: the card's kind and
+ * What a step's card says, read from the run's own answer (`RunView`), the run's row on the list and the agents: the card's kind and
  * the hue of its frame, its tag, its agent, its tries and rounds, its time, its session's five facts, its spend, a note and its one
  * action, `Read and approve` at an approval's gate. Pure, so that each state is proven without a browser; `StepCard` draws it.
  */
 import type { AgentListing } from './api/agents.ts';
 import type { StepPhase } from './api/reasons.ts';
-import type { RunDetail } from './api/detail.ts';
+import type { RunView, StepView } from './runView.ts';
 import type { RunSummary } from './api/runs.ts';
 import { meaningOf } from './meaning.ts';
 import { sinceShort, sinceWords, whenWords } from './runWords.ts';
@@ -48,13 +48,13 @@ export type StepCardFacts = {
 };
 
 /** A step of the run's own answer. */
-type DetailStep = RunDetail['steps'][number];
+type DetailStep = StepView;
 
 /** What the card reads: the run's row, the step's name, the run's own answer once read, the agents once read, and the instant now. */
 export type StepCardInput = {
   run: Pick<RunSummary, 'id' | 'cancelledAt' | 'holding' | 'steps'>;
   step: string;
-  detail?: Pick<RunDetail, 'steps'> | undefined;
+  detail?: Pick<RunView, 'steps'> | undefined;
   agents?: ReadonlyArray<Pick<AgentListing, 'name' | 'role'>> | undefined;
   now: Date;
 };
@@ -164,7 +164,7 @@ export function factsOf(step: DetailStep): Array<{ key: string; value: string }>
     { key: 'Model', value: first(filed?.model, spec?.model) },
     { key: 'Effort', value: first(filed?.effort, spec?.effort) },
     { key: 'Context', value: contextSaid(filed?.contextTokens ?? spec?.context ?? null) },
-    { key: 'Permission', value: first(filed?.permissionMode, spec?.permissionMode, spec?.sandbox) },
+    { key: 'Permission', value: first(filed?.fence, spec?.fence, spec?.sandbox) },
   ];
 }
 
@@ -228,7 +228,7 @@ export function stepCardOf({ run, step, detail, agents, now }: StepCardInput): S
   return {
     kind,
     hue: hueOf(state),
-    tag: { word: stateWordsOf(state, codes.on).rail, ...TAGS[kind] },
+    tag: { word: stateWordsOf(state, codes.on, run.holding != null).rail, ...TAGS[kind] },
     agent: agentOf(row?.agent ?? null, agents),
     step,
     place: own && detail ? placeOf(own, detail.steps, kind) : null,

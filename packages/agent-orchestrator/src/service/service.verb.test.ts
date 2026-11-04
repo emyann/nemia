@@ -120,6 +120,7 @@ function hostOf(world: World): { host: ServiceHost; events: string[] } {
       return '';
     },
     linger: () => true,
+    standing: readPause,
     lease: () => {
       const read = world.lease;
       const next = world.later?.shift();
@@ -615,6 +616,20 @@ test('a pause a person put stands through a take-over: it is neither put again n
   assert.equal((await install({ takeOver: String(OLD) }, host)).did, 'taken');
   assert.ok(!events.includes('pause') && !events.includes('resume'), events.join('\n'));
   assert.equal(readPause()?.by, 'ann');
+});
+
+test('status says the pause that stands, by whom and why, as its file says it, and nothing of one once it is lifted', async () => {
+  const why = 'need to put the laptop on sleep';
+  putPause({ by: 'yrnd1', why });
+  const { host } = hostOf({ lease: lease(OLD), unitPid: null, landings: [] });
+  const paused = (await status(host)).lines.filter((l) => l.startsWith('pause: '));
+  assert.equal(paused.length, 1);
+  assert.ok(paused[0].includes('yrnd1') && paused[0].includes(why), paused[0]);
+  resumePause();
+  assert.deepEqual(
+    (await status(host)).lines.filter((l) => l.startsWith('pause: ')),
+    [],
+  );
 });
 
 test('a take-over interrupted while it waits on a landing lifts its own pause and signals nothing', async () => {

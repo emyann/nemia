@@ -25,11 +25,16 @@ export {
   overBudgetLine,
   pauseAskVoid,
   pauseAsksVoid,
+  raiseGrounds,
+  raiseVerdict,
   retriesDue,
   retryable,
   retryLines,
   retryOffers,
+  roundOver,
+  stepRaise,
   tryNote,
 } from './retry.ts';
+export type { RaiseGrounds, RaiseReads, StepRaise } from './retry.ts';
 export { retryRefusal } from './retry-refusal.ts';
 export { WAITS_ON_PERSON, waitsOnPerson } from './waits.ts';

@@ -24,10 +24,10 @@ export type { FactoryInstruction };
  * the entries (commands/routes.ts), guarded, each answered as the read.
  */
 export const factoryInstruction = new Hono<ApiEnv>().get('/api/factories/:factory/instruction', (c) =>
-  served(c, async ({ e, placeService }) => {
+  served(c, async ({ e, placeService, home }) => {
     const { factory } = c.req.param();
     const wrong = factoryNameRefusal(factory);
     if (wrong !== undefined) return c.json({ error: `GET /api/factories/${factory}/instruction: ${wrong}` }, 400);
-    return c.json((await runPlaced(placeService, e, FACTORY_INSTRUCTION.handler({ factory }))) satisfies FactoryInstruction);
+    return c.json((await runPlaced({ placeService, home }, e, FACTORY_INSTRUCTION.handler({ factory }))) satisfies FactoryInstruction);
   }),
 );

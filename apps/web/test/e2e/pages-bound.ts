@@ -20,7 +20,10 @@ import { overBound, pagesLine, shardPages, shardsMissing, type ShardPages } from
 /** The shard file a shard run writes, by its name: `pages-<i>-of-<n>.json`. */
 const SHARD_FILE = /^pages-\d+-of-\d+\.json$/;
 
-/** Every shard file under `dirs`, each directory read one level deep, in the order their names sort. */
+/**
+ * Every shard file under `dirs`, each directory read through its whole tree (a download without `merge-multiple` nests a folder per
+ * artifact), in the order their names sort.
+ */
 function shardsIn(dirs: readonly string[]): ShardPages[] {
   return dirs.flatMap((dir) =>
     fs
@@ -40,8 +43,9 @@ if (!dirs.length) {
 const absent = dirs.filter((dir) => !fs.existsSync(dir));
 if (absent.length) {
   console.error(
-    `pages-bound: ${absent.join(', ')} ${absent.length > 1 ? 'are' : 'is'} not there, and a shard's page times cannot be read from it: ` +
-      'run `npm run e2e -- --shard <i> --of <n>` with WF_ARTIFACTS set to the directory, and name that directory here',
+    `pages-bound: ${absent.join(', ')} ${absent.length > 1 ? 'are' : 'is'} not there, so no shard's page times can be read from it. ` +
+      'A shard writes them only once its pages have passed (run.ts): in CI every shard failed or was cancelled, and their own ' +
+      "results are the e2e's verdict, so read their logs and answer them; by hand, name the directory each shard's WF_ARTIFACTS named",
   );
   process.exit(2);
 }

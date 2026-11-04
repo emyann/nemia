@@ -21,10 +21,10 @@ import { EngineService, asked, tried } from '../runtime-client.ts';
 import { verifiesRest } from '../config/config.store.ts';
 import { HOME } from '../record/record.store.ts';
 import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
-import { restingMemo, type RestingMemo } from '../rest/resting.verb.ts';
+import { informerMemo, type InformerMemo } from '../rest/informer.verb.ts';
 import { kindOf } from '../runlist/runlist.ts';
 import type { Filings } from '../summary/reads.verb.ts';
-import { runsSummarized, type RunSummary } from '../summary/summary.verb.ts';
+import { runsSummarized } from '../summary/summary.verb.ts';
 import {
   appendAnswer,
   appendOutbox,
@@ -64,12 +64,12 @@ import {
 export type ChatPlace = { readonly task: string | undefined; readonly dir: string };
 
 /**
- * How the runs that wait on the person are read, as the board's list reads them: the store, the memo of runs at rest and the feed's
+ * How the runs that wait on the person are read, as the board's list reads them: the store, the informer and the feed's
  * filing times its caller keeps, and the environment that says whether to verify them. Each defaults as a caller that keeps none.
  */
 export type ChatReads = {
   readonly home?: string;
-  readonly runs?: RestingMemo<Omit<RunSummary, 'startedAt'>>;
+  readonly runs?: InformerMemo;
   readonly filings?: Filings;
   readonly env?: NodeJS.ProcessEnv;
 };
@@ -119,7 +119,7 @@ const waitingNow = (reads: ChatReads) =>
     const e = yield* EngineService;
     const runs = yield* runsSummarized(e, {
       home: reads.home ?? HOME,
-      memo: reads.runs ?? restingMemo(),
+      memo: reads.runs ?? informerMemo(),
       filings: reads.filings ?? { filed: new Map(), cursor: 0 },
       verify: reads.env ? verifiesRest(reads.env) : false,
     });

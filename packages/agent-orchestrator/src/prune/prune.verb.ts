@@ -17,7 +17,8 @@ import { filesPrunedWords, isRepositoryRun, namesInOrder, type RepositoryRun, ty
 import { approvedFirst, landsOnCheck } from '../status/status.ts';
 import { decision } from '../decide/decide.ts';
 import { forgetRefusal, heldWorktree, idRefusal, inventoryUnread, runWorktrees, type AskName } from '../forget/forget.ts';
-import { HOME, stepsOf } from '../record/record.store.ts';
+import { HOME } from '../record/record.store.ts';
+import { stepsOf } from '../steps/steps.verb.ts';
 import { runStore } from '../record/files.store.ts';
 import { askRunPlace, PlaceService, type RunPlaceRead } from '../place/place.store.ts';
 import { freedBytes } from './freed.store.ts';
@@ -37,7 +38,7 @@ import { Conflict, Invalid } from '../refusal/refusal.ts';
  */
 export function merging(run: Run, steps: readonly Workflow[] | undefined, memo: StatusMemo): MergeState['merging'] {
   if (!readsCheckout(run, steps)) return 'none';
-  const read = checkoutStatus(run, memo);
+  const read = checkoutStatus(run, steps ?? [], memo);
   if ('unread' in read) throw new Conflict({ message: `run ${run.id}: ${read.unread}; read its checkout, ${run.repo}, then try again` });
   return read.merging;
 }
@@ -152,7 +153,7 @@ export const judging = Effect.fn('prune.judging')(function* (
   if (!isRepositoryRun(run)) return refused(folder ?? '');
 
   const within = resolved(path.join(HOME, 'worktrees', id));
-  const steps = frozenSteps(run);
+  const steps = yield* frozenSteps(run);
   const place = yield* askRunPlace(run, yield* PlaceService, within);
   if (!('inventory' in place)) return refused(inventoryUnread('prune', id, run.repo, place));
   const listed = placeWorktrees(run, steps, within, place).filter((w) => w.removable !== 'gone');
@@ -182,13 +183,7 @@ export const sized = Effect.fn('prune.sized')(function* (ready: Ready) {
 });
 
 /** A run's frozen steps, or none when its workflow does not read: the run is judged without them. */
-function frozenSteps(run: Run): Workflow[] | undefined {
-  try {
-    return stepsOf(run);
-  } catch {
-    return undefined;
-  }
-}
+const frozenSteps = (run: Run): Effect.Effect<Workflow[] | undefined> => Effect.orElseSucceed(stepsOf(run), () => undefined);
 
 /** The run's worktrees inside `within` as its place's inventory read them (`runWorktrees`), the record's paths read as git names them. */
 function placeWorktrees(run: RepositoryRun, steps: readonly Workflow[] | undefined, within: string, place: RunPlaceRead) {
@@ -257,9 +252,9 @@ const judgedOf = Effect.fn('prune.judged')(function* (
     run.steps[name] = { ...run.steps[name], taskId };
   }
   const askAt = (a: AskName) => runStore.asks.where(run.id, a);
-  const standings = steps.some((s) => approvedFirst(s, run) && !run.steps[s.name]?.taskId) ? standingsOf(run, git) : [];
+  const standings = steps.some((s) => approvedFirst(s, run) && !run.steps[s.name]?.taskId) ? standingsOf(run, steps, git) : [];
   const checkout = statusMemo(headsOver(git), placed);
-  if (readsCheckout(run, steps)) yield* askCheckoutStatus(run, checkout);
+  if (readsCheckout(run, steps)) yield* askCheckoutStatus(run, steps, checkout);
   return {
     decided: decision(steps, run, phaseOf, landedOf(run, git), reader, asked, verdictOf, asks, rounds, harnessBlocked(views), spendOf).kind,
     held: forgetRefusal(

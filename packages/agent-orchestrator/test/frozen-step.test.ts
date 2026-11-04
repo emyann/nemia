@@ -1,38 +1,56 @@
 /**
- * The schema a frozen step is read back by (`FrozenStepSchema`), held to the parser it reads the output of: every step of every folder
- * shipped and of the tests' team, as `nemia start` freezes it, reads back as it was; the decoded type and `Workflow` are each the other;
+ * The schema a frozen step is read back by (`FrozenStepSchema`), held to the parser it reads the output of: every step of the tests'
+ * team, of a copy of it whose implement has a closeout schema of its own, and of the package's examples, as `nemia start` freezes it,
+ * reads back as it was; the decoded type and `Workflow` are each the other;
  * and a key of `STEP_KEYS` the schema has no field for fails the typecheck.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
 import { Result, Schema } from 'effect';
-import { FrozenStepSchema, loadWorkflows, type FrozenStepFields } from '../src/folder/folder.store.ts';
+import { FrozenStepSchema, type FrozenStepFields } from '../src/folder/folder.store.ts';
+import { loadWorkflows } from '../src/workflows/workflows.store.ts';
 import { asNamed, FORMER_KEYS, type Workflow } from '../src/workflow.ts';
 import { ownDenies } from '../src/workflow/index.ts';
-import { placesOf, shippedFolders, TEAM_DEV } from './team.ts';
+import { plantStepOutput, TEAM_DEV, teamCopy } from './team.ts';
 
-/** Every folder shipped (`team.ts`), and the tests' team's `dev`. */
-const FOLDERS = [...shippedFolders(), TEAM_DEV];
+/** The package's example folders (`wf-examples/`), each a workflow. */
+const EXAMPLES = path.join(import.meta.dirname, '..', 'wf-examples');
+
+/** The tests' team's `dev`, a copy of it whose implement has a closeout schema of its own, and each example. */
+const FOLDERS = [
+  TEAM_DEV,
+  (() => {
+    const team = teamCopy('wf-frozen-step-');
+    plantStepOutput(team);
+    return path.join(team, 'dev');
+  })(),
+  ...fs.readdirSync(EXAMPLES).map((name) => path.join(EXAMPLES, name)),
+];
 
 const decode = Schema.decodeUnknownResult(FrozenStepSchema);
 
 /** A step as a record holds it: through JSON, as `nemia start` writes it and `readRun` reads it. */
 const frozen = (step: Workflow): unknown => JSON.parse(JSON.stringify(step));
 
-test("every step of every folder shipped and of the tests' team, frozen, reads back by the schema as it was frozen", () => {
+test("every step of the tests' team, of its copy with a step's own schema and of the examples, frozen, reads back by the schema as it was frozen", () => {
   assert.ok(FOLDERS.includes(TEAM_DEV), `the team is read: ${FOLDERS.join(', ')}`);
   let agents = 0;
+  let outputs = 0;
   for (const dir of FOLDERS) {
-    const steps = loadWorkflows(dir, placesOf(dir));
+    const steps = loadWorkflows(dir);
     assert.ok(steps.length > 0, `${dir} has steps`);
     for (const step of steps) {
       const decoded = decode(frozen(step));
       assert.ok(Result.isSuccess(decoded), `${dir}/${step.name} reads: ${Result.isFailure(decoded) ? String(decoded.failure) : ''}`);
       assert.deepEqual(decoded.success, frozen(step), `${dir}/${step.name} reads as it was frozen, no key dropped`);
       if (step.agent) agents += 1;
+      if (step.output) outputs += 1;
     }
   }
   assert.ok(agents > 0, 'a step names an agent, so the agent is read too');
+  assert.ok(outputs > 1, "a step's own schema and an agent's are read too");
 });
 
 test('a step with every key the parser types, its agent and its output reads as it was frozen; one key off, it is refused', () => {

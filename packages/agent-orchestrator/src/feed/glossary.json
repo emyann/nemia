@@ -23,6 +23,11 @@
       "type": "DaemonLine"
     },
     {
+      "term": "Delivery",
+      "meaning": "where the deliverer is with a subscription: the byte of the feed it has delivered or folded every line before, the routine lines folded and not yet said, and the subscription it was written for; kept beside the subscription's file and checked by the model's `Delivery` on every write.",
+      "type": "Delivery"
+    },
+    {
       "term": "Feed",
       "meaning": "the store's stream of what happened, written by the daemon alone, which the board and Nemia follow.",
       "type": "FeedLine",
@@ -35,6 +40,11 @@
       "term": "Feed cursor",
       "meaning": "a byte offset of complete lines of the feed, from 0: where a read, or a subscription's news, starts.",
       "type": "FeedCursor"
+    },
+    {
+      "term": "Feed door",
+      "meaning": "the one way the feed is read and appended to: `FeedDoor`, one group `lines` (`end`, `read`, `cursorRefusal`, `append`), append-only; the files at the store's root a program is given, or a test's memory stand-in that keeps the lines as their bytes. It refuses a cursor at no line's boundary and a line the model's `FeedLine` refuses, writing nothing of that append. The fold a pass reads it by is its caller's (`emitFeed`), never the layer's.",
+      "type": "FeedDoorShape"
     },
     {
       "term": "Line",
@@ -128,6 +138,11 @@
         "label": "Her subscription",
         "href": "/nemia/#her-subscription"
       }
+    },
+    {
+      "term": "Subscription door",
+      "meaning": "the one way a program reads and writes the store's subscriptions and their deliveries, by `SubscriptionName`: a name taken is `Conflict`, one dropped that is not there `Missing`, and each write is checked by the model on every layer, the files under the store's root or a test's memory stand-in.",
+      "type": "SubscriptionDoorShape"
     },
     {
       "term": "Subscription name",

@@ -153,9 +153,24 @@ export const PAUSED: Pick<PersonWords, 'rail' | 'meaning'> = {
   meaning: 'It signed off, and its check runs once the factories are resumed.',
 };
 
-/** The rail word and meaning of a step by its state, and by what it waits on where a state has a wait of its own (the pause's). */
-export const stateWordsOf = (state: StepState, on: WaitOn | null): Pick<PersonWords, 'rail' | 'meaning'> =>
-  state === 'waiting' && on === 'pause' ? PAUSED : PERSON[state];
+/**
+ * A step not started on a run a person holds: named as any step to come, since it is drawn as one, and its meaning says the hold is why it
+ * has not.
+ */
+export const HELD_TO_COME: Pick<PersonWords, 'rail' | 'meaning'> = {
+  rail: PERSON.waiting.rail,
+  meaning: 'It has not started yet: a person holds the run until other runs land, and nothing of it starts until the hold lifts.',
+};
+
+/**
+ * The rail word and meaning of a step by its state, by what it waits on where a state has a wait of its own (the pause's), and by whether
+ * a person holds the run (`runHeld`), which a step not started waits on. `runHeld` has no default, as `stepState`'s has none.
+ */
+export const stateWordsOf = (state: StepState, on: WaitOn | null, runHeld: boolean): Pick<PersonWords, 'rail' | 'meaning'> => {
+  if (state === 'waiting' && on === 'pause') return PAUSED;
+  if (runHeld && (state === 'waiting' || state === 'waiting-for-slot')) return HELD_TO_COME;
+  return PERSON[state];
+};
 
 /**
  * A check's verdict as a person reads it, from its codes: `passed`, `exit 1` for the code it failed with (`failed` where it gave none),

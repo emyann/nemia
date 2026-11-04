@@ -42,7 +42,7 @@ the orchestrator's code holds a fact today, it is named beside it.
   (2.1.291, 2026-10-06); a `node -e` write of it is judged by the classifier alone, which refused it once and let it through unruled
   once.
 - **`Bash(claude *--bg*)`, `Bash(claude *--background*)` and `Bash(claude *remote-control*)` refuse an `auto` job's own session, a
-  `cd … &&` before it included, by the rule** (2.1.291, 2026-10-06): a step starts a probe through `workflows/build/probe.ts` alone.
+  `cd … &&` before it included, by the rule** (2.1.291, 2026-10-06): a step starts a probe through `packages/templates/sdlc/workflows/build/probe.ts` alone.
 - **A path inside `Read(//…)` or `Edit(//…)` carries a space, a comma and braces; `*`, `?` and `[` widen it, and a `\` misses its own
   folder** (2.1.291, 2026-10-06, allow and deny alike): `CLAUDE_UNRULED` holds the set, with `(`/`)` the runtime's `RULE` refuses;
   `\*` is read as an escape, unused yet.
@@ -151,6 +151,16 @@ the orchestrator's code holds a fact today, it is named beside it.
   runs are folded into the turn in flight and answered by its one result** (SDK 0.3.270, CLI 2.1.301, 2026-10-16): so a turn is
   answered by the `user_message_uuids` on its result (`answered`, `harness/claude/attached-session.ts`), never by counting;
   `queued_turn_count` was 0 on a result a second turn followed, so nothing reads it.
+- **An MCP server's tools are deferred only where the session has `ToolSearch`** (SDK 0.3.308, Claude Code 2.1.308, 2026-11-02): a
+  closed `tools` list without it sends every server's tools whole on every request — a design step's 23 Playwright tools, 4.1k tokens
+  of its first request — and one with it sends them as names, each definition loaded on demand. So `attachedOptions` adds `ToolSearch`
+  to a closed list where the session has a server (`TOOL_SEARCH`, `harness/claude/attached-options.ts`). In `dontAsk`, with the tool
+  on `allowedTools`, the session loaded it and called it; `ToolSearch` itself needed no allow. Read off the transcript's first
+  `api-request-shape`, by `test/live.test.ts` and its control on the code before it.
+- **`claudeMdExcludes` in `Options.settings` keeps a folder's `CLAUDE.md` out of a session** (2.1.308, 2026-11-02):
+  `**/node_modules/**/CLAUDE.md` left out the `nested_memory` attachment a read under `node_modules/<dep>/` brought, while one beside
+  it outside `node_modules` was still attached; without the key, both were, and the dependency's text reached the model
+  (`DEPENDENCY_CLAUDE_MD`, `harness/claude/memory.ts`; `test/live.test.ts`).
 
 ## The claude.ai bridge
 

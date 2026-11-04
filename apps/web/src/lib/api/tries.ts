@@ -1,6 +1,7 @@
 /**
- * A step's tries, as a run's detail carries them (apps/api/src/detail/tries.ts), with the files a closeout named (agent-orchestrator's
- * artifacts/artifacts.store.ts) and its check's logs (logs.ts), each type with the schema `get` decodes it with.
+ * A step's tries, as the api answers them (`GET /api/runs/:id/steps/:step/tries`, apps/api/src/runs/runs.ts), with the files a closeout
+ * named (agent-orchestrator's artifacts/artifacts.store.ts) and its check's logs (logs.ts), each type with the schema `get` decodes it
+ * with.
  */
 import { Schema } from 'effect';
 import { decodes } from './decodes.ts';
@@ -48,7 +49,7 @@ export const StepArtifactSchema = decodes<StepArtifact>()(
   ]),
 );
 
-/** Mirrors `StepReply` in apps/api/src/detail/tries.ts: a loop's target's answer to one finding. */
+/** Mirrors `StepReply` in apps/api/src/runs/runs.ts: a loop's target's answer to one finding. */
 export type StepReply = { finding: string; answer: string; why: string };
 
 /** Decodes a `StepReply`. */
@@ -69,10 +70,17 @@ export type QuestionOption = { label: string; meaning: string };
 export const QuestionOptionSchema = decodes<QuestionOption>()(Schema.Struct({ label: Schema.String, meaning: Schema.String }));
 
 /**
- * Mirrors `Question` in agent-orchestrator's question/question.ts: its `title`, which an answer names; its `body`; its `options`; the label
- * it `recommended`, or null; and whether `multiple` options may be chosen together.
+ * Mirrors `Question` in agent-orchestrator's question/question.ts: its `title`, which an answer names; its `body`; its `options`; what
+ * it `recommended` — one label or null, or, on a question that takes `multiple` options, a list of labels — and whether `multiple` options
+ * may be chosen together.
  */
-export type Question = { title: string; body: string; options: QuestionOption[]; recommended: string | null; multiple: boolean };
+export type Question = {
+  title: string;
+  body: string;
+  options: QuestionOption[];
+  recommended: string | string[] | null;
+  multiple: boolean;
+};
 
 /** Decodes a `Question`. */
 export const QuestionSchema = decodes<Question>()(
@@ -80,7 +88,7 @@ export const QuestionSchema = decodes<Question>()(
     title: Schema.String,
     body: Schema.String,
     options: Schema.mutable(Schema.Array(QuestionOptionSchema)),
-    recommended: Schema.NullOr(Schema.String),
+    recommended: Schema.NullOr(Schema.Union([Schema.String, Schema.mutable(Schema.Array(Schema.String))])),
     multiple: Schema.Boolean,
   }),
 );
@@ -97,7 +105,7 @@ export const AskedQuestionsSchema = decodes<AskedQuestions>()(
 );
 
 /**
- * Mirrors `StepCloseout` in apps/api/src/detail/tries.ts: with what it gave of its declared output, what it did not, and its `replies`;
+ * Mirrors `StepCloseout` in apps/api/src/runs/runs.ts: with what it gave of its declared output, what it did not, and its `replies`;
  * each declared field's JSON Schema off the workflow the run froze; the `questions` of each question field that decoded, in the schema's
  * order; and the statement as the engine recorded it (`raw`). `summary` is one line, `body` the markdown beneath it, `values` what it
  * handed on beside its files, each with its `link` where the api found it an http(s) address, and `refused` what the run did not accept of
@@ -192,7 +200,7 @@ export const StepCheckSchema = decodes<StepCheck>()(
 );
 
 /**
- * Mirrors `StepUnreadable` in apps/api/src/detail/tries.ts: a closing statement the api could not read, its words for why, and the
+ * Mirrors `StepUnreadable` in apps/api/src/runs/runs.ts: a closing statement the api could not read, its words for why, and the
  * statement as it came.
  */
 export type StepUnreadable = { error: string; raw: unknown };
@@ -212,7 +220,7 @@ export const ATTEMPT_ENDS = ['harness', 'lost', 'unstartable', 'operator', 'dead
 export type AttemptEnd = (typeof ATTEMPT_ENDS)[number];
 
 /**
- * Mirrors `StepAttempts` in apps/api/src/detail/tries.ts. `endedAt` is when the latest attempt ended — the
+ * Mirrors `StepAttempts` in apps/api/src/runs/runs.ts. `endedAt` is when the latest attempt ended — the
  * engine's `Attempt.endedAt` — and null while it runs, or where the engine's record has none.
  */
 export type StepAttempts = {
@@ -236,7 +244,7 @@ export const StepAttemptsSchema = decodes<StepAttempts>()(
 );
 
 /**
- * Mirrors `StepTry` in apps/api/src/detail/tries.ts: one try of a step, earliest first. `cause` is what replaced it, null on the current
+ * Mirrors `StepTry` in apps/api/src/runs/runs.ts: one try of a step, earliest first. `cause` is what replaced it, null on the current
  * try, which `current` marks; `note` how it was reached, in the CLI `ls`'s words. `phase`, `reason` and `message` are the step's own on
  * the current try, and on an earlier one the codes and the word of its task's engine; `message` is shown, never compared.
  */

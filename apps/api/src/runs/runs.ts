@@ -3,25 +3,46 @@
  * and what `nemia decide` shows of it.
  */
 import { Effect } from 'effect';
-import { Hono } from 'hono';
+import { type Context, Hono } from 'hono';
 import {
+  type Command,
   COMMANDS,
   type FinishedPage,
   type FinishedRun,
+  Informer,
   judgedUnlessUnreadable,
   type ListedRun,
   type OpenRuns,
   viewsFor,
   runWith,
+  runObject,
+  runLines,
+  type RunLines,
+  type RunObject,
   type RunSummary,
   type WaitingRun,
 } from 'agent-orchestrator';
-import type { Run } from 'agent-orchestrator/run';
 import { decisionOf } from '../decide/decision.ts';
-import { detail, type RunDetail } from '../detail/index.ts';
 import { type ApiEnv, served, type Served } from '../layer.ts';
 import { workflowPageOf, type WorkflowPageAddress } from '../step/step.ts';
+import { selectorOf } from '../labels/index.ts';
 import { commandNamed, findRun, noSuchRun, runPlaced } from '../store.ts';
+
+/**
+ * The types of what the run object's sub-resources and its steps answer, judged by the package: a step's tries (`triesOf`), what it was
+ * told (`toldOf`) and what its sessions used (`usedOf`), where the board's mirrors read them.
+ */
+export type {
+  StepAcceptance,
+  StepApproval,
+  StepAttempts,
+  StepCloseout,
+  StepGate,
+  StepReply,
+  StepTry,
+  StepUnreadable,
+} from 'agent-orchestrator';
+export type { StepFiled, StepRaise, TaskPart, RunRead, StepUsed, Usage } from 'agent-orchestrator';
 
 /** A person's hold on a run, as `PUT /api/runs/:id/hold` answers it beside the run (`{ id, lifted: false, hold }`). */
 export type { Hold } from 'agent-orchestrator/run';
@@ -29,8 +50,15 @@ export type { Hold } from 'agent-orchestrator/run';
 /** A run as the list answers it: its summary, and the address of its workflow's page, null where the board pages none. */
 export type RunListing = RunSummary & { workflowPage: WorkflowPageAddress | null };
 
-/** A run as its page answers it: in full (`RunDetail`), and the address of its workflow's page, null where the board pages none. */
-export type RunPage = RunDetail & { workflowPage: WorkflowPageAddress | null };
+/** A run as `GET /api/runs/:id` answers it: the package's run object, `nemia/v1`'s `Run`, the answer of `nemia show`. */
+export type RunAnswer = RunObject.Run;
+
+/**
+ * The lines read beside the run object (`GET /api/runs/:runId/lines`): the command lines a person types about the run and each of its
+ * steps (`runLines`), where it came from, and the address of its workflow's page (`workflowPageOf`), as the list gives it. Constant for a
+ * run, off its record alone: the board reads it once and never again on the feed.
+ */
+export type RunLinesAnswer = RunLines & { workflowPage: WorkflowPageAddress | null };
 
 /** What the list adds to a row: the address of its workflow's page, null where the board pages none. */
 type Paged = { workflowPage: WorkflowPageAddress | null };
@@ -59,28 +87,43 @@ const RUNS_FINISHED = commandNamed('runs finished');
  */
 const LIST_KEYS = { factory: 'ofFactory', page: 'page', size: 'size' } as const;
 
-/** The arguments a request gives a read of the list: each key of `LIST_KEYS` its query says, and no other. */
-const listArgs = (query: (name: string) => string | undefined): Record<string, string> =>
-  Object.fromEntries(
+/** The arguments a request gives a read of the list: each key of `LIST_KEYS` its query says, its `?selector=`s, and no other. */
+const listArgs = (c: Context<ApiEnv>): Record<string, string | string[]> => ({
+  ...selectorOf(c),
+  ...Object.fromEntries(
     Object.entries(LIST_KEYS).flatMap(([key, name]) => {
-      const value = query(name);
+      const value = c.req.query(name);
       return value === undefined ? [] : [[key, value]];
     }),
-  );
+  ),
+});
 
 /**
- * What the read `entry` answers `args`, handed the app's memo of runs at rest and its feed's filing times, as `GET /api/runs` hands
- * them.
+ * `program` over the app's informer of each run's judgement (`Informer`, the package's), which the store's daemon's pass fills: what the
+ * run object and its sub-resources read a run's judgement through (`stepsReading`), and keep on a miss.
  */
-const listRead = ({ e, placeService, env, home, memo }: Served, entry: (typeof COMMANDS)[number], args: Record<string, string>) =>
-  runPlaced(placeService, e, entry.handler(args, env, home, { runs: memo.resting, filings: memo.filings }));
+const informed = <A, E, R>({ informer }: Served, program: Effect.Effect<A, E, R>): Effect.Effect<A, E, R> =>
+  Effect.provideService(program, Informer, informer);
+
+/** What a list's read hands the package to keep between requests: the app's informer and its feed's filing times. */
+const keptOf = ({ informer, memo }: Served) => ({ ...(informer ? { runs: informer } : {}), filings: memo.filings });
+
+/** What the read `entry` answers `args`, handed the app's informer and its feed's filing times, as `GET /api/runs` hands them. */
+const listRead = (s: Served, entry: (typeof COMMANDS)[number], args: Record<string, string | string[]>) =>
+  runPlaced(s, s.e, entry.handler(args, s.env, s.home, keptOf(s)));
 
 /** `rows`, each with the address of its workflow's page (`workflowPageOf`), as the whole list gives it. */
 const paged = <R extends RunSummary>(rows: readonly R[], { repo, home }: Served): Array<R & Paged> =>
   rows.map((run) => ({ ...run, workflowPage: workflowPageOf(run, repo, home) }));
 
-/** One run read for its page (`run`), an entry of the package's table the api serves alone: on `GET /api/runs/:id`. */
-const RUN = commandNamed('run');
+/**
+ * Why `GET /api/runs/:id` refuses `?view=`, the page's `view=page` among them: it answers the run object alone, and names where the rest
+ * is read.
+ */
+const noView = (id: string, view: string): string =>
+  `GET /api/runs/${id} takes no view, not view=${view}: drop it — the route answers the run object; read a step's tries at ` +
+  `/api/runs/${id}/steps/<step>/tries, what it was told at /api/runs/${id}/steps/<step>/told, and the command lines and the ` +
+  `workflow's page at /api/runs/${id}/lines.`;
 
 /** What a run would hand a run started with it as context (`concluded`), an entry of the package's table: on `GET …/concluded`. */
 const CONCLUDED = commandNamed('concluded');
@@ -90,19 +133,25 @@ const CONCLUDED = commandNamed('concluded');
  * run — its removal and its prune among them — are the command table's routes (`commands`, commands/routes.ts).
  *
  * - `GET /api/runs` — every run's summary (`RunListing`), each with the address of its workflow's page (`workflowPageOf`), in the
- *   store's order: the package's entry (`runs`), handed the app's memo of runs at rest and its feed's filing times. One request costs,
+ *   store's order: the package's entry (`runs`), handed the app's informer (`Informer`) and its feed's filing times. One request costs,
  *   however many runs there are, one harness observation (one listing of the sessions it holds, one scan of the detached runs' files),
  *   a read of every task journal in the engine's store, and each run's record and workflow folder. That is a cold read's cost: a warm
  *   one costs the store's stamp walk (one `readdir`, and a `stat` of each run's files) and the records and journals of the runs still
- *   moving, and reads no record of a run at rest — the memo hands the store the run it judged (`given`) in place of a read of it. The
+ *   moving, and reads no record of a run at rest — the informer hands the store the run it judged (`given`) in place of a read of it. The
  *   records are read before the engine: `nemia` files a step's task before it writes the id on the run, so every id read is in the
  *   listing that follows; the other way round, a task filed between the two reads would show as `unknown` until the next poll. A run
  *   that waits on runs reads each of them off the same views (`seenBy`): its record and git, and its tasks as they were listed. The
- *   feed's filing times are read once, on from where the last read stopped (`filedTimes`): when each run started. A run at rest is
- *   answered from the list's memo (`restingRead`) while nothing it was judged on has moved, so a poll reads the journals of the runs
+ *   feed's filing times are read once, on from where the last read stopped (`filedTimes`): when each run started. Each run's judgement is
+ *   the informer's, the one the store's daemon's pass made and the run's object reads (`informerRead`): a run at rest is answered from it
+ *   while nothing it was judged on has moved, and a moving one within the pass that judged it, so a poll reads the journals of the runs
  *   still moving and of none other; the rest are read through the request's own engine and the tick's last standing (`viewsFor`,
  *   `standingSnapshot`). With `WF_VERIFY_REST` a kept answer is judged afresh too, and one that differs fails the request: such a read
  *   is handed nothing from memory and reads every record again.
+ * - `?selector=` on `GET /api/runs`, `GET /api/runs-open`, `GET /api/runs-finished` and `GET /api/listing[/:runId]` — a selector of the
+ *   runs' labels (`team=core`, `team in (core,infra)`, `!team`), as `nemia ls -l` takes it, given again for another, of which one must
+ *   take a run (OR): each row carries its whole map, `labels` (the person's keys, `workflow`, and `factory`, `default` for the default
+ *   factory), and a selector reads that. The runs are selected before any is judged, the counts and the page cut over those taken. A
+ *   selector the package's grammar refuses (`selectorsRefusal`) is its `Invalid`, a 422 naming the key or the clause.
  * - `GET /api/runs-open` — the light answer (`OpenListing`), by the package's entry (`runs open`): the runs that wait on a person
  *   (`waiting`) and the runs in flight (`inFlight`), each in the store's order, and `counts` of each and of the finished runs; a run that
  *   moves and also waits is among the waiting, once. Each row is the list's own (`RunListing`) with its `wallMs`, created until now, and
@@ -126,56 +175,81 @@ const CONCLUDED = commandNamed('concluded');
  *   `wallMs` and the breakdown of a finished run stands still. The page is cut before anything is read for it, so beyond what a warm
  *   `GET /api/runs` costs this read costs the records and the task journals of that page's rows alone — nine where the board asks, at
  *   most `?size=`'s hundred — and nothing for the finished runs it does not answer.
- * - `GET /api/runs/:id` — a run in full (`detail`) with the address of its workflow's page (`RunPage`), found by the package's entry
- *   (`run`): refused with a 404 when there is no such run, and with a 502 when a task it reads does not, in the words the list says it with
- *   (`RunSummary.unreadable`).
+ * - `GET /api/runs/:id` — the run as one object (`RunAnswer`), the route of its entry of the command table (`show`), judged by the
+ *   package (`runObject`) as `nemia show` judges it, off the app's informer (`Informer`) where it holds the run's judgement, handed the
+ *   app's memo and the request's doors (`inRequest`), which the entry's own
+ *   handler is not: so it is served here, by hand. Found among the runs the store lists, never by a path made of its id: refused with a
+ *   404 when there is no such run, and with a 502 when a task it reads does not, in the words the list says it with
+ *   (`RunSummary.unreadable`). It takes no `view`: the page `?view=page` once answered is gone, and any `view` is a 422 that says what
+ *   to read in its place — the object here, a step's tries and told at their sub-resources, and the lines at `…/lines`.
+ * - `GET /api/runs/:runId/lines` — the lines beside the object (`RunLinesAnswer`): the run's `decide` and `refresh` lines, each step's
+ *   `approve`, `retry` and `say` by its name, where it came from (`fromNote`, null for a run started from no card), and the address of
+ *   its workflow's page (`workflowPageOf`), the one the list gives the run. Off the run's record alone (`runLines`): it judges nothing and
+ *   reads no task, and it is constant for the run, so the board reads it once. Served by hand, as no entry of the command table answers
+ *   it; a 404 when there is no such run, as the object's route.
  * - `GET /api/runs/:runId/decision` — what `nemia decide` shows a person (`decisionOf`), the route of its entry of the command table. Not
- *   on the page's poll, since it runs `git diff`. Refused as the run's page is: a 404 with no such run, and a 502 when a task it reads does
- *   not, in the words the list says it with (`RunSummary.unreadable`).
+ *   on the board's poll, since it runs `git diff`. Refused as the run's object is: a 404 with no such run, and a 502 when a task it reads
+ *   does not, in the words the list says it with (`RunSummary.unreadable`).
  * - `GET /api/runs/:runId/concluded` — what a run started now with `--from <runId>` would be handed of it (`nemia concluded`): the run,
  *   whether it has landed and its `## From run` section, made by the package as the tick makes it. A 404 with no such run, the package's
  *   `Missing`, answered by `app.onError`.
+ * - `GET /api/runs/:runId/steps/:step/tries`, `…/tries/:try`, `…/tries/:try/closeout` and `…/steps/:step/told` — the run object's
+ *   sub-resources (`tries`, `try`, `closeout`, `told`): a step's tries, one try, its closeout, and the layers it was told. Each binds its
+ *   path into the entry's arguments, as the CLI's flags do; a step or a try the run does not have is the package's `Missing`, a 404.
  */
+
+/** The run object's sub-resources, each a read of the package's table served on its route. */
+const TRIES = commandNamed('tries');
+const TRY = commandNamed('try');
+const CLOSEOUT = commandNamed('closeout');
+const TOLD = commandNamed('told');
+
+/**
+ * Answers a sub-resource's entry, its path's parameters bound to the argument keys of the same names, and `query`'s arguments beside
+ * them (the listing's `?selector=`).
+ */
+const subResource = (c: Context<ApiEnv>, command: Command, query: Record<string, string[]> = {}) =>
+  served(c, async (s) => c.json(await runPlaced(s, s.e, informed(s, command.handler({ ...query, ...c.req.param() }, s.env, s.home)))));
 
 export const runs = new Hono<ApiEnv>()
   .get('/api/runs', (c) =>
-    served(c, async ({ e, placeService, env, home, memo, repo }) => {
-      const summaries = (await runPlaced(
-        placeService,
-        e,
-        RUNS.handler({}, env, home, { runs: memo.resting, filings: memo.filings }),
-      )) as unknown as RunSummary[];
-      return c.json(summaries.map((run): RunListing => ({ ...run, workflowPage: workflowPageOf(run, repo, home) })));
+    served(c, async (s) => {
+      const summaries = (await runPlaced(s, s.e, RUNS.handler(selectorOf(c), s.env, s.home, keptOf(s)))) as unknown as RunSummary[];
+      return c.json(summaries.map((run): RunListing => ({ ...run, workflowPage: workflowPageOf(run, s.repo, s.home) })));
     }),
   )
   .get('/api/runs-open', (c) =>
     served(c, async (s) => {
-      const open = (await listRead(
-        s,
-        RUNS_OPEN,
-        listArgs((name) => c.req.query(name)),
-      )) as unknown as OpenRuns;
+      const open = (await listRead(s, RUNS_OPEN, listArgs(c))) as unknown as OpenRuns;
       return c.json({ ...open, waiting: paged(open.waiting, s), inFlight: paged(open.inFlight, s) } satisfies OpenListing);
     }),
   )
   .get('/api/runs-finished', (c) =>
     served(c, async (s) => {
-      const page = (await listRead(
-        s,
-        RUNS_FINISHED,
-        listArgs((name) => c.req.query(name)),
-      )) as unknown as FinishedPage;
+      const page = (await listRead(s, RUNS_FINISHED, listArgs(c))) as unknown as FinishedPage;
       return c.json({ ...page, runs: paged(page.runs, s) } satisfies FinishedListing);
     }),
   )
-  .get('/api/runs/:id', (c) =>
+  .get('/api/runs/:runId', (c) =>
     served(c, async (s) => {
-      const id = c.req.param('id');
-      const { run } = (await runPlaced(s.placeService, s.e, RUN.handler({ id }))) as { run: Run | null };
+      const id = c.req.param('runId');
+      const raw = c.req.query('raw');
+      if (raw !== undefined && raw !== 'false') return rawRecord(c, s, id, raw);
+      const view = c.req.query('view');
+      if (view !== undefined) return c.json({ error: noView(id, view) }, 422);
+      const run = findRun(id);
       if (!run) return c.json({ error: noSuchRun(id) }, 404);
-      const full = await detail(run, s);
-      if ('unjudged' in full) return c.json({ error: full.unjudged }, 502);
-      return c.json({ ...full, workflowPage: workflowPageOf(run, s.repo, s.home) } satisfies RunPage);
+      const object = await runPlaced(s, s.e, informed(s, runObject(run, s)));
+      if ('unjudged' in object) return c.json({ error: object.unjudged }, 502);
+      return c.json(object satisfies RunAnswer);
+    }),
+  )
+  .get('/api/runs/:runId/lines', (c) =>
+    served(c, async ({ repo, home }) => {
+      const id = c.req.param('runId');
+      const run = findRun(id);
+      if (!run) return c.json({ error: noSuchRun(id) }, 404);
+      return c.json({ ...runLines(run), workflowPage: workflowPageOf(run, repo, home) } satisfies RunLinesAnswer);
     }),
   )
   .get('/api/runs/:runId/decision', (c) =>
@@ -184,16 +258,56 @@ export const runs = new Hono<ApiEnv>()
       const run = findRun(id);
       if (!run) return c.json({ error: noSuchRun(id) }, 404);
       const { unreadable } = await runWith(e, viewsFor(e, [run]));
-      const read = await runWith(
+      const read = await runPlaced(
+        { placeService, home },
         e,
         judgedUnlessUnreadable(run, unreadable, () =>
-          Effect.tryPromise({ try: () => decisionOf(run, e, placeService, home, env), catch: (err) => err }),
+          Effect.tryPromise({ try: () => decisionOf(run, e, { placeService, home }, env), catch: (err) => err }),
         ),
       );
       if ('unreadable' in read) return c.json({ error: read.unreadable }, 502);
       return c.json(read.judged);
     }),
   )
+  .get('/api/runs/:runId/steps/:step/tries', (c) => subResource(c, TRIES))
+  .get('/api/runs/:runId/steps/:step/tries/:try', (c) => subResource(c, TRY))
+  .get('/api/runs/:runId/steps/:step/tries/:try/closeout', (c) => subResource(c, CLOSEOUT))
+  .get('/api/runs/:runId/steps/:step/told', (c) => subResource(c, TOLD))
   .get('/api/runs/:runId/concluded', (c) =>
-    served(c, async ({ e, placeService }) => c.json(await runPlaced(placeService, e, CONCLUDED.handler({ runId: c.req.param('runId') })))),
-  );
+    served(c, async ({ e, placeService, home }) =>
+      c.json(await runPlaced({ placeService, home }, e, CONCLUDED.handler({ runId: c.req.param('runId') }))),
+    ),
+  )
+  .get('/api/listing', (c) => subResource(c, LS, selectorOf(c)))
+  .get('/api/listing/:runId', (c) => subResource(c, LS, selectorOf(c)));
+
+/**
+ * The reads `nemia` prints from, a client of the api, beside the board's: what `nemia ls` lists and a run's record as `nemia show --raw`
+ * prints it.
+ *
+ * - `GET /api/listing` and `GET /api/listing/:runId` — `nemia ls`'s answer (`RunsListed`), every run or the one named, by its entry of the
+ *   command table (`ls`), whose lines `nemia` prints: each run with its record, judged or left unjudged, and its result branches; the
+ *   daemon's standing; where the branches stand; the pause; and the schedules. A run the store does not have is the package's `Missing`, a
+ *   404. Not the board's list, which is `GET /api/runs`, and not in the OpenAPI document, which documents the run object alone.
+ * - `GET /api/runs/:runId?raw=true` — the run's record as `nemia show --raw` prints it (`RawRecord`), by `show`'s entry with `raw` set:
+ *   its brief cut at 120 characters and each frozen step's body at 60. `raw=false` is the object, as with no `raw`; any other value a 422
+ *   naming `raw=true`; a run the store does not have a 404, as the object's.
+ *
+ * This is `nemia ls`'s entry of the package's table, served on the first two.
+ */
+const LS = commandNamed('ls');
+
+/** `nemia show`'s entry of the package's table, whose `raw` answers the record. */
+const SHOW = commandNamed('show');
+
+/** A run's record as `GET /api/runs/:runId?raw=true` answers it: as `nemia show --raw` prints it. */
+export type RawRecord = Readonly<Record<string, unknown>>;
+
+/** `GET /api/runs/:runId?raw=…`: the record for `raw=true`, else a 422 naming it. */
+async function rawRecord(c: Context<ApiEnv>, { e, placeService, env, home }: Served, id: string, raw: string) {
+  if (raw !== 'true')
+    return c.json({ error: `GET /api/runs/${id} takes raw=true for the run's record, or no raw for the run object: not raw=${raw}.` }, 422);
+  if (!findRun(id)) return c.json({ error: noSuchRun(id) }, 404);
+  const record: RawRecord = await runPlaced({ placeService, home }, e, SHOW.handler({ runId: id, raw: true }, env, home));
+  return c.json(record);
+}

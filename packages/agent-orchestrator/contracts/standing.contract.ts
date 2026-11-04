@@ -8,11 +8,12 @@
 import { assume, type Implementation, spec } from '@emyann/tsverify';
 import type { Verdict } from '../src/check/check.ts';
 import type { Closeout } from '../src/closeout/index.ts';
-import type { CloseoutAsked, Run, StepStatus, TaskPhase } from '../src/record/record.ts';
+import { type CloseoutAsked, type Run, type StepStatus, type TaskPhase, TRIED_FROM } from '../src/record/record.ts';
 import type { Workflow } from '../src/step/step.ts';
-import { askedAgain, notHandedOn, overBudget, type SpendOf } from '../src/status/status.ts';
+import { askedAgain, notHandedOn, overBudget, ownStatus, type SpendOf } from '../src/status/status.ts';
 import { loopSpan } from '../src/workflow/validate.ts';
 import { declaredOutput } from '../src/closeout/closeout.ts';
+import { closeoutRefusals } from '../src/question/question.ts';
 import { approved, gated } from './laws.ts';
 
 /** Where a step stands, as `standing` takes and answers it: its own status, and the one a person reads. */
@@ -32,10 +33,20 @@ export const notYetHandedOn = assume(notHandedOn, { pure: true });
 export const askedForARound = assume(askedAgain, { pure: true });
 export const theLoopsSteps = assume(loopSpan, { pure: true });
 export const whatItDeclared = assume(declaredOutput, { pure: true });
+export const whatItRefuses = assume(closeoutRefusals, { pure: true });
 
 const standingSpec = spec<Stands>({
   /** The run holds a record of the step: `nemia start` writes one for each (start.verb.ts). */
   requires: ({ input: [step, run] }) => Object.hasOwn(run.steps, step.name),
+  /**
+   * Whether a step is held is left to the code where it turns on what `phaseOf`, `closeoutOf`, `askedCloseout`, `spendOf` and
+   * `verdictOf` say: a blocked step whose session has settled, a check that refused, a looping step's round, an ending not
+   * yet filed. The verifier reads each callback as answering anew on each call, so a law that asks one cannot say what the
+   * code was told; held by `test/assess-retries.test.ts` and `test/assess-rounds.test.ts` (over budget) and
+   * `test/assess-gates.test.ts` and `test/assess-endings.test.ts` (awaiting approval) until a callback can be declared pure
+   * (tsverify's `docs/roadmap.md`, "A function the code is given, declared pure where a spec says so").
+   */
+  open: ['output.status'],
   ensures: {
     awaitingOnlyAtAGate: {
       description: 'Awaiting approval covers both gates, and only a gate: after a step signs off, and before an ending is filed',
@@ -44,6 +55,11 @@ const standingSpec = spec<Stands>({
     awaitingIsUnapproved: {
       description: 'Nobody has approved the try that waits',
       condition: ({ input: [step, run], output }) => output.status !== 'awaiting approval' || !approved(run, step.name),
+    },
+    ownIsItsOwn: {
+      description:
+        "Its own status is the one ownStatus gives: standing reads a step's own work as ownStatus does, and holds it only above that",
+      condition: ({ input: [step, run, p, c, a, steps, s], output }) => output.own === ownStatus(step, run, p, c, a, steps, s),
     },
     ownOrHeld: {
       description: 'Where a step stands but for its budget and its gate: its own status, or one of those two',
@@ -79,6 +95,32 @@ const standingSpec = spec<Stands>({
       condition: ({ input: [step, run, , , , steps, s], output }) =>
         output.status !== 'over budget' || overBudget(step, run, s) !== undefined || steps.some((x) => x.name === step.name && !!x.loop),
     },
+    overBudgetWhereATryIsTheWayOn: {
+      description:
+        'A filed step over its cap whose try ended unsigned, failed, stopped or denied reads over budget: another try of it is the way on, and nothing is left to spend on one',
+      condition: ({ input: [step, run, , , , , s], output }) =>
+        !run.steps[step.name]?.taskId ||
+        overBudget(step, run, s) === undefined ||
+        (output.own !== 'unsigned' && output.own !== 'failed' && output.own !== 'stopped' && output.own !== 'denied') ||
+        output.status === 'over budget',
+    },
+    noTryNoHold: {
+      description:
+        'A step still running, cut off at its cap by its harness, or out of rounds reads its own status: no other session of it is the way on, so neither its budget nor its gate holds it',
+      condition: ({ output }) =>
+        (output.own !== 'running' && output.own !== 'budget exhausted' && output.own !== 'exhausted') || output.status === output.own,
+    },
+    aTryHeldOnlyOverItsOwnCap: {
+      description:
+        'A step whose way on is a try of it (unsigned, failed, stopped, blocked, denied, or its check refused) is held only over its own cap, whatever its loop spends',
+      condition: ({ input: [step, run, , , , , s], output }) =>
+        output.status !== 'over budget' || !TRIED_FROM.has(output.own) || overBudget(step, run, s) !== undefined,
+    },
+    aGateHoldsOnlyASignedOrUnfiledStep: {
+      description: 'A gate holds a step that signed off on its own work, or an ending not yet filed: nothing else awaits approval',
+      condition: ({ output }) =>
+        output.status !== 'awaiting approval' || output.own === 'verified' || output.own === 'unverified' || output.own === 'pending',
+    },
     anEndingWaitsBeforeItIsFiled: {
       description: 'An ending approved before it is filed waits at its gate once every step before it has handed on',
       condition: ({ input: [step, run, p, c, a, steps, s, v], output }) =>
@@ -110,10 +152,35 @@ const ownStatusSpec = spec<
   ) => StepStatus
 >({
   requires: ({ input: [step, run] }) => Object.hasOwn(run.steps, step.name),
+  /**
+   * Every status but pending turns on what `phaseOf`, `closeoutOf`, `askedCloseout` and `spendOf` say of its task, which the
+   * verifier reads as answering anew on each call, so a law that asks one cannot say what the code was told; held by
+   * `test/assess-lifecycle.test.ts`, `test/assess-closeouts.test.ts`, `test/assess-retries.test.ts` and
+   * `test/assess-rounds.test.ts` until a callback can be declared pure (tsverify's `docs/roadmap.md`, "A function the code is
+   * given, declared pure where a spec says so").
+   */
+  open: true,
   ensures: {
     neverHeld: {
       description: 'A step on its own work is never at its budget or its gate, which standing alone says',
       condition: ({ output }) => output !== 'awaiting approval' && output !== 'over budget',
+    },
+    pendingExactlyUnfiled: {
+      description: 'A step is pending exactly while it has no task filed',
+      condition: ({ input: [step, run], output }) => (output === 'pending') === !run.steps[step.name]?.taskId,
+    },
+    unverifiedOnlyWithNoCheck: {
+      description: 'Unverified only of a step with no check: a step with one is verified, checking, or its check failed',
+      condition: ({ input: [step], output }) => output !== 'unverified' || !step.check,
+    },
+    aCheckIsReadOnlyOfAStepWithOne: {
+      description: 'Verified, checking, or failed at its check only of a step that has a check',
+      condition: ({ input: [step], output }) =>
+        (output !== 'verified' && output !== 'checking' && output !== 'failed (check)') || !!step.check,
+    },
+    deniedOnlyUnderDenialsFail: {
+      description: 'Denied only of a step whose denials fail it',
+      condition: ({ input: [step], output }) => output !== 'denied' || step.denials === 'fail',
     },
   },
 });

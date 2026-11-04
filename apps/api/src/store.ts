@@ -1,9 +1,9 @@
 /**
  * The store as every run route reads it: the engine an app reads through, as a service (`Engine`), and the store's root, which is the
  * package's own service, re-exported here so a route has one import site for both (`StoreRoot`, given at `app.ts` from `WF_ROOT`); every
- * task's view, a run found by its id, one run judged (`judgedOn`), and the task a step's routes read. What the board's reading of a run
- * stands on — the views of its tasks, its workflow and steps, the feed's filing times — is the package's (`viewsFor`, `workflowsOf`,
- * `filedTimes`).
+ * task's view, a run found by its id, and the task a step's routes read. What the board's reading of a run stands on — the views of its
+ * tasks, its workflow and steps, the feed's filing times, the run judged as its object — is the package's (`viewsFor`, `workflowsOf`,
+ * `filedTimes`, `runObject`).
  */
 import { Context, Effect, Layer } from 'effect';
 import {
@@ -12,23 +12,16 @@ import {
   COMMANDS,
   engine,
   engineOf,
-  judge,
-  judgedUnlessUnreadable,
   runStore,
   runWith,
   PlaceService,
   type EngineService,
-  standingReader,
-  standingSnapshot,
-  standingsOf,
   stepNames,
   type Unreadable,
-  viewsFor,
   type Views,
   workflowsOf,
 } from 'agent-orchestrator';
-import type { Workflow } from 'agent-orchestrator/workflow';
-import { isRepositoryRun, type Run } from 'agent-orchestrator/run';
+import type { Run } from 'agent-orchestrator/run';
 
 /**
  * The engine the api reads through — `list`, `view` and `logs` — one for an app, built with its runtime (`live`: the package's
@@ -60,6 +53,7 @@ export class Engine extends Context.Service<Engine, ReturnType<typeof engine>>()
  * means to move those sets `WF_ROOT` before it imports the package, as `test/harness.ts` does.
  */
 export { StoreRoot } from 'agent-orchestrator';
+import { StoreRoot } from 'agent-orchestrator';
 
 type Reader = Engine['Service'];
 
@@ -86,12 +80,6 @@ export async function everyView(e: Reader): Promise<{ views: Views; unreadable: 
     unreadable: new Map(listed.unreadable.map(({ taskId, why }) => [taskId, why])),
   };
 }
-
-/**
- * The folder a step of a folder run works in, off the run's record (`folderPlace` made it): null for a step of a repository run, which
- * works on a branch, and for one the run has not filed yet, which has no folder.
- */
-export const workFolderOf = (run: Run, step: string): string | null => (isRepositoryRun(run) ? null : (run.steps[step]?.workspace ?? null));
 
 /**
  * The command of the orchestrator's table (`COMMANDS`) named `name`, which a route serves: thrown as the module that names it loads when
@@ -123,36 +111,14 @@ export function taskOfStep(id: string, step: string, home: string): { run: Run; 
 }
 
 /**
- * The views of `run`'s tasks over `e`, and what the run is judged as off them, its steps `names` of `workflows`, where its branches stand
- * read off `standing.json` (`standingSnapshot`): or, when its unfrozen folder does not load or a task it reads does not, why it is not
- * judged (`judgedUnlessUnreadable`). Rejects with what the engine's reads die of.
- */
-export const judgedOn = (
-  e: Engine['Service'],
-  placeService: PlaceService['Service'],
-  run: Run,
-  names: readonly string[],
-  workflows: readonly Workflow[] | null,
-) =>
-  runPlaced(
-    placeService,
-    e,
-    Effect.gen(function* () {
-      const { views, reader, unreadable } = yield* viewsFor(e, [run]);
-      const git = standingReader(yield* standingSnapshot());
-      const standings = (status: Parameters<typeof standingsOf>[2], steps: Parameters<typeof standingsOf>[1]) =>
-        standingsOf(run, steps, status, git);
-      const read = yield* judgedUnlessUnreadable(run, unreadable, () => judge(run, names, workflows, views, { reader, git, standings }));
-      return { views, read };
-    }),
-  );
-
-/**
- * A package program run for a request: over the engine `e` (`runWith`) and the place the app's layer gave (`Served.placeService`). Rejects
+ * A package program run for a request: over the engine `e` (`runWith`), the place the app's layer gave and the store's root (`at`). Rejects
  * with what the program failed with or died of, as `runWith` does.
  */
 export const runPlaced = <A, E>(
-  place: PlaceService['Service'],
+  at: Placed,
   e: Engine['Service'],
-  program: Effect.Effect<A, E, EngineService | PlaceService>,
-): Promise<A> => runWith(e, program.pipe(Effect.provideService(PlaceService, place)));
+  program: Effect.Effect<A, E, EngineService | PlaceService | StoreRoot>,
+): Promise<A> => runWith(e, program.pipe(Effect.provideService(PlaceService, at.placeService), Effect.provideService(StoreRoot, at.home)));
+
+/** Where a request's package program runs: the place the app's layer gave, and the store's root (`Served.placeService`, `Served.home`). */
+export type Placed = { readonly placeService: PlaceService['Service']; readonly home: string };

@@ -12,8 +12,11 @@ import { REVISIONS_POLICIES, type RevisionsPolicy } from '../factory/factory.ts'
 /** The schema every document of a template is written in. */
 export const API_VERSION = 'nemia.dev/v1alpha1';
 
-/** A problem of a template: the file, the keys and indexes leading to the value in its document (none for the file), and the words. */
-export type Refusal = { file: string; at: ReadonlyArray<string | number>; message: string };
+/**
+ * A problem of a template: the file, the keys and indexes leading to the value in its document (none for the file), the line and column
+ * it stands at in a file that is no document, where it has one, and the words.
+ */
+export type Refusal = { file: string; at: ReadonlyArray<string | number>; line?: number; col?: number; message: string };
 
 /**
  * A template's folder as read: its name, each file by its path from the folder with `/` between parts, and each document that parsed, by
@@ -72,6 +75,8 @@ export type AgentSpec = {
   skills?: readonly string[];
   /** The MCP servers of the checkout its sessions load, by name. */
   mcp?: readonly string[];
+  /** What a step may override of it, each one of `OVERRIDABLE`; absent, everything, as the agent's `overridable:` line. */
+  overridable?: readonly string[];
   output?: { path: string };
   harness?: string;
 } & { readonly [harness: string]: unknown };
@@ -79,7 +84,10 @@ export type AgentSpec = {
 /** What a step changes of the agent it hires: its harness, skills and MCP servers added, and one block per harness (`Profile`). */
 export type Overrides = { harness?: string; skills?: readonly string[]; mcp?: readonly string[] } & { readonly [harness: string]: unknown };
 
-/** A step of a workflow, in order: its wiring, what it reads of the store, what is tallied of its closeout, and its overrides. */
+/**
+ * A step of a workflow, in order: its wiring, what it reads of the store, its own closeout schema, what is tallied of its closeout, and its
+ * overrides.
+ */
 export type Step = {
   name: string;
   instruction?: Text;
@@ -95,6 +103,8 @@ export type Step = {
   retries?: number;
   deadlineSeconds?: number;
   reads?: readonly string[];
+  /** The step's own closeout schema, a file of its workflow's folder, by its path from the template's root. */
+  output?: { path: string };
   tally?: readonly string[];
   overrides?: Overrides;
 };
@@ -246,6 +256,7 @@ const STEP: Shape = {
     retries: 'number',
     deadlineSeconds: 'number',
     reads: 'strings',
+    output: { fields: { path: 'string' }, required: ['path'] },
     tally: 'strings',
     overrides: OVERRIDES,
   },
@@ -277,6 +288,7 @@ const SPECS: Readonly<Record<Exclude<DocumentFile['kind'], 'Lock'>, Shape>> = {
       instructions: 'text',
       skills: 'strings',
       mcp: 'strings',
+      overridable: 'strings',
       output: { fields: { path: 'string' }, required: ['path'] },
       harness: 'string',
       ...BLOCKS,
@@ -302,6 +314,20 @@ export const isMap = (value: unknown): value is Record<string, unknown> =>
 /** Whether `value` is a `{ param }` and nothing more. */
 export const isParam = (value: unknown): value is ParamRef =>
   isMap(value) && Object.keys(value).length === 1 && typeof value.param === 'string';
+
+/**
+ * A parameter's value written inside a string or a text: `${{ parameters.<name> }}`, spaces inside the braces optional. A shell's `$VAR`
+ * and `${VAR}` are none.
+ */
+const PARAMETER_EXPRESSION = /\$\{\{\s*parameters\.([A-Za-z_][A-Za-z0-9_]*)\s*\}\}/g;
+
+/** The name of each `${{ parameters.<name> }}` in `text`, with the offset it stands at, in order. */
+export const expressionsIn = (text: string): Array<{ name: string; index: number }> =>
+  [...text.matchAll(PARAMETER_EXPRESSION)].flatMap((match) => (match[1] === undefined ? [] : [{ name: match[1], index: match.index }]));
+
+/** `text` with each `${{ parameters.<name> }}` in it replaced by what `write` gives its name. */
+export const writeExpressions = (text: string, write: (name: string) => string): string =>
+  text.replace(PARAMETER_EXPRESSION, (_, name: string) => write(name));
 
 /** A key path as a person reads it: `spec.steps[1].budget`. */
 export const spelled = (at: ReadonlyArray<string | number>): string =>

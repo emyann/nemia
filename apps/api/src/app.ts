@@ -1,8 +1,18 @@
+import fs from 'node:fs/promises';
 import { Layer, ManagedRuntime, Metric } from 'effect';
 import { type ErrorHandler, Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import type { ContentfulStatusCode } from 'hono/utils/http-status';
-import { feedHubLayer, gitPlaceLayer, leaseRelease, runningRelease, storeRootLayer, telemetryLayer, VERSION } from 'agent-orchestrator';
+import {
+  feedHubLayer,
+  gitPlaceLayer,
+  informerLayer,
+  leaseRelease,
+  runningRelease,
+  storeRootLayer,
+  telemetryLayer,
+  VERSION,
+} from 'agent-orchestrator';
 import { isRefusal, type Refusal } from 'agent-orchestrator';
 import { agents, skills } from './agents/index.ts';
 import { customInstructions } from './custom/custom.ts';
@@ -16,6 +26,7 @@ import { ApiConfig, type ApiEnv, type ApiRuntime, ReadMemo, served, type Service
 import { machines } from './machines/machines.ts';
 import { nemia, nemiaChat } from './nemia/index.ts';
 import { runs } from './runs/runs.ts';
+import { openapi, REFERENCE_BUNDLE, referenceOf } from './openapi/index.ts';
 import { saidRequest } from './request/request.ts';
 import { stats } from './stats/stats.ts';
 import { step } from './step/step.ts';
@@ -53,11 +64,12 @@ const RELEASE = leaseRelease(runningRelease());
 export type VersionAnswer = { version: string; release: typeof RELEASE };
 
 /**
- * Every service the api reads, live, over `env`: the settings read from it on each request (`ApiConfig`), the package's engine
- * (`Engine`) and the store's root, read from `env` (`StoreRoot`, `storeRootLayer`: `WF_ROOT`), an MCP asker and a quota asker with
- * nothing asked yet (`McpAsker`, `QuotaAsker`), reads that have
- * kept nothing yet (`ReadMemo`), the steps followed live, none yet (`Followings`), the hub the feed's lines are published to as the
- * process's daemon writes them (`feedHubLayer`), and the git place (`gitPlaceLayer`).
+ * Every service the api reads, live, over `env`: the settings read from it on each request (`ApiConfig`), the package's engine (`Engine`)
+ * and the store's root, read from `env` (`StoreRoot`, `storeRootLayer`: `WF_ROOT`), an MCP asker and a quota asker with nothing asked yet
+ * (`McpAsker`, `QuotaAsker`), reads that have kept nothing yet (`ReadMemo`), an informer of each run's judgement holding none, which the
+ * daemon's passes fill and every request reads (`informerLayer`: one per app, so the store's daemon and the board's reads judge a run
+ * once), the steps followed live, none yet (`Followings`), the hub the feed's lines are published to as the process's daemon writes them
+ * (`feedHubLayer`), and the git place (`gitPlaceLayer`).
  *
  * And the process's telemetry (`telemetryLayer`): the line logger every log of the app goes through — each request's among them — and,
  * where `env` names an OTLP collector, the tracer, the exporters and their `Flusher` besides. Held here and not around the process's
@@ -73,11 +85,16 @@ export const liveOf = (env: NodeJS.ProcessEnv = process.env): Layer.Layer<Servic
     McpAsker.live,
     QuotaAsker.live,
     ReadMemo.live,
+    informerLayer(),
     Followings.live,
     feedHubLayer(),
     gitPlaceLayer,
     telemetryLayer(env),
   );
+
+let bundle: Promise<string> | undefined;
+/** The OpenAPI page's viewer script, read from the installed package once and kept: a reread would serve the same file. */
+const viewerScript = () => (bundle ??= fs.readFile(REFERENCE_BUNDLE, 'utf8'));
 
 /**
  * An api over `layer`, and the runtime its handlers run on (`ManagedRuntime`), built from the layer once, the first time a request or
@@ -176,8 +193,8 @@ export function appOf(layer: Layer.Layer<Services>): { app: Hono<ApiEnv>; runtim
     .get('/api/health', (c) => c.json({ ok: true }))
     .get('/api/version', (c) => c.json({ version: VERSION, release: RELEASE }))
     .get('/api/capabilities', (c) =>
-      served(c, async ({ e, placeService, env, repo, home, mcp }) =>
-        c.json(await capabilitiesWithSteps(repo, { e, placeService, env, home, asker: mcp })),
+      served(c, async ({ e, placeService, env, repo, home, mcp, inRequest }) =>
+        c.json(await capabilitiesWithSteps(repo, { e, placeService, env, home, asker: mcp, inRequest })),
       ),
     )
     .route('/', factories)
@@ -195,16 +212,24 @@ export function appOf(layer: Layer.Layer<Services>): { app: Hono<ApiEnv>; runtim
     .route('/', skills)
     .route('/', inbox)
     .route('/', runs)
+    .route('/', openapi)
+    .route('/', referenceOf(viewerScript))
     .route('/', stats)
-    .get('/api/ceilings', (c) => served(c, async ({ e, placeService, env }) => c.json(await ceilingsOf(e, placeService, env))))
-    .get('/api/passes', (c) => served(c, async ({ e, placeService }) => c.json(await passesOf(e, placeService, c.req.query('last')))))
+    .get('/api/ceilings', (c) =>
+      served(c, async ({ e, placeService, env, home }) => c.json(await ceilingsOf(e, { placeService, home }, env))),
+    )
+    .get('/api/passes', (c) =>
+      served(c, async ({ e, placeService, home }) => c.json(await passesOf(e, { placeService, home }, c.req.query('last')))),
+    )
     .get('/api/series', (c) =>
-      served(c, async ({ e, placeService, memo }) => c.json(await seriesOf(e, placeService, c.req.query('range'), memo.series))),
+      served(c, async ({ e, placeService, memo, home }) =>
+        c.json(await seriesOf(e, { placeService, home }, c.req.query('range'), memo.series)),
+      ),
     )
     .get('/api/metrics', async (c) => c.json(metricsOf(await runtime.runPromise(Metric.snapshot))))
-    .get('/api/pause', (c) => served(c, async ({ e, placeService }) => c.json(await pauseOf(e, placeService))))
+    .get('/api/pause', (c) => served(c, async ({ e, placeService, home }) => c.json(await pauseOf(e, { placeService, home }))))
     .get('/api/pause/now', (c) =>
-      served(c, async ({ e, placeService, memo }) => c.json(await pauseNowOf(e, placeService, memo.records.pause))),
+      served(c, async ({ e, placeService, memo, home }) => c.json(await pauseNowOf(e, { placeService, home }, memo.records.pause))),
     )
     .get('/api/daemon', (c) => c.json(readDaemon()))
     .get('/api/quota', (c) =>

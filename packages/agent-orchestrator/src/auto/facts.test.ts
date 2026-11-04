@@ -34,7 +34,9 @@ test('`factsOf`: all five hold where all agree, and each fails on the state that
     assert.equal(factsOf({ ...AGREED, closeout: { outcome: 'blocked', needs: 'a key' } }).recommends, false);
     assert.equal(factsOf({ ...AGREED, closeout: undefined }).recommends, false);
     assert.equal(factsOf({ ...AGREED, questions: [{ recommended: 'Strict' }, { recommended: null }] }).recommends, false);
+    assert.equal(factsOf({ ...AGREED, questions: [{ recommended: 'Strict' }, { recommended: [] }] }).recommends, false);
     assert.equal(factsOf({ ...AGREED, questions: [{ recommended: 'Strict' }] }).recommends, true);
+    assert.equal(factsOf({ ...AGREED, questions: [{ recommended: ['Card', 'Run'] }] }).recommends, true);
   });
   await t.test('REFUSED checked: a check that refused, one that did not finish, and a step with no check', () => {
     assert.equal(factsOf({ ...AGREED, verdict: 1 }).checked, false);

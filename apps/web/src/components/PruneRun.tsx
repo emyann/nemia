@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Dialog, DialogTrigger, Heading, Popover, Radio, RadioGroup, Text } from 'react-aria-components';
 import { Button } from '@/components/ui/button';
-import { decisionQuery, pruneRun, type RunDetail } from '../lib/api';
+import { decisionQuery, pruneRun } from '../lib/api';
+import type { RunView } from '../lib/runView';
 import { decidableRun, decisionStamp } from '../lib/decide';
 import { awaitingOf, firstChoice, prunable, pruneOffer, pruneQuestion, type PruneChoice, type PruneOffer } from '../lib/prune.ts';
 import { cn } from '../lib/utils';
@@ -17,7 +18,7 @@ import { runsMoved } from '@/lib/runWrites';
  * second time in words that say what goes. The api prunes through the package's `prune`, as the CLI's `prune <run> --yes` does, and
  * refuses in its words, shown here. Nothing is offered where the package would prune nothing (`prunable`).
  */
-export function PruneRun({ run }: { run: RunDetail }) {
+export function PruneRun({ run }: { run: RunView }) {
   if (!prunable(run)) return null;
   return (
     <DialogTrigger>
@@ -39,7 +40,7 @@ export function PruneRun({ run }: { run: RunDetail }) {
  * decision reads nothing more; a run called off has nothing to decide, and is not asked. A decision read for an earlier state of the run
  * (`keepPreviousData`) is not taken for this one's.
  */
-function PruneRead({ run, onClose }: { run: RunDetail; onClose: () => void }) {
+function PruneRead({ run, onClose }: { run: RunView; onClose: () => void }) {
   const decidable = decidableRun(run);
   const { data, error, isPlaceholderData } = useQuery({ ...decisionQuery(run.id, decisionStamp(run)), enabled: decidable });
   if (decidable && error) {
@@ -79,7 +80,7 @@ function PruneForm({ id, offer, onClose }: { id: string; offer: PruneOffer; onCl
     onSuccess: async (done) => {
       setAsking(false);
       if (done.left === 0) onClose();
-      await Promise.all([queryClient.invalidateQueries({ queryKey: ['runs', id], exact: true }), runsMoved(queryClient)]);
+      await Promise.all([queryClient.invalidateQueries({ queryKey: ['runs', id], exact: true }), runsMoved(queryClient, id)]);
     },
   });
   return (

@@ -31,7 +31,8 @@ read it, then write it into yours from there:
 - an agent: `drafts/<factory>/agents/<name>.md`, with the result schema its `output:` names beside it —
   `nemia agents write yours --file drafts/<factory>/agents/<name>.md`;
 - a skill: `drafts/<factory>/skills/<name>/SKILL.md` — `nemia skills write yours --file drafts/<factory>/skills/<name>/SKILL.md`;
-- a workflow: `drafts/<factory>/<workflow>/`, a markdown file per step, its keys in its frontmatter, and its README —
+- a workflow: `drafts/<factory>/<workflow>/`, a markdown file per step, its keys in its frontmatter, its README, and any script its
+  `check:` runs or schema its `output:` names beside them, written too —
   `nemia workflows write yours <workflow> --folder drafts/<factory>/<workflow>`.
 
 An agent the person already has, in another factory's repository or in their library, is recruited with the `recruit-or-create` skill, not

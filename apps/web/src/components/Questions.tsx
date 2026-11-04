@@ -11,45 +11,56 @@ import { cn } from '../lib/utils';
 import { OFFERS } from '../lib/words';
 import { BUTTON, MODES, Refusal, TEXTAREA, useAsk } from './Ask';
 import { Markdown } from './Markdown';
+import type { Frozen } from '../lib/frozen';
 
 /** What a person has said so far of each question, by its title: the labels chosen, and words of their own. */
 export type Draft = Readonly<Record<string, { chose: readonly string[]; own: string }>>;
 
-const said = (draft: Draft, q: Question) => draft[q.title] ?? { chose: [], own: '' };
+const said = (draft: Draft, q: Frozen<Question>) => draft[q.title] ?? { chose: [], own: '' };
+
+/**
+ * The labels `q` recommends, as a list: none for null, one for a label, and every label of a list, which a question that takes several
+ * may recommend.
+ */
+export const recommendedOf = (q: Frozen<Question>): readonly string[] =>
+  q.recommended === null ? [] : typeof q.recommended === 'string' ? [q.recommended] : q.recommended;
 
 /** `draft` with every question that has a recommendation set to it, and their words kept; a question without one is left as it was. */
-export const recommendedDraft = (questions: readonly Question[], draft: Draft): Draft =>
+export const recommendedDraft = (questions: readonly Frozen<Question>[], draft: Draft): Draft =>
   Object.fromEntries([
     ...Object.entries(draft),
-    ...questions.flatMap((q) => (q.recommended === null ? [] : [[q.title, { ...said(draft, q), chose: [q.recommended] }]])),
+    ...questions.flatMap((q) => {
+      const chose = recommendedOf(q);
+      return chose.length ? [[q.title, { ...said(draft, q), chose }]] : [];
+    }),
   ]);
 
 /**
  * `draft` with `label` chosen, or no longer chosen, on `q`: the one choice of a question that takes one, among others of one that takes
  * several.
  */
-export const chosenDraft = (draft: Draft, q: Question, label: string, on: boolean): Draft => {
+export const chosenDraft = (draft: Draft, q: Frozen<Question>, label: string, on: boolean): Draft => {
   const before = said(draft, q).chose.filter((l) => q.multiple && l !== label);
   return { ...draft, [q.title]: { ...said(draft, q), chose: on ? [...before, label] : before } };
 };
 
 /** The titles of the questions `draft` leaves with neither a choice nor words, in the order asked. */
-export const unanswered = (questions: readonly Question[], draft: Draft): string[] =>
+export const unanswered = (questions: readonly Frozen<Question>[], draft: Draft): string[] =>
   questions.filter((q) => said(draft, q).chose.length === 0 && !said(draft, q).own.trim()).map((q) => q.title);
 
 /** `draft` as the api takes it: an answer to each question, in the order asked, its own words only where there are any. */
-export const answersFrom = (questions: readonly Question[], draft: Draft): QuestionAnswer[] =>
+export const answersFrom = (questions: readonly Frozen<Question>[], draft: Draft): QuestionAnswer[] =>
   questions.map((q) => {
     const { chose, own } = said(draft, q);
     return own.trim() ? { question: q.title, chose, own: own.trim() } : { question: q.title, chose };
   });
 
-/** One option as a question shows it: its label, what choosing it means, and whether it is the one recommended. */
-function OptionText({ q, label, meaning }: { q: Question; label: string; meaning: string }) {
+/** One option as a question shows it: its label, what choosing it means, and whether it is recommended. */
+function OptionText({ q, label, meaning }: { q: Frozen<Question>; label: string; meaning: string }) {
   return (
     <span className="min-w-0">
       <strong className="font-medium">{label}</strong> <span className="text-muted-foreground">— {meaning}</span>
-      {q.recommended === label && (
+      {recommendedOf(q).includes(label) && (
         <span data-recommended className="ml-1.5 rounded bg-surface-variant px-1 py-px text-body-small font-medium text-on-surface-variant">
           recommended
         </span>
@@ -58,8 +69,8 @@ function OptionText({ q, label, meaning }: { q: Question; label: string; meaning
   );
 }
 
-/** The questions of one field of a closeout, read-only: each question, its body, and its options, the one recommended marked. */
-export function Questions({ field, questions }: { field: string; questions: readonly Question[] }) {
+/** The questions of one field of a closeout, read-only: each question, its body, and its options, each recommended one marked. */
+export function Questions({ field, questions }: { field: string; questions: readonly Frozen<Question>[] }) {
   return (
     <section data-questions={field} aria-label={field} className="min-w-0 space-y-2">
       <h4 className="font-mono text-body-small text-muted-foreground">{field}</h4>
@@ -86,7 +97,7 @@ export function Questions({ field, questions }: { field: string; questions: read
 }
 
 /** One question to answer: its options as radios, or checkboxes where it takes several, and a line for words of the person's own. */
-export function QuestionField({ q, n, draft, onDraft }: { q: Question; n: number; draft: Draft; onDraft: (next: Draft) => void }) {
+export function QuestionField({ q, n, draft, onDraft }: { q: Frozen<Question>; n: number; draft: Draft; onDraft: (next: Draft) => void }) {
   const id = useId();
   const { chose, own } = said(draft, q);
   return (
@@ -147,7 +158,7 @@ export function QuestionFields({
   draft,
   onDraft,
 }: {
-  questions: readonly Question[];
+  questions: readonly Frozen<Question>[];
   draft: Draft;
   onDraft: (next: Draft) => void;
 }) {
@@ -163,11 +174,11 @@ export function RecommendButton({
   draft,
   onDraft,
 }: {
-  questions: readonly Question[];
+  questions: readonly Frozen<Question>[];
   draft: Draft;
   onDraft: (next: Draft) => void;
 }) {
-  if (!questions.some((q) => q.recommended !== null)) return null;
+  if (!questions.some((q) => recommendedOf(q).length)) return null;
   return (
     <button
       type="button"

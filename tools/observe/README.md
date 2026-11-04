@@ -244,8 +244,8 @@ node tools/observe/render/render.ts --stop <name>
   render's. A held stack holds the one slot: stop it when done.
 
 Who runs it: the build workflow's implement step, whose check refuses a change under `tools/observe` a dashboard reads without the
-picture and the text of each dashboard it changed (`workflows/build/pictures.ts`). Design and review are refused the command and
-Docker (`RENDERS` in `agent-orchestrator/test/agent-fences.test.ts`); review reads the files. It needs `docker` and Playwright's
+picture and the text of each dashboard it changed (the nemia factory's `pictures.ts`, an overlay in its own tree, out of git). Design
+and review are refused the command and Docker by the factory's overlays; review reads the files. It needs `docker` and Playwright's
 Chromium (`npx playwright install chromium`), and is never run by the suite: `agent-orchestrator/test/observe-render.boundary.test.ts` holds it
 on a stub `docker`.
 

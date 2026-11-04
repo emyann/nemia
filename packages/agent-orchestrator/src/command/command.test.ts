@@ -198,6 +198,43 @@ test("say's words are every argument after its step, joined", () => {
   assert.equal(parseArgv(SAY.spec, ['r-1']), undefined);
 });
 
+test('a flag is read wherever it stands among the positionals: a switch, a valued flag and a repeated flag, before them as after', async (t) => {
+  const rows: readonly (readonly [row: string, spec: Spec, after: readonly string[], before: readonly string[]])[] = [
+    ['a switch', HOLDING, ['r-1', '--off'], ['--off', 'r-1']],
+    ['a valued flag', SPEC, ['r-1', 'impl', '--who', 'bo'], ['--who', 'bo', 'r-1', 'impl']],
+    ['a valued flag between the positionals', SPEC, ['r-1', 'impl', '--note=hi'], ['r-1', '--note=hi', 'impl']],
+    ['a repeated flag', HOLDING, ['r-1', '--until', 'a', '--until', 'b'], ['--until', 'a', 'r-1', '--until', 'b']],
+    ['show --raw', entry('show').spec, ['r-1', '--raw'], ['--raw', 'r-1']],
+    ['closeout --try', entry('closeout').spec, ['r-1', 'impl', '--try', '1'], ['--try', '1', 'r-1', 'impl']],
+    ['retry --budget', RETRY.spec, ['r-1', '--budget', '5'], ['--budget', '5', 'r-1']],
+  ];
+  for (const [row, spec, after, before] of rows)
+    await t.test(row, () => {
+      const read = parseArgv(spec, after);
+      assert.ok(read, `${after.join(' ')} is read`);
+      assert.deepEqual(parseArgv(spec, before), read);
+    });
+});
+
+test('-- ends the flags: each word after it is a positional, whatever it starts with', () => {
+  assert.deepEqual(parseArgv(SPEC, ['--who', 'bo', '--', '--slow']), { mode: 'fast', runId: '--slow', who: 'bo' });
+  assert.deepEqual(parseArgv(SPEC, ['r-1', '--', '--slow']), { mode: 'fast', runId: 'r-1', step: '--slow' });
+  assert.deepEqual(
+    parseArgv(HOLDING, ['--', '-x']),
+    { runId: '-x' },
+    'an operand is no argument left out, though the spec says its refusal',
+  );
+  assert.equal(refusalOf(['r-1', 'impl', '--', 'extra']), 'UNKNOWN extra');
+});
+
+test('a flag the command has none of, or a positional past those it takes, is refused before its arguments as after them', () => {
+  assert.equal(refusalOf(['--loud', 'r-1']), 'UNKNOWN --loud');
+  assert.equal(refusalOf(['--fast=yes', 'r-1']), 'UNKNOWN --fast=yes');
+  assert.equal(refusalOf(['--nope', 'r-1'], HOLDING), 'UNKNOWN --nope', 'its run given, the flag is what it does not take');
+  assert.equal(refusalOf(['--who', 'bo', 'r-1', 'impl', 'extra']), 'UNKNOWN extra');
+  assert.equal(refusalOf(['--raw', 'r-1', 'r-2'], entry('show').spec), entry('show').spec.unknown('r-2'));
+});
+
 test('the command line a refusal shows names what was given and the usage of what was not', () => {
   assert.equal(commandLine(RETRY, { runId: 'r-1', step: 'impl' }), 'nemia retry r-1 impl');
   assert.equal(commandLine({ name: 'x', spec: SPEC }, { runId: 'r-1' }), 'nemia x r-1 [<step>]');
@@ -267,8 +304,9 @@ test("the table's help is today's, word for word", () => {
       '                               what a run started with --from <runId> would be handed of it, now',
       '  nemia inbox',
       '                               the cards parked before they are started: name, first line, workflow',
-      '                               and repo when set, and started as <runId> (nemia inbox --help)',
-      '  nemia inbox add "<idea>"|<file> [--workflow <name>] [--repo <path>] [--factory <name>]',
+      '                               and repo when set, and started as <runId> (nemia inbox --help); -l: the',
+      '                               cards a selector takes; --show-labels, -L <key>: their labels on each line',
+      '  nemia inbox add "<idea>"|<file> [--workflow <name>] [--repo <path>] [--factory <name>] [--label <key=value>]...',
       '                               park an idea as a card in the inbox, named from its first line',
       '  nemia inbox queue <name> [--workflow <w>] [--off]',
       '                               mark a card to start on its own: the tick starts the oldest queued',
@@ -278,6 +316,14 @@ test("the table's help is today's, word for word", () => {
       '                               never waited on; --off takes them off',
       '  nemia inbox rm <name>',
       '                               drop a card without starting it',
+      '  nemia label run <runId> <key=value|key->... [--overwrite]',
+      "                               edit a run's labels: key=value sets a key, key- removes it; changing a",
+      "                               value takes --overwrite. nemia ls -l selects by them, and the feed's",
+      '                               lines written after carry them',
+      '  nemia label inbox <name> <key=value|key->... [--overwrite]',
+      "                               edit an inbox card's labels: key=value sets a key, key- removes it;",
+      '                               changing a value takes --overwrite. nemia inbox -l selects by them, and',
+      '                               the run the card starts is created with them',
       '  nemia factory',
       "                               the store's factories: the default first — every run and card that",
       '                               names no factory, read, never written — then each by name with its',
@@ -287,13 +333,17 @@ test("the table's help is today's, word for word", () => {
       '  nemia factory add <name> --repo <path> [--repo <path> ...] [--no-trust]',
       '                               file a factory: a lowercase slug naming one or more directories,',
       '                               each trusted for its steps unless --no-trust',
-      '  nemia factory apply <name> --template <folder|archive> --repo <path> [--repo <path> ...] [--set <key>=<value> ...] [--no-trust]',
+      '  nemia factory apply <name> --template <name|folder|archive> --repo <path> [--repo <path> ...] [--set <key>=<value> ...] [--no-trust]',
       '                               make a factory from a template that passes its check, its parameters',
       '                               given with --set; the daemon renders its tree',
-      '  nemia factory diff <name> --to <x.y.z> [--template <folder|archive>]',
+      '  nemia factory adopt <name> --template <name|folder|archive> [--set <key>=<value> ...] --plan <digest>',
+      '                               take a hand-made factory over by a template, in place, as nemia factory',
+      '                               diff previewed it: its name, cards, runs and stats stay',
+      '  nemia factory diff <name> --to <x.y.z> [--template <name|folder|archive>] | <name> --template <name|folder|archive> [--set <key>=<value> ...]',
       "                               preview a templated factory's upgrade: what merges cleanly, and each",
-      '                               conflict with its sides; nothing is written',
-      '  nemia factory upgrade <name> --to <x.y.z> [--template <folder|archive>] [--downgrade]',
+      "                               conflict with its sides; or a hand-made factory's takeover by a",
+      '                               template, and the plan nemia factory adopt takes; nothing is written',
+      '  nemia factory upgrade <name> --to <x.y.z> [--template <name|folder|archive>] [--downgrade]',
       '                               upgrade a templated factory: its file wants --to, and the daemon merges',
       "                               the template's change into its tree once each conflict is resolved",
       '  nemia factory resolve <name> <conflict> --ours|--theirs|--file <path>',
@@ -412,7 +462,7 @@ test("the table's help is today's, word for word", () => {
       "                               engine journals the words on the step's task, nemia ls notes the step",
       '                               said to, and nemia decide prints them under it. A try that continues',
       '                               the session is handed them again, as ## Said to your session',
-      '  nemia ls [<runId>]',
+      '  nemia ls [<runId>] [-l <selector>] [--show-labels] [-L <key>]',
       '                               runs and their steps — a run waiting on another says waiting on <run>,',
       '                               one the cap on runs in flight holds waiting for a run slot (2 of 2 in',
       "                               flight); what each step's tries and the run have cost, where measured;",
@@ -421,18 +471,24 @@ test("the table's help is today's, word for word", () => {
       '                               session, check or landing at work, or Paused once none is, then each',
       '                               check it holds, a landing with its merge staged in the checkout',
       '                               (MERGE_HEAD) among them; a step whose check it holds says waiting on',
-      '                               the pause',
-      '  nemia show <runId>',
-      '                               the run, and what each step was told',
+      '                               the pause. -l: the runs whose labels a selector takes (team=core,',
+      '                               given again for another); --show-labels: each run with its labels;',
+      '                               -L <key>: that label beside each run, given again for another',
+      '  nemia show <runId> [--raw]',
+      '                               the run as one object (nemia/v1 Run); --raw: its record, and',
+      '                               what each step was told',
+      '  nemia closeout <runId> <step> [--try <n>]',
+      "                               what a step's try signed off with: its latest, or --try <n>",
       '  nemia logs <runId> <step>',
       "                               that step's session output",
-      '  nemia stats [--from <day>] [--to <day>] [--by agent|step|factory|workflow|repo] [--agent|--step|--factory|--workflow|--repo <v>] [--line|--json]',
+      '  nemia stats [--from <day>] [--to <day>] [--by agent|step|factory|workflow|repo] [--agent|--step|--factory|--workflow|--repo <v>] [-l <selector>] [--line|--json]',
       '                               what every run in the store adds up to, by UTC day: rounds to',
       '                               acceptance of each loop: step, landings of the workspace: base step',
       "                               and on which try, cost and time per landed run, and each step's",
       '                               tries, time, cost, checks and gate waits; first the last 14 days',
       '                               against the 14 before. A number nothing measured reads —, never 0.',
-      '                               --line: one line, for a recap; --json: the whole answer',
+      '                               --line: one line, for a recap; --json: the whole answer; -l: the',
+      '                               runs whose labels a selector takes, as nemia ls -l takes them',
       '  nemia passes [--last <n>] [--json]',
       '                               what the recent passes of the tick cost: their median and slowest',
       '                               time, a histogram of their times, where the time went phase by',
@@ -612,13 +668,18 @@ test("the table's help is today's, word for word", () => {
       "                               this nemia's release, an install's tag or a checkout, and its folder;",
       "                               the release the store's releases/current names; and the release the",
       '                               daemon runs, from its lease. --json: the whole answer',
+      '  nemia daemon [--json]',
+      "                               the store's daemon, started where none ticks it (as any command that",
+      '                               ticks starts it, unless NEMIA_DAEMON_START=off): its state, its pid and',
+      '                               the url the api serves at, from its lease. --json: the whole answer',
       '  nemia frontmatter rewrite [<folder>...] [--check]',
       "                               rewrite as YAML each markdown file's frontmatter still in the former",
       "                               line form, under the folders given or the store's own. --check: write",
       '                               nothing, and exit 1 where a rewrite is due',
       '  nemia workflows write (yours | factory) <name> --folder <draft> [--factory <name>] [--version <v>]',
       '                               a workflow folder of yours, or of a templated --factory, written from',
-      '                               a draft folder; one there already, at the --version it was read at',
+      '                               a draft folder, its steps, README, scripts and schemas, leaving a file',
+      '                               it does not carry; one there already, at the --version it was read at',
       '  nemia workflows rm yours <name> --version <v>',
       '                               a workflow folder of yours removed, at the --version it was read at',
       '  nemia tick [--stats]',
@@ -986,7 +1047,8 @@ const REFUSALS: readonly Refused[] = [
   ["watch, a typo'd short flag is no cursor", 'watch', ['-L'], ['nemia watch does not take -L']],
   ['watch, a cursor', 'watch', ['12'], null],
   ['watch, every flag', 'watch', ['--once', '12', '-l', 'factory=nemia', '--json'], null],
-  ['watch, a selector on no key of a feed line', 'watch', ['-l', 'message=hi'], ['"message" is no key of a feed line']],
+  ['watch, a selector on the message, which nothing selects on', 'watch', ['-l', 'message=hi'], ['message', '-l <key>=<value>']],
+  ['watch, a selector on a prefixed key', 'watch', ['-l', 'no/pe=x'], ['"no/pe"', '-l <key>=<value>']],
   ['watch, an empty selector', 'watch', ['-l', 'factory=nemia', '-l', ''], ['"" is no selector']],
   ['watch, --cursor-file given nothing', 'watch', ['--cursor-file'], ['nemia watch --cursor-file takes the path']],
   ['watch, --cursor-file twice', 'watch', ['--cursor-file', 'a', '--cursor-file', 'b'], ['nemia watch takes --cursor-file once']],
@@ -1032,6 +1094,11 @@ const REFUSALS: readonly Refused[] = [
   ['show, a run', 'show', ['r'], null],
   ['show, a flag where the run stands', 'show', ['--x'], ["nemia show takes one run's id", 'not --x.']],
   ['show, a word more', 'show', ['r', 'extra'], ["nemia show takes one run's id", 'not extra.']],
+  ['show, a run raw', 'show', ['r', '--raw'], null],
+  ['closeout, a run and a step', 'closeout', ['r', 's'], null],
+  ['closeout, a try', 'closeout', ['r', 's', '--try', '2'], null],
+  ['closeout, a word more', 'closeout', ['r', 's', 'extra'], ['nemia closeout', 'not extra.']],
+  ['closeout, --try twice', 'closeout', ['r', 's', '--try', '1', '--try', '2'], ['nemia closeout takes --try once']],
   ['logs, a run and a step', 'logs', ['r', 's'], null],
   ['logs, a word more', 'logs', ['r', 's', 'extra'], ['nemia logs', "one run's id and one step's name", 'not extra.']],
   ['logs, a flag more', 'logs', ['r', 's', '--tail'], ['nemia logs', "one run's id and one step's name", 'not --tail.']],
@@ -1091,7 +1158,7 @@ test('REFUSED at shipped defaults: what each command refuses of its command line
       names(words, ...said);
       for (const word of not) assert.ok(!words!.includes(word), `${words} names ${word}`);
     });
-  await t.test('watch, -l given no selector: the forms, then every key of a feed line, in order', () => {
+  await t.test("watch, -l given no selector: the forms, then every key of a feed line, in order, and a person's labels", () => {
     const words = refusedBy(entry('watch'), ['-l', '--json']);
     names(words, 'nemia watch -l takes', '-l <key>=<value>', '-l <key>!=<value>', '-l "<key> in (<a>,<b>)"', '-l "<key> notin (<a>,<b>)"');
     assert.deepEqual(words!.split('The keys: ')[1].split(', '), [
@@ -1107,6 +1174,7 @@ test('REFUSED at shipped defaults: what each command refuses of its command line
       'type',
       'waits',
       'source',
+      'and any label a person put',
     ]);
   });
 });

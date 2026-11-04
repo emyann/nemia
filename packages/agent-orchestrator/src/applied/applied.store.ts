@@ -22,6 +22,9 @@ const folderOf = (name: string): string => folderAt(HOME, name);
 /** The folder a templated factory of the store `home` runs from (`treeDir`). */
 export const treeDirAt = (home: string, name: string): string => path.join(folderAt(home, name), 'tree');
 
+/** The base of a templated factory of the store `home`: the template as last rendered into it (`appliedDir`). */
+export const appliedDirAt = (home: string, name: string): string => path.join(folderAt(home, name), 'applied');
+
 /** What the controller last observed of a templated factory of the store `home` (`readStatus`). */
 export const readStatusAt = (home: string, name: string): Status | undefined => statusIn(path.join(folderAt(home, name), 'status.json'));
 
@@ -68,11 +71,31 @@ export const readTreeWiringAt = (home: string, name: string): { wiring: TreeWiri
 
 /** The wiring a tree's `file` holds, none while it is not there, or why it does not read. */
 function wiringIn(file: string): { wiring: TreeWiring } | { absent: true } | { error: string } {
-  let raw: unknown;
+  let text: string;
   try {
-    raw = JSON.parse(fs.readFileSync(file, 'utf8'));
+    text = fs.readFileSync(file, 'utf8');
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code === 'ENOENT') return { absent: true };
+    return { error: `${file} is not JSON (${(err as Error).message}): fix it by hand, as {"workflows": [...], "hires": {...}}.` };
+  }
+  return wiringOfText(file, text);
+}
+
+/**
+ * The wiring a render's `entries` hold in their `factory.json`, as a tree seeded from them would read it: none where they hold none, or
+ * why it does not read.
+ */
+export function treeWiringOf(entries: readonly Entry[]): { wiring: TreeWiring } | { absent: true } | { error: string } {
+  const entry = entries.find((e) => e.path === 'factory.json');
+  return entry === undefined ? { absent: true } : wiringOfText("the render's factory.json", entry.bytes.toString('utf8'));
+}
+
+/** The wiring `text`, read at `file`, holds, or why it does not read. */
+function wiringOfText(file: string, text: string): { wiring: TreeWiring } | { error: string } {
+  let raw: unknown;
+  try {
+    raw = JSON.parse(text);
+  } catch (err) {
     return { error: `${file} is not JSON (${(err as Error).message}): fix it by hand, as {"workflows": [...], "hires": {...}}.` };
   }
   const decoded = Schema.decodeUnknownResult(TreeWiringSchema)(raw);

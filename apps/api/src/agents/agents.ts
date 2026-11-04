@@ -9,14 +9,14 @@
  * The repository's agents are read-only here, as its workflows are: the api writes nothing into a checkout.
  */
 import path from 'node:path';
-import { Schema } from 'effect';
+import { Effect, Schema } from 'effect';
 import { Hono } from 'hono';
 import {
+  AgentDoor,
   agentRead,
   agentSkillsFound,
   factoriesFilling,
   inFactory,
-  loadAgents,
   readFactories,
   stepsFilled,
   type AgentFill,
@@ -35,7 +35,7 @@ import { refusedBeforeReading, type Guarded, type Refusal } from '../guard.ts';
 import { type ApiEnv, served } from '../layer.ts';
 import type { Engine } from '../store.ts';
 import { givenSkills, type GivenSkill } from './skills.ts';
-import { sourcesOf, type WorkflowSource } from '../workflows/workflows.ts';
+import { sourcesOf, type InRequest, type WorkflowSource } from '../workflows/workflows.ts';
 import { commandNamed, runPlaced } from '../store.ts';
 import type { PlaceService } from 'agent-orchestrator';
 
@@ -80,18 +80,26 @@ const SOURCES = commandNamed('agents sources');
 const agentPlaces = (repo: string, home: string): Array<{ from: WorkflowSource; dir: string }> =>
   sourcesOf(repo, home).map(({ from, dir }) => ({ from, dir: path.join(dir, AGENTS_FOLDER) }));
 
-/** The package's reading of an agent as the board lists it: its custom instructions' file left out, what it is given, why it is untried. */
-function listingOf({ custom: _custom, ...read }: AgentReading, repo: string, home: string): AgentListing {
+/**
+ * The package's reading of an agent as the board lists it: its custom instructions' file left out, what it is given — its skills found
+ * through the Skill door as a start on `repo` finds them — and why it is untried.
+ */
+const listingOf = Effect.fnUntraced(function* ({ custom: _custom, ...read }: AgentReading, repo: string, home: string) {
   const given =
-    read.error === null && read.skills ? givenSkills(read.skills.split(', '), agentSkillsFound(read.dir, repo, home), repo, home) : [];
-  return { ...read, given, untried: untriedOf({ ...read, schemaFile: read.schema?.file ?? null }, home) };
-}
+    read.error === null && read.skills
+      ? givenSkills(read.skills.split(', '), yield* agentSkillsFound(read.dir, repo, home), repo, home)
+      : [];
+  return { ...read, given, untried: untriedOf({ ...read, schemaFile: read.schema?.file ?? null }, home) } satisfies AgentListing;
+});
 
-/** One agent as the listing has it, its skills found as a start on `repo` finds them, or null when `dir` has no file of that name. */
-export function listedAgent(from: WorkflowSource, dir: string, name: string, repo: string, home: string): AgentListing | null {
-  const read = agentRead(from, dir, name, { repo, home });
-  return read && listingOf(read, repo, home);
-}
+/**
+ * One agent as the listing has it, read through the Agent door, its skills found as a start on `repo` finds them, or null when `dir` has
+ * no agent of that name.
+ */
+const listedAgent = Effect.fnUntraced(function* (from: WorkflowSource, dir: string, name: string, repo: string, home: string) {
+  const read = yield* agentRead(from, dir, name, { repo, home });
+  return read && (yield* listingOf(read, repo, home));
+});
 
 /**
  * An agent as an A2A Agent Card, and the truth about it: `servedOverA2A` is always false, and `why` says what the shape leaves out and why
@@ -244,6 +252,12 @@ function placeOf(from: string, name: string | null, route: string, repo: string,
   return { dir: place.dir };
 }
 
+/**
+ * A workflow folder beside the folder of agents `dir`, whose agents found with no other place are `dir`'s alone: what the Agent door's
+ * `found` is asked for one folder's agents, each kept with the load's refusal of it, as no other of its reads keeps one.
+ */
+const workflowIn = (dir: string): string => path.join(path.dirname(dir), '_');
+
 /** Why there is no agent to answer (404): `from`'s folder, `dir`, has none named `name`. */
 const noAgentWords = (from: string, name: string, dir: string): string =>
   `${from === 'yours' ? 'Yours has' : 'The repository has'} no agent named '${name}' (${path.join(dir, `${name}.md`)}). GET /api/agents lists the agents there are.`;
@@ -284,9 +298,9 @@ const noAgentWords = (from: string, name: string, dir: string): string =>
  */
 export const agents = new Hono<ApiEnv>()
   .get('/api/agents', (c) =>
-    served(c, async ({ e, placeService, env, repo, home, factory }) => {
-      const { agents: read } = (await runPlaced(placeService, e, AGENTS.handler({ repo }, env, home))) as AgentsRead;
-      const listings = read.map((one) => listingOf(one, repo, home));
+    served(c, async ({ e, placeService, env, repo, home, factory, inRequest }) => {
+      const { agents: read } = (await runPlaced({ placeService, home }, e, AGENTS.handler({ repo }, env, home))) as AgentsRead;
+      const listings = await inRequest(Effect.forEach(read, (one) => listingOf(one, repo, home)));
       const answer: LibraryAgent[] = inFactory(
         listings,
         stepsFilled(repo, home, factory),
@@ -299,31 +313,31 @@ export const agents = new Hono<ApiEnv>()
   .get('/api/agents/sources', (c) =>
     served(c, async ({ e, placeService, env, home }) => {
       const at = c.req.query('path');
-      return c.json(await runPlaced(placeService, e, SOURCES.handler(at === undefined ? {} : { path: at }, env, home)));
+      return c.json(await runPlaced({ placeService, home }, e, SOURCES.handler(at === undefined ? {} : { path: at }, env, home)));
     }),
   )
   .get('/api/agents/:from/:name', (c) =>
-    served(c, async ({ e, placeService, env, repo, home }) => {
+    served(c, async ({ e, placeService, env, repo, home, inRequest }) => {
       const { from, name } = c.req.param();
       const place = placeOf(from, name, `GET /api/agents/${from}/${name}`, repo, home);
       if ('status' in place) return c.json({ error: place.error }, place.status);
-      const { agent } = (await runPlaced(placeService, e, READ.handler({ from, name, dir: place.dir, repo }, env, home))) as {
+      const { agent } = (await runPlaced({ placeService, home }, e, READ.handler({ from, name, dir: place.dir, repo }, env, home))) as {
         agent: AgentReading | null;
       };
       if (!agent) return c.json({ error: noAgentWords(from, name, place.dir) }, 404);
-      return c.json(listingOf(agent, repo, home));
+      return c.json(await inRequest(listingOf(agent, repo, home)));
     }),
   )
   .get('/api/agents/:from/:name/card', (c) =>
-    served(c, async ({ e, placeService, env, repo, home }) => {
+    served(c, async ({ e, placeService, env, repo, home, inRequest }) => {
       const { from, name } = c.req.param();
       const route = `GET /api/agents/${from}/${name}/card`;
       const place = placeOf(from, name, route, repo, home);
       if ('status' in place) return c.json({ error: place.error }, place.status);
-      const agent = loadAgents(place.dir).get(name);
+      const agent = (await inRequest(Effect.flatMap(AgentDoor, (door) => door.agents.found({ dir: workflowIn(place.dir) })))).get(name);
       if (agent === undefined) return c.json({ error: noAgentWords(from, name, place.dir) }, 404);
       if (agent instanceof Error) return c.json({ error: agent.message }, 422);
-      const { card } = (await runPlaced(placeService, e, AGENT_CARD.handler({ name, repo, from }, env, home))) as CardRead;
+      const { card } = (await runPlaced({ placeService, home }, e, AGENT_CARD.handler({ name, repo, from }, env, home))) as CardRead;
       return c.json({
         card,
         servedOverA2A: false,
@@ -332,7 +346,7 @@ export const agents = new Hono<ApiEnv>()
     }),
   )
   .post('/api/agents/:from', (c) =>
-    served(c, async ({ e, placeService, repo, home }) => {
+    served(c, async ({ e, placeService, repo, home, inRequest }) => {
       const { from } = c.req.param();
       const route = `POST /api/agents/${from}`;
       const refused = refusedBeforeReading(
@@ -349,12 +363,12 @@ export const agents = new Hono<ApiEnv>()
       const place = placeOf(from, read.body.name, route, repo, home);
       if ('status' in place) return c.json({ error: place.error }, place.status);
       const given = draftOf(read.body, read.body.name);
-      const answer = await saved(e, placeService, { from, repo, home }, given, 201);
+      const answer = await saved(e, placeService, inRequest, { from, repo, home }, given, 201);
       return c.json(answer.body, answer.status);
     }),
   )
   .put('/api/agents/:from/:name', (c) =>
-    served(c, async ({ e, placeService, repo, home }) => {
+    served(c, async ({ e, placeService, repo, home, inRequest }) => {
       const { from, name } = c.req.param();
       const route = `PUT /api/agents/${from}/${name}`;
       const refused = refusedBeforeReading(
@@ -377,12 +391,12 @@ export const agents = new Hono<ApiEnv>()
       if ('status' in read) return c.json({ error: read.error }, read.status);
       const { version } = read.body;
       const given = draftOf(read.body, read.body.name ?? name);
-      const answer = await saved(e, placeService, { from, repo, home }, { ...given, version, name }, 200);
+      const answer = await saved(e, placeService, inRequest, { from, repo, home }, { ...given, version, name }, 200);
       return c.json(answer.body, answer.status);
     }),
   )
   .post('/api/agents/:from/:name/try', (c) =>
-    served(c, async ({ e, placeService, repo, home }) => {
+    served(c, async ({ e, placeService, repo, home, inRequest }) => {
       const { from, name } = c.req.param();
       const route = `POST /api/agents/${from}/${name}/try`;
       const refused = refusedBeforeReading(
@@ -394,7 +408,7 @@ export const agents = new Hono<ApiEnv>()
       if (refused) return c.json({ error: refused.error }, refused.status);
       if (from === 'repo') {
         const dir = path.join(repo, 'workflows', AGENTS_FOLDER);
-        const listed = agentNameRefusal(name) === undefined ? listedAgent('repo', dir, name, repo, home) : null;
+        const listed = agentNameRefusal(name) === undefined ? await inRequest(listedAgent('repo', dir, name, repo, home)) : null;
         const untried = listed?.untried ?? untriedOf({ from, name, file: path.join(dir, `${name}.md`), keys: {}, schemaFile: null }, home);
         if (untried === null) throw new Error(`${route}: the package says the repository's agent ${name} can be tried, which no try does.`);
         return c.json({ error: `${route}: ${untried.why} \`${untried.copy}\`` }, 403);
@@ -412,7 +426,7 @@ export const agents = new Hono<ApiEnv>()
       );
       if ('status' in read) return c.json({ error: read.error }, read.status);
       const run = (await runPlaced(
-        placeService,
+        { placeService, home },
         e,
         TRY.handler({ from, name, brief: read.body.brief, repo }, undefined, home),
       )) as AgentTried;
@@ -443,7 +457,7 @@ export const agents = new Hono<ApiEnv>()
       );
       if ('status' in read) return c.json({ error: read.error }, read.status);
       const { version } = read.body;
-      return c.json(await runPlaced(placeService, e, REMOVE.handler({ from, name, version, repo }, undefined, home)));
+      return c.json(await runPlaced({ placeService, home }, e, REMOVE.handler({ from, name, version, repo }, undefined, home)));
     }),
   );
 
@@ -458,6 +472,7 @@ type AgentAt = { from: string; repo: string; home: string };
 async function saved(
   e: Engine['Service'],
   placeService: PlaceService['Service'],
+  inRequest: InRequest,
   { from, repo, home }: AgentAt,
   { draft, schema, version, name }: { draft: AgentDraft; schema: AgentSchema | null; version?: string; name?: string },
   ok: 200 | 201,
@@ -470,8 +485,8 @@ async function saved(
     ...(version !== undefined && { version }),
     ...(name !== undefined && { name }),
   };
-  const done = (await runPlaced(placeService, e, WRITE.handler(args, undefined, home))) as AgentWritten;
-  const agent = listedAgent('yours', done.dir, done.agent.name, repo, home);
+  const done = (await runPlaced({ placeService, home }, e, WRITE.handler(args, undefined, home))) as AgentWritten;
+  const agent = await inRequest(listedAgent('yours', done.dir, done.agent.name, repo, home));
   if (agent === null) throw new Error(`The agent ${done.agent.name} written to ${done.dir} does not read back: GET /api/agents says why.`);
   return {
     body: { agent, written: done.written, removed: done.removed },

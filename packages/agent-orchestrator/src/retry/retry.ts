@@ -19,7 +19,8 @@ import {
   type TaskPhase,
 } from '../record/record.ts';
 import { REASON_OF, type QualifiedStep } from '../phase/phase.ts';
-import { envelopeRefusals, type Closeout } from '../closeout/index.ts';
+import type { Closeout } from '../closeout/index.ts';
+import { closeoutRefusals } from '../question/index.ts';
 import {
   aboveWord,
   approvalOf,
@@ -40,6 +41,7 @@ import {
   type Raise,
   type SpendOf,
   budgetWord,
+  dollars,
 } from '../status/status.ts';
 import type { Verdict } from '../check/check.ts';
 import { retriesSpent, signoffDue, type EarlierTry, type Retry, type RetryAsk, type RetryMode } from './retry-ask.ts';
@@ -49,6 +51,7 @@ import { filedDenies, landedWords } from '../ending/ending.ts';
 import { allowRuleOf, disallowedBy, type DeniedAt } from '../keys/index.ts';
 import { heldLater } from '../round/round.ts';
 import { answersOr } from '../question/index.ts';
+import type { MostSpent, RaiseVerdictOf } from '../../contracts/raise.contract.ts';
 
 /**
  * What a person may ask for a step, and the status that says why. Pure.
@@ -156,6 +159,114 @@ export function retryable(
   };
 }
 
+/**
+ * A step's raise of its cap, judged from what its gatherer read (`stepRaise`): a try's, where its try carries one and may be taken, else a
+ * round's, for a looping step over its budget or out of rounds whose loop has a step over its cap — above the most any of them has cost,
+ * as `roundAsk` refuses less. None on a run called off. Pure; its laws are `contracts/raise.contract.ts`'s.
+ */
+export const raiseVerdict: RaiseVerdictOf = (i) => {
+  if (i.called) return null;
+  if (i.tryRaise !== null && i.modes.length > 0) return { by: 'retry', above: i.tryRaise.above, modes: i.modes, own: i.own };
+  if (!i.loop || (i.status !== 'over budget' && i.status !== 'exhausted') || i.over.length === 0) return null;
+  return { by: 'round', above: mostSpent(i.over), modes: [], own: null };
+};
+
+/** The most any step of a loop over its cap has cost (`loopOver`), or 0 where none is: `Math.max(0, ...over)`, which the verifier reads. */
+export const mostSpent: MostSpent = (over) => {
+  let most = 0;
+  for (const spent of over) if (spent > most) most = spent;
+  return most;
+};
+
+/**
+ * What a step's raise is read from beside the run, its workflow and what its tries cost: each task's phase, each step's closeout, whether a
+ * task was asked for one, and each step's check verdict, as `retryable` reads them. The run page reads them off its views (`phaseOfView`,
+ * `closeoutReader`, `closeoutAsked`, `exitVerdicts`), `nemia decide` off the same views through its own reads.
+ */
+export type RaiseReads = {
+  phaseOf: (taskId: string) => TaskPhase;
+  closeoutOf: (step: string) => Closeout | undefined;
+  askedCloseout: (taskId: string) => CloseoutAsked;
+  verdictOf: (step: string) => Verdict | undefined;
+};
+
+/**
+ * A raise of a step's cap the package takes, and how it is asked for: `retry` — `nemia retry --budget`, the board's `POST …/retry` — for a
+ * step over its budget or ended at it that a try takes on (`retryable`'s `raise`); `round` — `nemia retry --round --budget`, `POST …/round`
+ * — for a looping step whose round waits on a step of its loop over its budget (`loopOver`). `above` is what the budget has to be more
+ * than, as the package refuses one that is not — what the tries have cost, or the cap a session was ended at — and `said` that, in dollars
+ * (`dollars`).
+ *
+ * For a try, `modes` are the ways the package takes it (`retryable`) — `recheck` among them where a check did not pass, which costs nothing
+ * and needs no raise — and `own` how the step ended on its own work, its budget aside (`ownStatus`): `blocked` for a step that signed off
+ * blocked, whose try is answered with its raise (`nemia retry --budget <amount> --message "<answer>"`, as `nemia decide` offers it),
+ * `unsigned`, `failed (check)`, `failed`, `stopped`, `denied` or `budget exhausted`. Over its budget, a step's word is `over budget`, so
+ * the word alone does not say which. For a round, no modes, and `own` null: a round is asked for as it is, with a budget.
+ */
+export type StepRaise = { by: 'retry' | 'round'; above: number; said: string; modes: RetryMode[]; own: StepStatus | null };
+
+/**
+ * A step's raise (`StepRaise`, null for none), and what `nemia decide` words it with: `retry`, the try's raise behind a raise by retry —
+ * what its tries cost and the cap, beside `above` — and `round`, each step of its loop over its cap (`roundOver`), which a looping step's
+ * OVER BUDGET line names whether a raise is offered or not.
+ */
+export type RaiseGrounds = { raise: StepRaise | null; retry: Raise | undefined; round: ReturnType<typeof loopOver> };
+
+/** The steps of a looping step's loop over their cap (`loopOver`), which hold its round; none for a step that does not loop. Pure. */
+export const roundOver = (steps: readonly Workflow[], step: Workflow, run: Run, spendOf: SpendOf): ReturnType<typeof loopOver> =>
+  step.loop ? loopOver(steps, step, run, spendOf) : [];
+
+/**
+ * The raise of a step's cap the package takes, gathered once for the run page and `nemia decide`: `retryable`, `ownStatus` and
+ * `roundOver` read, and `raiseVerdict` judges — none on a run cancelled, pruned or held, where a raise is refused (`heldRefusal`). Pure.
+ *
+ * @param tried What `retryable` says of the step, read with `reads`: given where a caller has read it already.
+ */
+export function raiseGrounds(
+  step: Workflow,
+  run: Run,
+  steps: readonly Workflow[],
+  reads: RaiseReads,
+  spendOf: SpendOf,
+  tried: ReturnType<typeof retryable> = retryable(
+    step,
+    run,
+    reads.phaseOf,
+    reads.closeoutOf,
+    reads.askedCloseout,
+    steps,
+    () => false,
+    spendOf,
+    reads.verdictOf,
+  ),
+): RaiseGrounds {
+  const round = roundOver(steps, step, run, spendOf);
+  const own = tried.raise ? ownStatus(step, run, reads.phaseOf, reads.closeoutOf, reads.askedCloseout, steps, spendOf) : null;
+  const verdict = raiseVerdict({
+    called: Boolean(run.cancelledAt || run.pruned || run.hold),
+    tryRaise: tried.raise ?? null,
+    modes: tried.modes,
+    status: tried.status,
+    own,
+    loop: Boolean(step.loop),
+    over: round.map((o) => o.spent.usd),
+  });
+  if (!verdict) return { raise: null, retry: undefined, round };
+  const { by, above, modes } = verdict;
+  return {
+    raise: { by, above, said: dollars(above), modes, own: verdict.own },
+    retry: by === 'retry' ? tried.raise : undefined,
+    round,
+  };
+}
+
+/**
+ * A step's raise of its cap (`StepRaise`), or null: the one the run page's `raise` shows and `nemia decide`'s offers word (`raiseGrounds`).
+ * Pure.
+ */
+export const stepRaise = (step: Workflow, run: Run, steps: readonly Workflow[], reads: RaiseReads, spendOf: SpendOf): StepRaise | null =>
+  raiseGrounds(step, run, steps, reads, spendOf).raise;
+
 /** A standing's codes: a session its harness asks the person through is `AwaitingAnswer` via `session`, else its status's reason. */
 const codesOf = (status: StepStatus, harnessAsks: boolean): QualifiedStep =>
   harnessAsks ? { reason: 'AwaitingAnswer', via: 'session' } : REASON_OF[status];
@@ -258,7 +369,7 @@ export const pauseAsksVoid = (
  *
  * And a step `unsigned` because its closeout named a file the run did not have (`lackedOf`) is continued the same way, under the same one
  * ask a round (`signoffDue`): its session continued, told each file, why, and to write it or take the name off. One that names a file
- * the run does not have again stays `unsigned`, on a person; so is one whose envelope the run refused (`envelopeRefusals`).
+ * the run does not have again stays `unsigned`, on a person; so is one whose envelope or questions the run refused (`closeoutRefusals`).
  *
  * An ask names one try, by number, so it is honoured once: an ask for a try the record already holds is
  * spent (`spentAsks`) and files nothing, whichever pass reads it.
@@ -338,15 +449,15 @@ export function retriesDue(
       retriesSpent(record) < (step.retries ?? 0)
     ) {
       due.push({ step: step.name, try: next, mode: 'continue', by: 'retries' });
-    } else if (status === 'unsigned' && signoffDue(record, askedCloseout(record.taskId), refusedOf(closeoutOf(step.name)))) {
+    } else if (status === 'unsigned' && signoffDue(record, askedCloseout(record.taskId), refusedOf(step, closeoutOf(step.name)))) {
       due.push({ step: step.name, try: next, mode: 'continue', by: 'signoff' });
     }
   }
   return due.filter((r) => !due.some((o) => o.back?.includes(r.step)));
 }
 
-/** Whether the run refuses a closeout's envelope (`envelopeRefusals`): a closeout not given is not. */
-const refusedOf = (said: Closeout | undefined): boolean => Boolean(said && envelopeRefusals(said).length);
+/** Whether the run refuses a closeout's envelope or its questions (`closeoutRefusals`): a closeout not given is not. */
+const refusedOf = (step: Workflow, said: Closeout | undefined): boolean => Boolean(said && closeoutRefusals(step, said).length);
 
 /** Who asked for a try by its ask: `nemia pause --now`, where the ask names the task it stopped, else a person. */
 const askedBy = (ask: RetryAsk): 'ask' | 'pause' => (ask.interrupted === undefined ? 'ask' : 'pause');
@@ -480,17 +591,10 @@ export function retryOffers(
   for (const step of steps) {
     const offer = (bare: string, before: string, after = '') =>
       lines.push({ step: step.name, command: bare, said: `${step.name}: ${before}:  ${bare}${after}` });
-    const { status, modes, sendsBack, back, raise } = retryable(
-      step,
-      run,
-      phaseOf,
-      closeoutOf,
-      askedCloseout,
-      steps,
-      () => false,
-      spendOf,
-      verdictOf,
-    );
+    const tried = retryable(step, run, phaseOf, closeoutOf, askedCloseout, steps, () => false, spendOf, verdictOf);
+    const { status, modes, sendsBack, back } = tried;
+    const reads = { phaseOf, closeoutOf, askedCloseout, verdictOf };
+    const { raise: judged, retry: raise } = raiseGrounds(step, run, steps, reads, spendOf, tried);
     const command = `nemia retry ${run.id} ${step.name}`;
     if (back) {
       offer(...backWords(command, step.name, back.join(', ')));
@@ -522,7 +626,7 @@ export function retryOffers(
       );
     } else if (raise) {
       const recheck = modes.includes('recheck') ? '; --recheck runs its check again, and needs no --budget' : '';
-      const own = ownStatus(step, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf);
+      const own = judged?.own;
       const word = status === 'over budget' ? `over budget (${own === 'failed (check)' ? 'check refused' : own})` : status;
       offer(...raiseWords(command, word, raise, landAgain, `${spent}${recheck}`));
     } else if (status === 'denied') {
@@ -603,7 +707,7 @@ export function overBudgetLine(steps: readonly Workflow[], run: Run, d: Decision
     const step = steps.find((s) => s.name === name);
     const own = step ? overBudget(step, run, spendOf) : undefined;
     if (own) return `${name} (${spentWord(own.spent)} of ${budgetWord(own.cap)})`;
-    const others = step ? loopOver(steps, step, run, spendOf) : [];
+    const others = step ? roundOver(steps, step, run, spendOf) : [];
     if (!others.length) return name;
     return `${name} (held: its round would file ${others.map((o) => `${o.name} again, which has cost ${spentWord(o.spent)} of its ${budgetWord(o.cap)} budget`).join(', and ')})`;
   });
@@ -636,10 +740,12 @@ export function answerLines(
   if (d.kind !== 'awaiting' || run.pruned || run.hold) return {};
   const lines: Record<string, string> = {};
   for (const step of steps) {
-    const { status, modes, raise } = retryable(step, run, phaseOf, closeoutOf, askedCloseout, steps, () => false, spendOf);
+    const tried = retryable(step, run, phaseOf, closeoutOf, askedCloseout, steps, () => false, spendOf);
+    const reads = { phaseOf, closeoutOf, askedCloseout, verdictOf: () => undefined };
+    const { retry: raise } = raiseGrounds(step, run, steps, reads, spendOf, tried);
     const answer = answersOr(step, closeoutOf(step.name), '--message "<answer>"');
-    if (status === 'blocked' && modes.length) lines[step.name] = `to answer it:  nemia retry ${run.id} ${step.name} ${answer}`;
-    else if (raise && modes.length && closeoutOf(step.name)?.outcome === 'blocked') {
+    if (tried.status === 'blocked' && tried.modes.length) lines[step.name] = `to answer it:  nemia retry ${run.id} ${step.name} ${answer}`;
+    else if (raise && closeoutOf(step.name)?.outcome === 'blocked') {
       lines[step.name] =
         `to answer it, its cap raised above ${aboveWord(raise)}:  nemia retry ${run.id} ${step.name} --budget <amount> ${answer}`;
     }

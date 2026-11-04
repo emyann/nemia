@@ -1,0 +1,137 @@
+---
+title: sdlc, the builtin template
+description: sdlc is the team that builds Nemia, made generic, a template Nemia has built in, and how to apply it to a repository of your own.
+---
+
+sdlc is a factory template that comes with Nemia: the team that builds Nemia, with Nemia's own repository taken out of it. Applied to
+a repository of yours, it makes a factory that takes an idea to an intent, an intent to a change merged into your base branch, and
+reads its own stats to propose what to correct.
+
+**It owns** six agents, four workflows, the skills their steps name, the scripts their checks run, and the rules every agent hired
+into the factory is told.
+
+**It never touches** your repository's history but through a landing the run checks: a step never commits a merge onto your base
+branch or pushes, and the run does it in its place, by default in your own checkout on the local check's word, and on GitHub through
+the scripts the template carries.
+
+**It is reached through** its name: `nemia factory apply` takes a bare word at its template flag as a template Nemia has built in, and
+the factory's file records that name. Its folder is in the templates workspace, `packages/templates/`.
+
+## Its agents
+
+| Agent  | Its role               |
+| ------ | ---------------------- |
+| Iris   | product engineer       |
+| Seldon | software architect     |
+| Grace  | lead software engineer |
+| Agora  | code reviewer          |
+| Otto   | release engineer       |
+| Argus  | janitor                |
+
+Seldon, Agora, Iris and Argus read the repository and never write it; Grace and Otto write it, and are refused a push. Every agent's
+fence refuses an edit of your store's factories, workflows and inbox.
+
+## Its workflows
+
+- **intake** turns an idea into an intent, Iris asking you what it leaves open.
+- **build** takes an intent to your base branch: a design, an implement in rounds, a review, and a landing a person approves.
+- **quick** takes a card that settles its change to your base branch: an implement, then a review whose pass lands it, with no gate.
+- **janitor**, on demand, reads the factory's stats and files what it proposes as cards in your inbox, starting none.
+
+## Its parameters
+
+What your repository decides is a parameter, given with `--set` when you apply the template; one you do not give takes its default.
+
+| Parameter  | What it says                                                                         | Its default                                                                              |
+| ---------- | ------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------- |
+| github     | whether the factory judges and lands its work on GitHub (`true`) or in your checkout | false                                                                                    |
+| localCheck | in your checkout: the command that judges each round, and the merged tree at landing | npm run --if-present lint && npm run --if-present typecheck && npm run --if-present test |
+| ciCheck    | on GitHub: the name of the CI status check a pull request waits on                   | ci                                                                                       |
+| roundCheck | on GitHub: the command implement's check runs after each round, before CI            | npm run --if-present lint && npm run --if-present typecheck                              |
+| areas      | the areas of the repository a card names, in the factory's rules                     | the top-level folders of the repository                                                  |
+| storeRoot  | the store the agents' fences keep them out of                                        | ~/.agent-workflows                                                                       |
+
+github is a boolean, refused at apply unless it is `true` or `false`. A factory reads localCheck where it is false, and ciCheck and
+roundCheck where it is true.
+
+storeRoot is written as Claude Code reads a path in a permission rule: `~/` for a store under your home, and two slashes for any
+other absolute path, `--set storeRoot=//srv/nemia` for a store at `/srv/nemia`. With one slash Claude Code reads the path from the
+settings' folder, so the fence would deny nothing.
+
+## Apply it
+
+```bash
+nemia factory apply myapp --template sdlc --repo ~/code/myapp \
+  --set localCheck='npm run lint && npm test' \
+  --set areas='src, docs and scripts'
+```
+
+That factory works in your checkout, with no remote. To judge and land on GitHub instead:
+
+```bash
+nemia factory apply myapp --template sdlc --repo ~/code/myapp \
+  --set github=true \
+  --set ciCheck=build \
+  --set roundCheck='npm run lint'
+```
+
+That files the factory `myapp` on the repository, made from sdlc with your parameters, and trusts the repository for the harness, as
+[a factory's repositories](/factories/#its-repositories) says (`--no-trust` trusts nothing). The daemon renders the template into the
+factory, its workflows and agents yours to change after. A `--set` may be repeated, one per parameter, and `--repo` too, for a factory
+on more than one repository. `nemia factory diff` and `nemia factory upgrade` take the same name at their template flag.
+
+## In your checkout, the default
+
+With github false, nothing is pushed and no pull request is opened. Implement's check runs localCheck on each round's tree. To land,
+the land step stages every branch of the run's result in one merge in your repository's own checkout, committing nothing; the run then
+runs localCheck on that merged tree, commits the merge onto your base branch when it passes, and takes it back when it does not. A merge
+that conflicts is aborted, and the work goes back. localCheck is the only judge here, so give it the commands that run your tests.
+
+## Before you apply it on GitHub
+
+With github true, sdlc lands a change through a pull request on GitHub, and waits on your CI to judge it. Before a run of build or
+quick can land:
+
+- **`gh` is logged in** on the machine the daemon runs on, to the account that may push your repository's branches and open and merge
+  its pull requests.
+- **Your base branch is protected, requiring the CI check named by ciCheck**, so a pull request merges only once that check passes on
+  it. The landing refuses a pull request whose check is not green at the head the review read.
+
+Under GitHub, CI is the judge. The round check between implement's rounds is a quick refusal of what is plainly broken, not the
+verdict: a repository with neither a `lint` nor a `typecheck` script passes the default round check having checked nothing, and its
+CI is then the only check its changes meet. Give roundCheck the commands your repository has.
+
+## Upgrading from 1.0.0
+
+sdlc 1.0.0 landed on GitHub, and had no github parameter. From 2.0.0 the default is your checkout, so a factory applied at 1.0.0
+that should stay on GitHub is given `github: true` before it upgrades. `nemia factory upgrade` takes no `--set`: add `"github": true`
+to the parameters the factory's file records (`template.params` in `factories/<name>.json` of your store), then upgrade it with
+`nemia factory upgrade <name> --to 2.0.0`. A new factory is given it at apply, `--set github=true`.
+
+## Fit it to your repository
+
+Once the daemon has rendered the factory, its tree is yours to change. Four changes a repository often needs are already possible:
+
+- **Leave a workflow out.** `nemia factory fire myapp --step janitor/argus` takes back the janitor's hire, then
+  `nemia factory detach myapp janitor` takes the workflow back. A detach is refused while the factory still hires someone into one
+  of the workflow's steps, so fire first.
+- **Keep every step from a command.** A step's file in the tree takes a `disallowedTools` line of its own, which adds to its agent's
+  fence, and a deny beats any allow. Take a suite too heavy for a machine other work shares: deny `npm test` on each step, say in your
+  repository's CLAUDE.md how a step runs the one test file it changed, and let your CI run the whole suite as the judge. A rule is
+  matched as it is typed, so it holds against the usual spellings and not against a quoted one.
+- **Let the reading agents run your checks.** Seldon, Agora, Iris and Argus run in `dontAsk` mode, and run only what they are allowed.
+  A step's own `allowedTools` may only narrow its agent's, never widen them, so allow their read-only checks (the linter, the
+  typecheck, one test file, `gh pr view` and `gh pr checks`) in your repository's `.claude/settings.json`, where they travel with it.
+- **Commit before a landing.** The landing runs in your checkout, on your base branch, either way. It refuses a checkout with
+  uncommitted changes before it merges anything, and leaves them as they are: on GitHub, its script refuses changes to tracked
+  files; in your checkout, the land step checks it first, as the git place's _Stage a landing_ says, and signs off blocked with
+  nothing staged. A person commits them or sets them aside, then retries the step. A run starts from your checkout's last commit,
+  so work you have not committed is not in it.
+
+## Sources
+
+This page is written from `packages/templates/CLAUDE.md`, `packages/templates/sdlc/nemia.yaml` and
+`packages/agent-orchestrator/src/templates/templates.store.ts` (`templatePlace` and `BUILTIN_TEMPLATES`). _Fit it to your repository_
+is written from `packages/agent-orchestrator/src/factory/factory.verb.ts`, `packages/agent-orchestrator/src/step/step.ts`,
+`packages/agent-orchestrator/src/agents/agents.ts`, `packages/templates/sdlc/workflows/build/landing.ts`,
+`packages/templates/sdlc/workflows/build/land.md` and `packages/agent-orchestrator/place/git/SKILL.md`.

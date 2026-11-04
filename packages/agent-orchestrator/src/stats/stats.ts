@@ -21,6 +21,7 @@ import { askedAgain, landsOnCheck } from '../status/status.ts';
 import { gateWaitOf, tryEndOf, type Timeline, type TimelineTry } from '../timeline/index.ts';
 import { healthOf, type Health } from '../series/series.ts';
 import { marksOf, type Mark, type RunFrozen } from './marks.ts';
+import type { Selectors } from '../watch/selector.ts';
 import {
   deniesRecorded,
   ranAsJob,
@@ -44,9 +45,10 @@ export type ByKey = (typeof BY_KEYS)[number];
 
 /**
  * What a person asks of the stats: the UTC days `from` and `to` (`YYYY-MM-DD`, both included; the first fact's day and today's by
- * default), the key the rows go by, and a value per key the facts must have.
+ * default), the key the rows go by, a value per key the facts must have, and `selectors` (`-l`, parsed), which keep the facts of the
+ * runs whose labels one of them takes (`selectedRuns`), every run's where none is given.
  */
-export type StatsQuery = { from?: string; to?: string; by?: ByKey } & Partial<Record<ByKey, string>>;
+export type StatsQuery = { from?: string; to?: string; by?: ByKey; selectors?: Selectors } & Partial<Record<ByKey, string>>;
 
 /** How a try's check ended: it passed, it refused the work (`refusedCheck`), or it did not finish. */
 export type CheckVerdict = 'passed' | 'refused' | 'unfinished';
@@ -497,7 +499,8 @@ const byKey = (a: string | null, b: string | null): number => (a === b ? 0 : a =
  * then kept between its days: `from` defaults to the first fact's or mark's day, `to` to `now`'s. With `by`, one group per value of that
  * key, sorted by key (`byKey`); a step with no agent, and a run with no repository, are a group of their own (`key` null), last. The tiles
  * are always the last 14 days to `now`'s day and the 14 before. `healthOver` reads the system's health over the days answered: none
- * kept, unless handed.
+ * kept, unless handed. `taken` says the runs whose facts and marks are kept, of the query's selectors (`statsRun` reads them off the
+ * runs' labels): every run's, unless handed — and a run left out is still compared with, as one another key leaves out.
  */
 export function statsOf(
   facts: Facts,
@@ -505,11 +508,13 @@ export function statsOf(
   now: Date,
   unreadable: readonly string[] = [],
   healthOver: (from: string | null, to: string) => Health = () => healthOf([]),
+  taken: (run: string) => boolean = () => true,
 ): Stats {
   const filters = Object.fromEntries(BY_KEYS.flatMap((k) => (query[k] === undefined ? [] : [[k, query[k]]]))) as Partial<
     Record<ByKey, string>
   >;
-  const every: Kept = { tries: facts.tries, runs: facts.runs, marks: marksOf(facts.frozen) };
+  const of = <F extends { run: string }>(rows: readonly F[]): F[] => rows.filter((row) => taken(row.run));
+  const every: Kept = { tries: of(facts.tries), runs: of(facts.runs), marks: of(marksOf(facts.frozen)) };
   const kept = Object.entries(filters).reduce((f, [k, v]) => having(f, k as ByKey, v ?? null), every);
   const today = now.toISOString().slice(0, 10);
   const to = query.to ?? today;

@@ -147,10 +147,12 @@ test("every CLAUDE.md of the repository is read, the root's and each package's, 
   assert.deepEqual([...claudeFiles(ROOT)].sort(), [
     'CLAUDE.md',
     'apps/api/CLAUDE.md',
+    'apps/cli/CLAUDE.md',
     'apps/docs/CLAUDE.md',
     'apps/web/CLAUDE.md',
     'packages/agent-orchestrator/CLAUDE.md',
     'packages/agent-runtime/CLAUDE.md',
+    'packages/templates/CLAUDE.md',
     'tools/guards/CLAUDE.md',
   ]);
 });

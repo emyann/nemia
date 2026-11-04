@@ -1,8 +1,8 @@
 /**
  * Context without a wait, as the board reads and writes it: `GET /api/runs/:runId/concluded`, the section a run started with `--from` would
- * be handed; `PUT` and `DELETE /api/inbox/:name/from`, a card's `from:` set and taken off; and a step's `taskParts` on `GET /api/runs/:id`,
- * each `## From run` section labelled by how the run was handed it — in the harness's scratch store (`root`), on the stand-ins: the
- * runtime's test engine and the test place.
+ * be handed; `PUT` and `DELETE /api/inbox/:name/from`, a card's `from:` set and taken off; and a step's `taskParts` on
+ * `GET /api/runs/:id/steps/:step/told`, each `## From run` section labelled by how the run was handed it — in the harness's scratch store
+ * (`root`), on the stand-ins: the runtime's test engine and the test place.
  */
 import { root } from './harness.ts';
 import { test } from 'node:test';
@@ -10,13 +10,13 @@ import { story } from './checkpoints.ts';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import type { RunDetail } from '../src/detail/detail.ts';
 import type { InboxFromAnswer } from '../src/inbox/inbox.ts';
 import { addToInbox, StoreRoot } from 'agent-orchestrator';
 import { Effect } from 'effect';
 import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from 'agent-orchestrator/testing';
 import { appOver, eachTest, engineFor } from './placed.ts';
+import { objectOf, toldOf } from './run-reads.ts';
 
 /** `program`, one of the package's inbox verbs, run on the harness's store (`root`): its refusal thrown as itself. */
 const onStore = <A, E>(program: Effect.Effect<A, E>): A => Effect.runSync(Effect.provideService(program, StoreRoot, root));
@@ -124,11 +124,9 @@ test("context without a wait: a run's concluded section read, a card's from: set
         steps: { implement: { taskId: 't-context' } },
       });
 
-      const res = await app().request('/api/runs/child-c3');
-      assert.equal(res.status, 200);
-      const detail = (await res.json()) as RunDetail;
-      assert.deepEqual(detail.context, ['read-b2']);
-      const parts = detail.steps[0].taskParts ?? [];
+      const run = await objectOf(app(), 'child-c3');
+      assert.deepEqual(run.spec.context, ['read-b2']);
+      const parts = (await toldOf(app(), 'child-c3', 'implement')).taskParts ?? [];
       assert.deepEqual(
         parts.map((p) => (p.kind === 'from' ? [p.run, p.how, p.asked] : [p.kind])),
         [['text'], ['waited-a1', 'waited', 'Build the cache.'], ['read-b2', 'read', 'Measure the cache.']],

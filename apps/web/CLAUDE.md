@@ -124,6 +124,9 @@ class merge do, which no test refuses — are in `.claude/skills/change-the-boar
   `cancelled` said to a person) and a runtime word (`journal`, `engine`, `WF_MAX_RUNS`) on hover.
 - A value two files under `lib/api/` need sits in a sibling that imports no sibling: the builder's saves decode a `WorkflowListing`, so
   they sit in `workflows.ts` beside its schema.
+- `src/lib/api/run.gen.ts`, the run object's mirror, is generated, never edited: `npm run mirror`, from `apps/web`, writes it from the
+  document the api serves through Effect's `toCodeDocument` (`test/mirror.ts`), and `test/mirror.test.ts` refuses a checked-in file
+  that differs from what the document generates.
 
 ## Invariants no test holds
 
@@ -134,8 +137,12 @@ class merge do, which no test refuses — are in `.claude/skills/change-the-boar
 - A link to a route is `routeLink` (`components/routeLink.tsx`), under the root's `RouterProvider`: Enter on a React Aria link is two
   clicks, and each would navigate.
 - A suspense query keeps what it showed when a read fails: a page that must say a thing is gone reads the query's `error`, and a query
-  whose 404 is an answer does not retry it (`runGone`, `retryRun` in `lib/api/detail.ts`).
+  whose 404 is an answer does not retry it (`runGone`, `retryRun` in `lib/api/gone.ts`).
 - A query keyed by the state it answers for is not invalidated by a write: a write invalidates the run's record alone (`exact: true`).
+  A run's step sub-resources (its tries and told, `lib/api/run.ts`) are keyed by `stepStamp` (`lib/lifecyclePath.ts`) and never named by
+  a step's event on the feed; a run's event, a removal and a write (`runsMoved` given the run) read every stamp of them by prefix.
+  A run is drawn from its view (`lib/runView.ts`): `useRunView` on a route whose loader read it (`loadRun`), `useRunRead` where none
+  did (a bar, a preview, a try), undefined until the object, the lines and every step's reads are in, so it is drawn whole.
 - `refetchInterval` is read again only when the query changes: `useFeed` reads the active polled queries once whenever the feed's stream
   opens or goes down (`pace` in `lib/feed.ts`), which is also what a stream from the feed's end does not carry.
 - An `EventSource` is closed on the `error` fired as the response ends, or after a grace (`follow`), never on the last event.

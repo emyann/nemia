@@ -1,0 +1,143 @@
+{
+  "machine": {
+    "cpu": "Intel(R) Core(TM) Ultra 9 275HX",
+    "cores": 12,
+    "memoryBytes": 16770076672,
+    "node": "v24.20.0",
+    "platform": "linux",
+    "load": 1.49
+  },
+  "commit": "68e273002459568743ce9eb6701e26adff337de6",
+  "date": "2026-11-03T00:05:48.236Z",
+  "repeat": 5,
+  "from": "~/.agent-workflows",
+  "engine": "~/.agent-engine",
+  "copy": {
+    "files": 131428,
+    "bytes": 3067977728,
+    "ms": 39653.606047,
+    "leftOut": [
+      "api.log",
+      "daemon.json",
+      "engine/a2a",
+      "wf-up.log",
+      "worktrees"
+    ]
+  },
+  "counts": {
+    "runs": 154,
+    "finishedRuns": 151,
+    "openRuns": 3,
+    "tasks": 7629,
+    "journalBytes": 119061348,
+    "feedLines": 38667,
+    "unreadable": {
+      "runs": 0,
+      "passLines": 0
+    },
+    "invariantRefusals": 0
+  },
+  "asked": {
+    "finishedRun": "a-step-can-read-and-search-i-l4z4",
+    "openRun": "labels-on-cards-and-runs-to-0tvg",
+    "feedCursor": 9237389,
+    "feedLinesRead": 1000
+  },
+  "measures": {
+    "runList": {
+      "cold": {
+        "ms": 2197.2673339999965,
+        "heapMb": 180.889008
+      },
+      "warm": {
+        "ms": 60.976346000003105,
+        "heapMb": 1.5292
+      }
+    },
+    "stats": {
+      "cold": {
+        "ms": 7778.898534000007,
+        "heapMb": 86.768912
+      },
+      "warm": {
+        "ms": 110.07414199999766,
+        "heapMb": 0.296368
+      }
+    },
+    "finishedRun": {
+      "cold": {
+        "ms": 1103.9198109999998,
+        "heapMb": 89.537536
+      },
+      "warm": {
+        "ms": 74.46950500000094,
+        "heapMb": 0.165696
+      }
+    },
+    "openRun": {
+      "cold": {
+        "ms": 1127.2535520000092,
+        "heapMb": 89.857208
+      },
+      "warm": {
+        "ms": 116.1206419999944,
+        "heapMb": 0.112224
+      }
+    },
+    "feedFromCursor": {
+      "cold": {
+        "ms": 25.58347899999353,
+        "heapMb": 0.183616
+      },
+      "warm": {
+        "ms": 24.577590000000782,
+        "heapMb": 0.083552
+      }
+    },
+    "tickPass": {
+      "cold": {
+        "ms": 1214.0896659999853,
+        "heapMb": 0.205256
+      },
+      "warm": {
+        "ms": 141.30132400000002,
+        "heapMb": 0.18968
+      }
+    },
+    "tickPassInformed": {
+      "cold": {
+        "ms": 2149.811378000013,
+        "heapMb": 2.211688
+      },
+      "warm": {
+        "ms": 180.89722399998573,
+        "heapMb": 0.163688
+      }
+    },
+    "runListAfterPass": {
+      "cold": {
+        "ms": 1074.482971999998,
+        "heapMb": 66.011944
+      },
+      "warm": {
+        "ms": 28.692110000003595,
+        "heapMb": 1.407016
+      }
+    },
+    "openRunAfterPass": {
+      "cold": {
+        "ms": 1036.0339769999846,
+        "heapMb": 64.826272
+      },
+      "warm": {
+        "ms": 20.489051999989897,
+        "heapMb": 0.067832
+      }
+    }
+  },
+  "spawned": {
+    "git read (pass)": 34
+  },
+  "placeRefused": {},
+  "refusals": []
+}

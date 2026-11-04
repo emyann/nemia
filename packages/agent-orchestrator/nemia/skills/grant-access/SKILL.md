@@ -23,7 +23,7 @@ its work, or a grant the agent lacks to do its job.
 
 ## Read it
 
-1. `nemia show <run>` and `nemia logs <run> <step>`: what the step was asked to do, and what it was doing when it was denied.
+1. `nemia show --raw <run>` and `nemia logs <run> <step>`: what the step was asked to do, and what it was doing when it was denied.
 2. Read the agent's definition in the factory's folder (`nemia factory`, then its file): its fence as written, and its job.
 3. Decide which it is:
    - **Kept on purpose**: a push, a merge, a delete, a kill by name, a write outside its job. The deny is right; the step should have

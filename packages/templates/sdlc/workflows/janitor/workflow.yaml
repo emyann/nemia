@@ -1,0 +1,12 @@
+apiVersion: nemia.dev/v1alpha1
+kind: Workflow
+metadata:
+  name: janitor
+  description: "Read how the factory's work went and say what to correct. Argus, the janitor, reads `nemia stats` since the janitor's last run, against the same length of time before it, writes a short report, and proposes one correction per card: an allow or a deny by name, a line in an agent's body or a skill, or a refusal kept on purpose, each with the numbers behind it. Argus proposes and never acts."
+spec:
+  steps:
+    - name: argus
+      place: git
+      check: "{ if [ -n \"${WF_WORKFLOW_FILES:-}\" ]; then node \"$WF_WORKFLOW_FILES/cards.ts\" \"${WF_CLOSEOUT:-}\"; else echo \"nemia check: WF_WORKFLOW_FILES is not set, so cards.ts is read from the run's frozen workflow files alone: this check runs in a run, which sets it\" >&2; false; fi; }"
+      reads:
+        - inbox

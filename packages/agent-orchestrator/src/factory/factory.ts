@@ -182,7 +182,8 @@ export type FactoryWrite =
   | 'rules'
   | 'schedule'
   | 'unschedule'
-  | 'upgrade';
+  | 'upgrade'
+  | 'adopt';
 
 /** What to do in place of `nemia factory <verb>` on the default factory. */
 const INSTEAD: Record<FactoryWrite, string> = {
@@ -200,6 +201,8 @@ const INSTEAD: Record<FactoryWrite, string> = {
   schedule: 'It offers every workflow found, and starts none by itself: schedule in a factory nemia factory ls lists.',
   unschedule: 'It schedules nothing: unschedule in a factory nemia factory ls lists.',
   upgrade: 'It is made from no template: upgrade a factory nemia factory apply made.',
+  adopt:
+    'It holds every run and card that names no factory: take over a factory nemia factory ls lists, or make one with nemia factory apply.',
 };
 
 /** The refusal of `nemia factory <verb>` on the default factory, which is read, never written. */
@@ -613,7 +616,7 @@ export const unscheduledRefusal = (factory: string, workflow: string, scheduled:
 
 /** Why a factory `name` is not filed: there is one already, at `file`, left as it was. */
 export const takenFactoryRefusal = (name: string, file: string): string =>
-  `There is a factory ${name} already, at ${file}, and it was left as it was. See it with nemia factory ls; to name other repositories, nemia factory rm ${name}, then add it again.`;
+  `There is a factory ${name} already, at ${file}, and it was left as it was. See it with nemia factory ls; to name other repositories, nemia factory rm ${name}, then add it again; to put a template onto it in place, keeping its cards and runs, nemia factory diff ${name} --template <name|folder|archive>, then nemia factory adopt.`;
 
 /** Why the wiring of a templated factory `name` is not written: its tree, at `tree`, is not rendered yet; then what was not done. */
 export const unrenderedTreeRefusal = (name: string, tree: string, notDone: string): string =>

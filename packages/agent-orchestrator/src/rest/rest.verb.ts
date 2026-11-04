@@ -1,8 +1,8 @@
 /**
  * A memo of runs brought up to the engine's feed (`followedFeed`): what the tick's memo of runs at rest (`RestMemo` in tick.verb.ts), the
- * stats' memo of each run's facts (`StatsMemo` in stats.verb.ts) and the list's memo of runs at rest (`RestingMemo` in resting.verb.ts) all
- * read before they answer a run from memory. A controller, reaching the runtime through the client (`runtime-client.ts`): it reads the
- * feed, and writes nothing.
+ * stats' memo of each run's facts (`StatsMemo` in stats.verb.ts) and the informer of each run's judgement (`InformerMemo` in
+ * informer.verb.ts) all read before they answer a run from memory. A controller, reaching the runtime through the client
+ * (`runtime-client.ts`): it reads the feed, and writes nothing.
  */
 import { Effect } from 'effect';
 import type { Engine } from '../runtime-client.ts';

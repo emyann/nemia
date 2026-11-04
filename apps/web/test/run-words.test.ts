@@ -339,6 +339,18 @@ test('railSaid, barSaid, nowOf: what the rail and a run in flight say of its ste
       'a at work, b to come',
     );
     assert.equal(railSaid(summary([['a', 'waiting on the pause']]).steps, false, false), `a ${PAUSED.rail}`);
+    assert.equal(
+      railSaid(
+        summary([
+          ['design', 'waiting'],
+          ['implement', 'waiting'],
+        ]).steps,
+        false,
+        true,
+      ),
+      'design to come, implement to come',
+      'a held run whose steps have not started: each said as any step to come, the run itself saying it is held',
+    );
   });
   await t.test('what a run in flight does now: its first step not done and its place among its steps, and no duration at all', () => {
     const working = summary([...DONE.slice(0, 1), ['implement', 'running (working)'], ['review', 'waiting'], ['land', 'waiting']]);
@@ -347,6 +359,20 @@ test('railSaid, barSaid, nowOf: what the rail and a run in flight say of its ste
     assert.deepEqual(nowOf(checking), { word: 'being checked', note: 'implement (2 of 2)' });
     const queued = summary([['design', 'waiting']]);
     assert.deepEqual(nowOf(queued), { word: 'to come', note: 'design (1 of 1)' });
+    assert.deepEqual(
+      nowOf({
+        ...queued,
+        holding: {
+          at: '2026-11-01T00:00:00.000Z',
+          runs: [],
+          word: 'held until r-0 lands',
+          advice: 'wf hold r-1 --off',
+          waitingOnYou: false,
+        },
+      }),
+      { word: PERSON.held.rail, note: 'design (1 of 1)' },
+      'a held run nothing of which has started says the hold, its step drawn as to come',
+    );
     const paused = summary([...DONE.slice(0, 1), ['implement', 'waiting on the pause']]);
     assert.equal(nowOf(paused)?.word, PAUSED.rail, 'a check the pause holds says so, as its chip does');
     assert.equal(nowOf(summary([...DONE])), null, 'every step done: nothing to say');
@@ -360,10 +386,11 @@ test('railSaid, barSaid, nowOf: what the rail and a run in flight say of its ste
       );
   });
   await t.test("a bar as a button says its step's name and the rail's word for its state", () => {
-    assert.equal(barSaid('implement', 'working', null), 'implement, at work');
-    assert.equal(barSaid('design', 'awaiting-approval', null), 'design, waits on you');
-    assert.equal(barSaid('land', 'failed-check', null), 'land, failed its check');
-    assert.equal(barSaid('review', 'waiting', 'run'), 'review, to come');
-    assert.equal(barSaid('theme', 'waiting', 'pause'), `theme, ${PAUSED.rail}`, 'a check the pause holds');
+    assert.equal(barSaid('implement', 'working', null, false), 'implement, at work');
+    assert.equal(barSaid('design', 'awaiting-approval', null, false), 'design, waits on you');
+    assert.equal(barSaid('land', 'failed-check', null, false), 'land, failed its check');
+    assert.equal(barSaid('review', 'waiting', 'run', false), 'review, to come');
+    assert.equal(barSaid('theme', 'waiting', 'pause', false), `theme, ${PAUSED.rail}`, 'a check the pause holds');
+    assert.equal(barSaid('review', 'waiting', 'run', true), 'review, to come', 'not started on a held run: to come');
   });
 });

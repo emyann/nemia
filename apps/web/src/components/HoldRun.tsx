@@ -5,7 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { putHold, runsQuery, type RunDetail, type RunSummary } from '../lib/api';
+import { putHold, runsQuery, type RunSummary } from '../lib/api';
+import type { RunView } from '../lib/runView';
 import { titleOf } from '../lib/factory';
 import { holdable, holdCandidates } from '../lib/hold.ts';
 import { cn } from '../lib/utils';
@@ -19,7 +20,7 @@ import { runsMoved } from '@/lib/runWrites';
  * package's, of a run it will not hold or one it will not wait on — is shown in the form, and nothing is written. Nothing is offered where
  * the run says it cannot be held (`holdable`).
  */
-export function HoldRun({ run }: { run: RunDetail }) {
+export function HoldRun({ run }: { run: RunView }) {
   if (!holdable(run)) return null;
   return (
     <DialogTrigger>
@@ -36,7 +37,7 @@ export function HoldRun({ run }: { run: RunDetail }) {
 }
 
 /** The runs a hold may wait on, read off the list the Runs page reads (`holdCandidates`), before the form is drawn. */
-function HoldRead({ run, onClose }: { run: RunDetail; onClose: () => void }) {
+function HoldRead({ run, onClose }: { run: RunView; onClose: () => void }) {
   const { data, error } = useQuery(runsQuery);
   if (error) {
     return (
@@ -71,7 +72,7 @@ function HoldForm({ id, runs, onClose }: { id: string; runs: RunSummary[]; onClo
     mutationFn: () => putHold(id, until, why),
     onSuccess: async () => {
       onClose();
-      await Promise.all([queryClient.invalidateQueries({ queryKey: ['runs', id], exact: true }), runsMoved(queryClient)]);
+      await Promise.all([queryClient.invalidateQueries({ queryKey: ['runs', id], exact: true }), runsMoved(queryClient, id)]);
     },
   });
   return (

@@ -1,8 +1,14 @@
-# packages/agent-orchestrator — `nemia` (`wf`, its alias)
+# packages/agent-orchestrator — the in-process `nemia` (`wf`, its alias)
 
 Workflows as folders of markdown, runs of their steps, a tick that files and admits them on the runtime, and the verbs a person uses:
 run slots, worktrees and landing, what a check means, budgets across tries, gates, the inbox, factories, stats, agent definitions. What
 it holds today that is a candidate for the runtime is in `docs/architecture.md`, *Who owns what*.
+
+The `nemia` a person types is the client in `apps/cli` (`apps/cli/CLAUDE.md`): it asks the api for the moved reads and spawns this
+package's CLI for everything else — every write, `decide`, a help, and a read typed with `--local` — with the same words. `bin/nemia.ts`
+and `bin/wf.ts` are that in-process CLI, the old path: exported as `agent-orchestrator/bin` and `/bin/wf`, resolved and spawned by
+`apps/cli/src/local.ts` alone, and no package declares them as its bins. A change to a moved read's output changes the client's printer
+too, which holds parity with this one until the in-process reads retire.
 
 ## Folders
 
@@ -63,7 +69,7 @@ it holds today that is a candidate for the runtime is in `docs/architecture.md`,
 - **A team is whole with its `agents/` and `skills/`**: a test that copies a workflow folder copies both, as `teamCopy` copies the
   tests' team (`test/fixtures/team/`); a sentence a step is told is read with `toldIn`.
 - **A Claude Code step's instructions are in `runs/<id>/agents/<step>/prompt.md`** and its brief is its own note (`briefBody`); a step
-  whose rendered folder is gone is told its skills whole in the brief (`unrendered`, `skillsAgain`).
+  whose rendered folder is gone is told its skills whole in the brief (`unrendered`, `toldOf`).
 - **A step's `body` opens with the heading of its agent's instructions** (`LAYER_HEADINGS`, one per layer `headedLayers` composes): a
   screen that quotes the step reads its own words, `ownNote` (`ending/ending.ts`), as `toDecide` and `wf decide` do.
 - **The board's listing of a step is resolved; its file is not**: write a step's own keys (`ListedStep.own`). A key the parser converts
@@ -71,7 +77,7 @@ it holds today that is a candidate for the runtime is in `docs/architecture.md`,
   package's readers (`splitFrontmatter` for the block, `readFrontmatter` for its YAML, both from `agent-orchestrator/workflow`), never a
   parser of its own.
 - **A test that needs a realistic folder reads the tests' team** (`test/fixtures/team`, `test/team.ts`), never a shipped one: a
-  person's factories get no workflow or agent from the package, and a guard over what ships reads `shippedFolders()`.
+  person's factories get no workflow or agent from the package.
 - **The api reads `agent-orchestrator`, `agent-orchestrator/run` and `agent-orchestrator/workflow`**, its tests with
   `await import`: the api's typecheck fails on a name a subpath no longer exports, so before moving a name out of `run.ts` or
   `workflow.ts`, re-export from `run.ts` what the api reads there.
@@ -91,6 +97,7 @@ it holds today that is a candidate for the runtime is in `docs/architecture.md`,
 - **A revision answered for a kind nobody has resolved has no ledger entry, and the ledger's last entry is not what the files hold**:
   compare against a fresh resolve (`driftNow`, which numbers without a write), by digest, never against the ledger's top, or an edit
   reads as no drift and a reverted one as behind.
+- **A run's labels are a person's file, `runs/<id>.labels`, composed on read and never written into the record** (`src/record/files.store.ts`): `runs.create` drops them, so a start writes them with `runs.labels.put` after it, and a test plants them the same way.
 - **A person's fact that stops a run's asks is read by `assess`**, not only by the verbs and the tick; a line that offers a verb says that
   verb's refusal itself (each producer reads `run.pruned`).
 - **A level-triggered ask cannot simply be deleted once acted on**: the verb it would let through refuses the state the deletion makes.
@@ -123,12 +130,37 @@ it holds today that is a candidate for the runtime is in `docs/architecture.md`,
   branded from a plain string with `WorkflowDir.read` outside the model and a stored record. A test that only needs a workflow to exist
   gives its program one `workflowDoorMemory()` (`src/workflows/memory.store.ts`) and writes it through the door (`aWorkflow`,
   `test/workflow-walks.ts`); code still on the folder's stores (`test/workflow-door.baseline.ts`) reads the disk whatever door was given. A
+  run's steps are a program (`stepsOf`, `src/steps/steps.verb.ts`): a frozen record's need no door and no root, and an unfrozen one's
+  folder is read through the door at the program's `StoreRoot`, refused `UnloadedFolder` where it does not load. A
   write's version is judged by `workflowVersionRefusal` (`src/folder/folder.ts`), whose contract a new rule of the version is a law of.
+  The door's read and write find a workflow's agents and skills through the Agent and Skill doors, so a program given
+  `agentDoorMemory()` and a store's root reads a files workflow's agents from the memory; `workflowDoorMemory(defs?)` takes the agent
+  and skill doors it reads through (`doorFrom`, `test/door-walks.ts`), and given none yields the program's, rooted. The version
+  (`workflowVersion`, a program) finds them through the same doors, an agent's skills counted as found beside the workflow
+  (`AgentAt.skills`), and so do the pass's revisions (`passRevisions`, a `Cache` per read) and the start: a test that runs a start,
+  a pin or a version gives it `StoreRoot` or the doors' memory. Its digest is the files' reader's but in two cases, each pinned run
+  reading as drifted once: an `agent:` name `AgentName` refuses reads as missing, and an added skill whose `SKILL.md` is no regular
+  file as null.
+- **An agent and a skill are read and written through the Agent and Skill doors (`AgentDoor`, `src/agents/agent-door.store.ts`;
+  `SkillDoor`, `src/skills/skill-door.store.ts`), rooted as the Factory door is**: a handler that yields one runs through `rooted`, and a
+  test that only needs an agent or a skill to exist gives its program `agentDoorMemory()` or `skillDoorMemory()` (`anAgent`,
+  `test/agent-walks.ts`; `aSkill`, `test/skill-walks.ts`). Code still on their stores (`test/agent-door.baseline.ts`) reads the disk
+  whatever door was given. A new rule of which root wins is a law of `contracts/lookup.contract.ts`, and of a definition's version a
+  law of `contracts/definition-version.contract.ts`, not a row of a test.
 - **A template is read and written through the Template door (`TemplateDoor`, `src/templates/templates.store.ts`), whose default is
   rooted** as the Factory door's: a program that yields it — the template verbs, `nemia factory apply`, diff, upgrade and resolve, the
   factory controller (`reconcileFactory`) — is given `StoreRoot`, a handler through `rooted`, and a test runs it with one
   (`test/templated.ts`) or gives `templateDoorMemory()` (`src/templates/memory.store.ts`). The door checks a tree's name and paths
   (`TemplateTreeWrite`), never the template's lint: a verb that must refuse a template that does not pass checks it first (`checkedTree`).
+  A `--template <name>` and a factory's recorded name are resolved by `templatePlace` at `BuiltinTemplates`, before the door: a test
+  gives a scratch folder of its own (`withBuiltins`, `test/templated.ts`), never `packages/templates`.
+- **A subscription and its delivery are read and written through the Subscription door (`SubscriptionDoor`,
+  `src/subscription/subscription.store.ts`), the revision ledger through the Ledger door (`LedgerDoor`, `src/revisions/revisions.store.ts`)
+  and the feed through the Feed door (`FeedDoor`, `src/feed/feed.store.ts`), each rooted as the Factory door is**: a program that yields
+  one is given `StoreRoot`, or a test gives it `subscriptionDoorMemory()`, `ledgerDoorMemory()` or `feedDoorMemory()` (each a
+  `memory.store.ts` beside its store). A synchronous caller still on the module spellings (`listSubscriptions`, `ledgerOf`, `readFeed`, …)
+  reads the module's root whatever door was given, counted per door in `test/subscription-door.baseline.ts`,
+  `test/ledger-door.baseline.ts` and `test/feed-door.baseline.ts`. The feed's fold memo is `emitFeed`'s, never the layer's.
 - **A file written back is decoded by a `StructWithRest`**: a `Struct` strips the keys it does not name, and a record written by a newer
   tick keeps them. `Struct({})` accepts an array; a struct with a key refuses one. A frozen step is decoded by `FrozenStepSchema`
   (`folder/folder.store.ts`), a field per `StepKey`: a key added without one fails the typecheck.
@@ -154,7 +186,10 @@ it holds today that is a candidate for the runtime is in `docs/architecture.md`,
   hands the runtime the ceiling and the pools. A new engine verb goes into `ENGINE_PHASES`, and into `ENGINE_WRITES`, or `ENGINE_READS`
   where it changes no task (`views/views.verb.ts`); an admitted task starts on the runtime's next pass.
 - **Every test file that ticks a store sets `WF_VERIFY_REST=1`**, and a new input of a finished run's pass goes into `restStamps` (and
-  into the list's own memo, `restingRead`): what the stamps miss is missed for good.
+  into the informer's read of it, `informerRead` in `src/rest/informer.verb.ts`, whose `informedOf` decides): what the stamps miss is
+  missed for good. The informer beside it (`src/rest/`) holds every
+  run's judgement for a daemon, filled by the pass and read by the api's run object, list and sub-resources, checked against the same
+  inputs before it is served and rebuilt on a restart: a new input of a run's judgement goes into what it checks too.
 - **A test that starts a daemon and reads a finished run's worktree afterwards sets `WF_KEEP_WORKTREES=1`**: the daemon frees a finished
   run's worktrees on a sweep beside its passes (`freeOnce`, `src/prune/free.verb.ts`).
 - **The daemon measures the store's disk on a sweep beside its passes** (`diskOnce`, `src/disk/disk.verb.ts`): a test daemon walks its

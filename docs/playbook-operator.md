@@ -61,10 +61,10 @@ the why: prose is not a constraint.
 
 | Level | What belongs there | The question that places it | Where it lives here |
 |---|---|---|---|
-| **Agent** | How this kind of worker does its craft anywhere it is hired: its role, its method, its generic skills, its standing fence | Is it true for this agent in any factory and any workflow, another person's Java repository or a marketing factory included? | `workflows/agents/<name>.md`: its body, `skills:`, `tools`, fence |
+| **Agent** | How this kind of worker does its craft anywhere it is hired: its role, its method, its generic skills, its standing fence | Is it true for this agent in any factory and any workflow, another person's Java repository or a marketing factory included? | `packages/templates/sdlc/agents/<name>/` (the template the nemia factory runs on): its body, `skills:`, `tools`, fence |
 | **Factory** | How work is done in this factory's codebase or domain, by every workflow and step: its rules, its tools, its traps, its own skills | Is it true of any step of any workflow that works here, whoever the agent? | the root and package `CLAUDE.md` files, `docs/architecture.md`, `.claude/skills/` (the factory instruction, a path on the factory's record, `NEMIA.md` by default, once Nemia reads one) |
-| **Workflow** | How the steps of one process fit together: their order, what flows between them (`input:`, artifacts, `## From run`), gates, loops and rounds, budgets, the checks a step's work must pass, the ending | Is it about how the steps relate, or what every step of this process must pass? | `workflows/<name>/README.md` and each step's frontmatter (`after:`, `input:`, `loop:`, `rounds:`, `gate:`, `budget:`, `check:`) |
-| **Step** | What one step of one workflow does that its agent's craft does not say: the words for this position, the skills it adds, the fence it tightens, the store folders it reads | Does it make sense only at this step's place in this workflow? | the step's body and policy in `workflows/<name>/<step>.md` (`skills:`, `reads:`, `disallowedTools:`) |
+| **Workflow** | How the steps of one process fit together: their order, what flows between them (`input:`, artifacts, `## From run`), gates, loops and rounds, budgets, the checks a step's work must pass, the ending | Is it about how the steps relate, or what every step of this process must pass? | `packages/templates/sdlc/workflows/<name>/README.md` and each step's frontmatter (`after:`, `input:`, `loop:`, `rounds:`, `gate:`, `budget:`, `check:`) |
+| **Step** | What one step of one workflow does that its agent's craft does not say: the words for this position, the skills it adds, the fence it tightens, the store folders it reads | Does it make sense only at this step's place in this workflow? | the step's body and policy in `<name>/<step>.md` of the workflow's folder: `packages/templates/sdlc/workflows/<name>/<step>.md` in the template, the factory's tree in the store (`skills:`, `reads:`, `disallowedTools:`) |
 
 Around these four sit two more, which are not the factory's:
 
@@ -86,11 +86,12 @@ Around these four sit two more, which are not the factory's:
 **Examples from 2026-10-04 and 05:**
 
 - *An implementer of a web change pictures the pages it touches, in light and dark, and names them as artifacts; the reviewer reads them.*
-  This belongs to the **steps**: `workflows/build/implement.md` takes the pictures, `review.md` reads them. Not Ada's or Agora's body
+  This belongs to the **steps**: build's implement takes the pictures (the nemia factory's overlay on it, with the factory's own
+  `pictures.ts`), its review reads them. Not Grace's or Agora's body
   (they are the template's seed), and not CLAUDE.md (too specific for every step of the factory).
 - *The e2e asserts in the dark theme and takes no pictures.* This is the **workflow's** check: its command and the e2e's code.
 - *Load the `effect` skill before touching code that imports `effect`.* The knowledge is the **factory's** skill
-  (`.claude/skills/effect/`). Its attachment is on the **steps** that design, build and review (`skills:` in `workflows/build/*.md`).
+  (`.claude/skills/effect/`). Its attachment is on the **steps** that design, build and review (`skills:` on build's steps, in the nemia factory's overlays).
   It is not on the agents.
 - *Read with Read, Grep and Glob, never `grep` or `cd` in Bash; `cat`, `head`, `tail`, `wc`, `cut` and `ls` only inside the workspace.* This is the **agent's** craft, true anywhere. Iris's
   vendored skill does not say it, so it goes in her body.
@@ -224,7 +225,7 @@ rm "$S"/node_modules; git worktree remove "$S"
   factory. An architect who proposes a cut on cost alone is shown the measured history.
 - **A change to the product's model, or one spanning several cards, goes through an intake first** (Iris, the `intake` workflow): the
   intent is the system's durable record of the person's decisions, and her confirmation round catches misreadings. A contained change is
-  a build card, or a quick card (`workflow: quick`) when its card settles it, whatever its size (`workflows/quick/README.md`). In auto mode, Iris may interview the operator, who answers from the person's decisions and brings them the taste calls.
+  a build card, or a quick card (`workflow: quick`) when its card settles it, whatever its size (`packages/templates/sdlc/workflows/quick/README.md`). In auto mode, Iris may interview the operator, who answers from the person's decisions and brings them the taste calls.
 - **Chain** with `--after <run>` when runs touch the same files, or when one's design depends on another's result. `--after` also hands
   the run that waited the other's conclusions (`## From run`); context without a wait is `--from` once it lands
   (`context-is-not-a-wait-a-run-zovw`).
@@ -331,7 +332,7 @@ English; never push or open a pull request unless asked.
 | A step could not read what it was pointed to | see *Empowering the agents* |
 | Two branches that merge cleanly but fail together | prose only: the operator's checks before a landing gate |
 | A conflict found at the landing gate has no direct way back to implement | prose only: send back through review with `again` |
-| A landing staged in the owner's checkout judged a tree no CI had seen, and main was pushed by hand after it | the landing merges the run's own green pull request (`workflows/build/landing.ts`), `ci` required on its head, and fast-forwards the checkout; the check is a receipt |
+| A landing staged in the owner's checkout judged a tree no CI had seen, and main was pushed by hand after it | the landing merges the run's own green pull request (`packages/templates/sdlc/workflows/build/landing.ts`), `ci` required on its head, and fast-forwards the checkout; the check is a receipt |
 
 ## What a supervisor agent needs
 

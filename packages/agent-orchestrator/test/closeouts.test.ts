@@ -372,7 +372,8 @@ test('files a closeout names', async (t) => {
   let gone = '';
   await s.test("implement is filed its files directory, made outside the workspace, in its session's env and in its brief", async () => {
     ({ id, files, task } = await filed());
-    assert.deepEqual(taskOf(task).spec.config?.env, { [STEP_FILES]: files });
+    const frozen = path.join(ROOT, 'runs', id, 'workflow', String(readRun(id).workflowFiles));
+    assert.deepEqual(taskOf(task).spec.config?.env, { [STEP_FILES]: files, WF_WORKFLOW_FILES: frozen });
     assert.ok(fs.statSync(files).isDirectory(), 'made before the step was filed');
     assert.ok(!files.startsWith(readRun(id).steps.implement.workspace! + path.sep), 'not in the workspace, where it would ride the branch');
     const brief = briefOf(task);
@@ -717,11 +718,11 @@ test('a run given inputs', async (t) => {
     const screen = (await printedBy(sub, ['decide', id])).split('\n');
     assert.deepEqual(screen.slice(0, 2), [`${id}  add a flag`, `  inputs  mock.png, brief notes.md  —  in ${dir}`]);
   });
-  await s.test('a run given none has no key on its record, no directory, and a brief without the line', async () => {
+  await s.test('a run given none has no key on its record, no inputs directory, and a brief without the line', async () => {
     const plain = await stage.runPlaced(startRun({ brief: 'add a flag', repo, workflowDir: twoSteps(), isolate: false }));
     const record = JSON.parse(fs.readFileSync(path.join(ROOT, 'runs', `${plain.id}.json`), 'utf8'));
     assert.equal(Object.hasOwn(record, 'inputs'), false);
-    assert.equal(fs.existsSync(path.join(ROOT, 'runs', plain.id)), false, 'no directory');
+    assert.equal(fs.existsSync(path.join(ROOT, 'runs', plain.id, 'inputs')), false, 'no inputs directory');
     await pass(plain.id);
     assert.doesNotMatch(briefOf(`${plain.id}-implement`), /nemia start --input/);
   });
@@ -826,7 +827,7 @@ const where: Question = {
     { label: 'retry', meaning: 'Into the next try.' },
     { label: 'gate', meaning: 'With the approval.' },
   ],
-  recommended: null,
+  recommended: ['retry', 'gate'],
   multiple: true,
 };
 const when: Question = {
@@ -837,21 +838,26 @@ const when: Question = {
   multiple: false,
 };
 
+/** A workflow whose `plan` asks questions in `open` and `later`, before `implement`. */
+const askingPlan = () => {
+  const question = { 'x-shape': 'questions' };
+  return folderOf({
+    'plan.md': '---\nplace: git\noutput: plan.schema.json\n---\nplan it\n',
+    'plan.schema.json': JSON.stringify({
+      type: 'object',
+      properties: { open: question, later: question },
+      required: ['open', 'later'],
+      additionalProperties: false,
+    }),
+    'implement.md': '---\nafter: plan\nplace: git\n---\nimplement it\n',
+  });
+};
+
 test('a blocked step asks questions in two fields, and is answered by their numbers', async (t) => {
   const s = story(t);
   let id = '';
   await s.test('plan signs off blocked, asking two questions in `open` and one in `later`', async () => {
-    const question = { 'x-shape': 'questions' };
-    const dir = folderOf({
-      'plan.md': '---\nplace: git\noutput: plan.schema.json\n---\nplan it\n',
-      'plan.schema.json': JSON.stringify({
-        type: 'object',
-        properties: { open: question, later: question },
-        required: ['open', 'later'],
-        additionalProperties: false,
-      }),
-      'implement.md': '---\nafter: plan\nplace: git\n---\nimplement it\n',
-    });
+    const dir = askingPlan();
     const run = await stage.runPlaced(startRun({ brief: 'plan the flag', repo: aRepo(), workflowDir: dir, isolate: false }));
     id = run.id;
     await pass(id);
@@ -876,6 +882,11 @@ test('a blocked step asks questions in two fields, and is answered by their numb
       '         a  now — Today.  (recommended)',
       '         choose one, or answer in your own words',
     ]);
+    assert.deepEqual(
+      screen.filter((l) => l.includes('(recommended)')).slice(1, 3),
+      ['         a  retry — Into the next try.  (recommended)', '         b  gate — With the approval.  (recommended)'],
+      'each label a question that takes several recommends is marked',
+    );
     assert.ok(
       screen.includes(
         `    to answer it:  nemia retry ${id} plan --answer 1=<letter> --answer 2=<letter> --answer 3=<letter> [--message "<note>"]`,
@@ -888,20 +899,46 @@ test('a blocked step asks questions in two fields, and is answered by their numb
     const line = listedNow.slice(listedNow.findIndex((l) => l.startsWith(`${id}  `))).find((l) => l.startsWith('   plan '));
     assert.ok(line?.includes(' · asks 3 questions'), listedNow.join('\n'));
   });
-  await s.test("`--answer 3=a` answers the question of `later`, in the board's words", async (sub) => {
-    await printedBy(sub, ['retry', id, 'plan', '--answer', '1=a', '--answer', '2=b', '--answer', '3=a']);
+  await s.test("`--answer 2=a,b` and `3=a` answer them, in the board's words", async (sub) => {
+    await printedBy(sub, ['retry', id, 'plan', '--answer', '1=a', '--answer', '2=a,b', '--answer', '3=a']);
     const asks = fs.readdirSync(asksDir(id)).filter((f) => f !== 'done');
     const ask = JSON.parse(fs.readFileSync(path.join(asksDir(id), asks[0]), 'utf8'));
     const expected = answerText(
       [cut, where, when],
       [
         { question: cut.title, chose: ['one card'] },
-        { question: where.title, chose: ['gate'] },
+        { question: where.title, chose: ['retry', 'gate'] },
         { question: when.title, chose: ['now'] },
       ],
       undefined,
       'at the terminal',
     );
     assert.equal(ask.message, expected);
+  });
+});
+
+test('REFUSED once a round: questions that do not read are unsigned, nudged naming why, then said by `nemia decide`', async (t) => {
+  const s = story(t);
+  let id = '';
+  const joined = { ...where, recommended: 'retry, gate' };
+  await s.test('plan signs off blocked, recommending two labels joined in one string', async () => {
+    const run = await stage.runPlaced(startRun({ brief: 'plan the flag', repo: aRepo(), workflowDir: askingPlan(), isolate: false }));
+    id = run.id;
+    await pass(id);
+    const said = { outcome: 'blocked', summary: 'Half.', artifacts: [], needs: 'Two questions.', open: [cut, joined], later: [when] };
+    stage.board().settle(`${id}-plan`, 'succeeded', said);
+    const p = await pass(id);
+    assert.deepEqual(p.tried, ['plan'], 'the run asks the session to sign off again');
+    assert.equal(readRun(id).steps.plan.tries?.at(-1)?.cause, 'signoff');
+    names(briefOf(`${id}-plan-try2`), '`open`', 'question 2', '"retry, gate"');
+    stage.board().settle(`${id}-plan-try2`, 'succeeded', said);
+    assert.deepEqual((await pass(id)).tried, [], 'no second nudge in the round');
+  });
+  await s.test('`nemia decide` says why the field is not read as questions', async (sub) => {
+    const screen = await printedBy(sub, ['decide', id]);
+    assert.match(screen, /UNSIGNED: plan/);
+    const refused = screen.split('\n').find((l) => l.includes('!! not accepted:'));
+    assert.ok(refused, screen);
+    names(refused, '`open`', '"retry, gate"');
   });
 });

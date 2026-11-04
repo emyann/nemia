@@ -9,7 +9,7 @@
  * (`KillMode=process`, `AbandonProcessGroup`): the runtime's detached sessions and checks live on through a restart.
  */
 import { DAEMON_FILE, holderWords, lastPassWords, type DaemonStanding } from '../daemon/daemon.ts';
-import type { Finishing, Paused } from '../pause/pause.ts';
+import { pauseWords, type Finishing, type Pause, type Paused } from '../pause/pause.ts';
 
 /** What the machine is, as the store reads it: its platform, whether it is WSL, and whether systemd runs as its init. */
 export type Machine = { readonly platform: string; readonly wsl: boolean; readonly systemd: boolean };
@@ -345,10 +345,18 @@ const lingerLine = (linger: boolean | undefined, system: ServiceSystem, user: st
     : [`lingering: off — the service starts at login and stops at the last logout; loginctl enable-linger ${user} keeps it running`];
 };
 
-/** `nemia service status`'s lines: the service, the lease and who holds it, and lingering, each named. */
+/**
+ * `nemia service status`'s lines: the service, the lease and who holds it, the store's pause where one stands (since when, by whom and
+ * why, as its file says: `pauseWords`), and lingering, each named.
+ */
 export const statusLines = (
   read: ServiceRead,
   lease: DaemonStanding,
   linger: boolean | undefined,
-  { now, user }: { now: number; user: string },
-): string[] => [...unitLines(read), ...leaseLines(lease, read, now), ...lingerLine(linger, read.system, user)];
+  { now, user, pause }: { now: number; user: string; pause: Pause | null },
+): string[] => [
+  ...unitLines(read),
+  ...leaseLines(lease, read, now),
+  ...(pause ? [`pause: ${pauseWords(pause)}`] : []),
+  ...lingerLine(linger, read.system, user),
+];

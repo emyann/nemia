@@ -40,14 +40,13 @@ import {
   ownNote,
   prunedKept,
   questionLines,
-  envelopeRefusals,
+  closeoutRefusals,
   prunedWords,
   runStore,
   roundDueNote,
   saidLines,
   signoffsSpent,
   slotWord,
-  stepsOf,
   timelineLines,
   timelineTotalLines,
   touchedLines,
@@ -159,8 +158,7 @@ export async function decideVerb(rest: string[], e: Engine, place: Place): Promi
     const unjudged = await runWith(e, placedIn(place, unjudgedOf(e, runStore.runs.read(runId), err, 'nemia decide')));
     throw unjudged ? new Error(unjudged.said) : err;
   });
-  const { run } = decided;
-  const steps = stepsOf(run);
+  const { run, steps } = decided;
   const head = headOf(run);
   const out = heldOutOf(steps, decided.checkout);
   const decision = standstill(decided, head, steps, out);
@@ -184,7 +182,7 @@ export async function decideVerb(rest: string[], e: Engine, place: Place): Promi
 type Awaiting = Extract<Decided['decision'], { kind: 'awaiting' }>;
 
 /** A run's steps, as its workflow was frozen. */
-type Steps = ReturnType<typeof stepsOf>;
+type Steps = Decided['steps'];
 
 /** The step at `workspace: base`, the run's ending, and the line that says it waits for the checkout another run's ending has, or `''`. */
 type HeldOut = { ending?: Steps[number]; heldOut: string };
@@ -440,13 +438,13 @@ function printTries({ used, costs, timeline, answers, said }: Decided, name: str
 
 /**
  * A closeout's envelope as `nemia decide` prints it: its summary, its body beneath, each value as `name: value`, and what the run refused
- * of it (`envelopeRefusals`), each marked `!! not accepted`.
+ * of it and of its question fields (`closeoutRefusals`), each marked `!! not accepted`.
  */
-const envelopeLines = (c: Exclude<Closeout, { error: string }>): string[] => [
+const envelopeLines = (step: Steps[number] | undefined, c: Exclude<Closeout, { error: string }>): string[] => [
   ...(c.summary ? [c.summary] : []),
   ...(c.body ? c.body.split('\n').map((l) => `  ${l}`) : []),
   ...(c.values ?? []).map((v) => `${v.name}: ${v.value}`),
-  ...envelopeRefusals(c).map((r) => `!! not accepted: ${r}`),
+  ...closeoutRefusals(step, c).map((r) => `!! not accepted: ${r}`),
 ];
 
 /**
@@ -462,7 +460,7 @@ function printCloseout(
   place: Place,
 ): void {
   if ('error' in c) return console.log(`    closeout unreadable — ${c.error}`);
-  for (const line of envelopeLines(c)) console.log(`    ${line}`);
+  for (const line of envelopeLines(step, c)) console.log(`    ${line}`);
   const asked = askedQuestions(step, c);
   const fields = step ? owedFields(step, run, steps).filter((f) => !asked.some((a) => a.field === f)) : [];
   for (const line of step ? [...outputLines(step, c, fields), ...questionLines(asked)] : []) console.log(`    ${line}`);

@@ -1,6 +1,6 @@
 /**
- * What a step is told, by layer, as the api answers it on a run's detail (what its run froze) and on a workflow's listing (what a run of it
- * would be told): one schema, which `detail.ts` and `workflows.ts` both decode with.
+ * What a step is told, by layer, as the api answers it on a step's told (what its run froze) and on a workflow's listing (what a run of it
+ * would be told): the type a step's view reads them as, and the schema `workflows.ts` decodes with.
  */
 import { Schema } from 'effect';
 import { decodes } from './decodes.ts';
@@ -45,7 +45,7 @@ export const StepLayersSchema = decodes<StepLayers>()(
 );
 
 /**
- * Mirrors `TaskPart` in apps/api/src/detail/told.ts: a part of a step's task — its own text, or a run it was handed, by its id, the first
+ * Mirrors `TaskPart` in apps/api/src/runs/runs.ts: a part of a step's task — its own text, or a run it was handed, by its id, the first
  * line that run was asked (empty where its section could not read it), the section's body, and how it was handed: waited on until it
  * landed (`--after`), or read as context (`--from`); absent where the record names it as neither.
  */

@@ -1,12 +1,11 @@
 /**
  * A factory's rules, the fourth of an agent's five layers: what a factory tells every agent hired into it, one file kept with the factory
  * in the store (`<WF_ROOT>/factories/<name>/RULES.md`); and its instruction, Nemia's words for the factory, kept in its first folder or
- * in the store. Held here, pure: the order a step is told its layers in — the agent's instructions, the person's custom instructions, the
- * factory's rules, the step's own note — proven with layers that say different things, in Claude Code's prompt and in a brief; a factory
- * with no rules telling nothing; a step on a remote agent told none; and that the words never touch a key. Then a person's story on the
- * stage (`story.ts`): rules written, told as their own layer and frozen at `nemia start`, edited and cleared, reaching only later runs;
- * the instruction kept in the folder, then in the store, written from a file and cleared. And a table: rules that cannot be told stop a
- * start in their factory.
+ * in the store. The order a step is told its layers in — the agent's instructions, the person's custom instructions, the factory's
+ * rules, the step's own note — a factory with no rules telling nothing, a step on a remote agent told none, and the words touching no
+ * key are rows of the layers table in `rendering.test.ts`. Held here: a person's story on the stage (`story.ts`): rules written, told
+ * as their own layer and frozen at `nemia start`, edited and cleared, reaching only later runs; the instruction kept in the folder, then
+ * in the store, written from a file and cleared. And a table: rules that cannot be told stop a start in their factory.
  *
  * The rest of the area: the refusals of a write of the rules and of `nemia factory rules` as tables in `src/rules/`, and the guards a
  * rules or instruction file is read through, shared, in `src/factory/instruction.store.test.ts`; a factory's removal, which takes both,
@@ -17,8 +16,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { parseAgent, parseWorkflow, type Agents, type Workflow } from '../src/workflow.ts';
-import { briefBody, renderedFlags, renderedPrompt, rendersAgent, unrendered } from '../src/agents/agents.ts';
+import type { Workflow } from '../src/workflow.ts';
 import { headedLayers } from '../src/workflow/index.ts';
 import { scratch } from './scratch.ts';
 import { teamCopy } from './team.ts';
@@ -51,19 +49,6 @@ const { runPlaced } = stage;
 
 const RULES = 'Reply in German.';
 
-/** The agent `ada`, told in English, with `custom` as a person's custom instructions for it when given. */
-const adaWith = (custom?: string, keys = 'tools: Read'): Agents =>
-  new Map([
-    [
-      'ada',
-      { ...parseAgent('ada', `---\n${keys}\n---\nReply in English.\n`), ...(custom !== undefined && { customInstructions: custom }) },
-    ],
-  ]);
-
-/** The step `build`, attached to `ada`, its own note in Spanish, with `lines` in its frontmatter, in a factory whose rules are `rules`. */
-const buildWith = (agents: Agents, rules: string | undefined, lines = 'harness: claude'): Workflow =>
-  parseWorkflow('build', `---\nplace: git\nagent: ada\n${lines}\n---\nReply in Spanish.\n`, undefined, agents, undefined, undefined, rules);
-
 /** Where `text` is in `told`, which must hold it. */
 const at = (told: string, text: string): number => {
   const i = told.indexOf(text);
@@ -71,89 +56,6 @@ const at = (told: string, text: string): number => {
   return i;
 };
 
-/** Whether `told` says its four layers in their order: the agent's, the person's, the factory's, the step's. */
-const inOrder = (told: string): boolean =>
-  at(told, 'English') < at(told, 'French') && at(told, 'French') < at(told, 'German') && at(told, 'German') < at(told, 'Spanish');
-
-test("a step is told its agent's instructions, the custom instructions, the factory's rules, then its own note, when the four disagree", () => {
-  const step = buildWith(adaWith('Reply in French.'), RULES);
-  assert.ok(inOrder(step.body), step.body);
-  assert.equal(step.agent?.factoryRules, RULES);
-  assert.equal(step.agent?.customInstructions, 'Reply in French.', "the person's words are kept apart from the factory's");
-  assert.equal(step.agent?.instructions, 'Reply in English.');
-  assert.equal(step.agent?.body, 'Reply in Spanish.');
-
-  const codex = buildWith(adaWith('Reply in French.', ''), RULES, 'harness: codex');
-  assert.ok(inOrder(codex.body), codex.body);
-  assert.equal(briefBody(codex), codex.body, 'codex is told the four in its brief, in the same order');
-
-  const resumed = buildWith(adaWith('Reply in French.'), RULES, 'harness: claude\nresume: plan');
-  assert.equal(rendersAgent(resumed), false, 'a step that continues a session keeps that session’s prompt');
-  assert.ok(inOrder(briefBody(resumed)), briefBody(resumed));
-});
-
-test("Claude Code's prompt is the instructions, the custom instructions, the factory's rules, then the skills; the brief is the step's own note", () => {
-  const step = buildWith(adaWith('Reply in French.'), RULES);
-  const prompt = renderedPrompt(step, [{ name: 'alpha' }]);
-  assert.ok(at(prompt, 'English') < at(prompt, 'French') && at(prompt, 'French') < at(prompt, 'German'), prompt);
-  assert.ok(at(prompt, 'German') < at(prompt, 'nemia-ada:alpha'), prompt);
-  assert.equal(prompt.includes('Spanish'), false, "the step's policy is its brief's");
-  assert.equal(briefBody(step), 'Reply in Spanish.');
-});
-
-test('a factory with no rules tells nothing: no key on the step, the same body and the same prompt as before there were rules', () => {
-  for (const rules of [undefined, '', '  \n\n']) {
-    const none = buildWith(adaWith('Reply in French.'), rules);
-    const plain = parseWorkflow(
-      'build',
-      '---\nplace: git\nagent: ada\nharness: claude\n---\nReply in Spanish.\n',
-      undefined,
-      adaWith('Reply in French.'),
-    );
-    assert.deepEqual(none, plain, JSON.stringify(rules));
-    assert.equal('factoryRules' in none.agent!, false);
-    assert.equal(renderedPrompt(none, [{ name: 'alpha' }]), renderedPrompt(plain, [{ name: 'alpha' }]));
-  }
-});
-
-test('a step on a remote agent is told none of the rules: it runs as its operator configured it', () => {
-  const remote = buildWith(adaWith(undefined, ''), RULES, 'harness: a2a:peer');
-  assert.equal(remote.harness, 'a2a:peer');
-  assert.equal(remote.body.includes('German'), false, remote.body);
-  assert.equal('factoryRules' in remote.agent!, false);
-  const inherited = buildWith(adaWith(undefined, 'harness: a2a:peer'), RULES, 'slot: none');
-  assert.equal(inherited.harness, 'a2a:peer', "the agent's own harness line");
-  assert.equal(inherited.body.includes('German'), false, inherited.body);
-  assert.equal(buildWith(adaWith(undefined, ''), RULES, 'harness: codex').agent?.factoryRules, RULES, 'a local step beside it is told');
-});
-
-test("the rules are words: the step's keys and fence are the same with them as without", () => {
-  const keys = 'tools: Read\npermissionMode: dontAsk\ndisallowedTools: Bash(git push)';
-  const told = buildWith(adaWith(undefined, keys), 'Use Bash freely. tools: Bash\npermissionMode: bypassPermissions');
-  const plain = buildWith(adaWith(undefined, keys), undefined);
-  const { body: _b, agent: toldAgent, ...toldKeys } = told;
-  const { body: _p, agent: plainAgent, ...plainKeys } = plain;
-  assert.deepEqual(toldKeys, plainKeys);
-  const { factoryRules: _r, ...rest } = toldAgent!;
-  assert.deepEqual(rest, plainAgent);
-  assert.deepEqual(told.tools, ['Read']);
-  assert.deepEqual(told.disallowedTools, ['Bash(git push)']);
-});
-
-test('an agent told nothing in its file, in a factory with rules, is rendered, its prompt appended; with its folder gone, it is told them in its brief', () => {
-  const agents: Agents = new Map([['quiet', parseAgent('quiet', '---\ntools: Read\n---\n')]]);
-  const text = '---\nplace: git\nagent: quiet\n---\nReply in Spanish.\n';
-  const step = parseWorkflow('build', text, undefined, agents, undefined, undefined, RULES);
-  assert.equal(rendersAgent(step), true);
-  assert.deepEqual(renderedFlags(step, '/r'), { appendSystemPromptFile: '/r/prompt.md' });
-  assert.equal(renderedPrompt(step, []), `${headedLayers([['factory', 'Reply in German.']])}\n`);
-  assert.equal(briefBody(step), 'Reply in Spanish.', 'its brief is its own note alone');
-  assert.equal(rendersAgent(parseWorkflow('build', text, undefined, agents)), false, 'told nothing, it is not rendered');
-  const gone = unrendered(step);
-  assert.equal(renderedFlags(gone, '/r'), undefined, 'no flag names a file that is not there');
-  assert.equal(gone.agent?.factoryRules, undefined);
-  assert.ok(at(briefBody(gone), 'German') < at(briefBody(gone), 'Spanish'), briefBody(gone));
-});
 /** A git repository with one commit on `main`, for a start. */
 function aRepo(): string {
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));

@@ -11,6 +11,7 @@ import { Schema } from 'effect';
 import { pauseFile, readPause } from '../pause/pause.store.ts';
 import type { Pause } from '../pause/pause.ts';
 import type { AskKey, AskOf, AsksRead, AskWritten, PersonRequest, Pruned, Run, RunStore } from './record.ts';
+import type { Labels } from '../labels/labels.ts';
 import type { RetryAsk } from '../retry/index.ts';
 import type { RoundAsk } from '../status/status.ts';
 import {
@@ -161,13 +162,24 @@ function consumeAllAsks(run: Run, asks: readonly RetryAsk[], rounds: readonly Ro
 }
 
 /**
- * Remove the run's record and a person's files beside it, and its own directory, and the claim of the card it was started from while the
- * claim names it (`claimCard`), answering each path removed from `WF_ROOT`. A claim naming another run is that run's, and stays.
+ * Remove the run's record and a person's files beside it — its labels among them — and its own directory, and the claim of the card it was
+ * started from while the claim names it (`claimCard`), answering each path removed from `WF_ROOT`. A claim naming another run is that
+ * run's, and stays.
  */
 function removeRunFiles(id: string): string[] {
   const card = cardOf(id);
   const removed: string[] = [];
-  for (const at of [runFile(id), cancelFile(id), pruneFile(id), holdFile(id), refreshFile(id), asksDir(id), path.join(runsDir(), id)]) {
+  const files = [
+    runFile(id),
+    cancelFile(id),
+    pruneFile(id),
+    holdFile(id),
+    refreshFile(id),
+    labelsFile(id),
+    asksDir(id),
+    path.join(runsDir(), id),
+  ];
+  for (const at of files) {
     const st = lstatOf(at);
     if (!st) continue;
     fs.rmSync(at, { recursive: true, force: true });
@@ -214,6 +226,65 @@ function runIds(): string[] {
   } catch {
     return [];
   }
+}
+
+/**
+ * A person's labels on the run (`nemia label run`, and `nemia start`'s copy at creation): a JSON object of strings, a person's fact in a
+ * file of its own for the reason `cancelFile` is. Written whole by `writeLabels`, which removes it for an empty map, and removed by
+ * `nemia rm` with the run. Composed onto the run as `labels` by every read of the store (`labelled`), and never written into the record
+ * (`rewriteRun`, `writeRun`). Every write moves the run's stamp, as every `<id>.<anything>` does (`restStamps`).
+ */
+export const labelsFile = (id: string): string => path.join(runsDir(), `${id}.labels`);
+
+const isLabels = Schema.is(Schema.Record(Schema.String, Schema.String));
+
+/**
+ * The run's labels, read: undefined for a run nobody labelled. A file that does not read as a JSON object of strings labels the run with
+ * nothing, and is said once on stderr, naming the file and the verb that writes it whole again.
+ */
+function readLabels(id: string): Labels | undefined {
+  let json: unknown;
+  try {
+    json = JSON.parse(fs.readFileSync(labelsFile(id), 'utf8'));
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
+  }
+  if (isLabels(json) && !Array.isArray(json)) return Object.keys(json).length ? json : undefined;
+  sayOnce(
+    `run ${id}: its labels, ${labelsFile(id)}, are no JSON object of strings, and are read as none: write them again with nemia label run ${id} <key>=<value> --overwrite, or remove the file`,
+  );
+  return undefined;
+}
+
+/**
+ * Write a person's labels on the run whole, through a hidden file renamed over the one there, so a reader never reads half a map; an
+ * empty map removes the file, there or not.
+ */
+export function writeLabels(id: string, labels: Labels): void {
+  if (!Object.keys(labels).length) {
+    fs.rmSync(labelsFile(id), { force: true });
+    return;
+  }
+  fs.mkdirSync(runsDir(), { recursive: true });
+  const tmp = path.join(runsDir(), `.${id}.labels.${process.pid}.tmp`);
+  fs.writeFileSync(tmp, JSON.stringify(labels, null, 2));
+  fs.renameSync(tmp, labelsFile(id));
+}
+
+/** The run as its record reads (`readRun`), with its labels composed onto it, and whatever the record carried under `labels` dropped. */
+function labelled(run: Run): Run {
+  const labels = readLabels(run.id);
+  const { labels: _, ...bare } = run;
+  return labels ? { ...bare, labels } : bare;
+}
+
+/**
+ * The run a memo kept, noted in `given` by identity: listed as given, labels and all, since its stamp — the `.labels` file among what it
+ * stamps — still holds, so its labels are not read again, and the very run is handed back (`keptOf`).
+ */
+function givenOf(given: Set<Run>, run: Run | undefined): Run | undefined {
+  if (run) given.add(run);
+  return run;
 }
 
 /**
@@ -343,7 +414,7 @@ function paused(run: Run, pause: Pause | null = readPause()): Run {
  */
 function runListed(id: string, said: (line: string) => void, pause: Pause | null): Run | undefined {
   try {
-    return paused(readRun(id), pause);
+    return paused(labelled(readRun(id)), pause);
   } catch (err) {
     if (err instanceof UnreadableRecord) said(`left out: ${err.message}`);
     else if (fs.existsSync(runFile(id))) throw err;
@@ -417,16 +488,18 @@ export function claimCard(card: string, id: string): { taken: true } | { by: str
 }
 
 /**
- * A run's record and a person's files beside it, each a file of its own under `runs/`, with the store's pause composed onto each run read
- * (`paused`); the markers of the runs `nemia rm` forgets, under `forgetting/`.
+ * A run's record and a person's files beside it, each a file of its own under `runs/`, with the run's labels and the store's pause
+ * composed onto each run read (`labelled`, `paused`); the markers of the runs `nemia rm` forgets, under `forgetting/`.
  */
 export const filesStore: RunStore = {
   runs: {
-    read: (id) => paused(readRun(id)),
+    read: (id) => paused(labelled(readRun(id))),
     find: findRun,
     list: (said, kept) => {
       const pause = readPause();
-      return listRuns(said, kept).map((run) => paused(run, pause));
+      const given = new Set<Run>();
+      const keeps = kept && ((id: string) => givenOf(given, kept(id)));
+      return listRuns(said, keeps).map((run) => paused(given.has(run) ? run : labelled(run), pause));
     },
     create: writeRun,
     rewrite: rewriteRun,
@@ -444,6 +517,7 @@ export const filesStore: RunStore = {
   },
   asks: { read: readAllAsks, answers: readAnswers, consume: consumeAllAsks, write: writePersonAsk, where: askWhere },
   holds: { lift: removeHold, put: writeHold, stands: (id) => fs.existsSync(holdFile(id)) },
+  labels: { put: writeLabels },
   refresh: { lift: removeRefresh, put: writeRefresh, stands: (id) => fs.existsSync(refreshFile(id)) },
   forgetting: {
     write: writeForgetting,

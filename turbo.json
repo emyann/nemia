@@ -21,13 +21,14 @@
         "$TURBO_ROOT$/apps/*/src/**",
         "$TURBO_ROOT$/apps/*/test/**",
         "$TURBO_ROOT$/apps/*/*.ts",
+        "$TURBO_ROOT$/apps/*/bin/**",
+        "$TURBO_ROOT$/apps/*/contracts/**",
         "$TURBO_ROOT$/apps/*/package.json",
         "$TURBO_ROOT$/apps/*/tsconfig.json",
         "$TURBO_ROOT$/apps/*/CLAUDE.md",
         "$TURBO_ROOT$/CLAUDE.md",
-        "$TURBO_ROOT$/README.md",
-        "$TURBO_ROOT$/LICENSE",
-        "$TURBO_ROOT$/workflows/**",
+        "$TURBO_ROOT$/.claude/skills/**",
+        "$TURBO_ROOT$/packages/templates/sdlc/**",
         "$TURBO_ROOT$/packages/agent-runtime/**",
         "!$TURBO_ROOT$/packages/agent-runtime/.turbo/**"
       ]
@@ -38,7 +39,6 @@
         "$TURBO_DEFAULT$",
         "$TURBO_ROOT$/.github/**",
         "$TURBO_ROOT$/.gitleaks.toml",
-        "$TURBO_ROOT$/workflows/**",
         "$TURBO_ROOT$/docs/**",
         "$TURBO_ROOT$/tools/**",
         "$TURBO_ROOT$/package.json",
@@ -56,16 +56,17 @@
         "$TURBO_ROOT$/apps/*/tsconfig.json",
         "$TURBO_ROOT$/apps/*/src/**",
         "$TURBO_ROOT$/apps/*/*.ts",
+        "$TURBO_ROOT$/apps/*/bin/**",
+        "$TURBO_ROOT$/apps/*/contracts/**",
         "$TURBO_ROOT$/apps/web/.storybook/**",
         "$TURBO_ROOT$/apps/*/glossary.json",
         "$TURBO_ROOT$/apps/docs/src/content/docs/**",
         "$TURBO_ROOT$/CLAUDE.md",
         "$TURBO_ROOT$/apps/*/CLAUDE.md",
         "$TURBO_ROOT$/packages/*/CLAUDE.md",
-        "$TURBO_ROOT$/README.md",
-        "$TURBO_ROOT$/LICENSE",
         "$TURBO_ROOT$/.claude/settings.json",
         "$TURBO_ROOT$/.claude/skills/**",
+        "$TURBO_ROOT$/packages/templates/sdlc/skills/**",
         "$TURBO_ROOT$/apps/web/.claude/skills/**"
       ]
     },
@@ -78,6 +79,8 @@
         "$TURBO_ROOT$/apps/*/src/**",
         "$TURBO_ROOT$/apps/*/test/**",
         "$TURBO_ROOT$/apps/*/*.ts",
+        "$TURBO_ROOT$/apps/*/bin/**",
+        "$TURBO_ROOT$/apps/*/contracts/**",
         "$TURBO_ROOT$/packages/agent-orchestrator/src/**",
         "$TURBO_ROOT$/packages/agent-orchestrator/bin/**",
         "$TURBO_ROOT$/packages/agent-orchestrator/test/**",
@@ -88,7 +91,6 @@
       "dependsOn": ["^transit"],
       "inputs": [
         "$TURBO_DEFAULT$",
-        "$TURBO_ROOT$/tools/**",
         "$TURBO_ROOT$/packages/*/src/**",
         "$TURBO_ROOT$/packages/*/place/**",
         "$TURBO_ROOT$/packages/*/servers/**",
@@ -100,7 +102,6 @@
       "dependsOn": ["^transit"],
       "inputs": [
         "$TURBO_DEFAULT$",
-        "$TURBO_ROOT$/tools/**",
         "$TURBO_ROOT$/.claude/skills/change-the-board/SKILL.md",
         "$TURBO_ROOT$/CLAUDE.md",
         "$TURBO_ROOT$/.gitattributes"
@@ -118,7 +119,6 @@
         "$TURBO_ROOT$/packages/**",
         "!$TURBO_ROOT$/packages/*/.turbo/**",
         "$TURBO_ROOT$/docs/**",
-        "$TURBO_ROOT$/workflows/**",
         "$TURBO_ROOT$/README.md",
         "$TURBO_ROOT$/CLAUDE.md"
       ]

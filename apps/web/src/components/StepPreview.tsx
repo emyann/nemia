@@ -2,7 +2,8 @@ import { useContext, useEffect, useId, useMemo, useRef, useState, type KeyboardE
 import { Button, PopoverContext } from 'react-aria-components';
 import { useQuery } from '@tanstack/react-query';
 import { BottomSheet, PreviewCard, PreviewTrigger } from '@/components/ui/ds';
-import { agentsQuery, runQuery, type RunSummary, type WaitOn } from '@/lib/api';
+import { agentsQuery, type RunSummary, type WaitOn } from '@/lib/api';
+import { useRunRead } from '@/lib/runView';
 import { barSaid } from '@/lib/runWords';
 import type { StepState } from '@/lib/status';
 import { stepCardOf, type StepCardInput } from '@/lib/stepCard';
@@ -24,9 +25,9 @@ const BAR_BUTTON = cn('-my-3 grid h-8 w-full cursor-pointer content-center outli
  * instant the run was read; while they are read, what the row already knows.
  */
 function OpenedCard({ run, step, asOf }: { run: RailRun; step: string; asOf: Date }) {
-  const detail = useQuery(runQuery(run.id));
+  const detail = useRunRead(run.id);
   const agents = useQuery(agentsQuery);
-  const input: StepCardInput = { run, step, detail: detail.data, agents: agents.data, now: asOf };
+  const input: StepCardInput = { run, step, detail: detail.view, agents: agents.data, now: asOf };
   return <StepCard facts={stepCardOf(input)} />;
 }
 
@@ -81,7 +82,7 @@ function HoverPreview({ run, step, asOf, children }: { run: RailRun; step: RailS
     <PreviewTrigger delay={warm ? 0 : undefined} onOpenChange={opened}>
       <Button
         ref={bar}
-        aria-label={barSaid(step.name, step.state, step.on)}
+        aria-label={barSaid(step.name, step.state, step.on, run.holding != null)}
         data-step-bar={step.name}
         data-step-preview="card"
         className={BAR_BUTTON}
@@ -105,7 +106,7 @@ function HoverPreview({ run, step, asOf, children }: { run: RailRun; step: RailS
 /** A bar where no pointer hovers or the window is compact: a press opens the same card in the kit's modal bottom sheet. */
 function SheetPreview({ run, step, asOf, children }: { run: RailRun; step: RailStep; asOf: Date; children: ReactNode }) {
   const [open, setOpen] = useState(false);
-  const said = barSaid(step.name, step.state, step.on);
+  const said = barSaid(step.name, step.state, step.on, run.holding != null);
   return (
     <>
       <Button aria-label={said} data-step-bar={step.name} data-step-preview="sheet" className={BAR_BUTTON} onPress={() => setOpen(true)}>

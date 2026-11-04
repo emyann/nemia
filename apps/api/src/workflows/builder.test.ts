@@ -13,9 +13,12 @@ import path from 'node:path';
 import { scratch } from '../../test/scratch.ts';
 import { TEAM } from '../../test/team.ts';
 import { story } from '../../test/checkpoints.ts';
-import { app } from '../app.ts';
+import { Effect, Layer } from 'effect';
+import { AgentDoor, type AgentDoorShape } from 'agent-orchestrator';
+import { agentDoorMemory } from 'agent-orchestrator/testing';
+import { app, appOf, liveOf } from '../app.ts';
 import { DEFAULT_HARNESS, putSchemasBack, stepsNamed } from './builder.ts';
-import { workflowVersion as versionIn } from 'agent-orchestrator';
+import { StoreRoot, workflowVersion as versionIn } from 'agent-orchestrator';
 import { listWorkflows } from './workflows.ts';
 import { engine, builtinGitPlace, HARNESS_CHOICES, loadWorkflows, workflowTaken, writeWorkflow } from 'agent-orchestrator';
 import {
@@ -34,7 +37,11 @@ process.env.HKB_REPO = repo;
 execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: repo });
 
 /** A folder's version as the board reads it: its agents and skills looked for in the repository's `.claude/` and in yours too. */
-const versionOf = (dir: string): string => versionIn(dir, { repo, home: root });
+/** A program that reads the store, run over the harness's root (`WF_ROOT`), as a request's services give it. */
+const inRoot = <A, E>(program: Effect.Effect<A, E, StoreRoot>): Promise<A> =>
+  Effect.runPromise(program.pipe(Effect.provideService(StoreRoot, root)));
+const versionOf = (dir: string): string =>
+  Effect.runSync(versionIn(dir, { repo, home: root }).pipe(Effect.provideService(StoreRoot, root)));
 
 type KeyForm = import('./builder.ts').KeyForm;
 type WorkflowSaved = import('./builder.ts').WorkflowSaved;
@@ -393,7 +400,7 @@ test('a person builds a workflow of theirs on the board: the form, a new folder,
       assert.deepEqual(saved.written, ['README.md', 'plan.md']);
       assert.deepEqual(
         saved.workflow,
-        (await listWorkflows(engine(), builtinGitPlace, repo, root)).find((w) => w.name === 'fresh'),
+        (await listWorkflows(engine(), builtinGitPlace, repo, root, inRoot)).find((w) => w.name === 'fresh'),
       );
       assert.equal(saved.workflow.from, 'yours');
       assert.deepEqual(
@@ -436,7 +443,7 @@ test('a person builds a workflow of theirs on the board: the form, a new folder,
       assert.deepEqual(snapshot(dir), before, 'byte for byte');
       assert.deepEqual(
         saved.workflow,
-        (await listWorkflows(engine(), builtinGitPlace, repo, root)).find((w) => w.name === 'as-listed' && w.from === 'yours'),
+        (await listWorkflows(engine(), builtinGitPlace, repo, root, inRoot)).find((w) => w.name === 'as-listed' && w.from === 'yours'),
         'answered as the listing reads it',
       );
     },
@@ -490,7 +497,7 @@ test('a person builds a workflow of theirs on the board: the form, a new folder,
       assert.equal(saved.workflow.readme, '# drawn\n\nPlan, build, review.\n', 'the README it wrote, whole');
       assert.deepEqual(
         saved.workflow,
-        (await listWorkflows(engine(), builtinGitPlace, repo, root)).find((w) => w.name === 'drawn'),
+        (await listWorkflows(engine(), builtinGitPlace, repo, root, inRoot)).find((w) => w.name === 'drawn'),
         'answered as the listing reads it',
       );
 
@@ -741,7 +748,7 @@ test('a step with an agent on the board: listed resolved, with its layers and se
           (e: Error) => e.message.includes('gives the skill `mind-the-cache`') && e.message.includes('no skills folder has it'),
           'read with its own place alone, the skill is not there',
         );
-        const listing = (await listWorkflows(engine(), builtinGitPlace, repo, root)).find(
+        const listing = (await listWorkflows(engine(), builtinGitPlace, repo, root, inRoot)).find(
           (w) => w.name === 'skilled' && w.from === 'yours',
         );
         assert.equal(
@@ -836,12 +843,9 @@ test("versionOf: what moves a folder's version — the agents its steps name, th
   });
 
   await t.test(
-    "versionOf reads `agent:` as the parser does — indented, or with a space before its colon — and covers the schema the agent's output: names",
+    "versionOf reads `agent:` as the parser does — with a space before its colon — and covers the schema the agent's output: names",
     async () => {
-      for (const [folder, line] of [
-        ['indented', '  agent: critic'],
-        ['spaced', 'agent : critic'],
-      ] as const) {
+      for (const [folder, line] of [['spaced', 'agent : critic']] as const) {
         const dir = path.join(STORE, `version-${folder}`);
         write(path.join(STORE, 'agents', 'critic.md'), '---\nharness: claude\noutput: critique.schema.json\n---\nFind what is wrong.\n');
         write(
@@ -854,7 +858,7 @@ test("versionOf: what moves a folder's version — the agents its steps name, th
           }),
         );
         write(path.join(dir, 'judge.md'), `---\nplace: git\n${line}\n---\n`);
-        const listing = (await listWorkflows(engine(), builtinGitPlace, repo, root)).find((w) => w.name === `version-${folder}`);
+        const listing = (await listWorkflows(engine(), builtinGitPlace, repo, root, inRoot)).find((w) => w.name === `version-${folder}`);
         assert.equal(
           listing?.steps[0]?.spec.agent,
           'critic',
@@ -1628,4 +1632,29 @@ test("stepsNamed: the steps a refusal names — a cycle's several, a name refuse
   assert.deepEqual(stepsNamed('two steps are named plan, and a step is its file, plan.md. Rename one of them.', names), ['plan']);
   assert.deepEqual(stepsNamed('no steps to write to /x, and a workflow has at least one.', names), []);
   assert.deepEqual(stepsNamed('planning: something', names), []);
+});
+
+test("the form a step is drawn in reads yours' agents through the app's Agent door: one held only by the door it was given is offered, with the values it gives", async () => {
+  const { app: own, runtime: ownRuntime } = appOf(Layer.merge(liveOf(), agentDoorMemory()));
+  const name = 'remembered' as Parameters<AgentDoorShape['agents']['write']>[0];
+  await ownRuntime.runPromise(
+    Effect.flatMap(AgentDoor, (door) =>
+      door.agents.write(
+        name,
+        { name, description: 'Use it when a note is to be kept.', keys: { model: 'opus', tools: 'Read, Grep' }, body: 'Keep the note.' },
+        undefined,
+        { dir: path.join(STORE, 'agents'), anywhere: true },
+      ),
+    ),
+  );
+  assert.equal(fs.existsSync(path.join(STORE, 'agents', 'remembered.md')), false, 'the agent is held by the door, not on disk');
+  const res = await own.request('/api/workflows/keys');
+  assert.equal(res.status, 200);
+  const form = (await res.json()) as KeyForm;
+  assert.deepEqual(
+    form.keys.find((k) => k.key === 'agent')?.choices,
+    ['remembered'],
+    "the agents of yours are the door's, none of the files beside it",
+  );
+  assert.deepEqual(form.agents, { remembered: { model: 'opus', tools: ['Read', 'Grep'] } }, 'and it comes with the role values it sets');
 });

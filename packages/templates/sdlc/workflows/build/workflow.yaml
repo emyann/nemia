@@ -1,0 +1,44 @@
+apiVersion: nemia.dev/v1alpha1
+kind: Workflow
+metadata:
+  name: build
+  description: Build an accepted intent into working, reviewed code on main. Seldon writes the spec, which a person approves; Grace builds it; Agora reviews it and sends it back while a finding is worth a round, three at most; Otto lands it, once a person approves the landing. A change its card settles, which needs no design, goes through [`quick`](../quick/README.md), whatever its size, with no spec.
+spec:
+  steps:
+    - name: design
+      place: git
+      gate: true
+      budget: 12
+      reads:
+        - costs
+    - name: implement
+      after:
+        - design
+      input:
+        - design
+      place: git
+      budget: 40
+      check: "{ if [ -n \"${WF_WORKFLOW_FILES:-}\" ]; then node \"$WF_WORKFLOW_FILES/probe.ts\" check; else echo \"nemia check: WF_WORKFLOW_FILES is not set, so probe.ts is read from the run's frozen workflow files alone: this check runs in a run, which sets it\" >&2; false; fi; } && if [ \"${{ parameters.github }}\" = true ]; then { if [ -n \"${WF_WORKFLOW_FILES:-}\" ]; then node \"$WF_WORKFLOW_FILES/pull-request.ts\" push; else echo \"nemia check: WF_WORKFLOW_FILES is not set, so pull-request.ts is read from the run's frozen workflow files alone: this check runs in a run, which sets it\" >&2; false; fi; } && { ${{ parameters.roundCheck }}; } && { if [ -n \"${WF_WORKFLOW_FILES:-}\" ]; then node \"$WF_WORKFLOW_FILES/pull-request.ts\" wait --check \"${{ parameters.ciCheck }}\"; else echo \"nemia check: WF_WORKFLOW_FILES is not set, so pull-request.ts is read from the run's frozen workflow files alone: this check runs in a run, which sets it\" >&2; false; fi; }; else { ${{ parameters.localCheck }}; }; fi"
+      overrides:
+        claude:
+          context: 400k
+    - name: land
+      after:
+        - review
+      place: git
+      workspace: base
+      gate: true
+      budget: 10
+      check: "if [ \"${{ parameters.github }}\" = true ]; then { if [ -n \"${WF_WORKFLOW_FILES:-}\" ]; then node \"$WF_WORKFLOW_FILES/landing.ts\" receipt --run \"$WF_RUN\"; else echo \"nemia check: WF_WORKFLOW_FILES is not set, so landing.ts is read from the run's frozen workflow files alone: this check runs in a run, which sets it\" >&2; false; fi; }; else { ${{ parameters.localCheck }}; }; fi"
+    - name: review
+      after:
+        - implement
+      input:
+        - design
+      place: git
+      budget: 16
+      loop: implement
+      rounds: 3
+      tally:
+        - findings
+        - findings.kind=placement

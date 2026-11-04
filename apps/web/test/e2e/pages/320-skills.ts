@@ -80,10 +80,13 @@ export default {
         "the repository's scratch is listed, refused with its reason",
       );
       await expectCount(scratch.getByRole('button'), 0, 'and nothing to press');
-      await expectVisible(
-        sheet.locator('section[aria-label="Built into Nemia"]', { hasText: 'None here.' }),
-        'no skill is built into Nemia, and its group says so',
-      );
+      const builtIn = sheet.locator('section[aria-label="Built into Nemia"]');
+      await expectCount(builtIn.locator('[data-offered-skill]'), 3, "Nemia's three builtin skills are listed in their own group");
+      for (const name of ['create-an-agent', 'grill-me', 'grilling'])
+        await expectVisible(
+          builtIn.locator(`[data-offered-skill="${name}"]`).getByRole('button', { name: `Copy ${name} to my library and add` }),
+          `${name} is offered as a copy into your library`,
+        );
       const offered = sheet.locator(`section[aria-label="Your library"] [data-offered-skill="${mine}"]`);
       await expectVisible(offered.locator('p', { hasText: /tokens/ }), `${mine} says what it costs a turn`);
       await settled(page);

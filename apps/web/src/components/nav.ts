@@ -47,11 +47,11 @@ export type Destination = { id: string; label: string; icon: LucideIcon; lights:
 /**
  * The rail's destinations, in their order: Overview, the factories' canvas at `/`; Runs, the Inbox, Factories (a factory's floor and its
  * settings), Agents and Workflows, each lit on its page and under it; Stats; Nemia, her chat as a page of its own, which her docked face
- * also opens; and Settings, lit on each of its tabs (`SETTINGS_TABS`).
+ * also opens; and Settings, lit on each of its tabs (`SETTINGS_TABS`). A label's page lights Runs.
  */
 export const DESTINATIONS: readonly Destination[] = [
   { id: 'overview', label: 'Overview', icon: House, lights: (path) => path === '/' },
-  { id: 'runs', label: 'Runs', icon: List, lights: under('/runs') },
+  { id: 'runs', label: 'Runs', icon: List, lights: (path) => under('/runs')(path) || under('/labels')(path) },
   { id: 'inbox', label: 'Inbox', icon: Inbox, lights: under('/inbox') },
   { id: 'factories', label: 'Factories', icon: Factory, lights: under('/factories') },
   { id: 'agents', label: 'Agents', icon: Bot, lights: under('/agents') },

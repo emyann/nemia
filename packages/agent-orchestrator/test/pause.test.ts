@@ -1,12 +1,12 @@
 /**
- * The store paused, then paused at once, then resumed — a person's story on the stage (`story.ts`): `nemia pause --now` alone says what
- * it would stop and writes nothing; `nemia pause --yes` pauses as a plain pause does; a pass under it starts nothing — no step, try or
- * check, and no due schedule — while what runs finishes, and `nemia watch --once`, `nemia start` and `nemia up` say it; `nemia pause
- * --now --yes` keeps the pause as it was put, its timeout cut to 0 so the sessions' drain cuts each session's call, asks no session a try
- * nor a stop, and asks each check at work but a landing's to stop, its ask on disk first, a step already asked of left at work; and
- * `nemia resume` lifts it and the drain, each session parked going on as the same try, the pass after running again each check the
- * pause stopped and starting the schedule's fire. The stand-in parks no session: its list says a session held at its hook where the
- * story parks it, as the runtime would under the drain.
+ * The store paused, then paused at once, then resumed — a person's story on the stage (`story.ts`): `nemia pause --now` alone says what it
+ * would stop and writes nothing; `nemia pause --yes` pauses as a plain pause does; a pass under it starts nothing — no step, try or check,
+ * and no due schedule — while each working session stops at its current tool call's end, and `nemia watch --once`, `nemia start` and `nemia
+ * up` say it; `nemia pause --now --yes` keeps the pause as it was put, its timeout cut to 0 so the sessions' drain cuts each session's
+ * call, asks no session a try nor a stop, and asks each check at work but a landing's to stop, its ask on disk first, a step already asked
+ * of left at work; and `nemia resume` lifts it and the drain, each session parked going on as the same try, the pass after running again
+ * each check the pause stopped and starting the schedule's fire. The stand-in parks no session: its list says a session held at its hook
+ * where the story parks it, as the runtime would under the drain.
  *
  * What the pause holds back and how each line says it is pure, in `src/pause/pause.test.ts`; the pause's file in
  * `src/pause/pause.store.test.ts`. The runtime's own admission under the pause — a task filed and not admitted while it stands — is
@@ -112,7 +112,7 @@ const askOf = (id: string, step: string, n: number) => JSON.parse(fs.readFileSyn
 /** The runs a schedule started: the fire each was started for. */
 const scheduledDues = (): string[] => listRuns().flatMap((r) => (r.scheduled ? [r.scheduled.due] : []));
 
-test('the store paused, then paused at once, then resumed: nothing new starts, what runs finishes, and what the pause stopped is tried again', async (t) => {
+test("the store paused, then paused at once, then resumed: nothing new starts, each session stops at its tool call's end, and what the pause stopped is tried again", async (t) => {
   const s = story(t);
   t.mock.timers.enable({ apis: ['Date'], now: Date.parse('2026-10-04T12:00:00Z') });
   const parked = new Set<string>();
@@ -260,7 +260,7 @@ test('the store paused, then paused at once, then resumed: nothing new starts, w
       assert.match(
         pausedWords(standing) ?? '',
         /^Pausing: 5 sessions finishing a tool call, cut now/,
-        "what runs finishes: four sessions, the landing's and the session of a run called off, and a check; the clock is past the timeout, so their calls are being cut",
+        "what still finishes: four sessions, the landing's and the session of a run called off, and a check; the clock is past the timeout, so their calls are being cut",
       );
       assert.deepEqual(b.sessionDrains.at(-1), { graceMs: 600_000 }, "the pass puts the sessions' drain again at the pause's timeout");
     },

@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { POPOVER } from './CardGate';
 import { pauseNowQuery, pauseQuery, putPause, resumePause } from '@/lib/api';
-import { interruptSentence, type PauseState, type PauseWords, pauseWords } from '@/lib/pause';
+import { interruptSentence, PAUSE_PARKS, type PauseState, type PauseWords, pauseWords } from '@/lib/pause';
 import { cn } from '@/lib/utils';
 import { useNow } from '@/lib/useNow';
 
@@ -60,7 +60,7 @@ function WhyForm({ onPut, onClose, isPending }: { onPut: (why: string) => void; 
         onPut(why.trim());
       }}
     >
-      <p className="text-body-small text-muted-foreground">Nothing new starts in any factory until they resume; what runs finishes.</p>
+      <p className="text-body-small text-muted-foreground">Until they resume, in every factory: {PAUSE_PARKS}.</p>
       <WhyField why={why} setWhy={setWhy} />
       <FormActions label="Pause" onClose={onClose} isPending={isPending} />
     </Form>
@@ -184,8 +184,8 @@ function PauseFacts({
 }
 
 /**
- * The pause of all factories, in the frame's top bar: one button, a pause icon while they run,
- * `Pausing · N` while what runs finishes, and a play icon with `Paused` once nothing does (`pauseWords`, read again on each poll of
+ * The pause of all factories, in the frame's top bar: one button, a pause icon while they run, `Pausing · N` while each working session
+ * stops at its current tool call's end, and a play icon with `Paused` once nothing does (`pauseWords`, read again on each poll of
  * `GET /api/pause`).
  * It opens a popover with the whole of it — since when, by whom and why, each task still finishing, each session parked at a tool call's
  * end, named by the call it stopped after, each landing held with its merge

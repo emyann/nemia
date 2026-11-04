@@ -2752,9 +2752,10 @@ wf resume                                               # the next pass files wh
 
 `wf hold` pauses one run; `wf pause` pauses the store, as Kubernetes cordons a node. While it stands no pass
 starts new work: no step, try, round or check is filed (the check of a step that has ended among them), no
-queued task is admitted on the runtime, and no queued inbox card is started. What runs finishes: a session in
-flight ends and its closeout is recorded, and a landing whose check has already ended commits or aborts as it
-would. A filing in flight when the pause is put stops before its next part, as it does for a cancel or a hold.
+queued task is admitted on the runtime, and no queued inbox card is started. Each working session stops when its
+current tool call ends, cut once the pause's timeout passes, and goes on as the same try on `wf resume`; a check
+runs on, and a landing whose check has already ended commits or aborts as it would. A pause put with no timeout
+(the one `nemia service restart` puts for itself) parks no session: each runs on to its end. A filing in flight when the pause is put stops before its next part, as it does for a cancel or a hold.
 `wf start` still writes the run, and says the pause: nothing of it is filed until the resume. An approval, a
 retry, a round or an answer written meanwhile is kept, and the first pass after `wf resume` files what it
 lets through, with what waited.
@@ -2762,7 +2763,7 @@ lets through, with what waited.
 A pause says how far it has come, read from the world on each pass and never stored:
 
 ```text
-Pausing: 2 finishing — the store is paused since 2026-10-04T12:00:00.000Z by ann: merging by hand; nothing new starts, …
+Pausing: 2 finishing — the store is paused since 2026-10-04T12:00:00.000Z by ann: merging by hand; nothing new starts, and each working session …
    r-1's plan is finishing: its session is at work
    r-2's ship is finishing: the check of its landing runs
 Paused since 2026-10-04T12:00:00.000Z by ann: merging by hand — nothing runs and nothing new starts; wf resume resumes it

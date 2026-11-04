@@ -33,3 +33,14 @@ test("the client's pause lines are the orchestrator's: the count of sessions fin
   const parked = { ...paused, finishing: [] };
   assert.deepEqual(pausedLines(parked, now), orchestratorLines(parked, now));
 });
+
+test("the client says what the orchestrator says a pause does: a timed one parks each session at its call's end, an untimed one lets it run on", () => {
+  const untimed = { ...paused, pause: { at, by: 'ann' } };
+  assert.deepEqual(pausedLines(untimed, now), orchestratorLines(untimed, now));
+  assert.equal(pausedWords(untimed, now), orchestratorWords(untimed, now));
+  assert.match(pausedWords(paused, now) ?? '', /each working session stops when its current tool call ends, cut once the timeout passes/);
+  assert.match(pausedWords(untimed, now) ?? '', /each working session runs on to its end/);
+  for (const p of [paused, untimed]) {
+    assert.doesNotMatch(pausedLines(p, now).join('\n'), /what runs finishes/);
+  }
+});

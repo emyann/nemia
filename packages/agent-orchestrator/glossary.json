@@ -298,7 +298,7 @@
     },
     {
       "term": "Release retention",
-      "meaning": "what removes an installed release: the current, the two newest, and any a session in flight or a running Nemia process runs on are kept, the rest removed after `nemia upgrade` and on the daemon's sweep; nothing while a local session in flight recorded no release.",
+      "meaning": "what removes an installed release: the current, the two newest, and any a session in flight or a running Nemia process runs on are kept, the rest removed after `nemia upgrade` and on the daemon's sweep; nothing while a local session in flight recorded no release. The same sweep removes each upgrade leftover.",
       "type": "Retention"
     },
     {
@@ -491,6 +491,11 @@
       "term": "Unreachable",
       "meaning": "a step that cannot run, because a step it waits on stops what follows it (`stopsFollowers`): an assessment's `unreachable`, and `nemia tick`'s `unreachable:`. Never called blocked, which is a closeout's outcome alone.",
       "type": "Assessment"
+    },
+    {
+      "term": "Upgrade leftover",
+      "meaning": "what a crashed `nemia upgrade` leaves under `<WF_ROOT>/releases/`: a build's folder (`.building-<tag>-<pid>`, its trial store inside) or a pointer link (`.current-<pid>`) whose process is gone, and a build log under `<WF_ROOT>/releases/.logs/` older than 30 days (`LOGS_KEPT_DAYS`); removed by the release retention's sweep, never one whose process lives.",
+      "type": "Leftovers"
     },
     {
       "term": "Waiting",

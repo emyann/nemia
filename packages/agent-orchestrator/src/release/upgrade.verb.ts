@@ -161,13 +161,16 @@ const restarted = Effect.fn('restarted')(function* (args: Args, host: ServiceHos
 /**
  * The releases removed once the daemon is restarted (`retainOnce`), pinning the one this process runs and the one the lease says the
  * daemon runs; a sweep that fails is a line, never a failed upgrade, since the pointer has moved already. Lines only where it removed
- * something or held.
+ * a release or a crashed upgrade's leftover, or held.
  */
 const removedAfter = Effect.fn('removedAfter')(function* (root: string, host: ServiceHost) {
   const lease = host.lease();
   const daemon = lease.kind === 'ticking' && lease.file.release !== undefined ? [lease.file.release] : [];
   return yield* retainOnce(root, [runningRelease(), ...daemon]).pipe(
-    Effect.map((done) => ({ removed: done.removed, lines: done.removed.length || done.held !== null ? done.lines : [] })),
+    Effect.map((done) => {
+      const said = done.removed.length > 0 || done.swept.entries.length > 0 || done.swept.logs.length > 0 || done.held !== null;
+      return { removed: done.removed, lines: said ? done.lines : [] };
+    }),
     Effect.catchCause((cause) => {
       const err = Cause.squash(cause);
       const why = err instanceof Error ? err.message : String(err);
@@ -224,7 +227,9 @@ const UPGRADE: Command<Upgraded> = {
     "the repository the tag is in (the running release's source);",
     '--name: the service (nemia). Then it removes each release that is',
     'not current, not among the two newest, and that no session or',
-    'running nemia runs on, as the daemon does every five minutes',
+    'running nemia runs on, the folder of each build whose upgrade died,',
+    'and each build log older than 30 days, as the daemon does every five',
+    'minutes',
   ],
   spec: {
     positionals: [{ key: 'tag', takes: 'required', kind: 'name' }],

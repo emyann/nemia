@@ -10,11 +10,13 @@ import type { RecordMemo } from '../rest/index.ts';
 import type { RetryAsk } from '../retry/index.ts';
 import { endsOnBase, type Workflow } from '../step/step.ts';
 import { landsOnCheck } from '../status/status.ts';
-import { phaseOfView, type WordView } from '../views/views-words.ts';
+import { parkedOf, phaseOfView, type WordView } from '../views/views-words.ts';
 
 /**
  * A person's pause on the store, as its file says it: when it was put, who put it, and the person's words for why (`why`, absent when none
- * were given), each one line. A file that does not read gives each field empty, and still pauses.
+ * were given), each one line; and the grace a call in flight is given before it is cut (`graceMs`), absent on a pause that parks no
+ * session — the take-over's own, or one put before the grace was written. A file that does not read gives each field empty, and still
+ * pauses.
  */
 export type Pause = { at: string; by: string; why?: string; graceMs?: number };
 
@@ -50,6 +52,14 @@ export const graceRefusal = (text: string): string | undefined => {
 /** The grace `text` says, in milliseconds, or undefined where `graceRefusal` refuses it. */
 export const graceOf = (text: string): number | undefined => (graceRefusal(text) === undefined ? formOf(text) : undefined);
 
+/** Why `nemia pause`'s `--grace` is refused: a grace out of its form, or one given with `--now`, which cuts at once; null when none. */
+export const pauseGraceRefusal = (grace: string | undefined, now: boolean, shape: string): string | null => {
+  if (grace === undefined) return null;
+  if (now) return `--grace gives each call in flight a while to end, and --now cuts them at once: give one, ${shape}.`;
+  const wrong = graceRefusal(grace);
+  return wrong === undefined ? null : `--grace: ${wrong}: ${shape}, as nemia pause --grace 10m.`;
+};
+
 /** A grace in words, by its largest whole unit: `10m`, `90s`, `2h`. */
 export const graceWords = (ms: number): string =>
   ms % 3_600_000 === 0 ? `${ms / 3_600_000}h` : ms % 60_000 === 0 ? `${ms / 60_000}m` : `${Math.round(ms / 1_000)}s`;
@@ -74,7 +84,7 @@ export type PauseHeld = { run: string; step: string };
 /**
  * A task still at work under the pause, which it lets finish: `run`'s `step`, as a `session` at work, the `check` of its work, or the
  * check of a `landing` (an ending that lands on its check) — `stopping` once the engine was asked to stop it, and `resumed` while an ask
- * `nemia pause --now` wrote names it (`interrupted`), which tries it again on the resume. A stop asked by another hand carries no
+ * `nemia pause --now` wrote names it (`interrupted`), which runs a check again on the resume. A stop asked by another hand carries no
  * `resumed`. `calling` is the tool a session is in a call to, which a stop of the daemon waits for.
  */
 export type Finishing = {
@@ -87,22 +97,29 @@ export type Finishing = {
 };
 
 /**
- * A task a pause at once stops (`nemia pause --now`): `run`'s `step`, its `session` at work or the `check` of its work, by the task's id. A
- * landing is never one.
+ * A task a pause at once cuts (`nemia pause --now`): `run`'s `step`, its `session` at work, whose tool call the sessions' drain cuts at
+ * once and which goes on as the same try, or the `check` of its work, stopped and run again; by the task's id. A landing is never one.
  */
 export type Interrupt = { run: string; step: string; kind: 'session' | 'check'; taskId: string };
 
 /**
- * What a reader of the whole store is told of the pause: the pause, or null; each task still finishing under it, none once it is
- * "Paused"; each landing it holds with its merge staged; and each other check it keeps from being filed (`held`).
+ * A session the pause has parked at a tool call's end: `run`'s `step`, held at its hook `after` its call to that tool where its harness
+ * says it, or with its call to `cut` cut at the grace's end. It continues as the same try once the store is resumed.
  */
-export type Paused = { pause: Pause | null; finishing: Finishing[]; staged: PauseStaged[]; held: PauseHeld[] };
+export type Parked = { run: string; step: string; after?: string; cut?: string };
 
 /**
- * The pause as a pass reads it while it stands: the pause, each task still finishing under it, each landing it holds staged, and each
- * other check it holds.
+ * What a reader of the whole store is told of the pause: the pause, or null; each task still finishing under it, none once it is
+ * "Paused"; each session it has parked (`parked`); each landing it holds with its merge staged; and each other check it keeps from being
+ * filed (`held`).
  */
-export type PauseStanding = { pause: Pause; finishing: Finishing[]; staged: PauseStaged[]; held: PauseHeld[] };
+export type Paused = { pause: Pause | null; finishing: Finishing[]; parked: Parked[]; staged: PauseStaged[]; held: PauseHeld[] };
+
+/**
+ * The pause as a pass reads it while it stands: the pause, each task still finishing under it, each session it has parked, each landing
+ * it holds staged, and each other check it holds.
+ */
+export type PauseStanding = { pause: Pause; finishing: Finishing[]; parked: Parked[]; staged: PauseStaged[]; held: PauseHeld[] };
 
 /**
  * A task's view as `finishingOf` reads it: the words' view (`WordView`), whether the runtime holds it queued for a slot, and whether it was
@@ -115,7 +132,8 @@ export type FinishingView = WordView & {
 };
 
 /** What a pause at once costs, as `nemia pause --now` and the board's confirm say it before it is paid. */
-export const NOW_COST = 'An interrupted step redoes its unfinished work and reads its context again.';
+export const NOW_COST =
+  'A session has its tool call cut and continues as the same try, told which call was cut; a check runs again from its start.';
 
 /** How `nemia resume` is typed, as every line that offers it says it. */
 export const RESUME_LINE = 'nemia resume';
@@ -123,7 +141,8 @@ export const RESUME_LINE = 'nemia resume';
 /**
  * The tasks of `run` still at work, which the pause lets finish: each step's current task and its check's, pending or running. Left out:
  * one the runtime holds queued, which no pass admits under the pause; a session that waits on a person (`needs-human`), which holds no
- * slot and does no work until answered; and one with no view. Each is `resumed` where one of `asks`, the run's waiting asks, names it.
+ * slot and does no work until answered; a session the pause has parked (`parkedOf`); and one with no view. Each is `resumed` where one
+ * of `asks`, the run's waiting asks, names it.
  */
 export function finishingOf(
   run: Run,
@@ -143,7 +162,7 @@ export function finishingOf(
   );
 }
 
-/** The session and the check of `step` in `run` at work (`atWork`), each with its task id and its view. */
+/** The session and the check of `step` in `run` at work (`atWork`), each with its task id and its view; a session parked is not. */
 const stepAtWork = (
   run: Run,
   step: Workflow,
@@ -157,9 +176,18 @@ const stepAtWork = (
     ] as const
   ).flatMap(([taskId, kind]) => {
     const view = taskId ? viewOf(taskId) : undefined;
-    return taskId && view && atWork(view) ? [{ taskId, kind, view }] : [];
+    return taskId && view && atWork(view) && !(kind === 'session' && parkedOf(view)) ? [{ taskId, kind, view }] : [];
   });
 };
+
+/** Each session among `runs` the pause has parked (`parkedOf`): a step's current task, read off `viewOf`. */
+export const parkedAmong = (runs: readonly Run[], viewOf: (taskId: string) => FinishingView | undefined): Parked[] =>
+  runs.flatMap((run) =>
+    Object.entries(run.steps).flatMap(([step, record]) => {
+      const parked = record.taskId ? parkedOf(viewOf(record.taskId)) : undefined;
+      return parked ? [{ run: run.id, step, ...parked }] : [];
+    }),
+  );
 
 /**
  * The tasks of `run` a pause at once stops: those still at work as `finishingOf` reads them, but a step's in the repository's own
@@ -252,13 +280,19 @@ const heldCount = ({ staged, held }: Pick<Paused, 'staged' | 'held'>): string =>
 
 /**
  * The pause as it stands, in one line: "Pausing" with how many tasks still finish, or "Paused" once none does, each with how many checks
- * it holds back (`staged` and `held`), when any. Null when no pause stands.
+ * it holds back (`staged` and `held`), when any. Under a pause with a grace, while sessions finish, how many finish a tool call and in how
+ * many minutes from `now` what is left is cut (`pausingWords`). Null when no pause stands.
  */
-export const pausedWords = (paused: Pick<Paused, 'pause' | 'finishing' | 'staged' | 'held'>): string | null => {
+export const pausedWords = (paused: Pick<Paused, 'pause' | 'finishing' | 'staged' | 'held'>, now: Date = new Date()): string | null => {
   const { pause, finishing } = paused;
   if (!pause) return null;
+  const sessions = finishing.filter((f) => f.kind === 'session').length;
+  const head =
+    pause.graceMs !== undefined && sessions
+      ? pausingWords(sessions, Date.parse(pause.at) + pause.graceMs - now.getTime())
+      : `Pausing: ${finishing.length} finishing`;
   return finishing.length
-    ? `Pausing: ${finishing.length} finishing${heldCount(paused)} — the store is paused ${sinceWords(pause)}; nothing new starts, and what runs finishes; ${RESUME_LINE} resumes it`
+    ? `${head}${heldCount(paused)} — the store is paused ${sinceWords(pause)}; nothing new starts, and what runs finishes; ${RESUME_LINE} resumes it`
     : `Paused ${sinceWords(pause)} — nothing runs and nothing new starts${heldCount(paused)}; ${RESUME_LINE} resumes it`;
 };
 
@@ -282,11 +316,18 @@ const atWorkWords = (kind: Finishing['kind'], calling: string | undefined): stri
 export const callsOf = (paused: { finishing: readonly Finishing[] }): Finishing[] =>
   paused.finishing.filter((f) => f.calling !== undefined);
 
-/** A task a pause at once stops, in words: its run, its step, and whether its session or its check. */
-export const interruptWords = ({ run, step, kind }: Interrupt): string =>
-  `${run}'s ${step}: its ${kind === 'session' ? 'session' : 'check'}`;
+/** A session the pause has parked, in one line: its run and step, and the call it stopped after or the call cut. */
+export const parkedWords = ({ run, step, after, cut }: Parked): string =>
+  `${run}'s ${step} is paused${after ? ` after its call to ${after}` : cut ? `, its call to ${cut} cut` : ''}`;
 
-/** What a pause at once did, as `nemia pause --now --yes` answers it: the pause, whether it stood already, what it stopped and left. */
+/**
+ * A task a pause at once cuts, in words: its run, its step, and whether its session, whose call is cut and which goes on as the same try,
+ * or its check, run again.
+ */
+export const interruptWords = ({ run, step, kind }: Interrupt): string =>
+  `${run}'s ${step}: ${kind === 'session' ? 'its session, its call cut, going on as the same try' : 'its check, run again'}`;
+
+/** What a pause at once did, as `nemia pause --now --yes` answers it: the pause, whether it stood already, what it cut and left. */
 export type PausedNow = { pause: Pause; kept: boolean; interrupted: Interrupt[]; skipped: Interrupt[] };
 
 /** How `nemia pause --now` acts once it is shown what it stops. */
@@ -294,13 +335,14 @@ export const NOW_LINE = 'nemia pause --now --yes';
 
 /**
  * What `nemia pause --now` says before it acts: that it would put the pause, or keep the one that stands (`standing`); each task it would
- * stop, what that costs (`NOW_COST`), that a landing finishes, and the line that acts (`NOW_LINE`). With nothing at work, it says so.
+ * cut — a session's tool call, which goes on as the same try, or a check, run again — what that costs (`NOW_COST`), that a landing
+ * finishes, and the line that acts (`NOW_LINE`). With nothing at work, it says so.
  */
 export const nowLines = (interrupts: readonly Interrupt[], standing = false): string[] => {
   const pausing = standing ? "would keep the store's pause as it stands" : 'would pause the store';
   return [
     interrupts.length
-      ? `nemia pause --now ${pausing} and stop ${interrupts.length} at work, each tried again on ${RESUME_LINE}:`
+      ? `nemia pause --now ${pausing} and cut ${interrupts.length} at work, each going on at ${RESUME_LINE}:`
       : `nemia pause --now ${pausing}; nothing outside a landing is at work, so it stops nothing.`,
     ...interrupts.map((i) => `   ${interruptWords(i)}`),
     `${NOW_COST} A landing that checks or merges is left to finish.`,
@@ -309,15 +351,15 @@ export const nowLines = (interrupts: readonly Interrupt[], standing = false): st
 };
 
 /**
- * What `nemia pause --now --yes` says once it acted: the pause put, or the one that stood kept as it was put; each task it stopped, or that
- * none was at work; each it left at work, since a try of it was asked for already; and the cost.
+ * What `nemia pause --now --yes` says once it acted: the pause put, or the one that stood kept as it was put; each task it cut, or that
+ * none was at work; each check it left at work, since a try of it was asked for already; and the cost.
  */
 export const pausedNowLines = ({ pause, kept, interrupted, skipped }: PausedNow): string[] => [
   kept
-    ? `the store's pause stands as it was put, ${sinceWords(pause)}; now what runs is asked to stop`
-    : `the store is paused at once ${sinceWords(pause)} — what runs is asked to stop, and a landing finishes; ${RESUME_LINE} resumes it`,
+    ? `the store's pause stands as it was put, ${sinceWords(pause)}; now what runs is cut`
+    : `the store is paused at once ${sinceWords(pause)} — what runs is cut, and a landing finishes; ${RESUME_LINE} resumes it`,
   interrupted.length
-    ? `asked to stop ${interrupted.length}, each tried again on ${RESUME_LINE}:`
+    ? `cut ${interrupted.length}, each going on at ${RESUME_LINE}:`
     : 'nothing outside a landing was at work: nothing was stopped',
   ...interrupted.map((i) => `   ${interruptWords(i)}`),
   ...skipped.map((i) => `   ${interruptWords(i)} — left at work: a try of it is asked for already`),
@@ -338,13 +380,18 @@ export const heldLines = ({ staged, held }: Pick<Paused, 'staged' | 'held'>): st
 ];
 
 /**
- * Every line said of the pause: none when the store is not paused, else the pause as it stands (`pausedWords`), then each task still
- * finishing and each check it holds back (`heldLines`), indented.
+ * Every line said of the pause at `now`: none when the store is not paused, else the pause as it stands (`pausedWords`), then each task
+ * still finishing, each session parked (`parkedWords`) and each check it holds back (`heldLines`), indented.
  */
-export const pausedLines = (paused: Paused): string[] => {
-  const line = pausedWords(paused);
+export const pausedLines = (paused: Paused, now: Date = new Date()): string[] => {
+  const line = pausedWords(paused, now);
   if (line === null) return [];
-  return [line, ...paused.finishing.map((f) => `   ${finishingWords(f)}`), ...heldLines(paused)];
+  return [
+    line,
+    ...paused.finishing.map((f) => `   ${finishingWords(f)}`),
+    ...paused.parked.map((p) => `   ${parkedWords(p)}`),
+    ...heldLines(paused),
+  ];
 };
 
 /** What `nemia up` says once the pause it said is resumed. */

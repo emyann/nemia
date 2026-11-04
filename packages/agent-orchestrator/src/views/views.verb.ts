@@ -211,6 +211,8 @@ const ENGINE_READS = new Set([
   'mcpSignIn',
   'mcpSignInState',
   'mcpSignOut',
+  'drain',
+  'drainSessions',
 ]);
 
 /** The engine's verbs that change a task, each with the tasks it names: a filing names the task it files, which a read may have kept. */

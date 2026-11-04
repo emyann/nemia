@@ -12,7 +12,7 @@ import { names } from '../../test/assessed.ts';
 
 const ROOT = scratch('wf-pause-store-');
 process.env.WF_ROOT = ROOT;
-const { pauseFile, resumePause, putPause, readPause } = await import('./pause.store.ts');
+const { cutPause, pauseFile, resumePause, putPause, readPause } = await import('./pause.store.ts');
 const { storeAdmission } = await import('../runtime-client.ts');
 
 /** Whether `fn` refuses with exit 2, of `kind`, its message naming each of `facts`: the command its fix names, and who and when. */
@@ -73,5 +73,23 @@ test('the pause on disk: put, read back, refused, lifted, read when it does not 
     assert.deepEqual(resumePause(), cordon);
     assert.equal(fs.existsSync(path.join(ROOT, 'cordon')), false, 'nemia resume removes it');
     assert.equal(storeAdmission().unschedulable(), false);
+  });
+  await t.test('a pause put with a grace keeps it on its file; an old file of `{at, by}` has none', () => {
+    const put = putPause({ by: 'ann' }, new Date('2026-10-04T12:00:00.000Z'), 900_000);
+    assert.deepEqual(put, { at: '2026-10-04T12:00:00.000Z', by: 'ann', graceMs: 900_000 });
+    assert.deepEqual(readPause(), put);
+    resumePause();
+    fs.writeFileSync(pauseFile(), `${JSON.stringify({ at: '2026-10-03T08:00:00.000Z', by: 'ann' })}\n`);
+    assert.deepEqual(readPause(), { at: '2026-10-03T08:00:00.000Z', by: 'ann' }, 'no grace: the pause parks nothing');
+    fs.writeFileSync(pauseFile(), `${JSON.stringify({ at: '2026-10-03T08:00:00.000Z', by: 'ann', graceMs: 'ten' })}\n`);
+    assert.deepEqual(readPause(), { at: '2026-10-03T08:00:00.000Z', by: 'ann' }, 'a grace that is no count of milliseconds is none');
+    resumePause();
+  });
+  await t.test('cutPause sets the grace to 0, keeping when, by whom and why; with no pause it is refused', () => {
+    putPause({ by: 'ann', why: 'the bill' }, new Date('2026-10-04T12:00:00.000Z'), 600_000);
+    assert.deepEqual(cutPause(), { at: '2026-10-04T12:00:00.000Z', by: 'ann', why: 'the bill', graceMs: 0 });
+    assert.deepEqual(readPause(), { at: '2026-10-04T12:00:00.000Z', by: 'ann', why: 'the bill', graceMs: 0 });
+    resumePause();
+    refusedAs(() => cutPause(), 'Missing', 'nemia pause');
   });
 });

@@ -1,5 +1,7 @@
 /**
- * The store's pause on disk: `$WF_ROOT/cordon`, a person's file, `{at, by, why?}`, put by `nemia pause` and deleted by `nemia resume`.
+ * The store's pause on disk: `$WF_ROOT/cordon`, a person's file, `{at, by, why?, graceMs?}`, put by `nemia pause` and deleted by
+ * `nemia resume`; `graceMs`, the grace a call in flight is given before the sessions' drain cuts it, absent on a pause that parks no
+ * session (the take-over's own, or one put before the grace was written), and set to 0 by `nemia pause --now` (`cutPause`).
  * Every pass reads it, as `runStore` composes it onto each run it reads, so a pause put or lifted between two passes is honoured by the
  * next. The file keeps the name it had before the verbs were renamed, so a pause put then still stands and `nemia resume` lifts it.
  *
@@ -24,7 +26,11 @@ export const pauseFile = (): string => path.join(ROOT, 'cordon');
 const Said = Schema.optional(Schema.String);
 
 /** The pause's file as `putPause` writes it; a field it does not read is left empty, never a reason to lift the pause. */
-const isPauseFile = Schema.is(Schema.Struct({ at: Said, by: Said, why: Said }));
+const isPauseFile = Schema.is(Schema.Struct({ at: Said, by: Said, why: Said, graceMs: Schema.optional(Schema.Unknown) }));
+
+/** A grace as the file holds it: whole milliseconds from 0, or none. */
+const graceRead = (value: unknown): number | undefined =>
+  typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : undefined;
 
 /** The text as JSON, or undefined where it is not: a file half written, or another program's. */
 const jsonOr = (text: string): unknown => {
@@ -49,7 +55,13 @@ export function readPause(): Pause | null {
   const read = jsonOr(text);
   const file = isPauseFile(read) ? read : {};
   const why = oneLine(file.why ?? '', Infinity);
-  return { at: oneLine(file.at ?? '', Infinity), by: oneLine(file.by ?? '', Infinity), ...(why ? { why } : {}) };
+  const graceMs = graceRead('graceMs' in file ? file.graceMs : undefined);
+  return {
+    at: oneLine(file.at ?? '', Infinity),
+    by: oneLine(file.by ?? '', Infinity),
+    ...(why ? { why } : {}),
+    ...(graceMs === undefined ? {} : { graceMs }),
+  };
 }
 
 /** Who the machine says runs this process, or undefined where it cannot say. */
@@ -63,11 +75,17 @@ function osUser(): string | undefined {
 
 /**
  * Pauses the store: writes its file, created only where none is, and answers the pause as written — `by` the name given, else the
- * machine's user. Refuses (`Conflict`) a store already paused, naming who paused it, `nemia resume`, and `nemia pause --now`.
+ * machine's user, and `graceMs` where one is given, which the pass puts on the sessions' drain; with none the pause parks no session.
+ * Refuses (`Conflict`) a store already paused, naming who paused it, `nemia resume`, and `nemia pause --now`.
  */
-export function putPause(said: { why?: string; by?: string }, now: Date = new Date()): Pause {
+export function putPause(said: { why?: string; by?: string }, now: Date = new Date(), graceMs?: number): Pause {
   const by = said.by ?? osUser() ?? 'someone';
-  const pause: Pause = { at: now.toISOString(), by, ...(said.why ? { why: said.why } : {}) };
+  const pause: Pause = {
+    at: now.toISOString(),
+    by,
+    ...(said.why ? { why: said.why } : {}),
+    ...(graceMs === undefined ? {} : { graceMs }),
+  };
   fs.mkdirSync(ROOT, { recursive: true });
   try {
     fs.writeFileSync(pauseFile(), `${JSON.stringify(pause)}\n`, { flag: 'wx' });
@@ -78,6 +96,21 @@ export function putPause(said: { why?: string; by?: string }, now: Date = new Da
       message: `the store is already paused${stands?.by ? ` by ${stands.by}` : ''}${stands?.at ? ` since ${stands.at}` : ''}: ${RESUME_LINE} lifts it first, and nemia pause --now stops what still finishes under it.`,
     });
   }
+  return pause;
+}
+
+/**
+ * The store's pause with its grace cut to 0, as `nemia pause --now` cuts every call in flight: since when, by whom and why kept as they
+ * were put, the file written whole through a hidden file renamed over it. Answers the pause as written. Refuses (`Missing`) a store no
+ * pause stands on.
+ */
+export function cutPause(): Pause {
+  const stands = readPause();
+  if (stands === null) throw new Missing({ message: 'the store is not paused: there is nothing to cut (nemia pause --now puts one).' });
+  const pause: Pause = { ...stands, graceMs: 0 };
+  const hidden = path.join(ROOT, `.cordon.${process.pid}`);
+  fs.writeFileSync(hidden, `${JSON.stringify(pause)}\n`);
+  fs.renameSync(hidden, pauseFile());
   return pause;
 }
 

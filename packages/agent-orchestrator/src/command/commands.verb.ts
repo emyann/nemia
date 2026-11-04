@@ -51,7 +51,8 @@ import { TEMPLATES } from '../template/template.verb.ts';
 import { INBOXES } from '../inbox/commands.verb.ts';
 import { LABELS } from '../labels/commands.verb.ts';
 import { CONCLUDED, START } from '../start/commands.verb.ts';
-import { CANCEL, PAUSE, PAUSED, PAUSE_NOW, HOLD, PRUNE, RAN, RM, RESUME } from './runs.verb.ts';
+import { CANCEL, HOLD, PRUNE, RAN, RM } from './runs.verb.ts';
+import { PAUSE_ENTRIES } from '../pause/grace.verb.ts';
 import { SUBSCRIBE, UNSUBSCRIBE } from '../subscription/subscription.verb.ts';
 import { PASSES } from '../meter/passes.verb.ts';
 import { LEVEL } from '../nemia/level.verb.ts';
@@ -552,10 +553,7 @@ export const COMMANDS: readonly Command[] = [
   HOLD,
   RM,
   PRUNE,
-  PAUSE,
-  RESUME,
-  PAUSED,
-  PAUSE_NOW,
+  ...PAUSE_ENTRIES,
   SUBSCRIBE,
   UNSUBSCRIBE,
   LEVEL,

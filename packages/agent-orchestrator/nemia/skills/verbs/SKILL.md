@@ -253,25 +253,30 @@ They write, and are yours to run unasked, on your judgement: say what you did.
                                said; --by: who puts the hold (default: your OS user).
                                nemia hold <runId> --off: lift the hold now, and the next tick goes on as
                                if it had never been put
-  nemia pause [--why "<words>"] [--by <name>] [--now [--yes]]
+  nemia pause [--why "<words>"] [--by <name>] [--grace <d> | --now [--yes]]
                                pause the store: no pass starts new work — no step, try, round or
                                check filed, no queued task admitted, no queued card started — and
-                               what runs finishes, its end and closeout recorded; a landing whose
-                               check has ended commits or aborts. Pausing: N finishing while a
-                               session works or a check or landing runs, Paused once none does.
+                               every session, job or attached, parks at its tool call's end: a call
+                               still in flight once the grace has passed is cut. A check runs on, its
+                               end recorded; a landing whose check has ended commits or aborts.
+                               Pausing: N sessions finishing a tool call, cut in M min while they
+                               do, Paused once none does; nemia ls says each step paused.
                                nemia start still writes a run, and approvals, retries and answers are
                                kept, not acted on: the pass after nemia resume files what waits. nemia ls,
                                nemia watch --once, nemia start and nemia up say it, and nemia ls names what finishes.
                                Refused while a pause stands.
                                --why: the reason, said wherever the pause is; --by: who pauses it
                                (default: your OS user)
-                               --now: pause at once — each step session or check at work, but a
-                               landing, is asked to stop and tried again on nemia resume: a continue of
-                               its session, or a recheck. A pause that stands is kept as it was.
+                               --grace: how long a call in flight is given to end, for this pause
+                               (90s, 10m, 2h; from 1s to 23h); default: the store's, nemia grace
+                               --now: pause at once — each step session at work, but a landing's,
+                               has its call cut and parks, going on as the same try on nemia resume;
+                               each check is asked to stop and run again. A pause that stands is kept.
                                --yes: with --now, act; without it, --now only says what it would
-                               interrupt
+                               cut
   nemia resume
-                               resume the store: the next pass files what waits
+                               resume the store: each session parked goes on as the same try, and the
+                               next pass files what waits
   nemia subscribe <name> <task> [-l <selector>]... [--digest-every <minutes>] [--at-least <level>]
                                give the engine's long-lived task <task> a subscription to the feed,
                                named <name>, from its end: a line one of its selectors takes is said to
@@ -399,6 +404,12 @@ Each asks the person at a prompt every time it runs: say what it does before you
                                a worktree held, on no branch, or with changes no commit has;
                                and a finished run not merged unless --unmerged, with --artifacts
                                as without: its files are what a person reads to decide it
+  nemia grace [<d>]
+                               the store's pause grace: how long nemia pause, nemia service restart and
+                               nemia upgrade give each tool call in flight to end before it is cut; bare,
+                               the grace in force (10m by default); given one, sets it: digits and s, m
+                               or h, from 1s to 23h, as 90s, 10m or 2h. nemia pause --grace <d> gives one
+                               pause a grace of its own
   nemia policy confirm <agent> <id> --words '<words>'
                                put in force a rule the agent proposed, or the default again, as its
                                words read: from then on, at auto, the answer it names is given unasked

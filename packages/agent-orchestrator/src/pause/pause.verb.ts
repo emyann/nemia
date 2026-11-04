@@ -1,17 +1,39 @@
 /**
- * The store's pause at once (`nemia pause --now`): what it would stop, read off one view of every run's current tasks and never stored
- * (`nowRead`), and the verb that puts the pause, or keeps the one that stands, then writes for each task at work the ask that tries it
- * again on the resume and asks the engine to stop it (`pauseNow`). A controller: it reaches the engine through the client, and writes
- * a person's files — the pause through `putPause`, each ask through `runStore.asks.write` — never a run's record.
+ * The store's pause that parks every session at its tool call's end (`pauseParked`), and the pause at once (`nemia pause --now`): what it
+ * would cut, read off one view of every run's current tasks and never stored (`nowRead`), and the verb that puts the pause, or keeps the
+ * one that stands, cuts its grace to 0 so every session's call is cut and the session parked, then writes for each check at work the ask
+ * that runs it again on the resume and asks the engine to stop it (`pauseNow`). A controller: it reaches the engine through the client,
+ * and writes a person's files — the pause through `putPause` and `cutPause`, each ask through `runStore.asks.write` — never a run's
+ * record.
  */
 import { Effect } from 'effect';
-import { EngineService, asked } from '../runtime-client.ts';
+import { EngineService, asked, sessionsDrained, tried } from '../runtime-client.ts';
 import { tryOf, type Run } from '../record/record.ts';
 import { keptRuns, runStore } from '../record/files.store.ts';
 import { stepsOf } from '../steps/steps.verb.ts';
 import { stopAsked } from '../tick/held.verb.ts';
-import { putPause, readPause } from './pause.store.ts';
-import { currentTasks, interruptsAmong, liveAmong, type Interrupt, type PauseRuns, type PausedNow, type RunTasks } from './pause.ts';
+import { cutPause, putPause, readPause } from './pause.store.ts';
+import { graceAt } from './grace.store.ts';
+import { rootGiven } from '../config/root.store.ts';
+import { Invalid } from '../refusal/refusal.ts';
+import {
+  currentTasks,
+  graceOf,
+  graceRefusal,
+  interruptsAmong,
+  liveAmong,
+  type Interrupt,
+  type PauseRuns,
+  type PausedNow,
+  type RunTasks,
+} from './pause.ts';
+
+/** The grace `text` says, in milliseconds; refused `Invalid` where it is out of its form. */
+const graceGiven = (text: string): number => {
+  const ms = graceOf(text);
+  if (ms === undefined) throw new Invalid({ message: `--grace: ${graceRefusal(text)}: as nemia pause --grace 10m` });
+  return ms;
+};
 
 /** A run as a pause at once first reads it: whether a person called it off, and every current task of its steps. */
 const runTasks = (run: Run): RunTasks => ({
@@ -54,33 +76,52 @@ export const nowRead = Effect.fn('nowRead')(function* (memo?: PauseRuns) {
 });
 
 /**
+ * Pauses the store, parking every session, job or attached, at its tool call's end: puts the pause with its grace (`putPause`) — `given`,
+ * else the store's at `home` (`graceAt`) — then the sessions' drain (`sessionsDrained`), so the pause takes hold before the next pass,
+ * which puts the drain again from the file. Refused (`Conflict`) while a pause stands, as `putPause` refuses it; a grace `given` out of
+ * its form (`Invalid`), as the command's check refuses it first.
+ */
+export const pauseParked = Effect.fn('pauseParked')(function* (
+  said: { why?: string; by?: string },
+  given: string | undefined,
+  home: string | undefined,
+  now: Date = new Date(),
+) {
+  const graceMs = yield* tried(() => (given === undefined ? graceAt(rootGiven(home, 'pause')).ms : graceGiven(given)));
+  const pause = yield* tried(() => putPause(said, now, graceMs));
+  yield* sessionsDrained({ graceMs });
+  return pause;
+});
+
+/**
  * Pauses the store at once: puts the pause (`putPause`), or keeps the one that stands as it was put — its since, its by and its why, so
- * `said` is then not written — and, for each task at work but a landing (`interruptsOf`), writes the ask that tries its step again once the
- * store is resumed, a continue of the session or a recheck of the check, naming the task (`interrupted`), and only then asks the engine to
- * stop it (`stopAsked`), so a stop is never taken with no ask to pick it up. A task whose step already has an ask for that try is left at
- * work (`skipped`). A stop the engine refuses — the task settled since it was read — is passed over: the tick sets its ask aside
- * (`pauseAskVoid`).
+ * `said` is then not written — and cuts its grace to 0 (`cutPause`), and puts the sessions' drain at that grace, which cuts every
+ * session's tool call in flight at once: each session parks and goes on as the same try once the store is resumed, so it is asked no try
+ * and no stop. For each check at work but a landing's (`interruptsOf`), it writes the ask that runs it again once the store is resumed,
+ * naming the task (`interrupted`), and only then asks the engine to stop it (`stopAsked`), so a stop is never taken with no ask to pick
+ * it up. A check whose step already has an ask for that try is left at work (`skipped`). A stop the engine refuses — the task settled
+ * since it was read — is passed over: the tick sets its ask aside (`pauseAskVoid`).
  */
 export const pauseNow = Effect.fn('pauseNow')(function* (said: { why?: string; by?: string }, now: Date = new Date()) {
   const e = yield* EngineService;
   const stands = readPause();
-  const pause = stands ?? putPause(said, now);
+  if (stands === null) yield* tried(() => putPause(said, now, 0));
+  const pause = yield* tried(() => cutPause());
+  yield* sessionsDrained({ graceMs: 0 });
   const { runs, interrupts } = yield* interruptsRead();
   const interrupted: Interrupt[] = [];
   const skipped: Interrupt[] = [];
   for (const i of interrupts) {
+    if (i.kind === 'session') {
+      interrupted.push(i);
+      continue;
+    }
     const run = runs.get(i.run);
     if (run === undefined) {
       skipped.push(i);
       continue;
     }
-    const ask = {
-      step: i.step,
-      try: tryOf(run, i.step) + 1,
-      mode: i.kind === 'check' ? ('recheck' as const) : ('continue' as const),
-      interrupted: i.taskId,
-      at: now.toISOString(),
-    };
+    const ask = { step: i.step, try: tryOf(run, i.step) + 1, mode: 'recheck' as const, interrupted: i.taskId, at: now.toISOString() };
     if (!runStore.asks.write(i.run, { kind: 'retry', of: 'try', ask }).written) {
       skipped.push(i);
       continue;

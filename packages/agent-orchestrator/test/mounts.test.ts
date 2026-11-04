@@ -26,7 +26,7 @@ import { CARD, filedOf, handedBy, INBOX, INPUT_FILE, INPUTS, mountHolds, readsAt
 import { factoryMounts, stepMounts } from '../src/factory/factory.ts';
 import { mountsLine } from '../src/start/index.ts';
 import { inputsMounts, readsMounts } from '../src/filed/filed.ts';
-import { volumeMounts } from '../src/filed/volumes.ts';
+import { volumeMounts } from '../src/volume/volume.ts';
 import { handedMounts } from '../src/artifacts/artifacts.ts';
 import { writesOutsideByRule } from '../src/workflow/index.ts';
 import { parseWorkflow, agentsDir } from '../src/workflow.ts';
@@ -397,7 +397,7 @@ test("REFUSED at nemia start: a factory's folder a step cannot be filed, each In
   );
 
   await t.test(
-    'a writable volume on a harness that holds only read-only mounts, naming the volume\'s fixes; marked read-only, the same step starts',
+    "a writable volume on a harness that holds only read-only mounts, naming the volume's fixes; marked read-only, the same step starts",
     async () => {
       const { repos, team } = fresh();
       const dir = coded(team, 'trio', 'sandbox: workspace-write\n');

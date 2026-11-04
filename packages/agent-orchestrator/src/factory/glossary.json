@@ -8,7 +8,8 @@
     "packages/agent-orchestrator/src/factories",
     "packages/agent-orchestrator/src/templates",
     "packages/agent-orchestrator/src/wiring",
-    "packages/agent-orchestrator/src/adopt"
+    "packages/agent-orchestrator/src/adopt",
+    "packages/agent-orchestrator/src/volume"
   ],
   "terms": [
     {

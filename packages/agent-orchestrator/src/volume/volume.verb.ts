@@ -1,7 +1,7 @@
 /**
- * `nemia factory volume add` and `volume rm`: a folder of the person's machine given to a factory's runs as a volume, marked `:ro` or `:rw`,
- * and taken back. Written into the factory's own file through the Factory door, whether or not it is made from a template: a volume is
- * the person's, never the template's.
+ * `nemia factory volume add` and `volume rm`: a folder of the person's machine given to a factory's runs as a volume, marked `:ro` or
+ * `:rw`, and taken back. Written into the factory's own file through the Factory door, whether or not it is made from a template: a volume
+ * is the person's, never the template's.
  */
 import path from 'node:path';
 import { Effect } from 'effect';
@@ -13,9 +13,9 @@ import { rooted } from '../wiring/wire.verb.ts';
 import { tried } from '../runtime-client.ts';
 import { Invalid, Missing } from '../refusal/refusal.ts';
 import { isDirectory } from '../record/record.store.ts';
-import { FactoryName } from './factory.model.ts';
-import { refuseName } from './factory.store.ts';
-import { factoryVolumes, volumeMark, type Volume } from './factory.ts';
+import { FactoryName } from '../factory/factory.model.ts';
+import { refuseName } from '../factory/factory.store.ts';
+import { factoryVolumes, volumeMark, type Volume } from '../factory/factory.ts';
 import { volumeOf, volumeRefusal, withVolume } from './volume.ts';
 
 /** The text under `key`, as the spec read it. */
@@ -28,6 +28,31 @@ const ONLY_HERE = { side: 'cli', why: 'the board shows no volume yet: nemia fact
 export const NOT_THE_WORKSPACE = "a step's writes there are not the run's workspace: nothing commits, lands or reverts them";
 
 const ADD_USAGE = '<factory> <path>:ro|:rw';
+
+/** The forms of `nemia factory volume`, as `nemia factory --help` lists them beside the factory's others. */
+export const VOLUME_FORMS = `nemia factory volume add <factory> <path>:ro|:rw  (nemia factory volume add --help)
+nemia factory volume rm <factory> <path>`;
+
+/** `nemia factory volume add --help`: what a volume is, and what it is not. */
+const VOLUME_HELP = `${VOLUME_FORMS}
+
+A volume is a folder of this machine a factory mounts for every local step of its runs, beside its
+repositories, as a container is given one: <path>:ro read-only, <path>:rw writable. The mark is
+required, since a volume left unmarked would be writable without anyone having said so.
+
+A writable volume is writable only for a step whose fence writes, and read-only for every other. It is
+not the run's workspace: nothing commits, lands or reverts what a step writes there, and every run of
+the factory reaches it at once. A volume never makes the factory work on its folder: where a start, a
+card or a schedule lands is unchanged.
+
+Kept in the factory's own file (factories/<name>.json, "volumes"), never in a template, and kept by
+nemia factory adopt and upgrade. Copied onto a run at its start, so a run in flight keeps what it began
+with. A second add of one path replaces it; nemia factory lists them under the factory.
+
+Refused, and nothing written: no :ro or :rw, a folder that is no directory, one of the factory's
+repositories, a folder at or inside the store, a writable one holding the store, the default factory,
+and a volume rm of a path it does not mount. A start is refused where a step's harness cannot hold a
+volume's mount: Codex holds no writable one.`;
 
 const ADD_SPEC: Spec = {
   positionals: [
@@ -60,6 +85,7 @@ export const FACTORY_VOLUME_ADD: Command<Added> = {
     "read-only (:ro) or writable (:rw); a writable one is not a run's workspace",
   ],
   spec: ADD_SPEC,
+  manual: VOLUME_HELP,
   writes: true,
   class: 'ask',
   only: ONLY_HERE,
@@ -95,7 +121,7 @@ const RM_USAGE = '<factory> <path>';
 export const FACTORY_VOLUME_RM: Command<{ file: string; removed: string }> = {
   name: 'factory volume rm',
   usage: RM_USAGE,
-  help: ["take a volume off a factory, by its path"],
+  help: ['take a volume off a factory, by its path'],
   spec: {
     positionals: [
       { key: 'factory', takes: 'required', kind: 'name' },
@@ -142,3 +168,6 @@ export const FACTORY_VOLUME_RM: Command<{ file: string; removed: string }> = {
   },
   print: ({ file, removed }, args) => [`${textOf(args, 'factory')}  volume ${removed} removed`, `changed: ${file}`],
 };
+
+/** `nemia factory volume`'s entries, in the order `nemia`'s help lists them. */
+export const FACTORY_VOLUMES: readonly Command[] = [FACTORY_VOLUME_ADD, FACTORY_VOLUME_RM] as readonly Command[];

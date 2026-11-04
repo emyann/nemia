@@ -86,8 +86,8 @@ export const adoptRefusal: AdoptRefusal = (factory, adoption) => {
 };
 
 /**
- * `factory` taken over by `template`, running from `tree`: its name, repositories, schedules, instruction and volumes kept; its workflows, hires
- * and revisions policy the template's `wiring`.
+ * `factory` taken over by `template`, running from `tree`: its name, repositories, schedules, instruction and volumes kept; its workflows,
+ * hires and revisions policy the template's `wiring`.
  */
 export const adopted: Adopted = (factory, wiring, template, tree) => ({
   name: factory.name,

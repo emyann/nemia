@@ -1,10 +1,13 @@
 /**
  * A factory's volume as a person spells it, and why one cannot be: `nemia factory volume add <factory> <path>:ro|:rw` reads the path and
- * its mark as docker compose's short syntax does (`volumeOf`), and refuses a volume no run should mount (`volumeRefusal`). Pure: the
- * command (`volume.verb.ts`) looks at the disk and hands in what it saw.
+ * its mark as docker compose's short syntax does (`volumeOf`), and refuses a volume no run should mount (`volumeRefusal`); and what a
+ * step is filed of a run's volumes (`volumeMounts`). Pure: the command (`volume.verb.ts`) looks at the disk and hands in what it saw.
  */
 import path from 'node:path';
-import { factoryVolumes, type Factory, type Volume } from './factory.ts';
+import { factoryVolumes, type Factory, type Volume } from '../factory/factory.ts';
+import type { Mount } from '../record/record.ts';
+import { writesNothing, type Fenced } from '../workflow/index.ts';
+import { isRemoteHarness } from '../harness/harness.ts';
 
 /** How a volume is spelled, for a refusal that names both. */
 const SPELLED = '<path>:ro to read it, <path>:rw to write it';
@@ -63,3 +66,14 @@ export function withVolume(factory: Pick<Factory, 'volumes'>, volume: Volume): {
   const was = volumes.find((v) => v.path === volume.path)?.readOnly ?? null;
   return { volumes: factoryVolumes({ volumes: [...volumes.filter((v) => v.path !== volume.path), volume] }), was };
 }
+
+/**
+ * The volumes `step` is filed with, of those its run mounts (`volumes`): each read-only as it was marked, and a writable one writable only
+ * where the step's fence writes (`writesNothing`), since a volume widens where a step's writes reach, never what it may do. None for a
+ * step on a remote agent, filed no local field. `writable:` never names one: it names a repository of the factory, by its folder's name.
+ */
+export const volumeMounts = (step: Fenced, volumes: readonly Mount[] | undefined): Mount[] => {
+  if (!volumes?.length || isRemoteHarness(step.harness)) return [];
+  const unwriting = writesNothing(step);
+  return volumes.map((v) => ({ path: v.path, readOnly: v.readOnly || unwriting }));
+};

@@ -67,12 +67,13 @@ const ScheduleSchema = Schema.StructWithRest(
 );
 
 /**
- * A factory's file: at least one repository, each a string; the workflows attached to it, each by its folder's name, its hires, a
- * step's `<workflow>/<step>` to an agent's name, and its schedules, by workflow, when it has any, and where its instruction is kept, a path
- * or the store, when it says; whether its runs follow merged revisions, `follow` or `pinned`, when it says (a templated factory says it
- * in its tree's wiring, and this key is not read); the folders it mounts beside its repositories (`volumes`), each `{ path, readOnly }`,
- * kept in this file whether or not it is made from a template, since they are the person's and never the template's; and the template it was made from, when it was (`nemia factory apply`): its folder,
- * its version and the parameters given. A key a later `nemia` writes beside them is kept, not refused.
+ * A factory's file: at least one repository, each a string; the workflows attached to it, each by its folder's name, its hires, a step's
+ * `<workflow>/<step>` to an agent's name, and its schedules, by workflow, when it has any, and where its instruction is kept, a path or the
+ * store, when it says; whether its runs follow merged revisions, `follow` or `pinned`, when it says (a templated factory says it in its
+ * tree's wiring, and this key is not read); the folders it mounts beside its repositories (`volumes`), each `{ path, readOnly }`, kept in
+ * this file whether or not it is made from a template, since they are the person's and never the template's; and the template it was made
+ * from, when it was (`nemia factory apply`): its folder, its version and the parameters given. A key a later `nemia` writes beside them is
+ * kept, not refused.
  */
 const FactoryFileSchema = Schema.StructWithRest(
   Schema.Struct({
@@ -84,7 +85,9 @@ const FactoryFileSchema = Schema.StructWithRest(
     revisions: Schema.optionalKey(Schema.Literals(REVISIONS_POLICIES)),
     volumes: Schema.optionalKey(
       Schema.Array(
-        Schema.StructWithRest(Schema.Struct({ path: Schema.String, readOnly: Schema.Boolean }), [Schema.Record(Schema.String, Schema.Unknown)]),
+        Schema.StructWithRest(Schema.Struct({ path: Schema.String, readOnly: Schema.Boolean }), [
+          Schema.Record(Schema.String, Schema.Unknown),
+        ]),
       ),
     ),
     template: Schema.optionalKey(

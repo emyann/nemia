@@ -349,9 +349,10 @@ const isDirectory = (at: string): boolean => fs.statSync(at, { throwIfNoEntry: f
 const mountsAt = (factory: Factory | undefined, repo: string | undefined): Mount[] =>
   factory ? factoryMounts(factory, repo).filter((m) => isDirectory(m.path)) : [];
 
-/** The volumes of `factory` a run in it mounts (`factoryVolumes`), each marked as named and a directory now; none in the default factory. */
-const volumesAt = (factory: Factory | undefined): Mount[] =>
-  factory ? factoryVolumes(factory).filter((v) => isDirectory(v.path)) : [];
+/**
+ * The volumes of `factory` a run in it mounts (`factoryVolumes`), each marked as named and a directory now; none in the default factory.
+ */
+const volumesAt = (factory: Factory | undefined): Mount[] => (factory ? factoryVolumes(factory).filter((v) => isDirectory(v.path)) : []);
 
 /**
  * Why `steps`, started from `opts` in `factory` on `own` (none for a folder run), cannot be given `mounts`: a `writable:` name no folder
@@ -390,7 +391,9 @@ export function leftOutMounts(run: Run): string[] {
   return leftOut(run).mounts;
 }
 
-/** The factory's volumes `startRun` left out of `run`'s volumes, as `nemia start` says them: each no directory now, as none was at start. */
+/**
+ * The factory's volumes `startRun` left out of `run`'s volumes, as `nemia start` says them: each no directory now, as none was at start.
+ */
 export function leftOutVolumes(run: Run): string[] {
   return leftOut(run).volumes;
 }

@@ -22,7 +22,7 @@ import type { Workflow } from '../workflow.ts';
 import { approvedFirst, gatesOf } from '../status/status.ts';
 import { fromNote } from './inputs.ts';
 import { leftOutMounts, leftOutVolumes, startRun, type StartedRun } from './start.verb.ts';
-import { volumeMounts } from '../filed/volumes.ts';
+import { volumeMounts } from '../volume/volume.ts';
 import { isRemoteHarness } from '../harness/harness.ts';
 import { labelsText } from '../labels/labels.ts';
 import { pausedRead } from '../list/list.verb.ts';
@@ -214,7 +214,9 @@ function volumeLines(run: Run): string[] {
       (w) =>
         `volume: ${w.path} — ${w.steps.length ? `writable for ${w.steps.join(', ')}, read-only for every other local step` : 'writable, and read-only for every step here, since none writes'}; not the run's workspace: nothing commits or lands what a step writes there`,
     ),
-    ...(missing.length ? [`not mounted: ${missing.join(', ')} — of the factory's volumes, and no directory now; start again once it is there`] : []),
+    ...(missing.length
+      ? [`not mounted: ${missing.join(', ')} — of the factory's volumes, and no directory now; start again once it is there`]
+      : []),
   ];
 }
 

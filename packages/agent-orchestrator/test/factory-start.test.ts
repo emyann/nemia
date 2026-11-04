@@ -348,7 +348,10 @@ test('a factory from nothing to a run: filed, given workflows, hires and a sched
         "writable for each step whose fence writes; a step's writes there are not the run's workspace: nothing commits, lands or reverts them",
         `changed: ${file} — runs started from now on mount it; a run in flight keeps what it was started with`,
       ]);
-      assert.equal((await typedFrom(ROOT, ['factory', 'volume', 'add', 'pipao', `${notes}:ro`]))[0], `pipao  volume ${notes} :ro (was :rw)`);
+      assert.equal(
+        (await typedFrom(ROOT, ['factory', 'volume', 'add', 'pipao', `${notes}:ro`]))[0],
+        `pipao  volume ${notes} :ro (was :rw)`,
+      );
       await typedFrom(ROOT, ['factory', 'volume', 'add', 'pipao', `${scratchpad}:rw`]);
       const volumes = [
         { path: notes, readOnly: true },

@@ -24,7 +24,16 @@
     },
     {
       "term": "Card state",
-      "meaning": "where a card is in its life — filed, queued, refused or started — computed once by the inbox's listing and sent on the wire as is.",
+      "meaning": "where a card is in its life: filed, queued or refused before it starts, and its run's phase once it has (pending, running, waiting, succeeded, failed, stopped, cancelled), read from the run each time the inbox is read and never stored on the card; a card whose run was removed reads filed again. Computed once by the orchestrator and sent on the wire as is.",
+      "type": "CardState",
+      "see": {
+        "label": "From a card to a landing",
+        "href": "/how-a-run-lives/#from-a-card-to-a-landing"
+      }
+    },
+    {
+      "term": "In play",
+      "meaning": "a card the inbox lists by default: filed, queued or refused, or started with a run that is pending, running or waiting. A card whose run ended is listed with nemia inbox --all, and behind the Inbox page's Ended filter.",
       "type": "CardState",
       "see": {
         "label": "From a card to a landing",

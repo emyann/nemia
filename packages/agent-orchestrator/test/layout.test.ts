@@ -308,10 +308,12 @@ test('REFUSED on the source: a value import of the tick from the cap it reads be
     [
       'src/cap/cap.verb.ts',
       'src/ending/ending.verb.ts',
+      'src/inbox/inbox.verb.ts',
       'src/list/list.verb.ts',
       'src/rest/informer.verb.ts',
       'src/summary/judged.verb.ts',
       'src/summary/judgement.verb.ts',
+      'src/summary/summary.verb.ts',
       'src/tick/advance.verb.ts',
       'src/tick/tick.verb.ts',
     ],

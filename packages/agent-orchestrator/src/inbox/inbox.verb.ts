@@ -1,6 +1,7 @@
 /**
  * Starting an inbox card (`startFromInbox`) and the queue's next card (`startQueued`, which the tick calls), each through `startRun`, then
- * taking the card out of the inbox. A controller: Effect programs, which reach the runtime through `start/start.verb.ts`.
+ * taking the card out of the inbox; and the inbox listed with each card's state (`inboxJudged`), which reads each started card's run's
+ * phase. A controller: Effect programs, which reach the runtime through `start/start.verb.ts` and the judged list.
  */
 import path from 'node:path';
 import { Cause, Effect, Exit } from 'effect';
@@ -10,6 +11,7 @@ import type { WorkflowDir } from '../folder/folder.model.ts';
 import { WorkflowDoor } from '../workflows/workflows.store.ts';
 import {
   fromText,
+  cardsListed,
   inboxListing,
   inboxNameRefusal,
   nextQueued,
@@ -22,6 +24,7 @@ import {
   startedRefusal,
   unfactoredCardRefusal,
   type InboxCard,
+  type CardListing,
   type InboxListing,
   type QueueStarted,
   type MissedStart,
@@ -35,6 +38,8 @@ import { RunDoor } from '../runs/runs.store.ts';
 import { CardName } from './inbox.model.ts';
 import { inboxCards, readableFactories } from './inbox.store.ts';
 import { repoFor, startRun, type StartedRun } from '../start/start.verb.ts';
+import { cardRuns, type SummaryHow } from '../summary/summary.verb.ts';
+import type { Engine } from '../runtime-client.ts';
 import { contextRefusal } from '../start/index.ts';
 import { placesOf } from '../folder/lookup.store.ts';
 import { defaultStartsAllowed, factoryNames, treeOf } from '../factory/factory.store.ts';
@@ -282,7 +287,7 @@ export const setFrom = Effect.fn('setFrom')(function* (name: string, runs: reado
  * The tries in `names` of cards `listing` does not list as tried — no longer queued as they were — removed; one that cannot be is left for
  * a later pass.
  */
-const dropStaleTries = (names: Iterable<string>, listing: readonly InboxListing[]) =>
+const dropStaleTries = (names: Iterable<string>, listing: readonly CardListing[]) =>
   Effect.gen(function* () {
     const door = yield* CardDoor;
     for (const name of names) {
@@ -320,7 +325,7 @@ export const startQueued = Effect.fn('startQueued')(function* (repo: string, giv
   const runs = given ?? (yield* (yield* RunDoor).runs.list());
   const files = yield* door.cards.entries();
   const tries = yield* door.tries.list();
-  const listing = inboxListing(files, runs, isDirectory, tries);
+  const listing = cardsListed(files, runs, isDirectory, tries);
   yield* dropStaleTries(tries.keys(), listing);
   if (!queueOrder(listing).length) return undefined;
   const factories = readableFactories();
@@ -353,4 +358,18 @@ export const startQueued = Effect.fn('startQueued')(function* (repo: string, giv
   return refused
     ? ({ card: next.name, refused: why, ...where } satisfies QueueStarted)
     : ({ card: next.name, failed: why, again: false, ...where } satisfies QueueStarted);
+});
+
+/**
+ * `nemia inbox`'s listing, each entry with its state (`inboxListing`): its cards and the tick's tries read through the Card door, the
+ * factories that read, and each run a card was started from with its phase as the list judges it, through the informer `how.memo`
+ * (`cardRuns`) — so a started card reads its run's phase, read now and never stored on the card. Reading a phase takes the engine, which
+ * `inbox.store.ts` does not import.
+ */
+export const inboxJudged = Effect.fn('inboxJudged')(function* (e: Engine, how: SummaryHow) {
+  const door = yield* CardDoor;
+  const entries = yield* door.cards.entries();
+  const tries = yield* door.tries.list();
+  const runs = yield* cardRuns(e, how);
+  return inboxListing(entries, runs, isDirectory, tries, readableFactories());
 });

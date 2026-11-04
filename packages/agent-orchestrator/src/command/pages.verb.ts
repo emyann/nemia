@@ -132,7 +132,7 @@ export const RUNS: Command<RunSummary[]> = {
  * How a read of the list reads, as `RUNS` does: the informer and the feed's filing times its caller keeps, verified as its
  * environment says; a caller that keeps neither judges every run.
  */
-const howOf = (env?: NodeJS.ProcessEnv, home?: string, kept?: Kept): SummaryHow => ({
+export const howOf = (env?: NodeJS.ProcessEnv, home?: string, kept?: Kept): SummaryHow => ({
   home: home ?? HOME,
   memo: kept?.runs ?? informerMemo(),
   filings: kept?.filings ?? { filed: new Map(), cursor: 0 },

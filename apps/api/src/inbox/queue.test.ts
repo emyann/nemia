@@ -123,11 +123,20 @@ test("a person queues cards, reads their place and the tick's tries, and takes t
       const entries = await listed();
       const byName = new Map(entries.map((e) => [e.name, e]));
       for (const entry of onStore(readInbox())) {
-        const { body, filedAt, ...rest } = byName.get(entry.name)!;
-        assert.deepEqual(rest, entry, `${entry.name}: every key the package lists, as it lists it, the api's own two beside them`);
+        const { body, filedAt, state: _state, ...rest } = byName.get(entry.name)!;
+        assert.deepEqual(
+          rest,
+          entry,
+          `${entry.name}: every key the package lists, as it lists it, the api's own two and its state beside them`,
+        );
         assert.equal(typeof body, 'string');
         assert.equal(typeof filedAt, 'string');
       }
+      assert.deepEqual(
+        [first.name, second.name, parked.name].map((name) => byName.get(name)!.state),
+        ['queued', 'refused', 'filed'],
+        "each card's state, none of them started",
+      );
       assert.equal(byName.get(first.name)!.queued!.place, 1);
       assert.match(byName.get(first.name)!.queued!.at, /^\d{4}-\d{2}-\d{2}T/);
       assert.equal(byName.get(first.name)!.tried, undefined, 'no try of a card the tick has not tried');

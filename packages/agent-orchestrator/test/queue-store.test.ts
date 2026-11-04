@@ -54,7 +54,7 @@ const {
 /** An inbox verb run at this test's store root, as `nemia` gives it one: its answer, or its refusal thrown. */
 const atRoot = <A, E>(program: Effect.Effect<A, E>): A => Effect.runSync(Effect.provideService(program, StoreRoot, ROOT));
 const addToInbox = (opts: Parameters<typeof verbs.addToInbox>[0]) => atRoot(verbs.addToInbox(opts));
-const readInbox = (memo?: Parameters<typeof verbs.readInbox>[0]) => atRoot(verbs.readInbox(memo));
+const readInbox = () => atRoot(verbs.readInbox());
 const { listRuns, readRun } = await import('../src/record/record.store.ts');
 const { main: cli } = await import('../src/cli/main.ts');
 const { cardFiles } = await import('../src/cards/cards.store.ts');
@@ -763,9 +763,9 @@ test('a card becomes a run: filed with its factory and its gate, queued, it wait
         ['Cache the views between passes', solo, path.join(solo, 'workflows', 'dev'), 'solo', true, { inbox: name }, true, true],
       );
       assert.deepEqual(
-        [readInbox().find((l) => l.name === name)?.state, /^queued:/m.test(fs.readFileSync(file, 'utf8'))],
-        ['started', false],
-        'the card kept, listed as started, its queued: line taken off',
+        [readInbox().find((l) => l.name === name)?.startedAs, /^queued:/m.test(fs.readFileSync(file, 'utf8'))],
+        [[run.id], false],
+        'the card kept, listed as started as its run, its queued: line taken off',
       );
       const next = await runWith(b.e, tickRun());
       assert.deepEqual(
@@ -1168,9 +1168,14 @@ test(
     const [byHand] = fromCard(removed.card.name);
     fs.rmSync(path.join(ROOT, 'runs', `${byHand.id}.json`));
     assert.deepEqual(
-      [readInbox().find((l) => l.name === removed.card.name)?.state, (await runWith(b.e, tickRun())).queue, fromCard(removed.card.name)],
-      ['filed', undefined, []],
-      'its run forgotten, the card reads filed, and the tick does not start it again',
+      [
+        readInbox().find((l) => l.name === removed.card.name)?.startedAs,
+        readInbox().find((l) => l.name === removed.card.name)?.queued,
+        (await runWith(b.e, tickRun())).queue,
+        fromCard(removed.card.name),
+      ],
+      [[], undefined, undefined, []],
+      'its run forgotten, the card is started as nothing and out of the queue, and the tick does not start it again',
     );
 
     const stuck = addToInbox({ text: 'Started by hand, and left behind', workflow: 'dev', repo });

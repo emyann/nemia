@@ -35,6 +35,7 @@ import {
   StoreRoot,
   type Factory,
   type InboxListing,
+  type InformerMemo,
 } from 'agent-orchestrator';
 import { readBody, type BodyIssue } from '../body.ts';
 import { refusedBeforeReading, type Guarded, type Refusal } from '../guard.ts';
@@ -94,10 +95,13 @@ export type InboxFromAnswer = { name: string; file: string; from: string[]; was:
 /** One card read for its page (`inbox show`), an entry of the package's table the api serves alone: on `GET /api/inbox/:name`. */
 const CARD = commandNamed('inbox show');
 
+/** What the inbox's reads keep between requests: the app's informer, which judges each started card's run, as `GET /api/runs` keeps it. */
+const keptOf = (informer: InformerMemo | undefined) => (informer ? { runs: informer } : {});
+
 const isDirectory = (at: string): boolean => Boolean(fs.statSync(at, { throwIfNoEntry: false })?.isDirectory());
 
 /**
- * The inbox as the package lists it (`cards`, every entry by default), each entry with its body and when its file was written
+ * The inbox as the package lists it (`cards`, the cards in play by default), each entry with its body and when its file was written
  * (`InboxEntry`). An entry dropped, or edited into a card that does not read, since the listing read it is listed as the listing has it,
  * with no body or time, and read again next time.
  */
@@ -275,9 +279,11 @@ function filingOf(body: typeof FILE_BODY.Type, repo: string, home: string): Fili
 /**
  * The inbox's routes. Each write passes the guard (guard.ts) before its body is read.
  *
- * - `GET /api/inbox` — `nemia inbox`'s cards, through its entry's handler, and every entry of the folder that does not read as one, with
- *   why: never hidden, as a workflow that does not load is not. 500 for a run's record that does not parse: the listing reads them all,
- *   for the runs a card was started as. Each entry carries its person `labels` (`{}` where it sets none). `?selector=`, given again
+ * - `GET /api/inbox` — `nemia inbox`'s cards still in play, through its entry's handler, and every entry of the folder that does not read
+ *   as one, with why: never hidden, as a workflow that does not load is not. A started card's `state` is its run's phase, judged through
+ *   the app's informer as `GET /api/runs` judges it; `?all=true` lists the cards whose run ended too, as `nemia inbox --all` does, and any
+ *   other value of `all` is a 422 naming `?all=true`. 500 for a run's record that does not parse: the listing reads them all, for the runs
+ *   a card was started as. Each entry carries its person `labels` (`{}` where it sets none). `?selector=`, given again
  *   for another, keeps the cards one of them takes (OR), over the card's labels with its `workflow:` and `factory:` where it sets them,
  *   as `nemia inbox -l` keeps them; a selector the package's grammar refuses is a 422 naming the key or the clause.
  * - `GET /api/inbox/:name` — one card, for its page (`InboxCardPage`). A name that would leave the inbox, or a hidden one, is refused in
@@ -300,22 +306,28 @@ function filingOf(body: typeof FILE_BODY.Type, repo: string, home: string): Fili
  * from its entry, `nemia inbox rm`'s, `nemia inbox queue`'s and `nemia inbox from`'s.
  */
 export const inbox = new Hono<ApiEnv>()
-  .get('/api/inbox', (c) =>
-    served(c, async ({ e, placeService, memo, home }) => {
+  .get('/api/inbox', (c) => {
+    const all = c.req.query('all');
+    if (all !== undefined && all !== 'true')
+      return c.json(
+        { error: `GET /api/inbox takes ?all=true to list every card, not ?all=${all}: drop it to list the cards in play` },
+        422,
+      );
+    return served(c, async ({ e, placeService, informer, env, home }) => {
       const { cards } = await runPlaced(
         { placeService, home },
         e,
-        INBOX.handler(selectorOf(c), undefined, home, { records: { inbox: memo.records.inbox } }),
+        INBOX.handler({ ...selectorOf(c), ...(all === 'true' ? { all: true } : {}) }, env, home, keptOf(informer)),
       );
       return c.json(await runPlaced({ placeService, home }, e, listInbox(cards, home)));
-    }),
-  )
+    });
+  })
   .get('/api/inbox/:name', (c) => {
     const name = c.req.param('name');
     const wrong = inboxNameRefusal(name);
     if (wrong) return c.json({ error: wrong }, 400);
-    return served(c, async ({ e, placeService, home }) => {
-      const { card, source } = (await runPlaced({ placeService, home }, e, CARD.handler({ name }, undefined, home))) as {
+    return served(c, async ({ e, placeService, informer, env, home }) => {
+      const { card, source } = (await runPlaced({ placeService, home }, e, CARD.handler({ name }, env, home, keptOf(informer)))) as {
         card: InboxListing;
         source: string;
       };

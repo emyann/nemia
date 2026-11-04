@@ -65,6 +65,11 @@ const RunFileSchema = Schema.StructWithRest(
     carried: Schema.optional(CarriedSchema),
     /** How far into its say file the words were handed to the session, in bytes. */
     heard: Schema.optional(Schema.Finite),
+    /**
+     * The limit the session was ended at without being resumed: `budget`, where a holder taking it up found its attempt had already
+     * spent its whole cap (`capLeft`, `attached.ts`). Carried onto its sighting as the harness's own end at its cap would be.
+     */
+    limit: Schema.optional(Schema.Literal('budget')),
     /** What its claude.ai bridge came to, where one was asked for: its facts, or why there is none. */
     bridge: Schema.optional(BridgeFactsSchema),
     /** The spawn, its brief left out: what a holder resumes the session with. */

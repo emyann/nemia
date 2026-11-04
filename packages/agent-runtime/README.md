@@ -1899,7 +1899,9 @@ and any other engine, or the same one before `hold`, runs a task as a job in a p
   and its spend lost (`docs/open-issues.md`). A call still held at its hook then is never written in flight, nor run.
 - **Taken up.** On a look, a holder adopts a session parked, or one whose holder's process is gone: it kills what is left of
   its Claude Code's process group, unless that pid is another process's now (`childStart`), then resumes it under the same id (`--resume=<id>`, no fork), told it was paused, or, after a
-  crash, which call did not finish. A non-holder reads such a session as `working`.
+  crash, which call did not finish. It is handed what is left of its attempt's spend cap (`--max-budget-usd`, the cap less what the
+  attempt spent so far), never the whole cap again; one that has spent it all is not resumed, and ends `failed` with
+  `limit: 'budget'`, as a job its cap cut does. A non-holder reads such a session as `working`.
 - **The drain.** `drain(pid)` writes a file naming a holder and when it started: its new calls wait until `drain(null)`, so a
   restart can wait for the calls in flight before it signals. A drain naming a process that is gone holds nothing, nor one left
   for a process whose pid a later one was given.

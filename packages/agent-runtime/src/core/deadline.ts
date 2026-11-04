@@ -5,7 +5,8 @@
  */
 import { elapsedMs, type Instant } from './clock.ts';
 import type { Monotonic } from './clock.ts';
-import { turnOf, type Attempt, type Event, type Now, type Sighting, type State } from './domain.ts';
+import type { Attempt, Event, Now, Sighting, State } from './domain.ts';
+import { turnOf } from './turn.ts';
 import { startedWhen } from './restart.ts';
 
 /** Whether `a` is held back at its hook now: seen held (`held`), and not seen going on since (`released`). */

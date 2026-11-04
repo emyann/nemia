@@ -433,7 +433,10 @@ async function measure(asked: Asked, root: string, fence: Fence) {
   };
 }
 
-/** The engine's verbs a pass on the copy may call: its reads, and the three writes that only append to the copy's journals. */
+/**
+ * The engine's verbs a pass on the copy may call: its reads, the three writes that only append to the copy's journals, and the sessions'
+ * drain, which each pass sets from the pause and which writes or removes the copy's own drain file alone.
+ */
 const PASS_VERBS = new Set([
   'view',
   'list',
@@ -448,6 +451,7 @@ const PASS_VERBS = new Set([
   'file',
   'admit',
   'stop',
+  'drainSessions',
 ]);
 
 /**

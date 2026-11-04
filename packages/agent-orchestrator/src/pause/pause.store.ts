@@ -108,9 +108,10 @@ export function cutPause(): Pause {
   const stands = readPause();
   if (stands === null) throw new Missing({ message: 'the store is not paused: there is nothing to cut (nemia pause --now puts one).' });
   const pause: Pause = { ...stands, timeoutMs: 0 };
-  const hidden = path.join(ROOT, `.cordon.${process.pid}`);
+  const file = pauseFile();
+  const hidden = path.join(path.dirname(file), `.cordon.${process.pid}`);
   fs.writeFileSync(hidden, `${JSON.stringify(pause)}\n`);
-  fs.renameSync(hidden, pauseFile());
+  fs.renameSync(hidden, file);
   return pause;
 }
 

@@ -659,8 +659,8 @@
     {
       "files": ["packages/agent-orchestrator/src/list/list.ts"],
       "rules": {
-        "max-lines-per-function": ["error", { "max": 156, "skipBlankLines": true, "skipComments": true }],
-        "complexity": ["error", { "max": 36 }],
+        "max-lines-per-function": ["error", { "max": 152, "skipBlankLines": true, "skipComments": true }],
+        "complexity": ["error", { "max": 34 }],
         "sonarjs/cognitive-complexity": ["error", 40]
       }
     },
@@ -787,8 +787,8 @@
     {
       "files": ["packages/agent-runtime/src/core/domain.ts"],
       "rules": {
-        "complexity": ["error", { "max": 26 }],
-        "sonarjs/cognitive-complexity": ["error", 22]
+        "complexity": ["error", { "max": 22 }],
+        "sonarjs/cognitive-complexity": ["error", 20]
       }
     },
     {

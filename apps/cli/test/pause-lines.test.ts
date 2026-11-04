@@ -4,10 +4,7 @@
  */
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {
-  pausedLines as orchestratorLines,
-  pausedWords as orchestratorWords,
-} from '../../../packages/agent-orchestrator/src/pause/pause.ts';
+import { pausedLines as orchestratorLines, pausedWords as orchestratorWords } from 'agent-orchestrator';
 import { pausedLines } from '../src/reads/ls-lines.ts';
 import { pausedWords } from '../src/watch/lines.ts';
 

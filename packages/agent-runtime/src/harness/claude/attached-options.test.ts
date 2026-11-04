@@ -266,8 +266,7 @@ const ROWS: { name: string; check: () => void }[] = [
     },
   },
   {
-    // The seam the orchestrator gives a factory's harness settings through: a key it puts in the task's settings reaches the SDK as is.
-    name: "a task's settings holding attribution reach the SDK's settings unchanged, beside auto-memory off",
+    name: "a task's settings holding attribution (a factory's harness setting) reach the SDK's settings unchanged, beside auto-memory off",
     check: () => {
       const attribution = { commit: '', pr: '' };
       const given = attachedOptions(withClaude({ settings: JSON.stringify({ attribution }), appendSystemPromptFile: APPEND }));

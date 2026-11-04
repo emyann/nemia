@@ -32,7 +32,7 @@ export type HarnessSettings = { claude?: ClaudeFactorySettings };
 export type SettingsAsRead = Readonly<Record<string, unknown>>;
 
 const SERVERS = "an agent's mcp: line and nemia factory server add";
-const RUNS = 'it runs a program, which no factory setting may';
+const RUNS = 'a program it runs';
 
 /** Where a Claude Code setting a factory may not set is owned instead, for the refusal to name. */
 const OWNED_ELSEWHERE: Readonly<Record<string, string>> = {
@@ -56,8 +56,7 @@ const OWNED_ELSEWHERE: Readonly<Record<string, string>> = {
   claudeMdExcludes: 'the runtime, which writes it for every session',
 };
 
-const isObject = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null && !Array.isArray(value);
+const isObject = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
 
 /** Why `value` is no `attribution`: neither a boolean nor an object of `commit`, `pr` (strings) and `sessionUrl` (a boolean). */
 function attributionRefusal(value: unknown): string | undefined {
@@ -79,7 +78,8 @@ const valueRefusal = (key: (typeof CLAUDE_FACTORY_SETTINGS)[number], value: unkn
       ? undefined
       : `is a ${key === 'language' ? 'string' : 'boolean'}`;
 
-const isAllowed = (key: string): key is (typeof CLAUDE_FACTORY_SETTINGS)[number] => (CLAUDE_FACTORY_SETTINGS as readonly string[]).includes(key);
+const isAllowed = (key: string): key is (typeof CLAUDE_FACTORY_SETTINGS)[number] =>
+  (CLAUDE_FACTORY_SETTINGS as readonly string[]).includes(key);
 
 /**
  * Why `settings`, a factory's `harnessSettings` as it was written, cannot be given to its runs: not an object; a harness other than
@@ -93,17 +93,25 @@ export function harnessSettingsRefusal(settings: unknown, factory: string): stri
     if (harness !== 'claude')
       return `the harness settings of ${factory} name ${harness}, where only ${SETTINGS_HARNESSES.join(', ')} takes settings from a factory: remove ${harness} from its file`;
     if (!isObject(keys)) return `the claude settings of ${factory} are no object: write them with nemia factory setting set`;
-    for (const [key, value] of Object.entries(keys)) {
-      const rm = `nemia factory setting rm ${factory} claude.${key}`;
-      if (!isAllowed(key)) {
-        const owner = OWNED_ELSEWHERE[key];
-        return `a factory does not set claude.${key}${owner ? `, which is ${owner.startsWith('it ') ? owner.slice(3) : `owned by ${owner}`}` : ''}: it sets ${CLAUDE_FACTORY_SETTINGS.join(', ')} alone. ${rm}`;
-      }
-      const wrong = valueRefusal(key, value);
-      if (wrong) return `claude.${key} of ${factory} ${wrong}: nemia factory setting set ${factory} claude.${key} <json>, or ${rm}`;
-    }
+    const refused = Object.entries(keys)
+      .map(([key, value]) => claudeKeyRefusal(key, value, factory))
+      .find((why) => why !== undefined);
+    if (refused) return refused;
   }
   return undefined;
+}
+
+/** Why the Claude Code setting `key` of `factory` cannot be `value`: a key off the list, naming where it is owned, or a wrong value. */
+function claudeKeyRefusal(key: string, value: unknown, factory: string): string | undefined {
+  const rm = `nemia factory setting rm ${factory} claude.${key}`;
+  if (!isAllowed(key)) {
+    const owner = OWNED_ELSEWHERE[key];
+    const owned =
+      owner === undefined ? '' : `, which ${owner === RUNS ? 'runs a program, which no factory setting may' : `is owned by ${owner}`}`;
+    return `a factory does not set claude.${key}${owned}: it sets ${CLAUDE_FACTORY_SETTINGS.join(', ')} alone. ${rm}`;
+  }
+  const wrong = valueRefusal(key, value);
+  return wrong && `claude.${key} of ${factory} ${wrong}: nemia factory setting set ${factory} claude.${key} <json>, or ${rm}`;
 }
 
 /** Whether `settings` are what a factory may set (`harnessSettingsRefusal`). */

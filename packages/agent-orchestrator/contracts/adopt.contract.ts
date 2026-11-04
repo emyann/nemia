@@ -43,7 +43,11 @@ const same = (a: string | number | boolean | undefined, b: string | number | boo
   a === b || (a !== a && b !== b);
 
 /** Whether two dictionaries hold the same entries, in the same order, a NaN the same as a NaN. */
-/** Whether `a` and `b` name the same keys, in the same order. */
+/**
+ * Whether `a` and `b` name the same keys, in the same order: what `keepsItsHarnessSettings` says of a factory's harness settings, whose
+ * values are what its file holds, unjudged (`unknown`), which the verifier compares by no means. That the values are carried is held by
+ * the story (`test/factory-start.test.ts`, its setting checkpoints).
+ */
 const sameKeys = (a: Readonly<Record<string, unknown>>, b: Readonly<Record<string, unknown>>): boolean => {
   const was = Object.keys(a);
   const now = Object.keys(b);
@@ -152,8 +156,6 @@ const adoptedSpec = spec<(factory: Factory, wiring: Wiring, template: FactoryTem
     },
     keepsItsHarnessSettings: {
       description: "It keeps its harness settings, the same ones, none where it had none: they are the person's, never the template's",
-      // Its values are what the file holds, unjudged (`unknown`), which the verifier compares by no means: their keys are the law, and
-      // that the values are carried is held by the story (`test/factory-start.test.ts`, its setting checkpoints).
       condition: ({ input: [factory], output }) =>
         (output.harnessSettings === undefined) === (factory.harnessSettings === undefined) &&
         sameKeys(output.harnessSettings ?? {}, factory.harnessSettings ?? {}),

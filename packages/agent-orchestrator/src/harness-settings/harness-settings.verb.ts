@@ -12,7 +12,14 @@ import { tried } from '../runtime-client.ts';
 import { Invalid, Missing } from '../refusal/refusal.ts';
 import { FactoryName } from '../factory/factory.model.ts';
 import { refuseName } from '../factory/factory.store.ts';
-import { CLAUDE_FACTORY_SETTINGS, harnessSettingsRefusal, settingKeyOf, settingsNamed, withoutSetting, withSetting } from './harness-settings.ts';
+import {
+  CLAUDE_FACTORY_SETTINGS,
+  harnessSettingsRefusal,
+  settingKeyOf,
+  settingsNamed,
+  withoutSetting,
+  withSetting,
+} from './harness-settings.ts';
 
 /** The text under `key`, as the spec read it. */
 const textOf = (args: Args, key: string): string => (typeof args[key] === 'string' ? args[key] : '');

@@ -185,14 +185,19 @@ const said = (harness: string, step: FiledStep, config: Parameters<typeof config
 test("filedConfig: a Claude Code step is given its factory's harness settings beneath its own", async (t) => {
   const OFF = { attribution: { commit: '', pr: '' } };
   const given = (step: Workflow, own: object, harnessSettings?: object) =>
-    filedConfig(step, [step], { gates: [], ...(harnessSettings === undefined ? {} : { harnessSettings }) }, {
-      model: undefined,
-      budgetUsd: undefined,
-      runArtifacts: '/runs/r/artifacts',
-      inbox: '/inbox',
-      own,
-      landingDenied: () => [],
-    });
+    filedConfig(
+      step,
+      [step],
+      { gates: [], ...(harnessSettings === undefined ? {} : { harnessSettings }) },
+      {
+        model: undefined,
+        budgetUsd: undefined,
+        runArtifacts: '/runs/r/artifacts',
+        inbox: '/inbox',
+        own,
+        landingDenied: () => [],
+      },
+    );
   const settingsOf = (config: object): unknown => {
     const claude: unknown = Reflect.get(config, 'claude');
     const settings: unknown = typeof claude === 'object' && claude !== null ? Reflect.get(claude, 'settings') : undefined;
@@ -205,7 +210,9 @@ test("filedConfig: a Claude Code step is given its factory's harness settings be
     }),
   );
   await t.test("the agent's other flags are kept", () =>
-    assert.deepEqual(Reflect.get(Reflect.get(given(stepOf(), { claude: { pluginDir: ['/p'] } }, { claude: OFF }), 'claude'), 'pluginDir'), ['/p']),
+    assert.deepEqual(Reflect.get(Reflect.get(given(stepOf(), { claude: { pluginDir: ['/p'] } }, { claude: OFF }), 'claude'), 'pluginDir'), [
+      '/p',
+    ]),
   );
   await t.test('a step with no agent is given a claude key for them', () =>
     assert.deepEqual(settingsOf(given(stepOf(), { enabledSkills: 'default' }, { claude: OFF })), OFF),

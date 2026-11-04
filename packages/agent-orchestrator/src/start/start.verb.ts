@@ -360,10 +360,10 @@ const volumesAt = (factory: Factory | undefined): Mount[] => (factory ? factoryV
  * The harness settings of `factory` a run in it freezes, or why it cannot start (`harnessSettingsRefusal`, a key a person wrote by hand
  * that a factory may not set); none in the default factory, and for a factory that names none.
  */
-const settingsAt = (factory: Factory | undefined): HarnessSettings | string | undefined => {
+const settingsAt = (factory: Factory | undefined): Effect.Effect<HarnessSettings | undefined, Invalid> => {
   const settings = factory?.harnessSettings;
-  if (factory === undefined || settings === undefined || isHarnessSettings(settings)) return settings;
-  return harnessSettingsRefusal(settings, factory.name);
+  if (factory === undefined || settings === undefined || isHarnessSettings(settings)) return Effect.succeed(settings);
+  return Effect.fail(new Invalid({ message: harnessSettingsRefusal(settings, factory.name) ?? 'its harness settings do not read' }));
 };
 
 /**
@@ -433,7 +433,8 @@ function leftOut(run: Run): { mounts: string[]; volumes: string[] } {
 
 /**
  * What `opts` tells the run, with `steps` as the workflow it freezes, `inputs` by name, `factory` the one it is started in, `mounts`
- * the folders it gives each local step, `volumes` the factory's volumes, and `harnessSettings` its harness settings; an option not given is left out, and so are the default
+ * the folders it gives each local step, `volumes` the factory's volumes, and `harnessSettings` its harness settings; an option not given is
+ * left out, and so are the default
  * factory, no mounts and no volumes. No gate of it is
  * timed yet (`gatesTimed`), no denied call counted (`deniedCounted`), no settle counted (`settlesCounted`), and its timeline not handed
  * to the metrics (`runTimed`).
@@ -680,8 +681,7 @@ export const startRun = Effect.fn('start')(function* (opts: StartOptions) {
   const refusedContext = contextRefusal(opts.context ?? [], opts.after ?? [], runStore.runs.exists, id);
   if (refusedContext) return yield* Effect.fail(refusedContext);
   const inherited = yield* inheritedOf(opts, edits);
-  const harnessSettings = settingsAt(factory);
-  if (typeof harnessSettings === 'string') return yield* Effect.fail(new Invalid({ message: harnessSettings }));
+  const harnessSettings = yield* settingsAt(factory);
   const mounts = mountsAt(factory, folder ? undefined : opts.repo);
   const volumes = volumesAt(factory);
   const unmounted = mountRefusal(opts, steps, places, factory, folder ? undefined : opts.repo, mounts, denied, volumes);

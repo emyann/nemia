@@ -66,7 +66,8 @@ export const DEFAULT_REVISIONS: RevisionsPolicy = 'pinned';
  * revisions, when it says (`revisionsOf`). `template` and `tree`: the template it was made from, and the folder it runs from, its
  * workflows, agents, skills, wiring and instruction, when it was made from one. `volumes`: the folders of the person's machine its runs
  * mount for every local step beside its repositories, each read-only or writable as it was named (`Volume`), when it names any.
- * `harnessSettings`: the settings of a harness every session of its runs' steps on it is given, when it names any (`HarnessSettings`), as the file holds them: judged at a start and at the door's write, not on read.
+ * `harnessSettings`: the settings of a harness every session of its runs' steps on it is given, when it names any (`HarnessSettings`), as
+ * the file holds them: judged at a start and at the door's write, not on read.
  */
 export type Factory = {
   name: string;

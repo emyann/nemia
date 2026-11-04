@@ -72,7 +72,8 @@ const ScheduleSchema = Schema.StructWithRest(
  * store, when it says; whether its runs follow merged revisions, `follow` or `pinned`, when it says (a templated factory says it in its
  * tree's wiring, and this key is not read); the folders it mounts beside its repositories (`volumes`), each `{ path, readOnly }`, kept in
  * this file whether or not it is made from a template, since they are the person's and never the template's; the settings of a harness
- * its runs' sessions are given (`harnessSettings`), kept here for the same reason and judged by the model at the door, not on read; and the template it was made
+ * its runs' sessions are given (`harnessSettings`), kept here for the same reason and judged by the model at the door, not on read; and the
+ * template it was made
  * from, when it was (`nemia factory apply`): its folder, its version and the parameters given. A key a later `nemia` writes beside them is
  * kept, not refused.
  */

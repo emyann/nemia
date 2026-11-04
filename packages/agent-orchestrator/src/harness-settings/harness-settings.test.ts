@@ -35,8 +35,8 @@ test('a factory sets the allowed Claude Code settings alone, each of its type', 
       const refusal = harnessSettingsRefusal(row.settings, 'f');
       if (row.refused === false) assert.equal(refusal, undefined);
       else assert.match(refusal ?? '', new RegExp(row.refused));
-      // The model at the door refuses what the judgement refuses, an extra key included, where a Struct would strip it.
-      if (row.settings !== undefined) assert.equal(Schema.is(HarnessSettings)(row.settings), row.refused === false, 'the model agrees');
+      if (row.settings !== undefined)
+        assert.equal(Schema.is(HarnessSettings)(row.settings), row.refused === false, 'the model refuses it too, never strips it');
     });
 });
 
@@ -59,7 +59,9 @@ test('a Claude Code step is filed the allowed settings, its own laid over them',
 });
 
 test('a setting is named <harness>.<key>, set and taken off', async (t) => {
-  await t.test('split at its first dot', () => assert.deepEqual(settingKeyOf('claude.attribution'), { harness: 'claude', key: 'attribution' }));
+  await t.test('split at its first dot', () =>
+    assert.deepEqual(settingKeyOf('claude.attribution'), { harness: 'claude', key: 'attribution' }),
+  );
   await t.test('no dot is refused', () => assert.equal(typeof settingKeyOf('attribution'), 'string'));
   await t.test('set beside the others', () =>
     assert.deepEqual(withSetting({ claude: { language: 'french' } }, 'claude', 'attribution', false), {

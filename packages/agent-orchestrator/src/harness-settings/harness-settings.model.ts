@@ -13,7 +13,11 @@ const Rest = [Schema.Record(Schema.String, Schema.Unknown)] as const;
 const Attribution = Schema.Union([
   Schema.Boolean,
   Schema.StructWithRest(
-    Schema.Struct({ commit: Schema.optional(Schema.String), pr: Schema.optional(Schema.String), sessionUrl: Schema.optional(Schema.Boolean) }),
+    Schema.Struct({
+      commit: Schema.optional(Schema.String),
+      pr: Schema.optional(Schema.String),
+      sessionUrl: Schema.optional(Schema.Boolean),
+    }),
     Rest,
   ),
 ]);
@@ -28,8 +32,11 @@ export const ClaudeFactorySettings = Schema.StructWithRest(
   Rest,
 ).annotate({ identifier: 'ClaudeFactorySettings' });
 
-/** A factory's harness settings, by harness (`claude` alone), every key off the list refused. */
-export const HarnessSettings = Schema.StructWithRest(Schema.Struct({ claude: Schema.optional(ClaudeFactorySettings) }), Rest)
-  // No identifier: the model's diagram draws it as a field of the factory and of the run, not as an entity of its own.
-  .check(Schema.makeFilter((settings) => harnessSettingsRefusal(settings, '<factory>') ?? true));
+/**
+ * A factory's harness settings, by harness (`claude` alone), every key off the list refused. No identifier: the model's diagram draws it
+ * as a field of the factory and of the run, not as an entity of its own.
+ */
+export const HarnessSettings = Schema.StructWithRest(Schema.Struct({ claude: Schema.optional(ClaudeFactorySettings) }), Rest).check(
+  Schema.makeFilter((settings) => harnessSettingsRefusal(settings, '<factory>') ?? true),
+);
 export type HarnessSettings = typeof HarnessSettings.Type;

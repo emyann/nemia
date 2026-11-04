@@ -25,14 +25,26 @@ test('a volume is read as compose spells it, and its mark is required', async (t
 });
 
 test('a volume that is no directory, a repository, or reaches the store is refused', async (t) => {
-  const factory = { name: 'f', repos: ['/r'] };
-  const dirs = new Set(['/r', '/r/sub', '/home/me', '/home/me/.agent-workflows', '/home/me/.agent-workflows/runs', '/notes']);
+  const factory = { name: 'f', repos: ['/r', '/p/app'] };
+  const dirs = new Set([
+    '/p',
+    '/p/app',
+    '/r',
+    '/r/sub',
+    '/home/me',
+    '/home/me/.agent-workflows',
+    '/home/me/.agent-workflows/runs',
+    '/notes',
+  ]);
   const store = '/home/me/.agent-workflows';
   const rows: { name: string; path: string; readOnly: boolean; refused: boolean }[] = [
     { name: 'a folder of this machine is taken', path: '/notes', readOnly: false, refused: false },
     { name: 'no directory', path: '/gone', readOnly: true, refused: true },
     { name: 'one of its repositories', path: '/r', readOnly: true, refused: true },
-    { name: 'a folder inside a repository is taken', path: '/r/sub', readOnly: true, refused: false },
+    { name: 'a read-only folder inside a repository is taken', path: '/r/sub', readOnly: true, refused: false },
+    { name: 'a writable folder inside a repository', path: '/r/sub', readOnly: false, refused: true },
+    { name: 'a writable folder holding a repository', path: '/p', readOnly: false, refused: true },
+    { name: 'a read-only folder holding a repository is taken', path: '/p', readOnly: true, refused: false },
     { name: 'the store itself', path: store, readOnly: true, refused: true },
     { name: 'a folder inside the store', path: `${store}/runs`, readOnly: true, refused: true },
     { name: 'a writable folder holding the store', path: '/home/me', readOnly: false, refused: true },

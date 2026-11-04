@@ -36,9 +36,10 @@ const within = (inner: string, outer: string): boolean => {
 
 /**
  * Why `volume` cannot be a volume of `factory`, or undefined: a path that is no directory (`isDirectory` looks); one of the factory's
- * repositories, which its runs mount already, and the one a run works on is its workspace; one at or inside the store `storeRoot`, whose
- * runs, cards and worktrees no step reads around its doors; and a writable one that holds the store, which would let a step write them.
- * A read-only one that holds it, a person's home say, is taken.
+ * repositories, which its runs mount already, and the one a run works on is its workspace; a writable one inside one of them or holding
+ * one, which would let a step write a repository outside its worktree, the run's own included, which no run mounts; one at or inside the
+ * store `storeRoot`, whose runs, cards and worktrees no step reads around its doors; and a writable one that holds the store, which would
+ * let a step write them. A read-only one that holds it, a person's home say, is taken.
  */
 export function volumeRefusal(
   factory: Pick<Factory, 'name' | 'repos'>,
@@ -51,6 +52,9 @@ export function volumeRefusal(
   if (!isDirectory(at)) return `${at} is no directory: a volume is a folder of this machine. Give the path to one. Nothing was changed.`;
   if (factory.repos.some((r) => path.resolve(r) === at))
     return `${at} is a repository of the factory ${factory.name}, which its runs mount already, read-only, or work on: name a step's \`writable:\` to write it. Nothing was changed.`;
+  const reached = factory.repos.map((r) => path.resolve(r)).find((r) => within(at, r) || within(r, at));
+  if (!volume.readOnly && reached !== undefined)
+    return `${at} ${within(at, reached) ? 'is inside' : 'holds'} ${reached}, a repository of the factory ${factory.name}, and a writable volume would let a step write it outside its worktree, where nothing commits or lands what it writes: mount it read-only — ${at}:ro — or name a step's \`writable:\` to write the repository. Nothing was changed.`;
   if (within(at, store))
     return `${at} is inside Nemia's store, ${store}, whose runs, cards and worktrees a step reaches only through its verbs: mount a folder outside it. Nothing was changed.`;
   if (!volume.readOnly && within(store, at))

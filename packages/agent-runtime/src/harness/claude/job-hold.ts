@@ -1,12 +1,12 @@
 /**
  * What a held session and a held job share: how long a call may wait at its `PreToolUse` hook, which call belongs to a sub-agent and is
  * never held, the calls in flight a session keeps, and the two files a Claude Code job holds by — the store's sessions' drain, which says
- * every job is to stop at its call's end, and the job's own hold file, which says what it is doing about it.
+ * every session, job or attached, is to stop at its call's end, and the job's own hold file, which says what it is doing about it.
  *
  * The sessions' drain is apart from the holder's (`putDrain`, `attached-file.ts`): a restart drains and lifts its holder, and must neither
  * hold nor release the jobs (two facts, two files). It carries when it was put and its grace, so a job that reads it judges by itself,
- * on every poll, whether its call has outlived the grace or its hold the bound (`bin/ae-claude-job.ts`): nothing is carried between two
- * reads but the file.
+ * on every poll, whether its call has outlived the grace or its hold the bound (`bin/ae-claude-job.ts`), and a holder, on every look,
+ * whether an attached session's call has (`attached.ts`): nothing is carried between two reads but the file.
  *
  * The hold file is the job's word on what it was doing, written whole as it changes (a temp file renamed over it), and read by the
  * runner's look beside its run: a call in flight (`calling`), a drain read standing (`draining`), a call waiting at its hook
@@ -103,9 +103,15 @@ const readDecoded = <A>(file: string, decode: (u: unknown) => Option.Option<A>):
 const decodeDrain = Schema.decodeUnknownOption(SessionDrainSchema);
 const decodeHold = Schema.decodeUnknownOption(JobHoldSchema);
 
-/** The sessions' drain put on the store at `root`, stamped now: every job's next call waits, and a call in flight has `graceMs`. */
-export const putSessionDrain = (root: string, { graceMs }: { graceMs: number }): void =>
+/**
+ * The sessions' drain put on the store at `root`: every session's next call waits, and a call in flight has `graceMs`. A drain standing
+ * with the same grace is kept as it is, so a pass that puts it again on every tick never moves the `at` its grace counts from; one with
+ * another grace is stamped now, which is how a grace of 0 cuts a standing drain's calls at once.
+ */
+export const putSessionDrain = (root: string, { graceMs }: { graceMs: number }): void => {
+  if (sessionDrainOf(sessionDrainFile(root))?.graceMs === graceMs) return;
   writeWhole(sessionDrainFile(root), { at: new Date(instantNow().at).toISOString(), graceMs } satisfies SessionDrain);
+};
 
 /** The sessions' drain lifted: no job waits. */
 export const liftSessionDrain = (root: string): void => fs.rmSync(sessionDrainFile(root), { force: true });

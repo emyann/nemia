@@ -40,6 +40,8 @@ import {
   type AttachedRun,
 } from '../src/harness/claude/attached-file.ts';
 import { fold, idleOf, type Event, type Sighting } from '../src/core/index.ts';
+import { cutWords } from '../src/core/restart.ts';
+import { liftSessionDrain, putSessionDrain } from '../src/harness/claude/job-hold.ts';
 import { respawning } from '../src/core/domain.ts';
 import { purseOf } from '../src/core/clock.ts';
 import { instantNow } from '../src/core/engine/now.ts';
@@ -824,6 +826,85 @@ test(
       );
       assert.equal(run(root)?.heldBack, undefined, "a call marked as a sub-agent's is never counted as held back");
     });
+  },
+);
+
+test(
+  'the sessions’ drain holds an attached session’s next call, cuts a call past its grace, and tells the session the cut once lifted',
+  WAITED,
+  async (t) => {
+    await t.test('a new call waits at its hook, its sighting held back after the call that ended, its process living on', async (rt) => {
+      const { root, dir, request } = kept({ call: 'Read', next: 'Edit' });
+      const h = await holder(root, 1_000);
+      rt.after(async () => {
+        liftSessionDrain(root);
+        await h.close();
+      });
+      await Effect.runPromise(h.attached.ops.spawn(request));
+      assert.equal((await inCall(rt, root)).tool, 'Read');
+      putSessionDrain(root, { graceMs: 600_000 });
+      fs.writeFileSync(path.join(dir, 'release'), '');
+      fs.writeFileSync(path.join(dir, 'next'), '');
+      const seen = await until(
+        rt,
+        async () => {
+          const got = await sighted(h);
+          return got?.heldBack !== undefined && got;
+        },
+        'the next call held back, on the sighting',
+        { everyMs: 50 },
+      );
+      assert.equal(seen.heldBack?.after?.tool, 'Read', 'held after the main-thread call that ended last');
+      assert.equal(seen.calling, undefined, 'a call held is not in flight');
+      assert.equal(seen.state, 'working');
+      assert.deepEqual(
+        (lines(dir, 'answers.jsonl') as { event: string }[]).map((a) => a.event),
+        ['PreToolUse', 'PostToolUse'],
+        'the held call’s hook is not answered',
+      );
+      assert.equal(alive(Number(fs.readFileSync(path.join(dir, 'pid'), 'utf8'))), true, 'its Claude Code lives on');
+      liftSessionDrain(root);
+      assert.equal((await until(rt, () => run(root)?.calling, 'the held call let through', { everyMs: 50 })).tool, 'Edit');
+      assert.equal((await sighted(h))?.heldBack, undefined, 'nothing held once the drain is lifted');
+      fs.writeFileSync(path.join(dir, 'release-next'), '');
+      await idle(rt, root);
+    });
+
+    await t.test(
+      'a call in flight past the grace: its turn interrupted and the cut kept; once lifted it is told the cut, under the same session',
+      async (rt) => {
+        const { root, dir, request } = kept({ call: 'Bash' });
+        const h = await holder(root, 1_000);
+        rt.after(async () => {
+          liftSessionDrain(root);
+          await h.close();
+        });
+        await Effect.runPromise(h.attached.ops.spawn(request));
+        assert.equal((await inCall(rt, root)).tool, 'Bash');
+        const sessionId = await until(rt, () => run(root)?.sessionId, 'the session named', { everyMs: 50 });
+        putSessionDrain(root, { graceMs: 0 });
+        await until(rt, async () => (await sighted(h), interrupts(dir) === 1), 'the turn interrupted on a look past the grace', {
+          everyMs: 50,
+        });
+        await until(rt, () => resultsOf(root) === 1, 'the cut turn printed its result', { everyMs: 50 });
+        assert.equal(run(root)?.cut?.tool, 'Bash', 'the cut call kept on the run file');
+        const seen = await sighted(h);
+        assert.equal(seen?.state, 'working', 'a cut session is neither idle nor ended: it waits for the lift');
+        assert.ok(seen?.heldBack, 'and its sighting says it is held');
+        assert.equal(interrupts(dir), 1, 'one interrupt, however many looks');
+        assert.equal(alive(Number(fs.readFileSync(path.join(dir, 'pid'), 'utf8'))), true, 'its Claude Code lives on');
+        liftSessionDrain(root);
+        await until(rt, async () => (await sighted(h), saidIn(dir).length === 2), 'the session told the cut on a look after the lift', {
+          everyMs: 50,
+        });
+        assert.deepEqual(saidIn(dir), ['do the work', cutWords('Bash')]);
+        assert.equal(run(root)?.cut, undefined, 'the cut is cleared once told');
+        assert.equal(run(root)?.sessionId, sessionId, 'the same session');
+        assert.equal(lines(dir, 'argv.jsonl').length, 1, 'on the one Claude Code, never resumed in another');
+        fs.writeFileSync(path.join(dir, 'release'), '');
+        await idle(rt, root);
+      },
+    );
   },
 );
 

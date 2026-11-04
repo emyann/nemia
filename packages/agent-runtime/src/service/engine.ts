@@ -535,11 +535,13 @@ export type EngineShape = {
   readonly drain: (holder: number | null) => Effect.Effect<void, DrainRefused>;
   /**
    * Put the store's sessions' drain, with how long a call in flight is given to finish (`graceMs`), or with `null` lift it. While it stands
-   * every Claude Code job, on its own process, finishes its call in flight and holds its next main-thread call at its hook; past the
-   * grace with a call in flight, or held past its bound, it ends itself parked, and the engine continues it as a new attempt of the
-   * same task once the drain is lifted. Apart from the holder's drain (`drain`): a restart drains and lifts its holder and neither holds
-   * nor releases the jobs. Refused — `DrainRefused` — for anything but `{ graceMs }` of whole milliseconds from 0 with no other key, or
-   * null.
+   * every Claude Code session finishes its call in flight and holds its next main-thread call at its hook. A job, on its own process,
+   * past the grace with a call in flight, or held past its bound, ends itself parked, and the engine continues it as the same try once
+   * the drain is lifted. An attached session, past the grace with a call in flight, has its turn interrupted by its holder and the cut
+   * call kept, and is told the cut once the drain is lifted, under the same session. Put again with the grace it stands with, the drain
+   * is kept as it stands, its `at` unmoved, so a pass may put it on every tick; put with another grace, it is stamped anew, so a grace
+   * of 0 cuts at once. Apart from the holder's drain (`drain`): a restart drains and lifts its holder and neither holds nor releases the
+   * jobs. Refused — `DrainRefused` — for anything but `{ graceMs }` of whole milliseconds from 0 with no other key, or null.
    */
   readonly drainSessions: (given: { graceMs: number } | null) => Effect.Effect<void, DrainRefused>;
   /**

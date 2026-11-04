@@ -14,6 +14,12 @@ kept for what it measured of Claude Code itself.
   waiting; a turn cut by `interrupt()` prints `error_during_execution` with its `total_cost_usd`, and the CLI saves its total as it
   leaves. On a real Claude Code 2.1.316, and what it does when a hook outlives its `timeout` (`HOOK_HOLD_S`, 24 h), it is unmeasured
   (`docs/open-issues.md`, *A job's hold is measured on the stand-in alone*): `JOB_HOLD_MS` parks an hour before that timeout.
+- **An attached session's turn cut by `Query.interrupt()` under the sessions' drain leaves it answering under its id** (SDK 0.3.316, on
+  the stand-in Claude Code of `test/attached.boundary.test.ts`, 2026-11-04): a call in flight past the drain's grace is cut by the
+  SDK's `interrupt` control request, one per cut however many looks read it; the turn ends with an `error_during_execution` result,
+  the Claude Code process lives on with its input open, and the words pushed once the drain is lifted (`cutWords`) begin a turn of
+  their own on the same process and session id, no resume. On a real Claude Code it is unmeasured (`docs/open-issues.md`, *A job's
+  hold is measured on the stand-in alone*).
 
 `CLAUDE.md`, *Claude Code, as a harness*, forwards here, and the five documents that point at that heading resolve through it. Where
 the orchestrator's code holds a fact today, it is named beside it.

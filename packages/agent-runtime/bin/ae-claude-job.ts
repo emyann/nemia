@@ -176,13 +176,15 @@ const requestAt = (at: string | undefined): Requested => {
  *   `holdMs`, the job gives up its hold. Either way it parks (`park`): `parked` written on the hold file, with the call it cut as its
  *   `calling`, and `ended` told to end the session.
  * - The hold file says, as it changes: the earliest call in flight (`calling`), the drain read standing (`draining`, since this process
- *   first read it), a call waiting at its hook (`heldBack`, since the first of them began to wait); the last two gone once the drain
- *   is read lifted. Once parked it says `parked`, and nothing after.
+ *   first read it), a call waiting at its hook (`heldBack`, since the first of them began to wait, and `after`, the main-thread call
+ *   that ended last, kept by its `PostToolUse` or `PostToolUseFailure` hook); the last two gone once the drain is read lifted. Once
+ *   parked it says `parked`, and nothing after.
  */
 const holdOf = (io: HoldIO, ended: () => void) => {
   const calls: CallsInFlight = new Map();
   const waiting: string[] = [];
   let draining: string | undefined;
+  let after: { tool: string } | undefined;
   let parked: JobHold['parked'];
   let written: string | undefined;
   const write = (): void => {
@@ -190,7 +192,7 @@ const holdOf = (io: HoldIO, ended: () => void) => {
     const hold: JobHold = {
       ...(first && !parked ? { calling: first } : {}),
       ...(draining ? { draining: { since: draining } } : {}),
-      ...(waiting[0] && !parked ? { heldBack: { since: waiting[0] } } : {}),
+      ...(waiting[0] && !parked ? { heldBack: { since: waiting[0], ...(after ? { after } : {}) } } : {}),
       ...(parked ? { parked } : {}),
     };
     const text = JSON.stringify(hold);
@@ -219,7 +221,9 @@ const holdOf = (io: HoldIO, ended: () => void) => {
     write();
   };
   const held = (): boolean => !parked && drain() !== null && calls.size === 0;
-  const over = async (_input: unknown, id: string | undefined) => {
+  const over = async (input: unknown, id: string | undefined) => {
+    const ended = id === undefined ? undefined : calls.get(id);
+    if (ended && !inside(input)) after = { tool: ended.tool };
     if (id && calls.delete(id) && !parked) write();
     return {};
   };

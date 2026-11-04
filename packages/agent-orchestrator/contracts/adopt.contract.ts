@@ -135,8 +135,9 @@ const adoptedSpec = spec<(factory: Factory, wiring: Wiring, template: FactoryTem
       condition: ({ input: [factory], output }) => sameInstruction(output.instruction, factory.instruction),
     },
     keepsItsVolumes: {
-      description: "It keeps its volumes: they are the person's folders, never the template's",
+      description: "It keeps its volumes, none where it had none: they are the person's folders, never the template's",
       condition: ({ input: [factory], output }) =>
+        (output.volumes === undefined) === (factory.volumes === undefined) &&
         (output.volumes ?? []).length === (factory.volumes ?? []).length &&
         (output.volumes ?? []).every(
           (v, i) => v.path === (factory.volumes ?? []).at(i)?.path && v.readOnly === (factory.volumes ?? []).at(i)?.readOnly,

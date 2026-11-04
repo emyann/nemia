@@ -357,6 +357,9 @@ test('a factory from nothing to a run: filed, given workflows, hires and a sched
       ].sort((x, y) => x.path.localeCompare(y.path));
       assert.deepEqual((fileOf(f) as { volumes: unknown }).volumes, volumes);
       assert.deepEqual((fileOf(f) as { later: unknown }).later, { kept: true }, 'every other key kept');
+      await typedFrom(ROOT, ['factory', 'detach', f, 'notes']);
+      await typedFrom(ROOT, ['factory', 'attach', f, 'notes']);
+      assert.deepEqual((fileOf(f) as { volumes: unknown }).volumes, volumes, 'a wiring change keeps the volumes');
       await refusedBy(() => typedFrom(ROOT, ['factory', 'volume', 'add', f, notes]), 'Invalid', notes);
       await refusedBy(() => typedFrom(ROOT, ['factory', 'volume', 'add', 'default', `${notes}:ro`]), 'Conflict');
       await refusedBy(() => typedFrom(ROOT, ['factory', 'volume', 'add', f, `${ROOT}:ro`]), 'Invalid', ROOT);

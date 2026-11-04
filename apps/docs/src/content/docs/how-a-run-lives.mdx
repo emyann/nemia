@@ -45,7 +45,9 @@ sequenceDiagram
   T-->>P: the merge committed on the base branch
 ```
 
-1. **A card.** A short markdown brief, which may wait in the inbox (`~/.agent-workflows/inbox/`) until someone starts it.
+1. **A card.** A short markdown brief, which may wait in the inbox (`~/.agent-workflows/inbox/`) until someone starts it. Once
+   started, the card stays and shows its run's phase. The inbox lists the cards still in play, and those whose run ended are behind
+   a filter (`nemia inbox --all`, or Ended on the Inbox page).
 2. **The start.** `nemia start` in a [factory](/factories/) writes the run's record: the workflow folder as it is now, every step's
    agent and hire, the check commands, all frozen on the record. Nothing the run does later reads the folder again.
 3. **The tick files a step.** On its next pass, the tick finds a step whose `after` is satisfied and files its task with the runtime,

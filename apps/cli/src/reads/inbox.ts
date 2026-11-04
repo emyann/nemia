@@ -2,9 +2,9 @@
  * `nemia inbox`, read from the api (`GET /api/inbox`): each card a line, then how to start, queue or drop one — or that the inbox is
  * empty — printed as the in-process command prints it (`inboxLines`, the orchestrator's `inbox/inbox.ts`, ported word for word). Where
  * a card that names no factory is said to start is this process's `WF_DEFAULT_FACTORY_STARTS`, and the folder named in the last line this
- * store's, as the in-process command reads both. `-l <selector>` (sent as `?selector=`, given again for another), `--show-labels` and
- * `-L <key>` are read here; any other words after `inbox` go to the old path: `inbox add`, `inbox rm` and the rest are commands of
- * their own there.
+ * store's, as the in-process command reads both. The api lists the cards in play, each started card in its run's phase; `--all` (sent as
+ * `?all=true`) lists every card. `-l <selector>` (sent as `?selector=`, given again for another), `--show-labels` and `-L <key>` are read
+ * here; any other words after `inbox` go to the old path: `inbox add`, `inbox rm` and the rest are commands of their own there.
  */
 import path from 'node:path';
 import type { InboxEntry } from '../../../api/src/client/client.ts';
@@ -36,6 +36,9 @@ const cardLabels = (l: Pick<InboxEntry, 'labels' | 'workflow' | 'factory'>): Lab
   factory: l.factory || 'default',
 });
 
+/** A started card's state beside its run, as the in-process `phaseSaid` says it: `waiting on you` for a run that waits on a person. */
+const phaseSaid = (state: InboxEntry['state']): string => (state === 'waiting' ? 'waiting on you' : state);
+
 /** No label asked shown: the lines as they were. */
 const NONE_SHOWN: LabelsAsked = { selector: [], showLabels: false, columns: [] };
 
@@ -44,7 +47,7 @@ function inboxLines(listing: readonly InboxEntry[], unfactoredStarts: boolean, a
   const width = Math.max(0, ...listing.map((l) => l.name.length));
   const inLine = listing.filter((l) => l.queued?.place).length;
   return listing.map((l) => {
-    const started = l.startedAs.length ? `  started as ${l.startedAs.join(', ')}` : '';
+    const started = l.startedAs.length ? `  started as ${l.startedAs.join(', ')}, ${phaseSaid(l.state)}` : '';
     const queued = l.queued?.place ? `  queued ${l.queued.place} of ${inLine}` : '';
     const tried = triedClause(l, unfactoredStarts);
     const labelled = labelSegments(cardLabels(l), asked);
@@ -54,27 +57,37 @@ function inboxLines(listing: readonly InboxEntry[], unfactoredStarts: boolean, a
 }
 
 /**
- * What `nemia inbox` prints of the cards, in a process whose environment is `env`, of those `asked`'s selectors took: with none taken
- * where a selector was given, that none matches.
+ * What `nemia inbox` prints of the cards, in a process whose environment is `env`, of those `asked`'s selectors took: with none taken,
+ * how many were left out for their run having ended (`ended`), else that none matches where a selector was given, else that the inbox
+ * is empty — the in-process `INBOX`'s `print`.
  */
 export const inboxPrinted = (
   cards: readonly InboxEntry[],
   env: NodeJS.ProcessEnv = process.env,
   asked: LabelsAsked = NONE_SHOWN,
+  ended = 0,
 ): string[] =>
   cards.length
     ? [
         ...inboxLines(cards, env.WF_DEFAULT_FACTORY_STARTS === '1', asked),
         `\nstart one: nemia start ${path.join(storeRoot(env), 'inbox', '<name>.md')} [--workflows <w>] [--repo <r>] [--factory <f>] — queue one: nemia inbox queue <name> — drop one: nemia inbox rm <name>`,
       ]
-    : asked.selector.length
-      ? [`no card of the inbox matches -l ${asked.selector.join(' -l ')} — see them all with nemia inbox --show-labels`]
-      : [`the inbox is empty — park an idea with nemia inbox add "<idea>"`];
+    : ended
+      ? [
+          `no card in play${asked.selector.length ? ` matches -l ${asked.selector.join(' -l ')}` : ''}, and ${ended} whose run ended — list them with nemia inbox --all`,
+        ]
+      : asked.selector.length
+        ? [`no card of the inbox matches -l ${asked.selector.join(' -l ')} — see them all with nemia inbox --show-labels`]
+        : [`the inbox is empty — park an idea with nemia inbox add "<idea>"`];
 
 export async function inbox(args: readonly string[]): Promise<number> {
-  const read = labelsAsked(args);
+  const all = args.includes('--all');
+  const read = labelsAsked(args.filter((word) => word !== '--all'));
   if (read === null || read.rest.length) return spawned(['inbox', ...args]);
-  const cards = await get<InboxEntry[]>('inbox', '/api/inbox', { selector: read.asked.selector });
-  for (const line of inboxPrinted(cards, process.env, read.asked)) process.stdout.write(`${line}\n`);
+  const listed = (every: boolean) =>
+    get<InboxEntry[]>('inbox', '/api/inbox', { selector: read.asked.selector, ...(every ? { all: 'true' } : {}) });
+  const cards = await listed(all);
+  const ended = cards.length || all ? 0 : (await listed(true)).length;
+  for (const line of inboxPrinted(cards, process.env, read.asked, ended)) process.stdout.write(`${line}\n`);
   return 0;
 }

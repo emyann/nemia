@@ -91,6 +91,16 @@ test("checkEnvOf: every check is told the run's copy of its workflow folder, whe
   });
 });
 
+test("checkEnvOf: every check is told its run's labels, as JSON, an object even where the run has none", async (t) => {
+  const told = { workspace: '/wt', files: '/wf/runs/r-1/artifacts/implement', closeout: undefined };
+  const rows: Array<[string, Run, string]> = [
+    ['a labelled run', { ...run({}), labels: { work: 'fix', area: 'api' } }, '{"work":"fix","area":"api"}'],
+    ['a run with no labels', run({}), '{}'],
+  ];
+  for (const [name, r, labels] of rows)
+    await t.test(name, () => assert.equal(checkEnvOf(r, { name: 'implement' }, told).WF_LABELS, labels));
+});
+
 test('attemptVerdict: the exit code an attempt recorded, else unfinished', async (t) => {
   await t.test('an exit code recorded is the verdict', () => {
     assert.equal(attemptVerdict({ exitCode: 3 }), 3);

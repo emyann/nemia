@@ -42,11 +42,20 @@ const heldCount = ({ staged, held }: Pick<Paused, 'staged' | 'held'>): string =>
 };
 
 /** The pause as it stands, in one line, or null when none stands. */
-export const pausedWords = (paused: Paused): string | null => {
+/** The sessions still in a tool call under a timed pause and when they are cut, as the orchestrator's `pausingWords` says it. */
+const pausingWords = (sessions: number, leftMs: number): string =>
+  `Pausing: ${sessions} session${sessions === 1 ? '' : 's'} finishing a tool call, cut in ${Math.max(1, Math.ceil(leftMs / 60_000))} min`;
+
+export const pausedWords = (paused: Paused, now: Date = new Date()): string | null => {
   const { pause, finishing } = paused;
   if (!pause) return null;
+  const sessions = finishing.filter((f) => f.kind === 'session').length;
+  const head =
+    pause.timeoutMs !== undefined && sessions
+      ? pausingWords(sessions, Date.parse(pause.at) + pause.timeoutMs - now.getTime())
+      : `Pausing: ${finishing.length} finishing`;
   return finishing.length
-    ? `Pausing: ${finishing.length} finishing${heldCount(paused)} — the store is paused ${sinceWords(pause)}; nothing new starts, and what runs finishes; ${RESUME_LINE} resumes it`
+    ? `${head}${heldCount(paused)} — the store is paused ${sinceWords(pause)}; nothing new starts, and what runs finishes; ${RESUME_LINE} resumes it`
     : `Paused ${sinceWords(pause)} — nothing runs and nothing new starts${heldCount(paused)}; ${RESUME_LINE} resumes it`;
 };
 

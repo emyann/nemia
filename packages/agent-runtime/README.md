@@ -1862,7 +1862,7 @@ or background sessions that outlive the calling process"). So a job's own proces
 the holder's resume is what lets a long-lived one outlive its holder. Until 2026-10-24 that was `claude --bg`, a session Claude Code
 itself detached and listed in `claude agents`; and a job could run as `claude -p` (`claude-detached`). Neither runs now.
 
-### A job's drain: held at its next call, continued within its cap
+### The sessions' drain: a job held at its next call, continued within its cap
 
 `Engine.drainSessions({ graceMs })` puts the sessions' drain, one file for the whole store (`sessionDrainFile`, `src/harness/claude/job-hold.ts`),
 and `drainSessions(null)` lifts it; anything else is refused `DrainRefused`. It is a fact apart from the holder's drain (`drain`), so a
@@ -1890,6 +1890,16 @@ While the attempt is held, or a sessions' drain stands (`Now.drained`), `observe
 again from when the session last went on, as Kubernetes resets a resumed Job's `startTime`: from the latest of the turn's first start,
 an attempt's release, and the start of an attempt that continues a parked one (`deadlineFrom`). Three laws of
 `contracts/observe.contract.ts` hold it.
+
+**Attached sessions under the sessions' drain.** The drain a person's pause puts holds the attached sessions too, through their holder:
+while it stands, the holder holds each session's next main-thread call at its hook, and the session's sighting says `heldBack`, with the
+call it stopped after. A call in flight runs on. On each look past the drain's `at` plus its `graceMs`, a session still in a call has
+its turn interrupted through the SDK (`Query.interrupt()`), and the holder keeps the cut call on the session's run file. The session
+keeps answering under the same session id, with its input open, and its sighting still says `heldBack`. Once a look reads the drain
+lifted, the session is told `cutWords(tool)` as words of its own, and it goes on as the same try on the same Claude Code process. If its
+holder lets go before the lift, the next holder resumes it told the same words. A put of the drain with the grace it already has keeps
+the drain as it stands, so a pass can put it on every tick without moving the `at` its grace counts from. A put with another grace
+stamps it anew, so a grace of 0 (`--now`) cuts at once.
 
 ### Attached: Claude Code on the Agent SDK, durable by resume
 

@@ -180,7 +180,7 @@
     },
     {
       "term": "Parked",
-      "meaning": "a job that ended itself under a jobs' drain, past the drain's grace with a call in flight or held past its bound, or that crashed while held or draining, with the call it cut (`calling`) where it cut one. A fact on its end beside its state, never an end reason: once the drain is lifted the runtime continues it as the next attempt of the same task, resumed in its session and told the call that did not finish, with what is left of its spend cap (`parkedCapLeft`, built on `capLeft`).",
+      "meaning": "a job that ended itself under a sessions' drain, past the drain's grace with a call in flight or held past its bound, or that crashed while held or draining, with the call it cut (`calling`) where it cut one. A fact on its end beside its state, never an end reason: once the drain is lifted the runtime continues it as the next attempt of the same task, resumed in its session and told the call that did not finish, with what is left of its spend cap (`parkedCapLeft`, built on `capLeft`).",
       "type": "Parked"
     },
     {

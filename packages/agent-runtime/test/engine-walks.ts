@@ -298,7 +298,7 @@ const NO_GRACE: readonly unknown[] = [5, 'soon', { graceMs: -1 }, { graceMs: 1.5
 
 const DRAIN_JOBS: readonly Walk[] = [
   {
-    name: 'the jobs’ drain is put with a grace, put again, and lifted with null',
+    name: 'the sessions’ drain is put with a grace, put again, and lifted with null',
     walk: async ({ engine }) => [
       await asked(engine.drainSessions({ graceMs: 30_000 })),
       await asked(engine.drainSessions({ graceMs: 0 })),
@@ -307,7 +307,7 @@ const DRAIN_JOBS: readonly Walk[] = [
     says: [null, null, null],
   },
   {
-    name: 'a jobs’ drain refused for anything but a grace of whole milliseconds from 0, with no other key, or null',
+    name: 'a sessions’ drain refused for anything but a grace of whole milliseconds from 0, with no other key, or null',
     walk: async ({ engine }) => Promise.all(NO_GRACE.map((given) => asked(engine.drainSessions(given as { graceMs: number } | null)))),
     says: NO_GRACE.map(() => ({ refused: 'DrainRefused' })),
   },

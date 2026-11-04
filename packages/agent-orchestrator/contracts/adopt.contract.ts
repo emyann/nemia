@@ -43,6 +43,13 @@ const same = (a: string | number | boolean | undefined, b: string | number | boo
   a === b || (a !== a && b !== b);
 
 /** Whether two dictionaries hold the same entries, in the same order, a NaN the same as a NaN. */
+/** Whether `a` and `b` name the same keys, in the same order. */
+const sameKeys = (a: Readonly<Record<string, unknown>>, b: Readonly<Record<string, unknown>>): boolean => {
+  const was = Object.keys(a);
+  const now = Object.keys(b);
+  return now.length === was.length && now.every((key, i) => was.at(i) === key);
+};
+
 const sameDict = (
   a: Readonly<Record<string, string | number | boolean>>,
   b: Readonly<Record<string, string | number | boolean>>,
@@ -142,6 +149,14 @@ const adoptedSpec = spec<(factory: Factory, wiring: Wiring, template: FactoryTem
         (output.volumes ?? []).every(
           (v, i) => v.path === (factory.volumes ?? []).at(i)?.path && v.readOnly === (factory.volumes ?? []).at(i)?.readOnly,
         ),
+    },
+    keepsItsHarnessSettings: {
+      description: "It keeps its harness settings, the same ones, none where it had none: they are the person's, never the template's",
+      // Its values are what the file holds, unjudged (`unknown`), which the verifier compares by no means: their keys are the law, and
+      // that the values are carried is held by the story (`test/factory-start.test.ts`, its setting checkpoints).
+      condition: ({ input: [factory], output }) =>
+        (output.harnessSettings === undefined) === (factory.harnessSettings === undefined) &&
+        sameKeys(output.harnessSettings ?? {}, factory.harnessSettings ?? {}),
     },
     offersTheTemplates: {
       description: "Its workflows are the template's wiring's",

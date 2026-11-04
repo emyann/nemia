@@ -146,6 +146,7 @@ erDiagram
     unknown instruction "optional"
     enum revisions "optional"
     string tree "optional"
+    object harnessSettings "optional"
   }
   AppliedTemplate {
     TemplateSource source FK

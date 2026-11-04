@@ -234,15 +234,16 @@ rm "$S"/node_modules; git worktree remove "$S"
      is `v1.0.0`. Its body opens with what to do, then GitHub's notes, grouped by label, and lists the unlabelled pull requests apart.
      The workflow rebuilds it when main moves. After relabelling a merged pull request, run `gh workflow run release.yml` to rebuild
      it.
-  3. Press "Approve workflows to run" in the release pull request's merge box. That starts its `ci` and `release-label`, the checks
-     main requires, which wait because the workflow's own token pushed `release`; a rebuild after main moves asks for the click again.
-     Leave other waiting runs alone.
+  3. Nothing to approve: the workflow dispatches `ci` and `release-label` on the release pull request's head, and those runs start
+     with no approval and report the checks main requires. Leave the runs that wait for approval alone: the workflow's own token
+     pushed `release`, so its pull_request runs wait, and they are not needed. A rebuild after main moves dispatches both again on the
+     new head, and so does `gh workflow run release.yml` where a check failed, was cancelled or is missing on the head.
   4. Merge it, with the owner, once both are green. The merge sets the root `package.json` version on main, and the `release` workflow's `tag` job tags
      `v<x.y.z>` on that commit and makes the GitHub release with the same notes.
   5. **Once, after the change that made this lands**, in this order: `nemia upgrade`, so the checks pass `WF_LABELS`; move the factory
      onto sdlc 2.1.0 with `pullRequestLabels="work=feature:feature work=fix:fix work=docs:docs work=cleanup:internal
      work=measure:internal"`. Then the owner turns on "Allow GitHub Actions to create and approve pull requests" (Settings → Actions →
-     General) and adds `release-label` to main's required checks. Runs started before the factory moved keep their frozen scripts:
+     General); `ci` and `release-label` are both among main's required checks already. Runs started before the factory moved keep their frozen scripts:
      label their pull requests by hand.
 - **`npm install` in the main checkout**, at a gap, after a landing that changed `package-lock.json` or a bin: the steps' worktrees
   link the main checkout's `node_modules`. The daemon and its sessions no longer read it; check the tree stays clean.

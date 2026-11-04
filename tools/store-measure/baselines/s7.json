@@ -1,0 +1,167 @@
+{
+  "machine": {
+    "cpu": "Intel(R) Core(TM) Ultra 9 275HX",
+    "cores": 12,
+    "memoryBytes": 16770076672,
+    "node": "v24.20.0",
+    "platform": "linux",
+    "load": 1.15
+  },
+  "commit": "c14f8083e11fd4c9f49b0e9373ebc99a7a7cba5b",
+  "date": "2026-11-04T07:33:11.425Z",
+  "repeat": 5,
+  "from": "~/.agent-workflows",
+  "engine": "~/.agent-engine",
+  "copy": {
+    "files": 156925,
+    "bytes": 3483550311,
+    "ms": 33757.054984,
+    "leftOut": [
+      "api.log",
+      "daemon.json",
+      "engine/a2a",
+      "wf-up.log",
+      "worktrees"
+    ]
+  },
+  "counts": {
+    "runs": 202,
+    "finishedRuns": 199,
+    "openRuns": 3,
+    "tasks": 7973,
+    "journalBytes": 123112560,
+    "feedLines": 40441,
+    "cards": {
+      "listed": 165,
+      "started": 88
+    },
+    "unreadable": {
+      "runs": 0,
+      "passLines": 0
+    },
+    "invariantRefusals": 0
+  },
+  "asked": {
+    "finishedRun": "kit-the-ranges-the-docs-writ-bc2q",
+    "openRun": "operations-a-release-is-a-pu-muwo",
+    "feedCursor": 10077096,
+    "feedLinesRead": 1000
+  },
+  "measures": {
+    "runList": {
+      "cold": {
+        "ms": 2058.6223610000015,
+        "heapMb": 212.87448
+      },
+      "warm": {
+        "ms": 72.21344600000157,
+        "heapMb": 1.896632
+      }
+    },
+    "stats": {
+      "cold": {
+        "ms": 8435.475787999996,
+        "heapMb": 111.57704
+      },
+      "warm": {
+        "ms": 253.97006700000202,
+        "heapMb": 0.376016
+      }
+    },
+    "finishedRun": {
+      "cold": {
+        "ms": 930.6544040000008,
+        "heapMb": 94.682272
+      },
+      "warm": {
+        "ms": 23.61706299999787,
+        "heapMb": 0.122576
+      }
+    },
+    "openRun": {
+      "cold": {
+        "ms": 1003.1052170000039,
+        "heapMb": 94.491464
+      },
+      "warm": {
+        "ms": 70.25151099999493,
+        "heapMb": 0.15076
+      }
+    },
+    "feedFromCursor": {
+      "cold": {
+        "ms": 24.77432399999816,
+        "heapMb": 0.185136
+      },
+      "warm": {
+        "ms": 22.737248999997973,
+        "heapMb": 0.07868
+      }
+    },
+    "tickPass": {
+      "cold": {
+        "ms": 1841.0245799999975,
+        "heapMb": 0.456928
+      },
+      "warm": {
+        "ms": 119.59605299998657,
+        "heapMb": 0.272896
+      }
+    },
+    "tickPassInformed": {
+      "cold": {
+        "ms": 2997.164217999991,
+        "heapMb": 2.843048
+      },
+      "warm": {
+        "ms": 165.6195000000007,
+        "heapMb": 0.298776
+      }
+    },
+    "runListAfterPass": {
+      "cold": {
+        "ms": 1058.641803000006,
+        "heapMb": 64.991832
+      },
+      "warm": {
+        "ms": 31.972034000005806,
+        "heapMb": 1.81172
+      }
+    },
+    "openRunAfterPass": {
+      "cold": {
+        "ms": 1036.889890999999,
+        "heapMb": 63.387952
+      },
+      "warm": {
+        "ms": 66.1927919999871,
+        "heapMb": 0.13292
+      }
+    },
+    "inbox": {
+      "cold": {
+        "ms": 173.19715500000166,
+        "heapMb": 1.19892
+      },
+      "warm": {
+        "ms": 63.8800179999962,
+        "heapMb": 0.971688
+      }
+    },
+    "inboxAfterPass": {
+      "cold": {
+        "ms": 163.73869100000593,
+        "heapMb": -29.801024
+      },
+      "warm": {
+        "ms": 67.87325299999793,
+        "heapMb": 0.819104
+      }
+    }
+  },
+  "spawned": {
+    "git read (pass)": 160
+  },
+  "placeRefused": {},
+  "refusals": []
+}

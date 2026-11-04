@@ -63,6 +63,31 @@ nemia factory volume rm pipao /home/me/scratch
 - Volumes are yours: they live in the factory's own file (`"volumes"`, each `{ "path", "readOnly" }`), never in a template, and
   `nemia factory adopt` and `nemia factory upgrade` keep them. `nemia factory` lists them under the factory.
 
+## Its harness settings
+
+A factory can name settings of a harness that every session of its runs' steps on that harness is given, on top of the repository's
+own settings, as a container is given its configuration by its Pod. Say a preference once, and every repository the factory works on
+has it: no file is written into a repository, and for Claude Code the settings reach the session through the Agent SDK's settings
+option. The value is JSON:
+
+```sh
+nemia factory setting set pipao claude.attribution '{"commit":"","pr":""}'  # no Co-Authored-By trailer, no pull request line
+nemia factory setting rm pipao claude.attribution
+```
+
+- A factory sets `claude.attribution`, `claude.includeGitInstructions` and `claude.language` alone. Each changes what a session writes
+  or says, and none what it may reach or run.
+- Every other key is refused, naming where it is owned instead: permissions are a step's `allowedTools:` and `disallowedTools:`, hooks
+  the repository's `.claude/settings.json`, MCP servers an agent's `mcp:` and `nemia factory server add`, and a key that runs a program
+  (`apiKeyHelper`, `statusLine`, …) is no factory's. Claude Code's settings keep growing, so the list says what is allowed: a new key is
+  a decision someone makes, never one let through unjudged.
+- A step's own agent's settings win a key both name. A step on Codex, or on a remote agent, is given none.
+- A run copies the settings at its start, so a later change reaches only the runs started after it. A key a factory may not set,
+  written into its file by hand, refuses every start in the factory until it is removed.
+- Settings are yours: they live in the factory's own file (`"harnessSettings": { "claude": { … } }`), never in a template, and
+  `nemia factory adopt` and `nemia factory upgrade` keep them. `nemia factory` lists them under the factory; the board shows none yet.
+- The default factory holds none, as it holds no volume: a run that names no factory is given no factory setting.
+
 ## Attached workflows
 
 A factory offers only the workflows attached to it, and none until one is. Attaching records the workflow's folder name in the

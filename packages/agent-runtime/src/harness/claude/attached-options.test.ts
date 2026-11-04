@@ -266,6 +266,16 @@ const ROWS: { name: string; check: () => void }[] = [
     },
   },
   {
+    // The seam the orchestrator gives a factory's harness settings through: a key it puts in the task's settings reaches the SDK as is.
+    name: "a task's settings holding attribution reach the SDK's settings unchanged, beside auto-memory off",
+    check: () => {
+      const attribution = { commit: '', pr: '' };
+      const given = attachedOptions(withClaude({ settings: JSON.stringify({ attribution }), appendSystemPromptFile: APPEND }));
+      assert.ok(given.settings && typeof given.settings === 'object');
+      assert.deepEqual([given.settings.attribution, given.settings.autoMemoryEnabled], [attribution, false]);
+    },
+  },
+  {
     name: 'REFUSED: a flag of config.claude given twice, naming the flag',
     check: () =>
       assert.throws(

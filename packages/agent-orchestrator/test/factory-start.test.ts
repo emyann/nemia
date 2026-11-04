@@ -26,6 +26,7 @@ process.env.WF_ROOT = ROOT;
 process.env.WF_VERIFY_REST = '1';
 const {
   addFactory,
+  advanceRun,
   attachWorkflow,
   detachWorkflow,
   fireAgent,
@@ -396,6 +397,65 @@ test('a factory from nothing to a run: filed, given workflows, hires and a sched
       await refusedBy(() => typedFrom(ROOT, ['factory', 'volume', 'rm', f, writable.path]), 'Missing', writable.path);
     },
   );
+
+  await s.test(
+    '`nemia factory setting set` writes a harness setting into the file, listed and kept by a wiring change; REFUSED a widening key or on default',
+    async () => {
+      const f = path.basename(file, '.json');
+      const off = { commit: '', pr: '' };
+      const said = await typedFrom(ROOT, ['factory', 'setting', 'set', f, 'claude.attribution', JSON.stringify(off)]);
+      assert.equal(said[0], `${f}  setting claude.attribution {"commit":"","pr":""}`);
+      assert.deepEqual(fileOf(f).harnessSettings, { claude: { attribution: off } });
+      assert.deepEqual((fileOf(f) as { later: unknown }).later, { kept: true }, 'every other key kept');
+      const before = fs.readFileSync(file, 'utf8');
+      await refusedBy(() => typedFrom(ROOT, ['factory', 'setting', 'set', f, 'claude.permissions', '{"allow":["Bash(*)"]}']), 'Invalid', 'permissions');
+      await refusedBy(() => typedFrom(ROOT, ['factory', 'setting', 'set', f, 'codex.model', '"x"']), 'Invalid', 'codex');
+      await refusedBy(() => typedFrom(ROOT, ['factory', 'setting', 'set', f, 'claude.language', 'french']), 'Invalid', 'french');
+      await refusedBy(() => typedFrom(ROOT, ['factory', 'setting', 'set', 'default', 'claude.attribution', 'false']), 'Conflict');
+      assert.equal(fs.readFileSync(file, 'utf8'), before, 'nothing written');
+      await typedFrom(ROOT, ['factory', 'detach', f, 'notes']);
+      await typedFrom(ROOT, ['factory', 'attach', f, 'notes']);
+      assert.deepEqual(fileOf(f).harnessSettings, { claude: { attribution: off } }, 'a wiring change keeps the settings');
+      const listed = (await typedFrom(ROOT, ['factory', 'ls'])).filter((l) => l.includes(' setting '));
+      assert.deepEqual(listed.map((l) => l.trim()), ['setting claude.attribution {"commit":"","pr":""}']);
+    },
+  );
+
+  await s.test(
+    "a run started then freezes the settings, says them, and files them to each Claude Code step's session; a setting removed after changes no run started",
+    async () => {
+      const f = path.basename(file, '.json');
+      const out = await typedFrom(b, ['start', 'x', '--workflows', build, '--factory', f, '--no-worktree']);
+      const id = startedId(out);
+      assert.deepEqual(readRun(id).harnessSettings, { claude: { attribution: { commit: '', pr: '' } } });
+      assert.ok(out.some((l) => l.startsWith('harness settings: claude.attribution')), out.join('\n'));
+      await stage.runWith(stage.board().e, advanceRun(readRun(id)));
+      const filed = stage.board().specs.filter((spec) => Object.values(readRun(id).steps).some((st) => st.taskId === spec.id));
+      assert.ok(filed.length, 'a step was filed');
+      for (const spec of filed) {
+        const settings = (spec.config as { claude?: { settings?: string } } | undefined)?.claude?.settings;
+        assert.deepEqual(JSON.parse(settings ?? '{}').attribution, { commit: '', pr: '' }, spec.id);
+      }
+      const record = fs.readFileSync(path.join(ROOT, 'runs', `${id}.json`), 'utf8');
+      assert.deepEqual(await typedFrom(ROOT, ['factory', 'setting', 'rm', f, 'claude.attribution']), [
+        `${f}  setting claude.attribution removed`,
+        `changed: ${file}`,
+      ]);
+      assert.equal('harnessSettings' in fileOf(f), false, 'the key is gone once none is left');
+      assert.equal(fs.readFileSync(path.join(ROOT, 'runs', `${id}.json`), 'utf8'), record);
+      await refusedBy(() => typedFrom(ROOT, ['factory', 'setting', 'rm', f, 'claude.attribution']), 'Missing', 'claude.attribution');
+    },
+  );
+
+  await s.test('REFUSED: a start in a factory whose file a person gave a widening setting by hand, naming it, and no run written', async () => {
+    const f = path.basename(file, '.json');
+    const before = fs.readFileSync(file, 'utf8');
+    fs.writeFileSync(file, JSON.stringify({ ...fileOf(f), harnessSettings: { claude: { hooks: {} } } }));
+    const runs = runsWritten();
+    await refusedBy(() => typedFrom(b, ['start', 'x', '--workflows', build, '--factory', f, '--no-worktree']), 'Invalid', 'hooks');
+    assert.deepEqual(runsWritten(), runs);
+    fs.writeFileSync(file, before);
+  });
 
   await s.test('of two repositories: the one named, else the one it is typed in; REFUSED elsewhere, naming both', async () => {
     const inside = await typedFrom(b, ['start', 'x', '--workflows', build, '--factory', 'pipao', '--no-worktree']);

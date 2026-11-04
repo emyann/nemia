@@ -68,6 +68,7 @@ erDiagram
     FactoryName factory FK "optional"
     list mounts "optional"
     list volumes "optional"
+    object harnessSettings "optional"
     object place "optional"
     string repo "optional"
     string baseRef "optional"

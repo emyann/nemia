@@ -352,7 +352,7 @@ Bring your own harness — three ways, in order of how much you have to write:
 
 | | |
 |---|---|
-| `'claude'` | Claude Code as the engine runs it: every session on the Agent SDK — a task as a job (in a process of its own, or attached in the daemon's holder while it holds), and a long-lived session (`restartPolicy: 'Always'`) attached |
+| `'claude'` | Claude Code as the engine runs it: every session on the Agent SDK — a task as a job, always in a process of its own, and a long-lived session (`restartPolicy: 'Always'`) attached in the daemon's holder |
 | a `HarnessSpec` | any CLI that runs a prompt and exits — a command and an exit code |
 | a `RunnerOps` | four Effect methods, and six optional ones, `find`, `output`, `release`, `transcript`, `say` and `refuses`, for anything else at all; its own `refuses` is asked by `file` |
 
@@ -389,7 +389,7 @@ Three are wired:
 
 | harness | how it runs | who keeps the registry |
 |---|---|---|
-| `claude` | a job: `query()` in `bin/ae-claude-job.ts`, in a worker we detach, printing the SDK's messages as a stream of JSON lines; attached in the daemon's holder while it holds, and a long-lived session there alone | **us**, a run file |
+| `claude` | a job: `query()` in `bin/ae-claude-job.ts`, in a worker we detach, printing the SDK's messages as a stream of JSON lines, holder or not; a long-lived session attached in the daemon's holder alone | **us**, a run file |
 | `codex` | `codex exec --json`, in a worker we detach | **us** — a directory of run files |
 | `command` | the process a task's `config.command` names, same worker — no agent at all | us |
 
@@ -1821,7 +1821,8 @@ what a step leaves behind. The rule is what lets Codex do it itself.
 
 **Every Claude Code session runs on the Agent SDK.** `ae`, and `Engine.layer` until its process takes `hold()`, run a Claude Code
 task as a job: `query()` in a process of its own (`bin/ae-claude-job.ts`), which the engine's worker detaches, so the session
-outlives the engine. Once the process holds, a task runs attached in it (*Attached*, below), and a long-lived one there alone. No
+outlives the engine, and a restart or an upgrade of the daemon never touches it. Once the process holds, a long-lived task runs
+attached in it (*Attached*, below), and only a long-lived one: a job keeps its own process. No
 environment variable selects another. `sdkRunner()` exists too, but only as a `Layer`: you compose it yourself, and tick in the same
 long-lived process that spawned the sessions, because they die with it.
 
@@ -1841,6 +1842,7 @@ reason `Runner` is a seam and not an import.
 |---|---|---|
 | owns the session | a job: **its own process**, detached; attached: **the holder**, durable by resume | **this process** |
 | engine dies mid-session | a job runs on, the next tick adopts it; a held session is parked and taken up by the next holder | session dies with it |
+| told to stop for a while | a job finishes its call and is held at its next one (*A job's drain*, below) | not wired |
 | run state | a run file per session | an in-memory map |
 | narrow the tools, a spend cap, MCP servers | `tools`, `disallowedTools`, `budgetUsd`, strict MCP (`attachedOptions`) | not wired: it passes only `model` and `permissionMode` |
 | the conversation, one session by its name, telling it something | `transcript`, `find`, `say` | not wired |
@@ -1851,12 +1853,34 @@ or background sessions that outlive the calling process"). So a job's own proces
 the holder's resume is what lets a long-lived one outlive its holder. Until 2026-10-24 that was `claude --bg`, a session Claude Code
 itself detached and listed in `claude agents`; and a job could run as `claude -p` (`claude-detached`). Neither runs now.
 
+### A job's drain: held at its next call, continued within its cap
+
+`Engine.drainJobs({ graceMs })` puts the jobs' drain, one file for the whole store (`jobDrainFile`, `src/harness/claude/job-hold.ts`),
+and `drainJobs(null)` lifts it; anything else is refused `DrainRefused`. It is a fact apart from the holder's drain (`drain`), so a
+daemon's restart, which puts and lifts that one, never holds or releases a job. Every job's own process reads it on each poll
+(`bin/ae-claude-job.ts`): a call in flight finishes, and the next call of the main thread waits at its `PreToolUse` hook, as an
+attached session's does under a let-go; a sub-agent's call is never held. The job writes what it does beside its run (`<name>.hold`:
+`calling`, `draining`, `heldBack`), which each look reads into its sighting (`heldBack` on the view).
+
+Past the drain's grace with a call still in flight, or held past `JOB_HOLD_MS` (23 h, under Claude Code's 24 h hook timeout,
+`HOOK_HOLD_S`), the job **parks**: `parked` on its hold file with the call it cut, then the SDK's `interrupt()` and the end of its
+prompt, so Claude Code saves its total as it leaves. Its end is journalled with `parked` beside it, never as a reason of its own, and
+`decide` continues it as the next attempt of the same task — a restart inside one task, never a new try — once the drain is lifted
+(`PARK_HELD` while it stands), after the restart's back-off, resumed in its session and told the call that did not finish
+(`cutWords`, else `PARKED_WORDS`). It is handed what is left of its turn's cap (`capLeft`, `src/core/cap.ts`); a park that left
+nothing ends failed with `limit: 'budget'` instead, and nothing continues it.
+
+A crash takes the same road only for a job that was held or draining: a job whose worker's lease is gone and that has a session is
+read `parked` where its hold file says `heldBack`, `draining` or `parked`, or a jobs' drain stands at the look (`heldSighting`). Any
+other crash ends failed as before, for the layer above to judge. Everything here is read off files on each pass, so it survives a
+restart of the daemon.
+
 ### Attached: Claude Code on the Agent SDK, durable by resume
 
 Beside the job, `query()` in the process that holds the engine's attached sessions (`harness/claude/attached.ts`). The process
-takes `hold()` in a scope; while it holds, a `claude` task spawns attached, a long-lived one (`restartPolicy: 'Always'`) only so,
-and any other engine, or the same one before `hold`, runs a task as a job in a process of its own and refuses a long-lived one
-`unstartable`. The Claude Code either road drives is the Agent SDK's own bundled CLI, or the command
+takes `hold()` in a scope; while it holds, a long-lived `claude` task (`restartPolicy: 'Always'`) spawns attached, and a job still
+runs in a process of its own (`withAttached`, `src/harness/claude/code.ts`); any other engine, or the same one before `hold`, refuses
+a long-lived one `unstartable`. The Claude Code either road drives is the Agent SDK's own bundled CLI, or the command
 `EngineOptions.claudeExecutable` names — a held session is given it here, a job's own process as `AE_CLAUDE_EXECUTABLE`.
 
 - **Who holds them.** One process: the one whose engine took `hold()`. It spawns, adopts and resumes; another engine reads the

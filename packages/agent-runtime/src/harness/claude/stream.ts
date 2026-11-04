@@ -98,6 +98,8 @@ export const PRINTED = {
     subtype: Schema.Literal('init'),
     cwd: Schema.optional(Schema.NonEmptyString),
     model: Schema.optional(Schema.NonEmptyString),
+    /** The version of Claude Code the process runs (`SDKSystemMessage`, `sdk.d.ts:6244`): absent from a capture of an older one. */
+    claude_code_version: Schema.optional(Schema.NonEmptyString),
   }),
   stream_event: Schema.Struct({
     type: Schema.Literal('stream_event'),

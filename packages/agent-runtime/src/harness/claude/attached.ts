@@ -121,8 +121,9 @@ const carriedFrom = (root: string, resumeFrom: string): NonNullable<AttachedRun[
 };
 
 /**
- * A run file's sighting: its state, whether a process still holds the session and which (`held`, `pid`), its bridge, its call in
- * flight, and what its capture says it closed out with, used and was denied.
+ * A run file's sighting: its state, whether a process still holds the session and which (`held`, `pid`), the code its holder runs
+ * (`image`), its bridge, its call in flight, and what its capture says it closed out with, used and was denied, and the Claude Code
+ * it runs (`harnessVersion`).
  *
  * A session a holder still runs (`isOpen`) says whether its process is there, which `decide` reads for a long-lived task alone: held,
  * its idle session is open (`idleOf`); with its holder gone it is one the harness is taking up again (`respawning`), and is not
@@ -141,6 +142,7 @@ const sightingOf = (root: string, run: AttachedRun): Sighting => {
     ...(denials?.length ? { denials } : {}),
     ...(held === undefined ? {} : { held }),
     ...(held === true ? { pid: run.owner } : {}),
+    ...(run.image ? { image: run.image } : {}),
     ...bridgeOf(run.bridge),
     ...(run.calling && run.state === 'working' ? { calling: run.calling } : {}),
     ...asksOf(root, run),

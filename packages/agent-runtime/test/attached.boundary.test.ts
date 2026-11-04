@@ -25,6 +25,7 @@ import path from 'node:path';
 import test, { type TestContext } from 'node:test';
 import { Effect, Exit, Logger, Scope } from 'effect';
 import { attachedSessions, letGoOf, type Attached } from '../src/harness/claude/attached.ts';
+import { IMAGE } from '../src/harness/image.ts';
 import {
   alive,
   attachedDir,
@@ -611,28 +612,33 @@ test('the next holder takes up a session left behind: what it tells the session,
     },
   );
 
-  await t.test('a session at work under a pid another process has taken since is adopted, its holder gone', async (rt) => {
-    const { root, dir, request } = place({ output: { done: 1 } });
-    const taker = squatter(rt);
-    writeRun(root, {
-      name: NAME,
-      state: 'working',
-      owner: taker,
-      ownerStart: 'when its holder started, not this process',
-      startedAt: new Date().toISOString(),
-      sessionId: 'reused-pid',
-      calling: { tool: 'Bash', since: new Date().toISOString() },
-      request: { ...request, brief: undefined },
-    });
-    const h = await holder(root);
-    rt.after(h.close);
-    await sighted(h);
-    await until(rt, () => saidIn(dir).length, 'the adopted session told something', { everyMs: 50 });
-    assert.deepEqual(saidIn(dir), [crashNote('Bash')]);
-    assert.equal(alive(taker), true, "the process that took the pid is not the session's, and is left alone");
-    assert.equal(run(root)?.owner, thisHolder().owner);
-    assert.equal(run(root)?.ownerStart, thisHolder().ownerStart);
-  });
+  await t.test(
+    'a session at work under a pid another process has taken since is adopted, its holder gone, and names the adopter’s code',
+    async (rt) => {
+      const { root, dir, request } = place({ output: { done: 1 } });
+      const taker = squatter(rt);
+      writeRun(root, {
+        name: NAME,
+        state: 'working',
+        owner: taker,
+        ownerStart: 'when its holder started, not this process',
+        image: '/store/releases/v0.9.0/packages/agent-runtime',
+        startedAt: new Date().toISOString(),
+        sessionId: 'reused-pid',
+        calling: { tool: 'Bash', since: new Date().toISOString() },
+        request: { ...request, brief: undefined },
+      });
+      const h = await holder(root);
+      rt.after(h.close);
+      await sighted(h);
+      await until(rt, () => saidIn(dir).length, 'the adopted session told something', { everyMs: 50 });
+      assert.deepEqual(saidIn(dir), [crashNote('Bash')]);
+      assert.equal(alive(taker), true, "the process that took the pid is not the session's, and is left alone");
+      assert.equal(run(root)?.owner, thisHolder().owner);
+      assert.equal(run(root)?.ownerStart, thisHolder().ownerStart);
+      assert.equal(run(root)?.image, IMAGE, 'the new holder writes the code it runs over the one before');
+    },
+  );
 
   await t.test("adopting a session leaves alone a process that has taken its Claude Code's pid since", async (rt) => {
     const { root, dir, request } = place({ output: { done: 1 } });

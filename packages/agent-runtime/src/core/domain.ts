@@ -135,6 +135,19 @@ export type Sighting = {
    */
   ranOn?: string;
   /**
+   * The code the session's process runs, as that process reports it: the real folder of the runtime package that spawned or holds
+   * it — a Pod's container image (`containerStatuses[].image`). A job keeps the one it was spawned with; a long-lived session
+   * names the holder that has it now, so a new holder on new code says so. Absent when its runner cannot say, and from a session
+   * spawned before it was recorded. **Carried, never judged**: `decide` does not read it, and what release it is is the layer
+   * above's to say.
+   */
+  image?: string;
+  /**
+   * The version of the harness the session runs on, as the harness said it — Claude Code's init message's `claude_code_version`,
+   * from the last one it printed. Absent when the harness says none. **Carried, never judged**: `decide` does not read it.
+   */
+  harnessVersion?: string;
+  /**
    * Whether the harness still holds the session's process — Claude Code's registry lists a pid for it. A fact about the
    * process, beside `state`, which is the turn's: a turn that ended (`completed`, or Claude Code's idle `blocked`) leaves a
    * process that is still there. Absent from a harness that cannot say, which reads as not held. Read by `decide` only for a
@@ -335,6 +348,10 @@ export type EndReason = 'harness' | 'lost' | 'unstartable' | 'operator' | 'deadl
  * - `denied`: a tool call the harness refused the attempt in flight, as it said so while the attempt ran: written by the engine
  *   off a working sighting, once per denial past those the attempt holds (`deniedFacts`). Joins the attempt's `denials`; an
  *   end that names its own replaces them. `decide` never reads it.
+ * - `image`: the code an attempt in flight runs on (`image`) and its harness's version (`harnessVersion`), as its sighting said
+ *   them: written by the engine off a sighting of an unended attempt whenever either differs from what the attempt holds
+ *   (`imageFacts`), so a new holder or a resumed process on another version writes again. The latest of each wins. `decide`
+ *   never reads it.
  * - `stop-requested`: the operator asked for it to stop.
  * - `said`: a person's words, handed to the session of the attempt in flight through its harness (`say`). Written once
  *   the harness took them, so it means they were handed over — not that the session read them, or did what they asked.
@@ -441,6 +458,7 @@ export type Event =
   | { kind: 'measured'; at: string; attempt: number; usage: Usage }
   | { kind: 'counted'; at: string; attempt: number; usage: Usage }
   | ({ kind: 'denied'; at: string; attempt: number } & Denial)
+  | { kind: 'image'; at: string; attempt: number; image?: string; harnessVersion?: string }
   | { kind: 'gap'; at: string; attempt: number; mono?: Monotonic }
   | { kind: 'process'; at: string; attempt: number; pid?: number }
   | { kind: 'stop-requested'; at: string }
@@ -516,6 +534,13 @@ export type Attempt = {
    * attempt an older runtime recorded, and from one whose harness cannot say. Carried, never read.
    */
   ranOn?: string;
+  /**
+   * The code its session's process ran on, the latest its sightings said (see `Sighting.image`). Absent from an attempt an older
+   * runtime recorded, and from one whose runner cannot say. Carried, never read.
+   */
+  image?: string;
+  /** Its harness's version, the latest its sightings said (see `Sighting.harnessVersion`). Carried, never read. */
+  harnessVersion?: string;
   /** The limit its configuration set that its harness says it ended the session at — `budget` — when it said one. Carried, never read. */
   limit?: string;
   /**
@@ -600,7 +625,7 @@ function endAttempt(a: Attempt, e: Extract<Event, { kind: 'ended' }>): void {
 /** An event about one attempt, `e`, written into that attempt's fold `a`. */
 function foldInto(
   a: Attempt,
-  e: Extract<Event, { kind: 'spawned' | 'ended' | 'measured' | 'counted' | 'denied' | 'gap' | 'process' }>,
+  e: Extract<Event, { kind: 'spawned' | 'ended' | 'measured' | 'counted' | 'denied' | 'image' | 'gap' | 'process' }>,
 ): void {
   switch (e.kind) {
     case 'spawned':
@@ -618,6 +643,10 @@ function foldInto(
       return;
     case 'denied':
       a.denials = [...(a.denials ?? []), e.what === undefined ? { tool: e.tool } : { tool: e.tool, what: e.what }];
+      return;
+    case 'image':
+      if (e.image !== undefined) a.image = e.image;
+      if (e.harnessVersion !== undefined) a.harnessVersion = e.harnessVersion;
       return;
     case 'gap':
       if (a.gapSince === undefined && e.mono) a.gapMono = e.mono;
@@ -691,6 +720,7 @@ export function fold(taskId: string, events: readonly Event[]): State {
       case 'measured':
       case 'counted':
       case 'denied':
+      case 'image':
       case 'gap':
       case 'process': {
         const a = s.attempts.find((x) => x.n === e.attempt);

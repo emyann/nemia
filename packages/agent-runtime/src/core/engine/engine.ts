@@ -39,6 +39,7 @@ import { CEILING_INSTEAD } from './filing.ts';
 import { ownPool, toAdmit, type AdmissionRule } from '../admission.ts';
 import { countedFacts } from './counted.ts';
 import { deniedFacts } from './denied.ts';
+import { imageFacts } from './image.ts';
 import { instantNow } from './now.ts';
 import { spawnedEntry, stamped } from './stamped.ts';
 import { TaskId } from '../model.ts';
@@ -383,12 +384,18 @@ const lastSighting = (state: State, observed: ReadonlyMap<string, Sighting>): Si
 };
 
 /**
- * What a task's sighting says of an attempt in flight, for the record: a long-lived one's process (`sightingFacts`) and what it
- * has consumed so far (`countedFacts`), and what the harness has denied any (`deniedFacts`).
+ * What a task's sighting says of an attempt in flight, for the record: a long-lived one's process (`sightingFacts`), what it
+ * has consumed so far (`countedFacts`), what the harness has denied any (`deniedFacts`), and the code and harness version it
+ * runs on (`imageFacts`).
  */
 const notedOf = (state: State, observed: ReadonlyMap<string, Sighting>, at: string, mono?: Monotonic): Event[] => {
   const sighting = lastSighting(state, observed);
-  return [...sightingFacts(state, sighting, at, mono), ...countedFacts(state, sighting, at), ...deniedFacts(state, sighting, at)];
+  return [
+    ...sightingFacts(state, sighting, at, mono),
+    ...countedFacts(state, sighting, at),
+    ...deniedFacts(state, sighting, at),
+    ...imageFacts(state, sighting, at),
+  ];
 };
 
 /**

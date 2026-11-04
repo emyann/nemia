@@ -14,6 +14,7 @@ import type { AskQuestion, SessionAsk, SessionState } from '../../core/index.ts'
 import { BridgeFactsSchema } from './attached-bridge.ts';
 import { CarriedSchema } from '../detached/run-file.ts';
 import type { SpawnRequest } from '../seam.ts';
+import { IMAGE } from '../image.ts';
 
 /**
  * What a holder writes of a session: `working` while a holder runs it, `idle` once a long-lived session's turn ended and it waits with
@@ -47,6 +48,11 @@ const RunFileSchema = Schema.StructWithRest(
     owner: Schema.Finite,
     /** When that process started (`processStart`), so a pid another process has taken since is not read as the holder. */
     ownerStart: Schema.optional(Schema.String),
+    /**
+     * The code that holder runs (`IMAGE`), written with `owner` by each holder that takes the session up: the session's
+     * `Sighting.image`. Absent from a run file a holder wrote before it was recorded.
+     */
+    image: Schema.optional(Schema.String),
     startedAt: Schema.String,
     /** Claude Code's own id of the session, once its first message named it: what a resume continues. */
     sessionId: Schema.optional(Schema.String),
@@ -230,10 +236,10 @@ export const alive = (pid: number): boolean => {
   }
 };
 
-/** This process, as a run file names its holder: its pid, and when it started. */
-export const thisHolder = (): { owner: number; ownerStart?: string } => {
+/** This process, as a run file names its holder: its pid, when it started, and the code it runs (`IMAGE`). */
+export const thisHolder = (): { owner: number; ownerStart?: string; image: string } => {
   const start = processStart(process.pid);
-  return { owner: process.pid, ...(start ? { ownerStart: start } : {}) };
+  return { owner: process.pid, ...(start ? { ownerStart: start } : {}), image: IMAGE };
 };
 
 /**

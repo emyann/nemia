@@ -93,6 +93,11 @@ const RunFileSchema = Schema.StructWithRest(
      * written, whose parent is looked for among the run files instead.
      */
     carried: Schema.optional(CarriedSchema),
+    /**
+     * The code the run's worker runs (`IMAGE`), written by the spawn and kept by the worker: the run's `Sighting.image`. Absent from a
+     * run file spawned before it was written.
+     */
+    image: Schema.optional(Schema.String),
     /** For a spec with `input`: what the worker writes on the harness's stdin (`RunInput`). Absent, the run takes no words. */
     input: Schema.optional(
       Schema.Struct({

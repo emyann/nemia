@@ -348,8 +348,8 @@ async function measure(asked: Asked, root: string, fence: Fence) {
   await first.runtime.dispose();
   const feed = feedOf(wf);
   const passed = passedOver(orch, place, fence, wf, fresh);
-  const objectOf = (id: string | null) =>
-    id === null ? null : overApps(fresh, (app) => getJson(app, `/api/runs/${encodeURIComponent(id)}`), repeat);
+  const objectOf = (id: string | null, over = fresh) =>
+    id === null ? null : overApps(over, (app) => getJson(app, `/api/runs/${encodeURIComponent(id)}`), repeat);
   const measures: Record<MeasureKey, Measured | null> = {
     runList: await overApps(fresh, (app) => getJson(app, '/api/runs'), repeat),
     stats: await overApps(fresh, (app) => getJson(app, '/api/stats'), repeat),
@@ -359,8 +359,7 @@ async function measure(asked: Asked, root: string, fence: Fence) {
     tickPass: null,
     tickPassInformed: null,
     runListAfterPass: await overApps(passed, (app) => getJson(app, '/api/runs'), repeat),
-    openRunAfterPass:
-      openRun === null ? null : await overApps(passed, (app) => getJson(app, `/api/runs/${encodeURIComponent(openRun)}`), repeat),
+    openRunAfterPass: await objectOf(openRun, passed),
     inbox: await overApps(fresh, (app) => getJson(app, INBOX_URL), repeat),
     inboxAfterPass: await overApps(passed, (app) => getJson(app, INBOX_URL), repeat),
   };

@@ -1,6 +1,7 @@
 /**
  * The store's pause, as the tick honours it: while `$WF_ROOT/cordon` stands no pass starts new work — no step, try or check filed, no
- * queued task admitted, no queued card started, nothing of a run `nemia start` wrote meanwhile — and what runs finishes; a person's retry
+ * queued task admitted, no queued card started, nothing of a run `nemia start` wrote meanwhile — and what is at work goes on (this pause
+ * carries no timeout, so no session is parked); a person's retry
  * and approval written meanwhile wait on their files; and the pass after the lift files what waits. Every pass judges afresh what the memo
  * of runs at rest answers (`verifyRest`), and one in the middle starts with no memo at all, as a restarted daemon does.
  *
@@ -202,7 +203,7 @@ const staged = (repo: string) => {
   stand().world.stage(repo, 'side');
 };
 
-test('while the store is paused nothing new starts and what runs finishes; the pass after the lift files what waits', WAITED, async (t) => {
+test('while the store is paused nothing new starts and the work goes on; the pass after the lift files what waits', WAITED, async (t) => {
   const running = await begun(TWO);
   const checked = await begun(CHECKED);
   const refused = await begun(ONE);

@@ -146,10 +146,10 @@ export const pauseNowQuery = queryOptions({
 });
 
 /**
- * Pauses the store, as the package's `pause` does, saying `why` when given: from the next pass nothing new starts, and what runs
- * finishes. With `now`, a pause at once, as the package's `pauseNow`: what runs is asked to stop too, each step tried again on the
- * resume, and a pause that stands is kept as it was. Rejects with the api's refusal in full — the package's words for a store already
- * paused — or its own about the request.
+ * Pauses the store, as the package's `pause` does, saying `why` when given: from the next pass nothing new starts, and each working session
+ * stops when its current tool call ends, cut once the store's timeout passes. With `now`, a pause at once, as the package's `pauseNow`:
+ * what runs is asked to stop too, each step tried again on the resume, and a pause that stands is kept as it was. Rejects with the api's
+ * refusal in full — the package's words for a store already paused — or its own about the request.
  */
 export const putPause = (why?: string, now?: boolean): Promise<PauseAnswer> =>
   send('POST', '/api/pause', PauseAnswerSchema, {

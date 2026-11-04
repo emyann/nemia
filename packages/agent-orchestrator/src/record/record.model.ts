@@ -9,6 +9,7 @@ import { stepTaskId } from './record.ts';
 import { idRefusal } from '../forget/forget.ts';
 import { FrozenWorkflowStep, StepName, WorkflowDir, WorkflowName } from '../folder/folder.model.ts';
 import { TRY_CAUSES, upgradeTries } from '../retry/index.ts';
+import { HarnessSettings } from '../harness-settings/harness-settings.model.ts';
 
 /** What a stored record is read through before `Run` reads it, as the store does: a try's former `then` read as its `cause`. */
 export { upgradeTries };
@@ -173,6 +174,7 @@ export const Run = Schema.Struct({
   factory: Schema.optional(FactoryName.OnRead),
   mounts: Schema.optional(Schema.Array(Schema.Struct({ path: Schema.String, readOnly: Schema.Boolean }))),
   volumes: Schema.optional(Schema.Array(Schema.Struct({ path: Schema.String, readOnly: Schema.Boolean }))),
+  harnessSettings: Schema.optional(HarnessSettings),
   place: Schema.optional(Schema.Struct({ kind: Schema.Literal('folder') })),
   repo: Schema.optional(Schema.String),
   baseRef: Schema.optional(Schema.String),

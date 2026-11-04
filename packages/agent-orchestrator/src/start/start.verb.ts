@@ -26,6 +26,7 @@ import { pinsOf } from '../revisions/pin.verb.ts';
 import { workRoot } from '../record/places.store.ts';
 import { gateRefusal } from '../ending/ending.ts';
 import { isRepositoryRun, type Mount, type Run } from '../record/record.ts';
+import { harnessSettingsRefusal, isHarnessSettings, type HarnessSettings } from '../harness-settings/harness-settings.ts';
 import { afterRefusal } from '../wait/wait.ts';
 import { contextRefusal } from './context.ts';
 import { inputRefusal, type InputFile } from './inputs.ts';
@@ -317,6 +318,7 @@ type Told = Pick<
   | 'factory'
   | 'mounts'
   | 'volumes'
+  | 'harnessSettings'
   | 'gatesTimed'
   | 'deniedCounted'
   | 'settlesCounted'
@@ -353,6 +355,16 @@ const mountsAt = (factory: Factory | undefined, repo: string | undefined): Mount
  * The volumes of `factory` a run in it mounts (`factoryVolumes`), each marked as named and a directory now; none in the default factory.
  */
 const volumesAt = (factory: Factory | undefined): Mount[] => (factory ? factoryVolumes(factory).filter((v) => isDirectory(v.path)) : []);
+
+/**
+ * The harness settings of `factory` a run in it freezes, or why it cannot start (`harnessSettingsRefusal`, a key a person wrote by hand
+ * that a factory may not set); none in the default factory, and for a factory that names none.
+ */
+const settingsAt = (factory: Factory | undefined): HarnessSettings | string | undefined => {
+  const settings = factory?.harnessSettings;
+  if (factory === undefined || settings === undefined || isHarnessSettings(settings)) return settings;
+  return harnessSettingsRefusal(settings, factory.name);
+};
 
 /**
  * Why `steps`, started from `opts` in `factory` on `own` (none for a folder run), cannot be given `mounts`: a `writable:` name no folder
@@ -421,7 +433,7 @@ function leftOut(run: Run): { mounts: string[]; volumes: string[] } {
 
 /**
  * What `opts` tells the run, with `steps` as the workflow it freezes, `inputs` by name, `factory` the one it is started in, `mounts`
- * the folders it gives each local step, and `volumes` the factory's volumes; an option not given is left out, and so are the default
+ * the folders it gives each local step, `volumes` the factory's volumes, and `harnessSettings` its harness settings; an option not given is left out, and so are the default
  * factory, no mounts and no volumes. No gate of it is
  * timed yet (`gatesTimed`), no denied call counted (`deniedCounted`), no settle counted (`settlesCounted`), and its timeline not handed
  * to the metrics (`runTimed`).
@@ -433,6 +445,7 @@ function toldOf(
   factory: Factory | undefined,
   mounts: Mount[],
   volumes: Mount[],
+  harnessSettings: HarnessSettings | undefined,
 ): Told {
   const after = opts.after ?? [];
   const context = opts.context ?? [];
@@ -452,6 +465,7 @@ function toldOf(
     ...(factory ? { factory: factory.name } : {}),
     ...(mounts.length ? { mounts } : {}),
     ...(volumes.length ? { volumes } : {}),
+    ...(harnessSettings ? { harnessSettings } : {}),
     gatesTimed: [],
     deniedCounted: [],
     settlesCounted: [],
@@ -612,7 +626,9 @@ export const repoFor = (name: string | undefined, named: string | undefined, fal
  * is frozen on the record as `mounts`, filed with every local step and named on its brief, so a later change to the factory changes
  * no run started. Left out when none is mounted, and in the default factory. Its volumes (`factoryVolumes`), each a directory now, are
  * frozen beside them as `volumes` (`volumesAt`), filed with every local step as marked, a writable one only where the step's fence
- * writes (`volumeMounts`); a step whose harness cannot hold one is refused before anything is written (`volumeMountRefusal`).
+ * writes (`volumeMounts`); a step whose harness cannot hold one is refused before anything is written (`volumeMountRefusal`). Its harness
+ * settings are frozen beside them as `harnessSettings`, given to every step on their harness (`filedConfig`); a key a factory may not
+ * set, written into its file by hand, refuses the start `Invalid` before anything is written (`settingsAt`).
  *
  * The revision of every kind the run resolved — its workflow, each agent, each of their skills and the factory's rules — is appended to
  * the ledger and pinned on the record as `pinned` (`pinsOf`); a run that has filed nothing resolves them again on every pass, so an
@@ -664,11 +680,13 @@ export const startRun = Effect.fn('start')(function* (opts: StartOptions) {
   const refusedContext = contextRefusal(opts.context ?? [], opts.after ?? [], runStore.runs.exists, id);
   if (refusedContext) return yield* Effect.fail(refusedContext);
   const inherited = yield* inheritedOf(opts, edits);
+  const harnessSettings = settingsAt(factory);
+  if (typeof harnessSettings === 'string') return yield* Effect.fail(new Invalid({ message: harnessSettings }));
   const mounts = mountsAt(factory, folder ? undefined : opts.repo);
   const volumes = volumesAt(factory);
   const unmounted = mountRefusal(opts, steps, places, factory, folder ? undefined : opts.repo, mounts, denied, volumes);
   if (unmounted) return yield* Effect.fail(new Invalid({ message: unmounted }));
-  const told = toldOf(opts, steps, inputs, factory, mounts, volumes);
+  const told = toldOf(opts, steps, inputs, factory, mounts, volumes, harnessSettings);
   const stepRecords = Object.fromEntries(steps.map((s) => [s.name, { taskId: null }]));
   const run = yield* folder ? folderRun(id, told, stepRecords) : repositoryRun(id, told, stepRecords, opts.repo, isolate);
   yield* tried(() => copyInputs(run, inputs));

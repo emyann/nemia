@@ -182,6 +182,45 @@ test('filedConfig: what a local step is filed beside its fence, its files direct
 const said = (harness: string, step: FiledStep, config: Parameters<typeof configRefusal>[1], flags?: FiledFlags): string | undefined =>
   filedRefusal((c) => configRefusal(harness, c), 'implement', config, lineOf(step, flags));
 
+test("filedConfig: a Claude Code step is given its factory's harness settings beneath its own", async (t) => {
+  const OFF = { attribution: { commit: '', pr: '' } };
+  const given = (step: Workflow, own: object, harnessSettings?: object) =>
+    filedConfig(step, [step], { gates: [], ...(harnessSettings === undefined ? {} : { harnessSettings }) }, {
+      model: undefined,
+      budgetUsd: undefined,
+      runArtifacts: '/runs/r/artifacts',
+      inbox: '/inbox',
+      own,
+      landingDenied: () => [],
+    });
+  const settingsOf = (config: object): unknown => {
+    const claude: unknown = Reflect.get(config, 'claude');
+    const settings: unknown = typeof claude === 'object' && claude !== null ? Reflect.get(claude, 'settings') : undefined;
+    return typeof settings === 'string' ? JSON.parse(settings) : undefined;
+  };
+  await t.test("an agent's rendered settings keep their keys and gain the factory's", () =>
+    assert.deepEqual(settingsOf(given(stepOf(), { claude: { settings: '{"outputStyle":"p:s"}', pluginDir: ['/p'] } }, { claude: OFF })), {
+      ...OFF,
+      outputStyle: 'p:s',
+    }),
+  );
+  await t.test("the agent's other flags are kept", () =>
+    assert.deepEqual(Reflect.get(Reflect.get(given(stepOf(), { claude: { pluginDir: ['/p'] } }, { claude: OFF }), 'claude'), 'pluginDir'), ['/p']),
+  );
+  await t.test('a step with no agent is given a claude key for them', () =>
+    assert.deepEqual(settingsOf(given(stepOf(), { enabledSkills: 'default' }, { claude: OFF })), OFF),
+  );
+  await t.test('a step on another harness is given none', () =>
+    assert.equal('claude' in given(stepOf('harness: codex\n'), {}, { claude: OFF }), false),
+  );
+  await t.test('a run that froze none files what it did', () =>
+    assert.deepEqual(given(stepOf(), { claude: { settings: '{"a":1}' } }), given(stepOf(), { claude: { settings: '{"a":1}' } }, {})),
+  );
+  await t.test("a hand-edited record's widening key is not filed", () =>
+    assert.deepEqual(settingsOf(given(stepOf(), {}, { claude: { ...OFF, permissions: { allow: ['Bash(*)'] } } })), OFF),
+  );
+});
+
 test("filedRefusal: the runtime's refusal of a filed config, after the step's line it comes from, the flag a retry typed, or none", async (t) => {
   await t.test("a field the runtime refuses alone is named by the step's line it comes from, and the field it is filed as", () => {
     const ultra = said('claude', { model: 'opus', effort: 'ultra' }, { model: 'opus', effort: 'ultra' })!;

@@ -12,6 +12,7 @@ import type { MergeOf, RoundAsk } from '../status/status.ts';
 import type { Pause } from '../pause/pause.ts';
 import type { Pin } from '../revisions/revisions.ts';
 import type { Labels } from '../labels/labels.ts';
+import type { HarnessSettings } from '../harness-settings/harness-settings.ts';
 
 /**
  * A folder a step may reach beyond its workspace, as the runtime takes it (`config.mounts`): an absolute path, and whether the step may
@@ -162,6 +163,14 @@ type RunBase = {
    * lands or reverts what a step writes there. Absent: none.
    */
   volumes?: Mount[];
+  /**
+   * The factory's harness settings, frozen at start from its file once judged (`harnessSettingsRefusal`): the settings of a harness each
+   * step of the run on it is given on top of the repository's own, its own agent's laid over them (`filedConfig`), so a later change to
+   * the factory changes no run started. Read as the record holds it, among the keys the store keeps unnamed, and judged again key by key
+   * at each filing (`filedClaudeSettings`), so a hand-edited record files no key a factory may not set. Absent: none, and in the
+   * default factory.
+   */
+  harnessSettings?: HarnessSettings;
   /**
    * What people approved at a gate (`nemia approve`), each in a file of its own beside the retry asks —
    * `runs/<id>.asks/approve-<step>-<try>` — composed on read, as `cancelledAt` is (`readRun` in record.store.ts), and never written into

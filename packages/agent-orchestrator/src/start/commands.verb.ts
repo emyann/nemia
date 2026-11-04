@@ -38,6 +38,7 @@ import { Invalid, Missing } from '../refusal/refusal.ts';
 import { idRefusal } from '../forget/forget.ts';
 import { RunDoor } from '../runs/runs.store.ts';
 import { RunId } from '../record/record.model.ts';
+import { settingsNamed } from '../harness-settings/harness-settings.ts';
 
 /** What `nemia start --help` prints of a folder of cards, after the start of one brief. */
 const FOLDER_HELP = `nemia start <folder> [--repo .] [--factory <name>]
@@ -193,7 +194,14 @@ function mountLines(run: Run): string[] {
       ? [`not mounted: ${missing.join(', ')} — of the factory's repositories, and no directory now; start again once it is there`]
       : []),
     ...volumeLines(run),
+    ...settingsLine(run),
   ];
+}
+
+/** The harness settings a run froze from its factory, by name, as each of its Claude Code steps is given them. */
+function settingsLine(run: Run): string[] {
+  const named = settingsNamed(run.harnessSettings).map((s) => s.name);
+  return named.length ? [`harness settings: ${named.join(', ')} — for every Claude Code step, beneath its agent's own`] : [];
 }
 
 /**

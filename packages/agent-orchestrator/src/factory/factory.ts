@@ -211,7 +211,8 @@ export type FactoryWrite =
   | 'unschedule'
   | 'upgrade'
   | 'adopt'
-  | 'volume';
+  | 'volume'
+  | 'setting';
 
 /** What to do in place of `nemia factory <verb>` on the default factory. */
 const INSTEAD: Record<FactoryWrite, string> = {
@@ -230,6 +231,7 @@ const INSTEAD: Record<FactoryWrite, string> = {
   unschedule: 'It schedules nothing: unschedule in a factory nemia factory ls lists.',
   upgrade: 'It is made from no template: upgrade a factory nemia factory apply made.',
   volume: 'It mounts no volume, and no run is started in it: add one to a factory nemia factory ls lists.',
+  setting: 'It holds no harness settings, and no run is started in it: set one on a factory nemia factory ls lists.',
   adopt:
     'It holds every run and card that names no factory: take over a factory nemia factory ls lists, or make one with nemia factory apply.',
 };

@@ -4,7 +4,10 @@
  *
  * - The four read-only agents (Seldon, Agora, Iris, Argus) run `dontAsk`, name the place's `git` skill, allow one and the same read-only
  *   set of git's questions and text tools (`READ_SET`), and deny beside it what that set would let git write a file, run a program or
- *   read outside the repository by (`READ_SET_DENIES`).
+ *   read outside the repository by (`READ_SET_DENIES`), an assignment before git among them.
+ * - Agora, the reviewer, alone allows `gh pr view` and `gh pr checks` (`GH_READS`), on either way sdlc lands, and the four deny beside
+ *   them every form of gh that opens a browser, never returns, reads beyond the answer or another repository, bundles a short option to
+ *   reach one, or is typed after an assignment (`GH_DENIES`): a repository's own allow of gh reaches every step, so each is fenced.
  * - Every agent is refused an edit and a write of the store's factories, workflows and inbox, under the store the factory names
  *   (`storeRoot`), and none of its runs: a step writes its own run's folder.
  * - The two writers, Grace and Otto, each deny `git push`, a forced branch delete, a kill by name, every `gh`, a session started by
@@ -70,12 +73,13 @@ const READ_SET = [
 
 /**
  * What the read set would let git write a file, run a program or read outside the repository by, and `wc` read a list of paths by:
- * `git grep`'s pager option, git's environment, `--output`, `--no-index`, `blame --contents`, `grep -f`, `wc --files0-from`.
+ * `git grep`'s pager option, git's environment, any assignment before git (`HOME`, `XDG_CONFIG_HOME`), `--output`, `--no-index`, `blame --contents`, `grep -f`, `wc --files0-from`.
  */
 const READ_SET_DENIES = [
   'Bash(git grep *O*)',
   'Bash(git grep *--op*)',
   'Bash(*GIT_*)',
+  'Bash(*=* git *)',
   'Bash(git *--output*)',
   'Bash(git *--no-ind*)',
   'Bash(git blame *--con*)',
@@ -83,6 +87,31 @@ const READ_SET_DENIES = [
   'Bash(git grep * -f*)',
   'Bash(wc *--f*)',
 ];
+
+/** The pull request's reads, which Agora alone allows itself. */
+const GH_READS = ['Bash(gh pr view:*)', 'Bash(gh pr checks:*)'];
+
+/**
+ * What gh's reads would open, run or read beyond the answer by, each read-only agent's deny: the browser, `--watch`, a jq query or a
+ * template, another repository by option or by address, a short option bundled after `-c`, and any assignment before gh.
+ */
+const GH_DENIES = [
+  'Bash(gh *--web*)',
+  'Bash(gh * -w*)',
+  'Bash(gh *--watch*)',
+  'Bash(gh *--jq*)',
+  'Bash(gh * -q*)',
+  'Bash(gh *--template*)',
+  'Bash(gh * -t*)',
+  'Bash(gh *--repo*)',
+  'Bash(gh * -R*)',
+  'Bash(gh *//*)',
+  'Bash(gh * -c*)',
+  'Bash(*=* gh *)',
+];
+
+/** The reviewer, the one read-only agent whose steps read the pull request. */
+const READS_THE_PULL_REQUEST = 'agora';
 
 /**
  * The store's folders no agent edits or writes, under `root`: its factories, its workflows and its inbox. An `Edit` rule alone, since
@@ -165,6 +194,10 @@ function shortOf(fences: Record<string, Fence>, root: string): string[] {
         ...(skills.includes('git') ? [] : [`${agent}: names no git skill`]),
         ...lacks(agent, READ_SET, allowed, 'allows no'),
         ...lacks(agent, READ_SET_DENIES, denied, 'denies no'),
+        ...lacks(agent, GH_DENIES, denied, 'denies no'),
+        ...(agent === READS_THE_PULL_REQUEST
+          ? lacks(agent, GH_READS, allowed, 'allows no')
+          : allowed.filter((rule) => rule.startsWith('Bash(gh')).map((rule) => `${agent}: allows gh, ${rule}`)),
       ];
     }),
     ...Object.keys(fences)
@@ -179,15 +212,21 @@ function shortOf(fences: Record<string, Fence>, root: string): string[] {
   ];
 }
 
-/** sdlc as it ships, and a copy with one line cut from three agents' fences, rendered on one store with the store `STORE`. */
+/**
+ * sdlc as it ships, on either way it lands, and a copy with one line cut from five agents' fences, rendered on one store with the store
+ * `STORE`.
+ */
 const TREES = await rendered([
   { name: 'shipped', template: copyOf(SDLC), sets: [`storeRoot=${STORE}`] },
+  { name: 'github', template: copyOf(SDLC), sets: [`storeRoot=${STORE}`, 'github=true'] },
   {
     name: 'cut',
     template: copyOf(SDLC, {
       'agents/otto/agent.yaml': (text) => text.replace('        - Edit(${{ parameters.storeRoot }}/inbox/**)\n', ''),
-      'agents/agora/agent.yaml': (text) => text.replace('        - Bash(git *--output*)\n', ''),
+      'agents/agora/agent.yaml': (text) =>
+        text.replace('        - Bash(git *--output*)\n', '').replace('        - Bash(gh pr checks:*)\n', ''),
       'agents/iris/agent.yaml': (text) => text.replace('        - Bash(git merge-base:*)\n', ''),
+      'agents/seldon/agent.yaml': (text) => text.replace('        - Bash(gh *--jq*)\n', '').replace('        - Bash(*=* git *)\n', ''),
       'agents/grace/agent.yaml': (text) => text.replace('        - Bash(git push:*)\n', ''),
     }),
     sets: [`storeRoot=${STORE}`],
@@ -203,10 +242,13 @@ const fencesOf = (name: string): Record<string, Fence> => {
 
 test('REFUSED: an agent with a line of its fence cut is named, with the rule it lost', () => {
   assert.deepEqual(shortOf(fencesOf('cut'), STORE).sort(), [
+    `agora: allows no Bash(gh pr checks:*)`,
     `agora: denies no Bash(git *--output*)`,
     `grace: denies no Bash(git push:*)`,
     `iris: allows no Bash(git merge-base:*)`,
     `otto: denies no Edit(${STORE}/inbox/**)`,
+    `seldon: denies no Bash(*=* git *)`,
+    `seldon: denies no Bash(gh *--jq*)`,
   ]);
 });
 
@@ -217,8 +259,10 @@ test('REFUSED: a deny over the runs, and a read-only agent in another mode or wi
     ...fences,
     seldon: { ...seldon, mode: 'auto', skills: seldon.skills.filter((skill) => skill !== 'git') },
     otto: { ...fences.otto, denied: [...fences.otto.denied, `Edit(${STORE}/runs/**)`] },
+    iris: { ...fences.iris, allowed: [...fences.iris.allowed, 'Bash(gh pr view:*)'] },
   };
   assert.deepEqual(shortOf(planted, STORE), [
+    'iris: allows gh, Bash(gh pr view:*)',
     'seldon: runs auto',
     'seldon: names no git skill',
     `otto: denies its runs, Edit(${STORE}/runs/**)`,
@@ -226,9 +270,20 @@ test('REFUSED: a deny over the runs, and a read-only agent in another mode or wi
 });
 
 test("sdlc's six agents carry their fences: the read set and its denies, the store's denies, and the writers' refusals", () => {
-  const fences = fencesOf('shipped');
-  assert.deepEqual(Object.keys(fences).sort(), ['agora', 'argus', 'grace', 'iris', 'otto', 'seldon']);
-  assert.deepEqual(shortOf(fences, STORE), []);
+  for (const way of ['shipped', 'github']) {
+    const fences = fencesOf(way);
+    assert.deepEqual(Object.keys(fences).sort(), ['agora', 'argus', 'grace', 'iris', 'otto', 'seldon'], way);
+    assert.deepEqual(shortOf(fences, STORE), [], way);
+  }
+});
+
+test("Agora allows gh's two reads and nothing else of gh, on either way sdlc lands", () => {
+  for (const way of ['shipped', 'github'])
+    assert.deepEqual(
+      fencesOf(way).agora.allowed.filter((rule) => rule.startsWith('Bash(gh')),
+      GH_READS,
+      way,
+    );
 });
 
 test('the four read-only agents allow one and the same read set, and nothing else of git', () => {

@@ -39,8 +39,10 @@ script and refuses unless the pull request's head is the commit it judges — Gi
 read again for up to 30 s before the refusal — then runs the round check, then, unless GitHub says the pull request conflicts with its
 base (refused at once, naming the merge of the base, since GitHub runs no CI on a conflicting head), waits on the CI context (1800 s
 for it to start, 2400 s whole): CI runs the repository's suite on that commit, and a red, cancelled or missing context is the check's
-refusal, with the Actions URL, the failing jobs and a bounded tail of their log — no agent of this team may type `gh`, so the script
-reads it for them.
+refusal, with the Actions URL, the failing jobs and a bounded tail of their log — no writer of this team may type `gh`, so the script
+reads it for them. The reviewer alone reads the pull request and its checks itself (`gh pr view`, `gh pr checks`), its fence allowing
+those two and refusing every other form: a browser, `--watch`, a jq query or a template, another repository, and an assignment before
+`gh`.
 
 The push labels the pull request too, from the run's own labels, by the rules the factory's `pullRequestLabels` parameter sets (each
 `<key>=<value>:<label>`, the rules apart by spaces; empty, the default, labels nothing): it adds the labels the rules give the run and

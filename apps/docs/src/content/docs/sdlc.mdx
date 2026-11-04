@@ -141,7 +141,10 @@ Once the daemon has rendered the factory, its tree is yours to change. Four chan
   matched as it is typed, so it holds against the usual spellings and not against a quoted one.
 - **Let the reading agents run your checks.** Seldon, Agora, Iris and Argus run in `dontAsk` mode, and run only what they are allowed.
   A step's own `allowedTools` may only narrow its agent's, never widen them, so allow their read-only checks (the linter, the
-  typecheck, one test file, `gh pr view` and `gh pr checks`) in your repository's `.claude/settings.json`, where they travel with it.
+  typecheck, one test file) in your repository's `.claude/settings.json`, where they travel with it. From sdlc 2.2.0, Agora allows
+  itself `gh pr view` and `gh pr checks`, to read the pull request it reviews on GitHub, and the four deny every other form of them:
+  a browser, `--watch`, a jq query or a template, another repository, and an assignment before `gh`. An allow of `gh` in your
+  settings reaches every reading agent, so leave it out.
 - **Commit before a landing.** The landing runs in your checkout, on your base branch, either way. It refuses a checkout with
   uncommitted changes before it merges anything, and leaves them as they are: on GitHub, its script refuses changes to tracked
   files; in your checkout, the land step checks it first, as the git place's _Stage a landing_ says, and signs off blocked with

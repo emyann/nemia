@@ -16,7 +16,51 @@ import { phaseOfView, type WordView } from '../views/views-words.ts';
  * A person's pause on the store, as its file says it: when it was put, who put it, and the person's words for why (`why`, absent when none
  * were given), each one line. A file that does not read gives each field empty, and still pauses.
  */
-export type Pause = { at: string; by: string; why?: string };
+export type Pause = { at: string; by: string; why?: string; graceMs?: number };
+
+/** The grace a store's pause gives a call in flight when nothing sets one: ten minutes (`pause-grace.json`, `nemia grace`). */
+export const DEFAULT_GRACE_MS = 600_000;
+
+/** The shortest grace a pause takes: one second. */
+export const MIN_GRACE_MS = 1_000;
+
+/** The longest grace a pause takes: 23 hours, the runtime's bound on a held job (`JOB_HOLD_MS`), under its hook's own (`HOOK_HOLD_S`). */
+export const MAX_GRACE_MS = 23 * 3_600_000;
+
+/** How a grace is typed, as every refusal of one says it. */
+export const GRACE_FORM = 'digits and s, m or h, from 1s to 23h, as 90s, 10m or 2h';
+
+const UNIT_MS = { s: 1_000, m: 60_000, h: 3_600_000 } as const;
+
+/** The milliseconds `text` says by the form alone, bounds unread; undefined where it is not digits and one unit. */
+const formOf = (text: string): number | undefined => {
+  const m = /^(\d+)([smh])$/.exec(text.trim());
+  return m ? Number(m[1]) * UNIT_MS[m[2] as keyof typeof UNIT_MS] : undefined;
+};
+
+/** Why `text` is no grace, naming the form, or undefined for one that reads. */
+export const graceRefusal = (text: string): string | undefined => {
+  const ms = formOf(text);
+  if (ms === undefined) return `a grace is ${GRACE_FORM}; it was given ${JSON.stringify(text)}`;
+  return ms < MIN_GRACE_MS || ms > MAX_GRACE_MS
+    ? `a grace is from 1s to 23h (${GRACE_FORM}); it was given ${JSON.stringify(text)}`
+    : undefined;
+};
+
+/** The grace `text` says, in milliseconds, or undefined where `graceRefusal` refuses it. */
+export const graceOf = (text: string): number | undefined => (graceRefusal(text) === undefined ? formOf(text) : undefined);
+
+/** A grace in words, by its largest whole unit: `10m`, `90s`, `2h`. */
+export const graceWords = (ms: number): string =>
+  ms % 3_600_000 === 0 ? `${ms / 3_600_000}h` : ms % 60_000 === 0 ? `${ms / 60_000}m` : `${Math.round(ms / 1_000)}s`;
+
+/**
+ * How many sessions are still finishing a tool call under a pause and when what is left is cut, in one line, as the pause and a restart
+ * say it while they wait: "Pausing: 2 sessions finishing a tool call, cut in 9 min". `leftMs` is rounded up to whole minutes, never
+ * below one.
+ */
+export const pausingWords = (sessions: number, leftMs: number): string =>
+  `Pausing: ${sessions} session${sessions === 1 ? '' : 's'} finishing a tool call, cut in ${Math.max(1, Math.ceil(leftMs / 60_000))} min`;
 
 /**
  * A landing the pause holds with its merge staged: the ending of `run`, `step`, whose session staged the merge in `repo`'s own checkout

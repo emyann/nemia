@@ -64,7 +64,7 @@ export const pausingLine = (sessions: number, leftMs: number): string =>
 const pausingHead = ({ pause, finishing }: Paused & { pause: Pause }, now: Date): string => {
   const sessions = finishing.filter((f) => f.kind === 'session').length;
   return pause.timeoutMs !== undefined && sessions
-    ? pausingLine(sessions, Date.parse(pause.at) + pause.timeoutMs - now.getTime())
+    ? pausingLine(sessions, Math.min(pause.timeoutMs, Date.parse(pause.at) + pause.timeoutMs - now.getTime()))
     : `Pausing: ${finishing.length} finishing`;
 };
 

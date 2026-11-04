@@ -148,6 +148,12 @@ test('pauseWords under a pause with a timeout: sessions finishing a call and whe
     assert.match(pauseWords(one, null, NOW).line, /^Pausing: 1 session finishing a tool call, cut in 1 min — /);
     const early = paused({ pause: { ...timed, at: NOW.toISOString() }, finishing: [{ run: 'r-1', step: 'plan', kind: 'session' }] });
     assert.match(pauseWords(early, null, new Date(NOW.getTime() + 60_001)).line, /cut in 9 min — /);
+    const ahead = new Date(NOW.getTime() - 30_000);
+    assert.match(
+      pauseWords(early, null, ahead).line,
+      /cut in 10 min — /,
+      'a pause stamped ahead of this clock is cut in no more than its timeout',
+    );
   });
   await t.test('with only checks finishing, or no timeout, it counts what finishes as before', () => {
     const checks = paused({ pause: timed, finishing: [{ run: 'r-3', step: 'ship', kind: 'landing' }] });

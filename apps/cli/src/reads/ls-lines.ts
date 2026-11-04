@@ -246,7 +246,7 @@ const pausedWords = (paused: Paused, now: Date = new Date()): string | null => {
   const sessions = finishing.filter((f) => f.kind === 'session').length;
   const head =
     pause.timeoutMs !== undefined && sessions
-      ? pausingWords(sessions, Date.parse(pause.at) + pause.timeoutMs - now.getTime())
+      ? pausingWords(sessions, Math.min(pause.timeoutMs, Date.parse(pause.at) + pause.timeoutMs - now.getTime()))
       : `Pausing: ${finishing.length} finishing`;
   return finishing.length
     ? `${head}${heldCount(paused)} — the store is paused ${sinceWords(pause)}; nothing new starts, and what runs finishes; ${RESUME_LINE} resumes it`

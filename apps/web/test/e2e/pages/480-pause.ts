@@ -147,10 +147,13 @@ export default {
       await popover.getByRole('button', { name: 'Pause', exact: true }).click();
       await expectCount(popover, 0, 'sent, the popover closes once the api answered');
       if (!fs.existsSync(file)) throw new Refused(`the popover put the pause once the api answered — ${file} is not there`);
-      const put = JSON.parse(fs.readFileSync(file, 'utf8')) as { at: string; by: string; why?: string };
+      const put = JSON.parse(fs.readFileSync(file, 'utf8')) as { at: string; by: string; why?: string; timeoutMs?: number };
+      if (put.timeoutMs !== 600_000)
+        throw new Refused(`the pause carries the store's timeout, 10 min by default — its file holds ${JSON.stringify(put.timeoutMs)}`);
       if (put.why !== WHY) throw new Refused(`the pause's file holds the why given, "${WHY}" — it holds ${JSON.stringify(put.why)}`);
       const read = (await (await page.request.get(new URL('/api/pause', page.url()).href)).json()) as Paused;
       const count = read.finishing.length;
+      const sessions = read.finishing.filter((f) => f.kind === 'session').length;
       if (count === 0) throw new Refused("the seeded store has sessions at work, which finish under the pause — the api's read names none");
       await expectTexts(
         button.and(page.locator(`[data-pause="pausing"][data-finishing="${count}"]`)),
@@ -162,8 +165,12 @@ export default {
       await expectVisible(
         popover
           .locator('[data-pause-line]')
-          .getByText(new RegExp(`^Pausing: ${count} finishing — paused since .+ by ${put.by}: ${WHY}\\. Nothing new starts`)),
-        'its popover says how many finish, since when, by whom and why',
+          .getByText(
+            new RegExp(
+              `^Pausing: ${sessions} sessions? finishing a tool call, cut in (?:9|10) min — paused since .+ by ${put.by}: ${WHY}\\. Nothing new starts`,
+            ),
+          ),
+        'its popover says how many sessions finish a tool call, when they are cut, since when, by whom and why',
       );
       await expectTexts(popover.locator('[data-pause-finishing] li'), read.finishing.map(finishingSentence), 'and names each');
       await expectTexts(

@@ -117,7 +117,7 @@ test("a crashed first upgrade's leftovers are swept on a store with no pointer, 
   const s = story(t);
   const home = scratch('wf-retain-crashed-');
   const releases = releasesDir(home);
-  /** A pid no process has: past Linux's highest (`PID_MAX_LIMIT`, 2^22) and macOS's. */
+  /** A pid no process has: past the highest Linux allows (2^22) and macOS's. */
   const dead = 4_194_305;
   const at = (name: string) => path.join(releases, name);
   fs.mkdirSync(at(`.building-v1-${dead}/trial/engine`), { recursive: true });

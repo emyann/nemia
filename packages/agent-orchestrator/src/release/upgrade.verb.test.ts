@@ -458,7 +458,7 @@ test('an upgrade removes the releases no one needs: not the two newest, not one 
   await s.test(
     "a crashed upgrade's build folder is removed by the next upgrade, which says so, and only a log over 30 days old goes",
     async () => {
-      /** A pid no process has: past Linux's highest (`PID_MAX_LIMIT`, 2^22) and macOS's. */
+      /** A pid no process has: past the highest Linux allows (2^22) and macOS's. */
       const dead = 4_194_305;
       const crashed = path.join(releasesDir(), `.building-v9-${dead}`);
       fs.mkdirSync(path.join(crashed, 'trial', 'engine'), { recursive: true });

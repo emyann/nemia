@@ -1120,7 +1120,7 @@ test("REFUSED: a step's own deny line cut to one rule lifts none of its agent's,
   );
 });
 
-/** The pull request's reads the reviewer allows itself, planted beside the read set. sdlc's own is Agora's, held as written there. */
+/** The pull request's reads the reviewer allows itself, planted beside the read set. sdlc's own is held as written there. */
 const GH_ALLOWS = ['Bash(gh pr view:*)', 'Bash(gh pr checks:*)'];
 
 /**

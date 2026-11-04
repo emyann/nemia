@@ -9,7 +9,7 @@
 import { Schema } from 'effect';
 import { brandedCount, brandedId, foreignId, type Count, type Id } from './brand.ts';
 import { erDiagram, type ErModel } from './er.ts';
-import { FORMER_REASONS, HarnessArgsSchema, SaidAtEnd, StoredEventSchema, UsageSchema } from './event-schema.ts';
+import { FORMER_REASONS, HarnessArgsSchema, ParkedSchema, SaidAtEnd, StoredEventSchema, UsageSchema } from './event-schema.ts';
 
 /** The most bytes a file's name may hold on the file systems a store is kept on. */
 const NAME_BYTES = 255;
@@ -100,6 +100,7 @@ export const Attempt = Schema.Struct({
   image: Schema.optional(Schema.String),
   harnessVersion: Schema.optional(Schema.String),
   limit: Schema.optional(Schema.String),
+  parked: Schema.optional(ParkedSchema),
   turn: Schema.optional(Schema.Number),
   error: Schema.optional(Schema.String),
   gapSince: Schema.optional(Schema.String),

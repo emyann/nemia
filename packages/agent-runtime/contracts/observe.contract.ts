@@ -5,18 +5,9 @@
  */
 import { assume, type Implementation, spec } from '@emyann/tsverify';
 import type { Monotonic } from '../src/core/clock.ts';
-import {
-  type Attempt,
-  awaitsAdmission,
-  backoffOf,
-  nameFor,
-  RESTART_BACKOFF,
-  type Now,
-  type Sighting,
-  type State,
-  waitsForInput,
-} from '../src/core/domain.ts';
+import { type Attempt, awaitsAdmission, nameFor, type Now, type Sighting, type State, waitsForInput } from '../src/core/domain.ts';
 import type { LifecycleEvent } from '../src/core/lifecycle.ts';
+import { backoffOf, RESTART_BACKOFF } from '../src/core/restart.ts';
 
 /**
  * The restart's wait doubles up to its cap: past some forty ends in a row its product is no exact double, which the
@@ -50,6 +41,11 @@ const attemptStamped = (a: Attempt): boolean =>
 const inFlight = (state: State): Attempt | undefined => {
   const last = state.attempts.at(-1);
   return last !== undefined && last.ended === null ? last : undefined;
+};
+/** Whether the last attempt, of the current turn, was parked under a jobs' drain (`Attempt.parked`, which only an end carries). */
+const parkedLast = (state: State): boolean => {
+  const last = state.attempts.at(-1);
+  return last !== undefined && last.parked !== undefined && (last.turn ?? 0) === state.inputs.length;
 };
 /** What a pass sees only of the session of an attempt in flight: its deadline, its sighting, or its absence. */
 const SESSION_EVENTS = [
@@ -173,11 +169,32 @@ const observeSpec = spec<(state: State, observed: ReadonlyMap<string, Sighting>,
       description: 'A person is waited on only for a task held open',
       condition: ({ input: [state], output }) => output.type !== 'AWAITING_INPUT' || state.holdOpen === true,
     },
-    onlyALongLivedTaskRestarts: {
-      description: 'Only a long-lived task restarts, idles or is respawned',
+    onlyALongLivedTaskIdles: {
+      description: 'Only a long-lived task idles or is respawned',
       condition: ({ input: [state], output }) =>
-        state.restartPolicy === 'Always' ||
-        !['BACKING_OFF', 'RESTART_DUE', 'SESSION_IDLE', 'SESSION_RESPAWNING', 'RESPAWN_OVERDUE'].includes(output.type),
+        state.restartPolicy === 'Always' || !['SESSION_IDLE', 'SESSION_RESPAWNING', 'RESPAWN_OVERDUE'].includes(output.type),
+    },
+    /**
+     * A job parked under a jobs' drain is continued as a restart inside its task (the card "a job stops at its tool call's end"),
+     * so a restart is no longer the long-lived task's alone.
+     */
+    onlyALongLivedTaskOrAParkedJobRestarts: {
+      description: 'Only a long-lived task, or a job whose attempt ended parked, restarts',
+      condition: ({ input: [state], output }) =>
+        state.restartPolicy === 'Always' || parkedLast(state) || !['BACKING_OFF', 'RESTART_DUE'].includes(output.type),
+    },
+    aParkedJobIsContinued: {
+      description: 'A job whose last attempt ended parked is continued or held, never settled on that end',
+      condition: ({ input: [state], output }) => output.type !== 'ATTEMPT_ENDED' || !parkedLast(state),
+    },
+    aParkedJobIsHeldWhileDrained: {
+      description: "While a jobs' drain stands, a job is never continued",
+      condition: ({ input: [state, , now], output }) =>
+        now.drained !== true || state.restartPolicy === 'Always' || output.type !== 'RESTART_DUE',
+    },
+    heldOnlyWhenParkedAndDrained: {
+      description: "A job is held parked only while a jobs' drain stands and its last attempt ended parked",
+      condition: ({ input: [state, , now], output }) => output.type !== 'PARK_HELD' || (now.drained === true && parkedLast(state)),
     },
     queuedOnlyWhenQueued: {
       description: "Queued only while it waits for the layer above's word",

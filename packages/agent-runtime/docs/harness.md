@@ -4,9 +4,16 @@ What Claude Code does as the steps meet it, measured at the version each line na
 has, trust, the bridge to claude.ai, and what it exports. A measurement here is a floor read on a
 release, never a promise of the next one — re-measure before you lean on it, and name the version and the day beside what you read.
 
-Since 2026-10-24 every Claude Code session of this runtime runs on the Agent SDK: a step as a job, a long-lived session attached while
-a process holds it (`nemia up`). A line below about `claude -p` or a `--bg` session is the record of a road this runtime no longer runs,
+Since 2026-10-24 every Claude Code session of this runtime runs on the Agent SDK: a step as a job, in a process of its own whether or
+not a process holds sessions (since 2026-11-03), and a long-lived session attached while a process holds it (`nemia up`). A line below about `claude -p` or a `--bg` session is the record of a road this runtime no longer runs,
 kept for what it measured of Claude Code itself.
+
+- **A job's `PreToolUse` hook holds its call, and `interrupt()` then the end of the prompt prints the cut turn's result with its
+  cost** (SDK 0.3.316, on the stand-in Claude Code of `test/job-hold.boundary.test.ts`, 2026-11-03): with `permissionPrompts: 'none'`
+  and the job's hooks on its options, the SDK registers them at `initialize`, and an unanswered `PreToolUse` callback keeps the call
+  waiting; a turn cut by `interrupt()` prints `error_during_execution` with its `total_cost_usd`, and the CLI saves its total as it
+  leaves. On a real Claude Code 2.1.316, and what it does when a hook outlives its `timeout` (`HOOK_HOLD_S`, 24 h), it is unmeasured
+  (`docs/open-issues.md`, *A job's hold is measured on the stand-in alone*): `JOB_HOLD_MS` parks an hour before that timeout.
 
 `CLAUDE.md`, *Claude Code, as a harness*, forwards here, and the five documents that point at that heading resolve through it. Where
 the orchestrator's code holds a fact today, it is named beside it.

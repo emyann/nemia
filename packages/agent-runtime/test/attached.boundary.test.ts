@@ -1063,7 +1063,7 @@ test('a denial is journalled while the attempt is at work, before its result', W
   const layer = Engine.layer({ root, harnesses: { claude: claudeCodeOps({ root }, attached) } });
   const go = <A>(f: (e: Engine['Service']) => Effect.Effect<A, unknown>) =>
     Effect.runPromise(Effect.flatMap(Engine, f).pipe(Effect.provide(layer)) as Effect.Effect<A>);
-  const id = await go((e) => e.file({ brief: request.brief, cwd: dir, config: request.config }));
+  const id = await go((e) => e.file({ brief: request.brief, cwd: dir, config: request.config, restartPolicy: 'Always' }));
   t.after(async () => {
     fs.writeFileSync(path.join(dir, 'end'), '');
     await Effect.runPromise(Scope.close(scope, Exit.void));

@@ -55,6 +55,8 @@ import {
   type TaskView,
   BodyRefused,
 } from '../core/engine/index.ts';
+import { DrainRefused, drainChecked, drainJobsChecked, passReadsOf } from './drain.ts';
+export { DrainRefused, drainChecked, drainJobsChecked, drainJobsRefusalOf, drainRefusalOf } from './drain.ts';
 import { OutputRefused, outputVerbOf } from './output.ts';
 import { followVerbOf, type FollowRefused } from './follow.ts';
 import { DEFAULT_HARNESSES } from './default-harnesses.ts';
@@ -73,7 +75,6 @@ import {
   isClaude,
   runnersOf,
   optionsRefusalOf,
-  admissionOf,
   heldHarnessesOf,
   type EngineIo,
   type EngineOptions,
@@ -87,7 +88,7 @@ import { harnessedOf, noFallbackRefusal, remoteIn, type Harnessed } from './harn
 import { McpStateRefused, mcpStateVerbOf } from './mcp-state.ts';
 import { McpSignInRefused, mcpSignInVerbsOf, type McpSignInStarted, type McpSignInState } from './mcp-sign-in.ts';
 import { traceparentOf } from '../harness/telemetry.ts';
-import { attachedSessions, putDrain, liftDrain, type Attached } from '../harness/claude/index.ts';
+import { attachedSessions, liftJobDrain, putDrain, putJobDrain, liftDrain, type Attached } from '../harness/claude/index.ts';
 import type { McpServersRead } from '../harness/mcp-state.ts';
 import type { RemoteMcpServer } from '../harness/seam.ts';
 import { answerOptionsRefusalOf } from './answer-options.ts';
@@ -138,23 +139,6 @@ const attemptAsked = <A extends { readonly n: number }>(attempts: readonly A[], 
   const refused = attemptRefusal(attempts, attempt);
   if (refused !== undefined) return Effect.fail(new TranscriptRefused({ message: refused }));
   return Effect.succeed(attempt === undefined ? attempts.at(-1) : attempts.find((a) => a.n === attempt));
-};
-
-/** A drain this engine will not put, and why: a holder that is no process id. Nothing was written. */
-export class DrainRefused extends Schema.TaggedError<DrainRefused>()('DrainRefused', {
-  message: Schema.String,
-}) {}
-
-/** Why `drain` refuses its holder, or `undefined` for a process id or null. */
-export const drainRefusalOf = (holder: unknown): string | undefined =>
-  holder === null || (Number.isInteger(holder) && (holder as number) > 0)
-    ? undefined
-    : `takes the process id of the engine that holds the attached sessions, a whole number from 1, or null to let their calls go; it was handed ${JSON.stringify(holder) ?? 'nothing'}.`;
-
-/** `drain`'s check of its holder: fails with `DrainRefused` for what `drainRefusalOf` refuses, and does nothing otherwise. */
-export const drainChecked = (holder: unknown): Effect.Effect<void, DrainRefused> => {
-  const refused = drainRefusalOf(holder);
-  return refused === undefined ? Effect.void : Effect.fail(new DrainRefused({ message: refused }));
 };
 
 /** Why `list` refuses what it was handed, or `undefined` for nothing or one list of task ids. */
@@ -530,9 +514,10 @@ export type EngineShape = {
    * the scope it is taken in lasts: while held, a Claude Code task that runs to its end is spawned attached on the Agent SDK, and a
    * session parked, or left by a holder that is gone, is resumed under its own id on the next look. As the scope closes it holds back
    * the new tool calls of each session with none in flight, waits at most `LET_GO_MS` for each call in flight to end, then stops each
-   * session and parks it for the next holder, a call it cut at that bound kept on the session's run file and said on the log. An
-   * engine that never takes it runs such a task as a job on its own process (`bin/ae-claude-job.ts`), and refuses a long-lived one's
-   * spawn `unstartable`: a long-lived Claude Code session runs attached, and nowhere else.
+   * session and parks it for the next holder, a call it cut at that bound kept on the session's run file and said on the log. A
+   * Claude Code job — a task with no `restartPolicy` — runs on its own process (`bin/ae-claude-job.ts`) whether or not the sessions are
+   * held, so the hold neither takes it nor ends it (`drainJobs` holds it); an engine that never takes the hold refuses a long-lived
+   * task's spawn `unstartable`: a long-lived Claude Code session runs attached, and nowhere else.
    *
    * Answers what the hold serves (`Served`): a loopback port of its own, speaking A2A as a reading surface alone — the card,
    * `GetTask` and `SubscribeToTask` — behind one bearer token, for the sessions of each harness configured as the literal
@@ -548,6 +533,15 @@ export type EngineShape = {
    * another process's holder is not held. Refused — `DrainRefused` — for a holder that is neither a process id nor null.
    */
   readonly drain: (holder: number | null) => Effect.Effect<void, DrainRefused>;
+  /**
+   * Put the store's jobs' drain, with how long a call in flight is given to finish (`graceMs`), or with `null` lift it. While it stands
+   * every Claude Code job, on its own process, finishes its call in flight and holds its next main-thread call at its hook; past the
+   * grace with a call in flight, or held past its bound, it ends itself parked, and the engine continues it as a new attempt of the
+   * same task once the drain is lifted. Apart from the holder's drain (`drain`): a restart drains and lifts its holder and neither holds
+   * nor releases the jobs. Refused — `DrainRefused` — for anything but `{ graceMs }` of whole milliseconds from 0 with no other key, or
+   * null.
+   */
+  readonly drainJobs: (given: { graceMs: number } | null) => Effect.Effect<void, DrainRefused>;
   /**
    * Tick on a timer until stopped. Ticks never overlap: a beat that comes while a tick runs is skipped, so a tick that
    * outruns the interval is not joined by a second pass over the same store. The timer holds the process open, as a control
@@ -726,7 +720,8 @@ const writtenVerbsOf = (...given: Parameters<typeof sayVerbOf>) => ({
  *   runner and counted on the way (`ObserveCount`, `io`), where `spawned` says whether it asked a registry;
  * - one memo of the settled tasks its passes may skip (`core/engine/memo.ts`), which lives as long as this engine, so a new engine
  *   folds every task on its first pass;
- * - what its passes admit under (`admissionOf`): `maxConcurrent`, `unschedulable`, and each harness's pool.
+ * - what its passes admit under (`admissionOf`): `maxConcurrent`, `unschedulable`, and each harness's pool; and whether the jobs' drain
+ *   stands, read off its store's file once per pass (`passReadsOf`).
  *
  * Fails with `EngineRefused` for what `optionsRefusalOf` refuses.
  */
@@ -772,7 +767,7 @@ const make = (options: EngineOptions) =>
     const byName = harnessedOf(harnesses, runners);
     const fallen = own(byName, fallback);
     if (fallen === undefined) return yield* Effect.fail(new EngineRefused({ message: noFallbackRefusal(fallback, harnesses) }));
-    const layer = Layer.mergeAll(journal, Runner.layer(composite(runners, fallback)), tickMemoLayer(), admissionOf(options, harnesses));
+    const layer = Layer.mergeAll(journal, Runner.layer(composite(runners, fallback)), tickMemoLayer(), passReadsOf(options, harnesses));
     const go = <A, E>(e: Effect.Effect<A, E, Journal | Runner>): Effect.Effect<A, E> => e.pipe(Effect.provide(layer));
     const read = (taskId: string) => go(Effect.flatMap(Journal, (j) => j.read(TaskId.read(taskId))));
 
@@ -948,9 +943,13 @@ const servingOf = (harnesses: Record<string, HarnessConfig>, made: Record<string
 
 /**
  * The verbs of the sessions run attached: `hold`, with the port it serves while it holds (`servedOf`), and `drain`, which writes the
- * drain's file or removes it.
+ * drain's file or removes it; and `drainJobs`, which does the same of the jobs' drain.
  */
-const attachVerbsOf = (attached: Attached, root: string, serving: ReturnType<typeof servingOf>): Pick<EngineShape, 'hold' | 'drain'> => ({
+const attachVerbsOf = (
+  attached: Attached,
+  root: string,
+  serving: ReturnType<typeof servingOf>,
+): Pick<EngineShape, 'hold' | 'drain' | 'drainJobs'> => ({
   hold: () =>
     Effect.flatMap(attached.hold, () =>
       Object.keys(serving.ops).length > 0 ? servedOf({ root, ops: serving.ops, events: serving.events }) : Effect.succeed(null),
@@ -958,6 +957,10 @@ const attachVerbsOf = (attached: Attached, root: string, serving: ReturnType<typ
   drain: Effect.fn('Engine.drain')(function* (holder: number | null) {
     yield* drainChecked(holder);
     yield* Effect.sync(() => (holder === null ? liftDrain(root) : putDrain(root, holder)));
+  }),
+  drainJobs: Effect.fn('Engine.drainJobs')(function* (given: { graceMs: number } | null) {
+    yield* drainJobsChecked([...arguments]);
+    yield* Effect.sync(() => (given === null ? liftJobDrain(root) : putJobDrain(root, given)));
   }),
 });
 

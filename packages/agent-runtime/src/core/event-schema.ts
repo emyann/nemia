@@ -158,6 +158,11 @@ export type FormerReason = (typeof FORMER_REASONS)[number];
  * vouched for with, read as `succeeded`, a former reason (`FORMER_REASONS`) the harness's end with no statement, and
  * `closedOut` given by its former name (`upgrade`, each).
  */
+/** A job parked under a jobs' drain, and the call it cut, where it cut one (`Parked`, `domain.ts`): carried by its end and its attempt. */
+export const ParkedSchema = Schema.Struct({
+  calling: Schema.optional(Schema.Struct({ tool: Schema.String, since: Schema.String })),
+});
+
 /** What the workload said as an attempt ended, if anything: carried by the end and by the attempt it settles, never read. */
 export const SaidAtEnd = { closeout: Schema.optional(Schema.Unknown) };
 
@@ -178,6 +183,7 @@ const Ended = event('ended', {
   files: Schema.optional(Schema.mutable(Schema.Array(Schema.String))),
   ranOn: Schema.optional(Schema.String),
   limit: Schema.optional(Schema.String),
+  parked: Schema.optional(ParkedSchema),
   error: Schema.optional(Schema.String),
   mono: Schema.optional(MonotonicSchema),
 });

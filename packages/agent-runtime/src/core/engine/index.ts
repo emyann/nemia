@@ -3,6 +3,7 @@
  */
 export {
   Admission,
+  JobsDrained,
   GRACE_MS,
   ReconcileRefused,
   TickRefused,

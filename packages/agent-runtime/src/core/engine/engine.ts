@@ -34,11 +34,15 @@ import { TASK_LABEL } from '../labels.ts';
 import { transition, type Move, type Refusal } from '../lifecycle.ts';
 import { divergence, keptIn, keptLooked, releasableOf, TickMemo, TickMemoDiverged, type Releasable, type TickMemoState } from './memo.ts';
 import { CEILING_INSTEAD } from './filing.ts';
+import { ReconcileRefused, reconcileRefusalOf, settleRefusalOf } from './reconcile-refusal.ts';
+
+export { ReconcileRefused, reconcileRefusalOf, settleRefusalOf } from './reconcile-refusal.ts';
 import { ownPool, toAdmit, type AdmissionRule } from '../admission.ts';
 import { notedOf } from './noted.ts';
 import { instantNow } from './now.ts';
 import { spawnedEntry, stamped } from './stamped.ts';
 import { TaskId } from '../model.ts';
+import { continuedCap, parkedEnd } from '../cap.ts';
 
 /**
  * The lifecycle `reconcile` moves a task by: the shipped one (`lifecycle.ts`) unless a test provides another, which is how a
@@ -52,13 +56,25 @@ export const Lifecycle = Context.Reference<Move>('engine/Lifecycle', { defaultVa
  */
 export const Admission = Context.Reference<AdmissionRule>('engine/Admission', { defaultValue: () => ({ poolOf: ownPool }) });
 
+/**
+ * Whether the store's jobs' drain stands, read off its file once per pass (`Now.drained`): `Engine.layer` provides the read of its
+ * store's file. By default none stands, so a pass run over layers of a test's own holds no parked job back.
+ */
+export const JobsDrained = Context.Reference<() => boolean>('engine/JobsDrained', { defaultValue: () => () => false });
+
 /** How long a spawned session may go unregistered by the harness before we call it gone. */
 export const GRACE_MS = 30_000;
 
-/** The clock `decide` is handed for one task: now, on the wall clock and the monotonic one, with the grace and the unread names. */
-const nowFor = (unread: ReadonlySet<string>): Now => {
+/** What a pass read of the world beside its look, the same for every task it decides: the names it could not read, and the drain. */
+type World = { readonly unread: ReadonlySet<string>; readonly drained: boolean };
+
+/**
+ * The clock `decide` is handed for one task: now, on the wall clock and the monotonic one, with the grace, the unread names and
+ * whether the jobs' drain stands.
+ */
+const nowFor = ({ unread, drained }: World): Now => {
   const now = instantNow();
-  return { at: new Date(now.at), ...(now.mono ? { mono: now.mono } : {}), graceMs: GRACE_MS, unread };
+  return { at: new Date(now.at), ...(now.mono ? { mono: now.mono } : {}), graceMs: GRACE_MS, unread, ...(drained ? { drained } : {}) };
 };
 
 /**
@@ -101,6 +117,11 @@ export type TaskView = {
   waitingFor?: string;
   /** The tool call the attempt in flight is in, and since when, as its harness sees it (`Sighting.calling`). Absent between calls. */
   calling?: { tool: string; since: string };
+  /**
+   * Since when the attempt in flight holds a main-thread call back at its hook, the jobs' drain standing (`Sighting.heldBack`). Absent
+   * while nothing is held. Carried, never judged.
+   */
+  heldBack?: { since: string };
   /**
    * The questions the attempt in flight is waiting on a person for, as its harness holds them (`Sighting.asks`). Absent from a
    * harness that cannot say, and from a task whose session may ask nobody. Carried, never judged.
@@ -182,36 +203,14 @@ const endedOnStatement = (state: State, observed: ReadonlyMap<string, Sighting>)
   return new Map(observed).set(name, { ...seen, state: 'completed' });
 };
 
-/** A `reconcile` or `settleTask` handed what it no longer takes, and why. Nothing was read or written. */
-export class ReconcileRefused extends Schema.TaggedError<ReconcileRefused>()('ReconcileRefused', {
-  message: Schema.String,
-}) {}
-
-/**
- * Why `reconcile` refuses what it was handed past the task and the observation, or `undefined` when it was handed nothing more:
- * a caller built against a `reconcile` that took the ceiling's `slots` third would otherwise have them dropped without a word.
- */
-export const reconcileRefusalOf = (extra: readonly unknown[]): string | undefined =>
-  extra.length === 0
-    ? undefined
-    : `reconcile takes a task and an observation, and was handed ${extra.length} more: its third argument was the ceiling's slots, and a ceiling is the engine's own now. ${CEILING_INSTEAD}`;
-
-/**
- * Why `settleTask` refuses its `maxSteps`, or `undefined`: a count of steps is a whole number above nought, and nothing
- * follows it. A caller built against a `settleTask` that took the ceiling's `slots` third hands a `{ used, max }` in
- * `maxSteps`'s place, which compares false and would settle nothing.
- */
-export const settleRefusalOf = (maxSteps: unknown, extra: readonly unknown[]): string | undefined =>
-  Number.isInteger(maxSteps) && (maxSteps as number) > 0 && extra.length === 0
-    ? undefined
-    : // oxlint-disable-next-line typescript/no-base-to-string -- `String` is reached only once an object and a function are ruled out
-      `settleTask takes a task, an observation and a number of steps above nought, and was handed ${extra.length ? `${extra.length} more` : `a maxSteps of ${typeof maxSteps === 'object' || typeof maxSteps === 'function' ? JSON.stringify(maxSteps) : String(maxSteps)}`}: its third argument was the ceiling's slots, and a ceiling is the engine's own now. ${CEILING_INSTEAD}`;
-
 /** What one look saw of the sessions, by name: what `reconcile` and `settleTask` are handed. */
 type Observed = ReadonlyMap<string, Sighting>;
 
 /** Nothing left unread: what `reconcile` and `settleTask` decide on, handed an observation and no more. */
 const ALL_READ: ReadonlySet<string> = new Set();
+
+/** The pass's world with nothing left unread, the drain read now: what `reconcile` and `settleTask` decide on. */
+const allRead = Effect.map(JobsDrained, (drained): World => ({ unread: ALL_READ, drained: drained() }));
 
 /**
  * One task, one step. Returns the action taken, so a caller can loop until nothing moves.
@@ -223,11 +222,14 @@ const ALL_READ: ReadonlySet<string> = new Set();
 export const reconcile = Effect.fn('reconcile')(function* (taskId: string, observed: ReadonlyMap<string, Sighting>) {
   const refused = reconcileRefusalOf([...arguments].slice(2));
   if (refused) return yield* Effect.fail(new ReconcileRefused({ message: refused }));
-  return yield* reconcileOn(taskId, observed, ALL_READ);
+  return yield* reconcileOn(taskId, observed, yield* allRead);
 });
 
-/** What the sighting `seen` an attempt ended on says of it, as its `ended` event carries it, each key written, undefined or not. */
-const endFacts = (seen: Sighting | undefined) => ({
+/**
+ * What the sighting `seen` attempt `n` ended on says of it, as its `ended` event carries it, each key written, undefined or not, and
+ * what it says of a park (`parkedEnd`): `parked`, which `decide` continues, or `limit: 'budget'` for a park that spent its cap.
+ */
+const endFacts = (state: State, n: number, seen: Sighting | undefined) => ({
   usage: seen?.usage,
   exitCode: seen?.exitCode,
   denials: seen?.denials,
@@ -235,11 +237,13 @@ const endFacts = (seen: Sighting | undefined) => ({
   files: seen?.files,
   ranOn: seen?.ranOn,
   limit: seen?.limit,
+  ...parkedEnd(state, n, seen),
 });
 
 /**
  * What a harness is asked to start for attempt `n` of task `taskId`, named `name`: its brief (or the words that nudge it), folder,
- * harness and configuration for its turn, the session it continues, and the labels its telemetry says, the task's id among them.
+ * harness and configuration for its turn — handed what is left of its cap where it continues a parked attempt (`continuedCap`) — the
+ * session it continues, and the labels its telemetry says, the task's id among them.
  */
 const spawnRequestOf = (taskId: string, state: State, name: string, n: number): SpawnRequest => {
   const attempt = state.attempts.find((a) => a.n === n);
@@ -254,6 +258,7 @@ const spawnRequestOf = (taskId: string, state: State, name: string, n: number): 
     resumeFrom: attempt?.resumeFrom,
     resource: { ...state.labels, [TASK_LABEL]: taskId },
     traceparent: state.traceparent,
+    ...continuedCap(state, n, configForTurn(state.config, turnOf(state, attempt?.turn ?? 0).config)),
   };
 };
 
@@ -289,14 +294,14 @@ const spawnRequestOf = (taskId: string, state: State, name: string, n: number): 
  *    a fact `decide` never reads. `decide` ends a stopped or timed-out attempt before it settles, so only a journal an older
  *    runtime wrote settles over an open one, and the id is written for the task that journal is replayed into.
  */
-const reconcileOn = Effect.fn('reconcileOn')(function* (taskId: string, observed: Observed, unread: ReadonlySet<string>) {
+const reconcileOn = Effect.fn('reconcileOn')(function* (taskId: string, observed: Observed, world: World) {
   const journal = yield* Journal;
   const runner = yield* Runner;
 
   const move = yield* Lifecycle;
 
   const state = yield* notedFold(taskId, observed);
-  const action = decide(state, endedOnStatement(state, observed), nowFor(unread), move);
+  const action = decide(state, endedOnStatement(state, observed), nowFor(world), move);
   const at = () => new Date().toISOString();
 
   switch (action.do) {
@@ -347,7 +352,7 @@ const reconcileOn = Effect.fn('reconcileOn')(function* (taskId: string, observed
         nativeId: action.nativeId,
         closeout: action.closeout,
         ...(action.closedOut !== undefined ? { closedOut: action.closedOut } : {}),
-        ...endFacts(observed.get(nameFor(taskId, action.attempt))),
+        ...endFacts(state, action.attempt, observed.get(nameFor(taskId, action.attempt))),
       });
       break;
     }
@@ -405,19 +410,14 @@ const wroteAny = (noted: readonly Event[], actions: readonly Action[]): boolean 
 export const settleTask = Effect.fn('settleTask')(function* (taskId: string, observed: ReadonlyMap<string, Sighting>, maxSteps = 8) {
   const refused = settleRefusalOf(maxSteps, [...arguments].slice(3));
   if (refused) return yield* Effect.fail(new ReconcileRefused({ message: refused }));
-  return yield* settleOn(taskId, observed, ALL_READ, maxSteps);
+  return yield* settleOn(taskId, observed, yield* allRead, maxSteps);
 });
 
 /** `settleTask`, told which names the pass could not read, as `reconcileOn` is. */
-const settleOn = Effect.fn('settleOn')(function* (
-  taskId: string,
-  observed: ReadonlyMap<string, Sighting>,
-  unread: ReadonlySet<string>,
-  maxSteps: number,
-) {
+const settleOn = Effect.fn('settleOn')(function* (taskId: string, observed: ReadonlyMap<string, Sighting>, world: World, maxSteps: number) {
   const taken: Action[] = [];
   for (let i = 0; i < maxSteps; i++) {
-    const action = yield* reconcileOn(taskId, observed, unread);
+    const action = yield* reconcileOn(taskId, observed, world);
     taken.push(action);
     if (!PROGRESSES.has(action.do)) break;
   }
@@ -595,9 +595,9 @@ const forgetNamed = Effect.fn('forgetNamed')(function* (memo: TickMemoState) {
  * The memo's proof, in `verify` alone: a skipped task folded all the same, and decided, as the pass would have without the
  * memo. A difference fails the pass, naming the task, rather than being mended quietly. Untraced: it runs for every kept task.
  */
-const verifyKept = Effect.fnUntraced(function* (kept: Releasable, observed: ReadonlyMap<string, Sighting>, unread: ReadonlySet<string>) {
+const verifyKept = Effect.fnUntraced(function* (kept: Releasable, observed: ReadonlyMap<string, Sighting>, world: World) {
   const fresh = fold(kept.taskId, yield* (yield* Journal).read(TaskId.read(kept.taskId)));
-  const decided = decide(fresh, endedOnStatement(fresh, observed), nowFor(unread), yield* Lifecycle);
+  const decided = decide(fresh, endedOnStatement(fresh, observed), nowFor(world), yield* Lifecycle);
   const why = divergence(kept, fresh, decided);
   if (why) return yield* Effect.fail(new TickMemoDiverged({ taskId: kept.taskId, message: `the pass skipped \`${kept.taskId}\`: ${why}` }));
 });
@@ -691,6 +691,7 @@ export const tick = Effect.fn('tick')(function* () {
   }
   const lookedFor = [...folded.values(), ...keptLooked(memo)];
   const { seen: observed, unread, unobserved, unreadWhy } = yield* lookAt(runner, expectedOf(lookedFor));
+  const world: World = { unread, drained: (yield* JobsDrained)() };
 
   const taken: Action[] = [];
   const views: TaskView[] = [];
@@ -701,7 +702,7 @@ export const tick = Effect.fn('tick')(function* () {
     const held = keptIn(memo, id);
     if (held) {
       keptCount++;
-      if (held.memo.verify) yield* verifyKept(held.kept, observed, unread);
+      if (held.memo.verify) yield* verifyKept(held.kept, observed, world);
       const { listed } = yield* releaseFinished(held.kept, observed, unread);
       if (listed) held.memo.listed.add(id);
       else held.memo.listed.delete(id);
@@ -710,7 +711,7 @@ export const tick = Effect.fn('tick')(function* () {
     const before = folded.get(id);
     if (!before) continue;
     const noted = notedOf(before, observed, '');
-    const actions = yield* settleOn(id, observed, unread, 8);
+    const actions = yield* settleOn(id, observed, world, 8);
     taken.push(...actions);
     for (const a of actions) if (a.do === 'nothing' && a.refused) stalled.push({ taskId: id, ...a.refused });
     const stepped = wroteAny(noted, actions) ? fold(id, yield* journal.read(id)) : before;
@@ -835,13 +836,15 @@ const unreadOfTask = (state: State, unreadWhy: ReadonlyMap<string, string> | und
 /**
  * What the sighting of the attempt in flight carries into a view untouched: the word a `needs-human` phase waits for — there is no
  * question to answer about a session nobody is waiting on, so it is carried under no other phase — the call the attempt is in, the
- * questions it waits on a person for, and the asks whose held call took an answer. None of it is judged.
+ * call it holds back under the jobs' drain, the questions it waits on a person for, and the asks whose held call took an answer. None
+ * of it is judged.
  */
 const carriedOf = (sighting: Sighting | undefined, phase: TaskView['phase']) => {
   const waitingFor = phase === 'needs-human' ? sighting?.waitingFor : undefined;
   return {
     ...(waitingFor ? { waitingFor } : {}),
     ...(sighting?.calling ? { calling: sighting.calling } : {}),
+    ...(sighting?.heldBack ? { heldBack: sighting.heldBack } : {}),
     ...(sighting?.asks ? { asks: sighting.asks } : {}),
     ...(sighting?.asksTaken ? { asksTaken: sighting.asksTaken } : {}),
   };

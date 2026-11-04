@@ -114,6 +114,7 @@ const VERBS = [
   'close',
   'compact',
   'drain',
+  'drainJobs',
   'feed',
   'file',
   'follow',
@@ -474,6 +475,14 @@ test('each refusal is a tagged error, and refusalWords words it behind the verb,
             .join(', ')
             .replace(/[[\]{}]/g, '\\$&')}: nothing was written\\.$`,
         ),
+      ],
+    ),
+    ...[[-1], [{ graceMs: -1 }], [{ graceMs: 0.5 }], [{ graceMs: 1, holder: 4242 }], [], [{ graceMs: 1 }, null]].map(
+      (args): [string, string, () => Promise<unknown>, RegExp] => [
+        'drainJobs',
+        'DrainRefused',
+        () => effect((e) => untyped(e.drainJobs)(...args)),
+        /./,
       ],
     ),
   ];

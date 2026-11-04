@@ -33,6 +33,7 @@ const PHASE: Record<StepReason, StepPhase> = {
   Unknown: 'pending',
   Running: 'running',
   Checking: 'running',
+  Paused: 'running',
   AwaitingApproval: 'waiting',
   AwaitingAnswer: 'waiting',
   AwaitingRound: 'waiting',
@@ -109,6 +110,20 @@ test('stepState: each reason the api carries, read as the state a person acts on
     assert.notEqual(state, stateAt('Checking'), 'no check of it is filed');
     assert.equal(isLive(state), false, 'no session or check of it is at work');
   });
+  await t.test(
+    "a session the store's pause parked between two tool calls (`Paused`, phase `running`) is paused, at rest, and asks nobody",
+    () => {
+      const state = stepState(plain('running', 'Paused'), false, false);
+      assert.equal(state, 'paused');
+      assert.equal(stateAt('Paused'), 'paused');
+      assert.equal(PERSON[state].rail, 'paused');
+      assert.equal(isLive(state), false, 'nothing of it is at work while it is parked');
+      assert.equal(waitsOnPerson(state, false), false, "it resumes with the store, on nobody else's word");
+      assert.equal(meaningOf(stateDrawn[state].hue), 'rest');
+      assert.equal(stateDrawn[state].form, 'ringed');
+      assert.equal(stepState(plain('running', 'Paused'), true, true), 'paused', 'a hold or a cancel leaves a parked session as it is');
+    },
+  );
 });
 
 test('stepState, satisfiesAfter, waitsOnPerson, waitsAtGate: what is work done, what waits on a person, and what a hold stops', async (t) => {

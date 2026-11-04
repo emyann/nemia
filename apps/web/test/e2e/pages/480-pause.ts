@@ -177,7 +177,7 @@ export default {
       const calling = { run: FAKE.id, step: FAKE.refused, kind: 'session', calling: 'Bash' };
       await page.route('**/api/pause', (route) =>
         route.request().method() === 'GET'
-          ? route.fulfill({ json: { pause: put, finishing: [calling], staged: [], held: [] } })
+          ? route.fulfill({ json: { pause: put, finishing: [calling], parked: [], staged: [], held: [] } })
           : route.fallback(),
       );
       await page.reload({ waitUntil: 'load' });
@@ -195,7 +195,7 @@ export default {
       const held = { run: FAKE.id, step: FAKE.refused };
       await page.route('**/api/pause', (route) =>
         route.request().method() === 'GET'
-          ? route.fulfill({ json: { pause: put, finishing: [], staged: [staged], held: [held] } })
+          ? route.fulfill({ json: { pause: put, finishing: [], parked: [], staged: [staged], held: [held] } })
           : route.fallback(),
       );
       await page.reload({ waitUntil: 'load' });

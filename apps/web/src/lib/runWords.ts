@@ -25,6 +25,7 @@ export type WaitKind = (typeof WAIT_KINDS)[number];
  */
 export const waitKindOf: Record<StepState, WaitKind | null> = {
   working: null,
+  paused: null,
   'needs-human': null,
   checking: null,
   verified: null,

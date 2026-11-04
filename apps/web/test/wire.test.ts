@@ -235,6 +235,7 @@ export type MachineVerb = Holds<Same<Board.MachineVerb, Widened<machines.Machine
 export type Paused = Holds<Same<Board.Paused, PausedOf>>;
 export type Pause = Holds<Same<Board.Pause, NonNullable<PausedOf['pause']>>>;
 export type Finishing = Holds<Same<Board.Finishing, PausedOf['finishing'][number]>>;
+export type Parked = Holds<Same<Board.Parked, PausedOf['parked'][number]>>;
 export type PauseStaged = Holds<Same<Board.PauseStaged, PausedOf['staged'][number]>>;
 export type PauseHeld = Holds<Same<Board.PauseHeld, PausedOf['held'][number]>>;
 export type PauseNowRead = Holds<Same<Board.PauseNowRead, pause.PauseNowRead>>;

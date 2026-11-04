@@ -103,6 +103,30 @@ test("a chip shows a person's word for the state, never the status; on hover wha
   assert.notEqual(paused.replace(/<[^>]*>/g, ''), PERSON.waiting.rail, 'a check the pause holds is its own wait, not a step to come');
 });
 
+test("a step the store's pause parked reads paused, and its hover names the call it stopped after, in the api's words", () => {
+  const codes = { phase: 'running', reason: 'Paused', on: null, via: null } as const;
+  for (const message of ['paused after its call to Bash', 'paused, its call to Bash cut']) {
+    const html = renderToStaticMarkup(
+      createElement(StatusChip, { codes: { ...codes, message }, runCancelled: false, runHeld: false, note: 'try 2' }),
+    );
+    assert.match(html, /data-state="paused"/);
+    assert.equal(html.replace(/<[^>]*>/g, ''), PERSON.paused.rail);
+    assert.equal(titleOf(html), `${PERSON.paused.meaning}\n${message}\ntry 2`);
+  }
+  const bare = renderToStaticMarkup(
+    createElement(StatusChip, { codes: { ...codes, message: 'paused' }, runCancelled: false, runHeld: false }),
+  );
+  assert.equal(titleOf(bare), PERSON.paused.meaning, 'a parked step whose call is not known says only what paused means');
+  const working = renderToStaticMarkup(
+    createElement(StatusChip, {
+      codes: { phase: 'running', reason: 'Running', on: null, via: null, message: 'running' },
+      runCancelled: false,
+      runHeld: false,
+    }),
+  );
+  assert.equal(titleOf(working), PERSON.working.meaning, "any other state's sentence stays off its hover");
+});
+
 test('a note under a chip is the note as `wf ls` prints it, and nothing at all for a step without one', () => {
   const html = renderToStaticMarkup(createElement(StepNote, { note: 'try 2, by retries: 1' }));
   assert.match(html, /^<p data-note="true"[^>]*>try 2, by retries: 1<\/p>$/);

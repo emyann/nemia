@@ -28,7 +28,7 @@ const NOW_WHY = 'the quota runs low';
 const PLAIN_WHY = 'merging by hand on main';
 
 /** What the package says an interrupted step costs. */
-const COST = 'An interrupted step redoes its unfinished work and reads its context again.';
+const COST = 'A session has its tool call cut and continues as the same try, told which call was cut; a check runs again from its start.';
 
 /** What `GET /api/pause/now` answers, each interrupt with the task it stops, which the board does not read. */
 type NowRead = { interrupts: Array<Interrupt & { taskId: string }>; cost: string };

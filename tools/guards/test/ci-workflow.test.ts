@@ -43,12 +43,15 @@ import {
   readWorkflow,
   runSteps,
   ALLOWLIST_STEP,
+  actionDrift,
   allowlistStep,
   SCAN,
   SCAN_CONFIG,
   shardRunStep,
+  stallDrift,
   staleStep,
   STALE_STEP,
+  targetDrift,
   type Step,
   type Workflow,
   workflowText,
@@ -294,21 +297,6 @@ function gateDrift(workflow: Workflow): string[] {
   ];
 }
 
-/** GitHub's own action, taken by major tag: the pointer floats to its latest release, and a third party's never matches. */
-const OWN_ACTION = /^actions\/[a-z][a-z\d-]*@v\d+$/;
-
-/** A step that takes an action this workflow may not take. */
-function actionDrift(workflow: Workflow): string[] {
-  return Object.entries(workflow.jobs).flatMap(([name, job]) =>
-    (job.steps ?? [])
-      .filter((step) => step.uses !== undefined && !OWN_ACTION.test(step.uses))
-      .map(
-        (step) =>
-          `the ${name} job in ${FILE} takes ${String(step.uses)}: this workflow takes GitHub's own actions by major tag alone, so write it actions/<name>@v<major>, and take a third party's code as a pinned download in a run step instead`,
-      ),
-  );
-}
-
 /** The timezone every leg runs its suite under. */
 const ZONE_EVERY = 'UTC';
 
@@ -538,16 +526,6 @@ function cancelDrift(workflow: Workflow): string[] {
     : [
         `concurrency.cancel-in-progress in ${FILE} reads ${String(value)}: write it ${SPARED} so a branch's superseded run is cancelled and every push to main keeps its own run, since the ${GATE} gate reads a cancelled job as a failure and a landing that was never tested would report red`,
       ];
-}
-
-/** The trigger that would run a fork's code with a token that can write, read from the file's own text. */
-function targetDrift(text: string): string[] {
-  const trigger = ['pull', 'request', 'target'].join('_');
-  return text.includes(trigger)
-    ? [
-        `${FILE} names ${trigger}: a fork's code must not run with a token that can write, so trigger on pull_request instead and read nothing of the fork's with write access`,
-      ]
-    : [];
 }
 
 /** The expression the shard's run must be given its shard by: the leg's own, never a literal, or every leg would run shard 1. */
@@ -883,44 +861,6 @@ function guardsDrift(workflow: Workflow): string[] {
       `the ${OWN_JOB.job} job's checkout in ${FILE} does not pass fetch-depth: 0: the due step diffs the commit before this push, which the shallow default has not, so give the checkout fetch-depth: 0 or the suite runs on every event`,
     );
   return sentences;
-}
-
-/** A run step that downloads: the lockfile's install, the browser's, a release fetched by hand. Every action here reaches the network. */
-const NETWORK = /\bnpm ci\b|playwright install|\bcurl\b/;
-
-/** Whether a step reaches the network, and so must end at a bound of its own rather than at its job's. */
-const reachesNetwork = (step: Step): boolean => step.uses !== undefined || NETWORK.test(step.run ?? '');
-
-/** A bound as GitHub takes it: a whole number of minutes above zero. */
-const bounded = (minutes: unknown): minutes is number => typeof minutes === 'number' && Number.isInteger(minutes) && minutes > 0;
-
-/**
- * A job with no `timeout-minutes`, a step that reaches the network with none, and a step whose bound is not under its job's. Without
- * one GitHub waits 360 minutes on a stalled download, and the run's own wait on `ci` gives up long before; a step's bound at or past its
- * job's lets the job's fire first, and the red then names no step.
- */
-function stallDrift(workflow: Workflow): string[] {
-  return Object.entries(workflow.jobs).flatMap(([name, job]) => {
-    const minutes = job['timeout-minutes'];
-    if (!bounded(minutes))
-      return [
-        `the ${name} job in ${FILE} has no timeout-minutes: give it a bound well above its slowest green run, or a stall holds it for GitHub's default of 360 minutes`,
-      ];
-    return (job.steps ?? []).flatMap((step) => {
-      const label = step.name ?? step.uses ?? step.run ?? '?';
-      const own = step['timeout-minutes'];
-      if (!reachesNetwork(step)) return [];
-      if (!bounded(own))
-        return [
-          `the step "${label}" of the ${name} job in ${FILE} reaches the network and has no timeout-minutes: give it a bound well above its slowest green run, so a stalled download fails naming the step`,
-        ];
-      if (own >= minutes)
-        return [
-          `the step "${label}" of the ${name} job in ${FILE} is bounded at ${own} minutes, not under its job's ${minutes}: lower it below the job's, or the job's bound fires first and names no step`,
-        ];
-      return [];
-    });
-  });
 }
 
 /** Every clause, over the shipped file. */

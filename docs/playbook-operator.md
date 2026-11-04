@@ -222,6 +222,27 @@ rm "$S"/node_modules; git worktree remove "$S"
   5. **To roll back,** `nemia upgrade <an older tag>`: a tag built already at the same commit is switched to without a rebuild. A tag
      moved since it was built is refused: tag the new commit with a new name.
   6. Old releases stay under `releases/` until removal by rule lands. Leave them.
+- **Cut a product release** (`tools/release/README.md`). These are GitHub releases `v<x.y.z>`, apart from the local `nemia-*` tags
+  above, which stay local and are never read as releases; nor is `v1-final` or a `legacy/*` tag. Nothing is published to npm.
+  1. Every pull request into main carries one release label: `breaking`, `feature`, `fix`, `docs` or `internal`. The
+     `release-label` check refuses none or several. A run's pull request gets its label from its card's `work=` label, through the
+     factory's `pullRequestLabels`. Label a hand-opened one, or change a run's, with
+     `gh api -X POST repos/{owner}/{repo}/issues/<n>/labels -f 'labels[]=<label>'`. A breaking change is relabelled `breaking` by hand
+     before it merges.
+  2. The `release` workflow keeps one pull request open, `release: v<x.y.z>` from branch `release`, whenever a pull request with a
+     label other than `internal` has merged since the last `v<x.y.z>` tag. The bump is the highest of their labels; the first release
+     is `v1.0.0`. Its body is GitHub's notes, grouped by label, and lists the unlabelled pull requests apart. The workflow rebuilds it
+     when main moves, and dispatches `ci` and `release-label` on it. After relabelling a merged pull request, run
+     `gh workflow run release.yml` to rebuild it.
+  3. Read its `proof` job. Green means the dispatched `ci` counts for main's protection. Red means press "Approve workflows to run" in
+     the pull request's merge box, which runs the waiting `pull_request` `ci` that counts. Otherwise leave those waiting runs alone.
+  4. Merge it, with the owner. The merge sets the root `package.json` version on main, and the `release` workflow's `tag` job tags
+     `v<x.y.z>` on that commit and makes the GitHub release with the same notes.
+  5. **Once, after the change that made this lands**, in this order: `nemia upgrade`, so the checks pass `WF_LABELS`; move the factory
+     onto sdlc 2.1.0 with `pullRequestLabels="work=feature:feature work=fix:fix work=docs:docs work=cleanup:internal
+     work=measure:internal"`. Then the owner turns on "Allow GitHub Actions to create and approve pull requests" (Settings → Actions →
+     General) and adds `release-label` to main's required checks. Runs started before the factory moved keep their frozen scripts:
+     label their pull requests by hand.
 - **`npm install` in the main checkout**, at a gap, after a landing that changed `package-lock.json` or a bin: the steps' worktrees
   link the main checkout's `node_modules`. The daemon and its sessions no longer read it; check the tree stays clean.
 - Never stop the daemon with the harness's task-stop, by a name pattern, or by a hand restart of the unit: `nemia upgrade` restarts it,

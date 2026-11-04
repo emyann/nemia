@@ -98,13 +98,18 @@ export type CheckEnv = {
    * start or at its last move of pins: absent only where the record names no copy, a run started before the copy was taken.
    */
   WF_WORKFLOW_FILES?: string;
+  /**
+   * The run's labels (`area`, `work`, …) as a JSON object of strings, `{}` where it has none: what Kubernetes' Downward API gives a
+   * container of its own Pod's labels, so a check can act on what its run is, such as labelling the pull request it pushes.
+   */
+  WF_LABELS: string;
 };
 
 /**
  * What a step's check is told (`CheckEnv`): its run, its step, the workspace it judges and the step's artifacts folder (`t.files`), the
  * run's base commit where the step works on a branch of a repository run, the file of the step's closeout (`t.closeout`) where it
- * signed off one, and the run's copy of its workflow folder (`t.workflowFiles`) wherever the record names one — a repository run's step
- * and ending and a folder run's alike.
+ * signed off one, the run's copy of its workflow folder (`t.workflowFiles`) wherever the record names one — a repository run's step
+ * and ending and a folder run's alike — and the run's labels.
  */
 export const checkEnvOf = (
   run: Run,
@@ -118,6 +123,7 @@ export const checkEnvOf = (
   WF_ARTIFACTS: t.files,
   ...(t.closeout ? { WF_CLOSEOUT: t.closeout } : {}),
   ...(t.workflowFiles ? { WF_WORKFLOW_FILES: t.workflowFiles } : {}),
+  WF_LABELS: JSON.stringify(run.labels ?? {}),
 });
 
 /**

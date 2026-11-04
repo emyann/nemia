@@ -3,7 +3,7 @@ kind: FactoryTemplate
 metadata:
   name: sdlc
 spec:
-  version: 2.0.0
+  version: 2.1.0
   rules:
     path: RULES.md
   parameters:
@@ -23,6 +23,10 @@ spec:
       type: string
       description: "The command the implement step's check runs on each round's tree before it waits on CI, from the workspace's root: the quick refusal before CI judges. Read only where github is true; where it is false, localCheck judges."
       default: npm run --if-present lint && npm run --if-present typecheck
+    pullRequestLabels:
+      type: string
+      description: "The labels the implement step's check gives the run's pull request, from the run's own labels: rules apart by spaces, each <key>=<value>:<label>, so kind=bug:bug kind=chore:maintenance labels a run whose kind is bug with bug and one whose kind is chore with maintenance. The labels the rules give the run are added and any other a rule could give is removed; a label no rule gives is left alone, and each label a rule gives must exist in the repository. It is written inside a double-quoted shell word, so it holds no quote, no $ and no backtick. Empty (the default) labels nothing. Read only where github is true."
+      default: ""
     areas:
       type: string
       description: The areas a card's title and its area= label name, in the words RULES.md writes them in.

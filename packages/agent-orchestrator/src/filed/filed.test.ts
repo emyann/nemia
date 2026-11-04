@@ -222,7 +222,7 @@ test("filedConfig: a Claude Code step is given its factory's harness settings be
     assert.equal('claude' in given(stepOf('harness: codex\n'), {}, { claude: OFF }), false),
   );
   await t.test('a run that froze none, or none of this harness, files its own settings as they were', () => {
-    for (const frozen of [undefined, {}, { codex: { language: 'french' } }])
+    for (const frozen of [undefined, {}, { codex: { language: 'french' } }] as Run['harnessSettings'][])
       assert.deepEqual(Reflect.get(given(stepOf(), { claude: { settings: '{"a":1}' } }, frozen), 'claude'), { settings: '{"a":1}' });
   });
   await t.test("a hand-edited record's widening key, of no type a record is written with, is not filed", () => {

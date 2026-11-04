@@ -99,7 +99,7 @@ export const adopted: Adopted = (factory, wiring, template, tree) => ({
   revisions: wiring.revisions,
   template,
   tree,
-  ...(factory.volumes === undefined ? {} : { volumes: factory.volumes }),
+  volumes: factory.volumes,
 });
 
 /** A hire a takeover changes: a step hired into by the template only (`added`), by the factory only (`dropped`), or by both, apart. */

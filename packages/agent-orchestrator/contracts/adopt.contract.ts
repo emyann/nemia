@@ -138,7 +138,9 @@ const adoptedSpec = spec<(factory: Factory, wiring: Wiring, template: FactoryTem
       description: "It keeps its volumes: they are the person's folders, never the template's",
       condition: ({ input: [factory], output }) =>
         (output.volumes ?? []).length === (factory.volumes ?? []).length &&
-        (output.volumes ?? []).every((v, i) => v.path === factory.volumes?.[i]?.path && v.readOnly === factory.volumes?.[i]?.readOnly),
+        (output.volumes ?? []).every(
+          (v, i) => v.path === (factory.volumes ?? []).at(i)?.path && v.readOnly === (factory.volumes ?? []).at(i)?.readOnly,
+        ),
     },
     offersTheTemplates: {
       description: "Its workflows are the template's wiring's",

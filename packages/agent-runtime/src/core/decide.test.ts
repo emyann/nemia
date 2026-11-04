@@ -17,6 +17,7 @@ import {
   observe,
   PARKED_WORDS,
   RESTART_WORDS,
+  sightingFacts,
   turnOf,
   waitsForInput,
   type Event,
@@ -1390,5 +1391,148 @@ test('HELD OPEN: a task held open signs and waits on a person, is answered into 
       sessionId: 's0',
       why: 'operator',
     });
+  });
+});
+
+test('decide: no pause ends a try by its deadline — held at its hook or under a drain, it is not stopped, and it counts again from when it goes on', async (t) => {
+  const LONG_AGO = 0;
+  const NOW = 1_000_000;
+  const job = (...more: Event[]): Event[] => [
+    { kind: 'filed', at: at(LONG_AGO), brief: 'b', cwd: '/r', queued: false, deadlineSeconds: 60 },
+    { kind: 'starting', at: at(LONG_AGO), attempt: 1 },
+    { kind: 'spawned', at: at(LONG_AGO + 1), attempt: 1 },
+    ...more,
+  ];
+  const working = seen([N1, 'working']);
+  const drained = (ms: number) => ({ ...now(ms), drained: true });
+  const stopped = { do: 'stop', sessionId: 's0', why: 'deadline' };
+
+  await t.test('first started long ago and never held: stopped, as today', () => {
+    assert.deepEqual(decide(fold(TASK, job()), working, now(NOW)), stopped);
+  });
+  await t.test('under a drain: no stop, however long it stands', () => {
+    for (const later of [0, 3_600_000]) {
+      assert.notEqual(observe(fold(TASK, job()), working, drained(NOW + later)).type, 'DEADLINE_PASSED');
+      assert.equal(decide(fold(TASK, job()), working, drained(NOW + later)).do, 'nothing');
+    }
+  });
+  await t.test('held at its hook, no drain read: no stop', () => {
+    const held = job({ kind: 'held', at: at(NOW - 120_000), attempt: 1 });
+    assert.equal(decide(fold(TASK, held), working, now(NOW)).do, 'nothing');
+  });
+  await t.test('released 10 s ago: not stopped; 61 s after its release: stopped', () => {
+    const released = job({ kind: 'held', at: at(NOW - 120_000), attempt: 1 }, { kind: 'released', at: at(NOW - 10_000), attempt: 1 });
+    assert.equal(decide(fold(TASK, released), working, now(NOW)).do, 'nothing');
+    assert.deepEqual(decide(fold(TASK, released), working, now(NOW + 51_000)), stopped);
+  });
+  await t.test(
+    'the release counts on the monotonic clock within a boot: a wall clock stepped far forward stops nothing 10 s after it',
+    () => {
+      const mono = (ms: number) => ({ boot: 'b1', ms });
+      const released = job(
+        { kind: 'held', at: at(NOW - 120_000), attempt: 1, mono: mono(1_000) },
+        { kind: 'released', at: at(NOW - 10_000), attempt: 1, mono: mono(5_000) },
+      );
+      assert.equal(decide(fold(TASK, released), working, { ...now(NOW + 600_000), mono: mono(15_000) }).do, 'nothing');
+      assert.deepEqual(decide(fold(TASK, released), working, { ...now(NOW), mono: mono(66_001) }), stopped);
+    },
+  );
+  await t.test('held again after a release: no stop until it is released again', () => {
+    const again = job(
+      { kind: 'held', at: at(NOW - 300_000), attempt: 1 },
+      { kind: 'released', at: at(NOW - 200_000), attempt: 1 },
+      { kind: 'held', at: at(NOW - 190_000), attempt: 1 },
+    );
+    const state = fold(TASK, again);
+    assert.equal(state.attempts[0]?.releasedAt, undefined, 'a new hold clears the release');
+    assert.equal(decide(state, working, now(NOW)).do, 'nothing');
+  });
+  await t.test('a continuation of a parked attempt, started 10 s ago: not stopped; 61 s after its start: stopped', () => {
+    const continued = job(
+      {
+        kind: 'ended',
+        at: at(NOW - 30_000),
+        attempt: 1,
+        sessionId: 's0',
+        observed: 'failed',
+        reason: 'harness',
+        nativeId: 'n1',
+        parked: {},
+      },
+      { kind: 'starting', at: at(NOW - 10_000), attempt: 2, resumeFrom: 'n1', nudge: PARKED_WORDS },
+      { kind: 'spawned', at: at(NOW - 9_000), attempt: 2 },
+    );
+    const live = seen([N2, 'working']);
+    assert.equal(decide(fold(TASK, continued), live, now(NOW)).do, 'nothing');
+    assert.deepEqual(decide(fold(TASK, continued), live, now(NOW + 51_001)), stopped);
+  });
+  await t.test("a later attempt that continues no park counts from the turn's first start", () => {
+    const retried = job(
+      { kind: 'ended', at: at(NOW - 30_000), attempt: 1, sessionId: 's0', observed: 'failed', reason: 'harness', nativeId: 'n1' },
+      { kind: 'starting', at: at(NOW - 10_000), attempt: 2 },
+      { kind: 'spawned', at: at(NOW - 9_000), attempt: 2 },
+    );
+    assert.deepEqual(decide(fold(TASK, retried), seen([N2, 'working']), now(NOW)), stopped);
+  });
+  await t.test("the hold and the release read back through the journal's schema", () => {
+    const decoded = Schema.decodeUnknownResult(StoredEventSchema);
+    for (const e of [
+      { kind: 'held', at: at(1), attempt: 1, mono: { boot: 'b1', ms: 1 } },
+      { kind: 'released', at: at(2), attempt: 1 },
+    ])
+      assert.deepEqual(Result.getOrThrow(decoded(e)), e);
+    assert.ok(Result.isFailure(decoded({ kind: 'held', at: at(1) })), 'a hold names its attempt');
+  });
+});
+
+test('sightingFacts: a hold once per attempt when its sighting first says heldBack, its release once when it goes, for any task', async (t) => {
+  const WHEN = at(50);
+  const job = (...more: Event[]): Event[] => [
+    { kind: 'filed', at: at(0), brief: 'b', cwd: '/r', queued: false },
+    { kind: 'starting', at: at(1), attempt: 1 },
+    { kind: 'spawned', at: at(2), attempt: 1 },
+    ...more,
+  ];
+  const longLived: Event[] = [
+    { kind: 'filed', at: at(0), brief: 'b', cwd: '/r', queued: false, restartPolicy: 'Always' },
+    { kind: 'starting', at: at(1), attempt: 1 },
+    { kind: 'spawned', at: at(2), attempt: 1 },
+  ];
+  const free: Sighting = { sessionId: 's0', state: 'working' };
+  const held: Sighting = { ...free, heldBack: { since: at(40), after: { tool: 'Read' } } };
+  const heldAt: Event = { kind: 'held', at: at(10), attempt: 1 };
+  const rows: Array<[string, Event[], Sighting | undefined, Event[]]> = [
+    ['a job first seen heldBack: held', job(), held, [{ kind: 'held', at: WHEN, attempt: 1 }]],
+    ['a job seen heldBack again: nothing', job(heldAt), held, []],
+    ['a held job seen without it: released', job(heldAt), free, [{ kind: 'released', at: WHEN, attempt: 1 }]],
+    ['a released job seen without it again: nothing', job(heldAt, { kind: 'released', at: at(20), attempt: 1 }), free, []],
+    [
+      'a released job held again: held',
+      job(heldAt, { kind: 'released', at: at(20), attempt: 1 }),
+      held,
+      [{ kind: 'held', at: WHEN, attempt: 1 }],
+    ],
+    ['a job never held, seen free: nothing', job(), free, []],
+    ['a held job not seen this pass: nothing', job(heldAt), undefined, []],
+    ['a long-lived task held too', longLived, { ...held, held: true }, [{ kind: 'held', at: WHEN, attempt: 1 }]],
+    [
+      'an ended attempt: nothing',
+      job({ kind: 'ended', at: at(30), attempt: 1, sessionId: 's0', observed: 'failed', reason: 'harness' }),
+      held,
+      [],
+    ],
+  ];
+  for (const [name, events, sighting, facts] of rows)
+    await t.test(name, () => {
+      assert.deepEqual(sightingFacts(fold(TASK, events), sighting, WHEN), facts);
+    });
+  await t.test('stamped on the monotonic clock when the engine read one', () => {
+    const mono = { boot: 'b1', ms: 7 };
+    assert.deepEqual(sightingFacts(fold(TASK, job()), held, WHEN, mono), [{ kind: 'held', at: WHEN, attempt: 1, mono }]);
+  });
+  await t.test('a settled task: nothing', () => {
+    const settled = fold(TASK, job({ kind: 'settled', at: at(5), outcome: 'failed' }));
+    assert.deepEqual(sightingFacts(settled, held, WHEN), []);
+    assert.deepEqual(sightingFacts(fold(TASK, job(heldAt, { kind: 'settled', at: at(5), outcome: 'failed' })), free, WHEN), []);
   });
 });

@@ -158,7 +158,10 @@ export type FormerReason = (typeof FORMER_REASONS)[number];
  * vouched for with, read as `succeeded`, a former reason (`FORMER_REASONS`) the harness's end with no statement, and
  * `closedOut` given by its former name (`upgrade`, each).
  */
-/** A job parked under a sessions' drain, and the call it cut, where it cut one (`Parked`, `domain.ts`): carried by its end and its attempt. */
+/**
+ * A job parked under a sessions' drain, and the call it cut, where it cut one (`Parked`, `domain.ts`): carried by its end and its
+ * attempt.
+ */
 export const ParkedSchema = Schema.Struct({
   calling: Schema.optional(Schema.Struct({ tool: Schema.String, since: Schema.String })),
 });
@@ -217,6 +220,8 @@ export const StoredEventSchema = Schema.Union([
   event('image', { attempt: Schema.Finite, image: Schema.optional(Schema.String), harnessVersion: Schema.optional(Schema.String) }),
   event('gap', { attempt: Schema.Finite, mono: Schema.optional(MonotonicSchema) }),
   event('process', { attempt: Schema.Finite, pid: Schema.optional(Schema.Finite) }),
+  event('held', { attempt: Schema.Finite, mono: Schema.optional(MonotonicSchema) }),
+  event('released', { attempt: Schema.Finite, mono: Schema.optional(MonotonicSchema) }),
   event('stop-requested', {}),
   event('said', {
     attempt: Schema.Finite,

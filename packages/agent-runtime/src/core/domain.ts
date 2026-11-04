@@ -27,7 +27,8 @@ import type { FormerReason } from './event-schema.ts';
 import type { TranscriptMark } from '../harness/seam.ts';
 import { transition, VERBS, type LifecycleEvent, type Move, type Refusal, type VerbGuard, type VerbName } from './lifecycle.ts';
 import { elapsedMs, type Instant, type Monotonic } from './clock.ts';
-import { backoffOf, endedWhen, restartWords, startedWhen } from './restart.ts';
+import { backoffOf, endedWhen, restartWords } from './restart.ts';
+import { deadlineOf, heldNow, holdFacts } from './deadline.ts';
 import { endOf, isLive, NEEDS_HUMAN, RUNNING, waitsOnPerson, type Outcome, type SessionState } from './session.ts';
 import { foldInto } from './attempt-fold.ts';
 import type { Decide } from '../../contracts/decide.contract.ts';
@@ -392,6 +393,9 @@ export type EndReason = 'harness' | 'lost' | 'unstartable' | 'operator' | 'deadl
  *   Written once per gap, by the engine off a sighting (`sightingFacts`); `decide` reads when it opened (`gapSince`).
  * - `process`: the same attempt's session was listed held in a process — `pid`, when its harness said — after a gap, or
  *   in a process it had not been seen in. Closes the gap. Written by the engine off a sighting; reported, never acted on.
+ * - `held`: an attempt in flight was first seen held back at its hook (`Sighting.heldBack`), at `at`; `released`: one held was
+ *   first seen going on again. Written once per hold and once per release, by the engine off a sighting (`sightingFacts`), for
+ *   any task; `decide` reads them for the deadline (`deadlineFrom`, `heldNow`: `deadline.ts`).
  * - `settled`: terminal. Nothing moves after this. `nativeId` is the session of an attempt it left open — stopped by a
  *   person, or past its deadline, with no `ended` to carry it — as the harness still listed it: what `logs` reads once
  *   that session has been let go. `decide` never reads it.
@@ -483,6 +487,8 @@ export type Event =
   | { kind: 'image'; at: string; attempt: number; image?: string; harnessVersion?: string }
   | { kind: 'gap'; at: string; attempt: number; mono?: Monotonic }
   | { kind: 'process'; at: string; attempt: number; pid?: number }
+  | { kind: 'held'; at: string; attempt: number; mono?: Monotonic }
+  | { kind: 'released'; at: string; attempt: number; mono?: Monotonic }
   | { kind: 'stop-requested'; at: string }
   | ({ kind: 'said' } & Said)
   | ({ kind: 'input' } & Input)
@@ -583,6 +589,14 @@ export type Attempt = {
   gapMono?: Monotonic;
   /** The processes its session was seen held in, in order, as journalled. Carried, never read but for the last. See `process`. */
   processes?: number[];
+  /** When its session was last seen held back at its hook (`Sighting.heldBack`), while held or since: see `held`. */
+  heldSince?: string;
+  /** The same moment on the monotonic clock, when the engine that journalled it read one. */
+  heldMono?: Monotonic;
+  /** When its session was first seen going on after its last hold, absent while it is held: see `released`. */
+  releasedAt?: string;
+  /** The same moment on the monotonic clock, when the engine that journalled it read one. */
+  releasedMono?: Monotonic;
 };
 
 export type State = {
@@ -713,16 +727,6 @@ export function fold(taskId: string, events: readonly Event[]): State {
           ...(s.inputs.length ? { turn: s.inputs.length } : {}),
         });
         break;
-      case 'spawned':
-      case 'ended':
-      case 'measured':
-      case 'counted':
-      case 'denied':
-      case 'image':
-      case 'gap':
-      case 'process':
-        intoAttempt(s, e);
-        break;
       case 'stop-requested':
         s.stopRequested = true;
         break;
@@ -741,6 +745,8 @@ export function fold(taskId: string, events: readonly Event[]): State {
         if (open && open.ended === null && e.nativeId) open.nativeId = e.nativeId;
         break;
       }
+      default:
+        intoAttempt(s, e);
     }
   }
   return s;
@@ -940,7 +946,9 @@ export const lifecycleOf: LifecycleOf = (state) => {
  *
  * The deadline is measured over the time the task has been RUNNING — its current turn, for a task held open — from the
  * first attempt's intent rather than from filing: a task queued for admission has not started burning its time, and a
- * deadline that expired in the queue would be a ceiling that quietly fails work instead of delaying it. It is also the
+ * deadline that expired in the queue would be a ceiling that quietly fails work instead of delaying it. No pause ends a try by
+ * it: the clock counts again from when the session last went on — a release from its hook, or the start of an attempt that
+ * continues a parked one (`deadlineFrom`, `deadline.ts`). It is also the
  * only thing that ends a blocked session: one waiting on a person is running, forever, as far as every other rule here is
  * concerned. Every duration judged here — the deadline, the grace window, a respawn's gap, a restart's backoff and its
  * reset — is measured by `elapsedMs`: on the monotonic clock between two moments journalled in one boot, so a stepped wall
@@ -948,7 +956,8 @@ export const lifecycleOf: LifecycleOf = (state) => {
  *
  * With an attempt in flight, the first rule that holds answers:
  *
- * 1. `DEADLINE_PASSED`, when it is overdue, a person has not asked it to stop, and its sighting has not ended on its own.
+ * 1. `DEADLINE_PASSED`, when it is overdue, a person has not asked it to stop, and its sighting has not ended on its own; never
+ *    while a sessions' drain stands (`Now.drained`) or the attempt is held back at its hook (`heldNow`).
  *    The deadline stops what runs and ends what it cut; an end its harness recorded is judged by that end, as it would be
  *    in time, since a pass steps a task until nothing moves and so reads an end recorded past the deadline past it too. A
  *    person's stop outranks the deadline.
@@ -995,9 +1004,7 @@ export const observe: Observe = (state, observed, now) => {
   const sighting = last ? observed.get(nameFor(state.taskId, last.n)) : undefined;
   const turn = turnOf(state);
 
-  const first = turn.attempts[0];
-  const ranFor = first === undefined ? 0 : elapsedMs(startedWhen(first), instantOf(now));
-  const overdue = state.deadlineSeconds !== undefined && first !== undefined && ranFor > state.deadlineSeconds * 1000;
+  const { ranFor, overdue } = deadlineOf(state, now);
 
   if (last && last.ended === null) return flightEvent(state, last, sighting, now, overdue);
 
@@ -1043,7 +1050,8 @@ const liveOf = (sighting: Sighting | undefined): { live: true; sighting: Sightin
 /** What `observe` reads off an attempt in flight, by its rules 2 to 4: its deadline, its sighting, or its absence. */
 function flightEvent(state: State, last: Attempt, sighting: Sighting | undefined, now: Now, overdue: boolean): LifecycleEvent {
   const endedOwn = sighting !== undefined && ENDED_OWN.has(sighting.state);
-  if (overdue && !state.stopRequested && !endedOwn) return { type: 'DEADLINE_PASSED', attempt: last.n, ...liveOf(sighting) };
+  const paused = now.drained === true || heldNow(last);
+  if (overdue && !paused && !state.stopRequested && !endedOwn) return { type: 'DEADLINE_PASSED', attempt: last.n, ...liveOf(sighting) };
   if (sighting) return sessionEvent(state, last, sighting, now);
   if (now.unread?.has(nameFor(state.taskId, last.n))) return { type: 'UNREAD', attempt: last.n, overdue };
   if (!last.spawnedAt) return { type: 'UNSPAWNED', attempt: last.n, name: nameFor(state.taskId, last.n) };
@@ -1138,14 +1146,21 @@ function restartOf(state: State, last: Attempt, sighting: Sighting | undefined, 
 const instantOf = (now: Now): Instant => ({ at: now.at.getTime(), mono: now.mono });
 
 /**
- * What the engine journals of a long-lived attempt in flight off its sighting, before it decides: a `gap` the first time its
- * session is seen respawning, and a `process` once it is seen held again after one, or held in a process it had not been
- * seen in. Nothing for a job, a settled task, an ended attempt or a session the pass did not see. Each is stamped `at`; a gap
- * also `mono`, the same moment on the monotonic clock when the engine read one, since `decide` bounds how long it lasts.
+ * What the engine journals of an attempt in flight off its sighting, before it decides: for any task, its hold and its release
+ * (`holdFacts`); for a long-lived one, a `gap` the first time its session is seen respawning, and a `process` once it is seen held
+ * again after one, or held in a process it had not been seen in. Nothing for a settled task, an ended attempt or a session the
+ * pass did not see. Each is stamped `at`; a gap, a hold and a release also `mono`, the same moment on the monotonic clock when the
+ * engine read one, since `decide` measures from them.
  */
 export function sightingFacts(state: State, sighting: Sighting | undefined, at: string, mono?: Monotonic): Event[] {
   const last = state.attempts.at(-1);
-  if (state.restartPolicy !== 'Always' || state.settled || !sighting || !last || last.ended !== null) return [];
+  if (state.settled || !sighting || !last || last.ended !== null) return [];
+  const held = holdFacts(last, sighting, at, mono);
+  return state.restartPolicy === 'Always' ? [...held, ...processFacts(state, last, sighting, at, mono)] : held;
+}
+
+/** A long-lived attempt in flight's `gap` and `process`, as `sightingFacts` says. */
+function processFacts(state: State, last: Attempt, sighting: Sighting, at: string, mono?: Monotonic): Event[] {
   if (respawning(state, sighting))
     return last.gapSince === undefined ? [{ kind: 'gap', at, attempt: last.n, ...(mono ? { mono } : {}) }] : [];
   if (sighting.held !== true) return [];

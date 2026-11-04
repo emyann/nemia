@@ -7,9 +7,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { brokenOn } from '@emyann/tsverify';
+import { deadlineOf } from '../src/core/deadline.ts';
 import { backoff, edges } from '../contracts/decide.contract.ts';
-import { backoff as observedBackoff } from '../contracts/observe.contract.ts';
-import type { Attempt, Sighting } from '../src/core/domain.ts';
+import { deadline, backoff as observedBackoff } from '../contracts/observe.contract.ts';
+import { fold, type Attempt, type Event, type Sighting } from '../src/core/domain.ts';
 import { type LifecycleEvent, STATES } from '../src/core/lifecycle.ts';
 
 /** Every kind of event the table takes: a kind added to `LifecycleEvent` fails the typecheck here until the events below hold one. */
@@ -110,4 +111,42 @@ test("the restart's wait keeps within its cap, however many ends come in a row",
   runs.push([[attempt({ ended: 'failed', endedAt: new Date(Date.UTC(2026, 9, 30, 13)).toISOString(), reason: 'harness' })]]);
   assert.deepEqual(brokenOn(backoff, runs as never), []);
   assert.deepEqual(brokenOn(observedBackoff, runs as never), []);
+});
+
+test('a deadline is past only where one was set and its turn has started, in whole milliseconds', () => {
+  const mono = (ms: number) => ({ boot: 'b1', ms });
+  const journal = (deadlineSeconds: number | undefined, ...more: Event[]): Event[] => [
+    { kind: 'filed', at: at(0), brief: 'b', cwd: '/r', queued: false, ...(deadlineSeconds === undefined ? {} : { deadlineSeconds }) },
+    { kind: 'starting', at: at(1), attempt: 1, mono: mono(1_000) },
+    ...more,
+  ];
+  const parked: Event[] = [
+    { kind: 'ended', at: at(10), attempt: 1, sessionId: 's', observed: 'failed', reason: 'harness', parked: {} },
+    { kind: 'starting', at: at(20), attempt: 2, mono: mono(20_000) },
+    { kind: 'held', at: at(25), attempt: 2 },
+    { kind: 'released', at: at(30), attempt: 2, mono: mono(30_000) },
+  ];
+  const states = [
+    fold('t', [{ kind: 'filed', at: at(0), brief: 'b', cwd: '/r', deadlineSeconds: 1 }]),
+    fold('t', [
+      { kind: 'filed', at: at(0), brief: 'b', cwd: '/r', deadlineSeconds: 1, holdOpen: true },
+      ...journal(undefined).slice(1),
+      { kind: 'ended', at: at(5), attempt: 1, sessionId: 's', observed: 'succeeded', reason: 'harness', nativeId: 'n' },
+      { kind: 'input', at: at(6), text: 'go on' },
+    ]),
+    fold('t', journal(undefined)),
+    fold('t', journal(1)),
+    fold('t', journal(1, { kind: 'held', at: at(5), attempt: 1, mono: mono(5_000) }, { kind: 'released', at: at(9), attempt: 1 })),
+    fold('t', journal(1, ...parked)),
+  ];
+  const nows = [
+    { at: new Date(at(40)), graceMs: 0 },
+    { at: new Date(at(3_600)), graceMs: 0, mono: mono(3_600_000) },
+  ];
+  const runs = states.flatMap((s) => nows.map((n) => [s, n] as const));
+  assert.deepEqual(brokenOn(deadline, runs as never), []);
+  assert.ok(
+    runs.some(([s, n]) => deadlineOf(s, n).overdue),
+    'some of the runs are past their deadline',
+  );
 });

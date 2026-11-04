@@ -677,7 +677,7 @@ after a space starts a comment. The keys are a closed list:
 | `harness` | `claude` (default), `codex`, `command` |
 | `model` | the harness's model name |
 | `permissionMode` | the harness's own words — see below; default `auto` for Claude Code, `workspace-write` for Codex |
-| `deadlineSeconds` | the time the machine was up since the attempt started — the turn's first, when held open — above 0, on the monotonic clock within a boot and the wall clock across a reboot; absent, no deadline |
+| `deadlineSeconds` | the time the machine was up since the attempt started — the turn's first, when held open, or its last release from a pause (*A job's drain*) — above 0, on the monotonic clock within a boot and the wall clock across a reboot; absent, no deadline |
 | `resumeFrom` | a session id to continue, instead of starting cold |
 | `worktree` | `true`, `false`, or a name — the harness cuts it |
 | `closeoutSchema` | a JSON Schema file — the workload ends by answering in that shape |
@@ -1883,6 +1883,13 @@ A crash takes the same road only for a job that was held or draining: a job whos
 read `parked` where its hold file says `heldBack`, `draining` or `parked`, or a sessions' drain stands at the look (`heldSighting`). Any
 other crash ends failed as before, for the layer above to judge. Everything here is read off files on each pass, so it survives a
 restart of the daemon.
+
+**No pause ends a try by its deadline.** The engine journals `held` the first time it sees an attempt in flight `heldBack`, and
+`released` the first time it sees one held without it, for any task, as it journals a `gap` (`sightingFacts`, `src/core/deadline.ts`).
+While the attempt is held, or a sessions' drain stands (`Now.drained`), `observe` gives no `DEADLINE_PASSED`; and the deadline counts
+again from when the session last went on, as Kubernetes resets a resumed Job's `startTime`: from the latest of the turn's first start,
+an attempt's release, and the start of an attempt that continues a parked one (`deadlineFrom`). Three laws of
+`contracts/observe.contract.ts` hold it.
 
 ### Attached: Claude Code on the Agent SDK, durable by resume
 

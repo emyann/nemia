@@ -3,11 +3,12 @@
  * is. Its end is `domain.ts`'s own (`endAttempt`).
  */
 import type { Attempt, Event } from './domain.ts';
+import { holdInto } from './deadline.ts';
 
 /** An event about one attempt, `e`, written into that attempt's fold `a`: every one but its end (`endAttempt`, `domain.ts`). */
 export function foldInto(
   a: Attempt,
-  e: Extract<Event, { kind: 'spawned' | 'measured' | 'counted' | 'denied' | 'image' | 'gap' | 'process' }>,
+  e: Extract<Event, { kind: 'spawned' | 'measured' | 'counted' | 'denied' | 'image' | 'gap' | 'process' | 'held' | 'released' }>,
 ): void {
   switch (e.kind) {
     case 'spawned':
@@ -36,5 +37,9 @@ export function foldInto(
       delete a.gapSince;
       delete a.gapMono;
       if (e.pid !== undefined) a.processes = [...(a.processes ?? []), e.pid];
+      return;
+    case 'held':
+    case 'released':
+      holdInto(a, e);
   }
 }

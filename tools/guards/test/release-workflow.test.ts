@@ -215,7 +215,13 @@ test('REFUSED: a missing release-label job, a dispatch trigger on the check, lab
     'the label check dispatched again',
   );
   refused(
-    all(planted(LABEL_CHECK, '          PR_NUMBER:', '          LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) }}\n          PR_NUMBER:')),
+    all(
+      planted(
+        LABEL_CHECK,
+        '          PR_NUMBER:',
+        '          LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) }}\n          PR_NUMBER:',
+      ),
+    ),
     'LABELS',
     "the payload's labels put back",
   );
@@ -248,7 +254,9 @@ test('REFUSED: a job granted a write it does not make, a job the release does no
     'pr granted the dispatch it no longer makes',
   );
   refused(
-    all(`${text(RELEASE)}\n  proof:\n    needs: [pr]\n    runs-on: ubuntu-latest\n    timeout-minutes: 45\n    steps:\n      - run: ${TOOL} proof\n        timeout-minutes: 42\n`),
+    all(
+      `${text(RELEASE)}\n  proof:\n    needs: [pr]\n    runs-on: ubuntu-latest\n    timeout-minutes: 45\n    steps:\n      - run: ${TOOL} proof\n        timeout-minutes: 42\n`,
+    ),
     'a job proof the release does not name',
     'a proof job put back',
   );

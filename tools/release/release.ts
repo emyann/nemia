@@ -326,11 +326,11 @@ const rebuilt = (out: Out, r: Reach, root: string, main: string, version: string
  */
 const APPROVE = [
   `**To release:** press "${APPROVE_BUTTON}" in this pull request's merge box. That starts its \`ci\` and \`release-label\`, the`,
-  'checks main requires, which wait because the workflow\'s own token pushed `release`. Merge once both are green. A rebuild, when',
+  "checks main requires, which wait because the workflow's own token pushed `release`. Merge once both are green. A rebuild, when",
   'main moves, pushes a new head and asks for the click again.',
 ].join('\n');
 
-/** The release pull request's body: what a person does, GitHub's generated notes, then the pull requests no label counted, within GitHub's bound. */
+/** The release pull request's body: what a person does, GitHub's notes, then the pull requests no label counted, within GitHub's bound. */
 const bodyOf = (generated: string, unlabelled: Pull[]): string => {
   let body = `${APPROVE}\n\n${generated}\n`;
   if (unlabelled.length) body += `\n## Not labelled, counted for no bump\n\n${unlabelled.map((pull) => `#${pull.number}`).join(', ')}\n`;

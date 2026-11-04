@@ -14,7 +14,8 @@ import type { DaemonStanding } from '../daemon/daemon.ts';
 import type { Args } from '../command/command.ts';
 import { scratch } from '../../test/scratch.ts';
 import { testPlace } from '../../place/memory/index.ts';
-import { runOver } from '../../test/placed.ts';
+import { eachTest, runOver } from '../../test/placed.ts';
+import { testEngine } from 'agent-runtime/testing';
 import { story } from '../../test/checkpoints.ts';
 
 const ROOT = fs.realpathSync(scratch('wf-upgrade-'));
@@ -26,7 +27,7 @@ const { upgrade, RELEASES } = await import('./upgrade.verb.ts');
 const { currentRelease, releaseDir, releasesDir, runningAt } = await import('./release.store.ts');
 const { unitText } = await import('../service/service.ts');
 const { readPause } = await import('../pause/pause.store.ts');
-const { runWith: runEngine } = await import('../runtime-client.ts');
+const { runWith: runEngine, engineOf } = await import('../runtime-client.ts');
 const place = testPlace();
 const stand = () => place;
 const runWith = runOver(runEngine, () => stand().layer);
@@ -186,7 +187,8 @@ function unitOn(checkout: string): void {
   );
 }
 
-const run = (args: Args, host: ServiceHost, env: NodeJS.ProcessEnv = ENV) => runWith({} as never, upgrade(args, host, env));
+const engine = eachTest(testEngine);
+const run = (args: Args, host: ServiceHost, env: NodeJS.ProcessEnv = ENV) => runWith(engineOf(engine().layer), upgrade(args, host, env));
 
 /** The refusal an upgrade fails with: its tag and message. */
 async function refusalOf(args: Args, host: ServiceHost, env?: NodeJS.ProcessEnv): Promise<{ tag: string; message: string }> {
@@ -395,4 +397,61 @@ test("nemia upgrade is classed ask and is the CLI's alone; Nemia's fence asks fo
   const granted = widened(fence, ['Bash(nemia upgrade:*)']);
   assert.ok(!granted.ask.includes('Bash(nemia upgrade:*)'), "the person's allow reaches the call");
   assert.ok(nemiaFence(TABLE).allow.includes('Bash(nemia version)'), 'version is a read');
+});
+
+test('an upgrade removes the releases no one needs: not the two newest, not one a session runs on, nothing while a build is under way', async (t) => {
+  const s = story(t);
+  const e = () => engineOf(engine().layer);
+  const runOn = (args: Args) => runWith(e(), upgrade(args, idle().host, ENV));
+  const installed = () =>
+    fs
+      .readdirSync(releasesDir())
+      .filter((f) => !f.startsWith('.') && f !== 'current')
+      .sort();
+  await run({ tag: 'v1', repo: REPO }, idle().host);
+  await run({ tag: 'v2', repo: REPO }, idle().host);
+  tagged('v6', 'six');
+  tagged('v7', 'seven');
+  tagged('v8', 'eight');
+
+  await s.test('v6 built after v1 and v2 removes v1, which is neither of the two newest nor run on', async () => {
+    const done = await runOn({ tag: 'v6', repo: REPO });
+    assert.deepEqual(done.removed, ['v1']);
+    assert.equal(fs.existsSync(releaseDir('v1')), false);
+    assert.ok(
+      done.lines.some((l) => /\bv1\b/.test(l) && l !== done.lines[0]),
+      done.lines.join('\n'),
+    );
+    assert.deepEqual(installed(), ['v2', 'v6']);
+  });
+
+  await s.test('a session at work on v2 keeps it when v7 makes it the oldest', async () => {
+    const engineNow = e();
+    await Effect.runPromise(engineNow.file({ id: 'on-v2', brief: 'b', cwd: '/r', harness: 'claude' }));
+    engine().settle('on-v2', 'working', { image: path.join(fs.realpathSync(releasesDir()), 'v2', 'packages', 'agent-runtime') });
+    const done = await runWith(engineNow, upgrade({ tag: 'v7', repo: REPO }, idle().host, ENV));
+    assert.deepEqual(done.removed, []);
+    assert.deepEqual(installed(), ['v2', 'v6', 'v7']);
+  });
+
+  await s.test('a build under way in another upgrade holds every removal', async () => {
+    const building = path.join(releasesDir(), `.building-vx-${process.pid}`);
+    fs.mkdirSync(building);
+    try {
+      const done = await runOn({ tag: 'v8', repo: REPO });
+      assert.deepEqual(done.removed, []);
+      assert.deepEqual(installed(), ['v2', 'v6', 'v7', 'v8']);
+    } finally {
+      fs.rmSync(building, { recursive: true, force: true });
+    }
+  });
+
+  await s.test('once nothing holds, a rollback to v7 removes v2 and v6', async () => {
+    engine().settle('on-v2', 'succeeded', {});
+    const done = await runOn({ tag: 'v7', repo: REPO });
+    assert.equal(done.built, false);
+    assert.deepEqual([...done.removed].sort(), ['v2', 'v6']);
+    assert.deepEqual(installed(), ['v7', 'v8']);
+    assert.deepEqual(leftovers(), []);
+  });
 });

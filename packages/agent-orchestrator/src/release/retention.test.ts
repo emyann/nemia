@@ -32,9 +32,7 @@ test('newestFirst orders the installed releases by when they were built, the lat
 });
 
 test('retentionLines names each release removed, the sessions a held sweep waits on, and nothing with no pointer', async (t) => {
-  const installed = newestFirst(
-    ['v1', 'v2', 'v3', 'v4'].map((tag, i) => ({ tag, builtAt: `2026-11-0${i + 1}T00:00:00.000Z` })),
-  );
+  const installed = newestFirst(['v1', 'v2', 'v3', 'v4'].map((tag, i) => ({ tag, builtAt: `2026-11-0${i + 1}T00:00:00.000Z` })));
   await t.test('each removed tag', () => {
     const answer = retention(installed, { current: 'v4', pinned: [], unrecorded: 0 });
     assert.deepEqual(answer.remove, ['v2', 'v1']);

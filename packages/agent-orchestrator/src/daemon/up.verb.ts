@@ -27,6 +27,7 @@ import { disk } from '../disk/disk.verb.ts';
 import type { DiskReading } from '../disk/disk.ts';
 import { leaseRelease } from '../release/release.ts';
 import { runningRelease } from '../release/version.verb.ts';
+import { retain } from '../release/retention.verb.ts';
 
 /**
  * How the daemon asks a harness for its quota: the engine's `quota` unless the process hands it another. The api hands it the ask its
@@ -268,7 +269,9 @@ const saidStarted = ({ held, replaced }: TakenStore): Effect.Effect<void> =>
  * from a template to it (`reconcile`), and on a sixth it frees the worktrees of the runs the latest pass answered finished (`free`), which
  * no pass waits on. On a seventh, once the first pass has answered and every `DISK_EVERY` after, it measures what the store takes on the
  * disk (`disk`), asking the engine what it keeps by task, and hands each pass the latest reading as it does the quota: no pass walks the
- * store, and a sweep that failed leaves the passes none.
+ * store, and a sweep that failed leaves the passes none. On an eighth, once the first pass has answered and every `RETAIN_EVERY` after,
+ * it removes the installed releases no one needs (`retain`), pinning the one this process runs: by then each session it adopted has
+ * recorded what it runs on.
  */
 export const up = (
   e: Engine,
@@ -310,6 +313,7 @@ export const up = (
         over(e),
       ),
     );
+    yield* Effect.forkScoped(Deferred.await(answered).pipe(Effect.andThen(retain([leaseRelease(runningRelease())])), over(e)));
     yield* saidStarted(taken);
     if (onTaken) yield* onTaken(taken);
     let said = NOTHING_SAID;

@@ -173,6 +173,8 @@ finish, SIGTERM, the unit started, and the store resumed once the new daemon has
 when it does not; a daemon started by hand is named with the take-over that hands it to the service. A release is a tag built and
 checked under the store (`src/release/`): `nemia upgrade <tag>` exports it clean, builds it into `$WF_ROOT/releases/<tag>` on a trial store, switches the pointer `releases/current` by a rename
 and restarts the service onto it; `nemia version` says what runs and what the pointer names, and the lease keeps its daemon's `release`.
+A release that is not current, not among the two newest, and that no running Nemia process nor session in flight runs on is removed
+after `nemia upgrade` and on a sweep of the daemon's every five minutes (`retain`, `src/release/retention.verb.ts`).
 A checkout is refused a store whose pointer names an install, but for `version` and a help, unless `NEMIA_ON_INSTALLED=1`
 (`trialRefusal`, in the CLI's `main` and the api's). Where nothing ticks the store, a command whose work waits on the next pass (`ticks`
 in the command table) starts the daemon before it runs (`ensureDaemon`, `src/demand/demand.verb.ts`): the store's login service where

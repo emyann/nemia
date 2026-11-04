@@ -5,7 +5,7 @@
  * daemon that serves the api.
  */
 import path from 'node:path';
-import { Effect } from 'effect';
+import { Cause, Effect } from 'effect';
 import type { Args } from '../command/command.ts';
 import type { Command } from '../command/entry.verb.ts';
 import { PlaceService, type Place } from '../place/place.store.ts';
@@ -31,6 +31,7 @@ import {
   type Building,
 } from './release.store.ts';
 import { runningRelease } from './version.verb.ts';
+import { RETAIN_EVERY, retainOnce } from './retention.verb.ts';
 
 /** The command an upgrade's pause and lines name. */
 const BY = 'nemia upgrade';
@@ -42,13 +43,17 @@ const BUILD_STEPS: readonly (readonly string[])[] = [
   ['npm', 'run', RELEASE_CHECK],
 ];
 
-/** What `nemia upgrade` did: the release now current, whether it was built now, how the daemon was restarted, and its lines. */
+/**
+ * What `nemia upgrade` did: the release now current, whether it was built now, how the daemon was restarted, the releases it removed, and
+ * its lines.
+ */
 export type Upgraded = {
   readonly release: ReleaseFile;
   readonly dir: string;
   readonly built: boolean;
   readonly restart: 'service' | 'hand' | 'none';
   readonly pid: number | null;
+  readonly removed: readonly string[];
   readonly lines: readonly string[];
 };
 
@@ -78,14 +83,19 @@ function checked(tag: string, building: Building, env: NodeJS.ProcessEnv): void 
  * The release of `tag`: the one built already where it names the commit the tag names now, else built — exported, its commands run on a
  * trial store, the export's repository sealed away, `release.json` written last and the tree renamed into `releases/<tag>`. The build's
  * folder is taken away however it ends. Refused: a tag the repository lacks (`Missing`); one built at another commit, the tag moved, or a
- * release of it placed meanwhile (`Conflict`); a tag with no `release:check` script, or a command that fails (`Invalid`).
+ * release of it placed meanwhile (`Conflict`); a tag with no `release:check` script, or a command that fails (`Invalid`). The pointer is
+ * switched to it last, while the build's folder still stands, so the retention, which removes nothing while a build is under way, never
+ * removes a release between the read that finds it built and the pointer naming it.
  */
 function prepared(place: Place, tag: string, repo: string, root: string, env: NodeJS.ProcessEnv): { release: ReleaseFile; built: boolean } {
   const building = buildingOf(tag, new Date().toISOString().replace(/[:.]/g, '-'), root);
   try {
     const { commit } = answered(tag, place.askNow('export', { repo, tag, into: building.tree }));
     const had = releaseFileOf(releaseDir(tag, root));
-    if (had?.commit === commit) return { release: had, built: false };
+    if (had?.commit === commit) {
+      switchCurrent(tag, root);
+      return { release: had, built: false };
+    }
     if (had !== undefined)
       throw new Conflict({
         message: `${BY} ${tag}: releases/${tag} was built at ${had.commit.slice(0, 7)}, and the tag now names ${commit.slice(0, 7)}: the tag moved. Tag the new commit with a new name.`,
@@ -102,6 +112,7 @@ function prepared(place: Place, tag: string, repo: string, root: string, env: No
       throw new Conflict({
         message: `${BY} ${tag}: releases/${tag} was placed by another upgrade meanwhile: run it again to switch to it.`,
       });
+    switchCurrent(tag, root);
     return { release, built: true };
   } finally {
     removeBuilding(building);
@@ -147,7 +158,31 @@ const restarted = Effect.fn('restarted')(function* (args: Args, host: ServiceHos
   };
 });
 
-/** Upgrades the store to `tag` (`prepared`), switches the pointer, then restarts the daemon (`restarted`); refused before the switch. */
+/**
+ * The releases removed once the daemon is restarted (`retainOnce`), pinning the one this process runs and the one the lease says the
+ * daemon runs; a sweep that fails is a line, never a failed upgrade, since the pointer has moved already. Lines only where it removed
+ * something or held.
+ */
+const removedAfter = Effect.fn('removedAfter')(function* (root: string, host: ServiceHost) {
+  const lease = host.lease();
+  const daemon = lease.kind === 'ticking' && lease.file.release !== undefined ? [lease.file.release] : [];
+  return yield* retainOnce(root, [runningRelease(), ...daemon]).pipe(
+    Effect.map((done) => ({ removed: done.removed, lines: done.removed.length || done.held !== null ? done.lines : [] })),
+    Effect.catchCause((cause) => {
+      const err = Cause.squash(cause);
+      const why = err instanceof Error ? err.message : String(err);
+      return Effect.succeed({
+        removed: [] as string[],
+        lines: [`no old release was removed: ${why}; the daemon's sweep tries again within ${RETAIN_EVERY}`],
+      });
+    }),
+  );
+});
+
+/**
+ * Upgrades the store to `tag` (`prepared`, which switches the pointer), restarts the daemon (`restarted`), then removes what no one needs
+ * (`removedAfter`); refused before the switch.
+ */
 export const upgrade = Effect.fn('upgrade')(function* (args: Args, host: ServiceHost = liveHost(), env: NodeJS.ProcessEnv = process.env) {
   const tag = typeof args.tag === 'string' ? args.tag : '';
   const root = host.roots().root;
@@ -155,16 +190,22 @@ export const upgrade = Effect.fn('upgrade')(function* (args: Args, host: Service
   const { release, built } = yield* tried(() => {
     const wrong = tagRefusal(tag);
     if (wrong !== null) throw new Invalid({ message: wrong });
-    const result = prepared(place, tag, repoOf(args, runningRelease()), root, env);
-    switchCurrent(tag, root);
-    return result;
+    return prepared(place, tag, repoOf(args, runningRelease()), root, env);
   });
   const dir = releaseDir(tag, root);
   const said = built
     ? `built ${tag} (${release.commit.slice(0, 7)}) into ${dir}: npm ci, npm run build and npm run ${RELEASE_CHECK} passed`
     : `${tag} is built already at ${release.commit.slice(0, 7)} (${dir}): switched to it without a rebuild`;
   const daemon = yield* restarted(args, host, tag);
-  return { release, dir, built, ...daemon, lines: [said, `releases/${CURRENT} now names ${tag}`, ...daemon.lines] } satisfies Upgraded;
+  const retained = yield* removedAfter(root, host);
+  return {
+    release,
+    dir,
+    built,
+    ...daemon,
+    removed: retained.removed,
+    lines: [said, `releases/${CURRENT} now names ${tag}`, ...daemon.lines, ...retained.lines],
+  } satisfies Upgraded;
 });
 
 /** How `nemia upgrade` is typed, as its refusals end on it. */
@@ -181,7 +222,9 @@ const UPGRADE: Command<Upgraded> = {
     'it where the login service runs the pointer. A tag built already is',
     'switched to without a rebuild, so an older tag rolls back. --repo:',
     "the repository the tag is in (the running release's source);",
-    '--name: the service (nemia)',
+    '--name: the service (nemia). Then it removes each release that is',
+    'not current, not among the two newest, and that no session or',
+    'running nemia runs on, as the daemon does every five minutes',
   ],
   spec: {
     positionals: [{ key: 'tag', takes: 'required', kind: 'name' }],

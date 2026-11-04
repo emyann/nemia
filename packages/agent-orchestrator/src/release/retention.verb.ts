@@ -17,7 +17,7 @@ import { newestFirst, retention, retentionLines, type Retention } from './retent
 import { inFlight } from './version.verb.ts';
 
 /** The daemon's pace of sweeps: a release is freed within this of its last session ending. */
-export const RETAIN_EVERY: Duration.Input = '5 minutes';
+export const RETAIN_EVERY = '5 minutes' satisfies Duration.Input;
 
 /** A Nemia process's release, as the lease records it or as the process finds its own (`runningRelease`). */
 export type ProcessRelease = LeaseRelease | Running;

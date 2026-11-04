@@ -183,8 +183,8 @@ export const buildUnderWay = (home: string): boolean =>
 
 /**
  * Moves `releases/<tag>` aside to `releases/.removing-<tag>-<pid>`, for the caller to delete off the event loop, and answers where;
- * answers false, moving nothing, where it is gone already, while an upgrade is building (it may be about to point at it) or the pointer names it. Synchronous, so
- * nothing in this process switches the pointer between the reads and the rename.
+ * answers false, moving nothing, where it is gone already, while an upgrade is building (it may be about to point at it) or the pointer
+ * names it. Synchronous, so nothing in this process switches the pointer between the reads and the rename.
  */
 export function removeRelease(home: string, tag: string): string | false {
   const dir = releaseDir(tag, home);

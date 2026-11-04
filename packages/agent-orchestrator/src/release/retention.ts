@@ -23,18 +23,14 @@ export type Retention = { readonly remove: readonly string[]; readonly held: 'no
 
 /** The installed releases newest first: by `builtAt` descending, then by tag descending, so two built at once still order. */
 export const newestFirst = (installed: readonly Installed[]): Installed[] =>
-  [...installed].sort((a, b) =>
-    a.builtAt === b.builtAt ? (a.tag < b.tag ? 1 : a.tag > b.tag ? -1 : 0) : a.builtAt < b.builtAt ? 1 : -1,
-  );
+  [...installed].sort((a, b) => (a.builtAt === b.builtAt ? (a.tag < b.tag ? 1 : a.tag > b.tag ? -1 : 0) : a.builtAt < b.builtAt ? 1 : -1));
 
 /** The releases to remove of `installed`, given newest first, by what is in use (`Retention`). */
 export const retention: ReleaseRetention = (installed, inUse) => {
   if (inUse.current === null) return { remove: [], held: 'no pointer' };
   if (inUse.unrecorded > 0) return { remove: [], held: 'unrecorded' };
   const current = inUse.current;
-  const remove = installed
-    .filter((r, i) => i >= RELEASES_KEPT && r.tag !== current && !inUse.pinned.includes(r.tag))
-    .map((r) => r.tag);
+  const remove = installed.filter((r, i) => i >= RELEASES_KEPT && r.tag !== current && !inUse.pinned.includes(r.tag)).map((r) => r.tag);
   return { remove, held: null };
 };
 
@@ -46,5 +42,7 @@ export function retentionLines(answer: Retention, unrecorded: number): string[] 
       `no release removed: ${unrecorded} local session${unrecorded === 1 ? '' : 's'} in flight recorded no release, so any release may be under ${unrecorded === 1 ? 'it' : 'them'}; ` +
         'removal waits until they end (nemia version counts them as not recorded).',
     ];
-  return answer.remove.map((tag) => `removed the release ${tag}: not current, not among the ${RELEASES_KEPT} newest, and nothing runs on it`);
+  return answer.remove.map(
+    (tag) => `removed the release ${tag}: not current, not among the ${RELEASES_KEPT} newest, and nothing runs on it`,
+  );
 }

@@ -28,8 +28,7 @@ const retentionSpec = spec<(installed: readonly Installed[], inUse: InUse) => Re
     },
     neverTheTwoNewest: {
       description: 'The two newest releases are never removed',
-      condition: ({ input: [installed], output }) =>
-        output.remove.every((tag) => installed.every((r, i) => i >= 2 || r.tag !== tag)),
+      condition: ({ input: [installed], output }) => output.remove.every((tag) => installed.every((r, i) => i >= 2 || r.tag !== tag)),
     },
     onlyWhatIsInstalled: {
       description: 'Only an installed release is removed',
@@ -45,8 +44,7 @@ const retentionSpec = spec<(installed: readonly Installed[], inUse: InUse) => Re
     },
     anUnrecordedSessionHolds: {
       description: 'A local session in flight that recorded no release holds every removal',
-      condition: ({ input: [, inUse], output }) =>
-        (output.held === 'unrecorded') === (inUse.current !== null && inUse.unrecorded > 0),
+      condition: ({ input: [, inUse], output }) => (output.held === 'unrecorded') === (inUse.current !== null && inUse.unrecorded > 0),
     },
     everyOtherGoes: {
       description: 'Unheld, every installed release that is not current, not running and not among the two newest is removed',

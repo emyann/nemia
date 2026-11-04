@@ -586,6 +586,11 @@ export const DIAMOND = {
     /** What `running`'s card says on hover of the minute it waited, created and nothing filed, before its step was: not time at work. */
     running: 'waited 1m 00s before its first step was filed',
   },
+  /**
+   * What `running`'s session runs on, as its attempt recorded it: an image under the store's `releases/<tag>/`, and Claude Code's
+   * version.
+   */
+  ranOn: { tag: 'v1.2.0', harnessVersion: '2.1.316' },
 } as const;
 
 /**
@@ -957,7 +962,18 @@ export function seedDiamond(repo: string, root: string, now = Date.now()): void 
   work(running.id, false);
   write(
     path.join(root, 'engine', 'tasks', `${task(running)}.jsonl`),
-    lines([filed(running, 1.2), { kind: 'starting', at: ago(1.1), attempt: 1 }, { kind: 'spawned', at: ago(1.1), attempt: 1 }]),
+    lines([
+      filed(running, 1.2),
+      { kind: 'starting', at: ago(1.1), attempt: 1 },
+      { kind: 'spawned', at: ago(1.1), attempt: 1 },
+      {
+        kind: 'image',
+        at: ago(1.05),
+        attempt: 1,
+        image: path.join(root, 'releases', DIAMOND.ranOn.tag, 'packages', 'agent-runtime'),
+        harnessVersion: DIAMOND.ranOn.harnessVersion,
+      },
+    ]),
   );
   record(running, 2.2, { taskId: task(running), workspace: repo, branch: branchOf(running.id) });
   record(bottom, 2.0, { taskId: null });

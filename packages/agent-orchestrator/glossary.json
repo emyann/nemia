@@ -297,6 +297,11 @@
       }
     },
     {
+      "term": "Release retention",
+      "meaning": "what removes an installed release: the current, the two newest, and any a session in flight or a running Nemia process runs on are kept, the rest removed after `nemia upgrade` and on the daemon's sweep; nothing while a local session in flight recorded no release.",
+      "type": "Retention"
+    },
+    {
       "term": "Revision",
       "meaning": "one entry of a kind and name's ledger: its number, a whole one from 1, the digest of the content it was given for, and when it was first seen — the model's `Revision` (`packages/agent-orchestrator/src/revisions/revisions.model.ts`), checked on an append and read nominally.",
       "type": "Revision"

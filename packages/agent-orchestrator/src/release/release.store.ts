@@ -1,8 +1,9 @@
 /**
  * The store's releases on disk: `$WF_ROOT/releases/<tag>` each, `releases/current` the relative link to one, `releases/.logs/` what each
- * build said, and `releases/.building-<tag>-<pid>/` a build under way — its exported `tree/` and the `trial/` store its checks run on.
- * Reads the pointer and a release's `release.json` (`ReleaseFileSchema`), runs a build's commands with the build's output in its log, and
- * writes a release last, then the pointer, each by a rename, so no reader meets half of either.
+ * build said, `releases/.building-<tag>-<pid>/` a build under way — its exported `tree/` and the `trial/` store its checks run on — and
+ * `releases/.removing-<tag>-<pid>/` a release the retention moved aside to delete. Reads the pointer and a release's `release.json`
+ * (`ReleaseFileSchema`), runs a build's commands with the build's output in its log, and writes a release last, then the pointer, each by
+ * a rename, so no reader meets half of either; a release goes by a rename too, so no reader meets half of one removed.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -10,6 +11,7 @@ import { spawnSync } from 'node:child_process';
 import { Result, Schema } from 'effect';
 import { wfRoot } from '../config/config.store.ts';
 import { CURRENT, RELEASE_FILE, type Current, type ReleaseFile, type Running } from './release.ts';
+import type { Installed } from '../retention/retention.ts';
 
 /** `release.json` as an upgrade writes it (`ReleaseFile`). */
 const ReleaseFileSchema = Schema.Struct({
@@ -142,3 +144,66 @@ export function switchCurrent(tag: string, root: string = wfRoot()): void {
   fs.symlinkSync(tag, hidden);
   fs.renameSync(hidden, path.join(releases, CURRENT));
 }
+
+/** The prefix of a build's folder, and of a release moved aside to be deleted. */
+const BUILDING = '.building-';
+const REMOVING = '.removing-';
+
+/** The names under the store's `releases/`, or none where it does not exist. */
+function namesIn(home: string): string[] {
+  try {
+    return fs.readdirSync(releasesDir(home));
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * The releases installed under the store's `releases/`: each real folder there — never the pointer, a link, nor a dot folder (`.logs`,
+ * a build, a release moved aside) — whose `release.json` reads, by its folder's name and when it was built.
+ */
+export function installedReleases(home: string): Installed[] {
+  return namesIn(home).flatMap((name) => {
+    if (name.startsWith('.') || name === CURRENT) return [];
+    const dir = path.join(releasesDir(home), name);
+    if (!fs.lstatSync(dir, { throwIfNoEntry: false })?.isDirectory()) return [];
+    const file = releaseFileOf(dir);
+    return file === undefined ? [] : [{ tag: name, builtAt: file.builtAt }];
+  });
+}
+
+/**
+ * Whether an upgrade is building: a `.building-<tag>-<pid>` folder whose pid, its last `-` part, `live` says is a live process (the
+ * daemon store's `alive`, given by the caller).
+ */
+export const buildUnderWay = (home: string, live: (pid: number) => boolean): boolean =>
+  namesIn(home).some((name) => {
+    if (!name.startsWith(BUILDING)) return false;
+    const pid = Number(name.slice(name.lastIndexOf('-') + 1));
+    return Number.isInteger(pid) && pid > 0 && live(pid);
+  });
+
+/**
+ * Moves `releases/<tag>` aside to `releases/.removing-<tag>-<pid>`, for the caller to delete off the event loop, and answers where;
+ * answers false, moving nothing, where it is gone already, while an upgrade is building (it may be about to point at it) or the pointer
+ * names it. Synchronous, so nothing in this process switches the pointer between the reads and the rename.
+ */
+export function removeRelease(home: string, tag: string, live: (pid: number) => boolean): string | false {
+  const dir = releaseDir(tag, home);
+  let real: string;
+  try {
+    real = fs.realpathSync(dir);
+  } catch {
+    return false;
+  }
+  if (buildUnderWay(home, live) || currentRelease(home)?.dir === real) return false;
+  const aside = path.join(releasesDir(home), `${REMOVING}${tag}-${process.pid}`);
+  fs.renameSync(dir, aside);
+  return aside;
+}
+
+/** The releases moved aside and not yet deleted: one a sweep was stopped on, which the next deletes. */
+export const leftRemovals = (home: string): string[] =>
+  namesIn(home)
+    .filter((name) => name.startsWith(REMOVING))
+    .map((name) => path.join(releasesDir(home), name));

@@ -11,10 +11,13 @@ import path from 'node:path';
 import { scratch } from '../../test/scratch.ts';
 import type { ReleaseFile } from './release.ts';
 import {
+  asideLeftover,
+  buildLogs,
   buildUnderWay,
   currentRelease,
   installedReleases,
   leftRemovals,
+  pidEntries,
   placeRelease,
   releaseDir,
   releaseFileOf,
@@ -130,4 +133,54 @@ test('REFUSED: a release is not removed while the pointer names it or a build is
     ['v2'],
     'a release moved aside is no installed one',
   );
+});
+
+test("the pid-named entries under releases/ are each build's folder and each pointer link made beside current, by whether its process lives", () => {
+  const root = storeWith('v1');
+  switchCurrent('v1', root);
+  const releases = releasesDir(root);
+  fs.mkdirSync(path.join(releases, '.building-v9-4141'));
+  fs.mkdirSync(path.join(releases, `.building-v9-${LIVE}`));
+  fs.symlinkSync('v1', path.join(releases, '.current-4141'));
+  fs.mkdirSync(path.join(releases, '.building-v9-abc'));
+  fs.mkdirSync(path.join(releases, '.logs'));
+  fs.mkdirSync(path.join(releases, '.removing-v1-1'));
+  assert.deepEqual(
+    pidEntries(root, live).sort((a, b) => (a.name < b.name ? -1 : 1)),
+    [
+      { name: '.building-v9-4141', live: false },
+      { name: `.building-v9-${LIVE}`, live: true },
+      { name: '.current-4141', live: false },
+    ],
+  );
+  assert.deepEqual(pidEntries(scratch('wf-release-none-'), live), [], 'no releases/ folder');
+});
+
+test("a leftover is moved aside with what it holds, once; a pointer link is moved as a link, and the release it named stands", () => {
+  const root = storeWith('v1');
+  const releases = releasesDir(root);
+  const dead = path.join(releases, '.building-v9-4141');
+  fs.mkdirSync(path.join(dead, 'tree'), { recursive: true });
+  fs.mkdirSync(path.join(dead, 'trial', 'engine'), { recursive: true });
+  const aside = asideLeftover(root, '.building-v9-4141');
+  assert.equal(aside, path.join(releases, `.removing-.building-v9-4141-${process.pid}`));
+  assert.ok(fs.existsSync(path.join(releases, `.removing-.building-v9-4141-${process.pid}`, 'trial', 'engine')));
+  assert.equal(fs.existsSync(dead), false);
+  assert.equal(asideLeftover(root, '.building-v9-4141'), false, 'gone already');
+  fs.symlinkSync('v1', path.join(releases, '.current-4141'));
+  const link = asideLeftover(root, '.current-4141');
+  assert.ok(link !== false && fs.lstatSync(link).isSymbolicLink());
+  assert.deepEqual(leftRemovals(root).sort(), [aside, link].sort());
+  for (const dir of leftRemovals(root)) fs.rmSync(dir, { recursive: true, force: true });
+  assert.ok(fs.existsSync(path.join(releaseDir('v1', root), 'release.json')), 'deleting the link leaves the release it named');
+});
+
+test("the build logs are each file under releases/.logs with when it was last written, in whole milliseconds; none with no folder", () => {
+  const root = storeWith();
+  assert.deepEqual(buildLogs(root), [], 'no releases/ folder');
+  const logs = path.join(releasesDir(root), '.logs');
+  fs.mkdirSync(path.join(logs, 'not-a-log'), { recursive: true });
+  fs.writeFileSync(path.join(logs, 'v1-a.log'), 'npm ci\n');
+  fs.utimesSync(path.join(logs, 'v1-a.log'), 1_700_000_000.5, 1_700_000_000.5);
+  assert.deepEqual(buildLogs(root), [{ name: 'v1-a.log', modifiedMs: 1_700_000_000_500 }]);
 });

@@ -29,6 +29,7 @@ import { firstCall, HOOK_HOLD_S, inside, type CallsInFlight } from './job-hold.t
 import { claudeStreamKept } from '../detached/output.ts';
 import type { SpawnRequest } from '../seam.ts';
 import type { AskOption, AskQuestion } from '../../core/index.ts';
+import { cutWords } from '../../core/restart.ts';
 
 /** What a session's new calls ask before they start: whether this process holds back a new call of `live` now. */
 export type Held = (live: Live) => boolean;
@@ -94,6 +95,10 @@ export type Live = {
   /** The calls of this session's that are waiting on a person now, by the call's id: what keeps one ask written down once. */
   asking: Set<string>;
   q?: { interrupt?: () => Promise<void> };
+  /** Since when a new call of the main thread is held at its hook (ISO), while one is: the run file's `hold`. */
+  holding?: string;
+  /** The main-thread call that ended last, kept by its `PostToolUse` or `PostToolUseFailure` hook: what a hold says it came after. */
+  after?: { tool: string };
   done: Promise<void>;
   pushed?: (m: SDKMessage) => void;
 };
@@ -236,20 +241,56 @@ export const DENIED_HERE =
   'No person is here to approve this call, so it is denied. Do what you can with the tools you are allowed, and say in your answer what you were denied.';
 
 /**
- * The session's run file rewritten with `patch`, its earliest call in flight as `calling` and how many wait at their hook as
- * `heldBack`; nothing once the session is let go, its file its holder's last word (`parked`).
+ * The session's run file rewritten with `patch`, its earliest call in flight as `calling`, how many wait at their hook as `heldBack`,
+ * and since when one is held there, after which call, as `hold`; nothing once the session is let go, its file its holder's last word
+ * (`parked`).
  */
 const rewrite = (root: string, live: Live, patch: Partial<AttachedRun> = {}): void => {
   if (live.letGo) return;
   const first = firstCall(live.calls);
-  const { calling: _, heldBack: __, ...rest } = live.run;
-  live.run = { ...rest, ...patch, ...(first ? { calling: first } : {}), ...(live.waiting ? { heldBack: live.waiting } : {}) };
+  const { calling: _, heldBack: __, hold: ___, ...rest } = live.run;
+  const hold = live.waiting && live.holding ? { since: live.holding, ...(live.after ? { after: live.after } : {}) } : undefined;
+  live.run = {
+    ...rest,
+    ...patch,
+    ...(first ? { calling: first } : {}),
+    ...(live.waiting ? { heldBack: live.waiting } : {}),
+    ...(hold ? { hold } : {}),
+  };
   writeRun(root, live.run);
+};
+
+/**
+ * The turn of `live` cut by the sessions' drain in its call to `tool`: the cut kept on its run file, then the SDK's interrupt sent
+ * (`interruptTurn`), which ends the turn with a result of its own and leaves the session answering under its id, its input open
+ * for the words it is told once the drain is lifted (`toldCut`). Nothing where the session is let go.
+ */
+export const cutTurn = async (root: string, live: Live, tool: string): Promise<boolean> => {
+  if (live.letGo) return false;
+  rewrite(root, live, { cut: { tool, since: new Date().toISOString() } });
+  return interruptTurn(live);
+};
+
+/**
+ * The session `live`, cut by the sessions' drain, told so once the drain is lifted: `cutWords` of the call it cut pushed on its input
+ * as words it must answer, a turn of their own, and the cut cleared. Nothing where it stands uncut or is let go; a session whose
+ * input has closed has the cut cleared alone, as there is no one to tell.
+ */
+export const toldCut = (root: string, live: Live): void => {
+  const cut = live.run.cut;
+  if (cut === undefined || live.letGo) return;
+  const { cut: _, ...rest } = live.run;
+  live.run = rest;
+  if (live.input.closed) return rewrite(root, live);
+  live.unanswered.add(live.input.push(cutWords(cut.tool)));
+  rewrite(root, live, { state: 'working' });
 };
 
 /** The hooks that keep the call in flight, a new one held while `held` says so. */
 const hooksOf = (root: string, live: Live, held: Held, mayAsk: boolean): Partial<Record<HookEvent, HookCallbackMatcher[]>> => {
-  const ended = async (_input: unknown, id: string | undefined) => {
+  const ended = async (input: unknown, id: string | undefined) => {
+    const call = id === undefined ? undefined : live.calls.get(id);
+    if (call && !inside(input)) live.after = { tool: call.tool };
     if (id && live.calls.delete(id)) rewrite(root, live);
     return {};
   };
@@ -261,8 +302,14 @@ const hooksOf = (root: string, live: Live, held: Held, mayAsk: boolean): Partial
           async (input, id, { signal }) => {
             if (!inside(input)) {
               live.waiting++;
-              if (held(live)) rewrite(root, live);
-              await waitWhile(held, signal, live).finally(() => live.waiting--);
+              if (held(live)) {
+                live.holding ??= new Date().toISOString();
+                rewrite(root, live);
+              }
+              await waitWhile(held, signal, live).finally(() => {
+                live.waiting--;
+                if (live.waiting === 0) delete live.holding;
+              });
               if (live.letGo) return await cutWhileHeld(signal, live);
             }
             const tool = (input as { tool_name?: string }).tool_name ?? 'a tool';
@@ -345,6 +392,9 @@ const answered = (live: Live, m: SDKMessage): void => {
  * session id, and the input stays open so the next words said are heard in the same session. An `is_error` result — an interrupted
  * turn's `error_during_execution` among them — ends the turn and never fails the session.
  *
+ * A turn the sessions' drain cut (`cutTurn`) ends neither: its session is written `working`, its input open, and waits for the drain's
+ * lift, when it is told the cut (`toldCut`).
+ *
  * It is `idle` only once every word pushed on its input has been answered (`answered`): words pushed while a turn runs are sometimes
  * worked as a turn of their own and sometimes folded into the one running, so a result is read for the messages it names, never counted.
  *
@@ -358,15 +408,20 @@ const took = (root: string, live: Live, m: SDKMessage): void => {
   const bridged = bridgeStateOf(m);
   if (m.type === 'system' && m.subtype === 'init' && m.session_id !== live.run.sessionId) rewrite(root, live, { sessionId: m.session_id });
   else if (bridged !== undefined) rewrite(root, live, { bridge: { ...live.run.bridge, state: bridged } });
-  else if (m.type === 'result') {
-    live.calls.clear();
-    live.asking.clear();
-    cutAsks(root, live.run.name);
-    answered(live, m);
-    if (live.open) return rewrite(root, live, { state: live.unanswered.size ? 'working' : 'idle', sessionId: m.session_id });
-    live.input.close();
-    rewrite(root, live, { state: m.is_error ? 'failed' : 'completed', sessionId: m.session_id });
-  } else if (over.length) rewrite(root, live);
+  else if (m.type === 'result') turnEnded(root, live, m);
+  else if (over.length) rewrite(root, live);
+};
+
+/** The turn of `live` ended by its result `m`: its calls and asks cleared, and the session written as `took` says. */
+const turnEnded = (root: string, live: Live, m: Extract<SDKMessage, { type: 'result' }>): void => {
+  live.calls.clear();
+  live.asking.clear();
+  cutAsks(root, live.run.name);
+  answered(live, m);
+  if (live.run.cut) return rewrite(root, live, { state: 'working', sessionId: m.session_id });
+  if (live.open) return rewrite(root, live, { state: live.unanswered.size ? 'working' : 'idle', sessionId: m.session_id });
+  live.input.close();
+  rewrite(root, live, { state: m.is_error ? 'failed' : 'completed', sessionId: m.session_id });
 };
 
 /**

@@ -74,6 +74,10 @@ erDiagram
     string gapSince "optional"
     object gapMono "optional"
     list processes "optional"
+    string heldSince "optional"
+    object heldMono "optional"
+    string releasedAt "optional"
+    object releasedMono "optional"
   }
   Session {
     SessionId nativeId PK

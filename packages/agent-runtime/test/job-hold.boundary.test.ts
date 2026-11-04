@@ -1,5 +1,5 @@
 /**
- * A Claude Code job held by the jobs' drain, in its own process: the real `bin/ae-claude-job.ts`, run as the worker runs it — a spawn
+ * A Claude Code job held by the sessions' drain, in its own process: the real `bin/ae-claude-job.ts`, run as the worker runs it — a spawn
  * request's path on its argv, the brief's line on its stdin, its stdin ended once its result is printed — the real `query()`, and the
  * stand-in Claude Code the SDK spawns through `AE_CLAUDE_EXECUTABLE` (`fixtures/stand-in-claude.ts`).
  *
@@ -21,7 +21,7 @@ import { fileURLToPath } from 'node:url';
 import { scratch } from './scratch.ts';
 import { story } from './checkpoints.ts';
 import { until, WAITED } from '../src/waits/index.ts';
-import { jobDrainFile, liftJobDrain, putJobDrain, readJobHold } from '../src/harness/claude/job-hold.ts';
+import { sessionDrainFile, sessionDrainOf, liftSessionDrain, putSessionDrain, readJobHold } from '../src/harness/claude/job-hold.ts';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const BIN = path.join(HERE, '..', 'bin', 'ae-claude-job.ts');
@@ -77,7 +77,7 @@ const job = (t: { after: (f: () => void) => void }, plan: object, io: { holdMs?:
         cwd: dir,
         config: { env: { STANDIN_DIR: dir, STANDIN_PLAN: JSON.stringify(plan), STANDIN_NO_BRIDGE: '1' } },
       },
-      io: { holdFile, drainFile: jobDrainFile(root), holdPollMs: 20, ...io },
+      io: { holdFile, drainFile: sessionDrainFile(root), holdPollMs: 20, ...io },
     }),
   );
   const child = spawn(process.execPath, [BIN, at], {
@@ -121,7 +121,7 @@ const job = (t: { after: (f: () => void) => void }, plan: object, io: { holdMs?:
 };
 
 test(
-  'a Claude Code job under the jobs’ drain: finishes its call, held at the next, cut past the grace, parked past its bound',
+  'a Claude Code job under the sessions’ drain: finishes its call, held at the next, cut past the grace, parked past its bound',
   WAITED,
   async (t) => {
     const s = story(t);
@@ -134,7 +134,7 @@ test(
         () => `the call in flight on the hold file: ${JSON.stringify(a.hold())}`,
         { everyMs: 20 },
       );
-      putJobDrain(a.root, { graceMs: LONG_GRACE_MS });
+      putSessionDrain(a.root, { graceMs: LONG_GRACE_MS });
       await until(
         c,
         () => a.hold()?.draining !== undefined,
@@ -168,7 +168,7 @@ test(
     });
 
     await s.test('lifted: the held call runs, and draining and heldBack clear', async (c) => {
-      liftJobDrain(a.root);
+      liftSessionDrain(a.root);
       await until(
         c,
         () => a.hold()?.calling?.tool === 'Edit',
@@ -192,7 +192,7 @@ test(
         () => `the call in flight: ${JSON.stringify(b.hold())}`,
         { everyMs: 20 },
       );
-      putJobDrain(b.root, { graceMs: 0 });
+      putSessionDrain(b.root, { graceMs: 0 });
       const { code } = await b.done;
       assert.notEqual(code, null, 'it left by itself, killed by nobody');
       assert.equal(b.hold()?.parked?.calling?.tool, 'Bash', `parked with the call it cut: ${JSON.stringify(b.hold())}`);
@@ -219,7 +219,7 @@ test(
       );
       d.release('release');
       await until(c, () => answered(d.dir, 'PostToolUse') === 1 && d.hold()?.calling === undefined, 'the first call over', { everyMs: 20 });
-      putJobDrain(d.root, { graceMs: LONG_GRACE_MS });
+      putSessionDrain(d.root, { graceMs: LONG_GRACE_MS });
       d.release('next');
       const { code } = await d.done;
       assert.notEqual(code, null, 'it left by itself');
@@ -232,7 +232,7 @@ test(
     await s.test('a sub-agent’s call is answered while the job’s calls are held', async (c) => {
       const e = job(t, { nested: 'Read', fromSubAgent: true, hold: true });
       await until(c, () => wrote(e.dir, 'said.jsonl').length === 1, 'the session took its brief', { everyMs: 20 });
-      putJobDrain(e.root, { graceMs: LONG_GRACE_MS });
+      putSessionDrain(e.root, { graceMs: LONG_GRACE_MS });
       await until(
         c,
         () => e.hold()?.draining !== undefined,
@@ -246,15 +246,72 @@ test(
         () => `the sub-agent’s call answered: ${JSON.stringify(e.hold())}`,
         { everyMs: 20 },
       );
-      liftJobDrain(e.root);
+      liftSessionDrain(e.root);
       e.release('end');
       const { code } = await e.done;
       assert.equal(code, 0, e.err());
     });
 
+    await s.test('held after a call that ended: its hold file names that call as the one it stopped after', async (c) => {
+      const g = job(t, { call: 'Read', next: 'Edit' });
+      await until(
+        c,
+        () => g.hold()?.calling?.tool === 'Read',
+        () => `the call in flight: ${JSON.stringify(g.hold())}`,
+        { everyMs: 20 },
+      );
+      putSessionDrain(g.root, { graceMs: LONG_GRACE_MS });
+      g.release('release');
+      g.release('next');
+      const held = await until(
+        c,
+        () => g.hold()?.heldBack,
+        () => `held back: ${JSON.stringify(g.hold())}`,
+        { everyMs: 20 },
+      );
+      assert.equal(held.after?.tool, 'Read', 'the main-thread call that ended last before the hold');
+      liftSessionDrain(g.root);
+      g.release('release-next');
+      const { code } = await g.done;
+      assert.equal(code, 0, g.err());
+    });
+
+    await s.test(
+      'a drain put again with its grace keeps its `at`; put with another grace it is stamped anew and judged by it',
+      async (c) => {
+        const h = job(t, { call: 'Bash' });
+        await until(
+          c,
+          () => h.hold()?.calling?.tool === 'Bash',
+          () => `the call in flight: ${JSON.stringify(h.hold())}`,
+          { everyMs: 20 },
+        );
+        const standing = { at: new Date(Date.now() - 60_000).toISOString(), graceMs: LONG_GRACE_MS };
+        fs.mkdirSync(path.dirname(sessionDrainFile(h.root)), { recursive: true });
+        fs.writeFileSync(sessionDrainFile(h.root), JSON.stringify(standing));
+        putSessionDrain(h.root, { graceMs: standing.graceMs });
+        putSessionDrain(h.root, { graceMs: standing.graceMs });
+        assert.deepEqual(sessionDrainOf(sessionDrainFile(h.root)), standing, 'two puts of the same grace keep the drain as it stood');
+        await until(
+          c,
+          () => h.hold()?.draining !== undefined,
+          () => `draining: ${JSON.stringify(h.hold())}`,
+          { everyMs: 20 },
+        );
+        assert.equal(h.hold()?.parked, undefined, 'its call runs on within the grace');
+        putSessionDrain(h.root, { graceMs: 0 });
+        const now = sessionDrainOf(sessionDrainFile(h.root));
+        assert.equal(now?.graceMs, 0);
+        assert.notEqual(now?.at, standing.at, 'another grace writes a new `at`');
+        const { code } = await h.done;
+        assert.notEqual(code, null, 'it left by itself');
+        assert.equal(h.hold()?.parked?.calling?.tool, 'Bash', `parked at once with the call it cut: ${JSON.stringify(h.hold())}`);
+      },
+    );
+
     await s.test('a SIGTERM still ends a held job, and its Claude Code with it', async (c) => {
       const f = job(t, { call: 'Bash' });
-      putJobDrain(f.root, { graceMs: LONG_GRACE_MS });
+      putSessionDrain(f.root, { graceMs: LONG_GRACE_MS });
       await until(
         c,
         () => f.hold()?.heldBack !== undefined,

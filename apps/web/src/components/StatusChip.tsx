@@ -1,7 +1,7 @@
 import { CircleDashed } from 'lucide-react';
 import type { StepCodes } from '../lib/api';
 import { stateClass, stepState } from '../lib/status';
-import { stateWordsOf } from '../lib/words';
+import { chipTitle, stateWordsOf } from '../lib/words';
 
 /**
  * A step's state, from its codes (`phase`, `reason`, `on`, `via`), in a person's word (`PERSON`'s rail word, never the CLI's sentence),
@@ -14,6 +14,9 @@ import { stateWordsOf } from '../lib/words';
  * `runHeld` is whether a person holds the run (the CLI's `hold`): a gate is drawn `held`, and a step not
  * started is drawn as one to come whose hover says the hold.
  *
+ * A step the store's pause parked (`paused`) says on hover, after its meaning, the api's sentence (`message`), which names the call it
+ * stopped after or the call cut (`chipTitle`).
+ *
  * `note` is what the CLI's `ls` prints beside the status — `try 2, by retries: 1`, `round 2 of 3` — on its own line after
  * the meaning, on hover: for where there is no room under the chip, on a canvas or in a list. Where there is, `StepNote`.
  *
@@ -25,7 +28,7 @@ export function StatusChip({
   runHeld,
   note = null,
 }: {
-  codes: StepCodes;
+  codes: StepCodes & { readonly message?: string };
   runCancelled: boolean;
   runHeld: boolean;
   note?: string | null;
@@ -34,7 +37,7 @@ export function StatusChip({
   const { rail, meaning } = stateWordsOf(state, codes.on, runHeld);
   return (
     <span
-      title={note ? `${meaning}\n${note}` : meaning}
+      title={chipTitle(state, meaning, codes.message, note)}
       data-state={state}
       className={`inline-flex max-w-full min-w-0 items-center gap-1 whitespace-nowrap rounded px-1.5 py-0.5 font-mono text-body-small leading-none ${stateClass[state]}`}
     >

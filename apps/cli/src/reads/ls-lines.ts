@@ -236,11 +236,20 @@ const heldCount = ({ staged, held }: Pick<Paused, 'staged' | 'held'>): string =>
   return n ? `, ${n} check${n === 1 ? '' : 's'} held` : '';
 };
 
-const pausedWords = (paused: Paused): string | null => {
+/** The sessions still in a tool call under a timed pause and when they are cut, as the orchestrator's `pausingWords` says it. */
+const pausingWords = (sessions: number, leftMs: number): string =>
+  `Pausing: ${sessions} session${sessions === 1 ? '' : 's'} finishing a tool call, cut ${leftMs > 0 ? `in ${Math.ceil(leftMs / 60_000)} min` : 'now'}`;
+
+const pausedWords = (paused: Paused, now: Date = new Date()): string | null => {
   const { pause, finishing } = paused;
   if (!pause) return null;
+  const sessions = finishing.filter((f) => f.kind === 'session').length;
+  const head =
+    pause.timeoutMs !== undefined && sessions
+      ? pausingWords(sessions, Math.min(pause.timeoutMs, Date.parse(pause.at) + pause.timeoutMs - now.getTime()))
+      : `Pausing: ${finishing.length} finishing`;
   return finishing.length
-    ? `Pausing: ${finishing.length} finishing${heldCount(paused)} — the store is paused ${sinceWords(pause)}; nothing new starts, and what runs finishes; ${RESUME_LINE} resumes it`
+    ? `${head}${heldCount(paused)} — the store is paused ${sinceWords(pause)}; nothing new starts, and what runs finishes; ${RESUME_LINE} resumes it`
     : `Paused ${sinceWords(pause)} — nothing runs and nothing new starts${heldCount(paused)}; ${RESUME_LINE} resumes it`;
 };
 
@@ -261,12 +270,16 @@ const heldWords = ({ run, step }: Paused['held'][number]): string =>
   `${run}'s ${step} has signed off, and its check waits on ${RESUME_LINE}`;
 
 /** Every line said of the pause: none when the store is not paused, else the pause, each task finishing and each check it holds. */
-export const pausedLines = (paused: Paused): string[] => {
-  const line = pausedWords(paused);
+export const pausedLines = (paused: Paused, now: Date = new Date()): string[] => {
+  const line = pausedWords(paused, now);
   if (line === null) return [];
   return [
     line,
     ...paused.finishing.map((f) => `   ${finishingWords(f)}`),
+    ...paused.parked.map(
+      ({ run, step, after, cut }) =>
+        `   ${run}'s ${step} is paused${after ? ` after its call to ${after}` : cut ? `, its call to ${cut} cut` : ''}`,
+    ),
     ...paused.staged.map((s) => `   ${stagedWords(s)}`),
     ...paused.held.map((h) => `   ${heldWords(h)}`),
   ];

@@ -128,7 +128,7 @@ export {
   waitWord,
 } from './wait/wait.ts';
 export type { ParentRun, Wait } from './wait/wait.ts';
-export type { Interrupt, Pause, Paused, PausedNow, PauseHeld, PauseStaged } from './pause/pause.ts';
+export type { Interrupt, Parked, Pause, Paused, PausedNow, PauseHeld, PauseStaged } from './pause/pause.ts';
 export { artifactLines, artifactPlace, artifactsContract, HANDED_CLOSEOUT, sizeOf } from './artifacts/artifacts.ts';
 export type { ArtifactFile, ArtifactPlace, MissingArtifact } from './artifacts/artifacts.ts';
 export { heldRefusal, pruneAgain, prunedBytes, prunedKept, prunedRefusal, pruneLines, pruneRefusal, pruningBytes } from './prune/prune.ts';

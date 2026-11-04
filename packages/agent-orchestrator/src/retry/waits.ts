@@ -18,6 +18,7 @@ export const WAITS_ON_PERSON: Record<StepReason, boolean> = {
   Waiting: false,
   Running: false,
   Checking: false,
+  Paused: false,
   AwaitingApproval: true,
   AwaitingAnswer: true,
   AwaitingRound: true,

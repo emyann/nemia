@@ -228,6 +228,7 @@ test('a take-over waits for the landing checks that run; a landing held staged, 
       { run: 'r2', step: 'test', kind: 'check' as const },
       { run: 'r3', step: 'ship', kind: 'landing' as const },
     ],
+    parked: [],
     staged: [{ run: 'r4', step: 'ship', repo: '/srv/repo' }],
     held: [{ run: 'r5', step: 'ship' }],
   };

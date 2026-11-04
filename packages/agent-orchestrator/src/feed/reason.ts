@@ -10,7 +10,7 @@
  * the feed was signed, and a one-shot offered by its word — and `feed.test.ts` and `test/assessed.ts` hold the codes the listing sets
  * to what it reads off the same word.
  *
- * **The codes are the owner's.** The 43 entries below — 17 of a run, 23 of a step, 1 of a daemon, 2 of the store, 32 distinct codes,
+ * **The codes are the owner's.** The 44 entries below — 17 of a run, 24 of a step, 1 of a daemon, 2 of the store, 33 distinct codes,
  * eleven of them shared between a run and a step — were named at their slices' design gates. A code renamed is still read under its
  * former name (`FORMER_REASONS`, below), on a line on disk and in a stored selector, so a rename breaks none.
  *
@@ -111,6 +111,7 @@ export const REASONS = {
   BudgetExhausted: { kinds: ['Run', 'Step'], type: 'Warning' },
   OverBudget: { kinds: ['Run', 'Step'], type: 'Warning' },
   Stopped: { kinds: ['Step'], type: 'Warning' },
+  Paused: { kinds: ['Step'], type: 'Normal' },
   Unsigned: { kinds: ['Run', 'Step'], type: 'Warning' },
   UnreadableCloseout: { kinds: ['Step'], type: 'Warning' },
   ToolDenied: { kinds: ['Step'], type: 'Warning', source: 'runtime', once: true },
@@ -207,6 +208,7 @@ const RUN_WORDS: readonly Rule[] = [
 const STEP_WORDS: readonly Rule[] = [
   { is: 'pending', reason: 'Pending' },
   { is: 'running', reason: 'Running' },
+  { starts: 'paused', reason: 'Paused' },
   { starts: SLOT_WAIT, reason: 'Waiting', on: 'limit' },
   { is: PAUSE_WAIT, reason: 'Waiting', on: 'pause' },
   { starts: 'waiting on the checkout', reason: 'Waiting', on: 'checkout' },

@@ -1629,13 +1629,16 @@ prose is a former shape: what a job was before 2026-10-21, or a measurement's pr
 
 ## A job's hold is measured on the stand-in alone
 
-**What.** A Claude Code job held under the jobs' drain (`bin/ae-claude-job.ts`) relies on two facts read only on the stand-in Claude
+**What.** A Claude Code job held under the sessions' drain (`bin/ae-claude-job.ts`) relies on two facts read only on the stand-in Claude
 Code of `test/job-hold.boundary.test.ts`: that a real Claude Code 2.1.316 waits on an unanswered `PreToolUse` hook under
 `--permission-prompts=none`, and that `interrupt()` then the end of the prompt saves the cut turn's cost. What it does when the hook
 passes its own `timeout` (`HOOK_HOLD_S`, 24 h) is unknown: if it let the call run, a job held past the bound would act under a pause,
-so `JOB_HOLD_MS` parks an hour earlier.
+so `JOB_HOLD_MS` parks an hour earlier. An attached session held under the same drain leans on a third, read on the stand-in of
+`test/attached.boundary.test.ts` alone: that `Query.interrupt()` of a turn in a call leaves the session answering under its id, its
+process and its input open, so the words it is told once the drain is lifted (`cutWords`) are worked as a turn of the same session.
 
-**Where.** `src/harness/claude/job-hold.ts`, `bin/ae-claude-job.ts`; `docs/harness.md`.
+**Where.** `src/harness/claude/job-hold.ts`, `bin/ae-claude-job.ts`, `src/harness/claude/attached.ts`; `docs/harness.md`.
 
 **To close.** A probe on a real Claude Code: hold a job's call under a drain, then park it by grace and by a shortened bound, and read
-its saved cost on resume; and one hook given a short `timeout` it outlives.
+its saved cost on resume; one hook given a short `timeout` it outlives; and an attached session's call cut past the drain's grace,
+interrupted, then told `cutWords` once the drain is lifted, read for a turn of its own under the same session id.

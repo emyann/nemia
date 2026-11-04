@@ -42,13 +42,13 @@ import {
   viewedOnce,
   waitingOf,
 } from '../views/views.verb.ts';
-import { engineWord, phaseOfView } from '../views/views-words.ts';
+import { engineWord, parkedOf, phaseOfView } from '../views/views-words.ts';
 import { checkoutHold } from '../ending/ending.verb.ts';
 import { landsOnCheck } from '../status/status.ts';
 import { mergeStaged, statusMemo } from '../place/landing.store.ts';
 import { PlaceService } from '../place/place.store.ts';
 import { readPause } from '../pause/pause.store.ts';
-import { currentTasks, finishingAmong, type Pause, type Paused, type PauseHeld, type PauseStaged } from '../pause/pause.ts';
+import { currentTasks, finishingAmong, parkedAmong, type Pause, type Paused, type PauseHeld, type PauseStaged } from '../pause/pause.ts';
 
 /**
  * How a caller reads a run (`runReading`): what it already holds, and what it asks to be read. Each left out is read as `nemia ls` reads
@@ -142,6 +142,7 @@ export const runReading = Effect.fn('runReading')(function* (e: Engine, run: Run
     waitingOf: waitingOf(views),
     deniedOf: deniedOf(views),
     ...(how.releases === undefined ? {} : { ranOnOf: ranOnOf(views, how.releases) }),
+    parkedOf: (taskId) => parkedOf(views.get(taskId)),
     holds: holdsOf(run, parent),
   });
   return { ...listed, assessed, assessOf, phaseOf, answers, spendOf, spend: runSpend(run, spendOf) } satisfies RunReading;
@@ -264,6 +265,7 @@ const pausedOf = Effect.fnUntraced(function* (e: Engine, pause: Pause, runs: rea
       (run) => among.get(run.id) ?? [],
       (run) => runStore.asks.read(run.id).asks,
     ),
+    parked: parkedAmong(runs, (taskId) => read.get(taskId)),
     ...heldAmong(reads),
   } satisfies Paused;
 });
@@ -276,7 +278,7 @@ const pausedOf = Effect.fnUntraced(function* (e: Engine, pause: Pause, runs: rea
 export const pausedRead = Effect.fn('pausedRead')(function* () {
   const e = yield* EngineService;
   const pause = readPause();
-  if (!pause) return { pause: null, finishing: [], staged: [], held: [] } satisfies Paused;
+  if (!pause) return { pause: null, finishing: [], parked: [], staged: [], held: [] } satisfies Paused;
   const runs = runStore.runs.list();
   const viewed = viewedOnce(e);
   return yield* pausedOf(viewed, pause, runs, yield* holdingReads(viewed, runs, standingReader(yield* standingSnapshot())));

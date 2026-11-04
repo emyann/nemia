@@ -42,6 +42,7 @@ export type EnginePhase =
  */
 export type WordAttempt = AttemptClock & {
   ended: EngineOutcome | null;
+  parked?: { calling?: { tool: string } };
   closedOut?: boolean;
   former?: 'unsigned';
   closeout?: unknown;
@@ -54,6 +55,7 @@ export type WordAttempt = AttemptClock & {
  */
 export type WordView = TaskClock & {
   phase: EnginePhase;
+  heldBack?: { since: string; after?: { tool: string } };
   state: TaskClock['state'] & {
     settled: EngineOutcome | null;
     attempts: readonly WordAttempt[];
@@ -141,3 +143,17 @@ export const engineWord =
  */
 export const wordOfView = (v: WordView | undefined): EnginePhase | 'unknown' =>
   !v?.state.brief ? 'unknown' : v.phase !== 'input-required' && signedAndHeld(v) ? 'succeeded' : v.phase;
+
+/**
+ * A session the runtime holds parked at a tool call's end under the store's pause, beside its phase and never inside it: held back at
+ * its hook (`heldBack`, with the call it stopped `after` where its harness kept it), or ended parked with the call it `cut`, its
+ * continuation not yet started. Undefined for a task that is neither, or settled.
+ */
+export const parkedOf = (v: WordView | undefined): { after?: string; cut?: string } | undefined => {
+  if (!v || v.state.settled) return undefined;
+  if (v.heldBack) return v.heldBack.after ? { after: v.heldBack.after.tool } : {};
+  const attempts: readonly WordAttempt[] = v.state.attempts;
+  const last = attempts.at(-1);
+  if (!last?.parked) return undefined;
+  return last.parked.calling ? { cut: last.parked.calling.tool } : {};
+};

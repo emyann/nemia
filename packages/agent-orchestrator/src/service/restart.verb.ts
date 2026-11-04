@@ -1,8 +1,10 @@
 /**
  * `nemia service restart`: the daemon that holds the store restarted on the code its service runs, as the take-over does it (`takeOver`)
- * — the store paused, each landing check let finish, SIGTERM, the unit started, and the store resumed once the new daemon has completed
- * its first pass. A daemon started by hand is not the service's to start again: it is named, with the take-over that hands it to the
- * service. The command the CLI serves alone, beside the service's others.
+ * — the store paused, each landing check let finish, the daemon's own sessions held and their calls in flight given up to the timeout
+ * (`--timeout <d>`, else the store's), SIGTERM, the unit started, and the store resumed once the new daemon has completed its first pass.
+ * The jobs run on through it, and each session the daemon parked is resumed by the new one as the same try. A daemon started by hand
+ * is not the service's to start again: it is named, with the take-over that hands it to the service. The command the CLI serves
+ * alone, beside the service's others.
  */
 import { Effect } from 'effect';
 import type { Args } from '../command/command.ts';
@@ -12,14 +14,15 @@ import { readPause } from '../pause/pause.store.ts';
 import { Conflict, Missing } from '../refusal/refusal.ts';
 import { tried } from '../runtime-client.ts';
 import { holderOfLease, takeOverLine } from './service.ts';
-import { liveHost, NAME_FLAG, serviceAt, SERVICES, type ServiceAt, type ServiceHost } from './service.verb.ts';
+import { timeoutFlag } from '../pause/pause.ts';
+import { timedHost, liveHost, NAME_FLAG, serviceAt, SERVICES, type ServiceAt, type ServiceHost } from './service.verb.ts';
 import { startedPassed, takeOver } from './takeover.verb.ts';
 
 /** The command a restart's pause and lines name. */
 const BY = 'nemia service restart';
 
 /** How the command is typed, as its refusals end on it. */
-const SHAPE = 'nemia service restart [--name <name>]';
+const SHAPE = 'nemia service restart [--name <name>] [--timeout <d>]';
 
 /** What `nemia service restart` did: the service, the pid that ticks the store now, whether a person's pause stood, and its lines. */
 export type Restarted = {
@@ -93,19 +96,22 @@ export const restartService = Effect.fn('restartService')(function* (args: Args,
 /** `nemia service restart`. */
 const RESTART: Command<Restarted> = {
   name: 'service restart',
-  usage: '[--name <name>]',
+  usage: '[--name <name>] [--timeout <d>]',
   help: [
     "restart the service's daemon on the code it runs: pause the store, wait",
-    'for landing checks, stop it, start the service, and resume once the new',
-    'daemon has completed its first pass; refused, naming the log, when that',
-    'pass fails. A pause a person put stands. Starts the service where',
-    "nothing ticks; a daemon started by hand is named with --take-over's line",
+    "for landing checks, give the daemon's sessions up to the timeout to end",
+    'their tool calls (--timeout <d>, else nemia pause-timeout), stop it, start the',
+    'service, and resume once the new daemon has completed its first pass;',
+    'refused, naming the log, when that pass fails. Jobs run on; each',
+    'session parks and resumes as the same try. A pause a person put stands.',
+    'Starts the service where nothing ticks; a daemon started by hand is',
+    "named with --take-over's line",
   ],
-  spec: { positionals: [], flags: [NAME_FLAG], unknown: (arg) => `${BY} does not take ${arg}: ${SHAPE}.` },
+  spec: { positionals: [], flags: [NAME_FLAG, timeoutFlag(SHAPE)], unknown: (arg) => `${BY} does not take ${arg}: ${SHAPE}.` },
   writes: true,
   class: 'ask',
   only: { side: 'cli', why: "it restarts the person's login service, on the machine the command runs on" },
-  handler: (args) => restartService(args),
+  handler: (args, _env, home) => Effect.flatMap(timedHost(args, home, 'service restart'), (host) => restartService(args, host)),
   print: (data) => data.lines,
 };
 

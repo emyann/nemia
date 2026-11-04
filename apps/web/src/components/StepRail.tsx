@@ -6,7 +6,7 @@ import { costText, pastBudget } from '../lib/cost';
 import type { Flow, Pill } from '../lib/flow';
 import { gateNodeLine, gateOfSummary } from '../lib/gate';
 import { waitsAtGate, stateClass, stepState } from '../lib/status';
-import { stateWordsOf } from '../lib/words';
+import { chipTitle, stateWordsOf } from '../lib/words';
 import { useNow } from '../lib/useNow';
 import { StatusChip } from './StatusChip';
 import { Travelling } from './StateEdge';
@@ -104,11 +104,12 @@ export function StepRail({ run, flow }: { run: RunSummary; flow: Flow }) {
   );
 }
 
-/** A step's name, a person's word for its state and what that means, and its note: what hovering over it says. */
+/** A step's name, a person's word for its state and what that means (`chipTitle`), and its note: what hovering over it says. */
 function stepTitle(step: SummaryStep | undefined, name: string, cancelled: boolean, held: boolean): string {
   if (!step) return name;
-  const words = stateWordsOf(stepState(step, cancelled, held), step.on, held);
-  return `${name}: ${words.rail} — ${words.meaning}${step.note ? `\n${step.note}` : ''}`;
+  const state = stepState(step, cancelled, held);
+  const words = stateWordsOf(state, step.on, held);
+  return `${name}: ${words.rail} — ${chipTitle(state, words.meaning, step.message, step.note)}`;
 }
 
 /**

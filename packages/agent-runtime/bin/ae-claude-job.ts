@@ -29,7 +29,7 @@
  *   (`bridgeStateOf`), so the runner's look reads the bridge off the file (`claudeCodeOps`), never off this process's memory. The
  *   request is awaited before the next message is printed: a job's one turn ends after its bridge is up, as measured on Agent SDK
  *   0.3.308 (`docs/harness.md`, *The claude.ai bridge*). No bridge never fails the job: the session runs on, and the file says why.
- * - Where the runner names a hold file and the store's jobs' drain (`io.holdFile`, `io.drainFile`), the job is held by that drain as
+ * - Where the runner names a hold file and the store's sessions' drain (`io.holdFile`, `io.drainFile`), the job is held by that drain as
  *   an attached session is by its holder's (`holdOf`, through what the two share in `job-hold.ts`): a call in flight when it is put
  *   finishes, and the next call of the main thread waits at its `PreToolUse` hook (the SDK's `HookCallbackMatcher`, its timeout
  *   `HOOK_HOLD_S`) until it is lifted; a sub-agent's call is never held. The drain is read off its file on every poll (`io.holdPollMs`)
@@ -60,7 +60,7 @@ import {
   inside,
   JOB_HOLD_MS,
   JOB_HOLD_POLL_MS,
-  jobDrainOf,
+  sessionDrainOf,
   writeJobHold,
   type Call,
   type CallsInFlight,
@@ -128,7 +128,7 @@ const inputOf = () => {
   };
 };
 
-/** The files and bounds a job is held by (`HarnessIO`): its hold file, the store's jobs' drain, its hold's bound and its poll. */
+/** The files and bounds a job is held by (`HarnessIO`): its hold file, the store's sessions' drain, its hold's bound and its poll. */
 type HoldIO = { holdFile: string; drainFile: string; holdMs: number; holdPollMs: number };
 
 /** What the runner wrote for this job at its spawn: the request whole, and the files it named for it (`HarnessIO`). */
@@ -140,7 +140,7 @@ const msOr = (value: unknown, otherwise: number): number =>
 
 /**
  * The spawn request the runner wrote at `at`, whole, the bridge file it named, where it named one, and the hold, where it named both
- * a hold file and the jobs' drain: its bound and poll as the request gives them (`holdMs`, `holdPollMs`), the shipped ones otherwise.
+ * a hold file and the sessions' drain: its bound and poll as the request gives them (`holdMs`, `holdPollMs`), the shipped ones otherwise.
  */
 const requestAt = (at: string | undefined): Requested => {
   if (!at)
@@ -166,7 +166,7 @@ const requestAt = (at: string | undefined): Requested => {
 };
 
 /**
- * The job's hold: its calls in flight, kept by its hooks, and the jobs' drain, read off its file on every poll and at every new call.
+ * The job's hold: its calls in flight, kept by its hooks, and the sessions' drain, read off its file on every poll and at every new call.
  *
  * - A new call of the main thread waits at its `PreToolUse` hook while the drain stands and none of the session's calls is in flight
  *   (the attached sessions' rule, `attached.ts`), reading the drain again every `holdPollMs`; a call that belongs to a call in flight —
@@ -176,13 +176,15 @@ const requestAt = (at: string | undefined): Requested => {
  *   `holdMs`, the job gives up its hold. Either way it parks (`park`): `parked` written on the hold file, with the call it cut as its
  *   `calling`, and `ended` told to end the session.
  * - The hold file says, as it changes: the earliest call in flight (`calling`), the drain read standing (`draining`, since this process
- *   first read it), a call waiting at its hook (`heldBack`, since the first of them began to wait); the last two gone once the drain
- *   is read lifted. Once parked it says `parked`, and nothing after.
+ *   first read it), a call waiting at its hook (`heldBack`, since the first of them began to wait, and `after`, the main-thread call
+ *   that ended last, kept by its `PostToolUse` or `PostToolUseFailure` hook); the last two gone once the drain is read lifted. Once
+ *   parked it says `parked`, and nothing after.
  */
 const holdOf = (io: HoldIO, ended: () => void) => {
   const calls: CallsInFlight = new Map();
   const waiting: string[] = [];
   let draining: string | undefined;
+  let after: { tool: string } | undefined;
   let parked: JobHold['parked'];
   let written: string | undefined;
   const write = (): void => {
@@ -190,7 +192,7 @@ const holdOf = (io: HoldIO, ended: () => void) => {
     const hold: JobHold = {
       ...(first && !parked ? { calling: first } : {}),
       ...(draining ? { draining: { since: draining } } : {}),
-      ...(waiting[0] && !parked ? { heldBack: { since: waiting[0] } } : {}),
+      ...(waiting[0] && !parked ? { heldBack: { since: waiting[0], ...(after ? { after } : {}) } } : {}),
       ...(parked ? { parked } : {}),
     };
     const text = JSON.stringify(hold);
@@ -199,7 +201,7 @@ const holdOf = (io: HoldIO, ended: () => void) => {
     written = text;
   };
   const drain = () => {
-    const read = jobDrainOf(io.drainFile);
+    const read = sessionDrainOf(io.drainFile);
     draining = read === null ? undefined : (draining ?? new Date().toISOString());
     return read;
   };
@@ -219,7 +221,9 @@ const holdOf = (io: HoldIO, ended: () => void) => {
     write();
   };
   const held = (): boolean => !parked && drain() !== null && calls.size === 0;
-  const over = async (_input: unknown, id: string | undefined) => {
+  const over = async (input: unknown, id: string | undefined) => {
+    const ended = id === undefined ? undefined : calls.get(id);
+    if (ended && !inside(input)) after = { tool: ended.tool };
     if (id && calls.delete(id) && !parked) write();
     return {};
   };

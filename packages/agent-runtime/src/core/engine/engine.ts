@@ -57,10 +57,10 @@ export const Lifecycle = Context.Reference<Move>('engine/Lifecycle', { defaultVa
 export const Admission = Context.Reference<AdmissionRule>('engine/Admission', { defaultValue: () => ({ poolOf: ownPool }) });
 
 /**
- * Whether the store's jobs' drain stands, read off its file once per pass (`Now.drained`): `Engine.layer` provides the read of its
+ * Whether the store's sessions' drain stands, read off its file once per pass (`Now.drained`): `Engine.layer` provides the read of its
  * store's file. By default none stands, so a pass run over layers of a test's own holds no parked job back.
  */
-export const JobsDrained = Context.Reference<() => boolean>('engine/JobsDrained', { defaultValue: () => () => false });
+export const SessionsDrained = Context.Reference<() => boolean>('engine/SessionsDrained', { defaultValue: () => () => false });
 
 /** How long a spawned session may go unregistered by the harness before we call it gone. */
 export const GRACE_MS = 30_000;
@@ -70,7 +70,7 @@ type World = { readonly unread: ReadonlySet<string>; readonly drained: boolean }
 
 /**
  * The clock `decide` is handed for one task: now, on the wall clock and the monotonic one, with the grace, the unread names and
- * whether the jobs' drain stands.
+ * whether the sessions' drain stands.
  */
 const nowFor = ({ unread, drained }: World): Now => {
   const now = instantNow();
@@ -118,10 +118,10 @@ export type TaskView = {
   /** The tool call the attempt in flight is in, and since when, as its harness sees it (`Sighting.calling`). Absent between calls. */
   calling?: { tool: string; since: string };
   /**
-   * Since when the attempt in flight holds a main-thread call back at its hook, the jobs' drain standing (`Sighting.heldBack`). Absent
-   * while nothing is held. Carried, never judged.
+   * Since when the attempt in flight holds a main-thread call back at its hook, the sessions' drain standing (`Sighting.heldBack`). Absent
+   * while nothing is held, with the call it stopped after (`after`) where its harness kept it. Carried, never judged.
    */
-  heldBack?: { since: string };
+  heldBack?: { since: string; after?: { tool: string } };
   /**
    * The questions the attempt in flight is waiting on a person for, as its harness holds them (`Sighting.asks`). Absent from a
    * harness that cannot say, and from a task whose session may ask nobody. Carried, never judged.
@@ -210,7 +210,7 @@ type Observed = ReadonlyMap<string, Sighting>;
 const ALL_READ: ReadonlySet<string> = new Set();
 
 /** The pass's world with nothing left unread, the drain read now: what `reconcile` and `settleTask` decide on. */
-const allRead = Effect.map(JobsDrained, (drained): World => ({ unread: ALL_READ, drained: drained() }));
+const allRead = Effect.map(SessionsDrained, (drained): World => ({ unread: ALL_READ, drained: drained() }));
 
 /**
  * One task, one step. Returns the action taken, so a caller can loop until nothing moves.
@@ -691,7 +691,7 @@ export const tick = Effect.fn('tick')(function* () {
   }
   const lookedFor = [...folded.values(), ...keptLooked(memo)];
   const { seen: observed, unread, unobserved, unreadWhy } = yield* lookAt(runner, expectedOf(lookedFor));
-  const world: World = { unread, drained: (yield* JobsDrained)() };
+  const world: World = { unread, drained: (yield* SessionsDrained)() };
 
   const taken: Action[] = [];
   const views: TaskView[] = [];
@@ -836,7 +836,7 @@ const unreadOfTask = (state: State, unreadWhy: ReadonlyMap<string, string> | und
 /**
  * What the sighting of the attempt in flight carries into a view untouched: the word a `needs-human` phase waits for — there is no
  * question to answer about a session nobody is waiting on, so it is carried under no other phase — the call the attempt is in, the
- * call it holds back under the jobs' drain, the questions it waits on a person for, and the asks whose held call took an answer. None
+ * call it holds back under the sessions' drain, the questions it waits on a person for, and the asks whose held call took an answer. None
  * of it is judged.
  */
 const carriedOf = (sighting: Sighting | undefined, phase: TaskView['phase']) => {

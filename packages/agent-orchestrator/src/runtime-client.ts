@@ -397,3 +397,11 @@ export const missingCredential: MissingCredential = (scheme, _agentUrl, harness)
  */
 export const drained = (holder: number | null): Effect.Effect<void, never, EngineService> =>
   Effect.flatMap(EngineService, (e) => asked('drain', e.drain(holder)));
+
+/**
+ * Holds every session, job or attached, at its tool call's end under the store's pause, and cuts a call still in flight once `graceMs`
+ * has passed since the drain was put; with null lifts it, each session parked going on as the same try. The runtime's `drainSessions`,
+ * through the engine the program is given: a put with the grace that stands keeps its start, and another grace starts it again.
+ */
+export const sessionsDrained = (given: { graceMs: number } | null): Effect.Effect<void, never, EngineService> =>
+  Effect.flatMap(EngineService, (e) => asked('drainSessions', e.drainSessions(given)));

@@ -17,6 +17,7 @@ import { container, dashed, filled, hairline, meaningOf, paint, ringed, type Hue
 
 export type StepState =
   | 'working'
+  | 'paused'
   | 'needs-human'
   | 'checking'
   | 'verified'
@@ -95,6 +96,7 @@ const HELD_BY_A_HOLD: ReadonlySet<StepState> = new Set(['blocked', 'awaiting-app
 export const STATE_OF: Record<StepReason, StepState> = {
   Running: 'working',
   Checking: 'checking',
+  Paused: 'paused',
   CheckPassed: 'verified',
   Succeeded: 'unverified',
   AwaitingApproval: 'awaiting-approval',
@@ -143,10 +145,12 @@ const GATE: Drawn = { hue: 'yours', form: 'filled', mark: 'font-semibold' };
  * the only filled accent; `yours` for a session asking, and ringed for work to try again, not a question (`unsigned`, `denied`). `alive`
  * for a session at work. `failure` for a failure and nothing else. The rest is at rest or done: sage for a check that runs, a step that is
  * done (ringed when only its own word says so, and `StatusChip` marks it too) and a step to come, a hairline; grey for a step a person
- * holds, one called off, and one the engine does not know. No state is `money`: amber is an amount, drawn beside the chip.
+ * holds, one called off, and one the engine does not know, and grey ringed for a session the store's pause parked between two calls. No
+ * state is `money`: amber is an amount, drawn beside the chip.
  */
 export const stateDrawn: Record<StepState, Drawn> = {
   working: { hue: 'alive', form: 'container' },
+  paused: { hue: 'grey', form: 'ringed' },
   'needs-human': { hue: 'yours', form: 'container' },
   checking: { hue: 'sage', form: 'container', mark: 'ring-1 ring-sage ring-inset' },
   verified: { hue: 'sage', form: 'filled' },

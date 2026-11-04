@@ -24,7 +24,9 @@ process.env.WF_ROOT = ROOT;
 process.env.WF_VERIFY_REST = '1';
 delete process.env.WF_MAX_RUNS;
 delete process.env.WF_MAX_CONCURRENT;
-const { installService, liveHost, uninstallService, serviceStatus, SERVICES } = await import('./service.verb.ts');
+const { attachedCalls, timeoutGiven, installService, liveHost, uninstallService, serviceStatus, SERVICES } =
+  await import('./service.verb.ts');
+const { pausingWords } = await import('../pause/pause.ts');
 const { LET_GO_MS } = await import('agent-runtime');
 const { restartService, RESTARTS } = await import('./restart.verb.ts');
 const { putPause, readPause, pauseFile, resumePause } = await import('../pause/pause.store.ts');
@@ -159,6 +161,7 @@ function hostOf(world: World): { host: ServiceHost; events: string[] } {
     say: (line) => events.push(`say ${line}`),
     pollMs: 1,
     waitMs: 200,
+    timeoutMs: 200,
     stopMs: world.stopMs ?? 300,
   };
   return { host, events };
@@ -518,14 +521,14 @@ test('a take-over drains the daemon and waits for each call in flight, naming it
   const fiber = taking(host, clock);
   t.after(() => Effect.runPromise(Fiber.interrupt(fiber)));
   await until(t, () => clock.asked.length >= 2, 'the call read, its rest and the bound of the wait asked', { bell: clock.bell });
-  assert.deepEqual(clock.asked.slice(0, 2), [host.pollMs, host.waitMs], 'it rests at the host’s pace, under the host’s bound');
+  assert.deepEqual(clock.asked.slice(0, 2), [host.pollMs, host.timeoutMs], 'it rests at the host’s pace, under the host’s timeout');
   await stepped(t, clock, fiber, host.pollMs);
   assert.equal((await Effect.runPromise(Fiber.join(fiber))).did, 'taken');
   const from = events.indexOf(`drain ${OLD}`);
   assert.deepEqual(events.slice(from, from + 6), [
     `drain ${OLD}`,
     'calls 1',
-    "say waiting for r2's implement: its call to Bash runs, and the daemon is stopped once it has ended",
+    `say ${pausingWords(1, host.timeoutMs)}`,
     'calls 1',
     'calls 0',
     `signal ${OLD}`,
@@ -538,17 +541,16 @@ test('a take-over gives up on a call that never ends, says which, and goes on to
   world.onSignal = () => (world.lease = lease(OLD, 'stopped'));
   world.onStart = () => passing(world, NEW);
   const { host, events } = hostOf(world);
-  const bound = { ...host, waitMs: 30 };
+  const bound = { ...host, timeoutMs: 30 };
   const clock = steeredClock();
   const fiber = taking(bound, clock);
   t.after(() => Effect.runPromise(Fiber.interrupt(fiber)));
-  const gave =
-    "say giving up on r2's implement: its call to Bash has not ended in 30 ms, and the daemon is stopped now; its holder cuts the " +
-    'call, and the next one resumes the session told the call did not finish';
+  const gaveUp = () => events.find((e) => e.startsWith("say giving up on r2's implement") && e.includes('Bash'));
   await until(t, () => clock.asked.length >= 2, 'the call read, its rest and the bound of the wait asked', { bell: clock.bell });
-  assert.ok(!events.includes(gave), 'a clock nothing moved is a bound nothing reached: it waits');
-  await clock.adjust(bound.waitMs);
-  await until(t, () => events.includes(gave), 'the call it gave up on named', { bell: clock.bell });
+  assert.equal(gaveUp(), undefined, 'a clock nothing moved is a timeout nothing reached: it waits');
+  await clock.adjust(bound.timeoutMs);
+  await until(t, () => gaveUp() !== undefined, 'the call it gave up on named', { bell: clock.bell });
+  const gave = gaveUp() ?? '';
   await stepped(t, clock, fiber, host.pollMs);
   assert.equal((await Effect.runPromise(Fiber.join(fiber))).did, 'taken');
   assert.ok(events.indexOf(`signal ${OLD}`) > events.indexOf(gave), 'it gives up, says so, and only then signals');
@@ -561,20 +563,129 @@ test('a take-over whose daemon takes its own let-go to stop is not refused: the 
   world.onStart = () => passing(world, NEW);
   const { host, events } = hostOf(world);
   const clock = steeredClock();
-  const bound = { ...host, waitMs: 20 };
+  const bound = { ...host, timeoutMs: 20 };
   const fiber = taking(bound, clock);
   t.after(() => Effect.runPromise(Fiber.interrupt(fiber)));
   await until(t, () => clock.asked.length >= 2, 'the call read, its rest and the bound of the wait asked', { bell: clock.bell });
-  await clock.adjust(bound.waitMs);
+  await clock.adjust(bound.timeoutMs);
   await until(t, () => events.some((e) => e.startsWith("say giving up on r2's implement")), 'the call it gave up on named first', {
     bell: clock.bell,
   });
   await stepped(t, clock, fiber, bound.pollMs);
   const done = await Effect.runPromise(Fiber.join(fiber));
   assert.equal(done.did, 'taken', 'the daemon let the store go on its own time and was never refused for it');
-  assert.ok(slow.length * bound.pollMs > bound.waitMs, 'and it waited past the bound it gives a call in flight, read by read');
+  assert.ok(slow.length * bound.pollMs > bound.timeoutMs, 'and it waited past the timeout it gives a call in flight, read by read');
   assert.ok(events.includes(`signal ${OLD}`), events.join('\n'));
   assert.equal(readPause(), null, 'and the pause it put is lifted, since the take-over succeeded');
+});
+
+/** A task as the engine lists it, as far as the take-over reads one: a job (`restartPolicy` absent) or a session living in the daemon. */
+type Listed = import('./service.verb.ts').ListedTask;
+
+/** A task of `run`'s `step` at work, living in the daemon where `always`, in its call to `tool` where one is given. */
+const listedTask = (id: string, step: string, always: boolean, tool?: string): Listed => ({
+  id,
+  state: { settled: null, labels: { run: 'r2', step }, ...(always ? { restartPolicy: 'Always' as const } : {}) },
+  ...(tool ? { calling: { tool, since: '2026-11-03T10:00:00Z' } } : {}),
+});
+
+/**
+ * The engine's list over `views`, as the take-over reads it: each read's ids (`undefined` for the whole store), and the views it answers,
+ * of the ids asked where some are.
+ */
+const listOver = (views: Listed[]) => {
+  const asked: (readonly string[] | undefined)[] = [];
+  const list = (ids?: readonly string[]) =>
+    Effect.sync(() => {
+      asked.push(ids);
+      return { views: ids === undefined ? views : views.filter((v) => ids.includes(v.id)) };
+    });
+  return { asked, list };
+};
+
+/** `host` with its calls read off `list` as the live host reads them (`attachedCalls`), each read logged as the fake's are. */
+const callsOver = (
+  host: ServiceHost,
+  events: string[],
+  list: (ids?: readonly string[]) => Effect.Effect<{ views: Listed[] }>,
+): ServiceHost => {
+  const read = attachedCalls(list);
+  return { ...host, calls: () => Effect.tap(read(), (found) => Effect.sync(() => void events.push(`calls ${found.length}`))) };
+};
+
+test('a take-over leaves the jobs running: a job in a call is not waited for, and with no attached call the signal comes at once', async () => {
+  const world: World = { lease: lease(OLD), unitPid: null, landings: [[]], calls: [] };
+  world.onSignal = () => (world.lease = lease(OLD, 'stopped'));
+  world.onStart = () => passing(world, NEW);
+  const { host, events } = hostOf(world);
+  const { asked, list } = listOver([
+    listedTask('job-1', 'implement', false, 'Bash'),
+    listedTask('session-1', 'design', true),
+    { ...listedTask('session-0', 'intake', true, 'Read'), state: { settled: 'succeeded', restartPolicy: 'Always' } },
+  ]);
+  assert.equal((await install({ takeOver: String(OLD) }, callsOver(host, events, list))).did, 'taken');
+  const from = events.indexOf(`drain ${OLD}`);
+  assert.deepEqual(events.slice(from, from + 3), [`drain ${OLD}`, 'calls 0', `signal ${OLD}`]);
+  assert.ok(!events.some((e) => e.startsWith('say Pausing')), events.join('\n'));
+  assert.deepEqual(asked, [undefined], 'the whole store is listed once, for the sessions living in the daemon');
+});
+
+test(
+  'a take-over waits up to its timeout for an attached call, says the count when it changes, gives up and signals',
+  WAITED,
+  async (t) => {
+    const world: World = { lease: lease(OLD), unitPid: null, landings: [[]], calls: [] };
+    world.onSignal = () => (world.lease = lease(OLD, 'stopped'));
+    world.onStart = () => passing(world, NEW);
+    const { host: fake, events } = hostOf(world);
+    const { asked, list } = listOver([listedTask('job-1', 'implement', false, 'Bash'), listedTask('session-1', 'design', true, 'Read')]);
+    const host = { ...callsOver(fake, events, list), pollMs: 30_000, timeoutMs: 150_000, waitMs: 1_000_000 };
+    const clock = steeredClock();
+    const fiber = taking(host, clock);
+    t.after(() => Effect.runPromise(Fiber.interrupt(fiber)));
+    const said = () => events.filter((e) => e.startsWith('say '));
+    for (let read = 1; read <= 4; read++) {
+      await until(t, () => resting(clock, host.pollMs), `rest ${read} of the poll asked`, { bell: clock.bell });
+      await clock.adjust(host.pollMs);
+    }
+    await until(t, () => resting(clock, host.pollMs), 'the fifth rest of the poll asked', { bell: clock.bell });
+    assert.deepEqual(
+      said(),
+      [3, 2, 1].map((min) => `say ${pausingWords(1, min * 60_000)}`),
+      'said once each time the minutes change',
+    );
+    assert.ok(!events.includes(`signal ${OLD}`), 'within its timeout it waits');
+    await clock.adjust(host.timeoutMs - 4 * host.pollMs);
+    await until(t, () => events.includes(`signal ${OLD}`), 'the signal, once the timeout is spent', { bell: clock.bell });
+    const gave = events.findIndex((e) => e.startsWith("say giving up on r2's design") && e.includes('Read'));
+    assert.ok(gave > 0 && gave < events.indexOf(`signal ${OLD}`), events.join('\n'));
+    await stepped(t, clock, fiber, host.pollMs);
+    assert.equal((await Effect.runPromise(Fiber.join(fiber))).did, 'taken');
+    assert.ok(
+      asked.length > 1 && asked.slice(1).every((ids) => ids?.join() === 'session-1'),
+      `each read after the first asks the sessions alone: ${JSON.stringify(asked)}`,
+    );
+  },
+);
+
+test('the take-over’s timeout: --timeout where given, else the store’s; a timeout that does not read is Invalid', async (t) => {
+  const home = scratch('wf-service-timeout-');
+  await t.test('nothing set: the store’s default, ten minutes', async () => {
+    assert.equal(await Effect.runPromise(timeoutGiven({}, home, 'nemia service restart')), 600_000);
+  });
+  await t.test('the store’s timeout, where one is set', async () => {
+    fs.writeFileSync(path.join(home, 'pause-timeout.json'), `${JSON.stringify({ timeout: '15m' })}\n`);
+    assert.equal(await Effect.runPromise(timeoutGiven({}, home, 'nemia service restart')), 900_000);
+  });
+  await t.test('--timeout over it', async () => {
+    assert.equal(await Effect.runPromise(timeoutGiven({ timeout: '90s' }, home, 'nemia upgrade')), 90_000);
+  });
+  await t.test('--timeout that does not read: Invalid, naming the flag', async () => {
+    await assert.rejects(
+      Effect.runPromise(timeoutGiven({ timeout: 'soon' }, home, 'nemia upgrade')),
+      refusedWith('Invalid', /--timeout\b/),
+    );
+  });
 });
 
 test(
@@ -583,7 +694,7 @@ test(
   async (t) => {
     const world: World = { lease: lease(OLD), unitPid: null, landings: [[LANDING]], calls: [[]] };
     const { host, events } = hostOf(world);
-    const fiber = taking({ ...host, waitMs: 1 });
+    const fiber = taking({ ...host, waitMs: 1, timeoutMs: 1 });
     await until(
       t,
       () => events.filter((e) => e === 'landings 1').length >= 5,

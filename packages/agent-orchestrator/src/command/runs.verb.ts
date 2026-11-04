@@ -19,10 +19,12 @@ import { Conflict, Missing } from '../refusal/refusal.ts';
 import { BY_CAP, oneLine, WHY_CAP, type Hold } from '../record/record.ts';
 import { holdWord } from '../wait/wait.ts';
 import { hold, unhold } from '../wait/wait.verb.ts';
-import { readPause, resumePause, putPause } from '../pause/pause.store.ts';
-import { nowRead, pauseNow } from '../pause/pause.verb.ts';
+import { readPause, resumePause } from '../pause/pause.store.ts';
+import { nowRead, pauseNow, pauseParked } from '../pause/pause.verb.ts';
 import {
   NOW_COST,
+  pauseTimeoutRefusal,
+  timeoutFlag,
   nowLines,
   pausedNowLines,
   pauseWords,
@@ -34,7 +36,7 @@ import {
 } from '../pause/pause.ts';
 import { Effect } from 'effect';
 import { pausedRead } from '../list/list.verb.ts';
-import { tried } from '../runtime-client.ts';
+import { sessionsDrained, tried } from '../runtime-client.ts';
 import type { Args } from './command.ts';
 import type { Command, Ran } from './entry.verb.ts';
 
@@ -337,7 +339,7 @@ export const PRUNE: Command<{
 };
 
 /** `nemia pause`'s form, as each of its refusals ends on it. */
-const PAUSE_SHAPE = 'nemia pause [--why "<words>"] [--by <name>] [--now [--yes]]';
+const PAUSE_SHAPE = 'nemia pause [--why "<words>"] [--by <name>] [--timeout <d> | --now [--yes]]';
 
 /** `nemia pause`'s `--why` and `--by`. */
 const PAUSE_SAID: readonly Said[] = [
@@ -356,54 +358,65 @@ type PauseNowRead = { pause: Pause | null; interrupts: Interrupt[] };
  */
 type PauseAnswer = { pause: Pause } | PausedNow | PauseNowRead;
 
-/** `nemia pause`'s handler, by its flags: a plain pause, refused while one stands; `--now`, which only reads; `--now --yes`, which acts. */
-const pauseBy = Effect.fnUntraced(function* (args: Args) {
+/**
+ * `nemia pause`'s handler, by its flags: a plain pause, which parks every session at its call's end within `--timeout` or the store's
+ * timeout (`timeoutAt`), refused while one stands; `--now`, which only reads; `--now --yes`, which acts.
+ */
+const pauseBy = Effect.fnUntraced(function* (args: Args, home?: string) {
   const said = { why: saidOf(args, 'why'), by: saidOf(args, 'by') };
-  if (args.now !== true) return { pause: putPause(said) } satisfies PauseAnswer;
+  if (args.now !== true) return { pause: yield* pauseParked(said, textOf(args, 'timeout'), home) } satisfies PauseAnswer;
   if (args.yes !== true) return { pause: readPause(), interrupts: yield* nowRead() } satisfies PauseAnswer;
   return (yield* pauseNow(said)) satisfies PauseAnswer;
 });
 
 /**
- * `nemia pause`: the store paused (`putPause`), on `POST /api/pause` too; the pause as written. Refused while a pause stands (`Conflict`).
- * `--now` says what a pause at once would stop and writes nothing; `--now --yes`, as the route always does, pauses at once (`pauseNow`).
+ * `nemia pause`: the store paused, every session parked at its tool call's end within the timeout (`pauseParked`), on `POST /api/pause`
+ * too; the pause as written, its timeout `--timeout` (`timeout` in the body) or the store's. Refused while a pause stands (`Conflict`).
+ * `--now` says what a pause at once would cut and writes nothing; `--now --yes`, as the route always does, pauses at once (`pauseNow`).
  */
 export const PAUSE: Command<PauseAnswer> = {
   name: 'pause',
-  usage: '[--why "<words>"] [--by <name>] [--now [--yes]]',
+  usage: '[--why "<words>"] [--by <name>] [--timeout <d> | --now [--yes]]',
   help: [
     'pause the store: no pass starts new work — no step, try, round or',
     'check filed, no queued task admitted, no queued card started — and',
-    'what runs finishes, its end and closeout recorded; a landing whose',
-    'check has ended commits or aborts. Pausing: N finishing while a',
-    'session works or a check or landing runs, Paused once none does.',
+    "every session, job or attached, parks at its tool call's end: a call",
+    'still in flight once the timeout has passed is cut. A check runs on, its',
+    'end recorded; a landing whose check has ended commits or aborts.',
+    'Pausing: N sessions finishing a tool call, cut in M min while they',
+    'do, Paused once none does; nemia ls says each step paused.',
     'nemia start still writes a run, and approvals, retries and answers are',
     'kept, not acted on: the pass after nemia resume files what waits. nemia ls,',
     'nemia watch --once, nemia start and nemia up say it, and nemia ls names what finishes.',
     'Refused while a pause stands.',
     '--why: the reason, said wherever the pause is; --by: who pauses it',
     '(default: your OS user)',
-    '--now: pause at once — each step session or check at work, but a',
-    'landing, is asked to stop and tried again on nemia resume: a continue of',
-    'its session, or a recheck. A pause that stands is kept as it was.',
+    '--timeout: how long a call in flight is given to end, for this pause',
+    "(90s, 10m, 2h; from 1s to 23h); default: the store's, nemia pause-timeout",
+    "--now: pause at once — each step session at work, but a landing's,",
+    'has its call cut and parks, going on as the same try on nemia resume;',
+    'each check is asked to stop and run again. A pause that stands is kept.',
     '--yes: with --now, act; without it, --now only says what it would',
-    'interrupt',
+    'cut',
   ],
   spec: {
     positionals: [],
     flags: [
       ...saidFlags(PAUSE_SAID, 'nemia pause', 'a pause', PAUSE_TAKES, PAUSE_SHAPE),
+      timeoutFlag(PAUSE_SHAPE),
       { flag: '--now', kind: 'switch', key: 'now' },
       { flag: '--yes', kind: 'switch', key: 'yes' },
     ],
     unknown: (arg) => `nemia pause does not take ${arg}: ${PAUSE_SHAPE}.`,
     apart: (_value, flag) => takesFor(PAUSE_TAKES, flag),
   },
-  check: (args) => PAUSE_SAID.map((s) => saidRefusal(args, s, PAUSE_TAKES)).find((r) => r !== null) ?? null,
+  check: (args) =>
+    PAUSE_SAID.map((s) => saidRefusal(args, s, PAUSE_TAKES)).find((r) => r !== null) ??
+    pauseTimeoutRefusal(textOf(args, 'timeout'), args.now === true, PAUSE_SHAPE),
   writes: true,
   class: 'act',
   route: { method: 'POST', path: '/api/pause', status: 200, sets: { yes: true } },
-  handler: pauseBy,
+  handler: (args, _env, home) => pauseBy(args, home),
   print: (answer) =>
     'interrupts' in answer
       ? nowLines(answer.interrupts, answer.pause !== null)
@@ -413,12 +426,13 @@ export const PAUSE: Command<PauseAnswer> = {
 };
 
 /**
- * `nemia resume`: the store's pause lifted (`resumePause`), on `DELETE /api/pause` too; the pause lifted. Refused with none (`Missing`).
+ * `nemia resume`: the store's pause lifted (`resumePause`), then the sessions' drain, each session parked going on as the same try; on
+ * `DELETE /api/pause` too; the pause lifted. Refused with none (`Missing`).
  */
 export const RESUME: Command<{ pause: Pause }> = {
   name: 'resume',
   usage: '',
-  help: ['resume the store: the next pass files what waits'],
+  help: ['resume the store: each session parked goes on as the same try, and the', 'next pass files what waits'],
   spec: {
     positionals: [],
     flags: [],
@@ -428,7 +442,7 @@ export const RESUME: Command<{ pause: Pause }> = {
   ticks: true,
   class: 'act',
   route: { method: 'DELETE', path: '/api/pause', status: 200 },
-  handler: () => tried(() => ({ pause: resumePause() })),
+  handler: () => tried(() => ({ pause: resumePause() })).pipe(Effect.tap(() => sessionsDrained(null))),
   print: () => [RESUMED],
 };
 

@@ -68,7 +68,11 @@ const attemptStamped = (a: Attempt): boolean =>
   wallStamped(a.endedAt) &&
   monoStamped(a.endedMono) &&
   wallStamped(a.gapSince) &&
-  monoStamped(a.gapMono);
+  monoStamped(a.gapMono) &&
+  wallStamped(a.heldSince) &&
+  monoStamped(a.heldMono) &&
+  wallStamped(a.releasedAt) &&
+  monoStamped(a.releasedMono);
 
 /** The last attempt, while it has not ended. */
 const inFlight = (state: State): Attempt | undefined => {

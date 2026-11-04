@@ -24,7 +24,7 @@ import { admissionOrder, slotFree, type RunSlot } from '../cap/cap.ts';
 import { passRead, type PassRead } from '../cap/cap.verb.ts';
 import { passRevisions } from '../revisions/pin.verb.ts';
 import { readPause } from '../pause/pause.store.ts';
-import { finishingAmong, type Finishing, type Pause, type PauseStanding } from '../pause/pause.ts';
+import { finishingAmong, parkedAmong, type Finishing, type Parked, type Pause, type PauseStanding } from '../pause/pause.ts';
 import { isRepositoryRun, type Run } from '../record/record.ts';
 import { unloadedFolder } from '../steps/steps.ts';
 import { stepsAmong } from '../steps/steps.verb.ts';
@@ -261,6 +261,7 @@ export const tickRun = Effect.fn('tick')(function* ({ repo, memo, verifyRest, qu
 const pass = Effect.fn('pass')(function* (engine: Engine, { repo, memo, verify }: PassOptions) {
   const informer = yield* Informer;
   if (informer) passStarted(informer);
+  yield* drainFromPause(engine);
   const report = yield* asked('tick', engine.tick());
   noteSeen({ ...sessionsOf(report, Date.now()), load: loadNow() });
   const e = reportedEngine(engine, report.views ?? []);
@@ -296,12 +297,33 @@ const pass = Effect.fn('pass')(function* (engine: Engine, { repo, memo, verify }
           pause: {
             pause,
             finishing: finishingReported(runs, report.views ?? [], yield* stepsAmong(runs)),
+            parked: parkedReported(runs, report.views ?? []),
             ...(yield* heldRead(e, runs, standingReader(standing))),
           },
         }
       : {}),
   };
 });
+
+/**
+ * The sessions' drain as the store's pause says it, put again on each pass before the engine's tick, so a pause put or lifted by any hand
+ * — or a daemon restarted under one — is honoured by the next pass: a pause with a timeout puts the drain at that timeout, which the
+ * runtime keeps as it stands when the timeout is the same; no pause lifts it; a pause with no timeout — the take-over's own, or one put
+ * before the timeout was written — leaves it as it stands. An engine with no such verb (a test's hand-made fake, as `ioOf` reads one) is
+ * left as it is.
+ */
+const drainFromPause = Effect.fnUntraced(function* (engine: Engine) {
+  if (typeof engine.drainSessions !== 'function') return;
+  const pause = yield* tried(() => readPause());
+  if (pause === null) yield* asked('drainSessions', engine.drainSessions(null));
+  else if (pause.timeoutMs !== undefined) yield* asked('drainSessions', engine.drainSessions({ graceMs: pause.timeoutMs }));
+});
+
+/** Each session of `runs` the pause has parked (`parkedAmong`), read off the views the runtime reported on the pass. */
+const parkedReported = (runs: readonly Run[], views: readonly TaskView[]): Parked[] => {
+  const reported = new Map(views.map((v) => [v.id, v]));
+  return parkedAmong(runs, (taskId) => reported.get(taskId));
+};
 
 /** Each task of `runs` still finishing under the pause (`finishingAmong`), read off the views the runtime reported on the pass. */
 const finishingReported = (

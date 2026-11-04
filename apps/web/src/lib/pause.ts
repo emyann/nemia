@@ -1,9 +1,9 @@
 /**
  * The words of the pause of all factories on the board (`PauseButton`): whether they run, are Pausing while what runs finishes, or are
  * Paused once nothing does, as the package says it (`pausedWords`), read off `GET /api/pause` on each poll and never kept. Pure: the time
- * is handed in.
+ * is handed in. The board neither shows nor sets a pause's timeout: it pauses with the store's, and says only when what finishes is cut.
  */
-import type { Finishing, Interrupt, Pause, Paused, PauseHeld, PauseStaged } from './api';
+import type { Finishing, Interrupt, Parked, Pause, Paused, PauseHeld, PauseStaged } from './api';
 import { clockWord } from './quota.ts';
 
 /** What the button shows: all factories run, a pause stands while tasks still finish, or nothing runs under it; or nothing is read yet. */
@@ -11,8 +11,8 @@ export type PauseState = 'running' | 'pausing' | 'paused' | 'reading';
 
 /**
  * The pause in words: its `state`; `text`, the button's short form (`Pausing · 2`, `Paused`, none while all factories run); `label`, the
- * button's name; `line`, the whole sentence, its `title` and the popover's first line; and each task finishing, landing staged and other
- * check held, a sentence each.
+ * button's name; `line`, the whole sentence, its `title` and the popover's first line; and each task finishing, session parked, landing
+ * staged and other check held, a sentence each.
  */
 export type PauseWords = {
   state: PauseState;
@@ -20,6 +20,7 @@ export type PauseWords = {
   label: string;
   line: string;
   finishing: string[];
+  parked: string[];
   staged: string[];
   held: string[];
 };
@@ -45,6 +46,28 @@ const atWork = (kind: Finishing['kind'], calling: string | undefined): string =>
   return kind === 'check' ? 'its check runs' : 'the check of its landing runs';
 };
 
+/** A session the pause has parked, in a sentence: its run and step, and the call it stopped after or the call cut (`parkedWords`). */
+export const parkedSentence = ({ run, step, after, cut }: Parked): string =>
+  `${run}'s ${step} is paused${after ? ` after its call to ${after}` : cut ? `, its call to ${cut} cut` : ''}`;
+
+/**
+ * How many sessions still finish a tool call and when what is left is cut, as the package's `pausingWords` says it: "Pausing: 2 sessions
+ * finishing a tool call, cut in 9 min", `leftMs` rounded up to whole minutes; "…, cut now" once none is left.
+ */
+export const pausingLine = (sessions: number, leftMs: number): string =>
+  `Pausing: ${sessions} session${sessions === 1 ? '' : 's'} finishing a tool call, cut ${leftMs > 0 ? `in ${Math.ceil(leftMs / 60_000)} min` : 'now'}`;
+
+/**
+ * The head of the Pausing line: under a pause with a timeout while sessions finish, how many and when they are cut (`pausingLine`);
+ * otherwise how many tasks finish.
+ */
+const pausingHead = ({ pause, finishing }: Paused & { pause: Pause }, now: Date): string => {
+  const sessions = finishing.filter((f) => f.kind === 'session').length;
+  return pause.timeoutMs !== undefined && sessions
+    ? pausingLine(sessions, Math.min(pause.timeoutMs, Date.parse(pause.at) + pause.timeoutMs - now.getTime()))
+    : `Pausing: ${finishing.length} finishing`;
+};
+
 /** A task a pause at once would stop, in a few words: its run, then its step's session or check. */
 export const interruptSentence = ({ run, step, kind }: Interrupt): string => `${run}: ${step}'s ${kind}`;
 
@@ -62,12 +85,14 @@ const heldCount = ({ staged, held }: Paused): string => {
 };
 
 /**
- * The pause as `paused` says it at `now`: Pausing with how many tasks still finish, Paused once none does, each with how many checks it
- * holds back, when any; all factories running where no pause stands, and reading while nothing is read; a read that failed says why.
+ * The pause as `paused` says it at `now`: Pausing with how many tasks still finish — under a timeout, how many sessions finish a tool call
+ * and when what is left is cut (`pausingHead`) — Paused once none does, each with how many checks it holds back, when any, and each
+ * session it parked named; all factories running where no pause stands, and reading while nothing is read; a read that failed says why.
  */
 export function pauseWords(paused: Paused | undefined, error: Error | null, now: Date): PauseWords {
   const lists = {
     finishing: (paused?.finishing ?? []).map(finishingSentence),
+    parked: (paused?.parked ?? []).map(parkedSentence),
     staged: (paused?.staged ?? []).map(stagedSentence),
     held: (paused?.held ?? []).map(heldSentence),
   };
@@ -84,7 +109,8 @@ export function pauseWords(paused: Paused | undefined, error: Error | null, now:
   const since = pauseSince(paused.pause, now);
   const count = paused.finishing.length;
   if (count > 0) {
-    const line = `Pausing: ${count} finishing${heldCount(paused)} — paused ${since}. Nothing new starts, and what runs finishes.`;
+    const head = pausingHead({ ...paused, pause: paused.pause }, now);
+    const line = `${head}${heldCount(paused)} — paused ${since}. Nothing new starts, and what runs finishes.`;
     return { state: 'pausing', text: `Pausing · ${count}`, label: `Pausing, ${count} finishing`, line, ...lists };
   }
   const line = `Paused ${since}. Nothing runs and nothing new starts${heldCount(paused)}.`;

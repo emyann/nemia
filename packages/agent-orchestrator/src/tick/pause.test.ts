@@ -21,7 +21,7 @@ import { Engine } from 'agent-runtime';
 import type { Run } from '../run.ts';
 import type { Finishing } from '../pause/pause.ts';
 import { scratch } from '../../test/scratch.ts';
-import { until, WAITED } from 'agent-runtime/testing';
+import { testEngine, until, WAITED } from 'agent-runtime/testing';
 import { Effect } from 'effect';
 import { testPlace } from '../../place/memory/index.ts';
 import { runGiven, runOver } from '../../test/placed.ts';
@@ -246,13 +246,17 @@ test('while the store is paused nothing new starts and what runs finishes; the p
   ).sort(byStep);
   assert.deepEqual(
     sorted(first.pause!),
-    { pause, finishing: atWork, staged: [], held: [] },
+    { pause, finishing: atWork, parked: [], staged: [], held: [] },
     'the pass says the pause it read, and what still finishes under it: neither the queued task nor one settled; no landing held yet',
   );
   assert.match(pausedLines(first.pause!)[0], /^Pausing: 3 finishing/);
   assert.equal(first.queue, undefined, 'and started no queued card');
   const listedAtWork = (await runWith(h.e, runsListed())).paused!;
-  assert.deepEqual(sorted(listedAtWork), { pause, finishing: atWork, staged: [], held: [] }, 'nemia ls names each task still finishing');
+  assert.deepEqual(
+    sorted(listedAtWork),
+    { pause, finishing: atWork, parked: [], staged: [], held: [] },
+    'nemia ls names each task still finishing',
+  );
   assert.deepEqual(sorted(await runWith(h.e, pausedRead())), sorted(listedAtWork), 'and the api reads the same');
   h.signAll();
   await pass(freshRestMemo());
@@ -263,7 +267,7 @@ test('while the store is paused nothing new starts and what runs finishes; the p
   const checks = [{ run: checked.id, step: 'work' }];
   assert.deepEqual(
     last.pause,
-    { pause, finishing: [], staged: held, held: checks },
+    { pause, finishing: [], parked: [], staged: held, held: checks },
     "once what ran has finished, nothing finishes; the landing is held staged, and checked's check held, each named once",
   );
   assert.deepEqual(pausedLines(last.pause), [
@@ -304,7 +308,7 @@ test('while the store is paused nothing new starts and what runs finishes; the p
   const listed = await runWith(h.e, runsListed());
   assert.deepEqual(
     listed.paused,
-    { pause, finishing: [], staged: held, held: checks },
+    { pause, finishing: [], parked: [], staged: held, held: checks },
     'nemia ls names the pause, and the landing whose merge it holds staged in the checkout, its check not filed',
   );
   assert.equal(readRun(landing.id).steps.ship?.check, undefined);
@@ -317,7 +321,7 @@ test('while the store is paused nothing new starts and what runs finishes; the p
   const unread = await pass();
   assert.deepEqual(
     unread.pause,
-    { pause, finishing: [], staged: [], held: checks },
+    { pause, finishing: [], parked: [], staged: [], held: checks },
     'a landing whose journal does not read is left out, and the pass goes on',
   );
   assert.ok(
@@ -349,8 +353,40 @@ test('while the store is paused nothing new starts and what runs finishes; the p
   assert.ok(lifted.queue, 'the queued card tried');
   assert.ok(readRun(landing.id).steps.ship?.check, "landing's check filed");
   assert.equal((await runWith(h.e, runsListed())).paused, undefined, 'and nemia ls says no pause');
-  assert.deepEqual(await runWith(h.e, pausedRead()), { pause: null, finishing: [], staged: [], held: [] });
+  assert.deepEqual(await runWith(h.e, pausedRead()), { pause: null, finishing: [], parked: [], staged: [], held: [] });
   await pass();
   assert.ok(h.spawned.length > before, 'and sessions started again');
   assert.notEqual((await Effect.runPromise(h.e.view(queuedTask))).admission, 'queued', 'the queued task admitted');
+});
+
+test("each pass sets the sessions' drain from the pause before the engine's tick: a timed pause puts it, no pause lifts it, a pause with no timeout leaves it", async () => {
+  const stand = testEngine();
+  const seenAtTick: number[] = [];
+  const e = engineOf(stand.layer);
+  Object.assign(e, {
+    tick: () =>
+      Effect.sync(() => {
+        seenAtTick.push(stand.sessionDrains.length);
+        return { tasks: 0, actions: [], running: {}, views: [] };
+      }),
+    tallied: undefined,
+  });
+  const pass = () => runWith(e, tickRun());
+  putPause({ by: 'ann' }, new Date(), 900_000);
+  try {
+    await pass();
+    assert.deepEqual(stand.sessionDrains, [{ graceMs: 900_000 }], 'a timed pause puts the drain at its timeout');
+    assert.deepEqual(seenAtTick, [1], "before the engine's tick");
+  } finally {
+    resumePause();
+  }
+  await pass();
+  assert.deepEqual(stand.sessionDrains, [{ graceMs: 900_000 }, null], 'no pause lifts it');
+  putPause({ by: 'the take-over' });
+  try {
+    await pass();
+    assert.deepEqual(stand.sessionDrains, [{ graceMs: 900_000 }, null], 'a pause with no timeout leaves the drain as it stands');
+  } finally {
+    resumePause();
+  }
 });

@@ -19,6 +19,11 @@
  *   ended `failed` at its budget rather than resumed.
  * - **The drain.** A file naming the holder's pid and when it started (`putDrain`): while it names this process, the new calls of each
  *   session with none in flight wait at their hook, so a restart can wait for the calls in flight before it signals.
+ * - **The sessions' drain.** The store's drain a person's pause puts (`putSessionDrain`, `job-hold.ts`), which holds the jobs too: while
+ *   it stands, the new calls of each session with none in flight wait at their hook, as under the holder's. Read on every look, never
+ *   as a transition (`paused`): past its `at` plus its `graceMs` with a call in flight, the session's turn is interrupted through the SDK
+ *   and the call it cut kept on its run file (`cut`), the session left answering under its id with its input open; once a look reads
+ *   the drain lifted, the session is told the cut (`cutWords`) as words of its own. Held or cut, its sighting says `heldBack`.
  * - **What it keeps.** Its run file, and a capture of the messages a reader reads (denials as they come, the result's statement and
  *   usage); the conversation is Claude Code's own transcript, which is also where a follow's whole events and its cursor come from
  *   (`attached-follow.ts`), the same file `transcript` reads.
@@ -26,7 +31,7 @@
 import { Effect, Option, Schedule, type Scope } from 'effect';
 import fs from 'node:fs';
 import { instantNow } from '../../core/engine/now.ts';
-import { purseOf, type Purse } from '../../core/clock.ts';
+import { elapsedMs, purseOf, type Purse } from '../../core/clock.ts';
 import { capLeft, capSpent } from '../../core/cap.ts';
 import type { Sighting, Usage } from '../../core/index.ts';
 import { RunnerError } from '../error.ts';
@@ -55,7 +60,9 @@ import {
   writeRun,
   type AttachedRun,
 } from './attached-file.ts';
-import { gone, hear, interruptTurn, killGroup, startSession, type Held, type Live } from './attached-session.ts';
+import { cutTurn, gone, hear, interruptTurn, killGroup, startSession, toldCut, type Held, type Live } from './attached-session.ts';
+import { sessionDrainFile, sessionDrainOf } from './job-hold.ts';
+import { cutWords } from '../../core/restart.ts';
 import { pushesOf, type Pushes } from './attached-follow.ts';
 import { bridgeOf } from './attached-bridge.ts';
 
@@ -174,9 +181,20 @@ const sightingOf = (root: string, run: AttachedRun): Sighting => {
     ...(run.image ? { image: run.image } : {}),
     ...bridgeOf(run.bridge),
     ...(run.calling && run.state === 'working' ? { calling: run.calling } : {}),
+    ...heldBackOf(run),
     ...(run.limit ? { limit: run.limit } : {}),
     ...asksOf(root, run),
   };
+};
+
+/**
+ * What a session's sighting says it is held at, while its holder holds it under a drain: since when a new call waits at its hook and
+ * after which call (`hold`), or, cut by the sessions' drain and waiting for its lift, since the cut, after no call.
+ */
+const heldBackOf = (run: AttachedRun): Pick<Sighting, 'heldBack'> => {
+  if (run.state !== 'working') return {};
+  if (run.hold) return { heldBack: run.hold };
+  return run.cut ? { heldBack: { since: run.cut.since } } : {};
 };
 
 /**
@@ -195,9 +213,10 @@ const orphaned = (run: AttachedRun): boolean => run.state === 'parked' || (isOpe
 
 /**
  * What a resumed session is told first, by its run file: which call did not finish, where one was in flight when its holder ended or
- * cut it at its bound (`crashNote`), else that it was paused between two calls (`CARRY_ON`).
+ * cut it at its bound (`crashNote`), or where the sessions' drain cut it and it was let go before the lift (`cutWords`), else that it
+ * was paused between two calls (`CARRY_ON`).
  */
-const noteOf = (run: AttachedRun): string => (run.calling ? crashNote(run.calling.tool) : CARRY_ON);
+const noteOf = (run: AttachedRun): string => (run.calling ? crashNote(run.calling.tool) : run.cut ? cutWords(run.cut.tool) : CARRY_ON);
 
 /**
  * How many calls of `l` are in flight doing work: those of its calls that are not waiting on a person (`Live.asking`). A call held
@@ -228,7 +247,7 @@ const parked = (root: string, live: Map<string, Live>, cut: boolean): Effect.Eff
       cutAsks(root, l.run.name);
       const kept = cut && workingIn(l) > 0 ? l.run.calling : undefined;
       const working = l.run.state === 'working';
-      const { calling: _, ...rest } = l.run;
+      const { calling: _, hold: __, ...rest } = l.run;
       l.run = { ...rest, state: 'parked', ...(kept ? { calling: kept } : {}) };
       writeRun(root, l.run);
       l.letGo = true;
@@ -310,7 +329,7 @@ const adoptIn =
     const child = childOf(run);
     killGroup(child);
     await gone(child);
-    const { childPid: _, childStart: __, calling: ___, ownerStart: ____, ...rest } = run;
+    const { childPid: _, childStart: __, calling: ___, ownerStart: ____, cut: _____, hold: ______, ...rest } = run;
     const mine: AttachedRun = { ...rest, ...thisHolder() };
     if (stopped(run) || !run.sessionId) return writeRun(root, { ...mine, state: stopped(run) ? 'canceled' : 'failed' });
     const resumed = resumedRequest(root, run);
@@ -329,7 +348,8 @@ export const attachedSessions = (root: string, executable?: string, options: { l
   const letGoMs = options.letGoMs ?? LET_GO_MS;
   let holding = false;
   let draining = false;
-  const held: Held = (l) => (draining || drainsThis(root)) && l.calls.size === 0;
+  const sessionsDrain = () => sessionDrainOf(sessionDrainFile(root));
+  const held: Held = (l) => (draining || drainsThis(root) || sessionsDrain() !== null) && l.calls.size === 0;
   const pushes = pushesOf({ root, holds: (name) => live.has(name) });
   const start = (r: SpawnRequest, run: AttachedRun, first: string, resume?: string) =>
     live.set(
@@ -360,11 +380,21 @@ export const attachedSessions = (root: string, executable?: string, options: { l
 
   const adopt = adoptIn(root, start, stopped);
 
+  const paused = (at: Live): void => {
+    if (!at.abort || at.letGo) return;
+    const drain = sessionsDrain();
+    if (drain === null) return toldCut(root, at);
+    if (at.run.cut || at.run.state !== 'working' || workingIn(at) === 0) return;
+    if (elapsedMs({ at: Date.parse(drain.at) }, instantNow()) < drain.graceMs) return;
+    void cutTurn(root, at, toolOf(at)).catch(() => undefined);
+  };
+
   const looked = (run: AttachedRun): AttachedRun => {
     const at = live.get(run.name);
     if (!holding) return run;
     if (at && stopped(run) && isOpen(at.run.state)) at.abort.abort();
     interrupted(run);
+    if (at) paused(at);
     if (at?.input) hear(root, at);
     if (!at && orphaned(run)) {
       const placeholder = { run, letGo: true } as Live;

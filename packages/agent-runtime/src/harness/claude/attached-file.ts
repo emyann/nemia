@@ -67,6 +67,16 @@ const RunFileSchema = Schema.StructWithRest(
     calling: Schema.optional(Schema.Struct({ tool: Schema.String, since: Schema.String })),
     /** How many new calls wait at their hook now, held back by a drain; absent when none waits. */
     heldBack: Schema.optional(Schema.Finite),
+    /**
+     * Since when a new call of the main thread waits at its hook, held back by a drain, and the main-thread call that ended last before
+     * it (`after`), where one did: the session's `Sighting.heldBack`. Absent when none waits.
+     */
+    hold: Schema.optional(Schema.Struct({ since: Schema.String, after: Schema.optional(Schema.Struct({ tool: Schema.String })) })),
+    /**
+     * The call the sessions' drain cut, its turn interrupted past the drain's grace, and since when (ISO): kept until the drain is
+     * lifted, when the session is told the cut (`cutWords`), or the next holder resumes it told so. Its sighting says `heldBack` meanwhile.
+     */
+    cut: Schema.optional(Schema.Struct({ tool: Schema.String, since: Schema.String })),
     /** What the session resumed from had spent, which its own results print on in theirs: taken off what it reports. */
     carried: Schema.optional(CarriedSchema),
     /** How far into its say file the words were handed to the session, in bytes. */
@@ -216,12 +226,14 @@ export const writeRun = (root: string, run: AttachedRun): void => {
   fs.renameSync(tmp, file);
 };
 
-/** Every attached run file under `root`, by its session's name: neither drain's file (`DRAIN`, the jobs' `jobDrainFile`) is one. */
+/** Every attached run file under `root`, by its session's name: neither drain's file (`DRAIN`, the jobs' `sessionDrainFile`) is one. */
 export const everyRun = (root: string): Map<string, AttachedRun> => {
   const dir = attachedDir(root);
   let names: string[];
   try {
-    names = fs.readdirSync(dir).filter((f) => f.endsWith('.json') && !f.endsWith('.mcp.json') && f !== DRAIN && f !== 'jobs-drain.json');
+    names = fs
+      .readdirSync(dir)
+      .filter((f) => f.endsWith('.json') && !f.endsWith('.mcp.json') && f !== DRAIN && f !== 'sessions-drain.json');
   } catch {
     return new Map();
   }

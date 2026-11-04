@@ -28,7 +28,7 @@ const NOW_WHY = 'the quota runs low';
 const PLAIN_WHY = 'merging by hand on main';
 
 /** What the package says an interrupted step costs. */
-const COST = 'An interrupted step redoes its unfinished work and reads its context again.';
+const COST = 'A session has its tool call cut and continues as the same try, told which call was cut; a check runs again from its start.';
 
 /** What `GET /api/pause/now` answers, each interrupt with the task it stops, which the board does not read. */
 type NowRead = { interrupts: Array<Interrupt & { taskId: string }>; cost: string };
@@ -100,12 +100,13 @@ export default {
    * All factories paused at once from the top bar, as `wf pause --now --yes` does (`POST /api/pause` with `now`). With a session at
    * work and a landing at work (LANDING, which the page writes), Pause now…, offered beside Pause… while all factories run, names each
    * run's step it stops — the api's read (`GET /api/pause/now`), which leaves the landing out — and says what that costs. Confirmed, the
-   * pause's file holds its why, each step it named is asked to stop on its journal and has the try that continues it beside its run, the
-   * landing is left at work, and the popover reads Pausing, each named step stopping and tried again on the resume. From Pausing, after
-   * a plain Pause…, Pause now… is offered beside Resume, asks no why, and keeps the pause as it was put; on a phone's screen its confirm
-   * fits. Resume takes the pause away. Which tasks a pause at once stops, and how the resume continues each, is the package's judgement,
-   * proven in its own tests (`packages/agent-orchestrator/src/tick/pause.test.ts`). The page puts back every file it wrote, and the
-   * window's size.
+   * pause's file holds its why; a session it named is asked no stop and no try, its call cut by the sessions' drain so it goes on as the
+   * same try on the resume, while a check it named is asked to stop and has the try that runs it again beside its run; the landing is
+   * left at work, and the popover reads Pausing, each named check stopping and tried again on the resume. From Pausing, after
+   * a plain Pause…, Pause now… is offered beside Resume, asks no why, and keeps the pause as it was put, its timeout cut to 0; on a phone's
+   * screen its confirm fits. Resume takes the pause away. Which tasks a pause at once stops, and how the resume continues each, is the
+   * package's judgement, proven in its own tests (`packages/agent-orchestrator/src/tick/pause.test.ts`). The page puts back every file it
+   * wrote, and the window's size.
    */
   name: 'pause-now',
   route: '/factories/default',
@@ -142,24 +143,29 @@ export default {
       await expectCount(popover, 0, 'confirmed, the popover closes once the api answered');
 
       if (pauseFile().why !== NOW_WHY) throw new Refused(`the pause's file holds the why given — it holds ${JSON.stringify(pauseFile())}`);
-      for (const { run, step, taskId } of read.interrupts) {
-        if (!journalOf(taskId).includes('"stop-requested"')) throw new Refused(`${run}'s ${step}: its task ${taskId} is asked to stop`);
+      for (const { run, step, taskId, kind } of read.interrupts) {
+        const stopped = journalOf(taskId).includes('"stop-requested"');
         const asks = path.join(store!, 'runs', `${run}.asks`);
         const ask = fs.existsSync(asks) && fs.readdirSync(asks).some((f) => fs.readFileSync(path.join(asks, f), 'utf8').includes(taskId));
-        if (!ask) throw new Refused(`${run}'s ${step}: the try that continues it is asked beside its run`);
+        if (kind === 'session' && (stopped || ask))
+          throw new Refused(`${run}'s ${step}: a session is cut, never stopped nor asked a try — its task ${taskId} was`);
+        if (kind === 'check' && !stopped) throw new Refused(`${run}'s ${step}: its check ${taskId} is asked to stop`);
+        if (kind === 'check' && !ask) throw new Refused(`${run}'s ${step}: the try that runs its check again is asked beside its run`);
       }
+      const checks = read.interrupts.filter((i) => i.kind === 'check');
       if (journalOf(LANDING_TASK).includes('"stop-requested"')) throw new Refused('the landing is left at work, never asked to stop');
       const paused = await apiRead<Paused>(page, '/api/pause');
       const stopping = paused.finishing.filter((f) => f.stopping && f.resumed);
-      if (stopping.length !== read.interrupts.length)
-        throw new Refused(`each step it named is stopping, tried again on the resume — the api reads ${JSON.stringify(paused.finishing)}`);
+      if (stopping.length !== checks.length)
+        throw new Refused(`each check it named is stopping, tried again on the resume — the api reads ${JSON.stringify(paused.finishing)}`);
       await expectVisible(button.and(page.locator('[data-pause="pausing"]')), 'the button says Pausing while they stop');
       await button.click();
       await expectTexts(popover.locator('[data-pause-finishing] li'), paused.finishing.map(finishingSentence), 'each, stopping or not');
-      await expectVisible(
-        popover.locator('[data-pause-finishing] li', { hasText: 'tried again on the resume' }).first(),
-        'a step is stopping, and tried again on the resume',
-      );
+      if (checks.length)
+        await expectVisible(
+          popover.locator('[data-pause-finishing] li', { hasText: 'tried again on the resume' }).first(),
+          'a check is stopping, and tried again on the resume',
+        );
       await settled(page);
       await photograph(page, path.join(OUT, `pause-now-stopping-${theme}.png`));
       await page.keyboard.press('Escape');
@@ -186,8 +192,11 @@ export default {
       await photograph(page, path.join(OUT, `pause-now-phone-${theme}.png`));
       await popover.getByRole('button', { name: 'Pause now', exact: true }).click();
       await expectCount(popover, 0, 'confirmed from Pausing, the popover closes once the api answered');
-      if (JSON.stringify(pauseFile()) !== JSON.stringify(plain))
-        throw new Refused(`the pause stands as it was put, ${JSON.stringify(plain)} — its file holds ${JSON.stringify(pauseFile())}`);
+      const cut = { ...plain, timeoutMs: 0 };
+      if (JSON.stringify(pauseFile()) !== JSON.stringify(cut))
+        throw new Refused(
+          `the pause stands as it was put, its timeout cut to 0, ${JSON.stringify(cut)} — its file holds ${JSON.stringify(pauseFile())}`,
+        );
       if (size) await page.setViewportSize(size);
 
       await button.click();

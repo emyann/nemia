@@ -1,25 +1,26 @@
 /**
  * The pause of all factories on the board (src/lib/pause.ts): they run where no pause stands, Pausing with how many still finish while any
- * does, Paused once none does, each task and each landing held named in a sentence, and a read that failed said; what a pause at once
- * would stop, and a task it asked to stop, each in its words. `npm run e2e` presses the buttons themselves (`480-pause.ts`,
- * `481-pause-now.ts`).
+ * does — under a pause with a timeout, how many sessions finish a tool call and when what is left is cut — Paused once none does, each
+ * session it parked named by the call it stopped after, each task and each landing held named in a sentence, and a read that failed
+ * said; what a pause at once would stop, and a task it asked to stop, each in its words. `npm run e2e` presses the buttons themselves
+ * (`480-pause.ts`, `481-pause-now.ts`), and reads a parked step (`482-paused-step.ts`).
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { Paused } from '../src/lib/api.ts';
 import { clockWord } from '../src/lib/quota.ts';
-import { finishingSentence, interruptSentence, pauseWords } from '../src/lib/pause.ts';
+import { finishingSentence, interruptSentence, parkedSentence, pauseWords } from '../src/lib/pause.ts';
 
 const NOW = new Date('2026-10-04T16:00:00.000Z');
 const AT = '2026-10-04T15:40:00.000Z';
 const PAUSE = { at: AT, by: 'ann', why: 'merging by hand' };
 
 /** What `GET /api/pause` answers, with `extra` over a pause and nothing at work. */
-const paused = (extra: Partial<Paused> = {}): Paused => ({ pause: PAUSE, finishing: [], staged: [], held: [], ...extra });
+const paused = (extra: Partial<Paused> = {}): Paused => ({ pause: PAUSE, finishing: [], parked: [], staged: [], held: [], ...extra });
 
 test('pauseWords: what the pause says, from none to Pausing to Paused', async (t) => {
   await t.test('no pause: all factories run, with no short form, and the button pauses them all', () => {
-    const words = pauseWords({ pause: null, finishing: [], staged: [], held: [] }, null, NOW);
+    const words = pauseWords({ pause: null, finishing: [], parked: [], staged: [], held: [] }, null, NOW);
     assert.equal(words.state, 'running');
     assert.equal(words.text, null);
     assert.equal(words.label, 'Pause all factories');
@@ -108,5 +109,80 @@ test('interruptSentence and finishingSentence: what a pause stops and what finis
     const finishing = { run: 'r1', step: 'implement', kind: 'session' as const, calling: 'Bash' };
     assert.equal(finishingSentence(finishing), "r1's implement is finishing: its call to Bash runs");
     assert.equal(finishingSentence({ ...finishing, calling: undefined }), "r1's implement is finishing: its session is at work");
+  });
+});
+
+test('pauseWords under a pause with a timeout: sessions finishing a call and when they are cut, then each parked, then Paused', async (t) => {
+  const timed = { ...PAUSE, timeoutMs: 600_000 };
+  const parked = [
+    { run: 'r-5', step: 'plan', after: 'Bash' },
+    { run: 'r-6', step: 'review', cut: 'Edit' },
+    { run: 'r-7', step: 'design' },
+  ];
+  await t.test('while sessions finish a call, the count line says how many and in how many minutes what is left is cut', () => {
+    const words = pauseWords(
+      paused({
+        pause: { ...timed, at: new Date(NOW.getTime() - 570_000).toISOString() },
+        finishing: [
+          { run: 'r-1', step: 'plan', kind: 'session', calling: 'Bash' },
+          { run: 'r-2', step: 'implement', kind: 'session' },
+          { run: 'r-3', step: 'ship', kind: 'landing' },
+        ],
+        parked,
+        held: [{ run: 'r-4', step: 'land' }],
+      }),
+      null,
+      NOW,
+    );
+    assert.equal(words.state, 'pausing');
+    assert.equal(words.text, 'Pausing · 3');
+    assert.equal(
+      words.line,
+      `Pausing: 2 sessions finishing a tool call, cut in 1 min, 1 check held — paused since ${clockWord(new Date(NOW.getTime() - 570_000), NOW)} by ann: merging by hand. Nothing new starts, and what runs finishes.`,
+    );
+    assert.deepEqual(words.parked, parked.map(parkedSentence));
+  });
+  await t.test('the minutes left are rounded up, "cut now" once none is left, and one session is said so', () => {
+    const at = new Date(NOW.getTime() - 599_500);
+    const one = paused({ pause: { ...timed, at: at.toISOString() }, finishing: [{ run: 'r-1', step: 'plan', kind: 'session' }] });
+    assert.match(pauseWords(one, null, NOW).line, /^Pausing: 1 session finishing a tool call, cut in 1 min — /);
+    const early = paused({ pause: { ...timed, at: NOW.toISOString() }, finishing: [{ run: 'r-1', step: 'plan', kind: 'session' }] });
+    assert.match(pauseWords(early, null, new Date(NOW.getTime() + 60_001)).line, /cut in 9 min — /);
+    const now = paused({
+      pause: { ...timed, at: NOW.toISOString(), timeoutMs: 0 },
+      finishing: [{ run: 'r-1', step: 'plan', kind: 'session' }],
+    });
+    assert.match(
+      pauseWords(now, null, NOW).line,
+      /^Pausing: 1 session finishing a tool call, cut now — /,
+      'a pause at once is cutting now',
+    );
+    assert.match(pauseWords(early, null, new Date(NOW.getTime() + 600_000)).line, /cut now — /, 'past its timeout, the call is being cut');
+    const ahead = new Date(NOW.getTime() - 30_000);
+    assert.match(
+      pauseWords(early, null, ahead).line,
+      /cut in 10 min — /,
+      'a pause stamped ahead of this clock is cut in no more than its timeout',
+    );
+  });
+  await t.test('with only checks finishing, or no timeout, it counts what finishes as before', () => {
+    const checks = paused({ pause: timed, finishing: [{ run: 'r-3', step: 'ship', kind: 'landing' }] });
+    assert.match(pauseWords(checks, null, NOW).line, /^Pausing: 1 finishing — /);
+    const untimed = paused({ finishing: [{ run: 'r-1', step: 'plan', kind: 'session' }] });
+    assert.match(pauseWords(untimed, null, NOW).line, /^Pausing: 1 finishing — /);
+  });
+  await t.test('once nothing finishes it is Paused, each parked session still named', () => {
+    const words = pauseWords(paused({ pause: timed, parked }), null, NOW);
+    assert.equal(words.state, 'paused');
+    assert.equal(words.text, 'Paused');
+    assert.match(words.line, /^Paused since /);
+    assert.equal(words.parked.length, 3);
+  });
+  await t.test('a parked session is named by the call it stopped after, the call cut, or neither', () => {
+    assert.deepEqual(parked.map(parkedSentence), [
+      "r-5's plan is paused after its call to Bash",
+      "r-6's review is paused, its call to Edit cut",
+      "r-7's design is paused",
+    ]);
   });
 });

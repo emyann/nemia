@@ -13,7 +13,8 @@ import type { PlaceOutcome, PlaceVerb } from '../place/place.ts';
 import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
 import { tried } from '../runtime-client.ts';
 import { holderOfLease, takeOverLine, DEFAULT_NAME } from '../service/service.ts';
-import { liveHost, NAME_FLAG, serviceForUpgrade, type ServiceHost } from '../service/service.verb.ts';
+import { timeoutFlag } from '../pause/pause.ts';
+import { timedHost, liveHost, NAME_FLAG, serviceForUpgrade, type ServiceHost } from '../service/service.verb.ts';
 import { takeOver } from '../service/takeover.verb.ts';
 import { CURRENT, RELEASE_CHECK, restartPlan, tagRefusal, type ReleaseFile, type Running } from './release.ts';
 import {
@@ -212,18 +213,21 @@ export const upgrade = Effect.fn('upgrade')(function* (args: Args, host: Service
 });
 
 /** How `nemia upgrade` is typed, as its refusals end on it. */
-const SHAPE = 'nemia upgrade <tag> [--repo <path>] [--name <name>]';
+const SHAPE = 'nemia upgrade <tag> [--repo <path>] [--name <name>] [--timeout <d>]';
 
 /** `nemia upgrade`. */
 const UPGRADE: Command<Upgraded> = {
   name: 'upgrade',
-  usage: '<tag> [--repo <path>] [--name <name>]',
+  usage: '<tag> [--repo <path>] [--name <name>] [--timeout <d>]',
   help: [
     "build the tag from a clean export into the store's releases/<tag>:",
     'npm ci, npm run build and npm run release:check there, on a trial',
     'store; then point releases/current at it and restart the daemon onto',
-    'it where the login service runs the pointer. A tag built already is',
-    'switched to without a rebuild, so an older tag rolls back. --repo:',
+    'it where the login service runs the pointer: jobs run on, and the',
+    "daemon's sessions are given up to the timeout to end their tool calls",
+    '(--timeout <d>, else nemia pause-timeout), park, and resume as the same try on',
+    'the new release. A tag built already is switched to without a',
+    'rebuild, so an older tag rolls back. --repo:',
     "the repository the tag is in (the running release's source);",
     '--name: the service (nemia). Then it removes each release that is',
     'not current, not among the two newest, and that no session or',
@@ -234,13 +238,17 @@ const UPGRADE: Command<Upgraded> = {
   spec: {
     positionals: [{ key: 'tag', takes: 'required', kind: 'name' }],
     missing: `nemia upgrade takes the tag to build, like nemia upgrade v1.2.0: ${SHAPE}.`,
-    flags: [{ flag: '--repo', kind: 'text', key: 'repo', takes: `--repo takes the repository the tag is in: ${SHAPE}.` }, NAME_FLAG],
+    flags: [
+      { flag: '--repo', kind: 'text', key: 'repo', takes: `--repo takes the repository the tag is in: ${SHAPE}.` },
+      NAME_FLAG,
+      timeoutFlag(SHAPE),
+    ],
     unknown: (arg) => `nemia upgrade does not take ${arg}: ${SHAPE}.`,
   },
   writes: true,
   class: 'ask',
   only: { side: 'cli', why: 'builds for minutes and restarts the daemon that serves the api' },
-  handler: (args) => upgrade(args),
+  handler: (args, _env, home) => Effect.flatMap(timedHost(args, home, 'upgrade'), (host) => upgrade(args, host)),
   print: (data) => data.lines,
 };
 

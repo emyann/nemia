@@ -115,7 +115,7 @@ export const JOURNALS: Record<string, Event[]> = {
   'long-lived, lost cold': [filed({ restartPolicy: 'Always' }), starting(1), spawned(1), ended(1, 'failed', 'lost')],
 };
 
-/** A job parked under a jobs' drain, its end saying so (`Attempt.parked`): in a call, or between two. */
+/** A job parked under a sessions' drain, its end saying so (`Attempt.parked`): in a call, or between two. */
 const parkedEnd = (n: number, calling?: boolean): Event => ({
   kind: 'ended',
   at: at(2 * S),
@@ -126,8 +126,16 @@ const parkedEnd = (n: number, calling?: boolean): Event => ({
   nativeId: `native-${n}`,
   parked: calling ? { calling: { tool: 'Bash', since: at(S) } } : {},
 });
-/** Journal shapes of a parked job, asked for by `lifecycle.test.ts` alone (`parked`), as `unread` is. */
+/** A job's attempt seen held back at its hook (`held`), and seen going on again (`released`). */
+const hold = (n: number, ms = S): Event => ({ kind: 'held', at: at(ms), attempt: n });
+const release = (n: number, ms = 2 * S): Event => ({ kind: 'released', at: at(ms), attempt: n });
+/**
+ * Journal shapes of a parked job, and of a job held at its hook and released, asked for by `lifecycle.test.ts` alone (`parked`), as
+ * `unread` is.
+ */
 const PARKED: Record<string, Event[]> = {
+  'job, held at its hook': [filed(), starting(1), spawned(1), hold(1)],
+  'job, held, released': [filed(), starting(1), spawned(1), hold(1), release(1)],
   'job, parked in a call': [filed(), starting(1), spawned(1), parkedEnd(1, true)],
   'job, parked between calls': [filed(), starting(1), spawned(1), parkedEnd(1)],
   'job, parked, stop asked': [filed(), starting(1), spawned(1), parkedEnd(1), { kind: 'stop-requested', at: at(2 * S) }],
@@ -153,8 +161,8 @@ export type Case = {
  * Every journal shape, under every deadline, sighting and time: `SIGHTINGS` keyed by the name a case takes. With `unread`, one
  * sighting more, `unread`: the last attempt's name on none, its harness not read this pass (`Now.unread`). Asked
  * for by `lifecycle.test.ts` alone, so the corpus `session-state.test.ts` holds to its recording stays the one recorded. With
- * `late`, one time more (`LATE`), on the same terms. With `parked`, the journals of a parked job (`PARKED`), and every case read
- * twice more, under a jobs' drain (`Now.drained`), on the same terms.
+ * `late`, one time more (`LATE`), on the same terms. With `parked`, the journals of a parked or held job (`PARKED`), and every case read
+ * twice more, under a sessions' drain (`Now.drained`), on the same terms.
  */
 export const corpusOf = (
   SIGHTINGS: Record<string, Omit<Sighting, 'sessionId'> | undefined>,

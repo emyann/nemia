@@ -114,7 +114,7 @@ function NowForm({
           <p className="text-body-small text-muted-foreground">
             {read.data.interrupts.length === 0
               ? 'Nothing outside a landing is at work: pausing now stops nothing.'
-              : `A landing finishes; this stops ${read.data.interrupts.length} at work, each tried again on Resume:`}
+              : `A landing finishes; this cuts ${read.data.interrupts.length} at work, each going on at Resume:`}
           </p>
           <Lines lines={read.data.interrupts.map(interruptSentence)} data="data-pause-interrupt" />
           <p data-pause-cost className="text-body-small">
@@ -129,9 +129,9 @@ function NowForm({
 }
 
 /**
- * The pause in the popover: its whole sentence, each task still finishing and each landing held, then what may be done — Pause… while
- * all factories run (`onAsk('pause')`), Pause now… while they run or are Pausing (`onAsk('now')`), Resume while a pause stands
- * (`onResume`).
+ * The pause in the popover: its whole sentence, each task still finishing, each session parked and each landing held, then what may be
+ * done — Pause… while all factories run (`onAsk('pause')`), Pause now… while they run or are Pausing (`onAsk('now')`), Resume while a
+ * pause stands (`onResume`).
  */
 function PauseFacts({
   words,
@@ -150,6 +150,7 @@ function PauseFacts({
         {words.line}
       </p>
       <Lines lines={words.finishing} data="data-pause-finishing" />
+      <Lines lines={words.parked} data="data-pause-parked" />
       <Lines lines={words.staged} data="data-pause-staged" className="text-yours" />
       <Lines lines={words.held} data="data-pause-held" />
       <ul data-pause-actions className="flex flex-col gap-1">
@@ -186,7 +187,8 @@ function PauseFacts({
  * The pause of all factories, in the frame's top bar: one button, a pause icon while they run,
  * `Pausing · N` while what runs finishes, and a play icon with `Paused` once nothing does (`pauseWords`, read again on each poll of
  * `GET /api/pause`).
- * It opens a popover with the whole of it — since when, by whom and why, each task still finishing, each landing held with its merge
+ * It opens a popover with the whole of it — since when, by whom and why, each task still finishing, each session parked at a tool call's
+ * end, named by the call it stopped after, each landing held with its merge
  * staged, so a person who paused to use main knows why `MERGE_HEAD` is there, and each other check held — and a list of what may be
  * done: Pause…, which asks an optional why (`WhyForm`) and puts the pause (`POST /api/pause`); Pause now…, which says what it stops and
  * what that costs (`NowForm`) and pauses at once (`POST /api/pause` with `now`); or Resume (`DELETE /api/pause`); the popover closes

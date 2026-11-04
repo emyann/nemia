@@ -8,8 +8,17 @@ import { Schema } from 'effect';
 import { decodes } from './decodes.ts';
 import { get, send } from './read.ts';
 
-/** Mirrors the package's `Pause`: since when (ISO), by whom, and why, when a reason was given. Empty where its file no longer says. */
-export type Pause = { at: string; by: string; why?: string };
+/**
+ * Mirrors the package's `Pause`: since when (ISO), by whom, and why, when a reason was given, empty where its file no longer says; and
+ * the timeout a tool call in flight is given before it is cut (`timeoutMs`), absent on a pause that parks no session.
+ */
+export type Pause = { at: string; by: string; why?: string; timeoutMs?: number };
+
+/**
+ * Mirrors the package's `Parked`: `run`'s `step`, a session the pause has parked at a tool call's end, held `after` its call to that
+ * tool where its harness kept it, or with its call to `cut` cut once the timeout ran out.
+ */
+export type Parked = { run: string; step: string; after?: string; cut?: string };
 
 /** Mirrors the package's `PauseStaged`: a run whose ending has its merge staged in `repo`'s checkout, its check held by the pause. */
 export type PauseStaged = { run: string; step: string; repo: string };
@@ -42,11 +51,12 @@ export type PauseAnswer = { pause: Pause; kept?: boolean; interrupted?: readonly
 
 /**
  * Mirrors the package's `Paused`: the pause, null where none stands; each task still finishing under it, none once it is Paused; each
- * landing it holds with its merge staged; and each other check it holds.
+ * session it has parked; each landing it holds with its merge staged; and each other check it holds.
  */
 export type Paused = {
   pause: Pause | null;
   finishing: readonly Finishing[];
+  parked: readonly Parked[];
   staged: readonly PauseStaged[];
   held: readonly PauseHeld[];
 };
@@ -57,6 +67,7 @@ const PauseSchema = decodes<Pause>()(
     at: Schema.String,
     by: Schema.String,
     why: Schema.optional(Schema.String),
+    timeoutMs: Schema.optional(Schema.Number),
   }),
 );
 
@@ -72,6 +83,14 @@ const PausedSchema = decodes<Paused>()(
         stopping: Schema.optional(Schema.Literal(true)),
         resumed: Schema.optional(Schema.Literal(true)),
         calling: Schema.optional(Schema.String),
+      }),
+    ),
+    parked: Schema.Array(
+      Schema.Struct({
+        run: Schema.String,
+        step: Schema.String,
+        after: Schema.optional(Schema.String),
+        cut: Schema.optional(Schema.String),
       }),
     ),
     staged: Schema.Array(Schema.Struct({ run: Schema.String, step: Schema.String, repo: Schema.String })),

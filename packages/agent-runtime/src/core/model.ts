@@ -106,6 +106,10 @@ export const Attempt = Schema.Struct({
   gapSince: Schema.optional(Schema.String),
   gapMono: Schema.optional(Monotonic),
   processes: Schema.optional(Schema.Array(Schema.Number)),
+  heldSince: Schema.optional(Schema.String),
+  heldMono: Schema.optional(Monotonic),
+  releasedAt: Schema.optional(Schema.String),
+  releasedMono: Schema.optional(Monotonic),
 }).annotate({ identifier: 'Attempt' });
 export type Attempt = typeof Attempt.Type;
 

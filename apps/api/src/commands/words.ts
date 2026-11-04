@@ -316,14 +316,14 @@ const HOLD: RouteWords = {
 };
 
 /** The body `POST /api/pause` takes: `nemia pause`'s flags, as JSON, `now` its `--now`, which the route acts on as `--yes` does. */
-const PAUSE_SHAPE = '`{ "why"?: "<words>", "by"?: "<name>", "now"?: true }`';
+const PAUSE_SHAPE = '`{ "why"?: "<words>", "by"?: "<name>", "timeout"?: "<d>", "now"?: true }`';
 
 /** What `issue` says of a key of `POST /api/pause`'s body sent wrong, `input` what the request sent. */
 const pauseKeyWords = (key: unknown, input: unknown): string => {
   const was = `This request's was ${JSON.stringify(input)}: ${PAUSE_SHAPE}.`;
-  if (key === 'now') return `\`now\` stops what still finishes, as \`nemia pause --now --yes\` does: true, or left out. ${was}`;
-  if (key === 'why' || key === 'by')
-    return `\`${key}\` is ${key === 'why' ? 'why the store is paused' : 'who pauses it'}, as \`nemia pause --${key} "<words>"\` takes it: text, or left out. ${was}`;
+  if (key === 'now') return `\`now\` cuts what still finishes, as \`nemia pause --now --yes\` does: true, or left out. ${was}`;
+  if (key === 'why' || key === 'by' || key === 'timeout')
+    return `\`${key}\` is ${key === 'why' ? 'why the store is paused' : key === 'by' ? 'who pauses it' : 'how long a call in flight is given'}, as \`nemia pause --${key} ${key === 'timeout' ? '10m' : '"<words>"'}\` takes it: text, or left out. ${was}`;
   return `POST /api/pause takes a JSON object: ${PAUSE_SHAPE}.`;
 };
 

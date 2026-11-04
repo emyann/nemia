@@ -70,7 +70,7 @@ export const continuedCap = (state: State, n: number, config: HarnessArgs | unde
 };
 
 /**
- * What the end of attempt `n` of `state`, seen `seen`, says of a park: `parked` where its job ended itself under the jobs' drain
+ * What the end of attempt `n` of `state`, seen `seen`, says of a park: `parked` where its job ended itself under the sessions' drain
  * (`Sighting.parked`), which `decide` continues; but a park that left nothing of its turn's cap — `parkedCapLeft` less the attempt's own
  * cost, an unpriced one counted 0 — is no park, and says `limit: 'budget'` instead, so it settles failed and nothing continues it.
  * Nothing for an end that was no park.

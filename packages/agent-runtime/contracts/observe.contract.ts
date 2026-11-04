@@ -5,6 +5,7 @@
  */
 import { assume, type Implementation, spec } from '@emyann/tsverify';
 import type { Monotonic } from '../src/core/clock.ts';
+import { deadlineOf } from '../src/core/deadline.ts';
 import { type Attempt, awaitsAdmission, nameFor, type Now, type Sighting, type State, waitsForInput } from '../src/core/domain.ts';
 import type { LifecycleEvent } from '../src/core/lifecycle.ts';
 import { backoffOf, RESTART_BACKOFF } from '../src/core/restart.ts';
@@ -35,17 +36,50 @@ const attemptStamped = (a: Attempt): boolean =>
   wallStamped(a.endedAt) &&
   monoStamped(a.endedMono) &&
   wallStamped(a.gapSince) &&
-  monoStamped(a.gapMono);
+  monoStamped(a.gapMono) &&
+  wallStamped(a.heldSince) &&
+  monoStamped(a.heldMono) &&
+  wallStamped(a.releasedAt) &&
+  monoStamped(a.releasedMono);
+
+/**
+ * How long the current turn has run since it last went on, and whether past its deadline (`deadlineOf`): the latest of its attempts'
+ * starts and releases, kept by a loop the verifier does not read, and arithmetic on it that a caller's proof cannot read, so what
+ * `observe` may take of it is declared, and tested on the real function; its rows in `src/core/decide.test.ts` hold the moment it
+ * counts from.
+ */
+export const deadline = assume(deadlineOf, {
+  pure: true,
+  ensures: {
+    onlyADeadlineSet: {
+      description: 'Only a task that set a deadline is past it',
+      condition: ({ input: [state], output }) => !output.overdue || state.deadlineSeconds !== undefined,
+    },
+    notWhileQueued: {
+      description: 'A turn waiting for the layer above has not started burning its time',
+      condition: ({ input: [state], output }) => !output.overdue || !awaitsAdmission(state),
+    },
+    wholeMilliseconds: {
+      description: 'The time run is whole milliseconds',
+      condition: ({ output }) => Number.isInteger(output.ranFor),
+    },
+  },
+});
 
 /** The last attempt, while it has not ended. */
 const inFlight = (state: State): Attempt | undefined => {
   const last = state.attempts.at(-1);
   return last !== undefined && last.ended === null ? last : undefined;
 };
-/** Whether the last attempt, of the current turn, was parked under a jobs' drain (`Attempt.parked`, which only an end carries). */
+/** Whether the last attempt, of the current turn, was parked under a sessions' drain (`Attempt.parked`, which only an end carries). */
 const parkedLast = (state: State): boolean => {
   const last = state.attempts.at(-1);
   return last !== undefined && last.parked !== undefined && (last.turn ?? 0) === state.inputs.length;
+};
+/** Whether the last attempt is in flight and held back at its hook: seen held, and not seen going on since. */
+const heldInFlight = (state: State): boolean => {
+  const last = inFlight(state);
+  return last !== undefined && last.heldSince !== undefined && last.releasedAt === undefined;
 };
 /** What a pass sees only of the session of an attempt in flight: its deadline, its sighting, or its absence. */
 const SESSION_EVENTS = [
@@ -108,6 +142,19 @@ const observeSpec = spec<(state: State, observed: ReadonlyMap<string, Sighting>,
         const seen = sightingOf(state, observed);
         return seen === undefined || !['completed', 'failed', 'rejected'].includes(seen.state) || output.type !== 'DEADLINE_PASSED';
       },
+    },
+    noDeadlinePassesWhileDrained: {
+      description: "While the sessions' drain stands, no deadline passes",
+      condition: ({ input: [, , now], output }) => now.drained !== true || output.type !== 'DEADLINE_PASSED',
+    },
+    aHeldAttemptsDeadlineDoesNotPass: {
+      description: "A held attempt's deadline does not pass",
+      condition: ({ input: [state], output }) => !heldInFlight(state) || output.type !== 'DEADLINE_PASSED',
+    },
+    aDeadlineCountsFromTheLastResume: {
+      description:
+        'A deadline counts from the last resume: it passes only once the turn has run its seconds since it last went on (`deadlineOf`)',
+      condition: ({ input: [state, , now], output }) => output.type !== 'DEADLINE_PASSED' || deadlineOf(state, now).overdue,
     },
     aDeadlineIsOneSet: {
       description: 'A deadline passed or spent is one the task set',
@@ -175,7 +222,7 @@ const observeSpec = spec<(state: State, observed: ReadonlyMap<string, Sighting>,
         state.restartPolicy === 'Always' || !['SESSION_IDLE', 'SESSION_RESPAWNING', 'RESPAWN_OVERDUE'].includes(output.type),
     },
     /**
-     * A job parked under a jobs' drain is continued as a restart inside its task (the card "a job stops at its tool call's end"),
+     * A job parked under a sessions' drain is continued as a restart inside its task (the card "a job stops at its tool call's end"),
      * so a restart is no longer the long-lived task's alone.
      */
     onlyALongLivedTaskOrAParkedJobRestarts: {
@@ -188,12 +235,12 @@ const observeSpec = spec<(state: State, observed: ReadonlyMap<string, Sighting>,
       condition: ({ input: [state], output }) => output.type !== 'ATTEMPT_ENDED' || !parkedLast(state),
     },
     aParkedJobIsHeldWhileDrained: {
-      description: "While a jobs' drain stands, a job is never continued",
+      description: "While a sessions' drain stands, a job is never continued",
       condition: ({ input: [state, , now], output }) =>
         now.drained !== true || state.restartPolicy === 'Always' || output.type !== 'RESTART_DUE',
     },
     heldOnlyWhenParkedAndDrained: {
-      description: "A job is held parked only while a jobs' drain stands and its last attempt ended parked",
+      description: "A job is held parked only while a sessions' drain stands and its last attempt ended parked",
       condition: ({ input: [state, , now], output }) => output.type !== 'PARK_HELD' || (now.drained === true && parkedLast(state)),
     },
     queuedOnlyWhenQueued: {

@@ -36,13 +36,15 @@ export type AnswerVia = (typeof ANSWER_VIA)[number];
 
 /**
  * The reasons a step stands in, the feed's codes: a wait on a person is an `Awaiting*` code or a stop beside them (phase `waiting`), a
- * wait on a thing is `Waiting` with what it waits on (`on`), and a step waiting on the steps before it is `Pending`.
+ * wait on a thing is `Waiting` with what it waits on (`on`), a step waiting on the steps before it is `Pending`, and a session the store's
+ * pause parked between two tool calls is `Paused` (phase `running`).
  */
 export const STEP_REASONS = [
   'Pending',
   'Waiting',
   'Running',
   'Checking',
+  'Paused',
   'AwaitingApproval',
   'AwaitingAnswer',
   'AwaitingRound',

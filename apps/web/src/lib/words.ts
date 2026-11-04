@@ -67,6 +67,11 @@ const GATE = 'waits on you';
 /** A person's words for each state of a step. */
 export const PERSON: Record<StepState, PersonWords> = {
   working: { rail: 'at work', meaning: 'Its session is running.', ...NONE },
+  paused: {
+    rail: 'paused',
+    meaning: "Parked between two tool calls by the store's pause; resumes as the same try.",
+    ...NONE,
+  },
   'needs-human': { rail: 'asks you', meaning: 'Its session is asking a person a question.', ...NONE },
   checking: { rail: 'being checked', meaning: 'It signed off, and the run is running its check.', ...NONE },
   verified: { rail: 'verified', meaning: 'Its check passed: the command the run judges it by exited 0.', ...NONE },
@@ -171,6 +176,15 @@ export const stateWordsOf = (state: StepState, on: WaitOn | null, runHeld: boole
   if (runHeld && (state === 'waiting' || state === 'waiting-for-slot')) return HELD_TO_COME;
   return PERSON[state];
 };
+
+/**
+ * What a chip says on hover: what its state means; for a step the store's pause parked, the api's sentence, which names the call it
+ * stopped after or the call cut, where it says more than the rail word; then the step's note, when it has one.
+ */
+export const chipTitle = (state: StepState, meaning: string, message: string | undefined, note: string | null): string =>
+  [meaning, state === 'paused' && message && message !== PERSON.paused.rail ? message : null, note || null]
+    .filter((line) => line !== null)
+    .join('\n');
 
 /**
  * A check's verdict as a person reads it, from its codes: `passed`, `exit 1` for the code it failed with (`failed` where it gave none),

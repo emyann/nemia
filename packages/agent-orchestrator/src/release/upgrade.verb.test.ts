@@ -9,7 +9,6 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { spawnSync } from 'node:child_process';
 import { Effect } from 'effect';
 import type { DaemonStanding } from '../daemon/daemon.ts';
 import type { Args } from '../command/command.ts';
@@ -459,8 +458,8 @@ test('an upgrade removes the releases no one needs: not the two newest, not one 
   await s.test(
     "a crashed upgrade's build folder is removed by the next upgrade, which says so, and only a log over 30 days old goes",
     async () => {
-      const dead = spawnSync(process.execPath, ['-e', '']).pid;
-      assert.ok(dead !== undefined && dead > 0, 'an exited child names a dead pid');
+      /** A pid no process has: past Linux's highest (`PID_MAX_LIMIT`, 2^22) and macOS's. */
+      const dead = 4_194_305;
       const crashed = path.join(releasesDir(), `.building-v9-${dead}`);
       fs.mkdirSync(path.join(crashed, 'trial', 'engine'), { recursive: true });
       const logs = path.join(releasesDir(), '.logs');

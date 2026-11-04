@@ -6,7 +6,6 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { spawnSync } from 'node:child_process';
 import { Effect } from 'effect';
 import { testEngine } from 'agent-runtime/testing';
 import { scratch } from '../../test/scratch.ts';
@@ -118,8 +117,8 @@ test("a crashed first upgrade's leftovers are swept on a store with no pointer, 
   const s = story(t);
   const home = scratch('wf-retain-crashed-');
   const releases = releasesDir(home);
-  const dead = spawnSync(process.execPath, ['-e', '']).pid;
-  assert.ok(dead !== undefined && dead > 0, 'an exited child names a dead pid');
+  /** A pid no process has: past Linux's highest (`PID_MAX_LIMIT`, 2^22) and macOS's. */
+  const dead = 4_194_305;
   const at = (name: string) => path.join(releases, name);
   fs.mkdirSync(at(`.building-v1-${dead}/trial/engine`), { recursive: true });
   fs.writeFileSync(at(`.building-v1-${dead}/trial/engine/x`), 'x');

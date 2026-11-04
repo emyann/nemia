@@ -171,7 +171,7 @@ lease over only when told: from the checkout, or, run from an install, from `rel
 `nemia service install --take-over` and `nemia upgrade`): the store paused unless a person's pause stands — a pause with no timeout,
 so nothing new is filed and the jobs run on, untouched — each landing check let finish, the daemon's own sessions (`restartPolicy:
 'Always'`) held by the holder's drain and their calls in flight waited for up to the timeout (`--timeout <d>`, else the store's, `nemia
-timeout`), SIGTERM, the holder's let-go parking each session for the next, the unit started, and the store resumed once the new daemon
+pause-timeout`), SIGTERM, the holder's let-go parking each session for the next, the unit started, and the store resumed once the new daemon
 has completed its first pass, which resumes each parked session as the same try on the release it runs — refused, naming its log,
 when it does not; a daemon started by hand is named with the take-over that hands it to the service. A person's pause (`nemia pause`)
 parks every session, a job or one living in the daemon, at its tool call's end through the runtime's sessions' drain

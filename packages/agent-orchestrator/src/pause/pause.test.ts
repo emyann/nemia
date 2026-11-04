@@ -368,6 +368,11 @@ test('a parked session under the pause: it finishes nothing, it is named parked,
       /^Pausing: 3 finishing/,
       'a pause with no timeout counts as before',
     );
+    const cut = pausedWords({ pause: { ...PAUSE, timeoutMs: 0 }, finishing, staged: [], held: [] }, now) ?? '';
+    assert.ok(cut.startsWith('Pausing: 2 sessions finishing a tool call, cut now'), cut);
+    const past = new Date(Date.parse(PAUSE.at) + 600_000);
+    const due = pausedWords({ pause: timed, finishing, staged: [], held: [] }, past) ?? '';
+    assert.ok(due.startsWith('Pausing: 2 sessions finishing a tool call, cut now'), due);
   });
   await t.test('a timeout is digits and one unit, from 1s to 23h', () => {
     assert.deepEqual(['90s', '10m', '2h', '23h', '1s'].map(timeoutOf), [90_000, 600_000, 7_200_000, 82_800_000, 1_000]);

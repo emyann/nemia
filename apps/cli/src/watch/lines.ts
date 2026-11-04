@@ -44,7 +44,7 @@ const heldCount = ({ staged, held }: Pick<Paused, 'staged' | 'held'>): string =>
 /** The pause as it stands, in one line, or null when none stands. */
 /** The sessions still in a tool call under a timed pause and when they are cut, as the orchestrator's `pausingWords` says it. */
 const pausingWords = (sessions: number, leftMs: number): string =>
-  `Pausing: ${sessions} session${sessions === 1 ? '' : 's'} finishing a tool call, cut in ${Math.max(1, Math.ceil(leftMs / 60_000))} min`;
+  `Pausing: ${sessions} session${sessions === 1 ? '' : 's'} finishing a tool call, cut ${leftMs > 0 ? `in ${Math.ceil(leftMs / 60_000)} min` : 'now'}`;
 
 export const pausedWords = (paused: Paused, now: Date = new Date()): string | null => {
   const { pause, finishing } = paused;

@@ -67,11 +67,11 @@ export const timeoutWords = (ms: number): string =>
 
 /**
  * How many sessions are still finishing a tool call under a pause and when what is left is cut, in one line, as the pause and a restart
- * say it while they wait: "Pausing: 2 sessions finishing a tool call, cut in 9 min". `leftMs` is rounded up to whole minutes, never
- * below one.
+ * say it while they wait: "Pausing: 2 sessions finishing a tool call, cut in 9 min", `leftMs` rounded up to whole minutes; "…, cut now"
+ * once none is left, under `nemia pause --now` or past the timeout, while the calls are being cut.
  */
 export const pausingWords = (sessions: number, leftMs: number): string =>
-  `Pausing: ${sessions} session${sessions === 1 ? '' : 's'} finishing a tool call, cut in ${Math.max(1, Math.ceil(leftMs / 60_000))} min`;
+  `Pausing: ${sessions} session${sessions === 1 ? '' : 's'} finishing a tool call, cut ${leftMs > 0 ? `in ${Math.ceil(leftMs / 60_000)} min` : 'now'}`;
 
 /**
  * A landing the pause holds with its merge staged: the ending of `run`, `step`, whose session staged the merge in `repo`'s own checkout

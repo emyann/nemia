@@ -52,10 +52,10 @@ export const parkedSentence = ({ run, step, after, cut }: Parked): string =>
 
 /**
  * How many sessions still finish a tool call and when what is left is cut, as the package's `pausingWords` says it: "Pausing: 2 sessions
- * finishing a tool call, cut in 9 min", `leftMs` rounded up to whole minutes, never below one.
+ * finishing a tool call, cut in 9 min", `leftMs` rounded up to whole minutes; "…, cut now" once none is left.
  */
 export const pausingLine = (sessions: number, leftMs: number): string =>
-  `Pausing: ${sessions} session${sessions === 1 ? '' : 's'} finishing a tool call, cut in ${Math.max(1, Math.ceil(leftMs / 60_000))} min`;
+  `Pausing: ${sessions} session${sessions === 1 ? '' : 's'} finishing a tool call, cut ${leftMs > 0 ? `in ${Math.ceil(leftMs / 60_000)} min` : 'now'}`;
 
 /**
  * The head of the Pausing line: under a pause with a timeout while sessions finish, how many and when they are cut (`pausingLine`);

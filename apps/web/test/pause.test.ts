@@ -122,7 +122,7 @@ test('pauseWords under a pause with a timeout: sessions finishing a call and whe
   await t.test('while sessions finish a call, the count line says how many and in how many minutes what is left is cut', () => {
     const words = pauseWords(
       paused({
-        pause: timed,
+        pause: { ...timed, at: new Date(NOW.getTime() - 570_000).toISOString() },
         finishing: [
           { run: 'r-1', step: 'plan', kind: 'session', calling: 'Bash' },
           { run: 'r-2', step: 'implement', kind: 'session' },
@@ -138,16 +138,26 @@ test('pauseWords under a pause with a timeout: sessions finishing a call and whe
     assert.equal(words.text, 'Pausing · 3');
     assert.equal(
       words.line,
-      `Pausing: 2 sessions finishing a tool call, cut in 1 min, 1 check held — paused since ${clockWord(new Date(AT), NOW)} by ann: merging by hand. Nothing new starts, and what runs finishes.`,
+      `Pausing: 2 sessions finishing a tool call, cut in 1 min, 1 check held — paused since ${clockWord(new Date(NOW.getTime() - 570_000), NOW)} by ann: merging by hand. Nothing new starts, and what runs finishes.`,
     );
     assert.deepEqual(words.parked, parked.map(parkedSentence));
   });
-  await t.test('the minutes left are rounded up, never below one, and one session is said so', () => {
-    const at = new Date(Date.parse(AT) + 60_500);
+  await t.test('the minutes left are rounded up, "cut now" once none is left, and one session is said so', () => {
+    const at = new Date(NOW.getTime() - 599_500);
     const one = paused({ pause: { ...timed, at: at.toISOString() }, finishing: [{ run: 'r-1', step: 'plan', kind: 'session' }] });
     assert.match(pauseWords(one, null, NOW).line, /^Pausing: 1 session finishing a tool call, cut in 1 min — /);
     const early = paused({ pause: { ...timed, at: NOW.toISOString() }, finishing: [{ run: 'r-1', step: 'plan', kind: 'session' }] });
     assert.match(pauseWords(early, null, new Date(NOW.getTime() + 60_001)).line, /cut in 9 min — /);
+    const now = paused({
+      pause: { ...timed, at: NOW.toISOString(), timeoutMs: 0 },
+      finishing: [{ run: 'r-1', step: 'plan', kind: 'session' }],
+    });
+    assert.match(
+      pauseWords(now, null, NOW).line,
+      /^Pausing: 1 session finishing a tool call, cut now — /,
+      'a pause at once is cutting now',
+    );
+    assert.match(pauseWords(early, null, new Date(NOW.getTime() + 600_000)).line, /cut now — /, 'past its timeout, the call is being cut');
     const ahead = new Date(NOW.getTime() - 30_000);
     assert.match(
       pauseWords(early, null, ahead).line,

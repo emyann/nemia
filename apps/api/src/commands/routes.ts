@@ -365,14 +365,13 @@ export const wordBreaks = (table: readonly Pick<CommandSpec, 'name' | 'route'>[]
  * - `POST /api/pause` — the store paused, as `nemia pause` pauses it (`pauseParked`), its body `nemia pause`'s `--why`, `--by`, `--timeout`
  *   and `--now`, its route setting `yes`, and the route names no run: no pass starts new work until the lift, and every session parks at
  *   its tool call's end within `timeout` (`"15m"`; the store's, `nemia pause-timeout`, where it is left out), written on the pause as
- * `timeoutMs`.   Refuses what `nemia pause` refuses of `--why`, `--by` and `--timeout` — a timeout out of its form, or given with `now` —
- * with 422, and a   pause that stands without `now` with 409 (`Conflict`). Its 200 is `{ pause }`, as written. With `now`, as `nemia pause
- * --now --yes`,   it pauses at once (`pauseNow`): it keeps a pause that stands as it was put, its timeout cut to 0, so each session's call
- * is cut and the   session goes on as the same try once the store is resumed, and asks each check at work but a landing's to stop, run
- * again then; its   200 is `{ pause, kept, interrupted, skipped }`.
+ *   `timeoutMs`. Refuses what `nemia pause` refuses of `--why`, `--by` and `--timeout` — a timeout out of its form, or given with `now` —
+ *   with 422, and a pause that stands without `now` with 409 (`Conflict`). Its 200 is `{ pause }`, as written. With `now`, as `nemia pause
+ *   --now --yes`, it pauses at once (`pauseNow`): it keeps a pause that stands as it was put, its timeout cut to 0, so each session's call
+ *   is cut and the session goes on as the same try once the store is resumed, and asks each check at work but a landing's to stop, run
+ *   again then; its 200 is `{ pause, kept, interrupted, skipped }`.
  * - `DELETE /api/pause` — the store's pause lifted, as `nemia resume` lifts it (`resumePause`), and the sessions' drain with it; it reads
- *   no body. None standing is a 404
- *   (`Missing`). Its 200 is `{ pause }`, the pause lifted.
+ *   no body. None standing is a 404 (`Missing`). Its 200 is `{ pause }`, the pause lifted.
  * - `POST /api/subscriptions/:name` — a long-lived task given a subscription to the feed, as `nemia subscribe <name> <task>` gives it
  *   (`subscribe`), its body `{ task, selectors?, digestEvery?, atLeast? }`, `selectors` a list as `-l` given many times, and `atLeast`
  *   the level a run's factory is at least at for its lines to be carried, as `--at-least` takes it, stored as the subscription's `scope`:

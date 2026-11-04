@@ -20,9 +20,9 @@ const PAUSE_NOW = commandNamed('pause now');
 export type PauseNowRead = { interrupts: Interrupt[]; cost: string };
 
 /**
- * The store's pause or null, with its timeout (`timeoutMs`) where it parks sessions; each task still finishing under it; each session it has
- * parked at a tool call's end (`parked`: its run, its step, and the call it stopped `after` or the call `cut`); each landing it holds with
- * its merge staged in its checkout (MERGE_HEAD); and each other check it holds, read through `e`.
+ * The store's pause or null, with its timeout (`timeoutMs`) where it parks sessions; each task still finishing under it; each session it
+ * has parked at a tool call's end (`parked`: its run, its step, and the call it stopped `after` or the call `cut`); each landing it holds
+ * with its merge staged in its checkout (MERGE_HEAD); and each other check it holds, read through `e`.
  */
 export const pauseOf = async (e: Engine['Service'], at: Placed): Promise<Paused> => (await runPlaced(at, e, PAUSED.handler({}))) as Paused;
 

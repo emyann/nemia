@@ -109,14 +109,14 @@ export const attachedCalls = <E, R>(list: (ids?: readonly string[]) => Effect.Ef
 const engineList = (ids?: readonly string[]) => Effect.flatMap(EngineService, (e) => asked('list', e.list(ids)));
 
 /**
- * The timeout a take-over gives the calls in flight: `--timeout` where given (`timeoutOf`), else the store's at `home` (`timeoutAt`). Refused
- * (`Invalid`): a `--timeout` that does not read, naming `by`'s flag, or a timeout file that does not read.
+ * The timeout a take-over gives the calls in flight: `--timeout` where given (`timeoutOf`), else the store's at `home` (`timeoutAt`).
+ * Refused (`Invalid`): a `--timeout` that does not read, naming `by`'s flag, or a timeout file that does not read.
  */
 export const timeoutGiven = (args: Args, home: string, by: string): Effect.Effect<number, Refusal> =>
   tried(() => {
-    if (typeof args.timeoutText !== 'string') return timeoutAt(home).ms;
-    const ms = timeoutOf(args.timeoutText);
-    if (ms === undefined) throw new Invalid({ message: `${by}: --timeout takes ${timeoutRefusal(args.timeoutText)}, like --timeout 10m.` });
+    if (typeof args.timeout !== 'string') return timeoutAt(home).ms;
+    const ms = timeoutOf(args.timeout);
+    if (ms === undefined) throw new Invalid({ message: `${by}: --timeout takes ${timeoutRefusal(args.timeout)}, like --timeout 10m.` });
     return ms;
   });
 
@@ -129,14 +129,6 @@ export const timedHost = (args: Args, home: string | undefined, verb: string): E
     ),
     liveHost,
   );
-
-/** `--timeout <d>`, which a restart and an upgrade take: how long the daemon's calls in flight are given before they are cut. */
-export const timeoutFlag = (shape: string): Flag => ({
-  flag: '--timeout',
-  kind: 'text',
-  key: 'timeoutText',
-  takes: `--timeout takes a duration, like --timeout 10m: ${shape}.`,
-});
 
 /**
  * The machine as it is: the process's node, the store's lease and pause, `systemctl` and `launchctl` themselves. The daemon an install

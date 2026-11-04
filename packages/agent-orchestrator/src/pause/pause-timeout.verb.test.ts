@@ -1,6 +1,6 @@
 /**
- * `nemia pause-timeout`: bare, the timeout in force — the default with no file, or the one set and when; given a duration, it writes it; a timeout out
- * of its form, and a file that does not read, refused. Through the command's entry, at a root of the test's own.
+ * `nemia pause-timeout`: bare, the timeout in force — the default with no file, or the one set and when; given a duration, it writes it; a
+ * timeout out of its form, and a file that does not read, refused. Through the command's entry, at a root of the test's own.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

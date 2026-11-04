@@ -14,7 +14,8 @@ import { readPause } from '../pause/pause.store.ts';
 import { Conflict, Missing } from '../refusal/refusal.ts';
 import { tried } from '../runtime-client.ts';
 import { holderOfLease, takeOverLine } from './service.ts';
-import { timedHost, timeoutFlag, liveHost, NAME_FLAG, serviceAt, SERVICES, type ServiceAt, type ServiceHost } from './service.verb.ts';
+import { timeoutFlag } from '../pause/pause.ts';
+import { timedHost, liveHost, NAME_FLAG, serviceAt, SERVICES, type ServiceAt, type ServiceHost } from './service.verb.ts';
 import { startedPassed, takeOver } from './takeover.verb.ts';
 
 /** The command a restart's pause and lines name. */

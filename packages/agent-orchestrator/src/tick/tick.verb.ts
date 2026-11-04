@@ -307,9 +307,10 @@ const pass = Effect.fn('pass')(function* (engine: Engine, { repo, memo, verify }
 
 /**
  * The sessions' drain as the store's pause says it, put again on each pass before the engine's tick, so a pause put or lifted by any hand
- * — or a daemon restarted under one — is honoured by the next pass: a pause with a timeout puts the drain at that timeout, which the runtime
- * keeps as it stands when the timeout is the same; no pause lifts it; a pause with no timeout — the take-over's own, or one put before the
- * timeout was written — leaves it as it stands. An engine with no such verb (a test's hand-made fake, as `ioOf` reads one) is left as it is.
+ * — or a daemon restarted under one — is honoured by the next pass: a pause with a timeout puts the drain at that timeout, which the
+ * runtime keeps as it stands when the timeout is the same; no pause lifts it; a pause with no timeout — the take-over's own, or one put
+ * before the timeout was written — leaves it as it stands. An engine with no such verb (a test's hand-made fake, as `ioOf` reads one) is
+ * left as it is.
  */
 const drainFromPause = Effect.fnUntraced(function* (engine: Engine) {
   if (typeof engine.drainSessions !== 'function') return;

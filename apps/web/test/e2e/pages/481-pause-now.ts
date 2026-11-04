@@ -103,10 +103,10 @@ export default {
    * pause's file holds its why; a session it named is asked no stop and no try, its call cut by the sessions' drain so it goes on as the
    * same try on the resume, while a check it named is asked to stop and has the try that runs it again beside its run; the landing is
    * left at work, and the popover reads Pausing, each named check stopping and tried again on the resume. From Pausing, after
-   * a plain Pause…, Pause now… is offered beside Resume, asks no why, and keeps the pause as it was put, its timeout cut to 0; on a phone's screen its confirm
-   * fits. Resume takes the pause away. Which tasks a pause at once stops, and how the resume continues each, is the package's judgement,
-   * proven in its own tests (`packages/agent-orchestrator/src/tick/pause.test.ts`). The page puts back every file it wrote, and the
-   * window's size.
+   * a plain Pause…, Pause now… is offered beside Resume, asks no why, and keeps the pause as it was put, its timeout cut to 0; on a phone's
+   * screen its confirm fits. Resume takes the pause away. Which tasks a pause at once stops, and how the resume continues each, is the
+   * package's judgement, proven in its own tests (`packages/agent-orchestrator/src/tick/pause.test.ts`). The page puts back every file it
+   * wrote, and the window's size.
    */
   name: 'pause-now',
   route: '/factories/default',

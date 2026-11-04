@@ -678,11 +678,11 @@ test('the take-over’s timeout: --timeout where given, else the store’s; a ti
     assert.equal(await Effect.runPromise(timeoutGiven({}, home, 'nemia service restart')), 900_000);
   });
   await t.test('--timeout over it', async () => {
-    assert.equal(await Effect.runPromise(timeoutGiven({ timeoutText: '90s' }, home, 'nemia upgrade')), 90_000);
+    assert.equal(await Effect.runPromise(timeoutGiven({ timeout: '90s' }, home, 'nemia upgrade')), 90_000);
   });
   await t.test('--timeout that does not read: Invalid, naming the flag', async () => {
     await assert.rejects(
-      Effect.runPromise(timeoutGiven({ timeoutText: 'soon' }, home, 'nemia upgrade')),
+      Effect.runPromise(timeoutGiven({ timeout: 'soon' }, home, 'nemia upgrade')),
       refusedWith('Invalid', /--timeout\b/),
     );
   });

@@ -1,6 +1,6 @@
 /**
- * The store's pause timeout on disk (`pause-timeout.json`): ten minutes where no file is, the file's once `putTimeout` writes it, and a file
- * that does not read refused, naming the verb that writes it again. Each test on a root of its own, given by parameter.
+ * The store's pause timeout on disk (`pause-timeout.json`): ten minutes where no file is, the file's once `putTimeout` writes it, and a
+ * file that does not read refused, naming the verb that writes it again. Each test on a root of its own, given by parameter.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

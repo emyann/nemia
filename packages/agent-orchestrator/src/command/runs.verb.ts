@@ -24,6 +24,7 @@ import { nowRead, pauseNow, pauseParked } from '../pause/pause.verb.ts';
 import {
   NOW_COST,
   pauseTimeoutRefusal,
+  timeoutFlag,
   nowLines,
   pausedNowLines,
   pauseWords,
@@ -358,8 +359,8 @@ type PauseNowRead = { pause: Pause | null; interrupts: Interrupt[] };
 type PauseAnswer = { pause: Pause } | PausedNow | PauseNowRead;
 
 /**
- * `nemia pause`'s handler, by its flags: a plain pause, which parks every session at its call's end within `--timeout` or the store's timeout
- * (`timeoutAt`), refused while one stands; `--now`, which only reads; `--now --yes`, which acts.
+ * `nemia pause`'s handler, by its flags: a plain pause, which parks every session at its call's end within `--timeout` or the store's
+ * timeout (`timeoutAt`), refused while one stands; `--now`, which only reads; `--now --yes`, which acts.
  */
 const pauseBy = Effect.fnUntraced(function* (args: Args, home?: string) {
   const said = { why: saidOf(args, 'why'), by: saidOf(args, 'by') };
@@ -369,9 +370,9 @@ const pauseBy = Effect.fnUntraced(function* (args: Args, home?: string) {
 });
 
 /**
- * `nemia pause`: the store paused, every session parked at its tool call's end within the timeout (`pauseParked`), on `POST /api/pause` too;
- * the pause as written, its timeout `--timeout` (`timeout` in the body) or the store's. Refused while a pause stands (`Conflict`). `--now` says
- * what a pause at once would cut and writes nothing; `--now --yes`, as the route always does, pauses at once (`pauseNow`).
+ * `nemia pause`: the store paused, every session parked at its tool call's end within the timeout (`pauseParked`), on `POST /api/pause`
+ * too; the pause as written, its timeout `--timeout` (`timeout` in the body) or the store's. Refused while a pause stands (`Conflict`).
+ * `--now` says what a pause at once would cut and writes nothing; `--now --yes`, as the route always does, pauses at once (`pauseNow`).
  */
 export const PAUSE: Command<PauseAnswer> = {
   name: 'pause',
@@ -402,12 +403,7 @@ export const PAUSE: Command<PauseAnswer> = {
     positionals: [],
     flags: [
       ...saidFlags(PAUSE_SAID, 'nemia pause', 'a pause', PAUSE_TAKES, PAUSE_SHAPE),
-      {
-        flag: '--timeout',
-        kind: 'name',
-        key: 'timeout',
-        takes: `--timeout takes how long a call in flight is given, as 10m: ${PAUSE_SHAPE}.`,
-      },
+      timeoutFlag(PAUSE_SHAPE),
       { flag: '--now', kind: 'switch', key: 'now' },
       { flag: '--yes', kind: 'switch', key: 'yes' },
     ],
@@ -446,11 +442,7 @@ export const RESUME: Command<{ pause: Pause }> = {
   ticks: true,
   class: 'act',
   route: { method: 'DELETE', path: '/api/pause', status: 200 },
-  handler: () =>
-    Effect.tap(
-      tried(() => ({ pause: resumePause() })),
-      () => sessionsDrained(null),
-    ),
+  handler: () => tried(() => ({ pause: resumePause() })).pipe(Effect.tap(() => sessionsDrained(null))),
   print: () => [RESUMED],
 };
 

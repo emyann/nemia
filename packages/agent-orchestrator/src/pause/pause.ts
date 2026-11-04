@@ -5,6 +5,7 @@
  * `nemia watch --once`, `nemia start`, `nemia up` and the board say it. Pure: its file is `pause.store.ts`'s, and the gates that honour
  * it are `assess` and the tick's `pass`.
  */
+import type { Flag } from '../command/command.ts';
 import type { Run } from '../record/record.ts';
 import type { RecordMemo } from '../rest/index.ts';
 import type { RetryAsk } from '../retry/index.ts';
@@ -280,8 +281,8 @@ const heldCount = ({ staged, held }: Pick<Paused, 'staged' | 'held'>): string =>
 
 /**
  * The pause as it stands, in one line: "Pausing" with how many tasks still finish, or "Paused" once none does, each with how many checks
- * it holds back (`staged` and `held`), when any. Under a pause with a timeout, while sessions finish, how many finish a tool call and in how
- * many minutes from `now` what is left is cut (`pausingWords`). Null when no pause stands.
+ * it holds back (`staged` and `held`), when any. Under a pause with a timeout, while sessions finish, how many finish a tool call and in
+ * how many minutes from `now` what is left is cut (`pausingWords`). Null when no pause stands.
  */
 export const pausedWords = (paused: Pick<Paused, 'pause' | 'finishing' | 'staged' | 'held'>, now: Date = new Date()): string | null => {
   const { pause, finishing } = paused;
@@ -396,3 +397,11 @@ export const pausedLines = (paused: Paused, now: Date = new Date()): string[] =>
 
 /** What `nemia up` says once the pause it said is resumed. */
 export const RESUMED = 'the store is resumed — the next pass files what waits';
+
+/** The `--timeout <d>` flag of `nemia pause`, `nemia service restart` and `nemia upgrade`, its refusal ending on the verb's `shape`. */
+export const timeoutFlag = (shape: string): Flag => ({
+  flag: '--timeout',
+  kind: 'text',
+  key: 'timeout',
+  takes: `--timeout takes how long a call in flight is given, as --timeout 10m: ${shape}.`,
+});

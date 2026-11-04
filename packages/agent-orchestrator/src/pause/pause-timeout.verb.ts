@@ -1,7 +1,7 @@
 /**
- * `nemia pause-timeout [<d>]`: the store's pause timeout, how long a person's pause, a restart and an upgrade give each tool call in flight before it
- * is cut. Bare, the timeout in force, as `nemia level` says the level; given a duration, the timeout written (`putTimeout`). A command of the
- * CLI alone: the board pauses with the store's timeout and sets none.
+ * `nemia pause-timeout [<d>]`: the store's pause timeout, how long a person's pause, a restart and an upgrade give each tool call in flight
+ * before it is cut. Bare, the timeout in force, as `nemia level` says the level; given a duration, the timeout written (`putTimeout`). A
+ * command of the CLI alone: the board pauses with the store's timeout and sets none.
  */
 import { Effect } from 'effect';
 import { rootGiven } from '../config/root.store.ts';
@@ -26,8 +26,8 @@ const timeoutLine = ({ ms, set, at }: TimeoutAt): string =>
   `the store's pause timeout is ${timeoutWords(ms)}${set ? (at ? `, set ${at}` : '') : ' (the default)'}`;
 
 /**
- * `nemia pause-timeout`: the store's pause timeout, read bare and written given a duration. Refused: a timeout out of its form, a file that does not
- * read.
+ * `nemia pause-timeout`: the store's pause timeout, read bare and written given a duration. Refused: a timeout out of its form, a file that
+ * does not read.
  */
 export const TIMEOUT: Command<TimeoutAnswer> = {
   name: 'pause-timeout',

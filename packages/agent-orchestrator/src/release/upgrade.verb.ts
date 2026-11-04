@@ -13,7 +13,8 @@ import type { PlaceOutcome, PlaceVerb } from '../place/place.ts';
 import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
 import { tried } from '../runtime-client.ts';
 import { holderOfLease, takeOverLine, DEFAULT_NAME } from '../service/service.ts';
-import { timedHost, timeoutFlag, liveHost, NAME_FLAG, serviceForUpgrade, type ServiceHost } from '../service/service.verb.ts';
+import { timeoutFlag } from '../pause/pause.ts';
+import { timedHost, liveHost, NAME_FLAG, serviceForUpgrade, type ServiceHost } from '../service/service.verb.ts';
 import { takeOver } from '../service/takeover.verb.ts';
 import { CURRENT, RELEASE_CHECK, restartPlan, tagRefusal, type ReleaseFile, type Running } from './release.ts';
 import {

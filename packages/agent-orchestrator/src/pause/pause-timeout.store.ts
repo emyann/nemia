@@ -1,7 +1,7 @@
 /**
- * The store's pause timeout on disk, `$WF_ROOT/pause-timeout.json` (`{"timeout": "10m"}`): how long a person's pause, a restart and an upgrade
- * give each call in flight before it is cut, read the same way by every process and set by `nemia pause-timeout <d>`. Absent, the timeout is ten
- * minutes (`DEFAULT_TIMEOUT_MS`). Read and written whole, through a hidden file renamed over it.
+ * The store's pause timeout on disk, `$WF_ROOT/pause-timeout.json` (`{"timeout": "10m"}`): how long a person's pause, a restart and an
+ * upgrade give each call in flight before it is cut, read the same way by every process and set by `nemia pause-timeout <d>`. Absent, the
+ * timeout is ten minutes (`DEFAULT_TIMEOUT_MS`). Read and written whole, through a hidden file renamed over it.
  *
  * The store's root is no module's to read: every function here takes it as a required `home: string`, as `servers.store.ts` does.
  */

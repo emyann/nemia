@@ -4,13 +4,14 @@
  * `gh`, each call bounded.
  *
  * - `check`: the `release-label` check. Exactly one of `LABELS` on the pull request, read from `LABELS` (a JSON array of names, the
- *   pure entry a test drives) or, unset, from the pull request numbered `PR_NUMBER` as it is now, as the workflow passes it.
+ *   pure entry a test drives) or, unset, from the pull request numbered `PR_NUMBER` as it is now, as the workflow passes it. Given a
+ *   `HEAD_SHA` (a dispatched run's commit), it refuses a pull request whose head is another commit.
  * - `labels`: makes the five labels in the repository, and puts back the colour or description of one that drifted.
  * - `tag`: where the root `package.json` names a version that has no tag `v<version>`, makes that GitHub release on the first-parent
  *   commit of main that set the version, with the notes GitHub generates since the previous release.
  * - `pr`: keeps the release pull request (`release` into `main`) open while a pull request merged since the last release carries a label
- *   that releases, rebuilt from main when main moves, its body opening on the merge box's button that starts the runs main requires;
- *   closes it when nothing is to release. It dispatches nothing: a dispatched run never counts for a pull request.
+ *   that releases, rebuilt from main when main moves, and dispatches `DISPATCHED` on its head where the head has no such run pending or
+ *   green: the runs that report main's required checks with no person's approval. Closes it when nothing is to release.
  *
  * Only a tag `v<x.y.z>` is a release (`releaseTag`): `v1-final`, `legacy/v1-final` and the operator's local `nemia-*` tags are not.
  * Exit codes: 0 done, 1 refused or failed (the line says what to do), 2 a verb it does not have.
@@ -44,18 +45,23 @@ const TAG = /^v(\d+)\.(\d+)\.(\d+)$/;
 export const BRANCH = 'release';
 export const BASE = 'main';
 
+/**
+ * The workflows `pr` dispatches on the release branch's head, each with the check it reports there by the name main requires, and
+ * whether it is given the pull request's number (its `pr` input).
+ */
+export const DISPATCHED = [
+  { file: 'ci.yml', check: 'ci', pr: false },
+  { file: 'release-label.yml', check: 'release-label', pr: true },
+] as const;
+
 /** The bound on one `git` or `gh` call: a stalled network fails the call, never the job's whole bound. */
 const CALL_MS = 120_000;
 
 /** Who commits the version on `release`: the workflow, as GitHub names its own token's user. */
 const IDENTITY = ['-c', 'user.name=github-actions[bot]', '-c', 'user.email=41898282+github-actions[bot]@users.noreply.github.com'];
 
-/**
- * The setting GitHub refuses the token's pull request without, and the merge box's button the release pull request's body opens on:
- * the workflow's token pushed `release`, so the pull request's `ci` and `release-label` runs wait for a person's approval.
- */
+/** The setting GitHub refuses the token's pull request without. */
 export const CREATE_SETTING = 'Allow GitHub Actions to create and approve pull requests';
-export const APPROVE_BUTTON = 'Approve workflows to run';
 
 /** The pages of merged pull requests read at most: 100 each, far past the repository's count. */
 const MAX_PAGES = 200;
@@ -144,7 +150,7 @@ type Pull = {
   labels: { name: string }[];
   merged_at?: string | null;
   merge_commit_sha?: string | null;
-  head?: { ref: string };
+  head?: { ref: string; sha?: string };
 };
 
 /** The open pull request whose head is `branch`, into main, or `undefined`. */
@@ -157,12 +163,16 @@ const addCommand = (number: string | undefined): string =>
   `gh api -X POST repos/{owner}/{repo}/issues/${number ?? '<number>'}/labels -f 'labels[]=<label>'`;
 
 /**
- * `check`: exactly one release label. The labels are read live by `PR_NUMBER`, so a run a person approves after the pull request was
- * labelled reads the label it has then, never the payload of the event that started it.
+ * `check`: exactly one release label. The labels are read live by `PR_NUMBER`, so a run that starts after the pull request was
+ * labelled reads the label it has then, never the payload of the event that started it. A dispatched run passes `HEAD_SHA`, the commit
+ * it reports on, and the pull request's head must be that commit: a dispatch elsewhere cannot borrow a labelled pull request's number.
  */
 const check = (env: Env, out: Out, r: Reach): number => {
   let labels: unknown;
   const number = env.PR_NUMBER;
+  const head = env.HEAD_SHA ?? '';
+  if (env.LABELS !== undefined && head !== '')
+    throw new Refusal('release-label: HEAD_SHA is compared with the live pull request: unset LABELS, and pass PR_NUMBER');
   if (env.LABELS !== undefined) {
     try {
       labels = JSON.parse(env.LABELS);
@@ -174,7 +184,13 @@ const check = (env: Env, out: Out, r: Reach): number => {
       throw new Refusal(
         'release-label: set PR_NUMBER to the pull request number (github.event.pull_request.number), or LABELS to its labels as a JSON array',
       );
-    labels = r.api<Pull>('GET', `repos/{owner}/{repo}/pulls/${number}`).labels.map((label) => label.name);
+    const pull = r.api<Pull>('GET', `repos/{owner}/{repo}/pulls/${number}`);
+    if (head !== '' && pull.head?.sha !== head)
+      throw new Refusal(
+        `release-label: pull request #${number}'s head is ${pull.head?.sha ?? 'unknown'}, not ${head}, the commit this run checks. ` +
+          `Check its head with gh workflow run release-label.yml --ref ${pull.head?.ref ?? '<its head branch>'} -f pr=${number}`,
+      );
+    labels = pull.labels.map((label) => label.name);
   }
   if (!Array.isArray(labels) || labels.some((label) => typeof label !== 'string'))
     throw new Refusal('release-label: LABELS is no JSON array of names: unset it, and pass PR_NUMBER so the labels are read live');
@@ -321,18 +337,18 @@ const rebuilt = (out: Out, r: Reach, root: string, main: string, version: string
 };
 
 /**
- * What a person does with the release pull request, first in its body so `BODY_MAX`'s cut never reaches it: the token's push started
- * runs that wait for approval, and those are the checks main requires.
+ * What a person does with the release pull request, first in its body so `BODY_MAX`'s cut never reaches it: merge once the dispatched
+ * checks are green. The token's push also starts pull_request runs that wait for approval; main's protection counts the dispatched ones.
  */
-const APPROVE = [
-  `**To release:** press "${APPROVE_BUTTON}" in this pull request's merge box. That starts its \`ci\` and \`release-label\`, the`,
-  "checks main requires, which wait because the workflow's own token pushed `release`. Merge once both are green. A rebuild, when",
-  'main moves, pushes a new head and asks for the click again.',
+const TO_RELEASE = [
+  `**To release:** merge once ${DISPATCHED.map(({ check }) => `\`${check}\``).join(' and ')} are green on this head. The release workflow`,
+  'dispatched both here, so nothing needs approving: leave the runs that wait for approval as they are. A rebuild, when main moves,',
+  'dispatches them again on the new head. A check missing or failed on the head: gh workflow run release.yml.',
 ].join('\n');
 
 /** The release pull request's body: what a person does, GitHub's notes, then the pull requests no label counted, within GitHub's bound. */
 const bodyOf = (generated: string, unlabelled: Pull[]): string => {
-  let body = `${APPROVE}\n\n${generated}\n`;
+  let body = `${TO_RELEASE}\n\n${generated}\n`;
   if (unlabelled.length) body += `\n## Not labelled, counted for no bump\n\n${unlabelled.map((pull) => `#${pull.number}`).join(', ')}\n`;
   return body.length > BODY_MAX
     ? `${body.slice(0, BODY_MAX)}\n\n… cut at GitHub's bound on a body; the release's own notes are whole.\n`
@@ -353,6 +369,27 @@ const opened = (env: Env, title: string, body: string): number => {
 };
 
 const labelsOf = (pull: Pull): string[] => pull.labels.map((label) => label.name);
+
+type WorkflowRun = { status: string; conclusion: string | null };
+
+/** Whether a dispatched run stands for its check on its head: still to finish, or green. A failed or cancelled one is tried again. */
+const standing = (run: WorkflowRun): boolean => run.status !== 'completed' || run.conclusion === 'success';
+
+/**
+ * Dispatches each of `DISPATCHED` on the release branch where `head` has no dispatched run of it that stands, `release-label.yml` given
+ * the pull request's number. Read from the head's runs every pass, whoever pushed it: a rerun with nothing changed dispatches nothing.
+ */
+const dispatch = (out: Out, r: Reach, head: string, number: number): void => {
+  for (const { file, pr } of DISPATCHED) {
+    const { workflow_runs: runs } = r.api<{ workflow_runs: WorkflowRun[] }>(
+      'GET',
+      `repos/{owner}/{repo}/actions/workflows/${file}/runs?head_sha=${head}&event=workflow_dispatch&per_page=100`,
+    );
+    if (runs.some(standing)) continue;
+    r.gh(['workflow', 'run', file, '--ref', BRANCH, ...(pr ? ['-f', `pr=${number}`] : [])]);
+    out(`pr: dispatched ${file} on ${BRANCH} at ${head}`);
+  }
+};
 
 /** `pr`: the release pull request, as main and the merged pull requests are now. */
 const pr = (env: Env, out: Out, r: Reach, root: string): number => {
@@ -380,6 +417,7 @@ const pr = (env: Env, out: Out, r: Reach, root: string): number => {
   out(`pr: #${number} is ${title}`);
   if (!open?.labels.some((label) => label.name === 'internal'))
     r.api('POST', `repos/{owner}/{repo}/issues/${number}/labels`, ['labels[]=internal']);
+  dispatch(out, r, head, number);
   return 0;
 };
 

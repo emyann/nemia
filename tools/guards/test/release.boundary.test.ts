@@ -2,7 +2,7 @@
  * `tools/release/release.ts` run for real on a scratch repository — a bare origin and a clone of it, with the tags this repository has
  * (`v0.3.0`, `v1-final`, `legacy/v1-final`) and the operator's local `nemia-2026.11.03` — and a stub `gh` first on PATH that logs each
  * call and answers GitHub's part from a state file: the merged pull requests (more than one page of them), the open ones, one pull
- * request by its number, and the generated notes. What it asserts is the exit code, the calls made and positions in a body, never a
+ * request by its number, the generated notes, and a workflow's dispatched runs on a head, which a dispatch it records adds to. What it asserts is the exit code, the calls made and positions in a body, never a
  * sentence.
  */
 import { test } from 'node:test';
@@ -11,7 +11,7 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from './scratch.ts';
-import { APPROVE_BUTTON, CREATE_SETTING } from '../../release/release.ts';
+import { CREATE_SETTING, DISPATCHED } from '../../release/release.ts';
 
 const RELEASE = path.join(import.meta.dirname, '..', '..', 'release', 'release.ts');
 
@@ -22,8 +22,11 @@ type Pull = {
   labels: { name: string }[];
   merged_at?: string | null;
   merge_commit_sha?: string | null;
-  head: { ref: string };
+  head: { ref: string; sha?: string };
 };
+
+/** A dispatched run the stub knows: its workflow file, the head it ran on, the pull request it was given, and how it stands. */
+type Run = { file: string; head: string; pr?: string; status: string; conclusion: string | null };
 
 /** What the stub answers from, and what it changes as the script acts. */
 type State = {
@@ -31,14 +34,18 @@ type State = {
   createFails?: boolean;
   labels: { name: string; color: string; description: string }[];
   next: number;
+  runs?: Run[];
 };
 
 /**
  * The stub `gh`: logs its argv as one JSON line to `STUB_LOG`, reads and writes `STUB_STATE`, and answers as GitHub would the calls
- * the tool makes. It answers no dispatch and no run list: a call the release no longer makes exits 9.
+ * the tool makes; a call it has no answer for exits 9. A dispatch records a queued run on the origin's \`release\` head as it is then, and a
+ * pull request opened takes that head too.
  */
 const STUB = `
 const fs = require('node:fs');
+const { execFileSync } = require('node:child_process');
+const releaseHead = () => execFileSync('git', ['ls-remote', 'origin', 'refs/heads/release'], { encoding: 'utf8' }).split('\\t')[0];
 const args = process.argv.slice(2);
 const stdin = args.includes('-') ? fs.readFileSync(0, 'utf8') : undefined;
 fs.appendFileSync(process.env.STUB_LOG, JSON.stringify({ args, stdin }) + '\\n');
@@ -76,6 +83,10 @@ if (args[0] === 'api') {
     const p = state.pulls.find((each) => each.number === Number(m[1]));
     p.labels.push({ name: field('labels[]') }); save(); print(p.labels);
   }
+  else if (method === 'GET' && (m = /^repos\\/\\{owner\\}\\/\\{repo\\}\\/actions\\/workflows\\/([^/]+)\\/runs$/.exec(route))) {
+    const runs = (state.runs || []).filter((run) => run.file === m[1] && run.head === q.get('head_sha') && q.get('event') === 'workflow_dispatch');
+    print({ total_count: runs.length, workflow_runs: runs.map((run) => ({ head_sha: run.head, event: 'workflow_dispatch', status: run.status, conclusion: run.conclusion })) });
+  }
   else if (method === 'POST' && route === 'repos/{owner}/{repo}/releases/generate-notes') { print({ name: field('tag_name'), body: '## Fixes\\n* a fix, up to ' + field('target_commitish') }); }
   else { process.stderr.write('stub gh: no answer for ' + args.join(' ')); process.exit(9); }
   process.exit(0);
@@ -83,18 +94,23 @@ if (args[0] === 'api') {
 if (args[0] === 'pr' && args[1] === 'create') {
   if (state.createFails) { process.stderr.write('pull request create failed: GraphQL: GitHub Actions is not permitted to create or approve pull requests (createPullRequest)'); process.exit(1); }
   const number = state.next++;
-  state.pulls.push({ number, title: args[args.indexOf('--title') + 1], body: stdin, labels: [], merged_at: null, head: { ref: args[args.indexOf('--head') + 1] } });
+  state.pulls.push({ number, title: args[args.indexOf('--title') + 1], body: stdin, labels: [], merged_at: null, head: { ref: args[args.indexOf('--head') + 1], sha: releaseHead() } });
   save(); process.stdout.write('https://github.com/o/r/pull/' + number + '\\n'); process.exit(0);
 }
 if (args[0] === 'release' && args[1] === 'create') process.exit(0);
+if (args[0] === 'workflow' && args[1] === 'run' && args[3] === '--ref' && args[4] === 'release') {
+  const pr = args.indexOf('-f') >= 0 ? args[args.indexOf('-f') + 1] : undefined;
+  state.runs = [...(state.runs || []), { file: args[2], head: releaseHead(), pr: pr && pr.startsWith('pr=') ? pr.slice(3) : pr, status: 'queued', conclusion: null }];
+  save(); process.exit(0);
+}
 process.stderr.write('stub gh: no answer for ' + args.join(' ')); process.exit(9);
 `;
 
 type Call = { args: string[]; stdin?: string };
 
 /**
- * A scratch world: the origin, the clone the tool runs in, the stub's state and log. Its environment leaves out an inherited `LABELS`
- * and `PR_NUMBER`, the check's two inputs, so each test sets the one it reads.
+ * A scratch world: the origin, the clone the tool runs in, the stub's state and log. Its environment leaves out an inherited `LABELS`,
+ * `PR_NUMBER` and `HEAD_SHA`, the check's inputs, so each test sets the ones it reads.
  */
 const world = () => {
   const root = scratch('release-');
@@ -102,7 +118,7 @@ const world = () => {
   const seed = path.join(root, 'seed');
   const clone = path.join(root, 'clone');
   const bin = path.join(root, 'bin');
-  const { LABELS: _payload, PR_NUMBER: _number, ...inherited } = process.env;
+  const { LABELS: _payload, PR_NUMBER: _number, HEAD_SHA: _head, ...inherited } = process.env;
   const env = {
     ...inherited,
     GIT_AUTHOR_NAME: 't',
@@ -177,9 +193,18 @@ const merged = (number: number, labels: string[], sha: string | null): Pull => (
   head: { ref: `branch-${number}` },
 });
 
-/** No call dispatches a workflow or reads its runs: a dispatched run never counts for a pull request. */
-const dispatched = (calls: Call[]) =>
-  calls.filter((call) => (call.args[0] === 'workflow' && call.args[1] === 'run') || call.args.some((arg) => arg.includes('actions/')));
+/** The dispatches made, each as the arguments after `gh workflow run`. */
+const dispatched = (calls: Call[]): string[][] =>
+  calls.filter((call) => call.args[0] === 'workflow' && call.args[1] === 'run').map((call) => call.args.slice(2));
+
+/** The reads of a workflow's dispatched runs. */
+const runReads = (calls: Call[]): Call[] => calls.filter((call) => call.args.some((arg) => arg.includes('/actions/workflows/')));
+
+/** The two dispatches on `release`, `release-label.yml` given the pull request's number. */
+const BOTH = (number: number): string[][] => [
+  ['ci.yml', '--ref', 'release'],
+  ['release-label.yml', '--ref', 'release', '-f', `pr=${number}`],
+];
 
 /** Where `word` stands in `body`, refusing a body that lacks it. */
 const at = (body: string, word: string): number => {
@@ -194,7 +219,7 @@ const older = (): Pull[] => Array.from({ length: 130 }, (_, i) => merged(1000 + 
 const has = (calls: Call[], ...words: string[]) => calls.some((call) => words.every((word) => call.args.includes(word)));
 const named = (calls: Call[], ...words: string[]) => calls.filter((call) => words.every((word) => call.args.includes(word)));
 
-test('pr rebuilds release from main at 1.0.0, opens its pull request labelled internal, its body opening on the approval, and dispatches nothing', () => {
+test('pr rebuilds release from main at 1.0.0, opens its pull request labelled internal, its body opening on the checks, then dispatches both on its head', () => {
   const w = world();
   const fix = w.land('a fix');
   const docs = w.land('some docs');
@@ -236,11 +261,25 @@ test('pr rebuilds release from main at 1.0.0, opens its pull request labelled in
   assert.ok(notes[0].args.includes('tag_name=v1.0.0'));
   const body = named(ran.calls, 'pr', 'create')[0].stdin ?? '';
   assert.ok(body.includes('#3'), 'the unlabelled pull request is listed apart in the body');
-  assert.ok(at(body, APPROVE_BUTTON) < at(body, '## Fixes'), 'the body opens with the merge box button, ahead of the notes');
-  assert.deepEqual(dispatched(ran.calls), [], 'no workflow is dispatched, and no run list read');
+  for (const { check } of DISPATCHED) assert.ok(at(body, `\`${check}\``) < at(body, '## Fixes'), `the body names ${check} ahead of the notes`);
+  assert.deepEqual(dispatched(ran.calls), BOTH(900), 'ci and release-label are dispatched on release, the label check given #900');
+  const label = ran.calls.findIndex((call) => call.args.includes('repos/{owner}/{repo}/issues/900/labels'));
+  const labelCheck = ran.calls.findIndex((call) => call.args[0] === 'workflow' && call.args[2] === 'release-label.yml');
+  assert.ok(label >= 0 && label < labelCheck, 'the label is on before the check that reads it is dispatched');
+  const head = w.git(w.origin, 'rev-parse', 'refs/heads/release');
+  assert.deepEqual(
+    runReads(ran.calls).map((call) => call.args[3]),
+    DISPATCHED.map(({ file }) => `repos/{owner}/{repo}/actions/workflows/${file}/runs?head_sha=${head}&event=workflow_dispatch&per_page=100`),
+    "each workflow's dispatched runs are read on the head",
+  );
+  assert.deepEqual(
+    w.read().runs?.map((run) => [run.file, run.head]),
+    DISPATCHED.map(({ file }) => [file, head]),
+    'each run is on the head pushed',
+  );
 });
 
-test('a second pr with nothing moved pushes and patches nothing; with main moved it updates the same pull request, the approval still first', () => {
+test('a second pr with nothing moved pushes, patches and dispatches nothing; with main moved it updates the same pull request and dispatches on the new head', () => {
   const w = world();
   const feature = w.land('a feature');
   w.state({ pulls: [merged(1, ['feature'], feature)], labels: [], next: 900 });
@@ -251,7 +290,8 @@ test('a second pr with nothing moved pushes and patches nothing; with main moved
   assert.equal(again.status, 0, again.out);
   assert.equal(w.git(w.origin, 'rev-parse', 'refs/heads/release'), first, 'release is not pushed again');
   assert.ok(!has(again.calls, 'PATCH'), 'the pull request is left as it is');
-  assert.deepEqual(dispatched(again.calls), []);
+  assert.deepEqual(dispatched(again.calls), [], 'the head has both runs queued: nothing is dispatched again');
+  assert.equal(runReads(again.calls).length, DISPATCHED.length, 'one read of the runs per workflow');
   assert.ok(!has(again.calls, 'pr', 'create'), 'no second pull request');
 
   const fix = w.land('a fix after');
@@ -265,8 +305,53 @@ test('a second pr with nothing moved pushes and patches nothing; with main moved
   const patch = named(moved.calls, 'PATCH', 'repos/{owner}/{repo}/pulls/900');
   assert.equal(patch.length, 1, 'and updated');
   const body = patch[0].args.find((arg) => arg.startsWith('body=')) ?? '';
-  assert.ok(at(body, APPROVE_BUTTON) < at(body, '## Fixes'), 'the new body opens with the approval again: a rebuild asks for it');
-  assert.deepEqual(dispatched(moved.calls), []);
+  for (const { check } of DISPATCHED) assert.ok(at(body, `\`${check}\``) < at(body, '## Fixes'), `the new body names ${check} first`);
+  assert.deepEqual(dispatched(moved.calls), BOTH(900), 'each is dispatched once on the new head');
+  assert.deepEqual(
+    w.read().runs?.filter((run) => run.head === second).map((run) => run.file),
+    DISPATCHED.map(({ file }) => file),
+  );
+});
+
+test("pr decides from the head's dispatched runs, never from whether it pushed: a missing, failed or cancelled run is dispatched again", async (t) => {
+  const settled = (status: string, conclusion: string | null) => {
+    const w = world();
+    const feature = w.land('a feature');
+    w.state({ pulls: [merged(1, ['feature'], feature)], labels: [], next: 900 });
+    assert.equal(w.run('pr').status, 0);
+    const runs = w.read().runs ?? [];
+    w.state({ ...w.read(), runs: runs.map((run) => (run.file === 'ci.yml' ? { ...run, status, conclusion } : run)) });
+    return w;
+  };
+  await t.test('the head with no dispatched run left gets both, though release is not pushed', () => {
+    const w = world();
+    const feature = w.land('a feature');
+    w.state({ pulls: [merged(1, ['feature'], feature)], labels: [], next: 900 });
+    assert.equal(w.run('pr').status, 0);
+    const head = w.git(w.origin, 'rev-parse', 'refs/heads/release');
+    w.state({ ...w.read(), runs: [] });
+    const ran = w.run('pr');
+    assert.equal(ran.status, 0, ran.out);
+    assert.equal(w.git(w.origin, 'rev-parse', 'refs/heads/release'), head, 'release is not pushed');
+    assert.deepEqual(dispatched(ran.calls), BOTH(900));
+  });
+  for (const conclusion of ['failure', 'cancelled'])
+    await t.test(`a ci ended ${conclusion} is dispatched again, and the queued release-label is left`, () => {
+      const w = settled('completed', conclusion);
+      const ran = w.run('pr');
+      assert.equal(ran.status, 0, ran.out);
+      assert.deepEqual(dispatched(ran.calls), [['ci.yml', '--ref', 'release']]);
+    });
+  await t.test('a ci that succeeded, or is still in progress, is not dispatched again', () => {
+    for (const [status, conclusion] of [
+      ['completed', 'success'],
+      ['in_progress', null],
+    ] as const) {
+      const ran = settled(status, conclusion).run('pr');
+      assert.equal(ran.status, 0, ran.out);
+      assert.deepEqual(dispatched(ran.calls), [], `${status} ${conclusion}`);
+    }
+  });
 });
 
 test('with every pull request merged since the last release internal, pr opens none and closes the one open', () => {
@@ -279,7 +364,8 @@ test('with every pull request merged since the last release internal, pr opens n
   assert.equal(ran.status, 0, ran.out);
   assert.ok(!has(ran.calls, 'pr', 'create'));
   assert.ok(has(ran.calls, 'PATCH', 'repos/{owner}/{repo}/pulls/900', 'state=closed'), 'the open release pull request is closed');
-  assert.deepEqual(dispatched(ran.calls), []);
+  assert.deepEqual(dispatched(ran.calls), [], 'nothing is dispatched');
+  assert.deepEqual(runReads(ran.calls), [], 'and no runs read');
 });
 
 test("check, given PR_NUMBER and no LABELS, reads the pull request's labels as they are now", async (t) => {
@@ -300,6 +386,18 @@ test("check, given PR_NUMBER and no LABELS, reads the pull request's labels as t
     const open: Pull = { ...merged(900, ['dependencies'], null), title: 'release: v1.0.0', head: { ref: 'release' } };
     w.state({ pulls: [open], labels: [], next: 901 });
     assert.equal(w.run('check', { PR_NUMBER: '900' }).status, 1);
+  });
+  await t.test("a dispatched run passes on the pull request's head, and is refused on another commit, exit 1", () => {
+    const w = world();
+    const open: Pull = { ...merged(900, ['internal'], null), title: 'release: v1.0.0', head: { ref: 'release', sha: 'a'.repeat(40) } };
+    w.state({ pulls: [open], labels: [], next: 901 });
+    assert.equal(w.run('check', { PR_NUMBER: '900', HEAD_SHA: 'a'.repeat(40) }).status, 0, 'the head the run is on');
+    const other = w.run('check', { PR_NUMBER: '900', HEAD_SHA: 'b'.repeat(40) });
+    assert.equal(other.status, 1, 'another commit is refused, the label right or not');
+    assert.ok(other.out.includes('gh workflow run release-label.yml --ref release -f pr=900'), 'naming the dispatch that checks the head');
+    const event = w.run('check', { PR_NUMBER: '900', HEAD_SHA: '' });
+    assert.equal(event.status, 0, 'an empty HEAD_SHA, as a pull_request event passes it, compares nothing');
+    assert.equal(event.calls.length, 1, 'one read');
   });
   await t.test('REFUSED: no pull request has the number, exit 1', () => {
     const w = world();

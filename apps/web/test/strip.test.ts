@@ -38,8 +38,9 @@ const factory = (name: string, hires: Record<string, string>): Factory => ({
   hires,
   error: null,
   schedules: [],
-  commands: { attach: '', rm: '', add: '', schedule: '', trust: '' },
+  commands: { attach: '', rm: '', add: '', schedule: '', trust: '', volume: '' },
   untrusted: [],
+  volumes: [],
   template: null,
 });
 

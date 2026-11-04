@@ -167,6 +167,7 @@ export type RunSlot = Holds<Same<Board.RunSlot, NonNullable<Extract<decision.Run
 
 export type FactorySchedule = Holds<Same<Board.FactorySchedule, factories.ScheduleAnswer>>;
 export type FactoryUntrusted = Holds<Same<Board.FactoryUntrusted, factories.UntrustedAnswer>>;
+export type FactoryVolume = Holds<Same<Board.FactoryVolume, factories.VolumeAnswer>>;
 export type Factory = Holds<Same<Board.Factory, factories.FactoryAnswer>>;
 /** Whether a clear removed a file is not the board's to read. */
 export type FactoryRules = Holds<Same<Board.FactoryRules, Omit<rules.FactoryRules, 'removed'>>>;

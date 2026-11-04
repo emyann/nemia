@@ -124,7 +124,7 @@ type Seen = {
  *   `ATTEMPT_ENDED`.
  * - Nothing in flight in a long-lived task, whose ended session is restarted (`restartOf` in `domain.ts`): `UNREAD` while its
  *   harness could not be read, `PREVIOUS_LIVE` while it still holds the old one, `BACKING_OFF` within the backoff, then
- *   `RESTART_DUE`.
+ *   `RESTART_DUE`. A job whose attempt ended parked takes the same road, `PARK_HELD` while a jobs' drain stands.
  * - `SETTLED`: a settled task. Every state it can be in is final, and takes no event; `decide` never asks (`settledQuiet`).
  */
 export type LifecycleEvent =
@@ -160,6 +160,7 @@ export type LifecycleEvent =
       former?: FormerReason;
     }
   | { type: 'BACKING_OFF'; attempt: number; backoffMs: number }
+  | { type: 'PARK_HELD'; attempt: number }
   | { type: 'RESTART_DUE'; attempt: number; resumeFrom?: string; nudge?: string }
   | { type: 'SETTLED'; outcome: Outcome };
 
@@ -194,6 +195,8 @@ const said = (event: LifecycleEvent): Action => {
       return { do: 'nothing', why: 'restarting — its harness respawns its process' };
     case 'BACKING_OFF':
       return { do: 'nothing', why: `restarting — backing off ${event.backoffMs / 1000}s after attempt ${event.attempt} ended` };
+    case 'PARK_HELD':
+      return { do: 'nothing', why: `parked — attempt ${event.attempt} continues once the jobs' drain is lifted` };
     case 'UNSEEN_IN_GRACE':
       return { do: 'nothing', why: 'spawned, waiting for the harness to register it' };
     case 'UNREAD':
@@ -438,7 +441,8 @@ const CONFIG = {
     },
     /**
      * Nothing runs, and the record says how the turn ended, or that a person closed it: it settles on that — or, for a
-     * long-lived task no stop was asked of, restarts it, unless its harness refused the spawn, which it settles on.
+     * long-lived task no stop was asked of, restarts it, unless its harness refused the spawn, which it settles on; and a job
+     * parked under a jobs' drain, no stop asked, it holds while the drain stands and then continues.
      */
     ending: {
       on: {
@@ -468,8 +472,10 @@ const CONFIG = {
         PREVIOUS_LIVE: {
           actions: act('stop', (e: Ev<'PREVIOUS_LIVE'>) => ({ do: 'stop', sessionId: e.sessionId, why: 'to restart it' })),
         },
-        /** A long-lived task's session ended, no stop asked: it waits out the backoff (`backoffOf` in `domain.ts`). */
+        /** A long-lived task's session ended, no stop asked: it waits out the backoff (`backoffOf` in `restart.ts`). */
         BACKING_OFF: { actions: nothing },
+        /** A job parked under a jobs' drain, while it stands: held, and continued once it is lifted (`restartOf` in `domain.ts`). */
+        PARK_HELD: { actions: nothing },
         /** The backoff spent: the next attempt starts, continuing the latest session it had. */
         RESTART_DUE: {
           target: 'starting',

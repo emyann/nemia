@@ -6,7 +6,8 @@
  */
 import { assume, type Implementation, spec } from '@emyann/tsverify';
 import type { Monotonic } from '../src/core/clock.ts';
-import { type Action, type Attempt, backoffOf, nameFor, type Now, RESTART_BACKOFF, type Sighting, type State } from '../src/core/domain.ts';
+import { type Action, type Attempt, nameFor, type Now, type Sighting, type State } from '../src/core/domain.ts';
+import { backoffOf, RESTART_BACKOFF } from '../src/core/restart.ts';
 import { type Move, transition } from '../src/core/lifecycle.ts';
 
 export const backoff = assume(backoffOf, {

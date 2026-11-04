@@ -249,6 +249,7 @@ stateDiagram-v2
   ending --> ending: UNREAD / nothing
   ending --> ending: PREVIOUS_LIVE / stop
   ending --> ending: BACKING_OFF / nothing
+  ending --> ending: PARK_HELD / nothing
   ending --> starting: RESTART_DUE / start
   submitted --> stopping: requestStop [stoppable] (by person)
   starting --> stopping: requestStop [stoppable] (by person)
@@ -1934,6 +1935,8 @@ of pure code sits beside it.
 | `src/index.ts` | the export list of `agent-runtime`, by name, all Effect — the boundary; `decide` is not on it |
 | `src/core/session.ts` | a session's state in A2A's names, the end each records and the phase a person reads (`endOf`, `TaskPhase`, `LIVE_PHASE`): read by both `domain.ts` and `lifecycle.ts`, so neither imports the other's values |
 | `src/core/domain.ts` | events, `fold`, **`decide`** and what it reads — `lifecycleOf`, `observe` — pure, no I/O, the whole judgement, and the session name read back (`nameParts`) |
+| `src/core/cap.ts` | what is left of a turn's spend cap for an attempt that continues a parked job (`capLeft`): the cap less what the parked attempts it continues spent — pure, asked by the engine, so `decide` reads no spend |
+| `src/core/restart.ts` | how a task restarts inside itself, pure: a long-lived task's back-off, a kubelet's (`RESTART_BACKOFF`, `backoffOf`), and the words a restarted session or a parked job's continuation is told (`RESTART_WORDS`, `PARKED_WORDS`, `cutWords`), re-exported by `domain.ts` |
 | `src/core/lifecycle.ts` | the lifecycle as an XState statechart, used as a pure transition function: its states, the edge for each event and the one action it names, the refusal of an event with no edge, and the diagram generated from it |
 | `src/core/path.ts` | a task's path through the lifecycle, replayed off its journal (`pathOf`): the state after each entry, the entry's kind and its time, for the `path` verb — pure, a reader's, never a pass's |
 | `src/core/event-schema.ts` | every event a runtime has written, as an Effect Schema, former shapes included: `Journal.layer` checks what any store gives back against it before `upgrade`, and fails a task's read with a `JournalError` naming its file, the entry and the field (`entryWords`); a feed entry it refuses is skipped and said (`FeedRefusal`) |

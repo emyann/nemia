@@ -788,7 +788,7 @@
       "files": ["packages/agent-runtime/src/core/domain.ts"],
       "rules": {
         "complexity": ["error", { "max": 26 }],
-        "sonarjs/cognitive-complexity": ["error", 23]
+        "sonarjs/cognitive-complexity": ["error", 22]
       }
     },
     {

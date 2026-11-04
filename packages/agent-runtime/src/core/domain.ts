@@ -175,9 +175,10 @@ export type Sighting = {
   /**
    * The main-thread tool call its session made that waits at its hook, held while a sessions' drain stands, and since when (ISO), for a
    * harness whose job holds its calls (Claude Code's job on the Agent SDK). Absent while no call waits, and from a harness that cannot
-   * say. **Carried, never judged**: `decide` does not read it; a person learns from it that the job is held, not stalled.
+   * say. **Carried, never judged**: `decide` does not read it; a person learns from it that the job is held, not stalled. `after`: the
+   * main-thread call that ended last before the hold, where its harness kept it.
    */
-  heldBack?: { since: string };
+  heldBack?: { since: string; after?: { tool: string } };
   /**
    * The job ended itself under a sessions' drain — past the drain's grace with a call in flight, or held past its bound — or crashed while
    * it was held or draining, as its runner read it (`Parked`). Read by `decide` on an ended attempt alone, where its end carries it.

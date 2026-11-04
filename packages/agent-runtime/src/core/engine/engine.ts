@@ -119,9 +119,9 @@ export type TaskView = {
   calling?: { tool: string; since: string };
   /**
    * Since when the attempt in flight holds a main-thread call back at its hook, the sessions' drain standing (`Sighting.heldBack`). Absent
-   * while nothing is held. Carried, never judged.
+   * while nothing is held, with the call it stopped after (`after`) where its harness kept it. Carried, never judged.
    */
-  heldBack?: { since: string };
+  heldBack?: { since: string; after?: { tool: string } };
   /**
    * The questions the attempt in flight is waiting on a person for, as its harness holds them (`Sighting.asks`). Absent from a
    * harness that cannot say, and from a task whose session may ask nobody. Carried, never judged.

@@ -67,7 +67,7 @@ export type SessionDrain = typeof SessionDrainSchema.Type;
 const JobHoldSchema = Schema.Struct({
   calling: Schema.optional(CallSchema),
   draining: Schema.optional(Schema.Struct({ since: Schema.String })),
-  heldBack: Schema.optional(Schema.Struct({ since: Schema.String })),
+  heldBack: Schema.optional(Schema.Struct({ since: Schema.String, after: Schema.optional(Schema.Struct({ tool: Schema.String })) })),
   parked: Schema.optional(Schema.Struct({ at: Schema.String, calling: Schema.optional(CallSchema) })),
 });
 

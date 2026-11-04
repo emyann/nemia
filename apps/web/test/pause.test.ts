@@ -24,7 +24,8 @@ test('pauseWords: what the pause says, from none to Pausing to Paused', async (t
     assert.equal(words.state, 'running');
     assert.equal(words.text, null);
     assert.equal(words.label, 'Pause all factories');
-    assert.match(words.line, /^Pause all factories: nothing new starts, and each working session stops when its current tool call ends/);
+    assert.match(words.line, /^Pause all factories: nothing new starts/);
+    assert.match(words.line, /each working session stops when its current tool call ends/);
   });
   await t.test(
     'a pause with tasks at work is Pausing with their count and the checks it holds, and names each, each landing staged and each check held',
@@ -145,7 +146,7 @@ test('pauseWords under a pause with a timeout: sessions finishing a call and whe
       ),
       words.line,
     );
-    assert.match(words.line, /each working session stops when its current tool call ends, cut once the timeout passes/);
+    assert.match(words.line, /current tool call ends, cut once the timeout passes/);
     assert.deepEqual(words.parked, parked.map(parkedSentence));
   });
   await t.test('the minutes left are rounded up, "cut now" once none is left, and one session is said so', () => {

@@ -28,6 +28,7 @@ import type { TranscriptMark } from '../harness/seam.ts';
 import { transition, VERBS, type LifecycleEvent, type Move, type Refusal, type VerbGuard, type VerbName } from './lifecycle.ts';
 import { elapsedMs, type Instant, type Monotonic } from './clock.ts';
 import { endOf, isLive, NEEDS_HUMAN, RUNNING, waitsOnPerson, type Outcome, type SessionState } from './session.ts';
+import { foldInto } from './attempt-fold.ts';
 import type { Decide } from '../../contracts/decide.contract.ts';
 import type { LifecycleOf } from '../../contracts/lifecycle.contract.ts';
 import type { Observe } from '../../contracts/observe.contract.ts';
@@ -622,41 +623,11 @@ function endAttempt(a: Attempt, e: Extract<Event, { kind: 'ended' }>): void {
   a.error = e.error ?? a.error;
 }
 
-/** An event about one attempt, `e`, written into that attempt's fold `a`. */
-function foldInto(
-  a: Attempt,
-  e: Extract<Event, { kind: 'spawned' | 'ended' | 'measured' | 'counted' | 'denied' | 'image' | 'gap' | 'process' }>,
-): void {
-  switch (e.kind) {
-    case 'spawned':
-      a.spawnedAt = e.at;
-      if (e.mono) a.spawnedMono = e.mono;
-      a.error = e.error;
-      return;
-    case 'ended':
-      return endAttempt(a, e);
-    case 'measured':
-      a.usage = { ...a.usage, ...e.usage };
-      return;
-    case 'counted':
-      a.usage = e.usage;
-      return;
-    case 'denied':
-      a.denials = [...(a.denials ?? []), e.what === undefined ? { tool: e.tool } : { tool: e.tool, what: e.what }];
-      return;
-    case 'image':
-      if (e.image !== undefined) a.image = e.image;
-      if (e.harnessVersion !== undefined) a.harnessVersion = e.harnessVersion;
-      return;
-    case 'gap':
-      if (a.gapSince === undefined && e.mono) a.gapMono = e.mono;
-      a.gapSince ??= e.at;
-      return;
-    case 'process':
-      delete a.gapSince;
-      delete a.gapMono;
-      if (e.pid !== undefined) a.processes = [...(a.processes ?? []), e.pid];
-  }
+/** An event about one attempt, `e`, written into that attempt's fold when `s` holds it: its end here, every other in `foldInto`. */
+function intoAttempt(s: State, e: Extract<Event, { kind: 'ended' } | Parameters<typeof foldInto>[1]>): void {
+  const a = s.attempts.find((x) => x.n === e.attempt);
+  if (a && e.kind === 'ended') endAttempt(a, e);
+  else if (a && e.kind !== 'ended') foldInto(a, e);
 }
 
 /** The task as the `filed` event `e` states it, written into the fold `s`. */
@@ -722,11 +693,9 @@ export function fold(taskId: string, events: readonly Event[]): State {
       case 'denied':
       case 'image':
       case 'gap':
-      case 'process': {
-        const a = s.attempts.find((x) => x.n === e.attempt);
-        if (a) foldInto(a, e);
+      case 'process':
+        intoAttempt(s, e);
         break;
-      }
       case 'stop-requested':
         s.stopRequested = true;
         break;

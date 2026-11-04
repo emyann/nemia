@@ -35,7 +35,7 @@ import { compactOps } from './compact.ts';
 import { lookedFor } from './looked.ts';
 import { detachedStateOf, firstRunFile, leased, runFileIn, type Carried, type Run, type RunFile } from './run-file.ts';
 import { carriedOf, lessCarried } from './carried.ts';
-import { IMAGE } from '../image.ts';
+import { sightedOf } from './sighted.ts';
 import { workerBoundsOf, type DetachedOptions } from './detached-options.ts';
 import { spawnFiles, spawnInput } from './spawn-files.ts';
 
@@ -269,7 +269,10 @@ export type HarnessOutput = {
    * this is what happened, and the two are different facts. Absent when the harness does not say.
    */
   ranOn?: string;
-  /** The version of the harness the session runs, as its own start line said it — Claude Code's `claude_code_version`. Absent when it does not say. */
+  /**
+   * The version of the harness the session runs, as its own start line said it — Claude Code's `claude_code_version`. Absent when it
+   * does not say.
+   */
   harnessVersion?: string;
 };
 
@@ -312,12 +315,7 @@ const sightingOf = (
   closeout: statement ?? (output?.read.closeout && { payload: output.read.closeout.payload }),
   ...(typeof run.exitCode === 'number' && run.exitCode >= 0 ? { exitCode: run.exitCode } : {}),
   ...(usage ? { usage } : {}),
-  ...(output?.read.limit ? { limit: output.read.limit } : {}),
-  ...(output?.read.denials?.length ? { denials: output.read.denials } : {}),
-  ...(output?.read.skills ? { skills: output.read.skills } : {}),
-  ...(output?.read.files ? { files: output.read.files } : {}),
-  ...(output?.read.ranOn ? { ranOn: output.read.ranOn } : {}),
-  ...(output?.read.harnessVersion ? { harnessVersion: output.read.harnessVersion } : {}),
+  ...(output ? sightedOf(output.read) : {}),
   ...(run.image ? { image: run.image } : {}),
 });
 
@@ -856,7 +854,6 @@ const runnerOf = (spec: HarnessSpec, root: string, bounds: ReturnType<typeof wor
             ...(env ? { env } : {}),
             ...(spec.streams ? { streams } : {}),
             stopFile: stopFile(r.name),
-            image: IMAGE,
             ...(spec.start ? { start: spec.start } : {}),
             ...(spec.resumeCostCarried && r.resumeFrom
               ? { resumeFrom: r.resumeFrom, carried: carriedBy(readAll(), r.resumeFrom, Date.now(), r.name) }

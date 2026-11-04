@@ -2,7 +2,8 @@
  * A release of the system: a tag built into a folder of its own under the store's `releases/`, and `releases/current`, the pointer the
  * login service runs. What a tag may be called (`tagRefusal`), which code is running (`Running`: a checkout or an install), the refusal
  * of a checkout on a store that runs an install (`trialRefusal`), how an upgrade restarts the daemon (`restartPlan`), which release a
- * session runs on (`sessionRelease`, off the image its attempt recorded), and what `nemia version` says (`versionLines`). Pure: `release.store.ts` reads and writes the folders, `upgrade.verb.ts` and `version.verb.ts`
+ * session runs on (`sessionRelease`, off the image its attempt recorded), and what `nemia version` says (`versionLines`). Pure:
+ * `release.store.ts` reads and writes the folders, `upgrade.verb.ts` and `version.verb.ts`
  * are the commands.
  */
 import path from 'node:path';
@@ -111,7 +112,10 @@ export function sessionRelease(image: string, releases: string): SessionRelease 
   return inside && tag !== '' && tagRefusal(tag) === null ? { kind: 'install', tag } : { kind: 'checkout', root: image };
 }
 
-/** A session's release and harness in words, `on v1.2.0, claude 2.1.316` or `on checkout, claude 2.1.316`; null where neither was recorded. */
+/**
+ * A session's release and harness in words, `on v1.2.0, <harness> <version>` or `on checkout, <harness> <version>`; null where neither
+ * was recorded.
+ */
 export function ranOnWords(release: SessionRelease | null, harness: SessionHarness | null): string | null {
   const said = [
     ...(release === null ? [] : [release.kind === 'install' ? release.tag : 'checkout']),
@@ -154,7 +158,7 @@ export function checkoutPromiseLine(release: LeaseRelease | Running): string | n
   return (
     `this daemon runs the checkout ${release.root}, which makes no promise to keep a running session on its own files: an edit there, ` +
     `or another branch checked out, reaches the sessions at work. Each still records what it runs on (nemia version); ` +
-    `run an installed release for that promise: nemia upgrade <tag>.`
+    `build a release for that promise: nemia upgrade <tag>.`
   );
 }
 

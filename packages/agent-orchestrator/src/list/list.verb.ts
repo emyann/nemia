@@ -4,6 +4,7 @@
  * `nemia ls` reads the repository's own checkout as the pass that would file into it reads it (`checkoutHold`, in `ending.verb.ts`). A
  * controller, reaching the runtime through the client (`runtime-client.ts`).
  */
+import { realReleasesDir } from '../release/release.store.ts';
 import { Cause, Effect, Exit } from 'effect';
 import { EngineService, asked, over, unreadableJournal, type Engine, type TaskView } from '../runtime-client.ts';
 import type { RunSlot } from '../cap/cap.ts';
@@ -73,7 +74,10 @@ export type ReadingHow = {
   checkout?: PassStanding;
   git: BranchReader;
   parent?: (id: string) => ParentRun;
-  /** The store's real releases folder (`realReleasesDir`), which a step at work is said to run on under (`ranOnOf`); left out, none is said. */
+  /**
+   * The store's real releases folder (`realReleasesDir`), which a step at work is said to run on under (`ranOnOf`); left out, none
+   * is said.
+   */
   releases?: string;
 };
 
@@ -181,9 +185,10 @@ const readOrUnjudged = Effect.fnUntraced(function* (
  * the second with no result branch (`stepsAmong`); any other failure rejects. With no run named, the factories' schedules
  * (`schedulesListed`). Refuses a run named that is not in the store, as `runStore.runs.read` does. Of the runs `selectors` takes
  * (`selectedRuns`), off each composed record before any is judged; the cap, the pause and the schedules are still read of the whole store.
- * A step at work says what its session runs on under `releases`, the store's real releases folder, where it is given (`ranOnOf`).
+ * A step at work says what its session runs on under the real releases folder of the store at `home`, where it is given (`ranOnOf`).
  */
-export const runsListed = Effect.fn('runsListed')(function* (runId?: string, selectors: Selectors = [], releases?: string) {
+export const runsListed = Effect.fn('runsListed')(function* (runId?: string, selectors: Selectors = [], home?: string) {
+  const releases = home === undefined ? undefined : realReleasesDir(home);
   const e = yield* EngineService;
   const all = runId ? [runStore.runs.read(runId)] : runStore.runs.list();
   const runs = selectedRuns(all, selectors);

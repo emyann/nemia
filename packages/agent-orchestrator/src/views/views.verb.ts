@@ -355,7 +355,8 @@ export const deniedOf =
   };
 
 /**
- * What the session of a task at work runs on, in words (`ranOnWords`): `on v1.2.0, claude 2.1.316`, off what its last attempt recorded,
+ * What the session of a task at work runs on, in words (`ranOnWords`): `on v1.2.0, <harness> <version>`, off what its last attempt
+ * recorded,
  * its image placed under `releases`, the store's real releases folder (`sessionRanOn`). Nothing for a task settled, one whose last
  * attempt has ended, or one whose attempt recorded neither. Exported, log-free, for a consumer that words a step as `nemia ls` does.
  */

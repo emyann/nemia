@@ -5,6 +5,7 @@
 import { Result, Schema, SchemaIssue } from 'effect';
 import type { SessionState } from '../../core/index.ts';
 import { instantNow } from '../../core/engine/now.ts';
+import { IMAGE } from '../image.ts';
 import { elapsedMs, type Instant, type Monotonic } from '../../core/clock.ts';
 
 /**
@@ -158,8 +159,11 @@ export const runFileIn = (text: string): RunFile | string => {
 
 const formatter = SchemaIssue.makeFormatterStandardSchemaV1();
 
-/** The run file the spawn writes before its worker starts: `plan`, working, with no pid yet, and its first beat on both clocks. */
+/**
+ * The run file the spawn writes before its worker starts: `plan`, working, with no pid yet, its first beat on both clocks, and the
+ * code it is spawned from (`image`).
+ */
 export const firstRunFile = (plan: object): string => {
   const now = instantNow();
-  return JSON.stringify({ ...plan, state: 'working', pid: 0, heartbeatAt: new Date(now.at).toISOString(), beat: now.mono });
+  return JSON.stringify({ ...plan, image: IMAGE, state: 'working', pid: 0, heartbeatAt: new Date(now.at).toISOString(), beat: now.mono });
 };

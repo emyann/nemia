@@ -30,7 +30,6 @@ import { budgetRefusal, budgetWord } from '../status/status.ts';
 import { decideRun, type Decided } from '../decide/decide.verb.ts';
 import { slotsRead, type Slots } from '../cap/cap.verb.ts';
 import { runsListed } from '../list/list.verb.ts';
-import { realReleasesDir } from '../release/release.store.ts';
 import { lsLines, type RunsListed } from '../list/list.ts';
 import { PAGES, labelFlags, runsShown, selectorCheck, selectorsIn } from './pages.verb.ts';
 import { pausedLines } from '../pause/pause.ts';
@@ -391,8 +390,7 @@ const LS: Command<RunsListed> = {
     { method: 'GET', path: '/api/listing', status: 200 },
     { method: 'GET', path: '/api/listing/:runId', status: 200 },
   ],
-  handler: (args, _env, home) =>
-    Effect.flatMap(selectorsIn(args), (selectors) => runsListed(textOf(args, 'runId'), selectors, realReleasesDir(rootGiven(home, 'ls')))),
+  handler: (args, _env, home) => Effect.flatMap(selectorsIn(args), (s) => runsListed(textOf(args, 'runId'), s, rootGiven(home, 'ls'))),
   print: (listed, args) => [...(listed.paused ? pausedLines(listed.paused) : []), ...lsLines(listed, Date.now(), runsShown(args))],
 };
 

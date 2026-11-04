@@ -25,7 +25,8 @@
  * a step, `bin/ae-claude-job.ts`, itself, on the same request shape and the SDK's own Claude Code (no `AE_CLAUDE_EXECUTABLE`), and
  * keeps its stdout, ending its stdin at the session's `result` line as the worker does (`closesOn`). The session's `system`/`init`
  * line, whose `model` and `claude_code_version` are asserted, is the one `claudeStreamOutput` — the reader the engine uses — reads as
- * `ranOn`, and its version as `harnessVersion`, which the engine records on the attempt with the runtime's own folder (`image`). That line is written to `WF_ARTIFACTS` as
+ * `ranOn`, and its version as `harnessVersion`, which the engine records on the attempt with the runtime's own folder (`image`). That line
+ * is written to `WF_ARTIFACTS` as
  * `sdk-<version>-init.json`, beside the engine's attempt, so the record and the line it came from are handed over together.
  *
  * Its control is the old SDK: the same job on 0.3.270 records `claude-opus-5`, which is the measurement the card was filed on.

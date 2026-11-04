@@ -304,7 +304,8 @@ export function triesOf(
 /**
  * A try's attempts (`StepAttempts`), off the engine's view of its task, on the turn it was (`attemptsOn`). A try with no task, or one the
  * engine has lost, has had none. How the latest ended is read through `endWords`: an end without the statement its task asked for is
- * `failed · unsigned`, the orchestrator's word, the runtime not judging it, and never the harness's `done` that the runtime records. What it
+ * `failed · unsigned`, the orchestrator's word, the runtime not judging it, and never the harness's `done` that the runtime records. What
+ * it
  * ran on is its recorded image placed under `releases`, the store's real releases folder, and its harness's version (`sessionRanOn`).
  */
 export function attemptsIn(taskId: string | null, views: Views, releases: string, turn?: number): StepAttempts {

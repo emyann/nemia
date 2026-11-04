@@ -142,6 +142,7 @@ const PINNED: Record<string, string[]> = {
     'chatStop',
     'checkoutHold',
     'checkoutLine',
+    'checkoutPromiseLine',
     'checkoutWord',
     'clearCustomInstructions',
     'clearSchedule',

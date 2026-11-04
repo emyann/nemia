@@ -369,12 +369,8 @@ async function tickMeasured(orch: Orchestrator, place: Place, fence: Fence, wf: 
 const passedOver = (orch: Orchestrator, place: Place, fence: Fence, wf: string, fresh: () => Promise<Built>) => async () => {
   const built = await fresh();
   const informer = await built.runtime.runPromise(Effect.service(orch.Informer));
-  const program = orch
-    .tickRun({ repo: wf, verifyRest: false })
-    .pipe(
-      Effect.provide(Layer.merge(orch.PlaceService.layer(place), orch.storeRootLayer(process.env))),
-      Effect.provideService(orch.Informer, informer),
-    );
+  const layer = Layer.merge(orch.PlaceService.layer(place), orch.storeRootLayer(process.env));
+  const program = orch.tickRun({ repo: wf, verifyRest: false }).pipe(Effect.provide(layer), Effect.provideService(orch.Informer, informer));
   fence.arm('pass');
   try {
     await orch.runWith(passEngine(orch.engine(), fence), program);

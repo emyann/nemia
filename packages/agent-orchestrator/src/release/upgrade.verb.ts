@@ -31,7 +31,7 @@ import {
   type Building,
 } from './release.store.ts';
 import { runningRelease } from './version.verb.ts';
-import { RETAIN_EVERY, retainOnce } from './retention.verb.ts';
+import { RETAIN_EVERY, retainOnce } from '../retention/retention.verb.ts';
 
 /** The command an upgrade's pause and lines name. */
 const BY = 'nemia upgrade';

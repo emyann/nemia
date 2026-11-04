@@ -8,7 +8,6 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { spawn } from 'node:child_process';
 import { scratch } from '../../test/scratch.ts';
 import type { ReleaseFile } from './release.ts';
 import {
@@ -99,28 +98,30 @@ test('the installed releases are the folders under releases/ with a release.json
   assert.deepEqual(installedReleases(scratch('wf-release-none-')), [], 'no releases/ at all');
 });
 
-test('a build is under way while the process its folder names lives, and not once it has exited', async () => {
+/** The pids a test says are live processes. */
+const LIVE = 4242;
+const live = (pid: number): boolean => pid === LIVE;
+
+test('a build is under way while the process its folder names lives, and not once it has exited', () => {
   const root = storeWith('v1');
-  assert.equal(buildUnderWay(root), false, 'no build folder');
-  const child = spawn(process.execPath, ['-e', '0']);
-  const gone = await new Promise<number>((resolve) => child.on('exit', () => resolve(child.pid ?? 0)));
-  fs.mkdirSync(path.join(releasesDir(root), `.building-v9-${gone}`));
-  assert.equal(buildUnderWay(root), false, 'the pid has exited');
-  fs.mkdirSync(path.join(releasesDir(root), `.building-v9-${process.pid}`));
-  assert.equal(buildUnderWay(root), true, 'this process');
+  assert.equal(buildUnderWay(root, live), false, 'no build folder');
+  fs.mkdirSync(path.join(releasesDir(root), '.building-v9-4141'));
+  assert.equal(buildUnderWay(root, live), false, 'a pid that has exited');
+  fs.mkdirSync(path.join(releasesDir(root), `.building-v9-${LIVE}`));
+  assert.equal(buildUnderWay(root, live), true, 'a live pid');
 });
 
 test('REFUSED: a release is not removed while the pointer names it or a build is under way; else it is moved aside, then listed', () => {
   const root = storeWith('v1', 'v2');
   switchCurrent('v2', root);
-  assert.equal(removeRelease(root, 'v2'), false, 'the current');
+  assert.equal(removeRelease(root, 'v2', live), false, 'the current');
   assert.ok(fs.existsSync(releaseDir('v2', root)));
-  const building = path.join(releasesDir(root), `.building-v3-${process.pid}`);
+  const building = path.join(releasesDir(root), `.building-v3-${LIVE}`);
   fs.mkdirSync(building);
-  assert.equal(removeRelease(root, 'v1'), false, 'a build under way');
+  assert.equal(removeRelease(root, 'v1', live), false, 'a build under way');
   assert.ok(fs.existsSync(releaseDir('v1', root)));
   fs.rmSync(building, { recursive: true });
-  const aside = removeRelease(root, 'v1');
+  const aside = removeRelease(root, 'v1', live);
   assert.equal(aside, path.join(releasesDir(root), `.removing-v1-${process.pid}`));
   assert.equal(fs.existsSync(releaseDir('v1', root)), false);
   assert.deepEqual(leftRemovals(root), [aside]);

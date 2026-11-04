@@ -9,12 +9,13 @@ import path from 'node:path';
 import { Cause, Effect, type Duration } from 'effect';
 import { StoreRoot } from '../config/root.store.ts';
 import type { LeaseRelease } from '../daemon/daemon.ts';
+import { alive } from '../daemon/daemon.store.ts';
 import { firstPiece } from '../piece/piece.ts';
 import { asked, EngineService } from '../runtime-client.ts';
-import { sessionRelease, type Running } from './release.ts';
-import { currentRelease, installedReleases, leftRemovals, realReleasesDir, removeRelease } from './release.store.ts';
+import { sessionRelease, type Running } from '../release/release.ts';
+import { currentRelease, installedReleases, leftRemovals, realReleasesDir, removeRelease } from '../release/release.store.ts';
 import { newestFirst, retention, retentionLines, type Retention } from './retention.ts';
-import { inFlight } from './version.verb.ts';
+import { inFlight } from '../release/version.verb.ts';
 
 /** The daemon's pace of sweeps: a release is freed within this of its last session ending. */
 export const RETAIN_EVERY = '5 minutes' satisfies Duration.Input;
@@ -90,7 +91,7 @@ export const retainOnce = Effect.fn('retainOnce')(function* (
   const answer = retention(installed, { current: path.basename(current.dir), pinned, unrecorded });
   const removed: string[] = [];
   for (const tag of answer.remove) {
-    const aside = removeRelease(home, tag);
+    const aside = removeRelease(home, tag, alive);
     if (aside === false) continue;
     yield* deleted(aside);
     removed.push(tag);

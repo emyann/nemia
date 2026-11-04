@@ -2252,7 +2252,7 @@ release holds no repository at all.
 ## Shipped: an old release is removed once unused (harness-updates C2)
 
 Nothing removed `releases/<tag>`, and each release is a full `npm ci` plus build, about 850 MB. Removing one under a session that runs on
-it would crash that session. What was built, in `src/release/`:
+it would crash that session. What was built, in `src/retention/` and `src/release/`:
 
 - **The rule is Claude Code's** (`retention`, `retention.ts`, proved by `contracts/retention.contract.ts`): keep the release the pointer
   names, every release a running Nemia process or a local session in flight runs on, and the two newest by `builtAt`
@@ -2260,7 +2260,7 @@ it would crash that session. What was built, in `src/release/`:
   release (`held: 'unrecorded'`, said once while it stands), since it could be on any of them. A remote agent's (`a2a:`) session runs
   on no release here.
 - **A sweep reads everything afresh** (`retainOnce`, `retention.verb.ts`): the pointer, the folders that hold a `release.json`
-  (`installedReleases`), the engine's attempts in flight (`inFlight`, shared with `nemia version`), each pinning the tag its image sits
+  (`installedReleases`, `release/release.store.ts`), the engine's attempts in flight (`inFlight`, shared with `nemia version`), each pinning the tag its image sits
   under, and the releases of the processes it is given (`pinnedBy`). Each release removed is first renamed to
   `releases/.removing-<tag>-<pid>` (`removeRelease`, which refuses while a build is under way or the pointer names it), then deleted off
   the event loop; a folder left by a stopped sweep is deleted by the next (`leftRemovals`).
@@ -2271,9 +2271,9 @@ it would crash that session. What was built, in `src/release/`:
   which holds while a build of a live pid stands, never removes a release between the read that finds it built and the pointer naming
   it. No lock: the build folder is the marker.
 
-Tested in `src/release/retention.test.ts` (the order and the words), `release.store.test.ts` (the installed releases, a build under way,
-a release moved aside), `retention.verb.test.ts` (the sweep's story over a scratch store and the engine's stand-in) and
-`upgrade.verb.test.ts` (an upgrade's removal, a session's pin, a build that holds, a rollback). The contract's laws are proved but one,
+Tested in `src/retention/retention.test.ts` (the order and the words), `retention.verb.test.ts` (the sweep's story over a scratch
+store and the engine's stand-in), `src/release/release.store.test.ts` (the installed releases, a build under way, a release moved
+aside) and `upgrade.verb.test.ts` (an upgrade's removal, a session's pin, a build that holds, a rollback). The contract's laws are proved but one,
 `everyOtherGoes`, which tsverify answers `bounded`: its proof side does not know a `.filter` keeps every element that matches. Still to
 come: removing what a crashed upgrade leaves (a dead `.building-*`) and old build logs, a card of its own.
 

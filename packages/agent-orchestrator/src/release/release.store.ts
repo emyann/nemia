@@ -10,9 +10,8 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { Result, Schema } from 'effect';
 import { wfRoot } from '../config/config.store.ts';
-import { alive } from '../daemon/daemon.store.ts';
 import { CURRENT, RELEASE_FILE, type Current, type ReleaseFile, type Running } from './release.ts';
-import type { Installed } from './retention.ts';
+import type { Installed } from '../retention/retention.ts';
 
 /** `release.json` as an upgrade writes it (`ReleaseFile`). */
 const ReleaseFileSchema = Schema.Struct({
@@ -173,12 +172,15 @@ export function installedReleases(home: string): Installed[] {
   });
 }
 
-/** Whether an upgrade is building: a `.building-<tag>-<pid>` folder whose pid, its last `-` part, is a live process. */
-export const buildUnderWay = (home: string): boolean =>
+/**
+ * Whether an upgrade is building: a `.building-<tag>-<pid>` folder whose pid, its last `-` part, `live` says is a live process (the
+ * daemon store's `alive`, given by the caller).
+ */
+export const buildUnderWay = (home: string, live: (pid: number) => boolean): boolean =>
   namesIn(home).some((name) => {
     if (!name.startsWith(BUILDING)) return false;
     const pid = Number(name.slice(name.lastIndexOf('-') + 1));
-    return Number.isInteger(pid) && pid > 0 && alive(pid);
+    return Number.isInteger(pid) && pid > 0 && live(pid);
   });
 
 /**
@@ -186,7 +188,7 @@ export const buildUnderWay = (home: string): boolean =>
  * answers false, moving nothing, where it is gone already, while an upgrade is building (it may be about to point at it) or the pointer
  * names it. Synchronous, so nothing in this process switches the pointer between the reads and the rename.
  */
-export function removeRelease(home: string, tag: string): string | false {
+export function removeRelease(home: string, tag: string, live: (pid: number) => boolean): string | false {
   const dir = releaseDir(tag, home);
   let real: string;
   try {
@@ -194,7 +196,7 @@ export function removeRelease(home: string, tag: string): string | false {
   } catch {
     return false;
   }
-  if (buildUnderWay(home) || currentRelease(home)?.dir === real) return false;
+  if (buildUnderWay(home, live) || currentRelease(home)?.dir === real) return false;
   const aside = path.join(releasesDir(home), `${REMOVING}${tag}-${process.pid}`);
   fs.renameSync(dir, aside);
   return aside;

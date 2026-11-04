@@ -1,12 +1,12 @@
 /**
- * Which releases go (agent-orchestrator, src/release/retention.ts): `retention`, given the releases installed under the store's
+ * Which releases go (agent-orchestrator, src/retention/retention.ts): `retention`, given the releases installed under the store's
  * `releases/`, newest first, and what is in use — the pointer's tag, the tags a running Nemia process or a session in flight runs on, and
  * the count of local sessions in flight that recorded no release. Claude Code's rule: keep the current, every release in use and the two
  * newest; remove the rest; and remove nothing while the pointer is missing or a session's release is unknown, since removing a release
  * under a session would crash it.
  */
 import { type Implementation, spec } from '@emyann/tsverify';
-import type { Installed, InUse, Retention } from '../src/release/retention.ts';
+import type { Installed, InUse, Retention } from '../src/retention/retention.ts';
 
 /** Whether `tag` is kept by what is in use: the pointer names it, or a process or a session runs on it. */
 const inUseBy = (inUse: InUse, tag: string): boolean => tag === inUse.current || inUse.pinned.includes(tag);
@@ -14,7 +14,7 @@ const inUseBy = (inUse: InUse, tag: string): boolean => tag === inUse.current ||
 const retentionSpec = spec<(installed: readonly Installed[], inUse: InUse) => Retention>({
   /**
    * The installed releases are distinct folders. They come newest first (`newestFirst`), which the laws read only as "the first two":
-   * the verifier does not model the order of strings, so that order is held by `src/release/retention.test.ts`.
+   * the verifier does not model the order of strings, so that order is held by `src/retention/retention.test.ts`.
    */
   requires: ({ input: [installed] }) => installed.every((r, i) => installed.every((o, j) => j <= i || o.tag !== r.tag)),
   ensures: {

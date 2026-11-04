@@ -1,8 +1,9 @@
 /**
- * Which installed releases go: Claude Code's rule, kept by `retention` and proved by `contracts/retention.contract.ts`. Kept: the release
+ * Which installed releases go: the rule kept by `retention` and proved by `contracts/retention.contract.ts`. Kept: the release
  * the pointer names, every release a running Nemia process or a session in flight runs on, and the two newest (`RELEASES_KEPT`); the
  * rest removed. Nothing is removed while the store has no pointer, nor while a local session in flight recorded no release, since
- * removing a release under a session would crash it. Pure: `release.store.ts` reads and removes the folders, `retention.verb.ts` sweeps.
+ * removing a release under a session would crash it. Pure: `release/release.store.ts` reads and removes the folders, and
+ * `retention.verb.ts` sweeps.
  */
 import type { ReleaseRetention } from '../../contracts/retention.contract.ts';
 

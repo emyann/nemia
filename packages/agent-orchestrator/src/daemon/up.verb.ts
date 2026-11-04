@@ -27,7 +27,7 @@ import { disk } from '../disk/disk.verb.ts';
 import type { DiskReading } from '../disk/disk.ts';
 import { leaseRelease } from '../release/release.ts';
 import { runningRelease } from '../release/version.verb.ts';
-import { retain } from '../release/retention.verb.ts';
+import { retain } from '../retention/retention.verb.ts';
 
 /**
  * How the daemon asks a harness for its quota: the engine's `quota` unless the process hands it another. The api hands it the ask its

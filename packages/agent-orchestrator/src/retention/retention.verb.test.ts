@@ -16,7 +16,7 @@ const ROOT = scratch('wf-retain-');
 process.env.WF_ROOT = ROOT;
 const { runWith, engineOf } = await import('../runtime-client.ts');
 const { retainOnce, freshRetainMemory } = await import('./retention.verb.ts');
-const { releaseDir, releasesDir, realReleasesDir, switchCurrent, writeReleaseFile } = await import('./release.store.ts');
+const { releaseDir, releasesDir, realReleasesDir, switchCurrent, writeReleaseFile } = await import('../release/release.store.ts');
 const engine = eachTest(testEngine);
 
 /** Plants a built release of `tag` in `home`, built on day `day` of November. */

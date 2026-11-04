@@ -19,8 +19,10 @@
  * beside it of what that set would let git run a program by (`RUNS_A_PROGRAM_DENIES`), write a file by (`WRITES_A_FILE_DENY`) or read
  * outside the repository by (`READS_OUTSIDE_DENIES`), and `wc` read a list of paths by (`WC_READS_A_LIST_DENY`). Both are planted here
  * on the tests' reviewer, a dontAsk agent, in a copy of the team (`planted`), and read as a run reads it. Each deny is proven to be the one
- * that refuses its own spellings, and each plain read still asked. The planted lists may drift from sdlc's: what sdlc writes is held
- * where it is written.
+ * that refuses its own spellings, and each plain read still asked. Beside them, a reviewer's reads of its pull request (`GH_ALLOWS`), and
+ * the denies of every other form of gh they reach (`GH_REFUSED`), each proven the one that refuses its own spellings, and proven needed
+ * where the checkout's settings allow those reads to a step that allows none itself. The planted lists may drift from sdlc's: what sdlc
+ * writes is held where it is written.
  *
  * Every path a repository skill says its work is on matches a file of the checkout (`appliesUnmatched`), the read-within-reach rule of
  * the repository's skills is counted as `nemia stats` counts it (`rulesOfTry`), and no tsconfig of the checkout makes `tsc --noEmit`
@@ -795,6 +797,10 @@ const WC_READS_A_LIST_DENY = 'Bash(wc *--f*)';
  *   (the matcher's test denies an address so). Without the leading `*` the deny reaches only a part that opens `GIT_`, and a first
  *   assignment that names something else, or a `nohup` or a `timeout` before it, carries the whole of git's environment through. It is
  *   the fence under what each of these roles' skills already says in prose: never `VAR=`.
+ * - An assignment of a variable that is not git's names a program too: `HOME` and `XDG_CONFIG_HOME` move the configuration git reads to
+ *   a folder the change under review can carry, whose `diff.external` or `core.pager` git then runs. `Bash(*GIT_*)` names none of them,
+ *   so the deny is of any assignment before git, `Bash(*=* git *)`: an `=` anywhere before ` git` in the part as typed. It reaches every
+ *   spelling `Bash(*GIT_*)` does here, and still asks a search for a word that holds `=` (`STILL_ASKED`), the `=` being after `git`.
  */
 const GIT_RUNS_A_PROGRAM: Call[] = [
   'git grep -Osh foo HEAD',
@@ -813,16 +819,28 @@ const GIT_RUNS_A_PROGRAM: Call[] = [
   'FOO=1 GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=diff.external GIT_CONFIG_VALUE_0=sh git diff HEAD',
   'nohup GIT_EXTERNAL_DIFF=sh git diff HEAD',
   'timeout 5 GIT_EXTERNAL_DIFF=sh git diff HEAD',
+  'HOME=planted git diff HEAD',
+  'XDG_CONFIG_HOME=planted git diff HEAD',
+  'FOO=1 HOME=planted git log -p',
+  'nohup XDG_CONFIG_HOME=planted git show HEAD',
+  'timeout 5 HOME=planted git diff HEAD',
 ].map((command) => ({ tool: 'Bash', command }));
 
 /** A plain read of each verb those denies narrow, which every read-only agent still asks. */
-const STILL_ASKED: Call[] = ['git grep -n foo HEAD', 'git diff HEAD', 'git show HEAD', 'git log -p'].map((command) => ({
-  tool: 'Bash',
-  command,
-}));
+const STILL_ASKED: Call[] = [
+  'git grep -n foo HEAD',
+  'git diff HEAD',
+  'git show HEAD',
+  'git log -p',
+  'git grep -n a=b HEAD',
+  'git log --format=%H -1',
+].map((command) => ({ tool: 'Bash', command }));
 
-/** The three denies that answer the allow of a read, by the rule each is written as, planted beside the read set. */
-const RUNS_A_PROGRAM_DENIES = ['Bash(git grep *O*)', 'Bash(git grep *--op*)', 'Bash(*GIT_*)'];
+/** The deny that answers any assignment before git, `HOME` and `XDG_CONFIG_HOME` among them, planted beside the read set. */
+const ASSIGNED_BEFORE_GIT_DENY = 'Bash(*=* git *)';
+
+/** The four denies that answer the allow of a read, by the rule each is written as, planted beside the read set. */
+const RUNS_A_PROGRAM_DENIES = ['Bash(git grep *O*)', 'Bash(git grep *--op*)', 'Bash(*GIT_*)', ASSIGNED_BEFORE_GIT_DENY];
 
 /**
  * The verbs of the read set that take git's `--output=<file>`, which creates or truncates the file it names; each measured on git 2.43 to
@@ -949,6 +967,12 @@ const less = (rules: readonly string[], ...rule: string[]): string[] => {
   return rules.filter((kept) => !rule.includes(kept));
 };
 
+/**
+ * The read set's denies less the deny of any assignment before git, which reaches every spelling typed behind one: a test of another
+ * deny reads it, so that deny's spelling behind an assignment shows it reaches that spelling on its own.
+ */
+const UNASSIGNED_DENIES = less(READ_SET_DENIES, ASSIGNED_BEFORE_GIT_DENY);
+
 test('a dontAsk step with the read set and its denies planted asks each read by its own allow, and is refused each write, program and read outside', () => {
   const step = planted();
   assert.deepEqual(runs(step, GIT_READS, {}, []), GIT_READS.map(shown), 'by its own allow, no settings read');
@@ -996,9 +1020,9 @@ test('REFUSED: without Claude Code’s check of a path, or without the deny of w
 });
 
 test('REFUSED: without the denies of a read outside a dontAsk step reads one by each, and each deny refuses its own spellings', () => {
-  const open = planted({ denies: less(READ_SET_DENIES, ...READS_OUTSIDE_DENIES) });
+  const open = planted({ denies: less(UNASSIGNED_DENIES, ...READS_OUTSIDE_DENIES) });
   assert.deepEqual(runs(open, GIT_READS_OUTSIDE, {}, []), GIT_READS_OUTSIDE.map(shown));
-  const without = (rule: string): string[] => runs(planted({ denies: less(READ_SET_DENIES, rule) }), GIT_READS_OUTSIDE, {}, []);
+  const without = (rule: string): string[] => runs(planted({ denies: less(UNASSIGNED_DENIES, rule) }), GIT_READS_OUTSIDE, {}, []);
   assert.deepEqual(without('Bash(git *--no-ind*)'), [
     'Bash(git diff --no-index /etc/hostname CLAUDE.md)',
     'Bash(git diff --stat --no-index /etc/hostname CLAUDE.md)',
@@ -1021,13 +1045,13 @@ test('REFUSED: without the denies of a read outside a dontAsk step reads one by 
 });
 
 test('REFUSED: without the deny of --output a dontAsk step writes a file by each verb, and one narrowed to right after the verb misses it later', () => {
-  const open = planted({ denies: less(READ_SET_DENIES, WRITES_A_FILE_DENY) });
+  const open = planted({ denies: less(UNASSIGNED_DENIES, WRITES_A_FILE_DENY) });
   assert.deepEqual(runs(open, GIT_WRITES_A_FILE, {}, []), GIT_WRITES_A_FILE.map(shown));
-  const narrow = planted({ denies: [...less(READ_SET_DENIES, WRITES_A_FILE_DENY), 'Bash(git diff --output*)'] });
+  const narrow = planted({ denies: [...less(UNASSIGNED_DENIES, WRITES_A_FILE_DENY), 'Bash(git diff --output*)'] });
   assert.ok(runs(narrow, GIT_WRITES_A_FILE, {}, []).includes('Bash(git diff --stat HEAD --output /tmp/x)'), 'written late, it runs');
 });
 
-test('REFUSED: without the denies of a program a dontAsk step runs one by each, and each of the three refuses its own spellings', () => {
+test('REFUSED: without the denies of a program a dontAsk step runs one by each, and each refuses its own spellings', () => {
   const open = planted({ denies: less(READ_SET_DENIES, ...RUNS_A_PROGRAM_DENIES) });
   assert.deepEqual(runs(open, GIT_RUNS_A_PROGRAM, {}, []), GIT_RUNS_A_PROGRAM.map(shown));
   const without = (rule: string): string[] => runs(planted({ denies: less(READ_SET_DENIES, rule) }), GIT_RUNS_A_PROGRAM, {}, []);
@@ -1042,7 +1066,15 @@ test('REFUSED: without the denies of a program a dontAsk step runs one by each, 
     'Bash(git grep --ope=sh foo HEAD)',
     'Bash(git grep --op=sh foo HEAD)',
   ]);
-  assert.deepEqual(without('Bash(*GIT_*)'), [
+  assert.deepEqual(without('Bash(*GIT_*)'), [], "every assignment of git's environment is an assignment before git, refused too");
+  assert.deepEqual(without(ASSIGNED_BEFORE_GIT_DENY), [
+    'Bash(HOME=planted git diff HEAD)',
+    'Bash(XDG_CONFIG_HOME=planted git diff HEAD)',
+    'Bash(FOO=1 HOME=planted git log -p)',
+    'Bash(nohup XDG_CONFIG_HOME=planted git show HEAD)',
+    'Bash(timeout 5 HOME=planted git diff HEAD)',
+  ]);
+  assert.deepEqual(runs(planted({ denies: less(READ_SET_DENIES, 'Bash(*GIT_*)', ASSIGNED_BEFORE_GIT_DENY) }), GIT_RUNS_A_PROGRAM, {}, []), [
     'Bash(GIT_EXTERNAL_DIFF=sh git diff HEAD)',
     'Bash(GIT_EXTERNAL_DIFF=sh git show HEAD)',
     'Bash(GIT_EXTERNAL_DIFF=sh git log -p)',
@@ -1051,8 +1083,13 @@ test('REFUSED: without the denies of a program a dontAsk step runs one by each, 
     'Bash(FOO=1 GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=diff.external GIT_CONFIG_VALUE_0=sh git diff HEAD)',
     'Bash(nohup GIT_EXTERNAL_DIFF=sh git diff HEAD)',
     'Bash(timeout 5 GIT_EXTERNAL_DIFF=sh git diff HEAD)',
+    'Bash(HOME=planted git diff HEAD)',
+    'Bash(XDG_CONFIG_HOME=planted git diff HEAD)',
+    'Bash(FOO=1 HOME=planted git log -p)',
+    'Bash(nohup XDG_CONFIG_HOME=planted git show HEAD)',
+    'Bash(timeout 5 HOME=planted git diff HEAD)',
   ]);
-  const narrow = planted({ denies: [...less(READ_SET_DENIES, 'Bash(*GIT_*)'), 'Bash(GIT_*)'] });
+  const narrow = planted({ denies: [...less(READ_SET_DENIES, 'Bash(*GIT_*)', ASSIGNED_BEFORE_GIT_DENY), 'Bash(GIT_*)'] });
   assert.deepEqual(
     runs(narrow, GIT_RUNS_A_PROGRAM, {}, []),
     [
@@ -1060,6 +1097,11 @@ test('REFUSED: without the denies of a program a dontAsk step runs one by each, 
       'Bash(FOO=1 GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=diff.external GIT_CONFIG_VALUE_0=sh git diff HEAD)',
       'Bash(nohup GIT_EXTERNAL_DIFF=sh git diff HEAD)',
       'Bash(timeout 5 GIT_EXTERNAL_DIFF=sh git diff HEAD)',
+      'Bash(HOME=planted git diff HEAD)',
+      'Bash(XDG_CONFIG_HOME=planted git diff HEAD)',
+      'Bash(FOO=1 HOME=planted git log -p)',
+      'Bash(nohup XDG_CONFIG_HOME=planted git show HEAD)',
+      'Bash(timeout 5 HOME=planted git diff HEAD)',
     ],
     'the deny without its leading * reaches only a part that opens GIT_',
   );
@@ -1076,6 +1118,141 @@ test("REFUSED: a step's own deny line cut to one rule lifts none of its agent's,
     GIT_RUNS_A_PROGRAM.map(shown),
     "the line alone, as it once replaced its agent's",
   );
+});
+
+/** The pull request's reads the reviewer allows itself, planted beside the read set. sdlc's own is Agora's, held as written there. */
+const GH_ALLOWS = ['Bash(gh pr view:*)', 'Bash(gh pr checks:*)'];
+
+/**
+ * The reads of a run's pull request a reviewer makes, in the spellings a session types: its state, head, mergeability and checks, by
+ * its number or its branch, fields asked with `--json`. A `w` or an `R` inside the fields is no option, and `--comments` stays open.
+ */
+const GH_READS: Call[] = [
+  'gh pr view 196 --json state,mergeable,headRefOid,title,body,url',
+  'gh pr view 196 --json reviews,reviewDecision',
+  'gh pr view 196 --comments',
+  'gh pr view wf/r-1/implement',
+  'gh pr checks 196',
+  'gh pr checks 196 --required',
+  'gh pr checks 196 --json name,state,bucket',
+].map((command) => ({ tool: 'Bash', command }));
+
+/**
+ * What gh's two reads would open, run or read beyond the answer by, each deny with the spellings it alone refuses, as typed. gh's flags
+ * are pflag's, which takes no abbreviation of a long option, so a long one is denied by its whole name anywhere after `gh`, and a short
+ * one by ` -<letter>` opening a word:
+ *
+ * - `--web`, `-w`: opens a browser, the program `BROWSER` or gh's `browser:` names.
+ * - `--watch`: `pr checks` polls until every check ends, and never returns while one is pending.
+ * - `--jq`, `-q`: gh compiles the query with the process's environment loaded, so `$ENV` and `env` print every secret the daemon holds.
+ * - `--template`, `-t`: a Go template over the answer, with functions of its own; `--json` alone gives every field a review reads.
+ * - `--repo`, `-R`, an address (`//`): another repository's pull request, by option or in place of the number.
+ * - `-c`: `pr view`'s one short boolean but `-w`, after which pflag bundles any short option, so `-cw`, `-cq…`, `-ct…` and `-cR…`
+ *   reach the forms above; `--comments` stays open.
+ * - an assignment before gh, matched on the part as typed (`deniedPartsOfCall`): `GH_PAGER`, `PAGER`, `BROWSER`, `GH_BROWSER` choose a
+ *   program, `GH_CONFIG_DIR`, `XDG_CONFIG_HOME` and `HOME` a config whose `pager:` or `browser:` does, and `GH_REPO` another
+ *   repository. Its leading `*=*` reaches a variable no list names, and a first assignment, a `nohup` or a `timeout` before it.
+ *
+ * A quoted, escaped or brace-split spelling (`--w''eb`) is not here: a Bash rule matches the text as typed, and no deny reaches it.
+ */
+const GH_REFUSED: Record<string, string[]> = {
+  'Bash(gh *--web*)': ['gh pr view 196 --web', 'gh pr checks 196 --web=true'],
+  'Bash(gh * -w*)': ['gh pr view 196 -w', 'gh pr checks 196 -w', 'gh pr view 196 -wc'],
+  'Bash(gh *--watch*)': ['gh pr checks 196 --watch', 'gh pr checks 196 --fail-fast --watch=true'],
+  'Bash(gh *--jq*)': ["gh pr view 196 --json title --jq '$ENV'", 'gh pr checks 196 --json name --jq=env'],
+  'Bash(gh * -q*)': ['gh pr view 196 --json title -q env'],
+  'Bash(gh *--template*)': ["gh pr view 196 --json title --template '{{.title}}'"],
+  'Bash(gh * -t*)': ['gh pr checks 196 --json name -t x'],
+  'Bash(gh *--repo*)': ['gh pr view 1 --repo o/r', 'gh pr view 1 --repo=o/r'],
+  'Bash(gh * -R*)': ['gh pr checks 1 -R o/r'],
+  'Bash(gh *//*)': ['gh pr view https://github.com/o/r/pull/1'],
+  'Bash(gh * -c*)': ['gh pr view -cw 196', 'gh pr view 196 -cq env', 'gh pr view 196 -ct x', 'gh pr view 196 -cRo/r'],
+  'Bash(*=* gh *)': [
+    'GH_PAGER=sh gh pr view 196',
+    'PAGER=sh gh pr view 196',
+    'BROWSER=sh gh pr view 196',
+    'GH_BROWSER=sh gh pr checks 196',
+    'GH_CONFIG_DIR=planted gh pr view 196',
+    'XDG_CONFIG_HOME=planted gh pr view 196',
+    'HOME=planted gh pr view 196',
+    'GH_REPO=o/r gh pr view 1',
+    'FOO=1 GH_PAGER=sh gh pr view 196',
+    'nohup PAGER=sh gh pr view 196',
+    'timeout 5 BROWSER=sh gh pr checks 196',
+  ],
+};
+
+/** The denies beside gh's reads, each read-only agent's, by the rule each is written as. */
+const GH_DENIES = Object.keys(GH_REFUSED);
+
+/** Every spelling of gh's reads a read-only step must not run. */
+const GH_REFUSED_CALLS: Call[] = Object.values(GH_REFUSED)
+  .flat()
+  .map((command) => ({ tool: 'Bash', command }));
+
+/** gh's writes, the gh lines of `FENCED`: what an allow of gh wider than the two reads reaches. */
+const GH_WRITES: Call[] = FENCED.filter((call) => call.command?.startsWith('gh '));
+
+/** The reviewer with the read set and gh's reads planted, and their denies, or `denies` in place of gh's. */
+const ghPlanted = ({ allows = GH_ALLOWS, denies = GH_DENIES }: { allows?: readonly string[]; denies?: readonly string[] } = {}): Step =>
+  planted({ allows: [...READ_SET_ALLOWS, ...allows], denies: [...READ_SET_DENIES, ...denies] });
+
+test("a dontAsk step with gh's two reads and their denies planted reads its pull request, and runs no other form of gh", () => {
+  const step = ghPlanted();
+  assert.deepEqual(runs(step, GH_READS, {}, []), GH_READS.map(shown), 'by its own allow, no settings read');
+  assert.deepEqual(runs(step, GH_REFUSED_CALLS, {}, []), []);
+  assert.deepEqual(runs(step, GH_WRITES, {}, []), []);
+  assert.deepEqual(runs(step, GIT_READS, {}, []), GIT_READS.map(shown), 'and the read set still asks');
+  assert.deepEqual(runs(step, TEXT_READS, {}, []), TEXT_READS.map(shown));
+});
+
+test("REFUSED: without gh's denies a dontAsk step runs every refused form by the two reads alone, and each deny refuses its own spellings", () => {
+  assert.equal(GH_WRITES.length, 12, "FENCED's gh lines are read");
+  assert.deepEqual(runs(ghPlanted({ denies: [] }), GH_REFUSED_CALLS, {}, []), GH_REFUSED_CALLS.map(shown));
+  for (const [rule, spellings] of Object.entries(GH_REFUSED))
+    assert.deepEqual(
+      runs(ghPlanted({ denies: less(GH_DENIES, rule) }), GH_REFUSED_CALLS, {}, []),
+      spellings.map((command) => `Bash(${command})`),
+      rule,
+    );
+});
+
+test('REFUSED: a deny of a GH_ assignment opening the part, in place of any assignment before gh, misses every other', () => {
+  const narrow = ghPlanted({ denies: [...less(GH_DENIES, 'Bash(*=* gh *)'), 'Bash(GH_*)'] });
+  assert.deepEqual(runs(narrow, GH_REFUSED_CALLS, {}, []), [
+    'Bash(PAGER=sh gh pr view 196)',
+    'Bash(BROWSER=sh gh pr view 196)',
+    'Bash(XDG_CONFIG_HOME=planted gh pr view 196)',
+    'Bash(HOME=planted gh pr view 196)',
+    'Bash(FOO=1 GH_PAGER=sh gh pr view 196)',
+    'Bash(nohup PAGER=sh gh pr view 196)',
+    'Bash(timeout 5 BROWSER=sh gh pr checks 196)',
+  ]);
+});
+
+test('REFUSED: gh whole in place of the two reads runs every gh write, and gh pr whole every write of a pull request', () => {
+  assert.deepEqual(runs(ghPlanted({ allows: ['Bash(gh:*)'] }), GH_WRITES, {}, []), GH_WRITES.map(shown));
+  assert.deepEqual(runs(ghPlanted({ allows: ['Bash(gh pr:*)'] }), GH_WRITES, {}, []), [
+    'Bash(gh pr create --title x --body y)',
+    'Bash(gh pr merge 7 --merge)',
+    'Bash(gh pr edit 7 --body x)',
+    'Bash(gh pr ready 7)',
+    'Bash(gh pr close 7)',
+    'Bash(gh pr comment 7 -b x)',
+    'Bash(gh pr review 7 --approve)',
+  ]);
+});
+
+test("REFUSED: the checkout's settings allow gh's reads to every step, so a read-only step that allows none itself runs gh's refused forms without the denies", () => {
+  const fenced = planted({ denies: [...READ_SET_DENIES, ...GH_DENIES] });
+  assert.ok(!(fenced.allowedTools ?? []).some((rule) => rule.startsWith('Bash(gh')), 'the step allows no gh of its own');
+  assert.ok(
+    GH_ALLOWS.every((rule) => SETTINGS_ALLOWS.includes(rule)),
+    "the settings allow gh's two reads, until the nemia factory runs the sdlc that carries them",
+  );
+  assert.deepEqual(runs(fenced, GH_READS, SETTINGS, []), GH_READS.map(shown), "the settings' reads reach it");
+  assert.deepEqual(runs(fenced, GH_REFUSED_CALLS, SETTINGS, []), [], 'and its denies fence them');
+  assert.deepEqual(runs(planted(), GH_REFUSED_CALLS, SETTINGS, []), GH_REFUSED_CALLS.map(shown), 'without them, the settings open each');
 });
 
 /** The folders a walk of the checkout leaves out: what an install, a build or git writes, none of them a file a change is on. */

@@ -73,7 +73,8 @@ const READ_SET = [
 
 /**
  * What the read set would let git write a file, run a program or read outside the repository by, and `wc` read a list of paths by:
- * `git grep`'s pager option, git's environment, any assignment before git (`HOME`, `XDG_CONFIG_HOME`), `--output`, `--no-index`, `blame --contents`, `grep -f`, `wc --files0-from`.
+ * `git grep`'s pager option, git's environment, any assignment before git (`HOME`, `XDG_CONFIG_HOME`), `--output`, `--no-index`,
+ * `blame --contents`, `grep -f`, `wc --files0-from`.
  */
 const READ_SET_DENIES = [
   'Bash(git grep *O*)',

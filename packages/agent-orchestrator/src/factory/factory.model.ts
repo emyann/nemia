@@ -15,6 +15,13 @@ import { factoryNameRefusal, REVISIONS_POLICIES } from './factory.ts';
 export const FactoryName = brandedId('FactoryName', factoryNameRefusal);
 export type FactoryName = Id<'FactoryName'>;
 
+/**
+ * A folder of the person's machine a factory mounts for every local step of its runs (`Volume`): its path, and whether steps only read it,
+ * the runtime's `Mount` field and Kubernetes' `volumeMounts.readOnly`, compose's long-form read_only. Marked always.
+ */
+export const Volume = Schema.Struct({ path: Schema.String, readOnly: Schema.Boolean }).annotate({ identifier: 'Volume' });
+export type Volume = typeof Volume.Type;
+
 /** A schedule of a workflow a factory has attached (`Schedule`). */
 const Schedule = Schema.Struct({
   cron: Schema.String,
@@ -40,10 +47,11 @@ export type AppliedTemplate = typeof AppliedTemplate.Type;
 const workflowOf = (step: string): string => step.slice(0, step.indexOf('/'));
 
 /**
- * A factory as its store reads it (`Factory`): its hires by `<workflow>/<step>`, its schedules by workflow. Its invariants are the
- * door's: it works on one repository at least (`factoryRepos`), and it hires and schedules only into a workflow it offers — a hire or a
- * schedule into one it has not attached is refused, and a workflow it still hires into or schedules is not detached (`wiringRefusal`,
- * `wiring.ts`, whose contract proves those refusals); this struct's own checks refuse a factory the door writes that breaks them.
+ * A factory as its store reads it (`Factory`): its hires by `<workflow>/<step>`, its schedules by workflow. Its invariants are the door's:
+ * it works on one repository at least (`factoryRepos`), mounts no volume that is one of its repositories or named twice, and it hires and
+ * schedules only into a workflow it offers — a hire or a schedule into one it has not attached is refused, and a workflow it still hires
+ * into or schedules is not detached (`wiringRefusal`, `wiring.ts`, whose contract proves those refusals); this struct's own checks refuse a
+ * factory the door writes that breaks them.
  */
 export const Factory = Schema.Struct({
   name: FactoryName.OnRead,
@@ -55,6 +63,7 @@ export const Factory = Schema.Struct({
   revisions: Schema.optional(Schema.Literals(REVISIONS_POLICIES)),
   template: Schema.optional(AppliedTemplate),
   tree: Schema.optional(Schema.String),
+  volumes: Schema.optional(Schema.Array(Volume)),
 })
   .check(
     Schema.makeFilter((factory) => factory.repos.length > 0 || 'a factory works on no repository: nemia factory add <name> --repo <path>'),
@@ -64,6 +73,17 @@ export const Factory = Schema.Struct({
         (workflow) => !offered.includes(workflow),
       );
       return unoffered === undefined || `it hires into or schedules ${unoffered}, which it does not offer: nemia factory attach it`;
+    }),
+    Schema.makeFilter((factory) => {
+      const at = (factory.volumes ?? []).map((v) => v.path);
+      const repos = new Set(factory.repos);
+      const repo = at.find((v) => repos.has(v));
+      if (repo !== undefined)
+        return `its volume ${repo} is one of its repositories, which a run mounts already: nemia factory volume rm ${factory.name} ${repo}`;
+      const twice = at.find((v, i) => at.indexOf(v) !== i);
+      return (
+        twice === undefined || `it names the volume ${twice} twice: nemia factory volume rm ${factory.name} ${twice}, then add it once`
+      );
     }),
   )
   .annotate({ identifier: 'Factory' });
@@ -79,4 +99,4 @@ export const Hire = Schema.Struct({
 export type Hire = typeof Hire.Type;
 
 /** The factory context's part of the orchestrator's diagram. */
-export const factoryModel = { entities: [Factory, AppliedTemplate, Hire], ids: { FactoryName: 'Factory' } } satisfies ErModel;
+export const factoryModel = { entities: [Factory, AppliedTemplate, Hire, Volume], ids: { FactoryName: 'Factory' } } satisfies ErModel;

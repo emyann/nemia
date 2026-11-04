@@ -7,7 +7,7 @@
  * and what the factory keeps and takes.
  */
 import type { Adopted, AdoptRefusal } from '../../contracts/adopt.contract.ts';
-import { DEFAULT_REVISIONS, type Factory, type Hires, type RevisionsPolicy } from '../factory/factory.ts';
+import { DEFAULT_REVISIONS, factoryVolumes, volumeMark, type Factory, type Hires, type RevisionsPolicy } from '../factory/factory.ts';
 
 /** The wiring a template's render holds in its `factory.json`: its workflows, its hires, and its revisions policy where it says one. */
 export type Wiring = { readonly workflows: readonly string[]; readonly hires: Hires; readonly revisions?: RevisionsPolicy };
@@ -86,8 +86,8 @@ export const adoptRefusal: AdoptRefusal = (factory, adoption) => {
 };
 
 /**
- * `factory` taken over by `template`, running from `tree`: its name, repositories, schedules and instruction kept; its workflows, hires
- * and revisions policy the template's `wiring`.
+ * `factory` taken over by `template`, running from `tree`: its name, repositories, schedules, instruction and volumes kept; its workflows,
+ * hires and revisions policy the template's `wiring`.
  */
 export const adopted: Adopted = (factory, wiring, template, tree) => ({
   name: factory.name,
@@ -99,6 +99,7 @@ export const adopted: Adopted = (factory, wiring, template, tree) => ({
   revisions: wiring.revisions,
   template,
   tree,
+  volumes: factory.volumes,
 });
 
 /** A hire a takeover changes: a step hired into by the template only (`added`), by the factory only (`dropped`), or by both, apart. */
@@ -116,7 +117,12 @@ export type HireChange = {
  */
 export type AdoptPlan = {
   readonly factory: string;
-  readonly kept: { readonly repos: readonly string[]; readonly schedules: readonly string[]; readonly instruction: boolean };
+  readonly kept: {
+    readonly repos: readonly string[];
+    readonly schedules: readonly string[];
+    readonly instruction: boolean;
+    readonly volumes: readonly string[];
+  };
   readonly workflows: { readonly added: readonly string[]; readonly dropped: readonly string[]; readonly kept: readonly string[] };
   readonly hires: readonly HireChange[];
   readonly revisions: { readonly was: RevisionsPolicy; readonly now: RevisionsPolicy };
@@ -150,7 +156,12 @@ export function adoptPlan(factory: Factory, adoption: Adoption, runs: readonly s
   const policy = adoption.wiring.revisions ?? DEFAULT_REVISIONS;
   return {
     factory: factory.name,
-    kept: { repos: factory.repos, schedules: sorted(Object.keys(factory.schedules)), instruction: factory.instruction !== undefined },
+    kept: {
+      repos: factory.repos,
+      schedules: sorted(Object.keys(factory.schedules)),
+      instruction: factory.instruction !== undefined,
+      volumes: factoryVolumes(factory).map((v) => `${v.path}${volumeMark(v)}`),
+    },
     workflows: {
       added: sorted([...now].filter((w) => !was.has(w))),
       dropped: sorted([...was].filter((w) => !now.has(w))),
@@ -188,7 +199,7 @@ export function adoptLines(plan: AdoptPlan, digest: string, adopt: string): stri
   const blocked = stranded.cards.length > 0 || stranded.schedules.length > 0;
   return [
     `${factory}: taken over by the template, in place — nothing is written until nemia factory adopt`,
-    `stays: its name, its repositories (${listed(kept.repos)}), its schedules (${listed(kept.schedules)}), ${kept.instruction ? 'its instruction' : 'no instruction'}, its cards, its runs and its stats`,
+    `stays: its name, its repositories (${listed(kept.repos)}), its schedules (${listed(kept.schedules)}), ${kept.instruction ? 'its instruction' : 'no instruction'}, its volumes (${listed(kept.volumes)}), its cards, its runs and its stats`,
     `workflows: + ${listed(workflows.added)}; - ${listed(workflows.dropped)}; kept ${listed(workflows.kept)}`,
     hires.length ? 'hires:' : 'hires: unchanged',
     ...hires.map(hireLine),

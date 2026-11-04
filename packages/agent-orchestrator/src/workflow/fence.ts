@@ -385,7 +385,7 @@ const WRITING_TOOLS = ['Edit', 'Write', 'MultiEdit', 'NotebookEdit', 'Bash'];
  * narrowest that writes unasked (`editsUnasked`) with no `Edit` rule in `allowedTools:`, where the rule a writable mount is filed with
  * would be its first write.
  */
-function unwrittenBy(step: Workflow): string | undefined {
+function unwrittenBy(step: Fenced): string | undefined {
   const reach = reachOf(step.harness);
   const word = step.sandbox ?? step.permissionMode ?? reach.given;
   if (Object.hasOwn(reach.rank, word) && rankOf(reach, word) === 0) return `runs in \`${word}\`, which writes nothing`;
@@ -396,6 +396,16 @@ function unwrittenBy(step: Workflow): string | undefined {
     return `runs in \`${word}\`, which asks before an edit, and allows no \`Edit\` rule, so it writes nothing`;
   return undefined;
 }
+
+/** A step as `unwrittenBy` reads it: any of its lines, its fence's among them. */
+export type Fenced = Partial<Workflow>;
+
+/**
+ * Whether `step`'s fence, as resolved with its agent's, writes nothing (`unwrittenBy`): the one judgement `refuseUnwritable` refuses
+ * `writable:` by, and the filing holds a factory's writable volume read-only by (`volumeMounts`), so a volume gives no write to a step
+ * that has none.
+ */
+export const writesNothing = (step: Fenced): boolean => unwrittenBy(step) !== undefined;
 
 /**
  * Refuses `writable:` on a step whose fence, as resolved with its agent's (`agent`, by name), writes nothing (`unwrittenBy`). The key

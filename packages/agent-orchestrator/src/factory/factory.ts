@@ -63,7 +63,8 @@ export const DEFAULT_REVISIONS: RevisionsPolicy = 'pinned';
  * attached to it, each by its folder's name, its hires and its schedules, by workflow; none of each when the file names none.
  * `instruction`: where its instruction is kept, when the file says (`instructionAt`). `revisions`: whether its runs follow merged
  * revisions, when it says (`revisionsOf`). `template` and `tree`: the template it was made from, and the folder it runs from, its
- * workflows, agents, skills, wiring and instruction, when it was made from one.
+ * workflows, agents, skills, wiring and instruction, when it was made from one. `volumes`: the folders of the person's machine its runs
+ * mount for every local step beside its repositories, each read-only or writable as it was named (`Volume`), when it names any.
  */
 export type Factory = {
   name: string;
@@ -75,7 +76,30 @@ export type Factory = {
   revisions?: RevisionsPolicy;
   template?: FactoryTemplate;
   tree?: string;
+  volumes?: readonly Volume[];
 };
+
+/**
+ * A folder of the person's machine a factory mounts for every local step of its runs, apart from the repositories it works on, as a
+ * container is given a volume (`docker run -v <path>:ro|:rw`): its absolute path, and whether steps only read it. Marked always, as the
+ * runtime's `Mount` is: a volume left unmarked would be writable without anyone having said so. It never makes the factory work on its
+ * folder, and a writable one is not a run's workspace: nothing commits, lands or reverts what a step writes there. It is the
+ * factory's own, kept in its file, never in a template.
+ */
+export type Volume = { path: string; readOnly: boolean };
+
+/** The volumes of `factory`, each as `path.resolve` spells it, sorted, once each: the first named of a path given twice. */
+export function factoryVolumes(factory: Pick<Factory, 'volumes'>): Volume[] {
+  const seen = new Map<string, Volume>();
+  for (const v of factory.volumes ?? []) {
+    const at = path.resolve(v.path);
+    if (!seen.has(at)) seen.set(at, { path: at, readOnly: v.readOnly });
+  }
+  return [...seen.values()].sort((a, b) => a.path.localeCompare(b.path));
+}
+
+/** How a volume is said: `:ro` or `:rw`, as docker compose marks it. */
+export const volumeMark = (v: Pick<Volume, 'readOnly'>): ':ro' | ':rw' => (v.readOnly ? ':ro' : ':rw');
 
 /** The revisions policy of `factory`: what it says, else `pinned`, which is also the default factory's, which says nothing. */
 export const revisionsOf = (factory: Pick<Factory, 'revisions'> | undefined): RevisionsPolicy => factory?.revisions ?? DEFAULT_REVISIONS;
@@ -183,7 +207,8 @@ export type FactoryWrite =
   | 'schedule'
   | 'unschedule'
   | 'upgrade'
-  | 'adopt';
+  | 'adopt'
+  | 'volume';
 
 /** What to do in place of `nemia factory <verb>` on the default factory. */
 const INSTEAD: Record<FactoryWrite, string> = {
@@ -201,6 +226,7 @@ const INSTEAD: Record<FactoryWrite, string> = {
   schedule: 'It offers every workflow found, and starts none by itself: schedule in a factory nemia factory ls lists.',
   unschedule: 'It schedules nothing: unschedule in a factory nemia factory ls lists.',
   upgrade: 'It is made from no template: upgrade a factory nemia factory apply made.',
+  volume: 'It mounts no volume, and no run is started in it: add one to a factory nemia factory ls lists.',
   adopt:
     'It holds every run and card that names no factory: take over a factory nemia factory ls lists, or make one with nemia factory apply.',
 };
@@ -492,6 +518,23 @@ export const writableMountRefusal = (factory: Pick<Factory, 'name'>, where: stri
   `step. Hire into ${where} an agent whose harness holds a writable mount (nemia factory hire ${factory.name} <agent> --step ${where}), ` +
   `or delete the name from \`writable:\`, so the step only reads the folder. Nothing was written.`;
 
+/**
+ * Why a run in `factory` cannot start: the runtime refuses the step `where` (`<workflow>/<step>`) a volume of the factory, mounted for it
+ * as it is marked (`volumeMounts`), in its words (`why`); then where the mount came from, and what a person can do.
+ */
+export const volumeMountRefusal = (factory: Pick<Factory, 'name'>, where: string, why: string): string =>
+  `${why}\nThat folder is a volume of the factory ${factory.name}: a run in it mounts each volume for every local step, a writable one ` +
+  `writable for each step whose fence writes. Hire into ${where} an agent whose harness holds the mount ` +
+  `(nemia factory hire ${factory.name} <agent> --step ${where}); mark the volume read-only (nemia factory volume add ${factory.name} <path>:ro); ` +
+  `or take it off (nemia factory volume rm ${factory.name} <path>). Nothing was written.`;
+
+/** A factory's volumes as `nemia factory ls` lists them under its line: `volume /home/me/notes :ro`, a writable one with its caveat. */
+const volumeLines = (volumes: readonly Volume[] | undefined, width: number): string[] =>
+  factoryVolumes({ volumes }).map(
+    (v) =>
+      `${' '.repeat(width)}  volume ${v.path} ${volumeMark(v)}${v.readOnly ? '' : " — writable, and not a run's workspace: nothing commits or lands what a step writes there"}`,
+  );
+
 /** A factory's hires as `nemia factory ls` lists them under its line, sorted by step: `dev/implement ← implementer`. */
 const hireLines = (hires: Hires, width: number): string[] =>
   Object.keys(hires)
@@ -572,6 +615,7 @@ export function factoryLines(
             ...untrustedLines(l.name, untrusted, width),
             ...templateLines(l.template, l.status, width),
             ...workflowLine(l.workflows, width),
+            ...volumeLines(l.volumes, width),
             ...hireLines(l.hires, width),
             ...scheduleLines(l, listed, width, now),
             ...instructionLine(l.instruction, width),

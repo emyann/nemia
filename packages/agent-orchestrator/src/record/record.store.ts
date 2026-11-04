@@ -81,6 +81,7 @@ const runBase = {
   gates: Schema.optional(Strings),
   factory: Schema.optional(Schema.String),
   mounts: Schema.optional(Schema.mutable(Schema.Array(Schema.Struct({ path: Schema.String, readOnly: Schema.Boolean })))),
+  volumes: Schema.optional(Schema.mutable(Schema.Array(Schema.Struct({ path: Schema.String, readOnly: Schema.Boolean })))),
   slotHeldAt: Schema.optional(Schema.String),
   gatesTimed: Schema.optional(Schema.mutable(Schema.Array(Schema.Struct({ step: Schema.String, try: Schema.Number })))),
   deniedCounted: Schema.optional(Schema.mutable(Schema.Array(Schema.Struct({ task: Schema.String, attempts: Schema.Number })))),
@@ -170,13 +171,8 @@ const wordsOf = (value: unknown, cap: number): string | undefined => (isText(val
 const isPrunedWorktree = Schema.is(Schema.StructWithRest(Schema.Struct({ path: Schema.String, bytes: Schema.Finite }), Rest));
 
 /** A marker's text as JSON, or undefined where it is not: each field is then read as missing, as a marker that does not read is. */
-const jsonOr = (text: string): unknown => {
-  try {
-    return JSON.parse(text);
-  } catch {
-    return undefined;
-  }
-};
+const JsonText = Schema.fromJsonString(Schema.Unknown);
+const jsonOr = (text: string): unknown => Result.getOrUndefined(Schema.decodeUnknownResult(JsonText)(text));
 
 /** A person's marker file, as JSON where it reads as JSON (`jsonOr`) — or undefined, when there is no such file to read. */
 const markerOf = (file: string): { json: unknown } | undefined => {

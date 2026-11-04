@@ -21,7 +21,9 @@ import { frozenStepsOf } from '../steps/steps.ts';
 import type { Workflow } from '../workflow.ts';
 import { approvedFirst, gatesOf } from '../status/status.ts';
 import { fromNote } from './inputs.ts';
-import { leftOutMounts, startRun, type StartedRun } from './start.verb.ts';
+import { leftOutMounts, leftOutVolumes, startRun, type StartedRun } from './start.verb.ts';
+import { volumeMounts } from '../volume/volume.ts';
+import { isRemoteHarness } from '../harness/harness.ts';
 import { labelsText } from '../labels/labels.ts';
 import { pausedRead } from '../list/list.verb.ts';
 import { pausedWords, type Paused } from '../pause/pause.ts';
@@ -189,6 +191,31 @@ function mountLines(run: Run): string[] {
     ...written.map((w) => `writable: ${w.path} — for ${w.steps.join(', ')} alone`),
     ...(missing.length
       ? [`not mounted: ${missing.join(', ')} — of the factory's repositories, and no directory now; start again once it is there`]
+      : []),
+    ...volumeLines(run),
+  ];
+}
+
+/**
+ * The factory's volumes a run mounts: those read-only, then each writable one with the steps whose fence writes it (`volumeMounts`), and
+ * that it is not the run's workspace; then those left out because they were no directory.
+ */
+function volumeLines(run: Run): string[] {
+  const missing = leftOutVolumes(run);
+  const volumes = run.volumes ?? [];
+  const local = startedSteps(run).filter((s) => !isRemoteHarness(s.harness));
+  const reads = volumes.filter((v) => v.readOnly);
+  const writes = volumes
+    .filter((v) => !v.readOnly)
+    .map((v) => ({ path: v.path, steps: local.filter((s) => volumeMounts(s, [v])[0]?.readOnly === false).map((s) => s.name) }));
+  return [
+    ...(reads.length ? [`volumes: ${reads.map((v) => v.path).join(', ')} — read-only, for every local step`] : []),
+    ...writes.map(
+      (w) =>
+        `volume: ${w.path} — ${w.steps.length ? `writable for ${w.steps.join(', ')}, read-only for every other local step` : 'writable, and read-only for every step here, since none writes'}; not the run's workspace: nothing commits or lands what a step writes there`,
+    ),
+    ...(missing.length
+      ? [`not mounted: ${missing.join(', ')} — of the factory's volumes, and no directory now; start again once it is there`]
       : []),
   ];
 }

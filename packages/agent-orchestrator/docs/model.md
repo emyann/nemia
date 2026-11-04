@@ -67,6 +67,7 @@ erDiagram
     list gates FK "optional"
     FactoryName factory FK "optional"
     list mounts "optional"
+    list volumes "optional"
     object place "optional"
     string repo "optional"
     string baseRef "optional"
@@ -156,6 +157,10 @@ erDiagram
     WorkflowName workflow FK
     StepName step FK
     AgentName agent FK
+  }
+  Volume {
+    string path
+    boolean readOnly
   }
   Template {
     TemplateSource source PK
@@ -285,6 +290,7 @@ erDiagram
   Workflow ||--o{ Factory : workflows
   Agent ||--o{ Factory : hires
   Factory ||--o| AppliedTemplate : template
+  Factory ||--o{ Volume : volumes
   Template ||--o{ AppliedTemplate : source
   Factory ||--o{ Hire : factory
   Workflow ||--o{ Hire : workflow

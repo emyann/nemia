@@ -8,7 +8,8 @@
     "packages/agent-orchestrator/src/factories",
     "packages/agent-orchestrator/src/templates",
     "packages/agent-orchestrator/src/wiring",
-    "packages/agent-orchestrator/src/adopt"
+    "packages/agent-orchestrator/src/adopt",
+    "packages/agent-orchestrator/src/volume"
   ],
   "terms": [
     {
@@ -18,6 +19,15 @@
       "see": {
         "label": "Factories",
         "href": "/factories/"
+      }
+    },
+    {
+      "term": "Volume",
+      "meaning": "a folder of the person's machine a factory mounts for every local step of its runs, beside its repositories, marked read-only (`:ro`) or writable (`:rw`) as docker compose marks one; kept in the factory's own file, never in its template. A writable one is writable only where a step's fence writes, and is not the run's workspace: nothing commits or lands what a step writes there.",
+      "type": "Volume",
+      "see": {
+        "label": "Factories",
+        "href": "/factories/#its-volumes"
       }
     },
     {

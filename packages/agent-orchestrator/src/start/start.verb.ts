@@ -44,6 +44,8 @@ import {
   DEFAULT_FACTORY,
   factoryMountRefusal,
   factoryMounts,
+  factoryVolumes,
+  volumeMountRefusal,
   writableMountRefusal,
   writableRefusal,
   factoryRepo,
@@ -201,8 +203,8 @@ export const configRefused = (
 const startArtifacts = (): string => path.dirname(artifactsDir({ id: 'run' }, 'step'));
 
 /**
- * `configRefused`'s refusal with the step it refuses, in a run that mounts `mounts` (`factoryMounts`) and whose place denies a landing
- * session `denied`.
+ * `configRefused`'s refusal with the step it refuses, in a run that mounts `mounts` (`factoryMounts`) and the volumes `volumes`
+ * (`volumesAt`), and whose place denies a landing session `denied`.
  */
 function refusedStep(
   steps: readonly Workflow[],
@@ -211,6 +213,7 @@ function refusedStep(
   written: Readonly<Record<string, string>>,
   mounts: readonly Mount[],
   denied: readonly string[],
+  volumes: readonly Mount[] = [],
 ): { step: Workflow; why: string } | undefined {
   for (const step of steps.filter((s) => !isRemoteHarness(s.harness))) {
     const own = ownOf(step, renderedFlags(step, '.'), () => places.repo);
@@ -218,7 +221,11 @@ function refusedStep(
     const config = filedConfig(
       step,
       steps,
-      { gates: [...gates], ...(mounts.length ? { mounts: [...mounts] } : {}) },
+      {
+        gates: [...gates],
+        ...(mounts.length ? { mounts: [...mounts] } : {}),
+        ...(volumes.length ? { volumes: [...volumes] } : {}),
+      },
       { model: step.model, budgetUsd: budgetUsdFor(step.budget), runArtifacts, inbox: inboxDir(), own, landingDenied: () => denied },
     );
     const former = written[step.name];
@@ -309,6 +316,7 @@ type Told = Pick<
   | 'gates'
   | 'factory'
   | 'mounts'
+  | 'volumes'
   | 'gatesTimed'
   | 'deniedCounted'
   | 'settlesCounted'
@@ -342,9 +350,15 @@ const mountsAt = (factory: Factory | undefined, repo: string | undefined): Mount
   factory ? factoryMounts(factory, repo).filter((m) => isDirectory(m.path)) : [];
 
 /**
+ * The volumes of `factory` a run in it mounts (`factoryVolumes`), each marked as named and a directory now; none in the default factory.
+ */
+const volumesAt = (factory: Factory | undefined): Mount[] => (factory ? factoryVolumes(factory).filter((v) => isDirectory(v.path)) : []);
+
+/**
  * Why `steps`, started from `opts` in `factory` on `own` (none for a folder run), cannot be given `mounts`: a `writable:` name no folder
  * answers (`writableRefusal`), or a step whose harness cannot hold its mounts: asked first of every folder read-only, as the run mounts
- * them (`factoryMountRefusal`), then of the folders its `writable:` names writable (`writableMountRefusal`). Nothing when every step can.
+ * them (`factoryMountRefusal`), then of the folders its `writable:` names writable (`writableMountRefusal`), then of the factory's volumes
+ * as each step is filed them (`volumeMountRefusal`). Nothing when every step can.
  */
 function mountRefusal(
   opts: StartOptions,
@@ -354,16 +368,19 @@ function mountRefusal(
   own: string | undefined,
   mounts: readonly Mount[],
   denied: readonly string[],
+  volumes: readonly Mount[] = [],
 ): string | undefined {
   const workflow = path.basename(path.resolve(opts.workflowDir));
   const unwritable = writableRefusal(steps, workflow, factory, own, mounts);
-  if (unwritable || !factory || !mounts.length) return unwritable;
-  const ask = (asked: readonly Workflow[]) =>
-    refusedStep(asked, places, opts.gates ?? [], formerModesWritten(opts.workflowDir), mounts, denied);
+  if (unwritable || !factory || (!mounts.length && !volumes.length)) return unwritable;
+  const ask = (asked: readonly Workflow[], given: readonly Mount[] = []) =>
+    refusedStep(asked, places, opts.gates ?? [], formerModesWritten(opts.workflowDir), mounts, denied, given);
   const reading = ask(steps.map(({ writable: _, ...step }) => step));
   if (reading) return factoryMountRefusal(factory, `${workflow}/${reading.step.name}`, reading.why);
   const writing = ask(steps);
-  return writing && writableMountRefusal(factory, `${workflow}/${writing.step.name}`, writing.why);
+  if (writing) return writableMountRefusal(factory, `${workflow}/${writing.step.name}`, writing.why);
+  const volume = volumes.length ? ask(steps, volumes) : undefined;
+  return volume && volumeMountRefusal(factory, `${workflow}/${volume.step.name}`, volume.why);
 }
 
 /**
@@ -371,26 +388,52 @@ function mountRefusal(
  * is no directory now, as none was at start. None for a run in the default factory, or in one whose file no longer reads.
  */
 export function leftOutMounts(run: Run): string[] {
-  if (!run.factory) return [];
+  return leftOut(run).mounts;
+}
+
+/**
+ * The factory's volumes `startRun` left out of `run`'s volumes, as `nemia start` says them: each no directory now, as none was at start.
+ */
+export function leftOutVolumes(run: Run): string[] {
+  return leftOut(run).volumes;
+}
+
+/** The factory's folders and volumes `startRun` left out of `run`, each no directory now; none where the factory does not read. */
+function leftOut(run: Run): { mounts: string[]; volumes: string[] } {
+  if (!run.factory) return { mounts: [], volumes: [] };
   let factory: Factory;
   try {
     factory = readFactory(run.factory);
   } catch {
-    return [];
+    return { mounts: [], volumes: [] };
   }
-  const mounted = new Set((run.mounts ?? []).map((m) => m.path));
-  return factoryMounts(factory, isRepositoryRun(run) ? run.repo : undefined)
-    .map((m) => m.path)
-    .filter((at) => !mounted.has(at) && !isDirectory(at));
+  const mounted = new Set([...(run.mounts ?? []), ...(run.volumes ?? [])].map((m) => m.path));
+  const missing = (at: string) => !mounted.has(at) && !isDirectory(at);
+  return {
+    mounts: factoryMounts(factory, isRepositoryRun(run) ? run.repo : undefined)
+      .map((m) => m.path)
+      .filter(missing),
+    volumes: factoryVolumes(factory)
+      .map((v) => v.path)
+      .filter(missing),
+  };
 }
 
 /**
- * What `opts` tells the run, with `steps` as the workflow it freezes, `inputs` by name, `factory` the one it is started in, and `mounts`
- * the folders it gives each local step; an option not given is left out, and so are the default factory and no mounts. No gate of it is
+ * What `opts` tells the run, with `steps` as the workflow it freezes, `inputs` by name, `factory` the one it is started in, `mounts`
+ * the folders it gives each local step, and `volumes` the factory's volumes; an option not given is left out, and so are the default
+ * factory, no mounts and no volumes. No gate of it is
  * timed yet (`gatesTimed`), no denied call counted (`deniedCounted`), no settle counted (`settlesCounted`), and its timeline not handed
  * to the metrics (`runTimed`).
  */
-function toldOf(opts: StartOptions, steps: Workflow[], inputs: readonly InputFile[], factory: Factory | undefined, mounts: Mount[]): Told {
+function toldOf(
+  opts: StartOptions,
+  steps: Workflow[],
+  inputs: readonly InputFile[],
+  factory: Factory | undefined,
+  mounts: Mount[],
+  volumes: Mount[],
+): Told {
   const after = opts.after ?? [];
   const context = opts.context ?? [];
   const gates = opts.gates ?? [];
@@ -408,6 +451,7 @@ function toldOf(opts: StartOptions, steps: Workflow[], inputs: readonly InputFil
     ...(gates.length ? { gates: [...gates] } : {}),
     ...(factory ? { factory: factory.name } : {}),
     ...(mounts.length ? { mounts } : {}),
+    ...(volumes.length ? { volumes } : {}),
     gatesTimed: [],
     deniedCounted: [],
     settlesCounted: [],
@@ -566,7 +610,9 @@ export const repoFor = (name: string | undefined, named: string | undefined, fal
  * `writable:` names the folders it alone is filed writable (`stepMounts`), each refused unless one folder of the factory has the name and
  * is mounted or the run's own (`writableRefusal`), and on a harness that holds no writable mount (`writableMountRefusal`). The list
  * is frozen on the record as `mounts`, filed with every local step and named on its brief, so a later change to the factory changes
- * no run started. Left out when none is mounted, and in the default factory.
+ * no run started. Left out when none is mounted, and in the default factory. Its volumes (`factoryVolumes`), each a directory now, are
+ * frozen beside them as `volumes` (`volumesAt`), filed with every local step as marked, a writable one only where the step's fence
+ * writes (`volumeMounts`); a step whose harness cannot hold one is refused before anything is written (`volumeMountRefusal`).
  *
  * The revision of every kind the run resolved — its workflow, each agent, each of their skills and the factory's rules — is appended to
  * the ledger and pinned on the record as `pinned` (`pinsOf`); a run that has filed nothing resolves them again on every pass, so an
@@ -619,9 +665,10 @@ export const startRun = Effect.fn('start')(function* (opts: StartOptions) {
   if (refusedContext) return yield* Effect.fail(refusedContext);
   const inherited = yield* inheritedOf(opts, edits);
   const mounts = mountsAt(factory, folder ? undefined : opts.repo);
-  const unmounted = mountRefusal(opts, steps, places, factory, folder ? undefined : opts.repo, mounts, denied);
+  const volumes = volumesAt(factory);
+  const unmounted = mountRefusal(opts, steps, places, factory, folder ? undefined : opts.repo, mounts, denied, volumes);
   if (unmounted) return yield* Effect.fail(new Invalid({ message: unmounted }));
-  const told = toldOf(opts, steps, inputs, factory, mounts);
+  const told = toldOf(opts, steps, inputs, factory, mounts, volumes);
   const stepRecords = Object.fromEntries(steps.map((s) => [s.name, { taskId: null }]));
   const run = yield* folder ? folderRun(id, told, stepRecords) : repositoryRun(id, told, stepRecords, opts.repo, isolate);
   yield* tried(() => copyInputs(run, inputs));

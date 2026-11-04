@@ -35,6 +35,7 @@ import type { Run } from '../record/record.ts';
 import { trustedLines, type PlaceTrust, type Untrusted } from '../trust/trust.ts';
 import { FACTORY_TRUST, NO_TRUST, trustPlaces, untrustedPlaces } from '../trust/trust.verb.ts';
 import { FACTORY_SERVER_ADD, FACTORY_SERVER_RM, FACTORY_SERVERS } from '../servers/servers.verb.ts';
+import { FACTORY_VOLUMES, VOLUME_FORMS } from '../volume/volume.verb.ts';
 
 export const FACTORY_HELP = `nemia factory [ls]
 nemia factory add <name> --repo <path> [--repo <path> ...] [--no-trust]
@@ -53,6 +54,7 @@ nemia factory unschedule <factory> <workflow>
 nemia factory servers <factory>
 nemia factory server add <factory> <server> --url <address> [--transport http|sse] [--header <name>=<value> ...] [--client-id <id>] [--callback-port <port>]
 nemia factory server rm <factory> <server>
+${VOLUME_FORMS}
 nemia factory rules <name> [--file <path>|- | --clear]
 nemia factory instruction <name> [--path <path> | --store | --clear]
 nemia factory instruct <name> --file <path>|- | --clear
@@ -64,7 +66,7 @@ A factory is a named grouping in the store: \${WF_ROOT:-~/.agent-workflows}/fact
 factory, naming the repositories its work is on, the workflows it offers and the agents it hires into their steps:
 
     { "repos": ["/home/me/code/app"], "workflows": ["build"], "hires": { "build/implement": "implementer" },
-      "instruction": { "path": "docs/NEMIA.md" } }
+      "instruction": { "path": "docs/NEMIA.md" }, "volumes": [{ "path": "/home/me/notes", "readOnly": true }] }
 
   nemia factory     lists the default factory first — every run and card that names no factory; it is no file,
                  and is read, never written — then each factory by name with its repositories. A file that
@@ -173,10 +175,7 @@ refused, naming the attach.`;
 const WRITTEN_HERE = { side: 'cli', why: 'the board files, attaches to and removes no factory: nemia factory does' } as const;
 
 /** The text under `key`: what the spec read there. */
-const textOf = (args: Args, key: string): string => {
-  const value = args[key];
-  return typeof value === 'string' ? value : '';
-};
+const textOf = (args: Args, key: string): string => (typeof args[key] === 'string' ? args[key] : '');
 
 /**
  * The listing every factory shares: those of the store, as `readFactories` reads them, their schedules as `schedulesListed` does, and
@@ -224,7 +223,7 @@ export const FACTORY: Command<Listed> = {
     positionals: [],
     flags: [],
     unknown: (arg) =>
-      `nemia factory does not take ${arg}. It lists the factories — nemia factory ls — files one with nemia factory add <name> --repo <path>, takes a hand-made one over by a template with nemia factory diff <name> --template <folder|archive>, then nemia factory adopt, trusts its places again with nemia factory trust <name>, attaches a workflow with nemia factory attach <factory> <workflow>, detaches it with nemia factory detach <factory> <workflow>, hires an agent into a step with nemia factory hire <factory> <agent> --step <workflow>/<step>, fires it with nemia factory fire <factory> --step <workflow>/<step>, schedules a workflow's runs with nemia factory schedule <factory> <workflow> --cron <expr> --brief <text>, takes the schedule back with nemia factory unschedule <factory> <workflow>, writes the rules its agents are told with nemia factory rules <name> --file <path>, says where Nemia's instruction for it is kept with nemia factory instruction <name>, writes it with nemia factory instruct <name> --file <path>, and removes one with nemia factory rm <name> (nemia factory --help).`,
+      `nemia factory does not take ${arg}. It lists the factories — nemia factory ls — files one with nemia factory add <name> --repo <path>, takes a hand-made one over by a template with nemia factory diff <name> --template <folder|archive>, then nemia factory adopt, trusts its places again with nemia factory trust <name>, attaches a workflow with nemia factory attach <factory> <workflow>, detaches it with nemia factory detach <factory> <workflow>, hires an agent into a step with nemia factory hire <factory> <agent> --step <workflow>/<step>, fires it with nemia factory fire <factory> --step <workflow>/<step>, schedules a workflow's runs with nemia factory schedule <factory> <workflow> --cron <expr> --brief <text>, takes the schedule back with nemia factory unschedule <factory> <workflow>, writes the rules its agents are told with nemia factory rules <name> --file <path>, says where Nemia's instruction for it is kept with nemia factory instruction <name>, writes it with nemia factory instruct <name> --file <path>, mounts a folder for its runs with nemia factory volume add <factory> <path>:ro|:rw, and removes one with nemia factory rm <name> (nemia factory --help).`,
   },
   writes: false,
   class: 'read',
@@ -575,6 +574,7 @@ export const FACTORIES: readonly Command[] = [
   FACTORY_SERVERS,
   FACTORY_SERVER_ADD,
   FACTORY_SERVER_RM,
+  ...FACTORY_VOLUMES,
   FACTORY_RULES,
   FACTORY_INSTRUCTION,
   FACTORY_INSTRUCT,

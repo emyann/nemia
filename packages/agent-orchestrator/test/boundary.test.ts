@@ -1108,7 +1108,9 @@ test('REFUSED: a verb that reaches the client only through a controller that no 
     ],
     'through a controller, never a store',
   );
-  assert.deepEqual(clientBreaks(planted('src/inbox/inbox.verb.ts', (imports) => imports.filter((m) => m !== 'src/start/start.verb.ts'))), [
+  const throughNone = (imports: readonly string[]) =>
+    imports.filter((m) => m !== 'src/start/start.verb.ts' && m !== 'src/summary/summary.verb.ts' && m !== CLIENT);
+  assert.deepEqual(clientBreaks(planted('src/inbox/inbox.verb.ts', throughNone)), [
     'src/inbox/inbox.verb.ts is a controller and reaches src/runtime-client.ts through none of its imports: the controllers reach the runtime through the client',
   ]);
 });

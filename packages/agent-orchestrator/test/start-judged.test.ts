@@ -178,9 +178,9 @@ test('nemia start judges what a session may call: a tool no rule names refused, 
     () => {
       const contracts = folder(
         'contracts',
-        { design: '---\nplace: git\nagent: seldon\n---\nWrite the spec and its contracts.\n' },
+        { design: '---\nplace: git\nagent: implementer\n---\nWrite the spec and its contracts.\n' },
         {
-          seldon:
+          implementer:
             '---\nrole: Architect\npermissionMode: dontAsk\ntools: Read, Grep, Glob, Bash, Skill, Agent, WebFetch, WebSearch, Write, Edit\n' +
             'allowedTools: Bash(git log:*), Agent, WebFetch, WebSearch, Edit(packages/*/contracts/*.contract.ts), ' +
             'Edit(apps/*/contracts/*.contract.ts)\n---\nDesign it.\n',

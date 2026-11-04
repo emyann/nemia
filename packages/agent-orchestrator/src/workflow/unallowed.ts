@@ -30,8 +30,8 @@ function refusingWord(step: Workflow, reach: FenceReach): string | undefined {
 }
 
 /**
- * The tools a rule on `tool` reaches: an `Edit` rule, bare or with a path, every file-editing tool, as Claude Code checks a write
- * against `Edit` rules alone (`EDITING_TOOLS`); any other rule its own tool.
+ * The tools a rule on `tool` reaches: an `Edit` rule, bare or with a path, every file-editing tool (`EDITING_TOOLS`), since the
+ * harness checks a write against `Edit` rules alone, whatever tool made it; any other rule its own tool.
  */
 const namedBy = (tool: string): readonly string[] => (tool === 'Edit' ? EDITING_TOOLS : [tool]);
 
@@ -40,8 +40,9 @@ const namedBy = (tool: string): readonly string[] => (tool === 'Edit' ? EDITING_
  * `allowedTools:` — its agent's, where the step writes none of its own — and `allows`, the rules the repository's own settings grant,
  * unless the step says `place: folder`, whose session works in a folder the run makes and gets none of them. A tool the harness runs
  * with no rule at all (`FenceReach.unfenced`), and one the step's own fence word grants with none (`FenceReach.granted`, the Edit
- * family under a word that writes unasked), each needs no rule, and an `Edit` rule reaches every file-editing tool (`namedBy`). `undefined` for a step with no `tools:` line, which is given every tool,
- * for one whose fence word asks rather than refuses, and for one on a remote agent, whose operator holds its fence.
+ * family under a word that writes unasked), each needs no rule, and an `Edit` rule reaches every file-editing tool (`namedBy`).
+ * `undefined` for a step with no `tools:` line, which is given every tool, for one whose fence word asks rather than refuses, and for
+ * one on a remote agent, whose operator holds its fence.
  */
 function unallowedIn(step: Workflow, allows: readonly string[]): Unallowed | undefined {
   const harness = step.harness ?? DEFAULT_HARNESS;
@@ -71,9 +72,11 @@ function lists(step: Workflow, found: Unallowed): string {
 /** Where the allow belongs, and what taking the tool off instead costs: an agent's file reaches every step of it, a step's line one. */
 function fixes(step: Workflow, found: Unallowed): string {
   const file = fenceFile(step);
-  const scoped = EDITING_TOOLS.includes(found.tool)
-    ? `\`allowedTools: Edit(…)\`, a path rule on \`Edit\` narrowed to the files it writes, which Claude Code checks every file-editing tool against`
-    : `\`allowedTools: ${found.tool}\`, or narrowed to what it needs, \`${found.tool}(…)\``;
+  const editing = EDITING_TOOLS.includes(found.tool);
+  const narrowed = editing
+    ? ', a path rule on `Edit` narrowed to the files it writes, which every file-editing tool is checked against'
+    : `, or narrowed to what it needs, \`${found.tool}(…)\``;
+  const scoped = `\`allowedTools: ${editing ? 'Edit(…)' : found.tool}\`${narrowed}`;
   const where =
     file === undefined
       ? `on this step — ${scoped}`

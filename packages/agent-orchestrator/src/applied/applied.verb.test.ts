@@ -25,7 +25,7 @@ const { exportTemplate, reconciled } = programsAt(ROOT);
 const { attachWorkflow, detachWorkflow, fireAgent, hireAgent, readFactories, readFactory } = await import('../runner.ts');
 const { main: cli } = await import('../cli/main.ts');
 const { reconcile } = await import('./applied.verb.ts');
-const { appliedDir, readStatus, treeDir } = await import('./applied.store.ts');
+const { appliedDir, readStatus, statusFile, treeDir } = await import('./applied.store.ts');
 const { setRevisions } = await import('../factory/factory.store.ts');
 const stand = eachTest(testPlace);
 /** `nemia`, as a person types it, its commands given this test's place. */
@@ -257,6 +257,76 @@ test('what the controller says of a template or parameters moved since the rende
       assert.doesNotMatch(review(treeDir('moved')), /^rounds: 5$/m);
     },
   );
+});
+
+/** The status of `name` rewritten as the controller wrote it before it named templates: with no `template`, changed by `change`. */
+function unnamed(name: string, change: (status: Record<string, unknown>) => void = () => {}): void {
+  const { template: _named, ...status } = JSON.parse(fs.readFileSync(statusFile(name), 'utf8'));
+  change(status);
+  fs.writeFileSync(statusFile(name), JSON.stringify(status));
+}
+
+test('the controller names the template a base holds, even where the base is no longer the render, so a switch from it can be told', async (t) => {
+  await t.test('a base that is the render is named after its template', async (t) => {
+    t.mock.method(console, 'log', () => {});
+    const { dir, repo } = template();
+    await apply('as-rendered', dir, repo, '--set', 'budget=7');
+    assert.equal(reconciled(templated('as-rendered')).template, 'team');
+  });
+  await t.test(
+    "the template's files changed under its version (ContentChanged): the base is named after the template the file names",
+    async (t) => {
+      t.mock.method(console, 'log', () => {});
+      const { dir, repo } = template();
+      await apply('content', dir, repo, '--set', 'budget=7');
+      reconciled(templated('content'));
+      edit(dir, 'workflows/dev/workflow.yaml', (spec) => {
+        spec.steps[1].rounds = 5;
+      });
+      unnamed('content');
+      const status = reconciled(templated('content'));
+      assert.deepEqual([status.conditions[0].reason, status.template], ['ContentChanged', 'team']);
+      assert.equal(readStatus('content')?.template, 'team', 'and written');
+    },
+  );
+  await t.test('the template moved to another version (VersionDrift): named', async (t) => {
+    t.mock.method(console, 'log', () => {});
+    const { dir, repo } = template();
+    await apply('drift', dir, repo, '--set', 'budget=7');
+    reconciled(templated('drift'));
+    edit(dir, 'nemia.yaml', (spec) => {
+      spec.version = '0.2.0';
+    });
+    unnamed('drift');
+    const status = reconciled(templated('drift'));
+    assert.deepEqual([status.conditions[0].reason, status.template], ['VersionDrift', 'team']);
+  });
+  await t.test("the parameters in the factory's file changed (ParamsChanged): named", async (t) => {
+    t.mock.method(console, 'log', () => {});
+    const { dir, repo } = template();
+    await apply('params', dir, repo, '--set', 'budget=7');
+    reconciled(templated('params'));
+    const file = path.join(FACTORIES, 'params.json');
+    const content = JSON.parse(fs.readFileSync(file, 'utf8'));
+    content.template.params.budget = 9;
+    fs.writeFileSync(file, JSON.stringify(content));
+    unnamed('params');
+    const status = reconciled(templated('params'));
+    assert.deepEqual([status.conditions[0].reason, status.template], ['ParamsChanged', 'team']);
+  });
+  await t.test("an upgrade under way: the factory's file names the template wanted, not the base's, so no name is written", async (t) => {
+    t.mock.method(console, 'log', () => {});
+    const { dir, repo } = template();
+    await apply('under-way', dir, repo, '--set', 'budget=7');
+    reconciled(templated('under-way'));
+    edit(dir, 'workflows/dev/workflow.yaml', (spec) => {
+      spec.steps[1].rounds = 5;
+    });
+    unnamed('under-way', (status) => {
+      status.upgrade = { from: '0.1.0', to: '0.2.0', conflicts: [] };
+    });
+    assert.equal(reconciled(templated('under-way')).template, undefined);
+  });
 });
 
 test("what a templated factory's verbs read and write: its tree's wiring, instruction and parts, and the places apply trusts", async (t) => {

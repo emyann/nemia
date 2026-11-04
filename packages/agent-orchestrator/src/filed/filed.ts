@@ -6,6 +6,7 @@ import { filedAllows, filedDenies } from '../ending/ending.ts';
 import { sessionModel, type RetryHow } from '../retry/index.ts';
 import type { Mount, Run, StepRecord } from '../record/record.ts';
 import { stepMounts } from '../factory/factory.ts';
+import { volumeMounts } from './volumes.ts';
 import { handedMounts, type HandedFiles } from '../artifacts/artifacts.ts';
 import { DEFAULT_HARNESS, isRemoteHarness } from '../harness/harness.ts';
 import { fenceReach, unruledIn } from 'agent-runtime/vocabulary';
@@ -16,7 +17,8 @@ import { splitServers, type FactoryServer, type FactoryServers } from '../server
  * run froze: its model and cap as the filing chooses them (`t`), its context window off the session it continues (`sessionContext`), its
  * deny list with what the run's place denies an ending (`filedDenies`, `t.landingDenied`, asked of an ending alone), its allow list with
  * an ending's read of the run's artifacts folder (`runArtifacts`, `filedAllows`), the folders the run mounts (`mounts`, frozen at start),
- * writable where the step's `writable:` names one (`stepMounts`), then the folders its brief names beside them (`filedFolders`): its own
+ * writable where the step's `writable:` names one (`stepMounts`), then its factory's volumes (`run.volumes`), a writable one writable only
+ * where the step's fence writes (`volumeMounts`), then the folders its brief names beside them (`filedFolders`): its own
  * files directory, read-only, for a step that writes outside its directory only by rule (`ownMounts`), the
  * artifacts folder of each step it comes after, read-only, then the store's folders its `reads:` names, read-only, the inbox at `t.inbox`,
  * then the run's inputs folder at `t.inputs`, read-only, given only for a run given inputs, then the run's copy of its workflow folder
@@ -29,7 +31,7 @@ import { splitServers, type FactoryServer, type FactoryServers } from '../server
 export const filedConfig = <Own extends object>(
   step: Workflow,
   steps: readonly Workflow[],
-  run: Pick<Run, 'gates' | 'mounts'>,
+  run: Pick<Run, 'gates' | 'mounts' | 'volumes'>,
   t: {
     model: string | undefined;
     budgetUsd: number | undefined;
@@ -57,7 +59,11 @@ export const filedConfig = <Own extends object>(
   disallowedTools: filedDenies(step, run, t.landingDenied),
   allowedTools: filedAllows(step, t.runArtifacts),
   budgetUsd: t.budgetUsd,
-  ...mountsOf([...(stepMounts(step, run.mounts) ?? []), ...folders(filedFolders(step, steps, t))]),
+  ...mountsOf([
+    ...(stepMounts(step, run.mounts) ?? []),
+    ...volumeMounts(step, run.volumes),
+    ...folders(filedFolders(step, steps, t)),
+  ]),
   ...serversOf(step, t.servers),
   ...stepFilesEnv(step, t.runArtifacts, t.workflowFiles),
   ...t.own,

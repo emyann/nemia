@@ -81,6 +81,7 @@ const runBase = {
   gates: Schema.optional(Strings),
   factory: Schema.optional(Schema.String),
   mounts: Schema.optional(Schema.mutable(Schema.Array(Schema.Struct({ path: Schema.String, readOnly: Schema.Boolean })))),
+  volumes: Schema.optional(Schema.mutable(Schema.Array(Schema.Struct({ path: Schema.String, readOnly: Schema.Boolean })))),
   slotHeldAt: Schema.optional(Schema.String),
   gatesTimed: Schema.optional(Schema.mutable(Schema.Array(Schema.Struct({ step: Schema.String, try: Schema.Number })))),
   deniedCounted: Schema.optional(Schema.mutable(Schema.Array(Schema.Struct({ task: Schema.String, attempts: Schema.Number })))),

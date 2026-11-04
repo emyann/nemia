@@ -155,6 +155,14 @@ type RunBase = {
    */
   mounts?: Mount[];
   /**
+   * The factory's volumes, frozen at start from its file (`factoryVolumes`): folders of the person's machine apart from its
+   * repositories, each marked as the factory named it, left out when it was no directory at start. Filed with every local step beside
+   * `mounts` (`volumeMounts`), a writable one writable only where the step's fence writes, and named on its brief. Kept apart from
+   * `mounts` so that `writable:` never widens one by its folder's name. A writable volume is not the run's workspace: nothing commits,
+   * lands or reverts what a step writes there. Absent: none.
+   */
+  volumes?: Mount[];
+  /**
    * What people approved at a gate (`nemia approve`), each in a file of its own beside the retry asks —
    * `runs/<id>.asks/approve-<step>-<try>` — composed on read, as `cancelledAt` is (`readRun` in record.store.ts), and never written into
    * the record: the tick owns the record, a person owns their word. An approval opens a gate for the try it names (`approvalOf`), and one

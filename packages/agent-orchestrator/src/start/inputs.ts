@@ -10,6 +10,8 @@ import type { Workflow } from '../step/step.ts';
 import type { Mount, Run } from '../record/record.ts';
 import { stepMounts } from '../factory/factory.ts';
 import type { FiledFolders } from '../filed/filed.ts';
+import { volumeMounts } from '../filed/volumes.ts';
+import type { Fenced } from '../workflow/index.ts';
 import { HANDED_CLOSEOUT, type HandedFiles } from '../artifacts/artifacts.ts';
 
 /**
@@ -125,23 +127,27 @@ function namedWords(step: string, files: HandedFiles | undefined): string {
 
 /**
  * What a step's brief says of the folders its run mounts, under what was asked for: each by its absolute path, those its `writable:` names
- * to write (`stepMounts`), the others to read and never write; then the folders it is filed with beyond them (`folders`, as `filedFolders`
+ * to write (`stepMounts`), the others to read and never write; then the factory's volumes as the step is filed them (`volumeMounts`), those
+ * it may write said to be no workspace of its, and those it reads; then the folders it is filed with beyond them (`folders`, as `filedFolders`
  * in filed.ts files them), to read and never write: its own files directory (`own`), the artifacts folders of the steps before it
  * (`handed`), each with how to list it, the store's folders its `reads:` names (`store`), and the run's copy of its workflow folder
  * (`workflow`), by its path and its variable (`WF_WORKFLOW_FILES`); a blank line before them. Nothing for a run
  * that mounts none and a step given no other folder, and for a step on a remote agent, which is filed none.
  */
 export const mountsLine = (
-  step: Pick<Workflow, 'harness' | 'writable'>,
-  run: Pick<Run, 'mounts'>,
+  step: Pick<Workflow, 'harness' | 'writable'> & Fenced,
+  run: Pick<Run, 'mounts' | 'volumes'>,
   folders: FiledFolders = { handed: [], store: [], inputs: [] },
 ): string[] => {
   const local = !isRemoteHarness(step.harness);
   const mounts = local ? stepMounts(step, run.mounts) : undefined;
+  const volumes = volumeMounts(step, run.volumes);
   const { handed, store } = local ? folders : { handed: [], store: [] };
   const own = (local ? folders.own : undefined) ?? [];
   const workflow = workflowLines(local, folders.workflow);
-  if (!mounts?.length && !own.length && !handed.length && !store.length && !workflow.length) return [];
+  if (!mounts?.length && !volumes.length && !own.length && !handed.length && !store.length && !workflow.length) return [];
+  const volumeWrites = volumes.filter((v) => !v.readOnly);
+  const volumeReads = volumes.filter((v) => v.readOnly);
   const writes = (mounts ?? []).filter((m) => !m.readOnly);
   const reads = (mounts ?? []).filter((m) => m.readOnly);
   return [
@@ -154,6 +160,16 @@ export const mountsLine = (
     ...(reads.length
       ? [
           `Folders of this factory you may read, and must not write: ${pathsOf(reads)}. Each is mounted read-only; your own work stays in your workspace.`,
+        ]
+      : []),
+    ...(volumeWrites.length
+      ? [
+          `Volumes of this factory you may write: ${pathsOf(volumeWrites)}. Each is a folder of this machine, not your workspace: nothing commits, lands or reverts what you write there, and every run of the factory reaches it.`,
+        ]
+      : []),
+    ...(volumeReads.length
+      ? [
+          `Volumes of this factory you may read, and must not write: ${pathsOf(volumeReads)}. Each is a folder of this machine, mounted read-only; your own work stays in your workspace.`,
         ]
       : []),
     ...(own.length

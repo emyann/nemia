@@ -1,5 +1,4 @@
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import type { Page } from 'playwright';
 import { photograph, themeOf } from '../board.ts';
@@ -83,18 +82,20 @@ async function expectNone(page: Page): Promise<void> {
 
 export default {
   /**
-   * A factory's volumes on its settings page, read-only. The page writes two folders of its own, outside the store, into the file of
-   * FACTORIES' `hiring` as `nemia factory volume add` writes them, one `:ro` and one `:rw`: the card lists each, in the api's order, with
-   * its mark, the caveat on the writable one, and the line that takes it back. A factory with none shows the api's line to add one. It is
-   * pictured once, in the dark theme. The factory's file is put back, then the folders removed, whatever happens.
+   * A factory's volumes on its settings page, read-only. The page makes two folders where the pictures go (`OUT`), outside the store and
+   * every factory's repositories, as `nemia factory volume add` requires, and writes them into the file of FACTORIES' `hiring` as the
+   * verb writes them, one `:ro` and one `:rw`: the card lists each, in the api's order, with its mark, the caveat on the writable one,
+   * and the line that takes it back. A factory with none shows the api's line to add one. It is pictured once, in the dark theme. The
+   * factory's file is put back, then the folders removed, whatever happens.
    */
   name: 'factory-volumes',
   route: '/',
   expect: async (page) => {
     const factoryFile = path.join(store!, 'factories', `${FACTORY}.json`);
     const factoryText = fs.readFileSync(factoryFile, 'utf8');
-    const ro = fs.mkdtempSync(path.join(os.tmpdir(), 'nemia-e2e-volume-ro-'));
-    const rw = fs.mkdtempSync(path.join(os.tmpdir(), 'nemia-e2e-volume-rw-'));
+    fs.mkdirSync(OUT, { recursive: true });
+    const ro = fs.mkdtempSync(path.join(OUT, 'factory-volumes-ro-'));
+    const rw = fs.mkdtempSync(path.join(OUT, 'factory-volumes-rw-'));
     try {
       const factory = JSON.parse(factoryText) as Record<string, unknown>;
       const volumes = [

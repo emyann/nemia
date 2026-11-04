@@ -1,5 +1,7 @@
 /**
- * Where the repository's Actions workflow is, how it parses, and which of its steps is the gate's.
+ * Where the repository's Actions workflow is, how it parses, and which of its steps is the gate's; and, at the end, the clauses every
+ * workflow of the repository is held to (an action of GitHub's own, a bound on every job and network step, no trigger that hands a
+ * fork a writable token), read by `release-workflow.test.ts` too.
  *
  * Read by the guard that holds the file to the repository (`ci-workflow.test.ts`) and by the tests that run a step's own script
  * (`ci-gate.boundary.test.ts`, `ci-build.boundary.test.ts`, `ci-scan.boundary.test.ts`): one writer for the path and for what each of
@@ -70,6 +72,8 @@ export type Job = {
   name?: string;
   if?: string;
   needs?: string[];
+  permissions?: Record<string, string>;
+  concurrency?: { group?: string; 'cancel-in-progress'?: unknown };
   strategy?: { 'fail-fast'?: boolean; matrix?: Record<string, unknown[]> };
   steps?: Step[];
   'timeout-minutes'?: unknown;
@@ -77,7 +81,7 @@ export type Job = {
 
 export type Workflow = {
   name?: string;
-  on?: Record<string, { branches?: string[]; paths?: string[]; 'paths-ignore'?: string[] } | null>;
+  on?: Record<string, { branches?: string[]; types?: string[]; paths?: string[]; 'paths-ignore'?: string[] } | null>;
   permissions?: Record<string, string>;
   concurrency?: { group?: string; 'cancel-in-progress'?: unknown };
   jobs: Record<string, Job>;
@@ -124,3 +128,72 @@ export const scanStep = (workflow: Workflow): Step | undefined =>
 /** The scan job's step that proves its allowlist, by its name. */
 export const allowlistStep = (workflow: Workflow): Step | undefined =>
   runSteps(workflow, SCAN).find((step) => step.name === ALLOWLIST_STEP);
+
+/**
+ * GitHub's own action, taken by major tag: the pointer floats to its latest release, and a third party's never matches. This clause and
+ * those below it hold every workflow of the repository, each taking the file's name for the sentence that names it.
+ */
+export const OWN_ACTION = /^actions\/[a-z][a-z\d-]*@v\d+$/;
+
+/** A step that takes an action this workflow may not take. */
+export function actionDrift(workflow: Workflow, file: string = FILE): string[] {
+  return Object.entries(workflow.jobs).flatMap(([name, job]) =>
+    (job.steps ?? [])
+      .filter((step) => step.uses !== undefined && !OWN_ACTION.test(step.uses))
+      .map(
+        (step) =>
+          `the ${name} job in ${file} takes ${String(step.uses)}: this workflow takes GitHub's own actions by major tag alone, so write it actions/<name>@v<major>, and take a third party's code as a pinned download in a run step instead`,
+      ),
+  );
+}
+
+/** The trigger that would run a fork's code with a token that can write, read from the file's own text. */
+export function targetDrift(text: string, file: string = FILE): string[] {
+  const trigger = ['pull', 'request', 'target'].join('_');
+  return text.includes(trigger)
+    ? [
+        `${file} names ${trigger}: a fork's code must not run with a token that can write, so trigger on pull_request instead and read nothing of the fork's with write access`,
+      ]
+    : [];
+}
+
+/**
+ * A run step that reaches the network: the lockfile's install, the browser's, a release fetched by hand, a call of GitHub's CLI, a
+ * push or a fetch of git, and the release tool, whose verbs call both. Every action here reaches the network.
+ */
+export const NETWORK = /\bnpm ci\b|playwright install|\bcurl\b|(?:^|[\s;&|(])gh\s|\bgit (?:push|fetch)\b|tools\/release\/release\.ts/;
+
+/** Whether a step reaches the network, and so must end at a bound of its own rather than at its job's. */
+export const reachesNetwork = (step: Step): boolean => step.uses !== undefined || NETWORK.test(step.run ?? '');
+
+/** A bound as GitHub takes it: a whole number of minutes above zero. */
+export const bounded = (minutes: unknown): minutes is number => typeof minutes === 'number' && Number.isInteger(minutes) && minutes > 0;
+
+/**
+ * A job with no `timeout-minutes`, a step that reaches the network with none, and a step whose bound is not under its job's. Without
+ * one GitHub waits 360 minutes on a stalled download, and the run's own wait on `ci` gives up long before; a step's bound at or past its
+ * job's lets the job's fire first, and the red then names no step.
+ */
+export function stallDrift(workflow: Workflow, file: string = FILE): string[] {
+  return Object.entries(workflow.jobs).flatMap(([name, job]) => {
+    const minutes = job['timeout-minutes'];
+    if (!bounded(minutes))
+      return [
+        `the ${name} job in ${file} has no timeout-minutes: give it a bound well above its slowest green run, or a stall holds it for GitHub's default of 360 minutes`,
+      ];
+    return (job.steps ?? []).flatMap((step) => {
+      const label = step.name ?? step.uses ?? step.run ?? '?';
+      const own = step['timeout-minutes'];
+      if (!reachesNetwork(step)) return [];
+      if (!bounded(own))
+        return [
+          `the step "${label}" of the ${name} job in ${file} reaches the network and has no timeout-minutes: give it a bound well above its slowest green run, so a stalled download fails naming the step`,
+        ];
+      if (own >= minutes)
+        return [
+          `the step "${label}" of the ${name} job in ${file} is bounded at ${own} minutes, not under its job's ${minutes}: lower it below the job's, or the job's bound fires first and names no step`,
+        ];
+      return [];
+    });
+  });
+}

@@ -36,6 +36,7 @@ const { advanceRun, closeoutAsked, decideRun, exitVerdicts, list, Missing, phase
   await import('../src/runner.ts');
 const { stepsNow: stepsOf } = await import('./steps-now.ts');
 const { askFile, asksDir, markCancelled, readAnswers, readRun } = await import('../src/record/record.store.ts');
+const { filesStore } = await import('../src/record/files.store.ts');
 const { isRepositoryRun, LINE_NAME, shownNote } = await import('../src/run.ts');
 const { verdictWord } = await import('../src/check/check.ts');
 const { runStore } = await import('../src/record/files.store.ts');
@@ -409,14 +410,16 @@ const implementThenReview = (lines: string[] = []): string => {
 };
 
 /** `nemia start` of `workflowDir` over a fresh repository, the steps in its checkout: a repository run, unticked. */
-const startedRun = async (workflowDir: string): Promise<RepositoryRun> => {
-  const run = await stage.runPlaced(startRun({ brief: 'add a flag', repo: aRepo(), workflowDir, isolate: false }));
+const startedRun = async (workflowDir: string, labels?: readonly string[]): Promise<RepositoryRun> => {
+  const run = await stage.runPlaced(
+    startRun({ brief: 'add a flag', repo: aRepo(), workflowDir, isolate: false, ...(labels ? { labels: { edits: labels } } : {}) }),
+  );
   assert.ok(isRepositoryRun(run), `${run.id} works on a repository`);
   return run;
 };
 
-/** One pass of the tick over the run `id`, on the stage's engine. */
-const tick = (id: string) => stage.runWith(stage.board().e, advanceRun(readRun(id)));
+/** One pass of the tick over the run `id`, on the stage's engine, the run read through the store as the daemon reads it: labels and all. */
+const tick = (id: string) => stage.runWith(stage.board().e, advanceRun(filesStore.runs.read(id)));
 
 /** The attempt of `id` ended in `phase` with what `end` says — its closeout, exit code, reason, cost, denials, what it printed. */
 const ended = (id: string, phase: EnginePhase, end: TestEnd = {}): void => {
@@ -473,7 +476,7 @@ test("a checked step, from its check's filing to `retries:` spent and the run wa
   const try2 = () => `${id()}-implement-try2`;
   const check2 = () => `${id()}-implement-try2-check`;
   await s.test('implement is filed, and a `check:` planted in the folder afterwards is planted after the run froze it', async () => {
-    run = await startedRun(dir);
+    run = await startedRun(dir, ['work=fix']);
     await tick(id());
     fs.writeFileSync(path.join(dir, 'implement.md'), '---\nplace: git\ncheck: true\n---\nimplement it\n');
   });
@@ -516,6 +519,7 @@ test("a checked step, from its check's filing to `retries:` spent and the run wa
           WF_ARTIFACTS: path.join(ROOT, 'runs', id(), 'artifacts', 'implement'),
           WF_CLOSEOUT: path.join(ROOT, 'checks', `${check1()}.closeout.json`),
           WF_WORKFLOW_FILES: path.join(ROOT, 'runs', id(), 'workflow', String(readRun(id()).workflowFiles)),
+          WF_LABELS: '{"work":"fix"}',
         },
         niceness: 10,
       });

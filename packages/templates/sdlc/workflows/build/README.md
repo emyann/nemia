@@ -42,6 +42,12 @@ for it to start, 2400 s whole): CI runs the repository's suite on that commit, a
 refusal, with the Actions URL, the failing jobs and a bounded tail of their log — no agent of this team may type `gh`, so the script
 reads it for them.
 
+The push labels the pull request too, from the run's own labels, by the rules the factory's `pullRequestLabels` parameter sets (each
+`<key>=<value>:<label>`, the rules apart by spaces; empty, the default, labels nothing): it adds the labels the rules give the run and
+removes any other a rule could give, so a relabelled card is followed and a label a person put on that no rule gives is left alone,
+through REST and never `gh pr edit`. A malformed rule, or a label a rule gives that the repository lacks, is the check's refusal before
+anything is pushed. A card with no label a rule reads, or a pull request opened by hand, gets no label from it.
+
 Land merges that same pull request, through `landing.ts`, which its check also reads from the frozen files. Otto runs its `merge --run
 <id> --subject … --body-file … --check <name>`: it refuses anything but this run's own green pull request — not a draft, based on the
 base branch, its head the commit the review read, `mergeable`, the CI context green at that commit, and no result branch of the run

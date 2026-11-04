@@ -217,6 +217,11 @@ What the `create-an-agent` skill (`packages/agent-orchestrator/skills/create-an-
   touched what they read (`tools/guards/CLAUDE.md`). A config guard that imports the orchestrator past its three entries stays in it.
 - `tools/coverage/` — a package's line and branch coverage per source file (`record.ts`) and the comparison of two records
   (`compare.ts`), a session's measure; held by `tools/guards/test/coverage.test.ts` and its boundary.
+- `tools/release/` — Nemia's GitHub releases (`release.ts`): the `release-label` check every pull request into main passes
+  (`.github/workflows/release-label.yml`), and the `release` workflow (`.github/workflows/release.yml`) that keeps a release pull
+  request open, tags `v<x.y.z>` and makes the GitHub release when it merges, its notes by `.github/release.yml`. Never shipped; held by
+  `tools/guards/test/release.test.ts`, `release.boundary.test.ts` and `release-workflow.test.ts`. The playbook says how a release is
+  cut (`docs/playbook-operator.md`, *Cut a product release*).
 - `tools/store-measure/` — what the store's reads cost, cold and warm: a tick pass, the run list, the stats, a run's page and the feed from
   a cursor, on a copy of both stores in a temp folder with the run count beside them, never the live store
   (`node --expose-gc tools/store-measure/report.ts [--repeat N] [--json <file>] [--compare <baseline.json>]`); the baseline before the

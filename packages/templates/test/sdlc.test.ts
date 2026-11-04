@@ -1,11 +1,12 @@
 /**
  * sdlc as a factory gets it: `nemia template lint` passes it, spawned as a person types it, and `nemia factory apply` renders it into a
  * factory's tree with every parameter written where the template says it: the CI context in each implement check and each landing,
- * the round's check in build's implement check, the areas in RULES.md, and no expression left in any file. Its way, `github`, is the
- * branch each implement and land check takes and the answer each of their notes opens with: on GitHub where it is set true, and in the
- * checkout by default, where the local check judges each round and the merged tree; a `github` that is no boolean is refused at
- * apply. Each step that writes its own `output:` has its schema beside it in the tree, the template's own bytes; the team is six
- * agents, Ada none of them. Applied with no `--set`, each parameter takes its default.
+ * the round's check in build's implement check, the rules of the pull request's labels in each implement check, the areas in
+ * RULES.md, and no expression left in any file. Its way, `github`, is the branch each implement and land check takes and the answer
+ * each of their notes opens with: on GitHub where it is set true, and in the checkout by default, where the local check judges each
+ * round and the merged tree; a `github` that is no boolean is refused at apply. Each step that writes its own `output:` has its schema
+ * beside it in the tree, the template's own bytes; the team is six agents, Ada none of them. Applied with no `--set`, each parameter
+ * takes its default.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -20,7 +21,11 @@ import { copyOf, filesUnder, nemia, rendered, SDLC, storeEnv } from './template.
 /** The template, copied once, and applied twice on one store: with every parameter set, and with none. */
 const COPY = copyOf(SDLC);
 const TREES = await rendered([
-  { name: 'set', template: COPY, sets: ['github=true', 'ciCheck=gate', 'roundCheck=echo round', 'localCheck=echo local', 'areas=a, b'] },
+  {
+    name: 'set',
+    template: COPY,
+    sets: ['github=true', 'ciCheck=gate', 'roundCheck=echo round', 'localCheck=echo local', 'areas=a, b', 'pullRequestLabels=work=fix:fix'],
+  },
   { name: 'plain', template: COPY },
 ]);
 
@@ -71,6 +76,11 @@ test('applied with every parameter set, each is written where the template says,
   assert.ok(build.includes('{ echo round; }'), build);
   assert.match(build, ciCheck('gate'));
   assert.match(checkOf(tree, 'quick', 'implement'), ciCheck('gate'));
+  for (const workflow of ['build', 'quick'])
+    assert.ok(
+      checkOf(tree, workflow, 'implement').includes('push --labels "work=fix:fix";'),
+      `${workflow}/implement labels by the rules set`,
+    );
   for (const workflow of ['build', 'quick']) assert.match(stepIn(tree, workflow, 'land').body, ciCheck('gate'), `${workflow}/land`);
   for (const [workflow, step] of WAYS) {
     const check = checkOf(tree, workflow, step);
@@ -90,6 +100,8 @@ test('applied with no --set, each parameter takes its default', () => {
   const build = checkOf(tree, 'build', 'implement');
   assert.ok(build.includes('{ npm run --if-present lint && npm run --if-present typecheck; }'), build);
   assert.match(build, ciCheck('ci'));
+  for (const workflow of ['build', 'quick'])
+    assert.ok(checkOf(tree, workflow, 'implement').includes('push --labels "";'), `${workflow}/implement labels nothing by default`);
   for (const workflow of ['build', 'quick']) assert.match(stepIn(tree, workflow, 'land').body, ciCheck('ci'), `${workflow}/land`);
   for (const [workflow, step] of WAYS) {
     const check = checkOf(tree, workflow, step);

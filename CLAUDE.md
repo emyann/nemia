@@ -164,7 +164,7 @@ What the `create-an-agent` skill (`packages/agent-orchestrator/skills/create-an-
   `Bash(gh * -q*)`, whose jq reads the process's environment, `Bash(gh *--template*)` and `Bash(gh * -t*)`, `Bash(gh *--repo*)`,
   `Bash(gh * -R*)` and `Bash(gh *//*)` for another repository, `Bash(gh * -c*)`, after which a short option bundles, and `Bash(*=* gh
   *)` for any assignment before gh (`GH_PAGER`, `PAGER`, `BROWSER`, `GH_CONFIG_DIR`, `HOME`). They are on all four because a settings
-  allow of gh reaches every step: this checkout's `.claude/settings.json` keeps its two until the nemia factory runs sdlc 2.2.0, and
+  allow of gh reaches every step, and
   a spelling the shell rejoins passes these as it passes git's. The set is on the agents rather than in `.claude/settings.json` so
   that the team travels to a factory that is not this checkout; `packages/templates/test/fences.test.ts` holds sdlc's rules as written
   and the four lines equal, and `packages/agent-orchestrator/test/agent-fences.test.ts`, on planted lines, every read open, every write

@@ -4,14 +4,14 @@
 # holds this file.
 name: release-label
 
-# The labels are read on every event that can change them. A dispatch is the release workflow's: it runs this check on the release
-# pull request's head, which the workflow's own token pushed and so started no pull_request run. The sibling trigger that would run a
-# fork's code against a writable token is named nowhere here.
+# The check runs on every event that can change the labels, and reads them live by the pull request's number: a run a person approves
+# later (the release pull request's, whose head the workflow's own token pushed) reads the labels it has then, not its event's
+# payload. No dispatch: a dispatched run never counts for a pull request. The sibling trigger that would run a fork's code against a
+# writable token is named nowhere here.
 on:
   pull_request:
     types: [opened, reopened, synchronize, labeled, unlabeled]
     branches: [main]
-  workflow_dispatch:
 
 # The check reads the code and the pull request's labels, and writes nothing.
 permissions:
@@ -35,18 +35,10 @@ jobs:
         with:
           node-version: '24.16.0'
       - name: Check the pull request's release label
-        if: github.event_name == 'pull_request'
-        timeout-minutes: 2
-        # The labels and the number come through env, never interpolated into the command line: a label's name is anyone's to write.
-        env:
-          LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-        run: node tools/release/release.ts check
-      - name: Check the release label of the open pull request this branch heads
-        if: github.event_name == 'workflow_dispatch'
         timeout-minutes: 3
+        # The number comes through env, never interpolated into the command line, and the labels are read from the API with it.
         env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-          BRANCH: ${{ github.ref_name }}
         run: node tools/release/release.ts check

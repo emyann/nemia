@@ -1,8 +1,8 @@
 /**
  * `tools/release/release.ts` run for real on a scratch repository — a bare origin and a clone of it, with the tags this repository has
  * (`v0.3.0`, `v1-final`, `legacy/v1-final`) and the operator's local `nemia-2026.11.03` — and a stub `gh` first on PATH that logs each
- * call and answers GitHub's part from a state file: the merged pull requests (more than one page of them), the open ones, the
- * workflow runs on a head, the generated notes and the proof's GraphQL. What it asserts is the exit code and the calls made, never a
+ * call and answers GitHub's part from a state file: the merged pull requests (more than one page of them), the open ones, one pull
+ * request by its number, and the generated notes. What it asserts is the exit code, the calls made and positions in a body, never a
  * sentence.
  */
 import { test } from 'node:test';
@@ -11,7 +11,7 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from './scratch.ts';
-import { CREATE_SETTING, PROOF_BOUND_ENV, PROOF_INTERVAL_ENV } from '../../release/release.ts';
+import { APPROVE_BUTTON, CREATE_SETTING } from '../../release/release.ts';
 
 const RELEASE = path.join(import.meta.dirname, '..', '..', 'release', 'release.ts');
 
@@ -28,20 +28,17 @@ type Pull = {
 /** What the stub answers from, and what it changes as the script acts. */
 type State = {
   pulls: Pull[];
-  runs: Record<string, string[]>;
   createFails?: boolean;
-  graphql?: unknown;
   labels: { name: string; color: string; description: string }[];
   next: number;
 };
 
 /**
  * The stub `gh`: logs its argv as one JSON line to `STUB_LOG`, reads and writes `STUB_STATE`, and answers as GitHub would the calls
- * the tool makes. A `workflow run` records the origin's `release` head as a dispatched run of that file, so a second pass reads it.
+ * the tool makes. It answers no dispatch and no run list: a call the release no longer makes exits 9.
  */
 const STUB = `
 const fs = require('node:fs');
-const { execFileSync } = require('node:child_process');
 const args = process.argv.slice(2);
 const stdin = args.includes('-') ? fs.readFileSync(0, 'utf8') : undefined;
 fs.appendFileSync(process.env.STUB_LOG, JSON.stringify({ args, stdin }) + '\\n');
@@ -49,7 +46,6 @@ const state = JSON.parse(fs.readFileSync(process.env.STUB_STATE, 'utf8'));
 const save = () => fs.writeFileSync(process.env.STUB_STATE, JSON.stringify(state));
 const field = (key) => { for (let i = 0; i < args.length - 1; i++) if ((args[i] === '-f' || args[i] === '-F') && args[i + 1].startsWith(key + '=')) return args[i + 1].slice(key.length + 1); };
 const print = (value) => process.stdout.write(JSON.stringify(value));
-if (args[0] === 'api' && args[1] === 'graphql') { print(state.graphql); process.exit(0); }
 if (args[0] === 'api') {
   const method = args[2];
   const [route, query = ''] = args[3].split('?');
@@ -57,6 +53,11 @@ if (args[0] === 'api') {
   let m;
   if (method === 'GET' && route === 'repos/{owner}/{repo}/labels') { print(q.get('page') === '1' ? state.labels : []); }
   else if (method === 'POST' && route === 'repos/{owner}/{repo}/labels') { state.labels.push({ name: field('name'), color: field('color'), description: field('description') }); save(); print({}); }
+  else if (method === 'GET' && (m = /^repos\\/\\{owner\\}\\/\\{repo\\}\\/pulls\\/(\\d+)$/.exec(route))) {
+    const p = state.pulls.find((each) => each.number === Number(m[1]));
+    if (!p) { process.stderr.write('HTTP 404: Not Found'); process.exit(1); }
+    print(p);
+  }
   else if (method === 'PATCH' && (m = /^repos\\/\\{owner\\}\\/\\{repo\\}\\/labels\\/(.+)$/.exec(route))) { print({}); }
   else if (method === 'GET' && route === 'repos/{owner}/{repo}/pulls') {
     const per = Number(q.get('per_page')); const page = Number(q.get('page') || 1);
@@ -76,9 +77,6 @@ if (args[0] === 'api') {
     p.labels.push({ name: field('labels[]') }); save(); print(p.labels);
   }
   else if (method === 'POST' && route === 'repos/{owner}/{repo}/releases/generate-notes') { print({ name: field('tag_name'), body: '## Fixes\\n* a fix, up to ' + field('target_commitish') }); }
-  else if (method === 'GET' && (m = /^repos\\/\\{owner\\}\\/\\{repo\\}\\/actions\\/workflows\\/([^/]+)\\/runs$/.exec(route))) {
-    print({ total_count: (state.runs[m[1]] || []).filter((sha) => sha === q.get('head_sha')).length });
-  }
   else { process.stderr.write('stub gh: no answer for ' + args.join(' ')); process.exit(9); }
   process.exit(0);
 }
@@ -88,10 +86,6 @@ if (args[0] === 'pr' && args[1] === 'create') {
   state.pulls.push({ number, title: args[args.indexOf('--title') + 1], body: stdin, labels: [], merged_at: null, head: { ref: args[args.indexOf('--head') + 1] } });
   save(); process.stdout.write('https://github.com/o/r/pull/' + number + '\\n'); process.exit(0);
 }
-if (args[0] === 'workflow' && args[1] === 'run') {
-  const sha = execFileSync('git', ['--git-dir', process.env.STUB_ORIGIN, 'rev-parse', 'refs/heads/' + args[args.indexOf('--ref') + 1]], { encoding: 'utf8' }).trim();
-  (state.runs[args[2]] ||= []).push(sha); save(); process.exit(0);
-}
 if (args[0] === 'release' && args[1] === 'create') process.exit(0);
 process.stderr.write('stub gh: no answer for ' + args.join(' ')); process.exit(9);
 `;
@@ -99,8 +93,8 @@ process.stderr.write('stub gh: no answer for ' + args.join(' ')); process.exit(9
 type Call = { args: string[]; stdin?: string };
 
 /**
- * A scratch world: the origin, the clone the tool runs in, the stub's state and log. Its environment leaves out an inherited `LABELS`,
- * the check's payload path, so a `check` given `BRANCH` reads the pull request as a dispatch does.
+ * A scratch world: the origin, the clone the tool runs in, the stub's state and log. Its environment leaves out an inherited `LABELS`
+ * and `PR_NUMBER`, the check's two inputs, so each test sets the one it reads.
  */
 const world = () => {
   const root = scratch('release-');
@@ -108,7 +102,7 @@ const world = () => {
   const seed = path.join(root, 'seed');
   const clone = path.join(root, 'clone');
   const bin = path.join(root, 'bin');
-  const { LABELS: _payload, ...inherited } = process.env;
+  const { LABELS: _payload, PR_NUMBER: _number, ...inherited } = process.env;
   const env = {
     ...inherited,
     GIT_AUTHOR_NAME: 't',
@@ -120,7 +114,6 @@ const world = () => {
     PATH: `${bin}${path.delimiter}${process.env.PATH}`,
     STUB_LOG: path.join(root, 'gh.log'),
     STUB_STATE: path.join(root, 'state.json'),
-    STUB_ORIGIN: origin,
   };
   const git = (cwd: string, ...args: string[]): string => {
     const ran = spawnSync('git', args, { cwd, env, encoding: 'utf8', timeout: 30_000 });
@@ -184,26 +177,35 @@ const merged = (number: number, labels: string[], sha: string | null): Pull => (
   head: { ref: `branch-${number}` },
 });
 
+/** No call dispatches a workflow or reads its runs: a dispatched run never counts for a pull request. */
+const dispatched = (calls: Call[]) =>
+  calls.filter((call) => (call.args[0] === 'workflow' && call.args[1] === 'run') || call.args.some((arg) => arg.includes('actions/')));
+
+/** Where `word` stands in `body`, refusing a body that lacks it. */
+const at = (body: string, word: string): number => {
+  const index = body.indexOf(word);
+  assert.ok(index >= 0, `the body holds ${JSON.stringify(word)}`);
+  return index;
+};
+
 /** More than a page of pull requests merged before the last release, whose commits are not in the range. */
 const older = (): Pull[] => Array.from({ length: 130 }, (_, i) => merged(1000 + i, ['feature'], `${'0'.repeat(39)}${i % 10}`));
 
 const has = (calls: Call[], ...words: string[]) => calls.some((call) => words.every((word) => call.args.includes(word)));
 const named = (calls: Call[], ...words: string[]) => calls.filter((call) => words.every((word) => call.args.includes(word)));
 
-test('pr rebuilds release from main at 1.0.0, opens its pull request labelled internal, and dispatches ci and release-label on it', () => {
+test('pr rebuilds release from main at 1.0.0, opens its pull request labelled internal, its body opening on the approval, and dispatches nothing', () => {
   const w = world();
   const fix = w.land('a fix');
   const docs = w.land('some docs');
   w.state({
     pulls: [...older(), merged(1, ['fix'], fix), merged(2, ['docs'], docs), merged(3, [], w.legacy)],
-    runs: {},
     labels: [],
     next: 900,
   });
   const ran = w.run('pr');
   assert.equal(ran.status, 0, ran.out);
 
-  const release = w.git(w.origin, 'rev-parse', 'refs/heads/release');
   assert.equal(
     w.git(w.origin, 'rev-parse', 'refs/heads/release^1'),
     w.git(w.origin, 'rev-parse', 'refs/heads/main'),
@@ -234,22 +236,22 @@ test('pr rebuilds release from main at 1.0.0, opens its pull request labelled in
   assert.ok(notes[0].args.includes('tag_name=v1.0.0'));
   const body = named(ran.calls, 'pr', 'create')[0].stdin ?? '';
   assert.ok(body.includes('#3'), 'the unlabelled pull request is listed apart in the body');
-  for (const file of ['ci.yml', 'release-label.yml'])
-    assert.ok(has(ran.calls, 'workflow', 'run', file, '--ref', 'release'), `${file} dispatched`);
-  assert.deepEqual(w.read().runs['ci.yml'], [release]);
+  assert.ok(at(body, APPROVE_BUTTON) < at(body, '## Fixes'), 'the body opens with the merge box button, ahead of the notes');
+  assert.deepEqual(dispatched(ran.calls), [], 'no workflow is dispatched, and no run list read');
 });
 
-test('a second pr with nothing moved pushes and dispatches nothing; with main moved it updates the same pull request and dispatches again', () => {
+test('a second pr with nothing moved pushes and patches nothing; with main moved it updates the same pull request, the approval still first', () => {
   const w = world();
   const feature = w.land('a feature');
-  w.state({ pulls: [merged(1, ['feature'], feature)], runs: {}, labels: [], next: 900 });
+  w.state({ pulls: [merged(1, ['feature'], feature)], labels: [], next: 900 });
   assert.equal(w.run('pr').status, 0);
   const first = w.git(w.origin, 'rev-parse', 'refs/heads/release');
 
   const again = w.run('pr');
   assert.equal(again.status, 0, again.out);
   assert.equal(w.git(w.origin, 'rev-parse', 'refs/heads/release'), first, 'release is not pushed again');
-  assert.ok(!has(again.calls, 'workflow', 'run'), 'nothing is dispatched where the head has its runs');
+  assert.ok(!has(again.calls, 'PATCH'), 'the pull request is left as it is');
+  assert.deepEqual(dispatched(again.calls), []);
   assert.ok(!has(again.calls, 'pr', 'create'), 'no second pull request');
 
   const fix = w.land('a fix after');
@@ -260,8 +262,11 @@ test('a second pr with nothing moved pushes and dispatches nothing; with main mo
   assert.notEqual(second, first);
   assert.equal(w.git(w.origin, 'rev-parse', 'refs/heads/release^1'), fix, 'rebuilt on the moved main');
   assert.ok(!has(moved.calls, 'pr', 'create'), 'the same pull request is kept');
-  assert.ok(has(moved.calls, 'PATCH', 'repos/{owner}/{repo}/pulls/900'), 'and updated');
-  for (const file of ['ci.yml', 'release-label.yml']) assert.ok(has(moved.calls, 'workflow', 'run', file, '--ref', 'release'));
+  const patch = named(moved.calls, 'PATCH', 'repos/{owner}/{repo}/pulls/900');
+  assert.equal(patch.length, 1, 'and updated');
+  const body = patch[0].args.find((arg) => arg.startsWith('body=')) ?? '';
+  assert.ok(at(body, APPROVE_BUTTON) < at(body, '## Fixes'), 'the new body opens with the approval again: a rebuild asks for it');
+  assert.deepEqual(dispatched(moved.calls), []);
 });
 
 test('with every pull request merged since the last release internal, pr opens none and closes the one open', () => {
@@ -269,42 +274,44 @@ test('with every pull request merged since the last release internal, pr opens n
   const cleanup = w.land('a cleanup');
   const open: Pull = { ...merged(900, ['internal'], null), title: 'release: v1.0.0', head: { ref: 'release' } };
   const mergedAsV030 = merged(5, ['breaking'], w.git(w.clone, 'rev-parse', 'v0.3.0^{commit}'));
-  w.state({ pulls: [mergedAsV030, merged(1, ['internal'], cleanup), open], runs: {}, labels: [], next: 901 });
+  w.state({ pulls: [mergedAsV030, merged(1, ['internal'], cleanup), open], labels: [], next: 901 });
   const ran = w.run('pr');
   assert.equal(ran.status, 0, ran.out);
   assert.ok(!has(ran.calls, 'pr', 'create'));
   assert.ok(has(ran.calls, 'PATCH', 'repos/{owner}/{repo}/pulls/900', 'state=closed'), 'the open release pull request is closed');
-  assert.ok(!has(ran.calls, 'workflow', 'run'));
+  assert.deepEqual(dispatched(ran.calls), []);
 });
 
-test('check, dispatched on a branch, reads the labels of the open pull request that branch heads', async (t) => {
-  await t.test('the release pull request, labelled internal, passes', () => {
+test("check, given PR_NUMBER and no LABELS, reads the pull request's labels as they are now", async (t) => {
+  await t.test('the release pull request, labelled internal after it opened, passes', () => {
     const w = world();
     const open: Pull = { ...merged(900, ['internal'], null), title: 'release: v1.0.0', head: { ref: 'release' } };
-    w.state({ pulls: [merged(1, ['fix'], w.legacy), open], runs: {}, labels: [], next: 901 });
-    const ran = w.run('check', { BRANCH: 'release' });
+    w.state({ pulls: [merged(1, ['fix'], w.legacy), open], labels: [], next: 901 });
+    const ran = w.run('check', { PR_NUMBER: '900' });
     assert.equal(ran.status, 0, ran.out);
-    const reads = named(ran.calls, 'GET').filter((call) => call.args[3].includes('state=open'));
-    assert.equal(reads.length, 1);
-    assert.ok(reads[0].args[3].includes('head={owner}:release'), 'the open pull request is read by its head branch');
+    assert.deepEqual(
+      ran.calls.map((call) => call.args.slice(0, 4)),
+      [['api', '-X', 'GET', 'repos/{owner}/{repo}/pulls/900']],
+      'one read, of the pull request by its number',
+    );
   });
-  await t.test('REFUSED: no open pull request heads the branch, exit 1', () => {
-    const w = world();
-    w.state({ pulls: [merged(1, ['fix'], w.legacy)], runs: {}, labels: [], next: 901 });
-    assert.equal(w.run('check', { BRANCH: 'release' }).status, 1);
-  });
-  await t.test('REFUSED: the open pull request carries no release label, exit 1', () => {
+  await t.test('REFUSED: the pull request carries no release label, exit 1', () => {
     const w = world();
     const open: Pull = { ...merged(900, ['dependencies'], null), title: 'release: v1.0.0', head: { ref: 'release' } };
-    w.state({ pulls: [open], runs: {}, labels: [], next: 901 });
-    assert.equal(w.run('check', { BRANCH: 'release' }).status, 1);
+    w.state({ pulls: [open], labels: [], next: 901 });
+    assert.equal(w.run('check', { PR_NUMBER: '900' }).status, 1);
+  });
+  await t.test('REFUSED: no pull request has the number, exit 1', () => {
+    const w = world();
+    w.state({ pulls: [], labels: [], next: 901 });
+    assert.equal(w.run('check', { PR_NUMBER: '900' }).status, 1);
   });
 });
 
 test('REFUSED: GitHub refusing the token a pull request exits 1 naming the setting that allows it', () => {
   const w = world();
   const fix = w.land('a fix');
-  w.state({ pulls: [merged(1, ['fix'], fix)], runs: {}, labels: [], next: 900, createFails: true });
+  w.state({ pulls: [merged(1, ['fix'], fix)], labels: [], next: 900, createFails: true });
   const ran = w.run('pr');
   assert.equal(ran.status, 1, ran.out);
   assert.ok(ran.out.includes(CREATE_SETTING), 'the refusal names the setting');
@@ -313,7 +320,7 @@ test('REFUSED: GitHub refusing the token a pull request exits 1 naming the setti
 test('tag releases the version main names on the commit that set it, and does nothing once its tag is there', () => {
   const w = world();
   const fix = w.land('a fix');
-  w.state({ pulls: [merged(1, ['fix'], fix)], runs: {}, labels: [], next: 900 });
+  w.state({ pulls: [merged(1, ['fix'], fix)], labels: [], next: 900 });
   assert.equal(w.run('pr').status, 0);
   w.git(w.seed, 'fetch', '--quiet', 'origin', 'release');
   w.git(w.seed, 'merge', '--quiet', '--no-ff', '-m', 'Merge the release', 'FETCH_HEAD');
@@ -337,7 +344,7 @@ test('tag releases the version main names on the commit that set it, and does no
 
 test('tag does nothing where package.json names no version', () => {
   const w = world();
-  w.state({ pulls: [], runs: {}, labels: [], next: 900 });
+  w.state({ pulls: [], labels: [], next: 900 });
   const ran = w.run('tag');
   assert.equal(ran.status, 0, ran.out);
   assert.deepEqual(ran.calls, []);
@@ -347,7 +354,6 @@ test('labels makes the five missing labels and leaves one that is right alone', 
   const w = world();
   w.state({
     pulls: [],
-    runs: {},
     labels: [{ name: 'internal', color: 'cfd3d7', description: 'Releases nothing: the repository changed, not what a user gets' }],
     next: 900,
   });
@@ -358,65 +364,4 @@ test('labels makes the five missing labels and leaves one that is right alone', 
     ['name=breaking', 'name=feature', 'name=fix', 'name=docs'],
   );
   assert.ok(!has(ran.calls, 'PATCH'));
-});
-
-/** The proof's GraphQL answer: the head's check runs, as `[name, conclusion, isRequired]`. */
-const answer = (runs: [string, string, boolean][]) => ({
-  data: {
-    repository: {
-      pullRequest: {
-        headRefOid: 'abc',
-        mergeStateStatus: 'CLEAN',
-        commits: {
-          nodes: [
-            {
-              commit: {
-                oid: 'abc',
-                statusCheckRollup: {
-                  contexts: {
-                    nodes: runs.map(([name, conclusion, isRequired]) => ({
-                      __typename: 'CheckRun',
-                      name,
-                      status: 'COMPLETED',
-                      conclusion,
-                      isRequired,
-                    })),
-                  },
-                },
-              },
-            },
-          ],
-        },
-      },
-    },
-  },
-});
-
-const LOWERED = { [PROOF_BOUND_ENV]: '400', [PROOF_INTERVAL_ENV]: '50' };
-
-test('proof passes where ci is green and required on the head, and fails where it is green and not required, or never comes', () => {
-  const w = world();
-  const open: Pull = { ...merged(900, ['internal'], null), head: { ref: 'release' } };
-  const proving = (runs: [string, string, boolean][]) => {
-    w.state({ pulls: [open], runs: {}, labels: [], next: 901, graphql: answer(runs) });
-    return w.run('proof', LOWERED);
-  };
-  const green = proving([
-    ['ci', 'SUCCESS', true],
-    ['release-label', 'SUCCESS', false],
-  ]);
-  assert.equal(green.status, 0, green.out);
-  const query = named(green.calls, 'api', 'graphql')[0];
-  assert.ok(query.args.includes('number=900'), "the proof asks about the release pull request's own number");
-  assert.ok(query.args.some((arg) => arg.includes('isRequired(pullRequestNumber: $number)')));
-
-  const uncounted = proving([
-    ['ci', 'SUCCESS', false],
-    ['release-label', 'SUCCESS', false],
-  ]);
-  assert.equal(uncounted.status, 1, uncounted.out);
-
-  const absent = proving([['release-label', 'SUCCESS', false]]);
-  assert.equal(absent.status, 1, absent.out);
-  assert.ok(named(absent.calls, 'api', 'graphql').length >= 2, 'it asked again before its bound');
 });

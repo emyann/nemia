@@ -69,9 +69,11 @@ test('REFUSED: a pull request with no release label, or with two, naming the fiv
   assert.equal((await check(['fix'])).code, 0);
   assert.equal((await check(['fix', 'dependencies'])).code, 0, 'a label of no release beside one is no second');
   assert.equal(await main(['check'], { LABELS: '{' }, () => {}), 1, 'labels that are no JSON array are refused');
+  assert.equal(await main(['check'], {}, () => {}), 1, 'neither LABELS nor PR_NUMBER: refused, naming both');
 });
 
 test('REFUSED: a verb the tool does not have', async () => {
   assert.equal(await main(['publish'], {}, () => {}), 2);
+  assert.equal(await main(['proof'], {}, () => {}), 2, 'the proof is gone: the release dispatches nothing to prove');
   assert.equal(await main([], {}, () => {}), 2);
 });

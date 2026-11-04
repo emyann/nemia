@@ -110,10 +110,11 @@ function modulesLoaded(entry: string, more: readonly string[] = []): string[] {
  * and the 76 modules of the `yaml` package it parses with, none of which touches a disk.
  *
  * `agent-orchestrator/run` is one more for `former-reason/former-reason.ts`, the pure reading of the feed's former reason codes, kept in
- * a folder of its own so the card that drops them deletes it whole.
+ * a folder of its own so the card that drops them deletes it whole, and one more for `harness-settings/harness-settings.ts`, the pure
+ * judgement of a factory's harness settings `filedConfig` copies the allowed ones by, which imports nothing.
  */
 const PINNED_MODULES: Record<string, { all: number; effect: number }> = {
-  'agent-orchestrator/run': { all: 179, effect: 15 },
+  'agent-orchestrator/run': { all: 180, effect: 15 },
   'agent-orchestrator/workflow': { all: 132, effect: 15 },
 };
 

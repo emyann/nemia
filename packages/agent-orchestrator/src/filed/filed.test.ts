@@ -13,6 +13,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { parseWorkflow, type Workflow } from '../workflow.ts';
 import { filedConfig, STEP_FILES, WORKFLOW_FILES, workflowMounts } from './filed.ts';
+import type { Run } from '../record/record.ts';
 import type { FactoryServers } from '../servers/servers.ts';
 import { configRefusal } from '../runtime-client.ts';
 import { filedRefusal, lineOf, type FiledFlags, type FiledStep } from '../keys/index.ts';
@@ -181,6 +182,54 @@ test('filedConfig: what a local step is filed beside its fence, its files direct
 /** The refusal of `config` on `harness`, said as the step `implement`'s, its lines read off `step` and `flags`. */
 const said = (harness: string, step: FiledStep, config: Parameters<typeof configRefusal>[1], flags?: FiledFlags): string | undefined =>
   filedRefusal((c) => configRefusal(harness, c), 'implement', config, lineOf(step, flags));
+
+test("filedConfig: a Claude Code step is given its factory's harness settings beneath its own", async (t) => {
+  const OFF = { attribution: { commit: '', pr: '' } };
+  const given = (step: Workflow, own: object, harnessSettings?: Run['harnessSettings']) =>
+    filedConfig(
+      step,
+      [step],
+      { gates: [], ...(harnessSettings === undefined ? {} : { harnessSettings }) },
+      {
+        model: undefined,
+        budgetUsd: undefined,
+        runArtifacts: '/runs/r/artifacts',
+        inbox: '/inbox',
+        own,
+        landingDenied: () => [],
+      },
+    );
+  const settingsOf = (config: object): unknown => {
+    const claude: unknown = Reflect.get(config, 'claude');
+    const settings: unknown = typeof claude === 'object' && claude !== null ? Reflect.get(claude, 'settings') : undefined;
+    return typeof settings === 'string' ? JSON.parse(settings) : undefined;
+  };
+  await t.test("an agent's rendered settings keep their keys and gain the factory's", () =>
+    assert.deepEqual(settingsOf(given(stepOf(), { claude: { settings: '{"outputStyle":"p:s"}', pluginDir: ['/p'] } }, { claude: OFF })), {
+      ...OFF,
+      outputStyle: 'p:s',
+    }),
+  );
+  await t.test("the agent's other flags are kept", () =>
+    assert.deepEqual(Reflect.get(Reflect.get(given(stepOf(), { claude: { pluginDir: ['/p'] } }, { claude: OFF }), 'claude'), 'pluginDir'), [
+      '/p',
+    ]),
+  );
+  await t.test('a step with no agent is given a claude key for them', () =>
+    assert.deepEqual(settingsOf(given(stepOf(), { enabledSkills: 'default' }, { claude: OFF })), OFF),
+  );
+  await t.test('a step on another harness is given none', () =>
+    assert.equal('claude' in given(stepOf('harness: codex\n'), {}, { claude: OFF }), false),
+  );
+  await t.test('a run that froze none, or none of this harness, files its own settings as they were', () => {
+    for (const frozen of [undefined, {}, { codex: { language: 'french' } }] as Run['harnessSettings'][])
+      assert.deepEqual(Reflect.get(given(stepOf(), { claude: { settings: '{"a":1}' } }, frozen), 'claude'), { settings: '{"a":1}' });
+  });
+  await t.test("a hand-edited record's widening key, of no type a record is written with, is not filed", () => {
+    const handEdited: unknown = { claude: { ...OFF, permissions: { allow: ['Bash(*)'] } } };
+    assert.deepEqual(settingsOf(given(stepOf(), {}, handEdited as Run['harnessSettings'])), OFF);
+  });
+});
 
 test("filedRefusal: the runtime's refusal of a filed config, after the step's line it comes from, the flag a retry typed, or none", async (t) => {
   await t.test("a field the runtime refuses alone is named by the step's line it comes from, and the field it is filed as", () => {

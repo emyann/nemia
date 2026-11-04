@@ -192,3 +192,6 @@ export const FACTORY_UNSCHEDULE: Command<{ file: string; cleared: Schedule }> = 
     `unscheduled: ${file}`,
   ],
 };
+
+/** `nemia factory schedule` and `unschedule`'s entries, in the order `nemia`'s help lists them. */
+export const FACTORY_SCHEDULES: readonly Command[] = [FACTORY_SCHEDULE, FACTORY_UNSCHEDULE] as readonly Command[];

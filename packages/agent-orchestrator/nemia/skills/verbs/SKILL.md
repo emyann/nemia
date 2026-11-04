@@ -342,6 +342,11 @@ Each asks the person at a prompt every time it runs: say what it does before you
                                read-only (:ro) or writable (:rw); a writable one is not a run's workspace
   nemia factory volume rm <factory> <path>
                                take a volume off a factory, by its path
+  nemia factory setting set <factory> <harness>.<key> <json>
+                               give every session of a factory's runs on a harness one of its settings,
+                               claude.attribution among them; its value is JSON
+  nemia factory setting rm <factory> <harness>.<key>
+                               take a harness setting off a factory, by its key
   nemia factory instruct <name> --file <path>|- | --clear
                                write the instruction the store keeps for a factory (- for stdin), what
                                Nemia is to know of it and no step is told, or remove it with --clear

@@ -68,6 +68,7 @@ erDiagram
     FactoryName factory FK "optional"
     list mounts "optional"
     list volumes "optional"
+    object harnessSettings "optional"
     object place "optional"
     string repo "optional"
     string baseRef "optional"
@@ -146,6 +147,7 @@ erDiagram
     unknown instruction "optional"
     enum revisions "optional"
     string tree "optional"
+    object harnessSettings "optional"
   }
   AppliedTemplate {
     TemplateSource source FK

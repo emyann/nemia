@@ -42,6 +42,17 @@ const leavesAForeignFolder = (adoption: Adoption): boolean =>
 const same = (a: string | number | boolean | undefined, b: string | number | boolean | undefined): boolean =>
   a === b || (a !== a && b !== b);
 
+/**
+ * Whether `a` and `b` name the same keys, in the same order: what `keepsItsHarnessSettings` says of a factory's harness settings. Their
+ * values are what its file holds, unjudged (`unknown`, so that a hand-edited key still reads and `nemia factory setting rm` can take it
+ * off), which the verifier compares by no means: that `adopted` carries each value is held by `src/adopt/adopt.test.ts`, which runs it.
+ */
+const sameKeys = (a: Readonly<Record<string, unknown>>, b: Readonly<Record<string, unknown>>): boolean => {
+  const was = Object.keys(a);
+  const now = Object.keys(b);
+  return now.length === was.length && now.every((key, i) => was.at(i) === key);
+};
+
 /** Whether two dictionaries hold the same entries, in the same order, a NaN the same as a NaN. */
 const sameDict = (
   a: Readonly<Record<string, string | number | boolean>>,
@@ -142,6 +153,12 @@ const adoptedSpec = spec<(factory: Factory, wiring: Wiring, template: FactoryTem
         (output.volumes ?? []).every(
           (v, i) => v.path === (factory.volumes ?? []).at(i)?.path && v.readOnly === (factory.volumes ?? []).at(i)?.readOnly,
         ),
+    },
+    keepsItsHarnessSettings: {
+      description: "It keeps its harness settings, the same ones, none where it had none: they are the person's, never the template's",
+      condition: ({ input: [factory], output }) =>
+        (output.harnessSettings === undefined) === (factory.harnessSettings === undefined) &&
+        sameKeys(output.harnessSettings ?? {}, factory.harnessSettings ?? {}),
     },
     offersTheTemplates: {
       description: "Its workflows are the template's wiring's",

@@ -25,8 +25,9 @@
  * may drift from sdlc's: what sdlc writes is held where it is written.
  *
  * A writer of one kind of file: the read set with the allows of a contract (`CONTRACT_WRITES`), each a path from the session's working
- * folder (`WORK`), is planted the same way and writes exactly the checkout's contracts and no other file; spelled with a leading `*` it
- * writes none, and on a step over an agent that lacks them the same lines are refused at load, a step's fence only narrowing its agent's.
+ * folder (`WORK`), is planted the same way and writes exactly the checkout's contracts, read from the disk, and no helper beside them
+ * nor a path of another shape (`NOT_CONTRACTS`); spelled with a leading `*` it writes none, and on a step over an agent that lacks them
+ * the same lines are refused at load, a step's fence only narrowing its agent's.
  *
  * Every path a repository skill says its work is on matches a file of the checkout (`appliesUnmatched`), the read-within-reach rule of
  * the repository's skills is counted as `nemia stats` counts it (`rulesOfTry`), and no tsconfig of the checkout makes `tsc --noEmit`
@@ -53,7 +54,6 @@ import { admissionOf, nemiaFence, widened } from '../src/admission/index.ts';
 import { TABLE } from '../src/command/commands.verb.ts';
 import { rulesOfTry } from '../src/stats/discipline.ts';
 import { REPO, TEAM, TEAM_DEV, teamCopy } from './team.ts';
-import { files } from './repo-files.ts';
 
 /** The repository's own folder of skills, which a step run in this checkout may load. */
 const REPO_SKILLS = path.join(REPO, '.claude', 'skills');
@@ -1157,22 +1157,51 @@ test("REFUSED: a step's own deny line cut to one rule lifts none of its agent's,
  */
 const CONTRACT_WRITES = ['Edit(packages/*/contracts/*.contract.ts)', 'Edit(apps/*/contracts/*.contract.ts)'];
 
-/** A write of each file of the checkout, at the planted session's working folder. */
-const WRITES_OF_THE_CHECKOUT: Call[] = files().map((file) => ({ tool: 'Write', path: `${WORK}/${file}` }));
+/**
+ * Every file under a `contracts/` folder of a package or an app of the checkout, by its path from the root, read from the disk: the
+ * contracts a designer writes, and the helpers beside them it must not.
+ */
+const CONTRACTS_FOLDERS_FILES: string[] = ['packages', 'apps'].flatMap((top) =>
+  fs.readdirSync(path.join(REPO, top)).flatMap((name) => {
+    const folder = path.join(REPO, top, name, 'contracts');
+    if (!fs.existsSync(folder)) return [];
+    return fs
+      .readdirSync(folder, { recursive: true, encoding: 'utf8' })
+      .filter((file) => fs.statSync(path.join(folder, file)).isFile())
+      .map((file) => `${top}/${name}/contracts/${file}`)
+      .sort();
+  }),
+);
 
-/** The files of the checkout, each by its path from the root, that `step` writes: each write run on its own, `runs` showing no path. */
+/** Each other shape of a path the contract allows must refuse, by its path from the root but the last, which is outside `WORK`. */
+const NOT_CONTRACTS = [
+  'packages/a/src/x.ts',
+  'packages/a/contracts/n/x.contract.ts',
+  'packages/a/b/contracts/x.contract.ts',
+  'contracts/x.contract.ts',
+  'x.contract.ts',
+  'CLAUDE.md',
+  '/elsewhere/packages/a/contracts/x.contract.ts',
+];
+
+/** A write of each file of the checkout's contracts folders and of each other shape, at the planted session's working folder. */
+const CONTRACT_SHAPED_WRITES: Call[] = [...CONTRACTS_FOLDERS_FILES, ...NOT_CONTRACTS].map((file) => ({
+  tool: 'Write',
+  path: file.startsWith('/') ? file : `${WORK}/${file}`,
+}));
+
+/** The paths of those writes `step` makes, each from the root where it is in `WORK`: each run on its own, `runs` showing no path. */
 const writtenBy = (step: Step): string[] =>
-  WRITES_OF_THE_CHECKOUT.filter((call) => runs(step, [call], {}, []).length > 0).map((call) => call.path!.slice(WORK.length + 1));
+  CONTRACT_SHAPED_WRITES.filter((call) => runs(step, [call], {}, []).length > 0).map((call) =>
+    call.path!.startsWith(`${WORK}/`) ? call.path!.slice(WORK.length + 1) : call.path!,
+  );
 
 test('a dontAsk step with the read set and the contract allows planted writes exactly the contracts of the checkout, and still asks each read', () => {
   const step = planted({ allows: [...READ_SET_ALLOWS, ...CONTRACT_WRITES] });
-  const written = writtenBy(step);
-  const contracts = files().filter((file) => /^(?:packages|apps)\/[^/]+\/contracts\/[^/]+\.contract\.ts$/.test(file));
+  const contracts = CONTRACTS_FOLDERS_FILES.filter((file) => file.endsWith('.contract.ts'));
   assert.ok(contracts.length > 0, 'the checkout holds contracts to write');
-  assert.deepEqual(written, contracts);
-  assert.ok(files().includes('packages/agent-orchestrator/contracts/laws.ts'), 'the shared helpers are a file of the checkout');
-  assert.ok(!written.includes('packages/agent-orchestrator/contracts/laws.ts'), 'and refused, a contract file alone being allowed');
-  assert.ok(!written.some((file) => file.includes('/src/')), 'no source file');
+  assert.ok(CONTRACTS_FOLDERS_FILES.includes('packages/agent-orchestrator/contracts/laws.ts'), 'and helpers beside them');
+  assert.deepEqual(writtenBy(step), contracts, 'every contract, and no helper nor any other shape');
   assert.deepEqual(runs(step, GIT_READS, {}, []), GIT_READS.map(shown));
   assert.deepEqual(runs(step, GIT_WRITES, {}, []), []);
   assert.deepEqual(writtenBy(planted()), [], 'without them, the read set writes no file');

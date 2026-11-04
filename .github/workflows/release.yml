@@ -1,6 +1,6 @@
 # Nemia's releases: a pull request this workflow keeps open, and the tag and GitHub release its merge makes (tools/release/README.md).
 # Each job runs one verb of tools/release/release.ts, which decides from the tags, main, the release branch, the merged pull requests
-# and the head's runs as they are, so a rerun with nothing changed does nothing. Nothing is published to npm and no artifact is
+# and the release pull request as they are, so a rerun with nothing changed does nothing. Nothing is published to npm and no artifact is
 # attached. tools/guards/test/release-workflow.test.ts holds this file.
 name: release
 
@@ -17,8 +17,9 @@ permissions:
 
 # Every job and every step that reaches the network (an action, gh, git's push and fetch, which the release tool calls) carries a
 # timeout-minutes of its own, under its job's. labels, tag and pr share the job concurrency release and are never cancelled: two runs
-# never write the labels, the tag or the release branch at once, and a run waiting behind another is the newer one. proof waits on
-# the release pull request's checks, up to 40 minutes, in a group of its own a newer run cancels, so it never holds a tag back.
+# never write the labels, the tag or the release branch at once, and a run waiting behind another is the newer one. No job waits on
+# the release pull request's checks: its pull_request runs wait for a person's "Approve workflows to run", which its body names, and
+# main's protection holds the merge until they are green. A dispatched run would never count, so none is dispatched.
 jobs:
   labels:
     runs-on: ubuntu-latest
@@ -77,7 +78,6 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
-      actions: write
     concurrency:
       group: release
       cancel-in-progress: false
@@ -100,29 +100,3 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: node tools/release/release.ts pr
-
-  proof:
-    needs: [pr]
-    runs-on: ubuntu-latest
-    timeout-minutes: 45
-    permissions:
-      contents: read
-      pull-requests: read
-      checks: read
-    concurrency:
-      group: release-proof
-      cancel-in-progress: true
-    steps:
-      - uses: actions/checkout@v7
-        timeout-minutes: 3
-      - uses: actions/setup-node@v7
-        timeout-minutes: 3
-        with:
-          node-version: '24.16.0'
-      - name: Show that the dispatched ci counts for main's protection
-        # Red names the merge box's "Approve workflows to run", whose pull_request ci counts where the dispatched one does not.
-        timeout-minutes: 42
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-        run: node tools/release/release.ts proof

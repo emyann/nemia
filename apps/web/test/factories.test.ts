@@ -47,8 +47,10 @@ const factory = (name: string, extra: Partial<Factory> = {}): Factory => ({
     add: `nemia factory add ${name} --repo <path>`,
     schedule: `nemia factory schedule ${name} <workflow> --cron <expr> --brief <text>`,
     trust: `nemia factory trust ${name}`,
+    volume: `nemia factory volume add ${name} <path>:ro|:rw`,
   },
   untrusted: [],
+  volumes: [],
   template: null,
   ...extra,
 });

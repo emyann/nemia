@@ -16,8 +16,9 @@ const factory = (name: string, repos: string[]) => ({
   hires: {},
   error: null,
   schedules: [],
-  commands: { attach: 'a', rm: 'r', add: 'd', schedule: 's', trust: 't' },
+  commands: { attach: 'a', rm: 'r', add: 'd', schedule: 's', trust: 't', volume: 'v' },
   untrusted: [],
+  volumes: [],
   template: null,
 });
 

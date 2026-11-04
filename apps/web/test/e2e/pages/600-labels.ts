@@ -86,6 +86,7 @@ export default {
         page.locator(`[data-section="in play"] [data-card="${CARD}"]`),
         'it lists the card no run started, which is in play',
       );
+      await expectVisible(page.locator('[data-section="in play"] h2', { hasText: /^Card in play$/ }), 'one card is said in the singular');
       await expectVisible(page.locator('[data-bucket="landed"]', { hasText: '1' }), 'and counts the landed run');
       await expectVisible(page.locator('[data-section="runs"] h2', { hasText: /^Run$/ }), 'one run is said in the singular');
       await expectVisible(page.locator('[data-label-spent]'), 'and says what its runs spent, landed or not');

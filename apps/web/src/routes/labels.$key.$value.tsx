@@ -79,7 +79,10 @@ function LabelPage() {
     <ScanLines className="min-h-full px-4 py-6 sm:px-8">
       <article data-label-page={selector} className="mx-auto flex w-full max-w-[1360px] flex-col gap-10">
         <PageName>{selector}</PageName>
-        <Section name="in play" plate={<Plate count={cards.length} title="Cards in play" quiet={cards.length === 0} />}>
+        <Section
+          name="in play"
+          plate={<Plate count={cards.length} title={cards.length === 1 ? 'Card in play' : 'Cards in play'} quiet={cards.length === 0} />}
+        >
           {cards.length === 0 ? (
             <p className="m-0 text-body-medium text-on-surface-variant">
               No card with this label is in play: none waits to start, and no run started from one is at work or waits.

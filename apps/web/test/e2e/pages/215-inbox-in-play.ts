@@ -3,7 +3,7 @@ import path from 'node:path';
 import type { Locator, Page } from 'playwright';
 import { fed, photograph, themeOf } from '../board.ts';
 import { expectCount, expectVisible, idle, Refused, settled, WAIT_MS, watch } from '../checks.ts';
-import { FACTORIES, hiringStarts, WORKFLOWS } from '../seed.ts';
+import { FACTORIES, GATED, hiringStarts, WORKFLOWS } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT, store, takeBackRuns } from '../world.ts';
 
@@ -11,6 +11,12 @@ import { OUT, store, takeBackRuns } from '../world.ts';
 const CARD = 'show-the-cards-in-play-e2e0';
 /** Its first line, and the brief its start is prefilled with. */
 const BODY = 'Show the cards in play\n\nA card started from the Inbox, whose run is then called off.';
+/** The label it carries, whose page lists it while it is in play. */
+const LABEL = { key: 'team', value: 'in-play-e2e' } as const;
+/** A second card, started as a copy of GATED's run, which waits on a person at its gate. */
+const WAITING = 'wait-on-the-plan-e2e0';
+/** That copy's id. */
+const WAITING_RUN = 'wait-on-the-plan-run-e2e0';
 
 /** A card on the Inbox page, by its name. */
 const cardIn = (page: Page, name: string): Locator => page.locator(`section[aria-label="Cards"] li[data-card="${name}"]`);
@@ -45,7 +51,8 @@ export default {
    * card filed in the factory and started from the board reads under In play, its run's phase on a chip (`at work`, or `waiting its turn`
    * with no daemon to take it); once its run is called off — its `.cancelled` marker written beside the record, as `wf cancel` writes it,
    * the board having no Call off of its own — In play no longer lists it, Ended does, as `called off`, and each count has moved by one.
-   * The run, its claim, the card and the factory's hires are taken back.
+   * Before, the card's own page and its label's page show the same chip; after, a second card, started as a copy of GATED's run, which
+   * waits at its gate, reads `waits on you`. The runs, the claim, the cards and the factory's hires are taken back.
    */
   name: 'inbox-in-play',
   route: '/inbox',
@@ -58,7 +65,10 @@ export default {
     const other = await page.context().newPage();
     const unhire = hiringStarts(store!);
     try {
-      fs.writeFileSync(cardFile, `---\nworkflow: ${WORKFLOWS.good.name}\nfactory: ${FACTORIES.hiring.name}\n---\n${BODY}\n`);
+      fs.writeFileSync(
+        cardFile,
+        `---\nworkflow: ${WORKFLOWS.good.name}\nfactory: ${FACTORIES.hiring.name}\nlabels:\n  ${LABEL.key}: ${LABEL.value}\n---\n${BODY}\n`,
+      );
       const { problems } = watch(other);
       await other.goto(page.url(), { waitUntil: 'load' });
       await idle(other);
@@ -97,6 +107,22 @@ export default {
       await settled(other);
       await photograph(other, path.join(OUT, `inbox-in-play-started-${theme}.png`), { fullPage: true });
 
+      await load(other, `/inbox/${CARD}`);
+      await expectVisible(
+        other.locator(`[data-started-as]:has(a[href="/runs/${id}"]) [data-card-state="${phase}"]`),
+        `the card's own page says it started as ${id}, with the same chip`,
+      );
+      await settled(other);
+      await photograph(other, path.join(OUT, `inbox-in-play-card-${theme}.png`), { fullPage: true });
+
+      await load(other, `/labels/${LABEL.key}/${LABEL.value}`);
+      await expectVisible(
+        other.locator(`[data-section="in play"] [data-card="${CARD}"] [data-card-state="${phase}"]`),
+        `its label's page lists it in play, with the same chip`,
+      );
+      await settled(other);
+      await photograph(other, path.join(OUT, `inbox-in-play-label-${theme}.png`), { fullPage: true });
+
       fs.writeFileSync(path.join(runsDir, `${id}.cancelled`), new Date().toISOString());
       fed(id, 'cancelled');
       await load(other, '/inbox');
@@ -119,6 +145,17 @@ export default {
 
       await load(other, '/inbox?cards=ended');
       await expectVisible(cardIn(other, CARD), 'Ended is kept in the address: a load of ?cards=ended lists it again');
+
+      const gated = JSON.parse(fs.readFileSync(path.join(runsDir, `${GATED.id}.json`), 'utf8')) as Record<string, unknown>;
+      fs.writeFileSync(path.join(inbox, `${WAITING}.md`), 'Wait on the plan\n\nA card whose run waits at its gate.\n');
+      fs.writeFileSync(path.join(runsDir, `${WAITING_RUN}.json`), JSON.stringify({ ...gated, id: WAITING_RUN, from: { inbox: WAITING } }));
+      await load(other, '/inbox');
+      await expectVisible(
+        cardIn(other, WAITING).locator('[data-card-state="waiting"]', { hasText: /^waits on you$/ }),
+        'a card whose run waits on a person is in play, its chip saying it waits on you',
+      );
+      await settled(other);
+      await photograph(other, path.join(OUT, `inbox-in-play-waiting-${theme}.png`), { fullPage: true });
       await idle(other);
       const seen = problems();
       if (seen.length)
@@ -129,6 +166,7 @@ export default {
       await other.close();
       takeBackRuns(runsDir, runsBefore);
       fs.rmSync(cardFile, { force: true });
+      fs.rmSync(path.join(inbox, `${WAITING}.md`), { force: true });
       unhire();
     }
   },

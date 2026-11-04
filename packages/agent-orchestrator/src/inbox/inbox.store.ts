@@ -12,8 +12,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Cause, Effect } from 'effect';
 import {
+  cardsListed,
   ideaCard,
-  inboxListing,
   labelledText,
   inboxNameRefusal,
   noCardLine,
@@ -23,7 +23,6 @@ import {
   queueRefusal,
   type InboxCard,
   type InboxListing,
-  type InboxRuns,
 } from './inbox.ts';
 import { queueFactoryRefusal } from './queue-factory.ts';
 import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
@@ -46,28 +45,25 @@ import { keptRuns } from '../record/files.store.ts';
 /** The names of the inbox's cards, as `nemia inbox` lists them. */
 export const inboxCards = Effect.fn('inboxCards')(function* () {
   const entries = yield* (yield* CardDoor).cards.entries();
-  return inboxListing(entries, [], () => true)
+  return cardsListed(entries, [], () => true)
     .filter((l) => l.file.endsWith('.md'))
     .map((l) => l.name);
 });
 
 /**
- * `nemia inbox`: every card in the inbox, by name, with the runs a record says it was started as (`inboxListing`) — and every entry that
- * does not read as a card, with why. The run records are read for their `from`, so a card a run was started from is listed as
- * started; the tick's tries, so a queued card whose start was refused, or failed, says why; and the factories that read, so a card says the
- * repository its factory picks for it (`factoryRepo`).
- *
- * All a run says here is its id and the card it was started from, so the records are read through `memo` where a caller that polls hands
- * one (`keptRuns`): a warm read of the board's inbox reads no finished run's record. With none — the command line's — every record is
- * read, and the answer is the same.
+ * Every card in the inbox, by name, with the runs a record says it was started as (`cardsListed`) — and every entry that does not read as
+ * a card, with why — before any run's phase is read, so with no `state`: what the queue's writes and the workflows' users read. The run
+ * records are read for their `from`, so a card a run was started from is out of the queue; the tick's tries, so a queued card whose start
+ * was refused, or failed, says why; and the factories that read, so a card says the repository its factory picks for it (`factoryRepo`).
+ * `nemia inbox` lists the cards with their state through `inboxJudged` (judged.verb.ts), which reads each run's phase.
  */
-export const readInbox = Effect.fn('readInbox')(function* (memo?: InboxRuns) {
+export const readInbox = Effect.fn('readInbox')(function* () {
   const door = yield* CardDoor;
   const entries = yield* door.cards.entries();
   const tries = yield* door.tries.list();
-  return inboxListing(
+  return cardsListed(
     entries,
-    keptRuns(memo, (run) => ({ id: run.id, ...(run.from === undefined ? {} : { from: run.from }) })),
+    keptRuns(undefined, (run) => ({ id: run.id, ...(run.from === undefined ? {} : { from: run.from }) })),
     isDirectory,
     tries,
     readableFactories(),

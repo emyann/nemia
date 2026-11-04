@@ -10,7 +10,7 @@ import type { WorkflowDir } from '../folder/folder.model.ts';
 import { WorkflowDoor } from '../workflows/workflows.store.ts';
 import {
   fromText,
-  inboxListing,
+  cardsListed,
   inboxNameRefusal,
   nextQueued,
   queueOrder,
@@ -22,6 +22,7 @@ import {
   startedRefusal,
   unfactoredCardRefusal,
   type InboxCard,
+  type CardListing,
   type InboxListing,
   type QueueStarted,
   type MissedStart,
@@ -282,7 +283,7 @@ export const setFrom = Effect.fn('setFrom')(function* (name: string, runs: reado
  * The tries in `names` of cards `listing` does not list as tried — no longer queued as they were — removed; one that cannot be is left for
  * a later pass.
  */
-const dropStaleTries = (names: Iterable<string>, listing: readonly InboxListing[]) =>
+const dropStaleTries = (names: Iterable<string>, listing: readonly CardListing[]) =>
   Effect.gen(function* () {
     const door = yield* CardDoor;
     for (const name of names) {
@@ -320,7 +321,7 @@ export const startQueued = Effect.fn('startQueued')(function* (repo: string, giv
   const runs = given ?? (yield* (yield* RunDoor).runs.list());
   const files = yield* door.cards.entries();
   const tries = yield* door.tries.list();
-  const listing = inboxListing(files, runs, isDirectory, tries);
+  const listing = cardsListed(files, runs, isDirectory, tries);
   yield* dropStaleTries(tries.keys(), listing);
   if (!queueOrder(listing).length) return undefined;
   const factories = readableFactories();

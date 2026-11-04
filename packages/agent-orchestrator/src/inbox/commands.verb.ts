@@ -17,12 +17,15 @@ import { Invalid, Missing } from '../refusal/refusal.ts';
 import { parseSelectors, SELECTOR_FORM, selectorsRefusal, selectsLabels } from '../watch/selector.ts';
 import { labelsText, type LeftOut } from '../labels/labels.ts';
 import { firstPiece } from '../piece/piece.ts';
-import { cardLabels, inboxLines, noCardLine, type InboxCard, type InboxListing } from './inbox.ts';
-import { addToInbox, dropFromInbox, queueInInbox, readInbox, type InboxDropped, type InboxQueued } from './inbox.store.ts';
+import { cardInPlay, cardLabels, inboxLines, noCardLine, type InboxCard, type InboxListing } from './inbox.ts';
+import { addToInbox, dropFromInbox, queueInInbox, type InboxDropped, type InboxQueued } from './inbox.store.ts';
+import { inboxJudged } from './judged.verb.ts';
+import { EngineService } from '../runtime-client.ts';
+import { howOf } from '../command/pages.verb.ts';
 import { setFrom, type InboxFrom } from './inbox.verb.ts';
 
-export const INBOX_HELP = `nemia inbox
-nemia inbox -l <selector>... [--show-labels] [-L <key>]...
+export const INBOX_HELP = `nemia inbox [--all]
+nemia inbox -l <selector>... [--all] [--show-labels] [-L <key>]...
 nemia inbox add "<idea>"|<file> [--workflow <name>] [--repo <path>] [--factory <name>] [--label <key=value>]...
 nemia inbox queue <name> [--workflow <w>] [--off]
 nemia inbox from <name> <run>... | --off
@@ -43,10 +46,11 @@ is said at start:
     ---
     Cache the engine's views between passes.
 
-  nemia inbox       lists each card: its name, the first line of its body, its workflow and repo when set, and
-                 started as <runId> for a card a run's record says it was started as: a started card stays in the
-                 inbox, and is not started again.
-                 An entry that does not read as a card is listed with why. -l keeps the cards a selector takes
+  nemia inbox       lists the cards still in play: its name, the first line of its body, its workflow and repo when
+                 set, and started as <runId>, <phase> for a card a run's record says it was started as, the phase
+                 its run is in now (waiting on you where it waits on a person): a started card stays in the inbox,
+                 and is not started again. A card whose run ended (succeeded, failed, stopped, cancelled) is listed
+                 with --all. An entry that does not read as a card is listed with why. -l keeps the cards a selector takes
                  (key=v, key!=v, "key in (a,b)", "key notin (a,b)", key), over its labels, workflow and factory,
                  given again for another; --show-labels adds its labels to its line, -L <key> that key's value.
   nemia inbox add   files an idea, text or a file, named with the slug a run id makes of its first line, suffix and
@@ -98,19 +102,25 @@ const leftOutLines = (name: string, leftOut: readonly LeftOut[]): string[] =>
       `label ${key} not inherited: ${values.map((v) => `${v.run} has ${key}=${v.value}`).join(', ')} — set it with nemia label inbox ${name} ${key}=<value>`,
   );
 
-/** `nemia inbox`: each card, a line each, and how to start, queue or drop one; or that the inbox is empty. */
-export const INBOX: Command<{ cards: InboxListing[] }> = {
+/**
+ * `nemia inbox`: each card still in play (`cardInPlay`), or every card with `--all`, a line each, and how to start, queue or drop one; or
+ * that the inbox is empty. A started card's state is its run's phase, judged through the informer the caller keeps (`kept.runs`). `ended`
+ * counts the cards the selector takes that are left out for their run having ended: none with `--all`.
+ */
+export const INBOX: Command<{ cards: InboxListing[]; ended: number }> = {
   name: 'inbox',
   usage: '',
   help: [
-    'the cards parked before they are started: name, first line, workflow',
-    'and repo when set, and started as <runId> (nemia inbox --help); -l: the',
-    'cards a selector takes; --show-labels, -L <key>: their labels on each line',
+    'the cards still in play: name, first line, workflow and repo when set,',
+    'and started as <runId>, <phase> (nemia inbox --help); --all: those whose',
+    'run ended too; -l: the cards a selector takes; --show-labels, -L <key>:',
+    'their labels on each line',
   ],
   spec: {
     positionals: [],
     flags: [
       { flag: '-l', kind: 'text', key: 'selector', many: true, takes: INBOX_SELECTOR_TAKES },
+      { flag: '--all', kind: 'switch', key: 'all' },
       { flag: '--show-labels', kind: 'switch', key: 'showLabels' },
       { flag: '-L', kind: 'text', key: 'labelColumns', many: true, takes: LABEL_COLUMN_TAKES },
     ],
@@ -122,16 +132,19 @@ export const INBOX: Command<{ cards: InboxListing[] }> = {
   class: 'read',
   route: { method: 'GET', path: '/api/inbox', status: 200 },
   manual: INBOX_HELP,
-  handler: (args, _env, home, kept) =>
+  handler: (args, env, home, kept) =>
     Effect.gen(function* () {
       const selector = listOf(args, 'selector');
       const refused = selectorsRefusal(selector);
       if (refused) return yield* Effect.fail(new Invalid({ message: `nemia inbox -l: ${refused}` }));
       const selectors = parseSelectors(selector);
-      const cards = yield* rooted(home, 'inbox', readInbox(kept?.records?.inbox));
-      return { cards: cards.filter((card) => selectsLabels(selectors, cardLabels(card))) };
+      const e = yield* EngineService;
+      const cards = yield* rooted(home, 'inbox', inboxJudged(e, howOf(env, home, kept)));
+      const selected = cards.filter((card) => selectsLabels(selectors, cardLabels(card)));
+      const shown = args.all === true ? selected : selected.filter(cardInPlay);
+      return { cards: shown, ended: selected.length - shown.length };
     }),
-  print: ({ cards }, args) =>
+  print: ({ cards, ended }, args) =>
     cards.length
       ? [
           ...inboxLines(cards, defaultStartsAllowed(), {
@@ -140,10 +153,16 @@ export const INBOX: Command<{ cards: InboxListing[] }> = {
           }),
           `\nstart one: nemia start ${path.join(inboxDir(), '<name>.md')} [--workflows <w>] [--repo <r>] [--factory <f>] — queue one: nemia inbox queue <name> — drop one: nemia inbox rm <name>`,
         ]
-      : listOf(args, 'selector').length
-        ? [`no card of the inbox matches -l ${listOf(args, 'selector').join(' -l ')} — see them all with nemia inbox --show-labels`]
-        : [`the inbox is empty — park an idea with nemia inbox add "<idea>"`],
+      : ended
+        ? [`no card in play${inboxSelected(args)}, and ${ended} whose run ended — list them with nemia inbox --all`]
+        : listOf(args, 'selector').length
+          ? [`no card of the inbox matches -l ${listOf(args, 'selector').join(' -l ')} — see them all with nemia inbox --show-labels`]
+          : [`the inbox is empty — park an idea with nemia inbox add "<idea>"`],
 };
+
+/** `nemia inbox`'s `-l` as its empty line says it: ` matches -l a -l b`, or nothing where none was given. */
+const inboxSelected = (args: Args): string =>
+  listOf(args, 'selector').length ? ` matches -l ${listOf(args, 'selector').join(' -l ')}` : '';
 
 /** What one of `nemia inbox add`'s flags names, once per card. */
 const ADD_NAMES: Readonly<Record<string, string>> = { '--workflow': 'workflow', '--repo': 'repository', '--factory': 'factory' };
@@ -429,13 +448,13 @@ export const INBOX_CARD: Command<{ card: InboxListing; source: string }> = {
   class: 'read',
   route: { method: 'GET', path: '/api/inbox/:name', status: 200 },
   only: { side: 'api', why: "the board's card page reads one card with its file as written; at the command line a person opens the file" },
-  handler: (args, _env, home) =>
+  handler: (args, env, home, kept) =>
     rooted(
       home,
       'inbox show',
       Effect.gen(function* () {
         const name = textOf(args, 'name') ?? '';
-        const cards = yield* readInbox();
+        const cards = yield* inboxJudged(yield* EngineService, howOf(env, home, kept));
         const named = (c: InboxListing): boolean => c.name === name;
         const card = cards.find((c) => named(c) && c.file.endsWith('.md')) ?? cards.find(named);
         const source = card === undefined ? null : yield* sourceOf(card.file, home ?? '');

@@ -149,10 +149,10 @@ test('a person starts a card: the run carries where it came from, and the card s
       assert.deepEqual(
         (await listed()).map((e) => [e.name, e.state, e.startedAs]).sort(byName),
         [
-          [card.name, 'started', [answered.id]],
-          [other.card.name, 'started', [parent.run.id]],
+          [card.name, 'running', [answered.id]],
+          [other.card.name, 'running', [parent.run.id]],
         ].sort(byName),
-        'both cards kept, each listed as started by the run it became',
+        "both cards kept, each listed as started by the run it became, in its run's phase",
       );
 
       const { card: plain } = onStore(addToInbox({ text: 'Keep the brief\n\nAs the card says it.' }));
@@ -525,7 +525,11 @@ test("a person files cards, in a factory and out of one, lists them, opens a car
       const stray = entries.find((e) => e.file === 'notes.txt')!;
       assert.match(stray.error!, /^notes\.txt: not a card/);
       const started = entries.find((e) => e.name === card.name)!;
-      assert.deepEqual([started.startedAs, started.state], [['started-run-k2q9'], 'started']);
+      assert.deepEqual(
+        [started.startedAs, started.state],
+        [['started-run-k2q9'], 'running'],
+        'a run that cannot be judged reads running, as the runs list counts it',
+      );
       assert.deepEqual([broken.state, stray.state], ['filed', 'filed'], 'every entry has its state, one that does not read filed');
 
       fs.rmSync(path.join(inbox, 'broken.md'));

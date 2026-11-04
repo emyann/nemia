@@ -21,6 +21,7 @@ import { standingReader, standingSnapshot } from '../standing/standing.verb.ts';
 import { informedJudgements, type InformerMemo, informerRead } from '../rest/informer.verb.ts';
 import { type Judgement, type Judgements, judgementsOf, sameJudgement } from './judgement.verb.ts';
 import { type RunGraph, runGraph } from './graph.ts';
+import type { CardRun } from '../inbox/inbox.ts';
 import {
   codedStep,
   ENGINE_REASON,
@@ -431,5 +432,26 @@ export const runsSummarized = Effect.fn('runsSummarized')(function* (e: Engine, 
   return runs.flatMap((run): RunSummary[] => {
     const summary = summaries.get(run.id);
     return summary ? [{ ...summary, startedAt: runStartedAt(run, filed) }] : [];
+  });
+});
+
+/**
+ * Each run a card was started from (`from.inbox`), with its phase as the list judges it, read through the informer `how.memo` as
+ * `runsSummarized` reads it: the card's state once it has started (`cardState`). One listing gives both which runs name a card and their
+ * phases, so a card whose run is listed always has its phase. A run that could not be judged reads `running`, as the list counts it
+ * (`unjudgedFields`). Every listed run is kept in the informer, so a read of the inbox leaves the list's runs where they were.
+ */
+export const cardRuns = Effect.fn('cardRuns')(function* (e: Engine, { home, memo, verify }: SummaryHow) {
+  const git = standingReader(yield* standingSnapshot());
+  const read = yield* informerRead(e, memo, verify, git, sameJudgement);
+  const all = runStore.runs.list(undefined, read.given);
+  read.only(all.map((run) => run.id));
+  const fromCards = all.filter((run) => run.from?.inbox !== undefined);
+  const judged = yield* informedJudgements(e, home, fromCards, read, git, () => all);
+  return fromCards.flatMap((run): CardRun[] => {
+    const one = judged.runs.get(run.id);
+    if (one === undefined) return [];
+    const phase = 'judgement' in one ? one.judgement.judged.phase : unjudgedFields().phase;
+    return [{ id: run.id, ...(run.from === undefined ? {} : { from: run.from }), phase }];
   });
 });

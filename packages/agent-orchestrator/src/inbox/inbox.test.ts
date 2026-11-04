@@ -27,6 +27,8 @@ import {
   queueOrder,
   cardState,
   CARD_STATES,
+  cardInPlay,
+  type CardRun,
   type CardState,
   queueRefusal,
   queueRepo,
@@ -36,6 +38,7 @@ import {
   type InboxListing,
 } from './inbox.ts';
 import { fromNote } from '../start/index.ts';
+import { RUN_PHASES } from '../phase/phase.ts';
 import { names } from '../../test/assessed.ts';
 
 /**
@@ -212,11 +215,11 @@ test("`inboxListing`: each card by file name, with the runs whose record's `from
     { file: 'drafts/', text: '' },
   ];
   const runs = [
-    { id: 'parse-the-flag-ab12', from: { inbox: 'parse-the-flag-1x2y' } },
-    { id: 'add-a-flag-cd34' },
-    { id: 'parse-the-flag-ef56', from: { inbox: 'parse-the-flag-1x2y' } },
-    { id: 'broken-gh78', from: { inbox: 'broken-a1b2' } },
-  ];
+    { id: 'parse-the-flag-ab12', from: { inbox: 'parse-the-flag-1x2y' }, phase: 'succeeded' },
+    { id: 'add-a-flag-cd34', phase: 'running' },
+    { id: 'parse-the-flag-ef56', from: { inbox: 'parse-the-flag-1x2y' }, phase: 'waiting' },
+    { id: 'broken-gh78', from: { inbox: 'broken-a1b2' }, phase: 'failed' },
+  ] satisfies CardRun[];
   const listing = inboxListing(files, runs, isDirectory);
   const said = new Map(listing.map((l) => [l.name, l.error]));
   assert.deepEqual(
@@ -231,7 +234,7 @@ test("`inboxListing`: each card by file name, with the runs whose record's `from
         factory: null,
         startedAs: ['broken-gh78'],
         labels: {},
-        state: 'started',
+        state: 'failed',
         from: [],
         factoryRepo: null,
         error: 'refused',
@@ -287,7 +290,7 @@ test("`inboxListing`: each card by file name, with the runs whose record's `from
         factory: null,
         startedAs: ['parse-the-flag-ab12', 'parse-the-flag-ef56'],
         labels: {},
-        state: 'started',
+        state: 'waiting',
         from: [],
         factoryRepo: null,
         error: null,
@@ -306,7 +309,9 @@ test("`inboxListing`: each card by file name, with the runs whose record's `from
   assert.deepEqual(inboxListing([], runs, isDirectory), []);
 
   assert.deepEqual(
-    inboxListing([files[3]], [{ id: 'gone-1234', from: { inbox: 'parse-the-flag-1x2y' } }], isDirectory).map((l) => l.startedAs),
+    inboxListing([files[3]], [{ id: 'gone-1234', from: { inbox: 'parse-the-flag-1x2y' }, phase: 'running' }], isDirectory).map(
+      (l) => l.startedAs,
+    ),
     [[]],
     'a record naming a card no longer there lists nothing: that card was started, and removed',
   );
@@ -322,15 +327,26 @@ test('`nemia inbox` prints a line per entry: the name, the first line of the bod
       { file: 'cache-a1.md', text: 'Cache the views.\n' },
       { file: 'notes.txt', text: '' },
     ],
-    [{ id: 'cache-the-views-ab12', from: { inbox: 'cache-a1' } }],
+    [{ id: 'cache-the-views-ab12', from: { inbox: 'cache-a1' }, phase: 'succeeded' }],
     isDirectory,
   );
   assert.deepEqual(inboxLines(listing), [
-    'cache-a1             Cache the views.  started as cache-the-views-ab12',
+    'cache-a1             Cache the views.  started as cache-the-views-ab12, succeeded',
     'notes.txt            notes.txt: not a card. The inbox holds one markdown file per card, <name>.md — move it out, or, for a card, name it <name>.md.',
     'parse-the-flag-1x2y  Parse the flag option in cli.ts, and every option after  workflow: dev  repo: /home/me/code/app',
   ]);
   assert.deepEqual(inboxLines([]), []);
+  assert.deepEqual(
+    inboxLines(
+      inboxListing(
+        [{ file: 'cache-a1.md', text: 'Cache the views.\n' }],
+        [{ id: 'r-1', from: { inbox: 'cache-a1' }, phase: 'waiting' }],
+        isDirectory,
+      ),
+    ),
+    ['cache-a1  Cache the views.  started as r-1, waiting on you'],
+    'a run that waits on a person says so',
+  );
 });
 
 test('`noCardLine` says the inbox has no card of that name, and which it has — the name without its .md when that is one', () => {
@@ -546,7 +562,12 @@ test("`inboxListing` gives each queued card its place in the order — by when i
     ],
     ['a-tied', { at: '2026-09-16T10:07:00.000Z', text: files[1].text, repo: app, why: noGit, refused: false }],
   ]);
-  const listing = inboxListing(files, [{ id: 'started-by-hand-ab12', from: { inbox: 'e-started' } }], isDirectory, tries);
+  const listing = inboxListing(
+    files,
+    [{ id: 'started-by-hand-ab12', from: { inbox: 'e-started' }, phase: 'succeeded' }],
+    isDirectory,
+    tries,
+  );
   assert.deepEqual(
     listing.map((l) => [l.name, l.state, l.queued, l.tried]),
     [
@@ -564,7 +585,7 @@ test("`inboxListing` gives each queued card its place in the order — by when i
         { at: '2026-09-16T09:00:00.000Z', place: 1 },
         { at: '2026-09-16T10:06:00.000Z', repo: app, why: 'd-first.md: `workflow: nope` — no workflow folder.', refused: true },
       ],
-      ['e-started', 'started', { at: '2026-09-16T08:00:00.000Z', place: null }, undefined],
+      ['e-started', 'succeeded', { at: '2026-09-16T08:00:00.000Z', place: null }, undefined],
       ['f-parked', 'filed', undefined, undefined],
     ],
   );
@@ -600,7 +621,7 @@ test("`inboxListing` gives each queued card its place in the order — by when i
       'b-late     Late  workflow: dev  queued 4 of 4',
       'c-tied     Tied  workflow: dev  queued 3 of 4',
       'd-first    First, and refused  workflow: nope  queued 1 of 4',
-      'e-started  Started by hand  workflow: dev  started as started-by-hand-ab12',
+      'e-started  Started by hand  workflow: dev  started as started-by-hand-ab12, succeeded',
       'f-parked   Parked  workflow: dev',
     ],
     'each card on one line, its try said after it only where there is one',
@@ -643,18 +664,38 @@ test("`inboxListing` gives each queued card its place in the order — by when i
   );
 });
 
-test('`cardState`: one closed word per entry — started wins whatever the card carries, then refused, queued, filed', async (t) => {
+test("`cardState`: one closed word per entry — its run's phase whatever the card carries, the first still in play, else the last; then refused, queued, filed", async (t) => {
   const tried = (refused: boolean) => ({ at: '2026-09-16T10:06:00.000Z', repo: '/home/me/code/app', why: 'x', refused });
   const queued = { at: '2026-09-16T10:00:00.000Z', place: null };
   const rows: [string, Parameters<typeof cardState>[0], CardState][] = [
-    ['a record names it, though it is queued and was refused', { startedAs: ['r-1'], queued, tried: tried(true) }, 'started'],
-    ['queued, its try as it stands refused', { startedAs: [], queued, tried: tried(true) }, 'refused'],
-    ['queued, its try failed otherwise', { startedAs: [], queued, tried: tried(false) }, 'queued'],
-    ['queued, never tried', { startedAs: [], queued }, 'queued'],
-    ['neither queued nor started', { startedAs: [] }, 'filed'],
+    ...RUN_PHASES.map((phase): [string, Parameters<typeof cardState>[0], CardState] => [`its run is ${phase}`, { phases: [phase] }, phase]),
+    ['its run is running, though it is queued and was refused', { phases: ['running'], queued, tried: tried(true) }, 'running'],
+    ['two runs, one ended and one still in play: the one in play', { phases: ['succeeded', 'running'] }, 'running'],
+    ['two runs, both ended: the last', { phases: ['failed', 'succeeded'] }, 'succeeded'],
+    ['queued, its try as it stands refused', { phases: [], queued, tried: tried(true) }, 'refused'],
+    ['queued, its try failed otherwise', { phases: [], queued, tried: tried(false) }, 'queued'],
+    ['queued, never tried', { phases: [], queued }, 'queued'],
+    ['neither queued nor started, or its run removed', { phases: [] }, 'filed'],
   ];
   for (const [name, entry, state] of rows) await t.test(name, () => assert.equal(cardState(entry), state));
   assert.deepEqual([...new Set(rows.map(([, , state]) => state))].sort(), [...CARD_STATES].sort(), 'every state has its row');
+});
+
+test('`CARD_IN_PLAY`: a card not started and one whose run has not ended are in play; one whose run ended is not', async (t) => {
+  const rows: [CardState, boolean][] = [
+    ['filed', true],
+    ['queued', true],
+    ['refused', true],
+    ['pending', true],
+    ['running', true],
+    ['waiting', true],
+    ['succeeded', false],
+    ['failed', false],
+    ['stopped', false],
+    ['cancelled', false],
+  ];
+  for (const [state, inPlay] of rows) await t.test(state, () => assert.equal(cardInPlay({ state }), inPlay));
+  assert.deepEqual(rows.map(([state]) => state).sort(), [...CARD_STATES].sort(), 'every state has its row');
 });
 
 test("a queued card of a factory is tried on the factory's one repository, and its refusal there is remembered: `nextQueued` passes over it from a daemon anywhere — `queueRepo` says the daemon's repository only when neither the card nor its factory names one", () => {

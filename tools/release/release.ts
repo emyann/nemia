@@ -4,14 +4,13 @@
  * `gh`, each call bounded.
  *
  * - `check`: the `release-label` check. Exactly one of `LABELS` on the pull request, read from `LABELS` (a JSON array of names, the
- *   pull_request payload's) or, unset, from the open pull request whose head is `BRANCH`.
+ *   pure entry a test drives) or, unset, from the pull request numbered `PR_NUMBER` as it is now, as the workflow passes it.
  * - `labels`: makes the five labels in the repository, and puts back the colour or description of one that drifted.
  * - `tag`: where the root `package.json` names a version that has no tag `v<version>`, makes that GitHub release on the first-parent
  *   commit of main that set the version, with the notes GitHub generates since the previous release.
  * - `pr`: keeps the release pull request (`release` into `main`) open while a pull request merged since the last release carries a label
- *   that releases, rebuilt from main when main moves, and dispatches `ci.yml` and `release-label.yml` on its head; closes it when
- *   nothing is to release.
- * - `proof`: waits, bounded, for the head's `ci` and `release-label` check runs and fails unless `ci` is green and required there.
+ *   that releases, rebuilt from main when main moves, its body opening on the merge box's button that starts the runs main requires;
+ *   closes it when nothing is to release. It dispatches nothing: a dispatched run never counts for a pull request.
  *
  * Only a tag `v<x.y.z>` is a release (`releaseTag`): `v1-final`, `legacy/v1-final` and the operator's local `nemia-*` tags are not.
  * Exit codes: 0 done, 1 refused or failed (the line says what to do), 2 a verb it does not have.
@@ -45,25 +44,16 @@ const TAG = /^v(\d+)\.(\d+)\.(\d+)$/;
 export const BRANCH = 'release';
 export const BASE = 'main';
 
-/** The workflows the release pull request's head is dispatched, with the check run each reports. */
-export const DISPATCHED = [
-  { file: 'ci.yml', check: 'ci' },
-  { file: 'release-label.yml', check: 'release-label' },
-] as const;
-
-/** How long `proof` waits for the head's check runs, and how often it asks: the shipped bounds, lowered for a test by the env below. */
-export const PROOF_BOUND_MS = 40 * 60_000;
-export const PROOF_INTERVAL_MS = 30_000;
-export const PROOF_BOUND_ENV = 'RELEASE_PROOF_BOUND_MS';
-export const PROOF_INTERVAL_ENV = 'RELEASE_PROOF_INTERVAL_MS';
-
 /** The bound on one `git` or `gh` call: a stalled network fails the call, never the job's whole bound. */
 const CALL_MS = 120_000;
 
 /** Who commits the version on `release`: the workflow, as GitHub names its own token's user. */
 const IDENTITY = ['-c', 'user.name=github-actions[bot]', '-c', 'user.email=41898282+github-actions[bot]@users.noreply.github.com'];
 
-/** The setting GitHub refuses the token's pull request without, and the merge box's button `proof` sends a person to. */
+/**
+ * The setting GitHub refuses the token's pull request without, and the merge box's button the release pull request's body opens on:
+ * the workflow's token pushed `release`, so the pull request's `ci` and `release-label` runs wait for a person's approval.
+ */
 export const CREATE_SETTING = 'Allow GitHub Actions to create and approve pull requests';
 export const APPROVE_BUTTON = 'Approve workflows to run';
 
@@ -166,10 +156,13 @@ const releaseLabels = (labels: readonly string[]): string[] => labels.filter((na
 const addCommand = (number: string | undefined): string =>
   `gh api -X POST repos/{owner}/{repo}/issues/${number ?? '<number>'}/labels -f 'labels[]=<label>'`;
 
-/** `check`: exactly one release label. */
+/**
+ * `check`: exactly one release label. The labels are read live by `PR_NUMBER`, so a run a person approves after the pull request was
+ * labelled reads the label it has then, never the payload of the event that started it.
+ */
 const check = (env: Env, out: Out, r: Reach): number => {
   let labels: unknown;
-  let number = env.PR_NUMBER;
+  const number = env.PR_NUMBER;
   if (env.LABELS !== undefined) {
     try {
       labels = JSON.parse(env.LABELS);
@@ -177,21 +170,14 @@ const check = (env: Env, out: Out, r: Reach): number => {
       labels = undefined;
     }
   } else {
-    const branch = env.BRANCH;
-    if (!branch)
+    if (!number || !/^\d+$/.test(number))
       throw new Refusal(
-        'release-label: set LABELS to the pull request labels as a JSON array, or BRANCH to the head branch of an open pull request into main',
+        'release-label: set PR_NUMBER to the pull request number (github.event.pull_request.number), or LABELS to its labels as a JSON array',
       );
-    const pull = openPull(r, branch);
-    if (!pull)
-      throw new Refusal(
-        `release-label: no open pull request into ${BASE} has head ${branch}: open it, then dispatch this workflow again on ${branch}`,
-      );
-    labels = pull.labels.map((label) => label.name);
-    number = String(pull.number);
+    labels = r.api<Pull>('GET', `repos/{owner}/{repo}/pulls/${number}`).labels.map((label) => label.name);
   }
   if (!Array.isArray(labels) || labels.some((label) => typeof label !== 'string'))
-    throw new Refusal('release-label: LABELS is no JSON array of names: pass toJSON(github.event.pull_request.labels.*.name) through env');
+    throw new Refusal('release-label: LABELS is no JSON array of names: unset it, and pass PR_NUMBER so the labels are read live');
   const given = releaseLabels(labels as string[]);
   if (given.length === 1) {
     out(`release-label: ${given[0]} (${bump(given)})`);
@@ -334,9 +320,19 @@ const rebuilt = (out: Out, r: Reach, root: string, main: string, version: string
   return r.git('rev-parse', 'HEAD');
 };
 
-/** The release pull request's body: GitHub's generated notes, then the pull requests no label counted, within GitHub's bound. */
+/**
+ * What a person does with the release pull request, first in its body so `BODY_MAX`'s cut never reaches it: the token's push started
+ * runs that wait for approval, and those are the checks main requires.
+ */
+const APPROVE = [
+  `**To release:** press "${APPROVE_BUTTON}" in this pull request's merge box. That starts its \`ci\` and \`release-label\`, the`,
+  'checks main requires, which wait because the workflow\'s own token pushed `release`. Merge once both are green. A rebuild, when',
+  'main moves, pushes a new head and asks for the click again.',
+].join('\n');
+
+/** The release pull request's body: what a person does, GitHub's generated notes, then the pull requests no label counted, within GitHub's bound. */
 const bodyOf = (generated: string, unlabelled: Pull[]): string => {
-  let body = `${generated}\n`;
+  let body = `${APPROVE}\n\n${generated}\n`;
   if (unlabelled.length) body += `\n## Not labelled, counted for no bump\n\n${unlabelled.map((pull) => `#${pull.number}`).join(', ')}\n`;
   return body.length > BODY_MAX
     ? `${body.slice(0, BODY_MAX)}\n\n… cut at GitHub's bound on a body; the release's own notes are whole.\n`
@@ -354,19 +350,6 @@ const opened = (env: Env, title: string, body: string): number => {
   const m = /\/pull\/(\d+)/.exec(ran.stdout);
   if (!m) throw new Refusal(`pr: gh pr create printed no pull request URL (${ran.stdout.trim()}): run gh workflow run release.yml again`);
   return Number(m[1]);
-};
-
-/** Dispatches each of `DISPATCHED` on the release branch where `head` has no dispatched run of it yet. */
-const dispatch = (out: Out, r: Reach, head: string): void => {
-  for (const { file } of DISPATCHED) {
-    const runs = r.api<{ total_count: number }>(
-      'GET',
-      `repos/{owner}/{repo}/actions/workflows/${file}/runs?head_sha=${head}&event=workflow_dispatch&per_page=1`,
-    );
-    if (runs.total_count > 0) continue;
-    r.gh(['workflow', 'run', file, '--ref', BRANCH]);
-    out(`pr: dispatched ${file} on ${BRANCH} at ${head}`);
-  }
 };
 
 const labelsOf = (pull: Pull): string[] => pull.labels.map((label) => label.name);
@@ -397,92 +380,10 @@ const pr = (env: Env, out: Out, r: Reach, root: string): number => {
   out(`pr: #${number} is ${title}`);
   if (!open?.labels.some((label) => label.name === 'internal'))
     r.api('POST', `repos/{owner}/{repo}/issues/${number}/labels`, ['labels[]=internal']);
-  dispatch(out, r, head);
   return 0;
 };
 
-type CheckRun = { __typename?: string; name?: string; status?: string; conclusion?: string | null; isRequired?: boolean };
-type Proof = {
-  data?: {
-    repository?: {
-      pullRequest?: {
-        headRefOid: string;
-        mergeStateStatus: string;
-        commits: { nodes: { commit: { oid: string; statusCheckRollup: { contexts: { nodes: CheckRun[] } } | null } }[] };
-      };
-    };
-  };
-};
-
-const PROOF_QUERY = `query($owner: String!, $name: String!, $number: Int!) {
-  repository(owner: $owner, name: $name) {
-    pullRequest(number: $number) {
-      headRefOid
-      mergeStateStatus
-      commits(last: 1) { nodes { commit { oid statusCheckRollup { contexts(first: 100) { nodes {
-        __typename
-        ... on CheckRun { name status conclusion isRequired(pullRequestNumber: $number) }
-      } } } } } }
-    }
-  }
-}`;
-
-const boundOf = (env: Env, key: string, shipped: number): number => {
-  const given = Number(env[key]);
-  return env[key] !== undefined && Number.isFinite(given) && given > 0 ? given : shipped;
-};
-
-/** The release pull request's head as GraphQL reads it: its completed `ci` and `release-label` check runs, and its merge state. */
-const headOf = (r: Reach, number: number) => {
-  const answer = JSON.parse(
-    r.gh(['api', 'graphql', '-f', `query=${PROOF_QUERY}`, '-F', 'owner={owner}', '-F', 'name={repo}', '-F', `number=${number}`]),
-  ) as Proof;
-  const pull = answer.data?.repository?.pullRequest;
-  const commit = pull?.commits.nodes[0]?.commit;
-  const runs = commit?.statusCheckRollup?.contexts.nodes ?? [];
-  const done = (name: string) => runs.filter((run) => run.name === name && run.status === 'COMPLETED');
-  return { oid: commit?.oid ?? '', merge: pull?.mergeStateStatus ?? 'UNKNOWN', ci: done('ci'), label: done('release-label') };
-};
-
-/** Judges a completed `ci`: 0 where one is green and required, else the refusal naming the merge box's button. */
-const judged = (out: Out, number: number, head: ReturnType<typeof headOf>): number => {
-  const green = head.ci.find((run) => run.conclusion === 'SUCCESS');
-  const required = (green ?? head.ci[0]).isRequired === true;
-  out(
-    `proof: #${number} at ${head.oid}: ci ${green ? 'SUCCESS' : head.ci[0].conclusion}, ${required ? 'required' : 'not required'}; ` +
-      `release-label ${head.label[0]?.conclusion ?? 'not yet'}; mergeStateStatus ${head.merge}`,
-  );
-  if (green && required) return 0;
-  throw new Refusal(
-    `proof: the dispatched ci on #${number}'s head is ${green ? "green but not counted by main's protection" : 'not green'}. ` +
-      `Open the pull request and press "${APPROVE_BUTTON}" in its merge box, which runs the waiting pull_request ci that counts`,
-  );
-};
-
-/** `proof`: the dispatched `ci` is green and required on the release pull request's head, asked until both checks complete or the bound. */
-const proof = async (env: Env, out: Out, r: Reach): Promise<number> => {
-  const bound = boundOf(env, PROOF_BOUND_ENV, PROOF_BOUND_MS);
-  const interval = boundOf(env, PROOF_INTERVAL_ENV, PROOF_INTERVAL_MS);
-  const deadline = performance.now() + bound;
-  for (;;) {
-    const open = openPull(r, BRANCH);
-    if (!open) {
-      out('proof: no release pull request is open: nothing to prove');
-      return 0;
-    }
-    const head = headOf(r, open.number);
-    const late = performance.now() >= deadline;
-    if (head.ci.length && (head.label.length || late)) return judged(out, open.number, head);
-    if (late)
-      throw new Refusal(
-        `proof: no completed ci check run on #${open.number}'s head ${head.oid} within ${Math.round(bound / 60_000)} minutes: ` +
-          `run gh workflow run ci.yml --ref ${BRANCH}, or press "${APPROVE_BUTTON}" in the pull request's merge box`,
-      );
-    await new Promise((resolve) => setTimeout(resolve, interval));
-  }
-};
-
-const USAGE = 'usage: node tools/release/release.ts check | labels | tag | pr | proof';
+const USAGE = 'usage: node tools/release/release.ts check | labels | tag | pr';
 
 /** Runs a verb in the repository at the working directory: its exit code. */
 export const main = async (argv: string[], env: Env = process.env, out: Out = console.log): Promise<number> => {
@@ -497,8 +398,6 @@ export const main = async (argv: string[], env: Env = process.env, out: Out = co
         return tag(out, r);
       case 'pr':
         return pr(env, out, r, r.git('rev-parse', '--show-toplevel'));
-      case 'proof':
-        return await proof(env, out, r);
       default:
         out(USAGE);
         return 2;

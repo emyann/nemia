@@ -28,12 +28,26 @@ import {
   entriesIn,
   readResolutions,
   readStatus,
+  choicesFor,
   resolutionsFile,
   treeDir,
   writeResolutions,
   type Entry,
 } from '../applied/applied.store.ts';
-import { compareVersions, compose, mergeTrees, planLines, resolveLine, type Choice, type PlanNext, type TreeMerge } from './index.ts';
+import {
+  compareVersions,
+  compose,
+  mergeBaseOf,
+  mergeTrees,
+  planLines,
+  resolveLine,
+  switchTrees,
+  type Choice,
+  type PlanNext,
+  type Switched,
+  type TreeMerge,
+} from './index.ts';
+import type { Status } from '../applied/applied.store.ts';
 import { adoptPreview, shellArg, type AdoptPreview } from '../adopt/adopt.verb.ts';
 import { planDigest } from '../adopt/adopt.store.ts';
 import { adoptLines } from '../adopt/adopt.ts';
@@ -42,10 +56,25 @@ import { adoptLines } from '../adopt/adopt.ts';
 type Templated = Factory & { template: FactoryTemplate };
 
 /**
- * What an upgrade to `to` is asked of: the factory, the version its base holds where a status names it, the template's source, and its
- * render at `to`.
+ * What an upgrade to `to` is asked of: the factory, the version its base holds where a status names it, the template's source, its
+ * render at `to`, and, where the render is of another template than the one the base holds, both by name (a switch, merged with no
+ * common base).
  */
-type Asked = { factory: Templated; from: string | undefined; to: string; source: string; render: RenderedAt; base: Entry[] };
+type Asked = {
+  factory: Templated;
+  from: string | undefined;
+  to: string;
+  source: string;
+  render: RenderedAt;
+  base: Entry[];
+  switched?: Switched;
+};
+
+/** The switch an upgrade onto `render` is, from the base the status `status` names, both templates by name; none where it is no switch. */
+const switchOf = (status: Status | undefined, render: RenderedAt): Switched | undefined =>
+  status?.template !== undefined && mergeBaseOf(status.template, render.name) === 'none'
+    ? { from: status.template, to: render.name }
+    : undefined;
 
 /** The version a base holds where no status names it, as the plan and the upgrade print it. */
 const UNKNOWN = 'a version no status names';
@@ -65,10 +94,14 @@ const setsGiven = (args: Args): string[] => (Array.isArray(args.sets) ? args.set
 const VERSION = /^\d+\.\d+\.\d+$/;
 
 /**
- * The templated factory `name`, rendered once: its base, and the version it holds where its status names it. Refused: the factory, one
- * made from no template, one not rendered.
+ * The templated factory `name`, rendered once: its base, the version it holds where its status names it, and the status. Refused: the
+ * factory, one made from no template, one not rendered.
  */
-function rendered(name: string, verb: string, notDone: string): { factory: Templated; from: string | undefined; base: Entry[] } {
+function rendered(
+  name: string,
+  verb: string,
+  notDone: string,
+): { factory: Templated; from: string | undefined; base: Entry[]; status: Status | undefined } {
   const factory = readFactory(name, notDone);
   if (factory.template === undefined)
     throw new Invalid({
@@ -79,7 +112,8 @@ function rendered(name: string, verb: string, notDone: string): { factory: Templ
     throw new Conflict({
       message: `${verb}: ${name} is not rendered yet, so there is no base to merge with: start the daemon, nemia up, and try again once nemia factory ls shows it applied. ${notDone}`,
     });
-  return { factory: factory as Templated, from: readStatus(name)?.version ?? undefined, base };
+  const status = readStatus(name);
+  return { factory: factory as Templated, from: status?.version ?? undefined, base, status };
 }
 
 /**
@@ -117,12 +151,14 @@ const renderTo = Effect.fn('renderTo')(function* (
  * from no template (`Invalid`) and one not rendered (`Conflict`); a `--to` that is no `x.y.z` (`Invalid`); a `--template` naming no
  * builtin template (`Missing`, `templatePlace`); a template at another version
  * than `--to` (`Conflict`, naming `--template`); a template that does not render with the factory's parameters overlaid by each
- * `--set` (`Invalid`, a `--set` of a key it declares none of among them); the version its base holds asked again, the same content or
- * another (`Conflict`); and a downgrade without `--downgrade` where `downgrades` (`Conflict`). Where no status
- * names the version its base holds, any `--to` is taken: the controller checks it against the base.
+ * `--set` (`Invalid`, a `--set` of a key it declares none of among them); a `--template` while the status names a version but not yet
+ * the template the base holds, no upgrade waiting (`Conflict`, naming `nemia up`, whose next pass names it); the version its base holds
+ * asked again, the same content or another (`Conflict`); and a downgrade without `--downgrade` where `downgrades` (`Conflict`). A switch
+ * onto a template of another name is judged by no version: its numbers are another template's. Where no status names the version its
+ * base holds, any `--to` is taken: the controller checks it against the base.
  */
 const upgradeAsked = Effect.fn('upgradeAsked')(function* (args: Args, verb: string, notDone: string, downgrades = true) {
-  const { factory, from, base } = yield* tried(() => rendered(textOf(args, 'factory') ?? '', verb, notDone));
+  const { factory, from, base, status } = yield* tried(() => rendered(textOf(args, 'factory') ?? '', verb, notDone));
   const to = textOf(args, 'to');
   if (to === undefined || !VERSION.test(to))
     return yield* Effect.fail(
@@ -134,12 +170,20 @@ const upgradeAsked = Effect.fn('upgradeAsked')(function* (args: Args, verb: stri
   const source = given === undefined ? factory.template.source : sourceGiven(given);
   if (given !== undefined) yield* templatePlace(source);
   const render = yield* renderTo(verb, factory, source, to, notDone, setsGiven(args));
-  return yield* tried(() => upgradeChecked({ factory, from, to, source, render, base }, verb, notDone, downgrades, args));
+  if (given !== undefined && typeof status?.version === 'string' && status.template === undefined && status.upgrade === undefined)
+    return yield* Effect.fail(
+      new Conflict({
+        message: `${verb}: ${factory.name}'s status does not name the template its base was rendered from yet, so whether ${given} is another template, to merge with no common base, cannot be told: start the daemon, nemia up, whose next pass names it, then ${verb} again. ${notDone}`,
+      }),
+    );
+  const switched = switchOf(status, render);
+  return yield* tried(() => upgradeChecked({ factory, from, to, source, render, base, switched }, verb, notDone, downgrades, args));
 });
 
 /** The upgrade `asked`, refused where it asks the version its base holds again, or a downgrade not asked for (`upgradeAsked`). */
 function upgradeChecked(asked: Asked, verb: string, notDone: string, downgrades: boolean, args: Args): Asked {
   const { factory, from, to, render, base } = asked;
+  if (asked.switched !== undefined) return asked;
   if (to === from)
     throw new Conflict({
       message:
@@ -157,11 +201,11 @@ function upgradeChecked(asked: Asked, verb: string, notDone: string, downgrades:
 /**
  * What files the upgrade `asked` as `args` give it: the line, the plan's digest, and the parameters it drops. The line carries
  * `--template` where one was given, each `--set`, `--plan` where the upgrade changes the factory's parameters — a `--set` given or a
- * parameter dropped (`planRequired`) — and `--downgrade` where it is one.
+ * parameter dropped — or is a switch (`planRequired`), and `--downgrade` where it is one of the same template.
  */
 function nextOf(home: string, asked: Asked, args: Args): PlanNext {
   const { factory, from, to, source, render } = asked;
-  const digest = planDigest(home, factory.name, render, source);
+  const digest = planDigest(home, factory.name, render, source, asked.switched?.from);
   const words = [
     factory.name,
     '--to',
@@ -169,13 +213,17 @@ function nextOf(home: string, asked: Asked, args: Args): PlanNext {
     ...(textOf(args, 'template') === undefined ? [] : ['--template', source]),
     ...setsGiven(args).flatMap((set) => ['--set', set]),
     ...(planRequired(asked, args) ? ['--plan', digest] : []),
-    ...(from !== undefined && compareVersions(to, from) < 0 ? ['--downgrade'] : []),
+    ...(asked.switched === undefined && from !== undefined && compareVersions(to, from) < 0 ? ['--downgrade'] : []),
   ];
   return { line: `nemia factory upgrade ${words.map(shellArg).join(' ')}`, digest, dropped: render.dropped };
 }
 
-/** Whether the upgrade `asked` as `args` give it changes the factory's parameters, so is held to its preview's `--plan`. */
-const planRequired = (asked: Asked, args: Args): boolean => setsGiven(args).length > 0 || asked.render.dropped.length > 0;
+/**
+ * Whether the upgrade `asked` as `args` give it changes the factory's parameters, or is a switch, whose every line asks a choice, so is
+ * held to its preview's `--plan`.
+ */
+const planRequired = (asked: Asked, args: Args): boolean =>
+  asked.switched !== undefined || setsGiven(args).length > 0 || asked.render.dropped.length > 0;
 
 /** The line that previews the upgrade `asked` as `args` give it. */
 const previewLine = (asked: Asked, args: Args): string =>
@@ -199,19 +247,21 @@ function planHeld(home: string, asked: Asked, args: Args, verb: string, notDone:
   if (plan === undefined) {
     if (!planRequired(asked, args)) return asked;
     throw new Invalid({
-      message: `${verb}: this upgrade rewrites ${asked.factory.name}'s parameters, so it files only a plan a person previewed: ${preview} prints it and the line to type, which carries --plan <digest>. ${notDone}`,
+      message: `${verb}: this upgrade ${asked.switched === undefined ? `rewrites ${asked.factory.name}'s parameters` : `switches ${asked.factory.name} from ${asked.switched.from} onto ${asked.switched.to}, another template, with no common base`}, so it files only a plan a person previewed: ${preview} prints it and the line to type, which carries --plan <digest>. ${notDone}`,
     });
   }
-  if (plan !== planDigest(home, asked.factory.name, asked.render, asked.source))
+  if (plan !== planDigest(home, asked.factory.name, asked.render, asked.source, asked.switched?.from))
     throw new Conflict({
       message: `${verb}: --plan ${plan} is not the plan of ${asked.factory.name}'s upgrade now — the factory's file, the template, its version, the parameters or the render changed since it was previewed: preview it again, ${preview}. ${notDone}`,
     });
   return asked;
 }
 
-/** The merge of the factory's tree with its base and `render`, three ways. */
-const mergeOf = (name: string, base: readonly Entry[], render: RenderedAt): TreeMerge =>
-  mergeTrees(base, entriesIn(treeDir(name)), render.entries);
+/** The merge of the factory's tree with its base and `render`, three ways; or, for a switch, with `render` alone, with no common base. */
+const mergeOf = (name: string, base: readonly Entry[], render: RenderedAt, switched: Switched | undefined): TreeMerge =>
+  switched === undefined
+    ? mergeTrees(base, entriesIn(treeDir(name)), render.entries)
+    : switchTrees(entriesIn(treeDir(name)), render.entries);
 
 /** The flags plan and upgrade take: `--to`, and `--template` where the template is at another place than the one the factory names. */
 const TO: Flag = {
@@ -253,7 +303,15 @@ const PLAN_SPEC: Spec = {
 };
 
 /** What `nemia factory diff` previews of a templated factory: the factory, the versions, the merge, and what files it. */
-type Planned = { kind: 'upgrade'; name: string; from: string | undefined; to: string; merge: TreeMerge; next: PlanNext };
+type Planned = {
+  kind: 'upgrade';
+  name: string;
+  from: string | undefined;
+  to: string;
+  merge: TreeMerge;
+  next: PlanNext;
+  switched?: Switched;
+};
 
 /**
  * `nemia factory diff`: on a templated factory, the merge an upgrade would make, what merges cleanly and each conflict, the parameters
@@ -266,7 +324,8 @@ export const FACTORY_PLAN: Command<Planned | AdoptPreview> = {
     '<name> --to <x.y.z> [--template <name|folder|archive>] [--set <key>=<value> ...] | <name> --template <name|folder|archive> [--set <key>=<value> ...]',
   help: [
     "preview a templated factory's upgrade: what merges cleanly, and each",
-    "conflict with its sides; or a hand-made factory's takeover by a",
+    'conflict with its sides; onto a template of another name, a switch',
+    "with no common base; or a hand-made factory's takeover by a",
     'template, and the plan nemia factory adopt takes; nothing is written',
   ],
   spec: PLAN_SPEC,
@@ -286,16 +345,16 @@ export const FACTORY_PLAN: Command<Planned | AdoptPreview> = {
         if (now.template === undefined) return yield* adoptPreview(args);
         const home = yield* StoreRoot;
         const asked = yield* upgradeAsked(args, verb, notDone, false);
-        const { factory, from, to, render, base } = asked;
-        const merge = yield* tried(() => mergeOf(factory.name, base, render));
+        const { factory, from, to, render, base, switched } = asked;
+        const merge = yield* tried(() => mergeOf(factory.name, base, render, switched));
         const next = yield* tried(() => nextOf(home, asked, args));
-        return { kind: 'upgrade', name: factory.name, from, to, merge, next } satisfies Planned;
+        return { kind: 'upgrade', name: factory.name, from, to, merge, next, ...(switched ? { switched } : {}) } satisfies Planned;
       }),
     ),
   print: (planned) =>
     planned.kind === 'adopt'
       ? adoptLines(planned.plan, planned.digest, planned.line)
-      : planLines(planned.name, planned.from ?? UNKNOWN, planned.to, planned.merge, planned.next),
+      : planLines(planned.name, planned.from ?? UNKNOWN, planned.to, planned.merge, planned.next, planned.switched),
 };
 
 /** `nemia factory upgrade`'s spec: the factory, `--to`, `--template`, a `--set` per parameter, `--plan` and `--downgrade`. */
@@ -359,8 +418,8 @@ export const FACTORY_UPGRADE: Command<Upgraded> = {
         const notDone = 'Nothing was upgraded.';
         const home = yield* StoreRoot;
         const asked = yield* upgradeAsked(args, verb, notDone);
-        const { factory, from, to, source, render, base } = yield* tried(() => planHeld(home, asked, args, verb, notDone));
-        const conflicts = yield* tried(() => mergeOf(factory.name, base, render).conflicts.length);
+        const { factory, from, to, source, render, base, switched } = yield* tried(() => planHeld(home, asked, args, verb, notDone));
+        const conflicts = yield* tried(() => mergeOf(factory.name, base, render, switched).conflicts.length);
         const door = yield* FactoryDoor;
         const now = yield* door.factories.read(FactoryName.read(factory.name));
         const template = now.template ?? factory.template;
@@ -418,15 +477,15 @@ function choiceOf(args: Args): Choice {
 type Resolved = { name: string; at: string; to: string; file: string; left: string[] };
 
 /**
- * The choice `args` give, written for one conflict of the upgrade under way. Refused, nothing written: the factory as an upgrade is
- * (`rendered`); a base whose version no status names, no upgrade under way, or a template that no longer renders at the version wanted
- * (`Conflict`); an address that is no conflict of the merge (`Missing`, naming those there are); and a `--file` that is not there
- * (`Invalid`).
+ * The choice `args` give, written for one conflict of the upgrade under way — another version wanted, or a template of another name
+ * than the base's (a switch) — for that version and that template. Refused, nothing written: the factory as an upgrade is (`rendered`);
+ * a base whose version no status names, a template that no longer renders at the version wanted, or no upgrade under way (`Conflict`);
+ * an address that is no conflict of the merge (`Missing`, naming those there are); and a `--file` that is not there (`Invalid`).
  */
 const resolved = Effect.fn('resolved')(function* (args: Args) {
   const verb = 'nemia factory resolve';
   const notDone = 'Nothing was resolved.';
-  const { factory, from, base } = yield* tried(() => rendered(textOf(args, 'factory') ?? '', verb, notDone));
+  const { factory, from, base, status } = yield* tried(() => rendered(textOf(args, 'factory') ?? '', verb, notDone));
   const to = factory.template.version;
   if (from === undefined)
     return yield* Effect.fail(
@@ -434,18 +493,22 @@ const resolved = Effect.fn('resolved')(function* (args: Args) {
         message: `${verb}: no status names the version ${factory.name}'s base was applied at, so no upgrade of it can be merged: name it, nemia factory upgrade ${factory.name} --to <it> [--template <name|folder|archive>], and upgrade again once nemia factory ls shows it applied. ${notDone}`,
       }),
     );
-  if (to === from)
+  const render = yield* renderTo(verb, factory, factory.template.source, to, notDone);
+  const switched = switchOf(status, render);
+  if (to === from && switched === undefined)
     return yield* Effect.fail(
       new Conflict({
         message: `${verb}: no upgrade of ${factory.name} is under way, so it has no conflict to resolve: nemia factory diff ${factory.name} --to <x.y.z>, then nemia factory upgrade. ${notDone}`,
       }),
     );
-  const render = yield* renderTo(verb, factory, factory.template.source, to, notDone);
-  return yield* tried(() => resolvedWith(args, factory, to, mergeOf(factory.name, base, render)));
+  return yield* tried(() => resolvedWith(args, factory, to, render.name, mergeOf(factory.name, base, render, switched)));
 });
 
-/** The choice `args` give for one conflict of `merge`, the upgrade of `factory` to `to`, written (`resolved`). */
-function resolvedWith(args: Args, factory: Templated, to: string, merge: TreeMerge): Resolved {
+/**
+ * The choice `args` give for one conflict of `merge`, the upgrade of `factory` to `to` of the template named `name`, written
+ * (`resolved`), beside the choices already made for that version and that template.
+ */
+function resolvedWith(args: Args, factory: Templated, to: string, name: string, merge: TreeMerge): Resolved {
   const verb = 'nemia factory resolve';
   const notDone = 'Nothing was resolved.';
   const at = textOf(args, 'conflict') ?? '';
@@ -455,8 +518,8 @@ function resolvedWith(args: Args, factory: Templated, to: string, merge: TreeMer
     });
   const choice = choiceOf(args);
   const kept = readResolutions(factory.name);
-  const choices = { ...(kept?.to === to ? kept.choices : {}), [at]: choice };
-  writeResolutions(factory.name, { ...kept, to, choices });
+  const choices = { ...choicesFor(kept, to, name), [at]: choice };
+  writeResolutions(factory.name, { ...kept, to, template: name, choices });
   const left = compose(merge, choices);
   return { name: factory.name, at, to, file: resolutionsFile(factory.name), left: 'pending' in left ? left.pending.map((c) => c.at) : [] };
 }
@@ -466,8 +529,9 @@ export const FACTORY_RESOLVE: Command<Resolved> = {
   name: 'factory resolve',
   usage: '<name> <conflict> --ours|--theirs|--file <path>',
   help: [
-    "choose for one conflict of a templated factory's upgrade: your tree, the",
-    'template, or the text of a file; the daemon merges once each has one',
+    "choose for one conflict of a templated factory's upgrade or switch: your",
+    'tree, the template (none: drop the file), or the text of a file; the',
+    'daemon merges once each has one',
   ],
   spec: RESOLVE_SPEC,
   check: (args) =>

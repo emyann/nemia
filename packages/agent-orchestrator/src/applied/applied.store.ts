@@ -146,13 +146,15 @@ const UpgradeSchema = Schema.Struct({
 });
 
 /**
- * What the controller observed of a templated factory: the template's version its base holds, the base's digest, the parameters it was
- * rendered with, its conditions, `Applied` and `ConflictsPending`, and the upgrade waiting on the person's choices, where one does; a key a
- * later `nemia` writes is kept.
+ * What the controller observed of a templated factory: the template's version its base holds, and its name where the controller has
+ * named it (a status written before names were recorded has none, until a pass names it); the base's digest, the parameters it was
+ * rendered with, its conditions, `Applied` and `ConflictsPending`, and the upgrade waiting on the person's choices, where one does; a
+ * key a later `nemia` writes is kept.
  */
 const StatusSchema = Schema.StructWithRest(
   Schema.Struct({
     version: Schema.NullOr(Schema.String),
+    template: Schema.optionalKey(Schema.String),
     digest: Schema.NullOr(Schema.String),
     params: Schema.Record(Schema.String, Schema.Union([Schema.String, Schema.Number, Schema.Boolean])),
     conditions: Schema.Array(ConditionSchema),
@@ -294,10 +296,14 @@ export const swapTree = (name: string, entries: readonly Entry[], read: string):
 /** The base of the factory `name` replaced by `entries`, read-only: the template as now applied. */
 export const replaceBase = (name: string, entries: readonly Entry[]): void => void swapFolder(appliedDir(name), entries, true);
 
-/** The person's choices for an upgrade's conflicts: the version they are for, and a choice by address. */
+/**
+ * The person's choices for an upgrade's conflicts: the version they are for, the name of the template they were made for (none where
+ * written before names were recorded), and a choice by address.
+ */
 const ResolutionsSchema = Schema.StructWithRest(
   Schema.Struct({
     to: Schema.String,
+    template: Schema.optionalKey(Schema.String),
     choices: Schema.Record(Schema.String, Schema.Union([Schema.Literals(['ours', 'theirs']), Schema.Struct({ text: Schema.String })])),
   }),
   [Schema.Record(Schema.String, Schema.Unknown)],
@@ -318,6 +324,15 @@ export function readResolutions(name: string): Resolutions | undefined {
     return undefined;
   }
 }
+
+/**
+ * The choices of `resolutions` that apply to an upgrade to `to` of the template named `name`: those made for that version, of that
+ * template or of one no name was recorded for; none else, so a choice made for one template is never applied to another's merge.
+ */
+export const choicesFor = (resolutions: Resolutions | undefined, to: string, name: string): Resolutions['choices'] =>
+  resolutions !== undefined && resolutions.to === to && (resolutions.template === undefined || resolutions.template === name)
+    ? resolutions.choices
+    : {};
 
 /** The person's choices for the factory `name`'s upgrade written whole. */
 export const writeResolutions = (name: string, resolutions: Resolutions): void =>

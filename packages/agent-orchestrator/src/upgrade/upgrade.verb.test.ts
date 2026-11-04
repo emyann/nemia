@@ -392,6 +392,7 @@ test('choices made for another version are not merged, and the next resolve drop
   await main(['factory', 'resolve', 'stale', `${README}:1-1`, '--theirs'], noEngine());
   assert.deepEqual(JSON.parse(fs.readFileSync(resolutionsFile('stale'), 'utf8')), {
     to: '0.3.0',
+    template: 'team',
     choices: { [`${README}:1-1`]: 'theirs' },
   });
   assert.deepEqual(

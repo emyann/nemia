@@ -108,6 +108,26 @@ that should stay on GitHub is given `github: true` as it upgrades: preview it wi
 `nemia factory diff <name> --to 2.0.0 --set github=true`, which names each parameter the factory holds that 2.0.0 does not declare (`dropped:`), then type the upgrade line it
 prints last, which carries the same `--set` and the plan's `--plan`. A new factory is given it at apply, `--set github=true`.
 
+## Moving onto it from another template
+
+A factory applied from a template of another name, such as one you made by hand, can move onto sdlc by an upgrade. It is a template
+switch: the two templates share no base, so nothing tells your own changes from the old template's text. Preview it with
+`nemia factory diff <name> --to <version> --template sdlc`. Its first line names both templates, and its `switch:` line says there is
+no common base.
+
+- A file both hold, the same, is clean.
+- A file only sdlc holds is added, from the template.
+- A file only your factory holds is a conflict whose template side is none.
+- A file both hold, different, is a conflict on each run of lines that differs, even a run only sdlc holds, so you see every line it
+  would insert. The factory's file and a step's frontmatter are asked key by key.
+
+Answer each conflict with `nemia factory resolve`. To keep your factory's own prose, take `--ours` on its rules and step files. To drop
+an old file of the template you left, take `--theirs`. Then type the upgrade line the diff printed last: a switch is always filed with
+its `--plan`.
+
+Once merged, the factory's base is sdlc. A later upgrade of sdlc merges three ways, and carries the prose you kept as your tree's
+edits.
+
 ## Fit it to your repository
 
 Once the daemon has rendered the factory, its tree is yours to change. Four changes a repository often needs are already possible:
@@ -131,7 +151,8 @@ Once the daemon has rendered the factory, its tree is yours to change. Four chan
 ## Sources
 
 This page is written from `packages/templates/CLAUDE.md`, `packages/templates/sdlc/nemia.yaml` and
-`packages/agent-orchestrator/src/templates/templates.store.ts` (`templatePlace` and `BUILTIN_TEMPLATES`). _Fit it to your repository_
+`packages/agent-orchestrator/src/templates/templates.store.ts` (`templatePlace` and `BUILTIN_TEMPLATES`). _Moving onto it from another template_ is written from
+`packages/agent-orchestrator/src/upgrade/merge.ts`. _Fit it to your repository_
 is written from `packages/agent-orchestrator/src/factory/factory.verb.ts`, `packages/agent-orchestrator/src/step/step.ts`,
 `packages/agent-orchestrator/src/agents/agents.ts`, `packages/templates/sdlc/workflows/build/landing.ts`,
 `packages/templates/sdlc/workflows/build/land.md` and `packages/agent-orchestrator/place/git/SKILL.md`.

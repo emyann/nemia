@@ -39,9 +39,12 @@ test("a takeover's plan, row by row", async (t) => {
     ]);
   });
 
-  await t.test('what stays: the repositories, the schedules and whether it keeps an instruction', () => {
+  await t.test('what stays: the repositories, the schedules, whether it keeps an instruction, and its volumes', () => {
     const plan = adoptPlan({ ...made, instruction: { store: true } }, adoption(), [], null);
-    assert.deepEqual(plan.kept, { repos: ['/r'], schedules: ['a'], instruction: true });
+    assert.deepEqual(plan.kept, { repos: ['/r'], schedules: ['a'], instruction: true, volumes: [] });
+    const mounting = adoptPlan({ ...made, volumes: [{ path: '/notes', readOnly: true }] }, adoption(), [], null);
+    assert.deepEqual(mounting.kept.volumes, ['/notes:ro']);
+    assert.ok(adoptLines(mounting, 'sha256:d', 'adopt').some((l) => l.includes('its volumes (/notes:ro)')));
   });
 
   await t.test('the revisions policy before and after: pinned by default, follow where the wiring says it', () => {

@@ -26,6 +26,7 @@ import { CARD, filedOf, handedBy, INBOX, INPUT_FILE, INPUTS, mountHolds, readsAt
 import { factoryMounts, stepMounts } from '../src/factory/factory.ts';
 import { mountsLine } from '../src/start/index.ts';
 import { inputsMounts, readsMounts } from '../src/filed/filed.ts';
+import { volumeMounts } from '../src/filed/volumes.ts';
 import { handedMounts } from '../src/artifacts/artifacts.ts';
 import { writesOutsideByRule } from '../src/workflow/index.ts';
 import { parseWorkflow, agentsDir } from '../src/workflow.ts';
@@ -395,6 +396,20 @@ test("REFUSED at nemia start: a factory's folder a step cannot be filed, each In
     },
   );
 
+  await t.test(
+    'a writable volume on a harness that holds only read-only mounts, naming the volume\'s fixes; marked read-only, the same step starts',
+    async () => {
+      const { repos, team } = fresh();
+      const dir = coded(team, 'trio', 'sandbox: workspace-write\n');
+      const volume = scratch('wf-mounts-volume-');
+      await typed(['factory', 'volume', 'add', 'trio', `${volume}:rw`]);
+      await refused({ ...at(dir, repos[0], 'trio') }, volume, 'nemia factory volume add trio <path>:ro', 'nemia factory volume rm trio');
+      await typed(['factory', 'volume', 'add', 'trio', `${volume}:ro`]);
+      const run = await stage.runPlaced(startRun(at(dir, repos[0], 'trio')));
+      assert.deepEqual(readRun(run.id).volumes, readOnly(volume));
+    },
+  );
+
   await t.test('a factory folder whose path a permission rule cannot name, naming the step first, the factory and its fixes', async () => {
     const { plain } = fresh();
     const [own, spaced] = [aRepo(), aRepo('First (Last)-')];
@@ -750,4 +765,40 @@ test('`writable:`: the folders a step may write, read, refused, and mounted', as
         return true;
       });
     });
+});
+
+test("volumeMounts: a factory's volumes as a step is filed them, a writable one writable only where the step's fence writes", async (t) => {
+  const [ro, rw] = ['/vol/ro', '/vol/rw'];
+  const volumes = [
+    { path: ro, readOnly: true },
+    { path: rw, readOnly: false },
+  ];
+  const rows: { row: string; step: Parameters<typeof volumeMounts>[0]; want: Mount[] }[] = [
+    { row: 'a step that writes: :ro read-only, :rw writable', step: { permissionMode: 'acceptEdits' }, want: volumes },
+    {
+      row: 'a step that asks before an edit and allows none writes nothing: :rw held read-only',
+      step: { permissionMode: 'dontAsk' },
+      want: readOnly(ro, rw),
+    },
+    { row: 'a step that writes nothing by its mode: :rw held read-only', step: { permissionMode: 'plan' }, want: readOnly(ro, rw) },
+    {
+      row: 'the same mode allowed an edit writes: :rw writable',
+      step: { permissionMode: 'dontAsk', allowedTools: ['Edit(**)'] },
+      want: volumes,
+    },
+    { row: 'a remote agent is filed none', step: { harness: 'a2a:far' }, want: [] },
+  ];
+  for (const { row, step, want } of rows) await t.test(row, () => assert.deepEqual(volumeMounts(step, volumes), want));
+  await t.test('a run that mounts none files none', () => assert.deepEqual(volumeMounts({}, undefined), []));
+  await t.test('the brief names each volume as it is filed, a writable one as no workspace of the step', () => {
+    const line = (step: Parameters<typeof mountsLine>[0], at: string) =>
+      mountsLine(step, { volumes }).find((l) => l.includes(`\`${at}\``)) ?? '';
+    assert.match(line({ permissionMode: 'acceptEdits' }, rw), /you may write.*not your workspace/);
+    assert.match(line({ permissionMode: 'acceptEdits' }, ro), /must not write/);
+    assert.match(line({ permissionMode: 'plan' }, rw), /must not write/);
+    assert.deepEqual(mountsLine({ harness: 'a2a:far' }, { volumes }), []);
+  });
+  await t.test("`writable:` widens no volume: it names the factory's repositories, and a volume is not among the run's mounts", () =>
+    assert.deepEqual(stepMounts({ writable: ['rw'] }, readOnly('/srv/a')), readOnly('/srv/a')),
+  );
 });

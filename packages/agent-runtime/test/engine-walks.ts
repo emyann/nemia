@@ -293,6 +293,26 @@ const DRAIN: readonly Walk[] = [
   },
 ];
 
+/** What `drainJobs` refuses, each handed as an untyped caller may: none of it a grace a drain is put with. */
+const NO_GRACE: readonly unknown[] = [5, 'soon', { graceMs: -1 }, { graceMs: 1.5 }, { graceMs: 1, more: true }, {}, undefined];
+
+const DRAIN_JOBS: readonly Walk[] = [
+  {
+    name: 'the jobs’ drain is put with a grace, put again, and lifted with null',
+    walk: async ({ engine }) => [
+      await asked(engine.drainJobs({ graceMs: 30_000 })),
+      await asked(engine.drainJobs({ graceMs: 0 })),
+      await asked(engine.drainJobs(null)),
+    ],
+    says: [null, null, null],
+  },
+  {
+    name: 'a jobs’ drain refused for anything but a grace of whole milliseconds from 0, with no other key, or null',
+    walk: async ({ engine }) => Promise.all(NO_GRACE.map((given) => asked(engine.drainJobs(given as { graceMs: number } | null)))),
+    says: NO_GRACE.map(() => ({ refused: 'DrainRefused' })),
+  },
+];
+
 const OUTPUT: readonly Walk[] = [
   {
     name: 'a stream of a task nothing was filed under is refused',
@@ -768,6 +788,7 @@ export const WALKS = {
   kept: KEPT,
   hold: HOLD,
   drain: DRAIN,
+  drainJobs: DRAIN_JOBS,
   mcpState: MCP_STATE,
   mcpSignIn: MCP_SIGN_IN,
   mcpSignInState: MCP_SIGN_IN_STATE,

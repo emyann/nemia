@@ -6,8 +6,8 @@
  * and a parked job's continuation is a restart inside its task, the same try for the layer above: it is handed what the parked
  * attempts it continues left of it, never the whole cap again.
  */
-import { configForTurn } from '../harness/args.ts';
-import { turnOf, type Attempt, type State } from './domain.ts';
+import { configForTurn, type HarnessArgs } from '../harness/args.ts';
+import { turnOf, type Attempt, type Parked, type Sighting, type State } from './domain.ts';
 
 /**
  * The cap attempt `attempt` of `state` is handed: its turn's `budgetUsd` less the `costUsd` of the parked attempts it continues —
@@ -35,4 +35,33 @@ const spentParked = (attempts: readonly Attempt[]): number => {
     spent += a.usage?.costUsd ?? 0;
   }
   return spent;
+};
+
+/**
+ * The configuration a spawn of attempt `n` of `state` is handed where it continues a parked attempt of its own turn: `config`, the
+ * turn's, with its `budgetUsd` what the parked attempts it continues left of it (`capLeft`); nothing where it continues none, or its
+ * turn gives no cap, so the spawn keeps the turn's own.
+ */
+export const continuedCap = (state: State, n: number, config: HarnessArgs | undefined): { config?: HarnessArgs } => {
+  const at = state.attempts.findIndex((a) => a.n === n);
+  const before = at > 0 ? state.attempts[at - 1] : undefined;
+  const continues = before?.parked !== undefined && (before.turn ?? 0) === (state.attempts[at]?.turn ?? 0);
+  const left = continues ? capLeft(state, n) : undefined;
+  return left === undefined ? {} : { config: { ...config, budgetUsd: left } };
+};
+
+/**
+ * What the end of attempt `n` of `state`, seen `seen`, says of a park: `parked` where its job ended itself under the jobs' drain
+ * (`Sighting.parked`), which `decide` continues; but a park that left nothing of its turn's cap — `capLeft` less the attempt's own
+ * cost, an unpriced one counted 0 — is no park, and says `limit: 'budget'` instead, so it settles failed and nothing continues it.
+ * Nothing for an end that was no park.
+ */
+export const parkedEnd = (
+  state: State,
+  n: number,
+  seen: Pick<Sighting, 'parked' | 'usage'> | undefined,
+): { parked?: Parked; limit?: 'budget' } => {
+  if (seen?.parked === undefined) return {};
+  const left = capLeft(state, n);
+  return left !== undefined && left - (seen.usage?.costUsd ?? 0) <= 0 ? { limit: 'budget' } : { parked: seen.parked };
 };

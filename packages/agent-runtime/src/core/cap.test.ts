@@ -1,9 +1,10 @@
 /**
- * `capLeft`: the spend cap a continuation of a parked job is handed, its turn's cap less what the parked attempts it continues spent.
+ * `capLeft`: the spend cap a continuation of a parked job is handed, its turn's cap less what the parked attempts it continues spent;
+ * and the two the engine writes by it: a continuation's spawn config (`continuedCap`) and a parked end (`parkedEnd`).
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { capLeft } from './cap.ts';
+import { capLeft, continuedCap, parkedEnd } from './cap.ts';
 import { fold, type Event, type Usage } from './domain.ts';
 import type { HarnessArgs } from '../harness/args.ts';
 
@@ -79,4 +80,48 @@ test("capLeft: a continuation's cap is its turn's, less what the parked attempts
     assert.equal(capLeft(state, 3), 1, "turn 1's $3 less attempt 2's $2, attempt 1 being turn 0's");
     assert.equal(capLeft(state, 2), 3, 'attempt 2 starts turn 1, continuing nothing of it');
   });
+});
+
+test('continuedCap and parkedEnd: a continuation is handed its cap left, and a park that spent it is no park', async (t) => {
+  const started = (n: number): Event[] => [{ kind: 'starting', at: at(n * 10), attempt: n }];
+  const rows: [string, () => unknown, unknown][] = [
+    [
+      'a continuation of a parked attempt: its config with the cap left',
+      () => continuedCap(fold(TASK, [cap5, ...ran(1, { parked: true, costUsd: 2 }), ...started(2)]), 2, { budgetUsd: 5, model: 'm' }),
+      { config: { budgetUsd: 3, model: 'm' } },
+    ],
+    [
+      'an attempt that continues no park keeps its own config',
+      () => continuedCap(fold(TASK, [cap5, ...ran(1, { costUsd: 2 }), ...started(2)]), 2, { budgetUsd: 5 }),
+      {},
+    ],
+    ['a first attempt keeps its own config', () => continuedCap(fold(TASK, [cap5, ...started(1)]), 1, { budgetUsd: 5 }), {}],
+    [
+      'a continuation with no cap keeps its own config',
+      () => continuedCap(fold(TASK, [filed(), ...ran(1, { parked: true, costUsd: 2 }), ...started(2)]), 2, undefined),
+      {},
+    ],
+    ['an end that was no park says nothing of one', () => parkedEnd(fold(TASK, [cap5, ...started(1)]), 1, { usage: { costUsd: 9 } }), {}],
+    [
+      'a park with cap left is a park',
+      () => parkedEnd(fold(TASK, [cap5, ...started(1)]), 1, { parked: { calling: { tool: 'Bash', since: at(5) } }, usage: { costUsd: 2 } }),
+      { parked: { calling: { tool: 'Bash', since: at(5) } } },
+    ],
+    [
+      'a park with no cap is a park',
+      () => parkedEnd(fold(TASK, [filed(), ...started(1)]), 1, { parked: {}, usage: { costUsd: 9 } }),
+      { parked: {} },
+    ],
+    [
+      'a park that spent the cap whole is `limit: budget`, and no park',
+      () => parkedEnd(fold(TASK, [cap5, ...started(1)]), 1, { parked: {}, usage: { costUsd: 5 } }),
+      { limit: 'budget' },
+    ],
+    [
+      'a continuation that spent what its parked attempts left is `limit: budget`',
+      () => parkedEnd(fold(TASK, [cap5, ...ran(1, { parked: true, costUsd: 3 }), ...started(2)]), 2, { parked: {}, usage: { costUsd: 2 } }),
+      { limit: 'budget' },
+    ],
+  ];
+  for (const [name, asked, says] of rows) await t.test(name, () => assert.deepEqual(asked(), says));
 });

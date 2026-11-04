@@ -20,7 +20,8 @@ words the agent can act on. It files, chains and restarts. It does not decide wh
 
 **The operator decides:**
 
-- when to restart the daemon, re-arm the watch, re-read a closeout;
+- when to tag and install a release (`nemia upgrade`, *After a landing*), at a gap, reporting `nemia version` in one line; when to
+  re-arm the watch, re-read a closeout;
 - how to word the person's answer so an agent can act on it;
 - what to verify before bringing a gate (trial merges, flaky tests) and what to park as a follow-up card;
 - how to chain and parallelise the runs the person asked for, paced by the harness quota (see *Filing and chaining*).
@@ -37,9 +38,9 @@ words the agent can act on. It files, chains and restarts. It does not decide wh
    you on every transition. Re-arm the watch every time it expires (it lasts 30 minutes):
 
    ```sh
-   cur=$(npx nemia watch --once | awk '/^cursor:/{print $2}' | tail -1)
+   cur=$(nemia watch --once | awk '/^cursor:/{print $2}' | tail -1)
    ( … the lease-liveness loop, printing only when it changes … ) &
-   npx nemia watch "$cur" 2>&1 | awk '/^[[:space:]]*$/ || /watching from/ || /is now nemia/ {next}
+   nemia watch "$cur" 2>&1 | awk '/^[[:space:]]*$/ || /watching from/ || /is now nemia/ {next}
      { rest=$0; sub(/^[^ ]+ +[^ ]+ +/, "", rest)
        if (rest ~ /awaiting approval|BLOCKED|input-required|failed|refused|over budget|succeeded|committed its merge|aborted|cancelled|stalled|error/) { print; fflush() } }'
    ```
@@ -49,8 +50,13 @@ words the agent can act on. It files, chains and restarts. It does not decide wh
 2. **React** to each event. A gate (`awaiting approval`), a round (`input-required · BLOCKED`), a failed check, a landing, or a daemon
    line that is not ok needs action.
 3. **After any gap** (an expired watch, a long answer to the person), list what moved before re-arming
-   (`npx nemia ls | grep -E 'awaiting approval|checking|input-required|running \('`): gates reached while nobody watched are the common miss.
+   (`nemia ls | grep -E 'awaiting approval|checking|input-required|running \('`): gates reached while nobody watched are the common miss.
    Never trust a remembered event; re-read the world.
+
+On a store that runs a release, `nemia` is the installed one, `$WF_ROOT/releases/current/node_modules/.bin/nemia`, first on the PATH.
+The checkout's `npx nemia` is refused there but for `version` and help (`trialRefusal`,
+`packages/agent-orchestrator/src/release/release.ts`); `NEMIA_ON_INSTALLED=1` acts from the checkout knowingly, which the loop never
+needs.
 
 ## Where an instruction belongs
 
@@ -96,8 +102,8 @@ Around these four sit two more, which are not the factory's:
 - *Read with Read, Grep and Glob, never `grep` or `cd` in Bash; `cat`, `head`, `tail`, `wc`, `cut` and `ls` only inside the workspace.* This is the **agent's** craft, true anywhere. Iris's
   vendored skill does not say it, so it goes in her body.
 - *Argus reads the inbox's cards.* This is the janitor **step's** `reads: [inbox]`, a mount held by machinery, not a sentence.
-- *Restart the daemon after a landing that changed its code.* This is the **factory's**: it holds for Nemia building Nemia, until release
-  and upgrade (slice 9) replace it. It is not Nemia's system instruction.
+- *Install a release after the landings the factory should run on.* This is the **factory's**: Nemia building Nemia installs its own
+  landings with `nemia upgrade`, which replaced the hand restart after a code landing. It is not Nemia's system instruction.
 - *Ask the owner past about $80.* This is the person's **custom instruction**.
 
 **Changing an instruction.** Change it at its level, through a card the factory builds, never by a hand edit nobody records. A step's
@@ -189,21 +195,34 @@ rm "$S"/node_modules; git worktree remove "$S"
 
 ## After a landing
 
-- **The daemon is the api**, started without `--no-tick`: it holds the store (`~/.agent-workflows/daemon.json`, `by: "api"`), ticks it, and
-  answers the board on 8787. Start it detached from the main checkout, through Node so the starting shell keeps no pipe open:
-
-  ```sh
-  cd apps/api && env -u CLAUDECODE -u CLAUDE_CODE_SESSION_ID … WF_MAX_CONCURRENT=50 WF_MAX_RUNS=6 \
-    node -e 'const fs=require("fs"),log=fs.openSync(process.env.HOME+"/.agent-workflows/api.log","a");require("child_process").spawn(process.execPath,["src/main.ts"],{detached:true,stdio:["ignore",log,log]}).unref()'
-  ```
-
-  Find it by its lease, never by a name pattern: `npx nemia ls`'s last line names the holder, its pid and its url.
-- **Restart the daemon** when a landing changed `packages/agent-runtime/src`, `packages/agent-orchestrator/src` or `apps/api/src` (not
-  for a doc, a skill, a test or the web alone). Pause around it so no landing check is filed during the restart:
-  `nemia pause --why "…"`; wait until no landing is checking on two looks in a row (one look can fall in the gap between two landings);
-  stop the api by the pid its lease names and wait for `stoppedAt`; start it; `nemia resume`. Several landings queued together share one
-  restart after the last. Run one restart helper at a time. Never stop the daemon with the harness's task-stop, never by a name pattern.
-- **After a rename of the CLI or a new bin**, `npm install` in the main checkout at a gap links it; check the tree stays clean.
+- **The daemon is the api**, run by the login service `nemia.service` (a systemd user unit, written by `nemia service install`) from
+  `releases/current/apps/api`: it holds the store (`~/.agent-workflows/daemon.json`, `by: "api"`), ticks it, and answers the board on
+  8787. Find it by its lease, never by a name pattern: `nemia ls`'s last line, or the `daemon:` line of `nemia version`, names the
+  holder, its pid and the release it runs. A machine whose daemon still runs a checkout is moved once (*Moving the factory onto a
+  release*).
+- **A landing changes the checkout, never the daemon** nor a session at work. What landed reaches the factory at the next
+  `nemia upgrade`, which the operator runs at a gap after the landings the factory should run on, whatever they changed.
+- **Install a release:**
+  1. Tag main's head in the owner's checkout, at a gap: `git tag nemia-2026.11.03 main`, dated, with `.2` for a second the same day
+     (`nemia-2026.11.03.2`), and kept local: never pushed. `v<semver>` stays free for product releases.
+  2. `nemia upgrade <tag>`. It exports the tag into `releases/<tag>` beside the running one and runs `npm ci`, `npm run build` and
+     `npm run release:check` there on a trial store: minutes, and about 850 MB a release. Where a command fails it is refused with
+     nothing changed, naming the command, its exit and its log. Otherwise it points `releases/current` at the tag and restarts the
+     service through the take-over: it pauses the store unless a person's pause stands, lets each landing check finish, waits for each
+     attached session's call in flight, stops the daemon by SIGTERM, starts the unit, and resumes once the new daemon has made its first
+     pass (`packages/agent-orchestrator/src/service/takeover.verb.ts`).
+  3. Jobs and their checks run on, on the release they started on: the restart signals the daemon alone (`KillMode=process`). Every
+     new try, round or resume starts on the new release.
+  4. Read `nemia version`: `current:` and `daemon:` name the tag, and `sessions:` counts the sessions at work by release and Claude Code
+     version; the old release's count falls to none as its sessions end. `nemia ls` says `on <tag>, claude <version>` beside a step
+     at work, and the board's step inspector says what the latest attempt ran on. Report it to the person in one line.
+  5. **To roll back,** `nemia upgrade <an older tag>`: a tag built already at the same commit is switched to without a rebuild. A tag
+     moved since it was built is refused: tag the new commit with a new name.
+  6. Old releases stay under `releases/` until removal by rule lands. Leave them.
+- **`npm install` in the main checkout**, at a gap, after a landing that changed `package-lock.json` or a bin: the steps' worktrees
+  link the main checkout's `node_modules`. The daemon and its sessions no longer read it; check the tree stays clean.
+- Never stop the daemon with the harness's task-stop, by a name pattern, or by a hand restart of the unit: `nemia upgrade` restarts it,
+  and `nemia service restart` where nothing new is to be installed, each through the take-over.
 - **Main is fast-forwarded by the run**, not by hand: the landing merges the pull request on GitHub, then runs `git fetch origin && git
   merge --ff-only origin/main` in the owner's checkout. Nothing is pushed afterwards, and GitHub deletes the head branch.
 - **A landing that signed off `blocked`:** nothing was merged and the checkout is untouched. The refusal names the exact `nemia retry`
@@ -218,6 +237,69 @@ rm "$S"/node_modules; git worktree remove "$S"
   request not merged, a squash instead of a merge commit, a checkout the fast-forward did not reach, a branch of the run left out.
   Read it and name the cause. A check that did not finish (a deadline) is no refusal: file the landing again.
 - **Never touch the main checkout** (npm, git, a file) while a landing is checking in it.
+
+### A harness update
+
+The Claude Code the sessions run on is the Agent SDK's, pinned exactly in `packages/agent-runtime/package.json`
+(`packages/agent-runtime/test/sdk-pin.test.ts`). A harness update is a card that bumps that pin; it moves every `sdk.d.ts:<line>`
+citation with it (`sdk-citations.boundary.test.ts`), and lands like any change. Then install a release as above. The sessions at work
+keep the Claude Code they started on, every new one takes the new version, and `nemia version`'s `sessions:` shows both while they
+overlap.
+
+This retires the hand bump of 2026-11-03 (`the-factory-s-sessions-move-yns7`, PR #577, `3893a3162`): pause, wait until no session
+works, land, `npm install`, restart. None of it is needed now, and none of it is done again.
+
+## Moving the factory onto a release
+
+A checklist, run once per machine whose daemon runs a checkout, by the operator after the owner says go: it touches the live store and
+the login service, which no step writes. Here it moves this factory's `nemia.service`, which has run `apps/api/src/main.ts` of the
+checkout since 2026-11-01, onto `releases/current`. Run it at a quiet moment: the build runs the whole suite on this machine. At any
+step that is refused, stop, read what the refusal names, and tell the owner; the store stays as the last step left it.
+
+1. **Read where it stands**, from the main checkout: `npx nemia version` says `current: none`, the daemon on `checkout at …` and the
+   checkout's no-promise line. `npx nemia service status` says the unit is installed and runs, the checkout it runs, that it holds the
+   store, and lingering.
+2. **Record the unit as it is:** `systemctl --user cat nemia.service` prints its file and its drop-in. Copy every `Environment=` line but
+   `WF_ROOT` and `PATH`, which the install writes itself: `WF_MAX_CONCURRENT=50`, `WF_MAX_RUNS=7`, `OTEL_EXPORTER_OTLP_ENDPOINT` (the side
+   collector's address as printed), `NEMIA_TOOL_DETAILS=1`, `NEMIA_DAEMON_START=off`, and any other found there. The drop-in
+   `~/.config/systemd/user/nemia.service.d/memory.conf` (`MemoryHigh=11G`, `MemoryMax=13G`, `OOMPolicy=continue`, `WF_MAX_RUNS=7`) is the
+   operator's, outside `nemia service`: the install rewrites the unit's file alone and leaves the drop-in folder as it is.
+3. **Tag** main's head at a gap: `git tag nemia-<YYYY.MM.DD> main` (*Install a release*).
+4. **Rehearse on a scratch store:** `WF_ROOT=<a scratch folder> npx nemia upgrade <tag> --repo <the main checkout>`. No daemon ticks
+   it, so it builds, switches and says `no daemon ticks the store: the next one started runs <tag>`. Then delete the scratch folder. A
+   refusal here leaves the live store untouched: read the log it names and file a card; the switch waits for it to land. The likely one
+   is `release:check` in the export, whose repository is empty: a test that reads git history fails there.
+5. **Build and switch the live store**, from the main checkout, which may act since no pointer stands yet: `npx nemia upgrade <tag>`.
+   Expect `built <tag> …`, `releases/current now names <tag>`, then, the unit running the checkout, `pid N ticks the store and does not
+   run releases/current: it is left running the code it started with.` and the line that moves it. From here the checkout's `nemia` and
+   its api are refused on this store, so go on at once: a checkout daemon that stops now does not start again.
+6. **Put the installed bin first** on the PATH, in the operator's shell profile and in the shell that runs the steps below:
+   `export PATH="$HOME/.agent-workflows/releases/current/node_modules/.bin:$PATH"`. `command -v nemia` names it, and `nemia version` says
+   `this nemia: <tag> (install, …)`.
+7. **Pause the live store** (`nemia pause --why "moving the daemon onto a release"`) and wait until no landing is checking on two looks
+   in a row.
+8. **Re-point the unit**, from that shell: `nemia service install --env WF_MAX_CONCURRENT=50 --env WF_MAX_RUNS=7 --env
+   OTEL_EXPORTER_OTLP_ENDPOINT="$OTEL_EXPORTER_OTLP_ENDPOINT" --env NEMIA_TOOL_DETAILS=1 --env NEMIA_DAEMON_START=off`, one `--env` per
+   line recorded in step 2, the collector's address set in that shell first. The installed `nemia` writes the unit onto
+   `releases/current/apps/api` with this shell's `WF_ROOT` and PATH, so the steps' bare `nemia` (Argus's `nemia stats`, the janitor's
+   `cards.ts`, which runs `nemia inbox add`) is the installed one. The unit holding the store, it restarts it: `restarted nemia.service,
+   which held the store`. That restart is the system's own, with no take-over, which is why step 7 paused.
+9. **Verify,** then resume:
+   - `nemia service status`: the unit runs, from `releases/current`, and holds the store.
+   - `nemia version`: `current:` and `daemon:` on `<tag> (install, …)`, no no-promise line, and `sessions:` counting the `checkout`
+     sessions still at work and no new ones on it.
+   - `systemctl --user cat nemia.service`: the `Environment=` lines of step 2, the release's bin first on PATH, and the drop-in still
+     listed after the file.
+   - `nemia resume`; the janitor's next run files its cards.
+10. **Approve no landing** until `nemia version`'s `sessions:` names no `checkout` session: a landing's fast-forward still moves the
+    files under them.
+11. **If the new unit does not hold the store** (step 9 fails, or `nemia service status` says it stopped): `journalctl --user -u
+    nemia.service` says why. To go back, `nemia service uninstall`, then from the main checkout, with `NEMIA_ON_INSTALLED=1` set (a
+    checkout's api is refused on a store with a pointer otherwise), `npx nemia service install --env NEMIA_ON_INSTALLED=1` with the
+    `--env` lines of step 2, `nemia resume`, and tell the owner.
+
+From then on every upgrade restarts the daemon by itself (*Install a release*), and this checklist is for another machine, or this one
+rebuilt.
 
 ## Filing and chaining
 
@@ -305,7 +387,7 @@ Nemia off, Semi-auto stops at every gate, Auto is what the person's custom instr
 
 **For this factory's instruction (building Nemia):** the layers and `docs/architecture.md`; trial merges against main and every landing
 ahead; a web change's pictures are the implementer's, read by the reviewer; command-table and frame cards collide, so chain them; restart
-the daemon after code landings, paused, until release and upgrade; store names and the `wf/` branch prefix stay; a landing check has its
+the daemon after code landings, paused, until release and upgrade (since replaced by `nemia upgrade`, *After a landing*); store names and the `wf/` branch prefix stay; a landing check has its
 own deadline (2700 s), measured from a week of landings, now bounding a receipt rather than a suite; a landing merges the run's own
 green pull request and nothing is pushed by hand.
 
@@ -339,7 +421,7 @@ English; never push or open a pull request unless asked.
 - **Reads:** `nemia ls`, `nemia decide`, `nemia inbox`, `nemia stats`, `nemia passes`, `GET /api/quota`, the task journals, the check
   logs, the session transcripts; `git log`, `git diff`, `git merge-tree`, `git grep` on any branch.
 - **Acts:** `nemia start` (`--after`, later `--from`), `nemia approve`, `nemia retry` (`--message`, `--recheck`), `nemia say`,
-  `nemia hold` (`--until`, `--why`, `--off`), `nemia pause` and `nemia resume`, `nemia inbox add`, `nemia retry --round`, `nemia refresh --base`; the daemon restart;
+  `nemia hold` (`--until`, `--why`, `--off`), `nemia pause` and `nemia resume`, `nemia inbox add`, `nemia retry --round`, `nemia refresh --base`; `nemia upgrade` and `nemia version`;
   scratch worktrees for verification.
 - **Asks:** a channel to the person that carries questions as data and waits for the answer, on the board and on a phone.
 - **Wakes:** on a subscription to the feed filtered at the source to what needs judgement, with a digest of the rest (slice 5a), never

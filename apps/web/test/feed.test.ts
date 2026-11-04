@@ -114,9 +114,9 @@ const line = (run: string, step?: string) => ({ at: '2026-09-22T21:00:00.000Z', 
 
 test('keysOf, polled and filterOf: what each event reads again, and what is polled', async (t) => {
   await t.test(
-    'each event names the queries it can change, and no other: a step its run and the list, a run the cap and the inbox too, a removal its record and the cap',
+    "each event names the queries it can change, and no other: a step its run, the list and the inbox, whose started cards show their run's phase, a run the cap too, a removal its record and the cap",
     () => {
-      assert.deepEqual(keysOf('step', 'r-1'), [['runs'], ['runs-open'], ['runs-finished'], ['runs', 'r-1'], ['daemon']]);
+      assert.deepEqual(keysOf('step', 'r-1'), [['runs'], ['runs-open'], ['runs-finished'], ['runs', 'r-1'], ['inbox'], ['daemon']]);
       assert.deepEqual(keysOf('run', 'r-1'), [
         ['runs'],
         ['runs-open'],
@@ -134,6 +134,7 @@ test('keysOf, polled and filterOf: what each event reads again, and what is poll
         ['runs', 'r-1'],
         ['runs', 'r-1', 'steps'],
         ['ceilings'],
+        ['inbox'],
         ['daemon'],
       ]);
       for (const event of ['step', 'run', 'removed'] as const) {
@@ -233,6 +234,32 @@ test('keysOf, polled and filterOf: what each event reads again, and what is poll
     assert.deepEqual(filterOf(['runs', 'a', 'steps']), { queryKey: ['runs', 'a', 'steps'], exact: false });
     assert.deepEqual(filterOf(['runs-open']), { queryKey: ['runs-open'], exact: false });
   });
+  await t.test(
+    "REFUSED: every read of the inbox — every card, the cards in play, a selector's, a card's page — is read again on a step's, a run's and a removal's event: a started card shows its run's phase",
+    async () => {
+      const inbox: QueryKey[] = [
+        ['inbox'],
+        ['inbox', { all: true }],
+        ['inbox', { all: true }, { selector: 'team=core' }],
+        ['inbox', { selector: 'team=core' }],
+        ['inbox', 'cache-the-views-k2q9'],
+      ];
+      const marked = async (event: 'step' | 'run' | 'removed', filter = filterOf) => {
+        const client = new QueryClient();
+        for (const key of inbox) client.setQueryData(key, {});
+        await Promise.all(keysOf(event, 'a').map((key) => client.invalidateQueries(filter(key))));
+        const keys = inbox.filter((key) => client.getQueryState(key)?.isInvalidated);
+        client.clear();
+        return keys;
+      };
+      for (const event of ['step', 'run', 'removed'] as const) assert.deepEqual(await marked(event), inbox, `a ${event} event`);
+      assert.deepEqual(
+        await marked('run', (queryKey) => ({ queryKey, exact: true })),
+        [['inbox']],
+        'invalidated exactly, the Inbox page, a label page and a card page are left as they were',
+      );
+    },
+  );
   await t.test(
     "a step's tries and told are read again by a run's event and a removal, by prefix, and never by a step's: it moves their stamp",
     async () => {

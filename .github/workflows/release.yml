@@ -17,9 +17,10 @@ permissions:
 
 # Every job and every step that reaches the network (an action, gh, git's push and fetch, which the release tool calls) carries a
 # timeout-minutes of its own, under its job's. labels, tag and pr share the job concurrency release and are never cancelled: two runs
-# never write the labels, the tag or the release branch at once, and a run waiting behind another is the newer one. No job waits on
-# the release pull request's checks: its pull_request runs wait for a person's "Approve workflows to run", which its body names, and
-# main's protection holds the merge until they are green. A dispatched run would never count, so none is dispatched.
+# never write the labels, the tag or the release branch at once, and a run waiting behind another is the newer one. The pr job
+# dispatches ci and release-label on the release head where the head has no such run pending or green: a run this token dispatches
+# starts with no person's approval, and reports on the head the check runs main's protection requires, matched by name. The
+# pull_request runs the token's push also creates wait for approval and are not needed. No job waits on the dispatched runs.
 jobs:
   labels:
     runs-on: ubuntu-latest
@@ -76,6 +77,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
+      # actions: write dispatches ci.yml and release-label.yml on the release head.
+      actions: write
       contents: write
       pull-requests: write
     concurrency:

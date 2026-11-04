@@ -210,7 +210,6 @@ export type {
   InstructionAt,
   Schedule,
   TemplateStatus,
-  Volume,
 } from './factory/factory.ts';
 export {
   ENGINE_REASON,
@@ -504,8 +503,7 @@ export type { ReadingHow, RunReading } from './list/list.verb.ts';
 export type { Answered, Decided } from './decide/decide.verb.ts';
 export type { DecideCommand } from './decide/decide.ts';
 export type { RunsListed, Unjudged } from './list/list.ts';
-export { graphOf, runGraph } from './summary/graph.ts';
-export type { GraphEdge, RunGraph } from './summary/graph.ts';
+export { graphOf, runGraph, type GraphEdge, type RunGraph } from './summary/graph.ts';
 export {
   bare,
   filedTimes,

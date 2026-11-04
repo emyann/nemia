@@ -7129,7 +7129,7 @@ test("REFUSED: FactoryVolumes says the caveat on a writable volume alone — eac
   assert.match(notes, /data-volume-mark="ro"[^>]*>:ro</);
   assert.match(scratch, /data-volume-mark="rw"[^>]*>:rw</);
   assert.doesNotMatch(notes, /data-volume-caveat/, 'a read-only volume carries no caveat');
-  assert.match(scratch, /data-volume-caveat/, 'the writable one says it is not the run\'s workspace');
+  assert.match(scratch, /data-volume-caveat/, "the writable one says it is not the run's workspace");
   assert.ok(notes.includes('nemia factory volume rm nemia /home/me/notes'), "the api's line that takes it back");
   assert.ok(scratch.includes('nemia factory volume rm nemia /home/me/scratch'));
   assert.doesNotMatch(html, /data-no-volumes/);

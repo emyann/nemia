@@ -321,6 +321,137 @@ test('REFUSED: a pull request whose head is another commit, and none open at all
   assert.ok(unopened.err.includes('--body-file "$WF_STEP_FILES/pr-body.md"'), unopened.err);
 });
 
+/** The rules a factory's `pullRequestLabels` gives `push --labels`, in the tests below: two values of one key, each its own label. */
+const RULES = 'work=fix:fix work=cleanup:internal';
+
+/** The repository's labels, as `gh api --paginate …/labels --jq .[].name` prints them: one name a line. */
+const REPO_LABELS: Rule = { when: 'repos/{owner}/{repo}/labels', out: 'fix\ninternal\nbug' };
+
+/**
+ * A place whose one open pull request is at HEAD carrying `labels`, in a repository holding `repo` (`REPO_LABELS` by default): the
+ * rules under which `push --labels` reads what it has to set.
+ */
+function labelled(labels: string[], repo: Rule = REPO_LABELS) {
+  const at = placed();
+  const head = gitIn(at.repo, 'rev-parse', 'HEAD').trim();
+  at.gh.answers([
+    repo,
+    ...passing(at.repo).filter((rule) => rule.when !== 'pr list'),
+    { when: 'pr list', out: listed(head, { labels: labels.map((name) => ({ name })) }) },
+  ]);
+  return at;
+}
+
+/** The calls that add or remove a label of the pull request, through REST. */
+const labelCalls = (calls: readonly Called[]): Called[] =>
+  calls.filter((call) => call.argv.some((arg) => /\/issues\/\d+\/labels/.test(arg)));
+
+test("push --labels adds the label the rules give the run's labels, through REST and never gh pr edit, and says what it set", () => {
+  const at = labelled([]);
+  const r = pr(at, 'push', ['--labels', RULES], { WF_LABELS: JSON.stringify({ work: 'cleanup', area: 'api' }) });
+  assert.equal(r.code, 0, r.err);
+  assert.equal(tip(at.bare!, at.branch), gitIn(at.repo, 'rev-parse', 'HEAD').trim(), 'the branch is pushed');
+  assert.deepEqual(
+    labelCalls(r.calls).map((call) => call.argv),
+    [['api', '-X', 'POST', 'repos/{owner}/{repo}/issues/7/labels', '-f', 'labels[]=internal']],
+  );
+  assert.equal(asked(r.calls, 'pr', 'edit').length, 0, 'never `gh pr edit`, whose GraphQL query GitHub refuses');
+  assert.ok(
+    asked(r.calls, 'api').some(
+      (call) => call.argv.includes('--paginate') && call.argv.some((arg) => arg.startsWith('repos/{owner}/{repo}/labels')),
+    ),
+    `the repository's labels are read every page:\n${JSON.stringify(r.calls)}`,
+  );
+  assert.match(r.out, /nemia pr: .*internal/);
+});
+
+test('push --labels follows a relabelled run: the label its rules no longer give goes, the one they give comes, a label no rule gives stays', () => {
+  const at = labelled(['fix', 'bug']);
+  const r = pr(at, 'push', ['--labels', RULES], { WF_LABELS: JSON.stringify({ work: 'cleanup' }) });
+  assert.equal(r.code, 0, r.err);
+  assert.deepEqual(
+    labelCalls(r.calls).map((call) => call.argv),
+    [
+      ['api', '-X', 'POST', 'repos/{owner}/{repo}/issues/7/labels', '-f', 'labels[]=internal'],
+      ['api', '-X', 'DELETE', 'repos/{owner}/{repo}/issues/7/labels/fix'],
+    ],
+    '`bug`, which no rule can give, is left alone',
+  );
+
+  const none = labelled(['fix', 'bug']);
+  const unmatched = pr(none, 'push', ['--labels', RULES], { WF_LABELS: JSON.stringify({ area: 'api' }) });
+  assert.equal(unmatched.code, 0, unmatched.err);
+  assert.deepEqual(
+    labelCalls(unmatched.calls).map((call) => call.argv),
+    [['api', '-X', 'DELETE', 'repos/{owner}/{repo}/issues/7/labels/fix']],
+    'a run whose labels no rule matches carries no label a rule gives',
+  );
+
+  const already = labelled(['internal']);
+  const settled = pr(already, 'push', ['--labels', RULES], { WF_LABELS: JSON.stringify({ work: 'cleanup' }) });
+  assert.equal(settled.code, 0, settled.err);
+  assert.deepEqual(labelCalls(settled.calls), [], 'a pull request that already carries what the rules give is not called again');
+});
+
+test('push with --labels "", with no --labels, or with no WF_LABELS from the run, makes no label call', () => {
+  for (const [args, more] of [
+    [['--labels', ''], { WF_LABELS: JSON.stringify({ work: 'fix' }) }],
+    [[], { WF_LABELS: JSON.stringify({ work: 'fix' }) }],
+    [['--labels', RULES], {}],
+  ] as const) {
+    const at = labelled(['fix']);
+    const r = pr(at, 'push', [...args], more);
+    assert.equal(r.code, 0, `${args.join(' ')}: ${r.err}`);
+    assert.deepEqual(labelCalls(r.calls), [], `${args.join(' ')}: no label is added or removed`);
+    assert.ok(
+      !asked(r.calls, 'api').some((call) => call.argv.some((arg) => arg.includes('/labels'))),
+      `${args.join(' ')}: nor are the repository's labels read`,
+    );
+    assert.match(r.out, /nemia pr: #7 is at/);
+  }
+});
+
+test('REFUSED, before anything is pushed: a rule that is not <key>=<value>:<label>, and a --labels with no value', () => {
+  for (const args of [
+    ['--labels', 'work=fix'],
+    ['--labels', 'work:fix'],
+    ['--labels', `${RULES} =fix:fix`],
+    ['--labels', 'work=:fix'],
+    ['--labels', 'work=fix:'],
+    ['--labels'],
+    ['--label', RULES],
+  ]) {
+    const at = labelled([]);
+    const r = pr(at, 'push', args, { WF_LABELS: JSON.stringify({ work: 'fix' }) });
+    assert.equal(r.code, 1, `${args.join(' ')}: ${r.out}`);
+    assert.ok(r.err.startsWith('nemia pr: '), `a refusal of the script's, not a crash:\n${r.err}`);
+    assert.match(r.err, /--labels/, 'naming the flag');
+    assert.equal(tip(at.bare!, at.branch), null, `${args.join(' ')}: nothing is pushed`);
+    assert.deepEqual(labelCalls(r.calls), []);
+  }
+});
+
+test('REFUSED, before anything is pushed: a WF_LABELS that is not a JSON object of strings', () => {
+  for (const said of ['work=fix', '[]', '"fix"', 'null', JSON.stringify({ work: 1 })]) {
+    const at = labelled([]);
+    const r = pr(at, 'push', ['--labels', RULES], { WF_LABELS: said });
+    assert.equal(r.code, 1, `${said}: ${r.out}`);
+    assert.match(r.err, /WF_LABELS/, 'naming the variable');
+    assert.equal(tip(at.bare!, at.branch), null, `${said}: nothing is pushed`);
+    assert.deepEqual(labelCalls(r.calls), []);
+  }
+});
+
+test('REFUSED, before anything is pushed: a label the rules give that the repository lacks, naming it and the create that answers it', () => {
+  const at = labelled([], { when: 'repos/{owner}/{repo}/labels', out: 'fix\nbug' });
+  const r = pr(at, 'push', ['--labels', RULES], { WF_LABELS: JSON.stringify({ work: 'fix' }) });
+  assert.equal(r.code, 1, r.out);
+  assert.match(r.err, /internal/, 'naming the label');
+  assert.match(r.err, /gh label create/, 'and the command that makes it');
+  assert.equal(tip(at.bare!, at.branch), null, 'nothing is pushed');
+  assert.deepEqual(labelCalls(r.calls), []);
+});
+
 test('wait reads mergeable again while GitHub computes it, polls the ci context until it has a verdict, and passes on a green one; REFUSED at once: a conflicting head', () => {
   const at = placed();
   const head = gitIn(at.repo, 'rev-parse', 'HEAD').trim();
@@ -521,8 +652,8 @@ test('REFUSED: no ci context within the bound, and a ci still pending at its end
   assert.ok(unfinished.err.includes(RETRY), unfinished.err);
 });
 
-test("build's implement check, rendered on GitHub, pushes through the script before the round check, waits last on the CI context it was set, and runs no suite and no e2e itself", async () => {
-  const at = await renderedSdlc(['github=true', 'roundCheck=round-check --all', 'ciCheck=gate']);
+test("build's implement check, rendered on GitHub, pushes through the script before the round check, labelling by the rules it was set, waits last on the CI context it was set, and runs no suite and no e2e itself", async () => {
+  const at = await renderedSdlc(['github=true', 'roundCheck=round-check --all', 'ciCheck=gate', `pullRequestLabels=${RULES}`]);
   const check = stepsOf(at, 'build').find((step) => step.name === 'implement')?.check;
   assert.equal(typeof check, 'string', "sdlc's build has an implement step with a check");
   const frozen = check as string;
@@ -540,6 +671,10 @@ test("build's implement check, rendered on GitHub, pushes through the script bef
   assert.doesNotMatch(frozen, /npm test/, "the suite is CI's now, on the pushed commit");
   assert.doesNotMatch(frozen, /npm run e2e/, 'and so is the whole e2e');
   assert.ok(clauseOf(frozen, 'wait').includes('pull-request.ts" wait --check "gate";'), 'the wait reads the CI context the factory set');
+  assert.ok(
+    clauseOf(frozen, 'push').includes(`pull-request.ts" push --labels "${RULES}";`),
+    'the push labels by the rules the factory set',
+  );
   for (const verb of ['push', 'wait']) {
     const clause = clauseOf(frozen, verb);
     assert.ok(
@@ -548,6 +683,7 @@ test("build's implement check, rendered on GitHub, pushes through the script bef
     );
     const at2 = placed();
     at2.gh.answers([
+      REPO_LABELS,
       ...passing(at2.repo).filter((rule) => rule.when !== 'pr view'),
       {
         when: 'pr view',
@@ -578,9 +714,14 @@ test("build's implement check, rendered on GitHub, pushes through the script bef
     assert.match(unset.err, /WF_WORKFLOW_FILES/, 'naming the variable');
     assert.deepEqual(at2.gh.calls(), [], 'and runs no script');
     assert.equal(tip(at2.bare!, at2.branch), null, 'nothing is pushed');
-    const ran = run({ WF_WORKFLOW_FILES: path.join(at.tree, 'workflows', 'build') });
+    const ran = run({ WF_WORKFLOW_FILES: path.join(at.tree, 'workflows', 'build'), WF_LABELS: JSON.stringify({ work: 'cleanup' }) });
     assert.equal(ran.code, 0, `${verb}, from the frozen workflow files, on a red \`ci\` beside a green \`gate\`:\n${ran.err}`);
     assert.match(ran.out, verb === 'push' ? /nemia pr: #7 is at [0-9a-f]{12}/ : /nemia ci: `gate` passed on/);
+    assert.deepEqual(
+      labelCalls(at2.gh.calls()).map((call) => call.argv.at(-1)),
+      verb === 'push' ? ['labels[]=internal'] : [],
+      `the rendered push reads the rules whole, spaces and all, and the wait sets no label:\n${ran.out}`,
+    );
   }
 });
 

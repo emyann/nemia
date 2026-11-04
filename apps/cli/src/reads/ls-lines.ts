@@ -105,8 +105,8 @@ const NEEDS_HUMAN = 'needs-human';
 const shownStatus = (s: Pick<Step, 'message' | 'waits'>): string =>
   s.waits ? `${NEEDS_HUMAN}: ${s.waits}${s.message.slice(NEEDS_HUMAN.length)}` : s.message;
 
-const shownNote = (s: Pick<Step, 'note' | 'denied' | 'asks'>): string | undefined =>
-  [s.note, s.asks ? `asks ${s.asks} question${s.asks === 1 ? '' : 's'}` : '', s.denied].filter(Boolean).join(' · ') || undefined;
+const shownNote = (s: Pick<Step, 'note' | 'denied' | 'asks' | 'ranOn'>): string | undefined =>
+  [s.note, s.asks ? `asks ${s.asks} question${s.asks === 1 ? '' : 's'}` : '', s.ranOn, s.denied].filter(Boolean).join(' · ') || undefined;
 
 const onYouWords = (l: { steps: ReadonlyArray<Pick<Step, 'name' | 'reason'>>; waitingOnYou: readonly string[] }): string[] =>
   l.waitingOnYou.map((name) => (l.steps.find((s) => s.name === name)?.reason === 'AwaitingApproval' ? `approve ${name}` : name));

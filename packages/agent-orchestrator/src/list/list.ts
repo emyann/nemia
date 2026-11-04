@@ -58,7 +58,8 @@ export type Listing = {
    * again or about to be, `note`: the try it is on and how it got there (`tryNote`), or the try due (`dueNote`).
    * Beside the message and never in it, so the words stay the vocabulary a reader of them keys on: so are `waits`, what the harness says a
    * `needs-human` session waits for (`waitingWords`), and `denied`, what its current try was denied (`deniedWords`), which `nemia ls`
-   * prints in the line (`shownStatus`, `shownNote`) and the board does not. `roundDue`, only on a looping step whose next round is due
+   * prints in the line (`shownStatus`, `shownNote`) and the board does not, and `ranOn`, what the session of a step at work runs on
+   * (`ranOnWords`), which `nemia ls` prints in the note beside them (`shownNote`) and the board shows off the run object. `roundDue`, only on a looping step whose next round is due
    * (`roundsDue`) and which no retry takes first: what its note words as `roundDueNote`. `asks`, only on a step waiting on a person whose
    * closeout asks questions: how many (`askedQuestions`), which `nemia ls` counts in the note and `nemia decide` prints whole.
    *
@@ -77,6 +78,7 @@ export type Listing = {
       cost?: string;
       waits?: string;
       denied?: string;
+      ranOn?: string;
       roundDue?: true;
       asks?: number;
     }
@@ -204,6 +206,12 @@ export interface ListingInput {
    */
   readonly deniedOf?: (taskId: string) => readonly string[];
   /**
+   * What the session of each task at work runs on, in words (`ranOnOf` in views.verb.ts): the row's `ranOn`, `on v1.2.0, claude 2.1.316`,
+   * for a step whose current try is at work, beside its status and note and never in them; `nemia ls` prints it in the note before what
+   * the try was denied (`shownNote`). Left out, no row says one.
+   */
+  readonly ranOnOf?: (taskId: string) => string | undefined;
+  /**
    * The runs a held run waits on to land, as `holdsOf` reads them: said where `waiting on you` would be (`holdWord`). Left out,
    * the runs the hold names, each taken as one that may still land.
    */
@@ -265,6 +273,7 @@ export function listing({
   checkout,
   waitingOf = () => undefined,
   deniedOf = () => [],
+  ranOnOf = () => undefined,
   holds,
 }: ListingInput): Listing {
   const waiting = gated(run) ? [...waits] : [];
@@ -343,7 +352,15 @@ export function listing({
     const taskId = run.steps[step.name]?.taskId;
     const note = [tried, gate, row.note, landingWord(run, step.name), saidWord(saidTo(step.name))].filter(Boolean).join(' · ');
     const roundDue = round && !retry ? { roundDue: true as const } : {};
-    return { ...row, ...(note ? { note } : {}), ...roundDue, ...deniedRow(taskId ? deniedOf(taskId) : []), ...cost };
+    const ranOn = taskId ? ranOnOf(taskId) : undefined;
+    return {
+      ...row,
+      ...(note ? { note } : {}),
+      ...roundDue,
+      ...(ranOn ? { ranOn } : {}),
+      ...deniedRow(taskId ? deniedOf(taskId) : []),
+      ...cost,
+    };
   });
 
   function lineOf(step: Workflow): Listing['steps'][number] {
@@ -590,8 +607,8 @@ function asking(
  * A step's note as `nemia ls` prints it: the row's note, then how many questions its closeout asks (`asks`), then what its current try was
  * denied (`denied`), last.
  */
-export const shownNote = (s: Pick<Listing['steps'][number], 'note' | 'denied' | 'asks'>): string | undefined =>
-  [s.note, s.asks ? `asks ${s.asks} question${s.asks === 1 ? '' : 's'}` : '', s.denied].filter(Boolean).join(' · ') || undefined;
+export const shownNote = (s: Pick<Listing['steps'][number], 'note' | 'denied' | 'asks' | 'ranOn'>): string | undefined =>
+  [s.note, s.asks ? `asks ${s.asks} question${s.asks === 1 ? '' : 's'}` : '', s.ranOn, s.denied].filter(Boolean).join(' · ') || undefined;
 
 /**
  * A step at its gate, beside its line on `nemia ls`: the two things a person can say, as the commands that say them. The send-back goes to

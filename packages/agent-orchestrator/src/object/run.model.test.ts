@@ -269,6 +269,19 @@ test('a hand-built run decodes through `Run`, and a state not among its words is
   assert.equal(Schema.decodeUnknownResult(Run)(kinded)._tag, 'Failure', 'the kind is `Run`');
 });
 
+test("a step's latest attempt says the release and harness it ran on, each null when unrecorded, and a release of another kind is refused", () => {
+  const latest = { startedAt: '2026-11-03T00:00:00Z', ended: null, endedAt: null, reason: null };
+  const ran = {
+    count: 1,
+    latest: { ...latest, release: { kind: 'install', tag: 'v1.2.0' }, harness: { name: 'claude', version: '2.1.316' } },
+  };
+  assert.deepEqual(Schema.decodeUnknownSync(StepAttempts)(ran), ran);
+  const unrecorded = { count: 1, latest: { ...latest, release: null, harness: null } };
+  assert.deepEqual(Schema.decodeUnknownSync(StepAttempts)(unrecorded), unrecorded);
+  const other = { count: 1, latest: { ...latest, release: { kind: 'image', root: '/x' }, harness: null } };
+  assert.equal(Schema.decodeUnknownResult(StepAttempts)(other)._tag, 'Failure', 'a release is an install or a checkout');
+});
+
 test("the run's OpenAPI 3.1 document holds `Run`, and imports back into a Schema that decodes the same run", () => {
   const openapi = runDocument();
   assert.equal(openapi.dialect, 'openapi-3.1');

@@ -29,6 +29,7 @@ import {
   closeoutOf,
   closeoutReader,
   deniedOf,
+  ranOnOf,
   exitVerdicts,
   harnessBlocked,
   parentsRead,
@@ -72,6 +73,8 @@ export type ReadingHow = {
   checkout?: PassStanding;
   git: BranchReader;
   parent?: (id: string) => ParentRun;
+  /** The store's real releases folder (`realReleasesDir`), which a step at work is said to run on under (`ranOnOf`); left out, none is said. */
+  releases?: string;
 };
 
 /**
@@ -134,6 +137,7 @@ export const runReading = Effect.fn('runReading')(function* (e: Engine, run: Run
     checkout,
     waitingOf: waitingOf(views),
     deniedOf: deniedOf(views),
+    ...(how.releases === undefined ? {} : { ranOnOf: ranOnOf(views, how.releases) }),
     holds: holdsOf(run, parent),
   });
   return { ...listed, assessed, assessOf, phaseOf, answers, spendOf, spend: runSpend(run, spendOf) } satisfies RunReading;
@@ -147,17 +151,23 @@ export const runReading = Effect.fn('runReading')(function* (e: Engine, run: Run
  * person reading the list wants the detail. Where the run's result stands against the base branch is what says a finished run is one
  * nobody has decided; one no pass read is said unread.
  */
-export const list = Effect.fn('list')(function* (e: Engine, run: Run, slot?: RunSlot, standing?: PassStanding) {
+export const list = Effect.fn('list')(function* (e: Engine, run: Run, slot?: RunSlot, standing?: PassStanding, releases?: string) {
   const read = standing ?? (yield* standingSnapshot());
-  return yield* runReading(e, run, { slot, git: standingReader(read), checkout: read });
+  return yield* runReading(e, run, { slot, git: standingReader(read), checkout: read, ...(releases === undefined ? {} : { releases }) });
 });
 
 /**
  * What `list` reads of `run`, or why it is left unjudged (`unjudgedOf`): a run a task journal of which does not read, or whose unfrozen
  * folder does not load; any other failure of the read is the program's.
  */
-const readOrUnjudged = Effect.fnUntraced(function* (e: Engine, run: Run, slot: RunSlot | undefined, standing: PassStanding) {
-  const exit = yield* Effect.exit(list(e, run, slot, standing));
+const readOrUnjudged = Effect.fnUntraced(function* (
+  e: Engine,
+  run: Run,
+  slot: RunSlot | undefined,
+  standing: PassStanding,
+  releases: string | undefined,
+) {
+  const exit = yield* Effect.exit(list(e, run, slot, standing, releases));
   if (Exit.isSuccess(exit)) return exit.value;
   const unjudged = yield* unjudgedOf(e, run, Cause.squash(exit.cause), 'nemia ls');
   return unjudged ?? (yield* Effect.failCause(exit.cause));
@@ -171,8 +181,9 @@ const readOrUnjudged = Effect.fnUntraced(function* (e: Engine, run: Run, slot: R
  * the second with no result branch (`stepsAmong`); any other failure rejects. With no run named, the factories' schedules
  * (`schedulesListed`). Refuses a run named that is not in the store, as `runStore.runs.read` does. Of the runs `selectors` takes
  * (`selectedRuns`), off each composed record before any is judged; the cap, the pause and the schedules are still read of the whole store.
+ * A step at work says what its session runs on under `releases`, the store's real releases folder, where it is given (`ranOnOf`).
  */
-export const runsListed = Effect.fn('runsListed')(function* (runId?: string, selectors: Selectors = []) {
+export const runsListed = Effect.fn('runsListed')(function* (runId?: string, selectors: Selectors = [], releases?: string) {
   const e = yield* EngineService;
   const all = runId ? [runStore.runs.read(runId)] : runStore.runs.list();
   const runs = selectedRuns(all, selectors);
@@ -186,7 +197,7 @@ export const runsListed = Effect.fn('runsListed')(function* (runId?: string, sel
     const viewed = viewedOnce(e);
     const held = yield* runSlots(viewed, runId ? runStore.runs.list() : all, process.env, passParents(git));
     for (const run of runs) {
-      const read = yield* readOrUnjudged(viewed, run, held.get(run.id), standing);
+      const read = yield* readOrUnjudged(viewed, run, held.get(run.id), standing, releases);
       const steps = among.get(run.id) ?? [];
       listed.push({ run, listed: read, result: resultBranches(run, steps) });
       reads.push({ run, read, steps, staged: () => mergeStaged(run, steps, memo) });

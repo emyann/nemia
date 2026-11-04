@@ -36,6 +36,8 @@ import { parentRecord } from '../steps/steps.verb.ts';
 import { continuesFrom } from '../retry/index.ts';
 import { phaseOfView, unsignedEnd, wordOfView, type EnginePhase } from './views-words.ts';
 import { RunDoor } from '../runs/runs.store.ts';
+import { DEFAULT_HARNESS } from '../harness/harness.ts';
+import { ranOnWords, sessionRanOn } from '../release/release.ts';
 import { RunId } from '../record/record.model.ts';
 
 /**
@@ -350,6 +352,21 @@ export const deniedOf =
   (taskId: string): string[] => {
     const state = views.get(taskId)?.state;
     return [...new Set((state ? currentTurn(state) : []).flatMap((a) => (a.denials ?? []).map(denialText)))];
+  };
+
+/**
+ * What the session of a task at work runs on, in words (`ranOnWords`): `on v1.2.0, claude 2.1.316`, off what its last attempt recorded,
+ * its image placed under `releases`, the store's real releases folder (`sessionRanOn`). Nothing for a task settled, one whose last
+ * attempt has ended, or one whose attempt recorded neither. Exported, log-free, for a consumer that words a step as `nemia ls` does.
+ */
+export const ranOnOf =
+  (views: ReadonlyMap<string, TaskView>, releases: string) =>
+  (taskId: string): string | undefined => {
+    const state = views.get(taskId)?.state;
+    const last = state && state.settled === null ? state.attempts.at(-1) : undefined;
+    if (!state || !last || last.ended !== null) return undefined;
+    const { release, harness } = sessionRanOn(last, state.harness ?? DEFAULT_HARNESS, releases);
+    return ranOnWords(release, harness) ?? undefined;
   };
 
 /**

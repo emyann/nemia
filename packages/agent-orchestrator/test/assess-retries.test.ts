@@ -1340,6 +1340,27 @@ test("`nemia ls` says what a step's current try was denied after its note, never
   });
 });
 
+test('`nemia ls` says what the session of a step at work runs on in its note, before its denials, never in its status', async (t) => {
+  const r = run({ implement: 't1', review: 't2' });
+  const listed = fullListing({
+    steps: STEPS,
+    run: r,
+    phaseOf: shown({ t1: 'succeeded', t2: 'working' }),
+    closeoutOf: signedOff({ implement: said('done') }),
+    deniedOf: (id) => (id === 't2' ? ['Bash(npm)'] : []),
+    ranOnOf: (id) => (id === 't2' ? 'on v1.2.0, claude 2.1.316' : undefined),
+  }).steps;
+  const [implement, review] = listed;
+  await t.test('the step at work carries it beside its word, and its note prints it before what it was denied', () => {
+    assert.equal(review.ranOn, 'on v1.2.0, claude 2.1.316');
+    assert.equal(review.message, 'working');
+    assert.equal(shownNote(review), 'on v1.2.0, claude 2.1.316 · denied: Bash(npm)');
+  });
+  await t.test('a step whose reader says nothing carries nothing', () => {
+    assert.equal('ranOn' in implement, false);
+  });
+});
+
 test('`denials: fail`: a step that signed off denied a call reads denied', async (t) => {
   const DENYING: Workflow[] = [{ ...step('implement'), check: 'npm test', retries: 2, denials: 'fail' }, step('review', ['implement'])];
   const r = run({ implement: 't1', review: null });

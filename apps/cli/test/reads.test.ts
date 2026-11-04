@@ -109,6 +109,19 @@ settled('t-build-1', { outcome: 'done', summary: 'A first cut.', needs: null, ar
 settled('t-build-2', { outcome: 'done', summary: 'Built it.', needs: null, artifacts: ['NOTES.md'] }, 30);
 settled('t-review', { outcome: 'blocked', summary: 'Half reviewed.', needs: 'Which database?', artifacts: [] }, 50);
 write(path.join(root, 'runs', `${RUN}.labels`), JSON.stringify({ team: 'core' }));
+waitingRun('r-working', { steps: { build: { taskId: 't-working' } } });
+journal('t-working', [
+  { kind: 'filed', at: at(100), brief: 'The brief of t-working.', cwd: root, harness: 'codex', queued: false },
+  { kind: 'starting', at: at(101), attempt: 1 },
+  { kind: 'spawned', at: at(101), attempt: 1 },
+  {
+    kind: 'image',
+    at: at(102),
+    attempt: 1,
+    image: path.join(root, 'releases', 'v1.2.0', 'packages', 'agent-runtime'),
+    harnessVersion: '0.200.0',
+  },
+]);
 write(
   path.join(root, 'inbox', 'cache-the-views.md'),
   "---\nworkflow: dev\nlabels:\n  team: core\n---\nCache the engine's views between passes.\n",
@@ -213,6 +226,12 @@ for (const [argv, route] of READS)
     assert.equal(served.err, local.err, 'the same stderr');
     assert.match(api.said().slice(before), route, 'it asked the api');
   });
+
+test('`nemia ls` says what the session of a step at work runs on, off its attempt’s record, beside its line', async () => {
+  const said = await nemia(['ls', 'r-working']);
+  assert.equal(said.code, 0, said.err);
+  assert.match(said.out, /build .* · on v1\.2\.0, codex 0\.200\.0/);
+});
 
 test("REFUSED: an unknown run is the api's refusal, exit 2, naming the command that lists the runs", async () => {
   const shown = await nemia(['show', 'no-such-run']);

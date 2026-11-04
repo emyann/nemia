@@ -52,7 +52,7 @@ removes any other a rule could give, so a relabelled card is followed and a labe
 through REST and never `gh pr edit`. A malformed rule, or a label a rule gives that the repository lacks, is the check's refusal before
 anything is pushed. GitHub has no labelled create, so the open sets the labels through REST the moment the pull request exists, in the
 same call, before a CI job that reads them can start: a check that reads a pull request's labels never sees the run's unlabelled.
-The rules reach the open as `--labels` on the line implement's note renders from the parameter, and an open without the flag is
+The rules reach the open as `--labels` on the line the implement step's note renders from the parameter, and an open without the flag is
 refused. A card with no label a rule reads, or a pull request opened by hand, gets no label from it.
 
 Land merges that same pull request, through `landing.ts`, which its check also reads from the frozen files. Otto runs its `merge --run

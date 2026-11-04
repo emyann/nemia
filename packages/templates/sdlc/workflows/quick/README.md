@@ -50,7 +50,7 @@ run copies this folder alone, so it carries `build`'s `probe.ts`, `pull-request.
 3. `build`'s `pull-request.ts`, quick's copy of it: `push` pushes the branch and refuses unless the one open, non-draft
    pull request of it is at the commit the check judges, and labels that pull request from the run's labels by the factory's
    `pullRequestLabels` rules (`<key>=<value>:<label>`; empty, the default, labels nothing), as `build`'s README says, and as
-   implement's `open` already did when it created the pull request; `wait` polls the CI context the factory names (its `ciCheck`
+   the implement step's `open` already did when it created the pull request; `wait` polls the CI context the factory names (its `ciCheck`
    parameter, `ci` by default) on that head, reading only the latest run of each check, and refuses a red, cancelled or missing one with the Actions URL, the failing jobs and a tail of their log.
 
 On GitHub, no typecheck, no lint and no test on this machine: nothing here runs Grace's tests for her before the review. Her session runs the

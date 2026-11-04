@@ -177,6 +177,12 @@ What the `create-an-agent` skill (`packages/agent-orchestrator/skills/create-an-
   (`npx tsc --noEmit`, `npx oxlint`), and deny on that line what would write or watch, `tsc`'s options by their first letters in each
   case, since it reads an option's name in any case and after one dash or two; intake and the janitor deny both whole. Each of the
   four is told, in one paragraph they hold equal, to put a refused call its work needs at the top of its sign-off, never only in a risk.
+- **In the nemia factory, build's design writes the contracts its spec adds** (`change-a-contract`): the factory's own copy of Seldon,
+  in its tree out of git, adds `Write, Edit` to its tools and allows `Edit(packages/*/contracts/*.contract.ts)` and
+  `Edit(apps/*/contracts/*.contract.ts)`, a contract directly under a package's or an app's `contracts/` and no other file, each path
+  read from the session's working folder; a step's fence only narrows its agent's, so the lines are the agent's, never the step's.
+  `packages/agent-orchestrator/test/agent-fences.test.ts` holds them on planted lines: the checkout's contracts written, every other file
+  refused, and the same lines on a step refused at load.
 
 ## Where things are
 

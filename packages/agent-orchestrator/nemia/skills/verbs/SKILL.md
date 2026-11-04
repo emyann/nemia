@@ -428,7 +428,9 @@ Each asks the person at a prompt every time it runs: say what it does before you
                                the repository the tag is in (the running release's source);
                                --name: the service (nemia). Then it removes each release that is
                                not current, not among the two newest, and that no session or
-                               running nemia runs on, as the daemon does every five minutes
+                               running nemia runs on, the folder of each build whose upgrade died,
+                               and each build log older than 30 days, as the daemon does every five
+                               minutes
   nemia frontmatter rewrite [<folder>...] [--check]
                                rewrite as YAML each markdown file's frontmatter still in the former
                                line form, under the folders given or the store's own. --check: write

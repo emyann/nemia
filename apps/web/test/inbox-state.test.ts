@@ -1,6 +1,7 @@
 /**
  * A card's state is the orchestrator's, computed once and sent closed (`InboxEntry.state`, src/lib/api/inbox.ts): the board reads it and
- * never rebuilds it from the runs a card was started as. A test of what `src/` says about the inbox, read as text.
+ * never rebuilds it from the runs a card was started as: whether a card started is its state's kind (`CARD_KIND`, src/lib/inbox.ts). A
+ * test of what `src/` says about the inbox, read as text.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -17,7 +18,8 @@ const REBUILT = /startedAs\s*\.\s*(length|includes|some|find|every)\b/g;
 /** Each place `text`, the file `file`, rebuilds a card's state from `startedAs`, as `<file>:<line>` and the fix. */
 export const rebuiltAt = (file: string, text: string): string[] =>
   [...text.matchAll(REBUILT)].map(
-    (m) => `${file}:${text.slice(0, m.index).split('\n').length} reads startedAs.${m[1]}: read the card's \`state\` ('started') instead`,
+    (m) =>
+      `${file}:${text.slice(0, m.index).split('\n').length} reads startedAs.${m[1]}: read whether it started off its \`state\` through CARD_KIND (src/lib/inbox.ts) instead`,
   );
 
 const sources = (dir: string): string[] =>
@@ -31,7 +33,7 @@ test("REFUSED: a card's state rebuilt from startedAs is found, on one line or ac
   const lines = (found: string[]) => found.map((at) => at.split(' ')[0]);
   assert.deepEqual(lines(rebuiltAt('a.ts', 'const started = entry.startedAs.length === 0;')), ['a.ts:1']);
   assert.deepEqual(lines(rebuiltAt('b.ts', 'x\nentry.startedAs\n  .includes(id);\ncard.startedAs.some(f)')), ['b.ts:2', 'b.ts:4']);
-  assert.deepEqual(rebuiltAt('c.ts', "entry.startedAs.map((id) => id); entry.state === 'started'"), []);
+  assert.deepEqual(rebuiltAt('c.ts', "entry.startedAs.map((id) => id); CARD_KIND[entry.state] !== 'unstarted'"), []);
 });
 
 test("no file of the board's src rebuilds a card's state from startedAs", () => {

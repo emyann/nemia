@@ -10,7 +10,6 @@ import type { StatsMemo } from '../stats/stats.verb.ts';
 import type { InformerMemo } from '../rest/informer.verb.ts';
 import type { ScheduleRuns } from '../schedule/listed.store.ts';
 import type { PauseRuns } from '../pause/pause.ts';
-import type { InboxRuns } from '../inbox/index.ts';
 import type { SeriesMemo } from '../series/series.ts';
 import type { Filings } from '../summary/reads.verb.ts';
 import type { Args, CommandSpec } from './command.ts';
@@ -29,11 +28,10 @@ export type Kept = {
 };
 
 /**
- * A memo of a projection of every run's record, one per read that polls (`keptRecords`): the inbox's listing, the factories' schedules
- * and the pause's current tasks. A read handed none reads every record, as the command line does.
+ * A memo of a projection of every run's record, one per read that polls (`keptRecords`): the factories' schedules and the pause's current
+ * tasks. A read handed none reads every record, as the command line does.
  */
 export type KeptRecords = {
-  readonly inbox?: InboxRuns;
   readonly factories?: ScheduleRuns;
   readonly pause?: PauseRuns;
 };

@@ -53,11 +53,12 @@ const team = (): string => {
   return dir;
 };
 
-/** The run started on `team` and advanced one pass, so both its steps are filed. */
-const started = async (): Promise<string> => {
+/** The run started on `team`, from the card `card` where one is given, and advanced one pass, so both its steps are filed. */
+const started = async (card?: string): Promise<string> => {
   const repo = scratch('wf-summary-repo-');
   stand().world.repository(repo, {});
-  const run = await runPlaced(startRun({ brief: 'sum me', repo, workflowDir: team(), isolate: true }));
+  const from = card === undefined ? {} : { from: { inbox: card } };
+  const run = await runPlaced(startRun({ brief: 'sum me', repo, workflowDir: team(), isolate: true, ...from }));
   await runWith(e(), advanceRun(readRun(run.id)));
   return run.id;
 };
@@ -111,4 +112,29 @@ test("a run's judged fields: the judgement's run-level words, its time at work a
   const row = list.find((r) => r.id === id);
   assert.ok(row, `the run ${id} is listed`);
   assert.equal(row.atWork?.since, AT, "the list's row carries the judged time at work");
+});
+
+test('`cardRuns`: each run started from a card with its phase as the list judges it, read now; a run from no card is not answered, and stays in the informer', async () => {
+  const { cardRuns } = await import('./summary.verb.ts');
+  const { informerMemo, passStarted } = await import('../rest/informer.verb.ts');
+  const fromCard = await started('cache-the-views-k2q9');
+  const loose = await started();
+  const memo = informerMemo();
+  const how = { home: ROOT, memo, filings: { filed: new Map(), cursor: 0 }, verify: false };
+  passStarted(memo);
+  await runWith(e(), RUNS.handler({}, { ...process.env, WF_VERIFY_REST: '0' }, ROOT, { runs: memo }));
+  assert.ok(memo.runs.has(loose), 'the list, within a pass, kept the run from no card');
+
+  assert.deepEqual(await runWith(e(), cardRuns(e(), how)), [{ id: fromCard, from: { inbox: 'cache-the-views-k2q9' }, phase: 'running' }]);
+  assert.ok(memo.runs.has(loose), "an inbox read leaves the list's run from no card where it was");
+
+  for (const step of ['build', 'notes'])
+    engine().settle(`${fromCard}-${step}`, 'succeeded', { closeout: SIGNED, startedAt: AT, spawnedAt: AT });
+  await runWith(e(), advanceRun(readRun(fromCard)));
+  passStarted(memo);
+  assert.deepEqual(
+    (await runWith(e(), cardRuns(e(), how))).map((r) => r.phase),
+    ['succeeded'],
+    'its run settled, the phase moves with it: nothing was written on the card',
+  );
 });

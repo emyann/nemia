@@ -41,7 +41,7 @@ const { approveRun, forgetRun, isRepositoryRun, prune, retryRun, startRun, Store
 const atRoot = <A, E>(program: Effect.Effect<A, E>): A => Effect.runSync(Effect.provideService(program, StoreRoot, ROOT));
 const addToInbox = (opts: Parameters<typeof verbs.addToInbox>[0]) => atRoot(verbs.addToInbox(opts));
 const queueInInbox = (...args: Parameters<typeof verbs.queueInInbox>) => atRoot(verbs.queueInInbox(...args));
-const readInbox = (memo?: Parameters<typeof verbs.readInbox>[0]) => atRoot(verbs.readInbox(memo));
+const readInbox = () => atRoot(verbs.readInbox());
 const { listRuns, readRun } = await import('../record/record.store.ts');
 const { resumePause, putPause } = await import('../pause/pause.store.ts');
 const { tickRun, freshRestMemo } = await import('./tick.verb.ts');

@@ -20,7 +20,6 @@ import {
   Informer,
   type InformerMemo,
   recordMemo,
-  type InboxRuns,
   type PauseRuns,
   type RecordMemo,
   type ScheduleRuns,
@@ -52,7 +51,7 @@ export class ApiConfig extends Context.Service<ApiConfig, { readonly env: NodeJS
  * in `liveOf`): the stats' memo of each run's facts (`stats`, the package's `StatsMemo`), the feed's filing times (`filings`,
  * `filedTimes`), where each blocked session's conversation was last read (`said`), the series' days read (`series`, the
  * package's `SeriesMemo`), and `records`, one memo per read that wants a little of every run (the package's `RecordMemo`, keyed by the
- * run's stamp alone): the inbox's listing, the factories' schedules, the pause's current tasks and a step's recent runs. One for an app,
+ * run's stamp alone): the factories' schedules, the pause's current tasks and a step's recent runs. One for an app,
  * built with its runtime (`live`), so an app over another engine starts with none. A cache: nothing is decided by it.
  */
 export class ReadMemo extends Context.Service<
@@ -63,7 +62,6 @@ export class ReadMemo extends Context.Service<
     readonly said: LastSaid;
     readonly series: SeriesMemo;
     readonly records: {
-      readonly inbox: InboxRuns;
       readonly factories: ScheduleRuns;
       readonly pause: PauseRuns;
       readonly step: RecordMemo<StepRun>;
@@ -75,7 +73,7 @@ export class ReadMemo extends Context.Service<
     filings: { filed: new Map(), cursor: 0 },
     said: new Map(),
     series: seriesMemo(),
-    records: { inbox: recordMemo(), factories: recordMemo(), pause: recordMemo(), step: recordMemo() },
+    records: { factories: recordMemo(), pause: recordMemo(), step: recordMemo() },
   }));
 }
 

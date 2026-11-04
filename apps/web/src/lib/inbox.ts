@@ -1,4 +1,4 @@
-import type { Ceilings, Factory, InboxEntry, WorkflowListing } from './api';
+import type { CardState, Ceilings, Factory, InboxEntry, WorkflowListing } from './api';
 import { DEFAULT_NAME, shownIn, startRepo } from './factories.ts';
 
 /**
@@ -7,6 +7,39 @@ import { DEFAULT_NAME, shownIn, startRepo } from './factories.ts';
  */
 export const newestCardsFirst = (entries: readonly InboxEntry[]): InboxEntry[] =>
   [...entries].sort((a, b) => (b.filedAt ?? '').localeCompare(a.filedAt ?? '') || a.name.localeCompare(b.name));
+
+/**
+ * Where a card stands, by its state, one total table: `unstarted` its own three (filed, queued, refused), `in flight` a run pending,
+ * running or waiting on a person, `ended` a run that ended. Whether a card started is read here, never from its `startedAs`; the first two
+ * are the cards in play, which the api lists by default (the orchestrator's `CARD_IN_PLAY`).
+ */
+export const CARD_KIND: Readonly<Record<CardState, 'unstarted' | 'in flight' | 'ended'>> = {
+  filed: 'unstarted',
+  queued: 'unstarted',
+  refused: 'unstarted',
+  pending: 'in flight',
+  running: 'in flight',
+  waiting: 'in flight',
+  succeeded: 'ended',
+  failed: 'ended',
+  stopped: 'ended',
+  cancelled: 'ended',
+};
+
+/** Whether a card was started: its state is a run's phase (`CARD_KIND`), whether that run is in flight or ended. */
+export const startedCard = (entry: Pick<InboxEntry, 'state'>): boolean => CARD_KIND[entry.state] !== 'unstarted';
+
+/** Whether a card is still in play: not started, or its run is in flight — what `GET /api/inbox` lists by default. */
+export const inPlay = (entry: Pick<InboxEntry, 'state'>): boolean => CARD_KIND[entry.state] !== 'ended';
+
+/** The cards still in play (`inPlay`), in their order: the Inbox page's In play, an entry that does not read as a card among them. */
+export const cardsInPlay = <T extends Pick<InboxEntry, 'state'>>(entries: readonly T[]): T[] => entries.filter(inPlay);
+
+/** The cards whose run ended (`CARD_KIND` `ended`), in their order: the Inbox page's Ended. */
+export const cardsEnded = <T extends Pick<InboxEntry, 'state'>>(entries: readonly T[]): T[] => entries.filter((entry) => !inPlay(entry));
+
+/** The Inbox page's `?cards=`: `ended` lists the cards whose run ended; absent, or any other value, the cards in play. */
+export const cardsSearch = (search: Record<string, unknown>): { cards?: 'ended' } => (search.cards === 'ended' ? { cards: 'ended' } : {});
 
 /** Whether an entry of the inbox is a card's file, `<name>.md`, and not a stray file the listing shows with why it is not a card. */
 const isCard = (entry: Pick<InboxEntry, 'file'>): boolean => entry.file.endsWith('.md');
@@ -290,12 +323,13 @@ export function capLine(ceilings: Pick<Ceilings, 'cap' | 'inFlight'>, queued: nu
 }
 
 /**
- * The cards of the factory `picked` names that are not yet started, as the rail's Inbox badge counts them: each card that reads and is
- * not `started`, queued or not; every factory's while `picked` names none (`shownIn`), as the Inbox page lists them then.
+ * The cards of the factory `picked` names that are not yet started, as the rail's Inbox badge counts them: each card that reads and whose
+ * kind is `unstarted` (`CARD_KIND`: filed, queued or refused), never one whose run is in flight or ended; every factory's while `picked`
+ * names none (`shownIn`), as the Inbox page lists them then.
  */
 export const notStarted = (entries: readonly InboxEntry[], picked: string | undefined): InboxEntry[] =>
   shownIn(
-    entries.filter((entry) => entry.error === null && entry.state !== 'started'),
+    entries.filter((entry) => entry.error === null && CARD_KIND[entry.state] === 'unstarted'),
     picked,
   );
 

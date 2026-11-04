@@ -313,7 +313,11 @@ test('a person works in a factory with hires: the listing names what is unfilled
       const { id } = (await res.json()) as { id: string };
       const run = runStore.runs.read(id);
       assert.deepEqual([run.factory, run.repo, run.from?.inbox], ['hired', repoR, card.name]);
-      assert.equal(onStore(readInbox()).find((c) => c.name === card.name)?.state, 'started', 'the card is kept, listed as started');
+      assert.deepEqual(
+        onStore(readInbox()).find((c) => c.name === card.name)?.startedAs,
+        [id],
+        'the card is kept, listed as started as its run',
+      );
     },
   );
 

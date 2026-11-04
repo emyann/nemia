@@ -30,8 +30,9 @@
  * **The keys are a closed list**, as a plan card's are: a key nothing reads is a constraint nobody enforces.
  *
  * Nothing about a run changes. A card started is a run like any other, whose record carries `from: { inbox: <name> }`, and the card is
- * kept: it has a life of its own, its `CardState`, read once by the listing (`cardState`) from its file, the records that name it and the
- * tick's tries, and sent as is.
+ * kept: the card and its run are two records. Its `CardState` is its own until it starts — read by the listing (`cardState`) from its
+ * file and the tick's tries — and its run's phase from then on, read from the run each time the inbox is read and never stored on the
+ * card; sent as is.
  *
  * Pure: handed a card's text, the folder's entries and the run records, and whether a path is a directory, never reading one
  * (inbox.store.ts and inbox.verb.ts read them).
@@ -40,7 +41,7 @@ import path from 'node:path';
 import { bodyOf, frontmatterKeys, type PlanFile } from '../plan/plan.ts';
 import { DEFAULT_FACTORY, factoryNameRefusal, type Factory } from '../factory/factory.ts';
 import type { Run } from '../record/record.ts';
-import type { RecordMemo } from '../rest/index.ts';
+import { RUN_PHASES, type RunPhase } from '../phase/phase.ts';
 import { isReadme, splitFrontmatter, WorkflowError } from '../step/step.ts';
 import {
   frontmatterOrNull,
@@ -304,7 +305,7 @@ export type InboxListing = {
   startedAs: string[];
   /** A person's labels on the card (`labels:`): none, `{}`, on a card that carries none and on an entry that does not read as a card. */
   labels: Labels;
-  /** Where the card is in its life (`cardState`): computed here once, and read as is by everything above. */
+  /** Where the card is in its life (`cardState`): computed here once, its run's phase once started, and read as is above. */
   state: CardState;
   /** Why the entry does not read as a card: its card's refusal, or not a `.md` file. Null for a card. */
   error: string | null;
@@ -338,22 +339,47 @@ export type InboxListing = {
 export type MissedStart = { at: string; text: string; repo: string; why: string; refused: boolean };
 
 /**
- * Where a card is in its life, closed: `filed` — in the inbox, to be started by a person; `queued` — waiting for the tick to start it;
- * `refused` — queued, and the tick's start of it as it stands was refused, so it waits for a person; `started` — a run's record names it.
+ * Where a card is in its life, closed: its own word until it starts — `filed`, in the inbox, to be started by a person; `queued`, waiting
+ * for the tick to start it; `refused`, queued, and the tick's start of it as it stands was refused, so it waits for a person — and its
+ * run's phase from then on (`RUN_PHASES`). A card whose run's record is gone is free again, and reads its own word.
  */
-export const CARD_STATES = ['filed', 'queued', 'refused', 'started'] as const;
+export const CARD_STATES = ['filed', 'queued', 'refused', ...RUN_PHASES] as const;
 export type CardState = (typeof CARD_STATES)[number];
 
-/**
- * A listed entry's state, from what the listing read of it: `started` when a record names it, whatever it carries; else `refused` when it
- * is queued and its try as it stands was refused; else `queued` when it is queued; else `filed` — an entry that does not read as a card
- * among them, its `error` saying why. Pure.
- */
-export const cardState = (l: Pick<InboxListing, 'startedAs' | 'queued' | 'tried'>): CardState =>
-  l.startedAs.length ? 'started' : l.queued ? (l.tried?.refused ? 'refused' : 'queued') : 'filed';
+/** A run as the inbox reads it: its id, the card it was started from, and its phase as the runs list judges it, read now. */
+export type CardRun = Pick<Run, 'id' | 'from'> & { phase: RunPhase };
 
-/** The memo a caller that polls the inbox keeps of what its listing reads of every run: the card it was started from, under its id. */
-export type InboxRuns = RecordMemo<Pick<Run, 'id' | 'from'>>;
+/**
+ * A listed entry's state, from what the listing read of it: the phase of its run when a record names it, whatever the card carries — the
+ * first of its runs still in play where several do, else the last's; else `refused` when it is queued and its try as it stands was
+ * refused; else `queued` when it is queued; else `filed` — an entry that does not read as a card among them, its `error` saying why. Pure.
+ */
+export const cardState = (l: Pick<InboxListing, 'queued' | 'tried'> & { phases: readonly RunPhase[] }): CardState =>
+  l.phases.find((phase) => CARD_IN_PLAY[phase]) ?? l.phases.at(-1) ?? (l.queued ? (l.tried?.refused ? 'refused' : 'queued') : 'filed');
+
+/**
+ * Whether a card in each state is still in play, which is what `nemia inbox` and the board's Inbox list by default: a card not started,
+ * and one whose run has not ended — `pending`, `running`, `waiting`. A card whose run ended (`succeeded`, `failed`, `stopped`,
+ * `cancelled`) is listed with `--all`. Total, so a new state is placed here before it typechecks.
+ */
+export const CARD_IN_PLAY: Readonly<Record<CardState, boolean>> = {
+  filed: true,
+  queued: true,
+  refused: true,
+  pending: true,
+  running: true,
+  waiting: true,
+  succeeded: false,
+  failed: false,
+  stopped: false,
+  cancelled: false,
+};
+
+/** Whether `l` is a card still in play (`CARD_IN_PLAY`). Pure. */
+export const cardInPlay = (l: Pick<InboxListing, 'state'>): boolean => CARD_IN_PLAY[l.state];
+
+/** An entry as the inbox lists it before its runs' phases are read: everything but its `state` (`cardsListed`). */
+export type CardListing = Omit<InboxListing, 'state'>;
 
 /**
  * The workflow, repository and factory a card that does not read lists, off its lenient reading (`lenient`): each as written where it is
@@ -365,22 +391,22 @@ function queuedKeys(lenient: InboxCard | undefined): Pick<InboxListing, 'workflo
 }
 
 /**
- * The inbox as `nemia inbox` lists it, by file name: every entry of the folder — a folder inside it by its name and a trailing `/` — each
- * card with the runs its name is on (`startedAs`), and each entry that is not a card listed with why, never hidden. A hidden file and a
- * README are not listed: the one is an editor's, the other says what the folder is for. A queued card says when, and its place in the
- * order; and, when the tick's last try of its start is of the card as it stands (`tries`, by name), that try. A queued card that reads but
- * for a `repo:` naming no directory keeps its place, with its workflow and repository as written, the repository keying its try: the start
- * refuses it by name, as it refuses a workflow gone, and it never leaves the queue with nothing said. An entry that does not read for
- * another reason is not queued. Each card says the repository its factory picks for it (`factoryRepo`), from the store's `factories` that
- * read, by name: with none handed, none picks one.
+ * The inbox as `nemia inbox` lists it before its runs' phases are read (`CardListing`), by file name: every entry of the folder — a folder
+ * inside it by its name and a trailing `/` — each card with the runs its name is on (`startedAs`), and each entry that is not a card listed
+ * with why, never hidden. A hidden file and a README are not listed: the one is an editor's, the other says what the folder is for. A
+ * queued card says when, and its place in the order; and, when the tick's last try of its start is of the card as it stands (`tries`, by
+ * name), that try. A queued card that reads but for a `repo:` naming no directory keeps its place, with its workflow and repository as
+ * written, the repository keying its try: the start refuses it by name, as it refuses a workflow gone, and it never leaves the queue with
+ * nothing said. An entry that does not read for another reason is not queued. Each card says the repository its factory picks for it
+ * (`factoryRepo`), from the store's `factories` that read, by name: with none handed, none picks one.
  */
-export function inboxListing(
+export function cardsListed(
   files: readonly PlanFile[],
   runs: readonly Pick<Run, 'id' | 'from'>[],
   isDirectory: (at: string) => boolean,
   tries: ReadonlyMap<string, MissedStart> = new Map(),
   factories: ReadonlyMap<string, Pick<Factory, 'repos'>> = new Map(),
-): InboxListing[] {
+): CardListing[] {
   const triedOf = (name: string, text: string): Pick<InboxListing, 'tried'> => {
     const t = tries.get(name);
     return t && t.text === text ? { tried: { at: t.at, repo: t.repo, why: t.why, refused: t.refused } } : {};
@@ -388,7 +414,7 @@ export function inboxListing(
   const listed = files
     .filter((f) => !f.file.startsWith('.') && !isReadme(f.file))
     .sort((a, b) => a.file.localeCompare(b.file))
-    .map(({ file, text }): Omit<InboxListing, 'state'> => {
+    .map(({ file, text }): CardListing => {
       if (!file.endsWith('.md')) {
         return {
           name: file,
@@ -445,8 +471,7 @@ export function inboxListing(
           ...(queued !== undefined ? { queued: { at: queued, place: null }, ...triedOf(name, text) } : {}),
         };
       }
-    })
-    .map((l): InboxListing => ({ ...l, state: cardState(l) }));
+    });
   queueOrder(listed).forEach((l, i) => {
     if (l.queued) l.queued.place = i + 1;
   });
@@ -454,13 +479,31 @@ export function inboxListing(
 }
 
 /**
- * The queued cards in the order the tick starts them: by when each was queued, then by name — a `started` card left out, since it is never
- * started again, even one whose `queued:` line its start could not take off. Pure. A card whose start was refused keeps its place, and the
- * tick passes over it (`nextQueued`).
+ * The inbox as `nemia inbox` and the board list it: `cardsListed`, each entry with its `state` (`cardState`), off the phases of the
+ * runs that name it, which `runs` carries as read now. Pure.
  */
-export const queueOrder = (listing: readonly InboxListing[]): InboxListing[] =>
+export function inboxListing(
+  files: readonly PlanFile[],
+  runs: readonly CardRun[],
+  isDirectory: (at: string) => boolean,
+  tries: ReadonlyMap<string, MissedStart> = new Map(),
+  factories: ReadonlyMap<string, Pick<Factory, 'repos'>> = new Map(),
+): InboxListing[] {
+  const phases = new Map(runs.map((r) => [r.id, r.phase] as const));
+  return cardsListed(files, runs, isDirectory, tries, factories).map((l) => ({
+    ...l,
+    state: cardState({ ...l, phases: l.startedAs.flatMap((id) => phases.get(id) ?? []) }),
+  }));
+}
+
+/**
+ * The queued cards in the order the tick starts them: by when each was queued, then by name — a card a run was started from left out
+ * (`startedAs`), since it is never started again, even one whose `queued:` line its start could not take off. Pure. A card whose start was
+ * refused keeps its place, and the tick passes over it (`nextQueued`).
+ */
+export const queueOrder = <L extends Pick<CardListing, 'name' | 'queued' | 'startedAs'>>(listing: readonly L[]): L[] =>
   listing
-    .flatMap((l) => (l.queued && l.state !== 'started' ? [{ l, at: l.queued.at }] : []))
+    .flatMap((l) => (l.queued && !l.startedAs.length ? [{ l, at: l.queued.at }] : []))
     .sort((a, b) => a.at.localeCompare(b.at) || a.l.name.localeCompare(b.l.name))
     .map(({ l }) => l);
 
@@ -499,11 +542,11 @@ export function queueRepo(
  * as it stands — its text the same, and tried on the repository it would be tried on now (`queueRepo`, with the store's `factories` by
  * name). A card whose start failed for any other reason keeps its place, and is tried again. Pure.
  */
-export const nextQueued = (
-  listing: readonly InboxListing[],
+export const nextQueued = <L extends Pick<CardListing, 'name' | 'queued' | 'startedAs' | 'tried' | 'repo' | 'factory'>>(
+  listing: readonly L[],
   repo: string,
   factories: ReadonlyMap<string, Pick<Factory, 'repos'>> = new Map(),
-): InboxListing | undefined => queueOrder(listing).find((l) => !(l.tried?.refused && l.tried.repo === queueRepo(l, repo, factories).repo));
+): L | undefined => queueOrder(listing).find((l) => !(l.tried?.refused && l.tried.repo === queueRepo(l, repo, factories).repo));
 
 /**
  * What the tick did with the queue on a pass (`startQueued` in inbox.verb.ts): started the next card as a run — and, when its `queued:`
@@ -576,7 +619,7 @@ export function inboxLines(listing: readonly InboxListing[], unfactoredStarts = 
   const width = Math.max(0, ...listing.map((l) => l.name.length));
   const inLine = listing.filter((l) => l.queued?.place).length;
   return listing.map((l) => {
-    const started = l.startedAs.length ? `  started as ${l.startedAs.join(', ')}` : '';
+    const started = l.startedAs.length ? `  started as ${l.startedAs.join(', ')}, ${phaseSaid(l.state)}` : '';
     const queued = l.queued?.place ? `  queued ${l.queued.place} of ${inLine}` : '';
     const tried = triedClause(l, unfactoredStarts);
     const labelled = labelSegments(cardLabels(l), show);
@@ -584,6 +627,11 @@ export function inboxLines(listing: readonly InboxListing[], unfactoredStarts = 
     return `${l.name.padEnd(width)}  ${(l.title ?? '').slice(0, 56).trimEnd()}${l.workflow ? `  workflow: ${l.workflow}` : ''}${l.repo ? `  repo: ${l.repo}` : ''}${l.gate ? `  gate: ${l.gate}` : ''}${l.factory ? `  factory: ${l.factory}` : ''}${queued}${tried}${started}${labelled}`;
   });
 }
+
+/**
+ * A started card's state as `nemia inbox` says it beside its run: its run's phase, and `waiting on you` for a run that waits on a person.
+ */
+const phaseSaid = (state: CardState): string => (state === 'waiting' ? 'waiting on you' : state);
 
 /** What `nemia inbox` shows of each card's labels: all of them (`--show-labels`), and a segment per key asked for (`-L`), in order. */
 export type LabelsShown = { readonly showLabels?: boolean; readonly columns?: readonly string[] };

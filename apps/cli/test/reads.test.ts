@@ -82,6 +82,7 @@ write(
       build: { taskId: 't-build-2', tries: [{ taskId: 't-build-1', cause: 'fresh' }] },
       review: { taskId: 't-review' },
     },
+    from: { inbox: 'hold-the-reads' },
   }),
 );
 /** A run of one step not filed yet, beside `RUN`, with `more` on its record: a wait, a hold or a cancellation for `nemia ls` to word. */
@@ -104,7 +105,7 @@ waitingRun('r-after', { after: ['r-missing'] });
 waitingRun('r-held', {});
 write(path.join(root, 'runs', 'r-held.hold'), JSON.stringify({ at: at(70), until: [RUN], why: 'merge conflicts', by: 'operator' }));
 write(path.join(root, 'cordon'), JSON.stringify({ at: at(90), by: 'operator', why: 'a release' }));
-waitingRun('r-cancelled', { cancelledAt: at(80) });
+waitingRun('r-cancelled', { cancelledAt: at(80), from: { inbox: 'called-off' } });
 settled('t-build-1', { outcome: 'done', summary: 'A first cut.', needs: null, artifacts: [] }, 10);
 settled('t-build-2', { outcome: 'done', summary: 'Built it.', needs: null, artifacts: ['NOTES.md'] }, 30);
 settled('t-review', { outcome: 'blocked', summary: 'Half reviewed.', needs: 'Which database?', artifacts: [] }, 50);
@@ -128,6 +129,8 @@ write(
 );
 write(path.join(root, 'inbox', 'tidy-the-docs.md'), '---\nlabels:\n  team: docs\n---\nTidy the docs.\n');
 write(path.join(root, 'inbox', 'notes.txt'), 'not a card\n');
+write(path.join(root, 'inbox', 'hold-the-reads.md'), 'Hold the reads to the old path.\n');
+write(path.join(root, 'inbox', 'called-off.md'), '---\nlabels:\n  team: gone\n---\nCalled off.\n');
 
 /** How a child ended, and what it said on each stream. */
 type Said = { code: number | null; out: string; err: string };
@@ -196,7 +199,26 @@ const READS: ReadonlyArray<readonly [readonly string[], RegExp]> = [
   [['inbox', '-l', 'team=core', '-l', 'team=docs', '--show-labels', '-L', 'team'], /\/api\/inbox\b/],
   [['inbox', '-L', 'team', '-L', 'workflow'], /\/api\/inbox\b/],
   [['inbox', '-l', 'team=nope'], /\/api\/inbox\b/],
+  [['inbox', '--all'], /\/api\/inbox\b/],
+  [['inbox', '-l', 'team=gone'], /\/api\/inbox\b/],
+  [['inbox', '-l', 'team=gone', '--all'], /\/api\/inbox\b/],
 ];
+
+test("a started card says its run's phase, `waiting on you` where its run waits on a person; one whose run ended is listed with --all alone", async () => {
+  const listed = await nemia(['inbox']);
+  assert.equal(listed.code, 0, listed.err);
+  assert.match(listed.out, /^hold-the-reads .*  started as r-parity, waiting on you$/m, 'its run waits on a person');
+  assert.doesNotMatch(listed.out, /^called-off /m, 'its run was called off: out of the cards in play');
+  const all = await nemia(['inbox', '--all']);
+  assert.match(
+    all.out,
+    /^called-off .*  started as r-cancelled, cancelled$/m,
+    'listed with --all, sent to the api as ?all=true, in its phase',
+  );
+  const gone = await nemia(['inbox', '-l', 'team=gone']);
+  assert.match(gone.out, /1 whose run ended/, 'a selector only ended cards match says how many, and how to list them');
+  assert.match(gone.out, /nemia inbox --all/);
+});
 
 test('the labels the parity seeds show on the lines a person asks them on', async () => {
   const listed = await nemia(['ls', '-l', 'team=core', '--show-labels']);

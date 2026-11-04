@@ -8,11 +8,37 @@ import { KeyRowSchema, type KeyRow } from './library.ts';
 import type { WorkflowListing } from './workflows.ts';
 
 /**
- * A card's life, as the orchestrator computes it once (`CardState` in its inbox) and the api sends it: `started` once a run's record names
- * it, whatever else it carries; `refused` queued and refused as it stands; `queued` queued otherwise; `filed` every other, an entry that
- * does not read as a card among them. The board reads it and never rebuilds it from `queued`, `tried` or `startedAs`.
+ * A card's life, as the orchestrator computes it once (`CardState` in its inbox) and the api sends it: its own until it starts — `refused`
+ * queued and refused as it stands, `queued` queued otherwise, `filed` every other, an entry that does not read as a card among them — and
+ * its run's phase from then on (`pending`, `running`, `waiting` on a person, `succeeded`, `failed`, `stopped`, `cancelled`), read as the
+ * inbox is read and never kept on the card. A card whose run's record was removed reads `filed` again. The board reads it and never
+ * rebuilds it from `queued`, `tried`, `startedAs` or the run.
  */
-export type CardState = 'filed' | 'queued' | 'refused' | 'started';
+export type CardState =
+  | 'filed'
+  | 'queued'
+  | 'refused'
+  | 'pending'
+  | 'running'
+  | 'waiting'
+  | 'succeeded'
+  | 'failed'
+  | 'stopped'
+  | 'cancelled';
+
+/** Every `CardState`, in the order the orchestrator lists them (`CARD_STATES`): the card's own three, then its run's phases. */
+export const CARD_STATES = [
+  'filed',
+  'queued',
+  'refused',
+  'pending',
+  'running',
+  'waiting',
+  'succeeded',
+  'failed',
+  'stopped',
+  'cancelled',
+] as const satisfies readonly CardState[];
 
 /**
  * Mirrors `InboxEntry` in apps/api/src/inbox/inbox.ts: a card as the CLI's `inbox` lists it — or an entry of the inbox that does not read
@@ -70,7 +96,7 @@ const inboxEntryFields = {
   from: Schema.mutable(Schema.Array(Schema.String)),
   gate: Schema.optionalKey(Schema.String),
   startedAs: Schema.mutable(Schema.Array(Schema.String)),
-  state: Schema.Literals(['filed', 'queued', 'refused', 'started']),
+  state: Schema.Literals(CARD_STATES),
   error: Schema.NullOr(Schema.String),
   body: Schema.NullOr(Schema.String),
   filedAt: Schema.NullOr(Schema.String),
@@ -84,19 +110,35 @@ const inboxEntryFields = {
 const InboxEntrySchema = decodes<InboxEntry>()(Schema.Struct(inboxEntryFields));
 
 /**
- * The inbox. Not polled: it changes when a person files, drops or starts a card, here or at the command line. Read again on each visit, and
- * on a run's event on the workflow feed, which a queued card started is; the feed says nothing of cards.
+ * The inbox's cards still in play (`GET /api/inbox`): each not yet started, and each whose run is pending, running or waiting — a card
+ * whose run ended is left out (`inboxAllQuery` lists it). Not polled: it changes when a person files, drops or starts a card, here or at
+ * the command line. Read again on each visit, and on a run's event on the workflow feed, which a queued card started is, and a run
+ * ending too; the feed says nothing of cards.
  */
 export const inboxQuery = queryOptions({
   queryKey: ['inbox'],
   queryFn: () => get('/api/inbox', Schema.mutable(Schema.Array(InboxEntrySchema))),
 });
 
-/** The inbox's cards `selector` takes by their labels (`?selector=`), or every card for none; under `['inbox']`, read again with it. */
+/**
+ * The inbox's cards in play that `selector` takes by their labels (`?selector=`), or every one for none; under `['inbox']`, read again
+ * with it.
+ */
 export const inboxSelectedQuery = (selector: string | undefined) =>
   queryOptions({
     queryKey: ['inbox', ...selectorKey(selector)],
     queryFn: () => get(withSelector('/api/inbox', selector), Schema.mutable(Schema.Array(InboxEntrySchema))),
+  });
+
+/**
+ * Every card of the inbox (`?all=true`), its run ended or not, that `selector` takes by its labels, or every card for none: the Inbox
+ * page's read, which splits them into in play and ended itself (`CARD_KIND`). Under `['inbox']`, read again with it; keyed by an object,
+ * which no card's name can be, so a card named `all` keeps its page's key (`cardQuery`, `['inbox', name]`).
+ */
+export const inboxAllQuery = (selector: string | undefined) =>
+  queryOptions({
+    queryKey: ['inbox', { all: true }, ...selectorKey(selector)],
+    queryFn: () => get(withSelector('/api/inbox?all=true', selector), Schema.mutable(Schema.Array(InboxEntrySchema))),
   });
 
 /**

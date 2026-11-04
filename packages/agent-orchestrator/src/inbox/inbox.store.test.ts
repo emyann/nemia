@@ -17,7 +17,7 @@ import type { Run } from '../record/record.ts';
 import { scratch } from '../../test/scratch.ts';
 import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from '../../place/memory/index.ts';
-import { eachTest, runGiven } from '../../test/placed.ts';
+import { eachTest, runGiven, runOver } from '../../test/placed.ts';
 import { heldUnasked } from '../../test/unasked.ts';
 import { story } from '../../test/story.ts';
 
@@ -33,14 +33,16 @@ const { inboxDir, startRun, startFromInbox, StoreRoot, ...verbs } = await import
 /** An inbox verb run at this test's store root, as `nemia` gives it one: its answer, or its refusal thrown. */
 const atRoot = <A, E>(program: Effect.Effect<A, E>): A => Effect.runSync(Effect.provideService(program, StoreRoot, ROOT));
 const addToInbox = (opts: Parameters<typeof verbs.addToInbox>[0]) => atRoot(verbs.addToInbox(opts));
-const readInbox = (memo?: Parameters<typeof verbs.readInbox>[0]) => atRoot(verbs.readInbox(memo));
+const readInbox = () => atRoot(verbs.readInbox());
 const dropFromInbox = (name: string) => atRoot(verbs.dropFromInbox(name));
 const stand = eachTest(testPlace);
 const runPlaced = runGiven(() => stand().layer);
 const { readRun } = await import('../record/record.store.ts');
 const { runStore } = await import('../record/files.store.ts');
-const { recordMemo } = await import('../rest/index.ts');
-const { metered } = await import('../meter/tally.store.ts');
+const { informerMemo } = await import('../rest/informer.verb.ts');
+const { INBOX: INBOX_LIST } = await import('./commands.verb.ts');
+const { runWith: runEngine } = await import('../runtime-client.ts');
+const runWith = runOver(runEngine, () => stand().layer);
 const { main: cli } = await import('../cli/main.ts');
 /** `nemia`, as a person types it, its commands given this test's place. */
 const main = (argv: string[], e?: Parameters<typeof cli>[1]) => cli(argv, e, undefined, stand().place);
@@ -51,6 +53,10 @@ heldUnasked(engine);
 
 /** The engine of this test: the stand-in, which no command here files on, stops, says to or forgets from (`heldUnasked`). */
 const noEngine = () => engineOf(engine().layer);
+
+/** Every card as `nemia inbox --all` lists it, with its state, read through `memo` where one is given, as the api keeps one. */
+const judgedInbox = async (memo = informerMemo()) =>
+  (await runWith(noEngine(), INBOX_LIST.handler({ all: true }, undefined, ROOT, { runs: memo }))).cards;
 
 /**
  * Refused by kind and exit 2, its message naming each of `named` — the command, flag or field its fix names, and the card or path it is
@@ -126,7 +132,7 @@ test('a person parks ideas in the inbox, lists them, starts them and drops them'
     assert.equal(inboxDir(), path.join(ROOT, 'inbox'));
     assert.deepEqual(readInbox(), []);
     assert.deepEqual(await printedBy(t, 'inbox'), ['the inbox is empty — park an idea with nemia inbox add "<idea>"']);
-    assert.match((await printedBy(t, 'inbox', '--help'))[0], /^nemia inbox$/);
+    assert.match((await printedBy(t, 'inbox', '--help'))[0], /^nemia inbox \[--all\]$/);
     assert.ok(
       (await printedBy(t, 'help')).some((l) => l.startsWith('  nemia inbox add "<idea>"|<file> [--workflow <name>] [--repo <path>]')),
       'on the general help',
@@ -222,7 +228,7 @@ test('a person parks ideas in the inbox, lists them, starts them and drops them'
       assert.ok(
         lines.some((l) =>
           new RegExp(
-            `^${escaped(third.slice(0, -3))} +Show the flag on the settings page\\.  workflow: ui  repo: ${escaped(repo)}  started as show-the-flag-on-the-settin-zz99$`,
+            `^${escaped(third.slice(0, -3))} +Show the flag on the settings page\\.  workflow: ui  repo: ${escaped(repo)}  started as show-the-flag-on-the-settin-zz99, running$`,
           ).test(l),
         ),
         lines.join('\n'),
@@ -334,8 +340,9 @@ test('a person parks ideas in the inbox, lists them, starts them and drops them'
       ]);
       assert.ok(fs.existsSync(file), 'the card stays in the inbox');
       assert.deepEqual(
-        readInbox().map((l) => [l.name, l.state, l.startedAs]),
-        [[card.name, 'started', [id]]],
+        (await judgedInbox()).map((l) => [l.name, l.state, l.startedAs]),
+        [[card.name, 'running', [id]]],
+        "its state is its run's phase, read now",
       );
       const before = runsWritten();
       await assert.rejects(main(['start', file], noEngine()), refusedWith('Conflict', card.file, id, 'nemia inbox add'));
@@ -782,8 +789,8 @@ test(
     assert.equal(started.queueLeft, undefined);
     assert.equal(fs.readFileSync(taken, 'utf8'), `---\nworkflow: dev\nrepo: ${repo}\n---\nCache the views\n`);
     assert.deepEqual(
-      readInbox().map((l) => [l.name, l.state, l.queued]),
-      [['taken-a1b2', 'started', undefined]],
+      (await judgedInbox()).map((l) => [l.name, l.state, l.queued]),
+      [['taken-a1b2', 'running', undefined]],
     );
 
     const left = queuedCard('left-c3d4');
@@ -797,11 +804,11 @@ test(
     const id = printed[0].split(' ')[0];
     assert.deepEqual(readRun(id).from, { inbox: 'left-c3d4' });
     assert.ok(printed[2].includes('nemia inbox queue left-c3d4 --off'), printed[2]);
-    const listed = readInbox().find((l) => l.name === 'left-c3d4')!;
-    assert.deepEqual([listed.state, listed.queued], ['started', { at: '2026-09-16T10:00:00.000Z', place: null }]);
+    const listed = (await judgedInbox()).find((l) => l.name === 'left-c3d4')!;
+    assert.deepEqual([listed.state, listed.queued], ['running', { at: '2026-09-16T10:00:00.000Z', place: null }]);
     assert.match(
       (await printedBy(t, 'inbox')).find((line) => line.startsWith('left-c3d4'))!,
-      new RegExp(`started as ${escaped(id)}$`),
+      new RegExp(`started as ${escaped(id)}, running$`),
     );
   },
 );
@@ -823,24 +830,27 @@ test('a card gone between its start and the taking off of its `queued:` line is 
   assert.deepEqual(readInbox(), []);
 });
 
-test("a warm read of the inbox reads no finished run's record, however many there are, and answers a cold read's own", async () => {
+test("a warm read of the inbox, through the informer the api keeps, answers a cold read's own; a card whose run was removed reads filed", async () => {
   emptyInbox();
   for (const file of fs.readdirSync(path.join(ROOT, 'runs'))) fs.rmSync(path.join(ROOT, 'runs', file), { recursive: true });
   const { card } = addToInbox({ text: 'Cache the inbox' });
   writeRecord('r-started', { inbox: card.name });
-  const memo = recordMemo<Pick<Run, 'id' | 'from'>>();
-  const warm = async () => {
-    readInbox(memo);
-    return (await metered(async () => readInbox(memo))).tallies?.records;
-  };
+  for (let n = 0; n < 20; n++) writeRecord(`fin-${String(n).padStart(3, '0')}`);
+  const memo = informerMemo();
+  await judgedInbox(memo);
+  assert.deepEqual(await judgedInbox(memo), await judgedInbox(), "the warm answer is a cold read's own: nothing the board shows changes");
+  assert.deepEqual(
+    (await judgedInbox(memo)).map((l) => [l.name, l.state, l.startedAs]),
+    [[card.name, 'running', ['r-started']]],
+    'it says what started the card, in the phase the list gives a run it cannot judge',
+  );
 
-  const few = await warm();
-  for (let n = 0; n < 200; n++) writeRecord(`fin-${String(n).padStart(3, '0')}`);
-  const many = await warm();
-  assert.equal(few, 0, 'nothing moved since the last read, so no record is read');
-  assert.equal(many, few, "a warm read reads no finished run's record, however many there are");
-  assert.deepEqual(readInbox(memo), readInbox(), "the warm answer is a cold read's own: nothing the board shows changes");
-  assert.deepEqual(readInbox(memo).find((l) => l.name === card.name)?.startedAs, ['r-started'], 'and it still says what started the card');
+  runStore.runs.forget('r-started');
+  assert.deepEqual(
+    (await judgedInbox(memo)).map((l) => [l.name, l.state, l.startedAs]),
+    [[card.name, 'filed', []]],
+    'its run removed, the card is free again: filed, started as nothing',
+  );
 });
 
 test("a card's labels: filed with --label, inherited from its from: runs, selected with -l, shown with --show-labels and -L, and copied to the run it starts", async (t) => {

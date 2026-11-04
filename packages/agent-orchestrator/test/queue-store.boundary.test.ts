@@ -31,7 +31,7 @@ delete process.env.WF_MAX_CONCURRENT;
 const { startRun, tickRun, runWith: runEngine, gitPlaceLayer, StoreRoot, ...verbs } = await import('../src/runner.ts');
 /** An inbox verb run at this test's store root, as `nemia` gives it one: its answer, or its refusal thrown. */
 const atRoot = <A, E>(program: Effect.Effect<A, E>): A => Effect.runSync(Effect.provideService(program, StoreRoot, ROOT));
-const readInbox = (memo?: Parameters<typeof verbs.readInbox>[0]) => atRoot(verbs.readInbox(memo));
+const readInbox = () => atRoot(verbs.readInbox());
 const runWith = runOver(runEngine, gitPlaceLayer);
 const runPlaced = runGiven(gitPlaceLayer);
 const { listRuns, readRun } = await import('../src/record/record.store.ts');
@@ -283,10 +283,10 @@ test('a queued card whose start fails without a refusal — its `.worktreeinclud
   assert.deepEqual(cleared.queue, { card: 'odd-include-a1b2', run: run.id }, 'the link gone: the next pass starts it');
   const kept = fs.readFileSync(path.join(INBOX, 'odd-include-a1b2.md'), 'utf8');
   assert.doesNotMatch(kept, /^queued:/m, 'the card is kept, its queued: line taken off');
-  assert.equal(
-    readInbox().find((l) => l.name === 'odd-include-a1b2')?.state,
-    'started',
-    'listed as started, and the pass after starts the card behind it',
+  assert.deepEqual(
+    readInbox().find((l) => l.name === 'odd-include-a1b2')?.startedAs,
+    [run.id],
+    'listed as started as its run, and the pass after starts the card behind it',
   );
   const behind = await runWith(b.e, tickRun());
   assert.deepEqual(

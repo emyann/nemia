@@ -17,9 +17,10 @@ They write nothing: run them unasked, as often as you need. One that sets with s
   nemia concluded <runId>
                                what a run started with --from <runId> would be handed of it, now
   nemia inbox
-                               the cards parked before they are started: name, first line, workflow
-                               and repo when set, and started as <runId> (nemia inbox --help); -l: the
-                               cards a selector takes; --show-labels, -L <key>: their labels on each line
+                               the cards still in play: name, first line, workflow and repo when set,
+                               and started as <runId>, <phase> (nemia inbox --help); --all: those whose
+                               run ended too; -l: the cards a selector takes; --show-labels, -L <key>:
+                               their labels on each line
   nemia factory
                                the store's factories: the default first — every run and card that
                                names no factory, read, never written — then each by name with its

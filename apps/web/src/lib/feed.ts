@@ -29,14 +29,15 @@ export const REOPEN_MS = 5_000;
 export const FLUSH_MS = 1_000;
 
 /**
- * The queries an event of the feed can change, each to be invalidated as `filterOf` says: exactly, never by prefix, but the light answer's
- * — `['runs', id, 'decision', stamp]` is keyed by the state it answers for, and read again under a key of its own when the run's record
- * moves (`decisionQuery`).
+ * The queries an event of the feed can change, each to be invalidated as `filterOf` says: exactly, never by prefix, but the light answer's,
+ * the finished runs', a run's steps' and the inbox's — `['runs', id, 'decision', stamp]` is keyed by the state it answers for, and read
+ * again under a key of its own when the run's record moves (`decisionQuery`).
  *
- * A step's word moves the run's record, its row in the list, the light answer the frame reads and the pages of the finished runs. A
- * run's own word does that, and moves what counts against the cap, and may be a queued card started — the feed carries no card events,
- * so the inbox is read again on it. A run removed is gone from the list and from the cap, and its record is read again too: the read
- * that finds none is how a page open on the run learns it is gone (`runGone`).
+ * A step's word moves the run's record, its row in the list, the light answer the frame reads and the pages of the finished runs, and
+ * the inbox: a card started shows its run's phase, which a step moves — to `waiting` on a person, say — and the feed carries no card
+ * events. A run's own word does that, and moves what counts against the cap, and may be a queued card started. A run removed is gone
+ * from the list and from the cap, and frees the card it was started from, and its record is read again too: the read that finds none is
+ * how a page open on the run learns it is gone (`runGone`).
  *
  * A run's object (`['runs', id]`) is read again on each of them. A step's tries and told (`['runs', id, 'steps', …]`) are keyed by the
  * step's state in the object (`stepStamp`), so a step's event, which moves that state, never names them; a run's own event and a removal
@@ -60,11 +61,11 @@ export function keysOf(event: FeedEvent, run?: string): QueryKey[] {
     case 'store':
       return [['pause'], ['pause', 'now'], ['daemon']];
     case 'step':
-      return [['runs'], ['runs-open'], ['runs-finished'], ['runs', run], ['daemon']];
+      return [['runs'], ['runs-open'], ['runs-finished'], ['runs', run], [INBOX], ['daemon']];
     case 'run':
-      return [['runs'], ['runs-open'], ['runs-finished'], ['runs', run], ['runs', run, STEPS], ['ceilings'], ['inbox'], ['daemon']];
+      return [['runs'], ['runs-open'], ['runs-finished'], ['runs', run], ['runs', run, STEPS], ['ceilings'], [INBOX], ['daemon']];
     case 'removed':
-      return [['runs'], ['runs-open'], ['runs-finished'], ['runs', run], ['runs', run, STEPS], ['ceilings'], ['daemon']];
+      return [['runs'], ['runs-open'], ['runs-finished'], ['runs', run], ['runs', run, STEPS], ['ceilings'], [INBOX], ['daemon']];
   }
 }
 
@@ -77,15 +78,19 @@ const OPEN = 'runs-open';
 /** The first word of every key of a page of the finished runs (`finishedRunsQuery`): it stands for each factory's every page. */
 const FINISHED = 'runs-finished';
 
+/** The first word of every read of the inbox (`inboxQuery`, `inboxAllQuery`, a selector's, a card's page): it stands for each of them. */
+const INBOX = 'inbox';
+
 /**
- * How a key an event or a write names is invalidated: exactly, for every key but the light answer's, the finished runs' and a run's
- * steps' (`['runs', id, 'steps']`), each of which stands for every key under it — a factory's own answer and each page move with every
- * run's, and every stamp of each step's tries and told with a run's event, and the feed names no factory, no page and no stamp.
+ * How a key an event or a write names is invalidated: exactly, for every key but the light answer's, the finished runs', the inbox's and a
+ * run's steps' (`['runs', id, 'steps']`), each of which stands for every key under it — a factory's own answer and each page move with
+ * every run's, every read of the inbox with its started cards' runs, and every stamp of each step's tries and told with a run's event,
+ * and the feed names no factory, no page, no selector, no card and no stamp.
  */
 export const filterOf = (queryKey: QueryKey): { queryKey: QueryKey; exact: boolean } => ({
   queryKey,
   exact: !(
-    (queryKey.length === 1 && (queryKey[0] === OPEN || queryKey[0] === FINISHED)) ||
+    (queryKey.length === 1 && (queryKey[0] === OPEN || queryKey[0] === FINISHED || queryKey[0] === INBOX)) ||
     (queryKey.length === 3 && queryKey[2] === STEPS)
   ),
 });

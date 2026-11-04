@@ -19,10 +19,9 @@ import { labelsText, type LeftOut } from '../labels/labels.ts';
 import { firstPiece } from '../piece/piece.ts';
 import { cardInPlay, cardLabels, inboxLines, noCardLine, type InboxCard, type InboxListing } from './inbox.ts';
 import { addToInbox, dropFromInbox, queueInInbox, type InboxDropped, type InboxQueued } from './inbox.store.ts';
-import { inboxJudged } from './judged.verb.ts';
 import { EngineService } from '../runtime-client.ts';
 import { howOf } from '../command/pages.verb.ts';
-import { setFrom, type InboxFrom } from './inbox.verb.ts';
+import { inboxJudged, setFrom, type InboxFrom } from './inbox.verb.ts';
 
 export const INBOX_HELP = `nemia inbox [--all]
 nemia inbox -l <selector>... [--all] [--show-labels] [-L <key>]...

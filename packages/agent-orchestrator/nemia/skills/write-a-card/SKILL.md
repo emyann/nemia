@@ -35,5 +35,5 @@ Keep it short: each part a line or a short list. A card is a brief, not a design
 - **Start**: `nemia start <store>/inbox/<name>.md`, the card's own file, with `--after <run>` where it waits on one. It runs in the
   card's factory and workflow, and stays in the inbox, listed as started. To hand it runs as context, `nemia inbox from <name> <run>` first.
 
-Each is yours. After any of them, say the card's state in one line — parked, queued, or started as `<run>` — and offer the next step:
+Each is yours. After any of them, say the card's state in one line — parked, queued, or started as `<run>` and the phase that run is in now — and offer the next step:
 queue it, start it, or what it waits on.

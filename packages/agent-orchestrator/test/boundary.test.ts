@@ -1098,7 +1098,6 @@ test('REFUSED: a verb that reaches the client only through a controller that no 
     'src/plan/plan.verb.ts is a controller and reaches src/runtime-client.ts through none of its imports: the controllers reach the runtime through the client',
   ]);
   assert.deepEqual(clientBreaks({ ...linked, 'src/start/start.verb.ts': ['src/plan/plan.verb.ts'] }), [
-    'src/inbox/inbox.verb.ts is a controller and reaches src/runtime-client.ts through none of its imports: the controllers reach the runtime through the client',
     'src/plan/plan.verb.ts is a controller and reaches src/runtime-client.ts through none of its imports: the controllers reach the runtime through the client',
     'src/start/start.verb.ts is a controller and reaches src/runtime-client.ts through none of its imports: the controllers reach the runtime through the client',
   ]);

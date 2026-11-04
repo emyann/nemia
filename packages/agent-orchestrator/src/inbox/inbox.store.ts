@@ -55,7 +55,7 @@ export const inboxCards = Effect.fn('inboxCards')(function* () {
  * a card, with why — before any run's phase is read, so with no `state`: what the queue's writes and the workflows' users read. The run
  * records are read for their `from`, so a card a run was started from is out of the queue; the tick's tries, so a queued card whose start
  * was refused, or failed, says why; and the factories that read, so a card says the repository its factory picks for it (`factoryRepo`).
- * `nemia inbox` lists the cards with their state through `inboxJudged` (judged.verb.ts), which reads each run's phase.
+ * `nemia inbox` lists the cards with their state through `inboxJudged` (inbox.verb.ts), which reads each run's phase.
  */
 export const readInbox = Effect.fn('readInbox')(function* () {
   const door = yield* CardDoor;

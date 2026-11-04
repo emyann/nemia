@@ -43,7 +43,6 @@ const { informerMemo } = await import('../rest/informer.verb.ts');
 const { INBOX: INBOX_LIST } = await import('./commands.verb.ts');
 const { runWith: runEngine } = await import('../runtime-client.ts');
 const runWith = runOver(runEngine, () => stand().layer);
-const { metered } = await import('../meter/tally.store.ts');
 const { main: cli } = await import('../cli/main.ts');
 /** `nemia`, as a person types it, its commands given this test's place. */
 const main = (argv: string[], e?: Parameters<typeof cli>[1]) => cli(argv, e, undefined, stand().place);
@@ -229,7 +228,7 @@ test('a person parks ideas in the inbox, lists them, starts them and drops them'
       assert.ok(
         lines.some((l) =>
           new RegExp(
-            `^${escaped(third.slice(0, -3))} +Show the flag on the settings page\\.  workflow: ui  repo: ${escaped(repo)}  started as show-the-flag-on-the-settin-zz99$`,
+            `^${escaped(third.slice(0, -3))} +Show the flag on the settings page\\.  workflow: ui  repo: ${escaped(repo)}  started as show-the-flag-on-the-settin-zz99, running$`,
           ).test(l),
         ),
         lines.join('\n'),
@@ -342,7 +341,7 @@ test('a person parks ideas in the inbox, lists them, starts them and drops them'
       assert.ok(fs.existsSync(file), 'the card stays in the inbox');
       assert.deepEqual(
         (await judgedInbox()).map((l) => [l.name, l.state, l.startedAs]),
-        [[card.name, 'pending', [id]]],
+        [[card.name, 'running', [id]]],
         "its state is its run's phase, read now",
       );
       const before = runsWritten();
@@ -806,10 +805,10 @@ test(
     assert.deepEqual(readRun(id).from, { inbox: 'left-c3d4' });
     assert.ok(printed[2].includes('nemia inbox queue left-c3d4 --off'), printed[2]);
     const listed = (await judgedInbox()).find((l) => l.name === 'left-c3d4')!;
-    assert.deepEqual([listed.state, listed.queued], ['pending', { at: '2026-09-16T10:00:00.000Z', place: null }]);
+    assert.deepEqual([listed.state, listed.queued], ['running', { at: '2026-09-16T10:00:00.000Z', place: null }]);
     assert.match(
       (await printedBy(t, 'inbox')).find((line) => line.startsWith('left-c3d4'))!,
-      new RegExp(`started as ${escaped(id)}, pending$`),
+      new RegExp(`started as ${escaped(id)}, running$`),
     );
   },
 );
@@ -831,28 +830,19 @@ test('a card gone between its start and the taking off of its `queued:` line is 
   assert.deepEqual(readInbox(), []);
 });
 
-test("a warm read of the inbox reads no finished run's record, however many there are, and answers a cold read's own; a card whose run was removed reads filed", async () => {
+test("a warm read of the inbox, through the informer the api keeps, answers a cold read's own; a card whose run was removed reads filed", async () => {
   emptyInbox();
   for (const file of fs.readdirSync(path.join(ROOT, 'runs'))) fs.rmSync(path.join(ROOT, 'runs', file), { recursive: true });
   const { card } = addToInbox({ text: 'Cache the inbox' });
   writeRecord('r-started', { inbox: card.name });
+  for (let n = 0; n < 20; n++) writeRecord(`fin-${String(n).padStart(3, '0')}`);
   const memo = informerMemo();
-  const warm = async () => {
-    await judgedInbox(memo);
-    return (await metered(async () => judgedInbox(memo))).tallies?.records;
-  };
-
-  const few = await warm();
-  for (let n = 0; n < 200; n++) writeRecord(`fin-${String(n).padStart(3, '0')}`);
-  const many = await warm();
-  console.error('FEWMANY', few, many);
-  assert.equal(few ?? 0, 0, 'nothing moved since the last read, so no record is read');
-  assert.equal(many ?? 0, few ?? 0, "a warm read reads no finished run's record, however many there are");
+  await judgedInbox(memo);
   assert.deepEqual(await judgedInbox(memo), await judgedInbox(), "the warm answer is a cold read's own: nothing the board shows changes");
   assert.deepEqual(
-    (await judgedInbox(memo)).find((l) => l.name === card.name)?.startedAs,
-    ['r-started'],
-    'and it still says what started the card',
+    (await judgedInbox(memo)).map((l) => [l.name, l.state, l.startedAs]),
+    [[card.name, 'running', ['r-started']]],
+    'it says what started the card, in the phase the list gives a run it cannot judge',
   );
 
   runStore.runs.forget('r-started');

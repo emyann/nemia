@@ -21,7 +21,7 @@ import { standingReader, standingSnapshot } from '../standing/standing.verb.ts';
 import { informedJudgements, type InformerMemo, informerRead } from '../rest/informer.verb.ts';
 import { type Judgement, type Judgements, judgementsOf, sameJudgement } from './judgement.verb.ts';
 import { type RunGraph, runGraph } from './graph.ts';
-import type { CardRun } from '../inbox/inbox.ts';
+import type { CardRun } from '../inbox/index.ts';
 import {
   codedStep,
   ENGINE_REASON,
@@ -413,6 +413,18 @@ export type SummaryHow = {
 };
 
 /**
+ * The store listed through the informer `memo`, as the list and the inbox read it: where branches stand, the informer's read, and every
+ * run, a run whose files stamp as they did given as the run the informer kept. Every listed run stays in the informer, and no other.
+ */
+const listedThrough = Effect.fnUntraced(function* (e: Engine, memo: InformerMemo, verify: boolean) {
+  const git = standingReader(yield* standingSnapshot());
+  const read = yield* informerRead(e, memo, verify, git, sameJudgement);
+  const all = runStore.runs.list(undefined, read.given);
+  read.only(all.map((run) => run.id));
+  return { git, read, all };
+});
+
+/**
  * Every run's summary, in the store's order, as the board's list answers it: through `e`, each run's judgement read through the informer
  * `how.memo` (`informedJudgements`) — the one the daemon's pass fills and the run's object reads — and summarized off it (`summaryOf`),
  * verified as `how.verify` says. Dies where a verified answer differs from the informer's (`answered`).
@@ -422,10 +434,7 @@ export type SummaryHow = {
  * every record afresh.
  */
 export const runsSummarized = Effect.fn('runsSummarized')(function* (e: Engine, { home, memo, filings, verify, selectors }: SummaryHow) {
-  const git = standingReader(yield* standingSnapshot());
-  const read = yield* informerRead(e, memo, verify, git, sameJudgement);
-  const all = runStore.runs.list(undefined, read.given);
-  read.only(all.map((run) => run.id));
+  const { git, read, all } = yield* listedThrough(e, memo, verify);
   const filed = yield* filedTimes(e, filings);
   const runs = selectedRuns(all, selectors);
   const summaries = summariesOf(runs, yield* informedJudgements(e, home, runs, read, git, () => all), home);
@@ -442,10 +451,7 @@ export const runsSummarized = Effect.fn('runsSummarized')(function* (e: Engine, 
  * (`unjudgedFields`). Every listed run is kept in the informer, so a read of the inbox leaves the list's runs where they were.
  */
 export const cardRuns = Effect.fn('cardRuns')(function* (e: Engine, { home, memo, verify }: SummaryHow) {
-  const git = standingReader(yield* standingSnapshot());
-  const read = yield* informerRead(e, memo, verify, git, sameJudgement);
-  const all = runStore.runs.list(undefined, read.given);
-  read.only(all.map((run) => run.id));
+  const { git, read, all } = yield* listedThrough(e, memo, verify);
   const fromCards = all.filter((run) => run.from?.inbox !== undefined);
   const judged = yield* informedJudgements(e, home, fromCards, read, git, () => all);
   return fromCards.flatMap((run): CardRun[] => {

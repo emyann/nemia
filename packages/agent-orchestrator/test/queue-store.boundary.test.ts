@@ -283,7 +283,7 @@ test('a queued card whose start fails without a refusal — its `.worktreeinclud
   assert.deepEqual(cleared.queue, { card: 'odd-include-a1b2', run: run.id }, 'the link gone: the next pass starts it');
   const kept = fs.readFileSync(path.join(INBOX, 'odd-include-a1b2.md'), 'utf8');
   assert.doesNotMatch(kept, /^queued:/m, 'the card is kept, its queued: line taken off');
-  assert.equal(
+  assert.deepEqual(
     readInbox().find((l) => l.name === 'odd-include-a1b2')?.startedAs,
     [run.id],
     'listed as started as its run, and the pass after starts the card behind it',

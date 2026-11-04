@@ -10,6 +10,7 @@ import { StepName, WorkflowName } from '../record/record.model.ts';
 import { AgentName } from '../agents/agents.model.ts';
 import { TemplateSource } from '../templates/templates.model.ts';
 import { factoryNameRefusal, REVISIONS_POLICIES } from './factory.ts';
+import { HarnessSettings } from '../harness-settings/harness-settings.model.ts';
 
 /** A factory's name: its file's in the store, minus `.json`, a lowercase slug (`factoryNameRefusal`, over `FACTORY_NAME`). */
 export const FactoryName = brandedId('FactoryName', factoryNameRefusal);
@@ -48,7 +49,8 @@ const workflowOf = (step: string): string => step.slice(0, step.indexOf('/'));
 
 /**
  * A factory as its store reads it (`Factory`): its hires by `<workflow>/<step>`, its schedules by workflow. Its invariants are the door's:
- * it works on one repository at least (`factoryRepos`), mounts no volume that is one of its repositories or named twice, and it hires and
+ * it works on one repository at least (`factoryRepos`), names only the harness settings a factory may set (`harnessSettingsRefusal`),
+ * mounts no volume that is one of its repositories or named twice, and it hires and
  * schedules only into a workflow it offers — a hire or a schedule into one it has not attached is refused, and a workflow it still hires
  * into or schedules is not detached (`wiringRefusal`, `wiring.ts`, whose contract proves those refusals); this struct's own checks refuse a
  * factory the door writes that breaks them.
@@ -64,6 +66,7 @@ export const Factory = Schema.Struct({
   template: Schema.optional(AppliedTemplate),
   tree: Schema.optional(Schema.String),
   volumes: Schema.optional(Schema.Array(Volume)),
+  harnessSettings: Schema.optional(HarnessSettings),
 })
   .check(
     Schema.makeFilter((factory) => factory.repos.length > 0 || 'a factory works on no repository: nemia factory add <name> --repo <path>'),

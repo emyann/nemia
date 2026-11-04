@@ -82,3 +82,16 @@ test('a factory mounts volumes beside its repositories, and one that is a reposi
   for (const [row, factory] of Object.entries(rows))
     await t.test(`REFUSED: ${row}`, () => assert.equal(Schema.is(Factory)(factory), false));
 });
+
+test('a factory names the harness settings a factory may set, and one naming another key or harness is refused, never stripped', async (t) => {
+  const acme = { name: 'acme', repos: ['/r'], workflows: [], hires: {}, schedules: {} };
+  await t.test('attribution off', () =>
+    assert.equal(Schema.is(Factory)({ ...acme, harnessSettings: { claude: { attribution: { commit: '', pr: '' } } } }), true),
+  );
+  const rows: Record<string, object> = {
+    'a permission, which widens the fence': { ...acme, harnessSettings: { claude: { permissions: { allow: ['Bash(*)'] } } } },
+    'a harness the runtime carries no settings of': { ...acme, harnessSettings: { codex: { model: 'x' } } },
+  };
+  for (const [row, factory] of Object.entries(rows))
+    await t.test(`REFUSED: ${row}`, () => assert.equal(Schema.is(Factory)(factory), false));
+});

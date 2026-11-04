@@ -9,7 +9,8 @@
     "packages/agent-orchestrator/src/templates",
     "packages/agent-orchestrator/src/wiring",
     "packages/agent-orchestrator/src/adopt",
-    "packages/agent-orchestrator/src/volume"
+    "packages/agent-orchestrator/src/volume",
+    "packages/agent-orchestrator/src/harness-settings"
   ],
   "terms": [
     {
@@ -28,6 +29,15 @@
       "see": {
         "label": "Factories",
         "href": "/factories/#its-volumes"
+      }
+    },
+    {
+      "term": "Harness settings",
+      "meaning": "the settings of a harness a factory gives every session of its runs' steps on it, on top of the repository's own: for Claude Code, through the Agent SDK's settings option, never a file written into the repository. A factory sets `attribution`, `includeGitInstructions` and `language` alone, each changing what a session writes or says and none what it may reach or run; kept in the factory's own file, never in its template, and frozen on a run at its start.",
+      "type": "HarnessSettings",
+      "see": {
+        "label": "Factories",
+        "href": "/factories/#its-harness-settings"
       }
     },
     {

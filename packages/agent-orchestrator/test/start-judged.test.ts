@@ -87,13 +87,14 @@ const written = (id: string): boolean => runsWritten().includes(id);
 /** `startRun` of `workflowDir` in `repo` (one of its own by default): the run's id, or the refusal it failed with, thrown. */
 function started(
   workflowDir: string,
-  opts: { repo?: string; gates?: string[]; inputs?: string[]; refused?: ConfigRefused; isolate?: boolean } = {},
+  opts: { repo?: string; gates?: string[]; inputs?: string[]; refused?: ConfigRefused; isolate?: boolean; factory?: string } = {},
 ): string {
   const program = startRun({
     brief: 'add a flag',
     repo: opts.repo ?? aRepo(),
     workflowDir,
     gates: opts.gates,
+    ...(opts.factory ? { factory: opts.factory } : {}),
     ...(opts.inputs ? { inputs: opts.inputs } : {}),
     ...(opts.isolate === undefined ? {} : { isolate: opts.isolate }),
   });
@@ -267,6 +268,20 @@ test("REFUSED at nemia start, before a run is written: a step's first filing its
       refused: (_steps: unknown, _places: unknown, gates: readonly string[]) => void asked.push(gates),
     });
     assert.deepEqual(asked, [['implement']]);
+  });
+
+  await t.test("a factory's harness settings are on the run its refusal is asked of the steps' first filing with", () => {
+    const asked: unknown[] = [];
+    const repo = aRepo();
+    const harnessSettings = { claude: { attribution: { commit: '', pr: '' } } };
+    const dir = lone('settings-asked', 'agent: plain', { plain: '---\nrole: Builder\n---\nBuild it.\n' });
+    fs.mkdirSync(path.join(ROOT, 'factories'), { recursive: true });
+    const file = { repos: [repo], workflows: ['settings-asked'], harnessSettings };
+    fs.writeFileSync(path.join(ROOT, 'factories', 'settled.json'), JSON.stringify(file));
+    started(dir, { repo, factory: 'settled', refused: (...args: unknown[]) => void asked.push(args[5]) });
+    assert.deepEqual(asked, [harnessSettings]);
+    const steps = loadWorkflows(dir, PLACES);
+    assert.equal(configRefused(steps, PLACES, [], [], {}, harnessSettings), undefined, 'and the runtime takes that filing');
   });
 
   await t.test(

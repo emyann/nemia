@@ -468,7 +468,8 @@ test('a builtin template, named: applied, recorded by its name, read wherever Ne
     const drift = programsAt(ROOT, s.builtins).reconciled(templated('named'));
     assert.equal(drift.conditions[0].reason, 'VersionDrift');
     const volumes = [{ path: scratch('wf-applied-kept-'), readOnly: false }];
-    fs.writeFileSync(s.file, JSON.stringify({ ...JSON.parse(fs.readFileSync(s.file, 'utf8')), volumes }));
+    const harnessSettings = { claude: { attribution: { commit: '', pr: '' } } };
+    fs.writeFileSync(s.file, JSON.stringify({ ...JSON.parse(fs.readFileSync(s.file, 'utf8')), volumes, harnessSettings }));
     await runEngine(
       noEngine(),
       withBuiltins(FACTORY_UPGRADE.handler({ factory: 'named', to: '0.2.0' }, undefined, ROOT), s.builtins).pipe(
@@ -478,6 +479,7 @@ test('a builtin template, named: applied, recorded by its name, read wherever Ne
     const { source, version } = JSON.parse(fs.readFileSync(s.file, 'utf8')).template;
     assert.deepEqual([source, version], ['team', '0.2.0']);
     assert.deepEqual(JSON.parse(fs.readFileSync(s.file, 'utf8')).volumes, volumes, 'an upgrade keeps the volumes');
+    assert.deepEqual(JSON.parse(fs.readFileSync(s.file, 'utf8')).harnessSettings, harnessSettings, 'and the harness settings');
     assert.equal(programsAt(ROOT, s.builtins).reconciled(templated('named')).conditions[0].reason, 'Upgraded');
   });
   await t.test(

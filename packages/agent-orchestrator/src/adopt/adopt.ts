@@ -7,6 +7,7 @@
  * and what the factory keeps and takes.
  */
 import type { Adopted, AdoptRefusal } from '../../contracts/adopt.contract.ts';
+import { settingsNamed } from '../harness-settings/harness-settings.ts';
 import { DEFAULT_REVISIONS, factoryVolumes, volumeMark, type Factory, type Hires, type RevisionsPolicy } from '../factory/factory.ts';
 
 /** The wiring a template's render holds in its `factory.json`: its workflows, its hires, and its revisions policy where it says one. */
@@ -86,7 +87,8 @@ export const adoptRefusal: AdoptRefusal = (factory, adoption) => {
 };
 
 /**
- * `factory` taken over by `template`, running from `tree`: its name, repositories, schedules, instruction and volumes kept; its workflows,
+ * `factory` taken over by `template`, running from `tree`: its name, repositories, schedules, instruction, volumes and harness settings
+ * kept; its workflows,
  * hires and revisions policy the template's `wiring`.
  */
 export const adopted: Adopted = (factory, wiring, template, tree) => ({
@@ -100,6 +102,7 @@ export const adopted: Adopted = (factory, wiring, template, tree) => ({
   template,
   tree,
   volumes: factory.volumes,
+  harnessSettings: factory.harnessSettings,
 });
 
 /** A hire a takeover changes: a step hired into by the template only (`added`), by the factory only (`dropped`), or by both, apart. */
@@ -122,6 +125,7 @@ export type AdoptPlan = {
     readonly schedules: readonly string[];
     readonly instruction: boolean;
     readonly volumes: readonly string[];
+    readonly settings: readonly string[];
   };
   readonly workflows: { readonly added: readonly string[]; readonly dropped: readonly string[]; readonly kept: readonly string[] };
   readonly hires: readonly HireChange[];
@@ -161,6 +165,7 @@ export function adoptPlan(factory: Factory, adoption: Adoption, runs: readonly s
       schedules: sorted(Object.keys(factory.schedules)),
       instruction: factory.instruction !== undefined,
       volumes: factoryVolumes(factory).map((v) => `${v.path}${volumeMark(v)}`),
+      settings: settingsNamed(factory.harnessSettings).map((s) => s.name),
     },
     workflows: {
       added: sorted([...now].filter((w) => !was.has(w))),
@@ -199,7 +204,7 @@ export function adoptLines(plan: AdoptPlan, digest: string, adopt: string): stri
   const blocked = stranded.cards.length > 0 || stranded.schedules.length > 0;
   return [
     `${factory}: taken over by the template, in place — nothing is written until nemia factory adopt`,
-    `stays: its name, its repositories (${listed(kept.repos)}), its schedules (${listed(kept.schedules)}), ${kept.instruction ? 'its instruction' : 'no instruction'}, its volumes (${listed(kept.volumes)}), its cards, its runs and its stats`,
+    `stays: its name, its repositories (${listed(kept.repos)}), its schedules (${listed(kept.schedules)}), ${kept.instruction ? 'its instruction' : 'no instruction'}, its volumes (${listed(kept.volumes)}), its harness settings (${listed(kept.settings)}), its cards, its runs and its stats`,
     `workflows: + ${listed(workflows.added)}; - ${listed(workflows.dropped)}; kept ${listed(workflows.kept)}`,
     hires.length ? 'hires:' : 'hires: unchanged',
     ...hires.map(hireLine),

@@ -27,15 +27,16 @@ import { removeInstructionFolder } from './instruction.store.ts';
 import { FACTORY_INSTRUCT, FACTORY_INSTRUCTION } from './instruction.verb.ts';
 import { FACTORY_RULES } from '../rules/rules.verb.ts';
 import { TEMPLATED_FACTORY_VERBS } from '../adopt/templated.verb.ts';
-import { FACTORY_SCHEDULE, FACTORY_UNSCHEDULE } from '../schedule/schedule.verb.ts';
+import { FACTORY_SCHEDULES } from '../schedule/schedule.verb.ts';
 import { schedulesListed, type ScheduleRun, type ScheduleRuns } from '../schedule/listed.store.ts';
 import type { ScheduleListed } from '../schedule/schedule.ts';
 import { keptRuns } from '../record/files.store.ts';
 import type { Run } from '../record/record.ts';
 import { trustedLines, type PlaceTrust, type Untrusted } from '../trust/trust.ts';
 import { FACTORY_TRUST, NO_TRUST, trustPlaces, untrustedPlaces } from '../trust/trust.verb.ts';
-import { FACTORY_SERVER_ADD, FACTORY_SERVER_RM, FACTORY_SERVERS } from '../servers/servers.verb.ts';
+import { FACTORY_SERVER_VERBS } from '../servers/servers.verb.ts';
 import { FACTORY_VOLUMES, VOLUME_FORMS } from '../volume/volume.verb.ts';
+import { FACTORY_SETTINGS, SETTING_FORMS } from '../harness-settings/harness-settings.verb.ts';
 
 export const FACTORY_HELP = `nemia factory [ls]
 nemia factory add <name> --repo <path> [--repo <path> ...] [--no-trust]
@@ -55,6 +56,7 @@ nemia factory servers <factory>
 nemia factory server add <factory> <server> --url <address> [--transport http|sse] [--header <name>=<value> ...] [--client-id <id>] [--callback-port <port>]
 nemia factory server rm <factory> <server>
 ${VOLUME_FORMS}
+${SETTING_FORMS}
 nemia factory rules <name> [--file <path>|- | --clear]
 nemia factory instruction <name> [--path <path> | --store | --clear]
 nemia factory instruct <name> --file <path>|- | --clear
@@ -223,7 +225,7 @@ export const FACTORY: Command<Listed> = {
     positionals: [],
     flags: [],
     unknown: (arg) =>
-      `nemia factory does not take ${arg}. It lists the factories — nemia factory ls — files one with nemia factory add <name> --repo <path>, takes a hand-made one over by a template with nemia factory diff <name> --template <folder|archive>, then nemia factory adopt, trusts its places again with nemia factory trust <name>, attaches a workflow with nemia factory attach <factory> <workflow>, detaches it with nemia factory detach <factory> <workflow>, hires an agent into a step with nemia factory hire <factory> <agent> --step <workflow>/<step>, fires it with nemia factory fire <factory> --step <workflow>/<step>, schedules a workflow's runs with nemia factory schedule <factory> <workflow> --cron <expr> --brief <text>, takes the schedule back with nemia factory unschedule <factory> <workflow>, writes the rules its agents are told with nemia factory rules <name> --file <path>, says where Nemia's instruction for it is kept with nemia factory instruction <name>, writes it with nemia factory instruct <name> --file <path>, mounts a folder for its runs with nemia factory volume add <factory> <path>:ro|:rw, and removes one with nemia factory rm <name> (nemia factory --help).`,
+      `nemia factory does not take ${arg}. It lists the factories — nemia factory ls — files one with nemia factory add <name> --repo <path>, takes a hand-made one over by a template with nemia factory diff <name> --template <folder|archive>, then nemia factory adopt, trusts its places again with nemia factory trust <name>, attaches a workflow with nemia factory attach <factory> <workflow>, detaches it with nemia factory detach <factory> <workflow>, hires an agent into a step with nemia factory hire <factory> <agent> --step <workflow>/<step>, fires it with nemia factory fire <factory> --step <workflow>/<step>, schedules a workflow's runs with nemia factory schedule <factory> <workflow> --cron <expr> --brief <text>, takes the schedule back with nemia factory unschedule <factory> <workflow>, writes the rules its agents are told with nemia factory rules <name> --file <path>, says where Nemia's instruction for it is kept with nemia factory instruction <name>, writes it with nemia factory instruct <name> --file <path>, mounts a folder for its runs with nemia factory volume add <factory> <path>:ro|:rw, gives its runs' sessions a harness setting with nemia factory setting set <factory> <harness>.<key> <json>, and removes one with nemia factory rm <name> (nemia factory --help).`,
   },
   writes: false,
   class: 'read',
@@ -569,12 +571,10 @@ export const FACTORIES: readonly Command[] = [
   FACTORY_DETACH,
   FACTORY_HIRE,
   FACTORY_FIRE,
-  FACTORY_SCHEDULE,
-  FACTORY_UNSCHEDULE,
-  FACTORY_SERVERS,
-  FACTORY_SERVER_ADD,
-  FACTORY_SERVER_RM,
+  ...FACTORY_SCHEDULES,
+  ...FACTORY_SERVER_VERBS,
   ...FACTORY_VOLUMES,
+  ...FACTORY_SETTINGS,
   FACTORY_RULES,
   FACTORY_INSTRUCTION,
   FACTORY_INSTRUCT,

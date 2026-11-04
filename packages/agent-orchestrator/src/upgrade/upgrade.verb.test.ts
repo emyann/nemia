@@ -248,6 +248,20 @@ test('an upgrade onto a template that declares other parameters: --set given, th
     upgrade('--set', 'cap=9', '--set', 'budget=3', '--plan', digest),
     refusedWith('Invalid', /declares no parameter budget/),
   );
+  const defaulted = path.join(scratch('wf-upgrade-defaulted-'), 'team');
+  fs.cpSync(other, defaulted, { recursive: true });
+  edit(defaulted, 'nemia.yaml', (spec) => {
+    spec.parameters.cap.default = 5;
+  });
+  const bare = ['onto', '--to', '0.2.0', '--template', defaulted];
+  const dropping = await printedBy(t, 'factory', 'diff', ...bare);
+  assert.ok(dropping.includes('dropped: budget'), dropping.join('\n'));
+  assert.match(
+    dropping.at(-1) ?? '',
+    new RegExp(`^nemia factory upgrade onto --to 0\\.2\\.0 --template \\S+ --plan sha256:[0-9a-f]{64} files it`),
+    'a parameter dropped with no --set given still holds the upgrade to its plan',
+  );
+  await assert.rejects(main(['factory', 'upgrade', ...bare], noEngine()), refusedWith('Invalid', /nemia factory diff onto --to 0\.2\.0/));
   assert.deepEqual(bytesUnder(FACTORIES), before, 'the previews and every refusal write nothing');
   const folder = bytesUnder(path.join(FACTORIES, 'onto'));
   const filed = await printedBy(t, 'factory', 'upgrade', ...onto, '--set', 'cap=9', '--plan', digest);

@@ -205,7 +205,7 @@ function runWith(note: string | null): RunView {
         closeout: null,
         unreadable: null,
         check: null,
-        attempts: { count: 1, latest: { startedAt: at, ended: 'succeeded', endedAt: at, reason: 'harness' } },
+        attempts: { count: 1, latest: { startedAt: at, ended: 'succeeded', endedAt: at, reason: 'harness', release: null, harness: null } },
         used: UNMEASURED,
         spent: null,
         budget: null,
@@ -223,7 +223,10 @@ function runWith(note: string | null): RunView {
             closeout: null,
             unreadable: null,
             answer: null,
-            attempts: { count: 1, latest: { startedAt: at, ended: 'succeeded', endedAt: at, reason: 'harness' } },
+            attempts: {
+              count: 1,
+              latest: { startedAt: at, ended: 'succeeded', endedAt: at, reason: 'harness', release: null, harness: null },
+            },
           },
         ],
         timeline: [],
@@ -1526,9 +1529,10 @@ test("the inspector's Details say what a step used and what it cost beside its s
   const labels = rows(run.steps[0]);
   const at = (label: string) => labels.findIndex(([l]) => l === label);
   assert.deepEqual(
-    labels.slice(at('latest took'), at('latest took') + 3).map(([l, v]) => [l, l === 'latest took' ? '…' : v]),
+    labels.slice(at('latest took'), at('latest took') + 4).map(([l, v]) => [l, l === 'latest took' ? '…' : v]),
     [
       ['latest took', '…'],
+      ['ran on', 'not recorded'],
       ['used', 'not measured'],
       ['cost', 'not measured'],
     ],
@@ -1592,7 +1596,10 @@ const textsOf = (html: string): string[] =>
     .filter(Boolean);
 
 const tookAt = '2026-09-13T00:12:30.000Z';
-const ranOnce: StepAttempts = { count: 1, latest: { startedAt: at, ended: 'succeeded', endedAt: tookAt, reason: 'harness' } };
+const ranOnce: StepAttempts = {
+  count: 1,
+  latest: { startedAt: at, ended: 'succeeded', endedAt: tookAt, reason: 'harness', release: null, harness: null },
+};
 const closeoutSaying = (summary: string, more: Partial<StepCloseout> = {}): StepCloseout => ({
   outcome: 'done',
   summary,
@@ -1669,7 +1676,7 @@ const threeTries: StepTry[] = [
     on: null,
     via: null,
     message: 'running (working)',
-    attempts: { count: 2, latest: { startedAt: tookAt, ended: null, endedAt: null, reason: null } },
+    attempts: { count: 2, latest: { startedAt: tookAt, ended: null, endedAt: null, reason: null, release: null, harness: null } },
     check: { command: 'npm test', taskId: null, verdict: null, refused: null },
     closeout: null,
     unreadable: null,
@@ -1930,7 +1937,10 @@ test("a closeout's question field is drawn as its questions, read-only, the reco
 });
 
 test("a try that ended with no statement says the machine's reason, unsigned, in a sentence — and its fold says the reason, where it said `no closeout`", () => {
-  const unsigned: StepAttempts = { count: 1, latest: { startedAt: at, ended: 'failed', endedAt: tookAt, reason: 'unsigned' } };
+  const unsigned: StepAttempts = {
+    count: 1,
+    latest: { startedAt: at, ended: 'failed', endedAt: tookAt, reason: 'unsigned', release: null, harness: null },
+  };
   const tries = threeTries.map((t) => (t.try === 1 ? { ...t, attempts: unsigned, closeout: null } : t));
   const html = renderToStaticMarkup(createElement(TryCloseouts, { tries, selected: tries[0], none: 'unused' }));
   assert.deepEqual(textsOf(/<p data-outcome="unsigned" data-by="machine"[^>]*>[\s\S]*?<\/p>/.exec(html)![0]), [

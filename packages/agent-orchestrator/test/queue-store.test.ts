@@ -47,6 +47,8 @@ const {
   tickRun,
   runWith: runEngine,
   StoreRoot,
+  checkoutPromiseLine,
+  runningRelease,
   ...verbs
 } = await import('../src/runner.ts');
 /** An inbox verb run at this test's store root, as `nemia` gives it one: its answer, or its refusal thrown. */
@@ -600,6 +602,8 @@ test("the daemon's ceilings, as `nemia up`, `nemia tick` and `nemia ls` read the
       delete process.env.WF_MAX_RUNS;
     }
     const holds = `   holds ${ROOT} as pid ${process.pid} — a second daemon, the api or a nemia up, or a nemia tick, on this store is refused while it ticks (daemon.json)`;
+    const promise = checkoutPromiseLine(runningRelease());
+    const promised = promise ? [`   ${promise}`] : [];
     const startedLines = printed.filter((l) => / {2}daemon started {2}· /.test(l));
     assert.deepEqual(
       startedLines.map((l) => l.replace(/^\d\d:\d\d:\d\d {2}/, '').replace(/at \S+$/, 'at …')),
@@ -613,10 +617,12 @@ test("the daemon's ceilings, as `nemia up`, `nemia tick` and `nemia ls` read the
         '   sessions at work per pool: at most 4 at once — claude, codex, checks each a pool (WF_MAX_CONCURRENT)',
         '   runs in flight: no cap (WF_MAX_RUNS)',
         holds,
+        ...promised,
         'up — every 1000ms, ^C to stop',
         '   sessions at work per pool: at most 4 at once — claude, codex, checks each a pool (WF_MAX_CONCURRENT)',
         '   runs in flight: at most 2 at once — a run with nothing filed waits for a slot, oldest first (WF_MAX_RUNS)',
         holds,
+        ...promised,
       ],
       'the store taken is said once per start; daemon.store.test.ts has the rest of it',
     );

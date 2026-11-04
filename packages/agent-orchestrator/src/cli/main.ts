@@ -61,6 +61,7 @@ import {
   currentRelease,
   runningRelease,
   trialRefusal,
+  checkoutPromiseLine,
   ensureDaemon,
   liveDemandHost,
   type DemandHost,
@@ -270,6 +271,8 @@ function upVerb(args: Args, e: Engine, place: Place): void | Promise<void> {
       );
       const took = takeoverLine(replaced, store, Date.now());
       if (took) console.log(`   ${took}`);
+      const promise = checkoutPromiseLine(runningRelease());
+      if (promise) console.log(`   ${promise}`);
     });
   const daemon = up(e, { every, repo: path.resolve('.'), holder: 'up', onTaken });
   return runMain(

@@ -1594,9 +1594,13 @@ total is lost to the attempt: an undercount, never a double count. Pricing the t
 it, and was refused at design (2026-10-23) as a second cost source drifting from Claude Code's own; revisit if the stats show it
 bites.
 
-The step's spend cap does not hold across those processes either: the SDK's `maxBudgetUsd` counts only the spend since its `query()`
-call started (`sdk.d.ts:6100-6103`), and `adopt` resumes with the task's whole `config.budgetUsd`, so every restart of the holder
-hands the session its whole cap again. Left to an intent of its own by the person's answer at the design gate (2026-10-23).
+The step's spend cap holds across those processes as far as that total does. The SDK's `maxBudgetUsd` counts only the spend since
+its `query()` call started (`sdk.d.ts:6100-6103`), so `adopt` hands the resumed process the task's `config.budgetUsd` less what the
+attempt has spent so far by its capture (`capLeft`, `harness/claude/attached.ts`), the run file keeping the whole cap for the next
+take-up to count from; an attempt that has spent it all is not resumed, but ended `failed` with `limit: 'budget'` (the
+harness-updates intent, 2026-11-03). What is left is the same loss: a process killed outright spent what no total saved, so the cap
+handed after it is too generous by that much. A new attempt (`resumeFrom`) is handed its whole cap: a budget across tries is the
+layer above's.
 
 ## `claude-detached` still spells `claude -p`, and is the only road that does (closed 2026-10-24)
 

@@ -14,7 +14,6 @@ import {
   needsHuman,
   respawning,
   settledQuiet,
-  sightingFacts,
   spawnRefused,
   turnOf,
   waitsForInput,
@@ -27,7 +26,6 @@ import {
   type State,
   type Usage,
 } from '../domain.ts';
-import type { Monotonic } from '../clock.ts';
 import { atWorkState, LIVE_PHASE, type SessionState, type TaskPhase } from '../session.ts';
 import { Journal } from './journal.ts';
 import { bridgeOfTask, configForTurn } from '../../harness/args.ts';
@@ -40,8 +38,7 @@ import { ReconcileRefused, reconcileRefusalOf, settleRefusalOf } from './reconci
 
 export { ReconcileRefused, reconcileRefusalOf, settleRefusalOf } from './reconcile-refusal.ts';
 import { ownPool, toAdmit, type AdmissionRule } from '../admission.ts';
-import { countedFacts } from './counted.ts';
-import { deniedFacts } from './denied.ts';
+import { notedOf } from './noted.ts';
 import { instantNow } from './now.ts';
 import { spawnedEntry, stamped } from './stamped.ts';
 import { TaskId } from '../model.ts';
@@ -380,21 +377,6 @@ const reconcileOn = Effect.fn('reconcileOn')(function* (taskId: string, observed
 
   return action;
 });
-
-/** The sighting of a task's last attempt in one observation, as the harness gave it. */
-const lastSighting = (state: State, observed: ReadonlyMap<string, Sighting>): Sighting | undefined => {
-  const last = state.attempts.at(-1);
-  return last ? observed.get(nameFor(state.taskId, last.n)) : undefined;
-};
-
-/**
- * What a task's sighting says of an attempt in flight, for the record: a long-lived one's process (`sightingFacts`) and what it
- * has consumed so far (`countedFacts`), and what the harness has denied any (`deniedFacts`).
- */
-const notedOf = (state: State, observed: ReadonlyMap<string, Sighting>, at: string, mono?: Monotonic): Event[] => {
-  const sighting = lastSighting(state, observed);
-  return [...sightingFacts(state, sighting, at, mono), ...countedFacts(state, sighting, at), ...deniedFacts(state, sighting, at)];
-};
 
 /**
  * A task's fold, with what its sighting says of an attempt in flight journalled first (`notedOf`): the fold `decide` reads, so

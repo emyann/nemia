@@ -25,6 +25,7 @@ import path from 'node:path';
 import test, { type TestContext } from 'node:test';
 import { Effect, Exit, Logger, Scope } from 'effect';
 import { attachedSessions, letGoOf, type Attached } from '../src/harness/claude/attached.ts';
+import { IMAGE } from '../src/harness/image.ts';
 import {
   alive,
   attachedDir,
@@ -48,7 +49,7 @@ import type { SpawnRequest } from '../src/harness/seam.ts';
 import { Engine } from '../src/index.ts';
 import { scratch } from './scratch.ts';
 import { story } from './checkpoints.ts';
-import { sdkArgValue } from './sdk-argv.ts';
+import { sdkArgGiven, sdkArgValue } from './sdk-argv.ts';
 import { until, WAITED, type Waiter } from '../src/waits/index.ts';
 import { holder, inCall, kept, lines, NAME, place, run, STAND_IN } from './attached-held.ts';
 
@@ -99,6 +100,28 @@ const saidIn = (dir: string) => lines(dir, 'said.jsonl') as string[];
 
 /** The sighting of the session the holder `h` looks at. */
 const sighted = async (h: { attached: Attached }) => (await Effect.runPromise(h.attached.ops.observe)).get(NAME);
+
+/**
+ * A session left parked under `root`, its capture holding one result for each running total of `totals` as Claude Code prints them,
+ * and what it resumed from carried where `carried` is given.
+ */
+const leftBehind = (root: string, request: SpawnRequest, totals: number[], carried?: { costUsd: number }) => {
+  const result = (total: number) => ({ type: 'result', subtype: 'success', is_error: false, session_id: 'left', total_cost_usd: total });
+  fs.mkdirSync(path.dirname(filesOf(root, NAME).out), { recursive: true });
+  fs.writeFileSync(filesOf(root, NAME).out, totals.map((n) => `${JSON.stringify(result(n))}\n`).join(''));
+  writeRun(root, {
+    name: NAME,
+    state: 'parked',
+    owner: process.pid,
+    startedAt: new Date().toISOString(),
+    sessionId: 'left',
+    ...(carried ? { carried } : {}),
+    request: { ...request, brief: undefined },
+  });
+};
+
+/** The spend cap the session's run file keeps on its request. */
+const capKept = (root: string) => (run(root)?.request.config as { budgetUsd?: number } | undefined)?.budgetUsd;
 
 /** A process that idles until killed, in a group of its own: what takes a pid a run file names. */
 const squatter = (t: TestContext) => {
@@ -611,27 +634,102 @@ test('the next holder takes up a session left behind: what it tells the session,
     },
   );
 
-  await t.test('a session at work under a pid another process has taken since is adopted, its holder gone', async (rt) => {
-    const { root, dir, request } = place({ output: { done: 1 } });
-    const taker = squatter(rt);
-    writeRun(root, {
-      name: NAME,
-      state: 'working',
-      owner: taker,
-      ownerStart: 'when its holder started, not this process',
-      startedAt: new Date().toISOString(),
-      sessionId: 'reused-pid',
-      calling: { tool: 'Bash', since: new Date().toISOString() },
-      request: { ...request, brief: undefined },
-    });
+  await t.test(
+    'a session at work under a pid another process has taken since is adopted, its holder gone, and names the adopter’s code',
+    async (rt) => {
+      const { root, dir, request } = place({ output: { done: 1 } });
+      const taker = squatter(rt);
+      writeRun(root, {
+        name: NAME,
+        state: 'working',
+        owner: taker,
+        ownerStart: 'when its holder started, not this process',
+        image: '/store/releases/v0.9.0/packages/agent-runtime',
+        startedAt: new Date().toISOString(),
+        sessionId: 'reused-pid',
+        calling: { tool: 'Bash', since: new Date().toISOString() },
+        request: { ...request, brief: undefined },
+      });
+      const h = await holder(root);
+      rt.after(h.close);
+      await sighted(h);
+      await until(rt, () => saidIn(dir).length, 'the adopted session told something', { everyMs: 50 });
+      assert.deepEqual(saidIn(dir), [crashNote('Bash')]);
+      assert.equal(alive(taker), true, "the process that took the pid is not the session's, and is left alone");
+      assert.equal(run(root)?.owner, thisHolder().owner);
+      assert.equal(run(root)?.ownerStart, thisHolder().ownerStart);
+      assert.equal(run(root)?.image, IMAGE, 'the new holder writes the code it runs over the one before');
+    },
+  );
+
+  await t.test("a parked session is handed its cap less what its attempt spent, its parent's carried spend left out", async (rt) => {
+    const { root, dir, request } = place({ output: { done: 1 } }, { budgetUsd: 2 });
+    leftBehind(root, request, [0.75], { costUsd: 0.25 });
     const h = await holder(root);
     rt.after(h.close);
     await sighted(h);
-    await until(rt, () => saidIn(dir).length, 'the adopted session told something', { everyMs: 50 });
-    assert.deepEqual(saidIn(dir), [crashNote('Bash')]);
-    assert.equal(alive(taker), true, "the process that took the pid is not the session's, and is left alone");
-    assert.equal(run(root)?.owner, thisHolder().owner);
-    assert.equal(run(root)?.ownerStart, thisHolder().ownerStart);
+    const [argv] = await until(
+      rt,
+      () => lines(dir, 'argv.jsonl').length && (lines(dir, 'argv.jsonl') as string[][]),
+      'the session resumed',
+      {
+        everyMs: 50,
+      },
+    );
+    assert.equal(sdkArgValue(argv, '--max-budget-usd'), '1.5', '2, less the 0.75 printed, less the 0.25 its parent carried');
+  });
+
+  await t.test("a session taken up again counts its attempt's whole spend so far, off the whole cap its run file keeps", async (rt) => {
+    const { root, dir, request } = place({ output: { done: 1 } }, { budgetUsd: 2 });
+    leftBehind(root, request, [0.5, 1.25]);
+    const h = await holder(root);
+    rt.after(h.close);
+    await sighted(h);
+    const [argv] = await until(
+      rt,
+      () => lines(dir, 'argv.jsonl').length && (lines(dir, 'argv.jsonl') as string[][]),
+      'the session resumed',
+      {
+        everyMs: 50,
+      },
+    );
+    assert.equal(sdkArgValue(argv, '--max-budget-usd'), '0.75', "the cap less the last result's running total");
+    assert.equal(capKept(root), 2, 'the run file keeps the whole cap, never the remainder');
+  });
+
+  await t.test('a parked session with no cap is resumed with none', async (rt) => {
+    const { root, dir, request } = place({ output: { done: 1 } });
+    leftBehind(root, request, [0.5]);
+    const h = await holder(root);
+    rt.after(h.close);
+    await sighted(h);
+    const [argv] = await until(
+      rt,
+      () => lines(dir, 'argv.jsonl').length && (lines(dir, 'argv.jsonl') as string[][]),
+      'the session resumed',
+      {
+        everyMs: 50,
+      },
+    );
+    assert.equal(sdkArgGiven(argv, '--max-budget-usd'), false);
+  });
+
+  await t.test('REFUSED: a parked session that has spent its whole cap is not resumed, and ends failed at its budget', async (rt) => {
+    const { root, dir, request } = place({ output: { done: 1 } }, { budgetUsd: 2 });
+    leftBehind(root, request, [2.25]);
+    const h = await holder(root);
+    rt.after(h.close);
+    const seen = await until(
+      rt,
+      async () => {
+        const got = await sighted(h);
+        return got?.state === 'failed' && got;
+      },
+      'the session ended',
+      { everyMs: 50 },
+    );
+    assert.equal(seen.limit, 'budget');
+    assert.deepEqual(lines(dir, 'argv.jsonl'), [], 'no Claude Code is started past its cap');
   });
 
   await t.test("adopting a session leaves alone a process that has taken its Claude Code's pid since", async (rt) => {
@@ -874,7 +972,7 @@ const sameCost = (a: number | undefined, b: number) => a !== undefined && Math.a
 
 test("a session cut by its holder's let-go and resumed by the next holder costs what both of its processes spent", WAITED, async (t) => {
   const s = story(t);
-  const { root, dir, request } = place({ call: 'Bash', cost: 0.5, output: {} });
+  const { root, dir, request } = place({ call: 'Bash', cost: 0.5, output: {} }, { budgetUsd: 2 });
   const first = await holder(root, 1_000);
   let next: Awaited<ReturnType<typeof holder>> | undefined;
   t.after(async () => {
@@ -909,6 +1007,13 @@ test("a session cut by its holder's let-go and resumed by the next holder costs 
     const [, argv] = lines(dir, 'argv.jsonl') as string[][];
     assert.ok(argv.includes('--resume=stand-in-session'), 'the session is resumed by its own id');
     assert.ok(sameCost(seen.usage?.costUsd, 1), `0.5 for the cut process and 0.5 for its resume, not ${seen.usage?.costUsd}`);
+  });
+
+  await s.test('the resume is handed what is left of its cap, never the whole cap again', () => {
+    const [firstArgv, argv] = lines(dir, 'argv.jsonl') as string[][];
+    assert.equal(sdkArgValue(firstArgv, '--max-budget-usd'), '2', 'the first process is handed the whole cap');
+    assert.equal(sdkArgValue(argv, '--max-budget-usd'), '1.5', 'the resume, the cap less the 0.5 its first process spent');
+    assert.equal(capKept(root), 2, 'the run file keeps the whole cap');
   });
 });
 

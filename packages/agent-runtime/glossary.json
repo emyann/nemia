@@ -100,9 +100,19 @@
       "type": "HarnessArgs"
     },
     {
+      "term": "Harness version",
+      "meaning": "the version of the harness a session's process runs, as the harness says it: Claude Code's init message's `claude_code_version`, the last one it printed. Recorded on the attempt while it works (`harnessVersion`), carried and never judged.",
+      "type": "Attempt"
+    },
+    {
       "term": "Held back",
       "meaning": "a job's main-thread tool call waiting at its hook while a jobs' drain stands, and since when: carried on its sighting, never judged, so a person sees the job is held and not stalled.",
       "type": "Sighting"
+    },
+    {
+      "term": "Image",
+      "meaning": "the code a session's process runs, as that process reports it: the real folder of the runtime package that spawned or holds it, a Pod's container image. Recorded on the attempt while it works (`image`), a long-lived session's rewritten by each new holder; what release it is, is the layer above's to say.",
+      "type": "Attempt"
     },
     {
       "term": "Journal",

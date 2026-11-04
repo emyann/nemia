@@ -1,5 +1,6 @@
 /**
- * `nemia version`: which release this `nemia` runs, which one the store's pointer names, and which one the daemon runs, read off its lease.
+ * `nemia version`: which release this `nemia` runs, which one the store's pointer names, which one the daemon runs, read off its lease,
+ * and which releases and harness versions the sessions at work run on, read off the engine's records of their attempts.
  * The command the CLI serves alone, since the api answers its own release at `GET /api/version`. Also where the running code is found
  * (`runningRelease`), for the trial guard, the lease and the api.
  */
@@ -8,11 +9,13 @@ import { Effect } from 'effect';
 import type { Command } from '../command/entry.verb.ts';
 import type { LeaseRelease } from '../daemon/daemon.ts';
 import { daemonStanding } from '../daemon/daemon.store.ts';
-import { tried } from '../runtime-client.ts';
+import { DEFAULT_HARNESS } from '../harness/harness.ts';
+import { asked, EngineService, tried, type TaskView } from '../runtime-client.ts';
+import { rootGiven } from '../config/root.store.ts';
 import { daemonEntry } from '../service/service.store.ts';
 import { VERSION as PACKAGE_VERSION } from '../version/version.ts';
-import { versionLines, type Current, type Running } from './release.ts';
-import { currentRelease, runningAt } from './release.store.ts';
+import { sessionCounts, sessionRanOn, versionLines, type Current, type Running, type SessionCount } from './release.ts';
+import { currentRelease, realReleasesDir, runningAt } from './release.store.ts';
 
 /** The package's own folder, whose root is the checkout's or the install's. */
 const PACKAGE = path.join(import.meta.dirname, '..', '..');
@@ -29,23 +32,43 @@ export function runningRelease(): Running {
   }
 }
 
-/** What `nemia version` reads: the package's version, this nemia's release, the store's pointer, the daemon's, and its lines. */
+/**
+ * What `nemia version` reads: the package's version, this nemia's release, the store's pointer, the daemon's, the sessions at work by
+ * release and harness version, and its lines.
+ */
 export type Versions = {
   readonly version: string;
   readonly running: Running;
   readonly current: Current | null;
   readonly daemon: { readonly pid: number; readonly release: LeaseRelease | null } | null;
+  readonly sessions: readonly SessionCount[];
   readonly lines: readonly string[];
 };
 
-/** Reads the three releases and words them (`versionLines`). */
-export const versions = Effect.fn('versions')(function* () {
+/**
+ * The sessions at work among `views`, counted by what their attempts recorded they run on (`sessionCounts`): the last attempt of each task
+ * not settled, while it has not ended, its image placed under the store's real `releases` folder.
+ */
+export const sessionsAtWork = (views: readonly TaskView[], releases: string): SessionCount[] =>
+  sessionCounts(
+    views.flatMap((v) => {
+      const last = v.state.settled === null ? v.state.attempts.at(-1) : undefined;
+      return last && last.ended === null ? [sessionRanOn(last, v.state.harness ?? DEFAULT_HARNESS, releases)] : [];
+    }),
+  );
+
+/** Reads the three releases and the sessions at work off the engine's records, and words them (`versionLines`). */
+export const versions = Effect.fn('versions')(function* (home: string) {
+  const e = yield* EngineService;
+  const listed = yield* asked('version', e.list());
+  const sessions = sessionsAtWork(listed.views, realReleasesDir(home));
   return yield* tried((): Versions => {
     const running = runningRelease();
     const current = currentRelease();
     const lease = daemonStanding();
     const daemon = lease.kind === 'ticking' ? { pid: lease.file.pid, release: lease.file.release ?? null } : null;
-    return { version: PACKAGE_VERSION, running, current, daemon, lines: versionLines(PACKAGE_VERSION, running, current, lease) };
+    const lines = versionLines(PACKAGE_VERSION, running, current, lease, sessions);
+    return { version: PACKAGE_VERSION, running, current, daemon, sessions, lines };
   });
 });
 
@@ -56,7 +79,9 @@ const VERSION: Command<Versions> = {
   help: [
     "this nemia's release, an install's tag or a checkout, and its folder;",
     "the release the store's releases/current names; and the release the",
-    'daemon runs, from its lease. --json: the whole answer',
+    'daemon runs, from its lease, and whether it promises to keep a running',
+    'session on its files; and the sessions at work by release and harness',
+    'version, off their records. --json: the whole answer',
   ],
   spec: {
     positionals: [],
@@ -66,7 +91,7 @@ const VERSION: Command<Versions> = {
   writes: false,
   class: 'read',
   only: { side: 'cli', why: 'it says which code the command runs from; the api answers its own at GET /api/version' },
-  handler: () => versions(),
+  handler: (_args, _env, home) => versions(rootGiven(home, 'version')),
   print: (data, args) => {
     if (args.json !== true) return data.lines;
     const { lines: _lines, ...answer } = data;

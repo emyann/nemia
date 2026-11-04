@@ -374,6 +374,11 @@
       "retired": []
     },
     {
+      "term": "Session release",
+      "meaning": "the release a session runs on, off the image its attempt recorded: an install's tag where that sits under the store's `releases/<tag>/`, else a checkout. Shown on a step's latest attempt, beside a step at work in `nemia ls`, and counted in `nemia version`.",
+      "type": "SessionRelease"
+    },
+    {
       "term": "Session state",
       "meaning": "where a step's session stands as its moment says it to a follower (`StepMoment`, kind `state`), in A2A's TaskState words: submitted, working, input-required, auth-required, completed, failed, canceled, rejected — the runtime's `SessionState`, kept rather than renamed and held equal in `packages/agent-orchestrator/src/runtime-client.ts`.",
       "type": "StepSessionState"

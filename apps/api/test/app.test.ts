@@ -493,7 +493,7 @@ test("a store's runs read on the list and on a run's page: each summarized with 
       via: 'closeout',
       message: 'succeeded · BLOCKED',
       check: null,
-      attempts: { count: 1, latest: { startedAt: at, ended: 'succeeded', endedAt: at, reason: 'harness' } },
+      attempts: { count: 1, latest: { startedAt: at, ended: 'succeeded', endedAt: at, reason: 'harness', release: null, harness: null } },
     };
     assert.deepEqual(specOf(run, 'implement'), {
       name: 'implement',
@@ -835,7 +835,7 @@ test('a run whose workflow folder changes or vanishes after it starts is read of
       via: 'closeout',
       message: 'succeeded · BLOCKED',
       check: null,
-      attempts: { count: 1, latest: { startedAt: at, ended: 'succeeded', endedAt: at, reason: 'harness' } },
+      attempts: { count: 1, latest: { startedAt: at, ended: 'succeeded', endedAt: at, reason: 'harness', release: null, harness: null } },
     };
     assert.equal(specOf(object, 'original'), undefined, 'the folder no longer has it: no spec of it');
     assert.deepEqual(await toldOf(app, 'r-6', 'original'), {
@@ -1096,7 +1096,7 @@ test("a step's attempts and its log: how many, when the latest began and ended, 
     assert.deepEqual(
       run.steps.map((s: { attempts: unknown }) => s.attempts),
       [
-        { count: 2, latest: { startedAt: later, ended: null, endedAt: null, reason: null } },
+        { count: 2, latest: { startedAt: later, ended: null, endedAt: null, reason: null, release: null, harness: null } },
         { count: 0, latest: null },
       ],
       'the second attempt is still going, so it has not ended; the one the engine lost is counted',
@@ -1114,7 +1114,7 @@ test("a step's attempts and its log: how many, when the latest began and ended, 
       (await objectOf(app, 'r-8')).status.steps[0].attempts,
       {
         count: 1,
-        latest: { startedAt: at, ended: 'succeeded', endedAt: later, reason: 'harness' },
+        latest: { startedAt: at, ended: 'succeeded', endedAt: later, reason: 'harness', release: null, harness: null },
       },
       'an attempt that ran half an hour ends at its ended event, not at its start, so the board can say how long it took',
     );
@@ -1127,7 +1127,10 @@ test("a step's attempts and its log: how many, when the latest began and ended, 
         { kind: 'ended', at: later, attempt: 1, sessionId: `ae/${taskId}/1`, ...end },
         { kind: 'settled', at: later, outcome: settled },
       ]);
-    const unsignedWords = { count: 1, latest: { startedAt: at, ended: 'failed', endedAt: later, reason: 'unsigned' } };
+    const unsignedWords = {
+      count: 1,
+      latest: { startedAt: at, ended: 'failed', endedAt: later, reason: 'unsigned', release: null, harness: null },
+    };
     quiet('t-8u', { observed: 'done', reason: 'harness', closedOut: false }, 'succeeded');
     writeRun({ ...r2, id: 'r-8u', steps: { implement: { taskId: 't-8u', branch: 'wf/r-8u/implement' }, review: { taskId: null } } });
     const unsigned = (await objectOf(app, 'r-8u')).status;
@@ -1147,7 +1150,10 @@ test("a step's attempts and its log: how many, when the latest began and ended, 
     );
     assert.equal(judgedUnsigned.steps[0].message, 'unsigned');
 
-    const cappedWords = { count: 1, latest: { startedAt: at, ended: 'failed', endedAt: later, reason: 'budget' } };
+    const cappedWords = {
+      count: 1,
+      latest: { startedAt: at, ended: 'failed', endedAt: later, reason: 'budget', release: null, harness: null },
+    };
     quiet('t-8b', { observed: 'failed', reason: 'harness', limit: 'budget', exitCode: 1 }, 'failed');
     writeRun({ ...r2, id: 'r-8b', steps: { implement: { taskId: 't-8b', branch: 'wf/r-8b/implement' }, review: { taskId: null } } });
     const capped = (await objectOf(app, 'r-8b')).status;
@@ -2121,7 +2127,10 @@ test("a step's tries and its closeout: every try of a looped step off one observ
 
       const run = (await objectOf(app, 'r-50')).status;
 
-      const once = { count: 1, latest: { startedAt: at, ended: 'succeeded', endedAt: at, reason: 'harness' } };
+      const once = {
+        count: 1,
+        latest: { startedAt: at, ended: 'succeeded', endedAt: at, reason: 'harness', release: null, harness: null },
+      };
       const closeout = (raw: { summary: string }, more: object = {}) => ({
         apiVersion: null,
         outcome: 'done',

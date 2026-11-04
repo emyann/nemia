@@ -129,7 +129,7 @@ test("the kind is the value's and its schema's, never its field's name: it is no
 
 const ended = (reason: AttemptEnd, how: AttemptOutcome = 'failed'): StepAttempts => ({
   count: 1,
-  latest: { startedAt: 'a', ended: how, endedAt: 'b', reason },
+  latest: { startedAt: 'a', ended: how, endedAt: 'b', reason, release: null, harness: null },
 });
 const said = (outcome: 'done' | 'blocked') =>
   ({
@@ -194,7 +194,11 @@ test("with no statement and no reason â€” running, not filed, a harness's done â
   const nobody = { by: 'nobody', words: 'No closeout yet.' };
   assert.deepEqual(
     outcomeOf(
-      { closeout: null, unreadable: null, attempts: { count: 1, latest: { startedAt: 'a', ended: null, endedAt: null, reason: null } } },
+      {
+        closeout: null,
+        unreadable: null,
+        attempts: { count: 1, latest: { startedAt: 'a', ended: null, endedAt: null, reason: null, release: null, harness: null } },
+      },
       'No closeout yet.',
     ),
     nobody,

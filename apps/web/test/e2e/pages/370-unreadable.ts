@@ -37,7 +37,7 @@ export default {
       await expectVisible(
         row(running.id).locator('[data-now-unreadable]', {
           hasText: new RegExp(
-            `^${escaped(`${running.id}'s record reads, but the journal of its task ${task} does not: ${task}'s journal (`)}.*\\), entry 4 is a \`measured\` event`,
+            `^${escaped(`${running.id}'s record reads, but the journal of its task ${task} does not: ${task}'s journal (`)}.*\\), entry 5 is a \`measured\` event`,
           ),
         }),
         "the running run's row says its record reads and its task does not, in the runtime's words",

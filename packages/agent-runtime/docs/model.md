@@ -65,6 +65,8 @@ erDiagram
     list skills "optional"
     list files "optional"
     string ranOn "optional"
+    string image "optional"
+    string harnessVersion "optional"
     string limit "optional"
     object parked "optional"
     number turn "optional"

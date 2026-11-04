@@ -97,6 +97,8 @@ export const Attempt = Schema.Struct({
   skills: Schema.optional(Strings),
   files: Schema.optional(Strings),
   ranOn: Schema.optional(Schema.String),
+  image: Schema.optional(Schema.String),
+  harnessVersion: Schema.optional(Schema.String),
   limit: Schema.optional(Schema.String),
   parked: Schema.optional(ParkedSchema),
   turn: Schema.optional(Schema.Number),

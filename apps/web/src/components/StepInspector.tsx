@@ -21,6 +21,7 @@ import { Asked } from './GateBrief';
 const SessionTalk = lazy(() => import('./session/SessionTalk').then((m) => ({ default: m.SessionTalk })));
 import { StatusChip, StepNote } from './StatusChip';
 import type { Frozen } from '../lib/frozen';
+import { ranOnWords } from '../lib/ranOn';
 
 type Step = StepView;
 
@@ -121,7 +122,8 @@ type DetailsProps = {
  * of dashes it says so once, above its spec.
  *
  * Its facts: the try the attempts are of, once there is more than one, since each round and each try within one is a task of its own; how
- * long the latest attempt took, only where its end is on the record; what its current try consumed, in the CLI `decide`'s words — `not
+ * long the latest attempt took, only where its end is on the record; what it ran on, the release and harness version its session
+ * recorded (`ranOnWords`), `not recorded` where it recorded neither; what its current try consumed, in the CLI `decide`'s words — `not
  * measured` where nobody counted, never 0; what its sessions read (`readRows`); and what every try has cost together (`spentRows`).
  */
 function Details({ run, step, state, runCancelled, current, selected, onSelect }: DetailsProps) {
@@ -156,6 +158,7 @@ function Details({ run, step, state, runCancelled, current, selected, onSelect }
                 ) : null),
             ],
             ['latest took', latest?.endedAt ? duration(Date.parse(latest.endedAt) - Date.parse(latest.startedAt)) : null],
+            ['ran on', ranOnWords(latest)],
             ['used', step.used?.used],
             ['cost', step.used?.cost],
             ...readRows(step.used),

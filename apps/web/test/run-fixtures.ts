@@ -207,7 +207,14 @@ export const step = (extra: Partial<Step> = {}): Step => ({
   },
   attempts: {
     count: 1,
-    latest: { startedAt: '2026-09-30T05:02:00.000Z', ended: 'failed', endedAt: '2026-09-30T05:09:00.000Z', reason: null },
+    latest: {
+      startedAt: '2026-09-30T05:02:00.000Z',
+      ended: 'failed',
+      endedAt: '2026-09-30T05:09:00.000Z',
+      reason: null,
+      release: null,
+      harness: null,
+    },
   },
   used: used(),
   spent: { usd: 1.25, measured: 1, unmeasured: 0, said: '$1.25' },

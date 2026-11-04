@@ -104,9 +104,9 @@ CI is then the only check its changes meet. Give roundCheck the commands your re
 ## Upgrading from 1.0.0
 
 sdlc 1.0.0 landed on GitHub, and had no github parameter. From 2.0.0 the default is your checkout, so a factory applied at 1.0.0
-that should stay on GitHub is given `github: true` before it upgrades. `nemia factory upgrade` takes no `--set`: add `"github": true`
-to the parameters the factory's file records (`template.params` in `factories/<name>.json` of your store), then upgrade it with
-`nemia factory upgrade <name> --to 2.0.0`. A new factory is given it at apply, `--set github=true`.
+that should stay on GitHub is given `github: true` as it upgrades: preview it with
+`nemia factory diff <name> --to 2.0.0 --set github=true`, which names each parameter the factory holds that 2.0.0 does not declare (`dropped:`), then type the upgrade line it
+prints last, which carries the same `--set` and the plan's `--plan`. A new factory is given it at apply, `--set github=true`.
 
 ## Fit it to your repository
 

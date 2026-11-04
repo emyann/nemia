@@ -12,5 +12,6 @@ export {
   type Conflict,
   type Merged,
   type TreeFile,
+  type PlanNext,
   type TreeMerge,
 } from './merge.ts';

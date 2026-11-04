@@ -129,7 +129,7 @@ async function printedBy(t: { mock: { method: Function } }, ...args: string[]): 
   return printed.flatMap((p) => p.split('\n'));
 }
 
-test('upgrade refuses, writing nothing: no template, no render, a --to that is no version, the template at another, the same, a downgrade; and diff a --set on a templated factory, and no --template on a hand-made one', async (t) => {
+test('upgrade refuses, writing nothing: no template, no render, a --to that is no version, the template at another, the same, a downgrade; and diff no --template on a hand-made one', async (t) => {
   t.mock.method(console, 'log', () => {});
   const { dir, repo } = await applied('kept');
   await main(['factory', 'add', 'plain', '--repo', repo], noEngine());
@@ -155,7 +155,6 @@ test('upgrade refuses, writing nothing: no template, no render, a --to that is n
   await assert.rejects(upgrade('kept', '--to', '0.0.9'), refusedWith('Conflict', /0\.0\.9 is below 0\.1\.0[^]*--to 0\.0\.9 --downgrade/));
   released(dir, '0.2.0', 5);
   const diff = (name: string, ...rest: string[]) => main(['factory', 'diff', name, ...rest], noEngine());
-  await assert.rejects(diff('kept', '--to', '0.2.0', '--set', 'budget=9'), refusedWith('Invalid', /--set/));
   await assert.rejects(diff('plain', '--to', '0.2.0'), refusedWith('Invalid', /--template </));
   edit(dir, 'nemia.yaml', (spec) => {
     spec.parameters.gated = { type: 'boolean', description: 'a gate before the ship' };
@@ -212,6 +211,76 @@ test('an upgrade with no conflict, up or down: filed alone, then merged by the c
       );
     },
   );
+});
+
+test('an upgrade onto a template that declares other parameters: --set given, the undeclared dropped and named, held to the previewed plan', async (t) => {
+  t.mock.method(console, 'log', () => {});
+  const { dir } = await applied('onto');
+  const other = path.join(scratch('wf-upgrade-other-'), 'team');
+  fs.cpSync(dir, other, { recursive: true });
+  released(other, '0.2.0', 5);
+  edit(other, 'nemia.yaml', (spec) => {
+    spec.parameters = { cap: { type: 'number', description: 'dollars for a review, capped' } };
+  });
+  edit(other, 'workflows/dev/workflow.yaml', (spec) => {
+    spec.steps[1].budget = { param: 'cap' };
+  });
+  const file = path.join(FACTORIES, 'onto.json');
+  const filedAs = JSON.parse(fs.readFileSync(file, 'utf8'));
+  const before = bytesUnder(FACTORIES);
+  const onto = ['onto', '--to', '0.2.0', '--template', other];
+  await assert.rejects(main(['factory', 'diff', ...onto], noEngine()), refusedWith('Invalid', /cap has no default/));
+  const preview = await printedBy(t, 'factory', 'diff', ...onto, '--set', 'cap=9');
+  assert.ok(preview.includes('dropped: budget'), preview.join('\n'));
+  const digest = preview.find((line) => line.startsWith('plan: '))?.slice('plan: '.length) ?? '';
+  assert.match(digest, /^sha256:[0-9a-f]{64}$/);
+  assert.ok(
+    preview.at(-1)?.startsWith(`nemia factory upgrade onto --to 0.2.0 --template ${other} --set cap=9 --plan ${digest} files it`),
+    preview.join('\n'),
+  );
+  const eight = await printedBy(t, 'factory', 'diff', ...onto, '--set', 'cap=8');
+  const stale = eight.find((line) => line.startsWith('plan: '))?.slice('plan: '.length) ?? '';
+  assert.notEqual(stale, digest, 'another --set is another plan');
+  const upgrade = (...rest: string[]) => main(['factory', 'upgrade', ...onto, ...rest], noEngine());
+  await assert.rejects(upgrade('--set', 'cap=9'), refusedWith('Invalid', /nemia factory diff onto --to 0\.2\.0/));
+  await assert.rejects(upgrade('--set', 'cap=9', '--plan', stale), refusedWith('Conflict', /nemia factory diff onto --to 0\.2\.0/));
+  await assert.rejects(
+    upgrade('--set', 'cap=9', '--set', 'budget=3', '--plan', digest),
+    refusedWith('Invalid', /declares no parameter budget/),
+  );
+  const defaulted = path.join(scratch('wf-upgrade-defaulted-'), 'team');
+  fs.cpSync(other, defaulted, { recursive: true });
+  edit(defaulted, 'nemia.yaml', (spec) => {
+    spec.parameters.cap.default = 5;
+  });
+  const bare = ['onto', '--to', '0.2.0', '--template', defaulted];
+  const dropping = await printedBy(t, 'factory', 'diff', ...bare);
+  assert.ok(dropping.includes('dropped: budget'), dropping.join('\n'));
+  assert.match(
+    dropping.at(-1) ?? '',
+    new RegExp(`^nemia factory upgrade onto --to 0\\.2\\.0 --template \\S+ --plan sha256:[0-9a-f]{64} files it`),
+    'a parameter dropped with no --set given still holds the upgrade to its plan',
+  );
+  await assert.rejects(main(['factory', 'upgrade', ...bare], noEngine()), refusedWith('Invalid', /nemia factory diff onto --to 0\.2\.0/));
+  assert.deepEqual(bytesUnder(FACTORIES), before, 'the previews and every refusal write nothing');
+  const folder = bytesUnder(path.join(FACTORIES, 'onto'));
+  const filed = await printedBy(t, 'factory', 'upgrade', ...onto, '--set', 'cap=9', '--plan', digest);
+  assert.ok(filed.includes('dropped: budget'), filed.join('\n'));
+  assert.deepEqual(JSON.parse(fs.readFileSync(file, 'utf8')), {
+    ...filedAs,
+    template: { source: other, version: '0.2.0', params: { cap: 9 } },
+  });
+  assert.deepEqual(bytesUnder(path.join(FACTORIES, 'onto')), folder, 'the upgrade writes no tree, base nor status');
+  const status = reconciled(templated('onto'));
+  assert.equal(status.version, '0.2.0');
+  assert.deepEqual(
+    status.conditions.map((c) => [c.type, c.status, c.reason]),
+    [
+      ['Applied', 'True', 'Upgraded'],
+      ['ConflictsPending', 'False', 'Merged'],
+    ],
+  );
+  assert.match(textIn(appliedDir('onto'), REVIEW), /^budget: 9$/m, 'rendered with the --set');
 });
 
 test("a step's own closeout schema carried by an upgrade: its line merged into a step the person changed, its file beside it", async (t) => {

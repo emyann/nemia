@@ -374,8 +374,14 @@ function sideLines(name: string, text: string | null): string[] {
   return [`    ${name}:`, ...linesOf(text).map((line) => `      | ${line.replace(/\n$/, '')}`)];
 }
 
-/** What `nemia factory diff` prints of the merge of `name`'s upgrade from `from` to `to`: what merges cleanly, then each conflict. */
-export function planLines(name: string, from: string, to: string, merge: TreeMerge): string[] {
+/** What files the upgrade a preview printed: its line, the plan's digest, and the parameters it drops from the factory's file. */
+export type PlanNext = { line: string; digest: string; dropped: readonly string[] };
+
+/**
+ * What `nemia factory diff` prints of the merge of `name`'s upgrade from `from` to `to`: what merges cleanly, then each conflict, the
+ * parameters the upgrade drops where any, the plan's digest, and `next`'s line, which files it.
+ */
+export function planLines(name: string, from: string, to: string, merge: TreeMerge, next: PlanNext): string[] {
   const lines = [`${name}: ${from} → ${to}`, `merges cleanly: ${merge.merged.length}`];
   for (const merged of merge.merged) lines.push(`  ${merged.at}  from ${FROM[merged.from]}`);
   lines.push(`conflicts: ${merge.conflicts.length}`);
@@ -387,10 +393,12 @@ export function planLines(name: string, from: string, to: string, merge: TreeMer
       ...sideLines('theirs', conflict.theirs),
       `    ${resolveLine(name, conflict.at)}`,
     );
+  if (next.dropped.length) lines.push(`dropped: ${next.dropped.join(', ')}`);
   lines.push(
+    `plan: ${next.digest}`,
     merge.conflicts.length
-      ? `nemia factory upgrade ${name} --to ${to} files it; the daemon merges once each conflict is resolved.`
-      : `nemia factory upgrade ${name} --to ${to} files it; the daemon merges it on its next pass.`,
+      ? `${next.line} files it; the daemon merges once each conflict is resolved.`
+      : `${next.line} files it; the daemon merges it on its next pass.`,
   );
   return lines;
 }

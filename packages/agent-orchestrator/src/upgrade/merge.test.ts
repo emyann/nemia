@@ -177,7 +177,8 @@ test("a templated factory's tree merged three ways, row by row: by file, by key,
         tree({ 'a.md': 'x\n', 'b.md': 'b\n' }),
         tree({ 'a.md': 'A\n', 'b.md': 'B\n' }),
       );
-      assert.deepEqual(planLines('made', '1.0.0', '1.1.0', merge), [
+      const next = { line: 'nemia factory upgrade made --to 1.1.0 --set a=1 --plan sha256:d', digest: 'sha256:d', dropped: ['b', 'c'] };
+      assert.deepEqual(planLines('made', '1.0.0', '1.1.0', merge, next), [
         'made: 1.0.0 → 1.1.0',
         'merges cleanly: 1',
         '  b.md  from the template',
@@ -190,8 +191,14 @@ test("a templated factory's tree merged three ways, row by row: by file, by key,
         '    theirs:',
         '      | A',
         "    nemia factory resolve made 'a.md:1-1' --ours|--theirs|--file <path>",
-        'nemia factory upgrade made --to 1.1.0 files it; the daemon merges once each conflict is resolved.',
+        'dropped: b, c',
+        'plan: sha256:d',
+        'nemia factory upgrade made --to 1.1.0 --set a=1 --plan sha256:d files it; the daemon merges once each conflict is resolved.',
       ]);
+      assert.ok(
+        !planLines('made', '1.0.0', '1.1.0', merge, { ...next, dropped: [] }).some((l) => l.startsWith('dropped:')),
+        'no line where none is dropped',
+      );
       const long = { at: 'a.md', base: 'x\n'.repeat(5), ours: null, theirs: 'y\n' };
       assert.deepEqual(conflictCut(long, 2), { at: 'a.md', base: 'x\nx\n… 3 more lines: read applied/a.md\n', ours: null, theirs: 'y\n' });
     },

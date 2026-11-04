@@ -188,6 +188,9 @@ function unitOn(checkout: string): void {
 }
 
 const engine = eachTest(testEngine);
+
+/** A pid no process has: past the highest Linux allows (2^22) and macOS's. */
+const DEAD = 4_194_305;
 const run = (args: Args, host: ServiceHost, env: NodeJS.ProcessEnv = ENV) => runWith(engineOf(engine().layer), upgrade(args, host, env));
 
 /** The refusal an upgrade fails with: its tag and message. */
@@ -454,4 +457,31 @@ test('an upgrade removes the releases no one needs: not the two newest, not one 
     assert.deepEqual(installed(), ['v7', 'v8']);
     assert.deepEqual(leftovers(), []);
   });
+
+  await s.test(
+    "a crashed upgrade's build folder is removed by the next upgrade, which says so, and only a log over 30 days old goes",
+    async () => {
+      const crashed = path.join(releasesDir(), `.building-v9-${DEAD}`);
+      fs.mkdirSync(path.join(crashed, 'trial', 'engine'), { recursive: true });
+      const logs = path.join(releasesDir(), '.logs');
+      const old = path.join(logs, 'v9-old.log');
+      fs.writeFileSync(old, 'npm ci\n');
+      const longAgo = (Date.now() - 31 * 24 * 60 * 60 * 1000) / 1000;
+      fs.utimesSync(old, longAgo, longAgo);
+      const fresh = fs.readdirSync(logs).filter((name) => name !== 'v9-old.log');
+      assert.ok(fresh.length > 0, 'the builds before wrote their logs');
+      const done = await runOn({ tag: 'v8', repo: REPO });
+      assert.equal(fs.existsSync(crashed), false);
+      assert.ok(
+        done.lines.some((l) => l.includes(`.building-v9-${DEAD}`)),
+        done.lines.join('\n'),
+      );
+      assert.ok(
+        done.lines.some((l) => l.includes('v9-old.log')),
+        done.lines.join('\n'),
+      );
+      assert.deepEqual(fs.readdirSync(logs).sort(), [...fresh].sort(), "a fresh log, a failed build's among them, is kept");
+      assert.deepEqual(leftovers(), []);
+    },
+  );
 });

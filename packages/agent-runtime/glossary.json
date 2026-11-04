@@ -48,6 +48,11 @@
       ]
     },
     {
+      "term": "Drain",
+      "meaning": "a word that holds new tool calls at their hook, read off a file on every look: the holder's drain (`drain`), put for the attached sessions of one holding process across its restart, and the jobs' drain, store-wide, which every Claude Code job reads on each poll and the engine's pass on each pass (`Now.drained`). A job's call in flight finishes within the drain's grace; a parked job is continued only once the jobs' drain is lifted. Two independent facts: lifting one never lifts the other.",
+      "type": "Now"
+    },
+    {
       "term": "End reason",
       "meaning": "why an attempt ended, in the only categories the engine can tell apart: `harness`, `lost`, `unstartable`, `operator` or `deadline`. A reason an older runtime judged by itself reads back as the harness's end, kept as `former`.",
       "type": "EndReason",
@@ -98,6 +103,11 @@
       "term": "Harness version",
       "meaning": "the version of the harness a session's process runs, as the harness says it: Claude Code's init message's `claude_code_version`, the last one it printed. Recorded on the attempt while it works (`harnessVersion`), carried and never judged.",
       "type": "Attempt"
+    },
+    {
+      "term": "Held back",
+      "meaning": "a job's main-thread tool call waiting at its hook while a jobs' drain stands, and since when: carried on its sighting, never judged, so a person sees the job is held and not stalled.",
+      "type": "Sighting"
     },
     {
       "term": "Image",
@@ -161,6 +171,11 @@
       "term": "Outcome",
       "meaning": "how an attempt ended and how a task settled: one word for both, `succeeded`, `failed` or `stopped`. A journal's former `done` is read as `succeeded`.",
       "type": "Outcome"
+    },
+    {
+      "term": "Parked",
+      "meaning": "a job that ended itself under a jobs' drain, past the drain's grace with a call in flight or held past its bound, or that crashed while held or draining, with the call it cut (`calling`) where it cut one. A fact on its end beside its state, never an end reason: once the drain is lifted the runtime continues it as the next attempt of the same task, resumed in its session and told the call that did not finish, with what is left of its spend cap (`parkedCapLeft`, built on `capLeft`).",
+      "type": "Parked"
     },
     {
       "term": "Phase",

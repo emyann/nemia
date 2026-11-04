@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { Effect } from 'effect';
 import { attachedLongLived, claudeCodeOps } from './code.ts';
+import type { Attached } from './attached.ts';
 import { Engine } from '../../index.ts';
 import { builtEngine } from '../../../test/engine.ts';
 import { scratch } from '../../../test/scratch.ts';
@@ -52,5 +53,43 @@ test('REFUSED: a long-lived spawn with nothing holding the attached sessions, re
       ['unstartable'],
       'one attempt, unstartable, and no restart',
     );
+  });
+});
+
+/** An attached runner that holds, each spawn it is handed counted: what `claudeCodeOps` routes a spawn to while a holder holds. */
+const holding = () => {
+  const spawned: string[] = [];
+  const attached: Attached = {
+    ops: {
+      spawn: (r) => Effect.sync(() => void spawned.push(r.name)),
+      observe: Effect.succeed(new Map()),
+      observeFor: () => Effect.succeed({ seen: new Map(), unread: new Set() }),
+      stop: () => Effect.void,
+      logs: () => Effect.succeed(''),
+    },
+    hold: Effect.void,
+    holding: () => true,
+    has: (name) => spawned.includes(name),
+    following: () => 0,
+  };
+  return { attached, spawned };
+};
+
+test('under a holder, a job spawn takes the job road and a long-lived spawn goes attached', async (t) => {
+  await t.test(
+    'a job spawn takes the job road, never the attached one: refused by the job road, which checks its folder first',
+    async () => {
+      const { attached, spawned } = holding();
+      const r = { name: 'ae/j1/1', brief: 'run it', cwd: '/no/such/folder/ae-route' };
+      const err = await Effect.runPromise(Effect.flip(claudeCodeOps({ root: scratch('ae-route-job-') }, attached).spawn(r)));
+      assert.equal(err._tag, 'RunnerError');
+      assert.deepEqual(spawned, [], 'and nothing was spawned attached');
+    },
+  );
+  await t.test('a long-lived spawn goes attached', async () => {
+    const { attached, spawned } = holding();
+    const r = { name: 'ae/l1/1', brief: 'stay', cwd: '/no/such/folder/ae-route', restartPolicy: 'Always' as const };
+    await Effect.runPromise(claudeCodeOps({ root: scratch('ae-route-ll-') }, attached).spawn(r));
+    assert.deepEqual(spawned, ['ae/l1/1'], 'spawned attached');
   });
 });

@@ -22,7 +22,7 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import type { Denial, Sighting, Usage } from '../../core/index.ts';
-import { RunnerError, type McpServer, type RunnerOps, type SessionKept, type SpawnRequest, type TranscriptEvent } from '../seam.ts';
+import { RunnerError, type RunnerOps, type SessionKept, type SpawnRequest, type TranscriptEvent } from '../seam.ts';
 import { forgetFiles, keptOf } from '../forget.ts';
 import { withoutTelemetry } from '../telemetry.ts';
 import { readTranscript } from '../transcript.ts';
@@ -38,10 +38,12 @@ import { carriedOf, lessCarried } from './carried.ts';
 import { sightedOf } from './sighted.ts';
 import { workerBoundsOf, type DetachedOptions } from './detached-options.ts';
 import { spawnFiles, spawnInput } from './spawn-files.ts';
+import type { HarnessIO } from './harness-io.ts';
 
 export { detachedStateOf, STALE_MS } from './run-file.ts';
 export { WORKER_BEAT_MS, WORKER_STOP_GRACE_MS } from './worker-bounds.ts';
 export type { DetachedOptions } from './detached-options.ts';
+export type { HarnessIO } from './harness-io.ts';
 import { followOf, type PartialMark } from './follow.ts';
 
 /** Everything this engine needs to know about a harness. Add one by writing one of these. */
@@ -206,44 +208,6 @@ export type HarnessSpec = {
  * read as failed, with no id, once it has ended.
  */
 export type StartEvent = { event: Readonly<Record<string, string>>; id: string };
-
-/**
- * Where a harness that can take a structured final answer should put it.
- *
- * Chosen by the runner, per run, OUTSIDE the workspace: anything written inside a step's worktree
- * travels down its git branch, and the next step would be cut a directory that already says it is
- * finished.
- */
-export type HarnessIO = {
-  /** Present when the task asked for a closeout: its JSON Schema, written to a file. */
-  closeoutSchemaFile?: string;
-  /** Where the harness should write the final answer that satisfies the schema. */
-  closeoutFile?: string;
-  /** Directories to treat as trusted for this run. Codex loads a project's rules only when trusted. */
-  trustedDirs?: string[];
-  /**
-   * Present when the session has MCP servers of the task's: its `mcp` and the entries its `projectMcp` picks, written as an MCP
-   * config (`{"mcpServers": …}`).
-   */
-  mcpConfigFile?: string;
-  /** The checkout's own `.mcp.json`, when there is one. Found by a spec's `prepare`, which reads the disk. */
-  projectMcpConfig?: string;
-  /** The entries a task's `projectMcp` picked from its checkout's `.mcp.json`, for a harness that takes servers as arguments. */
-  pickedMcp?: Record<string, McpServer>;
-  /** `ionice -c3` runs on this machine, so a command can be put in the idle IO class. Found by a spec's `prepare`. */
-  idleIo?: true;
-  /**
-   * Where the spawn request whole, and the `io` the runner computed for it, were written for the harness to read
-   * (`HarnessSpec.needsRequest`). Present only for a spec that asks.
-   */
-  requestFile?: string;
-  /**
-   * Where a Claude Code job's own process writes what its claude.ai bridge came to (`AttachedBridge`, decoded by
-   * `BridgeFactsSchema`), and each `bridge_state` its stream says after: named by its spec's `prepare` beside the run's own files
-   * where the task asks for a bridge (`claude.remoteControl`), and read into the job's sighting by its runner. Absent: none was asked.
-   */
-  bridgeFile?: string;
-};
 
 /** What a harness's output said, as its spec's `readOutput` found it. Each part absent when it does not say. */
 export type HarnessOutput = {
@@ -429,6 +393,16 @@ export const detachedFind =
       const at = runAt(spec, root, name);
       return at && 'run' in at ? { sessionId: name } : undefined;
     });
+
+/**
+ * Whether the run of `spec` under `name` lost its worker: its run file says `working` and its heartbeat is stale (`leased`), so its
+ * worker died without writing an end, killed or with the machine. `false` where there is no run file, it does not read, or its worker
+ * wrote an end. Read off the run file alone, as the lease is.
+ */
+export const leaseGone = (spec: HarnessSpec, root: string, name: string): boolean => {
+  const at = runAt(spec, root, name);
+  return at !== undefined && 'run' in at && at.run.state === 'working' && leased(at.run, instantNow()) !== 'working';
+};
 
 /** When a run file says its harness started: `NaN` for one that does not say, which is before and after nothing. */
 const startOf = (run: RunFile) => (run.startedAt ? new Date(run.startedAt).getTime() : NaN);

@@ -1,7 +1,8 @@
 /**
  * The store's releases on disk: `$WF_ROOT/releases/<tag>` each, `releases/current` the relative link to one, `releases/.logs/` what each
- * build said, `releases/.building-<tag>-<pid>/` a build under way — its exported `tree/` and the `trial/` store its checks run on — and
- * `releases/.removing-<tag>-<pid>/` a release the retention moved aside to delete. Reads the pointer and a release's `release.json`
+ * build said, `releases/.building-<tag>-<pid>/` a build under way — its exported `tree/` and the `trial/` store its checks run on —,
+ * `releases/.current-<pid>` the pointer's next link while it is switched, and `releases/.removing-<name>-<pid>` a release or a crashed
+ * upgrade's leftover the retention moved aside to delete. Reads the pointer and a release's `release.json`
  * (`ReleaseFileSchema`), runs a build's commands with the build's output in its log, and writes a release last, then the pointer, each by
  * a rename, so no reader meets half of either; a release goes by a rename too, so no reader meets half of one removed.
  */
@@ -11,7 +12,7 @@ import { spawnSync } from 'node:child_process';
 import { Result, Schema } from 'effect';
 import { wfRoot } from '../config/config.store.ts';
 import { CURRENT, RELEASE_FILE, type Current, type ReleaseFile, type Running } from './release.ts';
-import type { Installed } from '../retention/retention.ts';
+import type { BuildLog, Installed, PidEntry } from '../retention/index.ts';
 
 /** `release.json` as an upgrade writes it (`ReleaseFile`). */
 const ReleaseFileSchema = Schema.Struct({
@@ -93,8 +94,8 @@ export function buildingOf(tag: string, stamp: string, root: string = wfRoot()):
   const dir = path.join(releases, `.building-${tag}-${process.pid}`);
   fs.rmSync(dir, { recursive: true, force: true });
   fs.mkdirSync(path.join(dir, 'trial'), { recursive: true });
-  fs.mkdirSync(path.join(releases, '.logs'), { recursive: true });
-  return { dir, tree: path.join(dir, 'tree'), trial: path.join(dir, 'trial'), log: path.join(releases, '.logs', `${tag}-${stamp}.log`) };
+  fs.mkdirSync(path.join(releases, LOGS), { recursive: true });
+  return { dir, tree: path.join(dir, 'tree'), trial: path.join(dir, 'trial'), log: path.join(releases, LOGS, `${tag}-${stamp}.log`) };
 }
 
 /**
@@ -139,15 +140,17 @@ export const removeBuilding = (building: Building): void => fs.rmSync(building.d
 /** Points `releases/current` at `releases/<tag>`: a relative link made beside it, then renamed over it, so the pointer is never absent. */
 export function switchCurrent(tag: string, root: string = wfRoot()): void {
   const releases = releasesDir(root);
-  const hidden = path.join(releases, `.${CURRENT}-${process.pid}`);
+  const hidden = path.join(releases, `${CURRENT_LINK}${process.pid}`);
   fs.rmSync(hidden, { force: true });
   fs.symlinkSync(tag, hidden);
   fs.renameSync(hidden, path.join(releases, CURRENT));
 }
 
-/** The prefix of a build's folder, and of a release moved aside to be deleted. */
+/** The prefix of a build's folder, of the pointer's next link, and of what the retention moved aside to be deleted. */
 const BUILDING = '.building-';
+const CURRENT_LINK = `.${CURRENT}-`;
 const REMOVING = '.removing-';
+const LOGS = '.logs';
 
 /** The names under the store's `releases/`, or none where it does not exist. */
 function namesIn(home: string): string[] {
@@ -173,15 +176,56 @@ export function installedReleases(home: string): Installed[] {
 }
 
 /**
- * Whether an upgrade is building: a `.building-<tag>-<pid>` folder whose pid, its last `-` part, `live` says is a live process (the
- * daemon store's `alive`, given by the caller).
+ * The entries under the store's `releases/` an upgrade names by its pid: each build's folder (`.building-<tag>-<pid>`) and each pointer
+ * link made beside `current` (`.current-<pid>`), with whether that pid, the name's last `-` part, is a live process (`live`, the daemon
+ * store's `alive`, given by the caller). A name whose last part is no pid is left out, and so never removed.
  */
-export const buildUnderWay = (home: string, live: (pid: number) => boolean): boolean =>
-  namesIn(home).some((name) => {
-    if (!name.startsWith(BUILDING)) return false;
+export const pidEntries = (home: string, live: (pid: number) => boolean): PidEntry[] =>
+  namesIn(home).flatMap((name) => {
+    if (!name.startsWith(BUILDING) && !name.startsWith(CURRENT_LINK)) return [];
     const pid = Number(name.slice(name.lastIndexOf('-') + 1));
-    return Number.isInteger(pid) && pid > 0 && live(pid);
+    return Number.isInteger(pid) && pid > 0 ? [{ name, live: live(pid) }] : [];
   });
+
+/** Whether an upgrade is building: a `.building-<tag>-<pid>` folder whose pid is a live process (`pidEntries`). */
+export const buildUnderWay = (home: string, live: (pid: number) => boolean): boolean =>
+  pidEntries(home, live).some((e) => e.live && e.name.startsWith(BUILDING));
+
+/**
+ * The build logs under `releases/.logs/`: each regular file there, with when it was last written in whole milliseconds; none where the
+ * folder does not exist.
+ */
+export function buildLogs(home: string): BuildLog[] {
+  const dir = path.join(releasesDir(home), LOGS);
+  let names: string[];
+  try {
+    names = fs.readdirSync(dir);
+  } catch {
+    return [];
+  }
+  return names.flatMap((name) => {
+    const stat = fs.lstatSync(path.join(dir, name), { throwIfNoEntry: false });
+    return stat?.isFile() ? [{ name, modifiedMs: Math.floor(stat.mtimeMs) }] : [];
+  });
+}
+
+/** Where the build log `name` is, for the caller to delete. */
+export const buildLogPath = (home: string, name: string): string => path.join(releasesDir(home), LOGS, name);
+
+/**
+ * Moves the leftover `releases/<name>` (a `pidEntries` entry) aside to `releases/.removing-<name>-<pid>`, a link as a link, for the
+ * caller to delete off the event loop, and answers where; answers false, moving nothing, where it is gone already.
+ */
+export function asideLeftover(home: string, name: string): string | false {
+  const aside = path.join(releasesDir(home), `${REMOVING}${name}-${process.pid}`);
+  try {
+    fs.renameSync(path.join(releasesDir(home), name), aside);
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return false;
+    throw err;
+  }
+  return aside;
+}
 
 /**
  * Moves `releases/<tag>` aside to `releases/.removing-<tag>-<pid>`, for the caller to delete off the event loop, and answers where;

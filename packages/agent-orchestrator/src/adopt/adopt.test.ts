@@ -1,12 +1,13 @@
 /**
  * A takeover's plan, row by row: the workflows the template adds and drops, each hire it changes, the revisions policy before and after,
  * the store's rules it leaves unread with the line that writes them into the tree, the runs waiting or in flight by the policy after,
- * and the cards and schedules it would strand. Its refusals are laws of `contracts/adopt.contract.ts`, not rows here.
+ * and the cards and schedules it would strand. Its refusals are laws of `contracts/adopt.contract.ts`, not rows here; and the values of the
+ * harness settings the factory taken over keeps, which that contract's law reads by their keys alone, the values being unjudged.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { Factory } from '../factory/factory.ts';
-import { adoptLines, adoptPlan, type Adoption } from './adopt.ts';
+import { adopted, adoptLines, adoptPlan, type Adoption } from './adopt.ts';
 
 /** A hand-made factory offering `a` and `b`, hiring `p` into `a/x`, scheduling `a`. */
 const made: Factory = {
@@ -95,4 +96,10 @@ test("a takeover's plan, row by row", async (t) => {
     assert.ok(lines.some((l) => l.includes('sha256:d')));
     assert.ok(lines.some((l) => l.includes('nemia factory adopt f --plan sha256:d')));
   });
+});
+
+test('the factory taken over keeps its harness settings whole, each value as it was', () => {
+  const harnessSettings = { claude: { attribution: { commit: '', pr: '' }, language: 'french' } };
+  const kept = adopted({ ...made, harnessSettings }, { workflows: ['a'], hires: {} }, { source: 't', version: '1.0.0', params: {} }, '/t');
+  assert.deepEqual(kept.harnessSettings, { claude: { attribution: { commit: '', pr: '' }, language: 'french' } });
 });

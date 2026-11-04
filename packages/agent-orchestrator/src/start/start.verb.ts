@@ -26,7 +26,8 @@ import { pinsOf } from '../revisions/pin.verb.ts';
 import { workRoot } from '../record/places.store.ts';
 import { gateRefusal } from '../ending/ending.ts';
 import { isRepositoryRun, type Mount, type Run } from '../record/record.ts';
-import { harnessSettingsRefusal, isHarnessSettings, type HarnessSettings } from '../harness-settings/harness-settings.ts';
+import type { HarnessSettings } from '../harness-settings/harness-settings.ts';
+import { settingsAt } from '../harness-settings/harness-settings.verb.ts';
 import { afterRefusal } from '../wait/wait.ts';
 import { contextRefusal } from './context.ts';
 import { inputRefusal, type InputFile } from './inputs.ts';
@@ -106,7 +107,8 @@ const stepsIn = Effect.fnUntraced(function* (workflowDir: string, places: Places
  *   before the runtime's, which would speak of a rule or a folder the person never wrote; the run's inputs folder among them when
  *   `given`, for a run `nemia start --input` gives files;
  * - a step whose first filing's config its harness refuses (`refused`, `configRefused` unless a caller gives another), the run started at
- *   `gates` beside the workflow's own: a word, a window, a cap or a bridge (`remote: true`) its harness does not take;
+ *   `gates` beside the workflow's own and given the factory's judged `harnessSettings`: a word, a window, a cap or a bridge
+ *   (`remote: true`) its harness does not take;
  * - a step whose `tools:` names a tool nothing its session would be allowed (`unallowedRefusal`, pure, asked of a folder a waiting run
  *   takes again too), judged against `allows`, the allow rules the run's own repository grants a session started in it (`repoAllows`).
  *
@@ -124,10 +126,12 @@ export const stepsToStart = Effect.fn('stepsToStart')(function* (
   given = false,
   allows: Allows = NO_ALLOWS,
   known?: SkillsFound,
+  harnessSettings?: HarnessSettings,
 ) {
   const steps = yield* stepsIn(workflowDir, places, factory);
   const found = known ?? (isFolderTeam(steps) ? yield* (yield* SkillDoor).skills.found({ dir: workflowDir, places }) : undefined);
-  return yield* tried(() => startable(steps, workflowDir, isolate, places, denied, found, gates, refused, given, allows));
+  const asked = { refused, given, allows, harnessSettings };
+  return yield* tried(() => startable(steps, workflowDir, isolate, places, denied, found, gates, asked));
 });
 
 /** `stepsToStart`'s judgement of the steps read, past the folder's load: each refusal it names thrown as `Invalid`. */
@@ -139,9 +143,12 @@ function startable(
   denied: readonly string[],
   found: SkillsFound | undefined,
   gates: readonly string[],
-  refused: ConfigRefused,
-  given: boolean,
-  allows: Allows,
+  {
+    refused,
+    given,
+    allows,
+    harnessSettings,
+  }: { refused: ConfigRefused; given: boolean; allows: Allows; harnessSettings?: HarnessSettings },
 ): Workflow[] {
   const set = stepSetRefusal(steps, isolate);
   if (set) throw new Invalid({ message: set });
@@ -157,7 +164,7 @@ function startable(
     ...(given ? { inputs: inputsDir({ id: 'run' }) } : {}),
   });
   if (unruled) throw new Invalid({ message: unruled });
-  const refusedConfig = refused(steps, places, gates, denied, formerModesWritten(workflowDir));
+  const refusedConfig = refused(steps, places, gates, denied, formerModesWritten(workflowDir), harnessSettings);
   if (refusedConfig) throw new Invalid({ message: refusedConfig });
   return steps;
 }
@@ -198,14 +205,16 @@ export const configRefused = (
   gates: readonly string[],
   denied: readonly string[],
   written: Readonly<Record<string, string>> = {},
-): string | undefined => refusedStep(steps, places, gates, written, [], denied)?.why;
+  harnessSettings?: HarnessSettings,
+): string | undefined => refusedStep(steps, places, gates, written, [], denied, [], harnessSettings)?.why;
 
 /** A run's artifacts folder as a start asks of its steps' first filing, before the run has an id. */
 const startArtifacts = (): string => path.dirname(artifactsDir({ id: 'run' }, 'step'));
 
 /**
  * `configRefused`'s refusal with the step it refuses, in a run that mounts `mounts` (`factoryMounts`) and the volumes `volumes`
- * (`volumesAt`), and whose place denies a landing session `denied`.
+ * (`volumesAt`), given the factory's harness settings `harnessSettings` (`settingsAt`), and whose place denies a landing session
+ * `denied`.
  */
 function refusedStep(
   steps: readonly Workflow[],
@@ -215,6 +224,7 @@ function refusedStep(
   mounts: readonly Mount[],
   denied: readonly string[],
   volumes: readonly Mount[] = [],
+  harnessSettings?: HarnessSettings,
 ): { step: Workflow; why: string } | undefined {
   for (const step of steps.filter((s) => !isRemoteHarness(s.harness))) {
     const own = ownOf(step, renderedFlags(step, '.'), () => places.repo);
@@ -226,6 +236,7 @@ function refusedStep(
         gates: [...gates],
         ...(mounts.length ? { mounts: [...mounts] } : {}),
         ...(volumes.length ? { volumes: [...volumes] } : {}),
+        ...(harnessSettings ? { harnessSettings } : {}),
       },
       { model: step.model, budgetUsd: budgetUsdFor(step.budget), runArtifacts, inbox: inboxDir(), own, landingDenied: () => denied },
     );
@@ -245,6 +256,7 @@ export type ConfigRefused = (
   gates: readonly string[],
   denied: readonly string[],
   written?: Readonly<Record<string, string>>,
+  harnessSettings?: HarnessSettings,
 ) => string | undefined;
 
 /** The refusal `startRun` asks of a folder's steps before a run is written: `configRefused`, unless a layer gives another. */
@@ -357,17 +369,6 @@ const mountsAt = (factory: Factory | undefined, repo: string | undefined): Mount
 const volumesAt = (factory: Factory | undefined): Mount[] => (factory ? factoryVolumes(factory).filter((v) => isDirectory(v.path)) : []);
 
 /**
- * The harness settings of `factory` a run in it freezes, or why it cannot start (`harnessSettingsRefusal`, a key a person wrote by hand
- * that a factory may not set); none in the default factory, and for a factory that names none.
- */
-const settingsAt = (factory: Factory | undefined): Effect.Effect<HarnessSettings | undefined, Invalid> => {
-  const settings = factory?.harnessSettings;
-  if (factory === undefined || settings === undefined) return Effect.succeed(undefined);
-  if (isHarnessSettings(settings)) return Effect.succeed(settings);
-  return Effect.fail(new Invalid({ message: harnessSettingsRefusal(settings, factory.name) ?? 'its harness settings do not read' }));
-};
-
-/**
  * Why `steps`, started from `opts` in `factory` on `own` (none for a folder run), cannot be given `mounts`: a `writable:` name no folder
  * answers (`writableRefusal`), or a step whose harness cannot hold its mounts: asked first of every folder read-only, as the run mounts
  * them (`factoryMountRefusal`), then of the folders its `writable:` names writable (`writableMountRefusal`), then of the factory's volumes
@@ -381,13 +382,13 @@ function mountRefusal(
   own: string | undefined,
   mounts: readonly Mount[],
   denied: readonly string[],
-  volumes: readonly Mount[] = [],
+  { volumes, harnessSettings }: { volumes: readonly Mount[]; harnessSettings: HarnessSettings | undefined },
 ): string | undefined {
   const workflow = path.basename(path.resolve(opts.workflowDir));
   const unwritable = writableRefusal(steps, workflow, factory, own, mounts);
   if (unwritable || !factory || (!mounts.length && !volumes.length)) return unwritable;
   const ask = (asked: readonly Workflow[], given: readonly Mount[] = []) =>
-    refusedStep(asked, places, opts.gates ?? [], formerModesWritten(opts.workflowDir), mounts, denied, given);
+    refusedStep(asked, places, opts.gates ?? [], formerModesWritten(opts.workflowDir), mounts, denied, given, harnessSettings);
   const reading = ask(steps.map(({ writable: _, ...step }) => step));
   if (reading) return factoryMountRefusal(factory, `${workflow}/${reading.step.name}`, reading.why);
   const writing = ask(steps);
@@ -651,6 +652,7 @@ export const startRun = Effect.fn('start')(function* (opts: StartOptions) {
   const isolate = opts.isolate ?? true;
   const places = placesOf(opts.repo);
   const factory = yield* tried(() => factoryNamed(opts.factory));
+  const harnessSettings = yield* settingsAt(factory);
   const refused = yield* StartRefusal;
   const { declared } = yield* PlaceService;
   const denied = declared.denyWhileLanding;
@@ -666,6 +668,7 @@ export const startRun = Effect.fn('start')(function* (opts: StartOptions) {
     Boolean(opts.inputs?.length),
     yield* tried(() => repoAllows(opts.repo, opts.factory)),
     found,
+    harnessSettings,
   );
   const folder = isFolderTeam(steps);
   if (folder && opts.repoNamed) return yield* Effect.fail(new Invalid({ message: repoNamedRefusal(opts.repo) }));
@@ -682,10 +685,12 @@ export const startRun = Effect.fn('start')(function* (opts: StartOptions) {
   const refusedContext = contextRefusal(opts.context ?? [], opts.after ?? [], runStore.runs.exists, id);
   if (refusedContext) return yield* Effect.fail(refusedContext);
   const inherited = yield* inheritedOf(opts, edits);
-  const harnessSettings = yield* settingsAt(factory);
   const mounts = mountsAt(factory, folder ? undefined : opts.repo);
   const volumes = volumesAt(factory);
-  const unmounted = mountRefusal(opts, steps, places, factory, folder ? undefined : opts.repo, mounts, denied, volumes);
+  const unmounted = mountRefusal(opts, steps, places, factory, folder ? undefined : opts.repo, mounts, denied, {
+    volumes,
+    harnessSettings,
+  });
   if (unmounted) return yield* Effect.fail(new Invalid({ message: unmounted }));
   const told = toldOf(opts, steps, inputs, factory, mounts, volumes, harnessSettings);
   const stepRecords = Object.fromEntries(steps.map((s) => [s.name, { taskId: null }]));

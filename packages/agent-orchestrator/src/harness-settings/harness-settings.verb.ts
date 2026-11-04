@@ -12,10 +12,13 @@ import { tried } from '../runtime-client.ts';
 import { Invalid, Missing } from '../refusal/refusal.ts';
 import { FactoryName } from '../factory/factory.model.ts';
 import { refuseName } from '../factory/factory.store.ts';
+import type { Factory } from '../factory/factory.ts';
 import {
   SETTABLE,
   SETTINGS_HARNESS,
   harnessSettingsRefusal,
+  isHarnessSettings,
+  type HarnessSettings,
   settingKeyOf,
   settingsNamed,
   withoutSetting,
@@ -166,6 +169,17 @@ export const FACTORY_SETTING_RM: Command<{ file: string; removed: string }> = {
     );
   },
   print: ({ file, removed }, args) => [`${textOf(args, 'factory')}  setting ${removed} removed`, `changed: ${file}`],
+};
+
+/**
+ * The harness settings of `factory` a run in it freezes, or why it cannot start (`harnessSettingsRefusal`, a key a person wrote by hand
+ * that a factory may not set); none in the default factory, and for a factory that names none.
+ */
+export const settingsAt = (factory: Factory | undefined): Effect.Effect<HarnessSettings | undefined, Invalid> => {
+  const settings = factory?.harnessSettings;
+  if (factory === undefined || settings === undefined) return Effect.succeed(undefined);
+  if (isHarnessSettings(settings)) return Effect.succeed(settings);
+  return Effect.fail(new Invalid({ message: harnessSettingsRefusal(settings, factory.name) ?? 'its harness settings do not read' }));
 };
 
 /** `nemia factory setting`'s entries, in the order `nemia`'s help lists them. */

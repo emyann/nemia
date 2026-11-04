@@ -42,11 +42,10 @@ const leavesAForeignFolder = (adoption: Adoption): boolean =>
 const same = (a: string | number | boolean | undefined, b: string | number | boolean | undefined): boolean =>
   a === b || (a !== a && b !== b);
 
-/** Whether two dictionaries hold the same entries, in the same order, a NaN the same as a NaN. */
 /**
- * Whether `a` and `b` name the same keys, in the same order: what `keepsItsHarnessSettings` says of a factory's harness settings, whose
- * values are what its file holds, unjudged (`unknown`), which the verifier compares by no means. That the values are carried is held by
- * the story (`test/factory-start.test.ts`, its setting checkpoints).
+ * Whether `a` and `b` name the same keys, in the same order: what `keepsItsHarnessSettings` says of a factory's harness settings. Their
+ * values are what its file holds, unjudged (`unknown`, so that a hand-edited key still reads and `nemia factory setting rm` can take it
+ * off), which the verifier compares by no means: that `adopted` carries each value is held by `src/adopt/adopt.test.ts`, which runs it.
  */
 const sameKeys = (a: Readonly<Record<string, unknown>>, b: Readonly<Record<string, unknown>>): boolean => {
   const was = Object.keys(a);
@@ -54,6 +53,7 @@ const sameKeys = (a: Readonly<Record<string, unknown>>, b: Readonly<Record<strin
   return now.length === was.length && now.every((key, i) => was.at(i) === key);
 };
 
+/** Whether two dictionaries hold the same entries, in the same order, a NaN the same as a NaN. */
 const sameDict = (
   a: Readonly<Record<string, string | number | boolean>>,
   b: Readonly<Record<string, string | number | boolean>>,

@@ -189,6 +189,7 @@ export {
   factoryLines,
   factoryNameRefusal,
   factoryRepo,
+  factoryVolumes,
   writersOf,
   fillsOf,
   hireRefusal,
@@ -209,6 +210,7 @@ export type {
   InstructionAt,
   Schedule,
   TemplateStatus,
+  Volume,
 } from './factory/factory.ts';
 export {
   ENGINE_REASON,

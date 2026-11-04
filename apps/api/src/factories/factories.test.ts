@@ -462,6 +462,7 @@ test('a person reads the factories: the default first, each by name, a broken fi
           add: `nemia factory add ${name} --repo <path>`,
           schedule: `nemia factory schedule ${name} <workflow> --cron <expr> --brief <text>`,
           trust: `nemia factory trust ${name}`,
+          volume: `nemia factory volume add ${name} <path>:ro|:rw`,
         });
         assert.deepEqual(body[0], {
           name: 'default',
@@ -473,6 +474,7 @@ test('a person reads the factories: the default first, each by name, a broken fi
           schedules: [],
           template: null,
           untrusted: [],
+          volumes: [],
           commands: commandsOf('default'),
         });
         assert.deepEqual(body[2].untrusted, [
@@ -508,6 +510,7 @@ test('a person reads the factories: the default first, each by name, a broken fi
             schedules: [],
             template: null,
             untrusted: [],
+            volumes: [],
             commands: commandsOf('hired'),
           },
         );
@@ -515,9 +518,51 @@ test('a person reads the factories: the default first, each by name, a broken fi
         assert.deepEqual(body[3].repos, [repoR, repoS]);
         assert.equal(body[1].default, false);
         assert.match(body[1].error ?? '', /is not JSON/);
-        assert.deepEqual([body[1].repos, body[1].workflows, body[1].hires, body[1].schedules, body[1].template], [[], [], {}, [], null]);
+        assert.deepEqual(
+          [body[1].repos, body[1].workflows, body[1].hires, body[1].schedules, body[1].template, body[1].volumes],
+          [[], [], {}, [], null, []],
+        );
       } finally {
         fs.rmSync(path.join(root, 'factories', 'broken.json'));
+      }
+    },
+  );
+
+  await s.test(
+    "a factory's volumes as the package lists them: resolved, sorted, once each, each with the line that takes it back",
+    async () => {
+      const file = path.join(root, 'factories', 'vols.json');
+      write(
+        file,
+        JSON.stringify({
+          name: 'vols',
+          repos: [repoR],
+          workflows: [],
+          hires: {},
+          schedules: {},
+          volumes: [
+            { path: '/tmp/x/zeta', readOnly: true },
+            { path: '/tmp/x/notes/', readOnly: false },
+            { path: '/tmp/x/alpha', readOnly: true },
+            { path: '/tmp/x/notes', readOnly: true },
+          ],
+        }),
+      );
+      try {
+        const vols = (await get<FactoryAnswer[]>('/api/factories')).body.find((f) => f.name === 'vols');
+        const rm = (at: string) => ({ rm: `nemia factory volume rm vols ${at}` });
+        assert.deepEqual(
+          vols?.volumes,
+          [
+            { path: '/tmp/x/alpha', readOnly: true, commands: rm('/tmp/x/alpha') },
+            { path: '/tmp/x/notes', readOnly: false, commands: rm('/tmp/x/notes') },
+            { path: '/tmp/x/zeta', readOnly: true, commands: rm('/tmp/x/zeta') },
+          ],
+          'sorted and resolved, a path named twice listed once as it was first named',
+        );
+        assert.equal(vols?.commands.volume, 'nemia factory volume add vols <path>:ro|:rw');
+      } finally {
+        fs.rmSync(file);
       }
     },
   );

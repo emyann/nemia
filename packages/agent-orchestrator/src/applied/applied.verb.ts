@@ -310,6 +310,23 @@ export const reconcileFactory = Effect.fn('reconcileFactory')(function* (factory
 });
 
 /**
+ * The name of the template a base holds (`baseTemplateOf`): `rendered` where the base is the render; else the status's `last`; else, while
+ * no upgrade is under way, `named`, the template the factory's file names.
+ */
+const namedBase = (
+  factory: Factory & { template: FactoryTemplate },
+  rendered: string | undefined,
+  last: Status | undefined,
+  named: string | undefined,
+): string | undefined =>
+  baseTemplateOf({
+    rendered,
+    recorded: last?.template,
+    idle: typeof last?.version === 'string' && last.version === factory.template.version && last.upgrade === undefined,
+    named,
+  });
+
+/**
  * `factory` brought to its template as rendered now (`now`), or as the condition that says why it is not, `named` the name of the
  * template its file names where it was read (`reconcileFactory`). The status names the template the base holds (`baseTemplateOf`).
  */
@@ -321,16 +338,24 @@ function reconciledWith(factory: Factory & { template: FactoryTemplate }, now: R
   const digest = base.length ? digestOf(base) : null;
   if (!('type' in now) && digest !== null && upgradeDue(factory, now, digest, last))
     return upgradePass(factory, now, base, last as Status & { version: string });
+  return observed(factory, now, base, digest, last, named);
+}
+
+/**
+ * The status of a pass that merges nothing, written where it changed: the version and the template its base holds, its digest, its
+ * parameters and its conditions (`reconciledWith`).
+ */
+function observed(
+  factory: Factory & { template: FactoryTemplate },
+  now: RenderedAt | Condition,
+  base: readonly Entry[],
+  digest: string | null,
+  last: Status | undefined,
+  named: string | undefined,
+): Status {
   const current = !('type' in now) && digest === digestOf(now.entries);
   const version = base.length ? (current ? now.version : (last?.version ?? null)) : null;
-  const template = base.length
-    ? baseTemplateOf({
-        rendered: current ? now.name : undefined,
-        recorded: last?.template,
-        idle: typeof last?.version === 'string' && last.version === factory.template.version && last.upgrade === undefined,
-        named,
-      })
-    : undefined;
+  const template = base.length ? namedBase(factory, current ? now.name : undefined, last, named) : undefined;
   const status: Status = {
     version,
     ...(template === undefined ? {} : { template }),

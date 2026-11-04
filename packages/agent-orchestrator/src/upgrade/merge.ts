@@ -333,7 +333,10 @@ function unrelatedText(path: string, ours: string, theirs: string): Part[] {
   return ['---\n', ...unrelatedHead(path, o.head, t.head), '---\n', ...unrelatedLines(path, o.body, t.body, o.lines)];
 }
 
-/** `factory.json` merged by key with no base: its workflows as a set (`unrelatedSet`), its hires by step, any other key whole (`unrelatedKey`). */
+/**
+ * `factory.json` merged by key with no base: its workflows as a set (`unrelatedSet`), its hires by step, any other key whole
+ * (`unrelatedKey`).
+ */
 function unrelatedWiring(ours: string, theirs: string): FileMerge | undefined {
   const [o, t] = [objectOf(ours), objectOf(theirs)];
   if (o === undefined || t === undefined) return undefined;

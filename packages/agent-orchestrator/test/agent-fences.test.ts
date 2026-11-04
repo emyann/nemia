@@ -21,8 +21,8 @@
  * on the tests' reviewer, a dontAsk agent, in a copy of the team (`planted`), and read as a run reads it. Each deny is proven to be the one
  * that refuses its own spellings, and each plain read still asked. Beside them, a reviewer's reads of its pull request (`GH_ALLOWS`), and
  * the denies of every other form of gh they reach (`GH_REFUSED`), each proven the one that refuses its own spellings, and proven needed
- * where the checkout's settings allow those reads to a step that allows none itself. The planted lists may drift from sdlc's: what sdlc
- * writes is held where it is written.
+ * where a settings file allows those reads to a step that allows none itself, which the checkout's no longer does. The planted lists
+ * may drift from sdlc's: what sdlc writes is held where it is written.
  *
  * Every path a repository skill says its work is on matches a file of the checkout (`appliesUnmatched`), the read-within-reach rule of
  * the repository's skills is counted as `nemia stats` counts it (`rulesOfTry`), and no tsconfig of the checkout makes `tsc --noEmit`
@@ -1243,16 +1243,24 @@ test('REFUSED: gh whole in place of the two reads runs every gh write, and gh pr
   ]);
 });
 
-test("REFUSED: the checkout's settings allow gh's reads to every step, so a read-only step that allows none itself runs gh's refused forms without the denies", () => {
+test("the checkout's settings allow no gh, so a read-only step that allows none itself runs no gh", () => {
   const fenced = planted({ denies: [...READ_SET_DENIES, ...GH_DENIES] });
   assert.ok(!(fenced.allowedTools ?? []).some((rule) => rule.startsWith('Bash(gh')), 'the step allows no gh of its own');
-  assert.ok(
-    GH_ALLOWS.every((rule) => SETTINGS_ALLOWS.includes(rule)),
-    "the settings allow gh's two reads, until the nemia factory runs the sdlc that carries them",
+  assert.deepEqual(
+    SETTINGS_ALLOWS.filter((rule) => rule.startsWith('Bash(gh')),
+    [],
+    'the settings allow no gh: the reviewer allows its own reads',
   );
-  assert.deepEqual(runs(fenced, GH_READS, SETTINGS, []), GH_READS.map(shown), "the settings' reads reach it");
-  assert.deepEqual(runs(fenced, GH_REFUSED_CALLS, SETTINGS, []), [], 'and its denies fence them');
-  assert.deepEqual(runs(planted(), GH_REFUSED_CALLS, SETTINGS, []), GH_REFUSED_CALLS.map(shown), 'without them, the settings open each');
+  assert.deepEqual(runs(fenced, GH_READS, SETTINGS, []), [], 'no read reaches it');
+  assert.deepEqual(runs(planted(), GH_READS, SETTINGS, []), [], 'nor reaches a step without the denies');
+});
+
+test("REFUSED: a settings allow of gh's reads reaches every step, so a read-only step that allows none itself runs gh's refused forms without the denies", () => {
+  const settings: Settings = { permissions: { ...SETTINGS.permissions, allow: [...SETTINGS_ALLOWS, ...GH_ALLOWS] } };
+  const fenced = planted({ denies: [...READ_SET_DENIES, ...GH_DENIES] });
+  assert.deepEqual(runs(fenced, GH_READS, settings, []), GH_READS.map(shown), "the settings' reads reach it");
+  assert.deepEqual(runs(fenced, GH_REFUSED_CALLS, settings, []), [], 'and its denies fence them');
+  assert.deepEqual(runs(planted(), GH_REFUSED_CALLS, settings, []), GH_REFUSED_CALLS.map(shown), 'without them, the settings open each');
 });
 
 /** The folders a walk of the checkout leaves out: what an install, a build or git writes, none of them a file a change is on. */

@@ -1,10 +1,11 @@
 /**
- * `capLeft`: the spend cap a continuation of a parked job is handed, its turn's cap less what the parked attempts it continues spent;
+ * `capLeft` and `capSpent`: a cap less what was spent, and whether that is a cap spent whole; `parkedCapLeft`: the spend cap a
+ * continuation of a parked job is handed, its turn's cap less what the parked attempts it continues spent;
  * and the two the engine writes by it: a continuation's spawn config (`continuedCap`) and a parked end (`parkedEnd`).
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { capLeft, continuedCap, parkedEnd } from './cap.ts';
+import { capLeft, capSpent, continuedCap, parkedCapLeft, parkedEnd } from './cap.ts';
 import { fold, type Event, type Usage } from './domain.ts';
 import type { HarnessArgs } from '../harness/args.ts';
 
@@ -40,7 +41,22 @@ const filed = (config?: HarnessArgs): Event => ({
 });
 const cap5 = filed({ budgetUsd: 5 });
 
-test("capLeft: a continuation's cap is its turn's, less what the parked attempts it continues spent", async (t) => {
+test('capLeft and capSpent: a cap less what was spent, at or below nothing a cap spent whole', async (t) => {
+  const rows: [string, number | undefined, number | undefined, number | undefined, boolean][] = [
+    ['no cap: none, and never spent', undefined, 3, undefined, false],
+    ['spend unknown counts nothing', 5, undefined, 5, false],
+    ['some spent', 5, 2, 3, false],
+    ['spent exactly', 5, 5, 0, true],
+    ['overspent goes below nothing, and is spent', 5, 7, -2, true],
+  ];
+  for (const [name, cap, spent, left, isSpent] of rows)
+    await t.test(name, () => {
+      assert.equal(capLeft(cap, spent), left);
+      assert.equal(capSpent(capLeft(cap, spent)), isSpent);
+    });
+});
+
+test("parkedCapLeft: a continuation's cap is its turn's, less what the parked attempts it continues spent", async (t) => {
   const rows: [string, Event[], number, number | undefined][] = [
     ['no cap given', [filed(), ...ran(1, { parked: true, costUsd: 2 })], 2, undefined],
     ['a first attempt, nothing continued', [cap5], 1, 5],
@@ -50,11 +66,11 @@ test("capLeft: a continuation's cap is its turn's, less what the parked attempts
     ['a parked attempt that measured nothing counts 0', [cap5, ...ran(1, { parked: true, usage: false })], 2, 5],
     ['the run stops at an end that was not a park', [cap5, ...ran(1, { costUsd: 4 }), ...ran(2, { parked: true, costUsd: 1 })], 3, 4],
     ['an end that was not a park is continued by nothing', [cap5, ...ran(1, { costUsd: 4 })], 2, 5],
-    ['a cap spent whole leaves 0, never below', [cap5, ...ran(1, { parked: true, costUsd: 7 })], 2, 0],
+    ['a cap overspent leaves below nothing, which is spent', [cap5, ...ran(1, { parked: true, costUsd: 7 })], 2, -2],
   ];
   for (const [name, events, attempt, left] of rows)
     await t.test(name, () => {
-      assert.equal(capLeft(fold(TASK, events), attempt), left);
+      assert.equal(parkedCapLeft(fold(TASK, events), attempt), left);
     });
 
   await t.test("a later turn takes its input's cap, and its run does not reach back into the turn before", () => {
@@ -77,8 +93,8 @@ test("capLeft: a continuation's cap is its turn's, less what the parked attempts
       },
     ];
     const state = fold(TASK, events);
-    assert.equal(capLeft(state, 3), 1, "turn 1's $3 less attempt 2's $2, attempt 1 being turn 0's");
-    assert.equal(capLeft(state, 2), 3, 'attempt 2 starts turn 1, continuing nothing of it');
+    assert.equal(parkedCapLeft(state, 3), 1, "turn 1's $3 less attempt 2's $2, attempt 1 being turn 0's");
+    assert.equal(parkedCapLeft(state, 2), 3, 'attempt 2 starts turn 1, continuing nothing of it');
   });
 });
 

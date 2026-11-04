@@ -1596,7 +1596,7 @@ bites.
 
 The step's spend cap holds across those processes as far as that total does. The SDK's `maxBudgetUsd` counts only the spend since
 its `query()` call started (`sdk.d.ts:6100-6103`), so `adopt` hands the resumed process the task's `config.budgetUsd` less what the
-attempt has spent so far by its capture (`capLeft`, `harness/claude/attached.ts`), the run file keeping the whole cap for the next
+attempt has spent so far by its capture (`capLeft`, `src/core/cap.ts`), the run file keeping the whole cap for the next
 take-up to count from; an attempt that has spent it all is not resumed, but ended `failed` with `limit: 'budget'` (the
 harness-updates intent, 2026-11-03). What is left is the same loss: a process killed outright spent what no total saved, so the cap
 handed after it is too generous by that much. A new attempt (`resumeFrom`) is handed its whole cap: a budget across tries is the

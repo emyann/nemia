@@ -73,7 +73,7 @@ const RunFileSchema = Schema.StructWithRest(
     heard: Schema.optional(Schema.Finite),
     /**
      * The limit the session was ended at without being resumed: `budget`, where a holder taking it up found its attempt had already
-     * spent its whole cap (`capLeft`, `attached.ts`). Carried onto its sighting as the harness's own end at its cap would be.
+     * spent its whole cap (`capSpent`, `src/core/cap.ts`). Carried onto its sighting as the harness's own end at its cap would be.
      */
     limit: Schema.optional(Schema.Literal('budget')),
     /** What its claude.ai bridge came to, where one was asked for: its facts, or why there is none. */

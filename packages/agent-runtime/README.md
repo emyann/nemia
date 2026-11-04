@@ -1876,7 +1876,7 @@ Past the drain's grace with a call still in flight, or held past `JOB_HOLD_MS` (
 prompt, so Claude Code saves its total as it leaves. Its end is journalled with `parked` beside it, never as a reason of its own, and
 `decide` continues it as the next attempt of the same task — a restart inside one task, never a new try — once the drain is lifted
 (`PARK_HELD` while it stands), after the restart's back-off, resumed in its session and told the call that did not finish
-(`cutWords`, else `PARKED_WORDS`). It is handed what is left of its turn's cap (`capLeft`, `src/core/cap.ts`); a park that left
+(`cutWords`, else `PARKED_WORDS`). It is handed what is left of its turn's cap (`parkedCapLeft`, `src/core/cap.ts`); a park that left
 nothing ends failed with `limit: 'budget'` instead, and nothing continues it.
 
 A crash takes the same road only for a job that was held or draining: a job whose worker's lease is gone and that has a session is
@@ -1971,7 +1971,7 @@ of pure code sits beside it.
 | `src/core/session.ts` | a session's state in A2A's names, the end each records and the phase a person reads (`endOf`, `TaskPhase`, `LIVE_PHASE`): read by both `domain.ts` and `lifecycle.ts`, so neither imports the other's values |
 | `src/core/domain.ts` | events, `fold`, **`decide`** and what it reads — `lifecycleOf`, `observe` — pure, no I/O, the whole judgement, and the session name read back (`nameParts`) |
 | `src/core/attempt-fold.ts` | an event about one attempt written into that attempt's fold (`foldInto`), for `fold`: pure |
-| `src/core/cap.ts` | what is left of a turn's spend cap for an attempt that continues a parked job (`capLeft`): the cap less what the parked attempts it continues spent — pure, asked by the engine, so `decide` reads no spend |
+| `src/core/cap.ts` | a spend cap handed on, pure: the cap less what was spent (`capLeft`) and whether that is a cap spent whole (`capSpent`), for a holder's take-up of an attached session and for a parked job's continuation, whose cap is its turn's less what the parked attempts it continues spent (`parkedCapLeft`) — asked by the engine and the holder, so `decide` reads no spend |
 | `src/core/restart.ts` | how a task restarts inside itself, pure: a long-lived task's back-off, a kubelet's (`RESTART_BACKOFF`, `backoffOf`), and the words a restarted session or a parked job's continuation is told (`RESTART_WORDS`, `PARKED_WORDS`, `cutWords`), re-exported by `domain.ts` |
 | `src/core/lifecycle.ts` | the lifecycle as an XState statechart, used as a pure transition function: its states, the edge for each event and the one action it names, the refusal of an event with no edge, and the diagram generated from it |
 | `src/core/path.ts` | a task's path through the lifecycle, replayed off its journal (`pathOf`): the state after each entry, the entry's kind and its time, for the `path` verb — pure, a reader's, never a pass's |

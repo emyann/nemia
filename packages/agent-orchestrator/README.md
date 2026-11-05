@@ -483,7 +483,10 @@ task's `resources.limits.memory`; the runtime runs the session's harness and eve
 so a runaway test is killed there alone. The step's check is filed without it, and takes the engine's default: the daemon's
 `WF_MEMORY_LIMIT`, which every task filed with no limit of its own runs under, its scope made in `WF_CGROUP_PARENT`'s slice where one
 is set. A daemon started with `WF_MEMORY_LIMIT` on a host where the runtime cannot make such a scope refuses to start, naming the
-variable to unset (`limitRefusal`).
+variable to unset (`limitRefusal`). A session or a check the kernel killed a process of at its limit says so in its step's note — on the
+feed, `nemia ls` and the run page — with the limit, the peak, and the knob to raise: the step's `memory:` where it names one, else
+`WF_MEMORY_LIMIT` (`outOfMemoryWords`). A raised `memory:` reaches a new run, since a run freezes its workflow; a raised
+`WF_MEMORY_LIMIT` reaches what the daemon files once it is restarted with it.
 
 **A harness's fence is written under that harness's block**, named by its id, the shape a template writes (`src/template/layout.ts`):
 

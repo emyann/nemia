@@ -528,8 +528,8 @@ export type EngineShape = {
    */
   readonly hold: () => Effect.Effect<Served | null, never, Scope.Scope>;
   /**
-   * Hold back the new tool calls of the attached sessions the process `holder` holds, each at its hook until the drain is lifted, or
-   * with `null` lift it. A call in flight runs on, and so does a call that belongs to one, or the call in flight could never end;
+   * Hold back the new tool calls of the attached sessions the process `holder` holds, each at its hook until the drain is lifted or the
+   * process that put it ends, or with `null` lift it. A call in flight runs on, and so does a call that belongs to one, or the call in flight could never end;
    * another process's holder is not held. Refused — `DrainRefused` — for a holder that is neither a process id nor null.
    */
   readonly drain: (holder: number | null) => Effect.Effect<void, DrainRefused>;

@@ -40,8 +40,8 @@ export default {
    * A gate whose step proposes the budgets of the steps after it as data: drawn beside Approve, a row a step — its amount in a field, its
    * own budget, `above the workflow's $40.00` where it is above it, why — and the run's line. Review's amount changed from $8 to $6,
    * Approve sends that change alone (`budgets: [{ step: 'review', usd: 6 }]`); the api writes the proposal and that change into the
-   * approval, apart, and the step, read again, shows the caps its approval set (`gate.budgets.from === 'approved'`), implement's $60 still said above. Taken back, and
-   * the run with it.
+   * approval, apart, and the step, read again, shows the caps its approval set (`gate.budgets.from === 'approved'`), implement's $60
+   * still said above. Taken back, and the run with it.
    */
   name: 'gate-budgets',
   route: '/runs',

@@ -42,17 +42,20 @@ fence refuses an edit of your store's factories, workflows and inbox.
 
 What your repository decides is a parameter, given with `--set` when you apply the template; one you do not give takes its default.
 
-| Parameter  | What it says                                                                         | Its default                                                                              |
-| ---------- | ------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------- |
-| github     | whether the factory judges and lands its work on GitHub (`true`) or in your checkout | false                                                                                    |
-| localCheck | in your checkout: the command that judges each round, and the merged tree at landing | npm run --if-present lint && npm run --if-present typecheck && npm run --if-present test |
-| ciCheck    | on GitHub: the name of the CI status check a pull request waits on                   | ci                                                                                       |
-| roundCheck | on GitHub: the command implement's check runs after each round, before CI            | npm run --if-present lint && npm run --if-present typecheck                              |
-| areas      | the areas of the repository a card names, in the factory's rules                     | the top-level folders of the repository                                                  |
-| storeRoot  | the store the agents' fences keep them out of                                        | ~/.agent-workflows                                                                       |
+| Parameter      | What it says                                                                                                           | Its default                                                                              |
+| -------------- | ---------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| github         | whether the factory judges and lands its work on GitHub (`true`) or in your checkout                                   | false                                                                                    |
+| localCheck     | in your checkout: the command that judges each round, and the merged tree at landing                                   | npm run --if-present lint && npm run --if-present typecheck && npm run --if-present test |
+| ciCheck        | on GitHub: the name of the CI status check a pull request waits on                                                     | ci                                                                                       |
+| roundCheck     | on GitHub: the command implement's check runs after each round, before CI                                              | npm run --if-present lint && npm run --if-present typecheck                              |
+| implementCheck | either way: a command of your own that implement's check runs after sdlc's scripts, before the push or the local check | true (checks nothing)                                                                    |
+| areas          | the areas of the repository a card names, in the factory's rules                                                       | the top-level folders of the repository                                                  |
+| storeRoot      | the store the agents' fences keep them out of                                                                          | ~/.agent-workflows                                                                       |
 
 github is a boolean, refused at apply unless it is `true` or `false`. A factory reads localCheck where it is false, and ciCheck and
-roundCheck where it is true.
+roundCheck where it is true, and implementCheck either way: set it to add a check of your own to
+implement's check in build and quick, rather than editing their check lines, and an upgrade that changes those lines merges with no
+conflict on them.
 
 storeRoot is written as Claude Code reads a path in a permission rule: `~/` for a store under your home, and two slashes for any
 other absolute path, `--set storeRoot=//srv/nemia` for a store at `/srv/nemia`. With one slash Claude Code reads the path from the

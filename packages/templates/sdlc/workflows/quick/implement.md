@@ -25,7 +25,7 @@ Your check then pushes again through the same script, so CI's verdict is for the
 next try is handed that, since you may type no `gh` yourself.
 
 **Nothing runs your tests for you.** The check measures the change, proves the probes and the parts, then pushes the branch and waits on CI: it
-runs `change.ts size`, `probe.ts`, `parts.ts`, `pull-request.ts push` and `pull-request.ts wait`, in that order, and nothing else. Run them yourself
+runs `change.ts size`, `probe.ts`, `parts.ts`, the factory's own check, its `implementCheck` parameter (`${{ parameters.implementCheck }}`; `true` checks nothing), `pull-request.ts push` and `pull-request.ts wait`, in that order, and nothing else. Run them yourself
 before you sign off, as the repository's instructions say of a session's checks: the tests of what you changed, the types and the
 lint. CI's `${{ parameters.ciCheck }}` context runs the repository's suite on the commit your check pushed, before the review, and that
 is the last thing any suite reads: the landing merges that same commit and its check is only the receipt that it was merged. A red
@@ -37,8 +37,8 @@ GitHub calls unmergeable, a `${{ parameters.ciCheck }}` no longer green — and 
 This factory has no remote: nothing is pushed and no pull request is opened, and you open none.
 
 **The local check is the only judge.** The check measures the change, proves the probes and the parts, then runs the repository's local check
-(`${{ parameters.localCheck }}`) on this round's tree, from the workspace's root: it runs `change.ts size`, `probe.ts`, `parts.ts` and
-the local check, in that order, and nothing else. Run the tests of what you changed, the types and the lint yourself before you sign off, as the
+(`${{ parameters.localCheck }}`) on this round's tree, from the workspace's root: it runs `change.ts size`, `probe.ts`, `parts.ts`,
+the factory's own check, its `implementCheck` parameter (`${{ parameters.implementCheck }}`; `true` checks nothing) and the local check, in that order, and nothing else. Run the tests of what you changed, the types and the lint yourself before you sign off, as the
 repository's instructions say of a session's checks; a refusal of the local check comes back to you with the end of its output. The
 landing runs the local check again, on the base with your branch merged into it, before the merge is committed: a merge that conflicts
 or breaks it is taken back, and nothing landed.

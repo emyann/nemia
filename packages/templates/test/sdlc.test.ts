@@ -11,6 +11,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import yaml from 'js-yaml';
@@ -24,9 +25,18 @@ const TREES = await rendered([
   {
     name: 'set',
     template: COPY,
-    sets: ['github=true', 'ciCheck=gate', 'roundCheck=echo round', 'localCheck=echo local', 'areas=a, b', 'pullRequestLabels=work=fix:fix'],
+    sets: [
+      'github=true',
+      'ciCheck=gate',
+      'roundCheck=echo round',
+      'localCheck=echo local',
+      'areas=a, b',
+      'pullRequestLabels=work=fix:fix',
+      'implementCheck=echo own',
+    ],
   },
   { name: 'plain', template: COPY },
+  { name: 'own', template: COPY, sets: ['implementCheck=echo own'] },
 ]);
 
 /** The tree of the factory `name`, which the controller seeded. */
@@ -114,6 +124,55 @@ test('applied with no --set, each parameter takes its default', () => {
   }
   assert.ok(fs.readFileSync(path.join(tree, 'RULES.md'), 'utf8').includes('the top-level folders of the repository'));
   assert.ok(fs.readFileSync(path.join(tree, 'workflows/agents/otto.md'), 'utf8').includes('Edit(~/.agent-workflows/inbox/**)'));
+});
+
+/** The end of the parts.ts clause, the last of sdlc's own scripts that both ways run. */
+const PARTS_END =
+  'parts.ts" check; else echo "nemia check: WF_WORKFLOW_FILES is not set, so parts.ts is read from the run\'s frozen workflow files alone: this check runs in a run, which sets it" >&2; false; fi; } && ';
+
+/** The factory's own check, `command`, as the implement check runs it: a clause of its own, between sdlc's scripts and the way's `if`. */
+const ownClause = (command: string, github: boolean): string => `${PARTS_END}{ ${command}; } && ${branchOn(github)}`;
+
+/** How many times `part` is in `text`. */
+const count = (text: string, part: string): number => text.split(part).length - 1;
+
+test("the factory's own check runs in build's and quick's implement check, either way, after sdlc's scripts and before the way's branch", () => {
+  for (const [name, github] of [
+    ['set', true],
+    ['own', false],
+  ] as const)
+    for (const workflow of ['build', 'quick']) {
+      const check = checkOf(treeOf(name), workflow, 'implement');
+      assert.equal(count(check, '{ echo own; }'), 1, `${name}: ${workflow}/implement runs it once:\n${check}`);
+      assert.equal(
+        count(check, ownClause('echo own', github)),
+        1,
+        `${name}: ${workflow}/implement runs it after parts.ts, before the way:\n${check}`,
+      );
+      for (const step of workflow === 'build' ? ['implement'] : ['implement', 'review'])
+        assert.ok(stepIn(treeOf(name), workflow, step).body.includes('`echo own`'), `${name}: ${workflow}/${step}'s note names it`);
+    }
+});
+
+/** sha256 of each implement check sdlc 2.4.0 rendered at its defaults, before it had the factory's own check. */
+const BEFORE = {
+  build: 'f34b5cdfee30dbcaf03045dac42b7e070346faf5a665b9c3ee8a34e5075c5231',
+  quick: '3a0b737a51839a29466be2c71d4f69656c01f7007883f502fd1724f7652b380f',
+} as const;
+
+const sha256 = (text: string): string => crypto.createHash('sha256').update(text).digest('hex');
+
+test("unset, the factory's own check is a clause that does nothing, and the check is otherwise 2.4.0's byte for byte", () => {
+  for (const workflow of ['build', 'quick'] as const) {
+    const check = checkOf(treeOf('plain'), workflow, 'implement');
+    assert.equal(count(check, ownClause('true', false)), 1, `${workflow}/implement runs \`true\` in its place:\n${check}`);
+    assert.equal(sha256(check.replace('{ true; } && ', '')), BEFORE[workflow], `${workflow}/implement is 2.4.0's but for it`);
+    assert.equal(
+      checkOf(treeOf('own'), workflow, 'implement').replace('{ echo own; }', '{ true; }'),
+      check,
+      'and setting it changes that clause alone',
+    );
+  }
 });
 
 test('REFUSED: a github that is no boolean, at apply, naming the --set that fixes it, which an undeclared parameter does not', () => {

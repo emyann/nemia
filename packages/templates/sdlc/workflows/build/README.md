@@ -19,8 +19,8 @@ The factory's `github` parameter, set when the template is applied, picks one. A
 workflow's steps, so both ways are in each file: the implement and land steps' checks are each one shell `if` on the rendered value, and the
 notes of implement, review and land each open with the answer and hold a part for each.
 
-- **`github: false`, the default: in this checkout.** No remote is read or written. The implement step's check runs `probe.ts` and `parts.ts`,
-  then the factory's `localCheck` parameter (the repository's lint, typecheck and test, where it has them, by default) on the round's tree; no
+- **`github: false`, the default: in this checkout.** No remote is read or written. The implement step's check runs `probe.ts`, `parts.ts` and
+  the factory's own check, its `implementCheck` parameter, then the factory's `localCheck` parameter (the repository's lint, typecheck and test, where it has them, by default) on the round's tree; no
   pull request is opened. Land checks the checkout and stages every result branch in one `git merge --no-ff --no-commit`, as the git
   place's skill says (*Stage a landing*), and signs off with the merge's message; the land step's check runs `localCheck` again, on the merged
   tree, and the run commits the merge on its exit 0 and takes it back otherwise. `localCheck` is the only judge, so it runs the tests.
@@ -30,7 +30,8 @@ notes of implement, review and land each open with the answer and hold a part fo
 
 The CI context the scripts wait on and land on is the factory's `ciCheck` parameter (`ci` by default), handed to each script as
 `--check <name>`; the implement step's round check runs the factory's `roundCheck` parameter (the repository's lint and typecheck, where it has
-them, by default).
+them, by default). Either way, the implement step's check runs the factory's own check, its `implementCheck` parameter (`true`, the default,
+checks nothing), after `parts.ts check` and before the push or the local check.
 
 Implement pushes its branch and opens the pull request through `pull-request.ts`, read from the frozen files as the others are: it
 pushes this run's own branch, never another and never the base and never forced, and opens or updates the one pull request of the
@@ -82,6 +83,12 @@ landing reads it), or the check refuses, naming each part left out and the two w
 replaced she declares replaced, `node "$WF_WORKFLOW_FILES/parts.ts" replaced <part>…`, which removes its branch and keeps its tip as
 `refs/backup/wf/<run>/<part>` — a step may not delete a branch — and names in her closeout; so the landing never finds a superseded
 part it would refuse.
+
+The implement step's check then runs the factory's own check, its `implementCheck` parameter, either way: a command of the factory's
+own (a script it keeps in this folder is read as `node "$WF_WORKFLOW_FILES/<script>.ts"`), run from the workspace's root after `parts.ts
+check` and before anything is pushed or the local check runs, so a non-zero exit refuses the round with nothing pushed. Its default,
+`true`, checks nothing. A factory that adds a check of its own sets the parameter rather than editing the check line or the sentences
+that list its scripts, and an upgrade that changes either merges with no conflict on them.
 
 Review counts what it closes out on (`tally: findings, findings.kind=placement`): the findings of each round, and those of
 them whose `kind` is `placement` (a change in a boundary the repository's rules give to another concern). `nemia stats` totals each per

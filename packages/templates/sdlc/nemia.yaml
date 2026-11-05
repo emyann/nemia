@@ -3,7 +3,7 @@ kind: FactoryTemplate
 metadata:
   name: sdlc
 spec:
-  version: 2.4.0
+  version: 2.5.0
   rules:
     path: RULES.md
   parameters:
@@ -23,6 +23,10 @@ spec:
       type: string
       description: "The command the implement step's check runs on each round's tree before it waits on CI, from the workspace's root: the quick refusal before CI judges. Read only where github is true; where it is false, localCheck judges."
       default: npm run --if-present lint && npm run --if-present typecheck
+    implementCheck:
+      type: string
+      description: "A command of the factory's own that the implement step's check of build and of quick runs on each round's tree, from the workspace's root, either way: after sdlc's own scripts and before anything is pushed or the local check runs, so a non-zero exit refuses the round with nothing pushed. A script of the factory's own is written as node \"$WF_WORKFLOW_FILES/<script>.ts\", a file the factory keeps in both workflows' folders. sh runs it inside { ...; }, so it is a whole command, its quotes and braces balanced. true, the default, checks nothing."
+      default: "true"
     pullRequestLabels:
       type: string
       description: "The labels the implement step gives the run's pull request as it opens it, and its check again each round, from the run's own labels: rules apart by spaces, each <key>=<value>:<label>, so kind=bug:bug kind=chore:maintenance labels a run whose kind is bug with bug and one whose kind is chore with maintenance. The labels the rules give the run are added and any other a rule could give is removed; a label no rule gives is left alone, and each label a rule gives must exist in the repository. It is written inside a double-quoted shell word, so it holds no quote, no $ and no backtick. Empty (the default) labels nothing. Read only where github is true."

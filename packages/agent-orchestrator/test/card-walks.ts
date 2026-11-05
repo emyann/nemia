@@ -74,6 +74,17 @@ export const CARD_WALKS: Readonly<Record<string, readonly Walk[]>> = {
       says: { time: true, kept: true },
     },
   ],
+  'cards.entryAt': [
+    { name: 'an entry not there is null', walk: ({ door }) => done(door.cards.entryAt({ file: 'gone-idea.md' })), says: null },
+    {
+      name: "a card's entry is dated as its card is filed",
+      walk: ({ door }) => {
+        filed(door, 'an-idea');
+        return done(door.cards.entryAt({ file: 'an-idea.md' })) === done(door.cards.filedAt(nameOf('an-idea')));
+      },
+      says: true,
+    },
+  ],
   'cards.add': [
     { name: 'filed at its name, in the inbox', walk: ({ door }) => filed(door, 'an-idea'), says: '<root>/inbox/an-idea.md' },
     {

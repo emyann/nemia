@@ -256,15 +256,17 @@ test('a stray entry is listed, never hidden: under its file, with why it is no c
     ),
   );
   assert.deepEqual(
-    walked.map((c) => [c.metadata.name, c.status.file, c.status.error === undefined]),
+    walked.map((c) => [c.metadata.name, c.status.file]),
     [
-      ['idea.txt', 'idea.txt', false],
-      ['notes', 'notes', false],
-      ['notes', 'notes.md', true],
-      ['sub/', 'sub/', false],
+      ['idea.txt', 'idea.txt'],
+      ['notes', 'notes'],
+      ['notes', 'notes.md'],
+      ['sub/', 'sub/'],
     ],
     'each entry once, a page at a time, the stray notes and the card notes.md two places of the list',
   );
+  const saidWhy = walked.filter((c) => c.status.error !== undefined).map((c) => c.status.file);
+  assert.deepEqual(saidWhy, ['idea.txt', 'notes', 'sub/'], 'each stray says why it is no card');
   const idea = walked[0];
   assert.equal(idea?.metadata.creationTimestamp, fs.statSync(path.join(inbox, 'idea.txt')).mtime.toISOString(), 'dated by its file');
   assert.equal(walked[3]?.metadata.creationTimestamp, fs.statSync(path.join(inbox, 'sub')).mtime.toISOString(), 'a folder by its own');

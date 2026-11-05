@@ -553,7 +553,7 @@ test("a person files cards, in a factory and out of one, lists them, opens a car
   );
 
   await s.test(
-    'GET /api/cards lists a card that does not read with its refusal and no body, a card started with its run, no entry that is no markdown file, and reads the folder on each request',
+    'GET /api/cards lists a card that does not read with its refusal and no body, a card started with its run, an entry that is no markdown file with why, and reads the folder on each request',
     async () => {
       clear();
       write(path.join(inbox, 'broken.md'), '---\nafter: some-run\n---\nWait for it.\n');
@@ -565,10 +565,12 @@ test("a person files cards, in a factory and out of one, lists them, opens a car
       const broken = entries.find((e) => e.name === 'broken')!;
       assert.match(broken.error!, /^broken\.md: `after` is not a key an inbox card has/);
       assert.deepEqual([broken.body, broken.title, typeof broken.filedAt], [null, null, 'string']);
-      assert.equal(
-        entries.some((e) => e.name.startsWith('notes')),
-        false,
-        'an entry that is no markdown file is no card, and the list leaves it out',
+      const stray = entries.find((e) => e.name === 'notes.txt');
+      const whyGiven = typeof stray?.error === 'string';
+      assert.deepEqual(
+        [whyGiven, typeof stray?.filedAt],
+        [true, 'string'],
+        'an entry that is no markdown file is listed under its file, with why, dated when it was written',
       );
       const started = entries.find((e) => e.name === card.name)!;
       assert.deepEqual(
@@ -743,8 +745,8 @@ test("what a filing, a card's page or a drop refuses, writing nothing", async (t
       fs.mkdirSync(path.join(inbox, 'sub'));
       assert.deepEqual(
         (await listed()).map((e) => e.name).sort(),
-        ['broken', card.name].sort(),
-        'the list has the two cards: a stray file and a folder are none',
+        ['broken', card.name, 'notes.txt', 'sub/'].sort(),
+        'the listing has all four',
       );
 
       const missing = await cardPage('no-such-card');

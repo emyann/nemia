@@ -22,16 +22,24 @@ request", "value": "<the url>"}`.
 Your check runs `probe.ts`, `parts.ts` and the factory's own check, its `implementCheck` parameter (`${{ parameters.implementCheck }}`; `true` checks nothing), then pushes again through the same script, so CI's verdict is for the commit it judges, runs the repository's round check
 (`${{ parameters.roundCheck }}`), and waits on the `${{ parameters.ciCheck }}` context: CI runs the repository's suite on that commit,
 and a red, cancelled or missing `${{ parameters.ciCheck }}` comes back as the check's refusal, with the Actions URL, the failing jobs
-and the tail of their log — your next try is handed that, since you may type no `gh` yourself.
+and the tail of their log — the script reads it for you, since you may type no `gh` yourself (*When your check refuses*, below).
 
 ### false — in this checkout
 
 This factory has no remote: nothing is pushed and no pull request is opened, and you open none. Your check runs `probe.ts`,
 `parts.ts` and the factory's own check, its `implementCheck` parameter (`${{ parameters.implementCheck }}`; `true` checks nothing), then the repository's local check (`${{ parameters.localCheck }}`) on this round's tree, from the workspace's root, and nothing else: a refusal
-of it comes back to you with the end of its output, as the next try's brief. That command is the only judge of the change before it
+of it comes back to you with the end of its output (*When your check refuses*, below). That command is the only judge of the change before it
 lands, and the landing runs it again, on the base with your branch merged into it, before the merge is committed.
 
 ### Either way
+
+**When your check refuses**, the run tries you again on its own, up to twice a round (`retries: 2`): it continues this session and
+hands you, as data, the command, its exit and the last lines of what it printed — on GitHub, the failing jobs and the lines that
+failed each. Make the work pass it, never weaken it, merge the base again, and sign off as before. A refusal whose last line says `not
+the work` is a person's — no `gh` or none logged in, no `origin`, a draft or wrongly based pull request, the label rules, CI that never judged the commit: change nothing, and sign off `blocked`, quoting it in `needs`. So is a failure you find has nothing to do
+with your change (it fails on the base too, or it is a flake): change nothing, and say why in `needs`. The `nemia retry … --recheck`
+line a refusal ends with is for the person, once your tries are spent. Past the retries, past the step's budget, or when the check did
+not finish, the run waits on a person.
 
 **Merge the base before you sign off**, on every try: the base moves while you work, and a base you did not merge is one the
 landing refuses rather than lands: on GitHub, CI judges the commit your check pushes and nothing judges the merged tree afterwards —

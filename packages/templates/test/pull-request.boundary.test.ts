@@ -53,6 +53,12 @@ function stepsOf(at: Rendered, workflow: string) {
  */
 const RETRY = 'nemia retry r-1 implement --recheck';
 
+/**
+ * The line a refusal no change to the branch answers ends with, so a try retried on its own stops for the person; a refusal the work
+ * answers carries none.
+ */
+const PERSONS = /^nemia (pr|ci): not the work: /m;
+
 /** A place to push from: a scratch repository on `branch`, its `origin` a bare repository, and a stub `gh` answering `rules`. */
 function placed({ branch = 'wf/r-1/run', remote = true } = {}): { repo: string; bare: string | undefined; branch: string; gh: Gh } {
   const repo = scratch('wf-pr-repo-');
@@ -196,6 +202,7 @@ test('REFUSED: no origin remote, no gh on the PATH, and a gh that is not authent
   assert.equal(r.code, 1, r.out);
   assert.match(r.err, /has no `origin` remote/);
   assert.match(r.err, /git remote -v/);
+  assert.match(r.err, PERSONS, 'a person adds the remote');
   assert.deepEqual(r.calls, [], 'the remote is read before gh');
 
   const at = placed();
@@ -203,6 +210,7 @@ test('REFUSED: no origin remote, no gh on the PATH, and a gh that is not authent
   const unauthed = pr(at, 'push');
   assert.equal(unauthed.code, 1, unauthed.out);
   assert.match(unauthed.err, /is not authenticated here: run `gh auth login`/);
+  assert.match(unauthed.err, PERSONS, 'a person logs gh in');
   assert.equal(tip(at.bare!, at.branch), null, 'nothing is pushed');
 
   const gitAlone = scratch('wf-pr-nogh-');
@@ -216,6 +224,7 @@ test('REFUSED: no origin remote, no gh on the PATH, and a gh that is not authent
   assert.equal(missing.status, 1, missing.stdout);
   assert.match(missing.stderr, /no `gh` on the PATH/);
   assert.match(missing.stderr, /gh auth login/);
+  assert.match(missing.stderr, PERSONS, 'a person installs gh');
 });
 
 test('REFUSED, never forced: a tip on origin that HEAD does not hold; origin keeps it, and the refusal names the merge', () => {
@@ -230,6 +239,7 @@ test('REFUSED, never forced: a tip on origin that HEAD does not hold; origin kee
   assert.equal(r.code, 1, r.out);
   assert.match(r.err, /was rejected, and this script never forces a push/);
   assert.match(r.err, /git merge main-worktree\/HEAD/);
+  assert.doesNotMatch(r.err, PERSONS, 'the merge that answers it is the work');
   assert.equal(tip(at.bare!, at.branch), theirs, "origin's tip is the one it had");
   assert.notEqual(mine, theirs);
 });
@@ -242,6 +252,7 @@ test('REFUSED: a draft pull request, or one based on another branch than the rem
   assert.equal(draft.code, 1, draft.out);
   assert.match(draft.err, /#7 is a draft/);
   assert.match(draft.err, /gh pr ready 7/);
+  assert.match(draft.err, PERSONS, 'a person marks it ready');
   assert.equal(tip(at.bare!, at.branch), null, 'no push follows a draft');
   assert.equal(asked(draft.calls, 'api').length, 0);
 
@@ -256,6 +267,7 @@ test('REFUSED: a draft pull request, or one based on another branch than the rem
   assert.ok(based.err.includes('#7 is based on `release`'), based.err);
   assert.ok(based.err.includes("the remote's default branch `main`"), based.err);
   assert.match(based.err, /gh pr edit 7 --base main/);
+  assert.match(based.err, PERSONS, 'a person moves its base');
   assert.ok(based.err.includes('gh api -X PATCH repos/{owner}/{repo}/pulls/7 -f base=main'), based.err);
 });
 
@@ -272,6 +284,7 @@ test('REFUSED: two open pull requests for one branch, naming the close a person 
   assert.ok(r.err.includes('2 open pull requests have wf/r-1/run'), r.err);
   assert.ok(r.err.includes('(#7, #8)'), r.err);
   assert.match(r.err, /gh pr close <number>/);
+  assert.match(r.err, PERSONS, 'a person closes one');
 });
 
 test("push pushes the hand-off commit and proves the pull request's head is the commit the check judges", () => {
@@ -311,6 +324,7 @@ test('REFUSED: a pull request whose head is another commit, and none open at all
   assert.match(stale.err, /0 s after the push/, 'a head elsewhere for the bound is refused, saying how long');
   assert.ok(stale.err.includes('pull-request.ts" open --title'), stale.err);
   assert.ok(stale.err.includes('--body-file "$WF_STEP_FILES/pr-body.md"'), stale.err);
+  assert.doesNotMatch(stale.err, PERSONS, 'the open that answers it is the work');
 
   const none = placed();
   none.gh.answers([...passing(none.repo).filter((rule) => rule.when !== 'pr list'), { when: 'pr list', out: '[]' }]);
@@ -319,6 +333,7 @@ test('REFUSED: a pull request whose head is another commit, and none open at all
   assert.ok(unopened.err.includes('no open pull request has wf/r-1/run as its head'), unopened.err);
   assert.ok(unopened.err.includes('pull-request.ts" open --title'), unopened.err);
   assert.ok(unopened.err.includes('--body-file "$WF_STEP_FILES/pr-body.md"'), unopened.err);
+  assert.doesNotMatch(unopened.err, PERSONS, 'the open that answers it is the work');
 });
 
 /** The rules a factory's `pullRequestLabels` gives `push --labels`, in the tests below: two values of one key, each its own label. */
@@ -417,6 +432,7 @@ test('REFUSED, before anything is pushed: a rule that is not <key>=<value>:<labe
     assert.equal(r.code, 1, `${args.join(' ')}: ${r.out}`);
     assert.ok(r.err.startsWith('nemia pr: '), `a refusal of the script's, not a crash:\n${r.err}`);
     assert.match(r.err, /--labels/, 'naming the flag');
+    assert.match(r.err, PERSONS, `${args.join(' ')}: the factory's rules are a person's`);
     assert.equal(tip(at.bare!, at.branch), null, `${args.join(' ')}: nothing is pushed`);
     assert.deepEqual(labelCalls(r.calls), []);
   }
@@ -428,6 +444,7 @@ test('REFUSED, before anything is pushed: a WF_LABELS that is not a JSON object 
     const r = pr(at, 'push', ['--labels', RULES], { WF_LABELS: said });
     assert.equal(r.code, 1, `${said}: ${r.out}`);
     assert.match(r.err, /WF_LABELS/, 'naming the variable');
+    assert.match(r.err, PERSONS, `${said}: the run's labels as given are a person's`);
     assert.equal(tip(at.bare!, at.branch), null, `${said}: nothing is pushed`);
     assert.deepEqual(labelCalls(r.calls), []);
   }
@@ -439,6 +456,7 @@ test('REFUSED, before anything is pushed: a label the rules give that the reposi
   assert.equal(r.code, 1, r.out);
   assert.match(r.err, /internal/, 'naming the label');
   assert.match(r.err, /gh label create/, 'and the command that makes it');
+  assert.match(r.err, PERSONS, "the repository's labels are a person's");
   assert.equal(tip(at.bare!, at.branch), null, 'nothing is pushed');
   assert.deepEqual(labelCalls(r.calls), []);
 });
@@ -451,6 +469,7 @@ test('REFUSED, exit 2 before anything is pushed: a run whose labels match none o
     assert.equal(r.code, 2, `${verb}: ${r.out}`);
     assert.ok(r.err.startsWith('nemia pr: '), `${verb}: a refusal of the script's, not a crash:\n${r.err}`);
     for (const word of ['work', 'fix', 'cleanup', 'nemia label run']) assert.ok(r.err.includes(word), `${verb}: naming ${word}:\n${r.err}`);
+    assert.match(r.err, PERSONS, `${verb}: a person labels the run`);
     assert.equal(tip(at.bare!, at.branch), null, `${verb}: nothing is pushed`);
     assert.deepEqual(labelCalls(r.calls), [], `${verb}: no label is added or removed`);
     assert.equal(asked(r.calls, 'pr', 'create').length + asked(r.calls, 'api', '-X', 'PATCH').length, 0, `${verb}: nothing is opened`);
@@ -563,6 +582,7 @@ test('wait reads mergeable again while GitHub computes it, polls the ci context 
   assert.equal(asked(conflicting.calls, 'pr', 'view').length, 0, 'no ci is waited for on a head that conflicts with its base');
   assert.ok(conflicting.err.includes('git merge main-worktree/HEAD'), `it names the merge of the base:\n${conflicting.err}`);
   assert.ok(conflicting.err.includes('pull-request.ts" open --title'), `and the push of the round again:\n${conflicting.err}`);
+  assert.doesNotMatch(conflicting.err, PERSONS, 'the merge of the base that answers it is the work');
 });
 
 /** `lines` as a job's log GitHub serves: each line stamped with the time it was printed. */
@@ -746,6 +766,7 @@ test('REFUSED: a wait with no --check, a --check with no name, or more after it,
     assert.equal(r.code, 1, `${given.join(' ')}: ${r.out}`);
     assert.ok(r.err.startsWith('nemia ci: '), `a refusal of the script's, not a crash:\n${r.err}`);
     assert.match(r.err, /--check/, 'naming the flag');
+    assert.match(r.err, PERSONS, `${given.join(' ')}: the check line is the factory's`);
     assert.deepEqual(r.calls, [], 'gh is not called at all');
   }
 });
@@ -767,6 +788,26 @@ test('the retry line a red ci prints names the step the check is of, which the b
   assert.ok(!red({}).includes('nemia retry r-1 run --recheck'), "never the branch's leaf, which names no step a person could retry");
 });
 
+test("a ci that failed is the work's to answer; one only cancelled, skipped or neutral judged nothing, and is a person's", () => {
+  const judged = (...conclusions: string[]) => {
+    const at = placed();
+    const [first = 'SUCCESS', ...rest] = conclusions;
+    const others = rest.map((conclusion, i) => ({ name: 'ci', workflowName: `w${i}`, status: 'COMPLETED', conclusion }));
+    at.gh.answers([
+      ...passing(at.repo).filter((rule) => rule.when !== 'pr view'),
+      { when: 'pr view', out: rollup({ status: 'COMPLETED', conclusion: first }, ...others) },
+      { when: 'actions/jobs', out: 'boom' },
+    ]);
+    const r = pr(at, 'wait', CI, { WF_CI_POLL_SECONDS: '0' });
+    assert.equal(r.code, 1, r.out);
+    return r.err;
+  };
+  assert.doesNotMatch(judged('FAILURE'), PERSONS, 'a red ci is the work');
+  assert.doesNotMatch(judged('CANCELLED', 'FAILURE'), PERSONS, 'a failure beside a cancelled job is the work still');
+  assert.match(judged('CANCELLED'), PERSONS, 'a cancelled ci judged nothing');
+  assert.match(judged('SKIPPED', 'NEUTRAL'), PERSONS, 'nor did a skipped or neutral one');
+});
+
 test('REFUSED: no ci context within the bound, and a ci still pending at its end, each by the name of the context', () => {
   const at = placed();
   at.gh.answers([
@@ -778,6 +819,7 @@ test('REFUSED: no ci context within the bound, and a ci still pending at its end
   assert.match(absent.err, /no `ci` context was reported for #7 within 0 s/);
   assert.ok(absent.err.includes('https://github.com/o/r/pull/7/checks'), absent.err);
   assert.ok(absent.err.includes(RETRY), absent.err);
+  assert.match(absent.err, PERSONS, 'CI that never came judged nothing');
 
   const slow = placed();
   slow.gh.answers([
@@ -789,6 +831,7 @@ test('REFUSED: no ci context within the bound, and a ci still pending at its end
   assert.match(unfinished.err, /`ci` for #7 was still in_progress after 0 s/);
   assert.ok(unfinished.err.includes(CI_URL), unfinished.err);
   assert.ok(unfinished.err.includes(RETRY), unfinished.err);
+  assert.match(unfinished.err, PERSONS, 'CI still running at the bound judged nothing');
 });
 
 test("build's implement check, rendered on GitHub, pushes through the script before the round check, labelling by the rules it was set, waits last on the CI context it was set, and runs no suite and no e2e itself", async () => {

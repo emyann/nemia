@@ -36,6 +36,7 @@ erDiagram
     Always restartPolicy "optional"
     object labels "optional"
     string traceparent "optional"
+    object resources "optional"
     boolean queued "optional"
     number admitted "optional"
     list inputs
@@ -62,6 +63,7 @@ erDiagram
     object usage
     number exitCode
     string terminationMessage "optional"
+    object memory "optional"
     list denials "optional"
     list skills "optional"
     list files "optional"

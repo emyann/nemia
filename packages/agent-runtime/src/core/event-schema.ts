@@ -115,6 +115,16 @@ const BriefPartsSchema = Schema.mutable(Schema.Array(Schema.Union([Schema.String
 const event = <const K extends string, const F extends Schema.Struct.Fields>(kind: K, fields: F) =>
   Schema.StructWithRest(Schema.Struct({ kind: Schema.Literal(kind), at: Schema.String, ...fields }), Rest);
 
+/** What a task asks of its host's resources (`TaskResources`, `domain.ts`): a memory limit, a quantity `file` read. */
+export const ResourcesSchema = Schema.Struct({ limits: Schema.optional(Schema.Struct({ memory: Schema.optional(Schema.String) })) });
+
+/** What a task's cgroup said of its memory as an attempt ended (`MemoryUse`, `domain.ts`). */
+export const MemoryUseSchema = Schema.Struct({
+  limitBytes: Schema.Finite,
+  peakBytes: Schema.optional(Schema.Finite),
+  oomKills: Schema.Finite,
+});
+
 /**
  * A filing: one an older runtime wrote may carry its harness's arguments beside its own fields, which `upgrade` lifts into `config`.
  * A store that keeps bodies holds its brief in parts (`briefParts`) and its schema an end is held to as a body
@@ -138,6 +148,7 @@ const Filed = event('filed', {
   restartPolicy: Schema.optional(Schema.Literal('Always')),
   labels: Schema.optional(Schema.Record(Schema.String, Schema.String)),
   traceparent: Schema.optional(Schema.String),
+  resources: Schema.optional(ResourcesSchema),
 });
 
 /** A moment on the monotonic clock, as the engine stamps an attempt's start, spawn and end, and a gap (`Monotonic`, `core/clock.ts`). */
@@ -183,6 +194,7 @@ const Ended = event('ended', {
   usage: Schema.optional(UsageSchema),
   exitCode: Schema.optional(Schema.Finite),
   terminationMessage: Schema.optional(Schema.String),
+  memory: Schema.optional(MemoryUseSchema),
   denials: Schema.optional(Schema.mutable(Schema.Array(Schema.Struct({ tool: Schema.String, what: Schema.optional(Schema.String) })))),
   skills: Schema.optional(Schema.mutable(Schema.Array(Schema.String))),
   files: Schema.optional(Schema.mutable(Schema.Array(Schema.String))),

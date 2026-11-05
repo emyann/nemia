@@ -69,7 +69,14 @@ export type {
   McpSignInStarted,
   McpSignInState,
 } from './service/index.ts';
-export type { EngineOptions, HarnessConfig, Pooled, TaskSpec, TickReport, EngineIo, ObserveCount } from './service/options.ts';
+export type { EngineOptions, HarnessConfig, Pooled, Resources, TaskSpec, TickReport, EngineIo, ObserveCount } from './service/options.ts';
+/**
+ * A memory limit's bytes, read off its Kubernetes quantity, and words for one the runtime does not read: for a caller that checks a
+ * limit before it files it. And whether this host can hold one at all (a scope of systemd's user manager), in words that say what to
+ * set, asked once a process.
+ */
+export { memoryBytesOf, memoryQuantityRefusal } from './core/memory.ts';
+export { scopeRefusal } from './harness/cgroup.ts';
 /**
  * Why a task's configuration on one of the harnesses an engine runs by default is one `file()` refuses, in the runtime's words, or
  * `undefined`: for a caller that checks a task before it files it, and words the refusal in its own keys.

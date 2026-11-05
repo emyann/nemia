@@ -57,13 +57,19 @@
  * A plan with `terminationMessagePath` has that file read once, at the harness's exit, and what it held written as `terminationMessage`
  * beside the exit code (`terminationMessageAt`).
  *
+ * A plan with `memoryLimit` was started in a scope of its own under that limit (`scopeArgv`, `harness/cgroup.ts`), this worker
+ * beside its harness in it: on each beat and at the harness's exit it reads its own cgroup's files (`cgroupMemoryOf('self')`) and
+ * writes what they say as `memory`, the last read kept where a read finds nothing. It outlives the harness in the cgroup, so the OOM
+ * kill that ended a runaway child is still counted there when it writes the end.
+ *
  * argv: <runFile>  — JSON: { cmd, args, cwd, logFile, env?, streams?, stopFile?, start?, input?, inputAt?, stopGraceMs?, beatMs?,
- * terminationMessagePath? }
+ * terminationMessagePath?, memoryLimit? }
  */
 import fs from 'node:fs';
 import { spawn } from 'node:child_process';
 import { WORKER_BEAT_MS, WORKER_STOP_GRACE_MS } from '../src/harness/detached/worker-bounds.ts';
 import { terminationMessageAt } from '../src/harness/detached/termination-message.ts';
+import { cgroupMemoryOf, type CgroupMemory } from '../src/harness/cgroup.ts';
 
 /** The run file the worker is started on, its one argument; a worker started without one says how to start it, and exits 2. */
 const runFile = ((given: string | undefined): string => {
@@ -86,6 +92,7 @@ const plan = JSON.parse(fs.readFileSync(runFile, 'utf8')) as {
   stopGraceMs?: number;
   beatMs?: number;
   terminationMessagePath?: string;
+  memoryLimit?: number;
 };
 
 /** The running boot's id, read once from where Linux keeps it; `undefined` where the machine does not say. */
@@ -113,6 +120,7 @@ let status = {
   startRefused: undefined as { line: number; field: string; found: string } | undefined,
   exitCode: undefined as number | undefined,
   terminationMessage: undefined as string | undefined,
+  memory: undefined as CgroupMemory | undefined,
   /** A harness started here has closed nothing yet, whatever the one before it did. */
   inputClosed: undefined as true | undefined,
 };
@@ -229,6 +237,8 @@ if (!plan.pid && plan.stopFile && fs.existsSync(plan.stopFile)) {
  * the one process that says how the run ended.
  */
 const input = plan.input;
+/** How much more the OOM killer weighs the harness's processes than the worker's in a limited scope: half the limit's worth. */
+const HARNESS_OOM_SCORE_ADJ = 500;
 /**
  * The harness, in a process group of its own (`detached`): not to outlive anything, but so a stop takes its children with it.
  * A harness that shells out, as Codex does, otherwise leaves orphans, and an orphaned build holds the worktree the next
@@ -241,6 +251,18 @@ const child = spawn(plan.cmd, plan.args, {
   detached: true,
 });
 spawned = true;
+/**
+ * Under a memory limit, makes the harness and every child it starts (each inherits it) the ones the kernel's OOM killer ends first in
+ * the scope, never this worker, the one process that writes the end: the killer picks the largest by its score, and a worker that has
+ * only started its harness can outweigh a child that has only started to run away. Raising a process's score needs no privilege.
+ */
+const weighHarness = (pid: number | undefined) => {
+  if (plan.memoryLimit === undefined || pid === undefined) return;
+  try {
+    fs.writeFileSync(`/proc/${pid}/oom_score_adj`, String(HARNESS_OOM_SCORE_ADJ));
+  } catch {}
+};
+weighHarness(child.pid);
 /** The harness's stdout and stderr, piped as the spawn above asks: Node gives both for a piped stream, started or not. */
 const { stdout, stderr } = child;
 if (stdout === null || stderr === null) throw new Error('ae-worker: the harness was spawned with stdout and stderr piped, and has none');
@@ -325,7 +347,10 @@ stderr.on('data', toLog);
 stdout.on('data', keep(whole?.stdout));
 stderr.on('data', keep(whole?.stderr));
 
-const beat = setInterval(() => write(), BEAT_MS);
+/** What this worker's cgroup says of its memory now, for a plan under a limit, the last read kept where this one finds nothing. */
+const memoryNow = (): Partial<typeof status> => (plan.memoryLimit === undefined ? {} : { memory: cgroupMemoryOf('self') ?? status.memory });
+
+const beat = setInterval(() => write(memoryNow()), BEAT_MS);
 beat.unref?.();
 
 /** How often the inbox is looked at for words: the most a word waits before it is written on. */
@@ -403,6 +428,7 @@ child.on('exit', (code) => {
         state: stopping ? 'stopped' : code === 0 ? 'done' : 'failed',
         exitCode: stopping ? -1 : (code ?? -1),
         terminationMessage: said,
+        ...memoryNow(),
       });
       setTimeout(() => void leave(0), 50);
     }),

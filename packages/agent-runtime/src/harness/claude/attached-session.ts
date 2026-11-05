@@ -35,6 +35,11 @@ import type { SpawnRequest } from '../seam.ts';
 import type { AskOption, AskQuestion } from '../../core/index.ts';
 import { own } from '../../core/own.ts';
 import { cutWords } from '../../core/restart.ts';
+import { cgroupMemoryOf } from '../cgroup.ts';
+import { scopeFor, type ScopeAt } from '../scope.ts';
+
+/** What a verb refuses, thrown where it is read: nothing the harness can do will take it, and asking again will not change that. */
+export class Refusal extends Error {}
 
 /** What a session's new calls ask before they start: whether this process holds back a new call of `live` now. */
 export type Held = (live: Live) => boolean;
@@ -108,6 +113,8 @@ export type Live = {
   pushed?: (m: SDKMessage) => void;
   /** What the `init` lines this process captured say to a reader of its capture (`initLineKept`): none before the first. */
   initRead?: InitRead;
+  /** Run under a memory limit, in a scope of its own: each rewrite reads what Claude Code's cgroup says of its memory. */
+  limited?: true;
 };
 
 /**
@@ -265,8 +272,10 @@ const rewrite = (root: string, live: Live, patch: Partial<AttachedRun> = {}): vo
   const first = firstCall(live.calls);
   const { calling: _, heldBack: __, hold: ___, ...rest } = live.run;
   const hold = live.waiting && live.holding ? { since: live.holding, ...(live.after ? { after: live.after } : {}) } : undefined;
+  const memory = live.limited && live.run.childPid !== undefined ? cgroupMemoryOf(live.run.childPid) : undefined;
   live.run = {
     ...rest,
+    ...(memory ? { memory } : {}),
     ...patch,
     ...(first ? { calling: first } : {}),
     ...(live.waiting ? { heldBack: live.waiting } : {}),
@@ -516,7 +525,13 @@ export const startSession = (
   r: SpawnRequest,
   run: AttachedRun,
   first: string,
-  options: { held: Held; executable?: string; resume?: string; pushed?: (m: SDKMessage) => void },
+  options: {
+    held: Held;
+    executable?: string;
+    resume?: string;
+    pushed?: (m: SDKMessage) => void;
+    scope?: ScopeAt;
+  },
 ): Live => {
   const abort = new AbortController();
   const open = r.restartPolicy === 'Always';
@@ -535,6 +550,9 @@ export const startSession = (
     ...(options.pushed ? { pushed: options.pushed } : {}),
   };
   const given = attachedOptions(r);
+  const scope = scopeFor(r, options.scope ?? {});
+  if (scope !== undefined && 'refused' in scope) throw new Refusal(scope.refused);
+  if (scope) live.limited = true;
   writeRun(root, run);
   live.unanswered.add(live.input.push(first));
   const q = query({
@@ -547,7 +565,8 @@ export const startSession = (
       hooks: hooksOf(root, live, options.held, mayAsk),
       ...(options.executable ? { pathToClaudeCodeExecutable: options.executable } : {}),
       spawnClaudeCodeProcess: (o) => {
-        const child = spawn(o.command, o.args, { cwd: o.cwd, env: o.env, stdio: ['pipe', 'pipe', 'pipe'], detached: true });
+        const [command, ...args] = [...(scope?.argv ?? []), o.command, ...o.args];
+        const child = spawn(command ?? o.command, args, { cwd: o.cwd, env: o.env, stdio: ['pipe', 'pipe', 'pipe'], detached: true });
         o.signal.addEventListener('abort', () => killGroup(child.pid), { once: true });
         if (child.pid !== undefined) rewrite(root, live, childFacts(child.pid));
         return child;
@@ -569,6 +588,7 @@ export const startSession = (
     } catch {
       end = abort.signal.aborted ? 'canceled' : 'failed';
     }
+    if (live.limited) rewrite(root, live);
     killGroup(live.run.childPid);
     if (abort.signal.aborted) end = 'canceled';
     if (!live.letGo && (live.run.state === 'working' || live.run.state === 'idle')) rewrite(root, live, { state: end });

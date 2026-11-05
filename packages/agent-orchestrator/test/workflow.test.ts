@@ -226,6 +226,7 @@ test('every key a step has is read — none is accepted and then dropped', () =>
     denials: 'fail',
     remote: 'true',
     deadlineSeconds: '900',
+    memory: '4Gi',
     budget: '2.50',
     check: 'npm test && npm run typecheck',
     retries: '1',
@@ -278,6 +279,7 @@ test('every key a step has is read — none is accepted and then dropped', () =>
   };
   for (const key of STEP_KEYS) assert.notEqual(all[key], undefined, `${key} is on the list and never read`);
   assert.equal(w.deadlineSeconds, 900);
+  assert.equal(w.memory, '4Gi');
   assert.equal(w.retries, 1);
   assert.deepEqual(w.input, ['implement']);
   assert.deepEqual(w.output, { file: 'review.schema.json', schema: LOOPING });

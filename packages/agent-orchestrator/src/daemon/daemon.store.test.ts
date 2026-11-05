@@ -1353,3 +1353,90 @@ test('the daemon delivers the subscriptions: a wake line written to the feed is 
   dropSubscription('daemon');
   clear();
 });
+
+test('REFUSED at start: a daemon with WF_MEMORY_LIMIT set on a host that cannot hold one takes no store, naming the variable to unset', async (t) => {
+  clear();
+  const { up } = await import('./up.verb.ts');
+  const { Invalid } = await import('../refusal/refusal.ts');
+  const was = { memory: process.env.WF_MEMORY_LIMIT, parent: process.env.WF_CGROUP_PARENT };
+  t.after(() => {
+    for (const [name, value] of [
+      ['WF_MEMORY_LIMIT', was.memory],
+      ['WF_CGROUP_PARENT', was.parent],
+    ] as const)
+      if (value === undefined) delete process.env[name];
+      else process.env[name] = value;
+  });
+  process.env.WF_MEMORY_LIMIT = '4Gi';
+  process.env.WF_CGROUP_PARENT = 'agents.slice';
+  const asked: Array<string | undefined> = [];
+  const noted = (parent?: string): void => void asked.push(parent);
+  const refusing = (parent?: string) => (noted(parent), 'this host has no systemd user manager.');
+  const e = engineOf(() => {
+    throw STOP;
+  });
+  await assert.rejects(runPlaced(Effect.scoped(up(e, { every: 10, repo: ROOT, holder: 'api', scope: refusing }))), (err: unknown) => {
+    assert.ok(err instanceof Invalid, String(err));
+    assert.equal(err.exitCode, 2);
+    assert.ok(err.message.includes('this host has no systemd user manager.'), "the probe's words");
+    assert.ok(err.message.includes('unset WF_MEMORY_LIMIT'), err.message);
+    return true;
+  });
+  assert.deepEqual(asked, ['agents.slice'], 'the probe asked once, for the slice the scopes are made in');
+  assert.equal(e.passes, 0, 'no pass ran');
+  assert.equal(fs.existsSync(FILE), false, 'the store was never taken');
+
+  await t.test('a host that holds one starts, and so does any host with WF_MEMORY_LIMIT unset, never probed', async () => {
+    const holding = (parent?: string): undefined => {
+      noted(parent);
+      return undefined;
+    };
+    await assert.rejects(
+      runPlaced(
+        Effect.scoped(
+          up(
+            engineOf(() => {
+              throw STOP;
+            }),
+            { every: 10, repo: ROOT, holder: 'api', scope: holding },
+          ),
+        ),
+      ),
+      (err) => err === STOP,
+    );
+    delete process.env.WF_MEMORY_LIMIT;
+    await assert.rejects(
+      runPlaced(
+        Effect.scoped(
+          up(
+            engineOf(() => {
+              throw STOP;
+            }),
+            { every: 10, repo: ROOT, holder: 'api', scope: refusing },
+          ),
+        ),
+      ),
+      (err) => err === STOP,
+    );
+    assert.deepEqual(asked, ['agents.slice', 'agents.slice'], 'probed with the limit set, and not without it');
+    clear();
+  });
+
+  await t.test('REFUSED: a WF_MEMORY_LIMIT the runtime does not read, before any probe', async () => {
+    process.env.WF_MEMORY_LIMIT = '8 GB';
+    await assert.rejects(
+      runPlaced(
+        Effect.scoped(
+          up(
+            engineOf(() => {
+              throw STOP;
+            }),
+            { every: 10, repo: ROOT, holder: 'api', scope: refusing },
+          ),
+        ),
+      ),
+      (err: unknown) => err instanceof Invalid && err.exitCode === 2 && err.message.startsWith('WF_MEMORY_LIMIT=8 GB '),
+    );
+    assert.equal(fs.existsSync(FILE), false);
+  });
+});

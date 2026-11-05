@@ -73,6 +73,7 @@ import {
   handleOf,
   isSpec,
   isClaude,
+  limitedBy,
   runnersOf,
   optionsRefusalOf,
   heldHarnessesOf,
@@ -763,9 +764,9 @@ const make = (options: EngineOptions) =>
     const observed: Record<string, ObserveCount> = {};
     const counted = countedInto(observed);
     const observedNow = () => copyOf(observed);
-    const { credentials, missingCredential, telemetry, claudeExecutable } = options;
-    const attached = attachedSessions(root, claudeExecutable);
-    const made = runnersOf(harnesses, root, credentials, missingCredential, telemetry, attached, claudeExecutable);
+    const { credentials, missingCredential, telemetry, claudeExecutable, cgroupParent } = options;
+    const attached = attachedSessions(root, claudeExecutable, { cgroupParent });
+    const made = runnersOf(harnesses, root, credentials, missingCredential, telemetry, attached, claudeExecutable, cgroupParent);
     const runners = Object.fromEntries(Object.entries(made).map(seamOf(harnesses, events, counted, options)));
     const byName = harnessedOf(harnesses, runners);
     const fallen = own(byName, fallback);
@@ -804,7 +805,7 @@ const make = (options: EngineOptions) =>
       const task = { ...spec, harness: spec.harness ?? fallback, traceparent: options.telemetry ? yield* filingSpan : undefined };
       const refused = refusalOf(task) ?? argsRefusalOf(task) ?? harnessRefusalOf(task, harnesses);
       if (refused) return yield* Effect.fail(new FileRefused({ message: refused }));
-      return yield* go(file(task));
+      return yield* go(file(limitedBy(options.defaultLimits, task, harnesses)));
     });
 
     const tickVerb = Effect.fn('Engine.tick')(function* () {

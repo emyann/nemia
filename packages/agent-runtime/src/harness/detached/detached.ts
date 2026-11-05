@@ -19,14 +19,11 @@
 import { Effect } from 'effect';
 import fs from 'node:fs';
 import path from 'node:path';
-import { spawn } from 'node:child_process';
-import { fileURLToPath } from 'node:url';
 import type { Denial, Sighting, Usage } from '../../core/index.ts';
 import { RunnerError, type RunnerOps, type SessionKept, type SpawnRequest, type TranscriptEvent } from '../seam.ts';
 import { forgetFiles, keptOf } from '../forget.ts';
-import { withoutTelemetry } from '../telemetry.ts';
 import { readTranscript } from '../transcript.ts';
-import { countRead, countSpawn, readText } from '../../core/engine/tally.ts';
+import { countRead, readText } from '../../core/engine/tally.ts';
 import { instantNow } from '../../core/engine/now.ts';
 import type { Instant } from '../../core/clock.ts';
 import { quote } from '../../core/quote.ts';
@@ -37,6 +34,8 @@ import { detachedStateOf, firstRunFile, leased, runFileIn, type Carried, type Ru
 import { carriedOf, lessCarried } from './carried.ts';
 import { sightedOf } from './sighted.ts';
 import { workerBoundsOf, type DetachedOptions } from './detached-options.ts';
+import { startable, startWorker } from './start-worker.ts';
+import type { ScopeAt } from '../scope.ts';
 import { spawnFiles, spawnInput } from './spawn-files.ts';
 import type { HarnessIO } from './harness-io.ts';
 
@@ -241,16 +240,8 @@ export type HarnessOutput = {
   harnessVersion?: string;
 };
 
-/** The worker a detached run is spawned with, `bin/ae-worker.ts`, found from this file's own folder. */
-export const WORKER = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..', 'bin', 'ae-worker.ts');
+export { WORKER } from './start-worker.ts';
 const safe = (name: string) => name.replace(/[^a-zA-Z0-9]+/g, '_');
-const isDirectory = (p: string) => {
-  try {
-    return fs.statSync(p).isDirectory();
-  } catch {
-    return false;
-  }
-};
 /**
  * What the worker is given to write on a harness's stdin: the brief's line first; then each line of the inbox from `from`
  * on — the inbox's size when the run was spawned, so a run spawned again under a name finds no words said to the one
@@ -280,6 +271,7 @@ const sightingOf = (
   closeout: statement ?? (output?.read.closeout && { payload: output.read.closeout.payload }),
   ...(typeof run.exitCode === 'number' && run.exitCode >= 0 ? { exitCode: run.exitCode } : {}),
   ...(run.terminationMessage !== undefined ? { terminationMessage: run.terminationMessage } : {}),
+  ...(run.memory !== undefined ? { memory: run.memory } : {}),
   ...(usage ? { usage } : {}),
   ...(output ? sightedOf(output.read) : {}),
   ...(run.image ? { image: run.image } : {}),
@@ -639,17 +631,6 @@ const runFileOps = (spec: HarnessSpec, root: string, dir: string) => ({
 });
 
 /**
- * Starts the detached worker on the run file `file`, in `cwd`, and lets it go: in its own process group, its streams closed, in the
- * engine's environment less its telemetry (`withoutTelemetry`), which a runner hands a session itself.
- */
-const startWorker = (file: string, cwd: string): void => {
-  const child = spawn(process.execPath, [WORKER, file], { detached: true, stdio: 'ignore', cwd, env: withoutTelemetry(process.env) });
-  child.on('error', () => {});
-  child.unref();
-  countSpawn();
-};
-
-/**
  * The runner of a detached harness: a worker per session (`bin/ae-worker.ts`), and the directory `runs/<spec's name>`
  * under `root` as its registry, read fresh every pass, the same shape as `claude agents`. Beside each run file: the
  * harness's output (`.log`), what was read of it once the run was over (`.said`, `harness/detached/said.ts`), its closeout
@@ -737,10 +718,10 @@ const startWorker = (file: string, cwd: string): void => {
  *   not working; and words whose line holds a line break, which would reach the harness as two, or as half a message.
  */
 export const detachedOps = (spec: HarnessSpec, root: string, options: DetachedOptions = {}): RunnerOps =>
-  runnerOf(spec, root, workerBoundsOf(options));
+  runnerOf(spec, root, workerBoundsOf(options), options);
 
 /** `detachedOps`, its workers' bounds read. */
-const runnerOf = (spec: HarnessSpec, root: string, bounds: ReturnType<typeof workerBoundsOf>): RunnerOps => {
+const runnerOf = (spec: HarnessSpec, root: string, bounds: ReturnType<typeof workerBoundsOf>, at: ScopeAt): RunnerOps => {
   const dir = path.join(root, 'runs', spec.name);
   const runFile = (name: string) => runFileOf(spec, root, name);
   const logFile = (name: string) => path.join(dir, `${safe(name)}.log`);
@@ -808,7 +789,7 @@ const runnerOf = (spec: HarnessSpec, root: string, bounds: ReturnType<typeof wor
       Effect.try({
         try: () => {
           const r = { ...asked, cwd: path.resolve(asked.cwd) };
-          if (!isDirectory(r.cwd)) throw new Error(`cwd ${r.cwd} is not a directory`);
+          const { argv, ...limit } = startable(r, at);
           fs.mkdirSync(dir, { recursive: true });
           const streams = { stdout: streamFileOf(dir, r.name, 'stdout'), stderr: streamFileOf(dir, r.name, 'stderr') };
           outputs.delete(r.name);
@@ -840,9 +821,9 @@ const runnerOf = (spec: HarnessSpec, root: string, bounds: ReturnType<typeof wor
               : {}),
             ...(input ? { input } : {}),
           };
-          fs.writeFileSync(runFile(r.name), firstRunFile({ ...plan, ...terminationOf(spec, r), ...bounds }));
+          fs.writeFileSync(runFile(r.name), firstRunFile({ ...plan, ...terminationOf(spec, r), ...bounds, ...limit }));
 
-          startWorker(runFile(r.name), r.cwd);
+          startWorker(runFile(r.name), r.cwd, argv);
         },
         catch: (cause) => new RunnerError({ verb: 'spawn', message: `${spec.name}: ${String(cause)}`, refused: true }),
       }),

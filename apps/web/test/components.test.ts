@@ -1165,6 +1165,7 @@ const unset: WorkflowStepSpec = {
   denials: null,
   remote: null,
   deadlineSeconds: null,
+  memory: null,
   budget: null,
   check: null,
   retries: null,

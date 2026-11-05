@@ -234,6 +234,13 @@ const REFUSALS: Array<[Record<string, unknown>, RegExp]> = [
     { restartPolicy: 'Always', closeoutSchema: { type: 'object' } },
     /^`restartPolicy: 'Always'` keeps the session open until it is stopped, and a closing statement \(`closeoutSchema`\) would end its attempt\. Leave `closeoutSchema` off\.$/,
   ],
+  [{ resources: '8Gi' }, /^`resources: "8Gi"` is not/],
+  [{ resources: { requests: { memory: '1Gi' } } }, /^`resources\.requests`/],
+  [{ resources: { limits: '8Gi' } }, /^`resources\.limits: "8Gi"` is not/],
+  [{ resources: { limits: { cpu: '1' } } }, /^`resources\.limits\.cpu`.*`memory`/],
+  [{ resources: { limits: { memory: '8 GB' } } }, /^`resources\.limits\.memory`: "8 GB"/],
+  [{ resources: { limits: { memory: 8 } } }, /^`resources\.limits\.memory: 8` is not/],
+  [{ resources: { limits: { memory: '1.5Gi' } } }, /1536Mi/],
 ];
 
 /** A row's name: what it files beside `ok`. */
@@ -283,7 +290,7 @@ const check: HarnessSpec = { name: 'check', command: () => ({ cmd: 'sh', args: [
  * caller of `agent-runtime` has. `shipped` is the three built-in harnesses; the rest bring their own.
  */
 const harnessDoors = () => {
-  const over = (harnesses?: EngineOptions['harnesses'], defaultHarness?: string) => {
+  const over = (harnesses?: EngineOptions['harnesses'], defaultHarness?: string, more: Partial<EngineOptions> = {}) => {
     const journal = memoryStore();
     const engine = builtEngine(
       Engine.layer({
@@ -291,6 +298,7 @@ const harnessDoors = () => {
         journal: asyncStore(journal),
         ...(harnesses ? { harnesses } : {}),
         ...(defaultHarness ? { defaultHarness } : {}),
+        ...more,
       }),
     );
     return { engine, journal };
@@ -311,6 +319,7 @@ const harnessDoors = () => {
     brought: over({ picky, fake: asyncOps(fakeHarness(new Map())) }, 'picky'),
     own: over({ own }, 'own'),
     windows: over({ bare, windowed, runner: asyncOps(runner) }),
+    limited: over({ claude: 'claude', remote: { url: 'https://a.example' } }, 'claude', { defaultLimits: { memory: '6Gi' } }),
   };
 };
 type Doors = ReturnType<typeof harnessDoors>;
@@ -438,6 +447,12 @@ const HARNESS_REFUSALS: Array<{ name: string; door: keyof Doors; spec: Record<st
     door: 'brought',
     spec: { config: { model: 'huge' } },
     says: /picky runs no huge models/,
+  },
+  {
+    name: "a memory limit on a remote agent, whose process is the other party's",
+    door: 'limited',
+    spec: { harness: 'remote', resources: { limits: { memory: '2Gi' } } },
+    says: /`resources\.limits\.memory`.*`remote`/,
   },
   {
     name: 'a runner brought as its own RunnerOps is asked its own refusal',
@@ -622,6 +637,33 @@ const TAKEN: Array<{
     door: 'windows',
     spec: { harness: 'windowed', config: { contextTokens: 16_000 } },
     holds: (filed) => assert.equal(filed.config?.contextTokens, 16_000),
+  },
+  {
+    name: "the engine's default memory limit, written onto a task filed with none, as a LimitRange's default onto a Pod",
+    door: 'limited',
+    spec: {},
+    holds: (filed, view) => {
+      assert.deepEqual(filed.resources, { limits: { memory: '6Gi' } }, 'on the record, so a new default never changes it');
+      assert.deepEqual(view.state.resources, { limits: { memory: '6Gi' } });
+    },
+  },
+  {
+    name: "a task's own memory limit wins over the engine's default",
+    door: 'limited',
+    spec: { resources: { limits: { memory: '2Gi' } } },
+    holds: (filed) => assert.deepEqual(filed.resources, { limits: { memory: '2Gi' } }),
+  },
+  {
+    name: "the engine's default is not written onto a remote agent's task, which it would make unfileable",
+    door: 'limited',
+    spec: { harness: 'remote' },
+    holds: (filed) => assert.equal('resources' in filed, false),
+  },
+  {
+    name: 'an engine with no default files a task with no limit as it did',
+    door: 'shipped',
+    spec: {},
+    holds: (filed) => assert.equal('resources' in filed, false),
   },
   {
     name: "contextTokens on a runner, which is a runner's own business",

@@ -141,6 +141,8 @@ export type WorkflowStepSpec = {
   /** `remote:` as written: null where the step has no line. */
   remote: boolean | null;
   deadlineSeconds: number | null;
+  /** `memory:` as written, the session's memory limit (`8Gi`): null where the step has no line. */
+  memory: string | null;
   /** The most the step's tries may cost together, in dollars (`budget:`). */
   budget: number | null;
   check: string | null;
@@ -197,6 +199,7 @@ export const StepKeySchema = decodes<StepKey>()(
     'denials',
     'remote',
     'deadlineSeconds',
+    'memory',
     'budget',
     'check',
     'retries',
@@ -250,6 +253,7 @@ export const WorkflowStepSpecSchema = decodes<WorkflowStepSpec>()(
     denials: Schema.NullOr(Schema.Literal('fail')),
     remote: Schema.NullOr(Schema.Boolean),
     deadlineSeconds: Schema.NullOr(Schema.Number),
+    memory: Schema.NullOr(Schema.String),
     budget: Schema.NullOr(Schema.Number),
     check: Schema.NullOr(Schema.String),
     retries: Schema.NullOr(Schema.Number),

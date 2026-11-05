@@ -1,14 +1,16 @@
 /**
  * The `WF_` environment the package reads: where the store lives (`WF_ROOT`), the daemon's two ceilings (`WF_MAX_CONCURRENT`,
- * `WF_MAX_RUNS`), whether a pass judges its runs at rest in full (`WF_VERIFY_REST`), whether a finished run keeps its
- * worktrees (`WF_KEEP_WORKTREES`), and how long the series are kept
- * (`WF_METRICS_MINUTE_DAYS`, `WF_METRICS_HOUR_DAYS`). Each is an Effect `Config` with its default, and
- * each has a plain reader that takes the environment, `process.env` unless given, and answers the value or throws `Invalid`, exit 2, in the
- * variable's own words. A value that is set and not one the variable takes is refused, never read as its default. Reads no disk.
+ * `WF_MAX_RUNS`), whether a pass judges its runs at rest in full (`WF_VERIFY_REST`), whether a finished run keeps its worktrees
+ * (`WF_KEEP_WORKTREES`), how long the series are kept (`WF_METRICS_MINUTE_DAYS`, `WF_METRICS_HOUR_DAYS`), and the memory limit each
+ * session runs under by default and the slice its scope is made in (`WF_MEMORY_LIMIT`, `WF_CGROUP_PARENT`). Each is an Effect `Config`
+ * with its default, and each has a plain reader that takes the environment, `process.env` unless given, and answers the value or throws
+ * `Invalid`, exit 2, in the variable's own words. A value that is set and not one the variable takes is refused, never read as its
+ * default. Reads no disk.
  */
 import os from 'node:os';
 import path from 'node:path';
 import { Config, ConfigProvider, Effect, Result, Schema } from 'effect';
+import { memoryQuantityRefusal } from 'agent-runtime/vocabulary';
 import { Invalid } from '../refusal/refusal.ts';
 
 /** An environment as a reader takes it: `process.env`, or a record a test means. */
@@ -64,6 +66,24 @@ const minuteDays = Config.schema(Schema.String.check(Schema.isPattern(/^\s*0*([2
 /** `WF_METRICS_HOUR_DAYS`: days of hour lines kept, a whole number from 1; undefined, kept until pruned, when unset. */
 const hourDays = Config.schema(Schema.String.check(Schema.isPattern(/^\s*0*[1-9]\d*\s*$/)), 'WF_METRICS_HOUR_DAYS').pipe(
   Config.map((value): number | undefined => Number(value.trim())),
+  Config.withDefault(undefined),
+);
+
+/** `WF_MEMORY_LIMIT`: a Kubernetes quantity the runtime reads (`memoryQuantityRefusal`), trimmed; undefined, no limit, unset or blank. */
+const memory = Config.schema(
+  Schema.String.check(Schema.makeFilter((value: string) => !value.trim() || memoryQuantityRefusal(value.trim()) === undefined)),
+  'WF_MEMORY_LIMIT',
+).pipe(
+  Config.map((value): string | undefined => value.trim() || undefined),
+  Config.withDefault(undefined),
+);
+
+/** A systemd slice's unit name: letters, digits, `_`, `-`, `.`, `:` and `@`, ending `.slice`, as `systemd-run --slice=` takes one. */
+const SLICE = /^[\w:@.-]*[\w:@-]\.slice$/;
+
+/** `WF_CGROUP_PARENT`: a slice's unit name (`SLICE`); undefined, the user manager's root slice, when unset or empty. */
+const slice = Config.schema(Schema.String.check(Schema.isPattern(SLICE)), 'WF_CGROUP_PARENT').pipe(
+  Config.map((value): string | undefined => value),
   Config.withDefault(undefined),
 );
 
@@ -157,4 +177,31 @@ export const metricsHourDays = (env: Env = process.env): number | undefined =>
     env,
     (value) =>
       `WF_METRICS_HOUR_DAYS=${value} is not a whole number from 1. It is how many days of the series' hour lines are kept: WF_METRICS_HOUR_DAYS=365 — or unset, to keep them until you delete them.`,
+  );
+
+/**
+ * `WF_MEMORY_LIMIT`, the memory limit every session and check the daemon files runs under when its step names none (the engine's
+ * `defaultLimits`): a Kubernetes quantity, `8Gi`, `512Mi`, `4G`, as written, or undefined — no limit — when unset, empty or blank. Refused
+ * in the runtime's words when it is anything else: read as no limit, a mistyped value would lift the bound it was set to hold.
+ */
+export const memoryLimit = (env: Env = process.env): string | undefined =>
+  read(
+    memory,
+    'WF_MEMORY_LIMIT',
+    env,
+    (value) =>
+      `WF_MEMORY_LIMIT=${value} is not a memory limit: ${memoryQuantityRefusal(value.trim()) ?? ''} It is what each session runs under when its step names no \`memory:\`, a Kubernetes quantity: WF_MEMORY_LIMIT=8Gi — or unset, for no limit.`,
+  );
+
+/**
+ * `WF_CGROUP_PARENT`, the systemd slice every limited session's scope is made in, as Docker's `--cgroup-parent`: a unit name ending
+ * `.slice`, which an operator caps to bound the sessions together, or undefined — the user manager's root slice — when unset or empty.
+ */
+export const cgroupParent = (env: Env = process.env): string | undefined =>
+  read(
+    slice,
+    'WF_CGROUP_PARENT',
+    env,
+    (value) =>
+      `WF_CGROUP_PARENT=${value} is not a slice's name. It is the systemd slice each limited session's scope is made in, a unit name of letters, digits and dashes ending .slice: WF_CGROUP_PARENT=sessions.slice — or unset, for the user manager's own.`,
   );

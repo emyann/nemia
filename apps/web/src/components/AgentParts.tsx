@@ -3,7 +3,7 @@ import { useGaze } from '@blobatar/react/gaze';
 import type { Expression } from 'blobatar';
 import type { ReactNode } from 'react';
 import { Link as AriaLink } from 'react-aria-components';
-import type { AgentListing, AgentSkill, AgentUser, GivenSkill, SkillSource } from '../lib/api';
+import { sourceOf, type AgentListing, type AgentSkill, type AgentUser, type GivenSkill, type SkillSource } from '../lib/api';
 import { costWords, SOURCE_BADGES } from '../lib/skills';
 import { cn } from '../lib/utils';
 import { routeLink } from './routeLink';
@@ -15,7 +15,15 @@ export const RouteLink = routeLink(AriaLink);
 const LINK =
   'rounded-sm underline decoration-outline underline-offset-2 outline-none hover:decoration-foreground focus-visible:ring-2 focus-visible:ring-ring/50';
 
-/** Where an agent is read from, as the Workflows page badges a workflow: yours, or this repository's. */
+/** The word for each origin an agent is read from. */
+const AGENT_FROM: Readonly<Record<AgentListing['from'], string>> = {
+  factory: "the factory's",
+  repo: 'this repository',
+  yours: 'yours',
+  builtin: "Nemia's",
+};
+
+/** Where an agent is read from, as the Workflows page badges a workflow: yours, this repository's, the factory's or Nemia's. */
 export function FromBadge({ from }: { from: AgentListing['from'] }) {
   return (
     <span
@@ -25,7 +33,7 @@ export function FromBadge({ from }: { from: AgentListing['from'] }) {
         from === 'yours' ? container.grey : 'bg-muted text-muted-foreground',
       )}
     >
-      {from === 'yours' ? 'yours' : 'this repository'}
+      {AGENT_FROM[from]}
     </span>
   );
 }
@@ -221,7 +229,7 @@ export function AgentRefused({
           <span>Open</span>
           {users.map((user) => {
             const [workflow = '', step = ''] = user.split('/');
-            return <NodeLink key={user} user={{ from, workflow, step }} />;
+            return <NodeLink key={user} user={{ from: sourceOf(from), workflow, step }} />;
           })}
         </p>
       )}

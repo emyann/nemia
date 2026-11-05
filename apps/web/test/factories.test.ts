@@ -335,6 +335,7 @@ test('factoryOf, shownIn, workflowFactories, listPlace, hirePlaceOf: which facto
       assert.equal(fromWord('repo'), 'this repository');
       assert.equal(fromWord('repo', 'default'), 'this repository');
       assert.equal(fromWord('repo', 'pipao'), "the factory's");
+      assert.equal(fromWord('factory', 'pipao'), "the factory's", "a factory's own tree, by its origin");
     },
   );
   await t.test(

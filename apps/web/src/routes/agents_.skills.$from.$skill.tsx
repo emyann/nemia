@@ -8,6 +8,7 @@ import { SkillForm } from '../components/SkillForm';
 import { saveSkill, SkillRefusal, skillQuery, switchPreload, type SkillDetail, type SkillDraft, type SkillSaved } from '../lib/api';
 import { costWords, drawnSkill, preloadWords, reachWords } from '../lib/skills';
 import { invalidateSkills } from '../lib/agentWrites';
+import { FACTORY_WAY } from '../lib/factories';
 import { BackToAgents } from './agents_.new';
 
 /**
@@ -48,7 +49,7 @@ function SkillPage() {
   if (shown !== drawn) setDrawn(shown);
   const moved = shown.version !== detail.version;
 
-  const wroteIt = async ({ written: _, ...now }: SkillSaved) => {
+  const wroteIt = async (now: SkillSaved) => {
     queryClient.setQueryData(skillQuery(from, name).queryKey, now);
     setDrawn(now);
     await invalidateSkills(queryClient);
@@ -203,6 +204,7 @@ function Elsewhere({ detail }: { detail: SkillDetail }) {
           {code(detail.copyHint)}.
         </>
       )}
+      {from === 'factory' && <span data-way="factory">A factory&apos;s own skills are read here, not written: {FACTORY_WAY}.</span>}
       {from === 'builtin' && (
         <>Built into Nemia, and read here: an agent of yours is given a copy in your library, made from its page's skills.</>
       )}

@@ -13,6 +13,7 @@ import {
   disconnect,
   draftGraph,
   draftOf,
+  filesSaved,
   firstStep,
   listedWith,
   listOf,
@@ -484,11 +485,26 @@ test("a step with an agent: what it owns, what its agent gives it, and the keys 
         (err: Error) =>
           err.message.includes('The step implement') &&
           err.message.includes('with ada') &&
-          err.message.includes('without ?factory= (workflowsQuery)'),
+          err.message.includes('read in no factory (workflowsQuery)'),
       );
       const unhired = toPut(draftOf(hiredIn(null)));
       assert.equal('hired' in unhired[0], false, 'a step put carries no hire');
       assert.equal(unhired[0].spec.agent, 'ada', 'drafted, a step whose file writes an agent puts it back');
     },
   );
+});
+
+test("a save's files, as the board says them: each step changed or added and each schema pasted written, the rest left, a step gone removed", () => {
+  const draft = draftOf(folder);
+  const changed = setSchema(setBody(draft, 'implement', 'Implement it twice.'), 'implement', { file: 'implement.schema.json', text: '{}' });
+  assert.deepEqual(filesSaved(changed, undefined, folder), {
+    written: ['implement.md', 'implement.schema.json'],
+    kept: ['review.md'],
+    removed: [],
+  });
+  assert.deepEqual(filesSaved(removeStep(draft, 'review'), '# dev\n', folder), {
+    written: ['README.md'],
+    kept: ['implement.md'],
+    removed: ['review.md'],
+  });
 });

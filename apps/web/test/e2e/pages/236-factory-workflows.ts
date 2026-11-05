@@ -71,8 +71,9 @@ export default {
   /**
    * A factory's workflows are read in that factory. TREED is on a repository that is not the checkout, and its workflows are in its
    * tree: picked, the Workflows page lists what the api lists in it — its tree's `dev`, which shadows the checkout's, its `tree-only`,
-   * and the one of yours it attaches — each tagged with it alone, none said to be this repository's. Its `dev` leads to the tree's
-   * folder: its one step, no builder, nothing about a checkout or this repository, and why it cannot start there; a press on its step
+   * and the one of yours it attaches — each tagged with it alone, none said to be this repository's, the tree's by the origin `factory`.
+   * Its `dev` leads to the tree's folder: its one step, no builder but the factory's way, nothing about a checkout or this repository,
+   * and why it cannot start there; a press on its step
    * opens the bar on the tree's step, whose Open, as a double click on the step, lands on the step's page in the factory. One of yours it
    * hires into still opens its builder, which drafts from the list read with no factory, and starts its run in the factory. TWIN, on two
    * repositories, asks which on the list and on a workflow's page, and is read on the one picked; a name no factory has says so on the
@@ -97,7 +98,7 @@ export default {
         [good.name, OWN.name, yours.name],
         `with ${TREED} picked, Workflows lists what the api lists in it: its tree's two, then the one of yours it attaches`,
       );
-      await expectCount(page.locator('section[data-from="repo"]'), 2, "the tree's folders are listed as the factory's");
+      await expectCount(page.locator('section[data-from="factory"]'), 2, "the tree's folders are listed as the factory's, by its origin");
       await expectVisible(card(good.name).getByText(SHADOW.description), `${good.name}'s description is the tree's`);
       await expectTexts(cards.locator('[data-factory-tag]'), [TREED, TREED, TREED], `each tagged with ${TREED} alone`);
       await expectCount(page.locator('[data-filtered-out]'), 0, 'and the factory is not said to hold none');
@@ -106,13 +107,17 @@ export default {
       await shoot('list');
 
       await card(good.name).getByRole('link', { name: good.name, exact: true }).click();
-      await expectIn(page, `/workflows/repo/${good.name}`, `${good.name}'s card leads to its page in ${TREED}`);
+      await expectIn(page, `/workflows/factory/${good.name}`, `${good.name}'s card leads to its page in ${TREED}, by its origin`);
       const article = page.locator(`article[aria-label="Workflow ${good.name}"]`);
       const folder = path.join('factories', TREED, 'tree', 'workflows', good.name);
       await expectVisible(article.locator('[data-folder]', { hasText: folder }), `the page prints the tree's folder, ${folder}`);
       await expectTexts(article.locator('[data-step-row] > div > a'), [SHADOW.step], "its rows are the tree's one step");
       for (const step of good.steps) await expectCount(article.locator(`[data-step-row="${step}"]`), 0, `and not the checkout's ${step}`);
       await expectVisible(article.locator('[data-no-builder]'), 'it says why it has no builder');
+      await expectVisible(
+        article.locator('[data-no-builder][data-way="factory"]', { hasText: "the factory's way" }),
+        "the way a factory's own workflow changes, which a write of it is refused with",
+      );
       await expectCount(article.locator('[data-no-builder]', { hasText: 'this checkout' }), 0, 'with nothing about a checkout');
       await expectCount(article.getByRole('button', { name: 'Build', exact: true }), 0, 'and no Build');
       await expectVisible(
@@ -123,13 +128,13 @@ export default {
       await shoot('workflow');
 
       await article.locator(`.react-flow__node[data-id="${SHADOW.step}"]`).click();
-      const bar = page.locator(`aside[data-bar="spec:repo/${good.name}/${SHADOW.step}"]`);
+      const bar = page.locator(`aside[data-bar="spec:factory/${good.name}/${SHADOW.step}"]`);
       await expectVisible(bar.locator('[data-runs-on]'), "a press on the tree's step opens the bar on it, read in the factory");
       await expectCount(bar.getByText('has no step named'), 0, "and not on the checkout's workflow of the same name");
       await expectVisible(bar.getByText("the factory's"), "said to be the factory's");
       await shoot('bar');
       await bar.getByRole('link', { name: 'Open', exact: true }).click();
-      await expectIn(page, `/workflows/repo/${good.name}/${SHADOW.step}`, "the bar's Open lands on the step's page in the factory");
+      await expectIn(page, `/workflows/factory/${good.name}/${SHADOW.step}`, "the bar's Open lands on the step's page in the factory");
       await expectVisible(page.locator('article h1', { hasText: SHADOW.step }), "and the tree's step is drawn");
       await expectVisible(page.locator('[data-from="repo"]', { hasText: "the factory's" }), "said to be the factory's too");
       await expectCount(page.locator('article').getByText('this repository'), 0, "and nothing on it says this repository's");
@@ -138,7 +143,7 @@ export default {
       await article.locator(`.react-flow__node[data-id="${SHADOW.step}"]`).dblclick();
       await expectIn(
         page,
-        `/workflows/repo/${good.name}/${SHADOW.step}`,
+        `/workflows/factory/${good.name}/${SHADOW.step}`,
         "a double click on the tree's step lands on its page in the factory",
       );
       await expectVisible(page.locator('article h1', { hasText: SHADOW.step }), "and the tree's step is drawn there too");

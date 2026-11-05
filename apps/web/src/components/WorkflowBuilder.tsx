@@ -1,21 +1,14 @@
 import { useCallback, useId, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Background, BackgroundVariant, MarkerType, Position, ReactFlow, type Connection } from '@xyflow/react';
-import {
-  BuildRefusal,
-  keyFormQuery,
-  saveWorkflow,
-  workflowsQuery,
-  type StepLayers,
-  type WorkflowListing,
-  type WorkflowSaved,
-} from '../lib/api';
+import { BuildRefusal, keyFormQuery, saveWorkflow, workflowsQuery, type StepLayers, type WorkflowListing } from '../lib/api';
 import {
   addStep,
   connect,
   disconnect,
   draftGraph,
   draftOf,
+  filesSaved,
   listedWith,
   nameRefusal,
   orderOf,
@@ -26,6 +19,7 @@ import {
   unsaved,
   unsavedSteps,
   type DraftStep,
+  type WorkflowSaved,
 } from '../lib/builder';
 import { edgeStroke, LOOP_SOURCE, LOOP_TARGET } from '../lib/canvas';
 import { extentOf } from '../lib/layout';
@@ -58,11 +52,12 @@ const INPUT =
  * with its rounds). An edge's button takes its key away. A block is added with a name and what it is told, and a block clicked opens its
  * form. Above them, its README: the workflow level's instruction, sent with a save only where it changed (`readmeSent`).
  *
- * Nothing is written until Save, which puts the whole folder with any schema pasted for an `output:` (`PUT /api/workflows/yours/:name`) in
- * one write, judged whole by the api before any of it is written, at the version the draft was read from. The api answers the folder read
- * back from disk, which the draft starts again from; or the package's refusal, shown above the canvas and on each step it names
- * (`SaveRefused`); or, for a folder changed on disk since, a 409 with Read the folder again, rather than a write over it. Changes not saved
- * are marked on the card and on each step, and the draft is compared with the folder as it was last read.
+ * Nothing is written until Save, which puts the whole folder with any schema pasted for an `output:` (a `PUT` of
+ * `/api/namespaces/default/workflows/:name`) in one write, judged whole by the api before any of it is written, at the version the draft
+ * was read from. The api answers the folder read back from disk, which the draft starts again from; or the package's refusal, shown above
+ * the canvas and on each step it names (`SaveRefused`); or, for a folder changed on disk since, a 409 with Read the folder again, rather
+ * than a write over it. Changes not saved are marked on the card and on each step, and the draft is compared with the folder as it was last
+ * read.
  *
  * Read the folder again starts the draft from what the folder holds now, and lets go of what was drawn; a folder gone, or one that no
  * longer reads, closes the builder, and the card says why. A read that fails keeps the refusal's status, so a 409's "nothing written" is
@@ -95,13 +90,7 @@ export function WorkflowBuilder({ workflow, onClose }: { workflow: WorkflowListi
   };
 
   const save = useMutation({
-    mutationFn: (draft: { steps: DraftStep[]; readme: string }) =>
-      saveWorkflow(base.name, {
-        version: base.version,
-        steps: toPut(draft.steps),
-        schemas: schemasOf(draft.steps),
-        readme: readmeSent(draft.readme, base),
-      }),
+    mutationFn: (draft: { steps: DraftStep[]; readme: string }) => savedOf(base, draft),
     onMutate: () => {
       setRefusal(null);
       setSaved(null);
@@ -356,12 +345,27 @@ function ReadmeField({ text, changed, onChange }: { text: string; changed: boole
 }
 
 /**
+ * The draft saved over `base`, the folder it was drafted from, at the version `base` was read at: the folder read back, and the files the
+ * save wrote, left and removed (`filesSaved`).
+ */
+async function savedOf(base: WorkflowListing, draft: { steps: DraftStep[]; readme: string }): Promise<WorkflowSaved> {
+  const readme = readmeSent(draft.readme, base);
+  const workflow = await saveWorkflow(base.name, {
+    version: base.version,
+    steps: toPut(draft.steps),
+    schemas: schemasOf(draft.steps),
+    readme,
+  });
+  return { workflow, ...filesSaved(draft.steps, readme, base) };
+}
+
+/**
  * What a save that did not go through says, by what the api answered.
  *
  * A 4xx is the api's judgement of the request — the package's refusal, a body it will not read, a folder changed since (409) — and it
  * writes nothing, so the banner says so. Anything else leaves what the folder holds unknown: a 500 is a write that broke off partway, and
- * an answer with no status of its own may have been carried out all the same — a fetch that never landed, or one the api answered with
- * what the board does not read (`build` in lib/api/workflows.ts), which is why the words for it are what the api did not say rather than
+ * an answer with no status of its own may have been carried out all the same — a fetch that never landed, or one the api answered with what
+ * the board does not read (`saveWorkflow` in lib/api/workflows.ts), which is why the words for it are what the api did not say rather than
  * that it said nothing. None of them says nothing was written, and each offers to read the folder again, as a 409 does — the one way back
  * to what is on disk, since the draft is a folder read at a version the api no longer has.
  */

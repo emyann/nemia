@@ -111,11 +111,11 @@ export const namedElsewhere = (workflow: string | null, repo: string | null, her
  * a card that names none, or one that is not among them.
  *
  * As a start from the command line finds it (`workflowFolder`): an absolute path is that folder, whichever source has it; a name is the
- * repository's workflow of that name, never yours, since a name on a card is looked for under the repository's `workflows/`. `repo` is the
- * card's `repo:` and `here` the api's repository, whose workflows are listed: a name on a card about another repository is that
- * repository's workflow (`namedElsewhere`), which is not listed, so it presets nothing — a workflow of the same name here would run another
- * workflow than the card names. A relative path is read from the inbox, a folder the board does not list, and is no workflow's name, so it
- * presets nothing.
+ * repository's workflow of that name (a factory's own, in a factory), never yours, since a name on a card is looked for under the
+ * repository's `workflows/`. `repo` is the card's `repo:` and `here` the api's repository, whose workflows are listed: a name on a card
+ * about another repository is that repository's workflow (`namedElsewhere`), which is not listed, so it presets nothing — a workflow of the
+ * same name here would run another workflow than the card names. A relative path is read from the inbox, a folder the board does not list,
+ * and is no workflow's name, so it presets nothing.
  */
 export function presetOf(
   workflow: string | null,
@@ -126,7 +126,7 @@ export function presetOf(
   if (!workflow || namedElsewhere(workflow, repo, here)) return null;
   const readable = workflows.filter((w) => w.error === null);
   if (/^(?:[\\/]|[A-Za-z]:[\\/])/.test(workflow)) return readable.find((w) => trimmed(w.dir) === trimmed(workflow)) ?? null;
-  return readable.find((w) => w.from === 'repo' && w.name === workflow) ?? null;
+  return readable.find((w) => w.from !== 'yours' && w.name === workflow) ?? null;
 }
 
 /** Whether a card names no factory: it has no `factory:` line, or writes `default`, which is no factory to start in. */

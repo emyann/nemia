@@ -11,6 +11,7 @@ import { WorkflowCanvas } from '../components/WorkflowCanvas';
 import { FromBadge, NoBuilder, Unplaced } from '../components/WorkflowParts';
 import {
   factoriesQuery,
+  fromMatches,
   storeQuery,
   workflowsInQuery,
   workflowsQuery,
@@ -112,7 +113,7 @@ type Asked = { from: string; name: string; address: PagePlace; building: boolean
 /** The workflow `name` read from `from` with no factory, tagged with the factories it is in; or that none is listed by that name. */
 function Everywhere({ from, name, address, building, factories }: Asked & { factories: readonly Factory[] | undefined }) {
   const { data: all } = useSuspenseQuery(workflowsQuery);
-  const workflow = all.find((w) => w.from === from && w.name === name);
+  const workflow = all.find((w) => fromMatches(w.from, from) && w.name === name);
   if (!workflow) return <NotListed from={from} name={name} />;
   return (
     <Workflow
@@ -137,7 +138,7 @@ function Everywhere({ from, name, address, building, factories }: Asked & { fact
 function InFactory({ from, name, address, place, building, factory }: Asked & { place: Place; factory: Factory | undefined }) {
   const { data: listed } = useSuspenseQuery(workflowsInQuery(place));
   const { data: plain } = useQuery({ ...workflowsQuery, enabled: from === 'yours' });
-  const workflow = listed.find((w) => w.from === from && w.name === name);
+  const workflow = listed.find((w) => fromMatches(w.from, from) && w.name === name);
   if (!workflow) return <NotOffered name={name} place={place} address={address} attach={factory?.commands.attach} />;
   const why = whyNotStarted(workflow);
   return (

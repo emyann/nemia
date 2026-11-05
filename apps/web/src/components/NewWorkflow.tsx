@@ -62,8 +62,8 @@ function Refused({ message }: { message: string }) {
 
 /**
  * A new workflow of yours, in `folder`, your workflows' folder: its name — its folder's — and a first step, a name, what it is told and
- * where it works, which a person chooses (`POST /api/workflows/yours`). Once made, `onCreated` is told its name, and the board opens its
- * page with its builder. Refused in the api's words: a name taken, or a step the package refuses.
+ * where it works, which a person chooses (`POST /api/namespaces/default/workflows`). Once made, `onCreated` is told its name, and the
+ * board opens its page with its builder. Refused in the api's words: a name taken, or a step the package refuses.
  */
 export function NewWorkflow({ folder, onCreated }: { folder: string; onCreated: (name: string) => void }) {
   const queryClient = useQueryClient();
@@ -77,8 +77,8 @@ export function NewWorkflow({ folder, onCreated }: { folder: string; onCreated: 
   const create = useMutation({
     mutationFn: (made: NonNullable<typeof first>) => createWorkflow(name, made),
     onSuccess: (made) => {
-      onCreated(made.workflow.name);
-      queryClient.setQueryData(workflowsQuery.queryKey, (list) => listedWith(list, made.workflow));
+      onCreated(made.name);
+      queryClient.setQueryData(workflowsQuery.queryKey, (list) => listedWith(list, made));
       void rereadWorkflows(queryClient);
       setOpen(false);
       setName('');

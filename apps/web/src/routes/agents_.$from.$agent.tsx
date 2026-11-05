@@ -20,6 +20,7 @@ import {
 } from '../lib/api';
 import { formKeyOf, keptAfterCopy, keptAfterSave, settleSave, type KeptForm } from '../lib/agents';
 import { invalidateAgents } from '../lib/agentWrites';
+import { FACTORY_WAY } from '../lib/factories';
 import { BackToAgents } from './agents_.new';
 
 /** The page of an agent, at /agents/$from/$agent: `agents_` draws it on its own, not inside the Agents page, which has no outlet for it. */
@@ -180,7 +181,12 @@ function AgentHeader({ agent, mine }: { agent: AgentListing; mine: boolean }) {
       </div>
       {agent.description && <p className="text-body-medium text-foreground">{agent.description}</p>}
       <UsedBy listing={agent} />
-      {!mine && (
+      {!mine && agent.from === 'factory' && (
+        <p data-read-only data-way="factory" className="text-body-small text-muted-foreground">
+          A factory&apos;s own agents are read here, not written: {FACTORY_WAY}.
+        </p>
+      )}
+      {!mine && agent.from !== 'factory' && (
         <p data-read-only className="text-body-small text-muted-foreground">
           The repository's agents are read here, not written: they change with the repository, in a commit.
           {agent.untried?.copy && <> To start one of yours from this one, {code(agent.untried.copy)}.</>}

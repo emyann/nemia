@@ -140,15 +140,22 @@ test('budgetOf: the cap in force, read from the record and the approvals in forc
         steps: { design: { taskId: 'd1' }, implement: { taskId: 'm1', ...(tries ? { tries } : {}) } },
       },
     );
-  const at = (n: number, budgets: Record<string, number>, tryNo = 1) => ({
+  const at = (n: number, proposed: Record<string, number>, tryNo = 1, given?: Record<string, number>) => ({
     step: 'design',
     try: tryNo,
     at: `2026-01-01T00:00:0${n}Z`,
-    budgets,
+    proposed,
+    ...(given ? { given } : {}),
   });
   await t.test("no approval: the step's own budget", () => assert.equal(budgetOf(IMPLEMENT, onTry(undefined)), 40));
   await t.test('an approval of the try its step is on: its cap for the step', () =>
     assert.equal(budgetOf(IMPLEMENT, onTry([at(1, { implement: 7 })])), 7),
+  );
+  await t.test("an amount the person gave over the step's proposal: the person's", () =>
+    assert.equal(budgetOf(IMPLEMENT, onTry([at(1, { implement: 7 }, 1, { implement: 5 })])), 5),
+  );
+  await t.test("an amount the person gave for a step the proposal left out: the person's", () =>
+    assert.equal(budgetOf(IMPLEMENT, onTry([at(1, { review: 3 }, 1, { implement: 6 })])), 6),
   );
   await t.test('two approvals capping one step: the last given, whatever order the files are read in', () =>
     assert.equal(budgetOf(IMPLEMENT, onTry([at(2, { implement: 9 }, 1), { ...at(1, { implement: 7 }), step: 'intake' }])), 9),
@@ -181,7 +188,9 @@ test("gateBudgets: a gate's budgets, proposed before its approval and approved a
     names(at?.said, 'the run has spent $3.00', 'at most', 'intake', 'no cap');
   });
   await t.test('after it: the caps it set, the why of an amount the person changed gone', () => {
-    const approved = gated([{ step: 'design', try: 1, at: '2026-01-01T00:00:00Z', budgets: { implement: 60, review: 4 } }]);
+    const approved = gated([
+      { step: 'design', try: 1, at: '2026-01-01T00:00:00Z', proposed: { implement: 60, review: 3 }, given: { review: 4 } },
+    ]);
     const at = gateBudgets(approved, DESIGN, STEPS, said, spent);
     assert.equal(at?.from, 'approved');
     assert.deepEqual(

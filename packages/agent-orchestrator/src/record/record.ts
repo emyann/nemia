@@ -307,10 +307,18 @@ export type PrunedFiles = { at: string; bytes: number };
 /**
  * A person's word at a gate, as its file says it (`nemia approve`): the step, the try it approves, when, and what they said with it — the
  * words every step after the gate is handed under `## Approved` (`approvedSection`). `message` is absent on an approval given without any.
- * `budgets`: the caps it sets for the steps after the gate, by step, in dollars — the budgets the gated step proposed, with the amounts the
- * person gave over them (`approvedCaps`) — read on every pass as those steps' caps (`budgetOf`); absent where it sets none.
+ * `proposed` and `given`: the budgets the gated step proposed for the steps after the gate and those the person gave, by step, in dollars,
+ * each kept as it came and apart from the other (`approvedCaps`); the cap a step is given is read from both on every pass, the person's
+ * amount over the proposal's (`approvedCap`, `budgetOf`). Each is absent where it holds none.
  */
-export type Approval = { step: string; try: number; at: string; message?: string; budgets?: Record<string, number> };
+export type Approval = {
+  step: string;
+  try: number;
+  at: string;
+  message?: string;
+  proposed?: Record<string, number>;
+  given?: Record<string, number>;
+};
 
 /**
  * A person's word at a loop out of rounds, as its file says it (`nemia approve`): the looping step, the try it accepts, when, and what they

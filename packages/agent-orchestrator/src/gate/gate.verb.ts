@@ -14,13 +14,13 @@ import { standingsOf } from '../branches/branches.store.ts';
 import { standingLive } from '../standing/standing.verb.ts';
 import { closeoutAsked, closeoutReader, exitVerdicts, spendReader, taskPhasesRead } from '../views/views.verb.ts';
 import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
-import { aboveTheWorkflow, approvedCaps, ceilingsOf, laterSteps, proposedBudgets, type StepBudget } from '../budget/budget.ts';
+import { aboveTheWorkflow, approvedCaps, capsOf, ceilingsOf, laterSteps, proposedBudgets, type StepBudget } from '../budget/budget.ts';
 import { RunDoor } from '../runs/runs.store.ts';
 import { RunId } from '../record/record.model.ts';
 
 /**
  * What `nemia approve` did: the run, the approval as written, and its file; the caps it set for the steps after the gate, in the order the
- * file holds them (`approvedCaps`), and the steps among them whose cap is above their own `budget:` (`aboveTheWorkflow`).
+ * proposal names them and then the person (`capsOf`), and the steps among them whose cap is above their own `budget:` (`aboveTheWorkflow`).
  */
 export type Approved = { run: Run; approval: Approval; file: string; caps: StepBudget[]; above: string[] };
 
@@ -37,8 +37,9 @@ export type Approved = { run: Run; approval: Approval; file: string; caps: StepB
  * between the look and the write is refused as the look would have refused it, and a file at the approval's name that is not one is
  * named, with how to clear it.
  *
- * The approval carries the caps it sets for the steps after the gate (`budgets`): the budgets the step's closeout proposes (`"x-shape":
- * "budgets"`), with each amount the person gave (`given`, `nemia approve --budget <step>=<amount>`) over them (`approvedCaps`). A given
+ * The approval carries the caps it sets for the steps after the gate, kept apart (`approvedCaps`): the budgets the step's closeout proposes
+ * (`proposed`, `"x-shape": "budgets"`) and each amount the person gave (`given`, `nemia approve --budget <step>=<amount>`), which the cap
+ * of a step takes over the proposal's (`approvedCap`). A given
  * amount that names no step after the gate, is given twice, or is no amount is refused `Invalid`, exit 2, before anything is written.
  *
  * Sending back is not this verb's: `nemia retry <run> <step> --message "<objection>"` — the try it files is one this approval does not
@@ -89,13 +90,15 @@ export const approveRun = Effect.fn('approve')(function* (
       }),
     );
   }
-  const caps = set.caps.map((c) => ({ step: c.step, usd: c.usd }));
+  const caps = capsOf(set.proposed, set.given);
+  const byStep = (budgets: readonly StepBudget[]) => Object.fromEntries(budgets.map((b) => [b.step, b.usd]));
   const approval: Approval = {
     step: stepName,
     try: tryOf(run, stepName),
     at: new Date().toISOString(),
     ...(message !== undefined ? { message } : {}),
-    ...(caps.length ? { budgets: Object.fromEntries(caps.map((c) => [c.step, c.usd])) } : {}),
+    ...(set.proposed.length ? { proposed: byStep(set.proposed) } : {}),
+    ...(set.given.length ? { given: byStep(set.given) } : {}),
   };
   const written = yield* (yield* RunDoor).asks.write(RunId.read(id), { kind: 'approve', of: 'gate', ask: approval });
   const file = written.where;

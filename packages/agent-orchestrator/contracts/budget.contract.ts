@@ -3,8 +3,9 @@
  * it, as data (`"x-shape": "budgets"`), which a person's approval makes those steps' caps, changed where the person changed them.
  *
  * `proposalRefusal` says why a closeout's budgets are not taken, and the run refuses that closeout back to its agent as it refuses a
- * question field that does not read. `approvedCaps` is what an approval writes: the proposals, with the person's own amounts over
- * them. `capInForce` is the cap a step is filed and judged under, read on every pass from the record and the approvals in force,
+ * question field that does not read. `approvedCaps` is what an approval writes: the proposal and the person's own amounts, each kept as
+ * it came and apart from the other; `approvedCap` reads the cap it sets for one step from them, the person's amount over the
+ * proposal's. `capInForce` is the cap a step is filed and judged under, read on every pass from the record and the approvals in force,
  * nothing carried. `aboveTheWorkflow` names the caps above the step's own `budget:`, which the gate says and which no rule of auto
  * approves unasked.
  *
@@ -50,31 +51,16 @@ const proposalRefusalSpec = spec<(budgets: readonly StepBudget[], later: readonl
 /** The function's type, which the code takes: it then imports nothing of tsverify. */
 export type ProposalRefusal = Implementation<typeof proposalRefusalSpec>;
 
-const unchangedSpec = spec<(proposed: readonly StepBudget[], given: readonly StepBudget[]) => StepBudget[]>({
-  /** What `approvedCaps` hands it: a proposal that names each step once, each an amount (`settable`). */
-  requires: ({ input: [proposed] }) => onceEach(proposed) && proposed.every((p) => anAmount(p.usd)),
-  ensures: {
-    onlyTheUnchanged: {
-      description: 'What stands of a proposal is only budgets it made for steps the person gave no amount',
-      condition: ({ input: [proposed, given], output }) =>
-        output.every((o) => !names(given, o.step) && proposed.some((p) => p.step === o.step && p.usd === o.usd)),
-    },
-    everyUnchanged: {
-      description: 'Every budget it made for a step the person gave no amount stands',
-      condition: ({ input: [proposed, given], output }) =>
-        proposed.every((p) => names(given, p.step) || output.some((o) => o.step === p.step && o.usd === p.usd)),
-    },
-    onceEachStands: {
-      description: 'What stands names a step once at most',
-      condition: ({ output }) => onceEach(output),
-    },
-  },
-});
-/** The function's type, which the code takes: it then imports nothing of tsverify. */
-export type Unchanged = Implementation<typeof unchangedSpec>;
+/** Whether `kept` holds `budgets` as they came: as many, each at its place, its step at its amount. */
+const asTheyCame = (kept: readonly StepBudget[], budgets: readonly StepBudget[]): boolean =>
+  kept.length === budgets.length && budgets.every((b, i) => kept.at(i)?.step === b.step && kept.at(i)?.usd === b.usd);
 
 const approvedCapsSpec = spec<
-  (proposed: readonly StepBudget[], given: readonly StepBudget[], later: readonly string[]) => { caps: StepBudget[] } | { refused: string }
+  (
+    proposed: readonly StepBudget[],
+    given: readonly StepBudget[],
+    later: readonly string[],
+  ) => { proposed: StepBudget[]; given: StepBudget[] } | { refused: string }
 >({
   /**
    * What a gated step proposed was taken when it signed off (`proposalRefusal`): a closeout it refuses reads unsigned, and no gate
@@ -86,29 +72,48 @@ const approvedCapsSpec = spec<
       description: 'An approval is refused exactly when a budget the person gave names no later step, names one twice, or is no amount',
       condition: ({ input: [, given, later], output }) => 'refused' in output === !settable(given, later),
     },
-    thePersonsAmountWins: {
-      description: 'Each budget the person gave is the cap the approval sets for its step',
-      condition: ({ input: [, given], output }) =>
-        'refused' in output || given.every((g) => output.caps.some((o) => o.step === g.step && o.usd === g.usd)),
+    theProposalKeptApart: {
+      description: 'An approval keeps what the step proposed as it came, apart from what the person gave',
+      condition: ({ input: [proposed], output }) => 'refused' in output || asTheyCame(output.proposed, proposed),
     },
-    aProposalStandsUnchanged: {
-      description: 'Each budget the step proposed that the person did not change is the cap the approval sets for its step',
-      condition: ({ input: [proposed, given], output }) =>
-        'refused' in output || proposed.every((p) => names(given, p.step) || output.caps.some((o) => o.step === p.step && o.usd === p.usd)),
-    },
-    nothingElse: {
-      description: 'An approval sets a cap only for a step the step proposed or the person gave',
-      condition: ({ input: [proposed, given], output }) =>
-        'refused' in output || output.caps.every((o) => names(proposed, o.step) || names(given, o.step)),
-    },
-    oneCapAStep: {
-      description: 'An approval sets one cap for a step at most',
-      condition: ({ output }) => 'refused' in output || onceEach(output.caps),
+    thePersonsKeptApart: {
+      description: 'An approval keeps the budgets the person gave as they came, apart from what the step proposed',
+      condition: ({ input: [, given], output }) => 'refused' in output || asTheyCame(output.given, given),
     },
   },
 });
 /** The function's type, which the code takes: it then imports nothing of tsverify. */
 export type ApprovedCaps = Implementation<typeof approvedCapsSpec>;
+
+/**
+ * The cap an approval sets for one step, read from what it keeps apart (`approvedCaps`): the person's amount over the proposal's. One
+ * answer a step, so an approval sets one cap for a step at most by its shape.
+ */
+const approvedCapSpec = spec<(proposed: readonly StepBudget[], given: readonly StepBudget[], step: string) => number | undefined>({
+  /**
+   * What an approval keeps: each list an amount for a step, once each (`approvedCaps`, `proposalRefusal`), as the approval's file is read
+   * (`Dollars`, record.store.ts).
+   */
+  requires: ({ input: [proposed, given] }) =>
+    proposed.every((p) => anAmount(p.usd)) && given.every((g) => anAmount(g.usd)) && onceEach(proposed) && onceEach(given),
+  ensures: {
+    thePersonsAmountWins: {
+      description: 'A budget the person gave is the cap the approval sets for its step',
+      condition: ({ input: [, given, step], output }) => given.every((g) => g.step !== step || output === g.usd),
+    },
+    aProposalStandsUnchanged: {
+      description: 'A budget the step proposed that the person did not change is the cap the approval sets for its step',
+      condition: ({ input: [proposed, given, step], output }) =>
+        names(given, step) || proposed.every((p) => p.step !== step || output === p.usd),
+    },
+    aCapExactlyWhereOneIsSaid: {
+      description: 'An approval sets a cap for a step exactly when the step proposed one or the person gave one',
+      condition: ({ input: [proposed, given, step], output }) => (output !== undefined) === (names(proposed, step) || names(given, step)),
+    },
+  },
+});
+/** The function's type, which the code takes: it then imports nothing of tsverify. */
+export type ApprovedCap = Implementation<typeof approvedCapSpec>;
 
 const capInForceSpec = spec<(i: CapInput) => number | undefined>({
   /**

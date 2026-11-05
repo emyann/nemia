@@ -14,8 +14,9 @@ const MADE = { name: 'unhired-e2e', description: 'Use this when a plan needs a s
 
 export default {
   /**
-   * New agent come from a step whose factory refuses the hire: the agent is written, the hire is answered 404, its Hire not among the factory's, in the package's words,
-   * and the person stays on the creator, which says in the window that the agent is created but not hired, and why, with the way back
+   * New agent come from a step whose factory refuses the hire: the agent is written, and the hire is answered 404 in the package's
+   * words, since a step of a workflow the factory does not offer is no Hire of it, and the sentence names the attach to type. The
+   * person stays on the creator, which says in the window that the agent is created but not hired, and why, with the way back
    * to the step. Its one refusal is the point, so its page counts exactly it; the factory and the agent are written by the page and
    * taken back after.
    */
@@ -49,7 +50,6 @@ export default {
         form.getByRole('button', { name: 'Create agent' }).click(),
       ]);
       const { error } = (await answered.json()) as { error?: string };
-      // A step of a workflow the factory does not offer is no Hire of it: a 404 whose sentence names the attach to type.
       const sentence = error ?? '';
       if (answered.status() !== 404 || !sentence.includes(`nemia factory attach ${FACTORY}`))
         throw new Refused(`the api refuses the hire in the package's words — it answered ${answered.status()}: ${error}`);

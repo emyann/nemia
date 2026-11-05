@@ -262,6 +262,9 @@ export function listing(input: ListingInput): Listing {
  * One line per step, deliberately. The summary, `needs` and a check's output were written for
  * `nemia decide`, where there is room to read them; here they would turn a list into a report.
  *
+ * A step never filed that the run's words read at its gate (`runWords`: a gated table condition whose table answered) is listed there, as
+ * a gated step that signed off is: awaiting approval, waiting on you, its note the approval and the send-back of what it routes on.
+ *
  * Who a run waits on is asked again here, so a caller's stale list cannot say a run that started, or was
  * called off, waits on a run or a slot. A root not filed names them, and an ending step approved and not
  * filed names the run whose step has the checkout (`checkoutWord`). The engine's word for a settled task

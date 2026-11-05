@@ -46,6 +46,7 @@
         "$TURBO_ROOT$/turbo.json",
         "$TURBO_ROOT$/packages/*/package.json",
         "$TURBO_ROOT$/apps/*/package.json",
+        "$TURBO_ROOT$/packages/*/src/**",
         "$TURBO_ROOT$/packages/agent-runtime/test/remote-agent.test.ts",
         "$TURBO_ROOT$/apps/web/test/e2e/pages/NAMES",
         "$TURBO_ROOT$/packages/agent-orchestrator/nemia/skills/bring-what-waits/SKILL.md",

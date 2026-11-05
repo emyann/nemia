@@ -12,6 +12,10 @@ contract asks of each step here, by what the step does. CI's `contracts` job run
 A contract is handed from step to step as a file, never as prose: design writes it, the run commits it under design's step, implement
 starts from that commit, and review reads implement's diff of it against that commit.
 
+A function's `src/` imports its contract's types by `import type` from its package's `contracts/`, never `@emyann/tsverify` itself:
+the verifier stays in the root's `devDependencies`, no workspace ships it (`tools/guards/test/no-shipped-verifier.test.ts`), and a law
+that would want it at run time is made provable from the code, or restated so a helper's spec carries it.
+
 ## Design
 
 When the change adds a pure function that decides — a status, an action, a refusal, from what it is handed — or changes one a contract

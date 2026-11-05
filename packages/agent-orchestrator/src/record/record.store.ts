@@ -412,8 +412,9 @@ export const When = Schema.String.check(Schema.makeFilter((at: string) => !Numbe
 const Dollars = Schema.Finite.check(Schema.isGreaterThan(0));
 const BUDGET_WORDS = 'its budget is not an amount of dollars above zero';
 
-const ApprovalFileSchema = Schema.StructWithRest(Schema.Struct({ at: When, message: Schema.optionalKey(Said) }), Rest);
-const AcceptanceFileSchema = Schema.StructWithRest(Schema.Struct({ at: When, message: Said }), Rest);
+const Caps = Schema.Record(Schema.String, Dollars);
+const ApprovalFileSchema = Kept({ at: When, message: Schema.optionalKey(Said), budgets: Schema.optionalKey(Caps) });
+const AcceptanceFileSchema = Kept({ at: When, message: Said });
 const RoundAskFileSchema = Kept({ budget: Schema.optionalKey(Dollars), at: Schema.optionalKey(Schema.Unknown) });
 const RetryAskFileSchema = Kept({
   mode: Schema.Literals(['continue', 'fresh', 'recheck']),
@@ -444,18 +445,18 @@ export function readAs<S extends Schema.ConstraintDecoder<unknown>>(schema: S, v
 /** Why a message is refused: one that is not text, or one with nothing in it. */
 const messageWords = (held: unknown): string => (isText(fieldOf(held, 'message')) ? 'its message is empty' : 'its message is not text');
 
+/** Why an approval file is refused, by the field refused: one written by hand where `nemia approve` would have refused it. */
+const APPROVAL_WORDS: Record<string, string> = { at: 'it says no time it was given', budgets: 'its budgets are not dollars above zero' };
+const NO_APPROVAL = 'it is not an approval nemia approve wrote';
+
 /** One approval file, read: the step and the try from its name, when and what was said from what it holds — or why it cannot be read. */
 export function approvalIn(file: string, step: string, n: number): Approval | string {
   const held = heldIn(file);
   if ('unreadable' in held) return held.unreadable;
   const read = readAs(ApprovalFileSchema, held.read);
-  if ('refused' in read) {
-    if (read.refused === 'at') return 'it says no time it was given';
-    if (read.refused === 'message') return messageWords(held.read);
-    return 'it is not an approval nemia approve wrote';
-  }
-  const { at, message } = read.read;
-  return { step, try: n, at, ...(message === undefined ? {} : { message }) };
+  if ('refused' in read) return read.refused === 'message' ? messageWords(held.read) : (APPROVAL_WORDS[read.refused] ?? NO_APPROVAL);
+  const { at, message, budgets } = read.read;
+  return { step, try: n, at, ...(message === undefined ? {} : { message }), ...(budgets === undefined ? {} : { budgets: { ...budgets } }) };
 }
 
 /**

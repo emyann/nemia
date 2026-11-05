@@ -210,3 +210,5 @@ export {
   toldLayers,
 } from './brief/index.ts';
 export type { EndingStopped, HandedPart, ParentCloseout, ParentStep, RetryBriefing, RoundBriefing, ToldLayers } from './brief/index.ts';
+export type { StepBudget } from './budget/budget.ts';
+export type { GateBudget, GateBudgets, GateBudgetsFrom } from './gate-budgets/gate-budgets.ts';

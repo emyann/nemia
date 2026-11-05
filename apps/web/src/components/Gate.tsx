@@ -11,6 +11,7 @@ import { answersFrom, QuestionFields, RecommendButton, unanswered, type Draft } 
 import { when } from './Facts';
 import { runsMoved } from '@/lib/runWrites';
 import type { Frozen } from '../lib/frozen';
+import { budgetsGiven, GateBudgetFields, GateBudgetRows, type Amounts, type GateBudgets, type GivenBudget } from './GateBudgets';
 
 /** A gated step's gate, as its object's status holds it. */
 type StepGate = NonNullable<StepView['gate']>;
@@ -43,6 +44,11 @@ type StepApproval = NonNullable<StepGate['approval']>;
  * has a choice or words, and sends the answers with its words as their note (`approvalBody`); Send back to the gated step carries them
  * too, all or none (`sendBackBody`). The api checks them against what the step asks now and writes them in the package's words.
  *
+ * `budgets` are the caps the step proposes for the steps after it, where its closeout gives any (`GateBudgets`, `from: 'proposed'`):
+ * drawn beside Approve, each with an amount field holding the proposal (`GateBudgetRows`). Approve sends the amounts the person changed
+ * as `budgets`, and none where nothing changed, so the proposal is what the package writes (`approvalBody`, `budgetsGiven`); it waits
+ * while a field holds no amount above zero.
+ *
  * An ending's approval runs it where nothing can be taken back, so it takes a second, deliberate press: Approve, then Run <step>. The words
  * of either answer go as they were typed, as `--message` takes them: none with an approval where nothing was written, and a send-back with
  * none is the package's to refuse. Where the ending waits on more than one step, one of them is enough to hold its gate again.
@@ -56,6 +62,7 @@ export function Gate({
   framed = true,
   closeout = null,
   questions = [],
+  budgets,
 }: {
   runId: string;
   step: string;
@@ -67,14 +74,21 @@ export function Gate({
   framed?: boolean;
   closeout?: Frozen<StepCloseout> | null;
   questions?: readonly Frozen<Question>[];
+  /** The step's gate's budgets (`step.gate.budgets`): drawn with a field each while they are its proposal. */
+  budgets?: Frozen<GateBudgets> | null;
 }) {
   const [draft, setDraft] = useState<Draft>({});
+  const [amounts, setAmounts] = useState<Amounts>({});
   const [to, setTo] = useState(back[0] ?? step);
   const field = useId();
-  const approval = useApprove(runId, step, () => setDraft({}));
+  const approval = useApprove(runId, step, () => {
+    setDraft({});
+    setAmounts({});
+  });
   const sendBack = useAsk(runId, step, () => setDraft({}));
   const busy = approval.isPending || sendBack.isPending;
   const answering = { questions, draft, left: unanswered(questions, draft) };
+  const budgeting = budgetsGiven(budgets, amounts);
 
   const taken = approval.isSuccess
     ? takenOf({ approved: approval.data.try }, step, acts)
@@ -102,7 +116,17 @@ export function Gate({
         )}
         <div className="min-w-0 space-y-4">
           {questions.length > 0 && <GateQuestions step={step} questions={questions} draft={draft} onDraft={setDraft} />}
-          <ApproveForm step={step} acts={acts} approveLine={approveLine} field={field} approval={approval} busy={busy} {...answering} />
+          <GateBudgetFields step={step} budgets={budgets} amounts={amounts} onAmounts={setAmounts} field={field} />
+          <ApproveForm
+            step={step}
+            acts={acts}
+            approveLine={approveLine}
+            field={field}
+            approval={approval}
+            busy={busy}
+            budgeting={budgeting}
+            {...answering}
+          />
           {back.length > 0 && (
             <SendBackForm step={step} back={back} to={to} onTo={setTo} field={field} sendBack={sendBack} busy={busy} {...answering} />
           )}
@@ -153,6 +177,11 @@ type Answering = { questions: readonly Frozen<Question>[]; draft: Draft; left: r
 
 const notAnswered = (left: readonly string[]) => (left.length > 0 ? `Not answered: ${left.join(' · ')}` : undefined);
 
+/** Why Approve waits, on hover: the questions not answered, then the budgets whose field holds no amount above zero. */
+const approveWaits = (left: readonly string[], unread: readonly string[]): string | undefined =>
+  [notAnswered(left), unread.length > 0 ? `No amount above $0 for: ${unread.join(' · ')}` : undefined].filter(Boolean).join(' — ') ||
+  undefined;
+
 /**
  * Approve, with a box for the words — the note beside the answers where the step asks questions, and held until each has one. At an
  * ending's gate (`acts`), a second press runs it.
@@ -164,6 +193,7 @@ function ApproveForm({
   field,
   approval,
   busy,
+  budgeting,
   questions,
   draft,
   left,
@@ -174,6 +204,8 @@ function ApproveForm({
   field: string;
   approval: ReturnType<typeof useApprove>;
   busy: boolean;
+  /** The budgets the person changed, and those whose field holds no amount (`budgetsGiven`). */
+  budgeting: { given: readonly GivenBudget[]; unread: readonly string[] };
 }) {
   const [words, setWords] = useState('');
   const [confirming, setConfirming] = useState(false);
@@ -186,7 +218,7 @@ function ApproveForm({
       onSubmit={(event) => {
         event.preventDefault();
         if (acts && !confirming) return setConfirming(true);
-        approval.mutate(approvalBody(questions, draft, words));
+        approval.mutate(approvalBody(questions, draft, words, budgeting.given));
       }}
     >
       <label htmlFor={`${field}-words`} className="sr-only">
@@ -205,7 +237,12 @@ function ApproveForm({
         className={TEXTAREA}
       />
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-        <button type="submit" disabled={busy || left.length > 0} title={notAnswered(left)} className={BUTTON}>
+        <button
+          type="submit"
+          disabled={busy || left.length > 0 || budgeting.unread.length > 0}
+          title={approveWaits(left, budgeting.unread)}
+          className={BUTTON}
+        >
           {approval.isPending ? 'Approving…' : confirming ? `Run ${step} now` : 'Approve'}
         </button>
         {confirming && !approval.isPending && (
@@ -344,15 +381,18 @@ function Choice<T extends string>({
 
 /**
  * What an approval sends: the answers to the questions the step asks, where it asks any, in the order asked; and the words, where any were
- * written — beside answers, their note.
+ * written — beside answers, their note; and the budgets the person changed (`budgetsGiven`), where they changed any, and no `budgets` at
+ * all where they changed none, so the package writes the step's proposal as it stands.
  */
 export const approvalBody = (
   questions: readonly Frozen<Question>[],
   draft: Draft,
   words: string,
-): { message?: string; answers?: QuestionAnswer[] } => ({
+  given: readonly GivenBudget[] = [],
+): { message?: string; answers?: QuestionAnswer[]; budgets?: GivenBudget[] } => ({
   ...(questions.length ? { answers: answersFrom(questions, draft) } : {}),
   ...(words.trim() ? { message: words } : {}),
+  ...(given.length ? { budgets: given.map(({ step, usd }) => ({ step, usd })) } : {}),
 });
 
 /**
@@ -533,8 +573,21 @@ export const gateWord = (gate: StepGate, ends = false): string =>
  * `ends` for the step that ends the run in the checkout (`endsTheRun`): nothing follows its gate, and the package hands the words to that
  * step itself — the terms it acts on (`approvedSection` in agent-orchestrator). Its approval is also what filed it, so the sentence says
  * that and not that something after it was let through.
+ *
+ * `budgets`, where the step's gate carries the caps its approval set (`from: 'approved'`), are drawn under the words, read only.
  */
-export function Approved({ step, approval, ends = false }: { step: string; approval: StepApproval; ends?: boolean }) {
+export function Approved({
+  step,
+  approval,
+  ends = false,
+  budgets,
+}: {
+  step: string;
+  approval: StepApproval;
+  ends?: boolean;
+  /** The step's gate's budgets: drawn under the approval once they are the caps it set (`from: 'approved'`). */
+  budgets?: Frozen<GateBudgets> | null;
+}) {
   return (
     <section
       aria-label={`The approval of ${step}`}
@@ -559,6 +612,7 @@ export function Approved({ step, approval, ends = false }: { step: string; appro
           {approval.message}
         </p>
       )}
+      {budgets?.from === 'approved' && <GateBudgetRows step={step} budgets={budgets} />}
     </section>
   );
 }
@@ -574,7 +628,8 @@ export const SECONDARY = 'bg-card text-foreground ring-1 ring-outline ring-inset
 export function useApprove(runId: string, step: string, onApproved: () => void) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (how: { message?: string; answers?: readonly QuestionAnswer[] }) => approveStep(runId, step, how),
+    mutationFn: (how: { message?: string; answers?: readonly QuestionAnswer[]; budgets?: readonly GivenBudget[] }) =>
+      approveStep(runId, step, how),
     onSuccess: () => {
       onApproved();
       void queryClient.invalidateQueries({ queryKey: ['runs', runId], exact: true });

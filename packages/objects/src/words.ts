@@ -243,3 +243,6 @@ export const SIGN_IN_STATES = ['none', 'waiting', 'connected', 'expired', 'faile
 
 /** One of `SIGN_IN_STATES`. */
 export type SignInStateWord = (typeof SIGN_IN_STATES)[number];
+
+/** Where a gate's budgets come from: the gated step's proposal, before the approval; the approval's caps, after it. */
+export const GATE_BUDGETS_FROM = ['proposed', 'approved'] as const;

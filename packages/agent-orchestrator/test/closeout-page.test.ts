@@ -21,7 +21,7 @@ const STEP = { name: 'implement', after: [], body: 'x' } as unknown as Workflow;
 
 /** The closeout `said` as the step's detail reads it, off an engine whose task holds it as its last attempt's. */
 const read = (said: unknown) =>
-  closeoutIn(RUN, 'implement', STEP, 't1', new Map([['t1', { state: { attempts: [{ closeout: said }] } }]]) as unknown as Views);
+  closeoutIn(RUN, 'implement', STEP, 't1', new Map([['t1', { state: { attempts: [{ closeout: said }] } }]]) as unknown as Views, [STEP]);
 
 test("closeoutIn: a step's closeout read in either version", async (t) => {
   await t.test(

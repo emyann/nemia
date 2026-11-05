@@ -8,6 +8,8 @@
  */
 import { envelopeRefusals, type Closeout } from '../closeout/index.ts';
 import { isObject, type Workflow } from '../step/step.ts';
+import { BUDGETS_SCHEMA, budgetRefusals } from '../budget/budget.ts';
+import { fieldsOf, itemsOf, sameSchema } from '../shape/shape.ts';
 
 /** One option of a question: its label, which an answer names, and what choosing it means. */
 export type QuestionOption = { label: string; meaning: string };
@@ -85,29 +87,7 @@ const FORMER_QUESTIONS_SCHEMAS = [
 ];
 
 /** The shapes a marker may name, each with its schema. */
-const SHAPES: Record<string, object> = { questions: QUESTIONS_SCHEMA };
-
-/** A value's JSON with every object's keys sorted, so two schemas compare whatever order their keys were written in. */
-const canonical = (value: unknown): string =>
-  JSON.stringify(value, (_key, v: unknown) => {
-    const fields = fieldsOf(v);
-    if (!fields) return v;
-    // oxlint-disable-next-line unicorn/no-useless-spread -- the verifier sees only a spread as allocated here (`fieldsOf`)
-    const entries = [...Object.entries(fields)];
-    entries.sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
-    return Object.fromEntries(entries);
-  });
-
-/**
- * `value`'s own fields, as a fresh record, where it is an object that is no list; else undefined. Read without a type predicate or a cast,
- * so that what a step's status reads through it (`closeoutRefusals`) is checked pure by the contracts' verifier, which also counts only a
- * spread as an array allocated here: a key list is spread before it is sorted, where the linter would call the spread useless.
- */
-const fieldsOf = (value: unknown): Record<string, unknown> | undefined =>
-  typeof value === 'object' && value !== null && !Array.isArray(value) ? Object.fromEntries(Object.entries(value)) : undefined;
-
-/** `value`'s items, as a fresh list, where it is a list; else undefined. */
-const itemsOf = (value: unknown): unknown[] | undefined => (Array.isArray(value) ? Array.from<unknown>(value) : undefined);
+const SHAPES: Record<string, object> = { questions: QUESTIONS_SCHEMA, budgets: BUDGETS_SCHEMA };
 
 /** Whether `value` holds the marker anywhere, at any depth. */
 const marked = (value: unknown): boolean =>
@@ -128,7 +108,10 @@ export function expandShapes(properties: Record<string, unknown>): { properties:
     }
     const shape = field[SHAPE_KEY];
     if (typeof shape !== 'string' || !Object.hasOwn(SHAPES, shape)) {
-      return { error: `\`${name}\` asks for the shape ${JSON.stringify(shape)}, and the one shape there is is \`questions\`` };
+      const known = Object.keys(SHAPES).map((k) => `\`${k}\``);
+      return {
+        error: `\`${name}\` asks for the shape ${JSON.stringify(shape)}, which is none of the shapes there are: ${known.join(', ')}`,
+      };
     }
     const beside = Object.keys(field).filter((k) => k !== SHAPE_KEY && k !== 'description');
     if (beside.length) {
@@ -145,12 +128,7 @@ export function expandShapes(properties: Record<string, unknown>): { properties:
  * Whether a field's schema is `QUESTIONS_SCHEMA`, or a former one a frozen run holds (`FORMER_QUESTIONS_SCHEMAS`), its `description`
  * aside.
  */
-const isQuestionsSchema = (schema: unknown): boolean => {
-  const fields = fieldsOf(schema);
-  if (!fields) return false;
-  const { description: _, ...rest } = fields;
-  return [QUESTIONS_SCHEMA, ...FORMER_QUESTIONS_SCHEMAS].some((known) => canonical(rest) === canonical(known));
-};
+const isQuestionsSchema = (schema: unknown): boolean => sameSchema(schema, [QUESTIONS_SCHEMA, ...FORMER_QUESTIONS_SCHEMAS]);
 
 /** The fields a step's `output:` declares whose schema is `QUESTIONS_SCHEMA`, in the schema's order: none for a step without `output:`. */
 export const questionFields = (step: Workflow | undefined): string[] =>
@@ -307,12 +285,14 @@ export function questionRefusals(step: Workflow | undefined, said: Closeout | { 
 }
 
 /**
- * What the run refuses of a closeout a step gave, each a sentence saying what to do instead: its envelope (`envelopeRefusals`) and its
- * question fields (`questionRefusals`). A closeout with any reads `unsigned`, and the run asks its session once a round to mend it.
+ * What the run refuses of a closeout a step gave, each a sentence saying what to do instead: its envelope (`envelopeRefusals`), its
+ * question fields (`questionRefusals`) and its budget fields (`budgetRefusals`, which reads the run's `steps` for the steps after it). A
+ * closeout with any reads `unsigned`, and the run asks its session once a round to mend it.
  */
-export const closeoutRefusals = (step: Workflow | undefined, said: Closeout): string[] => [
+export const closeoutRefusals = (step: Workflow | undefined, said: Closeout, steps: readonly Workflow[]): string[] => [
   ...envelopeRefusals(said),
   ...questionRefusals(step, said),
+  ...budgetRefusals(step, steps, said),
 ];
 
 /** Words that say to read the step again, for an answer that does not fit the questions it asks now. */

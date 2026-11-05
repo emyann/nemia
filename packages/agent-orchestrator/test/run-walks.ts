@@ -96,11 +96,12 @@ const stepOf = (asked: PersonRequest): string => (asked.of === 'base' ? asked.as
 
 const READ: Walk[] = [
   {
-    name: 'a run made is read back with the hold, the approval and the cancellation beside it composed onto it',
+    name: 'a run made is read back with the hold, the approval with the caps it sets, and the cancellation beside it composed onto it',
     walk: ({ door }) => {
       made(door, 'w-read');
       const hold = act(door.holds.put(idOf('w-read'), ['other-run'], {}));
-      act(door.asks.write(idOf('w-read'), { kind: 'approve', of: 'gate', ask: { step: 'implement', try: 1, at, message: 'yes' } }));
+      const ask = { step: 'implement', try: 1, at, message: 'yes', budgets: { review: 4 } };
+      act(door.asks.write(idOf('w-read'), { kind: 'approve', of: 'gate', ask }));
       const cancelledAt = act(door.runs.cancel(idOf('w-read')));
       const read = act(door.runs.read(idOf('w-read'))) as Run;
       return {
@@ -115,7 +116,7 @@ const READ: Walk[] = [
       brief: 'add a flag',
       hold: ['other-run'],
       held: true,
-      approvals: [{ step: 'implement', try: 1, at, message: 'yes' }],
+      approvals: [{ step: 'implement', try: 1, at, message: 'yes', budgets: { review: 4 } }],
       cancelled: true,
     },
   },

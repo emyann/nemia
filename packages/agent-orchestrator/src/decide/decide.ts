@@ -288,7 +288,7 @@ export function costLine(step: Workflow | undefined, run: Run, name: string, use
     sessions > 1
       ? `${current === 'not measured' ? 'this try not measured' : `${current} this try`}${read ? ` · ${read}` : ''} · ${all.measured ? spentWord(all) : 'not measured'} over ${tryOf(run, name)} tries`
       : `${current}${read ? ` · ${read}` : ''}`;
-  const cap = step ? budgetOf(step, record) : undefined;
+  const cap = step ? budgetOf(step, run) : undefined;
   return `cost  ${spent}${cap !== undefined ? ` · budget ${budgetWord(cap)}` : ''}`;
 }
 

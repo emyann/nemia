@@ -303,6 +303,36 @@ test('POST …/approve: what it refuses — a body, a run or step not there, emp
   );
 });
 
+test('POST …/approve with `budgets`: the caps a person gives the later steps written into the approval and shown at the gate; REFUSED: budgets that do not read, or name no later step, and nothing written', async (t) => {
+  await t.test('a body whose `budgets` do not read is a 400 naming the key', async () => {
+    for (const budgets of ['x', [{ step: 'review' }], [{ step: 'review', usd: '4' }]]) {
+      assert.match(await refusedWith(await approveOver('plan', { budgets }), 400, JSON.stringify(budgets)), /budgets/);
+    }
+    nothingWritten('budgets that do not read');
+  });
+
+  await t.test("a budget for a step that does not come after the gate is the command's refusal", async () => {
+    const res = await approveOver('plan', { budgets: [{ step: 'tokens', usd: 4 }] });
+    assert.ok(res.status >= 400 && res.status < 500, `refused, answered ${String(res.status)}`);
+    nothingWritten('a budget for tokens, which does not come after plan');
+  });
+
+  await t.test('the caps given are written into the approval, and the gate shows them approved', async () => {
+    const id = 'r-gate-budgets';
+    gatedRun(id);
+    const res = await approveOver('plan', { budgets: [{ step: 'review', usd: 4 }] }, BOARD, id);
+    assert.equal(res.status, 202, await res.clone().text());
+    const written = JSON.parse(fs.readFileSync(approvalFile(id, 'plan', 1), 'utf8')) as { budgets?: unknown };
+    assert.deepEqual(written.budgets, { review: 4 });
+    const plan = (await object(id)).status.steps.find((s) => s.name === 'plan');
+    assert.equal(plan?.gate?.budgets?.from, 'approved');
+    assert.deepEqual(
+      plan?.gate?.budgets?.steps.map((b) => [b.step, b.usd]),
+      [['review', 4]],
+    );
+  });
+});
+
 test('a person approves a gate on the board: the need on the list and the detail, the approval written as `nemia approve` writes it, then the step waits on nobody', async (t) => {
   const s = story(t);
   let took: Approved | undefined;

@@ -263,7 +263,7 @@ const sendTry = Effect.fnUntraced(function* (f: Filing, r: Retry, step: Workflow
         yield* costsFor(f, step, Boolean(resumeFrom)),
         { words: told.words, say: told.say, targets: told.targets },
       );
-  const budgetUsd = budgetUsdFor(r.budget ?? budgetOf(step, record), stepSpend(run, r.step, reads.spendOf));
+  const budgetUsd = budgetUsdFor(r.budget ?? budgetOf(step, run), stepSpend(run, r.step, reads.spendOf));
   if (answers) return yield* answerHeld(e, taskId, brief, budgetUsd);
   yield* asked('file', e.file(trySpec(f, r, step, record, { taskId, brief, resumeFrom, budgetUsd, told })));
   return undefined;
@@ -417,7 +417,7 @@ function roundSpec(
         model: sessionModel(target, record),
         ...filedAt(run, f.reads.home),
         budgetUsd: budgetUsdFor(
-          r.budget !== undefined && r.raise?.includes(r.target) ? r.budget : budgetOf(target, record),
+          r.budget !== undefined && r.raise?.includes(r.target) ? r.budget : budgetOf(target, run),
           stepSpend(run, r.target, reads.spendOf),
         ),
         own: told.own,
@@ -600,7 +600,7 @@ function readySpec(
         model: step.model,
         ...filedAt(run, f.reads.home),
         caller: callerMounts(step, parents),
-        budgetUsd: budgetUsdFor(budgetOf(step, run.steps[step.name]), stepSpend(run, step.name, reads.spendOf)),
+        budgetUsd: budgetUsdFor(budgetOf(step, run), stepSpend(run, step.name, reads.spendOf)),
         own: told.own,
         landingDenied: () => said.words?.denied ?? [],
       }),

@@ -415,7 +415,7 @@ function listedSteps({
 
   function budgetStatus(step: Workflow, status: StepStatus): string {
     const spent = stepSpend(run, step.name, spendOf);
-    const cap = budgetOf(step, run.steps[step.name]);
+    const cap = budgetOf(step, run);
     const of = cap === undefined ? '' : ` of ${budgetWord(cap)}`;
     if (status === 'budget exhausted')
       return `budget exhausted${spent.measured ? ` ${spentWord(spent)}${of}` : cap === undefined ? '' : ` at ${budgetWord(cap)}`}`;

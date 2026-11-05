@@ -77,7 +77,7 @@ import { RunDoor } from '../runs/runs.store.ts';
  * record, with nothing asked of the engine. What the tick's pass reads the earlier tries for (`taskPhases`): with no cap anywhere, what
  * they cost is a number nothing in the pass looks at, and a step answered without limit would grow that read for ever.
  */
-const underBudget = (steps: readonly Workflow[], run: Run): boolean => steps.some((s) => budgetOf(s, run.steps[s.name]) !== undefined);
+const underBudget = (steps: readonly Workflow[], run: Run): boolean => steps.some((s) => budgetOf(s, run) !== undefined);
 
 /**
  * Checks a pass filed and never wrote down, put back on the record in memory — `advance` is the one writer of the run's json, and writes

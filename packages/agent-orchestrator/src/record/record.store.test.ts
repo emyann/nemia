@@ -331,6 +331,16 @@ test("an ask a verb would not write is refused in that verb's words, reason by r
     assert.equal(approvalIn(ask('a5', [AT]), 'plan', 1), 'it is not an approval nemia approve wrote');
     assert.ok(String(approvalIn(ask('a6', '{'), 'plan', 1)).startsWith('unreadable ('));
     assert.deepEqual(approvalIn(ask('a7', { at: AT }), 'plan', 1), { step: 'plan', try: 1, at: AT });
+    assert.deepEqual(approvalIn(ask('a9', { at: AT, budgets: { implement: 60, review: 2.5 } }), 'plan', 1), {
+      step: 'plan',
+      try: 1,
+      at: AT,
+      budgets: { implement: 60, review: 2.5 },
+    });
+    for (const [i, budgets] of [{ implement: 'x' }, { implement: 0 }, [60]].entries()) {
+      const why = approvalIn(ask(`a10-${i}`, { at: AT, budgets }), 'plan', 1);
+      assert.ok(typeof why === 'string' && why.includes('budgets'), JSON.stringify(why));
+    }
     assert.deepEqual(approvalIn(ask('a8', { at: AT, message: 'go', by: 'a newer wf' }), 'plan', 2), {
       step: 'plan',
       try: 2,

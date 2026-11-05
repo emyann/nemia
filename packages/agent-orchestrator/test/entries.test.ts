@@ -23,6 +23,7 @@ const PINNED: Record<string, string[]> = {
     'BY_CAP',
     'BY_KEYS',
     'CHECK_AFFECTING',
+    'budgetArgs',
     'CHECK_RESULTS',
     'checkVerdictOf',
     'CLI',

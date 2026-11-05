@@ -120,7 +120,7 @@ function costOf(run: Run, name: string, at: RunReading): Pick<RunStepStatus, 'sp
   const { steps, views, judged } = at;
   const step = steps.find((s) => s.name === name);
   const spent = spentOf(stepSpend(run, name, judged.spendOf));
-  const cap = step ? budgetOf(step, run.steps[name]) : undefined;
+  const cap = step ? budgetOf(step, run) : undefined;
   const budget =
     step && cap !== undefined
       ? {
@@ -245,7 +245,14 @@ const stepStatusOf = Effect.fnUntraced(function* (name: string, at: StepAt) {
     roundDue: judged.roundDue.has(name),
     ...needsOf(run, name, views, judged),
     lastLine,
-    gate: gateOf(run, steps.find((s) => s.name === name) ?? bare(name), current.reason),
+    gate: gateOf(
+      run,
+      steps.find((s) => s.name === name) ?? bare(name),
+      current.reason,
+      steps,
+      raiseReads(run, views).closeoutOf,
+      judged.spendOf,
+    ),
     said: taskId ? [...(views.get(taskId)?.state.said ?? [])] : [],
     asked: askedOf(judged.asked.get(name)),
     check: current.check,

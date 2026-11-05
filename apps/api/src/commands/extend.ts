@@ -4,7 +4,16 @@
  * and the arguments those keys carry.
  */
 import { Schema } from 'effect';
-import { type Args, budgetRefusal, type CommandSpec, commandLine, type RetryHow, roundBudgetRefusal, tryOf } from 'agent-orchestrator';
+import {
+  type Args,
+  budgetArgs,
+  budgetRefusal,
+  type CommandSpec,
+  commandLine,
+  type RetryHow,
+  roundBudgetRefusal,
+  tryOf,
+} from 'agent-orchestrator';
 import type { Run } from 'agent-orchestrator/run';
 import { answeredApproval, answeredHow } from '../asks/answers.ts';
 import type { Refusal } from '../guard.ts';
@@ -78,13 +87,19 @@ const RETRY: Extension = {
   },
 };
 
+/** The caps a person gives the later steps at a gate, as the board sends them: a step by its name and its dollars each. */
+const BUDGETS = Schema.Array(Schema.Struct({ step: Schema.String, usd: Schema.Finite }));
+
 /**
  * Approve's: the person's `answers` to the questions the gated step's current closeout asks, checked and written as the approval's words,
- * the words it carried becoming their note (`answeredApproval`). An approval with no `answers` is the command's alone.
+ * the words it carried becoming their note (`answeredApproval`); and their `budgets`, the caps they give the later steps, handed to the
+ * command as `nemia approve --budget <step>=<amount>` types them (`budgetArgs`), whose refusals are the command's. An approval with
+ * neither is the command's alone.
  */
 const APPROVE: Extension = {
-  takes: { answers: ANSWERS },
-  async fold({ e, home, run }, _command, args, { answers }) {
+  takes: { answers: ANSWERS, budgets: BUDGETS },
+  async fold({ e, home, run }, _command, given, { answers, budgets }) {
+    const args = Schema.is(BUDGETS)(budgets) && budgets.length > 0 ? { ...given, budgets: budgetArgs(budgets) } : given;
     if (!Schema.is(ANSWERS)(answers)) return { args };
     const note = typeof args.message === 'string' ? args.message : undefined;
     const answered = await answeredApproval(e, run, String(args.step), note, answers, home);

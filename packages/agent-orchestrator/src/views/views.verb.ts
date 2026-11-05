@@ -36,7 +36,8 @@ import { stepsOf } from '../steps/steps.verb.ts';
 import { landedOf, type BranchReader } from '../branches/branches.store.ts';
 import { parentRecord } from '../steps/steps.verb.ts';
 import { continuesFrom } from '../retry/index.ts';
-import { currentTurn, phaseOfView, unsignedEnd, wordOfView, type EnginePhase } from './views-words.ts';
+import { currentTurn, killedMemoryOf, phaseOfView, unsignedEnd, wordOfView, type EnginePhase } from './views-words.ts';
+import { outOfMemory } from '../out-of-memory/out-of-memory.ts';
 import { RunDoor } from '../runs/runs.store.ts';
 import { DEFAULT_HARNESS } from '../harness/harness.ts';
 import { ranOnWords, sessionRanOn } from '../release/release.ts';
@@ -438,8 +439,9 @@ export const saidIn = (view: TaskView | undefined): readonly Said[] => view?.sta
  * `passed` is whether its task settled `succeeded`. `verdict` is what its latest attempt exited with, or `unfinished` (`attemptVerdict`):
  * the word the tick tells a refusal from a check that did not finish by (`exitVerdicts`, `refusedCheck`), and the one `nemia ls` and the
  * api say. Then the last lines of each stream, kept apart so that a loud stderr does not push stdout's last lines off the screen.
+ * And `killed`, where the kernel killed a process of the check at its memory limit (`CheckRefusal`).
  */
-export type CheckReport = { command: string; passed: boolean; verdict: Verdict; stdout: string; stderr: string };
+export type CheckReport = CheckRefusal & { passed: boolean };
 
 /**
  * What each step's settled check said, by step name, for each step whose check's phase `want` takes (`refusalRead`), read one at a time
@@ -467,8 +469,9 @@ export const checkReportsRead = Effect.fn('checkReports')(function* (
  */
 export const refusalRead = Effect.fn('refusalOf')(function* (command: string, taskId: string, lines = CHECK_TAIL_LINES) {
   const e = yield* EngineService;
-  const { verdict, stdout, stderr } = yield* checkStreams(e, taskId, TAIL_BYTES);
-  return { command, verdict, stdout: lastLines(stdout, lines), stderr: lastLines(stderr, lines) } satisfies CheckRefusal;
+  const { verdict, stdout, stderr, killed } = yield* checkStreams(e, taskId, TAIL_BYTES);
+  const said = { command, verdict, stdout: lastLines(stdout, lines), stderr: lastLines(stderr, lines) };
+  return (killed ? { ...said, killed } : said) satisfies CheckRefusal;
 });
 
 /**
@@ -542,8 +545,9 @@ const checkStreams = Effect.fnUntraced(function* (e: Engine, taskId: string, std
     { concurrency: 'unbounded' },
   );
   const verdict = attemptVerdict(view.state.attempts.at(-1));
-  if (stdout === undefined) return { verdict, stdout: yield* asked('logs', e.logs(taskId)), stderr: stderr ?? '', kept: false };
-  return { verdict, stdout, stderr: stderr ?? '', kept: true };
+  const killed = outOfMemory(killedMemoryOf(view), undefined);
+  if (stdout === undefined) return { verdict, stdout: yield* asked('logs', e.logs(taskId)), stderr: stderr ?? '', kept: false, killed };
+  return { verdict, stdout, stderr: stderr ?? '', kept: true, killed };
 });
 
 /**

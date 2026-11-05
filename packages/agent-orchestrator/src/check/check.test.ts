@@ -298,6 +298,18 @@ test('refusalSection: what a check said reaches the step tried again as data', a
     assert.match(unfinished, /It did not finish: it was stopped, or killed before it exited with a code/);
     assert.equal(JSON.parse(/```+json\n([\s\S]*?)\n```+/.exec(unfinished)![1]).exit, 'unfinished');
   });
+  await t.test('a check killed at its memory limit says so before the data, naming WF_MEMORY_LIMIT; its data unchanged', () => {
+    const killed = refusalSection({
+      ...said,
+      verdict: 137,
+      killed: { kills: 1, limitBytes: 6 * 1024 ** 3, peakBytes: null, raise: 'default' },
+    });
+    const fenceAt = killed.search(/`{3,}json/);
+    assert.ok(killed.indexOf('out of memory') > 0 && killed.indexOf('out of memory') < fenceAt);
+    assert.ok(killed.indexOf('WF_MEMORY_LIMIT') < fenceAt);
+    assert.deepEqual(Object.keys(JSON.parse(/```+json\n([\s\S]*?)\n```+/.exec(killed)![1])), ['command', 'exit', 'stdout', 'stderr']);
+    assert.doesNotMatch(refusalSection(said), /out of memory/);
+  });
 });
 
 test('lastLines: the last lines of some output, without the blank ones at its end', async (t) => {

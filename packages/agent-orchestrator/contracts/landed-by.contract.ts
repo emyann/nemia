@@ -25,7 +25,7 @@ const cameOntoSpec = spec<(tip: string, head: string, walk: readonly WalkRow[]) 
    * `WalkRow`).
    */
   requires: ({ input: [, head, walk] }) =>
-    walk.every((row) => row.length >= 2) && (walk.length === 0 || walk[0]?.[0] === head),
+    walk.every((row) => row.length >= 2) && (walk.length === 0 || walk.at(0)?.at(0) === head),
   ensures: {
     theLinesNewestIsItsOwn: {
       description: 'A tip that is the line’s newest commit came onto it as itself, nothing above it',
@@ -40,14 +40,14 @@ const cameOntoSpec = spec<(tip: string, head: string, walk: readonly WalkRow[]) 
       description:
         'Where the commit of the line nearest the tip has the tip as its first parent, the tip itself is on the line: it came on as itself, a fast-forward, under every commit of the walk',
       condition: ({ input: [tip, , walk], output }) =>
-        oldest(walk)?.[1] !== tip || (output?.commit === tip && output.below === walk.length),
+        oldest(walk)?.at(1) !== tip || (output?.commit === tip && output.below === walk.length),
     },
     aMergeBringsItIn: {
       description:
         'Where the commit of the line nearest the tip has another first parent, that commit merged it in: the first of the line to hold it, however many landed on top since',
       condition: ({ input: [tip, , walk], output }) => {
         const first = oldest(walk);
-        return first === undefined || first[1] === tip || (output !== undefined && output.commit === first[0] && output.below === walk.length - 1);
+        return first === undefined || first.at(1) === tip || (output !== undefined && output.commit === first.at(0) && output.below === walk.length - 1);
       },
     },
   },
@@ -56,23 +56,30 @@ const cameOntoSpec = spec<(tip: string, head: string, walk: readonly WalkRow[]) 
 /** `cameOnto`'s type, which the code takes: it then imports nothing of tsverify. */
 export type CameOnto = Implementation<typeof cameOntoSpec>;
 
-const landedBySpec = spec<(points: readonly (OnTheLine | undefined)[]) => string | undefined>({
+/** The same point of the line: the same commit, as many first parents below the line's newest. */
+const same = (a: OnTheLine | undefined, b: OnTheLine | undefined): boolean =>
+  a !== undefined && b !== undefined && a.commit === b.commit && a.below === b.below;
+
+/**
+ * Two of the points where a result's tips came onto the line, `landed` the first commit that holds those taken so far (or where the
+ * first came on) and `next` where one more came on; the caller folds the result's tips through it, one at a time. A fold of one tip is
+ * its own point, and of none is nothing: the caller asks of no point then.
+ */
+const landedBySpec = spec<(landed: OnTheLine | undefined, next: OnTheLine | undefined) => OnTheLine | undefined>({
+  /** Each point is where `cameOnto` put a tip: a count of first parents, never below zero. */
+  requires: ({ input: [landed, next] }) => (landed === undefined || landed.below >= 0) && (next === undefined || next.below >= 0),
   ensures: {
-    nothingAskedNothingLanded: {
-      description: 'With no tip asked of, no commit is said to have brought the result in',
-      condition: ({ input: [points], output }) => points.length !== 0 || output === undefined,
-    },
     aTipOffTheLineLandsNothing: {
       description: 'Where one tip is not on the line, nothing holds the whole result: no commit is said to have landed it',
-      condition: ({ input: [points], output }) => points.every((p) => p !== undefined) || output === undefined,
+      condition: ({ input: [landed, next], output }) => (landed !== undefined && next !== undefined) || output === undefined,
     },
     theFirstToHoldThemAll: {
       description:
-        'Where every tip is on the line, the result landed by the newest of the commits that brought them: the first of the line to hold them all',
-      condition: ({ input: [points], output }) =>
-        points.length === 0 ||
-        !points.every((p) => p !== undefined) ||
-        points.some((p) => p !== undefined && p.commit === output && points.every((q) => q === undefined || p.below <= q.below)),
+        'Where both are on the line, the result landed by the newer of the two: the first commit of the line to hold them both',
+      condition: ({ input: [landed, next], output }) =>
+        landed === undefined ||
+        next === undefined ||
+        (landed.below <= next.below ? same(output, landed) : same(output, next)),
     },
   },
 });

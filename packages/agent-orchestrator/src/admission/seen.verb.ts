@@ -8,6 +8,7 @@ import { stepsOf } from '../steps/steps.verb.ts';
 import { retryable, WAITS_ON_PERSON } from '../retry/index.ts';
 import { acceptanceOf, overBudget, runSpend } from '../status/status.ts';
 import { askedQuestions } from '../question/index.ts';
+import { aboveTheWorkflow, ceilingsOf, proposedBudgets } from '../budget/budget.ts';
 import { closeoutAsked, closeoutReader, exitVerdicts, harnessBlocked, spendReader, taskPhasesRead } from '../views/views.verb.ts';
 import type { Seen } from '../auto/index.ts';
 import { RunDoor } from '../runs/runs.store.ts';
@@ -15,7 +16,8 @@ import { RunId } from '../record/record.model.ts';
 
 /**
  * What admission reads of the run `runId` for its step `stepName` (`Seen`): the step's closeout and the questions it asks, its check's
- * verdict, each looping step that signed with whether it asks again and whether a person accepted it, whether any step is at its cap, what
+ * verdict, each looping step that signed with whether it asks again and whether a person accepted it, whether any step is at its cap,
+ * whether the step proposes a cap above a step's own `budget:`, what
  * the run cost, and whether another step waits on the person. A step the run does not have reads as one that signed nothing. Refused: no
  * such run (`Missing`), and a record that does not read.
  */
@@ -49,6 +51,7 @@ export const seenOf = Effect.fnUntraced(function* (runId: string, stepName: stri
       .filter((s) => s.loop && closeoutOf(s.name))
       .map((s) => ({ again: closeoutOf(s.name)?.output?.again === true, personAccepted: acceptanceOf(run, s.name) !== undefined })),
     overBudget: steps.some((s) => overBudget(s, run, spendOf) !== undefined),
+    aboveCeiling: aboveTheWorkflow(proposedBudgets(step, closeout), ceilingsOf(steps)).length > 0,
     spend: runSpend(run, spendOf).usd,
     othersWaiting: steps.some((s) => s.name !== stepName && waits(s)),
   } satisfies Seen;

@@ -94,16 +94,18 @@ test("taskUsage: a step's usage counts the resumed attempts that rebuilt their c
 
 test('budgetUsdFor and budgetOf: what is left of the cap in force goes to the engine', async (t) => {
   const capped: Workflow = { ...step('implement'), harness: 'claude', budget: 3 };
+  const onRecord = (record?: Run['steps'][string]): Run =>
+    ({ id: 'r1', brief: 'b', workflowDir: '/w', createdAt: 'x', steps: record ? { implement: record } : {} }) as Run;
   const cost = (usd: number) => ({ usd, measured: 1, unmeasured: 0 });
   await t.test('nothing spent: the whole cap', () => {
-    assert.equal(budgetUsdFor(budgetOf(capped, { taskId: 't1' })), 3);
+    assert.equal(budgetUsdFor(budgetOf(capped, onRecord({ taskId: 't1' }))), 3);
   });
   await t.test('a try under the cap leaves the next what is left', () => {
     assert.equal(budgetUsdFor(3, cost(2.9)), 0.1);
-    assert.equal(budgetUsdFor(budgetOf({ ...step('implement'), budget: 3 }, undefined), cost(1)), 2);
+    assert.equal(budgetUsdFor(budgetOf({ ...step('implement'), budget: 3 }, onRecord()), cost(1)), 2);
   });
   await t.test('a raised cap, less what was spent', () => {
-    const raised = budgetOf(capped, { taskId: 't2', tries: [{ taskId: 't1', cause: 'continue', budget: 10 }] });
+    const raised = budgetOf(capped, onRecord({ taskId: 't2', tries: [{ taskId: 't1', cause: 'continue', budget: 10 }] }));
     assert.equal(budgetUsdFor(raised, cost(4.25)), 5.75);
   });
   await t.test('digits, rounded up to a millionth: never 0, which the engine refuses', () => {

@@ -138,6 +138,18 @@ accepts.
 and the run files nothing more of it on its own word. A person raises the cap with `--budget` on `nemia retry`, with `--round` for a round. The
 cost is what the harness priced each attempt at, read by the runtime once the attempt has ended.
 
+A gated step can propose the budgets of the steps after it, as data: an output field of the budgets shape (`"x-shape": "budgets"`),
+one item a step, with its name, its dollars and why that amount. The approval of its gate makes them those steps' caps, with any
+amount the person changes as they approve (`--budget` on `nemia approve`, once a step). Of the caps a step can have, the first that
+holds is the one it runs under:
+
+1. a person's `--budget` on `nemia retry`, for the try the step is on;
+2. the last approval in force that set it a cap;
+3. the step's own `budget`.
+
+A cap above the step's own `budget` is said at the gate, beside the amount the workflow gives it, and Nemia at `auto` never approves
+such a gate unasked: a person does.
+
 ## An example
 
 The `sdlc` template's `build` is a workflow, `packages/templates/sdlc/workflows/build/`: design, then implement, then review

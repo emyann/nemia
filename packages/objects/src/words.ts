@@ -271,3 +271,6 @@ export const WRITE_WAYS = ['default', 'factory'] as const;
 
 /** One of `WRITE_WAYS`. */
 export type WriteWay = (typeof WRITE_WAYS)[number];
+
+/** Where a gate's budgets come from: the gated step's proposal, before the approval; the approval's caps, after it. */
+export const GATE_BUDGETS_FROM = ['proposed', 'approved'] as const;

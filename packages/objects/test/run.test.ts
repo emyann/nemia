@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { Schema } from 'effect';
-import { API_VERSION, RUN_PHASES, Run, StepTries, WAIT_ON } from 'objects';
+import { API_VERSION, GATE_BUDGETS_FROM, RUN_PHASES, Run, StepTries, WAIT_ON } from 'objects';
 
 const FIXTURES = path.join(import.meta.dirname, 'fixtures');
 const read = (name: string): string => fs.readFileSync(path.join(FIXTURES, name), 'utf8');
@@ -34,6 +34,24 @@ test('REFUSED: a run whose phase or wait is not among its words, or whose kind i
   const waiting = { ...run, status: { ...run.status, on: 'nowhere' } };
   assert.equal(Schema.decodeUnknownResult(Run)(waiting)._tag, 'Failure', 'a wait is one of its words');
   assert.equal(Schema.decodeUnknownResult(Run)({ ...run, kind: 'Step' })._tag, 'Failure', 'the kind is `Run`');
+});
+
+test("a step's gate decodes with its budgets and without them; REFUSED: budgets from neither a proposal nor an approval", () => {
+  const run = Schema.decodeUnknownSync(Run)(judged);
+  const step = run.status.steps[0];
+  assert.ok(step);
+  const gate = { awaiting: true, approval: null };
+  const budgets = {
+    from: 'proposed',
+    steps: [{ step: 'implement', usd: 60, said: '$60.00', why: 'p90 $19', workflow: 40, above: true }],
+    said: 'spent $3.00 of at most $63.00 under these caps',
+  };
+  const withGate = (g: unknown) => ({ ...run, status: { ...run.status, steps: [{ ...step, gate: g }, ...run.status.steps.slice(1)] } });
+  assert.equal(Schema.decodeUnknownResult(Run)(withGate(gate))._tag, 'Success', 'a gate with no budgets');
+  assert.equal(Schema.decodeUnknownResult(Run)(withGate({ ...gate, budgets }))._tag, 'Success', 'a gate with budgets');
+  assert.ok(!(GATE_BUDGETS_FROM as readonly string[]).includes('guessed'));
+  const guessed = withGate({ ...gate, budgets: { ...budgets, from: 'guessed' } });
+  assert.equal(Schema.decodeUnknownResult(Run)(guessed)._tag, 'Failure', 'budgets come from one of their words');
 });
 
 test("a step's tries decode as a sub-resource of their own, the current one last", () => {

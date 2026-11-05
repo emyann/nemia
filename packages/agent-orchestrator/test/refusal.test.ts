@@ -113,12 +113,16 @@ function modulesLoaded(entry: string, more: readonly string[] = []): string[] {
  * a folder of its own so the card that drops them deletes it whole, and one more for `harness-settings/harness-settings.ts`, the pure
  * judgement of a factory's harness settings `filedConfig` copies the allowed ones by, which imports nothing.
  *
- * `agent-orchestrator/workflow` is one more for `definition/served.ts`, the deciders of which origin serves a definition and whether a
- * write of one is taken, which imports nothing but its contracts' types.
+ * Each is two more for the budgets a gate sets: `budget/budget.ts`, which `question/question.ts` expands the `budgets` shape by and
+ * `status/status.ts` reads the cap in force by (`capInForce`), and `shape/shape.ts`, the reading of an object's fields and a list's items
+ * both share; both pure, neither touching a disk.
+ *
+ * `agent-orchestrator/workflow` is one more for `definition/served.ts`, the deciders of which origin serves a definition, of a namespace's
+ * list and of whether a write of one is taken, which imports nothing but its contracts' types.
  */
 const PINNED_MODULES: Record<string, { all: number; effect: number }> = {
-  'agent-orchestrator/run': { all: 188, effect: 15 },
-  'agent-orchestrator/workflow': { all: 138, effect: 15 },
+  'agent-orchestrator/run': { all: 190, effect: 15 },
+  'agent-orchestrator/workflow': { all: 140, effect: 15 },
 };
 
 const isEffectModule = (url: string): boolean => url.includes('/node_modules/effect/');

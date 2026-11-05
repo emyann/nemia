@@ -291,7 +291,7 @@ export function handOffDue(steps: readonly Workflow[], run: Run, phaseOf: (taskI
 }
 
 /** Every step that waits on `name`, directly or through another. */
-function downstreamOf(steps: readonly Workflow[], name: string): Set<string> {
+export function downstreamOf(steps: readonly Workflow[], name: string): Set<string> {
   const found = new Set<string>();
   const queue = [name];
   for (let current = queue.pop(); current !== undefined; current = queue.pop()) {

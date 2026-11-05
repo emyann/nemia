@@ -42,7 +42,8 @@ base (refused at once, naming the merge of the base, since GitHub runs no CI on 
 for it to start, 2400 s whole), reading only the latest run of each check on the head, so a failure a later run of the same check
 superseded is neither judged nor listed: CI runs the repository's suite on that commit, and a red, cancelled or missing context is the check's
 refusal, with the Actions URL, the failing jobs and a bounded tail of their log — no writer of this team may type `gh`, so the script
-reads it for them. The reviewer alone reads the pull request and its checks itself (`gh pr view`, `gh pr checks`), its fence allowing
+reads it for them. Where the context is red on the base branch too, at the commit of it the head holds, the refusal says so and names
+the base's jobs that did not pass, so a failure that is the base's is not read as the change's; it stays the try's refusal. The reviewer alone reads the pull request and its checks itself (`gh pr view`, `gh pr checks`), its fence allowing
 those two and refusing every other form: a browser, `--watch`, a jq query or a template, another repository, and an assignment before
 `gh`.
 
@@ -80,7 +81,15 @@ origin/<base>`). On a refusal he changes nothing and signs off `blocked` with th
 the receipt alone — the pull request `MERGED` with a merge commit reachable from HEAD, the checkout clean on the base with no merge in
 progress, every commit of every branch of the run with an equivalent patch on HEAD (`git cherry`, so a part taken as a commit of its
 own counts as taken) — which is what the run needs to record `landed` on the commit that landed. It runs no suite: CI judged the head
-the review read, and the merge commit's first parent is the base.
+the review read, and the merge commit's first parent is the base. Last, where the factory's `landingWaitsOnCi` is true (the default),
+the receipt waits on the CI context at the merge commit on the base branch (`receipt --run <id> --check <name> --wait-on-ci <true|false>`;
+up to 1800 s for it to be reported there, or 2400 s while another check there still runs, and 2400 s in all, inside the landing
+check's own deadline). Green passes. Red fails the step
+though the merge stands — nothing is taken back — naming the jobs that did not pass: a person re-runs them where CI failed on its own
+account, or lands a fix, then types `nemia retry <run> land`; where the base's tip holds the merge and the context is green there, the
+receipt passes and says so. Still running at the bound fails with the same retry line. Never reported fails too, naming
+`landingWaitsOnCi`: a repository whose CI does not run on pushes to the base sets it false (`--set landingWaitsOnCi=false`), and the
+receipt then waits on nothing.
 
 The implement step's check runs `probe.ts`, read from the frozen files as well: a session a step starts to measure something, a probe, is named
 `<run>-probe-<label>` (`node "$WF_WORKFLOW_FILES/probe.ts" start <label> -- <prompt>`), runs in the machinery's trusted folder

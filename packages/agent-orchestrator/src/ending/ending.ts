@@ -32,6 +32,7 @@ import {
 import type { CheckoutHold } from '../cap/cap.ts';
 import { DEFAULT_HARNESS, isRemoteHarness } from '../harness/harness.ts';
 import type { Assessment } from '../tick/assess.ts';
+import type { ClaimedAt } from '../../contracts/checkout-claim.contract.ts';
 
 /**
  * The deny list a step is filed with, each try and each round: its own, and `landingDenied` — what its place denies a landing session
@@ -216,12 +217,30 @@ export const LANDED_CAP = 160;
 /**
  * When the person's word that would file a run's ending step was given (`MainClaim`): the approval of an ending that has not run
  * (`approvalOf`), or the ask for the try that would file it again — a step that ended blocked, or whose check refused, is tried like any
- * other, and its try works in that same checkout. Undefined where there is no such word, and nothing of it would be filed. Pure.
+ * other, and its try works in that same checkout. Undefined where there is no such word. An ending with no gate is filed with nobody's word,
+ * so the claim reads `endingClaimedAt`, which gives it the run's creation; this stays the person's word alone, as the rest blocker
+ * `checkoutAsked` reads it. Pure.
  */
 export const endingAsked = (run: Run, step: Workflow, asks: readonly RetryAsk[]): string | undefined =>
   run.steps[step.name]?.taskId
     ? asks.find((a) => a.step === step.name && a.try === tryOf(run, step.name) + 1)?.at
     : approvalOf(run, step.name)?.at;
+
+/**
+ * When a run's ending claims the repository's own checkout (`MainClaim.at`), or none: the person's word that would file it, where there is
+ * one; else, for an ending with no gate not yet filed, the run's creation, since its workflow files it with nobody's word once the step
+ * before it passes; else nothing. Proved by `contracts/checkout-claim.contract.ts`. Pure.
+ */
+export const claimedAt: ClaimedAt = (w) => w.asked ?? (!w.gated && !w.filed ? w.createdAt : undefined);
+
+/** `claimedAt` of a run's ending, read off its record and its asks (`checkoutHold`, `mainClaim`). Pure. */
+export const endingClaimedAt = (run: Run, step: Workflow, asks: readonly RetryAsk[]): string | undefined =>
+  claimedAt({
+    asked: endingAsked(run, step, asks),
+    gated: hasGate(step, run),
+    filed: Boolean(run.steps[step.name]?.taskId),
+    createdAt: run.createdAt,
+  });
 
 /**
  * A run whose ending step waits for the repository's own checkout, as `nemia ls` says it on that step's line: `waiting on the checkout

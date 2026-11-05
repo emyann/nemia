@@ -12,7 +12,7 @@ import type { Verdict } from '../check/check.ts';
 import type { Workflow } from '../workflow.ts';
 import { sizeOf } from '../artifacts/artifacts.ts';
 import { heldCheckouts, runAdmitted, type MainClaim, type RunSlot } from '../cap/cap.ts';
-import { endingAsked, landedWords, landingDue, landingOpen } from './ending.ts';
+import { endingClaimedAt, landedWords, landingDue, landingOpen } from './ending.ts';
 import { isRepositoryRun, type CloseoutAsked, type RepositoryRun, type LandingRecord, type Run, type TaskPhase } from '../record/record.ts';
 import { landsOnCheck, ownStatus, type SpendOf } from '../status/status.ts';
 import { runReady } from '../wait/wait.ts';
@@ -42,9 +42,10 @@ import type { PassStanding } from '../standing/standing.verb.ts';
  * when nothing does and this run's may be filed.
  *
  * Asked of the store on the pass that asks, never stored, and then of every run of the same repository — but first, and cheaply, of the
- * run's own asks: undefined, with no other run's claim read, for a run called off, for one with no person's word that would file its own
- * ending (`endingAsked`: the approval of one that has not run, or the ask for a try of one that has), and for one whose ending is in that
- * checkout already. A run is in the checkout while the engine holds its `workspace: base` task in flight, as `inFlight` counts one, so a
+ * run's own asks: undefined, with no other run's claim read, for a run called off, for one whose own ending claims nothing
+ * (`endingClaimedAt`: no person's word that would file it — the approval of one that has not run, or the ask for a try of one that has —
+ * and no workflow that files it with nobody's, as an ending with no gate not yet filed is), and for one whose ending is in that checkout
+ * already. A run is in the checkout while the engine holds its `workspace: base` task in flight, as `inFlight` counts one, so a
  * step filed earlier in this very pass is read as being in it. One waiting to be filed counts only if the pass would in fact file it: a
  * send-back of the work un-holds its gate, and an ending that will not be filed must not hold another run's for ever. The cap on runs in
  * flight is read once for the pass (`runSlots`): a run it holds files nothing, so its ending claims nothing (`mainClaim`).
@@ -66,7 +67,7 @@ export const checkoutHold = Effect.fn('checkoutHold')(function* (
   memo: StatusMemo,
 ) {
   const ending = steps.find((s) => endsOnBase(s));
-  if (!ending || run.cancelledAt || endingAsked(run, ending, runStore.asks.read(run.id).asks) === undefined) return undefined;
+  if (!ending || run.cancelledAt || endingClaimedAt(run, ending, runStore.asks.read(run.id).asks) === undefined) return undefined;
   const read = 'read' in from ? from.read : passRead(e, runStore.runs.list(), env, yield* from.standing, yield* passRevisions());
   const slotOf = (id: string) => read.slots.pipe(Effect.map((slots) => slots.get(id)));
   const mine = yield* mainClaim(e, run, 'read' in from ? Effect.succeed(from.slot) : slotOf(run.id), read.parents, memo);
@@ -96,7 +97,8 @@ export const checkoutHold = Effect.fn('checkoutHold')(function* (
  * place gives no reading of is held: a merge nobody can read is never let go.
  *
  * It WAITS for the checkout on a person's word that would file it — an approval of an ending that has not run, or the ask for a try of one
- * that ended blocked (`endingAsked`) — and only where the pass would in fact file it: a send-back of the work un-holds the gate, an ask no
+ * that ended blocked — or, for an ending with no gate not yet filed, on its workflow's, as of the run's creation (`endingClaimedAt`): its
+ * workflow files it with nobody's word once the step before it passes, into that same checkout. And only where the pass would in fact file it: a send-back of the work un-holds the gate, an ask no
  * tick honours files nothing, a run waiting on runs that have not landed files no root of its own (`runReady`), and neither does one the
  * cap on runs in flight holds (`runAdmitted`) — so an ending that will not be filed does not hold another run's. Those last two are the
  * questions `advance` asks before it files a ready step, and they bite only on a run with nothing filed: an ending is one when it is also
@@ -130,7 +132,7 @@ const mainClaim = Effect.fnUntraced(function* (
   }
   if (run.cancelledAt) return undefined;
   const { asks, rounds } = runStore.asks.read(run.id);
-  const at = endingAsked(run, ending, asks);
+  const at = endingClaimedAt(run, ending, asks);
   if (at === undefined) return undefined;
   const { views, phaseOf } = yield* taskPhasesRead(run).pipe(over(e));
   const a = assess(

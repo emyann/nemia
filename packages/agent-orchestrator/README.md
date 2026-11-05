@@ -2423,13 +2423,17 @@ dropped. **Nothing in the packages knows what shipping means.**
   main` task of any run on the same repository is in flight, **nothing of another is filed** — not a first
   session, and not the try a person asks for after one ended blocked, which works in that same directory. It
   reads `waiting on the checkout (<run>'s ship has it)` on `wf ls`, on its own line or beside the try it is
-  waiting to take, and `wf decide` says which run's step has it. Such a run is running, not waiting on anybody:
+  waiting to take, and `wf decide` says which run's step has it. An ending with no gate, which its workflow files
+  once the step before it passes, waits the same way: it claims the checkout as of the run's creation. A landing
+  holds the checkout until it has landed or aborted, not only while its session runs: while its check runs on the
+  merge, and while the merge is staged and not yet committed or aborted, so another run's ending is filed on the
+  first pass after that one. Such a run is running, not waiting on anybody:
   the word that files its ending is given, so `wf decide` reads it as still running, nothing is `→ waiting on
   you`, and it keeps counting against the cap on runs in flight. A claim on that checkout is a promise that the
   pass would file the step, so a run whose ending it would not file claims nothing and holds nobody: one whose
   work is being sent back, one waiting on a run that has not landed, and one the cap on runs in flight holds —
   the last two reachable where a folder's one step merges, which makes its ending its root. With nothing in the
-  checkout, the oldest approval takes it. Level-triggered: the claims are read from the world on the pass that
+  checkout, the oldest word takes it. Level-triggered: the claims are read from the world on the pass that
   asks, including what that pass has already filed, so the order a pass reads the runs in decides nothing, and
   a restart changes nothing.
 - **A run's result is the work the ending acts on**, not the ending's own branch: `resultSteps` reads the steps

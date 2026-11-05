@@ -1447,6 +1447,68 @@ test('two runs of one repository land close together: each records the commit th
   });
 });
 
+test("an ending its workflow files with no gate waits for the checkout while another run's landing check runs, and is filed on the first pass after that run lands", async (t) => {
+  const s = story(t);
+  const { settle } = stage.board();
+  const aLandingAndAQuickRun = async () => {
+    const repo = at.aRepo();
+    const a = await at.stagedAndSigned({ repo });
+    const b = await at.workDone(at.ungatedFolder(), repo);
+    settle(`${b.id}-review`, 'succeeded', { ...SIGNED, again: false });
+    return { repo, a, b };
+  };
+  let one: Awaited<ReturnType<typeof aLandingAndAQuickRun>>;
+
+  await s.test(
+    "while A's landing check is pending, B's ungated ending is not filed, and every screen says A's ship has the checkout",
+    async () => {
+      one = await aLandingAndAQuickRun();
+      const { repo, a, b } = one;
+      const base = world().head(repo);
+      assert.deepEqual((await at.pass(b.id)).filed, [], "B's land is not filed into the checkout A's check runs on");
+      assert.equal(world().head(repo), base, 'nothing landed');
+      assert.equal(readRun(b.id).steps.ship?.taskId ?? null, null);
+      await at.aPass(e());
+      assert.equal((await shipOf(b.id)).message, `waiting on the checkout (${a.id}'s ship has it)`);
+      assert.deepEqual((await stage.runWith(e(), decideRun(b.id))).checkout, { run: a.id, step: 'ship' });
+    },
+  );
+
+  await s.test("while A's check runs, B still files nothing", async () => {
+    const { a, b } = one;
+    settle(a.checkId, 'working');
+    assert.deepEqual((await at.pass(b.id)).filed, []);
+  });
+
+  await s.test("A's check passed and its merge is staged, not yet landed: B still files nothing", async () => {
+    const { repo, a, b } = one;
+    settle(a.checkId, 'succeeded', undefined, 0);
+    assert.deepEqual((await at.pass(b.id)).filed, []);
+    assert.equal(at.mergeHead(repo), true, "A's merge is still staged");
+  });
+
+  await s.test("A's pass lands its merge, and B's ending is filed on the pass after, in the repository's own checkout", async () => {
+    const { repo, a, b } = one;
+    await at.pass(a.id);
+    const landed = readRun(a.id).steps.ship?.landed;
+    assert.ok(landed && 'commit' in landed, 'A landed');
+    assert.deepEqual((await at.pass(b.id)).filed, ['ship']);
+    assert.equal(readRun(b.id).steps.ship?.workspace, repo);
+  });
+
+  await s.test("A's check refused the merged tree: B waits until A's pass aborts the merge, and is filed on the pass after", async () => {
+    const { repo, a, b } = await aLandingAndAQuickRun();
+    settle(a.checkId, 'failed', undefined, 1);
+    assert.deepEqual((await at.pass(b.id)).filed, [], 'the refused merge is staged until A aborts it');
+    await at.pass(a.id);
+    assert.equal(at.mergeHead(repo), false, 'A aborted its merge');
+    const landed = readRun(a.id).steps.ship?.landed;
+    assert.ok(landed && 'aborted' in landed, 'A landed nothing');
+    assert.deepEqual((await at.pass(b.id)).filed, ['ship']);
+    assert.equal(readRun(b.id).steps.ship?.workspace, repo);
+  });
+});
+
 test('a checkout held by a merge staged and not landed, and claimed by no run the pass will not file', async (t) => {
   const s = story(t);
   const { settle } = stage.board();

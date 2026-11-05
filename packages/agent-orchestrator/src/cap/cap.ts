@@ -17,7 +17,8 @@ export type CheckoutHold = { run: string; step: string };
 /**
  * A run's claim on a repository's own checkout on a pass (`checkoutHold` in ending.verb.ts): the `workspace: base` step that works there,
  * the repository, and either `holds` — its task is filed and the engine holds it in flight, so the step is in that checkout now — or `at`,
- * the time of the approval that would file it (`approvalOf`), which is what orders the runs waiting for it.
+ * the time of the word that would file it (`claimedAt`): a person's approval or ask, or the run's creation for an ending its workflow
+ * files with no gate. That time orders the runs waiting for it.
  */
 export type MainClaim = { id: string; repo: string; step: string; holds: boolean; at?: string };
 
@@ -28,7 +29,7 @@ export type MainClaim = { id: string; repo: string; step: string; holds: boolean
  * `git status`, trial merge over each other, and the loser's `git merge --abort` throws away the winner's staged merge. Prose in a
  * `ship.md` is not a constraint, so the machinery holds the second: a run whose `workspace: base` task is in flight has the checkout, and
  * every other run of the same repository waiting to file one is held until it settles, and a run in it is never held. With none in it,
- * the oldest approval takes it — then by id — so which pass reads which run first decides nothing.
+ * the oldest word takes it — then by id — so which pass reads which run first decides nothing.
  *
  * Level-triggered, like the rest: the claims are read from the world on the pass that asks, including what that pass has already filed,
  * and a run held on one pass is asked again on the next.

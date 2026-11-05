@@ -46,7 +46,10 @@ const onRoute = (when: readonly string[] | undefined, answered: string | undefin
   when === undefined || (answered !== undefined && when.includes(answered));
 
 const nodeFateSpec = spec<(when: readonly string[] | undefined, answered: string | undefined, parents: readonly NodeWord[]) => Fate>({
-  /** Which of `waits` and `unreachable` a node no law places reads is the code's: the laws say only what must be ready, skipped or stopped. */
+  /**
+   * Which of `waits` and `unreachable` a node no law places reads is the code's: the laws say only what must be ready, skipped or
+   * stopped.
+   */
   open: ['output'],
   ensures: {
     offItsRouteIsSkipped: {

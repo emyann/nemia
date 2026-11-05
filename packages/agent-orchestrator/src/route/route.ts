@@ -13,9 +13,11 @@ export type { Fate } from '../../contracts/join.contract.ts';
 export type { ScriptAnswer, ScriptRead, ScriptVerdict } from '../../contracts/route-answer.contract.ts';
 export type { RouteTable, TablePick } from '../../contracts/route-table.contract.ts';
 
-/** The route the table holds for the producer's value, when the value is a string with a row naming a declared route; else none. */
+/**
+ * The route the table holds for the producer's value, when the value is a string with a row of the table's own naming a declared route;
+ * else none. A value spelled as a prototype key ("constructor") has no row.
+ */
 export const tableRoute: TableRoute = (table, routes, value) => {
-  // Own keys only: a value spelled as a prototype key ("constructor") has no row.
   if (typeof value !== 'string' || !Object.hasOwn(table.table, value)) return { kind: 'unsigned' };
   const row = table.table[value];
   return row !== undefined && routes.includes(row) ? { kind: 'route', route: row } : { kind: 'unsigned' };

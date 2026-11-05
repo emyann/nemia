@@ -68,6 +68,8 @@ const STEP_STATUS = {
   'failed (check)': { word: 'failed ✗ check (exit 1)', reason: 'CheckFailed' },
   failed: { word: 'failed', reason: 'Failed' },
   stopped: { word: 'stopped', reason: 'Stopped' },
+  skipped: { word: 'skipped', reason: 'Unknown' },
+  sent: { word: 'sent', reason: 'Unknown' },
 } satisfies Record<StepStatus, { word: string; reason: Reason; via?: AnswerVia }>;
 
 /** What the engine's word for a task comes to in the feed (`feedPhase`), and the two words `listing` writes in its place. */

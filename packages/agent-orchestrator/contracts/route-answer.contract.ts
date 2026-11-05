@@ -1,7 +1,7 @@
 /**
  * A script condition's answer (agent-orchestrator, src/route/route.ts, `scriptRoute`): what a condition whose eval is a script reads, off
  * its task's attempt — the exit verdict (`attemptVerdict`, check.ts) and the answer file the runtime kept at exit (the attempt's
- * `terminationMessage`), decoded strictly in a `*.store.ts` before it reaches here — as a route, or as one of the step's own words.
+ * terminationMessage), decoded strictly in a `*.store.ts` before it reaches here — as a route, or as one of the step's own words.
  *
  * Only a clean exit with an answer naming a declared route is a route. Every other case has one word, each already a `StepStatus` the
  * pass reads: a script that never finished is `stopped`, one that exited non-zero `failed`, one that exited 0 with no answer the run can
@@ -13,7 +13,7 @@ import { type Implementation, spec } from '@emyann/tsverify';
 export type ScriptVerdict = number | 'unfinished';
 
 /**
- * The answer file, decoded (`RouteAnswer` in the design, §2): a route, with why; or `unsure`, with the words a person reads. Absent where
+ * The answer file, decoded (RouteAnswer in the design, §2): a route, with why; or `unsure`, with the words a person reads. Absent where
  * the runtime kept no file, or what it kept does not decode — both a route and `unsure`, neither, or more than its cap.
  */
 export type ScriptAnswer =

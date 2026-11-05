@@ -2,8 +2,9 @@
  * The workflow folders as entries of the command table, each through the Workflow door (`WorkflowDoor`, run `rooted` at the store's root
  * its handler is given): a folder of yours written from its steps (`WORKFLOWS_WRITE`) and removed (`WORKFLOWS_REMOVE`), each checked
  * against the version it was read at, served on both sides — the command line reads a draft folder (`cli/writers.ts`), the builder sends
- * its steps; and the folders the board lists, each loaded (`WORKFLOWS_LIST`), and one step of a folder (`WORKFLOWS_STEP`), on the api
- * alone. The api resolves which folder a read names, and words the board's answer around what each entry answers.
+ * its steps; and one step of a folder (`WORKFLOWS_STEP`), on the api alone. The folders the board lists are loaded by the program the
+ * api runs itself (`foldersLoaded`), handed its factory whole. The api resolves which folder a read names, and words the board's answer
+ * around what each answers.
  */
 import path from 'node:path';
 import { Cause, Effect, Exit } from 'effect';
@@ -272,31 +273,6 @@ export const foldersLoaded = Effect.fn('foldersLoaded')(function* (
   return Object.fromEntries(loads);
 });
 
-/** Each folder `dirs` names, loaded as a start on `repo` would load it, in the factory named with its hires (`FolderLoaded`), by folder. */
-export const WORKFLOWS_LIST: Command<Record<string, FolderLoaded>> = {
-  name: 'workflows',
-  usage: '[<dirs> ...]',
-  help: ['the workflow folders named, each loaded'],
-  spec: apiSpec([{ key: 'dirs', takes: 'many', kind: 'name' }], ['repo', 'factory']),
-  writes: false,
-  class: 'read',
-  only: {
-    side: 'api',
-    why: 'the board lists every folder with its steps and its graph; at the command line, nemia start names the one it runs',
-  },
-  handler: (args, _env, home) =>
-    rooted(
-      home,
-      'workflows',
-      Effect.gen(function* () {
-        const dirs = Array.isArray(args.dirs) ? args.dirs : [];
-        const factory = yield* tried(() => factoryIn(args));
-        return yield* foldersLoaded(dirs, placesOf(args, home), factory);
-      }),
-    ),
-  print: () => [],
-};
-
 /**
  * One step of the folder `dir`, the workflow `name`, loaded as a start would load it, in the factory named with its hires: the step, or
  * null where the folder has none of that name, and the names of the steps it has.
@@ -340,9 +316,4 @@ export const WORKFLOWS_STEP: Command<{ step: Workflow | null; steps: string[] }>
 };
 
 /** The board's workflow entries, in the order the table lists them. */
-export const WORKFLOW_ENTRIES: readonly Command[] = [
-  WORKFLOWS_WRITE,
-  WORKFLOWS_REMOVE,
-  WORKFLOWS_LIST,
-  WORKFLOWS_STEP,
-] as readonly Command[];
+export const WORKFLOW_ENTRIES: readonly Command[] = [WORKFLOWS_WRITE, WORKFLOWS_REMOVE, WORKFLOWS_STEP] as readonly Command[];

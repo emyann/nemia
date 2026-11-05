@@ -58,10 +58,20 @@ function notOwned(dir: string, uid: number | undefined): string | undefined {
   return undefined;
 }
 
-/** `Conflict` saying why `dir`, under the folder of renders, is not this user's, and what to remove before asking again. */
-const notOwnedRefusal = (why: string, remove: string): Conflict =>
+/**
+ * `Conflict` saying why the folder of renders `root` is not this user's, and what works: this user cannot remove another's folder from
+ * the machine's temporary folder, which is sticky, so its owner or root removes it, or the api is started where `os.tmpdir()` is this
+ * user's own (`TMPDIR`).
+ */
+const rootRefusal = (why: string, root: string): Conflict =>
   new Conflict({
-    message: `${why}, so no template is rendered or served from it: remove it (rm -rf ${remove}) and ask again, or give the api a folder of renders of this user's own.`,
+    message: `${why}, so no template is rendered or served from it: have its owner, or root, remove it (rm -rf ${root}) and ask again, or restart the api with TMPDIR set to a folder of this user's own, under which it renders.`,
+  });
+
+/** `Conflict` saying why `dir`, inside this user's own folder of renders, is not this user's, and that removing it lets it be staged. */
+const insideRefusal = (why: string, dir: string): Conflict =>
+  new Conflict({
+    message: `${why}, so it is not served: remove it (rm -rf ${dir}), and the next ask stages the render again.`,
   });
 
 /**
@@ -73,11 +83,11 @@ const renderStaged = Effect.fn('renderStaged')(function* (root: string, dir: str
   const uid = yield* RenderOwner;
   fs.mkdirSync(root, { recursive: true, mode: 0o700 });
   const rootWhy = notOwned(root, uid);
-  if (rootWhy !== undefined) return yield* Effect.fail(notOwnedRefusal(rootWhy, root));
+  if (rootWhy !== undefined) return yield* Effect.fail(rootRefusal(rootWhy, root));
   if ((fs.statSync(root).mode & 0o077) !== 0) fs.chmodSync(root, 0o700);
   for (const on of [path.dirname(dir), dir]) {
     const why = notOwned(on, uid);
-    if (why !== undefined) return yield* Effect.fail(notOwnedRefusal(why, on));
+    if (why !== undefined) return yield* Effect.fail(insideRefusal(why, on));
   }
   if (fs.existsSync(dir) && digestOf(entriesIn(dir)) !== digestOf(entries)) fs.rmSync(dir, { recursive: true, force: true });
   stageFolder(dir, entries, false);

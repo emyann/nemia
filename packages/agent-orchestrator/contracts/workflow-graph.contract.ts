@@ -18,6 +18,21 @@ const distinct = (steps: readonly GraphStep[]): boolean => steps.every((s, i) =>
 /** The run's graph of the same steps: the verifier takes it as a pure function, read the same by the laws and the code. */
 export const runsGraph = assume(inputGraphOf, { pure: true });
 
+/** An edge of the graph, as both the run's and the typed graph draw them. */
+type Edge = TypedGraph['edges'][number];
+
+/** Whether two numbers are the same number, NaN the same as NaN, as a copy of one is. */
+const sameNumber = (a: number, b: number): boolean => a === b || (a !== a && b !== b);
+
+/** Whether two edges are the same: their ends, their kind, and a loop's rounds or a route's route. */
+const sameEdge = (a: Edge, b: Edge | undefined): boolean =>
+  b !== undefined &&
+  a.from === b.from &&
+  a.to === b.to &&
+  a.kind === b.kind &&
+  (a.kind !== 'loop' || (b.kind === 'loop' && sameNumber(a.rounds, b.rounds))) &&
+  (a.kind !== 'route' || (b.kind === 'route' && a.route === b.route));
+
 const typedGraphOfSpec = spec<(steps: readonly GraphStep[]) => TypedGraph>({
   requires: ({ input: [steps] }) => distinct(steps),
   ensures: {
@@ -48,9 +63,7 @@ const typedGraphOfSpec = spec<(steps: readonly GraphStep[]) => TypedGraph>({
           run.roots.length === output.roots.length &&
           run.roots.every((r, i) => output.roots.at(i) === r) &&
           run.edges.length === output.edges.length &&
-          run.edges.every(
-            (e, i) => output.edges.at(i)?.from === e.from && output.edges.at(i)?.to === e.to && output.edges.at(i)?.kind === e.kind,
-          )
+          run.edges.every((e, i) => sameEdge(e, output.edges.at(i)))
         );
       },
     },

@@ -6,13 +6,24 @@
  * builtin), the one served — the first, or, with an origin asked, that origin where it holds the name — and what shadows it. Its laws are
  * `contracts/definition-served.contract.ts`'s.
  *
+ * `definitionsServed`: a namespace's list, every name found served once, `definitionServed` of the origins that hold it in the lookup
+ * order (`heldOrigins`, whose laws are the same file's). Its list laws are held by `served.test.ts`, over every list up to a size: tsverify
+ * decides none of them today (Z3 runs out of memory at its default work; a loop needs an invariant `src` may not import; `flatMap` over
+ * the two proved helpers is unknown).
+ *
  * `definitionWriteRefusal`: the api writes your library alone, and only in `default`, where every definition of yours is served; a
  * factory's own definitions change the factory's way. Its laws are `contracts/definition-write.contract.ts`'s.
  */
-import type { DefinitionServedOf } from '../../contracts/definition-served.contract.ts';
+import type {
+  DefinitionOrigin,
+  DefinitionServedOf,
+  DefinitionFound,
+  DefinitionListed,
+  HeldOriginsOf,
+} from '../../contracts/definition-served.contract.ts';
 import type { DefinitionWriteRefusal } from '../../contracts/definition-write.contract.ts';
 
-export type { DefinitionOrigin, DefinitionServed } from '../../contracts/definition-served.contract.ts';
+export type { DefinitionFound, DefinitionListed, DefinitionOrigin, DefinitionServed } from '../../contracts/definition-served.contract.ts';
 export type { DefinitionWrite, WriteRefused, WriteThere, WriteWay } from '../../contracts/definition-write.contract.ts';
 
 export const definitionServed: DefinitionServedOf = (held, asked) => {
@@ -21,6 +32,20 @@ export const definitionServed: DefinitionServedOf = (held, asked) => {
   if (asked === undefined) return { origin: first, shadowedBy: null };
   return held.includes(asked) ? { origin: asked, shadowedBy: first === asked ? null : first } : null;
 };
+
+/** The order a factory looks a name up in: its own tree, the repository, yours, then Nemia's builtin. */
+const LOOKUP: readonly DefinitionOrigin[] = ['factory', 'repo', 'yours', 'builtin'];
+
+/** The origins that hold `name` among `found`, in the lookup order. */
+export const heldOrigins: HeldOriginsOf = (found, name) => LOOKUP.filter((o) => found.some((f) => f.name === name && f.origin === o));
+
+export const definitionsServed = (found: readonly DefinitionFound[], asked: DefinitionOrigin | undefined): DefinitionListed[] =>
+  found
+    .filter((f, i) => found.slice(0, i).every((g) => g.name !== f.name))
+    .flatMap((f) => {
+      const one = definitionServed(heldOrigins(found, f.name), asked);
+      return one === null ? [] : [{ name: f.name, origin: one.origin, shadowedBy: one.shadowedBy }];
+    });
 
 /** A factory's own definitions are its tree: today `nemia workflows write factory` writes it. */
 const FACTORYS_WAY =

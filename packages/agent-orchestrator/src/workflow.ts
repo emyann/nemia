@@ -158,4 +158,10 @@ export type {
 export { renderSkill, skillDraftOf, skillEntryOf, withPreload } from './skills/skills.ts';
 export type { AgentSkill, SkillDraft } from './skills/skills.ts';
 /** Which definition a namespace serves of a name, and where a write of one goes (`definition/served.ts`). */
-export { definitionServed, definitionWriteRefusal, type DefinitionWrite, type WriteRefused } from './definition/served.ts';
+export {
+  definitionServed,
+  definitionsServed,
+  definitionWriteRefusal,
+  type DefinitionWrite,
+  type WriteRefused,
+} from './definition/served.ts';

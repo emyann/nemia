@@ -1,10 +1,10 @@
 /**
  * What the three definitions' handlers share: the origins a name is looked up in, in the factory's order; the one served of each name
- * (`definitionServed`, the orchestrator's) with what shadows it; a page of them as `<Kind>List`; and a write's refusal
+ * (`definitionsServed`, the orchestrator's) with what shadows it; a page of them as `<Kind>List`; and a write's refusal
  * (`definitionWriteRefusal`) as the `Api`'s error.
  */
 import { Invalid as Refused, pageOf, parseSelectors, selectorsRefusal, selectsLabels, type ObjectQuery } from 'agent-orchestrator';
-import { definitionServed, definitionWriteRefusal, type DefinitionWrite } from 'agent-orchestrator/workflow';
+import { definitionsServed, definitionWriteRefusal, type DefinitionWrite } from 'agent-orchestrator/workflow';
 import { API_VERSION, DEFINITION_ORIGINS, Invalid, Missing } from 'objects';
 export { writtenAt } from '../workflows/builder.ts';
 
@@ -29,21 +29,16 @@ export function originAsked(asked: string | undefined): Origin | undefined {
 }
 
 /**
- * Of every definition `held`, each name once: the origin `definitionServed` serves of those that hold it, in the lookup order
- * (`DEFINITION_ORIGINS`), the first or the one `asked`; a name `asked` does not hold is left out.
+ * Of every definition `held`, each name once, as the package's `definitionsServed` decides: the origin served of those that hold it, in
+ * the lookup order, the first or the one `asked`; a name `asked` does not hold is left out.
  */
 export function servedOf<T>(held: readonly Held<T>[], asked: Origin | undefined): Served<T>[] {
-  const names = [...new Set(held.map((h) => h.name))];
-  return names.flatMap((name) => {
-    const at = held
-      .filter((h) => h.name === name)
-      .sort((a, b) => DEFINITION_ORIGINS.indexOf(a.origin) - DEFINITION_ORIGINS.indexOf(b.origin));
-    const served = definitionServed(
-      at.map((h) => h.origin),
-      asked,
-    );
-    const one = served && at.find((h) => h.origin === served.origin);
-    return one ? [{ ...one, shadowedBy: served?.shadowedBy ?? null }] : [];
+  return definitionsServed(
+    held.map(({ name, origin }) => ({ name, origin })),
+    asked,
+  ).flatMap((listed) => {
+    const one = held.find((h) => h.name === listed.name && h.origin === listed.origin);
+    return one ? [{ ...one, shadowedBy: listed.shadowedBy }] : [];
   });
 }
 

@@ -18,7 +18,8 @@ export type CheckoutHold = { run: string; step: string };
  * A run's claim on a repository's own checkout on a pass (`checkoutHold` in ending.verb.ts): the `workspace: base` step that works there,
  * the repository, and either `holds` — its task is filed and the engine holds it in flight, so the step is in that checkout now — or `at`,
  * the time of the word that would file it (`claimedAt`): a person's approval or ask, or the run's creation for an ending its workflow
- * files with no gate. That time orders the runs waiting for it.
+ * files with no gate, and for the try the run files itself of an ending whose try landed no commit. That time orders the runs waiting
+ * for it.
  */
 export type MainClaim = { id: string; repo: string; step: string; holds: boolean; at?: string };
 

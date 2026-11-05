@@ -362,7 +362,7 @@ export const advancePass = Effect.fn('advancePass')(
     const from = pass
       ? { read: pass, slot }
       : { standing: standingNow(runStore.runs.list()).pipe(Effect.provideService(PlaceService, place)) };
-    const checkout = yield* checkoutHold(e, run, steps, from, process.env, memo);
+    const checkout = yield* checkoutHold(e, run, steps, from, process.env, memo, phaseOf);
     const lift = yield* liftHold(e, run, parents);
     const assessed = assess(steps, run, phaseOf, signedOff, asked, verdictOf, asks, roundAsks, sessionBlocked, spendOf, [], checkout);
     const settled = settledOf(run, reads);

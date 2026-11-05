@@ -3,7 +3,9 @@
  * timeout, so nothing new is filed and the jobs run on, checks included — a landing's wait on CI among them — each on the runtime's
  * worker, which outlives the daemon, its result read by the next; the daemon's own sessions held at their next call and their calls in
  * flight waited for up to the timeout, the daemon of the confirmed pid stopped by SIGTERM — which writes `stoppedAt`, its holder parking
- * each session for the next — the service started, and the store resumed once the service's daemon has completed its first pass. A
+ * each session for the next — the service started once the system says its unit no longer runs the stopped daemon (`unitRunning`: the
+ * daemon lets the lease go before its process exits, and systemd answers a start of a unit still active as done and does nothing), and
+ * the store resumed once the service's daemon has completed its first pass. A
  * pause a person put stands as it was. The pause it puts names the process that runs it (`heldBy`, put by its host), and so does the
  * runtime's drain: a take-over killed while it waits leaves neither standing past the daemon's next pass. `nemia service install
  * --take-over`, `nemia upgrade` and `nemia service restart` run it.
@@ -14,6 +16,7 @@ import { daemonLine, type DaemonStanding } from '../daemon/daemon.ts';
 import { timeoutWords, pausingWords, type Finishing, type Pause } from '../pause/pause.ts';
 import { Conflict, type Refusal } from '../refusal/refusal.ts';
 import { tried, type EngineService } from '../runtime-client.ts';
+import { unitRunning, type UnitState } from './service.ts';
 
 /**
  * What the take-over is handed of its host (`ServiceHost` in `service.verb.ts`): the lease, a signal to a pid, the store's pause put and
@@ -35,8 +38,16 @@ export type TakeoverHost = {
   readonly stopMs: number;
 };
 
-/** The service a take-over starts: its start, and the command that reads its log (`logsLine`). */
-export type Started = { readonly start: () => void; readonly logs: string };
+/**
+ * The service a take-over starts: its start, the command that reads its log (`logsLine`), the system's word on its unit now
+ * (`stateNow`, null where the system cannot be asked), and the command a person types to start it (`startLine`).
+ */
+export type Started = {
+  readonly start: () => void;
+  readonly logs: string;
+  readonly stateNow: () => UnitState | null;
+  readonly startLine: string;
+};
 
 /** The command a take-over runs under unless it is named: the install that hands the store to the service. */
 export const INSTALL_BY = 'nemia service install';
@@ -119,12 +130,71 @@ const called = (host: TakeoverHost) =>
     );
   });
 
-/** Waits, at most `ms`, until the lease reads as `done` says; else refused (`Conflict`) with `refusal`. */
-const leaseUntil = (host: TakeoverHost, ms: number, done: (lease: DaemonStanding) => boolean, refusal: string) =>
+/** Waits, at most `ms`, until the lease reads as `done` says; else refused (`Conflict`) with `refusal`, its words read then. */
+const leaseUntil = (host: TakeoverHost, ms: number, done: (lease: DaemonStanding) => boolean, refusal: () => string) =>
   Effect.repeat(
     Effect.sync(() => host.lease()),
     { schedule: Schedule.spaced(host.pollMs), until: done },
-  ).pipe(Effect.timeoutOrElse({ duration: ms, orElse: () => Effect.fail(new Conflict({ message: refusal })) }));
+  ).pipe(Effect.timeoutOrElse({ duration: ms, orElse: () => Effect.suspend(() => Effect.fail(new Conflict({ message: refusal() }))) }));
+
+/**
+ * Waits, at most the host's `stopMs`, until the system says the unit no longer runs the daemon of `old` (`unitRunning`), reading it on
+ * each poll: a start asked of a unit whose main process is still the stopped daemon is a start of a unit already active, which systemd
+ * answers at once and does nothing for. Refused (`Conflict`) past it, naming `ps -p` and the start line. `unknown` does not hold it.
+ */
+const unitLetGo = (host: TakeoverHost, service: Started, by: string, old: number, left: string) =>
+  Effect.repeat(
+    Effect.sync(() => unitRunning(service.stateNow(), old)),
+    { schedule: Schedule.spaced(host.pollMs), until: (running) => running !== 'old' },
+  ).pipe(
+    Effect.timeoutOrElse({
+      duration: host.stopMs,
+      orElse: () =>
+        Effect.fail(
+          new Conflict({
+            message: `${by}: pid ${old} let the store go and is still the service's main process after ${timeoutSaid(host.stopMs)}: check it with ps -p ${old}, stop it, then start the service with ${service.startLine}; ${left}.`,
+          }),
+        ),
+    }),
+  );
+
+/** The first line a program said on its error output as it failed, else of its error, else nothing. */
+const failedLine = (err: unknown): string => {
+  const stderr = typeof err === 'object' && err !== null && 'stderr' in err ? String(err.stderr) : '';
+  const message = err instanceof Error ? err.message : String(err);
+  return [...stderr.split('\n'), ...message.split('\n')].map((l) => l.trim()).find((l) => l !== '') ?? '';
+};
+
+/** Starts the service; a start the system refuses is refused (`Conflict`) with the system's first line, the start line and the log. */
+const startOf = (service: Started, by: string, left: string) =>
+  tried(() => {
+    try {
+      service.start();
+    } catch (err) {
+      if (err instanceof Conflict) throw err;
+      throw new Conflict({
+        message: `${by}: the service's start failed (${failedLine(err)}): read why in its log with ${service.logs}, then start it with ${service.startLine}; ${left}.`,
+      });
+    }
+  });
+
+/**
+ * Why no daemon ticks the store after the start, by what the unit runs now (`unitRunning`): a process that has not taken the store, no
+ * process at all, the stopped daemon still, or the system could not say. Only a unit that runs a process is said to have been started.
+ */
+const notTickingWords = (service: Started, by: string, old: number | null, left: string): string => {
+  const state = service.stateNow();
+  switch (unitRunning(state, old)) {
+    case 'other':
+      return `${by}: the service was started and does not tick the store yet: nemia service status says why, and ${service.logs} its log; ${left}.`;
+    case 'none':
+      return `${by}: the service is not running (${state?.active ?? 'no process'}): start it with ${service.startLine}, read why it stopped in its log with ${service.logs}, and its state with nemia service status; ${left}.`;
+    case 'old':
+      return `${by}: pid ${old} is still the service's main process and does not tick the store: check it with ps -p ${old}, stop it, then start the service with ${service.startLine}; ${left}.`;
+    case 'unknown':
+      return `${by}: no daemon ticks the store after the service's start, and the system could not say what the service runs: nemia service status reads it, ${service.startLine} starts it, and ${service.logs} reads its log; ${left}.`;
+  }
+};
 
 /** Whether `lease` names the daemon of `pid` ticking with no pass completed yet: what the first-pass wait waits through. */
 const firstPassDue = (lease: DaemonStanding, pid: number): boolean =>
@@ -151,34 +221,35 @@ export const firstPassed = (pid: number, host: TakeoverHost, service: Started, b
   });
 
 /**
- * Starts the service and answers the pid of its daemon once that daemon has completed its first pass (`firstPassed`). Refused
- * (`Conflict`): no daemon but `old` ticks the store within the host's `waitMs`, or the one that does ends before its first pass; each
- * naming `left`.
+ * Starts the service once its unit no longer runs the daemon of `old` (`unitLetGo`), and answers the pid of its daemon once that daemon
+ * has completed its first pass (`firstPassed`). Refused (`Conflict`): the unit still runs `old` past the host's `stopMs`; the system
+ * refuses the start; no daemon but `old` ticks the store within the host's `waitMs`, its words chosen by what the unit runs then
+ * (`notTickingWords`: the start line where it runs nothing); or the one that does ends before its first pass; each naming `left`.
  */
 export const startedPassed = (host: TakeoverHost, service: Started, by: string, old: number | null, left: string) =>
   Effect.gen(function* () {
-    yield* tried(service.start);
+    if (old !== null) yield* unitLetGo(host, service, by, old, left);
+    yield* startOf(service, by, left);
     const ticking = yield* leaseUntil(
       host,
       host.waitMs,
       (lease) => lease.kind === 'ticking' && lease.file.pid !== old,
-      `${by}: the service was started and does not tick the store yet: nemia service status says why, and ${service.logs} its log; ${left}.`,
+      () => notTickingWords(service, by, old, left),
     );
     return ticking.kind === 'ticking' ? yield* firstPassed(ticking.file.pid, host, service, by, left) : null;
   });
 
 /**
- * Hands the store from the daemon of `pid` to the service it starts (`service`), and answers the pid that ticks it then, once that
- * daemon has completed its first pass (`startedPassed`). Refused (`Conflict`): a pid that is not the confirmed holder, before
- * anything is done; a daemon that does not let the store go within the host's `stopMs`, which stands above the runtime's own
- * let-go so a daemon parking a session whose call it cut is not read as one that will not stop; a service that does not take the
- * store within its `waitMs`; or a service whose daemon ends before its first pass — the store left paused, since no work starts
- * without a daemon to judge it, until a daemon's first pass lifts it once this command has ended. Its pause has no timeout, so it parks
- * no job: the jobs and the checks run on, and none is waited for. Before the signal it holds back the new tool calls of the daemon's
- * attached sessions (`drain`) and waits at most the host's `timeoutMs` for each call in flight (`called`), so the daemon stops between
- * two calls where it can, and says which call it gave up on where it cannot.
- * Interrupted before the signal, it lifts the drain and the pause it put; after it, the drain names a daemon that is gone, and no
- * other is held by it. Its pause and its lines name `by`.
+ * Hands the store from the daemon of `pid` to the service it starts (`service`) once its unit has let that daemon's process go, and answers
+ * the pid that ticks it then, once that daemon has completed its first pass (`startedPassed`). Refused (`Conflict`): a pid that is not the
+ * confirmed holder, before anything is done; a daemon that does not let the store go within the host's `stopMs`, which stands above the
+ * runtime's own let-go so a daemon parking a session whose call it cut is not read as one that will not stop; a service that does not take
+ * the store within its `waitMs`; or a service whose daemon ends before its first pass — the store left paused, since no work starts without
+ * a daemon to judge it, until a daemon's first pass lifts it once this command has ended. Its pause has no timeout, so it parks no job: the
+ * jobs and the checks run on, and none is waited for. Before the signal it holds back the new tool calls of the daemon's attached sessions
+ * (`drain`) and waits at most the host's `timeoutMs` for each call in flight (`called`), so the daemon stops between two calls where it
+ * can, and says which call it gave up on where it cannot. Interrupted before the signal, it lifts the drain and the pause it put; after it,
+ * the drain names a daemon that is gone, and no other is held by it. Its pause and its lines name `by`.
  */
 export const takeOver = Effect.fn('takeOver')(function* (pid: number, host: TakeoverHost, service: Started, by: string = INSTALL_BY) {
   yield* takeOverConfirmed(pid, host, by);
@@ -211,7 +282,8 @@ export const takeOver = Effect.fn('takeOver')(function* (pid: number, host: Take
     host,
     host.stopMs,
     (lease) => lease.kind === 'stopped' || lease.kind === 'gone' || (lease.kind === 'ticking' && lease.file.pid !== pid),
-    `${by}: pid ${pid} was sent SIGTERM and still holds the store: check it with ps -p ${pid}, stop it, and ${by === INSTALL_BY ? 'install' : 'run it'} again; ${left}.`,
+    () =>
+      `${by}: pid ${pid} was sent SIGTERM and still holds the store: check it with ps -p ${pid}, stop it, and ${by === INSTALL_BY ? 'install' : 'run it'} again; ${left}.`,
   );
   return { pid: yield* startedPassed(host, service, by, pid, left), paused: !own };
 }, Effect.scoped);

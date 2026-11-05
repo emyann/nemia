@@ -1,0 +1,39 @@
+s10 against s9: a try the run files of its ending waits for the checkout (claimedAt gives the run's creation to a filed ending whose
+try landed no commit). Four readings of the same store copied, on one machine, one evening, each the median of 5:
+
+| reading | code | load | tickPass cold | tickPass warm | tickPassInformed cold | tickPassInformed warm |
+| --- | --- | ---: | ---: | ---: | ---: | ---: |
+| s9 (s9.json) | before | 4.10 | 3115.6 | 258.1 | 4701.3 | 367.6 |
+| after, first | after | 4.98 | 3505.7 | 437.1 | 5557.6 | 534.2 |
+| before, again | before | (5.96 avg) | 3916.6 | 740.9 | 5257.1 | 857.7 |
+| s10 (s10.json) | after | 3.97 | 3268.6 | 248.4 | 4767.8 | 338.7 |
+
+The same code reads ×1.7 to ×2.9 apart warm with the machine's load, and the reading of the change at the load of s9 is within its
+noise: the change adds no time a pass shows. What it adds is the reads of a run whose ending is filed and landed no commit, past
+`checkoutHold`'s first check: an asks read, its tasks' phases (the pass's kept views on the tick), one `assess` and its parents. Of
+the store's 280 runs, 246 have a filed `workspace: base` ending: 244 landed a commit and claim nothing as before; two reach the new
+path (one whose land left the checkout untouched, one with nothing landed), and on the tick a finished one rests before it is judged
+(`checkoutAsked` is unchanged). A run whose own ending is in flight, such as a long-lived `workspace: base` step that never lands,
+is known to hold the checkout from the phases `advancePass` read, and views no task again. `pass-reads.boundary.test.ts` and
+`pass-calls.boundary.test.ts` pass with no count moved.
+
+The table `--compare` printed for s10 against the "before, again" reading, taken back to back:
+
+against 4cc9b3f4fde4 of 2026-11-05T19:14:16.470Z: 280 runs now, 280 then; 8524 tasks now, 8520 then; 247 cards now, 247 then
+
+| read | cold ms | baseline | ratio | warm ms | baseline | ratio |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| tickPass | 3268.6 | 3916.6 | ×0.83 | 248.4 | 740.9 | ×0.34 |
+| tickPassInformed | 4767.8 | 5257.1 | ×0.91 | 338.7 | 857.7 | ×0.39 |
+| runList | 2955.4 | 3049.9 | ×0.97 | 149.4 | 156.6 | ×0.95 |
+| stats | 12554.6 | 13439.4 | ×0.93 | 438.2 | 366.0 | ×1.20 |
+| finishedRun | 1071.6 | 1274.9 | ×0.84 | 65.7 | 77.0 | ×0.85 |
+| openRun | 1219.3 | 1429.4 | ×0.85 | 241.9 | 279.7 | ×0.86 |
+| feedFromCursor | 23.9 | 30.1 | ×0.79 | 22.6 | 25.6 | ×0.88 |
+| runListAfterPass | 1038.5 | 1186.2 | ×0.88 | 40.0 | 43.0 | ×0.93 |
+| openRunAfterPass | 1059.4 | 1133.3 | ×0.93 | 61.3 | 70.0 | ×0.88 |
+| inbox | 1566.5 | 1821.0 | ×0.86 | 245.1 | 309.2 | ×0.79 |
+| inboxAfterPass | 107.5 | 120.4 | ×0.89 | 115.1 | 110.8 | ×1.04 |
+| chatHistory | 2748.4 | 3226.6 | ×0.85 | 135.5 | 170.4 | ×0.80 |
+| chatBeatBefore | 2904.4 | 3138.6 | ×0.93 | 145.4 | 161.8 | ×0.90 |
+| chatFoldStep | 2.4 | 2.9 | ×0.82 | 2.3 | 2.5 | ×0.91 |

@@ -349,14 +349,14 @@ test("each family of writes: its answer decoded, an answer unread refused with w
       assert.deepEqual(
         spec.steps,
         [
-          { name: 'ship', keys: { workspace: 'base', slot: 'none', gate: true }, body: 'Land it.' },
+          { name: 'ship', keys: { agent: own?.spec.agent, workspace: 'base', slot: 'none', gate: true }, body: 'Land it.' },
           {
             name: 'note',
             keys: Object.fromEntries(Object.entries(bare.spec).filter(([, v]) => v !== null && !(Array.isArray(v) && v.length === 0))),
             body: 'Say it.',
           },
         ],
-        'a step with an agent sends the keys it sets itself and its own note; one with none, every key it sets and its body',
+        'a step with an agent sends its agent, the keys it sets itself and its own note; one with none, every key it sets and its body',
       );
       assert.equal(Object.hasOwn(spec, 'readme'), false, 'a README unchanged is not sent');
       answering(t, { error: 'a and b wait on each other.', steps: ['a', 'b'] }, 422);

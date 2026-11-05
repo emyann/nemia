@@ -144,13 +144,15 @@ const isSet = (key: string, value: unknown): boolean =>
   value !== null && value !== undefined && !(Array.isArray(value) && !value.length && !LISTS_OF_NONE.includes(key));
 
 /**
- * A step as its file writes it, which a save sends (`spec.steps`): a step with an agent, the keys it sets itself and its own note; one with
- * none, every key it sets and all of its body.
+ * A step as its file writes it, which a save sends (`spec.steps`): a step with an agent, its `agent`, the keys it sets itself (`own.keys`,
+ * which leave `agent` out) and its own note; one with none, every key it sets and all of its body.
  */
 export const writtenStepOf = (step: StepWritten): WorkflowStep => {
   const entries = Object.entries(step.spec) as Array<[StepKey, unknown]>;
   const kept =
-    step.own === null ? entries.filter(([key, value]) => isSet(key, value)) : entries.filter(([key]) => step.own?.keys.includes(key));
+    step.own === null
+      ? entries.filter(([key, value]) => isSet(key, value))
+      : entries.filter(([key, value]) => (key === 'agent' && isSet(key, value)) || step.own?.keys.includes(key));
   return { name: step.name, keys: Object.fromEntries(kept), body: step.own === null ? step.body : step.own.body };
 };
 

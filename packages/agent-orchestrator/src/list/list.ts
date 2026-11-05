@@ -2,7 +2,7 @@
  * What `nemia ls` shows of a run and each of its steps (`listing`), and the words it and the board say of a wait: a harness's
  * (`waitingWords`, `harnessWaitLine`), a denial's (`deniedWords`), a person's (`onYouWords`). Pure.
  */
-import { gated, hasStarted, holdAdvice, holdWord, waitAdvice, waitWord, type Wait } from '../wait/wait.ts';
+import { gated, hasStarted, holdAdvice, holdNeedsYou, holdWord, waitAdvice, waitWord, type Wait } from '../wait/wait.ts';
 import { slotWord, type CheckoutHold, type RunSlot } from '../cap/cap.ts';
 import { checkoutWord, LANDED_CAP, landedWords, onBaseNote, toDecideWords, type ToDecide } from '../ending/ending.ts';
 import type { Workflow } from '../step/step.ts';
@@ -93,7 +93,7 @@ export type Listing = {
   /**
    * The runs a person holds this run until (`Run.hold`, `holdsOf`): while the hold stands, nothing is asked of anyone, and `nemia ls` says
    * `held until <run> lands` where it would say who the run waits on (`holdWord`). Absent on a run nobody holds, or one called off; empty
-   * on a hold whose file names no run, which `Run.hold` still says.
+   * on a hold that names no run, which a person alone lifts (`held until a person lifts it`).
    */
   holding?: Wait[];
   /** The runs this run's roots wait on (`waitsOf`): none once it has started, or on a run nobody has called off. */
@@ -691,7 +691,7 @@ function asksLines(run: Run, { steps, waitingOnYou, waiting, holding, toDecide }
   if (waitingWords.length) lines.push(`   → waiting on you: ${waitingWords.join(', ')}  —  nemia decide ${run.id}`);
   if (waiting.some((w) => w.missing || w.cancelledAt || w.gone?.length)) lines.push(`   → waiting on you: ${waitAdvice(run, waiting)}`);
   if (holding) {
-    const never = !holding.length || holding.some((w) => w.missing || w.cancelledAt || w.gone?.length);
+    const never = holdNeedsYou(holding);
     const lifting = holding.length > 0 && holding.every((w) => w.landed);
     lines.push(
       `   → ${holdWord(holding, run.hold)}${never ? `: ${holdAdvice(run, holding)}` : lifting ? '' : `  —  nemia hold ${run.id} --off lifts it`}`,

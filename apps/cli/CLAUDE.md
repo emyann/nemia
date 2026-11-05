@@ -4,7 +4,7 @@
 inbox's read and `watch`) asked of the api serving the store over HTTP, and every other verb, a help, and a read typed with `--local`
 run on the orchestrator's own CLI, spawned with the same words (`src/local.ts`). It sits beside the board, above the api: the order is
 `web, cli → api → orchestrator → runtime` (`docs/architecture.md`, *The layers*). Which way a command goes is `routeOf`
-(`src/route.ts`), a pure decision proved by its contract (`npm run contracts` runs `tsverify apps/cli/src`).
+(`src/route.ts`), a pure decision proved by its contract (`npm run contracts` proves it, `apps/cli/src` being one of the roots `tools/contracts/legs.ts` names).
 
 - **It imports the objects by their entry, the api's types, and no other package of ours.** Its source and its bins import no
   `agent-orchestrator`, no `agent-runtime`, no harness SDK and no path into `packages/`; `objects` by its entry alone, never

@@ -141,7 +141,7 @@ export const PERSON: Record<StepState, PersonWords> = {
   },
   held: {
     rail: 'held',
-    meaning: 'A person holds the run until other runs land, so nothing of it starts and nothing is asked of you until the hold lifts.',
+    meaning: 'A person holds the run, so nothing of it starts and nothing is asked of you until the hold lifts.',
     ...NONE,
   },
   cancelled: { rail: 'called off', meaning: 'The run was called off.', ...NONE },
@@ -168,7 +168,7 @@ export const PAUSED: Pick<PersonWords, 'rail' | 'meaning'> = {
  */
 export const HELD_TO_COME: Pick<PersonWords, 'rail' | 'meaning'> = {
   rail: PERSON.waiting.rail,
-  meaning: 'It has not started yet: a person holds the run until other runs land, and nothing of it starts until the hold lifts.',
+  meaning: 'It has not started yet: a person holds the run, and nothing of it starts until the hold lifts.',
 };
 
 /**

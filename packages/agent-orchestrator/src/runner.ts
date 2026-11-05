@@ -435,6 +435,7 @@ export { approveRun, type Approved } from './gate/gate.verb.ts';
 export { askedNow } from './question/asked.verb.ts';
 export { cancelRun, type Cancelled } from './cancel/cancel.verb.ts';
 export { hold, type Holding, unhold } from './wait/wait.verb.ts';
+export { holdNeedsYou } from './wait/wait.ts';
 export {
   finishingWords,
   heldLines,
@@ -454,7 +455,7 @@ export {
 } from './pause/pause.ts';
 export { readPause } from './pause/pause.store.ts';
 export { retryRun } from './retry/retry.verb.ts';
-export { sayRun } from './say/say.verb.ts';
+export { sayRun, type Told } from './say/say.verb.ts';
 export { COMMANDS, TABLE } from './command/commands.verb.ts';
 export { admitted } from './admission/admit.verb.ts';
 export { PRUNE, RM } from './command/runs.verb.ts';
@@ -490,7 +491,6 @@ export { renamedIn, renamedValues } from './command/command.ts';
 export type { Args, CommandSpec, Flag, Positional, Route, Spec } from './command/command.ts';
 export type { Accepted, RoundAsked } from './round/round.verb.ts';
 export type { Asked } from './retry/retry.verb.ts';
-export type { Told } from './say/say.verb.ts';
 export { forgetRun, runsForgetting } from './forget/forget.verb.ts';
 export { freeingMany, judgingMany, prune, type Listed, type Turned } from './prune/prune.verb.ts';
 export { decideRun } from './decide/decide.verb.ts';

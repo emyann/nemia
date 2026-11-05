@@ -1,20 +1,19 @@
 import type { RunSummary } from './api/runs.ts';
 import type { Frozen } from './frozen.ts';
 
-type Holdable = Frozen<Pick<RunSummary, 'id' | 'place' | 'repo' | 'cancelledAt' | 'holding' | 'holdUntil' | 'status'>> & {
+type Holdable = Frozen<Pick<RunSummary, 'id' | 'cancelledAt' | 'holding' | 'holdUntil' | 'status'>> & {
   pruned: object | null;
 };
 
 type Candidate = Pick<RunSummary, 'id' | 'place' | 'repo' | 'cancelledAt' | 'pruned' | 'status' | 'toDecide'>;
 
 /**
- * Whether the run's page offers a hold, by what the run says of itself: a repository run, not called off, not pruned, nobody holding it,
- * and running or stopped on something, a person or a step that broke; a run that succeeded has nothing left to file. The rest — a run
+ * Whether the run's page offers a hold, by what the run says of itself: not called off, not pruned, nobody holding it, and running or
+ * stopped on something, a person or a step that broke; a run that succeeded has nothing left to file. A folder run is offered one too: it
+ * has no run to wait on (`holdCandidates` gives none), so it is held until a person lifts it. The rest — a run
  * that has landed, a circle, a run on another base branch — is the package's to refuse (`holdRefusal`), in its words.
  */
 export const holdable = (run: Holdable): boolean =>
-  run.place === 'git' &&
-  run.repo !== null &&
   run.cancelledAt === null &&
   run.pruned === null &&
   run.holding === null &&

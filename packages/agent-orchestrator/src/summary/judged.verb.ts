@@ -13,7 +13,7 @@ import { resultSteps } from '../branches/index.ts';
 import { type BranchStanding, sendBackTo, type Spend, type SpendOf, spentWord } from '../status/status.ts';
 import { closeoutOf, deniedOf, unreadOf } from '../views/views.verb.ts';
 import { wordOfView, type EnginePhase } from '../views/views-words.ts';
-import { holdAdvice, holdWord, type ParentRun, type Wait, waitAdvice, waitWord } from '../wait/wait.ts';
+import { holdAdvice, holdNeedsYou, holdWord, type ParentRun, type Wait, waitAdvice, waitWord } from '../wait/wait.ts';
 import { merges, type ToDecide, toDecideWords } from '../ending/ending.ts';
 import type { Retry, RetryAsk } from '../retry/index.ts';
 import type { Assessment } from '../tick/assess.ts';
@@ -116,8 +116,9 @@ export type RunWaiting = {
  * and, for one that never will without a person, why — as `RunWaiting.runs` has them — or, in the moment every one has landed and the next
  * tick has not yet lifted the hold, each of them `landed`. `word` is what `nemia ls` prints under the run (`holdWord`), with the person's
  * why and name when the hold has them, and `advice` the line
- * `nemia decide` prints under it (`holdAdvice`). `waitingOnYou` is whether the hold lifts only by a person's hand: it names no run, or a
- * run it names never lands on its own — the rule `nemia ls` prints the advice by. A hold asks nothing of anyone while it may still lift:
+ * `nemia decide` prints under it (`holdAdvice`). `waitingOnYou` is whether the hold waits on a person: exactly when a run it names never
+ * lands on its own, and false for a hold that names no run, which is the person's word already given (`holdNeedsYou`, the rule `nemia ls`
+ * prints the advice by). `runs` is empty for such a hold. A hold asks nothing of anyone while it stands:
  * every verb a step's word would take is refused while it stands (`heldRefusal`), so no step of a held run waits on you (`waitingOnYou`)
  * and nothing is offered.
  */
@@ -186,14 +187,6 @@ export function runWaitingOf(run: Run, waits: readonly Wait[]): RunWaiting | nul
     waitingOnYou: waits.some(neverLands),
   };
 }
-
-/**
- * Whether a held run's hold lifts only by a person's hand: it names no run, or a run it names never lands on its own — no such run, a
- * cancelled one, a result branch gone. As `nemia ls` and `nemia decide` decide it (cli/main.ts). Not `neverLands` above, which reads any
- * reason a `Wait` carries as one it may never land for: a hold's `landed` is the opposite.
- */
-const holdNeedsYou = (holds: readonly Wait[]): boolean =>
-  !holds.length || holds.some((w) => Boolean(w.missing || w.cancelledAt || w.gone?.length));
 
 /** A person's hold on a run (`RunHolding`), in the package's words; null for a run nobody holds, and one called off. */
 export function holdingOf(run: Run, holds: readonly Wait[]): RunHolding | null {
@@ -454,7 +447,8 @@ export type JudgeHow = {
  * The runs its roots wait on and the runs a person holds it until are each read once, through the request's reader: a root of a run
  * waiting on runs says `waiting on <run>`, and the run moves while each may still land — the tick files the roots when they do — and not
  * once one never will without a person. A held run moves as it would unheld while the hold may still lift on its own — the tick lifts it
- * once every run it names has landed, and files then what is due — and not once it lifts only by a person's hand. No slot is said and no
+ * once every run it names has landed, and files then what is due — and not once it lifts only by a person's hand: a run it names never
+ * lands, or it names none. No slot is said and no
  * checkout read: the board says the run slots over its Factory.
  *
  * Where the run's result branches stand is asked once the run's status is known (`standings`): left out, no branch is read, only a gate
@@ -474,7 +468,8 @@ export const judge = Effect.fn('judge')(function* (
   const waiting = runWaitingOf(run, read.waiting);
   const holding = holdingOf(run, read.holding ?? []);
   const { hold: _, ...unheld } = run;
-  const due = holding && !holding.waitingOnYou ? read.assessOf(unheld) : { ready, check, retry, round };
+  const lifts = holding !== null && holding.runs.length > 0 && !holding.waitingOnYou;
+  const due = lifts ? read.assessOf(unheld) : { ready, check, retry, round };
   const tickReads = Boolean(run.workflow ?? folder);
   const waitingOnYou = names.filter((name) => read.waitingOnYou.includes(name));
   return {

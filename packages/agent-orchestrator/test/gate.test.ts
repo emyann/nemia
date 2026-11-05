@@ -326,11 +326,11 @@ test("a gate's step proposes the caps of the steps after it, and its approval ma
     },
   );
   await s.test(
-    '`nemia approve --budget review=4` writes the proposal and the amount given into the approval, apart, and prints the caps they set',
+    '`nemia approve --budget review=4` writes the caps into the approval, the proposal with the amount given over it',
     async () => {
       const printed = await printedBy(['approve', id, 'plan', '--budget', 'review=4'], b.e);
       const held = JSON.parse(fs.readFileSync(path.join(asksDir(id), 'approve-plan-1'), 'utf8'));
-      assert.deepEqual([held.proposed, held.given], [{ implement: 7, review: 3 }, { review: 4 }]);
+      assert.deepEqual(held.budgets, { review: 4, implement: 7 });
       assert.ok(printed.includes('   cap  review $4.00') && printed.includes('   cap  implement $7.00'), printed.join('\n'));
     },
   );

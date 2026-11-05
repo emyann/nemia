@@ -12,7 +12,7 @@ const approving = (r: { request: () => { method: () => string }; url: () => stri
   r.request().method() === 'POST' && new URL(r.url()).pathname === `/api/runs/${BUDGETING.id}/steps/${BUDGETING.gated}/approve`;
 
 /** The JSON of the approval file `file`, or nothing where it is not there. */
-const approvalIn = (file: string): { proposed?: Record<string, number>; given?: Record<string, number> } =>
+const approvalIn = (file: string): { budgets?: Record<string, number> } =>
   fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : {};
 
 /** The rows of `budgets`, the one above its step's own budget saying so and the other not. */
@@ -39,8 +39,8 @@ export default {
   /**
    * A gate whose step proposes the budgets of the steps after it as data: drawn beside Approve, a row a step — its amount in a field, its
    * own budget, `above the workflow's $40.00` where it is above it, why — and the run's line. Review's amount changed from $8 to $6,
-   * Approve sends that change alone (`budgets: [{ step: 'review', usd: 6 }]`); the api writes the proposal and that change into the
-   * approval, apart, and the step, read again, shows the caps its approval set (`gate.budgets.from === 'approved'`), implement's $60 still said above. Taken back, and
+   * Approve sends that change alone (`budgets: [{ step: 'review', usd: 6 }]`); the api writes the caps into the approval, and the step,
+   * read again, shows the caps its approval set (`gate.budgets.from === 'approved'`), implement's $60 still said above. Taken back, and
    * the run with it.
    */
   name: 'gate-budgets',
@@ -74,10 +74,8 @@ export default {
       if (approved.status() !== 202)
         throw new Refused(`the api takes the approval with its budgets — it answered ${approved.status()}: ${await approved.text()}`);
       const file = approvalIn(path.join(asks, `approve-${gated}-1`));
-      const proposedKept = file.proposed?.[above.step] === above.usd && file.proposed[under.step] === under.usd;
-      const givenKept = file.given?.[under.step] === under.given && Object.keys(file.given).length === 1;
-      if (!proposedKept || Object.keys(file.proposed ?? {}).length !== 2 || !givenKept)
-        throw new Refused(`the approval keeps the proposal and the person's amount apart — it holds ${JSON.stringify(file)}`);
+      if (file.budgets?.[above.step] !== above.usd || file.budgets[under.step] !== under.given || Object.keys(file.budgets).length !== 2)
+        throw new Refused(`the approval holds the proposal's caps with the person's over them — it holds ${JSON.stringify(file)}`);
 
       const caps = page.locator(`section[aria-label="The approval of ${gated}"] section[data-gate-budgets="approved"]`);
       await expectVisible(caps, `read again, ${gated}'s approval shows the caps it set`);

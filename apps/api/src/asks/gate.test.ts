@@ -322,8 +322,8 @@ test('POST …/approve with `budgets`: the caps a person gives the later steps w
     gatedRun(id);
     const res = await approveOver('plan', { budgets: [{ step: 'review', usd: 4 }] }, BOARD, id);
     assert.equal(res.status, 202, await res.clone().text());
-    const written = JSON.parse(fs.readFileSync(approvalFile(id, 'plan', 1), 'utf8')) as { proposed?: unknown; given?: unknown };
-    assert.deepEqual([written.proposed, written.given], [undefined, { review: 4 }], 'plan proposed none, and the person gave review $4');
+    const written = JSON.parse(fs.readFileSync(approvalFile(id, 'plan', 1), 'utf8')) as { budgets?: unknown };
+    assert.deepEqual(written.budgets, { review: 4 });
     const plan = (await object(id)).status.steps.find((s) => s.name === 'plan');
     assert.equal(plan?.gate?.budgets?.from, 'approved');
     assert.deepEqual(

@@ -7,7 +7,7 @@ import type { Closeout } from '../closeout/index.ts';
 import type { Run } from '../record/record.ts';
 import { approvalOf, budgetOf, dollars, hasGate, runSpend, spentWord, stepSpend, type SpendOf } from '../status/status.ts';
 import type { Workflow } from '../step/step.ts';
-import { aboveTheWorkflow, budgetRefusals, budgetsIn, capsOf, ceilingsOf, proposedBudgets } from '../budget/budget.ts';
+import { aboveTheWorkflow, budgetRefusals, ceilingsOf, proposedBudgets } from '../budget/budget.ts';
 
 /** Where a gate's budgets come from: its step's closeout, before the approval, or the approval itself. */
 export type GateBudgetsFrom = 'proposed' | 'approved';
@@ -38,10 +38,10 @@ export function gateBudgets(
   if (!hasGate(step, run)) return undefined;
   const proposed = proposedBudgets(step, said);
   const approval = approvalOf(run, step.name);
-  const given = budgetsIn(approval?.given);
-  const approved = capsOf(budgetsIn(approval?.proposed), given).map((c) => ({
-    ...c,
-    why: given.some((g) => g.step === c.step) ? null : (proposed.find((p) => p.step === c.step)?.why ?? null),
+  const approved = Object.entries(approval?.budgets ?? {}).map(([name, usd]) => ({
+    step: name,
+    usd,
+    why: proposed.find((p) => p.step === name && p.usd === usd)?.why ?? null,
   }));
   if (!approval && budgetRefusals(step, steps, said).length) return undefined;
   const from: GateBudgetsFrom = approval ? 'approved' : 'proposed';

@@ -7,7 +7,7 @@
  *
  * Pure. The four functions a contract proves are typed by `contracts/budget.contract.ts`.
  */
-import type { AboveTheWorkflow, ApprovedCap, ApprovedCaps, CapInForce, ProposalRefusal } from '../../contracts/budget.contract.ts';
+import type { AboveTheWorkflow, ApprovedCaps, CapInForce, ProposalRefusal, Unchanged } from '../../contracts/budget.contract.ts';
 import type { Closeout } from '../closeout/index.ts';
 import { fieldsOf, itemsOf, sameSchema } from '../shape/shape.ts';
 import type { Workflow } from '../step/step.ts';
@@ -150,33 +150,22 @@ export const proposalRefusal: ProposalRefusal = (budgets, later) => {
   return null;
 };
 
+/** What stands of a proposal once a person gave amounts: each budget it made for a step they gave none, in its order. */
+export const unchanged: Unchanged = (proposed, given) => {
+  const kept: StepBudget[] = [];
+  for (const p of proposed) if (!given.some((g) => g.step === p.step)) kept.push(p);
+  return kept;
+};
+
 /**
- * What an approval writes: the budgets the step proposed and those the person gave, each as it came, kept apart so that the cap of a step
- * is read from both (`approvedCap`). Refused where a budget the person gave cannot be set (`proposalRefusal`).
+ * The caps an approval sets: each budget the person gave, then each the step proposed that the person did not change. Refused where a
+ * budget the person gave cannot be set (`proposalRefusal`).
  */
 export const approvedCaps: ApprovedCaps = (proposed, given, later) => {
   const refused = proposalRefusal(given, later);
   if (refused !== null) return { refused };
-  return { proposed: [...proposed], given: [...given] };
+  return { caps: [...given, ...unchanged(proposed, given)] };
 };
-
-/** The cap an approval sets for `step`: the amount the person gave it, else the one the step proposed, else none. */
-export const approvedCap: ApprovedCap = (proposed, given, step) =>
-  given.find((g) => g.step === step)?.usd ?? proposed.find((p) => p.step === step)?.usd;
-
-/** The caps an approval sets, a step each, in the order the proposal and then the person named them: what a gate and a print show. */
-export const capsOf = (proposed: readonly StepBudget[], given: readonly StepBudget[]): StepBudget[] =>
-  [...proposed, ...given]
-    .map((b) => b.step)
-    .filter((step, i, all) => all.indexOf(step) === i)
-    .flatMap((step) => {
-      const usd = approvedCap(proposed, given, step);
-      return usd === undefined ? [] : [{ step, usd }];
-    });
-
-/** A record of dollars by step, as an approval's file holds a list of budgets: none for none. */
-export const budgetsIn = (record: Readonly<Record<string, number>> | undefined): StepBudget[] =>
-  Object.entries(record ?? {}).map(([step, usd]) => ({ step, usd }));
 
 /** The cap a step is filed and judged under: a raise of its own try, else the last approval given, else its own `budget:`, or none. */
 export const capInForce: CapInForce = (i) => i.raised ?? i.approved.at(-1) ?? i.workflow;
@@ -206,7 +195,7 @@ export const budgetArgs = (budgets: readonly StepBudget[]): string[] => budgets.
 export const approvedCapsOf = (run: Run, step: string): number[] => {
   let last: { at: string; usd: number } | undefined;
   for (const a of run.approvals ?? []) {
-    const usd = approvedCap(budgetsIn(a.proposed), budgetsIn(a.given), step);
+    const usd = a.budgets?.[step];
     if (usd === undefined || a.try !== tryOf(run, a.step)) continue;
     if (last === undefined || a.at >= last.at) last = { at: a.at, usd };
   }

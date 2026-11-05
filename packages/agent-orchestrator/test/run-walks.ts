@@ -100,7 +100,7 @@ const READ: Walk[] = [
     walk: ({ door }) => {
       made(door, 'w-read');
       const hold = act(door.holds.put(idOf('w-read'), ['other-run'], {}));
-      const ask = { step: 'implement', try: 1, at, message: 'yes', proposed: { review: 3 }, given: { review: 4 } };
+      const ask = { step: 'implement', try: 1, at, message: 'yes', budgets: { review: 4 } };
       act(door.asks.write(idOf('w-read'), { kind: 'approve', of: 'gate', ask }));
       const cancelledAt = act(door.runs.cancel(idOf('w-read')));
       const read = act(door.runs.read(idOf('w-read'))) as Run;
@@ -116,7 +116,7 @@ const READ: Walk[] = [
       brief: 'add a flag',
       hold: ['other-run'],
       held: true,
-      approvals: [{ step: 'implement', try: 1, at, message: 'yes', proposed: { review: 3 }, given: { review: 4 } }],
+      approvals: [{ step: 'implement', try: 1, at, message: 'yes', budgets: { review: 4 } }],
       cancelled: true,
     },
   },

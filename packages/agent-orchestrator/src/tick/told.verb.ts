@@ -331,6 +331,6 @@ export const tryTold = (
   ...(t.refusal ? { refusal: t.refusal } : {}),
   ...(t.status === 'denied' ? { denied: (record.taskId === null ? undefined : f.reads.spendOf(record.taskId))?.denied ?? [] } : {}),
   ...(t.status === 'unsigned' ? lacksTold(f.run, r.step, record) : {}),
-  ...(t.status === 'unsigned' ? refusedTold(stepNamed(f, r.step), f.reads.signedOff(r.step)) : {}),
+  ...(t.status === 'unsigned' ? refusedTold(stepNamed(f, r.step), f.reads.signedOff(r.step), f.reads.steps) : {}),
   ...(r.back?.[0] !== undefined ? { ending: endingSaid(f, stepNamed(f, r.back[0])) } : {}),
 });

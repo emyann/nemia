@@ -467,7 +467,7 @@ export function retriesDue(
       retriesSpent(record) < (step.retries ?? 0)
     ) {
       due.push({ step: step.name, try: next, mode: 'continue', by: 'retries' });
-    } else if (status === 'unsigned' && signoffDue(record, askedCloseout(record.taskId), refusedOf(step, closeoutOf(step.name)))) {
+    } else if (status === 'unsigned' && signoffDue(record, askedCloseout(record.taskId), refusedOf(step, closeoutOf(step.name), steps))) {
       due.push({ step: step.name, try: next, mode: 'continue', by: 'signoff' });
     }
   }
@@ -475,7 +475,8 @@ export function retriesDue(
 }
 
 /** Whether the run refuses a closeout's envelope or its questions (`closeoutRefusals`): a closeout not given is not. */
-const refusedOf = (step: Workflow, said: Closeout | undefined): boolean => Boolean(said && closeoutRefusals(step, said).length);
+const refusedOf = (step: Workflow, said: Closeout | undefined, steps: readonly Workflow[]): boolean =>
+  Boolean(said && closeoutRefusals(step, said, steps).length);
 
 /** Who asked for a try by its ask: `nemia pause --now`, where the ask names the task it stopped, else a person. */
 const askedBy = (ask: RetryAsk): 'ask' | 'pause' => (ask.interrupted === undefined ? 'ask' : 'pause');

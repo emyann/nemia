@@ -523,7 +523,7 @@ Each answers what waits on the person. Bring the matter first, with the `bring-w
                                question: "<n>=a,c" chooses several where it takes several,
                                "<n>=a: <words>" adds your own words, "<n>: <words>" says words
                                alone; --message is then the note under your answers
-  nemia approve <runId> [<step>] [--answer <n>=<letter>]... [--message "<words>"]
+  nemia approve <runId> [<step>] [--answer <n>=<letter>]... [--budget <step>=<amount>]... [--message "<words>"]
                                let a step waiting at its gate hand on: what waits on it is filed on
                                the next tick, and every step after the gate is handed your words
                                under ## Approved. To send it back instead, with what to change:
@@ -539,4 +539,9 @@ Each answers what waits on the person. Bring the matter first, with the `bring-w
                                question: "<n>=a,c" chooses several where it takes several,
                                "<n>=a: <words>" adds your own words, "<n>: <words>" says words
                                alone; --message is then the note under your answers
+                               --budget <step>=<amount>: the cap of a step after the gate, in
+                               dollars, over what the step proposed for it; once for each step.
+                               Your approval makes the budgets the step proposed the caps of the
+                               steps after the gate, and auto never approves unasked a cap above
+                               a step's own budget
 ```

@@ -784,7 +784,7 @@ test("a step over its budget is tried again only on a person's `--budget` above 
     assert.deepEqual(raised.tries?.at(-1), { taskId: 't1', check: { taskId: 'c1' }, cause: 'fresh', budget: 10 });
     assert.equal(tryNote(BUDGETED[0], raised), 'try 3, fresh, on your word, budget $10');
     const on3: Run = { ...r, steps: { ...r.steps, implement: { ...raised, check: { taskId: 'c2' } } } };
-    assert.equal(budgetOf(BUDGETED[0], on3.steps.implement), 10);
+    assert.equal(budgetOf(BUDGETED[0], on3), 10);
     const p3 = phases({ ...REFUSED_TWICE, t2: 'succeeded', c2: 'failed' });
     const status = (t2: number) =>
       stepStatus(BUDGETED[0], on3, p3, signedDone, asked, BUDGETED, spends({ t0: 1.75, t1: 2.5, t2 }), OVER.verdict);

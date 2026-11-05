@@ -139,7 +139,12 @@ turn is its sign-off: an agent that runs long commands (the e2e) is told to run 
 off with one running (an engineer's first web build once signed off before its e2e ended). A closeout signed `blocked` is read on its
 own, so an agent that asks in rounds carries everything settled so far in each one: an interviewer's third round once dropped its earlier
 decisions. Declare the questions as a field of the output schema, `{ "x-shape": "questions", "description": "…" }`, which the loader
-expands to one strict shape: the board draws them as choices a person answers by clicking.
+expands to one strict shape: the board draws them as choices a person answers by clicking. A gated step that knows what the steps after
+it will cost declares `{ "x-shape": "budgets", "description": "…" }` beside them: a list of `{ step, usd, why }`, each a step after the
+gate, once, in dollars above zero, `why` the figures the amount went by. The gate shows them beside the closeout, and approving it makes
+them those steps' caps, with any amount the person changed (`nemia approve <run> <step> --budget <step>=<amount>`); a cap above a step's
+own `budget:` is said there, and never approved unasked. A closeout whose budgets name another step, or no amount, is refused back to its
+session.
 
 ## Check it
 

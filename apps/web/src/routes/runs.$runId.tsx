@@ -375,15 +375,15 @@ function StepSection({ run, step, runCancelled }: { run: RunView; step: StepView
 
       {atGate ? <AtGate run={run} step={step} acts={acts} /> : handedOn}
 
-      {gate?.approval && <Approved step={step.name} approval={gate.approval} ends={ends} />}
+      {gate?.approval && <Approved step={step.name} approval={gate.approval} ends={ends} budgets={gate.budgets} />}
     </section>
   );
 }
 
 /**
  * A step at its gate, under its section: its policy drawn open, then the gate. An ending's (`acts`) beside the work it would act on,
- * sending back the steps it waits on; any other beside what the step handed on, with the questions it asks (`askedIn`), sending back the
- * step.
+ * sending back the steps it waits on; any other beside what the step handed on, with the questions it asks (`askedIn`) and the budgets
+ * it proposes for the steps after it (`gate.budgets`), sending back the step.
  */
 function AtGate({ run, step, acts }: { run: RunView; step: StepView; acts: boolean }) {
   const back = acts
@@ -405,6 +405,7 @@ function AtGate({ run, step, acts }: { run: RunView; step: StepView; acts: boole
           back={back}
           closeout={step.closeout}
           questions={askedIn(step.closeout)}
+          budgets={step.gate?.budgets}
         />
       )}
     </>

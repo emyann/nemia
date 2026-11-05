@@ -247,6 +247,7 @@ test("REFUSED on the source: a value import from the format's leaf back to a fol
   files.set('src/step/step.ts', `${files.get('src/step/step.ts')}\nimport { countOf } from '../keys/index.ts';`);
   assert.deepEqual(cycles(valueGraph(files)), [
     [
+      'src/budget/budget.ts',
       'src/closeout/closeout.ts',
       'src/closeout/envelope.ts',
       'src/closeout/handed-closeout.ts',
@@ -261,6 +262,7 @@ test("REFUSED on the source: a value import from the format's leaf back to a fol
       'src/question/numbered.ts',
       'src/question/question.ts',
       'src/step/step.ts',
+      'src/workspace/workspace.ts',
     ],
   ]);
 });

@@ -16,6 +16,7 @@ import {
   ATTEMPT_ENDS,
   CHECK_RESULTS,
   ENGINE_OUTCOMES,
+  GATE_BUDGETS_FROM,
   HANDED_HOW,
   OUTCOMES,
   PEAK_MARKS,
@@ -283,12 +284,34 @@ const StepArtifact = Schema.Union([
 ]);
 
 /**
+ * The budgets a gated step proposes for the steps after it, or the caps its approval set (`GateBudgets`, tries.verb.ts): per step, the
+ * amount and its words, why the step proposed it (null where it did not say, or the person gave it), the step's own `budget:` (null
+ * where it has none) and whether the amount is above it; then the run's line in a person's words, what it has spent and the most it may
+ * cost under these caps.
+ */
+const GateBudgets = Schema.Struct({
+  from: Schema.Literals(GATE_BUDGETS_FROM),
+  steps: List(
+    Schema.Struct({
+      step: Schema.String,
+      usd: Schema.Finite,
+      said: Schema.String,
+      why: NullString,
+      workflow: Schema.NullOr(Schema.Finite),
+      above: Schema.Boolean,
+    }),
+  ),
+  said: Schema.String,
+});
+
+/**
  * A step's gate, awaiting approval or approved (`StepGate`, tries.verb.ts) — and a looping step's, once a person approved its try out of
  * rounds as it stands (`nemia approve` of a loop), its approval that acceptance.
  */
 const StepGate = Schema.Struct({
   awaiting: Schema.Boolean,
   approval: Schema.NullOr(Schema.Struct({ try: Schema.Finite, at: Schema.String, message: NullString })),
+  budgets: Schema.optionalKey(GateBudgets),
 });
 
 /** Words a person said to a session while it ran (`Said`, say.ts). */

@@ -3,6 +3,7 @@
  * person approved or accepted before it (`fromSection`, `approvedSection`, `acceptedSection`); and the lines `nemia decide` prints of a
  * gate and of an accepted loop (`gateLines`, `acceptedLines`). Pure.
  */
+import { proposedBudgets } from '../budget/budget.ts';
 import { LOOP_REPLIES, outputFields, type Workflow } from '../step/step.ts';
 import { andList, dataBlock, fenced, type CloseoutAsked, type Run, type StepStatus, type TaskPhase } from '../record/record.ts';
 import { declaredOutput, type Closeout } from '../closeout/index.ts';
@@ -579,10 +580,19 @@ export function acceptedSection(
 }
 
 /**
+ * The approval a person types at `step`'s gate: an `--answer` for each question its closeout asks, and `[--budget <step>=<amount>]...`
+ * where it proposes budgets for the steps after it.
+ */
+function approveCommand(run: Run, step: Workflow, said: Closeout | undefined): string {
+  const budgets = proposedBudgets(step, said).length ? ' [--budget <step>=<amount>]...' : '';
+  return `nemia approve ${run.id} ${step.name} ${answersOr(step, said, '[--message "<words>"]')}${budgets}`;
+}
+
+/**
  * What `nemia decide` prints under each gated step whose gate has something to say: `approved 23:10Z — "ship the second reading"` for the
  * try it is on, or `awaiting approval` with the two commands a person has, the approval with an `--answer` for each question the step's
- * closeout asks (`answersOr`). Nothing for a gated step not yet signed off, nor for one with no
- * gate. Pure.
+ * closeout asks (`answersOr`) and the budgets it proposes (`approveCommand`). Nothing for a gated step not yet signed off, nor for one with
+ * no gate. Pure.
  *
  * An ending whose work a try or round due files again holds no gate (`unheld`), as `assess`, `listing` and `decision` read it, since
  * `nemia approve` refuses it then. On a pruned run the gate is never approved (`prunedRefusal`); on a held one it is not asked for until
@@ -627,7 +637,7 @@ export function gateLines(
         .map((name) => `nemia retry ${run.id} ${name} --message "<objection>"`)
         .join(' or ');
       lines[step.name] =
-        `awaiting approval:  nemia approve ${run.id} ${step.name} ${answersOr(step, closeoutOf(step.name), '[--message "<words>"]')}${back ? `  — or send it back:  ${back}` : ''}`;
+        `awaiting approval:  ${approveCommand(run, step, closeoutOf(step.name))}${back ? `  — or send it back:  ${back}` : ''}`;
     }
   }
   return lines;

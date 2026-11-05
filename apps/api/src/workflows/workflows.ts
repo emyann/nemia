@@ -26,6 +26,7 @@ import {
   DEFAULT_FACTORY,
   fillsOf,
   foldersIn,
+  foldersLoaded,
   inboxNameRefusal,
   START as START_ENTRY,
   startFactory,
@@ -53,7 +54,7 @@ import { refusedBeforeReading, type Guarded, type Refusal } from '../guard.ts';
 import { type ApiEnv, served, type Served } from '../layer.ts';
 import { StoreRoot, type Engine } from '../store.ts';
 import { graphOf, workflowVersion, type RunGraph } from 'agent-orchestrator';
-import { commandNamed, runPlaced } from '../store.ts';
+import { runPlaced } from '../store.ts';
 import type { PlaceService } from 'agent-orchestrator';
 
 /** Where a workflow is read from: the repository's `workflows/`, or yours, in the store. */
@@ -257,12 +258,10 @@ export const sourcesOf = (repo: string, home: string, tree?: string): Array<{ fr
 const unshadowed = <T extends { from: WorkflowSource }>(found: readonly T[], name: (t: T) => string = () => ''): T[] =>
   found.filter((f, i) => found.findIndex((g) => g.from === f.from && name(g) === name(f)) === i);
 
-/** The table's entries the board's workflows are read through, each served on the api alone. */
-const LIST = commandNamed('workflows');
-
 /**
- * Each folder `dirs` names, loaded as a start on `repo` would load it, in `factory` with its hires: the table's `workflows`, by
- * folder.
+ * Each folder `dirs` names, loaded as a start on `repo` would load it, in `factory` with its hires and rules (`foldersLoaded`, what the
+ * table's `workflows` runs), by folder. The factory is handed whole, so one the store does not hold — a template's render — loads as a
+ * factory applied from it would.
  */
 export const loadedOf = async (
   e: Engine['Service'],
@@ -271,12 +270,7 @@ export const loadedOf = async (
   repo: string,
   home: string,
   factory?: Factory,
-) =>
-  (await runPlaced(
-    { placeService, home },
-    e,
-    LIST.handler({ dirs, repo, ...(factory && { factory: factory.name }) }, undefined, home),
-  )) as Record<string, FolderLoaded>;
+) => (await runPlaced({ placeService, home }, e, foldersLoaded(dirs, { repo, home }, factory))) as Record<string, FolderLoaded>;
 
 /** The loading of the folder `dir` among `loaded`, which `loadedOf` gives for each folder it was asked: thrown, naming it, where none. */
 export function loadedAt(loaded: Readonly<Record<string, FolderLoaded>>, dir: string): FolderLoaded {

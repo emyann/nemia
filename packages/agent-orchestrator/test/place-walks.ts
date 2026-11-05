@@ -821,7 +821,61 @@ const STATUS: readonly Walk[] = [
     },
     says: {
       conflicted: { answer: { conflicted: true, merging: 'ours', missing: [], tip: 'commit-1' } },
-      landed: { answer: { conflicted: false, merging: 'none', missing: [], tip: 'commit-2' } },
+      landed: { answer: { conflicted: false, merging: 'none', missing: [], tip: 'commit-2', landedBy: 'commit-2' } },
+    },
+  },
+  {
+    name: 'a result landed is read by the commit that brought it onto the line, never by the tip once another came on top of it',
+    walk: (side, area) => {
+      const { root, base, work } = forked(side, area);
+      const ask = (tips: Record<string, string>) => side.place.askNow('status', { repo: root, tips });
+      side.world.stage(root, 'work');
+      side.place.askNow('land', { repo: root, act: 'commit', message: 'land work' });
+      const first = side.world.head(root);
+      const other = side.world.branch(root, 'other', { 'c.txt': 'three\n' }, base);
+      side.world.stage(root, 'other');
+      side.place.askNow('land', { repo: root, act: 'commit', message: 'land other' });
+      const second = side.world.head(root);
+      const merged = { work: ask({ work }), both: ask({ work, other }), none: ask({}) };
+      const moved = side.world.branch(root, 'moved', { 'd.txt': 'four\n' }, second);
+      side.world.putBack(root, moved);
+      const onTop = side.world.branch(root, 'main', { 'e.txt': 'five\n' });
+      const forward = { moved: ask({ moved }), all: ask({ work, moved }) };
+      return { first, second, moved, onTop, merged, forward };
+    },
+    says: {
+      first: 'commit-1',
+      second: 'commit-4',
+      moved: 'commit-2',
+      onTop: 'commit-3',
+      merged: {
+        work: { answer: { conflicted: false, merging: 'none', missing: [], tip: 'commit-4', landedBy: 'commit-1' } },
+        both: { answer: { conflicted: false, merging: 'none', missing: [], tip: 'commit-4', landedBy: 'commit-4' } },
+        none: { answer: { conflicted: false, merging: 'none', missing: [], tip: 'commit-4' } },
+      },
+      forward: {
+        moved: { answer: { conflicted: false, merging: 'none', missing: [], tip: 'commit-3', landedBy: 'commit-2' } },
+        all: { answer: { conflicted: false, merging: 'none', missing: [], tip: 'commit-3', landedBy: 'commit-2' } },
+      },
+    },
+  },
+  {
+    name: 'a tip that reaches the line only through a commit of another branch is read by the merge that brought that branch in',
+    walk: (side, area) => {
+      const { root, work } = forked(side, area);
+      const deeper = side.world.branch(root, 'deeper', { 'c.txt': 'three\n' }, work);
+      side.world.stage(root, 'deeper');
+      side.place.askNow('land', { repo: root, act: 'commit', message: 'land deeper' });
+      const merge = side.world.head(root);
+      const onTop = side.world.branch(root, 'main', { 'd.txt': 'four\n' });
+      return { work, deeper, merge, onTop, status: side.place.askNow('status', { repo: root, tips: { work } }) };
+    },
+    says: {
+      deeper: 'commit-1',
+      merge: 'commit-2',
+      onTop: 'commit-3',
+      status: { answer: { conflicted: false, merging: 'none', missing: [], tip: 'commit-3', landedBy: 'commit-2' } },
+      work: 'commit-4',
     },
   },
   {

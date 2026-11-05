@@ -100,7 +100,8 @@ export type Landing =
  *   step gave no message to commit it with. A check that refused it names the base the merge was staged on (`refusedBase`).
  * - **record**, with no merge of the run's to act on: the step ended anything but done with nothing staged; it signed off done having
  *   staged none (nothing is checked or committed); the check passed and the result is on the checkout's HEAD already (it landed there as
- *   that commit); or the check ended and the merge it judged is no longer staged.
+ *   the commit that brought it onto the base, the place's `landedBy`: never HEAD itself, which another landing may have moved on top of it
+ *   while the check ran); or the check ended and the merge it judged is no longer staged.
  */
 export function landingDue(
   step: Workflow,
@@ -141,7 +142,7 @@ export function landingDue(
   }
   if (check === 'succeeded') {
     if (ours) return message?.trim() ? { act: 'commit', message } : end(`${step.name} signed off no commit message`);
-    if (onHead && tip) return { act: 'record', landed: { commit: tip } };
+    if (onHead && read.landedBy) return { act: 'record', landed: { commit: read.landedBy } };
     return {
       act: 'record',
       landed: { aborted: 'its check passed, and the merge it judged was no longer staged, so nothing was committed' },

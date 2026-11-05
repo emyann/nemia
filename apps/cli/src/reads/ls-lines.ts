@@ -240,11 +240,16 @@ const heldCount = ({ staged, held }: Pick<Paused, 'staged' | 'held'>): string =>
 const pausingWords = (sessions: number, leftMs: number): string =>
   `Pausing: ${sessions} session${sessions === 1 ? '' : 's'} finishing a tool call, cut ${leftMs > 0 ? `in ${Math.ceil(leftMs / 60_000)} min` : 'now'}`;
 
-/** What the pause does, as the orchestrator's `pauseDoes` says it: a timed pause parks each session at its call's end; none runs on. */
+/**
+ * What the pause does, as the orchestrator's `pauseDoes` says it: a pause at once cuts each session and parks it; a timed one parks it at
+ * its call's end; none runs on.
+ */
 const pauseDoes = ({ timeoutMs }: NonNullable<Paused['pause']>): string =>
-  timeoutMs !== undefined
-    ? 'nothing new starts, and each working session stops when its current tool call ends, cut once the timeout passes'
-    : 'nothing new starts, and each working session runs on to its end';
+  timeoutMs === 0
+    ? 'nothing new starts, and each working session is cut at once and parks'
+    : timeoutMs !== undefined
+      ? 'nothing new starts, and each working session stops when its current tool call ends, cut once the timeout passes'
+      : 'nothing new starts, and each working session runs on to its end';
 
 const pausedWords = (paused: Paused, now: Date = new Date()): string | null => {
   const { pause, finishing } = paused;

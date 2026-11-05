@@ -53,7 +53,11 @@ const wrote = (dir: string, file: string): unknown[] => {
   }
 };
 
-/** How many of the stand-in's hooks of `event` were answered. */
+/**
+ * How many of the stand-in's hooks of `event` were answered. The bin writes its hold file inside the hook, before it returns, and the
+ * stand-in notes the answer only once the SDK has carried it back: so a test waits for the answer and reads the hold file after it,
+ * never the hold file and then the answer.
+ */
 const answered = (dir: string, event: string): number =>
   wrote(dir, 'answers.jsonl').filter((a) => (a as { event?: string }).event === event).length;
 
@@ -171,11 +175,11 @@ test(
       liftSessionDrain(a.root);
       await until(
         c,
-        () => a.hold()?.calling?.tool === 'Edit',
-        () => `the held call in flight: ${JSON.stringify(a.hold())}`,
+        () => answered(a.dir, 'PreToolUse') === 2,
+        () => `the held call's hook answered: ${JSON.stringify(a.hold())}`,
         { everyMs: 20 },
       );
-      assert.equal(answered(a.dir, 'PreToolUse'), 2, 'its hook answered');
+      assert.equal(a.hold()?.calling?.tool, 'Edit', 'the held call in flight');
       assert.equal(a.hold()?.draining, undefined, 'draining cleared');
       assert.equal(a.hold()?.heldBack, undefined, 'heldBack cleared');
       a.release('release-next');

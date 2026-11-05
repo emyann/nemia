@@ -36,8 +36,9 @@ holds what every change needs.
   (`agent-orchestrator`, `agent-runtime`, `objects`, `api`, `web`, `cli`, `guards`, `templates`). Typecheck and lint run whole: they are cheap. Implement's round check runs the
   declarations, the typecheck and the lint, and pushes the round's commit and waits on GitHub's `ci` context, which runs the whole
   suite on it (`packages/templates/sdlc/workflows/build/implement.md`); the landing's check runs no suite at all — it is the receipt that
-  the pull request `ci` judged was merged (`packages/templates/sdlc/workflows/build/landing.ts`) — so the commit `ci` passed on is the
-  last thing any suite reads; a session runs the whole suite only to measure it, as the e2e's rule says.
+  the pull request `ci` judged was merged (`packages/templates/sdlc/workflows/build/landing.ts`), then a wait on main's own `ci` at the
+  merge commit, so a landing that turns main red fails its land step — so no step's suite reads the merged tree, and main's own `ci`
+  is the last word on it; a session runs the whole suite only to measure it, as the e2e's rule says.
   A failing test it did not run is the check's refusal, answered in the next try. Outside a run no check
   follows you: run the whole suite before you commit.
 - `npm run typecheck` — `tsrs --noEmit` per package, over its `src` and its `test/` (the web's `test/e2e/` under its own tsconfig, and the

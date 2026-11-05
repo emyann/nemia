@@ -52,7 +52,8 @@ const RETRY_SHAPE =
 const REFRESH_SHAPE = '`{ "base"?: true, "step"?: "<looping step>" }`';
 
 /** The body `POST …/approve` takes: `nemia approve`'s `--message`, as JSON. */
-const APPROVE_SHAPE = '`{ "message"?: "<words>", "answers"?: [{ "question": "<title>", "chose": ["<label>"], "own"?: "<words>" }] }`';
+const APPROVE_SHAPE =
+  '`{ "message"?: "<words>", "answers"?: [{ "question": "<title>", "chose": ["<label>"], "own"?: "<words>" }], "budgets"?: [{ "step": "<step>", "usd": <amount> }] }`';
 
 /** The body `POST …/say` takes: the words, as `nemia say` takes them. */
 const SAY_SHAPE = '`{ "text": "<words>" }`';

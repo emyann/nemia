@@ -373,8 +373,9 @@ const stopEvent = (stop: SourceStop): ChatEvent => ({
 
 /**
  * The chat, oldest first: each session's events with each turn the person stopped in its place in time, a session line where an attempt
- * began after the first, then each outbox entry no said carries yet, undelivered: the person's, or a peer's where an agent wrote it. A tool call with no result is
- * `pending`, but the session's last, which is `running`, or `waits` where the phase says the task needs the person. Pure.
+ * began after the first, then each outbox entry no said carries yet, undelivered: the person's, or a peer's where an agent wrote it. A
+ * tool call with no result is `pending`, but the session's last, which is `running`, or `waits` where the phase says the task needs the
+ * person. Pure.
  */
 export function projectChat(sources: ChatSources): ChatEvent[] {
   const claims = claimsOf(sources);

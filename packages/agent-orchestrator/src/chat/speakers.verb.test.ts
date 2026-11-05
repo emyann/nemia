@@ -12,7 +12,7 @@ import { CHAT_ALLOW, CHAT_DISALLOW, CHAT_SPEAKERS } from './speakers.verb.ts';
 import { speakersFile } from './chat.store.ts';
 
 /** The tag a handler's refusal carries, or undefined where it answered. */
-const refusedAs = async (program: Effect.Effect<unknown, unknown, never>): Promise<string | undefined> => {
+const refusedAs = async (program: Effect.Effect<unknown, unknown>): Promise<string | undefined> => {
   const exit = await Effect.runPromiseExit(program);
   if (Exit.isSuccess(exit)) return undefined;
   const failure = exit.cause.reasons.find((r) => r._tag === 'Fail');

@@ -98,7 +98,7 @@ const RECORD: Record<string, Partial<Record<Rule, number>>> = {
   'packages/agent-orchestrator/src/tick/assess.ts': { 'sonarjs/cognitive-complexity': 1 },
   'packages/agent-orchestrator/src/ending/ending.ts': { complexity: 1, 'sonarjs/cognitive-complexity': 1 },
   'packages/agent-orchestrator/src/status/status.ts': { complexity: 1, 'sonarjs/cognitive-complexity': 2 },
-  'packages/agent-orchestrator/src/wait/wait.ts': { complexity: 1, 'sonarjs/cognitive-complexity': 2 },
+  'packages/agent-orchestrator/src/wait/wait.ts': { 'sonarjs/cognitive-complexity': 2 },
   'packages/agent-orchestrator/src/record/record.store.ts': { 'max-lines': 1 },
   'packages/agent-orchestrator/src/timeline/timeline.ts': { complexity: 1, 'sonarjs/cognitive-complexity': 1 },
   'packages/agent-orchestrator/src/workflow/validate.ts': { 'sonarjs/cognitive-complexity': 2 },

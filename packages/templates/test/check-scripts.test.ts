@@ -61,8 +61,8 @@ test("sdlc's checks run only scripts of their own workflow's folder", () => {
           .flatMap((check) => check.scripts),
       ),
     ].sort();
-  assert.deepEqual(named('build'), ['landing.ts', 'probe.ts', 'pull-request.ts']);
-  assert.deepEqual(named('quick'), ['change.ts', 'landing.ts', 'probe.ts', 'pull-request.ts']);
+  assert.deepEqual(named('build'), ['landing.ts', 'parts.ts', 'probe.ts', 'pull-request.ts']);
+  assert.deepEqual(named('quick'), ['change.ts', 'landing.ts', 'parts.ts', 'probe.ts', 'pull-request.ts']);
   assert.deepEqual(named('janitor'), ['cards.ts']);
   assert.deepEqual(strays(SDLC), []);
 });

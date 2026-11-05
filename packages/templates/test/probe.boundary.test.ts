@@ -275,7 +275,7 @@ test("REFUSED at shipped defaults: implement's check, rendered, refuses a live p
   const check = stepsOf(rendering, 'build').find((step) => step.name === 'implement')?.check;
   assert.equal(typeof check, 'string', "sdlc's build has an implement step with a check");
   const scripts = Object.fromEntries(
-    ['landing.ts', 'probe.ts', 'pull-request.ts'].map((name) => [
+    ['landing.ts', 'parts.ts', 'probe.ts', 'pull-request.ts'].map((name) => [
       `workflows/build/${name}`,
       fs.readFileSync(path.join(BUILD, name), 'utf8'),
     ]),

@@ -142,7 +142,7 @@ function closeoutFile(more: Record<string, unknown>): string {
 
 /** The scripts a run's base could hold, which the check never reads from it: quick's `change.ts` and the scripts it carries. */
 const SCRIPTS = Object.fromEntries(
-  ['change.ts', 'landing.ts', 'probe.ts', 'pull-request.ts'].map((name) => [
+  ['change.ts', 'landing.ts', 'parts.ts', 'probe.ts', 'pull-request.ts'].map((name) => [
     `workflows/quick/${name}`,
     fs.readFileSync(path.join(QUICK, name), 'utf8'),
   ]),
@@ -243,7 +243,7 @@ test("REFUSED: implement's check, with no frozen workflow files named, reads no 
 /** An `npx` and an `npm` that fail whatever they are handed: a check that passes over them ran no test, no types, no lint, no page. */
 const UNRUNNABLE: Failing = { npx: 3, e2e: 4, npm: 5 };
 
-test("REFUSED at shipped defaults: implement's check, as rendered, runs its four clauses in order, refuses on each one's refusal, and runs no npm or npx", () => {
+test("REFUSED at shipped defaults: implement's check, as rendered, runs its five clauses in order, refuses on each one's refusal, and runs no npm or npx", () => {
   const { repo, base } = workOn({ 'apps/api/src/a.ts': 'x\n', 'apps/web/src/routes/x.tsx': 'export const x = 1;\n' });
   const files = scratch('wf-quick-files-');
   const signed = { plan: 'p' };
@@ -252,6 +252,7 @@ test("REFUSED at shipped defaults: implement's check, as rendered, runs its four
   const PRINTS = [
     /nemia size: 2 files, 2 lines/,
     /no live probe of run r-1/,
+    /nemia parts: run r-1 has no branch but/,
     /nemia pr: #7 is at [0-9a-f]{12}, the commit this check judges/,
     /nemia ci: `ci` passed on/,
   ];
@@ -276,17 +277,31 @@ test("REFUSED at shipped defaults: implement's check, as rendered, runs its four
   assert.match(probing.err, /cannot tell which probes are live/);
   assert.deepEqual(
     printed(probing).map((at) => at >= 0),
-    [true, false, false, false],
+    [true, false, false, false, false],
     'the probes are read second, after the size',
   );
+
+  git(repo, 'branch', 'wf/r-1/p1', base);
+  git(repo, 'checkout', '-q', 'wf/r-1/p1');
+  commit(repo, { 'b.ts': 'an earlier cut\n' }, 'p1: b.ts');
+  git(repo, 'checkout', '-q', BRANCH);
+  const unsettled = run(signed);
+  assert.notEqual(unsettled.code, 0, unsettled.out);
+  assert.match(unsettled.err, /nemia parts: `wf\/r-1\/p1`/);
+  assert.deepEqual(
+    printed(unsettled).map((at) => at >= 0),
+    [true, true, false, false, false],
+    'the parts are read third, after the probes, and a part left out refuses before anything is pushed',
+  );
+  git(repo, 'branch', '-D', 'wf/r-1/p1');
 
   const unopened = run(signed, {}, [...passing(repo).filter((rule) => rule.when !== 'pr list'), { when: 'pr list', out: '[]' }]);
   assert.notEqual(unopened.code, 0, unopened.out);
   assert.match(unopened.err, /no open pull request has wf\/r-1\/run as its head/);
   assert.deepEqual(
     printed(unopened).map((at) => at >= 0),
-    [true, true, false, false],
-    'the branch is pushed third, after the probes are read',
+    [true, true, true, false, false],
+    'the branch is pushed fourth, after the parts are read',
   );
 
   const red = run(signed, {}, [
@@ -298,13 +313,13 @@ test("REFUSED at shipped defaults: implement's check, as rendered, runs its four
   assert.ok(red.err.includes('nemia retry r-1 implement --recheck'), red.err);
   assert.deepEqual(
     printed(red).map((at) => at >= 0),
-    [true, true, true, false],
+    [true, true, true, true, false],
     'CI is waited on last',
   );
-  for (const refused of [probing, unopened, red]) assert.deepEqual(refused.said, []);
+  for (const refused of [probing, unsettled, unopened, red]) assert.deepEqual(refused.said, []);
 });
 
-test("REFUSED at shipped defaults, in the checkout: implement's check runs the size, the probes and the local check, in that order, pushes nothing and calls no gh", () => {
+test("REFUSED at shipped defaults, in the checkout: implement's check runs the size, the probes, the parts and the local check, in that order, pushes nothing and calls no gh", () => {
   const { repo, base } = workOn({ 'src/a.ts': 'x\n' });
   const bareTip = (): string => execFileSync('git', ['-C', repo, 'ls-remote', 'origin'], { encoding: 'utf8' });
   const run = (exit: number): Ran => {
@@ -323,7 +338,7 @@ test("REFUSED at shipped defaults, in the checkout: implement's check runs the s
     });
     return { code: ran.status, out: ran.stdout, err: ran.stderr, said: said() };
   };
-  const PRINTS = [/nemia size: 1 files, 1 lines/, /no live probe of run r-1/, /local check ran/];
+  const PRINTS = [/nemia size: 1 files, 1 lines/, /no live probe of run r-1/, /nemia parts: run r-1 has no branch but/, /local check ran/];
   const printed = (ran: Ran): number[] => PRINTS.map((line) => ran.out.search(line));
 
   const passed = run(0);
@@ -339,8 +354,8 @@ test("REFUSED at shipped defaults, in the checkout: implement's check runs the s
   assert.notEqual(red.code, 0, red.out);
   assert.deepEqual(
     printed(red).map((at) => at >= 0),
-    [true, true, true],
-    'a failing local check refuses, after the size and the probes',
+    [true, true, true, true],
+    'a failing local check refuses, after the size, the probes and the parts',
   );
   assert.equal(bareTip(), '');
 });
@@ -438,13 +453,17 @@ test("REFUSED: a note or a README that says a bound on the size, or other clause
   const clauses = [...check.matchAll(/node\s+"\$WF_WORKFLOW_FILES\/([\w-]+\.ts)"\s+(size|tests|pages|push|wait)?/g)].map(
     ([, script, verb]) => (verb ? `${script} ${verb}` : script),
   );
-  assert.deepEqual(clauses, ['change.ts size', 'probe.ts', 'pull-request.ts push', 'pull-request.ts wait']);
+  assert.deepEqual(clauses, ['change.ts size', 'probe.ts', 'parts.ts', 'pull-request.ts push', 'pull-request.ts wait']);
   assert.doesNotMatch(check, /\bnpm\b|\bnpx\b/);
   assert.equal(local, '; else { npm run --if-present lint && npm run --if-present typecheck && npm run --if-present test; }; fi');
   const ahead = [...before.matchAll(/node\s+"\$WF_WORKFLOW_FILES\/([\w-]+\.ts)"\s+(size)?/g)].map(([, script, verb]) =>
     verb ? `${script} ${verb}` : script,
   );
-  assert.deepEqual(ahead, ['change.ts size', 'probe.ts'], 'in the checkout, the size and the probes run before the local check');
+  assert.deepEqual(
+    ahead,
+    ['change.ts size', 'probe.ts', 'parts.ts'],
+    'in the checkout, the size, the probes and the parts run before the local check',
+  );
   const runsHere = new RegExp(
     `runs\\s+${ahead.map((clause) => `\`${clause.replace('.', '\\.').replace(' ', '\\s+')}\``).join(',\\s+')}\\s+and\\s+the\\s+local\\s+check,\\s+in\\s+that\\s+order,\\s+and\\s+nothing\\s+else`,
   );
@@ -456,9 +475,9 @@ test("REFUSED: a note or a README that says a bound on the size, or other clause
   );
   for (const file of ['implement.md', 'README.md']) {
     assert.match(said(file), runs, `${file} says what the check runs`);
-    assert.doesNotMatch(said(file).replace('`probe.ts`,', '`probe.ts`, `change.ts tests`,'), runs);
+    assert.doesNotMatch(said(file).replace(/`probe\.ts`,\s+`parts\.ts`,/, '`probe.ts`, `parts.ts`, `change.ts tests`,'), runs);
     assert.match(said(file), runsHere, `${file} says what the check runs in the checkout`);
-    assert.doesNotMatch(said(file).replace('`probe.ts` and the local', '`probe.ts`, `change.ts tests` and the local'), runsHere);
+    assert.doesNotMatch(said(file).replace(/`parts\.ts`\s+and\s+the\s+local/, '`parts.ts`, `change.ts tests` and the local'), runsHere);
   }
   for (const made of /const GENERATED = \[([^\]]*)\];/
     .exec(TEXT)![1]

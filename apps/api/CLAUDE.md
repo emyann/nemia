@@ -58,7 +58,7 @@ from the orchestrator; what it holds today below its layer is in `docs/architect
 - **Every list is watched by `watchable`** (`src/watch/watch.ts`, `?watch=true`): a list's route goes through `listed` in `serve.ts`
   (and `partsRoutes`' and `definitionsRoutes`' `listed`), or it is not watched, which `src/watch/watch.test.ts` refuses for every GET
   list of the `Api`. A watch reads its list again through its own route, so each open one costs a list read per feed line (at most
-  one per 500 ms) and per resync: a watch of runs on a large store keeps the api reading the RunList. Discovery (`GET /api`,
+  one per 500 ms) and per resync: a watch of runs on a busy feed reads the RunList about a third of the time (the measure below). Discovery (`GET /api`,
   `src/discovery/discovery.ts`) is read off the `Api`, so a path added there is discovered with nothing to change. SSE under HttpApi was
   measured on 2026-11-05 (`docs/measure-2026-11-05-sse-under-httpapi.md`): the watch's frames are already HttpApi's and it can move;
   the feed can once its opening comment and its `Last-Event-ID` resume are written through `StreamSse({ events })`. Neither moved yet.

@@ -46,12 +46,16 @@ of the event, no id), an abort of the HttpApi stream ends its fiber, and `OpenAp
 ## The runs watch's re-read cost
 
 A watch reads its list again on a feed line, at most one read in flight and one per `WATCH_SETTLE` (500 ms), and every
-`WATCH_RESYNC` (5 s). Every read again is a whole list read through the route. On the 277-run store measured by run qw07 (the RunList
-5.4 s warm, 35 s cold, before resource-objects-the-runlist-7q76 lands), a watch of runs on a busy feed reads again back to back: one
-5.4 s read, 0.5 s settled, and the next, so each open runs watch keeps the api reading the RunList about 90% of the time. This is derived
-from those numbers, not measured on that store: no watch was opened on the live api. The SSE framing above costs microseconds an event
-beside it. Until the RunList read is cheap, a client should not hold a watch of runs open on a large store; the cards, the factories'
-parts and the definitions read in milliseconds.
+`WATCH_RESYNC` (5 s). Every read again is a whole list read through the route, so on a busy feed a runs watch reads the RunList back
+to back: one read, 0.5 s settled, the next. Derived from the store measures, not measured with a watch open on the live api:
+
+- **Before the RunList read its objects from the informer** (qw07's measure, 277 runs: 5.4 s warm, 35 s cold), each open runs watch
+  would keep the api reading the RunList about 90% of the time (5.4 s of every 5.9 s).
+- **On the base this branch merged** (resource-objects-the-runlist-7q76, `tools/store-measure/baselines/s11-vs-s10.txt`, 282 runs:
+  247 ms warm, 3.8 s cold), about a third of the time (0.25 s of every 0.75 s) per open runs watch on a busy feed, and one read per
+  5 s on a quiet one. The first read of a cold api is the cold read.
+
+The SSE framing above costs microseconds an event beside it. The cards, the factories' parts and the definitions read in milliseconds.
 
 ## Verdict
 

@@ -67,9 +67,8 @@ export const CHECK_DEADLINE_SECONDS = 3300;
  * of it. A constant beside `CHECK_DEADLINE_SECONDS` rather than a step key: one command family of this repository's team lands, and a
  * round's check is measured on its own.
  *
- * On GitHub a landing's check runs no suite: sdlc's `landing.ts receipt` reads the merge, then waits on the base branch's CI context at
- * the merge commit, up to its own whole bound (`WHOLE_SECONDS` in `packages/templates/sdlc/workflows/build/landing.ts`), which
- * `packages/templates/test/landing.boundary.test.ts` holds at least 300 s under this number.
+ * A template's landing check may instead run no suite and wait on CI at the merge commit, up to a bound of its own; the template's tests
+ * read this number from `agent-orchestrator/run` and hold that bound well under it.
  */
 export const LANDING_CHECK_DEADLINE_SECONDS = 2700;
 

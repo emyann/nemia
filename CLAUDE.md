@@ -46,7 +46,8 @@ holds what every change needs.
   `tools/guards/test/suite.test.ts` refuses a test file no typecheck reads. tsrs, the Rust port of TypeScript 7.1's compiler, pinned
   exactly at the root, checks the same files as tsc 6 in about a third of its memory (the seven packages' peaks ~2.3 GB against ~8.3
   GB, measured 2026-11-02), so runs reaching their checks together no longer run the machine out of it. `typescript@6` stays, for
-  the 27 files that import its compiler API, the editor, and the steps' own `npx tsc` measures.
+  the 27 files that import its compiler API, the editor, and a step's `npx tsc --noEmit` where tsc 6 is still wanted: the steps
+  measure with `npx tsrs --noEmit`, the compiler `ci` judges with.
 - `npm run lint` — oxlint (`.oxlintrc.json`) and `oxfmt --check` (`.oxfmtrc.json`); `npm run format` writes the layout. Every shipped
   `check:` runs it after the types. A rule turned off, or a line allowed with `oxlint-disable-next-line`, says why beside it.
 - `npm run build`, then `npm run e2e -- --pages <the pages the change touches>` (and `--photos` when pictures are due), when you touch
@@ -177,8 +178,11 @@ What the `create-an-agent` skill (`packages/agent-orchestrator/skills/create-an-
   board's pinned `npx shadcn view` the settings allow, and `npm test`; intake and the janitor, which run no test, `node --test` and `npx
   turbo run test` besides, while design and review keep the checks their notes name and are refused a build on that line
   (`npx turbo run test *build*`) and a file of the e2e's (`node --test *e2e/*`, the folder: the board's `test/e2e-*.test.ts` stay open). Design and review measure by the compiler and the linter, which the settings allow
-  (`npx tsc --noEmit`, `npx oxlint`), and deny on that line what would write or watch, `tsc`'s options by their first letters in each
-  case, since it reads an option's name in any case and after one dash or two; intake and the janitor deny both whole. Each of the
+  (`npx tsrs --noEmit`, the compiler `ci` judges with, `npx tsc --noEmit` where tsc 6 is still wanted, `npx oxlint`), and deny on that
+  line what would write or watch, each compiler's options by their first letters in each case, since it reads an option's name in any
+  case and after one dash or two, and tsrs's fast mode, whose verdict may differ from the pinned TypeScript's, by `--fast` and by
+  `TSRS_FAST` (`Bash(*=* npx tsrs *)`, any assignment before tsrs, as for git and gh); intake and the janitor deny all three whole.
+  Each of the
   four is told, in one paragraph they hold equal, to put a refused call its work needs at the top of its sign-off, never only in a risk.
 - **In the nemia factory, build's design writes the contracts its spec adds** (`change-a-contract`): the factory's own copy of Seldon,
   in its tree out of git, adds `Write, Edit` to its tools and allows `Edit(packages/*/contracts/*.contract.ts)` and

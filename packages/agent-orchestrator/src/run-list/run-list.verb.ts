@@ -76,7 +76,8 @@ export const runListOf = Effect.fn('runListOf')(function* <R extends Listed, E, 
 
 /**
  * A page of the store's runs (`runListOf`), listed through the informer `how.memo` (`storeRunsListed`) and each run of the page judged
- * into its object (`runObject`) with `reads`, as a list says it (`listed`): no harness asked, no drift read. A program over the engine, the place, the informer and the store's root.
+ * into its object (`runObject`) with `reads`, as a list says it (`listed`): no harness asked, no drift read. A program over the
+ * engine, the place, the informer and the store's root.
  */
 export const runList = Effect.fn('runList')(function* (e: Engine, how: SummaryHow, reads: RunReads, query: RunQuery) {
   return yield* runListOf(yield* storeRunsListed(e, how), query, (run) => runObject(run, { ...reads, listed: true }));

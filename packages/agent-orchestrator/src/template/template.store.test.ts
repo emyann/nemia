@@ -261,15 +261,11 @@ test('what export writes from a repository and a factory, read back as it was wr
     const { when, workflow } = steps.get('to-build') ?? {};
     assert.deepEqual({ when, workflow }, { when: ['web'], workflow: 'build' });
   });
-  await t.test(
-    "a condition's table route: is written as its map",
-    { todo: 'the frontmatter reader reads a `route:` map once the parser takes one' },
-    () => {
-      const dir = target();
-      exportTemplate({ dir, from: routedRepo('{ from: implement.surface, table: { web: web, docs: docs } }') });
-      assert.deepEqual(stepsOf(dir, 'dev').get('triage')?.route, { from: 'implement.surface', table: { web: 'web', docs: 'docs' } });
-    },
-  );
+  await t.test("a condition's table route: is written as its map", () => {
+    const dir = target();
+    exportTemplate({ dir, from: routedRepo('{ from: implement.surface, table: { web: web, docs: docs } }') });
+    assert.deepEqual(stepsOf(dir, 'dev').get('triage')?.route, { from: 'implement.surface', table: { web: 'web', docs: 'docs' } });
+  });
   await t.test("a step's own output: is written as a {path:} from the template's root, its schema carried beside it", () => {
     const repo = repoWithTeam();
     plantStepOutput(path.join(repo, 'workflows'));

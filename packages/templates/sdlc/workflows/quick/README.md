@@ -16,7 +16,9 @@ it. Its size bounds nothing: the review reads every file and every line, tests a
 be touched.
 
 Everything else goes through [`build`](../build/README.md): a change that needs a design, or one a review is likely to send back twice.
-A card says which with `workflow: quick` or `workflow: build`.
+A card says which with `workflow: quick` or `workflow: build`, and an intake run says which by its ending: intake's condition
+`next` routes an intent that needs no design here, its node `to-quick` filing the card with `from:` the intake run, once the person
+approves the route ([intake](../intake/README.md)).
 
 ## Two ways to judge and land: in this checkout, or on GitHub
 

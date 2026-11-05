@@ -327,22 +327,18 @@ test('a condition, a node on one of its routes and a workflow node are rendered 
   });
   const routes = [
     ['judge', /^route: judge$/m],
-    [{ script: 'routes/pick.ts' }, /^route: \{ script: routes\/pick\.ts \}$/m],
+    [{ script: 'routes/pick.ts' }, /^route:\n {2}script: routes\/pick\.ts$/m],
     [
       { from: 'implement.surface', table: { web: 'web', docs: 'docs' } },
-      /^route: \{ from: implement\.surface, table: \{ web: web, docs: docs \} \}$/m,
+      /^route:\n {2}from: implement\.surface\n {2}table:\n {4}web: web\n {4}docs: docs$/m,
     ],
   ] as const;
   for (const [route, line] of routes)
-    await t.test(
-      `route: ${JSON.stringify(route)} is written as YAML flow`,
-      { todo: "the step file's writer (renderStep) writes a `route:` once the parser reads one" },
-      () => {
-        const { tree, out } = routed([{ ...triage, route }, ...nodes]);
-        assert.deepEqual(out.refusals, []);
-        assert.match(fs.readFileSync(path.join(tree, 'workflows/dev/triage.md'), 'utf8'), line);
-      },
-    );
+    await t.test(`route: ${JSON.stringify(route)} is written as its word or its map`, () => {
+      const { tree, out } = routed([{ ...triage, route }, ...nodes]);
+      assert.deepEqual(out.refusals, []);
+      assert.match(fs.readFileSync(path.join(tree, 'workflows/dev/triage.md'), 'utf8'), line);
+    });
 });
 
 test('what a render refuses by name, with nothing of it to write', async (t) => {

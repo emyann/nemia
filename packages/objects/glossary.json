@@ -156,6 +156,30 @@
     {
       "term": "revision",
       "meaning": "a definition's number in the revision ledger for what its files hold now, read without a write: `status.revision` on a Workflow, an Agent and a Skill (`definitionStatus`, `packages/objects/src/definition.ts`)."
+    },
+    {
+      "term": "Template",
+      "meaning": "a factory template Nemia builds in, served as an object no namespace holds, by its name: its manifest's spec as written, and in its status where it is read from, its content's digest, the names of its documents and what stops it being read (`Template`, `packages/objects/src/template.ts`). Applying it is a Factory's action.",
+      "type": "Template"
+    },
+    {
+      "term": "Template document",
+      "meaning": "one of a template's workflows, agents or skills, served under its template (`/api/templates/<name>/<plural>/<doc>`) in the Schema a namespace serves it in, rendered with the parameters' defaults, with origin `builtin` (`TemplatesGroup`, `packages/objects/src/api.ts`)."
+    },
+    {
+      "term": "Subscription",
+      "meaning": "a runtime task told of the feed's lines its selectors match, served as an object no namespace holds: what was asked in its spec, where the deliverer is with it in its status (`Subscription`, `packages/objects/src/subscription.ts`).",
+      "type": "Subscription"
+    },
+    {
+      "term": "Event",
+      "meaning": "one line of the feed served as an object, named by the byte its line starts at, in the namespace of the factory it names, or in none for a daemon's or the store's line that names none (`Event`, `packages/objects/src/event.ts`). It departs from Kubernetes' core/v1 Event on purpose: `involved` for its involvedObject, a `source` word for an EventSource, a closed `reason`, no count, firstTimestamp, lastTimestamp or series, and the line's time as `creationTimestamp`.",
+      "type": "Event"
+    },
+    {
+      "term": "Involved",
+      "meaning": "what an Event is about: a run, one of its steps, a daemon or the store, by its kind (`INVOLVED_KINDS`) and its name (`EventInvolved`, `packages/objects/src/event.ts`).",
+      "type": "EventInvolved"
     }
   ]
 }

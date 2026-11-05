@@ -274,3 +274,79 @@ export type WriteWay = (typeof WRITE_WAYS)[number];
 
 /** Where a gate's budgets come from: the gated step's proposal, before the approval; the approval's caps, after it. */
 export const GATE_BUDGETS_FROM = ['proposed', 'approved'] as const;
+
+/**
+ * The reasons an Event is served under: the feed's codes, in its table's order (`REASONS`, agent-orchestrator's `src/feed/reason.ts`),
+ * `Unknown` among them, the word a line whose reason this `nemia` does not know is served as.
+ */
+export const EVENT_REASONS = [
+  'Running',
+  'Succeeded',
+  'Failed',
+  'Cancelled',
+  'AwaitingApproval',
+  'AwaitingAnswer',
+  'AwaitingRound',
+  'Removed',
+  'Pending',
+  'Waiting',
+  'Checking',
+  'CheckPassed',
+  'CheckFailed',
+  'Denied',
+  'BudgetExhausted',
+  'OverBudget',
+  'Stopped',
+  'Skipped',
+  'Sent',
+  'Paused',
+  'Unsigned',
+  'UnreadableCloseout',
+  'ToolDenied',
+  'Approved',
+  'CancelAsked',
+  'HoldPut',
+  'HoldLifted',
+  'SpawnFailed',
+  'SessionLost',
+  'ClosedOut',
+  'RevisionsBehind',
+  'Unknown',
+  'DaemonStarted',
+  'StorePaused',
+  'StoreResumed',
+  'LevelChanged',
+] as const;
+
+/** One of `EVENT_REASONS`. */
+export type EventReason = (typeof EVENT_REASONS)[number];
+
+/** What an Event is about: a run, one of its steps, a daemon that took the store, or the store itself. */
+export const INVOLVED_KINDS = ['Run', 'Step', 'Daemon', 'Store'] as const;
+
+/** One of `INVOLVED_KINDS`. */
+export type InvolvedKind = (typeof INVOLVED_KINDS)[number];
+
+/** How serious an Event is, as Kubernetes types one: routine news, or something gone wrong. */
+export const EVENT_TYPES = ['Normal', 'Warning'] as const;
+
+/** One of `EVENT_TYPES`. */
+export type EventType = (typeof EVENT_TYPES)[number];
+
+/** Whose deed an Event is: the tick's judgement, the runtime's journal, a person's verb, or a daemon that took the store. */
+export const EVENT_SOURCES = ['tick', 'runtime', 'person', 'daemon'] as const;
+
+/** One of `EVENT_SOURCES`. */
+export type EventSource = (typeof EVENT_SOURCES)[number];
+
+/** Who an Event waits on, where it waits on someone: a person. */
+export const EVENT_WAITS = ['person'] as const;
+
+/** One of `EVENT_WAITS`. */
+export type EventWaits = (typeof EVENT_WAITS)[number];
+
+/** The type of a value a template's parameter takes when the template is applied. */
+export const TEMPLATE_PARAMETER_TYPES = ['string', 'number', 'boolean'] as const;
+
+/** One of `TEMPLATE_PARAMETER_TYPES`. */
+export type TemplateParameterType = (typeof TEMPLATE_PARAMETER_TYPES)[number];

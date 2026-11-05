@@ -30,8 +30,8 @@ const answers = Object.values(Api.groups).flatMap((group) =>
 );
 
 /**
- * The path a kind's objects are got at: the Run by its id, the Factory, which no namespace holds, by its name, and every other kind by
- * its namespace and name.
+ * The path a kind's objects are got at: the Run by its id, the Factory, the Template and the Subscription, which no namespace holds, by
+ * their names, the Event by its name in any namespace, and every other kind by its namespace and name.
  */
 const GET_PATHS: Record<(typeof KINDS)[number], string> = {
   Run: '/api/runs/:runId',
@@ -44,6 +44,9 @@ const GET_PATHS: Record<(typeof KINDS)[number], string> = {
   Workflow: '/api/namespaces/:namespace/workflows/:name',
   Agent: '/api/namespaces/:namespace/agents/:name',
   Skill: '/api/namespaces/:namespace/skills/:name',
+  Template: '/api/templates/:name',
+  Subscription: '/api/subscriptions/:name',
+  Event: '/api/events/:name',
 };
 
 /** The kinds whose list is a later intent. */

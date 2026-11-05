@@ -16,6 +16,9 @@
  * the Workflows, Agents and Skills by `definitionsRoutes` (definitions/routes.ts), each request placed in the factory its namespace names
  * and on the repository its `?repo=` names (`placeFor`), so `default` is the api's repository and your library.
  *
+ * The cluster's templates and their documents, the feed's subscriptions — their `GET`s alone, subscribing and unsubscribing being
+ * commands/routes.ts's — and the feed's lines as events, cluster-wide and in a namespace, are handed on as they are.
+ *
  * `GET /api/runs/:runId` with `?raw=` (not `false`) or `?view=` is passed on to the runs' own route (runs/runs.ts), which answers both.
  */
 import { Context, Layer } from 'effect';
@@ -39,6 +42,8 @@ import { agentsHandlers, definitionsRoutes, skillsHandlers, workflowsHandlers } 
 import { placeFor } from '../factories/place.ts';
 import { ServedNow } from './refused.ts';
 import { runsHandlers } from './runs.ts';
+import { eventsHandlers, subscriptionsHandlers } from '../feed-objects/index.ts';
+import { templatesHandlers } from '../template-objects/templates.ts';
 
 /** Where every path the objects are served on is listed, with what each takes. */
 const DOCUMENT = 'GET /openapi/v3/nemia/v1';
@@ -95,6 +100,9 @@ export const objectsHandler = (runtime: ApiRuntime) => {
         workflowsHandlers,
         agentsHandlers,
         skillsHandlers,
+        templatesHandlers,
+        subscriptionsHandlers,
+        eventsHandlers,
       ]),
       Layer.provide(HttpServer.layerServices),
     ),
@@ -209,6 +217,16 @@ export function objectsRoutes(runtime: ApiRuntime): Hono<ApiEnv> {
     .get('/api/runs/:runId/steps/:step/tries/:try', forward)
     .get('/api/runs/:runId/steps/:step/tries/:try/closeout', forward)
     .get('/api/runs/:runId/steps/:step/told', forward)
+    .get('/api/templates', listed)
+    .get('/api/templates/:name', forward)
+    .get('/api/templates/:name/:plural{workflows|agents|skills}', listed)
+    .get('/api/templates/:name/:plural{workflows|agents|skills}/:doc', forward)
+    .get('/api/subscriptions', listed)
+    .get('/api/subscriptions/:name', forward)
+    .get('/api/events', listed)
+    .get('/api/events/:name', forward)
+    .get('/api/namespaces/:namespace/events', listed)
+    .get('/api/namespaces/:namespace/events/:name', forward)
     .get('/api/cards', listed)
     .get('/api/namespaces/:namespace/cards', listed)
     .get('/api/namespaces/:namespace/cards/:name', forward)

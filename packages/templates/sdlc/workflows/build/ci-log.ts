@@ -1,7 +1,9 @@
 /**
- * The lines of a failing CI job's log that say why it failed, for `pull-request.ts`'s refusal of a red CI context: pure, reading no
- * process and calling nothing. It sits beside the script rather than in it so the script stays within its size, and it travels with it:
- * a run freezes its workflow's whole folder (`$WF_WORKFLOW_FILES`), so the script reads it there, as it is read here. It imports nothing.
+ * The lines of a failing CI job's log that say why it failed, for `pull-request.ts`'s refusal of a red CI context, and how a check of a
+ * commit reads — its name, whether it is over, its verdict, the latest run of each — for that script's wait and `landing.ts`'s: pure,
+ * reading no process and calling nothing. It sits beside the scripts rather than in them so each stays within its size, and it travels
+ * with them: a run freezes its workflow's whole folder (`$WF_WORKFLOW_FILES`), so a script reads it there, as it is read here. It
+ * imports nothing.
  */
 
 /** The most lines the refusal prints of one failing job's log: enough to read, never a log in a closeout. */
@@ -77,4 +79,65 @@ export function failures(log: string): { lines: string[]; tests: boolean } {
   const cleanup = all.findIndex((line) => /^Post job cleanup\.?$/.test(line.trim()));
   const ran = cleanup === -1 ? all : all.slice(0, cleanup);
   return { lines: ran.filter((line) => line.trim() && !postJob(line)).slice(-TAIL_LINES), tests: false };
+}
+
+/**
+ * A check of a commit, a check run or a status context, as either script reads one: each field absent where GitHub gives none.
+ * `startedAt` is when a check run started; Go's zero time (`0001-01-01T00:00:00Z`) for one still queued.
+ */
+type Check = Partial<Record<CheckField, string>>;
+type CheckField = 'name' | 'context' | 'status' | 'state' | 'conclusion' | 'detailsUrl' | 'targetUrl' | 'workflowName' | 'startedAt';
+
+/** The one conclusion that is a pass: a skipped, cancelled or neutral CI context is no verdict to land on. */
+export const PASSED = 'SUCCESS';
+
+/** The states of a check that is not over: anything else is a verdict. */
+const PENDING = new Set(['QUEUED', 'IN_PROGRESS', 'WAITING', 'PENDING', 'REQUESTED', 'EXPECTED']);
+
+/** The name of a check, a check run's or a status context's. */
+export const nameOf = (entry: Check): string => entry.name ?? entry.context ?? '';
+
+/** Whether a check is not over yet. */
+export const pending = (entry: Check): boolean => PENDING.has((entry.status ?? entry.state ?? '').toUpperCase());
+
+/** The verdict of a check, a check run's conclusion or a status context's state, upper-cased; empty where it has neither. */
+export const verdict = (entry: Check): string => (entry.conclusion ?? entry.state ?? '').toUpperCase();
+
+/** Where a person reads the check: a check run's details, a status context's target. */
+export const linkOf = (entry: Check): string => entry.detailsUrl ?? entry.targetUrl ?? '';
+
+/** How the CI context's checks of a commit read: none reported, none over yet, every one passed, or one that did not. */
+export type Seen = 'absent' | 'pending' | 'passed' | 'failed';
+
+/** How `ours`, the CI context's checks of a commit, read now. */
+export function seenOf(ours: readonly Check[]): Seen {
+  if (ours.length === 0) return 'absent';
+  if (ours.every(pending)) return 'pending';
+  return ours.every((entry) => verdict(entry) === PASSED) ? 'passed' : 'failed';
+}
+
+/** When `entry` started, in milliseconds; a run not started yet — no time, one that does not parse, or Go's zero time — is the newest. */
+const startOf = (entry: Check): number => {
+  const at = Date.parse(entry.startedAt ?? '');
+  return Number.isNaN(at) || at < 0 ? Number.POSITIVE_INFINITY : at;
+};
+
+/** What makes two rollup entries runs of one check: a status context's name, or a check run's name within its workflow. */
+export const checkKey = (entry: Check): string =>
+  entry.context !== undefined ? `status ${entry.context}` : `run ${entry.name ?? ''}\u0000${entry.workflowName ?? ''}`;
+
+/**
+ * The latest run of each check in `entries`, in the rollup's order: a check re-run, or run again on another event of the same head (a
+ * `labeled` after an `opened`), leaves its earlier runs in the rollup, and only the newest is its verdict, as GitHub's branch protection
+ * and `gh pr checks` read it. The newest by `startedAt`, one not started counting as newest; of two that tie, the later in the rollup.
+ */
+export function latest<T extends Check>(entries: readonly T[]): T[] {
+  const newest = new Map<string, number>();
+  entries.forEach((entry, i) => {
+    const was = newest.get(checkKey(entry));
+    const prior = was === undefined ? undefined : entries[was];
+    if (prior === undefined || startOf(entry) >= startOf(prior)) newest.set(checkKey(entry), i);
+  });
+  const kept = new Set(newest.values());
+  return entries.filter((_, i) => kept.has(i));
 }

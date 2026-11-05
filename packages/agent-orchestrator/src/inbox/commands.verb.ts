@@ -143,7 +143,7 @@ export const INBOX: Command<{ cards: InboxListing[]; ended: number }> = {
       const selectors = parseSelectors(selector);
       const e = yield* EngineService;
       const cards = yield* rooted(home, 'inbox', inboxJudged(e, howOf(env, home, kept)));
-      const selected = cards.filter((card) => card.file.endsWith('.md') && selectsLabels(selectors, cardLabels(card)));
+      const selected = cards.filter((card) => selectsLabels(selectors, cardLabels(card)));
       const shown = args.all === true ? selected : selected.filter(cardInPlay);
       return { cards: shown, ended: selected.length - shown.length };
     }),

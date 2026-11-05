@@ -237,7 +237,7 @@ test('the labels the parity seeds show on the lines a person asks them on', asyn
   const cards = await nemia(['inbox', '-L', 'team']);
   assert.match(cards.out, /^cache-the-views .*  team: core$/m, "a card's column");
   assert.match(cards.out, /^hold-the-reads .*  team: <none>$/m, 'a card with no such key says none');
-  assert.doesNotMatch(cards.out, /^notes\.txt /m, 'an entry that is no card is listed by no client, as the Card list leaves it out');
+  assert.match(cards.out, /^notes\.txt .*  team: <none>$/m, 'an entry that is no card is listed too, never hidden');
 });
 
 for (const [argv, route] of READS)

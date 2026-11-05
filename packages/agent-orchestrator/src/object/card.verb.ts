@@ -4,7 +4,9 @@
  * none; its `creationTimestamp` when it was filed; its `resourceVersion` a digest of its text, which changes on every write of it; its
  * labels a person's, and a selector reads them with its `workflow:` and `factory:` (`cardLabels`). A list is selected first, sorted by
  * name, then cut into a page (`pageOf`), so `remainingItemCount` counts what the selector keeps. An entry of the inbox that is no
- * markdown file is no card, and is not listed; one that does not read is, its `status.error` saying why.
+ * markdown file (`idea.txt`, a folder `sub/`) is no card, and is listed all the same, never hidden: under its file, which is its name,
+ * its `status.error` saying why, dated by when it was last written (`entryAt`); one that does not read is listed too, its error saying
+ * why. Neither is read or pressed by its name: `cardObjectOf` finds a card alone.
  */
 import { createHash } from 'node:crypto';
 import { Effect } from 'effect';
@@ -30,8 +32,14 @@ export type CardQuery = {
 /** The namespace of a listed card: its factory, or `default`. */
 const namespaceOf = (l: InboxListing): string => l.factory ?? DEFAULT_NAMESPACE;
 
-/** Names in the order a list answers them and a token reads them: by their UTF-16 code units, as `<` compares. */
-const byName = (a: InboxListing, b: InboxListing): number => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0);
+/**
+ * What a list orders an entry by and a token carries: its name, then its file, so a stray `notes` and the card `notes.md`, both named
+ * `notes`, are two places of the list. A line break sorts below every letter a name holds, so the order is the names' first.
+ */
+const keyOf = (l: InboxListing): string => `${l.name}\n${l.file}`;
+
+/** Entries in the order a list answers them and a token reads them: by their key's UTF-16 code units, as `<` compares. */
+const byName = (a: InboxListing, b: InboxListing): number => (keyOf(a) < keyOf(b) ? -1 : keyOf(a) > keyOf(b) ? 1 : 0);
 
 /** The digest of a card's text: its `resourceVersion`. */
 const digestOf = (text: string): string => createHash('sha256').update(text).digest('hex').slice(0, 16);
@@ -75,14 +83,21 @@ const cardOf = (l: InboxListing, text: string, filedAt: string): Card => {
       ...(l.error !== null ? { error: l.error } : {}),
       inPlay: CARD_IN_PLAY[l.state],
       ...(l.queued !== undefined && l.queued.place !== null ? { place: l.queued.place } : {}),
+      file: l.file,
     },
   };
 };
 
-/** The object of the listed card `l`, read through the Card door, or null for an entry that is no card or is gone since the listing. */
+/**
+ * The object of the listed entry `l`, read through the Card door: a card, or a stray entry with no text, dated when it was last written.
+ * Null for one gone since the listing.
+ */
 const objectOf = Effect.fn('objectOf')(function* (l: InboxListing) {
-  if (!l.file.endsWith('.md')) return null;
   const door = yield* CardDoor;
+  if (!l.file.endsWith('.md')) {
+    const at = yield* door.cards.entryAt(l);
+    return at === null ? null : cardOf(l, '', at);
+  }
   const name = CardName.read(l.name);
   const text = yield* door.cards.read(name);
   const filedAt = yield* door.cards.filedAt(name);
@@ -105,11 +120,8 @@ const selected = (listing: readonly InboxListing[], selectors: readonly string[]
 export const cardListOf = Effect.fn('cardListOf')(function* (listing: readonly InboxListing[], query: CardQuery) {
   const { namespace } = query;
   const inNamespace = namespace === undefined ? listing : listing.filter((l) => namespaceOf(l) === namespace);
-  const kept = yield* selected(
-    inNamespace.filter((l) => l.file.endsWith('.md')),
-    query.labelSelector ?? [],
-  );
-  const page = pageOf(kept, (l) => l.name, { limit: query.limit ?? null, continue: query.continue });
+  const kept = yield* selected(inNamespace, query.labelSelector ?? []);
+  const page = pageOf(kept, keyOf, { limit: query.limit ?? null, continue: query.continue });
   if (page instanceof Invalid) return yield* Effect.fail(page);
   const items = (yield* Effect.forEach(page.items, objectOf)).filter((c): c is Card => c !== null);
   const answered: CardList = {

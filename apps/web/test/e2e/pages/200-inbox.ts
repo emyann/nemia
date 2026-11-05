@@ -63,7 +63,7 @@ export default {
    * The inbox: the seeded cards, newest first, and the queue; a card filed from the box into a factory, queued, unqueued, then removed
    * with its Remove; a card's start form, in the factory picked for it, preset from the card. Each in a page of its own: a card started,
    * which opens its run's page and stays listed, started; a card started already; a card about a repository the factory
-   * picked does not work on; stray files and a folder, which the Card list leaves out; an empty inbox; and a start, a remove and a
+   * picked does not work on; stray files and a folder, each listed with why it is no card; an empty inbox; and a start, a remove and a
    * queue each refused behind the page's back. Every start picks its factory first, and is sent with it (`expectInFactory`); the
    * factory is made able to start its workflow for the page (`hiringStarts`). Every write is taken back, so every page after this one,
    * in either theme, reads the store as seeded.
@@ -232,7 +232,10 @@ async function visit(page: Page): Promise<void> {
         throw new Refused(`the api queues the card, through the board's proxy — it answered ${queued.status()}: ${await queued.text()}`);
       const {
         spec: { queued: at },
-      } = (await queued.json()) as { spec: { queued: string } };
+        status: { place },
+      } = (await queued.json()) as { spec: { queued: string }; status: { place?: number } };
+      if (place !== QUEUED.length + 1)
+        throw new Refused(`the card queued is behind the ${QUEUED.length} queued already — the api placed it ${place}`);
       const queuedText = fs.readFileSync(written, 'utf8');
       if (queuedText !== queuedCardText({ workflow: WORKFLOWS.good.name, body: FILED }, at, undefined, FACTORY)) {
         throw new Refused(
@@ -552,17 +555,31 @@ async function visit(page: Page): Promise<void> {
       const { problems } = watch(strays);
       await strays.goto(page.url(), { waitUntil: 'load' });
       await idle(strays);
-      await expectCount(cardIn(strays, 'sub/'), 0, 'a folder in the inbox is no card, and the Card list leaves it out');
-      await expectCount(cardIn(strays, 'notes.txt'), 0, 'a stray file is no card, and is left out too');
+      const sub = cardIn(strays, 'sub/');
+      await expectVisible(sub.getByText(/^sub\/: not a card/), 'a folder in the inbox is listed with why it is not a card');
+      await expectCount(
+        sub.getByRole('link'),
+        0,
+        'and has no page: the api refuses the name sub/, so a link would open a refusal of what is listed',
+      );
       const named = cardIn(strays, 'notes');
-      await expectCount(named, 1, 'beside a stray file of one name, the card of that name alone is listed');
+      await expectCount(named, 2, 'a card and a stray file of one name are both listed, under that name');
+      const namedStray = named.filter({ hasText: 'notes: not a card' });
+      await expectVisible(namedStray, 'the stray is listed with why it is not a card');
+      await expectCount(
+        namedStray.getByRole('link'),
+        0,
+        "and has no page: /inbox/notes is notes.md, so a link would open the card's page under the stray's name",
+      );
       await expectVisible(
         named.filter({ has: strays.locator('[data-title]') }).locator('a[href="/inbox/notes"]', { hasText: 'Notes, as a card' }),
-        'and the card keeps its page, which is the one the api reads',
+        'and the card of that name keeps the page, which is the one the api reads',
       );
 
-      await strays.goto(new URL('/inbox/notes.txt', strays.url()).href, { waitUntil: 'load' });
-      await idle(strays);
+      const notes = cardIn(strays, 'notes.txt');
+      await expectVisible(notes.getByText(/^notes\.txt: not a card/), 'a stray file is listed with why it is not a card');
+      await notes.getByRole('link', { name: 'notes.txt' }).click();
+      await strays.waitForURL('**/inbox/notes.txt', { timeout: WAIT_MS });
       await expectVisible(strays.getByText(/^notes\.txt: not a card/), "the stray file's page says why it is not a card");
       await expectCount(strays.locator('section[aria-label="Keys"]'), 0, 'and lays out no keys');
       await strays.getByRole('button', { name: 'Source' }).click();

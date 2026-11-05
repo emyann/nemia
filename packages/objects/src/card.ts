@@ -62,6 +62,11 @@ export const CardStatus = Schema.Struct({
   inPlay: Schema.Boolean,
   /** A queued card's place in the order the tick starts cards in, from 1, among every card queued and not started, every factory's. */
   place: Schema.optionalKey(Schema.Number),
+  /**
+   * The entry's file in the inbox: `<name>.md` for a card, and for a stray entry that is no card (`idea.txt`, a folder `sub/`) its own
+   * file, which is its name, its `error` saying why it is no card.
+   */
+  file: Schema.optionalKey(Schema.String),
 });
 export type CardStatus = typeof CardStatus.Type;
 

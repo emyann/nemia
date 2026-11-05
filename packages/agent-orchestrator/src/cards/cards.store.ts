@@ -39,6 +39,11 @@ export type CardLayer = {
     readonly read: (name: string) => string | null;
     /** When the card `name` was filed, as an ISO time, kept across a write back. Null when it is gone. */
     readonly filedAt: (name: string) => string | null;
+    /**
+     * When the inbox's entry was last written, as an ISO time, by its `file` as `entries` lists it, a folder with its trailing `/`: what a
+     * stray entry, no card, is dated by. Null when it is gone. Handed the entry, not a card's name, since a stray's file names no card.
+     */
+    readonly entryAt: (entry: { readonly file: string }) => string | null;
     /** File a person's card, exclusively: where it is filed. A card already at its name is `Conflict`, and left as it is. */
     readonly add: (name: string, text: string) => string;
     /** Write the card `name` whole, so a reader never reads half a card, keeping its filing time. `Missing` when it is not there. */
@@ -198,6 +203,7 @@ export function cardFiles(home: string): CardLayer {
         }
       },
       filedAt: (name) => fs.statSync(fileOf(name), { throwIfNoEntry: false })?.mtime.toISOString() ?? null,
+      entryAt: ({ file }) => fs.statSync(path.join(inbox, file.replace(/\/$/, '')), { throwIfNoEntry: false })?.mtime.toISOString() ?? null,
       add: (name, text) => {
         fs.mkdirSync(inbox, { recursive: true });
         try {

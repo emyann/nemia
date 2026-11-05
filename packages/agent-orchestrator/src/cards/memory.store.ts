@@ -28,6 +28,7 @@ export function cardDoorMemory(): Layer.Layer<never> {
           .sort((a, b) => (a.file < b.file ? -1 : a.file > b.file ? 1 : 0)),
       read: (name) => cards.get(name)?.text ?? null,
       filedAt: (name) => cards.get(name)?.filedAt ?? null,
+      entryAt: ({ file }) => (file.endsWith('.md') ? (cards.get(file.slice(0, -'.md'.length))?.filedAt ?? null) : null),
       add: (name, text) => {
         if (cards.has(name)) throw cardTaken(name, where(name));
         cards.set(name, { text, filedAt: new Date().toISOString() });

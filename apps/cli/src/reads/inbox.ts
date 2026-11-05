@@ -69,8 +69,10 @@ export const rowOf = (card: Card, repos: ReadonlyMap<string, string> = new Map()
 };
 
 /** The cards in the order the in-process listing reads them: by file name, `<name>.md`, as `localeCompare` orders them. */
-const byFile = (cards: readonly Card[]): Card[] =>
-  [...cards].sort((a, b) => `${a.metadata.name}.md`.localeCompare(`${b.metadata.name}.md`));
+const byFile = (cards: readonly Card[]): Card[] => [...cards].sort((a, b) => fileOf(a).localeCompare(fileOf(b)));
+
+/** The entry's file in the inbox: a card's `<name>.md`, a stray's own (`status.file`). */
+const fileOf = (card: Card): string => card.status.file ?? `${card.metadata.name}.md`;
 
 /** Why a queued card's last start did not happen, as the in-process `triedClause` says it. */
 function triedClause(l: InboxRow, unfactoredStarts: boolean): string {

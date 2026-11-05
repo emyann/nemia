@@ -10,6 +10,10 @@ import { Effect, Exit } from 'effect';
 import { CardDoor } from '../cards/cards.store.ts';
 import type { PlaceService } from '../place/place.store.ts';
 import { cardDoorMemory } from '../cards/memory.store.ts';
+import { cardDoorFiles } from '../cards/cards.store.ts';
+import fs from 'node:fs';
+import path from 'node:path';
+import { scratch } from '../../test/scratch.ts';
 import { CardName } from '../inbox/inbox.model.ts';
 import { inboxListing } from '../inbox/inbox.ts';
 import { aCard } from '../../test/card-walks.ts';
@@ -228,4 +232,40 @@ test('a stray file listed before a card of its name is passed over; a card says 
     ),
   ) as { status: { place?: number } };
   assert.equal(queued.status.place, 2, 'the place the listing judged');
+});
+
+test('a stray entry is listed, never hidden: under its file, with why it is no card, dated when it was written; walked apart from a card of its name', () => {
+  const home = scratch('card-strays-');
+  const inbox = path.join(home, 'inbox');
+  fs.mkdirSync(path.join(inbox, 'sub'), { recursive: true });
+  fs.writeFileSync(path.join(inbox, 'notes.md'), aCard('Notes'));
+  fs.writeFileSync(path.join(inbox, 'notes'), 'a stray file\n');
+  fs.writeFileSync(path.join(inbox, 'idea.txt'), 'an idea saved as text\n');
+  const walked = valueOf(
+    Effect.runSyncExit(
+      Effect.gen(function* () {
+        const pages = [];
+        let token: string | undefined;
+        do {
+          const page = yield* list({ limit: 1, continue: token });
+          pages.push(...page.items);
+          token = page.metadata.continue;
+        } while (token !== undefined && pages.length < 10);
+        return pages;
+      }).pipe(Effect.provide(cardDoorFiles(home)), Effect.provide(stand().layer)),
+    ),
+  );
+  assert.deepEqual(
+    walked.map((c) => [c.metadata.name, c.status.file, c.status.error === undefined]),
+    [
+      ['idea.txt', 'idea.txt', false],
+      ['notes', 'notes', false],
+      ['notes', 'notes.md', true],
+      ['sub/', 'sub/', false],
+    ],
+    'each entry once, a page at a time, the stray notes and the card notes.md two places of the list',
+  );
+  const idea = walked[0];
+  assert.equal(idea?.metadata.creationTimestamp, fs.statSync(path.join(inbox, 'idea.txt')).mtime.toISOString(), 'dated by its file');
+  assert.equal(walked[3]?.metadata.creationTimestamp, fs.statSync(path.join(inbox, 'sub')).mtime.toISOString(), 'a folder by its own');
 });

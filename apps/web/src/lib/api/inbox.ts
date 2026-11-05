@@ -97,7 +97,7 @@ export const entryOf = (card: Card): InboxEntry => {
   const { metadata, spec, status } = card;
   return {
     name: metadata.name,
-    file: `${metadata.name}.md`,
+    file: status.file ?? `${metadata.name}.md`,
     title: status.title ?? null,
     workflow: spec.workflow ?? null,
     repo: spec.repo ?? null,

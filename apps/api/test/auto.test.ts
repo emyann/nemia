@@ -40,7 +40,7 @@ function propose(rule: Record<string, unknown>): void {
 
 /** `tries`, as the person reads it on the board. */
 const TRIES = { answer: 'retry', steps: ['implement'], when: ['checked', 'withinBudget'] };
-const WORDS = 'Try again the step implement unasked when its check passed and no step is past its budget.';
+const WORDS = 'Try implement again on its own once its check passed and it stayed within budget.';
 
 propose(TRIES);
 
@@ -57,7 +57,7 @@ test('A person keeps her rules: the default in force, a proposed rule refused bu
         [
           [
             'default',
-            'Approve any step unasked when the agent recommends it, its check passed, every reviewer accepted, no step is past its budget and nothing is left open.',
+            'Approve any step on its own once its agent recommends it, its check passed, its review passed, it stayed within budget and nothing waits on you.',
           ],
         ],
       );
@@ -96,7 +96,7 @@ test('A person keeps her rules: the default in force, a proposed rule refused bu
       try {
         const stale = await asked('PUT', '/api/policy/nemia/rules/tries', { words: WORDS });
         assert.equal(stale.status, 409);
-        assert.match(String(stale.body.error), /^nemia's rule tries now reads "Approve any step unasked, whatever the run’s state\."/);
+        assert.match(String(stale.body.error), /^nemia's rule tries now reads "Approve any step on its own, whatever its state\."/);
         assert.equal(fs.existsSync(CONFIRMED), false);
       } finally {
         propose(TRIES);

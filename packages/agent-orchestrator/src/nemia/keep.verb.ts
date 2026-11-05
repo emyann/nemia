@@ -235,13 +235,19 @@ const herTask = (e: Engine, id: string | undefined) =>
 const HERS = SubscriptionName.read(NEMIA_SUBSCRIPTION);
 
 /**
- * Her subscription as the keeper reads it through the door: the task it tells and whether it carries her floor, or undefined where
- * there is none. A file left out of the listing is the deliverer's to say.
+ * Her subscription as the keeper reads it through the door: the task it tells, whether it carries her floor and whether her selectors
+ * as they ship, or undefined where there is none. A file left out of the listing is the deliverer's to say.
  */
 const herSubscription = Effect.fn('herSubscription')(function* () {
   const { listed } = yield* (yield* SubscriptionDoor).subscriptions.list();
   const sub = listed.find((s) => s.name === NEMIA_SUBSCRIPTION)?.subscription;
-  return sub === undefined ? undefined : ({ task: sub.task, scoped: sub.scope?.atLeast === NEMIA_FLOOR } satisfies HerSubscription);
+  return sub === undefined
+    ? undefined
+    : ({
+        task: sub.task,
+        scoped: sub.scope?.atLeast === NEMIA_FLOOR,
+        selected: sub.selectors.join('\n') === NEMIA_SELECTORS.join('\n'),
+      } satisfies HerSubscription);
 });
 
 /**

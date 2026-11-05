@@ -24,7 +24,10 @@ In this order, a line or two each, and leave out a part with nothing in it:
 3. **Failed or blocked**: each, with the step and the reason in its own words.
 4. **Spent**: what the runs spent since the last recap (`nemia ls`), your own sessions' spend (`nemia level`), and the quota's pace,
    read with the command your first message names, when it names one.
-5. **Next**: the one thing you recommend the person do now, and why.
+5. **At auto**: for each factory whose level changed to auto since the last recap (a `level changed` line), where your rules can
+   approve no step at its gate, or only some (`nemia policy reach nemia --factory <name>`), say so in a line, and offer the rules it
+   suggests, in their words.
+6. **Next**: the one thing you recommend the person do now, and why.
 
 Read `nemia ls` for what is in flight and `nemia decide <run>` for a run whose state you report. Quote a step's words rather than
 paraphrase them. Offer to bring what waits, with the `bring-what-waits` skill, rather than bring it unasked.

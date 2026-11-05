@@ -34,6 +34,8 @@ import { ceilings, recordCeilings, recordPassCost, recordRecentPass } from '../d
 import { verifiesRest } from '../config/config.store.ts';
 import { feedFile } from '../feed/feed.store.ts';
 import { emitFeed } from '../feed/feed.verb.ts';
+import { levelsNow } from '../level/levels.verb.ts';
+import type { FactoryLevel } from '../level/level.ts';
 import {
   freshStandingMemo,
   headsFor,
@@ -249,7 +251,8 @@ export const tickRun = Effect.fn('tick')(function* ({ repo, memo, verifyRest, qu
  * - where the process keeps an informer (`Informer`, the api's daemon), the pass begins its number first (`passStarted`), and once every
  *   run is advanced, judges each as the api serves it and keeps it there (`informed`), so a request reads what the pass judged.
  * - then the tasks of runs `nemia rm` removed that had not settled are forgotten (`finishForgetting`), and what it says is the pass's.
- * - last, and apart, the feed is written where it changed: a feed that cannot be written costs the report (`feedError`), never the pass.
+ * - last, and apart, the feed is written where it changed, each factory's level in force among it, read beside the pause (`levelsNow`):
+ *   a feed that cannot be written costs the report (`feedError`), never the pass, and levels that do not read cost their lines alone.
  *
  * A run a read of whose task journal is refused (`unreadableJournal`), or that froze no workflow and whose folder does not load
  * (`unloadedFolder`), is left unjudged, out of the feed's `removed` and counted in flight (`judged`); a pause's reads leave it out
@@ -272,6 +275,7 @@ const pass = Effect.fn('pass')(function* (engine: Engine, { repo, memo, verify }
   if (resting) forgotten(memo, runs);
   noteSeen({ runs: runs.length });
   const pause = yield* tried(() => readPause());
+  const levels = yield* levelsNow().pipe(Effect.orElseSucceed(() => undefined));
   const judging: Judging = { done: new Map(), unjudged: new Map() };
   const standing = yield* passStanding(runs, memo.standing);
   const read: PassRead = passRead(e, runs, process.env, standing, yield* passRevisions());
@@ -289,7 +293,7 @@ const pass = Effect.fn('pass')(function* (engine: Engine, { repo, memo, verify }
   const forgetting = yield* withinEffect('act', finishForgetting().pipe(over(e)));
   yield* Effect.annotateCurrentSpan({ runs: runs.length, rested: resting?.rested ?? 0 });
   return {
-    ...passOf(report, runs, judging, queue, yield* feedErrorOf(runs, judging, pause)),
+    ...passOf(report, runs, judging, queue, yield* feedErrorOf(runs, judging, pause, levels)),
     ...(scheduled ? { scheduled } : {}),
     ...(forgetting.length ? { forgetting } : {}),
     ...(pause
@@ -423,14 +427,21 @@ const waitingJudged = Effect.fn('waitingJudged')(function* (
 const feedOf = <F>(id: string, judged: { feed: F } | undefined): (readonly [string, F])[] => (judged ? [[id, judged.feed] as const] : []);
 
 /**
- * Why the feed could not be written with what the pass judged (`emitFeed`) and the store's pause it read at its start (`pause`, whose
- * put and lift the feed says), or undefined once it was: never the pass's failure.
+ * Why the feed could not be written with what the pass judged (`emitFeed`), the store's pause it read at its start (`pause`, whose
+ * put and lift the feed says) and each factory's level in force it read beside it (`levels`, whose changes the feed says; undefined where
+ * they did not read, and nothing is said of them), or undefined once it was: never the pass's failure.
  */
-const feedErrorOf = (runs: readonly Run[], { done, unjudged }: Judging, pause: Pause | null): Effect.Effect<string | undefined> =>
+const feedErrorOf = (
+  runs: readonly Run[],
+  { done, unjudged }: Judging,
+  pause: Pause | null,
+  levels: readonly FactoryLevel[] | undefined,
+): Effect.Effect<string | undefined> =>
   Effect.exit(
     emitFeed(new Map(runs.flatMap((run) => feedOf(run.id, done.get(run.id)))), {
       unjudged: new Set(unjudged.keys()),
       pause,
+      ...(levels === undefined ? {} : { levels }),
     }),
   ).pipe(
     Effect.map((written) =>

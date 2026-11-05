@@ -333,6 +333,11 @@
       ]
     },
     {
+      "term": "Reach",
+      "meaning": "whether a rule of an agent's policy could ever approve a step at its gate, read off the step as its workflow declares it: a step approved before it runs has nothing of its own for a rule to read, and a step with no check never passed one. Read by `nemia policy reach`, which suggests a rule for each step none reaches.",
+      "type": "GateReach"
+    },
+    {
       "term": "Raise",
       "meaning": "a raise of a step's budget cap the package takes, `by` a try (`nemia retry --budget`) or a round (`nemia retry --round --budget`), above what its tries cost: judged once (`stepRaise`), and read by the run object, the run page and `nemia decide`.",
       "type": "StepRaise"

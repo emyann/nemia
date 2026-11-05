@@ -24,10 +24,11 @@ export type Seen = {
 };
 
 /**
- * The facts of `seen`: the agent recommends where its step signed `done` and gave each question it asks a recommended answer, a list of
- * none being none; its check passed where its verdict is exit 0, so a step with no check never meets it; every reviewer accepted where
- * no looping step asks for another round and none was accepted by a person over what it found; no step is past its budget; and nothing
- * is left open where the step asks no question and needs nothing of the person, and no other step waits on them. Pure.
+ * The facts of `seen`: its agent recommends it where its step signed `done` and gave each question it asks a recommended answer, a list
+ * of none being none; its check passed where its verdict is exit 0, so a step with no check never meets it; its review passed where no
+ * looping step asks for another round and none was accepted by a person over what it found; it stayed within budget where no step is
+ * past its budget; and nothing waits on you where the step asks no question and needs nothing of the person, and no other step waits on
+ * them. Pure.
  */
 export const factsOf = (seen: Seen): Facts => ({
   recommends: seen.closeout?.outcome === 'done' && seen.questions.every((q) => q.recommended !== null && q.recommended.length > 0),

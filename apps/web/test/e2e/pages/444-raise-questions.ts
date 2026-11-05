@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { fed, photograph, sidebar, themeOf } from '../board.ts';
+import { fed, photograph, sidebar, themeOf, isRunAction } from '../board.ts';
 import { expectCount, expectVisible, idle, Refused, settled, WAIT_MS } from '../checks.ts';
 import { ASKING, writeAsking } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -38,7 +38,7 @@ export default {
 
       const [sent] = await Promise.all([
         page.waitForResponse(
-          (r) => r.request().method() === 'POST' && new URL(r.url()).pathname === `/api/runs/${id}/steps/${raised}/retry`,
+          (r) => r.request().method() === 'POST' && isRunAction(new URL(r.url()).pathname, id, `/steps/${raised}/retry`),
           { timeout: WAIT_MS },
         ),
         button.click(),

@@ -44,16 +44,22 @@ import { folderFiles, workFolderOf } from '../resource/files.store.ts';
 import { type LastSaid, lastLineOf } from '../resource/checks.verb.ts';
 import { readOf, totalOf, usedOf } from '../resource/usage.ts';
 import type { Run as RunObject, RunSpec, RunStatus, RunStepStatus, StepTold, TryCloseout, TryShort } from './run.model.ts';
+import { runNamespace } from '../run-list/run-list.ts';
+import { prunedWords } from '../record/record.ts';
+import { prunedKept } from '../prune/prune.ts';
 import { currentOf, raiseReads, runReading, type RunReading, stepsReading, triesIn } from './read.verb.ts';
 
 /**
  * What `runObject` is handed beside its services: what a caller's reads keep between requests (`filings`, the feed's
  * filing times; `said`, where each blocked session's conversation was last read), and `inRequest`, which runs the drift's program
  * (`driftNow`) over a request's own services, so it reads the doors the api was given; without it the drift runs over the program's own.
+ * `listed` judges the run as a list says it, which a board polls: no harness asked for a blocked session's last line, and no drift
+ * read through the doors, so each step's `lastLine` is null and `kinds` empty there, and the run read alone says them.
  */
 export type RunReads = {
   readonly memo: { readonly filings: Filings; readonly said: LastSaid };
   readonly inRequest?: (program: ReturnType<typeof driftNow>) => Promise<readonly Drift[]>;
+  readonly listed?: boolean;
 };
 
 /** The object of a run, or why it is not judged, in the words the list says it with. */
@@ -87,6 +93,7 @@ const specStepOf = (s: Workflow): RunSpec['steps'][number] => ({
   sandbox: s.sandbox ?? null,
   tools: s.tools ?? null,
   deadlineSeconds: s.deadlineSeconds ?? null,
+  ...(s.agent?.name !== undefined ? { agent: s.agent.name } : {}),
 });
 
 /**
@@ -172,6 +179,7 @@ const prunedOf = (run: Run): RunStatus['pruned'] =>
         at: run.pruned.at,
         worktrees: run.pruned.worktrees.map(({ path: p, bytes }) => ({ path: p, bytes })),
         artifacts: run.pruned.artifacts ? { at: run.pruned.artifacts.at, bytes: run.pruned.artifacts.bytes } : null,
+        said: `${prunedWords(run.pruned)}; ${prunedKept(run.pruned)}`,
       }
     : null;
 
@@ -201,6 +209,7 @@ const runRead = ({ clock, steps, names }: RunReading): RunStatus['read'] =>
 type StepAt = RunReading & {
   readonly used: ReturnType<typeof consumption>;
   readonly said: LastSaid;
+  readonly listed: boolean;
 };
 
 /** The step `name`'s word, as `nemia decide` says it (`stepStatus`), off the views already read. */
@@ -223,13 +232,13 @@ const stepWord = ({ run, steps, views, judged }: StepAt, name: string): RunStepS
  * One more observation for a blocked session's last line (`lastLineOf`).
  */
 const stepStatusOf = Effect.fnUntraced(function* (name: string, at: StepAt) {
-  const { e, run, steps, views, judged, used, clock, said: memoSaid } = at;
+  const { e, run, steps, views, judged, used, clock, said: memoSaid, listed } = at;
   const taskId = run.steps[name]?.taskId ?? null;
   const judgedContext = steps.find((s) => s.name === name)?.context;
   const current = currentOf(at, name);
   const tries = triesIn(at, name, current);
   const latest = tries.find((t) => t.current);
-  const lastLine = atHarness(current) ? yield* Effect.promise(() => lastLineOf(e, views, taskId, memoSaid)) : null;
+  const lastLine = !listed && atHarness(current) ? yield* Effect.promise(() => lastLineOf(e, views, taskId, memoSaid)) : null;
   const status: RunStepStatus = {
     name,
     ...stepSaid(judged, name),
@@ -290,15 +299,15 @@ const restOf = (run: Run, at: RunReading, kinds: readonly Drift[]) => {
  * with (`spec`); and what the package judges of it now (`status`) — the runs list's judged fields (`judgedFields`), the graph with its
  * `input` edges (`runInputGraph`), its time as a whole and each step, and the rest the board shows (`restOf`). Off one read of the run
  * (`runReading`) — never a sub-resource's verb per step, each of which reads the run again — or, when its unfrozen folder does not load
- * or a task it reads does not, why it is not judged, in the words the list says it with (`{ unjudged }`). One more observation for each
- * blocked session's last line (`lastLineOf`); the kinds it is behind the files on (`driftNow`) through the doors, over `inRequest`'s
- * services where given. A program over the engine, the place and the store's root.
+ * or a task it reads does not, why it is not judged, in the words the list says it with (`{ unjudged }`). Unless `listed`, one more
+ * observation for each blocked session's last line (`lastLineOf`), and the kinds it is behind the files on (`driftNow`) through the
+ * doors, over `inRequest`'s services where given. A program over the engine, the place and the store's root.
  */
-export const runObject = Effect.fn('runObject')(function* (run: Run, { memo, inRequest }: RunReads) {
+export const runObject = Effect.fn('runObject')(function* (run: Run, { memo, inRequest, listed = false }: RunReads) {
   const at = yield* runReading(run, memo.filings);
   if ('unjudged' in at) return { unjudged: at.unjudged } satisfies RunObjectAnswer;
-  const kinds = inRequest ? yield* Effect.promise(() => inRequest(driftNow(run))) : yield* driftNow(run);
-  const stepAt: StepAt = { ...at, used: consumption(at.views, run), said: memo.said };
+  const kinds = listed ? [] : inRequest ? yield* Effect.promise(() => inRequest(driftNow(run))) : yield* driftNow(run);
+  const stepAt: StepAt = { ...at, used: consumption(at.views, run), said: memo.said, listed };
   const steps = yield* Effect.forEach(at.names, (name) => stepStatusOf(name, stepAt), { concurrency: 'unbounded' });
   const { factory, workflow } = runLabels(run);
   const object: RunObject = {
@@ -306,6 +315,7 @@ export const runObject = Effect.fn('runObject')(function* (run: Run, { memo, inR
     kind: 'Run',
     metadata: {
       name: run.id,
+      namespace: runNamespace(run.factory),
       creationTimestamp: run.createdAt,
       labels: metadataLabels({ workflow, factory, ...(run.labels !== undefined ? { labels: run.labels } : {}) }),
     },

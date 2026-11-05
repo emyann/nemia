@@ -425,6 +425,14 @@ const listedThrough = Effect.fnUntraced(function* (e: Engine, memo: InformerMemo
 });
 
 /**
+ * Every run of the store, in its order, listed through the informer `how.memo` as the list reads it (`listedThrough`): a run whose files
+ * stamp as they did is the run the informer kept, its record not read. What the RunList selects and pages before it judges any run.
+ */
+export const storeRunsListed = Effect.fn('storeRunsListed')(function* (e: Engine, { memo, verify }: SummaryHow) {
+  return (yield* listedThrough(e, memo, verify)).all;
+});
+
+/**
  * Every run's summary, in the store's order, as the board's list answers it: through `e`, each run's judgement read through the informer
  * `how.memo` (`informedJudgements`) — the one the daemon's pass fills and the run's object reads — and summarized off it (`summaryOf`),
  * verified as `how.verify` says. Dies where a verified answer differs from the informer's (`answered`).

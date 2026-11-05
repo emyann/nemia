@@ -40,6 +40,11 @@ import type * as yours from '../../api/src/workflows/yours.ts';
 
 /** A step of a run's object, as the api answers it (`GET /api/runs/:id`): its status, as the package judges it. */
 type Step = runs.RunAnswer['status']['steps'][number];
+/**
+ * A run's row as the runs-open view answers it, but the three keys that view adds: the summary the board's run row (`RunSummary`) is
+ * held to, now that the array of rows has gone and the board reads every run off the open and finished views.
+ */
+type RunRow = Omit<runs.OpenListing['inFlight'][number], 'wallMs' | 'finishedAt' | 'clock'>;
 type SaidHeld = Omit<Step['said'][number], 'after'> & { after: NonNullable<Step['said'][number]['after']> | null };
 type RadiusOf = Extract<decision.Touched['radius'], { changes: unknown }>;
 type ChatEventOf = chat.ChatHistoryAnswer['events'][number];
@@ -154,19 +159,19 @@ export type CheckoutHold = Holds<Same<Board.CheckoutHold, NonNullable<decision.D
 export type RunSlot = Holds<Same<Board.RunSlot, NonNullable<Extract<decision.RunDecision, { running: true }>['held']>>>;
 
 export type RunLines = Holds<Same<Board.RunLines, runs.RunLinesAnswer>>;
-export type RunGraph = Holds<Same<Board.RunGraph, runs.RunListing['graph']>>;
-export type GraphEdge = Holds<Same<Board.GraphEdge, runs.RunListing['graph']['edges'][number]>>;
-export type GraphNode = Holds<Same<Board.GraphNode, NonNullable<runs.RunListing['graph']['nodes']>[number]>>;
+export type RunGraph = Holds<Same<Board.RunGraph, RunRow['graph']>>;
+export type GraphEdge = Holds<Same<Board.GraphEdge, RunRow['graph']['edges'][number]>>;
+export type GraphNode = Holds<Same<Board.GraphNode, NonNullable<RunRow['graph']['nodes']>[number]>>;
 
 export type InboxCardPage = Holds<Same<Board.InboxCardPage, inbox.InboxCardPage>>;
 export type FromSet = Holds<Same<Board.FromSet, inbox.InboxFromAnswer>>;
 
-export type PlaceKind = Holds<Same<Board.PlaceKind, runs.RunListing['place']>>;
-export type RunStatus = Holds<Same<Board.RunStatus, runs.RunListing['status']>>;
+export type PlaceKind = Holds<Same<Board.PlaceKind, RunRow['place']>>;
+export type RunStatus = Holds<Same<Board.RunStatus, RunRow['status']>>;
 /** The codes the board groups and colours by, each held to the field the api carries it in. */
-export type RunPhase = Holds<Same<Board.RunPhase, runs.RunListing['phase']>>;
-export type RunReason = Holds<Same<Board.RunReason, runs.RunListing['reason']>>;
-export type StepPhase = Holds<Same<Board.StepPhase, runs.RunListing['steps'][number]['phase']>>;
+export type RunPhase = Holds<Same<Board.RunPhase, RunRow['phase']>>;
+export type RunReason = Holds<Same<Board.RunReason, RunRow['reason']>>;
+export type StepPhase = Holds<Same<Board.StepPhase, RunRow['steps'][number]['phase']>>;
 export type StepReason = Holds<Same<Board.StepReason, Step['reason']>>;
 export type TryPhase = Holds<Same<Board.StepPhase, runs.StepTry['phase']>>;
 export type TryReason = Holds<Same<Board.StepReason, runs.StepTry['reason']>>;
@@ -174,17 +179,17 @@ export type TryOn = Holds<Same<Board.WaitOn | null, runs.StepTry['on']>>;
 export type TryVia = Holds<Same<Board.AnswerVia | null, runs.StepTry['via']>>;
 export type StepOn = Holds<Same<Board.WaitOn | null, Step['on']>>;
 export type StepVia = Holds<Same<Board.AnswerVia | null, Step['via']>>;
-export type RunOn = Holds<Same<Board.WaitOn | null, runs.RunListing['on']>>;
-export type RunVia = Holds<Same<Board.AnswerVia | null, runs.RunListing['via']>>;
+export type RunOn = Holds<Same<Board.WaitOn | null, RunRow['on']>>;
+export type RunVia = Holds<Same<Board.AnswerVia | null, RunRow['via']>>;
 export type CheckVerdict = Holds<Same<Board.CheckVerdict, NonNullable<logs.StepCheck['verdict']>>>;
-export type StepVerdict = Holds<Same<Board.CheckVerdict, NonNullable<runs.RunListing['steps'][number]['verdict']>>>;
+export type StepVerdict = Holds<Same<Board.CheckVerdict, NonNullable<RunRow['steps'][number]['verdict']>>>;
 export type CheckResult = Holds<Same<Board.CheckResult, NonNullable<logs.StepCheck['verdict']>['result']>>;
-export type RunToDecide = Holds<Same<Board.RunToDecide, NonNullable<runs.RunListing['toDecide']>>>;
-export type Spent = Holds<Same<Board.Spent, NonNullable<runs.RunListing['cost']>>>;
-export type AtWork = Holds<Same<Board.AtWork, NonNullable<runs.RunListing['atWork']>>>;
-export type RunTokens = Holds<Same<Board.RunTokens, NonNullable<runs.RunListing['tokens']>>>;
-export type RunWaiting = Holds<Same<Board.RunWaiting, NonNullable<runs.RunListing['waiting']>>>;
-export type RunHolding = Holds<Same<Board.RunHolding, NonNullable<runs.RunListing['holding']>>>;
+export type RunToDecide = Holds<Same<Board.RunToDecide, NonNullable<RunRow['toDecide']>>>;
+export type Spent = Holds<Same<Board.Spent, NonNullable<RunRow['cost']>>>;
+export type AtWork = Holds<Same<Board.AtWork, NonNullable<RunRow['atWork']>>>;
+export type RunTokens = Holds<Same<Board.RunTokens, NonNullable<RunRow['tokens']>>>;
+export type RunWaiting = Holds<Same<Board.RunWaiting, NonNullable<RunRow['waiting']>>>;
+export type RunHolding = Holds<Same<Board.RunHolding, NonNullable<RunRow['holding']>>>;
 export type StepNeeds = Holds<Same<Board.StepNeeds, Pick<Step, keyof Board.StepNeeds>>>;
 
 export type TaskPart = Holds<Same<Board.TaskPart, runs.TaskPart>>;
@@ -213,7 +218,7 @@ export type Interrupt = Holds<Same<Board.Interrupt, pause.PauseNowRead['interrup
 export type QuotaWindow = Holds<Same<Board.QuotaWindow, quota.QuotaWindow>>;
 export type Quota = Holds<Same<Board.Quota, quota.Quota>>;
 
-export type RunSummary = Holds<Same<Board.RunSummary, runs.RunListing>>;
+export type RunSummary = Holds<Same<Board.RunSummary, RunRow>>;
 export type OpenRuns = Holds<Same<Board.OpenRuns, runs.OpenListing>>;
 export type FinishedPage = Holds<Same<Board.FinishedPage, runs.FinishedListing>>;
 export type ListedRun = Holds<Same<Board.ListedRun, runs.OpenListing['inFlight'][number]>>;
@@ -221,7 +226,6 @@ export type WaitingRun = Holds<Same<Board.WaitingRun, runs.OpenListing['waiting'
 export type RunClock = Holds<Same<Board.RunClock, NonNullable<runs.OpenListing['inFlight'][number]['clock']>>>;
 export type StepCost = Holds<Same<Board.StepCost, NonNullable<runs.OpenListing['waiting'][number]['stepCosts']>[number]>>;
 export type FinishedRun = Holds<Same<Board.FinishedRun, runs.FinishedListing['runs'][number]>>;
-export type Hold = Holds<Same<Board.Hold, runs.Hold>>;
 
 export type TranscriptEvent = Holds<Same<Board.TranscriptEvent, steps.TranscriptEvent>>;
 export type StepTranscript = Holds<Same<Board.StepTranscript, steps.StepTranscript>>;

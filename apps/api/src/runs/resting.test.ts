@@ -1,5 +1,6 @@
 /**
- * The informer of each run's judgement (`informerRead`, the package's rest/informer.verb.ts), as the list reads it: `GET /api/runs` answers
+ * The informer of each run's judgement (`informerRead`, the package's rest/informer.verb.ts), as the list reads it: `GET /api/runs`, the
+ * `RunList`, answers
  * a finished run from memory while nothing it was judged on has moved, so a poll reads the journals of the runs still moving and of none
  * other — and answers afresh the moment anything it watches does: the run's record, a file a person writes beside it, a line of its tasks
  * on the engine's feed, a tip of a branch as the tick's last pass read it (`standing.json`, written here as a pass writes it: `aPass`), or
@@ -28,13 +29,15 @@ import {
   Informer,
   informerRead,
   runStore,
-  type RunSummary,
   standingReader,
   standingSnapshot,
   verifiesRest,
 } from 'agent-orchestrator';
 import { runTasks } from 'agent-orchestrator/run';
+import type { RunList } from 'objects';
+import type { RunListing } from './runs.ts';
 import { runWith } from '../../test/builtin-place.ts';
+import { summariesOf } from '../../test/run-reads.ts';
 import { names } from '../../test/named.ts';
 
 /** The engine the app's requests read through: its reads are what a poll costs. */
@@ -220,11 +223,18 @@ async function journalsAsked<T>(f: () => Promise<T>): Promise<{ value: T; asked:
   }
 }
 
-const list = async () => {
+/** A poll of the list (`GET /api/runs`, the `RunList`): what a poll costs is what this reads. */
+const poll = async () => {
   const res = await app.request('/api/runs');
   assert.equal(res.status, 200, await res.clone().text());
-  return (await res.json()) as RunSummary[];
+  return (await res.json()) as RunList;
 };
+
+/**
+ * Every run's summary, off the same memo, as the board's views answer them (`summariesOf`): what a run's facts are read from. Its wall
+ * time and its clock, which grow between two reads, are left out: a test here compares two reads of one run.
+ */
+const list = async () => (await summariesOf(app)).map(({ wallMs: _wall, clock: _clock, ...row }) => row);
 const listed = async (id: string) => (await list()).find((r) => r.id === id);
 
 /** With the memo's check off: what the memo alone answers. */
@@ -253,11 +263,21 @@ test('a polled list keeps a run at rest and judges it afresh the moment anything
     assert.ok(resting.runs.has('r-rest'), 'kept');
     assert.ok(!resting.runs.has('r-moving'), 'not kept: its task is in flight');
 
+    const polled = await poll();
     const hits = resting.hits;
-    const { value: again, asked } = await journalsAsked(() => unverified(list));
-    assert.deepEqual(again, first, 'the same answer from memory');
+    const { value: again, asked } = await journalsAsked(() => unverified(poll));
+    assert.deepEqual(again, polled, 'the same answer from memory');
     assert.equal(asked, 1, "the moving run's one journal, and not the finished run's");
     assert.equal(resting.hits - hits, 1);
+
+    const summaries = async () => {
+      const res = await app.request('/api/runs-summaries');
+      assert.equal(res.status, 200, await res.clone().text());
+      return ((await res.json()) as RunListing[]).map((r) => r.id).sort();
+    };
+    const board = await journalsAsked(() => unverified(summaries));
+    assert.deepEqual(board.value, ['r-moving', 'r-rest'], 'every run, once');
+    assert.equal(board.asked, 1, "the board's whole list, off the informer's summaries: the moving run's one journal again");
   });
   await s.test('a record rewritten is judged afresh', async () => {
     await list();
@@ -543,7 +563,7 @@ test("what a poll costs: the journals of the runs still moving, of a page's own 
     appended('r-moving-implement', { kind: 'said', at, attempt: 1, text: 'Keep going.' });
     const before = await readsOf();
     const reads = Effect.runSync(e.io()).reads;
-    await unverified(list);
+    await unverified(poll);
     const read = Effect.runSync(e.io()).reads - reads;
     const after = await readsOf();
     assert.ok(read > 0, "the line appended to the moving run's journal was read");
@@ -577,21 +597,21 @@ test("what a poll costs: the journals of the runs still moving, of a page's own 
       );
     child('r-child-1');
     await list();
-    const cost = async () => (await journalsAsked(() => unverified(list))).asked;
+    const cost = async () => (await journalsAsked(() => unverified(async () => app.request('/api/runs-open')))).asked;
     const one = await cost();
     child('r-child-2');
     await list();
     assert.equal(
       await cost(),
       one,
-      "a second run waiting on the parent reads no journal more: the parent's tasks are among the request's views",
+      "the board's poll: a second run waiting on the parent reads no journal more, the parent's tasks among the request's views (the RunList judges each run on its own)",
     );
   });
   await s.test(
     "a poll's reads: a run at rest, a moving one and one whose check refused it cost the journals of the moving one alone, and judged afresh their own journals and no more",
     async () => {
       await list();
-      const cost = async () => (await journalsAsked(() => unverified(list))).asked;
+      const cost = async () => (await journalsAsked(() => unverified(poll))).asked;
       const before = await cost();
       aFinishedRun('r-count-rest');
       running('r-count-moving-implement');
@@ -648,7 +668,7 @@ test("what a poll costs: the journals of the runs still moving, of a page's own 
       await aPass();
       try {
         await list();
-        const whole = await journalsAsked(() => unverified(list));
+        const whole = await journalsAsked(() => unverified(async () => app.request('/api/runs-finished?size=100&page=1000')));
         assert.ok(resting.runs.has('r-paged') && resting.runs.has('r-asks'), 'both at rest, and kept');
         const read = <T>(address: string) =>
           journalsAsked(() =>
@@ -669,7 +689,11 @@ test("what a poll costs: the journals of the runs still moving, of a page's own 
         );
         const journalsOf = (ids: readonly string[]) => new Set(ids.flatMap((id) => runTasks(runStore.runs.read(id))));
         const paged = journalsOf(page.value.runs.map((run) => run.id));
-        assert.equal(page.asked, whole.asked + paged.size, "the whole list's, and the journals of that page's own rows alone");
+        assert.equal(
+          page.asked,
+          whole.asked + paged.size,
+          "the summaries' read alone (a page past the last, cut before any row is read), and the journals of that page's own rows",
+        );
         const one = await read<{ runs: { id: string }[] }>('/api/runs-finished?size=1');
         const first = journalsOf(one.value.runs.map((run) => run.id));
         assert.ok(first.size < paged.size, `the fixture holds more rows than a page of one — ${first.size} of ${paged.size}`);

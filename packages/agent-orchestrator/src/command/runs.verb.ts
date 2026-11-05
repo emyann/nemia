@@ -37,7 +37,7 @@ import {
 import { Effect } from 'effect';
 import { pausedRead } from '../list/list.verb.ts';
 import { sessionsDrained, tried } from '../runtime-client.ts';
-import type { Args } from './command.ts';
+import { type Args, NAMED_ACTION } from './command.ts';
 import type { Command, Ran } from './entry.verb.ts';
 
 /** The text under `key`, or undefined where none was given. */
@@ -197,8 +197,8 @@ export const HOLD: Command<{ id: string; lifted: boolean; hold: Hold }> = {
   writes: true,
   class: 'act',
   route: [
-    { method: 'POST', path: '/api/runs/:runId/hold', status: 200, sets: { off: false } },
-    { method: 'DELETE', path: '/api/runs/:runId/hold', status: 200, sets: { off: true } },
+    { method: 'POST', path: '/api/namespaces/:namespace/runs/:runId/hold', status: 200, sets: { off: false }, hand: NAMED_ACTION },
+    { method: 'DELETE', path: '/api/namespaces/:namespace/runs/:runId/hold', status: 200, sets: { off: true }, hand: NAMED_ACTION },
   ],
   handler: Effect.fnUntraced(function* (args: Args) {
     const runId = textOf(args, 'runId') ?? '';
@@ -265,7 +265,7 @@ export const RM: Command<{ id: string; removed: boolean; engine: EngineForgettin
   check: rmRefusal,
   writes: true,
   class: 'ask',
-  route: { method: 'DELETE', path: '/api/runs/:runId', status: 200 },
+  route: { method: 'DELETE', path: '/api/namespaces/:namespace/runs/:runId', status: 200, hand: NAMED_ACTION },
   handler: Effect.fnUntraced(function* (args: Args) {
     const forgot = yield* forgetRun(textOf(args, 'runId') ?? '', {
       deleteBranches: args.deleteBranches === true,
@@ -323,7 +323,7 @@ export const PRUNE: Command<{
   },
   writes: true,
   class: 'ask',
-  route: { method: 'POST', path: '/api/runs/:runId/prune', status: 200, sets: { yes: true } },
+  route: { method: 'POST', path: '/api/namespaces/:namespace/runs/:runId/prune', status: 200, sets: { yes: true }, hand: NAMED_ACTION },
   handler: Effect.fnUntraced(function* (args: Args) {
     const p: Pruning = yield* prune(textOf(args, 'runId') ?? '', {
       unmerged: args.unmerged === true,

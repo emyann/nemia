@@ -29,7 +29,7 @@ import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from 'agent-orchestrator/testing';
 import { appOver, eachTest, engineFor, runOver } from '../../test/placed.ts';
 import { story } from '../../test/checkpoints.ts';
-import { objectOf } from '../../test/run-reads.ts';
+import { objectOf, summariesOf } from '../../test/run-reads.ts';
 
 const stand = eachTest(testPlace);
 const standIn = eachTest(testEngine);
@@ -109,7 +109,7 @@ const tryIt = (name: string, body: unknown, headers: Record<string, string> = js
     body: typeof body === 'string' ? body : JSON.stringify(body),
   });
 const remove = (id: string, headers: Record<string, string> = json) =>
-  app().request(`/api/runs/${id}`, { method: 'DELETE', headers, body: '{}' });
+  app().request(`/api/namespaces/default/runs/${id}`, { method: 'DELETE', headers, body: '{}' });
 
 const records = (): string[] =>
   fs.existsSync(RUNS)
@@ -141,7 +141,7 @@ function signedOff(taskId: string, cwd: string): void {
   });
 }
 
-const listed = async (): Promise<RunSummary[]> => (await (await app().request('/api/runs')).json()) as RunSummary[];
+const listed = async (): Promise<RunSummary[]> => await summariesOf(app());
 
 let first = '';
 

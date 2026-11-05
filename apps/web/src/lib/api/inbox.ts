@@ -241,12 +241,14 @@ export const startCard = (
   start: { workflow: string; from: WorkflowListing['from']; brief: string; after?: readonly string[]; context?: readonly string[] },
   place?: Place | null,
 ): Promise<Started> =>
-  cards.start(
-    namespaceOf(card.factory),
-    card.name,
-    { ...start, from: sourceOf(start.from) },
-    place && place.factory !== 'default' ? place : undefined,
-  );
+  cards
+    .start(
+      namespaceOf(card.factory),
+      card.name,
+      { ...start, from: sourceOf(start.from) },
+      place && place.factory !== 'default' ? place : undefined,
+    )
+    .then(({ id, card: started }) => ({ id, card: started }));
 
 /**
  * Mirrors `InboxFromAnswer` in apps/api/src/inbox/inbox.ts: what the CLI's `inbox from` did — the card's `from:` as it now reads, and the

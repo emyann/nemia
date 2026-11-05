@@ -31,7 +31,6 @@ export const TEAM_NAMES: Baseline = {
   'apps/api/src/runs/hired-folder.test.ts': { count: 3, ...TEAM_MOVES.fixtures },
   'apps/api/src/factories/factories.test.ts': { count: 18, ...TEAM_MOVES.fixtures },
   'apps/api/src/factories/hires.test.ts': { count: 7, ...TEAM_MOVES.fixtures },
-  'apps/api/src/runs/lists.test.ts': { count: 1, ...TEAM_MOVES.fixtures },
   'apps/api/src/runs/unreadable.test.ts': { count: 4, ...TEAM_MOVES.fixtures },
   'apps/api/src/stats/stats.test.ts': { count: 4, ...TEAM_MOVES.fixtures },
   'apps/api/src/step/step.test.ts': { count: 21, ...TEAM_MOVES.fixtures },

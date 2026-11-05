@@ -1,9 +1,9 @@
 import path from 'node:path';
 import type { Locator, Page } from 'playwright';
-import type { OpenRuns, RunSummary } from '../../../src/lib/api/runs.ts';
+import type { OpenRuns } from '../../../src/lib/api/runs.ts';
 import { bellHash, bellRows, type BellRow } from '../../../src/lib/bell.ts';
 import { waitsOnYou } from '../../../src/lib/factory.ts';
-import { photograph, themeOf } from '../board.ts';
+import { photograph, themeOf, rowsAnswered } from '../board.ts';
 import { expectCount, expectOnScreen, expectVisible, idle, Refused, settled, WAIT_MS } from '../checks.ts';
 import { FACTORIES } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -32,7 +32,7 @@ async function visit(page: Page, to: string): Promise<void> {
  */
 async function agrees(page: Page, rows: readonly BellRow[]): Promise<void> {
   if (!rows.length) throw new Refused('the seeded store has runs waiting on you: the api lists none');
-  const own = bellRows((await answer<RunSummary[]>(page, '/api/runs')).filter(waitsOnYou)).map((row) => row.run);
+  const own = bellRows((await rowsAnswered(page)).filter(waitsOnYou)).map((row) => row.run);
   const said = rows.map((row) => row.run);
   if (own.join() !== said.join())
     throw new Refused(`the api says ${said.join(', ')} wait on you — the board's rule over the whole list says ${own.join(', ')}`);

@@ -6,6 +6,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { putHold, runsQuery, type RunSummary } from '../lib/api';
+import { useRunNamespace } from '@/lib/runNamespace';
 import type { RunView } from '../lib/runView';
 import { titleOf } from '../lib/factory';
 import { holdable, holdCandidates } from '../lib/hold.ts';
@@ -69,8 +70,9 @@ function HoldForm({ id, runs, onClose }: { id: string; runs: RunSummary[]; onClo
   const [until, setUntil] = useState<string[]>([]);
   const [why, setWhy] = useState('');
   const queryClient = useQueryClient();
+  const namespaceNow = useRunNamespace(id);
   const hold = useMutation({
-    mutationFn: () => putHold(id, until, why),
+    mutationFn: () => namespaceNow().then((ns) => putHold(ns, id, until, why)),
     onSuccess: async () => {
       onClose();
       await Promise.all([queryClient.invalidateQueries({ queryKey: ['runs', id], exact: true }), runsMoved(queryClient, id)]);

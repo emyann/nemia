@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Locator, Page } from 'playwright';
-import { photograph, sidebar, themeOf, stepBar } from '../board.ts';
+import { photograph, sidebar, themeOf, stepBar, isRunAction } from '../board.ts';
 import { expectCount, expectInside, expectUncut, expectVisible, idle, Refused, settled, WAIT_MS, watch } from '../checks.ts';
 import { COSTLY } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -223,7 +223,7 @@ export default {
 
     const asks = path.join(store!, 'runs', `${COSTLY.id}.asks`);
     const retried = (r: { request: () => { method: () => string }; url: () => string }) =>
-      r.request().method() === 'POST' && new URL(r.url()).pathname === `/api/runs/${COSTLY.id}/steps/${over.step}/retry`;
+      r.request().method() === 'POST' && isRunAction(new URL(r.url()).pathname, COSTLY.id, `/steps/${over.step}/retry`);
     const refused = await page.context().newPage();
     try {
       const { problems } = watch(refused);

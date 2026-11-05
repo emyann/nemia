@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import type { Page } from 'playwright';
-import { fed, photograph, themeOf } from '../board.ts';
+import { fed, photograph, themeOf, isRunAction } from '../board.ts';
 import { cardOf } from '../canvas.ts';
 import { expectCount, expectVisible, idle, literal, Refused, settled, WAIT_MS } from '../checks.ts';
 import { GATED, HELD } from '../seed.ts';
@@ -14,11 +14,12 @@ const WHY = 'its parser conflicts with the flag';
 
 export default {
   /**
-   * A hold put on the board, as `nemia hold <run> --until <run> --why <words>` puts it (`POST /api/runs/:id/hold`): Hold… in GATED's
-   * header opens a form offering the runs of its repository that may still land, HELD among them and GATED not; HELD ticked through its
-   * label and a why given, Hold writes the hold's file with the api's user as `by`, and the page says it in its Held section, offering Lift
-   * and no Hold…; GATED's card on the Factory says it whole too. The hold is then lifted from the page, as the `lift` page lifts it. What
-   * the api refuses is the `hold-put-refused` page's, and its own tests' (`apps/api/test/hold.test.ts`).
+   * A hold put on the board, as `nemia hold <run> --until <run> --why <words>` puts it (`POST
+   * /api/namespaces/:namespace/runs/:runId/hold`): Hold… in GATED's header opens a form offering the runs of its repository that may still
+   * land, HELD among them and GATED not; HELD ticked through its label and a why given, Hold writes the hold's file with the api's user as
+   * `by`, and the page says it in its Held section, offering Lift and no Hold…; GATED's card on the Factory says it whole too. The hold is
+   * then lifted from the page, as the `lift` page lifts it. What the api refuses is the `hold-put-refused` page's, and its own tests'
+   * (`apps/api/test/hold.test.ts`).
    */
   name: 'hold-put',
   route: `/runs/${GATED.id}`,
@@ -46,7 +47,7 @@ export default {
       await photograph(page, path.join(OUT, `hold-put-form-${theme}.png`), { fullPage: true });
 
       const [answered] = await Promise.all([
-        page.waitForResponse((r) => r.request().method() === 'POST' && new URL(r.url()).pathname === `/api/runs/${id}/hold`, {
+        page.waitForResponse((r) => r.request().method() === 'POST' && isRunAction(new URL(r.url()).pathname, id, `/hold`), {
           timeout: WAIT_MS,
         }),
         put.click(),

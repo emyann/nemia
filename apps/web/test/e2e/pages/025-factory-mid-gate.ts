@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Response } from 'playwright';
-import { fed, photograph, themeOf, stepBar } from '../board.ts';
+import { fed, photograph, themeOf, stepBar, isRunAction } from '../board.ts';
 import { cardOf, expectClearOfEachOther, expectClearOfPanels } from '../canvas.ts';
 import { expectCount, expectOnScreen, expectVisible, idle, Refused, settled, WAIT_MS } from '../checks.ts';
 import { GATED } from '../seed.ts';
@@ -22,7 +22,7 @@ export default {
     const { id, gated } = GATED;
     const asks = path.join(store!, 'runs', `${id}.asks`);
     const approved = (r: Response) =>
-      r.request().method() === 'POST' && new URL(r.url()).pathname === `/api/runs/${id}/steps/${gated}/approve`;
+      r.request().method() === 'POST' && isRunAction(new URL(r.url()).pathname, id, `/steps/${gated}/approve`);
     await expectCount(page.getByRole('switch', { name: 'Show finished', checked: false }), 1, 'Show finished is off');
     await page.getByRole('button', { name: 'Reset layout' }).click();
     await settled(page);

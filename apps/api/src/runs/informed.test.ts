@@ -17,9 +17,10 @@ import { Effect, Layer } from 'effect';
 import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from 'agent-orchestrator/testing';
 import { Informer, informerMemo, type InformerMemo } from 'agent-orchestrator';
-import type { Labelled } from 'objects';
+import type { Labelled, RunList } from 'objects';
 import type { RunAnswer, RunListing } from './runs.ts';
 import { appOver, beforeEachTest, eachTest, engineFor } from '../../test/placed.ts';
+import { summariesOf } from '../../test/run-reads.ts';
 
 const stand = eachTest(testPlace);
 const standIn = eachTest(testEngine);
@@ -72,13 +73,13 @@ const object = async (id: string, on = app()): Promise<RunAnswer> => {
   assert.equal(res.status, 200, `the run ${id} answers`);
   return (await res.json()) as RunAnswer;
 };
-const listing = async (on = app()): Promise<RunListing[]> => (await (await on.request('/api/runs')).json()) as RunListing[];
+const listing = async (on = app()): Promise<RunListing[]> => await summariesOf(on);
 const post = (route: string, body: unknown) => app().request(route, { method: 'POST', headers: BOARD, body: JSON.stringify(body) });
 
 test('an approval through the api is answered on the very next request, with no pass between', async () => {
   assert.deepEqual((await object(GATED)).status.waitingOnYou, ['implement'], 'the fixture waits at its gate');
   assert.ok(informer().runs.has(GATED), 'and the informer keeps it, at rest at its gate');
-  assert.equal((await post(`/api/runs/${GATED}/steps/implement/approve`, {})).status, 202);
+  assert.equal((await post(`/api/namespaces/default/runs/${GATED}/steps/implement/approve`, {})).status, 202);
   assert.ok(!informer().runs.has(GATED), 'the write mount took it out');
   assert.deepEqual((await object(GATED)).status.waitingOnYou, [], 'approved, on the next request');
 });
@@ -87,7 +88,7 @@ test('a word said through the api to a session at work, which moves no stamp and
   informer().pass = 1;
   await object(AT_WORK);
   assert.ok(informer().runs.has(AT_WORK), 'kept within the pass now running');
-  assert.equal((await post(`/api/runs/${AT_WORK}/steps/implement/say`, { text: 'Widen the scope.' })).status, 202);
+  assert.equal((await post(`/api/namespaces/default/runs/${AT_WORK}/steps/implement/say`, { text: 'Widen the scope.' })).status, 202);
   const step = (await object(AT_WORK)).status.steps.find((s) => s.name === 'implement');
   assert.deepEqual(
     step?.said.map((said) => said.text),
@@ -101,32 +102,39 @@ test("a run's labels set through the api are its object's on the very next reque
   try {
     assert.equal((await object(GATED)).metadata.labels['team'], undefined, 'the fixture carries no team');
     assert.ok(informer().runs.has(GATED), 'and the informer keeps it');
-    const res = await post(`/api/runs/${GATED}/labels`, { labels: ['team=core'] });
+    const res = await post(`/api/namespaces/default/runs/${GATED}/labels`, { labels: ['team=core'] });
     assert.equal(res.status, 200, await res.clone().text());
     const labelled = (await res.json()) as Labelled;
     assert.deepEqual([labelled.kind, labelled.name, labelled.labels, labelled.was], ['Run', GATED, { team: 'core' }, {}]);
     assert.ok(!informer().runs.has(GATED), 'the write mount took it out');
     assert.equal((await object(GATED)).metadata.labels['team'], 'core', 'labelled, on the next request');
     assert.equal((await listing()).find((r) => r.id === GATED)?.labels['team'], 'core', 'and on its row of the list');
-    const changed = await post(`/api/runs/${GATED}/labels`, { labels: ['team=infra'] });
+    const changed = await post(`/api/namespaces/default/runs/${GATED}/labels`, { labels: ['team=infra'] });
     assert.equal(changed.status, 422, 'REFUSED: a value changed without overwrite');
-    const over = await post(`/api/runs/${GATED}/labels`, { labels: ['team=infra'], overwrite: true });
+    const over = await post(`/api/namespaces/default/runs/${GATED}/labels`, { labels: ['team=infra'], overwrite: true });
     assert.equal(over.status, 200, await over.clone().text());
     assert.equal((await object(GATED)).metadata.labels['team'], 'infra', 'overwritten, on the next request');
-    const wrong = await post(`/api/runs/${GATED}/labels`, { labels: 'team=core' });
+    const wrong = await post(`/api/namespaces/default/runs/${GATED}/labels`, { labels: 'team=core' });
     assert.equal(wrong.status, 400, 'REFUSED: labels that are no list');
   } finally {
     process.env.WF_VERIFY_REST = '1';
   }
 });
 
+/** The runs as a list of objects (`GET /api/runs`, the `RunList`), a 200. */
+const runList = async (on = app()): Promise<RunList> => {
+  const res = await on.request('/api/runs');
+  assert.equal(res.status, 200, 'the runs list answers');
+  return (await res.json()) as RunList;
+};
+
 test('a cold app and a warm app answer the run object and the runs list alike', async () => {
   const warm = app();
-  const warmed = { object: await object(GATED, warm), list: await listing(warm) };
+  const warmed = { object: await object(GATED, warm), list: await runList(warm) };
   assert.ok(informer().runs.has(GATED), 'the warm app kept the run');
   const cold = appOver(standIn(), stand(), Layer.succeed(Informer)(informerMemo() satisfies InformerMemo));
   assert.deepEqual(await object(GATED, cold), warmed.object, 'the object');
-  assert.deepEqual(await listing(cold), warmed.list, 'the list');
+  assert.deepEqual(await runList(cold), warmed.list, 'the list');
 });
 
 test("the run's status phase and reason are its row's in the list: one judgement for both (Q18)", async () => {

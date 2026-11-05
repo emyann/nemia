@@ -5,6 +5,8 @@ export {
   Labelled,
   Labels,
   Run,
+  RunDrift,
+  RunList,
   RunMetadata,
   RunSpec,
   RunSpecStep,
@@ -22,7 +24,27 @@ export {
   StepUsed,
   TryCloseout,
   TryShort,
+  RunUnjudged,
 } from './run.ts';
+export {
+  RETRY_ASKED_MODES,
+  RunApprove,
+  RunApproved,
+  RunAsked,
+  RunHeld,
+  RunHold,
+  RunHoldWritten,
+  RunPrune,
+  RunPruned,
+  RunRefresh,
+  RunRefreshed,
+  RunRemoved,
+  RunRetry,
+  RunSaid,
+  RunSay,
+  RunStart,
+  RunStarted,
+} from './run-actions.ts';
 export {
   ANSWER_VIA,
   ARTIFACT_KINDS,
@@ -139,6 +161,7 @@ export { Volume, VolumeList, VolumeSpec, VolumeStatus } from './volume.ts';
 export {
   Api,
   AgentsGroup,
+  BadRequest,
   BuiltinGroup,
   CardsGroup,
   Conflict,
@@ -158,6 +181,7 @@ export {
   TemplatesGroup,
   Unjudged,
   VolumesGroup,
+  WriteFailed,
   WorkflowsGroup,
 } from './api.ts';
 export { GraphEdge, GraphNode, ObjectGraph, TypedGraph } from './graph.ts';

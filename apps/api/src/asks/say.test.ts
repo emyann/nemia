@@ -1,6 +1,6 @@
 /**
- * A person's words to a step's running session over HTTP: POST /api/runs/:id/steps/:step/say, which calls the package's `sayRun` —
- * `nemia say`'s own — and the `said` on the step's detail, read back off the engine.
+ * A person's words to a step's running session over HTTP: POST /api/namespaces/:namespace/runs/:runId/steps/:step/say, which calls the
+ * package's `sayRun` — `nemia say`'s own — and the `said` on the step's detail, read back off the engine.
  *
  * On the stand-ins: the runtime's test engine, its tasks filed and moved by hand, and the test place, under the run records this file
  * seeds. One engine for the file, since its runs are seeded as it loads and its tests read them in turn. The tasks: `t-implement`, at
@@ -20,8 +20,8 @@ import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from 'agent-orchestrator/testing';
 import type { Said } from 'agent-orchestrator';
 import { appOver, beforeEachTest, eachTest, engineFor, runOver } from '../../test/placed.ts';
-import { objectOf, type ObjectStep } from '../../test/run-reads.ts';
-import { list, runStore, sayRun, type RunSummary } from 'agent-orchestrator';
+import { objectOf, summariesOf, type ObjectStep } from '../../test/run-reads.ts';
+import { list, runStore, sayRun } from 'agent-orchestrator';
 import { story } from '../../test/checkpoints.ts';
 
 const stand = eachTest(testPlace);
@@ -81,7 +81,7 @@ const BOARD = {
 };
 
 const sayTo = (step: string, body: unknown, headers: Record<string, string> = BOARD, run = R) =>
-  app().request(`/api/runs/${run}/steps/${step}/say`, {
+  app().request(`/api/namespaces/default/runs/${run}/steps/${step}/say`, {
     method: 'POST',
     headers,
     body: typeof body === 'string' ? body : JSON.stringify(body),
@@ -201,7 +201,7 @@ test("a person's words to a working session: the package's `sayRun` hands them t
         'said to 1×',
         "`nemia ls`'s words",
       );
-      const summary = ((await (await app().request('/api/runs')).json()) as RunSummary[]).find((r) => r.id === R)!;
+      const summary = (await summariesOf(app())).find((r) => r.id === R)!;
       assert.equal(summary.steps.find((s) => s.name === 'implement')!.note, 'said to 1×', 'and on the list');
       assert.deepEqual(written().files, records, "the runs' records untouched, and no file of the api's");
     },

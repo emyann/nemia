@@ -1,7 +1,8 @@
 /**
  * What a step needs from a person, and the board's answer to it: `needs` and the codes (`AwaitingAnswer` via `session`) on each step,
- * `answer` on a try a person answered, and POST /api/runs/:id/steps/:step/retry, which asks for another try as `nemia retry` does — through
- * the package's `retryRun`, given the harness's word as `nemia retry` gives it, and refused in the package's words.
+ * `answer` on a try a person answered, and POST /api/namespaces/:namespace/runs/:runId/steps/:step/retry, which asks for another try as
+ * `nemia retry` does — through the package's `retryRun`, given the harness's word as `nemia retry` gives it, and refused in the package's
+ * words.
  *
  * One table of what the route refuses, nothing written and no session stopped, then one story: a person answering a blocked step,
  * rechecking a refused check, continuing the sessions the harness blocked, and reading the answered try once the tick took it. The
@@ -17,13 +18,14 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { askFile, list, runStore, type RunSummary } from 'agent-orchestrator';
+import { askFile, list, runStore } from 'agent-orchestrator';
 import { Effect } from 'effect';
+import type { RunList } from 'objects';
 import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from 'agent-orchestrator/testing';
 import { appOver, beforeEachTest, eachTest, engineFor, runOver } from '../../test/placed.ts';
 import { story } from '../../test/checkpoints.ts';
-import { objectOf, stepOf, triesOf } from '../../test/run-reads.ts';
+import { objectOf, stepOf, summariesOf, triesOf } from '../../test/run-reads.ts';
 
 const stand = eachTest(testPlace);
 const standIn = eachTest(testEngine);
@@ -128,7 +130,7 @@ const BOARD = {
 };
 
 const ask = (step: string, body: unknown, headers: Record<string, string> = BOARD, run = R) =>
-  app().request(`/api/runs/${run}/steps/${step}/retry`, {
+  app().request(`/api/namespaces/default/runs/${run}/steps/${step}/retry`, {
     method: 'POST',
     headers,
     body: typeof body === 'string' ? body : JSON.stringify(body),
@@ -148,7 +150,7 @@ const nothingWritten = (why: string) => {
 
 /** The run object of `id` (`GET /api/runs/:id`). */
 const object = async (id = R) => objectOf(app(), id);
-const summary = async (id = R) => ((await (await app().request('/api/runs')).json()) as RunSummary[]).find((r) => r.id === id)!;
+const summary = async (id = R) => (await summariesOf(app())).find((r) => r.id === id)!;
 
 /** The error a refused ask answered with, its status `status`. */
 const refusedWith = async (res: Response, status: number, said: string): Promise<string> => {
@@ -250,6 +252,14 @@ test("a blocked session's last line is what it said last — its last `text` or 
     false,
     'the list carries no last line: it reads no conversation',
   );
+  const listed = (await (await app().request('/api/runs')).json()) as RunList;
+  const onTheList = listed.items.find((run) => run.metadata.name === R);
+  assert.deepEqual(
+    onTheList?.status.steps.filter((step) => WAITED.includes(step.name)).map((step) => step.lastLine),
+    [null, null, null, null],
+    "the RunList asks no harness for a blocked session's words, which its poll would pay for each time: held's line, planted, is read on the run alone",
+  );
+  assert.deepEqual(onTheList?.status.kinds, [], 'nor does it read the drift through the doors');
 
   const since = [...held, event('a-4', 7, 'assistant', 'tool_use')];
   standIn().plantTranscript('t-held', 1, since);

@@ -12,6 +12,7 @@ import {
   commandLine,
   type RetryHow,
   roundBudgetRefusal,
+  runNamespace,
   tryOf,
 } from 'agent-orchestrator';
 import type { Run } from 'agent-orchestrator/run';
@@ -118,7 +119,7 @@ const RM: Extension = {
     if (tryOf(run, home)) return { args };
     return {
       status: 409,
-      error: `DELETE /api/runs/${run.id}: the board removes only a try, a run started from an agent's page, and ${run.id} is a run of ${run.workflowDir}. Remove it with \`nemia rm ${run.id}\`, which says what it hands off and what it leaves.`,
+      error: `DELETE /api/namespaces/${runNamespace(run.factory)}/runs/${run.id}: the board removes only a try, a run started from an agent's page, and ${run.id} is a run of ${run.workflowDir}. Remove it with \`nemia rm ${run.id}\`, which says what it hands off and what it leaves.`,
     };
   },
 };

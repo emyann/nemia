@@ -405,7 +405,7 @@ export const START: Command<Started> = {
   class: 'act',
   route: {
     method: 'POST',
-    path: '/api/runs',
+    path: '/api/namespaces/:namespace/runs',
     status: 201,
     hand: 'its body names a workflow by `from` and name, or an inbox card by name, which the api finds among the folders a start finds one in, in the factory the request is served in: never a path sent',
   },

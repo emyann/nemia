@@ -14,6 +14,7 @@ import { clockCounts, repoName, runClock, titleOf, toDecideOf, waitsOnRuns, wait
 import { flowSteps, railOf, tilesOf } from '@/lib/flow';
 import { decideLine, gateOfSummary } from '@/lib/gate';
 import { useNow } from '@/lib/useNow';
+import { namespaceOf } from '@/lib/runNamespace';
 import { ENDED } from '@/lib/words';
 import { RouteLink } from './AgentParts';
 import { CardGate, type Taken } from './CardGate';
@@ -158,7 +159,7 @@ export function RunNode({
           </p>
         ) : gate ? (
           <CardGate
-            runId={run.id}
+            run={{ id: run.id, namespace: namespaceOf(run.factory) }}
             gate={gate}
             title={decide?.kind === 'approve' && decide.step === gate.step ? decide.said : `approve ${gate.step}`}
             stamp={stamp}
@@ -349,7 +350,7 @@ function Chips({ run, decide, cancelled, reads }: { run: RunSummary; decide: boo
           held
         </Badge>
       )}
-      {run.holding && !cancelled && <CardLift id={run.id} />}
+      {run.holding && !cancelled && <CardLift id={run.id} namespace={namespaceOf(run.factory)} />}
       {cancelled && <Badge variant="outline">{ENDED.cancelled.word}</Badge>}
       {run.pruned && (
         <Badge variant="outline" data-pruned title={run.pruned.said} className="text-on-surface-variant">

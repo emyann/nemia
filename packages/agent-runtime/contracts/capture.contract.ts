@@ -29,8 +29,7 @@ const initKeptSpec = spec<(line: InitRead, read: InitRead | undefined) => InitRe
     },
     readsTheSame: {
       description: 'A reader reads the same of the capture whether the line was kept, cut or dropped',
-      condition: ({ input: [line, read], output }) =>
-        read === undefined || same(readOf(read, output ?? {}), readOf(read, line)),
+      condition: ({ input: [line, read], output }) => read === undefined || same(readOf(read, output ?? {}), readOf(read, line)),
     },
     dropsWhatChangesNothing: {
       description: 'A later init line that changes nothing a reader reads is not kept',

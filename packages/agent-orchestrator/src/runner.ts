@@ -320,7 +320,7 @@ export type {
 export { feedCursorRefusal, feedFile, feedSize, freshFeedMemo, readFeed, readFeedEnds, watchFeed } from './feed/feed.store.ts';
 export { cursorFileStart, cutCursorFile, keepCursor } from './watch/cursor.store.ts';
 export { emitFeed, FEED_FOLLOW_BEATS, FEED_FOLLOW_READS, FEED_FOLLOWERS, FeedHub, feedHubLayer, followFeed } from './feed/feed.verb.ts';
-export { followStep } from './following/following.verb.ts';
+export { followStep, followTask } from './following/following.verb.ts';
 export type { StepMoment } from './following/following.ts';
 export type { Followed } from './feed/feed.verb.ts';
 export { lockfileParts, provisionDeps } from './workspace/worktree.store.ts';
@@ -545,8 +545,8 @@ export { driftWords, kindsDrift, revisionNow, REVISION_KINDS, stepsDrift } from 
 export type { Drift, KindName, Pin, Revision, RevisionKind } from './revisions/revisions.ts';
 export { ledgerOf } from './revisions/revisions.store.ts';
 export { driftNow } from './revisions/pin.verb.ts';
-export { chatAnswer, chatHistory, chatRead, chatSay, chatSince, chatStop } from './chat/chat.verb.ts';
-export type { ChatChanges, ChatHistory, ChatPlace, ChatReads } from './chat/chat.verb.ts';
+export { chatAnswer, chatHistory, chatRead, chatSay, chatStop, FILES_CHECK_MS, followChat, RECORD_BEAT_MS } from './chat/chat.verb.ts';
+export type { ChatChanges, ChatFollow, ChatFollowed, ChatHistory, ChatPlace, ChatReads, ChatSent } from './chat/chat.verb.ts';
 export type { Ask, AskAnswer, AskEvent, AskOption, AskPick, AskQuestion, CallState, ChatEvent, ChatFrom, Presence } from './chat/chat.ts';
 export { nemiaChatPlace } from './nemia/level.store.ts';
 

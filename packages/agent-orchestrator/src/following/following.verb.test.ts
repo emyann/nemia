@@ -18,7 +18,7 @@ import { bell, until, WAITED } from 'agent-runtime/testing';
 
 const ROOT = scratch('wf-following-');
 process.env.WF_ROOT = ROOT;
-const { followStep } = await import('./following.verb.ts');
+const { followStep, followTask } = await import('./following.verb.ts');
 const { emitFeed, feedHubLayer } = await import('../feed/feed.verb.ts');
 const { EngineService } = await import('../runtime-client.ts');
 const { RunDoor } = await import('../runs/runs.store.ts');
@@ -349,4 +349,72 @@ test('REFUSED: a step with no task filed, as Missing, in words saying when to fo
   assert.ok(err.message.startsWith('run r-5 '), err.message);
   assert.ok(err.message.includes('`implement`'), err.message);
   assert.ok(err.message.includes('`nemia ls`'), err.message);
+});
+
+/** `followTask` of `taskId` on `rt`, waiting `waitMs` between its attempts: each moment pushed to `got` as it comes, ringing `rung`. */
+function followed_(rt: ReturnType<typeof runtimeOf>, taskId: string, got: StepMoment<Event>[], waitMs: number) {
+  const rung = bell();
+  const ended = rt.runPromiseExit(
+    Stream.runForEach(followTask(taskId, undefined, { waitMs }), (m) =>
+      Effect.sync(() => {
+        got.push(m as StepMoment<Event>);
+        rung.ring();
+      }),
+    ),
+  );
+  return { ended, rung };
+}
+
+test(
+  'a task followed relays its live attempt, reads its view again between attempts, goes on saying moved, and ends once settled',
+  WAITED,
+  async (t) => {
+    const task: Task = {
+      attempts: [
+        [
+          { kind: 'state', state: 'working' },
+          { kind: 'events', events: [said('a-1')], cursor: 'c1' },
+        ],
+      ],
+      ended: 0,
+      settled: null,
+      history: [],
+    };
+    const { e, views } = engineOver(new Map([['nemia', task]]));
+    const rt = runtimeOf(t, e);
+    const got: StepMoment<Event>[] = [];
+    const { ended, rung } = followed_(rt, 'nemia', got, 1);
+    await until(
+      t,
+      () => got.length === 3,
+      () => `the first attempt: ${ids(got)}`,
+      { bell: rung },
+    );
+    await until(
+      t,
+      () => views.length >= 3,
+      () => `the view read again while no attempt is live: ${views}`,
+      { everyMs: 5 },
+    );
+    task.ended = 1;
+    task.history = [said('a-1'), said('a-2')];
+    task.attempts.push([{ kind: 'events', events: [said('a-2')], cursor: 'c2' }]);
+    await until(
+      t,
+      () => got.length === 6,
+      () => `the next attempt: ${ids(got)}`,
+      { bell: rung },
+    );
+    task.ended = 2;
+    task.settled = 'succeeded';
+    assert.ok(Exit.isSuccess(await ended));
+    assert.deepEqual(ids(got), ['streamed true', 'state working', 'events a-1', 'moved nemia', 'events a-2', 'events a-1,a-2', 'settled']);
+  },
+);
+
+test('a task whose harness does not stream is said not streamed, and its following ends there', async (t) => {
+  const { e } = engineOver(new Map([['nemia', { attempts: [[]], ended: 0, settled: null, history: [] }]]), ['nemia']);
+  const got: StepMoment<Event>[] = [];
+  assert.ok(Exit.isSuccess(await followed_(runtimeOf(t, e), 'nemia', got, 1).ended));
+  assert.deepEqual(ids(got), ['streamed false']);
 });

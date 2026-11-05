@@ -70,8 +70,8 @@ async function expectIn(page: Page, pathname: string, assertion: string): Promis
 export default {
   /**
    * A factory's workflows are read in that factory. TREED is on a repository that is not the checkout, and its workflows are in its
-   * tree: picked, the Workflows page lists what the api lists in it, by name — its tree's `dev`, which shadows the checkout's, its `tree-only`,
-   * and the one of yours it attaches — each tagged with it alone, none said to be this repository's, the tree's by the origin `factory`.
+   * tree: picked, the Workflows page lists what the api lists in it, by name — its tree's `dev`, which shadows the checkout's, its
+   * `tree-only`, and the one of yours it attaches — each tagged with it alone, none said to be this repository's, the tree's by the origin `factory`.
    * Its `dev` leads to the tree's folder: its one step, no builder but the factory's way, nothing about a checkout or this repository,
    * and why it cannot start there; a press on its step
    * opens the bar on the tree's step, whose Open, as a double click on the step, lands on the step's page in the factory. One of yours it

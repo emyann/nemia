@@ -41,10 +41,15 @@ export default {
     const refused = await page.context().newPage();
     try {
       const { problems } = watch(refused);
-      const listed = await (await refused.request.get(new URL('/api/runs', page.url()).href)).text();
+      const listed = new Map<string, string>();
       await refused.route(
-        (url) => url.pathname === '/api/runs',
-        (route) => route.fulfill({ status: 200, contentType: 'application/json', body: listed }),
+        (url) => url.pathname === '/api/runs-open' || url.pathname === '/api/runs-finished',
+        async (route) => {
+          const at = route.request().url();
+          const body = listed.get(at) ?? (await (await route.fetch()).text());
+          listed.set(at, body);
+          await route.fulfill({ status: 200, contentType: 'application/json', body });
+        },
       );
       await refused.goto(page.url(), { waitUntil: 'load' });
       await idle(refused);

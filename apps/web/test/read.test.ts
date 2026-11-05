@@ -12,8 +12,6 @@ import ts from 'typescript';
 import * as api from '../src/lib/api.ts';
 import { ReadRefusal, UnreadAnswer } from '../src/lib/api/read.ts';
 import { openRunsQuery, runsQuery, runsSelectedQuery, type OpenRuns, type RunSummary } from '../src/lib/api/runs.ts';
-import { runRowOf } from '../src/lib/api/runRow.ts';
-import { run as objectRun } from './run-object-fixtures.ts';
 
 const DIR = path.resolve(import.meta.dirname, '../src/lib/api');
 
@@ -124,19 +122,13 @@ const row = (extra: object = {}): RunSummary => ({
 });
 
 const readRuns = runsQuery.queryFn as unknown as () => Promise<RunSummary[]>;
-const readSelected = (selector: string) => runsSelectedQuery(selector).queryFn as unknown as () => Promise<RunSummary[]>;
 
-/** Whether `err` is an `UnreadAnswer` whose message names the route, `at`, what was found there and the fix. */
+/** Whether `err` is an `UnreadAnswer` of the open runs whose message names `at` and what was found there. */
 const unread = (at: string, found: string) => (err: unknown) => {
   assert.ok(err instanceof UnreadAnswer, String(err));
-  assert.ok(err.message.startsWith('GET /api/runs answered what this board does not read'), err.message);
   assert.ok(err.message.includes(`at ${at}, `), err.message);
   assert.ok(err.message.includes(found), err.message);
-  assert.ok(
-    err.message.endsWith('restart the api (npm run dev) and rebuild the board (npm run build), then reload the page.'),
-    err.message,
-  );
-  assert.equal(err.route, 'GET /api/runs');
+  assert.equal(err.route, 'GET /api/runs-open');
   return true;
 };
 
@@ -180,58 +172,137 @@ test("the light answer decodes what the api gives, a waiting run with its clock 
   assert.deepEqual(openRunsQuery('a b').queryKey, ['runs-open', 'a b']);
 });
 
-/** A RunList of `items`, and of `unjudged` where given, as `GET /api/runs` answers it. */
-const runList = (items: unknown[], unjudged?: unknown[]) => ({
-  apiVersion: 'nemia/v1',
-  kind: 'RunList',
-  metadata: {},
-  items,
-  ...(unjudged ? { unjudged } : {}),
-});
+/** A listed row of the open runs: the row, with the wall time, end and clock a listed row adds. */
+const listed = (r: object) => ({ ...r, wallMs: 0, finishedAt: null, clock: null });
 
-test('the Runs list reads the RunList, each run made the row the floor reads, a run it could not judge a row that says why', async (t) => {
+/**
+ * Answer the board's read of every run: `inFlight` as the open runs in flight, and `finished` as the finished runs, `perPage` to a
+ * page. Answers what it is asked for by its path, and keeps each address asked.
+ */
+function answeringRuns(t: { after: (fn: () => void) => void }, inFlight: unknown, finished: object[] = [], perPage = 100): string[] {
   const asked: string[] = [];
   const before = globalThis.fetch;
-  const answer = runList([objectRun('acme'), objectRun('default')], [{ name: 'r-bad', error: 'a journal does not read' }]);
   globalThis.fetch = async (input) => {
-    asked.push(String(input));
-    return new Response(JSON.stringify(answer), { status: 200, headers: { 'content-type': 'application/json' } });
+    const at = String(input);
+    asked.push(at);
+    const url = new URL(at, 'http://board');
+    const page = Number(url.searchParams.get('page') ?? '1');
+    const pages = Math.max(1, Math.ceil(finished.length / perPage));
+    const body = url.pathname.endsWith('/runs-open')
+      ? { asOf: '2026-11-05T10:00:00.000Z', counts: { waiting: 0, inFlight: 0, finished: finished.length }, waiting: [], inFlight }
+      : {
+          asOf: '2026-11-05T10:00:00.000Z',
+          total: finished.length,
+          page,
+          size: perPage,
+          pages,
+          runs: finished.slice((page - 1) * perPage, page * perPage),
+        };
+    return new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': 'application/json' } });
   };
   t.after(() => {
     globalThis.fetch = before;
   });
-  const runs = await readRuns();
-  assert.deepEqual(
-    runs.map((r) => [r.id, r.factory, r.unreadable]),
-    [
-      ['r-1', 'acme', null],
-      ['r-1', null, null],
-      ['r-bad', null, 'a journal does not read'],
-    ],
-  );
-  assert.deepEqual(runs[0], runRowOf(objectRun('acme')));
-  await readSelected('team=blue')();
-  assert.deepEqual(asked, ['/api/runs', '/api/runs?labelSelector=team%3Dblue'], 'every run on one page: no limit is sent');
+  return asked;
+}
+
+/** A finished row: the row, ended, with its outcome. */
+const ended = (id: string) => ({
+  ...row({ id, status: 'succeeded' }),
+  wallMs: 0,
+  finishedAt: '2026-11-05T09:00:00.000Z',
+  outcome: 'succeeded',
+  clock: null,
 });
 
-test('REFUSED: a run whose status is no word the board knows, or whose steps are not an array; an answer that is no list', async (t) => {
-  const bad = objectRun('acme');
-  answering(t, runList([objectRun('acme'), { ...bad, status: { ...bad.status, status: 'nonsense' } }]));
-  await assert.rejects(readRuns(), unread('items[1].status.status', '"nonsense", where'));
-  answering(t, runList([{ ...bad, status: { ...bad.status, steps: { implement: 'blocked' } } }]));
-  await assert.rejects(readRuns(), unread('items[0].status.steps', '{"implement":"blocked"}, where'));
-  answering(t, [objectRun('acme')]);
-  await assert.rejects(readRuns(), unread('the answer', 'where the board reads'));
+test('the Runs list decodes the summaries the api gives, each union in its every shape', async (t) => {
+  const result = row({ toDecide: { kind: 'result', branches: ['wf/r-1/implement'], said: 'merge', command: 'git merge' } });
+  answeringRuns(
+    t,
+    [row(), result, row({ place: 'folder', waiting: null, holding: null, cost: null, toDecide: null, pruned: null })].map(listed),
+  );
+  const runs = await readRuns();
+  assert.equal(runs.length, 3);
+  assert.deepEqual(runs[0], listed(row()));
+  assert.deepEqual(runs[1], listed(result));
+});
+
+test('every run is read off the summaries, the open runs then every page of the finished ones, and never off the RunList', async (t) => {
+  const asked = answeringRuns(t, [listed(row())], [ended('f-1'), ended('f-2'), ended('f-3')], 2);
+  const runs = await readRuns();
+  assert.deepEqual(
+    runs.map((r) => r.id),
+    ['r-1', 'f-1', 'f-2', 'f-3'],
+  );
+  assert.equal(asked.length, 3, 'the open runs, and the two pages of the finished ones');
+  assert.ok(
+    asked.every((at) => !new URL(at, 'http://board').pathname.endsWith('/api/runs')),
+    'the RunList judges every run it lists: a poll reads the summaries',
+  );
+  const selected = answeringRuns(t, []);
+  await (runsSelectedQuery('team=blue').queryFn as unknown as () => Promise<RunSummary[]>)();
+  assert.ok(
+    selected.every((at) => new URL(at, 'http://board').searchParams.get('selector') === 'team=blue'),
+    'a selector goes with every read',
+  );
+});
+
+test('REFUSED: a row whose status is no word the board knows', async (t) => {
+  answeringRuns(t, [row(), row({ status: 'nonsense' })].map(listed));
+  await assert.rejects(
+    readRuns(),
+    unread('inFlight[1].status', '"nonsense", where the board reads "running" | "succeeded" | "failed" | "cancelled"'),
+  );
+});
+
+test('REFUSED: a row whose steps are not an array', async (t) => {
+  answeringRuns(t, [listed(row({ steps: { implement: 'blocked' } }))]);
+  await assert.rejects(readRuns(), unread('inFlight[0].steps', '{"implement":"blocked"}, where the board reads array'));
+});
+
+test('REFUSED: a step without a key the board reads, and a value quoted to 60 characters', async (t) => {
+  const [step] = row().steps;
+  const { waitingFor: _, ...without } = step;
+  answeringRuns(t, [listed(row({ steps: [without] }))]);
+  await assert.rejects(readRuns(), unread('inFlight[0].steps[0].waitingFor', 'is missing'));
+
+  const { via: __, ...unqualified } = step;
+  answeringRuns(t, [listed(row({ steps: [unqualified] }))]);
+  await assert.rejects(readRuns(), unread('inFlight[0].steps[0].via', 'is missing'));
+  const { on: ___, ...runUnqualified } = row();
+  answeringRuns(t, [listed(runUnqualified)]);
+  await assert.rejects(readRuns(), unread('inFlight[0].on', 'is missing'));
+  answeringRuns(t, [listed(row({ on: 'slot' }))]);
+  await assert.rejects(readRuns(), unread('inFlight[0].on', '"slot", where'));
+
+  answeringRuns(t, [listed(row({ brief: 7 }))]);
+  await assert.rejects(readRuns(), unread('inFlight[0].brief', '7, where'));
+  answeringRuns(t, [listed(row({ graph: 'x'.repeat(100) }))]);
+  await assert.rejects(readRuns(), unread('inFlight[0].graph', `"${'x'.repeat(58)}…, where`));
+});
+
+test('REFUSED: an answer whose runs are no list at all is refused there', async (t) => {
+  answeringRuns(t, { runs: [] });
+  await assert.rejects(readRuns(), unread('inFlight', '{"runs":[]}, where the board reads array'));
+});
+
+test('a key the board does not know is dropped, not refused', async (t) => {
+  answeringRuns(t, [listed(row({ colour: 'blue', steps: [{ ...row().steps[0], mood: 'calm' }] }))]);
+  const [run] = await readRuns();
+  assert.equal(Object.hasOwn(run, 'colour'), false);
+  assert.equal(Object.hasOwn(run.steps[0], 'mood'), false);
+  assert.deepEqual(run, listed(row()));
 });
 
 test("a read the api refused still rejects in the api's words and status, not as an answer unread", async (t) => {
-  answering(t, { error: 'no such namespace' }, 422);
+  answering(t, { error: 'no run x' }, 404);
   const err: unknown = await readRuns().then(
-    () => assert.fail('a 422 was read'),
+    () => assert.fail('a 404 was read'),
     (e: unknown) => e,
   );
   assert.ok(err instanceof ReadRefusal && !(err instanceof UnreadAnswer), String(err));
-  assert.equal(err.status, 422);
+  assert.equal(err.status, 404);
+  assert.equal(err.message, 'no run x');
 });
 
 /**
@@ -712,7 +783,7 @@ test("every read and write the board's source makes passes a schema", () => {
   const { faults, schemed, sent } = unschemedReads(texts);
   assert.ok(schemed >= 15, `the walk counted ${schemed} reads through get with a schema`);
   assert.deepEqual(faults, []);
-  assert.ok(sent >= 12, `the walk counted ${sent} writes through send with a schema: the run's actions are the objects' client's`);
+  assert.ok(sent >= 12, `the walk counted ${sent} writes through send with a schema`);
 });
 
 test("read.ts hands out its read, its write, the decode they share with the objects' client and their three refusals, and nothing else", async () => {

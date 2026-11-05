@@ -1,7 +1,6 @@
 /**
- * Every run, as the Factory, the strips and the pickers list them: the RunList (`GET /api/runs`) through the objects' client, each run made
- * the row they read (`runRowsOf`, runRow.ts); the rows of the runs-open and runs-finished views; and a run's named actions, each in
- * the run's namespace.
+ * Every run, as the Factory, the strips and the pickers list them: the summaries of the runs-open and runs-finished views, every page
+ * of them; those views' own rows; and a run's named actions, each in the run's namespace.
  */
 import { queryOptions } from '@tanstack/react-query';
 import { Schema } from 'effect';
@@ -10,7 +9,6 @@ import { pace } from '../feed.ts';
 import { selectorKey, withSelector } from './selector.ts';
 import { get } from './read.ts';
 import { runs } from './objects.ts';
-import { runRowsOf } from './runRow.ts';
 import type { RunHeld, RunRemoved } from 'objects';
 import { RunGraphSchema, type RunGraph } from './graph.ts';
 import { WorkflowPageAddressSchema, type WorkflowPageAddress } from './address.ts';
@@ -51,10 +49,7 @@ import {
   type StepNeeds,
 } from './judged.ts';
 
-/**
- * A run's row, as the Factory's floor, the strips and the pickers read it, made of a Run by `runRowOf` (runRow.ts); and the base of each
- * row of the runs-open and runs-finished views, which the api answers whole.
- */
+/** Mirrors `RunListing` in apps/api/src/runs/runs.ts: a run's summary, the base of each row of the runs-open and runs-finished views. */
 export type RunSummary = {
   id: string;
   /** The repository a repository run is about; null for a folder run (`place`), which has none. */
@@ -226,21 +221,40 @@ const RunSummarySchema = decodes<RunSummary>()(
   }),
 );
 
+/** The most rows a page of the finished runs holds (`?size=`), so every run is read in as few pages as the api serves. */
+const EVERY_PAGE_SIZE = 100;
+
 /**
- * Every run, as rows (`runRowsOf`): the RunList on one page, a run it could not judge a row that says why. Read again on each event of the
- * workflow feed (`useFeed`), and every 5 s while the feed is not followed — every minute while it is.
+ * Every run's summary, `selector` taking them by their labels where it says one: the runs that wait and move (`GET /api/runs-open`),
+ * then every page of the finished runs (`GET /api/runs-finished`), which between them hold each run once. Read off the informer's
+ * summaries, not the RunList, whose objects cost a judgement of each run on every poll.
+ */
+async function everyRun(selector = ''): Promise<RunSummary[]> {
+  const open = await get(withSelector('/api/runs-open', selector), OpenRunsSchema);
+  const finished: RunSummary[] = [];
+  for (let page = 1, pages = 1; page <= pages; page += 1) {
+    const read = await get(withSelector(`/api/runs-finished?page=${page}&size=${EVERY_PAGE_SIZE}`, selector), FinishedPageSchema);
+    pages = read.pages;
+    finished.push(...read.runs);
+  }
+  return [...open.waiting, ...open.inFlight, ...finished];
+}
+
+/**
+ * Every run. Read again on each event of the workflow feed (`useFeed`), and every 5 s while the feed is not followed — every minute while
+ * it is.
  */
 export const runsQuery = queryOptions({
   queryKey: ['runs'],
-  queryFn: () => runs.listAll().then(runRowsOf),
+  queryFn: () => everyRun(),
   refetchInterval: () => pace(5_000),
 });
 
-/** The runs `selector` takes by their labels (`GET /api/runs?labelSelector=`), under `['runs']`, read again as it is. */
+/** The runs `selector` takes by their labels (`?selector=` of the open and finished runs), under `['runs']`, read again as it is. */
 export const runsSelectedQuery = (selector: string) =>
   queryOptions({
     queryKey: ['runs', ...selectorKey(selector)],
-    queryFn: () => runs.listAll(selector.trim() === '' ? undefined : selector.trim()).then(runRowsOf),
+    queryFn: () => everyRun(selector),
     refetchInterval: () => pace(5_000),
   });
 

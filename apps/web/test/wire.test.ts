@@ -41,8 +41,8 @@ import type * as yours from '../../api/src/workflows/yours.ts';
 /** A step of a run's object, as the api answers it (`GET /api/runs/:id`): its status, as the package judges it. */
 type Step = runs.RunAnswer['status']['steps'][number];
 /**
- * A run's row as the runs-open view answers it, but the three keys that view adds: what the board's run row (`RunSummary`), which the
- * board also makes of a Run (lib/api/runRow.ts), is held to now that the RunList has replaced the array of rows.
+ * A run's row as the runs-open view answers it, but the three keys that view adds: the summary the board's run row (`RunSummary`) is
+ * held to, now that the array of rows has gone and the board reads every run off the open and finished views.
  */
 type RunRow = Omit<runs.OpenListing['inFlight'][number], 'wallMs' | 'finishedAt' | 'clock'>;
 type SaidHeld = Omit<Step['said'][number], 'after'> & { after: NonNullable<Step['said'][number]['after']> | null };

@@ -3,9 +3,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { Locator, Page } from 'playwright';
 import { expectCount, expectTexts, expectVisible, idle, Refused, settled, WAIT_MS, watch } from './checks.ts';
-import type { FactoryCommands, FactoryList, RunList, ScheduleList } from 'objects';
-import { runRowsOf } from '../../src/lib/api/runRow.ts';
-import type { RunSummary } from '../../src/lib/api/runs.ts';
+import type { FactoryCommands, FactoryList, ScheduleList } from 'objects';
+import type { FinishedPage, OpenRuns, RunSummary } from '../../src/lib/api/runs.ts';
 import { factoryViewOf, type Factory } from '../../src/lib/api/factories.ts';
 import { instantWhole, instantWords } from '../../src/lib/instant.ts';
 import { attachedFiles, attachedRun, DIAMOND } from './seed.ts';
@@ -509,8 +508,20 @@ export async function answered<T>(page: Page, pathname: string): Promise<T> {
   return (await (await page.request.get(new URL(pathname, page.url()).href)).json()) as T;
 }
 
-/** Every run as the board's rows, read apart from the page: the RunList (`GET /api/runs`) made rows as the board makes them. */
-export const rowsAnswered = async (page: Page): Promise<RunSummary[]> => runRowsOf(await answered<RunList>(page, '/api/runs'));
+/**
+ * Every run's summary, read apart from the page as the board reads them: the open runs (`GET /api/runs-open`), then every page of the
+ * finished ones (`GET /api/runs-finished`).
+ */
+export async function rowsAnswered(page: Page): Promise<RunSummary[]> {
+  const open = await answered<OpenRuns>(page, '/api/runs-open');
+  const finished: RunSummary[] = [];
+  for (let at = 1, pages = 1; at <= pages; at += 1) {
+    const read = await answered<FinishedPage>(page, `/api/runs-finished?page=${at}&size=100`);
+    pages = read.pages;
+    finished.push(...read.runs);
+  }
+  return [...open.waiting, ...open.inFlight, ...finished];
+}
 
 /**
  * Whether `pathname` is the run `id` on its namespaced path, in whichever namespace it is: the run itself (its removal), or with `tail` one

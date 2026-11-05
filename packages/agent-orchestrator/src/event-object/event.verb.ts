@@ -3,7 +3,7 @@
  * written, from the cursor its `continue` token carries (0 where it carries none), keeps the lines the feed's own selector takes
  * (`selects`, as `/api/feed/stream?selector=` does) and, for a namespace, those `eventNamespace` puts there, then cuts the page
  * (`listPage`). An event
- * is read by its name, the byte its line starts at: one read from that byte, the first line it holds. A line's start is the cursor before
+ * is read by its name, the byte its line starts at: one read from that byte of its first line alone, never the rest of the feed. A line's start is the cursor before
  * it — the end of the line before, or the cursor the read began at — so where a line nobody can read lies between two, the one after it
  * is named by where the unreadable one starts, and read from there all the same.
  */
@@ -22,10 +22,10 @@ export type EventQuery = ObjectQuery;
 /** A byte of the feed spelled as a name or a token carries it: a decimal with no sign and no leading zero. */
 const byteOf = (text: string): number | undefined => (/^(0|[1-9][0-9]*)$/.test(text) ? Number(text) : undefined);
 
-/** The Events of the lines after `cursor`, in feed order, each named by the cursor before it. */
-const eventsAfter = Effect.fn('eventsAfter')(function* (cursor: number) {
+/** The Events of the lines after `cursor`, in feed order, each named by the cursor before it: every one, or the first `limit`. */
+const eventsAfter = Effect.fn('eventsAfter')(function* (cursor: number, limit?: number) {
   const door = yield* FeedDoor;
-  const read = yield* door.lines.read(cursor);
+  const read = yield* door.lines.read(cursor, limit);
   return read.lines.map((line, i) => ({
     line,
     event: eventOf(line, i === 0 ? cursor : (read.ends[i - 1] ?? cursor), read.ends[i] ?? cursor),
@@ -89,7 +89,7 @@ export const eventObject = Effect.fn('eventObject')(function* (name: string, nam
   if (byte === undefined) return yield* Effect.fail(missing);
   const door = yield* FeedDoor;
   if ((yield* door.lines.cursorRefusal(byte)) !== undefined) return yield* Effect.fail(missing);
-  const first = (yield* eventsAfter(byte)).at(0);
+  const first = (yield* eventsAfter(byte, 1)).at(0);
   if (first === undefined) return yield* Effect.fail(missing);
   const event: Event = first.event;
   if (namespace !== undefined && event.metadata.namespace !== namespace) return yield* Effect.fail(missing);

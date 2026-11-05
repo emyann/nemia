@@ -2,13 +2,18 @@
  * The feed's lines as Events (`eventList`, `eventObject`, event.verb.ts; `eventOf`, event.ts), over the Feed door's memory stand-in: a v0
  * line and its v1 form are served alike, a reason this nemia does not know is served `Unknown`, a page walked by `continue` reads the
  * next lines in feed order, a namespace's list holds no daemon's line, and an Event is read by the byte its line starts at — a byte
- * inside a line, or a namespace the event is not in, is `Missing`. Kinds are asserted, never sentences.
+ * inside a line, or a namespace the event is not in, is `Missing`. And over the files, that an Event read by its byte reads its own line
+ * and not the feed after it, its bytes counted by a metered pass (`meteredPass`). Kinds are asserted, never sentences.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Effect, Exit, Schema } from 'effect';
 import { Event, EventList } from 'objects';
-import { FeedDoor } from '../feed/feed.store.ts';
+import fs from 'node:fs';
+import path from 'node:path';
+import { scratch } from '../../test/scratch.ts';
+import { meteredPass } from '../meter/tally.store.ts';
+import { FeedDoor, feedDoorFiles } from '../feed/feed.store.ts';
 import { feedDoorMemory } from '../feed/memory.store.ts';
 import type { FeedLine } from '../feed/feed.ts';
 import { Invalid, Missing } from '../refusal/refusal.ts';
@@ -183,4 +188,17 @@ test('an Event read under another namespace, or a cluster-scoped one under any, 
   assert.ok(started !== undefined);
   assert.ok(failure(over(lines, eventObject(started.metadata.name, 'mill'))) instanceof Missing);
   assert.equal(value(over(lines, eventObject(started.metadata.name))).involved.kind, 'Daemon');
+});
+
+test("an Event read by its byte on a large feed reads its own line, past a line nobody can read and a first chunk, and not the feed's rest", () => {
+  const root = scratch('wf-event-one-');
+  const big = { ...v1, message: 'x'.repeat(100 * 1024) };
+  const rest = `${JSON.stringify(v1)}\n`.repeat(40_000);
+  fs.writeFileSync(path.join(root, 'feed.jsonl'), `not a line of the feed\n${JSON.stringify(big)}\n${rest}`);
+  const size = fs.statSync(path.join(root, 'feed.jsonl')).size;
+  const { value: event, tallies } = Effect.runSync(meteredPass(eventObject('0')).pipe(Effect.provide(feedDoorFiles(root))));
+  assert.equal(event.message, big.message, 'the line after the one nobody can read, named by where that one starts');
+  const bytes = Object.values(tallies?.kinds ?? {}).reduce((sum, kind) => sum + kind.bytes, 0);
+  assert.ok(bytes > Buffer.byteLength(JSON.stringify(big)), `its own line is read whole (${bytes} bytes)`);
+  assert.ok(bytes < size / 4, `${bytes} bytes read of a feed of ${size}`);
 });

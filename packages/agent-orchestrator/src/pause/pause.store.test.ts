@@ -93,4 +93,3 @@ test('the pause on disk: put, read back, refused, lifted, read when it does not 
     refusedAs(() => cutPause(), 'Missing', 'nemia pause');
   });
 });
-

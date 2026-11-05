@@ -185,7 +185,11 @@ test('an upgrade with no conflict, up or down: filed alone, then merged by the c
       const folder = bytesUnder(path.join(FACTORIES, 'clean'));
       const printed = await printedBy(t, 'factory', 'upgrade', 'clean', '--to', '0.2.0');
       assert.deepEqual(printed, ['clean: 0.1.0 → 0.2.0', `filed: ${file}`, 'the daemon merges it on its next pass (nemia up)']);
-      assert.deepEqual(JSON.parse(fs.readFileSync(file, 'utf8')), { ...filedAs, template: { ...filedAs.template, version: '0.2.0' } });
+      assert.deepEqual(
+        JSON.parse(fs.readFileSync(file, 'utf8')),
+        { ...filedAs, template: { ...filedAs.template, version: '0.2.0' }, generation: 2 },
+        'the template wanted is a change of its spec, counted',
+      );
       assert.deepEqual(bytesUnder(path.join(FACTORIES, 'clean')), folder, 'the upgrade writes no tree, base nor status');
       const status = reconciled(templated('clean'));
       assert.equal(status.version, '0.2.0');
@@ -297,6 +301,7 @@ test('an upgrade onto a template that declares other parameters: --set given, th
   assert.deepEqual(JSON.parse(fs.readFileSync(file, 'utf8')), {
     ...filedAs,
     template: { source: other, version: '0.2.0', params: { cap: 9 } },
+    generation: 2,
   });
   assert.deepEqual(bytesUnder(path.join(FACTORIES, 'onto')), folder, 'the upgrade writes no tree, base nor status');
   const status = reconciled(templated('onto'));

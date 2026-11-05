@@ -5,6 +5,7 @@
 export {
   factoryServerRefusal,
   factoryServersRefusal,
+  maskedHeaders,
   REFUSED_HEADER,
   serverNameRefusal,
   splitServers,

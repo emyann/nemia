@@ -375,19 +375,11 @@ export const wordBreaks = (table: readonly Pick<CommandSpec, 'name' | 'route'>[]
  *   `nemia prune`'s words alone, the page saying `Not pruned` above them itself; any other failure is a 502. Its 200 is `{ id, pruned:
  *   true, lines, worktrees, artifacts, left }`. No feed line: the marker the prune writes moves the run's stamp in `runStore`, and the
  *   board reads the run again itself.
- * - `PUT /api/factories/:factory/hires/:step` — an agent hired into a step of a factory's workflow, as `nemia factory hire` hires it
- *   (`hireAgent`), its body `{ agent }` and its step `<workflow>/<step>` one encoded segment, `build%2Fimplement`. Refused in the package's
- *   words: a factory the store does not have (404, `Missing`), the default factory (409, `Conflict`), a step or an agent that is no name
- *   and a workflow the factory does not offer (422, `Invalid`), and a step whose own file names its agent, in the store's root of the
- *   app or a repository of the factory's (409, `Conflict`, in `hireRefusalOf`'s words). Its 200 is `{ file, replaced }`, the agent the
- *   hire replaced or null.
  * - `POST /api/agents/yours/copy` — an agent file copied into your library, as `nemia agents copy` copies it (`copyAgent`), its body
  *   `{ file, as?, keep? }`, `keep` a list as `--keep` given many times: the agent, its schema and every skill it gives but the builtin
  *   place skills, each part your library holds as it is reused, and the record of where it came from. Refused in the package's words,
  *   before anything is written: a file that is not there (404, `Missing`), a part your library holds otherwise (409, `Conflict`, naming
  *   each and its fix, `as` or `keep`), and a file the store would not run, a key another harness's agent file has among them (422,
  *   `Invalid`). A key it does not take is a 400. Its 200 is `{ name, copied, reused, record }`.
- * - `DELETE /api/factories/:factory/hires/:step` — a step's hire taken back, as `nemia factory fire` takes it (`fireAgent`); it reads no
- *   body. A step the factory hires no one into is a 404 (`Missing`). Its 200 is `{ file, fired }`.
  */
 export const commands = routesOf(COMMANDS);

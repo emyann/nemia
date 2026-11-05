@@ -3,6 +3,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { Locator, Page } from 'playwright';
 import { expectCount, expectTexts, expectVisible, idle, Refused, settled, WAIT_MS, watch } from './checks.ts';
+import type { FactoryCommands, FactoryList, ScheduleList } from 'objects';
+import { factoryViewOf, type Factory } from '../../src/lib/api/factories.ts';
 import { instantWhole, instantWords } from '../../src/lib/instant.ts';
 import { attachedFiles, attachedRun, DIAMOND } from './seed.ts';
 import { measure } from './contrast.ts';
@@ -503,6 +505,26 @@ export async function expectInstant(
 /** What the api answers at `pathname`, read apart from the page: the page's own requests do not count it. */
 export async function answered<T>(page: Page, pathname: string): Promise<T> {
   return (await (await page.request.get(new URL(pathname, page.url()).href)).json()) as T;
+}
+
+/**
+ * The factories as the board's pages draw them, read apart from the page: the api's `FactoryList`, each factory's lines and, but for the
+ * default factory, its schedules, made the board's view as the board makes it (`factoryViewOf`).
+ */
+export async function factoriesAnswered(page: Page): Promise<Factory[]> {
+  const listed = await answered<FactoryList>(page, '/api/factories');
+  return Promise.all(
+    listed.items.map(async (factory) => {
+      const name = encodeURIComponent(factory.metadata.name);
+      const [commands, scheduled] = await Promise.all([
+        answered<FactoryCommands>(page, `/api/factories/${name}/commands`),
+        factory.metadata.name === 'default'
+          ? Promise.resolve({ items: [] })
+          : answered<ScheduleList>(page, `/api/namespaces/${name}/schedules`),
+      ]);
+      return factoryViewOf(factory, commands, scheduled.items);
+    }),
+  );
 }
 
 /**

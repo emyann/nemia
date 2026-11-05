@@ -1,9 +1,9 @@
 /**
- * A factory's server signed in to and out of from the board (src/servers/sign-in.ts), over the runtime's stand-in for the three
+ * A factory's server signed in to and out of from the board (src/factory-parts/mcp-servers.ts), over the runtime's stand-in for the three
  * sign-in verbs: the real ones spawn Claude Code and wait on a browser, which no api test does.
  *
  * The rule the card rests on is that no answer carries the builtin secret: every body of the three routes, and the servers' read with
- * its builtin list, is searched for its value — and the fixture that breaks the search is a body that holds it.
+ * the builtin list, is searched for its value — and the fixture that breaks the search is a body that holds it.
  */
 import { root } from './harness.ts';
 import { test } from 'node:test';
@@ -24,7 +24,7 @@ fs.mkdirSync(path.join(root, 'factories', 'signmill'), { recursive: true });
 const GITHUB = JSON.parse(fs.readFileSync(path.join(BUILTIN_SERVERS, 'github.json'), 'utf8')) as Record<string, unknown>;
 
 const BOARD = { 'content-type': 'application/json', 'sec-fetch-site': 'same-origin' };
-const URL = '/api/factories/signmill/servers';
+const URL = '/api/namespaces/signmill/mcpservers';
 
 /**
  * An app whose engine answers the three sign-in verbs from the runtime's stand-in, and everything else from the package's engine: the
@@ -58,8 +58,8 @@ async function recorded(app: ReturnType<typeof appWith>['app'], name: string, se
   const oauth = server.oauth as { clientId: string; callbackPort: number } | undefined;
   const body = {
     url: server.url,
-    header: Object.entries((server.headers ?? {}) as Record<string, string>).map(([k, v]) => `${k}=${v}`),
-    ...(oauth ? { clientId: oauth.clientId, callbackPort: String(oauth.callbackPort) } : {}),
+    ...(server.headers === undefined ? {} : { headers: server.headers }),
+    ...(oauth ? { oauth } : {}),
   };
   const res = await app.request(`${URL}/${name}`, { method: 'PUT', headers: BOARD, body: JSON.stringify(body) });
   assert.equal(res.status, 200, await res.text());
@@ -100,8 +100,10 @@ test('a sign-in answers the address to open, then its state; a sign-out answers 
   assert.deepEqual(JSON.parse(connected.text), { state: 'connected' });
   const out = await asked(app, 'DELETE', `${URL}/github/sign-in`);
   assert.deepEqual([out.status, JSON.parse(out.text)], [200, { signedOut: true }]);
-  const read = await asked(app, 'GET', URL);
-  const builtin = (JSON.parse(read.text) as { builtin: Array<Record<string, unknown>> }).builtin;
+  const read = await asked(app, 'GET', '/api/builtin/mcpservers');
+  const builtin = (JSON.parse(read.text) as { items: Array<{ metadata: { name: string }; spec: Record<string, unknown> }> }).items.map(
+    (s) => ({ name: s.metadata.name, ...s.spec }),
+  );
   assert.deepEqual(
     builtin.map((s) => s.name),
     ['github'],
@@ -123,7 +125,7 @@ test('FIXTURE: a body that held the secret would be caught by the same search', 
   assert.equal(JSON.stringify({ builtin: [{ ...GITHUB, clientSecret: secret }] }).includes(secret), true);
 });
 
-test('REFUSED: a server the factory does not record (404), a port another sign-in waits on (409), a bad name (400), another site (403)', async () => {
+test('REFUSED: a server the factory does not record (404), a port another sign-in waits on (409), a bad name (422), another site (403)', async () => {
   const { app } = appWith();
   await recorded(app, 'github', GITHUB);
   await recorded(app, 'twin', { ...GITHUB, url: 'https://twin.example/mcp' });
@@ -132,7 +134,7 @@ test('REFUSED: a server the factory does not record (404), a port another sign-i
   const held = await asked(app, 'POST', `${URL}/twin/sign-in`);
   assert.equal(held.status, 409, held.text);
   assert.match(held.text, /a sign-in to `github` already waits on port 8791/);
-  assert.equal((await asked(app, 'POST', `${URL}/bad%20name/sign-in`)).status, 400);
+  assert.equal((await asked(app, 'POST', `${URL}/bad%20name/sign-in`)).status, 422);
   const foreign = await asked(app, 'POST', `${URL}/twin/sign-in`, { ...BOARD, 'sec-fetch-site': 'cross-site' });
   assert.equal(foreign.status, 403, 'a page on another site cannot start a sign-in');
   await recorded(app, 'docs', { type: 'http', url: 'https://docs.example/mcp' });

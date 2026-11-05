@@ -9,7 +9,7 @@
  * write of theirs made since the merge read it.
  */
 import fs from 'node:fs';
-import { Cause, Duration, Effect } from 'effect';
+import { Cause, Clock, Duration, Effect } from 'effect';
 import { tried } from '../runtime-client.ts';
 import { leftOut, type Args, type Flag, type Spec } from '../command/command.ts';
 import type { Command } from '../command/entry.verb.ts';
@@ -39,6 +39,8 @@ import {
   type Status,
 } from './applied.store.ts';
 import { overlaid, renderFactory, resolveParams, type Params } from './index.ts';
+import { transitionedAt } from './condition-time.ts';
+import { generationOf } from '../factories/generation.ts';
 import { trustedLines, type PlaceTrust } from '../trust/trust.ts';
 import { NO_TRUST, trustPlaces } from '../trust/trust.verb.ts';
 import {
@@ -251,7 +253,13 @@ const upgradeDue = (factory: Factory & { template: FactoryTemplate }, now: Rende
  * status is written, naming each; once every one has, the tree is swapped for the merge where no one wrote it since it was read, then the
  * base for the render, then the status. A pass that stops between them composes the same tree on the next.
  */
-function upgradePass(factory: Factory & { template: FactoryTemplate }, now: RenderedAt, base: Entry[], last: Status & { version: string }) {
+function upgradePass(
+  factory: Factory & { template: FactoryTemplate },
+  now: RenderedAt,
+  base: Entry[],
+  last: Status & { version: string },
+  at: string,
+) {
   const { name, template } = factory;
   const ours = entriesIn(treeDir(name));
   const switched =
@@ -267,8 +275,7 @@ function upgradePass(factory: Factory & { template: FactoryTemplate }, now: Rend
       conditions: waiting(factory, last.version, composed.pending, switched),
       upgrade: { from: last.version, to: template.version, conflicts: composed.pending.map((c) => conflictCut(c)) },
     };
-    writeStatus(name, status);
-    return status;
+    return statusWritten(factory, stamped(status, last, at, factory));
   }
   if (!swapTree(name, composed.entries, digestOf(ours))) return last;
   replaceBase(name, now.entries);
@@ -279,9 +286,28 @@ function upgradePass(factory: Factory & { template: FactoryTemplate }, now: Rend
     params: template.params,
     conditions: upgraded(factory, now.version),
   };
-  writeStatus(name, status);
-  return status;
+  return statusWritten(factory, stamped(status, last, at, factory));
 }
+
+/**
+ * `status` as the pass at `at` writes it over `last`, what the file held: each condition stamped with when its status last moved, against
+ * the condition of its type `last` held (`transitionedAt`), and the generation of `factory` the pass read (`observedGeneration`). Decided
+ * from what the pass read alone, so two passes that observe the same keep the same time.
+ */
+function stamped(status: Status, last: Status | undefined, at: string, factory: Pick<Factory, 'generation'>): Status {
+  const conditions = status.conditions.map((c) => {
+    const before = last?.conditions.find((was) => was.type === c.type);
+    const held = before === undefined ? null : { status: before.status, lastTransitionTime: before.lastTransitionTime ?? null };
+    return { ...c, lastTransitionTime: transitionedAt(held, c.status, at) };
+  });
+  return { ...status, conditions, observedGeneration: generationOf(factory) };
+}
+
+/** `status` written as the status of `factory`, where it changed; the status. */
+const statusWritten = (factory: Pick<Factory, 'name'>, status: Status): Status => {
+  writeStatus(factory.name, status);
+  return status;
+};
 
 /** The `Applied` condition of a pass that merges nothing: the render's problem, else a version no status names, else `appliedOf`'s. */
 function observedOf(
@@ -307,7 +333,8 @@ const cameByUpgrade = (last: Status | undefined, version: string): boolean =>
  */
 export const reconcileFactory = Effect.fn('reconcileFactory')(function* (factory: Factory & { template: FactoryTemplate }) {
   const { now, named } = yield* templateNow(factory);
-  return reconciledWith(factory, now, named);
+  const at = new Date(yield* Clock.currentTimeMillis).toISOString();
+  return reconciledWith(factory, now, named, at);
 });
 
 /**
@@ -331,15 +358,20 @@ const namedBase = (
  * `factory` brought to its template as rendered now (`now`), or as the condition that says why it is not, `named` the name of the
  * template its file names where it was read (`reconcileFactory`). The status names the template the base holds (`baseTemplateOf`).
  */
-function reconciledWith(factory: Factory & { template: FactoryTemplate }, now: RenderedAt | Condition, named: string | undefined): Status {
+function reconciledWith(
+  factory: Factory & { template: FactoryTemplate },
+  now: RenderedAt | Condition,
+  named: string | undefined,
+  at: string,
+): Status {
   const last = readStatus(factory.name);
   if (!('type' in now)) stageFolder(appliedDir(factory.name), now.entries, true);
   const base = entriesIn(appliedDir(factory.name));
   if (base.length && !fs.existsSync(treeDir(factory.name))) stageFolder(treeDir(factory.name), base, false);
   const digest = base.length ? digestOf(base) : null;
   if (!('type' in now) && digest !== null && upgradeDue(factory, now, digest, last))
-    return upgradePass(factory, now, base, last as Status & { version: string });
-  return observed(factory, now, base, digest, last, named);
+    return upgradePass(factory, now, base, last as Status & { version: string }, at);
+  return observed(factory, now, base, digest, last, named, at);
 }
 
 /**
@@ -353,6 +385,7 @@ function observed(
   digest: string | null,
   last: Status | undefined,
   named: string | undefined,
+  at: string,
 ): Status {
   const current = !('type' in now) && digest === digestOf(now.entries);
   const version = base.length ? (current ? now.version : (last?.version ?? null)) : null;
@@ -367,8 +400,7 @@ function observed(
         ? upgraded(factory, now.version)
         : [observedOf(factory, now, digest, version, last), NO_CONFLICTS],
   };
-  writeStatus(factory.name, status);
-  return status;
+  return statusWritten(factory, stamped(status, last, at, factory));
 }
 
 /** One pass: every factory of the store made from a template, reconciled (`reconcileFactory`). The factories reconciled, by name. */

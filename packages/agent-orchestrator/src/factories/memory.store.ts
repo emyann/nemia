@@ -21,6 +21,7 @@ import {
   type Factory,
 } from '../factory/factory.ts';
 import { factoryRulesRefusal, FACTORY_RULES_FILE } from '../rules/rules.ts';
+import { generationWritten, levelDiffers } from './generation.ts';
 import type { FactoryLevelFile } from '../level/level.ts';
 import type { FactoryServers } from '../servers/index.ts';
 import { FactoryDoor, factoryDoorOver, type FactoryLayer } from '../factories/factories.store.ts';
@@ -35,6 +36,12 @@ const named = (name: string): string => {
   const bad = factoryNameRefusal(name);
   if (bad) throw new Invalid({ message: bad });
   return name;
+};
+
+/** The factory `name` of `factories` counted one change more where its level `now` changes the one it held (`was`); none for no factory. */
+const levelCounted = (factories: Map<string, Factory>, name: string, was: FactoryLevelFile | undefined, now: FactoryLevelFile): void => {
+  const factory = factories.get(name);
+  if (factory !== undefined && levelDiffers(was, now)) factories.set(name, generationWritten(factory, factory, true));
 };
 
 /** A fresh Factory door over maps: nothing filed, no level, rules nor servers. */
@@ -62,12 +69,12 @@ export function factoryDoorMemory(): Layer.Layer<never> {
         )
           throw new Conflict({ message: unrenderedTreeRefusal(factory.name, factoriesAt(factory.name, 'tree'), 'Nothing was filed.') });
         if (factories.has(factory.name)) throw new Conflict({ message: takenFactoryRefusal(factory.name, file) });
-        factories.set(factory.name, structuredClone(factory));
+        factories.set(factory.name, structuredClone({ ...factory, generation: 1 }));
         return file;
       },
       rewrite: (factory) => {
-        held(factory.name, 'Nothing was written.');
-        factories.set(factory.name, structuredClone(factory));
+        const was = held(factory.name, 'Nothing was written.');
+        factories.set(factory.name, structuredClone(generationWritten(was, factory)));
         return factoriesAt(`${factory.name}.json`);
       },
       remove: (name) => {
@@ -80,8 +87,10 @@ export function factoryDoorMemory(): Layer.Layer<never> {
     level: {
       read: (name) => structuredClone(levels.get(named(name))),
       write: (name, level) => {
+        const was = levels.get(named(name));
         if (level.level === undefined && level.raise === undefined) levels.delete(named(name));
         else levels.set(named(name), structuredClone(level));
+        levelCounted(factories, name, was, level);
       },
     },
     rules: {

@@ -1,9 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Page } from 'playwright';
-import type { Factory } from '../../../src/lib/api/factories.ts';
 import { barValue } from '../../../src/lib/bar.ts';
-import { photograph, themeOf } from '../board.ts';
+import { factoriesAnswered, photograph, themeOf } from '../board.ts';
 import { expectCount, expectTexts, expectVisible, idle, Refused, settled } from '../checks.ts';
 import { FACTORIES, FAKE } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -45,7 +44,7 @@ export default {
     try {
       fs.writeFileSync(file, JSON.stringify({ repos: [place] }, null, 2));
       await visit(page, ALONE);
-      const answered = (await (await page.request.get(new URL('/api/factories', page.url()).href)).json()) as Factory[];
+      const answered = await factoriesAnswered(page);
       const factory = answered.find((one) => one.name === FACTORY);
       if (factory?.untrusted.length !== 1 || factory.untrusted[0].place !== place)
         throw new Refused(`the api says ${place} is the one untrusted place of ${FACTORY} — ${JSON.stringify(factory?.untrusted)}`);

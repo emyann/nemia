@@ -7,6 +7,8 @@
  * it may call. Pure; the file is `servers.store.ts`'s and the verbs `servers.verb.ts`'s.
  */
 import { SERVER_NAME } from '../keys/index.ts';
+import { HEADER_MASK } from 'objects';
+import type { HeaderWrittenOf } from '../../contracts/header-mask.contract.ts';
 
 /** The header a factory refuses to record by name: a person types no secret, and a server signs in instead. */
 export const REFUSED_HEADER = 'authorization';
@@ -128,3 +130,17 @@ export const splitServers = (
   const checkout = named.filter((name) => !mine.some(([own]) => own === name));
   return { ...(mine.length ? { mcp: Object.fromEntries(mine) } : {}), checkout };
 };
+
+/**
+ * A header as a write keeps it, against `stored`, the value the record holds for it, null for none: `sent` where it is a value of its
+ * own; the stored value where it is `HEADER_MASK`, which a read served for it; refused where it is the mask and nothing is stored, a mask
+ * that stands for no value.
+ */
+export const headerWritten: HeaderWrittenOf = (sent, stored) => {
+  if (sent !== HEADER_MASK) return { value: sent };
+  return stored === null ? { refused: 'masked' } : { value: stored };
+};
+
+/** `headers` as a read serves them: each value as `HEADER_MASK`, so no read carries a header's value out of the store. */
+export const maskedHeaders = (headers: Readonly<Record<string, string>>): Record<string, string> =>
+  Object.fromEntries(Object.keys(headers).map((name) => [name, HEADER_MASK]));

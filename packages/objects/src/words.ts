@@ -163,3 +163,78 @@ export const HANDED_HOW = ['waited', 'read'] as const;
 
 /** Where a step's told layers were given: its prompt, or its brief. */
 export const TOLD_VIA = ['prompt', 'brief'] as const;
+
+/** The conditions the controller says of a templated factory: whether its base holds the template, and whether an upgrade waits. */
+export const FACTORY_CONDITION_TYPES = ['Applied', 'ConflictsPending'] as const;
+
+/** One of `FACTORY_CONDITION_TYPES`. */
+export type FactoryConditionType = (typeof FACTORY_CONDITION_TYPES)[number];
+
+/** Why a factory's condition is what it is, one word each, as the controller writes them. */
+export const FACTORY_CONDITION_REASONS = [
+  'NoUpgrade',
+  'TemplateInvalid',
+  'VersionDrift',
+  'Rendered',
+  'ParamsChanged',
+  'ContentChanged',
+  'VersionUnknown',
+  'Upgraded',
+  'Merged',
+  'UpgradePending',
+  'Conflicts',
+] as const;
+
+/** One of `FACTORY_CONDITION_REASONS`. */
+export type FactoryConditionReason = (typeof FACTORY_CONDITION_REASONS)[number];
+
+/** Whether a factory's condition holds, as Kubernetes words it. */
+export const FACTORY_CONDITION_STATUSES = ['True', 'False'] as const;
+
+/** One of `FACTORY_CONDITION_STATUSES`. */
+export type ConditionStatus = (typeof FACTORY_CONDITION_STATUSES)[number];
+
+/** What an MCP server's header value is served as: never a value a header is sent with. Sent back, it keeps the stored value. */
+export const HEADER_MASK = '********';
+
+/** Where a step's agent came from: its own file's `agent:`, the factory's hire, neither, or both, which a start refuses. */
+export const FILL_ORIGINS = ['step', 'factory', 'unfilled', 'refused'] as const;
+
+/** One of `FILL_ORIGINS`. */
+export type FillOrigin = (typeof FILL_ORIGINS)[number];
+
+/** Where a setting a session gets came from: the step's own file, its agent's file, or neither, the harness's own default. */
+export const SETTING_ORIGINS = ['step', 'agent', 'default'] as const;
+
+/** One of `SETTING_ORIGINS`. */
+export type SettingOrigin = (typeof SETTING_ORIGINS)[number];
+
+/** The levels a factory runs at, the least left to Nemia first: a person starts every run, some start themselves, or all do. */
+export const LEVELS = ['manual', 'semi-auto', 'auto'] as const;
+
+/** One of `LEVELS`. */
+export type Level = (typeof LEVELS)[number];
+
+/** Whether a factory's runs follow the revisions merged since they started (`follow`) or keep those they started on (`pinned`). */
+export const REVISIONS_POLICIES = ['follow', 'pinned'] as const;
+
+/** One of `REVISIONS_POLICIES`. */
+export type RevisionsPolicy = (typeof REVISIONS_POLICIES)[number];
+
+/** How an MCP server is reached over its url: streamable HTTP, or server-sent events. */
+export const MCP_TRANSPORTS = ['http', 'sse'] as const;
+
+/** One of `MCP_TRANSPORTS`. */
+export type McpTransport = (typeof MCP_TRANSPORTS)[number];
+
+/** The state of an MCP server as its harness reports it, the runtime's own words carried whole. */
+export const MCP_STATES = ['connected', 'needs-auth', 'failed', 'pending', 'disabled'] as const;
+
+/** One of `MCP_STATES`. */
+export type McpState = (typeof MCP_STATES)[number];
+
+/** Where an MCP server's sign-in stands: none asked, one waiting on the person, or how the last one ended. */
+export const SIGN_IN_STATES = ['none', 'waiting', 'connected', 'expired', 'failed'] as const;
+
+/** One of `SIGN_IN_STATES`. */
+export type SignInStateWord = (typeof SIGN_IN_STATES)[number];

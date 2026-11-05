@@ -461,3 +461,22 @@ export const cardRuns = Effect.fn('cardRuns')(function* (e: Engine, { home, memo
     return [{ id: run.id, ...(run.from === undefined ? {} : { from: run.from }), phase }];
   });
 });
+
+/** A run whose record mounts volumes, as a Volume's status reads it: its id, its factory, its phase and the folders it mounts. */
+export type MountingRun = Pick<Run, 'id' | 'factory'> & { phase: RunPhase; volumes: readonly { path: string; readOnly: boolean }[] };
+
+/**
+ * Every run whose record mounts a volume, judged through the informer `how.memo` as the cards' runs are (`cardRuns`): its phase, and the
+ * volumes its record holds.
+ */
+export const mountingRuns = Effect.fn('mountingRuns')(function* (e: Engine, { home, memo, verify }: SummaryHow) {
+  const { git, read, all } = yield* listedThrough(e, memo, verify);
+  const mounting = all.filter((run) => (run.volumes?.length ?? 0) > 0);
+  const judged = yield* informedJudgements(e, home, mounting, read, git, () => all);
+  return mounting.flatMap((run): MountingRun[] => {
+    const one = judged.runs.get(run.id);
+    if (one === undefined) return [];
+    const phase = 'judgement' in one ? one.judgement.judged.phase : unjudgedFields().phase;
+    return [{ id: run.id, ...(run.factory === undefined ? {} : { factory: run.factory }), phase, volumes: run.volumes ?? [] }];
+  });
+});

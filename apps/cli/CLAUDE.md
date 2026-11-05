@@ -13,7 +13,7 @@ run on the orchestrator's own CLI, spawned with the same words (`src/local.ts`).
   `apps/cli/test/structure.test.ts` and the cli's block of `.oxlintrc.json` (proven by
   `packages/agent-orchestrator/test/imports.boundary.test.ts`). A bin imports `../src/` and nothing else.
 - **A kind of `objects` is read through `src/objects.ts`**, `objects`' `Api` made a typed client (`HttpApiClient.make`) over the
-  daemon's lease url: `nemia show`'s Run, `nemia closeout`'s tries and `nemia inbox`'s CardList, decoded by the Schemas the api
+  daemon's lease url: `nemia show`'s Run, `nemia closeout`'s tries and `nemia inbox`'s CardList and FactoryList, decoded by the Schemas the api
   encodes with. A read of a kind `objects` does not hold yet is a GET of `src/client.ts`, typed by the client door; a kind that moves
   into `objects` leaves the door and moves onto `src/objects.ts`. The printers map an object to the row they read in one place (`rowOf`
   for the inbox), and work out here what the object does not carry (a queued card's place, the in-play states).

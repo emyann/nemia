@@ -23,6 +23,11 @@
       }
     },
     {
+      "term": "Generation",
+      "meaning": "the count of changes to a factory's spec, Kubernetes' `metadata.generation`, kept on its file as `generation`: filed at 1, one more for each write through the Factory door that changes its repositories, workflows, hires, volumes, harness settings, revisions policy, template or level, none for a schedule or its instruction's place (`generationAfter`, proved by `packages/agent-orchestrator/contracts/generation.contract.ts`, in `packages/agent-orchestrator/src/factories/generation.ts`). A file written before the counter reads as 1. The controller writes the generation it read as the status's `observedGeneration`.",
+      "type": "GenerationAfter"
+    },
+    {
       "term": "Volume",
       "meaning": "a folder of the person's machine a factory mounts for every local step of its runs, beside its repositories, marked read-only (`:ro`) or writable (`:rw`) as docker compose marks one; kept in the factory's own file, never in its template. A writable one is writable only where a step's fence writes, and is not the run's workspace: nothing commits or lands what a step writes there.",
       "type": "Volume",
@@ -30,6 +35,11 @@
         "label": "Factories",
         "href": "/factories/#its-volumes"
       }
+    },
+    {
+      "term": "Volume name",
+      "meaning": "the name a factory's volume is served and linked under, stored on its entry at `nemia factory volume add`: its folder's name as a slug (`volumeBase`), with a suffix, `<base>-2`, where another volume of the factory holds it (`volumeNameAmong`, proved by `packages/agent-orchestrator/contracts/volume-name.contract.ts`). An entry an older file stores none of is named on read, after the stored names, in path order (`volumesNamed`, `packages/agent-orchestrator/src/volume/volume.ts`); a name once stored is kept.",
+      "type": "NamedVolume"
     },
     {
       "term": "Harness settings",
@@ -67,6 +77,11 @@
         "label": "Factories",
         "href": "/factories/"
       }
+    },
+    {
+      "term": "Condition time",
+      "meaning": "when a templated factory's condition last moved, `lastTransitionTime` on each condition of its status file, as Kubernetes' SetStatusCondition keeps it: kept while its status holds, stamped with the pass's time where its status flips, where the condition is new, and where a status written before the field kept none; a reason or a message that changes moves no time (`transitionedAt`, proved by `packages/agent-orchestrator/contracts/condition-time.contract.ts`, in `packages/agent-orchestrator/src/applied/condition-time.ts`).",
+      "type": "TransitionedAt"
     },
     {
       "term": "Factory name",

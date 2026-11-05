@@ -1,8 +1,8 @@
 /**
- * `nemia factory`, each of its forms an entry of the command table: the store's factories listed — bare, which the api serves on its own
- * route, and `ls` — then filed, given workflows and relieved of them and removed, which the command line alone does; hired into and fired
- * from, which the api serves on a step's hire, `/api/factories/:factory/hires/:step`, the step as one segment, `build%2Fimplement`; and its
- * instruction's two verbs (instruction.verb.ts), which the api serves. Their handlers answer data, and the CLI prints it.
+ * `nemia factory`, each of its forms an entry of the command table: the store's factories listed — bare, which the api serves as the
+ * Factory's list of `objects`, and `ls` — then filed, given workflows and relieved of them and removed, which the command line alone
+ * does; hired into and fired from, which the api serves as a Hire's writes, `/api/namespaces/:namespace/hires/<workflow>.<step>`; and
+ * its instruction's two verbs (instruction.verb.ts), which the api serves. Their handlers answer data, and the CLI prints it.
  */
 import { Effect } from 'effect';
 import { tried } from '../runtime-client.ts';
@@ -229,7 +229,7 @@ export const FACTORY: Command<Listed> = {
   },
   writes: false,
   class: 'read',
-  route: { method: 'GET', path: '/api/factories', status: 200 },
+  only: { side: 'cli', why: "the api serves it as the Factory's `listAll` of `objects`' Api, calling this handler" },
   manual: FACTORY_HELP,
   handler: (_args, _env, _home, kept) => listedNow(kept?.records?.factories),
   print: listed,
@@ -247,7 +247,7 @@ const FACTORY_LS: Command<Listed> = {
   },
   writes: false,
   class: 'read',
-  only: { side: 'cli', why: "the api lists the factories on nemia factory's route: ls is the command line's second name for it" },
+  only: { side: 'cli', why: "the api lists the factories as the Factory's `listAll`: ls is the command line's second name for it" },
   handler: (_args, _env, _home, kept) => listedNow(kept?.records?.factories),
   print: listed,
 };
@@ -411,7 +411,7 @@ const FACTORY_HIRE: Command<{ file: string; replaced: string | null }> = {
   check: stepCheck('hire', '<factory> <agent>', HIRE_SPEC),
   writes: true,
   class: 'ask',
-  route: { method: 'PUT', path: '/api/factories/:factory/hires/:step', status: 200 },
+  only: { side: 'cli', why: "the api serves it as the Hire's `put` of `objects`' Api, calling this handler" },
   handler: (args, _env, home) => {
     const step = textOf(args, 'step');
     const agent = textOf(args, 'agent');
@@ -449,7 +449,7 @@ const FACTORY_FIRE: Command<{ file: string; fired: string }> = {
   check: stepCheck('fire', '<factory>', FIRE_SPEC),
   writes: true,
   class: 'ask',
-  route: { method: 'DELETE', path: '/api/factories/:factory/hires/:step', status: 200 },
+  only: { side: 'cli', why: "the api serves it as the Hire's `delete` of `objects`' Api, calling this handler" },
   handler: (args, _env, home) => {
     const step = textOf(args, 'step');
     return rooted(

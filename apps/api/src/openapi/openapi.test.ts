@@ -165,7 +165,7 @@ const RUN_ACTIONS = [
   ['post', '/api/namespaces/{namespace}/runs/{name}/steps/{step}/say', '202', 'RunSay'],
 ] as const;
 
-test("the document holds the RunList, a run in its namespace, and each of the run's named actions with its body and its refusals", async (t) => {
+test("the document holds the RunList, a run in its namespace, and each of the run's named actions with its body and its refusals", async () => {
   type Op = {
     requestBody?: { content: { 'application/json': { schema: unknown } } };
     responses: Record<string, { content?: { 'application/json': { schema: unknown } } }>;

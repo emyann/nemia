@@ -113,7 +113,8 @@ export const runRowOf = (run: Run): RunSummary => {
 };
 
 /**
- * The row of a run the list could not judge: its name and why (`unreadable`), in its namespace's factory (null for the default), running as far as anyone
+ * The row of a run the list could not judge: its name and why (`unreadable`), in its namespace's factory (null for the default),
+ * running as far as anyone
  * knows, with no step, no graph and no time — what the floor's card and the Runs page say of it is the why.
  */
 export const unjudgedRowOf = (run: RunUnjudged): RunSummary => ({

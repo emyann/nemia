@@ -533,10 +533,10 @@ function runBreaks(c: Entry, runners: readonly string[]): string[] {
 const NAMESPACE_PARAM = 'namespace';
 
 /**
- * Where an entry's words for its sides break the rules: a name in a route's path that no argument of its spec takes, but its namespace, which the command
- * would never read; a why left empty, of a route served by hand, of the side that serves it alone, or of a flag one side alone takes; and a
- * flag the api alone takes on an entry with no route that hands it — one the table generates, or one served by hand — which nothing would
- * ever hand it.
+ * Where an entry's words for its sides break the rules: a name in a route's path that no argument of its spec takes, but its namespace,
+ * which the command would never read; a why left empty, of a route served by hand, of the side that serves it alone, or of a flag one
+ * side alone takes; and a flag the api alone takes on an entry with no route that hands it — one the table generates, or one served by
+ * hand — which nothing would ever hand it.
  */
 function sideBreaks(c: Entry): string[] {
   const breaks: string[] = [];

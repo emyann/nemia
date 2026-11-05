@@ -16,6 +16,8 @@ import { Invalid, Missing } from '../refusal/refusal.ts';
 import { parseSelectors, selectorsRefusal } from '../watch/selector.ts';
 import { pageOf } from './page.ts';
 import { runNamespace } from './run-list.ts';
+
+export { runNamespace };
 import { type RunObjectAnswer, runObject, type RunReads } from './run.verb.ts';
 
 /** What a list of runs is asked: its namespace (none for every run), `?limit=`, `?continue=`, and its label selectors, OR'd. */

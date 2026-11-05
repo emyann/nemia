@@ -376,7 +376,7 @@ test('a folder team as the board finds and files for it, the repository a plain 
   );
   await s.test(
     'a card started on a folder team carries the repository it named and the run looked at none of — and a card that names none, nothing',
-    async (t) => {
+    async () => {
       const json = { 'content-type': 'application/json' };
       const file = async (body: string, repo?: string): Promise<string> => {
         const res = await app().request('/api/namespaces/default/cards', {

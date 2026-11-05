@@ -308,7 +308,8 @@ async function readAgain(
  * - `GET /api/runs/:runId/steps/:step/log` — the end of the step's session output as text (`LOG_LINES`), read by `nemia logs`' entry
  *   (`LOGS`), which reads it whole; empty for a step not filed yet; 502 when the engine could not read it. The board reads the
  *   conversation from the transcript routes.
- * - `GET /api/runs/:runId/steps/:step/artifacts/:name` — one file of the step's files directory, by name and never by path (`step artifact`),
+ * - `GET /api/runs/:runId/steps/:step/artifacts/:name` — one file of the step's files directory, by name and never by path
+ *   (`step artifact`),
  *   as its closeout's `artifacts` link it; read on each request and never kept, since a step that runs again writes its files again.
  *   400 for a name that is not one; 410 for a file gone because `nemia prune --artifacts` removed the run's files, leaving its record,
  *   closeouts and branches; 404 for a file the directory does not have.

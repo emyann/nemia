@@ -59,7 +59,7 @@ export const RunRetry = Schema.Struct({
 export type RunRetry = typeof RunRetry.Type;
 
 /**
- * What an ask of a try answers, accepted and not yet done: the try asked for, the ask's file and whether the tick stops a blocked session
+ * What an ask of a try answers, taken and not yet done: the try asked for, the ask's file and whether the tick stops a blocked session
  * first; or, of a round, the looping step and the round. `hint` names the spelling to send where the body said a former one.
  */
 export const RunAsked = Schema.Struct({

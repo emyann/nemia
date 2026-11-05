@@ -167,7 +167,8 @@ A landing that fails its check costs a round and the person's time. Before showi
 5. **Order the collision.** When two runs conflict, land the one at its gate, unless the other is expensive or on its last round; then
    hold the ready one and have it merge main after.
 6. **If it cannot land yet, hold it:** `nemia hold <run> --until <run> --why "…"` the moment you know, and tell the person why in one
-   line. An open gate is an invitation to approve.
+   line; work parked with no run to wait on yet (folded into an intake not started) is `nemia hold <run> --why "…"`, which only
+   `nemia hold <run> --off` lifts. An open gate is an invitation to approve.
 7. **When the reviewer could not verify a rule**, verify it yourself in a scratch worktree before approving, and report what you ran.
 
 Scratch worktree, never the main checkout:
@@ -436,7 +437,7 @@ English; never push or open a pull request unless asked.
 | A comment line over 140 columns, found by review each time | `npm run lint` refuses it |
 | A gate quoting the agent's instructions instead of the decision | a gate quotes the step's own note |
 | Questions as unreadable Markdown | questions as data, answered by clicking |
-| A landing that could not land yet, left open | `nemia hold --until --why`, the reason shown on the board |
+| A landing that could not land yet, left open | `nemia hold --until --why`, the reason shown on the board; work parked with no run to wait on, `nemia hold <run> --why`, lifted by `--off` alone |
 | A landing check killed by its deadline while passing | the landing check's own deadline (2700 s, `LANDING_CHECK_DEADLINE_SECONDS`); an over-half signal is an inbox card |
 | Chained runs not yet started plus queued landings made every pass re-read the store (196 MB a pass) | the journal cursor and once-per-pass reads (`a-tick-pass-reads-196-mb-of-aol7`) |
 | Every e2e pictured every page in two themes (about 85% of a landing) | the e2e asserts in dark only; the implementer pictures the change (`the-e2e-visits-its-two-theme-fuey`) |
@@ -450,7 +451,7 @@ English; never push or open a pull request unless asked.
 - **Reads:** `nemia ls`, `nemia decide`, `nemia inbox`, `nemia stats`, `nemia passes`, `GET /api/quota`, the task journals, the check
   logs, the session transcripts; `git log`, `git diff`, `git merge-tree`, `git grep` on any branch.
 - **Acts:** `nemia start` (`--after`, later `--from`), `nemia approve`, `nemia retry` (`--message`, `--recheck`), `nemia say`,
-  `nemia hold` (`--until`, `--why`, `--off`), `nemia pause` (`--timeout <d>`; `--now` cuts the calls at once, no try spent) and
+  `nemia hold` (`--until`, or none to hold until `--off`; `--why`, `--off`), `nemia pause` (`--timeout <d>`; `--now` cuts the calls at once, no try spent) and
   `nemia resume`, `nemia pause-timeout`, `nemia inbox add`, `nemia retry --round`, `nemia refresh --base`; `nemia upgrade` (`--timeout <d>`) and
   `nemia version`;
   scratch worktrees for verification.

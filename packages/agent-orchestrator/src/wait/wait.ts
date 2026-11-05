@@ -4,6 +4,7 @@
  */
 import path from 'node:path';
 import { prunedWords, type Hold, type Run } from '../record/record.ts';
+import type { HoldNeedsYou, HoldStop, HoldStopOf } from '../../contracts/hold.contract.ts';
 
 /**
  * Whether any step of the run has been filed, on any try — a step a round moved behind still has its tries. A run that has
@@ -77,6 +78,29 @@ const waitName = (w: Wait): string =>
 /** Whether a person has to act for this run to land: nothing the tick can read will change on its own. */
 const neverLands = (w: Wait): boolean => Boolean(w.missing || w.cancelledAt || w.gone?.length);
 
+/**
+ * Whether a standing hold waits on a person (`holdsOf`'s runs): exactly when a run it names never lands without one — no such run, a
+ * cancelled one, a result branch gone. Pure, and proved by `contracts/hold.contract.ts`. A hold that names no run asks nothing: it is the
+ * person's word already given, lifted by their hand alone (`nemia hold <run> --off`). `holdingOf`, `nemia ls` and `nemia decide` read it
+ * alike.
+ */
+export const holdNeedsYou: HoldNeedsYou = (holds) => holds.some(neverLands);
+
+/**
+ * What of the run itself refuses a hold, in the order `holdRefusal` says it — or null. Pure, and proved by `contracts/hold.contract.ts`:
+ * a run cancelled, pruned or finished, of which nothing is left to file; one already held, since a hold is put once, whole; and a folder
+ * run asked to wait on runs to land, which it has no branch for. A hold that names no run is no reason to refuse: it holds the run until a
+ * person lifts it, and a folder run may take one.
+ */
+export const holdStop: HoldStopOf = (p): HoldStop | null => {
+  if (p.cancelled) return 'cancelled';
+  if (p.pruned) return 'pruned';
+  if (p.finished !== null) return p.finished;
+  if (p.held) return 'held';
+  if (p.folder && p.until.length > 0) return 'folder';
+  return null;
+};
+
 /** A run's roots, waiting, as `nemia ls` says it in the status column: `waiting on a-1x2y (cancelled), b-3z4w`. */
 export const waitWord = (waits: readonly Wait[]): string => `waiting on ${waits.map(waitName).join(', ')}`;
 
@@ -107,7 +131,7 @@ export function waitAdvice(run: Run, waits: readonly Wait[]): string {
 
 /**
  * The runs a held run waits on to land (`Run.hold`), as `nemia ls` and `nemia decide` name them: each that has not landed, and why it may
- * never (`waitsOf`'s words). Pure. None for a run nobody holds. While every one has landed and the tick has not yet lifted the hold, each
+ * never (`waitsOf`'s words). Pure. None for a run nobody holds, and for a hold that names no run, which a person alone lifts. While every one has landed and the tick has not yet lifted the hold, each
  * is named all the same, marked `landed`: the run is still held, and says why for the moment it is.
  */
 export function holdsOf(run: Run, parentOf: (runId: string) => ParentRun): Wait[] {
@@ -119,9 +143,12 @@ export function holdsOf(run: Run, parentOf: (runId: string) => ParentRun): Wait[
 /** Words as a shell reads them back whole: in single quotes, each `'` in them closed, escaped and opened again. */
 const shellQuoted = (words: string): string => `'${words.replaceAll("'", `'\\''`)}'`;
 
-/** The command that holds `id` on `until`, with the words `why` a hold had: `nemia hold r-1 --until a-1 --why 'merge conflicts'`. */
+/**
+ * The command that holds `id` on `until`, with the words `why` a hold had: `nemia hold r-1 --until a-1 --why 'merge conflicts'`, and
+ * `nemia hold r-1` for a hold that names no run.
+ */
 const holdAgain = (id: string, until: readonly string[], why?: string): string =>
-  `nemia hold ${id} ${until.map((u) => `--until ${u}`).join(' ')}${why ? ` --why ${shellQuoted(why)}` : ''}`;
+  `nemia hold ${id}${until.map((u) => ` --until ${u}`).join('')}${why ? ` --why ${shellQuoted(why)}` : ''}`;
 
 /** `a` and `b`, or `a, b and c`, of runs. */
 const runList = (ids: readonly string[]): string => (ids.length > 1 ? `${ids.slice(0, -1).join(', ')} and ${ids.at(-1)}` : (ids[0] ?? ''));
@@ -134,14 +161,14 @@ const saidWord = ({ why, by }: Pick<Hold, 'why' | 'by'>): string => {
 
 /**
  * A held run, as `nemia ls` and `nemia decide` say it: `held until a-1x2y lands`, each run it waits on with why it may never, as `waitWord`
- * names them, then what the person who put the hold said of it when `said` is given: `held until a-1x2y lands (why: merge conflicts; by
+ * names them, or `held until a person lifts it` for a hold that names no run, then what the person who put the hold said of it when `said` is given: `held until a-1x2y lands (why: merge conflicts; by
  * operator)`. Pure. Never `waiting on you`: a hold is a person's word already given, and nothing is asked of anyone while it stands.
  *
  * @param said The hold's `why` and `by`, each shown when it is there; a hold file older code wrote has neither, and shows the plain line.
  */
 export function holdWord(waits: readonly Wait[], said: Pick<Hold, 'why' | 'by'> = {}): string {
   const words = saidWord(said);
-  if (!waits.length) return `held, on a hold that names no run${words}`;
+  if (!waits.length) return `held until a person lifts it${words}`;
   const named = runList(waits.map(waitName));
   const one = waits.length === 1;
   const held = `held until ${named} ${one ? 'lands' : 'land'}${words}`;
@@ -151,13 +178,14 @@ export function holdWord(waits: readonly Wait[], said: Pick<Hold, 'why' | 'by'> 
 
 /**
  * What a held run leaves a person to do, in one line, for `nemia decide` and `nemia ls`. Pure. Nothing, while each run it waits on may
- * still land: the tick lifts the hold when they have, and what the run's steps ask is asked then. For a run that never will without a
- * person — no such run, a cancelled one, a result branch gone — or a hold that names no run, why, and the ways out: lift the hold, or
- * cancel the run.
+ * still land: the tick lifts the hold when they have, and what the run's steps ask is asked then. Nothing either for a hold that names
+ * no run: it is the person's word already given, and only `--off` lifts it. For a run that never will without a person — no such run, a
+ * cancelled one, a result branch gone — why, and the ways out: lift the hold, or cancel the run.
  */
 export function holdAdvice(run: Run, waits: readonly Wait[]): string {
   const off = `nemia hold ${run.id} --off`;
-  if (!waits.length) return `the hold on ${run.id} names no run, so no run's landing lifts it — yours to lift: ${off}`;
+  if (!waits.length)
+    return `nothing of ${run.id} is filed, and nothing is asked of you, until a person lifts the hold; to go on: ${off}`;
   if (waits.every((w) => w.landed)) return `the next tick lifts the hold, and ${run.id} goes on; nothing to decide yet`;
   const never = waits.filter(neverLands);
   if (!never.length) {
@@ -200,12 +228,13 @@ function routeTo(u: string, id: string, byId: ReadonlyMap<string, Run>): string[
 }
 
 /**
- * Why `nemia hold <run> --until <run>…` will not hold this run, in words that name the fix — or null. Pure: handed the run, each run named
+ * Why `nemia hold <run> [--until <run>…]` will not hold this run, in words that name the fix — or null. Pure: handed the run, each run named
  * as `parentOf` reads it — its record, whether it has landed as `nemia decide` says it, and a result branch gone — every run in the store,
  * for the circle, and `finished`: that the run has landed, or succeeded and waits on nothing but a person's merge.
  *
- * Refused, of the run: nothing named; a run cancelled, pruned or finished, of which nothing is left to file, so nothing to hold; a run
- * already held, since a hold is put once, whole — it is lifted and put again; and a folder run, which lands on no branch. Of each run
+ * Refused, of the run, as `holdStop` decides it: a run cancelled, pruned or finished, of which nothing is left to file, so nothing to hold;
+ * a run already held, since a hold is put once, whole — it is lifted and put again; and a folder run asked to wait on runs, which lands on
+ * no branch. A hold that names no run is refused nothing else: it holds the run until a person lifts it. Of each run
  * named, what `afterRefusal` refuses of `--after`, for the same reason, a wait for ever: given twice, the run itself, one the store does
  * not have, a folder run, another repository or another base branch, one that worked on its base (`--no-worktree`), a cancelled run and
  * one whose result branch is gone. And one already landed, which there is nothing to wait for. And a circle: a run named that already
@@ -220,21 +249,31 @@ export function holdRefusal(
   finished?: 'landed' | 'succeeded',
 ): string | null {
   const id = run.id;
-  if (!until.length)
-    return `nemia hold ${id} needs the runs it waits on to land: nemia hold ${id} --until <run>, once for each. To lift a hold: nemia hold ${id} --off.`;
-  if (run.cancelledAt) return `${id} was cancelled at ${run.cancelledAt}: nothing of it is filed again, so there is nothing to hold.`;
-  if (run.pruned) return `${id} was ${prunedWords(run.pruned)}: nothing of it is filed again, so there is nothing to hold.`;
-  if (finished === 'landed') return `${id} has landed: nothing of it is left to file, so there is nothing to hold.`;
-  if (finished === 'succeeded') {
-    return `${id} has succeeded: nothing of it is left to file, so there is nothing to hold, and what is left is yours — merge its branch once ${runList([...until])} ${until.length > 1 ? 'have' : 'has'} landed (nemia decide ${id} names it).`;
+  const stop = holdStop({
+    cancelled: Boolean(run.cancelledAt),
+    pruned: Boolean(run.pruned),
+    finished: finished ?? null,
+    held: Boolean(run.hold),
+    folder: run.repo === undefined,
+    until,
+  });
+  if (stop === 'cancelled') return `${id} was cancelled at ${run.cancelledAt}: nothing of it is filed again, so there is nothing to hold.`;
+  if (stop === 'pruned' && run.pruned)
+    return `${id} was ${prunedWords(run.pruned)}: nothing of it is filed again, so there is nothing to hold.`;
+  if (stop === 'landed') return `${id} has landed: nothing of it is left to file, so there is nothing to hold.`;
+  if (stop === 'succeeded') {
+    return until.length
+      ? `${id} has succeeded: nothing of it is left to file, so there is nothing to hold, and what is left is yours — merge its branch once ${runList([...until])} ${until.length > 1 ? 'have' : 'has'} landed (nemia decide ${id} names it).`
+      : `${id} has succeeded: nothing of it is left to file, so there is nothing to hold; what is left is yours: nemia decide ${id}.`;
   }
-  if (run.hold) {
+  if (stop === 'held' && run.hold) {
     const all = [...new Set([...run.hold.until, ...until])];
     return `${id} is already ${holdWord(run.hold.until.map((u) => ({ run: u })))} (nemia hold, at ${run.hold.at || 'a time its file no longer says'}). A hold is put once, whole: lift it, and hold the run again on every run it waits on — nemia hold ${id} --off, then ${holdAgain(id, all, run.hold.why)}.`;
   }
-  if (run.repo === undefined) {
-    return `${id}'s team works in folders (place: folder), and a hold waits for runs to land on its git branch, which a folder run has none of. Cancel it (nemia cancel ${id}) and start it again once the work it waits on is done.`;
+  if (stop === 'folder') {
+    return `${id}'s team works in folders (place: folder), and --until waits for runs to land on its git branch, which a folder run has none of. Hold it until you lift it instead (nemia hold ${id}, with no --until), or cancel it (nemia cancel ${id}) and start it again once the work it waits on is done.`;
   }
+  if (run.repo === undefined) return null;
   const seen = new Set<string>();
   for (const u of until) {
     const drop = `hold it without --until ${u}`;

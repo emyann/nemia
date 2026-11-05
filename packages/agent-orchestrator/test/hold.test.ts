@@ -52,6 +52,8 @@ const {
   runWith,
 } = await import('../src/runner.ts');
 const { listRuns, readRun } = await import('../src/record/record.store.ts');
+const { RUNS } = await import('../src/command/pages.verb.ts');
+type RunSummary = import('../src/summary/summary.verb.ts').RunSummary;
 const { passStanding } = await import('../src/standing/standing.verb.ts');
 const { engineOf } = await import('../src/runtime-client.ts');
 const { main } = await import('../src/cli/main.ts');
@@ -510,6 +512,103 @@ test('a run held until another lands: said by every screen with why and who, not
   );
 });
 
+/** `plan`, declaring `open`, a field of questions, then `implement` after it. */
+const planned = () =>
+  folderOf('plan-', {
+    'plan.md': '---\nplace: git\noutput: plan.schema.json\n---\nplan it\n',
+    'plan.schema.json': JSON.stringify({
+      type: 'object',
+      properties: { open: { 'x-shape': 'questions', description: 'What is undecided.' } },
+      required: ['open'],
+      additionalProperties: false,
+    }),
+    'implement.md': '---\nafter: plan\nplace: git\n---\nimplement it\n',
+  });
+const CUT = {
+  title: 'How is the card cut?',
+  body: 'It is big.',
+  options: [
+    { label: 'one card', meaning: 'All at once.' },
+    { label: 'two cards', meaning: 'The shape first.' },
+  ],
+  recommended: 'two cards',
+  multiple: false,
+};
+
+test('a run held until a person lifts it: no run named, nothing asked nor filed while it stands, a restart keeps it, and only --off puts its questions back', async (t) => {
+  const s = story(t);
+  const b = stage.board();
+  const repo = aRepo();
+  const user = os.userInfo().username;
+  const why = 'folded into the microVM intake (hotz)';
+  const words = `held until a person lifts it (why: ${why}; by ${user})`;
+  const summaryOf = async (id: string) => {
+    const all = (await stage.runWith(b.e, RUNS.handler({}, process.env))) as RunSummary[];
+    const found = all.find((r) => r.id === id);
+    assert.ok(found, `${id} is listed`);
+    return found;
+  };
+  let id = '';
+
+  await s.test('a run blocked at its step\'s questions waits on you', async (sub) => {
+    id = (await aStarted(repo, 'plan the flag', planned())).id;
+    await tick(b, id);
+    b.settle(`${id}-plan`, 'succeeded', { outcome: 'blocked', summary: 'Half.', artifacts: [], needs: 'One question.', open: [CUT] });
+    await tick(b, id);
+    await aPass(b.e);
+    assert.match(await said(sub, 'ls', id), /waiting on you/);
+    assert.deepEqual((await summaryOf(id)).waitingOnYou, ['plan']);
+  });
+  await s.test('`nemia hold <run> --why` with no --until holds it, and writes a hold that names no run', async (sub) => {
+    const printed = await said(sub, 'hold', id, '--why', why);
+    assert.ok(printed.startsWith(`${id}  ${words}`), printed);
+    assert.match(printed, new RegExp(`nemia hold ${id} --off`), 'it says how to lift it');
+    assert.deepEqual((JSON.parse(fs.readFileSync(holdFileOf(id), 'utf8')) as { until: unknown }).until, []);
+  });
+  await s.test('`nemia decide`, `nemia ls` and the summary say it is held and why, and ask nothing', async (sub) => {
+    await aPass(b.e);
+    const screen = (await decideScreen(sub, b.e, [id], { '<id>': id })).join('\n');
+    assert.match(screen, new RegExp(`\n  ${literal(words)}\n`), screen);
+    assert.doesNotMatch(screen, /waiting on you|How is the card cut\?/, screen);
+    assert.doesNotMatch(screen, VERBS, screen);
+    const ls = await said(sub, 'ls', id);
+    assert.match(ls, new RegExp(`→ ${literal(words)}  —  nemia hold ${id} --off lifts it`), ls);
+    assert.doesNotMatch(ls, /waiting on you/, ls);
+    const summary = await summaryOf(id);
+    assert.equal(summary.holding?.waitingOnYou, false);
+    assert.deepEqual(summary.holding?.runs, []);
+    assert.equal(summary.holding?.word, words);
+    assert.deepEqual(summary.waitingOnYou, []);
+    assert.equal(summary.moving, false, 'a hold no tick lifts does not move');
+  });
+  await s.test('ticks file nothing, and no tick lifts it: the run read afresh, as a restarted daemon reads it, is still held', async () => {
+    const filed = b.filings.length;
+    for (let i = 0; i < 5; i++) await tick(b, id);
+    assert.equal(b.filings.length, filed, 'nothing filed while held');
+    assert.ok(fs.existsSync(holdFileOf(id)), 'the hold stands');
+    assert.deepEqual(readRun(id).hold?.until, []);
+    assert.equal(readRun(id).hold?.why, why);
+  });
+  await s.test('`nemia hold <run> --off` lifts it, and its questions are the person\'s again', async (sub) => {
+    await said(sub, 'hold', id, '--off');
+    await tick(b, id);
+    await aPass(b.e);
+    assert.match((await decideScreen(sub, b.e, [id], { '<id>': id })).join('\n'), /How is the card cut\?/);
+    assert.deepEqual((await summaryOf(id)).waitingOnYou, ['plan']);
+  });
+  await s.test('a folder run takes a hold that names no run, and --off lifts it', async (sub) => {
+    const dir = folderOf('folder-', { 'implement.md': '---\nplace: folder\n---\nimplement it\n' });
+    const folder = await stage.runPlaced(startRun({ brief: 'in a folder', workflowDir: dir }));
+    const filed = b.filings.length;
+    await said(sub, 'hold', folder.id, '--why', 'parked');
+    for (let i = 0; i < 2; i++) await tick(b, folder.id);
+    assert.equal(b.filings.length, filed, 'nothing of the held folder run filed');
+    await said(sub, 'hold', folder.id, '--off');
+    await tick(b, folder.id);
+    assert.ok(b.filings.includes(`${folder.id}-implement`), 'filed once lifted');
+  });
+});
+
 test('REFUSED by name at shipped defaults: what `nemia hold` refuses — its arguments, the runs it names, the run it holds, its words — exit 2, and no hold written', async (t) => {
   const holdFiles = (): string[] =>
     fs.existsSync(path.join(ROOT, 'runs'))
@@ -534,9 +633,11 @@ test('REFUSED by name at shipped defaults: what `nemia hold` refuses — its arg
   assert.equal((await typed(t, 'hold', already.id, '--until', target.id)).error, undefined);
   const worded = await aRunning(b, repo);
   assert.equal((await typed(t, 'hold', worded.id, '--until', target.id, '--why', "it's blocked", '--by', 'operator')).error, undefined);
+  const folder = await stage.runPlaced(
+    startRun({ brief: 'in a folder', workflowDir: folderOf('folder-', { 'implement.md': '---\nplace: folder\n---\ndo it\n' }) }),
+  );
   const u = ['hold', id, '--until', target.id];
   const rows: Array<[string, string[], string, string[]]> = [
-    ['neither --until nor --off', ['hold', 'r-x'], 'Invalid', ['nemia hold needs the runs to wait on, or --off']],
     ['both', ['hold', 'r-x', '--until', 'a', '--off'], 'Invalid', ['nemia hold takes --until or --off, not both']],
     ['a flag it does not take', ['hold', 'r-x', '--after', 'a'], 'Invalid', ['nemia hold does not take --after']],
     ['--until with no run', ['hold', 'r-x', '--until'], 'Invalid', ['--until takes the run to wait on']],
@@ -593,6 +694,21 @@ test('REFUSED by name at shipped defaults: what `nemia hold` refuses — its arg
       ['A hold is put once, whole: lift it', `then nemia hold ${already.id} --until ${target.id}.`],
     ],
     ['a run cancelled', ['hold', called.id, '--until', target.id], 'Conflict', [`${called.id} was cancelled at`, 'nothing to hold']],
+    ['a run cancelled, held naming no run', ['hold', called.id], 'Conflict', [`${called.id} was cancelled at`, 'nothing to hold']],
+    ['a run landed, held naming no run', ['hold', landed.id], 'Conflict', [`${landed.id} has landed`, 'nothing of it is left to file']],
+    ['a run succeeded, held naming no run', ['hold', done.id], 'Conflict', [`${done.id} has succeeded`, `nemia decide ${done.id}`]],
+    [
+      'a run already held, held again naming no run',
+      ['hold', already.id],
+      'Conflict',
+      ['A hold is put once, whole: lift it', `nemia hold ${already.id} --off`],
+    ],
+    [
+      'a folder run, held until a run lands',
+      ['hold', folder.id, '--until', target.id],
+      'Conflict',
+      ['place: folder', `nemia hold ${folder.id}`],
+    ],
     ['a run landed', ['hold', landed.id, '--until', target.id], 'Conflict', [`${landed.id} has landed`, 'nothing of it is left to file']],
     [
       'a run succeeded',

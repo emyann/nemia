@@ -20,6 +20,7 @@ import {
   type TaskPhase,
 } from '../record/record.ts';
 import type { Closeout } from '../closeout/index.ts';
+import { runWords } from '../routed/routed-words.ts';
 import {
   acceptanceOf,
   askedAgain,
@@ -421,6 +422,31 @@ function acceptWaits(run: Run, looping: Workflow, asks: readonly RoundAsk[]): st
 }
 
 /**
+ * Why `nemia approve <run>` with no step names is not a loop's acceptance: no loop is out of rounds, and a step waits at its gate as the
+ * run reads it (`runWords`) — the approval it means, named. Undefined otherwise, and on a run cancelled, pruned or held, whose own
+ * refusals come after.
+ */
+function gateNotLoop(
+  steps: readonly Workflow[],
+  run: Run,
+  phaseOf: (taskId: string) => TaskPhase,
+  closeoutOf: (step: string) => Closeout | undefined,
+  askedCloseout: (taskId: string) => CloseoutAsked,
+  spendOf: SpendOf,
+): string | undefined {
+  if (run.cancelledAt || run.pruned || run.hold) return undefined;
+  const words = runWords(steps, run, phaseOf, closeoutOf, askedCloseout, spendOf);
+  if (steps.some((s) => s.loop && words.get(s.name) === 'exhausted')) return undefined;
+  const gates = steps.filter((s) => words.get(s.name) === 'awaiting approval').map((s) => s.name);
+  if (!gates.length) return undefined;
+  return (
+    `no loop of ${run.id} is out of rounds, so there is no loop to accept, and ${andList(gates)} ${gates.length > 1 ? 'wait' : 'waits'} at ${gates.length > 1 ? 'their gates' : 'its gate'}: name the step to approve — ` +
+    gates.map((g) => `nemia approve ${run.id} ${g}`).join(' or ') +
+    '.'
+  );
+}
+
+/**
  * What `nemia approve` of a loop out of rounds accepts — the looping step and the try — or why it will not, in words that say what to do
  * instead. Pure.
  *
@@ -448,6 +474,8 @@ export function acceptAsk(
   spendOf: SpendOf = () => undefined,
 ): { step: string; try: number } | { refusal: string } {
   const no = (refusal: string) => ({ refusal });
+  const gate = name === undefined ? gateNotLoop(steps, run, phaseOf, closeoutOf, askedCloseout, spendOf) : undefined;
+  if (gate) return no(gate);
   const words = acceptWordsRefusal(message, `nemia approve ${run.id}${name === undefined ? ' [<step>]' : ` ${name}`}`);
   if (words) return no(words);
   if (run.cancelledAt) {

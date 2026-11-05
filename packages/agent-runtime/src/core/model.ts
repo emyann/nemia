@@ -9,7 +9,16 @@
 import { Schema } from 'effect';
 import { brandedCount, brandedId, foreignId, type Count, type Id } from './brand.ts';
 import { erDiagram, type ErModel } from './er.ts';
-import { FORMER_REASONS, HarnessArgsSchema, ParkedSchema, SaidAtEnd, StoredEventSchema, UsageSchema } from './event-schema.ts';
+import {
+  FORMER_REASONS,
+  HarnessArgsSchema,
+  MemoryUseSchema,
+  ParkedSchema,
+  ResourcesSchema,
+  SaidAtEnd,
+  StoredEventSchema,
+  UsageSchema,
+} from './event-schema.ts';
 
 /** The most bytes a file's name may hold on the file systems a store is kept on. */
 const NAME_BYTES = 255;
@@ -94,6 +103,7 @@ export const Attempt = Schema.Struct({
   usage: Schema.NullOr(UsageSchema),
   exitCode: Schema.NullOr(Schema.Number),
   terminationMessage: Schema.optional(Schema.String),
+  memory: Schema.optional(MemoryUseSchema),
   denials: Schema.optional(Schema.Array(Schema.Struct({ tool: Schema.String, what: Schema.optional(Schema.String) }))),
   skills: Schema.optional(Strings),
   files: Schema.optional(Strings),
@@ -154,6 +164,7 @@ export const Task = Schema.Struct({
   restartPolicy: Schema.optional(Schema.Literal('Always')),
   labels: Schema.optional(Schema.Record(Schema.String, Schema.String)),
   traceparent: Schema.optional(Schema.String),
+  resources: Schema.optional(ResourcesSchema),
   queued: Schema.optional(Schema.Boolean),
   admitted: Schema.optional(Schema.Number),
   inputs: Schema.Array(Input),

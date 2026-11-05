@@ -158,6 +158,7 @@ test('a job runs to its end: filed, spawned once, running, ended on what its har
   const s = story(t);
   const b = board();
   const usage = { responses: 3, toolCalls: 5, inputTokens: 1200, outputTokens: 80 };
+  const memory = { limitBytes: 67_108_864, peakBytes: 67_108_864, oomKills: 1 };
   let id = '';
   let cursor = 0;
 
@@ -206,7 +207,7 @@ test('a job runs to its end: filed, spawned once, running, ended on what its har
   await s.test(
     'its harness says it completed: the pass settles it succeeded, finding out by asking, with what it consumed and how it exited',
     async () => {
-      for (const [k, v] of b.sessions) b.sessions.set(k, { ...v, state: 'completed', usage, exitCode: 0 });
+      for (const [k, v] of b.sessions) b.sessions.set(k, { ...v, state: 'completed', usage, exitCode: 0, memory });
       await b.run(tick());
       assert.equal(
         await b.run(phaseOf(id)),
@@ -217,6 +218,7 @@ test('a job runs to its end: filed, spawned once, running, ended on what its har
       const [a] = (await b.run(view(id, new Map()))).state.attempts;
       assert.deepEqual(a.usage, usage, 'what it consumed, from the sighting that ended it');
       assert.equal(a.exitCode, 0, 'and how it exited');
+      assert.deepEqual(a.memory, memory, 'and what its cgroup said of its memory, carried as the sighting gave it');
     },
   );
 
@@ -389,6 +391,19 @@ test('tick: what a pass starts, carries to its harness untouched, and reports', 
     const [a] = (await b.run(view(id, new Map()))).state.attempts;
     assert.equal(a.usage, null, 'the fake harness measures nothing');
     assert.equal(a.exitCode, null);
+    assert.equal('memory' in a, false, 'no cgroup read, no memory: the key absent, as a former journal reads');
+    const ended = (await b.run(eventsOf(id))).find((e) => e.kind === 'ended');
+    assert.ok(ended && !('memory' in ended), 'and absent from the end');
+  });
+
+  await t.test("a task's memory limit reaches its harness untouched, and a task with none hands none", async () => {
+    const b = board();
+    await b.run(file({ ...spec, resources: { limits: { memory: '64Mi' } } }));
+    await b.run(file({ ...spec, brief: 'unlimited' }));
+    await b.run(tick());
+    const by = (brief: string) => b.spawned.find((r) => r.brief === brief);
+    assert.deepEqual(by(spec.brief)?.resources, { limits: { memory: '64Mi' } });
+    assert.equal(by('unlimited')?.resources, undefined);
   });
 
   await t.test('settleTask is a fixpoint: it stops when nothing moves', async () => {

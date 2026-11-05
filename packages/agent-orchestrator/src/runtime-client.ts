@@ -36,7 +36,7 @@ import {
 } from 'agent-runtime';
 import { envNameOf, readRemoteAgents, remoteAgentsFile } from './harness/a2a.store.ts';
 import { HOME } from './record/record.store.ts';
-import { maxConcurrent } from './config/config.store.ts';
+import { cgroupParent, maxConcurrent, memoryLimit } from './config/config.store.ts';
 import { pauseFile } from './pause/pause.store.ts';
 import { servesOnStore } from './daemon/daemon.store.ts';
 import { REMOTE_PREFIX, remoteNameOf } from './harness/harness.ts';
@@ -88,6 +88,9 @@ export type {
 export { ForgetRefused, type ForgetReport, type KeptReport } from 'agent-runtime';
 /** The name the engine gives a task's session, which is the name `claude agents` lists it under (`harnessWaitLine`). */
 export { nameFor } from 'agent-runtime';
+
+/** Why this host cannot hold a task's memory limit, a scope of systemd's user manager in a slice where given, or `undefined`. */
+export { scopeRefusal } from 'agent-runtime';
 /** The task's lifecycle as plain data, which the board draws: what the api carries on a step's path (`StepPath`'s `lifecycle`). */
 export { lifecycleGraph, type LifecycleGraph } from 'agent-runtime';
 /** A denied call as the runtime words it, and as a permission rule is written: `Skill(look)`, `Bash(pytest)` (`deniedOf`). */
@@ -186,6 +189,10 @@ export const quotaHarnesses = (): string[] => Object.keys(HARNESSES);
  * words. A step already filed on it runs on no other harness: the runtime routes a task whose harness it does not have to none, so one at
  * work on the agent is held, neither there nor gone, and one not yet started is refused its start (`composite` in the runtime).
  *
+ * Each task it files without a memory limit of its own is filed under `WF_MEMORY_LIMIT`'s (`defaultLimits`), its scope made in
+ * `WF_CGROUP_PARENT`'s slice where one is set (`cgroupParent`): a value either variable refuses gives the engine neither, and the tick
+ * refuses its pass on the same read (`ceilings`), so nothing is filed without the limit it was set to hold.
+ *
  * When the process exports its own telemetry (`otlpOf`), the engine is handed the same collector, and each session it starts exports
  * there too, tagged with the labels its task was filed with (`stepLabels`); with its tools' inputs only when `NEMIA_TOOL_DETAILS` is
  * `1` (`sessionTelemetryOf`). Any other value is said on stderr and leaves them off (`toolDetailsRefusalOf`), as an export interval that
@@ -206,6 +213,7 @@ export const engine = (): Engine => {
       credentials,
       missingCredential,
       ...storeAdmission(),
+      ...storeLimits(),
       ...(telemetry ? { telemetry } : {}),
     }),
   );
@@ -316,6 +324,22 @@ export const storeAdmission = (): { maxConcurrent?: number; unschedulable: () =>
 const ceilingOf = (): { maxConcurrent?: number } => {
   try {
     return { maxConcurrent: maxConcurrent() };
+  } catch (err) {
+    if (isRefusal(err)) return {};
+    throw err;
+  }
+};
+
+/**
+ * What the store's engine limits its tasks by, as `engine()` hands it to the runtime: `WF_MEMORY_LIMIT` as the default limit
+ * (`defaultLimits`), and `WF_CGROUP_PARENT` as the slice each limited task's scope is made in (`cgroupParent`); neither when unset, and
+ * neither when either is refused, as `ceilingOf` gives no ceiling.
+ */
+export const storeLimits = (): { defaultLimits?: { memory: string }; cgroupParent?: string } => {
+  try {
+    const memory = memoryLimit();
+    const parent = cgroupParent();
+    return { ...(memory === undefined ? {} : { defaultLimits: { memory } }), ...(parent === undefined ? {} : { cgroupParent: parent }) };
   } catch (err) {
     if (isRefusal(err)) return {};
     throw err;

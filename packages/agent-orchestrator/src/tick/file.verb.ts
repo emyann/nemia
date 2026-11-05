@@ -81,6 +81,14 @@ import { found, recordNamed, stepNamed, taskToStop, tryTold } from './told.verb.
 type Spec = Parameters<Engine['file']>[0];
 
 /**
+ * What a step's session is limited by, a container's `resources`: its `memory:` as `limits.memory`, or nothing, where the engine's
+ * default stands (`WF_MEMORY_LIMIT`). On a session alone, inside `localFields`, since the runtime refuses a limit on a remote agent; a
+ * check is filed without it, and takes the engine's default.
+ */
+const limitsOf = (step: Workflow): Pick<Spec, 'resources'> =>
+  step.memory === undefined ? {} : { resources: { limits: { memory: step.memory } } };
+
+/**
  * What a pass read of a run before it filed anything (`advanceRun`): the run's steps, the engine's views of its tasks and the readers made
  * of them, and a person's asks. One for the pass: every phase of it reads the same.
  */
@@ -307,6 +315,7 @@ const trySpec = (
     resumeFrom: t.resumeFrom,
     ...(holdsOpenOn(step) ? { holdOpen: true as const } : {}),
     closeoutSchema: closeoutSchemaOf(step, f.reads.steps),
+    ...limitsOf(step),
   })),
   deadlineSeconds: step.deadlineSeconds,
 });
@@ -426,6 +435,7 @@ function roundSpec(
       resumeFrom,
       ...(holdsOpenOn(target) ? { holdOpen: true as const } : {}),
       closeoutSchema: closeoutSchemaOf(target, reads.steps),
+      ...limitsOf(target),
     })),
     deadlineSeconds: target.deadlineSeconds,
   };
@@ -610,6 +620,7 @@ function readySpec(
        * The engine hands it to the harness and records the answer without reading it: what the fields mean is this package's (`Closeout`).
        */
       closeoutSchema: closeoutSchemaOf(step, reads.steps),
+      ...limitsOf(step),
     })),
   };
 }

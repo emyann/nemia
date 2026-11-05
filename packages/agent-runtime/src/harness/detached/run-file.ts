@@ -95,6 +95,18 @@ const RunFileSchema = Schema.StructWithRest(
      * `exitCode`. Absent where the file was missing or no regular file.
      */
     terminationMessage: Schema.optional(Schema.String),
+    /**
+     * For a run under a memory limit: the limit in bytes its scope holds (`MemoryMax=`), written by the spawn. Absent: no limit, and
+     * the worker reads no cgroup.
+     */
+    memoryLimit: Schema.optional(Schema.Finite),
+    /**
+     * What the run's scope said of its memory (`cgroupMemoryOf`), read by the worker on each beat and at the harness's exit, the last
+     * read kept: the run's `Sighting.memory`. Absent where it ran under no limit, or no read found its cgroup.
+     */
+    memory: Schema.optional(
+      Schema.Struct({ limitBytes: Schema.Finite, peakBytes: Schema.optional(Schema.Finite), oomKills: Schema.Finite }),
+    ),
     /** The harness's own id this run resumed, kept only for a spec whose printed totals carry the parent's. */
     resumeFrom: Schema.optional(Schema.String),
     /**

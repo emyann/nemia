@@ -980,6 +980,39 @@ so what a chain of filings spends together is the caller's to count (the orchest
 carried the cap beside `config` and recorded a capped end with reason `budget`; the journal's reader (`upgrade`) reads both in
 today's shape — the cap under `config`, the end `harness` with `limit: 'budget'` — and rewrites nothing on disk.
 
+## What a session may use of the host: `resources.limits.memory`
+
+`resources: { limits: { memory: '8Gi' } }` is the most memory a task's process tree may hold, a container's
+`resources.limits.memory` in Kubernetes' quantity: whole digits and a unit of `Ki`, `Mi`, `Gi`, `Ti` (powers of 1024) or `k`, `M`,
+`G`, `T` (powers of 1000), or none for bytes (`memoryBytesOf`, `src/core/memory.ts`). A fraction (`1.5Gi`), an exponent, `m`, a
+`requests`, a limit other than `memory` (`cpu`) and anything else under `resources` are refused at `file()` (`resourcesRefusalOf`),
+nothing journalled; so is a limit on a remote agent, whose process is the other party's. An engine given
+`defaultLimits: { memory: '6Gi' }` writes it onto every task filed with no `resources` of its own, as a LimitRange's default is
+written into a Pod at admission: the `filed` entry says what each task ran under, and a new default never changes a task already
+filed. A remote agent's task is never given the default, so a default makes no remote task unfileable. `Engine.layer` refuses a
+`defaultLimits.memory` it cannot read, and a `cgroupParent` that is not a slice's unit name (`sessions.slice`).
+
+The limit is the host's to hold, as the kubelet holds a container's: a limited task's process tree runs in a transient scope of
+systemd's user manager (`scopeArgv`, `src/harness/cgroup.ts`) — `systemd-run --user --scope --quiet --collect
+[--slice=<cgroupParent>] -p MemoryMax=<bytes> -p MemorySwapMax=0 -p OOMPolicy=continue --`. A process passing the limit is killed
+by the kernel inside that cgroup alone; nothing outside it, a neighbour's session or the daemon, is touched. Each road:
+
+| road | what runs in the scope | what records `memory` |
+|---|---|---|
+| a detached job (`command`, `codex`, a `HarnessSpec`, a Claude Code job) | the worker (`bin/ae-worker.ts`) and its harness: systemd-run runs the worker itself, so its pid, group and stop path are unchanged | the worker, on each beat and at the harness's exit, off its own cgroup (`cgroupMemoryOf('self')`); it gives its harness `oom_score_adj` 500, which every child inherits, so the kernel kills a runaway child, never the worker that writes the end; `OOMPolicy=continue` keeps systemd from stopping the rest of the scope |
+| a held session (attached, a long-lived one among them) | Claude Code, its children with it | its holder, off Claude Code's cgroup where it rewrites the run file and once before it ends the session: best-effort, since a scope that emptied with Claude Code killed in it reads nothing more, and the last read stands |
+
+The attempt keeps what the cgroup said as it ended, `memory: { limitBytes, peakBytes?, oomKills }` — `oomKills` the processes the
+kernel's OOM killer ended in it, `peakBytes` its `memory.peak` where the kernel keeps one (5.19 on) — carried from the sighting
+onto the `ended` entry and the attempt as `terminationMessage` is, absent with no limit and on a journal written before; `decide`
+reads none of it. The peak counts the worker's own Node process beside its harness.
+
+**Off systemd.** A host where the scope cannot be made — no user manager reachable (`XDG_RUNTIME_DIR` and
+`DBUS_SESSION_BUS_ADDRESS` unset), cgroup v1, or a systemd older than 253, whose scopes take no `OOMPolicy=` — refuses a limited
+task's spawn, so its attempt ends `unstartable`, the refusal saying what to set (`scopeRefusal`, a probe run once a process for
+each slice, the same properties around `sh` reading its own `memory.max`). An unlimited task never asks it. What the host measured
+before it was built is in `docs/harness.md`, *A memory limit, held by a scope*.
+
 ## How much a session keeps in mind: `contextTokens`
 
 `contextTokens: 200000` is the context window a task's sessions are given, in tokens: past about it, Claude Code compacts
@@ -2005,6 +2038,7 @@ of pure code sits beside it.
 | `src/core/path.ts` | a task's path through the lifecycle, replayed off its journal (`pathOf`): the state after each entry, the entry's kind and its time, for the `path` verb — pure, a reader's, never a pass's |
 | `src/core/event-schema.ts` | every event a runtime has written, as an Effect Schema, former shapes included: `Journal.layer` checks what any store gives back against it before `upgrade`, and fails a task's read with a `JournalError` naming its file, the entry and the field (`entryWords`); a feed entry it refuses is skipped and said (`FeedRefusal`) |
 | `src/core/quote.ts` | how a sentence quotes what it did not write, pure: a value cut to 60 characters, another party's address, status text or words to 200, the cut marked `…` (`quote`), and a long list shown by its first three and how many more (`firstOf`) |
+| `src/core/memory.ts` | a memory limit read off its Kubernetes quantity (`memoryBytesOf`), the words for one it cannot read (`memoryQuantityRefusal`), and the bytes of a whole amount of a unit (`quantityBytes`, proved by `contracts/memory.contract.ts`) |
 | `src/core/model.ts` | the runtime's model as Effect Schemas, a declaration nothing reads through yet (`docs/model.md`): its ids (`TaskId`, by `taskIdRefusal`; `AttemptNumber`; the harness's `SessionId`), its entities, the task's invariant (its attempts number from 1 with no gap) and its diagram (`runtimeModelDiagram`) |
 | `src/core/brand.ts` | an id of the model in its two forms, from Effect's `Brand` (`brandedId`, `brandedCount`, `foreignId`): checked on create, nominal on read |
 | `src/core/er.ts` | a model's entity-relation diagram, drawn from its schemas (`erDiagram`): a block per entity, then each relation, as beautiful-mermaid reads them — pure |
@@ -2070,12 +2104,15 @@ of pure code sits beside it.
 | `src/harness/claude/telemetry.ts` | a session's telemetry as Claude Code reads it: its variables, its tools' details only when asked, in every session's environment on the Agent SDK (`claudeTelemetryEnv`) |
 | `src/harness/claude/vocabulary.ts` | Claude Code's modes, their ranks, efforts and context windows, the models it drops `auto` on, and what it refuses to be asked for |
 | `src/harness/claude/index.ts` | the face of `harness/claude/`, as the face takes it |
+| `src/harness/cgroup.ts` | a task's memory limit held by the host: the scope of systemd's user manager its process tree runs in (`scopeArgv`), the probe that says why a host cannot make one (`scopeRefusal`), and what a cgroup's files say of its memory (`cgroupMemoryOf`) |
+| `src/harness/scope.ts` | the scope a spawn asks for, off its request's memory limit (`scopeFor`): its bytes and the argv before its command, or the words that say what to set |
 | `src/harness/command/command.ts` | a process as a harness: the program a task's `config.command` names, its `env` and `niceness`, its streams kept whole, and what it refuses |
 | `src/harness/codex/codex.ts` | Codex through `codex exec`: the trust it is extended, and its spec |
 | `src/harness/codex/vocabulary.ts` | Codex's sandboxes, narrowest first, its efforts and its default sandbox, with no I/O |
 | `src/harness/codex/stream.ts` | what a Codex session prints under `exec --json`: each event the runtime reads decoded by `CodexEventSchema`, a stream that does not decode refused, its usage, and what a follow reads of it (`codexPartials`: no pieces of text, its lines decoded) |
 | `src/harness/codex/rollout.ts` | the Codex rollout records the runtime reads, each decoded by its schema in `ROLLOUT`, a record that does not decode refused |
 | `src/harness/codex/transcript.ts` | a Codex thread's rollout: where it is, and its records as events |
+| `src/harness/detached/start-worker.ts` | how a detached run's worker is started: what its request must hold before a run file is written (`startable`: a folder, a limit the host can hold) and the worker launched, in its scope where it has one (`startWorker`) |
 | `src/harness/detached/detached.ts` | a runner for any harness that runs a prompt and exits: `HarnessSpec`, the detached worker's run files, the lease, the four verbs over them, and `output`, a stream kept whole |
 | `src/harness/detached/detached-options.ts` | how a detached runner's workers run, beside its spec (`DetachedOptions`): their stop grace and heartbeat, each defaulted to the shipped bound, and a beat the lease would read as dead refused (`workerBoundsOf`) |
 | `src/harness/detached/worker-bounds.ts` | the detached worker's two shipped bounds, named once (`WORKER_STOP_GRACE_MS`, `WORKER_BEAT_MS`), importing nothing, as the worker it is read by imports nothing else |
@@ -2142,6 +2179,9 @@ of pure code sits beside it.
 | `src/core/decide.test.ts` | every branch of the decision, no harness needed |
 | `test/engine.test.ts` | the crash cases, what a pass reports (`running` per harness) and that it chooses no order, the pass refusing an argument, the fields carried, against a fake harness |
 | `test/command.test.ts` | the command harness against the real worker: a long stdout read back whole, stderr apart, the exit code, `env`, `niceness`, a stop, a lingering child, a respawn, and its refusals |
+| `test/memory-limit.test.ts` | a host that makes no scope (the probe's program `false`): a limited task, its own limit or the engine's default, ends `unstartable` with no run file, and an unlimited one runs |
+| `test/memory-limit.boundary.test.ts` | a memory limit on a real cgroup: a runaway child of a 256Mi task killed in its scope, the attempt carrying the limit, the kill and the peak, and a neighbour untouched; skipped with the probe's words off systemd |
+| `test/attached-memory.test.ts` | a held long-lived session under a memory limit: refused its start where the host makes no scope (its unlimited neighbour started), ended `failed` rather than taken up again when a holder that makes none finds it parked, and run in a scope of its own whose memory its run file and sighting say where the host makes one |
 | `test/detached.test.ts` | the worker, the lease, the composite, each spec's argv and refusals — `sh` as the harness |
 | `test/mcp.test.ts` | what each harness is given for MCP, at shipped defaults — fake `claude` and `codex` on `PATH` |
 | `test/io.test.ts` | what a pass costs as the runtime reports it: a tick's `ms` and each harness's observes, and `io()`'s bytes read and processes started |

@@ -6,7 +6,7 @@
 import { Cause, Deferred, Effect, Exit, Fiber, Metric, type Scope } from 'effect';
 import type { StoreRoot } from '../config/root.store.ts';
 import type { PlaceService } from '../place/place.store.ts';
-import { over, quotaHarnesses, type Engine, type HarnessQuota } from '../runtime-client.ts';
+import { over, quotaHarnesses, scopeRefusal, type Engine, type HarnessQuota } from '../runtime-client.ts';
 import { HOME } from '../record/record.store.ts';
 import { queueLine } from '../inbox/index.ts';
 import { scheduleLine } from '../schedule/schedule.ts';
@@ -15,7 +15,8 @@ import { PASS_SERIES } from '../meter/meter.verb.ts';
 import { seriesBorn } from '../telemetry/telemetry.store.ts';
 import { heldLines, pausedWords, RESUMED } from '../pause/pause.ts';
 import { refusalLines, tickRun, type Pass } from '../tick/tick.verb.ts';
-import { beat, heldServes, heldUrl, passed, releaseStore, stillHeld, takeStore, type TakenStore } from './daemon.store.ts';
+import { beat, ceilings, heldServes, heldUrl, passed, releaseStore, stillHeld, takeStore, type TakenStore } from './daemon.store.ts';
+import { Invalid } from '../refusal/refusal.ts';
 import { takenFromLine, type HolderKind } from './daemon.ts';
 import { deliver } from '../subscription/deliver.verb.ts';
 import { DAEMON_STARTED, startedLine } from '../feed/index.ts';
@@ -39,8 +40,9 @@ export type QuotaAsk = (harness: string) => Effect.Effect<HarnessQuota, unknown>
  * What `up` runs with: its interval, `every` ms; the repository a queued card that names none starts on, and the folder the lease names
  * (`repo`); the kind of daemon it is (`holder`); the calling process's own series a collector reads by their increase, born at zero
  * with the daemon's (`series`, `DAEMON_SERIES`); what to do once the lease is taken and before the first pass, in the lease's scope
- * (`onTaken` — where the api serves, and `nemia up` says what it holds); and how a harness's quota is asked (`quota`, `QuotaAsk`), the
- * engine's own unless given.
+ * (`onTaken` — where the api serves, and `nemia up` says what it holds); how a harness's quota is asked (`quota`, `QuotaAsk`), the
+ * engine's own unless given; and how this host is asked whether it holds a memory limit (`scope`, the runtime's `scopeRefusal` unless
+ * given).
  */
 export type UpOptions = {
   every: number;
@@ -49,6 +51,7 @@ export type UpOptions = {
   series?: ReadonlyArray<Metric.Metric<never, unknown>>;
   onTaken?: (taken: TakenStore) => Effect.Effect<void, unknown, Scope.Scope>;
   quota?: QuotaAsk;
+  scope?: (parent?: string) => string | undefined;
 };
 
 /**
@@ -254,7 +257,24 @@ const saidStarted = ({ held, replaced }: TakenStore): Effect.Effect<void> =>
   );
 
 /**
- * The daemon: the store's lease taken as `holder` (`takeStore`, refused by name while another daemon of either kind ticks it) and let go
+ * Why a daemon may not start under the memory limit its environment sets (`WF_MEMORY_LIMIT`): this host cannot hold one, in the words of
+ * `scope` — the runtime's probe of a scope of systemd's user manager in `WF_CGROUP_PARENT`'s slice (`scopeRefusal`), a parameter so that a
+ * test can stand another in — and the variable to unset. Every task it filed would be refused its start, so it refuses first, exit 2.
+ * `undefined` where no limit is set, never probing, or where the host holds one; a value either variable refuses is thrown as it is.
+ */
+export const limitRefusal = (scope: (parent?: string) => string | undefined = scopeRefusal): Invalid | undefined => {
+  const { memory, cgroupParent: parent } = ceilings();
+  if (memory === undefined) return undefined;
+  const why = scope(parent);
+  if (why === undefined) return undefined;
+  return new Invalid({
+    message: `${why} The daemon would file every session under WF_MEMORY_LIMIT=${memory}, and each would be refused its start: unset WF_MEMORY_LIMIT${parent === undefined ? '' : ' and WF_CGROUP_PARENT'} to start without a limit, or start the daemon where systemd's user manager runs.`,
+  });
+};
+
+/**
+ * The daemon: refused before anything where its memory limit cannot be held on this host (`limitRefusal`, `WF_MEMORY_LIMIT`); then the
+ * store's lease taken as `holder` (`takeStore`, refused by name while another daemon of either kind ticks it) and let go
  * as its scope closes, however it ends, so a signal that stops it leaves the store free at once; the engine's attached sessions held
  * (`hold`) inside it, so as the scope closes each is let go between two tool calls, before the lease, and what that hold serves on its own
  * port written onto the lease beside the api's url (`heldServes`), by this process, which is the one that holds it — so another process on
@@ -275,9 +295,11 @@ const saidStarted = ({ held, replaced }: TakenStore): Effect.Effect<void> =>
  */
 export const up = (
   e: Engine,
-  { every, repo, holder, series = [], onTaken, quota }: UpOptions,
+  { every, repo, holder, series = [], onTaken, quota, scope }: UpOptions,
 ): Effect.Effect<never, unknown, Scope.Scope | PlaceService | StoreRoot> =>
   Effect.gen(function* () {
+    const unheld = yield* Effect.try({ try: () => limitRefusal(scope), catch: (err) => err });
+    if (unheld) return yield* Effect.fail(unheld);
     const taken = yield* Effect.acquireRelease(
       Effect.try({ try: () => takeStore({ every, cwd: repo, by: holder, release: leaseRelease(runningRelease()) }), catch: (err) => err }),
       ({ held }) => Effect.sync(() => releaseStore(held)),

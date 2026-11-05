@@ -7,7 +7,17 @@ import { WORKER_BEAT_MS, WORKER_STOP_GRACE_MS } from './worker-bounds.ts';
  * (`beatMs`, default `WORKER_BEAT_MS`), written onto every plan for the worker to read. Options so that a test of a stop or a
  * heartbeat shortens them rather than waiting the shipped bounds out (`test/detached.test.ts`).
  */
-export type DetachedOptions = { stopGraceMs?: number; beatMs?: number };
+export type DetachedOptions = {
+  stopGraceMs?: number;
+  beatMs?: number;
+  /** The slice a limited run's scope is made in (`EngineOptions.cgroupParent`). Absent: the user manager's root slice. */
+  cgroupParent?: string;
+  /**
+   * The program a limited run's scope is made by, and its probe asked of (`scopeArgv`, `scopeRefusal`): a test stands one in that
+   * refuses (`false`). Absent: `systemd-run`.
+   */
+  scopeProgram?: string;
+};
 
 /**
  * The bounds `options` give, each defaulted to the shipped one. Throws a `RangeError` for a beat not above 0 and under `STALE_MS`:

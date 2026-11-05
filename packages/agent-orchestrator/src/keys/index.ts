@@ -7,6 +7,7 @@ export {
   contextOf,
   contextText,
   countOf,
+  memoryOf,
   DENIALS,
   denialsOf,
   dollarsOf,

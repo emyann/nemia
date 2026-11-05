@@ -242,7 +242,7 @@ const CLAUDE_CODE_REFUSED: Record<string, string> = {
   hooks:
     "a run starts no hooks of an agent's own; hooks go in the repository's `.claude/settings.json`, which its sessions read in a checkout Claude Code trusts",
   memory:
-    "a run keeps no memory of an agent's own between sessions: what a step knows is its brief, its workspace and the session it continues",
+    "a run keeps no memory of an agent's own between sessions: what a step knows is its brief, its workspace and the session it continues; a step's own `memory:` is the most memory its sessions may use, a limit such as `memory: 4Gi`, written on each step",
   isolation: "where a step works is the step's `workspace:` — a worktree of its own unless it says `main` or `folder`",
 };
 

@@ -468,7 +468,7 @@ const DECLARED = {
 test("a checked step, from its check's filing to `retries:` spent and the run waiting on you", async (t) => {
   const s = story(t);
   const b = stage.board();
-  const dir = implementThenReview(['output: implement.schema.json', 'check: npm test && npm run typecheck', 'retries: 1']);
+  const dir = implementThenReview(['output: implement.schema.json', 'check: npm test && npm run typecheck', 'retries: 1', 'memory: 4Gi']);
   fs.writeFileSync(path.join(dir, 'implement.schema.json'), JSON.stringify(DECLARED));
   let run: RepositoryRun;
   const id = () => run.id;
@@ -482,6 +482,9 @@ test("a checked step, from its check's filing to `retries:` spent and the run wa
   });
   await s.test("implement's session is told the run's labels as its check will be, by the pass that filed it", () => {
     assert.equal(b.tasks.get(`${id()}-implement`)?.spec.config?.env?.WF_LABELS, '{"work":"fix"}');
+  });
+  await s.test("implement's session is filed under the step's `memory:`, a container's limit", () => {
+    assert.deepEqual(b.tasks.get(`${id()}-implement`)?.spec.resources, { limits: { memory: '4Gi' } });
   });
   await s.test(
     'implement signs off, and the run files its check itself: the frozen command, in its workspace, on the check harness, the follower unfiled',
@@ -512,6 +515,7 @@ test("a checked step, from its check's filing to `retries:` spent and the run wa
         'one attempt, as every task is: the runtime refuses a count or a policy',
       );
       assert.equal(spec.brief, 'npm test && npm run typecheck', 'the brief is the frozen check line, not the one planted since');
+      assert.equal('resources' in spec, false, "the step's `memory:` binds its session alone: its check takes the engine's default");
       assert.deepEqual(spec.config, {
         command: ['sh', '-c', 'npm test && npm run typecheck'],
         env: {
@@ -553,6 +557,7 @@ test("a checked step, from its check's filing to `retries:` spent and the run wa
       const pass = await tick(id());
       assert.deepEqual([pass.tried, pass.filed, pass.unreachable, pass.status], [['implement'], [], [], 'running']);
       const spec = b.tasks.get(try2())!.spec;
+      assert.deepEqual(spec.resources, { limits: { memory: '4Gi' } }, "a try is filed under the step's `memory:` as its first was");
       assert.deepEqual(
         { cwd: spec.cwd, resumeFrom: spec.resumeFrom, harness: spec.harness },
         { cwd: run.repo, resumeFrom: `native-${id()}-implement`, harness: undefined },

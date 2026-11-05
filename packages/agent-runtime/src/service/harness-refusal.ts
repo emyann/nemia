@@ -39,6 +39,8 @@ import { heldHarnessesOf, isClaude, isRemote, isSpec, type HarnessConfig, type T
  * 7e. a list in `enabledSkills` on a harness that cannot close a session's skills (`enabledSkillsMisplaced`): a `HarnessSpec` that
  *    does not declare `enabledSkills`, whose session would hold every skill it finds; Claude Code holds one through its SDK, which
  *    every session of it runs on;
+ * 7f. a memory limit (`resources.limits.memory`) on a remote agent (`limitMisplaced`), whose process is the other party's and no
+ *    cgroup of this host's holds; an engine's `defaultLimits` is never written onto such a task, so a default makes none unfileable;
  * 8. a long-lived task on a harness whose session ends with its turn (`longLivedMisplaced`);
  * 9. what the harness's own `refuses` refuses: Claude Code's lists, a spec's, or a remote agent's (`remoteRefuses`).
  *
@@ -88,7 +90,24 @@ const misplaced = (spec: TaskSpec & { harness: string }, h: HarnessConfig, harne
   argsMisplaced(spec, h, harnesses) ??
   longLivedMisplaced(spec, h, harnesses) ??
   mayAskMisplaced(spec, harnesses) ??
-  enabledSkillsMisplaced(spec, h, harnesses);
+  enabledSkillsMisplaced(spec, h, harnesses) ??
+  limitMisplaced(spec, h, harnesses);
+
+/**
+ * A memory limit on a remote agent, whose process is the other party's: no cgroup of this host's reaches it. An engine's
+ * `defaultLimits` is never written onto such a task (`limitedBy`), so only a limit the task asks for itself is refused here.
+ */
+const limitMisplaced = (
+  spec: TaskSpec & { harness: string },
+  h: HarnessConfig,
+  harnesses: Record<string, HarnessConfig>,
+): string | undefined => {
+  if (spec.resources?.limits?.memory === undefined || !isRemote(h)) return undefined;
+  const held = Object.entries(harnesses)
+    .filter(([, o]) => isClaude(o) || isSpec(o))
+    .map(([name]) => `\`${name}\``);
+  return `\`resources.limits.memory\` holds a task's process tree in a cgroup of this host's, and the \`${spec.harness}\` harness is a remote agent, whose process is the other party's: no limit of ours reaches it. ${held.length ? `File the task on ${held.join(' or ')}, or leave \`resources\` off.` : 'Leave `resources` off.'}`;
+};
 
 /**
  * Whether a session on `h` is given its skills through Claude Code's SDK (`Options.skills`), or a spec's own knob: every session of a

@@ -5,7 +5,8 @@
 import { Effect, Schema } from 'effect';
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
-import { awaitsAdmission, fold, verbTakes, type Input, type State } from '../domain.ts';
+import { awaitsAdmission, fold, verbTakes, type Input, type State, type TaskResources } from '../domain.ts';
+import { memoryQuantityRefusal } from '../memory.ts';
 import { Journal, type JournalError } from './journal.ts';
 import { argsRefusalOf, configForTurn, turnArgsRefusalOf, type HarnessArgs } from '../../harness/args.ts';
 import { Runner } from '../../harness/seam.ts';
@@ -37,6 +38,8 @@ export type Filing = {
   labels?: Record<string, string>;
   /** The trace context of the span that filed the task: set by the engine that exports, never by its caller. See the `filed` event. */
   traceparent?: string;
+  /** What its process tree may use of the host, a container's `resources` (`resourcesRefusalOf`). See the `filed` event. */
+  resources?: TaskResources;
 };
 
 /** A task `file` would not journal, and why, in the sentence `refusalOf` gives. Nothing was written. */
@@ -79,6 +82,35 @@ const priorityRefusalOf = (priority: unknown): string | undefined =>
     : `\`priority: ${typeof priority === 'number' ? priority : JSON.stringify(priority)}\` is not a priority. Give a whole number from ${-PRIORITY_MOST - 1} to ${PRIORITY_MOST}, higher first, or leave it out for 0.`;
 
 /**
+ * Why a task's `resources` cannot be held, or `undefined`: anything but an object of `limits` alone, a `limits` that is not an object
+ * of `memory` alone, and a `memory` that is no quantity `memoryBytesOf` reads (`memoryQuantityRefusal`'s words). A container's
+ * `requests` and its other limits (`cpu`) are refused rather than dropped: a limit taken and never held is a promise nobody keeps.
+ */
+export const resourcesRefusalOf = (resources: unknown): string | undefined => {
+  if (resources === undefined) return undefined;
+  const shown = (v: unknown) => (typeof v === 'number' ? String(v) : JSON.stringify(v));
+  const isObject = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
+  if (!isObject(resources))
+    return `\`resources: ${shown(resources)}\` is not a container's resources. Give \`{ limits: { memory: '8Gi' } }\`, or leave it out.`;
+  const other = Object.keys(resources).find((k) => k !== 'limits');
+  if (other !== undefined)
+    return `\`resources.${other}\` is not something the runtime holds: a task takes \`resources.limits\` alone. Leave \`${other}\` out.`;
+  const { limits } = resources;
+  if (limits === undefined) return undefined;
+  if (!isObject(limits))
+    return `\`resources.limits: ${shown(limits)}\` is not a set of limits. Give \`{ memory: '8Gi' }\`, or leave it out.`;
+  const unheld = Object.keys(limits).find((k) => k !== 'memory');
+  if (unheld !== undefined)
+    return `\`resources.limits.${unheld}\` is not a limit the runtime holds: \`memory\` is its only one. Leave \`${unheld}\` out.`;
+  const { memory } = limits;
+  if (memory === undefined) return undefined;
+  if (typeof memory !== 'string')
+    return `\`resources.limits.memory: ${shown(memory)}\` is not a quantity: write it as a string, like \`'8Gi'\` or \`'512Mi'\`.`;
+  const words = memoryQuantityRefusal(memory);
+  return words === undefined ? undefined : `\`resources.limits.memory\`: ${words}`;
+};
+
+/**
  * Why a task cannot be filed, as a sentence that says what to write instead — or `undefined`: the half of it that is the
  * runtime's own, and no harness's. Asked in this order, the first that holds answering:
  *
@@ -89,7 +121,8 @@ const priorityRefusalOf = (priority: unknown): string | undefined =>
  *    from JSON or against an older `TaskSpec` still sends them;
  * 4. a `deadlineSeconds` that is not seconds above 0, an empty `resumeFrom`, a `holdOpen` that is not `true`, a `queued`
  *    that is not a boolean, a `priority` that is not a whole number in int32, and `labels` it cannot carry (`labelsRefusalOf`);
- * 5. what a long-lived task cannot honour (`restartRefusalOf`).
+ * 5. what a long-lived task cannot honour (`restartRefusalOf`);
+ * 6. `resources` it cannot hold (`resourcesRefusalOf`).
  *
  * Checked by `file` itself, so no caller journals what the loop cannot use. A journalled task is a promise the loop
  * keeps trying to honour, so a value it cannot use is cheapest refused before it is written: `deadlineSeconds: NaN`
@@ -115,7 +148,13 @@ export const refusalOf = (spec: Filing): string | undefined => {
   if (spec.queued !== undefined && typeof spec.queued !== 'boolean') {
     return `\`queued: ${JSON.stringify(spec.queued)}\` is not a yes or a no. Give true to have the task wait for \`admit\` before it starts, or leave it out to start it on the next pass.`;
   }
-  return priorityRefusalOf(spec.priority) ?? labelsRefusalOf(spec.labels) ?? partsRefusalOf(spec) ?? restartRefusalOf(spec);
+  return (
+    priorityRefusalOf(spec.priority) ??
+    labelsRefusalOf(spec.labels) ??
+    partsRefusalOf(spec) ??
+    restartRefusalOf(spec) ??
+    resourcesRefusalOf(spec.resources)
+  );
 };
 
 /** Why a task's `briefParts` cannot be its brief's, or `undefined`: anything but a list of texts, or texts that do not join into it. */
@@ -186,6 +225,7 @@ export const file = Effect.fn('file')(function* (spec: Filing) {
         ...(spec.restartPolicy === 'Always' ? { restartPolicy: 'Always' as const } : {}),
         ...(spec.labels !== undefined && Object.keys(spec.labels).length ? { labels: spec.labels } : {}),
         ...(spec.traceparent !== undefined ? { traceparent: spec.traceparent } : {}),
+        ...(spec.resources?.limits?.memory !== undefined ? { resources: spec.resources } : {}),
       },
       spec.briefParts,
     )

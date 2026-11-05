@@ -17,8 +17,12 @@ spec:
       default: npm run --if-present lint && npm run --if-present typecheck && npm run --if-present test
     ciCheck:
       type: string
-      description: "The CI status context branch protection requires of the base branch, which the implement step's check waits on and the landing merges on. Read only where github is true."
+      description: "The CI status context branch protection requires of the base branch, which the implement step's check waits on and the landing merges on; where landingWaitsOnCi is true, the landing's check then waits on it at the merge commit on the base branch. Read only where github is true."
       default: ci
+    landingWaitsOnCi:
+      type: boolean
+      description: "Whether the landing's check, where github is true, waits on the CI context ciCheck names at the merge commit on the base branch, and fails the step where the merge turned the base red. It needs CI to run on pushes to the base branch: set it false, with --set landingWaitsOnCi=false, where CI does not. Read only where github is true."
+      default: true
     roundCheck:
       type: string
       description: "The command the implement step's check runs on each round's tree before it waits on CI, from the workspace's root: the quick refusal before CI judges. Read only where github is true; where it is false, localCheck judges."

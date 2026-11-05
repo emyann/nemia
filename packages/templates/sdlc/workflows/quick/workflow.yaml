@@ -21,7 +21,7 @@ spec:
       place: git
       workspace: base
       budget: 10
-      check: "if [ \"${{ parameters.github }}\" = true ]; then { if [ -n \"${WF_WORKFLOW_FILES:-}\" ]; then node \"$WF_WORKFLOW_FILES/landing.ts\" receipt --run \"$WF_RUN\"; else echo \"nemia check: WF_WORKFLOW_FILES is not set, so landing.ts is read from the run's frozen workflow files alone: this check runs in a run, which sets it\" >&2; false; fi; }; else { ${{ parameters.localCheck }}; }; fi"
+      check: "if [ \"${{ parameters.github }}\" = true ]; then { if [ -n \"${WF_WORKFLOW_FILES:-}\" ]; then node \"$WF_WORKFLOW_FILES/landing.ts\" receipt --run \"$WF_RUN\" --check \"${{ parameters.ciCheck }}\" --wait-on-ci \"${{ parameters.landingWaitsOnCi }}\"; else echo \"nemia check: WF_WORKFLOW_FILES is not set, so landing.ts is read from the run's frozen workflow files alone: this check runs in a run, which sets it\" >&2; false; fi; }; else { ${{ parameters.localCheck }}; }; fi"
     - name: review
       after:
         - implement

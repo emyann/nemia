@@ -25,7 +25,7 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { loadWorkflows } from 'agent-orchestrator';
-import { checkArgv } from 'agent-orchestrator/run';
+import { LANDING_CHECK_DEADLINE_SECONDS, checkArgv } from 'agent-orchestrator/run';
 import { scratch } from './scratch.ts';
 import { renderedSdlc } from './template.ts';
 import { type Called, type Gh, type Rule, bareOrigin, ghStub, gitIn } from './origin.ts';
@@ -141,12 +141,61 @@ const mergeable = (w: World, more: Record<string, unknown> = {}): Rule[] => [
   { when: 'pr merge', out: 'Merged pull request #7' },
 ];
 
-/** The rules under which the receipt passes: the same pull request, merged as the commit origin's main holds. */
+/** Where a person reads a job of the merge commit's CI, as GitHub's REST API gives a check run's `html_url`. */
+const JOB_URL = 'https://github.com/o/r/actions/runs/1/job/2';
+
+/** A check run named `name` as GitHub's REST API gives one, lower-case: completed with `conclusion`, or `status` where it is not over. */
+const checkRun = (name: string, conclusion: string | null, status = 'completed', url = JOB_URL): Record<string, unknown> => ({
+  name,
+  status,
+  conclusion,
+  html_url: url,
+  details_url: url,
+  started_at: '2026-11-05T10:00:00Z',
+});
+
+/** A commit's combined status where every check is a check run: `pending`, with no context in it — no verdict at all. */
+const NO_STATUSES = JSON.stringify({ state: 'pending', total_count: 0, statuses: [] });
+
+/** The rules answering the CI of commit `sha`: its check runs `runs` (one answer, or `outs` for a poll) and its combined status. */
+const ciAt = (sha: string, runs: Record<string, unknown>[] | Record<string, unknown>[][], status = NO_STATUSES): Rule[] => [
+  Array.isArray(runs[0])
+    ? { when: `commits/${sha}/check-runs`, outs: (runs as Record<string, unknown>[][]).map((r) => JSON.stringify({ check_runs: r })) }
+    : { when: `commits/${sha}/check-runs`, out: JSON.stringify({ total_count: runs.length, check_runs: runs }) },
+  { when: `commits/${sha}/status`, out: status },
+];
+
+/** The base's tip as `gh api repos/{owner}/{repo}/commits/main` gives it. */
+const tipIs = (sha: string): Rule => ({ when: 'commits/main', out: JSON.stringify({ sha }) });
+
+/** The rules under which the receipt passes: the same pull request, merged as the commit origin's main holds, `ci` green on it. */
 const landed = (w: World, more: Record<string, unknown> = {}): Rule[] => [
   { when: 'auth status' },
   { when: 'repo view', out: JSON.stringify({ defaultBranchRef: { name: 'main' } }) },
   { when: 'pr list', out: listed(w, { state: 'MERGED', mergeCommit: { oid: w.merged }, ...more }) },
+  ...ciAt(w.merged, [checkRun('ci', 'success')]),
 ];
+
+/** `landed`, its merge commit's CI answered by `first` instead: rules put first win. */
+const landedWith = (w: World, ...first: Rule[]): Rule[] => [...first, ...landed(w)];
+
+/** The receipt's arguments: the run, the CI context `ci`, and whether it waits on it at the merge commit. */
+const receiptArgs = (wait = 'true', check = 'ci'): string[] => ['--run', RUN, '--check', check, '--wait-on-ci', wait];
+
+/** The calls that read a commit's check runs: the wait on CI at the merge, or at the base's tip. */
+const waited = (calls: readonly Called[], at = ''): Called[] =>
+  calls.filter((call) => call.argv.some((word) => word.includes(`${at}/check-runs`)));
+
+/** The wait's knobs at nothing: every bound of the receipt's wait at nothing, so a pending or an absent `ci` is refused at once. */
+const NO_WAIT = { WF_CI_START_SECONDS: '0', WF_CI_WAIT_SECONDS: '0', WF_CI_POLL_SECONDS: '0' };
+
+/** A checkout the merge verb has landed on, its receipt's answers still to write. */
+function afterMerge(): World {
+  const w = world();
+  w.gh.answers(mergeable(w));
+  assert.equal(land(w, 'merge', args()).code, 0);
+  return w;
+}
 
 type Ran = { code: number | null; out: string; err: string; calls: Called[] };
 
@@ -232,17 +281,19 @@ test("merge merges the run's own green pull request with a merge commit at the h
   assert.match(r.out, /nemia land: `main` here is fast-forwarded to [0-9a-f]{12}/);
 });
 
-test('receipt passes on the landing the merge made: merged, a merge commit, the checkout clean on it, no branch left out', () => {
+test('receipt passes on the landing the merge made: merged, a merge commit, the checkout clean on it, no branch left out, ci green at the merge', () => {
   const w = world();
   w.gh.answers(mergeable(w));
   assert.equal(land(w, 'merge', args()).code, 0);
   const merges = asked(w.gh.calls(), 'pr', 'merge').length;
   w.gh.answers(landed(w));
-  const r = land(w, 'receipt', ['--run', RUN]);
+  const r = land(w, 'receipt', receiptArgs());
   assert.equal(r.code, 0, r.err);
   assert.match(r.out, /nemia land: #7 is merged as [0-9a-f]{12}, a merge commit/);
   assert.match(r.out, /every commit of `wf\/r-1\/` on HEAD, by its patch/);
   assert.equal(asked(r.calls, 'pr', 'merge').length, merges, 'the receipt merges nothing of its own');
+  assert.equal(waited(r.calls, `commits/${w.merged}`).length, 1, 'it read the CI of the merge commit');
+  assert.ok(r.out.includes(`\`ci\` passed on \`main\` at ${w.merged.slice(0, 12)}`), r.out);
 });
 
 test('REFUSED: a verb the script has not, and a merge with no subject, no body file, or a body file that is missing or empty', () => {
@@ -515,16 +566,17 @@ test('REFUSED: a receipt whose pull request is not merged, or merged as a commit
 
   for (const state of ['OPEN', 'CLOSED']) {
     w.gh.answers(landed(w, { state }));
-    const r = land(w, 'receipt', ['--run', RUN]);
+    const r = land(w, 'receipt', receiptArgs());
     assert.equal(r.code, 1, `${state}: ${r.out}`);
     assert.match(r.err, /no pull request of `wf\/r-1\/` is merged/);
     assert.ok(r.err.includes(`#7 is \`${state.toLowerCase()}\``), r.err);
     assert.match(r.err, /landing\.ts merge --run r-1 --subject … --body-file …/);
     assert.match(r.err, /--body-file … --check <name>/);
+    assert.deepEqual(waited(r.calls), [], 'a receipt that refuses waits on nothing');
   }
 
   w.gh.answers([...landed(w).filter((rule) => rule.when !== 'pr list'), { when: 'pr list', out: '[]' }]);
-  const none = land(w, 'receipt', ['--run', RUN]);
+  const none = land(w, 'receipt', receiptArgs());
   assert.equal(none.code, 1, none.out);
   assert.ok(none.err.includes('no pull request of `wf/r-1/` is merged'), none.err);
   assert.ok(none.err.includes('nothing of this run landed'), none.err);
@@ -532,13 +584,14 @@ test('REFUSED: a receipt whose pull request is not merged, or merged as a commit
   assert.match(none.err, /--body-file … --check <name>/);
 
   w.gh.answers(landed(w, { mergeCommit: { oid: w.tip } }));
-  const squashed = land(w, 'receipt', ['--run', RUN]);
+  const squashed = land(w, 'receipt', receiptArgs());
   assert.equal(squashed.code, 1, squashed.out);
   assert.match(squashed.err, /which has 1 parent and not the two a merge commit has/);
   assert.match(squashed.err, /it was squashed or rebased/);
+  assert.deepEqual(waited(squashed.calls), [], 'a receipt that refuses waits on nothing');
 
   w.gh.answers(landed(w, { mergeCommit: null }));
-  const nameless = land(w, 'receipt', ['--run', RUN]);
+  const nameless = land(w, 'receipt', receiptArgs());
   assert.equal(nameless.code, 1, nameless.out);
   assert.match(nameless.err, /is merged but names no merge commit/);
 });
@@ -546,20 +599,22 @@ test('REFUSED: a receipt whose pull request is not merged, or merged as a commit
 test('REFUSED: a receipt in a checkout the fast-forward did not reach, one that is dirty, and one a branch of the run is not in', () => {
   const behind = world();
   behind.gh.answers(landed(behind));
-  const r = land(behind, 'receipt', ['--run', RUN]);
+  const r = land(behind, 'receipt', receiptArgs());
   assert.equal(r.code, 1, r.out);
   assert.ok(r.err.includes("the merge of #7, is not reachable from this checkout's HEAD"), r.err);
   assert.ok(r.err.includes('the fast-forward did not happen'), r.err);
   assert.match(r.err, /git fetch origin && git merge --ff-only origin\/main/);
+  assert.deepEqual(waited(r.calls), [], 'a receipt that refuses waits on nothing');
 
   const dirty = world();
   dirty.gh.answers(mergeable(dirty));
   assert.equal(land(dirty, 'merge', args()).code, 0);
   fs.writeFileSync(path.join(dirty.repo, 'a.ts'), 'export const a = 42;\n');
   dirty.gh.answers(landed(dirty));
-  const d = land(dirty, 'receipt', ['--run', RUN]);
+  const d = land(dirty, 'receipt', receiptArgs());
   assert.equal(d.code, 1, d.out);
   assert.match(d.err, /this checkout has uncommitted changes/);
+  assert.deepEqual(waited(d.calls), [], 'a receipt that refuses waits on nothing');
 
   const left = world();
   left.gh.answers(mergeable(left));
@@ -572,15 +627,16 @@ test('REFUSED: a receipt in a checkout the fast-forward did not reach, one that 
   gitIn(left.repo, 'reset', '-q', '--hard', 'HEAD~1');
   takenPart(left);
   left.gh.answers(landed(left));
-  const l = land(left, 'receipt', ['--run', RUN]);
+  const l = land(left, 'receipt', receiptArgs());
   assert.equal(l.code, 1, l.out);
   assert.ok(l.err.startsWith('nemia land: `wf/r-1/review` ('), l.err);
   assert.ok(!l.err.includes('part-a'), 'a branch whose every patch is on HEAD is not left out');
   assert.match(l.err, /the run would record a landing that left it out/);
+  assert.deepEqual(waited(l.calls), [], 'a receipt that refuses waits on nothing');
 
   gitIn(left.repo, 'branch', '-D', `wf/${RUN}/review`);
   left.gh.answers(landed(left));
-  const taken = land(left, 'receipt', ['--run', RUN]);
+  const taken = land(left, 'receipt', receiptArgs());
   assert.equal(taken.code, 0, taken.err);
 });
 
@@ -608,7 +664,7 @@ test('merge after a fast-forward it was declined merges nothing a second time: i
   assert.match(again.out, /nemia land: `main` here is fast-forwarded to [0-9a-f]{12}/);
   assert.deepEqual(stands(w.repo), { branch: 'main', head: w.merged, clean: true, merging: false });
 
-  const receipt = land(w, 'receipt', ['--run', RUN]);
+  const receipt = land(w, 'receipt', receiptArgs());
   assert.equal(receipt.code, 0, receipt.err);
 });
 
@@ -620,7 +676,7 @@ test('the receipt takes the merged pull request among the ones the run has: a cl
   const closed = { ...merged[0], number: 8, url: 'https://github.com/o/r/pull/8', state: 'CLOSED', mergeCommit: null };
 
   w.gh.answers([...landed(w).filter((rule) => rule.when !== 'pr list'), { when: 'pr list', out: JSON.stringify([closed, ...merged]) }]);
-  const beside = land(w, 'receipt', ['--run', RUN]);
+  const beside = land(w, 'receipt', receiptArgs());
   assert.equal(beside.code, 0, `a closed pull request beside the merged one is no refusal: it cannot be closed again\n${beside.err}`);
   assert.match(beside.out, /nemia land: #7 is merged as [0-9a-f]{12}, a merge commit/);
 
@@ -628,7 +684,7 @@ test('the receipt takes the merged pull request among the ones the run has: a cl
     ...landed(w).filter((rule) => rule.when !== 'pr list'),
     { when: 'pr list', out: JSON.stringify([...merged, { ...merged[0], number: 8, url: 'https://github.com/o/r/pull/8' }]) },
   ]);
-  const both = land(w, 'receipt', ['--run', RUN]);
+  const both = land(w, 'receipt', receiptArgs());
   assert.equal(both.code, 1, both.out);
   assert.match(both.err, /2 pull requests of `wf\/r-1\/` are merged \(#7, #8\)/);
   assert.match(both.err, /is a person's to say/);
@@ -648,6 +704,155 @@ test('REFUSED: a merge of a run that has one pull request merged and another sti
   assert.equal(stands(w.repo).head, w.base, 'and the checkout is untouched');
 });
 
+test('REFUSED: a receipt whose merge turned the base red, naming the jobs that did not pass; the merge stands', () => {
+  const w = afterMerge();
+  const cancelled = checkRun('e2e', 'cancelled');
+  w.gh.answers(
+    landedWith(
+      w,
+      ...ciAt(w.merged, [
+        checkRun('ci', 'failure', 'completed', 'https://github.com/o/r/actions/runs/1/job/9'),
+        cancelled,
+        checkRun('lint', 'success'),
+      ]),
+      tipIs(w.merged),
+    ),
+  );
+  const r = land(w, 'receipt', receiptArgs());
+  assert.equal(r.code, 1, r.out);
+  assert.ok(r.err.startsWith('nemia land: '), r.err);
+  assert.ok(r.err.includes('`main`'), r.err);
+  assert.match(r.err, /red/);
+  assert.ok(r.err.includes(w.merged.slice(0, 12)), 'naming the merge commit');
+  assert.ok(r.err.includes(`e2e: CANCELLED ${JOB_URL}`), `the cancelled job with its URL:\n${r.err}`);
+  assert.ok(!r.err.includes('lint:'), 'a job that passed is not named');
+  assert.match(r.err, /merge stands/);
+  assert.ok(r.err.includes(RETRY), r.err);
+  assert.deepEqual(
+    r.calls.filter((call) => call.argv.some((word) => word.includes('/compare/'))),
+    [],
+    'a tip that is the merge itself is compared with nothing',
+  );
+});
+
+test('the receipt waits on ci at the merge commit: still running past the bound is refused, and a poll that turns green passes', () => {
+  const w = afterMerge();
+  w.gh.answers(landedWith(w, ...ciAt(w.merged, [checkRun('ci', null, 'in_progress')])));
+  const running = land(w, 'receipt', receiptArgs(), NO_WAIT);
+  assert.equal(running.code, 1, running.out);
+  assert.match(running.err, /still in_progress after 0 s/);
+  assert.ok(running.err.includes(JOB_URL), running.err);
+  assert.match(running.err, /merge stands/);
+  assert.ok(running.err.includes(RETRY), running.err);
+
+  w.gh.answers(
+    landedWith(
+      w,
+      ...ciAt(w.merged, [[checkRun('ci', null, 'queued')], [checkRun('ci', null, 'in_progress')], [checkRun('ci', 'success')]]),
+    ),
+  );
+  const before = waited(w.gh.calls()).length;
+  const turned = land(w, 'receipt', receiptArgs(), { WF_CI_POLL_SECONDS: '0' });
+  assert.equal(turned.code, 0, turned.err);
+  assert.ok(waited(turned.calls).length - before >= 2, 'it read the merge commit again while ci ran');
+  assert.ok(turned.out.includes('`ci` passed on `main`'), turned.out);
+});
+
+test('REFUSED: a receipt whose ci is never reported at the merge commit names landingWaitsOnCi; a combined `pending` with no context is no verdict', () => {
+  const w = afterMerge();
+  w.gh.answers(landedWith(w, ...ciAt(w.merged, [checkRun('lint', 'success')], NO_STATUSES)));
+  const r = land(w, 'receipt', receiptArgs(), { WF_CI_START_SECONDS: '0', WF_CI_POLL_SECONDS: '0' });
+  assert.equal(r.code, 1, r.out);
+  assert.match(r.err, /no `ci` was reported/);
+  assert.match(r.err, /landingWaitsOnCi=false/);
+  assert.ok(r.err.includes(RETRY), r.err);
+});
+
+test('the receipt reads a status context as it reads a check run: a red one is refused, a green one passes', () => {
+  const statuses = (state: string): string =>
+    JSON.stringify({ state, statuses: [{ context: 'ci', state, target_url: 'https://ci.example/build/3' }] });
+  const w = afterMerge();
+  w.gh.answers(landedWith(w, ...ciAt(w.merged, [], statuses('failure')), tipIs(w.merged)));
+  const red = land(w, 'receipt', receiptArgs());
+  assert.equal(red.code, 1, red.out);
+  assert.ok(red.err.includes('ci: FAILURE https://ci.example/build/3'), red.err);
+  assert.ok(red.err.includes(RETRY), red.err);
+
+  w.gh.answers(landedWith(w, ...ciAt(w.merged, [], statuses('success'))));
+  const green = land(w, 'receipt', receiptArgs());
+  assert.equal(green.code, 0, green.err);
+});
+
+test("a receipt red at the merge passes where the base's tip holds it and is green there; a tip red, running or diverged is refused", () => {
+  const TIP = 'f'.repeat(40);
+  const fixed = (w: World, compared: string, ...atTip: Record<string, unknown>[]): Rule[] =>
+    landedWith(
+      w,
+      ...ciAt(w.merged, [checkRun('ci', 'failure')]),
+      tipIs(TIP),
+      { when: `compare/${w.merged}...${TIP}`, out: JSON.stringify({ status: compared }) },
+      ...ciAt(TIP, atTip),
+    );
+  const w = afterMerge();
+  for (const compared of ['ahead', 'identical']) {
+    w.gh.answers(fixed(w, compared, checkRun('ci', 'success')));
+    const r = land(w, 'receipt', receiptArgs());
+    assert.equal(r.code, 0, `${compared}: ${r.err}`);
+    assert.ok(r.out.includes(w.merged.slice(0, 12)) && r.out.includes(TIP.slice(0, 12)), r.out);
+    assert.match(r.out, /red on `main` at the merge/);
+  }
+  for (const [why, compared, atTip] of [
+    ['red at the tip', 'ahead', checkRun('ci', 'failure')],
+    ['running at the tip', 'ahead', checkRun('ci', null, 'in_progress')],
+    ['a tip that does not hold the merge', 'diverged', checkRun('ci', 'success')],
+  ] as const) {
+    w.gh.answers(fixed(w, compared, atTip));
+    const r = land(w, 'receipt', receiptArgs());
+    assert.equal(r.code, 1, `${why}: ${r.out}`);
+    assert.match(r.err, /merge stands/, why);
+    assert.ok(r.err.includes(RETRY), why);
+  }
+  w.gh.answers(landedWith(w, ...ciAt(w.merged, [checkRun('ci', 'failure')]), { when: 'commits/main', status: 1, err: 'HTTP 502' }));
+  const unread = land(w, 'receipt', receiptArgs());
+  assert.equal(unread.code, 1, `a tip that cannot be read is the red refusal: ${unread.out}`);
+  assert.match(unread.err, /merge stands/);
+});
+
+test('a receipt told not to wait on ci reads no check, saying so by landingWaitsOnCi; a --wait-on-ci of neither, or none, is refused before gh', () => {
+  const w = afterMerge();
+  w.gh.answers(landed(w));
+  const r = land(w, 'receipt', receiptArgs('false'));
+  assert.equal(r.code, 0, r.err);
+  assert.deepEqual(waited(r.calls), [], 'no check of the merge commit is read');
+  assert.match(r.out, /landingWaitsOnCi/);
+  assert.match(r.out, /#7 is merged as [0-9a-f]{12}, a merge commit/, 'the three facts are proven all the same');
+
+  for (const given of [receiptArgs('maybe'), ['--run', RUN, '--wait-on-ci', 'true'], ['--run', RUN, '--check', 'ci'], ['--run', RUN]]) {
+    const calls = w.gh.calls().length;
+    const refused = land(w, 'receipt', given);
+    assert.equal(refused.code, 1, given.join(' '));
+    assert.ok(refused.err.startsWith('nemia land: '), refused.err);
+    assert.equal(refused.calls.length, calls, `gh is not called at all: ${given.join(' ')}`);
+  }
+});
+
+test("the receipt's wait fits the landing check's deadline: the start bound under the whole, and the whole 300 s under the deadline", () => {
+  const source = fs.readFileSync(SCRIPT, 'utf8');
+  const end = source.indexOf('function ciAt(');
+  assert.ok(end > 0, 'landing.ts has its ciAt');
+  const head = source.slice(0, end);
+  const bound = (name: string): number => {
+    const found = new RegExp(`const ${name} = ([\\d_]+);`).exec(head);
+    assert.ok(found, `landing.ts declares ${name} before ciAt`);
+    return Number(found[1].replaceAll('_', ''));
+  };
+  assert.ok(bound('START_SECONDS') < bound('WHOLE_SECONDS'));
+  assert.ok(
+    LANDING_CHECK_DEADLINE_SECONDS - bound('WHOLE_SECONDS') >= 300,
+    `the landing check's deadline is ${LANDING_CHECK_DEADLINE_SECONDS} s, the wait's ${bound('WHOLE_SECONDS')} s`,
+  );
+});
+
 test("both land steps' checks, rendered on GitHub, are the receipt alone, run from the run's frozen workflow files, and run no suite and no e2e", async () => {
   const at = await renderedSdlc(['github=true']);
   for (const workflow of ['build', 'quick']) {
@@ -656,7 +861,7 @@ test("both land steps' checks, rendered on GitHub, are the receipt alone, run fr
     const frozen = step!.check!;
     assert.ok(
       frozen.startsWith(
-        'if [ "true" = true ]; then { if [ -n "${WF_WORKFLOW_FILES:-}" ]; then node "$WF_WORKFLOW_FILES/landing.ts" receipt --run "$WF_RUN";',
+        'if [ "true" = true ]; then { if [ -n "${WF_WORKFLOW_FILES:-}" ]; then node "$WF_WORKFLOW_FILES/landing.ts" receipt --run "$WF_RUN" --check "ci" --wait-on-ci "true";',
       ),
       `on GitHub, the receipt is run from the run's frozen workflow files first:\n${frozen}`,
     );
@@ -702,6 +907,13 @@ test("both land steps' checks, rendered on GitHub, are the receipt alone, run fr
     const passed = check({ WF_WORKFLOW_FILES: path.join(at.tree, 'workflows', workflow) });
     assert.equal(passed.code, 0, passed.err);
     assert.match(passed.out, /nemia land: #7 is merged as [0-9a-f]{12}, a merge commit/, 'the receipt, from the frozen files');
+    assert.ok(waited(w.gh.calls(), `commits/${w.merged}`).length > 0, 'and its wait on ci at the merge commit');
+  }
+
+  const unwaited = await renderedSdlc(['github=true', 'landingWaitsOnCi=false']);
+  for (const workflow of ['build', 'quick']) {
+    const frozen = stepsOf(unwaited, workflow).find((s) => s.name === 'land')?.check ?? '';
+    assert.ok(frozen.includes('receipt --run "$WF_RUN" --check "ci" --wait-on-ci "false";'), `${workflow}: ${frozen}`);
   }
 });
 

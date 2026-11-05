@@ -12,8 +12,8 @@ export type PageCut =
   | { readonly from: number; readonly to: number; readonly remainingItemCount: number; readonly more: boolean }
   | { readonly refused: 'limit' };
 
-/** A count: a whole number from 0. */
-const count = (n: number): boolean => Number.isInteger(n) && n >= 0;
+/** A count: a whole number from 0, safe in a double, as an array's length and index are. */
+const count = (n: number): boolean => Number.isSafeInteger(n) && n >= 0;
 
 /** Whether `?limit=` is one a list takes: none, or a whole number from 1. */
 const limitTaken = (limit: number | null): boolean => limit === null || (Number.isInteger(limit) && limit >= 1);

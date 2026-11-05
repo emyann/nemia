@@ -679,6 +679,7 @@ test("`cardState`: one closed word per entry — its run's phase whatever the ca
   ];
   for (const [name, entry, state] of rows) await t.test(name, () => assert.equal(cardState(entry), state));
   assert.deepEqual([...new Set(rows.map(([, , state]) => state))].sort(), [...CARD_STATES].sort(), 'every state has its row');
+  assert.deepEqual(CARD_STATES, ['filed', 'queued', 'refused', ...RUN_PHASES], "the card's three words, then the run phases in order");
 });
 
 test('`CARD_IN_PLAY`: a card not started and one whose run has not ended are in play; one whose run ended is not', async (t) => {

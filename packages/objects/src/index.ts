@@ -61,3 +61,14 @@ export type {
   TryCause,
   WaitOn,
 } from './words.ts';
+export {
+  CARD_STATES,
+  Card,
+  CardFile,
+  CardLastStart,
+  CardList,
+  CardSpec,
+  CardStart,
+  CardStatus,
+  type CardState,
+} from './card.ts';

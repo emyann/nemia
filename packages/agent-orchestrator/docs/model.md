@@ -51,6 +51,7 @@ The diagram below is printed by the code (`src/model/diagram.model.ts`, through 
 ## The diagram
 
 <!-- diagram:orchestrator-model:begin — generated, from the repository's root: node -e "import('./packages/agent-orchestrator/src/model/diagram.model.ts').then((m) => console.log(m.orchestratorModelDiagram()))" -->
+```mermaid
 erDiagram
   Run {
     RunId id PK

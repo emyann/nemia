@@ -264,7 +264,11 @@ rm "$S"/node_modules; git worktree remove "$S"
   work goes round the review once more, and its pass files the landing.
 - **A failed landing check:** the check is a receipt now, so a refusal says the merge did not happen as the step claimed — the pull
   request not merged, a squash instead of a merge commit, a checkout the fast-forward did not reach, a branch of the run left out.
-  Read it and name the cause. A check that did not finish (a deadline) is no refusal: file the landing again.
+  Read it and name the cause. A check that did not finish (a deadline) is no refusal: file the landing again. After those, the receipt
+  waits on main's `ci` at the merge commit (up to 2400 s, inside the 2700 s deadline): a refusal that says main is red there means the
+  merge stands and main turned red. Read the jobs it names: re-run them where CI failed on its own account (a timeout), or land a fix;
+  then `nemia retry <run> land`, which passes once main's tip holding the merge is green. A refusal that no `ci` was reported at the
+  merge means CI does not run on pushes to main for that factory: apply it with `--set landingWaitsOnCi=false`.
 - **Never touch the main checkout** (npm, git, a file) while a landing is checking in it.
 
 ### A harness update
@@ -418,7 +422,7 @@ Nemia off, Semi-auto stops at every gate, Auto is what the person's custom instr
 **For this factory's instruction (building Nemia):** the layers and `docs/architecture.md`; trial merges against main and every landing
 ahead; a web change's pictures are the implementer's, read by the reviewer; command-table and frame cards collide, so chain them; restart
 the daemon after code landings, paused, until release and upgrade (since replaced by `nemia upgrade`, *After a landing*); store names and the `wf/` branch prefix stay; a landing check has its
-own deadline (2700 s), measured from a week of landings, now bounding a receipt rather than a suite; a landing merges the run's own
+own deadline (2700 s), measured from a week of landings, now bounding a receipt and its 2400 s wait on main's `ci` at the merge rather than a suite; a landing merges the run's own
 green pull request and nothing is pushed by hand.
 
 **For the steps of `build`:** implement pictures the pages a web change touches (light, dark, the phone where it matters); review reads them

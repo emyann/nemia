@@ -61,7 +61,7 @@ run copies this folder alone, so it carries `build`'s `probe.ts`, `parts.ts`, `p
    pull request of it is at the commit the check judges, and labels that pull request from the run's labels by the factory's
    `pullRequestLabels` rules (`<key>=<value>:<label>`; empty, the default, labels nothing), as `build`'s README says, and as
    the implement step's `open` already did when it created the pull request; `wait` polls the CI context the factory names (its `ciCheck`
-   parameter, `ci` by default) on that head, reading only the latest run of each check, and refuses a red, cancelled or missing one with the Actions URL, the failing jobs and a tail of their log.
+   parameter, `ci` by default) on that head, reading only the latest run of each check, and refuses a red, cancelled or missing one with the Actions URL, the failing jobs and a tail of their log; where the context is red on the base branch too, at the commit of it the head holds, the refusal says so and names the base's jobs that did not pass, and stays the try's.
 
 When the implement step's check refuses, at any clause and either way, the run tries implement again on its own, up to twice a round
 (`retries: 2`), continuing its session, each try under the step's `budget:`, and hands the try the check's verdict as data: the command,
@@ -77,7 +77,9 @@ repository's suite on the commit the check pushed, and the check waits on it. La
 `build`'s `landing.ts` (quick's copy) and fast-forwards the checkout, and its check is the receipt that the merge happened —
 `build`'s land step to the letter but its `after:` and its gate (note, check, fence and budget). Main has one guard, whatever the
 workflow: the required CI context on the head the review read, and a merge that refuses anything but this run's own green pull
-request.
+request. Where the factory's `landingWaitsOnCi` is true (the default), the receipt then waits on the CI context at the merge commit on
+the base branch, as `build`'s README says: a merge that turned the base red fails the land step though the merge stands, unless the
+base's tip holds it and is green there; set it false (`--set landingWaitsOnCi=false`) where CI does not run on pushes to the base.
 
 ## The review
 

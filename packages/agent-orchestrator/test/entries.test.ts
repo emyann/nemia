@@ -581,6 +581,7 @@ const PINNED: Record<string, string[]> = {
     'CHECK_DEADLINE_SECONDS',
     'GIVEN',
     'HANDED_CLOSEOUT',
+    'LANDING_CHECK_DEADLINE_SECONDS',
     'LINE_NAME',
     'MOMENTUM',
     'PRECEDENCE',

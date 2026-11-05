@@ -573,6 +573,7 @@ test('wait reads mergeable again while GitHub computes it, polls the ci context 
   assert.equal(asked(r.calls, 'pr', 'list').length, 2, 'an UNKNOWN mergeable is read again until GitHub has computed it');
   assert.equal(asked(r.calls, 'pr', 'view').length, 3, 'it polled until the verdict');
   assert.match(r.out, /nemia ci: `ci` passed on/);
+  assert.equal(compared(r.calls).length, 0, "a green head's wait never reads the base's ci");
   assert.equal(tip(at.bare!, at.branch), null, 'the wait pushes nothing');
 
   const torn = placed();
@@ -664,7 +665,9 @@ test('REFUSED: a red ci, with the Actions URL, the failing jobs, the lines that 
     assert.ok(!r.err.includes(noise), `GitHub's post-job lines are no reason: ${noise}\n${r.err}`);
   assert.ok(r.err.includes(RETRY), r.err);
   assert.deepEqual(
-    asked(r.calls, 'api').map((call) => call.argv),
+    asked(r.calls, 'api')
+      .filter((call) => call.argv.some((arg) => arg.includes('/actions/jobs/')))
+      .map((call) => call.argv),
     [
       ['api', 'repos/{owner}/{repo}/actions/jobs/9012/logs'],
       ['api', 'repos/{owner}/{repo}/actions/jobs/3456/logs'],
@@ -684,6 +687,80 @@ test('REFUSED: a red ci, with the Actions URL, the failing jobs, the lines that 
     assert.ok(refused.err.includes(conclusion.toLowerCase()), refused.err);
     assert.ok(refused.err.includes(RETRY), refused.err);
   }
+});
+
+/** The calls of the stub `gh` that ask GitHub how a head stands to the base (`compare/<base>...<head>`). */
+const compared = (calls: readonly Called[]): Called[] =>
+  asked(calls, 'api').filter((call) => call.argv.some((arg) => arg.includes('/compare/')));
+
+/** The commit the base held when the head was cut, as `compare` answers it. */
+const BASE_AT = 'b'.repeat(40);
+
+/** The URL of a job that failed on the base, which the refusal names. */
+const BASE_JOB_URL = 'https://github.com/o/r/actions/runs/77/job/88';
+
+/**
+ * A red `ci` on the head, and the base's answers at the commit the head holds: `compare` naming it, its check runs as REST gives them
+ * (lower-case) and its status contexts, each overridable.
+ */
+function redOnBase(base: { compare?: Rule; runs?: Record<string, unknown>[]; statuses?: Record<string, unknown>[] }) {
+  const at = placed();
+  const head = gitIn(at.repo, 'rev-parse', 'HEAD').trim();
+  at.gh.answers([
+    ...passing(at.repo).filter((rule) => rule.when !== 'pr view'),
+    { when: 'pr view', out: rollup({ status: 'COMPLETED', conclusion: 'FAILURE' }) },
+    { when: 'actions/jobs', out: 'boom' },
+    base.compare ?? {
+      when: `compare/main...${head}`,
+      out: JSON.stringify({ status: 'ahead', merge_base_commit: { sha: BASE_AT } }),
+    },
+    { when: `commits/${BASE_AT}/check-runs`, out: JSON.stringify({ total_count: 0, check_runs: base.runs ?? [] }) },
+    { when: `commits/${BASE_AT}/status`, out: JSON.stringify({ state: 'pending', statuses: base.statuses ?? [] }) },
+  ]);
+  return pr(at, 'wait', CI, { WF_CI_POLL_SECONDS: '0' });
+}
+
+/** A check run at the base, as REST gives one: lower-case, its URL `html_url`. */
+const baseRun = (name: string, conclusion: string | null, url = BASE_JOB_URL) => ({
+  name,
+  status: conclusion === null ? 'in_progress' : 'completed',
+  conclusion,
+  html_url: url,
+  started_at: '2026-11-04T09:00:00Z',
+});
+
+test("a red ci whose base is red too at the commit the head holds says so, naming the base's failing jobs; the refusal stays the work's", () => {
+  const r = redOnBase({ runs: [baseRun('ci', 'failure', CI_URL), baseRun('test web', 'failure'), baseRun('lint', 'success')] });
+  assert.equal(r.code, 1, r.out);
+  assert.ok(r.err.includes('`ci` for #7 is failure'), `the head's refusal is as it was:\n${r.err}`);
+  assert.ok(r.err.includes('`main`'), `the base is named:\n${r.err}`);
+  assert.ok(r.err.includes(BASE_AT.slice(0, 12)), `at the commit the head holds:\n${r.err}`);
+  assert.ok(r.err.includes(`test web: FAILURE ${BASE_JOB_URL}`), `the base's failing job, with its URL:\n${r.err}`);
+  assert.ok(!r.err.includes('lint: '), `a job that passed on the base is not named:\n${r.err}`);
+  assert.ok(r.err.includes('git merge main-worktree/HEAD'), `the merge of a moved base is named:\n${r.err}`);
+  assert.ok(r.err.includes(RETRY), r.err);
+  assert.doesNotMatch(r.err, PERSONS, "the base's red is a hint: the refusal stays the try's");
+
+  const byStatus = redOnBase({ statuses: [{ context: 'ci', state: 'failure', target_url: BASE_JOB_URL }] });
+  assert.ok(byStatus.err.includes(BASE_AT.slice(0, 12)), `a status context of the base's is read too:\n${byStatus.err}`);
+});
+
+test('a red ci on a base that is green, pending, unread or not answered adds no line about the base; the refusal is as it was', () => {
+  const head = (r: ReturnType<typeof pr>) => {
+    assert.equal(r.code, 1, r.out);
+    assert.ok(r.err.includes('`ci` for #7 is failure'), r.err);
+    assert.ok(r.err.includes(RETRY), r.err);
+    assert.doesNotMatch(r.err, PERSONS, 'still the work');
+    assert.ok(!r.err.includes(BASE_AT.slice(0, 12)), `no line about the base:\n${r.err}`);
+    assert.ok(!r.err.includes('`main`'), `no line about the base:\n${r.err}`);
+    return r;
+  };
+  head(redOnBase({ runs: [baseRun('ci', 'success', CI_URL), baseRun('test web', 'failure')] }));
+  head(redOnBase({ runs: [baseRun('ci', null, CI_URL)] }));
+  head(redOnBase({ runs: [] }));
+  const unread = head(redOnBase({ compare: { when: '/compare/', status: 1, err: 'HTTP 404: Not Found' } }));
+  assert.equal(compared(unread.calls).length, 1, 'the base is asked once');
+  head(redOnBase({ compare: { when: '/compare/', out: 'not json' } }));
 });
 
 /** Two start times of one check, the first before the second, and the start gh exports for a run still queued (Go's zero time). */

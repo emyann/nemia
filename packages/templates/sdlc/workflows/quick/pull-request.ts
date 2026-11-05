@@ -2,8 +2,8 @@
  * `node pull-request.ts <verb>` — the one door through which a run's change reaches GitHub: the push of this run's own branch, and the pull
  * request CI judges. A Bash prefix rule cannot tell `git push origin wf/…` from `git push origin main`, and no agent may type either, so
  * the act is this script, read from the run's frozen workflow files (`$WF_WORKFLOW_FILES`) as `probe.ts` is, and `gh` is denied whole to
- * the agents that run it. It imports `node:child_process` and its sibling `ci-log.ts`, the pure rules of a failing job's log, and no
- * other: a run freezes its workflow's whole folder, so the sibling is beside it wherever it runs.
+ * the agents that run it. It imports `node:child_process` and its sibling `ci-log.ts`, the pure rules of a failing job's log and of how a
+ * check reads, and no other: a run freezes its workflow's whole folder, so the sibling is beside it wherever it runs.
  *
  * - `open --title <t> --body-file <f> --labels "<rules>"`, which the engineer types once a round after merging the base: it pushes her
  *   branch to `origin` and opens the pull request with the title and body she wrote, or updates the one that is open, never a draft and
@@ -30,7 +30,9 @@
  *   would come, naming the merge of the base that answers it (`mergeable`, read again for up to 15 s while GitHub says `UNKNOWN`,
  *   `WF_PR_MERGEABLE_SECONDS`); then it polls the `<name>` context of that head (`gh pr view --json statusCheckRollup`), reading only the
  *   latest run of each check there (`latest`), so a failure a later run of its check superseded is neither judged nor listed, 1800 s for it
- *   to start (`WF_CI_START_SECONDS`) and 2400 s whole (`WF_CI_WAIT_SECONDS`), `WF_CI_POLL_SECONDS` the interval; on a red, cancelled or
+ *   to start (`WF_CI_START_SECONDS`) and 2400 s whole (`WF_CI_WAIT_SECONDS`), `WF_CI_POLL_SECONDS` the interval. A read of the pull request
+ *   or of its checks that fails — `gh` timing out, exiting non-zero, or answering no JSON — is no verdict: it is read again within the
+ *   whole bound, and a read still failing there is a person's refusal, naming the last error. On a red, cancelled or
  *   absent context refuses by name with the Actions URL, the failing jobs, and from each failing job's log the lines that failed it — a
  *   test with its diff, a type or lint error — or a bounded tail where none is, GitHub's post-job lines left out — the next try reads why
  *   CI went red here, since no agent may call `gh` itself — and the `nemia retry <run> <step> --recheck` line, whose step is the check's
@@ -62,7 +64,7 @@
  * the work's, never the person's because of it. A green head's wait asks nothing of the base.
  */
 import { spawnSync } from 'node:child_process';
-import { failures } from './ci-log.ts';
+import { PASSED, type Seen, checkKey, failures, latest, linkOf, nameOf, pending, seenOf, verdict } from './ci-log.ts';
 
 /** A reason the verb is refused: said on stderr, exit 1. */
 class Refusal extends Error {}
@@ -131,12 +133,6 @@ const STEP = 'implement';
 
 /** How long a call of `git` or `gh` may take, in milliseconds. */
 const BOUND = 120_000;
-
-/** The states of a check that is not over: anything else is a verdict. */
-const PENDING = new Set(['QUEUED', 'IN_PROGRESS', 'WAITING', 'PENDING', 'REQUESTED', 'EXPECTED']);
-
-/** The one conclusion that is a pass: a skipped, cancelled or neutral CI context is no verdict to land on. */
-const PASSED = 'SUCCESS';
 
 /**
  * An entry of a head's check rollup, as `gh pr view --json statusCheckRollup` gives one: a check run, or a status context, each field
@@ -301,18 +297,6 @@ function pushing(branch: string): string {
   return pushed.err || pushed.out ? (pushed.err || pushed.out).trim().split('\n')[0] : `${branch} is on origin`;
 }
 
-/** The name of a rollup entry, a check run's or a status context's. */
-const nameOf = (entry: Entry): string => entry.name ?? entry.context ?? '';
-
-/** Whether a rollup entry is not over yet. */
-const pending = (entry: Entry): boolean => PENDING.has((entry.status ?? entry.state ?? '').toUpperCase());
-
-/** The verdict of a rollup entry, a check run's conclusion or a status context's state, upper-cased; empty where it has neither. */
-const verdict = (entry: Entry): string => (entry.conclusion ?? entry.state ?? '').toUpperCase();
-
-/** Where a person reads the entry: a check run's details, a status context's target. */
-const linkOf = (entry: Entry): string => entry.detailsUrl ?? entry.targetUrl ?? '';
-
 /** A rule of `push --labels`: a run whose label `key` is `value` gets the pull request label `label`. */
 type LabelRule = { key: string; value: string; label: string };
 
@@ -413,32 +397,6 @@ function relabelled(pr: Pr, plan: { want: Set<string>; givable: Set<string> }): 
   const set = plan.want.size ? [...plan.want].join(', ') : 'none';
   const moved = [...adding.map((label) => `+${label}`), ...removing.map((label) => `-${label}`)];
   return `#${pr.number} carries the labels its run's give: ${set}${moved.length ? ` (${moved.join(' ')})` : ''}`;
-}
-
-/** When `entry` started, in milliseconds; a run not started yet — no time, one that does not parse, or Go's zero time — is the newest. */
-const startOf = (entry: Entry): number => {
-  const at = Date.parse(entry.startedAt ?? '');
-  return Number.isNaN(at) || at < 0 ? Number.POSITIVE_INFINITY : at;
-};
-
-/** What makes two rollup entries runs of one check: a status context's name, or a check run's name within its workflow. */
-const checkKey = (entry: Entry): string =>
-  entry.context !== undefined ? `status ${entry.context}` : `run ${entry.name ?? ''}\u0000${entry.workflowName ?? ''}`;
-
-/**
- * The latest run of each check in `entries`, in the rollup's order: a check re-run, or run again on another event of the same head (a
- * `labeled` after an `opened`), leaves its earlier runs in the rollup, and only the newest is its verdict, as GitHub's branch protection
- * and `gh pr checks` read it. The newest by `startedAt`, one not started counting as newest; of two that tie, the later in the rollup.
- */
-function latest(entries: readonly Entry[]): Entry[] {
-  const newest = new Map<string, number>();
-  entries.forEach((entry, i) => {
-    const was = newest.get(checkKey(entry));
-    const prior = was === undefined ? undefined : entries[was];
-    if (prior === undefined || startOf(entry) >= startOf(prior)) newest.set(checkKey(entry), i);
-  });
-  const kept = new Set(newest.values());
-  return entries.filter((_, i) => kept.has(i));
 }
 
 /** The `statusCheckRollup` of `number`, as it is now. */
@@ -608,16 +566,6 @@ function push(args: string[]): string[] {
   return [said, proven, 'note' in plan ? plan.note : relabelled(pr, plan)];
 }
 
-/** How the wait reads the CI context's entries of a head: none reported, none over yet, every one passed, or one that did not. */
-type Seen = 'absent' | 'pending' | 'passed' | 'failed';
-
-/** How `ours`, the CI context's entries of the head, read now. */
-function seenOf(ours: readonly Entry[]): Seen {
-  if (ours.length === 0) return 'absent';
-  if (ours.every(pending)) return 'pending';
-  return ours.every((entry) => verdict(entry) === PASSED) ? 'passed' : 'failed';
-}
-
 /**
  * Whether a rollup entry is over and judged the commit red: a verdict that is no pass, and not cancelled, skipped or neutral, which judge
  * nothing — CI's or a person's to run again, not the branch's to answer.
@@ -698,12 +646,15 @@ function unanswered(seen: Seen, pr: Pr, check: string, ours: Entry[], entries: E
  * The one open pull request of `branch`, read again while GitHub says its `mergeable` is `UNKNOWN` and the bound is not out; refuses one
  * GitHub says is `CONFLICTING`, naming the merge that answers it. Any other answer, `UNKNOWN` to the end included, is waited on as before.
  */
-function unconflicted(branch: string, onto: string, check: string): Pr {
+function unconflicted(branch: string, onto: string, check: string, began: number, retry: string): Pr {
   const whole = seconds('WF_PR_MERGEABLE_SECONDS', MERGEABLE_SECONDS);
   const poll = seconds('WF_PR_MERGEABLE_POLL_SECONDS', MERGEABLE_POLL_SECONDS);
-  const began = Date.now();
   for (;;) {
-    const pr = sole(pulls(branch), branch, onto);
+    const pr = sole(
+      retried(`the pull request of \`${branch}\``, () => pulls(branch), began, retry),
+      branch,
+      onto,
+    );
     const said = (pr.mergeable ?? '').toUpperCase();
     if (said === 'CONFLICTING')
       throw new Refusal(
@@ -713,6 +664,25 @@ function unconflicted(branch: string, onto: string, check: string): Pr {
       );
     if (said !== 'UNKNOWN' || Date.now() - began >= whole * 1000) return pr;
     sleep(poll);
+  }
+}
+
+/**
+ * What `value` reads of GitHub, read again while it fails — `gh` timing out, exiting non-zero, or answering no JSON, none of which is a
+ * verdict — until the wait's whole bound since `began` (`WF_CI_WAIT_SECONDS`), where the last error is a person's refusal. A person's
+ * refusal, such as no `gh` at all, stands at once.
+ */
+function retried<T>(what: string, value: () => T, began: number, retry: string): T {
+  for (;;) {
+    try {
+      return value();
+    } catch (err) {
+      if (!(err instanceof Refusal) || err instanceof PersonsRefusal) throw err;
+      const whole = seconds('WF_CI_WAIT_SECONDS', WHOLE_SECONDS);
+      if (Date.now() - began >= whole * 1000)
+        throw new PersonsRefusal(`${what} could not be read from GitHub within ${whole} s; the last read said: ${err.message}\n${retry}`);
+      sleep(seconds('WF_CI_POLL_SECONDS', POLL_SECONDS));
+    }
   }
 }
 
@@ -781,14 +751,14 @@ function wait(args: string[]): string[] {
   const check = checkOf(args);
   const { branch, run: ofRun, onto } = placed();
   const retry = `  Then: nemia retry ${ofRun} ${process.env.WF_STEP || STEP} --recheck`;
-  const pr = unconflicted(branch, onto, check);
+  const began = Date.now();
+  const pr = unconflicted(branch, onto, check, began, retry);
   const whole = seconds('WF_CI_WAIT_SECONDS', WHOLE_SECONDS);
   const start = Math.min(seconds('WF_CI_START_SECONDS', START_SECONDS), whole);
   const poll = seconds('WF_CI_POLL_SECONDS', POLL_SECONDS);
-  const began = Date.now();
   let rerun: Rerun | undefined;
   for (;;) {
-    const entries = latest(rollup(pr.number));
+    const entries = latest(retried(`the checks of #${pr.number}`, () => rollup(pr.number), began, retry));
     const ours = entries.filter((entry) => nameOf(entry) === check);
     const red = ours.filter(judgedRed);
     rerun ??= rerunOnce(ours, entries);

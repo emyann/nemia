@@ -1,6 +1,6 @@
 /**
  * sdlc's `quick` carries `build`'s four scripts byte for byte (`landing.ts`, `parts.ts`, `pull-request.ts`, `probe.ts`), and the module
- * one of them imports (`ci-log.ts`, read by `pull-request.ts`): a run
+ * they import (`ci-log.ts`, read by `pull-request.ts` and `landing.ts`): a run
  * freezes its own workflow's folder alone, so quick's checks run its own copies, and a fix made to one is made to both. Held first on a
  * scratch copy with one copy a byte apart, then on sdlc as it ships, each pair read for a name it must hold, so an emptied pair cannot
  * pass.

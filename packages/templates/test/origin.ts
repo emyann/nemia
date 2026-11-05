@@ -5,7 +5,8 @@
  *
  * A rule of the fixture is matched by the words of the call (`when`, a substring of the arguments joined by spaces), the first rule that
  * matches winning; `outs` answers a poll, one entry per matching call and the last repeating, so a `pending` that turns green is a
- * fixture and never a sleep. A call no rule matches is answered with nothing, exit 0.
+ * fixture and never a sleep, and `statuses` gives each such call its exit the same way, so a read that fails once and then answers is a
+ * fixture too. A call no rule matches is answered with nothing, exit 0.
  */
 import { execFileSync, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -16,11 +17,11 @@ import { scratch } from './scratch.ts';
 export type Called = { cwd: string; argv: string[] };
 
 /** What the stub `gh` answers a call whose words hold `when`: one answer, or one per matching call with the last repeating. */
-export type Rule = { when: string; out?: string; outs?: string[]; err?: string; status?: number };
+export type Rule = { when: string; out?: string; outs?: string[]; err?: string; status?: number; statuses?: number[] };
 
 /**
  * The stub `gh`: records each call in `GH_LOG`, then answers from the rules in `GH_RULES` — the first whose `when` the arguments hold,
- * its `outs` entry for the number of calls it has already matched, the last repeating.
+ * its `outs` entry and its `statuses` entry for the number of calls it has already matched, the last of each repeating.
  */
 const STUB = `#!${process.execPath}
 const fs = require('node:fs');
@@ -38,7 +39,8 @@ if (rule) {
   const out = outs.length ? outs[Math.min(seen, outs.length - 1)] : '';
   if (out) process.stdout.write(out.endsWith('\\n') ? out : out + '\\n');
   if (rule.err) process.stderr.write(rule.err + '\\n');
-  process.exitCode = rule.status ?? 0;
+  const statuses = rule.statuses ?? [rule.status ?? 0];
+  process.exitCode = statuses.length ? statuses[Math.min(seen, statuses.length - 1)] : 0;
 }
 `;
 

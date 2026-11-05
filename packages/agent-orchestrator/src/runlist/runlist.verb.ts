@@ -11,7 +11,7 @@ import { Effect } from 'effect';
 import { type Engine, tried } from '../runtime-client.ts';
 import { runStore } from '../record/files.store.ts';
 import type { Run } from '../record/record.ts';
-import { Invalid } from '../refusal/refusal.ts';
+import { Invalid, Missing } from '../refusal/refusal.ts';
 import { stepSpend, taskSpend } from '../status/status.ts';
 import { type Spent, spentOf } from '../summary/judged.verb.ts';
 import { filedTimes, judgedSteps, unreadableOf, type Unreadable, type Views, viewsFor, workflowsOf } from '../summary/reads.verb.ts';
@@ -83,8 +83,20 @@ const NONE_READ: { views: Views; unreadable: Unreadable } = { views: new Map(), 
  */
 const NO_PARENT = (): readonly Run[] => [];
 
-/** The records of `ids` the store still has, in their order. */
-const recordsOf = (ids: readonly string[]): Run[] => ids.filter((id) => runStore.runs.exists(id)).map((id) => runStore.runs.read(id));
+/**
+ * The records of `ids` the store still has, in their order: one removed since the list was read is passed over, whenever it went, its
+ * row read with no clock — never a check that it exists before its read, which a removal between the two turns into the whole read's
+ * refusal (`Missing`).
+ */
+const recordsOf = (ids: readonly string[]): Run[] =>
+  ids.flatMap((id) => {
+    try {
+      return [runStore.runs.read(id)];
+    } catch (err) {
+      if (err instanceof Missing) return [];
+      throw err;
+    }
+  });
 
 /** What a row's breakdowns are read off: the engine's views of its tasks, the tasks left out, and the feed's filing times. */
 type Read = { views: Views; unreadable: Unreadable; filed: ReadonlyMap<string, string> };

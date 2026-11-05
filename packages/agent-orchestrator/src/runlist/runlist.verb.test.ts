@@ -505,3 +505,43 @@ test('REFUSED by kind: a selector that is none, on each read of the list', async
       }),
     );
 });
+
+/**
+ * The records of `ids` removed as each is read, after the store was listed: a run removed between the list and the read of its row, as
+ * `nemia rm` removes one while the board polls. Each is put back before the next listing, so every read lists it.
+ */
+const goneAsRead = (t: TestContext, ids: readonly string[]): void => {
+  const fileOf = (id: string) => path.join(RUNS_DIR, `${id}.json`);
+  const texts = new Map(ids.map((id) => [id, fs.readFileSync(fileOf(id), 'utf8')]));
+  const { list, read } = { list: runStore.runs.list.bind(runStore.runs), read: runStore.runs.read.bind(runStore.runs) };
+  t.mock.method(runStore.runs, 'list', (...args: Parameters<typeof list>) => {
+    for (const [id, text] of texts) fs.writeFileSync(fileOf(id), text);
+    return list(...args);
+  });
+  t.mock.method(runStore.runs, 'read', (id: string) => {
+    if (texts.has(id)) fs.rmSync(fileOf(id), { force: true });
+    return read(id);
+  });
+};
+
+test('a run removed as its row is read is still its row, with no clock, on each read: neither read refuses the store over it', async (t) => {
+  const waiting = await aWaiting();
+  const moving = await anInFlight();
+  const done = await aFinished();
+  goneAsRead(t, [waiting, moving, done]);
+
+  const light = await open();
+  assert.deepEqual(
+    light.waiting.map((row) => [row.id, row.clock, row.stepCosts, row.waitingSince]),
+    [[waiting, null, null, null]],
+  );
+  assert.deepEqual(
+    light.inFlight.map((row) => [row.id, row.clock]),
+    [[moving, null]],
+  );
+  const page = await finishedPage();
+  assert.deepEqual(
+    page.runs.map((row) => [row.id, row.clock]),
+    [[done, null]],
+  );
+});

@@ -442,7 +442,7 @@ const planIn = (printed: string[]): { plan: string; line: string } => ({
 });
 
 test('a parameter set again at the version applied: previewed, filed with its plan, merged with no new version', async (t) => {
-  await t.test('it merges with no conflict, and the factory\'s file records the new value', async (t) => {
+  await t.test("it merges with no conflict, and the factory's file records the new value", async (t) => {
     t.mock.method(console, 'log', () => {});
     await applied('reset');
     const file = path.join(FACTORIES, 'reset.json');
@@ -477,7 +477,7 @@ test('a parameter set again at the version applied: previewed, filed with its pl
         ['ConflictsPending', 'False', 'Merged'],
       ],
     );
-    assert.match(textIn(treeDir('reset'), REVIEW), /^budget: 9\nloop: implement\nrounds: 4$/m, 'the new value and the person\'s change');
+    assert.match(textIn(treeDir('reset'), REVIEW), /^budget: 9\nloop: implement\nrounds: 4$/m, "the new value and the person's change");
     assert.match(textIn(appliedDir('reset'), REVIEW), /^budget: 9\nloop: implement\nrounds: 3$/m, 'the base is the new render');
     await assert.rejects(upgrade(), refusedWith('Conflict', /reset is already applied at 0\.1\.0/));
   });

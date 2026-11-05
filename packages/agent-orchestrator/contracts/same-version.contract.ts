@@ -74,8 +74,7 @@ const choicesApplySpec = spec<(recorded: ChoicesRecorded, merge: MergeAt) => boo
       condition: ({ input: [recorded, merge], output }) => recorded.base === undefined || recorded.base === merge.base || !output,
     },
     unrecordedBaseNotForParams: {
-      description:
-        'Choices written before their base was recorded were made for a version upgrade, never for a change of parameters alone',
+      description: 'Choices written before their base was recorded were made for a version upgrade, never for a change of parameters alone',
       condition: ({ input: [recorded, merge], output }) => recorded.base !== undefined || merge.from !== merge.to || !output,
     },
     madeForThisMerge: {

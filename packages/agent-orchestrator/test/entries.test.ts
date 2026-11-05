@@ -783,7 +783,7 @@ const PINNED: Record<string, string[]> = {
     'workChecks',
     'workspacePlan',
   ],
-  'agent-orchestrator/testing': ['MEMORY_AGENTS', 'agentDoorMemory', 'skillDoorMemory', 'testPlace'],
+  'agent-orchestrator/testing': ['BuiltinTemplates', 'MEMORY_AGENTS', 'agentDoorMemory', 'skillDoorMemory', 'testPlace'],
   'agent-orchestrator/workflow': [
     'definitionServed',
     'definitionsServed',

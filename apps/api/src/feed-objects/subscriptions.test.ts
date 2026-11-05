@@ -1,42 +1,28 @@
 /**
- * The subscriptions group served (src/objects): a subscription the api's own route put is listed and read as a Subscription, its status
- * where the deliverer is (at its start, with nothing delivered yet), and one nobody put is a 404; the subscribe and unsubscribe routes
- * answer as they did.
+ * The subscriptions group served (src/feed-objects): a subscription in the store is listed and read as a Subscription, its spec its file's
+ * and its status where the deliverer is — at its start, nothing delivered — and one
+ * nobody put is a 404; `DELETE /api/subscriptions/:name`, the api's own route, still answers `{ name }`.
  */
-import '../../test/harness.ts';
+import { root } from '../../test/harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { Effect, Layer, Schema } from 'effect';
-import { engine } from 'agent-orchestrator';
+import fs from 'node:fs';
+import path from 'node:path';
+import { Schema } from 'effect';
 import { Subscription, SubscriptionList } from 'objects';
-import { appOf, liveOf } from '../app.ts';
-import { Engine } from '../store.ts';
+import { app } from '../app.ts';
 
 const BOARD = { 'content-type': 'application/json', 'sec-fetch-site': 'same-origin' };
+const folder = path.join(root, 'subscriptions');
 
-/** An app whose engine has filed one long-lived task, `watcher`. */
-const app = appOf(
-  Layer.merge(
-    liveOf(),
-    Layer.succeed(Engine)({
-      ...engine(),
-      view: (id: string) =>
-        Effect.succeed({
-          id,
-          phase: 'pending',
-          state: { settled: null, filedAt: '2026-11-05T10:00:00.000Z', restartPolicy: 'Always' },
-        }),
-    } as never),
-  ),
-).app;
+/** A subscription's file, as `nemia subscribe` writes one. */
+const subscribe = (name: string, task: string, from = 0): void => {
+  fs.mkdirSync(folder, { recursive: true });
+  fs.writeFileSync(path.join(folder, `${name}.json`), JSON.stringify({ task, selectors: ['reason=Failed'], digestEvery: 15, from }));
+};
 
-test('a subscription put by POST is listed and read as an object; DELETE still answers { name }', async () => {
-  const put = await app.request('/api/subscriptions/news', {
-    method: 'POST',
-    headers: BOARD,
-    body: JSON.stringify({ task: 'watcher', selectors: ['reason=Failed'], digestEvery: 15 }),
-  });
-  assert.equal(put.status, 201);
+test('a subscription in the store is listed and read as an object; DELETE still answers { name }', async () => {
+  subscribe('news', 'watcher');
   const list = await app.request('/api/subscriptions');
   assert.equal(list.status, 200);
   const items = Schema.decodeUnknownSync(SubscriptionList)(await list.json()).items;

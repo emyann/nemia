@@ -173,6 +173,7 @@ test('A person talks with Nemia in her chat: a page of history, a send to her ou
 const ASK: Ask = {
   id: 'q1',
   at: at(2),
+  kind: 'question',
   questions: [
     {
       question: 'What the board shows as an old closeout’s one line?',

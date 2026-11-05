@@ -125,9 +125,12 @@ export default {
       await photograph(page, path.join(OUT, `skills-composed-${await themeOf(page)}.png`), { fullPage: true });
 
       const [saved] = await Promise.all([
-        page.waitForResponse((r) => r.request().method() === 'PUT' && new URL(r.url()).pathname === `/api/agents/yours/${seeded.name}`, {
-          timeout: WAIT_MS,
-        }),
+        page.waitForResponse(
+          (r) => r.request().method() === 'PUT' && new URL(r.url()).pathname === `/api/namespaces/default/agents/${seeded.name}`,
+          {
+            timeout: WAIT_MS,
+          },
+        ),
         form.getByRole('button', { name: 'Save' }).click(),
       ]);
       if (saved.status() !== 200) throw new Refused(`the api saves the agent — it answered ${saved.status()}: ${await saved.text()}`);

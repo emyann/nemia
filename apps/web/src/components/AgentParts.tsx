@@ -2,8 +2,17 @@ import { Blobatar } from '@blobatar/react';
 import { useGaze } from '@blobatar/react/gaze';
 import type { Expression } from 'blobatar';
 import type { ReactNode } from 'react';
+import { useRouterState } from '@tanstack/react-router';
 import { Link as AriaLink } from 'react-aria-components';
-import type { AgentListing, AgentSkill, AgentUser, GivenSkill, SkillSource } from '../lib/api';
+import {
+  sourceOf,
+  type AgentListing,
+  type AgentSkill,
+  type AgentUser,
+  type GivenSkill,
+  type PagePlace,
+  type SkillSource,
+} from '../lib/api';
 import { costWords, SOURCE_BADGES } from '../lib/skills';
 import { cn } from '../lib/utils';
 import { routeLink } from './routeLink';
@@ -15,7 +24,15 @@ export const RouteLink = routeLink(AriaLink);
 const LINK =
   'rounded-sm underline decoration-outline underline-offset-2 outline-none hover:decoration-foreground focus-visible:ring-2 focus-visible:ring-ring/50';
 
-/** Where an agent is read from, as the Workflows page badges a workflow: yours, or this repository's. */
+/** The word for each origin an agent is read from. */
+const AGENT_FROM: Readonly<Record<AgentListing['from'], string>> = {
+  factory: "the factory's",
+  repo: 'this repository',
+  yours: 'yours',
+  builtin: "Nemia's",
+};
+
+/** Where an agent is read from, as the Workflows page badges a workflow: yours, this repository's, the factory's or Nemia's. */
 export function FromBadge({ from }: { from: AgentListing['from'] }) {
   return (
     <span
@@ -25,7 +42,7 @@ export function FromBadge({ from }: { from: AgentListing['from'] }) {
         from === 'yours' ? container.grey : 'bg-muted text-muted-foreground',
       )}
     >
-      {from === 'yours' ? 'yours' : 'this repository'}
+      {AGENT_FROM[from]}
     </span>
   );
 }
@@ -180,14 +197,48 @@ function FollowingFace({ name, size, plate, expression, className }: Omit<FacePr
   );
 }
 
-/** A link to an agent's page, by name, its face beside it: what a node's form and a step's page link its agent with. */
-export function AgentLink({ from, name, className }: { from: AgentListing['from']; name: string; className?: string }) {
+/**
+ * The search a link to a definition's page carries: for a factory's own, which only its factory serves, the place it is read in, `place`,
+ * else the one the page is in (`here`); none for any other, which `default` serves whatever factory the link is drawn in.
+ */
+export const definitionSearch = (from: string, place: PagePlace | undefined, here: PagePlace = {}): PagePlace => {
+  if (from !== 'factory') return {};
+  const { factory, repo } = place ?? here;
+  return { ...(factory !== undefined && { factory }), ...(repo !== undefined && { repo }) };
+};
+
+/** The factory and repository the page is in, read off its address, for a link given no place (`definitionSearch`). */
+function usePlaceHere(): PagePlace {
+  const search: { factory?: unknown; repo?: unknown } = useRouterState({ select: (state) => state.location.search });
+  return {
+    ...(typeof search.factory === 'string' && { factory: search.factory }),
+    ...(typeof search.repo === 'string' && { repo: search.repo }),
+  };
+}
+
+/**
+ * A link to an agent's page, by name, its face beside it: what a node's form and a step's page link its agent with, in `place` where the
+ * agent is a factory's own (`definitionSearch`).
+ */
+export function AgentLink({
+  from,
+  name,
+  className,
+  place,
+}: {
+  from: AgentListing['from'];
+  name: string;
+  className?: string;
+  place?: PagePlace;
+}) {
+  const here = usePlaceHere();
   return (
     <span className="inline-flex items-center gap-1.5 align-middle">
       <AgentFace name={name} size={16} />
       <RouteLink
         to="/agents/$from/$agent"
         params={{ from, agent: name }}
+        search={definitionSearch(from, place, here)}
         data-agent-link={name}
         className={cn('font-mono', LINK, className)}
       >
@@ -221,7 +272,7 @@ export function AgentRefused({
           <span>Open</span>
           {users.map((user) => {
             const [workflow = '', step = ''] = user.split('/');
-            return <NodeLink key={user} user={{ from, workflow, step }} />;
+            return <NodeLink key={user} user={{ from: sourceOf(from), workflow, step }} />;
           })}
         </p>
       )}
@@ -239,12 +290,17 @@ export function SkillRefused({ message }: { message: string }) {
   );
 }
 
-/** A link to a skill's page, by its place and name: what an agent's skills and the Agents page's skills link a skill with. */
-export function SkillLink({ from, name, className }: { from: SkillSource; name: string; className?: string }) {
+/**
+ * A link to a skill's page, by its origin and name: what an agent's skills and the Agents page's skills link a skill with, in `place` where
+ * the skill is a factory's own (`definitionSearch`).
+ */
+export function SkillLink({ from, name, className, place }: { from: SkillSource; name: string; className?: string; place?: PagePlace }) {
+  const here = usePlaceHere();
   return (
     <RouteLink
       to="/agents/skills/$from/$skill"
       params={{ from, skill: name }}
+      search={definitionSearch(from, place, here)}
       data-skill-link={name}
       className={cn('font-mono', LINK, className)}
     >

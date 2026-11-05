@@ -562,7 +562,7 @@ export function folderOf(
   return {
     status: 404,
     error: there.length
-      ? `No workflow '${name}' in ${where}. The workflows there are: ${there.join(', ')}. GET /api/workflows lists them, with their steps.`
+      ? `No workflow '${name}' in ${where}. The workflows there are: ${there.join(', ')}. GET /api/namespaces/<namespace>/workflows lists them, each Workflow's steps in its \`spec.steps\`: the namespace \`default\`, or the factory's name.`
       : `No workflow '${name}': there is no workflow at all, in ${sources.map((s) => s.dir).join(' or ')}. A workflow is a folder of steps: add one there, such as workflows/dev/implement.md.`,
   };
 }
@@ -688,12 +688,9 @@ async function cardStarted(
 }
 
 /**
- * The workflows' routes, and the board's first write.
+ * The repository a start runs in, and the board's first write. The workflows themselves are the Workflow object's, at
+ * `/api/namespaces/<namespace>/workflows[/<name>]` (`src/definitions/workflows.ts`); a step's page is `step` (step/step.ts).
  *
- * - `GET /api/workflows` — every workflow (`listWorkflows`), read from disk on each request, so a folder a person has just edited lists as
- *   it is now; in a factory (`?factory=`), only those attached to it, read with its hires, each saying what they leave `unfilled` and
- *   each step the agent hired into it (`hired`). 500 for a folder that could not be listed.
- * - `GET /api/workflows/:from/:name/:step` — one step of one folder, for its page: `step` (step/step.ts).
  * - `GET /api/repository` — the repository a start runs in, as the request's `?factory=` and `?repo=` resolve it: what the start form
  *   lists the runs of, for a run to wait on.
  * - `POST /api/runs` — the board's first write, and the one a person makes at the command line: `nemia start <brief> --workflows <folder>
@@ -720,11 +717,6 @@ async function cardStarted(
  *   of a workflow or a card, is refused, `Invalid` (`defaultStartRefusal`): the default factory holds history, and no start names it.
  */
 export const workflows = new Hono<ApiEnv>()
-  .get('/api/workflows', (c) =>
-    served(c, async ({ e, placeService, repo, home, factory, inRequest }) =>
-      c.json(await listWorkflows(e, placeService, repo, home, inRequest, factory)),
-    ),
-  )
   .get('/api/repository', (c) => served(c, ({ repo }) => c.json({ repo })))
   .post('/api/runs', (c) =>
     served(c, async ({ e, placeService, repo, home, factory }) => {

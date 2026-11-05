@@ -80,9 +80,12 @@ async function expectSave(page: Page): Promise<void> {
   await expectVisible(keys, `${step}'s form, open as the builder opens`);
   await keys.locator('[data-field="check"] input').fill('npm test');
   const [saved] = await Promise.all([
-    page.waitForResponse((r) => r.request().method() === 'PUT' && new URL(r.url()).pathname === `/api/workflows/yours/${workflow}`, {
-      timeout: WAIT_MS,
-    }),
+    page.waitForResponse(
+      (r) => r.request().method() === 'PUT' && new URL(r.url()).pathname === `/api/namespaces/default/workflows/${workflow}`,
+      {
+        timeout: WAIT_MS,
+      },
+    ),
     builder.getByRole('button', { name: 'Save', exact: true }).click(),
   ]);
   if (saved.status() !== 200) throw new Refused(`the api saves the folder — it answered ${saved.status()}: ${await saved.text()}`);

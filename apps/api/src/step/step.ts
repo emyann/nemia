@@ -237,7 +237,7 @@ export const step = new Hono<ApiEnv>().get('/api/workflows/:from/:name/:step', (
     if (from !== 'repo' && from !== 'yours') {
       return c.json(
         {
-          error: `A step's page names where its workflow is read from: \`repo\` or \`yours\`, as GET /api/workflows lists each workflow's \`from\` — /api/workflows/repo/${name}/${asked}, say. This request's was '${from}'.`,
+          error: `A step's page names where its workflow is read from: \`repo\` or \`yours\`, as GET /api/namespaces/default/workflows/${name} says it in the Workflow's \`status.origin\` — /api/workflows/repo/${name}/${asked}, say. This request's was '${from}'.`,
         },
         400,
       );

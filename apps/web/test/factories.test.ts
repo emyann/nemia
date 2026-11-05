@@ -38,7 +38,7 @@ const factory = (name: string, extra: Partial<Factory> = {}): Factory => ({
   default: false,
   repos: ['/code/nemia'],
   workflows: ['build'],
-  hires: { 'build/implement': 'ada' },
+  hires: { 'build/implement': 'implementer' },
   error: null,
   schedules: [],
   commands: {
@@ -335,6 +335,7 @@ test('factoryOf, shownIn, workflowFactories, listPlace, hirePlaceOf: which facto
       assert.equal(fromWord('repo'), 'this repository');
       assert.equal(fromWord('repo', 'default'), 'this repository');
       assert.equal(fromWord('repo', 'pipao'), "the factory's");
+      assert.equal(fromWord('factory', 'pipao'), "the factory's", "a factory's own tree, by its origin");
     },
   );
   await t.test(

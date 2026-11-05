@@ -2,6 +2,7 @@ import type { GivenSkill, SkillCost, SkillDetail, SkillDraft, SkillPlace, SkillR
 
 /** What each place of skills is called on the board. */
 export const PLACE_LABELS: Readonly<Record<SkillSource, string>> = {
+  factory: "The factory's",
   yours: 'Your library',
   repo: 'This repository',
   builtin: 'Built into Nemia',
@@ -9,6 +10,7 @@ export const PLACE_LABELS: Readonly<Record<SkillSource, string>> = {
 
 /** A given skill's badge: where an agent of yours finds it. */
 export const SOURCE_BADGES: Readonly<Record<SkillSource, string>> = {
+  factory: "the factory's",
   yours: 'your library',
   repo: 'this repository',
   builtin: 'built into Nemia',

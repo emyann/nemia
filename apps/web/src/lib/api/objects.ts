@@ -2,8 +2,9 @@
  * The board's client of the objects (`objects`' `Api`): every read and write of a kind the api serves as an object goes through here, made
  * by `HttpApiClient` from the one definition the api serves, over `FetchHttpClient` — the Run and its sub-resources (`runs`), the
  * inbox's cards (`cards`), and a factory and its parts: the Factory with its rules, instruction and command lines (`factories`), its MCP
- * servers and their sign-ins (`mcpServers`), Nemia's own servers (`builtin`), its schedules, hires and volumes. Each is a promise, as
- * TanStack Query's functions take one.
+ * servers and their sign-ins (`mcpServers`), Nemia's own servers (`builtin`), its schedules, hires and volumes; and the definitions a
+ * namespace serves, its workflows, agents and skills (`workflows`, `agents`, `skills`). Each is a promise, as TanStack Query's functions
+ * take one.
  *
  * What a call rejects with is what the board's own reads and writes reject with (`read.ts`): a refusal in the api's words (its `error`)
  * and its status — a `ReadRefusal` for a read, so a run gone is still `runGone`, a `WriteRefusal` for a write — and an `UnreadAnswer`
@@ -16,6 +17,11 @@ import { Cause, Effect, Exit, Option, Schema } from 'effect';
 import { FetchHttpClient, HttpClient, HttpClientRequest } from 'effect/http';
 import { HttpApiClient } from 'effect/http-api';
 import {
+  Agent,
+  AgentCard,
+  AgentList,
+  AgentTried,
+  type AgentWrite,
   Api,
   Card,
   DEFAULT_NAMESPACE,
@@ -46,6 +52,15 @@ import {
   VolumeList,
   StepTold,
   StepTries,
+  Skill,
+  SkillFiles,
+  SkillList,
+  type SkillWrite,
+  Workflow,
+  type WorkflowCreate,
+  WorkflowList,
+  type WorkflowWrite,
+  type DefinitionOrigin,
 } from 'objects';
 import { decoded, ReadRefusal, WriteRefusal } from './read.ts';
 
@@ -76,7 +91,7 @@ type Seen = { route: string; status: number; statusText: string; body: Promise<u
 /** How a call is answered: the schema its answer decodes with, what a refusal is built as, and for a write what it may have done. */
 type How<A> = {
   schema: Schema.Decoder<A>;
-  refuse: (words: string, status: number) => Error;
+  refuse: (words: string, status: number, answer: unknown) => Error;
   may?: string;
   /** Keys the request is sent with beyond the ones the Api declares: the place a card is started in (`?factory=&repo=`). */
   query?: Record<string, string>;
@@ -118,16 +133,23 @@ async function call<A>(use: (client: Client) => Effect.Effect<A, unknown>, how: 
   const body = await seen.body;
   if (seen.status >= 200 && seen.status < 300) return decoded(seen.route, how.schema, body, how.may);
   const said = Option.getOrUndefined(Schema.decodeUnknownOption(Said)(body))?.error;
-  throw how.refuse(said ?? `${seen.route} answered ${seen.status} ${seen.statusText}`, seen.status);
+  throw how.refuse(said ?? `${seen.route} answered ${seen.status} ${seen.statusText}`, seen.status, body);
 }
 
 /** How a read is refused: a `ReadRefusal`, whose 404 on a run is the run gone. */
-const read = <A>(schema: Schema.Decoder<A>): How<A> => ({ schema, refuse: (words, status) => new ReadRefusal(words, status) });
+const read = <A>(schema: Schema.Decoder<A>, query?: Record<string, string>): How<A> => ({
+  schema,
+  refuse: (words, status) => new ReadRefusal(words, status),
+  ...(query ? { query } : {}),
+});
+
+/** What a refusal of a write is built as: the api's words, its status, and its answer whole, which a refusal may read more of. */
+export type Refuse = (words: string, status: number, answer: unknown) => Error;
 
 /** How a write is refused: a `WriteRefusal`; `may` says what it may have done, which an answer the board does not read says. */
-const write = <A>(schema: Schema.Decoder<A>, may: string, query?: Record<string, string>): How<A> => ({
+const write = <A>(schema: Schema.Decoder<A>, may: string, query?: Record<string, string>, refuse?: Refuse): How<A> => ({
   schema,
-  refuse: (words, status) => new WriteRefusal(words, status),
+  refuse: refuse ?? ((words, status) => new WriteRefusal(words, status)),
   may,
   ...(query ? { query } : {}),
 });
@@ -312,4 +334,116 @@ export const hires = {
 export const volumes = {
   list: (namespace: string): Promise<VolumeList> => call((c) => c.volumes.list({ params: { namespace }, query: {} }), read(VolumeList)),
   get: (namespace: string, name: string): Promise<Volume> => call((c) => c.volumes.get({ params: { namespace, name } }), read(Volume)),
+};
+
+/**
+ * Which definition a read is of, beside its namespace: `origin`, the place it is read from, shadowed or not (none: the one the namespace
+ * serves at each name); and `repo`, the factory's repository it is read on, sent as `?repo=` as every read of a factory's says it.
+ */
+export type DefinitionRead = { origin?: DefinitionOrigin; repo?: string };
+
+/** The `?origin=` of `at`, none for none. */
+const originOf = (at: DefinitionRead | undefined): { origin?: string } => (at?.origin ? { origin: at.origin } : {});
+
+/** The `?repo=` of `at`, sent beside the keys the Api declares; none for none. */
+const repoOf = (at: DefinitionRead | undefined): Record<string, string> | undefined => (at?.repo ? { repo: at.repo } : undefined);
+
+/** Every item of a list read page by page: `page` asked again with each `continue` its answer gives, until one gives none. */
+async function everyPage<T>(page: (next: string | undefined) => Promise<{ metadata: { continue?: string }; items: readonly T[] }>) {
+  const items: T[] = [];
+  let next: string | undefined;
+  do {
+    const answer = await page(next);
+    items.push(...answer.items);
+    next = answer.metadata.continue;
+  } while (next !== undefined);
+  return items;
+}
+
+/** What a write of a workflow may have done, and what to look at before writing again. */
+const WORKFLOW_WRITTEN = 'The folder may be written: reload the Workflows page before writing it again.';
+
+/**
+ * A namespace's workflows (`default`: the api's repository and your library), each the factory's resolved view of its name; yours made,
+ * written and removed in `default` alone. A write takes `refuse`, what its refusal is built as (a `WriteRefusal` for none).
+ */
+export const workflows = {
+  /** Every workflow the namespace serves, every page of it. */
+  list: (namespace: string, at?: DefinitionRead): Promise<Workflow[]> =>
+    everyPage((next) =>
+      call(
+        (c) => c.workflows.list({ params: { namespace }, query: { ...originOf(at), ...(next === undefined ? {} : { continue: next }) } }),
+        read(WorkflowList, repoOf(at)),
+      ),
+    ),
+  get: (namespace: string, name: string, at?: DefinitionRead): Promise<Workflow> =>
+    call((c) => c.workflows.get({ params: { namespace, name }, query: originOf(at) }), read(Workflow, repoOf(at))),
+  create: (namespace: string, body: WorkflowCreate, refuse?: Refuse): Promise<Workflow> =>
+    call((c) => c.workflows.create({ params: { namespace }, payload: body }), write(Workflow, WORKFLOW_WRITTEN, undefined, refuse)),
+  replace: (namespace: string, name: string, body: WorkflowWrite, refuse?: Refuse): Promise<Workflow> =>
+    call((c) => c.workflows.replace({ params: { namespace, name }, payload: body }), write(Workflow, WORKFLOW_WRITTEN, undefined, refuse)),
+  /** The workflow `name` removed, against the `resourceVersion` it was read at. */
+  delete: (namespace: string, name: string, resourceVersion: string, refuse?: Refuse): Promise<Workflow> =>
+    call(
+      (c) => c.workflows.delete({ params: { namespace, name }, query: { resourceVersion } }),
+      write(Workflow, 'The folder may be removed: reload the Workflows page before removing it again.', undefined, refuse),
+    ),
+};
+
+/** What an agent's write may have done, and what to look at before writing it again. */
+const AGENT_WRITTEN = 'The agent may be written: read it again on its page before writing it again.';
+
+/** A namespace's agents, as its workflows: yours made, written and removed in `default`; tried; and read as an A2A card. */
+export const agents = {
+  list: (namespace: string, at?: DefinitionRead): Promise<Agent[]> =>
+    everyPage((next) =>
+      call(
+        (c) => c.agents.list({ params: { namespace }, query: { ...originOf(at), ...(next === undefined ? {} : { continue: next }) } }),
+        read(AgentList, repoOf(at)),
+      ),
+    ),
+  get: (namespace: string, name: string, at?: DefinitionRead): Promise<Agent> =>
+    call((c) => c.agents.get({ params: { namespace, name }, query: originOf(at) }), read(Agent, repoOf(at))),
+  create: (namespace: string, body: AgentWrite, refuse?: Refuse): Promise<Agent> =>
+    call((c) => c.agents.create({ params: { namespace }, payload: body }), write(Agent, AGENT_WRITTEN, undefined, refuse)),
+  replace: (namespace: string, name: string, body: AgentWrite, refuse?: Refuse): Promise<Agent> =>
+    call((c) => c.agents.replace({ params: { namespace, name }, payload: body }), write(Agent, AGENT_WRITTEN, undefined, refuse)),
+  delete: (namespace: string, name: string, resourceVersion: string, refuse?: Refuse): Promise<Agent> =>
+    call(
+      (c) => c.agents.delete({ params: { namespace, name }, query: { resourceVersion } }),
+      write(Agent, AGENT_WRITTEN, undefined, refuse),
+    ),
+  /** A try of the agent `name` on `brief`: the run it started. */
+  try: (namespace: string, name: string, brief: string, refuse?: Refuse): Promise<AgentTried> =>
+    call(
+      (c) => c.agents.try({ params: { namespace, name }, payload: { brief } }),
+      write(AgentTried, 'The try may have started: look on the Runs page before trying the agent again.', undefined, refuse),
+    ),
+  card: (namespace: string, name: string, at?: DefinitionRead): Promise<AgentCard> =>
+    call((c) => c.agents.card({ params: { namespace, name }, query: originOf(at) }), read(AgentCard, repoOf(at))),
+};
+
+/** What a skill's write may have done, and what to look at before writing it again. */
+const SKILL_WRITTEN = 'The skill may be written: read the skills again before writing it again.';
+
+/** A namespace's skills: yours made and written in `default`, a builtin one copied to yours, and a folder's files by path. */
+export const skills = {
+  list: (namespace: string, at?: DefinitionRead): Promise<Skill[]> =>
+    everyPage((next) =>
+      call(
+        (c) => c.skills.list({ params: { namespace }, query: { ...originOf(at), ...(next === undefined ? {} : { continue: next }) } }),
+        read(SkillList, repoOf(at)),
+      ),
+    ),
+  get: (namespace: string, name: string, at?: DefinitionRead): Promise<Skill> =>
+    call((c) => c.skills.get({ params: { namespace, name }, query: originOf(at) }), read(Skill, repoOf(at))),
+  create: (namespace: string, body: SkillWrite, refuse?: Refuse): Promise<Skill> =>
+    call((c) => c.skills.create({ params: { namespace }, payload: body }), write(Skill, SKILL_WRITTEN, undefined, refuse)),
+  replace: (namespace: string, name: string, body: SkillWrite, refuse?: Refuse): Promise<Skill> =>
+    call((c) => c.skills.replace({ params: { namespace, name }, payload: body }), write(Skill, SKILL_WRITTEN, undefined, refuse)),
+  /** The builtin skill `name` copied into your library: the copy, as yours. */
+  copy: (namespace: string, name: string, refuse?: Refuse): Promise<Skill> =>
+    call((c) => c.skills.copy({ params: { namespace, name } }), write(Skill, SKILL_WRITTEN, undefined, refuse)),
+  files: (namespace: string, name: string, at?: DefinitionRead): Promise<SkillFiles> =>
+    call((c) => c.skills.files({ params: { namespace, name }, query: originOf(at) }), read(SkillFiles, repoOf(at))),
 };

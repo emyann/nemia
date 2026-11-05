@@ -109,7 +109,7 @@ function Place({
     <section aria-label={PLACE_LABELS[place.from]} data-skill-place={place.from} className="space-y-2 pt-4">
       <header className="space-y-0.5">
         <h3 className="text-label-medium text-muted-foreground uppercase">{PLACE_LABELS[place.from]}</h3>
-        <p className="font-mono text-body-small break-all text-muted-foreground">{place.dir}</p>
+        {place.dir !== null && <p className="font-mono text-body-small break-all text-muted-foreground">{place.dir}</p>}
         {place.from === 'builtin' && (
           <p data-copy-note className="text-body-small text-muted-foreground">
             An agent of yours finds no skill here. Copy to my library writes the skill's folder into your library at once — a write of its

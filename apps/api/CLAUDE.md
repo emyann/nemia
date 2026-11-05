@@ -46,7 +46,9 @@ from the orchestrator; what it holds today below its layer is in `docs/architect
 - **A new key in `STEP_KEYS` or `AGENT_KEYS` has sites here**: see `packages/agent-orchestrator/CLAUDE.md`.
 - **The objects are served by HttpApi handlers in `src/objects/`** (`runs.ts`, `cards.ts`, `factories.ts`; a factory's parts in
   `src/factory-parts/`: `mcp-servers.ts`, `schedules.ts`, `hires.ts`, `volumes.ts`, and in `parts.ts` what they share, their paths and
-  the guard words of their writes), built from `objects`' one `Api` into a web
+  the guard words of their writes; the Workflows, Agents and Skills in `src/definitions/`: `workflows.ts`, `agents.ts`, `skills.ts`,
+  in `served.ts` what they share and in `routes.ts` their paths and guard words, each request placed in its namespace's factory by
+  `placeFor`, a write of yours taken in `default` alone), built from `objects`' one `Api` into a web
   handler (`serve.ts`) that Hono's routes hand exactly the paths it serves, each inside `served`, guarded first where it writes: a handler
   reads the request's services (`ServedNow`, the app's informer among them), never a layer of its own. A path added to the `Api` gets its
   forwarding route there, or Hono answers it 404. The feed, `watch` and every other route stay Hono's.

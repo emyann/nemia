@@ -10,7 +10,7 @@ import { Effect } from 'effect';
 import { tried } from '../runtime-client.ts';
 import type { Args, Flag, Positional, Spec } from '../command/command.ts';
 import type { Command } from '../command/entry.verb.ts';
-import { apiKey, cliPath, factoryFlag, FROM, versionFlag, writerSpec, writerText, yoursOrRefused } from '../yours/yours.ts';
+import { cliPath, factoryFlag, FROM, versionFlag, writerSpec, writerText, yoursOrRefused } from '../yours/yours.ts';
 import { templatedTree } from '../factory/factory.store.ts';
 import { rooted } from '../wiring/wire.verb.ts';
 import { StoreRoot } from '../config/root.store.ts';
@@ -44,7 +44,6 @@ export const SKILLS_LIST: Command<Record<string, SkillRead>> = {
   spec: apiSpec([{ key: 'skills', takes: 'many', kind: 'name' }], []),
   writes: false,
   class: 'read',
-  route: { method: 'GET', path: '/api/skills', status: 200 },
   only: { side: 'api', why: "the board's skill picker lists every skill by place; at the command line a person lists the folders" },
   handler: (args, _env, home) =>
     rooted(
@@ -82,7 +81,6 @@ export const SKILLS_READ: Command<SkillPage> = {
   ),
   writes: false,
   class: 'read',
-  route: { method: 'GET', path: '/api/skills/:from/:name', status: 200 },
   only: {
     side: 'api',
     why: "the board's skill page reads one skill with its form and its users; at the command line a person reads its SKILL.md",
@@ -98,10 +96,6 @@ export const SKILLS_READ: Command<SkillPage> = {
     ),
   print: () => [],
 };
-
-/** Why the board's skill writes are served by the api's own routes. */
-const WRITE_HAND =
-  "the board guards the write, decodes the skill's form in its own words, answers a skill made with 201 and a change with 200, and reads the skill back";
 
 /** The words a written skill is said in: the files written, and the version it is at now, which a change of it gives. */
 const writtenLines = (data: SkillWritten | SkillCopied): string[] => [
@@ -135,17 +129,14 @@ export const SKILLS_WRITE: Command<SkillWritten | SkillCopied> = {
       ),
       versionFlag('skills write', 'the skill'),
       factoryFlag('skills write'),
-      apiKey('change', 'the command line reads the skill off --file, into the form the board sends'),
-      apiKey('copy', 'the board copies a builtin skill; the command line writes one a person wrote'),
-      apiKey('builtin', 'the board names the folder of builtin skills, where a copy is read from'),
     ],
   ),
   writes: true,
   class: 'ask',
-  route: [
-    { method: 'POST', path: '/api/skills/:from', status: 201, hand: WRITE_HAND },
-    { method: 'PUT', path: '/api/skills/:from/:name', status: 200, hand: WRITE_HAND },
-  ],
+  only: {
+    side: 'cli',
+    why: "the api serves it as the Skill's `create`, `replace` and `copy` verb of `objects`' Api (`/api/namespaces/:namespace/skills`), which calls this entry's handler: no route of its own",
+  },
   handler: (args, _env, home) =>
     rooted(
       home,

@@ -128,7 +128,7 @@ export default {
       await idle(p);
     };
     const puts = (name: string) => (r: Response) =>
-      r.request().method() === 'PUT' && new URL(r.url()).pathname === `/api/workflows/yours/${name}`;
+      r.request().method() === 'PUT' && new URL(r.url()).pathname === `/api/namespaces/default/workflows/${name}`;
 
     const mineDir = path.join(store!, 'workflows', yours.name);
     const before = filesIn(mineDir);
@@ -394,7 +394,7 @@ export default {
       await form.getByRole('radio', { name: /^On a repository's branches/ }).check();
       await photograph(form, path.join(OUT, `builder-new-chosen-${await themeOf(page)}.png`));
       const [created] = await Promise.all([
-        page.waitForResponse((r) => r.request().method() === 'POST' && new URL(r.url()).pathname === '/api/workflows/yours', {
+        page.waitForResponse((r) => r.request().method() === 'POST' && new URL(r.url()).pathname === '/api/namespaces/default/workflows', {
           timeout: WAIT_MS,
         }),
         make.click(),
@@ -449,16 +449,16 @@ export default {
       if ((await keys.locator('[data-field="output"] select').inputValue()) !== 'implement.schema.json')
         throw new Refused("once saved, implement's output names the schema beside it, as the folder lists it");
 
-      const answered = await page.request.get(new URL('/api/workflows', page.url()).href);
-      const listing = (
-        (await answered.json()) as Array<{
-          name: string;
-          from: string;
+      const answered = await page.request.get(new URL(`/api/namespaces/default/workflows/${name}?origin=yours`, page.url()).href);
+      const object = (await answered.json()) as {
+        status?: {
+          origin: string;
           steps: Array<{ name: string; spec: Record<string, unknown>; body: string }>;
           graph: { edges: unknown[] };
           error: string | null;
-        }>
-      ).find((w) => w.name === name && w.from === 'yours');
+        };
+      };
+      const listing = object.status?.origin === 'yours' ? object.status : undefined;
       const read = listing && {
         error: listing.error,
         steps: listing.steps.map((s) => [s.name, s.spec.after, s.spec.effort, s.spec.check, s.spec.output, s.body]),
@@ -474,7 +474,7 @@ export default {
       };
       if (JSON.stringify(read) !== JSON.stringify(want))
         throw new Refused(
-          `GET /api/workflows reads the folder as it was built, as a start would read it — it read ${JSON.stringify(read)}`,
+          `GET /api/namespaces/default/workflows/${name} reads the folder as it was built, as a start would read it — it read ${JSON.stringify(read)}`,
         );
       const files = [
         ['implement.md', `---\nafter: plan\nplace: git\neffort: high\ncheck: npm test\noutput: implement.schema.json\n---\n${implement}\n`],

@@ -1,6 +1,7 @@
 /**
  * An agent file copied into your library on the board's route (`POST /api/agents/yours/copy`, `nemia agents copy`'s entry), the agent
- * files the store knows read on `GET /api/agents/sources`, and where a copy came from on `GET /api/agents` — in a scratch store, from a
+ * files the store knows read on `GET /api/agents/sources`, and where a copy came from on `GET /api/namespaces/default/agents` — in a
+ * scratch store, from a
  * scratch folder. Every write is read back from disk, and every refusal is made to refuse, asserted on its words, with yours as it was.
  *
  * One story — a person copying an agent with its skill, watching its source change, copying another of the same name under another,
@@ -15,6 +16,7 @@ import path from 'node:path';
 import type { AgentSource } from 'agent-orchestrator';
 import { scratch } from '../../test/scratch.ts';
 import { app } from '../app.ts';
+import { listedIn } from '../../test/definitions.ts';
 import { story } from '../../test/checkpoints.ts';
 const repo = scratch('nemia-api-copy-repo-');
 process.env.HKB_REPO = repo;
@@ -64,7 +66,7 @@ test('a person copies an agent into theirs with its skill, reads where it came f
   const s = story(t);
 
   await s.test(
-    "an agent copied on the route is written into yours with its skill, and GET /api/agents lists where it came from, the source's change and its going",
+    "an agent copied on the route is written into yours with its skill, and the Agents list where it came from, the source's change and its going",
     async () => {
       const file = source('scout', ['description: Scouts the ground.', 'skills: scouting', 'model: sonnet']);
       const res = await copy({ file });
@@ -77,7 +79,7 @@ test('a person copies an agent into theirs with its skill, reads where it came f
       assert.equal(answer.record, path.join(root, 'agent-sources', 'scout.json'));
 
       const copiedOf = async () => {
-        const listed = (await (await app.request('/api/agents')).json()) as LibraryAgent[];
+        const listed = await listedIn<LibraryAgent>(app, 'agents', 'origin=yours');
         return listed.find((a) => a.from === 'yours' && a.name === 'scout')?.copied;
       };
       const first = await copiedOf();

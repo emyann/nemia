@@ -35,9 +35,8 @@
  *
  * `shipped` and `ships`, on the day decision 13a retired them (`Landed` in the run core's, the api's and the board's tables): the run's
  * sense, a run's result on its base, says `landed` everywhere since that card; the product's sense, what comes with Nemia (its git place,
- * the skills, servers and rules it lists), says `builtin` since decision 13b (its Builtin row in the same three tables). The one count left
- * is the api's former address of a builtin skill, `/api/skills/shipped/<name>`, which answers a permanent redirect to its `builtin` address
- * (`FORMER_BUILTIN`, `skills.ts`): it stays while a link or a bookmark may still name it.
+ * the skills, servers and rules it lists), says `builtin` since decision 13b (its Builtin row in the same three tables). The last count,
+ * the api's redirect from `/api/skills/shipped/<name>`, went with the per-kind skill routes (resource-objects: the Skill object).
  *
  * `accept`, on the day decision 7 retired it (`Approve` in the run core's table): `nemia accept` is `nemia approve` of a loop out of
  * rounds. What is left is the former spelling kept on purpose (`RENAMED`, read by admission and named in its doc), the record's names
@@ -161,9 +160,6 @@ export const RETIRED_COUNTS: Readonly<Record<string, Readonly<Record<string, num
   },
   staged: {
     'packages/agent-orchestrator/src/place/landing.store.ts': 4,
-  },
-  shipped: {
-    'apps/api/src/agents/skills.ts': 1,
   },
   stated: {
     'packages/agent-runtime/src/core/engine/journal.ts': 3,

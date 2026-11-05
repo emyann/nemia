@@ -503,7 +503,7 @@ export { list, pausedRead, runReading, unjudgedOf } from './list/list.verb.ts';
 export type { ReadingHow, RunReading } from './list/list.verb.ts';
 export type { DecideCommand } from './decide/decide.ts';
 export type { RunsListed, Unjudged } from './list/list.ts';
-export { graphOf, runGraph, type GraphEdge, type RunGraph } from './summary/graph.ts';
+export { graphOf, runGraph, typedGraphOf, type GraphEdge, type GraphStep, type RunGraph, type TypedGraph } from './summary/graph.ts';
 export {
   bare,
   filedTimes,
@@ -541,10 +541,10 @@ export { totalOf, usedOf, type RunRead, type StepUsed, type Usage } from './reso
 export { tailOf, type LastSaid, type StepCheck, type StepLog } from './resource/checks.verb.ts';
 export { refusedName, typeOf, type StepArtifact, type StepValue } from './resource/files.store.ts';
 export type { FinishedPage, FinishedRun, ListedRun, OpenRuns, RunClock, RunOutcome, StepCost, WaitingRun } from './runlist/runlist.verb.ts';
-export { driftWords, kindsDrift, revisionNow, REVISION_KINDS, stepsDrift } from './revisions/revisions.ts';
-export type { Drift, KindName, Pin, Revision, RevisionKind } from './revisions/revisions.ts';
-export { ledgerOf } from './revisions/revisions.store.ts';
+export { driftWords, kindsDrift, revisionNow, REVISION_KINDS, stepsDrift, type Drift, type KindName } from './revisions/revisions.ts';
 export { driftNow } from './revisions/pin.verb.ts';
+export type { Pin, Revision, RevisionKind } from './revisions/revisions.ts';
+export { definitionRevision, ledgerOf } from './revisions/revisions.store.ts';
 export { chatAnswer, chatHistory, chatRead, chatSay, chatStop, FILES_CHECK_MS, followChat, RECORD_BEAT_MS } from './chat/chat.verb.ts';
 export type { ChatChanges, ChatFollow, ChatFollowed, ChatHistory, ChatPlace, ChatReads, ChatSent } from './chat/chat.verb.ts';
 export type { Ask, AskAnswer, AskEvent, AskOption, AskPick, AskQuestion, CallState, ChatEvent, ChatFrom, Presence } from './chat/chat.ts';

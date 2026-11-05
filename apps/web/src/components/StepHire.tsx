@@ -40,11 +40,11 @@ export function StepHire({
 }) {
   const { data: page } = useQuery(stepQuery(from, workflow, step, place));
   if (!page || place.factory === undefined) return null;
-  return <Hiring page={page} where={where} />;
+  return <Hiring page={page} where={where} place={place} />;
 }
 
 /** The step's hire as `page` reads it, with the writes that change it, and a write's refusal in place. */
-function Hiring({ page, where }: { page: WorkflowStepPage; where: 'page' | 'row' }) {
+function Hiring({ page, where, place }: { page: WorkflowStepPage; where: 'page' | 'row'; place: PagePlace }) {
   const queryClient = useQueryClient();
   const { factory, hired, hiring } = page;
   const into = `${page.workflow}/${page.step}`;
@@ -62,7 +62,7 @@ function Hiring({ page, where }: { page: WorkflowStepPage; where: 'page' | 'row'
       {factory && hired ? (
         <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-body-small">
           <span className="text-muted-foreground">
-            {factory} hires <AgentLink from={page.from} name={hired} className="text-foreground" /> into this step.
+            {factory} hires <AgentLink from={page.from} name={hired} place={place} className="text-foreground" /> into this step.
           </span>
           <Button variant="outline" size="xs" data-fire={hired} isDisabled={write.isPending} onPress={() => send({ kind: 'fire' })}>
             Fire

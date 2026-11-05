@@ -93,6 +93,10 @@ test('pickedOf, destinationHref and pickTo: the picked factory, read and carried
       assert.equal(pickedOf('/factories/nemia', { factory: 'hiring' }), 'nemia', 'on a floor the path wins over a stray ?factory=');
       assert.equal(pickedOf('/workflows/repo/dev', { factory: 'hiring' }), 'hiring', "a workflow's page is read in the factory picked");
       assert.equal(pickedOf('/workflows/yours/w/review', { factory: 'hiring' }), 'hiring', "and a step's page");
+      assert.equal(pickedOf('/agents/factory/drafter', { factory: 'treed' }), 'treed', "a factory's own agent is read in its factory");
+      assert.equal(pickedOf('/agents/skills/factory/outline', { factory: 'treed' }), 'treed', 'and its own skill');
+      for (const path of ['/agents/yours/drafter', '/agents/skills/repo/outline'])
+        assert.equal(pickedOf(path, { factory: 'treed' }), undefined, `refused: ${path} is read in default, whatever factory is picked`);
       for (const path of ['/runs/r-1', '/agents', '/inbox/card', '/', '/workflows/repo/dev', '/workflows/repo/dev/review'])
         assert.equal(pickedOf(path, {}), undefined, `${path} picks none`);
       for (const path of ['/runs/r-1', '/agents', '/inbox/card', '/', '/stats'])
@@ -138,6 +142,21 @@ test('pickedOf, destinationHref and pickTo: the picked factory, read and carried
         "refused: /stats is no section's page, and a pick there opens the floor",
       );
       assert.deepEqual(pickTo('/factories/nemia', {}, undefined), { to: '/' });
+      assert.deepEqual(
+        pickTo('/agents/factory/drafter', { factory: 'treed', repo: '/x' }, 'other'),
+        { to: '/agents/$from/$agent', params: { from: 'factory', agent: 'drafter' }, search: { factory: 'other' } },
+        "a pick on a factory's own agent reads the same name in the factory picked, the repository of the one left dropped",
+      );
+      assert.deepEqual(
+        pickTo('/agents/skills/factory/outline', { factory: 'treed' }, 'other'),
+        { to: '/agents/skills/$from/$skill', params: { from: 'factory', skill: 'outline' }, search: { factory: 'other' } },
+        'and on its own skill',
+      );
+      assert.deepEqual(
+        pickTo('/agents/factory/drafter', { factory: 'treed' }, undefined),
+        { to: '/agents' },
+        "All factories on a factory's own agent opens the Agents page, since no factory's own is read outside its factory",
+      );
       assert.deepEqual(pickTo('/factories/nemia', {}, 'hiring'), { to: '/factories/$factory', params: { factory: 'hiring' } });
       assert.deepEqual(
         pickTo('/factories/nemia/settings', {}, undefined),

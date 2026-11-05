@@ -125,14 +125,21 @@ class merge do, which no test refuses — are in `.claude/skills/change-the-boar
   from the code's, it is translated there alone: `status.ts` reads the codes, `runWords.ts` and `stepCard.ts` compose.
   `test/structure.test.ts` refuses a rail word spelled elsewhere, a retired phrasing (`waits for you`, `check refused`, `not signed`,
   `cancelled` said to a person) and a runtime word (`journal`, `engine`, `WF_MAX_RUNS`) on hover.
-- A value two files under `lib/api/` need sits in a sibling that imports no sibling: the builder's saves decode a `WorkflowListing`, so
-  they sit in `workflows.ts` beside its schema.
-- A kind of `objects` (the Run, the Card, the Factory, the McpServer, the Schedule, the Hire, the Volume) is read through
-  `lib/api/objects.ts`, never a schema of the board's: its client is made from `objects`' `Api`, and each call rejects as `get` and
+- A value two files under `lib/api/` need sits in a sibling that imports no sibling: the word a route kept on Hono reads for a workflow's
+  origin (`sourceOf`) and a card entry copied (`cardEntryOf`) sit in `library.ts`, which `workflows.ts`, `agents.ts`, `skills.ts` and
+  `inbox.ts` all read.
+- A kind of `objects` (the Run, the Card, the Factory, the McpServer, the Schedule, the Hire, the Volume, the Workflow, the Agent, the
+  Skill) is read through `lib/api/objects.ts`, never a schema of the board's: its client is made from `objects`' `Api`, and each call rejects as `get` and
   `send` do (`ReadRefusal`, `WriteRefusal`, `UnreadAnswer`). The inbox's entry is made of a `Card` in one place (`entryOf`,
   `lib/api/inbox.ts`), and the pages' view of a factory of a `Factory`, its `FactoryCommands` and its schedules in one place
   (`factoryViewOf`, `lib/api/factories.ts`), which `factoriesQuery` reads together. A hire is written to its `Hire`, named
-  `<workflow>.<step>`; a server's header is served as the mask (`HEADER_MASK`), and a form sends it back unchanged to keep the value. `test/structure.test.ts` refuses a `*.gen.ts` under `src/lib/api` and a
+  `<workflow>.<step>`; a server's header is served as the mask (`HEADER_MASK`), and a form sends it back unchanged to keep the value.
+  A definition is seen as the board's view of its kind in one place each — `workflowViewOf` (`lib/api/workflows.ts`), `agentViewOf`
+  (`agents.ts`), `skillRowOf` and `skillDetailOf` (`skills.ts`) — read in `default` where the board has no factory, else in the factory's
+  namespace; the Agents and Skills pages read each origin whole (`?origin=`), shadowed or not, and a page's `$from` is the origin, `factory`
+  among its words, a definition of the factory's own offering no write and saying its way (`FACTORY_WAY`, `lib/factories.ts`). A save of
+  the builder sends each step as its file writes it (`writtenStepOf`). The routes kept on Hono (a step's page, a start, a card's
+  `from:`) read the factory's tree as `repo` (`sourceOf`), and an address naming `repo` finds a workflow of the factory's (`fromMatches`). `test/structure.test.ts` refuses a `*.gen.ts` under `src/lib/api` and a
   Schema of `src` named as a kind of `objects`.
 
 ## Invariants no test holds

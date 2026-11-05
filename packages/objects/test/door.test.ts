@@ -41,6 +41,9 @@ const GET_PATHS: Record<(typeof KINDS)[number], string> = {
   Schedule: '/api/namespaces/:namespace/schedules/:name',
   Hire: '/api/namespaces/:namespace/hires/:name',
   Volume: '/api/namespaces/:namespace/volumes/:name',
+  Workflow: '/api/namespaces/:namespace/workflows/:name',
+  Agent: '/api/namespaces/:namespace/agents/:name',
+  Skill: '/api/namespaces/:namespace/skills/:name',
 };
 
 /** The kinds whose list is a later intent. */

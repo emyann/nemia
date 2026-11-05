@@ -54,7 +54,7 @@ function StepPage() {
             {fromWord(page.from, place.factory)}
           </span>
         </div>
-        <StepAgent page={page} />
+        <StepAgent page={page} place={place} />
         <Skills skills={page.agentSkills} className="pl-3" />
         <StepHire from={from} workflow={workflow} step={step} place={place} where="page" />
       </header>

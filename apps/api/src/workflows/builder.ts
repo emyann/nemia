@@ -22,16 +22,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Effect, Schema } from 'effect';
 import { Hono } from 'hono';
-import {
-  AgentDoor,
-  HARNESS_CHOICES,
-  remoteAgents,
-  SkillDoor,
-  type WorkflowWritten,
-  repoWriteRefusal,
-  workflowStale,
-  workflowVersion,
-} from 'agent-orchestrator';
+import { AgentDoor, HARNESS_CHOICES, remoteAgents, SkillDoor, type WorkflowWritten, workflowVersion } from 'agent-orchestrator';
 import {
   AGENT_KEYS,
   AGENT_OWN_KEYS,
@@ -52,12 +43,11 @@ import {
   type StepDraft,
   type StepKey,
 } from 'agent-orchestrator/workflow';
-import { readBody, valueAt, type BodyIssue, type Words } from '../body.ts';
-import { refusedBeforeReading, type Guarded, type Refusal } from '../guard.ts';
+import { type Guarded, type Refusal } from '../guard.ts';
 import { type ApiEnv, type Served, served } from '../layer.ts';
-import { KINDS, schemaNameRefusal, WORDS, workflowNameRefusal, type KeyKind } from './words.ts';
+import { KINDS, schemaNameRefusal, WORDS, type KeyKind } from './words.ts';
 import type { Engine } from '../store.ts';
-import { folderOf, listed, loadedAt, loadedOf, placesOf, specOf, type WorkflowListing, type WorkflowStepSpec } from './workflows.ts';
+import { listed, loadedAt, loadedOf, placesOf, specOf, type WorkflowListing, type WorkflowStepSpec } from './workflows.ts';
 import { commandNamed, runPlaced } from '../store.ts';
 import type { PlaceService } from 'agent-orchestrator';
 
@@ -203,11 +193,6 @@ export function stepsNamed(message: string, names: readonly string[]): string[] 
 
 const isObject = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
 
-const STEP_SHAPE =
-  '`{ "name": "<step>", "spec": { "after": ["<step>"], "harness": "claude", … }, "body": "<what its agent is told>", "own"?: { "keys": ["<key>", …], "body": "<its own note>" } }`, as GET /api/workflows lists a step, a key unset as null or left out';
-const PUT_SHAPE = `\`{ "version": "<as GET /api/workflows lists it>", "steps": [<step>, …], "schemas"?: [{ "file": "<name>.json", "text": "<a JSON Schema>" }, …], "readme"?: "<README.md>" }\`, each step ${STEP_SHAPE}`;
-const POST_SHAPE = `\`{ "name": "<workflow>", "step": <step>, "readme"?: "<README.md>" }\`, the step ${STEP_SHAPE}`;
-
 /**
  * A step as a request sends it, its keys in the order they are refused. Each key of `spec` is typed by its kind (`KINDS`, in `draftOf`),
  * and a key no step has is passed on as it came, for the package to refuse in its words.
@@ -218,87 +203,7 @@ const STEP_BODY = Schema.Struct({
   spec: Schema.optionalKey(Schema.Record(Schema.String, Schema.Unknown)),
   own: Schema.optionalKey(Schema.NullOr(Schema.Struct({ keys: Schema.Array(Schema.String), body: Schema.String }))),
 });
-type StepBody = typeof STEP_BODY.Type;
-
-/** A `from` beside a write: yours, the only place the builder writes (`yoursOnly` refuses any other, through the route's words). */
-const FROM = Schema.optionalKey(Schema.Literal('yours'));
-const README = Schema.optionalKey(Schema.String);
-
-const POST_BODY = Schema.Struct({
-  from: FROM,
-  name: Schema.String.check(Schema.makeFilter((name: string) => workflowNameRefusal(name) === undefined)),
-  step: STEP_BODY,
-  readme: README,
-});
-
-/** A schema's file is one beside the steps (`schemaNameRefusal`), refused before its text is read. */
-const PUT_BODY = Schema.Struct({
-  from: FROM,
-  version: Schema.NonEmptyString,
-  steps: Schema.Array(STEP_BODY),
-  schemas: Schema.optionalKey(
-    Schema.Array(
-      Schema.Struct({
-        file: Schema.String.check(Schema.makeFilter((file: string) => schemaNameRefusal(file) === undefined)),
-        text: Schema.String,
-      }),
-    ),
-  ),
-  readme: README,
-});
-
-/** Why a step sent at `path` is not one (400), by the first of its keys its schema refused: `at` is how the sentence names it. */
-function stepWords(at: string, step: unknown, [key]: ReadonlyArray<PropertyKey>, route: string, shape: string): string {
-  const said = (why: string) => `${route}: ${why} Send ${shape}.`;
-  if (key === undefined) return said(`${at} is ${JSON.stringify(step)}, and a step is an object.`);
-  if (key === 'name') return said(`${at} has no \`name\`: a step is named by its file, without .md.`);
-  const called = `${at} (${String(valueAt(step, ['name']))})`;
-  if (key === 'body') return said(`${called} has no \`body\`, what its agent is told, as a string.`);
-  if (key === 'spec')
-    return said(`${called}'s \`spec\` is ${JSON.stringify(valueAt(step, ['spec']))}, and it is an object of the step's keys.`);
-  return said(
-    `${called}'s \`own\` is ${JSON.stringify(valueAt(step, ['own']))}, and it is what a step with an agent sets itself: \`{ "keys": ["<key>", …], "body": "<its own note>" }\`, as GET /api/workflows lists it, or null.`,
-  );
-}
-
-/** A readme that is not text, refused (400): a string, or left out for the README as it is. */
-const readmeWords = (readme: unknown, route: string, shape: string): string =>
-  `${route}: \`readme\` is the README's text, a string, or left out to leave it as it is — this request's was ${JSON.stringify(readme)}. Send ${shape}.`;
-
-/** Why a POST's body is not a new folder: another place (`yoursOnly`), a name that is not a folder's, its step, its readme. */
-function postWords(route: string, repo: string, home: string): Words {
-  return ({ path: [key, ...rest], input }: BodyIssue, body: unknown) => {
-    const name = valueAt(body, ['name']);
-    if (key === 'from')
-      return yoursOnly(route, input, typeof name === 'string' ? name : null, repo, home) ?? `${route}: \`from\` is yours.`;
-    if (key === 'name') return workflowNameRefusal(input) ?? `${route} takes a JSON object: ${POST_SHAPE}.`;
-    if (key === 'step') return stepWords('`step`', valueAt(body, ['step']), rest, route, POST_SHAPE);
-    if (key === 'readme') return readmeWords(input, route, POST_SHAPE);
-    return `${route} takes a JSON object: ${POST_SHAPE}.`;
-  };
-}
-
-/** Why a PUT's body is not a folder's steps: another place (`yoursOnly`), no version, its steps, its schemas, its readme. */
-function putWords(route: string, name: string, repo: string, home: string): Words {
-  return ({ path: [key, i, ...rest], input }: BodyIssue, body: unknown) => {
-    if (key === 'from') return yoursOnly(route, input, name, repo, home) ?? `${route}: \`from\` is yours.`;
-    if (key === 'version')
-      return `${route} takes the \`version\` the folder was read at, as GET /api/workflows lists it, so a save of a folder that has changed since is refused rather than written over what changed. This request's was ${JSON.stringify(input)}: read the folder, then send ${PUT_SHAPE}.`;
-    if (key === 'steps' && typeof i === 'number') return stepWords(`step ${i + 1}`, valueAt(body, ['steps', i]), rest, route, PUT_SHAPE);
-    if (key === 'steps') return `${route} takes the workflow's steps in \`steps\`, a list: ${PUT_SHAPE}.`;
-    if (key === 'schemas' && typeof i === 'number') {
-      const schema = valueAt(body, ['schemas', i]);
-      const file = valueAt(schema, ['file']);
-      const whole = typeof file === 'string' && typeof valueAt(schema, ['text']) === 'string';
-      if (whole && rest[0] === 'file') return schemaNameRefusal(file) ?? `${route}: \`${file}\` is not a schema's file.`;
-      return `${route}: schema ${i + 1} is ${JSON.stringify(schema)}, and a schema is \`{ "file": "<name>.json", "text": "<a JSON Schema>" }\`. Send ${PUT_SHAPE}.`;
-    }
-    if (key === 'schemas')
-      return `${route}: \`schemas\` is the schemas to write beside the steps, a list, or left out for none — this request's was ${JSON.stringify(input)}. Send ${PUT_SHAPE}.`;
-    if (key === 'readme') return readmeWords(input, route, PUT_SHAPE);
-    return `${route} takes a JSON object: ${PUT_SHAPE}.`;
-  };
-}
+export type StepBody = typeof STEP_BODY.Type;
 
 /** A write of yours, as the guard's refusals word it (guard.ts). */
 export const buildGuard = (route: string, does: string, shape: string): Guarded => ({
@@ -310,19 +215,6 @@ export const buildGuard = (route: string, does: string, shape: string): Guarded 
   instead: "Build it on the board's Workflows page, or edit the folder's files",
   shape,
 });
-
-/**
- * Why a write is not one of yours (403 for the repository's, with the copy to make by hand; 400 for anywhere else), or null. The api writes
- * nothing into a checkout: git would show a change nobody typed there, and a run started from the checkout would run it.
- */
-export function yoursOnly(route: string, from: unknown, name: string | null, repo: string, home: string): Refusal | null {
-  if (from === 'yours') return null;
-  if (from === 'repo') return { status: 403, error: repoWriteRefusal(route, 'workflows', name, repo, home) };
-  return {
-    status: 400,
-    error: `${route}: the builder writes yours, at /api/workflows/yours/…, and this request named ${JSON.stringify(from)}.`,
-  };
-}
 
 /** What a JSON value of each kind is, as a refusal of the wrong one says it. */
 const TYPES: Readonly<Record<KeyKind, { is: (value: unknown) => boolean; said: string }>> = (() => {
@@ -357,7 +249,7 @@ const TYPES: Readonly<Record<KeyKind, { is: (value: unknown) => boolean; said: s
  * agent's value in the step; its wiring is always its own.
  * Sent without `own`, every key it sets is its own and `body` is its note (the package's `StepDraft`, whose `agent` is a name).
  */
-function draftOf(step: StepBody, at: string, route: string, shape: string): StepDraft | Refusal {
+export function draftOf(step: StepBody, at: string, route: string, shape: string): StepDraft | Refusal {
   const { name, spec = {}, body, own } = step;
   const called = `${at} (${name})`;
   const draft: Record<string, unknown> = { after: [] };
@@ -377,23 +269,25 @@ function draftOf(step: StepBody, at: string, route: string, shape: string): Step
   return { ...draft, name, body: mine ? mine.body : body } as StepDraft;
 }
 
-const isRoleKey = (key: string): boolean => (ROLE_KEYS as readonly string[]).includes(key);
+export const isRoleKey = (key: string): boolean => (ROLE_KEYS as readonly string[]).includes(key);
 
 /** A schema a save writes beside the steps: its file's name and its text, as it is written. */
 export type SchemaFile = { file: string; text: string };
 
 /**
- * The schemas a PUT carries, or why not: not a list of `{ file, text }` (400), a file that is not a schema's (400, `schemaNameRefusal`) or
- * given twice (400). Each text is written ending in a line break, as a file is. Whether it is a schema a step can name is judged with the
- * steps.
+ * The schemas a PUT carries, or why not: a file that is not a schema's (400, `schemaNameRefusal`) or given twice (400, its refusal
+ * saying the route's `shape`). Each text is written ending in a line break, as a file is. Whether it is a schema a step can name is judged
+ * with the steps.
  */
-function schemasOf(schemas: typeof PUT_BODY.Type.schemas, route: string): SchemaFile[] | Refusal {
+export function schemasOf(schemas: readonly SchemaFile[] | undefined, route: string, shape: string): SchemaFile[] | Refusal {
   const out: SchemaFile[] = [];
   for (const schema of schemas ?? []) {
+    const wrong = schemaNameRefusal(schema.file);
+    if (wrong !== undefined) return { status: 400, error: `${route}: ${wrong}` };
     if (out.some((s) => s.file === schema.file))
       return {
         status: 400,
-        error: `${route}: ${schema.file} is given twice, and a file holds one schema. Give it once. Send ${PUT_SHAPE}.`,
+        error: `${route}: ${schema.file} is given twice, and a file holds one schema. Give it once. Send ${shape}.`,
       };
     out.push({ file: schema.file, text: schema.text.endsWith('\n') ? schema.text : `${schema.text}\n` });
   }
@@ -504,7 +398,7 @@ const WRITE = commandNamed('workflows write');
  * there (`changes`), handed the version it holds once its schemas are written, or a new one. The agents and skills its schemas are
  * judged with are read through the doors on the request's services (`inRequest`).
  */
-type Writing = {
+export type Writing = {
   e: Engine['Service'];
   placeService: PlaceService['Service'];
   name: string;
@@ -528,7 +422,7 @@ type Writing = {
  * Every schema the save has reached is put back, the one it was writing among them, should that write fail, or a later one, or the folder:
  * a write that fails partway has changed the file all the same, so a schema counts as written before its write, not after it.
  */
-async function write(
+export async function write(
   { e, placeService, name, dir, repo, home, changes, inRequest }: Writing,
   steps: readonly StepDraft[],
   readme: string | undefined,
@@ -598,81 +492,61 @@ async function write(
 }
 
 /**
- * The builder's routes. Each write is guarded (guard.ts) and writes only yours (`yoursOnly`: 403 for the repository's, with the copy to
- * make by hand); the body is refused as `postWords`, `putWords` and `draftOf` say (400), the package's refusal is a 422 with the steps it
- * names (`write`), and anything else a 500.
- *
- * - `GET /api/workflows/keys` — what a step's form is drawn from: the package's keys, in its order, and what each may be set to.
- * - `POST /api/workflows/:from` — a new folder of yours with its first step: `writeWorkflow` on a folder that is not there yet. 409, the
- *   package's refusal, for a name yours has already, a workflow or another file. 201 with the folder read back.
- * - `PUT /api/workflows/:from/:name` — a folder of yours put back from its steps: every step it is to have, as the listing has them, with
- *   the schemas pasted for them. 404 or 409 as `folderOf` says; 409 when the `version` the draft was read at is not what the folder holds
- *   now, since a step edited, added or removed since would be written over — nothing is written. 200 with the folder read back.
+ * The builder's route, `GET /api/workflows/keys`: what a step's form is drawn from, the package's keys, in its order, and what each may
+ * be set to. Its writes are the Workflow object's (`src/definitions/workflows.ts`), which call `draftOf`, `schemasOf` and `write` here.
  */
-export const builder = new Hono<ApiEnv>()
-  .get('/api/workflows/keys', (c) => served(c, async ({ home, inRequest }) => c.json(keyForm(await inRequest(yourAgentsRead(home))))))
-  .post('/api/workflows/:from', (c) =>
-    served(c, async ({ e, placeService, repo, home, inRequest }) => {
-      const { from } = c.req.param();
-      const route = `POST /api/workflows/${from}`;
-      const refused = refusedBeforeReading(
-        buildGuard(route, 'writes a workflow', POST_SHAPE),
-        c.req.header('host'),
-        c.req.header('sec-fetch-site'),
-        c.req.header('content-type'),
-      );
-      if (refused) return c.json({ error: refused.error }, refused.status);
-      const where = yoursOnly(route, from, null, repo, home);
-      if (where) return c.json({ error: where.error }, where.status);
-      const read = await readBody(c.req, POST_BODY, `${route} takes a JSON body: ${POST_SHAPE}.`, postWords(route, repo, home));
-      if ('status' in read) return c.json({ error: read.error }, read.status);
-      const { name, readme } = read.body;
-      const step = draftOf(read.body.step, '`step`', route, POST_SHAPE);
-      if ('status' in step) return c.json({ error: step.error }, step.status);
-      const dir = path.join(home, 'workflows', name);
-      const saved = await write({ e, placeService, name, dir, repo, home, changes: false, inRequest }, [step], readme);
-      if ('error' in saved) return c.json(saved, 422);
-      return c.json(saved, 201);
-    }),
-  )
-  .put('/api/workflows/:from/:name', (c) =>
-    served(c, async ({ e, placeService, repo, home, inRequest }) => {
-      const { from, name } = c.req.param();
-      const route = `PUT /api/workflows/${from}/${name}`;
-      const refused = refusedBeforeReading(
-        buildGuard(route, 'writes a workflow', PUT_SHAPE),
-        c.req.header('host'),
-        c.req.header('sec-fetch-site'),
-        c.req.header('content-type'),
-      );
-      if (refused) return c.json({ error: refused.error }, refused.status);
-      const where = yoursOnly(route, from, name, repo, home);
-      if (where) return c.json({ error: where.error }, where.status);
-      const read = await readBody(c.req, PUT_BODY, `${route} takes a JSON body: ${PUT_SHAPE}.`, putWords(route, name, repo, home));
-      if ('status' in read) return c.json({ error: read.error }, read.status);
-      const { body } = read;
-      const steps: StepDraft[] = [];
-      for (const [i, step] of body.steps.entries()) {
-        const draft = draftOf(step, `step ${i + 1}`, route, PUT_SHAPE);
-        if ('status' in draft) return c.json({ error: draft.error }, draft.status);
-        steps.push(draft);
-      }
-      const schemas = schemasOf(body.schemas, route);
-      if ('status' in schemas) return c.json({ error: schemas.error }, schemas.status);
-      const folder = folderOf(name, 'yours', repo, home);
-      if ('status' in folder) {
-        const make = folder.status === 404 ? ` To make a new one, POST /api/workflows/yours with its name and a first step.` : '';
-        return c.json({ error: `${folder.error}${make}` }, folder.status);
-      }
-      const now = await inRequest(workflowVersion(folder.dir, placesOf(repo, home)));
-      if (now !== body.version) return c.json({ error: workflowStale.write(folder.dir, body.version, now), steps: [] }, 409);
-      const saved = await write(
-        { e, placeService, name, dir: folder.dir, repo, home, changes: true, inRequest },
-        steps,
-        body.readme,
-        schemas,
-      );
-      if ('error' in saved) return c.json(saved, 422);
-      return c.json(saved, 200);
-    }),
-  );
+export const builder = new Hono<ApiEnv>().get('/api/workflows/keys', (c) =>
+  served(c, async ({ home, inRequest }) => c.json(keyForm(await inRequest(yourAgentsRead(home))))),
+);
+
+/**
+ * What the definitions' handlers read of the disk (src/definitions/), kept beside the folder store's other reads until the folder store
+ * moves them: when a file was last written (the epoch where it cannot be read), the names of the `.md` files directly in a folder, the
+ * folders holding a SKILL.md (a link among them), a SKILL.md's text (none for a link the picker refused), and a folder's files by path.
+ */
+export const writtenAt = (at: string): string => {
+  try {
+    return fs.statSync(at).mtime.toISOString();
+  } catch {
+    return new Date(0).toISOString();
+  }
+};
+
+export const markdownNamesIn = (dir: string): string[] => {
+  try {
+    return fs
+      .readdirSync(dir, { withFileTypes: true })
+      .filter((e) => e.isFile() && e.name.endsWith('.md'))
+      .map((e) => e.name.slice(0, -'.md'.length))
+      .sort();
+  } catch {
+    return [];
+  }
+};
+
+export const skillFoldersIn = (dir: string): string[] => {
+  try {
+    return fs
+      .readdirSync(dir, { withFileTypes: true })
+      .filter((e) => e.isDirectory() && fs.existsSync(path.join(dir, e.name, 'SKILL.md')))
+      .map((e) => e.name)
+      .sort();
+  } catch {
+    return [];
+  }
+};
+
+export const skillTextOf = (dir: string, refused: boolean): string | null => {
+  try {
+    if (refused && fs.lstatSync(dir).isSymbolicLink()) return null;
+    return fs.readFileSync(path.join(dir, 'SKILL.md'), 'utf8');
+  } catch {
+    return null;
+  }
+};
+
+export const filesUnder = (dir: string, under = ''): string[] =>
+  fs
+    .readdirSync(path.join(dir, under), { withFileTypes: true })
+    .flatMap((e) => (e.isDirectory() ? filesUnder(dir, path.join(under, e.name)) : [path.join(under, e.name)]))
+    .sort();

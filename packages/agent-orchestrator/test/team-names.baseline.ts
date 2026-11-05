@@ -48,7 +48,6 @@ export const TEAM_NAMES: Baseline = {
   'apps/web/test/read-library.test.ts': { count: 4, ...TEAM_MOVES.fixtures },
   'apps/web/test/step-card.test.ts': { count: 3, ...TEAM_MOVES.fixtures },
   'apps/web/test/strip.test.ts': { count: 20, ...TEAM_MOVES.fixtures },
-  'apps/web/test/write.test.ts': { count: 6, ...TEAM_MOVES.fixtures },
   'packages/agent-orchestrator/src/admission/admission.test.ts': { count: 10, ...TEAM_MOVES.fixtures },
   'packages/agent-orchestrator/src/cli/watch.test.ts': { count: 8, ...TEAM_MOVES.fixtures },
   'packages/agent-orchestrator/src/command/command.test.ts': { count: 8, ...TEAM_MOVES.fixtures },

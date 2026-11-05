@@ -87,7 +87,7 @@ test('the OpenAPI document is 3.1.0, defines `Run`, and imports back into a Sche
 
 test('the document is the one Effect writes of the Api, and holds, for each of KINDS, its get path and its component', async () => {
   const doc = (await (await app().request('/openapi/v3/nemia/v1')).json()) as {
-    paths: Record<string, { get?: unknown }>;
+    paths: Record<string, { get?: unknown; post?: unknown }>;
     components: { schemas: Record<string, unknown> };
   };
   assert.deepEqual(doc, JSON.parse(JSON.stringify(OpenApi.fromApi(Api))), 'the document is OpenApi.fromApi(Api), as JSON');
@@ -99,6 +99,9 @@ test('the document is the one Effect writes of the Api, and holds, for each of K
     Schedule: '/api/namespaces/{namespace}/schedules/{name}',
     Hire: '/api/namespaces/{namespace}/hires/{name}',
     Volume: '/api/namespaces/{namespace}/volumes/{name}',
+    Workflow: '/api/namespaces/{namespace}/workflows/{name}',
+    Agent: '/api/namespaces/{namespace}/agents/{name}',
+    Skill: '/api/namespaces/{namespace}/skills/{name}',
   } as const;
   for (const kind of KINDS) {
     assert.ok(doc.paths[GET_PATHS[kind]]?.get, `${kind} is got at ${GET_PATHS[kind]}`);
@@ -107,12 +110,16 @@ test('the document is the one Effect writes of the Api, and holds, for each of K
   assert.ok(doc.paths['/api/cards']?.get, 'the cards are listed across namespaces');
   assert.ok(doc.paths['/api/namespaces/{namespace}/cards']?.get, 'and in one');
   assert.ok(doc.components.schemas['CardList'], 'CardList is a component');
-  for (const kind of ['Factory', 'McpServer', 'Schedule', 'Hire', 'Volume'])
+  for (const kind of ['Factory', 'McpServer', 'Schedule', 'Hire', 'Volume', 'Workflow', 'Agent', 'Skill'])
     assert.ok(doc.components.schemas[`${kind}List`], `${kind}List is a component`);
   assert.ok(doc.paths['/api/factories']?.get, 'the factories are listed, cluster-scoped');
-  for (const plural of ['mcpservers', 'schedules', 'hires', 'volumes'])
+  for (const plural of ['mcpservers', 'schedules', 'hires', 'volumes', 'workflows', 'agents', 'skills'])
     assert.ok(doc.paths[`/api/namespaces/{namespace}/${plural}`]?.get, `the ${plural} are listed in a factory's namespace`);
   assert.ok(doc.paths['/api/builtin/mcpservers']?.get, "Nemia's builtin servers are listed");
+  assert.ok(doc.paths['/api/namespaces/{namespace}/agents/{name}/try']?.post, 'an agent is tried');
+  assert.ok(doc.paths['/api/namespaces/{namespace}/agents/{name}/card']?.get, 'and its card read');
+  assert.ok(doc.paths['/api/namespaces/{namespace}/skills/{name}/copy']?.post, 'a builtin skill is copied');
+  assert.ok(doc.paths['/api/namespaces/{namespace}/skills/{name}/files']?.get, "and a skill's files listed");
   assert.ok(doc.paths['/api/factories/{name}/commands']?.get, "a factory's command lines are got");
   assert.ok(doc.components.schemas['FactoryCommands'], 'FactoryCommands is a component');
 });

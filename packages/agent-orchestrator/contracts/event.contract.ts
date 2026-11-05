@@ -1,6 +1,6 @@
 /**
- * A feed line served as an `Event` (agent-orchestrator, src/event-object/event.ts; no code yet): the namespace it is served in, and the reason it
- * is served under.
+ * A feed line served as an `Event` (agent-orchestrator, src/event-object/event.ts): the namespace it is served in, and the reason it is
+ * served under.
  *
  * Its namespace (`eventNamespace`): the factory its line names (`labels.factory`, `default` on a run's line in the default
  * factory); a run's or a step's line that names none, written before lines carried labels, is in `default`, since every run is in a

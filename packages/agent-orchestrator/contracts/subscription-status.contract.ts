@@ -1,6 +1,6 @@
 /**
  * Where the deliverer is with a subscription, as its `Subscription` object's status says it (agent-orchestrator,
- * src/subscription-object/subscription.ts; no code yet): the byte of the feed every line before which is delivered or folded (`cursor`), how many
+ * src/subscription-object/subscription.ts): the byte of the feed every line before which is delivered or folded (`cursor`), how many
  * routine lines are folded and not yet said (`pending`, the digest's length), and when the first of them was folded (`since`, ms).
  *
  * The deliverer's file speaks for the subscription only where it was written for it, the same task and the same `from` (`resumedAt`,

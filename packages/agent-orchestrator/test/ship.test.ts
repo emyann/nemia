@@ -24,6 +24,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Effect } from 'effect';
 import type { Engine } from '../src/runtime-client.ts';
+import type { TestEnd } from 'agent-runtime/testing';
 import { scratch } from './scratch.ts';
 import { decideScreen } from './screens.ts';
 import { placeOver, unreadBy } from './place-over.ts';
@@ -1505,6 +1506,54 @@ test("an ending its workflow files with no gate waits for the checkout while ano
     const landed = readRun(a.id).steps.ship?.landed;
     assert.ok(landed && 'aborted' in landed, 'A landed nothing');
     assert.deepEqual((await at.pass(b.id)).filed, ['ship']);
+    assert.equal(readRun(b.id).steps.ship?.workspace, repo);
+  });
+});
+
+test("a try the run files itself of its land waits for the checkout while another run's landing holds it, and is filed on the first pass after that run lands", async (t) => {
+  const s = story(t);
+  const { settle, end } = stage.board();
+  const repo = at.aRepo();
+  const a = await at.workDone(at.ungatedFolder(), repo);
+  const b = await at.workDone(at.ungatedFolder(), repo);
+
+  await s.test("B's review passes first, and B's land takes the checkout: A's land, filed by its own review's pass, waits", async () => {
+    settle(`${b.id}-review`, 'succeeded', { ...SIGNED, again: false });
+    assert.deepEqual((await at.pass(b.id)).filed, ['ship']);
+    settle(`${a.id}-review`, 'succeeded', { ...SIGNED, again: false });
+    assert.deepEqual((await at.pass(a.id)).filed, [], "B's land holds the checkout");
+  });
+
+  await s.test("B's land ends without its closeout, and A's land, the older claim, takes the checkout", async () => {
+    end(`${b.id}-ship`, 'succeeded', { reason: 'harness', closedOut: false, former: 'unsigned' } as TestEnd);
+    assert.deepEqual((await at.pass(a.id)).filed, ['ship']);
+  });
+
+  await s.test("B's sign-off try is not filed while A's land holds the checkout", async () => {
+    const passed = await at.pass(b.id);
+    assert.deepEqual([passed.tried, passed.filed], [[], []]);
+    assert.equal(readRun(b.id).steps.ship?.taskId, `${b.id}-ship`, 'no try of it filed');
+    await at.aPass(e());
+    const ship = await shipOf(b.id);
+    assert.equal(ship.message, 'unsigned', 'the step stands as it ended');
+    assert.match(ship.note ?? '', new RegExp(`waiting on the checkout \\(${a.id}'s ship has it\\)`), 'and its try waits');
+    assert.deepEqual((await stage.runWith(e(), decideRun(b.id))).checkout, { run: a.id, step: 'ship' });
+  });
+
+  await s.test("while A's check runs on its staged merge, B's try still waits", async () => {
+    world().stage(repo, a.branch);
+    settle(`${a.id}-ship`, 'succeeded', { ...SIGNED, message: MESSAGE });
+    assert.deepEqual((await at.pass(a.id)).checked, ['ship']);
+    assert.deepEqual((await at.pass(b.id)).tried, []);
+  });
+
+  await s.test("A lands, and B's sign-off try is filed on the pass after, in the repository's own checkout", async () => {
+    settle(`${a.id}-ship-check`, 'succeeded', undefined, 0);
+    await at.pass(a.id);
+    const landed = readRun(a.id).steps.ship?.landed;
+    assert.ok(landed && 'commit' in landed, 'A landed');
+    assert.deepEqual((await at.pass(b.id)).tried, ['ship']);
+    assert.equal(readRun(b.id).steps.ship?.taskId, `${b.id}-ship-try2`);
     assert.equal(readRun(b.id).steps.ship?.workspace, repo);
   });
 });

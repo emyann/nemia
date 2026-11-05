@@ -44,7 +44,8 @@ import type { PassStanding } from '../standing/standing.verb.ts';
  * Asked of the store on the pass that asks, never stored, and then of every run of the same repository — but first, and cheaply, of the
  * run's own asks: undefined, with no other run's claim read, for a run called off, for one whose own ending claims nothing
  * (`endingClaimedAt`: no person's word that would file it — the approval of one that has not run, or the ask for a try of one that has —
- * and no workflow that files it with nobody's, as an ending with no gate not yet filed is), and for one whose ending is in that checkout
+ * and no workflow or run that files it with nobody's, as an ending with no gate not yet filed is, and a filed one whose try landed no
+ * commit, which the run tries again itself), and for one whose ending is in that checkout
  * already. A run is in the checkout while the engine holds its `workspace: base` task in flight, as `inFlight` counts one, so a
  * step filed earlier in this very pass is read as being in it. One waiting to be filed counts only if the pass would in fact file it: a
  * send-back of the work un-holds its gate, and an ending that will not be filed must not hold another run's for ever. The cap on runs in
@@ -98,7 +99,9 @@ export const checkoutHold = Effect.fn('checkoutHold')(function* (
  *
  * It WAITS for the checkout on a person's word that would file it — an approval of an ending that has not run, or the ask for a try of one
  * that ended blocked — or, for an ending with no gate not yet filed, on its workflow's, as of the run's creation (`endingClaimedAt`): its
- * workflow files it with nobody's word once the step before it passes, into that same checkout. And only where the pass would in fact file
+ * workflow files it with nobody's word once the step before it passes, into that same checkout; and, for a filed ending whose try landed
+ * no commit, on the run's own word, as of its creation too: the try the run files itself (the ask to sign off of a session that ended
+ * without its closeout, a check's `retries:`) works in that checkout all the same. And only where the pass would in fact file
  * it: a send-back of the work un-holds the gate, an ask no tick honours files nothing, a run waiting on runs that have not landed files no
  * root of its own (`runReady`), and neither does one the cap on runs in flight holds (`runAdmitted`) — so an ending that will not be filed
  * does not hold another run's. Those last two are the questions `advance` asks before it files a ready step, and they bite only on a run

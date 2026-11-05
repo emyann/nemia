@@ -965,11 +965,14 @@ const stuck = (facts: Partial<Parameters<typeof writeRun>[1]> = {}): Live =>
     done: new Promise<void>(() => undefined),
   }) as unknown as Live;
 
-/** The let-go of `live` under a budget of `ms`, its lines dropped, and the purse its waits took from. */
-const letGone = async (root: string, live: Map<string, Live>, ms: number) => {
+/**
+ * The let-go of `live` under a budget of `ms`, the calls in flight given `callsShare` of it where one is given, its lines dropped, and
+ * the purse its waits took from.
+ */
+const letGone = async (root: string, live: Map<string, Live>, ms: number, callsShare?: number) => {
   const purse = purseOf(ms, instantNow);
   const quiet = Logger.make(() => undefined);
-  await Effect.runPromise(letGoOf(root, live, ms, purse).pipe(Effect.provide(Logger.layer([quiet]))));
+  await Effect.runPromise(letGoOf(root, live, ms, purse, callsShare).pipe(Effect.provide(Logger.layer([quiet]))));
   return purse;
 };
 
@@ -1042,6 +1045,20 @@ test(
       assert.equal(run(root)?.calling?.tool, 'Agent', 'keeping the call it cut');
     });
 
+    await t.test('the wait for the calls in flight takes no more than the share it is given', async () => {
+      const { root } = place({});
+      const purse = await letGone(root, new Map([[NAME, stuck()]]), 1_000, 0.25);
+      assert.equal(purse.given.length, 3, 'each of its three waits took from the one purse');
+      assert.ok(
+        purse.given[0] > 0 && purse.given[0] <= 250,
+        `the calls in flight were given their share and no more, not ${purse.given[0]}`,
+      );
+      assert.ok(
+        purse.given.reduce((a, b) => a + b, 0) <= 1_000 + purse.given.length,
+        `the waits of one let-go add up to no more than its budget, not ${purse.given.join(' + ')}`,
+      );
+    });
+
     await t.test("the park leaves alone a process that has taken the session's Claude Code's pid since", async (rt) => {
       const { root } = place({});
       const taker = squatter(rt);
@@ -1067,10 +1084,16 @@ const costStates = (dir: string) => (lines(dir, 'cost-state.jsonl') as { totalCo
 /** Whether two costs are the same, to the cent's billionth: a sum of floats is not exact. */
 const sameCost = (a: number | undefined, b: number) => a !== undefined && Math.abs(a - b) < 1e-9;
 
+/**
+ * The cost story's first holder: it cuts the call in flight at 1 s (0.05 of 20 s), then waits on the cut session's end — the event
+ * that says its Claude Code printed what it spent and saved its total — with about 19 s to spare, far above a loaded runner's stall.
+ */
+const CUT = { letGoMs: 20_000, callsShare: 0.05 };
+
 test("a session cut by its holder's let-go and resumed by the next holder costs what both of its processes spent", WAITED, async (t) => {
   const s = story(t);
   const { root, dir, request } = place({ call: 'Bash', cost: 0.5, output: {} }, { budgetUsd: 2 });
-  const first = await holder(root, 1_000);
+  const first = await holder(root, CUT.letGoMs, CUT.callsShare);
   let next: Awaited<ReturnType<typeof holder>> | undefined;
   t.after(async () => {
     await next?.close();

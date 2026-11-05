@@ -102,4 +102,3 @@ export const CardStart = Schema.Struct({
   label: Schema.optionalKey(Schema.Array(Schema.String)),
 });
 export type CardStart = typeof CardStart.Type;
-

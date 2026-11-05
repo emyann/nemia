@@ -8,8 +8,11 @@ import { Option, Schema } from 'effect';
 import { decodes } from './decodes.ts';
 import { get, send } from './read.ts';
 
-/** Mirrors the package's `ChatFrom`: who a message is from — her, the person, or the keeper, whose words are a quiet marker. */
-export type ChatFrom = 'agent' | 'person' | 'keeper';
+/**
+ * Mirrors the package's `ChatFrom`: who a message is from — her, the person, the keeper, whose words are a quiet marker, or another
+ * agent speaking to her session as itself (`peer`), whose message carries the `name` it speaks under.
+ */
+export type ChatFrom = 'agent' | 'person' | 'keeper' | 'peer';
 
 /** Mirrors the package's `CallState`: done, at work, failed, not begun, or waiting on the person. */
 export type ChatCallState = 'done' | 'running' | 'error' | 'pending' | 'waits';
@@ -59,14 +62,14 @@ export type PermissionFacts = {
 };
 
 /**
- * Mirrors the package's `ChatEvent`, unique by its `id`: a `message`, the person's carrying when it was delivered (`delivered`, null
- * while it waits in her outbox); a `call`, one tool call with its sentence, a `fact` and its state; a `session` line where one of her
- * sessions ended and the next began; a `question` and a `proposal`, each an `AskEvent` — a call of hers waiting on the person, the
- * proposal her one-question ask; and a `permission`, an `AskEvent` too, a call of hers that would prompt, with what the SDK handed
- * over about it.
+ * Mirrors the package's `ChatEvent`, unique by its `id`: a `message`, the person's and another agent's carrying when it was delivered
+ * (`delivered`, null while it waits in her outbox), and another agent's the `name` it speaks under; a `call`, one tool call with its
+ * sentence, a `fact` and its state; a `session` line where one of her sessions ended and the next began; a `question` and a
+ * `proposal`, each an `AskEvent` — a call of hers waiting on the person, the proposal her one-question ask; and a `permission`, an
+ * `AskEvent` too, a call of hers that would prompt, with what the SDK handed over about it.
  */
 export type ChatEvent =
-  | { kind: 'message'; id: string; at: string; from: ChatFrom; text: string; delivered?: string | null }
+  | { kind: 'message'; id: string; at: string; from: ChatFrom; text: string; delivered?: string | null; name?: string }
   | { kind: 'call'; id: string; at: string; tool: string; sentence: string; fact?: string; state: ChatCallState }
   | { kind: 'session'; id: string; at: string; attempt: number }
   | ({ kind: 'question' } & AskEvent)
@@ -74,7 +77,7 @@ export type ChatEvent =
   | ({ kind: 'permission' } & AskEvent & { permission: PermissionFacts });
 
 /** Decodes a `ChatFrom`. */
-const ChatFromSchema = Schema.Literals(['agent', 'person', 'keeper']);
+const ChatFromSchema = Schema.Literals(['agent', 'person', 'keeper', 'peer']);
 
 /** Decodes a `ChatCallState`. */
 const ChatCallStateSchema = Schema.Literals(['done', 'running', 'error', 'pending', 'waits']);
@@ -147,6 +150,7 @@ const ChatEventSchema = decodes<ChatEvent>()(
       from: ChatFromSchema,
       text: Schema.String,
       delivered: Schema.optionalKey(Schema.NullOr(Schema.String)),
+      name: Schema.optionalKey(Schema.String),
     }),
     Schema.Struct({ kind: Schema.Literal('permission'), ...ASK_FIELDS, permission: PermissionFactsSchema }),
     Schema.Struct({ kind: Schema.Literal('question'), ...ASK_FIELDS }),

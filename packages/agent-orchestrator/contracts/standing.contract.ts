@@ -95,13 +95,45 @@ const standingSpec = spec<Stands>({
       condition: ({ input: [step, run, , , , steps, s], output }) =>
         output.status !== 'over budget' || overBudget(step, run, s) !== undefined || steps.some((x) => x.name === step.name && !!x.loop),
     },
-    overBudgetWhereATryIsTheWayOn: {
+    /**
+     * A filed step over its cap whose try ended unsigned, failed, stopped or denied reads over budget: another try of it is the way on,
+     * and nothing is left to spend on one. Said once per way a try ends, the four laws together being the one sentence: tsverify 0.7.0
+     * runs out of work on the four in one law (`bounded`), where 0.5.1 proved it and proves each alone.
+     */
+    overBudgetWhereATryUnsignedIsTheWayOn: {
       description:
-        'A filed step over its cap whose try ended unsigned, failed, stopped or denied reads over budget: another try of it is the way on, and nothing is left to spend on one',
+        'A filed step over its cap whose try ended unsigned reads over budget: another try of it is the way on, and nothing is left to spend on one',
       condition: ({ input: [step, run, , , , , s], output }) =>
         !run.steps[step.name]?.taskId ||
         overBudget(step, run, s) === undefined ||
-        (output.own !== 'unsigned' && output.own !== 'failed' && output.own !== 'stopped' && output.own !== 'denied') ||
+        output.own !== 'unsigned' ||
+        output.status === 'over budget',
+    },
+    overBudgetWhereATryFailedIsTheWayOn: {
+      description:
+        'A filed step over its cap whose try ended failed reads over budget: another try of it is the way on, and nothing is left to spend on one',
+      condition: ({ input: [step, run, , , , , s], output }) =>
+        !run.steps[step.name]?.taskId ||
+        overBudget(step, run, s) === undefined ||
+        output.own !== 'failed' ||
+        output.status === 'over budget',
+    },
+    overBudgetWhereATryStoppedIsTheWayOn: {
+      description:
+        'A filed step over its cap whose try ended stopped reads over budget: another try of it is the way on, and nothing is left to spend on one',
+      condition: ({ input: [step, run, , , , , s], output }) =>
+        !run.steps[step.name]?.taskId ||
+        overBudget(step, run, s) === undefined ||
+        output.own !== 'stopped' ||
+        output.status === 'over budget',
+    },
+    overBudgetWhereATryDeniedIsTheWayOn: {
+      description:
+        'A filed step over its cap whose try ended denied reads over budget: another try of it is the way on, and nothing is left to spend on one',
+      condition: ({ input: [step, run, , , , , s], output }) =>
+        !run.steps[step.name]?.taskId ||
+        overBudget(step, run, s) === undefined ||
+        output.own !== 'denied' ||
         output.status === 'over budget',
     },
     noTryNoHold: {

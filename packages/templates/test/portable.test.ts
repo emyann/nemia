@@ -7,8 +7,8 @@
  * What is let through, and only it (`ALLOWED`): a link to Anthropic's own documentation, whose path is that site's; the run's branch
  * prefix `wf/`, which Nemia's machinery names; the layout's own path of a step's schema in a `workflow.yaml` (`path:
  * workflows/<w>/…`) and the store's folder of workflows in a fence (`${{ parameters.storeRoot }}/workflows/**`); and the comment lines
- * of `pull-request.ts` that say what its generic parser reads of node:test's, tsc's and oxlint's output. An agent names only its own
- * skills, the place's and the interview (`ROLE_SKILLS`), and no MCP server, which the step that needs one names.
+ * of `ci-log.ts`, beside `pull-request.ts`, that say what its generic parser reads of node:test's, tsc's and oxlint's output. An agent
+ * names only its own skills, the place's and the interview (`ROLE_SKILLS`), and no MCP server, which the step that needs one names.
  *
  * Each word is first refused in planted text (`PLANTED`), each allowance is held to its place, and each file is read for a name it must
  * hold, so a file moved or emptied cannot make the guard pass by reading nothing.
@@ -87,7 +87,7 @@ const ALLOWED: Array<{ what: string; files: RegExp; pattern: RegExp }> = [
   },
   {
     what: "the parser's comment lines",
-    files: /^workflows\/[\w-]+\/pull-request\.ts$/,
+    files: /^workflows\/[\w-]+\/ci-log\.ts$/,
     pattern: /^\s*\*.*(?:node --test|\btsc\b|oxlint).*$/gm,
   },
   { what: "the parameters' defaults", files: /^nemia\.yaml$/, pattern: /^\s*default:.*$/gm },
@@ -132,6 +132,7 @@ const HOLDS: Array<[RegExp, (file: string) => string]> = [
   [/^skills\/[\w-]+\/rules\.json$/, () => '"breaks"'],
   [/^workflows\/([\w-]+)\/README\.md$/, (file) => `# ${file.split('/')[1]}\n`],
   [/^workflows\/[\w-]+\/workflow\.yaml$/, () => 'kind: Workflow'],
+  [/^workflows\/[\w-]+\/ci-log\.ts$/, () => 'export function failures'],
   [/^workflows\/[\w-]+\/[\w-]+\.ts$/, (file) => `node ${path.basename(file)}`],
   [/^workflows\/[\w-]+\/[\w-]+\.md$/, (file) => STEP_HOLDS[path.basename(file, '.md')] ?? 'a step the guard knows'],
 ];
@@ -161,7 +162,7 @@ test("REFUSED: each of this repository's words, planted in an agent, a step, a w
       ['agents/x/instructions.md', `You are X.\n${says}\n`],
       ['workflows/w/workflow.yaml', `kind: Workflow\nspec:\n  steps:\n    - name: s\n${says}\n`],
       ['workflows/w/s.md', `Do it. ${says}\n`],
-      ['workflows/w/pull-request.ts', `const said = ${JSON.stringify(says)};\n${says}\n`],
+      ['workflows/w/ci-log.ts', `const said = ${JSON.stringify(says)};\n${says}\n`],
       ['skills/x/SKILL.md', `---\nname: x\n---\n1. ${says}\n`],
     ]);
     assert.deepEqual(
@@ -181,7 +182,7 @@ test('REFUSED: each allowance outside its place lets nothing through', () => {
     ['workflows/w/workflow.yaml', 'check: node workflows/w/x.ts'],
     ['agents/x/instructions.md', 'never write ${{ parameters.storeRoot }}/workflows/x'],
     ['workflows/w/landing.ts', ' * a TypeScript error, as tsc prints it, and oxlint'],
-    ['workflows/w/pull-request.ts', 'const lint = "oxlint";'],
+    ['workflows/w/ci-log.ts', 'const lint = "oxlint";'],
     ['RULES.md', 'default: npm test'],
   ]);
   assert.deepEqual(oursIn(files), [
@@ -191,7 +192,7 @@ test('REFUSED: each allowance outside its place lets nothing through', () => {
     'agents/x/instructions.md: workflows/',
     'workflows/w/landing.ts: oxlint',
     'workflows/w/landing.ts: tsc',
-    'workflows/w/pull-request.ts: oxlint',
+    'workflows/w/ci-log.ts: oxlint',
     'RULES.md: npm',
   ]);
 });
@@ -201,7 +202,7 @@ test('each allowance lets through what stands in its place, and the matcher take
     ['workflows/w/s.md', `Read https://code.claude.com/docs/en/overview. A branch of wf/<run>/<leaf>, \`wf\\/x\`; $WF_RUN.`],
     ['workflows/w/workflow.yaml', 'output:\n  path: workflows/w/s.schema.json\n'],
     ['agents/x/agent.yaml', '- Edit(${{ parameters.storeRoot }}/workflows/**)\n- mcp__playwright__browser_click\n'],
-    ['workflows/w/pull-request.ts', ' * oxlint draws its rule; tsc prints `error TS`; node --test prints `not ok`\n'],
+    ['workflows/w/ci-log.ts', ' * oxlint draws its rule; tsc prints `error TS`; node --test prints `not ok`\n'],
     ['nemia.yaml', '      default: npm run --if-present lint\n'],
     ['RULES.md', 'a wfx of the workflows, $800, the implementer, From designs, B78'],
   ]);
@@ -221,7 +222,7 @@ test("every file of sdlc is read, and holds a name it must, and none says this r
 });
 
 test('the parser keeps its generic lines for node:test, tsc and oxlint, which the allowance is for', () => {
-  const text = sdlc().get('workflows/build/pull-request.ts') ?? '';
+  const text = sdlc().get('workflows/build/ci-log.ts') ?? '';
   assert.ok(text.includes('error TS'), "the parser reads tsc's error lines");
   assert.match(text, /^\s*\*.*oxlint/m, "the parser's comment names oxlint's form");
 });

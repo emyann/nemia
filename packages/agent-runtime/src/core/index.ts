@@ -4,7 +4,7 @@
  */
 export { denialText, fold, idleOf, nameFor, nameParts, waitsForInput } from './domain.ts';
 export type { Attempt, Bridge, Denial, EndReason, Event, Input, Parked, Said, Sighting, State, Usage } from './domain.ts';
-export type { AskOption, AskQuestion, SessionAsk } from './domain.ts';
+export type { AskOption, AskQuestion, PermissionFacts, SessionAsk, SessionAskKind } from './domain.ts';
 export { SESSION_STATES, TASK_PHASES, atWorkState, formerStateOf, isLive, isSessionState, waitsOnPerson } from './session.ts';
 export type { Outcome, SessionState, TaskPhase } from './session.ts';
 export { lifecycleGraph } from './lifecycle.ts';

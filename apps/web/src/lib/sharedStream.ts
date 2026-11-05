@@ -7,6 +7,7 @@
  *
  * A stream it shares carries a cursor as the id of a read's last event — a dot-separated count of each source, as her chat's does — and
  * the tab that holds it hands each read on as one batch under that id, so a tab that listed past it (`covers`) passes the batch whole.
+ * A read at the very cursor a tab holds moved what no count says — her presence — and its presence is taken, which replaces.
  * It opens nothing of itself: the stream is opened by the `open` its caller hands it, in the files that open the api's streams.
  */
 import type { StreamLike } from './follow.ts';
@@ -70,8 +71,9 @@ export function sharedStream(
     for (const listener of listeners.get(type) ?? []) listener(new MessageEvent(type, { data, lastEventId }));
   };
   const take = (batch: Batch) => {
-    if (batch.id !== '' && covers(seen, batch.id)) return;
-    batch.events.forEach((e, i) => dispatch(e.type, e.data, i === batch.events.length - 1 ? batch.id : ''));
+    const held = batch.id !== '' && covers(seen, batch.id);
+    const taken = held ? batch.events.filter((e) => e.type === 'presence' && covers(batch.id, seen)) : batch.events;
+    taken.forEach((e, i) => dispatch(e.type, e.data, i === taken.length - 1 ? batch.id : ''));
     if (batch.id !== '') seen = batch.id;
   };
   channel?.addEventListener('message', ({ data }) => (started ? take(data) : early.push(data)));

@@ -120,6 +120,13 @@ test('tabs share one stream: one holds it and hands each read on, a tab that lis
       assert.equal(opened.length, 1, 'still one stream for the three tabs');
     },
   );
+  await s.test(
+    'a read that moves only her presence, under the cursor every tab holds, reaches every tab: a presence replaces, so it is taken again',
+    () => {
+      opened[0]?.send('presence', 'q', '1.5');
+      for (const one of [b, c]) assert.deepEqual(one.got.at(-1), 'presence q #1.5');
+    },
+  );
   await s.test('the holder closed, another tab takes the lock and opens the stream again from the last cursor it was handed', async () => {
     a.shared.close();
     await settle();

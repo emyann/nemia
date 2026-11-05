@@ -25,12 +25,12 @@ const LINK =
  * The step's agent: the one the factory picked hires into it, marked as hired (`data-hired`); else the one its file names, or that it names
  * none, and with no factory picked, each factory that hires into the step, linked to this page in that factory (`data-hired-in`).
  */
-export function StepAgent({ page }: { page: WorkflowStepPage }) {
+export function StepAgent({ page, place = {} }: { page: WorkflowStepPage; place?: PagePlace }) {
   const { from, workflow, step, factory, hired, hiredIn } = page;
   if (factory && hired) {
     return (
       <p data-step-agent className="text-body-small leading-6 text-muted-foreground">
-        Its agent: <AgentLink from={from} name={hired} className="text-foreground" />{' '}
+        Its agent: <AgentLink from={from} name={hired} place={place} className="text-foreground" />{' '}
         <Badge variant="outline" data-hired={factory}>
           hired by {factory}
         </Badge>
@@ -44,8 +44,8 @@ export function StepAgent({ page }: { page: WorkflowStepPage }) {
       <p data-step-agent className="text-body-small text-muted-foreground">
         {named ? (
           <>
-            Its agent: <AgentLink from={from} name={named} className="text-foreground" />, named by its file, whose instructions it is told
-            first.
+            Its agent: <AgentLink from={from} name={named} place={place} className="text-foreground" />, named by its file, whose
+            instructions it is told first.
           </>
         ) : (
           'Its file names no agent.'
@@ -86,7 +86,7 @@ export function homesOf(page: WorkflowStepPage, place: PagePlace): LayerHomes {
   return {
     instructions: agent && (
       <>
-        lives in <AgentLink from={page.from} name={agent} />
+        lives in <AgentLink from={page.from} name={agent} place={place} />
         's file
       </>
     ),
@@ -133,7 +133,7 @@ export function homesOf(page: WorkflowStepPage, place: PagePlace): LayerHomes {
       ),
     skill: (name) => {
       const found = page.skillsFrom.find((skill) => skill.name === name);
-      if (found?.from) return <SkillLink from={found.from} name={name} />;
+      if (found?.from) return <SkillLink from={found.from} name={name} place={place} />;
       if (!found?.foundIn) return name;
       return (
         <span data-skill-found-in={found.foundIn} title={found.foundIn}>

@@ -169,6 +169,7 @@ function Moved({ file, onReadAgain }: { file: string; onReadAgain: () => void })
 
 /** The agents that give this very skill, each linked, or that none does. */
 function GivenBy({ detail }: { detail: SkillDetail }) {
+  const place = Route.useSearch();
   return (
     <p data-skill-users className="flex flex-wrap items-baseline gap-x-2 gap-y-1 text-body-small text-muted-foreground">
       {detail.users.length ? (
@@ -176,7 +177,7 @@ function GivenBy({ detail }: { detail: SkillDetail }) {
           <span>Given by</span>
           {detail.users.map((user, i) => (
             <span key={`${user.from}:${user.name}`}>
-              <AgentLink from={user.from} name={user.name} className="text-body-small text-foreground" />
+              <AgentLink from={user.from} name={user.name} place={place} className="text-body-small text-foreground" />
               {user.from === 'repo' && <span className="text-muted-foreground"> (this repository)</span>}
               {i < detail.users.length - 1 && ','}
             </span>

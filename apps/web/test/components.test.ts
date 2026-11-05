@@ -7659,3 +7659,29 @@ test('REFUSED: a Cost cell the keyboard cannot reach to open its tokens: a row w
   assert.doesNotMatch(untokened, /<button/, 'no tokens to break down, so nothing for the keyboard to open');
   assert.equal(costCell(null, TOKENS), '', 'a row with no cost says nothing');
 });
+
+test('a link to a factory definition keeps its factory and repository in its address, and a link to another origin carries none', async () => {
+  const { AgentLink, SkillLink } = await import('../src/components/AgentParts.tsx');
+  const place = { factory: 'treed', repo: '/r' };
+  const agent = await routedWith(createElement(AgentLink, { from: 'factory', name: 'drafter', place }));
+  assert.match(agent, /href="\/agents\/factory\/drafter\?factory=treed&amp;repo=%2Fr"/, 'the agent link names the factory');
+  const skill = await routedWith(createElement(SkillLink, { from: 'factory', name: 'outline', place }));
+  assert.match(skill, /href="\/agents\/skills\/factory\/outline\?factory=treed&amp;repo=%2Fr"/, 'the skill link names the factory');
+  const yours = await routedWith(createElement(AgentLink, { from: 'yours', name: 'drafter', place }));
+  assert.match(yours, /href="\/agents\/yours\/drafter"/, 'a link of yours is read in default, with no factory');
+});
+
+test('a link to a factory definition given no place is read in the factory of the page it is drawn on', async () => {
+  const { AgentLink } = await import('../src/components/AgentParts.tsx');
+  const { createMemoryHistory, createRootRoute, createRouter, RouterContextProvider } = await import('@tanstack/react-router');
+  const router = createRouter({
+    routeTree: createRootRoute(),
+    history: createMemoryHistory({ initialEntries: ['/agents?factory=treed'] }),
+  });
+  await router.load();
+  const html = renderToStaticMarkup(
+    // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` among the props, and a .ts file has no JSX.
+    createElement(RouterContextProvider, { router, children: createElement(AgentLink, { from: 'factory', name: 'drafter' }) }),
+  );
+  assert.match(html, /href="\/agents\/factory\/drafter\?factory=treed"/, "the page's factory is carried");
+});

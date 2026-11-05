@@ -41,7 +41,7 @@ function StepRow({ step, workflow, place, hiring }: { step: ListedStep; workflow
         <span className="text-body-small text-muted-foreground">
           {agent ? (
             <>
-              Its agent: <AgentLink from={workflow.from} name={agent} className="text-foreground" />
+              Its agent: <AgentLink from={workflow.from} name={agent} place={place} className="text-foreground" />
             </>
           ) : (
             'No agent: its own words are all it is told'

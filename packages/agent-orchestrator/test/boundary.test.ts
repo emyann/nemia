@@ -549,8 +549,9 @@ const DOOR_GIVES = 'place/git/';
 
 /**
  * A place's code stands beside the package: a file of `place/<name>/` imports node's built-ins, `effect`, the files of its own place,
- * `PLACE_REACHES` and a contract that proves it (`isContract`), never another package, another place or the rest of `src`; and of `packageFiles`, the package's `src` and `bin`,
- * `PLACE_DOOR` alone imports a file under `place/`, and of those only one under `DOOR_GIVES`.
+ * `PLACE_REACHES` and a contract that proves it (`isContract`), never another package, another place or the rest of `src`; and of
+ * `packageFiles`, the package's `src` and `bin`, `PLACE_DOOR` alone imports a file under `place/`, and of those only one under
+ * `DOOR_GIVES`.
  */
 function placeBreaks(sources: Sources, packageFiles: Sources = {}): string[] {
   const own = (file: string) => `${file.split('/').slice(0, 2).join('/')}/`;

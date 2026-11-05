@@ -275,3 +275,13 @@ test('the routes the actions replace are gone: a write on /api/runs/:runId/… a
   assert.equal(Array.isArray(listed), false, 'no array');
   assert.equal((listed as { kind?: unknown }).kind, 'RunList');
 });
+
+test("REFUSED: a run's action whose body is over the limit is a 413, as every object's write is, never a body that is no JSON", async () => {
+  const { OBJECT_BODY_LIMIT } = await import('./serve.ts');
+  const body = JSON.stringify({ workflow: 'flow', brief: 'x'.repeat(Number(OBJECT_BODY_LIMIT)) });
+  for (const route of ['/api/namespaces/default/runs', `/api/namespaces/default/runs/${R}/hold`]) {
+    const res = await app().request(route, { method: 'POST', headers: { 'content-type': 'application/json' }, body });
+    assert.equal(res.status, 413, route);
+    assert.equal(typeof ((await res.json()) as { error?: unknown }).error, 'string', `${route}: the 413 says why`);
+  }
+});

@@ -164,9 +164,18 @@ const asJson = (data: Readonly<Record<string, unknown>>): Readonly<Record<string
 /** A run's action's path names: its namespace, the run by the `Api`'s `name`, and its step where it names one. */
 type At = { readonly namespace: string; readonly name: string; readonly step?: string };
 
-/** The text `request` sent as its body, or none where it did not read: the pipeline answers that as a body that is no JSON. */
+/** Whether a body's read failed for its size: effect's `HttpServerError`, its `reason` a parse error of `BodyTooLarge`. */
+const tooLarge = (err: unknown): boolean => {
+  const reason: unknown = typeof err === 'object' && err !== null && 'reason' in err ? err.reason : undefined;
+  return typeof reason === 'object' && reason !== null && 'reason' in reason && reason.reason === 'BodyTooLarge';
+};
+
+/**
+ * The text `request` sent as its body, or none where it did not read: the pipeline answers that as a body that is no JSON. A body over
+ * the objects' limit (`OBJECT_BODY_LIMIT`, serve.ts) is effect's own failure, left to answer its 413, as every object's write is.
+ */
 const sentBy = (request: HttpServerRequest.HttpServerRequest): Effect.Effect<string | undefined> =>
-  Effect.catch(request.text, () => Effect.succeed(undefined));
+  Effect.catch(request.text, (err) => (tooLarge(err) ? Effect.die(err) : Effect.succeed(undefined)));
 
 /**
  * The named action `act` on the run `at` names, in its namespace: the run found (`Missing` where none is, or it is in another namespace),

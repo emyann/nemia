@@ -24,10 +24,13 @@
  * are guarded first in their command's words (`wordsAt`, commands/words.ts), each naming the path in the run's namespace; the start is
  * placed in the factory its namespace names and on its `?repo=` (`placeFor`), as a definition's write is.
  *
+ * A write's body is read up to `OBJECT_BODY_LIMIT` (effect's `MaxBodySize`, which it otherwise leaves unset), and one over it is
+ * answered 413 `{ error }` naming the limit.
+ *
  * `GET /api/runs/:runId` with `?raw=` (not `false`) or `?view=` is passed on to the runs' own route (runs/runs.ts), which answers both.
  */
-import { Context, Layer } from 'effect';
-import { HttpRouter, HttpServer } from 'effect/http';
+import { ByteSize, Context, Layer } from 'effect';
+import { HttpIncomingMessage, HttpRouter, HttpServer } from 'effect/http';
 import { HttpApiBuilder } from 'effect/http-api';
 import { type Context as RequestContext, Hono } from 'hono';
 import { Api } from 'objects';
@@ -55,6 +58,16 @@ import { templatesHandlers } from '../template-objects/templates.ts';
 /** Where every path the objects are served on is listed, with what each takes. */
 const DOCUMENT = 'GET /openapi/v3/nemia/v1';
 
+/**
+ * The most a write's body may be: 1 MiB. The largest object a client writes today is a skill whose body is a whole SKILL.md, 46 KB for
+ * the largest in this repository (the orchestrator's `nemia/skills/verbs`), and a workflow written whole with its steps' prompts is
+ * about 32 KB (sdlc's `build`): 1 MiB is twenty times the largest, and far below what holding a body in memory costs the api.
+ */
+export const OBJECT_BODY_LIMIT = ByteSize.mebibytes(1);
+
+/** The limit as a refusal says it: its unit and its bytes. */
+const OBJECT_BODY_LIMIT_SAID = `${ByteSize.format(OBJECT_BODY_LIMIT)} (${Number(OBJECT_BODY_LIMIT)} bytes)`;
+
 /** What a list of objects takes in its query. */
 const LIST_TAKES =
   '`?limit=<a whole number from 1>` and `?continue=<the token the page before answered>`, each once, and `?labelSelector=<selector>`, given again for another';
@@ -75,16 +88,19 @@ const saysError = (text: string): boolean => {
 /**
  * `response`, which the objects' handler answered `request` with, in the api's words: a 400 or a 404 HttpApi answered on its own, with no
  * `{ error }`, answered again with the same status and the sentence that names the fix — what the route takes (`takes`, said where the
- * route is one the api forwards), or where the paths are listed. Anything else as it is.
+ * route is one the api forwards), or where the paths are listed — and a 413, a body over `OBJECT_BODY_LIMIT`, with the limit. Anything
+ * else as it is.
  */
 export async function inApiWords(response: Response, request: Request, takes?: string): Promise<Response> {
-  if (response.status !== 400 && response.status !== 404) return response;
+  if (response.status !== 400 && response.status !== 404 && response.status !== 413) return response;
   if (saysError(await response.clone().text())) return response;
   const route = `${request.method} ${new URL(request.url).pathname}`;
   const error =
     response.status === 404
       ? `${route} is no path the objects are served on: ${DOCUMENT} lists each, with what it takes. Ask one of those.`
-      : `${route} does not read as its route takes it${takes ? `: ${takes}` : ''}. Send it in that shape: ${DOCUMENT} says each key and value.`;
+      : response.status === 413
+        ? `${route} was sent an object too large: a body may be ${OBJECT_BODY_LIMIT_SAID} at most. Send a smaller one.`
+        : `${route} does not read as its route takes it${takes ? `: ${takes}` : ''}. Send it in that shape: ${DOCUMENT} says each key and value.`;
   return new Response(JSON.stringify({ error }), { status: response.status, headers: { 'content-type': 'application/json' } });
 }
 
@@ -112,6 +128,7 @@ export const objectsHandler = (runtime: ApiRuntime) => {
         eventsHandlers,
       ]),
       Layer.provide(HttpServer.layerServices),
+      Layer.provideMerge(Layer.succeed(HttpIncomingMessage.MaxBodySize, OBJECT_BODY_LIMIT)),
     ),
     { memoMap: runtime.memoMap, disableLogger: true },
   );

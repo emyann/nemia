@@ -182,6 +182,11 @@ const adoptedSpec = spec<(factory: Factory, wiring: Wiring, template: FactoryTem
         sameDict(output.template.params, template.params) &&
         output.tree === tree,
     },
+    leavesItsGenerationToTheDoor: {
+      description:
+        "It carries no generation of its own: the count of changes to a factory's spec is the door's to write (`generationWritten`), never a caller's",
+      condition: ({ output }) => output.generation === undefined,
+    },
   },
 });
 export type Adopted = Implementation<typeof adoptedSpec>;

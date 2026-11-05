@@ -24,7 +24,6 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Effect } from 'effect';
 import type { Engine } from '../src/runtime-client.ts';
-import type { TestEnd } from 'agent-runtime/testing';
 import { scratch } from './scratch.ts';
 import { decideScreen } from './screens.ts';
 import { placeOver, unreadBy } from './place-over.ts';
@@ -1525,7 +1524,7 @@ test("a try the run files itself of its land waits for the checkout while anothe
   });
 
   await s.test("B's land ends without its closeout, and A's land, the older claim, takes the checkout", async () => {
-    end(`${b.id}-ship`, 'succeeded', { reason: 'harness', closedOut: false, former: 'unsigned' } as TestEnd);
+    end(`${b.id}-ship`, 'succeeded', { reason: 'harness', closedOut: false, former: 'unsigned' });
     assert.deepEqual((await at.pass(a.id)).filed, ['ship']);
   });
 

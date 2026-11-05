@@ -2,8 +2,8 @@
  * `node landing.ts <verb>` — the two acts a landing is made of, which no agent may type: the merge of this run's own pull request on
  * GitHub, and the receipt that it happened. A Bash prefix rule cannot tell `gh pr merge 7` from `gh pr merge 9`, and `gh` is denied whole
  * to the agents that land, so the act is this script, read from the run's frozen workflow files (`$WF_WORKFLOW_FILES`) and run with `node`,
- * as `pull-request.ts` carries the push and the pull request. It imports nothing of its own folder, though it may: the run freezes the
- * workflow's whole folder, so a script may import a sibling it holds, as `pull-request.ts` imports `ci-log.ts`. It is told the name of
+ * as `pull-request.ts` carries the push and the pull request. It imports `ci-log.ts`, beside it, for how a check of a commit reads, as
+ * `pull-request.ts` does: the run freezes the workflow's whole folder, so a script may import a sibling it holds. It is told the name of
  * the CI context it reads (`--check <name>`), since that name is the repository's, never the script's.
  *
  * - `merge --run <id> --subject <line> --body-file <f> --check <name>`, which the landing session types once its step has been filed — on a
@@ -24,7 +24,9 @@
  *   (`WF_CI_START_SECONDS`), 2400 s whole (`WF_CI_WAIT_SECONDS`), `WF_CI_POLL_SECONDS` the interval, inside the landing check's own
  *   deadline, the whole of it while another check at the merge still runs (a context that sums up other jobs comes once they end).
  *   Green passes. Red refuses, naming the jobs that did not pass — unless the base's tip holds the merge and the context is
- *   green there, which passes and says so. Still running at the bound, or never reported (CI may not run on pushes to the base: the
+ *   green there, which passes and says so. A read of GitHub that fails — `gh` timing out, exiting
+ *   non-zero, or answering no JSON — is no verdict: the wait reads again within the whole bound, and a read still failing there
+ *   refuses, naming the last error. Still running at the bound, or never reported (CI may not run on pushes to the base: the
  *   factory then sets `landingWaitsOnCi` false), refuses. A refusal there takes nothing back: the merge stands, and the retry reads
  *   GitHub again.
  *
@@ -38,12 +40,10 @@
  */
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
+import { PASSED, linkOf, nameOf, pending, seenOf, verdict } from './ci-log.ts';
 
 /** A reason the verb is refused: said on stderr, exit 1. */
 class Refusal extends Error {}
-
-/** The one conclusion that is a pass: a skipped, cancelled or neutral CI context is no verdict to land on. */
-const PASSED = 'SUCCESS';
 
 /** The one `mergeable` GitHub gives a pull request that can be merged now; `CONFLICTING` and `UNKNOWN` are both refusals. */
 const MERGEABLE = 'MERGEABLE';
@@ -59,9 +59,6 @@ const BOUND = 120_000;
  * maps one read over REST.
  */
 type Entry = Partial<Record<'name' | 'context' | 'status' | 'state' | 'conclusion' | 'detailsUrl' | 'targetUrl' | 'startedAt', string>>;
-
-/** The states of a check that is not over: anything else is a verdict. */
-const PENDING = new Set(['QUEUED', 'IN_PROGRESS', 'WAITING', 'PENDING', 'REQUESTED', 'EXPECTED']);
 
 /** The verdicts of a job that did not fail it: a job that is over with any other did not pass. */
 const NOT_FAILED = new Set([PASSED, 'SKIPPED', 'NEUTRAL']);
@@ -286,18 +283,6 @@ function sole(found: readonly Pr[], id: string, state: string, open: string): Pr
     );
   return found[0];
 }
-
-/** The verdict of a rollup entry, a check run's conclusion or a status context's state, upper-cased; empty where it has neither. */
-const verdict = (entry: Entry): string => (entry.conclusion ?? entry.state ?? '').toUpperCase();
-
-/** The name of an entry, a check run's or a status context's. */
-const nameOf = (entry: Entry): string => entry.name ?? entry.context ?? '';
-
-/** Whether an entry is not over yet. */
-const pending = (entry: Entry): boolean => PENDING.has((entry.status ?? entry.state ?? '').toUpperCase());
-
-/** Where a person reads the entry: a check run's details, a status context's target. */
-const linkOf = (entry: Entry): string => entry.detailsUrl ?? entry.targetUrl ?? '';
 
 /**
  * The CI context `check` of `number`'s head — the one the base branch's protection requires, named by `--check` — read as it is now;
@@ -580,14 +565,17 @@ function entriesAt(sha: string): Entry[] {
   ];
 }
 
-/** How the CI context's entries of a commit read: none reported, none over yet, every one passed, or one that did not. */
-type Seen = 'absent' | 'pending' | 'passed' | 'failed';
-
-/** How `ours`, the CI context's entries of a commit, read now. */
-function seenOf(ours: readonly Entry[]): Seen {
-  if (ours.length === 0) return 'absent';
-  if (ours.every(pending)) return 'pending';
-  return ours.every((entry) => verdict(entry) === PASSED) ? 'passed' : 'failed';
+/**
+ * A commit's checks as `entriesAt` reads them, or, where GitHub could not be read — `gh` timing out, exiting non-zero, or answering no
+ * JSON — none, and the error: no verdict, so the wait reads again.
+ */
+function readAt(sha: string): { entries: Entry[]; unread?: string } {
+  try {
+    return { entries: entriesAt(sha) };
+  } catch (err) {
+    if (!(err instanceof Refusal)) throw err;
+    return { entries: [], unread: err.message };
+  }
 }
 
 /** The entries of `entries` named `check`. */
@@ -609,9 +597,9 @@ function ciAt(pr: Pr, oid: string, onto: string, check: string, id: string): str
   const at = oid.slice(0, 12);
   const stands = `  The merge stands and nothing was taken back: #${pr.number} is on \`${onto}\`.`;
   for (;;) {
-    const entries = entriesAt(oid);
+    const { entries, unread } = readAt(oid);
     const ours = named(entries, check);
-    const seen = seenOf(ours);
+    const seen = unread === undefined ? seenOf(ours) : 'unread';
     if (seen === 'passed') return `\`${check}\` passed on \`${onto}\` at ${at}, the merge commit`;
     if (seen === 'failed') {
       const tip = fixedSince(oid, onto, check);
@@ -619,18 +607,24 @@ function ciAt(pr: Pr, oid: string, onto: string, check: string, id: string): str
         return `\`${check}\` was red on \`${onto}\` at the merge ${at}, and is green at ${tip.slice(0, 12)}, the base's tip, which holds it`;
       throw new Refusal(reddened(pr, oid, onto, check, entries, stands, id));
     }
-    const bound = seen === 'pending' || entries.some(pending) ? whole : start;
-    if (Date.now() - began >= bound * 1000) {
-      const said =
-        seen === 'pending'
-          ? `\`${check}\` on \`${onto}\` at ${at}, the merge of #${pr.number}, was still ` +
-            `${ours.map((entry) => (entry.status ?? entry.state ?? '').toLowerCase()).join(', ')} after ${bound} s: read ` +
-            `${linkOf(ours[0]) || commitUrl(pr, oid)}, and retry the step once it is over.`
-          : unreported(pr, oid, onto, check, entries, bound);
-      throw new Refusal([said, stands, retryLine(id)].join('\n'));
-    }
+    const bound = seen === 'absent' && !entries.some(pending) ? start : whole;
+    if (Date.now() - began >= bound * 1000)
+      throw new Refusal([unfinished(pr, oid, onto, check, entries, bound, unread), stands, retryLine(id)].join('\n'));
     sleep(poll);
   }
+}
+
+/**
+ * What the wait says of `check` at `oid` once `secs` are out: never read from GitHub, naming the last error `unread`; still running; or
+ * never reported.
+ */
+function unfinished(pr: Pr, oid: string, onto: string, check: string, entries: readonly Entry[], secs: number, unread?: string): string {
+  const [ours, at] = [named(entries, check), `\`${check}\` on \`${onto}\` at ${oid.slice(0, 12)}, the merge of #${pr.number},`];
+  if (unread !== undefined)
+    return `${at} could not be read from GitHub within ${secs} s; the last read said: ${unread}\n  Read ${commitUrl(pr, oid)}.`;
+  if (seenOf(ours) !== 'pending') return unreported(pr, oid, onto, check, entries, secs);
+  const states = ours.map((entry) => (entry.status ?? entry.state ?? '').toLowerCase()).join(', ');
+  return `${at} was still ${states} after ${secs} s: read ${linkOf(ours[0]) || commitUrl(pr, oid)}, and retry the step once it is over.`;
 }
 
 /** `listed` by name and verdict, or state where it has none yet, with its URL, one a line, at most `JOBS` of them. */

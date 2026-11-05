@@ -95,7 +95,8 @@ const LET_GO_EVERY_MS = 50;
 /**
  * What share of a let-go's budget the wait for the calls in flight may take at most, the rest kept for the waits after the park:
  * each session ending, and each call held at a hook being let go. A call that ends sooner leaves the whole remainder to them
- * (`leftOf`), so the share is a ceiling on the one wait that can run long, never a floor on the short ones.
+ * (`leftOf`), so the share is a ceiling on the one wait that can run long, never a floor on the short ones. A holder given `callsShare`
+ * (`attachedSessions`) takes that share instead, so a test can cut a call soon and still give the cut session long to end.
  */
 const LET_GO_CALLS_SHARE = 0.8;
 
@@ -287,13 +288,15 @@ const ended = (root: string, live: Map<string, Live>): Effect.Effect<void> =>
  * spent as they go, so the whole let-go ends within the budget rather than taking their sum: it always returns, and within the
  * bound, so a signal always ends the process and whatever waits for the process — a service unit's stop timeout, a restart's wait for
  * the lease — can be set above one number. `purse` is the caller's so a test can read what each wait was given (`Purse.given`) and
- * show they add up to no more than the budget.
+ * show they add up to no more than the budget; `callsShare` is the share of it the calls in flight may take, `LET_GO_CALLS_SHARE` unless
+ * the holder was given another.
  */
 export const letGoOf = (
   root: string,
   live: Map<string, Live>,
   letGoMs: number,
   purse: Purse = purseOf(letGoMs, instantNow),
+  callsShare: number = LET_GO_CALLS_SHARE,
 ): Effect.Effect<void> =>
   Effect.gen(function* () {
     const waited = inCallOf(live);
@@ -302,7 +305,7 @@ export const letGoOf = (
         `letting go of ${live.size} session(s): waiting at most ${letGoMs} ms for ${waited.length} call(s) in flight ` +
           `(${waited.map((l) => `${l.run.name} ${toolOf(l)}`).join(', ')})`,
       );
-    const quiet = yield* waitedOut(() => inCallOf(live).length === 0, purse.take(LET_GO_CALLS_SHARE));
+    const quiet = yield* waitedOut(() => inCallOf(live).length === 0, purse.take(callsShare));
     for (const l of quiet ? [] : inCallOf(live))
       yield* Effect.logWarning(
         `${l.run.name} is cut in its call to ${toolOf(l)}: it did not end within ${letGoMs} ms, and the next holder resumes the ` +
@@ -342,11 +345,12 @@ const adoptIn =
  * The attached sessions under `root`: `executable` the Claude Code they run, the SDK's own when absent (a test's stand-in otherwise).
  *
  * A session's interrupt file is read on every look, never as a transition: another process's ask survives a restart of the holder,
- * and an ask that landed after its turn ended is dropped there, never kept for the next turn.
+ * and an ask that landed after its turn ended is dropped there, never kept for the next turn. `options` are its let-go's bound,
+ * `letGoMs`, and the share of it the calls in flight may take, `callsShare` (`letGoOf`).
  */
-export const attachedSessions = (root: string, executable?: string, options: { letGoMs?: number } = {}): Attached => {
+export const attachedSessions = (root: string, executable?: string, options: { letGoMs?: number; callsShare?: number } = {}): Attached => {
   const live = new Map<string, Live>();
-  const letGoMs = options.letGoMs ?? LET_GO_MS;
+  const { letGoMs = LET_GO_MS, callsShare = LET_GO_CALLS_SHARE } = options;
   let holding = false;
   let draining = false;
   const sessionsDrain = () => sessionDrainOf(sessionDrainFile(root));
@@ -415,7 +419,7 @@ export const attachedSessions = (root: string, executable?: string, options: { l
 
   const letGo = Effect.gen(function* () {
     draining = true;
-    yield* letGoOf(root, live, letGoMs);
+    yield* letGoOf(root, live, letGoMs, purseOf(letGoMs, instantNow), callsShare);
     live.clear();
     holding = false;
     draining = false;

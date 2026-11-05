@@ -758,6 +758,27 @@ test('the receipt waits on ci at the merge commit: still running past the bound 
   assert.ok(turned.out.includes('`ci` passed on `main`'), turned.out);
 });
 
+test("the receipt's wait reads a GitHub read that fails as not yet read: once, then green, passes; failing to the bound, it names the last error", () => {
+  const w = afterMerge();
+  const green = JSON.stringify({ check_runs: [checkRun('ci', 'success')] });
+  const timedOut = 'spawnSync gh ETIMEDOUT';
+  w.gh.answers(
+    landedWith(w, { when: `commits/${w.merged}/check-runs`, outs: ['', green], err: timedOut, statuses: [1, 0] }, ...ciAt(w.merged, [])),
+  );
+  const before = waited(w.gh.calls()).length;
+  const once = land(w, 'receipt', receiptArgs(), { WF_CI_POLL_SECONDS: '0' });
+  assert.equal(once.code, 0, once.err);
+  assert.equal(waited(once.calls).length - before, 2, 'it read the merge commit again after the read that failed');
+  assert.ok(once.out.includes('`ci` passed on `main`'), once.out);
+
+  w.gh.answers(landedWith(w, { when: `commits/${w.merged}/check-runs`, err: timedOut, status: 1 }, ...ciAt(w.merged, [])));
+  const failing = land(w, 'receipt', receiptArgs(), NO_WAIT);
+  assert.equal(failing.code, 1, failing.out);
+  assert.ok(failing.err.includes(timedOut), failing.err);
+  assert.match(failing.err, /merge stands/);
+  assert.ok(failing.err.includes(RETRY), failing.err);
+});
+
 test('REFUSED: a receipt whose ci is never reported at the merge commit names landingWaitsOnCi; a combined `pending` with no context is no verdict', () => {
   const w = afterMerge();
   w.gh.answers(landedWith(w, ...ciAt(w.merged, [checkRun('lint', 'success')], NO_STATUSES)));

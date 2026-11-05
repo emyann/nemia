@@ -6,7 +6,8 @@
  * not waited for, and the new daemon's pass reads its result.
  *
  * The take-over's process is a child spawned with the test's `WF_ROOT`, putting the pause through the live host's own `pause`, killed
- * with SIGKILL and waited to its exit: no pid is guessed. The tick is the store's pass (`tickRun`) on the stage's engine, given a pass of
+ * with SIGKILL and waited to its exit: no pid is guessed. A real process's end is the first story's whole subject, so the file is a
+ * boundary test. The tick is the store's pass (`tickRun`) on the stage's engine, given a pass of
  * its own that does nothing and no tally, as `pause.test.ts` gives it. The take-over runs on a host whose machine is the test's — a
  * lease it steps, a signal and a start it logs — and whose pause, resume and calls are the live host's, over the stage's engine. A line
  * the take-over says of waiting on the landing throws, so a take-over that waits on it fails at once rather than hanging the story.

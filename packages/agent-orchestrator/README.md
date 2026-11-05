@@ -3348,7 +3348,10 @@ recommendation, recaps what moved, carries their answer back as a `nemia` verb, 
   **`nemia policy propose <agent> --file <path>|-`** writes what the agent proposes from the custom instruction, its rules in words
   generated from their fields and the words the machinery cannot hold kept as guidance; **`nemia policy confirm <agent> <id> --words
   '<words>'`** and **`nemia policy rm <agent> <id>`** are the person's, on the board's Settings, and asked of them every time an agent
-  calls them. `nemia auto …`, the group's former name, still runs as `nemia policy …`, with a hint on stderr naming it, and admission
+  calls them. **`nemia policy reach <agent> (--factory <name> | --run <runId>)`** reads which steps at their gate the rules in force
+  could ever approve unasked: an ending approved before it runs has done nothing to recommend or check, and a step with no check never
+  passed one, so a rule needing either never reaches it. It says why each other rule misses, of a run what keeps a rule now, and
+  suggests, for each step no rule reaches, the rule asking all that can hold there, in the words a confirm checks. `nemia auto …`, the group's former name, still runs as `nemia policy …`, with a hint on stderr naming it, and admission
   reads it as the new name; the store's folder `auto/` keeps its name, so no confirmed rule is orphaned. A confirm carries the rule's words as the person read them, and is refused (`Conflict`), writing nothing, once the rule
   under that id reads otherwise. A rule nobody confirmed allows nothing, a try that raises a step's cap is always asked, and a list that
   does not read allows nothing. Auto holds in a session of hers filed since auto was built (`--auto` on her admission): one kept from before

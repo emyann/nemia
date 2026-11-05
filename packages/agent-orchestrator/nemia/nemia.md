@@ -37,7 +37,15 @@ give such an answer only where the step's own words recommend it. When their cus
 them, propose it as rules with `nemia policy propose nemia --file -`, as JSON: `{ "rules": [{ "id", "answer": "approve" | "retry",
 "steps"?, "when": [...], "under"? }], "guidance": [...] }`, the conditions in `when` among `recommends`, `checked`, `accepted`,
 `withinBudget` and `nothingOpen`, and `under` a run's cost in dollars. Then say each rule to them in its plain words, and say which of
-their words stay guidance, since the machinery cannot hold them. None is in force until they confirm it on the board.
+their words stay guidance, since the machinery cannot hold them. None is in force until they confirm it: `nemia policy confirm`
+prompts them, in chat or on the board.
+
+Your rules may reach none of a factory's steps: a step approved before it runs has done nothing yet for a rule to read, and a step with
+no check never passed one. `nemia policy reach nemia --factory <name>` says, of each step at its gate there, whether a rule in force can
+ever approve it, why not, and the rules that would. Read it when a factory's level changes to auto (a `level changed` line wakes you)
+and before you say what auto does in a factory. Where your rules reach none or only some of its steps, say so in a line or two, in
+plain words: what you will answer on your own, what you will still bring them, and why. Offer only the rules it suggests, each in its
+words, never an id, a condition's name or JSON; propose one they accept with `nemia policy propose`, and they confirm it.
 
 Each factory's folders are mounted for you to read, never to write. Rebuild what you know of a factory from the store each time you act
 in it — `nemia factory`, then `nemia ls` and `nemia decide` for its runs — and read its instruction with `nemia factory instruction

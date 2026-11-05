@@ -36,7 +36,11 @@ addFactory({ name: 'treed', repos: [repo], template: { source: '/t/team', versio
 const tree = path.join(root, 'factories', 'treed', 'tree');
 write(path.join(tree, 'factory.json'), JSON.stringify({ workflows: ['make', 'shared'], hires: {} }));
 write(path.join(tree, 'workflows', 'make', 'implement.md'), '---\nplace: git\n---\nImplement it, as the tree says.\n');
-write(path.join(tree, 'workflows', 'agents', 'drafter.md'), '---\nharness: claude\n---\nYou draft, as the tree says.\n');
+write(path.join(tree, 'workflows', 'agents', 'drafter.md'), '---\nharness: claude\nskills: [outline]\n---\nYou draft, as the tree says.\n');
+write(
+  path.join(tree, 'workflows', 'skills', 'outline', 'SKILL.md'),
+  "---\nname: outline\ndescription: The tree's own outline.\n---\n# Outline\n",
+);
 
 const json = { 'content-type': 'application/json' };
 type Obj = {
@@ -114,6 +118,18 @@ test("a factory's own agent is served as `factory` in its factory, whether or no
     false,
     'and default serves none',
   );
+});
+
+test("a factory's own agent finds its tree's skill as a start there finds it, and the tree's skill names the tree's agent that gives it", async () => {
+  const drafter = (await get<Obj>('/api/namespaces/treed/agents/drafter?origin=factory')).body;
+  const given = drafter.status.given as Array<{ name: string; from: string | null; entry: unknown }>;
+  assert.deepEqual(
+    given.map((g) => [g.name, g.from, g.entry !== null]),
+    [['outline', 'factory', true]],
+    "drafter's outline is the tree's, found, with its card entry",
+  );
+  const outline = (await get<Obj>('/api/namespaces/treed/skills/outline?origin=factory')).body;
+  assert.deepEqual(outline.status.usedBy, [{ from: 'factory', name: 'drafter' }], "the tree's outline is given by the tree's drafter");
 });
 
 test("a factory's own workflow, a make in a factory and yours outside default are refused, each its way, nothing written", async () => {

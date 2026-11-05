@@ -38,6 +38,10 @@ fence refuses an edit of your store's factories, workflows and inbox.
 - **quick** takes a card that settles its change to your base branch: an implement, then a review whose pass lands it, with no gate.
 - **janitor**, on demand, reads the factory's stats and files what it proposes as cards in your inbox, starting none.
 
+In build and quick, implement tries again on its own, up to twice a round, when its check refuses, handed what the check printed; a
+refusal its scripts mark `not the work` (no `gh`, a draft pull request, CI that never ran) it signs off blocked on, and past its
+budget, its second try or a check that did not finish, the run waits on you.
+
 ## Its parameters
 
 What your repository decides is a parameter, given with `--set` when you apply the template; one you do not give takes its default.

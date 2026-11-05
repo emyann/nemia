@@ -126,6 +126,14 @@ test('applied with no --set, each parameter takes its default', () => {
   assert.ok(fs.readFileSync(path.join(tree, 'workflows/agents/otto.md'), 'utf8').includes('Edit(~/.agent-workflows/inbox/**)'));
 });
 
+test("build's and quick's implement try again on their own twice when their check refuses, either way, and land never does", () => {
+  for (const name of ['set', 'plain'])
+    for (const workflow of ['build', 'quick']) {
+      assert.equal(stepIn(treeOf(name), workflow, 'implement').front.retries, 2, `${name}: ${workflow}/implement`);
+      assert.equal(stepIn(treeOf(name), workflow, 'land').front.retries, undefined, `${name}: ${workflow}/land waits on a person`);
+    }
+});
+
 /** The end of the parts.ts clause, the last of sdlc's own scripts that both ways run. */
 const PARTS_END =
   'parts.ts" check; else echo "nemia check: WF_WORKFLOW_FILES is not set, so parts.ts is read from the run\'s frozen workflow files alone: this check runs in a run, which sets it" >&2; false; fi; } && ';

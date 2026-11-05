@@ -45,7 +45,6 @@ export const TEAM_NAMES: Baseline = {
   'apps/web/test/factory-fixtures.ts': { count: 2, ...TEAM_MOVES.fixtures },
   'apps/web/test/library-fixtures.ts': { count: 7, ...TEAM_MOVES.fixtures },
   'apps/web/test/placed.test.ts': { count: 6, ...TEAM_MOVES.fixtures },
-  'apps/web/test/read-factory.test.ts': { count: 5, ...TEAM_MOVES.fixtures },
   'apps/web/test/read-library.test.ts': { count: 4, ...TEAM_MOVES.fixtures },
   'apps/web/test/step-card.test.ts': { count: 3, ...TEAM_MOVES.fixtures },
   'apps/web/test/strip.test.ts': { count: 20, ...TEAM_MOVES.fixtures },

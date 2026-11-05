@@ -311,7 +311,7 @@ export const factoryObject = (over: FactoryOver = {}): Factory => ({
   spec: {
     repos: ['/work/mill'],
     workflows: ['build'],
-    hires: { 'build/implement': 'ada' },
+    hires: { 'build/implement': 'implementer' },
     volumes: [{ name: 'notes', path: '/home/me/notes', readOnly: true }],
     ...over.spec,
   },
@@ -373,8 +373,8 @@ export const mcpServerList = (...items: McpServer[]): McpServerList => ({
   items,
 });
 
-/** The hire of `mill` into `build`'s `implement`, `ada` hired there by the factory. */
-export const hireObject = (agent: string | undefined = 'ada'): Hire => {
+/** The hire of `mill` into `build`'s `implement`, `implementer` hired there by the factory. */
+export const hireObject = (agent: string | undefined = 'implementer'): Hire => {
   const set = { from: 'default' as const };
   return {
     apiVersion: 'nemia/v1',

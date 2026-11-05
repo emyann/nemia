@@ -155,7 +155,7 @@ const millView: Factory = {
   default: false,
   repos: ['/work/mill'],
   workflows: ['build'],
-  hires: { 'build/implement': 'ada' },
+  hires: { 'build/implement': 'implementer' },
   error: null,
   schedules: [
     {
@@ -286,15 +286,15 @@ test("a factory's writes: its rules, a hire and a fire, each at its own route, e
   await t.test("a hire and a fire are sent to the step's Hire, named <workflow>.<step>, and read back as the Hire", async (t) => {
     let answer: unknown = hireObject();
     const sent = serving(t, () => answer);
-    assert.deepEqual(await hireAgent('mill', 'build/implement', 'ada'), hireObject());
+    assert.deepEqual(await hireAgent('mill', 'build/implement', 'implementer'), hireObject());
     answer = hireObject(undefined);
     assert.deepEqual(await fireAgent('mill', 'build/implement'), hireObject(undefined));
     assert.deepEqual(sent, [
-      { url: '/api/namespaces/mill/hires/build.implement', method: 'PUT', body: { agent: 'ada' } },
+      { url: '/api/namespaces/mill/hires/build.implement', method: 'PUT', body: { agent: 'implementer' } },
       { url: '/api/namespaces/mill/hires/build.implement', method: 'DELETE', body: undefined },
     ]);
     answer = { file: '/f/mill.json', replaced: null };
-    await assert.rejects(hireAgent('mill', 'build/implement', 'ada'), (err: unknown) => {
+    await assert.rejects(hireAgent('mill', 'build/implement', 'implementer'), (err: unknown) => {
       assert.ok(err instanceof UnreadAnswer, String(err));
       assert.ok(err.message.includes("read the step's page again before hiring or firing again"), err.message);
       return true;

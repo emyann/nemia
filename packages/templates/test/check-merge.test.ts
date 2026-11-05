@@ -44,15 +44,17 @@ function rewrite(folder: string, file: string, from: string, to: string): void {
 }
 
 /** Each factory's tree as its operator left it: one spliced its own check into sdlc's line and sentence, one changed a line of its own. */
-{
+function leftByOperators(): void {
   const spliced = factory('spliced').tree;
   for (const workflow of ['build', 'quick'])
     rewrite(spliced, `workflows/${workflow}/implement.md`, PROBE_START, `{ own-check; } && ${PROBE_START}`);
   rewrite(spliced, 'workflows/build/implement.md', LISTED, LISTED.replace('`probe.ts`', '`own-check`, `probe.ts`'));
   fs.appendFileSync(path.join(factory('parameter').tree, 'RULES.md'), '\nA rule of our own.\n');
 }
+leftByOperators();
 
-/** The template's next version: its patch bumped, a script added to both check lines after parts.ts, and named where the note lists them. */
+/** The template's next version: its patch bumped, a script added to both check lines after parts.ts, and named where the note lists
+ * them. */
 const NEXT = (() => {
   const manifest = path.join(TEMPLATE, 'nemia.yaml');
   const version = /^ {2}version: (\d+)\.(\d+)\.(\d+)$/m.exec(fs.readFileSync(manifest, 'utf8'));

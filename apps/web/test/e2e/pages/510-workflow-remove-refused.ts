@@ -34,7 +34,7 @@ export default {
       await section.getByRole('button', { name: 'Remove…' }).click();
       const [answered] = await Promise.all([
         refused.waitForResponse(
-          (r) => r.request().method() === 'DELETE' && new URL(r.url()).pathname === `/api/workflows/yours/${NEEDED}`,
+          (r) => r.request().method() === 'DELETE' && new URL(r.url()).pathname === `/api/namespaces/default/workflows/${NEEDED}`,
           { timeout: WAIT_MS },
         ),
         section.getByRole('button', { name: 'Remove', exact: true }).click(),

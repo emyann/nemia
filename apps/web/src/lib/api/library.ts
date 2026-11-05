@@ -3,6 +3,7 @@
  * every key of a step, and a key's row on a card's or a step's page — each type with the schema `get` decodes it with.
  */
 import { Schema, SchemaTransformation, Struct } from 'effect';
+import type { DefinitionOrigin } from 'objects';
 import { decodes } from './decodes.ts';
 
 /** A list of strings, as a decoded answer holds it: mutable, as the plain types say. */
@@ -35,11 +36,40 @@ export const AgentSkillSchema = decodes<AgentSkill>()(
   }),
 );
 
-/** Where a skill is: your library (the store's `workflows/skills/`), the repository the board serves, or what is built into Nemia. */
-export type SkillSource = 'yours' | 'repo' | 'builtin';
+/**
+ * Where a skill is (an origin of `objects`): the factory's own tree, your library (the store's `workflows/skills/`), the repository the
+ * board serves, or what is built into Nemia.
+ */
+export type SkillSource = DefinitionOrigin;
 
-/** Decodes a `SkillSource`. */
-export const SkillSourceSchema = decodes<SkillSource>()(Schema.Literals(['yours', 'repo', 'builtin']));
+/**
+ * The word a route kept on Hono — a step's page, a start, a card's `from:` — reads where a workflow is from: `yours`, or `repo` for any
+ * other origin, the factory's own tree among them, which those routes read under `repo`.
+ */
+export const sourceOf = (from: string): 'repo' | 'yours' => (from === 'yours' ? 'yours' : 'repo');
+
+/** A card entry as an object says it, its lists copied into the board's plain type. */
+export const cardEntryOf = (entry: {
+  readonly id: string;
+  readonly name: string;
+  readonly description: string;
+  readonly tags: readonly string[];
+  readonly examples?: readonly string[];
+  readonly inputModes?: readonly string[];
+  readonly outputModes?: readonly string[];
+}): AgentSkill => ({
+  id: entry.id,
+  name: entry.name,
+  description: entry.description,
+  tags: [...entry.tags],
+  ...(entry.examples ? { examples: [...entry.examples] } : {}),
+  ...(entry.inputModes ? { inputModes: [...entry.inputModes] } : {}),
+  ...(entry.outputModes ? { outputModes: [...entry.outputModes] } : {}),
+});
+
+/** The origin a page's address names (its `$from`), as the api reads `?origin=`: one of its words, else none, the one it serves. */
+export const originWord = (from: string): DefinitionOrigin | undefined =>
+  from === 'factory' || from === 'repo' || from === 'yours' || from === 'builtin' ? from : undefined;
 
 /**
  * Mirrors `SkillCost` in the package: what a skill costs a turn, about, at four characters a token. Named, a turn carries its listing (its
@@ -47,20 +77,10 @@ export const SkillSourceSchema = decodes<SkillSource>()(Schema.Literals(['yours'
  */
 export type SkillCost = { preload: boolean; listed: number; body: number; perTurn: number };
 
-/** Decodes a `SkillCost`. */
-export const SkillCostSchema = decodes<SkillCost>()(
-  Schema.Struct({
-    preload: Schema.Boolean,
-    listed: Schema.Number,
-    body: Schema.Number,
-    perTurn: Schema.Number,
-  }),
-);
-
 /**
- * Mirrors `GivenSkill`: a skill an agent gives, named as its line writes it, where a start finds it and what it costs — or why none is
- * found. `from` is the place whose page it has; where it is null, `foundIn` is where this repository has it, as a skill named with its
- * folder, and null too for one found nowhere.
+ * A skill an agent gives, as its Agent object's `status.given` says it: named as its line writes it, where a start finds it and what it
+ * costs — or why none is found. `from` is the place whose page it has; where it is null, `foundIn` is where this repository has it, as a
+ * skill named with its folder, and null too for one found nowhere.
  */
 export type GivenSkill = {
   name: string;
@@ -72,24 +92,8 @@ export type GivenSkill = {
   cost: SkillCost | null;
 };
 
-/** Decodes a `GivenSkill`. */
-export const GivenSkillSchema = decodes<GivenSkill>()(
-  Schema.Struct({
-    name: Schema.String,
-    from: Schema.NullOr(SkillSourceSchema),
-    foundIn: Schema.NullOr(Schema.String),
-    entry: Schema.NullOr(AgentSkillSchema),
-    error: Schema.NullOr(Schema.String),
-    preload: Schema.Boolean,
-    cost: Schema.NullOr(SkillCostSchema),
-  }),
-);
-
 /** A schema pasted for a step's `output:`, written beside the steps by the save that carries it; an agent's, beside the agent. */
 export type SchemaFile = { file: string; text: string };
-
-/** Decodes a `SchemaFile`. */
-export const SchemaFileSchema = decodes<SchemaFile>()(Schema.Struct({ file: Schema.String, text: Schema.String }));
 
 /** Mirrors `WorkflowStepSpec` in apps/api/src/workflows/workflows.ts: every key a step of a workflow sets, before any run froze it. */
 export type WorkflowStepSpec = {

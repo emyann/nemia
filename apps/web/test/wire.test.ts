@@ -77,14 +77,6 @@ export type TakesReadonly = Holds<Same<{ a: readonly string[] }, { a: string[] }
 
 export type WorkflowPageAddress = Holds<Same<Board.WorkflowPageAddress, step.WorkflowPageAddress>>;
 
-export type AgentUser = Holds<Same<Board.AgentUser, agents.AgentUser>>;
-/** The board shows no agent's copy of another, so it reads no `copied`. */
-export type AgentListing = Holds<Same<Board.AgentListing, Omit<agents.AgentListing, 'copied'>>>;
-/** As `AgentListing`; and the Agents page lists no step an agent fills: the factories it fills one in are what it shows. */
-export type LibraryAgent = Holds<Same<Board.LibraryAgent, Omit<agents.LibraryAgent, 'copied' | 'fills'>>>;
-/** As `AgentListing`. */
-export type AgentSaved = Holds<Same<Board.AgentSaved, Omit<agents.AgentSaved, 'agent'> & { agent: Omit<agents.AgentListing, 'copied'> }>>;
-export type AgentTried = Holds<Same<Board.AgentTried, agents.AgentTried>>;
 export type CustomInstructions = Holds<Same<Board.CustomInstructions, custom.CustomInstructionsAnswer>>;
 export type CustomInstructionsCleared = Holds<Same<Board.CustomInstructionsCleared, custom.CustomInstructionsCleared>>;
 export type AgentRoleKey = Holds<Same<Board.AgentRoleKey, keyof agents.AgentListing['keys']>>;
@@ -197,7 +189,6 @@ export type StepNeeds = Holds<Same<Board.StepNeeds, Pick<Step, keyof Board.StepN
 export type TaskPart = Holds<Same<Board.TaskPart, runs.TaskPart>>;
 export type StepLayers = Holds<Same<Board.StepLayers, NonNullable<workflows.ListedStep['layers']>>>;
 
-export type GivenSkill = Holds<Same<Board.GivenSkill, skills.GivenSkill>>;
 export type WorkflowStepSpec = Holds<Same<Board.WorkflowStepSpec, workflows.WorkflowStepSpec>>;
 export type StepKey = Holds<Same<Board.StepKey, keyof workflows.WorkflowStepSpec>>;
 export type KeyRow = Holds<Same<Board.KeyRow, workflows.KeyRow>>;
@@ -230,14 +221,6 @@ export type RunClock = Holds<Same<Board.RunClock, NonNullable<runs.OpenListing['
 export type StepCost = Holds<Same<Board.StepCost, NonNullable<runs.OpenListing['waiting'][number]['stepCosts']>[number]>>;
 export type FinishedRun = Holds<Same<Board.FinishedRun, runs.FinishedListing['runs'][number]>>;
 export type Hold = Holds<Same<Board.Hold, runs.Hold>>;
-
-export type SkillRow = Holds<Same<Board.SkillRow, skills.SkillRow>>;
-export type SkillPlace = Holds<Same<Board.SkillPlace, skills.SkillPlace>>;
-export type SkillAdded = Holds<Same<Board.SkillAdded, skills.SkillAdded>>;
-export type SkillUser = Holds<Same<Board.SkillUser, skills.SkillUser>>;
-export type SkillDetail = Holds<Same<Board.SkillDetail, skills.SkillDetail>>;
-export type SkillSaved = Holds<Same<Board.SkillSaved, skills.SkillSaved>>;
-export type SkillDraft = Holds<Same<Board.SkillDraft, NonNullable<skills.SkillDetail['draft']>>>;
 
 export type TranscriptEvent = Holds<Same<Board.TranscriptEvent, steps.TranscriptEvent>>;
 export type StepTranscript = Holds<Same<Board.StepTranscript, steps.StepTranscript>>;
@@ -283,14 +266,10 @@ export type RunRead = Holds<Same<Board.RunRead, runs.RunRead>>;
 export type Version = Holds<Same<Board.Version, Omit<app.VersionAnswer, 'release'> & { release?: app.VersionAnswer['release'] }>>;
 export type VersionRelease = Holds<Same<Board.VersionRelease, NonNullable<app.VersionAnswer['release']>>>;
 
-export type ListedStep = Holds<Same<Board.ListedStep, workflows.ListedStep>>;
-export type StepOwn = Holds<Same<Board.StepOwn, workflows.StepOwn>>;
-export type WorkflowListing = Holds<Same<Board.WorkflowListing, workflows.WorkflowListing>>;
 export type RecentRun = Holds<Same<Board.RecentRun, step.RecentRun>>;
 export type SkillFrom = Holds<Same<Board.SkillFrom, step.SkillFrom>>;
 export type Hiring = Holds<Same<Board.Hiring, step.Hiring>>;
 export type WorkflowStepPage = Holds<Same<Board.WorkflowStepPage, step.WorkflowStepPage>>;
-export type WorkflowSaved = Holds<Same<Board.WorkflowSaved, builder.WorkflowSaved>>;
 
 /**
  * Mirrors no entry can hold yet: the api answers each through the package's command table, which types no answer, and the package's
@@ -303,7 +282,6 @@ const UNWIRED: Readonly<Record<string, string>> = {
   FactoryLevel: "nemia level's answer (`NemiaLevel`), not exported by the package",
   NemiaLevel: 'not exported by the package',
   NemiaMemory: 'not exported by the package',
-  WorkflowRemoved: 'not exported by the package',
 };
 
 /** The types exported from `text` whose doc comment says they mirror one of the api's, by name. */

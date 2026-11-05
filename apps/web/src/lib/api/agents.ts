@@ -1,9 +1,17 @@
-/** The agents, and the writes of one of yours (apps/api/src/agents/agents.ts). */
+/**
+ * The agents as the board reads them — the Agent objects of the default namespace (`objects.ts`), each seen as an `AgentListing` — the
+ * writes of one of yours through the Agent object, and your custom instructions for one (apps/api/src/custom/custom.ts).
+ */
 import { queryOptions } from '@tanstack/react-query';
 import { Option, Schema } from 'effect';
+import type { Agent, AgentSpec, DefinitionOrigin } from 'objects';
 import { decodes } from './decodes.ts';
-import { get, send, type SendHow } from './read.ts';
-import { AgentSkillSchema, GivenSkillSchema, SchemaFileSchema, type AgentSkill, type GivenSkill, type SchemaFile } from './library.ts';
+import { get, send } from './read.ts';
+import { agents as served, type Refuse } from './objects.ts';
+import { cardEntryOf, originWord, type AgentSkill, type GivenSkill, type SchemaFile } from './library.ts';
+
+/** The namespace of the api's repository and your library, where the board writes yours. */
+const DEFAULT = 'default';
 
 /**
  * The keys an agent sets on the steps that name it: every agent key but what describes the agent itself — its description, the skills its
@@ -22,48 +30,34 @@ export type AgentRoleKey =
   | 'remote'
   | 'output';
 
-/** Decodes an agent's role keys as its file writes them, each only where it sets it. */
-const RoleKeysSchema = decodes<Partial<Record<AgentRoleKey, string>>>()(
-  Schema.Struct({
-    harness: Schema.optionalKey(Schema.String),
-    model: Schema.optionalKey(Schema.String),
-    effort: Schema.optionalKey(Schema.String),
-    context: Schema.optionalKey(Schema.String),
-    permissionMode: Schema.optionalKey(Schema.String),
-    sandbox: Schema.optionalKey(Schema.String),
-    tools: Schema.optionalKey(Schema.String),
-    disallowedTools: Schema.optionalKey(Schema.String),
-    allowedTools: Schema.optionalKey(Schema.String),
-    remote: Schema.optionalKey(Schema.String),
-    output: Schema.optionalKey(Schema.String),
-  }),
-);
+/** Every role key, in its order. */
+const ROLE_KEYS: readonly AgentRoleKey[] = [
+  'harness',
+  'model',
+  'effort',
+  'context',
+  'permissionMode',
+  'sandbox',
+  'tools',
+  'disallowedTools',
+  'allowedTools',
+  'remote',
+  'output',
+];
 
-/** Mirrors `AgentUser` in apps/api/src/agents/agents.ts: a node that names an agent, the step of a workflow in the agent's own place. */
+/** A node that names an agent: the step of a workflow in the agent's own place. */
 export type AgentUser = { from: 'repo' | 'yours'; workflow: string; step: string };
 
-/** Where an agent is read from: the repository's, or yours. */
-const AgentPlaceSchema = Schema.Literals(['repo', 'yours']);
-
-/** Decodes an `AgentUser`. */
-const AgentUserSchema = decodes<AgentUser>()(
-  Schema.Struct({
-    from: AgentPlaceSchema,
-    workflow: Schema.String,
-    step: Schema.String,
-  }),
-);
-
 /**
- * Mirrors `AgentListing` in apps/api/src/agents/agents.ts: one agent — its keys as its file writes them, its instructions, the result
- * schema its `output:` names, what it says it can do — its card's skills, generated from the skills it gives (one entry each, read off each
- * SKILL.md, or one made from its description when it gives none), null with `cardError` saying why where none can be made — the skills its
- * sessions are given and its harness prompt as its lines write them (null for none), its file as written, the version a write carries, the
- * nodes that name it, and the parser's refusal of a file that does not read.
+ * An agent as the board reads it, off its Agent object: its keys as its file writes them, its instructions, the result schema its
+ * `output:` names, what it says it can do — its card's skills, generated from the skills it gives (one entry each, read off each SKILL.md,
+ * or one made from its description when it gives none), null with `cardError` saying why where none can be made — the skills its sessions
+ * are given and its harness prompt as its lines write them (null for none), its file as written, the version a write carries, the nodes
+ * that name it, and the parser's refusal of a file that does not read. `from` is where it is read from (`status.origin`).
  */
 export type AgentListing = {
   name: string;
-  from: 'repo' | 'yours';
+  from: DefinitionOrigin;
   dir: string;
   file: string;
   /** The job it holds, as its `role:` line writes it: `Product engineer`; null for none. */
@@ -84,66 +78,66 @@ export type AgentListing = {
   /** The skills it gives, one row each in its order: where a start finds it and what it costs a turn, or why none is found. */
   given: GivenSkill[];
   source: string;
+  /** What its file held when it was read (its `metadata.resourceVersion`): a write carries it back. */
   version: string;
   usedBy: AgentUser[];
   error: string | null;
   /**
    * Why it cannot be tried from the board — the repository's, a name a try's folder cannot take, a harness the try's Claude Code fence does
    * not reach, `remote: true` — and the command that copies it to yours when that is the fix, in the store the api reads; null when nothing
-   * does. Mirrors `Untried` in apps/api/src/agents/try.ts, whose words the try's route refuses with.
+   * does.
    */
   untried: { why: string; copy: string | null } | null;
 };
 
-/** Decodes an `AgentListing`: each key the board reads, of its type and words; a key it does not know is dropped. */
-const AgentListingSchema = decodes<AgentListing>()(
-  Schema.Struct({
-    name: Schema.String,
-    from: AgentPlaceSchema,
-    dir: Schema.String,
-    file: Schema.String,
-    role: Schema.NullOr(Schema.String),
-    description: Schema.NullOr(Schema.String),
-    keys: RoleKeysSchema,
-    body: Schema.String,
-    schema: Schema.NullOr(SchemaFileSchema),
-    card: Schema.NullOr(Schema.mutable(Schema.Array(AgentSkillSchema))),
-    cardError: Schema.NullOr(Schema.String),
-    skills: Schema.NullOr(Schema.String),
-    harnessPrompt: Schema.NullOr(Schema.String),
-    mcp: Schema.NullOr(Schema.String),
-    given: Schema.mutable(Schema.Array(GivenSkillSchema)),
-    source: Schema.String,
-    version: Schema.String,
-    usedBy: Schema.mutable(Schema.Array(AgentUserSchema)),
-    error: Schema.NullOr(Schema.String),
-    untried: Schema.NullOr(Schema.Struct({ why: Schema.String, copy: Schema.NullOr(Schema.String) })),
-  }),
-);
-
-/**
- * Mirrors `LibraryAgent` in apps/api/src/agents/agents.ts, as the Agents page reads it: an agent's listing, and the names of the factories
- * it fills a step in, sorted; the default factory is never one of them.
- */
+/** An agent's listing, as the Agents page reads it, and the names of the factories it fills a step in, sorted; never the default one. */
 export type LibraryAgent = AgentListing & { factories: string[] };
 
-/** Decodes a `LibraryAgent`: an `AgentListing` and its factories. */
-const LibraryAgentSchema = decodes<LibraryAgent>()(
-  Schema.Struct({
-    ...AgentListingSchema.fields,
-    factories: Schema.mutable(Schema.Array(Schema.String)),
-  }),
-);
+/** The role keys an agent's `spec.keys` sets, each as its file writes it; one unset left out. */
+const roleKeysOf = (keys: AgentSpec['keys']): Partial<Record<AgentRoleKey, string>> =>
+  Object.fromEntries(ROLE_KEYS.flatMap((key) => (typeof keys?.[key] === 'string' ? [[key, keys[key]]] : [])));
+
+/** An Agent, as the board reads it (`LibraryAgent`, an `AgentListing` with the factories it fills a step in). */
+export const agentViewOf = (agent: Agent): LibraryAgent => {
+  const { spec, status } = agent;
+  return {
+    name: agent.metadata.name,
+    from: status.origin,
+    dir: status.dir,
+    file: status.file,
+    role: spec.role ?? null,
+    description: spec.description ?? null,
+    keys: roleKeysOf(spec.keys),
+    body: spec.instructions ?? '',
+    schema: spec.output ? { ...spec.output } : null,
+    card: status.card ? status.card.map(cardEntryOf) : null,
+    cardError: status.cardError,
+    skills: spec.skills ?? null,
+    harnessPrompt: spec.harnessPrompt ?? null,
+    mcp: spec.mcp ?? null,
+    given: status.given.map((g) => ({ ...g, entry: g.entry ? cardEntryOf(g.entry) : null, cost: g.cost ? { ...g.cost } : null })),
+    source: status.source,
+    version: agent.metadata.resourceVersion,
+    usedBy: status.usedBy.map((u) => ({ ...u })),
+    error: status.error,
+    untried: status.untried ? { ...status.untried } : null,
+    factories: [...status.factories],
+  };
+};
+
+/** The origins the Agents page reads, each listed whole, shadowed or not: the repository's, then yours. */
+const LISTED: readonly DefinitionOrigin[] = ['repo', 'yours'];
 
 /** Every agent of the repository's and of yours, with the factories each fills a step in, read from disk on each request. */
 export const agentsQuery = queryOptions({
   queryKey: ['agents'],
-  queryFn: () => get('/api/agents', Schema.mutable(Schema.Array(LibraryAgentSchema))),
+  queryFn: async (): Promise<LibraryAgent[]> =>
+    (await Promise.all(LISTED.map((origin) => served.list(DEFAULT, { origin })))).flat().map(agentViewOf),
 });
 
-/** One agent, read from disk now: `agentQuery`'s read, for a page that must read it past the cache. */
-export const readAgent = (from: string, name: string): Promise<AgentListing> =>
-  get(`/api/agents/${encodeURIComponent(from)}/${encodeURIComponent(name)}`, AgentListingSchema);
+/** One agent, read from disk now, from the origin `from`: `agentQuery`'s read, for a page that must read it past the cache. */
+export const readAgent = async (from: string, name: string): Promise<AgentListing> =>
+  agentViewOf(await served.get(DEFAULT, name, { origin: originWord(from) }));
 
 /** One agent, for its page. */
 export const agentQuery = (from: string, name: string) =>
@@ -169,20 +163,20 @@ export type AgentDraft = {
   schema?: SchemaFile;
 };
 
-/** Mirrors `AgentSaved` in apps/api/src/agents/agents.ts: the agent as it now reads, and its files by name. */
-export type AgentSaved = { agent: AgentListing; written: string[]; removed: string[] };
+/** A draft as the Agent object's spec says it: its `output` the schema pasted, left out where none is, so the file keeps its own. */
+const specOfDraft = (draft: AgentDraft): AgentSpec => ({
+  role: draft.role,
+  description: draft.description,
+  keys: Object.fromEntries(Object.entries(draft.keys).filter((entry): entry is [string, string | null] => entry[1] !== undefined)),
+  skills: draft.skills,
+  harnessPrompt: draft.harnessPrompt,
+  mcp: draft.mcp,
+  ...(draft.schema ? { output: draft.schema } : {}),
+  instructions: draft.body,
+});
 
-/** A list of strings, as a decoded answer holds it: mutable, as the plain types say. */
-const Strings = Schema.mutable(Schema.Array(Schema.String));
-
-/** Decodes an `AgentSaved`. */
-const AgentSavedSchema = decodes<AgentSaved>()(
-  Schema.Struct({
-    agent: AgentListingSchema,
-    written: Strings,
-    removed: Strings,
-  }),
-);
+/** An agent written: the agent as it now reads. */
+export type AgentSaved = { agent: AgentListing };
 
 /**
  * A write of an agent the api refused: the package's sentence, the nodes that still name the agent when that is why, and the api's status —
@@ -199,57 +193,42 @@ export class AgentRefusal extends Error {
 }
 
 /** The nodes a refusal of an agent's write names: its `users`, none where it names none. */
-const UsersNamed = Schema.Struct({ users: Strings });
+const UsersNamed = Schema.Struct({ users: Schema.Array(Schema.String) });
 
 /** How an agent's write is refused: an `AgentRefusal` in the api's words, with the nodes it names and its status. */
-const refused: SendHow['refused'] = (words, status, answer) =>
+const refused: Refuse = (words, status, answer) =>
   new AgentRefusal(
     words,
     Option.match(Schema.decodeUnknownOption(UsersNamed)(answer), { onNone: () => [], onSome: (u) => u.users }),
     status,
   );
 
-/** What an agent's write may have done, and what to look at before writing it again. */
-const WRITTEN = 'The agent may be written: read it again on its page before writing it again.';
-
-/**
- * A write of an agent's, sent as `application/json` with `body`, its answer decoded with `schema`: rejected with an `AgentRefusal`, or an
- * `UnreadAnswer` saying `may`.
- */
-const agentWrite = <T>(
-  method: 'POST' | 'PUT' | 'DELETE',
-  route: string,
-  schema: Schema.Decoder<T>,
-  body: unknown,
-  may = WRITTEN,
-): Promise<T> => send(method, route, schema, { body, may, refused });
-
 /** Make an agent of yours. Rejects with an `AgentRefusal`: a name taken, or a key or value the package refuses. */
-export const createAgent = (draft: AgentDraft): Promise<AgentSaved> => agentWrite('POST', '/api/agents/yours', AgentSavedSchema, draft);
+export const createAgent = async (draft: AgentDraft): Promise<AgentSaved> => ({
+  agent: agentViewOf(await served.create(DEFAULT, { metadata: { name: draft.name }, spec: specOfDraft(draft) }, refused)),
+});
 
 /** Put an agent of yours back — renamed, when the draft names it otherwise — against the version it was read at. */
-export const saveAgent = (name: string, version: string, draft: AgentDraft): Promise<AgentSaved> =>
-  agentWrite('PUT', `/api/agents/yours/${encodeURIComponent(name)}`, AgentSavedSchema, { ...draft, version });
+export const saveAgent = async (name: string, version: string, draft: AgentDraft): Promise<AgentSaved> => ({
+  agent: agentViewOf(
+    await served.replace(DEFAULT, name, { metadata: { name: draft.name, resourceVersion: version }, spec: specOfDraft(draft) }, refused),
+  ),
+});
 
 /** Remove an agent of yours, against the version it was read at: refused while a node still names it, saying which. */
-export const removeAgent = (name: string, version: string): Promise<{ removed: string[] }> =>
-  agentWrite('DELETE', `/api/agents/yours/${encodeURIComponent(name)}`, Schema.Struct({ removed: Strings }), { version });
+export const removeAgent = async (name: string, version: string): Promise<AgentListing> =>
+  agentViewOf(await served.delete(DEFAULT, name, version, refused));
 
-/** What a try may have started, and where to look before trying the agent again. */
-const TRIED = 'The try may have started: look on the Runs page before trying the agent again.';
-
-/** Mirrors `AgentTried` in apps/api/src/agents/agents.ts: the run a try started, which its page follows. */
+/** The run a try started, which its page follows. */
 export type AgentTried = { id: string };
-
-/** Decodes an `AgentTried`. */
-const AgentTriedSchema = decodes<AgentTried>()(Schema.Struct({ id: Schema.String }));
 
 /**
  * Try an agent of yours on a short brief: a one-step folder run of it, fenced to its folder with a dollar to spend. Rejects with an
  * `AgentRefusal`: an empty brief, a try of it still running, an agent that does not read or gives a skill only the repository has.
  */
-export const tryAgent = (name: string, brief: string): Promise<AgentTried> =>
-  agentWrite('POST', `/api/agents/yours/${encodeURIComponent(name)}/try`, AgentTriedSchema, { brief }, TRIED);
+export const tryAgent = async (name: string, brief: string): Promise<AgentTried> => ({
+  id: (await served.try(DEFAULT, name, brief, refused)).id,
+});
 
 /**
  * Mirrors `CustomInstructionsAnswer` in apps/api/src/custom/custom.ts: a person's custom instructions for the agent `name`, the file in

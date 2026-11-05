@@ -218,7 +218,7 @@ export default {
       await settled(page);
       await photograph(page, path.join(OUT, `agents-new-${await themeOf(page)}.png`), { fullPage: true });
       const [created] = await Promise.all([
-        page.waitForResponse((r) => r.request().method() === 'POST' && new URL(r.url()).pathname === '/api/agents/yours', {
+        page.waitForResponse((r) => r.request().method() === 'POST' && new URL(r.url()).pathname === '/api/namespaces/default/agents', {
           timeout: WAIT_MS,
         }),
         form.getByRole('button', { name: 'Create agent' }).click(),
@@ -251,9 +251,12 @@ export default {
         throw new Refused(`the MCP servers it names are read back as written — they read ${JSON.stringify(servers)}`);
       await madeForm.getByRole('textbox', { name: 'Model' }).fill(made.edited);
       const [saved] = await Promise.all([
-        page.waitForResponse((r) => r.request().method() === 'PUT' && new URL(r.url()).pathname === `/api/agents/yours/${made.name}`, {
-          timeout: WAIT_MS,
-        }),
+        page.waitForResponse(
+          (r) => r.request().method() === 'PUT' && new URL(r.url()).pathname === `/api/namespaces/default/agents/${made.name}`,
+          {
+            timeout: WAIT_MS,
+          },
+        ),
         madeForm.getByRole('button', { name: 'Save' }).click(),
       ]);
       if (saved.status() !== 200) throw new Refused(`the api saves the agent — it answered ${saved.status()}: ${await saved.text()}`);
@@ -274,9 +277,12 @@ export default {
         'the ask names its file alone: it names no schema, and no card file goes with it',
       );
       const [removed] = await Promise.all([
-        page.waitForResponse((r) => r.request().method() === 'DELETE' && new URL(r.url()).pathname === `/api/agents/yours/${made.name}`, {
-          timeout: WAIT_MS,
-        }),
+        page.waitForResponse(
+          (r) => r.request().method() === 'DELETE' && new URL(r.url()).pathname === `/api/namespaces/default/agents/${made.name}`,
+          {
+            timeout: WAIT_MS,
+          },
+        ),
         page.locator('[data-remove-asks]').getByRole('button', { name: 'Remove', exact: true }).click(),
       ]);
       if (removed.status() !== 200)
@@ -303,7 +309,7 @@ export default {
       await refused.getByRole('button', { name: 'Remove…' }).click();
       const [answered] = await Promise.all([
         refused.waitForResponse(
-          (r) => r.request().method() === 'DELETE' && new URL(r.url()).pathname === `/api/agents/yours/${seeded.name}`,
+          (r) => r.request().method() === 'DELETE' && new URL(r.url()).pathname === `/api/namespaces/default/agents/${seeded.name}`,
           { timeout: WAIT_MS },
         ),
         refused.locator('[data-remove-asks]').getByRole('button', { name: 'Remove', exact: true }).click(),

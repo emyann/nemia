@@ -78,7 +78,7 @@ export const UNSET: Readonly<WorkflowStepSpec> = {
 const hiredRefusal = (steps: readonly ListedStep[]): string | null => {
   const hired = steps.find((s) => s.hired !== null);
   return hired
-    ? `The step ${hired.name} is listed with ${hired.hired}, the agent its factory hires into it, which its file does not write: the builder drafts a folder as its files write it. Open the builder on the folder as GET /api/workflows lists it without ?factory= (workflowsQuery).`
+    ? `The step ${hired.name} is listed with ${hired.hired}, the agent its factory hires into it, which its file does not write: the builder drafts a folder as its files write it. Open the builder on the folder as the default namespace serves it, read in no factory (workflowsQuery).`
     : null;
 };
 
@@ -374,6 +374,33 @@ export const readmeSent = (draft: string, workflow: Pick<WorkflowListing, 'readm
 /** The draft as a save puts it: each step in the listing's shape, a pasted schema's file named by its `output:`. */
 export const toPut = (steps: readonly DraftStep[]): StepWritten[] =>
   steps.map(({ name, spec, body, own, schema }) => ({ name, spec: schema ? { ...spec, output: schema.file } : spec, body, own }));
+
+/**
+ * A folder saved: the folder read back from disk, and its files by name — written, left as they were, removed — as the save sent them
+ * against the folder it drafted from (`filesSaved`).
+ */
+export type WorkflowSaved = { workflow: WorkflowListing; written: string[]; kept: string[]; removed: string[] };
+
+/**
+ * The files a save of `steps` and `readme` (sent, `readmeSent`) writes over the folder `base` was listed as: each step changed or added
+ * and each schema pasted written, the README when it was sent, each step as it was left, and each step listed and gone removed.
+ */
+export function filesSaved(
+  steps: readonly DraftStep[],
+  readme: string | undefined,
+  base: Pick<WorkflowListing, 'steps'>,
+): Omit<WorkflowSaved, 'workflow'> {
+  const changed = new Set(unsavedSteps(steps, base));
+  return {
+    written: [
+      ...(readme === undefined ? [] : ['README.md']),
+      ...steps.filter((s) => changed.has(s.name)).map((s) => `${s.name}.md`),
+      ...schemasOf(steps).map((s) => s.file),
+    ],
+    kept: steps.filter((s) => !changed.has(s.name)).map((s) => `${s.name}.md`),
+    removed: base.steps.filter((listed) => !steps.some((s) => s.name === listed.name)).map((s) => `${s.name}.md`),
+  };
+}
 
 /** The schemas pasted in the draft, as a save carries them: written beside the steps with them, judged with them first. */
 export const schemasOf = (steps: readonly DraftStep[]): SchemaFile[] =>

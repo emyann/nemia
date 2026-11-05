@@ -10,7 +10,7 @@ import { decodes } from './decodes.ts';
 import { selectorKey } from './selector.ts';
 import { get, send } from './read.ts';
 import { cards, namespaceOf } from './objects.ts';
-import { KeyRowSchema, type KeyRow } from './library.ts';
+import { KeyRowSchema, sourceOf, type KeyRow } from './library.ts';
 import type { Place, Started, WorkflowListing } from './workflows.ts';
 
 /**
@@ -200,6 +200,7 @@ type CardRef = Pick<InboxEntry, 'name' | 'factory'>;
  */
 export const fileCard = async ({
   factory,
+  from,
   ...card
 }: {
   body: string;
@@ -208,7 +209,7 @@ export const fileCard = async ({
   repo?: string;
   factory?: string;
 }): Promise<{ name: string }> => {
-  const filed = await cards.create(namespaceOf(factory), card);
+  const filed = await cards.create(namespaceOf(factory), { ...card, ...(from ? { from: sourceOf(from) } : {}) });
   return { name: filed.metadata.name };
 };
 
@@ -239,7 +240,13 @@ export const startCard = (
   card: CardRef,
   start: { workflow: string; from: WorkflowListing['from']; brief: string; after?: readonly string[]; context?: readonly string[] },
   place?: Place | null,
-): Promise<Started> => cards.start(namespaceOf(card.factory), card.name, start, place && place.factory !== 'default' ? place : undefined);
+): Promise<Started> =>
+  cards.start(
+    namespaceOf(card.factory),
+    card.name,
+    { ...start, from: sourceOf(start.from) },
+    place && place.factory !== 'default' ? place : undefined,
+  );
 
 /**
  * Mirrors `InboxFromAnswer` in apps/api/src/inbox/inbox.ts: what the CLI's `inbox from` did — the card's `from:` as it now reads, and the

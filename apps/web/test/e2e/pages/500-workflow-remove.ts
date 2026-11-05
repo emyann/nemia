@@ -66,9 +66,12 @@ export default {
 
       await card.getByRole('button', { name: 'Remove…' }).click();
       const [answered] = await Promise.all([
-        page.waitForResponse((r) => r.request().method() === 'DELETE' && new URL(r.url()).pathname === `/api/workflows/yours/${GOING}`, {
-          timeout: WAIT_MS,
-        }),
+        page.waitForResponse(
+          (r) => r.request().method() === 'DELETE' && new URL(r.url()).pathname === `/api/namespaces/default/workflows/${GOING}`,
+          {
+            timeout: WAIT_MS,
+          },
+        ),
         card.getByRole('button', { name: 'Remove', exact: true }).click(),
       ]);
       if (answered.status() !== 200) throw new Refused(`the api removes the folder — it answered ${answered.status()}`);

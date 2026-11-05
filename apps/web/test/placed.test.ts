@@ -14,22 +14,25 @@ const factory = (name: string, repos: string[]) =>
   factoryObject({ metadata: { name }, spec: { repos, workflows: [], hires: {}, volumes: [] } });
 
 /**
- * Answers every fetch of the test `t`: the factories with `factories`, each factory's lines and schedules, any other route with no
- * workflow; returns the routes asked but a factory's lines and schedules, which the factories' read asks beside its list.
+ * Answers every fetch of the test `t`: the factories with `factories`, each factory's lines and schedules, a namespace's workflows with
+ * none; returns the routes asked but a factory's lines and schedules, which the factories' read asks beside its list.
  */
 function answering(t: { after: (fn: () => void) => void }, factories: Factory[]): string[] {
   const asked: string[] = [];
   const before = globalThis.fetch;
   globalThis.fetch = async (input) => {
     const url = String(input);
+    const workflows = /^\/api\/namespaces\/[^/]+\/workflows(\?|$)/.test(url);
     const body = url.startsWith('/api/factories/')
       ? factoryCommands()
-      : url.startsWith('/api/namespaces/')
-        ? scheduleList()
-        : url.split('?')[0] === '/api/factories'
-          ? factoryList(...factories)
-          : [];
-    if (!url.startsWith('/api/factories/') && !url.startsWith('/api/namespaces/')) asked.push(url);
+      : workflows
+        ? { apiVersion: 'nemia/v1', kind: 'WorkflowList', metadata: {}, items: [] }
+        : url.startsWith('/api/namespaces/')
+          ? scheduleList()
+          : url.split('?')[0] === '/api/factories'
+            ? factoryList(...factories)
+            : [];
+    if (workflows || (!url.startsWith('/api/factories/') && !url.startsWith('/api/namespaces/'))) asked.push(url);
     return new Response(JSON.stringify(body), { headers: { 'content-type': 'application/json' } });
   };
   t.after(() => {
@@ -58,10 +61,10 @@ test('REFUSED: a page loads the list of its place — with no factory the one re
     await loadWorkflowsIn(new QueryClient(), address);
     return [...asked].sort();
   };
-  assert.deepEqual(await loaded({}), ['/api/factories', '/api/workflows']);
-  assert.deepEqual(await loaded({ factory: 'default' }), ['/api/factories', '/api/workflows']);
-  assert.deepEqual(await loaded({ factory: 'pipao' }), ['/api/factories', '/api/workflows?factory=pipao&repo=%2Fcode%2Fpipao']);
-  assert.deepEqual(await loaded({ factory: 'quay', repo: '/b' }), ['/api/factories', '/api/workflows?factory=quay&repo=%2Fb']);
+  assert.deepEqual(await loaded({}), ['/api/factories', '/api/namespaces/default/workflows']);
+  assert.deepEqual(await loaded({ factory: 'default' }), ['/api/factories', '/api/namespaces/default/workflows']);
+  assert.deepEqual(await loaded({ factory: 'pipao' }), ['/api/factories', '/api/namespaces/pipao/workflows?repo=%2Fcode%2Fpipao']);
+  assert.deepEqual(await loaded({ factory: 'quay', repo: '/b' }), ['/api/factories', '/api/namespaces/quay/workflows?repo=%2Fb']);
   assert.deepEqual(await loaded({ factory: 'quay' }), ['/api/factories'], 'several repositories and none named: no list is guessed');
   assert.deepEqual(await loaded({ factory: 'gone' }), ['/api/factories'], 'no factory of that name: no list');
 });

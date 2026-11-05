@@ -234,13 +234,22 @@ export const listPlace = (address: PagePlace, factories: readonly Factory[]): Li
 };
 
 /**
- * The word for where a workflow read from `from` comes from, read in `factory`: `yours` for one of yours anywhere; `this repository` for
- * one read with no factory or in the default one; `the factory's` in a named factory, whose folder its page prints.
+ * The word for where a workflow read from `from` comes from, read in `factory`: `yours` for one of yours anywhere; `the factory's` for one
+ * of the factory's own tree; `this repository` for one read with no factory or in the default one; `the factory's` in a named factory,
+ * whose folder its page prints — the word a route kept on Hono says `repo` for its tree too (`sourceOf`).
  */
 export const fromWord = (from: WorkflowListing['from'], factory?: string): string => {
   if (from === 'yours') return 'yours';
+  if (from === 'factory') return "the factory's";
   return factory === undefined || factory === DEFAULT_NAME ? 'this repository' : "the factory's";
 };
+
+/**
+ * The way a factory's own definition — a workflow, an agent or a skill of its tree (origin `factory`) — changes, which the api's refusal of
+ * a write to one names (`way: 'factory'`): the board offers no write for one, and says these words in its place. The command itself is the
+ * api's to answer, never the board's to spell (`test/structure.test.ts`).
+ */
+export const FACTORY_WAY = "they change the factory's way, its tree written from the command line, never on the board";
 
 /** The step a new agent is to be hired into once written: a factory, a workflow of yours, and its step. */
 export type HirePlace = { factory: string; workflow: string; step: string };

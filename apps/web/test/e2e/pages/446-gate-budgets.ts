@@ -74,7 +74,7 @@ export default {
       if (approved.status() !== 202)
         throw new Refused(`the api takes the approval with its budgets — it answered ${approved.status()}: ${await approved.text()}`);
       const file = approvalIn(path.join(asks, `approve-${gated}-1`));
-      if (JSON.stringify(file.budgets) !== JSON.stringify({ [above.step]: above.usd, [under.step]: under.given }))
+      if (file.budgets?.[above.step] !== above.usd || file.budgets[under.step] !== under.given || Object.keys(file.budgets).length !== 2)
         throw new Refused(`the approval holds the proposal's caps with the person's over them — it holds ${JSON.stringify(file)}`);
 
       const caps = page.locator(`section[aria-label="The approval of ${gated}"] section[data-gate-budgets="approved"]`);

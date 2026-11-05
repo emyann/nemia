@@ -3011,9 +3011,12 @@ export const BUDGETED = {
   items: {
     type: 'object',
     properties: {
-      step: { type: 'string' },
-      usd: { type: 'number' },
-      why: { type: 'string' },
+      step: { type: 'string', description: 'The name of a step that comes after this one, directly or through another. Once each.' },
+      usd: {
+        type: 'number',
+        description: "The most that step's tries may cost together, in dollars, above zero: its cap once a person approves this gate.",
+      },
+      why: { type: 'string', description: 'Which figures the amount went by: what like steps cost, and what this change adds.' },
     },
     required: ['step', 'usd', 'why'],
     additionalProperties: false,

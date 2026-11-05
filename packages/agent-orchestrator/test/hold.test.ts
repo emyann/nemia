@@ -53,7 +53,6 @@ const {
 } = await import('../src/runner.ts');
 const { listRuns, readRun } = await import('../src/record/record.store.ts');
 const { RUNS } = await import('../src/command/pages.verb.ts');
-type RunSummary = import('../src/summary/summary.verb.ts').RunSummary;
 const { passStanding } = await import('../src/standing/standing.verb.ts');
 const { engineOf } = await import('../src/runtime-client.ts');
 const { main } = await import('../src/cli/main.ts');
@@ -543,14 +542,14 @@ test('a run held until a person lifts it: no run named, nothing asked nor filed 
   const why = 'folded into the microVM intake (hotz)';
   const words = `held until a person lifts it (why: ${why}; by ${user})`;
   const summaryOf = async (id: string) => {
-    const all = (await stage.runWith(b.e, RUNS.handler({}, process.env))) as RunSummary[];
+    const all = await stage.runWith(b.e, RUNS.handler({}, process.env));
     const found = all.find((r) => r.id === id);
     assert.ok(found, `${id} is listed`);
     return found;
   };
   let id = '';
 
-  await s.test('a run blocked at its step\'s questions waits on you', async (sub) => {
+  await s.test("a run blocked at its step's questions waits on you", async (sub) => {
     id = (await aStarted(repo, 'plan the flag', planned())).id;
     await tick(b, id);
     b.settle(`${id}-plan`, 'succeeded', { outcome: 'blocked', summary: 'Half.', artifacts: [], needs: 'One question.', open: [CUT] });
@@ -589,7 +588,7 @@ test('a run held until a person lifts it: no run named, nothing asked nor filed 
     assert.deepEqual(readRun(id).hold?.until, []);
     assert.equal(readRun(id).hold?.why, why);
   });
-  await s.test('`nemia hold <run> --off` lifts it, and its questions are the person\'s again', async (sub) => {
+  await s.test("`nemia hold <run> --off` lifts it, and its questions are the person's again", async (sub) => {
     await said(sub, 'hold', id, '--off');
     await tick(b, id);
     await aPass(b.e);
@@ -598,7 +597,9 @@ test('a run held until a person lifts it: no run named, nothing asked nor filed 
   });
   await s.test('a folder run takes a hold that names no run, and --off lifts it', async (sub) => {
     const dir = folderOf('folder-', { 'implement.md': '---\nplace: folder\n---\nimplement it\n' });
-    const folder = await stage.runPlaced(startRun({ brief: 'in a folder', workflowDir: dir }));
+    const folder = await stage.runPlaced(
+      startRun({ brief: 'in a folder', repo: fs.mkdtempSync(path.join(ROOT, 'plain-')), workflowDir: dir }),
+    );
     const filed = b.filings.length;
     await said(sub, 'hold', folder.id, '--why', 'parked');
     for (let i = 0; i < 2; i++) await tick(b, folder.id);
@@ -634,7 +635,11 @@ test('REFUSED by name at shipped defaults: what `nemia hold` refuses — its arg
   const worded = await aRunning(b, repo);
   assert.equal((await typed(t, 'hold', worded.id, '--until', target.id, '--why', "it's blocked", '--by', 'operator')).error, undefined);
   const folder = await stage.runPlaced(
-    startRun({ brief: 'in a folder', workflowDir: folderOf('folder-', { 'implement.md': '---\nplace: folder\n---\ndo it\n' }) }),
+    startRun({
+      brief: 'in a folder',
+      repo: fs.mkdtempSync(path.join(ROOT, 'plain-')),
+      workflowDir: folderOf('folder-', { 'implement.md': '---\nplace: folder\n---\ndo it\n' }),
+    }),
   );
   const u = ['hold', id, '--until', target.id];
   const rows: Array<[string, string[], string, string[]]> = [

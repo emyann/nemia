@@ -258,7 +258,10 @@ for (const [argv, route] of READS)
 test('`nemia ls` says a hold that names no run is held until a person lifts it, and never that the run waits on you', async () => {
   const listed = await nemia(['ls', 'r-parked']);
   assert.equal(listed.code, 0, listed.err);
-  assert.match(listed.out, /→ held until a person lifts it \(why: folded into an intake; by operator\)  —  nemia hold r-parked --off lifts it/);
+  assert.match(
+    listed.out,
+    /→ held until a person lifts it \(why: folded into an intake; by operator\)  —  nemia hold r-parked --off lifts it/,
+  );
   assert.doesNotMatch(listed.out, /waiting on you/);
 });
 

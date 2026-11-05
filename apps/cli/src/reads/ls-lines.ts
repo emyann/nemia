@@ -84,8 +84,7 @@ function holdWord(waits: readonly Wait[], said: Said = {}): string {
 
 function holdAdvice(run: Run, waits: readonly Wait[]): string {
   const off = `nemia hold ${run.id} --off`;
-  if (!waits.length)
-    return `nothing of ${run.id} is filed, and nothing is asked of you, until a person lifts the hold; to go on: ${off}`;
+  if (!waits.length) return `nothing of ${run.id} is filed, and nothing is asked of you, until a person lifts the hold; to go on: ${off}`;
   if (waits.every((w) => w.landed)) return `the next tick lifts the hold, and ${run.id} goes on; nothing to decide yet`;
   const never = waits.filter(neverLands);
   if (!never.length) {

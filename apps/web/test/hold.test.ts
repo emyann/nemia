@@ -27,26 +27,20 @@ test('holdable, holdCandidates: which run is offered a hold, and which runs a ho
     assert.equal(holdable(run({ place: 'folder', repo: null })), true);
     assert.equal(holdable(run({ repo: null })), true, 'a repository run with no repository said: nothing to wait on, held all the same');
   });
-  await t.test(
-    'REFUSED: a run that cannot be held by what it says of itself is offered none — called off, pruned, held, succeeded',
-    () => {
-      const holding = { at: 'now', runs: [], word: 'held until r-2 lands', advice: '', waitingOnYou: false };
-      const cases: Array<[string, Partial<Run>]> = [
-        ['called off', { cancelledAt: 'now', status: 'cancelled' }],
-        ['called off, its status not yet said', { cancelledAt: 'now' }],
-        ['pruned', { pruned: { said: 'pruned' } }],
-        ['held', { holding, holdUntil: ['r-2'] }],
-        [
-          'held until a person lifts it',
-          { holding: { ...holding, word: 'held until a person lifts it' }, holdUntil: [] },
-        ],
-        ['held, its words not read', { holdUntil: ['r-2'] }],
-        ['held, the runs it waits on not said', { holding }],
-        ['succeeded', { status: 'succeeded' }],
-      ];
-      for (const [what, extra] of cases) assert.equal(holdable(run(extra)), false, what);
-    },
-  );
+  await t.test('REFUSED: a run that cannot be held by what it says of itself is offered none — called off, pruned, held, succeeded', () => {
+    const holding = { at: 'now', runs: [], word: 'held until r-2 lands', advice: '', waitingOnYou: false };
+    const cases: Array<[string, Partial<Run>]> = [
+      ['called off', { cancelledAt: 'now', status: 'cancelled' }],
+      ['called off, its status not yet said', { cancelledAt: 'now' }],
+      ['pruned', { pruned: { said: 'pruned' } }],
+      ['held', { holding, holdUntil: ['r-2'] }],
+      ['held until a person lifts it', { holding: { ...holding, word: 'held until a person lifts it' }, holdUntil: [] }],
+      ['held, its words not read', { holdUntil: ['r-2'] }],
+      ['held, the runs it waits on not said', { holding }],
+      ['succeeded', { status: 'succeeded' }],
+    ];
+    for (const [what, extra] of cases) assert.equal(holdable(run(extra)), false, what);
+  });
   await t.test(
     'a hold may wait on the other runs of its repository not called off, pruned or landed, in the order given — one succeeded with branches to decide among them',
     () => {

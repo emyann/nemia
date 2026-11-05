@@ -87,8 +87,8 @@ function HoldForm({ id, runs, onClose }: { id: string; runs: RunSummary[]; onClo
     >
       <Heading slot="title" className="font-semibold">{`Hold ${id}`}</Heading>
       <p className="text-body-small text-muted-foreground">
-        Nothing more of it is filed, and nothing is asked of you, until every run ticked has landed, or, with none ticked, until you
-        lift the hold. What runs now finishes.
+        Nothing more of it is filed, and nothing is asked of you, until every run ticked has landed, or, with none ticked, until you lift
+        the hold. What runs now finishes.
       </p>
       <WaitFor
         runs={runs}

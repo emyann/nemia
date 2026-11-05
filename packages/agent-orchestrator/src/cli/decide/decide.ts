@@ -25,7 +25,6 @@ import {
   dueNote,
   fromNote,
   holdAdvice,
-  holdNeedsYou,
   holdWord,
   inFullLines,
   inputsDir,
@@ -60,6 +59,7 @@ import {
 } from '../../runner.ts';
 import type { BranchChanges, CheckReport, DecideCommand, Decided, RepositoryRun } from '../../runner.ts';
 import { HELP, placedIn, usage, type Engine } from '../flags.ts';
+import { holdNeedsYou } from '../../wait/wait.ts';
 
 export const DECIDE_HELP = `nemia decide <runId> [--sensitive <globs>]
 

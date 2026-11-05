@@ -159,8 +159,9 @@ function holdArgsRefusal(args: Args): string | null {
 }
 
 /**
- * `nemia hold`: a run held until other runs land, or, naming none, until a person lifts it, or with `--off` its hold lifted now. The api serves both: it puts a hold on
- * `POST /api/runs/:runId/hold`, whose route fixes `off` false so no body lifts through it, and lifts one on `DELETE /api/runs/:runId/hold`.
+ * `nemia hold`: a run held until other runs land, or, naming none, until a person lifts it, or with `--off` its hold lifted now. The api
+ * serves both: it puts a hold on `POST /api/runs/:runId/hold`, whose route fixes `off` false so no body lifts through it, and lifts one on
+ * `DELETE /api/runs/:runId/hold`.
  */
 export const HOLD: Command<{ id: string; lifted: boolean; hold: Hold }> = {
   name: 'hold',
@@ -208,15 +209,13 @@ export const HOLD: Command<{ id: string; lifted: boolean; hold: Hold }> = {
     const { run, hold: put } = yield* hold(runId, [...listOf(args, 'until')], { why: saidOf(args, 'why'), by: saidOf(args, 'by') });
     return { id: run.id, lifted: false, hold: put };
   }),
-  print: ({ id, lifted, hold: put }, args) => [
+  print: ({ id, lifted, hold: put }) => [
     lifted
       ? `${id}  hold lifted — the next tick goes on, and what its steps ask is asked`
-      : put.until.length
-        ? `${id}  ${holdWord(
-            listOf(args, 'until').map((u) => ({ run: u })),
-            put,
-          )} — nothing more of it is filed, and nothing is asked of you, until then; the next tick lifts the hold`
-        : `${id}  ${holdWord([], put)} — nothing more of it is filed, and nothing is asked of you, until then; no tick lifts it: nemia hold ${id} --off`,
+      : `${id}  ${holdWord(
+          put.until.map((u) => ({ run: u })),
+          put,
+        )} — nothing more of it is filed, and nothing is asked of you, until then; ${put.until.length ? 'the next tick lifts the hold' : `no tick lifts it: nemia hold ${id} --off`}`,
   ],
 };
 

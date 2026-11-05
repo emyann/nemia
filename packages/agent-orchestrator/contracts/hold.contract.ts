@@ -50,8 +50,7 @@ const holdStopSpec = spec<(p: HoldPut) => HoldStop | null>({
       condition: ({ input: [p], output }) => !(open(p) && !waitsOnRuns(p)) || output === null,
     },
     aFolderRunIsHeldOnlyUntilLifted: {
-      description:
-        'A folder run is refused a hold that waits on runs to land, which it has no branch for, and never one that names none',
+      description: 'A folder run is refused a hold that waits on runs to land, which it has no branch for, and never one that names none',
       condition: ({ input: [p], output }) => (output === 'folder') === (open(p) && p.folder && waitsOnRuns(p)),
     },
     cancelledIsSaidFirst: {

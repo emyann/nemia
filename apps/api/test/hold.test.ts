@@ -724,21 +724,24 @@ test("a hold put on the board is put as `nemia hold --until --why --by` puts it,
       assert.equal(fs.existsSync(holdFile(PUT)), false);
     },
   );
-  await s.test('a hold put with no run to wait on, `{until: []}` or `{}`, holds the run until DELETE lifts it, and asks nothing', async () => {
-    for (const body of [{ until: [] }, { why: 'folded into an intake' }]) {
-      const res = await put(PUT, body);
-      assert.equal(res.status, 200, JSON.stringify(body));
-      assert.deepEqual((JSON.parse(fs.readFileSync(holdFile(PUT), 'utf8')) as { until: unknown }).until, []);
-      const row = (await listed()).get(PUT)!;
-      assert.match(row.holding?.word ?? '', /^held until a person lifts it/);
-      assert.equal(row.holding?.waitingOnYou, false);
-      assert.deepEqual(row.holdUntil, []);
-      assert.deepEqual(row.waitingOnYou, []);
-      assert.match((await detail(PUT)).holding?.word ?? '', /^held until a person lifts it/);
-      assert.equal((await lift(PUT)).status, 200);
-      assert.equal(fs.existsSync(holdFile(PUT)), false);
-    }
-  });
+  await s.test(
+    'a hold put with no run to wait on, `{until: []}` or `{}`, holds the run until DELETE lifts it, and asks nothing',
+    async () => {
+      for (const body of [{ until: [] }, { why: 'folded into an intake' }]) {
+        const res = await put(PUT, body);
+        assert.equal(res.status, 200, JSON.stringify(body));
+        assert.deepEqual((JSON.parse(fs.readFileSync(holdFile(PUT), 'utf8')) as { until: unknown }).until, []);
+        const row = (await listed()).get(PUT)!;
+        assert.match(row.holding?.word ?? '', /^held until a person lifts it/);
+        assert.equal(row.holding?.waitingOnYou, false);
+        assert.deepEqual(row.holdUntil, []);
+        assert.deepEqual(row.waitingOnYou, []);
+        assert.match((await detail(PUT)).holding?.word ?? '', /^held until a person lifts it/);
+        assert.equal((await lift(PUT)).status, 200);
+        assert.equal(fs.existsSync(holdFile(PUT)), false);
+      }
+    },
+  );
   await s.test('a hold put on the board takes its `by` where the body gives one, as `nemia hold --by` does', async () => {
     const res = await put(PUT, { until: ['p-live'], by: 'operator' });
     assert.equal(res.status, 200);

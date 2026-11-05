@@ -84,7 +84,7 @@ export {
   sizeOf,
 } from './run.ts';
 export type { FeedSaid, FeedWords, FolderRun, Hold, PlaceKind, Pruned, PrunedFiles, PruneFacts, Pruning, RepositoryRun } from './run.ts';
-export { BY_CAP, heldRefusal, holdAdvice, holdNeedsYou, holdRefusal, holdsOf, holdWord, oneLine, WHY_CAP } from './run.ts';
+export { BY_CAP, heldRefusal, holdAdvice, holdRefusal, holdsOf, holdWord, oneLine, WHY_CAP } from './run.ts';
 export {
   acceptAsk,
   acceptanceOf,

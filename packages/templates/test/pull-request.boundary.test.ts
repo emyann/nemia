@@ -1029,10 +1029,7 @@ test('REFUSED with no re-run, as today, where none can be asked', () => {
   const unread = refused(redThen([checks(...FIRST)], { when: 'actions/runs/1234', status: 1, err: 'HTTP 404' }), /its attempt is unread/);
   assert.equal(reruns(unread.calls).length, 0);
   refused(redThen([checks(...FIRST)], { when: 'actions/runs/1234', out: 'not json' }), /its attempt is unread/);
-  refused(
-    redThen([checks(...FIRST)], 1, { when: 'run rerun', status: 1, err: 'HTTP 403: Resource not accessible' }),
-    /HTTP 403/,
-  );
+  refused(redThen([checks(...FIRST)], 1, { when: 'run rerun', status: 1, err: 'HTTP 403: Resource not accessible' }), /HTTP 403/);
   const status = refused(
     redThen([checks({ context: 'ci', state: 'FAILURE', targetUrl: 'https://ci.example/build/9' })]),
     /no job of an Actions run/,

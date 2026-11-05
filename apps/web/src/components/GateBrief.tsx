@@ -79,6 +79,7 @@ export function GateBrief({ run, step }: { run: RunView; step: Step }) {
           acts={gate.ends}
           framed={false}
           questions={askedIn(step.closeout)}
+          budgets={step.gate?.budgets}
         />
       </div>
     </section>

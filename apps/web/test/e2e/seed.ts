@@ -3000,3 +3000,132 @@ export function writeAsking(root: string, now = Date.now()): string[] {
   );
   return [record, dir, path.join(root, 'runs', id), path.join(root, 'runs', `${id}.asks`), task(gated), task(raised)];
 }
+
+/**
+ * The output field of budgets a step's closeout gives, as the loader expands `{"x-shape": "budgets"}` and the record freezes it: a list of
+ * strict rows, each a later step, its amount in dollars and why. Equal to the orchestrator's `BUDGETS_SCHEMA`, which the run's record
+ * must hold whole for the gate to read the field as budgets.
+ */
+export const BUDGETED = {
+  type: 'array',
+  items: {
+    type: 'object',
+    properties: {
+      step: { type: 'string' },
+      usd: { type: 'number' },
+      why: { type: 'string' },
+    },
+    required: ['step', 'usd', 'why'],
+    additionalProperties: false,
+  },
+  description: 'The budgets of the steps after this one.',
+};
+
+/**
+ * A run whose gated step proposes the budgets of the steps after it, written by its page for its visit and taken back before it ends
+ * (`writeBudgeting`): `design → implement → review`, gated at design, which signed off proposing implement $60 — above implement's own
+ * `budget: 40` — and review $8, under its `budget: 16`. Neither later step is filed. The page changes review's to $6 and approves.
+ */
+export const BUDGETING = {
+  id: 'gate-budgets-e2e',
+  title: 'Budgets at a gate',
+  gated: 'design',
+  /** The step proposed above its own budget, its budget, the amount and why. */
+  above: { step: 'implement', budget: 40, usd: 60, why: 'Five parts in parallel, as the two wide runs took $60 to $80.' },
+  /** The step proposed under its own budget, its budget, the amount and why — and the amount the page gives it instead. */
+  under: { step: 'review', budget: 16, usd: 8, why: 'One review round, by the p90 of review.', given: 6 },
+} as const;
+
+/**
+ * Writes BUDGETING into the store at `root` — its record, its folder and design's task, ended once with the closeout it gave, flat as a
+ * harness writes it, with what it cost — and answers every path written, to take back.
+ */
+export function writeBudgeting(root: string, now = Date.now()): string[] {
+  const { id, gated, above, under } = BUDGETING;
+  const ago = (minutes: number) => new Date(now - minutes * 60_000).toISOString();
+  const dir = path.join(root, 'workflow-gate-budgets');
+  const schema = { type: 'object', properties: { budgets: BUDGETED }, required: ['budgets'], additionalProperties: false };
+  const task = path.join(root, 'engine', 'tasks', `${id}-${gated}.jsonl`);
+  write(
+    task,
+    lines([
+      { kind: 'filed', at: ago(9), brief: `Do ${gated}.`, cwd: '/code/hkb-v2', maxAttempts: 1, harness: 'claude' },
+      { kind: 'starting', at: ago(8.9), attempt: 1 },
+      { kind: 'spawned', at: ago(8.9), attempt: 1 },
+      {
+        kind: 'ended',
+        at: ago(7),
+        attempt: 1,
+        sessionId: `ae/${id}-${gated}/1`,
+        observed: 'done',
+        reason: 'harness',
+        closeout: {
+          outcome: 'done',
+          summary: 'The design, and what the steps after it should cost.',
+          needs: null,
+          artifacts: [],
+          budgets: [
+            { step: above.step, usd: above.usd, why: above.why },
+            { step: under.step, usd: under.usd, why: under.why },
+          ],
+        },
+        usage: {
+          responses: 6,
+          toolCalls: 9,
+          inputTokens: 400_000,
+          cacheReadTokens: 330_000,
+          cacheWriteTokens: 69_995,
+          uncachedTokens: 5,
+          peakContextTokens: 90_000,
+          firstContextTokens: 20_010,
+          firstCacheWriteTokens: 20_000,
+          outputTokens: 8_000,
+          costUsd: 3.1,
+          apiMs: 120_000,
+          toolMs: 4_000,
+        },
+      },
+      { kind: 'settled', at: ago(7), outcome: 'succeeded' },
+    ]),
+  );
+  write(path.join(dir, `${gated}.md`), `---\nplace: git\nharness: claude\noutput: budgets.schema.json\n---\nDo ${gated}.\n`);
+  for (const [one, after] of [
+    [above, gated],
+    [under, above.step],
+  ] as const)
+    write(
+      path.join(dir, `${one.step}.md`),
+      `---\nplace: git\nharness: claude\nafter: ${after}\nbudget: ${one.budget}\n---\nDo ${one.step}.\n`,
+    );
+  write(
+    path.join(dir, 'budgets.schema.json'),
+    `${JSON.stringify({ ...schema, properties: { budgets: { 'x-shape': 'budgets', description: BUDGETED.description } } }, null, 2)}\n`,
+  );
+  const record = path.join(root, 'runs', `${id}.json`);
+  write(
+    record,
+    JSON.stringify(
+      {
+        id,
+        repo: '/code/hkb-v2',
+        workspace: '/code/hkb-v2',
+        baseRef: '19c9365',
+        branch: 'main',
+        isolate: true,
+        brief: `${BUDGETING.title}\n\nA run written by the gate's budgets page of npm run e2e, and taken back when it leaves.`,
+        workflowDir: dir,
+        workflow: [
+          { name: gated, after: [], body: `Do ${gated}.`, harness: 'claude', output: { file: 'budgets.schema.json', schema } },
+          { name: above.step, after: [gated], body: `Do ${above.step}.`, harness: 'claude', budget: above.budget },
+          { name: under.step, after: [above.step], body: `Do ${under.step}.`, harness: 'claude', budget: under.budget },
+        ],
+        gates: [gated],
+        createdAt: ago(10),
+        steps: { [gated]: { taskId: `${id}-${gated}` }, [above.step]: { taskId: null }, [under.step]: { taskId: null } },
+      },
+      null,
+      2,
+    ),
+  );
+  return [record, dir, path.join(root, 'runs', id), path.join(root, 'runs', `${id}.asks`), task];
+}

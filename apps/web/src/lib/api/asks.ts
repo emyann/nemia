@@ -117,6 +117,10 @@ export const askRound = (runId: string, step: string, how: { budget?: number }):
  * With `answers`, a person's answers to the questions the step asks at its gate: the api checks them against what the step asks now and
  * writes them, `message` their note, as the approval's words — or refuses them, and nothing is approved.
  *
+ * With `budgets`, the caps a person set at the gate for the later steps the gated step proposed budgets for — only the rows changed
+ * from the proposal, each `{ step, usd }`: the api hands them to the package's `approve()`, which writes the proposal's caps with these
+ * over them into the approval, or refuses one, and nothing is approved. Left out where the person changed none.
+ *
  * On a loop out of rounds it takes the loop's work as it stands, as the CLI's `approve` of a loop does: `message` is then required, why
  * the work is good enough with its findings open, and the package refuses it missing or empty.
  *
@@ -125,7 +129,7 @@ export const askRound = (runId: string, step: string, how: { budget?: number }):
 export const approveStep = (
   runId: string,
   step: string,
-  how: { message?: string; answers?: readonly QuestionAnswer[] },
+  how: { message?: string; answers?: readonly QuestionAnswer[]; budgets?: readonly { step: string; usd: number }[] },
 ): Promise<Approved> =>
   send('POST', `/api/runs/${encodeURIComponent(runId)}/steps/${encodeURIComponent(step)}/approve`, ApprovedSchema, {
     body: how,

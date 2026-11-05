@@ -425,7 +425,7 @@ A repository carries its workflows checked in, one folder each under `<repo>/wor
 `wf start <brief> --workflows dev` picks one: a bare name is a folder under `<repo>/workflows/`, and a path to any
 workflow folder works too, looked at first. The board lists them, and the folders under
 `~/.agent-workflows/workflows/` as yours, draws each, and starts a run of one (`apps/api`,
-`GET /api/workflows` and `POST /api/runs`).
+`GET /api/namespaces/<factory>/workflows` and `POST /api/runs`).
 
 A folder can be written as well as read, and the board's builder saves through that write: `writeWorkflow(dir, steps, readme?)`
 in folder/write.store.ts. Each step is rendered by `renderStep` (workflow/step-file.ts), which is the parser run backwards: the keys the step sets, in

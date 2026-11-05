@@ -472,7 +472,10 @@ const AGENTS: Command<AgentsRead> = {
   check: agentsRefusal,
   writes: false,
   class: 'read',
-  route: { method: 'GET', path: '/api/agents', status: 200 },
+  only: {
+    side: 'cli',
+    why: "the api serves it as the Agent's `list` verb of `objects`' Api (`/api/namespaces/:namespace/agents`), which calls this entry's handler: no route of its own",
+  },
   handler: (args, _env, home) =>
     rooted(
       home,
@@ -496,7 +499,10 @@ const AGENT_CARD: Command<CardRead> = {
   check: agentsRefusal,
   writes: false,
   class: 'read',
-  route: { method: 'GET', path: '/api/agents/:from/:name/card', status: 200 },
+  only: {
+    side: 'cli',
+    why: "the api serves it as the Agent's `card` verb of `objects`' Api (`/api/namespaces/:namespace/agents`), which calls this entry's handler: no route of its own",
+  },
   handler: (args, _env, home) =>
     rooted(
       home,

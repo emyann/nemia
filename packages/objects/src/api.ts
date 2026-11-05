@@ -54,10 +54,11 @@ export class Conflict extends Schema.Class<Conflict>('Conflict')(
 
 /**
  * A request the package refuses as it is said — a label query, a limit, a token, a name: a 422. A write of a definition refused where it
- * is sent carries `way`, how the definition changes instead (`WRITE_WAYS`).
+ * is sent carries `way`, how the definition changes instead (`WRITE_WAYS`); a workflow's write refused for some of its steps names them
+ * (`steps`), for the builder to mark.
  */
 export class Invalid extends Schema.Class<Invalid>('Invalid')(
-  { error: Schema.String, way: Schema.optionalKey(Schema.Literals(WRITE_WAYS)) },
+  { error: Schema.String, way: Schema.optionalKey(Schema.Literals(WRITE_WAYS)), steps: Schema.optionalKey(Schema.Array(Schema.String)) },
   { httpApiStatus: 422 },
 ) {}
 

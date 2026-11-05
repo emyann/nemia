@@ -89,6 +89,10 @@ was asked is the card. Its note names quick's own check clauses in each way, and
 a test on this machine, so the reviewer runs the types and the lint itself, and in this checkout that the local check judged the round; and it says that its pass files the
 landing, so `again: true` is the only way back and it names no step.
 
+No design runs in quick, so no page outside the repository is handed to the review: a claim the change rests on, on a page the
+reviewer's fence refuses, signs the review off `blocked`, which holds the ungated land until a person answers it with `nemia retry
+<run> review --message "<what the page says>"`.
+
 `rounds: 2`, where build's review has 3: a card that a review has to send back twice is a card that wanted `build`, and the
 second objection leaves the step `exhausted` with the run waiting on a person, who types `nemia retry <run> review --round` for a third or
 `nemia approve <run> review --message "<why>"` to take the work as it stands. `budget: 12`, where build's has 16: there is no spec to read, and the review reads

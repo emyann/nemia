@@ -51,9 +51,24 @@
         "additionalProperties": false
       }
     },
+    "sources": {
+      "type": "array",
+      "description": "Each page outside the repository the spec rests on, as you read it: the steps after you read this in place of the page, and may fetch none of it. Empty when the spec rests on no outside page.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "url": { "type": "string", "description": "The page's address, as you fetched it." },
+          "read": { "type": "string", "description": "The day you read it, YYYY-MM-DD." },
+          "excerpt": { "type": "string", "description": "The passage each claim rests on, word for word, not the whole page; several passages are separated by a line holding only an ellipsis (…)." },
+          "claims": { "type": "array", "description": "What the spec takes from the page, each claim in a line.", "items": { "type": "string" } }
+        },
+        "required": ["url", "read", "excerpt", "claims"],
+        "additionalProperties": false
+      }
+    },
     "budgets": { "x-shape": "budgets", "description": "The budget you propose for each step of this run after yours, by its name: the dollars it may spend across its tries, and in `why` the figures of recent runs the amount went by. The approval of your gate makes them those steps' caps; the person may change any of them there." },
     "open": { "x-shape": "questions", "description": "What is still undecided, each as a question with its options and your recommendation. Empty only when nothing is." }
   },
-  "required": ["goal", "constraints", "approach", "placement", "changes", "steps", "tests", "risks", "decisions", "budgets", "open"],
+  "required": ["goal", "constraints", "approach", "placement", "changes", "steps", "tests", "risks", "decisions", "sources", "budgets", "open"],
   "additionalProperties": false
 }

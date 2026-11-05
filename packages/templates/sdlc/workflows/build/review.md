@@ -46,3 +46,9 @@ request makes the landing refuse rather than land. In this checkout, the landing
 (`${{ parameters.localCheck }}`) on the base with the branch merged into it: a merge that conflicts or breaks it is taken back. Either
 way, it costs a retry and never a broken base. Once implement has merged the base, the diff your brief
 names shows the base's landings with the change: read the change alone with `git diff main-worktree/HEAD...HEAD`.
+
+**Check the outside pages the spec rests on.** Design's `sources`, which your brief hands you with the rest of its declared fields,
+are each page outside the repository the spec rests on, as design read it: its address, the day, the passage word for word and the
+claims the spec takes from it. Check each claim of the spec and of the change that rests on such a page against its passage. A claim
+with no passage there, on a page your fence refuses, goes at the top of your sign-off, where the person who approves the landing reads
+it before anything merges.

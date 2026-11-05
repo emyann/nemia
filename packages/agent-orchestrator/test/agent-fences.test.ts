@@ -29,6 +29,11 @@
  * nor a path of another shape (`NOT_CONTRACTS`); spelled with a leading `*` it writes none, and on a step over an agent that lacks them
  * the same lines are refused at load, a step's fence only narrowing its agent's.
  *
+ * A read-only step measures types through the settings' allows of a compiler with `--noEmit` first (`measureAllow`): tsrs, which `ci`
+ * judges with, and tsc 6 beside it. The denies of what would write or watch (`COMPILER_WRITES`), and tsrs's `--fast` (`FAST`), are
+ * written for both from one list (`MEASURE_DENIES`) and planted on the reviewer, each proven the one that refuses its own spellings; a
+ * step that measures nothing denies each compiler whole (`MEASURELESS_DENIES`). They are the lines the nemia factory's overlays carry.
+ *
  * Every path a repository skill says its work is on matches a file of the checkout (`appliesUnmatched`), the read-within-reach rule of
  * the repository's skills is counted as `nemia stats` counts it (`rulesOfTry`), and no tsconfig of the checkout makes `tsc --noEmit`
  * write (`buildInfoConfigs`).
@@ -1229,6 +1234,151 @@ test('REFUSED: the contract writes on a step over an agent that lacks them are r
   ]) {
     fs.writeFileSync(file, fence(lines));
     assert.throws(() => loadWorkflows(path.join(root, 'dev')), lines);
+  }
+});
+
+/** The compilers a read-only step measures types by: tsrs, which `npm run typecheck` and `ci` run, and tsc 6, still allowed beside it. */
+const COMPILERS = ['tsrs', 'tsc'] as const;
+type Compiler = (typeof COMPILERS)[number];
+
+/** The settings' allow of `compiler` run to measure: `--noEmit` first, so no allow reaches a build, an emit or a watch by its first one. */
+const measureAllow = (compiler: Compiler): string => `Bash(npx ${compiler} --noEmit:*)`;
+
+/** What a compiler is typed with to measure, after `npx <compiler> `, none of which writes or watches. */
+const MEASURE_ARGS = [
+  '--noEmit',
+  '--noEmit -p packages/agent-orchestrator --noUncheckedIndexedAccess',
+  '--noEmit -p apps/web --exactOptionalPropertyTypes --isolatedDeclarations --target es2024',
+  '--noEmit --project apps/api --strict --listFilesOnly --forceConsistentCasingInFileNames',
+];
+
+/**
+ * The options that write or watch after `--noEmit`, by the deny that answers each, written after `npx <compiler> `, and the spellings it
+ * refuses: the build-info file (`--incremental`, `--tsBuildInfoFile`), the config (`--init`), the trace and profile, the watch, an emit
+ * turned back on by `false` or by a file of options (`@<file>`). Each compiler reads an option's name in any case and after one dash or
+ * two (measured on tsc 6 and on tsrs 0.20.1, which also took `false` to emit and `--incremental` to write its build-info file), so
+ * each spelling is one a session may type, and each deny holds the first letters of its option in one case (`-i` alone, the short
+ * `--incremental`, as a word).
+ */
+const COMPILER_WRITES: Record<string, string[]> = {
+  '*-w*': ['--watch', '-p packages/agent-runtime -w'],
+  '*-W*': ['--WATCH', '-W'],
+  '*-in*': ['--incremental', '-incremental -p apps/api', '--init'],
+  '*-iN*': ['--iNCREMENTAL'],
+  '*-In*': ['--Incremental', '--Init'],
+  '*-IN*': ['--INIT', '--INCREMENTAL'],
+  '*-i *': ['-i -p apps/api', '--i -p apps/api'],
+  '*-I *': ['-I -p apps/api', '--I -p apps/api'],
+  '*-ts*': ['--tsBuildInfoFile x'],
+  '*-tS*': ['--tSBuildInfoFile x'],
+  '*-Ts*': ['-Tsbuildinfofile x'],
+  '*-TS*': ['--TSBUILDINFOFILE x'],
+  '*-g*': ['--generateTrace trace', '--generateCpuProfile p.cpuprofile'],
+  '*-G*': ['--GenerateTrace trace'],
+  '* false*': ['false', '-p apps/api --NOEMIT false'],
+  '*@*': ['@options.txt'],
+};
+
+/**
+ * tsrs's own `--fast`, whose verdict may differ from the pinned TypeScript's, so a measure by it is not what `ci` judges by: refused as
+ * the options that write are, by its first letters in each case. tsrs takes no shorter spelling of it (`--fas` and `-f` it refuses).
+ */
+const FAST: Record<string, string[]> = {
+  '*-fa*': ['--fast', '-fast -p apps/api'],
+  '*-fA*': ['--fAST'],
+  '*-Fa*': ['--Fast'],
+  '*-FA*': ['--FAST'],
+};
+
+/** The refused options of `compiler`, by the deny of each: tsc's, and tsrs's with `--fast` beside them. */
+const refusedOf = (compiler: Compiler): Record<string, string[]> =>
+  Object.fromEntries(
+    Object.entries(compiler === 'tsrs' ? { ...COMPILER_WRITES, ...FAST } : COMPILER_WRITES).map(([deny, spellings]) => [
+      `Bash(npx ${compiler} ${deny})`,
+      spellings.map((args) => `npx ${compiler} --noEmit ${args}`),
+    ]),
+  );
+
+/**
+ * The denies a read-only step that measures carries on its line, tsrs's and tsc's, each compiler's held equal by being written from the
+ * one list: what the nemia factory's design and review write beside their tsc lines.
+ */
+const MEASURE_DENIES = COMPILERS.flatMap((compiler) => Object.keys(refusedOf(compiler)));
+
+/** The denies that keep intake and the janitor, which measure nothing, from the settings' allows of the compilers. */
+const MEASURELESS_DENIES = COMPILERS.map((compiler) => `Bash(npx ${compiler}:*)`);
+
+const bash = (command: string): Call => ({ tool: 'Bash', command });
+
+/** Every measure, by each compiler, and one behind a `timeout`. */
+const MEASURES: Call[] = COMPILERS.flatMap((compiler) => [
+  ...MEASURE_ARGS.map((args) => bash(`npx ${compiler} ${args}`)),
+  bash(`timeout 300 npx ${compiler} --noEmit -p packages/agent-orchestrator`),
+]);
+
+/** Every write, watch and `--fast`, by each compiler. */
+const MEASURE_WRITES: Call[] = COMPILERS.flatMap((compiler) => Object.values(refusedOf(compiler)).flat().map(bash));
+
+/** A write by each compiler behind a `timeout`, which a deny reaches as it reaches the part bare. */
+const WRAPPED_WRITES: Call[] = COMPILERS.map((compiler) => bash(`timeout 300 npx ${compiler} --noEmit --incremental`));
+
+/** A compiler with a first option that is not `--noEmit`, which emits, builds or watches: reached by no allow of the settings'. */
+const NO_EMIT_FIRST: Call[] = COMPILERS.flatMap((compiler) =>
+  ['', ' -p packages/agent-runtime', ' --build', ' --project apps/api --strict'].map((args) => bash(`npx ${compiler}${args}`)),
+);
+
+/** The reviewer with the read set and the measure's denies planted, or `denies` in their place. */
+const measuring = (denies: readonly string[] = MEASURE_DENIES): Step => planted({ denies: [...READ_SET_DENIES, ...denies] });
+
+test("a dontAsk step with the measure's denies planted measures by tsrs and by tsc through the settings, and is refused each write, watch and --fast", () => {
+  for (const compiler of COMPILERS)
+    assert.ok(SETTINGS_ALLOWS.includes(measureAllow(compiler)), `${measureAllow(compiler)} is in the settings`);
+  const step = measuring();
+  assert.deepEqual(runs(step, MEASURES), MEASURES.map(shown));
+  assert.deepEqual(runs(step, [...MEASURE_WRITES, ...WRAPPED_WRITES]), []);
+  assert.deepEqual(runs(step, NO_EMIT_FIRST), [], 'no allow reaches a compiler whose first option is not --noEmit');
+  assert.deepEqual(runs(step, MEASURES, {}), [], "the measures are the settings' allows, not the step's");
+});
+
+test("REFUSED: without a deny of the measure's, by either compiler, a dontAsk step runs exactly the spellings that deny refuses", () => {
+  const step = measuring();
+  assert.ok(
+    Object.keys(FAST).every((deny) => !MEASURE_DENIES.includes(`Bash(npx tsc ${deny})`)),
+    'tsc has no --fast to refuse',
+  );
+  for (const compiler of COMPILERS)
+    for (const [deny, spellings] of Object.entries(refusedOf(compiler))) {
+      const open = { ...step, disallowedTools: less(step.disallowedTools ?? [], deny) };
+      assert.deepEqual(
+        runs(open, MEASURE_WRITES),
+        spellings.map((command) => shown(bash(command))),
+        deny,
+      );
+    }
+});
+
+test("REFUSED: without the settings' allow of a compiler a step measures nothing by it, and with it allowed whole one that is not --noEmit first runs", () => {
+  const step = measuring();
+  for (const compiler of COMPILERS) {
+    const allow = measureAllow(compiler);
+    const its = (calls: readonly Call[]) =>
+      calls.filter((call) => partsOf(call.command!).some((part) => part.startsWith(`npx ${compiler} `) || part === `npx ${compiler}`));
+    const without = { permissions: { allow: less(SETTINGS_ALLOWS, allow) } };
+    assert.deepEqual(
+      runs(step, MEASURES, without),
+      MEASURES.filter((call) => !its(MEASURES).includes(call)).map(shown),
+      `without ${allow}`,
+    );
+    const whole = { permissions: { allow: [...less(SETTINGS_ALLOWS, allow), `Bash(npx ${compiler}:*)`] } };
+    assert.deepEqual(runs(step, its(NO_EMIT_FIRST), whole), its(NO_EMIT_FIRST).map(shown), `${compiler} allowed whole`);
+  }
+});
+
+test('a step that measures nothing denies each compiler whole, and REFUSED without one of those denies it measures by that compiler', () => {
+  assert.deepEqual(runs(measuring(MEASURELESS_DENIES), [...MEASURES, ...MEASURE_WRITES]), []);
+  for (const compiler of COMPILERS) {
+    const reached = runs(measuring(less(MEASURELESS_DENIES, `Bash(npx ${compiler}:*)`)), MEASURES);
+    assert.deepEqual(reached, MEASURES.filter((call) => call.command!.includes(`npx ${compiler} `)).map(shown), compiler);
   }
 });
 

@@ -23,6 +23,9 @@ Your check then pushes again through the same script, so CI's verdict is for the
 `${{ parameters.ciCheck }}` context: CI runs the repository's suite on that commit, and a red, cancelled or missing
 `${{ parameters.ciCheck }}` comes back as the check's refusal, with the Actions URL, the failing jobs and the tail of their log — the
 script reads it for you, since you may type no `gh` yourself (*When your check refuses*, below).
+A red context has been re-run once by then, its failed jobs, so a red refusal names the jobs re-run and how each ended the second
+time: a job red twice is the change's. A refusal that says the re-run was still running at the bound asks nothing of the work:
+change nothing, and sign off as before; the next check reads the re-run's own verdict and re-runs nothing again.
 
 **Nothing runs your tests for you.** The check measures the change, proves the probes and the parts, then pushes the branch and waits on CI: it
 runs `change.ts size`, `probe.ts`, `parts.ts`, the factory's own check, its `implementCheck` parameter (`${{ parameters.implementCheck }}`; `true` checks nothing), `pull-request.ts push` and `pull-request.ts wait`, in that order, and nothing else. Run them yourself

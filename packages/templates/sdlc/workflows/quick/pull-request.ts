@@ -46,6 +46,12 @@
  * open pull requests, a draft or another base, the label rules, `WF_LABELS` or the repository's labels, a `push` or `wait` given other
  * arguments than its check line's, and a CI context never reported, still pending at the bound, or only cancelled, skipped or neutral —
  * ends with one more line, `<tag>: not the work: …`: a try retried on its own reads it as the person's, and stops.
+ *
+ * A red the work answers says one thing more where the base is red too: the wait asks GitHub for the commit of the base the head holds
+ * (`gh api repos/{owner}/{repo}/compare/<base>...<head>`), reads the CI context there over REST, and where it failed, the refusal says so
+ * after its first line, with the base's jobs that did not pass and the merge of the base, so the next try reads the base's failure as
+ * the base's. A hint, never a verdict: a read that fails, or a base pending, green or unreported, adds nothing, and the refusal stays
+ * the work's, never the person's because of it. A green head's wait asks nothing of the base.
  */
 import { spawnSync } from 'node:child_process';
 
@@ -139,16 +145,9 @@ const PASSED = 'SUCCESS';
 type Entry = Partial<Record<EntryField, string>>;
 type EntryField = 'name' | 'context' | 'status' | 'state' | 'conclusion' | 'detailsUrl' | 'targetUrl' | 'workflowName' | 'startedAt';
 
-/** A pull request as this script reads one. */
-type Pr = {
-  number: number;
-  url: string;
-  isDraft: boolean;
-  baseRefName: string;
-  headRefOid: string;
-  mergeable?: string;
-  labels?: { name: string }[];
-};
+/** A pull request as this script reads one: what it is and what it is on, then what `pulls` reads of it besides. */
+type Pr = Opened & { mergeable?: string; labels?: { name: string }[] };
+type Opened = { number: number; url: string; isDraft: boolean; baseRefName: string; headRefOid: string };
 
 /** What a command printed: its exit, its streams, and whether there was no such command on the PATH. */
 type Ran = { status: number | null; out: string; err: string; missing: boolean };
@@ -185,12 +184,22 @@ function gh(...args: string[]): string {
 /** Whatever `gh` printed for `args`, failure included: for a read whose failure is said in words, never thrown. */
 const read = (...args: string[]): Ran => run('gh', args);
 
-/** `text` parsed as JSON; refuses, naming what was read, when it does not parse. */
+/** `text` parsed as JSON; refuses, naming what was read and what it said, when it does not parse. */
 function parsed<T>(what: string, text: string): T {
+  const said = hinted<T>(text);
+  if (said === undefined) throw new Refusal(`cannot read ${what}, which is no JSON: ${text.trim().slice(0, 200)}`);
+  return said;
+}
+
+/**
+ * `said` parsed as JSON, a read's output where it passed; `undefined` where it failed or does not parse: for a read that only hints,
+ * whose failure is no refusal.
+ */
+function hinted<T>(said: string | Ran): T | undefined {
   try {
-    return JSON.parse(text) as T;
-  } catch (err) {
-    throw new Refusal(`cannot read ${what}: ${(err as Error).message}`);
+    return JSON.parse(typeof said === 'string' ? said : said.status === 0 ? said.out : '') as T;
+  } catch {
+    return undefined;
   }
 }
 
@@ -230,10 +239,8 @@ function origin(): string {
 
 /** The remote's default branch, which every pull request of a run is based on. */
 function base(): string {
-  const name = parsed<{ defaultBranchRef?: { name?: string } }>(
-    "the remote's default branch",
-    gh('repo', 'view', '--json', 'defaultBranchRef'),
-  ).defaultBranchRef?.name;
+  const view = gh('repo', 'view', '--json', 'defaultBranchRef');
+  const name = parsed<{ defaultBranchRef?: { name?: string } }>("the remote's default branch", view).defaultBranchRef?.name;
   if (!name) throw new Refusal('`gh repo view --json defaultBranchRef` named no default branch: the base of the pull request is unknown');
   return name;
 }
@@ -342,12 +349,7 @@ function labelRules(args: readonly string[]): LabelRule[] {
 function runLabels(): Record<string, string> | undefined {
   const said = process.env.WF_LABELS;
   if (said === undefined) return undefined;
-  let read: unknown;
-  try {
-    read = JSON.parse(said);
-  } catch {
-    read = undefined;
-  }
+  const read = hinted<unknown>(said);
   if (typeof read !== 'object' || read === null || Array.isArray(read) || !Object.values(read).every((value) => typeof value === 'string'))
     throw new PersonsRefusal(
       `WF_LABELS is \`${said}\`, not a JSON object of strings such as {"kind":"bug"}: it is the run's labels, which the run gives ` +
@@ -526,6 +528,12 @@ function failures(log: string): { lines: string[]; tests: boolean } {
   return { lines: ran.filter((line) => line.trim() && !postJob(line)).slice(-TAIL_LINES), tests: false };
 }
 
+/** `failed` by name and verdict with its URL, one a line, at most `JOBS` of them. */
+const listing = (failed: readonly Entry[]): string[] => [
+  ...failed.slice(0, JOBS).map((entry) => `  ${nameOf(entry)}: ${verdict(entry) || 'no verdict'} ${linkOf(entry)}`.trimEnd()),
+  ...(failed.length > JOBS ? [`  … and ${failed.length - JOBS} more`] : []),
+];
+
 /**
  * Why CI went red, for the next try to read: each entry of `entries` that did not pass, by name and verdict with its URL; then, for each
  * that names a job, its log read by the job's id (`gh api repos/{owner}/{repo}/actions/jobs/<id>/logs`, which answers where `gh run view
@@ -535,8 +543,6 @@ function failures(log: string): { lines: string[]; tests: boolean } {
  */
 function why(entries: readonly Entry[], check: string): string[] {
   const failed = entries.filter((entry) => !pending(entry) && verdict(entry) !== PASSED);
-  const named = failed.slice(0, JOBS).map((entry) => `  ${nameOf(entry)}: ${verdict(entry) || 'no verdict'} ${linkOf(entry)}`.trimEnd());
-  const more = failed.length > named.length ? [`  … and ${failed.length - named.length} more`] : [];
   const jobs = new Map<string, string>();
   const ordered = [...failed.filter((entry) => nameOf(entry) !== check), ...failed.filter((entry) => nameOf(entry) === check)];
   for (const entry of ordered.slice(0, JOBS)) {
@@ -563,7 +569,7 @@ function why(entries: readonly Entry[], check: string): string[] {
       ...lines,
     );
   }
-  return ['the jobs that did not pass:', ...named, ...more, ...logs];
+  return ['the jobs that did not pass:', ...listing(failed), ...logs];
 }
 
 /** The options of `open`: the title, the file its body is read from, and the rules it labels by, `--labels ""` giving none. */
@@ -680,25 +686,55 @@ function seenOf(ours: readonly Entry[]): Seen {
  */
 const judgedRed = (entry: Entry): boolean => !pending(entry) && ![PASSED, 'CANCELLED', 'SKIPPED', 'NEUTRAL'].includes(verdict(entry));
 
-/** The refusal of a CI context `check` that gave a verdict this round cannot land on: what it said, why, and what to type next. */
-const redly = (pr: Pr, check: string, ours: readonly Entry[], entries: readonly Entry[], retry: string): string =>
+/** A check run or a status context as REST gives one (`commits/<sha>/check-runs`, `commits/<sha>/status`). */
+type Rest = Partial<Record<string, string>>;
+
+/**
+ * A commit's check runs and status contexts as `Entry`s, read over REST. Check runs come lower-case, a conclusion null until one is
+ * over, which `pending` and `verdict` read as they read the rollup's, upper-casing; only where a person reads each is named as the
+ * rollup names it. The combined status's own `state` is never read: a repository whose CI is all check runs answers `pending` with no
+ * status at all. Each read goes through `read`, so a failure is no throw: a read that fails gives no entries.
+ */
+function entriesAt(sha: string): Entry[] {
+  const at = `repos/{owner}/{repo}/commits/${sha}`;
+  const runs = hinted<{ check_runs?: Rest[] }>(read('api', `${at}/check-runs?per_page=100`))?.check_runs ?? [];
+  const statuses = hinted<{ statuses?: Rest[] }>(read('api', `${at}/status`))?.statuses ?? [];
+  return [...runs, ...statuses].map((r) => ({ ...r, detailsUrl: r.html_url ?? r.details_url, targetUrl: r.target_url ?? undefined }));
+}
+
+/**
+ * What the refusal of a red `check` says of the base, where `check` is red on `onto` too at the commit the head holds (`compare`'s merge
+ * base): that it is, the base's jobs that did not pass, and how to read the head's lines against them. A hint, never a verdict: a read
+ * that fails, or a base pending, green or with no `check`, adds nothing, and the refusal is as it was.
+ */
+function baseRed(pr: Pr, onto: string, check: string): string[] {
+  const sha = hinted<{ merge_base_commit?: Rest }>(read('api', `repos/{owner}/{repo}/compare/${onto}...${pr.headRefOid}`))
+    ?.merge_base_commit?.sha;
+  const entries = sha ? entriesAt(sha) : [];
+  if (!sha || seenOf(entries.filter((entry) => nameOf(entry) === check)) !== 'failed') return [];
+  return [
+    `  \`${check}\` is red on \`${onto}\` too, at ${sha.slice(0, 12)}, the base this head holds: a job failing there fails here whatever`,
+    `  this change does, so read the lines below against its jobs that did not pass, and merge \`${onto}\` where it moved since:`,
+    ...listing(entries.filter((entry) => !pending(entry) && ![PASSED, 'SKIPPED', 'NEUTRAL'].includes(verdict(entry)))),
+    '  git merge main-worktree/HEAD',
+  ];
+}
+
+/**
+ * The refusal of a CI context `check` that gave a verdict this round cannot land on: what it said, where it judged the commit red what
+ * the base `onto` says of it (`baseRed`), why, and what to type next.
+ */
+const redly = (pr: Pr, check: string, ours: readonly Entry[], entries: readonly Entry[], retry: string, onto: string): string =>
   [
     `\`${check}\` for #${pr.number} is ${ours.map(verdict).join(', ').toLowerCase()}, so this round is red where it is judged.`,
+    ...(ours.some(judgedRed) ? baseRed(pr, onto, check) : []),
     `  The Actions URL: ${linkOf(ours[0]) || `${pr.url}/checks`}`,
     ...why(entries, check),
     retry,
   ].join('\n');
 
 /** The refusal of a CI context `check` that never came, or never finished, within the bound the wait carries. */
-function unanswered(
-  seen: Seen,
-  pr: Pr,
-  check: string,
-  ours: readonly Entry[],
-  entries: readonly Entry[],
-  secs: number,
-  retry: string,
-): string {
+function unanswered(seen: Seen, pr: Pr, check: string, ours: Entry[], entries: Entry[], secs: number, retry: string): string {
   const checks = `${pr.url}/checks`;
   if (seen === 'pending')
     return [
@@ -728,13 +764,9 @@ function unconflicted(branch: string, onto: string, check: string): Pr {
     const said = (pr.mergeable ?? '').toUpperCase();
     if (said === 'CONFLICTING')
       throw new Refusal(
-        [
-          `GitHub says #${pr.number} conflicts with its base \`${onto}\`, and it runs no \`pull_request\` workflow on a conflicting ` +
-            `head, so no \`${check}\` would come. Merge the base into the run's branch in your session, resolve the conflicts, ` +
-            "commit, and open the round again with the script of the run's workflow files:",
-          '  git merge main-worktree/HEAD',
-          `  ${OPEN_LINE}`,
-        ].join('\n'),
+        `GitHub says #${pr.number} conflicts with its base \`${onto}\`, and it runs no \`pull_request\` workflow on a conflicting ` +
+          `head, so no \`${check}\` would come. Merge the base into the run's branch in your session, resolve the conflicts, ` +
+          `commit, and open the round again with the script of the run's workflow files:\n  git merge main-worktree/HEAD\n  ${OPEN_LINE}`,
       );
     if (said !== 'UNKNOWN' || Date.now() - began >= whole * 1000) return pr;
     sleep(poll);
@@ -762,15 +794,14 @@ function wait(args: string[]): string[] {
   const start = Math.min(seconds('WF_CI_START_SECONDS', START_SECONDS), whole);
   const poll = seconds('WF_CI_POLL_SECONDS', POLL_SECONDS);
   const began = Date.now();
-  const over = (secs: number): boolean => Date.now() - began >= secs * 1000;
   for (;;) {
     const entries = latest(rollup(pr.number));
     const ours = entries.filter((entry) => nameOf(entry) === check);
     const seen = seenOf(ours);
     if (seen === 'passed') return [`\`${check}\` passed on ${pr.headRefOid.slice(0, 12)}: ${pr.url}`];
-    if (seen === 'failed') throw new (ours.some(judgedRed) ? Refusal : PersonsRefusal)(redly(pr, check, ours, entries, retry));
+    if (seen === 'failed') throw new (ours.some(judgedRed) ? Refusal : PersonsRefusal)(redly(pr, check, ours, entries, retry, onto));
     const bound = seen === 'absent' ? start : whole;
-    if (over(bound)) throw new PersonsRefusal(unanswered(seen, pr, check, ours, entries, bound, retry));
+    if (Date.now() - began >= bound * 1000) throw new PersonsRefusal(unanswered(seen, pr, check, ours, entries, bound, retry));
     sleep(poll);
   }
 }

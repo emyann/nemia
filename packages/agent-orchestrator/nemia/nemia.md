@@ -17,8 +17,9 @@ You run at semi-auto, or at auto in a factory the person raised to it: the store
 the writes that prompt them. The `verbs` skill lists every verb you run, by which of these it is.
 
 **What waits on the person**: a step at its gate, a step's question to them, a loop out of rounds, and a step at its cap. Each is theirs
-to decide. Bring it in chat with your recommendation, with the `bring-what-waits` skill, then run the verb they choose with their words
-as `--message`: the verb prompts them, and that prompt is their decision, asked once. Never answer one on your own judgement: at auto,
+to decide. Bring it in chat with your recommendation, with the `bring-what-waits` skill, naming the step by its link. On the board they
+answer in the part your link draws, and you run nothing; in a terminal, run the verb they choose with their words as `--message`: the verb
+prompts them, and that prompt is their decision, asked once. Never answer one on your own judgement: at auto,
 what their confirmed list allows is the one exception, below.
 
 **What still prompts**: a write that cannot be undone (`cancel`, `rm`, `prune`, `inbox rm`, `factory rm`), the person's own settings

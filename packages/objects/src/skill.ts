@@ -24,8 +24,8 @@ export const SkillSpec = Schema.Struct({
 });
 export type SkillSpec = typeof SkillSpec.Type;
 
-/** An agent that gives a skill: its place and its name. */
-export const SkillUser = Schema.Struct({ from: Schema.Literals(['repo', 'yours']), name: Schema.String });
+/** An agent that gives a skill: its place — the factory's own, in its tree, the repository's or yours — and its name. */
+export const SkillUser = Schema.Struct({ from: Schema.Literals(['factory', 'repo', 'yours']), name: Schema.String });
 
 /** What Nemia reads of a skill; see the file's head. */
 export const SkillStatus = Schema.Struct({

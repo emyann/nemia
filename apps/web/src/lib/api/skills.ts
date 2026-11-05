@@ -106,7 +106,7 @@ export type SkillDraft = {
 };
 
 /** An agent that gives a skill, by its place and its name. */
-export type SkillUser = { from: 'yours' | 'repo'; name: string };
+export type SkillUser = { from: 'factory' | 'yours' | 'repo'; name: string };
 
 /**
  * One skill on its page — its row, the version a write carries back, its draft (null where its SKILL.md does not read, `body` its

@@ -117,6 +117,13 @@ export const yourSkillsRead = (repo: string, home: string, builtin: string = BUI
     } satisfies YourSkills;
   });
 
+/** A factory's tree's folder of workflows (`<tree>/workflows`), whose `agents/` and `skills/` are the factory's own. */
+export const treeWorkflows = (tree: string): string => path.join(path.resolve(tree), 'workflows');
+
+/** Whether the skill folder `dir` is one of the factory's own, in the `skills/` of its tree `tree`; never where there is no tree. */
+const inTree = (dir: string, tree: string | undefined): boolean =>
+  tree !== undefined && path.dirname(path.resolve(dir)) === path.join(treeWorkflows(tree), SKILLS_FOLDER);
+
 /** Which place a skill's folder is in, by the folder of skills it sits in; `null` for none of them. */
 export function sourceOf(dir: string, repo: string, home: string): SkillSource | null {
   const parent = path.dirname(path.resolve(dir));
@@ -251,7 +258,7 @@ export async function listSkills(
  */
 export type GivenSkill = {
   name: string;
-  from: SkillSource | null;
+  from: SkillSource | 'factory' | null;
   foundIn: string | null;
   entry: AgentSkill | null;
   error: string | null;
@@ -262,13 +269,14 @@ export type GivenSkill = {
 /**
  * The skills an agent gives, one row each in its order, each found where a start finds it (`found`, as the package's `agentSkillsFound`
  * finds them). A skill no place has is a row with the refusal the card says; one found in the repository where the board pages nothing,
- * as a skill named with its folder is, reads `from: null` and its folder in `foundIn`.
+ * as a skill named with its folder is, reads `from: null` and its folder in `foundIn`. One found in the `skills/` of the factory's tree
+ * `tree`, where an agent of that tree finds it first, is the factory's.
  */
-export function givenSkills(skills: readonly string[], found: SkillsFound, repo: string, home: string): GivenSkill[] {
+export function givenSkills(skills: readonly string[], found: SkillsFound, repo: string, home: string, tree?: string): GivenSkill[] {
   return givenRead(skills, found).map(({ name, dir, entry, error, preload, cost }) => ({
     name,
-    from: dir === null ? null : sourceOf(dir, repo, home),
-    foundIn: dir === null ? null : foundInOf(dir, repo, home),
+    from: dir === null ? null : inTree(dir, tree) ? 'factory' : sourceOf(dir, repo, home),
+    foundIn: dir === null || inTree(dir, tree) ? null : foundInOf(dir, repo, home),
     entry,
     error,
     preload,
@@ -303,8 +311,8 @@ export const skillGuard = (route: string, method: 'POST' | 'PUT', shape: string)
   shape,
 });
 
-/** An agent that gives a skill: its place and its name. */
-export type SkillUser = { from: AgentPlace; name: string };
+/** An agent that gives a skill: its place — the factory's own, in its tree, besides the two — and its name. */
+export type SkillUser = { from: AgentPlace | 'factory'; name: string };
 
 /**
  * One skill on its own page. `skill` is its row as the list has it; `version` what a write of it carries back (`skillVersion`); `draft`
@@ -343,12 +351,22 @@ export function skillDirOf(from: SkillSource, name: string, repo: string, home: 
 /**
  * The agents of both places, yours in the store `home`, that give the skill whose folder is `dir`, read through the Agent and Skill doors,
  * each as its own start finds the skill it names: at that path, or at another that is the same folder (`oneFolder`), as where one of the
- * repository's two places for skills is a link to the other.
+ * repository's two places for skills is a link to the other. With a factory's tree `tree`, its own agents first, as `factory`, each
+ * finding the skill as a start in that factory finds it: in the tree, then the repository, then yours.
  */
-export const skillUsers = Effect.fnUntraced(function* (dir: string, name: string, repo: string, home: string) {
+export const skillUsers = Effect.fnUntraced(function* (dir: string, name: string, repo: string, home: string, tree?: string) {
   const found = new Map<string, SkillsFound>();
   const at = path.resolve(dir);
   const users: SkillUser[] = [];
+  const gives = (given: string | Error | undefined) => typeof given === 'string' && (path.resolve(given) === at || oneFolder(given, at));
+  if (tree !== undefined) {
+    const folder = path.join(treeWorkflows(tree), '_');
+    const agents = yield* Effect.flatMap(AgentDoor, (door) => door.agents.found({ dir: folder }));
+    const skills = yield* Effect.flatMap(SkillDoor, (door) => door.skills.found({ dir: folder, places: placesOf(repo, home) }));
+    for (const [agent, read] of [...agents].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)))
+      if (!(read instanceof Error) && read.skills?.includes(name) && gives(skills.at.get(name)))
+        users.push({ from: 'factory', name: agent });
+  }
   for (const { from, dir: agents, name: agent, agent: read } of yield* listAgents(repo, home)) {
     if (read instanceof Error || !read.skills?.includes(name)) continue;
     let skills = found.get(agents);
@@ -356,8 +374,7 @@ export const skillUsers = Effect.fnUntraced(function* (dir: string, name: string
       skills = yield* agentSkillsFound(agents, repo, home);
       found.set(agents, skills);
     }
-    const given = skills.at.get(name);
-    if (typeof given === 'string' && (path.resolve(given) === at || oneFolder(given, at))) users.push({ from, name: agent });
+    if (gives(skills.at.get(name))) users.push({ from, name: agent });
   }
   return users;
 });

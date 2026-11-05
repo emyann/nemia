@@ -60,7 +60,9 @@ async function heldIn(s: Served): Promise<Held<LibraryAgent>[]> {
   const { agents } = (await runPlaced(s, s.e, AGENTS.handler({ repo: s.repo }, s.env, s.home))) as AgentsRead;
   const tree = await s.inRequest(treeAgents(s));
   const trees = new Set(tree.map((a) => a.file));
-  const listings = await s.inRequest(Effect.forEach([...tree, ...agents], (one) => listingOf(one, s.repo, s.home)));
+  const listings = await s.inRequest(
+    Effect.forEach([...tree, ...agents], (one) => listingOf(one, s.repo, s.home, trees.has(one.file) ? s.factory?.tree : undefined)),
+  );
   const filled = stepsFilled(s.repo, s.home, s.factory);
   const byFile = factoriesFilling(readFactories(), s.home);
   const own = inFactory(

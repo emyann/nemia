@@ -6,7 +6,7 @@ import { gated, hasStarted, holdAdvice, holdNeedsYou, holdWord, waitAdvice, wait
 import { slotWord, type CheckoutHold, type RunSlot } from '../cap/cap.ts';
 import { checkoutWord, LANDED_CAP, landedWords, onBaseNote, toDecideWords, type ToDecide } from '../ending/ending.ts';
 import type { Workflow } from '../step/step.ts';
-import type { EnginePhase } from '../views/views-words.ts';
+import { outOfMemory, outOfMemoryWords, type AttemptMemory, type EnginePhase } from '../views/views-words.ts';
 import { DENIED_CAP, DENIED_SHOWN, oneLine, satisfiesAfter, type CloseoutAsked, type Run, type StepStatus } from '../record/record.ts';
 import type { Closeout } from '../closeout/index.ts';
 import { checkVerdictOf, verdictWord, type CheckVerdict, type Verdict } from '../check/check.ts';
@@ -215,6 +215,12 @@ export interface ListingInput {
    * the runs the hold names, each taken as one that may still land.
    */
   readonly holds?: readonly Wait[];
+  /**
+   * The memory record of each task's current turn in which the kernel killed a process at its limit (`killedMemoryOf` in
+   * views-words.ts): a step whose session or check it says so of carries the words in its note (`memoryNoted`). Left out, or undefined
+   * for a task, no note says one.
+   */
+  readonly memoryOf?: (taskId: string) => AttemptMemory | undefined;
 }
 
 /**
@@ -222,7 +228,7 @@ export interface ListingInput {
  * node `sent → <card>`, a condition never filed its route and the line that routes it by hand.
  */
 export function listing(input: ListingInput): Listing {
-  const listed = listedSteps(input, listedWords(input));
+  const listed = memoryNoted(input, listedSteps(input, listedWords(input)));
   const routed = routedRows(input);
   if (!routed.size) return listed;
   const steps = listed.steps.map((s) => {
@@ -232,6 +238,28 @@ export function listing(input: ListingInput): Listing {
   });
   return { ...listed, steps };
 }
+
+/**
+ * Each step's note with what its current try's session and check say of a kill at the memory limit (`outOfMemoryWords`), after the note's
+ * own words: read off the attempts on every pass, so a step whose tasks carry no such record reads as it did. The session's words name the
+ * step's own `memory:` where it names one; a check runs under the daemon's default alone.
+ */
+const memoryNoted = ({ steps, run, memoryOf }: ListingInput, listed: Listing): Listing => {
+  if (!memoryOf) return listed;
+  const said = (taskId: string | null | undefined, own: string | undefined, of: 'session' | 'check'): string => {
+    const killed = taskId ? outOfMemory(memoryOf(taskId), own) : undefined;
+    return killed ? outOfMemoryWords(killed, own, of) : '';
+  };
+  const owns = new Map(steps.map((s) => [s.name, s.memory]));
+  return {
+    ...listed,
+    steps: listed.steps.map((s) => {
+      const rec = run.steps[s.name];
+      const words = [said(rec?.taskId, owns.get(s.name), 'session'), said(rec?.check?.taskId, undefined, 'check')].filter(Boolean);
+      return words.length ? { ...s, note: [s.note, ...words].filter(Boolean).join(' · ') } : s;
+    }),
+  };
+};
 
 /**
  * What `nemia ls` shows for each step of a run. Pure, like `decision`, and tested the same way.

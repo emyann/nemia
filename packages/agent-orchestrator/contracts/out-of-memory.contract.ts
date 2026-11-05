@@ -10,8 +10,8 @@
  *
  * `AttemptMemory` is written out here, as a pure file of the orchestrator writes a runtime's shape (views-words.ts), and is held equal to
  * the runtime's `MemoryUse` by a type-level check in src/runtime-client.ts. `KilledAtLimit` is what the words are written from
- * (`outOfMemoryWords`, src/list/list.ts). Implement moves both types into src/views/views-words.ts and imports them here, which changes no
- * law.
+ * (`outOfMemoryWords`, src/views/views-words.ts). Both are imported from here by views-words.ts, as src/route/route.ts imports its
+ * contracts' types.
  */
 import { type Implementation, spec } from '@emyann/tsverify';
 
@@ -31,9 +31,16 @@ const killed = (m: AttemptMemory | undefined): boolean => m !== undefined && m.o
 const outOfMemorySpec = spec<(memory: AttemptMemory | undefined, own: string | undefined) => KilledAtLimit | undefined>({
   /**
    * What the runtime records (`cgroupMemoryOf`, agent-runtime src/harness/cgroup.ts): a count of kills that is a whole number, none
-   * below zero, read off the cgroup's `memory.events`. `own` is the frozen step's `memory:`, a quantity the loader read, or nothing.
+   * below zero, read off the cgroup's `memory.events`, and a limit and a peak that are whole numbers of bytes, read off `memory.max` and
+   * `memory.peak` (a `NaN` is no byte count, and no result could equal it). `own` is the frozen step's `memory:`, a quantity the loader
+   * read, or nothing.
    */
-  requires: ({ input: [memory] }) => memory === undefined || (Number.isInteger(memory.oomKills) && memory.oomKills >= 0),
+  requires: ({ input: [memory] }) =>
+    memory === undefined ||
+    (Number.isInteger(memory.oomKills) &&
+      memory.oomKills >= 0 &&
+      Number.isInteger(memory.limitBytes) &&
+      (memory.peakBytes === undefined || Number.isInteger(memory.peakBytes))),
   ensures: {
     noRecordSaysNothing: {
       description: 'An attempt with no memory record — a former journal, or a task under no limit — says nothing of memory',

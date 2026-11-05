@@ -36,19 +36,11 @@ import { stepsOf } from '../steps/steps.verb.ts';
 import { landedOf, type BranchReader } from '../branches/branches.store.ts';
 import { parentRecord } from '../steps/steps.verb.ts';
 import { continuesFrom } from '../retry/index.ts';
-import { phaseOfView, unsignedEnd, wordOfView, type EnginePhase } from './views-words.ts';
+import { currentTurn, phaseOfView, unsignedEnd, wordOfView, type EnginePhase } from './views-words.ts';
 import { RunDoor } from '../runs/runs.store.ts';
 import { DEFAULT_HARNESS } from '../harness/harness.ts';
 import { ranOnWords, sessionRanOn } from '../release/release.ts';
 import { RunId } from '../record/record.model.ts';
-
-/**
- * The attempts of a task's current turn: every attempt of a task not held open, and of one held open those since the last answer a
- * person gave it (`answer`). What says how the step's session stands now — its closeout, whether it signed, what it was denied — since an
- * answered task keeps the attempts of the turns before it, and the turn it answered signed `blocked`.
- */
-const currentTurn = (state: TaskView['state']): TaskView['state']['attempts'] =>
-  state.attempts.filter((a) => (a.turn ?? 0) === (state.inputs?.length ?? 0));
 
 /**
  * How many answers a task held open has been given (`answer`): the turns after its first. Zero for any other task, and for one nobody read.

@@ -62,11 +62,15 @@ export const lines = (dir: string, file: string): unknown[] => {
 };
 
 /**
- * A holder of the sessions under `root`, for a scope the test closes, its let-go bound `letGoMs` where one is given. `said` keeps every
+ * A holder of the sessions under `root`, for a scope the test closes, its let-go bound `letGoMs` and the share of it the calls in flight
+ * may take, `callsShare`, where each is given. `said` keeps every
  * line its let-go logged, at its level, so what the holder says as it lets go is read rather than printed.
  */
-export const holder = async (root: string, letGoMs?: number) => {
-  const attached = attachedSessions(root, STAND_IN, letGoMs === undefined ? {} : { letGoMs });
+export const holder = async (root: string, letGoMs?: number, callsShare?: number) => {
+  const attached = attachedSessions(root, STAND_IN, {
+    ...(letGoMs === undefined ? {} : { letGoMs }),
+    ...(callsShare === undefined ? {} : { callsShare }),
+  });
   const scope = Scope.makeUnsafe();
   const said: string[] = [];
   const keeper = Logger.make(

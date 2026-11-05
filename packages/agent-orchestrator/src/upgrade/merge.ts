@@ -485,7 +485,7 @@ export type Switched = { from: string; to: string };
 export function planLines(name: string, from: string, to: string, merge: TreeMerge, next: PlanNext, switched?: Switched): string[] {
   const lines =
     switched === undefined
-      ? [`${name}: ${from} → ${to}`]
+      ? [from === to ? `${name}: its parameters at ${to}` : `${name}: ${from} → ${to}`]
       : [
           `${name}: ${switched.from} ${from} → ${switched.to} ${to}`,
           `switch: ${switched.to} is another template than ${switched.from}, the one ${name}'s base was rendered from, so the merge has no common base: nothing tells your own work from what ${switched.from} left, and each conflict below, a file only your tree holds among them, asks your choice`,

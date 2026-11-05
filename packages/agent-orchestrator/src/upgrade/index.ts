@@ -22,3 +22,5 @@ export {
   type Switched,
   type TreeMerge,
 } from './merge.ts';
+export { choicesApply, sameVersionChange } from './same-version.ts';
+export type { MergeAt, SameVersionKind } from '../../contracts/same-version.contract.ts';

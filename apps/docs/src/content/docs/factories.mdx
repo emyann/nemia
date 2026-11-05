@@ -157,9 +157,26 @@ A run that has filed nothing takes the files afresh at its first filing either w
   `nemia factory revisions` writes the wiring after.
 - Every pass of the daemon reads it, so a run in flight takes a change of it at its next filing.
 
+## Change a template's parameter
+
+A factory made from a template keeps the parameters it was applied with in its file (`template.params`). To change one without a new
+version of the template, preview it at the version the factory is applied at, then type the line the preview prints last:
+
+```bash
+nemia factory diff pipao --to 2.5.0 --set ciCheck=build          # 2.5.0, the version applied
+nemia factory upgrade pipao --to 2.5.0 --set ciCheck=build --plan sha256:…
+```
+
+The preview merges three ways, as an upgrade does: the base is the template at that version rendered with the parameters the factory
+was applied with, ours is its tree, and theirs is the template rendered with the new ones. The upgrade writes the parameters into the
+factory's file, held to the plan you previewed, and the daemon merges on its next pass, waiting on `nemia factory resolve` where your
+tree changed the same line. A parameter changed in the file by hand is merged the same way. A template whose files changed under the
+version the factory was applied at is still refused: give it a new version, and upgrade to that.
+
 ## Sources
 
 This page is written from `packages/agent-orchestrator/README.md` (_Factories: a named grouping in the store_ and its sections through
 _A factory's instruction_, and _Five layers_), and from `packages/agent-orchestrator/src/factory/factory.ts`,
 `packages/agent-orchestrator/src/factory/factory.store.ts`, `packages/agent-orchestrator/src/factory/instruction.store.ts`,
-`packages/agent-orchestrator/src/revisions/pin.verb.ts` and `packages/agent-orchestrator/src/rules/rules.store.ts`.
+`packages/agent-orchestrator/src/revisions/pin.verb.ts`, `packages/agent-orchestrator/src/rules/rules.store.ts`,
+`packages/agent-orchestrator/src/upgrade/upgrade.verb.ts` and `packages/agent-orchestrator/src/applied/applied.verb.ts`.

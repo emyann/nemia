@@ -222,28 +222,46 @@ test('what the controller says of a template or parameters moved since the rende
     assert.equal(reconciled(templated('drifted')).conditions[0].reason, 'TemplateInvalid');
   });
   await t.test(
-    "parameters changed in the factory's file, or the template's files changed at its version, are said by Applied; base and tree kept",
+    "parameters changed in the factory's file alone are merged at its version; changed with the template's files under it, said by Applied, base and tree kept",
     async (t) => {
       t.mock.method(console, 'log', () => {});
       const { dir, repo } = template();
       await apply('moved', dir, repo, '--set', 'budget=7');
       const first = reconciled(templated('moved'));
       const file = path.join(FACTORIES, 'moved.json');
-      const filedAs = fs.readFileSync(file, 'utf8');
-      const content = JSON.parse(filedAs);
-      content.template.params.budget = 9;
-      fs.writeFileSync(file, JSON.stringify(content));
+      const params = (budget: number) => {
+        const content = JSON.parse(fs.readFileSync(file, 'utf8'));
+        content.template.params.budget = budget;
+        fs.writeFileSync(file, JSON.stringify(content));
+      };
       const review = (folder: string) => fs.readFileSync(path.join(folder, 'workflows/dev/review.md'), 'utf8');
-      const changed = reconciled(templated('moved'));
-      const { message: moved, lastTransitionTime: _movedAt, ...params } = changed.conditions[0];
-      assert.deepEqual(params, { type: 'Applied', status: 'False', reason: 'ParamsChanged' });
-      assert.ok(moved.includes('nemia factory diff moved --to <version>'), moved);
-      assert.ok(moved.includes('nemia factory upgrade moved --to <version>'), moved);
-      assert.deepEqual([changed.digest, changed.params], [first.digest, first.params]);
-      assert.match(review(appliedDir('moved')), /^budget: 7$/m);
-      assert.match(review(treeDir('moved')), /^budget: 7$/m);
-      fs.writeFileSync(file, filedAs);
-      assert.equal(reconciled(templated('moved')).conditions[0].reason, 'Rendered', 'the parameters put back, the base is as rendered');
+      params(9);
+      const merged = reconciled(templated('moved'));
+      assert.deepEqual([merged.version, merged.conditions[0].reason, merged.params.budget], ['0.1.0', 'Upgraded', 9]);
+      assert.match(review(appliedDir('moved')), /^budget: 9$/m);
+      assert.match(review(treeDir('moved')), /^budget: 9$/m);
+      const workflow = path.join(dir, 'workflows/dev/workflow.yaml');
+      const released = fs.readFileSync(workflow, 'utf8');
+      edit(dir, 'workflows/dev/workflow.yaml', (spec) => {
+        spec.steps[1].rounds = 5;
+      });
+      params(11);
+      const both = reconciled(templated('moved'));
+      const { message: moved, lastTransitionTime: _movedAt, ...together } = both.conditions[0];
+      assert.deepEqual(together, { type: 'Applied', status: 'False', reason: 'ParamsChanged' });
+      assert.ok(moved.includes('nemia factory diff moved --to <version> --set'), moved);
+      assert.ok(moved.includes('put the template'), moved);
+      assert.deepEqual([both.digest, both.params], [merged.digest, merged.params]);
+      assert.match(review(appliedDir('moved')), /^budget: 9$/m);
+      assert.match(review(treeDir('moved')), /^budget: 9$/m);
+      fs.writeFileSync(workflow, released);
+      const restored = reconciled(templated('moved'));
+      assert.deepEqual(
+        [restored.conditions[0].reason, restored.params.budget],
+        ['Upgraded', 11],
+        "the template's files put back, the parameters merge",
+      );
+      assert.match(review(treeDir('moved')), /^budget: 11$/m);
       edit(dir, 'workflows/dev/workflow.yaml', (spec) => {
         spec.steps[1].rounds = 5;
       });
@@ -252,7 +270,8 @@ test('what the controller says of a template or parameters moved since the rende
       assert.deepEqual(contentChanged, { type: 'Applied', status: 'False', reason: 'ContentChanged' });
       assert.ok(changedWords.includes('0.1.0'), changedWords);
       assert.ok(changedWords.includes('a new version'), changedWords);
-      assert.equal(edited.digest, first.digest);
+      assert.equal(edited.digest, restored.digest);
+      assert.notEqual(edited.digest, first.digest);
       assert.doesNotMatch(review(appliedDir('moved')), /^rounds: 5$/m);
       assert.doesNotMatch(review(treeDir('moved')), /^rounds: 5$/m);
     },
@@ -282,9 +301,9 @@ test("the controller stamps each condition with when its status last moved, and 
     assert.equal(fs.readFileSync(statusFile('stamped'), 'utf8'), before);
   });
   await t.test("a condition whose status flips is stamped with the pass's time, the other keeps its own", () => {
-    const content = JSON.parse(fs.readFileSync(file, 'utf8'));
-    content.template.params.budget = 9;
-    fs.writeFileSync(file, JSON.stringify(content));
+    edit(dir, 'workflows/dev/workflow.yaml', (spec) => {
+      spec.steps[1].rounds = 5;
+    });
     assert.deepEqual(times(reconciledAt(templated('stamped'), at[2])), [
       ['Applied', 'False', at[2]],
       ['ConflictsPending', 'False', at[0]],
@@ -352,19 +371,25 @@ test('the controller names the template a base holds, even where the base is no 
     const status = reconciled(templated('drift'));
     assert.deepEqual([status.conditions[0].reason, status.template], ['VersionDrift', 'team']);
   });
-  await t.test("the parameters in the factory's file changed (ParamsChanged): named", async (t) => {
-    t.mock.method(console, 'log', () => {});
-    const { dir, repo } = template();
-    await apply('params', dir, repo, '--set', 'budget=7');
-    reconciled(templated('params'));
-    const file = path.join(FACTORIES, 'params.json');
-    const content = JSON.parse(fs.readFileSync(file, 'utf8'));
-    content.template.params.budget = 9;
-    fs.writeFileSync(file, JSON.stringify(content));
-    unnamed('params');
-    const status = reconciled(templated('params'));
-    assert.deepEqual([status.conditions[0].reason, status.template], ['ParamsChanged', 'team']);
-  });
+  await t.test(
+    "the parameters in the factory's file changed with the template's files under its version (ParamsChanged): named",
+    async (t) => {
+      t.mock.method(console, 'log', () => {});
+      const { dir, repo } = template();
+      await apply('params', dir, repo, '--set', 'budget=7');
+      reconciled(templated('params'));
+      edit(dir, 'workflows/dev/workflow.yaml', (spec) => {
+        spec.steps[1].rounds = 5;
+      });
+      const file = path.join(FACTORIES, 'params.json');
+      const content = JSON.parse(fs.readFileSync(file, 'utf8'));
+      content.template.params.budget = 9;
+      fs.writeFileSync(file, JSON.stringify(content));
+      unnamed('params');
+      const status = reconciled(templated('params'));
+      assert.deepEqual([status.conditions[0].reason, status.template], ['ParamsChanged', 'team']);
+    },
+  );
   await t.test("an upgrade under way: the factory's file names the template wanted, not the base's, so no name is written", async (t) => {
     t.mock.method(console, 'log', () => {});
     const { dir, repo } = template();

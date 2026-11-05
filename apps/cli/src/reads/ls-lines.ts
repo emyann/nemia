@@ -74,7 +74,7 @@ const saidWord = ({ why, by }: Said): string => {
 
 function holdWord(waits: readonly Wait[], said: Said = {}): string {
   const words = saidWord(said);
-  if (!waits.length) return `held, on a hold that names no run${words}`;
+  if (!waits.length) return `held until a person lifts it${words}`;
   const named = runList(waits.map(waitName));
   const one = waits.length === 1;
   const held = `held until ${named} ${one ? 'lands' : 'land'}${words}`;
@@ -84,7 +84,8 @@ function holdWord(waits: readonly Wait[], said: Said = {}): string {
 
 function holdAdvice(run: Run, waits: readonly Wait[]): string {
   const off = `nemia hold ${run.id} --off`;
-  if (!waits.length) return `the hold on ${run.id} names no run, so no run's landing lifts it — yours to lift: ${off}`;
+  if (!waits.length)
+    return `nothing of ${run.id} is filed, and nothing is asked of you, until a person lifts the hold; to go on: ${off}`;
   if (waits.every((w) => w.landed)) return `the next tick lifts the hold, and ${run.id} goes on; nothing to decide yet`;
   const never = waits.filter(neverLands);
   if (!never.length) {
@@ -120,7 +121,7 @@ function asksLines(run: Run, { steps, waitingOnYou, waiting, holding, toDecide }
   if (waitingWords.length) lines.push(`   → waiting on you: ${waitingWords.join(', ')}  —  nemia decide ${run.id}`);
   if (waiting.some((w) => w.missing || w.cancelledAt || w.gone?.length)) lines.push(`   → waiting on you: ${waitAdvice(run, waiting)}`);
   if (holding) {
-    const never = !holding.length || holding.some((w) => w.missing || w.cancelledAt || w.gone?.length);
+    const never = holding.some((w) => w.missing || w.cancelledAt || w.gone?.length);
     const lifting = holding.length > 0 && holding.every((w) => w.landed);
     lines.push(
       `   → ${holdWord(holding, run.hold)}${never ? `: ${holdAdvice(run, holding)}` : lifting ? '' : `  —  nemia hold ${run.id} --off lifts it`}`,

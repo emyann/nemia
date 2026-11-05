@@ -106,6 +106,8 @@ const waitingRun = (id: string, more: object) =>
 waitingRun('r-after', { after: ['r-missing'] });
 waitingRun('r-held', {});
 write(path.join(root, 'runs', 'r-held.hold'), JSON.stringify({ at: at(70), until: [RUN], why: 'merge conflicts', by: 'operator' }));
+waitingRun('r-parked', {});
+write(path.join(root, 'runs', 'r-parked.hold'), JSON.stringify({ at: at(71), until: [], why: 'folded into an intake', by: 'operator' }));
 write(path.join(root, 'cordon'), JSON.stringify({ at: at(90), by: 'operator', why: 'a release' }));
 waitingRun('r-cancelled', { cancelledAt: at(80), from: { inbox: 'called-off' } });
 settled('t-build-1', { outcome: 'done', summary: 'A first cut.', needs: null, artifacts: [] }, 10);
@@ -194,6 +196,7 @@ const READS: ReadonlyArray<readonly [readonly string[], RegExp]> = [
   [['closeout', RUN, 'review'], /\/api\/runs\/r-parity\/steps\/review\/tries/],
   [['ls'], /\/api\/listing\b/],
   [['ls', RUN], /\/api\/listing\/r-parity\b/],
+  [['ls', 'r-parked'], /\/api\/listing\/r-parked\b/],
   [['inbox'], /\/api\/cards\b/],
   [['ls', '-l', 'team=core', '--show-labels', '-L', 'team'], /\/api\/listing\b/],
   [['ls', '-l', 'team=core', '-l', 'team', '-L', 'workflow'], /\/api\/listing\b/],
@@ -251,6 +254,13 @@ for (const [argv, route] of READS)
     assert.equal(served.err, local.err, 'the same stderr');
     assert.match(api.said().slice(before), route, 'it asked the api');
   });
+
+test('`nemia ls` says a hold that names no run is held until a person lifts it, and never that the run waits on you', async () => {
+  const listed = await nemia(['ls', 'r-parked']);
+  assert.equal(listed.code, 0, listed.err);
+  assert.match(listed.out, /→ held until a person lifts it \(why: folded into an intake; by operator\)  —  nemia hold r-parked --off lifts it/);
+  assert.doesNotMatch(listed.out, /waiting on you/);
+});
 
 test('`nemia ls` says what the session of a step at work runs on, off its attempt’s record, beside its line', async () => {
   const said = await nemia(['ls', 'r-working']);

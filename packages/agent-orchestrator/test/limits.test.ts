@@ -68,7 +68,7 @@ const RECORD: Record<string, Partial<Record<Rule, number>>> = {
   'apps/web/src/components/WorkflowBuilder.tsx': { 'max-lines-per-function': 1 },
   'apps/web/src/lib/factory.ts': { 'max-lines-per-function': 1, complexity: 1, 'sonarjs/cognitive-complexity': 1 },
   'apps/web/src/lib/feed.ts': { 'max-lines-per-function': 1 },
-  'apps/web/src/lib/gate.ts': { complexity: 1, 'sonarjs/cognitive-complexity': 1 },
+  'apps/web/src/lib/gate.ts': { 'sonarjs/cognitive-complexity': 1 },
   'apps/web/src/lib/outcome.ts': { 'sonarjs/cognitive-complexity': 1 },
   'apps/web/src/lib/prune.ts': { 'sonarjs/cognitive-complexity': 1 },
   'apps/web/src/lib/transcript.ts': { complexity: 1, 'sonarjs/cognitive-complexity': 1 },

@@ -38,10 +38,11 @@
  * (inbox.store.ts and inbox.verb.ts read them).
  */
 import path from 'node:path';
+import { CARD_STATES } from 'objects';
 import { bodyOf, frontmatterKeys, type PlanFile } from '../plan/plan.ts';
 import { DEFAULT_FACTORY, factoryNameRefusal, type Factory } from '../factory/factory.ts';
 import type { Run } from '../record/record.ts';
-import { RUN_PHASES, type RunPhase } from '../phase/phase.ts';
+import type { RunPhase } from '../phase/phase.ts';
 import { isReadme, splitFrontmatter, WorkflowError } from '../step/step.ts';
 import {
   frontmatterOrNull,
@@ -341,9 +342,10 @@ export type MissedStart = { at: string; text: string; repo: string; why: string;
 /**
  * Where a card is in its life, closed: its own word until it starts — `filed`, in the inbox, to be started by a person; `queued`, waiting
  * for the tick to start it; `refused`, queued, and the tick's start of it as it stands was refused, so it waits for a person — and its
- * run's phase from then on (`RUN_PHASES`). A card whose run's record is gone is free again, and reads its own word.
+ * run's phase from then on (`RUN_PHASES`). A card whose run's record is gone is free again, and reads its own word. The list is held in
+ * `objects` beside the Card, and `inbox.test.ts` holds it to `RUN_PHASES`.
  */
-export const CARD_STATES = ['filed', 'queued', 'refused', ...RUN_PHASES] as const;
+export { CARD_STATES };
 export type CardState = (typeof CARD_STATES)[number];
 
 /** A run as the inbox reads it: its id, the card it was started from, and its phase as the runs list judges it, read now. */

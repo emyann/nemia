@@ -3,7 +3,8 @@ import { queryOptions } from '@tanstack/react-query';
 import { Schema } from 'effect';
 import { get, send } from './read.ts';
 import { selectorKey, withSelector } from './selector.ts';
-import { Labelled } from './run.gen.ts';
+import { Labelled } from 'objects';
+import { cards, namespaceOf } from './objects.ts';
 
 /** A label map: a key, its value. */
 export type Labels = Record<string, string>;
@@ -18,12 +19,9 @@ export const labelRun = (id: string, edits: readonly string[], overwrite = false
     may: 'The labels may be set: read the run again before sending it again.',
   });
 
-/** Edits the card `name`'s labels by `edits`, as the CLI's label verb for a card does. */
-export const labelCard = (name: string, edits: readonly string[], overwrite = false): Promise<Labelled> =>
-  send('POST', `/api/inbox/${encodeURIComponent(name)}/labels`, Labelled, {
-    body: { labels: edits, overwrite },
-    may: 'The labels may be set: read the card again before sending it again.',
-  });
+/** Edits `card`'s labels by `edits`, as the CLI's label verb for a card does: the Card's `labels` verb, in the card's namespace. */
+export const labelCard = (card: { name: string; factory: string | null }, edits: readonly string[], overwrite = false): Promise<Labelled> =>
+  cards.labels(namespaceOf(card.factory), card.name, { labels: edits, overwrite });
 
 /**
  * What the label page reads of `GET /api/stats`: the headline of every run the selector takes, and each step's cost summed over every

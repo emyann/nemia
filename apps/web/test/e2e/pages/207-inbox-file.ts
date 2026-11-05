@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Locator, Page, Response } from 'playwright';
-import { photograph, themeOf } from '../board.ts';
+import { cardsPath, photograph, themeOf } from '../board.ts';
 import { expectCount, expectTexts, expectVisible, idle, Refused, settled, WAIT_MS, watch } from '../checks.ts';
 import { CARDS, FACTORIES, hiringStarts, WORKFLOWS } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -23,17 +23,26 @@ async function open(page: Page, route: string): Promise<void> {
   await idle(page);
 }
 
+/** A filing's body as it was sent, its factory read back from the namespace its path names (none for `default`), as the box chose it. */
+function sentOf(filed: Response): unknown {
+  const namespace = new URL(filed.url()).pathname.split('/')[3];
+  const body = filed.request().postDataJSON() as Record<string, unknown>;
+  return namespace === 'default' ? body : { ...body, factory: namespace };
+}
+
 /** Type `idea` into the box and press File: the request's body as it was sent, and the card's name and file once the api took it. */
 async function fileFrom(page: Page, idea: string): Promise<{ sent: unknown; name: string; file: string }> {
   const box = page.locator('form[aria-label="File a card"]');
   await box.getByRole('textbox', { name: 'An idea' }).fill(idea);
   const [filed] = await Promise.all([
-    page.waitForResponse((r) => r.request().method() === 'POST' && new URL(r.url()).pathname === '/api/inbox', { timeout: WAIT_MS }),
+    page.waitForResponse((r) => r.request().method() === 'POST' && cardsPath().test(new URL(r.url()).pathname), { timeout: WAIT_MS }),
     box.getByRole('button', { name: 'File' }).click(),
   ]);
   if (filed.status() !== 201) throw new Refused(`the api files the card — it answered ${filed.status()}: ${await filed.text()}`);
-  const { name } = (await filed.json()) as { name: string };
-  return { sent: filed.request().postDataJSON() as unknown, name, file: path.join(store!, 'inbox', `${name}.md`) };
+  const {
+    metadata: { name },
+  } = (await filed.json()) as { metadata: { name: string } };
+  return { sent: sentOf(filed), name, file: path.join(store!, 'inbox', `${name}.md`) };
 }
 
 /** Refuses unless `sent`, a filing's body, is exactly `expected`, key for key. */
@@ -51,7 +60,7 @@ function expectFile(file: string, text: string, assertion: string): void {
 
 /**
  * Start the card `name`, which names no factory, on a page of its own: its Start draws a Factory list and no start form; with the
- * factory picked, then its workflow, Start sends the factory and its repository in the query of `POST /api/runs`, the record names
+ * factory picked, then its workflow, Start sends the factory and its repository in the query of the card's start, the record names
  * the factory, the repository and the card, and the card stays in the inbox, started. The run is taken back.
  */
 async function startUnassigned(page: Page, name: string, theme: string): Promise<void> {
@@ -77,7 +86,9 @@ async function startUnassigned(page: Page, name: string, theme: string): Promise
     await settled(other);
     await photograph(other, path.join(OUT, `inbox-file-unassigned-${theme}.png`), { fullPage: true });
     const [started] = await Promise.all([
-      other.waitForResponse((r) => r.request().method() === 'POST' && new URL(r.url()).pathname === '/api/runs', { timeout: WAIT_MS }),
+      other.waitForResponse((r) => r.request().method() === 'POST' && cardsPath(name, 'start').test(new URL(r.url()).pathname), {
+        timeout: WAIT_MS,
+      }),
       form.getByRole('button', { name: 'Start' }).click(),
     ]);
     await expectStartedIn(started, { factory, repo: checkout, card: name });
@@ -98,9 +109,7 @@ async function startUnassigned(page: Page, name: string, theme: string): Promise
 async function expectStartedIn(started: Response, { factory, repo, card }: { factory: string; repo: string; card: string }): Promise<void> {
   const sent = new URL(started.url()).searchParams;
   if (sent.get('factory') !== factory || sent.get('repo') !== repo)
-    throw new Refused(
-      `a card of no factory starts through POST /api/runs?factory=${factory}&repo=${repo} — it was sent to ${started.url()}`,
-    );
+    throw new Refused(`a card of no factory starts through its start, ?factory=${factory}&repo=${repo} — it was sent to ${started.url()}`);
   if (started.status() !== 201)
     throw new Refused(`the api starts the card in ${factory} — it answered ${started.status()}: ${await started.text()}`);
   const { id } = (await started.json()) as { id: string };

@@ -38,7 +38,6 @@ agent-try
 lift
 prune
 unreadable
-machines
 debug-path
 debug-polled
 debug-live
@@ -61,7 +60,6 @@ run-bar
 factory-bar
 factories-bar
 workflow-bar
-machines-bar
 frame
 told-layers
 custom-instructions

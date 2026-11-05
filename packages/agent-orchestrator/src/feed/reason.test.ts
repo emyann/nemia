@@ -101,7 +101,7 @@ const WAIT_WORDS: readonly Case[] = [
   { kind: 'Step', word: SLOT_WAIT, reason: 'Waiting', on: 'limit' },
   { kind: 'Step', word: slotWord({ inFlight: 1, cap: 2 }), reason: 'Waiting', on: 'limit' },
   { kind: 'Step', word: PAUSE_WAIT, note: 'its check is filed on nemia resume', reason: 'Waiting', on: 'pause' },
-  { kind: 'Step', word: checkoutWord({ run: 'r-2', step: 'land' }), reason: 'Waiting', on: 'checkout' },
+  { kind: 'Step', word: checkoutWord({ run: 'r-2', step: 'land' }), reason: 'Waiting', on: 'base' },
   { kind: 'Step', word: waitWord([{ run: 'r-2' }]), reason: 'Waiting', on: 'run' },
   { kind: 'Step', word: waitWord([{ run: 'r-2' }, { run: 'r-3' }]), reason: 'Waiting', on: 'run' },
 ];

@@ -1,7 +1,7 @@
 /**
  * The board's view of one run, as its pages draw it: composed from the run object (`runObjectQuery`), every step's tries and what it was
  * told (`stepTriesQuery`, `stepToldQuery`), and the run's lines (`runLinesQuery`). Not a mirror of the api: every type here is made from
- * the generated mirror (`api/run.gen.ts`) and the lines' (`RunLines`), under the names the run's components read.
+ * the objects' own types (`objects`) and the lines' (`RunLines`), under the names the run's components read.
  */
 import { useMemo } from 'react';
 import {
@@ -13,7 +13,7 @@ import {
   type QueryKey,
   type UseQueryResult,
 } from '@tanstack/react-query';
-import type { Run, RunSpec, RunSpecStep, RunStatus, RunStepStatus, StepTold, StepTry } from './api/run.gen.ts';
+import type { Run, RunSpec, RunSpecStep, RunStatus, RunStepStatus, StepTold, StepTry } from 'objects';
 import type { StepCloseout, StepTry as StepTryRead, StepUnreadable } from './api/tries.ts';
 import type { WorkflowPageAddress } from './api/address.ts';
 import { runGone, runLinesQuery, runObjectQuery, stepToldQuery, stepTriesQuery, type RunLines, type StepCommands } from './api/run.ts';
@@ -34,7 +34,7 @@ export type StepFiledView = NonNullable<RunStepStatus['filed']>;
  * try's closeout, or why it could not be read.
  *
  * Its closeout, its tries and its current try's short (`current`, absent from the page) are typed as the decision's mirror has them
- * (`api/tries.ts`), read only, which the generated ones are too. `current` is optional for a view built with no try read, as a
+ * (`api/tries.ts`), read only, which the objects' ones are too. `current` is optional for a view built with no try read, as a
  * workflow's unstarted run is (`unstartedRun`).
  */
 export type StepView = Omit<RunStepStatus, 'status' | 'filed' | 'current'> & {

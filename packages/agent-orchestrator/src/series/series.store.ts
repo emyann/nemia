@@ -21,7 +21,7 @@ import {
   healthOf,
   hoursDue,
   isRange,
-  LABEL_KEYS,
+  SERIES_LABEL_KEYS,
   memoDays,
   minutesDue,
   RANGES,
@@ -55,13 +55,16 @@ export const days = (tier: Tier): string[] => {
   return names.flatMap((name) => DAY_FILE.exec(name)?.slice(1, 2) ?? []).sort();
 };
 
-/** Lines appended to their days' files of `tier`. Refuses as `Invalid` a line labelled by a key outside `LABEL_KEYS`, writing none. */
+/**
+ * Lines appended to their days' files of `tier`. Refuses as `Invalid` a line labelled by a key outside `SERIES_LABEL_KEYS`, writing
+ * none.
+ */
 export const appendLines = (tier: Tier, lines: readonly RollupLine[]): void => {
   for (const line of lines) {
     const strange = strangeLabels(line.l);
     if (strange.length)
       throw new Invalid({
-        message: `A series line may not be labelled ${strange.join(', ')}: its labels are ${LABEL_KEYS.join(', ')}. A run's own detail stays in its record.`,
+        message: `A series line may not be labelled ${strange.join(', ')}: its labels are ${SERIES_LABEL_KEYS.join(', ')}. A run's own detail stays in its record.`,
       });
   }
   if (!lines.length) return;

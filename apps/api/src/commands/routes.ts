@@ -67,39 +67,22 @@ export function bodySchema(command: CommandSpec, inPath: readonly string[], rout
   return Schema.Struct(fields);
 }
 
-/** A path's last fixed word, a pattern's or a request's — `retry` of `/api/runs/:runId/steps/:step/retry`, `round` of `…/r1/round`. */
-const lastWord = (path: string): string =>
-  path
-    .split('/')
-    .filter((p) => p !== '' && !p.startsWith(':'))
-    .at(-1) ?? '';
-
-/**
- * The words of the command `name` on `path`, a route's pattern or a request's (`Named.path`), and the word a refusal names the route by:
- * those of a path it serves besides its own (`RouteWords.on`) — `retry`'s on `…/round`, `approve`'s on `…/accept`, `refresh`'s on
- * `…/merge`, the paths of the commands they absorbed — and that path's last word; or its own, and its name.
- */
-export const wordsAt = (name: string, path: string): RouteWords & { said: string } => {
+/** The words of the command `name` (`WORDS`), and the word a refusal names its route by: its name. */
+export const wordsAt = (name: string): RouteWords & { said: string } => {
   const own = WORDS[name];
   if (own === undefined) throw new Error(`No words for the command '${name}' in WORDS (commands/words.ts): give it its words there.`);
-  const word = lastWord(path);
-  const kept = own.on && Object.hasOwn(own.on, word) ? own.on[word] : undefined;
-  return kept ? { ...kept, said: word } : { ...own, said: name };
+  return { ...own, said: name };
 };
 
-/**
- * Whether `command` takes `key` on the api alone on `path`: its `apiTakes` names it, on a path of its own — a path kept from a command it
- * absorbed (`RouteWords.on`) takes none, as that command took none: `answers` sent to `…/round` or `…/accept` would go nowhere.
- */
-const takesOn = (command: Pick<CommandSpec, 'name' | 'apiTakes'>, key: string, path: string): boolean =>
-  (command.apiTakes?.includes(key) ?? false) && wordsAt(command.name, path).said === command.name;
+/** Whether `command` takes `key` on the api alone: its `apiTakes` names it. */
+const takesOn = (command: Pick<CommandSpec, 'apiTakes'>, key: string): boolean => command.apiTakes?.includes(key) ?? false;
 
 /** Every key a command of the table takes on the api alone, and the routes that write it. */
 const apiOnly = (table: readonly CommandSpec[]): ReadonlyMap<string, readonly Route[]> =>
   new Map(
     [...new Set(table.flatMap((c) => c.apiTakes ?? []))].map((key) => [
       key,
-      table.flatMap((c) => routeList(c).filter((r) => generated(r) && takesOn(c, key, r.path))),
+      table.flatMap((c) => routeList(c).filter((r) => generated(r) && takesOn(c, key))),
     ]),
   );
 
@@ -111,13 +94,13 @@ const routeShort = ({ method, path }: Route): string => {
 };
 
 /**
- * Why a body carries a key another command, or this one on another path, takes on the api alone and this route does not, 422 — a person's
- * `answers` sent to a round, which would go nowhere — or null.
+ * Why a body carries a key another command takes on the api alone and this route does not, 422 — a person's `answers` sent to a
+ * refresh, which would go nowhere — or null.
  */
 function foreignKey(command: CommandSpec, route: Route, table: readonly CommandSpec[], value: unknown, shape: string): Refusal | null {
   if (typeof value !== 'object' || value === null) return null;
   for (const [key, takers] of apiOnly(table)) {
-    if (!Object.hasOwn(value, key) || takesOn(command, key, route.path)) continue;
+    if (!Object.hasOwn(value, key) || takesOn(command, key)) continue;
     return {
       status: 422,
       error: `\`${key}\` is not a key ${routeShort(route)} takes — ${takers.map(routeShort).join(', ')} ${takers.length > 1 ? 'take' : 'takes'} it — so it would go nowhere: ${shape}.`,
@@ -164,7 +147,7 @@ function split(command: CommandSpec, body: Readonly<Record<string, unknown>>) {
  * not refused before those it has where the route's words are strict.
  */
 async function bodyOf(c: Context<ApiEnv>, command: CommandSpec, at: Named, route: Route) {
-  const words = wordsAt(command.name, at.path);
+  const words = wordsAt(command.name);
   const json = await jsonOf(c, words.said, words, at);
   if ('status' in json) return json;
   const { body, hint } = renamedValues(command.name, json.value);
@@ -208,7 +191,7 @@ async function storeArgsOf(
   at: Named,
 ): Promise<{ args: Args; hint?: string } | Refusal> {
   const bound = { ...c.req.param(), ...fixedOf(route) };
-  const bodyless = wordsAt(command.name, at.path).bodyless;
+  const bodyless = wordsAt(command.name).bodyless;
   if (bodyless) {
     const wrong = bodyless(at, await c.req.text());
     return wrong === null ? { args: bound } : { status: 400, error: wrong };
@@ -248,7 +231,7 @@ const namedBy = (c: Context<ApiEnv>): Named => ({
 const route = (command: Command, at: Route) => (c: Context<ApiEnv>) =>
   served(c, async (s) => {
     const named = namedBy(c);
-    const words = wordsAt(command.name, named.path);
+    const words = wordsAt(command.name);
     if (command.writes) {
       const guard = words.guard(named);
       const refused = refusedBeforeReading(guard, c.req.header('host'), c.req.header('sec-fetch-site'), c.req.header('content-type'));
@@ -302,12 +285,12 @@ export const wordBreaks = (table: readonly Pick<CommandSpec, 'name' | 'route'>[]
     .map((c) => `${c.name} is routed on the api, and words.ts has no words for it: give it its guard, its shape and its refusals there`);
 
 /**
- * The board's writes for a person's asks of a run, each route of a command of the package's table (`routesOf(COMMANDS)`) — a command on its
- * own path, and on the former paths of those it absorbed, kept so the board's calls answer as before: `retry` on `…/round`, `approve` on
- * `…/steps/:step/accept`, `refresh` on `…/merge`, each in the words of its path (`wordsAt`). Each
- * route is guarded as a start is (guard.ts), answers 404 for a run or a step it does not have, 400 for a body that is not an ask and 422
- * for a key another command takes on the api alone (`foreignKey`), refuses with 422 what the command's `check` refuses — the same words
- * `nemia` prints — and writes through the command's own handler, the package's verb, whose refusals it lets through to
+ * The board's writes for a person's asks of a run, each route of a command of the package's table (`routesOf(COMMANDS)`), one path per
+ * command, in its words (`wordsAt`): a round is `retry`'s with `round`, a merge of the base `refresh`'s with `base`, an acceptance of a
+ * loop `approve`'s. Each route is guarded as a start is (guard.ts), answers 404 for a run or a step it does not have, 400 for a body
+ * that is not an ask and 422 for a key another command takes on the api alone (`foreignKey`), refuses with 422 what the command's
+ * `check` refuses — the same words `nemia` prints — and writes through the command's own handler, the package's verb, whose refusals it
+ * lets through to
  * `app.onError` (app.ts), which answers each by its kind, verbatim: 404 for a run gone since the route read it (`Missing`), 409 for a state
  * that forbids the ask (`Conflict`), 422 for a record that does not read (`Invalid`). The api judges none of it. A 202 is accepted and not
  * yet done: the next tick honours the ask once, as it does one made at the command line. A write that fails otherwise is a 502 naming the
@@ -320,17 +303,17 @@ export const wordBreaks = (table: readonly Pick<CommandSpec, 'name' | 'route'>[]
  *   signed, is taken as `nemia retry` takes it (`stopBlocked`): the ask is written as any other, and the tick stops the session before it
  *   files the try — which the answer's `stopFirst` says, for the board to word, and then a tick after that one files the try. A person's
  *   `answers` to the questions the step's current closeout asks are checked against them and written as the try's message, the message
- *   given beside them its note (`answeredHow`): answers that do not fit, or on a recheck, are refused with 400.
- * - `POST /api/runs/:id/round` — another round of a run's loop: the loop out of rounds, or held on a step of it past its budget, with the
- *   cap raised. A path of `retry`, kept, which fixes `round` (`nemia retry --round`), its body `{ step?, budget? }`. Made by `roundRun`,
- *   which writes the ask file and nothing else. Refuses a budget not above zero with 400, before the round is asked
- *   (`roundBudgetRefusal`, which `roundAsk` refuses first, whatever the run); `answers` with 422, as a key another path takes; words or a
- *   model, which a round does not take, with 422 (the command's check); a round the loop may not go, or a budget not above what its steps
- *   have cost (`roundAsk`), with 409.
- * - `POST /api/runs/:id/merge` — a loop's work sent back to merge its base branch, on the round it is on, which the merge does not spend.
- *   A path of `refresh`, kept, which fixes `base` (`nemia refresh --base`), its body `{ step? }`. Made by `mergeRun`, which tries the merge
- *   with git and writes the ask file and nothing else. Refuses a merge the loop may not take (`mergeAsk`) with 409: among them a run whose
- *   result step closes no loop, pointed to `nemia retry`, and work that merges cleanly, pointed to the landing's approval.
+ *   given beside them its note (`answeredHow`): answers that do not fit, or on a recheck, are refused with 400. With `"round": true`,
+ *   another round of the loop the step closes (`nemia retry --round`): the loop out of rounds, or held on a step of it past its budget,
+ *   with the cap raised by `budget`. Made by `roundRun`, which writes the ask file and nothing else. Refuses a budget not above zero with
+ *   400, before the round is asked (`roundBudgetRefusal`, which `roundAsk` refuses first, whatever the run); words, answers or a model,
+ *   which a round does not take, with 422 (the command's check); a round the loop may not go, or a budget not above what its steps have
+ *   cost (`roundAsk`), with 409.
+ * - `POST /api/runs/:id/refresh` — the run pinned to the new revisions of the kinds it resolved (`nemia refresh`); with `"base": true`, a
+ *   loop's work sent back to merge its base branch, on the round it is on, which the merge does not spend (`nemia refresh --base`), the
+ *   looping step in `step` or left out for a run with one loop. Made by `mergeRun`, which tries the merge with git and writes the ask file
+ *   and nothing else. Refuses a merge the loop may not take (`mergeAsk`) with 409: among them a run whose result step closes no loop,
+ *   pointed to `nemia retry`, and work that merges cleanly, pointed to the landing's approval.
  * - `POST /api/runs/:id/steps/:step/say` — a person's words to a step's running session, through `sayRun`, `nemia say`'s own, which hands
  *   them to the session through the engine, and the engine journals them: the api writes nothing, and the step's detail reads them back
  *   (`said`). Refuses, in the package's and the engine's words, with 409: a step not filed, settled, or of a cancelled run; empty words; a
@@ -341,14 +324,10 @@ export const wordBreaks = (table: readonly Pick<CommandSpec, 'name' | 'route'>[]
  *   which writes the approval file and nothing else; the next tick files what waits on the step. Refuses empty words
  *   (`approvalWordsRefusal`) with 422 before the run is read, and a step that may not be approved (`approvalRefusal`) with 409 after —
  *   not gated, not signed off yet, already approved, sent back, or of a run called off. Sending it back is `POST …/retry` with a message,
- *   as `nemia retry --message` is.
- * - `POST /api/runs/:id/steps/:step/accept` — an acceptance of a loop out of rounds, as it stands: a path of `approve`, kept, which ends a
- *   loop out of rounds through `acceptRun` (`nemia approve` of a loop), which writes the acceptance file and nothing else; the next tick
- *   files what waits on the looping step as if it had said `again: false`. Refuses empty words with 422 before the run is read, and words
- *   left out with 422 once the step reads as a loop's (`Invalid`); a loop that may not be accepted (`acceptAsk`) with 409 after — a round
- *   the run files itself or one already asked for, a loop that ended `again: false`, a try already accepted, a run called off; and
- *   `answers` with 422, as a key another path takes. A step with no `loop:` is read as a gate's approval, as `nemia approve` reads it:
- *   approved where it waits at its gate, refused with 409 where it has none.
+ *   as `nemia retry --message` is. Of a loop out of rounds, its work accepted as it stands, through `acceptRun` (`nemia approve` of a
+ *   loop), which writes the acceptance file and nothing else; the next tick files what waits on the looping step as if it had said
+ *   `again: false`. Its words are required there (`Invalid`, 422), and a loop that may not be accepted (`acceptAsk`) is refused with 409 —
+ *   a round the run files itself or one already asked for, a loop that ended `again: false`, a try already accepted, a run called off.
  * - `POST /api/runs/:id/hold` — a run held until other runs land, as `nemia hold <run> --until <run>…` holds it (`hold`), its body
  *   `{ until, why?, by? }`, `until` a list as `--until` given many times, and `by` the user the api runs as where it is left out. Its route
  *   sets `off` false, so no body lifts through it, and a key it does not take, `off` among them, is a 400 naming each. Refuses what

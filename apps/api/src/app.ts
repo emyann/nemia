@@ -23,8 +23,8 @@ import { factoryServers, serverSignIns } from './servers/index.ts';
 import { ceilingsOf, metricsOf, passesOf, seriesOf, pauseNowOf, pauseOf, feed, QuotaAsker, readDaemon } from './factory/index.ts';
 import { inbox } from './inbox/inbox.ts';
 import { ApiConfig, type ApiEnv, type ApiRuntime, ReadMemo, served, type Services } from './layer.ts';
-import { machines } from './machines/machines.ts';
 import { nemia, nemiaChat } from './nemia/index.ts';
+import { objectsRoutes } from './objects/index.ts';
 import { runs } from './runs/runs.ts';
 import { openapi, REFERENCE_BUNDLE, referenceOf } from './openapi/index.ts';
 import { saidRequest } from './request/request.ts';
@@ -171,7 +171,6 @@ const viewerScript = () => (bundle ??= fs.readFile(REFERENCE_BUNDLE, 'utf8'));
  *   agent's custom instructions written and cleared; and a factory's instruction put where it is kept, and written and cleared.
  * - steps/steps.ts — a step's own reads: its output, its files, and its conversation, once or followed.
  * - factory/feed.ts — the workflow feed followed, as server-sent events.
- * - machines/machines.ts — the state machines the board draws, listed, and one machine's graph, read off its code.
  * - nemia/nemia.ts — Nemia, the store's own agent: where she is (`nemia level`'s read), and the facts she keeps (`nemia memory`). Her
  *   level is set on the route the table generates from `nemia level`.
  * - nemia/chat.ts — Nemia's chat: her history paged and followed, the person's words sent, and their read mark moved.
@@ -211,6 +210,7 @@ export function appOf(layer: Layer.Layer<Services>): { app: Hono<ApiEnv>; runtim
     .route('/', customInstructions)
     .route('/', skills)
     .route('/', inbox)
+    .route('/', objectsRoutes(runtime))
     .route('/', runs)
     .route('/', openapi)
     .route('/', referenceOf(viewerScript))
@@ -241,7 +241,6 @@ export function appOf(layer: Layer.Layer<Services>): { app: Hono<ApiEnv>; runtim
     .route('/', commands)
     .route('/', steps)
     .route('/', feed)
-    .route('/', machines)
     .route('/', nemia)
     .route('/', nemiaChat)
     .onError(answerError);

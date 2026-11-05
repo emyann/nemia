@@ -17,7 +17,7 @@ export {
   type RunLines,
   type StepCommands,
 } from './api/run.ts';
-export type * as RunObject from './api/run.gen.ts';
+export type * as RunObject from 'objects';
 export type * from './api/graph.ts';
 export type * from './api/layers.ts';
 export type * from './api/tries.ts';
@@ -57,9 +57,8 @@ export * from './api/daemon.ts';
 export * from './api/quota.ts';
 export * from './api/version.ts';
 export * from './api/store.ts';
-export * from './api/machines.ts';
 export * from './api/factories.ts';
 export * from './api/pause.ts';
 export * from './api/nemia.ts';
 export * from './api/chat.ts';
-export * from './api/auto.ts';
+export * from './api/policy.ts';

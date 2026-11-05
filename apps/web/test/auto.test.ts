@@ -5,7 +5,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { policyQuery, confirmRule, dropRule, type PolicyList } from '../src/lib/api/auto.ts';
+import { policyQuery, confirmRule, dropRule, type PolicyList } from '../src/lib/api/policy.ts';
 
 /** The builtin rule, as the api words it. */
 const DEFAULT = {

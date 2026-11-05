@@ -17,6 +17,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from './scratch.ts';
 import { Effect } from 'effect';
+import type { Card } from 'objects';
 import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from 'agent-orchestrator/testing';
 import { appOver, beforeEachTest, eachTest, engineFor } from './placed.ts';
@@ -354,18 +355,18 @@ test('a folder team as the board finds and files for it, the repository a plain 
     assert.equal(listed.find((w) => w.name === 'change')?.folderTeam, false, 'a team that works on a repository is not one');
   });
   await s.test(
-    'REFUSED: POST /api/inbox files a card for a folder team with a repository — filed without one, refused with one',
+    'REFUSED: POST /api/namespaces/default/cards files a card for a folder team with a repository — filed without one, refused with one',
     async () => {
       const json = { 'content-type': 'application/json' };
-      const filed = await app().request('/api/inbox', {
+      const filed = await app().request('/api/namespaces/default/cards', {
         method: 'POST',
         headers: json,
         body: JSON.stringify({ body: 'a note on tides', workflow: 'notes', from: 'yours' }),
       });
       assert.equal(filed.status, 201);
-      assert.equal(((await filed.json()) as { repo: string | null }).repo, null, 'filed with no repository');
+      assert.equal(((await filed.json()) as Card).spec.repo, undefined, 'filed with no repository');
 
-      const refused = await app().request('/api/inbox', {
+      const refused = await app().request('/api/namespaces/default/cards', {
         method: 'POST',
         headers: json,
         body: JSON.stringify({ body: 'a note on tides', workflow: 'notes', from: 'yours', repo: notARepo }),
@@ -381,7 +382,7 @@ test('a folder team as the board finds and files for it, the repository a plain 
     async () => {
       const json = { 'content-type': 'application/json' };
       const file = async (body: string, repo?: string): Promise<string> => {
-        const res = await app().request('/api/inbox', {
+        const res = await app().request('/api/namespaces/default/cards', {
           method: 'POST',
           headers: json,
           /**
@@ -390,9 +391,8 @@ test('a folder team as the board finds and files for it, the repository a plain 
            */
           body: JSON.stringify({ body, workflow: 'change', from: 'yours', ...(repo !== undefined ? { repo } : {}) }),
         });
-        const filed = (await res.json()) as { name?: string; error?: string };
-        assert.equal(res.status, 201, filed.error);
-        return filed.name!;
+        assert.equal(res.status, 201, await res.clone().text());
+        return ((await res.json()) as Card).metadata.name;
       };
       const startOn = async (card: string) =>
         app().request('/api/runs', {

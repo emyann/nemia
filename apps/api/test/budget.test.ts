@@ -1,8 +1,8 @@
 /**
  * What a step and a run cost, and a step held on its budget, as the board reads them: the engine's `costUsd`, `apiMs` and `toolMs` on
  * `used`, `cost` on a run and on each of its time's totals, `spent`, `budget` and `raise` on a step, the words `nemia ls` and `nemia
- * decide` say of a step past its cap — and a raise, asked for through POST …/retry and POST …/round with a `budget`, refused in the
- * package's words.
+ * decide` say of a step past its cap — and a raise, asked for through POST …/retry, of a try or with `"round": true` of a round, with a
+ * `budget`, refused in the package's words.
  *
  * One table of the raises the package refuses, then two stories: a run whose steps went over their budgets, read on the detail, the
  * list and the decision, read again once pruned, and raised; and steps past their budget on their own work, answered and rechecked with
@@ -232,7 +232,9 @@ const post = (route: string, body: unknown, headers: Record<string, string> = BO
   app().request(route, { method: 'POST', headers, body: typeof body === 'string' ? body : JSON.stringify(body) });
 const askTry = (step: string, body: unknown, headers?: Record<string, string>, run = R) =>
   post(`/api/runs/${run}/steps/${step}/retry`, body, headers);
-const askRound = (body: unknown, headers?: Record<string, string>) => post(`/api/runs/${R}/round`, body, headers);
+/** A round of `step`'s loop as the board asks it: `POST …/steps/:step/retry` with `"round": true`, beside the rest of `how`. */
+const askRound = ({ step = 'review', ...how }: { step?: string; budget?: unknown; round?: unknown }, run = R) =>
+  post(`/api/runs/${run}/steps/${step}/retry`, { mode: 'continue', round: true, ...how });
 
 const asksDir = path.join(root, 'runs', `${R}.asks`);
 /** Nothing was written: no ask, and the run's record as it was. */
@@ -264,7 +266,7 @@ const roundRefuses = async (step: string | undefined, budget: number | undefined
 /** `usedLines`' two lines, without their labels: what `nemia decide` prints beside a check. */
 const wordsOf = (usage: object) => usedLines(usage).map((line) => line.replace(/^\w+\s+/, ''));
 
-test("a raise the package refuses, by POST …/retry and POST …/round: its status, the facts its words name, the verb's own words — and nothing written", async (t) => {
+test("a raise the package refuses, by POST …/retry of a try and of a round: its status, the facts its words name, the verb's own words — and nothing written", async (t) => {
   await t.test(
     "REFUSED at shipped defaults: a try's budget that is not an amount — 0, below it, a word — is a 400; a budget on a recheck a 422",
     async () => {
@@ -319,7 +321,7 @@ test("a raise the package refuses, by POST …/retry and POST …/round: its sta
   );
 
   await t.test(
-    "REFUSED at shipped defaults: a round's budget not above zero, or a word, and a step that is no name, are 400s",
+    "REFUSED at shipped defaults: a round's budget not above zero, or a word, a round that is not `true`, and a body that is no object, are 400s",
     async () => {
       const zero = await askRound({ budget: 0 });
       assert.equal(zero.status, 400);
@@ -328,19 +330,11 @@ test("a raise the package refuses, by POST …/retry and POST …/round: its sta
       assert.ok(notAnAmount.startsWith('--budget 0 is not an amount.'), notAnAmount);
       const word = await askRound({ step: 'review', budget: 'five' });
       assert.equal(word.status, 400);
-      assert.ok(
-        ((await word.json()) as Refused).error.startsWith(
-          `\`budget\` is the cap to raise to, as \`nemia retry ${R} --round --budget <amount>\``,
-        ),
-      );
-      for (const body of [{ step: 42 }, { step: '' }, ['review']]) {
-        const res = await askRound(body);
-        assert.equal(res.status, 400, JSON.stringify(body));
-      }
-      const { error: named } = (await (await askRound({ step: 42 })).json()) as Refused;
-      assert.ok(named.startsWith('`step` names the looping step'), named);
-      for (const fact of [`\`nemia retry ${R} <step> --round\``, "This request's was 42: `"])
-        assert.ok(named.includes(fact), `${fact} in ${named}`);
+      assert.ok(((await word.json()) as Refused).error.startsWith('`budget` is the cap to raise to'));
+      const notTrue = await askRound({ round: 'yes' });
+      assert.equal(notTrue.status, 400);
+      assert.ok(((await notTrue.json()) as Refused).error.startsWith('`round` asks for another round'));
+      assert.equal((await post(`/api/runs/${R}/steps/review/retry`, ['review'])).status, 400, 'a list is no body');
       nothingWritten('a round body that is not one');
     },
   );
@@ -348,13 +342,13 @@ test("a raise the package refuses, by POST …/retry and POST …/round: its sta
   await t.test(
     "REFUSED at shipped defaults: a round's raise not above what the loop's steps have cost, none, or a step with no loop, is a 409 in `roundAsk`'s words; a run or step not there a 404",
     async () => {
-      const refusals: Array<[string | undefined, number | undefined, string[]]> = [
+      const refusals: Array<[string, number | undefined, string[]]> = [
         ['review', 2, ['--budget 2 is not above $2.10', 'what implement has cost']],
-        [undefined, undefined, ['review asked for round 3', 'implement has cost $2.10 of its $2 budget']],
+        ['review', undefined, ['review asked for round 3', 'implement has cost $2.10 of its $2 budget']],
         ['tokens', 5, ['tokens has no `loop:`']],
       ];
       for (const [step, budget, [start, ...facts]] of refusals) {
-        const res = await askRound({ ...(step ? { step } : {}), ...(budget !== undefined ? { budget } : {}) });
+        const res = await askRound({ step, ...(budget !== undefined ? { budget } : {}) });
         assert.equal(res.status, 409, `${step} ${budget}`);
         const { error } = (await res.json()) as Refused;
         assert.equal(error, await roundRefuses(step, budget));
@@ -364,7 +358,7 @@ test("a raise the package refuses, by POST …/retry and POST …/round: its sta
       const noStep = await askRound({ step: 'deploy', budget: 5 });
       assert.equal(noStep.status, 404);
       assert.match(((await noStep.json()) as Refused).error, new RegExp(`^Run '${R}' has no step 'deploy'`));
-      const noRun = await post('/api/runs/r-nope/round', { budget: 5 });
+      const noRun = await askRound({ budget: 5 }, 'r-nope');
       assert.equal(noRun.status, 404);
       assert.match(((await noRun.json()) as Refused).error, /^No run 'r-nope'/);
       nothingWritten('a round the package refuses');

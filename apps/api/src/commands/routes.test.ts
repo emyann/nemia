@@ -199,12 +199,12 @@ test('a command on its route answers what its `nemia` entry answers: the same fi
   );
 
   await t.test(
-    "a round on its former path `POST …/round`, now retry's, writes what `nemia retry --round` writes: the same step, round and file",
+    'a round, `POST …/steps/:step/retry` with `"round": true`, writes what `nemia retry --round` writes: the same step, round and file',
     async () => {
       loopingRun('r-cli-loop');
       loopingRun('r-api-loop');
       const typed = await asTyped('retry', ['r-cli-loop', '--round']);
-      const res = await post('/api/runs/r-api-loop/round', {});
+      const res = await post('/api/runs/r-api-loop/steps/review/retry', { mode: 'continue', round: true });
       assert.equal(res.status, 202);
       const answered = (await res.json()) as { step: string; round: number; file: string };
       assert.deepEqual(Object.keys(answered).sort(), ['file', 'round', 'step']);
@@ -216,12 +216,12 @@ test('a command on its route answers what its `nemia` entry answers: the same fi
   );
 
   await t.test(
-    "an acceptance on its former path `POST …/steps/:step/accept`, now approve's, writes what `nemia approve` of a loop out of rounds writes: the same step, try, words and file",
+    'an acceptance, `POST …/steps/:step/approve` of a loop out of rounds, writes what `nemia approve` of a loop writes: the same step, try, words and file',
     async () => {
       loopingRun('r-cli-enough');
       loopingRun('r-api-enough');
       const typed = await asTyped('approve', ['r-cli-enough', 'review', '--message', 'Good enough.']);
-      const res = await post('/api/runs/r-api-enough/steps/review/accept', { message: 'Good enough.' });
+      const res = await post('/api/runs/r-api-enough/steps/review/approve', { message: 'Good enough.' });
       assert.equal(res.status, 202);
       const answered = (await res.json()) as { step: string; try: number; message: string; file: string };
       assert.deepEqual([answered.step, answered.try, answered.message], [typed.step, typed.try, typed.message]);
@@ -232,7 +232,7 @@ test('a command on its route answers what its `nemia` entry answers: the same fi
   );
 
   await t.test(
-    "a merge on its former path `POST …/merge`, now refresh's, writes what `nemia refresh --base` writes: the same step, target, base commit and file",
+    'a merge, `POST …/refresh` with `"base": true`, writes what `nemia refresh --base` writes: the same step, target, base commit and file',
     async () => {
       const repo = fs.mkdtempSync(path.join(root, 'repo-'));
       const git = aGitRepo(repo);
@@ -252,7 +252,7 @@ test('a command on its route answers what its `nemia` entry answers: the same fi
         write(path.join(root, 'runs', `${id}.json`), JSON.stringify({ ...record, repo, workspace: repo, baseRef: base }));
       }
       const typed = await asTyped('refresh', ['r-cli-base', '--base']);
-      const res = await post('/api/runs/r-api-base/merge', {});
+      const res = await post('/api/runs/r-api-base/refresh', { base: true });
       assert.equal(res.status, 202, JSON.stringify(await res.clone().json()));
       const answered = (await res.json()) as Record<string, unknown>;
       for (const key of ['step', 'target', 'onto', 'sha', 'round']) assert.deepEqual(answered[key], typed[key], key);
@@ -272,7 +272,7 @@ test('a command on its route answers what its `nemia` entry answers: the same fi
         () => assert.fail('nemia refresh --base is refused'),
         (err: Error) => err.message,
       );
-      const res = await post('/api/runs/r-api-noloop/merge', {});
+      const res = await post('/api/runs/r-api-noloop/refresh', { base: true });
       assert.equal(res.status, 409);
       const said = ((await res.json()) as { error: string }).error;
       assert.equal(said, typed.replaceAll('r-cli-noloop', 'r-api-noloop'));
@@ -396,40 +396,29 @@ test('what a route refuses or ignores of its body, and the removals the board wi
   );
 
   await t.test(
-    'REFUSED at shipped defaults: `answers` sent to a round, or to a loop ended on `…/accept`, which take none on the api — 422 naming the key and the routes that take it, nothing written',
+    'REFUSED at shipped defaults: `answers` sent to a merge of the base, which takes none on the api — 422 naming the key and the routes that take it, nothing written',
     async () => {
       loopingRun('r-foreign');
-      const res = await post('/api/runs/r-foreign/round', {
-        budget: 5,
-        answers: [{ question: 'Which?', chose: ['A'] }],
-      });
+      const res = await post('/api/runs/r-foreign/refresh', { base: true, answers: [{ question: 'Which?', chose: ['A'] }] });
       assert.equal(res.status, 422);
       const said = ((await res.json()) as { error: string }).error;
-      assert.ok(said.startsWith('`answers` is not a key POST …/round takes'), said);
-      for (const fact of ['POST …/retry, POST …/approve take it', '`{ "step"?: "<looping step>", "budget"?: <amount> }`.'])
-        assert.ok(said.includes(fact), `${fact} in ${said}`);
-      const accept = await post('/api/runs/r-foreign/steps/review/accept', {
-        message: 'Good enough.',
-        answers: [{ question: 'Which?', chose: ['A'] }],
-      });
-      assert.equal(accept.status, 422, 'a kept path of approve takes no `answers`, as the command it was took none');
-      const acceptSaid = ((await accept.json()) as { error: string }).error;
-      assert.ok(acceptSaid.startsWith('`answers` is not a key POST …/accept takes'), acceptSaid);
+      assert.ok(said.startsWith('`answers` is not a key POST …/refresh takes'), said);
+      assert.ok(said.includes('POST …/retry, POST …/approve take it'), said);
       assert.deepEqual(asked('r-foreign'), [], 'nothing written');
     },
   );
 
   await t.test(
-    "REFUSED at shipped defaults: a bad body on a former path is refused in that path's words, not its command's — `budget` as a word on `POST …/round` is a 400 naming the round's body and `nemia retry --round`, nothing written",
+    'REFUSED: the retired paths `POST …/round`, `POST …/steps/:step/accept` and `POST …/merge` are served no more — 404, nothing written',
     async () => {
-      loopingRun('r-round-word');
-      const res = await post('/api/runs/r-round-word/round', { budget: 'five' });
-      assert.equal(res.status, 400);
-      const said = ((await res.json()) as { error: string }).error;
-      for (const fact of ['`nemia retry r-round-word --round --budget <amount>`', '`{ "step"?: "<looping step>", "budget"?: <amount> }`'])
-        assert.ok(said.includes(fact), `${fact} in ${said}`);
-      assert.ok(!said.includes('"mode"'), `retry's own body is not named: ${said}`);
-      assert.deepEqual(asked('r-round-word'), [], 'nothing written');
+      loopingRun('r-retired');
+      for (const [route, body] of [
+        ['/api/runs/r-retired/round', {}],
+        ['/api/runs/r-retired/steps/review/accept', { message: 'Good enough.' }],
+        ['/api/runs/r-retired/merge', {}],
+      ] as const)
+        assert.equal((await post(route, body)).status, 404, route);
+      assert.deepEqual(asked('r-retired'), [], 'nothing written');
     },
   );
 

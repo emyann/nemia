@@ -14,7 +14,6 @@ import { Route as AgentsRouteImport } from './routes/agents'
 import { Route as CapabilitiesRouteImport } from './routes/capabilities'
 import { Route as ChatRouteImport } from './routes/chat'
 import { Route as InboxRouteImport } from './routes/inbox'
-import { Route as MachinesRouteImport } from './routes/machines'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as StatsRouteImport } from './routes/stats'
 import { Route as WorkflowsRouteImport } from './routes/workflows'
@@ -55,11 +54,6 @@ const ChatRoute = ChatRouteImport.update({
 const InboxRoute = InboxRouteImport.update({
   id: '/inbox',
   path: '/inbox',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const MachinesRoute = MachinesRouteImport.update({
-  id: '/machines',
-  path: '/machines',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SettingsRoute = SettingsRouteImport.update({
@@ -151,7 +145,6 @@ export interface FileRoutesByFullPath {
   '/capabilities': typeof CapabilitiesRoute
   '/chat': typeof ChatRoute
   '/inbox': typeof InboxRoute
-  '/machines': typeof MachinesRoute
   '/settings': typeof SettingsRoute
   '/stats': typeof StatsRoute
   '/workflows': typeof WorkflowsRoute
@@ -175,7 +168,6 @@ export interface FileRoutesByTo {
   '/capabilities': typeof CapabilitiesRoute
   '/chat': typeof ChatRoute
   '/inbox': typeof InboxRoute
-  '/machines': typeof MachinesRoute
   '/settings': typeof SettingsRoute
   '/stats': typeof StatsRoute
   '/workflows': typeof WorkflowsRoute
@@ -200,7 +192,6 @@ export interface FileRoutesById {
   '/capabilities': typeof CapabilitiesRoute
   '/chat': typeof ChatRoute
   '/inbox': typeof InboxRoute
-  '/machines': typeof MachinesRoute
   '/settings': typeof SettingsRoute
   '/stats': typeof StatsRoute
   '/workflows': typeof WorkflowsRoute
@@ -226,7 +217,6 @@ export interface FileRouteTypes {
     | '/capabilities'
     | '/chat'
     | '/inbox'
-    | '/machines'
     | '/settings'
     | '/stats'
     | '/workflows'
@@ -250,7 +240,6 @@ export interface FileRouteTypes {
     | '/capabilities'
     | '/chat'
     | '/inbox'
-    | '/machines'
     | '/settings'
     | '/stats'
     | '/workflows'
@@ -274,7 +263,6 @@ export interface FileRouteTypes {
     | '/capabilities'
     | '/chat'
     | '/inbox'
-    | '/machines'
     | '/settings'
     | '/stats'
     | '/workflows'
@@ -299,7 +287,6 @@ export interface RootRouteChildren {
   CapabilitiesRoute: typeof CapabilitiesRoute
   ChatRoute: typeof ChatRoute
   InboxRoute: typeof InboxRoute
-  MachinesRoute: typeof MachinesRoute
   SettingsRoute: typeof SettingsRoute
   StatsRoute: typeof StatsRoute
   WorkflowsRoute: typeof WorkflowsRoute
@@ -353,13 +340,6 @@ declare module '@tanstack/react-router' {
       path: '/inbox'
       fullPath: '/inbox'
       preLoaderRoute: typeof InboxRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/machines': {
-      id: '/machines'
-      path: '/machines'
-      fullPath: '/machines'
-      preLoaderRoute: typeof MachinesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/settings': {
@@ -483,7 +463,6 @@ const rootRouteChildren: RootRouteChildren = {
   CapabilitiesRoute: CapabilitiesRoute,
   ChatRoute: ChatRoute,
   InboxRoute: InboxRoute,
-  MachinesRoute: MachinesRoute,
   SettingsRoute: SettingsRoute,
   StatsRoute: StatsRoute,
   WorkflowsRoute: WorkflowsRoute,

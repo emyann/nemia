@@ -1,7 +1,7 @@
 /**
- * What a person lets an agent answer unasked at `auto`, as rules the machinery holds: a rule (`AutoRule`) names an answer, the steps it
+ * What a person lets an agent answer unasked at `auto`, as rules the machinery holds: a rule (`PolicyRule`) names an answer, the steps it
  * covers and the conditions it needs (`CONDITIONS`), judged on a run's facts at the moment of the call (`Facts`, `allowedBy`); the
- * builtin rule, decide when all agree (`DEFAULT_AUTO`); the list in force (`listInForce`); a rule in the person's words, made from its
+ * builtin rule, decide when all agree (`DEFAULT_POLICY`); the list in force (`listInForce`); a rule in the person's words, made from its
  * fields (`ruleWords`); and the refusal of a rule that is none (`ruleRefusal`).
  *
  * Pure, and naming no agent: admission reads a list for whichever agent it is given (`admissionOf`). The files are `auto.store.ts`'s, the
@@ -19,19 +19,19 @@ export const CONDITIONS = ['recommends', 'checked', 'accepted', 'withinBudget', 
 export type Condition = (typeof CONDITIONS)[number];
 
 /** The answers a rule may give unasked: a step approved at its gate, and a step tried again. */
-export const AUTO_ANSWERS = ['approve', 'retry'] as const;
+export const RULE_ANSWERS = ['approve', 'retry'] as const;
 
 /** An answer a rule may give unasked. */
-export type AutoAnswer = (typeof AUTO_ANSWERS)[number];
+export type RuleAnswer = (typeof RULE_ANSWERS)[number];
 
 /**
  * A rule: its `id`; the `answer` it gives unasked; the `steps` it covers, by name, every step where absent; the conditions it needs
  * (`when`), all of them; a dollar line the run's spend stays under (`under`), none where absent; and where it came from (`from`): the
  * builtin default, or an agent's proposal the person confirmed.
  */
-export type AutoRule = {
+export type PolicyRule = {
   id: string;
-  answer: AutoAnswer;
+  answer: RuleAnswer;
   steps?: string[];
   when: Condition[];
   under?: number;
@@ -55,20 +55,20 @@ export const NO_FACTS: Facts = {
  * The folder of the store the rules for auto are kept in, one writer to each of its files (`auto.store.ts`). It keeps its name though the
  * commands that write it are `nemia policy`: a folder renamed would orphan every rule a person confirmed.
  */
-export const AUTO_FOLDER = 'auto';
+export const POLICY_FOLDER = 'auto';
 
 /** The id of the builtin rule. */
 export const DEFAULT_ID = 'default';
 
 /** The builtin rule, decide when all agree: approve any step unasked when every condition holds. */
-export const DEFAULT_AUTO: AutoRule = { id: DEFAULT_ID, answer: 'approve', when: [...CONDITIONS], from: 'default' };
+export const DEFAULT_POLICY: PolicyRule = { id: DEFAULT_ID, answer: 'approve', when: [...CONDITIONS], from: 'default' };
 
 /** The list in force: the builtin rule while the person has confirmed none, else their confirmed list, which replaces it. Pure. */
-export const listInForce = (confirmed: readonly AutoRule[] | undefined): AutoRule[] =>
-  confirmed === undefined ? [DEFAULT_AUTO] : [...confirmed];
+export const listInForce = (confirmed: readonly PolicyRule[] | undefined): PolicyRule[] =>
+  confirmed === undefined ? [DEFAULT_POLICY] : [...confirmed];
 
 /** Whether `rule` allows `answer` at `step` in `facts`: its answer, a step it covers, each condition it needs, and under its line. */
-const allows = (rule: AutoRule, answer: string, step: string, facts: Facts): boolean =>
+const allows = (rule: PolicyRule, answer: string, step: string, facts: Facts): boolean =>
   rule.answer === answer &&
   (rule.steps === undefined || rule.steps.includes(step)) &&
   rule.when.every((c) => facts[c]) &&
@@ -76,10 +76,10 @@ const allows = (rule: AutoRule, answer: string, step: string, facts: Facts): boo
 
 /** The first rule of `list` that allows `answer` at `step` in `facts`, or undefined where none does. Pure. */
 export const allowedBy = (
-  list: readonly AutoRule[],
+  list: readonly PolicyRule[],
   { answer, step }: { answer: string; step: string },
   facts: Facts,
-): AutoRule | undefined => list.find((rule) => allows(rule, answer, step, facts));
+): PolicyRule | undefined => list.find((rule) => allows(rule, answer, step, facts));
 
 /** Each condition as a rule says it. */
 const CONDITION_WORDS: Record<Condition, string> = {
@@ -91,7 +91,7 @@ const CONDITION_WORDS: Record<Condition, string> = {
 };
 
 /** Each answer as a rule says it. */
-const ANSWER_WORDS: Record<AutoAnswer, string> = { approve: 'Approve', retry: 'Try again' };
+const ANSWER_WORDS: Record<RuleAnswer, string> = { approve: 'Approve', retry: 'Try again' };
 
 /** Words joined as a sentence lists them: `a`, `a and b`, `a, b and c`. */
 const listed = (words: readonly string[]): string =>
@@ -101,7 +101,7 @@ const listed = (words: readonly string[]): string =>
  * A rule in the person's words, made from its fields alone, so what they read is what admission holds: `Approve any step unasked when
  * the agent recommends it, …`. Pure.
  */
-export function ruleWords(rule: AutoRule): string {
+export function ruleWords(rule: PolicyRule): string {
   const steps = rule.steps === undefined ? 'any step' : `${rule.steps.length === 1 ? 'the step' : 'the steps'} ${listed(rule.steps)}`;
   const when = [
     ...rule.when.map((c) => CONDITION_WORDS[c]),
@@ -129,7 +129,7 @@ function shapeRefusal(rule: Record<string, unknown>, at: string): string | undef
 
 /**
  * Why `rule` is no rule an agent may propose, or undefined where it is one: an id that is no name or is the default's, an answer that is
- * none of `AUTO_ANSWERS`, steps that are no list of names, a condition that is none of `CONDITIONS` or named twice, and a line that is no
+ * none of `RULE_ANSWERS`, steps that are no list of names, a condition that is none of `CONDITIONS` or named twice, and a line that is no
  * dollars above 0. `at` names it in the refusal. Pure.
  */
 export function ruleRefusal(rule: unknown, at: string): string | undefined {
@@ -139,7 +139,7 @@ export function ruleRefusal(rule: unknown, at: string): string | undefined {
   if (typeof r.id !== 'string' || !/^[a-z0-9][a-z0-9-]*$/.test(r.id))
     return `${at}: id is a name of lowercase letters, digits and dashes; ${JSON.stringify(r.id)} is not.`;
   if (r.id === DEFAULT_ID) return `${at}: the id ${DEFAULT_ID} is the builtin rule: give the rule an id of its own.`;
-  if (!(AUTO_ANSWERS as readonly unknown[]).includes(r.answer))
-    return `${at}: answer is one of ${AUTO_ANSWERS.join(', ')}; ${JSON.stringify(r.answer)} is not one a rule may give unasked.`;
+  if (!(RULE_ANSWERS as readonly unknown[]).includes(r.answer))
+    return `${at}: answer is one of ${RULE_ANSWERS.join(', ')}; ${JSON.stringify(r.answer)} is not one a rule may give unasked.`;
   return shapeRefusal(r, at);
 }

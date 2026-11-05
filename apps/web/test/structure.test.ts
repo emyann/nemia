@@ -1,6 +1,7 @@
 /**
  * The board's structure (`docs/architecture.md`, *Who owns what*): it reaches the api over HTTP alone. Its source imports no workspace
- * package and no node built-in, and no relative path that leaves `apps/web` (`importBreaks`); the lint block for `apps/web/src` in
+ * package but the objects' one entry, `objects`, the shapes of what the api serves, and no path into them; no node built-in, and no
+ * relative path that leaves `apps/web` (`importBreaks`); the lint block for `apps/web/src` in
  * `.oxlintrc.json` refuses the same packages as they are typed. Only `lib/useFeed.ts` and `lib/useStepTranscript.ts` open an
  * `EventSource`, the api's two streams (`eventSourceBreaks`), and only `components/Markdown.tsx` imports a markdown renderer
  * (`rendererBreaks`). Its reads go through `lib/api/read.ts` (`unschemedReads`, `read.test.ts`).
@@ -16,6 +17,11 @@
  * (`personWordBreaks`), no file says a retired phrasing or `cancelled` to a person (`retiredBreaks`), and no hover says a runtime word
  * (`hoverRuntimeBreaks`). A person's words for an offer are written once, in its `OFFERS`: no other file spells a sentence of it
  * (`offerWordBreaks`).
+ *
+ * No file of the board compares the runtime's `needs-human`: a question a session asks is read off its codes (`needsHumanBreaks`).
+ *
+ * A kind of `objects` is read through `lib/api/objects.ts`, never a schema of the board's: no file under `src/lib/api` is generated
+ * (`*.gen.ts`), and no file of `src` declares a Schema named as a kind (`kindSchemaBreaks`).
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -23,6 +29,7 @@ import fs from 'node:fs';
 import { builtinModules } from 'node:module';
 import path from 'node:path';
 import ts from 'typescript';
+import { KINDS } from 'objects';
 import { OFFERS, PAUSED, PERSON } from '../src/lib/words.ts';
 
 const WEB = path.join(import.meta.dirname, '..');
@@ -98,6 +105,9 @@ const leavesWeb = (file: string, mod: string): boolean =>
 const reachesTests = (file: string, mod: string): boolean =>
   mod.startsWith('.') && path.posix.normalize(path.posix.join(path.posix.dirname(file), mod)).startsWith('test/');
 
+/** The objects' package, the one workspace package the board imports, by its entry alone: spelled once, so no plant names a path of it. */
+const OBJECTS = 'objects';
+
 /**
  * Each import of the board's source that reaches past the api — a workspace package, a node built-in, a path out of `apps/web` — or
  * into the board's own tests, which the built board never holds.
@@ -108,6 +118,8 @@ function importBreaks(texts: ReadonlyMap<string, string>): string[] {
     for (const mod of importsIn(text)) {
       if (/^agent-(runtime|orchestrator)(\/|$)/.test(mod))
         out.push(`${file} imports ${mod}, a workspace package: the board reaches the api over HTTP alone`);
+      else if (mod.startsWith(`${OBJECTS}/`))
+        out.push(`${file} imports ${mod}, a path into ${OBJECTS}: import what it names from its entry, '${OBJECTS}'`);
       else if (mod.startsWith('node:') || builtinModules.includes(mod))
         out.push(`${file} imports ${mod}, a node built-in: the board runs in a browser, and asks the api for what node knows`);
       else if (leavesWeb(file, mod)) out.push(`${file} imports ${mod}, a path out of apps/web: the board reaches the api over HTTP alone`);
@@ -211,8 +223,71 @@ test('REFUSED: a workspace package, a node built-in, and a path out of apps/web'
   assert.deepEqual(planted('../../api/src/app.ts'), [
     'src/x.ts imports ../../api/src/app.ts, a path out of apps/web: the board reaches the api over HTTP alone',
   ]);
-  for (const mod of ['react', 'agent-orchestrator-ui', './lib/api.ts', '@/lib/api.ts', './test/fixtures.ts'])
+  for (const mod of ['react', 'agent-orchestrator-ui', './lib/api.ts', '@/lib/api.ts', './test/fixtures.ts', OBJECTS, `${OBJECTS}-ui`])
     assert.deepEqual(planted(mod), [], `${mod} is let through`);
+});
+
+test('REFUSED: a path into the objects; their entry is let through', () => {
+  const planted = (mod: string): string[] => importBreaks(new Map([['src/x.ts', `import { y } from '${mod}';\n`]]));
+  assert.equal(planted(`${OBJECTS}/src/run.ts`).length, 1, 'a file of its src');
+  assert.equal(planted(`${OBJECTS}/package.json`).length, 1, 'its manifest');
+  assert.deepEqual(planted(OBJECTS), [], 'its entry');
+});
+
+/** The names a Schema of a kind of `objects` goes by: the kind, its list, each with `Schema` after it or without. */
+const KIND_NAMES: ReadonlySet<string> = new Set(KINDS.flatMap((kind) => [kind, `${kind}List`].flatMap((n) => [n, `${n}Schema`])));
+
+/**
+ * Each file under `src/lib/api` named `*.gen.ts`, and each declaration of `src` of a Schema named as a kind of `objects`
+ * (`KIND_NAMES`): a `const` whose value is built from `Schema` or `decodes`. The board reads a kind through `lib/api/objects.ts`.
+ */
+function kindSchemaBreaks(texts: ReadonlyMap<string, string>): string[] {
+  const out: string[] = [];
+  for (const [file, text] of texts) {
+    if (/^src\/lib\/api\/.*\.gen\.ts$/.test(file))
+      out.push(`${file} is generated: a kind of objects is read through lib/api/objects.ts, so delete it and read the kind there`);
+    const source = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true);
+    const visit = (node: ts.Node): void => {
+      if (
+        ts.isVariableDeclaration(node) &&
+        ts.isIdentifier(node.name) &&
+        KIND_NAMES.has(node.name.text) &&
+        node.initializer !== undefined &&
+        /^(?:Schema\.|decodes\b)/.test(node.initializer.getText(source))
+      )
+        out.push(
+          `${file} declares a Schema ${node.name.text}, a kind of objects: import its Schema from 'objects' and read it through lib/api/objects.ts`,
+        );
+      ts.forEachChild(node, visit);
+    };
+    visit(source);
+  }
+  return out;
+}
+
+test('no file of the board mirrors a kind of objects: none generated under lib/api, no Schema named as a kind', () => {
+  assert.ok(KIND_NAMES.has('RunSchema') && KIND_NAMES.has('Card'), [...KIND_NAMES].join(', '));
+  assert.deepEqual(kindSchemaBreaks(sourceTexts()), []);
+});
+
+test('REFUSED: a generated file under lib/api, and a Schema of src named as a kind of objects', () => {
+  const planted = (file: string, text: string): string[] => kindSchemaBreaks(new Map([...sourceTexts(), [file, text]]));
+  assert.equal(planted('src/lib/api/run.gen.ts', 'export const x = 1;\n').length, 1, 'a generated file under lib/api');
+  assert.equal(
+    planted('src/lib/x.ts', "import { Schema } from 'effect';\nexport const RunSchema = Schema.Struct({ kind: Schema.String });\n").length,
+    1,
+    'a RunSchema',
+  );
+  assert.equal(
+    planted('src/lib/api/y.ts', 'const Run = Schema.Struct({});\nconst CardList = decodes<X>()(Schema.Struct({}));\n').length,
+    2,
+  );
+  assert.deepEqual(
+    planted('src/lib/z.ts', "import { Run } from 'objects';\nconst RunView = Schema.Struct({});\nconst Card = 1;\n"),
+    [],
+    'a kind imported, a name beside one, a value that is no Schema',
+  );
+  assert.deepEqual(planted('src/routeTree.gen.ts', 'export const x = 1;\n'), [], "the router's generated tree, out of lib/api");
 });
 
 test("REFUSED: a file of the source that imports a test file, the page of the look's stories among them", () => {
@@ -365,6 +440,36 @@ test('REFUSED: an EventSource opened in another file; one named in a JSDoc is le
     `src/lib/x.ts opens an EventSource: the api's streams are opened in ${STREAMS.join(' and ')} alone`,
   ]);
   assert.deepEqual(planted('/** Follows an EventSource, or anything that dispatches its events. */\nexport const x = 1;\n'), []);
+});
+
+/** The runtime's word for a task whose harness stopped its session to ask, quoted as a value in code. */
+const NEEDS_HUMAN = /(['"`])needs-human\1/;
+
+/**
+ * Each file whose code quotes the runtime's `needs-human`: the runtime keeps that word, and the board reads the orchestrator's codes
+ * above it — a question its session asks is `AwaitingAnswer` with `via` `session`, the board's `asks-in-session` (`stepState`,
+ * `src/lib/status.ts`). A comment that names the engine's word is let through.
+ */
+const needsHumanBreaks = (texts: ReadonlyMap<string, string>): string[] =>
+  [...texts]
+    .filter(([, text]) => NEEDS_HUMAN.test(withoutComments(text)))
+    .map(
+      ([file]) =>
+        `${file} compares the runtime's needs-human: read the step's codes, reason AwaitingAnswer via session, as stepState in src/lib/status.ts does`,
+    );
+
+test("no file of the board compares the runtime's needs-human: a question its session asks is read off the codes", () => {
+  assert.deepEqual(needsHumanBreaks(sourceTexts()), []);
+});
+
+test('REFUSED: a needs-human comparison planted in the board; one named in a comment is let through', () => {
+  const planted = (text: string): string[] => needsHumanBreaks(new Map([...sourceTexts(), ['src/lib/x.ts', text]]));
+  for (const quote of ["'", '"', '`']) {
+    const breaks = planted(`export const asks = (word: string): boolean => word === ${quote}needs-human${quote};\n`);
+    assert.equal(breaks.length, 1, quote);
+    assert.match(breaks[0] ?? '', /^src\/lib\/x\.ts compares the runtime's needs-human:/, quote);
+  }
+  assert.deepEqual(planted("/** The engine's `needs-human`, read off the codes. */\nexport const x = 1;\n"), []);
 });
 
 test(`only ${RENDERER} imports a markdown renderer, and it does`, () => {

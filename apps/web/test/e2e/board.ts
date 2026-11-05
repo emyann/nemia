@@ -326,6 +326,15 @@ export async function expectAlive(page: Page, face: string, who: string): Promis
 /** The places of the queued cards, as the board says them. */
 export const PLACES_SAID = ['1st', '2nd', '3rd', '4th'] as const;
 
+/**
+ * The path of the Card's verbs the board sends, in whatever namespace: the cards filed into (no `name`), a card (`name`), or its `verb`
+ * (`queue`, `unqueue`, `start`, `labels`) — as a pattern, since a card's namespace is its factory, `default` for none.
+ */
+export const cardsPath = (name?: string, verb?: string): RegExp =>
+  new RegExp(
+    `^/api/namespaces/[^/]+/cards${name === undefined ? '' : `/${encodeURIComponent(name)}`}${verb === undefined ? '' : `/${verb}`}$`,
+  );
+
 /** A folder's files, each name with its text: what a page that writes nothing leaves as it found. */
 export const filesIn = (dir: string): Array<[string, string]> =>
   fs

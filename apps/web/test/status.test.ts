@@ -53,7 +53,7 @@ const PHASE: Record<StepReason, StepPhase> = {
 const QUALIFIED = {
   'Waiting on run': { reason: 'Waiting', on: 'run', via: null },
   'Waiting on limit': { reason: 'Waiting', on: 'limit', via: null },
-  'Waiting on checkout': { reason: 'Waiting', on: 'checkout', via: null },
+  'Waiting on base': { reason: 'Waiting', on: 'base', via: null },
   'Waiting on pause': { reason: 'Waiting', on: 'pause', via: null },
   'AwaitingAnswer via session': { reason: 'AwaitingAnswer', on: null, via: 'session' },
   'AwaitingAnswer via closeout': { reason: 'AwaitingAnswer', on: null, via: 'closeout' },
@@ -78,11 +78,11 @@ const plain = (phase: StepPhase, reason: StepReason): StepCodes => ({ phase, rea
 test('stepState: each reason the api carries, read as the state a person acts on', async (t) => {
   await t.test('a qualified reason reads by what qualifies it: an answer by where it is asked, a wait by what it waits on', () => {
     const cases: Array<[keyof typeof QUALIFIED, StepState]> = [
-      ['AwaitingAnswer via session', 'needs-human'],
+      ['AwaitingAnswer via session', 'asks-in-session'],
       ['AwaitingAnswer via closeout', 'blocked'],
       ['Waiting on limit', 'waiting-for-slot'],
       ['Waiting on run', 'waiting'],
-      ['Waiting on checkout', 'waiting'],
+      ['Waiting on base', 'waiting'],
       ['Waiting on pause', 'waiting'],
     ];
     for (const [named, state] of cases) assert.equal(stateAt(named), state, named);
@@ -100,7 +100,7 @@ test('stepState: each reason the api carries, read as the state a person acts on
     assert.notEqual(stateAt('Succeeded'), stateAt('CheckPassed'));
   });
   await t.test('a step yet to start on a cancelled run reads cancelled, not waiting', () => {
-    for (const named of ['Pending', 'Waiting on run', 'Waiting on limit', 'Waiting on checkout', 'Waiting on pause'] as const)
+    for (const named of ['Pending', 'Waiting on run', 'Waiting on limit', 'Waiting on base', 'Waiting on pause'] as const)
       assert.equal(stateAt(named, true), 'cancelled', named);
     assert.equal(stateAt('Running', true), 'working', 'a step still running when the run was called off is running until the stop lands');
   });
@@ -193,7 +193,7 @@ test('stepState, satisfiesAfter, waitsOnPerson, waitsAtGate: what is work done, 
       );
       assert.deepEqual(
         states.filter((s) => waitsOnPerson(s, false)),
-        ['needs-human', ...gates, 'unsigned', 'denied'],
+        ['asks-in-session', ...gates, 'unsigned', 'denied'],
         'and beside the gates, a session asking through its harness and work to try again that only a person sends',
       );
       assert.equal(states.filter((s) => waitsOnPerson(s, true) || waitsAtGate(s, true)).length, 0);
@@ -246,11 +246,11 @@ test('stepState, satisfiesAfter, waitsOnPerson, waitsAtGate: what is work done, 
     const unmoved: Array<[Named, StepState]> = [
       ['Waiting on run', 'waiting'],
       ['Pending', 'waiting'],
-      ['Waiting on checkout', 'waiting'],
+      ['Waiting on base', 'waiting'],
       ['Waiting on pause', 'waiting'],
       ['Waiting on limit', 'waiting-for-slot'],
       ['Running', 'working'],
-      ['AwaitingAnswer via session', 'needs-human'],
+      ['AwaitingAnswer via session', 'asks-in-session'],
       ['Checking', 'checking'],
       ['CheckPassed', 'verified'],
       ['Succeeded', 'unverified'],

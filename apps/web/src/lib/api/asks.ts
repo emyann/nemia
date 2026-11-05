@@ -93,16 +93,17 @@ export const askTry = (
   });
 
 /**
- * Ask for another round of a run's loop, as the CLI's `round` does — past a cap, with `budget`, `--budget`: the api calls the package's
- * `round()`, which writes the ask and nothing else, and the next tick files the round. Resolves with the looping step, the round asked for,
- * and its ask file; rejects with the api's refusal in full — the package's words for a round the loop may not go, or a budget not above
- * what its steps have cost — or the api's own about the request; and an answer the board does not read, saying the ask may be written.
+ * Ask for another round of the loop `step` closes, as the CLI's `retry --round` does — `POST …/retry` with `"round": true` — past a
+ * cap, with `budget`, `--budget`: the api calls the package's `round()`, which writes the ask and nothing else, and the next tick files
+ * the round. Resolves with the looping step, the round asked for, and its ask file; rejects with the api's refusal in full — the
+ * package's words for a round the loop may not go, or a budget not above what its steps have cost — or the api's own about the request;
+ * and an answer the board does not read, saying the ask may be written.
  *
  * Sent as `application/json`, which the api requires of it, as of a try.
  */
-export const askRound = (runId: string, how: { step?: string; budget?: number }): Promise<AskedRound> =>
-  send('POST', `/api/runs/${encodeURIComponent(runId)}/round`, AskedRoundSchema, {
-    body: how,
+export const askRound = (runId: string, step: string, how: { budget?: number }): Promise<AskedRound> =>
+  send('POST', `/api/runs/${encodeURIComponent(runId)}/steps/${encodeURIComponent(step)}/retry`, AskedRoundSchema, {
+    body: { mode: 'continue', round: true, ...how },
     may: "The ask may be written: look at the looping step's note on the run's page before asking again.",
   });
 

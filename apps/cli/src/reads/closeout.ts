@@ -1,11 +1,12 @@
 /**
- * `nemia closeout <run> <step> [--try <n>]`, read from the api: what a try of a step signed off with — the one `--try` names
- * (`…/tries/:try/closeout`), else its latest, the last of its tries (`…/tries`) — printed as the in-process command prints it
- * (`closeoutLines`, the orchestrator's `command/reads.verb.ts`, ported word for word). Any other words go to the old path.
+ * `nemia closeout <run> <step> [--try <n>]`, read from the api through the objects' client: what a try of a step signed off with — the
+ * one `--try` names (`…/tries/:try/closeout`), else its latest, the last of its tries (`…/tries`) — printed as the in-process command
+ * prints it (`closeoutLines`, the orchestrator's `command/reads.verb.ts`, ported word for word). Any other words go to the old path.
  */
-import type { StepCloseout, StepTry, TryCloseout } from '../../../api/src/client/client.ts';
-import { get, Refused } from '../client.ts';
+import type { StepCloseout, TryCloseout } from 'objects';
+import { Refused } from '../client.ts';
 import { spawned } from '../local.ts';
+import { asked } from '../objects.ts';
 
 /** A field's value on one line: a string as it is, anything else as JSON. */
 const valueLine = (value: unknown): string => (typeof value === 'string' ? value : JSON.stringify(value));
@@ -49,14 +50,13 @@ function parsed(args: readonly string[]): { runId: string; step: string; tryNo?:
 }
 
 export async function closeout(args: readonly string[]): Promise<number> {
-  const asked = parsed(args);
-  if (asked === undefined) return spawned(['closeout', ...args]);
-  const { runId, step, tryNo } = asked;
-  const at = `/api/runs/${encodeURIComponent(runId)}/steps/${encodeURIComponent(step)}/tries`;
+  const typed = parsed(args);
+  if (typed === undefined) return spawned(['closeout', ...args]);
+  const { runId, step, tryNo } = typed;
   let read: TryCloseout;
-  if (tryNo !== undefined) read = await get<TryCloseout>('closeout', `${at}/${encodeURIComponent(tryNo)}/closeout`);
+  if (tryNo !== undefined) read = await asked('closeout', (client) => client.runs.closeout({ params: { runId, step, try: tryNo } }));
   else {
-    const { tries } = await get<{ tries: StepTry[] }>('closeout', at);
+    const { tries } = await asked('closeout', (client) => client.runs.tries({ params: { runId, step } }));
     const latest = tries.at(-1);
     if (latest === undefined)
       throw new Refused(

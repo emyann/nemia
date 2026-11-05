@@ -74,7 +74,7 @@ export const PERSON: Record<StepState, PersonWords> = {
     meaning: "Parked between two tool calls by the store's pause; resumes as the same try.",
     ...NONE,
   },
-  'needs-human': { rail: 'asks you', meaning: 'Its session is asking a person a question.', ...NONE },
+  'asks-in-session': { rail: 'asks you', meaning: 'Its session is asking a person a question.', ...NONE },
   checking: { rail: 'being checked', meaning: 'It signed off, and the run is running its check.', ...NONE },
   verified: { rail: 'verified', meaning: 'Its check passed: the command the run judges it by exited 0.', ...NONE },
   unverified: { rail: 'done', meaning: 'It signed off and has no check, so only its own word says it worked.', ...NONE },

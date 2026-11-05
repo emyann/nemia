@@ -13,8 +13,7 @@
     "theme:generate": "tsx src/components/ui/ds/tokens/generate-theme.mjs DESIGN.md --out theme",
     "board:serve": "node test/e2e/serve.ts serve",
     "board:stop": "node test/e2e/serve.ts stop",
-    "storybook": "storybook dev -p 6007 --no-open",
-    "mirror": "node test/mirror.ts"
+    "storybook": "storybook dev -p 6007 --no-open"
   },
   "dependencies": {
     "@blobatar/react": "2.7.0",
@@ -38,6 +37,7 @@
     "date-fns": "4.4.0",
     "effect": "4.0.6",
     "lucide-react": "1.61.0",
+    "objects": "*",
     "react": "^19.3.0",
     "react-aria-components": "1.21.1",
     "react-dom": "^19.3.0",

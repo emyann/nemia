@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import type { Page } from 'playwright';
-import { photograph, themeOf } from '../board.ts';
+import type { Page, Response } from 'playwright';
+import { cardsPath, photograph, themeOf } from '../board.ts';
 import { expectCount, expectTexts, expectVisible, idle, Refused, settled, WAIT_MS } from '../checks.ts';
 import { FACTORIES, hiringStarts, noFactories, onSeveralRepos, WORKFLOWS } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -18,17 +18,26 @@ async function open(page: Page, route: string): Promise<void> {
   await idle(page);
 }
 
+/** A filing's body as it was sent, its factory read back from the namespace its path names (none for `default`), as the box chose it. */
+function sentOf(filed: Response): unknown {
+  const namespace = new URL(filed.url()).pathname.split('/')[3];
+  const body = filed.request().postDataJSON() as Record<string, unknown>;
+  return namespace === 'default' ? body : { ...body, factory: namespace };
+}
+
 /** Type `idea` into the box and press File: the request's body as it was sent, and the card's file once the api took it. */
 async function fileFrom(page: Page, idea: string): Promise<{ sent: unknown; file: string }> {
   const box = page.locator('form[aria-label="File a card"]');
   await box.getByRole('textbox', { name: 'An idea' }).fill(idea);
   const [filed] = await Promise.all([
-    page.waitForResponse((r) => r.request().method() === 'POST' && new URL(r.url()).pathname === '/api/inbox', { timeout: WAIT_MS }),
+    page.waitForResponse((r) => r.request().method() === 'POST' && cardsPath().test(new URL(r.url()).pathname), { timeout: WAIT_MS }),
     box.getByRole('button', { name: 'File' }).click(),
   ]);
   if (filed.status() !== 201) throw new Refused(`the api files the card — it answered ${filed.status()}: ${await filed.text()}`);
-  const { name } = (await filed.json()) as { name: string };
-  return { sent: filed.request().postDataJSON() as unknown, file: path.join(store!, 'inbox', `${name}.md`) };
+  const {
+    metadata: { name },
+  } = (await filed.json()) as { metadata: { name: string } };
+  return { sent: sentOf(filed), file: path.join(store!, 'inbox', `${name}.md`) };
 }
 
 /** Refuses unless `sent`, a filing's body, is exactly `expected`, key for key, and the card's `file` holds exactly `text`. */

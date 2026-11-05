@@ -97,12 +97,6 @@ const RUN_LOOP = [
   { key: 'step', takes: 'optional', kind: 'name' },
 ] as const;
 
-/** Why a flag the api takes on a route of its own is no key of a body: the route fixes it. */
-const OWN_ROUTE = (route: string): Flag['only'] => ({
-  side: 'cli',
-  why: `the api serves it on a route of its own, ${route}, which names no step in its path and fixes it`,
-});
-
 /** The refusal of `nemia retry --round` given what another round does not take: answers, words, or a way to try a step. */
 function roundRefusal(args: Args): string | null {
   const line = commandLine(RETRY, args, { round: true, budget: amountIn(args, 'budget') });
@@ -165,7 +159,7 @@ const RETRY: Command<{
         way: true,
         takes: '--model takes the model to run the new session on: nemia retry <runId> <step> --model <m>',
       },
-      { flag: '--round', kind: 'switch', key: 'round', way: true, only: OWN_ROUTE('POST /api/runs/:runId/round') },
+      { flag: '--round', kind: 'switch', key: 'round', way: true },
       {
         flag: '--message',
         kind: 'text',
@@ -200,10 +194,7 @@ const RETRY: Command<{
   writes: true,
   ticks: true,
   class: 'answer',
-  route: [
-    { method: 'POST', path: '/api/runs/:runId/steps/:step/retry', status: 202 },
-    { method: 'POST', path: '/api/runs/:runId/round', status: 202, sets: { round: true, mode: 'continue' } },
-  ],
+  route: { method: 'POST', path: '/api/runs/:runId/steps/:step/retry', status: 202 },
   apiTakes: ['answers'],
   apiKeys: ['try', 'file', 'stopFirst', 'step', 'round'],
   handler: Effect.fnUntraced(function* (args: Args, _env, home) {
@@ -275,7 +266,7 @@ const REFRESH: Command<{
   ],
   spec: {
     positionals: RUN_LOOP,
-    flags: [{ flag: '--base', kind: 'switch', key: 'base', only: OWN_ROUTE('POST /api/runs/:runId/merge') }],
+    flags: [{ flag: '--base', kind: 'switch', key: 'base' }],
     unknown: (arg) =>
       `nemia refresh takes one run's id, and with --base the step that closes the loop whose work merges: not ${arg}. nemia refresh <runId>, or nemia refresh <runId> [<step>] --base.`,
     missing: 'nemia refresh takes the run to pin to the new revisions: nemia refresh <runId>.',
@@ -287,10 +278,7 @@ const REFRESH: Command<{
   writes: true,
   ticks: true,
   class: 'act',
-  route: [
-    { method: 'POST', path: '/api/runs/:runId/refresh', status: 202 },
-    { method: 'POST', path: '/api/runs/:runId/merge', status: 202, sets: { base: true } },
-  ],
+  route: { method: 'POST', path: '/api/runs/:runId/refresh', status: 202 },
   apiKeys: ['drift', 'step', 'target', 'onto', 'sha', 'round', 'file'],
   handler: Effect.fnUntraced(function* (args: Args, _env?: NodeJS.ProcessEnv, home?: string) {
     const { runId } = named(args);

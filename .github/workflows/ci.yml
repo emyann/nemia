@@ -39,16 +39,16 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     strategy:
-      # Every leg runs: one package's failure on one node says nothing about the other fifteen.
+      # Every leg runs: one package's failure on one node says nothing about the other seventeen.
       fail-fast: false
       matrix:
         # The orchestrator is not here: its suite is run in halves, and a matrix cannot split one combination, so its four legs arrive
         # through include below.
-        workspace: [agent-runtime, api, cli, web, docs, templates]
+        workspace: [agent-runtime, objects, api, cli, web, docs, templates]
         # Quoted, both of them: YAML reads 24.16 as a number and setup-node then installs the wrong Node. 24.16.0 is the floor
         # engines.node claims; 24 is its line's latest.
         node: ['24.16.0', '24']
-        # The orchestrator's suite is the longest of the seven (766 s for its leg's two passes, measured over 8 ci runs on 2026-10-21),
+        # The orchestrator's suite is the longest of the eight (766 s for its leg's two passes, measured over 8 ci runs on 2026-10-21),
         # so it runs in two halves. An include entry whose workspace the axis above does not name cannot be added to a combination, so
         # GitHub makes a leg of its own of it: four legs here, two nodes by two halves. Each half is named <i>/2, which is what
         # node --test-shard takes, and the fractions must tile 1..n of n or a half of the suite is run by nobody.

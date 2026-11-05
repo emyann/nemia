@@ -242,7 +242,7 @@ test("edgesOf, loopLabel and edgeState: a run's edges, done, running or to come"
         'blocked',
         'exhausted',
         'failed-check',
-        'needs-human',
+        'asks-in-session',
         'unsigned',
         'denied',
         'failed',

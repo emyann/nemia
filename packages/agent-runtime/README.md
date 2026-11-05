@@ -276,7 +276,7 @@ counts toward `LOST`; in `starting` it is read before the missing spawn, so an i
 under its name is neither spawned a second time nor cut until a pass reads the harness. XState
 is a dependency of this package alone, imported by `src/core/lifecycle.ts` alone (`test/xstate-boundary.test.ts`), and no
 entry exports the machine or its move, as none exports `decide`. `agent-runtime` exports its graph as plain data
-(`lifecycleGraph`: the states, the edges, the verbs, the first and the final states), which the board draws on its `/machines` page.
+(`lifecycleGraph`: the states, the edges, the verbs, the first and the final states), which the board's Debug panel draws a task's path on.
 
 **A task's path through it is read, never kept.** `engine.path(taskId)` replays the journal entry by entry (`pathOf`,
 `src/core/path.ts`): for each, the state `lifecycleOf` reads off the journal up to it, the entry's kind and its `at`, from the

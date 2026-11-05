@@ -23,7 +23,7 @@ export const isDecidable = (decision: RunDecision | undefined): decision is Deci
  * is one stamp either way: the hold is stamped on its own.
  *
  * A filed step still in flight is one word, whatever the engine calls it: `working`, `quiescent`,
- * `starting`, `between-attempts`, `needs-human` and `pending` flip between polls while nothing the decision says has moved,
+ * `starting`, `between-attempts`, a session its harness blocked and `pending` flip between polls while nothing the decision says has moved,
  * and each flip would ask the api — an observation per task, and `git diff` — again. A step that signs off, a check that
  * settles, a try filed (a new task) all move it.
  */
@@ -40,7 +40,7 @@ export const decisionStamp = (
     run.holding?.word ?? null,
     run.steps.map((s) => {
       const state = stepState(s, run.cancelledAt !== null, false);
-      const inFlight = s.taskId !== null && (state === 'working' || state === 'needs-human' || state === 'waiting');
+      const inFlight = s.taskId !== null && (state === 'working' || state === 'asks-in-session' || state === 'waiting');
       return [s.name, s.taskId, inFlight ? 'in flight' : s.message];
     }),
   ]);

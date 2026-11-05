@@ -2,9 +2,10 @@
  * The board's mirror of the api is one file per concern under src/lib/api/, which src/lib/api.ts re-exports. None of them may reach the
  * re-exporting file at run time, and a sibling only one level deep: a file may import values from a sibling that imports values from no
  * sibling (the schemas of judged.ts and graph.ts, which runs.ts decodes with), so no runtime import cycle can form among them. A type
- * crosses by `import type`, which is erased; the other values they import are react-query's, effect's, the feed's pace, their reads
- * (read.ts), `decodes` (decodes.ts) and the codes of where a step stands (reasons.ts); read.ts imports effect alone, decodes.ts no value at
- * all, and reasons.ts effect and decodes.ts.
+ * crosses by `import type`, which is erased; the other values they import are react-query's, effect's, the objects' (`objects`, by its
+ * entry), the feed's pace, their reads (read.ts), `decodes` (decodes.ts) and the codes of where a step stands (reasons.ts); read.ts
+ * imports effect alone, decodes.ts no value at all, and reasons.ts effect and decodes.ts. The objects' client (objects.ts) alone imports
+ * effect's HTTP client and HttpApi modules besides, which make it.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -14,7 +15,10 @@ import path from 'node:path';
 const DIR = path.resolve(import.meta.dirname, '../src/lib/api');
 
 /** What the files under src/lib/api/ may import values from. */
-const ALLOWED = new Set(['@tanstack/react-query', 'effect', '../feed.ts', './read.ts', './decodes.ts', './reasons.ts']);
+const ALLOWED = new Set(['@tanstack/react-query', 'effect', 'objects', '../feed.ts', './read.ts', './decodes.ts', './reasons.ts']);
+
+/** What one file alone may import besides: the objects' client, effect's modules that make it. */
+const OWN: ReadonlyMap<string, ReadonlySet<string>> = new Map([['objects.ts', new Set(['effect/http', 'effect/http-api'])]]);
 
 /** What read.ts, the reads every file imports, may import values from. */
 const READ_ALLOWED = new Set(['effect']);
@@ -43,7 +47,7 @@ export function importFaults(texts: ReadonlyMap<string, string>): string[] {
     specs
       .filter((s) => {
         const shared = SHARED.get(f);
-        return shared ? !shared.has(s) : !ALLOWED.has(s) && !(sibling(s) && texts.has(s.slice(2)) && leaf(s));
+        return shared ? !shared.has(s) : !ALLOWED.has(s) && !OWN.get(f)?.has(s) && !(sibling(s) && texts.has(s.slice(2)) && leaf(s));
       })
       .map((s) => `${f} imports ${s}`),
   );
@@ -81,12 +85,19 @@ test('REFUSED: a value import of a sibling that imports a sibling, of anything b
     ['read.ts', "import { Schema } from 'effect';\nimport { pace } from '../feed.ts';"],
     ['decodes.ts', "import { Schema } from 'effect';"],
     ['quota.ts', "import { decodes } from './decodes.ts';\nimport { get } from './read.ts';"],
+    [
+      'objects.ts',
+      "import { HttpApiClient } from 'effect/http-api';\nimport { Api } from 'objects';\nimport { Run } from 'objects/src/run.ts';",
+    ],
+    ['cards.ts', "import { cards } from './objects.ts';\nimport { FetchHttpClient } from 'effect/http';"],
   ]);
   assert.deepEqual(importFaults(texts), [
     'runs.ts imports ./graph.ts',
     'judged.ts imports ./runs.ts',
     'read.ts imports ../feed.ts',
     'decodes.ts imports effect',
+    'objects.ts imports objects/src/run.ts',
+    'cards.ts imports effect/http',
   ]);
 });
 

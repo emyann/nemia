@@ -7,7 +7,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Option, Schema } from 'effect';
 import { DaemonLine, Delivery, FeedCursor, FeedLine, feedModel, RunLine, StoreLine, Subscription, SubscriptionName } from './feed.model.ts';
-import { DAEMON_STARTED, startedLine, STORE, upgraded } from './feed.ts';
+import { DAEMON_STARTED, lineAsRead, startedLine, STORE, upgraded } from './feed.ts';
 import { DEFAULT_DIGEST_EVERY, DEFAULT_SELECTORS } from '../subscription/subscription.ts';
 
 const AT = '2026-09-16T10:00:00.000Z';
@@ -106,4 +106,11 @@ test('each kind of line decodes as the feed’s writers write it, and as a line 
     assert.deepEqual(feedModel.ids, { SubscriptionName: 'Subscription' });
     assert.deepEqual(feedModel.entities, [Subscription, Delivery, RunLine, DaemonLine, StoreLine]);
   });
+});
+
+test("a line written before WaitOn's `checkout` was renamed reads as a wait on `base`, and any other wait as it was written", () => {
+  const line = { at: '2026-09-01T00:00:00.000Z', run: 'r-1', step: 'land', word: 'waiting on the checkout', reason: 'Waiting' };
+  assert.equal(lineAsRead({ ...line, on: 'checkout' }).on, 'base');
+  assert.equal(lineAsRead({ ...line, on: 'limit' }).on, 'limit');
+  assert.equal(lineAsRead(line).on, undefined);
 });

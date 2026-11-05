@@ -287,6 +287,21 @@ export const unreadWorkflows = <T extends Pick<WorkflowListing, 'error'>>(workfl
   workflows.filter((w): w is T & { error: string } => w.error !== null);
 
 /**
+ * The repository a card's factory picks for it, as the orchestrator says it (`factoryRepoOf`): its factory's one repository, for a card
+ * with no `repo:` whose factory is among `factories` that read and is not the default — null for every other, and while the factories are
+ * unread. The Card does not carry it, so the page reads it off the factories it lists (`entryOf`).
+ */
+export function factoryRepoOf(
+  entry: Pick<InboxEntry, 'repo' | 'factory'>,
+  factories: readonly Pick<Factory, 'name' | 'default' | 'repos' | 'error'>[] | undefined,
+): string | null {
+  if (entry.repo !== null || entry.factory === null) return null;
+  const factory = factories?.find((f) => f.name === entry.factory && !f.default && f.error === null);
+  const [only] = factory?.repos ?? [];
+  return factory?.repos.length === 1 && only !== undefined ? only : null;
+}
+
+/**
  * What the tick's last try of a queued card's start says, as the CLI's `inbox` says it beside the card: refused, it waits for a person, not
  * for a slot; failed otherwise, the tick tries it again. The repository it was tried on is said for a card that names none but names its
  * factory — never for a card that names no factory, refused wherever a daemon runs: the one its factory picks said as such

@@ -5,7 +5,7 @@
 import { Effect, Stream } from 'effect';
 import { Hono } from 'hono';
 import { type SSEMessage, type SSEStreamingApi, streamSSE } from 'hono/streaming';
-import { LOGS, phaseOfView, refusedName, type StepLog, tailOf, type TaskView, typeOf } from 'agent-orchestrator';
+import { LOGS, lifecycleGraph, phaseOfView, refusedName, type StepLog, tailOf, type TaskView, typeOf } from 'agent-orchestrator';
 import { filesPrunedWords } from 'agent-orchestrator/run';
 import { type LifecycleTransition, pathToTurn, type StepPath, tryOfStep } from './path.ts';
 import type { Followings, Relayed } from './following.ts';
@@ -336,8 +336,9 @@ async function readAgain(
  * - `GET /api/runs/:id/steps/:step/path` — the path of the task of the step's try `try` through the runtime's lifecycle (`StepPath`,
  *   through `step path`), the current try's by default: each state its journal says, the entry that moved it and when, from the filing to
  *   now, replayed off the journal alone, so it asks no harness. An earlier try of a task held open, which later tries share, runs to the
- *   answer that opened the next turn (`pathToTurn`). A step not filed yet has an empty path. Refusals are `tryOfStep`'s; 502 when the
- *   journal could not be read.
+ *   answer that opened the next turn (`pathToTurn`). A step not filed yet has an empty path. Each answer carries the lifecycle the path
+ *   walks, read off the runtime's code (`lifecycleGraph`), which the board draws it on. Refusals are `tryOfStep`'s; 502 when the journal
+ *   could not be read.
  */
 export const steps = new Hono<ApiEnv>()
   .get('/api/runs/:runId/steps/:step/log', (c) =>
@@ -431,13 +432,13 @@ export const steps = new Hono<ApiEnv>()
       if ('error' in found) return c.json({ error: found.error }, 404);
       const asked = tryOfStep(found.run, step, c.req.query('try'));
       if ('error' in asked) return c.json({ error: asked.error }, asked.status);
-      if (!asked.taskId) return c.json({ taskId: null, try: asked.try, path: [] } satisfies StepPath);
+      if (!asked.taskId) return c.json({ taskId: null, try: asked.try, path: [], lifecycle: lifecycleGraph() } satisfies StepPath);
       try {
         const whole = (await runPlaced({ placeService, home }, e, PATH.handler({ id: found.run.id, step, task: asked.taskId }))) as {
           path: LifecycleTransition[];
         };
         const path = pathToTurn(whole.path, asked.turn);
-        return c.json({ taskId: asked.taskId, try: asked.try, path } satisfies StepPath);
+        return c.json({ taskId: asked.taskId, try: asked.try, path, lifecycle: lifecycleGraph() } satisfies StepPath);
       } catch (err) {
         const why = err instanceof Error ? err.message : String(err);
         return c.json(

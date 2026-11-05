@@ -2,13 +2,13 @@
  * The run page's reads decode the api's answers where they enter (`get`): a run's object (`runObjectQuery`), a step's tries
  * (`stepTriesQuery`), its decision (`decisionQuery`), a step's conversation (`readTranscript`) and its try's path (`stepPathQuery`). Each
  * reads back what the api gave, every union in its shapes; a key the api leaves out stays out and one the board does not know is dropped.
- * Which keys each answer has is `test/wire.test.ts`'s, and the generated mirror's (`run.gen.ts`).
+ * Which keys each answer has is `test/wire.test.ts`'s, and the objects' Schemas' (`objects`).
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { ReadRefusal, UnreadAnswer } from '../src/lib/api/read.ts';
 import { runGone, runObjectQuery, stepTriesQuery } from '../src/lib/api/run.ts';
-import type { Run, StepTry } from '../src/lib/api/run.gen.ts';
+import type { Run, StepTry } from 'objects';
 import { decisionQuery, type RunDecision } from '../src/lib/api/decision.ts';
 import { readTranscript, stepPathQuery, type StepPath } from '../src/lib/api/steps.ts';
 import { decidable, detail, step, stepPath, transcript } from './run-fixtures.ts';
@@ -107,6 +107,8 @@ test("get, the run page's reads: each decodes what the api gives, keeps out what
     assert.equal(Object.hasOwn(read.events[0], 'tool') || Object.hasOwn(read.events[0], 'result'), false);
     answering(t, stepPath());
     assert.deepEqual(await readPath(), stepPath());
+    const [, unguarded] = (await readPath()).lifecycle.edges;
+    assert.equal(Object.hasOwn(unguarded, 'guard'), false, 'an edge under no guard is read without one');
   });
   await t.test('a tool called without an input, as Claude Code may record it, is read without one', async (t) => {
     const call = { id: 'e-1', at: '2026-09-30T05:02:00.000Z', role: 'assistant', kind: 'tool_use', tool: { name: 'Stop' } } as const;

@@ -38,7 +38,7 @@ import { runStartedAt, type Timeline, type TimelineTotal } from '../timeline/ind
 import { consumption } from '../views/views.verb.ts';
 import type { Drift } from '../revisions/revisions.ts';
 import { driftNow } from '../revisions/pin.verb.ts';
-import { acceptedOf, driftOf, gateOf, type StepTry } from '../resource/tries.verb.ts';
+import { driftOf, gateOf, type StepTry } from '../resource/tries.verb.ts';
 import { filedOf, type StepFiled, toldOf } from '../resource/told.verb.ts';
 import { folderFiles, workFolderOf } from '../resource/files.store.ts';
 import { type LastSaid, lastLineOf } from '../resource/checks.verb.ts';
@@ -246,7 +246,6 @@ const stepStatusOf = Effect.fnUntraced(function* (name: string, at: StepAt) {
     ...needsOf(run, name, views, judged),
     lastLine,
     gate: gateOf(run, steps.find((s) => s.name === name) ?? bare(name), current.reason),
-    accepted: acceptedOf(run, name),
     said: taskId ? [...(views.get(taskId)?.state.said ?? [])] : [],
     asked: askedOf(judged.asked.get(name)),
     check: current.check,

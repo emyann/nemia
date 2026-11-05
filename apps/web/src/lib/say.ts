@@ -34,7 +34,7 @@ export function sayable(
   if (!step.taskId)
     return { open: false, why: `${step.name} is not filed yet, so it has no session to say anything to. Say it here once it runs.` };
   const state = stepState(step, false, false);
-  if (state === 'working' || state === 'needs-human') return { open: true };
+  if (state === 'working' || state === 'asks-in-session') return { open: true };
   if (state === 'unknown')
     return { open: false, why: `The engine has no record of ${step.name}'s task, so there is no session to say anything to.` };
   if (state === 'waiting') {

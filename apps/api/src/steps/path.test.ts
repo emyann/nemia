@@ -11,6 +11,7 @@ import { story } from '../../test/checkpoints.ts';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import { lifecycleGraph } from 'agent-orchestrator';
 import { app } from '../app.ts';
 import type { StepPath } from './path.ts';
 
@@ -120,7 +121,7 @@ test("A person reads a step's path, try by try: none before it is filed, the cur
   await s.test('a step not filed yet has no task and an empty path', async () => {
     const { status, body } = await get('/api/runs/r-unfiled/steps/implement/path');
     assert.equal(status, 200);
-    assert.deepEqual(body, { taskId: null, try: 1, path: [] });
+    assert.deepEqual(body, { taskId: null, try: 1, path: [], lifecycle: lifecycleGraph() });
   });
   await s.test("the current try's path by default: each state the journal says, the entry that moved it and when", async () => {
     const { status, body } = await get('/api/runs/r-retried/steps/implement/path');
@@ -131,6 +132,11 @@ test("A person reads a step's path, try by try: none before it is filed, the cur
       { state: 'starting', event: 'starting', at: at(10) },
       { state: 'working', event: 'spawned', at: at(11) },
     ]);
+    assert.deepEqual(
+      body.lifecycle,
+      lifecycleGraph(),
+      "and the lifecycle it walks, as the runtime's code has it, for the board to draw it on",
+    );
   });
   await s.test('an earlier try by number is its own task, to its end', async () => {
     const { status, body } = await get('/api/runs/r-retried/steps/implement/path?try=1');

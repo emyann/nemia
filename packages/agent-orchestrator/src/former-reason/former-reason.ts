@@ -22,7 +22,7 @@ export const FORMER_REASONS: Readonly<Record<string, Converted>> = {
   Blocked: { Step: { reason: 'AwaitingAnswer', via: 'closeout' }, Run: { reason: 'AwaitingAnswer' } },
   RoundsExhausted: { Step: { reason: 'AwaitingRound' } },
   WaitingForSlot: { Step: { reason: 'Waiting', on: 'limit' } },
-  WaitingForCheckout: { Step: { reason: 'Waiting', on: 'checkout' } },
+  WaitingForCheckout: { Step: { reason: 'Waiting', on: 'base' } },
   WaitingForPause: { Step: { reason: 'Waiting', on: 'pause' } },
   CheckDenied: { Step: { reason: 'Denied' } },
   Held: { Run: { reason: 'Waiting', on: 'run' } },

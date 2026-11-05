@@ -6,11 +6,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { ReadRefusal, UnreadAnswer } from '../src/lib/api/read.ts';
-import { cardQuery, inboxQuery, type InboxCardPage, type InboxEntry } from '../src/lib/api/inbox.ts';
+import { cardQuery, inboxAllQuery, type InboxCardPage, type InboxEntry } from '../src/lib/api/inbox.ts';
 import { capabilitiesQuery, type Capabilities } from '../src/lib/api/capabilities.ts';
 import { ceilingsQuery, type Ceilings } from '../src/lib/api/ceilings.ts';
 import { clearRules, factoryRulesQuery, fireAgent, hireAgent, writeRules, type FactoryRules } from '../src/lib/api/factories.ts';
-import { capabilities, cardPage, ceilings, inboxEntry, passCost, stepReach } from './factory-fixtures.ts';
+import { capabilities, cardList, cardObject, cardPage, ceilings, inboxEntry, passCost, stepReach } from './factory-fixtures.ts';
 
 /** Every read answering `body` as JSON, with `status`, for the length of the test. */
 function answering(t: { after: (fn: () => void) => void }, body: unknown, status = 200) {
@@ -21,7 +21,7 @@ function answering(t: { after: (fn: () => void) => void }, body: unknown, status
   });
 }
 
-const readInbox = inboxQuery.queryFn as unknown as () => Promise<InboxEntry[]>;
+const readInbox = inboxAllQuery(undefined).queryFn as unknown as () => Promise<InboxEntry[]>;
 const readCard = cardQuery('x').queryFn as unknown as () => Promise<InboxCardPage>;
 const readCapabilities = capabilitiesQuery.queryFn as unknown as () => Promise<Capabilities>;
 const readCeilings = ceilingsQuery.queryFn as unknown as () => Promise<Ceilings>;
@@ -40,7 +40,9 @@ const rules: FactoryRules = {
 
 test("get, the Factory's and the inbox's reads: each decodes what the api gives, keeps out what it leaves out, drops what the board does not read, and keeps a refusal of the api's", async (t) => {
   await t.test('what the api leaves out stays out: an inbox entry never queued nor tried', async (t) => {
-    answering(t, [without(inboxEntry(), 'queued', 'tried')]);
+    const { lastStart: _, ...untried } = cardObject().status;
+    const { queued: __, ...unqueued } = cardObject().spec;
+    answering(t, cardList({ ...cardObject(), spec: unqueued, status: untried }));
     const [entry] = await readInbox();
     assert.equal(Object.hasOwn(entry, 'queued'), false);
     assert.equal(Object.hasOwn(entry, 'tried'), false);
@@ -53,10 +55,10 @@ test("get, the Factory's and the inbox's reads: each decodes what the api gives,
   await t.test(
     'a key the board does not read is dropped, not refused: on a card, on a harness of the last pass, on a step it offers',
     async (t) => {
-      answering(t, [{ ...inboxEntry(), colour: 'blue' }]);
+      answering(t, cardList({ ...cardObject(), colour: 'blue' } as never));
       const [entry] = await readInbox();
       assert.equal(Object.hasOwn(entry, 'colour'), false);
-      assert.deepEqual(entry, inboxEntry());
+      assert.deepEqual(entry, inboxEntry({ queued: { at: '2026-09-30T05:01:00.000Z', place: null } }), 'a started card has no place');
 
       const pass = passCost();
       answering(t, ceilings({ pass: { ...pass, harnesses: { claude: { ...pass.harnesses.claude, colour: 'blue' } as never } } }));

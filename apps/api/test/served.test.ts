@@ -15,8 +15,24 @@ import { app } from '../src/app.ts';
 /** The routes the api serves that are its own, each with why no entry of the command table declares it. */
 const OWN: Readonly<Record<string, string>> = {
   'GET /api/health': 'the server answering at all, which no command of the orchestrator asks',
-  'GET /openapi/v3/nemia/v1':
-    "the run object's OpenAPI document, the api's description of its own routes around the package's Schema, which no command asks",
+  'GET /api/cards': "the Card's verbs, served by the objects' handler from `objects`' Api (src/objects/cards.ts) over the inbox's entries",
+  'GET /api/namespaces/:namespace/cards':
+    "the Card's verbs, served by the objects' handler from `objects`' Api (src/objects/cards.ts) over the inbox's entries",
+  'GET /api/namespaces/:namespace/cards/:name':
+    "the Card's verbs, served by the objects' handler from `objects`' Api (src/objects/cards.ts) over the inbox's entries",
+  'POST /api/namespaces/:namespace/cards':
+    "the Card's verbs, served by the objects' handler from `objects`' Api (src/objects/cards.ts) over the inbox's entries",
+  'DELETE /api/namespaces/:namespace/cards/:name':
+    "the Card's verbs, served by the objects' handler from `objects`' Api (src/objects/cards.ts) over the inbox's entries",
+  'POST /api/namespaces/:namespace/cards/:name/start':
+    "the Card's verbs, served by the objects' handler from `objects`' Api (src/objects/cards.ts) over the inbox's entries",
+  'POST /api/namespaces/:namespace/cards/:name/queue':
+    "the Card's verbs, served by the objects' handler from `objects`' Api (src/objects/cards.ts) over the inbox's entries",
+  'POST /api/namespaces/:namespace/cards/:name/unqueue':
+    "the Card's verbs, served by the objects' handler from `objects`' Api (src/objects/cards.ts) over the inbox's entries",
+  'POST /api/namespaces/:namespace/cards/:name/labels':
+    "the Card's verbs, served by the objects' handler from `objects`' Api (src/objects/cards.ts) over the inbox's entries",
+  'GET /openapi/v3/nemia/v1': "the objects' OpenAPI document, `OpenApi.fromApi(Api)`, which no command asks",
   'GET /openapi': "the page to browse the OpenAPI document, a view of the api's own document, which no command asks",
   'GET /openapi/scalar.js': "the OpenAPI page's viewer script, served from the installed package so the page reaches no other host",
   'GET /api/nemia/chat': "Nemia's chat paged, a program of the package's chat and no command, as its writes are none",
@@ -37,8 +53,6 @@ const OWN: Readonly<Record<string, string>> = {
   'GET /api/runs/:runId/lines':
     "a run's command lines and its workflow page's address, built off the command table and the run's record: an api address and command text, no command's answer",
   'GET /api/runs/:id/steps/:step/transcript/stream': "a stream of a step's transcript, held open for as long as the board reads it",
-  'GET /api/machines': 'the state machines the board draws, read off their code: no run, no store',
-  'GET /api/machines/:name': "one state machine's graph, read off its code: no run, no store",
   'GET /api/workflows/keys': "the keys a step may set and what each means, the builder's form: no run, no store",
   'GET /api/repository': 'the repository the request is served on, as the request names it',
   'POST /api/factories/:factory/servers/:server/sign-in':
@@ -87,6 +101,11 @@ function servedBreaks(
 
 test('every route the api serves is declared by an entry of the command table, or is its own with a why', () => {
   assert.deepEqual(servedBreaks(app.routes, COMMANDS, OWN), []);
+});
+
+test('the Machines page retired with its two routes: GET /api/machines and GET /api/machines/:name answer 404', async () => {
+  assert.equal((await app.request('/api/machines')).status, 404);
+  assert.equal((await app.request('/api/machines/lifecycle')).status, 404);
 });
 
 test("the runs' list is declared by runs, an entry the api serves alone; ls's answer, which nemia prints, is ls's own, on /api/listing", () => {

@@ -32,7 +32,7 @@ const { addFactory } = await import('../src/factory/factory.store.ts');
 const { writeFactoryLevel } = await import('../src/level/level.store.ts');
 const { writeLevel } = await import('../src/nemia/level.store.ts');
 const { customInstructionsFile } = await import('../src/agents/read.store.ts');
-const { DEFAULT_AUTO, ruleWords } = await import('../src/auto/auto.ts');
+const { DEFAULT_POLICY, ruleWords } = await import('../src/auto/auto.ts');
 const { confirmedFile, confirmRule, digestOf, dropRule, proposedFile, readConfirmed, readProposed, writeProposed } =
   await import('../src/auto/auto.store.ts');
 const { POLICY, POLICY_PROPOSE, proposalOf } = await import('../src/auto/auto.verb.ts');
@@ -58,7 +58,7 @@ const PROPOSAL = JSON.stringify({
 
 /** The words the person reads of `tries`, as proposed, and of the default. */
 const TRIES = ruleWords(proposalOf(PROPOSAL).rules[0]);
-const DEFAULT = ruleWords(DEFAULT_AUTO);
+const DEFAULT = ruleWords(DEFAULT_POLICY);
 
 /** A scratch store where nemia proposed `PROPOSAL` from no custom instruction. */
 function proposed(): string {
@@ -194,7 +194,7 @@ test('Auto rules decide an approval: proposed, confirmed beside the default, giv
     confirmRule(ROOT, 'nemia', 'tries', TRIES, NOW);
     assert.deepEqual(readConfirmed(ROOT, 'nemia'), {
       since: NOW.toISOString(),
-      rules: [DEFAULT_AUTO, { id: 'tries', answer: 'retry', steps: ['implement'], when: ['checked'], under: 20, from: 'proposed' }],
+      rules: [DEFAULT_POLICY, { id: 'tries', answer: 'retry', steps: ['implement'], when: ['checked'], under: 20, from: 'proposed' }],
     });
     const list = await shown();
     assert.equal(list.isDefault, false);
@@ -300,7 +300,7 @@ test('Auto rules decide an approval: proposed, confirmed beside the default, giv
     assert.deepEqual(readConfirmed(home, 'nemia')?.rules, [], 'nothing in force: every answer is asked');
     assert.equal((await shown(home)).isDefault, false);
     confirmRule(home, 'nemia', 'default', DEFAULT, NOW);
-    assert.deepEqual(readConfirmed(home, 'nemia')?.rules, [DEFAULT_AUTO]);
+    assert.deepEqual(readConfirmed(home, 'nemia')?.rules, [DEFAULT_POLICY]);
   });
 });
 

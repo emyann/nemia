@@ -1,14 +1,14 @@
 /**
  * A call's admission, decided off the command table and the runs' state: whether a shell line an agent is about to run acts on a run or a
  * factory below the agent's floor (`Scope`), answers what waits on the person (`admissionOf`), which a rule the person confirmed may let
- * through at `auto` (`Auto`), or is asked every time (`asksAlways`); the table's commands it types (`typedIn`), and the runs and factories
- * they name (`namedIn`). Pure: the caller reads the state (`admit.verb.ts`).
+ * through at `auto` (`PolicyReads`), or is asked every time (`asksAlways`); the table's commands it types (`typedIn`), and the runs and
+ * factories they name (`namedIn`). Pure: the caller reads the state (`admit.verb.ts`).
  */
 import type { AdmissionAnswer, AdmissionCall } from 'agent-runtime/vocabulary';
 import { parseArgv, renamedIn, type Spec } from '../command/command.ts';
 import { DEFAULT_FACTORY } from '../factory/factory.ts';
 import { atLeast, type Level } from '../level/level.ts';
-import { allowedBy, AUTO_ANSWERS, NO_FACTS, type AutoRule, type Facts } from '../auto/index.ts';
+import { allowedBy, RULE_ANSWERS, NO_FACTS, type PolicyRule, type Facts } from '../auto/index.ts';
 import type { CommandClass } from './class.ts';
 import type { ApproveForm } from '../gate/gate.ts';
 
@@ -181,8 +181,8 @@ function askedOf({ name, args }: Typed, waitOf: (runId: string, step: string) =>
  * (`factsOf`); and the yes an approval of a step gives, at its gate or to a loop out of rounds, undefined where it does not read
  * (`formOf`). Read at the call, and carried to no other.
  */
-export type Auto = {
-  list: readonly AutoRule[];
+export type PolicyReads = {
+  list: readonly PolicyRule[];
   levelOf: (runId: string) => Level | undefined;
   factsOf: (runId: string, step: string) => Facts | undefined;
   formOf: (runId: string, step: string) => ApproveForm | undefined;
@@ -205,13 +205,13 @@ export function answerOf(typed: Typed, table: readonly Entry[]): { runId: string
 }
 
 /**
- * Whether a rule of the person's list lets the typed answer through unasked: an answer a rule may give (`AUTO_ANSWERS`), raising no cap,
+ * Whether a rule of the person's list lets the typed answer through unasked: an answer a rule may give (`RULE_ANSWERS`), raising no cap,
  * asking for no round, naming a run and a step — an approval, one at the step's gate, never a loop's end (`formOf`), which was `nemia
  * accept` and is the person's every time — the run's factory at `auto`, and a rule that allows it in the run's facts at the call
  * (`allowedBy`).
  */
-function autoAllows(typed: Typed, table: readonly Entry[], auto: Auto | undefined): boolean {
-  if (auto === undefined || !(AUTO_ANSWERS as readonly string[]).includes(typed.name) || raises(typed.args) || rounds(typed.args))
+function policyAllows(typed: Typed, table: readonly Entry[], auto: PolicyReads | undefined): boolean {
+  if (auto === undefined || !(RULE_ANSWERS as readonly string[]).includes(typed.name) || raises(typed.args) || rounds(typed.args))
     return false;
   const answer = answerOf(typed, table);
   if (answer === undefined) return false;
@@ -233,7 +233,7 @@ function alwaysAsked(line: string, table: readonly Entry[]): AdmissionAnswer | u
  * Admission's answer for a call: where `scope` is given, `deny` for a shell line acting on a run or a factory below its floor, and `ask`
  * for one whose runs it cannot read (`scopeOf`); then `ask` where the line types a command asked every time (`asksAlways`), whatever the
  * session was allowed; then `ask`, saying why in the person's words, where the call is a shell line that types an `answer` command of
- * `table` that waits on the person (`askedOf`) and no rule of `auto` lets through (`autoAllows`); else none, and the call meets the
+ * `table` that waits on the person (`askedOf`) and no rule of `auto` lets through (`policyAllows`); else none, and the call meets the
  * session's own rules. `waitOf` says why a step waits on the person — at its gate, on its question, out of rounds, at its cap, or not there
  * to read — or undefined where it waits on no one.
  */
@@ -242,7 +242,7 @@ export function admissionOf(
   table: readonly Entry[],
   waitOf: (runId: string, step: string) => string | undefined,
   scope?: Scope,
-  auto?: Auto,
+  auto?: PolicyReads,
 ): AdmissionAnswer | undefined {
   const line = call.input.command;
   if (call.tool !== 'Bash' || typeof line !== 'string') return undefined;
@@ -252,7 +252,7 @@ export function admissionOf(
   if (always !== undefined) return always;
   for (const typed of typedIn(line, table).filter((t) => t.class === 'answer')) {
     const why = askedOf(typed, waitOf);
-    if (why !== undefined && !autoAllows(typed, table, auto)) return { decision: 'ask', message: why };
+    if (why !== undefined && !policyAllows(typed, table, auto)) return { decision: 'ask', message: why };
   }
   return undefined;
 }

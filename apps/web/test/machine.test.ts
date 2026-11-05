@@ -6,7 +6,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import type { MachineEdge, MachineVerb } from '../src/lib/api/machines.ts';
+import type { MachineEdge, MachineVerb } from '../src/lib/api/steps.ts';
 import {
   byAction,
   drawMachine,
@@ -17,7 +17,6 @@ import {
   LINE_HEIGHT,
   PAD_Y,
   pathOf,
-  stateFacts,
   stateSize,
   verbOf,
   type Drawing,
@@ -269,57 +268,6 @@ test('drawMachine: nothing laid over anything, no route through a state, read to
           );
         }
       }
-    },
-  );
-});
-
-test("stateFacts: a state's facts are what its drawing draws", async (t) => {
-  await t.test(
-    "a state's facts are what its drawing draws: its kind, the edges on its box, and each route that leaves it, on the lifecycle too",
-    () => {
-      for (const machine of [MACHINE, LIFECYCLE]) {
-        const drawing = drawMachine(machine);
-        for (const box of drawing.states) {
-          const facts = stateFacts(machine, box.id) ?? assert.fail(`no facts for ${box.id}`);
-          assert.deepEqual([facts.initial, facts.final], [box.initial, box.final], `${box.id}'s kind`);
-          assert.deepEqual(facts.stays, box.stays, `${box.id}'s stays`);
-          const drawn = drawing.routes.filter((r) => r.from === box.id).map(({ to, edges, verbs }) => ({ to, edges, verbs }));
-          assert.deepEqual(facts.routes, drawn, `${box.id}'s routes out`);
-        }
-      }
-    },
-  );
-  await t.test(
-    "a state's facts keep an edge back to it in its stays, never a route out, and a final state with no edge out has no route",
-    () => {
-      const busy = stateFacts(MACHINE, 'busy') ?? assert.fail('no facts for busy');
-      assert.deepEqual(busy.stays, [
-        { action: 'nothing', events: ['TICK'] },
-        { action: 'stop', events: ['LATE [live]'] },
-      ]);
-      assert.deepEqual(
-        busy.routes.map((r) => r.to),
-        ['done', 'failed', 'held'],
-      );
-      assert.deepEqual(busy.routes.find((r) => r.to === 'failed')?.verbs, ['cancel [open]']);
-      assert.deepEqual(
-        stateFacts(MACHINE, 'idle')?.routes.find((r) => r.to === 'failed'),
-        {
-          to: 'failed',
-          edges: [],
-          verbs: ['cancel [open]'],
-        },
-      );
-      const done = stateFacts(MACHINE, 'done') ?? assert.fail('no facts for done');
-      assert.deepEqual([done.initial, done.final, done.stays.length, done.routes.length], [false, true, 0, 0]);
-    },
-  );
-  await t.test(
-    "a state's facts are none for a state neither the graph nor any edge or verb names, and some for one only a verb names",
-    () => {
-      assert.equal(stateFacts(MACHINE, 'nowhere'), undefined);
-      const verbs = [{ ...MACHINE.verbs[0], from: ['idle'], to: 'gone' }];
-      assert.deepEqual(stateFacts({ ...MACHINE, verbs }, 'gone'), { initial: false, final: false, stays: [], routes: [] });
     },
   );
 });

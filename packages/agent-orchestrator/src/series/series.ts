@@ -11,11 +11,11 @@ import { unreadByPart, type DiskKind, type DiskPart, type DiskReading } from '..
 import { PASS_BOUNDS, PHASES, READ_BOUNDS, type Phase, type RecentPass } from '../meter/index.ts';
 
 /** The labels a line may carry: bounded keys, never a run id. A run's own detail stays in its record. */
-export const LABEL_KEYS = ['factory', 'workflow', 'step', 'agent', 'phase', 'harness', 'window', 'part', 'kind'] as const;
-export type LabelKey = (typeof LABEL_KEYS)[number];
+export const SERIES_LABEL_KEYS = ['factory', 'workflow', 'step', 'agent', 'phase', 'harness', 'window', 'part', 'kind'] as const;
+export type SeriesLabelKey = (typeof SERIES_LABEL_KEYS)[number];
 /** The words a label may say: a closed set for a pass's `phase` (the meter's) and the store's disk `part` and `kind` (the disk's). */
-type LabelWord<K extends LabelKey> = K extends 'phase' ? Phase : K extends 'part' ? DiskPart : K extends 'kind' ? DiskKind : string;
-export type Labels = { [K in LabelKey]?: LabelWord<K> };
+type LabelWord<K extends SeriesLabelKey> = K extends 'phase' ? Phase : K extends 'part' ? DiskPart : K extends 'kind' ? DiskKind : string;
+export type Labels = { [K in SeriesLabelKey]?: LabelWord<K> };
 
 /** The upper bounds of the machine's load per core. */
 export const LOAD_BOUNDS: readonly number[] = [0.1, 0.25, 0.5, 0.75, 1, 1.5, 2, 4];
@@ -77,9 +77,9 @@ const floorTo = (ms: number, size: number): string => new Date(Math.floor(ms / s
 /** The UTC day of an ISO time or a day: its file's name. */
 export const dayOf = (t: string): string => t.slice(0, 10);
 
-/** The label keys of `l` that are not `LABEL_KEYS`, in their order: none for a label set a line may carry. */
+/** The label keys of `l` that are not `SERIES_LABEL_KEYS`, in their order: none for a label set a line may carry. */
 export const strangeLabels = (l: Record<string, unknown>): string[] =>
-  Object.keys(l).filter((k) => !(LABEL_KEYS as readonly string[]).includes(k));
+  Object.keys(l).filter((k) => !(SERIES_LABEL_KEYS as readonly string[]).includes(k));
 
 /**
  * What a reading of the store's disk is sampled into: the bytes of each entry that read, by its part, its kind and its factory where it
@@ -128,8 +128,8 @@ export const samplesOf = (p: RecentPass): Sample[] => [
   ...(p.disk === undefined ? [] : diskSamples(p.disk)),
 ];
 
-/** A series and its labels as one key, the labels in `LABEL_KEYS`' order. */
-const keyOf = (s: string, l: Labels): string => JSON.stringify([s, ...LABEL_KEYS.map((k) => l[k] ?? null)]);
+/** A series and its labels as one key, the labels in `SERIES_LABEL_KEYS`' order. */
+const keyOf = (s: string, l: Labels): string => JSON.stringify([s, ...SERIES_LABEL_KEYS.map((k) => l[k] ?? null)]);
 
 /** The bounds of a series, none for a gauge or a name not kept. */
 const boundsOf = (s: string): readonly number[] | undefined => {
@@ -401,7 +401,7 @@ const round = (v: number): string => (Math.abs(v) >= 100 ? `${Math.round(v)}` : 
 
 /** A label set as a person reads it: `phase=place`, nothing for none. */
 const labelWords = (l: Labels): string =>
-  LABEL_KEYS.filter((k) => l[k] !== undefined)
+  SERIES_LABEL_KEYS.filter((k) => l[k] !== undefined)
     .map((k) => `${k}=${l[k]}`)
     .join(' ');
 

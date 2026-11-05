@@ -88,7 +88,7 @@ export type {
 export { ForgetRefused, type ForgetReport, type KeptReport } from 'agent-runtime';
 /** The name the engine gives a task's session, which is the name `claude agents` lists it under (`harnessWaitLine`). */
 export { nameFor } from 'agent-runtime';
-/** The task's lifecycle as plain data, which the board draws: what the api serves at `/api/machines`. */
+/** The task's lifecycle as plain data, which the board draws: what the api carries on a step's path (`StepPath`'s `lifecycle`). */
 export { lifecycleGraph, type LifecycleGraph } from 'agent-runtime';
 /** A denied call as the runtime words it, and as a permission rule is written: `Skill(look)`, `Bash(pytest)` (`deniedOf`). */
 export { denialText } from 'agent-runtime';

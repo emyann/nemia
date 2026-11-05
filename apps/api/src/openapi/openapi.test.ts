@@ -1,7 +1,7 @@
 /**
- * The run object's OpenAPI 3.1 document on its route: an OpenAPI 3.1.0 document whose `components.schemas` hold `Run`, which imports back
- * through Effect's own JSON Schema into a Schema that decodes the object the package builds of a run — the route a client generator
- * of the board's mirror rests on.
+ * The objects' OpenAPI 3.1 document on its route, `OpenApi.fromApi(Api)`: an OpenAPI 3.1.0 document whose `components.schemas` hold
+ * `Run`, which imports back through Effect's own JSON Schema into a Schema that decodes the object the package builds of a run — the
+ * route a client generator of the board's mirror rests on — and each of KINDS its get path and its component.
  */
 import { root } from '../../test/harness.ts';
 import { test } from 'node:test';
@@ -11,8 +11,9 @@ import path from 'node:path';
 import { Effect, JsonSchema, Schema, SchemaRepresentation } from 'effect';
 import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from 'agent-orchestrator/testing';
-import { COMMANDS, routeList, runObject, runStore } from 'agent-orchestrator';
-import { ANSWERS, LABEL_WRITES, RUN_READS } from './openapi.ts';
+import { runObject, runStore } from 'agent-orchestrator';
+import { OpenApi } from 'effect/http-api';
+import { Api, KINDS } from 'objects';
 import { appOver, beforeEachTest, eachTest, engineFor, runOver } from '../../test/placed.ts';
 
 const stand = eachTest(testPlace);
@@ -83,25 +84,24 @@ test('the OpenAPI document is 3.1.0, defines `Run`, and imports back into a Sche
   assert.equal(Schema.decodeUnknownResult(back)({ ...object, kind: 'Step' })._tag, 'Failure', 'the imported Schema keeps the kind closed');
 });
 
-test("the document's paths are the run's and its sub-resources' routes as the command table says them, each in OpenAPI's spelling", async () => {
-  const doc = (await (await app().request('/openapi/v3/nemia/v1')).json()) as { paths: Record<string, { get?: unknown }> };
-  const routes = COMMANDS.filter((c) => (RUN_READS as readonly string[]).includes(c.name))
-    .flatMap((c) => routeList(c))
-    .filter((r) => r.method === 'GET')
-    .map((r) => r.path.replace(/:(\w+)/g, '{$1}'));
-  assert.equal(routes.length, RUN_READS.length, 'each read has its route in the table');
-  const writes = COMMANDS.filter((c) => (LABEL_WRITES as readonly string[]).includes(c.name))
-    .flatMap((c) => routeList(c))
-    .filter((r) => r.method === 'POST')
-    .map((r) => r.path.replace(/:(\w+)/g, '{$1}'));
-  assert.equal(writes.length, LABEL_WRITES.length, 'each label write has its route in the table');
-  assert.deepEqual(Object.keys(doc.paths).sort(), [...routes, ...writes].sort(), 'the paths are those routes, and only those');
-  for (const path of routes) assert.ok(doc.paths[path]?.get, `${path} is read with GET`);
+test('the document is the one Effect writes of the Api, and holds, for each of KINDS, its get path and its component', async () => {
+  const doc = (await (await app().request('/openapi/v3/nemia/v1')).json()) as {
+    paths: Record<string, { get?: unknown }>;
+    components: { schemas: Record<string, unknown> };
+  };
+  assert.deepEqual(doc, JSON.parse(JSON.stringify(OpenApi.fromApi(Api))), 'the document is OpenApi.fromApi(Api), as JSON');
+  const GET_PATHS = { Run: '/api/runs/{runId}', Card: '/api/namespaces/{namespace}/cards/{name}' } as const;
+  for (const kind of KINDS) {
+    assert.ok(doc.paths[GET_PATHS[kind]]?.get, `${kind} is got at ${GET_PATHS[kind]}`);
+    assert.ok(doc.components.schemas[kind], `${kind} is a component`);
+  }
+  assert.ok(doc.paths['/api/cards']?.get, 'the cards are listed across namespaces');
+  assert.ok(doc.paths['/api/namespaces/{namespace}/cards']?.get, 'and in one');
+  assert.ok(doc.components.schemas['CardList'], 'CardList is a component');
 });
 
-test("the two label writes are POSTs whose body is a LabelEdit and whose answer a Labelled, and a run's labels an object of strings", async () => {
+test("the card's labels are a POST whose body is a LabelEdit and whose answer a Labelled, and a run's labels an object of strings", async () => {
   type Op = {
-    parameters: { name: string; in: string }[];
     requestBody: { content: { 'application/json': { schema: unknown } } };
     responses: Record<string, { content: { 'application/json': { schema: unknown } } }>;
   };
@@ -109,29 +109,14 @@ test("the two label writes are POSTs whose body is a LabelEdit and whose answer 
     paths: Record<string, { post?: Op }>;
     components: { schemas: Record<string, { properties?: Record<string, unknown> }> };
   };
-  for (const [path, param] of [
-    ['/api/runs/{runId}/labels', 'runId'],
-    ['/api/inbox/{name}/labels', 'name'],
-  ] as const) {
-    const post = doc.paths[path]?.post;
-    assert.ok(post, `${path} is written with POST`);
-    assert.deepEqual(
-      post.parameters.map((p) => [p.name, p.in]),
-      [[param, 'path']],
-      `${path} names its path's parameter`,
-    );
-    assert.deepEqual(
-      post.requestBody.content['application/json'].schema,
-      { $ref: '#/components/schemas/LabelEdit' },
-      `${path} is sent a LabelEdit`,
-    );
-    assert.deepEqual(
-      post.responses['200']?.content['application/json'].schema,
-      { $ref: '#/components/schemas/Labelled' },
-      `${path} answers a Labelled`,
-    );
-  }
-  for (const name of ['LabelEdit', 'Labelled']) assert.ok(doc.components.schemas[name], `${name} is a component`);
+  const post = doc.paths['/api/namespaces/{namespace}/cards/{name}/labels']?.post;
+  assert.ok(post, "a card's labels are written with POST");
+  assert.deepEqual(post.requestBody.content['application/json'].schema, { $ref: '#/components/schemas/LabelEdit' }, 'sent a LabelEdit');
+  assert.deepEqual(
+    post.responses['200']?.content['application/json'].schema,
+    { $ref: '#/components/schemas/Labelled' },
+    'answers a Labelled',
+  );
   assert.deepEqual(
     doc.components.schemas['RunMetadata']?.properties?.['labels'],
     { type: 'object', additionalProperties: { type: 'string' } },
@@ -139,21 +124,22 @@ test("the two label writes are POSTs whose body is a LabelEdit and whose answer 
   );
 });
 
-test("each read's path names its answer's component, which imports back and decodes what the route answers", async () => {
+/** The component each read of the runs group answers with, by its endpoint's name. */
+const ANSWERS = { show: 'Run', tries: 'StepTries', try: 'StepTry', closeout: 'TryCloseout', told: 'StepTold' } as const;
+
+test("each read of a run's path names its answer's component, which imports back and decodes what the route answers", async () => {
   const doc = (await (await app().request('/openapi/v3/nemia/v1')).json()) as {
-    paths: Record<string, { get?: { operationId: (typeof RUN_READS)[number]; responses: Record<string, unknown> } }>;
+    paths: Record<string, { get?: { operationId: string; responses: Record<string, { content?: unknown }> } }>;
     components: { schemas: Record<string, JsonSchema.JsonSchema> };
   };
   const asked = { runId: R, step: 'design', try: '1' };
-  for (const [path, { get }] of Object.entries(doc.paths)) {
-    if (get === undefined) continue;
-    const name = ANSWERS[get.operationId];
+  for (const [operation, name] of Object.entries(ANSWERS)) {
+    const found = Object.entries(doc.paths).find(([, { get }]) => get?.operationId === `runs.${operation}`);
+    assert.ok(found, `the document has the runs group's ${operation}`);
+    const [path, { get }] = found;
     assert.deepEqual(
-      get.responses['200'],
-      {
-        description: (get.responses['200'] as { description: string }).description,
-        content: { 'application/json': { schema: { $ref: `#/components/schemas/${name}` } } },
-      },
+      get?.responses['200']?.content,
+      { 'application/json': { schema: { $ref: `#/components/schemas/${name}` } } },
       `${path} answers ${name}`,
     );
     const back = SchemaRepresentation.fromJsonSchemaDocument(

@@ -120,7 +120,6 @@ function unstartedStep(name: string): StepView {
     denied: null,
     sessionUnread: null,
     gate: null,
-    accepted: null,
     lastLine: null,
     said: [],
     asked: null,

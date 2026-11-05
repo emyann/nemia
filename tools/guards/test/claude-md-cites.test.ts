@@ -152,6 +152,7 @@ test("every CLAUDE.md of the repository is read, the root's and each package's, 
     'apps/web/CLAUDE.md',
     'packages/agent-orchestrator/CLAUDE.md',
     'packages/agent-runtime/CLAUDE.md',
+    'packages/objects/CLAUDE.md',
     'packages/templates/CLAUDE.md',
     'tools/guards/CLAUDE.md',
   ]);

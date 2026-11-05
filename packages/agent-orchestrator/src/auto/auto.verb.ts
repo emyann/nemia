@@ -13,11 +13,11 @@ import { AgentName } from '../agents/agents.model.ts';
 import { HOME } from '../record/record.store.ts';
 import { Invalid } from '../refusal/refusal.ts';
 import { rooted } from '../wiring/wire.verb.ts';
-import { DEFAULT_AUTO, listInForce, ruleRefusal, ruleWords, type AutoRule } from './auto.ts';
+import { DEFAULT_POLICY, listInForce, ruleRefusal, ruleWords, type PolicyRule } from './auto.ts';
 import { confirmedFile, confirmRule, digestOf, dropRule, proposedFile, readConfirmed, readProposed, writeProposed } from './auto.store.ts';
 
 /** A rule with its words, as the person reads it. */
-export type WordedRule = AutoRule & { words: string };
+export type WordedRule = PolicyRule & { words: string };
 
 /**
  * An agent's rules, read: the agent, the file of the person's list, whether the builtin rule is in force for want of one (`isDefault`),
@@ -51,7 +51,7 @@ const idIn = (args: Args): string => String(args.id ?? '');
 const wordsIn = (args: Args): string => String(args.words ?? '');
 
 /** A rule with its words. */
-const worded = (rule: AutoRule): WordedRule => ({ ...rule, words: ruleWords(rule) });
+const worded = (rule: PolicyRule): WordedRule => ({ ...rule, words: ruleWords(rule) });
 
 /**
  * `agent`'s rules in the store `home`, composed from the person's list, the agent's proposal and its custom instruction, `instruction`
@@ -77,7 +77,7 @@ export function policyListOf(home: string, agent: string, instruction: string | 
             stale: proposed.digest !== digestOf(instruction),
           },
     instruction: instruction ?? null,
-    builtin: worded(DEFAULT_AUTO),
+    builtin: worded(DEFAULT_POLICY),
   };
 }
 
@@ -153,7 +153,7 @@ const proposalRefusal = (why: string): Invalid =>
 /**
  * The proposal in `words`: its rules and its guidance. Refused (`Invalid`): no JSON, a rule that is none, an id twice, guidance not words.
  */
-export function proposalOf(words: string): { rules: AutoRule[]; guidance: string[] } {
+export function proposalOf(words: string): { rules: PolicyRule[]; guidance: string[] } {
   let raw: unknown;
   try {
     raw = JSON.parse(words);
@@ -164,11 +164,11 @@ export function proposalOf(words: string): { rules: AutoRule[]; guidance: string
   if (!Array.isArray(rules)) throw proposalRefusal('the proposal has no list of rules');
   const bad = rules.map((rule, i) => ruleRefusal(rule, `rule ${i + 1}`)).find((why) => why !== undefined);
   if (bad) throw proposalRefusal(bad);
-  const ids = rules.map((r: AutoRule) => r.id);
+  const ids = rules.map((r: PolicyRule) => r.id);
   if (new Set(ids).size !== ids.length) throw proposalRefusal('the proposal names a rule id twice');
   if (!Array.isArray(guidance) || guidance.some((g) => typeof g !== 'string' || !g.trim()))
     throw proposalRefusal('its guidance is a list of words the machinery cannot hold');
-  const kept = (rule: AutoRule): AutoRule => ({
+  const kept = (rule: PolicyRule): PolicyRule => ({
     id: rule.id,
     answer: rule.answer,
     ...(rule.steps === undefined ? {} : { steps: rule.steps }),

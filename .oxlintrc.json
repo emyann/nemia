@@ -541,7 +541,7 @@
     {
       "files": ["apps/web/src/components/StartRun.tsx"],
       "rules": {
-        "max-lines-per-function": ["error", { "max": 97, "skipBlankLines": true, "skipComments": true }]
+        "max-lines-per-function": ["error", { "max": 95, "skipBlankLines": true, "skipComments": true }]
       }
     },
     {

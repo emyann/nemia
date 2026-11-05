@@ -1,6 +1,6 @@
 /**
- * The run object's OpenAPI document on stdout (`openapiDocument`, the one its route serves), for the board's generator of its run mirror
- * (`apps/web/test/mirror.ts`), which reaches the api through a process and never an import. Takes no argument.
+ * The objects' OpenAPI document on stdout (`openapiDocument`, the one its route serves), for a person or a tool that reads it from a
+ * file rather than from a daemon. Takes no argument.
  */
 import { openapiDocument } from './openapi.ts';
 

@@ -74,7 +74,7 @@ const runFrom = (id: string, card: string) =>
     }),
   );
 
-test("`INBOX`: the cards in play by default — a card whose run ended left out and counted — every card with --all, each in its run's phase; -l composes with both", async () => {
+test("`INBOX`: the cards in play by default — a card whose run ended left out and counted — every card with --all, each in its run's phase; -l composes with both; a stray file that is no card is left out, as the Card list leaves it", async () => {
   fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
   fs.writeFileSync(path.join(ROOT, 'inbox', 'at-work-a1b2.md'), '---\nlabels: { team: core }\n---\nAt work.\n');
   fs.writeFileSync(path.join(ROOT, 'inbox', 'ended-c3d4.md'), '---\nlabels: { team: core }\n---\nEnded.\n');
@@ -95,14 +95,12 @@ test("`INBOX`: the cards in play by default — a card whose run ended left out 
       cards: [
         ['at-work-a1b2', 'running'],
         ['notes', 'filed'],
-        ['notes', 'filed'],
       ],
       ended: 1,
     });
     assert.deepEqual((await listed({ all: true })).cards, [
       ['at-work-a1b2', 'running'],
       ['ended-c3d4', 'failed'],
-      ['notes', 'filed'],
       ['notes', 'filed'],
     ]);
     assert.deepEqual(await listed({ selector: ['team=core'] }), { cards: [['at-work-a1b2', 'running']], ended: 1 });

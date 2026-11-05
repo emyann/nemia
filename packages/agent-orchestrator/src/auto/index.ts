@@ -21,3 +21,19 @@ export {
   type Facts,
 } from './auto.ts';
 export { factsOf, type Seen } from './facts.ts';
+export {
+  neverHolds,
+  ruleReaches,
+  suggestedFor,
+  unmetNow,
+  gateRows,
+  missWords,
+  unmetWords,
+  NEVER_WORDS,
+  type GateSite,
+  type NeverWhy,
+  type Unmet,
+  type Reach,
+  type RuleMiss,
+  type GateReach,
+} from './reach.ts';

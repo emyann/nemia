@@ -9,15 +9,7 @@
  */
 import { type Implementation, spec } from '@emyann/tsverify';
 import type { Condition, Facts, PolicyRule } from '../src/auto/auto.ts';
-
-/**
- * A gate of a workflow, as reach reads it: the workflow and the step gated, whether the step is approved before it is filed — an ending
- * on the base branch with a gate (`approvedFirst`, src/status/status.ts) — and whether it has a `check:` (`hasCheck`).
- */
-export type GateSite = { workflow: string; step: string; approvedFirst: boolean; hasCheck: boolean };
-
-/** Why a condition can never hold at a gate: the step is approved before it runs, or it has no check to pass. */
-export type NeverWhy = 'approved-before-it-runs' | 'no-check';
+import { type GateSite, type NeverWhy, neverHolds, ruleReaches, type Unmet } from '../src/auto/reach.ts';
 
 /** The conditions a rule may need, in `CONDITIONS`' order (src/auto/auto.ts): written here, since a law reads none of the code's lists. */
 const ALL: readonly Condition[] = ['recommends', 'checked', 'accepted', 'withinBudget', 'nothingOpen'];
@@ -48,25 +40,19 @@ const neverHoldsSpec = spec<(site: GateSite, condition: Condition) => NeverWhy |
 });
 export type NeverHolds = Implementation<typeof neverHoldsSpec>;
 
-/** The code's `neverHolds`, declared here so the laws below read it by its spec. */
-declare const neverHolds: NeverHolds;
-
 /** Whether every condition `rule` needs can hold at `site`. */
 const eachCanHold = (rule: PolicyRule, site: GateSite): boolean => rule.when.every((c) => neverHolds(site, c) === null);
 
 const ruleReachesSpec = spec<(rule: PolicyRule, site: GateSite) => boolean>({
   ensures: {
     reachesExactlyWhenItCouldApprove: {
-      description:
-        'A rule can reach a gate exactly when it approves, covers the gated step, and needs no condition that never holds there',
-      condition: ({ input: [rule, site], output }) => output === (rule.answer === 'approve' && covers(rule, site.step) && eachCanHold(rule, site)),
+      description: 'A rule can reach a gate exactly when it approves, covers the gated step, and needs no condition that never holds there',
+      condition: ({ input: [rule, site], output }) =>
+        output === (rule.answer === 'approve' && covers(rule, site.step) && eachCanHold(rule, site)),
     },
   },
 });
 export type RuleReaches = Implementation<typeof ruleReachesSpec>;
-
-/** The code's `ruleReaches`, declared here so the laws below read it by its spec. */
-declare const ruleReaches: RuleReaches;
 
 const suggestedForSpec = spec<(site: GateSite) => PolicyRule>({
   ensures: {
@@ -91,12 +77,13 @@ const suggestedForSpec = spec<(site: GateSite) => PolicyRule>({
       description: 'It sets no dollar line, which is the person’s to add',
       condition: ({ output }) => output.under === undefined,
     },
+    comesFromNoOne: {
+      description: 'It says nowhere it came from: it is neither the builtin rule nor one an agent proposed and the person confirmed',
+      condition: ({ output }) => output.from === undefined,
+    },
   },
 });
 export type SuggestedFor = Implementation<typeof suggestedForSpec>;
-
-/** What keeps a rule from letting an answer through in a run's facts: the conditions it needs that do not hold, and its dollar line. */
-export type Unmet = { conditions: Condition[]; overLine: boolean };
 
 const unmetNowSpec = spec<(rule: PolicyRule, facts: Facts) => Unmet>({
   ensures: {

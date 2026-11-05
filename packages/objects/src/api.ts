@@ -25,7 +25,7 @@ export class Conflict extends Schema.Class<Conflict>('Conflict')(
   { httpApiStatus: 409 },
 ) {}
 
-/** A request the package refuses as it is said — a selector, a limit, a token, a name: a 422. */
+/** A request the package refuses as it is said — a label query, a limit, a token, a name: a 422. */
 export class Invalid extends Schema.Class<Invalid>('Invalid')({ error: Schema.String }, { httpApiStatus: 422 }) {}
 
 /** A run one of whose tasks does not read, so it is not judged: a 502, in the words the list says it with. */
@@ -41,8 +41,8 @@ const stepParams = { runId: Schema.String, step: Schema.String };
 /** A step's try, by its number as the path says it. */
 const tryParams = { ...stepParams, try: Schema.String };
 
-/** One label selector, or several given again, OR'd. */
-const Selector = Schema.optionalKey(Schema.Union([Schema.String, Schema.Array(Schema.String)]));
+/** One label query, or several given again, OR'd. */
+const LabelQuery = Schema.optionalKey(Schema.Union([Schema.String, Schema.Array(Schema.String)]));
 
 /**
  * The query of a list: `limit` (a whole number from 1), `continue` (the token the page before answered), `labelSelector`, and `selector`,
@@ -51,8 +51,8 @@ const Selector = Schema.optionalKey(Schema.Union([Schema.String, Schema.Array(Sc
 const listQuery = {
   limit: Schema.optionalKey(Schema.String),
   continue: Schema.optionalKey(Schema.String),
-  labelSelector: Selector,
-  selector: Selector,
+  labelSelector: LabelQuery,
+  selector: LabelQuery,
 };
 
 /** A card by its namespace and its name. */

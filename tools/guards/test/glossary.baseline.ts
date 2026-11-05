@@ -58,6 +58,9 @@
  * runtime took, said now only by the refusal that names the fix to a task or an engine still giving it (`harness-refusal.ts`,
  * `options.ts`). They stay while a caller may still write them.
  *
+ * `selector` in the objects' table, on the day lists took `labelSelector` (labelSelector): the query of a list in `api.ts` still reads
+ * `?selector=` the same, its retired spelling, so a link written before still selects; it goes when the list query is narrowed.
+ *
  * `cordon`, on the day the leftover words were settled (the Pause row in the run core's table): the store's pause file keeps its name,
  * `PAUSE_FILE` (`pause.store.ts`), so a pause put before the verbs were renamed still stands and is lifted; and `readRun` drops the key a
  * record of that time may hold (`record.store.ts`). They stay while a store or a record on disk may say it.
@@ -180,6 +183,9 @@ export const RETIRED_COUNTS: Readonly<Record<string, Readonly<Record<string, num
   },
   'claude-bg': {
     'packages/agent-runtime/src/service/options.ts': 3,
+  },
+  selector: {
+    'packages/objects/src/api.ts': 2,
   },
   cordon: {
     'packages/agent-orchestrator/src/pause/pause.store.ts': 1,

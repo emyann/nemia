@@ -145,7 +145,7 @@ function acceptedWords(looping: Pick<RunView['steps'][number], 'gate'>, findings
  * decision when it has been read, what the result touched and whether each branch still merges onto the base.
  *
  * A looping step's word is read off its closeout's output, the keys `wf`'s loop reads (`again`) and the reviewer's `findings`; a closeout
- * without them says it signed off, and how. A step not run says so. A looping step a person approved out of rounds (`nemia approve` of a
+ * without them says it signed off, and how. A step not run says so. A looping step a person approved out of rounds (an approval of a
  * loop, its gate's approval) is said accepted as it stands, with their words, not as asking another round, though its closeout still says
  * `again: true` (`acceptedWords`).
  */

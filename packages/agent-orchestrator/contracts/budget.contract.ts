@@ -118,11 +118,14 @@ export type ApprovedCaps = Implementation<typeof approvedCapsSpec>;
 
 const capInForceSpec = spec<(i: CapInput) => number | undefined>({
   /**
-   * Every amount it is handed is one: a try's budget and an approval's caps are read as dollars above zero (`Dollars`, record.store.ts),
-   * and a step's `budget:` is refused at load unless it is one (`budgetOf`, keys.ts).
+   * No amount it is handed is NaN, which equals nothing, itself included, so that no cap could keep the laws at it. The readers hand it
+   * none: a try's budget and an approval's caps are read as dollars above zero (`Dollars`, record.store.ts), and a step's `budget:` is
+   * refused at load unless it is one (`budgetOf`, keys.ts). Any other number, zero, negative or infinite, the laws bind.
    */
   requires: ({ input: [i] }) =>
-    (i.raised === undefined || anAmount(i.raised)) && i.approved.every(anAmount) && (i.workflow === undefined || anAmount(i.workflow)),
+    (i.raised === undefined || !Number.isNaN(i.raised)) &&
+    i.approved.every((usd) => !Number.isNaN(usd)) &&
+    (i.workflow === undefined || !Number.isNaN(i.workflow)),
   ensures: {
     aRaiseOfTheStepWins: {
       description: "A budget a person gave the step's own try is its cap, whatever a gate approved",

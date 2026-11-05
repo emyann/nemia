@@ -1,7 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { DEFAULT_ROUNDS, parseWorkflow, validate, type Workflow } from '../workflow.ts';
-import { graphOf, inputGraphOf, runGraph } from './graph.ts';
+import path from 'node:path';
+import { loadWorkflows } from '../workflows/workflows.store.ts';
+import { graphOf, inputGraphOf, routedDiagram, runGraph, TRIAGE } from './graph.ts';
 
 /**
  * Steps as `nemia start` freezes them, each file given `place: git`: parsed and validated, so the graph is read off what the run is judged
@@ -156,4 +158,63 @@ test('an `input` edge per step a step reads the output of, drawn after its `afte
       ['design after implement', 'design input implement'],
     );
   });
+});
+
+/** The tests' `triage` workflow, as `nemia start` would freeze it. */
+const triage = (): Workflow[] => loadWorkflows(path.join(import.meta.dirname, '..', '..', 'test', 'fixtures', 'team', 'triage'));
+
+test('a condition: a route edge per route of a `when:` in place of the after edge, and every node with its kind', () => {
+  assert.deepEqual(graphOf(triage()), {
+    roots: ['plan'],
+    edges: [
+      { from: 'plan', to: 'triage', kind: 'after' },
+      { from: 'triage', to: 'build-backend', kind: 'route', route: 'backend' },
+      { from: 'triage', to: 'build-web', kind: 'route', route: 'web' },
+      { from: 'triage', to: 'handoff', kind: 'route', route: 'web' },
+      { from: 'build-web', to: 'notes', kind: 'after' },
+      { from: 'build-backend', to: 'notes', kind: 'after' },
+    ],
+    nodes: [
+      { name: 'plan', kind: 'step' },
+      { name: 'triage', kind: 'condition', ends: ['docs'] },
+      { name: 'build-backend', kind: 'step' },
+      { name: 'build-web', kind: 'step' },
+      { name: 'handoff', kind: 'workflow', workflow: 'dev' },
+      { name: 'notes', kind: 'step' },
+    ],
+  });
+});
+
+test('a `when:` naming two routes draws two route edges; a node after a condition with no `when:` keeps its after edge', () => {
+  const graph = graphOf([
+    { name: 'pick', after: [], routes: ['a', 'b'] },
+    { name: 'both', after: ['pick'], when: ['a', 'b'] },
+    { name: 'every', after: ['pick'] },
+  ]);
+  assert.deepEqual(graph.edges, [
+    { from: 'pick', to: 'both', kind: 'route', route: 'a' },
+    { from: 'pick', to: 'both', kind: 'route', route: 'b' },
+    { from: 'pick', to: 'every', kind: 'after' },
+  ]);
+});
+
+test('a workflow with no condition and no workflow node carries no nodes: its graph is the one it was', () => {
+  assert.ok(
+    !(
+      'nodes' in
+      graphOf([
+        { name: 'a', after: [] },
+        { name: 'b', after: ['a'] },
+      ])
+    ),
+  );
+  assert.ok(!('nodes' in inputGraphOf([{ name: 'a', after: [] }])));
+});
+
+test("the drawing's workflow is the folder's: `TRIAGE` reads as the tests' triage, and the diagram prints from it", () => {
+  assert.deepEqual(graphOf(TRIAGE), graphOf(triage()));
+  assert.equal(routedDiagram(), routedDiagram(graphOf(triage())));
+  const lines = routedDiagram().split('\n');
+  for (const line of ['  triage --> build_web: web', '  triage --> [*]: docs (ends)', '  handoff --> [*]: sent', '  notes --> [*]'])
+    assert.ok(lines.includes(line), line);
 });

@@ -9,6 +9,7 @@ spec:
     - grilling
     - git
   overridable:
+    - output
     - fence
   harness: claude
   output:

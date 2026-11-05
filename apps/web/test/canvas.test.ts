@@ -163,6 +163,33 @@ test("edgesOf, loopLabel and edgeState: a run's edges, done, running or to come"
       ['a->b'],
     );
   });
+  await t.test('a route edge is labelled with its route, untaken where its condition took another or its target was skipped', () => {
+    const route = (from: string, to: string, r: string): GraphEdge => ({ from, to, kind: 'route', route: r });
+    const edges = edgesOf(
+      graphOf(
+        route('triage', 'web', 'web'),
+        route('triage', 'backend', 'backend'),
+        route('triage', 'both', 'web'),
+        route('triage', 'both', 'backend'),
+      ),
+      [step('triage', 'unverified'), step('web', 'working'), step('backend', 'skipped'), step('both', 'waiting')],
+      new Map([['triage', 'web']]),
+    );
+    assert.deepEqual(
+      edges.map((e) => [e.id, e.label, e.untaken, e.state]),
+      [
+        ['triage->web', 'web', false, 'running'],
+        ['triage->backend', 'backend', true, 'to-come'],
+        ['triage->both', 'web · backend', false, 'to-come'],
+      ],
+      'two routes into one step are one edge, taken where either is',
+    );
+    assert.deepEqual(
+      edgesOf(graphOf(route('triage', 'web', 'web')), [step('triage', 'waiting'), step('web', 'waiting')]).map((e) => e.untaken),
+      [false],
+      'a condition not answered yet leaves every route open',
+    );
+  });
   await t.test(
     "a loop's edge goes from the looping step back to its target, beside the `after` edge it returns along, and is never done",
     () => {

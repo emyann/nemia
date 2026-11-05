@@ -1,0 +1,12 @@
+{
+  "type": "object",
+  "properties": {
+    "surface": {
+      "type": "string",
+      "enum": ["web", "backend", "docs"],
+      "description": "The surface the change is on: the board, the backend, or the docs alone."
+    }
+  },
+  "required": ["surface"],
+  "additionalProperties": false
+}

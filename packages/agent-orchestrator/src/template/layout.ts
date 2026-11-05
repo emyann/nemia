@@ -100,6 +100,12 @@ export type Step = {
   check?: Value<string>;
   loop?: string;
   rounds?: number;
+  /** A condition's routes, how it answers them, and those on which the run ends; a node's routes; a workflow node's workflow. */
+  routes?: readonly string[];
+  route?: TemplateRoute;
+  ends?: readonly string[];
+  when?: readonly string[];
+  workflow?: string;
   retries?: number;
   deadlineSeconds?: number;
   reads?: readonly string[];
@@ -108,6 +114,9 @@ export type Step = {
   tally?: readonly string[];
   overrides?: Overrides;
 };
+
+/** A condition's `route:` as a template writes it: a table over a producer's field, a script, or `judge`. */
+export type TemplateRoute = { from: string; table: Readonly<Record<string, string>> } | { script: string } | 'judge';
 
 /** What each of a template's YAML files is, and the name its document must carry: its folder's, or the template's for the manifest. */
 export type DocumentFile = { kind: 'FactoryTemplate' | 'Workflow' | 'Agent' | 'Skill' | 'Lock'; name: string | undefined };
@@ -201,7 +210,7 @@ export function layoutRefusals(folder: Pick<ReadFolder, 'files'>, named: Readonl
 }
 
 /** A value's leaf kinds: what it must be, a `{ param }` allowed for `words` and `count`, and `not-yet` for a git or url source. */
-type Leaf = 'string' | 'number' | 'boolean' | 'strings' | 'text' | 'words' | 'count' | 'option' | 'revisions' | 'any' | 'not-yet';
+type Leaf = 'string' | 'number' | 'boolean' | 'strings' | 'text' | 'words' | 'count' | 'option' | 'revisions' | 'route' | 'any' | 'not-yet';
 
 /** A document's shape: a leaf, a list of one shape, or named fields, some required, and the shape of any other key (`rest`). */
 type Shape =
@@ -253,6 +262,11 @@ const STEP: Shape = {
     check: 'words',
     loop: 'string',
     rounds: 'number',
+    routes: 'strings',
+    route: 'route',
+    ends: 'strings',
+    when: 'strings',
+    workflow: 'string',
     retries: 'number',
     deadlineSeconds: 'number',
     reads: 'strings',
@@ -348,6 +362,20 @@ function textRefusal(value: unknown, at: ReadonlyArray<string | number>): string
 /** Whether `value` is a list of strings. */
 const isStrings = (value: unknown): boolean => Array.isArray(value) && value.every((item) => typeof item === 'string');
 
+/** Whether `value` is a `route:` (`TemplateRoute`). */
+const isRoute = (value: unknown): boolean => {
+  if (value === 'judge') return true;
+  if (!isMap(value)) return false;
+  const keys = Object.keys(value).sort().join(',');
+  if (keys === 'script') return typeof value.script === 'string';
+  return (
+    keys === 'from,table' &&
+    typeof value.from === 'string' &&
+    isMap(value.table) &&
+    Object.values(value.table).every((route) => typeof route === 'string')
+  );
+};
+
 /** What each plain leaf must be, and how it is said. */
 const LEAVES: Readonly<Record<Exclude<Leaf, 'text' | 'not-yet'>, [(value: unknown) => boolean, string]>> = {
   string: [(v) => typeof v === 'string', 'a string'],
@@ -358,6 +386,7 @@ const LEAVES: Readonly<Record<Exclude<Leaf, 'text' | 'not-yet'>, [(value: unknow
   count: [(v) => typeof v === 'number' || isParam(v), 'a number or {param: <name>}'],
   option: [(v) => ['string', 'number'].includes(typeof v) || v === true || isStrings(v), 'a string, a number, true or a list of strings'],
   revisions: [(v) => REVISIONS_POLICIES.some((p) => p === v), REVISIONS_POLICIES.join(' or ')],
+  route: [isRoute, '`judge`, {script: <file>} or {from: <step>.<field>, table: {<value>: <route>}}'],
   any: [() => true, 'anything'],
 };
 

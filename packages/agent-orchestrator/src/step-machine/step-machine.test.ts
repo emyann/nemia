@@ -6,13 +6,14 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { roundFiled, sentBack, stepStatus, type CloseoutAsked, type Run, type StepStatus, type TaskPhase, type TaskSpend } from '../run.ts';
+import { roundFiled, sentBack, type CloseoutAsked, type Run, type StepStatus, type TaskPhase, type TaskSpend } from '../run.ts';
 import { nextTry, type RetryMode } from '../retry/retry-ask.ts';
 import type { Closeout } from '../closeout/index.ts';
 import type { Verdict } from '../check/check.ts';
 import type { OutputSchema, Workflow } from '../workflow.ts';
 import { run, step } from '../../test/assessed.ts';
 import { STEP_EDGES, stepDiagram, stepMachineGraph, stepMove } from './step-machine.ts';
+import { runWords } from '../routed/index.ts';
 
 /** Every fact `stepStatus` reads: the workflow, the run's record, and what the engine, the closeouts and the checks say. */
 type World = {
@@ -61,16 +62,16 @@ const walk = (name: string, of: string, steps: Workflow[], ...moves: Move[]): Wa
 const wordOf = (w: World, name: string): StepStatus => {
   const def = w.steps.find((s) => s.name === name);
   assert.ok(def, `the walk reads ${name}, which its workflow has`);
-  return stepStatus(
-    def,
+  const words = runWords(
+    w.steps,
     w.run,
     (id) => w.phase[id] ?? 'unknown',
     (s) => w.said[s],
     (id) => w.asked[id] ?? false,
-    w.steps,
     (id) => w.spend[id],
     (s) => w.verdict[s],
   );
+  return words.get(def.name) ?? 'pending';
 };
 
 const recordOf = (w: World, name: string) => w.run.steps[name] ?? { taskId: null };
@@ -156,6 +157,16 @@ const sendBack = (work: string, n: number, taskId: string, ending: string): Move
     };
   },
 ];
+/** A person names a condition's route for a try (`nemia route`), as `readRun` composes their file onto its record. */
+const routeNamed = (name: string, route: string, n: number): Move => [
+  `${name} routed ${route} by a person, try ${n}`,
+  (w) => withRecord(w, name, { ...recordOf(w, name), route: { route, try: n, by: 'person' } }),
+];
+/** A workflow node's card filed (`StepRecord.sent`). */
+const cardSent = (name: string): Move => [
+  `${name}'s card filed`,
+  (w) => withRecord(w, name, { ...recordOf(w, name), sent: { card: `r-1-${name}`, at: AT } }),
+];
 const landed = (name: string, how: { commit: string } | { aborted: string }): Move => [
   `${name}'s landing ${'commit' in how ? 'committed' : 'aborted'}`,
   (w) => withRecord(w, name, { ...recordOf(w, name), landed: how }),
@@ -206,7 +217,54 @@ const works = (name: string, taskId: string, said: Closeout = done()): Move[] =>
   settle(taskId, 'succeeded'),
 ];
 
+const SURFACE: OutputSchema = {
+  type: 'object',
+  properties: { surface: { type: 'string', enum: ['web', 'backend'] } },
+  required: ['surface'],
+  additionalProperties: false,
+};
+/** plan → triage, a condition whose table reads plan's surface → build-web | build-backend. */
+const routed = (route: Workflow['route'] = { kind: 'table', from: 'plan.surface', table: { web: 'web', backend: 'backend' } }) => [
+  { ...step('plan'), output: { file: 'plan.schema.json', schema: SURFACE } },
+  { ...step('triage', ['plan']), input: ['plan'], routes: ['web', 'backend'], route },
+  { ...step('build-web', ['triage']), when: ['web'] },
+  { ...step('build-backend', ['triage']), when: ['backend'] },
+];
+const ROUTED: Workflow[] = routed();
+/** The same, with build-backend a route to the workflow `build`. */
+const ROUTED_TO_BUILD: Workflow[] = ROUTED.map((s) => (s.name === 'build-backend' ? { ...s, workflow: 'build' } : s));
+
 const WALKS: Walk[] = [
+  walk('a table condition answered', 'triage', ROUTED, ...works('plan', 'p1', done({ surface: 'web' }))),
+  walk(
+    'a table nobody closed: its producer said a value with no row',
+    'triage',
+    ROUTED,
+    ...works('plan', 'p1', done({ surface: 'mobile' })),
+  ),
+  walk(
+    'a node off its route, re-routed by a person before any follower is filed',
+    'build-backend',
+    ROUTED,
+    ...works('plan', 'p1', done({ surface: 'web' })),
+    routeNamed('triage', 'backend', 1),
+  ),
+  walk(
+    'a workflow node sending its card',
+    'build-backend',
+    ROUTED_TO_BUILD,
+    ...works('plan', 'p1', done({ surface: 'backend' })),
+    cardSent('build-backend'),
+  ),
+  walk(
+    'a script condition unsure',
+    'triage',
+    routed({ kind: 'script', script: 'routes/pick.ts' }),
+    ...works('plan', 'p1', done({ surface: 'web' })),
+    file('triage', 's1'),
+    sign('triage', BLOCKED),
+    settle('s1', 'succeeded'),
+  ),
   walk('plain', 'implement', PLAIN, ...works('implement', 'i1')),
   walk(
     'checked, passed',
@@ -432,6 +490,14 @@ test('every pair of words a walk reads through stepStatus is a move the step mac
       'refused',
       `${p.walk}, on ${p.label}: ${key(p.from, p.to)} is no edge of STEP_EDGES — add it with the event that makes it`,
     );
+  }
+});
+
+test('a step reads unverified or unsigned unfiled only as a condition its table answered', () => {
+  for (const p of PAIRS.filter((x) => x.from === 'pending' && (x.to === 'unverified' || x.to === 'unsigned'))) {
+    const walked = READ.find((w) => w.name === p.walk);
+    const def = WALKS.find((w) => w.name === p.walk)?.worlds[0]?.[1].steps.find((s) => s.name === walked?.step);
+    assert.equal(def?.route?.kind, 'table', `${p.walk}, on ${p.label}: ${key(p.from, p.to)} of a step no table answers`);
   }
 });
 

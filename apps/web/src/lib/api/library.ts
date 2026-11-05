@@ -149,6 +149,16 @@ export type WorkflowStepSpec = {
   tally: string[];
   loop: string | null;
   rounds: number | null;
+  /** A condition's routes (`routes:`): null for a step that is no condition. */
+  routes: string[] | null;
+  /** How a condition answers, as its line writes it: `judge`, `{ script: <file> }` or `{ from: <step>.<field>, table: { … } }`. */
+  route: string | null;
+  /** The routes of its condition a node runs on (`when:`): null for every route. */
+  when: string[] | null;
+  /** The routes of a condition on which the run ends (`ends:`): null for none. */
+  ends: string[] | null;
+  /** The workflow a workflow node files a card for (`workflow:`). */
+  workflow: string | null;
 };
 
 /** A key of a step, as the package's `STEP_KEYS` names it. */
@@ -191,6 +201,11 @@ export const StepKeySchema = decodes<StepKey>()(
     'tally',
     'loop',
     'rounds',
+    'routes',
+    'route',
+    'when',
+    'ends',
+    'workflow',
   ]),
 );
 
@@ -239,6 +254,11 @@ export const WorkflowStepSpecSchema = decodes<WorkflowStepSpec>()(
     tally: Strings,
     loop: Schema.NullOr(Schema.String),
     rounds: Schema.NullOr(Schema.Number),
+    routes: Schema.NullOr(Strings),
+    route: Schema.NullOr(Schema.String),
+    when: Schema.NullOr(Strings),
+    ends: Schema.NullOr(Strings),
+    workflow: Schema.NullOr(Schema.String),
   }),
 );
 

@@ -43,6 +43,8 @@ export const waitKindOf: Record<StepState, WaitKind | null> = {
   'waiting-for-slot': null,
   held: null,
   cancelled: null,
+  skipped: null,
+  sent: null,
   unreadable: null,
   unknown: null,
 };

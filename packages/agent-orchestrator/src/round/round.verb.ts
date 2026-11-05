@@ -36,7 +36,7 @@ export const roundRun = Effect.fn('round')(function* (id: string, stepName?: str
   const steps = yield* stepsOf(run);
   const { views, phaseOf } = yield* taskPhasesRead(run);
   const answer = (asks: readonly RoundAsk[]) =>
-    roundAsk(steps, run, stepName, phaseOf, closeoutReader(views, run), closeoutAsked(views), asks, spendReader(views), budget);
+    roundAsk(steps, run, stepName, phaseOf, closeoutReader(views, run, steps), closeoutAsked(views), asks, spendReader(views), budget);
 
   const first = answer((yield* (yield* RunDoor).asks.read(RunId.read(id))).rounds);
   if ('refusal' in first) return yield* Effect.fail(new Conflict({ message: first.refusal }));

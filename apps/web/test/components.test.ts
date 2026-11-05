@@ -1173,6 +1173,11 @@ const unset: WorkflowStepSpec = {
   tally: [],
   loop: null,
   rounds: null,
+  routes: null,
+  route: null,
+  when: null,
+  ends: null,
+  workflow: null,
 };
 
 const unescaped = (text: string) =>

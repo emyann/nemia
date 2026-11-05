@@ -884,8 +884,14 @@ test('the former names a file may still say: read under the names they have now,
   ]);
 });
 
-/** The keys every-key row sets, each as a file writes it: all but those read on a step of their own. */
-const EVERY: Record<Exclude<StepKey, 'workspace' | 'slot' | 'agent' | 'skills' | 'mcp' | 'sandbox'>, string> = {
+/**
+ * The keys every-key row sets, each as a file writes it: all but those read on a step of their own, the routing keys among them, whose
+ * round trip `src/route/route.test.ts` holds.
+ */
+const EVERY: Record<
+  Exclude<StepKey, 'workspace' | 'slot' | 'agent' | 'skills' | 'mcp' | 'sandbox' | 'routes' | 'route' | 'when' | 'ends' | 'workflow'>,
+  string
+> = {
   after: 'implement',
   resume: 'implement',
   input: 'implement',

@@ -130,8 +130,9 @@ function namedWords(step: string, files: HandedFiles | undefined): string {
  * to write (`stepMounts`), the others to read and never write; then the factory's volumes as the step is filed them (`volumeLines`);
  * then the folders it is filed with beyond them (`folders`, as `filedFolders`
  * in filed.ts files them), to read and never write: its own files directory (`own`), the artifacts folders of the steps before it
- * (`handed`), each with how to list it, the store's folders its `reads:` names (`store`), and the run's copy of its workflow folder
- * (`workflow`), by its path and its variable (`WF_WORKFLOW_FILES`); a blank line before them. Nothing for a run
+ * (`handed`), each with how to list it, the store's folders its `reads:` names (`store`), the folders of the run that routed on to this
+ * one (`caller`), and the run's copy of its workflow folder (`workflow`), by its path and its variable (`WF_WORKFLOW_FILES`); a blank line
+ * before them. Nothing for a run
  * that mounts none and a step given no other folder, and for a step on a remote agent, which is filed none.
  */
 export const mountsLine = (
@@ -144,7 +145,7 @@ export const mountsLine = (
   const volumes = volumeLines(volumeMounts(step, run.volumes));
   const { handed, store } = local ? folders : { handed: [], store: [] };
   const own = (local ? folders.own : undefined) ?? [];
-  const workflow = workflowLines(local, folders.workflow);
+  const workflow = [...callerLines(local, folders.caller), ...workflowLines(local, folders.workflow)];
   if (!mounts?.length && !volumes.length && !own.length && !handed.length && !store.length && !workflow.length) return [];
   const writes = (mounts ?? []).filter((m) => !m.readOnly);
   const reads = (mounts ?? []).filter((m) => m.readOnly);
@@ -196,6 +197,17 @@ function volumeLines(volumes: readonly Mount[]): string[] {
       : []),
   ];
 }
+
+/**
+ * What a brief says of the folders of the run that routed on to this one (`caller`, as `callerMounts` files them on a root, read-only), for
+ * a local step: their paths, to read and never write. Nothing where none is mounted, and for a remote agent.
+ */
+const callerLines = (local: boolean, caller: readonly Mount[] | undefined): string[] =>
+  local && caller?.length
+    ? [
+        `The files the run that routed on to this one wrote, which you may read and must not write: ${pathsOf(caller)}. Each is mounted read-only, a folder of a step its \`## From run\` below names; read it with Read, Grep and Glob.`,
+      ]
+    : [];
 
 /**
  * What a brief says of the run's copy of its workflow folder (`workflow`, as `workflowMounts` files it, read-only), for a local step: its

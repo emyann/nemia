@@ -145,6 +145,8 @@ export const PERSON: Record<StepState, PersonWords> = {
     ...NONE,
   },
   cancelled: { rail: 'called off', meaning: 'The run was called off.', ...NONE },
+  skipped: { rail: 'skipped', meaning: 'Its route was not taken, so it never runs: the run goes on without it.', ...NONE },
+  sent: { rail: 'sent', meaning: 'It filed its card for another workflow, and that run carries the work on.', ...NONE },
   unreadable: {
     rail: 'unreadable',
     meaning:

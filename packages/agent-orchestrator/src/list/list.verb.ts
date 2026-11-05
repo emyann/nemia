@@ -115,7 +115,7 @@ export const runReading = Effect.fn('runReading')(function* (e: Engine, run: Run
   const answers = runStore.asks.answers(run.id);
   const spendOf = spendReader(views);
   const assessOf = (on: Run): Assessment =>
-    assess(steps, on, phaseOf, closeoutReader(views, run), closeoutsAsked, verdictOf, asks, rounds, harnessBlocked(views), spendOf);
+    assess(steps, on, phaseOf, closeoutReader(views, run, steps), closeoutsAsked, verdictOf, asks, rounds, harnessBlocked(views), spendOf);
   const assessed = assessOf(run);
   const standings = how.standings ? how.standings(assessed.status, steps) : standingsOf(run, steps, git);
   const memo = statusMemo(headsOver(git), yield* PlaceService);
@@ -123,11 +123,13 @@ export const runReading = Effect.fn('runReading')(function* (e: Engine, run: Run
     ? yield* checkoutHold(e, run, steps, { standing: Effect.succeed(how.checkout) }, process.env, memo)
     : undefined;
   const parent = how.parent ?? (yield* parentsRead(run, git).pipe(over(e)));
+  const scripted = closeoutReader(views, run, steps);
   const listed = listing({
     steps: how.shown ?? steps,
     run,
     phaseOf: engineWord(views),
-    closeoutOf: (name) => closeoutOf(views, run, name),
+    closeoutOf: (name) =>
+      steps.some((s) => s.name === name && s.route?.kind === 'script') ? scripted(name) : closeoutOf(views, run, name),
     askedCloseout: closeoutsAsked,
     verdictOf,
     asks,

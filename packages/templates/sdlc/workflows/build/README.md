@@ -99,8 +99,10 @@ checkout, the land step's check runs `localCheck` on the merged tree, and a merg
 note says nothing of it: the ending signs off before the run executes its check. On a merge round (`## Merge` in the brief) the step
 merges the commit the brief names instead.
 
-Start it after the intake run whose intent it builds: `nemia start "<the intent's title>" --workflows build --after <intake-run>`. Its
-first step, design, is told the intent under *From run*; the steps after it read the spec.
+An intake run whose intent needs a design starts it: intake's ending, `next`, routes to `build` once the person approves it, and
+its node `to-build` files a card with `workflow: build` and `from:` the intake run (the [intake](../intake/README.md) README). By
+hand, start it after the intake run whose intent it builds: `nemia start "<the intent's title>" --workflows build --after
+<intake-run>`. Either way its first step, design, is told the intent under *From run*; the steps after it read the spec.
 
 Design reads `costs` (`reads: costs`): its brief says what the last finished runs of build in its factory cost, per step and whole. Its
 note asks for each step's budget from those figures, and for the cut by the work's seams, never by its cost.

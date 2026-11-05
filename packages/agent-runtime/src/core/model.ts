@@ -93,6 +93,7 @@ export const Attempt = Schema.Struct({
   former: Schema.optional(Schema.Literals(FORMER_REASONS)),
   usage: Schema.NullOr(UsageSchema),
   exitCode: Schema.NullOr(Schema.Number),
+  terminationMessage: Schema.optional(Schema.String),
   denials: Schema.optional(Schema.Array(Schema.Struct({ tool: Schema.String, what: Schema.optional(Schema.String) }))),
   skills: Schema.optional(Strings),
   files: Schema.optional(Strings),

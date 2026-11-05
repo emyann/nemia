@@ -45,11 +45,11 @@ export const cancelRun = Effect.fn('cancel')(function* (id: string) {
   const { asks, rounds } = yield* (yield* RunDoor).asks.read(RunId.read(id));
   const verdictOf = exitVerdicts(views, run);
   const spendOf = spendReader(views);
-  yield* adoptRounds(e, run, steps, views, phaseOf, closeoutReader(views, run), closeoutAsked(views), rounds, spendOf);
-  yield* adoptTries(e, run, steps, views, phaseOf, closeoutReader(views, run), closeoutAsked(views), verdictOf, asks, spendOf);
-  yield* adoptChecks(e, run, steps, views, phaseOf, closeoutReader(views, run), closeoutAsked(views), spendOf);
+  yield* adoptRounds(e, run, steps, views, phaseOf, closeoutReader(views, run, steps), closeoutAsked(views), rounds, spendOf);
+  yield* adoptTries(e, run, steps, views, phaseOf, closeoutReader(views, run, steps), closeoutAsked(views), verdictOf, asks, spendOf);
+  yield* adoptChecks(e, run, steps, views, phaseOf, closeoutReader(views, run, steps), closeoutAsked(views), spendOf);
 
-  const plan = cancelPlan(steps, run, phaseOf, closeoutReader(views, run), closeoutAsked(views), verdictOf, asks, rounds, spendOf);
+  const plan = cancelPlan(steps, run, phaseOf, closeoutReader(views, run, steps), closeoutAsked(views), verdictOf, asks, rounds, spendOf);
   if (plan.kind === 'finished') return { run, plan } satisfies Cancelled;
 
   for (const { taskId } of plan.stop) {

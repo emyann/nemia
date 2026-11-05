@@ -12,12 +12,12 @@
 import type { RunGraph, RunSummary } from './api';
 import { edgesOf, loopPath, movingInto, type EdgeState, type EdgeStep } from './canvas.ts';
 import { layers, stepsOf, type Point } from './layout.ts';
-import { waitsAtGate, satisfiesAfter, stepState, type StepState } from './status.ts';
+import { waitsAtGate, settledState, stepState, type StepState } from './status.ts';
 
 /**
  * One box of a flow. `step`, a step of the run; `fold`, the columns before or after the ones the rail shows, each step of them;
  * `more`, the steps of a column past the lanes it shows. `live`: a step of it is at work or waits on a person — where the run is.
- * `done`: every step of it is done (`satisfiesAfter`). `state` is a step's own, and null for the other two.
+ * `done`: every step of it is settled (`settledState`: done, or passed by its route). `state` is a step's own, and null for the other two.
  */
 export type Pill = {
   id: string;
@@ -99,7 +99,7 @@ export const isLiveStep = (state: StepState, cancelled: boolean): boolean =>
 export function liveColumn(columns: readonly string[][], stateOf: (name: string) => StepState, cancelled: boolean): number {
   const live = columns.findIndex((column) => column.some((name) => isLiveStep(stateOf(name), cancelled)));
   if (live >= 0) return live;
-  const todo = columns.findIndex((column) => column.some((name) => !satisfiesAfter(stateOf(name))));
+  const todo = columns.findIndex((column) => column.some((name) => !settledState(stateOf(name))));
   return todo >= 0 ? todo : columns.length - 1;
 }
 
@@ -156,7 +156,7 @@ const stateReader = (steps: readonly EdgeStep[]) => {
 const boxer =
   (stateOf: (name: string) => StepState, cancelled: boolean) =>
   (kind: Box['kind'], names: string[]): Box => {
-    const done = names.every((name) => satisfiesAfter(stateOf(name)));
+    const done = names.every((name) => settledState(stateOf(name)));
     return {
       id: `${kind}:${names[0]}`,
       kind,

@@ -358,6 +358,17 @@ const frozenStepFields = {
   tally: Schema.optionalKey(Strings),
   loop: Schema.optionalKey(Schema.String),
   rounds: Schema.optionalKey(Schema.Finite),
+  routes: Schema.optionalKey(Strings),
+  route: Schema.optionalKey(
+    Schema.Union([
+      Schema.Struct({ kind: Schema.Literal('table'), from: Schema.String, table: Schema.Record(Schema.String, Schema.String) }),
+      Schema.Struct({ kind: Schema.Literal('script'), script: Schema.String }),
+      Schema.Struct({ kind: Schema.Literal('judge') }),
+    ]),
+  ),
+  when: Schema.optionalKey(Strings),
+  ends: Schema.optionalKey(Strings),
+  workflow: Schema.optionalKey(Schema.String),
 } satisfies FrozenStepFields;
 
 /** A field under each former name of a key (`FORMER_KEYS`), checked as the key it is now: what `asNamed` moves onto that key. */

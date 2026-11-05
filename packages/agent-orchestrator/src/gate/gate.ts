@@ -7,9 +7,8 @@ import { andList, tryOf, type Run, type StepStatus } from '../record/record.ts';
 import { heard, modeWord, retryable } from '../retry/index.ts';
 import { approvalOf, approvedFirst, branchWord, gatesOf, hasGate, notHandedOn, resultOnBase, standing } from '../status/status.ts';
 import { heldRefusal, prunedRefusal } from '../prune/prune.ts';
-import { routeLine } from '../routed/routed-lines.ts';
+import { routeLine, runWords } from '../routed/index.ts';
 import { firstPiece } from '../piece/piece.ts';
-import { runWords } from '../routed/routed-words.ts';
 import type { ApprovalRefusal, HoldsOpen } from '../../contracts/gate.contract.ts';
 
 /**

@@ -20,7 +20,7 @@ import {
   type TaskPhase,
 } from '../record/record.ts';
 import type { Closeout } from '../closeout/index.ts';
-import { runWords } from '../routed/routed-words.ts';
+import { runWords } from '../routed/index.ts';
 import {
   acceptanceOf,
   askedAgain,

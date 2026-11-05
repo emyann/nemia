@@ -990,7 +990,7 @@ nothing journalled; so is a limit on a remote agent, whose process is the other 
 `defaultLimits: { memory: '6Gi' }` writes it onto every task filed with no `resources` of its own, as a LimitRange's default is
 written into a Pod at admission: the `filed` entry says what each task ran under, and a new default never changes a task already
 filed. A remote agent's task is never given the default, so a default makes no remote task unfileable. `Engine.layer` refuses a
-`defaultLimits.memory` it cannot read, and a `cgroupParent` that is not a slice's unit name (`nemia-sessions.slice`).
+`defaultLimits.memory` it cannot read, and a `cgroupParent` that is not a slice's unit name (`sessions.slice`).
 
 The limit is the host's to hold, as the kubelet holds a container's: a limited task's process tree runs in a transient scope of
 systemd's user manager (`scopeArgv`, `src/harness/cgroup.ts`) — `systemd-run --user --scope --quiet --collect

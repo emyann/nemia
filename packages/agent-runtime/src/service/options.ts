@@ -371,7 +371,7 @@ const limitsRefusalOf = (options: Omit<EngineOptions, 'root'>): string | undefin
   }
   const parent: unknown = options.cgroupParent;
   if (parent !== undefined && (typeof parent !== 'string' || !SLICE.test(parent) || parent === '-.slice')) {
-    return `\`cgroupParent: ${JSON.stringify(parent) ?? typeof parent}\` is not a systemd slice. Give a unit name ending \`.slice\`, like \`nemia-sessions.slice\`, or leave it out for the user manager's own.`;
+    return `\`cgroupParent: ${JSON.stringify(parent) ?? typeof parent}\` is not a systemd slice. Give a unit name ending \`.slice\`, like \`sessions.slice\`, or leave it out for the user manager's own.`;
   }
   return undefined;
 };

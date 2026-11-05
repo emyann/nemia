@@ -29,14 +29,14 @@ test('scopeArgv: the scope a limited task runs in, with and without a slice, and
     },
     {
       name: 'in a slice an operator caps',
-      argv: scopeArgv(8_589_934_592, 'nemia-sessions.slice'),
+      argv: scopeArgv(8_589_934_592, 'sessions.slice'),
       is: [
         'systemd-run',
         '--user',
         '--scope',
         '--quiet',
         '--collect',
-        '--slice=nemia-sessions.slice',
+        '--slice=sessions.slice',
         '-p',
         'MemoryMax=8589934592',
         '-p',

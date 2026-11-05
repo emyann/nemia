@@ -309,10 +309,10 @@ transcript saved, when it has one" (`sdk.d.ts:6100-6103`); this is what that sav
 Not Claude Code's own, but the host every harness runs on: what a scope of systemd's user manager does to a limited task's process
 tree (`resources.limits.memory`, `src/harness/cgroup.ts`), measured **2026-11-05 on systemd 255, kernel 6.6 (WSL2), Node 24.20**.
 
-- **Inside `nemia.service`, `systemd-run --user --scope … -p MemoryMax=67108864 -p MemorySwapMax=0 -p OOMPolicy=continue -- sh -c
+- **Inside a user service's cgroup (the engine's daemon run as a unit of the user manager), `systemd-run --user --scope … -p MemoryMax=67108864 -p MemorySwapMax=0 -p OOMPolicy=continue -- sh -c
   '<node allocating forever>'` ends the node child alone**: it is `Killed` (137), the shell lives on and reads its scope's
-  `memory.events` `oom_kill 1` and `memory.peak` 67108864. The scope is `/user.slice/…/app.slice/run-r<id>.scope`, outside
-  `nemia.service`; a `--slice=<new>.slice` is made on demand.
+  `memory.events` `oom_kill 1` and `memory.peak` 67108864. The scope is `/user.slice/…/app.slice/run-r<id>.scope`, outside the
+  service's cgroup; a `--slice=<new>.slice` is made on demand.
 - **The worker in the scope beside its harness is the OOM killer's pick unless it is told otherwise**: at 64Mi, the worker
   (`node bin/ae-worker.ts`) running a `node -e` harness whose child allocates 16 MB at a time was itself `Killed`, its run file left
   `working` until the lease called it dead. With the harness given `oom_score_adj` 500 (its children inherit it; raising one's own

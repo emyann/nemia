@@ -621,7 +621,7 @@ test('the engine refuses what it cannot be built from — a `maxConcurrent` that
           root: scratch('ae-engine-verbs-root-'),
           journal: asyncStore(memoryJournal()),
           defaultLimits: { memory: '6Gi' },
-          cgroupParent: 'nemia-sessions.slice',
+          cgroupParent: 'sessions.slice',
         }),
       ),
     );

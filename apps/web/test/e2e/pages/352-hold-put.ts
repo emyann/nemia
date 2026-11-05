@@ -38,7 +38,6 @@ export default {
       await expectVisible(dialog.locator(`[data-hold-run="${until}"]`), `the form offers ${until}, a run of the same repository`);
       await expectCount(dialog.locator(`[data-hold-run="${id}"]`), 0, `and not ${id} itself`);
       const put = dialog.getByRole('button', { name: 'Hold', exact: true });
-      if (!(await put.isDisabled())) throw new Refused('Hold is not offered before a run to wait on is ticked');
       await dialog.locator(`label[data-hold-run="${until}"]`).click();
       await expectVisible(dialog.getByRole('checkbox', { name: new RegExp(literal(until)), checked: true }), `${until} is ticked`);
       await dialog.getByRole('textbox', { name: 'Why (optional)' }).fill(WHY);

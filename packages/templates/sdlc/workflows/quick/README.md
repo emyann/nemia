@@ -26,8 +26,8 @@ The factory's `github` parameter, set when the template is applied, picks one, a
 steps' checks are each one shell `if` on the rendered value, and the notes of implement, review and land each open with the answer and
 hold a part for each.
 
-- **`github: false`, the default: in this checkout.** The implement step's check runs `change.ts size`, `probe.ts`, `parts.ts` and the local
-  check, in that order, and nothing else: the local check is the factory's `localCheck` parameter (the repository's lint, typecheck and test, where it
+- **`github: false`, the default: in this checkout.** The implement step's check runs `change.ts size`, `probe.ts`, `parts.ts`, the factory's
+  own check, its `implementCheck` parameter, and the local check, in that order, and nothing else: the local check is the factory's `localCheck` parameter (the repository's lint, typecheck and test, where it
   has them, by default), on the round's tree. Nothing is pushed and no pull request is opened. Land stages every result branch in one
   `git merge --no-ff --no-commit`, as the git place's skill says (*Stage a landing*); its check runs `localCheck` again, on the merged
   tree, and the run commits the merge on its exit 0 and takes it back otherwise.
@@ -36,8 +36,8 @@ hold a part for each.
 
 ## The implement step's check
 
-On GitHub, the check is the cheap set, and CI: it runs `change.ts size`, `probe.ts`, `parts.ts`, `pull-request.ts push`
-and `pull-request.ts wait --check <name>`, in that order, and nothing else.
+On GitHub, the check is the cheap set, and CI: it runs `change.ts size`, `probe.ts`, `parts.ts`, the factory's own check, its
+`implementCheck` parameter, `pull-request.ts push` and `pull-request.ts wait --check <name>`, in that order, and nothing else.
 Each script is read from the run's frozen workflow files (`node "$WF_WORKFLOW_FILES/<script>.ts"`, the copy of this folder the run
 took when it began), never from the tree it judges; where `WF_WORKFLOW_FILES` is not set, the check says so on stderr and fails. The
 run copies this folder alone, so it carries `build`'s `probe.ts`, `parts.ts`, `pull-request.ts` and `landing.ts` as copies of its own, equal to
@@ -52,7 +52,11 @@ run copies this folder alone, so it carries `build`'s `probe.ts`, `parts.ts`, `p
 3. `build`'s `parts.ts`, quick's copy of it: every other branch of the run (`wf/<run>/<part>`) is held by the branch, by patch,
    or was declared replaced (`parts.ts replaced <part>`, which removes it and keeps its tip under `refs/backup/`), so the landing
    finds no result branch left out.
-4. `build`'s `pull-request.ts`, quick's copy of it: `push` pushes the branch and refuses unless the one open, non-draft
+4. The factory's own check, its `implementCheck` parameter, either way: a command of the factory's own (a script it keeps in
+   both workflows' folders is read as `node "$WF_WORKFLOW_FILES/<script>.ts"`), so a factory adds a check by setting it rather than
+   by editing the check line or these sentences. A non-zero exit refuses the round before anything is pushed or the local check runs;
+   `true`, the default, checks nothing.
+5. `build`'s `pull-request.ts`, quick's copy of it: `push` pushes the branch and refuses unless the one open, non-draft
    pull request of it is at the commit the check judges, and labels that pull request from the run's labels by the factory's
    `pullRequestLabels` rules (`<key>=<value>:<label>`; empty, the default, labels nothing), as `build`'s README says, and as
    the implement step's `open` already did when it created the pull request; `wait` polls the CI context the factory names (its `ciCheck`

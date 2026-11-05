@@ -233,10 +233,11 @@ test('the labels the parity seeds show on the lines a person asks them on', asyn
   const either = await nemia(['inbox', '-l', 'team=core', '-l', 'team=docs']);
   assert.match(either.out, /^cache-the-views /m, 'one selector takes a card');
   assert.match(either.out, /^tidy-the-docs /m, 'and another takes another');
-  assert.doesNotMatch(either.out, /^notes\.txt /m, 'and neither takes an entry with no labels');
+  assert.doesNotMatch(either.out, /^hold-the-reads /m, 'and neither takes a card with no labels');
   const cards = await nemia(['inbox', '-L', 'team']);
   assert.match(cards.out, /^cache-the-views .*  team: core$/m, "a card's column");
-  assert.match(cards.out, /^notes\.txt .*  team: <none>$/m, 'an entry with no such key says none');
+  assert.match(cards.out, /^hold-the-reads .*  team: <none>$/m, 'a card with no such key says none');
+  assert.doesNotMatch(cards.out, /^notes\.txt /m, 'an entry that is no card is listed by no client, as the Card list leaves it out');
 });
 
 for (const [argv, route] of READS)

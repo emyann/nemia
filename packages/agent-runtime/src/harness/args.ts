@@ -120,6 +120,13 @@ export type HarnessArgs = {
    */
   niceness?: number;
   /**
+   * A file the command may write its last words to, as a Pod's container gives its `terminationMessagePath`: read once by the
+   * runtime when the process exits, at most `TERMINATION_MESSAGE_BYTES`, and kept on the attempt as its `terminationMessage`, none
+   * where the file is missing or no regular file. Its stdout never answers for it. Read by a `HarnessSpec` with `commandArgs` alone,
+   * and refused on any other harness. Refused unless an absolute path with no NUL in it.
+   */
+  terminationMessagePath?: string;
+  /**
    * The folders beyond its `cwd` the session may reach, as a Pod's container is given its volume mounts: each an absolute path, and
    * whether the session may only read it (`Mount`). Each harness renders them its own way, and one that cannot hold a mount's mode
    * refuses the task before it is journalled (`HarnessSpec.mounts`): Claude Code gives each one `--add-dir` and denies an edit
@@ -177,6 +184,7 @@ const KEYS: Record<keyof HarnessArgs, true> = {
   command: true,
   env: true,
   niceness: true,
+  terminationMessagePath: true,
   mounts: true,
   callAdmission: true,
   mayAsk: true,
@@ -458,11 +466,12 @@ const ENV_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
 const isArg = (v: unknown): v is string => typeof v === 'string' && !v.includes(String.fromCharCode(0));
 
 /**
- * Why a task's `command`, `env` or `niceness` cannot reach a process — or `undefined`: a `command` that is not a list whose first
- * entry names a program, or holds an entry that is no string or has a NUL; an `env` that is not an object of variable names to
- * strings with no NUL; a `niceness` that is not a whole number from 0 to 19.
+ * Why a task's `command`, `env`, `niceness` or `terminationMessagePath` cannot reach a process — or `undefined`: a `command` that is
+ * not a list whose first entry names a program, or holds an entry that is no string or has a NUL; an `env` that is not an object of
+ * variable names to strings with no NUL; a `niceness` that is not a whole number from 0 to 19; a `terminationMessagePath` that is not
+ * an absolute path with no NUL.
  */
-const commandArgsRefusalOf = ({ command, env, niceness }: HarnessArgs): string | undefined => {
+const commandArgsRefusalOf = ({ command, env, niceness, terminationMessagePath }: HarnessArgs): string | undefined => {
   if (command !== undefined && !(Array.isArray(command) && command.length > 0 && command[0] !== '' && command.every(isArg))) {
     return `\`command: ${JSON.stringify(command)}\` is not a command. Give the program and its arguments as a list of strings, the program first, like ["sh", "-c", "npm test"].`;
   }
@@ -481,6 +490,9 @@ const commandArgsRefusalOf = ({ command, env, niceness }: HarnessArgs): string |
   }
   if (niceness !== undefined && !(Number.isSafeInteger(niceness) && niceness >= 0 && niceness <= 19)) {
     return `\`niceness: ${shown(niceness)}\` is not a niceness. Give a whole number from 0 to 19, like 10, or leave it out for the worker's own priority.`;
+  }
+  if (terminationMessagePath !== undefined && !(isArg(terminationMessagePath) && path.isAbsolute(terminationMessagePath))) {
+    return `\`terminationMessagePath: ${JSON.stringify(terminationMessagePath)}\` is not an absolute path. Give the file the command writes its last words to from the root, like "/tmp/run/said", or leave it out.`;
   }
   return undefined;
 };

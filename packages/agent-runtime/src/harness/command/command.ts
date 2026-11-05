@@ -6,7 +6,7 @@ import { spawnSync } from 'node:child_process';
 import type { HarnessSpec } from '../detached/detached.ts';
 
 /** The arguments of a task the command harness reads; any other is refused (`commandHarness.refuses`). */
-const OWN: readonly string[] = ['command', 'env', 'niceness'];
+const OWN: readonly string[] = ['command', 'env', 'niceness', 'terminationMessagePath'];
 
 /** Whether `ionice -c3` runs under `nice`, asked once a process, by running the two as a command would. */
 let idleIoRuns: boolean | undefined;
@@ -63,7 +63,7 @@ export const commandHarness: HarnessSpec = {
       (key) => !OWN.includes(key) && task.config?.[key as keyof typeof task.config] !== undefined,
     );
     if (other !== undefined) {
-      return `\`${other}\` is an argument of an agent's harness, and the command harness runs a process, not an agent: it reads \`command\`, \`env\` and \`niceness\` alone. Leave \`${other}\` off a command task.`;
+      return `\`${other}\` is an argument of an agent's harness, and the command harness runs a process, not an agent: it reads \`command\`, \`env\`, \`niceness\` and \`terminationMessagePath\` alone. Leave \`${other}\` off a command task.`;
     }
     return undefined;
   },

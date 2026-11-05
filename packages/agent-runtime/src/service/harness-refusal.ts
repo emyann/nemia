@@ -26,8 +26,8 @@ import { heldHarnessesOf, isClaude, isRemote, isSpec, type HarnessConfig, type T
  *    system prompt would be read by nobody;
  * 6. a `codex` on any harness but a `HarnessSpec` with `codexArgs` (`codexArgsMisplaced`): its session would start without
  *    the trust it names;
- * 7. a `command` or a `niceness` on any harness but a `HarnessSpec` with `commandArgs` (`commandArgsMisplaced`): its
- *    session would run something else than the process they name;
+ * 7. a `command`, a `niceness` or a `terminationMessagePath` on any harness but a `HarnessSpec` with `commandArgs`
+ *    (`commandArgsMisplaced`): its session would run something else than the process they name;
  * 7a. an `env` on a harness that spawns no process of the session's own (`envMisplaced`): a remote agent, a `HarnessSpec` with
  *    neither `commandArgs` nor `env`; its session would start without it;
  * 7b. a mount in `mounts` on a harness that does not hold its mode (`mountsMisplaced`): a remote agent, a `HarnessSpec` whose
@@ -43,8 +43,8 @@ import { heldHarnessesOf, isClaude, isRemote, isSpec, type HarnessConfig, type T
  * 9. what the harness's own `refuses` refuses: Claude Code's lists, a spec's, or a remote agent's (`remoteRefuses`).
  *
  * A `RunnerOps` brought as its own is the consumer's: it is handed a `contextTokens`, a `claude.remoteControl`, a `claude`, a
- * `codex`, a `command`, an `env`, a `niceness`, `mounts`, `callAdmission`, `projectMcp` and `enabledSkills`, and asked nothing
- * here: its own `refuses`, if it has one, is asked by `file` through the `Runner`.
+ * `codex`, a `command`, an `env`, a `niceness`, a `terminationMessagePath`, `mounts`, `callAdmission`, `projectMcp` and
+ * `enabledSkills`, and asked nothing here: its own `refuses`, if it has one, is asked by `file` through the `Runner`.
  */
 export const harnessRefusalOf = (spec: TaskSpec & { harness: string }, harnesses: Record<string, HarnessConfig>): string | undefined => {
   const h = own(harnesses, spec.harness);
@@ -257,8 +257,9 @@ const mountsMisplaced = (
 };
 
 /**
- * Why a task's `command` or `niceness` cannot go on its harness — or `undefined`: they are the arguments of a harness that runs a
- * process (`commandArgs`), and any other would run its own session without them. A `RunnerOps` brought as its own is not asked.
+ * Why a task's `command`, `niceness` or `terminationMessagePath` cannot go on its harness — or `undefined`: they are the arguments
+ * of a harness that runs a process (`commandArgs`), and any other would run its own session without them. A `RunnerOps` brought
+ * as its own is not asked.
  */
 const commandArgsMisplaced = (
   spec: TaskSpec & { harness: string },
@@ -267,12 +268,12 @@ const commandArgsMisplaced = (
 ): string | undefined => {
   const runsCommands = (o: HarnessConfig) => isSpec(o) && o.commandArgs === true;
   const ownRunner = !(isClaude(h) || isSpec(h) || isRemote(h));
-  const key = (['command', 'niceness'] as const).find((k) => spec.config?.[k] !== undefined);
+  const key = (['command', 'niceness', 'terminationMessagePath'] as const).find((k) => spec.config?.[k] !== undefined);
   if (key === undefined || ownRunner || runsCommands(h)) return undefined;
   const takers = Object.entries(harnesses)
     .filter(([, o]) => runsCommands(o))
     .map(([name]) => `\`${name}\``);
-  return `\`${key}\` names a process to run, and the \`${spec.harness}\` harness runs a session of its own: it would start without it. ${takers.length ? `File the task on ${takers.join(' or ')}, or leave \`${key}\` off.` : `Leave \`${key}\` off: none of this engine's harnesses runs a command.`}`;
+  return `\`${key}\` is an argument of a process the runtime runs, and the \`${spec.harness}\` harness runs a session of its own: it would start without it. ${takers.length ? `File the task on ${takers.join(' or ')}, or leave \`${key}\` off.` : `Leave \`${key}\` off: none of this engine's harnesses runs a command.`}`;
 };
 
 /**

@@ -232,6 +232,7 @@ export const reconcile = Effect.fn('reconcile')(function* (taskId: string, obser
 const endFacts = (state: State, n: number, seen: Sighting | undefined) => ({
   usage: seen?.usage,
   exitCode: seen?.exitCode,
+  terminationMessage: seen?.terminationMessage,
   denials: seen?.denials,
   skills: seen?.skills,
   files: seen?.files,

@@ -27,9 +27,9 @@ const refusedBy = (ops: RunnerOps, t: Asked) =>
     }).pipe(Effect.provide(Runner.layer(ops))),
   );
 
-test('argsRefusalOf: where a key is and whether it is one — the twenty arguments, each beside `config` refused naming where it goes, a `config` that is no object, a key that is no argument — said before what a value is', async (t) => {
+test('argsRefusalOf: where a key is and whether it is one — the twenty-one arguments, each beside `config` refused naming where it goes, a `config` that is no object, a key that is no argument — said before what a value is', async (t) => {
   await t.test(
-    "HARNESS_ARGS is the twenty arguments a harness takes — the spend cap, the mounts, a call's admission, whether a person can be asked, Claude Code's own flags, Codex's and a command's among them, and remoteControl not: it is one of those flags",
+    "HARNESS_ARGS is the twenty-one arguments a harness takes — the spend cap, the mounts, a call's admission, whether a person can be asked, Claude Code's own flags, Codex's and a command's among them, and remoteControl not: it is one of those flags",
     () => {
       assert.deepEqual([...HARNESS_ARGS].sort(), [
         'allowedTools',
@@ -50,6 +50,7 @@ test('argsRefusalOf: where a key is and whether it is one — the twenty argumen
         'niceness',
         'permissionMode',
         'projectMcp',
+        'terminationMessagePath',
         'tools',
         'worktree',
       ]);
@@ -108,6 +109,7 @@ test('argsRefusalOf: where a key is and whether it is one — the twenty argumen
         command: ['sh', '-c', 'npm test'],
         env: { CI: '1' },
         niceness: 10,
+        terminationMessagePath: '/tmp/said',
         mounts: [{ path: '/repo', readOnly: true }],
         callAdmission: { command: ['my-admit'], tools: ['Bash'] },
         mayAsk: true,

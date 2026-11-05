@@ -65,6 +65,8 @@ export type Sighting = {
   usage?: Usage;
   /** How the harness's process exited. A fact about the process, not a verdict on the work. */
   exitCode?: number;
+  /** What the process left in its task's `terminationMessagePath` when it exited, for a harness that reads one. */
+  terminationMessage?: string;
   /**
    * What the workload said when it finished, and WHEN it said it — present only for a harness that
    * can take a structured final answer, and only once one was given.
@@ -354,9 +356,10 @@ export type EndReason = 'harness' | 'lost' | 'unstartable' | 'operator' | 'deadl
  * - `spawned`: RESULT — the spawn call returned, and the session is the harness's problem now. `error` when the call
  *   failed without the harness vouching that nothing started: whether a session exists is then the grace window's to
  *   find out.
- * - `ended`: an attempt reached a terminal state, as observed — never as assumed. `usage`, `exitCode`, `denials`, `skills`,
- *   `files`, `ranOn` and `limit` come from the same sighting, when its runner measured them; `decide` reads none of them. `parked`,
- *   from the same sighting, says the job ended itself under a sessions' drain (`Parked`): `decide` reads it, and continues the job.
+ * - `ended`: an attempt reached a terminal state, as observed — never as assumed. `usage`, `exitCode`, `terminationMessage`,
+ *   `denials`, `skills`, `files`, `ranOn` and `limit` come from the same sighting, when its runner measured them; `decide` reads
+ *   none of them. `parked`, from the same sighting, says the job ended itself under a sessions' drain (`Parked`): `decide` reads
+ *   it, and continues the job.
  *   `closedOut`, on an end read off a sighting of a task that asked for a closing statement: whether one came. A fact, never a
  *   verdict — `decide` does not read it, and the layer above judges what a missing statement means. Absent from an end an older runtime
  *   wrote, and from an end with no sighting behind it (`lost`, `unstartable`, a cut). `former`, on an end an older runtime gave a
@@ -473,6 +476,7 @@ export type Event =
       former?: FormerReason;
       usage?: Usage;
       exitCode?: number;
+      terminationMessage?: string;
       denials?: Denial[];
       skills?: string[];
       files?: string[];
@@ -552,6 +556,11 @@ export type Attempt = {
   usage: Usage | null;
   /** How its process exited; `null` for a harness whose process is not ours, or one that never exited. */
   exitCode: number | null;
+  /**
+   * What its process left in its task's `terminationMessagePath` at its exit, at most 4096 bytes; absent where it left none, or its
+   * task named no file. Carried, never read.
+   */
+  terminationMessage?: string;
   /** The tool calls its harness denied, when it denied any and said so. Carried, never read. */
   denials?: Denial[];
   /** The skills its session loaded, `[]` for none, when its harness said. Carried, never read. */
@@ -656,6 +665,7 @@ function endAttempt(a: Attempt, e: Extract<Event, { kind: 'ended' }>): void {
   if (e.former !== undefined) a.former = e.former;
   a.usage = e.usage ?? a.usage;
   a.exitCode = e.exitCode ?? null;
+  if (e.terminationMessage !== undefined) a.terminationMessage = e.terminationMessage;
   if (e.denials?.length) a.denials = e.denials;
   if (e.skills) a.skills = e.skills;
   if (e.files) a.files = e.files;

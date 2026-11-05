@@ -12,6 +12,7 @@ import type { Closeout } from '../closeout/index.ts';
 import { fieldsOf, itemsOf, sameSchema } from '../shape/shape.ts';
 import type { Workflow } from '../step/step.ts';
 import { downstreamOf } from '../workspace/workspace.ts';
+import { tryOf, type Run } from '../record/record.ts';
 
 /** A budget for one step, by its name, in dollars: what a gated step proposes, what a person gives, or a step's own `budget:`. */
 export type StepBudget = { step: string; usd: number };
@@ -185,3 +186,29 @@ export const ceilingsOf = (steps: readonly Workflow[]): StepBudget[] =>
  * the api's fold of a body's `budgets` hands the command, so both sides are read by one parser.
  */
 export const budgetArgs = (budgets: readonly StepBudget[]): string[] => budgets.map((b) => `${b.step}=${String(b.usd)}`);
+
+/**
+ * The caps the approvals in force set for a step, the earliest given first: each approval of a try its step is still on (`approvalOf`'s
+ * rule: one of an earlier try was spent by the try after it) that names the step among its `budgets`. Read from the person's files as
+ * `readRun` composes them, on every pass. Pure.
+ */
+export const approvedCapsOf = (run: Run, step: string): number[] =>
+  (run.approvals ?? [])
+    .filter((a) => a.try === tryOf(run, a.step))
+    .sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0))
+    .flatMap((a) => {
+      const usd = a.budgets?.[step];
+      return usd === undefined ? [] : [usd];
+    });
+
+/**
+ * The cap in force on a step (`capInForce`): the last a person raised it to (`EarlierTry.budget`: `nemia retry --budget`, `nemia retry
+ * --round --budget`), else the last cap an approval in force set for it (`approvedCapsOf`: `nemia approve --budget`, or the budgets its
+ * gated step proposed), else its `budget:`. Read from the record and the approvals on every pass, nothing carried.
+ */
+export const budgetOf = (step: Workflow, run: Run): number | undefined =>
+  capInForce({
+    raised: [...(run.steps[step.name]?.tries ?? [])].reverse().find((t) => t.budget !== undefined)?.budget,
+    approved: approvedCapsOf(run, step.name),
+    workflow: step.budget,
+  });

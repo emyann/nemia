@@ -1,13 +1,12 @@
 /**
- * `definitionRevision` (`pin.verb.ts`): the ledger's number for what a definition holds now, read through the Ledger door and never
+ * `definitionRevision` (`revisions.store.ts`): the ledger's number for what a definition holds now, read through the Ledger door and never
  * appended — the number a resolve of that content was given, or one past the highest for a content the ledger has not seen.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Effect } from 'effect';
 import { ledgerDoorMemory } from './memory.store.ts';
-import { LedgerDoor } from './revisions.store.ts';
-import { definitionRevision } from './pin.verb.ts';
+import { definitionRevision, LedgerDoor } from './revisions.store.ts';
 
 test('a definition reads the number its content was appended at, an unseen one the next, and nothing is appended', () => {
   const program = Effect.gen(function* () {

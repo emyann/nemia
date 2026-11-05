@@ -385,8 +385,6 @@ const PINNED: Record<string, string[]> = {
     'driftWords',
     'driftNow',
     'definitionRevision',
-    'definitionServed',
-    'definitionWriteRefusal',
     'kindsDrift',
     'ledgerOf',
     'revisionNow',
@@ -776,6 +774,8 @@ const PINNED: Record<string, string[]> = {
   ],
   'agent-orchestrator/testing': ['MEMORY_AGENTS', 'agentDoorMemory', 'skillDoorMemory', 'testPlace'],
   'agent-orchestrator/workflow': [
+    'definitionServed',
+    'definitionWriteRefusal',
     'AGENTS_FOLDER',
     'AGENT_KEYS',
     'AGENT_OWN_KEYS',

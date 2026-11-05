@@ -32,6 +32,16 @@ const TRIAGE = (): Workflow[] => [
 const changed = (name: string, change: (s: Workflow) => Workflow, steps = TRIAGE()): Workflow[] =>
   steps.some((s) => s.name === name) ? steps.map((s) => (s.name === name ? change(s) : s)) : [...steps, change(step(name))];
 
+/** The triage workflow with triage a judge on the reviewer, read-only (`dontAsk`), with what `keys` change of it. */
+const judged = (keys: Partial<Workflow> = {}): Workflow[] =>
+  changed('triage', (s) => ({
+    ...s,
+    route: { kind: 'judge' },
+    agent: { name: 'reviewer', keys: [], body: '', given: {} },
+    permissionMode: 'dontAsk',
+    ...keys,
+  }));
+
 const refusedAtLoad = (steps: Workflow[]): void => {
   assert.throws(
     () => validate(steps),
@@ -41,7 +51,14 @@ const refusedAtLoad = (steps: Workflow[]): void => {
 
 test('load refuses a workflow whose routes do not close', async (t) => {
   const rows: Array<[string, Workflow[]]> = [
-    ['a judge, which owes no route until it is built', changed('triage', (s) => ({ ...s, route: { kind: 'judge' } }))],
+    ['a judge whose agent runs in a mode that writes', judged({ permissionMode: 'acceptEdits' })],
+    ['a judge whose agent writes with its tools, unasked', judged({ permissionMode: 'auto', tools: ['Read', 'Edit'] })],
+    ['a judge with no agent whose own fence writes', judged({ agent: undefined, permissionMode: 'auto' })],
+    ['a judge on codex in a sandbox that writes', judged({ harness: 'codex', permissionMode: undefined, sandbox: 'workspace-write' })],
+    [
+      'a judge whose output declares route, which the run owes it',
+      judged({ output: { file: 'o.json', schema: { ...PLAN_SCHEMA, properties: { route: { type: 'string' } }, required: ['route'] } } }),
+    ],
     ['a when: naming a route the condition does not declare', changed('build-web', (s) => ({ ...s, when: ['mobile'] }))],
     ['a when: on a node that waits on no condition', changed('notes', (s) => ({ ...s, when: ['web'] }))],
     [
@@ -144,6 +161,10 @@ test('load takes a workflow whose routes close', async (t) => {
         TRIAGE().map((s) => (s.name === 'notes' ? { ...s, after: ['build-backend', 'review'] } : s)),
       ),
     ],
+    ['a judge with a budget, on a read-only agent', judged({ budget: 2 })],
+    ['a judge on an agent whose tools write nothing', judged({ permissionMode: 'auto', tools: ['Read', 'Grep'] })],
+    ['a judge on codex, read-only', judged({ harness: 'codex', permissionMode: undefined, sandbox: 'read-only' })],
+    ['a judge with no agent nor fence of its own, which a factory hires into', judged({ agent: undefined, permissionMode: undefined })],
     ['a workflow node on a route', changed('build-backend', (s) => ({ ...s, workflow: 'build' }))],
     ['a workflow without the routing keys', [step('implement'), step('review', ['implement'])]],
   ];

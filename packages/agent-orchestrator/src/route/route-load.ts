@@ -2,35 +2,27 @@
  * What load refuses of a workflow's routing (the design's §1): `routeRefusal`, which `validate` calls beside its loops' rules. Pure.
  */
 import type { Workflow } from '../step/step.ts';
+import { judgeRefusal, type JudgeFence } from './judge.ts';
 
 /**
  * Why a workflow's routing cannot run, or `undefined` where it closes (the design's §1, *What load refuses*): every `when:` waits on
  * exactly one condition and names its routes, and none it ends on (`whenRefusal`); every route is taken by a node or ended on, a table is
  * closed over its producer's enum and the condition's routes, and a condition cuts no workspace, has no check, files no try of its own and
  * spends no budget but a judge's (`conditionRefusal`); a workflow node files a card and nothing else (`workflowNodeRefusal`). The loops'
- * own rule, that no span crosses a condition, is `validate`'s, beside the loops'.
+ * own rule, that no span crosses a condition, is `validate`'s, beside the loops'. A judge's fence writes nothing (`judgeRefusal`, by
+ * the fence's own judgement, which `validate` hands in), unless it is left to a hire.
  */
-export function routeRefusal(steps: readonly Workflow[]): string | undefined {
+export function routeRefusal(steps: readonly Workflow[], fence: JudgeFence): string | undefined {
   const byName = new Map(steps.map((s) => [s.name, s]));
   for (const s of steps) {
     const refused =
-      judgeRefusal(s) ??
+      judgeRefusal(s, fence, true) ??
       whenRefusal(s, byName) ??
       (s.routes === undefined ? undefined : conditionRefusal(s, steps, byName)) ??
       workflowNodeRefusal(s);
     if (refused !== undefined) return refused;
   }
   return undefined;
-}
-
-/**
- * Why a condition may not be a judge yet: a judge's closeout owes no `route` field, its mode is not held read-only, and its brief names no
- * target, so it would run as a session that may write and sign off with no route, its followers waiting for good.
- */
-function judgeRefusal(s: Workflow): string | undefined {
-  return s.route?.kind === 'judge'
-    ? `${s.name}: \`route: judge\` is not built yet: a judge's closeout would owe no route. Give the condition a table (\`route: { from: <step>.<field>, table: { <value>: <route> } }\`) or a script (\`route: { script: <path> }\`).`
-    : undefined;
 }
 
 /** Why a node's `when:` takes no route: it waits on no condition or on two, names a route its condition lacks, or one it ends on. */

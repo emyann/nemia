@@ -310,6 +310,12 @@ export const DEFAULT_ROUNDS = 3;
 export const LOOP_REPLIES = 'replies';
 
 /**
+ * The field the run adds to a judge's closeout (`route: judge`): the route it took, one of its condition's `routes:`. The run's, so a
+ * judge's `output:` may not declare it (`judgeRefusal`, route/judge.ts); its schema is `judgeRouteSchema` in closeout.ts.
+ */
+export const JUDGE_ROUTE = 'route';
+
+/**
  * A step's declared output: the file as the step names it (its agent's where the step names none), the schema at `nemia start` — its
  * agent's fields and its own, merged (`mergedOutput`) — and the one owner of each field, where the step hires an agent.
  */

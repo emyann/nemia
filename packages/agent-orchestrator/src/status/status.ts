@@ -6,8 +6,9 @@
  * it reads the record alone.
  */
 import type { Verdict } from '../check/check.ts';
-import { DEFAULT_ROUNDS, endsOnBase, LOOP_REPLIES, outputFields, type Workflow } from '../step/step.ts';
+import { DEFAULT_ROUNDS, endsOnBase, JUDGE_ROUTE, LOOP_REPLIES, outputFields, type Workflow } from '../step/step.ts';
 import { loopSpan } from '../workflow/index.ts';
+import { isJudge } from '../route/index.ts';
 import type { TaskClock } from '../timeline/index.ts';
 import { declaredOutput, isLoopTarget, type Closeout } from '../closeout/index.ts';
 import { closeoutRefusals } from '../question/index.ts';
@@ -800,11 +801,12 @@ export function askingTry(steps: readonly Workflow[], run: Run, name: string): {
 
 /**
  * The fields a step's closeout must give on the try it is on: what its `output:` declares, and `replies` on a loop's target past round 1 —
- * where an empty list is no answer (`declaredOutput`).
+ * where an empty list is no answer (`declaredOutput`) — and `route` on a judge (`JUDGE_ROUTE`).
  */
 export const owedFields = (step: Workflow, run: Run, steps: readonly Workflow[]): string[] => [
   ...outputFields(step),
   ...(owesReplies(steps, run, step.name) ? [LOOP_REPLIES] : []),
+  ...(isJudge(step) ? [JUDGE_ROUTE] : []),
 ];
 
 /**

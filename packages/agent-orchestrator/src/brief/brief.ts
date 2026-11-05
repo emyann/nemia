@@ -31,6 +31,7 @@ import { INPUTS_HEADING, inputsLine, mountsLine } from '../start/index.ts';
 import { resultSteps, workChecks } from '../branches/index.ts';
 import { costsSection, type WorkflowCosts } from '../costs/index.ts';
 import { sayFilled, skillSaid, type PlaceSay } from '../place/place.ts';
+import { judgeSection } from '../route/index.ts';
 
 /**
  * What a step's place gives its brief: how an ending that lands on its check stages the merge and what it denies (`words`), and the
@@ -124,6 +125,8 @@ const opened = (step: Workflow): string => [PRECEDENCE, briefBody(step)].filter(
  * would name a commit behind it. Unless it has a check of its own, which the run executes on its merge (`landingContract`), it is told
  * the workflow's checks its work was judged by (`workChecks`).
  *
+ * A judge (`route: judge`) is told its routes, each with what it reaches or that it ends the run, and the `route` it owes (`judgeSection`).
+ *
  * @param closeoutOf How each step signed off. Read only for the steps this one names in `input:`.
  * @param artifactsDir The directory the run made for this step's files (`artifactsDir` in record.store.ts).
  * @param deps What the run made of this worktree's `node_modules` when it cut it (`provisionDeps` in worktree.store.ts).
@@ -172,7 +175,7 @@ export function composeBrief(
   ].join('\n');
   const again = againSection(step, run, steps, closeoutOf, inFolder, place.say, retry, round);
   if (retry?.resumed || round?.resumed) return again.slice(1) + contracts;
-  const given = givenSections(step, run, steps, closeoutOf, checked, place.say) + again;
+  const given = givenSections(step, run, steps, closeoutOf, checked, place.say) + again + judgeSection(step, steps);
   const tree = depsLines(deps);
   const handed = handedOf(step, run, steps, closeoutOf, parents, costs);
 

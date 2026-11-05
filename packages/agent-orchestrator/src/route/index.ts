@@ -3,3 +3,5 @@ export { conditionOf, nodeFate, nodeKind, scriptRoute, tableRoute } from './rout
 export type { Fate, NodeKind, RouteTable, ScriptAnswer, ScriptRead, ScriptVerdict, TablePick } from './route.ts';
 export { routeWritten, routingOf } from './route-keys.ts';
 export { routeRefusal } from './route-load.ts';
+export { isJudge, judgeRefusal, judgeSection } from './judge.ts';
+export type { JudgeFence } from './judge.ts';

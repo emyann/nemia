@@ -2009,8 +2009,11 @@ A **condition** is a step with `routes:`: the closed list of names it picks amon
   condition's own task on the runtime's command harness. It is handed its request in a file and writes its answer to the file the
   runtime reads at exit and keeps on the attempt (a command task's `terminationMessagePath`); stdout cannot spoof it. Exit 0 with no
   answer that decodes reads `unsigned`, a non-zero exit `failed`, no exit `stopped`.
-- **A judge**: `route: judge`, a read-only session whose closeout says `route`, one of `routes:`. Not built yet: load refuses
-  `route: judge` until the run owes a judge's closeout its `route` and holds its mode read-only.
+- **A judge**: `route: judge`, a read-only session whose closeout says `route`, one of `routes:`: the run adds the field to its
+  closeout schema, and a closeout without it is unsigned. Its agent is its `agent:` or the one a factory hires into it (`nemia factory
+  hire <factory> <agent> --step <workflow>/<condition>`); load refuses a fence that writes (on Claude Code, `permissionMode: dontAsk`
+  with no `Edit` rule, or no tool that writes; on Codex, `sandbox: read-only`), and a start refuses one that nothing hired. Its brief
+  names each route with what it reaches — a step by its note's first line, a workflow node by its card — or that it ends the run.
 
 Any kind may answer `unsure` with its reason instead: the condition reads `blocked`, and a person names the route. A table or a script
 condition names no `agent:`. No condition has a workspace of its own: it cuts no worktree and commits nothing, and a step after it takes

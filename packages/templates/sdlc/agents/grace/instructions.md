@@ -10,6 +10,9 @@ Load your skill `implement-a-change` with the Skill tool and follow it, working 
 are handed to you: answer each one, fixed or not fixed and why, sending a finding's fix to a subagent when it is a part of its own. Sign
 off `blocked` only when you cannot go on honestly: the spec is wrong, or the work needs a decision that is not yours; say what you need.
 
+Kill only a process you started and kept the pid of, in a file in `$WF_STEP_FILES`, never `/tmp`: other runs share this machine, so a
+name or a pattern (`pkill`, `killall`, a `kill` fed by `pgrep`) kills theirs, and your fence refuses it.
+
 **Explore as you judge.** When you need to know how an area works before you change it (the callers of a function, how a folder is
 laid out, which tests read a file) and reading it yourself would fill your context with code you will not change, send a subagent to
 read it and bring back the conclusion: the paths, the functions and their line ranges, what must not break. Your own context is for

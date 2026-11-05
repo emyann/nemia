@@ -622,7 +622,6 @@ test('a check that refuses once, at length, is tried with no ask, its brief carr
   let run: RepositoryRun;
   const id = () => run.id;
   const try2 = () => `${id()}-implement-try2`;
-  /** A refusal longer than `nemia decide`'s screen of 20 lines: a red CI's failing jobs and their diffs. */
   const stderr = Array.from({ length: 150 }, (_, i) => `err ${i + 1}`).join('\n');
   const stdout = Array.from({ length: 40 }, (_, i) => `out ${i + 1}`).join('\n');
   await s.test('implement signs off, and its check refuses at length', async () => {

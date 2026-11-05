@@ -6,6 +6,7 @@
  * back. A key the template has no place for is refused by name.
  */
 import path from 'node:path';
+import { parse } from 'yaml';
 import { HARNESS_KNOBS } from 'agent-runtime/vocabulary';
 import type { Agent } from '../agents/agents.ts';
 import { DEFAULT_HARNESS, isRemoteHarness } from '../harness/harness.ts';
@@ -13,7 +14,7 @@ import { budgetOf, countOf, gateOf, readsNamesOf, rulesOf, serverNamesOf, skillN
 import { FACTORY_RULES_FILE } from '../rules/rules.ts';
 import { baseSpelled } from '../former/former.ts';
 import type { RevisionsPolicy } from '../factory/factory.ts';
-import { API_VERSION, HARNESS_FENCE_KEYS, type Profile, type Step } from './layout.ts';
+import { API_VERSION, HARNESS_FENCE_KEYS, type Profile, type Step, type TemplateRoute } from './layout.ts';
 
 /** A step as its file writes it: its name, its own keys as the parser names them (never its agent's), its body and its file. */
 export type StepSource = { name: string; keys: Readonly<Record<string, string>>; body: string; file: string };
@@ -74,6 +75,9 @@ const BLOCK_KEYS = ['model', 'effort', 'context'] as const;
 /** The step keys copied as they are, as strings. */
 const WORDS = ['place', 'workspace', 'check', 'loop'] as const;
 
+/** The step keys of a route read as lists: a condition's routes and those it ends on, and the routes a node runs on. */
+const ROUTE_LISTS = ['routes', 'ends', 'when'] as const;
+
 /** The step keys read as counts. */
 const COUNTED = ['rounds', 'retries', 'deadlineSeconds'] as const;
 
@@ -90,6 +94,9 @@ const PLACED = new Set<string>([
   'reads',
   'output',
   'tally',
+  'route',
+  'workflow',
+  ...ROUTE_LISTS,
   ...WORDS,
   ...COUNTED,
   ...BLOCK_KEYS,
@@ -142,7 +149,45 @@ function wiringOf(workflow: string, step: StepSource): Partial<Step> {
   if (keys.budget !== undefined) wired.budget = budgetOf(step.file, keys.budget);
   for (const key of WORDS.slice(2)) if (keys[key] !== undefined) wired[key] = keys[key];
   for (const key of COUNTED) if (keys[key] !== undefined) wired[key] = countOf(step.file, key, keys[key]);
-  return { ...wired, ...closeoutOf(workflow, step.file, keys) };
+  return { ...wired, ...routingOf(keys), ...closeoutOf(workflow, step.file, keys) };
+}
+
+/** What `keys` say of routing: a condition's routes, its `route:` and its ends, a node's `when:`, a workflow node's workflow. */
+function routingOf(keys: Readonly<Partial<Record<string, unknown>>>): Partial<Step> {
+  const wired: Record<string, unknown> = {};
+  for (const key of ROUTE_LISTS) {
+    const written = keys[key];
+    if (Array.isArray(written)) wired[key] = written.map(String);
+    else if (typeof written === 'string') wired[key] = listOf(written);
+  }
+  if (keys.route !== undefined) wired.route = templateRoute(keys.route) ?? keys.route;
+  if (typeof keys.workflow === 'string') wired.workflow = keys.workflow;
+  return wired;
+}
+
+/** A line's YAML value, or the line itself where it does not read as YAML. */
+const flowOf = (written: string): unknown => {
+  try {
+    return parse(written) as unknown;
+  } catch {
+    return written;
+  }
+};
+
+/**
+ * A `route:` as the template writes it, from the step's line: `judge`, or the map its YAML flow reads as (`{ script }`, `{ from, table }`),
+ * or the parser's `RouteEval` (its `kind` dropped). Undefined for none of them: the line is carried as written, for the check to refuse.
+ */
+function templateRoute(written: unknown): TemplateRoute | undefined {
+  const value = typeof written === 'string' ? flowOf(written) : written;
+  if (typeof value === 'string') return value.trim() === 'judge' ? 'judge' : undefined;
+  if (typeof value !== 'object' || value === null) return undefined;
+  const map = value as Record<string, unknown>;
+  if (map.kind === 'judge') return 'judge';
+  if (typeof map.script === 'string') return { script: map.script };
+  if (typeof map.from !== 'string' || typeof map.table !== 'object' || map.table === null) return undefined;
+  const table = Object.fromEntries(Object.entries(map.table).map(([from, to]) => [from, String(to)]));
+  return { from: map.from, table };
 }
 
 /** What `keys` of a step of `workflow` say of the store and its closeout: its reads, its own schema from the template's root, its tally. */

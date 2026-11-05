@@ -133,6 +133,16 @@ export type WorkflowStepSpec = {
   tally: string[];
   loop: string | null;
   rounds: number | null;
+  /** A condition's routes (`routes:`): null for a step that is no condition. */
+  routes: string[] | null;
+  /** How a condition answers, as its line writes it: `judge`, `{ script: <file> }` or `{ from: <step>.<field>, table: { … } }`. */
+  route: string | null;
+  /** The routes of its condition a node runs on (`when:`): null for every route. */
+  when: string[] | null;
+  /** The routes of a condition on which the run ends (`ends:`): null for none. */
+  ends: string[] | null;
+  /** The workflow a workflow node files a card for (`workflow:`). */
+  workflow: string | null;
 };
 
 /**
@@ -212,13 +222,14 @@ export type KeyRow = { key: string; value: string | null; meaning: string };
 
 /**
  * A step's value for `key`, as a row says it: a list joined, a count in digits, a context window in the package's one form (`200k`, as
- * `renderStep` writes it), `output:` as the file it names, and null for none.
+ * `renderStep` writes it), `output:` as the file it names, `route:` as its line (`routeLine`), and null for none.
  */
 function keyValue(step: Workflow, key: StepKey): string | null {
   const value = key === 'output' ? step.output?.file : key === 'agent' ? step.agent?.name : step[key];
   if (value === undefined) return null;
   if (key === 'context' && typeof value === 'number') return contextText(value);
   if (Array.isArray(value)) return value.length ? value.join(', ') : null;
+  if (typeof value === 'object') return key === 'route' && step.route ? routeLine(step.route) : null;
   return String(value);
 }
 
@@ -444,7 +455,25 @@ export const specOf = (step: Workflow): WorkflowStepSpec => ({
   output: step.output?.file ?? null,
   loop: step.loop ?? null,
   rounds: step.rounds ?? null,
+  ...routingOf(step),
 });
+
+/** A condition's keys and a node's, each null where the step does not say it. */
+const routingOf = (step: Workflow) => ({
+  routes: step.routes ?? null,
+  route: step.route ? routeLine(step.route) : null,
+  when: step.when ?? null,
+  ends: step.ends ?? null,
+  workflow: step.workflow ?? null,
+});
+
+/** A condition's `route:` as its line writes it, in YAML flow. */
+const routeLine = (route: NonNullable<Workflow['route']>): string => {
+  if (route.kind === 'judge') return 'judge';
+  if (route.kind === 'script') return `{ script: ${route.script} }`;
+  const rows = Object.entries(route.table).map(([value, to]) => `${value}: ${to}`);
+  return `{ from: ${route.from}, table: { ${rows.join(', ')} } }`;
+};
 
 const SHAPE =
   '`{ "workflow": "<name>", "brief": "<what to do>" }`, with `"from": "repo"` or `"yours"` when both have a workflow of that name, `"after": ["<runId>", …]` for the runs it waits on, `"context": ["<runId>", …]` for the runs it reads as context, `"card": "<name>"` for an inbox card it starts, and `"label": ["<key>=<value>", "<key>-", …]` for the labels it is started with';

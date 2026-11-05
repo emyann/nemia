@@ -87,6 +87,11 @@ export const KINDS: Readonly<Record<StepKey, KeyKind>> = {
   tally: 'list',
   loop: 'step',
   rounds: 'count',
+  routes: 'list',
+  route: 'text',
+  when: 'list',
+  ends: 'list',
+  workflow: 'text',
 };
 
 /** A flag that says either word. */

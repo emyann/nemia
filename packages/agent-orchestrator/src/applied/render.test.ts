@@ -296,6 +296,47 @@ test("what a render writes into a factory's tree, read back as today's folder re
   );
 });
 
+test('a condition, a node on one of its routes and a workflow node are rendered as their lines', async (t) => {
+  const routed = (steps: Array<Record<string, unknown>>) => {
+    const { dir } = exported();
+    edit(dir, 'workflows/dev/workflow.yaml', (spec) => spec.steps.push(...steps));
+    return rendered(dir);
+  };
+  const triage = { name: 'triage', after: ['implement'], routes: ['web', 'docs'], ends: ['docs'] };
+  const nodes = [
+    { name: 'build-web', after: ['triage'], when: ['web'] },
+    { name: 'to-build', after: ['triage'], when: ['web', 'docs'], workflow: 'build' },
+  ];
+  await t.test('routes:, ends:, when: and workflow: are written as the lines a step file says them in', () => {
+    const { tree, out } = routed([triage, ...nodes]);
+    const file = (name: string) => fs.readFileSync(path.join(tree, `workflows/dev/${name}.md`), 'utf8');
+    assert.deepEqual(out.refusals, []);
+    assert.match(file('triage'), /^routes: web, docs$/m);
+    assert.match(file('triage'), /^ends: docs$/m);
+    assert.match(file('build-web'), /^when: web$/m);
+    assert.match(file('to-build'), /^when: web, docs$/m);
+    assert.match(file('to-build'), /^workflow: build$/m);
+  });
+  const routes = [
+    ['judge', /^route: judge$/m],
+    [{ script: 'routes/pick.ts' }, /^route: \{ script: routes\/pick\.ts \}$/m],
+    [
+      { from: 'implement.surface', table: { web: 'web', docs: 'docs' } },
+      /^route: \{ from: implement\.surface, table: \{ web: web, docs: docs \} \}$/m,
+    ],
+  ] as const;
+  for (const [route, line] of routes)
+    await t.test(
+      `route: ${JSON.stringify(route)} is written as YAML flow`,
+      { todo: "the step file's writer (renderStep) writes a `route:` once the parser reads one" },
+      () => {
+        const { tree, out } = routed([{ ...triage, route }, ...nodes]);
+        assert.deepEqual(out.refusals, []);
+        assert.match(fs.readFileSync(path.join(tree, 'workflows/dev/triage.md'), 'utf8'), line);
+      },
+    );
+});
+
 test('what a render refuses by name, with nothing of it to write', async (t) => {
   await t.test('a file a render asks for that is no file of the template is refused, so a {path} cannot reach outside it', () => {
     const { dir } = exported();

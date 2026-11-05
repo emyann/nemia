@@ -5,10 +5,9 @@
  * is said to start is this process's `WF_DEFAULT_FACTORY_STARTS`, and the folder named in the last line this store's, as the in-process
  * command reads both.
  *
- * The list holds every card, each started card in its run's phase; the cards in play are kept here by their state (`IN_PLAY`, the
- * orchestrator's `CARD_IN_PLAY`), and `--all` keeps every card. `-l <selector>` is sent as `labelSelector`, given again for another; a
- * queued card's place is its place among every card queued and not started, in the order the tick starts them (`placesOf`, the
- * orchestrator's `queueOrder`), so a list a selector cut is read beside the whole one; the repository a card's factory picks for it is
+ * The list holds every card, each started card in its run's phase; the cards in play are those the api says are (`status.inPlay`), and
+ * `--all` keeps every card. `-l <selector>` is sent as `labelSelector`, given again for another; a queued card's place is the one the api
+ * answers (`status.place`), among every card queued, whatever the selector kept; the repository a card's factory picks for it is
  * read off `GET /api/factories` where a line says it. `--show-labels` and `-L <key>` are read here; any other words after `inbox` go to
  * the old path: `inbox add`, `inbox rm` and the rest are commands of their own there.
  */
@@ -47,8 +46,8 @@ const factoryOf = (card: Card): string | null => {
   return namespace === DEFAULT_NAMESPACE ? null : namespace;
 };
 
-/** The card `card` as the printer's row, its place in the queue (`places`, by name) and the repository its factory picks (`repos`). */
-export const rowOf = (card: Card, places: ReadonlyMap<string, number>, repos: ReadonlyMap<string, string> = new Map()): InboxRow => {
+/** The card `card` as the printer's row, its place in the queue the api's (`status.place`), and the repository its factory picks (`repos`). */
+export const rowOf = (card: Card, repos: ReadonlyMap<string, string> = new Map()): InboxRow => {
   const { metadata, spec, status } = card;
   const factory = factoryOf(card);
   const only = factory === null || spec.repo !== undefined ? undefined : repos.get(factory);
@@ -63,39 +62,10 @@ export const rowOf = (card: Card, places: ReadonlyMap<string, number>, repos: Re
     labels: metadata.labels ?? {},
     state: status.state,
     error: status.error ?? null,
-    ...(spec.queued !== undefined ? { queued: { at: spec.queued, place: places.get(metadata.name) ?? null } } : {}),
+    ...(spec.queued !== undefined ? { queued: { at: spec.queued, place: status.place ?? null } } : {}),
     ...(status.lastStart !== undefined ? { tried: { ...status.lastStart } } : {}),
     factoryRepo: only ?? null,
   };
-};
-
-/**
- * Each queued card's place, from 1, in the order the tick starts them: by when it was queued, then by name, a card a run was started from
- * left out — the in-process `queueOrder`, over every card.
- */
-export const placesOf = (cards: readonly Card[]): Map<string, number> =>
-  new Map(
-    cards
-      .flatMap((c) => (c.spec.queued !== undefined && !c.status.runs.length ? [{ name: c.metadata.name, at: c.spec.queued }] : []))
-      .sort((a, b) => a.at.localeCompare(b.at) || a.name.localeCompare(b.name))
-      .map(({ name }, at) => [name, at + 1]),
-  );
-
-/**
- * Whether a card in each state is still in play, which `nemia inbox` lists by default: the in-process `CARD_IN_PLAY`. Total, so a new
- * state is placed here before it typechecks.
- */
-const IN_PLAY: Readonly<Record<CardState, boolean>> = {
-  filed: true,
-  queued: true,
-  refused: true,
-  pending: true,
-  running: true,
-  waiting: true,
-  succeeded: false,
-  failed: false,
-  stopped: false,
-  cancelled: false,
 };
 
 /** The cards in the order the in-process listing reads them: by file name, `<name>.md`, as `localeCompare` orders them. */
@@ -181,12 +151,10 @@ export async function inbox(args: readonly string[]): Promise<number> {
   const listed = (labelSelector: readonly string[]) =>
     asked('inbox', (client) => client.cards.listAll({ query: labelSelector.length ? { labelSelector } : {} }));
   const selected = byFile((await listed(selector)).items);
-  const shown = all ? selected : selected.filter((card) => IN_PLAY[card.status.state]);
-  const queued = shown.some((c) => c.spec.queued !== undefined && !c.status.runs.length);
-  const places = placesOf(queued && selector.length ? (await listed([])).items : selected);
+  const shown = all ? selected : selected.filter((card) => card.status.inPlay);
   const picks = shown.some((c) => c.status.lastStart !== undefined && c.spec.repo === undefined && factoryOf(c) !== null);
   const repos = picks ? reposOf(await get<FactoryAnswer[]>('inbox', '/api/factories')) : new Map<string, string>();
-  const rows = shown.map((card) => rowOf(card, places, repos));
+  const rows = shown.map((card) => rowOf(card, repos));
   for (const line of inboxPrinted(rows, process.env, read.asked, selected.length - shown.length)) process.stdout.write(`${line}\n`);
   return 0;
 }

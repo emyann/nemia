@@ -55,6 +55,7 @@ export const cardObject = (over: CardOver = {}): Card => ({
     lastStart: { at: '2026-09-30T05:02:00.000Z', repo: '/work/repo', why: 'the workflow is gone', refused: true },
     title: 'Decode the reads',
     ...over.status,
+    inPlay: over.status?.inPlay ?? false,
   },
 });
 

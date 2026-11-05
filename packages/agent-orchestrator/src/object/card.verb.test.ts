@@ -207,3 +207,25 @@ test('REFUSED: a card of another namespace and a card not there are Missing; a b
   assert.equal(kindOf(over(five, list({ labelSelector: ['team in (core'] }))), 'Invalid');
   assert.equal(kindOf(over(five, list({ labelSelector: ['team==core'] }))), 'Invalid');
 });
+
+test('a stray file listed before a card of its name is passed over; a card says whether it is in play, and its place in the queue', () => {
+  const read = (program: (l: ReturnType<typeof inboxListing>) => Effect.Effect<unknown, unknown, never>) =>
+    valueOf(over(five, Effect.flatMap(listed, program)));
+  const card = read((l) => {
+    const bravo = l.find((entry) => entry.name === 'bravo');
+    if (bravo === undefined) throw new Error('bravo is listed');
+    return cardObjectOf([{ ...bravo, file: 'bravo', error: 'not a card' }, ...l], 'bravo', 'alpha');
+  }) as { metadata: { name: string }; status: { inPlay: boolean; place?: number } };
+  assert.equal(card.metadata.name, 'bravo');
+  assert.equal(card.status.inPlay, true, 'a card filed and not started is in play');
+  assert.equal(card.status.place, undefined, 'a card not queued has no place');
+  const queued = read((l) =>
+    cardObjectOf(
+      l.map((entry) =>
+        entry.name === 'echo' ? { ...entry, state: 'queued' as const, queued: { at: '2026-11-04T09:00:00.000Z', place: 2 } } : entry,
+      ),
+      'echo',
+    ),
+  ) as { status: { place?: number } };
+  assert.equal(queued.status.place, 2, 'the place the listing judged');
+});

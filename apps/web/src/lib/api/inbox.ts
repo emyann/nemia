@@ -88,23 +88,11 @@ const inboxEntryFields = {
 };
 
 /**
- * Each queued card's place in the order the tick starts cards in, from 1, by its name: a card queued and not started, oldest queued
- * first, then by name — the orchestrator's `queueOrder`, read off the whole inbox, every factory's.
- */
-const placesOf = (items: readonly Card[]): Map<string, number> =>
-  new Map(
-    items
-      .flatMap((card) => (card.spec.queued !== undefined && card.status.runs.length === 0 ? [{ card, at: card.spec.queued }] : []))
-      .sort((a, b) => a.at.localeCompare(b.at) || a.card.metadata.name.localeCompare(b.card.metadata.name))
-      .map(({ card }, i) => [card.metadata.name, i + 1]),
-  );
-
-/**
- * `card` as the board's entry (`InboxEntry`), its queued place out of `places`: its file its name's markdown, as every card listed is;
+ * `card` as the board's entry (`InboxEntry`), its queued place the one the api answers (`status.place`): its file its name's markdown, as every card listed is;
  * its factory its namespace, none for `default`; `null` where the card says nothing. `factoryRepo` is null: the Card does not say which
  * repository its factory picks for it, so the page reads that off the factories (`factoryRepoOf`, lib/inbox.ts).
  */
-export const entryOf = (card: Card, places: ReadonlyMap<string, number>): InboxEntry => {
+export const entryOf = (card: Card): InboxEntry => {
   const { metadata, spec, status } = card;
   return {
     name: metadata.name,
@@ -120,36 +108,28 @@ export const entryOf = (card: Card, places: ReadonlyMap<string, number>): InboxE
     error: status.error ?? null,
     body: spec.body ?? null,
     filedAt: metadata.creationTimestamp,
-    ...(spec.queued !== undefined ? { queued: { at: spec.queued, place: places.get(metadata.name) ?? null } } : {}),
+    ...(spec.queued !== undefined ? { queued: { at: spec.queued, place: status.place ?? null } } : {}),
     ...(status.lastStart !== undefined ? { tried: { ...status.lastStart } } : {}),
     factoryRepo: null,
     labels: { ...metadata.labels },
   };
 };
 
-/** The entries of a page of cards (`entryOf`), each queued card's place read off `whole`, the inbox unselected. */
-export const entriesOf = (list: CardList, whole: CardList = list): InboxEntry[] => {
-  const places = placesOf(whole.items);
-  return list.items.map((card) => entryOf(card, places));
-};
+/** The entries of a page of cards (`entryOf`). */
+export const entriesOf = (list: CardList): InboxEntry[] => list.items.map(entryOf);
 
-/** The states of a card whose run ended, which the in-play reads leave out (`CARD_KIND`'s `ended`, lib/inbox.ts). */
-const ENDED: ReadonlySet<CardState> = new Set(['succeeded', 'failed', 'stopped', 'cancelled']);
-
-/**
- * Every card that `selector` takes by its labels (`?labelSelector=`), or every card for none, as entries: with a selector, the whole inbox
- * is read beside it, since a queued card's place is its place among every card.
- */
-const cardsSelected = async (selector: string | undefined): Promise<InboxEntry[]> => {
+/** Every card that `selector` takes by its labels (`?labelSelector=`), or every card for none. */
+const cardsListed = async (selector: string | undefined): Promise<CardList> => {
   const picked = selector === undefined || selector.trim() === '' ? undefined : selector.trim();
-  if (picked === undefined) return entriesOf(await cards.listAll());
-  const [list, whole] = await Promise.all([cards.listAll(picked), cards.listAll()]);
-  return entriesOf(list, whole);
+  return cards.listAll(picked);
 };
 
-/** The cards of `selector` still in play: not started, or whose run is pending, running or waiting. */
+/** Every card that `selector` takes, as entries. */
+const cardsSelected = async (selector: string | undefined): Promise<InboxEntry[]> => entriesOf(await cardsListed(selector));
+
+/** The cards of `selector` still in play, as the api says of each (`status.inPlay`). */
 const inPlaySelected = async (selector: string | undefined): Promise<InboxEntry[]> =>
-  (await cardsSelected(selector)).filter((entry) => !ENDED.has(entry.state));
+  (await cardsListed(selector)).items.filter((card) => card.status.inPlay).map(entryOf);
 
 /**
  * The inbox's cards still in play: each not yet started, and each whose run is pending, running or waiting — a card whose run ended is

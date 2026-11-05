@@ -58,6 +58,10 @@ export const CardStatus = Schema.Struct({
   lastStart: Schema.optionalKey(CardLastStart),
   title: Schema.optionalKey(Schema.String),
   error: Schema.optionalKey(Schema.String),
+  /** Whether the card is still in play: not started, or its run not ended. `nemia inbox` and the board list these by default. */
+  inPlay: Schema.Boolean,
+  /** A queued card's place in the order the tick starts cards in, from 1, among every card queued and not started, every factory's. */
+  place: Schema.optionalKey(Schema.Number),
 });
 export type CardStatus = typeof CardStatus.Type;
 

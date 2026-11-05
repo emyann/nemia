@@ -90,8 +90,8 @@ too, which holds parity with this one until the in-process reads retire.
 ## Runs, phases and asks
 
 - **The runtime's words stop here**: the orchestrator translates a runtime phase into its own status (`harnessBlocked`, `waitingOf`,
-  `settledOf` in `listing`, `phaseOfView`), and the api and the board read only the orchestrator's words; today
-  `needsOf` (`summary/judged.verb.ts`) and the web's `stepState` still compare `needs-human`. A new runtime phase is translated in `listing` and
+  `settledOf` in `listing`, `phaseOfView`), and the api and the board read only the orchestrator's words: the board compares no
+  `needs-human` (`apps/web/test/structure.test.ts` refuses one). A new runtime phase is translated in `listing` and
   `phaseOfView`; put a new word beside a phase (`waitingOf`), never into it.
 - **A new step status is `working` on the board until `stepState` knows it**.
 - **A revision answered for a kind nobody has resolved has no ledger entry, and the ledger's last entry is not what the files hold**:

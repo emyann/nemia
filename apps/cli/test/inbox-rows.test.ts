@@ -1,13 +1,13 @@
 /**
  * `nemia inbox`'s lines off the CardList say what the orchestrator's `inboxLines` says of the same cards: each `Card` made the printer's
- * row (`rowOf`), a queued card's place its place in the order the package's queue starts them (`placesOf`, `queueOrder`), and the
+ * row (`rowOf`), a queued card's place the one the api answers (`status.place`, the package's `queueOrder`), and the
  * repository its factory picks for it said where the tick's try was on it — on cards the parity seed of `reads.test.ts` holds none of.
  */
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { inboxLines, type InboxListing, queueOrder } from 'agent-orchestrator';
 import { API_VERSION, type Card } from 'objects';
-import { inboxPrinted, placesOf, rowOf } from '../src/reads/inbox.ts';
+import { inboxPrinted, rowOf } from '../src/reads/inbox.ts';
 
 /** A listing as the package lists a card, every key it does not set at its default. */
 const listing = (name: string, keys: Partial<InboxListing> = {}): InboxListing => ({
@@ -49,6 +49,8 @@ const cardOf = (l: InboxListing): Card => ({
     ...(l.tried !== undefined ? { lastStart: { ...l.tried } } : {}),
     ...(l.title !== null ? { title: l.title } : {}),
     ...(l.error !== null ? { error: l.error } : {}),
+    inPlay: !['succeeded', 'failed', 'stopped', 'cancelled'].includes(l.state),
+    ...(l.queued !== undefined && l.queued.place !== null ? { place: l.queued.place } : {}),
   },
 });
 
@@ -81,8 +83,7 @@ const repos = new Map([['mill', '/code/mill']]);
 
 test("each Card is the row the package's printer reads: the same lines, places and factory repositories as `inboxLines`", () => {
   const cards = listed.map(cardOf);
-  const places = placesOf(cards);
-  const rows = cards.map((c) => rowOf(c, places, repos));
+  const rows = cards.map((c) => rowOf(c, repos));
   for (const unfactored of [false, true]) {
     const env = unfactored ? { WF_DEFAULT_FACTORY_STARTS: '1', WF_ROOT: '/store' } : { WF_ROOT: '/store' };
     const asked = { selector: [], showLabels: true, columns: ['team', 'factory'] };
@@ -96,10 +97,9 @@ test("each Card is the row the package's printer reads: the same lines, places a
 
 test("a list a selector cut keeps each queued card's place among every card queued", () => {
   const cards = listed.map(cardOf);
-  const places = placesOf(cards);
   const kept = cards.filter((c) => c.metadata.name === 'b-milled');
   const [line] = inboxPrinted(
-    kept.map((c) => rowOf(c, places, repos)),
+    kept.map((c) => rowOf(c, repos)),
     { WF_ROOT: '/store' },
   );
   assert.match(line ?? '', /queued 3 of 1/, 'its place among all the queued cards, of the queued cards listed, as the package says it');

@@ -372,7 +372,7 @@ const cardAnswer = (name: string, namespace = 'default') => ({
   kind: 'Card',
   metadata: { name, namespace, creationTimestamp: '2026-09-16T10:00:00.000Z', resourceVersion: 'v1' },
   spec: { body: 'Cache the views' },
-  status: { state: 'filed', runs: [] },
+  status: { state: 'filed', runs: [], inPlay: true },
 });
 /** Each request sent: its path, method, content type and body. */
 const asSent = (sent: Array<{ url: string; init: RequestInit | undefined }>) =>
@@ -938,8 +938,8 @@ test("cardPlace, cardFiling, factoriesOffered, notStarted: a card's factory and 
       await (inboxAllQuery('team=core').queryFn as unknown as () => Promise<InboxEntry[]>)();
       assert.deepEqual(
         sent.map((r) => r.url),
-        ['/api/cards', '/api/cards?labelSelector=team%3Dcore', '/api/cards'],
-        'a selected read reads the whole inbox beside it, for the queue places',
+        ['/api/cards', '/api/cards?labelSelector=team%3Dcore'],
+        "a selected read is one read: each queued place is the api's, among every card",
       );
       assert.equal(all.queryKey[0], inboxQuery.queryKey[0], "under ['inbox'], so every write and the feed read it again");
       assert.notDeepEqual(all.queryKey, cardQuery('all').queryKey, 'a card named all keeps its page');
@@ -947,39 +947,41 @@ test("cardPlace, cardFiling, factoriesOffered, notStarted: a card's factory and 
       assert.equal(inPlayRead.length, 0, 'the in-play read leaves a card whose run ended out');
     },
   );
-  await t.test("a Card is the board's entry: its factory its namespace, its file its name, its place among every queued card", () => {
-    const queued = (name: string, at: string, namespace = 'pair') =>
-      cardObject({ metadata: { name, namespace }, spec: { queued: at }, status: { state: 'queued', runs: [] } });
+  await t.test("a Card is the board's entry: its factory its namespace, its file its name, its place the one the api answers", () => {
+    const queued = (name: string, at: string, place: number, namespace = 'pair') =>
+      cardObject({ metadata: { name, namespace }, spec: { queued: at }, status: { state: 'queued', runs: [], inPlay: true, place } });
     const whole = cardList(
-      queued('late', '2026-09-16T11:00:00.000Z'),
-      queued('early-b', '2026-09-16T10:00:00.000Z', 'default'),
-      queued('early-a', '2026-09-16T10:00:00.000Z'),
+      queued('late', '2026-09-16T11:00:00.000Z', 3),
+      queued('early-b', '2026-09-16T10:00:00.000Z', 2, 'default'),
       cardObject({
         metadata: { name: 'started' },
         spec: { queued: '2026-09-16T09:00:00.000Z' },
-        status: { state: 'running', runs: ['r-9'] },
+        status: { state: 'running', runs: ['r-9'], inPlay: true },
       }),
     );
-    const entries = entriesOf(cardList(...whole.items.slice(0, 1)), whole);
-    assert.deepEqual(entries[0]?.queued, { at: '2026-09-16T11:00:00.000Z', place: 3 }, 'its place among the whole inbox, not the page');
     const byName = new Map(entriesOf(whole).map((e) => [e.name, e]));
     assert.deepEqual(
-      ['early-a', 'early-b', 'late', 'started'].map((name) => byName.get(name)?.queued?.place),
-      [1, 2, 3, null],
-      'oldest first, then by name; a started card has no place',
+      ['early-b', 'late', 'started'].map((name) => byName.get(name)?.queued?.place),
+      [2, 3, null],
+      "each queued card's place as the api answers it, the board ordering none; a card with none has none",
     );
     assert.equal(byName.get('early-b')?.factory, null, 'default is no factory');
     assert.equal(byName.get('late')?.factory, 'pair');
     assert.equal(byName.get('late')?.file, 'late.md');
-    assert.deepEqual(cardEntryOf(cardObject({ metadata: { labels: { team: 'core' } } }), new Map()).labels, { team: 'core' });
+    assert.deepEqual(cardEntryOf(cardObject({ metadata: { labels: { team: 'core' } } })).labels, { team: 'core' });
   });
-  await t.test('the in-play reads leave out exactly the states CARD_KIND says ended', async (t) => {
-    sending(t, () => answered(200, cardList(...CARD_STATES.map((state) => cardObject({ metadata: { name: state }, status: { state } })))));
-    const kept = (await (inboxQuery.queryFn as unknown as () => Promise<InboxEntry[]>)()).map((e) => e.state);
-    assert.deepEqual(
-      kept,
-      CARD_STATES.filter((state) => CARD_KIND[state] !== 'ended'),
+  await t.test('the in-play reads keep exactly the cards the api says are in play (`status.inPlay`)', async (t) => {
+    const inPlay = (state: string) => CARD_KIND[state as keyof typeof CARD_KIND] !== 'ended';
+    sending(t, () =>
+      answered(
+        200,
+        cardList(...CARD_STATES.map((state) => cardObject({ metadata: { name: state }, status: { state, inPlay: inPlay(state) } }))),
+      ),
     );
+    const kept = (await (inboxQuery.queryFn as unknown as () => Promise<InboxEntry[]>)()).map((e) => e.state);
+    assert.deepEqual(kept, CARD_STATES.filter(inPlay));
+    sending(t, () => answered(200, cardList(cardObject({ metadata: { name: 'filed' }, status: { state: 'filed', inPlay: false } }))));
+    assert.equal((await (inboxQuery.queryFn as unknown as () => Promise<InboxEntry[]>)()).length, 0, 'the api says, not the state');
   });
   await t.test("each card state has a person's word, its sentence and a hue: a run called off is never said cancelled", () => {
     for (const state of CARD_STATES) {

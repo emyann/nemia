@@ -222,9 +222,9 @@ test("each family of writes: its answer decoded, an answer unread refused with w
       kind: 'Card',
       metadata: { name: 'a', namespace: 'default', creationTimestamp: 'now', resourceVersion: 'v' },
       spec: {},
-      status: { state: 'filed', runs: [] },
+      status: { state: 'filed', runs: [], inPlay: true },
     };
-    answering(t, { ...card, status: { state: 'parked', runs: [] } });
+    answering(t, { ...card, status: { state: 'parked', runs: [], inPlay: true } });
     await assert.rejects(
       queueCard({ name: 'a', factory: null }),
       unread('POST /api/namespaces/default/cards/a/queue', 'status.state', 'is "parked", where the board reads', 'before asking again.'),

@@ -17,7 +17,8 @@ orchestrator, the api, the board and the client import it through its one entry,
   `exports` map, by the web's and the client's lint blocks, and by `agent-orchestrator/test/contract.test.ts`.
 - **Plain Schemas of JSON**: strings, numbers, booleans, literals, records, arrays and structs, with no brand, no check and no
   transformation, so that `OpenApi.fromApi` writes each into the api's document as it is and a client decodes what the api encoded.
-- **`effect/unstable/http*` is marked `@stability unstable`**: its names may move in a minor release of effect, which is why `effect` is
-  pinned exactly (`4.0.6`) here as in every package, and moved in every package at once.
+- **`effect/http-api` and `effect/http` are marked `@stability unstable`** (the paths effect 4.0.6 exports them by): their names may
+  move in a minor release of effect, which is why `effect` is pinned exactly (`4.0.6`) here as in every package, and moved in every
+  package at once.
 - **Run one test** from this folder: `node --test test/<file>.test.ts`; the whole package: `npx turbo run test --force --continue
   --filter=objects`.

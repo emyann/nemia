@@ -123,3 +123,19 @@ test('a card filed, labelled, queued, taken off and dropped through the verbs is
   assert.equal(dropped.status, 200);
   assert.equal((await app.request(at)).status, 404, 'gone once dropped');
 });
+
+test('a stray file of the same name as a card is passed over: the card is read and pressed by its verbs, never answered 404', async (t) => {
+  card('z-notes');
+  fs.writeFileSync(path.join(inbox, 'z-notes'), 'a stray file, no card\n');
+  t.after(() => {
+    fs.rmSync(path.join(inbox, 'z-notes'), { force: true });
+    fs.rmSync(path.join(inbox, 'z-notes.md'), { force: true });
+  });
+  const at = '/api/namespaces/default/cards/z-notes';
+  const read = await app.request(at);
+  assert.equal(read.status, 200);
+  assert.equal(((await read.json()) as typeof Card.Type).metadata.name, 'z-notes');
+  const headers = { 'content-type': 'application/json', 'sec-fetch-site': 'same-origin' };
+  const labelled = await app.request(`${at}/labels`, { method: 'POST', headers, body: JSON.stringify({ labels: ['team=core'] }) });
+  assert.equal(labelled.status, 200);
+});

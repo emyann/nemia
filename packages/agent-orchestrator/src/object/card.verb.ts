@@ -11,7 +11,7 @@ import { Effect } from 'effect';
 import { API_VERSION, type Card, type CardList, DEFAULT_NAMESPACE } from 'objects';
 import { CardDoor } from '../cards/cards.store.ts';
 import { CardName } from '../inbox/inbox.model.ts';
-import { cardLabels, type InboxListing, parseInboxCard } from '../inbox/index.ts';
+import { CARD_IN_PLAY, cardLabels, type InboxListing, parseInboxCard } from '../inbox/index.ts';
 import { inboxJudged } from '../inbox/inbox.verb.ts';
 import type { SummaryHow } from '../summary/summary.verb.ts';
 import type { Engine } from '../runtime-client.ts';
@@ -73,6 +73,8 @@ const cardOf = (l: InboxListing, text: string, filedAt: string): Card => {
       ...(l.tried !== undefined ? { lastStart: { ...l.tried } } : {}),
       ...(l.title !== null ? { title: l.title } : {}),
       ...(l.error !== null ? { error: l.error } : {}),
+      inPlay: CARD_IN_PLAY[l.state],
+      ...(l.queued !== undefined && l.queued.place !== null ? { place: l.queued.place } : {}),
     },
   };
 };
@@ -127,7 +129,9 @@ export const cardListOf = Effect.fn('cardListOf')(function* (listing: readonly I
  * does is in another namespace.
  */
 export const cardObjectOf = Effect.fn('cardObjectOf')(function* (listing: readonly InboxListing[], name: string, namespace?: string) {
-  const l = listing.find((entry) => entry.name === name && (namespace === undefined || namespaceOf(entry) === namespace));
+  const l = listing.find(
+    (entry) => entry.file.endsWith('.md') && entry.name === name && (namespace === undefined || namespaceOf(entry) === namespace),
+  );
   const card = l === undefined ? null : yield* objectOf(l);
   if (card === null)
     return yield* Effect.fail(

@@ -53,7 +53,10 @@ through REST and never `gh pr edit`. A malformed rule, or a label a rule gives t
 anything is pushed. GitHub has no labelled create, so the open sets the labels through REST the moment the pull request exists, in the
 same call, before a CI job that reads them can start: a check that reads a pull request's labels never sees the run's unlabelled.
 The rules reach the open as `--labels` on the line the implement step's note renders from the parameter, and an open without the flag is
-refused. A card with no label a rule reads, or a pull request opened by hand, gets no label from it.
+refused. Where there are rules and the run's labels match none of them, the open and the push refuse before anything is pushed, exit 2,
+naming each key the rules read, the values they take and the `nemia label run <run> <key>=<value> --overwrite` that sets one: a pull
+request no rule labels would fail a check that reads its labels, and only the merge would find out. A pull request opened by hand gets
+no label from it.
 
 Land merges that same pull request, through `landing.ts`, which its check also reads from the frozen files. Otto runs its `merge --run
 <id> --subject … --body-file … --check <name>`: it refuses anything but this run's own green pull request — not a draft, based on the

@@ -26,7 +26,7 @@
     "test": "turbo run test --continue",
     "typecheck": "turbo run typecheck",
     "lint": "oxlint && oxfmt --check",
-    "contracts": "tsverify packages/agent-runtime/src --cache && tsverify packages/agent-orchestrator/src --cache && tsverify apps/cli/src --cache",
+    "contracts": "tsverify packages/agent-runtime/src --cache && tsverify packages/agent-orchestrator/src --cache && tsverify apps/cli/src --cache && tsverify apps/web/src/lib/brought.ts --cache",
     "format": "oxfmt",
     "e2e": "npm run e2e --workspace web --",
     "board:serve": "npm run board:serve --workspace web",

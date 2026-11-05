@@ -9,6 +9,7 @@ import assert from 'node:assert/strict';
 import { story } from './checkpoints.ts';
 import {
   askAnswered,
+  broughtOf,
   askInWords,
   askLeft,
   asksOpen,
@@ -668,6 +669,60 @@ test('foldChat, newFrom, linksOf, drawnAs and chatItems: her events as the page 
       assert.deepEqual(chatItems([]), [], 'nothing said is nothing drawn');
     },
   );
+});
+
+/** The link `bring-what-waits` teaches her to name a step by, its placeholders as the skill writes them. */
+const TAUGHT = '/runs/<run>?step=<step>';
+
+test('broughtOf and chatItems: a step her words link to is brought, drawn under her words as its own item', async (t) => {
+  await t.test('a link to a step of a run names the run and the step, and every other address names none', () => {
+    const rows: Array<[string, { run: string; step: string } | undefined]> = [
+      ['/runs/r-1?step=design', { run: 'r-1', step: 'design' }],
+      ['/runs/r-1?step=plan%2Fv2', { run: 'r-1', step: 'plan/v2' }],
+      ['/runs/r%201?step=design', { run: 'r 1', step: 'design' }],
+      [TAUGHT.replace('<run>', 'cli-one-run-e4tv').replace('<step>', 'design'), { run: 'cli-one-run-e4tv', step: 'design' }],
+      ['/runs/r-1', undefined],
+      ['/runs/r-1?step=', undefined],
+      ['/runs?step=x', undefined],
+      ['/runs/?step=x', undefined],
+      ['/runs/r-1/steps/design', undefined],
+      ['/runs/a/b?step=x', undefined],
+      ['/inbox/c?step=x', undefined],
+      ['/runs/r-1?step=%E0%A4%A', undefined],
+      ['https://example.test/runs/r-1?step=design', undefined],
+    ];
+    for (const [href, named] of rows) assert.deepEqual(broughtOf(href), named, href);
+  });
+  await t.test('her message brings each step it links once, after her words and in her order; a person who writes the same brings none', () => {
+    const items = chatItems([
+      message(
+        'm:1:a',
+        1,
+        'agent',
+        'Two wait. [design of r-1](/runs/r-1?step=design), [review of r-2](/runs/r-2?step=review), [design again](/runs/r-1?step=design), [the run](/runs/r-3).',
+      ),
+      message('p:1:b', 2, 'person', 'See [design of r-1](/runs/r-1?step=design).'),
+    ]);
+    assert.deepEqual(
+      items.map((item) => [item.kind, item.id]),
+      [
+        ['said', 'm:1:a'],
+        ['own', 'm:1:a:brought:r-1/design'],
+        ['own', 'm:1:a:brought:r-2/review'],
+        ['said', 'p:1:b'],
+      ],
+    );
+    const own = items[1];
+    if (own.kind !== 'own') throw new Error('a brought step is her own item');
+    assert.deepEqual(own.own, { kind: 'brought', run: 'r-1', step: 'design' });
+    const said = items[0];
+    if (said.kind !== 'said') throw new Error('her words are said');
+    assert.deepEqual(
+      said.links.map((link) => link.href),
+      ['/runs/r-1?step=design', '/runs/r-2?step=review', '/runs/r-1?step=design', '/runs/r-3'],
+      'every link stays a button beside what it brings',
+    );
+  });
 });
 
 test('reading her chat: a read made again that fails is the end, and clears the notice an earlier stream left', async (t) => {

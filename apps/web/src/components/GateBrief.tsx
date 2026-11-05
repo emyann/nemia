@@ -41,9 +41,10 @@ export function Asked({ run, step }: { run: RunView; step: Step }) {
 /**
  * A gate, told: the words off the record, the facts under them, then Approve and Send back. The facts read the run's decision once for this
  * state of the run, as the run page's Decide section does — what it touched, and whether each branch still merges onto the base — on the
- * detail the inspector has, never on the list the Factory polls.
+ * detail the inspector has, never on the list the Factory polls. Drawn wherever a step's gate is answered: the inspector, and a step a
+ * message links to (`components/chat/ChatBrought.tsx`).
  */
-function GateBrief({ run, step }: { run: RunView; step: Step }) {
+export function GateBrief({ run, step }: { run: RunView; step: Step }) {
   const gate = gateOfStep(run, step)!;
   const next = run.graph.edges.filter((e) => e.kind === 'after' && e.from === step.name).map((e) => e.to);
   const says = run.toDecide?.kind === 'approve' && run.toDecide.step === step.name ? run.toDecide.says : null;

@@ -14,6 +14,7 @@ import { personRoutes, spentAcceptances, spentApprovals, unrouted, withRoutes, t
 import { spentRoundAsks } from '../round/round.ts';
 import { spentAsks, TRY_CAUSES, upgradeAsk, upgradeTries, type RetryAsk } from '../retry/index.ts';
 import { asNamed } from '../workflow.ts';
+import { keptDeclared } from '../pinned/pinned.ts';
 import { FrozenStepSchema } from '../folder/folder.store.ts';
 import { inputsRoot } from './places.store.ts';
 import type { AsksRead, MergeAskHeld } from './record.ts';
@@ -287,7 +288,8 @@ export const removeHold = (id: string, at: string): boolean => {
  *
  * The frozen steps are read under the names their keys have now (`asNamed`), and written back under them (`recordText`), in their place
  * among the record's keys, so a record read and written back moves no line; a try's former `then` is read as its `cause`
- * (`upgradeTries`). Refused: an id with no record, as `no such run` naming
+ * (`upgradeTries`), and a step's record written before `declared` was kept is given it where its schema has not moved (`keptDeclared`).
+ * Refused: an id with no record, as `no such run` naming
  * `nemia ls` (`Missing`), for every verb that takes one; and a record that does not read as a run (`UnreadableRecord`).
  */
 export const readRun = (id: string): Run => within('records', () => readRecord(id));
@@ -306,7 +308,7 @@ const readRecord = (id: string): Run => {
   const read = { ...raw };
   for (const key of ['approvals', 'acceptances', 'pruned', 'hold', 'labels', 'pause', 'cordon']) delete read[key];
   const { workflow, ...unfrozen } = read;
-  const run = workflow ? { ...read, workflow: workflow.map(asNamed) } : unfrozen;
+  const run = workflow ? keptDeclared({ ...read, workflow: workflow.map(asNamed) }) : unfrozen;
   const [at, pruned, hold] = [fs.existsSync(cancelFile(id)) ? readText(cancelFile(id)).trim() : '', readPruned(id), readHold(id)];
   const { approvals, acceptances, routes } = within('asks', () => {
     const names = fileNames(asksDir(id));

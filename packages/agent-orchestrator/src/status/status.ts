@@ -800,7 +800,7 @@ export function askingTry(steps: readonly Workflow[], run: Run, name: string): {
  * (`JUDGE_ROUTE`).
  */
 export const owedFields = (step: Workflow, run: Run, steps: readonly Workflow[], said: Closeout | undefined): string[] => [
-  ...filedOwed(step, run, steps, said),
+  ...filedOwed(step, run, said),
   ...(owesReplies(steps, run, step.name) ? [LOOP_REPLIES] : []),
   ...(isJudge(step) ? [JUDGE_ROUTE] : []),
 ];

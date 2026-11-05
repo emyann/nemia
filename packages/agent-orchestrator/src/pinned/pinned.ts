@@ -63,14 +63,32 @@ export const resumeOn = (session: string | undefined, step: Workflow, f: PinsRea
   record?.closeoutHash === undefined || record.closeoutHash === closeoutHashOf(step, f.reads.steps) ? session : undefined;
 
 /**
- * The fields of its `output:` a step's closeout `said` owes on the try it is on, as that try was filed (`filedFields`): those its record
- * kept at the filing (`declared`), so a revision its run followed after it adds none. A record written before they were kept owes what
- * the step declares now where its closeout schema has not moved since (`closeoutHash`), and where it has, those of them it gave.
+ * A run as its record is read, each step's record written before `declared` was kept given the fields its try was filed with, where they
+ * are known: its closeout schema's digest (`closeoutHash`) is the one its step is filed with now, so the step declares now what it did
+ * then. Where the digest has moved, the record is left without them, which `filedOwed` reads as moved. Read on every read of the record
+ * (`readRun`), so nothing is carried: the digest is compared here, outside what a pass judges, since a judgement reads no hash. Pure.
  */
-export const filedOwed = (step: Workflow, run: Run, steps: readonly Workflow[], said: Closeout | undefined): string[] => {
+export const keptDeclared = <R extends Pick<Run, 'steps' | 'workflow'>>(run: R): R => {
+  const steps = run.workflow;
+  if (!steps) return run;
+  const kept = Object.entries(run.steps).map(([name, record]) => {
+    const step = steps.find((s) => s.name === name);
+    const hash = record.declared === undefined ? record.closeoutHash : undefined;
+    const unmoved = hash !== undefined && step !== undefined && hash === closeoutHashOf(step, steps);
+    return [name, unmoved ? { ...record, declared: outputFields(step) } : record] as const;
+  });
+  return { ...run, steps: Object.fromEntries(kept) };
+};
+
+/**
+ * The fields of its `output:` a step's closeout `said` owes on the try it is on, as that try was filed (`filedFields`): those its record
+ * kept at the filing (`declared`), so a revision its run followed after it adds none. A record with none but a digest of its closeout
+ * schema is one whose schema has moved since it was filed (`keptDeclared` gave the others theirs): it owes those of the fields declared
+ * now its closeout gave. A record with neither owes what the step declares now.
+ */
+export const filedOwed = (step: Workflow, run: Pick<Run, 'steps'>, said: Closeout | undefined): string[] => {
   const record = run.steps[step.name];
   const declared = record?.declared;
-  const hash = record?.closeoutHash;
-  const moved = declared === undefined && hash !== undefined && hash !== closeoutHashOf(step, steps);
+  const moved = declared === undefined && record?.closeoutHash !== undefined;
   return filedFields({ ...(declared ? { declared } : {}), moved }, outputFields(step), Object.keys(said?.output ?? {}));
 };

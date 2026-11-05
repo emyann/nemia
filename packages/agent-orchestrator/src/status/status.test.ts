@@ -9,6 +9,7 @@ import { taskUsage, type AttemptReason, type TaskClock } from '../timeline/timel
 import type { EarlierTry } from '../retry/retry-ask.ts';
 import type { OutputSchema, Workflow } from '../workflow.ts';
 import { closeoutHashOf, type Closeout } from '../closeout/index.ts';
+import { keptDeclared } from '../pinned/pinned.ts';
 import { run, step } from '../../test/assessed.ts';
 
 const clock = (m: number, s = 0) => new Date(Date.UTC(2026, 8, 13, 8, m, s)).toISOString();
@@ -131,9 +132,9 @@ const schemaOf = (...fields: string[]): OutputSchema => ({
 const GROWN: Workflow[] = [{ ...step('implement'), output: { file: 'implement.schema.json', schema: schemaOf('goal', 'why') } }];
 /** The same step as it was filed: `goal` alone. */
 const FILED: Workflow[] = [{ ...step('implement'), output: { file: 'implement.schema.json', schema: schemaOf('goal') } }];
-/** A run whose `implement` try's record says `record` of its filing. */
+/** A run on `GROWN` whose `implement` try's record says `record` of its filing, as `readRun` reads it (`keptDeclared`). */
 const filedAs = (record: { declared?: string[]; closeoutHash?: string }): Run =>
-  run({ implement: 'i1' }, { steps: { implement: { taskId: 'i1', ...record } } });
+  keptDeclared(run({ implement: 'i1' }, { steps: { implement: { taskId: 'i1', ...record } }, workflow: GROWN }));
 
 /** A looping review and its target, the loop on round `n` with review unfiled. */
 const LOOPING: OutputSchema = {

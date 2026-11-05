@@ -199,7 +199,7 @@ export function closeoutIn(
   if (!c || 'error' in c) return null;
   const fields = outputFields(step).filter((field) => field !== LOOP_REPLIES);
   const { given, missing: lacked } = declaredOutput(step, c, fields);
-  const owed = taskId === run.steps[name]?.taskId ? new Set(filedOwed(step, run, steps, c)) : undefined;
+  const owed = taskId === run.steps[name]?.taskId ? new Set(filedOwed(step, run, c)) : undefined;
   const missing = owed ? lacked.filter((field) => owed.has(field)) : lacked;
   const replies = c.output?.[LOOP_REPLIES];
   const declared = step.output?.schema.properties ?? {};

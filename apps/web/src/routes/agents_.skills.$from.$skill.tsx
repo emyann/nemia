@@ -8,15 +8,17 @@ import { SkillForm } from '../components/SkillForm';
 import { saveSkill, SkillRefusal, skillQuery, switchPreload, type SkillDetail, type SkillDraft, type SkillSaved } from '../lib/api';
 import { costWords, drawnSkill, preloadWords, reachWords } from '../lib/skills';
 import { invalidateSkills } from '../lib/agentWrites';
-import { FACTORY_WAY } from '../lib/factories';
+import { FACTORY_WAY, pagePlaceOf } from '../lib/factories';
 import { BackToAgents } from './agents_.new';
 
 /**
  * The page of a skill, at /agents/skills/$from/$skill: `agents_` draws it on its own, not inside the Agents page, which has no outlet for
- * it.
+ * it. It is read in the place its search names (`?factory=&repo=`), where a factory's own skill alone is found.
  */
 export const Route = createFileRoute('/agents_/skills/$from/$skill')({
-  loader: ({ context, params }) => context.queryClient.ensureQueryData(skillQuery(params.from, params.skill)),
+  validateSearch: pagePlaceOf,
+  loaderDeps: ({ search }) => ({ factory: search.factory, repo: search.repo }),
+  loader: ({ context, deps, params }) => context.queryClient.ensureQueryData(skillQuery(params.from, params.skill, deps)),
   component: SkillPage,
   errorComponent: ({ error }) => (
     <div className="space-y-3">
@@ -39,8 +41,8 @@ const code = (text: string) => <code className="font-mono text-body-small break-
  * it now reads, and says beside the refusal that it has been read again since.
  */
 function SkillPage() {
-  const { from, skill: name } = Route.useParams();
-  const { data: detail } = useSuspenseQuery(skillQuery(from, name));
+  const [{ from, skill: name }, place] = [Route.useParams(), Route.useSearch()];
+  const { data: detail } = useSuspenseQuery(skillQuery(from, name, place));
   const queryClient = useQueryClient();
   const mine = detail.skill.from === 'yours';
   const [changed, setChanged] = useState(false);
@@ -50,7 +52,7 @@ function SkillPage() {
   const moved = shown.version !== detail.version;
 
   const wroteIt = async (now: SkillSaved) => {
-    queryClient.setQueryData(skillQuery(from, name).queryKey, now);
+    queryClient.setQueryData(skillQuery(from, name, place).queryKey, now);
     setDrawn(now);
     await invalidateSkills(queryClient);
   };

@@ -20,14 +20,19 @@ import {
 } from '../lib/api';
 import { formKeyOf, keptAfterCopy, keptAfterSave, settleSave, type KeptForm } from '../lib/agents';
 import { invalidateAgents } from '../lib/agentWrites';
-import { FACTORY_WAY } from '../lib/factories';
+import { FACTORY_WAY, pagePlaceOf } from '../lib/factories';
 import { BackToAgents } from './agents_.new';
 
-/** The page of an agent, at /agents/$from/$agent: `agents_` draws it on its own, not inside the Agents page, which has no outlet for it. */
+/**
+ * The page of an agent, at /agents/$from/$agent: `agents_` draws it on its own, not inside the Agents page, which has no outlet for it. It
+ * is read in the place its search names (`?factory=&repo=`), where a factory's own agent alone is found.
+ */
 export const Route = createFileRoute('/agents_/$from/$agent')({
-  loader: ({ context, params }) =>
+  validateSearch: pagePlaceOf,
+  loaderDeps: ({ search }) => ({ factory: search.factory, repo: search.repo }),
+  loader: ({ context, deps, params }) =>
     Promise.all([
-      context.queryClient.ensureQueryData(agentQuery(params.from, params.agent)),
+      context.queryClient.ensureQueryData(agentQuery(params.from, params.agent, deps)),
       context.queryClient.prefetchQuery(keyFormQuery),
       context.queryClient.prefetchQuery(customInstructionsQuery(params.agent)),
     ]),
@@ -53,7 +58,8 @@ const code = (text: string) => <code className="font-mono text-body-small">{text
  */
 function AgentPage() {
   const { from, agent: name } = Route.useParams();
-  const { data: agent } = useSuspenseQuery(agentQuery(from, name));
+  const place = Route.useSearch();
+  const { data: agent } = useSuspenseQuery(agentQuery(from, name, place));
   const { data: keyForm } = useQuery(keyFormQuery);
   const queryClient = useQueryClient();
   const navigate = useNavigate();
@@ -89,7 +95,7 @@ function AgentPage() {
       keyForm={keyForm}
       readOnly={!mine}
       onSkillCopied={async () => {
-        const now = await readAgent(from, name).catch(() => null);
+        const now = await readAgent(from, name, place).catch(() => null);
         setKept(now && keptAfterCopy(agent, now, formKey));
       }}
       saving={save.isPending || remove.isPending}

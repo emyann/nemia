@@ -6,6 +6,7 @@ import { queryOptions } from '@tanstack/react-query';
 import type { DefinitionOrigin, Skill } from 'objects';
 import { skills as served, type Refuse } from './objects.ts';
 import { cardEntryOf, originWord, type AgentSkill, type SkillCost, type SkillSource } from './library.ts';
+import type { PagePlace } from './workflows.ts';
 
 /** The namespace of the api's repository and your library, where the board writes yours. */
 const DEFAULT = 'default';
@@ -151,11 +152,17 @@ export const skillDetailOf = (skill: Skill): SkillDetail => ({
   copyHint: skill.status.copyHint,
 });
 
-/** One skill, read from disk now: its page's read. Under `skillsQuery`'s key, so a write that reads the list again reads it again too. */
-export const skillQuery = (from: string, name: string) =>
+/**
+ * One skill, read from disk now, in `place`'s factory on its repository (none: the default namespace): its page's read. Under
+ * `skillsQuery`'s key, so a write that reads the list again reads it again too.
+ */
+export const skillQuery = (from: string, name: string, place: PagePlace = {}) =>
   queryOptions({
-    queryKey: ['skills', from, name],
-    queryFn: async () => skillDetailOf(await served.get(DEFAULT, name, { origin: originWord(from) })),
+    queryKey: place.factory ? ['skills', from, name, place.factory, place.repo ?? null] : ['skills', from, name],
+    queryFn: async () =>
+      skillDetailOf(
+        await served.get(place.factory ?? DEFAULT, name, { origin: originWord(from), ...(place.repo ? { repo: place.repo } : {}) }),
+      ),
   });
 
 /** A draft as the Skill object's spec says it: every key it sets; one it leaves out stays out. */

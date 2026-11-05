@@ -9,6 +9,7 @@ import { decodes } from './decodes.ts';
 import { get, send } from './read.ts';
 import { agents as served, type Refuse } from './objects.ts';
 import { cardEntryOf, originWord, type AgentSkill, type GivenSkill, type SchemaFile } from './library.ts';
+import type { PagePlace } from './workflows.ts';
 
 /** The namespace of the api's repository and your library, where the board writes yours. */
 const DEFAULT = 'default';
@@ -135,15 +136,18 @@ export const agentsQuery = queryOptions({
     (await Promise.all(LISTED.map((origin) => served.list(DEFAULT, { origin })))).flat().map(agentViewOf),
 });
 
-/** One agent, read from disk now, from the origin `from`: `agentQuery`'s read, for a page that must read it past the cache. */
-export const readAgent = async (from: string, name: string): Promise<AgentListing> =>
-  agentViewOf(await served.get(DEFAULT, name, { origin: originWord(from) }));
+/**
+ * One agent, read from disk now, from the origin `from`, in `place`'s factory on its repository (none: the default namespace):
+ * `agentQuery`'s read, for a page that must read it past the cache.
+ */
+export const readAgent = async (from: string, name: string, place: PagePlace = {}): Promise<AgentListing> =>
+  agentViewOf(await served.get(place.factory ?? DEFAULT, name, { origin: originWord(from), ...(place.repo ? { repo: place.repo } : {}) }));
 
-/** One agent, for its page. */
-export const agentQuery = (from: string, name: string) =>
+/** One agent, for its page, read in `place` (a factory's own agent is read in its factory alone). */
+export const agentQuery = (from: string, name: string, place: PagePlace = {}) =>
   queryOptions({
-    queryKey: ['agents', from, name],
-    queryFn: () => readAgent(from, name),
+    queryKey: place.factory ? ['agents', from, name, place.factory, place.repo ?? null] : ['agents', from, name],
+    queryFn: () => readAgent(from, name, place),
   });
 
 /**

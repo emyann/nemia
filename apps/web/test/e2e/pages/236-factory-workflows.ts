@@ -18,6 +18,9 @@ const OWN = { name: 'tree-only', step: 'only' };
 /** What its tree's `dev` says of itself, which the checkout's does not, and its one step, which the checkout's lacks. */
 const SHADOW = { description: "The tree's own dev, which shadows the checkout's.", step: 'draft' };
 
+/** The skill only its tree has, in its `skills/`. */
+const TREE_SKILL = { name: 'outline', description: "The tree's own outline." };
+
 /** The factory the page files on two repositories, attaching nothing: its workflows are read on the one a person picks. */
 const TWIN = { name: 'twin', repos: ['one', 'two'] };
 /** A name no factory has. */
@@ -42,6 +45,10 @@ function written(): () => void {
   put(path.join(workflows, good.name, 'README.md'), `${SHADOW.description}\n`);
   put(path.join(workflows, good.name, `${SHADOW.step}.md`), stepFile('Draft it.'));
   put(path.join(workflows, OWN.name, `${OWN.step}.md`), stepFile('Do the one thing.'));
+  put(
+    path.join(workflows, 'skills', TREE_SKILL.name, 'SKILL.md'),
+    `---\nname: ${TREE_SKILL.name}\ndescription: ${TREE_SKILL.description}\n---\n# Outline\n`,
+  );
   put(file, `${JSON.stringify({ repos: [path.join(store!, 'elsewhere')], template: TEMPLATE }, null, 2)}\n`);
   const twin = path.join(store!, 'factories', `${TWIN.name}.json`);
   put(twin, `${JSON.stringify({ repos: TWIN.repos.map((repo) => path.join(store!, repo)) }, null, 2)}\n`);
@@ -78,7 +85,8 @@ export default {
    * hires into still opens its builder, which drafts from the list read with no factory, and starts its run in the factory. TWIN, on two
    * repositories, asks which on the list and on a workflow's page, and is read on the one picked; a name no factory has says so on the
    * page and in the bar; a factory that does not offer a workflow says so on its page. With no factory picked, the tree's workflows are
-   * not listed, and `dev` is the checkout's. Each state is photographed, and the factories are taken back.
+   * not listed, and `dev` is the checkout's. The tree's own skill opens on its page in the factory, which says the factory's way and
+   * offers no write. Each state is photographed, and the factories are taken back.
    */
   name: 'factory-workflows',
   route: '/workflows',
@@ -160,6 +168,20 @@ export default {
         'and its start, every step filled, runs in the factory',
       );
       await shoot('yours');
+
+      await goto(page, `/agents/skills/factory/${TREE_SKILL.name}?factory=${TREED}`);
+      const skillPage = page.locator('article');
+      await expectVisible(
+        skillPage.locator('h1', { hasText: TREE_SKILL.name }),
+        `the tree's own ${TREE_SKILL.name} opens on its page in ${TREED}`,
+      );
+      await expectVisible(
+        skillPage.locator('[data-way="factory"]', { hasText: "the factory's way" }),
+        "it says a factory's own skill changes the factory's way",
+      );
+      await expectCount(skillPage.getByRole('button', { name: 'Save', exact: true }), 0, 'and offers no Save');
+      await expectCount(skillPage.locator('[data-preload] input:not([disabled])'), 0, 'nor a switch that writes its preload');
+      await shoot('skill');
 
       await goto(page, `/workflows?factory=${TWIN.name}`);
       const pick = page.locator(`[data-pick-repo="${TWIN.name}"]`);

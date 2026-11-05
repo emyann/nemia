@@ -2,8 +2,11 @@
  * The budgets a gated step proposes, as data (`budget.ts`): the `x-shape` marker the output-schema loader expands to `BUDGETS_SCHEMA`,
  * the strict decoder (`budgetsOf`), a closeout whose budgets cannot be set read `unsigned` and refused back to its session
  * (`closeoutRefusals`), and the cap a step is filed under read from the approvals in force (`budgetOf`). The four functions a contract
- * proves are its laws' (`contracts/budget.contract.ts`), not rows here. Each refusal row breaks one rule and is asserted by its kind and
- * the facts it names.
+ * proves are its laws' (`contracts/budget.contract.ts`), not rows here, but one: the full law `aProposalStands` narrows there, that each
+ * budget the step proposed and the person did not change is the cap the approval sets for its step, is held here by `approvedCaps` over
+ * every proposal and every set of amounts given, until tsverify proves a loop keeps every element it passes on
+ * (src-a-filter-s-result-is-pro-p25m, in the tsverify factory). Each refusal row breaks one rule and is asserted by its kind and the
+ * facts it names.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -15,7 +18,16 @@ import { budgetOf, stepStatus } from '../status/status.ts';
 import type { Run } from '../record/record.ts';
 import { names, phases, run } from '../../test/assessed.ts';
 import { gateBudgets } from '../gate-budgets/gate-budgets.ts';
-import { BUDGETS_SCHEMA, budgetFields, budgetsOf, budgetRefusals, laterSteps, proposedBudgets } from './budget.ts';
+import {
+  approvedCaps,
+  BUDGETS_SCHEMA,
+  budgetFields,
+  budgetsOf,
+  budgetRefusals,
+  laterSteps,
+  proposedBudgets,
+  type StepBudget,
+} from './budget.ts';
 
 /** A gated `design` whose output declares `budgets` as the shape, with `budget:` 12 of its own. */
 const design = parseWorkflow('design', '---\nplace: git\ngate: true\nbudget: 12\noutput: design.schema.json\n---\nDesign it.\n', () =>
@@ -129,6 +141,29 @@ test('ownStatus: a gated step whose budgets cannot be set reads unsigned, and wi
   assert.equal(status(proposing([{ step: 'design', usd: 5, why: 'w' }])), 'unsigned');
   assert.equal(status(proposing([{ step: 'implement', usd: 0, why: 'w' }])), 'unsigned');
   assert.equal(status(proposing([{ step: 'implement', usd: 7, why: 'w' }])), 'awaiting approval');
+});
+
+test('approvedCaps: each budget the step proposed that the person did not change is the cap the approval sets for its step', () => {
+  const later = ['implement', 'review', 'land'];
+  const subsets = (usd: number): StepBudget[][] =>
+    Array.from({ length: 2 ** later.length }, (_, mask) =>
+      later.filter((_, i) => mask & (1 << i)).map((step, i) => ({ step, usd: usd + i })),
+    );
+  let cases = 0;
+  for (const proposed of subsets(10)) {
+    for (const given of subsets(50)) {
+      const set = approvedCaps(proposed, given, later);
+      assert.ok(!('refused' in set), `${JSON.stringify(given)} can be set`);
+      for (const p of proposed.filter((b) => !given.some((g) => g.step === b.step))) {
+        assert.ok(
+          set.caps.some((c) => c.step === p.step && c.usd === p.usd),
+          `${p.step} proposed at ${p.usd}, not given: the cap stands in ${JSON.stringify(set.caps)}`,
+        );
+      }
+      cases += 1;
+    }
+  }
+  assert.equal(cases, 64, 'every proposal against every set of amounts given');
 });
 
 test('budgetOf: the cap in force, read from the record and the approvals in force on every pass', async (t) => {

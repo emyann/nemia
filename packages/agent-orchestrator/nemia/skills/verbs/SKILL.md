@@ -138,6 +138,8 @@ They write nothing: run them unasked, as often as you need. One that sets with s
                                unasked, in a factory or a run: why each other rule cannot (a step approved
                                before it runs has done nothing to recommend or check; one with no check
                                never passed one), what keeps a rule from a run now, and the rules that would
+  nemia chat speakers
+                               the names an agent may speak under in her chat, each one you allowed
   nemia service status [--name <name>]
                                the login service and the lease: whether it is installed and runs,
                                the checkout it runs, who holds the store, and lingering
@@ -443,6 +445,11 @@ Each asks the person at a prompt every time it runs: say what it does before you
   nemia policy rm <agent> <id>
                                take a rule out of force, the default among them: what it allowed is
                                asked of you again. Asked of you every time
+  nemia chat allow <name>
+                               let an agent speak in her chat under a name: its words reach her and the
+                               board as its own, never as yours. Asked of you every time
+  nemia chat disallow <name>
+                               take a name back: words under it are refused. Asked of you every time
   nemia service install [--env KEY=VALUE ...] [--name <name>] [--take-over <pid>]
                                install the daemon as a login service: a systemd user unit on Linux,
                                a launchd agent on macOS. It runs the api of this checkout with this

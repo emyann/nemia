@@ -46,6 +46,18 @@ reads it for them. The reviewer alone reads the pull request and its checks itse
 those two and refusing every other form: a browser, `--watch`, a jq query or a template, another repository, and an assignment before
 `gh`.
 
+When the implement step's check refuses, either way — a red, cancelled or missing CI context, `probe.ts`, `parts.ts`, the factory's own check or the
+local check — the run tries implement again on its own, up to twice a round (`retries: 2`), continuing its session, each try under the
+step's `budget:`. The try is handed the check's verdict as data — the command, its exit and the last lines of what it printed: on GitHub
+the failing jobs and the lines that failed each, which `pull-request.ts` reads since no writer may type `gh` — as a person's `nemia retry
+--message` listing the failures would have handed it. A refusal no change to the branch can answer ends with a line `<tag>: not the
+work: <why>`: `pull-request.ts` says so of no `gh` or none logged in, no `origin`, two open pull requests, a draft or another
+base, the label rules, `WF_LABELS` or the repository's labels, and a CI context never reported, still pending at the bound, or only
+cancelled, skipped or neutral; the implement step's note tells the try to change nothing and sign off `blocked` on it, quoting it, and so on a failure
+it finds is not its change's (a flake, a failure the base has too). What the run can tell spends no try and waits on a person at once: a
+step over its budget, a call denied under `denials: fail`, a check that did not finish, a blocked sign-off. Past the second try, a
+refusal waits on a person as it did before.
+
 The open labels the pull request as it creates or updates it, and the push again each round, from the run's own labels (`WF_LABELS`,
 which the run gives every session and check), by the rules the factory's `pullRequestLabels` parameter sets (each
 `<key>=<value>:<label>`, the rules apart by spaces; empty, the default, labels nothing): it adds the labels the rules give the run and

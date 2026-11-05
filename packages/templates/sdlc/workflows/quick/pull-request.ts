@@ -42,15 +42,28 @@
  * or one based on another branch; no open pull request where one is owed; a `headRefOid` that is not `HEAD`; a pull request that conflicts
  * with its base; an `open` with no `--labels`; an `open --labels` or a `push --labels` whose rules, `WF_LABELS` or the repository's
  * labels are not as above (a run whose labels match no rule, exit 2); a `wait` with no `--check`; and a CI context that is red,
- * cancelled, skipped or never reported.
+ * cancelled, skipped or never reported. A refusal a change to the branch cannot answer — no `gh` or none authenticated, no `origin`, two
+ * open pull requests, a draft or another base, the label rules, `WF_LABELS` or the repository's labels, a `push` or `wait` given other
+ * arguments than its check line's, and a CI context never reported, still pending at the bound, or only cancelled, skipped or neutral —
+ * ends with one more line, `<tag>: not the work: …`: a try retried on its own reads it as the person's, and stops.
  */
 import { spawnSync } from 'node:child_process';
 
 /** A reason the verb is refused: said on stderr, exit 1. */
 class Refusal extends Error {}
 
+/**
+ * A refusal only a person can answer — the machine, the repository on GitHub, the factory's rules, or CI that never judged — which no
+ * change to the branch answers: said as any other, then one more line, `<tag>: not the work: …` (`NOT_THE_WORK`), which tells a try of
+ * the step that runs this check, retried on its own, to change nothing and stop for the person.
+ */
+class PersonsRefusal extends Refusal {}
+
+/** The line a person's refusal ends with, after its tag. */
+const NOT_THE_WORK = 'not the work: a person answers this refusal, as it says; a change to the branch cannot';
+
 /** A run whose labels match none of the factory's label rules: refused as any other, exit 2, so a caller tells it apart. */
-class Unlabelled extends Refusal {}
+class Unlabelled extends PersonsRefusal {}
 
 /**
  * How long the CI context has to be reported at all, in seconds: a queue longer than this is a refusal, answered by a `--recheck`.
@@ -164,7 +177,7 @@ const NO_GH =
 /** What `gh` printed for `args`, trimmed; refuses, naming what it was asked, when `gh` fails or is not there. */
 function gh(...args: string[]): string {
   const ran = run('gh', args);
-  if (ran.missing) throw new Refusal(NO_GH);
+  if (ran.missing) throw new PersonsRefusal(NO_GH);
   if (ran.status !== 0) throw new Refusal(`\`gh ${args.join(' ')}\` failed: ${ran.err}`);
   return ran.out.trim();
 }
@@ -200,15 +213,15 @@ function branchOf(): { branch: string; run: string; leaf: string } {
 /** `gh auth status` passing; refuses with the one command a person types when it does not. */
 function authed(): void {
   const status = read('auth', 'status');
-  if (status.missing) throw new Refusal(NO_GH);
-  if (status.status !== 0) throw new Refusal(`\`gh\` is not authenticated here: run \`gh auth login\`. It said: ${status.err}`);
+  if (status.missing) throw new PersonsRefusal(NO_GH);
+  if (status.status !== 0) throw new PersonsRefusal(`\`gh\` is not authenticated here: run \`gh auth login\`. It said: ${status.err}`);
 }
 
 /** The remote `origin`'s address; refuses, naming the read, where there is none. */
 function origin(): string {
   const remote = run('git', ['remote', 'get-url', 'origin']);
   if (remote.status !== 0)
-    throw new Refusal(
+    throw new PersonsRefusal(
       'this repository has no `origin` remote, and the pull request is opened on it: see `git remote -v`, and add it with ' +
         '`git remote add origin <address>`',
     );
@@ -250,18 +263,18 @@ function sole(open: readonly Pr[], branch: string, onto: string): Pr {
         `merged the base, with the script of the run's workflow files:\n  ${OPEN_LINE}`,
     );
   if (open.length > 1)
-    throw new Refusal(
+    throw new PersonsRefusal(
       `${open.length} open pull requests have ${branch} as its head (${open.map((pr) => `#${pr.number}`).join(', ')}), and a run has ` +
         "one: close all but one with `gh pr close <number>`, which is a person's to type, then retry the step with `--recheck`",
     );
   const [pr] = open;
   if (pr.isDraft)
-    throw new Refusal(
+    throw new PersonsRefusal(
       `#${pr.number} is a draft, and a draft is not judged by the CI context branch protection requires. A person marks it ` +
         `ready: \`gh pr ready ${pr.number}\`. Then retry the step with \`--recheck\`.`,
     );
   if (pr.baseRefName !== onto)
-    throw new Refusal(
+    throw new PersonsRefusal(
       `#${pr.number} is based on \`${pr.baseRefName}\`, not on the remote's default branch \`${onto}\`, so landing it would not land on ` +
         `the base: a person moves its base (\`gh pr edit ${pr.number} --base ${onto}\`, or \`${API_LINE(pr.number, `base=${onto}`)}\` ` +
         `where \`gh pr edit\` fails on GitHub's deprecated Projects query), then the step is retried with \`--recheck\``,
@@ -304,7 +317,7 @@ function labelRules(args: readonly string[]): LabelRule[] {
   if (args.length === 0) return [];
   const [flag, given, ...rest] = args;
   if (flag !== '--labels' || given === undefined || rest.length)
-    throw new Refusal(
+    throw new PersonsRefusal(
       'push takes `--labels "<rules>"` and nothing else, each rule `<key>=<value>:<label>` and the rules apart by spaces: give it ' +
         'as the step\'s check gives it, `node "$WF_WORKFLOW_FILES/pull-request.ts" push --labels "<rules>"`',
     );
@@ -314,7 +327,7 @@ function labelRules(args: readonly string[]): LabelRule[] {
     .map((rule) => {
       const named = RULE.exec(rule);
       if (!named)
-        throw new Refusal(
+        throw new PersonsRefusal(
           `\`${rule}\` is no rule of --labels, which are each \`<key>=<value>:<label>\` (\`kind=bug:bug\` labels \`bug\` the pull ` +
             "request of a run labelled kind=bug): fix the factory's parameter that gives them, then retry the step with `--recheck`",
         );
@@ -336,7 +349,7 @@ function runLabels(): Record<string, string> | undefined {
     read = undefined;
   }
   if (typeof read !== 'object' || read === null || Array.isArray(read) || !Object.values(read).every((value) => typeof value === 'string'))
-    throw new Refusal(
+    throw new PersonsRefusal(
       `WF_LABELS is \`${said}\`, not a JSON object of strings such as {"kind":"bug"}: it is the run's labels, which the run gives ` +
         'its check; run the check in a run (`nemia retry <run> <step> --recheck`), or set it so by hand',
     );
@@ -363,7 +376,7 @@ function labelPlan(rules: readonly LabelRule[], run: string): { want: Set<string
   const has = repoLabels();
   const lacking = [...givable].filter((label) => !has.has(label));
   if (lacking.length)
-    throw new Refusal(
+    throw new PersonsRefusal(
       `the repository has no label ${lacking.map((label) => `\`${label}\``).join(', ')}, which --labels gives: create it ` +
         `(${lacking.map((label) => `\`gh label create ${label}\``).join(', ')}), or take it out of the factory's rules, then retry ` +
         'the step with `--recheck`',
@@ -661,6 +674,12 @@ function seenOf(ours: readonly Entry[]): Seen {
   return ours.every((entry) => verdict(entry) === PASSED) ? 'passed' : 'failed';
 }
 
+/**
+ * Whether a rollup entry is over and judged the commit red: a verdict that is no pass, and not cancelled, skipped or neutral, which judge
+ * nothing — CI's or a person's to run again, not the branch's to answer.
+ */
+const judgedRed = (entry: Entry): boolean => !pending(entry) && ![PASSED, 'CANCELLED', 'SKIPPED', 'NEUTRAL'].includes(verdict(entry));
+
 /** The refusal of a CI context `check` that gave a verdict this round cannot land on: what it said, why, and what to type next. */
 const redly = (pr: Pr, check: string, ours: readonly Entry[], entries: readonly Entry[], retry: string): string =>
   [
@@ -726,7 +745,7 @@ function unconflicted(branch: string, onto: string, check: string): Pr {
 function checkOf(args: readonly string[]): string {
   const [flag, name, ...rest] = args;
   if (flag !== '--check' || !name || name.startsWith('--') || rest.length)
-    throw new Refusal(
+    throw new PersonsRefusal(
       'wait takes `--check <name>`, the CI context branch protection requires of the base branch, and nothing else: give it as ' +
         'the step\'s check gives it, `node "$WF_WORKFLOW_FILES/pull-request.ts" wait --check <name>`',
     );
@@ -749,9 +768,9 @@ function wait(args: string[]): string[] {
     const ours = entries.filter((entry) => nameOf(entry) === check);
     const seen = seenOf(ours);
     if (seen === 'passed') return [`\`${check}\` passed on ${pr.headRefOid.slice(0, 12)}: ${pr.url}`];
-    if (seen === 'failed') throw new Refusal(redly(pr, check, ours, entries, retry));
+    if (seen === 'failed') throw new (ours.some(judgedRed) ? Refusal : PersonsRefusal)(redly(pr, check, ours, entries, retry));
     const bound = seen === 'absent' ? start : whole;
-    if (over(bound)) throw new Refusal(unanswered(seen, pr, check, ours, entries, bound, retry));
+    if (over(bound)) throw new PersonsRefusal(unanswered(seen, pr, check, ours, entries, bound, retry));
     sleep(poll);
   }
 }
@@ -765,7 +784,7 @@ const VERBS: Record<string, { tag: string; act: (args: string[]) => string[] }> 
 
 /**
  * The whole run: exit 0 with what was done on stdout, or the refusal on stderr with 1, 2 for a run no label rule matches; each line
- * under the verb's tag.
+ * under the verb's tag, and a person's refusal followed by its `not the work` line.
  */
 function main(): number {
   const [verb = '', ...args] = process.argv.slice(2);
@@ -778,6 +797,7 @@ function main(): number {
   } catch (err) {
     if (!(err instanceof Refusal)) throw err;
     process.stderr.write(`${tag}: ${err.message}\n`);
+    if (err instanceof PersonsRefusal) process.stderr.write(`${tag}: ${NOT_THE_WORK}\n`);
     return err instanceof Unlabelled ? 2 : 1;
   }
 }

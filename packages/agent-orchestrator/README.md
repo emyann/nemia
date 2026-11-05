@@ -1662,8 +1662,9 @@ retries: 1
 
 - **`retries: n`.** When a step's check *refuses* it, the next tick re-files the step, continuing the step's
   own last session (`resumeFrom` the try before, as `resume:` does between steps). Its brief says what became
-  of the last try, and carries the check's verdict as data: the command, the exit code, the last 20 lines of
-  stdout and of stderr, and the sentence that it must not weaken the check. At most `n` times. Past that the
+  of the last try, and carries the check's verdict as data: the command, the exit code, the last 300 lines of
+  stdout and of stderr (`REFUSAL_LINES`, within each stream's last 64 kB: enough to fix what failed, where `nemia decide` shows
+  20), and the sentence that it must not weaken the check. At most `n` times. Past that the
   step waits on you, as before. `retries:` spends nothing on a try that failed, was lost or could not start: the
   runtime makes one attempt per start and tries nothing again on its own, so such a try settles `failed` and waits on
   `wf retry`. A `--continue` of one whose harness never named its session — it could not start, or was lost — continues the
@@ -3434,13 +3435,18 @@ board's Settings, though no place names her), read as her session is filed; a wr
 session at the keeper's next beat, through the runtime's `say`, with no restart, then recorded in her filed instruction; a factory's rules are its
 instruction (above), which she reads before acting in it. Her machine and what was built: `docs/features.md`, *Nemia at Semi-auto*.
 
-Her chat, `src/chat/`, keeps only what nobody else holds, under `$WF_ROOT/nemia/chat/`: the person's words (`outbox.jsonl`) and read
-mark (`read.json`), written by the api's routes (`chatSay`, `chatRead`), and the keeper's marks of what it delivered
-(`delivered.jsonl`). The rest is projected on every read (`projectChat`): her words and her tool calls from her transcripts, attempt
-by attempt with a line between them, and what was said to her from the runtime's `said`, the person's where a mark claims it, else
-the keeper's quiet marker. The keeper delivers while she is kept and her session live, framed as the person's
-(`framedForHer`), and before it says it looks for the same words said since and unclaimed, so a restart between the say and the mark
-never says them twice. Her fence denies the folder.
+Her chat, `src/chat/`, keeps only what nobody else holds, under `$WF_ROOT/nemia/chat/`: the words written to her (`outbox.jsonl`) and
+the person's read mark (`read.json`), written by the api's routes (`chatSay`, `chatRead`), the keeper's marks of what it delivered
+(`delivered.jsonl`), and the names the person allowed an agent to speak under (`speakers.json`, written by `nemia chat allow <name>`
+and `nemia chat disallow <name>`, read with `nemia chat speakers`, each write asked of the person every time). An outbox entry says
+who wrote it (`from`, a `Speaker`): the person, whose words are taken from the board alone, or an agent by an allowed name; a line
+with none is the person's. Words from anywhere but the board that name no agent are refused (`Invalid`), and an agent under a name
+the person has not allowed (`Conflict`), each naming the fix (`speakerRefusal`). The rest is projected on every read
+(`projectChat`): her words and her tool calls from her transcripts, attempt by attempt with a line between them, and what was said to
+her from the runtime's `said`, the entry's where a mark claims it — the person's message, or a `peer`'s under its name — else the
+keeper's quiet marker. The keeper delivers while she is kept and her session live, framed by who wrote it (`framedFor`: the person's as
+they always were, an agent's under its name and never as the person's), and before it says it looks for the same words said since and
+unclaimed, so a restart between the say and the mark never says them twice. Her fence denies the folder.
 
 ## How much runs at once: `WF_MAX_CONCURRENT` and `WF_MAX_RUNS`
 

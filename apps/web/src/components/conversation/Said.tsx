@@ -1,6 +1,7 @@
 /**
  * One thing said in a conversation of the board, drawn by who said it: the agent's words in a cut bubble, with the pages they name as
- * the look's filled buttons under it; the person's own in a ringed bubble at the right; and a quiet line through the board's `Marker`
+ * the look's filled buttons under it; the person's own in a ringed bubble at the right; another agent's in a ringed bubble at the left,
+ * under its own name, apart from both (`Peer`); and a quiet line through the board's `Marker`
  * for what frames a conversation rather than being said in it (`Note`). Who said it and when stands over each bubble (`Who`), which a
  * conversation's own parts take for a bubble of their own.
  *
@@ -96,7 +97,26 @@ function Yours({ said, marks }: { said: Spoken; marks: string }) {
   );
 }
 
-/** One thing said, drawn as theirs at the right or as the agent's at the left. */
+/**
+ * Another agent's words to the session, at the left in a ringed bubble rather than the session's own agent's filled one, as they stand,
+ * under the name it speaks under and the word `agent`: never drawn as the person's, nor as the session's own agent's.
+ */
+function Peer({ said, marks }: { said: Spoken; marks: string }) {
+  return (
+    <div {...mark(marks, 'message', 'peer')} className="flex max-w-[94%] flex-col gap-1.5">
+      <Who who={`${said.who} · agent`} at={said.at} />
+      <div
+        {...mark(marks, 'bubble', 'peer')}
+        className="px-3.5 py-2.5 whitespace-pre-wrap text-body-medium text-on-surface ring-1 ring-outline ring-inset"
+      >
+        {said.text}
+      </div>
+    </div>
+  );
+}
+
+/** One thing said, drawn as theirs at the right, as another agent's at the left in a ring, or as the agent's at the left. */
 export function Said({ said, marks }: { said: Spoken; marks: string }) {
-  return said.yours ? <Yours said={said} marks={marks} /> : <Theirs said={said} marks={marks} />;
+  if (said.yours) return <Yours said={said} marks={marks} />;
+  return said.by === 'peer' ? <Peer said={said} marks={marks} /> : <Theirs said={said} marks={marks} />;
 }

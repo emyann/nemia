@@ -2,9 +2,21 @@
  * The Factory's and the inbox's reads as the api answers them, every key the board reads: an inbox entry (`inboxEntry`), the Card it is
  * made of (`cardObject`, in a `CardList` by `cardList`), a card's page
  * (`cardPage`), what the repository offers (`capabilities`, its steps from `stepReach`), the quota (`quota`), the cap and the last pass
- * (`ceilings`) and the daemon (`daemon`). Each takes keys to put over its own.
+ * (`ceilings`) and the daemon (`daemon`); a factory and its parts as objects — the `Factory` (`factoryObject`, in a `FactoryList` by
+ * `factoryList`), its lines (`factoryCommands`), a `Schedule`, an `McpServer` and a `Hire`. Each takes keys to put over its own.
  */
-import type { Card, CardList } from 'objects';
+import type {
+  Card,
+  CardList,
+  Factory,
+  FactoryCommands,
+  FactoryList,
+  Hire,
+  McpServer,
+  McpServerList,
+  Schedule,
+  ScheduleList,
+} from 'objects';
 import type { Capabilities, Ceilings, Daemon, InboxCardPage, InboxEntry, PassCost, Quota, QuotaWindow, StepReach } from '../src/lib/api.ts';
 
 /**
@@ -279,3 +291,110 @@ export const daemon = (extra: Partial<Daemon> = {}): Daemon => ({
   unobserved: [],
   ...extra,
 });
+
+/** An object's metadata: `name`, in `namespace` where it has one. */
+const meta = (name: string, namespace?: string) => ({
+  name,
+  ...(namespace === undefined ? {} : { namespace }),
+  creationTimestamp: '2026-09-30T05:00:00.000Z',
+  resourceVersion: '0123456789abcdef',
+});
+
+/** What a Factory may put over `factoryObject`'s, part by part. */
+type FactoryOver = { metadata?: Partial<Factory['metadata']>; spec?: Partial<Factory['spec']>; status?: Partial<Factory['status']> };
+
+/** The factory `mill`, as the objects answer it: one repository, one workflow, one hire, one volume, made from no template. */
+export const factoryObject = (over: FactoryOver = {}): Factory => ({
+  apiVersion: 'nemia/v1',
+  kind: 'Factory',
+  metadata: { ...meta('mill'), generation: 2, ...over.metadata },
+  spec: {
+    repos: ['/work/mill'],
+    workflows: ['build'],
+    hires: { 'build/implement': 'ada' },
+    volumes: [{ name: 'notes', path: '/home/me/notes', readOnly: true }],
+    ...over.spec,
+  },
+  status: { observedGeneration: 2, conditions: [], untrusted: [], ...over.status },
+});
+
+/** `items` as the factories' list answers them. */
+export const factoryList = (...items: Factory[]): FactoryList => ({ apiVersion: 'nemia/v1', kind: 'FactoryList', metadata: {}, items });
+
+/** The lines a person types for `name`, as `/api/factories/<name>/commands` answers them. */
+export const factoryCommands = (name = 'mill', over: Partial<FactoryCommands> = {}): FactoryCommands => ({
+  attach: `nemia factory attach ${name} <workflow>`,
+  rm: `nemia factory rm ${name}`,
+  add: `nemia factory add ${name} <repo>`,
+  schedule: `nemia schedule ${name} <workflow> <cron>`,
+  trust: `nemia factory trust ${name}`,
+  volume: `nemia factory volume ${name} <path>`,
+  unschedule: { build: `nemia unschedule ${name} build` },
+  volumeRm: { notes: `nemia factory volume rm ${name} notes` },
+  ...over,
+});
+
+/** The schedule of `build` in `mill`: fired once, its next fire known. */
+export const scheduleObject = (over: Partial<Schedule['status']> = {}): Schedule => ({
+  apiVersion: 'nemia/v1',
+  kind: 'Schedule',
+  metadata: meta('build', 'mill'),
+  spec: { cron: '0 9 * * 1', brief: 'The weekly build' },
+  status: {
+    since: '2026-09-30T05:00:00.000Z',
+    next: '2026-10-05T09:00:00.000Z',
+    last: { run: 'r-1', at: '2026-09-28T09:00:00.000Z' },
+    ...over,
+  },
+});
+
+/** `items` as a factory's schedules answer them. */
+export const scheduleList = (...items: Schedule[]): ScheduleList => ({ apiVersion: 'nemia/v1', kind: 'ScheduleList', metadata: {}, items });
+
+/** The server `github` of `mill`, its header served masked, signing in through an OAuth client; `status` its state, where read. */
+export const mcpServerObject = (status?: McpServer['status']): McpServer => ({
+  apiVersion: 'nemia/v1',
+  kind: 'McpServer',
+  metadata: meta('github', 'mill'),
+  spec: {
+    type: 'http',
+    url: 'https://api.githubcopilot.com/mcp/',
+    headers: { 'X-MCP-Toolsets': '********' },
+    oauth: { clientId: 'Iv23li', callbackPort: 8791 },
+  },
+  ...(status === undefined ? {} : { status }),
+});
+
+/** `items` as a factory's servers, or Nemia's builtin ones, answer them. */
+export const mcpServerList = (...items: McpServer[]): McpServerList => ({
+  apiVersion: 'nemia/v1',
+  kind: 'McpServerList',
+  metadata: {},
+  items,
+});
+
+/** The hire of `mill` into `build`'s `implement`, `ada` hired there by the factory. */
+export const hireObject = (agent: string | undefined = 'ada'): Hire => {
+  const set = { from: 'default' as const };
+  return {
+    apiVersion: 'nemia/v1',
+    kind: 'Hire',
+    metadata: meta('build.implement', 'mill'),
+    spec: { workflow: 'build', step: 'implement', ...(agent === undefined ? {} : { agent }) },
+    status: {
+      filled: agent === undefined ? 'unfilled' : 'factory',
+      ...(agent === undefined ? {} : { agent }),
+      settings: {
+        model: set,
+        effort: set,
+        context: set,
+        harness: set,
+        permissionMode: set,
+        allowedTools: set,
+        disallowedTools: set,
+        skills: set,
+        mcp: set,
+      },
+    },
+  };
+};

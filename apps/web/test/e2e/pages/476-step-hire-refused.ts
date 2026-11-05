@@ -43,7 +43,7 @@ export default {
       await form.getByRole('textbox', { name: 'Instructions' }).fill(MADE.body);
       const [answered] = await Promise.all([
         refused.waitForResponse(
-          (r) => r.request().method() === 'PUT' && new URL(r.url()).pathname === `/api/factories/${FACTORY}/hires/${yours.name}%2Fplan`,
+          (r) => r.request().method() === 'PUT' && new URL(r.url()).pathname === `/api/namespaces/${FACTORY}/hires/${yours.name}.plan`,
           { timeout: WAIT_MS },
         ),
         form.getByRole('button', { name: 'Create agent' }).click(),

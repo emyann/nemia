@@ -1,40 +1,29 @@
 /**
- * The factories (`GET /api/factories`, apps/api/src/factories/factories.ts); a factory's rules, what every agent hired into it is told
- * (`GET`, `PUT` and `DELETE` on `/api/factories/<name>/rules`, apps/api/src/factories/rules.ts and the routes the api generates beside
- * it); its instruction, Nemia's, which no step is told (`GET`, `PUT` and `DELETE` on `/api/factories/<name>/instruction`,
- * apps/api/src/factories/instruction.ts and the routes the api generates beside it); its hires (`PUT` and `DELETE` on
- * `/api/factories/<name>/hires/<workflow>%2F<step>`, routes the api generates); and its schedules and volumes, read-only.
+ * The factories, as the board's pages draw them: each read as a nemia/v1 `Factory` through the objects' client (`objects.ts`), beside
+ * the lines a person types for it (`/api/factories/<name>/commands`) and its schedules (`/api/namespaces/<name>/schedules`), and made the
+ * board's view of it in one place (`factoryViewOf`). A factory's rules, what every agent hired into it is told, and its instruction,
+ * Nemia's, which no step is told, are its sub-resources; its hires are `Hire` objects named `<workflow>.<step>`; its MCP servers are
+ * `McpServer` objects, their headers served masked, beside Nemia's builtin ones.
  */
 import { queryOptions } from '@tanstack/react-query';
-import { Schema } from 'effect';
-import { decodes } from './decodes.ts';
-import { get, send } from './read.ts';
+import {
+  DEFAULT_NAMESPACE,
+  type Factory as FactoryObject,
+  type FactoryCommands,
+  type FactoryCondition,
+  type FactoryInstruction,
+  type FactoryInstructionWrite,
+  type FactoryRules,
+  type Hire,
+  type McpServer,
+  type McpServerWrite,
+  type Schedule,
+  type SignedOut,
+  type SignInStarted,
+} from 'objects';
+import { builtin, factories, hireName, hires, mcpServers, schedules } from './objects.ts';
 
-/** Which condition a factory's is: mirrors `FACTORY_CONDITION_TYPES` in packages/agent-orchestrator/src/factory/factory.ts. */
-const CONDITION_TYPES = ['Applied', 'ConflictsPending'] as const;
-
-/** Why a condition is what it is: mirrors `FACTORY_CONDITION_REASONS` in packages/agent-orchestrator/src/factory/factory.ts. */
-const CONDITION_REASONS = [
-  'NoUpgrade',
-  'TemplateInvalid',
-  'VersionDrift',
-  'Rendered',
-  'ParamsChanged',
-  'ContentChanged',
-  'VersionUnknown',
-  'Upgraded',
-  'Merged',
-  'UpgradePending',
-  'Conflicts',
-] as const;
-
-/** A condition of a factory made from a template, as the daemon wrote it: `Applied` or `ConflictsPending`, its state and why. */
-export type FactoryCondition = {
-  type: (typeof CONDITION_TYPES)[number];
-  status: 'True' | 'False';
-  reason: (typeof CONDITION_REASONS)[number];
-  message: string;
-};
+export type { FactoryCondition, FactoryInstruction, FactoryRules, McpServerWrite, SignInStarted, SignInState } from 'objects';
 
 /**
  * The template a factory is made from: where it is, the version wanted and the parameters given; the version its tree was last applied
@@ -43,16 +32,15 @@ export type FactoryCondition = {
 export type FactoryTemplate = {
   source: string;
   version: string;
-  params: Record<string, string | number | boolean>;
+  params: Readonly<Record<string, string | number | boolean>>;
   applied: string | null;
-  conditions: FactoryCondition[];
+  conditions: readonly FactoryCondition[];
 };
 
 /**
- * Mirrors `ScheduleAnswer` in apps/api/src/factories/factories.ts: the workflow a factory schedules, its cron and the time zone it is read
- * in (null: the daemon's), what each run is asked, the repository its runs work on (null: the factory's), its next fire (null: its cron
- * gives none), its last scheduled run and when it was made, why its latest fire was refused (null: it was not), and the line that takes
- * it back.
+ * A workflow a factory schedules, from its `Schedule`: its cron and the time zone it is read in (null: the daemon's), what each run is
+ * asked, the repository its runs work on (null: the factory's), its next fire (null: its cron gives none), its last scheduled run, why
+ * its latest fire was refused (null: it was not), and the line that takes it back.
  */
 export type FactorySchedule = {
   workflow: string;
@@ -66,41 +54,23 @@ export type FactorySchedule = {
   commands: { unschedule: string };
 };
 
-/** Decodes a `FactorySchedule`. */
-const FactoryScheduleSchema = decodes<FactorySchedule>()(
-  Schema.Struct({
-    workflow: Schema.String,
-    cron: Schema.String,
-    tz: Schema.NullOr(Schema.String),
-    brief: Schema.String,
-    repo: Schema.NullOr(Schema.String),
-    next: Schema.NullOr(Schema.String),
-    last: Schema.NullOr(Schema.Struct({ run: Schema.String, at: Schema.String })),
-    refused: Schema.NullOr(Schema.String),
-    commands: Schema.Struct({ unschedule: Schema.String }),
-  }),
-);
-
 /**
- * Mirrors `UntrustedAnswer` in apps/api/src/factories/factories.ts: a place of a factory that a harness does not trust now, each word the
- * api's — the place, the harness by the name a person reads, what is withheld from the place's own settings meanwhile, and why no trust
- * can be kept for it (`never`), null where the factory's `commands.trust` gives it.
+ * A place of a factory that a harness does not trust now: the place, the harness by the name a person reads, what is withheld from the
+ * place's own settings meanwhile, and why no trust can be kept for it (`never`), null where the factory's `commands.trust` gives it.
  */
 export type FactoryUntrusted = { place: string; harness: string; withheld: string; never: string | null };
 
 /**
- * Mirrors `VolumeAnswer` in apps/api/src/factories/factories.ts: a folder of the person's machine a factory's runs reach beside its
- * repositories, its path as the api resolved it, whether it is read-only (`:ro`) or writable (`:rw`), and the line that takes it back.
+ * A folder of the person's machine a factory's runs reach beside its repositories: its path, whether it is read-only (`:ro`) or
+ * writable (`:rw`), and the line that takes it back.
  */
 export type FactoryVolume = { path: string; readOnly: boolean; commands: { rm: string } };
 
 /**
- * Mirrors `FactoryAnswer` in apps/api/src/factories/factories.ts: a factory's name, whether it is the default factory, the repositories it
- * works on, the workflows it offers — null for the default factory, which offers every workflow found — its hires, `<workflow>/<step>`
- * to an agent's name, and its schedules, none for the default factory. A factory whose file does not read has none of them, and `error`
- * says why, naming the file; null for every other. `template` is the template it is made from, null for one that is not. `untrusted` is
- * each of its places a harness does not trust now (`FactoryUntrusted`), none for the default factory. `volumes` is each folder its
- * runs reach beside its repositories, in the api's order (`FactoryVolume`), none for the default factory.
+ * The board's view of a factory (`factoryViewOf`): its name, whether it is the default factory, the repositories it works on, the
+ * workflows it offers — null for the default factory, which offers every workflow found — its hires, `<workflow>/<step>` to an agent's
+ * name, and its schedules. `error` says why its file does not read, null for every other. `template` is the template it is made from,
+ * null for one that is not; `untrusted` each of its places a harness does not trust now; `volumes` each folder its runs reach.
  */
 export type Factory = {
   name: string;
@@ -120,206 +90,135 @@ export type Factory = {
   volumes: FactoryVolume[];
 };
 
-/** Decodes a `Factory`. */
-const FactorySchema = decodes<Factory>()(
-  Schema.Struct({
-    name: Schema.String,
-    default: Schema.Boolean,
-    repos: Schema.mutable(Schema.Array(Schema.String)),
-    workflows: Schema.NullOr(Schema.mutable(Schema.Array(Schema.String))),
-    hires: Schema.Record(Schema.String, Schema.String),
-    error: Schema.NullOr(Schema.String),
-    schedules: Schema.mutable(Schema.Array(FactoryScheduleSchema)),
-    commands: Schema.Struct({
-      attach: Schema.String,
-      rm: Schema.String,
-      add: Schema.String,
-      schedule: Schema.String,
-      trust: Schema.String,
-      volume: Schema.String,
-    }),
-    volumes: Schema.mutable(
-      Schema.Array(Schema.Struct({ path: Schema.String, readOnly: Schema.Boolean, commands: Schema.Struct({ rm: Schema.String }) })),
-    ),
-    untrusted: Schema.mutable(
-      Schema.Array(
-        Schema.Struct({ place: Schema.String, harness: Schema.String, withheld: Schema.String, never: Schema.NullOr(Schema.String) }),
-      ),
-    ),
-    template: Schema.NullOr(
-      Schema.Struct({
-        source: Schema.String,
-        version: Schema.String,
-        params: Schema.Record(Schema.String, Schema.Union([Schema.String, Schema.Number, Schema.Boolean])),
-        applied: Schema.NullOr(Schema.String),
-        conditions: Schema.mutable(
-          Schema.Array(
-            Schema.Struct({
-              type: Schema.Literals(CONDITION_TYPES),
-              status: Schema.Literals(['True', 'False']),
-              reason: Schema.Literals(CONDITION_REASONS),
-              message: Schema.String,
-            }),
-          ),
-        ),
-      }),
-    ),
-  }),
-);
-
-/**
- * The factories: the default factory first, then each in the store. Not polled: a factory changes when a person runs the CLI's `factory`.
- * Read again on each visit.
- */
-export const factoriesQuery = queryOptions({
-  queryKey: ['factories'],
-  queryFn: () => get('/api/factories', Schema.mutable(Schema.Array(FactorySchema))),
+/** A schedule of a factory, as the view draws it: `unschedule` the line that takes it back. */
+const scheduleViewOf = (schedule: Schedule, unschedule: string): FactorySchedule => ({
+  workflow: schedule.metadata.name,
+  cron: schedule.spec.cron,
+  tz: schedule.spec.tz ?? null,
+  brief: schedule.spec.brief,
+  repo: schedule.spec.repo ?? null,
+  next: schedule.status.next ?? null,
+  last: schedule.status.last ?? null,
+  refused: schedule.status.refused ?? null,
+  commands: { unschedule },
 });
 
 /**
- * Mirrors `FactoryRules` in the orchestrator, as apps/api/src/factories/rules.ts answers it: the factory's `name`; `file`, the file its
- * rules are kept in; `words`, null where it keeps none; and `error`, why a file there cannot be told, else null.
+ * The view of `factory` the pages draw, from the object, the lines a person types for it (`commands`) and its schedules: a key the
+ * object leaves out is the view's null, a volume's line that takes it back is the one `commands` keeps under its name.
  */
-export type FactoryRules = { name: string; file: string; words: string | null; error: string | null };
+export const factoryViewOf = (factory: FactoryObject, commands: FactoryCommands, scheduled: readonly Schedule[] = []): Factory => {
+  const { spec, status } = factory;
+  return {
+    name: factory.metadata.name,
+    default: factory.metadata.name === DEFAULT_NAMESPACE,
+    repos: [...spec.repos],
+    workflows: spec.workflows ? [...spec.workflows] : null,
+    hires: { ...spec.hires },
+    error: status.error ?? null,
+    schedules: scheduled.map((s) => scheduleViewOf(s, commands.unschedule[s.metadata.name] ?? '')),
+    commands: {
+      attach: commands.attach,
+      rm: commands.rm,
+      add: commands.add,
+      schedule: commands.schedule,
+      trust: commands.trust,
+      volume: commands.volume,
+    },
+    template: spec.template ? { ...spec.template, applied: status.applied ?? null, conditions: status.conditions } : null,
+    untrusted: status.untrusted.map((u) => ({ place: u.place, harness: u.harness, withheld: u.withheld, never: u.never ?? null })),
+    volumes: spec.volumes.map((v) => ({
+      path: v.path,
+      readOnly: v.readOnly,
+      commands: { rm: (v.name === undefined ? undefined : commands.volumeRm[v.name]) ?? '' },
+    })),
+  };
+};
 
-/** Decodes a `FactoryRules`. */
-const FactoryRulesSchema = decodes<FactoryRules>()(
-  Schema.Struct({
-    name: Schema.String,
-    file: Schema.String,
-    words: Schema.NullOr(Schema.String),
-    error: Schema.NullOr(Schema.String),
-  }),
-);
+/** The view of one factory: its object, its lines and, for a factory a person made, its schedules, read together. */
+const viewRead = async (factory: FactoryObject): Promise<Factory> => {
+  const name = factory.metadata.name;
+  const [commands, scheduled] = await Promise.all([
+    factories.commands(name),
+    name === DEFAULT_NAMESPACE ? Promise.resolve([]) : schedules.list(name).then((list) => list.items),
+  ]);
+  return factoryViewOf(factory, commands, scheduled);
+};
 
-/** The route of the rules of the factory `name`. */
-const rulesRoute = (name: string): string => `/api/factories/${encodeURIComponent(name)}/rules`;
+/**
+ * The factories: the default factory first, then each in the store, each with its lines and schedules. Not polled: a factory changes when
+ * a person runs the CLI's `factory`. Read again on each visit.
+ */
+export const factoriesQuery = queryOptions({
+  queryKey: ['factories'],
+  queryFn: async (): Promise<Factory[]> => Promise.all((await factories.listAll()).items.map(viewRead)),
+});
 
 /** The rules of the factory `name`, read from its file on each request. */
 export const factoryRulesQuery = (name: string) =>
-  queryOptions({
-    queryKey: ['factory-rules', name],
-    queryFn: () => get(rulesRoute(name), FactoryRulesSchema),
-  });
-
-/** What a write of a factory's rules may have done, and what to look at before writing them again. */
-const RULES_WRITTEN = "The rules may be changed: read the factory's settings again before changing them again.";
+  queryOptions({ queryKey: ['factory-rules', name], queryFn: () => factories.rules(name) });
 
 /**
  * Write `words` as the rules of the factory `name`: the rules as they then read. Rejects with a `WriteRefusal` in the package's words: no
  * such factory (404), the default factory (409), blank words or words that open with a frontmatter block (422).
  */
-export const writeRules = (name: string, words: string): Promise<FactoryRules> =>
-  send('PUT', rulesRoute(name), FactoryRulesSchema, { body: { words }, may: RULES_WRITTEN });
+export const writeRules = (name: string, words: string): Promise<FactoryRules> => factories.putRules(name, words);
 
 /** Remove the rules of the factory `name`: the rules as they then read, none. */
-export const clearRules = (name: string): Promise<FactoryRules> =>
-  send('DELETE', rulesRoute(name), FactoryRulesSchema, { body: {}, may: RULES_WRITTEN });
-
-/**
- * Mirrors `FactoryInstruction` in the orchestrator, as apps/api/src/factories/instruction.ts answers it — what Nemia is to know about the
- * factory, which no step of a run is told: the factory's `name`; `path`, the path in its first folder its file names, null where it
- * names none or keeps the instruction in the store; `store`, whether the store keeps it; `file`, the file it is read from; `words`, null
- * where there is no file; `error`, why a file there does not read, else null; and `stored`, whether the store holds text for it, read or
- * not.
- */
-export type FactoryInstruction = {
-  name: string;
-  path: string | null;
-  store: boolean;
-  file: string;
-  words: string | null;
-  error: string | null;
-  stored: boolean;
-};
-
-/** Decodes a `FactoryInstruction`. */
-const FactoryInstructionSchema = decodes<FactoryInstruction>()(
-  Schema.Struct({
-    name: Schema.String,
-    path: Schema.NullOr(Schema.String),
-    store: Schema.Boolean,
-    file: Schema.String,
-    words: Schema.NullOr(Schema.String),
-    error: Schema.NullOr(Schema.String),
-    stored: Schema.Boolean,
-  }),
-);
-
-/** The route of the instruction of the factory `name`. */
-const instructionRoute = (name: string): string => `/api/factories/${encodeURIComponent(name)}/instruction`;
+export const clearRules = (name: string): Promise<FactoryRules> => factories.deleteRules(name);
 
 /** The instruction of the factory `name`, read where its file says it is kept, on each request. */
 export const factoryInstructionQuery = (name: string) =>
-  queryOptions({
-    queryKey: ['factory-instruction', name],
-    queryFn: () => get(instructionRoute(name), FactoryInstructionSchema),
-  });
-
-/** What a write of a factory's instruction may have done, and what to look at before writing it again. */
-const INSTRUCTION_WRITTEN = "The instruction may be changed: read the factory's settings again before changing it again.";
+  queryOptions({ queryKey: ['factory-instruction', name], queryFn: () => factories.instruction(name) });
 
 /** Where an instruction is to be kept: a file in the factory's first folder, by its path from it, or the store. */
-export type InstructionPlace = { path: string } | { store: true };
+export type InstructionPlace = FactoryInstructionWrite;
 
 /**
  * Keep the instruction of the factory `name` at `place`: the instruction as it then reads. Rejects with a `WriteRefusal` in the package's
  * words: no such factory (404), the default factory (409), a path that is not a file inside the folder (422).
  */
 export const placeInstruction = (name: string, place: InstructionPlace): Promise<FactoryInstruction> =>
-  send('PUT', instructionRoute(name), FactoryInstructionSchema, { body: place, may: INSTRUCTION_WRITTEN });
+  factories.putInstruction(name, place);
 
 /** Read the instruction of the factory `name` from `NEMIA.md` in its first folder again: the instruction as it then reads. */
-export const resetInstructionPlace = (name: string): Promise<FactoryInstruction> =>
-  send('DELETE', instructionRoute(name), FactoryInstructionSchema, { body: {}, may: INSTRUCTION_WRITTEN });
+export const resetInstructionPlace = (name: string): Promise<FactoryInstruction> => factories.deleteInstruction(name);
 
 /**
  * Write `words` as the instruction the store keeps for the factory `name`: the instruction as it then reads. Rejects with a `WriteRefusal`
  * in the package's words: an instruction read from the factory's folder (409), blank words (422).
  */
-export const writeInstruction = (name: string, words: string): Promise<FactoryInstruction> =>
-  send('PUT', `${instructionRoute(name)}/words`, FactoryInstructionSchema, { body: { words }, may: INSTRUCTION_WRITTEN });
+export const writeInstruction = (name: string, words: string): Promise<FactoryInstruction> => factories.putInstructionWords(name, words);
 
 /** Remove the instruction the store keeps for the factory `name`: the instruction as it then reads. */
-export const clearInstruction = (name: string): Promise<FactoryInstruction> =>
-  send('DELETE', `${instructionRoute(name)}/words`, FactoryInstructionSchema, { body: {}, may: INSTRUCTION_WRITTEN });
+export const clearInstruction = (name: string): Promise<FactoryInstruction> => factories.deleteInstructionWords(name);
 
-/** The route of the hire of the factory `name` into `step`, `<workflow>/<step>`: the step one segment, its slash encoded. */
-const hireRoute = (name: string, step: string): string => `/api/factories/${encodeURIComponent(name)}/hires/${encodeURIComponent(step)}`;
-
-/** What a hire or a fire may have done, and what to look at before sending it again. */
-const HIRE_WRITTEN = "The factory's hires may be changed: read the step's page again before hiring or firing again.";
-
-/** A hire written: the factory's file, and the agent it replaced in the step, null where none was hired. */
-export type Hired = { file: string; replaced: string | null };
-
-/** A fire written: the factory's file, and the agent fired. */
-export type Fired = { file: string; fired: string };
+/** The name of the hire into `step`, `<workflow>/<step>`: the two joined by a dot, the Hire's name. */
+const hireNamed = (step: string): string => {
+  const at = step.indexOf('/');
+  return at < 0 ? step : hireName(step.slice(0, at), step.slice(at + 1));
+};
 
 /**
- * Hire the agent `agent` into `step`, `<workflow>/<step>`, in the factory `name`: replacing the one hired there, if any. Rejects with a
- * `WriteRefusal` in the package's words: no such factory (404), the default factory (409), a workflow the factory does not offer (422).
+ * Hire the agent `agent` into `step`, `<workflow>/<step>`, in the factory `name`: replacing the one hired there, if any, and answering
+ * the Hire as it then reads. Rejects with a `WriteRefusal` in the package's words: no such factory or step (404), the default factory or
+ * a name two steps join to (409), a workflow the factory does not offer (422).
  */
-export const hireAgent = (name: string, step: string, agent: string): Promise<Hired> =>
-  send('PUT', hireRoute(name, step), Schema.Struct({ file: Schema.String, replaced: Schema.NullOr(Schema.String) }), {
-    body: { agent },
-    may: HIRE_WRITTEN,
-  });
+export const hireAgent = (name: string, step: string, agent: string): Promise<Hire> => hires.put(name, hireNamed(step), agent);
 
-/** Fire the agent the factory `name` hires into `step`, `<workflow>/<step>`. Rejects with a `WriteRefusal` where it hires none (404). */
-export const fireAgent = (name: string, step: string): Promise<Fired> =>
-  send('DELETE', hireRoute(name, step), Schema.Struct({ file: Schema.String, fired: Schema.String }), { body: {}, may: HIRE_WRITTEN });
+/** Fire the agent the factory `name` hires into `step`, `<workflow>/<step>`. Rejects with a `WriteRefusal` where it hires none. */
+export const fireAgent = (name: string, step: string): Promise<Hire> => hires.delete(name, hireNamed(step));
 
 /**
- * Mirrors `ServerListed` in the orchestrator, with the state the harness reports, as apps/api/src/servers/servers.ts answers it: one
- * MCP server a factory records, its wire facts — `type`, `url`, `headers` — and the facts of the OAuth client it signs in through,
- * never a secret. `state` is the harness's own word, carried, or null where the state could not be read, which is not an absence.
+ * One MCP server a factory records, from its `McpServer`: its wire facts — `type`, `url`, `headers`, each value served as the mask — and
+ * the facts of the OAuth client it signs in through, never a secret. `state` is the harness's own word, or null where the state could not
+ * be read, which is not an absence; `error` says why.
  */
 export type FactoryServer = {
   name: string;
   type: 'http' | 'sse';
   url: string;
-  headers?: Record<string, string>;
+  headers?: Readonly<Record<string, string>>;
   oauth?: { clientId: string; callbackPort?: number };
   state: string | null;
   tools?: number;
@@ -327,134 +226,56 @@ export type FactoryServer = {
 };
 
 /** One of Nemia's builtin servers, as the add form offers it: the facts a factory would record of it. */
-export type BuiltinServer = {
-  name: string;
-  type: 'http' | 'sse';
-  url: string;
-  headers?: Record<string, string>;
-  oauth?: { clientId: string; callbackPort?: number };
-};
+export type BuiltinServer = Omit<FactoryServer, 'state' | 'tools' | 'error'>;
+
+/** What the board reads of a factory's MCP servers: its record with each server's state, and Nemia's builtin servers. */
+export type FactoryServers = { factory: string; servers: readonly FactoryServer[]; builtin: readonly BuiltinServer[] };
+
+/** `server` as the board draws it: its spec beside its name, and what its status says. */
+const serverViewOf = (server: McpServer): FactoryServer => ({
+  name: server.metadata.name,
+  ...server.spec,
+  state: server.status?.state ?? null,
+  ...(server.status?.tools === undefined ? {} : { tools: server.status.tools }),
+  ...(server.status?.error === undefined ? {} : { error: server.status.error }),
+});
+
+/** A builtin server as the form offers it: its name and its spec. */
+const builtinViewOf = (server: McpServer): BuiltinServer => ({ name: server.metadata.name, ...server.spec });
 
 /**
- * What the board reads of a factory's MCP servers: its record with each server's state, `unread` saying in the runtime's words why
- * none was read, and Nemia's builtin servers.
- */
-export type FactoryServers = {
-  factory: string;
-  servers: FactoryServer[];
-  unread: string | null;
-  builtin: BuiltinServer[];
-};
-
-const ServerOauthSchema = Schema.Struct({ clientId: Schema.String, callbackPort: Schema.optional(Schema.Number) });
-
-/** Decodes a `FactoryServers`. */
-const FactoryServersSchema = decodes<FactoryServers>()(
-  Schema.Struct({
-    factory: Schema.String,
-    servers: Schema.mutable(
-      Schema.Array(
-        Schema.Struct({
-          name: Schema.String,
-          type: Schema.Literals(['http', 'sse']),
-          url: Schema.String,
-          headers: Schema.optional(Schema.Record(Schema.String, Schema.String)),
-          oauth: Schema.optional(ServerOauthSchema),
-          state: Schema.NullOr(Schema.String),
-          tools: Schema.optional(Schema.Number),
-          error: Schema.optional(Schema.String),
-        }),
-      ),
-    ),
-    unread: Schema.NullOr(Schema.String),
-    builtin: Schema.mutable(
-      Schema.Array(
-        Schema.Struct({
-          name: Schema.String,
-          type: Schema.Literals(['http', 'sse']),
-          url: Schema.String,
-          headers: Schema.optional(Schema.Record(Schema.String, Schema.String)),
-          oauth: Schema.optional(ServerOauthSchema),
-        }),
-      ),
-    ),
-  }),
-);
-
-const serversRoute = (name: string): string => `/api/factories/${encodeURIComponent(name)}/servers`;
-const serverRoute = (name: string, server: string): string => `${serversRoute(name)}/${encodeURIComponent(server)}`;
-
-/**
- * The MCP servers of the factory `name`, with the state its harness reports of each. **Not polled**: the read spawns a short-lived
- * harness session to ask the states, so it is made when a person opens the page and when they press to read again, never on the
- * board's minute poll — a chip may be a few minutes old, and a press is how it is refreshed. Its answer never goes stale, so neither a
- * mount after the loader's read nor a window's focus reads it again: the settings route's loader reads it once per visit (`OPENED`).
+ * The MCP servers of the factory `name`, with the state its harness reports of each, and Nemia's builtin ones. **Not polled**: the read
+ * spawns a short-lived harness session to ask the states, so it is made when a person opens the page and when they press to read again,
+ * never on the board's minute poll — a chip may be a few minutes old, and a press is how it is refreshed. Its answer never goes stale, so
+ * neither a mount after the loader's read nor a window's focus reads it again: the settings route's loader reads it once per visit
+ * (`OPENED`).
  */
 export const factoryServersQuery = (name: string) =>
   queryOptions({
     queryKey: ['factory-servers', name],
-    queryFn: () => get(serversRoute(name), FactoryServersSchema),
+    queryFn: async (): Promise<FactoryServers> => {
+      const [listed, offered] = await Promise.all([mcpServers.list(name), builtin.mcpServers()]);
+      return { factory: name, servers: listed.items.map(serverViewOf), builtin: offered.items.map(builtinViewOf) };
+    },
     staleTime: Infinity,
   });
 
-/** What a write of a factory's servers may have done, and what to look at before writing them again. */
-const SERVERS_WRITTEN = "The server may be recorded: read the factory's servers again before writing them again.";
-
-/** The answer a write of one server gives: the file written, and the server as it was recorded. */
-type ServerWritten = { file: string };
-
-const ServerWrittenSchema = decodes<ServerWritten>()(Schema.Struct({ file: Schema.String }));
-
 /**
- * Record `server` for the factory `name`, a second of one name replacing the first. Rejects with a `WriteRefusal` in the package's
- * words: no such factory (404), a name that is no factory's or no server's (400), and a server it refuses (422) — a local one, an
- * `Authorization` header, a `url` that is no address, a transport the harness loads nothing from.
+ * Record `server` for the factory `name`, a second of one name replacing the first; a header sent as the mask it was read with keeps
+ * the value stored. Rejects with a `WriteRefusal` in the package's words: no such factory (404), a name that is no factory's or no
+ * server's (400), and a server it refuses (422) — a local one, an `Authorization` header, a `url` that is no address, a transport the
+ * harness loads nothing from, a mask sent for a header it does not store.
  */
-export const recordServer = (
-  name: string,
-  server: string,
-  body: { url: string; transport?: string; header?: string[]; clientId?: string; callbackPort?: string },
-): Promise<ServerWritten> => send('PUT', serverRoute(name, server), ServerWrittenSchema, { body, may: SERVERS_WRITTEN });
+export const recordServer = (name: string, server: string, body: McpServerWrite): Promise<McpServer> => mcpServers.put(name, server, body);
 
 /** Take the server `server` off the factory `name`'s record. Rejects as `recordServer` does, and 404 for a server it does not record. */
-export const removeServer = (name: string, server: string): Promise<ServerWritten> =>
-  send('DELETE', serverRoute(name, server), ServerWrittenSchema, { body: {}, may: SERVERS_WRITTEN });
-
-/** What a sign-in answers at once, as apps/api/src/servers/sign-in.ts answers it: the address to open, and when it stops waiting. */
-export type SignInStarted = { authUrl: string; until: string };
-
-const SignInStartedSchema = decodes<SignInStarted>()(Schema.Struct({ authUrl: Schema.String, until: Schema.String }));
-
-/** The words of a sign-in's state, as the engine holds it: none asked, one waiting, or how the last one ended. */
-export const SIGN_IN_WORDS = ['none', 'waiting', 'connected', 'expired', 'failed'] as const;
-
-/** A server's last sign-in, as the api answers it from the engine's memory. */
-export type SignInState = { state: (typeof SIGN_IN_WORDS)[number]; until?: string; why?: string };
-
-const SignInStateSchema = decodes<SignInState>()(
-  Schema.Struct({
-    state: Schema.Literals(SIGN_IN_WORDS),
-    until: Schema.optional(Schema.String),
-    why: Schema.optional(Schema.String),
-  }),
-);
-
-/** What a sign-out answers. */
-type SignedOut = { signedOut: true };
-
-const SignedOutSchema = decodes<SignedOut>()(Schema.Struct({ signedOut: Schema.Literal(true) }));
-
-const signInRoute = (name: string, server: string): string => `${serverRoute(name, server)}/sign-in`;
-
-/** What a sign-in or a sign-out may have done, and what to look at before asking again. */
-const SIGN_IN_ASKED = "The sign-in may have changed: read the server's state again before asking again.";
+export const removeServer = (name: string, server: string): Promise<McpServer> => mcpServers.delete(name, server);
 
 /**
  * Start a sign-in to the factory `name`'s server `server`: resolves with the address the person opens. Rejects with a `WriteRefusal`:
  * no such server (404), another sign-in waiting on its callback port (409), a server with no OAuth client (422).
  */
-export const signInServer = (name: string, server: string): Promise<SignInStarted> =>
-  send('POST', signInRoute(name, server), SignInStartedSchema, { body: {}, may: SIGN_IN_ASKED });
+export const signInServer = (name: string, server: string): Promise<SignInStarted> => mcpServers.signIn(name, server);
 
 /**
  * The state of `server`'s last sign-in, from the engine's memory: it spawns nothing, so the board polls it while a sign-in waits,
@@ -463,10 +284,9 @@ export const signInServer = (name: string, server: string): Promise<SignInStarte
 export const signInStateQuery = (name: string, server: string) =>
   queryOptions({
     queryKey: ['factory-server-sign-in', name, server],
-    queryFn: () => get(signInRoute(name, server), SignInStateSchema),
+    queryFn: () => mcpServers.signInState(name, server),
     refetchInterval: (query) => (query.state.data?.state === 'waiting' ? 2_000 : false),
   });
 
 /** Sign the factory `name` out of `server`: its sign-in cleared, so its state reads needs-auth on the next read. 409 while one waits. */
-export const signOutServer = (name: string, server: string): Promise<SignedOut> =>
-  send('DELETE', signInRoute(name, server), SignedOutSchema, { body: {}, may: SIGN_IN_ASKED });
+export const signOutServer = (name: string, server: string): Promise<SignedOut> => mcpServers.signOut(name, server);

@@ -18,7 +18,9 @@ export default {
   route: '/',
   expect: async (page) => {
     const levelFile = path.join(store!, 'nemia', 'level.json');
-    await page.route(isFactories, (route) => route.fulfill({ json: [] }));
+    await page.route(isFactories, (route) =>
+      route.fulfill({ json: { apiVersion: 'nemia/v1', kind: 'FactoryList', metadata: {}, items: [] } }),
+    );
     try {
       await page.goto(new URL('/', page.url()).href, { waitUntil: 'load' });
       await idle(page);

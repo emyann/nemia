@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Locator, Page } from 'playwright';
-import { photograph, sidebar, themeOf } from '../board.ts';
+import { factoriesAnswered, photograph, sidebar, themeOf } from '../board.ts';
 import { expectCount, expectVisible, idle, Refused, settled } from '../checks.ts';
 import { FACTORIES, FOLDER, WORKFLOWS } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -39,10 +39,8 @@ async function settingsOf(page: Page, factory: string): Promise<void> {
 
 /** The line the api answers for scheduling a workflow of `factory`. */
 async function scheduleLine(page: Page, factory: string): Promise<string> {
-  const answer = await page.request.get(new URL('/api/factories', page.url()).href);
-  const listed = (await answer.json()) as { name: string; commands: { schedule: string } }[];
-  const line = listed.find((f) => f.name === factory)?.commands.schedule;
-  if (!line) throw new Refused(`GET /api/factories answers ${factory} with the line that schedules one — it answers none`);
+  const line = (await factoriesAnswered(page)).find((f) => f.name === factory)?.commands.schedule;
+  if (!line) throw new Refused(`GET /api/factories/${factory}/commands answers the line that schedules one — it answers none`);
   return line;
 }
 

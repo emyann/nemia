@@ -23,18 +23,14 @@ import type * as chat from '../../api/src/nemia/chat.ts';
 import type * as custom from '../../api/src/custom/custom.ts';
 import type * as daemon from '../../api/src/factory/daemon.ts';
 import type * as decision from '../../api/src/decide/decision.ts';
-import type * as factories from '../../api/src/factories/factories.ts';
 import type * as inbox from '../../api/src/inbox/inbox.ts';
-import type * as instruction from '../../api/src/factories/instruction.ts';
 import type * as logs from '../../api/src/steps/logs.ts';
 import type * as nemia from '../../api/src/nemia/nemia.ts';
 import type * as path from '../../api/src/steps/path.ts';
 import type * as pause from '../../api/src/factory/pause.ts';
 import type * as quota from '../../api/src/factory/quota.ts';
 import type * as reach from '../../api/src/capabilities/reach.ts';
-import type * as rules from '../../api/src/factories/rules.ts';
 import type * as runs from '../../api/src/runs/runs.ts';
-import type * as servers from '../../api/src/servers/servers.ts';
 import type * as skills from '../../api/src/agents/skills.ts';
 import type * as step from '../../api/src/step/step.ts';
 import type * as steps from '../../api/src/steps/steps.ts';
@@ -48,7 +44,6 @@ type SaidHeld = Omit<Step['said'][number], 'after'> & { after: NonNullable<Step[
 type RadiusOf = Extract<decision.Touched['radius'], { changes: unknown }>;
 type ChatEventOf = chat.ChatHistoryAnswer['events'][number];
 type AskOf = Extract<ChatEventOf, { kind: 'question' }>;
-type ServerOf = Omit<servers.FactoryServersRead['servers'][number], 'state'> & { state: string | null };
 /**
  * `T` with each literal widened to its kind, for a value the api types by its literals that the board reads as words: a table the api
  * writes `as const`, or a machine's states and events, which the board draws and never branches on.
@@ -163,22 +158,6 @@ export type Collision = Holds<Same<Board.Collision, decision.Collisions['collidi
 export type MergeWord = Holds<Same<Board.MergeWord, decision.Collisions['colliding'][number]['merge']>>;
 export type CheckoutHold = Holds<Same<Board.CheckoutHold, NonNullable<decision.Decidable['checkout']>>>;
 export type RunSlot = Holds<Same<Board.RunSlot, NonNullable<Extract<decision.RunDecision, { running: true }>['held']>>>;
-
-export type FactorySchedule = Holds<Same<Board.FactorySchedule, factories.ScheduleAnswer>>;
-export type FactoryUntrusted = Holds<Same<Board.FactoryUntrusted, factories.UntrustedAnswer>>;
-export type FactoryVolume = Holds<Same<Board.FactoryVolume, factories.VolumeAnswer>>;
-export type Factory = Holds<Same<Board.Factory, factories.FactoryAnswer>>;
-/** Whether a clear removed a file is not the board's to read. */
-export type FactoryRules = Holds<Same<Board.FactoryRules, Omit<rules.FactoryRules, 'removed'>>>;
-export type FactoryInstruction = Holds<Same<Board.FactoryInstruction, instruction.FactoryInstruction>>;
-/**
- * A server's `state` is the harness's own word, carried and drawn as it comes: one the runtime does not list yet is shown, not refused.
- */
-export type FactoryServer = Holds<Same<Board.FactoryServer, ServerOf>>;
-export type FactoryServers = Holds<
-  Same<Board.FactoryServers, Omit<servers.FactoryServersRead, 'servers'> & { servers: readonly ServerOf[] }>
->;
-export type BuiltinServer = Holds<Same<Board.BuiltinServer, servers.FactoryServersRead['builtin'][number]>>;
 
 export type RunLines = Holds<Same<Board.RunLines, runs.RunLinesAnswer>>;
 export type RunGraph = Holds<Same<Board.RunGraph, runs.RunListing['graph']>>;

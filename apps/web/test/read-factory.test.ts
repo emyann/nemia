@@ -1,7 +1,8 @@
 /**
  * The Factory's and the inbox's reads decode the api's answers where they enter (`get`): the inbox and a card's page, what the repository
  * offers, the quota, the cap and the last pass, and the daemon: a key the board does not read is dropped, and one the api leaves out stays
- * out; a refusal of the api's stays in its words. Which keys each answer has is `test/wire.test.ts`'s.
+ * out; a refusal of the api's stays in its words. Which keys each answer has is `test/wire.test.ts`'s. A factory and its parts are read as
+ * objects, and made the board's view of a factory in one place (`factoryViewOf`); a hire is written to its `Hire`, by its joined name.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -9,8 +10,39 @@ import { ReadRefusal, UnreadAnswer } from '../src/lib/api/read.ts';
 import { cardQuery, inboxAllQuery, type InboxCardPage, type InboxEntry } from '../src/lib/api/inbox.ts';
 import { capabilitiesQuery, type Capabilities } from '../src/lib/api/capabilities.ts';
 import { ceilingsQuery, type Ceilings } from '../src/lib/api/ceilings.ts';
-import { clearRules, factoryRulesQuery, fireAgent, hireAgent, writeRules, type FactoryRules } from '../src/lib/api/factories.ts';
-import { capabilities, cardList, cardObject, cardPage, ceilings, inboxEntry, passCost, stepReach } from './factory-fixtures.ts';
+import { HEADER_MASK } from 'objects';
+import {
+  clearRules,
+  factoriesQuery,
+  factoryRulesQuery,
+  factoryServersQuery,
+  factoryViewOf,
+  fireAgent,
+  hireAgent,
+  recordServer,
+  writeRules,
+  type Factory,
+  type FactoryRules,
+  type FactoryServers,
+} from '../src/lib/api/factories.ts';
+import {
+  capabilities,
+  cardList,
+  cardObject,
+  cardPage,
+  ceilings,
+  factoryCommands,
+  factoryList,
+  factoryObject,
+  hireObject,
+  inboxEntry,
+  mcpServerList,
+  mcpServerObject,
+  passCost,
+  scheduleList,
+  scheduleObject,
+  stepReach,
+} from './factory-fixtures.ts';
 
 /** Every read answering `body` as JSON, with `status`, for the length of the test. */
 function answering(t: { after: (fn: () => void) => void }, body: unknown, status = 200) {
@@ -89,54 +121,181 @@ test("get, the Factory's and the inbox's reads: each decodes what the api gives,
     answering(t, ceilings());
     assert.equal(Object.hasOwn((await readCeilings()).pass ?? {}, 'runs'), false);
   });
-  await t.test("a clear's answer reads without whether a file was removed", async (t) => {
+  await t.test("a clear's answer reads with whether a file was removed, the FactoryRules' own key", async (t) => {
     answering(t, { ...rules, words: null, removed: true });
-    assert.deepEqual(await clearRules('mill'), { ...rules, words: null }, "whether a file was removed is not the board's to read");
+    assert.deepEqual(await clearRules('mill'), { ...rules, words: null, removed: true });
+  });
+});
+
+/** Each request a test's reads and writes send: its method, its path and query, and its body where it has one. */
+type Sent = { method: string; url: string; body: unknown };
+
+/** Every request answered by `answer` of its path, its JSON with a 200, for the length of the test; what each sent, in `sent`. */
+function serving(t: { after: (fn: () => void) => void }, answer: (url: string, method: string) => unknown): Sent[] {
+  const sent: Sent[] = [];
+  const before = globalThis.fetch;
+  globalThis.fetch = async (input, init) => {
+    const url = String(input);
+    const method = init?.method ?? 'GET';
+    sent.push({ method, url, body: init?.body ? JSON.parse(String(init.body)) : undefined });
+    return new Response(JSON.stringify(answer(url, method)), { status: 200, headers: { 'content-type': 'application/json' } });
+  };
+  t.after(() => {
+    globalThis.fetch = before;
+  });
+  return sent;
+}
+
+const readFactories = factoriesQuery.queryFn as unknown as () => Promise<Factory[]>;
+const readServers = factoryServersQuery('mill').queryFn as unknown as () => Promise<FactoryServers>;
+
+/** The view of `mill` the fixtures make: what the pages drew from the old answer, key by key. */
+const millView: Factory = {
+  name: 'mill',
+  default: false,
+  repos: ['/work/mill'],
+  workflows: ['build'],
+  hires: { 'build/implement': 'ada' },
+  error: null,
+  schedules: [
+    {
+      workflow: 'build',
+      cron: '0 9 * * 1',
+      tz: null,
+      brief: 'The weekly build',
+      repo: null,
+      next: '2026-10-05T09:00:00.000Z',
+      last: { run: 'r-1', at: '2026-09-28T09:00:00.000Z' },
+      refused: null,
+      commands: { unschedule: 'nemia unschedule mill build' },
+    },
+  ],
+  commands: {
+    attach: 'nemia factory attach mill <workflow>',
+    rm: 'nemia factory rm mill',
+    add: 'nemia factory add mill <repo>',
+    schedule: 'nemia schedule mill <workflow> <cron>',
+    trust: 'nemia factory trust mill',
+    volume: 'nemia factory volume mill <path>',
+  },
+  template: null,
+  untrusted: [],
+  volumes: [{ path: '/home/me/notes', readOnly: true, commands: { rm: 'nemia factory volume rm mill notes' } }],
+};
+
+test("the factories are read as objects and made the pages' view: the Factory, its lines and its schedules", async (t) => {
+  await t.test('factoryViewOf: a key the object leaves out is null, a volume its line by name, a schedule its own', () => {
+    assert.deepEqual(factoryViewOf(factoryObject(), factoryCommands(), [scheduleObject()]), millView);
+    const templated = factoryObject({
+      spec: { template: { source: 'sdlc', version: '1.0.0', params: {} }, workflows: undefined },
+      status: {
+        applied: '1.0.0',
+        conditions: [{ type: 'Applied', status: 'True', reason: 'Rendered', message: 'rendered at 1.0.0' }],
+        untrusted: [{ place: '/work/mill', harness: 'Claude Code', withheld: 'its hooks' }],
+        error: 'mill.json does not read',
+      },
+    });
+    const view = factoryViewOf(templated, factoryCommands());
+    assert.deepEqual(view.template, {
+      source: 'sdlc',
+      version: '1.0.0',
+      params: {},
+      applied: '1.0.0',
+      conditions: [{ type: 'Applied', status: 'True', reason: 'Rendered', message: 'rendered at 1.0.0' }],
+    });
+    assert.deepEqual(view.untrusted, [{ place: '/work/mill', harness: 'Claude Code', withheld: 'its hooks', never: null }]);
+    assert.equal(view.error, 'mill.json does not read');
+    assert.deepEqual(view.schedules, [], 'no schedules read, none drawn');
+    assert.equal(factoryViewOf(factoryObject({ metadata: { name: 'default' } }), factoryCommands('default')).default, true);
+  });
+  await t.test("the query reads the list, then each factory's lines and, but for the default factory, its schedules", async (t) => {
+    const sent = serving(t, (url) => {
+      if (url.startsWith('/api/factories?') || url === '/api/factories')
+        return factoryList(factoryObject({ metadata: { name: 'default' }, spec: { workflows: undefined } }), factoryObject());
+      if (url === '/api/factories/default/commands') return factoryCommands('default');
+      if (url === '/api/factories/mill/commands') return factoryCommands();
+      if (url.startsWith('/api/namespaces/mill/schedules')) return scheduleList(scheduleObject());
+      throw new Error(`no answer for ${url}`);
+    });
+    const [first, mill] = await readFactories();
+    assert.equal(first?.default, true);
+    assert.equal(first?.workflows, null, 'the default factory offers every workflow');
+    assert.deepEqual(mill, millView);
+    assert.deepEqual(
+      sent.map((one) => `${one.method} ${one.url.split('?')[0]}`).sort(),
+      [
+        'GET /api/factories',
+        'GET /api/factories/default/commands',
+        'GET /api/factories/mill/commands',
+        'GET /api/namespaces/mill/schedules',
+      ],
+      'no schedules asked of the default factory',
+    );
+  });
+  await t.test('an answer that is no FactoryList is unread, naming where', async (t) => {
+    serving(t, () => ({ apiVersion: 'nemia/v1', kind: 'FactoryList', metadata: {}, items: [{ ...factoryObject(), kind: 'Card' }] }));
+    await assert.rejects(readFactories(), (err: unknown) => err instanceof UnreadAnswer);
+  });
+});
+
+test("a factory's servers are McpServer objects beside Nemia's builtin ones, each header masked, and the mask is sent back as it came", async (t) => {
+  const sent = serving(t, (url, method) => {
+    if (url.startsWith('/api/namespaces/mill/mcpservers') && method === 'GET')
+      return mcpServerList(mcpServerObject({ state: 'connected', tools: 3 }), {
+        ...mcpServerObject(),
+        metadata: { ...mcpServerObject().metadata, name: 'linear' },
+      });
+    if (url === '/api/builtin/mcpservers')
+      return mcpServerList({ ...mcpServerObject(), metadata: { name: 'github', creationTimestamp: 'x', resourceVersion: 'y' } });
+    return mcpServerObject();
+  });
+  const read = await readServers();
+  assert.deepEqual(
+    read.servers.map((one) => [one.name, one.state, one.tools, one.headers]),
+    [
+      ['github', 'connected', 3, { 'X-MCP-Toolsets': HEADER_MASK }],
+      ['linear', null, undefined, { 'X-MCP-Toolsets': HEADER_MASK }],
+    ],
+  );
+  assert.deepEqual(
+    read.builtin.map((one) => one.name),
+    ['github'],
+  );
+  const [github] = read.servers;
+  assert.ok(github);
+  await recordServer('mill', 'github', { type: github.type, url: github.url, headers: { ...github.headers } });
+  assert.deepEqual(sent.at(-1), {
+    method: 'PUT',
+    url: '/api/namespaces/mill/mcpservers/github',
+    body: { type: 'http', url: 'https://api.githubcopilot.com/mcp/', headers: { 'X-MCP-Toolsets': HEADER_MASK } },
   });
 });
 
 test("a factory's writes: its rules, a hire and a fire, each at its own route, each name one segment", async (t) => {
   await t.test("a factory's rules are written and cleared at the factory's own route, its name one segment", async (t) => {
-    const before = globalThis.fetch;
-    const sent: Array<{ method: string; url: string; body: unknown }> = [];
-    globalThis.fetch = async (input, init) => {
-      sent.push({ method: init?.method ?? 'GET', url: String(input), body: init?.body ? JSON.parse(String(init.body)) : undefined });
-      return new Response(JSON.stringify(rules), { status: 200, headers: { 'content-type': 'application/json' } });
-    };
-    t.after(() => {
-      globalThis.fetch = before;
-    });
+    const sent = serving(t, () => rules);
     await factoryRulesQuery('the mill').queryFn?.({} as never);
     await writeRules('the mill', 'Never push.');
     await clearRules('the mill');
     assert.deepEqual(sent, [
       { method: 'GET', url: '/api/factories/the%20mill/rules', body: undefined },
       { method: 'PUT', url: '/api/factories/the%20mill/rules', body: { words: 'Never push.' } },
-      { method: 'DELETE', url: '/api/factories/the%20mill/rules', body: {} },
+      { method: 'DELETE', url: '/api/factories/the%20mill/rules', body: undefined },
     ]);
   });
-  await t.test("a hire and a fire are sent to the step's hire, the step one segment, and read back as the api answers them", async (t) => {
-    const sent: Array<{ url: string; method: string | undefined; body: unknown }> = [];
-    const before = globalThis.fetch;
-    let answer: unknown = { file: '/f/mill.json', replaced: null };
-    globalThis.fetch = async (input, init) => {
-      sent.push({ url: String(input), method: init?.method, body: JSON.parse(String(init?.body)) });
-      return new Response(JSON.stringify(answer), { headers: { 'content-type': 'application/json' } });
-    };
-    t.after(() => {
-      globalThis.fetch = before;
-    });
-    assert.deepEqual(await hireAgent('mill', 'build/implement', 'ada'), { file: '/f/mill.json', replaced: null });
-    answer = { file: '/f/mill.json', fired: 'ada' };
-    assert.deepEqual(await fireAgent('mill', 'build/implement'), { file: '/f/mill.json', fired: 'ada' });
+  await t.test("a hire and a fire are sent to the step's Hire, named <workflow>.<step>, and read back as the Hire", async (t) => {
+    let answer: unknown = hireObject();
+    const sent = serving(t, () => answer);
+    assert.deepEqual(await hireAgent('mill', 'build/implement', 'ada'), hireObject());
+    answer = hireObject(undefined);
+    assert.deepEqual(await fireAgent('mill', 'build/implement'), hireObject(undefined));
     assert.deepEqual(sent, [
-      { url: '/api/factories/mill/hires/build%2Fimplement', method: 'PUT', body: { agent: 'ada' } },
-      { url: '/api/factories/mill/hires/build%2Fimplement', method: 'DELETE', body: {} },
+      { url: '/api/namespaces/mill/hires/build.implement', method: 'PUT', body: { agent: 'ada' } },
+      { url: '/api/namespaces/mill/hires/build.implement', method: 'DELETE', body: undefined },
     ]);
-    answer = { file: '/f/mill.json' };
+    answer = { file: '/f/mill.json', replaced: null };
     await assert.rejects(hireAgent('mill', 'build/implement', 'ada'), (err: unknown) => {
       assert.ok(err instanceof UnreadAnswer, String(err));
-      assert.ok(err.message.includes('at replaced, '), err.message);
       assert.ok(err.message.includes("read the step's page again before hiring or firing again"), err.message);
       return true;
     });

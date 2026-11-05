@@ -2,7 +2,8 @@
  * What HttpApi answers on its own, in the api's words (src/objects/serve.ts, `inApiWords`): a body its decoding refuses — not JSON, or
  * JSON of another shape — and a query it refuses are each a 400 whose body is `{ error }`, a sentence naming what the route takes; a
  * path the routes hand it and it serves nothing on is a 404 `{ error }` naming where the paths are listed. Its own refusals keep their
- * status and words. And the inbox's routes the Card's verbs replaced answer 404, so a client still reading them fails.
+ * status and words. A write whose body is over `OBJECT_BODY_LIMIT` is a 413 `{ error }` naming the limit, and one under it is filed as
+ * before. And the inbox's routes the Card's verbs replaced answer 404, so a client still reading them fails.
  */
 import { root } from '../../test/harness.ts';
 import { test } from 'node:test';
@@ -11,6 +12,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { names } from '../../test/named.ts';
 import { app } from '../app.ts';
+import { OBJECT_BODY_LIMIT } from './serve.ts';
 
 const JSON_TYPE = { 'content-type': 'application/json' };
 const inbox = path.join(root, 'inbox');
@@ -44,6 +46,33 @@ test('REFUSED: a card verb sent a body HttpApi does not decode — not JSON, or 
     names(error, route, takes);
   }
   assert.deepEqual(inboxAsIs(), before);
+});
+
+/** A card's file body whose JSON is `bytes` long, all of it the card's text. */
+const cardOfBytes = (bytes: number): string => {
+  const frame = JSON.stringify({ body: '' }).length;
+  return JSON.stringify({ body: 'x'.repeat(bytes - frame) });
+};
+
+test('REFUSED: a write whose body is a byte over the limit is a 413 `{ error }` naming the limit and that the object is too large, and nothing is written', async () => {
+  const limit = Number(OBJECT_BODY_LIMIT);
+  const before = inboxAsIs();
+  const body = cardOfBytes(limit + 1);
+  assert.equal(Buffer.byteLength(body), limit + 1);
+  const { status, error } = await refusal(await app.request('/api/namespaces/default/cards', { method: 'POST', headers: JSON_TYPE, body }));
+  assert.equal(status, 413);
+  names(error, 'too large', '1 MiB', String(limit));
+  assert.deepEqual(inboxAsIs(), before);
+});
+
+test('a write whose body is at the limit is answered as before: the card is filed whole', async () => {
+  const limit = Number(OBJECT_BODY_LIMIT);
+  const body = cardOfBytes(limit);
+  const res = await app.request('/api/namespaces/default/cards', { method: 'POST', headers: JSON_TYPE, body });
+  assert.equal(res.status, 201, await res.clone().text());
+  const filed = inboxAsIs().filter(([, text]) => text.length >= limit - 100);
+  assert.equal(filed.length, 1, 'the card is in the inbox');
+  for (const [name] of filed) fs.rmSync(path.join(inbox, name));
 });
 
 test('REFUSED: a list asked with a query of the wrong shape — a limit given twice — is a 400 `{ error }` naming the query it takes', async () => {

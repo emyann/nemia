@@ -162,23 +162,28 @@ export function Offers({
     <section aria-label="Answer" className="space-y-2">
       <h3 className={HEADING}>Answer — each runs its step's command, as the command line would: a try, a round, or an approval</h3>
       <ul className="space-y-3">
-        {offers.map((offer) =>
-          offer.case === 'raise' ? (
-            <RaiseRow key={offer.step} runId={runId} offer={offer} />
-          ) : offer.case === 'answer' && offer.questions.length > 0 ? (
-            <QuestionsForm key={offer.step} runId={runId} offer={offer} />
-          ) : offer.case === 'enough' ? (
-            <EnoughRow key={offer.step} runId={runId} offer={offer} line={lineOf(offer)} />
-          ) : (
-            <OfferRow key={offer.step} runId={runId} offer={offer} />
-          ),
-        )}
+        {offers.map((offer) => (
+          <AnswerRow key={offer.step} runId={runId} offer={offer} line={lineOf(offer)} />
+        ))}
         {asked.map((one) => (
           <AskedRow key={one.step} step={one.step} said={one.note ?? `try ${one.try} asked`} />
         ))}
       </ul>
     </section>
   );
+}
+
+/**
+ * One row of the Answer section, for the offer `offer`, whose command's line is `line` (`step.commands[offer.kind]`): a raise with its
+ * amount (`RaiseRow`), a step whose closeout asks questions as data answered by choosing (`QuestionsForm`), a loop out of rounds
+ * approved as it stands (`EnoughRow`), every other a try (`OfferRow`). Drawn wherever a step's answer is: the Decide section, and a
+ * step a message links to (`components/chat/ChatBrought.tsx`). A `<li>`, so its parent is a list.
+ */
+export function AnswerRow({ runId, offer, line }: { runId: string; offer: Answer; line: string }) {
+  if (offer.case === 'raise') return <RaiseRow runId={runId} offer={offer} />;
+  if (offer.case === 'answer' && offer.questions.length > 0) return <QuestionsForm runId={runId} offer={offer} />;
+  if (offer.case === 'enough') return <EnoughRow runId={runId} offer={offer} line={line} />;
+  return <OfferRow runId={runId} offer={offer} />;
 }
 
 /** What a step needs, as its row says it after its name, when it is not a question: a question is drawn as the markdown it is (`Asks`). */

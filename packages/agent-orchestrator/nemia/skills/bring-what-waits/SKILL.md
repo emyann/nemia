@@ -1,13 +1,21 @@
 ---
 name: bring-what-waits
-description: Bring what waits on the person — a step at its gate, a step's question to them, a loop out of rounds, a step at its cap, a factory's upgrade or takeover — in chat with a recommendation, then run the verb they choose with their words as --message, so its prompt is their decision, asked once.
+description: Bring what waits on the person — a step at its gate, a step's question to them, a loop out of rounds, a step at its cap, a factory's upgrade or takeover — in chat with a recommendation, naming a step by its link; on the board they answer in the part that link draws, and in a terminal you run the verb they choose with their words as --message, so its prompt is their decision, asked once.
 ---
 # Bring what waits
 
 Five things wait on the person, and only these: a step at its gate, a step's question to them, a loop out of rounds, a step at its cap,
-and a factory's upgrade, or its takeover by a template. Each is theirs to decide. Bring it in chat so they can decide in one read, with the verb you recommend; then run the verb they
-choose, with their words as `--message` where the verb takes it. The verb prompts them as it runs: that prompt is their decision, asked
-once, since they just gave it in chat. When they decline the prompt, ask what they want instead, and run that verb, which prompts again.
+and a factory's upgrade, or its takeover by a template. Each is theirs to decide. Bring it in chat so they can decide in one read, with the verb you recommend,
+and name each step you bring by its link, `[<step> of <run>](/runs/<run>?step=<step>)`.
+
+On the board — their words reach you framed `The person writes from the board:`, and what you say is read there — the person answers in
+the part your message draws under that link: the run's page's own form for the step, read live, which sends their answer to the step.
+Run nothing for it: give your brief and your pick for each question in your words above it, and leave the questions to the part. Where
+the part has no form for what they choose (one more round of a loop), run the verb.
+
+In a terminal, run the verb they choose, with their words as `--message` where the verb takes it. The verb prompts them as it runs: that
+prompt is their decision, asked once, since they just gave it in chat. When they decline the prompt, ask what they want instead, and run
+that verb, which prompts again.
 Two verbs answer what waits: `nemia approve`, of a step at its gate or, with `--message`, of a loop out of rounds; and `nemia retry`,
 one more try or, with `--round`, one more round. `nemia refresh <run> --base` brings the base into a loop's work.
 

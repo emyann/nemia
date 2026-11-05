@@ -3,10 +3,10 @@
  * state (`ChatFollowed`), the merge of the stream's events by their id (`mergeChatEvents`), what each of its frames does
  * (`changedChat`, `followChat`), the one translation of the api's presence into the board's (`presenceOf`), her
  * consecutive calls folded into a turn (`foldChat`) and that fold mapped onto the one shape both conversations draw (`chatItems`, her
- * adapter onto `lib/conversation.ts`, a step's session having one of its own), the links read out of
- * her words (`linksOf`), how an ask of hers is drawn (`drawnAsk`) and what is left to answer of one of several questions
- * (`askLeft`, `askAnswered`, `asksOpen`), which of them the composer's own words answer (`askInWords`, `wordsAnswer`), and
- * which of her messages are new to the person (`newFrom`, `readableFrom`).
+ * adapter onto `lib/conversation.ts`, a step's session having one of its own), the links read out of her words (`linksOf`) and the
+ * steps of runs they bring (`broughtOf`, `lib/stepLink.ts`), how an ask of hers is drawn (`drawnAsk`) and what is left to answer of
+ * one of several questions (`askLeft`, `askAnswered`, `asksOpen`), which of them the composer's own words answer (`askInWords`,
+ * `wordsAnswer`), and which of her messages are new to the person (`newFrom`, `readableFrom`).
  *
  * Beside the effect in `lib/useNemiaChat.ts`, as `lib/following.ts` sits beside `lib/useStepTranscript.ts`. The transport under
  * `followChat` is the one follower both conversations run on, `lib/follow.ts`.
@@ -16,6 +16,9 @@ import { chatDataOf } from './api/chat.ts';
 import type { ConversationItem, ConversationLine } from './conversation.ts';
 import { follow, type Followed, type Follower, type Frames, type StreamLike } from './follow.ts';
 import type { Presence } from './presence.ts';
+import { broughtOf } from './stepLink.ts';
+
+export { broughtOf } from './stepLink.ts';
 
 /** One tool call of hers, as her chat gives it. */
 export type ChatCall = Extract<ChatEvent, { kind: 'call' }>;
@@ -290,6 +293,25 @@ export function linksOf(text: string): { text: string; links: ChatLink[] } {
   return { text: plain, links };
 }
 
+/** A step of a run her words link to, which her talk draws under them as the run's page's own part for it (`ChatBrought`). */
+export type ChatBrought = { kind: 'brought'; run: string; step: string };
+
+/** What her talk draws itself, through the family's one escape hatch: an ask of hers, or a step her words bring. */
+export type ChatOwn = ChatAsk | ChatBrought;
+
+/** The steps the links `links` bring, each once, in the order she wrote them. */
+const broughtIn = (links: readonly ChatLink[]): ChatBrought[] => {
+  const seen = new Set<string>();
+  return links.flatMap((link) => {
+    const named = broughtOf(link.href);
+    if (!named) return [];
+    const key = `${named.run}/${named.step}`;
+    if (seen.has(key)) return [];
+    seen.add(key);
+    return [{ kind: 'brought' as const, ...named }];
+  });
+};
+
 /** One of her calls as a line of a turn: her events carry no input and no result, so a line of hers opens on nothing. */
 const lineOf = (call: ChatCall): ConversationLine => ({
   id: call.id,
@@ -300,7 +322,7 @@ const lineOf = (call: ChatCall): ConversationLine => ({
 });
 
 /** Her words, the person's own, or the keeper's quiet line: hers as markdown with her links named beside it (`linksOf`). */
-function saidOf(message: ChatMessage): ConversationItem<ChatAsk> {
+function saidOf(message: ChatMessage): ConversationItem<ChatOwn> {
   const drawn = drawnAs(message);
   if (drawn === 'marker') return { kind: 'note', id: message.id, what: 'keeper', words: message.text };
   if (drawn === 'person')
@@ -313,18 +335,24 @@ function saidOf(message: ChatMessage): ConversationItem<ChatAsk> {
  * Her chat on the one shape the family draws (`lib/conversation.ts`), her adapter onto it: her consecutive calls folded into one `work`
  * item a line a call (`foldChat`), her words and the person's into `said`, the keeper's framing and the rule between two of her
  * sessions into `note`, and a question, a proposal or a permission of hers into `own`, carrying the event her talk draws itself
- * (`drawnAsk`). An event the board has no drawing for is left out. Pure: a node test proves the whole mapping without a browser.
+ * (`drawnAsk`). After her words, an `own` item for each step of a run they link to (`broughtOf`), once a step, in her order: her talk
+ * draws the run's page's own part for it there. An event the board has no drawing for is left out. Pure: a node test proves the whole
+ * mapping without a browser.
  */
-export function chatItems(events: readonly ChatEvent[]): ConversationItem<ChatAsk>[] {
-  const out: ConversationItem<ChatAsk>[] = [];
+export function chatItems(events: readonly ChatEvent[]): ConversationItem<ChatOwn>[] {
+  const out: ConversationItem<ChatOwn>[] = [];
   for (const item of foldChat(events)) {
     if (item.kind === 'turn') {
       out.push({ kind: 'work', id: item.id, lines: item.calls.map(lineOf), running: item.running, ms: item.ms, counts: 'call' });
       continue;
     }
     const event = item.event;
-    if (event.kind === 'message') out.push(saidOf(event));
-    else if (isAsk(event)) out.push({ kind: 'own', id: event.id, own: event });
+    if (event.kind === 'message') {
+      const said = saidOf(event);
+      out.push(said);
+      if (said.kind === 'said' && !said.yours)
+        for (const own of broughtIn(said.links)) out.push({ kind: 'own', id: `${event.id}:brought:${own.run}/${own.step}`, own });
+    } else if (isAsk(event)) out.push({ kind: 'own', id: event.id, own: event });
     else if (event.kind === 'session')
       out.push({ kind: 'note', id: event.id, what: 'session', words: `A session of hers began — her ${event.attempt}` });
   }

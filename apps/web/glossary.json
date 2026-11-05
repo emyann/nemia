@@ -15,6 +15,11 @@
       }
     },
     {
+      "term": "Brought",
+      "meaning": "a step of a run her chat message links to (`/runs/<run>?step=<step>`), drawn under her words as the run's page's own part for what it waits on, read live: its gate, the Answer section's row, the banner's Continue, the note of a try asked, or its state alone, as `broughtPart` names it (`apps/web/src/lib/brought.ts`, proved by `apps/web/contracts/brought.contract.ts`), drawn by `apps/web/src/components/chat/ChatBrought.tsx`.",
+      "type": "BroughtPart"
+    },
+    {
       "term": "Builtin",
       "meaning": "what comes with Nemia, as the board says it: the place `builtin` of a skill, drawn 'Built into Nemia', the builtin servers above a factory's list and an agent's builtin auto rule. The former address `/agents/skills/shipped/<skill>` opens the builtin skill through the api's redirect.",
       "type": "SkillSource",

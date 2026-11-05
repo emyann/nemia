@@ -36,7 +36,7 @@ const SECTIONS: readonly { readonly class: 'read' | 'act' | 'ask' | 'answer'; re
     class: 'answer',
     heading: 'Answers what waits',
     says:
-      'Each answers what waits on the person. Bring the matter first, with the `bring-what-waits` skill, then run the verb they choose ' +
+      'Each answers what waits on the person. Bring the matter first, with the `bring-what-waits` skill, then, in a terminal, run the verb they choose ' +
       'with their words as `--message`: its prompt is their decision, asked once. `nemia retry` asks only of a step that waits on the person, or with `--budget`.',
   },
 ];

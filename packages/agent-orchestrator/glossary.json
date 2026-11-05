@@ -54,6 +54,11 @@
       ]
     },
     {
+      "term": "Chat ask",
+      "meaning": "what waits on the person in a chat, drawn as one kind of `ChatEvent`: her `question`, her `proposal` (one question whose choices explain nothing), or a `permission`, a call of her session's that would prompt a person, held on the same path as her question and carrying the call's facts (`PermissionFacts`). Kept in the chat's asks file (`packages/agent-orchestrator/src/chat/chat.store.ts`), keyed by its words, a permission by its own call (`askKey`, `packages/agent-orchestrator/src/chat/chat.ts`), and answered through `POST /api/nemia/chat/answer`.",
+      "type": "ChatAskKind"
+    },
+    {
       "term": "Check",
       "meaning": "a command the run executes after a step signs off; its exit code, not the agent's word, decides whether the run goes on.",
       "see": {

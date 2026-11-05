@@ -105,6 +105,9 @@ export const outboxOwed = (dir: string): boolean => {
  * answer is answered from what the person said the first time; where it does not, the one copy goes on waiting on them, and their
  * answer reaches her by the road `answersDue` finds for it. Level-triggered: nothing is marked for either, and the next beat finds
  * the call gone from `asks` once it has taken the answer.
+ *
+ * A permission is never the same words as another (`askKey` keys it by its own call): leave the person gave one call is no leave for
+ * the next call of the same command, which is copied and waits on them.
  */
 export const recordAsks = Effect.fn('recordAsks')(function* (taskId: string, dir: string) {
   const e = yield* EngineService;

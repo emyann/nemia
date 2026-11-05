@@ -87,6 +87,7 @@ const texts = (events: readonly { kind: string; text?: string }[]) => events.map
 const RAW = {
   id: 'call-1',
   at: '2026-10-16T18:02:00.000Z',
+  kind: 'question' as const,
   questions: [
     {
       question: 'What does the board show as an old closeout’s one line?',
@@ -100,6 +101,25 @@ const RAW = {
   ],
 };
 const QUESTION = RAW.questions[0].question;
+
+/** A call of her session's that would prompt a person, as the runtime holds it: one question, its choices, and the call's facts. */
+const PERMISSION = {
+  id: 'toolu-1',
+  at: '2026-10-16T18:03:00.000Z',
+  kind: 'permission' as const,
+  questions: [
+    {
+      question: 'Run git push origin main',
+      header: 'Permission',
+      options: [
+        { label: 'Allow once', description: 'Run it this once.' },
+        { label: 'Deny', description: 'Do not run it.' },
+      ],
+      multiSelect: false,
+    },
+  ],
+  permission: { tool: 'Bash', command: 'git push origin main', always: false, defaultToNo: false },
+};
 
 /** The ask as the chat keeps it, once read off the call the runtime reports (`askOf`). */
 const kept = askOf(RAW);
@@ -411,6 +431,34 @@ test('She asks, and the person answers: on the board, back through the call she 
       );
       assert.deepEqual(answeredIn(id).at(-1)?.answers, { [QUESTION]: 'Cut it on read' });
       assert.deepEqual(saidTo(id), [], 'nothing of it was said as words: her new call carried it');
+    },
+  );
+  await s.test(
+    'a permission answered once answers no later call of the same command: that one is written down, and waits on the person',
+    async () => {
+      const { id, dir } = await filed('permission', 'working');
+      stage.board().plantAsk(id, PERMISSION);
+      assert.deepEqual(await run(recordAsks(id, dir)), ['toolu-1']);
+      const words = PERMISSION.questions[0].question;
+      appendAnswer(dir, { id: 'toolu-1', at: new Date().toISOString(), answers: { [words]: 'Allow once' } });
+      await run(answersDue(id, dir));
+      await run(answersDue(id, dir));
+      stage.board().plantAsk(id, { ...PERMISSION, id: 'toolu-2' });
+      assert.deepEqual(await run(recordAsks(id, dir)), ['toolu-2'], 'the second call of the same command is an ask of its own');
+      assert.deepEqual(
+        answeredIn(id).map((one) => one.id),
+        ['toolu-1'],
+        'and leave given to the first call was written into no other',
+      );
+      const read = await run(chatHistory({ task: id, dir }, { limit: 50 }));
+      assert.deepEqual(
+        read.events.map((one) => [one.kind, one.id, one.kind === 'permission' && one.chose !== undefined]),
+        [
+          ['permission', 'q:toolu-1', true],
+          ['permission', 'q:toolu-2', false],
+        ],
+      );
+      assert.equal(asksWaiting(read.events), 1, 'the second waits on the person');
     },
   );
 });

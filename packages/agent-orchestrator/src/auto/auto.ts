@@ -81,33 +81,37 @@ export const allowedBy = (
   facts: Facts,
 ): PolicyRule | undefined => list.find((rule) => allows(rule, answer, step, facts));
 
-/** Each condition as a rule says it. */
-const CONDITION_WORDS: Record<Condition, string> = {
-  recommends: 'the agent recommends it',
+/** Each condition as a rule says it, in the words of a person who knows nothing of how Nemia reads it. */
+export const CONDITION_WORDS: Record<Condition, string> = {
+  recommends: 'its agent recommends it',
   checked: 'its check passed',
-  accepted: 'every reviewer accepted',
-  withinBudget: 'no step is past its budget',
-  nothingOpen: 'nothing is left open',
+  accepted: 'its review passed',
+  withinBudget: 'it stayed within budget',
+  nothingOpen: 'nothing waits on you',
 };
 
-/** Each answer as a rule says it. */
-const ANSWER_WORDS: Record<RuleAnswer, string> = { approve: 'Approve', retry: 'Try again' };
+/** Each answer as a rule says it, around the steps it names: `Approve land`, `Try design again`. */
+const ANSWER_WORDS: Record<RuleAnswer, (steps: string) => string> = {
+  approve: (steps) => `Approve ${steps}`,
+  retry: (steps) => `Try ${steps} again`,
+};
 
 /** Words joined as a sentence lists them: `a`, `a and b`, `a, b and c`. */
 const listed = (words: readonly string[]): string =>
   words.length < 2 ? (words[0] ?? '') : `${words.slice(0, -1).join(', ')} and ${words.at(-1)}`;
 
 /**
- * A rule in the person's words, made from its fields alone, so what they read is what admission holds: `Approve any step unasked when
- * the agent recommends it, …`. Pure.
+ * A rule in the person's words, made from its fields alone, so what they read is what admission holds: the steps by their names, as what
+ * is approved or tried again, then the conditions as a person says them — `Approve land on its own once its agent recommends it, its
+ * review passed, it stayed within budget and nothing waits on you.`, `Try any step again on its own once it has cost under $5.`,
+ * `Approve design and land on their own, whatever their state.` Pure.
  */
 export function ruleWords(rule: PolicyRule): string {
-  const steps = rule.steps === undefined ? 'any step' : `${rule.steps.length === 1 ? 'the step' : 'the steps'} ${listed(rule.steps)}`;
-  const when = [
-    ...rule.when.map((c) => CONDITION_WORDS[c]),
-    ...(rule.under === undefined ? [] : [`the run has cost under $${rule.under}`]),
-  ];
-  return `${ANSWER_WORDS[rule.answer]} ${steps} unasked${when.length ? ` when ${listed(when)}` : ', whatever the run’s state'}.`;
+  const several = rule.steps !== undefined && rule.steps.length > 1;
+  const steps = rule.steps === undefined ? 'any step' : listed(rule.steps);
+  const when = [...rule.when.map((c) => CONDITION_WORDS[c]), ...(rule.under === undefined ? [] : [`it has cost under $${rule.under}`])];
+  const own = several ? 'on their own' : 'on its own';
+  return `${ANSWER_WORDS[rule.answer](steps)} ${own}${when.length ? ` once ${listed(when)}` : `, whatever ${several ? 'their' : 'its'} state`}.`;
 }
 
 /** A value read as a list of names, or undefined where it is not one. */

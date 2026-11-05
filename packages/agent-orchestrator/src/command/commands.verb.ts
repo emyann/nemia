@@ -9,11 +9,12 @@
  * card`, `agentCardRead`) and its custom instructions (`nemia agents custom`, `AGENTS_CUSTOM`), a run's course (`nemia cancel`, `nemia
  * hold`, `nemia rm`, `nemia prune`), and the store's pause (`nemia pause`, `nemia resume`, and its read the api alone serves):
  * `runs.verb.ts`; Nemia's level and memory (`nemia level`, `nemia memory`: `nemia/`); an agent's rules at auto (`nemia policy`:
- * `POLICY_ENTRIES`); the reads of the store (`nemia show`, `nemia logs`, `nemia stats`: `reads.verb.ts`); the rewrite of a former
- * frontmatter as YAML (`nemia frontmatter rewrite`, `FRONTMATTER_REWRITE`); and what the board alone reads and writes, each served on the
- * api alone: a card's page (`INBOXES`), a run's page and its steps' files, path and conversation (`PAGES`), the agent and skill libraries
- * (`LIBRARY_ENTRIES`, `SKILL_ENTRIES`) and the workflow builder (`WORKFLOW_ENTRIES`). The whole table (`TABLE`) adds the commands the CLI
- * serves alone and runs itself, with no handler: `nemia tick`, `nemia up` and `nemia watch` (`RAN`).
+ * `POLICY_ENTRIES`, and what they reach, `POLICY_REACH`: `reach/`); the reads of the store (`nemia show`, `nemia logs`, `nemia stats`:
+ * `reads.verb.ts`); the rewrite of a former frontmatter as YAML (`nemia frontmatter rewrite`, `FRONTMATTER_REWRITE`); and what the board
+ * alone reads and writes, each served on the api alone: a card's page (`INBOXES`), a run's page and its steps' files, path and conversation
+ * (`PAGES`), the agent and skill libraries (`LIBRARY_ENTRIES`, `SKILL_ENTRIES`) and the workflow builder (`WORKFLOW_ENTRIES`). The whole
+ * table (`TABLE`) adds the commands the CLI serves alone and runs itself, with no handler: `nemia tick`, `nemia up` and `nemia watch`
+ * (`RAN`).
  */
 import { Effect } from 'effect';
 import { APPROVE } from '../gate/commands.verb.ts';
@@ -65,6 +66,7 @@ import { DAEMON } from '../daemon/daemon.verb.ts';
 import { FRONTMATTER_REWRITE } from '../frontmatter/frontmatter.verb.ts';
 import { ADMIT } from '../admission/admit.verb.ts';
 import { POLICY_ENTRIES } from '../auto/auto.verb.ts';
+import { POLICY_REACH } from '../reach/reach.verb.ts';
 import { writerText as textOf } from '../yours/yours.ts';
 import { refreshRun } from '../revisions/pin.verb.ts';
 import { driftWords, type Drift } from '../revisions/revisions.ts';
@@ -549,6 +551,7 @@ export const COMMANDS: readonly Command[] = [
   LEVEL,
   MEMORY,
   ...POLICY_ENTRIES,
+  POLICY_REACH,
   ...SERVICE_COMMANDS,
   ...RELEASES,
   ...VERSIONS,

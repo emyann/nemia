@@ -10,7 +10,7 @@
  * the feed was signed, and a one-shot offered by its word — and `feed.test.ts` and `test/assessed.ts` hold the codes the listing sets
  * to what it reads off the same word.
  *
- * **The codes are the owner's.** The 44 entries below — 17 of a run, 24 of a step, 1 of a daemon, 2 of the store, 33 distinct codes,
+ * **The codes are the owner's.** The 47 entries below — 17 of a run, 26 of a step, 1 of a daemon, 3 of the store, 36 distinct codes,
  * eleven of them shared between a run and a step — were named at their slices' design gates. A code renamed is still read under its
  * former name (`FORMER_REASONS`, below), on a line on disk and in a stored selector, so a rename breaks none.
  *
@@ -30,7 +30,8 @@ import { firstPiece } from '../piece/piece.ts';
 
 /**
  * The kinds of thing the feed writes a line about: a run, one of its steps, a daemon that took the store, or the store itself — its
- * pause, put by `nemia pause` and lifted by `nemia resume`, which is no run's and no daemon's.
+ * pause, put by `nemia pause` and lifted by `nemia resume`, and a factory's level in force, set by `nemia level`, which are no run's and
+ * no daemon's.
  */
 export type InvolvedKind = 'Run' | 'Step' | 'Daemon' | 'Store';
 
@@ -66,9 +67,10 @@ export const DAEMON_STARTED = 'daemon started';
 export const DENIED = 'denied: ';
 
 /**
- * The word each of a person's acts, each of the two runtime faults, a step's closeout read and a pinned run behind its files say, the one
- * place it is spelled: the owner named the first six at their slice's design gate, `closed out` on its card and `revisions behind` at
- * its design's, and `reason.test.ts` holds each literally beside the rule below that reads it back.
+ * The word each of a person's acts, each of the two runtime faults, a step's closeout read, the store's pause and a factory's level and
+ * a pinned run behind its files say, the one place it is spelled: the owner named the first six at their slice's design gate, `closed
+ * out` on its card, `revisions behind` at its design's and `level changed` on its card, and `reason.test.ts` holds each literally beside
+ * the rule below that reads it back.
  *
  * **None of them may carry a word a subscriber was woken by**: the retired prose match found its words anywhere inside a line's word, so
  * `failed`, `blocked` or `needs:` in one of these would have woken a subscriber for a fact the owner said waits on nobody — which is why a
@@ -84,6 +86,7 @@ export const LINE_WORDS = {
   ClosedOut: 'closed out',
   StorePaused: 'store paused',
   StoreResumed: 'store resumed',
+  LevelChanged: 'level changed',
   RevisionsBehind: 'revisions behind',
 } as const satisfies Partial<Record<keyof typeof REASONS, string>>;
 
@@ -129,6 +132,7 @@ export const REASONS = {
   DaemonStarted: { kinds: ['Daemon'], type: 'Normal', source: 'daemon' },
   StorePaused: { kinds: ['Store'], type: 'Normal', source: 'person', once: true },
   StoreResumed: { kinds: ['Store'], type: 'Normal', source: 'person', once: true },
+  LevelChanged: { kinds: ['Store'], type: 'Normal', source: 'person' },
 } as const satisfies Record<string, Entry>;
 
 /** One of the feed's reasons, the code a machine selects on. */
@@ -239,10 +243,14 @@ const STEP_WORDS: readonly Rule[] = [
   { is: 'unknown', reason: 'Unknown' },
 ];
 
-/** The store's words: its pause put and lifted, each a person's verb, said once per pause (`storeOnce`). */
+/**
+ * The store's words: its pause put and lifted, each a person's verb, said once per pause (`storeOnce`); and a factory's level in force,
+ * a word that stands per factory until the level changes (`levelLines`).
+ */
 const STORE_WORDS: readonly Rule[] = [
   { is: LINE_WORDS.StorePaused, reason: 'StorePaused' },
   { is: LINE_WORDS.StoreResumed, reason: 'StoreResumed' },
+  { is: LINE_WORDS.LevelChanged, reason: 'LevelChanged' },
 ];
 
 /** Whether `rule` recognises `word`: the whole word, or its beginning. */

@@ -7,19 +7,10 @@ import { slotWord, type CheckoutHold, type RunSlot } from '../cap/cap.ts';
 import { checkoutWord, LANDED_CAP, landedWords, onBaseNote, toDecideWords, type ToDecide } from '../ending/ending.ts';
 import type { Workflow } from '../step/step.ts';
 import type { EnginePhase } from '../views/views-words.ts';
-import {
-  DENIED_CAP,
-  DENIED_SHOWN,
-  oneLine,
-  satisfiesAfter,
-  type CloseoutAsked,
-  type Run,
-  type StepStatus,
-  type TaskPhase,
-} from '../record/record.ts';
+import { DENIED_CAP, DENIED_SHOWN, oneLine, satisfiesAfter, type CloseoutAsked, type Run, type StepStatus } from '../record/record.ts';
 import type { Closeout } from '../closeout/index.ts';
 import { checkVerdictOf, verdictWord, type CheckVerdict, type Verdict } from '../check/check.ts';
-import { routedRows, runWords } from '../routed/index.ts';
+import { listedWords, routedRows, settledOf as settledWord } from '../routed/index.ts';
 import { codedStep, ENGINE_REASON, holdsTheRun, REASON_OF, type CodedStep, type QualifiedStep } from '../phase/phase.ts';
 import { answerOf, dueNote, modeWord, retriesDue, tryNote, type RetryAsk } from '../retry/index.ts';
 import {
@@ -231,7 +222,7 @@ export interface ListingInput {
  * node `sent → <card>`, a condition never filed its route and the line that routes it by hand.
  */
 export function listing(input: ListingInput): Listing {
-  const listed = listedSteps(input);
+  const listed = listedSteps(input, listedWords(input));
   const routed = routedRows(input);
   if (!routed.size) return listed;
   const steps = listed.steps.map((s) => {
@@ -281,36 +272,37 @@ export function listing(input: ListingInput): Listing {
  * are free text in a padded column; at its gate, the approval and the send-back; what the run did with an
  * ending's merge (`landed`), unless it found nothing staged; how many times it was spoken to; and what it
  * was denied. Its cost goes beside its word once measured, unless the word already shows it.
+ *
+ * @param routed Every step's word on this pass, routing and all (`listedWords`).
  */
-function listedSteps({
-  steps,
-  run,
-  phaseOf,
-  closeoutOf,
-  askedCloseout = () => false,
-  verdictOf = () => undefined,
-  asks = [],
-  roundAsks = [],
-  answers = [],
-  waits = [],
-  saidTo = () => 0,
-  spendOf = () => undefined,
-  slot,
-  standings = [],
-  checkout,
-  waitingOf = () => undefined,
-  deniedOf = () => [],
-  ranOnOf = () => undefined,
-  parkedOf = () => undefined,
-  holds,
-}: ListingInput): Listing {
+function listedSteps(
+  {
+    steps,
+    run,
+    phaseOf,
+    closeoutOf,
+    askedCloseout = () => false,
+    verdictOf = () => undefined,
+    asks = [],
+    roundAsks = [],
+    answers = [],
+    waits = [],
+    saidTo = () => 0,
+    spendOf = () => undefined,
+    slot,
+    standings = [],
+    checkout,
+    waitingOf = () => undefined,
+    deniedOf = () => [],
+    ranOnOf = () => undefined,
+    parkedOf = () => undefined,
+    holds,
+  }: ListingInput,
+  routed: ReadonlyMap<string, StepStatus>,
+): Listing {
   const waiting = gated(run) ? [...waits] : [];
   const held = slot && !waiting.length && !hasStarted(run) && !run.cancelledAt ? slot : undefined;
-  const settledOf = (taskId: string): TaskPhase => {
-    const word = phaseOf(taskId);
-    if (word === 'input-required') return 'succeeded';
-    return word === 'succeeded' || word === 'failed' || word === 'stopped' || word === 'unknown' ? word : 'running';
-  };
+  const settledOf = settledWord(phaseOf);
   const readable = (name: string): Closeout | undefined => {
     const c = closeoutOf(name);
     return c && !('error' in c) ? c : undefined;
@@ -340,8 +332,6 @@ function listedSteps({
   const takenByHand = (name: string): boolean =>
     resultOnBase(standings) && !run.steps[name]?.taskId && steps.some((s) => s.name === name && approvedFirst(s, run));
 
-  // The run's word for each step, routing and all: a gated table condition never filed whose table answered waits at its gate.
-  const routed = runWords(steps, run, settledOf, readable, askedCloseout, spendOf, verdictOf);
   const waitingOnYou: string[] = [];
   const exhausted = new Set<string>();
   const heldLoops = new Set<string>();

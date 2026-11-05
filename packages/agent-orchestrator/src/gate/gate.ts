@@ -108,10 +108,12 @@ export const approvalRefusal: ApprovalRefusal = (
   if (pending) {
     return `try ${n + 1} of ${name} is already asked for (${modeWord(pending)}, at ${pending.at}): the next tick sends it back, and an approval of try ${n} would be spent by it at once. Approve try ${n + 1} once it has signed off — or, to approve this one, take that ask back first: retry-${name}-${n + 1}, in the run's .asks directory.`;
   }
-  const { status: stood } = standing(step, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf);
-  const word = runWords(steps, run, phaseOf, closeoutOf, askedCloseout, spendOf, verdictOf).get(name) ?? 'pending';
   const filed = Boolean(run.steps[name].taskId);
-  const status: StepStatus = filed && word === 'awaiting approval' ? stood : word;
+  const status = gateWord(
+    filed,
+    runWords(steps, run, phaseOf, closeoutOf, askedCloseout, spendOf, verdictOf).get(name),
+    () => standing(step, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf).status,
+  );
   if (approvedFirst(step, run) && !run.steps[name].taskId) {
     const back = asks.find((a) => step.after.includes(a.step));
     if (back) {
@@ -135,6 +137,26 @@ export const approvalRefusal: ApprovalRefusal = (
     }
   }
   if (status === 'awaiting approval') return null;
+  return notAtItsGate(step, run, filed, status);
+};
+
+/**
+ * The word the gate reads for a step: the run's (`word`, `runWords`: its standing with the routing laid over it), and for a filed step the
+ * run reads at its gate, where it stands (`stood`) — its session is what waits for the word. A step the words do not name reads `pending`.
+ * Pure.
+ */
+function gateWord(filed: boolean, word: StepStatus | undefined, stood: () => StepStatus): StepStatus {
+  const said = word ?? 'pending';
+  return filed && said === 'awaiting approval' ? stood() : said;
+}
+
+/**
+ * Why a gated step that does not wait at its gate is not approved, by the word the run reads for it (`status`), in words that name what
+ * to do instead. A table condition never filed (`filed` false) says it in a condition's words: its producer not signed off, its table
+ * answering no route, off the route taken. Pure.
+ */
+function notAtItsGate(step: Workflow, run: Run, filed: boolean, status: StepStatus): string {
+  const { name } = step;
   if (step.route?.kind === 'table' && !filed) {
     const producer = firstPiece(step.route.from, '.');
     const said: Partial<Record<StepStatus, string>> = {
@@ -161,7 +183,7 @@ export const approvalRefusal: ApprovalRefusal = (
     unverified: `${name} has handed nothing on: it asked for another round (\`again: true\`), which the run files itself. Its gate holds once a round of it hands on, \`again: false\`.`,
   };
   return why[status] ?? `${name} is ${status}, not awaiting approval, so there is nothing to approve. See why: nemia decide ${run.id}.`;
-};
+}
 
 /** The yes an approval gives: at a step's gate, or to a loop out of rounds. */
 export type ApproveForm = 'gate' | 'loop';

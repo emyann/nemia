@@ -191,7 +191,6 @@ test("a gated table condition on the tests' team: its producer signs off, a pers
 
   await s.test('plan is filed, and signs off on the board', async () => {
     assert.deepEqual((await pass(id)).filed, ['plan']);
-    // plan's output is its agent's schema, the reviewer's, with the surface its own adds.
     const closeout = { outcome: 'done', summary: 'planned', artifacts: [], needs: null, findings: [], again: false, surface: 'web' };
     stage.board().settle(`${id}-plan`, 'succeeded', closeout);
   });

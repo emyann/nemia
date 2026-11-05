@@ -9,7 +9,7 @@ import assert from 'node:assert/strict';
 import { brokenOn } from '@emyann/tsverify';
 import { theRunsWords } from '../contracts/gate.contract.ts';
 import type { Closeout } from '../src/closeout/closeout.ts';
-import type { Run, TaskPhase } from '../src/record/record.ts';
+import type { RepositoryRun, Run, TaskPhase } from '../src/record/record.ts';
 import type { Workflow } from '../src/step/step.ts';
 import { phases, run, step } from './assessed.ts';
 
@@ -56,7 +56,7 @@ const input = (steps: Workflow[], r: Run, p: (id: string) => TaskPhase, c: (s: s
 ];
 
 test("the run's words read awaiting approval only at a gate, and only while its try is unapproved", () => {
-  const triage = (extra: Partial<Run> = {}) =>
+  const triage = (extra: Partial<RepositoryRun> = {}) =>
     run({ plan: 't1', triage: null, 'build-web': null, 'build-backend': null }, { gates: ['triage'], ...extra });
   const planDone = phases({ t1: 'succeeded' });
   const inputs: Input[] = [

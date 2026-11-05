@@ -34,13 +34,25 @@ export type RoutedInput = {
 };
 
 /** The engine's word as a step's standing reads it: a session that stopped to ask is still at work, and what is not settled runs. */
-const settledOf =
+export const settledOf =
   (phaseOf: (taskId: string) => string) =>
   (taskId: string): TaskPhase => {
     const word = phaseOf(taskId);
     if (word === 'input-required') return 'succeeded';
     return word === 'succeeded' || word === 'failed' || word === 'stopped' || word === 'unknown' ? word : 'running';
   };
+
+/** A listing's closeouts as the routing reads them: one nobody can read is none. */
+const readableOf =
+  (input: RoutedInput) =>
+  (name: string): Closeout | undefined => {
+    const c = input.closeoutOf(name);
+    return c && !('error' in c) ? c : undefined;
+  };
+
+/** Every step's word on this pass (`runWords`), off a listing's input: the engine's words as a step's standing reads them. */
+export const listedWords = (input: RoutedInput): Map<string, StepStatus> =>
+  runWords(input.steps, input.run, settledOf(input.phaseOf), readableOf(input), input.askedCloseout, input.spendOf, input.verdictOf);
 
 /**
  * The rows the routing words for a run's steps never filed, by name: every other step reads as its own work says. A skipped node says the
@@ -52,11 +64,8 @@ export function routedRows(input: RoutedInput): Map<string, RoutedRow> {
   const { steps, run } = input;
   const rows = new Map<string, RoutedRow>();
   if (!steps.some((s) => s.routes !== undefined)) return rows;
-  const closeoutOf = (name: string): Closeout | undefined => {
-    const c = input.closeoutOf(name);
-    return c && !('error' in c) ? c : undefined;
-  };
-  const words = runWords(steps, run, settledOf(input.phaseOf), closeoutOf, input.askedCloseout, input.spendOf, input.verdictOf);
+  const closeoutOf = readableOf(input);
+  const words = listedWords(input);
   const wordOf = (name: string): StepStatus => words.get(name) ?? 'pending';
   const routeOf = (condition: Workflow): string | undefined => {
     const said = answeredRoute(condition, run, closeoutOf, wordOf, steps);

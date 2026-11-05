@@ -50,16 +50,7 @@ const theRunsWord = (
   a: ((taskId: string) => CloseoutAsked) | undefined,
   v: ((step: string) => Verdict | undefined) | undefined,
   s: SpendOf | undefined,
-) =>
-  runWords(
-    steps,
-    run,
-    p,
-    c ?? (() => undefined),
-    a ?? (() => false),
-    s ?? (() => undefined),
-    v ?? (() => undefined),
-  ).get(name);
+) => runWords(steps, run, p, c ?? (() => undefined), a ?? (() => false), s ?? (() => undefined), v ?? (() => undefined)).get(name);
 
 /**
  * Whether the step `name` waits at its gate on this pass: the run reads it `awaiting approval` (`theRunsWord`) — and, filed, it stands
@@ -82,8 +73,7 @@ const atItsGate = (
   if (step === undefined || theRunsWord(steps, run, name, p, c, a, v, s) !== 'awaiting approval') return false;
   return (
     !run.steps[name]?.taskId ||
-    standing(step, run, p, c ?? (() => undefined), a ?? (() => false), steps, s ?? (() => undefined), v).status ===
-      'awaiting approval'
+    standing(step, run, p, c ?? (() => undefined), a ?? (() => false), steps, s ?? (() => undefined), v).status === 'awaiting approval'
   );
 };
 

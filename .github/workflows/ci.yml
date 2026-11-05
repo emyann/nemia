@@ -139,13 +139,26 @@ jobs:
       - run: npm run typecheck
 
   contracts:
-    # The contracts under each package's contracts/, verified by tsverify (npm run contracts): any law or obligation not proved,
-    # or a contract it cannot read, exits 1. One leg on the floor, though a verdict is not yet the same on every run: a law near the
-    # solver's work limit can be proved on one run and stop "canceled" on the next, the first item of tsverify's roadmap ("The same
-    # verdict on every run", its docs/roadmap.md). So every law a contract here keeps is one proved on each of three runs of
-    # npm run contracts, without --cache; and the verdict cache below keeps a proof until a file it is keyed by changes.
+    # The contracts under each package's contracts/, verified by tsverify (npm run contracts, tools/contracts/prove.ts): any law or
+    # obligation not proved, or a contract it cannot read, exits 1. A verdict is not yet the same on every run: a law near the solver's
+    # work limit can be proved on one run and stop "canceled" on the next, the first item of tsverify's roadmap ("The same verdict on
+    # every run", its docs/roadmap.md). So every law a contract here keeps is one proved on each of three runs of npm run contracts,
+    # with no verdict kept; and the verdict cache below keeps a proof until a file it is keyed by changes.
+    #
+    # Three legs, side by side (tools/contracts/legs.ts says which contract each proves, every one by exactly one leg). Measured on CI
+    # on 2026-11-05 (run 41961131487, no verdict kept): observe (agent-runtime's domain.ts, 31 laws, 2 obligations) 667.8 s and
+    # approvalRefusal (agent-orchestrator's gate.ts, 13 laws, 16 obligations) 878.2 s; every other contract seconds, the runtime's nine
+    # together under a minute and each of the orchestrator's other proofs under 30 s. Proved one after another in one job they took
+    # 13 to 31 minutes whenever both were proved again, and once the step's 30 minutes; beside each other, a cold run's wall is the
+    # slowest single proof. Answered from the cache, the whole of it took about 1.3 minutes.
+    name: contracts ${{ matrix.leg }}
     runs-on: ubuntu-latest
     timeout-minutes: 35
+    strategy:
+      # Every leg runs: one leg's verdict says nothing about another's, and ci reads a leg that fails as the job failing.
+      fail-fast: false
+      matrix:
+        leg: [rest, observe, approval-refusal]
     steps:
       - uses: actions/checkout@v7
         timeout-minutes: 5
@@ -155,16 +168,17 @@ jobs:
           node-version: '24.16.0'
       - run: npm ci
         timeout-minutes: 10
-      # Each contract's verdict, kept from the runs before (tsverify --cache, keyed by the text of every file its program
-      # reads): a contract whose files are unchanged is answered from it. Restored after npm ci, which empties node_modules.
+      # Each contract's verdict, kept from the runs before (tsverify's cache, keyed by the text of every file its program reads): a
+      # contract whose files are unchanged is answered from it. One cache per leg, so the legs never overwrite each other's and a
+      # change that touches one leg's files proves that leg again alone. Restored after npm ci, which empties node_modules.
       - uses: actions/cache@v6
         timeout-minutes: 5
         with:
           path: node_modules/.cache/tsverify
-          key: tsverify-${{ github.sha }}
-          restore-keys: tsverify-
-      # On the owner's machine: 102 s with no verdict kept, 5 s with every one kept.
-      - run: npm run contracts
+          key: tsverify-${{ matrix.leg }}-${{ github.sha }}
+          restore-keys: tsverify-${{ matrix.leg }}-
+      # The slowest leg, approval-refusal, took 878.2 s cold on CI: 30 minutes is twice that.
+      - run: npm run contracts -- ${{ matrix.leg }}
         timeout-minutes: 30
 
   e2e:

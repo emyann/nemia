@@ -12,7 +12,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { parseWorkflow, type Workflow } from '../workflow.ts';
-import { filedConfig, STEP_FILES, WORKFLOW_FILES, workflowMounts } from './filed.ts';
+import { filedConfig, RUN_LABELS, STEP_FILES, WORKFLOW_FILES, workflowMounts } from './filed.ts';
 import type { Run } from '../record/record.ts';
 import type { FactoryServers } from '../servers/servers.ts';
 import { configRefusal } from '../runtime-client.ts';
@@ -20,11 +20,11 @@ import { filedRefusal, lineOf, type FiledFlags, type FiledStep } from '../keys/i
 import { names } from '../../test/assessed.ts';
 
 const stepOf = (lines = ''): Workflow => parseWorkflow('look', `---\nplace: git\n${lines}---\nLook.\n`);
-const filed = (step: Workflow, servers?: FactoryServers) =>
+const filed = (step: Workflow, servers?: FactoryServers, labels?: Run['labels']) =>
   filedConfig(
     step,
     [step],
-    { gates: [] },
+    { gates: [], ...(labels === undefined ? {} : { labels }) },
     {
       model: undefined,
       budgetUsd: undefined,
@@ -54,7 +54,13 @@ const GITHUB = {
 test('filedConfig: what a local step is filed beside its fence, its files directory and its servers', async (t) => {
   await t.test("a step's session is filed its files directory, the run's artifacts folder of that step, as WF_STEP_FILES", () => {
     assert.equal(STEP_FILES, 'WF_STEP_FILES');
-    assert.deepEqual(filed(stepOf()).env, { WF_STEP_FILES: '/runs/r/artifacts/look' });
+    assert.deepEqual(filed(stepOf()).env, { WF_STEP_FILES: '/runs/r/artifacts/look', WF_LABELS: '{}' });
+  });
+
+  await t.test("a step's session is told its run's labels as WF_LABELS, as its check is: a JSON object of strings, `{}` with none", () => {
+    assert.equal(RUN_LABELS, 'WF_LABELS');
+    assert.equal(filed(stepOf(), undefined, { work: 'fix' }).env.WF_LABELS, '{"work":"fix"}');
+    assert.equal(filed(stepOf()).env.WF_LABELS, '{}', 'an unlabelled run');
   });
 
   await t.test(
@@ -135,7 +141,7 @@ test('filedConfig: what a local step is filed beside its fence, its files direct
         );
       assert.equal(WORKFLOW_FILES, 'WF_WORKFLOW_FILES');
       const writer = withCopy(stepOf());
-      assert.deepEqual(writer.env, { WF_STEP_FILES: '/runs/r/artifacts/look', WF_WORKFLOW_FILES: frozen });
+      assert.deepEqual(writer.env, { WF_STEP_FILES: '/runs/r/artifacts/look', WF_WORKFLOW_FILES: frozen, WF_LABELS: '{}' });
       assert.deepEqual(writer.mounts, [{ path: frozen, readOnly: true }], "a writer's session reads it, and writes none of it");
       const folderStep = parseWorkflow('draft', '---\nplace: folder\npermissionMode: dontAsk\n---\nDraft.\n');
       assert.deepEqual(
@@ -149,7 +155,7 @@ test('filedConfig: what a local step is filed beside its fence, its files direct
       assert.deepEqual(workflowMounts({ harness: 'a2a:far' }, frozen), [], 'a remote agent is filed no local field');
       assert.deepEqual(workflowMounts({ harness: 'codex' }, frozen), [], 'a sandbox reads the disk already');
       assert.deepEqual(workflowMounts({ harness: 'claude' }, '/runs (old)/r/workflow/ab12'), [], 'a path no rule carries is not mounted');
-      assert.deepEqual(filed(stepOf()).env, { WF_STEP_FILES: '/runs/r/artifacts/look' }, 'no copy: the key is absent');
+      assert.deepEqual(filed(stepOf()).env, { WF_STEP_FILES: '/runs/r/artifacts/look', WF_LABELS: '{}' }, 'no copy: the key is absent');
       assert.equal(Object.hasOwn(filed(stepOf()), 'mounts'), false, 'and no mount');
     },
   );

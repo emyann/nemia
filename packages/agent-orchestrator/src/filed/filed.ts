@@ -25,7 +25,7 @@ import { splitServers, type FactoryServer, type FactoryServers } from '../server
  * then the run's inputs folder at `t.inputs`, read-only, given only for a run given inputs, then the run's copy of its workflow folder
  * at `t.workflowFiles`, read-only (`workflowMounts`); the key left out with none, the MCP servers
  * its sessions load, its factory's record first and the checkout's `.mcp.json` for the rest (`serversOf`), the step's files directory and
- * the run's copy of its workflow folder in its session's environment (`stepFilesEnv`), and the
+ * the run's copy of its workflow folder and the run's labels in its session's environment (`stepFilesEnv`), and the
  * harness's own arguments (`own`) last, a step's settings given its factory's harness settings beneath its own (`ownWith`). The
  * runtime judges no budget:
  * `budgetUsd` is the harness's own cap, and whether the step went over is this package's (`ownStatus`). Pure.
@@ -33,7 +33,7 @@ import { splitServers, type FactoryServer, type FactoryServers } from '../server
 export const filedConfig = <Own extends object>(
   step: Workflow,
   steps: readonly Workflow[],
-  run: Pick<Run, 'gates' | 'mounts' | 'volumes' | 'harnessSettings'>,
+  run: Pick<Run, 'gates' | 'mounts' | 'volumes' | 'harnessSettings' | 'labels'>,
   t: {
     model: string | undefined;
     budgetUsd: number | undefined;
@@ -63,7 +63,7 @@ export const filedConfig = <Own extends object>(
   budgetUsd: t.budgetUsd,
   ...mountsOf([...(stepMounts(step, run.mounts) ?? []), ...volumeMounts(step, run.volumes), ...folders(filedFolders(step, steps, t))]),
   ...serversOf(step, t.servers),
-  ...stepFilesEnv(step, t.runArtifacts, t.workflowFiles),
+  ...stepFilesEnv(step, t.runArtifacts, t.workflowFiles, run.labels),
   ...ownWith(step, run.harnessSettings, t.own),
 });
 
@@ -96,15 +96,27 @@ export const STEP_FILES = 'WF_STEP_FILES';
 export const WORKFLOW_FILES = 'WF_WORKFLOW_FILES';
 
 /**
- * A step's session's own environment: its files directory under `runArtifacts` as `STEP_FILES`, and the run's copy of its workflow folder
- * as `WORKFLOW_FILES` where the record names one (`workflowFiles`).
+ * The variable a step's session, as its check (`checkEnvOf`), is told its run's labels in: a JSON object of strings, `{}` where the run
+ * has none, as Kubernetes' Downward API gives a container its own Pod's labels. Read when the session is filed: a label put on the run
+ * after that reaches its next session and its check, not this one.
+ */
+export const RUN_LABELS = 'WF_LABELS';
+
+/**
+ * A step's session's own environment: its files directory under `runArtifacts` as `STEP_FILES`, the run's copy of its workflow folder
+ * as `WORKFLOW_FILES` where the record names one (`workflowFiles`), and the run's labels as `RUN_LABELS`.
  */
 const stepFilesEnv = (
   step: Pick<Workflow, 'name'>,
   runArtifacts: string,
   workflowFiles: string | undefined,
+  labels: Run['labels'],
 ): { env: Record<string, string> } => ({
-  env: { [STEP_FILES]: stepFilesOf(step, runArtifacts), ...(workflowFiles === undefined ? {} : { [WORKFLOW_FILES]: workflowFiles }) },
+  env: {
+    [STEP_FILES]: stepFilesOf(step, runArtifacts),
+    ...(workflowFiles === undefined ? {} : { [WORKFLOW_FILES]: workflowFiles }),
+    [RUN_LABELS]: JSON.stringify(labels ?? {}),
+  },
 });
 
 /** A step's files directory, the run's artifacts folder of that step under `runArtifacts`: what `STEP_FILES` names to its session. */

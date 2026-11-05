@@ -8,8 +8,11 @@ your fence refuses every `git push` and every `gh` call, so the push and the pul
 frozen workflow files (`$WF_WORKFLOW_FILES`) as your check reads it. Run it:
 
 ```
-node "$WF_WORKFLOW_FILES/pull-request.ts" open --title "<the card's line>" --body-file "$WF_STEP_FILES/pr-body.md"
+node "$WF_WORKFLOW_FILES/pull-request.ts" open --title "<the card's line>" --body-file "$WF_STEP_FILES/pr-body.md" --labels "${{ parameters.pullRequestLabels }}"
 ```
+
+Type the `--labels` as it stands: those are the factory's rules, and the script labels the pull request by them, from the run's
+labels, as it opens it, so no check of the repository sees it unlabelled; your check labels it again each round.
 
 Write that body first, in a file of your files directory: what the change does and what proves it, a few paragraphs, amended as the
 rounds go. The script pushes your own branch, never another and never the base and never forced, and opens the pull request or brings

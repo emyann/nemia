@@ -1,14 +1,17 @@
 /**
  * Which definitions a namespace serves (agent-orchestrator, src/definition/served.ts, `definitionsServed`): the Workflows, Agents or
- * Skills a factory resolves, each found by its name and its origin, in the order the factory looks a name up (`found`: the repository's,
- * a factory's tree read as the repository's, then yours, then Nemia's builtin). With no origin asked, a name is served once, as the first
+ * Skills a factory resolves, each found by its name and its origin, in the order the factory looks a name up (`found`: the factory's own
+ * tree, `factory`, then the repository's, then yours, then Nemia's builtin). With no origin asked, a name is served once, as the first
  * origin that holds it, and every other one of that name is shadowed by it. With `?origin=` asked, the definitions of that origin alone
  * are served, a shadowed one among them, each saying the origin that shadows it, so a client can read what the factory does not use.
  */
 import { type Implementation, spec } from '@emyann/tsverify';
 
-/** Where a definition is read from, as `objects` names it (`DEFINITION_ORIGINS`). */
-export type DefinitionOrigin = 'repo' | 'yours' | 'builtin';
+/**
+ * Where a definition is read from, as `objects` names it (`DEFINITION_ORIGINS`): a factory's own tree (`factory`, the folder a factory
+ * made from a template keeps in the store), the repository's checkout, your library, or what Nemia builds in.
+ */
+export type DefinitionOrigin = 'factory' | 'repo' | 'yours' | 'builtin';
 
 /** A definition found: its name, and the origin it was found in. */
 export type DefinitionFound = { readonly name: string; readonly origin: DefinitionOrigin };

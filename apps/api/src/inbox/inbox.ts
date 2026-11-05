@@ -177,7 +177,7 @@ const FILE: Guarded = {
 };
 
 /** What `POST /api/inbox` hands the package: the idea, and the keys the card writes. */
-type Filing = { text: string; workflow?: string; repo?: string; factory?: string; label?: string[] };
+export type Filing = { text: string; workflow?: string; repo?: string; factory?: string; label?: string[] };
 
 /** Why `factory` does not take a card about `repo`, not one of its repositories: an `Invalid`, naming them. */
 const outsideFactory = (factory: Factory, repo: string): Invalid =>
@@ -255,7 +255,7 @@ function filingIn(factory: Factory, body: typeof FILE_BODY.Type, home: string): 
  *
  * A filing that names a `factory` is the factory's to place (`filingIn`), and the api's repository is not looked at.
  */
-function filingOf(body: typeof FILE_BODY.Type, repo: string, home: string): Filing | Refusal {
+export function filingOf(body: typeof FILE_BODY.Type, repo: string, home: string): Filing | Refusal {
   const { body: text, workflow, from, repo: about } = body;
   if (from !== undefined && workflow === undefined) {
     return {

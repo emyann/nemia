@@ -8,18 +8,14 @@
  * (`test/refusal.test.ts`) and so cannot take from `objects`, whose door loads `effect`: `wordsHeld` holds each equal to `objects`' list,
  * both ways, so a word added on one side alone fails the typecheck.
  */
-import { JsonSchema, SchemaRepresentation } from 'effect';
 import {
   ANSWER_VIA,
   ATTEMPT_ENDS,
   CHECK_RESULTS,
   ENGINE_OUTCOMES,
-  LabelEdit,
-  Labelled,
   PLACE_KINDS,
   RETRY_MODES,
   REVISION_KINDS,
-  Run,
   RUN_PHASES,
   RUN_REASONS,
   SAID_AFTER,
@@ -27,11 +23,7 @@ import {
   STEP_PHASES,
   STEP_REASONS,
   STEP_STATUSES,
-  StepTold,
-  StepTries,
-  StepTry,
   TRY_CAUSES,
-  TryCloseout,
   WAIT_ON,
 } from 'objects';
 import type * as Phase from '../phase/phase.ts';
@@ -93,22 +85,3 @@ export const wordsHeld = {
   attemptEnds: true satisfies Same<Words<typeof ATTEMPT_ENDS>, AttemptEnd>,
   saidAfter: true satisfies Same<Words<typeof SAID_AFTER>, SaidAfterKind>,
 } as const;
-
-/**
- * The run object and its sub-resources' answers as an OpenAPI 3.1 multi-document: its roots references to `Run`, `StepTries`, `StepTry`,
- * `TryCloseout` and `StepTold`, then a label edit's answer and body (`Labelled`, `LabelEdit`), and each struct named above a component
- * of its own (`#/components/schemas/<name>`), every object closed (`onExcessProperty: 'error'`), so a client generated from it reads
- * structs and no index of extra keys but a label map's. Pure.
- */
-export function runDocument(): JsonSchema.MultiDocument<'openapi-3.1'> {
-  const roots = SchemaRepresentation.toRepresentations([
-    Run.ast,
-    StepTries.ast,
-    StepTry.ast,
-    TryCloseout.ast,
-    StepTold.ast,
-    Labelled.ast,
-    LabelEdit.ast,
-  ]);
-  return JsonSchema.toMultiDocumentOpenApi3_1(SchemaRepresentation.toJsonSchemaMultiDocument(roots, { onExcessProperty: 'error' }));
-}

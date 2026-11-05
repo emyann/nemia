@@ -50,7 +50,7 @@ import {
 import { toldLayers, type ToldLayers } from 'agent-orchestrator/run';
 import { NotBlank, readBody, valueAt, type BodyIssue } from '../body.ts';
 import { refusedBeforeReading, type Guarded, type Refusal } from '../guard.ts';
-import { type ApiEnv, served } from '../layer.ts';
+import { type ApiEnv, served, type Served } from '../layer.ts';
 import { StoreRoot, type Engine } from '../store.ts';
 import { graphOf, workflowVersion, type RunGraph } from 'agent-orchestrator';
 import { commandNamed, runPlaced } from '../store.ts';
@@ -598,6 +598,24 @@ export function agentSkillsOf(step: Workflow, found: { readonly agents: Agents; 
   } catch {
     return null;
   }
+}
+
+/**
+ * The card `card` started on the workflow `body` names, as `POST /api/runs` starts one sent with `card` (`startOf`, `cardStarted`), in the
+ * factory `factory` where one is named over the card's own: what the Card's `start` verb runs (src/objects). The workflow not found is
+ * its refusal, by its status.
+ */
+export async function cardStart(
+  { e, placeService, repo, home, factory: at }: Served,
+  card: string,
+  body: Omit<typeof START_BODY.Type, 'card'>,
+  factory: string | undefined,
+): Promise<{ id: string; card: string } | Refusal> {
+  const asked = startOf({ ...body, card }, repo, home, at?.tree);
+  if ('status' in asked) return asked;
+  if (!('card' in asked) || asked.card === undefined) return { status: 422, error: NO_BRIEF };
+  const started = await cardStarted(e, placeService, asked, repo, factory, home);
+  return { id: started.id, card: started.card ?? card };
 }
 
 /**

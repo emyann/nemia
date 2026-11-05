@@ -286,8 +286,8 @@ each step's tries whole and what it was told, which are its sub-resources, each 
 `--raw` record the CLI's alone), and refuses any `?view=` with a 422 naming what to read instead. The board reads the object, each
 step's tries and told at `…/steps/:step/tries` and `…/steps/:step/told`, keyed by the step's stamp so a step reads again only when it
 moved, and the lines once at `GET /api/runs/:id/lines` (`RunLinesAnswer`, mirrored by hand); the api's tests read the same. The api
-serves the object's sub-resources from the command table and its OpenAPI 3.1 document, generated from the Schemas, names the run's path
-and theirs (`apps/api/src/openapi/`, printed by its `print.ts`), and `GET /openapi` serves a page to browse it (Scalar's
+serves the object and its sub-resources through the `Api` of `objects` (`apps/api/src/objects/`, off the command table's entries and the
+app's one informer), and its OpenAPI 3.1 document is `OpenApi.fromApi(Api)` (`apps/api/src/openapi/`, printed by its `print.ts`), and `GET /openapi` serves a page to browse it (Scalar's
 reference, its script served by the api from the installed package, reading the document at its route). The board's run mirror is generated from
 that document by Effect's own modules (`apps/web/src/lib/api/run.gen.ts`, written by `npm run mirror` in `apps/web`), checked in, and
 refused when it drifts (`apps/web/test/mirror.test.ts`).
@@ -598,7 +598,7 @@ the entry files, `main.ts`, `app.ts` and `layer.ts`, which may read the environm
 which import no node:fs (nor fs/promises), node:child_process, node:http, node:https, node:net or node:os, nor `@hono/node-server`,
 and read neither `process.env` nor `fetch`. A reader that does today is listed with what it reaches (`MOVES`), and the list only
 shrinks. Its `src/` is a folder per page or verb a
-person uses — `runs/`, `openapi/`, `steps/`, `decide/`, `asks/`, `inbox/`, `factory/`, `capabilities/`, `workflows/`,
+person uses — `runs/`, `objects/` (the handlers of `objects`' `Api`, the run object and the cards, built into one web handler mounted on Hono's routes for the paths it serves), `openapi/`, `steps/`, `decide/`, `asks/`, `inbox/`, `factory/`, `capabilities/`, `workflows/`,
 `agents/`. The root holds `main.ts`, `app.ts`, `port.ts`, `guard.ts`, `store.ts`, `layer.ts` (the services a handler reads, and
 `served`, which runs it on the app's `ManagedRuntime`) and `body.ts` (the request-body reader every folder uses) and nothing else.
 A folder holds at most six source files; one of two or more has a face, `index.ts`, which holds only re-exports by name, and one of

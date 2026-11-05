@@ -15,7 +15,6 @@ import {
   type OpenRuns,
   viewsFor,
   runWith,
-  runObject,
   runLines,
   type RunLines,
   type RunObject,
@@ -177,13 +176,10 @@ const CONCLUDED = commandNamed('concluded');
  *   `wallMs` and the breakdown of a finished run stands still. The page is cut before anything is read for it, so beyond what a warm
  *   `GET /api/runs` costs this read costs the records and the task journals of that page's rows alone — nine where the board asks, at
  *   most `?size=`'s hundred — and nothing for the finished runs it does not answer.
- * - `GET /api/runs/:id` — the run as one object (`RunAnswer`), the route of its entry of the command table (`show`), judged by the
- *   package (`runObject`) as `nemia show` judges it, off the app's informer (`Informer`) where it holds the run's judgement, handed the
- *   app's memo and the request's doors (`inRequest`), which the entry's own
- *   handler is not: so it is served here, by hand. Found among the runs the store lists, never by a path made of its id: refused with a
- *   404 when there is no such run, and with a 502 when a task it reads does not, in the words the list says it with
- *   (`RunSummary.unreadable`). It takes no `view`: the page `?view=page` once answered is gone, and any `view` is a 422 that says what
- *   to read in its place — the object here, a step's tries and told at their sub-resources, and the lines at `…/lines`.
+ * - `GET /api/runs/:id` — the run as one object (`RunAnswer`), served by the objects' handler (src/objects, the runs group of `objects`'
+ *   `Api`), which this route hands it on to: `?raw=true` (the record, below) and any `view` are answered here. It takes no `view`: the
+ *   page `?view=page` once answered is gone, and any `view` is a 422 that says what to read in its place — the object, a step's tries and
+ *   told at their sub-resources, and the lines at `…/lines`.
  * - `GET /api/runs/:runId/lines` — the lines beside the object (`RunLinesAnswer`): the run's `decide` and `refresh` lines, each step's
  *   `approve`, `retry` and `say` by its name, where it came from (`fromNote`, null for a run started from no card), and the address of
  *   its workflow's page (`workflowPageOf`), the one the list gives the run. Off the run's record alone (`runLines`): it judges nothing and
@@ -196,15 +192,8 @@ const CONCLUDED = commandNamed('concluded');
  *   whether it has landed and its `## From run` section, made by the package as the tick makes it. A 404 with no such run, the package's
  *   `Missing`, answered by `app.onError`.
  * - `GET /api/runs/:runId/steps/:step/tries`, `…/tries/:try`, `…/tries/:try/closeout` and `…/steps/:step/told` — the run object's
- *   sub-resources (`tries`, `try`, `closeout`, `told`): a step's tries, one try, its closeout, and the layers it was told. Each binds its
- *   path into the entry's arguments, as the CLI's flags do; a step or a try the run does not have is the package's `Missing`, a 404.
+ *   sub-resources, served by the objects' handler (src/objects), off the same entries of the package's table.
  */
-
-/** The run object's sub-resources, each a read of the package's table served on its route. */
-const TRIES = commandNamed('tries');
-const TRY = commandNamed('try');
-const CLOSEOUT = commandNamed('closeout');
-const TOLD = commandNamed('told');
 
 /**
  * Answers a sub-resource's entry, its path's parameters bound to the argument keys of the same names, and `query`'s arguments beside
@@ -232,20 +221,14 @@ export const runs = new Hono<ApiEnv>()
       return c.json({ ...page, runs: paged(page.runs, s) } satisfies FinishedListing);
     }),
   )
-  .get('/api/runs/:runId', (c) =>
-    served(c, async (s) => {
-      const id = c.req.param('runId');
-      const raw = c.req.query('raw');
-      if (raw !== undefined && raw !== 'false') return rawRecord(c, s, id, raw);
-      const view = c.req.query('view');
-      if (view !== undefined) return c.json({ error: noView(id, view) }, 422);
-      const run = findRun(id);
-      if (!run) return c.json({ error: noSuchRun(id) }, 404);
-      const object = await runPlaced(s, s.e, informed(s, runObject(run, s)));
-      if ('unjudged' in object) return c.json({ error: object.unjudged }, 502);
-      return c.json(object satisfies RunAnswer);
-    }),
-  )
+  .get('/api/runs/:runId', (c, next) => {
+    const id = c.req.param('runId');
+    const raw = c.req.query('raw');
+    if (raw !== undefined && raw !== 'false') return served(c, (s) => rawRecord(c, s, id, raw));
+    const view = c.req.query('view');
+    if (view !== undefined) return c.json({ error: noView(id, view) }, 422);
+    return next();
+  })
   .get('/api/runs/:runId/lines', (c) =>
     served(c, async ({ repo, home }) => {
       const id = c.req.param('runId');
@@ -271,10 +254,6 @@ export const runs = new Hono<ApiEnv>()
       return c.json(read.judged);
     }),
   )
-  .get('/api/runs/:runId/steps/:step/tries', (c) => subResource(c, TRIES))
-  .get('/api/runs/:runId/steps/:step/tries/:try', (c) => subResource(c, TRY))
-  .get('/api/runs/:runId/steps/:step/tries/:try/closeout', (c) => subResource(c, CLOSEOUT))
-  .get('/api/runs/:runId/steps/:step/told', (c) => subResource(c, TOLD))
   .get('/api/runs/:runId/concluded', (c) =>
     served(c, async ({ e, placeService, home }) =>
       c.json(await runPlaced({ placeService, home }, e, CONCLUDED.handler({ runId: c.req.param('runId') }))),

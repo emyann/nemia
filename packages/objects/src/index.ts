@@ -62,3 +62,4 @@ export type {
   WaitOn,
 } from './words.ts';
 export { CARD_STATES, Card, CardFile, CardLastStart, CardList, CardSpec, CardStart, CardStatus, type CardState } from './card.ts';
+export { Api, CardsGroup, Conflict, Invalid, KINDS, type Kind, Missing, RunsGroup, Unjudged } from './api.ts';

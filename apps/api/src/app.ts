@@ -24,6 +24,7 @@ import { ceilingsOf, metricsOf, passesOf, seriesOf, pauseNowOf, pauseOf, feed, Q
 import { inbox } from './inbox/inbox.ts';
 import { ApiConfig, type ApiEnv, type ApiRuntime, ReadMemo, served, type Services } from './layer.ts';
 import { nemia, nemiaChat } from './nemia/index.ts';
+import { objectsRoutes } from './objects/index.ts';
 import { runs } from './runs/runs.ts';
 import { openapi, REFERENCE_BUNDLE, referenceOf } from './openapi/index.ts';
 import { saidRequest } from './request/request.ts';
@@ -209,6 +210,7 @@ export function appOf(layer: Layer.Layer<Services>): { app: Hono<ApiEnv>; runtim
     .route('/', customInstructions)
     .route('/', skills)
     .route('/', inbox)
+    .route('/', objectsRoutes(runtime))
     .route('/', runs)
     .route('/', openapi)
     .route('/', referenceOf(viewerScript))

@@ -15,8 +15,24 @@ import { app } from '../src/app.ts';
 /** The routes the api serves that are its own, each with why no entry of the command table declares it. */
 const OWN: Readonly<Record<string, string>> = {
   'GET /api/health': 'the server answering at all, which no command of the orchestrator asks',
-  'GET /openapi/v3/nemia/v1':
-    "the run object's OpenAPI document, the api's description of its own routes around the package's Schema, which no command asks",
+  'GET /api/cards': "the Card's verbs, served by the objects' handler from `objects`' Api (src/objects/cards.ts) over the inbox's entries",
+  'GET /api/namespaces/:namespace/cards':
+    "the Card's verbs, served by the objects' handler from `objects`' Api (src/objects/cards.ts) over the inbox's entries",
+  'GET /api/namespaces/:namespace/cards/:name':
+    "the Card's verbs, served by the objects' handler from `objects`' Api (src/objects/cards.ts) over the inbox's entries",
+  'POST /api/namespaces/:namespace/cards':
+    "the Card's verbs, served by the objects' handler from `objects`' Api (src/objects/cards.ts) over the inbox's entries",
+  'DELETE /api/namespaces/:namespace/cards/:name':
+    "the Card's verbs, served by the objects' handler from `objects`' Api (src/objects/cards.ts) over the inbox's entries",
+  'POST /api/namespaces/:namespace/cards/:name/start':
+    "the Card's verbs, served by the objects' handler from `objects`' Api (src/objects/cards.ts) over the inbox's entries",
+  'POST /api/namespaces/:namespace/cards/:name/queue':
+    "the Card's verbs, served by the objects' handler from `objects`' Api (src/objects/cards.ts) over the inbox's entries",
+  'POST /api/namespaces/:namespace/cards/:name/unqueue':
+    "the Card's verbs, served by the objects' handler from `objects`' Api (src/objects/cards.ts) over the inbox's entries",
+  'POST /api/namespaces/:namespace/cards/:name/labels':
+    "the Card's verbs, served by the objects' handler from `objects`' Api (src/objects/cards.ts) over the inbox's entries",
+  'GET /openapi/v3/nemia/v1': "the objects' OpenAPI document, `OpenApi.fromApi(Api)`, which no command asks",
   'GET /openapi': "the page to browse the OpenAPI document, a view of the api's own document, which no command asks",
   'GET /openapi/scalar.js': "the OpenAPI page's viewer script, served from the installed package so the page reaches no other host",
   'GET /api/nemia/chat': "Nemia's chat paged, a program of the package's chat and no command, as its writes are none",

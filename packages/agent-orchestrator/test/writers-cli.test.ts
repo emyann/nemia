@@ -445,11 +445,28 @@ test('REFUSED at shipped defaults: a writer typed at the command line, by its ki
   for (const [name, tag, argv, ...facts] of table) await t.test(name, (sub) => refusedAs(sub, tag, argv, ...facts));
 });
 
-/** The keys an entry's handler may be handed by either side: its positionals, and its flags but those the command line alone takes. */
+/**
+ * The keys the objects' handlers hand a writer's handler beside its spec (`apps/api/src/definitions/`): the Workflow's, Agent's and
+ * Skill's verbs of `objects`' Api, which read a body of their own, so these keys left the spec with the entries' routes.
+ */
+const OBJECTS_HAND: Readonly<Record<string, readonly string[]>> = {
+  'agents write': ['draft', 'schema', 'repo'],
+  'agents rm': ['repo'],
+  'agents run': ['repo'],
+  'skills write': ['change', 'copy', 'builtin'],
+  'workflows write': ['draft', 'readme', 'files', 'repo'],
+  'workflows rm': ['repo'],
+};
+
+/**
+ * The keys an entry's handler may be handed by either side: its positionals, its flags but those the command line alone takes, and those
+ * the objects' handlers hand it.
+ */
 const handlerKeys = (command: Command): Set<string> =>
   new Set([
     ...command.spec.positionals.map((p) => p.key),
     ...command.spec.flags.flatMap((f) => (f.only?.side !== 'cli' && f.key !== undefined ? [f.key] : [])),
+    ...(OBJECTS_HAND[command.name] ?? []),
   ]);
 
 /** The keys `handed` that `command`'s handler is never handed by the api: none, where the two sides read one spec. */
@@ -475,7 +492,7 @@ test('the command line hands each writer’s handler only what the api’s body 
     'workflows rm': ['workflows', 'rm', 'yours', 'spec', '--version', 'v'],
   };
   const writers = (TABLE as readonly Command[]).filter(
-    (c) => c.writes && c.only === undefined && /^(agents|skills|workflows) (write|rm|run)$/.test(c.name),
+    (c) => c.writes && c.only?.side !== 'api' && /^(agents|skills|workflows) (write|rm|run)$/.test(c.name),
   );
   assert.deepEqual(writers.map((c) => c.name).sort(), Object.keys(typedArgs).sort(), 'the six writers, each typed here');
   for (const command of writers)

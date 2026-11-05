@@ -97,6 +97,11 @@ test("barOf, barValue and barSearch: a bar's address, read and written", async (
       assert.deepEqual(barOf('spec:repo/dev/review'), SPEC);
       assert.deepEqual(barOf('spec:yours/mine/plan'), { kind: 'spec', from: 'yours', workflow: 'mine', step: 'plan' });
       assert.deepEqual(barOf('spec:yours/w/a/b:c'), { kind: 'spec', from: 'yours', workflow: 'w', step: 'a/b:c' }, 'a step keeps its own');
+      assert.deepEqual(
+        barOf('spec:factory/dev/draft'),
+        { kind: 'spec', from: 'factory', workflow: 'dev', step: 'draft' },
+        "a factory's own workflow, by its origin",
+      );
       for (const value of [
         'spec:other/dev/review',
         'spec:repo/dev',

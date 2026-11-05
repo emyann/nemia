@@ -2,20 +2,21 @@
  * The frame's floating bar, as the address and this browser keep it: what it shows, read from and written to the root's search key `bar`,
  * what a press beside it does, how wide it is drawn, and what Escape does. Pure, for `useBar`, the bar (`FloatingBar`) and its node test.
  */
+import type { DefinitionOrigin } from 'objects';
 import type { PagePlace } from './api/workflows.ts';
 
 /**
- * What the bar shows: the start of a run in a factory, or in none yet (`null`), which asks which first; a factory, a run, a step of a
- * run, a step of a workflow (`spec`), read from the repository's workflows or yours (`from`), the machine's gauges the top bar opens:
- * the daemon, the feed, what is at work, the quota and the version, whole, or the runs waiting on you across every factory, which the
- * Runs page opens under what waits on you.
+ * What the bar shows: the start of a run in a factory, or in none yet (`null`), which asks which first; a factory, a run, a step of a run,
+ * a step of a workflow (`spec`), read from its origin (`from`: the factory's own tree, the repository's or yours), the machine's gauges the
+ * top bar opens: the daemon, the feed, what is at work, the quota and the version, whole, or the runs waiting on you across every factory,
+ * which the Runs page opens under what waits on you.
  */
 export type Bar =
   | { kind: 'start'; factory: string | null }
   | { kind: 'factory'; factory: string }
   | { kind: 'run'; run: string }
   | { kind: 'step'; run: string; step: string }
-  | { kind: 'spec'; from: 'repo' | 'yours'; workflow: string; step: string }
+  | { kind: 'spec'; from: DefinitionOrigin; workflow: string; step: string }
   | { kind: 'gauges' }
   | { kind: 'waiting' };
 
@@ -39,13 +40,13 @@ function stepOf(name: string): Bar | undefined {
 }
 
 /**
- * The step of a workflow `name` names, `<from>/<workflow>/<step>`, split at its first two `/`; none for a `from` other than `repo` or
- * `yours`, or without a workflow or a step.
+ * The step of a workflow `name` names, `<from>/<workflow>/<step>`, split at its first two `/`; none for a `from` that is no origin
+ * (`factory`, `repo`, `yours`, `builtin`), or without a workflow or a step.
  */
 function specOf(name: string): Bar | undefined {
   const [from, workflow] = name.split('/', 2);
   const step = name.slice(`${from}/${workflow}/`.length);
-  if (from !== 'repo' && from !== 'yours') return undefined;
+  if (from !== 'factory' && from !== 'repo' && from !== 'yours' && from !== 'builtin') return undefined;
   return workflow && step && name.startsWith(`${from}/${workflow}/`) ? { kind: 'spec', from, workflow, step } : undefined;
 }
 
@@ -71,7 +72,7 @@ const PARSERS: Record<string, (name: string) => Bar | undefined> = {
  * The bar `value` names in the address — `start`, the bare word, for a start that asks its factory first, `gauges`, the bare word, for the
  * machine's gauges, `waiting`, the bare word, for the runs waiting on you, `start:<factory>`, `factory:<factory>`, `run:<run>`,
  * `step:<run>/<step>` or `spec:<from>/<workflow>/<step>` — or none for anything else: another kind bare or with
- * an empty name, a run with a `/` in its id, a `from` other than `repo` or `yours`, not a string. A factory keeps its whole name. A run id
+ * an empty name, a run with a `/` in its id, a `from` that is no origin, not a string. A factory keeps its whole name. A run id
  * is a file name in the store and a workflow's name its folder's, so a step's address splits at its first `/`, a workflow's step's at its
  * first two, and the step keeps any `/` or `:` of its own.
  */

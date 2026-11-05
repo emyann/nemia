@@ -5,7 +5,7 @@
 import type { ReactNode } from 'react';
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { storeQuery, type WorkflowListing } from '../lib/api';
-import { fromWord, type ListPlace } from '../lib/factories';
+import { FACTORY_WAY, fromWord, type ListPlace } from '../lib/factories';
 import { repoName } from '../lib/factory';
 import { container } from '../lib/meaning';
 
@@ -30,10 +30,16 @@ export function YoursFolder() {
 
 /**
  * Why `workflow` has no builder, or nothing for one of yours that reads: the board writes only yours, and nothing into a checkout, nor,
- * read in the named factory `factory`, into a factory's folder; and the builder puts back the steps a folder reads as, so one of yours that
- * does not read is fixed by hand first.
+ * read in the named factory `factory`, into a factory's folder — a factory's own tree changing the factory's way (`FACTORY_WAY`); and
+ * the builder puts back the steps a folder reads as, so one of yours that does not read is fixed by hand first.
  */
 export function NoBuilder({ workflow: { from, error }, factory }: { workflow: WorkflowListing; factory?: string }) {
+  if (from === 'factory')
+    return (
+      <p data-no-builder data-way="factory" className="text-body-small text-muted-foreground">
+        No builder: a factory&apos;s own workflows are its tree, and {FACTORY_WAY}.
+      </p>
+    );
   if (from === 'repo' && factory !== undefined)
     return (
       <p data-no-builder className="text-body-small text-muted-foreground">

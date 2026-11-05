@@ -5,7 +5,7 @@
  */
 import { useQuery } from '@tanstack/react-query';
 import { useSearch } from '@tanstack/react-router';
-import { factoriesQuery, workflowsInQuery, type WorkflowListing } from '@/lib/api';
+import { factoriesQuery, fromMatches, workflowsInQuery, type WorkflowListing } from '@/lib/api';
 import { fromWord, listPlace, pagePlaceOf, type ListPlace } from '@/lib/factories';
 import { FloatingBar } from './FloatingBar';
 import { runsOn, specLines } from './StepNode';
@@ -16,14 +16,14 @@ import { runsOn, specLines } from './StepNode';
  * are read it says so; a read that failed, a factory that lists nowhere, and a workflow or a step the api lists none by, are each said in
  * the bar, which stays open until a person closes it.
  */
-export function SpecBar({ from, workflow, step }: { from: 'repo' | 'yours'; workflow: string; step: string }) {
+export function SpecBar({ from, workflow, step }: { from: WorkflowListing['from']; workflow: string; step: string }) {
   const address = pagePlaceOf(useSearch({ strict: false }));
   const factories = useQuery(factoriesQuery);
   const where: ListPlace | null =
     listPlace(address, []).kind === 'every' ? { kind: 'every' } : factories.data ? listPlace(address, factories.data) : null;
   const listed = where?.kind === 'every' || where?.kind === 'in';
   const workflows = useQuery({ ...workflowsInQuery(where?.kind === 'in' ? where.place : null), enabled: listed });
-  const listing = listed ? workflows.data?.find((w) => w.from === from && w.name === workflow) : undefined;
+  const listing = listed ? workflows.data?.find((w) => fromMatches(w.from, from) && w.name === workflow) : undefined;
   return (
     <FloatingBar
       title={<span className="break-all">{step}</span>}

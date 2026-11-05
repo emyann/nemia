@@ -20,15 +20,22 @@ import {
 } from '../lib/api';
 import { formKeyOf, keptAfterCopy, keptAfterSave, settleSave, type KeptForm } from '../lib/agents';
 import { invalidateAgents } from '../lib/agentWrites';
+import { FACTORY_WAY, pagePlaceOf } from '../lib/factories';
 import { BackToAgents } from './agents_.new';
 
-/** The page of an agent, at /agents/$from/$agent: `agents_` draws it on its own, not inside the Agents page, which has no outlet for it. */
+/**
+ * The page of an agent, at /agents/$from/$agent: `agents_` draws it on its own, not inside the Agents page, which has no outlet for it. It
+ * is read in the place its search names (`?factory=&repo=`), where a factory's own agent alone is found; a factory's own has no custom
+ * instructions here, which are read by name in your library and the repository.
+ */
 export const Route = createFileRoute('/agents_/$from/$agent')({
-  loader: ({ context, params }) =>
+  validateSearch: pagePlaceOf,
+  loaderDeps: ({ search }) => ({ factory: search.factory, repo: search.repo }),
+  loader: ({ context, deps, params }) =>
     Promise.all([
-      context.queryClient.ensureQueryData(agentQuery(params.from, params.agent)),
+      context.queryClient.ensureQueryData(agentQuery(params.from, params.agent, deps)),
       context.queryClient.prefetchQuery(keyFormQuery),
-      context.queryClient.prefetchQuery(customInstructionsQuery(params.agent)),
+      params.from === 'factory' ? null : context.queryClient.prefetchQuery(customInstructionsQuery(params.agent)),
     ]),
   component: AgentPage,
   errorComponent: ({ error }) => (
@@ -52,7 +59,8 @@ const code = (text: string) => <code className="font-mono text-body-small">{text
  */
 function AgentPage() {
   const { from, agent: name } = Route.useParams();
-  const { data: agent } = useSuspenseQuery(agentQuery(from, name));
+  const place = Route.useSearch();
+  const { data: agent } = useSuspenseQuery(agentQuery(from, name, place));
   const { data: keyForm } = useQuery(keyFormQuery);
   const queryClient = useQueryClient();
   const navigate = useNavigate();
@@ -88,7 +96,7 @@ function AgentPage() {
       keyForm={keyForm}
       readOnly={!mine}
       onSkillCopied={async () => {
-        const now = await readAgent(from, name).catch(() => null);
+        const now = await readAgent(from, name, place).catch(() => null);
         setKept(now && keptAfterCopy(agent, now, formKey));
       }}
       saving={save.isPending || remove.isPending}
@@ -124,7 +132,7 @@ function AgentPage() {
         {form}
       </FormIn>
 
-      <CustomInstructions name={agent.name} />
+      {agent.from !== 'factory' && <CustomInstructions name={agent.name} />}
 
       {mine ? <TryAgent agent={agent} /> : <TryYours agent={agent} />}
     </article>
@@ -180,7 +188,12 @@ function AgentHeader({ agent, mine }: { agent: AgentListing; mine: boolean }) {
       </div>
       {agent.description && <p className="text-body-medium text-foreground">{agent.description}</p>}
       <UsedBy listing={agent} />
-      {!mine && (
+      {!mine && agent.from === 'factory' && (
+        <p data-read-only data-way="factory" className="text-body-small text-muted-foreground">
+          A factory&apos;s own agents are read here, not written: {FACTORY_WAY}.
+        </p>
+      )}
+      {!mine && agent.from !== 'factory' && (
         <p data-read-only className="text-body-small text-muted-foreground">
           The repository's agents are read here, not written: they change with the repository, in a commit.
           {agent.untried?.copy && <> To start one of yours from this one, {code(agent.untried.copy)}.</>}

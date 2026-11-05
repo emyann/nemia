@@ -14,6 +14,7 @@ import { dropCard, fileCard, queueCard, startCard } from '../src/lib/api/inbox.t
 import { AgentRefusal, createAgent, removeAgent, tryAgent, type AgentDraft } from '../src/lib/api/agents.ts';
 import { copySkill, saveSkill, SkillRefusal, type SkillDraft } from '../src/lib/api/skills.ts';
 import { BuildRefusal, saveWorkflow, startRun } from '../src/lib/api/workflows.ts';
+import { stepSpec, workflow, workflowObject } from './library-fixtures.ts';
 
 /** Every request answered with `body` — as JSON, or as it is when a string — with `status`, for the length of the test: what was sent. */
 function answering(t: { after: (fn: () => void) => void }, body: unknown, status = 200, statusText = '') {
@@ -115,7 +116,7 @@ test("send: a write sent as JSON, its answer decoded, and a refusal of the api's
 });
 
 const agentDraft: AgentDraft = {
-  name: 'ada',
+  name: 'implementer',
   role: null,
   description: null,
   skills: null,
@@ -253,59 +254,115 @@ test("each family of writes: its answer decoded, an answer unread refused with w
       );
       answering(t, { id: 'r', card: 'c', ignoredRepo: '/x' }, 201);
       assert.deepEqual(await startCard({ name: 'c', factory: null }, asked), { id: 'r', card: 'c' });
+      const tree = answering(t, { id: 'r' }, 201);
+      await startRun({ ...asked, from: 'factory' });
+      assert.equal(
+        (JSON.parse(String(tree[0]?.init?.body)) as { from: string }).from,
+        'repo',
+        "a factory's own workflow is started as the start's route reads its tree",
+      );
     },
   );
   await t.test(
     'REFUSED: agents — a save answered with an empty agent is unread, not saved; a refusal keeps its users and status',
     async (t) => {
-      answering(t, { agent: {}, written: [], removed: [] }, 201);
-      const err = await rejection(createAgent(agentDraft));
+      const sent = answering(t, {}, 201);
+      const err = await rejection(createAgent({ ...agentDraft, keys: { model: 'opus', tools: null, effort: undefined } }));
       assert.ok(err instanceof UnreadAnswer && !(err instanceof AgentRefusal), String(err));
       assert.ok(
-        /^POST \/api\/agents\/yours answered what this board does not read: at agent\.\w+, the value is missing\./.test(err.message),
+        /^POST \/api\/namespaces\/default\/agents answered what this board does not read: at [\w.]+, the value is missing\./.test(
+          err.message,
+        ),
         err.message,
       );
       assert.ok(err.message.includes('The agent may be written'), err.message);
+      assert.deepEqual(JSON.parse(String(sent[0]?.init?.body)), {
+        metadata: { name: 'implementer' },
+        spec: {
+          role: null,
+          description: null,
+          keys: { model: 'opus', tools: null },
+          skills: null,
+          harnessPrompt: null,
+          mcp: null,
+          instructions: '',
+        },
+      });
 
-      answering(t, { error: 'build/implement still names ada.', users: ['build/implement'] }, 409);
-      const named = await rejection(removeAgent('ada', 'v1'));
+      const removing = answering(t, { error: 'build/implement still names implementer.', users: ['build/implement'] }, 409);
+      const named = await rejection(removeAgent('implementer', 'v1'));
       assert.ok(named instanceof AgentRefusal, String(named));
-      assert.deepEqual([named.message, named.users, named.status], ['build/implement still names ada.', ['build/implement'], 409]);
+      assert.deepEqual([named.message, named.users, named.status], ['build/implement still names implementer.', ['build/implement'], 409]);
+      assert.deepEqual(
+        [removing[0]?.init?.method, removing[0]?.url],
+        ['DELETE', '/api/namespaces/default/agents/implementer?resourceVersion=v1'],
+        'the version it was read at is its query',
+      );
       answering(t, { error: 'another site' }, 403);
-      const cross = await rejection(tryAgent('ada', 'brief'));
+      const cross = await rejection(tryAgent('implementer', 'brief'));
       assert.ok(cross instanceof AgentRefusal, String(cross));
       assert.deepEqual([cross.users, cross.status], [[], 403]);
       answering(t, { removed: 'all' });
       await assert.rejects(
-        removeAgent('ada', 'v1'),
-        (e: unknown) => e instanceof UnreadAnswer && e.message.includes('at removed, the value is "all"'),
+        removeAgent('implementer', 'v1'),
+        (e: unknown) => e instanceof UnreadAnswer && e.route === 'DELETE /api/namespaces/default/agents/implementer',
       );
     },
   );
   await t.test('REFUSED: skills — a save answered without its skill is unread, never a SkillRefusal; a 409 is one', async (t) => {
-    answering(t, { written: [] });
+    const sent = answering(t, { written: [] });
     const err = await rejection(saveSkill('s', 'v1', skillDraft));
     assert.ok(err instanceof UnreadAnswer && !(err instanceof SkillRefusal), String(err));
-    assert.ok(
-      err.message.startsWith('PUT /api/skills/yours/s answered what this board does not read: at skill, the value is missing.'),
-      err.message,
-    );
+    assert.equal(err.route, 'PUT /api/namespaces/default/skills/s');
+    assert.ok(err.message.includes('The skill may be written'), err.message);
+    assert.deepEqual(JSON.parse(String(sent[0]?.init?.body)), {
+      metadata: { resourceVersion: 'v1' },
+      spec: { title: null, description: 'd', tags: [], examples: [], preload: false, body: '' },
+    });
     answering(t, { error: 's changed since it was read.' }, 409);
     const changed = await rejection(saveSkill('s', 'v1', skillDraft));
     assert.ok(changed instanceof SkillRefusal && changed.status === 409, String(changed));
     answering(t, { skill: null, written: [] }, 201);
-    await assert.rejects(copySkill('s'), (e: unknown) => e instanceof UnreadAnswer && e.message.includes('at skill, the value is null'));
-  });
-  await t.test('REFUSED: builder — a save answered with no workflow is unread; a refusal keeps its steps and status', async (t) => {
-    const save = { version: 'v1', steps: [], schemas: [] };
-    answering(t, { workflow: null, written: [], kept: [], removed: [] });
     await assert.rejects(
-      saveWorkflow('w', save),
-      unread('PUT /api/workflows/yours/w', 'workflow', 'is null, where the board reads', 'before writing it again.'),
+      copySkill('s'),
+      (e: unknown) => e instanceof UnreadAnswer && e.route === 'POST /api/namespaces/default/skills/s/copy',
     );
-    answering(t, { error: 'a and b wait on each other.', steps: ['a', 'b'] }, 422);
-    const cycle = await rejection(saveWorkflow('w', save));
-    assert.ok(cycle instanceof BuildRefusal, String(cycle));
-    assert.deepEqual([cycle.message, cycle.steps, cycle.status], ['a and b wait on each other.', ['a', 'b'], 422]);
   });
+  await t.test(
+    'REFUSED: builder — a save answered with no workflow is unread; a refusal keeps its steps and status; a step is sent as its file writes it',
+    async (t) => {
+      const [own] = workflow().steps;
+      const bare = {
+        name: 'note',
+        spec: stepSpec({ agent: null, harness: 'claude', model: null, after: [], tools: null }),
+        body: 'Say it.',
+        own: null,
+      };
+      const save = { version: 'v1', steps: [own, bare], schemas: [] };
+      const sent = answering(t, { ...workflowObject(), status: null });
+      await assert.rejects(
+        saveWorkflow('w', save),
+        unread('PUT /api/namespaces/default/workflows/w', 'status', 'is null, where the board reads', 'before writing it again.'),
+      );
+      const { spec, metadata } = JSON.parse(String(sent[0]?.init?.body)) as { spec: { steps: unknown[] }; metadata: unknown };
+      assert.deepEqual(metadata, { resourceVersion: 'v1' }, 'the version it was read at');
+      assert.deepEqual(
+        spec.steps,
+        [
+          { name: 'ship', keys: { agent: own?.spec.agent, workspace: 'base', slot: 'none', gate: true }, body: 'Land it.' },
+          {
+            name: 'note',
+            keys: Object.fromEntries(Object.entries(bare.spec).filter(([, v]) => v !== null && !(Array.isArray(v) && v.length === 0))),
+            body: 'Say it.',
+          },
+        ],
+        'a step with an agent sends its agent, the keys it sets itself and its own note; one with none, every key it sets and its body',
+      );
+      assert.equal(Object.hasOwn(spec, 'readme'), false, 'a README unchanged is not sent');
+      answering(t, { error: 'a and b wait on each other.', steps: ['a', 'b'] }, 422);
+      const cycle = await rejection(saveWorkflow('w', save));
+      assert.ok(cycle instanceof BuildRefusal, String(cycle));
+      assert.deepEqual([cycle.message, cycle.steps, cycle.status], ['a and b wait on each other.', ['a', 'b'], 422]);
+    },
+  );
 });

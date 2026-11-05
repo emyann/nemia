@@ -20,6 +20,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from '../../test/scratch.ts';
 import { app } from '../app.ts';
+import { everyOrigin, workflowsListed } from '../../test/definitions.ts';
 import { addFactory, attachWorkflow, hireAgent } from 'agent-orchestrator';
 
 type LibraryAgent = import('./agents.ts').LibraryAgent;
@@ -62,13 +63,8 @@ hireAgent({ factory: 'hired', agent: 'ada', step: 'alpha/implement' });
 hireAgent({ factory: 'shadow', agent: 'max', step: 'delta/ship' });
 hireAgent({ factory: 'other', agent: 'zed', step: 'omega/step' });
 
-const get = async <T>(url: string): Promise<T> => {
-  const res = await app.request(url);
-  const body = (await res.json()) as T;
-  assert.equal(res.status, 200, JSON.stringify(body));
-  return body;
-};
-const agents = (url: string): Promise<LibraryAgent[]> => get<LibraryAgent[]>(url);
+/** The agents of the namespace `ns`, every origin's, as the Agents page reads them. */
+const agents = (ns = 'default'): Promise<LibraryAgent[]> => everyOrigin<LibraryAgent>(app, 'agents', ns);
 const who = (listed: LibraryAgent[]): string[] => listed.map((a) => `${a.from}:${a.name}`);
 const one = (listed: LibraryAgent[], from: string, name: string): LibraryAgent => {
   const found = listed.find((a) => a.from === from && a.name === name);
@@ -77,23 +73,23 @@ const one = (listed: LibraryAgent[], from: string, name: string): LibraryAgent =
 };
 
 test("a factory's Agents page lists the agent it hires, with the step it fills, hired — and not yours of the same name", async () => {
-  const listed = await agents('/api/agents?factory=hired');
+  const listed = await agents('hired');
   assert.deepEqual(who(listed), ['repo:ada', 'repo:iris'], 'the hire, and the agent the attached alpha names: nothing else');
   assert.deepEqual(one(listed, 'repo', 'ada').fills, [{ from: 'repo', workflow: 'alpha', step: 'implement', hired: true }]);
 });
 
 test('a factory that hires no one, into workflows whose steps name no agent, has no agents', async () => {
-  assert.deepEqual(await agents('/api/agents?factory=empty'), []);
+  assert.deepEqual(await agents('empty'), []);
 });
 
 test("a step's written agent counts in a factory only when the factory attaches its workflow", async () => {
-  const listed = await agents('/api/agents?factory=hired');
+  const listed = await agents('hired');
   assert.deepEqual(one(listed, 'repo', 'iris').fills, [{ from: 'repo', workflow: 'alpha', step: 'review', hired: false }]);
   assert.ok(!who(listed).includes('repo:cleo'), 'gamma/plan names cleo, and hired has not attached gamma');
 });
 
 test("a hire is credited to the file a start would run, the workflow's own agents/ before yours, and yours when the repository has none", async () => {
-  const listed = await agents('/api/agents');
+  const listed = await agents();
   assert.deepEqual(one(listed, 'repo', 'ada').factories, ['hired']);
   assert.deepEqual([one(listed, 'yours', 'ada').fills, one(listed, 'yours', 'ada').factories], [[], []]);
 
@@ -101,22 +97,22 @@ test("a hire is credited to the file a start would run, the workflow's own agent
   const text = fs.readFileSync(theirs, 'utf8');
   fs.rmSync(theirs);
   try {
-    const fallen = await agents('/api/agents?factory=hired');
+    const fallen = await agents('hired');
     assert.deepEqual(one(fallen, 'yours', 'ada').fills, [{ from: 'repo', workflow: 'alpha', step: 'implement', hired: true }]);
-    assert.deepEqual(one(await agents('/api/agents'), 'yours', 'ada').factories, ['hired']);
+    assert.deepEqual(one(await agents(), 'yours', 'ada').factories, ['hired']);
   } finally {
     fs.writeFileSync(theirs, text);
   }
 });
 
 test("the repository's .claude/agents/ comes before yours: a hire it answers is not credited to yours of the same name", async () => {
-  assert.deepEqual(await agents('/api/agents?factory=shadow'), [], "the repository's max is not on the page, and yours does not fill it");
-  const max = one(await agents('/api/agents'), 'yours', 'max');
+  assert.deepEqual(await agents('shadow'), [], "the repository's max is not on the page, and yours does not fill it");
+  const max = one(await agents(), 'yours', 'max');
   assert.deepEqual([max.fills, max.factories], [[], []]);
 });
 
 test('in the default factory every agent is listed, each tagged with the factories it fills a step in — on any repository of theirs', async () => {
-  const listed = await agents('/api/agents');
+  const listed = await agents();
   assert.deepEqual(who(listed), ['repo:ada', 'repo:bo', 'repo:cleo', 'repo:iris', 'yours:ada', 'yours:max', 'yours:zed']);
   assert.deepEqual(one(listed, 'yours', 'zed').factories, ['other'], 'hired by a factory on repoS, into a workflow of yours');
   assert.deepEqual(one(listed, 'yours', 'zed').fills, [], 'the default factory hires no one');
@@ -128,7 +124,7 @@ test('in the default factory every agent is listed, each tagged with the factori
 test('a factory whose file does not read tags nothing, and hides no other', async () => {
   write(path.join(root, 'factories', 'broken.json'), '{ not json');
   try {
-    const listed = await agents('/api/agents');
+    const listed = await agents();
     assert.deepEqual(one(listed, 'yours', 'zed').factories, ['other']);
     assert.deepEqual(one(listed, 'repo', 'ada').factories, ['hired']);
   } finally {
@@ -137,19 +133,17 @@ test('a factory whose file does not read tags nothing, and hides no other', asyn
 });
 
 test('?factory=default is the default factory for the Agents page: the same answer as naming none', async () => {
-  assert.deepEqual(await agents('/api/agents?factory=default'), await agents('/api/agents'));
+  assert.deepEqual(await agents('default'), await agents());
 });
 
 test('a step of a folder the loader refuses still credits the agent it names', async () => {
-  const broken = (await get<WorkflowListing[]>('/api/workflows')).find((w) => w.name === 'broken');
+  const broken = (await workflowsListed<WorkflowListing>(app, '')).body.find((w) => w.name === 'broken');
   assert.ok(broken?.error, 'the folder does not load');
-  assert.deepEqual(one(await agents('/api/agents'), 'repo', 'bo').fills, [
-    { from: 'repo', workflow: 'broken', step: 'named', hired: false },
-  ]);
+  assert.deepEqual(one(await agents(), 'repo', 'bo').fills, [{ from: 'repo', workflow: 'broken', step: 'named', hired: false }]);
 });
 
 test("the workflow listing's `hired` is the factory's hire into the step: null for a step it does not hire into, and in the default factory", async () => {
-  const hired = (await get<WorkflowListing[]>('/api/workflows?factory=hired'))[0];
+  const hired = (await workflowsListed<WorkflowListing>(app, 'factory=hired')).body[0];
   assert.deepEqual(
     hired.steps.map((s) => [s.name, s.hired, s.spec.agent]),
     [
@@ -157,7 +151,7 @@ test("the workflow listing's `hired` is the factory's hire into the step: null f
       ['review', null, 'iris'],
     ],
   );
-  const all = await get<WorkflowListing[]>('/api/workflows');
+  const all = (await workflowsListed<WorkflowListing>(app, '')).body;
   assert.deepEqual(
     all.flatMap((w) => w.steps.map((s) => s.hired)),
     all.flatMap((w) => w.steps.map(() => null)),
@@ -166,7 +160,7 @@ test("the workflow listing's `hired` is the factory's hire into the step: null f
 
 test('REFUSED: a step whose `agent:` holds a path separator credits no agent, not even the file the path would reach', async () => {
   assert.deepEqual(
-    one(await agents('/api/agents'), 'repo', 'cleo').fills,
+    one(await agents(), 'repo', 'cleo').fills,
     [{ from: 'repo', workflow: 'gamma', step: 'plan', hired: false }],
     'broken/stray names ../agents/cleo, which the package refuses as a name: gamma/plan is all cleo fills',
   );

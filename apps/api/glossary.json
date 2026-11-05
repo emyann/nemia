@@ -34,7 +34,7 @@
     },
     {
       "term": "Builtin",
-      "meaning": "what comes with Nemia, as the api says it: a skill read `from: 'builtin'` (the folder `BUILTIN_SKILLS`, the orchestrator package's skills folder, each found by name, last, by an agent that gives it), the `builtin` servers of a factory's servers read (`BUILTIN_SERVERS`, `packages/agent-orchestrator/servers/`) and the `builtin` rule of an agent's auto list. The former address `/api/skills/shipped/<name>` answers a 308 to `/api/skills/builtin/<name>`.",
+      "meaning": "what comes with Nemia, as the api says it: a skill read `from: 'builtin'` (the folder `BUILTIN_SKILLS`, the orchestrator package's skills folder, each found by name, last, by an agent that gives it), the `builtin` servers of a factory's servers read (`BUILTIN_SERVERS`, `packages/agent-orchestrator/servers/`) and the `builtin` rule of an agent's auto list. A builtin skill is a Skill of origin `builtin`, read at `/api/namespaces/<namespace>/skills/<name>?origin=builtin` and copied into your library by `POST /api/namespaces/default/skills/<name>/copy`.",
       "type": "SkillSource",
       "retired": [
         {

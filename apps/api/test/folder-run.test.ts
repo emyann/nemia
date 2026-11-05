@@ -9,6 +9,7 @@
  * team that works in folders is filed with no `repo:` — and refused with one.
  */
 import { root } from './harness.ts';
+import { listedIn } from './definitions.ts';
 import { test } from 'node:test';
 import { names } from './named.ts';
 import { story } from './checkpoints.ts';
@@ -343,9 +344,7 @@ test("a folder run read on the board: listed by its kind and place, its page wit
 test('a folder team as the board finds and files for it, the repository a plain directory: listed as one, a card filed without a repository and refused with one, a card started on it says the repository it looked at none of', async (t) => {
   const s = story(t);
   await s.test('the workflows listing says which teams work in folders, with the repository a plain directory', async () => {
-    const res = await app().request('/api/workflows');
-    assert.equal(res.status, 200);
-    const listed = (await res.json()) as { name: string; from: string; folderTeam: boolean; error: string | null }[];
+    const listed = await listedIn<{ name: string; from: string; folderTeam: boolean; error: string | null }>(app(), 'workflows');
     const folderTeams = listed.filter((w) => w.folderTeam).map((w) => w.name);
     assert.deepEqual(
       folderTeams,

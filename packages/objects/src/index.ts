@@ -28,6 +28,8 @@ export {
   ARTIFACT_KINDS,
   ATTEMPT_ENDS,
   CHECK_RESULTS,
+  DEFINITION_ORIGINS,
+  EDGE_KINDS,
   ENGINE_OUTCOMES,
   FACTORY_CONDITION_REASONS,
   FACTORY_CONDITION_STATUSES,
@@ -37,6 +39,7 @@ export {
   HEADER_MASK,
   HANDED_HOW,
   LEVELS,
+  NODE_KINDS,
   MCP_STATES,
   MCP_TRANSPORTS,
   OUTCOMES,
@@ -60,17 +63,21 @@ export {
   TOLD_VIA,
   TRY_CAUSES,
   WAIT_ON,
+  WRITE_WAYS,
 } from './words.ts';
 export type {
   AnswerVia,
   CheckResult,
   ConditionStatus,
+  DefinitionOrigin,
+  EdgeKind,
   FactoryConditionReason,
   FactoryConditionType,
   FillOrigin,
   Level,
   McpState,
   McpTransport,
+  NodeKind,
   PlaceKind,
   RevisionKind,
   RevisionsPolicy,
@@ -82,6 +89,7 @@ export type {
   StepReason,
   TryCause,
   WaitOn,
+  WriteWay,
 } from './words.ts';
 export { CARD_STATES, Card, CardFile, CardLastStart, CardList, CardSpec, CardStart, CardStatus, type CardState } from './card.ts';
 export {
@@ -118,10 +126,12 @@ export { Hire, HireList, HireSetting, HireSettings, HireSpec, HireStatus, HireWr
 export { Volume, VolumeList, VolumeSpec, VolumeStatus } from './volume.ts';
 export {
   Api,
+  AgentsGroup,
   BuiltinGroup,
   CardsGroup,
   Conflict,
   FactoriesGroup,
+  Failed,
   HiresGroup,
   Invalid,
   KINDS,
@@ -130,6 +140,37 @@ export {
   Missing,
   RunsGroup,
   SchedulesGroup,
+  SkillsGroup,
   Unjudged,
   VolumesGroup,
+  WorkflowsGroup,
 } from './api.ts';
+export { GraphEdge, GraphNode, ObjectGraph, TypedGraph } from './graph.ts';
+export { CardSkill, Origin, SkillCost, WriteMeta } from './definition.ts';
+export {
+  SchemaFile,
+  StepKeys,
+  StepLayers,
+  Workflow,
+  WorkflowCreate,
+  WorkflowList,
+  WorkflowSpec,
+  WorkflowStatus,
+  WorkflowStep,
+  WorkflowStepStatus,
+  WorkflowWrite,
+} from './workflow.ts';
+export {
+  Agent,
+  AgentCard,
+  AgentFill,
+  AgentList,
+  AgentSpec,
+  AgentStatus,
+  AgentTried,
+  AgentTry,
+  AgentUser,
+  AgentWrite,
+  GivenSkill,
+} from './agent.ts';
+export { Skill, SkillFiles, SkillList, SkillSpec, SkillStatus, SkillUser, SkillWrite } from './skill.ts';

@@ -14,7 +14,7 @@ import {
   VERSION,
 } from 'agent-orchestrator';
 import { isRefusal, type Refusal } from 'agent-orchestrator';
-import { agents, skills } from './agents/index.ts';
+import { agents } from './agents/index.ts';
 import { customInstructions } from './custom/custom.ts';
 import { commands } from './commands/index.ts';
 import { capabilitiesWithSteps, McpAsker } from './capabilities/index.ts';
@@ -30,7 +30,7 @@ import { stats } from './stats/stats.ts';
 import { step } from './step/step.ts';
 import { Followings, steps } from './steps/index.ts';
 import { engineRead, Engine } from './store.ts';
-import { builder, remover, workflows, yours } from './workflows/index.ts';
+import { builder, workflows, yours } from './workflows/index.ts';
 
 /**
  * The status each kind of the orchestrator's refusal answers, whichever route it came through: what is asked of is not there (404), the
@@ -114,18 +114,15 @@ const viewerScript = () => (bundle ??= fs.readFile(REFERENCE_BUNDLE, 'utf8'));
  * - `GET /api/capabilities` — what the repository offers a step, read from the checkout on each request (capabilities/capabilities.ts), and
  *   what each step of each workflow gets of it (capabilities/reach.ts). Each MCP server the settings enable is started and asked for its
  *   tools once while the app runs (`McpAsker`); one that fails is an `error` on its entry, never a failed request.
- * - workflows/workflows.ts — a repository's workflows, listed, and a run of one started, the board's first write, or of an inbox card.
- * - workflows/builder.ts — a folder of yours built on the board: made with a first step, and put back from its steps with the schemas
- *   pasted for them; two writes, guarded as a start is, each through the package's entry `workflows write`.
- * - workflows/remove.ts — a folder of yours removed whole, its version checked, guarded as a start is, through the package's entry
- *   `workflows rm`.
+ * - definitions/ — the Workflows, Agents and Skills as objects, each in a namespace (`default`, the api's repository and your library, or a
+ *   factory's), served through `objects`' Api (objects/serve.ts): listed, read by origin, and yours written in `default` alone.
+ * - workflows/workflows.ts — a run of a workflow started, the board's first write, or of an inbox card.
+ * - workflows/builder.ts — what a step's form is drawn from (`GET /api/workflows/keys`), and the builder's write the Workflow's PUT calls.
  * - workflows/yours.ts — your store's folders under the store root, and the line that files a factory in it.
- * - agents/agents.ts — the agents beside each place workflows are listed from, each with the nodes that name it; one of yours made, put
- *   back or removed; three writes, guarded as a start is, through the package's entries `agents write` and `agents rm`.
+ * - agents/agents.ts — where agents are looked for (`GET /api/agents/sources`), and the reads and writes the Agent object calls.
  * - custom/custom.ts — a person's custom instructions for an agent, by its name, read through `nemia agents custom`'s entry; written and
  *   cleared on the routes the table generates from it (commands/routes.ts).
- * - agents/skills.ts — the skills an agent of yours can be given, by place; one skill on its page; and one of yours written — made,
- *   changed, or a builtin one copied into your library — each a write, guarded as a start is, through the package's entry `skills write`.
+ * - agents/skills.ts — the reads and writes of a skill the Skill object calls.
  * - inbox/inbox.ts — the inbox: its cards listed and one filed, through `nemia inbox`'s and `nemia inbox add`'s entries; one dropped and
  *   one queued on the routes the table generates (commands/routes.ts).
  * - runs/runs.ts — the runs listed, one run in full, and what `nemia decide` shows of it.
@@ -193,11 +190,9 @@ export function appOf(layer: Layer.Layer<Services>): { app: Hono<ApiEnv>; runtim
     .route('/', workflows)
     .route('/', step)
     .route('/', builder)
-    .route('/', remover)
     .route('/', yours)
     .route('/', agents)
     .route('/', customInstructions)
-    .route('/', skills)
     .route('/', inbox)
     .route('/', objectsRoutes(runtime))
     .route('/', runs)

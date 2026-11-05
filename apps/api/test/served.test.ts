@@ -13,6 +13,10 @@ import { COMMANDS, routeList } from 'agent-orchestrator';
 import { app } from '../src/app.ts';
 
 /** The routes the api serves that are its own, each with why no entry of the command table declares it. */
+/** Why a definition's path is the api's own. */
+const DEFINITION =
+  "served by the objects' handler from `objects`' Api (definitions/): a namespace's Workflows, Agents and Skills as its factory resolves them, which the table's entries they replace say `only`";
+
 const OWN: Readonly<Record<string, string>> = {
   'GET /api/health': 'the server answering at all, which no command of the orchestrator asks',
   'GET /api/cards': "the Card's verbs, served by the objects' handler from `objects`' Api (src/objects/cards.ts) over the inbox's entries",
@@ -77,6 +81,24 @@ const OWN: Readonly<Record<string, string>> = {
     "the Factory's verbs, served by the objects' handler from `objects`' Api (src/objects/factories.ts) over the factories' entries",
   'DELETE /api/factories/:name/instruction/words':
     "the Factory's verbs, served by the objects' handler from `objects`' Api (src/objects/factories.ts) over the factories' entries",
+  'GET /api/namespaces/:namespace/workflows': DEFINITION,
+  'GET /api/namespaces/:namespace/workflows/:name': DEFINITION,
+  'POST /api/namespaces/:namespace/workflows': DEFINITION,
+  'PUT /api/namespaces/:namespace/workflows/:name': DEFINITION,
+  'DELETE /api/namespaces/:namespace/workflows/:name': DEFINITION,
+  'GET /api/namespaces/:namespace/agents': DEFINITION,
+  'GET /api/namespaces/:namespace/agents/:name': DEFINITION,
+  'POST /api/namespaces/:namespace/agents': DEFINITION,
+  'PUT /api/namespaces/:namespace/agents/:name': DEFINITION,
+  'DELETE /api/namespaces/:namespace/agents/:name': DEFINITION,
+  'POST /api/namespaces/:namespace/agents/:name/try': DEFINITION,
+  'GET /api/namespaces/:namespace/agents/:name/card': DEFINITION,
+  'GET /api/namespaces/:namespace/skills': DEFINITION,
+  'GET /api/namespaces/:namespace/skills/:name': DEFINITION,
+  'POST /api/namespaces/:namespace/skills': DEFINITION,
+  'PUT /api/namespaces/:namespace/skills/:name': DEFINITION,
+  'POST /api/namespaces/:namespace/skills/:name/copy': DEFINITION,
+  'GET /api/namespaces/:namespace/skills/:name/files': DEFINITION,
   'GET /api/builtin/mcpservers':
     "Nemia's builtin MCP servers, served by the objects' handler from `objects`' Api (src/factory-parts/mcp-servers.ts) off the package's folder",
   'GET /api/namespaces/:namespace/mcpservers':

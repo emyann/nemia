@@ -244,5 +244,33 @@ export const SIGN_IN_STATES = ['none', 'waiting', 'connected', 'expired', 'faile
 /** One of `SIGN_IN_STATES`. */
 export type SignInStateWord = (typeof SIGN_IN_STATES)[number];
 
+/**
+ * Where a definition — a Workflow, an Agent, a Skill — is read from, in the order a factory looks a name up: the factory's own tree
+ * (`factory`, the folder a factory made from a template keeps in the store), the repository (`repo`), your library (`yours`),
+ * or what Nemia builds in (`builtin`).
+ */
+export const DEFINITION_ORIGINS = ['factory', 'repo', 'yours', 'builtin'] as const;
+
+/** One of `DEFINITION_ORIGINS`. */
+export type DefinitionOrigin = (typeof DEFINITION_ORIGINS)[number];
+
+/** What a node of a workflow's graph is: a step, a condition that routes, or a node that files a card for another workflow. */
+export const NODE_KINDS = ['step', 'condition', 'workflow'] as const;
+
+/** One of `NODE_KINDS`. */
+export type NodeKind = (typeof NODE_KINDS)[number];
+
+/** What an edge of a workflow's graph says: a wait (`after`), an input handed on, a loop back, or a condition's route. */
+export const EDGE_KINDS = ['after', 'input', 'loop', 'route'] as const;
+
+/** One of `EDGE_KINDS`. */
+export type EdgeKind = (typeof EDGE_KINDS)[number];
+
+/** How a refused write's definition changes instead: through the `default` namespace, or the factory's own way. */
+export const WRITE_WAYS = ['default', 'factory'] as const;
+
+/** One of `WRITE_WAYS`. */
+export type WriteWay = (typeof WRITE_WAYS)[number];
+
 /** Where a gate's budgets come from: the gated step's proposal, before the approval; the approval's caps, after it. */
 export const GATE_BUDGETS_FROM = ['proposed', 'approved'] as const;

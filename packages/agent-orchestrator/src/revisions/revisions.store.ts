@@ -174,3 +174,12 @@ export const ledgerOf = (kind: RevisionKind, name: string): Revision[] => atModu
  */
 export const appendRevision = (kind: RevisionKind, name: string, hash: string, at: string): Revision =>
   atModuleRoot((door) => door.entries.append({ kind, name }, hash, at));
+
+/**
+ * The ledger's number for what a definition holds now, by its digest (`version`), read through the Ledger door and never appended: the
+ * number a run resolving that content was or would be given (`revisionNow`), so a read of a Workflow, an Agent or a Skill writes nothing.
+ */
+export const definitionRevision = Effect.fn('definitionRevision')(function* (kind: RevisionKind, name: string, version: string) {
+  const entries = yield* (yield* LedgerDoor).entries.of({ kind, name });
+  return revisionNow(entries, version, '').n;
+});

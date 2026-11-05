@@ -17,6 +17,7 @@
  * claude.ai. The repository's own agents are `critic` and `grader`, the second with a result schema beside it.
  */
 import { root } from '../../test/harness.ts';
+import { asListing, everyOrigin } from '../../test/definitions.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -101,8 +102,8 @@ type RunSummary = import('agent-orchestrator').RunSummary;
 type AgentListing = import('./agents.ts').AgentListing;
 
 const json = { 'content-type': 'application/json' };
-const tryIt = (name: string, body: unknown, from = 'yours', headers: Record<string, string> = json) =>
-  app().request(`/api/agents/${from}/${name}/try`, {
+const tryIt = (name: string, body: unknown, headers: Record<string, string> = json) =>
+  app().request(`/api/namespaces/default/agents/${name}/try`, {
     method: 'POST',
     headers,
     body: typeof body === 'string' ? body : JSON.stringify(body),
@@ -183,7 +184,9 @@ test('a person tries an agent of theirs: a folder run fenced with a dollar, one 
     ]) {
       assert.ok(text.split('\n').includes(line), `the try's step says ${line}`);
     }
-    const agent = (await (await app().request('/api/agents/yours/scribe')).json()) as AgentListing;
+    const agent = asListing<AgentListing>(
+      (await (await app().request('/api/namespaces/default/agents/scribe?origin=yours')).json()) as never,
+    );
     assert.ok(text.includes(`# version ${agent.version}`), "and records the agent's version it was written at");
 
     const run = JSON.parse(fs.readFileSync(path.join(RUNS, `${first}.json`), 'utf8'));
@@ -229,7 +232,9 @@ test('a person tries an agent of theirs: a folder run fenced with a dollar, one 
       assert.equal((await remove(second)).status, 200);
 
       fs.writeFileSync(path.join(YOURS, 'scribe.md'), SCRIBE.replace('Write the notes.', 'Write the notes, briefly.'));
-      const agent = (await (await app().request('/api/agents/yours/scribe')).json()) as AgentListing;
+      const agent = asListing<AgentListing>(
+        (await (await app().request('/api/namespaces/default/agents/scribe?origin=yours')).json()) as never,
+      );
       const third = await idOf(await tryIt('scribe', { brief: 'Write them again.' }));
       assert.ok(
         fs.readFileSync(folder, 'utf8').includes(`# version ${agent.version}`),
@@ -319,7 +324,7 @@ test('what a try refuses, and what it is fenced to: the default factory, rules o
         /allows `Bash, Edit\(\/home\/\*\*\)` in a mode that asks first/,
       );
       assert.match(why, /none of those rules is inside the folder/);
-      const agents = (await (await app().request('/api/agents')).json()) as AgentListing[];
+      const agents = await everyOrigin<AgentListing>(app(), 'agents');
       assert.equal(agents.find((agent) => agent.name === 'outward')!.untried!.why, why, 'the listing says what the try refuses with');
       assert.equal(agents.find((agent) => agent.name === 'careful')!.untried, null);
       const keys = { permissionMode: 'default', allowedTools: 'Bash, Edit(/home/**)' };
@@ -350,12 +355,12 @@ test('what a try refuses, and what it is fenced to: the default factory, rules o
   });
 
   await t.test('a repository agent is refused: copy it to yours — the store this api reads — to try it, its schema with it', async () => {
-    const error = await refused(tryIt('critic', { brief: 'Criticise it.' }, 'repo'), 403, /[Cc]opy it to yours to try it/);
+    const error = await refused(tryIt('critic', { brief: 'Criticise it.' }), 422, /[Cc]opy it to yours to try it/);
     assert.ok(
       error.includes(`mkdir -p '${YOURS}' && cp '${path.join(repo, 'workflows', 'agents', 'critic.md')}' '${YOURS}/'`),
       `with the copy to make: ${error}`,
     );
-    const graded = await refused(tryIt('grader', { brief: 'Grade it.' }, 'repo'), 403, /[Cc]opy it to yours to try it/);
+    const graded = await refused(tryIt('grader', { brief: 'Grade it.' }), 422, /[Cc]opy it to yours to try it/);
     const theirs = path.join(repo, 'workflows', 'agents');
     assert.ok(
       graded.includes(`cp '${path.join(theirs, 'grader.md')}' '${path.join(theirs, 'grader.schema.json')}' '${YOURS}/'`),
@@ -387,7 +392,7 @@ test('what a try refuses, and what it is fenced to: the default factory, rules o
       assert.equal(res.status, 422, await res.clone().text());
       assert.equal(((await res.json()) as { error: string }).error, SERVERS_UNTRIED);
       assert.equal(fs.existsSync(path.join(TRIES, 'browsing')), false, 'no try folder for it');
-      const agents = (await (await app().request('/api/agents')).json()) as AgentListing[];
+      const agents = await everyOrigin<AgentListing>(app(), 'agents');
       assert.deepEqual(agents.find((agent) => agent.from === 'yours' && agent.name === 'browsing')?.untried, {
         why: SERVERS_UNTRIED,
         copy: null,
@@ -402,7 +407,7 @@ test('what a try refuses, and what it is fenced to: the default factory, rules o
       const why = await refused(tryIt('closed', { brief: 'Look.' }), 422, /`overridable: model, skills`/);
       assert.ok(why.includes('`fence`') && why.includes('try'), why);
       assert.equal(fs.existsSync(path.join(TRIES, 'closed')), false, 'no try folder for it');
-      const agents = (await (await app().request('/api/agents')).json()) as AgentListing[];
+      const agents = await everyOrigin<AgentListing>(app(), 'agents');
       assert.equal(agents.find((agent) => agent.from === 'yours' && agent.name === 'closed')?.untried?.why, why);
       fs.writeFileSync(path.join(YOURS, 'closed.md'), '---\noverridable: model, fence\nmodel: sonnet\n---\nSay what you see.\n');
       const id = await idOf(await tryIt('closed', { brief: 'Look.' }));
@@ -414,24 +419,18 @@ test('what a try refuses, and what it is fenced to: the default factory, rules o
   await t.test('an empty brief is refused, and a brief that is no string', async () => {
     await refused(tryIt('scribe', { brief: '   ' }), 422, /^The brief is empty, and a try asks the agent to do something\./);
     await refused(tryIt('scribe', { brief: '' }), 422, /^The brief is empty, and a try asks the agent to do something\./);
-    await refused(tryIt('scribe', {}), 400, /`brief` is what the agent is asked to do/);
-    await refused(tryIt('scribe', 'not json'), 400, /takes a JSON body/);
-    await refused(
-      tryIt('scribe', { brief: ['Do it.'] }),
-      400,
-      /^POST \/api\/agents\/yours\/scribe\/try: `brief` is what the agent is asked to do, a string: `\{ "brief": "<what the agent is asked to do>" \}`\. This request's was \["Do it\."\]\.$/,
-    );
-    await refused(
-      tryIt('scribe', ['Do it.']),
-      400,
-      /^POST \/api\/agents\/yours\/scribe\/try: `brief` is what the agent is asked to do[^]*This request's was undefined\.$/,
-    );
+    for (const body of [{}, 'not json', { brief: ['Do it.'] }, ['Do it.']])
+      await refused(
+        tryIt('scribe', body),
+        400,
+        /^POST \/api\/namespaces\/default\/agents\/scribe\/try does not read as its route takes it/,
+      );
   });
 
   await t.test(
     'an agent not there, one named as a try folder cannot be, and one giving a skill only the repository has, are refused',
     async () => {
-      await refused(tryIt('nobody', { brief: 'Do it.' }), 404, /no agent named 'nobody'/);
+      await refused(tryIt('nobody', { brief: 'Do it.' }), 404, /Nothing is at that name/);
       await refused(tryIt('agents', { brief: 'Do it.' }), 422, /cannot be tried: its try's folder/);
       await refused(tryIt('skills', { brief: 'Do it.' }), 422, /cannot be tried: its try's folder/);
       const error = await refused(tryIt('borrower', { brief: 'Borrow it.' }), 422, /only the repository has/);
@@ -439,10 +438,6 @@ test('what a try refuses, and what it is fenced to: the default factory, rules o
       assert.ok(error.includes(path.join(root, 'workflows', 'skills')), 'and the library to copy it into');
     },
   );
-
-  await t.test('REFUSED: a try of an agent from neither `repo` nor `yours` is a 400 naming both', async () => {
-    await refused(tryIt('scribe', { brief: 'Do it.' }, 'elsewhere'), 400, /`repo` or `yours`/);
-  });
 
   await t.test("a try's folder that is a link is refused, never written through", async () => {
     const away = scratch('nemia-api-try-away-');
@@ -460,7 +455,7 @@ test('what a try refuses, and what it is fenced to: the default factory, rules o
   await t.test(
     'the listing says why an agent cannot be tried, in the words the try refuses with, and the copy for a repository agent',
     async () => {
-      const agents = (await (await app().request('/api/agents')).json()) as AgentListing[];
+      const agents = await everyOrigin<AgentListing>(app(), 'agents');
       const of = (from: string, name: string) => agents.find((agent) => agent.from === from && agent.name === name)!;
       assert.equal(of('yours', 'scribe').untried, null, 'nothing refuses a try of scribe');
       assert.match(of('yours', 'coder').untried!.why, /runs on `codex`/);

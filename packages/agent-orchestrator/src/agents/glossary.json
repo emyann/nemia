@@ -6,7 +6,8 @@
     "packages/agent-orchestrator/src/agents",
     "packages/agent-orchestrator/src/skills",
     "packages/agent-orchestrator/src/custom",
-    "packages/agent-orchestrator/src/workflow/fence.ts"
+    "packages/agent-orchestrator/src/workflow/fence.ts",
+    "packages/agent-orchestrator/src/definition"
   ],
   "terms": [
     {
@@ -111,6 +112,25 @@
       "term": "Skill door",
       "meaning": "the one way a skill is found, read, written and copied: `SkillDoor` in `packages/agent-orchestrator/src/skills/skill-door.store.ts`, rooted as the Agent door is, through the same lookup roots and the one precedence (`lookedUp`), each write checked by the skill's name, the model's `Skill` and the version it was read at.",
       "type": "SkillDoorShape"
+    },
+    {
+      "term": "served",
+      "meaning": "the definition of a name a namespace answers with: the first origin that holds the name, or the origin asked for where it holds it (`definitionServed`, `packages/agent-orchestrator/src/definition/served.ts`).",
+      "type": "DefinitionServed"
+    },
+    {
+      "term": "shadowed",
+      "meaning": "a definition another origin holds the name of first: served only when its origin is asked for, saying that origin (`shadowedBy`, `packages/agent-orchestrator/src/definition/served.ts`)."
+    },
+    {
+      "term": "origin",
+      "meaning": "where a definition is read from: `factory`, the factory's own tree; `repo`; `yours`; `builtin` (`DefinitionOrigin`, `packages/agent-orchestrator/src/definition/served.ts`).",
+      "type": "DefinitionOrigin"
+    },
+    {
+      "term": "way",
+      "meaning": "how a refused write's definition changes instead: through the `default` namespace, or the factory's own way (`WriteWay`, `packages/agent-orchestrator/src/definition/served.ts`).",
+      "type": "WriteWay"
     }
   ]
 }

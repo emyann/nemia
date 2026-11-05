@@ -131,7 +131,7 @@ export default {
       const brief = panel.getByRole('textbox', { name: 'Brief' });
       await brief.fill(TRY.brief);
 
-      const [started] = await Promise.all([answered(page, 'POST', `/api/agents/yours/${seeded.name}/try`), button.click()]);
+      const [started] = await Promise.all([answered(page, 'POST', `/api/namespaces/default/agents/${seeded.name}/try`), button.click()]);
       const body = (await started.json()) as { id?: string; error?: string };
       if (started.status() !== 201 || !body.id)
         throw new Refused(`the api starts the try — it answered ${started.status()}: ${JSON.stringify(body)}`);

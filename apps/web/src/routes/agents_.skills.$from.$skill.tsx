@@ -8,14 +8,17 @@ import { SkillForm } from '../components/SkillForm';
 import { saveSkill, SkillRefusal, skillQuery, switchPreload, type SkillDetail, type SkillDraft, type SkillSaved } from '../lib/api';
 import { costWords, drawnSkill, preloadWords, reachWords } from '../lib/skills';
 import { invalidateSkills } from '../lib/agentWrites';
+import { FACTORY_WAY, pagePlaceOf } from '../lib/factories';
 import { BackToAgents } from './agents_.new';
 
 /**
  * The page of a skill, at /agents/skills/$from/$skill: `agents_` draws it on its own, not inside the Agents page, which has no outlet for
- * it.
+ * it. It is read in the place its search names (`?factory=&repo=`), where a factory's own skill alone is found.
  */
 export const Route = createFileRoute('/agents_/skills/$from/$skill')({
-  loader: ({ context, params }) => context.queryClient.ensureQueryData(skillQuery(params.from, params.skill)),
+  validateSearch: pagePlaceOf,
+  loaderDeps: ({ search }) => ({ factory: search.factory, repo: search.repo }),
+  loader: ({ context, deps, params }) => context.queryClient.ensureQueryData(skillQuery(params.from, params.skill, deps)),
   component: SkillPage,
   errorComponent: ({ error }) => (
     <div className="space-y-3">
@@ -38,8 +41,8 @@ const code = (text: string) => <code className="font-mono text-body-small break-
  * it now reads, and says beside the refusal that it has been read again since.
  */
 function SkillPage() {
-  const { from, skill: name } = Route.useParams();
-  const { data: detail } = useSuspenseQuery(skillQuery(from, name));
+  const [{ from, skill: name }, place] = [Route.useParams(), Route.useSearch()];
+  const { data: detail } = useSuspenseQuery(skillQuery(from, name, place));
   const queryClient = useQueryClient();
   const mine = detail.skill.from === 'yours';
   const [changed, setChanged] = useState(false);
@@ -48,8 +51,8 @@ function SkillPage() {
   if (shown !== drawn) setDrawn(shown);
   const moved = shown.version !== detail.version;
 
-  const wroteIt = async ({ written: _, ...now }: SkillSaved) => {
-    queryClient.setQueryData(skillQuery(from, name).queryKey, now);
+  const wroteIt = async (now: SkillSaved) => {
+    queryClient.setQueryData(skillQuery(from, name, place).queryKey, now);
     setDrawn(now);
     await invalidateSkills(queryClient);
   };
@@ -166,6 +169,7 @@ function Moved({ file, onReadAgain }: { file: string; onReadAgain: () => void })
 
 /** The agents that give this very skill, each linked, or that none does. */
 function GivenBy({ detail }: { detail: SkillDetail }) {
+  const place = Route.useSearch();
   return (
     <p data-skill-users className="flex flex-wrap items-baseline gap-x-2 gap-y-1 text-body-small text-muted-foreground">
       {detail.users.length ? (
@@ -173,7 +177,7 @@ function GivenBy({ detail }: { detail: SkillDetail }) {
           <span>Given by</span>
           {detail.users.map((user, i) => (
             <span key={`${user.from}:${user.name}`}>
-              <AgentLink from={user.from} name={user.name} className="text-body-small text-foreground" />
+              <AgentLink from={user.from} name={user.name} place={place} className="text-body-small text-foreground" />
               {user.from === 'repo' && <span className="text-muted-foreground"> (this repository)</span>}
               {i < detail.users.length - 1 && ','}
             </span>
@@ -203,6 +207,7 @@ function Elsewhere({ detail }: { detail: SkillDetail }) {
           {code(detail.copyHint)}.
         </>
       )}
+      {from === 'factory' && <span data-way="factory">A factory&apos;s own skills are read here, not written: {FACTORY_WAY}.</span>}
       {from === 'builtin' && (
         <>Built into Nemia, and read here: an agent of yours is given a copy in your library, made from its page's skills.</>
       )}

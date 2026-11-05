@@ -24,6 +24,16 @@ const workflowPageAt = (path: string): { from: string; workflow: string; step?: 
   return step === undefined ? { from, workflow } : { from, workflow, step };
 };
 
+/**
+ * A factory's own agent or skill, at `path`: its name, and the route of its page; none for any other page, and none for a definition of
+ * another origin, which is read in `default` whatever factory is picked.
+ */
+const ownDefinitionAt = (path: string): { kind: 'agent' | 'skill'; name: string } | undefined => {
+  const match = /^\/agents\/(skills\/)?factory\/([^/]+)$/.exec(path);
+  if (!match) return undefined;
+  return { kind: match[1] ? 'skill' : 'agent', name: decodeURIComponent(match[2] ?? '') };
+};
+
 /** The tabs of Settings, in their order: what is set for the whole store, and what the repository offers a step. */
 export const SETTINGS_TABS = [
   { to: '/settings', label: 'Settings' },
@@ -88,10 +98,10 @@ export function destinationHref(id: string, picked: string | undefined, first: s
 /**
  * The factory the address at `path` with `search` picks, from the address alone: the name of a factory's own page, its floor or its
  * settings, else the `?factory=` of a section's page — the Inbox, Runs or Workflows — or of a workflow's page or a step's, which
- * read in it, and of no other page under them; none, All factories, on every other page.
+ * read in it, and of a factory's own agent or skill, and of no other page under them; none, All factories, on every other page.
  */
 export function pickedOf(path: string, search: Record<string, unknown>): string | undefined {
-  return ownerOf(path) ?? (isListing(path) || workflowPageAt(path) ? factorySearch(search).factory : undefined);
+  return ownerOf(path) ?? (isListing(path) || workflowPageAt(path) || ownDefinitionAt(path) ? factorySearch(search).factory : undefined);
 }
 
 /** `search` without its `repo`. */
@@ -104,6 +114,9 @@ export type PickTarget =
   | { to: Listing; search: Record<string, unknown> }
   | { to: '/workflows/$from/$workflow'; params: { from: string; workflow: string }; search: Record<string, unknown> }
   | { to: '/workflows/$from/$workflow/$step'; params: { from: string; workflow: string; step: string }; search: Record<string, unknown> }
+  | { to: '/agents/$from/$agent'; params: { from: 'factory'; agent: string }; search: Record<string, unknown> }
+  | { to: '/agents/skills/$from/$skill'; params: { from: 'factory'; skill: string }; search: Record<string, unknown> }
+  | { to: '/agents' }
   | { to: '/factories/$factory'; params: { factory: string } }
   | { to: '/' };
 
@@ -111,7 +124,8 @@ export type PickTarget =
  * Where picking `factory` (none for All factories) takes the page at `path` with `search`: on a section's page, the same page with every
  * other key of its search kept and `factory` set or dropped — but its `repo`, dropped too, which is the repository of the factory left;
  * on a workflow's page or a step's, the same page read in the picked factory, on the repository it reads, its `repo` dropped likewise; on
- * a factory's own page, its floor or its settings, the picked factory's floor, or Overview for All factories; on any other page, the picked
+ * a factory's own page, its floor or its settings, the picked factory's floor, or Overview for All factories; on a factory's own agent or
+ * skill, the same name read in the picked factory, or the Agents page for All factories; on any other page, the picked
  * factory's floor, and nowhere for All factories, which that page already shows.
  */
 export function pickTo(path: string, search: Record<string, unknown>, factory: string | undefined): PickTarget | null {
@@ -128,6 +142,13 @@ export function pickTo(path: string, search: Record<string, unknown>, factory: s
     return step === undefined
       ? { to: '/workflows/$from/$workflow', params: workflow, search: picked }
       : { to: '/workflows/$from/$workflow/$step', params: { ...workflow, step }, search: picked };
+  }
+  const own = ownDefinitionAt(path);
+  if (own) {
+    if (factory === undefined) return { to: '/agents' };
+    return own.kind === 'agent'
+      ? { to: '/agents/$from/$agent', params: { from: 'factory', agent: own.name }, search: { factory } }
+      : { to: '/agents/skills/$from/$skill', params: { from: 'factory', skill: own.name }, search: { factory } };
   }
   if (factory !== undefined) return { to: '/factories/$factory', params: { factory } };
   return ownerOf(path) === undefined ? null : { to: '/' };

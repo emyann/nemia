@@ -13,7 +13,7 @@ import { WorkflowDoor, type CarriedFile } from './workflows.store.ts';
 import type { WorkflowDir } from '../folder/folder.model.ts';
 import type { Args, Flag, Positional, Spec } from '../command/command.ts';
 import type { Command } from '../command/entry.verb.ts';
-import { apiKey, cliPath, factoryFlag, FROM, versionFlag, writerSpec, yoursOrRefused } from '../yours/yours.ts';
+import { cliPath, factoryFlag, FROM, versionFlag, writerSpec, yoursOrRefused } from '../yours/yours.ts';
 import { workflowNameRefusal } from '../factory/factory.ts';
 import { readFactories, readFactory, readFactoryAt, templatedTree, templatedTreeAt } from '../factory/factory.store.ts';
 import { factoryFills } from '../rules/rules.store.ts';
@@ -61,13 +61,6 @@ function fillsIn(args: Args) {
   const factory = readFactory(name);
   return (workflow: string) => factoryFills(factory, workflow).fills;
 }
-
-/** Why the board's workflow writes are served by the api's own routes. */
-const WRITE_HAND =
-  'the builder guards the write, decodes its steps in its own words, judges and writes the schemas pasted beside them, and reads the folder back';
-
-/** `--repo`, which the board hands for the repository a folder's agents and skills are looked for in; the command line looks in yours. */
-const REPO = apiKey('repo', "the board names the repository it lists a folder's agents from; the command line names none, and reads yours");
 
 /**
  * How a write of the workflow `workflow` into the tree of the templated factory `name`, in the store `home`, is judged, as a run of it
@@ -161,18 +154,14 @@ export const WORKFLOWS_WRITE: Command<WorkflowWritten & { version: string }> = {
       ),
       versionFlag('workflows write', 'the folder'),
       factoryFlag('workflows write'),
-      apiKey('draft', 'the command line reads the steps off --folder, into the form the builder sends'),
-      apiKey('readme', 'the command line reads the README off --folder, as the builder sends the one written'),
-      apiKey('files', "the command line reads the draft folder's other files off --folder, which the builder never sends"),
-      REPO,
     ],
   ),
   writes: true,
   class: 'ask',
-  route: [
-    { method: 'POST', path: '/api/workflows/:from', status: 201, hand: WRITE_HAND },
-    { method: 'PUT', path: '/api/workflows/:from/:name', status: 200, hand: WRITE_HAND },
-  ],
+  only: {
+    side: 'cli',
+    why: "the api serves it as the Workflow's `create` and `replace` verb of `objects`' Api (`/api/namespaces/:namespace/workflows`), which calls this entry's handler: no route of its own",
+  },
   handler: (args, _env, home = HOME) =>
     rooted(
       home,
@@ -236,15 +225,13 @@ export const WORKFLOWS_REMOVE: Command<WorkflowRemoved> = {
     'workflows rm',
     'yours <name> --version <v>',
     [FROM, { key: 'name', takes: 'required', kind: 'name' }],
-    [versionFlag('workflows rm', 'the folder'), REPO],
+    [versionFlag('workflows rm', 'the folder')],
   ),
   writes: true,
   class: 'ask',
-  route: {
-    method: 'DELETE',
-    path: '/api/workflows/:from/:name',
-    status: 200,
-    hand: 'the builder guards the removal, and decodes its version in its own words',
+  only: {
+    side: 'cli',
+    why: "the api serves it as the Workflow's `delete` verb of `objects`' Api (`/api/namespaces/:namespace/workflows`), which calls this entry's handler: no route of its own",
   },
   handler: (args, _env, home = HOME) =>
     rooted(
@@ -275,7 +262,6 @@ export const WORKFLOWS_LIST: Command<Record<string, FolderLoaded>> = {
   spec: apiSpec([{ key: 'dirs', takes: 'many', kind: 'name' }], ['repo', 'factory']),
   writes: false,
   class: 'read',
-  route: { method: 'GET', path: '/api/workflows', status: 200 },
   only: {
     side: 'api',
     why: 'the board lists every folder with its steps and its graph; at the command line, nemia start names the one it runs',

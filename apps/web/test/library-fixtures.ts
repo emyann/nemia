@@ -1,8 +1,11 @@
 /**
  * The library's reads as the api answers them, every key the board reads: an agent (`agent`), as the list reads it (`listedAgent`), the
  * skills by place (`skillPlace`), one skill's page (`skillDetail`), a workflow (`workflow`, its steps' keys from `stepSpec`), a step's page
- * (`stepPage`) and the builder's form (`keyForm`). Each takes keys to put over its own.
+ * (`stepPage`) and the builder's form (`keyForm`). Each takes keys to put over its own. And each definition as the objects serve it, made
+ * from the board's view of it (`workflowObject`, `agentObject`, `skillObject`): the object a read answers, whose view is the fixture.
  */
+import type { Agent, Skill, Workflow } from 'objects';
+import { writtenStepOf } from '../src/lib/api/workflows.ts';
 import type {
   AgentListing,
   AgentSkill,
@@ -223,4 +226,99 @@ export const keyForm = (extra: Partial<KeyForm> = {}): KeyForm => ({
   agents: { otto: { harness: 'claude', gate: true, tools: ['Read'] }, bare: {} },
   remote: { prefix: 'a2a:', refuses: ['tools', 'workspace'] },
   ...extra,
+});
+
+/** When an object was made, where the fixture does not say. */
+const MADE = '2026-10-01T00:00:00.000Z';
+
+/** `listing` as the Workflow object the api serves in `namespace`: its view is `listing` with its graph's nodes. */
+export const workflowObject = (listing: WorkflowListing = workflow(), namespace = 'default'): Workflow => ({
+  apiVersion: 'nemia/v1',
+  kind: 'Workflow',
+  metadata: { name: listing.name, namespace, creationTimestamp: MADE, resourceVersion: listing.version },
+  spec: { description: listing.description, readme: listing.readme, steps: listing.steps.map(writtenStepOf) },
+  status: {
+    origin: listing.from,
+    dir: listing.dir,
+    graph: { ...listing.graph, nodes: listing.graph.nodes ?? listing.steps.map((step) => ({ name: step.name, kind: 'step' as const })) },
+    steps: listing.steps,
+    schemas: listing.schemas,
+    folderTeam: listing.folderTeam,
+    error: listing.error,
+    unfilled: listing.unfilled,
+  },
+});
+
+/** `listed` as the Agent object the api serves in `namespace`: its view is `listed`. */
+export const agentObject = (listed: LibraryAgent = listedAgent(), namespace = 'default'): Agent => ({
+  apiVersion: 'nemia/v1',
+  kind: 'Agent',
+  metadata: { name: listed.name, namespace, creationTimestamp: MADE, resourceVersion: listed.version },
+  spec: {
+    role: listed.role,
+    description: listed.description,
+    keys: listed.keys,
+    skills: listed.skills,
+    harnessPrompt: listed.harnessPrompt,
+    mcp: listed.mcp,
+    output: listed.schema,
+    instructions: listed.body,
+  },
+  status: {
+    origin: listed.from,
+    dir: listed.dir,
+    file: listed.file,
+    source: listed.source,
+    usedBy: listed.usedBy,
+    fills: [],
+    factories: listed.factories,
+    given: listed.given,
+    copied: null,
+    untried: listed.untried,
+    card: listed.card,
+    cardError: listed.cardError,
+    error: listed.error,
+  },
+});
+
+/**
+ * `detail` as the Skill object the api serves in `namespace`: its view is `detail`, where the row's `usedBy` names the agents of yours
+ * among its `users` (`consistentSkill`).
+ */
+export const skillObject = (detail: SkillDetail = consistentSkill(), namespace = 'default'): Skill => {
+  const { name: _, ...draft } = detail.draft ?? { name: '', body: detail.body };
+  return {
+    apiVersion: 'nemia/v1',
+    kind: 'Skill',
+    metadata: { name: detail.skill.name, namespace, creationTimestamp: MADE, resourceVersion: detail.version },
+    spec: draft,
+    status: {
+      origin: detail.skill.from,
+      dir: detail.skill.dir,
+      entry: detail.skill.entry,
+      error: detail.skill.error,
+      preload: detail.skill.preload,
+      cost: detail.skill.cost,
+      usedBy: detail.users,
+      found: detail.skill.found,
+      copyHint: detail.copyHint,
+    },
+  };
+};
+
+/** `skillDetail` with its row's `usedBy` the agents of yours its `users` name, as one object says both. */
+export const consistentSkill = (extra: Partial<SkillDetail> = {}): SkillDetail => {
+  const detail = skillDetail(extra);
+  return {
+    ...detail,
+    skill: { ...detail.skill, usedBy: detail.users.filter((u) => u.from === 'yours').map((u) => u.name) },
+  };
+};
+
+/** A page of `items` of `kind`, the last. */
+export const listOfItems = <K extends string, T>(kind: K, items: readonly T[]) => ({
+  apiVersion: 'nemia/v1' as const,
+  kind: `${kind}List` as const,
+  metadata: {},
+  items,
 });

@@ -8,7 +8,7 @@
 import { Effect } from 'effect';
 import { tried } from '../runtime-client.ts';
 import type { Args, Flag, Positional, Spec } from '../command/command.ts';
-import { apiKey, cliPath, factoryFlag, FROM, versionFlag, writerSpec, writerText, yoursOrRefused } from '../yours/yours.ts';
+import { cliPath, factoryFlag, FROM, versionFlag, writerSpec, writerText, yoursOrRefused } from '../yours/yours.ts';
 import { templatedTree } from '../factory/factory.store.ts';
 import type { Command } from '../command/entry.verb.ts';
 import { HOME } from '../record/record.store.ts';
@@ -46,12 +46,6 @@ const PLACE_AND_NAME: readonly Positional[] = [
   { key: 'name', takes: 'required', kind: 'name' },
 ];
 
-/** Why the board's agent writes are served by the api's own routes. */
-const WRITE_HAND = "the board guards the write, decodes the agent's form in its own words, and reads the agent back";
-
-/** `--repo`, which the board hands for the repository whose skills an agent's version counts; the command line counts yours alone. */
-const REPO = apiKey('repo', "the board names the repository it lists an agent's skills from; the command line names none, and reads yours");
-
 /** The words a written agent is said in: each file written and removed, and the version it is at now, which a change of it gives. */
 const writtenLines = ({ dir, agent, version, written, removed }: AgentWritten): string[] => [
   `${agent.name} written in ${dir}, at version ${version}: ${written.join(', ')}`,
@@ -86,17 +80,14 @@ export const AGENTS_WRITE: Command<AgentWritten> = {
       ),
       versionFlag('agents write', 'the agent'),
       factoryFlag('agents write'),
-      apiKey('draft', 'the command line reads the agent off --file, into the form the board sends'),
-      apiKey('schema', 'the command line reads the result schema beside --file, as the board sends the one pasted'),
-      REPO,
     ],
   ),
   writes: true,
   class: 'ask',
-  route: [
-    { method: 'POST', path: '/api/agents/:from', status: 201, hand: WRITE_HAND },
-    { method: 'PUT', path: '/api/agents/:from/:name', status: 200, hand: WRITE_HAND },
-  ],
+  only: {
+    side: 'cli',
+    why: "the api serves it as the Agent's `create` and `replace` verb of `objects`' Api (`/api/namespaces/:namespace/agents`), which calls this entry's handler: no route of its own",
+  },
   handler: (args, _env, home) =>
     rooted(
       home,
@@ -130,14 +121,12 @@ export const AGENTS_REMOVE: Command<AgentRemoved> = {
   name: 'agents rm',
   usage: 'yours <name> --version <v>',
   help: ['an agent of yours removed, at the --version it was read at'],
-  spec: writerSpec('agents rm', 'yours <name> --version <v>', PLACE_AND_NAME, [versionFlag('agents rm', 'the agent'), REPO]),
+  spec: writerSpec('agents rm', 'yours <name> --version <v>', PLACE_AND_NAME, [versionFlag('agents rm', 'the agent')]),
   writes: true,
   class: 'ask',
-  route: {
-    method: 'DELETE',
-    path: '/api/agents/:from/:name',
-    status: 200,
-    hand: 'the board guards the removal, and reads the version the agent was read at before it is removed',
+  only: {
+    side: 'cli',
+    why: "the api serves it as the Agent's `delete` verb of `objects`' Api (`/api/namespaces/:namespace/agents`), which calls this entry's handler: no route of its own",
   },
   handler: (args, _env, home) =>
     rooted(
@@ -171,20 +160,14 @@ export const AGENTS_TRY: Command<{ id: string }> = {
       takes: '--brief takes what the agent is asked to do, a sentence is enough: nemia agents run yours <name> --brief "<words>"',
       twice: 'nemia agents run takes --brief once: a try is one brief.',
     },
-    apiKey(
-      'repo',
-      'the board names the repository whose skills a try refuses; a try from the command line names none, as it runs with none',
-    ),
   ]),
   writes: true,
   class: 'act',
-  ticks: true,
-  route: {
-    method: 'POST',
-    path: '/api/agents/:from/:name/try',
-    status: 201,
-    hand: 'the board guards the try, and decodes its brief in its own words',
+  only: {
+    side: 'cli',
+    why: "the api serves it as the Agent's `try` verb of `objects`' Api (`/api/namespaces/:namespace/agents`), which calls this entry's handler: no route of its own",
   },
+  ticks: true,
   handler: (args, _env, home = HOME) =>
     tryAgent({
       who: 'nemia agents run',
@@ -208,7 +191,6 @@ export const AGENTS_READ: Command<{ agent: AgentReading | null }> = {
   spec: apiSpec(PLACE_AND_NAME, ['dir', 'repo']),
   writes: false,
   class: 'read',
-  route: { method: 'GET', path: '/api/agents/:from/:name', status: 200 },
   only: {
     side: 'api',
     why: "the board's agent page reads one agent with its versions and users; at the command line, nemia agents lists them",

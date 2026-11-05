@@ -116,10 +116,13 @@ function modulesLoaded(entry: string, more: readonly string[] = []): string[] {
  * Each is two more for the budgets a gate sets: `budget/budget.ts`, which `question/question.ts` expands the `budgets` shape by and
  * `status/status.ts` reads the cap in force by (`capInForce`), and `shape/shape.ts`, the reading of an object's fields and a list's items
  * both share; both pure, neither touching a disk.
+ *
+ * `agent-orchestrator/workflow` is one more for `definition/served.ts`, the deciders of which origin serves a definition, of a namespace's
+ * list and of whether a write of one is taken, which imports nothing but its contracts' types.
  */
 const PINNED_MODULES: Record<string, { all: number; effect: number }> = {
   'agent-orchestrator/run': { all: 190, effect: 15 },
-  'agent-orchestrator/workflow': { all: 139, effect: 15 },
+  'agent-orchestrator/workflow': { all: 140, effect: 15 },
 };
 
 const isEffectModule = (url: string): boolean => url.includes('/node_modules/effect/');

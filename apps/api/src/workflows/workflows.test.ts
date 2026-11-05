@@ -6,6 +6,7 @@
  * hidden, the second with a step in it; and `agents/`, the agents the workflows beside it name, whose files look like steps.
  */
 import { root } from '../../test/harness.ts';
+import { everyOrigin, listedIn } from '../../test/definitions.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
@@ -175,14 +176,12 @@ test("a condition's keys and a workflow node's are listed on the spec, the route
 test("a person reads the workflows on the board, opens a step's page, and is refused a page that is not there", async (t) => {
   const s = story(t);
   await s.test(
-    "GET /api/workflows lists each folder, the repository's then yours: its description, its steps' specs and bodies, its graph and the schemas beside its steps — and a folder the loader refuses, with the refusal and no steps",
+    "GET /api/namespaces/default/workflows lists each folder, the repository's then yours (each by its ?origin=): its description, its steps' specs and bodies, its graph and the schemas beside its steps — and a folder the loader refuses, with the refusal and no steps",
     async () => {
-      const res = await app.request('/api/workflows');
-      assert.equal(res.status, 200);
       const refused = loaderRefusal(broken);
       assert.match(refused, /review: `afer` is not a key a step has/);
 
-      const listing = (await res.json()) as WorkflowListing[];
+      const listing = await everyOrigin<WorkflowListing>(app, 'workflows');
       for (const w of listing)
         assert.equal(w.version, versionOf(w.dir), `${w.name}: at the version its files are at, which a save from the board carries`);
       assert.deepEqual(listing, [
@@ -474,7 +473,7 @@ test("a person reads the workflows on the board, opens a step's page, and is ref
         fs.rmSync(dir, { recursive: true });
         fs.rmSync(path.join(repo, 'workflows', 'agents', 'looker.md'));
       });
-      const listed = ((await (await app.request('/api/workflows')).json()) as WorkflowListing[]).find((w) => w.name === 'served');
+      const listed = (await listedIn<WorkflowListing>(app, 'workflows')).find((w) => w.name === 'served');
       const of = (name: string) => listed?.steps.find((step) => step.name === name);
       assert.deepEqual(
         [of('look')?.spec.mcp, of('look')?.mcp],

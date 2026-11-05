@@ -144,11 +144,18 @@ export const slotWord = (slot: RunSlot): string => `${SLOT_WAIT} (${slot.inFligh
 
 /**
  * The daemon's two ceilings, as it says them when it starts: sessions at work per pool (`WF_MAX_CONCURRENT`; `claude`, `codex` and checks
- * each a pool, a blocked session holding no slot), and runs in flight (`WF_MAX_RUNS`) — `no cap` when none.
+ * each a pool, a blocked session holding no slot), and runs in flight (`WF_MAX_RUNS`) — `no cap` when none; and the memory limit each
+ * session runs under when its step names none (`WF_MEMORY_LIMIT`), in the slice it names (`WF_CGROUP_PARENT`), on a line of its own
+ * only where one is set.
  */
-export const ceilingLines = (c: { sessions: number; runs: number }): string[] => [
+export const ceilingLines = (c: { sessions: number; runs: number; memory?: string; cgroupParent?: string }): string[] => [
   `sessions at work per pool: at most ${c.sessions} at once — claude, codex, checks each a pool (WF_MAX_CONCURRENT)`,
   `runs in flight: ${c.runs > 0 ? `at most ${c.runs} at once — a run with nothing filed waits for a slot, oldest first` : 'no cap'} (WF_MAX_RUNS)`,
+  ...(c.memory === undefined
+    ? []
+    : [
+        `memory per session: at most ${c.memory}, unless its step names its own memory: — a process past it is killed in its session's scope alone${c.cgroupParent === undefined ? '' : `, each scope in ${c.cgroupParent}`} (WF_MEMORY_LIMIT${c.cgroupParent === undefined ? '' : ', WF_CGROUP_PARENT'})`,
+      ]),
 ];
 
 export type InFlight = { name: string; taskId: string };

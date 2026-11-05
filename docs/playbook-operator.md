@@ -291,6 +291,39 @@ overlap.
 This retires the hand bump of 2026-11-03 (`the-factory-s-sessions-move-yns7`, PR #577, `3893a3162`): pause, wait until no session
 works, land, `npm install`, restart. None of it is needed now, and none of it is done again.
 
+### A memory limit per session
+
+A runaway test in one session can take the machine's memory; a limit on each session ends that process alone. Set it in the operator's
+drop-in, `~/.config/systemd/user/nemia.service.d/memory.conf`, beside its `MemoryHigh=` and `MemoryMax=`:
+
+```ini
+[Service]
+Environment=WF_MEMORY_LIMIT=6Gi
+Environment=WF_CGROUP_PARENT=sessions.slice
+```
+
+`WF_MEMORY_LIMIT` is a Kubernetes quantity (`6Gi`, `512Mi`, `4G`): every session and check the daemon files without a `memory:` of its
+step's runs under it. A step's `memory: 8Gi` raises or lowers it for that step's sessions alone; its check keeps the default. The runtime
+runs each limited task in a transient scope of systemd's user manager (`systemd-run --user --scope`, `MemoryMax=` the limit,
+`MemorySwapMax=0`, `OOMPolicy=continue`), so a process past it is killed by the kernel in that scope alone, and the attempt records the
+kill, the limit and the peak. It needs systemd 253 or later with a user manager on cgroup v2: a daemon started with `WF_MEMORY_LIMIT` on a
+host that cannot make such a scope refuses to start, naming the variable to unset.
+
+**The scopes sit outside the service's cgroup.** A limited session's scope is the user manager's, not the unit's: the drop-in's
+`MemoryHigh=11G` and `MemoryMax=13G` now bound the daemon and the api, and no longer the sessions together. Seven runs, each under its
+own limit, can still pass the machine. `WF_CGROUP_PARENT` (optional, a unit name ending `.slice`) makes every scope in one slice, which
+caps them together; give the slice its own cap, `~/.config/systemd/user/sessions.slice`:
+
+```ini
+[Slice]
+MemoryHigh=11G
+MemoryMax=13G
+```
+
+then `systemctl --user daemon-reload` and `systemctl --user restart nemia.service`. Without the variable each scope is made in the user
+manager's root slice, bounded by its own limit alone. Sessions already at work when the limit is set keep running where they started:
+only tasks filed afterwards are scoped. `nemia up` says the limit, and the slice, on its start lines.
+
 ## Moving the factory onto a release
 
 A checklist, run once per machine whose daemon runs a checkout, by the operator after the owner says go: it touches the live store and
@@ -304,8 +337,8 @@ step that is refused, stop, read what the refusal names, and tell the owner; the
 2. **Record the unit as it is:** `systemctl --user cat nemia.service` prints its file and its drop-in. Copy every `Environment=` line but
    `WF_ROOT` and `PATH`, which the install writes itself: `WF_MAX_CONCURRENT=50`, `WF_MAX_RUNS=7`, `OTEL_EXPORTER_OTLP_ENDPOINT` (the side
    collector's address as printed), `NEMIA_TOOL_DETAILS=1`, `NEMIA_DAEMON_START=off`, and any other found there. The drop-in
-   `~/.config/systemd/user/nemia.service.d/memory.conf` (`MemoryHigh=11G`, `MemoryMax=13G`, `OOMPolicy=continue`, `WF_MAX_RUNS=7`) is the
-   operator's, outside `nemia service`: the install rewrites the unit's file alone and leaves the drop-in folder as it is.
+   `~/.config/systemd/user/nemia.service.d/memory.conf` (`MemoryHigh=11G`, `MemoryMax=13G`, `OOMPolicy=continue`, `WF_MAX_RUNS=7`, and
+   `WF_MEMORY_LIMIT` and `WF_CGROUP_PARENT` where set, *A memory limit per session*) is the operator's, outside `nemia service`: the install rewrites the unit's file alone and leaves the drop-in folder as it is.
 3. **Tag** main's head at a gap: `git tag nemia-<YYYY.MM.DD> main` (*Install a release*).
 4. **Rehearse on a scratch store:** `WF_ROOT=<a scratch folder> npx nemia upgrade <tag> --repo <the main checkout>`. No daemon ticks
    it, so it builds, switches and says `no daemon ticks the store: the next one started runs <tag>`. Then delete the scratch folder. A

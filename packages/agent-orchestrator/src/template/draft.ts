@@ -73,7 +73,7 @@ export type Draft = { files: DraftFile[]; from: Array<{ part: string; from: stri
 const BLOCK_KEYS = ['model', 'effort', 'context'] as const;
 
 /** The step keys copied as they are, as strings. */
-const WORDS = ['place', 'workspace', 'check', 'loop'] as const;
+const WORDS = ['place', 'workspace', 'check', 'loop', 'memory'] as const;
 
 /** The step keys of a route read as lists: a condition's routes and those it ends on, and the routes a node runs on. */
 const ROUTE_LISTS = ['routes', 'ends', 'when'] as const;

@@ -166,6 +166,14 @@ export type Workflow = {
   remote?: boolean;
   deadlineSeconds?: number;
   /**
+   * `memory: 4Gi`: the most memory the step's sessions may use, a container's `resources.limits.memory` — a Kubernetes quantity the
+   * runtime reads (`8Gi`, `512Mi`, `4G`, `1073741824`), refused at load where it reads none. Filed as each session's
+   * `resources.limits.memory`: its harness and every child it starts run in a cgroup of their own under it, and a process that passes it
+   * is killed there alone. Its check takes the engine's default (`WF_MEMORY_LIMIT`), never this. Absent: the engine's default, else no
+   * limit. Refused on a remote agent, whose process is not ours.
+   */
+  memory?: string;
+  /**
    * The most the step's tries may cost together, in dollars — `budget: 5`, `budget: 2.50`. Absent: no cap. The run reads what each
    * ended try cost off the engine, and once they have together cost it or more, files nothing more for the step on its own — no `retries:`
    * try, no round of a loop it is in — until a person raises it (`nemia retry --budget`, `nemia retry --round --budget`). On `claude`,
@@ -368,6 +376,7 @@ export const STEP_KEYS = [
   'denials',
   'remote',
   'deadlineSeconds',
+  'memory',
   'budget',
   'check',
   'retries',
@@ -459,6 +468,8 @@ export const STEP_KEY_MEANINGS: Readonly<Record<StepKey, string>> = {
   remote:
     '`true`: every session of the step is bridged to claude.ai, where anyone signed in to the account can drive it from a browser or a phone — on `claude` only',
   deadlineSeconds: COUNTS.deadlineSeconds.counts,
+  memory:
+    "the most memory each session of the step may use, a container's limit — `4Gi`, `512Mi`: a process past it is killed in the session's own scope alone; its check takes the daemon's default (`WF_MEMORY_LIMIT`)",
   budget: "the most the step's tries may cost together, in dollars: past it the run files nothing more for it until a person raises it",
   check: "a shell command the run executes in the step's workspace after it hands off: exit 0 makes the step verified",
   retries: COUNTS.retries.counts,

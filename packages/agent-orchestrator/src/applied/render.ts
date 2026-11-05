@@ -123,6 +123,7 @@ const STEP_WORDS = [
   'workflow',
   'retries',
   'deadlineSeconds',
+  'memory',
   'reads',
   'tally',
 ];

@@ -452,8 +452,8 @@ keyed alphabetically, still reads in the order its steps run in `wf ls` and `wf 
 reads as it was written.
 
 A step's keys are a closed list — `after`, `resume`, `input`, `workspace`, `slot`, `agent`, `harness`, `model`, `effort`, `context`,
-`permissionMode`, `sandbox`, `tools`, `disallowedTools`, `allowedTools`, `remote`, `deadlineSeconds`, `budget`, `check`, `retries`,
-`gate`, `output`, `tally`, `loop`, `rounds` — and a key the parser does not know is refused by name before anything is spent, as is a value
+`permissionMode`, `sandbox`, `tools`, `disallowedTools`, `allowedTools`, `remote`, `deadlineSeconds`, `memory`, `budget`, `check`,
+`retries`, `gate`, `output`, `tally`, `loop`, `rounds` — and a key the parser does not know is refused by name before anything is spent, as is a value
 it cannot use (`src/workflow/step-file.ts`). The fence keys among them (`permissionMode`, `sandbox`, `tools`, `disallowedTools`,
 `allowedTools`) are written under the block of the harness the step runs on, below. `guide` is refused with a reason of its own, and so is `maxAttempts`, retired on 2026-09-23 with
 the runtime's own: the runtime makes one attempt at a session, and trying again is the run's — `retries:` and `wf retry`
@@ -475,6 +475,15 @@ to rewrite. Whether the word is a sandbox is the runtime's to say at `wf start`;
 still calls either fence `permissionMode`, and the tick hands the one the step has on (`modeOf`). A page of the board opened before the rename that sends `permissionMode` back
 on a codex step is refused, saying to reload; a save from the board writes `sandbox:`, and a save that changes nothing keeps the file.
 Codex's approval policy is untouched: `codex exec` asks nobody, and the engine passes no `-a`.
+
+`memory: 4Gi` is the most memory each session of the step may use, a container's `resources.limits.memory`: a Kubernetes quantity
+the runtime reads (`8Gi`, `512Mi`, `4G`, `1073741824`), refused at load where it reads none (`memoryOf`, in the runtime's words), and
+on a remote agent, whose process is not ours. Each session of the step — its first try, a retry, a round — is filed with it as its
+task's `resources.limits.memory`; the runtime runs the session's harness and every child it starts in a scope of their own under it,
+so a runaway test is killed there alone. The step's check is filed without it, and takes the engine's default: the daemon's
+`WF_MEMORY_LIMIT`, which every task filed with no limit of its own runs under, its scope made in `WF_CGROUP_PARENT`'s slice where one
+is set. A daemon started with `WF_MEMORY_LIMIT` on a host where the runtime cannot make such a scope refuses to start, naming the
+variable to unset (`limitRefusal`).
 
 **A harness's fence is written under that harness's block**, named by its id, the shape a template writes (`src/template/layout.ts`):
 

@@ -92,6 +92,7 @@ const LOCAL_ONLY: Record<string, string> = {
   allowedTools: 'Edit(**)',
   denials: 'fail',
   budget: '5',
+  memory: '4Gi',
   output: 'schema.json',
   tally: 'issues',
   resume: 'plan',

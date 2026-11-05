@@ -15,6 +15,7 @@ import {
   checkArgv,
   checkEnvOf,
   LANDING_CHECK_DEADLINE_SECONDS,
+  REFUSAL_LINES,
   type CheckHanded,
   type LandingSaid,
   type Verdict,
@@ -231,7 +232,7 @@ const sendTry = Effect.fnUntraced(function* (f: Filing, r: Retry, step: Workflow
   const remote = isRemoteHarness(step.harness);
   const continued = r.mode === 'continue' && !remote && record.taskId !== null ? sessionIn(reads.views, record.taskId) : undefined;
   const resumeFrom = resumeOn(continued, step, f, record);
-  const refusal = record.check && step.check ? yield* refusalRead(step.check, record.check.taskId).pipe(over(asRead(f))) : undefined;
+  const refusal = record.check && step.check ? yield* refusalRead(step.check, record.check.taskId, REFUSAL_LINES).pipe(over(asRead(f))) : undefined;
   const closeouts = yield* askingReads(f, r, resumeFrom);
   const checked = remote ? [] : yield* checksHandedRead(run, reads.steps, step).pipe(over(asRead(f)));
   const status = triedFrom(step, run, reads.phaseOf, reads.signedOff, reads.asked, reads.steps, reads.spendOf);

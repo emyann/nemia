@@ -1662,8 +1662,9 @@ retries: 1
 
 - **`retries: n`.** When a step's check *refuses* it, the next tick re-files the step, continuing the step's
   own last session (`resumeFrom` the try before, as `resume:` does between steps). Its brief says what became
-  of the last try, and carries the check's verdict as data: the command, the exit code, the last 20 lines of
-  stdout and of stderr, and the sentence that it must not weaken the check. At most `n` times. Past that the
+  of the last try, and carries the check's verdict as data: the command, the exit code, the last 300 lines of
+  stdout and of stderr (`REFUSAL_LINES`, within each stream's last 64 kB: enough to fix what failed, where `nemia decide` shows
+  20), and the sentence that it must not weaken the check. At most `n` times. Past that the
   step waits on you, as before. `retries:` spends nothing on a try that failed, was lost or could not start: the
   runtime makes one attempt per start and tries nothing again on its own, so such a try settles `failed` and waits on
   `wf retry`. A `--continue` of one whose harness never named its session — it could not start, or was lost — continues the

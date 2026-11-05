@@ -81,6 +81,12 @@ export const CHECK_NICENESS = 10;
 export const CHECK_TAIL_LINES = 20;
 
 /**
+ * How many lines of each stream a try after a refused check is handed (`sendTry`): enough for the agent to fix what failed — a red CI's
+ * failing jobs and the lines that failed them — where `CHECK_TAIL_LINES` is a person's screen. Bounded besides by the bytes read.
+ */
+export const REFUSAL_LINES = 300;
+
+/**
  * What the command is told about the run it judges. `WF_ARTIFACTS` is the directory the run made for the step's files, where a check that
  * makes files for a person — a screenshot of each page — puts them, off the branch.
  */

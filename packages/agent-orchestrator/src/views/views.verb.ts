@@ -13,6 +13,7 @@ import { Cause, Deferred, Effect, Exit } from 'effect';
 import { EngineService, asked, denialText, tried, type Engine, type TaskView } from '../runtime-client.ts';
 import {
   attemptVerdict,
+  CHECK_TAIL_LINES,
   failingLines,
   lastLines,
   reportedLines,
@@ -469,12 +470,13 @@ export const checkReportsRead = Effect.fn('checkReports')(function* (
 
 /**
  * What a check said, off the engine: the verdict of its latest attempt (`attemptVerdict`), and the last lines of each stream the runtime
- * kept (`checkStreams`). Fails with a refusal a read rejected with; dies of anything else.
+ * kept (`checkStreams`), `lines` of each: `nemia decide`'s screen unless asked for more, as a try is (`REFUSAL_LINES`). Fails with a
+ * refusal a read rejected with; dies of anything else.
  */
-export const refusalRead = Effect.fn('refusalOf')(function* (command: string, taskId: string) {
+export const refusalRead = Effect.fn('refusalOf')(function* (command: string, taskId: string, lines = CHECK_TAIL_LINES) {
   const e = yield* EngineService;
   const { verdict, stdout, stderr } = yield* checkStreams(e, taskId, TAIL_BYTES);
-  return { command, verdict, stdout: lastLines(stdout), stderr: lastLines(stderr) } satisfies CheckRefusal;
+  return { command, verdict, stdout: lastLines(stdout, lines), stderr: lastLines(stderr, lines) } satisfies CheckRefusal;
 });
 
 /**

@@ -1,5 +1,5 @@
 /**
- * What the api's discovery says it serves (agent-orchestrator, src/object/discovery.ts, `resourcesOf`): from the routes the
+ * What the api's discovery says it serves (agent-orchestrator, src/discovery/discovery.ts, `resourcesOf`): from the routes the
  * `Api` of `objects` serves, each read off its path (`routeOf`, whose rows a test holds), and the kinds it serves with their plurals
  * (`KINDS`, `RESOURCE_PLURALS`), one resource per kind, named by its plural, and one per sub-resource of a kind, named
  * `<plural>/<sub>`, as Kubernetes' discovery names `pods/log`. A resource is namespaced exactly when a route of it is under
@@ -9,28 +9,31 @@
  * kind is served by (`/api/builtin/mcpservers`) is said by none. The order of the resources and of their verbs is the door's.
  */
 import { type Implementation, spec } from '@emyann/tsverify';
-import type { KindPlural, Resource, ResourceVerb, Route } from '../src/object/discovery.ts';
+import type { KindPlural, Resource, ResourceVerb, ApiRoute } from '../src/discovery/discovery.ts';
 
 /** Every verb, to say of each whether a resource has it. */
 const VERBS: readonly ResourceVerb[] = ['get', 'list', 'watch', 'create', 'update', 'patch', 'delete'];
 
+/** Whether `route`, a route of a kind's collection, does `verb`: a `GET` lists and watches, a `POST` creates. */
+const collectionDoes = (route: ApiRoute, verb: ResourceVerb): boolean =>
+  route.method === 'GET' ? verb === 'list' || verb === 'watch' : route.method === 'POST' && verb === 'create';
+
+/** Whether `route`, a route of one object by its name, does `verb`: `GET` gets, `PUT` updates, `PATCH` patches, `DELETE` deletes. */
+const itemDoes = (route: ApiRoute, verb: ResourceVerb): boolean =>
+  verb === 'get'
+    ? route.method === 'GET'
+    : verb === 'update'
+      ? route.method === 'PUT'
+      : verb === 'patch'
+        ? route.method === 'PATCH'
+        : verb === 'delete' && route.method === 'DELETE';
+
 /** Whether `route`, a route of a kind itself (no `sub`), does `verb`. */
-const kindDoes = (route: Route, verb: ResourceVerb): boolean =>
-  route.sub === null &&
-  (verb === 'list' || verb === 'watch'
-    ? route.method === 'GET' && !route.item
-    : verb === 'get'
-      ? route.method === 'GET' && route.item
-      : verb === 'create'
-        ? route.method === 'POST' && !route.item
-        : verb === 'update'
-          ? route.method === 'PUT' && route.item
-          : verb === 'patch'
-            ? route.method === 'PATCH' && route.item
-            : route.method === 'DELETE' && route.item);
+const kindDoes = (route: ApiRoute, verb: ResourceVerb): boolean =>
+  route.sub === null && (route.item ? itemDoes(route, verb) : collectionDoes(route, verb));
 
 /** Whether `route`, a route of a sub-resource, does `verb`: its method's verb alone. */
-const subDoes = (route: Route, verb: ResourceVerb): boolean =>
+const subDoes = (route: ApiRoute, verb: ResourceVerb): boolean =>
   route.sub !== null &&
   (route.method === 'GET'
     ? verb === 'get'
@@ -60,7 +63,7 @@ const onceAs = (resources: readonly Resource[], name: string, kind: string): boo
   resources.some((r) => r.name === name && r.kind === kind) &&
   resources.every((r, i) => r.name !== name || !resources.slice(0, i).some((q) => q.name === name));
 
-const resourcesOfSpec = spec<(routes: readonly Route[], kinds: readonly KindPlural[]) => Resource[]>({
+const resourcesOfSpec = spec<(routes: readonly ApiRoute[], kinds: readonly KindPlural[]) => Resource[]>({
   requires: ({ input: [, kinds] }) => distinctKinds(kinds),
   ensures: {
     oneResourcePerKind: {
@@ -82,7 +85,7 @@ const resourcesOfSpec = spec<(routes: readonly Route[], kinds: readonly KindPlur
       description: 'Each sub-resource a route of a kind serves is listed once, of that kind',
       condition: ({ input: [routes, kinds], output }) =>
         routes.every(
-          (t) => t.sub === null || kinds.every((k) => k.plural !== t.plural || onceAs(output, subName(k.plural, t.sub), k.kind)),
+          (t) => t.sub === null || kinds.every((k) => k.plural !== t.plural || onceAs(output, subName(k.plural, t.sub ?? ''), k.kind)),
         ),
     },
     verbsAreWhatTheRoutesDo: {
@@ -117,5 +120,5 @@ const resourcesOfSpec = spec<(routes: readonly Route[], kinds: readonly KindPlur
   },
 });
 
-/** `resourcesOf`'s type, which `src/object/discovery.ts` takes. */
+/** `resourcesOf`'s type, which `src/discovery/discovery.ts` takes. */
 export type ResourcesOf = Implementation<typeof resourcesOfSpec>;

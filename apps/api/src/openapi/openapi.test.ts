@@ -125,6 +125,9 @@ test('the document is the one Effect writes of the Api, and holds, for each of K
   assert.ok(doc.paths['/api/namespaces/{namespace}/skills/{name}/files']?.get, "and a skill's files listed");
   assert.ok(doc.paths['/api/factories/{name}/commands']?.get, "a factory's command lines are got");
   assert.ok(doc.components.schemas['FactoryCommands'], 'FactoryCommands is a component');
+  assert.match(JSON.stringify(doc.paths['/api']?.get), /APIResourceList/, 'GET /api is discovery, answering the APIResourceList');
+  assert.ok(doc.components.schemas['APIResourceList'], 'APIResourceList is a component');
+  assert.match(JSON.stringify(doc.paths['/api/cards']?.get), /"name":"watch"/, 'a list takes `watch`');
 });
 
 test("the card's labels are a POST whose body is a LabelEdit and whose answer a Labelled, and a run's labels an object of strings", async () => {

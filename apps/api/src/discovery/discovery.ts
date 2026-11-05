@@ -6,11 +6,11 @@
  */
 import { Effect } from 'effect';
 import { HttpApiBuilder } from 'effect/http-api';
-import { resourcesOf, type Route, routeOf } from 'agent-orchestrator';
+import { resourcesOf, type ApiRoute, routeOf } from 'agent-orchestrator';
 import { API_VERSION, Api, type APIResourceList, KINDS, RESOURCE_PLURALS } from 'objects';
 
 /** Every route of the `Api` discovery reads: each endpoint's method and path, those `routeOf` reads as a resource's. */
-const routes: Route[] = Object.values(Api.groups).flatMap((group) =>
+const routes: ApiRoute[] = Object.values(Api.groups).flatMap((group) =>
   Object.values(group.endpoints).flatMap((endpoint) => {
     const route = routeOf(endpoint.method, endpoint.path);
     return route === null ? [] : [route];

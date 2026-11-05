@@ -34,6 +34,8 @@ const RUN_LIST =
   "the runs as objects, a RunList and one run in its namespace, served by the objects' handler from `objects`' Api (src/objects/runs.ts)";
 
 const OWN: Readonly<Record<string, string>> = {
+  'GET /api':
+    "discovery, served by the objects' handler from `objects`' Api (src/discovery/discovery.ts): every resource the api serves, which no command reads",
   'GET /api/templates': TEMPLATE,
   'GET /api/templates/:name': TEMPLATE,
   'GET /api/templates/:name/:plural{workflows|agents|skills}': TEMPLATE,

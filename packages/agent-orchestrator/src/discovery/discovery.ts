@@ -15,7 +15,7 @@ export type ResourceVerb = 'get' | 'list' | 'watch' | 'create' | 'update' | 'pat
  * A route as its path reads: the plural after `/api/` or `/api/namespaces/:namespace/`, whether it is under a namespace, whether a name
  * follows the plural (`item`), and the words after it with the names left out (`sub`, `steps/retry`), null where none follow.
  */
-export type Route = {
+export type ApiRoute = {
   readonly method: RouteMethod;
   readonly plural: string;
   readonly namespaced: boolean;
@@ -42,7 +42,7 @@ const isParam = (segment: string): boolean => segment.startsWith(':');
  * `/api/namespaces/:namespace/`; whether a name follows it; and the words after it, its names left out, joined by `/`. Null where the
  * method is none discovery reads, the path is not under `/api/`, or a segment is empty or the plural is a name.
  */
-export const routeOf = (method: string, path: string): Route | null => {
+export const routeOf = (method: string, path: string): ApiRoute | null => {
   const routeMethod = ROUTE_METHODS.find((m) => m === method);
   if (routeMethod === undefined || !path.startsWith('/api/')) return null;
   const segments = path.slice('/api/'.length).split('/');
@@ -72,21 +72,22 @@ const verbOfMethod = (method: RouteMethod): ResourceVerb =>
  * collection `list` and `watch` (every list is watched with `?watch=true`) where it is a `GET`, `create` where it is a `POST`; and of one
  * by its name its method's verb, but `create`, which is the collection's.
  */
-const routeDoes = (route: Route, verb: ResourceVerb): boolean => {
+const routeDoes = (route: ApiRoute, verb: ResourceVerb): boolean => {
   if (route.sub !== null) return verbOfMethod(route.method) === verb;
   if (!route.item) return route.method === 'GET' ? verb === 'list' || verb === 'watch' : route.method === 'POST' && verb === 'create';
   return route.method !== 'POST' && verbOfMethod(route.method) === verb;
 };
 
 /** The verbs the routes of `kind`'s plural with sub-resource `sub` (null for the kind itself) do, in the order discovery names them. */
-const verbsOf = (routes: readonly Route[], kind: KindPlural, sub: string | null): ResourceVerb[] =>
+const verbsOf = (routes: readonly ApiRoute[], kind: KindPlural, sub: string | null): ResourceVerb[] =>
   VERBS.flatMap((v) => (routes.some((t) => t.plural === kind.plural && t.sub === sub && routeDoes(t, v)) ? [v] : []));
 
 /** Whether a route of `kind`'s plural is under a namespace, which makes the kind and each of its sub-resources namespaced. */
-const namespacedOf = (routes: readonly Route[], kind: KindPlural): boolean => routes.some((t) => t.plural === kind.plural && t.namespaced);
+const namespacedOf = (routes: readonly ApiRoute[], kind: KindPlural): boolean =>
+  routes.some((t) => t.plural === kind.plural && t.namespaced);
 
 /** The sub-resource the route at `i` of `routes` is the first of, where a kind has its plural; null for any other route. */
-const subResourceAt = (routes: readonly Route[], kinds: readonly KindPlural[], t: Route, i: number): Resource | null => {
+const subResourceAt = (routes: readonly ApiRoute[], kinds: readonly KindPlural[], t: ApiRoute, i: number): Resource | null => {
   const kind = kinds.find((k) => k.plural === t.plural);
   return kind === undefined || t.sub === null || routes.slice(0, i).some((u) => u.plural === t.plural && u.sub === t.sub)
     ? null

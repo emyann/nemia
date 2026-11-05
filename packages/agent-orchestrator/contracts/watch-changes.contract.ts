@@ -1,5 +1,5 @@
 /**
- * What a watch of a list says changed (agent-orchestrator, src/object/watch.ts, `watchChanges`): between the objects it has
+ * What a watch of a list says changed (agent-orchestrator, src/list-watch/list-watch.ts, `watchChanges`): between the objects it has
  * sent a watcher (`sent`) and those the list answers now (`now`), each object by its key (its namespace and its name) and its version (the
  * object as served, so a change of its status is a change though its `resourceVersion` stands). An object the list holds now and the
  * watcher was never sent is ADDED; one it was sent at another version is MODIFIED; one it was sent that the list no longer holds is
@@ -7,7 +7,7 @@
  * initial state Kubernetes calls synthetic "Added" events. Which object each key names, and the BOOKMARK between reads, are the door's.
  */
 import { type Implementation, spec } from '@emyann/tsverify';
-import type { Versioned, WatchChange, WatchChangeType } from '../src/object/watch.ts';
+import type { Versioned, WatchChange, WatchChangeType } from '../src/list-watch/list-watch.ts';
 
 /** Whether no key is in `objects` twice, as a list names each object once. */
 const distinct = (objects: readonly Versioned[]): boolean => objects.every((o, i) => !objects.slice(0, i).some((p) => p.key === o.key));
@@ -61,5 +61,5 @@ const watchChangesSpec = spec<(sent: readonly Versioned[], now: readonly Version
   },
 });
 
-/** `watchChanges`'s type, which `src/object/watch.ts` takes. */
+/** `watchChanges`'s type, which `src/list-watch/list-watch.ts` takes. */
 export type WatchChanges = Implementation<typeof watchChangesSpec>;

@@ -13,7 +13,7 @@ const endpoints = Object.values(Api.groups).flatMap((group) =>
 );
 
 test('every kind has one plural, and no plural is given twice', () => {
-  assert.deepEqual([...Object.keys(RESOURCE_PLURALS)].sort(), [...KINDS].sort());
+  assert.deepEqual(Object.keys(RESOURCE_PLURALS).sort(), [...KINDS].sort());
   const plurals = Object.values(RESOURCE_PLURALS);
   assert.equal(new Set(plurals).size, plurals.length);
 });

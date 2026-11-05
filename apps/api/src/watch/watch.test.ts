@@ -1,5 +1,5 @@
 /**
- * Every list watched (`?watch=true`, src/objects/watch.ts): the initial state as an ADDED per object then a BOOKMARK; a card filed,
+ * Every list watched (`?watch=true`, src/watch/watch.ts): the initial state as an ADDED per object then a BOOKMARK; a card filed,
  * relabelled, started and dropped arriving as ADDED, MODIFIED and DELETED, the DELETED carrying the last object sent; a labelSelector
  * kept on every read, a card relabelled out of it DELETED; every GET list of the `Api` watchable; the watch's query refused before any
  * stream; and the feed's reader let go when the request is aborted. The resync beat is shortened (`Beats.watch`), never waited out.
@@ -65,7 +65,6 @@ async function watch(t: Waiter, url: string) {
       }
     }
   })();
-  /** The events up to and including the first BOOKMARK: the initial state. */
   const initial = async () => {
     await waitFor(t, () => events.some((e) => e.type === 'BOOKMARK'), `the first BOOKMARK of ${url}`);
     return events.slice(

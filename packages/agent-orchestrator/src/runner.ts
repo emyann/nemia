@@ -330,7 +330,7 @@ export { branchStandings, resultBranches, type BranchReader } from './branches/b
 export { passStanding, standingLive, standingLiveOf, standingReader, standingSnapshot, standingWhen } from './standing/standing.verb.ts';
 export { changesOf, type BranchChanges, type Note } from './branches/changes.store.ts';
 export { evictedBy } from './rest/index.ts';
-export { removeAgent, writeAgent } from './agents/agents.store.ts';
+export { removeAgent, writeAgent, type AgentSchema, type AgentSidecar, type AgentWritten } from './agents/agents.store.ts';
 export { copySkill, givenSkills, skillDirIn, skillFolders, skillRead, skillText, writeSkill } from './skills/skills.store.ts';
 export { PlaceService, type Place } from './place/place.store.ts';
 export { builtin, builtinGitPlace, gitPlaceLayer } from './place/builtin.store.ts';
@@ -360,7 +360,6 @@ export { draftSteps, loadWorkflows, writeWorkflow } from './workflows/workflows.
 export { workflowStale, workflowTaken } from './folder/folder.ts';
 export { workflowVersion } from './folder/version.store.ts';
 export { foldersIn } from './folder/lookup.store.ts';
-export type { AgentSchema, AgentSidecar, AgentWritten } from './agents/agents.store.ts';
 export { agentPlaces, agentRead, agentSkillsFound, findAgent, listAgents, type Readings } from './roster/roster.store.ts';
 export { agentFileOf, factoriesFilling, stepsFilled } from './roster/fills.store.ts';
 export { inFactory } from './roster/roster.ts';
@@ -464,17 +463,8 @@ export { runLines, type RunLines, type StepCommands } from './object/lines.verb.
 export { cardList, cardObject, type CardQuery } from './object/card.verb.ts';
 export { runIn, runList, runNamespace, type RunQuery } from './run-list/run-list.verb.ts';
 export { continueToken, continuedAfter, listPage, pageOf, type PageAsked, type Paged } from './object/page.ts';
-export { watchChanges, type Versioned, type WatchChange, type WatchChanges, type WatchChangeType } from './object/watch.ts';
-export {
-  resourcesOf,
-  routeOf,
-  type KindPlural,
-  type Resource,
-  type ResourcesOf,
-  type ResourceVerb,
-  type Route,
-  type RouteMethod,
-} from './object/discovery.ts';
+export { watchChanges, type Versioned } from './list-watch/list-watch.ts';
+export { resourcesOf, routeOf, type ApiRoute } from './discovery/discovery.ts';
 export { factoryCommandsOf, factoryList, factoryObject, type ObjectQuery } from './factory-object/factory.verb.ts';
 export { builtinServerList, mcpServerList, mcpServerObject } from './factory-object/mcp-server.verb.ts';
 export { scheduleList, scheduleObject } from './factory-object/schedule.verb.ts';
@@ -485,7 +475,7 @@ export { subscriptionList, subscriptionObject } from './subscription-object/subs
 export { templateList, templateObject, templateTree, TemplateRenders, type TemplateTreeRendered } from './template-object/template.verb.ts';
 export { folderRefusal, START } from './start/commands.verb.ts';
 export { INBOX, INBOX_ADD, INBOX_QUEUE } from './inbox/commands.verb.ts';
-export { FACTORY_INSTRUCT, FACTORY_INSTRUCTION, factoryInstruction } from './factory/instruction.verb.ts';
+export { FACTORY_INSTRUCT, FACTORY_INSTRUCTION, factoryInstruction, type FactoryInstruction } from './factory/instruction.verb.ts';
 export { FACTORY_RULES, factoryRules, type FactoryRules } from './rules/rules.verb.ts';
 /** A factory's own MCP servers: the entry that lists its record with each server's state, and the name rule the board shares. */
 export { FACTORY_SERVERS } from './servers/servers.verb.ts';
@@ -495,7 +485,6 @@ export { BUILTIN_SERVERS, builtinServers } from './servers/servers.store.ts';
 /** A factory's server signed in to and out of from the board, through the engine; the builtin secret stays inside the package. */
 export { serverSignIn, serverSignInState, serverSignOut } from './servers/sign-in.verb.ts';
 export type { ServerSignInStarted, ServerSignInState } from './servers/sign-in.verb.ts';
-export type { FactoryInstruction } from './factory/instruction.verb.ts';
 export { AGENTS_CUSTOM } from './custom/custom.verb.ts';
 export { POLICY_PROPOSE } from './auto/auto.verb.ts';
 export type { Command, Ran } from './command/entry.verb.ts';

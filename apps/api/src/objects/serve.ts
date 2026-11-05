@@ -27,8 +27,8 @@
  * A write's body is read up to `OBJECT_BODY_LIMIT` (effect's `MaxBodySize`, which it otherwise leaves unset), and one over it is
  * answered 413 `{ error }` naming the limit.
  *
- * Every list is handed on through `listed`, which `watchable` wraps (watch.ts): a list's route that does not go through it is not
- * watched. `GET /api` is discovery (discovery.ts), every resource read off the `Api`.
+ * Every list is handed on through `listed`, which `watchable` wraps (src/watch/watch.ts): a list's route that does not go through it is not
+ * watched. `GET /api` is discovery (src/discovery/discovery.ts), every resource read off the `Api`.
  *
  * `GET /api/runs/:runId` with `?raw=` (not `false`) or `?view=` is passed on to the runs' own route (runs/runs.ts), which answers both.
  */
@@ -55,8 +55,8 @@ import { agentsHandlers, definitionsRoutes, skillsHandlers, workflowsHandlers } 
 import { placeFor } from '../factories/place.ts';
 import { ServedNow } from './refused.ts';
 import { runsHandlers } from './runs.ts';
-import { watchable } from './watch.ts';
-import { discoveryHandlers } from './discovery.ts';
+import { watchable } from '../watch/watch.ts';
+import { discoveryHandlers } from '../discovery/discovery.ts';
 import { eventsHandlers, subscriptionsHandlers } from '../feed-objects/index.ts';
 import { templatesHandlers } from '../template-objects/templates.ts';
 

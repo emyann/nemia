@@ -1,5 +1,5 @@
 /**
- * Discovery served (`GET /api`, src/objects/discovery.ts): an APIResourceList of nemia/v1 naming every kind once under its plural, with
+ * Discovery served (`GET /api`, src/discovery/discovery.ts): an APIResourceList of nemia/v1 naming every kind once under its plural, with
  * its scope and its verbs as its routes serve them, each sub-resource beside it, and no resource of a plural no kind has; and every
  * resource said to list answering a GET of its collection.
  */

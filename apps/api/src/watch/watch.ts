@@ -1,7 +1,7 @@
 /**
  * Every list watched (`?watch=true`): a list's route wrapped by `watchable` answers it as server-sent events, each an unnamed `message`
  * whose data is the JSON of `watchEventOf(WatchedObject)` (`objects`), the frame HttpApi's `StreamSse({ data })` writes, so a move of
- * the stream under HttpApi changes no client (docs/measure-2026-11-05-sse-under-httpapi.md). The stream stays Hono's (decision 27).
+ * the stream under HttpApi changes no client (watch-sse.test.ts holds the frames equal). The stream stays Hono's (decision 27).
  *
  * The list is read by the route itself, the URL with `watch` taken out, so a watch answers what the list answers, its selectors and its
  * namespace's refusal with it: a first read that is no 2xx is answered as it is, before any stream. Then each object is sent ADDED, then a
@@ -65,8 +65,8 @@ async function readOf(answer: Response, at: number): Promise<Read> {
   };
 }
 
-/** An event as its frame: the JSON of its Schema's encoding, an unnamed message with no id. */
-const frameOf = (event: typeof WatchEvent.Type) => ({ data: JSON.stringify(Schema.encodeSync(WatchEvent)(event)) });
+/** An event as its frame: the JSON of its Schema's encoding, an unnamed message with no id, as HttpApi's `StreamSse` writes it. */
+export const frameOf = (event: typeof WatchEvent.Type) => ({ data: JSON.stringify(Schema.encodeSync(WatchEvent)(event)) });
 
 /** The BOOKMARK of a list of `kind` read at feed byte `at`. */
 const bookmarkOf = (kind: string, at: number) =>

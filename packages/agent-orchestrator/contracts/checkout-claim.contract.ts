@@ -6,20 +6,23 @@
  *
  * A person's word files an ending at its gate, and a person's `nemia retry` a try of one. An ending with no gate is filed by its workflow
  * instead, with nobody's word, once the step before it passes (`quick`'s land, routed by its review): it works in that one checkout all
- * the same, so it claims it, ordered by the run's creation, the workflow's word, given when the run began.
+ * the same, so it claims it, ordered by the run's creation, the workflow's word, given when the run began. So does a try the run files
+ * itself of a filed ending, with nobody's word — the ask to sign off of a session that ended without its closeout (`signoffDue`), a
+ * check's `retries:` — once its try landed no commit: that try works in the same checkout, on the word the workflow gave at the start.
  */
 import { type Implementation, spec } from '@emyann/tsverify';
 
 /**
  * What of a run's ending its claim is judged from, read off the record and the run's asks. `asked`: when the person's word that would file
  * it was given (`endingAsked`: the approval of an ending not yet filed, or the ask for the next try of one that was), none where there is
- * none. `gated`: it waits at a gate (`hasGate`). `filed`: a try of it has been filed (its record has a task). `createdAt`: when the run
- * was created (`Run.createdAt`).
+ * none. `gated`: it waits at a gate (`hasGate`). `filed`: a try of it has been filed (its record has a task). `landed`: that try landed a
+ * commit on the base branch (its record's `landed` is a `commit`). `createdAt`: when the run was created (`Run.createdAt`).
  */
 export type EndingWord = {
   readonly asked: string | undefined;
   readonly gated: boolean;
   readonly filed: boolean;
+  readonly landed: boolean;
   readonly createdAt: string;
 };
 
@@ -27,8 +30,11 @@ export type EndingWord = {
 const unasked = (w: EndingWord): boolean => w.asked === undefined;
 
 const claimedAtSpec = spec<(w: EndingWord) => string | undefined>({
-  /** Each time is a moment the store wrote (`nemia approve`, `nemia retry`, the run's start), never empty. */
-  requires: ({ input: [w] }) => w.createdAt.length > 0 && (w.asked === undefined || w.asked.length > 0),
+  /**
+   * Each time is a moment the store wrote (`nemia approve`, `nemia retry`, the run's start), never empty; and only a try that was filed
+   * lands a commit.
+   */
+  requires: ({ input: [w] }) => w.createdAt.length > 0 && (w.asked === undefined || w.asked.length > 0) && (!w.landed || w.filed),
   ensures: {
     aPersonsWordOrdersTheClaim: {
       description: 'An ending a person asked for claims the checkout as of their word: the approval, or the ask for its next try',
@@ -43,9 +49,15 @@ const claimedAtSpec = spec<(w: EndingWord) => string | undefined>({
         'An ending with no gate, not yet filed, claims the checkout with nobody’s word, as of the run’s creation: its workflow files it once the step before it passes',
       condition: ({ input: [w], output }) => !(unasked(w) && !w.gated && !w.filed) || output === w.createdAt,
     },
+    theRunFilesATryOfAnEndingThatLandedNothing: {
+      description:
+        'A filed ending whose try landed no commit, nobody asked to try again, claims the checkout as of the run’s creation, gated or not: the run files its next try itself, on a sign-off ask or a check’s `retries:`',
+      condition: ({ input: [w], output }) => !(unasked(w) && w.filed && !w.landed) || output === w.createdAt,
+    },
     aTryWaitsOnItsAsk: {
-      description: 'A filed ending nobody asked to try again claims nothing: its next try is filed on a person’s `nemia retry`',
-      condition: ({ input: [w], output }) => !(unasked(w) && w.filed) || output === undefined,
+      description:
+        'A filed ending whose try landed a commit, nobody asked to try again, claims nothing: the run files no try of it, and its next try is filed on a person’s `nemia retry`',
+      condition: ({ input: [w], output }) => !(unasked(w) && w.filed && w.landed) || output === undefined,
     },
   },
 });

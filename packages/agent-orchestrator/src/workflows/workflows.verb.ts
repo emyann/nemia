@@ -2,8 +2,9 @@
  * The workflow folders as entries of the command table, each through the Workflow door (`WorkflowDoor`, run `rooted` at the store's root
  * its handler is given): a folder of yours written from its steps (`WORKFLOWS_WRITE`) and removed (`WORKFLOWS_REMOVE`), each checked
  * against the version it was read at, served on both sides — the command line reads a draft folder (`cli/writers.ts`), the builder sends
- * its steps; and the folders the board lists, each loaded (`WORKFLOWS_LIST`), and one step of a folder (`WORKFLOWS_STEP`), on the api
- * alone. The api resolves which folder a read names, and words the board's answer around what each entry answers.
+ * its steps; and one step of a folder (`WORKFLOWS_STEP`), on the api alone. The folders the board lists are loaded by the program the
+ * api runs itself (`foldersLoaded`), handed its factory whole. The api resolves which folder a read names, and words the board's answer
+ * around what each answers.
  */
 import path from 'node:path';
 import { Cause, Effect, Exit } from 'effect';
@@ -17,6 +18,7 @@ import { cliPath, factoryFlag, FROM, versionFlag, writerSpec, yoursOrRefused } f
 import { workflowNameRefusal } from '../factory/factory.ts';
 import { readFactories, readFactory, readFactoryAt, templatedTree, templatedTreeAt } from '../factory/factory.store.ts';
 import { factoryFills } from '../rules/rules.store.ts';
+import type { Factory } from '../factory/factory.ts';
 import { readInbox } from '../inbox/inbox.store.ts';
 import { inboxDir, runStore } from '../record/files.store.ts';
 import { HOME, isDirectory } from '../record/record.store.ts';
@@ -50,16 +52,10 @@ const placesOf = (args: Args, home: string | undefined): Places => ({
   ...(home !== undefined && { home }),
 });
 
-/**
- * What the loader fills the steps of a workflow with in the factory the arguments name, read once: its hires into them, by the
- * workflow's name, and its rules where they read (`factoryFills`), left out where they do not, since a listing refuses nothing a start
- * will; none with no factory.
- */
-function fillsIn(args: Args) {
+/** The factory the arguments name, read once from the store; none where they name none. */
+function factoryIn(args: Args): Factory | undefined {
   const name = textOf(args, 'factory');
-  if (name === undefined) return () => undefined;
-  const factory = readFactory(name);
-  return (workflow: string) => factoryFills(factory, workflow).fills;
+  return name === undefined ? undefined : readFactory(name);
 }
 
 /**
@@ -254,40 +250,28 @@ const unloaded = (err: unknown): string => (err instanceof Error ? err.message :
 /** A folder loaded (`steps`), or why it does not load (`error`, the loader's words). */
 export type FolderLoaded = { steps: Workflow[] } | { error: string };
 
-/** Each folder `dirs` names, loaded as a start on `repo` would load it, in the factory named with its hires (`FolderLoaded`), by folder. */
-export const WORKFLOWS_LIST: Command<Record<string, FolderLoaded>> = {
-  name: 'workflows',
-  usage: '[<dirs> ...]',
-  help: ['the workflow folders named, each loaded'],
-  spec: apiSpec([{ key: 'dirs', takes: 'many', kind: 'name' }], ['repo', 'factory']),
-  writes: false,
-  class: 'read',
-  only: {
-    side: 'api',
-    why: 'the board lists every folder with its steps and its graph; at the command line, nemia start names the one it runs',
-  },
-  handler: (args, _env, home) =>
-    rooted(
-      home,
-      'workflows',
-      Effect.gen(function* () {
-        const dirs = Array.isArray(args.dirs) ? args.dirs : [];
-        const fills = yield* tried(() => fillsIn(args));
-        const door = yield* WorkflowDoor;
-        const loads: Array<[string, FolderLoaded]> = [];
-        for (const dir of dirs) {
-          const read = Effect.flatMap(
-            tried(() => workflowDirAt(path.resolve(dir))),
-            (at) => door.workflows.read(at, placesOf(args, home), fills(path.basename(dir))),
-          );
-          const loaded = yield* Effect.exit(read);
-          loads.push([dir, Exit.isSuccess(loaded) ? { steps: loaded.value } : { error: unloaded(Cause.squash(loaded.cause)) }]);
-        }
-        return Object.fromEntries(loads);
-      }),
-    ),
-  print: () => [],
-};
+/**
+ * Each folder of `dirs`, loaded as a start in `places` would load it, in `factory` with its hires and its rules where one is given
+ * (`factoryFills`), by folder (`FolderLoaded`). The factory is given whole, not named, so one the store does not hold loads alike: a
+ * template's render, read as a factory applied from it is.
+ */
+export const foldersLoaded = Effect.fn('foldersLoaded')(function* (
+  dirs: readonly string[],
+  places: Places,
+  factory?: Pick<Factory, 'name' | 'hires' | 'tree'>,
+) {
+  const door = yield* WorkflowDoor;
+  const loads: Array<[string, FolderLoaded]> = [];
+  for (const dir of dirs) {
+    const read = Effect.flatMap(
+      tried(() => workflowDirAt(path.resolve(dir))),
+      (at) => door.workflows.read(at, places, factory && factoryFills(factory, path.basename(dir)).fills),
+    );
+    const loaded = yield* Effect.exit(read);
+    loads.push([dir, Exit.isSuccess(loaded) ? { steps: loaded.value } : { error: unloaded(Cause.squash(loaded.cause)) }]);
+  }
+  return Object.fromEntries(loads);
+});
 
 /**
  * One step of the folder `dir`, the workflow `name`, loaded as a start would load it, in the factory named with its hires: the step, or
@@ -319,7 +303,10 @@ export const WORKFLOWS_STEP: Command<{ step: Workflow | null; steps: string[] }>
       Effect.gen(function* () {
         const name = textOf(args, 'name') ?? '';
         const dir = yield* tried(() => workflowDirAt(path.resolve(textOf(args, 'dir') ?? '')));
-        const fills = yield* tried(() => fillsIn(args)(name));
+        const fills = yield* tried(() => {
+          const factory = factoryIn(args);
+          return factory && factoryFills(factory, name).fills;
+        });
         const door = yield* WorkflowDoor;
         const steps = yield* door.workflows.read(dir, placesOf(args, home), fills);
         return { step: steps.find((s) => s.name === textOf(args, 'step')) ?? null, steps: steps.map((s) => s.name) };
@@ -329,9 +316,4 @@ export const WORKFLOWS_STEP: Command<{ step: Workflow | null; steps: string[] }>
 };
 
 /** The board's workflow entries, in the order the table lists them. */
-export const WORKFLOW_ENTRIES: readonly Command[] = [
-  WORKFLOWS_WRITE,
-  WORKFLOWS_REMOVE,
-  WORKFLOWS_LIST,
-  WORKFLOWS_STEP,
-] as readonly Command[];
+export const WORKFLOW_ENTRIES: readonly Command[] = [WORKFLOWS_WRITE, WORKFLOWS_REMOVE, WORKFLOWS_STEP] as readonly Command[];

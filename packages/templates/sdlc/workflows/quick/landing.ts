@@ -2,7 +2,8 @@
  * `node landing.ts <verb>` — the two acts a landing is made of, which no agent may type: the merge of this run's own pull request on
  * GitHub, and the receipt that it happened. A Bash prefix rule cannot tell `gh pr merge 7` from `gh pr merge 9`, and `gh` is denied whole
  * to the agents that land, so the act is this script, read from the run's frozen workflow files (`$WF_WORKFLOW_FILES`) and run with `node`,
- * as `pull-request.ts` carries the push and the pull request. It imports nothing: a frozen clause copies one file. It is told the name of
+ * as `pull-request.ts` carries the push and the pull request. It imports nothing of its own folder, though it may: the run freezes the
+ * workflow's whole folder, so a script may import a sibling it holds, as `pull-request.ts` imports `ci-log.ts`. It is told the name of
  * the CI context it reads (`--check <name>`), since that name is the repository's, never the script's.
  *
  * - `merge --run <id> --subject <line> --body-file <f> --check <name>`, which the landing session types once its step has been filed — on a

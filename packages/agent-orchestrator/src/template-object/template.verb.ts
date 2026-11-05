@@ -6,18 +6,21 @@
  * every problem, a key left out of the spec among them. A template that does not read is listed all the same, its problems saying why.
  *
  * And a template's render (`templateTree`): rendered with its parameters' defaults (`renderedAt`, which writes nothing), then written
- * once per content digest under the folder of renders (`TemplateRenders`, `<tmpdir>/nemia-templates`), laid out as a factory's tree is,
- * so the api reads its workflows, agents and skills as it reads a factory's. A write outside the store on a read: staged beside its
- * place and renamed into it (`stageFolder`), and a folder already there reused untouched.
+ * once per content digest under the folder of renders (`TemplateRenders`, `<tmpdir>/nemia-templates-<uid>`), laid out as a factory's
+ * tree is, so the api reads its workflows, agents and skills as it reads a factory's. A write outside the store on a read: staged beside
+ * its place and renamed into it (`stageFolder`). The folder of renders is this user's own (`RenderOwner`), made `0700`; a folder in it
+ * that this user does not own is refused `Conflict`, never served, and a render already there is reused untouched only where its content
+ * digests as the render does, and staged again where it does not.
  */
+import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { Context, Effect, Result, Schema } from 'effect';
 import { API_VERSION, type Template, TemplateSpec, type TemplateStatus } from 'objects';
-import { stageFolder, treeWiringOf } from '../applied/applied.store.ts';
+import { digestOf, entriesIn, stageFolder, treeWiringOf, type Entry } from '../applied/applied.store.ts';
 import { renderedAt } from '../applied/applied.verb.ts';
 import { bornAt, objectsListed, versionOf, type ObjectQuery } from '../factory-object/factory.verb.ts';
-import { Invalid, Missing } from '../refusal/refusal.ts';
+import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
 import { checkedTree, packageSkillNames, problemLine } from '../template/template.store.ts';
 import { isMap } from '../template/index.ts';
 import { TemplateSource } from '../templates/templates.model.ts';
@@ -33,9 +36,61 @@ export type TemplateTreeRendered = {
   hires: Record<string, string>;
 };
 
-/** The folder templates are rendered under, one folder per content digest: `<tmpdir>/nemia-templates`, unless given another. */
+/** The user the folder of renders belongs to, by uid: this process's; none where the platform has no uid, and nothing is checked. */
+export const RenderOwner = Context.Reference<number | undefined>('agent-orchestrator/RenderOwner', {
+  defaultValue: () => process.getuid?.(),
+});
+
+/**
+ * The folder templates are rendered under, one folder per content digest: `<tmpdir>/nemia-templates-<uid>`, this user's own, unless given
+ * another. The temporary folder is the machine's, so the name says whose it is: one shared by every user would be another's to make first.
+ */
 export const TemplateRenders = Context.Reference<string>('agent-orchestrator/TemplateRenders', {
-  defaultValue: () => path.join(os.tmpdir(), 'nemia-templates'),
+  defaultValue: () => path.join(os.tmpdir(), `nemia-templates-${process.getuid?.() ?? os.userInfo().username}`),
+});
+
+/** Why `dir` is not this user's own (`uid`) — a link, no folder, or owned by another — or undefined where it is, or is not there. */
+function notOwned(dir: string, uid: number | undefined): string | undefined {
+  const stat = fs.lstatSync(dir, { throwIfNoEntry: false });
+  if (stat === undefined) return undefined;
+  if (!stat.isDirectory()) return `${dir} is no folder`;
+  if (uid !== undefined && stat.uid !== uid) return `${dir} is owned by uid ${stat.uid}, not by this user (uid ${uid})`;
+  return undefined;
+}
+
+/**
+ * `Conflict` saying why the folder of renders `root` is not this user's, and what works: this user cannot remove another's folder from
+ * the machine's temporary folder, which is sticky, so its owner or root removes it, or the api is started where `os.tmpdir()` is this
+ * user's own (`TMPDIR`).
+ */
+const rootRefusal = (why: string, root: string): Conflict =>
+  new Conflict({
+    message: `${why}, so no template is rendered or served from it: have its owner, or root, remove it (rm -rf ${root}) and ask again, or restart the api with TMPDIR set to a folder of this user's own, under which it renders.`,
+  });
+
+/** `Conflict` saying why `dir`, inside this user's own folder of renders, is not this user's, and that removing it lets it be staged. */
+const insideRefusal = (why: string, dir: string): Conflict =>
+  new Conflict({
+    message: `${why}, so it is not served: remove it (rm -rf ${dir}), and the next ask stages the render again.`,
+  });
+
+/**
+ * The template render of `entries` at `dir`, under the folder of renders `root`: `root` made this user's own, `0700`; `dir` staged where
+ * it is not there, reused where it is this user's and its content digests as `entries` do, and staged again where it is this user's and
+ * does not. `Conflict` where `root` or a folder on the way to `dir` is not this user's: nothing of it is served.
+ */
+const renderStaged = Effect.fn('renderStaged')(function* (root: string, dir: string, entries: readonly Entry[]) {
+  const uid = yield* RenderOwner;
+  fs.mkdirSync(root, { recursive: true, mode: 0o700 });
+  const rootWhy = notOwned(root, uid);
+  if (rootWhy !== undefined) return yield* Effect.fail(rootRefusal(rootWhy, root));
+  if ((fs.statSync(root).mode & 0o077) !== 0) fs.chmodSync(root, 0o700);
+  for (const on of [path.dirname(dir), dir]) {
+    const why = notOwned(on, uid);
+    if (why !== undefined) return yield* Effect.fail(insideRefusal(why, on));
+  }
+  if (fs.existsSync(dir) && digestOf(entriesIn(dir)) !== digestOf(entries)) fs.rmSync(dir, { recursive: true, force: true });
+  stageFolder(dir, entries, false);
 });
 
 /** The names of a template's documents among its `files`: each workflow, agent and skill whose document is there, each sorted. */
@@ -136,8 +191,9 @@ export const templateObject = Effect.fn('templateObject')(function* (name: strin
 /**
  * The builtin template `name` rendered with its parameters' defaults, written once into `<TemplateRenders>/<digest>/<name>` as a
  * factory's tree is laid out (`workflows/<workflow>/`, `workflows/agents/`, `workflows/skills/`, `factory.json`, `NEMIA.md`, `RULES.md`),
- * reused untouched where it is there; its workflows and hires. `Missing` where no builtin template has that name, `Invalid` where it does
- * not render, its problems named.
+ * reused untouched where it is there as this user's with the render's content (`renderStaged`); its workflows and hires. `Missing` where
+ * no builtin template has that name, `Invalid` where it does not render, its problems named, `Conflict` where the folder of renders, or
+ * one in it on the way, is not this user's.
  */
 export const templateTree = Effect.fn('templateTree')(function* (name: string) {
   const place = yield* builtinNamed(name);
@@ -152,8 +208,9 @@ export const templateTree = Effect.fn('templateTree')(function* (name: string) {
       }),
     );
   }
-  const dir = path.join(yield* TemplateRenders, tree.digest, name);
-  stageFolder(dir, read.entries, false);
+  const root = yield* TemplateRenders;
+  const dir = path.join(root, tree.digest, name);
+  yield* renderStaged(root, dir, read.entries);
   return {
     name,
     source: place,

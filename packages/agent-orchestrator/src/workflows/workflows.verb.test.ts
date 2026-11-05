@@ -1,5 +1,5 @@
 /**
- * The board's workflow entries (`WORKFLOWS_WRITE`, `WORKFLOWS_REMOVE`, `WORKFLOWS_LIST`, `WORKFLOWS_STEP`), served on the api alone: a
+ * The board's workflow entries (`WORKFLOWS_WRITE`, `WORKFLOWS_REMOVE`, `WORKFLOWS_STEP`), and the folders it lists (`foldersLoaded`): a
  * folder written from its steps, or refused in the writer's words whole; a folder of yours removed whole, or refused with nothing removed
  * while it is not yours or something still needs it; each folder listed loaded, or with the loader's refusal, never failing the others;
  * and one step of a folder, or none, with the names of those it has. `WF_ROOT` is set before the import, since the store reads it as it
@@ -17,7 +17,7 @@ import { eachTest, runOver } from '../../test/placed.ts';
 
 const ROOT = scratch('wf-workflows-root-');
 process.env.WF_ROOT = ROOT;
-const { WORKFLOWS_LIST, WORKFLOWS_REMOVE, WORKFLOWS_STEP, WORKFLOWS_WRITE } = await import('./workflows.verb.ts');
+const { foldersLoaded, WORKFLOWS_REMOVE, WORKFLOWS_STEP, WORKFLOWS_WRITE } = await import('./workflows.verb.ts');
 const { runWith: runEngine } = await import('../runner.ts');
 const { engineOf } = await import('../runtime-client.ts');
 const stand = eachTest(testPlace);
@@ -40,6 +40,9 @@ const { skillDoorMemory } = await import('../skills/skill-memory.store.ts');
 const { doorFrom } = await import('../../test/door-walks.ts');
 
 const e = () => engineOf(engine().layer);
+
+/** The folders `dirs`, each loaded in no factory at the test's store, as the api loads the board's list. */
+const listedOf = (dirs: readonly string[]) => Effect.provideService(foldersLoaded(dirs, { home: ROOT }), StoreRoot, ROOT);
 
 /**
  * One Workflow door's memory stand-in, given to each program the test runs: the folders it writes, the next reads; its agents and skills
@@ -71,7 +74,7 @@ test('a folder written from its steps through the entry is the folder its list a
   const done = await runWith(e(), onMemory(WORKFLOWS_WRITE.handler({ from: 'yours', name: 'written', draft }, undefined, ROOT)));
   assert.deepEqual(done.written, ['build.md', 'plan.md']);
   assert.equal(fs.existsSync(dir), false, 'written to the memory layer, not the disk');
-  const listed = await runWith(e(), onMemory(WORKFLOWS_LIST.handler({ dirs: [dir] }, undefined, ROOT)));
+  const listed = await runWith(e(), onMemory(listedOf([dir])));
   const loaded = listed[dir];
   assert.ok(loaded && 'steps' in loaded, JSON.stringify(loaded));
   assert.deepEqual(
@@ -104,7 +107,7 @@ test('a step the folder does not have is none, with the names of those it has', 
 test("REFUSED: a folder that does not load is listed with the loader's words whole, and the folder beside it still loads", async () => {
   const good = folder('good', { 'only.md': '---\nplace: git\n---\nDo it.\n' });
   const bad = folder('bad', { 'only.md': '---\nafter: nowhere\nplace: git\n---\nDo it.\n' });
-  const listed = await runWith(e(), WORKFLOWS_LIST.handler({ dirs: [bad, good] }, undefined, ROOT));
+  const listed = await runWith(e(), listedOf([bad, good]));
   assert.deepEqual(listed[bad], { error: 'only: waits on "nowhere", which is not a step here' });
   assert.deepEqual(Object.keys(listed), [bad, good]);
   assert.ok(listed[good] && 'steps' in listed[good]);

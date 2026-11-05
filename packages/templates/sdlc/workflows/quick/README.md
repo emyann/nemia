@@ -40,7 +40,8 @@ On GitHub, the check is the cheap set, and CI: it runs `change.ts size`, `probe.
 `implementCheck` parameter, `pull-request.ts push` and `pull-request.ts wait --check <name>`, in that order, and nothing else.
 Each script is read from the run's frozen workflow files (`node "$WF_WORKFLOW_FILES/<script>.ts"`, the copy of this folder the run
 took when it began), never from the tree it judges; where `WF_WORKFLOW_FILES` is not set, the check says so on stderr and fails. The
-run copies this folder alone, so it carries `build`'s `probe.ts`, `parts.ts`, `pull-request.ts` and `landing.ts` as copies of its own, equal to
+run copies this folder alone, so it carries `build`'s `probe.ts`, `parts.ts`, `pull-request.ts`, `ci-log.ts` (which `pull-request.ts` imports) and `landing.ts`
+as copies of its own, equal to
 `build`'s byte for byte: an edit to one is made to both.
 
 1. `change.ts size`, first: the net change from the base the branch holds to `HEAD` (`git diff --numstat -M`, so a line added then

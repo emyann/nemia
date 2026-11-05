@@ -14,6 +14,7 @@ import { staged } from '../../test/story.ts';
 import { eachTest } from '../../test/placed.ts';
 import { TEAM } from '../../test/team.ts';
 import type { Run } from '../record/record.ts';
+import type { WordedRule } from './auto.verb.ts';
 
 const ROOT = scratch('wf-policy-reach-');
 process.env.WF_ROOT = ROOT;
@@ -60,7 +61,7 @@ test('`nemia policy reach`: which steps at their gate her rules can approve in a
   for (const workflow of ['dev', 'plain']) attachWorkflowAt(ROOT, { factory: 'f', workflow });
   writeFactoryLevel('f', { level: 'auto', since: '2026-11-05T00:00:00.000Z' });
 
-  let suggested: { id: string; words: string }[] = [];
+  let suggested: WordedRule[] = [];
   await t.test('nothing confirmed: the default reaches neither step, each said why, and a rule suggested for each', async () => {
     const read = await reach({ factory: 'f' });
     assert.equal(read.level, 'auto');
@@ -77,7 +78,10 @@ test('`nemia policy reach`: which steps at their gate her rules can approve in a
     );
     assert.deepEqual(read.suggested.map((s) => s.id).sort(), ['approve-draft', 'approve-ship']);
     for (const s of read.suggested) assert.equal(s.words, ruleWords(s), 'its words are the words a confirm checks');
-    assert.ok(POLICY_REACH.print(read, {}).some((l) => l.includes('approve-ship')), 'the suggestions are printed');
+    assert.ok(
+      POLICY_REACH.print(read, {}).some((l) => l.includes('approve-ship')),
+      'the suggestions are printed',
+    );
     suggested = read.suggested;
   });
 

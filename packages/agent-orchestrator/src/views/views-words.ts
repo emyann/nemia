@@ -5,8 +5,9 @@
  */
 import { type TaskPhase } from '../record/record.ts';
 import { signedAndHeld, type AttemptClock, type AttemptReason, type EngineOutcome, type TaskClock } from '../timeline/index.ts';
+import type { AttemptMemory, KilledAtLimit } from '../../contracts/out-of-memory.contract.ts';
 
-export type { AttemptReason, EngineOutcome };
+export type { AttemptMemory, AttemptReason, EngineOutcome, KilledAtLimit };
 
 /**
  * How an attempt ended, in the words a person reads for it (`endWords`): the runtime's reason (`AttemptReason`), or the orchestrator's
@@ -46,6 +47,8 @@ export type WordAttempt = AttemptClock & {
   closedOut?: boolean;
   former?: 'unsigned';
   closeout?: unknown;
+  /** What its cgroup said of its memory, for an attempt run under a memory limit (`AttemptMemory`). */
+  memory?: AttemptMemory;
 };
 
 /**
@@ -157,3 +160,24 @@ export const parkedOf = (v: WordView | undefined): { after?: string; cut?: strin
   if (!last?.parked) return undefined;
   return last.parked.calling ? { cut: last.parked.calling.tool } : {};
 };
+
+/**
+ * The attempts of a task's current turn: every attempt of a task not held open, and of one held open those since the last answer a
+ * person gave it (`answer`). What says how the step's session stands now — its closeout, whether it signed, what it was denied, whether
+ * it was killed at its memory limit — since an answered task keeps the attempts of the turns before it, and the turn it answered signed
+ * `blocked`.
+ */
+export const currentTurn = <A extends { turn?: number }>(state: { attempts: readonly A[]; inputs?: readonly unknown[] }): A[] =>
+  state.attempts.filter((a) => (a.turn ?? 0) === (state.inputs?.length ?? 0));
+
+/**
+ * The memory record of the last attempt of a task's current turn (`currentTurn`) in which the kernel killed a process at its limit
+ * (`oomKills` of 1 or more); undefined where none was, or the attempts carry no record — a former journal, or a task under no limit. Read
+ * off the view on every pass, never off a transition.
+ */
+export const killedMemoryOf = (v: WordView | undefined): AttemptMemory | undefined =>
+  v
+    ? currentTurn(v.state)
+        .reverse()
+        .find((a) => (a.memory?.oomKills ?? 0) >= 1)?.memory
+    : undefined;

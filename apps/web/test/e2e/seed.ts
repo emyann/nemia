@@ -591,6 +591,11 @@ export const DIAMOND = {
    * version.
    */
   ranOn: { tag: 'v1.2.0', harnessVersion: '2.1.316' },
+  /**
+   * What `landed`'s implement session recorded of its memory as it ended: the kernel killed one process at its 4Gi limit. Its step
+   * names no `memory:`, so its note names `WF_MEMORY_LIMIT`.
+   */
+  memory: { limitBytes: 4294967296, peakBytes: 4294967296, oomKills: 1 },
 } as const;
 
 /**
@@ -1071,7 +1076,7 @@ export function seedDiamond(repo: string, root: string, now = Date.now()): void 
     cwd: repo,
     maxAttempts: 1,
   });
-  const signedOff = (run: (typeof DIAMOND_RUNS)[number], began: number, ended: number) =>
+  const signedOff = (run: (typeof DIAMOND_RUNS)[number], began: number, ended: number, memory?: typeof DIAMOND.memory) =>
     write(
       path.join(root, 'engine', 'tasks', `${task(run)}.jsonl`),
       lines([
@@ -1086,6 +1091,7 @@ export function seedDiamond(repo: string, root: string, now = Date.now()): void 
           observed: 'done',
           reason: 'harness',
           closeout: { outcome: 'done', summary: `Did ${run.title}.`, needs: null, artifacts: [] },
+          ...(memory ? { memory } : {}),
         },
         { kind: 'settled', at: ago(ended), outcome: 'succeeded' },
       ]),
@@ -1096,7 +1102,7 @@ export function seedDiamond(repo: string, root: string, now = Date.now()): void 
   signedOff(top, 2.6, 2.5);
   record(top, 2.6, { taskId: task(top), workspace: repo, branch: branchOf(top.id) });
   work(landed.id, true);
-  signedOff(landed, 2.4, 2.3);
+  signedOff(landed, 2.4, 2.3, DIAMOND.memory);
   record(landed, 2.4, { taskId: task(landed), workspace: repo, branch: branchOf(landed.id) });
   work(running.id, false);
   write(

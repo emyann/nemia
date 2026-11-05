@@ -119,9 +119,13 @@ function modulesLoaded(entry: string, more: readonly string[] = []): string[] {
  *
  * `agent-orchestrator/workflow` is one more for `definition/served.ts`, the deciders of which origin serves a definition, of a namespace's
  * list and of whether a write of one is taken, which imports nothing but its contracts' types.
+ *
+ * `agent-orchestrator/run` is one more for `out-of-memory/out-of-memory.ts`, the judgement and the words of a session or a check killed
+ * at its memory limit, which `list/list.ts` appends to a step's note: pure, importing nothing but its contract's types, and a leaf of its
+ * own so that the listing does not load `views/views-words.ts` and the timeline behind it.
  */
 const PINNED_MODULES: Record<string, { all: number; effect: number }> = {
-  'agent-orchestrator/run': { all: 191, effect: 15 },
+  'agent-orchestrator/run': { all: 192, effect: 15 },
   'agent-orchestrator/workflow': { all: 141, effect: 15 },
 };
 

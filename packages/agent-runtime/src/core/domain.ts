@@ -187,10 +187,10 @@ export type Sighting = {
    */
   parked?: Parked;
   /**
-   * The questions and permissions the session is waiting on a person for, each held open where its task may ask one (`config.mayAsk`), for a harness
-   * that holds such a call (Claude Code attached on the Agent SDK). `[]` from such a harness while none waits, and absent from one
-   * that cannot say. **Carried, never judged**: `decide` does not read it; a layer above draws each question and answers it
-   * (`RunnerOps.answer`).
+   * The questions and permissions the session is waiting on a person for, each held open where its task may ask one
+   * (`config.mayAsk`), for a harness that holds such a call (Claude Code attached on the Agent SDK). `[]` from such a harness while
+   * none waits, and absent from one that cannot say. **Carried, never judged**: `decide` does not read it; a layer above draws each
+   * question and answers it (`RunnerOps.answer`).
    */
   asks?: SessionAsk[];
   /**

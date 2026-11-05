@@ -1,7 +1,8 @@
 /**
  * What the contracts (`contracts/`) assume of code the verifier does not read holds of the real code: the lifecycle's table, every
  * state against every kind of event, keeps each law `decide.contract.ts` declares of it, and the restart's wait keeps within its cap
- * however many ends come in a row, as `decide.contract.ts` and `observe.contract.ts` declare. `npm run contracts` proves each contract
+ * however many ends come in a row, as `decide.contract.ts` and `observe.contract.ts` declare, and a permission's command is a Bash
+ * call's alone, as `permission.contract.ts` declares. `npm run contracts` proves each contract
  * given these; this file is what makes them more than a claim.
  */
 import { test } from 'node:test';
@@ -10,6 +11,8 @@ import { brokenOn } from '@emyann/tsverify';
 import { deadlineOf } from '../src/core/deadline.ts';
 import { backoff, edges } from '../contracts/decide.contract.ts';
 import { deadline, backoff as observedBackoff } from '../contracts/observe.contract.ts';
+import { shellCommand } from '../contracts/permission.contract.ts';
+import { commandOf } from '../src/harness/claude/permission.ts';
 import { fold, type Attempt, type Event, type Sighting } from '../src/core/domain.ts';
 import { type LifecycleEvent, STATES } from '../src/core/lifecycle.ts';
 
@@ -149,4 +152,12 @@ test('a deadline is past only where one was set and its turn has started, in who
     runs.some(([s, n]) => deadlineOf(s, n).overdue),
     'some of the runs are past their deadline',
   );
+});
+
+test("a permission's command is a shell call's alone, read off its input as typed", () => {
+  const inputs: Record<string, unknown>[] = [{}, { command: 'ls -la' }, { command: 3 }, { command: '' }, { file_path: '/etc/hosts' }];
+  const runs = ['Bash', 'Read', 'Write', 'mcp__x__y'].flatMap((tool) => inputs.map((input) => [tool, input] as const));
+  assert.deepEqual(brokenOn(shellCommand, runs as never), []);
+  assert.equal(commandOf('Bash', { command: 'ls -la' }), 'ls -la', 'the command as typed');
+  assert.equal(commandOf('Bash', { command: 3 }), undefined, 'and nothing where the input holds no command string');
 });

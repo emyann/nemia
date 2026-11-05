@@ -7,63 +7,36 @@
  * `blockedPath`, `sdk.d.ts` of `@anthropic-ai/claude-agent-sdk` 0.3.316), with a shell call's command as typed; never words rebuilt
  * from the call's input. Three answers: allow once, always allow (the SDK's `suggestions` returned as `updatedPermissions`, as its
  * comment on `suggestions` says), and deny, with the person's own words as the message the session reads where they wrote some.
- *
- * The types and the three labels are declared here until implement moves them into `src` (`permission.ts`), which changes no law.
  */
-import { type Implementation, spec } from '@emyann/tsverify';
+import { assume, type Implementation, spec } from '@emyann/tsverify';
 import type { PermissionUpdate } from '@anthropic-ai/claude-agent-sdk';
-import type { AskQuestion } from '../src/core/index.ts';
-import { ASK_CUT } from '../src/harness/claude/attached-session.ts';
-
-/** The choice that runs the call this once. */
-export const PERMISSION_ONCE = 'Allow once';
-/** The choice that runs the call and saves the rules the SDK suggested, so a call like it is not asked again. */
-export const PERMISSION_ALWAYS = 'Always allow';
-/** The choice that refuses the call. */
-export const PERMISSION_DENY = 'Deny';
-
-/** What a call the person denied with no words of their own is told. */
-export const PERMISSION_DENIED =
-  'The person denied this call where it was shown to them. Do not run it again unasked: say in your answer what you were denied, and ask them if you need it.';
-
-/** What the SDK hands `canUseTool` about a prompt, as the ask reads it: its words, its two hints, and the rules it suggests saving. */
-export type PermissionOffer = {
-  title?: string;
-  displayName?: string;
-  description?: string;
-  decisionReason?: string;
-  blockedPath?: string;
-  defaultToNo?: boolean;
-  suppressAlwaysAllowRule?: boolean;
-  suggestions?: PermissionUpdate[];
-};
+import {
+  ASK_CUT,
+  commandOf,
+  PERMISSION_ALWAYS,
+  PERMISSION_DENIED,
+  PERMISSION_DENY,
+  PERMISSION_ONCE,
+  type PermissionAnswer,
+  type PermissionAsk,
+  type PermissionHeld,
+  type PermissionOffer,
+} from '../src/harness/claude/permission.ts';
 
 /**
- * What a permission ask carries beside its one question, for whoever draws it: the tool, a shell call's command as typed, the SDK's
- * words as it gave them, whether always is offered, and whether deny is the default.
+ * The command a shell call was typed with, read off its input. The verifier models no `===` of a value typed `unknown`, which a call's
+ * input holds, so it takes this reading on trust: pure, and nothing for a call of a tool other than Bash. That it is the input's own
+ * `command` is held by `test/assumptions.test.ts` on the real function, and by `test/attached-asks.boundary.test.ts` on the ask.
  */
-export type PermissionFacts = {
-  tool: string;
-  command?: string;
-  title?: string;
-  displayName?: string;
-  description?: string;
-  decisionReason?: string;
-  blockedPath?: string;
-  always: boolean;
-  defaultToNo: boolean;
-};
-
-/** A permission held for a person, as the session's asks carry it: one question, its choices the three answers. */
-export type PermissionAsk = { id: string; at: string; kind: 'permission'; questions: AskQuestion[]; permission: PermissionFacts };
-
-/** What the held call keeps while it waits: the call's input, whether always was offered, and the SDK's suggestions. */
-export type PermissionHeld = { input: Record<string, unknown>; always: boolean; suggestions: PermissionUpdate[] };
-
-/** What the held call returns to the SDK: a `PermissionResult`'s two members, as this flow gives them. */
-export type PermissionAnswer =
-  | { behavior: 'allow'; updatedInput: Record<string, unknown>; updatedPermissions?: PermissionUpdate[] }
-  | { behavior: 'deny'; message: string };
+export const shellCommand = assume(commandOf, {
+  pure: true,
+  ensures: {
+    onlyAShellCallHasOne: {
+      description: 'Only a call of Bash has a command',
+      condition: ({ input: [tool], output }) => output === undefined || tool === 'Bash',
+    },
+  },
+});
 
 /** Whether `s` is a word with something in it. */
 const said = (s: string | undefined): s is string => s !== undefined && s !== '';
@@ -71,6 +44,17 @@ const said = (s: string | undefined): s is string => s !== undefined && s !== ''
 /** Whether the SDK's offer lets a person save a rule: not suppressed, and a rule suggested. */
 const alwaysAllowed = (offer: PermissionOffer): boolean =>
   offer.suppressAlwaysAllowRule !== true && offer.suggestions !== undefined && offer.suggestions.length > 0;
+
+/**
+ * Whether `given` returns the SDK's `suggested` updates, one for one in their order, each of its kind and for its destination. The
+ * verifier models no identity of an object (`===` of two records or two arrays is refused as not modeled), so this says what of the
+ * suggestions it can read; that the updates and the call's input are returned as the SDK gave them is held by
+ * `test/attached-asks.boundary.test.ts`, which compares them whole on what the stand-in receives.
+ */
+const sameRules = (given: PermissionUpdate[] | undefined, suggested: PermissionUpdate[]): boolean =>
+  given !== undefined &&
+  given.length === suggested.length &&
+  given.every((u, i) => u.type === suggested.at(i)?.type && u.destination === suggested.at(i)?.destination);
 
 /** Whether the ask's one question offers the choice `label`. */
 const offers = (ask: PermissionAsk, label: string): boolean =>
@@ -127,12 +111,8 @@ const permissionAskSpec = spec<
     },
     aShellCallShowsItsCommandAsTyped: {
       description: 'A shell call carries its command as typed, and no other call carries one',
-      condition: ({ input: [, , tool, input], output }) => {
-        const command = input['command'];
-        return tool === 'Bash' && typeof command === 'string'
-          ? output.permission.command === command
-          : output.permission.command === undefined;
-      },
+      condition: ({ input: [, , tool, input], output }) =>
+        output.permission.command === commandOf(tool, input) && (tool === 'Bash' || output.permission.command === undefined),
     },
   },
 });
@@ -143,29 +123,24 @@ const permissionAnsweredSpec = spec<(held: PermissionHeld, given: string | undef
   ensures: {
     noAnswerIsACutCall: {
       description: 'A call no answer reached is denied with what every cut ask is told',
-      condition: ({ input: [, given], output }) =>
-        given === undefined ? output.behavior === 'deny' && output.message === ASK_CUT : true,
+      condition: ({ input: [, given], output }) => (given === undefined ? output.behavior === 'deny' && output.message === ASK_CUT : true),
     },
     onceRunsTheCallAsAsked: {
-      description: 'Allow once runs the call with its own input, and saves no rule',
-      condition: ({ input: [held, given], output }) =>
-        given === PERMISSION_ONCE
-          ? output.behavior === 'allow' && output.updatedInput === held.input && output.updatedPermissions === undefined
-          : true,
+      description: 'Allow once runs the call, and saves no rule',
+      condition: ({ input: [, given], output }) =>
+        given === PERMISSION_ONCE ? output.behavior === 'allow' && output.updatedPermissions === undefined : true,
     },
     alwaysSavesWhatTheSdkSuggested: {
       description: 'Always allow, where it was offered, runs the call and returns the SDK’s suggestions to be saved',
       condition: ({ input: [held, given], output }) =>
         given === PERMISSION_ALWAYS && held.always
-          ? output.behavior === 'allow' && output.updatedInput === held.input && output.updatedPermissions === held.suggestions
+          ? output.behavior === 'allow' && sameRules(output.updatedPermissions, held.suggestions)
           : true,
     },
     alwaysNotOfferedSavesNothing: {
       description: 'Always allow where it was not offered runs the call once, and saves no rule',
       condition: ({ input: [held, given], output }) =>
-        given === PERMISSION_ALWAYS && !held.always
-          ? output.behavior === 'allow' && output.updatedInput === held.input && output.updatedPermissions === undefined
-          : true,
+        given === PERMISSION_ALWAYS && !held.always ? output.behavior === 'allow' && output.updatedPermissions === undefined : true,
     },
     onlyTheTwoAllowsAllow: {
       description: 'A call runs only where the person chose allow once or always allow',

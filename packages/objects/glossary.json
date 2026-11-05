@@ -204,6 +204,28 @@
       "term": "BadRequest",
       "meaning": "a 400 a run's action answers for a request the api read and refused before the package was asked: a body that is no JSON, a name no run can have (`BadRequest`, `packages/objects/src/api.ts`).",
       "type": "BadRequest"
+    },
+    {
+      "term": "Watch event",
+      "meaning": "what a watch of a list (`?watch=true`) sends, one per server-sent message: an object `ADDED`, `MODIFIED` or `DELETED`, or a `BOOKMARK` (`WATCH_EVENT_TYPES`, `watchEventOf`, `packages/objects/src/watch.ts`). A watch keeps nothing between connections: a reconnect is sent every object `ADDED` again, so a reader takes `ADDED` as an upsert.",
+      "type": "WatchEventType"
+    },
+    {
+      "term": "Bookmark",
+      "meaning": "a watch event whose object is the list's kind carrying a `resourceVersion` alone, saying every change up to it was sent; the first ends the initial state (`BookmarkObject`, `packages/objects/src/watch.ts`)."
+    },
+    {
+      "term": "Discovery",
+      "meaning": "`GET /api`: every resource the api serves of nemia/v1, each a kind under its plural or a sub-resource of one (a run's hold), its scope and its verbs, read off the `Api` itself (`APIResourceList`, `DiscoveryGroup`, `packages/objects/src/discovery.ts`)."
+    },
+    {
+      "term": "Resource verb",
+      "meaning": "what a resource can be asked, in Kubernetes' words: `get`, `list`, `watch`, `create`, `update`, `patch`, `delete` (`RESOURCE_VERBS`, `packages/objects/src/words.ts`).",
+      "type": "ResourceVerb"
+    },
+    {
+      "term": "Plural",
+      "meaning": "the word a kind's paths name its collection by, `/api/<plural>` and `/api/namespaces/<namespace>/<plural>` (`RESOURCE_PLURALS`, `packages/objects/src/api.ts`)."
     }
   ]
 }

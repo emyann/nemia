@@ -21,7 +21,8 @@
  *
  * Cluster-scoped, beside the factories: group `templates`, the templates Nemia builds in, and each one's documents as the definitions'
  * Schemas; group `subscriptions`, the feed's subscriptions, read alone here. Group `events`, the feed's lines, each in the namespace of
- * the factory it names, a daemon's and the store's that name none in no namespace.
+ * the factory it names, a daemon's and the store's that name none in no namespace. Group `discovery`, `GET /api`: every resource the
+ * groups above serve, its scope and verbs.
  */
 import { Schema } from 'effect';
 import { HttpApi, HttpApiEndpoint, HttpApiGroup } from 'effect/http-api';
@@ -49,26 +50,29 @@ import { BadRequest, Conflict, Failed, Invalid, listQuery, Missing, Unjudged, Wr
 import { RunsGroup } from './run-api.ts';
 import { Subscription, SubscriptionList } from './subscription.ts';
 import { Event, EventList } from './event.ts';
+import { KINDS, type Kind } from './words.ts';
+import { APIResourceList } from './discovery.ts';
 
 export { BadRequest, Conflict, Failed, Invalid, Missing, Unjudged, WriteFailed, RunsGroup };
 
-/** The kinds the api serves as objects, each with its object Schema, its `<Kind>List` and its get endpoint here. */
-export const KINDS = [
-  'Run',
-  'Card',
-  'Factory',
-  'McpServer',
-  'Schedule',
-  'Hire',
-  'Volume',
-  'Workflow',
-  'Agent',
-  'Skill',
-  'Template',
-  'Subscription',
-  'Event',
-] as const;
-export type Kind = (typeof KINDS)[number];
+export { KINDS, type Kind };
+
+/** The plural each kind is served by, its paths' collection: `/api/<plural>` and `/api/namespaces/<namespace>/<plural>`. */
+export const RESOURCE_PLURALS: { readonly [K in Kind]: string } = {
+  Run: 'runs',
+  Card: 'cards',
+  Factory: 'factories',
+  McpServer: 'mcpservers',
+  Schedule: 'schedules',
+  Hire: 'hires',
+  Volume: 'volumes',
+  Workflow: 'workflows',
+  Agent: 'agents',
+  Skill: 'skills',
+  Template: 'templates',
+  Subscription: 'subscriptions',
+  Event: 'events',
+};
 
 /** The Card and a page of them, named so that the document holds each as a component, as it holds the Run. */
 const CardObject = Card.annotate({ identifier: 'Card' });
@@ -535,6 +539,11 @@ export class EventsGroup extends HttpApiGroup.make('events').add(
 ) {}
 
 /** Everything the api serves as objects. */
+/** The api's discovery: every resource it serves, read off this definition (Kubernetes' `/api`, for Nemia's one group version). */
+export class DiscoveryGroup extends HttpApiGroup.make('discovery').add(
+  HttpApiEndpoint.get('resources', '/api', { success: APIResourceList.annotate({ identifier: 'APIResourceList' }) }),
+) {}
+
 export const Api = HttpApi.make('nemia')
   .add(RunsGroup)
   .add(CardsGroup)
@@ -549,4 +558,5 @@ export const Api = HttpApi.make('nemia')
   .add(SkillsGroup)
   .add(TemplatesGroup)
   .add(SubscriptionsGroup)
-  .add(EventsGroup);
+  .add(EventsGroup)
+  .add(DiscoveryGroup);

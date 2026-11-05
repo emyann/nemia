@@ -45,10 +45,13 @@ const LabelQuery = Schema.optionalKey(Schema.Union([Schema.String, Schema.Array(
 /**
  * The query of a list: `limit` (a whole number from 1), `continue` (the token the page before answered), `labelSelector`, and `selector`,
  * its retired spelling, read the same. Each kept as the text it was sent as, so a wrong one is refused in the package's words, a 422.
+ * And `watch`: `watch=true` asks for the list as a stream of watch events (`watchEventOf`), which the api answers before this
+ * definition is reached, so a list's answer here is always a page.
  */
 export const listQuery = {
   limit: Schema.optionalKey(Schema.String),
   continue: Schema.optionalKey(Schema.String),
   labelSelector: LabelQuery,
   selector: LabelQuery,
+  watch: Schema.optionalKey(Schema.String),
 };

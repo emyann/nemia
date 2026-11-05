@@ -576,6 +576,7 @@ async function visit(page: Page): Promise<void> {
         'and the card of that name keeps the page, which is the one the api reads',
       );
 
+      await photograph(strays, path.join(OUT, `inbox-strays-list-${await themeOf(strays)}.png`), { fullPage: true });
       const notes = cardIn(strays, 'notes.txt');
       await expectVisible(notes.getByText(/^notes\.txt: not a card/), 'a stray file is listed with why it is not a card');
       await notes.getByRole('link', { name: 'notes.txt' }).click();

@@ -9,7 +9,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { assess } from '../src/tick/assess.ts';
 import { runWords } from '../src/routed/routed-words.ts';
-import { routedRows } from '../src/routed/routed-lines.ts';
+import { listedWords, routedRows } from '../src/routed/routed-lines.ts';
 import { retryable } from '../src/retry/retry.ts';
 import { ranShape } from '../src/workspace/worktree.store.ts';
 import { workspacePlan } from '../src/workspace/workspace.ts';
@@ -155,13 +155,8 @@ test("a gated condition's row says the route it proposes beside its gate", () =>
   const held = passOf({ filed: { plan: 'succeeded' }, steps: gated });
   const said = (name: string): Closeout | undefined =>
     name === 'plan' ? { outcome: 'done', summary: 'did plan', artifacts: [], output: { surface: 'web' } } : undefined;
-  const rows = routedRows({
-    steps: gated,
-    run: held.run,
-    phaseOf: phases({ 't-plan': 'succeeded' }),
-    closeoutOf: said,
-    askedCloseout: () => true,
-  });
+  const input = { steps: gated, run: held.run, phaseOf: phases({ 't-plan': 'succeeded' }), closeoutOf: said, askedCloseout: () => true };
+  const rows = routedRows(input, listedWords(input));
   assert.deepEqual(rows.get('triage'), { besides: 'proposes web' });
 });
 

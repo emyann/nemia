@@ -192,15 +192,27 @@ const ChatHistorySchema = decodes<ChatHistory>()(
   }),
 );
 
-/** Mirrors the package's `OutboxEntry`: what the person wrote, as her outbox keeps it until the keeper says it to her. */
-export type ChatSent = { id: string; at: string; text: string };
+/** Mirrors the package's `Speaker`: who wrote an outbox entry, the person or an agent by the name it speaks under. */
+export type ChatSpeaker = { kind: 'person' } | { kind: 'agent'; name: string };
 
-/** Decodes a `ChatSent`. */
+/**
+ * Mirrors the package's `OutboxEntry`: what was written to her, as her outbox keeps it until the keeper says it to her, with who wrote
+ * it where an agent did.
+ */
+export type ChatSent = { id: string; at: string; text: string; from?: ChatSpeaker };
+
+/** Decodes a `ChatSent`: the agent's speaker first, the member that owns more keys. */
 const ChatSentSchema = decodes<ChatSent>()(
   Schema.Struct({
     id: Schema.String,
     at: Schema.String,
     text: Schema.String,
+    from: Schema.optionalKey(
+      Schema.Union([
+        Schema.Struct({ kind: Schema.Literal('agent'), name: Schema.String }),
+        Schema.Struct({ kind: Schema.Literal('person') }),
+      ]),
+    ),
   }),
 );
 

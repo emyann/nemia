@@ -23,6 +23,7 @@ import {
   launchdLogs,
   launchdState,
   logsLine,
+  startLine,
   nameRefusal,
   plistRead,
   plistText,
@@ -219,10 +220,12 @@ const stateOf = (at: Placed, host: ServiceHost): UnitState | null => {
   }
 };
 
-/** The service as a take-over starts it: its start, and how its log is read. */
+/** The service as a take-over starts it: its start, how its log is read, the system's word on it now, and how a person starts it. */
 const startedOf = (at: Placed, host: ServiceHost): Started => ({
   start: () => ops(at, host).start(),
   logs: logsLine(at.system, at.name, host.dirs().home),
+  stateNow: () => stateOf(at, host),
+  startLine: startLine(at.system, at.name, at.file, host.user().uid),
 });
 
 /** A pid as `--take-over` gives it: digits, above zero; else refused (`Invalid`). */

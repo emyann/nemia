@@ -1,7 +1,7 @@
 /**
  * `nemia service restart`: the daemon that holds the store restarted on the code its service runs, as the take-over does it (`takeOver`)
  * — the store paused, the daemon's own sessions held and their calls in flight given up to the timeout (`--timeout <d>`, else the
- * store's), SIGTERM, the unit started, and the store resumed once the new daemon has completed its first pass. The jobs and the checks,
+ * store's), SIGTERM, the unit started once the system says it no longer runs the stopped daemon, and the store resumed once the new daemon has completed its first pass. The jobs and the checks,
  * a landing's wait on CI among them, run on through it on their workers and are not waited for, and each session the daemon parked is
  * resumed by the new one as the same try. Its waits are bounded: the timeout, then the take-over's `stopMs` and `waitMs` (90 s and 60 s
  * on the live host), then the new daemon's first pass; and its pause and drain end with its command, however it ends, lifted by the
@@ -39,9 +39,10 @@ export type Restarted = {
 /**
  * Where the service and the lease leave a restart: the service's daemon ticking (`restart` its pid), nothing ticking (`start`), or
  * refused (`Missing`: no service installed, naming the take-over where a daemon ticks the store; `Conflict`: a daemon that is not the
- * service's holds the store, or one is stalled).
+ * service's holds the store, or one is stalled). A start carries `old`, the daemon that let the store go and is still the unit's main
+ * process, which the start waits for the unit to end (`startedPassed`).
  */
-function planOf(service: ServiceAt, host: ServiceHost): { kind: 'restart'; pid: number } | { kind: 'start' } {
+function planOf(service: ServiceAt, host: ServiceHost): { kind: 'restart'; pid: number } | { kind: 'start'; old: number | null } {
   const lease = host.lease();
   if (!service.installed)
     throw new Missing({
@@ -61,7 +62,7 @@ function planOf(service: ServiceAt, host: ServiceHost): { kind: 'restart'; pid: 
     throw new Conflict({
       message: `${BY}: pid ${lease.file.pid} holds the store and is not ${service.unit}'s process, so it cannot be started again: ${takeOverLine(lease.file.pid, service.name)} hands the store to the service, which ${BY} restarts from then on.`,
     });
-  return { kind: 'start' };
+  return { kind: 'start', old: lease.kind === 'stopped' && service.state?.pid === lease.file.pid ? lease.file.pid : null };
 }
 
 /** The line said after a restart where a person's pause stood through it. */
@@ -81,7 +82,7 @@ export const restartService = Effect.fn('restartService')(function* (args: Args,
   });
   if (plan.kind === 'start') {
     const paused = yield* tried(() => readPause() !== null);
-    const pid = yield* startedPassed(host, service, BY, null, paused ? PAUSE_STOOD : 'the store is as it was');
+    const pid = yield* startedPassed(host, service, BY, plan.old, paused ? PAUSE_STOOD : 'the store is as it was');
     const lines = [
       `started ${service.unit}, which ticks the store${pid ? ` as pid ${pid}` : ''} and has completed its first pass`,
       ...(paused ? [PAUSE_STOOD] : []),
@@ -104,8 +105,10 @@ const RESTART: Command<Restarted> = {
     "restart the service's daemon on the code it runs: pause the store, give",
     "the daemon's sessions up to the timeout to end their tool calls",
     '(--timeout <d>, else nemia pause-timeout, 10m by default), stop it (up to',
-    '90s), start the service (up to 60s), and resume once the new daemon has',
-    'completed its first pass; refused, naming the log, when that pass fails.',
+    '90s, and until the unit has ended its process), start the service (up to',
+    '60s), and resume once the new daemon has completed its first pass;',
+    'refused, naming the log, when that pass fails, and naming the command',
+    'that starts the service when it is not running.',
     'Jobs and checks, a landing waiting on CI among them, run on and are not',
     'waited for; each session parks and resumes as the same try. Each wait is',
     "said on stderr as it waits. A pause a person put stands; the restart's",

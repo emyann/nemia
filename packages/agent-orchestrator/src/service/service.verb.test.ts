@@ -83,12 +83,15 @@ const passing = (world: World, pid: number): void => {
 
 /**
  * The fake machine's world: the lease, and the leases each read after it moves on to (`later`), the unit's main process, and what a
- * signal and a start change.
+ * signal and a start change. As systemd does, a signal to the unit's main process ends it, clearing `unitPid`; `lingers` reads of the
+ * unit after the signal still answer it, as a daemon that lets the lease go before it exits, and where it is given each read is an event.
  */
 type World = {
   lease: DaemonStanding;
   later?: DaemonStanding[];
   unitPid: number | null;
+  lingers?: number;
+  exiting?: number;
   calls?: Finishing[][];
   onSignal?: () => void;
   onStart?: () => void;
@@ -112,7 +115,11 @@ function hostOf(world: World): { host: ServiceHost; events: string[] } {
     path: '/usr/bin:/bin',
     user: () => ({ name: 'ann', uid: 1000 }),
     call: (argv) => {
-      if (argv.includes('show')) return `ActiveState=active\nUnitFileState=enabled\nMainPID=${world.unitPid ?? 0}\n`;
+      if (argv.includes('show')) {
+        if (world.exiting !== undefined && world.exiting-- <= 0) (world.unitPid = null), (world.exiting = undefined);
+        if (world.lingers !== undefined) events.push(`show ${world.unitPid ?? 0}`);
+        return `ActiveState=${world.unitPid === null ? 'inactive' : 'active'}\nUnitFileState=enabled\nMainPID=${world.unitPid ?? 0}\n`;
+      }
       events.push(argv.join(' '));
       if (argv[2] === 'start') world.onStart?.();
       return '';
@@ -129,6 +136,7 @@ function hostOf(world: World): { host: ServiceHost; events: string[] } {
     },
     signal: (pid) => {
       events.push(`signal ${pid}`);
+      if (world.unitPid === pid) world.exiting = world.lingers ?? 0;
       world.onSignal?.();
     },
     pause: (said) => {

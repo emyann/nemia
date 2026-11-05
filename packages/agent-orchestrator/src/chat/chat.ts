@@ -8,7 +8,6 @@
  * Pure. The files are `chat.store.ts`'s, the reads and the person's writes `chat.verb.ts`, and the delivery the keeper's
  * (`say.verb.ts`).
  */
-import { invariant } from '@emyann/tsverify';
 import type { FramedFor, SpeakerNameRefusal, SpeakerRefusal, WithSpeaker, WithoutSpeaker } from '../../contracts/speaker.contract.ts';
 import { Invalid } from '../refusal/refusal.ts';
 import type { EnginePhase } from '../views/views-words.ts';
@@ -242,16 +241,7 @@ export const framedFor: FramedFor = (speaker, text) =>
 export const withSpeaker: WithSpeaker = (allowed, name) => (allowed.includes(name) ? [...allowed] : [...allowed, name]);
 
 /** The person's `allowed` names with `name` taken back. Pure. */
-export const withoutSpeaker: WithoutSpeaker = (allowed, name) => {
-  let out: string[] = [];
-  for (const n of allowed) {
-    invariant((i) => allowed.slice(0, i).every((m) => m === name || out.includes(m)));
-    invariant(() => out.every((m) => m !== name));
-    invariant(() => out.every((m) => allowed.includes(m)));
-    if (n !== name) out = [...out, n];
-  }
-  return out;
-};
+export const withoutSpeaker: WithoutSpeaker = (allowed, name) => allowed.filter((n) => n !== name);
 
 /** The longest text the person may send at once. */
 export const CHAT_TEXT_MAX = 8000;

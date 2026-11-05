@@ -28,6 +28,7 @@ import {
   RESERVED_SPEAKERS,
   SPEAKER_NAME_MAX,
   speakerNameRefusal,
+  withoutSpeaker,
   presenceOf,
   projectChat,
   readChatCursor,
@@ -553,4 +554,18 @@ test('`speakerNameRefusal`: the names an agent speaks under, by their characters
   for (const name of taken) await t.test(`taken: ${JSON.stringify(name)}`, () => assert.equal(speakerNameRefusal(name), undefined));
   for (const name of refused)
     await t.test(`REFUSED: ${JSON.stringify(name.slice(0, 20))}`, () => assert.equal(typeof speakerNameRefusal(name), 'string'));
+});
+
+test('`withoutSpeaker` takes back no name but the one named: the full law its contract narrows until tsverify proves a filter keeps every element that passes (src-a-filter-s-result-is-pro-p25m)', async (t) => {
+  const lists: readonly (readonly string[])[] = [[], ['operator'], ['operator', 'run-x.design'], ['a', 'operator', 'b', 'operator', 'c']];
+  for (const allowed of lists)
+    for (const name of ['operator', 'a', 'absent'])
+      await t.test(`${JSON.stringify(allowed)} less ${name}`, () => {
+        const left = withoutSpeaker(allowed, name);
+        assert.deepEqual(
+          allowed.filter((n) => n !== name && !left.includes(n)),
+          [],
+          'every other name stays allowed',
+        );
+      });
 });

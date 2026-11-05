@@ -60,13 +60,13 @@ const filed = async (name: string, phase?: EnginePhase) => {
   return { id, dir: scratch('wf-nemia-chat-dir-') };
 };
 
-/** What was said to the task `id`, in order. */
 /** The person, as the board's send names them. */
 const PERSON = { kind: 'person' } as const;
 
 /** The operator, an agent speaking as itself. */
 const OPERATOR = { kind: 'agent', name: 'operator' } as const;
 
+/** What was said to the task `id`, in order. */
 const saidTo = (id: string) => stage.board().said.filter((one) => one.taskId === id);
 /** Each answer written into a call of the task `id`, in order. */
 const answeredIn = (id: string) => stage.board().answered.filter((one) => one.taskId === id);

@@ -125,7 +125,6 @@ test('A person talks with Nemia in her chat: a page of history, a send to her ou
       assert.match(String(unallowed.body.error), /nemia chat allow operator/);
       fs.mkdirSync(path.join(root, 'nemia', 'chat'), { recursive: true });
       fs.writeFileSync(path.join(root, 'nemia', 'chat', 'speakers.json'), JSON.stringify({ allowed: ['operator'] }));
-      assert.ok(fs.existsSync(path.join(root, 'nemia', 'chat', 'speakers.json')), 'the file nemia chat allow operator writes');
       const sent = await sentFromElsewhere({ text: 'I approved the gate.', from: operator });
       assert.equal(sent.status, 201);
       assert.deepEqual(sent.body.from, operator);

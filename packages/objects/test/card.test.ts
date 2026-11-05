@@ -23,6 +23,8 @@ const filed = {
     runs: [],
     lastStart: { at: '2026-11-04T02:00:00.000Z', repo: '/repo', why: 'no workflow build', refused: true },
     title: 'Cache the views.',
+    inPlay: true,
+    place: 1,
   },
 } as const;
 
@@ -31,7 +33,7 @@ const broken = {
   kind: 'Card',
   metadata: { name: 'broken', creationTimestamp: '2026-11-04T00:00:00.000Z', resourceVersion: 'd2' },
   spec: {},
-  status: { state: 'filed', runs: [], error: 'broken.md: a key it does not have' },
+  status: { state: 'filed', runs: [], error: 'broken.md: a key it does not have', inPlay: true },
 } as const;
 
 const roundTrip = <S extends Schema.Codec<unknown, unknown>>(schema: S, value: unknown): unknown =>

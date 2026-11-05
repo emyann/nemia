@@ -46,7 +46,7 @@ const factoryOf = (card: Card): string | null => {
   return namespace === DEFAULT_NAMESPACE ? null : namespace;
 };
 
-/** The card `card` as the printer's row, its place in the queue the api's (`status.place`), and the repository its factory picks (`repos`). */
+/** The card `card` as the printer's row: its queued place the api's (`status.place`), the repository its factory picks `repos`'s. */
 export const rowOf = (card: Card, repos: ReadonlyMap<string, string> = new Map()): InboxRow => {
   const { metadata, spec, status } = card;
   const factory = factoryOf(card);

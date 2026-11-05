@@ -209,7 +209,7 @@ test('REFUSED: a card of another namespace and a card not there are Missing; a b
 });
 
 test('a stray file listed before a card of its name is passed over; a card says whether it is in play, and its place in the queue', () => {
-  const read = (program: (l: ReturnType<typeof inboxListing>) => Effect.Effect<unknown, unknown, never>) =>
+  const read = (program: (l: ReturnType<typeof inboxListing>) => Effect.Effect<unknown, unknown>) =>
     valueOf(over(five, Effect.flatMap(listed, program)));
   const card = read((l) => {
     const bravo = l.find((entry) => entry.name === 'bravo');

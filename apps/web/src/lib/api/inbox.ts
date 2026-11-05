@@ -88,9 +88,10 @@ const inboxEntryFields = {
 };
 
 /**
- * `card` as the board's entry (`InboxEntry`), its queued place the one the api answers (`status.place`): its file its name's markdown, as every card listed is;
- * its factory its namespace, none for `default`; `null` where the card says nothing. `factoryRepo` is null: the Card does not say which
- * repository its factory picks for it, so the page reads that off the factories (`factoryRepoOf`, lib/inbox.ts).
+ * `card` as the board's entry (`InboxEntry`), its queued place the one the api answers (`status.place`): its file its name's markdown,
+ * as every card listed is; its factory its namespace, none for `default`; `null` where the card says nothing. `factoryRepo` is null:
+ * the Card does not say which repository its factory picks for it, so the page reads that off the factories (`factoryRepoOf`,
+ * lib/inbox.ts).
  */
 export const entryOf = (card: Card): InboxEntry => {
   const { metadata, spec, status } = card;

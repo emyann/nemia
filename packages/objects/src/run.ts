@@ -413,8 +413,8 @@ export const RunDrift = Schema.Struct({
  * The run now: the runs list's judged fields (`judgedFields`) — its word and codes, whether it moves, its cost, time at work and tokens,
  * what it waits on, its hold and what a person has to decide — then its graph, where its time went as a whole (`Timeline`'s rounds, run
  * and slot), and each step; and the rest of what the board shows of it but the lines to type, which are the command table's: when it
- * started and was called off, what a prune took and would find, the runs it is held until, what its sessions read, who it waits on, its
- * gates, a warning on its folder, and the kinds it is behind the files on.
+ * started and was called off, what a prune took (with its words, as `nemia ls` says them) and would find, the runs it is held until,
+ * what its sessions read, who it waits on, its gates, a warning on its folder, and the kinds it is behind the files on.
  */
 export const RunStatus = Schema.Struct({
   status: Schema.Literals(RUN_STATUSES),
@@ -471,6 +471,7 @@ export const RunStatus = Schema.Struct({
       at: Schema.String,
       worktrees: List(Schema.Struct({ path: Schema.String, bytes: Schema.Finite })),
       artifacts: Schema.NullOr(Schema.Struct({ at: Schema.String, bytes: Schema.Finite })),
+      said: Schema.optionalKey(Schema.String),
     }),
   ),
   onDisk: Schema.Struct({ worktrees: Schema.Boolean, files: Schema.Boolean }),

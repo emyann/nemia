@@ -32,7 +32,10 @@ export const stepSinceOf = (step: RunStepStatus): string | null => {
 /** A time a prune's marker no longer says. */
 const atOf = (at: string): string => at || 'a time its marker no longer says';
 
-/** What a prune removed and what it kept, in words for the mark beside a run's status: its worktrees, its files where they went too. */
+/**
+ * What a prune removed and what it kept, in words for the mark beside a run's status, where the Run carries none of the package's: its
+ * worktrees, its files where they went too.
+ */
 export const prunedSaid = (pruned: NonNullable<RunStatus['pruned']>): string => {
   const files = pruned.artifacts ? `its files were removed at ${atOf(pruned.artifacts.at)}` : '';
   const kept = pruned.artifacts ? 'its branches and record are kept' : 'its branches, record and files are kept';
@@ -64,7 +67,7 @@ export const runRowOf = (run: Run): RunSummary => {
     createdAt: metadata.creationTimestamp,
     startedAt: status.startedAt,
     cancelledAt: status.cancelledAt,
-    pruned: status.pruned ? { said: prunedSaid(status.pruned) } : null,
+    pruned: status.pruned ? { said: status.pruned.said ?? prunedSaid(status.pruned) } : null,
     after: spec.after,
     context: spec.context,
     waiting: status.waiting,

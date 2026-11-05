@@ -45,6 +45,8 @@ import { type LastSaid, lastLineOf } from '../resource/checks.verb.ts';
 import { readOf, totalOf, usedOf } from '../resource/usage.ts';
 import type { Run as RunObject, RunSpec, RunStatus, RunStepStatus, StepTold, TryCloseout, TryShort } from './run.model.ts';
 import { runNamespace } from './run-list.ts';
+import { prunedWords } from '../record/record.ts';
+import { prunedKept } from '../prune/prune.ts';
 import { currentOf, raiseReads, runReading, type RunReading, stepsReading, triesIn } from './read.verb.ts';
 
 /**
@@ -174,6 +176,7 @@ const prunedOf = (run: Run): RunStatus['pruned'] =>
         at: run.pruned.at,
         worktrees: run.pruned.worktrees.map(({ path: p, bytes }) => ({ path: p, bytes })),
         artifacts: run.pruned.artifacts ? { at: run.pruned.artifacts.at, bytes: run.pruned.artifacts.bytes } : null,
+        said: `${prunedWords(run.pruned)}; ${prunedKept(run.pruned)}`,
       }
     : null;
 

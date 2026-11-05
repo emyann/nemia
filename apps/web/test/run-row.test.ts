@@ -91,6 +91,8 @@ test('a prune is said in words: its worktrees, its files where they went too, an
   const files = { ...both, worktrees: [] };
   assert.doesNotMatch(prunedSaid(files), /worktrees/);
   assert.equal(runRowOf(run('acme', { pruned: worktrees })).pruned?.said, prunedSaid(worktrees));
+  const worded = { ...worktrees, said: 'the words the api answered' };
+  assert.equal(runRowOf(run('acme', { pruned: worded })).pruned?.said, worded.said, "the api's words, where the Run carries them");
 });
 
 test("a run the list could not judge is a row that says why, on its namespace's floor (none for default) and moving nothing it can say", () => {

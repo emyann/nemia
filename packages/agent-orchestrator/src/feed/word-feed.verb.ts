@@ -10,7 +10,7 @@
 import { listing } from '../list/list.ts';
 import { feedPhase, feedWords, LINE_WORDS, type FeedCloseout, type FeedDenial, type FeedWords, type Once } from './index.ts';
 import { closeoutOf, closeoutTold, saidCount, waitingOf } from '../views/views.verb.ts';
-import { engineWord, parkedOf } from '../views/views-words.ts';
+import { engineWord, killedMemoryOf, parkedOf } from '../views/views-words.ts';
 import { runStore } from '../record/files.store.ts';
 import { denialText, type TaskView } from '../runtime-client.ts';
 import { taskTryOf, turnTryOf, type Run } from '../record/record.ts';
@@ -59,6 +59,7 @@ export function wordFeed(
       checkout,
       waitingOf: waitingOf(views),
       parkedOf: (taskId) => parkedOf(views.get(taskId)),
+      memoryOf: (taskId) => killedMemoryOf(views.get(taskId)),
       holds: holdsOf(run, admission.parent),
     }),
     run,

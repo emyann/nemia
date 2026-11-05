@@ -36,7 +36,7 @@ const judgeOf = (broken: readonly string[] = []) => {
 
 const listed = (query: RunQuery, broken?: readonly string[]) => {
   const { asked, judge } = judgeOf(broken);
-  const exit = Effect.runSyncExit(runListOf(runs, query, judge));
+  const exit = Effect.runSyncExit(runListOf(runs, query, (page: readonly Listed[]) => Effect.forEach(page, judge)));
   return { exit, asked };
 };
 

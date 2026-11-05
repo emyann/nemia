@@ -37,6 +37,9 @@ import { passRead, type PassRead } from '../cap/cap.verb.ts';
 import { passRevisions } from '../revisions/pin.verb.ts';
 import type { PassStanding } from '../standing/standing.verb.ts';
 
+/** A task the engine holds in flight, as `inFlight` counts one: its step is in the checkout now. Pure. */
+const inFlightPhase = (phase: TaskPhase): boolean => phase === 'pending' || phase === 'running';
+
 /**
  * Which run's `workspace: base` step holds the repository's own checkout while this run's waits for it (`heldCheckouts`) — or undefined,
  * when nothing does and this run's may be filed.
@@ -44,7 +47,8 @@ import type { PassStanding } from '../standing/standing.verb.ts';
  * Asked of the store on the pass that asks, never stored, and then of every run of the same repository — but first, and cheaply, of the
  * run's own asks: undefined, with no other run's claim read, for a run called off, for one whose own ending claims nothing
  * (`endingClaimedAt`: no person's word that would file it — the approval of one that has not run, or the ask for a try of one that has —
- * and no workflow that files it with nobody's, as an ending with no gate not yet filed is), and for one whose ending is in that checkout
+ * and no workflow or run that files it with nobody's, as an ending with no gate not yet filed is, and a filed one whose try landed no
+ * commit, which the run tries again itself), and for one whose ending is in that checkout
  * already. A run is in the checkout while the engine holds its `workspace: base` task in flight, as `inFlight` counts one, so a
  * step filed earlier in this very pass is read as being in it. One waiting to be filed counts only if the pass would in fact file it: a
  * send-back of the work un-holds its gate, and an ending that will not be filed must not hold another run's for ever. The cap on runs in
@@ -57,6 +61,9 @@ import type { PassStanding } from '../standing/standing.verb.ts';
  *   is listed, and that read, only past the run's own asks, and the cap read only where a claim waits on a slot.
  * @param env Where the cap on runs in flight is read before any pass has written one (`runSlots`): the process's, or the api's own.
  * @param memo The reading of the places (`StatusMemo`), shared with the pass's `landEnding`, so a checkout is read once a run.
+ * @param phaseOf The phase of this run's tasks as the caller read them on this pass (`advancePass`'s): an ending in flight there is in the
+ *   checkout already, so nothing holds it and no task is viewed again — a long-lived `workspace: base` step, filed and never landed, claims
+ *   as of the run's creation, and is read on each pass. Left out, the ending's task is viewed (`mainClaim`).
  */
 export const checkoutHold = Effect.fn('checkoutHold')(function* (
   e: Engine,
@@ -65,9 +72,12 @@ export const checkoutHold = Effect.fn('checkoutHold')(function* (
   from: { read: PassRead; slot: RunSlot | undefined } | { standing: Effect.Effect<PassStanding, Refusal> },
   env: NodeJS.ProcessEnv,
   memo: StatusMemo,
+  phaseOf?: (taskId: string) => TaskPhase,
 ) {
   const ending = steps.find((s) => endsOnBase(s));
   if (!ending || run.cancelledAt || endingClaimedAt(run, ending, runStore.asks.read(run.id).asks) === undefined) return undefined;
+  const taskId = run.steps[ending.name]?.taskId;
+  if (taskId && phaseOf && inFlightPhase(phaseOf(taskId))) return undefined;
   const read = 'read' in from ? from.read : passRead(e, runStore.runs.list(), env, yield* from.standing, yield* passRevisions());
   const slotOf = (id: string) => read.slots.pipe(Effect.map((slots) => slots.get(id)));
   const mine = yield* mainClaim(e, run, 'read' in from ? Effect.succeed(from.slot) : slotOf(run.id), read.parents, memo);
@@ -98,12 +108,15 @@ export const checkoutHold = Effect.fn('checkoutHold')(function* (
  *
  * It WAITS for the checkout on a person's word that would file it — an approval of an ending that has not run, or the ask for a try of one
  * that ended blocked — or, for an ending with no gate not yet filed, on its workflow's, as of the run's creation (`endingClaimedAt`): its
- * workflow files it with nobody's word once the step before it passes, into that same checkout. And only where the pass would in fact file
+ * workflow files it with nobody's word once the step before it passes, into that same checkout; and, for a filed ending whose try landed
+ * no commit, on the run's own word, as of its creation too: the try the run files itself (the ask to sign off of a session that ended
+ * without its closeout, a check's `retries:`) works in that checkout all the same. And only where the pass would in fact file
  * it: a send-back of the work un-holds the gate, an ask no tick honours files nothing, a run waiting on runs that have not landed files no
  * root of its own (`runReady`), and neither does one the cap on runs in flight holds (`runAdmitted`) — so an ending that will not be filed
  * does not hold another run's. Those last two are the questions `advance` asks before it files a ready step, and they bite only on a run
  * with nothing filed: an ending is one when it is also its root, which a folder whose one step merges has. Neither touches a try, since a
- * run with a try due has started. Its `slot` is asked for there alone, and the runs it waits on are read through `parents`.
+ * run with a try due has started. Its `slot` and the runs it waits on (read through `parents`) are asked for there alone: a try due
+ * claims with neither read.
  */
 const mainClaim = Effect.fnUntraced(function* (
   e: Engine,
@@ -119,7 +132,7 @@ const mainClaim = Effect.fnUntraced(function* (
   const repo = path.resolve(run.repo);
   const taskId = run.steps[ending.name]?.taskId;
   const phase = taskId ? phaseOfView(yield* asked('view', e.view(taskId))) : 'unknown';
-  if (taskId && (phase === 'pending' || phase === 'running')) return { id: run.id, repo, step: ending.name, holds: true };
+  if (taskId && inFlightPhase(phase)) return { id: run.id, repo, step: ending.name, holds: true };
   if (taskId && landsOnCheck(ending, run) && !run.steps[ending.name]?.landed) {
     const { views, phaseOf } = yield* taskPhasesRead(run).pipe(over(e));
     const own = ownStatus(ending, run, phaseOf, closeoutReader(views, run), closeoutAsked(views), steps, spendReader(views));
@@ -147,11 +160,11 @@ const mainClaim = Effect.fnUntraced(function* (
     harnessBlocked(views),
     spendReader(views),
   );
+  const claim = { id: run.id, repo, step: ending.name, holds: false, at };
+  if (a.retry.some((r) => r.step === ending.name)) return claim;
+  if (!a.ready.includes(ending.name)) return undefined;
   const parent = yield* parentsRead(run, parents.git, parents.read).pipe(over(e));
-  const files = runReady(run, (id) => parent(id).landed) && runAdmitted(run, yield* slot);
-  return (files && a.ready.includes(ending.name)) || a.retry.some((r) => r.step === ending.name)
-    ? { id: run.id, repo, step: ending.name, holds: false, at }
-    : undefined;
+  return runReady(run, (id) => parent(id).landed) && runAdmitted(run, yield* slot) ? claim : undefined;
 });
 
 /**

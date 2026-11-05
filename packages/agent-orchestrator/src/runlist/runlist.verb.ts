@@ -83,8 +83,21 @@ const NONE_READ: { views: Views; unreadable: Unreadable } = { views: new Map(), 
  */
 const NO_PARENT = (): readonly Run[] => [];
 
-/** The records of `ids` the store still has, in their order. */
-const recordsOf = (ids: readonly string[]): Run[] => ids.filter((id) => runStore.runs.exists(id)).map((id) => runStore.runs.read(id));
+/**
+ * The records of `ids` the store still has, in their order: one removed since the list was read is passed over, whenever it went — before
+ * its read (`Missing`) or during it, a file of it gone mid-read — its row read with no clock. A read that fails while the record is still
+ * there fails the read, as the list's own read does (`listRuns`). Whether it is there is asked after a read failed, never before the read,
+ * where a removal between the two turns into the whole read's refusal.
+ */
+const recordsOf = (ids: readonly string[]): Run[] =>
+  ids.flatMap((id) => {
+    try {
+      return [runStore.runs.read(id)];
+    } catch (err) {
+      if (runStore.runs.exists(id)) throw err;
+      return [];
+    }
+  });
 
 /** What a row's breakdowns are read off: the engine's views of its tasks, the tasks left out, and the feed's filing times. */
 type Read = { views: Views; unreadable: Unreadable; filed: ReadonlyMap<string, string> };

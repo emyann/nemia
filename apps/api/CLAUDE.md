@@ -24,7 +24,8 @@ from the orchestrator; what it holds today below its layer is in `docs/architect
   package's `informerRead` in `rest/informer.verb.ts`): a run at rest while its record, its stamps, the feed for its tasks and its
   branch tips stand, and a moving run within the pass that judged it. A write through the api drops its run (`uninformed`,
   `commands/routes.ts`). A new input `summaryOf` reads for a run goes into one of those, or a poll answers it stale. The informer keeps the run it
-  judged and hands it to the store in place of a read of its record (`given`), so a warm list reads no record of a run at rest.
+  judged and hands it to the store in place of a read of its record (`given`), so a warm list reads no record of a run at rest. The
+  RunList serves each run's listed object kept beside its judgement, its disk parts read per request (`diskPartsOf`).
   `WF_VERIFY_REST=1` (set by the harness) judges every kept answer afresh and is handed nothing from memory, so every record is read
   again; a test that counts reads turns that off for its request (`unverified`). Requests overlap
   and share the feed cursor: a request keeps nothing once another has read the feed past where it read to.

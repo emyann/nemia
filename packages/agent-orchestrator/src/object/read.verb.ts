@@ -12,7 +12,7 @@ import { realReleasesDir } from '../release/release.store.ts';
 import type { RaiseReads } from '../retry/index.ts';
 import { bare, filedTimes, type Filings, type Views, workflowsOf } from '../summary/reads.verb.ts';
 import { stepSaid } from '../summary/judged.verb.ts';
-import { type Judgement, judgementsOf, sameJudgement } from '../summary/judgement.verb.ts';
+import { type JudgedOrWhy, type Judgement, judgementsOf, sameJudgement } from '../summary/judgement.verb.ts';
 import { informedJudgements, Informer, informerRead } from '../rest/informer.verb.ts';
 import { verifiesRest } from '../config/config.store.ts';
 import { standingReader, standingSnapshot } from '../standing/standing.verb.ts';
@@ -74,7 +74,20 @@ export const stepsReading = Effect.fnUntraced(function* (run: Run) {
   const e = yield* EngineService;
   const home = yield* StoreRoot;
   const folder = workflowsOf(run, home);
-  const one = yield* judgedOn(e, home, run);
+  return yield* stepsReadingOf(e, home, run, yield* judgedOn(e, home, run), folder);
+});
+
+/**
+ * The run's steps read once (`StepsReading`) off its judgement in hand (`one`, or why it is not judged) and its `folder` as it loads now,
+ * as `stepsReading` reads them: what the RunList builds each run of its page from, having judged the page in one batch.
+ */
+export const stepsReadingOf = Effect.fnUntraced(function* (
+  e: Engine,
+  home: string,
+  run: Run,
+  one: JudgedOrWhy,
+  folder: ReturnType<typeof workflowsOf>,
+) {
   if ('unjudged' in one) return { unjudged: one.unjudged };
   const { judgement } = one;
   const stderr = yield* Effect.promise(() => refusedStderr(e, run, judgement.views));
@@ -85,15 +98,27 @@ export const stepsReading = Effect.fnUntraced(function* (run: Run) {
 });
 
 /**
+ * Whether a read of `at` failed where it would read again: a refused check's stream the engine did not give (`unreadable`). What is built
+ * on such a read is served once and never kept, since the run's inputs may not move until it reads.
+ */
+export const readFailed = ({ checks, stderr }: StepsReading): boolean =>
+  [...stderr.values()].some((said) => typeof said === 'string') || [...checks.values()].some((check) => check.refused?.unreadable != null);
+
+/**
  * The run read once (`RunReading`): its steps (`stepsReading`), then its timeline, off the feed's filing times read on from `filings`
  * (`filedTimes`); or why it is not judged (`{ unjudged }`).
  */
 export const runReading = Effect.fnUntraced(function* (run: Run, filings: Filings) {
   const steps = yield* stepsReading(run);
   if ('unjudged' in steps) return steps;
-  const filed = yield* filedTimes(steps.e, filings);
-  const at: RunReading = { ...steps, clock: timeline(run, steps.views, filed, steps.steps), filed };
-  return at;
+  return runReadingOf(steps, yield* filedTimes(steps.e, filings));
+});
+
+/** The run read once (`RunReading`) off its steps read (`StepsReading`) and the feed's filing times `filed`, read already. */
+export const runReadingOf = (steps: StepsReading, filed: ReadonlyMap<string, string>): RunReading => ({
+  ...steps,
+  clock: timeline(steps.run, steps.views, filed, steps.steps),
+  filed,
 });
 
 /** What a step's raise and status word are read from, off the views already read (`RaiseReads`), as `nemia decide` reads them. */

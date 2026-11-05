@@ -178,6 +178,22 @@ export function workflowsOf(run: Run, home: string): { steps: Workflow[]; warnin
 }
 
 /**
+ * `workflowsOf` for each run it is asked about, each folder loaded once for the life of the reader: one for a request, so a list of many
+ * runs of a handful of folders loads a handful, and none is kept past it, since no stamp watches a folder.
+ */
+export function folderReader(home: string): (run: Run) => ReturnType<typeof workflowsOf> {
+  const loaded = new Map<string, ReturnType<typeof workflowsOf>>();
+  return (run) => {
+    const key = JSON.stringify([run.workflowDir, run.repo ?? null, run.factory ?? null, run.workflow === undefined]);
+    const known = loaded.get(key);
+    if (known !== undefined) return known;
+    const read = workflowsOf(run, home);
+    loaded.set(key, read);
+    return read;
+  };
+}
+
+/**
  * Which steps a run has, in the order to show them.
  *
  * Every step on the record, in the record's order — the workflow's order when the run started —

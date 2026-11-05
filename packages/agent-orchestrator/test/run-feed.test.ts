@@ -950,6 +950,36 @@ test("a step's denials, each a one-shot of the runtime counted by its step and t
   });
 });
 
+test('a step whose session was killed at its memory limit says so in its note, read off its attempt each pass', async (t) => {
+  const s = story(t);
+  emptyStore();
+  const GI = 1024 ** 3;
+  const noted = (run: Run) => lines().filter((l) => l.run === run.id && l.note?.includes('out of memory'));
+  let run: Run;
+  await s.test('its failed attempt carries a kill: its feed line says out of memory, the limit and the knob, once', async () => {
+    run = await started('the memory');
+    await tick();
+    settle(task(run, 'plan'), 'failed');
+    Object.assign(stage.board().tasks.get(task(run, 'plan'))!.attempt!, { memory: { limitBytes: 4 * GI, peakBytes: 4 * GI, oomKills: 1 } });
+    await tick();
+    const said = noted(run);
+    assert.deepEqual(
+      said.map((l) => l.step),
+      ['plan'],
+      'the step whose attempt was killed, and no other line of the run',
+    );
+    for (const fact of ['4Gi', 'WF_MEMORY_LIMIT']) assert.ok(said[0].note?.includes(fact), fact);
+  });
+  await s.test('more passes and a restarted daemon write no further line for it: a level read, never a transition', async () => {
+    const before = size();
+    const pass = await tick();
+    await ticks(2);
+    assert.equal(size(), before);
+    assert.deepEqual(recordFeed(judged(pass), { memo: freshFeedMemo() }).lines, []);
+    assert.equal(noted(run).length, 1);
+  });
+});
+
 test("a step's closeout read is a one-shot `closed out` of its step and try, said once across passes and a restart, and never written whole", async (t) => {
   const s = story(t);
   emptyStore();

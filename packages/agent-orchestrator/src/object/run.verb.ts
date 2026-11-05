@@ -248,7 +248,8 @@ const stepStatusOf = Effect.fnUntraced(function* (name: string, at: StepAt) {
     filed: filedIn(filedOf(run.steps[name], views)),
     taskId,
     workspace: run.steps[name]?.workspace ?? null,
-    ...filesOf(run, name),
+    files: [],
+    filesError: null,
     branch: run.steps[name]?.branch ?? null,
     note: judged.notes.get(name) ?? null,
     roundDue: judged.roundDue.has(name),
@@ -277,18 +278,18 @@ const stepStatusOf = Effect.fnUntraced(function* (name: string, at: StepAt) {
  * lines a person types, which are the command table's (`runLines`, lines.verb.ts), not the run's.
  */
 const restOf = (run: Run, at: RunReading, kinds: readonly Drift[]) => {
-  const { home, folder, steps, judged, filed } = at;
+  const { steps, judged, filed } = at;
   return {
     startedAt: runStartedAt(run, filed),
     cancelledAt: run.cancelledAt ?? null,
     pruned: prunedOf(run),
-    onDisk: onDiskOf(run, home),
+    onDisk: { worktrees: false, files: false },
     holdUntil: judged.holding && run.hold ? run.hold.until : [],
     read: runRead(at),
     waitingOnYou: judged.waitingOnYou,
     waitingOnYouWords: judged.waitingOnYouWords,
     gates: gatesOf(steps, run),
-    warning: folder.steps ? driftOf(run, folder.steps) : folder.warning,
+    warning: null,
     kinds: [...kinds],
   } satisfies Partial<RunStatus>;
 };
@@ -306,8 +307,20 @@ const restOf = (run: Run, at: RunReading, kinds: readonly Drift[]) => {
 export const runObject = Effect.fn('runObject')(function* (run: Run, { memo, inRequest, listed = false }: RunReads) {
   const at = yield* runReading(run, memo.filings);
   if ('unjudged' in at) return { unjudged: at.unjudged } satisfies RunObjectAnswer;
+  return yield* runObjectOf(run, at, { said: memo.said, listed, ...(inRequest ? { inRequest } : {}) });
+});
+
+/**
+ * The run's object (`runObject`) built off its reading in hand (`RunReading`), its parts no stamp watches read now (`diskPartsOf`): what
+ * the RunList builds a run of its page with, having judged and read the page in one batch.
+ */
+export const runObjectOf = Effect.fnUntraced(function* (
+  run: Run,
+  at: RunReading,
+  { said, inRequest, listed = false }: { readonly said: LastSaid } & Pick<RunReads, 'inRequest' | 'listed'>,
+) {
   const kinds = listed ? [] : inRequest ? yield* Effect.promise(() => inRequest(driftNow(run))) : yield* driftNow(run);
-  const stepAt: StepAt = { ...at, used: consumption(at.views, run), said: memo.said, listed };
+  const stepAt: StepAt = { ...at, used: consumption(at.views, run), said, listed };
   const steps = yield* Effect.forEach(at.names, (name) => stepStatusOf(name, stepAt), { concurrency: 'unbounded' });
   const { factory, workflow } = runLabels(run);
   const object: RunObject = {
@@ -328,7 +341,36 @@ export const runObject = Effect.fn('runObject')(function* (run: Run, { memo, inR
       ...restOf(run, at, kinds),
     },
   };
-  return object satisfies RunObjectAnswer;
+  return withDiskParts(object, diskPartsOf(run, at.home, at.folder));
+});
+
+/**
+ * The parts of a run's object that rest on the disk and on no input the informer checks, read on every request: what `nemia prune` would
+ * find (`onDisk`, which a prune, the free sweep or a hand removes with no stamp moved), each step's files in a folder run's step folder
+ * (`files`, `filesError`), and what the workflow folder as it loads now says against the run (`warning`).
+ */
+export type RunDiskParts = {
+  readonly onDisk: RunStatus['onDisk'];
+  readonly warning: RunStatus['warning'];
+  readonly files: (step: string) => Pick<RunStepStatus, 'files' | 'filesError'>;
+};
+
+/** The disk parts of `run` (`RunDiskParts`), off the store's root `home` and its workflow `folder` as it loads now (`workflowsOf`). */
+export const diskPartsOf = (run: Run, home: string, folder: RunReading['folder']): RunDiskParts => ({
+  onDisk: onDiskOf(run, home),
+  warning: folder.steps ? driftOf(run, folder.steps) : folder.warning,
+  files: (step) => filesOf(run, step),
+});
+
+/** `object` with its disk parts laid over (`RunDiskParts`): a new object, the one handed in left as it was, since a kept one is shared. */
+export const withDiskParts = (object: RunObject, parts: RunDiskParts): RunObject => ({
+  ...object,
+  status: {
+    ...object.status,
+    onDisk: parts.onDisk,
+    warning: parts.warning,
+    steps: object.status.steps.map((step) => ({ ...step, ...parts.files(step.name) })),
+  },
 });
 
 /** The run `runId`'s record and its one read, its step `step` named: refused where the run is not judged, or has no such step. */

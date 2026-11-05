@@ -192,7 +192,10 @@ too, which holds parity with this one until the in-process reads retire.
   into the informer's read of it, `informerRead` in `src/rest/informer.verb.ts`, whose `informedOf` decides): what the stamps miss is
   missed for good. The informer beside it (`src/rest/`) holds every
   run's judgement for a daemon, filled by the pass and read by the api's run object, list and sub-resources, checked against the same
-  inputs before it is served and rebuilt on a restart: a new input of a run's judgement goes into what it checks too.
+  inputs before it is served and rebuilt on a restart: a new input of a run's judgement goes into what it checks too. Beside a run's
+  judgement it keeps the RunList's object built on it (`keepObject`), served exactly while that judgement is (`keptObject`); the
+  object's parts no stamp watches — `onDisk`, a folder run's step files, the workflow folder's `warning` — are read on every request
+  (`diskPartsOf`, `src/object/run.verb.ts`). A new input of a run's object goes into what the informer checks, or into those parts.
 - **A test that starts a daemon and reads a finished run's worktree afterwards sets `WF_KEEP_WORKTREES=1`**: the daemon frees a finished
   run's worktrees on a sweep beside its passes (`freeOnce`, `src/prune/free.verb.ts`).
 - **The daemon measures the store's disk on a sweep beside its passes** (`diskOnce`, `src/disk/disk.verb.ts`): a test daemon walks its

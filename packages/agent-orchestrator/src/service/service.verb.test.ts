@@ -83,12 +83,15 @@ const passing = (world: World, pid: number): void => {
 
 /**
  * The fake machine's world: the lease, and the leases each read after it moves on to (`later`), the unit's main process, and what a
- * signal and a start change.
+ * signal and a start change. As systemd does, a signal to the unit's main process ends it, clearing `unitPid`; `lingers` reads of the
+ * unit after the signal still answer it, as a daemon that lets the lease go before it exits, and where it is given each read is an event.
  */
 type World = {
   lease: DaemonStanding;
   later?: DaemonStanding[];
   unitPid: number | null;
+  lingers?: number;
+  exiting?: number;
   calls?: Finishing[][];
   onSignal?: () => void;
   onStart?: () => void;
@@ -112,7 +115,14 @@ function hostOf(world: World): { host: ServiceHost; events: string[] } {
     path: '/usr/bin:/bin',
     user: () => ({ name: 'ann', uid: 1000 }),
     call: (argv) => {
-      if (argv.includes('show')) return `ActiveState=active\nUnitFileState=enabled\nMainPID=${world.unitPid ?? 0}\n`;
+      if (argv.includes('show')) {
+        if (world.exiting !== undefined && world.exiting-- <= 0) {
+          world.unitPid = null;
+          world.exiting = undefined;
+        }
+        if (world.lingers !== undefined) events.push(`show ${world.unitPid ?? 0}`);
+        return `ActiveState=${world.unitPid === null ? 'inactive' : 'active'}\nUnitFileState=enabled\nMainPID=${world.unitPid ?? 0}\n`;
+      }
       events.push(argv.join(' '));
       if (argv[2] === 'start') world.onStart?.();
       return '';
@@ -129,6 +139,7 @@ function hostOf(world: World): { host: ServiceHost; events: string[] } {
     },
     signal: (pid) => {
       events.push(`signal ${pid}`);
+      if (world.unitPid === pid) world.exiting = world.lingers ?? 0;
       world.onSignal?.();
     },
     pause: (said) => {
@@ -288,6 +299,35 @@ test('a hand daemon handed to the service: install, --take-over <pid>, restarts,
     assert.match(done.lines[0], new RegExp(`pid ${OLD} stopped, and pid ${NEW} ticks the store`));
   });
 
+  await s.test('a restart whose daemon lets the store go before it exits starts the unit only once the unit has ended it', async () => {
+    const world: World = { lease: lease(OLD), unitPid: OLD, lingers: 2 };
+    world.onSignal = () => (world.lease = lease(OLD, 'stopped'));
+    world.onStart = () => passing(world, NEW);
+    const { host, events } = hostOf(world);
+    const done = await restart({}, host);
+    const start = events.indexOf('systemctl --user start nemia.service');
+    assert.ok(start > 0, events.join('\n'));
+    assert.deepEqual(
+      events.slice(events.indexOf(`signal ${OLD}`), start).filter((e) => e.startsWith('show ')),
+      [`show ${OLD}`, `show ${OLD}`, 'show 0'],
+      'the start waits through the reads that still name the stopped daemon',
+    );
+    assert.equal(done.did, 'restarted');
+    assert.equal(done.pid, NEW);
+  });
+
+  await s.test("a restart where the stopped daemon is still the unit's process waits for the unit to end it, then starts it", async () => {
+    const world: World = { lease: lease(OLD, 'stopped'), unitPid: OLD, lingers: 1, exiting: 1 };
+    world.onStart = () => passing(world, NEW);
+    const { host, events } = hostOf(world);
+    const done = await restart({}, host);
+    const start = events.indexOf('systemctl --user start nemia.service');
+    assert.ok(events.slice(0, start).includes('show 0'), events.join('\n'));
+    assert.ok(!events.includes(`signal ${OLD}`), 'nothing is signalled where nothing ticks');
+    assert.equal(done.did, 'started');
+    assert.equal(done.pid, NEW);
+  });
+
   await s.test('a restart where nothing ticks starts the unit and waits for its first pass, signalling and pausing nothing', async () => {
     const world: World = { lease: lease(OLD, 'stopped'), unitPid: null };
     world.onStart = () => passing(world, NEW);
@@ -399,12 +439,57 @@ test('REFUSED: install, --take-over and restart, each by its kind and naming its
       const { host, events } = hostOf(world);
       await assert.rejects(
         install({ takeOver: String(OLD) }, { ...host, waitMs: 30 }),
-        refusedWith('Conflict', /nemia service status/, /nemia resume/),
+        (err: Error) =>
+          refusedWith('Conflict', /nemia service status/, /nemia resume/, /systemctl --user start nemia\.service/)(err) &&
+          !/was started/.test(err.message),
       );
       assert.ok(readPause() !== null);
       assert.ok(events.includes('systemctl --user start nemia.service') && !events.includes('resume'), events.join('\n'));
     },
   );
+
+  await t.test('--take-over whose started unit runs a process that never ticks: Conflict saying it was started', async () => {
+    const world: World = { lease: lease(OLD), unitPid: null };
+    world.onSignal = () => (world.lease = lease(OLD, 'stopped'));
+    world.onStart = () => (world.unitPid = NEW);
+    const { host } = hostOf(world);
+    await assert.rejects(
+      install({ takeOver: String(OLD) }, { ...host, waitMs: 30 }),
+      refusedWith('Conflict', /was started/, /nemia service status/, /nemia resume/),
+    );
+  });
+
+  await t.test('restart whose unit still runs the stopped daemon past the stop wait: Conflict naming ps -p, never started', async () => {
+    await installed();
+    const world: World = { lease: lease(OLD), unitPid: OLD, lingers: 1_000_000 };
+    world.onSignal = () => (world.lease = lease(OLD, 'stopped'));
+    const { host, events } = hostOf(world);
+    await assert.rejects(
+      restart({}, { ...host, stopMs: 30 }),
+      refusedWith('Conflict', new RegExp(`ps -p ${OLD}`), /systemctl --user start nemia\.service/, /nemia resume/),
+    );
+    assert.ok(!events.includes('systemctl --user start nemia.service'), events.join('\n'));
+    assert.ok(readPause() !== null, 'the store stays paused');
+  });
+
+  await t.test('restart whose start the system refuses: Conflict carrying its line, the start line and the log', async () => {
+    await installed();
+    const world: World = { lease: lease(OLD), unitPid: OLD };
+    world.onSignal = () => (world.lease = lease(OLD, 'stopped'));
+    world.onStart = () => {
+      throw Object.assign(new Error('Command failed: systemctl --user start nemia.service'), { stderr: 'Job for nemia.service failed.\n' });
+    };
+    const { host } = hostOf(world);
+    await assert.rejects(
+      restart({}, host),
+      refusedWith(
+        'Conflict',
+        /Job for nemia\.service failed\./,
+        /systemctl --user start nemia\.service/,
+        /journalctl --user -u nemia\.service/,
+      ),
+    );
+  });
 
   await t.test('--take-over where the stopped daemon still holds the store: Conflict naming ps -p, the service not started', async () => {
     const { host, events } = hostOf({ lease: lease(OLD), unitPid: null });

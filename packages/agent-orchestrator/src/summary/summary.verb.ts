@@ -426,10 +426,11 @@ const listedThrough = Effect.fnUntraced(function* (e: Engine, memo: InformerMemo
 
 /**
  * Every run of the store, in its order, listed through the informer `how.memo` as the list reads it (`listedThrough`): a run whose files
- * stamp as they did is the run the informer kept, its record not read. What the RunList selects and pages before it judges any run.
+ * stamp as they did is the run the informer kept, its record not read. What the RunList selects and pages before it judges any run,
+ * with the informer's read and where branches stand, which it judges the page through.
  */
 export const storeRunsListed = Effect.fn('storeRunsListed')(function* (e: Engine, { memo, verify }: SummaryHow) {
-  return (yield* listedThrough(e, memo, verify)).all;
+  return yield* listedThrough(e, memo, verify);
 });
 
 /**

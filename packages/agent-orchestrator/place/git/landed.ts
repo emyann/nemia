@@ -1,7 +1,8 @@
 /**
- * Where a run's result came onto the base's line, read off git's walk of that line (`git rev-list --first-parent --ancestry-path
- * --parents <tip>..HEAD`, newest first): `cameOnto` one tip, and `landedBy` the first commit of the line that holds two of them,
- * folded over every tip asked of into what the `status` verb answers as `landedBy`. Pure; proved by `contracts/landed-by.contract.ts`.
+ * Where a run's result came onto the base's line, read off git's walk of that line down to a tip, newest first, kept to the commits
+ * that hold it (`git rev-list --first-parent --parents <tip>..HEAD`, kept to `git rev-list --ancestry-path <tip>..HEAD`): `cameOnto`
+ * one tip, and `landedBy` the first commit of the line that holds two of them, folded over every tip asked of into what the `status`
+ * verb answers as `landedBy`. Pure; proved by `contracts/landed-by.contract.ts`.
  */
 import type { CameOnto, LandedBy } from '../../contracts/landed-by.contract.ts';
 

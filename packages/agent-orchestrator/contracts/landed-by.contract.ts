@@ -1,9 +1,10 @@
 /**
  * The commit that brought a run's result onto its base (agent-orchestrator, place/git/landed.ts): `cameOnto`, where one result
- * branch's tip came onto the line the base follows by first parents, read off git's walk of that line down to the tip
- * (`git rev-list --first-parent --ancestry-path --parents <tip>..HEAD`), and `landedBy`, the first commit of that line that
- * holds every tip asked of. What the git place's `status` answers as `landedBy`, and what a landing records (`landingDue`):
- * never the base's newest commit once another landing has moved it.
+ * branch's tip came onto the line the base follows by first parents, read off git's walk of that line down to the tip, kept to the
+ * commits that hold it (`git rev-list --first-parent --parents <tip>..HEAD`, kept to `git rev-list --ancestry-path <tip>..HEAD`),
+ * and `landedBy`, the newer of two such points, which the git place's `status` folds over every tip asked of into the first commit of
+ * the line that holds them all. What `status` answers as `landedBy`, and what a landing records (`landingDue`): never the base's
+ * newest commit once another landing has moved it.
  */
 import { type Implementation, spec } from '@emyann/tsverify';
 

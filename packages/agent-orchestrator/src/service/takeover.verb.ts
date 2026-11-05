@@ -184,9 +184,22 @@ export const takeOver = Effect.fn('takeOver')(function* (pid: number, host: Take
   yield* takeOverConfirmed(pid, host, by);
   let signalled = false;
   const own = yield* Effect.acquireRelease(pauseFor(pid, host, by), (put, exit) =>
-    put && (exit._tag === 'Success' || !signalled) ? tried(() => host.resume()).pipe(Effect.ignore) : Effect.void,
+    put && (exit._tag === 'Success' || !signalled)
+      ? tried(() => host.resume()).pipe(
+          Effect.ignore({ log: 'Unhandled', message: 'the pause this takeover put could not be lifted: lift it with nemia resume' }),
+        )
+      : Effect.void,
   );
-  yield* Effect.acquireRelease(host.drain(pid), () => (signalled ? Effect.void : host.drain(null).pipe(Effect.ignore)));
+  yield* Effect.acquireRelease(host.drain(pid), () =>
+    signalled
+      ? Effect.void
+      : host.drain(null).pipe(
+          Effect.ignore({
+            log: 'Unhandled',
+            message: "the drain this takeover put could not be lifted: the daemon's next pass lifts it",
+          }),
+        ),
+  );
   yield* called(host);
   yield* takeOverConfirmed(pid, host, by);
   signalled = true;

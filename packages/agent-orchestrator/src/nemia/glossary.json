@@ -46,8 +46,13 @@
       }
     },
     {
+      "term": "Peer",
+      "meaning": "another agent's words in a session's chat (`ChatFrom` `peer`), drawn under the name it spoke under and never as the person's.",
+      "type": "ChatFrom"
+    },
+    {
       "term": "Say",
-      "meaning": "putting words into her open session, through the runtime's `say`: the keeper's two acts, `sayCustom` (the person's custom words, once they changed) and `sayOutbox` (the person's chat words), and `chatSay`, which puts the person's words in her chat's outbox. The marks on disk keep the name `delivered`.",
+      "meaning": "putting words into her open session, through the runtime's `say`: the keeper's two acts, `sayCustom` (the person's custom words, once they changed) and `sayOutbox` (her chat's words, each framed by who wrote it, `framedFor`), and `chatSay`, which puts words in her chat's outbox, the person's or an allowed agent's. The marks on disk keep the name `delivered`.",
       "type": "NemiaAct",
       "retired": [
         {
@@ -69,8 +74,17 @@
         {
           "spelling": "chatSend",
           "card": "decision 14 part C: every way of putting words into a session is say"
+        },
+        {
+          "spelling": "framedForHer",
+          "card": "nemia: another agent can speak to her session in her chat without being labelled the person"
         }
       ]
+    },
+    {
+      "term": "Speaker",
+      "meaning": "who wrote words to a session's chat: the person, from the board alone, or an agent by a name the person allowed it with `nemia chat allow <name>`.",
+      "type": "Speaker"
     }
   ]
 }

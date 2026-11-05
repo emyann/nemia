@@ -20,7 +20,7 @@ and only it, then the part headed *Either way*.
 ### true — on GitHub
 
 **Nothing ran the suite on this machine.** The implement step's check is the cheap set and CI: `change.ts size`, `probe.ts`, `parts.ts`,
-`pull-request.ts push` and `pull-request.ts wait`, in that order, and nothing else — no typecheck, no lint, no test here. GitHub's
+the factory's own check, its `implementCheck` parameter (`${{ parameters.implementCheck }}`; `true` checks nothing), `pull-request.ts push` and `pull-request.ts wait`, in that order, and nothing else — no typecheck, no lint, no test here. GitHub's
 `${{ parameters.ciCheck }}` context judged the repository's suite on the commit implement pushed, and your brief hands you the check's
 exit and the end of its output, that verdict in it; a check that did not pass is a finding, and so is a round whose suite nothing ran.
 
@@ -35,7 +35,7 @@ the commit you are reviewing. You open, edit, merge and close none: those are re
 ### false — in this checkout
 
 **The local check judged this round.** This factory has no remote: there is no pull request to read and no CI. The implement step's
-check is `change.ts size`, `probe.ts`, `parts.ts` and the repository's local check (`${{ parameters.localCheck }}`), in that order, and nothing
+check is `change.ts size`, `probe.ts`, `parts.ts`, the factory's own check, its `implementCheck` parameter (`${{ parameters.implementCheck }}`; `true` checks nothing) and the repository's local check (`${{ parameters.localCheck }}`), in that order, and nothing
 else, and nothing else ran the suite. Your brief hands you the check's exit and the end of its output; a check that did not pass is a
 finding, and so is a round whose tests nothing ran.
 

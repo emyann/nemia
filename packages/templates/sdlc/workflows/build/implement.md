@@ -19,15 +19,15 @@ rounds go. The script pushes your own branch, never another and never the base a
 the open one up to date, never a draft. Name the address it prints (`nemia pr: <url>`) in your `artifacts` as a value, `{"name": "pull
 request", "value": "<the url>"}`.
 
-Your check runs `probe.ts` and `parts.ts`, then pushes again through the same script, so CI's verdict is for the commit it judges, runs the repository's round check
+Your check runs `probe.ts`, `parts.ts` and the factory's own check, its `implementCheck` parameter (`${{ parameters.implementCheck }}`; `true` checks nothing), then pushes again through the same script, so CI's verdict is for the commit it judges, runs the repository's round check
 (`${{ parameters.roundCheck }}`), and waits on the `${{ parameters.ciCheck }}` context: CI runs the repository's suite on that commit,
 and a red, cancelled or missing `${{ parameters.ciCheck }}` comes back as the check's refusal, with the Actions URL, the failing jobs
 and the tail of their log — your next try is handed that, since you may type no `gh` yourself.
 
 ### false — in this checkout
 
-This factory has no remote: nothing is pushed and no pull request is opened, and you open none. Your check runs `probe.ts` and
-`parts.ts`, then the repository's local check (`${{ parameters.localCheck }}`) on this round's tree, from the workspace's root, and nothing else: a refusal
+This factory has no remote: nothing is pushed and no pull request is opened, and you open none. Your check runs `probe.ts`,
+`parts.ts` and the factory's own check, its `implementCheck` parameter (`${{ parameters.implementCheck }}`; `true` checks nothing), then the repository's local check (`${{ parameters.localCheck }}`) on this round's tree, from the workspace's root, and nothing else: a refusal
 of it comes back to you with the end of its output, as the next try's brief. That command is the only judge of the change before it
 lands, and the landing runs it again, on the base with your branch merged into it, before the merge is committed.
 

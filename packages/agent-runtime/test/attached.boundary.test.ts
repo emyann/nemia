@@ -1084,11 +1084,16 @@ const costStates = (dir: string) => (lines(dir, 'cost-state.jsonl') as { totalCo
 /** Whether two costs are the same, to the cent's billionth: a sum of floats is not exact. */
 const sameCost = (a: number | undefined, b: number) => a !== undefined && Math.abs(a - b) < 1e-9;
 
+/**
+ * The cost story's first holder: it cuts the call in flight at 1 s (0.05 of 20 s), then waits on the cut session's end — the event
+ * that says its Claude Code printed what it spent and saved its total — with about 19 s to spare, far above a loaded runner's stall.
+ */
+const CUT = { letGoMs: 20_000, callsShare: 0.05 };
+
 test("a session cut by its holder's let-go and resumed by the next holder costs what both of its processes spent", WAITED, async (t) => {
   const s = story(t);
   const { root, dir, request } = place({ call: 'Bash', cost: 0.5, output: {} }, { budgetUsd: 2 });
-  // The call is cut at 1 s (0.05 of 20 s); the let-go then waits on the cut session's end, the event, with ~19 s to spare.
-  const first = await holder(root, 20_000, 0.05);
+  const first = await holder(root, CUT.letGoMs, CUT.callsShare);
   let next: Awaited<ReturnType<typeof holder>> | undefined;
   t.after(async () => {
     await next?.close();

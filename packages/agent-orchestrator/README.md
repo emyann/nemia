@@ -2045,7 +2045,9 @@ A **workflow node** is a route to another workflow: `workflow: dev` beside its `
 gate. Once it is due it files a card for the named workflow (a bare name, resolved through the factory when the route is taken) and
 reads **`sent`**, which satisfies `after`: the caller goes on, or ends. **A routed run does not wait for its caller to land**: it is a
 card queued like any other, started from the base branch and handed its caller as `from:` (*Context without a wait*), never
-`--after`; a later card may add a wait. Each run keeps its own workspace, gate, budget and landing.
+`--after`; a later card may add a wait. Each run keeps its own workspace, gate, budget and landing. The card opens with the `title`
+its condition's producer signed off on (a table's `from:` step, else the condition itself), where that step's `output:` declares one
+and it says one, else with the run's own title, and carries the run's labels as its `labels:` (`sentCardTitle`, `sendCards`).
 
 On a route not taken, a node that was never filed reads **`skipped`**, and so does a node whose parents are all skipped; it is worked
 out on every pass from the conditions' answers and carries nothing between passes. `skipped` neither satisfies `after` nor stops a

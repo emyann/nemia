@@ -64,6 +64,15 @@ export const FEED_WALKS: Readonly<Record<string, readonly Walk[]>> = {
       says: [TWO[1]?.word],
     },
     {
+      name: 'of at most one line: the first alone, and the cursor after it',
+      walk: ({ door }) => {
+        appended(door);
+        const read = done(door.lines.read(0, 1));
+        return { words: read.lines.map((l) => l.word), ends: read.ends, cursor: read.cursor };
+      },
+      says: { words: [TWO[0]?.word], ends: [bytesOf(TWO.slice(0, 1))], cursor: bytesOf(TWO.slice(0, 1)) },
+    },
+    {
       name: 'at the end: none, and the cursor where it was',
       walk: ({ door }) => {
         const end = appended(door);

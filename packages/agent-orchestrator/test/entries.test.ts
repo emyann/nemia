@@ -252,6 +252,7 @@ const PINNED: Record<string, string[]> = {
     'firstLine',
     'folderRefusal',
     'foldersIn',
+    'foldersLoaded',
     'forgetLine',
     'formerKeyLines',
     'freshFeedMemo',

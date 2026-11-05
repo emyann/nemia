@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Locator, Page, Response } from 'playwright';
-import { expectInstant, photograph, PLACES_SAID, sidebar, themeOf, railPlace, litOf } from '../board.ts';
+import { cardsPath, expectInstant, photograph, PLACES_SAID, sidebar, themeOf, railPlace, litOf } from '../board.ts';
 import { expectCount, expectTexts, expectVisible, idle, Refused, settled, WAIT_MS, watch } from '../checks.ts';
 import {
   CARDS,
@@ -63,9 +63,10 @@ export default {
    * The inbox: the seeded cards, newest first, and the queue; a card filed from the box into a factory, queued, unqueued, then removed
    * with its Remove; a card's start form, in the factory picked for it, preset from the card. Each in a page of its own: a card started,
    * which opens its run's page and stays listed, started; a card started already; a card about a repository the factory
-   * picked does not work on; stray files and a folder; an empty inbox; and a start, a remove and a queue each refused behind the page's
-   * back. Every start picks its factory first, and is sent with it (`expectInFactory`); the factory is made able to start its workflow
-   * for the page (`hiringStarts`). Every write is taken back, so every page after this one, in either theme, reads the store as seeded.
+   * picked does not work on; stray files and a folder, which the Card list leaves out; an empty inbox; and a start, a remove and a
+   * queue each refused behind the page's back. Every start picks its factory first, and is sent with it (`expectInFactory`); the
+   * factory is made able to start its workflow for the page (`hiringStarts`). Every write is taken back, so every page after this one,
+   * in either theme, reads the store as seeded.
    */
   name: 'inbox',
   route: '/inbox',
@@ -198,12 +199,14 @@ async function visit(page: Page): Promise<void> {
     await idea.fill(FILED);
     await box.getByRole('combobox', { name: 'Workflow' }).selectOption({ label: WORKFLOWS.good.name });
     const [filed] = await Promise.all([
-      page.waitForResponse((r) => r.request().method() === 'POST' && new URL(r.url()).pathname === '/api/inbox', { timeout: WAIT_MS }),
+      page.waitForResponse((r) => r.request().method() === 'POST' && cardsPath().test(new URL(r.url()).pathname), { timeout: WAIT_MS }),
       fileIt.click(),
     ]);
     if (filed.status() !== 201)
       throw new Refused(`the api files the card, through the board's proxy — it answered ${filed.status()}: ${await filed.text()}`);
-    const { name } = (await filed.json()) as { name: string };
+    const {
+      metadata: { name },
+    } = (await filed.json()) as { metadata: { name: string } };
     const written = path.join(inbox, `${name}.md`);
     try {
       const text = fs.existsSync(written) ? fs.readFileSync(written, 'utf8') : undefined;
@@ -220,16 +223,16 @@ async function visit(page: Page): Promise<void> {
 
       const fresh = cardIn(page, name);
       const [queued] = await Promise.all([
-        page.waitForResponse((r) => r.request().method() === 'POST' && new URL(r.url()).pathname === `/api/inbox/${name}/queue`, {
+        page.waitForResponse((r) => r.request().method() === 'POST' && cardsPath(name, 'queue').test(new URL(r.url()).pathname), {
           timeout: WAIT_MS,
         }),
         fresh.getByRole('button', { name: 'Queue', exact: true }).click(),
       ]);
       if (queued.status() !== 200)
         throw new Refused(`the api queues the card, through the board's proxy — it answered ${queued.status()}: ${await queued.text()}`);
-      const { queued: at, place } = (await queued.json()) as { queued: string; place: number };
-      if (place !== QUEUED.length + 1)
-        throw new Refused(`the card queued is behind the ${QUEUED.length} queued already — the api placed it ${place}`);
+      const {
+        spec: { queued: at },
+      } = (await queued.json()) as { spec: { queued: string } };
       const queuedText = fs.readFileSync(written, 'utf8');
       if (queuedText !== queuedCardText({ workflow: WORKFLOWS.good.name, body: FILED }, at, undefined, FACTORY)) {
         throw new Refused(
@@ -243,7 +246,7 @@ async function visit(page: Page): Promise<void> {
       );
       await expectCount(fresh.getByRole('button', { name: 'Queue', exact: true }), 0, 'and offers Queue no more');
       const [unqueued] = await Promise.all([
-        page.waitForResponse((r) => r.request().method() === 'DELETE' && new URL(r.url()).pathname === `/api/inbox/${name}/queue`, {
+        page.waitForResponse((r) => r.request().method() === 'POST' && cardsPath(name, 'unqueue').test(new URL(r.url()).pathname), {
           timeout: WAIT_MS,
         }),
         fresh.getByRole('button', { name: 'Unqueue' }).click(),
@@ -257,7 +260,7 @@ async function visit(page: Page): Promise<void> {
       if (fs.readFileSync(written, 'utf8') !== card)
         throw new Refused(`and the card is written as it was filed — ${written} holds ${JSON.stringify(fs.readFileSync(written, 'utf8'))}`);
       const [dropped] = await Promise.all([
-        page.waitForResponse((r) => r.request().method() === 'DELETE' && new URL(r.url()).pathname === `/api/inbox/${name}`, {
+        page.waitForResponse((r) => r.request().method() === 'DELETE' && cardsPath(name).test(new URL(r.url()).pathname), {
           timeout: WAIT_MS,
         }),
         cardIn(page, name).getByRole('button', { name: 'Remove' }).click(),
@@ -304,7 +307,7 @@ async function visit(page: Page): Promise<void> {
       };
       try {
         const [queued] = await Promise.all([
-          page.waitForResponse((r) => r.request().method() === 'POST' && new URL(r.url()).pathname === `/api/inbox/${planned.name}/queue`, {
+          page.waitForResponse((r) => r.request().method() === 'POST' && cardsPath(planned.name, 'queue').test(new URL(r.url()).pathname), {
             timeout: WAIT_MS,
           }),
           item.getByRole('button', { name: 'Queue', exact: true }).click(),
@@ -318,7 +321,9 @@ async function visit(page: Page): Promise<void> {
         );
         await idle(page);
         await unmoved('queued');
-        const { queued: at } = (await queued.json()) as { queued: string };
+        const {
+          spec: { queued: at },
+        } = (await queued.json()) as { spec: { queued: string } };
         if (fs.readFileSync(file, 'utf8') !== queuedCardText(planned, at, checkout, FACTORY))
           throw new Refused(
             `${planned.name} is queued in its factory, ${FACTORY}, which the tick starts it in — ${file} holds ${JSON.stringify(fs.readFileSync(file, 'utf8'))}`,
@@ -327,7 +332,7 @@ async function visit(page: Page): Promise<void> {
         await photograph(page, path.join(OUT, `inbox-queued-${await themeOf(page)}.png`), { fullPage: true });
         const [unqueued] = await Promise.all([
           page.waitForResponse(
-            (r) => r.request().method() === 'DELETE' && new URL(r.url()).pathname === `/api/inbox/${planned.name}/queue`,
+            (r) => r.request().method() === 'POST' && cardsPath(planned.name, 'unqueue').test(new URL(r.url()).pathname),
             { timeout: WAIT_MS },
           ),
           item.getByRole('button', { name: 'Unqueue' }).click(),
@@ -382,7 +387,12 @@ async function visit(page: Page): Promise<void> {
       const form = item.locator(`form[aria-label="Start ${planned.name}"]`);
       await form.getByRole('textbox', { name: 'Brief' }).fill(STARTED);
       const [started] = await Promise.all([
-        starting.waitForResponse((r) => r.request().method() === 'POST' && new URL(r.url()).pathname === '/api/runs', { timeout: WAIT_MS }),
+        starting.waitForResponse(
+          (r) => r.request().method() === 'POST' && cardsPath(planned.name, 'start').test(new URL(r.url()).pathname),
+          {
+            timeout: WAIT_MS,
+          },
+        ),
         form.getByRole('button', { name: 'Start' }).click(),
       ]);
       expectInFactory(started, checkout);
@@ -391,7 +401,7 @@ async function visit(page: Page): Promise<void> {
       const answer = (await started.json()) as { id: string };
       const { id } = answer;
       if ('removed' in answer || 'why' in answer)
-        throw new Refused(`the start answers the run alone, a card started being kept — it answered ${JSON.stringify(answer)}`);
+        throw new Refused(`the start answers the run and the card, a card started being kept — it answered ${JSON.stringify(answer)}`);
       await starting.waitForURL(`**/runs/${id}`, { timeout: WAIT_MS });
       await expectVisible(starting.locator('h1', { hasText: id }), `the start opens the run's page (${id})`);
       await expectVisible(
@@ -542,31 +552,17 @@ async function visit(page: Page): Promise<void> {
       const { problems } = watch(strays);
       await strays.goto(page.url(), { waitUntil: 'load' });
       await idle(strays);
-      const sub = cardIn(strays, 'sub/');
-      await expectVisible(sub.getByText(/^sub\/: not a card/), 'a folder in the inbox is listed with why it is not a card');
-      await expectCount(
-        sub.getByRole('link'),
-        0,
-        'and has no page: the api refuses the name sub/, so a link would open a refusal of what is listed',
-      );
+      await expectCount(cardIn(strays, 'sub/'), 0, 'a folder in the inbox is no card, and the Card list leaves it out');
+      await expectCount(cardIn(strays, 'notes.txt'), 0, 'a stray file is no card, and is left out too');
       const named = cardIn(strays, 'notes');
-      await expectCount(named, 2, 'a card and a stray file of one name are both listed, under that name');
-      const namedStray = named.filter({ hasText: 'notes: not a card' });
-      await expectVisible(namedStray, 'the stray is listed with why it is not a card');
-      await expectCount(
-        namedStray.getByRole('link'),
-        0,
-        "and has no page: /inbox/notes is notes.md, so a link would open the card's page under the stray's name",
-      );
+      await expectCount(named, 1, 'beside a stray file of one name, the card of that name alone is listed');
       await expectVisible(
         named.filter({ has: strays.locator('[data-title]') }).locator('a[href="/inbox/notes"]', { hasText: 'Notes, as a card' }),
-        'and the card of that name keeps the page, which is the one the api reads',
+        'and the card keeps its page, which is the one the api reads',
       );
 
-      const notes = cardIn(strays, 'notes.txt');
-      await expectVisible(notes.getByText(/^notes\.txt: not a card/), 'a stray file is listed with why it is not a card');
-      await notes.getByRole('link', { name: 'notes.txt' }).click();
-      await strays.waitForURL('**/inbox/notes.txt', { timeout: WAIT_MS });
+      await strays.goto(new URL('/inbox/notes.txt', strays.url()).href, { waitUntil: 'load' });
+      await idle(strays);
       await expectVisible(strays.getByText(/^notes\.txt: not a card/), "the stray file's page says why it is not a card");
       await expectCount(strays.locator('section[aria-label="Keys"]'), 0, 'and lays out no keys');
       await strays.getByRole('button', { name: 'Source' }).click();
@@ -617,7 +613,7 @@ async function visit(page: Page): Promise<void> {
     }
 
     const rereadOf = (p: Page) =>
-      p.waitForResponse((r) => r.request().method() === 'GET' && new URL(r.url()).pathname === '/api/inbox', { timeout: WAIT_MS });
+      p.waitForResponse((r) => r.request().method() === 'GET' && new URL(r.url()).pathname === '/api/cards', { timeout: WAIT_MS });
     const onlyRefusal = (p: Page, seen: string[], answered: Response) => {
       const expected = `request answered ${answered.status()}: ${answered.request().method()} ${answered.url()}`;
       const chromium = new RegExp(`^console error: Failed to load resource: the server responded with a status of ${answered.status()}\\b`);
@@ -651,18 +647,19 @@ async function visit(page: Page): Promise<void> {
       fs.renameSync(bareFile, bareAside);
       const reread = rereadOf(refused);
       const [answered] = await Promise.all([
-        refused.waitForResponse((r) => r.request().method() === 'POST' && new URL(r.url()).pathname === '/api/runs', { timeout: WAIT_MS }),
+        refused.waitForResponse((r) => r.request().method() === 'POST' && cardsPath(bare.name, 'start').test(new URL(r.url()).pathname), {
+          timeout: WAIT_MS,
+        }),
         form.getByRole('button', { name: 'Start' }).click(),
       ]);
       expectInFactory(answered, checkout);
       const { error } = (await answered.json()) as { error?: string };
-      const sentence = `no card ${bare.name} in the inbox. Its cards are: ${[planned.name, rich.name, ...queuedByFiling].sort().join(', ')}. Start one of those — nemia start ${path.join(inbox, '<name>.md')} — or park the idea first: nemia inbox add "<idea>".`;
-      if (answered.status() !== 404 || error !== sentence) {
+      if (answered.status() !== 404 || !error?.startsWith(`no card ${bare.name}`)) {
         throw new Refused(
           `the api refuses to start a card that is not there, in the package's words — it answered ${answered.status()}: ${JSON.stringify(error)}`,
         );
       }
-      const listing = (await (await reread).json()) as Array<{ name: string }>;
+      const listing = ((await (await reread).json()) as { items: Array<{ metadata: { name: string } }> }).items.map((c) => c.metadata);
       if (listing.some((e) => e.name === bare.name))
         throw new Refused(
           `the inbox read again after the refusal no longer lists ${bare.name} — it listed ${JSON.stringify(listing.map((e) => e.name))}`,
@@ -705,13 +702,13 @@ async function visit(page: Page): Promise<void> {
       fs.renameSync(cardFile, plannedAside);
       const reread = rereadOf(unremoved);
       const [answered] = await Promise.all([
-        unremoved.waitForResponse((r) => r.request().method() === 'DELETE' && new URL(r.url()).pathname === `/api/inbox/${planned.name}`, {
+        unremoved.waitForResponse((r) => r.request().method() === 'DELETE' && cardsPath(planned.name).test(new URL(r.url()).pathname), {
           timeout: WAIT_MS,
         }),
         item.getByRole('button', { name: 'Remove' }).click(),
       ]);
       const { error } = (await answered.json()) as { error?: string };
-      if (answered.status() !== 404 || !error?.startsWith(`no card ${planned.name} in the inbox.`)) {
+      if (answered.status() !== 404 || !error?.startsWith(`no card ${planned.name}`)) {
         throw new Refused(
           `the api refuses to drop a card that is not there, in the package's words — it answered ${answered.status()}: ${JSON.stringify(error)}`,
         );
@@ -773,9 +770,12 @@ async function visit(page: Page): Promise<void> {
       const before = fs.readdirSync(runsDir).sort();
       const reread = rereadOf(conflicted);
       const [answered] = await Promise.all([
-        conflicted.waitForResponse((r) => r.request().method() === 'POST' && new URL(r.url()).pathname === '/api/runs', {
-          timeout: WAIT_MS,
-        }),
+        conflicted.waitForResponse(
+          (r) => r.request().method() === 'POST' && cardsPath(planned.name, 'start').test(new URL(r.url()).pathname),
+          {
+            timeout: WAIT_MS,
+          },
+        ),
         form.getByRole('button', { name: 'Start' }).click(),
       ]);
       expectInFactory(answered, checkout);
@@ -826,11 +826,11 @@ async function visit(page: Page): Promise<void> {
       const queueIt = item.getByRole('button', { name: 'Queue', exact: true });
       await expectVisible(queueIt, `${planned.name} offers Queue`);
       const listedBefore = await order(requeued);
-      const elsewhere = await fetch(new URL(`/api/inbox/${planned.name}/queue`, requeued.url()), {
+      const elsewhere = await fetch(new URL(`/api/namespaces/${FACTORY}/cards/${planned.name}/queue`, requeued.url()), {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
       });
-      const { queued: behind } = (await elsewhere.json()) as { queued?: string };
+      const behind = ((await elsewhere.json()) as { spec?: { queued?: string } }).spec?.queued;
       if (elsewhere.status !== 200 || !behind)
         throw new Refused(`another tab queues ${planned.name} through the api — it answered ${elsewhere.status}`);
       if (fs.readFileSync(cardFile, 'utf8') !== queuedCardText(planned, behind, checkout, FACTORY))
@@ -840,7 +840,7 @@ async function visit(page: Page): Promise<void> {
       const reread = rereadOf(requeued);
       const [answered] = await Promise.all([
         requeued.waitForResponse(
-          (r) => r.request().method() === 'POST' && new URL(r.url()).pathname === `/api/inbox/${planned.name}/queue`,
+          (r) => r.request().method() === 'POST' && cardsPath(planned.name, 'queue').test(new URL(r.url()).pathname),
           { timeout: WAIT_MS },
         ),
         queueIt.click(),

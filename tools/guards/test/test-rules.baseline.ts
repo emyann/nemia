@@ -83,7 +83,7 @@ export const PINNED_WORDS: Readonly<Record<string, number>> = {
   'apps/web/test/skills.test.ts': 1,
   'apps/web/test/time-of-day.test.ts': 4,
   'apps/web/test/transcript.test.ts': 1,
-  'apps/web/test/write.test.ts': 3,
+  'apps/web/test/write.test.ts': 2,
   'packages/agent-runtime/test/a2a-handler.test.ts': 5,
   'packages/agent-runtime/test/a2a.test.ts': 11,
   'packages/agent-runtime/test/admission.test.ts': 1,

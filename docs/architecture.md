@@ -288,9 +288,8 @@ step's tries and told at `…/steps/:step/tries` and `…/steps/:step/told`, key
 moved, and the lines once at `GET /api/runs/:id/lines` (`RunLinesAnswer`, mirrored by hand); the api's tests read the same. The api
 serves the object and its sub-resources through the `Api` of `objects` (`apps/api/src/objects/`, off the command table's entries and the
 app's one informer), and its OpenAPI 3.1 document is `OpenApi.fromApi(Api)` (`apps/api/src/openapi/`, printed by its `print.ts`), and `GET /openapi` serves a page to browse it (Scalar's
-reference, its script served by the api from the installed package, reading the document at its route). The board's run mirror is generated from
-that document by Effect's own modules (`apps/web/src/lib/api/run.gen.ts`, written by `npm run mirror` in `apps/web`), checked in, and
-refused when it drifts (`apps/web/test/mirror.test.ts`).
+reference, its script served by the api from the installed package, reading the document at its route). The board reads the Run and
+the Card through a client made from the same `Api` (`apps/web/src/lib/api/objects.ts`), with no schema of its own for either.
 
 **In the api today, below its layer**: `src/capabilities/reach.ts` re-implementing permission matching. Its readers that touch the machine
 are counted against a baseline that only shrinks (`MOVES` in `apps/api/test/kinds.test.ts`), each entry naming the card that moves it,

@@ -4481,7 +4481,7 @@ async function startMarkup(folderTeam: boolean, repo?: string): Promise<string> 
       { client: new QueryClient() },
       createElement(StartRun, {
         workflow,
-        card: { name: 'a-note-on-the-tides', body: 'Why the tides come twice a day.' },
+        card: { name: 'a-note-on-the-tides', factory: null, body: 'Why the tides come twice a day.' },
         ...(repo ? { repo } : {}),
       }),
     ),

@@ -55,7 +55,7 @@ function CardPage() {
       {card.error === null && (
         <Labels
           labels={card.labels}
-          edit={(edits) => labelCard(card.name, edits).then(() => queryClient.invalidateQueries({ queryKey: ['inbox'] }))}
+          edit={(edits) => labelCard(card, edits).then(() => queryClient.invalidateQueries({ queryKey: ['inbox'] }))}
         />
       )}
 

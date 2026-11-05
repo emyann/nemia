@@ -1,8 +1,10 @@
 /**
- * The Factory's and the inbox's reads as the api answers them, every key the board reads: an inbox entry (`inboxEntry`), a card's page
+ * The Factory's and the inbox's reads as the api answers them, every key the board reads: an inbox entry (`inboxEntry`), the Card it is
+ * made of (`cardObject`, in a `CardList` by `cardList`), a card's page
  * (`cardPage`), what the repository offers (`capabilities`, its steps from `stepReach`), the quota (`quota`), the cap and the last pass
  * (`ceilings`) and the daemon (`daemon`). Each takes keys to put over its own.
  */
+import type { Card, CardList } from 'objects';
 import type { Capabilities, Ceilings, Daemon, InboxCardPage, InboxEntry, PassCost, Quota, QuotaWindow, StepReach } from '../src/lib/api.ts';
 
 /**
@@ -28,6 +30,36 @@ export const inboxEntry = (extra: Partial<InboxEntry> = {}): InboxEntry => ({
   factoryRepo: null,
   ...extra,
 });
+
+/** What a Card may put over `cardObject`'s, part by part. */
+type CardOver = { metadata?: Partial<Card['metadata']>; spec?: Partial<Card['spec']>; status?: Partial<Card['status']> };
+
+/**
+ * The Card `inboxEntry` is made of (`entryOf`): the same card, as the objects' list answers it — but its queued place, which is null, the
+ * card being started.
+ */
+export const cardObject = (over: CardOver = {}): Card => ({
+  apiVersion: 'nemia/v1',
+  kind: 'Card',
+  metadata: {
+    name: 'decode-the-reads',
+    namespace: 'nemia',
+    creationTimestamp: '2026-09-30T05:00:00.000Z',
+    resourceVersion: '0123456789abcdef',
+    ...over.metadata,
+  },
+  spec: { workflow: 'build', repo: '/work/repo', queued: '2026-09-30T05:01:00.000Z', body: 'Decode the reads\n', ...over.spec },
+  status: {
+    state: 'succeeded',
+    runs: ['r-0'],
+    lastStart: { at: '2026-09-30T05:02:00.000Z', repo: '/work/repo', why: 'the workflow is gone', refused: true },
+    title: 'Decode the reads',
+    ...over.status,
+  },
+});
+
+/** A page of the inbox's cards holding `items`, the last. */
+export const cardList = (...items: Card[]): CardList => ({ apiVersion: 'nemia/v1', kind: 'CardList', metadata: {}, items });
 
 /** A card's page: the entry, its file as written and its key rows. */
 export const cardPage = (extra: Partial<InboxCardPage> = {}): InboxCardPage => ({

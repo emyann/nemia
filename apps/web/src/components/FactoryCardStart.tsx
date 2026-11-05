@@ -196,7 +196,7 @@ function InFactory({ entry, place, onStarted, onRefused }: { entry: InboxEntry; 
         workflow && (
           <StartRun
             workflow={workflow}
-            card={{ name: entry.name, body: entry.body ?? '' }}
+            card={{ name: entry.name, factory: entry.factory, body: entry.body ?? '' }}
             repo={place.repo}
             place={place}
             onStarted={onStarted}

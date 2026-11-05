@@ -19,6 +19,9 @@
  * (`offerWordBreaks`).
  *
  * No file of the board compares the runtime's `needs-human`: a question a session asks is read off its codes (`needsHumanBreaks`).
+ *
+ * A kind of `objects` is read through `lib/api/objects.ts`, never a schema of the board's: no file under `src/lib/api` is generated
+ * (`*.gen.ts`), and no file of `src` declares a Schema named as a kind (`kindSchemaBreaks`).
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -26,6 +29,7 @@ import fs from 'node:fs';
 import { builtinModules } from 'node:module';
 import path from 'node:path';
 import ts from 'typescript';
+import { KINDS } from 'objects';
 import { OFFERS, PAUSED, PERSON } from '../src/lib/words.ts';
 
 const WEB = path.join(import.meta.dirname, '..');
@@ -228,6 +232,62 @@ test('REFUSED: a path into the objects; their entry is let through', () => {
   assert.equal(planted(`${OBJECTS}/src/run.ts`).length, 1, 'a file of its src');
   assert.equal(planted(`${OBJECTS}/package.json`).length, 1, 'its manifest');
   assert.deepEqual(planted(OBJECTS), [], 'its entry');
+});
+
+/** The names a Schema of a kind of `objects` goes by: the kind, its list, each with `Schema` after it or without. */
+const KIND_NAMES: ReadonlySet<string> = new Set(KINDS.flatMap((kind) => [kind, `${kind}List`].flatMap((n) => [n, `${n}Schema`])));
+
+/**
+ * Each file under `src/lib/api` named `*.gen.ts`, and each declaration of `src` of a Schema named as a kind of `objects`
+ * (`KIND_NAMES`): a `const` whose value is built from `Schema` or `decodes`. The board reads a kind through `lib/api/objects.ts`.
+ */
+function kindSchemaBreaks(texts: ReadonlyMap<string, string>): string[] {
+  const out: string[] = [];
+  for (const [file, text] of texts) {
+    if (/^src\/lib\/api\/.*\.gen\.ts$/.test(file))
+      out.push(`${file} is generated: a kind of objects is read through lib/api/objects.ts, so delete it and read the kind there`);
+    const source = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true);
+    const visit = (node: ts.Node): void => {
+      if (
+        ts.isVariableDeclaration(node) &&
+        ts.isIdentifier(node.name) &&
+        KIND_NAMES.has(node.name.text) &&
+        node.initializer !== undefined &&
+        /^(?:Schema\.|decodes\b)/.test(node.initializer.getText(source))
+      )
+        out.push(
+          `${file} declares a Schema ${node.name.text}, a kind of objects: import its Schema from 'objects' and read it through lib/api/objects.ts`,
+        );
+      ts.forEachChild(node, visit);
+    };
+    visit(source);
+  }
+  return out;
+}
+
+test('no file of the board mirrors a kind of objects: none generated under lib/api, no Schema named as a kind', () => {
+  assert.ok(KIND_NAMES.has('RunSchema') && KIND_NAMES.has('Card'), [...KIND_NAMES].join(', '));
+  assert.deepEqual(kindSchemaBreaks(sourceTexts()), []);
+});
+
+test('REFUSED: a generated file under lib/api, and a Schema of src named as a kind of objects', () => {
+  const planted = (file: string, text: string): string[] => kindSchemaBreaks(new Map([...sourceTexts(), [file, text]]));
+  assert.equal(planted('src/lib/api/run.gen.ts', 'export const x = 1;\n').length, 1, 'a generated file under lib/api');
+  assert.equal(
+    planted('src/lib/x.ts', "import { Schema } from 'effect';\nexport const RunSchema = Schema.Struct({ kind: Schema.String });\n").length,
+    1,
+    'a RunSchema',
+  );
+  assert.equal(
+    planted('src/lib/api/y.ts', 'const Run = Schema.Struct({});\nconst CardList = decodes<X>()(Schema.Struct({}));\n').length,
+    2,
+  );
+  assert.deepEqual(
+    planted('src/lib/z.ts', "import { Run } from 'objects';\nconst RunView = Schema.Struct({});\nconst Card = 1;\n"),
+    [],
+    'a kind imported, a name beside one, a value that is no Schema',
+  );
+  assert.deepEqual(planted('src/routeTree.gen.ts', 'export const x = 1;\n'), [], "the router's generated tree, out of lib/api");
 });
 
 test("REFUSED: a file of the source that imports a test file, the page of the look's stories among them", () => {

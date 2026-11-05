@@ -184,9 +184,7 @@ export type RunLines = Holds<Same<Board.RunLines, runs.RunLinesAnswer>>;
 export type RunGraph = Holds<Same<Board.RunGraph, runs.RunListing['graph']>>;
 export type GraphEdge = Holds<Same<Board.GraphEdge, runs.RunListing['graph']['edges'][number]>>;
 
-export type InboxEntry = Holds<Same<Board.InboxEntry, inbox.InboxEntry>>;
 export type InboxCardPage = Holds<Same<Board.InboxCardPage, inbox.InboxCardPage>>;
-export type Queued = Holds<Same<Board.Queued, inbox.InboxQueueAnswer>>;
 export type FromSet = Holds<Same<Board.FromSet, inbox.InboxFromAnswer>>;
 
 export type PlaceKind = Holds<Same<Board.PlaceKind, runs.RunListing['place']>>;

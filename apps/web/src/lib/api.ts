@@ -17,7 +17,7 @@ export {
   type RunLines,
   type StepCommands,
 } from './api/run.ts';
-export type * as RunObject from './api/run.gen.ts';
+export type * as RunObject from 'objects';
 export type * from './api/graph.ts';
 export type * from './api/layers.ts';
 export type * from './api/tries.ts';

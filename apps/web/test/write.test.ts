@@ -10,7 +10,7 @@ import { Schema } from 'effect';
 import { ReadRefusal, send, UnreadAnswer, WriteRefusal } from '../src/lib/api/read.ts';
 import { liftHold, pruneRun, putHold, removeRun } from '../src/lib/api/runs.ts';
 import { approveStep, askRound, askTry, sayToStep } from '../src/lib/api/asks.ts';
-import { dropCard, fileCard, queueCard } from '../src/lib/api/inbox.ts';
+import { dropCard, fileCard, queueCard, startCard } from '../src/lib/api/inbox.ts';
 import { AgentRefusal, createAgent, removeAgent, tryAgent, type AgentDraft } from '../src/lib/api/agents.ts';
 import { copySkill, saveSkill, SkillRefusal, type SkillDraft } from '../src/lib/api/skills.ts';
 import { BuildRefusal, saveWorkflow, startRun } from '../src/lib/api/workflows.ts';
@@ -216,29 +216,34 @@ test("each family of writes: its answer decoded, an answer unread refused with w
       assert.ok(err instanceof WriteRefusal && err.status === 422 && err.message === words, String(err));
     }
   });
-  await t.test('REFUSED: inbox — a queue with a word the board does not know, and a drop answered without removed', async (t) => {
-    answering(t, { name: 'a', file: '/i/a.md', was: 'parked', queued: null, place: null, of: null });
+  await t.test('REFUSED: inbox — a queued card answered with a state the board does not know, a drop answered with no card', async (t) => {
+    const card = {
+      apiVersion: 'nemia/v1',
+      kind: 'Card',
+      metadata: { name: 'a', namespace: 'default', creationTimestamp: 'now', resourceVersion: 'v' },
+      spec: {},
+      status: { state: 'filed', runs: [] },
+    };
+    answering(t, { ...card, status: { state: 'parked', runs: [] } });
     await assert.rejects(
-      queueCard('a'),
-      unread(
-        'POST /api/inbox/a/queue',
-        'was',
-        'is "parked", where the board reads "queued" | "taken back" | "not queued"',
-        'before asking again.',
-      ),
+      queueCard({ name: 'a', factory: null }),
+      unread('POST /api/namespaces/default/cards/a/queue', 'status.state', 'is "parked", where the board reads', 'before asking again.'),
     );
-    answering(t, { file: '/i/a.md' });
-    await assert.rejects(dropCard('a'), unread('DELETE /api/inbox/a', 'removed', 'is missing.', 'before dropping it again.'));
     answering(t, { removed: true, file: '/i/a.md' });
-    assert.equal(await dropCard('a'), undefined);
-    answering(t, { name: 7 }, 201);
+    await assert.rejects(
+      dropCard({ name: 'a', factory: null }),
+      unread('DELETE /api/namespaces/default/cards/a', 'apiVersion', 'is missing.', 'before dropping it again.'),
+    );
+    answering(t, card);
+    assert.equal(await dropCard({ name: 'a', factory: null }), undefined);
+    answering(t, { ...card, metadata: { ...card.metadata, name: 7 } }, 201);
     await assert.rejects(
       fileCard({ body: 'x' }),
-      unread('POST /api/inbox', 'name', 'is 7, where the board reads string', 'before filing it again.'),
+      unread('POST /api/namespaces/default/cards', 'metadata.name', 'is 7, where the board reads string', 'before filing it again.'),
     );
   });
   await t.test(
-    "REFUSED: workflows — a start whose id is a number; a card's start resolves to its run alone, without the keys the board does not read",
+    "REFUSED: workflows — a start whose id is a number; a card's start resolves to its run and its card, without the keys the board does not read",
     async (t) => {
       const asked = { workflow: 'dev', from: 'repo' as const, brief: 'b' };
       answering(t, { id: 7 }, 201);
@@ -247,7 +252,7 @@ test("each family of writes: its answer decoded, an answer unread refused with w
         unread('POST /api/runs', 'id', 'is 7, where the board reads string', 'look on the Runs page before starting it again.'),
       );
       answering(t, { id: 'r', card: 'c', ignoredRepo: '/x' }, 201);
-      assert.deepEqual(await startRun({ ...asked, card: 'c' }), { id: 'r' });
+      assert.deepEqual(await startCard({ name: 'c', factory: null }, asked), { id: 'r', card: 'c' });
     },
   );
   await t.test(

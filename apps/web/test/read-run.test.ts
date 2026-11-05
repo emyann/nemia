@@ -2,13 +2,13 @@
  * The run page's reads decode the api's answers where they enter (`get`): a run's object (`runObjectQuery`), a step's tries
  * (`stepTriesQuery`), its decision (`decisionQuery`), a step's conversation (`readTranscript`) and its try's path (`stepPathQuery`). Each
  * reads back what the api gave, every union in its shapes; a key the api leaves out stays out and one the board does not know is dropped.
- * Which keys each answer has is `test/wire.test.ts`'s, and the generated mirror's (`run.gen.ts`).
+ * Which keys each answer has is `test/wire.test.ts`'s, and the objects' Schemas' (`objects`).
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { ReadRefusal, UnreadAnswer } from '../src/lib/api/read.ts';
 import { runGone, runObjectQuery, stepTriesQuery } from '../src/lib/api/run.ts';
-import type { Run, StepTry } from '../src/lib/api/run.gen.ts';
+import type { Run, StepTry } from 'objects';
 import { decisionQuery, type RunDecision } from '../src/lib/api/decision.ts';
 import { readTranscript, stepPathQuery, type StepPath } from '../src/lib/api/steps.ts';
 import { decidable, detail, step, stepPath, transcript } from './run-fixtures.ts';

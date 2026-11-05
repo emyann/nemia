@@ -124,9 +124,10 @@ class merge do, which no test refuses — are in `.claude/skills/change-the-boar
   `cancelled` said to a person) and a runtime word (`journal`, `engine`, `WF_MAX_RUNS`) on hover.
 - A value two files under `lib/api/` need sits in a sibling that imports no sibling: the builder's saves decode a `WorkflowListing`, so
   they sit in `workflows.ts` beside its schema.
-- `src/lib/api/run.gen.ts`, the run object's mirror, is generated, never edited: `npm run mirror`, from `apps/web`, writes it from the
-  document the api serves through Effect's `toCodeDocument` (`test/mirror.ts`), and `test/mirror.test.ts` refuses a checked-in file
-  that differs from what the document generates.
+- A kind of `objects` (the Run, the Card) is read through `lib/api/objects.ts`, never a schema of the board's: its client is made from
+  `objects`' `Api`, and each call rejects as `get` and `send` do (`ReadRefusal`, `WriteRefusal`, `UnreadAnswer`). The inbox's entry is
+  made of a `Card` in one place (`entryOf`, `lib/api/inbox.ts`). `test/structure.test.ts` refuses a `*.gen.ts` under `src/lib/api` and a
+  Schema of `src` named as a kind of `objects`.
 
 ## Invariants no test holds
 

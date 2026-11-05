@@ -4,7 +4,7 @@
  * only, so a node test reads it as the page does.
  */
 import type { LifecycleTransition, MachineGraph, MachineVerb, StepPath } from './api/steps.ts';
-import type { RunStepStatus } from './api/run.gen.ts';
+import type { RunStepStatus } from 'objects';
 
 /**
  * How often the path of a task still moving is read again while the panel is open: a move that changes no step's word says nothing on the

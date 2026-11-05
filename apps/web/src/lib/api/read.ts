@@ -97,8 +97,11 @@ async function answer(route: string, path: string, init: RequestInit | undefined
   throw refuse(said ?? `${route} answered ${res.status} ${res.statusText}`, res.status, body);
 }
 
-/** `value` decoded with `schema`; throws an `UnreadAnswer` for `route` where it does not decode, with `may`'s words before the fix. */
-function decoded<T>(route: string, schema: Schema.Decoder<T>, value: unknown, may?: string): T {
+/**
+ * `value` decoded with `schema`; throws an `UnreadAnswer` for `route` where it does not decode, with `may`'s words before the fix. Shared
+ * with the objects' client (`objects.ts`), whose answers are read as these are.
+ */
+export function decoded<T>(route: string, schema: Schema.Decoder<T>, value: unknown, may?: string): T {
   const result = Schema.decodeUnknownResult(schema)(value);
   if (Result.isSuccess(result)) return result.success;
   throw new UnreadAnswer(route, unreadWords(route, value, result.failure.issue, may));

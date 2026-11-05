@@ -6,6 +6,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { UnreadAnswer, WriteRefusal } from '../src/lib/api/read.ts';
+import { entriesOf, entryOf as cardEntryOf } from '../src/lib/api/inbox.ts';
+import { cardList, cardObject } from './factory-fixtures.ts';
 import { CARD_WORDS } from '../src/lib/words.ts';
 import {
   CARD_STATES,
@@ -15,6 +17,7 @@ import {
   inboxAllQuery,
   inboxQuery,
   queueCard,
+  startCard,
   startRun,
   type CardState,
   type Factory,
@@ -33,6 +36,7 @@ import {
   cardsSearch,
   factoriesOffered,
   factoryPreset,
+  factoryRepoOf,
   hasPage,
   ignoredRepoNote,
   inboxBadgeTitle,
@@ -362,145 +366,166 @@ test("presetOf, ignoredRepoNote, afterFor: a card's start preset, its repository
   });
 });
 
-test('fileCard, dropCard, startRun, queueCard: what the board sends the api for a card', async (t) => {
+/** A card as the Card verbs answer it, named `name`, in `namespace`. */
+const cardAnswer = (name: string, namespace = 'default') => ({
+  apiVersion: 'nemia/v1',
+  kind: 'Card',
+  metadata: { name, namespace, creationTimestamp: '2026-09-16T10:00:00.000Z', resourceVersion: 'v1' },
+  spec: { body: 'Cache the views' },
+  status: { state: 'filed', runs: [] },
+});
+/** Each request sent: its path, method, content type and body. */
+const asSent = (sent: Array<{ url: string; init: RequestInit | undefined }>) =>
+  sent.map(({ url, init }) => [url, init?.method, new Headers(init?.headers).get('content-type'), init?.body ?? undefined]);
+
+test('fileCard, dropCard, startCard, queueCard: what the board sends the api for a card, through the Card verbs', async (t) => {
   await t.test(
-    "a card is filed as JSON, the one body the api takes, and resolves with its name; a refusal rejects with the api's message word for word",
+    "a card is filed in its factory's namespace as JSON, its factory carried by the path, and resolves with its name; a refusal rejects with the api's words",
     async (t) => {
-      let answer = answered(201, {
-        name: 'cache-the-views-k2q9',
-        file: '/store/inbox/cache-the-views-k2q9.md',
-        workflow: 'dev',
-        repo: '/code/app',
-        body: 'Cache the views',
-      });
-      const sent = sending(t, () => answer);
+      let answer = (): Response => answered(201, cardAnswer('cache-the-views-k2q9', 'pair'), 'Created');
+      const sent = sending(t, () => answer());
       const card = { body: 'Cache the views', workflow: 'dev', from: 'repo' as const, repo: '/code/app', factory: 'pair' };
       assert.deepEqual(await fileCard(card), { name: 'cache-the-views-k2q9' });
       const [{ url, init }] = sent as [(typeof sent)[number]];
-      assert.deepEqual([url, init?.method, new Headers(init?.headers).get('content-type')], ['/api/inbox', 'POST', 'application/json']);
-      assert.deepEqual(JSON.parse(String(init?.body)), card);
+      assert.deepEqual(
+        [url, init?.method, new Headers(init?.headers).get('content-type')],
+        ['/api/namespaces/pair/cards', 'POST', 'application/json'],
+      );
+      const { factory: _, ...body } = card;
+      assert.deepEqual(JSON.parse(String(init?.body)), body, 'the factory is the namespace, never sent twice');
+      answer = () => answered(201, cardAnswer('a-k2q9'), 'Created');
+      await fileCard({ body: 'An idea' });
+      assert.equal(sent[1]?.url, '/api/namespaces/default/cards', 'a card that names no factory is filed in default');
 
-      const refusal =
-        'the idea: `repo: /code/nope` names no directory. Correct it to the repository the idea is about, or delete the line, and the card is started on the repository its start names.';
-      answer = answered(422, { error: refusal });
-      await assert.rejects(fileCard(card), (err: Error) => err.message === refusal);
-      answer = answered(502, 'Bad Gateway', 'Bad Gateway');
-      await assert.rejects(fileCard(card), (err: Error) => err.message === 'POST /api/inbox answered 502 Bad Gateway');
-      answer = answered(201, {});
+      answer = () => answered(422, { error: 'the idea names no directory' });
+      await assert.rejects(
+        fileCard(card),
+        (err: Error) => err instanceof WriteRefusal && err.status === 422 && err.message === 'the idea names no directory',
+      );
+      answer = () => answered(502, 'Bad Gateway', 'Bad Gateway');
+      await assert.rejects(
+        fileCard(card),
+        (err: Error) => err instanceof WriteRefusal && err.status === 502 && err.message.includes('POST /api/namespaces/pair/cards'),
+      );
+      answer = () => answered(201, { ...cardAnswer('x'), metadata: {} }, 'Created');
       await assert.rejects(
         fileCard(card),
         (err: Error) =>
           err instanceof UnreadAnswer &&
-          err.route === 'POST /api/inbox' &&
-          err.message.includes('at name') &&
+          err.route === 'POST /api/namespaces/pair/cards' &&
+          err.message.includes('at metadata.name') &&
           /before filing it again/.test(err.message),
       );
     },
   );
   await t.test(
-    "a card is dropped by its name in the path, sent as JSON with no body; a refusal rejects with the api's message word for word",
+    "a card is dropped by its namespace and name in the path, sent as JSON with no body; a refusal rejects with the api's words",
     async (t) => {
-      let answer = answered(200, { removed: true, file: '/store/inbox/a b.md' });
-      const sent = sending(t, () => answer);
-      await dropCard('a b');
-      const [{ url, init }] = sent as [(typeof sent)[number]];
-      assert.deepEqual(
-        [url, init?.method, new Headers(init?.headers).get('content-type'), init?.body],
-        ['/api/inbox/a%20b', 'DELETE', 'application/json', undefined],
-      );
+      let answer = (): Response => answered(200, cardAnswer('a b'));
+      const sent = sending(t, () => answer());
+      await dropCard({ name: 'a b', factory: null });
+      await dropCard({ name: 'c', factory: 'pair' });
+      assert.deepEqual(asSent(sent), [
+        ['/api/namespaces/default/cards/a%20b', 'DELETE', 'application/json', undefined],
+        ['/api/namespaces/pair/cards/c', 'DELETE', 'application/json', undefined],
+      ]);
 
-      const refusal = 'no card gone-k2q9 in the inbox. Its cards are: cache-the-views-k2q9.';
-      answer = answered(404, { error: refusal });
-      await assert.rejects(dropCard('gone-k2q9'), (err: Error) => err.message === refusal);
-      answer = answered(500, 'oops', 'Internal Server Error');
+      answer = () => answered(404, { error: 'no card gone-k2q9' });
       await assert.rejects(
-        dropCard('gone-k2q9'),
+        dropCard({ name: 'gone-k2q9', factory: null }),
+        (err: Error) => err instanceof WriteRefusal && err.status === 404,
+      );
+      answer = () => answered(500, 'oops', 'Internal Server Error');
+      await assert.rejects(
+        dropCard({ name: 'gone-k2q9', factory: null }),
         (err: Error) =>
           err instanceof WriteRefusal &&
           err.status === 500 &&
-          err.message.includes('DELETE /api/inbox/gone-k2q9') &&
+          err.message.includes('DELETE /api/namespaces/default/cards/gone-k2q9') &&
           err.message.includes('500 Internal Server Error'),
       );
     },
   );
   await t.test(
-    'a card is started through POST /api/runs with `card` beside the workflow and the brief, and resolves with the run alone: the card stays',
+    'a card is started by its own verb, with the workflow and the brief, and resolves with the run: the card stays',
     async (t) => {
-      let answer = answered(201, { id: 'show-each-step-s-cost-42g6', card: 'show-what-a-step-cost-c3cw' }, 'Created');
-      const sent = sending(t, () => answer);
-      const asked = {
-        workflow: 'dev',
-        from: 'repo' as const,
-        brief: "Show each step's cost",
-        after: ['p-1'],
-        card: 'show-what-a-step-cost-c3cw',
-      };
-      assert.deepEqual(await startRun(asked), { id: 'show-each-step-s-cost-42g6' });
-      assert.deepEqual(JSON.parse(String(sent[0].init?.body)), asked);
+      let answer = (): Response => answered(201, { id: 'show-each-step-s-cost-42g6', card: 'show-what-a-step-cost-c3cw' }, 'Created');
+      const sent = sending(t, () => answer());
+      const asked = { workflow: 'dev', from: 'repo' as const, brief: "Show each step's cost", after: ['p-1'] };
+      const card = { name: 'show-what-a-step-cost-c3cw', factory: null };
+      assert.deepEqual(await startCard(card, asked), { id: 'show-each-step-s-cost-42g6', card: 'show-what-a-step-cost-c3cw' });
+      assert.equal(sent[0]?.url, '/api/namespaces/default/cards/show-what-a-step-cost-c3cw/start');
+      assert.deepEqual(JSON.parse(String(sent[0]?.init?.body)), asked);
 
-      answer = answered(201, { id: 'show-each-step-s-cost-42g6', removed: false, why: 'an older api' }, 'Created');
-      assert.deepEqual(await startRun(asked), { id: 'show-each-step-s-cost-42g6' }, 'a removal an older api answers is not read');
-
-      const refusal =
-        'no card show-what-a-step-cost-c3cw in the inbox. The inbox is empty. Start one of those — wf start /store/inbox/<name>.md — or park the idea first: wf inbox add "<idea>".';
-      answer = answered(404, { error: refusal });
-      await assert.rejects(startRun(asked), (err: Error) => err.message === refusal);
+      answer = () => answered(404, { error: 'no card show-what-a-step-cost-c3cw' });
+      await assert.rejects(startCard(card, asked), (err: Error) => err instanceof WriteRefusal && err.status === 404);
     },
   );
   await t.test(
-    "a card is queued by its name in the path, POST, and taken off the queue with DELETE, each sent as JSON with no body; a refusal rejects with the api's message word for word",
+    "a card is queued and taken off the queue by its own verbs, POST, each sent as JSON with no body; a refusal rejects with the api's words",
     async (t) => {
-      const done = { name: 'a b', file: '/store/inbox/a b.md', was: 'queued', queued: '2026-09-16T10:00:00.000Z', place: 2, of: 2 };
-      let answer = answered(200, done);
-      const sent = sending(t, () => answer);
-      assert.deepEqual(await queueCard('a b'), done);
-      answer = answered(200, { ...done, was: 'taken back', queued: null, place: null, of: null });
-      assert.equal((await queueCard('a b', { off: true })).was, 'taken back');
-      assert.deepEqual(
-        sent.map(({ url, init }) => [url, init?.method, new Headers(init?.headers).get('content-type'), init?.body]),
-        [
-          ['/api/inbox/a%20b/queue', 'POST', 'application/json', undefined],
-          ['/api/inbox/a%20b/queue', 'DELETE', 'application/json', undefined],
-        ],
-      );
+      let answer = (): Response => answered(200, cardAnswer('a b'));
+      const sent = sending(t, () => answer());
+      assert.equal((await queueCard({ name: 'a b', factory: 'pair' })).metadata.name, 'a b');
+      await queueCard({ name: 'a b', factory: 'pair' }, { off: true });
+      assert.deepEqual(asSent(sent), [
+        ['/api/namespaces/pair/cards/a%20b/queue', 'POST', 'application/json', undefined],
+        ['/api/namespaces/pair/cards/a%20b/unqueue', 'POST', 'application/json', undefined],
+      ]);
 
-      const refusal =
-        'bare.md: no workflow — a queued card starts on its own, and nothing says what runs it. Queue it with its workflow: wf inbox queue bare --workflow <w> writes both.';
-      answer = answered(422, { error: refusal });
-      await assert.rejects(queueCard('bare'), (err: Error) => err.message === refusal);
-      answer = answered(502, 'Bad Gateway', 'Bad Gateway');
+      answer = () => answered(422, { error: 'bare.md: no workflow' });
+      await assert.rejects(queueCard({ name: 'bare', factory: null }), (err: Error) => err instanceof WriteRefusal && err.status === 422);
+      answer = () => answered(502, 'Bad Gateway', 'Bad Gateway');
       await assert.rejects(
-        queueCard('bare', { off: true }),
-        (err: Error) => err.message === 'DELETE /api/inbox/bare/queue answered 502 Bad Gateway',
+        queueCard({ name: 'bare', factory: null }, { off: true }),
+        (err: Error) => err instanceof WriteRefusal && err.message.includes('POST /api/namespaces/default/cards/bare/unqueue'),
       );
-      answer = answered(200, {});
+      answer = () => answered(200, {});
       await assert.rejects(
-        queueCard('bare'),
+        queueCard({ name: 'bare', factory: null }),
         (err: Error) =>
           err instanceof UnreadAnswer &&
-          err.route === 'POST /api/inbox/bare/queue' &&
-          err.message.includes('at name') &&
+          err.route === 'POST /api/namespaces/default/cards/bare/queue' &&
           /before asking again/.test(err.message),
       );
     },
   );
-  await t.test(
-    'a card in a factory starts there: in the /api/runs request, the factory and its repository go in the query and the body is as before',
-    async (t) => {
-      const sent = sending(t, () => answered(201, { id: 'r', card: 'c' }, 'Created'));
-      const asked = { workflow: 'good', from: 'repo' as const, brief: 'Hire', card: 'c' };
-      await startRun(asked, { factory: 'hiring', repo: '/r/x' });
-      assert.equal(sent[0].url, '/api/runs?factory=hiring&repo=%2Fr%2Fx');
-      assert.deepEqual(JSON.parse(String(sent[0].init?.body)), asked);
-      await startRun(asked, { factory: 'default', repo: '/r/x' });
-      await startRun(asked);
-      assert.deepEqual(
-        sent.slice(1).map((s) => s.url),
-        ['/api/runs', '/api/runs'],
-        'the default factory, and no place, send no query',
-      );
-    },
-  );
+  await t.test('a card started in a factory says the factory and its repository in the query, the body as before', async (t) => {
+    const sent = sending(t, () => answered(201, { id: 'r', card: 'c' }, 'Created'));
+    const asked = { workflow: 'good', from: 'repo' as const, brief: 'Hire' };
+    await startCard({ name: 'c', factory: null }, asked, { factory: 'hiring', repo: '/r/x' });
+    assert.equal(sent[0]?.url, '/api/namespaces/default/cards/c/start?factory=hiring&repo=%2Fr%2Fx');
+    assert.deepEqual(JSON.parse(String(sent[0]?.init?.body)), asked);
+    await startCard({ name: 'c', factory: 'hiring' }, asked, { factory: 'default', repo: '/r/x' });
+    await startCard({ name: 'c', factory: 'hiring' }, asked);
+    assert.deepEqual(
+      sent.slice(1).map((s) => s.url),
+      ['/api/namespaces/hiring/cards/c/start', '/api/namespaces/hiring/cards/c/start'],
+      'the default factory, and no place, send no query',
+    );
+  });
+  await t.test('a run started of no card goes to POST /api/runs, its place in the query', async (t) => {
+    const sent = sending(t, () => answered(201, { id: 'r' }, 'Created'));
+    await startRun({ workflow: 'good', from: 'repo', brief: 'Hire' }, { factory: 'hiring', repo: '/r/x' });
+    assert.equal(sent[0]?.url, '/api/runs?factory=hiring&repo=%2Fr%2Fx');
+  });
+});
+
+test("factoryRepoOf: the repository a card's factory picks, read off the factories as the orchestrator reads it", () => {
+  const f = (name: string, repos: string[], extra: { default?: boolean; error?: string | null } = {}) => ({
+    name,
+    repos,
+    default: extra.default ?? false,
+    error: extra.error ?? null,
+  });
+  const factories = [f('solo', ['/code/app']), f('pair', ['/r/a', '/r/b']), f('broken', ['/r/c'], { error: 'bad' })];
+  assert.equal(factoryRepoOf({ repo: null, factory: 'solo' }, factories), '/code/app', 'its one repository');
+  assert.equal(factoryRepoOf({ repo: '/code/own', factory: 'solo' }, factories), null, 'a card that names its own');
+  assert.equal(factoryRepoOf({ repo: null, factory: 'pair' }, factories), null, 'a factory with several');
+  assert.equal(factoryRepoOf({ repo: null, factory: 'broken' }, factories), null, 'a factory that does not read');
+  assert.equal(factoryRepoOf({ repo: null, factory: null }, factories), null, 'no factory');
+  assert.equal(factoryRepoOf({ repo: null, factory: 'default' }, [f('default', ['/x'], { default: true })]), null, 'the default');
+  assert.equal(factoryRepoOf({ repo: null, factory: 'solo' }, undefined), null, 'the factories unread');
 });
 
 test('ordinal, queueOf, queueable, triedLine, capLine: the queue as the page and the Factory say it', async (t) => {
@@ -903,21 +928,59 @@ test("cardPlace, cardFiling, factoriesOffered, notStarted: a card's factory and 
     },
   );
   await t.test(
-    'every card is read with ?all=true, composed with a selector, under a key of its own beneath the inbox that no card page has',
+    'every card is read from GET /api/cards, a selector as labelSelector, under a key of its own beneath the inbox that no card page has',
     async (t) => {
-      const sent = sending(t, () => answered(200, [entry('ended', null, { state: 'cancelled', startedAs: ['r-1'] })]));
+      const ended = cardObject({ metadata: { name: 'ended' }, spec: {}, status: { state: 'cancelled', runs: ['r-1'] } });
+      const sent = sending(t, () => answered(200, cardList(ended)));
       const all = inboxAllQuery(undefined);
       const read = (await (all.queryFn as unknown as () => Promise<InboxEntry[]>)()).map((card) => card.state);
       assert.deepEqual(read, ['cancelled'], 'a card whose run ended decodes');
       await (inboxAllQuery('team=core').queryFn as unknown as () => Promise<InboxEntry[]>)();
       assert.deepEqual(
         sent.map((r) => r.url),
-        ['/api/inbox?all=true', '/api/inbox?all=true&selector=team%3Dcore'],
+        ['/api/cards', '/api/cards?labelSelector=team%3Dcore', '/api/cards'],
+        'a selected read reads the whole inbox beside it, for the queue places',
       );
       assert.equal(all.queryKey[0], inboxQuery.queryKey[0], "under ['inbox'], so every write and the feed read it again");
       assert.notDeepEqual(all.queryKey, cardQuery('all').queryKey, 'a card named all keeps its page');
+      const inPlayRead = await (inboxQuery.queryFn as unknown as () => Promise<InboxEntry[]>)();
+      assert.equal(inPlayRead.length, 0, 'the in-play read leaves a card whose run ended out');
     },
   );
+  await t.test("a Card is the board's entry: its factory its namespace, its file its name, its place among every queued card", () => {
+    const queued = (name: string, at: string, namespace = 'pair') =>
+      cardObject({ metadata: { name, namespace }, spec: { queued: at }, status: { state: 'queued', runs: [] } });
+    const whole = cardList(
+      queued('late', '2026-09-16T11:00:00.000Z'),
+      queued('early-b', '2026-09-16T10:00:00.000Z', 'default'),
+      queued('early-a', '2026-09-16T10:00:00.000Z'),
+      cardObject({
+        metadata: { name: 'started' },
+        spec: { queued: '2026-09-16T09:00:00.000Z' },
+        status: { state: 'running', runs: ['r-9'] },
+      }),
+    );
+    const entries = entriesOf(cardList(...whole.items.slice(0, 1)), whole);
+    assert.deepEqual(entries[0]?.queued, { at: '2026-09-16T11:00:00.000Z', place: 3 }, 'its place among the whole inbox, not the page');
+    const byName = new Map(entriesOf(whole).map((e) => [e.name, e]));
+    assert.deepEqual(
+      ['early-a', 'early-b', 'late', 'started'].map((name) => byName.get(name)?.queued?.place),
+      [1, 2, 3, null],
+      'oldest first, then by name; a started card has no place',
+    );
+    assert.equal(byName.get('early-b')?.factory, null, 'default is no factory');
+    assert.equal(byName.get('late')?.factory, 'pair');
+    assert.equal(byName.get('late')?.file, 'late.md');
+    assert.deepEqual(cardEntryOf(cardObject({ metadata: { labels: { team: 'core' } } }), new Map()).labels, { team: 'core' });
+  });
+  await t.test('the in-play reads leave out exactly the states CARD_KIND says ended', async (t) => {
+    sending(t, () => answered(200, cardList(...CARD_STATES.map((state) => cardObject({ metadata: { name: state }, status: { state } })))));
+    const kept = (await (inboxQuery.queryFn as unknown as () => Promise<InboxEntry[]>)()).map((e) => e.state);
+    assert.deepEqual(
+      kept,
+      CARD_STATES.filter((state) => CARD_KIND[state] !== 'ended'),
+    );
+  });
   await t.test("each card state has a person's word, its sentence and a hue: a run called off is never said cancelled", () => {
     for (const state of CARD_STATES) {
       assert.ok(CARD_WORDS[state].word.trim() !== '', state);

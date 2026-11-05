@@ -7,7 +7,10 @@
  * other contract seconds — the runtime's nine together under a minute, each of the orchestrator's other proofs under 30 s.
  * Proved one after another in one job, those two set CI's time; proved beside the rest, the slowest single one does.
  *
- * Pure but for `contractFilesUnder`, which reads the files of a folder: `prove.ts` loads tsverify and proves a leg.
+ * Each leg is proved by tsverify's own CLI, never in a process of ours: a verdict is not yet the same in every process (the first item
+ * of tsverify's roadmap, "The same verdict on every run"), and the laws here are each one its CLI proved on three runs.
+ *
+ * Pure but for `contractFilesUnder`, which reads the files of a folder: `prove.ts` reads the contracts and runs a leg's commands.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -55,6 +58,24 @@ export const planOf = (found: readonly Contract[], leg: Leg): Contract[] => {
         ': point ALONE in tools/contracts/legs.ts at where the contract is now, or take its leg out of ALONE and of the contracts job in .github/workflows/ci.yml',
     );
   return found.filter((c) => legOf(c) === leg);
+};
+
+/**
+ * The `tsverify` commands that prove the contracts of `found` that `leg` proves, each its arguments: one per root, naming every file
+ * of it whose contracts the leg proves all of, as `tsverify <root> --cache` proved a root before there were legs; then one per
+ * contract of a file the leg shares with another, by tsverify's one-contract form (`tsverify <file> <export>`). Throws as `planOf`.
+ */
+export const commandsOf = (found: readonly Contract[], leg: Leg): string[][] => {
+  const plan = planOf(found, leg);
+  const whole = (file: string): boolean => found.filter((c) => c.file === file).every((c) => legOf(c) === leg);
+  const files = [...new Set(plan.map((c) => c.file))];
+  const under = (root: string, file: string): boolean => file === root || file.startsWith(`${root}/`);
+  const roots = ROOTS.map((root) => files.filter((f) => under(root, f) && whole(f)).sort()).filter((f) => f.length > 0);
+  const elsewhere = files.filter((f) => whole(f) && !ROOTS.some((root) => under(root, f)));
+  return [
+    ...[...roots, ...(elsewhere.length > 0 ? [elsewhere] : [])].map((f) => [...f, '--cache']),
+    ...plan.filter((c) => !whole(c.file)).map((c) => [c.file, c.name, '--cache']),
+  ];
 };
 
 /** An import of tsverify or one of its entries, as tsverify's own CLI reads it. */

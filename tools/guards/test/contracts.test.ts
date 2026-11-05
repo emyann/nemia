@@ -11,7 +11,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from './scratch.ts';
 import { readWorkflow, type Workflow } from './ci-workflow.ts';
-import { ALONE, LEGS, contractFilesUnder, legOf, planOf, type Contract } from '../../contracts/legs.ts';
+import { ALONE, LEGS, commandsOf, contractFilesUnder, legOf, planOf, type Contract } from '../../contracts/legs.ts';
 import { contractsOf } from '../../contracts/prove.ts';
 
 const ROOT = path.join(import.meta.dirname, '..', '..', '..');
@@ -75,9 +75,29 @@ test('every contract found is proved by exactly one leg, and a leg of its own pr
   );
 });
 
+test("each leg's tsverify commands: a root's files whole where the leg proves all of a file, one contract alone where it shares one", () => {
+  const found: Contract[] = [
+    ...FOUND,
+    { file: 'packages/agent-runtime/src/harness/mcp.ts', name: 'transportOf' },
+    { file: 'packages/agent-runtime/src/core/engine/filing.ts', name: 'requestStop' },
+  ];
+  assert.deepEqual(commandsOf(found, 'rest'), [
+    ['packages/agent-runtime/src/core/engine/filing.ts', 'packages/agent-runtime/src/harness/mcp.ts', '--cache'],
+    ['apps/cli/src/route.ts', '--cache'],
+    ['packages/agent-runtime/src/core/domain.ts', 'decide', '--cache'],
+    ['packages/agent-orchestrator/src/gate/gate.ts', 'holdsOpen', '--cache'],
+  ]);
+  assert.deepEqual(commandsOf(found, 'observe'), [[ALONE.observe.file, ALONE.observe.name, '--cache']]);
+  assert.deepEqual(
+    commandsOf([{ file: 'apps/cli/src/route.ts', name: 'routeOf' }, ALONE.observe, ALONE['approval-refusal']], 'observe'),
+    [[ALONE.observe.file, '--cache']],
+    'a file whose every contract the leg proves is named whole',
+  );
+});
+
 test('REFUSED: a leg of its own whose contract is no longer where it names, by every leg', () => {
   const moved = FOUND.filter((c) => c !== ALONE.observe);
-  for (const leg of LEGS) assert.throws(() => planOf(moved, leg), Error, leg);
+  for (const leg of LEGS) assert.throws(() => commandsOf(moved, leg), Error, leg);
 });
 
 test("the contracts ALONE names are each a contract tsverify reads in this checkout's file", () => {

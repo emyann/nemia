@@ -333,3 +333,38 @@ test('approvalRefusal: approved already, and a send-back asked', async (t) => {
     );
   });
 });
+
+/** `plan → triage ─ web → build-web | backend → build-backend`: triage a table condition over plan's `surface`, never filed. */
+const ROUTED: Workflow[] = [
+  step('plan'),
+  {
+    ...step('triage', ['plan']),
+    routes: ['web', 'backend'],
+    route: { kind: 'table', from: 'plan.surface', table: { web: 'web', backend: 'backend' } },
+  },
+  { ...step('build-web', ['triage']), when: ['web'] },
+  { ...step('build-backend', ['triage']), when: ['backend'] },
+];
+const atTriage = (extra: Partial<RepositoryRun> = {}) =>
+  run({ plan: 't1', triage: null, 'build-web': null, 'build-backend': null }, { gates: ['triage'], ...extra });
+const planSaid = (surface: string) => (name: string) => (name === 'plan' ? { ...signedDone(), output: { surface } } : undefined);
+const triaged = (r: Run, p: (id: string) => TaskPhase, closeoutOf: (step: string) => Closeout | undefined) =>
+  approvalRefusal(ROUTED, r, 'triage', undefined, p, closeoutOf, asked);
+
+test('approvalRefusal: a gated table condition, never filed, at the gate the run reads', async (t) => {
+  await t.test('its table answered and nobody approved it: it may be approved', () => {
+    assert.equal(triaged(atTriage(), PLAN_DONE, planSaid('web')), null);
+  });
+  await t.test('REFUSED while its producer has not signed off: where the run stands is named', () => {
+    names(triaged(atTriage(), phases({ t1: 'running' }), planSaid('web')), 'nemia ls r-1');
+  });
+  await t.test('REFUSED its table answering no route: the line that routes it by hand is named', () => {
+    names(triaged(atTriage(), PLAN_DONE, planSaid('mobile')), 'nemia route r-1 triage <web|backend>');
+  });
+  await t.test('REFUSED once approved: what waits on it is filed on the next tick', () => {
+    names(triaged(atTriage({ approvals: [approval('triage', 1)] }), PLAN_DONE, planSaid('web')), 'try 1 of triage is already approved');
+  });
+  await t.test('REFUSED ungated: nothing to approve, the gates there are named', () => {
+    names(triaged(atTriage({ gates: undefined }), PLAN_DONE, planSaid('web')), 'triage has no gate', 'nemia start --gate <step>');
+  });
+});

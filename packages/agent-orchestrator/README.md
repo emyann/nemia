@@ -3228,7 +3228,7 @@ be (the workflow's `agents/`, the repository's, the store's).
 ### Every run in a factory
 
 Every start names its factory, or is started in the one whose repository it is on. The entries hold it: `wf start`, `wf start <card>`,
-`wf start <folder>`, the queue's start (`startQueued`) and `POST /api/runs`; `start()` itself takes what it is given.
+`wf start <folder>`, the queue's start (`startQueued`) and `POST /api/namespaces/:namespace/runs`; `start()` itself takes what it is given.
 
 ```
 $ cd ~/code/pipao/src

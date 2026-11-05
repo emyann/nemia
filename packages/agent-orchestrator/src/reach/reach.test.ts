@@ -8,8 +8,8 @@
  */
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { proposalOf } from './auto.verb.ts';
-import { CONDITION_WORDS, CONDITIONS, DEFAULT_POLICY, NO_FACTS, ruleRefusal, type Facts, type PolicyRule } from './index.ts';
+import { proposalOf } from '../auto/auto.verb.ts';
+import { CONDITION_WORDS, CONDITIONS, DEFAULT_POLICY, NO_FACTS, ruleRefusal, type Facts, type PolicyRule } from '../auto/index.ts';
 import { type GateSite, gateRows, missWords, NEVER_WORDS, ruleReaches, unmetWords } from './index.ts';
 
 /** An ending approved before it runs, with a check. */

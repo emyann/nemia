@@ -9,7 +9,7 @@ import { Cause, Effect } from 'effect';
 import type { Args } from '../command/command.ts';
 import type { Command } from '../command/entry.verb.ts';
 import { agentNameRefusal } from '../agents/agents.ts';
-import { HOME } from '../record/record.store.ts';
+import { rootGiven } from '../config/root.store.ts';
 import { rooted } from '../wiring/wire.verb.ts';
 import { FactoryDoor } from '../factories/factories.store.ts';
 import { FactoryName } from '../factory/factory.model.ts';
@@ -23,11 +23,12 @@ import { approvedFirst, hasGate } from '../status/status.ts';
 import { levelOfFactory } from '../level/levels.verb.ts';
 import type { Level } from '../level/level.ts';
 import { seenOf } from '../admission/seen.verb.ts';
-import { listInForce, ruleWords, type Facts } from './auto.ts';
-import { readConfirmed, readProposed } from './auto.store.ts';
-import { factsOf } from './facts.ts';
+import { factsOf, listInForce, ruleWords, type Facts, type PolicyRule } from '../auto/index.ts';
+import { readConfirmed, readProposed } from '../auto/auto.store.ts';
 import { gateRows, type GateReach, type GateSite, type Reach } from './reach.ts';
-import type { WordedRule } from './auto.verb.ts';
+
+/** A rule with its words, as the person reads it and a confirm checks them. */
+export type WordedRule = PolicyRule & { words: string };
 
 /** A workflow attached to the factory that does not load, and why, in the refusal's words. */
 export type Unloaded = { workflow: string; message: string };
@@ -191,6 +192,11 @@ export const POLICY_REACH: Command<PolicyReach> = {
   writes: false,
   class: 'read',
   only: { side: 'cli', why: 'an agent reads it from its session; the board draws no part for it yet' },
-  handler: (args, _env, home = HOME) => rooted(home, 'policy reach', reachOf(home, args)),
+  handler: (args, _env, home) =>
+    rooted(
+      home,
+      'policy reach',
+      Effect.suspend(() => reachOf(rootGiven(home, 'policy reach'), args)),
+    ),
   print: reachLines,
 };

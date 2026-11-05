@@ -14,16 +14,16 @@ import { staged } from '../../test/story.ts';
 import { eachTest } from '../../test/placed.ts';
 import { TEAM } from '../../test/team.ts';
 import type { Run } from '../record/record.ts';
-import type { WordedRule } from './auto.verb.ts';
+import type { WordedRule } from './reach.verb.ts';
 
 const ROOT = scratch('wf-policy-reach-');
 process.env.WF_ROOT = ROOT;
 const { POLICY_REACH } = await import('./reach.verb.ts');
-const { POLICY_ENTRIES } = await import('./auto.verb.ts');
+const { TABLE } = await import('../command/commands.verb.ts');
 const { attachWorkflowAt, createFactoryAt } = await import('../factory/factory.store.ts');
 const { writeFactoryLevel } = await import('../level/level.store.ts');
-const { confirmRule, writeProposed } = await import('./auto.store.ts');
-const { ruleWords } = await import('./auto.ts');
+const { confirmRule, writeProposed } = await import('../auto/auto.store.ts');
+const { ruleWords } = await import('../auto/auto.ts');
 const { engineOf, runWith } = await import('../runtime-client.ts');
 const { RunDoor } = await import('../runs/runs.store.ts');
 const { runDoorMemory } = await import('../runs/memory.store.ts');
@@ -154,7 +154,7 @@ test('`nemia policy reach`: which steps at their gate her rules can approve in a
   });
 
   await t.test('it is the policy group’s read, served by the CLI alone', () => {
-    assert.ok(POLICY_ENTRIES.some((e) => e.name === 'policy reach'));
+    assert.ok(TABLE.some((e) => e.name === 'policy reach'));
     assert.equal(POLICY_REACH.class, 'read');
     assert.equal(POLICY_REACH.only?.side, 'cli');
   });

@@ -521,8 +521,8 @@ const storeLines = (fold: FeedFold, at: string, pause: FeedPause): StoreLine[] =
 export type FeedLevels = readonly FactoryLevel[];
 
 /**
- * The level of `row` in a person's words, the note of its line: `tsverify is at auto until <its end>, then semi-auto` while a raise
- * stands, else `tsverify is at semi-auto`. It is what the fold compares, so a raise given a new end is a line of its own. Pure.
+ * The level of `row` in a person's words, the note of its line: `acme is at auto until <its end>, then semi-auto` while a raise
+ * stands, else `acme is at semi-auto`. It is what the fold compares, so a raise given a new end is a line of its own. Pure.
  */
 const levelNote = (row: FactoryLevel): string =>
   row.raise === null

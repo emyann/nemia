@@ -14,7 +14,6 @@ import { HOME } from '../record/record.store.ts';
 import { Invalid } from '../refusal/refusal.ts';
 import { rooted } from '../wiring/wire.verb.ts';
 import { DEFAULT_POLICY, listInForce, ruleRefusal, ruleWords, type PolicyRule } from './auto.ts';
-import { POLICY_REACH } from './reach.verb.ts';
 import { confirmedFile, confirmRule, digestOf, dropRule, proposedFile, readConfirmed, readProposed, writeProposed } from './auto.store.ts';
 
 /** A rule with its words, as the person reads it. */
@@ -298,4 +297,4 @@ export const POLICY_DROP: Command<PolicyList> = {
 };
 
 /** The entries of `nemia policy`, in the order `nemia`'s help lists them. */
-export const POLICY_ENTRIES = [POLICY, POLICY_REACH, POLICY_PROPOSE, POLICY_CONFIRM, POLICY_DROP] as const;
+export const POLICY_ENTRIES = [POLICY, POLICY_PROPOSE, POLICY_CONFIRM, POLICY_DROP] as const;

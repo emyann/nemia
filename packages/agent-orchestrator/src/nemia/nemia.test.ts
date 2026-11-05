@@ -187,9 +187,9 @@ test("a factory's level changed wakes her, and only her — her selectors name r
     at: '2026-11-05T13:00:00.000Z',
     store: 'store',
     word: LINE_WORDS.LevelChanged,
-    note: 'tsverify is at auto',
+    note: 'acme is at auto',
     involved: { kind: 'Store', name: 'store' },
-    labels: { factory: 'tsverify' },
+    labels: { factory: 'acme' },
   });
   assert.deepEqual([level.reason, level.source, level.waits], ['LevelChanged', 'person', undefined], "a person's deed, waiting on nobody");
   assert.equal(selects(parseSelectors([...NEMIA_SELECTORS]), level), true, 'she is told of a raise as of a gate');

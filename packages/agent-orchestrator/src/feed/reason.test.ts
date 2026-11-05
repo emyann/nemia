@@ -161,7 +161,7 @@ const ONE_SHOTS: readonly Case[] = [
 const STORE_LINES: readonly Case[] = [
   { kind: 'Store', word: 'store paused', note: 'since 2026-10-16T04:00:00.000Z', reason: 'StorePaused' },
   { kind: 'Store', word: 'store resumed', note: 'since 2026-10-16T04:00:00.000Z', reason: 'StoreResumed' },
-  { kind: 'Store', word: 'level changed', note: 'tsverify is at auto until 2026-10-16T05:00:00.000Z, then manual', reason: 'LevelChanged' },
+  { kind: 'Store', word: 'level changed', note: 'acme is at auto until 2026-10-16T05:00:00.000Z, then manual', reason: 'LevelChanged' },
 ];
 
 /** A parked step's words (`pausedWord`): paused between two calls, after the call it stopped after, or with the call it cut. */

@@ -107,7 +107,7 @@ no line: the tick's pass, which reads the store's pause (`$WF_ROOT/cordon`) alre
 for each put the feed holds that no longer stands (`storeOnce`), each counted off the feed's own lines, so a second daemon or a restart
 says neither again; a pause put and lifted between two passes leaves no line, since a pass reads what stands. A factory's level is a
 line of the store too: `level changed`, `reason: "LevelChanged"`, `source: "person"`, labelled with its factory (`labels.factory`), its
-note the level in force in words (`tsverify is at auto until <its end>, then semi-auto`, `tsverify is at semi-auto`). It is a word that
+note the level in force in words (`acme is at auto until <its end>, then semi-auto`, `acme is at semi-auto`). It is a word that
 stands per factory, not a one-shot: the same pass reads each factory's level in force (`levelsNow`) and writes a line where it is not
 what the feed said of that factory last, so a set from the board or the CLI, a raise, its `--end` and its end passing, which nothing
 writes, are each one line, and a factory at `manual` the feed has said nothing of gets none; it is one of Nemia's selectors

@@ -379,34 +379,34 @@ test("recordFeed writes a one-shot once per occurrence, counted off the feed's o
       const AUTO: FactoryLevelFile = { level: 'auto', since: AT };
       const RAISED: FactoryLevelFile = { level: 'semi-auto', since: AT, raise: { level: 'auto', until } };
       await t.test('a factory at manual the feed has said nothing of is never said; one above it is said once over many passes', () => {
-        for (let i = 0; i < 5; i++) pass([row('default', undefined), row('quiet', undefined), row('tsverify', AUTO)]);
-        assert.deepEqual(said(), [['tsverify', 'tsverify is at auto']]);
+        for (let i = 0; i < 5; i++) pass([row('default', undefined), row('quiet', undefined), row('acme', AUTO)]);
+        assert.deepEqual(said(), [['acme', 'acme is at auto']]);
         assert.deepEqual(
           storeLines().map((l) => [l.involved, l.reason, l.type, l.source, l.waits, l.labels]),
-          [[{ kind: 'Store', name: 'store' }, 'LevelChanged', 'Normal', 'person', undefined, { factory: 'tsverify' }]],
+          [[{ kind: 'Store', name: 'store' }, 'LevelChanged', 'Normal', 'person', undefined, { factory: 'acme' }]],
           "about the store, a person's deed, waiting on nobody, labelled with its factory alone",
         );
-        assert.ok(storeLines()[0]?.message?.includes('tsverify is at auto'), 'what a person reads says the level');
+        assert.ok(storeLines()[0]?.message?.includes('acme is at auto'), 'what a person reads says the level');
       });
       await t.test('a raise is said with its end, and its end passing, which nobody writes, is said as the level it fell back to', () => {
-        pass([row('tsverify', RAISED)]);
-        pass([row('tsverify', RAISED, at + 3_599_999)]);
-        pass([row('tsverify', RAISED, at + 3_600_000)]);
+        pass([row('acme', RAISED)]);
+        pass([row('acme', RAISED, at + 3_599_999)]);
+        pass([row('acme', RAISED, at + 3_600_000)]);
         assert.deepEqual(said().slice(1), [
-          ['tsverify', `tsverify is at auto until ${until}, then semi-auto`],
-          ['tsverify', 'tsverify is at semi-auto'],
+          ['acme', `acme is at auto until ${until}, then semi-auto`],
+          ['acme', 'acme is at semi-auto'],
         ]);
       });
       await t.test('a level set back to one said before is a change, said again: a standing word, never a one-shot counted by note', () => {
-        pass([row('tsverify', AUTO)]);
-        pass([row('tsverify', undefined)]);
+        pass([row('acme', AUTO)]);
+        pass([row('acme', undefined)]);
         assert.deepEqual(said().slice(3), [
-          ['tsverify', 'tsverify is at auto'],
-          ['tsverify', 'tsverify is at manual'],
+          ['acme', 'acme is at auto'],
+          ['acme', 'acme is at manual'],
         ]);
       });
       await t.test('a daemon with no fold says no level again', () => {
-        for (let i = 0; i < 3; i++) pass([row('tsverify', undefined), row('quiet', undefined)], freshFeedMemo());
+        for (let i = 0; i < 3; i++) pass([row('acme', undefined), row('quiet', undefined)], freshFeedMemo());
         assert.equal(storeLines().length, 5);
       });
       await t.test('a caller that read no levels says nothing of them, however the feed stands', () => {

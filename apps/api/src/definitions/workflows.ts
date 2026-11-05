@@ -42,22 +42,25 @@ type Folder = { from: WorkflowSource; dir: string };
 const SHAPE =
   '`{ "metadata": { "resourceVersion": "<as the Workflow was read>" }, "spec": { "steps": [{ "name", "keys", "body" }], "readme"? }, "schemas"?: [{ "file", "text" }] }`';
 
-/** Where the namespace's workflows are read from, in the lookup order: a factory's tree, the repository, yours. */
-const sourcesIn = (s: Served): Array<{ origin: Origin; from: WorkflowSource; dir: string }> => [
-  ...(s.factory?.tree !== undefined
-    ? [{ origin: 'factory' as const, from: 'repo' as const, dir: path.join(s.factory.tree, 'workflows') }]
-    : []),
-  { origin: 'repo', from: 'repo', dir: path.join(s.repo, 'workflows') },
-  { origin: 'yours', from: 'yours', dir: path.join(s.home, 'workflows') },
-];
+/** The folders of `dir`, each held at `origin`, read as `from`: in a factory only those attached to it. Nothing is loaded. */
+const foldersHeld = (s: Served, origin: Origin, from: WorkflowSource, dir: string): Held<Folder>[] =>
+  foldersIn(dir)
+    .filter((name) => !s.factory || s.factory.workflows.includes(name))
+    .map((name) => ({ name, origin, item: { from, dir: path.join(dir, name) } }));
 
-/** Every folder the namespace holds, at each origin, by name — in a factory only those attached to it. Nothing is loaded. */
-export const heldIn = (s: Served): Held<Folder>[] =>
-  sourcesIn(s).flatMap(({ origin, from, dir }) =>
-    foldersIn(dir)
-      .filter((name) => !s.factory || s.factory.workflows.includes(name))
-      .map((name) => ({ name, origin, item: { from, dir: path.join(dir, name) } })),
-  );
+/**
+ * The workflows of the factory's tree (`<tree>/workflows`), each held at `origin` — `factory` in a namespace, `builtin` for a template's
+ * render — and only those attached to it; none where the factory has no tree. The one reader of a tree's workflows. Nothing is loaded.
+ */
+export const treeWorkflowsHeld = (s: Served, origin: Origin): Held<Folder>[] =>
+  s.factory?.tree === undefined ? [] : foldersHeld(s, origin, 'repo', path.join(s.factory.tree, 'workflows'));
+
+/** Every folder the namespace holds, at each origin, by name, in the lookup order: a factory's tree, the repository, yours. */
+export const heldIn = (s: Served): Held<Folder>[] => [
+  ...treeWorkflowsHeld(s, 'factory'),
+  ...foldersHeld(s, 'repo', 'repo', path.join(s.repo, 'workflows')),
+  ...foldersHeld(s, 'yours', 'yours', path.join(s.home, 'workflows')),
+];
 
 /** A key set: not null, not left out, not an empty list. */
 /** The keys whose unset value is null, so a list of none (`tools: []`) is a line the file writes. */
@@ -96,23 +99,31 @@ const stepBodyOf = (step: WorkflowStep): StepBody => ({
   own: typeof step.keys.agent === 'string' ? { keys: Object.keys(step.keys), body: step.body } : null,
 });
 
-/** The object of one folder served: its listing, the loading its graph is drawn from, and its revision. */
+/**
+ * The object of one folder served: its listing, the loading its graph is drawn from, and its revision; with no namespace and no revision
+ * for one no namespace holds (a template's).
+ */
 const workflowObject = (
-  namespace: string,
+  namespace: string | undefined,
   origin: Origin,
   shadowedBy: Origin | null,
   listing: WorkflowListing,
   loaded: FolderLoaded,
-  revision: number,
+  revision: number | undefined,
 ): Workflow => ({
   apiVersion: API_VERSION,
   kind: 'Workflow',
-  metadata: { name: listing.name, namespace, creationTimestamp: writtenAt(listing.dir), resourceVersion: listing.version },
+  metadata: {
+    name: listing.name,
+    ...(namespace !== undefined && { namespace }),
+    creationTimestamp: writtenAt(listing.dir),
+    resourceVersion: listing.version,
+  },
   spec: { description: listing.description, readme: listing.readme, steps: listing.steps.map(writtenStep) },
   status: {
     origin,
     ...(shadowedBy !== null && { shadowedBy }),
-    revision,
+    ...(revision !== undefined && { revision }),
     dir: listing.dir,
     graph: typedGraphOf('error' in loaded ? [] : loaded.steps),
     steps: listing.steps.map((step) => ({ ...step, spec: keysOf(step.spec) })),
@@ -123,23 +134,34 @@ const workflowObject = (
   },
 });
 
-/** The objects of the folders `served`, each loaded now as a start in the namespace's factory would load it. */
-async function objectsOf(s: Served, namespace: string, served: ReturnType<typeof servedOf<Folder>>): Promise<Workflow[]> {
+/**
+ * The objects of the folders `served`, each loaded now as a start in the request's factory would load it: in `namespace`, with the
+ * ledger's revision, where one is given; with neither where none is (a template's documents, which the ledger does not count). The loader
+ * reads the factory from the store by its name, so one the store does not hold (`stored` false: a template's render) is loaded in none:
+ * its hires fill no step, and no step is said unfilled.
+ */
+export async function workflowObjectsOf(
+  s: Served,
+  served: ReturnType<typeof servedOf<Folder>>,
+  namespace?: string,
+  stored = true,
+): Promise<Workflow[]> {
+  const loadedIn = stored ? s.factory : undefined;
   const loaded = await loadedOf(
     s.e,
     s.placeService,
     served.map((f) => f.item.dir),
     s.repo,
     s.home,
-    s.factory,
+    loadedIn,
   );
   return s.inRequest(
     Effect.forEach(served, ({ name, origin, shadowedBy, item: { from, dir } }) =>
       Effect.gen(function* () {
         const version = yield* workflowVersion(dir, placesOf(s.repo, s.home));
-        const revision = yield* definitionRevision('workflow', name, version);
+        const revision = namespace === undefined ? undefined : yield* definitionRevision('workflow', name, version);
         const folder = loadedAt(loaded, dir);
-        return workflowObject(namespace, origin, shadowedBy, listingOf(name, from, dir, folder, version, s.factory), folder, revision);
+        return workflowObject(namespace, origin, shadowedBy, listingOf(name, from, dir, folder, version, loadedIn), folder, revision);
       }),
     ),
   );
@@ -149,7 +171,7 @@ const listPath = (namespace: string) => `GET /api/namespaces/${namespace}/workfl
 
 /** The workflow `name` the namespace serves (from `asked`, where one is), read now. */
 export async function workflowAt(s: Served, namespace: string, name: string, asked?: Origin): Promise<Workflow> {
-  const [one] = await objectsOf(s, namespace, [servedNamed(heldIn(s), name, asked, listPath(namespace))]);
+  const [one] = await workflowObjectsOf(s, [servedNamed(heldIn(s), name, asked, listPath(namespace))], namespace);
   if (one === undefined) throw new Error(`${name} was served and then not read.`);
   return one;
 }
@@ -184,7 +206,7 @@ export const workflowsHandlers = HttpApiBuilder.group(Api, 'workflows', (handler
     .handle('list', ({ params: { namespace }, query }) =>
       answered(async (s) => {
         const { origin, ...page } = query;
-        const items = await objectsOf(s, namespace, servedOf(heldIn(s), originAsked(origin)));
+        const items = await workflowObjectsOf(s, servedOf(heldIn(s), originAsked(origin)), namespace);
         return listed('Workflow', items, queryOf(page));
       }),
     )

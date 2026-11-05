@@ -52,41 +52,55 @@ const treeAgents = (s: Served) =>
     return read;
   });
 
+/** What the namespace's agents are told apart by: the steps each file fills (`stepsFilled`) and the factories that fill one with it. */
+const fillsIn = (s: Served) => ({ filled: stepsFilled(s.repo, s.home, s.factory), byFile: factoriesFilling(readFactories(), s.home) });
+
 /**
- * Every agent the namespace holds, at each origin, read now with its users and fills: the factory's tree's whether or not a step names
- * them, since they are the factory's own; every other only where it fills a step there (`inFactory`).
+ * The agents of the factory's tree (`<tree>/workflows/agents`), each held at `origin` — `factory` in a namespace, `builtin` for a
+ * template's render — read now with its users and fills, whether or not a step names it, since they are the factory's own; none where the
+ * factory has no tree. The one reader of a tree's agents.
+ */
+export async function treeAgentsHeld(s: Served, origin: Origin, fills = fillsIn(s)): Promise<Held<LibraryAgent>[]> {
+  const tree = await s.inRequest(treeAgents(s));
+  const listings = await s.inRequest(Effect.forEach(tree, (one) => listingOf(one, s.repo, s.home, s.factory?.tree)));
+  return inFactory(listings, fills.filled, fills.byFile).map((item) => ({ name: item.name, origin, item }));
+}
+
+/**
+ * Every agent the namespace holds, at each origin, read now with its users and fills: the factory's tree's (`treeAgentsHeld`); every
+ * other only where it fills a step there (`inFactory`).
  */
 async function heldIn(s: Served): Promise<Held<LibraryAgent>[]> {
   const { agents } = (await runPlaced(s, s.e, AGENTS.handler({ repo: s.repo }, s.env, s.home))) as AgentsRead;
-  const tree = await s.inRequest(treeAgents(s));
-  const trees = new Set(tree.map((a) => a.file));
+  const fills = fillsIn(s);
+  const own = await treeAgentsHeld(s, 'factory', fills);
+  const trees = new Set(own.map(({ item }) => item.file));
   const listings = await s.inRequest(
-    Effect.forEach([...tree, ...agents], (one) => listingOf(one, s.repo, s.home, trees.has(one.file) ? s.factory?.tree : undefined)),
+    Effect.forEach(
+      agents.filter((one) => !trees.has(one.file)),
+      (one) => listingOf(one, s.repo, s.home),
+    ),
   );
-  const filled = stepsFilled(s.repo, s.home, s.factory);
-  const byFile = factoriesFilling(readFactories(), s.home);
-  const own = inFactory(
-    listings.filter((one) => trees.has(one.file)),
-    filled,
-    byFile,
-  );
-  const elsewhere = inFactory(
-    listings.filter((one) => !trees.has(one.file)),
-    filled,
-    byFile,
-    s.factory,
-  );
-  return [
-    ...own.map((item) => ({ name: item.name, origin: 'factory' as const, item })),
-    ...elsewhere.map((item) => ({ name: item.name, origin: item.from, item })),
-  ];
+  const elsewhere = inFactory(listings, fills.filled, fills.byFile, s.factory);
+  return [...own, ...elsewhere.map((item) => ({ name: item.name, origin: item.from, item }))];
 }
 
-/** The object of one agent served, its revision read through the ledger. */
-const agentObject = (namespace: string, origin: Origin, shadowedBy: Origin | null, a: LibraryAgent, revision: number): Agent => ({
+/** The object of one agent served, its revision read through the ledger; with neither namespace nor revision for a template's. */
+const agentObject = (
+  namespace: string | undefined,
+  origin: Origin,
+  shadowedBy: Origin | null,
+  a: LibraryAgent,
+  revision: number | undefined,
+): Agent => ({
   apiVersion: API_VERSION,
   kind: 'Agent',
-  metadata: { name: a.name, namespace, creationTimestamp: writtenAt(a.file), resourceVersion: a.version },
+  metadata: {
+    name: a.name,
+    ...(namespace !== undefined && { namespace }),
+    creationTimestamp: writtenAt(a.file),
+    resourceVersion: a.version,
+  },
   spec: {
     role: a.role,
     description: a.description,
@@ -100,7 +114,7 @@ const agentObject = (namespace: string, origin: Origin, shadowedBy: Origin | nul
   status: {
     origin,
     ...(shadowedBy !== null && { shadowedBy }),
-    revision,
+    ...(revision !== undefined && { revision }),
     dir: a.dir,
     file: a.file,
     source: a.source,
@@ -116,12 +130,18 @@ const agentObject = (namespace: string, origin: Origin, shadowedBy: Origin | nul
   },
 });
 
-const objectsOf = (s: Served, namespace: string, served: ReturnType<typeof servedOf<LibraryAgent>>): Promise<Agent[]> =>
+/**
+ * The objects of the agents `served`: in `namespace`, with the ledger's revision, where one is given; with neither where none is (a
+ * template's documents, which the ledger does not count).
+ */
+export const agentObjectsOf = (s: Served, served: ReturnType<typeof servedOf<LibraryAgent>>, namespace?: string): Promise<Agent[]> =>
   s.inRequest(
     Effect.forEach(served, ({ origin, shadowedBy, item }) =>
-      Effect.map(definitionRevision('agent', item.name, item.version), (revision) =>
-        agentObject(namespace, origin, shadowedBy, item, revision),
-      ),
+      namespace === undefined
+        ? Effect.succeed(agentObject(undefined, origin, shadowedBy, item, undefined))
+        : Effect.map(definitionRevision('agent', item.name, item.version), (revision) =>
+            agentObject(namespace, origin, shadowedBy, item, revision),
+          ),
     ),
   );
 
@@ -129,7 +149,7 @@ const listPath = (namespace: string) => `GET /api/namespaces/${namespace}/agents
 
 /** The agent `name` the namespace serves (from `asked`, where one is), read now. */
 async function agentAt(s: Served, namespace: string, name: string, asked?: Origin): Promise<Agent> {
-  const [one] = await objectsOf(s, namespace, [servedNamed(await heldIn(s), name, asked, listPath(namespace))]);
+  const [one] = await agentObjectsOf(s, [servedNamed(await heldIn(s), name, asked, listPath(namespace))], namespace);
   if (one === undefined) throw new Error(`${name} was served and then not read.`);
   return one;
 }
@@ -166,7 +186,7 @@ export const agentsHandlers = HttpApiBuilder.group(Api, 'agents', (handlers) =>
     .handle('list', ({ params: { namespace }, query }) =>
       answered(async (s) => {
         const { origin, ...page } = query;
-        return listed('Agent', await objectsOf(s, namespace, servedOf(await heldIn(s), originAsked(origin))), queryOf(page));
+        return listed('Agent', await agentObjectsOf(s, servedOf(await heldIn(s), originAsked(origin)), namespace), queryOf(page));
       }),
     )
     .handle('get', ({ params: { namespace, name }, query }) => answered((s) => agentAt(s, namespace, name, originAsked(query.origin))))

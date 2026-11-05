@@ -1,7 +1,7 @@
 /**
- * `GET /api/inbox` lists the cards still in play (inbox.ts): a started card's `state` is its run's phase, judged through the app's
- * informer each time the inbox is read and never written on the card, so a run that moves moves its card; a card whose run ended is
- * listed with `?all=true` alone, and any other `all` is refused.
+ * `GET /api/cards` lists every card (objects/cards.ts): a started card's `state` is its run's phase, judged through the app's informer each
+ * time the inbox is read and never written on the card, so a run that moves moves its card, and one whose run ended reads its run's end —
+ * which cards are still in play is the reader's to keep by that state (`nemia inbox`, the board).
  *
  * On the stand-ins: the runtime's test engine, its tasks filed and settled by hand, and the test place, under the records this file seeds.
  */
@@ -14,9 +14,8 @@ import { Effect, Layer } from 'effect';
 import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from 'agent-orchestrator/testing';
 import { Informer, informerMemo } from 'agent-orchestrator';
-import type { InboxEntry } from './inbox.ts';
+import type { CardList } from 'objects';
 import { appOver, eachTest, engineFor } from '../../test/placed.ts';
-import { names } from '../../test/named.ts';
 
 const stand = eachTest(testPlace);
 const standIn = eachTest(testEngine);
@@ -50,16 +49,18 @@ fs.writeFileSync(
   }),
 );
 
-/** The cards `GET /api/inbox` lists, as name and state, by name; with `?all=true` where `all` is set. */
-const listed = async (all = false): Promise<[string, string][]> => {
-  const res = await app().request(`/api/inbox${all ? '?all=true' : ''}`);
+/** The cards `GET /api/cards` lists, as name and state, by name. */
+const listed = async (): Promise<[string, string][]> => {
+  const res = await app().request('/api/cards');
   assert.equal(res.status, 200, await res.clone().text());
-  return ((await res.json()) as InboxEntry[]).map((e): [string, string] => [e.name, e.state]).sort(([a], [b]) => a.localeCompare(b));
+  return ((await res.json()) as CardList).items
+    .map((c): [string, string] => [c.metadata.name, c.status.state])
+    .sort(([a], [b]) => a.localeCompare(b));
 };
 
 const cardText = () => fs.readFileSync(path.join(root, 'inbox', `${CARD}.md`), 'utf8');
 
-test("a started card reads its run's phase, read now: in play while its run works, and behind ?all=true once it ended, with nothing written on the card", async () => {
+test("a started card reads its run's phase, read now: running while its run works, and its run's end once it ended, with nothing written on the card", async () => {
   Effect.runSync(engine().file({ id: `t-${RUN}`, brief: 'Do it.', cwd: '/code/app', harness: 'claude' }));
   standIn().settle(`t-${RUN}`, 'working');
   const before = cardText();
@@ -69,20 +70,13 @@ test("a started card reads its run's phase, read now: in play while its run work
   ]);
 
   standIn().settle(`t-${RUN}`, 'failed', { exitCode: 1 });
-  assert.deepEqual(await listed(), [[PARKED, 'filed']], 'its run ended: out of the cards in play');
   assert.deepEqual(
-    await listed(true),
+    await listed(),
     [
       [CARD, 'failed'],
       [PARKED, 'filed'],
     ],
-    "and listed with ?all=true, in its run's phase",
+    "its run ended: listed in its run's phase, which a reader keeps out of the cards in play",
   );
   assert.equal(cardText(), before, 'the card is not written: its state is read from its run');
-});
-
-test('REFUSED: `all` with any value but true is a 422 that names ?all=true', async () => {
-  const res = await app().request('/api/inbox?all=yes');
-  assert.equal(res.status, 422);
-  names(((await res.json()) as { error: string }).error, '?all=true');
 });

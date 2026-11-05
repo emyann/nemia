@@ -1945,8 +1945,8 @@ codex:
   a loop below its cap — which goes round by itself — a round held on a budget, where raising the cap is
   the way on, a loop that ended `again: false`, and a round still running. A file at the acceptance's name
   that is not one is honoured by no pass, which says so in its notes and leaves the file alone. The board
-  accepts through the same function: its `accept` row takes the reason and posts it to the api's
-  `POST /api/runs/:id/steps/:step/accept`, which calls `accept()` and shows its refusals in these words.
+  accepts through the same function: its `approve` row takes the reason and posts it to the api's
+  `POST /api/runs/:id/steps/:step/approve`, which calls `accept()` and shows its refusals in these words.
 - **Taking it back is only a file to delete until a tick has acted on it.** `nemia retry --round` on an accepted loop
   refuses, and what it says depends on that: while nothing waiting on the loop has been filed, nothing has
   been done on the person's word, and the refusal names `accept-<step>-<try>` to delete before asking again.

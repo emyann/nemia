@@ -16,7 +16,6 @@
     "**/*.yml",
     "**/*.html",
     "**/routeTree.gen.ts",
-    "**/run.gen.ts",
     "**/fixtures/**",
     ".claude/**",
     "apps/web/.claude/**",

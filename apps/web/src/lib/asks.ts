@@ -82,8 +82,8 @@ export const needText = (need: Need): string => {
 /**
  * A need as a step's node says it, which has one line about thirty characters wide and truncates: for a session the harness blocked with
  * a wait on it, the wait alone (`waiting for a permission prompt`). It is the one fact this page has nowhere else at a glance — the chip
- * above the line already says `needs-human`, and `blocked by the harness: ` is twenty-four characters, which would leave room for a few of
- * the wait's. The whole of it, with what the session said last, is the line's `title`
+ * above the line already says the session asks, and `blocked by the harness: ` is twenty-four characters, which would leave room for a
+ * few of the wait's. The whole of it, with what the session said last, is the line's `title`
  * and the banner's. Every other need, and a harness that said nothing about what for, reads as it does anywhere else.
  */
 export const needNodeText = (need: Need): string => (need.kind === 'harness' && need.waitingFor ? need.waitingFor.words : needText(need));

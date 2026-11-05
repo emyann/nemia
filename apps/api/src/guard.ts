@@ -4,14 +4,14 @@
  * Twenty-eight writes pass it: a factory signed in to a server (`POST /api/factories/:factory/servers/:server/sign-in`,
  * servers/sign-in.ts) or signed out of one (`DELETE` on the same path), each of which writes the harness's own store, which every
  * session of the factory reads; a start (`POST /api/runs`, workflows.ts), which writes a run's record — and, for an inbox card, removes the
- * card; an ask for another try (`POST /api/runs/:id/steps/:step/retry`, asks.ts) or another round (`POST /api/runs/:id/round`, asks.ts,
- * kept for `nemia retry --round`), each of which writes a person's ask file; an approval of a step waiting at its gate (`POST
- * /api/runs/:id/steps/:step/approve`, asks.ts), which writes a person's approval file, or an acceptance of a loop out of rounds as it
- * stands (`POST /api/runs/:id/steps/:step/accept`, asks.ts, kept for `nemia approve` of a loop), which writes a person's acceptance file;
+ * card; an ask for another try or another round (`POST /api/runs/:id/steps/:step/retry`, asks.ts, with `"round": true` for `nemia retry
+ * --round`), which writes a person's ask file; an approval of a step waiting at its gate, or of a loop out of rounds as it stands (`POST
+ * /api/runs/:id/steps/:step/approve`, asks.ts), which writes a person's approval or acceptance file;
  * words for a step's running session (`POST /api/runs/:id/steps/:step/say`, asks.ts),
- * which the engine hands the session and journals; a card filed in the inbox (`POST /api/inbox`, inbox.ts) or dropped from it (`DELETE
- * /api/inbox/:name`, inbox.ts); a card queued to start on its own (`POST /api/inbox/:name/queue`, inbox.ts) or taken off the queue (`DELETE
- * /api/inbox/:name/queue`), each of which writes the store's inbox; and a workflow of yours built on the board — made (`POST
+ * which the engine hands the session and journals; the Card's six writes (objects/serve.ts): a card filed (`POST
+ * /api/namespaces/:namespace/cards`) or dropped (`DELETE …/cards/:name`), started (`POST …/cards/:name/start`), queued (`…/queue`) or
+ * taken off the queue (`…/unqueue`), and its labels edited (`…/labels`), each of which writes the store's inbox or starts a run, guarded
+ * before the objects' handler reads its body; and a workflow of yours built on the board — made (`POST
  * /api/workflows/yours`), or put back from its steps and the schemas pasted for them (`PUT /api/workflows/yours/:name`), builder.ts — each
  * of which writes the store's `workflows/`, and removes a step's file the folder has dropped — or removed whole (`DELETE
  * /api/workflows/yours/:name`, remove.ts); and an agent of yours made (`POST

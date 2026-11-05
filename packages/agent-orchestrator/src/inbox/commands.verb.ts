@@ -1,7 +1,8 @@
 /**
  * `nemia inbox`, each of its forms an entry of the command table: the cards listed, an idea filed as one, a card queued to start on its own
- * or taken off the queue, and a card dropped. The api serves each: the list and the filing by routes of its own, which call these
- * handlers, the queue and the drop on the routes the table generates. One card read for its page is an entry the api serves alone.
+ * or taken off the queue, and a card dropped. The api serves each as a verb of the Card (`objects`' Api, apps/api/src/objects/cards.ts),
+ * which calls these handlers, and none on a route of the table's; a card's `from:` on the routes the table generates. One card read for
+ * its page is an entry the api serves alone.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -129,7 +130,10 @@ export const INBOX: Command<{ cards: InboxListing[]; ended: number }> = {
   },
   writes: false,
   class: 'read',
-  route: { method: 'GET', path: '/api/inbox', status: 200 },
+  only: {
+    side: 'cli',
+    why: "the api serves it as the Card's `listAll` verb of `objects`' Api (`GET /api/cards`, a page of `Card` objects), which reads the inbox as this entry does: no route of its own",
+  },
   manual: INBOX_HELP,
   handler: (args, env, home, kept) =>
     Effect.gen(function* () {
@@ -213,11 +217,9 @@ export const INBOX_ADD: Command<{ card: InboxCard; file: string; labelsLeftOut?:
   check: (args) => leftOut(ADD_SPEC, args),
   writes: true,
   class: 'act',
-  route: {
-    method: 'POST',
-    path: '/api/inbox',
-    status: 201,
-    hand: 'its body names a workflow by `from` and name, which the api finds among the folders a start finds one in before the card is written: never a path sent',
+  only: {
+    side: 'cli',
+    why: "the api serves it as the Card's `create` verb of `objects`' Api (`POST /api/namespaces/:namespace/cards`, the namespace its factory), which calls this entry's handler: no route of its own",
   },
   handler: (args, _env, home) =>
     rooted(
@@ -306,10 +308,10 @@ export const INBOX_QUEUE: Command<Queued> = {
   writes: true,
   ticks: true,
   class: 'act',
-  route: [
-    { method: 'POST', path: '/api/inbox/:name/queue', status: 200, sets: { off: false } },
-    { method: 'DELETE', path: '/api/inbox/:name/queue', status: 200, sets: { off: true } },
-  ],
+  only: {
+    side: 'cli',
+    why: "the api serves it as the Card's `queue` and `unqueue` verbs of `objects`' Api (`POST /api/namespaces/:namespace/cards/:name/queue` and `…/unqueue`), which calls this entry's handler: no route of its own",
+  },
   apiKeys: ['name', 'file', 'was', 'queued', 'place', 'of'],
   handler: (args, _env, home) =>
     rooted(
@@ -409,7 +411,10 @@ export const INBOX_RM: Command<InboxDropped> = {
   },
   writes: true,
   class: 'ask',
-  route: { method: 'DELETE', path: '/api/inbox/:name', status: 200 },
+  only: {
+    side: 'cli',
+    why: "the api serves it as the Card's `delete` verb of `objects`' Api (`DELETE /api/namespaces/:namespace/cards/:name`), which calls this entry's handler: no route of its own",
+  },
   handler: (args, _env, home) => rooted(home, 'inbox rm', dropFromInbox(textOf(args, 'name') ?? '')),
   apiRefusal: (dropped, args) => (dropped.removed ? null : new Missing({ message: noCardLine(textOf(args, 'name') ?? '', dropped.cards) })),
   print: (dropped, args) => [

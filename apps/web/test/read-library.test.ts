@@ -1,6 +1,6 @@
 /**
  * The library's reads decode the api's answers where they enter (`get`): the agents, the skills, the workflows and a step's page, the
- * builder's form, the repository and the machines: a key the board does not know is dropped, and one the api leaves out stays out. Which
+ * builder's form and the repository: a key the board does not know is dropped, and one the api leaves out stays out. Which
  * keys each answer has — a step's `place`, `workspace` and `slot` among them, so a save of the builder puts them back — is
  * `test/wire.test.ts`'s.
  */
@@ -10,8 +10,7 @@ import { ReadRefusal, UnreadAnswer } from '../src/lib/api/read.ts';
 import { agentsQuery, readAgent, type LibraryAgent } from '../src/lib/api/agents.ts';
 import { skillQuery, type SkillDetail } from '../src/lib/api/skills.ts';
 import { stepQuery, workflowsInQuery, workflowsQuery, type WorkflowListing, type WorkflowStepPage } from '../src/lib/api/workflows.ts';
-import { machineQuery, type MachineGraph } from '../src/lib/api/machines.ts';
-import { listedAgent, machine, skillDetail, skillEntry, stepPage, workflow } from './library-fixtures.ts';
+import { listedAgent, skillDetail, skillEntry, stepPage, workflow } from './library-fixtures.ts';
 
 /** Every read answering `body` as JSON, with `status`, for the length of the test. */
 function answering(t: { after: (fn: () => void) => void }, body: unknown, status = 200) {
@@ -25,7 +24,6 @@ function answering(t: { after: (fn: () => void) => void }, body: unknown, status
 const readAgents = agentsQuery.queryFn as unknown as () => Promise<LibraryAgent[]>;
 const readSkill = skillQuery('yours', 'review-a-change').queryFn as unknown as () => Promise<SkillDetail>;
 const readWorkflows = workflowsQuery.queryFn as unknown as () => Promise<WorkflowListing[]>;
-const readMachine = machineQuery('lifecycle').queryFn as unknown as () => Promise<MachineGraph>;
 
 /** `value` without `keys`, as an api that does not send them answers. */
 const without = <T extends object>(value: T, ...keys: string[]): T =>
@@ -127,10 +125,6 @@ test("get, the library's reads: each decodes what the api gives, keeps out what 
       const skill = await readSkill();
       assert.equal(Object.hasOwn(skill.draft ?? {}, 'preload') || Object.hasOwn(skill.draft ?? {}, 'title'), false);
       assert.deepEqual(skill, skillDetail({ draft }));
-
-      answering(t, machine());
-      const [, unguarded] = (await readMachine()).edges;
-      assert.equal(Object.hasOwn(unguarded, 'guard'), false);
     },
   );
   await t.test('a key the board does not know is dropped, not refused', async (t) => {

@@ -2,7 +2,7 @@
  * A step's tries, earliest first, each with its attempts and how it signed off, as the run's record keeps them — and, of the revisions a
  * try ran on, the two drifts the run page shows: how the workflow folder has moved away from the steps the run started with (`driftOf`),
  * a name-level difference said as a warning; the kinds behind the files are the orchestrator's (`driftNow`). And what a person
- * said of the try a step is on: its gate's approval (`gateOf`) and a loop's acceptance (`acceptedOf`).
+ * said of the try a step is on: its gate's approval, or a loop's acceptance, which is `nemia approve` of a loop (`gateOf`).
  */
 import { endWords, type AttemptEnd, type EngineOutcome } from '../views/views-words.ts';
 import { DEFAULT_HARNESS } from '../harness/harness.ts';
@@ -40,7 +40,9 @@ export type StepApproval = { try: number; at: string; message: string | null };
 /**
  * A gated step's gate: its own `gate: true`, or one the run was started with (`hasGate`). `awaiting` while it waits at it — signed off,
  * verified first where it has a check, and the try it is on not approved: `nemia ls`'s `awaiting approval`, whatever else is asked of it.
- * And `approval`, once a person approved that try. Neither, for a gated step not signed off yet.
+ * And `approval`, once a person approved that try. Neither, for a gated step not signed off yet. A looping step a person approved out of
+ * rounds as it stands (`nemia approve` of a loop, its acceptance) has one too, never awaiting, its approval that acceptance: the Run says
+ * the two one way, as the command does.
  */
 export type StepGate = { awaiting: boolean; approval: StepApproval | null };
 
@@ -343,22 +345,16 @@ export function driftOf(run: Run, workflows: readonly Workflow[]): string | null
 
 /**
  * A step's gate (`StepGate`), or null for a step with none: whether it waits at it, by its reason (`AwaitingApproval`), and the approval of
- * the try it is on. Off the record as `runStore` composes it, with each approval its file holds (`approvalOf`): no read of its own.
+ * the try it is on — or, for a looping step, the acceptance of that try as it stands (`acceptanceOf`), which `nemia approve` of a loop
+ * writes, a gate of its own where the step has none. Off the record as `runStore` composes it, with each approval and acceptance its files
+ * hold: no read of its own.
  */
 export function gateOf(run: Run, step: Workflow, reason: StepReason): StepGate | null {
-  if (!hasGate(step, run)) return null;
-  const given = approvalOf(run, step.name);
+  const accepted = step.loop ? acceptanceOf(run, step.name) : undefined;
+  if (!hasGate(step, run) && accepted === undefined) return null;
+  const given = approvalOf(run, step.name) ?? accepted;
   return {
     awaiting: reason === 'AwaitingApproval',
     approval: given ? { try: given.try, at: given.at, message: given.message ?? null } : null,
   };
-}
-
-/**
- * A looping step's acceptance (`StepAcceptance`), off the record as `runStore` composes it, as `gateOf` reads an approval: no read of its
- * own.
- */
-export function acceptedOf(run: Run, step: string): StepAcceptance | null {
-  const given = acceptanceOf(run, step);
-  return given ? { try: given.try, at: given.at, message: given.message } : null;
 }

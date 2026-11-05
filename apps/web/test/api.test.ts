@@ -296,7 +296,7 @@ test("each ask of a run's page: posted as the api takes it, read back, and refus
       await assert.rejects(askTry('r-1', 'tokens', { mode: 'continue', budget: 4 }), (err: Error) => err.message === refusal);
 
       answer = () => answered(202, { step: 'review', round: 3, file: '/store/runs/r 1.asks/round-review-3' });
-      assert.deepEqual(await askRound('r 1', { step: 'review', budget: 3 }), {
+      assert.deepEqual(await askRound('r 1', 'review', { budget: 3 }), {
         step: 'review',
         round: 3,
         file: '/store/runs/r 1.asks/round-review-3',
@@ -304,13 +304,14 @@ test("each ask of a run's page: posted as the api takes it, read back, and refus
       const words =
         '--budget 2 is not above $2.10, what implement has cost: the round would be held again as soon as it was asked for. Give more than $2.10: nemia retry r-1 review --round --budget <amount>.';
       answer = () => answered(409, { error: words });
-      await assert.rejects(askRound('r-1', { step: 'review', budget: 2 }), (err: Error) => err.message === words);
+      await assert.rejects(askRound('r-1', 'review', { budget: 2 }), (err: Error) => err.message === words);
       answer = () => answered(202, {});
       await assert.rejects(
-        askRound('r-1', { budget: 3 }),
+        askRound('r-1', 'review', { budget: 3 }),
         (err: Error) =>
-          err.message.startsWith('POST /api/runs/r-1/round answered what this board does not read: at step, the value is missing.') &&
-          /before asking again/.test(err.message),
+          err.message.startsWith(
+            'POST /api/runs/r-1/steps/review/retry answered what this board does not read: at step, the value is missing.',
+          ) && /before asking again/.test(err.message),
       );
 
       assert.deepEqual(
@@ -318,9 +319,9 @@ test("each ask of a run's page: posted as the api takes it, read back, and refus
         [
           ['/api/runs/r-1/steps/tokens/retry', 'POST', 'application/json', { mode: 'continue', budget: 5 }],
           ['/api/runs/r-1/steps/tokens/retry', 'POST', 'application/json', { mode: 'continue', budget: 4 }],
-          ['/api/runs/r%201/round', 'POST', 'application/json', { step: 'review', budget: 3 }],
-          ['/api/runs/r-1/round', 'POST', 'application/json', { step: 'review', budget: 2 }],
-          ['/api/runs/r-1/round', 'POST', 'application/json', { budget: 3 }],
+          ['/api/runs/r%201/steps/review/retry', 'POST', 'application/json', { mode: 'continue', round: true, budget: 3 }],
+          ['/api/runs/r-1/steps/review/retry', 'POST', 'application/json', { mode: 'continue', round: true, budget: 2 }],
+          ['/api/runs/r-1/steps/review/retry', 'POST', 'application/json', { mode: 'continue', round: true, budget: 3 }],
         ],
       );
     },

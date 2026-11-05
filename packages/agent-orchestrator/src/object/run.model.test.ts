@@ -1,16 +1,14 @@
 /**
  * The run as one object (`Run`): a hand-built run decodes through it, its status carries the list's judged fields by the very types the
- * list's row has (`judgedFields`), and its OpenAPI 3.1 document (`runDocument`) holds a `Run` and imports back into a Schema that decodes
- * the same run.
+ * list's row has (`judgedFields`).
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { JsonSchema, Schema, SchemaRepresentation } from 'effect';
+import { Schema } from 'effect';
 import {
   Run,
   RunStatus,
   RunStepStatus,
-  runDocument,
   StepAttempts,
   StepCheck,
   StepCloseout,
@@ -64,9 +62,6 @@ const subResourcesSame = [
   true satisfies Same<StepUsed, UsedType>,
   true satisfies Same<StepTold, ReturnType<typeof toldOf> & { body: string | null }>,
 ];
-
-/** A Schema imported from JSON Schema, typed `Top` with its services unknown, as the decoder it is: built from JSON alone, it asks none. */
-const imported = (schema: Schema.Top): Schema.Decoder<unknown> => schema as Schema.Decoder<unknown>;
 
 const span = {
   taskId: 'r-1-build',
@@ -131,7 +126,6 @@ const unfiled = (name: string) => ({
   sessionUnread: null,
   lastLine: null,
   gate: null,
-  accepted: null,
   said: [],
   asked: null,
   check: null,
@@ -280,31 +274,4 @@ test("a step's latest attempt says the release and harness it ran on, each null 
   assert.deepEqual(Schema.decodeUnknownSync(StepAttempts)(unrecorded), unrecorded);
   const other = { count: 1, latest: { ...latest, release: { kind: 'image', root: '/x' }, harness: null } };
   assert.equal(Schema.decodeUnknownResult(StepAttempts)(other)._tag, 'Failure', 'a release is an install or a checkout');
-});
-
-test("the run's OpenAPI 3.1 document holds `Run`, and imports back into a Schema that decodes the same run", () => {
-  const openapi = runDocument();
-  assert.equal(openapi.dialect, 'openapi-3.1');
-  assert.deepEqual(openapi.schemas[0], { $ref: '#/components/schemas/Run' });
-  for (const name of ['Run', 'RunMetadata', 'RunSpec', 'RunSpecStep', 'RunStatus', 'RunStepStatus', 'TryShort', 'StepRaise']) {
-    assert.ok(openapi.definitions[name], `the document defines ${name}`);
-  }
-  for (const name of ['Labelled', 'LabelEdit']) {
-    assert.ok(openapi.definitions[name], `the document defines ${name}`);
-    assert.ok(
-      openapi.schemas.some((root) => JSON.stringify(root) === JSON.stringify({ $ref: `#/components/schemas/${name}` })),
-      `${name} is a root`,
-    );
-  }
-  const metadata = openapi.definitions.RunMetadata as { properties: { labels: { type: string; additionalProperties: unknown } } };
-  assert.deepEqual(
-    [metadata.properties.labels.type, metadata.properties.labels.additionalProperties],
-    ['object', { type: 'string' }],
-    "the run's labels are one map of strings",
-  );
-  const document = JsonSchema.fromSchemaOpenApi3_1({ ...openapi.schemas[0], $defs: openapi.definitions });
-  const back = imported(SchemaRepresentation.fromJsonSchemaDocument(document));
-  assert.deepEqual(Schema.decodeUnknownSync(back)(fixture), fixture, 'the imported Schema decodes the run');
-  const opened = { ...fixture, status: { ...fixture.status, phase: 'paused' } };
-  assert.equal(Schema.decodeUnknownResult(back)(opened)._tag, 'Failure', 'and keeps its words closed');
 });

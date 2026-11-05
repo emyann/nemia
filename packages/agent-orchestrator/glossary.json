@@ -239,6 +239,17 @@
       "type": "Phase"
     },
     {
+      "term": "Pause",
+      "meaning": "the whole store paused by a person (`nemia pause`, lifted by `nemia resume`): one file, `pauseFile`, composed on read onto every run, under which no pass files new work and what is in flight runs on. The file keeps its former name, `cordon` (`PAUSE_FILE`), so that a pause put before the verbs were renamed still stands and is lifted.",
+      "type": "Pause",
+      "retired": [
+        {
+          "spelling": "cordon",
+          "card": "resource objects, P9: the leftover words — cordon is the pause, auto's rules are policy, one LABEL_KEYS, no needs-human above the runtime"
+        }
+      ]
+    },
+    {
       "term": "Paused",
       "meaning": "a step whose session is parked at a tool call's end — held at its hook, or stopped with its call cut — until the pause is lifted or the new daemon resumes it as the same try: `paused`, `paused after its call to <tool>` or `paused, its call to <tool> cut` (`pausedWord`, read through `parkedOf`), reason `Paused`, phase running.",
       "type": "StepReason"
@@ -289,6 +300,30 @@
         {
           "spelling": "autoProposeRun",
           "card": "decision 14 part B: the chat's tool call is a call, and the auto commands are policy"
+        },
+        {
+          "spelling": "AutoRule",
+          "card": "resource objects, P9: the leftover words — cordon is the pause, auto's rules are policy, one LABEL_KEYS, no needs-human above the runtime"
+        },
+        {
+          "spelling": "AutoAnswer",
+          "card": "resource objects, P9: the leftover words — cordon is the pause, auto's rules are policy, one LABEL_KEYS, no needs-human above the runtime"
+        },
+        {
+          "spelling": "AUTO_ANSWERS",
+          "card": "resource objects, P9: the leftover words — cordon is the pause, auto's rules are policy, one LABEL_KEYS, no needs-human above the runtime"
+        },
+        {
+          "spelling": "DEFAULT_AUTO",
+          "card": "resource objects, P9: the leftover words — cordon is the pause, auto's rules are policy, one LABEL_KEYS, no needs-human above the runtime"
+        },
+        {
+          "spelling": "AUTO_FOLDER",
+          "card": "resource objects, P9: the leftover words — cordon is the pause, auto's rules are policy, one LABEL_KEYS, no needs-human above the runtime"
+        },
+        {
+          "spelling": "autoDir",
+          "card": "resource objects, P9: the leftover words — cordon is the pause, auto's rules are policy, one LABEL_KEYS, no needs-human above the runtime"
         }
       ]
     },
@@ -389,6 +424,17 @@
       "retired": []
     },
     {
+      "term": "Series label",
+      "meaning": "a key a line of the store's series may be labelled by (`SERIES_LABEL_KEYS`, `packages/agent-orchestrator/src/series/series.ts`), bounded and never a run id; not a feed line's label keys, which are `LABEL_KEYS` (`packages/agent-orchestrator/src/watch/selector.ts`), the one constant of that name.",
+      "type": "SeriesLabelKey",
+      "retired": [
+        {
+          "spelling": "LabelKey",
+          "card": "resource objects, P9: the leftover words — cordon is the pause, auto's rules are policy, one LABEL_KEYS, no needs-human above the runtime"
+        }
+      ]
+    },
+    {
       "term": "Session release",
       "meaning": "the release a session runs on, off the image its attempt recorded: an install's tag where that sits under the store's `releases/<tag>/`, else a checkout. Shown on a step's latest attempt, beside a step at work in `nemia ls`, and counted in `nemia version`.",
       "type": "SessionRelease"
@@ -453,7 +499,7 @@
     },
     {
       "term": "Sub-resource",
-      "meaning": "what the run object leaves out and serves on a path under its step: its `tries`, one `try`, a try's `closeout`, and what the step was `told`. Each is an entry of the command table, on the api and, for the closeout, the CLI, and answers with a Schema of its own beside the object's (`StepTries`, `StepTry`, `TryCloseout`, `StepTold`, in `packages/agent-orchestrator/src/object/run.model.ts`)."
+      "meaning": "what the run object leaves out and serves on a path under its step: its `tries`, one `try`, a try's `closeout`, and what the step was `told`. Each is an entry of the command table, on the api and, for the closeout, the CLI, and answers with a Schema of its own beside the object's (`StepTries`, `StepTry`, `TryCloseout`, `StepTold`, in `packages/objects/src/run.ts`, re-exported by `packages/agent-orchestrator/src/object/run.model.ts`)."
     },
     {
       "term": "TaskId",

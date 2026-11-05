@@ -2,7 +2,6 @@ import { useMemo, useState } from 'react';
 import { Background, BackgroundVariant, MarkerType, ReactFlow } from '@xyflow/react';
 import type { MachineGraph } from '../lib/api';
 import { drawMachine, type Drawing } from '../lib/machine';
-import type { useCanvasPress } from '../lib/useCanvasPress';
 import { MachineEdge, type MachineFlowEdge } from './MachineEdge';
 import { MachineNode, type MachineFlowNode } from './MachineNode';
 
@@ -13,27 +12,21 @@ const edgeTypes = { route: MachineEdge };
 /** No route taken: one array for the module's life. */
 const NONE: readonly string[] = [];
 
-/** What a press on a machine's states does, as `useCanvasPress` gives it: React Flow's handlers. */
-export type MachinePress = Omit<ReturnType<typeof useCanvasPress>, 'shown'>;
-
 /**
- * The drawing's states and routes as React Flow's nodes and edges, `lit`, `inspected` and `taken` marked on them; each state given back
- * its pointer events, a name and no outline of the browser's when it can be `pressed`.
+ * The drawing's states and routes as React Flow's nodes and edges, `lit` and `taken` marked on them.
  *
  * A state carries the size its layout gave it as the node's own `width` and `height`, never in its `style` alone: React Flow draws a node
  * whose size it does not know `visibility: hidden` until it has measured the box, and it forgets what it measured every time these nodes
- * are built again — on a press, on the bar switching or closing. A state invisible for a frame takes no focus, so the focus a person gives
- * it right then would land on nothing.
+ * are built again, as the lit state moves.
  */
-export function flowOf(drawing: Drawing, lit: string | undefined, taken: readonly string[], pressed: boolean, inspected: string | null) {
+export function flowOf(drawing: Drawing, lit: string | undefined, taken: readonly string[]) {
   const nodes: MachineFlowNode[] = drawing.states.map((box) => ({
     id: box.id,
     type: 'state',
     position: { x: box.x, y: box.y },
-    data: { ...box, lit: box.id === lit, pressable: pressed, inspected: box.id === inspected },
+    data: { ...box, lit: box.id === lit },
     width: box.width,
     height: box.height,
-    ...(pressed && { style: { pointerEvents: 'all' as const }, ariaLabel: `State ${box.id}`, className: 'outline-none' }),
     draggable: false,
     selectable: false,
   }));
@@ -67,34 +60,32 @@ export function flowOf(drawing: Drawing, lit: string | undefined, taken: readonl
  *
  * Laid out, never arranged: nothing moves, joins or zooms, and the wheel scrolls the page past it. It is drawn at its own size, or
  * smaller to fit a narrower frame, or one lower than `maxHeight`, which is as tall as the drawing then is; its flow has an id of its own,
- * `id` or else the machine's, which scopes its arrowheads' ids on a page that draws several.
+ * `id` or else the machine's `name`, which scopes its arrowheads' ids on a page that draws several; `title` is what a person calls the
+ * machine, which names the drawing.
  *
  * `lit` names the state a task's path stands in, and `taken` the routes it took there (`from->to`): drawn over the graph, lit in amber.
- *
- * Given `press`, a click, a tap or Enter on a state does what it says (`useCanvasPress`), and `inspected` names the state the frame's bar
- * shows, ringed; with none, as in the Debug panel, nothing on it takes a press or the focus.
+ * Nothing on it takes a press or the focus.
  */
 export function MachineCanvas({
   machine,
+  name,
+  title,
   id,
   lit,
   taken = NONE,
   maxHeight = Infinity,
-  press,
-  inspected = null,
 }: {
   machine: MachineGraph;
+  name: string;
+  title: string;
   id?: string;
   lit?: string;
   taken?: readonly string[];
   maxHeight?: number;
-  press?: MachinePress;
-  inspected?: string | null;
 }) {
   const [frameWidth, setFrameWidth] = useState(0);
   const drawing = useMemo(() => drawMachine(machine), [machine]);
-  const pressed = press !== undefined;
-  const drawn = useMemo(() => flowOf(drawing, lit, taken, pressed, inspected), [drawing, lit, taken, pressed, inspected]);
+  const drawn = useMemo(() => flowOf(drawing, lit, taken), [drawing, lit, taken]);
   const zoom = frameWidth ? Math.min(1, frameWidth / drawn.width, maxHeight / drawn.height) : 1;
 
   return (
@@ -105,26 +96,25 @@ export function MachineCanvas({
         observer.observe(el);
         return () => observer.disconnect();
       }}
-      aria-label={`${machine.title} as a graph`}
-      data-machine={machine.name}
+      aria-label={`${title} as a graph`}
+      data-machine={name}
       className="overflow-hidden rounded border border-outline-variant"
       style={{ height: Math.ceil(drawn.height * zoom) + 2 }}
     >
       {frameWidth > 0 && (
         <ReactFlow
-          id={id ?? `machine-${machine.name}`}
+          id={id ?? `machine-${name}`}
           nodes={drawn.nodes}
           edges={drawn.edges}
           nodeTypes={nodeTypes}
           edgeTypes={edgeTypes}
-          {...press}
           viewport={{ x: Math.max(0, (frameWidth - drawn.width * zoom) / 2), y: 0, zoom }}
           minZoom={0.1}
           nodesDraggable={false}
           nodesConnectable={false}
           elementsSelectable={false}
           edgesFocusable={false}
-          nodesFocusable={pressed}
+          nodesFocusable={false}
           panOnDrag={false}
           panOnScroll={false}
           zoomOnScroll={false}

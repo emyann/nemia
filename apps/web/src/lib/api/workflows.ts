@@ -291,9 +291,7 @@ const StartedSchema = decodes<Started>()(Schema.Struct({ id: Schema.String }));
  * `--after` does; left out when there are none. `context` names the runs it reads as context, as `--from` does; left out when there are
  * none.
  *
- * `card` starts an inbox card, as the CLI's `start <inbox>/<card>.md --brief <brief>` does: the record carries where it came from, and the
- * card keeps its file, listed as `started` from then on. Refused in the package's words: a card not there, one started
- * already.
+ * An inbox card is started through the Card's own verb (`startCard`, inbox.ts), never here.
  *
  * `place` starts it in a factory, on one of its repositories, as the CLI's `start --factory` does (`placeQuery`): refused in the package's
  * words for a workflow the factory has not attached, a step its hires leave unfilled, or a repository outside it.
@@ -307,7 +305,6 @@ export const startRun = (
     brief: string;
     after?: readonly string[];
     context?: readonly string[];
-    card?: string;
   },
   place?: Place | null,
 ): Promise<Started> =>

@@ -44,7 +44,7 @@ export type StoreMeasure = {
     tasks: number;
     journalBytes: number;
     feedLines: number;
-    /** The entries `GET /api/inbox?all=true` lists, and those of them a run was started from (a `startedAs` that is not empty). */
+    /** The cards `GET /api/cards` lists, and those of them a run was started from (a `status.runs` that is not empty). */
     cards: { listed: number; started: number };
     /** Runs the list answered off their record because a task's journal did not read, and the lines the pass said were unreadable. */
     unreadable: { runs: number; passLines: number };

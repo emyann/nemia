@@ -517,12 +517,12 @@ test('the commands a decision offers are bare `nemia` lines, by the state the ru
 
       const stepsOf = async () => (await detailOf('r-d9')).status.steps;
       assert.deepEqual(
-        (await stepsOf()).map((s) => [s.name, s.accepted]),
+        (await stepsOf()).map((s) => [s.name, s.gate?.approval ?? null]),
         [
           ['implement', null],
           ['review', null],
         ],
-        'before a person accepts, no step of the run says an acceptance',
+        'before a person accepts, no step of the run says an approval',
       );
       const asks = path.join(root, 'runs', 'r-d9.asks');
       fs.mkdirSync(asks, { recursive: true });
@@ -531,7 +531,7 @@ test('the commands a decision offers are bare `nemia` lines, by the state the ru
         JSON.stringify({ at: '2026-09-20T01:00:00.000Z', message: 'spent: of the try before' }),
       );
       assert.deepEqual(
-        (await stepsOf()).map((s) => [s.name, s.accepted]),
+        (await stepsOf()).map((s) => [s.name, s.gate?.approval ?? null]),
         [
           ['implement', null],
           ['review', null],
@@ -543,7 +543,7 @@ test('the commands a decision offers are bare `nemia` lines, by the state the ru
         JSON.stringify({ at: '2026-09-20T02:00:00.000Z', message: 'the findings are follow-up work' }),
       );
       assert.deepEqual(
-        (await stepsOf()).map((s) => [s.name, s.accepted]),
+        (await stepsOf()).map((s) => [s.name, s.gate?.approval ?? null]),
         [
           ['implement', null],
           ['review', { try: 2, at: '2026-09-20T02:00:00.000Z', message: 'the findings are follow-up work' }],

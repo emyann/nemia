@@ -1,7 +1,7 @@
 /**
- * The reads of one run: its object (`GET /api/runs/:id`, decoded by the generated mirror, `run.gen.ts`), each step's tries and what it
- * was told, and the run's lines — the commands a person types and where its workflow's page is, which the api serves by hand beside the
- * object. What the run's pages draw is composed from them (`runViewOf`, `lib/runView.ts`).
+ * The reads of one run: its object (`GET /api/runs/:id`) and each step's tries and what it was told, read through the objects' client
+ * (`objects.ts`) as `objects` defines them, and the run's lines — the commands a person types and where its workflow's page is, which
+ * the api serves by hand beside the object. What the run's pages draw is composed from them (`runViewOf`, `lib/runView.ts`).
  */
 import { queryOptions } from '@tanstack/react-query';
 import { Schema } from 'effect';
@@ -10,7 +10,8 @@ import { pace } from '../feed.ts';
 import { get } from './read.ts';
 import { retryRun, runGone } from './gone.ts';
 import { WorkflowPageAddressSchema, type WorkflowPageAddress } from './address.ts';
-import { Run, StepTold, StepTries, type StepTold as Told, type StepTry } from './run.gen.ts';
+import type { StepTold, StepTry } from 'objects';
+import { runs } from './objects.ts';
 
 /** A step's lines beside its controls: its approval at its gate, a try in its session, and words said to it. */
 export type StepCommands = { approve: string; retry: string; say: string };
@@ -46,9 +47,6 @@ export { retryRun, runGone } from './gone.ts';
 /** The run's path under the api. */
 const runPath = (id: string): string => `/api/runs/${encodeURIComponent(id)}`;
 
-/** A step's path under the api. */
-const stepPath = (id: string, step: string): string => `${runPath(id)}/steps/${encodeURIComponent(step)}`;
-
 /**
  * The run object, under the run's own key, which every event of the feed about the run reads again, exactly, and which the board polls
  * at `pace` while it does not follow the feed. A 404 is the run gone (`runGone`), not tried again.
@@ -56,7 +54,7 @@ const stepPath = (id: string, step: string): string => `${runPath(id)}/steps/${e
 export const runObjectQuery = (id: string) =>
   queryOptions({
     queryKey: ['runs', id],
-    queryFn: () => get(runPath(id), Run),
+    queryFn: () => runs.show(id),
     refetchInterval: () => pace(5_000),
     retry: retryRun,
   });
@@ -70,7 +68,7 @@ export const stepTriesQuery = (id: string, step: string, stamp: string) =>
   queryOptions({
     queryKey: ['runs', id, 'steps', step, 'tries', stamp],
     queryFn: (): Promise<readonly StepTry[]> =>
-      get(`${stepPath(id, step)}/tries`, StepTries).then(
+      runs.tries(id, step).then(
         (read) => read.tries,
         (error: unknown) => {
           if (runGone(error)) return [];
@@ -85,8 +83,8 @@ export const stepTriesQuery = (id: string, step: string, stamp: string) =>
 export const stepToldQuery = (id: string, step: string, stamp: string) =>
   queryOptions({
     queryKey: ['runs', id, 'steps', step, 'told', stamp],
-    queryFn: (): Promise<Told | null> =>
-      get(`${stepPath(id, step)}/told`, StepTold).then(
+    queryFn: (): Promise<StepTold | null> =>
+      runs.told(id, step).then(
         (read) => read,
         (error: unknown) => {
           if (runGone(error)) return null;

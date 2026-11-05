@@ -5,6 +5,8 @@
  *
  * - **No package below the api** (`workspace`, `harness`): no import of `agent-orchestrator`, `agent-runtime` or a harness SDK, by any
  *   route — an import, a re-export, `import()`, `require()` or a resolve — but the one `local.ts` makes (`spawn`).
+ * - **The objects by their entry alone** (`objects`): `objects`, the shapes of what the api serves, is the one workspace package the
+ *   client imports, and never a path into it (`objects/src/...`).
  * - **No path out of `apps/cli`** (`leaves`, `packages`), but to the api's client door: none into `packages/`.
  * - **The api's types alone, from its door** (`api-value`, `api-door`): an import of the api, by a relative path or by its name `api`, is
  *   `import type` (or `export type`), and of `apps/api/src/client/client.ts` alone.
@@ -52,6 +54,9 @@ const BELOW = /^agent-(?:orchestrator|runtime)(?:\/|$)/;
 const ORCH = 'agent-orchestrator';
 const RUNTIME = 'agent-runtime';
 
+/** The objects' package, which the client imports by its entry alone: spelled once, so no plant names a path of it. */
+const OBJECTS = 'objects';
+
 /** The orchestrator's CLI entries, which `LOCAL` resolves and spawns. */
 const ENTRIES = /^agent-orchestrator\/bin(?:\/wf)?$/;
 
@@ -62,7 +67,7 @@ const STORE = /daemon\.json|\.agent-workflows|\.agent-engine|\bWF_ROOT\b|\bAE_RO
 const FEED = /\/api\/feed\/stream|\bEventSource\b/;
 
 /** The rule a break is of, one word each, named in the header. */
-type Rule = 'workspace' | 'harness' | 'leaves' | 'packages' | 'api-value' | 'api-door' | 'bin' | 'store' | 'spawn' | 'feed';
+type Rule = 'workspace' | 'objects' | 'harness' | 'leaves' | 'packages' | 'api-value' | 'api-door' | 'bin' | 'store' | 'spawn' | 'feed';
 
 /** A file of the client that breaks a rule, and what to do instead. */
 type Break = { file: string; rule: Rule; fix: string };
@@ -166,6 +171,7 @@ function importBreak(file: string, { spec, way, typeOnly }: Named): Break | unde
   if (BELOW.test(spec))
     return { file, rule: 'workspace', fix: `ask the api over HTTP for what ${spec} gives, or run the old path through ${LOCAL}` };
   if (HARNESS.test(spec)) return { file, rule: 'harness', fix: 'only agent-runtime reaches a harness: ask the api' };
+  if (spec.startsWith(`${OBJECTS}/`)) return { file, rule: 'objects', fix: `import what ${spec} names from the entry, '${OBJECTS}'` };
   if (spec === 'node:child_process' || spec === 'child_process')
     return file === LOCAL ? undefined : { file, rule: 'spawn', fix: `spawn through ${LOCAL}'s spawned, the client's one process` };
   if (file.startsWith('bin/') && !(target ?? '').startsWith('apps/cli/src/'))
@@ -283,6 +289,17 @@ test('REFUSED: a package below the api or a harness SDK, imported by any route',
   for (const line of ["import { query } from '@anthropic-ai/claude-agent-sdk';", "import type { A } from '@a2a-js/sdk/client';"])
     assert.deepEqual(ruled(importBreaks(plantedIn('src/reads/x.ts', line))), ['src/reads/x.ts harness'], line);
   for (const line of ["import { Effect } from 'effect';", "import fs from 'node:fs';", "import { get } from '../client.ts';"])
+    assert.deepEqual(ruled(importBreaks(plantedIn('src/reads/x.ts', line))), [], `${line} is let through`);
+});
+
+test('REFUSED: a path into the objects, by any route; their entry is let through', () => {
+  for (const line of [
+    `import { Run } from '${OBJECTS}/src/run.ts';`,
+    `import type { Card } from '${OBJECTS}/card';`,
+    `const m = await import('${OBJECTS}/package.json');`,
+  ])
+    assert.deepEqual(ruled(importBreaks(plantedIn('src/x.ts', line))), ['src/x.ts objects'], line);
+  for (const line of [`import { Run, type Card } from '${OBJECTS}';`, `export * from '${OBJECTS}';`])
     assert.deepEqual(ruled(importBreaks(plantedIn('src/reads/x.ts', line))), [], `${line} is let through`);
 });
 

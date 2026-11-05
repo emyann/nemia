@@ -52,7 +52,10 @@ export type TryCause = 'retries' | 'signoff' | RetryMode | 'round' | 'merge' | '
 export const upgradeAsk = (read: unknown): unknown =>
   isObject(read) && !Array.isArray(read) && Object.hasOwn(read, 'mode') ? { ...read, mode: upgradeMode(Reflect.get(read, 'mode')) } : read;
 
-/** Every `TryCause`, as the record's schema reads one. */
+/**
+ * Every `TryCause`, as the record's schema reads one: `objects`' list word for word (`packages/objects/src/words.ts`), held equal by
+ * `wordsHeld` (`object/run.model.ts`).
+ */
 export const TRY_CAUSES = [
   'retries',
   'signoff',

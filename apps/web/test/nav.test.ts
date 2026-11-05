@@ -20,7 +20,7 @@ test("DESTINATIONS, destinationOf, SETTINGS_TABS and tabsOf: the rail's destinat
     },
   );
   await t.test(
-    "each page lights its destination — a run's steps Runs, a card's page the Inbox, a factory's settings Factories, Machines Settings — and a path that only begins with a destination's name lights none",
+    "each page lights its destination — a run's steps Runs, a card's page the Inbox, a factory's settings Factories, Capabilities Settings — and a path that only begins with a destination's name lights none",
     () => {
       assert.equal(lit('/'), 'Overview');
       assert.equal(lit('/runs/r-1/steps/s'), 'Runs');
@@ -31,7 +31,7 @@ test("DESTINATIONS, destinationOf, SETTINGS_TABS and tabsOf: the rail's destinat
       assert.equal(lit('/workflows/repo/dev/review'), 'Workflows');
       assert.equal(lit('/stats'), 'Stats');
       assert.equal(lit('/chat'), 'Nemia', 'her chat is a page of its own, and the rail lights her on it');
-      for (const path of ['/settings', '/machines', '/capabilities']) assert.equal(lit(path), 'Settings', path);
+      for (const path of ['/settings', '/capabilities']) assert.equal(lit(path), 'Settings', path);
       for (const path of [
         '/nowhere',
         '/chatx',
@@ -46,23 +46,32 @@ test("DESTINATIONS, destinationOf, SETTINGS_TABS and tabsOf: the rail's destinat
         assert.equal(lit(path), undefined, `refused: ${path} is no destination's page`);
     },
   );
-  await t.test("Settings has three tabs, Settings, Machines then Capabilities, each its own page's address", () => {
+  await t.test("Settings has two tabs, Settings then Capabilities, each its own page's address", () => {
     assert.deepEqual(SETTINGS_TABS, [
       { to: '/settings', label: 'Settings' },
-      { to: '/machines', label: 'Machines' },
       { to: '/capabilities', label: 'Capabilities' },
     ]);
   });
   await t.test(
     "a tab's page has the tabs of Settings, in their order, and any other page has none, a path that only begins with a tab's name included",
     () => {
-      for (const path of ['/settings', '/machines', '/capabilities'])
+      for (const path of ['/settings', '/capabilities'])
         assert.deepEqual(
           tabsOf(path)?.map((tab) => tab.label),
-          ['Settings', 'Machines', 'Capabilities'],
+          ['Settings', 'Capabilities'],
           path,
         );
-      for (const path of ['/machinesx', '/capabilitiesx', '/machines/x', '/capabilities/', '/settings/x', '/agents', '/', '/runs'])
+      for (const path of [
+        '/machines',
+        '/machinesx',
+        '/capabilitiesx',
+        '/machines/x',
+        '/capabilities/',
+        '/settings/x',
+        '/agents',
+        '/',
+        '/runs',
+      ])
         assert.equal(tabsOf(path), undefined, `refused: ${path} is no tab's page`);
     },
   );

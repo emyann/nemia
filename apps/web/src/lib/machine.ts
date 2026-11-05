@@ -12,7 +12,7 @@
  * Pure: sizes come from the number of lines and their length in the monospace the canvas writes them in, not from a measured page.
  */
 import { Graph, layout } from '@dagrejs/dagre';
-import type { MachineEdge, MachineGraph, MachineVerb } from './api/machines.ts';
+import type { MachineEdge, MachineGraph, MachineVerb } from './api/steps.ts';
 
 export type Point = { x: number; y: number };
 
@@ -168,27 +168,6 @@ function namesOf(graph: Pick<MachineGraph, 'states' | 'edges' | 'verbs'>): strin
 /** The edges back to `state` itself, by action: what its box lists. */
 const staysOf = (edges: readonly MachineEdge[], state: string): ByAction[] =>
   byAction(edges.filter((e) => e.from === state && e.to === state));
-
-/** A route out of a state as the frame's bar lists it: the state it leads to, its edges by action, and its verbs (`verbOf`). */
-export type RouteOut = { to: string; edges: ByAction[]; verbs: string[] };
-
-/** What one state of a machine is: whether the machine starts or can end there, the edges back to it, and each route out of it. */
-export type StateFacts = { initial: boolean; final: boolean; stays: ByAction[]; routes: RouteOut[] };
-
-/**
- * What `state` of `graph` is, read as `drawMachine` reads it, so the frame's bar lists what the drawing draws: its kind, its stays and
- * each route out of it, in the drawing's order. None for a state neither the graph nor any of its edges or verbs names.
- */
-export function stateFacts(
-  graph: Pick<MachineGraph, 'initial' | 'states' | 'final' | 'edges' | 'verbs'>,
-  state: string,
-): StateFacts | undefined {
-  if (!namesOf(graph).includes(state)) return undefined;
-  const routes = [...pairsOf(graph.edges, graph.verbs).values()]
-    .filter((pair) => pair.from === state)
-    .map(({ to, edges, verbs }) => ({ to, edges: byAction(edges), verbs }));
-  return { initial: state === graph.initial, final: graph.final.includes(state), stays: staysOf(graph.edges, state), routes };
-}
 
 /**
  * The machine laid out top to bottom by dagre: each state a box sized for its lines, each route with its label where dagre makes room

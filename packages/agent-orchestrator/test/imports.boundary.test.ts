@@ -3,7 +3,9 @@
  * SDK and no path into `packages/`; the client (`apps/cli`) imports none either, and from the api only `import type` of its client
  * door, `apps/api/src/client/client.ts` (a plant named `type:<spec>` is written as a type-only re-export); the api imports the
  * orchestrator through `agent-orchestrator`, `/run`, `/workflow` and `/effect` alone, and never the runtime or a harness SDK; the
- * orchestrator imports no harness SDK; the runtime imports no layer above it.
+ * orchestrator imports no harness SDK; the runtime imports no layer above it. The objects (`packages/objects`) sit at the bottom beside
+ * the runtime: the board, the client, the api and the orchestrator import them by their one entry, `objects`, and never a path into
+ * them; the runtime never imports them; and they import `effect` and their own files alone.
  *
  * `.oxlintrc.json` sets `no-restricted-imports` in one override block per layer, over its source alone. Oxlint accepts an option it does
  * not understand without a word, so these tests read the blocks out of the config, run oxlint with them on files planted in a scratch
@@ -42,8 +44,9 @@ const LAYERS: { name: string; at: string[]; refused: string[]; allowed: string[]
       'agent-runtime/vocabulary',
       ...SDKS,
       '../../../packages/agent-orchestrator/src/run.ts',
+      'objects/src/run.ts',
     ],
-    allowed: ['react', 'effect', '@tanstack/react-query', './lib/api.ts', '../test/fixtures.ts'],
+    allowed: ['react', 'effect', '@tanstack/react-query', './lib/api.ts', '../test/fixtures.ts', 'objects'],
   },
   {
     name: 'cli',
@@ -62,8 +65,10 @@ const LAYERS: { name: string; at: string[]; refused: string[]; allowed: string[]
       'api',
       'type:../../api/src/runs/runs.ts',
       'type:api/src/app.ts',
+      'objects/src/run.ts',
     ],
     allowed: [
+      'objects',
       'effect',
       'node:fs',
       './route.ts',
@@ -87,8 +92,9 @@ const LAYERS: { name: string; at: string[]; refused: string[]; allowed: string[]
       'agent-orchestrator/run/x',
       'agent-orchestrator/package.json',
       '../../../packages/agent-orchestrator/src/run.ts',
+      'objects/src/run.ts',
     ],
-    allowed: ['agent-orchestrator', 'agent-orchestrator/run', 'agent-orchestrator/workflow', 'hono', 'effect', './body.ts'],
+    allowed: ['agent-orchestrator', 'agent-orchestrator/run', 'agent-orchestrator/workflow', 'hono', 'effect', './body.ts', 'objects'],
   },
   {
     name: 'orchestrator',
@@ -98,14 +104,38 @@ const LAYERS: { name: string; at: string[]; refused: string[]; allowed: string[]
       'packages/agent-orchestrator/place/git',
       'packages/agent-orchestrator/place/memory',
     ],
-    refused: SDKS,
-    allowed: ['agent-runtime', 'agent-runtime/vocabulary', 'effect', 'node:fs', './runner.ts'],
+    refused: [...SDKS, 'objects/src/run.ts'],
+    allowed: ['agent-runtime', 'agent-runtime/vocabulary', 'effect', 'node:fs', './runner.ts', 'objects'],
   },
   {
     name: 'runtime',
     at: ['packages/agent-runtime/src', 'packages/agent-runtime/bin'],
-    refused: ['agent-orchestrator', 'agent-orchestrator/run', 'agent-orchestrator/effect', '../../agent-orchestrator/src/run.ts'],
+    refused: [
+      'agent-orchestrator',
+      'agent-orchestrator/run',
+      'agent-orchestrator/effect',
+      '../../agent-orchestrator/src/run.ts',
+      'objects',
+      'objects/src/meta.ts',
+      '../../objects/src/meta.ts',
+    ],
     allowed: [...SDKS, 'effect', 'xstate', './index.ts'],
+  },
+  {
+    name: 'objects',
+    at: ['packages/objects/src'],
+    refused: [
+      'agent-orchestrator',
+      'agent-runtime',
+      'hono',
+      'react',
+      'node:fs',
+      'objects',
+      '../../agent-orchestrator/src/run.ts',
+      '../test/fixtures.ts',
+      ...SDKS,
+    ],
+    allowed: ['effect', 'effect/unstable/httpapi', './meta.ts'],
   },
 ];
 
@@ -118,6 +148,7 @@ const TESTS = [
   'apps/api/src/runs',
   'packages/agent-orchestrator/test',
   'packages/agent-runtime/test',
+  'packages/objects/test',
 ];
 
 /** A plant's one line: a type-only re-export for a spec named `type:<spec>`, else a re-export of its values. */

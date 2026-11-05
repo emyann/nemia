@@ -4,7 +4,8 @@
  * beside the passes). Their handlers answer data, and the CLI prints it; the api serves the run object, a step's log and the stats on their
  * routes from the same entries. The feed is `nemia watch`'s, which the CLI runs itself.
  */
-import { Effect } from 'effect';
+import { Effect, Schema } from 'effect';
+import { Run as RunObject } from 'objects';
 import { EngineService, asked, tried } from '../runtime-client.ts';
 import type { PlaceService } from '../place/place.store.ts';
 import type { Refusal } from '../refusal/refusal.ts';
@@ -38,7 +39,8 @@ const rawOf = (run: Run) => {
 };
 
 /**
- * `nemia show`: the run as one object, `nemia/v1`'s `Run` (`runObject`), as JSON, with a line on stderr pointing to `--raw`; `--raw`, the
+ * `nemia show`: the run as one object, `nemia/v1`'s `Run` (`runObject`), encoded by the objects' `Run` as the api encodes it, so both
+ * print the same keys in the same order, as JSON, with a line on stderr pointing to `--raw`; `--raw`, the
  * run's record as it printed before, its brief cut at 120 characters and each frozen step's body at 60. The api serves the object on
  * `GET /api/runs/:runId`, by hand, handed the app's memo, as one judgement for both sides, and the record on `?raw=true`, for `nemia`.
  */
@@ -60,7 +62,14 @@ export const SHOW: Command = {
       (run): Effect.Effect<Readonly<Record<string, unknown>>, Refusal, EngineService | PlaceService> =>
         args.raw === true
           ? Effect.succeed(rawOf(run))
-          : rooted(home, 'show', runObject(run, { memo: { filings: kept?.filings ?? { filed: new Map(), cursor: 0 }, said: new Map() } })),
+          : Effect.map(
+              rooted(
+                home,
+                'show',
+                runObject(run, { memo: { filings: kept?.filings ?? { filed: new Map(), cursor: 0 }, said: new Map() } }),
+              ),
+              (object) => ('unjudged' in object ? object : Schema.encodeSync(RunObject)(object)),
+            ),
     ),
   print: (data) => [JSON.stringify(data, null, 2)],
   note: (_data, args) =>

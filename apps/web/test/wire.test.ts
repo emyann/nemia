@@ -27,7 +27,6 @@ import type * as factories from '../../api/src/factories/factories.ts';
 import type * as inbox from '../../api/src/inbox/inbox.ts';
 import type * as instruction from '../../api/src/factories/instruction.ts';
 import type * as logs from '../../api/src/steps/logs.ts';
-import type * as machines from '../../api/src/machines/machines.ts';
 import type * as nemia from '../../api/src/nemia/nemia.ts';
 import type * as path from '../../api/src/steps/path.ts';
 import type * as pause from '../../api/src/factory/pause.ts';
@@ -103,7 +102,7 @@ export type Said = Holds<Same<Board.Said, SaidHeld>>;
 export type QuestionAnswer = Holds<Same<Board.QuestionAnswer, answers.Answer>>;
 
 export type PolicyList = Holds<Same<Board.PolicyList, nemia.PolicyAnswer>>;
-export type AutoRule = Holds<Same<Board.AutoRule, nemia.PolicyAnswer['rules'][number]>>;
+export type PolicyRule = Holds<Same<Board.PolicyRule, nemia.PolicyAnswer['rules'][number]>>;
 export type Condition = Holds<Same<Board.Condition, nemia.PolicyAnswer['rules'][number]['when'][number]>>;
 
 export type Bridge = Holds<Same<Board.Bridge, NonNullable<runs.StepFiled['bridge']>>>;
@@ -185,9 +184,7 @@ export type RunLines = Holds<Same<Board.RunLines, runs.RunLinesAnswer>>;
 export type RunGraph = Holds<Same<Board.RunGraph, runs.RunListing['graph']>>;
 export type GraphEdge = Holds<Same<Board.GraphEdge, runs.RunListing['graph']['edges'][number]>>;
 
-export type InboxEntry = Holds<Same<Board.InboxEntry, inbox.InboxEntry>>;
 export type InboxCardPage = Holds<Same<Board.InboxCardPage, inbox.InboxCardPage>>;
-export type Queued = Holds<Same<Board.Queued, inbox.InboxQueueAnswer>>;
 export type FromSet = Holds<Same<Board.FromSet, inbox.InboxFromAnswer>>;
 
 export type PlaceKind = Holds<Same<Board.PlaceKind, runs.RunListing['place']>>;
@@ -226,11 +223,10 @@ export type KeyRow = Holds<Same<Board.KeyRow, workflows.KeyRow>>;
 export type AgentSkill = Holds<Same<Board.AgentSkill, NonNullable<agents.AgentListing['card']>[number]>>;
 export type SkillCost = Holds<Same<Board.SkillCost, NonNullable<skills.SkillRow['cost']>>>;
 
-export type MachineListing = Holds<Same<Board.MachineListing, machines.MachineListing>>;
-/** A machine's states, events and verbs are words the page draws for whichever machine the api names. */
-export type MachineGraph = Holds<Same<Board.MachineGraph, Widened<machines.MachineGraph>>>;
-export type MachineEdge = Holds<Same<Board.MachineEdge, Widened<machines.MachineGraph['edges'][number]>>>;
-export type MachineVerb = Holds<Same<Board.MachineVerb, Widened<machines.MachineGraph['verbs'][number]>>>;
+/** The lifecycle's states, events and verbs are words the Debug panel draws, whichever the runtime's code names. */
+export type MachineGraph = Holds<Same<Board.MachineGraph, Widened<path.StepPath['lifecycle']>>>;
+export type MachineEdge = Holds<Same<Board.MachineEdge, Widened<path.StepPath['lifecycle']['edges'][number]>>>;
+export type MachineVerb = Holds<Same<Board.MachineVerb, Widened<path.StepPath['lifecycle']['verbs'][number]>>>;
 
 export type Paused = Holds<Same<Board.Paused, PausedOf>>;
 export type Pause = Holds<Same<Board.Pause, NonNullable<PausedOf['pause']>>>;
@@ -266,7 +262,15 @@ export type TranscriptEvent = Holds<Same<Board.TranscriptEvent, steps.Transcript
 export type StepTranscript = Holds<Same<Board.StepTranscript, steps.StepTranscript>>;
 /** As a machine's: a step of a task's path is drawn by its state's and its event's words. */
 export type LifecycleTransition = Holds<Same<Board.LifecycleTransition, Widened<path.LifecycleTransition>>>;
-export type StepPath = Holds<Same<Board.StepPath, Omit<path.StepPath, 'path'> & { path: Widened<path.LifecycleTransition>[] }>>;
+export type StepPath = Holds<
+  Same<
+    Board.StepPath,
+    Omit<path.StepPath, 'path' | 'lifecycle'> & {
+      path: Widened<path.LifecycleTransition>[];
+      lifecycle: Widened<path.StepPath['lifecycle']>;
+    }
+  >
+>;
 
 export type YourStore = Holds<Same<Board.YourStore, yours.YourStore>>;
 

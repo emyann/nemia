@@ -369,7 +369,7 @@ export function listing({
     const { status: stands, own } = standing(step, run, settledOf, readable, askedCloseout, steps, spendOf, verdictOf);
     if (!taskId && (stands !== 'awaiting approval' || waitingAgain.has(name))) {
       if (checkout && waitsOnCheckout(steps, name, checkout) && !waitingAgain.has(name))
-        return { name, message: checkoutWord(checkout), ...coded({ reason: 'Waiting', on: 'checkout' }), branch };
+        return { name, message: checkoutWord(checkout), ...coded({ reason: 'Waiting', on: 'base' }), branch };
       return { name, ...unfiled(step, waiting, held), branch };
     }
     if (waitingAgain.has(name)) return { name, message: 'pending', ...coded({ reason: 'Pending' }), branch };

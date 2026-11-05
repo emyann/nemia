@@ -17,7 +17,7 @@ import { Effect, Layer } from 'effect';
 import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from 'agent-orchestrator/testing';
 import { Informer, informerMemo, type InformerMemo } from 'agent-orchestrator';
-import type { Labelled } from '../client/client.ts';
+import type { Labelled } from 'objects';
 import type { RunAnswer, RunListing } from './runs.ts';
 import { appOver, beforeEachTest, eachTest, engineFor } from '../../test/placed.ts';
 

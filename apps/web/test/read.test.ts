@@ -412,6 +412,12 @@ const GET_FIX = 'decode the read through `get(path, schema)` (lib/api/read.ts), 
 const SEND_FIX = 'decode the answer through `send(method, path, schema, how)` (lib/api/read.ts), with a schema beside its type';
 
 /**
+ * The files whose `fetch` is no unschemed read: read.ts's, under `get` and `send`, and the objects' client's (objects.ts), whose every
+ * answer is decoded by the `Api` of `objects` and, where it does not decode, by read.ts's `decoded` with the kind's own Schema.
+ */
+const DECODERS: ReadonlySet<string> = new Set(['lib/api/read.ts', 'lib/api/objects.ts']);
+
+/**
  * Every read or write in `texts` (a file's path under src/ to its text) that passes no schema: any `fetch` outside read.ts, a GET or a
  * write; a `get` of read.ts with no schema or one that decodes nothing, a `send` of read.ts the same by its third argument, and any
  * `getUndecoded`. A wrapper in the same file that hands its schema parameter on to `get` or `send` is held the same at each of its calls,
@@ -434,7 +440,7 @@ export function unschemedReads(texts: ReadonlyMap<string, string>): ReadScan {
       scan.faults.push(`${file}:${source.getLineAndCharacterOfPosition(node.getStart()).line + 1}: ${what}: ${fix}`);
     const visit = (node: ts.Node): void => {
       if (ts.isIdentifier(node) && node.text === 'getUndecoded') fault(node, 'getUndecoded reads an answer undecoded', GET_FIX);
-      if (ts.isCallExpression(node) && isFetch(node) && file !== 'lib/api/read.ts') {
+      if (ts.isCallExpression(node) && isFetch(node) && !DECODERS.has(file)) {
         if (isWrite(node)) fault(node, 'a write by fetch reads its answer undecoded', SEND_FIX);
         else fault(node, 'a GET by fetch reads an answer undecoded', GET_FIX);
       }
@@ -536,11 +542,12 @@ test('REFUSED: a write by fetch, bare, off globalThis or with its method in a va
   );
 });
 
-test('a get and a send with their schema, and the fetch inside read.ts, are no unschemed read', () => {
+test("a get and a send with their schema, and the fetch inside read.ts and the objects' client, are no unschemed read", () => {
   const texts = new Map([
     ['lib/api/c.ts', "import { get } from './read.ts';\nexport const c = () => get('/api/x', XSchema);"],
     ['lib/api/e.ts', "import { send } from './read.ts';\nexport const e = () => send('POST', '/api/x', XSchema, { may: 'M.' });"],
     ['lib/api/read.ts', "export const answer = (path: string, init?: RequestInit) => fetch(path, { ...init, method: 'POST' });"],
+    ['lib/api/objects.ts', 'const seen: typeof fetch = (input, init) => globalThis.fetch(String(input), init);'],
     ['lib/api/d.ts', "import { get, send } from '@tanstack/whatever';\nexport const d = () => [get('/api/x'), send('POST', '/x')];"],
   ]);
   assert.deepEqual(unschemedReads(texts), { faults: [], schemed: 1, sent: 1 });
@@ -718,11 +725,12 @@ test("every read and write the board's source makes passes a schema", () => {
   assert.ok(sent >= 16, `the walk counted ${sent} writes through send with a schema`);
 });
 
-test('read.ts hands out its read, its write and their three refusals, and nothing else', async () => {
+test("read.ts hands out its read, its write, the decode they share with the objects' client and their three refusals, and nothing else", async () => {
   assert.deepEqual(Object.keys(await import('../src/lib/api/read.ts')).sort(), [
     'ReadRefusal',
     'UnreadAnswer',
     'WriteRefusal',
+    'decoded',
     'get',
     'send',
   ]);

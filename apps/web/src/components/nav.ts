@@ -24,13 +24,9 @@ const workflowPageAt = (path: string): { from: string; workflow: string; step?: 
   return step === undefined ? { from, workflow } : { from, workflow, step };
 };
 
-/**
- * The tabs of Settings, in their order: what is set for the whole store, the state machines drawn from their code, and what the repository
- * offers a step.
- */
+/** The tabs of Settings, in their order: what is set for the whole store, and what the repository offers a step. */
 export const SETTINGS_TABS = [
   { to: '/settings', label: 'Settings' },
-  { to: '/machines', label: 'Machines' },
   { to: '/capabilities', label: 'Capabilities' },
 ] as const;
 

@@ -74,7 +74,7 @@ export function useApprove(runId: string, step: string) {
 export function useRound(runId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (how: { step?: string; budget?: number }) => askRound(runId, how),
+    mutationFn: ({ step, ...how }: { step: string; budget?: number }) => askRound(runId, step, how),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['runs', runId], exact: true });
     },

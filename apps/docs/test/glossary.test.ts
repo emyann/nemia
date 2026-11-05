@@ -150,6 +150,7 @@ test('the repository’s page lists every table in the map’s order, and every 
   const order = idsOf(fence);
   assert.deepEqual(order, [
     'runtime',
+    'objects',
     'run-core',
     'commands',
     'api',

@@ -9,7 +9,7 @@ import { satisfiesAfter, type StepState } from './status.ts';
 import type { Frozen } from './frozen.ts';
 
 /** A session is going, so its attempt's time is still counting. */
-export const isLive = (state: StepState): boolean => state === 'working' || state === 'needs-human';
+export const isLive = (state: StepState): boolean => state === 'working' || state === 'asks-in-session';
 
 /**
  * A duration in its two largest units: `42s`, `12m 04s`, `3h 12m`, `2d 4h`; one below zero, where this clock is behind the engine's, is

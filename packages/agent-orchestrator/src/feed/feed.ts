@@ -223,9 +223,11 @@ function current(line: FeedLine): FeedLine {
 /**
  * A line as a store decoded it off disk, upgraded to a v1 signal (`upgraded`): the one door between the loose shape the JSON held — a
  * string where this version writes a literal, so a line a newer `nemia` wrote is never dropped — and the typed line every reader works
- * with. The schemas that decode a line (`FeedLineSchema`, and the digest the deliverer keeps) read through here and nowhere else.
+ * with. The schemas that decode a line (`FeedLineSchema`, and the digest the deliverer keeps) read through here and nowhere else. A wait on
+ * the base branch's checkout, which a line written before the word was renamed says `on: 'checkout'`, reads as `base` (`WAIT_ON`).
  */
-export const lineAsRead = (line: Readonly<Record<string, unknown>>): FeedLine => upgraded(line as unknown as FeedLine);
+export const lineAsRead = (line: Readonly<Record<string, unknown>>): FeedLine =>
+  upgraded((line.on === 'checkout' ? { ...line, on: 'base' } : line) as unknown as FeedLine);
 
 /**
  * The line a daemon of pid `pid` writes once it has taken the store, at `at`, saying how the holder it `replaced` ended: stopped (when),

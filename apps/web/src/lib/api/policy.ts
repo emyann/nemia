@@ -18,7 +18,7 @@ export type Condition = 'recommends' | 'checked' | 'accepted' | 'withinBudget' |
  * none where left out), where it came from (`from`: the builtin rule, or one the agent proposed), and its words, generated from those
  * fields.
  */
-export type AutoRule = {
+export type PolicyRule = {
   id: string;
   answer: 'approve' | 'retry';
   steps?: readonly string[];
@@ -38,12 +38,12 @@ export type PolicyList = {
   agent: string;
   file: string;
   isDefault: boolean;
-  rules: readonly AutoRule[];
-  builtin: AutoRule;
+  rules: readonly PolicyRule[];
+  builtin: PolicyRule;
   proposed: {
     file: string;
     at: string;
-    rules: readonly (AutoRule & { confirmed: boolean })[];
+    rules: readonly (PolicyRule & { confirmed: boolean })[];
     guidance: readonly string[];
     stale: boolean;
   } | null;

@@ -1,12 +1,11 @@
 /**
- * The api's words for the two label edits it serves from the command table (`nemia label run`'s `POST /api/runs/:runId/labels` and
- * `nemia label inbox`'s `POST /api/inbox/:name/labels`): the write guard's, the body each takes, and why a body is not one (400).
+ * The api's words for the label edit it serves from the command table (`nemia label run`'s `POST /api/runs/:runId/labels`): the write
+ * guard's, the body it takes, and why a body is not one (400). A card's labels are edited by the Card's `labels` verb (objects/serve.ts).
  */
-import { inboxNameRefusal } from 'agent-orchestrator';
 import type { Words } from '../body.ts';
 import type { RouteWords } from '../commands/words.ts';
 
-/** The body `POST …/labels` takes, on a run and on a card: `nemia label`'s edits and `--overwrite`, as JSON (`LabelEdit`). */
+/** The body `POST …/labels` takes: `nemia label`'s edits and `--overwrite`, as JSON (`LabelEdit`). */
 const LABEL_SHAPE = '`{ "labels": ["<key>=<value>", "<key>-", …], "overwrite"?: true }`';
 
 /** Why a label edit's body is not one, by the first key its schema refused: the edits, or `overwrite`. */
@@ -35,25 +34,7 @@ const LABEL_RUN_WORDS: RouteWords = {
   strict: true,
 };
 
-/** A card's labels edited, as the guard's refusals word it (`POST /api/inbox/:name/labels`, `nemia label inbox`'s route). */
-const LABEL_INBOX_WORDS: RouteWords = {
-  shape: LABEL_SHAPE,
-  guard: ({ name }) => ({
-    route: `POST /api/inbox/${name}/labels`,
-    does: "edits an inbox card's labels",
-    forAnother: 'edit any',
-    why: "a card's labels are what the inbox selects it by, and what the run started from it inherits",
-    reach: "label it from the card's page on the board",
-    instead: `Label it from the card's page on the board, or with \`nemia label inbox ${name} <key>=<value>\``,
-    shape: LABEL_SHAPE,
-  }),
-  issue: ({ name }) => labelIssue(`nemia label inbox ${name}`),
-  named: ({ name }) => inboxNameRefusal(name) ?? null,
-  strict: true,
-};
-
-/** The words of the two label edits, by their commands' names, as `WORDS` takes them. */
-export const LABEL_WORDS: Readonly<Record<'label run' | 'label inbox', RouteWords>> = {
+/** The words of the label edit the table routes, by its command's name, as `WORDS` takes them. */
+export const LABEL_WORDS: Readonly<Record<'label run', RouteWords>> = {
   'label run': LABEL_RUN_WORDS,
-  'label inbox': LABEL_INBOX_WORDS,
 };

@@ -76,12 +76,16 @@ test('answerError: what each thrown thing is answered with, a refusal by its kin
     },
   );
   await t.test(
-    "the api's own app answers with it: a card to queue that is not there is the package's Missing, a 404 in its words",
+    "the api's own app answers with it: a card whose from: is taken off that is not there is the package's Missing, a 404 in its words",
     async () => {
-      const res = await app.request('/api/inbox/no-such-card/queue', { method: 'POST', headers: { 'content-type': 'application/json' } });
+      const res = await app.request('/api/inbox/no-such-card/from', {
+        method: 'DELETE',
+        headers: { 'content-type': 'application/json' },
+        body: '{}',
+      });
       assert.equal(res.status, 404);
       const { error } = (await res.json()) as { error: string };
-      assert.ok(error.startsWith(`${noCardLine('no-such-card', [])} Queue one of those`), error);
+      assert.ok(error.startsWith(noCardLine('no-such-card', [])), error);
     },
   );
 });

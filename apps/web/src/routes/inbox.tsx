@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useMutation, useQueryClient, useSuspenseQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient, useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router';
 import { FactoryCardStart, UnassignedStart } from '../components/FactoryCardStart';
 import { FileCard } from '../components/FileCard';
@@ -19,13 +19,14 @@ import { CardFrom } from '../components/CardFrom';
 import { Instant } from '../components/Instant';
 import { SelectorField } from '../components/SelectorField';
 import { Segment, SegmentedButton } from '../components/ui/ds/components/SegmentedButton';
-import { dropCard, inboxAllQuery, labelSearch, queueCard, type InboxEntry, type Started } from '../lib/api';
+import { dropCard, factoriesQuery, inboxAllQuery, labelSearch, queueCard, type InboxEntry, type Started } from '../lib/api';
 import { factorySearch, keptBy, shownIn } from '../lib/factories';
 import {
   cardLines,
   cardsEnded,
   cardsInPlay,
   cardsSearch,
+  factoryRepoOf,
   inPlay,
   newestCardsFirst,
   queuedWord,
@@ -200,6 +201,15 @@ function NoneShown({ ended, over }: { ended: boolean; over: number }) {
 }
 
 /**
+ * The tick's last try of a card's start (`Tried`), saying the repository its factory picks for it, which the Card does not carry: read off
+ * the factories (`factoryRepoOf`).
+ */
+function TriedHere({ entry }: { entry: InboxEntry & { tried: NonNullable<InboxEntry['tried']> } }) {
+  const factories = useQuery(factoriesQuery).data;
+  return <Tried entry={{ ...entry, factoryRepo: factoryRepoOf(entry, factories) }} />;
+}
+
+/**
  * Whether a card is drawn started, and as which runs: its state a run's phase (`CARD_KIND`), that phase and the runs the inbox says; else,
  * for a start made from the page that the inbox has not said yet (`startedNow`), that run, with no phase to show.
  */
@@ -244,13 +254,13 @@ function CardItem({
   const [starting, setStarting] = useState(false);
   const [startedNow, setStartedNow] = useState<string | null>(null);
   const remove = useMutation({
-    mutationFn: () => dropCard(entry.name),
+    mutationFn: () => dropCard(entry),
     onMutate: () => onRefused(null),
     onError: (error) => onRefused({ action: 'remove', message: error.message }),
     onSettled: () => void queryClient.invalidateQueries({ queryKey: ['inbox'] }),
   });
   const queue = useMutation({
-    mutationFn: (off: boolean) => queueCard(entry.name, { off }),
+    mutationFn: (off: boolean) => queueCard(entry, { off }),
     onMutate: () => onRefused(null),
     onError: (error, off) => onRefused({ action: off ? 'unqueue' : 'queue', message: error.message }),
     onSettled: () => void queryClient.invalidateQueries({ queryKey: ['inbox'] }),
@@ -317,7 +327,7 @@ function CardItem({
       </div>
 
       {started && <StartedAs startedAs={startedAs} state={phase} after={REMOVE_STARTED} />}
-      {triedShown(entry) && <Tried entry={entry} />}
+      {triedShown(entry) && <TriedHere entry={entry} />}
       {entry.error !== null && (
         <div className="space-y-1 rounded border border-failure bg-failure-container px-3 py-2">
           <p className="text-body-medium font-medium text-on-failure-container">Does not read as a card, so it cannot start:</p>

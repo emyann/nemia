@@ -96,7 +96,7 @@
     },
     {
       "term": "Step state",
-      "meaning": "the board's state of a step, drawn from its reason by one total table in `apps/web/src/lib/status.ts`, never from the words of its message.",
+      "meaning": "the board's state of a step, drawn from its reason by one total table in `apps/web/src/lib/status.ts`, never from the words of its message; a question its session asks, `AwaitingAnswer` via `session`, is `asks-in-session`, and the runtime's `needs-human` is compared nowhere in the board (`apps/web/test/structure.test.ts`).",
       "type": "StepState",
       "retired": [
         {
@@ -106,12 +106,35 @@
         {
           "spelling": "pauseHolds",
           "card": "A step's state crosses the wire as a code, not a sentence"
+        },
+        {
+          "spelling": "needs-human",
+          "card": "resource objects, P9: the leftover words — cordon is the pause, auto's rules are policy, one LABEL_KEYS, no needs-human above the runtime"
         }
       ],
       "see": {
         "label": "The board",
         "href": "/map/#the-board"
       }
+    },
+    {
+      "term": "Policy rules",
+      "meaning": "an agent's rules at Auto as Nemia's settings show them (`PolicyRules`, `apps/web/src/components/PolicyRules.tsx`), read and written through `GET /api/policy/:name` and its rules' routes (`apps/web/src/lib/api/policy.ts`).",
+      "type": "PolicyRule",
+      "retired": [
+        {
+          "spelling": "AutoRule",
+          "card": "resource objects, P9: the leftover words — cordon is the pause, auto's rules are policy, one LABEL_KEYS, no needs-human above the runtime"
+        },
+        {
+          "spelling": "AutoRules",
+          "card": "resource objects, P9: the leftover words — cordon is the pause, auto's rules are policy, one LABEL_KEYS, no needs-human above the runtime"
+        },
+        {
+          "spelling": "AutoParts",
+          "card": "resource objects, P9: the leftover words — cordon is the pause, auto's rules are policy, one LABEL_KEYS, no needs-human above the runtime"
+        }
+      ]
     },
     {
       "term": "Try",

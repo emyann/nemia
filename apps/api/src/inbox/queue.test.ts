@@ -1,9 +1,10 @@
 /**
- * The queue, as the board reads and writes it, told as a story of cards queued and taken back, one table of what the queue routes refuse,
- * and a story of the ceilings: GET /api/inbox's `queued` and `tried`; POST and DELETE /api/inbox/:name/queue (inbox.ts), a
- * card queued and taken off the queue through the package's `queueInInbox`; and GET /api/ceilings (app.ts), the cap the daemon's last pass
- * ran with and the runs it counts and holds, held to the package's `runSlots` — in the harness's scratch store (`root`) and a scratch
- * repository; and the shell's `WF_MAX_RUNS` is dropped, so no cap comes from it.
+ * The queue, as the board reads and writes it, told as a story of cards queued and taken back, one table of what the queue refuses, and a
+ * story of the ceilings: the Card's `spec.queued` and `status.lastStart` (`GET /api/cards`); the Card's `queue` and `unqueue` verbs
+ * (`POST /api/namespaces/:namespace/cards/:name/queue` and `…/unqueue`, objects/cards.ts), a card queued and taken off the queue through
+ * the package's `nemia inbox queue` entry; and GET /api/ceilings (app.ts), the cap the daemon's last pass ran with and the runs it counts
+ * and holds, held to the package's `runSlots` — in the harness's scratch store (`root`) and a scratch repository; and the shell's
+ * `WF_MAX_RUNS` is dropped, so no cap comes from it.
  */
 import { root } from '../../test/harness.ts';
 import { test } from 'node:test';
@@ -11,14 +12,17 @@ import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
+import type { Card, CardList } from 'objects';
 import { scratch } from '../../test/scratch.ts';
 import { story } from '../../test/checkpoints.ts';
 import { app } from '../app.ts';
 import {
   addToInbox,
   engine,
+  type InboxListing,
   PHASES,
   queueInInbox,
+  queueOrder,
   readInbox,
   runSlots,
   runStore,
@@ -45,9 +49,7 @@ git('init', '-q', '-b', 'main');
 git('commit', '-q', '--allow-empty', '-m', 'init');
 const base = git('rev-parse', 'HEAD').trim();
 
-type InboxEntry = import('./inbox.ts').InboxEntry;
 type Ceilings = import('../factory/ceilings.ts').Ceilings;
-type InboxQueueAnswer = import('./inbox.ts').InboxQueueAnswer;
 
 const inbox = path.join(root, 'inbox');
 const JSON_TYPE = { 'content-type': 'application/json' };
@@ -62,15 +64,60 @@ const clear = (): void => {
 const inboxAsIs = (): Array<[string, string]> =>
   (fs.existsSync(inbox) ? fs.readdirSync(inbox).sort() : []).map((name) => [name, fs.readFileSync(path.join(inbox, name), 'utf8')]);
 
-const queue = (name: string, headers: Record<string, string> = JSON_TYPE, body?: string) =>
-  app.request(`/api/inbox/${name}/queue`, { method: 'POST', headers, ...(body !== undefined ? { body } : {}) });
-const unqueue = (name: string, headers: Record<string, string> = JSON_TYPE, body?: string) =>
-  app.request(`/api/inbox/${name}/queue`, { method: 'DELETE', headers, ...(body !== undefined ? { body } : {}) });
-const listed = async (): Promise<InboxEntry[]> => {
-  const res = await app.request('/api/inbox');
+/** The Card's `queue` (or, `off`, its `unqueue`) of the card `name` in `namespace`, `body` sent where given. */
+const verb =
+  (off: boolean) =>
+  (name: string, headers: Record<string, string> = JSON_TYPE, body?: string, namespace = 'default') =>
+    app.request(`/api/namespaces/${namespace}/cards/${name}/${off ? 'unqueue' : 'queue'}`, {
+      method: 'POST',
+      headers,
+      ...(body !== undefined ? { body } : {}),
+    });
+const queue = verb(false);
+const unqueue = verb(true);
+const listed = async (): Promise<Card[]> => {
+  const res = await app.request('/api/cards');
   assert.equal(res.status, 200);
-  return (await res.json()) as InboxEntry[];
+  return ((await res.json()) as CardList).items.slice();
 };
+
+/** The names of the cards queued and not started, in the order the tick starts them, read off the Cards: the place each is in. */
+const inLine = (cards: readonly Card[]): string[] =>
+  cards
+    .filter((c) => c.spec.queued !== undefined && !c.status.runs.length)
+    .sort((a, b) => (a.spec.queued ?? '').localeCompare(b.spec.queued ?? '') || a.metadata.name.localeCompare(b.metadata.name))
+    .map((c) => c.metadata.name);
+
+/** What a Card says of the keys the package lists of its card, in the package's spelling: none for a key the card does not set. */
+const asListed = (c: Card) => ({
+  name: c.metadata.name,
+  title: c.status.title ?? null,
+  workflow: c.spec.workflow ?? null,
+  repo: c.spec.repo ?? null,
+  factory: c.metadata.namespace === 'default' ? null : (c.metadata.namespace ?? null),
+  from: c.spec.from ?? [],
+  startedAs: c.status.runs,
+  labels: c.metadata.labels ?? {},
+  state: c.status.state,
+  error: c.status.error ?? null,
+  queued: c.spec.queued ?? null,
+  tried: c.status.lastStart ?? null,
+});
+
+/** The same keys of the package's own listing of a card. */
+const packageListed = (l: Omit<InboxListing, 'state'>) => ({
+  name: l.name,
+  title: l.title,
+  workflow: l.workflow,
+  repo: l.repo,
+  factory: l.factory,
+  from: l.from,
+  startedAs: l.startedAs,
+  labels: l.labels,
+  error: l.error,
+  queued: l.queued?.at ?? null,
+  tried: l.tried ?? null,
+});
 
 /** What the package refuses a queue of `name` with — or its taking back — asked of it directly, which writes nothing when it refuses. */
 const refusalOf = (name: string, off = false): string => {
@@ -97,10 +144,10 @@ const startedFrom = (id: string, card: string): string =>
 
 const cardText = (name: string): string => fs.readFileSync(path.join(inbox, `${name}.md`), 'utf8');
 
-test("a person queues cards, reads their place and the tick's tries, and takes them back", async (t) => {
+test("a person queues cards, reads their order and the tick's tries, and takes them back", async (t) => {
   const s = story(t);
   await s.test(
-    "GET /api/inbox carries a queued card's time and place, and the tick's last try of its start, as the package lists them",
+    "GET /api/cards carries a queued card's time, and the tick's last try of its start, as the package lists them, and its order is the package's",
     async (t) => {
       clear();
       t.mock.timers.enable({ apis: ['Date'], now: Date.parse('2026-09-16T09:30:00.000Z') });
@@ -120,38 +167,41 @@ test("a person queues cards, reads their place and the tick's tries, and takes t
       fs.mkdirSync(path.join(root, 'queue'), { recursive: true });
       fs.writeFileSync(path.join(root, 'queue', `${second.name}.json`), JSON.stringify(tried));
 
-      const entries = await listed();
-      const byName = new Map(entries.map((e) => [e.name, e]));
-      for (const entry of onStore(readInbox())) {
-        const { body, filedAt, state: _state, ...rest } = byName.get(entry.name)!;
-        assert.deepEqual(
-          rest,
-          entry,
-          `${entry.name}: every key the package lists, as it lists it, the api's own two and its state beside them`,
-        );
-        assert.equal(typeof body, 'string');
-        assert.equal(typeof filedAt, 'string');
+      const cards = await listed();
+      const byName = new Map(cards.map((c) => [c.metadata.name, c]));
+      const listing = onStore(readInbox());
+      for (const entry of listing) {
+        const card = byName.get(entry.name);
+        assert.ok(card, `${entry.name} is listed`);
+        const { state: _state, ...rest } = asListed(card);
+        assert.deepEqual(rest, packageListed(entry), `${entry.name}: every key the package lists that a Card holds, as it lists it`);
+        assert.equal(typeof card.spec.body, 'string');
+        assert.equal(typeof card.metadata.creationTimestamp, 'string');
       }
       assert.deepEqual(
-        [first.name, second.name, parked.name].map((name) => byName.get(name)!.state),
+        [first.name, second.name, parked.name].map((name) => byName.get(name)?.status.state),
         ['queued', 'refused', 'filed'],
         "each card's state, none of them started",
       );
-      assert.equal(byName.get(first.name)!.queued!.place, 1);
-      assert.match(byName.get(first.name)!.queued!.at, /^\d{4}-\d{2}-\d{2}T/);
-      assert.equal(byName.get(first.name)!.tried, undefined, 'no try of a card the tick has not tried');
-      assert.equal(byName.get(second.name)!.queued!.place, 2);
+      assert.deepEqual(inLine(cards), [first.name, second.name], "the queue's order, read off the Cards");
       assert.deepEqual(
-        byName.get(second.name)!.tried,
+        inLine(cards),
+        queueOrder(listing).map((l) => l.name),
+        "the order the package's queue starts them in",
+      );
+      assert.match(byName.get(first.name)?.spec.queued ?? '', /^\d{4}-\d{2}-\d{2}T/);
+      assert.equal(byName.get(first.name)?.status.lastStart, undefined, 'no try of a card the tick has not tried');
+      assert.deepEqual(
+        byName.get(second.name)?.status.lastStart,
         { at: tried.at, repo, why: tried.why, refused: true },
         "the tick's own file for a start it refused, of the card as it stands",
       );
-      assert.equal('queued' in byName.get(parked.name)!, false, 'a card not queued carries no `queued`');
+      assert.equal(byName.get(parked.name)?.spec.queued, undefined, 'a card not queued carries no `queued`');
     },
   );
 
   await s.test(
-    'POST queues a card as `nemia inbox queue` does, with its place; DELETE takes it back as `--off` does, and a second says not queued',
+    'the queue verb queues a card as `nemia inbox queue` does, behind those queued before; unqueue takes it back as `--off` does, and a second writes nothing',
     async (t) => {
       clear();
       t.mock.timers.enable({ apis: ['Date'], now: Date.parse('2026-09-16T09:30:00.000Z') });
@@ -160,51 +210,32 @@ test("a person queues cards, reads their place and the tick's tries, and takes t
 
       const queued = await queue(first.name);
       assert.equal(queued.status, 200, await queued.clone().text());
-      const answer = (await queued.json()) as InboxQueueAnswer;
-      assert.match(answer.queued!, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
-      assert.deepEqual(answer, {
-        name: first.name,
-        file: path.join(inbox, `${first.name}.md`),
-        was: 'queued',
-        queued: answer.queued,
-        place: 1,
-        of: 1,
-      });
+      const answer = (await queued.json()) as Card;
+      assert.equal(answer.metadata.name, first.name);
+      assert.equal(answer.status.state, 'queued');
+      assert.match(answer.spec.queued ?? '', /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
       assert.equal(
         cardText(first.name),
-        `---\nworkflow: dev\nqueued: ${answer.queued}\n---\nCache the views between passes\n`,
+        `---\nworkflow: dev\nqueued: ${answer.spec.queued}\n---\nCache the views between passes\n`,
         'written as nemia inbox queue writes it',
       );
 
       t.mock.timers.tick(1);
-      const behind = (await (await queue(second.name, JSON_TYPE, '{}')).json()) as InboxQueueAnswer;
-      assert.deepEqual([behind.was, behind.place, behind.of], ['queued', 2, 2], 'a body of {} is no body');
-      const byName = (a: readonly unknown[], b: readonly unknown[]) => String(a[0]).localeCompare(String(b[0]));
-      assert.deepEqual(
-        (await listed()).map((e) => [e.name, e.queued?.place ?? null]).sort(byName),
-        [
-          [first.name, 1],
-          [second.name, 2],
-        ].sort(byName),
-      );
+      const behind = await queue(second.name, JSON_TYPE, '{}');
+      assert.equal(behind.status, 200, 'a body of {} is no body');
+      assert.deepEqual(inLine(await listed()), [first.name, second.name]);
 
       const off = await unqueue(first.name);
       assert.equal(off.status, 200, await off.clone().text());
-      assert.deepEqual(await off.json(), {
-        name: first.name,
-        file: path.join(inbox, `${first.name}.md`),
-        was: 'taken back',
-        queued: null,
-        place: null,
-        of: null,
-      });
+      const back = (await off.json()) as Card;
+      assert.deepEqual([back.metadata.name, back.spec.queued, back.status.state], [first.name, undefined, 'filed']);
       assert.equal(cardText(first.name), '---\nworkflow: dev\n---\nCache the views between passes\n');
-      assert.equal((await listed()).find((e) => e.name === second.name)!.queued!.place, 1, 'the card behind it moves up');
+      assert.deepEqual(inLine(await listed()), [second.name], 'the card behind it moves up');
 
       const before = inboxAsIs();
       const again = await unqueue(first.name);
       assert.equal(again.status, 200);
-      assert.equal(((await again.json()) as InboxQueueAnswer).was, 'not queued', 'taken back again: not queued');
+      assert.equal(((await again.json()) as Card).spec.queued, undefined, 'taken back again: not queued');
       assert.deepEqual(inboxAsIs(), before, 'and nothing written');
     },
   );
@@ -218,7 +249,7 @@ test("a person queues cards, reads their place and the tick's tries, and takes t
       const [hourAgo, minuteAgo] = [new Date('2026-09-16T09:00:00.000Z'), new Date('2026-09-16T09:59:00.000Z')];
       fs.utimesSync(older.file, hourAgo, hourAgo);
       fs.utimesSync(newer.file, minuteAgo, minuteAgo);
-      const filedAt = async () => new Map((await listed()).map((e) => [e.name, e.filedAt]));
+      const filedAt = async () => new Map((await listed()).map((c) => [c.metadata.name, c.metadata.creationTimestamp]));
       const before = await filedAt();
       assert.deepEqual([before.get(older.card.name), before.get(newer.card.name)], [hourAgo.toISOString(), minuteAgo.toISOString()]);
 
@@ -228,17 +259,12 @@ test("a person queues cards, reads their place and the tick's tries, and takes t
       assert.deepEqual(await filedAt(), before, 'queued, the older card keeps its filing time, and stays behind the newer one');
 
       const off = await unqueue(older.card.name);
-      assert.equal(((await off.json()) as InboxQueueAnswer).was, 'taken back');
+      assert.equal(off.status, 200);
       assert.doesNotMatch(cardText(older.card.name), /\nqueued: /, 'the card is taken off the queue');
       assert.deepEqual(await filedAt(), before, 'taken back, it keeps it too');
 
-      assert.equal(
-        (await queue(newer.card.name, JSON_TYPE, '{"workflow":"dev"}')).status,
-        400,
-        'refused: nothing is written, and nothing is set',
-      );
       assert.equal((await unqueue(newer.card.name)).status, 200);
-      assert.deepEqual(await filedAt(), before, 'a refusal, and a card taken off a queue it was not in, leave it as it was');
+      assert.deepEqual(await filedAt(), before, 'a card taken off a queue it was not in is left as it was');
     },
   );
 
@@ -250,19 +276,20 @@ test("a person queues cards, reads their place and the tick's tries, and takes t
       const { card } = onStore(addToInbox({ text: 'About a repository deleted', workflow: 'dev', repo: about }));
       onStore(queueInInbox(card.name));
       fs.rmSync(about, { recursive: true, force: true });
-      const entry = (await listed()).find((e) => e.name === card.name)!;
-      assert.match(entry.error!, /names no directory/);
-      assert.equal(entry.queued!.place, 1);
+      const cards = await listed();
+      const entry = cards.find((c) => c.metadata.name === card.name);
+      assert.match(entry?.status.error ?? '', /names no directory/);
+      assert.deepEqual(inLine(cards), [card.name], 'in its place in the queue');
 
       const off = await unqueue(card.name);
       assert.equal(off.status, 200, await off.clone().text());
-      assert.equal(((await off.json()) as InboxQueueAnswer).was, 'taken back');
-      assert.equal((await listed()).find((e) => e.name === card.name)!.queued, undefined);
+      assert.equal(((await off.json()) as Card).spec.queued, undefined, 'taken back');
+      assert.equal((await listed()).find((c) => c.metadata.name === card.name)?.spec.queued, undefined);
     },
   );
 });
 
-test('the queue routes: what a queue or a take-back refuses, writing nothing', async (t) => {
+test('the queue verbs: what a queue or a take-back refuses, writing nothing', async (t) => {
   await t.test(
     'a card with no workflow, or that does not read, is a 422; one not there a 404; one queued or started from a 409',
     async () => {
@@ -287,7 +314,7 @@ test('the queue routes: what a queue or a take-back refuses, writing nothing', a
         [started.name, 409, false],
       ] as const) {
         const res = off ? await unqueue(name) : await queue(name);
-        assert.equal(res.status, status, `${off ? 'DELETE' : 'POST'} ${name}`);
+        assert.equal(res.status, status, `${off ? 'unqueue' : 'queue'} ${name}`);
       }
       assert.deepEqual(inboxAsIs(), before);
     },
@@ -320,10 +347,12 @@ test('the queue routes: what a queue or a take-back refuses, writing nothing', a
       assert.ok(error.endsWith('Nothing was queued.'), error);
       assert.deepEqual(inboxAsIs(), before);
 
-      const placed = await queue('placed');
+      const placed = await queue('placed', JSON_TYPE, undefined, 'mill');
       assert.equal(placed.status, 200, await placed.clone().text());
-      const entry = (await listed()).find((e) => e.name === 'placed')!;
-      assert.deepEqual([entry.factory, entry.queued?.place], ['mill', 2]);
+      const cards = await listed();
+      assert.equal(cards.find((c) => c.metadata.name === 'placed')?.metadata.namespace, 'mill');
+      assert.deepEqual(inLine(cards), ['older', 'placed'], 'behind the card queued before it');
+      assert.equal((await queue('placed')).status, 404, "a factory's card is no card of the default namespace");
 
       const back = await unqueue('older');
       assert.equal(back.status, 200, await back.clone().text());
@@ -331,59 +360,36 @@ test('the queue routes: what a queue or a take-back refuses, writing nothing', a
     },
   );
 
-  await t.test(
-    "a name that is not a card's is a 400, and a body that is not none or `{}` a 400 naming the route, before the card is read",
-    async () => {
-      clear();
-      const { card } = onStore(addToInbox({ text: 'No workflow named' }));
-      const before = inboxAsIs();
-      for (const sent of ['.hidden', '..%2Fruns%2Fr-1', 'a%2Fb', 'a%5Cb']) {
-        for (const send of [queue, unqueue]) {
-          const res = await send(sent);
-          assert.equal(res.status, 400, sent);
-        }
-      }
-      const route = `POST /api/inbox/${card.name}/queue`;
-      const withWorkflow = await queue(card.name, JSON_TYPE, JSON.stringify({ workflow: 'dev' }));
-      assert.equal(withWorkflow.status, 400);
-      const withWorkflowSaid = ((await withWorkflow.json()) as { error: string }).error;
-      assert.ok(withWorkflowSaid.startsWith(`${route} takes no body, or \`{}\``), withWorkflowSaid);
-      for (const fact of ['this request sent {"workflow":"dev"}.', '`nemia inbox queue <name> --workflow <w>`']) {
-        assert.ok(withWorkflowSaid.includes(fact), `${fact}: ${withWorkflowSaid}`);
-      }
-      for (const body of ['{"off":true}', '[]', '"dev"', 'not json']) {
-        const res = await queue(card.name, JSON_TYPE, body);
-        assert.equal(res.status, 400, body);
-        assert.ok(((await res.json()) as { error: string }).error.startsWith(`${route} takes no body, or \`{}\``), body);
-      }
-      const offRoute = await unqueue(card.name, JSON_TYPE, '{"workflow":"dev"}');
-      assert.equal(offRoute.status, 400);
-      assert.ok(
-        ((await offRoute.json()) as { error: string }).error.startsWith(`DELETE /api/inbox/${card.name}/queue takes no body, or \`{}\``),
-      );
-      assert.deepEqual(inboxAsIs(), before);
-    },
-  );
-
-  await t.test('a body that is JSON and not `{}` — null, a workflow named null — is a 400 saying what was sent', async () => {
+  await t.test("a name that is not a card's is a 422 before the card is read, in the package's words", async () => {
     clear();
-    const { card } = onStore(addToInbox({ text: 'Queue me not', workflow: 'dev' }));
+    onStore(addToInbox({ text: 'No workflow named' }));
     const before = inboxAsIs();
-    const route = `POST /api/inbox/${card.name}/queue`;
-    const takes = `${route} takes no body, or \`{}\``;
-    const res = await queue(card.name, JSON_TYPE, 'null');
-    assert.equal(res.status, 400);
-    const nullSaid = ((await res.json()) as { error: string }).error;
-    assert.ok(nullSaid.startsWith(takes) && nullSaid.endsWith(', and this request sent null.'), nullSaid);
-    const named = await queue(card.name, JSON_TYPE, '{"workflow":null}');
-    assert.equal(named.status, 400);
-    const namedSaid = ((await named.json()) as { error: string }).error;
-    assert.ok(namedSaid.startsWith(takes), namedSaid);
-    for (const fact of ['this request sent {"workflow":null}.', '`nemia inbox queue <name> --workflow <w>`']) {
-      assert.ok(namedSaid.includes(fact), `${fact}: ${namedSaid}`);
+    for (const sent of ['.hidden', '..%2Fruns%2Fr-1', 'a%2Fb', 'a%5Cb']) {
+      for (const send of [queue, unqueue]) {
+        const res = await send(sent);
+        assert.equal(res.status, 422, sent);
+        assert.equal(typeof ((await res.json()) as { error: unknown }).error, 'string', sent);
+      }
     }
     assert.deepEqual(inboxAsIs(), before);
   });
+
+  await t.test(
+    'the queue takes no body: one sent — a workflow, null, text that is no JSON — is not read, so no workflow is written from it',
+    async () => {
+      clear();
+      const { card } = onStore(addToInbox({ text: 'Queue me on mine' }));
+      for (const body of [JSON.stringify({ workflow: 'dev' }), '{"workflow":null}', 'null']) {
+        const res = await queue(card.name, JSON_TYPE, body);
+        assert.equal(res.status, 422, `${body}: the card names no workflow, and none is read from the body`);
+      }
+      assert.equal(cardText(card.name), 'Queue me on mine\n', 'nothing written');
+      const { card: named } = onStore(addToInbox({ text: 'Queue me on dev', workflow: 'dev' }));
+      const res = await queue(named.name, JSON_TYPE, 'not json');
+      assert.equal(res.status, 200, await res.clone().text());
+      assert.equal(((await res.json()) as Card).spec.workflow, 'dev', 'queued on the workflow the card names');
+    },
+  );
 });
 
 const at = (minute: number) => `2026-09-16T10:${String(minute).padStart(2, '0')}:00.000Z`;

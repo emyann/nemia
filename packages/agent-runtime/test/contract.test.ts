@@ -11,6 +11,9 @@
  * caches this package's pass by this package's files alone: after a change elsewhere, `npx turbo run test --force`, or turbo replays a pass
  * that read none of it. The scanner is a copy of the one in packages/agent-orchestrator/test/contract.test.ts, not an import of it: a
  * package's test reaches into no other package's files, which is the rule it keeps.
+ *
+ * The runtime is the bottom layer, and the objects (`packages/objects`) sit beside it: no file of its `src` or `bin` imports them, by
+ * their name or by a path (`objectsBreaches`), since what a session runs carries no object of the layers above.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -277,5 +280,40 @@ test('decide is exported by no entry, and the stand-in by the testing entry alon
       'no entry exports fold: the check for decide would pass on entries that export nothing',
     ],
     'REFUSED: entries read as empty',
+  );
+});
+
+/** The objects' package, beside the runtime at the bottom: the layers above import it, and the runtime never. */
+const OBJECTS = { name: 'objects', dir: 'packages/objects' } as const;
+
+/** Where `file`, of this package, imports the objects: by their name or a subpath of it, or by a relative path into their folder. */
+function objectsBreaches(file: string, text: string): string[] {
+  return specifiersIn(withoutComments(text)).flatMap((spec) => {
+    const named = spec === OBJECTS.name || spec.startsWith(`${OBJECTS.name}/`);
+    const into =
+      spec.startsWith('.') && `${path.posix.normalize(path.posix.join(path.posix.dirname(file), spec))}/`.startsWith(`${OBJECTS.dir}/`);
+    return named || into
+      ? [`${file} imports ${spec}, the objects of the layers above: carry what a session needs on the task, read by a runner`]
+      : [];
+  });
+}
+
+test('REFUSED: a file of the runtime that imports the objects, by their entry, a subpath or a path; a name that opens with it is not it', () => {
+  const file = 'packages/agent-runtime/src/engine.ts';
+  assert.equal(objectsBreaches(file, "import { ObjectMeta } from 'objects';").length, 1, 'its entry');
+  assert.equal(objectsBreaches(file, "import type { Run } from 'objects/src/run.ts';").length, 1, 'a subpath');
+  assert.equal(objectsBreaches(file, `const m = await import('../../${OBJECTS.name}/src/meta.ts');`).length, 1, 'a relative path');
+  assert.equal(objectsBreaches('packages/agent-runtime/bin/ae.ts', "export * from 'objects';").length, 1, 'from its bin');
+  assert.deepEqual(objectsBreaches(file, "import { x } from 'objects-ui';\nimport { y } from './objects.ts';"), [], 'neither is it');
+  assert.deepEqual(objectsBreaches(file, " * import { Run } from 'objects';"), [], 'prose');
+});
+
+test("no file of the runtime's src or bin imports the objects, and the scan reads them", () => {
+  const listed = execFileSync('git', ['ls-files', '-co', '--exclude-standard', 'src', 'bin'], { cwd: PKG, encoding: 'utf8' });
+  const files = listed.split('\n').filter((f) => SOURCE.test(f) && fs.existsSync(path.join(PKG, f)));
+  assert.ok(files.includes('src/index.ts') && files.some((f) => f.startsWith('bin/')), 'the scan reads src/index.ts and the bin');
+  assert.deepEqual(
+    files.flatMap((f) => objectsBreaches(`${GUARDED.dir}/${f}`, fs.readFileSync(path.join(PKG, f), 'utf8'))),
+    [],
   );
 });

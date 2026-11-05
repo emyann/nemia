@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Locator, Page } from 'playwright';
-import { photograph, themeOf } from '../board.ts';
+import { cardsPath, photograph, themeOf } from '../board.ts';
 import { expectCount, expectVisible, idle, Refused, settled, WAIT_MS, watch } from '../checks.ts';
 import { FACTORIES, hiringStarts, WORKFLOWS } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -89,7 +89,9 @@ export default {
       await settled(other);
       await photograph(other, path.join(OUT, `inbox-factory-start-${theme}.png`), { fullPage: true });
       const [started] = await Promise.all([
-        other.waitForResponse((r) => r.request().method() === 'POST' && new URL(r.url()).pathname === '/api/runs', { timeout: WAIT_MS }),
+        other.waitForResponse((r) => r.request().method() === 'POST' && cardsPath(CARD, 'start').test(new URL(r.url()).pathname), {
+          timeout: WAIT_MS,
+        }),
         form.getByRole('button', { name: 'Start' }).click(),
       ]);
       const sent = new URL(started.url()).searchParams;

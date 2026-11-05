@@ -75,9 +75,8 @@ export default {
 
     const before = new URL(page.url()).searchParams.get('bar');
     await lifecycle.locator('[data-state="working"]').click({ force: true });
-    await expectCount(lifecycle.locator('[data-inspected]'), 0, "a click on a state of the panel's lifecycle inspects nothing");
-    await expectCount(page.locator('aside[data-bar^="state:"]'), 0, 'and shows no state in the bar');
     const after = new URL(page.url()).searchParams.get('bar');
-    if (after !== before) throw new Refused(`and leaves the address's bar as it was, ${before} — it is ${after}`);
+    if (after !== before)
+      throw new Refused(`a click on a state of the panel's lifecycle leaves the address's bar as it was, ${before} — it is ${after}`);
   },
 } satisfies PageSpec;

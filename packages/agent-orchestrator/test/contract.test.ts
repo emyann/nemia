@@ -17,6 +17,9 @@
  * `dependencies`, its tests in `dependencies` or `devDependencies`. That scan reads every file git lists under each workspace the root
  * package.json names, `tools/guards` among them.
  *
+ * The objects (`packages/objects`), which this package and the apps share, are reached through their one entry, `objects`, the same
+ * way (`OBJECTS`): never by a subpath, a relative path or a path built into their src. Their own files are not read for it.
+ *
  * No file of this package's `src`, `bin` or `place` imports the templates workspace (`packages/templates`), by its name or by a path:
  * the builtin templates are found by path (`BuiltinTemplates`, `src/templates/templates.store.ts`), as its skills and servers are.
  */
@@ -56,6 +59,12 @@ function specifiersIn(text: string): string[] {
 }
 
 type Guarded = { name: string; dir: string; entries: readonly string[] };
+
+/**
+ * The objects' package: the apps and this package reach it through its one entry, as they reach this one through its entries. The plants
+ * below spell a path of it through `OBJECTS.name`, since the scan they plant for reads this file.
+ */
+const OBJECTS = { name: 'objects', dir: 'packages/objects', entries: ['objects'] } as const;
 
 /** The CLI's entries: resolved to the file the client spawns, never imported (`binBreaches`), and so no entry `breaches` reads. */
 const SPAWNED = ['agent-orchestrator/bin', 'agent-orchestrator/bin/wf'];
@@ -174,6 +183,35 @@ test('and what is not a route is not refused: the three entries, the wf CLI spaw
     ' * `packages/agent-orchestrator/src/run.ts`, which briefs write constantly.',
   ].join('\n');
   assert.deepEqual(breaches('apps/web/test/e2e/x.ts', text, GUARDED), []);
+});
+
+test('code outside packages/objects reaches it through objects alone, and the scan reads this package and the apps', () => {
+  const files = workspaceFiles(OBJECTS);
+  for (const dir of ['packages/agent-orchestrator/src', 'apps/api/src', 'apps/web/src', 'apps/cli/src'])
+    assert.ok(
+      files.some((f) => f.startsWith(`${dir}/`)),
+      `the scan reads ${dir}`,
+    );
+  assert.deepEqual(
+    files.flatMap((f) => breaches(f, fs.readFileSync(path.join(ROOT, f), 'utf8'), OBJECTS)),
+    [],
+  );
+});
+
+test('REFUSED: objects reached by a subpath, a relative path or a path built into its src; its entry let through', () => {
+  const at = 'apps/web/src/lib/x.ts';
+  const reached = (text: string) => breaches(at, text, OBJECTS).length;
+  assert.equal(reached("import { Run } from 'objects/src/run.ts';"), 1, 'a subpath');
+  assert.equal(reached("import type { Card } from 'objects/card';"), 1, 'a subpath not in its exports');
+  assert.equal(reached("import { Run } from '../../../../packages/objects/src/run.ts';"), 1, 'a relative path');
+  assert.equal(
+    breaches('packages/agent-orchestrator/src/x.ts', "import { ObjectMeta } from '../../objects/src/meta.ts';", OBJECTS).length,
+    1,
+    'a relative path from this package',
+  );
+  assert.equal(reached(`const f = path.join(ROOT, 'packages', '${OBJECTS.name}', 'src', 'run.ts');`), 1, 'a path built into its src');
+  assert.equal(reached("import { Run, type Card } from 'objects';"), 0, 'its entry');
+  assert.equal(reached("import { x } from 'objects-ui';"), 0, 'another package whose name opens with it');
 });
 
 test("agent-orchestrator's exports are . (runner.ts), ./run, ./workflow, ./testing (the test place and the doors' stand-ins) and the CLI's two entries the client spawns, ./bin and ./bin/wf, and nothing else but its package.json", () => {
@@ -429,7 +467,15 @@ test('the declared-imports scan reads every workspace package, and finds workspa
   const all = manifests();
   const names = all.map((m) => m.name);
   const files = packageFiles(all);
-  for (const dir of ['apps/api', 'apps/cli', 'apps/web', 'packages/agent-orchestrator', 'packages/agent-runtime', 'tools/guards'])
+  for (const dir of [
+    'apps/api',
+    'apps/cli',
+    'apps/web',
+    'packages/agent-orchestrator',
+    'packages/agent-runtime',
+    'packages/objects',
+    'tools/guards',
+  ])
     assert.ok(
       files.some(({ manifest }) => manifest.dir === dir),
       `the scan reads ${dir}`,

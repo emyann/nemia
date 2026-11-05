@@ -29,12 +29,8 @@ async function expectTab(page: Page, name: string, assertion: string): Promise<v
 async function underHeader(page: Page): Promise<void> {
   const header = page.locator('header[data-frame-header]');
   await expectVisible(header.locator('[data-page-name]').getByText(PLACE, { exact: true }), `the header names the place, ${PLACE}`);
-  await expectTexts(
-    frameTabsOf(page).getByRole('tab'),
-    ['Settings', 'Machines', 'Capabilities'],
-    'the strip holds Settings, Machines, then Capabilities',
-  );
-  await expectTab(page, 'Machines', 'on /machines the Machines tab is selected');
+  await expectTexts(frameTabsOf(page).getByRole('tab'), ['Settings', 'Capabilities'], 'the strip holds Settings, then Capabilities');
+  await expectTab(page, 'Settings', 'on /settings the Settings tab is selected');
   const top = (await header.boundingBox())!;
   const strip = await frameTabsOf(page).boundingBox();
   const panel = await page.getByRole('tabpanel').boundingBox();
@@ -48,9 +44,9 @@ async function underHeader(page: Page): Promise<void> {
 
 /** A click on a tab opens its own address, the floating bar closed; a next visit to it opens the same tab. */
 async function clicks(page: Page): Promise<void> {
-  await page.goto(new URL('/machines?bar=state:lifecycle/working', page.url()).href);
+  await page.goto(new URL('/settings?bar=gauges', page.url()).href);
   await idle(page);
-  await expectVisible(page.locator('aside[data-bar="state:lifecycle/working"]'), 'a state is shown in the floating bar');
+  await expectVisible(page.locator('aside[data-bar="gauges"]'), "the machine's gauges are shown in the floating bar");
   await tabOf(page, 'Capabilities').click();
   await expectTab(page, 'Capabilities', 'a click on Capabilities selects it');
   expectAt(page, '/capabilities', 'and opens its own address, which carries no bar');
@@ -65,13 +61,13 @@ async function keys(page: Page): Promise<void> {
   await tabOf(page, 'Capabilities').focus();
   await page.keyboard.press('ArrowLeft');
   const focused = await page.evaluate(() => document.activeElement?.textContent?.trim());
-  if (focused !== 'Machines') throw new Refused(`ArrowLeft moves the focus to Machines — it is on ${focused}`);
+  if (focused !== 'Settings') throw new Refused(`ArrowLeft moves the focus to Settings — it is on ${focused}`);
   await expectTab(page, 'Capabilities', 'and opens nothing: Capabilities is still selected');
   expectAt(page, '/capabilities', 'and the address is unchanged');
   const before = await page.evaluate(() => history.length);
   await page.keyboard.press('Enter');
-  await expectTab(page, 'Machines', 'Enter on Machines selects it');
-  expectAt(page, '/machines', 'and opens its address');
+  await expectTab(page, 'Settings', 'Enter on Settings selects it');
+  expectAt(page, '/settings', 'and opens its address');
   await idle(page);
   const after = await page.evaluate(() => history.length);
   if (after !== before + 1) throw new Refused(`Enter opens the tab once — history grew by ${after - before}`);
@@ -99,13 +95,13 @@ async function onPhone(page: Page): Promise<void> {
 
 export default {
   /**
-   * The frame's tabs: Settings is one destination in the rail with a tab each, Settings, Machines and Capabilities, in a strip under the
+   * The frame's tabs: Settings is one destination in the rail with a tab each, Settings and Capabilities, in a strip under the
    * top bar and above the page. A tab is its own address: a click opens it, closing the floating bar, and a next visit opens the same tab.
    * The arrow keys move between the tabs without opening one, and Enter opens one, once. A page with one view, Agents, has no strip. The
    * window's size is taken back.
    */
   name: 'tabs',
-  route: '/machines',
+  route: '/settings',
   expect: async (page) => {
     const size = page.viewportSize();
     try {

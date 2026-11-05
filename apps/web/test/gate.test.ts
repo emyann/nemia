@@ -245,7 +245,12 @@ test("gateOfStep, gateFacts, needWords: the inspector's gate, the facts under it
         { label: 'round', said: 'round 1 · cost not measured' },
         { label: 'last review', said: 'review left 2 findings and asks another round', state: undefined, step: 'review' },
       ]);
-      const accepted = [{ ...findings[0], accepted: { try: 1, at: '2026-09-20T00:00:00Z', message: 'fan-in teams are follow-up work' } }];
+      const accepted = [
+        {
+          ...findings[0],
+          gate: { awaiting: false, approval: { try: 1, at: '2026-09-20T00:00:00Z', message: 'fan-in teams are follow-up work' } },
+        },
+      ];
       assert.deepEqual(
         gateFacts(detail(accepted, { cost: null }), null)[1],
         {

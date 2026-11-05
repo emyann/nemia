@@ -114,7 +114,6 @@
         "apps/web/src/lib/api/skills.ts",
         "apps/web/src/lib/api/workflows.ts",
         "apps/web/src/lib/api/builder.ts",
-        "apps/web/src/lib/api/machines.ts",
         "apps/web/src/lib/api/inbox.ts",
         "apps/web/src/lib/api/capabilities.ts",
         "apps/web/src/lib/api/quota.ts",
@@ -209,6 +208,20 @@
       }
     },
     {
+      "files": ["packages/objects/**"],
+      "rules": {
+        "comments/no-code-comments": "error",
+        "comments/no-history-in-comments": "error",
+        "comments/no-deferral-in-comments": "error",
+        "comments/no-wide-comment-lines": "error",
+        "no-warning-comments": [
+          "error",
+          { "terms": ["todo", "fixme", "xxx", "hack", "workaround", "work around", "stopgap", "learned by"], "location": "anywhere" }
+        ],
+        "no-inline-comments": ["error", { "ignorePattern": "^\\s*(oxlint|eslint)-(disable|enable)" }]
+      }
+    },
+    {
       "files": ["packages/templates/**"],
       "rules": {
         "comments/no-code-comments": "error",
@@ -240,7 +253,8 @@
     // source alone, since a test may import the runtime's entries for a fake. Their globs never overlap, because a later block that sets
     // `no-restricted-imports` on a file replaces an earlier one's options.
     // packages/agent-orchestrator/test/imports.boundary.test.ts holds them to the layers of docs/architecture.md.
-    // The board reaches the api over HTTP alone: no workspace package, no harness SDK, no path into packages/.
+    // The board reaches the api over HTTP alone: no workspace package but the objects' entry, `objects`, no harness SDK, no path into
+    // packages/.
     {
       "files": ["apps/web/src/**"],
       "rules": {
@@ -252,6 +266,7 @@
                 "group": ["agent-orchestrator", "agent-orchestrator/**", "agent-runtime", "agent-runtime/**"],
                 "message": "The board reaches the api over HTTP alone: ask the api for what this import gives"
               },
+              { "group": ["objects/**"], "message": "The board imports the objects by their entry alone: import it from 'objects'" },
               {
                 "group": ["@anthropic-ai/claude-agent-sdk", "@anthropic-ai/claude-agent-sdk/**", "@a2a-js/sdk", "@a2a-js/sdk/**"],
                 "message": "Only agent-runtime reaches a harness: ask the api for what this import gives"
@@ -262,8 +277,8 @@
         ]
       }
     },
-    // The client reaches the api over HTTP alone, and its answers' shapes by their types: no workspace package, no harness SDK, no path into
-    // packages/, and from the api nothing but `import type` of its client door, apps/api/src/client/client.ts. The value pattern comes first
+    // The client reaches the api over HTTP alone, and its answers' shapes by their types: no workspace package but the objects' entry,
+    // `objects`, no harness SDK, no path into packages/, and from the api nothing but `import type` of its client door, apps/api/src/client/client.ts. The value pattern comes first
     // and the door's after it, since oxlint lets through, for every pattern after it, an import a negated group matches. Its one reach of
     // the orchestrator is a resolve of agent-orchestrator/bin in src/local.ts, which is no import: the orchestrator's contract.test.ts
     // holds it, and apps/cli/test/structure.test.ts the rest. A test beside its source is of no layer.
@@ -284,6 +299,7 @@
                 "group": ["agent-orchestrator", "agent-orchestrator/**", "agent-runtime", "agent-runtime/**"],
                 "message": "The client reaches the api over HTTP alone: ask the api, or spawn the orchestrator's CLI from src/local.ts"
               },
+              { "group": ["objects/**"], "message": "The client imports the objects by their entry alone: import it from 'objects'" },
               {
                 "group": ["@anthropic-ai/claude-agent-sdk", "@anthropic-ai/claude-agent-sdk/**", "@a2a-js/sdk", "@a2a-js/sdk/**"],
                 "message": "Only agent-runtime reaches a harness: ask the api for what this import gives"
@@ -298,7 +314,7 @@
         ]
       }
     },
-    // The api reaches the orchestrator's public entries alone, and never the runtime or a harness. A test beside its source is of no layer,
+    // The api reaches the orchestrator's public entries alone, the objects by their entry, and never the runtime or a harness. A test beside its source is of no layer,
     // as one under apps/api/test is: it takes the stand-ins by the two testing entries.
     {
       "files": ["apps/api/src/**"],
@@ -312,6 +328,7 @@
                 "group": ["agent-orchestrator/**", "!agent-orchestrator/run", "!agent-orchestrator/workflow"],
                 "message": "The api reaches agent-orchestrator through its entries alone: agent-orchestrator, /run or /workflow"
               },
+              { "group": ["objects/**"], "message": "The api imports the objects by their entry alone: import it from 'objects'" },
               {
                 "group": ["agent-runtime", "agent-runtime/**"],
                 "message": "The api never reaches the runtime: call the orchestrator entry that does"
@@ -326,7 +343,7 @@
         ]
       }
     },
-    // The orchestrator reaches the runtime through its client, and a harness never.
+    // The orchestrator reaches the runtime through its client, the objects by their entry, and a harness never.
     {
       "files": ["packages/agent-orchestrator/src/**", "packages/agent-orchestrator/bin/**", "packages/agent-orchestrator/place/**"],
       "rules": {
@@ -334,6 +351,10 @@
           "error",
           {
             "patterns": [
+              {
+                "group": ["objects/**"],
+                "message": "The orchestrator imports the objects by their entry alone: import it from 'objects'"
+              },
               {
                 "group": ["@anthropic-ai/claude-agent-sdk", "@anthropic-ai/claude-agent-sdk/**", "@a2a-js/sdk", "@a2a-js/sdk/**"],
                 "message": "Only agent-runtime reaches a harness: reach it through src/runtime-client.ts"
@@ -372,7 +393,7 @@
       "excludeFiles": ["apps/cli/src/**/*.test.ts"],
       "rules": { "typescript/no-non-null-assertion": "error" }
     },
-    // The runtime is the bottom layer: it reaches no layer above it.
+    // The runtime is the bottom layer: it reaches no layer above it, nor the objects beside it, which are the layers above's words.
     {
       "files": ["packages/agent-runtime/src/**", "packages/agent-runtime/bin/**"],
       "rules": {
@@ -383,6 +404,29 @@
               {
                 "group": ["agent-orchestrator", "agent-orchestrator/**", "**/agent-orchestrator/**"],
                 "message": "The runtime reaches no layer above it: carry the knob on the task, read by a runner"
+              },
+              {
+                "group": ["objects", "objects/**", "**/objects/**"],
+                "message": "The runtime never reads an object of the layers above: carry what a session needs on the task, read by a runner"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    // The objects sit at the bottom beside the runtime, and every layer above reads them, the board in a browser: they import `effect`
+    // and their own files alone (`./x.ts`), no other package, no node built-in and no path out of src. One group refuses every import and
+    // lets those three through by negation: oxlint's regex reads no lookahead, and refuses nothing with one. packages/objects/CLAUDE.md.
+    {
+      "files": ["packages/objects/src/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["**", "!effect", "!effect/**", "!./**"],
+                "message": "The objects import effect and their own files alone: write it with effect's Schema, in a file of packages/objects/src"
               }
             ]
           }
@@ -497,7 +541,7 @@
     {
       "files": ["apps/web/src/components/StartRun.tsx"],
       "rules": {
-        "max-lines-per-function": ["error", { "max": 97, "skipBlankLines": true, "skipComments": true }]
+        "max-lines-per-function": ["error", { "max": 95, "skipBlankLines": true, "skipComments": true }]
       }
     },
     {
@@ -551,8 +595,7 @@
     {
       "files": ["apps/web/src/lib/gate.ts"],
       "rules": {
-        "complexity": ["error", { "max": 22 }],
-        "sonarjs/cognitive-complexity": ["error", 42]
+        "sonarjs/cognitive-complexity": ["error", 37]
       }
     },
     {

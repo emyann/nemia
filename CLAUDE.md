@@ -1,12 +1,15 @@
 # Nemia — contributor guide
 
-Two packages and three apps, each a layer that owns one thing. `packages/agent-runtime` runs agent sessions on a harness, durably: a
+Three packages and three apps, each a layer that owns one thing. `packages/agent-runtime` runs agent sessions on a harness, durably: a
 job that runs to its end, and a long-lived session that runs until stopped (`restartPolicy: 'Always'`); the `ae` CLI, and
 `src/core/domain.ts` is the whole judgement. `packages/agent-orchestrator` owns workflows and the runs of their steps — a folder of
-markdown is a workflow (its in-process CLI). `apps/api` puts the workflows behind HTTP; `apps/web`, the board, shows them to a person;
+markdown is a workflow (its in-process CLI). `packages/objects` holds the shapes of the objects Nemia serves, `nemia/v1`, and the
+HttpApi that serves them, importing only `effect`. `apps/api` puts the workflows behind HTTP; `apps/web`, the board, shows them to a person;
 `apps/cli`, beside it, is `nemia` and `wf`, a client of the api that spawns the orchestrator's CLI for every verb it has not moved.
 
-The order is `web, cli → api → orchestrator → runtime`: each layer reaches exactly the one below it, and nothing reaches up or skips one. Which layer owns what, the public contract of each and
+The order is `web, cli → api → orchestrator → runtime`, with `objects` at the bottom beside the runtime: each layer reaches exactly the
+one below it, and nothing reaches up or skips one, but that every layer above the runtime imports `objects` by its entry and the runtime
+never does. Which layer owns what, the public contract of each and
 the four rules and the tests that hold them are in `docs/architecture.md`: read it before you place a change. Read `README.md` and each
 package's README for the model before changing behaviour. `wf` becomes `nemia` (the Nemia intent), and both bins live in `apps/cli`; `ae` stays the runtime's CLI. The stores
 `~/.agent-workflows` (`WF_ROOT`) and `~/.agent-engine` (`AE_ROOT`) keep their names on purpose: a new default would orphan every
@@ -28,9 +31,9 @@ holds what every change needs.
   changed (beside it, or under its package's `test/` naming it), and for a doc, a skill or a workflow file the tests that read it (grep
   the tests for its path), each from its package's folder as its `test` script loads it: `node --import ./test/ambient.ts --test <file>`
   in `packages/agent-orchestrator`, `node --import ./test/harness.ts --test <file>` in `apps/api`, `node --test <file>` in
-  `packages/agent-runtime`, `apps/web`, `apps/cli`, `packages/templates` and `tools/guards`. Where a file alone does not say enough (a shared helper, a type many files read, a package's
+  `packages/agent-runtime`, `packages/objects`, `apps/web`, `apps/cli`, `packages/templates` and `tools/guards`. Where a file alone does not say enough (a shared helper, a type many files read, a package's
   test setup), the packages it touched: `npx turbo run test --force --continue --filter=<package>`, the package by its `name`
-  (`agent-orchestrator`, `agent-runtime`, `api`, `web`, `cli`, `guards`, `templates`). Typecheck and lint run whole: they are cheap. Implement's round check runs the
+  (`agent-orchestrator`, `agent-runtime`, `objects`, `api`, `web`, `cli`, `guards`, `templates`). Typecheck and lint run whole: they are cheap. Implement's round check runs the
   declarations, the typecheck and the lint, and pushes the round's commit and waits on GitHub's `ci` context, which runs the whole
   suite on it (`packages/templates/sdlc/workflows/build/implement.md`); the landing's check runs no suite at all — it is the receipt that
   the pull request `ci` judged was merged (`packages/templates/sdlc/workflows/build/landing.ts`) — so the commit `ci` passed on is the

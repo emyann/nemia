@@ -44,8 +44,8 @@ function retryHowOf(args: Args): RetryHow {
 }
 
 /**
- * A round's (`retry --round`, `POST …/round`): a budget not above zero is refused before the round is asked, 400, in the package's words
- * (`roundBudgetRefusal`). What else a round does not take is the command's check.
+ * A round's (`retry --round`, `POST …/retry` with `"round": true`): a budget not above zero is refused before the round is asked, 400,
+ * in the package's words (`roundBudgetRefusal`). What else a round does not take is the command's check.
  */
 const roundFold = (run: Run, args: Args): { args: Args } | Refusal => {
   const notAmount = roundBudgetRefusal(run.id, typeof args.budget === 'number' ? args.budget : undefined);
@@ -53,7 +53,7 @@ const roundFold = (run: Run, args: Args): { args: Args } | Refusal => {
 };
 
 /**
- * Retry's: a round's on its path (`roundFold`); else a `model`, which is a new session's, goes with `"mode": "fresh"` alone, and a
+ * Retry's: a round's (`roundFold`); else a `model`, which is a new session's, goes with `"mode": "fresh"` alone, and a
  * `budget` not above zero is refused in the package's words (`budgetRefusal`), both 400; then the person's `answers`, checked against the
  * questions the step's current closeout asks and written as the try's message (`answeredHow`). Whether the message and the budget may
  * ride on the ask is the command's check.

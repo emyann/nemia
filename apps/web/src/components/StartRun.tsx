@@ -1,7 +1,16 @@
 import { useId, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
-import { repositoryQuery, runsQuery, startRun, type Place, type RunSummary, type Started, type WorkflowListing } from '../lib/api';
+import {
+  repositoryQuery,
+  runsQuery,
+  startCard,
+  startRun,
+  type Place,
+  type RunSummary,
+  type Started,
+  type WorkflowListing,
+} from '../lib/api';
 import { standingOf, titleOf } from '../lib/factory';
 import { afterFor, ignoredRepoNote } from '../lib/inbox';
 import { ContextPicker } from './ContextPicker';
@@ -12,12 +21,12 @@ import { runsMoved } from '@/lib/runWrites';
  * workflow with them: then the new run, linked to its page, or the api's refusal in full — the loader's, the CLI `start`'s
  * (`afterRefusal`'s, for a run it will not wait on, or `contextRefusal`'s, for one it will not read), or its own about the brief.
  *
- * Given a `card`, it starts that inbox card, as the CLI's `start <inbox>/<card>.md --brief <brief>` does: the brief is prefilled with the
- * card's body, to make into the work, and the start is refused in the package's words — a card not there, one started already. `onStarted`
- * is told of a start the api took, the card staying in the inbox as `started`, which the caller shows; the Workflows
- * page gives none, and says where the run is itself. `repo` is where the run starts, when the card names a repository: what the runs to
- * wait on are listed from. A card's start sits under the workflow it picks, with no rule of its own above it. `place` starts it in a
- * factory, on one of its repositories, which `repo` then is too.
+ * Given a `card`, it starts that inbox card through the Card's verb (`startCard`), as the CLI's `start <inbox>/<card>.md --brief <brief>`
+ * does: the brief is prefilled with the card's body, to make into the work, and the start is refused in the package's words — a card not
+ * there, one started already. `onStarted` is told of a start the api took, the card staying in the inbox as `started`, which the caller
+ * shows; the Workflows page gives none, and says where the run is itself. `repo` is where the run starts, when the card names a
+ * repository: what the runs to wait on are listed from. A card's start sits under the workflow it picks, with no rule of its own above
+ * it. `place` starts it in a factory, on one of its repositories, which `repo` then is too.
  *
  * A team whose every step works in a folder runs on no repository, and the CLI's `start` refuses `--after` for one, since there is no
  * branch to wait on: no picker is drawn and nothing about a repository, and the start sends what the workflow takes of the picks
@@ -40,7 +49,7 @@ export function StartRun({
   onRefused,
 }: {
   workflow: WorkflowListing;
-  card?: { name: string; body: string };
+  card?: { name: string; factory: string | null; body: string };
   repo?: string;
   place?: Place;
   onStarted?: (started: Started) => void;
@@ -53,18 +62,16 @@ export function StartRun({
   const inFolders = workflow.folderTeam;
   const ignored = ignoredRepoNote(workflow, repo);
   const start = useMutation({
-    mutationFn: (asked: { brief: string; after: string[]; context: string[] }) =>
-      startRun(
-        {
-          workflow: workflow.name,
-          from: workflow.from,
-          brief: asked.brief,
-          ...(asked.after.length ? { after: asked.after } : {}),
-          ...(asked.context.length ? { context: asked.context } : {}),
-          ...(card ? { card: card.name } : {}),
-        },
-        place,
-      ),
+    mutationFn: (asked: { brief: string; after: string[]; context: string[] }) => {
+      const start = {
+        workflow: workflow.name,
+        from: workflow.from,
+        brief: asked.brief,
+        ...(asked.after.length ? { after: asked.after } : {}),
+        ...(asked.context.length ? { context: asked.context } : {}),
+      };
+      return card ? startCard(card, start, place) : startRun(start, place);
+    },
     onMutate: () => onRefused?.(null),
     onSuccess: (started) => {
       if (!card) {

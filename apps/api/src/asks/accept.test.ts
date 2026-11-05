@@ -1,7 +1,8 @@
 /**
- * POST /api/runs/:id/steps/:step/accept: a person's acceptance of a loop out of rounds, as it stands, from the board — a path of `nemia
- * approve`, kept, which ends a loop out of rounds through the package's `acceptRun`, which writes the acceptance and nothing else, and is
- * refused in the package's words. The api judges none of it: every refusal of a loop here is asserted equal to what `acceptRun` says.
+ * POST /api/runs/:id/steps/:step/approve of a loop out of rounds: a person's acceptance of it, as it stands, from the board — `nemia
+ * approve` of a loop, the one route that takes it, which ends a loop out of rounds through the package's `acceptRun`, which writes the
+ * acceptance and nothing else, and is refused in the package's words. The api judges none of it: every refusal of a loop here is
+ * asserted equal to what `acceptRun` says.
  *
  * One table of what the route refuses, nothing written, then the story of a person accepting a loop out of rounds. A row reads the
  * status and the facts the words name, and that they are `acceptRun`'s own.
@@ -119,7 +120,7 @@ const BOARD = {
 };
 
 const acceptOver = (step: string, body: unknown, headers: Record<string, string> = BOARD, run = R) =>
-  app().request(`/api/runs/${run}/steps/${step}/accept`, {
+  app().request(`/api/runs/${run}/steps/${step}/approve`, {
     method: 'POST',
     headers,
     body: typeof body === 'string' ? body : JSON.stringify(body),
@@ -155,12 +156,12 @@ const refusedWith = async (res: Response, status: number, said: string): Promise
   return ((await res.json()) as { error: string }).error;
 };
 
-test('POST …/accept: what it refuses — a body, a run or step not there, words missing or empty, a loop the package will not end — and nothing written', async (t) => {
+test('POST …/approve of a loop: what it refuses — a body, a run or step not there, words missing or empty, a loop the package will not end — and nothing written', async (t) => {
   await t.test('a body that is not an acceptance is a 400, naming what it takes', async () => {
     const bodies: Array<[unknown, RegExp]> = [
-      ['not json', /^POST …\/accept takes a JSON body/],
-      [[WHY], /^POST …\/accept takes a JSON object/],
-      [null, /^POST …\/accept takes a JSON object/],
+      ['not json', /^POST …\/approve takes a JSON body/],
+      [[WHY], /^POST …\/approve takes a JSON object/],
+      [null, /^POST …\/approve takes a JSON object/],
       [{ message: 42 }, /^`message`[^]*was 42/],
       [{ message: null }, /^`message`[^]*was null/],
     ];
@@ -261,7 +262,7 @@ test('a person accepts a loop out of rounds on the board: the acceptance written
       assert.ok(took);
       const run = await objectOf(app(), R);
       const review = stepOf(run, 'review');
-      assert.deepEqual(review.accepted, { try: 2, at: took.at, message: WHY });
+      assert.deepEqual(review.gate, { awaiting: false, approval: { try: 2, at: took.at, message: WHY } });
       const words = await runWith(engine(), list(engine(), runStore.runs.read(R)));
       const listed = words.steps.find((s) => s.name === 'review')!;
       assert.equal(review.message, listed.message, 'as `nemia ls` has it until the tick files what waits');

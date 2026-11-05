@@ -30,9 +30,9 @@
  *   the tick has filled the app's informer (`Informer`, given by `liveOf`), as the daemon's pass fills it: the pass is not timed, the read
  *   is. Cold over an app built afresh and one pass for each call; warm, called again within the same pass, which serves even a moving
  *   run's judgement.
- * - `inbox`, `inboxAfterPass`: `GET /api/inbox?all=true`, every card, over an app built afresh for each cold call and kept for the warm
- *   ones, and the same asked after a pass has filled the app's informer, as `runListAfterPass` is. The route ignores a query it does not
- *   read, so before `all` is one it lists every card all the same, and a `--compare` sets the same request side by side.
+ * - `inbox`, `inboxAfterPass`: `GET /api/cards`, every card (a `CardList`), over an app built afresh for each cold call and kept for the
+ *   warm ones, and the same asked after a pass has filled the app's informer, as `runListAfterPass` is. A baseline taken before the
+ *   CardList read `GET /api/inbox?all=true`, every card too, so a `--compare` sets the two reads of every card side by side.
  *
  * Beside the numbers: the runs, finished and open, the inbox's cards and those a run was started from, the runtime's tasks and their
  * journals' bytes, the runs whose tasks did not read and the pass's unreadable lines, and `invariantRefusals`, the records the Run model
@@ -322,7 +322,7 @@ const passedOver = (orch: Orchestrator, place: Place, fence: Fence, wf: string, 
 };
 
 /** The inbox, every card: the route ignores `all` where it does not read it, and lists every card then too. */
-const INBOX_URL = '/api/inbox?all=true';
+const INBOX_URL = '/api/cards';
 
 /** The newest run of `listing`, by `createdAt`, finished or not; null where there is none. */
 const newestOf = (listing: readonly RunSummary[], finished: boolean): string | null =>
@@ -344,7 +344,7 @@ async function measure(asked: Asked, root: string, fence: Fence) {
   const listing = (await getJson(first.app, '/api/runs')) as RunSummary[];
   const finishedRun = newestOf(listing, true);
   const openRun = newestOf(listing, false);
-  const cards = (await getJson(first.app, INBOX_URL)) as { startedAs: readonly string[] }[];
+  const cards = ((await getJson(first.app, INBOX_URL)) as { items: { status: { runs: readonly string[] } }[] }).items;
   await first.runtime.dispose();
   const feed = feedOf(wf);
   const passed = passedOver(orch, place, fence, wf, fresh);
@@ -376,7 +376,7 @@ async function measure(asked: Asked, root: string, fence: Fence) {
       tasks: tasks.length,
       journalBytes: tasks.reduce((sum, name) => sum + fs.statSync(path.join(wf, 'engine', 'tasks', name)).size, 0),
       feedLines: feed.lines,
-      cards: { listed: cards.length, started: cards.filter((c) => c.startedAs.length > 0).length },
+      cards: { listed: cards.length, started: cards.filter((c) => c.status.runs.length > 0).length },
       unreadable: { runs: listing.filter((r) => r.unreadable !== null).length, passLines: pass?.unreadable?.length ?? 0 },
       invariantRefusals: await invariantRefusals(wf),
     },

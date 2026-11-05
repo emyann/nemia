@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Locator, Page } from 'playwright';
-import { fed, photograph, themeOf } from '../board.ts';
+import { cardsPath, fed, photograph, themeOf } from '../board.ts';
 import { expectCount, expectVisible, idle, Refused, settled, WAIT_MS, watch } from '../checks.ts';
 import { FACTORIES, GATED, hiringStarts, WORKFLOWS } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -85,7 +85,9 @@ export default {
       const form = item.locator(`form[aria-label="Start ${CARD}"]`);
       await expectVisible(form, `Start opens ${CARD}'s start form, in its factory`);
       const [started] = await Promise.all([
-        other.waitForResponse((r) => r.request().method() === 'POST' && new URL(r.url()).pathname === '/api/runs', { timeout: WAIT_MS }),
+        other.waitForResponse((r) => r.request().method() === 'POST' && cardsPath(CARD, 'start').test(new URL(r.url()).pathname), {
+          timeout: WAIT_MS,
+        }),
         form.getByRole('button', { name: 'Start' }).click(),
       ]);
       if (started.status() !== 201) throw new Refused(`the api starts the card — it answered ${started.status()}: ${await started.text()}`);

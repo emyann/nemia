@@ -46,9 +46,6 @@ const PLACE_AND_NAME: readonly Positional[] = [
   { key: 'name', takes: 'required', kind: 'name' },
 ];
 
-/** `--repo`, which the board hands for the repository whose skills an agent's version counts; the command line counts yours alone. */
-const REPO = apiKey('repo', "the board names the repository it lists an agent's skills from; the command line names none, and reads yours");
-
 /** The words a written agent is said in: each file written and removed, and the version it is at now, which a change of it gives. */
 const writtenLines = ({ dir, agent, version, written, removed }: AgentWritten): string[] => [
   `${agent.name} written in ${dir}, at version ${version}: ${written.join(', ')}`,

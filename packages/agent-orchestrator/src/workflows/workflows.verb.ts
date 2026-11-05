@@ -62,9 +62,6 @@ function fillsIn(args: Args) {
   return (workflow: string) => factoryFills(factory, workflow).fills;
 }
 
-/** `--repo`, which the board hands for the repository a folder's agents and skills are looked for in; the command line looks in yours. */
-const REPO = apiKey('repo', "the board names the repository it lists a folder's agents from; the command line names none, and reads yours");
-
 /**
  * How a write of the workflow `workflow` into the tree of the templated factory `name`, in the store `home`, is judged, as a run of it
  * would read it: its agents and skills looked for in the factory's repository, the one a run of it works on — its tree where it names

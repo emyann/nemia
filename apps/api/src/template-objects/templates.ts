@@ -19,7 +19,7 @@ import { listed, servedNamed, servedOf } from '../definitions/served.ts';
 import { skillObjectsOf, treeSkillsHeld } from '../definitions/skills.ts';
 import { treeWorkflowsHeld, workflowObjectsOf } from '../definitions/workflows.ts';
 import { queryOf } from '../factory-parts/parts.ts';
-import { answered, answeredWrite } from './refused.ts';
+import { answered, answeredWrite } from '../objects/refused.ts';
 
 /**
  * The request's services placed in the template `name`'s render, as a factory made from it is: its workflows and hires the render's

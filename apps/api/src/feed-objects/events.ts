@@ -9,7 +9,7 @@ import { eventList, eventObject } from 'agent-orchestrator';
 import { Api } from 'objects';
 import { factoryNamed, queryOf } from '../factory-parts/parts.ts';
 import { runPlaced } from '../store.ts';
-import { answered } from './refused.ts';
+import { answered } from '../objects/refused.ts';
 
 export const eventsHandlers = HttpApiBuilder.group(Api, 'events', (handlers) =>
   handlers

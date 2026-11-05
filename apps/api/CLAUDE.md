@@ -49,7 +49,7 @@ from the orchestrator; what it holds today below its layer is in `docs/architect
   the guard words of their writes; the Workflows, Agents and Skills in `src/definitions/`: `workflows.ts`, `agents.ts`, `skills.ts`,
   in `served.ts` what they share and in `routes.ts` their paths and guard words, each request placed in its namespace's factory by
   `placeFor`, a write of yours taken in `default` alone; the cluster's builtin templates, the feed's subscriptions and its lines as
-  events in `templates.ts`, `subscriptions.ts` and `events.ts`, a template's documents read from its render by the definitions' own
+  events in `src/template-objects/templates.ts` and `src/feed-objects/` (`subscriptions.ts`, `events.ts`), a template's documents read from its render by the definitions' own
   tree readers, `treeWorkflowsHeld`, `treeAgentsHeld` and `treeSkillsHeld`), built from `objects`' one `Api` into a web
   handler (`serve.ts`) that Hono's routes hand exactly the paths it serves, each inside `served`, guarded first where it writes: a handler
   reads the request's services (`ServedNow`, the app's informer among them), never a layer of its own. A path added to the `Api` gets its

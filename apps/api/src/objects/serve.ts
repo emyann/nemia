@@ -42,9 +42,8 @@ import { agentsHandlers, definitionsRoutes, skillsHandlers, workflowsHandlers } 
 import { placeFor } from '../factories/place.ts';
 import { ServedNow } from './refused.ts';
 import { runsHandlers } from './runs.ts';
-import { eventsHandlers } from './events.ts';
-import { subscriptionsHandlers } from './subscriptions.ts';
-import { templatesHandlers } from './templates.ts';
+import { eventsHandlers, subscriptionsHandlers } from '../feed-objects/index.ts';
+import { templatesHandlers } from '../template-objects/templates.ts';
 
 /** Where every path the objects are served on is listed, with what each takes. */
 const DOCUMENT = 'GET /openapi/v3/nemia/v1';

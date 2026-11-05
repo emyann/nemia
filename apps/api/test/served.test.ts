@@ -19,15 +19,15 @@ const DEFINITION =
 
 /** Why a template's path is the api's own. */
 const TEMPLATE =
-  "served by the objects' handler from `objects`' Api (src/objects/templates.ts): the builtin templates and their documents as objects, which no command reads";
+  "served by the objects' handler from `objects`' Api (src/template-objects/templates.ts): the builtin templates and their documents as objects, which no command reads";
 
 /** Why a subscription's read is the api's own. */
 const SUBSCRIPTION =
-  "served by the objects' handler from `objects`' Api (src/objects/subscriptions.ts): a subscription read as an object, beside the subscribe and unsubscribe commands";
+  "served by the objects' handler from `objects`' Api (src/feed-objects/subscriptions.ts): a subscription read as an object, beside the subscribe and unsubscribe commands";
 
 /** Why an event's path is the api's own. */
 const EVENT =
-  "served by the objects' handler from `objects`' Api (src/objects/events.ts): the feed's lines as Events, a page of the feed `nemia watch` streams";
+  "served by the objects' handler from `objects`' Api (src/feed-objects/events.ts): the feed's lines as Events, a page of the feed `nemia watch` streams";
 
 const OWN: Readonly<Record<string, string>> = {
   'GET /api/templates': TEMPLATE,

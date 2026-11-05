@@ -2,7 +2,7 @@
  * The testing entry (`agent-orchestrator/testing`): the test place, `testPlace` (`place/memory`), which makes a place that answers from
  * memory with no process, and the types of what it answers; and the stand-ins of the Agent and Skill doors, `agentDoorMemory` and
  * `skillDoorMemory`, which hold agents and skills in maps (`MEMORY_AGENTS` the folder of yours there); and the folder of builtin
- * templates (`BuiltinTemplates`), which a test gives a scratch folder of its own, never the shipped templates. A file of its own, since a place's
+ * templates (`BuiltinTemplates`), which a test gives a scratch folder of its own, never the builtin templates Nemia carries. A file of its own, since a place's
  * code imports nothing of `src` but what a place is (`test/boundary.test.ts`). A test names it where it gives its programs a place or a
  * door; no file of the program the package exports imports it (`test/contract.test.ts`).
  */

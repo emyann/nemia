@@ -177,7 +177,9 @@ jobs:
           path: node_modules/.cache/tsverify
           key: tsverify-${{ matrix.leg }}-${{ github.sha }}
           restore-keys: tsverify-${{ matrix.leg }}-
-      # The slowest leg, approval-refusal, took 878.2 s cold on CI: 30 minutes is twice that.
+      # The slowest leg, approval-refusal, took 878.2 s cold on CI: 30 minutes is twice that. A leg of its own proves its contract by
+      # tsverify's one-contract form, which asks too which ends its result reaches: for observe, on the owner's machine, 893 s against
+      # 747 s for its whole file without them, so its leg stays under approval-refusal's.
       - run: npm run contracts -- ${{ matrix.leg }}
         timeout-minutes: 30
 

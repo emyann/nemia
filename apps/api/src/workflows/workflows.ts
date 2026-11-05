@@ -117,7 +117,7 @@ export type WorkflowStepSpec = {
   /** `remote:` as written, `true` or `false`: null where the step has no line. */
   remote: boolean | null;
   deadlineSeconds: number | null;
-  /** `memory:` as written, the session's memory limit as a container's `resources.limits.memory` (`8Gi`): null where the step has no line. */
+  /** `memory:` as written, the session's memory limit, a container's `resources.limits.memory` (`8Gi`): null without the line. */
   memory: string | null;
   /** The most the step's tries may cost together, in dollars (`budget:`). */
   budget: number | null;
@@ -430,6 +430,13 @@ const wiringOf = (step: Workflow) => ({
   slot: step.slot ?? null,
 });
 
+/** What a step's session is bounded by, each null where the step does not say it: its time, its memory and its cost. */
+const boundsOf = (step: Workflow) => ({
+  deadlineSeconds: step.deadlineSeconds ?? null,
+  memory: step.memory ?? null,
+  budget: step.budget ?? null,
+});
+
 export const specOf = (step: Workflow): WorkflowStepSpec => ({
   ...listsOf(step),
   ...wiringOf(step),
@@ -443,9 +450,7 @@ export const specOf = (step: Workflow): WorkflowStepSpec => ({
   tools: step.tools ?? null,
   denials: step.denials ?? null,
   remote: step.remote ?? null,
-  deadlineSeconds: step.deadlineSeconds ?? null,
-  memory: step.memory ?? null,
-  budget: step.budget ?? null,
+  ...boundsOf(step),
   check: step.check ?? null,
   retries: step.retries ?? null,
   gate: step.gate ?? null,

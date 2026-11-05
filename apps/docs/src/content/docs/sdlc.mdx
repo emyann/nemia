@@ -65,10 +65,9 @@ storeRoot is written as Claude Code reads a path in a permission rule: `~/` for 
 other absolute path, `--set storeRoot=//srv/nemia` for a store at `/srv/nemia`. With one slash Claude Code reads the path from the
 settings' folder, so the fence would deny nothing.
 
-To change a parameter later without a new version of sdlc, preview it at the version applied, `nemia factory diff <name> --to
-
-<the version applied> --set <key>=<value>`, then type the upgrade line it prints ([change a template's
-parameter](/factories/#change-a-templates-parameter)).
+To change a parameter later without a new version of sdlc, preview it at the version the factory is applied at with
+`nemia factory diff`, its `--to` that version and a `--set` for each parameter, then type the upgrade line it prints
+([change a template's parameter](/factories/#change-a-templates-parameter)).
 
 ## Apply it
 

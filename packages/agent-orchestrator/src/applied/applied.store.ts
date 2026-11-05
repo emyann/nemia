@@ -12,8 +12,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import { Result, Schema } from 'effect';
 import { FACTORY_CONDITION_REASONS, FACTORY_CONDITION_STATUSES, FACTORY_CONDITION_TYPES, REVISIONS_POLICIES } from '../factory/factory.ts';
 import { firstRefusal, HOME } from '../record/record.store.ts';
-import { choicesApply } from '../upgrade/same-version.ts';
-import type { MergeAt } from '../../contracts/same-version.contract.ts';
+import { choicesApply, type MergeAt } from '../upgrade/index.ts';
 
 /** The folder the store `home` keeps a factory's own files in, beside its `<name>.json`. */
 const folderAt = (home: string, name: string): string => path.join(home, 'factories', name);

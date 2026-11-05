@@ -79,6 +79,7 @@ export const KINDS: Readonly<Record<StepKey, KeyKind>> = {
   denials: 'choice',
   remote: 'flag',
   deadlineSeconds: 'count',
+  memory: 'text',
   budget: 'dollars',
   check: 'text',
   retries: 'count',

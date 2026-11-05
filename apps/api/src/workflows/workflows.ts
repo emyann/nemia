@@ -116,6 +116,8 @@ export type WorkflowStepSpec = {
   /** `remote:` as written, `true` or `false`: null where the step has no line. */
   remote: boolean | null;
   deadlineSeconds: number | null;
+  /** `memory:` as written, the session's memory limit as a container's `resources.limits.memory` (`8Gi`): null where the step has no line. */
+  memory: string | null;
   /** The most the step's tries may cost together, in dollars (`budget:`). */
   budget: number | null;
   check: string | null;
@@ -448,6 +450,7 @@ export const specOf = (step: Workflow): WorkflowStepSpec => ({
   denials: step.denials ?? null,
   remote: step.remote ?? null,
   deadlineSeconds: step.deadlineSeconds ?? null,
+  memory: step.memory ?? null,
   budget: step.budget ?? null,
   check: step.check ?? null,
   retries: step.retries ?? null,

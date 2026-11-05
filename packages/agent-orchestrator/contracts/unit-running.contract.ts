@@ -9,13 +9,7 @@
  * the unit runs a process, and the command that starts it where it runs none.
  */
 import { type Implementation, spec } from '@emyann/tsverify';
-import type { UnitState } from '../src/service/service.ts';
-
-/**
- * What the unit runs: the daemon the take-over stopped (`old`), another process (`other`), no process (`none`), or the system could not
- * say (`unknown`). Implement moves it into `src/service/service.ts`, beside `UnitState`.
- */
-export type UnitRunning = 'old' | 'other' | 'none' | 'unknown';
+import type { UnitRunning, UnitState } from '../src/service/service.ts';
 
 /**
  * `state` is the system's word on the unit (`systemdState`, `launchdState`), or null where the system's program could not be asked

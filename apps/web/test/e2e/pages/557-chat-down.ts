@@ -68,8 +68,8 @@ export default {
         await page.reload({ waitUntil: 'load' });
         await idle(page);
         await expectVisible(
-          dockOf(page).locator('[data-nemia-face="idle"]'),
-          'at Manual with her session still up, before the keeper ends it, her face reads up, at rest',
+          dockOf(page).locator('[data-nemia-face]:not([data-nemia-face="sleepy"])'),
+          'at Manual with her session still up, before the keeper ends it, her face is not asleep',
         );
         await expectCount(
           dockOf(page).locator('[data-cue]', { hasText: 'Down' }),

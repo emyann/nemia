@@ -26,9 +26,11 @@ async function expectDown(page: Parameters<PageSpec['expect']>[0], words: string
 
 export default {
   /**
-   * Nemia down, twice over: her task filed with no session of hers on the daemon, and her level at Manual, which keeps her none and
-   * ends the session she has. Either way a Down cue stands beside her face, her panel says why she stopped and where it is started,
-   * and what the person writes is taken by the api and waits in her outbox. Her level and her task are the page's, taken back after.
+   * Nemia down, twice over: her task filed with no session of hers on the daemon, and her level at Manual with her session ended.
+   * At Manual with her session still up, before the keeper ends it, she reads up: her face reads her session alone, since a factory
+   * raised above Manual keeps it up at the store's Manual. Down, a Down cue stands beside her face, her panel says why she stopped
+   * and where it is started, and what the person writes is taken by the api and waits in her outbox. Her level and her task are the
+   * page's, taken back after.
    */
   name: 'chat-down',
   route: '/',
@@ -61,11 +63,28 @@ export default {
       await photograph(page, path.join(OUT, `chat-down-waiting-${await themeOf(page)}.png`), { fullPage: true });
       back();
 
-      const manual = herChat({ level: 'manual', session: 'up' });
+      const stopping = herChat({ level: 'manual', session: 'up' });
       try {
         await page.reload({ waitUntil: 'load' });
         await idle(page);
-        await expectDown(page, 'Stopping: the keeper ends her session at its next beat.');
+        await expectVisible(
+          dockOf(page).locator('[data-nemia-face]:not([data-nemia-face="sleepy"])'),
+          'at Manual with her session still up, before the keeper ends it, her face is not asleep',
+        );
+        await expectCount(
+          dockOf(page).locator('[data-cue]', { hasText: 'Down' }),
+          0,
+          'and no Down cue stands: her face reads her session, never the level',
+        );
+      } finally {
+        stopping();
+      }
+
+      const manual = herChat({ level: 'manual', session: 'none' });
+      try {
+        await page.reload({ waitUntil: 'load' });
+        await idle(page);
+        await expectDown(page, 'Off: no session of hers runs.');
         await settled(page);
         await photograph(page, path.join(OUT, `chat-down-manual-${await themeOf(page)}.png`), { fullPage: true });
       } finally {

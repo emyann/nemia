@@ -8,9 +8,9 @@
  * runtime through the client: `runner.ts`, the package's root, the verbs it re-exports, one feature each, and the CLI above them, which
  * parses, calls and prints, and so reaches the package through `runner.ts` and the format through `workflow.ts` alone — as each bin
  * reaches it through the CLI. The client and the controllers import one another with no cycle. `MODEL` files are a layer's declaration
- * of its entities as Effect Schemas, beside each context's glossary (`modelBreaks`): they import Effect, other model files and pure
- * files alone, and no pure file imports one, so the pure entries load none. A file in `src/` or `bin/` that no kind names fails the
- * suite: a new file is sorted when it is written.
+ * of its entities as Effect Schemas, beside each context's glossary (`modelBreaks`): they import Effect, the objects' entry (`OBJECTS`),
+ * other model files and pure files alone, and no pure file imports one, so the pure entries load none. A file in `src/` or `bin/` that
+ * no kind names fails the suite: a new file is sorted when it is written.
  *
  * **A file in a feature folder takes its kind from its name** (`kindOf`): `<name>.store.ts` is a store, `<name>.verb.ts` a controller,
  * `<name>.model.ts` a model, any other `<name>.ts` pure, and every file under `src/cli/` is the CLI. A file at the root of `src` or in
@@ -368,16 +368,22 @@ function impurities(sources: Sources): string[] {
 }
 
 /**
- * A model file imports Effect (any of its modules), other model files and pure files, and nothing else — no store, controller or
- * client file, no runtime, no node module, no global of the process — so a model is a declaration a door adopts, never a door
- * itself; and `src/model/` holds model files alone.
+ * The objects' one entry (`packages/objects`), the Schemas every layer above the runtime shares: a model file re-exports what it
+ * declares of them from here, by this exact name, never a path into the package.
+ */
+const OBJECTS = 'objects';
+
+/**
+ * A model file imports Effect (any of its modules), the objects' entry (`OBJECTS`), other model files and pure files, and nothing
+ * else — no store, controller or client file, no runtime, no node module, no global of the process — so a model is a declaration a
+ * door adopts, never a door itself; and `src/model/` holds model files alone.
  */
 function modelBreaks(sources: Sources): string[] {
   const of = kinds(sources);
   const out = of.MODEL.flatMap((file) =>
     (sources[file] ?? [])
-      .filter((m) => !isEffect(m) && !of.MODEL.includes(m) && !of.PURE.includes(m))
-      .map((m) => `${file} is a model file and imports ${m}: a model imports effect, other model files and pure files alone`),
+      .filter((m) => !isEffect(m) && m !== OBJECTS && !of.MODEL.includes(m) && !of.PURE.includes(m))
+      .map((m) => `${file} is a model file and imports ${m}: a model imports effect, ${OBJECTS}, other model files and pure files alone`),
   );
   for (const file of Object.keys(sources).sort())
     if (file.startsWith(MODEL_FOLDER) && kindsOf(file)[0] !== 'MODEL')
@@ -691,7 +697,7 @@ test("REFUSED: a file of src that imports a door's memory stand-in", () => {
   assert.ok(broken[0].startsWith('src/tick/tick.verb.ts imports src/runs/memory.store.ts'), broken[0]);
 });
 
-test('model files import effect, other model files and pure files alone, no pure file imports one, and src/model/ holds model files alone', () => {
+test('model files import effect, objects, other model files and pure files alone, no pure file imports one, and src/model/ holds model files alone', () => {
   const sources = packageSources();
   assert.ok(
     ['src/model/er.model.ts', 'src/record/record.model.ts'].every((f) => f in sources),
@@ -712,19 +718,19 @@ test('model files import effect, other model files and pure files alone, no pure
   );
 });
 
-test('REFUSED: a pure file that imports a model file, and a model file that imports a store file, the disk or the runtime, or sits in src/model/ under another name', () => {
+test('REFUSED: a pure file that imports a model file, and a model file that imports a store file, the disk, the runtime or a path into objects, or sits in src/model/ under another name', () => {
   assert.deepEqual(impurities(adding('src/record/record.ts', 'src/record/record.model.ts')), [
     'src/record/record.ts is pure and imports src/record/record.model.ts',
   ]);
   assert.deepEqual(impurities(adding('src/run.ts', 'src/model/er.model.ts')), ['src/run.ts is pure and imports src/model/er.model.ts']);
-  for (const m of ['src/record/record.store.ts', 'node:fs', 'agent-runtime'])
+  for (const m of ['src/record/record.store.ts', 'node:fs', 'agent-runtime', 'objects/src/run.ts'])
     assert.deepEqual(modelBreaks(adding('src/record/record.model.ts', m)), [
-      `src/record/record.model.ts is a model file and imports ${m}: a model imports effect, other model files and pure files alone`,
+      `src/record/record.model.ts is a model file and imports ${m}: a model imports effect, objects, other model files and pure files alone`,
     ]);
   assert.deepEqual(modelBreaks({ ...packageSources(), 'src/model/words.ts': [] }), [
     'src/model/words.ts is in src/model/, which holds model files alone: name it <name>.model.ts, or put it beside the feature it serves',
   ]);
-  for (const m of ['effect', 'effect/Schema', 'src/model/brand.model.ts', 'src/record/record.ts', 'src/forget/forget.ts'])
+  for (const m of ['effect', 'effect/Schema', 'objects', 'src/model/brand.model.ts', 'src/record/record.ts', 'src/forget/forget.ts'])
     assert.deepEqual(modelBreaks(adding('src/record/record.model.ts', m)), [], `${m} is let through`);
 });
 

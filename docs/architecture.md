@@ -277,7 +277,8 @@ words the board's answer. Both sides hand a handler only what its one spec gives
 
 **In the orchestrator, moved down from the api**: the judgement of a run's steps (`packages/agent-orchestrator/src/resource/`: a
 step's tries, closeouts, checks, told layers, files and usage, and `runsInOf` reading a harness's argv for a mode), and the run as one
-object (`RunObject.Run`, an Effect Schema in `src/object/run.model.ts`, built by `runObject` in `src/object/run.verb.ts` off one read of
+object (`RunObject.Run`, an Effect Schema of `objects`, `packages/objects/src/run.ts`, re-exported by `src/object/run.model.ts`, built by
+`runObject` in `src/object/run.verb.ts` off one read of
 the run, from the list's judged fields, `judgedFields`, and the one raise, `stepRaise`). The object carries all the board shows but
 each step's tries whole and what it was told, which are its sub-resources, each answered by a Schema of its own (`StepTries`,
 `StepTry`, `TryCloseout`, `StepTold`), and the lines a person types, which are the command table's (`runLines`, `src/object/lines.verb.ts`).

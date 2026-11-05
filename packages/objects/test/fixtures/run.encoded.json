@@ -1,0 +1,304 @@
+{
+  "apiVersion": "nemia/v1",
+  "kind": "Run",
+  "metadata": {
+    "name": "r-1",
+    "creationTimestamp": "2026-10-14T09:00:00.000Z",
+    "labels": {
+      "workflow": "build",
+      "team": "core"
+    }
+  },
+  "spec": {
+    "steps": [
+      {
+        "name": "build",
+        "after": [],
+        "input": [],
+        "loop": null,
+        "rounds": null,
+        "harness": "claude",
+        "model": null,
+        "effort": null,
+        "context": null,
+        "workspace": null,
+        "place": null,
+        "resume": null,
+        "fence": null,
+        "sandbox": null,
+        "tools": null,
+        "deadlineSeconds": null
+      },
+      {
+        "name": "review",
+        "after": [
+          "build"
+        ],
+        "input": [
+          "build"
+        ],
+        "loop": "build",
+        "rounds": 3,
+        "harness": null,
+        "model": null,
+        "effort": null,
+        "context": null,
+        "workspace": null,
+        "place": null,
+        "resume": null,
+        "fence": null,
+        "sandbox": null,
+        "tools": [
+          "Read"
+        ],
+        "deadlineSeconds": null
+      }
+    ],
+    "brief": "build it",
+    "place": "git",
+    "repo": "/work/repo",
+    "baseRef": "abc123",
+    "branch": "main",
+    "isolate": true,
+    "work": null,
+    "workflowDir": "/work/team/build",
+    "try": null,
+    "after": [],
+    "context": [],
+    "from": {
+      "inbox": "c-1"
+    }
+  },
+  "status": {
+    "status": "waiting",
+    "phase": "waiting",
+    "reason": "OverBudget",
+    "on": null,
+    "via": null,
+    "moving": false,
+    "cost": {
+      "usd": 4.25,
+      "measured": 2,
+      "unmeasured": 0,
+      "said": "$4.25"
+    },
+    "atWork": {
+      "ms": 300000,
+      "since": null,
+      "endedAt": "2026-10-14T09:05:00.000Z"
+    },
+    "tokens": {
+      "total": 1200,
+      "input": 1000,
+      "output": 200,
+      "cacheRead": null,
+      "cacheWrite": null,
+      "uncached": null,
+      "measured": 1,
+      "unmeasured": 0,
+      "said": "1.2k",
+      "split": "1k in, 200 out"
+    },
+    "waiting": null,
+    "holding": null,
+    "toDecide": null,
+    "graph": {
+      "roots": [
+        "build"
+      ],
+      "edges": [
+        {
+          "from": "build",
+          "to": "review",
+          "kind": "after"
+        },
+        {
+          "from": "build",
+          "to": "review",
+          "kind": "input"
+        },
+        {
+          "from": "review",
+          "to": "build",
+          "kind": "loop",
+          "rounds": 3
+        }
+      ]
+    },
+    "timeline": {
+      "rounds": [],
+      "run": {
+        "loop": null,
+        "round": null,
+        "tasks": 1,
+        "inFlight": 0,
+        "queuedMs": 1000,
+        "ranMs": 299000,
+        "wallMs": 300000,
+        "queued": "1s",
+        "ran": "4m59s",
+        "wall": "5m",
+        "cost": {
+          "usd": 4.25,
+          "measured": 2,
+          "unmeasured": 0,
+          "said": "$4.25"
+        }
+      },
+      "slot": null
+    },
+    "steps": [
+      {
+        "name": "build",
+        "phase": "waiting",
+        "reason": "OverBudget",
+        "status": "over budget",
+        "on": null,
+        "via": null,
+        "message": "over budget $4.25 of $3",
+        "verdict": null,
+        "raise": {
+          "by": "retry",
+          "above": 4.25,
+          "said": "$4.25",
+          "modes": [
+            "continue",
+            "fresh"
+          ],
+          "own": "verified"
+        },
+        "timeline": [
+          {
+            "try": 1,
+            "round": 1,
+            "session": {
+              "taskId": "r-1-build",
+              "at": "ended",
+              "filedAt": "2026-10-14T09:00:00.000Z",
+              "spawnedAt": "2026-10-14T09:00:01.000Z",
+              "endedAt": "2026-10-14T09:05:00.000Z",
+              "attempts": 1,
+              "queuedMs": 1000,
+              "ranMs": 299000,
+              "queued": "1s",
+              "ran": "4m59s"
+            },
+            "sessionOf": null,
+            "check": null,
+            "used": {
+              "usage": {
+                "inputTokens": 1000,
+                "outputTokens": 200
+              },
+              "used": "1.2k tokens",
+              "cost": "$4.25",
+              "costUsd": 4.25,
+              "apiMs": null,
+              "toolMs": null,
+              "read": null,
+              "peak": null,
+              "rebuilt": 0
+            }
+          }
+        ],
+        "current": {
+          "try": 2,
+          "round": 1,
+          "phase": "waiting",
+          "reason": "OverBudget",
+          "outcome": "done",
+          "verdict": {
+            "result": "passed",
+            "exit": 0
+          }
+        },
+        "filed": null,
+        "taskId": null,
+        "workspace": null,
+        "branch": null,
+        "files": [],
+        "filesError": null,
+        "note": null,
+        "roundDue": false,
+        "needs": null,
+        "waitingFor": null,
+        "approve": null,
+        "denied": null,
+        "sessionUnread": null,
+        "lastLine": null,
+        "gate": null,
+        "accepted": null,
+        "said": [],
+        "asked": null,
+        "check": null,
+        "attempts": {
+          "count": 0,
+          "latest": null
+        },
+        "used": null,
+        "spent": null,
+        "budget": null
+      },
+      {
+        "name": "review",
+        "phase": "pending",
+        "reason": "Pending",
+        "status": "pending",
+        "on": null,
+        "via": null,
+        "message": "pending",
+        "verdict": null,
+        "raise": null,
+        "timeline": [],
+        "current": null,
+        "filed": null,
+        "taskId": null,
+        "workspace": null,
+        "branch": null,
+        "files": [],
+        "filesError": null,
+        "note": null,
+        "roundDue": false,
+        "needs": null,
+        "waitingFor": null,
+        "approve": null,
+        "denied": null,
+        "sessionUnread": null,
+        "lastLine": null,
+        "gate": null,
+        "accepted": null,
+        "said": [],
+        "asked": null,
+        "check": null,
+        "attempts": {
+          "count": 0,
+          "latest": null
+        },
+        "used": null,
+        "spent": null,
+        "budget": null
+      }
+    ],
+    "startedAt": "2026-10-14T09:00:00.000Z",
+    "cancelledAt": null,
+    "pruned": null,
+    "onDisk": {
+      "worktrees": true,
+      "files": true
+    },
+    "holdUntil": [],
+    "read": null,
+    "waitingOnYou": [],
+    "waitingOnYouWords": [],
+    "gates": [],
+    "warning": null,
+    "kinds": [
+      {
+        "kind": "agent",
+        "name": "builder",
+        "pinned": 2,
+        "now": 3
+      }
+    ]
+  }
+}

@@ -11,7 +11,10 @@ import { createHash } from 'node:crypto';
 /** The kinds a run resolves and a revision is kept for: its workflow folder, each step's agent, each skill, and the factory's rules. */
 export type RevisionKind = 'workflow' | 'agent' | 'skill' | 'rules';
 
-/** The kinds, in the order a run's pins and the board's drift are read in. */
+/**
+ * The kinds, in the order a run's pins and the board's drift are read in: `objects`' words (`packages/objects/src/words.ts`), held
+ * equal by `wordsHeld` (`object/run.model.ts`).
+ */
 export const REVISION_KINDS: readonly RevisionKind[] = ['workflow', 'agent', 'skill', 'rules'];
 
 /** One thing a revision is kept for: its kind, and its name within the kind — a workflow folder's, an agent's, a skill's, a factory's. */

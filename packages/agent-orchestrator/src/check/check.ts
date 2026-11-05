@@ -179,7 +179,10 @@ export function lastLines(text: string, n = CHECK_TAIL_LINES): string {
 /** How a verdict reads on a screen: `exit 1`, or `unfinished`. */
 export const verdictWord = (v: Verdict): string => (v === 'unfinished' ? 'unfinished' : `exit ${v}`);
 
-/** What a check's verdict can be at a door: `passed`, `failed`, `unfinished` (no verdict on the work), `running`, or `unknown`. */
+/**
+ * What a check's verdict can be at a door: `passed`, `failed`, `unfinished` (no verdict on the work), `running`, or `unknown`. `objects`'
+ * list word for word (`packages/objects/src/words.ts`), held equal by `wordsHeld` (`object/run.model.ts`).
+ */
 export const CHECK_RESULTS = ['passed', 'failed', 'unfinished', 'running', 'unknown'] as const;
 
 /** One of `CHECK_RESULTS`. */

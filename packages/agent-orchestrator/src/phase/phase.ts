@@ -7,6 +7,10 @@
  * until it has its code. Pure data, with type imports alone: `list.ts` reads these, and the feed (`reason.ts`) reads `list.ts`, so a value
  * import of the feed from here would close a cycle. A folder of its own for that reason: `list.ts` reads it here, never through the
  * feed's face; the feed re-exports it.
+ *
+ * Each of `STEP_PHASES`, `RUN_PHASES`, `WAIT_ON`, `ANSWER_VIA`, `STEP_REASONS` and `RUN_REASONS` is `objects`' list word for word
+ * (`packages/objects/src/words.ts`), held equal by `wordsHeld` (`object/run.model.ts`): a pure entry loads no Effect but `effect/Data`,
+ * so it keeps its own copy rather than `objects`' door.
  */
 import type { Reason } from '../feed/index.ts';
 import type { StepStatus } from '../record/record.ts';

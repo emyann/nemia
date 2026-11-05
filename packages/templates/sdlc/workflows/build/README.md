@@ -83,7 +83,8 @@ progress, every commit of every branch of the run with an equivalent patch on HE
 own counts as taken) — which is what the run needs to record `landed` on the commit that landed. It runs no suite: CI judged the head
 the review read, and the merge commit's first parent is the base. Last, where the factory's `landingWaitsOnCi` is true (the default),
 the receipt waits on the CI context at the merge commit on the base branch (`receipt --run <id> --check <name> --wait-on-ci <true|false>`;
-up to 1800 s for it to be reported there and 2400 s in all, inside the landing check's own deadline). Green passes. Red fails the step
+up to 1800 s for it to be reported there, or 2400 s while another check there still runs, and 2400 s in all, inside the landing
+check's own deadline). Green passes. Red fails the step
 though the merge stands — nothing is taken back — naming the jobs that did not pass: a person re-runs them where CI failed on its own
 account, or lands a fix, then types `nemia retry <run> land`; where the base's tip holds the merge and the context is green there, the
 receipt passes and says so. Still running at the bound fails with the same retry line. Never reported fails too, naming

@@ -21,7 +21,8 @@
  *   `true` (the factory's `landingWaitsOnCi`), it waits on the CI context `--check` names at the merge commit on the base branch, read
  *   over REST (its check runs and its status contexts; the combined `state` is never a verdict): 1800 s for it to be reported
  *   (`WF_CI_START_SECONDS`), 2400 s whole (`WF_CI_WAIT_SECONDS`), `WF_CI_POLL_SECONDS` the interval, inside the landing check's own
- *   deadline. Green passes. Red refuses, naming the jobs that did not pass — unless the base's tip holds the merge and the context is
+ *   deadline, the whole of it while another check at the merge still runs (a context that sums up other jobs comes once they end).
+ *   Green passes. Red refuses, naming the jobs that did not pass — unless the base's tip holds the merge and the context is
  *   green there, which passes and says so. Still running at the bound, or never reported (CI may not run on pushes to the base: the
  *   factory then sets `landingWaitsOnCi` false), refuses. A refusal there takes nothing back: the merge stands, and the retry reads
  *   GitHub again.
@@ -619,20 +620,37 @@ function ciAt(pr: Pr, oid: string, onto: string, check: string, id: string): str
         return `\`${check}\` was red on \`${onto}\` at the merge ${at}, and is green at ${tip.slice(0, 12)}, the base's tip, which holds it`;
       throw new Refusal(reddened(pr, oid, onto, check, entries, stands, id));
     }
-    const bound = seen === 'absent' ? start : whole;
+    // A context that sums up other jobs is reported only once they end: while any check at the merge runs, it has the whole bound.
+    const running = entries.filter(pending);
+    const bound = seen === 'pending' || running.length ? whole : start;
     if (Date.now() - began >= bound * 1000) {
       const said =
         seen === 'pending'
           ? `\`${check}\` on \`${onto}\` at ${at}, the merge of #${pr.number}, was still ` +
             `${ours.map((entry) => (entry.status ?? entry.state ?? '').toLowerCase()).join(', ')} after ${bound} s: read ` +
             `${linkOf(ours[0]) || commitUrl(pr, oid)}, and retry the step once it is over.`
-          : `no \`${check}\` was reported on \`${onto}\` at ${at}, the merge of #${pr.number}, within ${bound} s (${commitUrl(pr, oid)}). ` +
-            `Either CI does not run on pushes to \`${onto}\`, and the factory sets \`landingWaitsOnCi\` false ` +
-            '(`--set landingWaitsOnCi=false`), or it has not started yet, and the step is retried.';
+          : unreported(pr, oid, onto, check, entries, bound);
       throw new Refusal([said, stands, retryLine(id)].join('\n'));
     }
     sleep(poll);
   }
+}
+
+/**
+ * The refusal of a `check` never reported at `oid` within `secs`: the other checks there still running or not passed, with their URLs,
+ * and that CI may not run `check` on pushes to the base, which the factory's `landingWaitsOnCi` answers, or has not yet.
+ */
+function unreported(pr: Pr, oid: string, onto: string, check: string, entries: readonly Entry[], secs: number): string {
+  const told = entries.filter((entry) => pending(entry) || !NOT_FAILED.has(verdict(entry)));
+  const jobs = told
+    .slice(0, JOBS)
+    .map((entry) => `    ${nameOf(entry)}: ${(verdict(entry) || entry.status || '').toLowerCase()} ${linkOf(entry)}`.trimEnd());
+  return [
+    `no \`${check}\` was reported on \`${onto}\` at ${oid.slice(0, 12)}, the merge of #${pr.number}, within ${secs} s (${commitUrl(pr, oid)}).`,
+    ...(told.length ? ['  The other checks there still running or not passed:', ...jobs] : []),
+    `  Either CI does not run \`${check}\` on pushes to \`${onto}\`, and the factory sets \`landingWaitsOnCi\` false ` +
+      '(`--set landingWaitsOnCi=false`), or it has not reported yet, and the step is retried.',
+  ].join('\n');
 }
 
 /**

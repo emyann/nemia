@@ -25,23 +25,34 @@ const says = (changes: readonly WatchChange[], type: WatchChangeType, key: strin
 const watchChangesSpec = spec<(sent: readonly Versioned[], now: readonly Versioned[]) => WatchChange[]>({
   requires: ({ input: [sent, now] }) => distinct(sent) && distinct(now),
   ensures: {
-    addedExactlyTheNew: {
-      description: 'An object is ADDED exactly when the list holds it now and the watcher was never sent it',
-      condition: ({ input: [sent, now], output }) =>
-        now.every((n) => says(output, 'ADDED', n.key) === !holds(sent, n.key)) &&
-        output.every((c) => c.type !== 'ADDED' || (holds(now, c.key) && !holds(sent, c.key))),
+    addedTheNew: {
+      description: 'An object the list holds now that the watcher was never sent is ADDED',
+      condition: ({ input: [sent, now], output }) => now.every((n) => holds(sent, n.key) || says(output, 'ADDED', n.key)),
     },
-    modifiedExactlyTheChanged: {
-      description: 'An object is MODIFIED exactly when the list holds it now at another version than the one the watcher was sent',
-      condition: ({ input: [sent, now], output }) =>
-        now.every((n) => says(output, 'MODIFIED', n.key) === (holds(sent, n.key) && versionIn(sent, n.key) !== n.version)) &&
-        output.every((c) => c.type !== 'MODIFIED' || holds(now, c.key)),
+    addedOnlyTheNew: {
+      description: 'An object ADDED is one the list holds now and the watcher was never sent',
+      condition: ({ input: [sent, now], output }) => output.every((c) => c.type !== 'ADDED' || (holds(now, c.key) && !holds(sent, c.key))),
     },
-    deletedExactlyTheGone: {
-      description: 'An object is DELETED exactly when the watcher was sent it and the list no longer holds it',
+    modifiedTheChanged: {
+      description: 'An object the list holds now that the watcher was sent at another version is MODIFIED',
       condition: ({ input: [sent, now], output }) =>
-        sent.every((s) => says(output, 'DELETED', s.key) === !holds(now, s.key)) &&
-        output.every((c) => c.type !== 'DELETED' || holds(sent, c.key)),
+        now.every((n) => !holds(sent, n.key) || versionIn(sent, n.key) === n.version || says(output, 'MODIFIED', n.key)),
+    },
+    modifiedOnlyTheChanged: {
+      description: 'An object MODIFIED is one the list holds now at another version than the one the watcher was sent',
+      condition: ({ input: [sent, now], output }) =>
+        output.every(
+          (c) => c.type !== 'MODIFIED' || (holds(now, c.key) && holds(sent, c.key) && versionIn(sent, c.key) !== versionIn(now, c.key)),
+        ),
+    },
+    deletedTheGone: {
+      description: 'An object the watcher was sent that the list no longer holds is DELETED',
+      condition: ({ input: [sent, now], output }) => sent.every((s) => holds(now, s.key) || says(output, 'DELETED', s.key)),
+    },
+    deletedOnlyTheGone: {
+      description: 'An object DELETED is one the watcher was sent and the list no longer holds',
+      condition: ({ input: [sent, now], output }) =>
+        output.every((c) => c.type !== 'DELETED' || (holds(sent, c.key) && !holds(now, c.key))),
     },
     eachObjectOnce: {
       description: 'A watch says at most one thing of an object between two reads',

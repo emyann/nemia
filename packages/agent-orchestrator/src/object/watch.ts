@@ -17,16 +17,18 @@ export type WatchChange = { readonly type: WatchChangeType; readonly key: string
 export type { WatchChanges };
 
 /**
- * What changed between the objects sent a watcher (`sent`) and those the list holds now (`now`): each object of `now`, in its order,
- * ADDED where it was never sent and MODIFIED where it was sent at another version; then each of `sent` the list no longer holds,
- * DELETED. With nothing sent, every object is ADDED: a watch's first read. One candidate per object, none where it stands, so each key
- * is said at most once.
+ * What changed between the objects sent a watcher (`sent`) and those the list holds now (`now`): each object of `now` it was never sent,
+ * ADDED; each it was sent at another version, MODIFIED; then each of `sent` the list no longer holds, DELETED. With nothing sent, every
+ * object is ADDED: a watch's first read. The three are apart, so each key is said at most once.
  */
 export const watchChanges: WatchChanges = (sent, now) =>
   [
-    ...now.map((n): WatchChange | null => {
-      const was = sent.find((s) => s.key === n.key);
-      return was === undefined ? { type: 'ADDED', key: n.key } : was.version === n.version ? null : { type: 'MODIFIED', key: n.key };
-    }),
+    ...now.map((n): WatchChange | null =>
+      !sent.some((s) => s.key === n.key)
+        ? { type: 'ADDED', key: n.key }
+        : sent.find((s) => s.key === n.key)?.version === n.version
+          ? null
+          : { type: 'MODIFIED', key: n.key },
+    ),
     ...sent.map((s): WatchChange | null => (now.some((n) => n.key === s.key) ? null : { type: 'DELETED', key: s.key })),
   ].filter((c) => c !== null);

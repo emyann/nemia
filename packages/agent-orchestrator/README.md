@@ -105,7 +105,13 @@ with its lift. A put says who paused and why, as the pause's file does, in field
 stands the same way. The verbs write
 no line: the tick's pass, which reads the store's pause (`$WF_ROOT/cordon`) already, offers the put while the pause stands and the lift
 for each put the feed holds that no longer stands (`storeOnce`), each counted off the feed's own lines, so a second daemon or a restart
-says neither again; a pause put and lifted between two passes leaves no line, since a pass reads what stands. `nemia watch -l
+says neither again; a pause put and lifted between two passes leaves no line, since a pass reads what stands. A factory's level is a
+line of the store too: `level changed`, `reason: "LevelChanged"`, `source: "person"`, labelled with its factory (`labels.factory`), its
+note the level in force in words (`tsverify is at auto until <its end>, then semi-auto`, `tsverify is at semi-auto`). It is a word that
+stands per factory, not a one-shot: the same pass reads each factory's level in force (`levelsNow`) and writes a line where it is not
+what the feed said of that factory last, so a set from the board or the CLI, a raise, its `--end` and its end passing, which nothing
+writes, are each one line, and a factory at `manual` the feed has said nothing of gets none; it is one of Nemia's selectors
+(`reason=LevelChanged`), and every subscription is handed it, scoped or not, so a factory set down to `manual` is heard. `nemia watch -l
 kind=Store` follows them, and the api sends them as a `store` event. **Nothing reads it to decide**: every pass still
 judges from the world, and a feed deleted by hand costs its history, never a decision.
 

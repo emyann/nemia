@@ -1,7 +1,7 @@
 /**
  * The workflow layer's feed: one line for each change in what the tick judged of a run or of a step, one from each daemon once it has
- * taken the store (`startedLine`), and one for each pause of the store put and lifted (`storeOnce`), appended to `$WF_ROOT/feed.jsonl`,
- * and read by `nemia watch`.
+ * taken the store (`startedLine`), one for each pause of the store put and lifted (`storeOnce`), and one for each change of a factory's
+ * level in force (`levelLines`), appended to `$WF_ROOT/feed.jsonl`, and read by `nemia watch`.
  *
  * The engine keeps a feed of what happened to its tasks (`engine/feed.jsonl`: filed, started, ended, settled). What the workflow layer
  * decides on top of it — a step at its gate, one that signed off blocked, a loop out of rounds, a run waiting on another, a person's
@@ -52,6 +52,7 @@ import {
   type LineType,
 } from './reason.ts';
 import { currentOf } from '../former-reason/former-reason.ts';
+import type { FactoryLevel } from '../level/level.ts';
 
 export { DAEMON_STARTED, REMOVED, LINE_WORDS };
 export type { InvolvedKind, Reason, LineSource, LineType };
@@ -116,10 +117,11 @@ export type DaemonLine = { at: string; daemon: number; word: typeof DAEMON_START
 export const STORE = 'store';
 
 /**
- * The store's line of the feed: when, which store (`STORE`), the word — its pause put or lifted (`storeOnce`) — and the note beside it, the
- * moment the pause was put. A put carries who put the pause (`by`) and the person's words for why (`why`), each where the pause's file
- * says it, never in the note, which pairs the put with its lift. Of no run, so it carries no run's labels, and a subscription scoped to a
- * factory is handed it as it is handed a daemon's.
+ * The store's line of the feed: when, which store (`STORE`), the word — its pause put or lifted (`storeOnce`), or a factory's level in
+ * force (`levelLines`) — and the note beside it: the moment the pause was put, or the factory's level in words. A put carries who put the
+ * pause (`by`) and the person's words for why (`why`), each where the pause's file says it, never in the note, which pairs the put with
+ * its lift. Of no run, so it carries no run's labels — a level's line carries its factory's alone (`labels.factory`) — and a subscription
+ * scoped to a factory is handed it as it is handed a daemon's.
  */
 export type StoreLine = { at: string; store: string; word: string; note?: string; by?: string; why?: string } & Line;
 
@@ -129,7 +131,7 @@ export type FeedLine = RunLine | DaemonLine | StoreLine;
 /** Whether `line` is a run's line, which the fold, a subscription's scope and the board's events read by its run. */
 export const isRunLine = (line: FeedLine): line is RunLine => 'run' in line;
 
-/** Whether `line` is the store's (`StoreLine`): its pause put or lifted. */
+/** Whether `line` is the store's (`StoreLine`): its pause put or lifted, or a factory's level. */
 export const isStoreLine = (line: FeedLine): line is StoreLine => 'store' in line;
 
 /**
@@ -275,6 +277,12 @@ export const freshMemo = (): FeedMemo => ({ cursor: 0, fold: freshFold() });
 const foldKey = (involved: Involved): string => `${involved.kind}/${involved.name}`;
 
 /**
+ * Where the fold keeps the level last said of the factory `factory`: no `Run/` key, so a run's `removed` neither reads nor forgets it, and
+ * no `Step/` one, so no run's `forget` does.
+ */
+const levelKey = (factory: string): string => `Level/${factory}`;
+
+/**
  * Where the fold counts one occurrence of a one-shot: the reason its word names, what the line is about (`foldKey`'s shape, so `forget`
  * reads the run off it), the try it belongs to, and the note that tells one occurrence from another — the note last, so `holdOnce` reads
  * it back off the key. A run id and a step name are slugs and carry no `#`, so the note is what follows the second one.
@@ -310,15 +318,13 @@ const counted = (fold: FeedFold, line: FeedLine, involved: Involved, reason: Rea
  * Each run's line folded onto what came before, keyed by what it is about (`involvedOf`), so a feed of v0 lines and one of v1 lines fold
  * to the same state: the last word said of each run and step wins, a `removed` forgets a run and everything of it, and a one-shot goes to
  * its own count and never to a step's last word. The store's one-shots are counted as a run's are (`storeOnce` reads them back), and a
- * `removed` leaves them, being of no run; a store line that is no one-shot of ours — a code a newer `nemia` names — is no word the fold
- * keeps. A daemon's line is no run's. Pure.
+ * `removed` leaves them, being of no run; a factory's level line is the last word said of that factory (`levelKey`, `levelLines` reads it
+ * back); any other store line — a code a newer `nemia` names — is no word the fold keeps. A daemon's line is no run's. Pure.
  */
 export function foldFeed(fold: FeedFold, lines: readonly FeedLine[]): FeedFold {
   for (const l of lines) {
     if (isStoreLine(l)) {
-      const involved = involvedOf(l);
-      const reason = reasonOfLine(l, involved);
-      if (isOnce(reason)) counted(fold, l, involved, reason);
+      foldStore(fold, l);
       continue;
     }
     if (!isRunLine(l)) continue;
@@ -332,10 +338,22 @@ export function foldFeed(fold: FeedFold, lines: readonly FeedLine[]): FeedFold {
       forget(fold, involved.name);
       continue;
     }
-    fold.said.set(foldKey(involved), { word: l.word, ...(l.note !== undefined ? { note: l.note } : {}) });
+    fold.said.set(foldKey(involved), saidOf(l));
   }
   return fold;
 }
+
+/** The store's line `l` folded: a one-shot counted, a factory's level kept as the last word said of it, any other passed. */
+function foldStore(fold: FeedFold, l: StoreLine): void {
+  const involved = involvedOf(l);
+  const reason = reasonOfLine(l, involved);
+  if (isOnce(reason)) counted(fold, l, involved, reason);
+  const factory = l.labels?.factory;
+  if (reason === 'LevelChanged' && factory !== undefined) fold.said.set(levelKey(factory), saidOf(l));
+}
+
+/** The word and the note `line` says, as the fold keeps them. */
+const saidOf = (line: FeedLine): FeedSaid => ({ word: line.word, ...(line.note !== undefined ? { note: line.note } : {}) });
 
 /**
  * Whether the feed owes no line for `b`, having said `a` of it last: the same word and the same note — or, of a run at rest, the same word,
@@ -496,6 +514,47 @@ const storeLines = (fold: FeedFold, at: string, pause: FeedPause): StoreLine[] =
       }) as StoreLine,
   );
 
+/**
+ * Each factory's level in force as a pass read it (`levelsNow`): the level, its default and the raise in force, a raise past its end read
+ * as gone. A caller that did not read them passes nothing, and the feed then says nothing of any factory's level.
+ */
+export type FeedLevels = readonly FactoryLevel[];
+
+/**
+ * The level of `row` in a person's words, the note of its line: `tsverify is at auto until <its end>, then semi-auto` while a raise
+ * stands, else `tsverify is at semi-auto`. It is what the fold compares, so a raise given a new end is a line of its own. Pure.
+ */
+const levelNote = (row: FactoryLevel): string =>
+  row.raise === null
+    ? `${row.factory} is at ${row.level}`
+    : `${row.factory} is at ${row.level} until ${row.raise.until}, then ${row.default}`;
+
+/**
+ * The lines a factory's level owes the feed: one for each factory whose level in force is not what the feed said of it last
+ * (`levelKey`), and, for a factory the feed has said nothing of, one only where it is above `manual`. A standing word, not a one-shot: a
+ * level set, raised, its raise ended by `--end` or by its end passing, and set back again are each a change of the word, which a count of
+ * one-shots by their note could not tell from a second offer of the first. Read off the levels in force (`FeedLevels`), never off the
+ * verb that wrote them, so a raise that ends by itself, which nothing writes, is said as a person's `--end` is; a restarted daemon, whose
+ * fold is the whole feed, says none again. Each is a person's deed by the table: a raise's end is the stretch the person gave it. Pure.
+ */
+function levelLines(fold: FeedFold, at: string, levels: FeedLevels): StoreLine[] {
+  return levels.flatMap((row) => {
+    const said = fold.said.get(levelKey(row.factory));
+    const note = levelNote(row);
+    if (said === undefined ? row.level === 'manual' : said.note === note) return [];
+    return [
+      upgraded({
+        at,
+        store: STORE,
+        word: LINE_WORDS.LevelChanged,
+        note,
+        involved: STORE_INVOLVED,
+        labels: { factory: row.factory },
+      }) as StoreLine,
+    ];
+  });
+}
+
 /** One call a step's sessions were denied, as the one-shot the feed writes of it: the call in its word and as a field of its own. */
 const denialOnce = (d: FeedDenial): Once => ({
   step: d.step,
@@ -550,8 +609,9 @@ function onceLines(fold: FeedFold, at: string, run: string, words: FeedWords): R
 /**
  * The lines a pass owes the feed: one for each run and each step whose word or note is not what the feed said of it last — a run the feed
  * has never named says each of its words once — one line for each one-shot the feed does not hold yet (`onceLines`), one `removed`
- * for each run the feed still names that the store no longer has, and the store's pause put or lifted (`storeLines`) where the pass read
- * it (`pause`; nothing of the store where it is not given). Pure.
+ * for each run the feed still names that the store no longer has, the store's pause put or lifted (`storeLines`) where the pass read
+ * it (`pause`; nothing of the store where it is not given), and each factory's level that changed (`levelLines`) where the pass read the
+ * levels (`levels`; nothing of them where they are not given). Pure.
  *
  * A run the pass found at rest (`FeedWords.atRest`) owes a line only where a word moved: a note that moved alone, as a new wording of
  * the listing moves every finished run's, is not news of the run, and the feed keeps the note it said last.
@@ -565,6 +625,7 @@ export function feedChanges(
   at: string,
   unjudged: ReadonlySet<string> = new Set(),
   pause?: FeedPause,
+  levels?: FeedLevels,
 ): Array<RunLine | StoreLine> {
   const line = (run: string, step: string | undefined, said: FeedSaid, labels: FeedLabels): RunLine =>
     upgraded({
@@ -592,9 +653,14 @@ export function feedChanges(
     const id = key.startsWith('Run/') ? key.slice('Run/'.length) : undefined;
     if (id !== undefined && !now.has(id) && !unjudged.has(id)) out.push(line(id, undefined, { word: REMOVED }, { run: id }));
   }
-  if (pause !== undefined) out.push(...storeLines(fold, at, pause));
-  return out;
+  return [...out, ...storeChanges(fold, at, pause, levels)];
 }
+
+/** The store's lines a pass owes: its pause's where the pass read it (`storeLines`), its factories' levels' where it read them. Pure. */
+const storeChanges = (fold: FeedFold, at: string, pause: FeedPause | undefined, levels: FeedLevels | undefined): StoreLine[] => [
+  ...(pause === undefined ? [] : storeLines(fold, at, pause)),
+  ...(levels === undefined ? [] : levelLines(fold, at, levels)),
+];
 
 /**
  * What one line of the feed says, without its time: `r-1  plan  awaiting approval  · approve it: …`, a daemon's `pid 4242  daemon

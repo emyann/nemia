@@ -155,12 +155,13 @@ const ONE_SHOTS: readonly Case[] = [
 ];
 
 /**
- * The two words a person's pause and resume of the whole store write, spelled here by hand as the owner named them: `store paused` and
- * `store resumed`, each with the moment the pause was put as its note.
+ * The three words the store's lines say, spelled here by hand as the owner named them: `store paused` and `store resumed`, each with the
+ * moment the pause was put as its note, and `level changed`, a factory's level in force in words as its note.
  */
 const STORE_LINES: readonly Case[] = [
   { kind: 'Store', word: 'store paused', note: 'since 2026-10-16T04:00:00.000Z', reason: 'StorePaused' },
   { kind: 'Store', word: 'store resumed', note: 'since 2026-10-16T04:00:00.000Z', reason: 'StoreResumed' },
+  { kind: 'Store', word: 'level changed', note: 'tsverify is at auto until 2026-10-16T05:00:00.000Z, then manual', reason: 'LevelChanged' },
 ];
 
 /** A parked step's words (`pausedWord`): paused between two calls, after the call it stopped after, or with the call it cut. */
@@ -239,8 +240,8 @@ test('reasonOf names a reason for every word the package writes, only of a kind 
         `${runCodes('waiting', false, [codedStep(reason === 'AwaitingAnswer' ? { reason, via: 'session' } : ({ reason } as QualifiedStep))]).reason}/Run`,
       );
     const entries = REASON_CODES.flatMap((reason) => kindsOf(reason).map((kind) => `${reason}/${kind}`));
-    assert.equal(entries.length, 44, 'the table the owner named has 44 entries');
-    assert.equal(REASON_CODES.length, 33, 'of 33 distinct codes');
+    assert.equal(entries.length, 45, 'the table the owner named has 45 entries');
+    assert.equal(REASON_CODES.length, 34, 'of 34 distinct codes');
     assert.deepEqual(
       entries.filter((entry) => !reached.has(entry)),
       [],
@@ -367,8 +368,9 @@ test('typeOf, messageOf and sourceOf: how serious a line is, what a person reads
       [
         ['person', true, 'Normal', false],
         ['person', true, 'Normal', false],
+        ['person', false, 'Normal', false],
       ],
-      "the store's pause and resume are a person's verbs, said once each, and wait on nobody",
+      "the store's pause and resume are a person's verbs, said once each, and a factory's level a person's word that stands until it changes; none waits on anybody",
     );
     assert.equal(sourceOf('Running'), 'tick', "a word the tick judged is the tick's, which is what a reason naming no source is");
   });

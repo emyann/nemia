@@ -24,6 +24,7 @@ import {
   type FeedLine,
   type FeedMemo,
   type FeedPause,
+  type FeedLevels,
   type FeedPublished,
   type FeedWords,
 } from './feed.ts';
@@ -133,15 +134,19 @@ const loggedOf =
 
 /**
  * A pass's words written to the feed where they changed (`feedPass`, over this process's fold, `feedMemo`), with the store's pause put
- * or lifted where the pass hands the pause it read (`pause`), each line written logged (`loggedOf`: a `closed out` line as its
- * closeout, every other as its words) and, where the process has a hub (`FeedHub`), published to it with the bytes it was written at
+ * or lifted where the pass hands the pause it read (`pause`) and each factory's level changed where it hands the levels (`levels`), each
+ * line written logged (`loggedOf`: a `closed out` line as its closeout, every other as its words) and, where the process has a hub
+ * (`FeedHub`), published to it with the bytes it was written at
  * (`publishedOf`): none when another writer's bytes landed among them. Answers with the lines written. `memo` is for a test, which
  * starts one afresh to be a restarted daemon. Fails with a refusal of the store — the door's, given no store root among them — and
  * dies of anything else it threw.
  */
 export const emitFeed = Effect.fn('emitFeed')(function* (
   now: ReadonlyMap<string, FeedWords>,
-  { memo = feedMemo, ...pass }: { at?: string; memo?: FeedMemo; unjudged?: ReadonlySet<string>; pause?: FeedPause } = {},
+  {
+    memo = feedMemo,
+    ...pass
+  }: { at?: string; memo?: FeedMemo; unjudged?: ReadonlySet<string>; pause?: FeedPause; levels?: FeedLevels } = {},
 ) {
   const appended = yield* withinEffect('act', feedPass(yield* FeedDoor, memo, now, pass));
   yield* Effect.forEach(appended.lines, loggedOf(now), { discard: true });

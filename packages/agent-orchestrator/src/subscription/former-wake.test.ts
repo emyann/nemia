@@ -43,11 +43,18 @@ test('selectorsOfWake converts a stored wake list to what each word was selectin
     );
   });
   await t.test(
-    'the two lists a store holds today convert to the selectors the package ships, which is what holds a record to its constant',
+    'the two lists a store holds today convert to the selectors the package ships, but her level line, which no wake word named',
     () => {
       assert.deepEqual(selectorsOfWake(FORMER_DEFAULT_WAKE), { selectors: [...DEFAULT_SELECTORS], unconverted: [] });
-      assert.deepEqual(selectorsOfWake(FORMER_NEMIA_WAKE), { selectors: [...NEMIA_SELECTORS], unconverted: [] });
-      assert.deepEqual([...NEMIA_SELECTORS], ['waits=person', 'reason=ToolDenied'], 'her record reads as the intent words it');
+      assert.deepEqual(selectorsOfWake(FORMER_NEMIA_WAKE), {
+        selectors: NEMIA_SELECTORS.filter((s) => s !== 'reason=LevelChanged'),
+        unconverted: [],
+      });
+      assert.deepEqual(
+        [...NEMIA_SELECTORS],
+        ['waits=person', 'reason=ToolDenied', 'reason=LevelChanged'],
+        'her record reads as the intent words it; one converted lacks the level line, and the keeper puts it again (`nemia.test.ts`)',
+      );
     },
   );
   await t.test('a word the table does not know converts to nothing and is said; the rest of its list still converts', () => {

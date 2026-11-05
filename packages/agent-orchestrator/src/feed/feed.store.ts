@@ -36,6 +36,7 @@ import {
   type FeedLine,
   type FeedMemo,
   type FeedPause,
+  type FeedLevels,
   type FeedWords,
   lineAsRead,
 } from './feed.ts';
@@ -241,6 +242,8 @@ export const feedDoorFiles = (root: string): Layer.Layer<never> => Layer.succeed
  * (`FeedAppended`). `now` is every run the pass judged: one the feed still names that is not in it is gone, and gets its `removed` — but
  * for one of `unjudged`, which the pass read and could not judge (`feedChanges`). `pause` is the store's pause as the pass read it
  * (`readPause`), whose put and lift the feed says once each; a caller that read none gives none, and nothing is said of the store.
+ * `levels` is each factory's level in force as the pass read it (`levelsNow`), whose changes the feed says (`levelLines`); none given,
+ * none said.
  *
  * `memo` is the fold its caller has read so far, which this moves: it is read on to the end of the feed first — the lines the caller wrote
  * last pass, and any another wrote — and read again from the start when it does not fit the feed: another generation (a file cut and put
@@ -255,7 +258,8 @@ export const feedPass = (
     at = new Date().toISOString(),
     unjudged = new Set<string>(),
     pause,
-  }: { at?: string; unjudged?: ReadonlySet<string>; pause?: FeedPause } = {},
+    levels,
+  }: { at?: string; unjudged?: ReadonlySet<string>; pause?: FeedPause; levels?: FeedLevels } = {},
 ): Effect.Effect<FeedAppended, Refusal> =>
   Effect.gen(function* () {
     const end = yield* door.lines.end();
@@ -268,7 +272,7 @@ export const feedPass = (
     foldFeed(memo.fold, read.lines);
     memo.cursor = read.cursor;
     memo.generation = end?.generation;
-    const lines = feedChanges(memo.fold, now, at, unjudged, pause);
+    const lines = feedChanges(memo.fold, now, at, unjudged, pause, levels);
     const size = end?.cursor ?? 0;
     if (!lines.length) return { lines, before: size, after: size, leading: '' };
     const appended = yield* door.lines.append(lines);
@@ -293,7 +297,10 @@ function ran<A>(effect: Effect.Effect<A, Refusal>): A {
  */
 export const recordFeed = (
   now: ReadonlyMap<string, FeedWords>,
-  { memo = freshMemo(), ...pass }: { at?: string; memo?: FeedMemo; unjudged?: ReadonlySet<string>; pause?: FeedPause } = {},
+  {
+    memo = freshMemo(),
+    ...pass
+  }: { at?: string; memo?: FeedMemo; unjudged?: ReadonlySet<string>; pause?: FeedPause; levels?: FeedLevels } = {},
 ): FeedAppended => within('act', () => ran(feedPass(moduleDoor(), memo, now, pass)));
 
 /**

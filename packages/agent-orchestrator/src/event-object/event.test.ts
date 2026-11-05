@@ -197,7 +197,8 @@ test("an Event read by its byte on a large feed reads its own line, past a line 
   fs.writeFileSync(path.join(root, 'feed.jsonl'), `not a line of the feed\n${JSON.stringify(big)}\n${rest}`);
   const size = fs.statSync(path.join(root, 'feed.jsonl')).size;
   const { value: event, tallies } = Effect.runSync(meteredPass(eventObject('0')).pipe(Effect.provide(feedDoorFiles(root))));
-  assert.equal(event.message, big.message, 'the line after the one nobody can read, named by where that one starts');
+  const end = Buffer.byteLength(`not a line of the feed\n${JSON.stringify(big)}\n`);
+  assert.deepEqual(event, eventOf(big, 0, end), 'the line after the one nobody can read, named by where that one starts');
   const bytes = Object.values(tallies?.kinds ?? {}).reduce((sum, kind) => sum + kind.bytes, 0);
   assert.ok(bytes > Buffer.byteLength(JSON.stringify(big)), `its own line is read whole (${bytes} bytes)`);
   assert.ok(bytes < size / 4, `${bytes} bytes read of a feed of ${size}`);

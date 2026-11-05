@@ -1,8 +1,8 @@
 /**
- * The delivery of a chat's outbox to its long-lived task: each entry the person wrote and no mark names yet, said to the task in the
- * words that frame it (`framedForHer`), then marked. Before it says, it looks in what the runtime journalled as said (`state.said`) for
- * the entry's words said since it was written and claimed by no mark, and marks that one without saying again: a delivery cut between
- * the say and the mark is finished, never repeated. Level-triggered: it reads the files and the task's record each time, and carries
+ * The delivery of a chat's outbox to its long-lived task: each entry written and no mark names yet, said to the task in the
+ * words that frame it by who wrote it (`framedFor`), then marked. Before it says, it looks in what the runtime journalled as said
+ * (`state.said`) for the entry's words said since it was written and claimed by no mark, and marks that one without saying again: a
+ * delivery cut between the say and the mark is finished, never repeated. Level-triggered: it reads the files and the task's record each time, and carries
  * nothing between calls.
  *
  * Beside it, the questions of hers that wait on the person: each ask the runtime says her session holds open copied into the chat's own
@@ -38,7 +38,7 @@ import {
   askWords,
   callsOf,
   cutOf,
-  framedForHer,
+  framedFor,
   type AnswerOwed,
   type Ask,
   type AskAnswer,
@@ -74,7 +74,7 @@ export const sayOutbox = Effect.fn('sayOutbox')(function* (taskId: string, dir: 
   const claimed = new Set(marks.map(keyOf));
   const { state } = yield* asked('view', e.view(taskId));
   for (const [i, entry] of owed.entries()) {
-    const text = framedForHer(entry.text);
+    const text = framedFor(entry.from ?? { kind: 'person' }, entry.text);
     const found = unclaimed(state.said, text, entry.at, claimed);
     const heard =
       found ??

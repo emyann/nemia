@@ -33,7 +33,7 @@ const { keep, keepOnce } = await import('../src/nemia/keep.verb.ts');
 const { LEVEL } = await import('../src/nemia/level.verb.ts');
 const { MEMORY } = await import('../src/nemia/memory.verb.ts');
 const { appendOutbox, chatDir, stopsFile } = await import('../src/chat/chat.store.ts');
-const { framedForHer } = await import('../src/chat/chat.ts');
+const { framedFor } = await import('../src/chat/chat.ts');
 const { levelFile, memoryDir, nemiaDir, ownBin, promptFile, readLevel, readNemia, toldFile } = await import('../src/nemia/level.store.ts');
 const { listSubscriptions } = await import('../src/subscription/subscription.store.ts');
 const { StoreRoot } = await import('../src/config/root.store.ts');
@@ -451,7 +451,7 @@ test("Kept, she is told what changed: the person's custom words once, never by a
     assert.deepEqual(await beat(), ['sayOutbox']);
     assert.deepEqual(
       b.said.slice(told).map((one) => [one.taskId, one.text]),
-      [[task, framedForHer('Hi')]],
+      [[task, framedFor({ kind: 'person' }, 'Hi')]],
     );
     assert.deepEqual(await beat(), [], 'delivered once: level-triggered off the marks');
   });

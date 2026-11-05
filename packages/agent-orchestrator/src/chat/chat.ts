@@ -329,12 +329,21 @@ const claimsOf = (sources: ChatSources): Map<string, OutboxEntry> => {
   return claims;
 };
 
-/** A said as the chat draws it: the person's message where a delivered mark claims it, else the keeper's marker. */
+/**
+ * An outbox entry as the chat draws it, delivered by the said at `delivered` (null while it waits): the person's message, or a peer's
+ * under the name it spoke under where an agent wrote it, never the person's.
+ */
+const entryEvent = (entry: OutboxEntry, delivered: string | null): ChatEvent =>
+  entry.from?.kind === 'agent'
+    ? { kind: 'message', id: `p:${entry.id}`, at: entry.at, from: 'peer', name: entry.from.name, text: entry.text, delivered }
+    : { kind: 'message', id: `p:${entry.id}`, at: entry.at, from: 'person', text: entry.text, delivered };
+
+/** A said as the chat draws it: the entry's message where a delivered mark claims it, else the keeper's marker. */
 const saidEvent = (said: SourceSaid, claims: ReadonlyMap<string, OutboxEntry>): ChatEvent => {
   const entry = claims.get(saidKey(said.attempt, said.at));
   return entry === undefined
     ? { kind: 'message', id: `k:${said.attempt}:${said.at}`, at: said.at, from: 'keeper', text: markerOf(said.text) }
-    : { kind: 'message', id: `p:${entry.id}`, at: entry.at, from: 'person', text: entry.text, delivered: said.at };
+    : entryEvent(entry, said.at);
 };
 
 /** One session's events, each said to it placed after the transcript event it followed, or first where it followed none. */
@@ -364,7 +373,7 @@ const stopEvent = (stop: SourceStop): ChatEvent => ({
 
 /**
  * The chat, oldest first: each session's events with each turn the person stopped in its place in time, a session line where an attempt
- * began after the first, then each outbox entry no said carries yet, the person's, undelivered. A tool call with no result is
+ * began after the first, then each outbox entry no said carries yet, undelivered: the person's, or a peer's where an agent wrote it. A tool call with no result is
  * `pending`, but the session's last, which is `running`, or `waits` where the phase says the task needs the person. Pure.
  */
 export function projectChat(sources: ChatSources): ChatEvent[] {
@@ -386,16 +395,7 @@ export function projectChat(sources: ChatSources): ChatEvent[] {
   out.push(...withAsks);
   const shown = new Set(out.map((e) => e.id));
   const marked = new Map(sources.delivered.map((mark) => [mark.id, mark.said]));
-  for (const entry of sources.outbox)
-    if (!shown.has(`p:${entry.id}`))
-      out.push({
-        kind: 'message',
-        id: `p:${entry.id}`,
-        at: entry.at,
-        from: 'person',
-        text: entry.text,
-        delivered: marked.get(entry.id) ?? null,
-      });
+  for (const entry of sources.outbox) if (!shown.has(`p:${entry.id}`)) out.push(entryEvent(entry, marked.get(entry.id) ?? null));
   return out;
 }
 

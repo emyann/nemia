@@ -116,7 +116,10 @@ function hostOf(world: World): { host: ServiceHost; events: string[] } {
     user: () => ({ name: 'ann', uid: 1000 }),
     call: (argv) => {
       if (argv.includes('show')) {
-        if (world.exiting !== undefined && world.exiting-- <= 0) (world.unitPid = null), (world.exiting = undefined);
+        if (world.exiting !== undefined && world.exiting-- <= 0) {
+          world.unitPid = null;
+          world.exiting = undefined;
+        }
         if (world.lingers !== undefined) events.push(`show ${world.unitPid ?? 0}`);
         return `ActiveState=${world.unitPid === null ? 'inactive' : 'active'}\nUnitFileState=enabled\nMainPID=${world.unitPid ?? 0}\n`;
       }
@@ -296,7 +299,7 @@ test('a hand daemon handed to the service: install, --take-over <pid>, restarts,
     assert.match(done.lines[0], new RegExp(`pid ${OLD} stopped, and pid ${NEW} ticks the store`));
   });
 
-  await s.test("a restart whose daemon lets the store go before it exits starts the unit only once the unit has ended it", async () => {
+  await s.test('a restart whose daemon lets the store go before it exits starts the unit only once the unit has ended it', async () => {
     const world: World = { lease: lease(OLD), unitPid: OLD, lingers: 2 };
     world.onSignal = () => (world.lease = lease(OLD, 'stopped'));
     world.onStart = () => passing(world, NEW);
@@ -313,7 +316,7 @@ test('a hand daemon handed to the service: install, --take-over <pid>, restarts,
     assert.equal(done.pid, NEW);
   });
 
-  await s.test('a restart where the stopped daemon is still the unit\'s process waits for the unit to end it, then starts it', async () => {
+  await s.test("a restart where the stopped daemon is still the unit's process waits for the unit to end it, then starts it", async () => {
     const world: World = { lease: lease(OLD, 'stopped'), unitPid: OLD, lingers: 1, exiting: 1 };
     world.onStart = () => passing(world, NEW);
     const { host, events } = hostOf(world);
@@ -434,9 +437,11 @@ test('REFUSED: install, --take-over and restart, each by its kind and naming its
       const world: World = { lease: lease(OLD), unitPid: null };
       world.onSignal = () => (world.lease = lease(OLD, 'stopped'));
       const { host, events } = hostOf(world);
-      await assert.rejects(install({ takeOver: String(OLD) }, { ...host, waitMs: 30 }), (err: Error) =>
-        refusedWith('Conflict', /nemia service status/, /nemia resume/, /systemctl --user start nemia\.service/)(err) &&
-        !/was started/.test(err.message),
+      await assert.rejects(
+        install({ takeOver: String(OLD) }, { ...host, waitMs: 30 }),
+        (err: Error) =>
+          refusedWith('Conflict', /nemia service status/, /nemia resume/, /systemctl --user start nemia\.service/)(err) &&
+          !/was started/.test(err.message),
       );
       assert.ok(readPause() !== null);
       assert.ok(events.includes('systemctl --user start nemia.service') && !events.includes('resume'), events.join('\n'));
@@ -477,7 +482,12 @@ test('REFUSED: install, --take-over and restart, each by its kind and naming its
     const { host } = hostOf(world);
     await assert.rejects(
       restart({}, host),
-      refusedWith('Conflict', /Job for nemia\.service failed\./, /systemctl --user start nemia\.service/, /journalctl --user -u nemia\.service/),
+      refusedWith(
+        'Conflict',
+        /Job for nemia\.service failed\./,
+        /systemctl --user start nemia\.service/,
+        /journalctl --user -u nemia\.service/,
+      ),
     );
   });
 

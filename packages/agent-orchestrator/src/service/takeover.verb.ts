@@ -240,17 +240,16 @@ export const startedPassed = (host: TakeoverHost, service: Started, by: string, 
   });
 
 /**
- * Hands the store from the daemon of `pid` to the service it starts (`service`) once its unit has let that daemon's process go, and answers the pid that ticks it then, once that
- * daemon has completed its first pass (`startedPassed`). Refused (`Conflict`): a pid that is not the confirmed holder, before
- * anything is done; a daemon that does not let the store go within the host's `stopMs`, which stands above the runtime's own
- * let-go so a daemon parking a session whose call it cut is not read as one that will not stop; a service that does not take the
- * store within its `waitMs`; or a service whose daemon ends before its first pass — the store left paused, since no work starts
- * without a daemon to judge it, until a daemon's first pass lifts it once this command has ended. Its pause has no timeout, so it parks
- * no job: the jobs and the checks run on, and none is waited for. Before the signal it holds back the new tool calls of the daemon's
- * attached sessions (`drain`) and waits at most the host's `timeoutMs` for each call in flight (`called`), so the daemon stops between
- * two calls where it can, and says which call it gave up on where it cannot.
- * Interrupted before the signal, it lifts the drain and the pause it put; after it, the drain names a daemon that is gone, and no
- * other is held by it. Its pause and its lines name `by`.
+ * Hands the store from the daemon of `pid` to the service it starts (`service`) once its unit has let that daemon's process go, and answers
+ * the pid that ticks it then, once that daemon has completed its first pass (`startedPassed`). Refused (`Conflict`): a pid that is not the
+ * confirmed holder, before anything is done; a daemon that does not let the store go within the host's `stopMs`, which stands above the
+ * runtime's own let-go so a daemon parking a session whose call it cut is not read as one that will not stop; a service that does not take
+ * the store within its `waitMs`; or a service whose daemon ends before its first pass — the store left paused, since no work starts without
+ * a daemon to judge it, until a daemon's first pass lifts it once this command has ended. Its pause has no timeout, so it parks no job: the
+ * jobs and the checks run on, and none is waited for. Before the signal it holds back the new tool calls of the daemon's attached sessions
+ * (`drain`) and waits at most the host's `timeoutMs` for each call in flight (`called`), so the daemon stops between two calls where it
+ * can, and says which call it gave up on where it cannot. Interrupted before the signal, it lifts the drain and the pause it put; after it,
+ * the drain names a daemon that is gone, and no other is held by it. Its pause and its lines name `by`.
  */
 export const takeOver = Effect.fn('takeOver')(function* (pid: number, host: TakeoverHost, service: Started, by: string = INSTALL_BY) {
   yield* takeOverConfirmed(pid, host, by);

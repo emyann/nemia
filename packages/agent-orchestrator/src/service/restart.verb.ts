@@ -1,13 +1,12 @@
 /**
- * `nemia service restart`: the daemon that holds the store restarted on the code its service runs, as the take-over does it (`takeOver`)
- * — the store paused, the daemon's own sessions held and their calls in flight given up to the timeout (`--timeout <d>`, else the
- * store's), SIGTERM, the unit started once the system says it no longer runs the stopped daemon, and the store resumed once the new daemon has completed its first pass. The jobs and the checks,
- * a landing's wait on CI among them, run on through it on their workers and are not waited for, and each session the daemon parked is
- * resumed by the new one as the same try. Its waits are bounded: the timeout, then the take-over's `stopMs` and `waitMs` (90 s and 60 s
- * on the live host), then the new daemon's first pass; and its pause and drain end with its command, however it ends, lifted by the
- * daemon's next pass where it was killed. A daemon started by hand
- * is not the service's to start again: it is named, with the take-over that hands it to the service. The command the CLI serves
- * alone, beside the service's others.
+ * `nemia service restart`: the daemon that holds the store restarted on the code its service runs, as the take-over does it (`takeOver`) —
+ * the store paused, the daemon's own sessions held and their calls in flight given up to the timeout (`--timeout <d>`, else the store's),
+ * SIGTERM, the unit started once the system says it no longer runs the stopped daemon, and the store resumed once the new daemon has
+ * completed its first pass. The jobs and the checks, a landing's wait on CI among them, run on through it on their workers and are not
+ * waited for, and each session the daemon parked is resumed by the new one as the same try. Its waits are bounded: the timeout, then the
+ * take-over's `stopMs` and `waitMs` (90 s and 60 s on the live host), then the new daemon's first pass; and its pause and drain end with
+ * its command, however it ends, lifted by the daemon's next pass where it was killed. A daemon started by hand is not the service's to
+ * start again: it is named, with the take-over that hands it to the service. The command the CLI serves alone, beside the service's others.
  */
 import { Effect } from 'effect';
 import type { Args } from '../command/command.ts';

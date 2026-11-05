@@ -13,6 +13,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import { execFileSync } from 'node:child_process';
 import { Effect } from 'effect';
 import type { DaemonStanding } from '../src/daemon/daemon.ts';
 import { scratch } from './scratch.ts';
@@ -49,9 +50,7 @@ const NEW = 5151;
  * reads before it reads inactive with no process; `start` of an active unit changes nothing, and of an inactive one runs `NEW`, leaves
  * it inactive (`START=none`), or fails as systemd does (`START=fail`). Each call is a line of `log`.
  */
-fs.writeFileSync(
-  path.join(BIN, 'systemctl'),
-  `#!/bin/sh
+const STUB = `#!/bin/sh
 dir="$SYSTEMCTL_STUB"
 . "$dir/state"
 case "$2" in
@@ -71,9 +70,8 @@ case "$2" in
   *) echo "$*" >> "$dir/log" ;;
 esac
 printf 'ACTIVE=%s\\nPID=%s\\nSIGNALLED=%s\\nLINGER=%s\\nSTART=%s\\n' "$ACTIVE" "$PID" "$SIGNALLED" "$LINGER" "$START" > "$dir/state"
-`,
-  { mode: 0o755 },
-);
+`;
+fs.writeFileSync(path.join(BIN, 'systemctl'), STUB, { mode: 0o755 });
 
 /** The unit as the stub keeps it. */
 type Unit = { ACTIVE: string; PID: string; SIGNALLED: string; LINGER: string; START: string };
@@ -89,7 +87,12 @@ const unitNow = (): Unit =>
 
 const unitSet = (unit: Partial<Unit>): void => {
   const next = { ...unitNow(), ...unit };
-  fs.writeFileSync(path.join(UNIT, 'state'), Object.entries(next).map(([k, v]) => `${k}=${v}\n`).join(''));
+  fs.writeFileSync(
+    path.join(UNIT, 'state'),
+    Object.entries(next)
+      .map(([k, v]) => `${k}=${v}\n`)
+      .join(''),
+  );
 };
 
 const stubLog = (): string[] => fs.readFileSync(path.join(UNIT, 'log'), 'utf8').split('\n').filter(Boolean);
@@ -150,15 +153,22 @@ const conflict = (check: (message: string) => boolean) => (err: Error & { exitCo
   err._tag === 'Conflict' && err.exitCode === 2 && check(err.message);
 
 test('nemia service restart on a stub systemctl: the unit started once it has ended the old daemon, or a refusal that says so', async (t) => {
-  await t.test('a daemon that lets the store go before it exits: the start waits for the unit to end it, and the new daemon ticks', async () => {
-    const done = await restart(hostOf('run', 3));
-    assert.equal(done.did, 'restarted');
-    assert.equal(done.pid, NEW);
-    const log = stubLog();
-    assert.ok(!log.includes('start no-op'), log.join('\n'));
-    assert.ok(log.indexOf('start') > log.lastIndexOf(`show active ${OLD}`), log.join('\n'));
-    assert.equal(readPause(), null, 'the first pass lifted the restart\'s pause');
+  await t.test("the systemctl the live host runs is the stub, never the machine's own", () => {
+    assert.equal(execFileSync('sh', ['-c', 'command -v systemctl'], { encoding: 'utf8' }).trim(), path.join(BIN, 'systemctl'));
   });
+
+  await t.test(
+    'a daemon that lets the store go before it exits: the start waits for the unit to end it, and the new daemon ticks',
+    async () => {
+      const done = await restart(hostOf('run', 3));
+      assert.equal(done.did, 'restarted');
+      assert.equal(done.pid, NEW);
+      const log = stubLog();
+      assert.ok(!log.includes('start no-op'), log.join('\n'));
+      assert.ok(log.indexOf('start') > log.lastIndexOf(`show active ${OLD}`), log.join('\n'));
+      assert.equal(readPause(), null, "the first pass lifted the restart's pause");
+    },
+  );
 
   await t.test('a start that leaves the unit with no process: Conflict naming the start command, never "was started"', async () => {
     await assert.rejects(

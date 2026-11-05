@@ -38,8 +38,7 @@ const unitRunningSpec = spec<(state: UnitState | null, old: number | null) => Un
     },
     anotherProcessIsOther: {
       description: 'A main process that is not the stopped daemon is another one: the unit runs, and a start was not lost',
-      condition: ({ input: [state, old], output }) =>
-        (state !== null && state.pid !== null && state.pid !== old) === (output === 'other'),
+      condition: ({ input: [state, old], output }) => (state !== null && state.pid !== null && state.pid !== old) === (output === 'other'),
     },
   },
 });

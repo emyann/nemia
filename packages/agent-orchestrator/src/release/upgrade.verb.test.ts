@@ -90,7 +90,7 @@ function tagged(tag: string, marker: string, given: Record<string, string> = scr
 
 /**
  * The fake machine's world: the lease, the leases read after it in turn (`later`), the unit's main process, and what a signal and a start
- * change.
+ * change. As systemd does, a signal to the unit's main process ends it, clearing `unitPid`.
  */
 type World = {
   lease: DaemonStanding;

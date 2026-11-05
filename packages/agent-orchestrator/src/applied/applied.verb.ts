@@ -50,6 +50,7 @@ import {
   mergeBaseOf,
   mergeTrees,
   resolveLine,
+  sameVersionChange,
   switchTrees,
   type Conflict,
   type Switched,
@@ -157,7 +158,7 @@ function conditionOf(
 }
 
 /** Whether two parameter sets give the same value to every name. */
-const sameParams = (a: FactoryTemplate['params'], b: FactoryTemplate['params']): boolean =>
+export const sameParams = (a: FactoryTemplate['params'], b: FactoryTemplate['params']): boolean =>
   Object.keys(a).length === Object.keys(b).length && Object.entries(a).every(([key, value]) => b[key] === value);
 
 /** The `Applied` condition of a base whose digest is `base`, against the template rendered now (`now`) and the status last written. */
@@ -174,7 +175,7 @@ function appliedOf(factory: Factory & { template: FactoryTemplate }, base: strin
       'Applied',
       false,
       'ParamsChanged',
-      `The parameters in ${factory.name}'s file differ from those its base was rendered with: its base and tree are left as they are. Put them back, or upgrade with them to the template's next version: nemia factory diff ${factory.name} --to <version>, then nemia factory upgrade ${factory.name} --to <version>.`,
+      `The parameters in ${factory.name}'s file differ from those its base was rendered with, and the template's files changed under version ${now.version} too: its base and tree are left as they are. Give the template a new version for its change and upgrade with the parameters, nemia factory diff ${factory.name} --to <version> --set <key>=<value>, then the line it prints; or put the template's files back, and the next pass merges the parameters.`,
     );
   return condition(
     'Applied',
@@ -217,9 +218,11 @@ function waiting(
   const { name, template } = factory;
   const count = `${pending.length} conflict${pending.length === 1 ? '' : 's'}`;
   const what =
-    switched === undefined
-      ? `upgraded from ${from} to ${template.version}`
-      : `switched from ${switched.from} ${from} to ${switched.to} ${template.version}, another template, with no common base`;
+    switched !== undefined
+      ? `switched from ${switched.from} ${from} to ${switched.to} ${template.version}, another template, with no common base`
+      : from === template.version
+        ? `given its new parameters at ${from}`
+        : `upgraded from ${from} to ${template.version}`;
   const diff = `nemia factory diff ${name} --to ${template.version}${switched === undefined ? '' : ` --template ${template.source}`}`;
   return [
     condition(
@@ -239,12 +242,22 @@ function waiting(
 
 /**
  * Whether an upgrade is due: the base was applied at a known version, does not hold the template now, and the version wanted is
- * another, or the template now is another than the one the base holds (a switch, whatever the versions).
+ * another, or the template now is another than the one the base holds (a switch, whatever the versions), or, at the same version, the
+ * base is still the template rendered with the parameters it was recorded with (`recorded`), so the parameters alone changed
+ * (`sameVersionChange`).
  */
-const upgradeDue = (factory: Factory & { template: FactoryTemplate }, now: RenderedAt, digest: string, last?: Status): boolean =>
+const upgradeDue = (
+  factory: Factory & { template: FactoryTemplate },
+  now: RenderedAt,
+  digest: string,
+  last: Status | undefined,
+  recorded: string | undefined,
+): boolean =>
   typeof last?.version === 'string' &&
   digest !== digestOf(now.entries) &&
-  (last.version !== factory.template.version || mergeBaseOf(last.template, now.name) === 'none');
+  (last.version !== factory.template.version ||
+    mergeBaseOf(last.template, now.name) === 'none' ||
+    sameVersionChange({ base: digest, recorded, wanted: digestOf(now.entries) }) === 'params');
 
 /**
  * The upgrade of a factory from the version its base holds (`last`) to the one its file wants, the template rendered at it (`now`): its
@@ -265,7 +278,8 @@ function upgradePass(
   const switched =
     last.template !== undefined && mergeBaseOf(last.template, now.name) === 'none' ? { from: last.template, to: now.name } : undefined;
   const merge = switched === undefined ? mergeTrees(base, ours, now.entries) : switchTrees(ours, now.entries);
-  const composed = compose(merge, choicesFor(readResolutions(name), template.version, now.name));
+  const merging = { from: last.version, to: template.version, template: now.name, base: digestOf(base) };
+  const composed = compose(merge, choicesFor(readResolutions(name), merging));
   if ('pending' in composed) {
     const status: Status = {
       version: last.version,
@@ -333,8 +347,25 @@ const cameByUpgrade = (last: Status | undefined, version: string): boolean =>
  */
 export const reconcileFactory = Effect.fn('reconcileFactory')(function* (factory: Factory & { template: FactoryTemplate }) {
   const { now, named } = yield* templateNow(factory);
+  const recorded = yield* recordedOf(factory, now, readStatus(factory.name));
   const at = new Date(yield* Clock.currentTimeMillis).toISOString();
-  return reconciledWith(factory, now, named, at);
+  return reconciledWith(factory, now, named, at, recorded);
+});
+
+/**
+ * The digest of the template rendered now (`now`) at the version `last` names, with the parameters `last` recorded rather than the
+ * file's: read only where the file wants that version of that template with other parameters, so a pass can tell a change of the
+ * parameters alone from a template changed under its version (`sameVersionChange`); none where it is not read or does not render.
+ */
+const recordedOf = Effect.fn('recordedOf')(function* (
+  factory: Factory & { template: FactoryTemplate },
+  now: RenderedAt | Condition,
+  last: Status | undefined,
+) {
+  if ('type' in now || last?.version !== factory.template.version || sameParams(last.params, factory.template.params)) return undefined;
+  if (mergeBaseOf(last.template, now.name) === 'none') return undefined;
+  const read = yield* renderedOrNot(renderedAt(factory.template.source, setsOf(last.params)));
+  return 'problems' in read ? undefined : digestOf(read.entries);
 });
 
 /**
@@ -363,13 +394,14 @@ function reconciledWith(
   now: RenderedAt | Condition,
   named: string | undefined,
   at: string,
+  recorded: string | undefined,
 ): Status {
   const last = readStatus(factory.name);
   if (!('type' in now)) stageFolder(appliedDir(factory.name), now.entries, true);
   const base = entriesIn(appliedDir(factory.name));
   if (base.length && !fs.existsSync(treeDir(factory.name))) stageFolder(treeDir(factory.name), base, false);
   const digest = base.length ? digestOf(base) : null;
-  if (!('type' in now) && digest !== null && upgradeDue(factory, now, digest, last))
+  if (!('type' in now) && digest !== null && upgradeDue(factory, now, digest, last, recorded))
     return upgradePass(factory, now, base, last as Status & { version: string }, at);
   return observed(factory, now, base, digest, last, named, at);
 }

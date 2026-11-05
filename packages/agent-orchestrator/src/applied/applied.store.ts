@@ -12,6 +12,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import { Result, Schema } from 'effect';
 import { FACTORY_CONDITION_REASONS, FACTORY_CONDITION_STATUSES, FACTORY_CONDITION_TYPES, REVISIONS_POLICIES } from '../factory/factory.ts';
 import { firstRefusal, HOME } from '../record/record.store.ts';
+import { choicesApply, type MergeAt } from '../upgrade/index.ts';
 
 /** The folder the store `home` keeps a factory's own files in, beside its `<name>.json`. */
 const folderAt = (home: string, name: string): string => path.join(home, 'factories', name);
@@ -304,12 +305,14 @@ export const replaceBase = (name: string, entries: readonly Entry[]): void => vo
 
 /**
  * The person's choices for an upgrade's conflicts: the version they are for, the name of the template they were made for (none where
- * written before names were recorded), and a choice by address.
+ * written before names were recorded), the digest of the base they were made against (none where written before it was recorded), and
+ * a choice by address.
  */
 const ResolutionsSchema = Schema.StructWithRest(
   Schema.Struct({
     to: Schema.String,
     template: Schema.optionalKey(Schema.String),
+    base: Schema.optionalKey(Schema.String),
     choices: Schema.Record(Schema.String, Schema.Union([Schema.Literals(['ours', 'theirs']), Schema.Struct({ text: Schema.String })])),
   }),
   [Schema.Record(Schema.String, Schema.Unknown)],
@@ -332,13 +335,12 @@ export function readResolutions(name: string): Resolutions | undefined {
 }
 
 /**
- * The choices of `resolutions` that apply to an upgrade to `to` of the template named `name`: those made for that version, of that
- * template or of one no name was recorded for; none else, so a choice made for one template is never applied to another's merge.
+ * The choices of `resolutions` that apply to the merge `merge` (`choicesApply`): those made for its version, its template or one no name
+ * was recorded for, and its base; none else, so a choice made for one template is never applied to another's merge, nor one made before
+ * a merge landed to the next change at the same version.
  */
-export const choicesFor = (resolutions: Resolutions | undefined, to: string, name: string): Resolutions['choices'] =>
-  resolutions !== undefined && resolutions.to === to && (resolutions.template === undefined || resolutions.template === name)
-    ? resolutions.choices
-    : {};
+export const choicesFor = (resolutions: Resolutions | undefined, merge: MergeAt): Resolutions['choices'] =>
+  resolutions !== undefined && choicesApply(resolutions, merge) ? resolutions.choices : {};
 
 /** The person's choices for the factory `name`'s upgrade written whole. */
 export const writeResolutions = (name: string, resolutions: Resolutions): void =>

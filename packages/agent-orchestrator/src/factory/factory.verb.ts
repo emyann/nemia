@@ -96,14 +96,14 @@ factory, naming the repositories its work is on, the workflows it offers and the
                  rendered at that version with the factory's parameters and merged three ways — the base, your
                  tree, the render — each file whole first, factory.json by key, a step's frontmatter by key and
                  its body by line; what merges cleanly, and each conflict with its sides. It writes nothing.
-  nemia factory upgrade writes --to, and --template where given, into the factory's file, and nothing else: the
-                 daemon merges on its next pass, swapping the tree and then the base once each conflict has a
-                 choice, and writes ConflictsPending into status.json while one waits. Refused: a template at
-                 another version than --to, the version applied asked again, and a lower one without --downgrade.
-                 A run in flight keeps the folders frozen on its record.
+  nemia factory upgrade writes --to, and --template and --set where given, into the factory's file, and nothing else:
+                 the daemon merges on its next pass once each conflict has a choice (ConflictsPending in status.json); a
+                 run in flight keeps its frozen folders. With --to the version applied, a --set changes parameters alone.
+                 Refused: a template at another version than --to, the version applied with nothing to change or its
+                 template changed under it, a lower one without --downgrade, a --set without diff's --plan for it.
   nemia factory resolve writes your choice for one conflict, by the address nemia factory diff names: --ours keeps
-                 your tree's side, --theirs the template's, --file <path> the text of a file. Kept in
-                 factories/<name>/resolutions.json for the version wanted.
+                 your tree's side, --theirs the template's, --file <path> the text of a file; kept for the merge
+                 under way in factories/<name>/resolutions.json.
   nemia factory attach attaches a workflow, by its folder's name: the factory then offers it, and only the
                  workflows attached to it — none, until one is. Only the name is stored, and a step that
                  names its own agent is filled already; whether the workflow exists is judged at the start.

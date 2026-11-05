@@ -378,15 +378,6 @@ test('push --labels follows a relabelled run: the label its rules no longer give
     '`bug`, which no rule can give, is left alone',
   );
 
-  const none = labelled(['fix', 'bug']);
-  const unmatched = pr(none, 'push', ['--labels', RULES], { WF_LABELS: JSON.stringify({ area: 'api' }) });
-  assert.equal(unmatched.code, 0, unmatched.err);
-  assert.deepEqual(
-    labelCalls(unmatched.calls).map((call) => call.argv),
-    [['api', '-X', 'DELETE', 'repos/{owner}/{repo}/issues/7/labels/fix']],
-    'a run whose labels no rule matches carries no label a rule gives',
-  );
-
   const already = labelled(['internal']);
   const settled = pr(already, 'push', ['--labels', RULES], { WF_LABELS: JSON.stringify({ work: 'cleanup' }) });
   assert.equal(settled.code, 0, settled.err);
@@ -450,6 +441,20 @@ test('REFUSED, before anything is pushed: a label the rules give that the reposi
   assert.match(r.err, /gh label create/, 'and the command that makes it');
   assert.equal(tip(at.bare!, at.branch), null, 'nothing is pushed');
   assert.deepEqual(labelCalls(r.calls), []);
+});
+
+test('REFUSED, exit 2 before anything is pushed: a run whose labels match none of the rules, naming the key, its values and the relabel', () => {
+  for (const verb of ['push', 'open'] as const) {
+    const at = labelled(['fix', 'bug']);
+    const args = verb === 'push' ? ['--labels', RULES] : ['--title', 'The card', '--body-file', body(), '--labels', RULES];
+    const r = pr(at, verb, args, { WF_LABELS: JSON.stringify({ work: 'chore', area: 'api' }) });
+    assert.equal(r.code, 2, `${verb}: ${r.out}`);
+    assert.ok(r.err.startsWith('nemia pr: '), `${verb}: a refusal of the script's, not a crash:\n${r.err}`);
+    for (const word of ['work', 'fix', 'cleanup', 'nemia label run']) assert.ok(r.err.includes(word), `${verb}: naming ${word}:\n${r.err}`);
+    assert.equal(tip(at.bare!, at.branch), null, `${verb}: nothing is pushed`);
+    assert.deepEqual(labelCalls(r.calls), [], `${verb}: no label is added or removed`);
+    assert.equal(asked(r.calls, 'pr', 'create').length + asked(r.calls, 'api', '-X', 'PATCH').length, 0, `${verb}: nothing is opened`);
+  }
 });
 
 /** A place with no open pull request yet, in a repository holding `REPO_LABELS`: the rules under which `open` creates one. */
@@ -794,7 +799,7 @@ test("build's implement check, rendered on GitHub, pushes through the script bef
   const clauses = [...frozen.matchAll(/node\s+"\$WF_WORKFLOW_FILES\/([\w-]+\.ts)"\s+(check|push|wait)?/g)].map(([, script, verb]) =>
     verb ? `${script} ${verb}` : script,
   );
-  assert.deepEqual(clauses, ['probe.ts check', 'pull-request.ts push', 'pull-request.ts wait']);
+  assert.deepEqual(clauses, ['probe.ts check', 'parts.ts check', 'pull-request.ts push', 'pull-request.ts wait']);
   const round = frozen.indexOf('{ round-check --all; }');
   assert.ok(round > 0, `the round check the factory set is a clause of its own:\n${frozen}`);
   assert.ok(

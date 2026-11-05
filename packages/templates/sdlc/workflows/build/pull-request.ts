@@ -20,8 +20,10 @@
  *   The labels the rules give the run are added, and any other label a rule could give is removed, so a run relabelled is followed and a
  *   label no rule gives — a person's — is left as it is; each through REST (`issues/<n>/labels`), never `gh pr edit`, and the labels set
  *   are printed. A malformed rule, a `WF_LABELS` that is no JSON object of strings, and a label a rule gives that the repository lacks are
- *   refused before anything is pushed. An empty or absent `--labels` labels nothing, and so does a check with no `WF_LABELS` at all, a run
- *   of an older Nemia, saying so.
+ *   refused before anything is pushed, and so is a run whose labels match none of the rules, exit 2, naming each key the rules read, the
+ *   values they take and the `nemia label run <run> <key>=<value> --overwrite` that sets one: such a pull request would carry no label
+ *   a rule gives, and a check that reads its labels would fail where only the merge finds out. An empty or absent `--labels` labels
+ *   nothing, and so does a check with no `WF_LABELS` at all, a run of an older Nemia, saying so.
  * - `wait --check <name>`, which the round's check runs last, `<name>` the CI context branch protection requires of the base branch (the
  *   repository's, so the check gives it): it refuses at once a pull request GitHub says is `CONFLICTING` with its base, on which no CI
  *   would come, naming the merge of the base that answers it (`mergeable`, read again for up to 15 s while GitHub says `UNKNOWN`,
@@ -39,12 +41,16 @@
  * on the PATH or none authenticated; a push git rejects, which is answered by merging the base and never by a force; a draft pull request,
  * or one based on another branch; no open pull request where one is owed; a `headRefOid` that is not `HEAD`; a pull request that conflicts
  * with its base; an `open` with no `--labels`; an `open --labels` or a `push --labels` whose rules, `WF_LABELS` or the repository's
- * labels are not as above; a `wait` with no `--check`; and a CI context that is red, cancelled, skipped or never reported.
+ * labels are not as above (a run whose labels match no rule, exit 2); a `wait` with no `--check`; and a CI context that is red,
+ * cancelled, skipped or never reported.
  */
 import { spawnSync } from 'node:child_process';
 
 /** A reason the verb is refused: said on stderr, exit 1. */
 class Refusal extends Error {}
+
+/** A run whose labels match none of the factory's label rules: refused as any other, exit 2, so a caller tells it apart. */
+class Unlabelled extends Refusal {}
 
 /**
  * How long the CI context has to be reported at all, in seconds: a queue longer than this is a refusal, answered by a `--recheck`.
@@ -113,19 +119,12 @@ const PENDING = new Set(['QUEUED', 'IN_PROGRESS', 'WAITING', 'PENDING', 'REQUEST
 /** The one conclusion that is a pass: a skipped, cancelled or neutral CI context is no verdict to land on. */
 const PASSED = 'SUCCESS';
 
-/** An entry of a head's check rollup, as `gh pr view --json statusCheckRollup` gives one: a check run, or a status context. */
-type Entry = {
-  name?: string;
-  context?: string;
-  status?: string;
-  state?: string;
-  conclusion?: string;
-  detailsUrl?: string;
-  targetUrl?: string;
-  workflowName?: string;
-  /** When a check run started; Go's zero time (`0001-01-01T00:00:00Z`) for one still queued, absent where gh exports none. */
-  startedAt?: string;
-};
+/**
+ * An entry of a head's check rollup, as `gh pr view --json statusCheckRollup` gives one: a check run, or a status context, each field
+ * absent where gh exports none. `startedAt` is when a check run started; Go's zero time (`0001-01-01T00:00:00Z`) for one still queued.
+ */
+type Entry = Partial<Record<EntryField, string>>;
+type EntryField = 'name' | 'context' | 'status' | 'state' | 'conclusion' | 'detailsUrl' | 'targetUrl' | 'workflowName' | 'startedAt';
 
 /** A pull request as this script reads one. */
 type Pr = {
@@ -158,13 +157,14 @@ function git(what: string, ...args: string[]): string {
   return ran.out.trim();
 }
 
+/** The refusal where there is no `gh`, whichever call finds it out. */
+const NO_GH =
+  "no `gh` on the PATH, and the pull request is GitHub's CLI's to open. Install it (https://cli.github.com) and run `gh auth login`";
+
 /** What `gh` printed for `args`, trimmed; refuses, naming what it was asked, when `gh` fails or is not there. */
 function gh(...args: string[]): string {
   const ran = run('gh', args);
-  if (ran.missing)
-    throw new Refusal(
-      "no `gh` on the PATH, and the pull request is GitHub's CLI's to open. Install it (https://cli.github.com) and run `gh auth login`",
-    );
+  if (ran.missing) throw new Refusal(NO_GH);
   if (ran.status !== 0) throw new Refusal(`\`gh ${args.join(' ')}\` failed: ${ran.err}`);
   return ran.out.trim();
 }
@@ -200,10 +200,7 @@ function branchOf(): { branch: string; run: string; leaf: string } {
 /** `gh auth status` passing; refuses with the one command a person types when it does not. */
 function authed(): void {
   const status = read('auth', 'status');
-  if (status.missing)
-    throw new Refusal(
-      "no `gh` on the PATH, and the pull request is GitHub's CLI's to open. Install it (https://cli.github.com) and run `gh auth login`",
-    );
+  if (status.missing) throw new Refusal(NO_GH);
   if (status.status !== 0) throw new Refusal(`\`gh\` is not authenticated here: run \`gh auth login\`. It said: ${status.err}`);
 }
 
@@ -356,10 +353,12 @@ function repoLabels(): Set<string> {
  * What `push --labels` has to set, worked out before anything is pushed: the labels the rules give the run, and every label a rule could
  * give; `undefined` where there is nothing to set. Refuses a label a rule gives that the repository lacks.
  */
-function labelPlan(rules: readonly LabelRule[]): { want: Set<string>; givable: Set<string> } | { note: string } | undefined {
+function labelPlan(rules: readonly LabelRule[], run: string): { want: Set<string>; givable: Set<string> } | { note: string } | undefined {
   if (rules.length === 0) return undefined;
   const ofRun = runLabels();
   if (ofRun === undefined) return { note: "no label is set: this was given no WF_LABELS, the run's labels, which a later Nemia gives it" };
+  if (!rules.some((rule) => Object.hasOwn(ofRun, rule.key) && ofRun[rule.key] === rule.value))
+    throw new Unlabelled(unmatched(rules, ofRun, run));
   const givable = new Set(rules.map((rule) => rule.label));
   const has = repoLabels();
   const lacking = [...givable].filter((label) => !has.has(label));
@@ -371,6 +370,18 @@ function labelPlan(rules: readonly LabelRule[]): { want: Set<string>; givable: S
     );
   const want = new Set(rules.filter((rule) => Object.hasOwn(ofRun, rule.key) && ofRun[rule.key] === rule.value).map((rule) => rule.label));
   return { want, givable };
+}
+
+/**
+ * Why a run whose labels match none of `rules` is refused: each key the rules read, the run's value of it and the values the rules take,
+ * and the `nemia label run` that sets one. A pull request no rule labels fails a check that reads its labels, found out at the merge.
+ */
+function unmatched(rules: readonly LabelRule[], ofRun: Record<string, string>, run: string): string {
+  const has = (key: string): string => (Object.hasOwn(ofRun, key) ? `${key}=${ofRun[key]}` : `no ${key}`);
+  const takes = (key: string): string => `${key}=${rules.flatMap((rule) => (rule.key === key ? [rule.value] : [])).join('|')}`;
+  const keys = [...new Set(rules.map((rule) => rule.key))].map((key) => `\n  the run has ${has(key)}; the rules take ${takes(key)}`);
+  const fix = `\n  label the run with one, \`nemia label run ${run} <key>=<value> --overwrite\`, then type this again`;
+  return `this run's labels match none of the factory's label rules, so its pull request would carry no label:${keys.join('')}${fix}`;
 }
 
 /**
@@ -584,8 +595,8 @@ function edited(n: number, title: string, bodyFile: string): void {
  */
 function open(args: string[]): string[] {
   const { title, bodyFile, rules } = openArgs(args);
-  const { branch, onto } = placed();
-  const plan = labelPlan(rules);
+  const { branch, run, onto } = placed();
+  const plan = labelPlan(rules, run);
   const already = pulls(branch);
   const standing = already.length ? sole(already, branch, onto) : undefined;
   const said = [pushing(branch)];
@@ -630,8 +641,8 @@ function headed(branch: string, onto: string, at: string): Pr {
  */
 function push(args: string[]): string[] {
   const rules = labelRules(args);
-  const { branch, onto } = placed();
-  const plan = labelPlan(rules);
+  const { branch, run, onto } = placed();
+  const plan = labelPlan(rules, run);
   const said = pushing(branch);
   const at = head();
   const pr = headed(branch, onto, at);
@@ -752,7 +763,10 @@ const VERBS: Record<string, { tag: string; act: (args: string[]) => string[] }> 
   wait: { tag: 'nemia ci', act: wait },
 };
 
-/** The whole run: exit 0 with what was done on stdout, 1 with the refusal on stderr, each line under the verb's tag. */
+/**
+ * The whole run: exit 0 with what was done on stdout, or the refusal on stderr with 1, 2 for a run no label rule matches; each line
+ * under the verb's tag.
+ */
 function main(): number {
   const [verb = '', ...args] = process.argv.slice(2);
   const named = Object.hasOwn(VERBS, verb) ? VERBS[verb] : undefined;
@@ -764,7 +778,7 @@ function main(): number {
   } catch (err) {
     if (!(err instanceof Refusal)) throw err;
     process.stderr.write(`${tag}: ${err.message}\n`);
-    return 1;
+    return err instanceof Unlabelled ? 2 : 1;
   }
 }
 

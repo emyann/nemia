@@ -117,6 +117,8 @@ const PINNED: Record<string, string[]> = {
     'HARNESS_KNOBS',
     'configFolderIn',
     'fenceReach',
+    'memoryBytesOf',
+    'memoryQuantityRefusal',
     'unruledIn',
   ],
   'agent-runtime/testing': ['WAITED', 'bell', 'testEngine', 'until'],

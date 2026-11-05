@@ -81,9 +81,9 @@ const refusedNaming =
     return true;
   };
 
-/** A step's record without the revisions every filing pins (`pinned`, `closeoutHash`), whose subject is `revisions.test.ts`. */
+/** A step's record without the revisions every filing pins (`pinned`, `closeoutHash`, `declared`), whose subject is `revisions.test.ts`. */
 const filedAs = (record: StepRecord | undefined): Partial<StepRecord> => {
-  const { pinned: _, closeoutHash: __, ...rest } = record ?? { taskId: null };
+  const { pinned: _, closeoutHash: __, declared: ___, ...rest } = record ?? { taskId: null };
   return rest;
 };
 

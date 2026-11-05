@@ -14,6 +14,7 @@ import { personRoutes, spentAcceptances, spentApprovals, unrouted, withRoutes, t
 import { spentRoundAsks } from '../round/round.ts';
 import { spentAsks, TRY_CAUSES, upgradeAsk, upgradeTries, type RetryAsk } from '../retry/index.ts';
 import { asNamed } from '../workflow.ts';
+import { keptDeclared } from '../pinned/pinned.ts';
 import { FrozenStepSchema } from '../folder/folder.store.ts';
 import { inputsRoot } from './places.store.ts';
 import type { AsksRead, MergeAskHeld } from './record.ts';
@@ -42,11 +43,8 @@ const EarlierTrySchema = Kept({
   paused: Schema.optional(Schema.Literal(true)),
 });
 
-const LandedSchema = Schema.Union([
-  Schema.StructWithRest(Schema.Struct({ commit: Schema.String }), Rest),
-  Schema.StructWithRest(Schema.Struct({ aborted: Schema.String, refusedOn: Schema.optional(Schema.String) }), Rest),
-  Schema.StructWithRest(Schema.Struct({ untouched: Schema.String }), Rest),
-]);
+const Aborted = { aborted: Schema.String, refusedOn: Schema.optional(Schema.String) };
+const LandedSchema = Schema.Union([Kept({ commit: Schema.String }), Kept(Aborted), Kept({ untouched: Schema.String })]);
 
 const StepRecordSchema = Kept({
   taskId: Schema.NullOr(Schema.String),
@@ -59,6 +57,7 @@ const StepRecordSchema = Kept({
   filesRead: Schema.optional(Kept({ taskId: Schema.String, lacked: Schema.Record(Schema.String, Schema.String) })),
   pinned: Pins,
   closeoutHash: Schema.optional(Schema.String),
+  declared: Schema.optional(Strings),
 });
 
 /**
@@ -171,8 +170,7 @@ const wordsOf = (value: unknown, cap: number): string | undefined => (isText(val
 const isPrunedWorktree = Schema.is(Schema.StructWithRest(Schema.Struct({ path: Schema.String, bytes: Schema.Finite }), Rest));
 
 /** A marker's text as JSON, or undefined where it is not: each field is then read as missing, as a marker that does not read is. */
-const JsonText = Schema.fromJsonString(Schema.Unknown);
-const jsonOr = (text: string): unknown => Result.getOrUndefined(Schema.decodeUnknownResult(JsonText)(text));
+const jsonOr = (text: string): unknown => Result.getOrUndefined(Schema.decodeUnknownResult(Schema.fromJsonString(Schema.Unknown))(text));
 
 /** A person's marker file, as JSON where it reads as JSON (`jsonOr`) — or undefined, when there is no such file to read. */
 const markerOf = (file: string): { json: unknown } | undefined => {
@@ -289,7 +287,8 @@ export const removeHold = (id: string, at: string): boolean => {
  *
  * The frozen steps are read under the names their keys have now (`asNamed`), and written back under them (`recordText`), in their place
  * among the record's keys, so a record read and written back moves no line; a try's former `then` is read as its `cause`
- * (`upgradeTries`). Refused: an id with no record, as `no such run` naming
+ * (`upgradeTries`), and a step's record written before `declared` was kept is given it where its schema has not moved (`keptDeclared`).
+ * Refused: an id with no record, as `no such run` naming
  * `nemia ls` (`Missing`), for every verb that takes one; and a record that does not read as a run (`UnreadableRecord`).
  */
 export const readRun = (id: string): Run => within('records', () => readRecord(id));
@@ -308,7 +307,7 @@ const readRecord = (id: string): Run => {
   const read = { ...raw };
   for (const key of ['approvals', 'acceptances', 'pruned', 'hold', 'labels', 'pause', 'cordon']) delete read[key];
   const { workflow, ...unfrozen } = read;
-  const run = workflow ? { ...read, workflow: workflow.map(asNamed) } : unfrozen;
+  const run = workflow ? keptDeclared({ ...read, workflow: workflow.map(asNamed) }) : unfrozen;
   const [at, pruned, hold] = [fs.existsSync(cancelFile(id)) ? readText(cancelFile(id)).trim() : '', readPruned(id), readHold(id)];
   const { approvals, acceptances, routes } = within('asks', () => {
     const names = fileNames(asksDir(id));

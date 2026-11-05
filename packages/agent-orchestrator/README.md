@@ -425,7 +425,7 @@ A repository carries its workflows checked in, one folder each under `<repo>/wor
 `wf start <brief> --workflows dev` picks one: a bare name is a folder under `<repo>/workflows/`, and a path to any
 workflow folder works too, looked at first. The board lists them, and the folders under
 `~/.agent-workflows/workflows/` as yours, draws each, and starts a run of one (`apps/api`,
-`GET /api/namespaces/<factory>/workflows` and `POST /api/runs`).
+`GET /api/namespaces/<factory>/workflows` and `POST /api/namespaces/<factory>/runs`).
 
 A folder can be written as well as read, and the board's builder saves through that write: `writeWorkflow(dir, steps, readme?)`
 in folder/write.store.ts. Each step is rendered by `renderStep` (workflow/step-file.ts), which is the parser run backwards: the keys the step sets, in
@@ -1827,7 +1827,7 @@ its own, and everything below reads the words back off the engine's view of the 
   message with its time, fenced, before `## Your answer`. A new session (`--fresh`, or a continue with nothing to
   continue) is handed none, as it is handed none of the last one's conversation: say it again with `--message`.
 - **On the board**, the session page (`/runs/<run>/steps/<step>`) has a prompt box under the conversation. It posts to
-  `POST /api/runs/:id/steps/:step/say`, guarded as the retry route is, which calls this verb: a refusal shows under the
+  `POST /api/namespaces/:namespace/runs/:runId/steps/:step/say`, guarded as the retry route is, which calls this verb: a refusal shows under the
   box as the package or the engine words it, and words typed while a message is being said are kept. The step's detail
   carries `said`, and the page draws each as a turn of its own, once: where the session's transcript shows the words
   reaching it, the turn stands in place of that line. The box is closed, with the reason, for a step with no session in
@@ -1974,7 +1974,7 @@ codex:
   the way on, a loop that ended `again: false`, and a round still running. A file at the acceptance's name
   that is not one is honoured by no pass, which says so in its notes and leaves the file alone. The board
   accepts through the same function: its `approve` row takes the reason and posts it to the api's
-  `POST /api/runs/:id/steps/:step/approve`, which calls `accept()` and shows its refusals in these words.
+  `POST /api/namespaces/:namespace/runs/:runId/steps/:step/approve`, which calls `accept()` and shows its refusals in these words.
 - **Taking it back is only a file to delete until a tick has acted on it.** `nemia retry --round` on an accepted loop
   refuses, and what it says depends on that: while nothing waiting on the loop has been filed, nothing has
   been done on the person's word, and the refusal names `accept-<step>-<try>` to delete before asking again.
@@ -2660,7 +2660,7 @@ what a gate needs — a closeout to read, and a run that files nothing until it 
   **`wf rm` refuses a run at its gate**, naming the `wf approve` it waits for, and forgets it once it is called off. `nemia retry --round` on a
   loop whose step waits at its gate says to approve it or send it back.
 - **On the board**, a gated step's section on the run page shows what it handed on, with Approve — a box for the words — and Send back,
-  the answer box, beside it. The banner and the Factory's card say `approve plan`, and `POST /api/runs/:id/steps/:step/approve` calls
+  the answer box, beside it. The banner and the Factory's card say `approve plan`, and `POST /api/namespaces/:namespace/runs/:runId/steps/:step/approve` calls
   `approve()`, refused in its words.
 
 ## A supervisor: a session that watches the runs — `slot: none`
@@ -2871,8 +2871,8 @@ is held until says so and names the `wf hold … --off` that lets it go.
 
 The board puts the same hold and lifts it, from a run's page: Hold… picks the runs of its repository to
 wait on, or none, and takes a why, and Lift… lifts it. Its `by` is the OS user the api runs as. The api serves them
-as `POST /api/runs/<id>/hold`, `{ "until": ["<run>", …], "why"?: "<words>", "by"?: "<name>" }`, and
-`DELETE /api/runs/<id>/hold`: the same file, refused in the same words as `wf hold`.
+as `POST /api/namespaces/<factory>/runs/<id>/hold`, `{ "until": ["<run>", …], "why"?: "<words>", "by"?: "<name>" }`, and
+`DELETE /api/namespaces/<factory>/runs/<id>/hold`: the same file, refused in the same words as `wf hold`.
 
 `wf hold` refuses the following before anything is written, and names the fix for each:
 
@@ -3244,7 +3244,7 @@ be (the workflow's `agents/`, the repository's, the store's).
 ### Every run in a factory
 
 Every start names its factory, or is started in the one whose repository it is on. The entries hold it: `wf start`, `wf start <card>`,
-`wf start <folder>`, the queue's start (`startQueued`) and `POST /api/runs`; `start()` itself takes what it is given.
+`wf start <folder>`, the queue's start (`startQueued`) and `POST /api/namespaces/:namespace/runs`; `start()` itself takes what it is given.
 
 ```
 $ cd ~/code/pipao/src

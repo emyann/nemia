@@ -1,6 +1,7 @@
 import { useId, useState, type ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { approveStep, decisionQuery, type Question, type QuestionAnswer, type RetryMode, type StepCloseout } from '../lib/api';
+import { useRunNamespace } from '@/lib/runNamespace';
 import type { RunView, StepView } from '../lib/runView';
 import { askedSaid } from '../lib/asks';
 import { decidableRun, decisionStamp, isDecidable } from '../lib/decide';
@@ -623,13 +624,15 @@ export const SECONDARY = 'bg-card text-foreground ring-1 ring-outline ring-inset
 /**
  * An approval of a step at its gate through the api (`approveStep`), and the run read again once the api has it — its detail, and the
  * list the Factory's card reads, each by its own key (`exact`), never a decision: a decision is keyed by the state it was read for, and
- * refetching the key the page is on would fill it with the answer for the state after this write.
+ * refetching the key the page is on would fill it with the answer for the state after this write. Sent in the run's namespace:
+ * `namespace` where the caller holds it, as a card on the floor does, else the run's own (`useRunNamespace`).
  */
-export function useApprove(runId: string, step: string, onApproved: () => void) {
+export function useApprove(runId: string, step: string, onApproved: () => void, namespace?: string) {
   const queryClient = useQueryClient();
+  const namespaceNow = useRunNamespace(runId, namespace);
   return useMutation({
     mutationFn: (how: { message?: string; answers?: readonly QuestionAnswer[]; budgets?: readonly GivenBudget[] }) =>
-      approveStep(runId, step, how),
+      namespaceNow().then((ns) => approveStep(ns, runId, step, how)),
     onSuccess: () => {
       onApproved();
       void queryClient.invalidateQueries({ queryKey: ['runs', runId], exact: true });

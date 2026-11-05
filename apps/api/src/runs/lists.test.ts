@@ -1,7 +1,8 @@
 /**
- * The runs in two reads over HTTP (`GET /api/runs-open`, `GET /api/runs-finished`), beside the whole list (`GET /api/runs`): together
- * they answer every run the whole list answers, once, each row the whole list's own with the address of its workflow's page; `?ofFactory=`
- * keeps one factory's; and a page asked wrongly is a 422 naming the field and what it was given.
+ * The runs in two reads over HTTP (`GET /api/runs-open`, `GET /api/runs-finished`), beside the whole list (`GET /api/runs`, the `RunList`):
+ * together they answer every run the list holds, once, each row with the address of its workflow's page; `?ofFactory=` keeps one
+ * factory's; and a page asked wrongly is a 422 naming the field and what it was given. The `RunList` across namespaces and in one, paged
+ * by `?limit=` and `?continue=`, selected by `?labelSelector=` and its retired spelling `?selector=`, and one run read in its namespace.
  *
  * On the stand-ins: the runtime's test engine, each task filed and moved by hand (`engine().settle`), and the test place, under
  * the run records this file seeds. One story, so its checkpoints read one engine, one app and the runs it seeded in turn.
@@ -12,7 +13,8 @@ import { story } from '../../test/checkpoints.ts';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import type { FinishedListing, OpenListing, RunListing } from './runs.ts';
+import type { RunList } from 'objects';
+import type { FinishedListing, OpenListing, RunAnswer } from './runs.ts';
 import { Effect } from 'effect';
 import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from 'agent-orchestrator/testing';
@@ -70,13 +72,13 @@ const finished = (id: string, created: number, to: number, factory?: string) => 
 };
 
 beforeEachTest(() => {
-  finished('l-first', 0, 50, 'nemia');
+  finished('l-first', 0, 50, 'acme');
   finished('l-second', 5, 20);
-  finished('l-third', 10, 30, 'nemia');
+  finished('l-third', 10, 30, 'acme');
   finished('l-fourth', 15, 40);
-  finished('l-fifth', 16, 45, 'pipao');
+  finished('l-fifth', 16, 45, 'beta');
   journalled('l-asks-write', at(20), { to: at(25), closeout: BLOCKED });
-  aRun('l-asks', at(20), 'nemia');
+  aRun('l-asks', at(20), 'acme');
   journalled('l-moves-write', at(30));
   aRun('l-moves', at(30));
 });
@@ -95,26 +97,12 @@ const everyPage = async (query = ''): Promise<FinishedListing[]> => {
   return [first, ...rest];
 };
 
-/** A row of either read as the whole list answers the run: without what the two reads add. */
-const listingOf = (row: object): object => {
-  const {
-    wallMs: _w,
-    finishedAt: _f,
-    outcome: _o,
-    clock: _c,
-    stepCosts: _s,
-    waitingSince: _p,
-    ...listing
-  } = row as Record<string, unknown>;
-  return listing;
-};
-
 test("the runs read in two halves answer the whole list: open and finished, a factory's own, a page at a time", async (t) => {
   const s = story(t);
   await s.test(
     'the two reads answer every run of the whole list, once, each row its own with its workflow page; the counts add up',
     async () => {
-      const whole = await read<RunListing[]>('/api/runs');
+      const whole = (await read<RunList>('/api/runs')).items.map((run) => run.metadata.name);
       const open = await read<OpenListing>('/api/runs-open');
       const pages = await everyPage();
       assert.deepEqual(
@@ -132,14 +120,8 @@ test("the runs read in two halves answer the whole list: open and finished, a fa
       const rows = [...open.waiting, ...open.inFlight, ...pages.flatMap((page) => page.runs)];
       assert.equal(rows.length, whole.length);
       assert.equal(open.counts.waiting + open.counts.inFlight + open.counts.finished, whole.length);
-      for (const row of rows) {
-        assert.ok('workflowPage' in row, `${row.id} carries the address of its workflow's page`);
-        assert.deepEqual(
-          listingOf(row),
-          whole.find((run) => run.id === row.id),
-          row.id,
-        );
-      }
+      assert.deepEqual(rows.map((row) => row.id).sort(), [...whole].sort(), 'every run of the RunList, once');
+      for (const row of rows) assert.ok('workflowPage' in row, `${row.id} carries the address of its workflow's page`);
       assert.deepEqual(
         pages[0].runs.map((run) => [run.finishedAt, run.wallMs, run.outcome]),
         [
@@ -190,10 +172,10 @@ test("the runs read in two halves answer the whole list: open and finished, a fa
   await s.test(
     '?ofFactory= keeps the runs of one factory, default those that name none, and a name no run carries answers empty',
     async () => {
-      const nemia = await read<OpenListing>('/api/runs-open?ofFactory=nemia');
-      assert.deepEqual(nemia.counts, { waiting: 1, inFlight: 0, finished: 2 });
+      const acme = await read<OpenListing>('/api/runs-open?ofFactory=acme');
+      assert.deepEqual(acme.counts, { waiting: 1, inFlight: 0, finished: 2 });
       assert.deepEqual(
-        (await everyPage('&ofFactory=nemia')).flatMap((page) => page.runs.map((run) => run.id)),
+        (await everyPage('&ofFactory=acme')).flatMap((page) => page.runs.map((run) => run.id)),
         ['l-first', 'l-third'],
       );
       assert.deepEqual((await read<OpenListing>('/api/runs-open?ofFactory=default')).counts, { waiting: 0, inFlight: 1, finished: 2 });
@@ -257,11 +239,17 @@ test('?selector= keeps the runs one of its selectors takes by their labels, on e
       'the waiting run labelled infra',
     );
     assert.deepEqual(open.inFlight, [], 'and no run in flight carries it');
-    const all = await read<RunListing[]>('/api/runs?selector=team%3Dcore');
+    const all = await read<RunList>('/api/runs?selector=team%3Dcore');
     assert.deepEqual(
-      all.map((r) => r.id),
+      all.items.map((r) => r.metadata.name),
       ['l-second'],
-      'the whole list too',
+      'the whole list too, `?selector=` read as `?labelSelector=`',
+    );
+    const one = await read<RunList>('/api/namespaces/default/runs?labelSelector=team%3Dcore');
+    assert.deepEqual(
+      one.items.map((r) => r.metadata.name),
+      ['l-second'],
+      'and the list of a namespace',
     );
     const ceilings = { WF_MAX_RUNS: process.env.WF_MAX_RUNS, WF_MAX_CONCURRENT: process.env.WF_MAX_CONCURRENT };
     Object.assign(process.env, { WF_MAX_RUNS: '2', WF_MAX_CONCURRENT: '2' });
@@ -275,14 +263,92 @@ test('?selector= keeps the runs one of its selectors takes by their labels, on e
     );
   });
   await t.test('two selectors are either: a run one of them takes is kept', async () => {
-    const page = await read<FinishedListing>('/api/runs-finished?selector=team%3Dcore&selector=factory%3Dpipao');
+    const page = await read<FinishedListing>('/api/runs-finished?selector=team%3Dcore&selector=factory%3Dbeta');
     assert.deepEqual(page.runs.map((r) => r.id).sort(), ['l-fifth', 'l-second']);
   });
-  for (const address of ['/api/runs', '/api/runs-open', '/api/runs-finished', '/api/listing', '/api/listing/l-second'])
+  for (const address of [
+    '/api/runs',
+    '/api/runs-summaries',
+    '/api/runs-open',
+    '/api/runs-finished',
+    '/api/listing',
+    '/api/listing/l-second',
+  ])
     await t.test(`REFUSED: ${address} with a selector of a misspelled key, 422`, async () => {
       const res = await app().request(`${address}?selector=no%2Fpe%3Dx`);
       const body = (await res.json()) as { error?: string };
       assert.equal(res.status, 422, JSON.stringify(body));
       names(body.error, 'no/pe');
     });
+});
+
+/** The names of a `RunList`'s runs, in its order. */
+const namesOf = (list: RunList): string[] => list.items.map((run) => run.metadata.name);
+
+test("the runs as a RunList: across namespaces at /api/runs, one namespace at /api/namespaces/<factory>/runs, each run its factory's", async () => {
+  const all = await read<RunList>('/api/runs');
+  assert.deepEqual([all.apiVersion, all.kind], ['nemia/v1', 'RunList']);
+  assert.deepEqual(namesOf(all), ['l-asks', 'l-fifth', 'l-first', 'l-fourth', 'l-moves', 'l-second', 'l-third'], 'every run, by name');
+  assert.deepEqual(
+    all.items.map((run) => [run.metadata.name, run.metadata.namespace]),
+    [
+      ['l-asks', 'acme'],
+      ['l-fifth', 'beta'],
+      ['l-first', 'acme'],
+      ['l-fourth', 'default'],
+      ['l-moves', 'default'],
+      ['l-second', 'default'],
+      ['l-third', 'acme'],
+    ],
+    "a run's namespace is its factory, default for one that names none",
+  );
+  assert.equal(all.metadata.remainingItemCount, 0);
+  assert.equal(all.metadata.continue, undefined, 'one page holds them all');
+  assert.deepEqual(namesOf(await read<RunList>('/api/namespaces/acme/runs')), ['l-asks', 'l-first', 'l-third']);
+  assert.deepEqual(namesOf(await read<RunList>('/api/namespaces/default/runs')), ['l-fourth', 'l-moves', 'l-second']);
+  assert.deepEqual(namesOf(await read<RunList>('/api/namespaces/elsewhere/runs')), [], 'a namespace no run is in lists none');
+});
+
+test('a RunList pages by ?limit= and ?continue=, every run once, in order', async () => {
+  const seen: string[] = [];
+  let token: string | undefined;
+  let pages = 0;
+  do {
+    const page = await read<RunList>(`/api/runs?limit=3${token === undefined ? '' : `&continue=${encodeURIComponent(token)}`}`);
+    assert.ok(page.items.length <= 3, 'no more than the limit');
+    seen.push(...namesOf(page));
+    token = page.metadata.continue;
+    pages++;
+    if (token !== undefined) assert.equal(page.metadata.remainingItemCount, 7 - seen.length, 'what is left after this page');
+  } while (token !== undefined);
+  assert.equal(pages, 3);
+  assert.deepEqual(seen, ['l-asks', 'l-fifth', 'l-first', 'l-fourth', 'l-moves', 'l-second', 'l-third']);
+  const first = await read<RunList>('/api/namespaces/acme/runs?limit=2');
+  assert.deepEqual(namesOf(first), ['l-asks', 'l-first']);
+  const next = await read<RunList>(`/api/namespaces/acme/runs?limit=2&continue=${encodeURIComponent(first.metadata.continue ?? '')}`);
+  assert.deepEqual(namesOf(next), ['l-third'], "a namespace's page goes on in it");
+});
+
+test('REFUSED: a RunList asked a limit that is no whole number from 1, or a token it did not give, is a 422 naming the field', async () => {
+  for (const query of ['limit=0', 'limit=x', 'limit=-2', 'continue=not-a-token']) {
+    for (const address of ['/api/runs', '/api/namespaces/default/runs']) {
+      const res = await app().request(`${address}?${query}`);
+      const body = (await res.json()) as { error?: string };
+      assert.equal(res.status, 422, `${address}?${query}: ${JSON.stringify(body)}`);
+      names(body.error, query.split('=')[0] ?? '');
+    }
+  }
+});
+
+test('a run read in its namespace is the Run; under another, or by a name no run has, a 404; /api/runs/:runId reads it across them', async () => {
+  const one = await read<RunAnswer>('/api/namespaces/acme/runs/l-first');
+  assert.deepEqual([one.kind, one.metadata.name, one.metadata.namespace], ['Run', 'l-first', 'acme']);
+  assert.deepEqual(await read<RunAnswer>('/api/runs/l-first'), one, 'the same object across namespaces');
+  assert.equal((await read<RunAnswer>('/api/namespaces/default/runs/l-second')).metadata.namespace, 'default');
+  for (const address of ['/api/namespaces/default/runs/l-first', '/api/namespaces/beta/runs/l-first', '/api/namespaces/acme/runs/l-none']) {
+    const res = await app().request(address);
+    const body = (await res.json()) as { error?: string };
+    assert.equal(res.status, 404, `${address}: ${JSON.stringify(body)}`);
+    assert.equal(typeof body.error, 'string', 'a sentence saying where to look');
+  }
 });

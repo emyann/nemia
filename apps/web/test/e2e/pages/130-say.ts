@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Page } from 'playwright';
-import { fed, photograph, sidebar, themeOf } from '../board.ts';
+import { fed, photograph, sidebar, themeOf, isRunAction } from '../board.ts';
 import { expectCount, expectNone, expectVisible, Refused, settled, WAIT_MS, watch } from '../checks.ts';
 import { attachedFiles, DRAFT_TRANSCRIPT, SAYING } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -33,9 +33,8 @@ export default {
     const seededConversation = fs.readFileSync(conversation, 'utf8');
     const { run: runFile } = attachedFiles(store!, `ae/${taskId}/1`);
     const listed = fs.readFileSync(runFile, 'utf8');
-    const sayRoute = `/api/runs/${SAYING.run}/steps/${SAYING.step}/say`;
     const said = (r: { request: () => { method: () => string }; url: () => string }) =>
-      r.request().method() === 'POST' && new URL(r.url()).pathname === sayRoute;
+      r.request().method() === 'POST' && isRunAction(new URL(r.url()).pathname, SAYING.run, `/steps/${SAYING.step}/say`);
     const boxOf = (p: Page) => p.locator(`section[aria-label="Say something to ${SAYING.step}"]`);
     const fieldOf = (p: Page) => boxOf(p).getByRole('textbox', { name: `What to say to ${SAYING.step}'s session` });
     const sendOf = (p: Page) => boxOf(p).getByRole('button', { name: 'Send' });

@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Page } from 'playwright';
-import { fed, photograph, sidebar, themeOf, stepBar } from '../board.ts';
+import { fed, photograph, sidebar, themeOf, stepBar, isRunAction } from '../board.ts';
 import { expectCount, expectVisible, idle, Refused, settled, WAIT_MS } from '../checks.ts';
 import type { PageSpec } from '../visit.ts';
 import { ASKED } from '../seed.ts';
@@ -214,7 +214,7 @@ export default {
       await photograph(row, path.join(OUT, `questions-form-${theme}.png`));
 
       const [response] = await Promise.all([
-        page.waitForResponse((r) => r.request().method() === 'POST' && new URL(r.url()).pathname === `/api/runs/${id}/steps/spec/retry`, {
+        page.waitForResponse((r) => r.request().method() === 'POST' && isRunAction(new URL(r.url()).pathname, id, `/steps/spec/retry`), {
           timeout: WAIT_MS,
         }),
         send.click(),

@@ -1,6 +1,7 @@
 /**
- * The runs, for the board: every run listed, the runs that wait or move with the counts, a page of the finished runs, one run in full,
- * and what `nemia decide` shows of it.
+ * The runs, for the board: the runs that wait or move with the counts, a page of the finished runs, the record of one, and what `nemia
+ * decide` shows of it. The runs as objects — a `RunList` at `GET /api/runs` and `GET /api/namespaces/<namespace>/runs`, a run at
+ * `GET /api/namespaces/<namespace>/runs/<name>` and `GET /api/runs/:runId` — and the run's named actions are the objects' (src/objects).
  */
 import { Effect } from 'effect';
 import { type Context, Hono } from 'hono';
@@ -45,13 +46,16 @@ export type { StepFiled, StepRaise, TaskPart, RunRead, StepUsed, Usage } from 'a
 /** What a step's latest attempt ran on (`StepAttempts.latest`): its release and its harness, where the board's mirrors read them. */
 export type { SessionHarness, SessionRelease } from 'agent-orchestrator';
 
-/** A person's hold on a run, as `PUT /api/runs/:id/hold` answers it beside the run (`{ id, lifted: false, hold }`). */
+/**
+ * A person's hold on a run, as `POST /api/namespaces/:namespace/runs/:runId/hold` answers it beside the run (`{ id, lifted: false, hold
+ * }`).
+ */
 export type { Hold } from 'agent-orchestrator/run';
 
 /** A run as the list answers it: its summary, and the address of its workflow's page, null where the board pages none. */
 export type RunListing = RunSummary & { workflowPage: WorkflowPageAddress | null };
 
-/** A run as `GET /api/runs/:id` answers it: the package's run object, `nemia/v1`'s `Run`, the answer of `nemia show`. */
+/** A run as `GET /api/runs/:runId` answers it: the package's run object, `nemia/v1`'s `Run`, the answer of `nemia show`. */
 export type RunAnswer = RunObject.Run;
 
 /**
@@ -73,7 +77,7 @@ export type OpenListing = Omit<OpenRuns, 'waiting' | 'inFlight'> & {
 /** One page of the finished runs, as `GET /api/runs-finished` answers it. */
 export type FinishedListing = Omit<FinishedPage, 'runs'> & { runs: Array<FinishedRun & Paged> };
 
-/** Every run's summary (`runs`), an entry of the package's table the api serves alone: on `GET /api/runs`. */
+/** The summaries of every run (`runs`), an entry of the package's table: on `GET /api/runs-summaries`, the board's whole list. */
 const RUNS = commandNamed('runs');
 
 /** The runs that wait or move, with the counts (`runs open`), an entry of the package's table: on `GET /api/runs-open`. */
@@ -109,7 +113,7 @@ const informed = <A, E, R>({ informer }: Served, program: Effect.Effect<A, E, R>
 /** What a list's read hands the package to keep between requests: the app's informer and its feed's filing times. */
 const keptOf = ({ informer, memo }: Served) => ({ ...(informer ? { runs: informer } : {}), filings: memo.filings });
 
-/** What the read `entry` answers `args`, handed the app's informer and its feed's filing times, as `GET /api/runs` hands them. */
+/** What the read `entry` answers `args`, handed the app's informer and its feed's filing times. */
 const listRead = (s: Served, entry: (typeof COMMANDS)[number], args: Record<string, string | string[]>) =>
   runPlaced(s, s.e, entry.handler(args, s.env, s.home, keptOf(s)));
 
@@ -130,11 +134,13 @@ const noView = (id: string, view: string): string =>
 const CONCLUDED = commandNamed('concluded');
 
 /**
- * The runs' routes: the list, one run in full, what `nemia decide` shows of it, and what it would hand as context. The board's writes on a
- * run — its removal and its prune among them — are the command table's routes (`commands`, commands/routes.ts).
+ * The runs' routes: the board's two views of the list, the record of one run, what `nemia decide` shows of it, and what it would hand as
+ * context. The run's named actions on it — its removal and its prune among them — are served in its namespace by the objects' handlers
+ * (objects/runs.ts), through the command table's pipeline (`commandAnswered`, commands/routes.ts).
  *
- * - `GET /api/runs` — every run's summary (`RunListing`), each with the address of its workflow's page (`workflowPageOf`), in the
- *   store's order: the package's entry (`runs`), handed the app's informer (`Informer`) and its feed's filing times. One request costs,
+ * - `GET /api/runs-summaries` — every run's summary (`RunListing`), the board's whole list, which both views read too, each with the
+ *   address of its workflow's page (`workflowPageOf`), in the store's order, handed the app's informer (`Informer`) and its feed's filing
+ *   times. One request costs,
  *   however many runs there are, one harness observation (one listing of the sessions it holds, one scan of the detached runs' files),
  *   a read of every task journal in the engine's store, and each run's record and workflow folder. That is a cold read's cost: a warm
  *   one costs the store's stamp walk (one `readdir`, and a `stat` of each run's files) and the records and journals of the runs still
@@ -148,7 +154,7 @@ const CONCLUDED = commandNamed('concluded');
  *   still moving and of none other; the rest are read through the request's own engine and the tick's last standing (`viewsFor`,
  *   `standingSnapshot`). With `WF_VERIFY_REST` a kept answer is judged afresh too, and one that differs fails the request: such a read
  *   is handed nothing from memory and reads every record again.
- * - `?selector=` on `GET /api/runs`, `GET /api/runs-open`, `GET /api/runs-finished` and `GET /api/listing[/:runId]` — a selector of the
+ * - `?selector=` on `GET /api/runs-open`, `GET /api/runs-finished` and `GET /api/listing[/:runId]` — a selector of the
  *   runs' labels (`team=core`, `team in (core,infra)`, `!team`), as `nemia ls -l` takes it, given again for another, of which one must
  *   take a run (OR): each row carries its whole map, `labels` (the person's keys, `workflow`, and `factory`, `default` for the default
  *   factory), and a selector reads that. The runs are selected before any is judged, the counts and the page cut over those taken. A
@@ -163,7 +169,7 @@ const CONCLUDED = commandNamed('concluded');
  *   hold only a person lifts, the earliest where several are open; null where a task does not read or the record does not date the wait,
  *   as for a run that waits on one which never lands. A row in flight has neither of those two keys.
  *   `?ofFactory=` keeps the runs of one factory, `default` those whose record names none, compared as strings: a name no run carries
- *   answers empty lists and zero counts. Read off the same memo as `GET /api/runs`, with the journals of the waiting runs and of the runs
+ *   answers empty lists and zero counts. Read off the same memo as the summaries, with the journals of the waiting runs and of the runs
  *   in flight read for their breakdowns: it does not grow with the finished runs, and warm it costs no record of one.
  * - `GET /api/runs-finished` — one page of the finished runs (`FinishedListing`), by the package's entry (`runs finished`): newest first
  *   by `finishedAt`, when their work stopped — the later of the end of the last session or check and the cancellation — two that stopped
@@ -174,9 +180,9 @@ const CONCLUDED = commandNamed('concluded');
  *   above. A `page` that is no whole number from 1, or a `size` that is none from 1 to 100, is a 422 in the package's words (`Invalid`).
  *   Each row carries `clock` too, as a row of the light answer does, read where its work stopped so its five parts add up to its own
  *   `wallMs` and the breakdown of a finished run stands still. The page is cut before anything is read for it, so beyond what a warm
- *   `GET /api/runs` costs this read costs the records and the task journals of that page's rows alone — nine where the board asks, at
+ *   read of the summaries costs this read costs the records and the task journals of that page's rows alone — nine where the board asks, at
  *   most `?size=`'s hundred — and nothing for the finished runs it does not answer.
- * - `GET /api/runs/:id` — the run as one object (`RunAnswer`), served by the objects' handler (src/objects, the runs group of `objects`'
+ * - `GET /api/runs/:runId` — the run as one object (`RunAnswer`), served by the objects' handler (src/objects, the runs group of `objects`'
  *   `Api`), which this route hands it on to: `?raw=true` (the record, below) and any `view` are answered here. It takes no `view`: the
  *   page `?view=page` once answered is gone, and any `view` is a 422 that says what to read in its place — the object, a step's tries and
  *   told at their sub-resources, and the lines at `…/lines`.
@@ -203,10 +209,10 @@ const subResource = (c: Context<ApiEnv>, command: Command, query: Record<string,
   served(c, async (s) => c.json(await runPlaced(s, s.e, informed(s, command.handler({ ...query, ...c.req.param() }, s.env, s.home)))));
 
 export const runs = new Hono<ApiEnv>()
-  .get('/api/runs', (c) =>
+  .get('/api/runs-summaries', (c) =>
     served(c, async (s) => {
-      const summaries = (await runPlaced(s, s.e, RUNS.handler(selectorOf(c), s.env, s.home, keptOf(s)))) as unknown as RunSummary[];
-      return c.json(summaries.map((run): RunListing => ({ ...run, workflowPage: workflowPageOf(run, s.repo, s.home) })));
+      const summaries = (await listRead(s, RUNS, selectorOf(c))) as unknown as RunSummary[];
+      return c.json(paged(summaries, s) satisfies RunListing[]);
     }),
   )
   .get('/api/runs-open', (c) =>
@@ -269,7 +275,8 @@ export const runs = new Hono<ApiEnv>()
  * - `GET /api/listing` and `GET /api/listing/:runId` — `nemia ls`'s answer (`RunsListed`), every run or the one named, by its entry of the
  *   command table (`ls`), whose lines `nemia` prints: each run with its record, judged or left unjudged, and its result branches; the
  *   daemon's standing; where the branches stand; the pause; and the schedules. A run the store does not have is the package's `Missing`, a
- *   404. Not the board's list, which is `GET /api/runs`, and not in the OpenAPI document, which documents the run object alone.
+ *   404. Not the board's list, which is `GET /api/runs-open` and `GET /api/runs-finished`, and not in the OpenAPI document, which documents
+ *   the run object alone.
  * - `GET /api/runs/:runId?raw=true` — the run's record as `nemia show --raw` prints it (`RawRecord`), by `show`'s entry with `raw` set:
  *   its brief cut at 120 characters and each frozen step's body at 60. `raw=false` is the object, as with no `raw`; any other value a 422
  *   naming `raw=true`; a run the store does not have a 404, as the object's.

@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { fed, photograph, sidebar, themeOf, railPlace } from '../board.ts';
+import { fed, photograph, sidebar, themeOf, railPlace, runPath } from '../board.ts';
 import { expectCount, expectVisible, FEED_STREAM, feedAnswered, idle, Refused, settled } from '../checks.ts';
 import { GATED } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -58,9 +58,10 @@ export default {
     const approval = page.locator(`article > section#step-${gated} section[aria-label="The approval of ${gated}"]`);
     await expectVisible(approve, `${gated} waits at its gate`);
 
+    const approvePath = `${await runPath(page, id)}/steps/${gated}/approve`;
     try {
       reads = 0;
-      const answered = await page.request.post(new URL(`/api/runs/${id}/steps/${gated}/approve`, page.url()).href, {
+      const answered = await page.request.post(new URL(approvePath, page.url()).href, {
         data: { message: GATED.words },
       });
       if (answered.status() !== 202)

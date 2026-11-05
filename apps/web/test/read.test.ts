@@ -11,7 +11,7 @@ import path from 'node:path';
 import ts from 'typescript';
 import * as api from '../src/lib/api.ts';
 import { ReadRefusal, UnreadAnswer } from '../src/lib/api/read.ts';
-import { openRunsQuery, runsQuery, type OpenRuns, type RunSummary } from '../src/lib/api/runs.ts';
+import { openRunsQuery, runsQuery, runsSelectedQuery, type OpenRuns, type RunSummary } from '../src/lib/api/runs.ts';
 
 const DIR = path.resolve(import.meta.dirname, '../src/lib/api');
 
@@ -123,17 +123,12 @@ const row = (extra: object = {}): RunSummary => ({
 
 const readRuns = runsQuery.queryFn as unknown as () => Promise<RunSummary[]>;
 
-/** Whether `err` is an `UnreadAnswer` whose message names the route, `at`, what was found there and the fix. */
+/** Whether `err` is an `UnreadAnswer` of the runs' summaries whose message names `at` and what was found there. */
 const unread = (at: string, found: string) => (err: unknown) => {
   assert.ok(err instanceof UnreadAnswer, String(err));
-  assert.ok(err.message.startsWith('GET /api/runs answered what this board does not read'), err.message);
   assert.ok(err.message.includes(`at ${at}, `), err.message);
   assert.ok(err.message.includes(found), err.message);
-  assert.ok(
-    err.message.endsWith('restart the api (npm run dev) and rebuild the board (npm run build), then reload the page.'),
-    err.message,
-  );
-  assert.equal(err.route, 'GET /api/runs');
+  assert.equal(err.route, 'GET /api/runs-summaries');
   return true;
 };
 
@@ -231,6 +226,27 @@ test('a key the board does not know is dropped, not refused', async (t) => {
   assert.equal(Object.hasOwn(run, 'colour'), false);
   assert.equal(Object.hasOwn(run.steps[0], 'mood'), false);
   assert.deepEqual(run, row());
+});
+
+test('every run is one read of the summaries, a selector going with it, and never the RunList', async (t) => {
+  const asked: string[] = [];
+  const before = globalThis.fetch;
+  globalThis.fetch = async (input) => {
+    asked.push(String(input));
+    return new Response(JSON.stringify([row()]), { status: 200, headers: { 'content-type': 'application/json' } });
+  };
+  t.after(() => {
+    globalThis.fetch = before;
+  });
+  await readRuns();
+  await (runsSelectedQuery('team=blue').queryFn as unknown as () => Promise<RunSummary[]>)();
+  const paths = asked.map((at) => new URL(at, 'http://board'));
+  assert.deepEqual(
+    paths.map((at) => at.pathname),
+    ['/api/runs-summaries', '/api/runs-summaries'],
+    'the RunList judges every run it lists: a poll reads the summaries',
+  );
+  assert.equal(paths[1]?.searchParams.get('selector'), 'team=blue');
 });
 
 test("a read the api refused still rejects in the api's words and status, not as an answer unread", async (t) => {
@@ -722,7 +738,7 @@ test("every read and write the board's source makes passes a schema", () => {
   const { faults, schemed, sent } = unschemedReads(texts);
   assert.ok(schemed >= 15, `the walk counted ${schemed} reads through get with a schema`);
   assert.deepEqual(faults, []);
-  assert.ok(sent >= 16, `the walk counted ${sent} writes through send with a schema`);
+  assert.ok(sent >= 12, `the walk counted ${sent} writes through send with a schema`);
 });
 
 test("read.ts hands out its read, its write, the decode they share with the objects' client and their three refusals, and nothing else", async () => {

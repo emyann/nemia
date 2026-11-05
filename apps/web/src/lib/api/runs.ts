@@ -1,10 +1,15 @@
-/** Every run, as the Runs page and the Factory list them (`GET /api/runs`, apps/api/src/runs/runs.ts). */
+/**
+ * Every run, as the Factory, the strips and the pickers list them (`GET /api/runs-summaries`); the rows of the runs-open and
+ * runs-finished views; and a run's named actions, each in the run's namespace.
+ */
 import { queryOptions } from '@tanstack/react-query';
 import { Schema } from 'effect';
 import { decodes } from './decodes.ts';
 import { pace } from '../feed.ts';
 import { selectorKey, withSelector } from './selector.ts';
-import { get, send } from './read.ts';
+import { get } from './read.ts';
+import { runs } from './objects.ts';
+import type { RunHeld, RunRemoved } from 'objects';
 import { RunGraphSchema, type RunGraph } from './graph.ts';
 import { WorkflowPageAddressSchema, type WorkflowPageAddress } from './address.ts';
 import {
@@ -44,7 +49,7 @@ import {
   type StepNeeds,
 } from './judged.ts';
 
-/** Mirrors `RunListing` in apps/api/src/runs/runs.ts: a run's summary, and the address of its workflow's page. */
+/** Mirrors `RunListing` in apps/api/src/runs/runs.ts: a run's summary, the whole list's row and the base of each row of its two views. */
 export type RunSummary = {
   id: string;
   /** The repository a repository run is about; null for a folder run (`place`), which has none. */
@@ -217,20 +222,27 @@ const RunSummarySchema = decodes<RunSummary>()(
 );
 
 /**
+ * Every run's summary (`GET /api/runs-summaries`), `selector` taking them by their labels where it says one: one read, off the informer's
+ * summaries, never the RunList, whose objects cost a judgement of each run on every poll.
+ */
+const everyRun = (selector = ''): Promise<RunSummary[]> =>
+  get(withSelector('/api/runs-summaries', selector), Schema.mutable(Schema.Array(RunSummarySchema)));
+
+/**
  * Every run. Read again on each event of the workflow feed (`useFeed`), and every 5 s while the feed is not followed — every minute while
  * it is.
  */
 export const runsQuery = queryOptions({
   queryKey: ['runs'],
-  queryFn: () => get('/api/runs', Schema.mutable(Schema.Array(RunSummarySchema))),
+  queryFn: () => everyRun(),
   refetchInterval: () => pace(5_000),
 });
 
-/** The runs `selector` takes by their labels (`GET /api/runs?selector=`), under `['runs']`, read again as it is. */
+/** The runs `selector` takes by their labels (`GET /api/runs-summaries?selector=`), under `['runs']`, read again as it is. */
 export const runsSelectedQuery = (selector: string) =>
   queryOptions({
     queryKey: ['runs', ...selectorKey(selector)],
-    queryFn: () => get(withSelector('/api/runs', selector), Schema.mutable(Schema.Array(RunSummarySchema))),
+    queryFn: () => everyRun(selector),
     refetchInterval: () => pace(5_000),
   });
 
@@ -409,68 +421,28 @@ export const concludedQuery = (id: string) =>
     queryFn: () => get(`/api/runs/${encodeURIComponent(id)}/concluded`, ConcludedSchema),
   });
 
-/** What a removal answers: the run removed. */
-const RemovedSchema = decodes<{
-  id: string;
-  removed: true;
-}>()(Schema.Struct({ id: Schema.String, removed: Schema.Literal(true) }));
-
 /**
- * Remove a try's run, as the CLI's `rm` removes it: its record, and the folders it worked in. The api removes only a try, and not one still
- * in flight; rejects with its refusal in full — the package's words, which say to cancel it first — or the api's own about the request.
+ * Remove a try's run, as the CLI's `rm` removes it: its record, and the folders it worked in, in the run's namespace (`namespaceOf`). The
+ * api removes only a try, and not one still in flight; rejects with its refusal in full — the package's words, which say to cancel it
+ * first — or the api's own about the request.
  */
-export const removeRun = (id: string): Promise<{ id: string; removed: true }> =>
-  send('DELETE', `/api/runs/${encodeURIComponent(id)}`, RemovedSchema, {
-    body: {},
-    may: 'The run may be removed: look on the Runs page before removing it again.',
-  });
-
-/** What a lift answers: the run whose hold is lifted. The hold that was is dropped: nothing reads it. */
-const LiftedSchema = decodes<{
-  id: string;
-  lifted: true;
-}>()(Schema.Struct({ id: Schema.String, lifted: Schema.Literal(true) }));
+export const removeRun = (namespace: string, id: string): Promise<RunRemoved> =>
+  runs.delete(namespace, id, 'The run may be removed: look on the Runs page before removing it again.');
 
 /**
  * Lift a person's hold on a run, as the CLI's `hold <run> --off` lifts it: the hold's file removed, and the run goes on at the next tick.
  * Rejects with the api's refusal in full — the package's words for a run nobody holds — or its own about the request.
  */
-export const liftHold = (id: string): Promise<{ id: string; lifted: true }> =>
-  send('DELETE', `/api/runs/${encodeURIComponent(id)}/hold`, LiftedSchema, {
-    body: {},
-    may: "The hold may be lifted: look at the run's page before lifting it again.",
-  });
-
-/** Mirrors `Hold` in agent-orchestrator: when a person put a hold, the runs it waits on, why, and who put it. */
-export type Hold = { at: string; until: string[]; why?: string; by?: string };
-
-/** What a hold put answers: the run, and the hold as the package wrote it. */
-export type Held = { id: string; lifted: false; hold: Hold };
-
-/** Decodes a `Held`: `why` and `by` absent where the hold has none. */
-const HeldSchema = decodes<Held>()(
-  Schema.Struct({
-    id: Schema.String,
-    lifted: Schema.Literal(false),
-    hold: Schema.Struct({
-      at: Schema.String,
-      until: StringsSchema,
-      why: Schema.optionalKey(Schema.String),
-      by: Schema.optionalKey(Schema.String),
-    }),
-  }),
-);
+export const liftHold = (namespace: string, id: string): Promise<RunHeld> =>
+  runs.unhold(namespace, id, "The hold may be lifted: look at the run's page before lifting it again.");
 
 /**
  * Hold a run until the runs `until` names land, as the CLI's `hold <run> --until <run>… --why <words>` holds it, `why` sent only where it
  * says something; who put it is the user the api runs as. Rejects with the api's refusal in full — the package's words for a run it will
  * not hold, or a run to wait on it will not take — or its own about the request.
  */
-export const putHold = (id: string, until: readonly string[], why: string): Promise<Held> =>
-  send('POST', `/api/runs/${encodeURIComponent(id)}/hold`, HeldSchema, {
-    body: { until, ...(why.trim() ? { why } : {}) },
-    may: 'The run may be held: look at its page before holding it again.',
-  });
+export const putHold = (namespace: string, id: string, until: readonly string[], why: string): Promise<RunHeld> =>
+  runs.hold(namespace, id, { until, ...(why.trim() ? { why } : {}) }, 'The run may be held: look at its page before holding it again.');
 
 /**
  * What a prune gives back beyond the run's worktrees, as the CLI's `prune` takes it: `--artifacts`, its files; `--unmerged`, a run nobody
@@ -478,25 +450,15 @@ export const putHold = (id: string, until: readonly string[], why: string): Prom
  */
 export type PruneHow = { artifacts: boolean; unmerged: boolean };
 
-/** What the api answers a prune with: the CLI `prune`'s lines, and how many places it could not remove (`left`), which those lines name. */
+/** What a prune did, as the board says it: the CLI `prune`'s lines, and how many places it could not remove (`left`), which they name. */
 export type Pruned = { id: string; pruned: true; lines: string[]; left: number };
-
-/** Decodes the api's answer to a prune: its lines, and each place it could not remove, by its path. */
-const PruneAnswerSchema = Schema.Struct({
-  pruned: Schema.Literal(true),
-  lines: StringsSchema,
-  left: Schema.Array(Schema.Struct({ path: Schema.String })),
-});
 
 /**
  * Prune a finished run, as the CLI's `prune <run> --yes` does: its worktrees removed, and its files with `artifacts`; a run nobody merged
  * only with `unmerged`. No branch is deleted. Rejects with the api's refusal in full — the package's words for a run not over, one already
  * pruned, or one nobody merged — or its own about the request.
  */
-export async function pruneRun(id: string, how: PruneHow): Promise<Pruned> {
-  const answer = await send('POST', `/api/runs/${encodeURIComponent(id)}/prune`, PruneAnswerSchema, {
-    body: how,
-    may: 'The run may be pruned: look at its page before pruning it again.',
-  });
-  return { id, pruned: true, lines: answer.lines, left: answer.left.length };
+export async function pruneRun(namespace: string, id: string, how: PruneHow): Promise<Pruned> {
+  const answer = await runs.prune(namespace, id, how, 'The run may be pruned: look at its page before pruning it again.');
+  return { id, pruned: true, lines: [...answer.lines], left: answer.left.length };
 }

@@ -76,7 +76,7 @@ export const PINNED_WORDS: Readonly<Record<string, number>> = {
   'apps/web/test/nemia.test.ts': 1,
   'apps/web/test/outcome.test.ts': 3,
   'apps/web/test/pause.test.ts': 2,
-  'apps/web/test/read.test.ts': 2,
+  'apps/web/test/read.test.ts': 1,
   'apps/web/test/run-words.test.ts': 1,
   'apps/web/test/say.test.ts': 4,
   'apps/web/test/scratch.test.ts': 1,

@@ -109,8 +109,13 @@ const filedFrom = async (res: Response): Promise<Filed> => {
 };
 const drop = (name: string, headers: Record<string, string> = JSON_TYPE) =>
   app.request(`/api/namespaces/default/cards/${name}`, { method: 'DELETE', headers });
-const startCard = (body: unknown, headers: Record<string, string> = JSON_TYPE) =>
-  app.request('/api/runs', { method: 'POST', headers, body: JSON.stringify(body) });
+/** A start: of the card `card` names at the Card's own `start`, the rest of the body its; or of a run from a brief, with no card. */
+const startCard = ({ card, ...body }: { card?: string } & Record<string, unknown>, headers: Record<string, string> = JSON_TYPE) =>
+  app.request(card === undefined ? '/api/namespaces/default/runs' : `/api/namespaces/default/cards/${card}/start`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(body),
+  });
 /** A Card as the list answers it, in the keys a card's page says it by. */
 const entryOf = (c: Card) => ({
   name: c.metadata.name,
@@ -272,7 +277,7 @@ const startRefusal = async (name: string, extra: { brief?: string; after?: strin
 };
 
 test('POST /api/runs with `card`: what a start of a card refuses, writing nothing and removing nothing', async (t) => {
-  await t.test("a `card` that is not there is a 404 carrying the package's sentence word for word — and nothing is written", async () => {
+  await t.test("a `card` that is not there is a 404 naming it, the Card's own `Missing` — and nothing is written", async () => {
     clear();
     const { card } = onStore(addToInbox({ text: 'The card that is there' }));
     const expected = await startRefusal('no-such-card');
@@ -280,7 +285,7 @@ test('POST /api/runs with `card`: what a start of a card refuses, writing nothin
 
     const res = await startCard({ workflow: 'dev', card: 'no-such-card', brief: 'Do it.' });
     assert.equal(res.status, 404);
-    assert.equal(((await res.json()) as Refused).error, expected);
+    assert.match(((await res.json()) as Refused).error, /no-such-card/, 'the refusal names the card it has none of');
     const withMd = await startCard({ workflow: 'dev', card: `${card.name}.md`, brief: 'Do it.' });
     assert.equal(withMd.status, 404);
     assert.deepEqual(runFiles(), []);
@@ -351,23 +356,24 @@ test('POST /api/runs with `card`: what a start of a card refuses, writing nothin
   );
 
   await t.test(
-    "a `card` that is not a card's name is a 400, and one that is not text or with a brief that is not a 400 in the api's — before any workflow is looked for",
+    "a run's start sent a `card` is a 400 pointing at the Card's own start, a card's name that is none a 422, and a brief that is not text a 400 — before any workflow is looked for",
     async () => {
       clear();
       const { card } = onStore(addToInbox({ text: 'Keep this one' }));
-      for (const name of ['', '.hidden', '../runs/r-1', 'a/b', '..']) {
-        const res = await startCard({ workflow: 'nope', card: name, brief: 'Do it.' });
+      for (const name of ['', '.hidden', '../runs/r-1', 'a/b', '..', card.name, 42, null, ['a']]) {
+        const res = await app.request('/api/namespaces/default/runs', {
+          method: 'POST',
+          headers: JSON_TYPE,
+          body: JSON.stringify({ workflow: 'nope', card: name, brief: 'Do it.' }),
+        });
         assert.equal(res.status, 400, `${JSON.stringify(name)}: refused before the workflow nobody has`);
+        assert.match(((await res.json()) as Refused).error, /\/cards\/.*\/start/, `${JSON.stringify(name)}: the Card's start named`);
       }
-      for (const name of [42, null, ['a']]) {
-        const res = await startCard({ workflow: 'nope', card: name, brief: 'Do it.' });
-        assert.equal(res.status, 400, JSON.stringify(name));
-        assert.ok(((await res.json()) as Refused).error.startsWith('`card` names the inbox card to start'), JSON.stringify(name));
-      }
+      const hidden = await startCard({ workflow: 'nope', card: '.hidden', brief: 'Do it.' });
+      assert.equal(hidden.status, 422, "no card's name, refused before the workflow nobody has");
       for (const brief of [42, null]) {
         const res = await startCard({ workflow: 'dev', card: card.name, brief });
         assert.equal(res.status, 400, JSON.stringify(brief));
-        assert.ok(((await res.json()) as Refused).error.startsWith('`brief` is what the run is asked to do'), JSON.stringify(brief));
       }
       const unknown = await startCard({ workflow: 'nope', card: card.name });
       assert.equal(unknown.status, 404, "the workflow is still the api's to find, among its folders");
@@ -414,7 +420,7 @@ test("a card whose start fails without a refusal — its repository's `.worktree
   assert.equal(errors.length, 1, 'the failure said once on stderr');
   const lines = said.mock.calls.filter((call) => typeof call.arguments[0] === 'string').map((call) => String(call.arguments[0]));
   assert.equal(lines.length, 1, `beside it, the request's own line at Error: ${JSON.stringify(lines)}`);
-  assert.match(lines[0], /^\d\d:\d\d:\d\d {2}POST \/api\/runs 500 \d+ms$/);
+  assert.match(lines[0], /^\d\d:\d\d:\d\d {2}POST \/api\/namespaces\/default\/cards\/[^ ]+\/start 500 \d+ms$/);
 });
 
 /**

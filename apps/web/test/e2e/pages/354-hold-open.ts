@@ -2,9 +2,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import type { Page } from 'playwright';
-import type { RunSummary } from '../../../src/lib/api/runs.ts';
 import { waitsOnYou } from '../../../src/lib/factory.ts';
-import { fed, photograph, themeOf } from '../board.ts';
+import { fed, photograph, themeOf, isRunAction, rowsAnswered } from '../board.ts';
 import { cardOf } from '../canvas.ts';
 import { expectCount, expectVisible, idle, literal, Refused, settled, WAIT_MS } from '../checks.ts';
 import { GATED } from '../seed.ts';
@@ -42,7 +41,7 @@ export default {
       if (await put.isDisabled()) throw new Refused('Hold is offered with no run ticked: the run is then held until a person lifts it');
       await dialog.getByRole('textbox', { name: 'Why (optional)' }).fill(WHY);
       const [answered] = await Promise.all([
-        page.waitForResponse((r) => r.request().method() === 'POST' && new URL(r.url()).pathname === `/api/runs/${id}/hold`, {
+        page.waitForResponse((r) => r.request().method() === 'POST' && isRunAction(new URL(r.url()).pathname, id, `/hold`), {
           timeout: WAIT_MS,
         }),
         put.click(),
@@ -59,8 +58,7 @@ export default {
         throw new Refused('the Held section is not drawn as waiting on you: the hold is the person’s word already given');
       await expectCount(approve, 0, `and ${gated}'s section offers no Approve`);
       await expectCount(page.getByText('waiting on you', { exact: true }), 0, 'and nothing on it says it waits on you');
-      const runs = await page.evaluate(async () => (await (await fetch('/api/runs')).json()) as unknown);
-      const row = (runs as RunSummary[]).find((r) => r.id === id);
+      const row = (await rowsAnswered(page)).find((r) => r.id === id);
       if (!row || waitsOnYou(row)) throw new Refused(`the api lists ${id} among the runs that wait on no one, which the bell reads`);
       await idle(page);
       await settled(page);

@@ -17,9 +17,9 @@ import assert from 'node:assert/strict';
 import { Effect } from 'effect';
 import fs from 'node:fs';
 import path from 'node:path';
-import { objectOf, triesOf } from './run-reads.ts';
+import { objectOf, summariesOf, triesOf } from './run-reads.ts';
 import { app } from '../src/app.ts';
-import { approveRun, engine, list, runStore, type RunSummary } from 'agent-orchestrator';
+import { approveRun, engine, list, runStore } from 'agent-orchestrator';
 import { runWith } from './builtin-place.ts';
 
 const T0 = Date.parse('2026-09-24T01:00:00.000Z');
@@ -92,7 +92,7 @@ fs.appendFileSync(
 /** What the run object of `id` says of it and its steps (`GET /api/runs/:id`, `status`). */
 const detail = async (id: string) => (await objectOf(app, id)).status;
 const summary = async (id: string) => {
-  const run = ((await (await app.request('/api/runs')).json()) as RunSummary[]).find((r) => r.id === id);
+  const run = (await summariesOf(app)).find((r) => r.id === id);
   assert.ok(run, `${id} is on the list`);
   return run;
 };

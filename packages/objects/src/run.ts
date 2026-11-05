@@ -9,7 +9,7 @@
  * writes each into a document that imports back into a Schema decoding the same object.
  */
 import { Schema } from 'effect';
-import { API_VERSION } from './meta.ts';
+import { API_VERSION, listOf } from './meta.ts';
 import { ObjectGraph } from './graph.ts';
 import {
   ANSWER_VIA,
@@ -51,11 +51,13 @@ const StepPhase = Schema.Literals(STEP_PHASES);
 const StepReason = Schema.Literals(STEP_REASONS);
 
 /**
- * The run's name, when it was made, and the labels it is found by, one map (`metadataLabels`): its `workflow`, the `factory` it was
- * started in (`default` for the default one, as the feed says it), and a person's labels on it (`nemia label run`), as `-l` selects them.
+ * The run's name, the namespace it is in (its factory, `default` for one that names none; absent on an object served before the run had
+ * one), when it was made, and the labels it is found by, one map (`metadataLabels`): its `workflow`, the `factory` it was started in
+ * (`default` for the default one, as the feed says it), and a person's labels on it (`nemia label run`), as `-l` selects them.
  */
 export const RunMetadata = Schema.Struct({
   name: Schema.String,
+  namespace: Schema.optionalKey(Schema.String),
   creationTimestamp: Schema.String,
   labels: Schema.Record(Schema.String, Schema.String),
 }).annotate({ identifier: 'RunMetadata' });
@@ -64,7 +66,8 @@ export type RunMetadata = typeof RunMetadata.Type;
 /**
  * One step as the run froze it: what it waits on (`after`), whose declared output it is handed (`input`), and on a looping step the step
  * a round runs again and how many rounds it may run (`loop`, `rounds`; null on any other); then the rest of its frontmatter the board
- * shows, each null where the step does not set it: `fence` is the fence word the run froze for its session, said in this layer's word.
+ * shows, each null where the step does not set it: `fence` is the fence word the run froze for its session, said in this layer's word; and
+ * the agent it is given, by name, absent for a step given none.
  */
 export const RunSpecStep = Schema.Struct({
   name: Schema.String,
@@ -83,6 +86,7 @@ export const RunSpecStep = Schema.Struct({
   sandbox: NullString,
   tools: Schema.NullOr(Strings),
   deadlineSeconds: NullNumber,
+  agent: Schema.optionalKey(Schema.String),
 }).annotate({ identifier: 'RunSpecStep' });
 export type RunSpecStep = typeof RunSpecStep.Type;
 
@@ -397,7 +401,7 @@ const RunToDecide = Schema.Union([
 ]);
 
 /** One kind and name the run or a step of it is behind the files on (`Drift`, revisions.ts). */
-const Drift = Schema.Struct({
+export const RunDrift = Schema.Struct({
   kind: Schema.Literals(REVISION_KINDS),
   name: Schema.String,
   pinned: Schema.Finite,
@@ -409,8 +413,8 @@ const Drift = Schema.Struct({
  * The run now: the runs list's judged fields (`judgedFields`) — its word and codes, whether it moves, its cost, time at work and tokens,
  * what it waits on, its hold and what a person has to decide — then its graph, where its time went as a whole (`Timeline`'s rounds, run
  * and slot), and each step; and the rest of what the board shows of it but the lines to type, which are the command table's: when it
- * started and was called off, what a prune took and would find, the runs it is held until, what its sessions read, who it waits on, its
- * gates, a warning on its folder, and the kinds it is behind the files on.
+ * started and was called off, what a prune took (with its words, as `nemia ls` says them) and would find, the runs it is held until,
+ * what its sessions read, who it waits on, its gates, a warning on its folder, and the kinds it is behind the files on.
  */
 export const RunStatus = Schema.Struct({
   status: Schema.Literals(RUN_STATUSES),
@@ -467,6 +471,7 @@ export const RunStatus = Schema.Struct({
       at: Schema.String,
       worktrees: List(Schema.Struct({ path: Schema.String, bytes: Schema.Finite })),
       artifacts: Schema.NullOr(Schema.Struct({ at: Schema.String, bytes: Schema.Finite })),
+      said: Schema.optionalKey(Schema.String),
     }),
   ),
   onDisk: Schema.Struct({ worktrees: Schema.Boolean, files: Schema.Boolean }),
@@ -476,7 +481,7 @@ export const RunStatus = Schema.Struct({
   waitingOnYouWords: Strings,
   gates: Strings,
   warning: NullString,
-  kinds: List(Drift),
+  kinds: List(RunDrift),
 }).annotate({ identifier: 'RunStatus' });
 export type RunStatus = typeof RunStatus.Type;
 
@@ -489,6 +494,30 @@ export const Run = Schema.Struct({
   status: RunStatus,
 }).annotate({ identifier: 'Run' });
 export type Run = typeof Run.Type;
+
+/**
+ * A run that is in the list and could not be judged, so is no `Run`: its name, its namespace (its factory, `default` for none), and why,
+ * in the words the list says it with.
+ */
+export const RunUnjudged = Schema.Struct({
+  name: Schema.String,
+  namespace: Schema.optionalKey(Schema.String),
+  error: Schema.String,
+}).annotate({ identifier: 'RunUnjudged' });
+export type RunUnjudged = typeof RunUnjudged.Type;
+
+/**
+ * A page of the runs (`RunList`): `listOf('Run', Run)`, and beside it `unjudged`, each run of the page a task of which does not read, left
+ * out of `items` since it cannot be judged into a `Run`. A departure from Kubernetes, whose list holds objects alone: a run dropped with
+ * no word would read as gone, and a page refused for one journal would blank every other run of it. A run of a list is judged without
+ * the reads a poll should not pay for: no harness is asked for a blocked session's last line and no drift is read, so each step's
+ * `lastLine` is null and `kinds` empty there; the run read alone (`GET …/runs/<name>`) says them.
+ */
+export const RunList = Schema.Struct({
+  ...listOf('Run', Run).fields,
+  unjudged: Schema.optionalKey(Schema.Array(RunUnjudged)),
+}).annotate({ identifier: 'RunList' });
+export type RunList = typeof RunList.Type;
 
 /** A closeout's questions under one field of its output (`Asked`, question.ts). */
 const Asked = Schema.Struct({

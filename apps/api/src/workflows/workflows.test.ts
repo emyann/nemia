@@ -1,6 +1,6 @@
 /**
- * GET /api/workflows and POST /api/runs (workflows.ts): a story of a repository's workflows listed and a step's page read, a story of
- * runs of one started, and one table of what a start refuses — in a scratch store and a scratch repository.
+ * GET /api/workflows and POST /api/namespaces/<namespace>/runs (workflows.ts's `runStart`): a story of a repository's workflows listed and
+ * a step's page read, a story of runs of one started, and one table of what a start refuses — in a scratch store and a scratch repository.
  *
  * Beside the scratch repository's workflows lie folders and files that are not one: `NOTES.txt`, not a folder; `.vscode` and `.draft`,
  * hidden, the second with a step in it; and `agents/`, the agents the workflows beside it name, whose files look like steps.
@@ -19,7 +19,7 @@ import { ReadMemo } from '../layer.ts';
 import { Effect } from 'effect';
 import { StoreRoot, workflowVersion as versionIn } from 'agent-orchestrator';
 import { runWith } from '../../test/builtin-place.ts';
-import { objectOf } from '../../test/run-reads.ts';
+import { objectOf, summariesOf } from '../../test/run-reads.ts';
 import { listWorkflows, specOf } from './workflows.ts';
 import { engine, builtinGitPlace, hireRefusalOf, loadWorkflows, passStanding, runStore } from 'agent-orchestrator';
 import { AGENTS_FOLDER, STEP_KEY_MEANINGS, STEP_KEYS } from 'agent-orchestrator/workflow';
@@ -39,7 +39,6 @@ const versionOf = (dir: string): string =>
 type WorkflowStepSpec = import('./workflows.ts').WorkflowStepSpec;
 type WorkflowStepPage = import('../step/step.ts').WorkflowStepPage;
 type WorkflowListing = import('./workflows.ts').WorkflowListing;
-type RunSummary = import('agent-orchestrator').RunSummary;
 
 const write = (file: string, text: string): void => {
   fs.mkdirSync(path.dirname(file), { recursive: true });
@@ -132,7 +131,7 @@ const loaderRefusal = (dir: string): string => {
 };
 
 const post = (body: unknown) =>
-  app.request('/api/runs', {
+  app.request('/api/namespaces/default/runs', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: typeof body === 'string' ? body : JSON.stringify(body),
@@ -509,7 +508,7 @@ const filesOf = (dir: string): Array<[string, string]> =>
 test('a person starts runs from the board: the record as `nemia start` writes it, `after` frozen and read, `context` filed at once', async (t) => {
   const s = story(t);
   await s.test(
-    'POST /api/runs starts a run of the workflow it names as `nemia start` does: the record is written, and nothing is filed',
+    'POST /api/namespaces/default/runs starts a run of the workflow it names as `nemia start` does: the record is written, and nothing is filed',
     async () => {
       assert.deepEqual(runFiles(), []);
       const res = await post({ workflow: 'good', brief: 'Add a cache\n\nKeep it small.\n' });
@@ -556,7 +555,7 @@ test('a person starts runs from the board: the record as `nemia start` writes it
       assert.deepEqual(filedTasks(), [], "nothing filed: no task in the engine's store — `nemia tick` files the first step");
       assert.equal(fs.existsSync(path.join(root, 'worktrees')), false, 'and no worktree cut');
 
-      const listed = ((await (await app.request('/api/runs')).json()) as RunSummary[]).find((r) => r.id === id)!;
+      const listed = (await summariesOf(app)).find((r) => r.id === id)!;
       assert.equal(listed.workflowDir, good, 'the board lists it, with the folder it was started from');
       assert.deepEqual(
         listed.steps.map((s) => s.message),
@@ -589,7 +588,7 @@ test('a person starts runs from the board: the record as `nemia start` writes it
   });
 
   await s.test(
-    'POST /api/runs takes `after` and passes it to `startRun`, which freezes it on the record as `nemia start --after` does — and the board reads the run waiting on it',
+    'POST /api/namespaces/default/runs takes `after` and passes it to `startRun`, which freezes it on the record as `nemia start --after` does — and the board reads the run waiting on it',
     async () => {
       parents();
       const res = await post({ workflow: 'good', from: 'repo', brief: 'Once it lands.', after: ['p-running'] });
@@ -618,7 +617,7 @@ test('a person starts runs from the board: the record as `nemia start` writes it
   );
 
   await s.test(
-    'POST /api/runs takes `context` and passes it to `start()`, which freezes it on the record as `nemia start --from` does, and files at once: it waits on none',
+    'POST /api/namespaces/default/runs takes `context` and passes it to `start()`, which freezes it on the record as `nemia start --from` does, and files at once: it waits on none',
     async () => {
       parents();
       const res = await post({ workflow: 'good', from: 'repo', brief: 'Read it.', context: ['p-running'] });
@@ -670,13 +669,13 @@ test('a person starts runs from the board: the record as `nemia start` writes it
 
 /** A start of the repository's `good`, sent with exactly `headers`. */
 const sentWith = (headers: Record<string, string>) =>
-  app.request('/api/runs', {
+  app.request('/api/namespaces/default/runs', {
     method: 'POST',
     headers,
     body: JSON.stringify({ workflow: 'good', from: 'repo', brief: 'Push main to a new remote.' }),
   });
 
-test('POST /api/runs: what a start refuses, writing nothing, and the name two places have', async (t) => {
+test('POST /api/namespaces/default/runs: what a start refuses, writing nothing, and the name two places have', async (t) => {
   await t.test(
     'an unknown workflow (404, naming the ones there are), a missing or blank brief (422), a body of the wrong shape (400) — and nothing is written',
     async () => {
@@ -703,7 +702,11 @@ test('POST /api/runs: what a start refuses, writing nothing, and the name two pl
       for (const body of ['not json', [], { brief: 'Do it.' }, { workflow: 'good', brief: 'Do it.', from: 'elsewhere' }]) {
         const res = await post(body);
         assert.equal(res.status, 400, JSON.stringify(body));
-        assert.match(((await res.json()) as { error: string }).error, /POST \/api\/runs|`from`/, JSON.stringify(body));
+        assert.match(
+          ((await res.json()) as { error: string }).error,
+          /POST \/api\/namespaces\/<namespace>\/runs|`from`/,
+          JSON.stringify(body),
+        );
       }
 
       assert.deepEqual(runFiles(), before);
@@ -716,13 +719,13 @@ test('POST /api/runs: what a start refuses, writing nothing, and the name two pl
     async () => {
       const before = runFiles();
       const bodyKeys = ['`{ "workflow": "<name>", "brief": "<what to do>" }`', '`"from": "repo"`', '`"after": ["<runId>", …]`'];
-      bodyKeys.push('`"context": ["<runId>", …]`', '`"card": "<name>"`');
+      bodyKeys.push('`"context": ["<runId>", …]`', '`"label": ["<key>=<value>", "<key>-", …]`');
       const notNamed = new Set<string>();
       for (const workflow of ['', 7, null]) {
         const res = await post({ workflow, brief: 'Do it.' });
         assert.equal(res.status, 400, JSON.stringify(workflow));
         const said = ((await res.json()) as { error: string }).error;
-        assert.ok(said.startsWith('POST /api/runs names the workflow to start in `workflow`'), said);
+        assert.ok(said.startsWith('POST /api/namespaces/<namespace>/runs names the workflow to start in `workflow`'), said);
         for (const key of bodyKeys) assert.ok(said.includes(key), `${key}: ${said}`);
         notNamed.add(said);
       }

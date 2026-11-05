@@ -6,6 +6,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { approveStep, askRound, askTry, type QuestionAnswer, type RetryMode } from '../lib/api';
 import { runsMoved } from '@/lib/runWrites';
+import { useRunNamespace } from '@/lib/runNamespace';
 
 /** Each of the CLI `retry`'s ways, as an answer offers it. */
 export const MODES: Record<RetryMode, string> = {
@@ -29,9 +30,12 @@ export const TEXTAREA =
  * A mutation's `step` names another step to try instead, at an ending step's gate, where the send-back goes to the work and not to the step
  * at the gate (`sendBackTo` in agent-orchestrator); the request the api takes does not carry it. Its `answers` are a person's to the
  * questions the step's closeout asks, which the api checks and writes as the try's message, the `message` beside them their note.
+ *
+ * Sent in the run's namespace: `namespace` where the caller holds it, as a card on the floor does, else the run's own (`useRunNamespace`).
  */
-export function useAsk(runId: string, step: string, onAsked: () => void) {
+export function useAsk(runId: string, step: string, onAsked: () => void, namespace?: string) {
   const queryClient = useQueryClient();
+  const namespaceNow = useRunNamespace(runId, namespace);
   return useMutation({
     mutationFn: ({
       step: to,
@@ -42,7 +46,7 @@ export function useAsk(runId: string, step: string, onAsked: () => void) {
       budget?: number;
       answers?: readonly QuestionAnswer[];
       step?: string;
-    }) => askTry(runId, to ?? step, how),
+    }) => namespaceNow().then((ns) => askTry(ns, runId, to ?? step, how)),
     onSuccess: () => {
       onAsked();
       void queryClient.invalidateQueries({ queryKey: ['runs', runId], exact: true });
@@ -58,8 +62,9 @@ export function useAsk(runId: string, step: string, onAsked: () => void) {
  */
 export function useApprove(runId: string, step: string) {
   const queryClient = useQueryClient();
+  const namespaceNow = useRunNamespace(runId);
   return useMutation({
-    mutationFn: (how: { message: string }) => approveStep(runId, step, how),
+    mutationFn: (how: { message: string }) => namespaceNow().then((ns) => approveStep(ns, runId, step, how)),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['runs', runId], exact: true });
       void runsMoved(queryClient, runId);
@@ -73,8 +78,9 @@ export function useApprove(runId: string, step: string) {
  */
 export function useRound(runId: string) {
   const queryClient = useQueryClient();
+  const namespaceNow = useRunNamespace(runId);
   return useMutation({
-    mutationFn: ({ step, ...how }: { step: string; budget?: number }) => askRound(runId, step, how),
+    mutationFn: ({ step, ...how }: { step: string; budget?: number }) => namespaceNow().then((ns) => askRound(ns, runId, step, how)),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['runs', runId], exact: true });
     },

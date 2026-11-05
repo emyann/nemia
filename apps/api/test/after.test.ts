@@ -23,7 +23,7 @@ import type { RunDecision } from '../src/decide/decision.ts';
 import { app } from '../src/app.ts';
 import { decideRun, engine, list, passStanding, runStore, type RunSummary, waitAdvice, waitWord } from 'agent-orchestrator';
 import { runWith } from './builtin-place.ts';
-import { objectOf } from './run-reads.ts';
+import { objectOf, summariesOf } from './run-reads.ts';
 
 type Wait = import('agent-orchestrator').Wait;
 
@@ -144,9 +144,7 @@ fs.writeFileSync(
 type Listed = RunSummary;
 
 const listedRuns = async (): Promise<Map<string, Listed>> => {
-  const res = await app.request('/api/runs');
-  assert.equal(res.status, 200);
-  return new Map(((await res.json()) as Listed[]).map((r) => [r.id, r]));
+  return new Map(((await summariesOf(app)) as Listed[]).map((r) => [r.id, r]));
 };
 
 /** The waits as the api gives them, back in the package's shape. */

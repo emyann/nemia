@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Page } from 'playwright';
-import { photograph, themeOf } from '../board.ts';
+import { photograph, themeOf, runPath } from '../board.ts';
 import { expectCount, expectVisible, idle, Refused, settled, WAIT_MS } from '../checks.ts';
 import { LANDED } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -13,7 +13,7 @@ const LABEL = 'team=core';
 
 /** Edits `id`'s labels through the api, as the run page's field does. */
 async function labelRun(page: Page, id: string, edits: string[]): Promise<void> {
-  const answered = await page.request.post(new URL(`/api/runs/${id}/labels`, page.url()).href, { data: { labels: edits } });
+  const answered = await page.request.post(new URL(`${await runPath(page, id)}/labels`, page.url()).href, { data: { labels: edits } });
   if (answered.status() !== 200) throw new Refused(`the api labels ${id} — it answered ${answered.status()}: ${await answered.text()}`);
 }
 

@@ -16,7 +16,7 @@
     },
     {
       "term": "Ask route",
-      "meaning": "a person's ask of a run over HTTP, one route per command of the orchestrator's table: another try, or with `\"round\": true` another round of the loop the step closes, on `POST /api/runs/:runId/steps/:step/retry`; an approval at a gate, or of a loop out of rounds as it stands, on `POST /api/runs/:runId/steps/:step/approve`; the new revisions, or with `\"base\": true` a merge of the base into a loop's work, on `POST /api/runs/:runId/refresh` (`apps/api/src/commands/routes.ts`).",
+      "meaning": "a person's ask of a run over HTTP, one route per command of the orchestrator's table: another try, or with `\"round\": true` another round of the loop the step closes, on `POST /api/namespaces/:namespace/runs/:name/steps/:step/retry`; an approval at a gate, or of a loop out of rounds as it stands, on `POST /api/namespaces/:namespace/runs/:name/steps/:step/approve`; the new revisions, or with `\"base\": true` a merge of the base into a loop's work, on `POST /api/namespaces/:namespace/runs/:name/refresh`: named actions of objects' `Api`, served by `apps/api/src/objects/runs.ts` through the pipeline of `apps/api/src/commands/routes.ts`.",
       "retired": [
         {
           "spelling": "/round",
@@ -108,7 +108,7 @@
     },
     {
       "term": "Selector",
-      "meaning": "the `?selector=` query of a read of runs or cards (`GET /api/runs`, `/api/runs-open`, `/api/runs-finished`, `/api/listing`, `/api/stats`) and of the feed (`GET /api/feed/stream`): a selector of their labels in the orchestrator's grammar (`team=core`, `team in (core,infra)`, `!team`), given again for another, of which one must take a run or a card; handed to the entry as `selector` (`apps/api/src/labels/selector.ts`), and a malformed one a 422 naming the key."
+      "meaning": "the `?selector=` query of a read of runs or cards (`/api/runs-open`, `/api/runs-finished`, `/api/listing`, `/api/stats`) and of the feed (`GET /api/feed/stream`): a selector of their labels in the orchestrator's grammar (`team=core`, `team in (core,infra)`, `!team`), given again for another, of which one must take a run or a card; handed to the entry as `selector` (`apps/api/src/labels/selector.ts`), and a malformed one a 422 naming the key. The RunList (`GET /api/runs`, `GET /api/namespaces/:namespace/runs`) takes `labelSelector` in its place, and reads `?selector=` as retired."
     },
     {
       "term": "Try cause",

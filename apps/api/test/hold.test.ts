@@ -35,7 +35,7 @@ import {
   unhold,
 } from 'agent-orchestrator';
 import { runWith } from './builtin-place.ts';
-import { objectOf } from './run-reads.ts';
+import { objectOf, summariesOf } from './run-reads.ts';
 
 type Wait = import('agent-orchestrator').Wait;
 
@@ -242,9 +242,7 @@ const BOARD = {
 const post = (route: string, body: unknown) => app.request(route, { method: 'POST', headers: BOARD, body: JSON.stringify(body) });
 
 const listed = async (): Promise<Map<string, RunSummary>> => {
-  const res = await app.request('/api/runs');
-  assert.equal(res.status, 200);
-  return new Map(((await res.json()) as RunSummary[]).map((r) => [r.id, r]));
+  return new Map((await summariesOf(app)).map((r) => [r.id, r]));
 };
 /** The run object's `status` (`GET /api/runs/:id`, a 200 or it throws): its hold, its steps and what waits on you. */
 const detail = async (id: string): Promise<RunAnswer['status']> => (await objectOf(app, id)).status;
@@ -422,12 +420,12 @@ test('a person holds a run until another lands: the list, the page and the decis
     'REFUSED at shipped defaults: every verb the board sends for a held run — approve, send back, try, raise, round, accept — is a 409, and nothing is written',
     async () => {
       const cases: Array<[string, string, unknown]> = [
-        [GATE, `/api/runs/${GATE}/steps/plan/approve`, { message: 'Ship it.' }],
-        [GATE, `/api/runs/${GATE}/steps/plan/retry`, { mode: 'continue', message: 'Store it first.' }],
-        [BLOCKS, `/api/runs/${BLOCKS}/steps/implement/retry`, { mode: 'continue', message: 'Warm ones.' }],
-        [BUDGET, `/api/runs/${BUDGET}/steps/palette/retry`, { mode: 'continue', message: 'Warm ones.', budget: 5 }],
-        [LOOP, `/api/runs/${LOOP}/steps/review/retry`, { mode: 'continue', round: true }],
-        [LOOP, `/api/runs/${LOOP}/steps/review/approve`, { message: 'The findings are follow-up work.' }],
+        [GATE, `/api/namespaces/default/runs/${GATE}/steps/plan/approve`, { message: 'Ship it.' }],
+        [GATE, `/api/namespaces/default/runs/${GATE}/steps/plan/retry`, { mode: 'continue', message: 'Store it first.' }],
+        [BLOCKS, `/api/namespaces/default/runs/${BLOCKS}/steps/implement/retry`, { mode: 'continue', message: 'Warm ones.' }],
+        [BUDGET, `/api/namespaces/default/runs/${BUDGET}/steps/palette/retry`, { mode: 'continue', message: 'Warm ones.', budget: 5 }],
+        [LOOP, `/api/namespaces/default/runs/${LOOP}/steps/review/retry`, { mode: 'continue', round: true }],
+        [LOOP, `/api/namespaces/default/runs/${LOOP}/steps/review/approve`, { message: 'The findings are follow-up work.' }],
       ];
       for (const [id, route, body] of cases) {
         const res = await post(route, body);
@@ -529,7 +527,7 @@ test('a person holds a run until another lands: the list, the page and the decis
 
 /** A lift as the board sends it: a DELETE with an empty JSON body, through the same guard as every write. */
 const lift = (id: string, headers: Record<string, string> = BOARD) =>
-  app.request(`/api/runs/${id}/hold`, { method: 'DELETE', headers, body: '{}' });
+  app.request(`/api/namespaces/default/runs/${id}/hold`, { method: 'DELETE', headers, body: '{}' });
 
 /** Every file of a run in the store's `runs/`, and what each holds: what a refusal must leave as it was. */
 const filesOf = (id: string): Record<string, string> =>
@@ -607,7 +605,7 @@ test('a hold lifted on the board is lifted as `nemia hold --off` lifts it, a han
   );
 });
 
-test('DELETE /api/runs/:id/hold refuses, writing nothing: a run nobody holds is a 409, a run the store has not a 404', async (t) => {
+test('DELETE /api/namespaces/:namespace/runs/:runId/hold refuses, writing nothing: a run nobody holds is a 409, a run the store has not a 404', async (t) => {
   await t.test(
     'REFUSED at shipped defaults: a lift of a run nobody holds — one never held, a pruned one — is a 409 in the words of `nemia hold --off`, and nothing is written',
     async () => {
@@ -671,7 +669,7 @@ holdOn('h-circle-a', ['h-circle-b']);
 
 /** A hold put as the board sends it: a POST of `body` as JSON, through the same guard as every write. */
 const put = (id: string, body: unknown, headers: Record<string, string> = BOARD) =>
-  app.request(`/api/runs/${id}/hold`, { method: 'POST', headers, body: JSON.stringify(body) });
+  app.request(`/api/namespaces/default/runs/${id}/hold`, { method: 'POST', headers, body: JSON.stringify(body) });
 
 /** What the package refuses of `nemia hold <id> --until …`, word for word: `hold`'s own message. */
 const holdRefused = (id: string, until: string[]) => refusal(() => runWith(engine(), hold(id, until)));
@@ -751,7 +749,7 @@ test("a hold put on the board is put as `nemia hold --until --why --by` puts it,
   });
 });
 
-test('POST /api/runs/:id/hold refuses, writing nothing: arguments `nemia hold` refuses a 422, a body it does not take a 400, a run the store has not a 404, a hold `hold` refuses a 409, the guard before any read', async (t) => {
+test('POST /api/namespaces/:namespace/runs/:runId/hold refuses, writing nothing: arguments `nemia hold` refuses a 422, a body it does not take a 400, a run the store has not a 404, a hold `hold` refuses a 409, the guard before any read', async (t) => {
   await t.test(
     'REFUSED at shipped defaults: a hold whose arguments `nemia hold` refuses — a why over 200 characters, a blank by — is a 422 in its words, before the run is read, and nothing is written',
     async () => {
@@ -774,7 +772,10 @@ test('POST /api/runs/:id/hold refuses, writing nothing: arguments `nemia hold` r
     'REFUSED at shipped defaults: a hold whose body says `off`, or a key `nemia hold` does not take, is a 400 naming each and pointing `off` at the lift, and nothing is written',
     async () => {
       const cases: Array<[unknown, RegExp]> = [
-        [{ until: ['p-live'], off: true }, /does not take `off`: .* A hold is lifted with `DELETE \/api\/runs\/h-put\/hold`/],
+        [
+          { until: ['p-live'], off: true },
+          /does not take `off`: .* A hold is lifted with `DELETE \/api\/namespaces\/default\/runs\/h-put\/hold`/,
+        ],
         [{ until: ['p-live'], off: false, step: 'review' }, /does not take `off`, `step`: /],
         [{ until: 'p-live' }, /takes `until` as a list of run ids/],
         [{ until: ['p-live'], why: 3 }, /takes `why` as text/],
@@ -785,7 +786,7 @@ test('POST /api/runs/:id/hold refuses, writing nothing: arguments `nemia hold` r
         assert.equal(res.status, 400, JSON.stringify(body));
         const { error } = (await res.json()) as { error: string };
         assert.match(error, words);
-        assert.match(error, /^POST \/api\/runs\/h-put\/hold /);
+        assert.match(error, /^POST \/api\/namespaces\/default\/runs\/h-put\/hold /);
         assert.deepEqual(filesOf(PUT), before, JSON.stringify(body));
       }
     },
@@ -823,7 +824,7 @@ test('POST /api/runs/:id/hold refuses, writing nothing: arguments `nemia hold` r
     async () => {
       const res = await put('h-nope', { until: ['p-live'] }, { ...BOARD, 'sec-fetch-site': 'cross-site' });
       assert.equal(res.status, 403);
-      assert.match(((await res.json()) as { error: string }).error, /^POST \/api\/runs\/h-nope\/hold /);
+      assert.match(((await res.json()) as { error: string }).error, /^POST \/api\/namespaces\/default\/runs\/h-nope\/hold /);
     },
   );
 });

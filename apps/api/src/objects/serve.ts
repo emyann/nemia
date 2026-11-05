@@ -19,6 +19,11 @@
  * The cluster's templates and their documents, the feed's subscriptions — their `GET`s alone, subscribing and unsubscribing being
  * commands/routes.ts's — and the feed's lines as events, cluster-wide and in a namespace, are handed on as they are.
  *
+ * The runs, as a `RunList` across namespaces and in one, a run in its namespace and across them, and its sub-resources, are handed on as
+ * they are. A run's named actions — its start, its removal, its refresh, prune, labels and hold, and a step's retry, approval and words —
+ * are guarded first in their command's words (`wordsAt`, commands/words.ts), each naming the path in the run's namespace; the start is
+ * placed in the factory its namespace names and on its `?repo=` (`placeFor`), as a definition's write is.
+ *
  * A write's body is read up to `OBJECT_BODY_LIMIT` (effect's `MaxBodySize`, which it otherwise leaves unset), and one over it is
  * answered 413 `{ error }` naming the limit.
  *
@@ -29,7 +34,9 @@ import { HttpIncomingMessage, HttpRouter, HttpServer } from 'effect/http';
 import { HttpApiBuilder } from 'effect/http-api';
 import { type Context as RequestContext, Hono } from 'hono';
 import { Api } from 'objects';
+import { wordsAt } from '../commands/routes.ts';
 import { type Guarded, refusedBeforeReading } from '../guard.ts';
+import { startGuarded } from '../workflows/workflows.ts';
 import { type ApiEnv, type ApiRuntime, served } from '../layer.ts';
 import { cardsHandlers } from './cards.ts';
 import { factoriesHandlers } from './factories.ts';
@@ -195,11 +202,69 @@ const CARD_WRITES = {
     ),
 } as const;
 
+/**
+ * A run's named action, as the guard's refusals word it: its command's words (`wordsAt`), said of the run and the step its path names —
+ * the run spelled `:runId`, as the table's route is, which the objects' handler reads as the `Api`'s `:name`.
+ */
+const runWrite =
+  (command: string) =>
+  (c: RequestContext<ApiEnv>): Guarded =>
+    wordsAt(command).guard({
+      runId: c.req.param('runId') ?? '',
+      step: c.req.param('step') ?? '',
+      name: '',
+      factory: '',
+      namespace: c.req.param('namespace') ?? '',
+      method: c.req.method,
+      path: c.req.path,
+    });
+
+/**
+ * A start's answer, `response`: where it is a 201 naming the run it started (`id`), with the run's address beside it, `Location:
+ * /api/runs/<id>`, where the run object is read whatever namespace its start placed it in.
+ */
+async function located(response: Response): Promise<Response> {
+  if (response.status !== 201) return response;
+  const body: unknown = await response.clone().json();
+  if (typeof body !== 'object' || body === null || !('id' in body) || typeof body.id !== 'string') return response;
+  const headers = new Headers(response.headers);
+  headers.set('Location', `/api/runs/${encodeURIComponent(body.id)}`);
+  return new Response(response.body, { status: response.status, headers });
+}
+
 /** `GET /api/runs/:runId` asked for the record (`?raw=`, not `false`) or a view: the runs' own route answers it. */
 const notTheObject = (c: RequestContext<ApiEnv>): boolean => {
   const raw = c.req.query('raw');
   return (raw !== undefined && raw !== 'false') || c.req.query('view') !== undefined;
 };
+
+/** How a route hands a request to the objects' handler: as it is, as a list, or guarded first in a write's words. */
+type Hand = {
+  readonly forward: (c: RequestContext<ApiEnv>) => Response | Promise<Response>;
+  readonly listed: (c: RequestContext<ApiEnv>) => Response | Promise<Response>;
+  readonly guarded: (write: (c: RequestContext<ApiEnv>) => Guarded) => (c: RequestContext<ApiEnv>) => Response | Promise<Response>;
+};
+
+/**
+ * The runs' routes on `router`: the `RunList` across namespaces and in one and a run in its namespace, handed on as they are, and each of
+ * the run's named actions guarded in its command's words (`runWrite`), the run spelled `:runId` as the command table spells it.
+ */
+function runsRoutes(router: Hono<ApiEnv>, { forward, listed, guarded }: Hand): Hono<ApiEnv> {
+  const RUN = '/api/namespaces/:namespace/runs/:runId';
+  return router
+    .get('/api/runs', listed)
+    .get('/api/namespaces/:namespace/runs', listed)
+    .get(RUN, forward)
+    .delete(RUN, guarded(runWrite('rm')))
+    .post(`${RUN}/refresh`, guarded(runWrite('refresh')))
+    .post(`${RUN}/prune`, guarded(runWrite('prune')))
+    .post(`${RUN}/labels`, guarded(runWrite('label run')))
+    .post(`${RUN}/hold`, guarded(runWrite('hold')))
+    .delete(`${RUN}/hold`, guarded(runWrite('hold')))
+    .post(`${RUN}/steps/:step/retry`, guarded(runWrite('retry')))
+    .post(`${RUN}/steps/:step/approve`, guarded(runWrite('approve')))
+    .post(`${RUN}/steps/:step/say`, guarded(runWrite('say')));
+}
 
 /** The routes that hand the objects' handler each path it serves, built over the app's runtime. */
 export function objectsRoutes(runtime: ApiRuntime): Hono<ApiEnv> {
@@ -228,7 +293,10 @@ export function objectsRoutes(runtime: ApiRuntime): Hono<ApiEnv> {
     listed: (c) => placed(c, LIST_TAKES),
     guarded: placedGuarded,
   });
-  return partsRoutes(new Hono<ApiEnv>().route('/', definitions), { forward, listed, guarded })
+  const runs = runsRoutes(new Hono<ApiEnv>(), { forward, listed, guarded }).post('/api/namespaces/:namespace/runs', async (c) =>
+    located(await placedGuarded((c) => startGuarded(at(c)[0]))(c)),
+  );
+  return partsRoutes(new Hono<ApiEnv>().route('/', definitions).route('/', runs), { forward, listed, guarded })
     .get('/api/runs/:runId', (c, next) => (notTheObject(c) ? next() : forward(c)))
     .get('/api/runs/:runId/steps/:step/tries', forward)
     .get('/api/runs/:runId/steps/:step/tries/:try', forward)
@@ -255,10 +323,7 @@ export function objectsRoutes(runtime: ApiRuntime): Hono<ApiEnv> {
       '/api/namespaces/:namespace/cards/:name',
       guarded((c) => CARD_WRITES.delete(...at(c))),
     )
-    .post(
-      '/api/namespaces/:namespace/cards/:name/start',
-      guarded((c) => CARD_WRITES.start(...at(c))),
-    )
+    .post('/api/namespaces/:namespace/cards/:name/start', async (c) => located(await guarded((c) => CARD_WRITES.start(...at(c)))(c)))
     .post(
       '/api/namespaces/:namespace/cards/:name/queue',
       guarded((c) => CARD_WRITES.queue(...at(c))),

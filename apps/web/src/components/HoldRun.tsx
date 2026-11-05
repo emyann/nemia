@@ -15,8 +15,9 @@ import { Refusal } from './Ask';
 import { runsMoved } from '@/lib/runWrites';
 
 /**
- * Hold, on a run's page: the button opens a popover where a person ticks the runs to wait on and may say why, and the hold is put as the
- * CLI's `hold <run> --until <run>… --why <words>` puts it. The page then says the hold in its Held section, with Lift. A refusal — the
+ * Hold, on a run's page: the button opens a popover where a person ticks the runs to wait on, or none, and may say why, and the hold is
+ * put as the CLI's `hold <run> --until <run>… --why <words>` puts it; with none ticked, as `hold <run> --why <words>`, held until a person
+ * lifts it. The page then says the hold in its Held section, with Lift. A refusal — the
  * package's, of a run it will not hold or one it will not wait on — is shown in the form, and nothing is written. Nothing is offered where
  * the run says it cannot be held (`holdable`).
  */
@@ -86,7 +87,8 @@ function HoldForm({ id, runs, onClose }: { id: string; runs: RunSummary[]; onClo
     >
       <Heading slot="title" className="font-semibold">{`Hold ${id}`}</Heading>
       <p className="text-body-small text-muted-foreground">
-        Nothing more of it is filed, and nothing is asked of you, until every run ticked has landed. What runs now finishes.
+        Nothing more of it is filed, and nothing is asked of you, until every run ticked has landed, or, with none ticked, until you
+        lift the hold. What runs now finishes.
       </p>
       <WaitFor
         runs={runs}
@@ -119,7 +121,7 @@ function HoldForm({ id, runs, onClose }: { id: string; runs: RunSummary[]; onClo
         <Button type="button" variant="outline" size="sm" onPress={onClose} isDisabled={hold.isPending}>
           Cancel
         </Button>
-        <Button type="submit" size="sm" isDisabled={until.length === 0 || hold.isPending}>
+        <Button type="submit" size="sm" isDisabled={hold.isPending}>
           {hold.isPending ? 'Holding…' : 'Hold'}
         </Button>
       </div>
@@ -144,7 +146,7 @@ function WaitFor({
       <AriaLabel className="text-body-small font-medium">Wait for</AriaLabel>
       {runs.length === 0 ? (
         <Text slot="description" data-hold-none className="block text-body-small text-muted-foreground">
-          No other run of its repository may still land.
+          No other run of its repository may still land: it is held until you lift it.
         </Text>
       ) : (
         <div className="max-h-56 space-y-1.5 overflow-y-auto pr-1">

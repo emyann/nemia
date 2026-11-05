@@ -5,7 +5,7 @@
  * chooses the state and its colour. `cancelled` is a fact about the run rather than the step: a step to come on a run somebody called
  * off never will, and a step the cancellation stopped is `Stopped`.
  *
- * `held` is a fact about the run too: a person holds it until other runs land (the CLI's `hold`), and a step at a human gate asks nothing
+ * `held` is a fact about the run too: a person holds it until other runs land, or until they lift it (the CLI's `hold`), and a step at a human gate asks nothing
  * of anyone while it stands — every verb that would answer it is refused — so it is drawn `held`, never as waiting on a person. A step not
  * started under a hold is not filed until the hold lifts, yet keeps its state (`waiting`, `waiting-for-slot`) and is drawn as any step not
  * started: the run's own chip says why nothing moves, and the step's hover says it waits on the hold (`stateWordsOf`). A step at work,

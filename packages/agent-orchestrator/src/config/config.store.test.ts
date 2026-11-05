@@ -9,9 +9,11 @@ import assert from 'node:assert/strict';
 import os from 'node:os';
 import path from 'node:path';
 import {
+  cgroupParent,
   keepsWorktrees,
   maxConcurrent,
   maxRuns,
+  memoryLimit,
   metricsHourDays,
   metricsMinuteDays,
   verifiesRest,
@@ -57,6 +59,18 @@ test('REFUSED at shipped defaults: each WF_ variable set to what it does not tak
       'WF_METRICS_HOUR_DAYS',
       ['abc', '0', '-1'],
       'WF_METRICS_HOUR_DAYS=365',
+    ],
+    'WF_MEMORY_LIMIT not a quantity the runtime reads — a spaced unit, a lower-case one, an exponent, thousandths, a fraction, zero': [
+      memoryLimit,
+      'WF_MEMORY_LIMIT',
+      ['8 GB', '8gb', '129e6', '100m', '1.5Gi', '0', '-1Gi', 'lots'],
+      'WF_MEMORY_LIMIT=8Gi',
+    ],
+    'WF_CGROUP_PARENT not a slice — a path, a scope, a bare name, an escape': [
+      cgroupParent,
+      'WF_CGROUP_PARENT',
+      ['/sys/fs/cgroup/x', 'run.scope', 'sessions', 'a/b.slice', '.slice', 'a b.slice'],
+      'WF_CGROUP_PARENT=sessions.slice',
     ],
   };
   for (const [name, [read, variable, values, fix]] of Object.entries(rows))
@@ -124,6 +138,27 @@ test('each WF_ variable reads its default unset, empty or blank, and the values 
       'the series keep every hour when unset, and the days a value names',
       () => [metricsHourDays({}), metricsHourDays({ WF_METRICS_HOUR_DAYS: '1' }), metricsHourDays({ WF_METRICS_HOUR_DAYS: '400' })],
       [undefined, 1, 400],
+    ],
+    [
+      'WF_MEMORY_LIMIT and WF_CGROUP_PARENT: unset, empty or blank, no limit and no slice',
+      () => [
+        memoryLimit({}),
+        memoryLimit({ WF_MEMORY_LIMIT: '' }),
+        memoryLimit({ WF_MEMORY_LIMIT: '  ' }),
+        cgroupParent({}),
+        cgroupParent({ WF_CGROUP_PARENT: '' }),
+      ],
+      [undefined, undefined, undefined, undefined, undefined],
+    ],
+    [
+      'WF_MEMORY_LIMIT a quantity, as written, padding trimmed',
+      () => ['8Gi', '512Mi', ' 4G ', '1073741824'].map((value) => memoryLimit({ WF_MEMORY_LIMIT: value })),
+      ['8Gi', '512Mi', '4G', '1073741824'],
+    ],
+    [
+      'WF_CGROUP_PARENT a slice name, as written',
+      () => ['sessions.slice', 'agents.slice', 'a-b.slice'].map((value) => cgroupParent({ WF_CGROUP_PARENT: value })),
+      ['sessions.slice', 'agents.slice', 'a-b.slice'],
     ],
   ];
   for (const [name, got, want] of rows) await t.test(name, () => assert.deepEqual(got(), want));

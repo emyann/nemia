@@ -265,6 +265,7 @@ const WIRING = [
   'rounds',
   'budget',
   'deadlineSeconds',
+  'memory',
   'tally',
   'routes',
   'route',
@@ -280,7 +281,8 @@ test('REFUSED at shipped defaults: an agent file, one row per line it may not sa
       [...WIRING].sort(),
       'every key an agent may not set is wiring',
     );
-    for (const key of WIRING)
+    const claudeCodesToo = 'memory';
+    for (const key of WIRING.filter((k) => k !== claudeCodesToo))
       names(
         refusal(() => agent('implementer', `---\n${key}: something\n---\nImplement it.\n`)),
         'agents/implementer.md',
@@ -362,6 +364,7 @@ test('REFUSED at shipped defaults: an agent file, one row per line it may not sa
         ['mcpServers: github', 'on an `mcp:` line'],
         ['hooks: lint', '`.claude/settings.json`'],
         ['memory: project', "no memory of an agent's own"],
+        ['memory: 4Gi', "a step's own `memory:`"],
         ['isolation: worktree', '`workspace:`'],
       ] as const
     ).map(([line, fix]): Refused => [

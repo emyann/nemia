@@ -7,6 +7,8 @@ import { andList, tryOf, type Run, type StepStatus } from '../record/record.ts';
 import { heard, modeWord, retryable } from '../retry/index.ts';
 import { approvalOf, approvedFirst, branchWord, gatesOf, hasGate, notHandedOn, resultOnBase, standing } from '../status/status.ts';
 import { heldRefusal, prunedRefusal } from '../prune/prune.ts';
+import { routeLine, runWords } from '../routed/index.ts';
+import { firstPiece } from '../piece/piece.ts';
 import type { ApprovalRefusal, HoldsOpen } from '../../contracts/gate.contract.ts';
 
 /**
@@ -34,6 +36,12 @@ export const approvalWordsRefusal = (message: string | undefined, command = 'nem
 
 /**
  * Why `nemia approve` will not approve this step, in words that name the fix — or null, when it may: the step waits at its gate. Pure.
+ *
+ * Where it stands is the word the run's status reads (`runWords`): its standing with the routing laid over it, so a node the run says
+ * waits at its gate is never refused as not filed — a gated table condition, never filed, whose table answered, is approved as a gated
+ * step is, and the next tick files the node its route names. A filed step's gate is its session's: it waits where it stands there. A
+ * table condition never filed is refused in a condition's words: while its producer has not signed off, when its table answers no route
+ * (naming `nemia route`), and off the route taken.
  *
  * Refused: words that are empty (`approvalWordsRefusal`); a step the run does not have; a cancelled run, which files nothing; a step that
  * is not gated, naming the steps that are; the try it is on already approved — while it may still be sent back, or once it has handed on,
@@ -99,7 +107,12 @@ export const approvalRefusal: ApprovalRefusal = (
   if (pending) {
     return `try ${n + 1} of ${name} is already asked for (${modeWord(pending)}, at ${pending.at}): the next tick sends it back, and an approval of try ${n} would be spent by it at once. Approve try ${n + 1} once it has signed off — or, to approve this one, take that ask back first: retry-${name}-${n + 1}, in the run's .asks directory.`;
   }
-  const { status } = standing(step, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf);
+  const filed = Boolean(run.steps[name].taskId);
+  const status = gateWord(
+    filed,
+    runWords(steps, run, phaseOf, closeoutOf, askedCloseout, spendOf, verdictOf).get(name),
+    () => standing(step, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf).status,
+  );
   if (approvedFirst(step, run) && !run.steps[name].taskId) {
     const back = asks.find((a) => step.after.includes(a.step));
     if (back) {
@@ -123,6 +136,36 @@ export const approvalRefusal: ApprovalRefusal = (
     }
   }
   if (status === 'awaiting approval') return null;
+  return notAtItsGate(step, run, filed, status);
+};
+
+/**
+ * The word the gate reads for a step: the run's (`word`, `runWords`: its standing with the routing laid over it), and for a filed step the
+ * run reads at its gate, where it stands (`stood`) — its session is what waits for the word. A step the words do not name reads `pending`.
+ * Pure.
+ */
+function gateWord(filed: boolean, word: StepStatus | undefined, stood: () => StepStatus): StepStatus {
+  const said = word ?? 'pending';
+  return filed && said === 'awaiting approval' ? stood() : said;
+}
+
+/**
+ * Why a gated step that does not wait at its gate is not approved, by the word the run reads for it (`status`), in words that name what
+ * to do instead. A table condition never filed (`filed` false) says it in a condition's words: its producer not signed off, its table
+ * answering no route, off the route taken. Pure.
+ */
+function notAtItsGate(step: Workflow, run: Run, filed: boolean, status: StepStatus): string {
+  const { name } = step;
+  if (step.route?.kind === 'table' && !filed) {
+    const producer = firstPiece(step.route.from, '.');
+    const said: Partial<Record<StepStatus, string>> = {
+      pending: `${name} routes off what ${producer} says, and ${producer} has not signed off on it yet: its gate holds once its table answers a route. Approve it then (nemia ls ${run.id}).`,
+      unsigned: `${name}'s table answers no route for what ${producer} said, so there is nothing to approve. Route it yourself: ${routeLine(run, step)}.`,
+      skipped: `${name} is off the route the run took, so it is never filed and there is nothing to approve. See where the run stands: nemia ls ${run.id}.`,
+    };
+    const own = said[status];
+    if (own) return own;
+  }
   const then = `Its gate holds once it has signed off${step.check ? ' and passed its check' : ''}: approve it then (nemia ls ${run.id}).`;
   const why: Partial<Record<StepStatus, string>> = {
     pending: `${name} has not signed off yet: it has not been filed. ${then}`,
@@ -139,7 +182,7 @@ export const approvalRefusal: ApprovalRefusal = (
     unverified: `${name} has handed nothing on: it asked for another round (\`again: true\`), which the run files itself. Its gate holds once a round of it hands on, \`again: false\`.`,
   };
   return why[status] ?? `${name} is ${status}, not awaiting approval, so there is nothing to approve. See why: nemia decide ${run.id}.`;
-};
+}
 
 /** The yes an approval gives: at a step's gate, or to a loop out of rounds. */
 export type ApproveForm = 'gate' | 'loop';

@@ -54,6 +54,7 @@ const REMOTE_REFUSED: Partial<Record<StepKey, string>> = {
   reads:
     "gives a session on this machine a folder of the store to read, and a remote agent works on another party's machine, where no folder of this one is mounted",
   budget: 'is a spend cap a harness of ours keeps, and a remote agent keeps none and reports no cost',
+  memory: "limits the memory of a session's process on this machine, and a remote agent's process runs on another party's machine",
   output:
     "declares the fields of a closing statement the harness is asked for, and A2A has no closeout schema: a Task the agent completes is the step's sign-off, and a data part on its reply is what it says",
   tally: 'counts fields of the closeout `output:` declares, and a step on a remote agent declares no `output:`',

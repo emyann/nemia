@@ -5,6 +5,7 @@
  * (`composedRefusal`). The tool rules are `tools.ts`'s.
  */
 import path from 'node:path';
+import { memoryQuantityRefusal } from 'agent-runtime/vocabulary';
 import { CLOSEOUT_FIELDS, COUNTS, isObject, type OutputSchema, refuse, type StepOutput, type Workflow } from '../step/step.ts';
 import { DEFAULT_HARNESS, HARNESSES, isRemoteHarness, REMOTE_NAME, remoteNameOf } from '../harness/harness.ts';
 import { looseAt } from '../closeout/index.ts';
@@ -113,6 +114,26 @@ export function tokensOf(written: string): number | undefined {
  */
 export const contextText = (tokens: number): string =>
   Number.isSafeInteger(tokens) && tokens > 0 && tokens % 1_000 === 0 ? `${tokens / 1_000}k` : String(tokens);
+
+/** The scopes of a subagent's own `memory:`, which a step file copied from a subagent's may say. */
+const SUBAGENT_MEMORY: readonly string[] = ['user', 'project', 'local'];
+
+/**
+ * `memory:` as written, refused where the runtime reads no limit off it (`memoryQuantityRefusal`, in its words): a Kubernetes quantity,
+ * `4Gi`, `512Mi`, `4G`, which the session is filed under as its `resources.limits.memory`.
+ */
+export function memoryOf(step: string, memory: string | undefined): string | undefined {
+  if (memory === undefined) return undefined;
+  const why = memoryQuantityRefusal(memory);
+  if (why === undefined) return memory;
+  if (SUBAGENT_MEMORY.includes(memory.trim()))
+    return refuse(
+      `${step}: \`memory: ${memory}\` is a subagent's own memory, which a run does not carry: what a step knows is its brief, its workspace and the session it continues. A step's \`memory\` is the most memory each of its sessions may use, a Kubernetes quantity — for example \`memory: 4Gi\` — or delete the line.`,
+    );
+  return refuse(
+    `${step}: \`memory: ${memory}\` is not a memory limit: ${why} \`memory\` is the most memory each session of the step may use, a container's limit, as a Kubernetes quantity — for example \`memory: 4Gi\`.`,
+  );
+}
 
 /**
  * `context:` as tokens, refused unless a number of them (`tokensOf`). The windows a harness takes, and whether it has the knob, are the

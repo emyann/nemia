@@ -108,6 +108,8 @@ export type Step = {
   workflow?: string;
   retries?: number;
   deadlineSeconds?: number;
+  /** The most memory each session of the step may use, a Kubernetes quantity (`4Gi`), as its line writes it. */
+  memory?: string;
   reads?: readonly string[];
   /** The step's own closeout schema, a file of its workflow's folder, by its path from the template's root. */
   output?: { path: string };
@@ -269,6 +271,7 @@ const STEP: Shape = {
     workflow: 'string',
     retries: 'number',
     deadlineSeconds: 'number',
+    memory: 'string',
     reads: 'strings',
     output: { fields: { path: 'string' }, required: ['path'] },
     tally: 'strings',

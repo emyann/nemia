@@ -313,7 +313,7 @@ function printRefusals(run: Decided['run'], decision: Awaiting): void {
  * The steps that stopped the run and wait on a person — but on a pruned run, which waits on nobody — then a run every step of which is
  * verified, the ending's wait for the checkout, and what the next tick does once more.
  */
-function printStops({ run, overBudgetLine, offers }: Decided, decision: Awaiting, heldOut: string): void {
+function printStops({ run, steps, overBudgetLine, offers }: Decided, decision: Awaiting, heldOut: string): void {
   const onYouNote = run.pruned ? '' : ', waiting on you';
   if (decision.awaitingAnswer.length) console.log(`  BLOCKED${onYouNote}: ${decision.awaitingAnswer.join(', ')}`);
   if (decision.exhausted.length)
@@ -329,19 +329,28 @@ function printStops({ run, overBudgetLine, offers }: Decided, decision: Awaiting
     console.log(
       `  DENIED${onYouNote}: ${decision.denied.join(', ')}  — its harness denied its try a call, and denials: fail passes none on; nothing after it ran, and its check was not run`,
     );
-  printAwaitingApproval(run, decision.awaitingApproval, onYouNote);
+  printAwaitingApproval(run, steps, decision.awaitingApproval, onYouNote);
   if (decision.outcome === 'succeeded' && !decision.unverified.length) console.log(`  every step verified`);
   if (heldOut) console.log(heldOut);
   if (offers.length) console.log(`\n  once more, on the next tick:\n${offers.map((line) => `    ${line}`).join('\n')}`);
 }
 
-/** The gated steps waiting for approval: those that signed off at their gate, then the ending that has not run. */
-function printAwaitingApproval(run: Decided['run'], awaitingApproval: string[], onYouNote: string): void {
+/**
+ * The gated steps waiting for approval: those that signed off at their gate, then a condition never filed whose table answered, then the
+ * ending that has not run.
+ */
+function printAwaitingApproval(run: Decided['run'], steps: Steps, awaitingApproval: string[], onYouNote: string): void {
   const handedOn = awaitingApproval.filter((name) => run.steps[name]?.taskId);
-  const unrun = awaitingApproval.filter((name) => !run.steps[name]?.taskId);
+  const condition = (name: string): boolean => steps.some((s) => s.name === name && s.routes !== undefined);
+  const routing = awaitingApproval.filter((name) => !run.steps[name]?.taskId && condition(name));
+  const unrun = awaitingApproval.filter((name) => !run.steps[name]?.taskId && !condition(name));
   if (handedOn.length)
     console.log(
       `  AWAITING APPROVAL${onYouNote}: ${handedOn.join(', ')}  — signed off at its gate; nothing after it ${run.pruned ? 'was filed, and pruned, it cannot be approved' : 'is filed until you approve it, or send it back'}`,
+    );
+  if (routing.length)
+    console.log(
+      `  AWAITING APPROVAL${onYouNote}: ${routing.join(', ')}  — a condition at its gate, its table answered a route (nemia ls ${run.id}); nothing after it ${run.pruned ? 'was filed, and pruned, it cannot be approved' : 'is filed until you approve it, or send back what it routes on'}`,
     );
   if (unrun.length)
     console.log(

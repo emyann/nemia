@@ -7,19 +7,10 @@ import { slotWord, type CheckoutHold, type RunSlot } from '../cap/cap.ts';
 import { checkoutWord, LANDED_CAP, landedWords, onBaseNote, toDecideWords, type ToDecide } from '../ending/ending.ts';
 import type { Workflow } from '../step/step.ts';
 import type { EnginePhase } from '../views/views-words.ts';
-import {
-  DENIED_CAP,
-  DENIED_SHOWN,
-  oneLine,
-  satisfiesAfter,
-  type CloseoutAsked,
-  type Run,
-  type StepStatus,
-  type TaskPhase,
-} from '../record/record.ts';
+import { DENIED_CAP, DENIED_SHOWN, oneLine, satisfiesAfter, type CloseoutAsked, type Run, type StepStatus } from '../record/record.ts';
 import type { Closeout } from '../closeout/index.ts';
 import { checkVerdictOf, verdictWord, type CheckVerdict, type Verdict } from '../check/check.ts';
-import { routedRows } from '../routed/index.ts';
+import { listedWords, routedRows, settledOf as settledWord } from '../routed/index.ts';
 import { codedStep, ENGINE_REASON, holdsTheRun, REASON_OF, type CodedStep, type QualifiedStep } from '../phase/phase.ts';
 import { answerOf, dueNote, modeWord, retriesDue, tryNote, type RetryAsk } from '../retry/index.ts';
 import {
@@ -231,7 +222,7 @@ export interface ListingInput {
  * node `sent → <card>`, a condition never filed its route and the line that routes it by hand.
  */
 export function listing(input: ListingInput): Listing {
-  const listed = listedSteps(input);
+  const listed = listedSteps(input, listedWords(input));
   const routed = routedRows(input);
   if (!routed.size) return listed;
   const steps = listed.steps.map((s) => {
@@ -262,6 +253,9 @@ export function listing(input: ListingInput): Listing {
  * One line per step, deliberately. The summary, `needs` and a check's output were written for
  * `nemia decide`, where there is room to read them; here they would turn a list into a report.
  *
+ * A step never filed that the run's words read at its gate (`runWords`: a gated table condition whose table answered) is listed there, as
+ * a gated step that signed off is: awaiting approval, waiting on you, its note the approval and the send-back of what it routes on.
+ *
  * Who a run waits on is asked again here, so a caller's stale list cannot say a run that started, or was
  * called off, waits on a run or a slot. A root not filed names them, and an ending step approved and not
  * filed names the run whose step has the checkout (`checkoutWord`). The engine's word for a settled task
@@ -278,36 +272,37 @@ export function listing(input: ListingInput): Listing {
  * are free text in a padded column; at its gate, the approval and the send-back; what the run did with an
  * ending's merge (`landed`), unless it found nothing staged; how many times it was spoken to; and what it
  * was denied. Its cost goes beside its word once measured, unless the word already shows it.
+ *
+ * @param routed Every step's word on this pass, routing and all (`listedWords`).
  */
-function listedSteps({
-  steps,
-  run,
-  phaseOf,
-  closeoutOf,
-  askedCloseout = () => false,
-  verdictOf = () => undefined,
-  asks = [],
-  roundAsks = [],
-  answers = [],
-  waits = [],
-  saidTo = () => 0,
-  spendOf = () => undefined,
-  slot,
-  standings = [],
-  checkout,
-  waitingOf = () => undefined,
-  deniedOf = () => [],
-  ranOnOf = () => undefined,
-  parkedOf = () => undefined,
-  holds,
-}: ListingInput): Listing {
+function listedSteps(
+  {
+    steps,
+    run,
+    phaseOf,
+    closeoutOf,
+    askedCloseout = () => false,
+    verdictOf = () => undefined,
+    asks = [],
+    roundAsks = [],
+    answers = [],
+    waits = [],
+    saidTo = () => 0,
+    spendOf = () => undefined,
+    slot,
+    standings = [],
+    checkout,
+    waitingOf = () => undefined,
+    deniedOf = () => [],
+    ranOnOf = () => undefined,
+    parkedOf = () => undefined,
+    holds,
+  }: ListingInput,
+  routed: ReadonlyMap<string, StepStatus>,
+): Listing {
   const waiting = gated(run) ? [...waits] : [];
   const held = slot && !waiting.length && !hasStarted(run) && !run.cancelledAt ? slot : undefined;
-  const settledOf = (taskId: string): TaskPhase => {
-    const word = phaseOf(taskId);
-    if (word === 'input-required') return 'succeeded';
-    return word === 'succeeded' || word === 'failed' || word === 'stopped' || word === 'unknown' ? word : 'running';
-  };
+  const settledOf = settledWord(phaseOf);
   const readable = (name: string): Closeout | undefined => {
     const c = closeoutOf(name);
     return c && !('error' in c) ? c : undefined;
@@ -383,7 +378,8 @@ function listedSteps({
     const { name } = step;
     const taskId = run.steps[name]?.taskId;
     const branch = run.steps[name]?.branch ?? null;
-    const { status: stands, own } = standing(step, run, settledOf, readable, askedCloseout, steps, spendOf, verdictOf);
+    const { status: stood, own } = standing(step, run, settledOf, readable, askedCloseout, steps, spendOf, verdictOf);
+    const stands: StepStatus = !taskId && routed.get(name) === 'awaiting approval' ? 'awaiting approval' : stood;
     if (!taskId && (stands !== 'awaiting approval' || waitingAgain.has(name))) {
       if (checkout && waitsOnCheckout(steps, name, checkout) && !waitingAgain.has(name))
         return { name, message: checkoutWord(checkout), ...coded({ reason: 'Waiting', on: 'base' }), branch };

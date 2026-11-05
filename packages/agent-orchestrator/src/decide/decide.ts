@@ -28,6 +28,7 @@ import {
 import type { CheckoutHold } from '../cap/cap.ts';
 import { assess } from '../tick/assess.ts';
 import { resultSteps } from '../branches/index.ts';
+import { runWords } from '../routed/index.ts';
 import { merges } from '../ending/ending.ts';
 
 /**
@@ -210,10 +211,7 @@ export function decision(
   const direct = run.branch !== undefined && branches.includes(run.branch);
 
   const stands = once(landed);
-  const atGate = steps
-    .filter((s) => statusOf.get(s.name) === 'awaiting approval')
-    .map((s) => s.name)
-    .sort();
+  const atGate = waitingAtGates(steps, run, statusOf, runWords(steps, run, phaseOf, closeoutOf, askedCloseout, spendOf, verdictOf));
   const unrunEnding = (name: string): boolean => !run.steps[name]?.taskId && steps.some((s) => s.name === name && approvedFirst(s, run));
   const byHand =
     atGate.length > 0 && atGate.every(unrunEnding) && branches.length > 0 && !direct && branches.every((b) => stands(b) !== false);
@@ -336,6 +334,24 @@ const labelOf = (command: string): DecideCommand['label'] => {
   if (command.startsWith('nemia refresh ') && command.endsWith(' --base')) return 'refresh';
   return command.endsWith('--message "<objection>"') ? 'send back' : 'once more';
 };
+
+/**
+ * The steps waiting at their gate, by name: where they stand (`statusOf`), and a step never filed where the run's words read it there
+ * (`runWords`) — a gated table condition whose table answered.
+ */
+function waitingAtGates(
+  steps: readonly Workflow[],
+  run: Run,
+  statusOf: ReadonlyMap<string, StepStatus>,
+  words: ReadonlyMap<string, StepStatus>,
+): string[] {
+  const waits = (name: string): boolean =>
+    statusOf.get(name) === 'awaiting approval' || (!run.steps[name]?.taskId && words.get(name) === 'awaiting approval');
+  return steps
+    .filter((s) => waits(s.name))
+    .map((s) => s.name)
+    .sort();
+}
 
 /** For each step waiting at its gate on you (`awaitingApproval`), its approval and a send-back for each step it names (`sendBackTo`). */
 function gateChoices(steps: readonly Workflow[], run: Run, waiting: readonly string[]): DecideCommand[] {

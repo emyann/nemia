@@ -694,7 +694,7 @@
     {
       "files": ["packages/agent-orchestrator/src/list/list.ts"],
       "rules": {
-        "max-lines-per-function": ["error", { "max": 152, "skipBlankLines": true, "skipComments": true }],
+        "max-lines-per-function": ["error", { "max": 150, "skipBlankLines": true, "skipComments": true }],
         "complexity": ["error", { "max": 34 }],
         "sonarjs/cognitive-complexity": ["error", 40]
       }

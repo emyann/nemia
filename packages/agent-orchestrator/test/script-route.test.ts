@@ -22,7 +22,7 @@ const { main: cli } = await import('../src/cli/main.ts');
 const { engineOf, over } = await import('../src/runtime-client.ts');
 const { closeoutReader, taskPhasesRead } = await import('../src/views/views.verb.ts');
 const { runWords } = await import('../src/routed/routed-words.ts');
-const { routedRows } = await import('../src/routed/routed-lines.ts');
+const { listedWords, routedRows } = await import('../src/routed/routed-lines.ts');
 const { staged } = await import('./story.ts');
 type Board = ReturnType<typeof stage.board>;
 const stage = staged({ runWith: runEngine, main: cli, engineOf });
@@ -120,7 +120,8 @@ const rowsOf = async (b: Board, id: string) => {
   const run = readRun(id);
   const steps = run.workflow ?? [];
   const { views, phaseOf } = await stage.runWith(b.e, taskPhasesRead(run).pipe(over(b.e)));
-  return routedRows({ steps, run, phaseOf, closeoutOf: closeoutReader(views, run, steps) });
+  const input = { steps, run, phaseOf, closeoutOf: closeoutReader(views, run, steps) };
+  return routedRows(input, listedWords(input));
 };
 
 test('an unsure script reads blocked and offers nemia route; the route a person gives files its node, and the run goes on', async () => {

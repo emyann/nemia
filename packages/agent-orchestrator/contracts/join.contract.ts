@@ -65,9 +65,7 @@ const nodeFateSpec = spec<(when: readonly string[] | undefined, answered: string
         'A node is filed exactly when its route is taken, every parent is satisfied or skipped, and at least one ran — or it has none',
       condition: ({ input: [when, answered, parents], output }) =>
         (output === 'ready') ===
-        (onRoute(when, answered) &&
-          parents.every((p) => satisfies(p) || skipped(p)) &&
-          (parents.length === 0 || parents.some(satisfies))),
+        (onRoute(when, answered) && parents.every((p) => satisfies(p) || skipped(p)) && (parents.length === 0 || parents.some(satisfies))),
     },
     aStopStopsWhatIsOnItsRoute: {
       description: 'A parent that stops what follows makes a node on its route unreachable, never ready and never skipped',

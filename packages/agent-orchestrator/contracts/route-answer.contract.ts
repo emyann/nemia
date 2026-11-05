@@ -42,7 +42,11 @@ const scriptRouteSpec = spec<(verdict: ScriptVerdict, answer: ScriptAnswer | und
       description: 'A route is read only off a clean exit whose answer names it, and only a route the condition declares',
       condition: ({ input: [verdict, answer, routes], output }) =>
         output.kind !== 'route' ||
-        (verdict === 0 && answer !== undefined && answer.kind === 'route' && answer.route === output.route && routes.includes(output.route)),
+        (verdict === 0 &&
+          answer !== undefined &&
+          answer.kind === 'route' &&
+          answer.route === output.route &&
+          routes.includes(output.route)),
     },
     aCleanAnswerRoutes: {
       description: 'A clean exit whose answer names a declared route takes that route',

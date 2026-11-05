@@ -39,8 +39,7 @@ const tableRouteSpec = spec<(table: RouteTable, routes: readonly string[], value
       },
     },
     noRowNoRoute: {
-      description:
-        'A value with no row, or whose row names no declared route, answers no route: never the first route, never a default',
+      description: 'A value with no row, or whose row names no declared route, answers no route: never the first route, never a default',
       condition: ({ input: [table, routes, value], output }) => {
         const row = rowOf(table, value);
         return (row !== undefined && declared(routes, row)) || output.kind === 'unsigned';

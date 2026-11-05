@@ -1400,6 +1400,53 @@ test('two runs of one repository at their endings: the oldest approval takes the
   );
 });
 
+test('two runs of one repository land close together: each records the commit that brought its own result, never the base as it stands when its check ends', async (t) => {
+  const s = story(t);
+  const { settle } = stage.board();
+  let two: Awaited<ReturnType<typeof at.twoApproved>>;
+  let mergedA = '';
+  let mergedB = '';
+
+  await s.test("the older approval's ending lands its result on the base and signs off, and the pass files its check", async () => {
+    two = await at.twoApproved();
+    const { repo, first, second: a } = two;
+    await at.pass(first.id);
+    assert.deepEqual((await at.pass(a.id)).filed, ['ship'], 'the older approval takes the checkout');
+    at.mergedByHand(repo, a.branch);
+    mergedA = world().head(repo);
+    settle(`${a.id}-ship`, 'succeeded', { ...SIGNED, message: MESSAGE });
+    assert.deepEqual((await at.pass(a.id)).checked, ['ship'], 'its check is filed on the result already on the base');
+  });
+
+  await s.test("while that check runs, the other run's result lands on the base on top of it", async () => {
+    const { repo, first: b } = two;
+    at.mergedByHand(repo, b.branch);
+    mergedB = world().head(repo);
+    assert.notEqual(mergedB, mergedA, 'the base has moved past the first landing');
+    assert.deepEqual(world().read(repo, mergedB).parents[0], mergedA);
+  });
+
+  await s.test('the first check passes: its run records its own merge commit, not the base as it now stands', async () => {
+    const { repo, second: a } = two;
+    settle(`${a.id}-ship-check`, 'succeeded', undefined, 0);
+    await at.pass(a.id);
+    assert.deepEqual(readRun(a.id).steps.ship.landed, { commit: mergedA });
+    assert.equal(world().head(repo), mergedB, 'nothing committed by the run');
+    assert.equal((await stage.runWith(e(), decideRun(a.id))).decision.kind, 'landed');
+  });
+
+  await s.test('the other ending then takes the checkout, finds its result on the base, and records its own merge commit', async () => {
+    const { repo, first: b } = two;
+    assert.deepEqual((await at.pass(b.id)).filed, ['ship'], 'the checkout is free');
+    settle(`${b.id}-ship`, 'succeeded', { ...SIGNED, message: MESSAGE });
+    assert.deepEqual((await at.pass(b.id)).checked, ['ship']);
+    settle(`${b.id}-ship-check`, 'succeeded', undefined, 0);
+    await at.pass(b.id);
+    assert.deepEqual(readRun(b.id).steps.ship.landed, { commit: mergedB });
+    assert.equal(world().head(repo), mergedB);
+  });
+});
+
 test('a checkout held by a merge staged and not landed, and claimed by no run the pass will not file', async (t) => {
   const s = story(t);
   const { settle } = stage.board();

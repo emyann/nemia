@@ -369,7 +369,11 @@ test('the place reads the checkout as a landing needs it: whose merge is staged,
   assert.ok('answer' in made && 'commit' in made.answer);
   assert.equal(git(repo, 'log', '-1', '--format=%B'), 'Add a and b\n\nboth.');
   assert.equal(git(repo, 'log', '-1', '--format=%P').split(' ').length, 3, 'an octopus of the base and both tips');
-  assert.deepEqual(status(repo, tips), { merging: 'none', conflicted: false, missing: [], tip: made.answer.commit }, 'both on HEAD');
+  assert.deepEqual(
+    status(repo, tips),
+    { merging: 'none', conflicted: false, missing: [], tip: made.answer.commit, landedBy: made.answer.commit },
+    'both on HEAD',
+  );
 
   const c1 = branch('wf/r/c1', 'c.ts', 'one\n');
   const c2 = branch('wf/r/c2', 'c.ts', 'two\n');

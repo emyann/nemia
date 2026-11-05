@@ -20,7 +20,13 @@ import path from 'node:path';
 import ts from 'typescript';
 
 /** What `npm run contracts` proves, from the repository's root: each package's and app's code that a contract is written on. */
-export const ROOTS = ['packages/agent-runtime/src', 'packages/agent-orchestrator/src', 'apps/cli/src', 'apps/web/src/lib/brought.ts'];
+export const ROOTS = [
+  'packages/agent-runtime/src',
+  'packages/agent-orchestrator/src',
+  'packages/agent-orchestrator/place',
+  'apps/cli/src',
+  'apps/web/src/lib/brought.ts',
+];
 
 /** A leg of the `contracts` job: one runner, its own verdict cache. */
 export type Leg = 'observe' | 'approval-refusal' | 'rest';

@@ -163,3 +163,6 @@ export const HANDED_HOW = ['waited', 'read'] as const;
 
 /** Where a step's told layers were given: its prompt, or its brief. */
 export const TOLD_VIA = ['prompt', 'brief'] as const;
+
+/** Where a gate's budgets come from: the gated step's proposal, before the approval; the approval's caps, after it. */
+export const GATE_BUDGETS_FROM = ['proposed', 'approved'] as const;

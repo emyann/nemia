@@ -30,9 +30,10 @@
  * the same lines are refused at load, a step's fence only narrowing its agent's.
  *
  * A read-only step measures types through the settings' allows of a compiler with `--noEmit` first (`measureAllow`): tsrs, which `ci`
- * judges with, and tsc 6 beside it. The denies of what would write or watch (`COMPILER_WRITES`), and tsrs's `--fast` (`FAST`), are
- * written for both from one list (`MEASURE_DENIES`) and planted on the reviewer, each proven the one that refuses its own spellings; a
- * step that measures nothing denies each compiler whole (`MEASURELESS_DENIES`). They are the lines the nemia factory's overlays carry.
+ * judges with, and tsc 6 beside it. The denies of what would write or watch (`COMPILER_WRITES`), and tsrs's fast mode (`FAST`,
+ * `FAST_BY_ENV`), are written for both from one list (`MEASURE_DENIES`) and planted on the reviewer, each proven the one that refuses
+ * its own spellings; a step that measures nothing denies each compiler whole (`MEASURELESS_DENIES`). They are the lines the nemia
+ * factory's overlays carry.
  *
  * Every path a repository skill says its work is on matches a file of the checkout (`appliesUnmatched`), the read-within-reach rule of
  * the repository's skills is counted as `nemia stats` counts it (`rulesOfTry`), and no tsconfig of the checkout makes `tsc --noEmit`
@@ -1290,14 +1291,28 @@ const FAST: Record<string, string[]> = {
   '*-FA*': ['--FAST'],
 };
 
-/** The refused options of `compiler`, by the deny of each: tsc's, and tsrs's with `--fast` beside them. */
-const refusedOf = (compiler: Compiler): Record<string, string[]> =>
-  Object.fromEntries(
+/**
+ * tsrs's fast mode by its environment, `TSRS_FAST=1` (its README, *Fast mode*), which no option names: refused as git's and gh's
+ * environments are, by any assignment before the compiler as typed, since an allow is matched with the assignment stripped.
+ */
+const FAST_BY_ENV_DENY = 'Bash(*=* npx tsrs *)';
+const FAST_BY_ENV = [
+  'TSRS_FAST=1 npx tsrs --noEmit',
+  'TSRS_FAST=1 npx tsrs --noEmit -p packages/agent-orchestrator',
+  'TSRS_FAST=1 timeout 300 npx tsrs --noEmit',
+  'FOO=1 TSRS_FAST=1 npx tsrs --noEmit',
+];
+
+/** The refused spellings of `compiler`, by the deny of each: tsc's, and tsrs's with `--fast` and `TSRS_FAST` beside them. */
+const refusedOf = (compiler: Compiler): Record<string, string[]> => ({
+  ...Object.fromEntries(
     Object.entries(compiler === 'tsrs' ? { ...COMPILER_WRITES, ...FAST } : COMPILER_WRITES).map(([deny, spellings]) => [
       `Bash(npx ${compiler} ${deny})`,
       spellings.map((args) => `npx ${compiler} --noEmit ${args}`),
     ]),
-  );
+  ),
+  ...(compiler === 'tsrs' ? { [FAST_BY_ENV_DENY]: FAST_BY_ENV } : {}),
+});
 
 /**
  * The denies a read-only step that measures carries on its line, tsrs's and tsc's, each compiler's held equal by being written from the

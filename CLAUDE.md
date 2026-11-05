@@ -180,8 +180,9 @@ What the `create-an-agent` skill (`packages/agent-orchestrator/skills/create-an-
   (`npx turbo run test *build*`) and a file of the e2e's (`node --test *e2e/*`, the folder: the board's `test/e2e-*.test.ts` stay open). Design and review measure by the compiler and the linter, which the settings allow
   (`npx tsrs --noEmit`, the compiler `ci` judges with, `npx tsc --noEmit` where tsc 6 is still wanted, `npx oxlint`), and deny on that
   line what would write or watch, each compiler's options by their first letters in each case, since it reads an option's name in any
-  case and after one dash or two, and tsrs's `--fast`, whose verdict may differ from the pinned TypeScript's; intake and the janitor
-  deny all three whole. Each of the
+  case and after one dash or two, and tsrs's fast mode, whose verdict may differ from the pinned TypeScript's, by `--fast` and by
+  `TSRS_FAST` (`Bash(*=* npx tsrs *)`, any assignment before tsrs, as for git and gh); intake and the janitor deny all three whole.
+  Each of the
   four is told, in one paragraph they hold equal, to put a refused call its work needs at the top of its sign-off, never only in a risk.
 - **In the nemia factory, build's design writes the contracts its spec adds** (`change-a-contract`): the factory's own copy of Seldon,
   in its tree out of git, adds `Write, Edit` to its tools and allows `Edit(packages/*/contracts/*.contract.ts)` and

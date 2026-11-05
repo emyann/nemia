@@ -115,7 +115,8 @@ export const checkoutHold = Effect.fn('checkoutHold')(function* (
  * root of its own (`runReady`), and neither does one the cap on runs in flight holds (`runAdmitted`) — so an ending that will not be filed
  * does not hold another run's. Those last two are the questions `advance` asks before it files a ready step, and they bite only on a run
  * with nothing filed: an ending is one when it is also its root, which a folder whose one step merges has. Neither touches a try, since a
- * run with a try due has started. Its `slot` is asked for there alone, and the runs it waits on are read through `parents`.
+ * run with a try due has started. Its `slot` and the runs it waits on (read through `parents`) are asked for there alone: a try due
+ * claims with neither read.
  */
 const mainClaim = Effect.fnUntraced(function* (
   e: Engine,
@@ -159,11 +160,11 @@ const mainClaim = Effect.fnUntraced(function* (
     harnessBlocked(views),
     spendReader(views),
   );
+  const claim = { id: run.id, repo, step: ending.name, holds: false, at };
+  if (a.retry.some((r) => r.step === ending.name)) return claim;
+  if (!a.ready.includes(ending.name)) return undefined;
   const parent = yield* parentsRead(run, parents.git, parents.read).pipe(over(e));
-  const files = runReady(run, (id) => parent(id).landed) && runAdmitted(run, yield* slot);
-  return (files && a.ready.includes(ending.name)) || a.retry.some((r) => r.step === ending.name)
-    ? { id: run.id, repo, step: ending.name, holds: false, at }
-    : undefined;
+  return runReady(run, (id) => parent(id).landed) && runAdmitted(run, yield* slot) ? claim : undefined;
 });
 
 /**

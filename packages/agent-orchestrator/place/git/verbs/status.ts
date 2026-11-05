@@ -5,8 +5,9 @@
  * — whether a path is unmerged, the result branches a commit now would leave out, HEAD as `tip`, and, once every tip is in HEAD with no
  * merge of them in progress, the first commit of HEAD's first-parent line that holds them all as `landedBy`: one walk of that line down
  * to each tip (`rev-list --first-parent --ancestry-path --parents <tip>..HEAD`), read by `cameOnto` and `landedBy` (`../landed.ts`).
- * A walk git does not answer throws, so the pass reads the checkout as unread and waits, never as nothing landed. Unmerged paths are read with `ls-files
- * --unmerged`, off the index as it is, never with a diff, which refreshes the index and takes its lock in a checkout a person commits in.
+ * A walk git does not answer throws, so the pass reads the checkout as unread and waits, never as nothing landed. Unmerged paths are
+ * read with `ls-files --unmerged`, off the index as it is, never with a diff, which refreshes the index and takes its lock in a checkout
+ * a person commits in.
  * Refuses a checkout that is no git repository.
  */
 import fs from 'node:fs';
@@ -14,7 +15,6 @@ import path from 'node:path';
 import { git, gitSays, isDirectory, refused, type Asking, type Reply } from '../git.ts';
 import { cameOnto, landedBy } from '../landed.ts';
 import type { PlaceRequests } from '../../../src/place/place.ts';
-import type { OnTheLine } from '../../../contracts/landed-by.contract.ts';
 
 /** The commits MERGE_HEAD names in `checkout`, none when no merge is in progress. */
 function mergeHeads(checkout: string, file: string): string[] {
@@ -50,7 +50,7 @@ export function* status({ repo: checkout, tips }: PlaceRequests['status']): Aski
  */
 function* cameIn(checkout: string, head: string, tips: readonly string[], heads: readonly string[]): Asking<string | undefined> {
   if (!tips.length || tips.some((sha) => heads.includes(sha))) return undefined;
-  let point: OnTheLine | undefined;
+  let point: ReturnType<typeof cameOnto>;
   for (const [i, sha] of tips.entries()) {
     const said = yield* git(checkout, ['rev-list', '--first-parent', '--ancestry-path', '--parents', `${sha}..HEAD`]);
     const walk = said ? said.split('\n').map((row) => row.trim().split(' ')) : [];

@@ -24,8 +24,7 @@ const cameOntoSpec = spec<(tip: string, head: string, walk: readonly WalkRow[]) 
    * git answers the walk newest first, from `head` down, and lists each commit with at least its first parent (`--parents`; see
    * `WalkRow`).
    */
-  requires: ({ input: [, head, walk] }) =>
-    walk.every((row) => row.length >= 2) && (walk.length === 0 || walk.at(0)?.at(0) === head),
+  requires: ({ input: [, head, walk] }) => walk.every((row) => row.length >= 2) && (walk.length === 0 || walk.at(0)?.at(0) === head),
   ensures: {
     theLinesNewestIsItsOwn: {
       description: 'A tip that is the line’s newest commit came onto it as itself, nothing above it',
@@ -47,7 +46,11 @@ const cameOntoSpec = spec<(tip: string, head: string, walk: readonly WalkRow[]) 
         'Where the commit of the line nearest the tip has another first parent, that commit merged it in: the first of the line to hold it, however many landed on top since',
       condition: ({ input: [tip, , walk], output }) => {
         const first = oldest(walk);
-        return first === undefined || first.at(1) === tip || (output !== undefined && output.commit === first.at(0) && output.below === walk.length - 1);
+        return (
+          first === undefined ||
+          first.at(1) === tip ||
+          (output !== undefined && output.commit === first.at(0) && output.below === walk.length - 1)
+        );
       },
     },
   },
@@ -74,12 +77,9 @@ const landedBySpec = spec<(landed: OnTheLine | undefined, next: OnTheLine | unde
       condition: ({ input: [landed, next], output }) => (landed !== undefined && next !== undefined) || output === undefined,
     },
     theFirstToHoldThemAll: {
-      description:
-        'Where both are on the line, the result landed by the newer of the two: the first commit of the line to hold them both',
+      description: 'Where both are on the line, the result landed by the newer of the two: the first commit of the line to hold them both',
       condition: ({ input: [landed, next], output }) =>
-        landed === undefined ||
-        next === undefined ||
-        (landed.below <= next.below ? same(output, landed) : same(output, next)),
+        landed === undefined || next === undefined || (landed.below <= next.below ? same(output, landed) : same(output, next)),
     },
   },
 });

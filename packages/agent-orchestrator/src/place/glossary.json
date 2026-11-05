@@ -57,7 +57,7 @@
     },
     {
       "term": "MergeState",
-      "meaning": "whose merge is in progress in the repo's own directory, `ours`, `other` or `none`, whether a path is unmerged, the result branches a commit would leave out, and the repo's tip.",
+      "meaning": "whose merge is in progress in the repo's own directory, `ours`, `other` or `none`, whether a path is unmerged, the result branches a commit would leave out, the repo's tip, and the first commit of the repo's line that holds every result tip asked about (`landedBy`).",
       "type": "MergeState",
       "retired": [
         {

@@ -83,6 +83,7 @@ const FILES = [
   'packages/agent-runtime/src/core/engine/filing.ts',
   ALONE['approval-refusal'].file,
   'packages/agent-orchestrator/src/adopt/adopt.ts',
+  'packages/agent-orchestrator/place/git/landed.ts',
 ];
 
 test('every file a contract may be in is proved by exactly one leg, a root at a time', () => {
@@ -96,6 +97,7 @@ test('every file a contract may be in is proved by exactly one leg, a root at a 
   assert.deepEqual(commandsOf(FILES, 'rest'), [
     ['packages/agent-runtime/src/core/engine/filing.ts', 'packages/agent-runtime/src/harness/mcp.ts', '--cache'],
     ['packages/agent-orchestrator/src/adopt/adopt.ts', '--cache'],
+    ['packages/agent-orchestrator/place/git/landed.ts', '--cache'],
     ['apps/cli/src/route.ts', '--cache'],
   ]);
 });

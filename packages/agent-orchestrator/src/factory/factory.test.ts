@@ -131,17 +131,17 @@ test('what a refused start names: the factory, the workflow, the steps, the fold
       names(unfilledRefusal(steps.slice(0, 1), 'pipao', 'build'), 'pipao', 'implement');
       const routed = [
         {
-          name: 'next',
+          name: 'triage',
           harness: undefined,
           agent: undefined,
-          routes: ['build'],
+          routes: ['web'],
           route: { kind: 'table' as const, from: 'a.b', table: {} },
         },
-        { name: 'to-build', harness: undefined, agent: undefined, workflow: 'build' },
+        { name: 'handoff', harness: undefined, agent: undefined, workflow: 'dev' },
       ];
-      assert.equal(unfilledRefusal(routed, 'pipao', 'intake'), undefined, 'a table condition and a workflow node run no agent');
-      const judged = [{ name: 'next', harness: undefined, agent: undefined, routes: ['build'], route: { kind: 'judge' as const } }];
-      names(unfilledRefusal(judged, 'pipao', 'intake'), 'pipao', 'next');
+      assert.equal(unfilledRefusal(routed, 'acme', 'triage'), undefined, 'a table condition and a workflow node run no agent');
+      const judged = [{ name: 'triage', harness: undefined, agent: undefined, routes: ['web'], route: { kind: 'judge' as const } }];
+      names(unfilledRefusal(judged, 'acme', 'triage'), 'acme', 'triage');
     },
   );
   await t.test('outsideRefusal: taken as path.resolve spells both; REFUSED naming the list, sorted, the --repo and the add', () => {

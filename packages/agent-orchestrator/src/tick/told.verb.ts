@@ -126,7 +126,7 @@ export const ownOf = (step: Pick<Workflow, 'harness' | 'remote'>, rendered: Clau
 export type PlaceTold = {
   readonly words: LandingWords | undefined;
   readonly say: PlaceSay | undefined;
-  readonly targets: Readonly<Record<string, string>>;
+  readonly targets?: Readonly<Record<string, string>>;
 };
 
 /**
@@ -166,7 +166,12 @@ export function placeTold(
   place: Place,
   heads?: Readonly<Record<string, string>>,
 ): PlaceTold {
-  return { words: landingWords(run, steps, step, place, heads), say: placeSay(run, place), targets: workflowTargets(run, steps, step) };
+  const targets = workflowTargets(run, steps, step);
+  return {
+    words: landingWords(run, steps, step, place, heads),
+    say: placeSay(run, place),
+    ...(Object.keys(targets).length ? { targets } : {}),
+  };
 }
 
 /**

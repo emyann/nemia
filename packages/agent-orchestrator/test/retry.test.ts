@@ -1716,6 +1716,26 @@ test("exitVerdicts: a check's verdict is its attempt's exit code, `unfinished` w
     });
 });
 
+test('a check killed at its memory limit is told to the step tried again, outside the data, naming WF_MEMORY_LIMIT', async (t) => {
+  const b = stage.board();
+  const GI = 1024 ** 3;
+  const toldAfter = async (end: TestEnd): Promise<string> => {
+    const { id } = await throughCheck(['check: npm test', 'retries: 1'], 'failed', end);
+    assert.deepEqual((await tick(id)).tried, ['implement']);
+    const brief = b.tasks.get(`${id}-implement-try2`)!.spec.brief;
+    return brief.slice(brief.indexOf('## What the check said'));
+  };
+  await t.test('killed: the kill and the knob, before the fenced output', async () => {
+    const said = await toldAfter({ exitCode: 137, memory: { limitBytes: 6 * GI, peakBytes: 6 * GI, oomKills: 1 } });
+    for (const fact of ['check out of memory', '6Gi', 'WF_MEMORY_LIMIT']) assert.ok(said.includes(fact), fact);
+    assert.ok(said.indexOf('out of memory') < said.search(/`{3,}json/));
+  });
+  await t.test('a record with no kill, or none: nothing of memory', async () => {
+    assert.doesNotMatch(await toldAfter({ exitCode: 1, memory: { limitBytes: 6 * GI, peakBytes: GI, oomKills: 0 } }), /out of memory/);
+    assert.doesNotMatch(await toldAfter({ exitCode: 1 }), /out of memory/);
+  });
+});
+
 test("UNSIGNED is read off the LAST attempt of a try's task, on `nemia ls`, `nemia decide` and the next try's brief", async (t) => {
   const b = stage.board();
   const endOf = (word: string): TestEnd =>

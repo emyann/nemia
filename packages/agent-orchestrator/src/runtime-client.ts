@@ -29,6 +29,7 @@ import {
   type EndReason,
   type SessionState,
   type TaskPhase,
+  type TaskView,
   type TranscriptEvent,
   Engine as RuntimeEngine,
   refusalWords,
@@ -42,7 +43,7 @@ import { servesOnStore } from './daemon/daemon.store.ts';
 import { REMOTE_PREFIX, remoteNameOf } from './harness/harness.ts';
 import { Invalid, isRefusal, type Refusal } from './refusal/refusal.ts';
 import { exportIntervalRefusalOf, sessionTelemetryOf, toolDetailsRefusalOf } from './telemetry/telemetry.ts';
-import type { EnginePhase } from './views/views-words.ts';
+import type { AttemptMemory, EnginePhase } from './views/views-words.ts';
 import { fromThrow } from './door/door.store.ts';
 import type { SaidAfterKind } from './say/say.ts';
 import type { StepSessionState } from './following/following.ts';
@@ -70,6 +71,9 @@ export const stepSessionStateHeld: Same<StepSessionState, SessionState> = true;
 
 /** The orchestrator's copy of why an attempt ended (`AttemptReason`), held equal to the runtime's `EndReason`. */
 export const attemptReasonHeld: Same<AttemptReason, EndReason> = true;
+
+/** The orchestrator's copy of an attempt's memory record (`AttemptMemory`), held equal to the runtime's `MemoryUse`. */
+export const attemptMemoryHeld: Same<AttemptMemory, NonNullable<TaskView['state']['attempts'][number]['memory']>> = true;
 
 /** The runtime's engine, built: each verb an Effect whose refusal is a tagged error, which a controller reads with `asked`. */
 export type Engine = EngineShape;

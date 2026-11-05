@@ -308,7 +308,9 @@ Environment=WF_CGROUP_PARENT=sessions.slice
 step's runs under it. A step's `memory: 8Gi` raises or lowers it for that step's sessions alone; its check keeps the default. The runtime
 runs each limited task in a transient scope of systemd's user manager (`systemd-run --user --scope`, `MemoryMax=` the limit,
 `MemorySwapMax=0`, `OOMPolicy=continue`), so a process past it is killed by the kernel in that scope alone, and the attempt records the
-kill, the limit and the peak. It needs systemd 253 or later with a user manager on cgroup v2: a daemon started with `WF_MEMORY_LIMIT` on a
+kill, the limit and the peak. A step whose session or check was killed there says so in its note (the feed, `nemia ls`, the run page),
+naming the step's `memory:` to raise, or `WF_MEMORY_LIMIT` where the step names none: a check killed at the limit is no bug of the
+change it checked. It needs systemd 253 or later with a user manager on cgroup v2: a daemon started with `WF_MEMORY_LIMIT` on a
 host that cannot make such a scope refuses to start, naming the variable to unset.
 
 **The scopes sit outside the service's cgroup.** A limited session's scope is the user manager's, not the unit's: the drop-in's

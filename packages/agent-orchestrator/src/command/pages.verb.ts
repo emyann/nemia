@@ -116,9 +116,10 @@ export const RUNS: Command<RunSummary[]> = {
   check: selectorCheck,
   writes: false,
   class: 'read',
+  route: { method: 'GET', path: '/api/runs-summaries', status: 200 },
   only: {
     side: 'api',
-    why: "every run judged into a summary, kept between polls while the run rests: no route serves it since `GET /api/runs` is the RunList, and the command line prints each run's lines",
+    why: "every run judged into a summary, kept between polls while the run rests, which the board's floor, strips and pickers poll: `GET /api/runs` is the RunList, which judges each run it lists; the command line prints each run's lines",
   },
   handler: Effect.fnUntraced(function* (args: Args, env?: NodeJS.ProcessEnv, home?: string, kept?: Kept) {
     const selectors = yield* selectorsIn(args);

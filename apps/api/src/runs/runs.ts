@@ -77,6 +77,9 @@ export type OpenListing = Omit<OpenRuns, 'waiting' | 'inFlight'> & {
 /** One page of the finished runs, as `GET /api/runs-finished` answers it. */
 export type FinishedListing = Omit<FinishedPage, 'runs'> & { runs: Array<FinishedRun & Paged> };
 
+/** The summaries of every run (`runs`), an entry of the package's table: on `GET /api/runs-summaries`, the board's whole list. */
+const RUNS = commandNamed('runs');
+
 /** The runs that wait or move, with the counts (`runs open`), an entry of the package's table: on `GET /api/runs-open`. */
 const RUNS_OPEN = commandNamed('runs open');
 
@@ -135,8 +138,9 @@ const CONCLUDED = commandNamed('concluded');
  * context. The run's named actions on it — its removal and its prune among them — are served in its namespace by the objects' handlers
  * (objects/runs.ts), through the command table's pipeline (`commandAnswered`, commands/routes.ts).
  *
- * - The summaries both views read (`RunListing`), each with the address of its workflow's page (`workflowPageOf`), in the store's order,
- *   handed the app's informer (`Informer`) and its feed's filing times. One request costs,
+ * - `GET /api/runs-summaries` — every run's summary (`RunListing`), the board's whole list, which both views read too, each with the
+ *   address of its workflow's page (`workflowPageOf`), in the store's order, handed the app's informer (`Informer`) and its feed's filing
+ *   times. One request costs,
  *   however many runs there are, one harness observation (one listing of the sessions it holds, one scan of the detached runs' files),
  *   a read of every task journal in the engine's store, and each run's record and workflow folder. That is a cold read's cost: a warm
  *   one costs the store's stamp walk (one `readdir`, and a `stat` of each run's files) and the records and journals of the runs still
@@ -205,6 +209,12 @@ const subResource = (c: Context<ApiEnv>, command: Command, query: Record<string,
   served(c, async (s) => c.json(await runPlaced(s, s.e, informed(s, command.handler({ ...query, ...c.req.param() }, s.env, s.home)))));
 
 export const runs = new Hono<ApiEnv>()
+  .get('/api/runs-summaries', (c) =>
+    served(c, async (s) => {
+      const summaries = (await listRead(s, RUNS, selectorOf(c))) as unknown as RunSummary[];
+      return c.json(paged(summaries, s) satisfies RunListing[]);
+    }),
+  )
   .get('/api/runs-open', (c) =>
     served(c, async (s) => {
       const open = (await listRead(s, RUNS_OPEN, listArgs(c))) as unknown as OpenRuns;

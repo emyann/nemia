@@ -115,7 +115,7 @@ test("each command is served on the api where it was before the table, the lift 
       ['told', { method: 'GET', path: '/api/runs/:runId/steps/:step/told', status: 200 }],
       ['logs', { method: 'GET', path: '/api/runs/:runId/steps/:step/log', status: 200 }],
       ['stats', { method: 'GET', path: '/api/stats', status: 200 }],
-      ['runs', 'api'],
+      ['runs', { method: 'GET', path: '/api/runs-summaries', status: 200 }],
       ['runs open', { method: 'GET', path: '/api/runs-open', status: 200 }],
       ['runs finished', { method: 'GET', path: '/api/runs-finished', status: 200 }],
       ['step artifact', { method: 'GET', path: '/api/runs/:runId/steps/:step/artifacts/:name', status: 200 }],

@@ -287,8 +287,8 @@ each step's tries whole and what it was told, which are its sub-resources, each 
 factory, `default` for none; another namespace's is a 404), the route of the run's one entry of the command table (`show`, served on both
 sides, its `--raw` record the CLI's alone), and refuses any `?view=` with a 422 naming what to read instead. The runs are a `RunList` at
 `GET /api/runs` and `GET /api/namespaces/<factory>/runs`, paged by `?limit=` and `?continue=` and selected by `?labelSelector=`, for
-a client; the board's floor, strips and pickers read the runs' summaries still (`GET /api/runs-open`, every page of `GET
-/api/runs-finished`), since the RunList judges each run it lists on every poll until the informer keeps each run's object. The
+a client; the board's floor, strips and pickers read the runs' summaries still (`GET /api/runs-summaries`, the informer's), since
+the RunList judges each run it lists on every poll until the informer keeps each run's object. The
 board reads the object, each step's tries and told at `…/steps/:step/tries` and `…/steps/:step/told`, keyed by the step's stamp so a step
 reads again only when it moved, and the lines once at `GET /api/runs/:runId/lines` (`RunLinesAnswer`, mirrored by hand); the api's tests
 read the same. The run's named actions — its start (`POST /api/namespaces/<factory>/runs`), removal, refresh, prune, labels and hold,

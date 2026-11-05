@@ -35,6 +35,7 @@ import {
 } from 'agent-orchestrator';
 import { runTasks } from 'agent-orchestrator/run';
 import type { RunList } from 'objects';
+import type { RunListing } from './runs.ts';
 import { runWith } from '../../test/builtin-place.ts';
 import { summariesOf } from '../../test/run-reads.ts';
 import { names } from '../../test/named.ts';
@@ -268,6 +269,15 @@ test('a polled list keeps a run at rest and judges it afresh the moment anything
     assert.deepEqual(again, polled, 'the same answer from memory');
     assert.equal(asked, 1, "the moving run's one journal, and not the finished run's");
     assert.equal(resting.hits - hits, 1);
+
+    const summaries = async () => {
+      const res = await app.request('/api/runs-summaries');
+      assert.equal(res.status, 200, await res.clone().text());
+      return ((await res.json()) as RunListing[]).map((r) => r.id).sort();
+    };
+    const board = await journalsAsked(() => unverified(summaries));
+    assert.deepEqual(board.value, ['r-moving', 'r-rest'], 'every run, once');
+    assert.equal(board.asked, 1, "the board's whole list, off the informer's summaries: the moving run's one journal again");
   });
   await s.test('a record rewritten is judged afresh', async () => {
     await list();

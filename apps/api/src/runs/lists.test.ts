@@ -266,7 +266,14 @@ test('?selector= keeps the runs one of its selectors takes by their labels, on e
     const page = await read<FinishedListing>('/api/runs-finished?selector=team%3Dcore&selector=factory%3Dbeta');
     assert.deepEqual(page.runs.map((r) => r.id).sort(), ['l-fifth', 'l-second']);
   });
-  for (const address of ['/api/runs', '/api/runs-open', '/api/runs-finished', '/api/listing', '/api/listing/l-second'])
+  for (const address of [
+    '/api/runs',
+    '/api/runs-summaries',
+    '/api/runs-open',
+    '/api/runs-finished',
+    '/api/listing',
+    '/api/listing/l-second',
+  ])
     await t.test(`REFUSED: ${address} with a selector of a misspelled key, 422`, async () => {
       const res = await app().request(`${address}?selector=no%2Fpe%3Dx`);
       const body = (await res.json()) as { error?: string };

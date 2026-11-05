@@ -12,10 +12,10 @@ const hired = {
   apiVersion: API_VERSION,
   kind: 'Hire',
   metadata: { name: 'build.implement', namespace: 'mill', creationTimestamp: '2026-11-04T00:00:00.000Z', resourceVersion: 'h1' },
-  spec: { workflow: 'build', step: 'implement', agent: 'grace' },
+  spec: { workflow: 'build', step: 'implement', agent: 'implementer' },
   status: {
     filled: 'factory',
-    agent: 'grace',
+    agent: 'implementer',
     settings: {
       model: { value: 'opus', from: 'agent' },
       effort: { value: 'high', from: 'step' },
@@ -62,7 +62,7 @@ test('a hire and a page of them decode from JSON and encode back the same, absen
 });
 
 test('the write decodes as the old route was sent it', () => {
-  assert.deepEqual(roundTrip(HireWrite, { agent: 'ada' }), { agent: 'ada' });
+  assert.deepEqual(roundTrip(HireWrite, { agent: 'reviewer' }), { agent: 'reviewer' });
 });
 
 test('REFUSED: a fill origin or a setting origin off its words, a setting left out, a write with no agent, and another kind', () => {

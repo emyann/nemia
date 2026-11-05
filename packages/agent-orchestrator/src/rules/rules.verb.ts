@@ -52,19 +52,13 @@ const FILE = {
   only: { side: 'cli', why: 'the api is sent the words themselves, never a path to read' },
 } satisfies Flag;
 
-/** `nemia factory rules`'s spec: the factory's name, then `--file` or `--clear`; and the words, which a body alone carries. */
+/**
+ * `nemia factory rules`'s spec: the factory's name, then `--file` or `--clear`; the words, which the runner reads from the file or the
+ * api's handler is given, are no flag of it.
+ */
 const SPEC: Spec = {
   positionals: [{ key: 'factory', takes: 'required', kind: 'name' }],
-  flags: [
-    FILE,
-    { flag: '--clear', kind: 'switch', key: 'clear' },
-    {
-      flag: '--words',
-      kind: 'text',
-      key: 'words',
-      only: { side: 'api', why: 'the command line reads the words from --file', required: true },
-    },
-  ],
+  flags: [FILE, { flag: '--clear', kind: 'switch', key: 'clear' }],
   unknown: (arg) => `nemia factory rules takes one factory's name, then --file <path> (or --file - for stdin) or --clear, not ${arg}.`,
   apart: () => FILE.takes,
   missing: "nemia factory rules takes the factory's name: nemia factory rules <name> [--file <path>|- | --clear].",
@@ -119,16 +113,10 @@ export const FACTORY_RULES: Command<FactoryRules> = {
       : leftOut(SPEC, args),
   writes: true,
   class: { bare: 'read', sets: 'ask', setsBy: ['--file', '--clear'] },
-  route: [
-    {
-      method: 'GET',
-      path: '/api/factories/:factory/rules',
-      status: 200,
-      hand: 'a read of a command that writes: the api serves it by a route of its own, which calls the same handler',
-    },
-    { method: 'PUT', path: '/api/factories/:factory/rules', status: 200, sets: { clear: false } },
-    { method: 'DELETE', path: '/api/factories/:factory/rules', status: 200, sets: { clear: true } },
-  ],
+  only: {
+    side: 'cli',
+    why: "the api serves it as the Factory's `rules`, `putRules` and `deleteRules` of `objects`' Api, calling this handler",
+  },
   handler: (args, _env, home) => ruled(args, home),
   print(data, args) {
     const { name } = data;

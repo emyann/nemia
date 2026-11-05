@@ -129,25 +129,28 @@ test('the instruction routes: what a read or a write refuses, changing nothing',
     assert.ok(inFolder.includes(path.join(folder, 'NEMIA.md')), inFolder);
     assert.equal(fs.existsSync(path.join(STORE, 'NEMIA.md')), false, 'no store file is written for words refused');
   });
-  await t.test("a path out of the folder, an absolute one, or none at all is a 422 in the package's words", async () => {
-    const out = await refused(() => send('PUT', '/api/factories/mill/instruction', { path: '../NEMIA.md' }), 422);
-    assert.equal(
-      out,
-      packageSays(() => setInstruction({ factory: 'mill', at: { path: '../NEMIA.md' } })),
-    );
-    const absolute = await refused(() => send('PUT', '/api/factories/mill/instruction', { path: '/etc/passwd' }), 422);
-    assert.ok(absolute.includes('is absolute'), absolute);
-    const none = await refused(() => send('PUT', '/api/factories/mill/instruction', {}), 422);
-    assert.ok(none.includes('is put in one place'), none);
-  });
+  await t.test(
+    "a path out of the folder or an absolute one is a 422 in the package's words, and none at all a 400 naming the shape",
+    async () => {
+      const out = await refused(() => send('PUT', '/api/factories/mill/instruction', { path: '../NEMIA.md' }), 422);
+      assert.equal(
+        out,
+        packageSays(() => setInstruction({ factory: 'mill', at: { path: '../NEMIA.md' } })),
+      );
+      const absolute = await refused(() => send('PUT', '/api/factories/mill/instruction', { path: '/etc/passwd' }), 422);
+      assert.ok(absolute.includes('is absolute'), absolute);
+      const none = await refused(() => send('PUT', '/api/factories/mill/instruction', {}), 400);
+      assert.ok(none.includes('`{ "store": true }`'), none);
+    },
+  );
   await t.test('blank words for the store are a 422', async () => {
     await answered(send('PUT', '/api/factories/mill/instruction', { store: true }));
     const blank = await refused(() => send('PUT', '/api/factories/mill/instruction/words', { words: ' \n' }), 422);
     assert.match(blank, /^the instruction of mill is blank/);
     await answered(send('DELETE', '/api/factories/mill/instruction', {}));
   });
-  await t.test("a name that is no factory's is a 400, to read and to write", async () => {
-    await refused(() => app.request('/api/factories/Not%20One/instruction'), 400);
-    await refused(() => send('PUT', '/api/factories/Not%20One/instruction/words', { words: 'x' }), 400);
+  await t.test("a name that is no factory's is a 422 in the package's words, to read and to write", async () => {
+    await refused(() => app.request('/api/factories/Not%20One/instruction'), 422);
+    await refused(() => send('PUT', '/api/factories/Not%20One/instruction/words', { words: 'x' }), 422);
   });
 });

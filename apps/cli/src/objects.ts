@@ -89,3 +89,7 @@ export async function asked<A, E>(
   }
   return answerOf(exit, verb, base);
 }
+
+/** The factories the api lists (`FactoryList`, `GET /api/factories`), the default first on its own repository, for the read `verb`. */
+export const factoriesListed = (verb: string, env: NodeJS.ProcessEnv = process.env) =>
+  asked(verb, (client) => client.factories.listAll({ query: {} }), env);

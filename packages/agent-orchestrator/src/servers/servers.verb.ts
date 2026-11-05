@@ -112,7 +112,7 @@ export const FACTORY_SERVERS: Command<ServersListing> = {
   },
   writes: false,
   class: 'read',
-  route: { method: 'GET', path: '/api/factories/:factory/servers', status: 200 },
+  only: { side: 'cli', why: "the api serves it as the McpServer's `list` of `objects`' Api, calling this handler" },
   handler: (args, _env, home) => serversListed(textOf(args, 'factory'), rootGiven(home, 'factory servers')),
   print: ({ factory, servers, unread }) =>
     servers.length === 0
@@ -268,7 +268,7 @@ export const FACTORY_SERVER_ADD: Command<Added> = {
   check: addCheck,
   writes: true,
   class: 'ask',
-  route: { method: 'PUT', path: '/api/factories/:factory/servers/:server', status: 200 },
+  only: { side: 'cli', why: "the api serves it as the McpServer's `put` of `objects`' Api, calling this handler" },
   handler: (args, _env, home) =>
     rooted(
       home,
@@ -326,7 +326,7 @@ export const FACTORY_SERVER_RM: Command<{ file: string; removed: string }> = {
   },
   writes: true,
   class: 'ask',
-  route: { method: 'DELETE', path: '/api/factories/:factory/servers/:server', status: 200 },
+  only: { side: 'cli', why: "the api serves it as the McpServer's `delete` of `objects`' Api, calling this handler" },
   handler: (args, _env, home) =>
     rooted(
       home,

@@ -25,7 +25,7 @@ const templated = {
   spec: {
     repos: ['/repo'],
     workflows: ['build', 'quick'],
-    hires: { 'build/implement': 'grace' },
+    hires: { 'build/implement': 'implementer' },
     volumes: [{ name: 'data', path: '/a/data', readOnly: true }],
     harnessSettings: { claude: { model: 'opus' } },
     revisions: 'follow',
@@ -45,7 +45,7 @@ const templated = {
       { type: 'ConflictsPending', status: 'False', reason: 'NoUpgrade', message: 'no upgrade waits' },
     ],
     applied: '1.2.0',
-    upgrade: { from: '1.2.0', to: '1.3.0', conflicts: [{ at: 'agents/grace.md', base: 'a', ours: 'b', theirs: null }] },
+    upgrade: { from: '1.2.0', to: '1.3.0', conflicts: [{ at: 'agents/implementer.md', base: 'a', ours: 'b', theirs: null }] },
     untrusted: [{ place: '/repo', harness: 'Claude Code', withheld: 'its hooks', never: 'the folder is gone' }],
   },
 } as const;

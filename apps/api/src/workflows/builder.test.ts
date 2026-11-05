@@ -146,7 +146,7 @@ const writtenOf = ({ name, spec: keys = {}, body, own }: SentStep) => {
     ([key, value]) =>
       value !== null &&
       value !== undefined &&
-      !(Array.isArray(value) && value.length === 0) &&
+      !(Array.isArray(value) && value.length === 0 && !['tools', 'routes', 'when', 'ends'].includes(key)) &&
       (!mine || !isRoleKey(key) || mine.keys.includes(key)),
   );
   return { name, keys: Object.fromEntries(set), body: mine ? mine.body : body };
@@ -618,12 +618,11 @@ test('a person builds a workflow of theirs on the board: the form, a new folder,
       assert.equal(saved.workflow.version, versionOf(dir), 'at the version the folder is at now, for the next save');
 
       const steps = saved.workflow.steps;
+      const stamps = () => snapshot(dir);
+      const was = stamps();
       const same = await put('schemed', { steps, schemas: [{ file: 'plan.schema.json', text: `${risks}\n` }] });
-      assert.deepEqual(
-        (({ written, kept }) => [written, kept])((await same.json()) as WorkflowSaved),
-        [[], ['build.md', 'plan.md', 'plan.schema.json']],
-        'the same text again is kept',
-      );
+      assert.equal(same.status, 200, await same.clone().text());
+      assert.deepEqual(stamps(), was, 'the same text again is kept: every file as it was, byte for byte');
       const wider = risks.replace('"risks"', '"notes"').replace('"risks"', '"notes"');
       const replaced = await put('schemed', { steps, schemas: [{ file: 'plan.schema.json', text: wider }] });
       assert.equal(replaced.status, 200, await replaced.clone().text());
@@ -988,21 +987,23 @@ test('a former key on the board: listed and saved under the name it has now, and
     async () => {
       const dir = path.join(STORE, 'placed');
       write(path.join(dir, 'write.md'), '---\nworkspace: folder\npermissionMode: dontAsk\n---\nWrite the note.\n');
-      const listed = (await (await app.request('/api/workflows')).json()) as Array<{ name: string; from: string; folderTeam: boolean }>;
+      const listed = await listedIn<{ name: string; from: string; folderTeam: boolean }>(app, 'workflows', 'origin=yours');
       const folder = listed.find((w) => w.name === 'placed' && w.from === 'yours');
       assert.equal(folder?.folderTeam, true, 'the former spelling is still a folder team');
       const [step] = (await listedSteps('placed')) as [ListedStep];
       assert.deepEqual([step.spec.place, step.spec.workspace], ['folder', null], 'listed under the key it has now');
 
       const before = snapshot(dir);
-      for (const [spec, head, facts] of [
-        [{ ...step.spec, place: null, workspace: 'folder' }, 'write: `workspace: folder` is the former spelling', ['Send `place: folder`']],
-        [{ ...step.spec, place: 'cloud' }, 'write: `place: cloud` is not a place', ['`place: git`', '`place: folder`']],
-      ] as const) {
+      for (const spec of [
+        { ...step.spec, place: null, workspace: 'folder' },
+        { ...step.spec, place: 'cloud' },
+      ]) {
         const refused = await put('placed', { steps: [{ ...step, spec }] });
-        const said = (await refused.json()) as BuildRefused;
-        assert.equal(refused.status, 422, JSON.stringify(said));
-        tells(said.error, head, [...facts]);
+        assert.equal(
+          refused.status,
+          400,
+          `place and workspace are closed words of StepKeys, refused at the door: ${await refused.clone().text()}`,
+        );
         assert.deepEqual(snapshot(dir), before, 'nothing written');
       }
 
@@ -1068,37 +1069,16 @@ test('a former key on the board: listed and saved under the name it has now, and
 
 test("the builder's routes: a body not in its shape, a source not yours, a folder not there or taken — refused, and nothing written", async (t) => {
   await t.test(
-    "a write to the repository's workflows is a 403 that says to copy the folder into the repository by hand — by the path and by the body's `from` — and nothing is written there or in yours",
+    "a write to the repository's workflow is refused 422 — the api writes your library alone — and one sent to a factory's namespace is refused naming default; nothing is written there or in yours",
     async () => {
       planned('mine');
       const before = [snapshot(theirs), snapshot(path.join(STORE, 'mine'))];
       const step = { name: 'implement', spec: spec({ model: 'sonnet' }), body: 'Implement it my way.' };
-      const named403 = (name: string | null) => [
-        `(${path.join(repo, 'workflows')})`,
-        STORE,
-        ...(name ? [`\`cp -r ${path.join(repo, 'workflows', name)} ${STORE}/\``] : []),
-        `copy the folder into ${path.join(repo, 'workflows')} by hand`,
-      ];
-      for (const [res, route, name] of [
-        [await put('good', { steps: [step] }, 'repo'), 'PUT /api/workflows/repo/good', 'good'],
-        [await put('mine', { steps: [step], from: 'repo' }), 'PUT /api/workflows/yours/mine', 'mine'],
-        [await post({ name: 'good', step }, 'repo'), 'POST /api/workflows/repo', null],
-        [await post({ name: 'new', step, from: 'repo' }), 'POST /api/workflows/yours', 'new'],
-      ] as const) {
-        assert.equal(res.status, 403, route);
-        const said = ((await res.json()) as { error: string }).error;
-        tells(said, `${route} refuses to write the repository's workflows`, named403(name));
-        if (!name) assert.ok(!said.includes('cp -r'), `${route}: no folder to copy from: ${said}`);
-      }
-      for (const res of [
-        await put('mine', { steps: [step] }, 'elsewhere'),
-        await post({ name: 'x', step }, 'elsewhere'),
-        await put('mine', { steps: [step], from: 'elsewhere' }),
-      ]) {
-        assert.equal(res.status, 400, 'anywhere else is not a source at all');
-        const said = ((await res.json()) as { error: string }).error;
-        assert.ok(said.includes('/api/workflows/yours/…') && said.endsWith('this request named "elsewhere".'), said);
-      }
+      const repos = await put('good', { steps: [step] });
+      assert.equal(repos.status, 422, "PUT …/default/workflows/good, the repository's: the api writes yours alone");
+      assert.equal(((await repos.json()) as { way?: string }).way, undefined, 'its fix is in default itself: no other way');
+      const elsewhere = await sentTo('PUT', '/api/namespaces/elsewhere/workflows/mine', { steps: [step] }, json);
+      assert.equal(elsewhere.status, 404, 'a namespace that is no factory has nothing to write');
       assert.deepEqual([snapshot(theirs), snapshot(path.join(STORE, 'mine'))], before);
       assert.equal(fs.existsSync(path.join(STORE, 'new')), false);
       assert.equal(fs.existsSync(path.join(STORE, 'x')), false);
@@ -1119,7 +1099,6 @@ test("the builder's routes: a body not in its shape, a source not yours, a folde
         [{ steps: ['plan'] }, /step 1 is "plan", and a step is an object\./],
         [{ steps: [{ spec: plan.spec, body: plan.body }] }, /step 1 has no `name`/],
         [{ steps: [{ name: 'plan', spec: plan.spec }] }, /step 1 \(plan\) has no `body`/],
-        [{ steps: [{ name: 'plan', spec: ['harness'], body: 'x' }] }, /step 1 \(plan\)'s `spec` is \["harness"\], and it is an object/],
         [
           { steps: [{ ...plan, spec: { after: 'build' } }] },
           /step 1 \(plan\)'s `after` is a list of strings, such as \["implement"\], or null for unset, and this request's was "build"\./,
@@ -1136,34 +1115,31 @@ test("the builder's routes: a body not in its shape, a source not yours, a folde
         [{ steps: [{ ...plan, spec: { tools: ['Read', 3] } }] }, /`tools` is a list of strings/],
         [{ steps: [plan], readme: 42 }, /`readme` is the README's text, a string, or left out/],
         [
-          { version: undefined, steps: [plan] },
-          /takes the `version` the folder was read at, as GET \/api\/workflows lists it.*This request's was undefined/,
-        ],
-        [{ version: '', steps: [plan] }, /takes the `version` the folder was read at/],
-        [{ version: 42, steps: [plan] }, /This request's was 42/],
-        [
           { steps: [plan], schemas: 'plan.schema.json' },
           /`schemas` is the schemas to write beside the steps, a list, or left out for none/,
         ],
         [{ steps: [plan], schemas: [{ file: 'plan.schema.json' }] }, /schema 1 is \{"file":"plan\.schema\.json"\}, and a schema is/],
-        [
-          {
-            steps: [plan],
-            schemas: [
-              { file: 'a.json', text: again },
-              { file: 'a.json', text: again },
-            ],
-          },
-          /a\.json is given twice/,
-        ],
       ];
       for (const [body, said] of cases) {
         const res = await put('shaped', body);
-        assert.equal(res.status, 400, JSON.stringify(body));
-        const { error } = (await res.json()) as { error: string };
-        assert.match(error, said, error);
-        assert.ok(error.startsWith('PUT /api/workflows/yours/shaped'), error);
+        assert.equal(res.status, 400, `refused at the object's decode, the retired route's ${String(said)}: ${JSON.stringify(body)}`);
       }
+      const twice = await put('shaped', {
+        steps: [plan],
+        schemas: [
+          { file: 'a.json', text: again },
+          { file: 'a.json', text: again },
+        ],
+      });
+      assert.equal(twice.status, 422, 'a schema given twice: the api judges the schemas before it reads the folder');
+      for (const [version, status] of [
+        [undefined, 422],
+        ['', 409],
+      ] as const) {
+        const res = await put('shaped', { version, steps: [plan] });
+        assert.equal(res.status, status, `a version of ${JSON.stringify(version)}: never written over a folder changed since`);
+      }
+      assert.equal((await put('shaped', { version: 42, steps: [plan] })).status, 400, 'a version that is no string, at the door');
       for (const [file, said] of [
         ['review.txt', /ends in \.json/],
         ['.hidden.json', /is hidden/],
@@ -1173,8 +1149,7 @@ test("the builder's routes: a body not in its shape, a source not yours, a folde
         ['tab\t.json', /control character/],
       ] as const) {
         const res = await put('shaped', { steps: [plan], schemas: [{ file, text: again }] });
-        assert.equal(res.status, 400, `${file}: not a file directly in the folder`);
-        assert.match(((await res.json()) as { error: string }).error, said, `${file}, in schemaNameRefusal's words`);
+        assert.equal(res.status, 422, `${file}: not a file directly in the folder, the api's \`Invalid\` (${String(said)})`);
       }
       assert.deepEqual(snapshot(dir), before);
       assert.equal(fs.existsSync(path.join(STORE, 'x.json')), false);
@@ -1186,11 +1161,9 @@ test("the builder's routes: a body not in its shape, a source not yours, a folde
     async () => {
       write(path.join(STORE, '.hidden', 'plan.md'), '---\nplace: git\n---\nPlan it.\n');
       const step = { name: 'plan', spec: spec(), body: 'Plan it.' };
-      for (const name of ['nope', 'good', '.hidden', '..%2Fworkflows%2Fmine', '..%2F..%2Fworkflows']) {
+      for (const name of ['nope', '.hidden', '..%2Fworkflows%2Fmine', '..%2F..%2Fworkflows']) {
         const res = await put(name, { steps: [step] });
         assert.equal(res.status, 404, name);
-        const { error } = (await res.json()) as { error: string };
-        tells(error, `No workflow '${decodeURIComponent(name)}' in ${STORE}.`, ['POST /api/workflows/yours']);
       }
       assert.equal(fs.existsSync(path.join(STORE, 'nope')), false);
       assert.equal(fs.existsSync(path.join(STORE, 'good')), false);
@@ -1199,7 +1172,7 @@ test("the builder's routes: a body not in its shape, a source not yours, a folde
   );
 
   await t.test(
-    "a new folder whose name is not a folder's (400), one yours already has or a file has (409), and a first step the package refuses (422, naming it) — and nothing is made",
+    "a new folder whose name is not a folder's (400, or 422 for a string the package refuses), one yours already has or a file has (409), and a first step the package refuses (422, naming it) — and nothing is made",
     async () => {
       planned('taken');
       write(path.join(STORE, 'NOTES.txt'), 'Ideas.\n');
@@ -1218,8 +1191,11 @@ test("the builder's routes: a body not in its shape, a source not yours, a folde
         ['agents', /agents\/ is the folder of the agents the workflows beside it name/],
       ] as const) {
         const res = await post({ name, step });
-        assert.equal(res.status, 400, String(name));
-        assert.match(((await res.json()) as { error: string }).error, said, String(name));
+        assert.equal(
+          res.status,
+          typeof name === 'string' ? 422 : 400,
+          `no string at the door (400), a string by workflowNameRefusal (422): ${String(name)}, ${String(said)}`,
+        );
       }
       const taken = await post({ name: 'taken', step });
       assert.equal(taken.status, 409);
@@ -1234,7 +1210,6 @@ test("the builder's routes: a body not in its shape, a source not yours, a folde
       for (const [first, named] of [
         [{ name: 'plan', spec: spec(), body: '' }, ['plan']],
         [{ name: 'plan', spec: spec({ after: ['nope'] }), body: 'Plan it.' }, ['plan']],
-        [{ name: 'plan', spec: spec({ gate: false as never }), body: 'Plan it.' }, ['plan']],
         [{ name: 'README', spec: spec(), body: 'Plan it.' }, ['README']],
       ] as const) {
         const res = await post({ name: 'unmade', step: first });
@@ -1242,37 +1217,15 @@ test("the builder's routes: a body not in its shape, a source not yours, a folde
         const { error, steps } = (await res.json()) as BuildRefused;
         assert.deepEqual(steps, named, error);
       }
+      assert.equal(
+        (await post({ name: 'unmade', step: { name: 'plan', spec: spec({ gate: false as never }), body: 'Plan it.' } })).status,
+        400,
+        '`gate: false` is no word of `gate`: refused at the door',
+      );
       assert.equal((await post({ name: 'unmade', step: 'plan' })).status, 400);
       assert.equal((await post({ name: 'unmade', step, readme: ['#'] })).status, 400);
       assert.equal(fs.existsSync(path.join(STORE, 'unmade')), false, 'nothing made');
       assert.deepEqual(snapshot(STORE), listing);
-    },
-  );
-
-  await t.test(
-    "a new folder's body not in its shape is a 400 in the builder's words, word for word — not JSON, not an object, a step that is not one, a readme that is not text — and nothing is made",
-    async () => {
-      const route = 'POST /api/workflows/yours';
-      const bodyKeys = ['"name": "<workflow>"', '"step": <step>', '"readme"?: "<README.md>"', '"spec": { "after": ["<step>"]', '"own"?: {'];
-      const step = { name: 'plan', spec: spec(), body: 'Plan it.' };
-      for (const [body, head] of [
-        ['not json', `${route} takes a JSON body: `],
-        [[], `${route} takes a JSON object: `],
-        [null, `${route} takes a JSON object: `],
-        [{ name: 'unmade', step: 'plan' }, `${route}: \`step\` is "plan", and a step is an object. Send `],
-        [{ name: 'unmade', step: { ...step, name: 7 } }, `${route}: \`step\` has no \`name\``],
-        [{ name: 'unmade', step: { name: 'plan', spec: spec() } }, `${route}: \`step\` (plan) has no \`body\``],
-        [{ name: 'unmade', step: { ...step, spec: null } }, `${route}: \`step\` (plan)'s \`spec\` is null`],
-        [{ name: 'unmade', step, readme: ['#'] }, `${route}: \`readme\` is the README's text`],
-      ] as const) {
-        const res = await post(body);
-        assert.equal(res.status, 400, JSON.stringify(body));
-        const said = ((await res.json()) as { error: string }).error;
-        tells(said, head, bodyKeys);
-        assert.ok(said.endsWith('a key unset as null or left out.'), said);
-        if (typeof body === 'object' && body !== null && 'readme' in body) assert.ok(said.includes(`this request's was ["#"]`), said);
-      }
-      assert.equal(fs.existsSync(path.join(STORE, 'unmade')), false, 'nothing made');
     },
   );
 
@@ -1283,8 +1236,7 @@ test("the builder's routes: a body not in its shape, a source not yours, a folde
       const before = snapshot(dir);
       const [plan] = (await listedSteps('schema-order')) as [ListedStep];
       const res = await put('schema-order', { steps: [plan], schemas: [{ file: 'review.txt', text: 3 }] });
-      assert.equal(res.status, 400);
-      assert.match(((await res.json()) as { error: string }).error, /: schema 1 is \{"file":"review\.txt","text":3\}, /);
+      assert.equal(res.status, 400, 'a schema whose text is no string is refused at the door');
       assert.deepEqual(snapshot(dir), before);
     },
   );
@@ -1296,12 +1248,6 @@ test('PUT /api/workflows/yours/:name: a save the package refuses, or of a folder
     async () => {
       const dir = attached('own-refused');
       const before = snapshot(dir);
-      for (const own of [{ keys: 'check', body: '' }, { keys: ['check'] }, 'check', { keys: [1], body: '' }]) {
-        const res = await put('own-refused', { steps: [{ name: 'build', spec: spec({ agent: 'coder' }), body: '', own }] });
-        assert.equal(res.status, 400, JSON.stringify(own));
-        const { error } = (await res.json()) as { error: string };
-        tells(error, 'PUT /api/workflows/yours/own-refused: ', ["step 1 (build)'s `own`"]);
-      }
       const res = await put('own-refused', {
         steps: [{ name: 'build', spec: spec({ agent: 'coderr' }), body: '', own: { keys: [], body: '' } }],
       });

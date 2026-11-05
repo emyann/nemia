@@ -326,6 +326,8 @@ export type SchemaFile = { file: string; text: string };
 export function schemasOf(schemas: typeof PUT_BODY.Type.schemas, route: string): SchemaFile[] | Refusal {
   const out: SchemaFile[] = [];
   for (const schema of schemas ?? []) {
+    const wrong = schemaNameRefusal(schema.file);
+    if (wrong !== undefined) return { status: 400, error: `${route}: ${wrong}` };
     if (out.some((s) => s.file === schema.file))
       return {
         status: 400,

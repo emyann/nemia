@@ -7,7 +7,7 @@
  */
 import { Context, Effect } from 'effect';
 import { isRefusal } from 'agent-orchestrator';
-import { Conflict, Invalid, Missing } from 'objects';
+import { Conflict, Failed, Invalid, Missing } from 'objects';
 import type { Refusal } from '../guard.ts';
 import type { Served } from '../layer.ts';
 
@@ -38,3 +38,19 @@ export const answered = <A>(work: (s: Served) => Promise<A>): Effect.Effect<A, M
 /** One of the api's `Refusal`s as the `Api`'s error: 404 `Missing`, 409 `Conflict`, any other (400, 403) `Invalid`, a 422. */
 export const statusRefused = ({ status, error }: Refusal): Missing | Conflict | Invalid =>
   status === 404 ? new Missing({ error }) : status === 409 ? new Conflict({ error }) : new Invalid({ error });
+
+/**
+ * `answered` for a definition's verbs, whose writes touch the disk: a failure that is no refusal of the package's — the disk refusing a
+ * file the package let through — answers `Failed`, a 500 in the error's own words, rather than a 500 with no body.
+ */
+export const answeredWrite = <A>(work: (s: Served) => Promise<A>): Effect.Effect<A, Missing | Conflict | Invalid | Failed, ServedNow> =>
+  Effect.gen(function* () {
+    const s = yield* ServedNow;
+    return yield* Effect.tryPromise({ try: () => work(s), catch: (err) => err }).pipe(
+      Effect.catch((err) => {
+        const refused = refusedAs(err);
+        if (refused) return Effect.fail(refused);
+        return err instanceof Error ? Effect.fail(new Failed({ error: err.message })) : Effect.die(err);
+      }),
+    );
+  });

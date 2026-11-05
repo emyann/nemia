@@ -130,6 +130,7 @@ export {
   CardsGroup,
   Conflict,
   FactoriesGroup,
+  Failed,
   HiresGroup,
   Invalid,
   KINDS,

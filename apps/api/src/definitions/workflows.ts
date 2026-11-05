@@ -18,7 +18,7 @@ import { definitionRevision, foldersIn, typedGraphOf, workflowStale, workflowVer
 import { Api, API_VERSION, Conflict, Invalid, type Workflow, type WorkflowStep } from 'objects';
 import type { Served } from '../layer.ts';
 import { queryOf } from '../factory-parts/index.ts';
-import { answered, statusRefused } from '../objects/refused.ts';
+import { answeredWrite as answered, statusRefused } from '../objects/refused.ts';
 import { commandNamed, runPlaced } from '../store.ts';
 import { draftOf, isRoleKey, schemasOf, write, type StepBody } from '../workflows/builder.ts';
 import { workflowNameRefusal } from '../workflows/words.ts';
@@ -60,7 +60,12 @@ export const heldIn = (s: Served): Held<Folder>[] =>
   );
 
 /** A key set: not null, not left out, not an empty list. */
-const isSet = (value: unknown): boolean => value !== null && value !== undefined && !(Array.isArray(value) && value.length === 0);
+/** The keys whose unset value is null, so a list of none (`tools: []`) is a line the file writes. */
+const LISTS_OF_NONE: readonly string[] = ['tools', 'routes', 'when', 'ends'];
+
+/** Whether a file writes `key`'s line: a value set, an empty list only where unset is null. */
+const isSet = (key: string, value: unknown): boolean =>
+  value !== null && value !== undefined && !(Array.isArray(value) && value.length === 0 && !LISTS_OF_NONE.includes(key));
 
 /** The spec of a step in the object's words: `workspace: main`, the former spelling, said `base`. */
 const keysOf = (spec: ListedStep['spec']): WorkflowStep['keys'] => {
@@ -76,7 +81,9 @@ const writtenStep = (step: ListedStep): WorkflowStep => {
   const spec = keysOf(step.spec) as Record<string, unknown>;
   const own = step.own;
   const keys = Object.fromEntries(
-    Object.entries(spec).filter(([key, value]) => isSet(value) && (own === null || !isRoleKey(key) || own.keys.includes(key as never))),
+    Object.entries(spec).filter(
+      ([key, value]) => isSet(key, value) && (own === null || !isRoleKey(key) || own.keys.includes(key as never)),
+    ),
   );
   return { name: step.name, keys, body: own ? own.body : step.body };
 };

@@ -62,6 +62,9 @@ export class Invalid extends Schema.Class<Invalid>('Invalid')(
   { httpApiStatus: 422 },
 ) {}
 
+/** A write the package let through and the disk then refused (a file that is a folder, one read-only): a 500, saying what failed. */
+export class Failed extends Schema.Class<Failed>('Failed')({ error: Schema.String }, { httpApiStatus: 500 }) {}
+
 /** A run one of whose tasks does not read, so it is not judged: a 502, in the words the list says it with. */
 export class Unjudged extends Schema.Class<Unjudged>('Unjudged')({ error: Schema.String }, { httpApiStatus: 502 }) {}
 
@@ -194,6 +197,9 @@ export class CardsGroup extends HttpApiGroup.make('cards').add(
 
 /** What every verb of a factory and of its parts refuses with, as a card's do. */
 const objectErrors = cardErrors;
+
+/** What a definition's verbs refuse with: a part's refusals, and a write the disk failed. */
+const definitionErrors = [...cardErrors, Failed];
 
 /** The factories, which no namespace holds, and each one's rules, instruction and command lines. */
 export class FactoriesGroup extends HttpApiGroup.make('factories').add(
@@ -372,31 +378,31 @@ export class WorkflowsGroup extends HttpApiGroup.make('workflows').add(
     params: namespaceParams,
     query: { ...listQuery, ...originQuery },
     success: WorkflowListObject,
-    error: objectErrors,
+    error: definitionErrors,
   }),
   HttpApiEndpoint.get('get', '/api/namespaces/:namespace/workflows/:name', {
     params: cardParams,
     query: originQuery,
     success: WorkflowObject,
-    error: objectErrors,
+    error: definitionErrors,
   }),
   HttpApiEndpoint.post('create', '/api/namespaces/:namespace/workflows', {
     params: namespaceParams,
     payload: WorkflowCreate,
     success: WorkflowObject.pipe(Schema.annotate({ httpApiStatus: 201 })),
-    error: objectErrors,
+    error: definitionErrors,
   }),
   HttpApiEndpoint.put('replace', '/api/namespaces/:namespace/workflows/:name', {
     params: cardParams,
     payload: WorkflowWrite,
     success: WorkflowObject,
-    error: objectErrors,
+    error: definitionErrors,
   }),
   HttpApiEndpoint.delete('delete', '/api/namespaces/:namespace/workflows/:name', {
     params: cardParams,
     query: removeQuery,
     success: WorkflowObject,
-    error: objectErrors,
+    error: definitionErrors,
   }),
 ) {}
 
@@ -406,43 +412,43 @@ export class AgentsGroup extends HttpApiGroup.make('agents').add(
     params: namespaceParams,
     query: { ...listQuery, ...originQuery },
     success: AgentListObject,
-    error: objectErrors,
+    error: definitionErrors,
   }),
   HttpApiEndpoint.get('get', '/api/namespaces/:namespace/agents/:name', {
     params: cardParams,
     query: originQuery,
     success: AgentObject,
-    error: objectErrors,
+    error: definitionErrors,
   }),
   HttpApiEndpoint.post('create', '/api/namespaces/:namespace/agents', {
     params: namespaceParams,
     payload: AgentWrite,
     success: AgentObject.pipe(Schema.annotate({ httpApiStatus: 201 })),
-    error: objectErrors,
+    error: definitionErrors,
   }),
   HttpApiEndpoint.put('replace', '/api/namespaces/:namespace/agents/:name', {
     params: cardParams,
     payload: AgentWrite,
     success: AgentObject,
-    error: objectErrors,
+    error: definitionErrors,
   }),
   HttpApiEndpoint.delete('delete', '/api/namespaces/:namespace/agents/:name', {
     params: cardParams,
     query: removeQuery,
     success: AgentObject,
-    error: objectErrors,
+    error: definitionErrors,
   }),
   HttpApiEndpoint.post('try', '/api/namespaces/:namespace/agents/:name/try', {
     params: cardParams,
     payload: AgentTry,
     success: AgentTried.pipe(Schema.annotate({ httpApiStatus: 201 })),
-    error: objectErrors,
+    error: definitionErrors,
   }),
   HttpApiEndpoint.get('card', '/api/namespaces/:namespace/agents/:name/card', {
     params: cardParams,
     query: originQuery,
     success: AgentCard,
-    error: objectErrors,
+    error: definitionErrors,
   }),
 ) {}
 
@@ -452,36 +458,36 @@ export class SkillsGroup extends HttpApiGroup.make('skills').add(
     params: namespaceParams,
     query: { ...listQuery, ...originQuery },
     success: SkillListObject,
-    error: objectErrors,
+    error: definitionErrors,
   }),
   HttpApiEndpoint.get('get', '/api/namespaces/:namespace/skills/:name', {
     params: cardParams,
     query: originQuery,
     success: SkillObject,
-    error: objectErrors,
+    error: definitionErrors,
   }),
   HttpApiEndpoint.post('create', '/api/namespaces/:namespace/skills', {
     params: namespaceParams,
     payload: SkillWrite,
     success: SkillObject.pipe(Schema.annotate({ httpApiStatus: 201 })),
-    error: objectErrors,
+    error: definitionErrors,
   }),
   HttpApiEndpoint.put('replace', '/api/namespaces/:namespace/skills/:name', {
     params: cardParams,
     payload: SkillWrite,
     success: SkillObject,
-    error: objectErrors,
+    error: definitionErrors,
   }),
   HttpApiEndpoint.post('copy', '/api/namespaces/:namespace/skills/:name/copy', {
     params: cardParams,
     success: SkillObject.pipe(Schema.annotate({ httpApiStatus: 201 })),
-    error: objectErrors,
+    error: definitionErrors,
   }),
   HttpApiEndpoint.get('files', '/api/namespaces/:namespace/skills/:name/files', {
     params: cardParams,
     query: originQuery,
     success: SkillFiles,
-    error: objectErrors,
+    error: definitionErrors,
   }),
 ) {}
 

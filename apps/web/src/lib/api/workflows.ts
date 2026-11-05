@@ -193,8 +193,12 @@ export const workflowViewOf = (workflow: Workflow): WorkflowListing => ({
   unfilled: workflow.status.unfilled,
 });
 
-/** A value a key of a step's file writes: neither null nor an empty list, which a file leaves out. */
-const isSet = (value: unknown): boolean => value !== null && value !== undefined && !(Array.isArray(value) && !value.length);
+/** The keys whose unset value is null, so a list of none (`tools: []`) is a line the file writes. */
+const LISTS_OF_NONE: readonly string[] = ['tools', 'routes', 'when', 'ends'];
+
+/** Whether a step's file writes `key`'s line: a value set, an empty list only where unset is null. */
+const isSet = (key: string, value: unknown): boolean =>
+  value !== null && value !== undefined && !(Array.isArray(value) && !value.length && !LISTS_OF_NONE.includes(key));
 
 /**
  * A step as its file writes it, which a save sends (`spec.steps`): a step with an agent, the keys it sets itself and its own note; one with
@@ -202,7 +206,7 @@ const isSet = (value: unknown): boolean => value !== null && value !== undefined
  */
 export const writtenStepOf = (step: StepWritten): WorkflowStep => {
   const entries = Object.entries(step.spec) as Array<[StepKey, unknown]>;
-  const kept = step.own === null ? entries.filter(([, value]) => isSet(value)) : entries.filter(([key]) => step.own?.keys.includes(key));
+  const kept = step.own === null ? entries.filter(([key, value]) => isSet(key, value)) : entries.filter(([key]) => step.own?.keys.includes(key));
   return { name: step.name, keys: Object.fromEntries(kept), body: step.own === null ? step.body : step.own.body };
 };
 

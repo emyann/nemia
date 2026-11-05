@@ -28,7 +28,7 @@ import { type Agent, type AgentSpec, Api, API_VERSION, Invalid } from 'objects';
 import type { Served } from '../layer.ts';
 import { agentDraftOf, listingOf, saved, type AgentDraftBody, type LibraryAgent } from '../agents/agents.ts';
 import { queryOf } from '../factory-parts/index.ts';
-import { answered } from '../objects/refused.ts';
+import { answeredWrite as answered } from '../objects/refused.ts';
 import { markdownNamesIn } from '../workflows/builder.ts';
 import { commandNamed, runPlaced } from '../store.ts';
 import { listed, originAsked, servedNamed, servedOf, thereOf, writeGoes, writtenAt, type Held, type Origin } from './served.ts';

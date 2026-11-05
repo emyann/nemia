@@ -173,6 +173,11 @@ const spec = (fields: Partial<WorkflowStepSpec> = {}): WorkflowStepSpec => ({
   tally: [],
   loop: null,
   rounds: null,
+  routes: null,
+  route: null,
+  when: null,
+  ends: null,
+  workflow: null,
   ...fields,
 });
 

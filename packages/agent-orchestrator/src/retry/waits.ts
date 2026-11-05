@@ -32,6 +32,8 @@ export const WAITS_ON_PERSON: Record<StepReason, boolean> = {
   CheckFailed: false,
   UnreadableCloseout: false,
   Stopped: false,
+  Skipped: false,
+  Sent: false,
   Unknown: false,
 };
 

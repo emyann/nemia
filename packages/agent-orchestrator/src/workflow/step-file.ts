@@ -18,6 +18,7 @@ import {
 } from '../step/step.ts';
 import { fenceReach } from 'agent-runtime/vocabulary';
 import { renderFrontmatter, type FrontmatterPair } from '../frontmatter/frontmatter.ts';
+import { routeWritten, routingOf } from '../route/index.ts';
 import { DEFAULT_HARNESS, isRemoteHarness, remoteRefusal } from '../harness/harness.ts';
 import {
   budgetOf,
@@ -124,7 +125,7 @@ export function parseWorkflow(
     block: fenced,
   } = block === null
     ? { meta: {} as Partial<Record<StepKey, string>>, spelled: {}, block: undefined }
-    : readKeys<StepKey>(name, block, (key) => (isStepKey(key) ? undefined : unknownKey(name, key)));
+    : readKeys<StepKey>(name, block, (key) => (isStepKey(key) ? undefined : unknownKey(name, key)), ['route']);
   meta = baseSpelled(placeSpelled(name, meta));
   placeRequired(name, meta.place);
   const attached = attachedAgent(name, written, hired);
@@ -387,6 +388,7 @@ export function stepFrom(
     tally: tallyOf(name, meta.tally, output),
     loop: loopOf(name, meta.loop, output),
     rounds: roundsOf(name, meta.loop, meta.rounds),
+    ...routingOf(name, meta),
   };
 }
 
@@ -490,6 +492,7 @@ export function renderStep(step: StepDraft): string {
   if ((step.workspace as string | undefined) === 'main') refuse(baseWritten(step.name));
   const provenance = step.agent != null && typeof step.agent === 'object' ? step.agent : undefined;
   const pairs = STEP_KEYS.flatMap((key): FrontmatterPair[] => {
+    if (key === 'route') return step.route == null ? [] : [['route', routeWritten(step.route)]];
     const value = writtenValue(step.name, key, key === 'agent' ? (provenance?.name ?? step.agent) : ownValue(step, key));
     if (provenance && key !== 'agent' && !provenance.keys.includes(key) && value === provenance.given?.[key]) return [];
     return value === undefined ? [] : [[key, value]];

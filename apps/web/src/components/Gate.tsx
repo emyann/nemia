@@ -457,7 +457,9 @@ export const endsTheRun = (step: Pick<StepView, 'spec'>): boolean => step.spec?.
 export function ActsOn({ run, step }: { run: RunView; step: StepView }) {
   const { data, error } = useQuery({ ...decisionQuery(run.id, decisionStamp(run)), enabled: decidableRun(run) });
   const standings = isDecidable(data) ? data.standings : [];
-  const waitsOn = new Set(run.graph.edges.filter((e) => e.kind === 'after' && e.to === step.name).map((e) => e.from));
+  const waitsOn = new Set(
+    run.graph.edges.filter((e) => (e.kind === 'after' || e.kind === 'route') && e.to === step.name).map((e) => e.from),
+  );
   const work = run.steps.filter((one) => waitsOn.has(one.name));
 
   return (

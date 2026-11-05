@@ -7,6 +7,8 @@ import { endsOnBase, LOOP_REPLIES, stepPlace, type Workflow, WorkflowError } fro
 import { isRemoteHarness } from '../harness/harness.ts';
 import { contextText, sessionContext } from '../keys/index.ts';
 import { LINE_NAME } from '../workspace/workspace.ts';
+import { judgeRefusal, routeRefusal, type JudgeFence } from '../route/index.ts';
+import { fencedItself, writesNothing } from './fence.ts';
 
 /**
  * Whether a team works in folders the run makes, with no git repository (`place: folder`): every step says it, or none does
@@ -111,6 +113,7 @@ export function validate(steps: readonly Workflow[]): void {
   if (cycle !== undefined) throw new WorkflowError(cycle);
 
   validateLoops(steps);
+  validateRoutes(steps);
 }
 
 /**
@@ -330,6 +333,34 @@ function validateLoops(steps: readonly Workflow[]): void {
 }
 
 /**
+ * Why a loop crosses a condition, or `undefined`: a round files its whole span again (`loopSpan`), and a condition in it would be asked
+ * again after its followers were filed. So a span holds no condition but its looping step, and no `when:` node but its target.
+ */
+function loopRouteRefusal(steps: readonly Workflow[]): string | undefined {
+  for (const looping of steps) {
+    for (const name of looping.loop ? loopSpan(steps, looping) : []) {
+      const s = steps.find((x) => x.name === name);
+      if (name !== looping.name && s?.routes !== undefined) {
+        return `${looping.name}: \`loop: ${looping.loop}\` files ${name} again each round, and ${name} is a condition: a round would ask it again after its followers were filed. Loop back to a step after ${name}, or move the condition out of the loop.`;
+      }
+      if (name !== looping.loop && s?.when !== undefined) {
+        return `${looping.name}: \`loop: ${looping.loop}\` files ${name} again each round, and ${name} runs on a route (\`when:\`): only a loop's target may. Loop back to ${name}, or move it out of the loop.`;
+      }
+    }
+  }
+  return undefined;
+}
+
+/** How a judge's fence is told (`judgeRefusal`): by the fence's own judgement. */
+const JUDGE_FENCE: JudgeFence = { writesNothing, fencedItself };
+
+/** Refused: a workflow whose routes do not close (`routeRefusal`), or a loop that crosses a condition (`loopRouteRefusal`). */
+function validateRoutes(steps: readonly Workflow[]): void {
+  const refused = routeRefusal(steps, JUDGE_FENCE) ?? loopRouteRefusal(steps);
+  if (refused !== undefined) throw new WorkflowError(refused);
+}
+
+/**
  * Could two steps of this workflow ever run at the same time?
  *
  * True when there is more than one starting point, or when any step is followed by more than one.
@@ -360,7 +391,8 @@ export function terminalSteps(steps: readonly Workflow[]): Workflow[] {
  * check (`<name>-check`) or try (`<name>-try<N>`, `<name>-try<N>-check`), whose tasks a run files under those names and would read one as
  * the other; and, where the run's steps work in place (`isolate: false`), a team that says `place: folder`, which has no base branch to
  * work on, one that can run two steps at once (`fansOut`), which would share a directory, and an ending (`workspace: base`), which would
- * merge a result branch the run does not have.
+ * merge a result branch the run does not have. And a judge whose fence writes (`judgeRefusal`), with its hire or with none: load left a
+ * judge with no agent and no fence of its own to a hire, and a set that has none runs it on its harness's default, which writes.
  *
  * Asked twice, of the same set: of the folder `nemia start` is given, which it refuses (`stepsToStart`), and of the folder a run that has
  * filed nothing takes again on a pass (`stepsNow`), which keeps the set it froze and says so. What is left to `nemia start` alone reads
@@ -399,5 +431,5 @@ export function stepSetRefusal(steps: readonly Workflow[], isolate: boolean): st
     .find(({ of }) => of && steps.some((other) => other.name === of));
   if (tryClash)
     return `${tryClash.s.name}: a step may not be named for another step's try. The run files ${tryClash.of} tried again as ${tryClash.of}-try2, its check as ${tryClash.of}-try2-check, and on. Rename ${tryClash.s.name}.md.`;
-  return undefined;
+  return steps.map((s) => judgeRefusal(s, JUDGE_FENCE, false)).find((why) => why !== undefined);
 }

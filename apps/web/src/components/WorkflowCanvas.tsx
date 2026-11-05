@@ -9,6 +9,7 @@ import { useCanvasPress } from '../lib/useCanvasPress';
 import type { RunView, StepView } from '../lib/runView';
 import { StateEdge } from './StateEdge';
 import { stepEdges } from './stepGraph';
+import { nodeKinds, routesOf } from '../lib/routing';
 import { SpecNode, type SpecFlowNode } from './StepNode';
 
 /** The canvas's node types for React Flow, one object for the module's life. */
@@ -175,13 +176,14 @@ function drawnOf(workflow: WorkflowListing): Drawn | Error {
   } catch (err) {
     return err instanceof Error ? err : new Error(String(err));
   }
+  const kinds = nodeKinds(graph);
   const nodes: SpecFlowNode[] = steps.map((step, index) => ({
     id: step.name,
     type: 'spec',
     position: at.get(step.name)!,
     sourcePosition: Position.Right,
     targetPosition: Position.Left,
-    data: { name: step.name, index, spec: step.spec },
+    data: { name: step.name, index, spec: step.spec, node: kinds.get(step.name) ?? null, routes: routesOf(graph, step.name) },
     ariaLabel: `Step ${step.name}`,
     className: 'outline-none',
     draggable: false,

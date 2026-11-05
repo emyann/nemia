@@ -142,6 +142,9 @@ const docsWithMarkers = () =>
     });
 
 const RUNTIME_README = 'packages/agent-runtime/README.md';
+
+/** The orchestrator's model, where a workflow's own machine is drawn: the tests' `triage`, by `routedDiagram`. */
+const WORKFLOW_DOC = 'packages/agent-orchestrator/docs/model.md';
 const LOST = '  working --> ending: LOST / record-end';
 
 /** The runtime's README as it is on disk: the lifecycle's diagram, the one every refusal below is planted in. */
@@ -180,10 +183,11 @@ const doc = (name: string, script: string, body = ['stateDiagram-v2']) =>
     '',
   ].join('\n');
 
-test("every diagram in the repository's docs is what its machine prints, and the scan found the lifecycle's", () => {
+test("every diagram in the repository's docs is what its machine prints, and the scan found the lifecycle's and a workflow's", () => {
   const docs = docsWithMarkers();
   const found = docs.flatMap(({ file, text }) => blocksIn(file, text).blocks.map((b) => `${b.file} ${b.name}`));
   assert.ok(found.includes(`${RUNTIME_README} lifecycle`), `the scan reads the lifecycle's diagram: ${found.join(', ')}`);
+  assert.ok(found.includes(`${WORKFLOW_DOC} workflow`), `the scan reads a workflow's diagram: ${found.join(', ')}`);
   assert.deepEqual(driftIn(docs, printed), []);
 });
 

@@ -156,7 +156,7 @@ function stepSource(dir: string, file: string, refusals: string[]): StepSource[]
   try {
     if (fs.lstatSync(at).isSymbolicLink()) throw new Error(`${at} is a link, and a step's file is its own: copy what it points at here.`);
     const { block, body } = splitFrontmatter(at, fs.readFileSync(at, 'utf8'));
-    const keys = block === null ? {} : readKeys<string>(at, block, () => undefined).meta;
+    const keys = block === null ? {} : readKeys<string>(at, block, () => undefined, ['route']).meta;
     return [{ name: path.basename(file, '.md'), keys: keys as Record<string, string>, body: body.trim(), file: at }];
   } catch (err) {
     refusals.push((err as Error).message);

@@ -14,7 +14,7 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import yaml from 'js-yaml';
-import { splitFrontmatter } from 'agent-orchestrator/workflow';
+import { parseAgent, parseFolder, splitFrontmatter } from 'agent-orchestrator/workflow';
 import { scratch } from './scratch.ts';
 import { copyOf, filesUnder, nemia, rendered, SDLC, storeEnv } from './template.ts';
 
@@ -138,7 +138,11 @@ test("each step that writes its own output has its schema beside it, the templat
         return typeof output === 'string' ? [`workflows/${workflow}/${output}`] : [];
       }),
   );
-  assert.deepEqual(owned, ['workflows/quick/implement.schema.json'], "quick's implement writes its own output, and no other step");
+  assert.deepEqual(
+    owned,
+    ['workflows/quick/implement.schema.json', 'workflows/intake/route.schema.json'],
+    "quick's implement and intake's intake write their own output, and no other step",
+  );
   for (const file of owned) assert.ok(fs.readFileSync(path.join(tree, file)).equals(fs.readFileSync(path.join(SDLC, file))), file);
   for (const agent of ['agora', 'argus', 'iris', 'otto', 'seldon'])
     assert.ok(
@@ -148,6 +152,37 @@ test("each step that writes its own output has its schema beside it, the templat
       agent,
     );
 });
+
+for (const name of ['set', 'plain'])
+  test(`rendered ${name === 'set' ? 'on GitHub' : 'in the checkout'}, intake loads, ending in the condition next that routes to build or quick`, () => {
+    const folder = path.join(treeOf(name), 'workflows', 'intake');
+    const files = fs
+      .readdirSync(folder)
+      .filter((leaf) => leaf.endsWith('.md') && leaf !== 'README.md')
+      .map((leaf) => [leaf.slice(0, -'.md'.length), fs.readFileSync(path.join(folder, leaf), 'utf8')] as const);
+    const readIn = (dir: string) => (file: string) => {
+      const at = path.join(dir, file);
+      return fs.existsSync(at) ? fs.readFileSync(at, 'utf8') : undefined;
+    };
+    const agents = path.join(treeOf(name), 'workflows', 'agents');
+    const iris = parseAgent('iris', fs.readFileSync(path.join(agents, 'iris.md'), 'utf8'), readIn(agents));
+    const steps = parseFolder(files, readIn(folder), new Map([['iris', iris]]), undefined, {
+      factory: name,
+      workflow: 'intake',
+      agents: { intake: 'iris' },
+    });
+    const of = (step: string) => steps.find((s) => s.name === step);
+    assert.deepEqual(
+      steps.map((s) => s.name),
+      ['intake', 'next', 'to-build', 'to-quick'],
+    );
+    assert.equal(of('intake')?.gate ?? false, false, 'the gate is on the condition, so the intent is approved with its route');
+    assert.equal(of('next')?.gate, true);
+    assert.deepEqual(of('next')?.routes, ['build', 'quick']);
+    assert.deepEqual(of('next')?.route, { kind: 'table', from: 'intake.needsDesign', table: { yes: 'build', no: 'quick' } });
+    assert.deepEqual([of('to-build')?.when, of('to-build')?.workflow], [['build'], 'build']);
+    assert.deepEqual([of('to-quick')?.when, of('to-quick')?.workflow], [['quick'], 'quick']);
+  });
 
 test('the team is six agents, and Ada is none of them', () => {
   const agents = fs

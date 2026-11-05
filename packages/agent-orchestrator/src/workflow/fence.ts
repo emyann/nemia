@@ -407,6 +407,9 @@ export type Fenced = Partial<Workflow>;
  */
 export const writesNothing = (step: Fenced): boolean => unwrittenBy(step) !== undefined;
 
+/** Whether `step`'s own file sets a fence key (`FENCE_KEYS`): on a step with no agent, a fence no hire's agent would replace. */
+export const fencedItself = (step: Fenced): boolean => FENCE_KEYS.some((key) => step[key] !== undefined);
+
 /**
  * Refuses `writable:` on a step whose fence, as resolved with its agent's (`agent`, by name), writes nothing (`unwrittenBy`). The key
  * widens where a step's writes reach, and gives no write to a step that has none.

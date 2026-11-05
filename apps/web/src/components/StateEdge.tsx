@@ -6,7 +6,7 @@ import { useReducedMotion } from '../lib/useReducedMotion';
  * What an edge on a canvas is drawn from: what it says (`CanvasEdge.state`), whether it is a loop's edge back, and whether it is a line of
  * what a run reads as context (`read`), faint and dotted, which no run waits on.
  */
-export type StateEdgeData = { state: EdgeState; loop: boolean; read?: boolean };
+export type StateEdgeData = { state: EdgeState; loop: boolean; read?: boolean; untaken?: boolean };
 export type StateFlowEdge = Edge<StateEdgeData, 'state'>;
 
 /**
@@ -15,7 +15,7 @@ export type StateFlowEdge = Edge<StateEdgeData, 'state'>;
  * loop's edge back curves beneath the row from under its looping step (`loopPath`), dashed, with the round it is on beside
  * it, and moves as a running edge does while its round is due. Its arrow is the `markerEnd` `stepEdges` gives it, in its colour.
  * Its label is drawn after the dot, so the dot passes under the round and not over its words. A line of what a run reads is faint and
- * dotted, with no arrow (`READ_LINE`).
+ * dotted, with no arrow (`READ_LINE`). A route its condition did not take is thin and faint (`UNTAKEN`), its label kept.
  */
 export function StateEdge({
   sourceX,
@@ -28,7 +28,7 @@ export function StateEdge({
   label,
   data,
 }: EdgeProps<StateFlowEdge>) {
-  const { state, loop, read = false } = data ?? { state: 'to-come', loop: false };
+  const { state, loop, read = false, untaken = false } = data ?? { state: 'to-come', loop: false };
   const { path, labelX, labelY } = loop
     ? loopPath({ x: sourceX, y: sourceY }, { x: targetX, y: targetY })
     : bezier(getBezierPath({ sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition }));
@@ -39,7 +39,8 @@ export function StateEdge({
         path={path}
         markerEnd={read ? undefined : markerEnd}
         data-state={read ? 'read' : state}
-        style={read ? READ_LINE : { stroke, ...edgeLine(state, loop) }}
+        data-untaken={untaken || undefined}
+        style={read ? READ_LINE : { stroke, ...edgeLine(state, loop), ...(untaken ? UNTAKEN : {}) }}
       />
       {state === 'running' && <Travelling path={path} colour={stroke} />}
       <EdgeText
@@ -53,6 +54,9 @@ export function StateEdge({
     </>
   );
 }
+
+/** A route not taken: a hairline, faint, dashed as work that will not come. */
+export const UNTAKEN = { strokeWidth: 0.75, opacity: 0.4 } as const;
 
 /** A line of what a run reads as context: faint and dotted, beneath every wait. */
 export const READ_LINE = {

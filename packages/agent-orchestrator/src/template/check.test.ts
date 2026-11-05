@@ -256,6 +256,31 @@ test('the check of a template folder: the whole folder passes, and each rule bro
     );
   });
 
+  await t.test("a condition's routes, its route of each eval and its ends, a node's when and a workflow node have their places", () => {
+    const workflow = 'workflows/dev/workflow.yaml';
+    for (const route of ['judge', { script: 'routes/pick.ts' }, { from: 'design.surface', table: { web: 'web', docs: 'docs' } }]) {
+      const routed = (d: Record<string, any>) =>
+        d[workflow].spec.steps.push(
+          { name: 'triage', after: ['design'], routes: ['web', 'docs'], route, ends: ['docs'] },
+          { name: 'to-build', after: ['triage'], when: ['web'], workflow: 'build' },
+        );
+      assert.deepEqual(refusalsOf(routed), [], JSON.stringify(route));
+    }
+    for (const route of ['vote', { script: 3 }, { from: 'design.surface' }, { from: 'design.surface', table: { web: 1 } }])
+      assertRefused(
+        refusalsOf((d) => (d[workflow].spec.steps[0].route = route)),
+        workflow,
+        ['spec', 'steps', 0, 'route'],
+        '`judge`',
+      );
+    assertRefused(
+      refusalsOf((d) => (d[workflow].spec.steps[0].when = 'web')),
+      workflow,
+      ['spec', 'steps', 0, 'when'],
+      'a list of strings',
+    );
+  });
+
   await t.test("an agent's overridable words are what a step may override: one that is none is refused at its place", () => {
     assert.deepEqual(
       refusalsOf((d) => (d[AGENT].spec.overridable = ['fence', 'skills'])),

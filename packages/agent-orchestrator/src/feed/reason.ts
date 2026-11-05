@@ -10,7 +10,7 @@
  * the feed was signed, and a one-shot offered by its word — and `feed.test.ts` and `test/assessed.ts` hold the codes the listing sets
  * to what it reads off the same word.
  *
- * **The codes are the owner's.** The 45 entries below — 17 of a run, 24 of a step, 1 of a daemon, 3 of the store, 34 distinct codes,
+ * **The codes are the owner's.** The 47 entries below — 17 of a run, 26 of a step, 1 of a daemon, 3 of the store, 36 distinct codes,
  * eleven of them shared between a run and a step — were named at their slices' design gates. A code renamed is still read under its
  * former name (`FORMER_REASONS`, below), on a line on disk and in a stored selector, so a rename breaks none.
  *
@@ -114,6 +114,8 @@ export const REASONS = {
   BudgetExhausted: { kinds: ['Run', 'Step'], type: 'Warning' },
   OverBudget: { kinds: ['Run', 'Step'], type: 'Warning' },
   Stopped: { kinds: ['Step'], type: 'Warning' },
+  Skipped: { kinds: ['Step'], type: 'Normal' },
+  Sent: { kinds: ['Step'], type: 'Normal' },
   Paused: { kinds: ['Step'], type: 'Normal' },
   Unsigned: { kinds: ['Run', 'Step'], type: 'Warning' },
   UnreadableCloseout: { kinds: ['Step'], type: 'Warning' },
@@ -231,6 +233,8 @@ const STEP_WORDS: readonly Rule[] = [
   { is: 'succeeded', reason: 'Succeeded' },
   { starts: 'failed', reason: 'Failed' },
   { is: 'stopped', reason: 'Stopped' },
+  { starts: 'skipped', reason: 'Skipped' },
+  { starts: 'sent → ', reason: 'Sent' },
   { is: 'unsigned', reason: 'Unsigned' },
   { is: LINE_WORDS.Approved, reason: 'Approved' },
   { is: LINE_WORDS.SpawnFailed, reason: 'SpawnFailed' },

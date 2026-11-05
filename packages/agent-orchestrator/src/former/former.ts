@@ -163,11 +163,14 @@ const keyNamed = (written: string): string => (Object.hasOwn(FORMER_KEYS, writte
  * harness's fence (`fenceKeysOf`), and handed back as `block`: whether it is the file's harness is the caller's to judge
  * (`fenceBlockRefusal`). A fence key at the top level is its former spelling (`FORMER_FENCE_KEYS`), still read; one written both ways is
  * refused, naming both. A block holding anything but `fence`, a fence key the harness does not take, and two blocks are refused.
+ *
+ * A key in `maps` may hold a map, kept as its JSON text for its own reader (`route:`, `routeOf` in `step-file.ts`).
  */
 export function readKeys<K extends string>(
   step: string,
   block: string,
   refusal: (key: string) => string | undefined,
+  maps: readonly string[] = [],
 ): { meta: Partial<Record<K, string>>; spelled: Spelled; block?: FenceBlock } {
   const meta: Partial<Record<K, string>> = {};
   const spelled: Spelled = {};
@@ -189,7 +192,7 @@ export function readKeys<K extends string>(
         `${step}: \`${written}\` is set twice, and a step that says two things says nothing. Keep one line${key === 'after' ? ' and list every step on it: `after: a, b`' : ''}.`,
       );
     }
-    const value = flatValue(step, { ...entry, key }, LIST_KEYS.includes(key));
+    const value = keyValue(step, { ...entry, key }, maps);
     if (!value) refuse(noValue(step, key, written));
     meta[key as K] = value;
     if (written !== key) spelled[key] = written;
@@ -206,6 +209,12 @@ export function readKeys<K extends string>(
   }
   return { meta, spelled, ...(fenced && { block: fenced }) };
 }
+
+/** A key's value as a line holds it (`flatValue`), or the JSON text of a map on a key in `maps`, left to its own reader. */
+const keyValue = (step: string, entry: FrontmatterEntry, maps: readonly string[]): string =>
+  maps.includes(entry.key) && typeof entry.value === 'object' && !Array.isArray(entry.value)
+    ? JSON.stringify(entry.value)
+    : flatValue(step, entry, LIST_KEYS.includes(entry.key));
 
 /** Refused: a fence key written both at the top level, its former spelling, and under its harness's block. */
 const bothSpellings = (step: string, key: string, harness: string): string =>

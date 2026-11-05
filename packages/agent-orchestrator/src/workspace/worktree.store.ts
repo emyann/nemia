@@ -369,8 +369,13 @@ const madeBy = Effect.fn('madeBy')(function* (place: Place, request: PlaceReques
  * concurrent steps from editing the same directory. A workspace already cut is taken up where it stands, by the place. A merge that
  * conflicts is left conflicted, its paths answered (`conflicts`) for the step's brief: resolving it is the job. The dependencies are
  * provisioned after, in the workspace the place made, on the merged tree and its lockfile.
+ *
+ * A step is cut from the parents that ran (`ranShape`): a condition cuts no worktree, so a step after one is cut as if it followed the
+ * condition's first parent, and a parent never filed — skipped, off the route taken — is left out, so a fan-in merges only what ran and
+ * forks from the one parent that did.
  */
-export const workspaceFor = Effect.fn('workspaceFor')(function* (run: Run, steps: readonly Workflow[], step: Workflow, place: Place) {
+export const workspaceFor = Effect.fn('workspaceFor')(function* (run: Run, frozen: readonly Workflow[], routed: Workflow, place: Place) {
+  const { steps, step } = ranShape(run, frozen, routed);
   const plan = workspacePlan(steps, step);
   const cut = (made: Cut): CutOutcome => ({ cut: made });
   if (!isRepositoryRun(run)) return cut(folderPlace(runsDir()).make(run, plan, step.name));
@@ -386,9 +391,9 @@ export const workspaceFor = Effect.fn('workspaceFor')(function* (run: Run, steps
   }
   const asked = yield* madeBy(place, {
     repo: run.repo,
-    at: path.join(HOME, 'worktrees', run.id, cutName(steps, step)),
+    at: path.join(HOME, 'worktrees', run.id, cutName(frozen, routed)),
     run: run.id,
-    leaf: cutName(steps, step),
+    leaf: cutName(frozen, routed),
     from: plan.kind === 'merge' ? of(plan.from).branch : plan.from ? of(plan.from).branch : run.baseRef,
     also: plan.kind === 'merge' ? plan.also.map((other) => of(other).branch) : [],
   });
@@ -403,3 +408,23 @@ export const workspaceFor = Effect.fn('workspaceFor')(function* (run: Run, steps
     notes: [...made.notes, ...depsNotes(deps)],
   });
 });
+
+/**
+ * The workflow as its workspaces are cut: each condition (`routes:`) left out and a step after one waiting on the condition's first parent
+ * instead, its own workspace being that parent's; and `step` waiting only on the parents that ran — filed, or a condition's first parent
+ * that was — so a skipped one, never filed, is no line of work to merge. A workflow with no condition is the workflow. Pure.
+ */
+export function ranShape(run: Pick<Run, 'steps'>, steps: readonly Workflow[], step: Workflow): { steps: Workflow[]; step: Workflow } {
+  const byName = new Map(steps.map((s) => [s.name, s]));
+  const through = (name: string, seen: ReadonlySet<string> = new Set()): string[] => {
+    const s = byName.get(name);
+    if (s?.routes === undefined || seen.has(name)) return [name];
+    const [first] = [...s.after].sort();
+    return first === undefined ? [] : through(first, new Set([...seen, name]));
+  };
+  const parents = (s: Workflow): string[] => [...new Set(s.after.flatMap((a) => through(a)))];
+  const shaped = steps.filter((s) => s.routes === undefined).map((s) => ({ ...s, after: parents(s) }));
+  const filed = (name: string): boolean => Boolean(run.steps[name]?.taskId || run.steps[name]?.workspace);
+  const ran = { ...step, after: parents(step).filter(filed) };
+  return { steps: shaped.map((s) => (s.name === step.name ? ran : s)), step: ran };
+}

@@ -163,3 +163,48 @@ export const HANDED_HOW = ['waited', 'read'] as const;
 
 /** Where a step's told layers were given: its prompt, or its brief. */
 export const TOLD_VIA = ['prompt', 'brief'] as const;
+
+/** The conditions the controller says of a templated factory: whether its base holds the template, and whether an upgrade waits. */
+export const FACTORY_CONDITION_TYPES = ['Applied', 'ConflictsPending'] as const;
+
+/** One of `FACTORY_CONDITION_TYPES`. */
+export type FactoryConditionType = (typeof FACTORY_CONDITION_TYPES)[number];
+
+/** Why a factory's condition is what it is, one word each, as the controller writes them. */
+export const FACTORY_CONDITION_REASONS = [
+  'NoUpgrade',
+  'TemplateInvalid',
+  'VersionDrift',
+  'Rendered',
+  'ParamsChanged',
+  'ContentChanged',
+  'VersionUnknown',
+  'Upgraded',
+  'Merged',
+  'UpgradePending',
+  'Conflicts',
+] as const;
+
+/** One of `FACTORY_CONDITION_REASONS`. */
+export type FactoryConditionReason = (typeof FACTORY_CONDITION_REASONS)[number];
+
+/** Whether a factory's condition holds, as Kubernetes words it. */
+export const FACTORY_CONDITION_STATUSES = ['True', 'False'] as const;
+
+/** One of `FACTORY_CONDITION_STATUSES`. */
+export type ConditionStatus = (typeof FACTORY_CONDITION_STATUSES)[number];
+
+/** What an MCP server's header value is served as: never a value a header is sent with. Sent back, it keeps the stored value. */
+export const HEADER_MASK = '********';
+
+/** Where a step's agent came from: its own file's `agent:`, the factory's hire, neither, or both, which a start refuses. */
+export const FILL_ORIGINS = ['step', 'factory', 'unfilled', 'refused'] as const;
+
+/** One of `FILL_ORIGINS`. */
+export type FillOrigin = (typeof FILL_ORIGINS)[number];
+
+/** Where a setting a session gets came from: the step's own file, its agent's file, or neither, the harness's own default. */
+export const SETTING_ORIGINS = ['step', 'agent', 'default'] as const;
+
+/** One of `SETTING_ORIGINS`. */
+export type SettingOrigin = (typeof SETTING_ORIGINS)[number];

@@ -39,6 +39,11 @@ export type SpawnRequest = {
   config?: HarnessArgs;
   /** A previous session of this harness to continue instead of starting cold. */
   resumeFrom?: string;
+  /**
+   * The task's resources, a container's `resources`: with `limits.memory`, the runner runs the harness and every child it starts in a
+   * cgroup of their own under it (`harness/cgroup.ts`), and says what that cgroup saw on the sighting (`Sighting.memory`).
+   */
+  resources?: { limits?: { memory?: string } };
   /** A JSON Schema the workload's final answer must satisfy. Passed through; never interpreted. */
   closeoutSchema?: object;
   /**

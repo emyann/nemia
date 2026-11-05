@@ -47,6 +47,17 @@ export type Pooled = { pool?: string };
  * or not.
  */
 export type EngineOptions = {
+  /**
+   * The memory limit a task filed with none of its own is filed with, as a LimitRange's default is written into a Pod at admission:
+   * a Kubernetes quantity (`Resources`). Written onto the task's `filed` event, so the journal says what each ran under and a new
+   * default never changes a task already filed. Refused at `Engine.layer` unless `memoryBytesOf` reads it. Absent: no default.
+   */
+  defaultLimits?: { memory: string };
+  /**
+   * The systemd slice each limited task's scope is made in (`systemd-run --slice=`), as Docker's `--cgroup-parent`: the slice an
+   * operator caps to bound every limited session together. A unit name ending `.slice`. Absent: the user manager's root slice.
+   */
+  cgroupParent?: string;
   /** The sessions at work at once in each pool: a whole number from 1. Absent: no ceiling, and nothing is admitted but by `admit`. */
   maxConcurrent?: number;
   /**
@@ -181,7 +192,17 @@ export type TaskSpec = {
    * to 256 characters and no control character.
    */
   labels?: Record<string, string>;
+  /**
+   * What the task's process tree may use, a container's `resources`: `limits.memory` alone, a Kubernetes quantity (`8Gi`, `512Mi`,
+   * `4G`). Its harness and every child it starts run in a cgroup of their own under it, and a process that passes it is ended by the
+   * kernel there alone; the attempt says so (`Attempt.memory`). Absent: the engine's `defaultLimits`, else no limit. Taken by every
+   * harness that runs a process here, refused on a remote agent's; any other key is refused.
+   */
+  resources?: Resources;
 };
+
+/** A task's resources, a container's: its limits, of memory alone, as a Kubernetes quantity. */
+export type Resources = { limits?: { memory?: string } };
 
 /**
  * One pass: how many tasks it read, how many actions it took, the sessions at work on each harness as it left them — its

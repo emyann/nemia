@@ -14,31 +14,48 @@ import { type Implementation, spec } from '@emyann/tsverify';
  */
 export type MemoryUnit = '' | 'k' | 'M' | 'G' | 'T' | 'Ki' | 'Mi' | 'Gi' | 'Ti';
 
-/** The bytes one of `unit` is: a power of 1000 for a decimal unit, of 1024 for a binary one, 1 for none. */
-const unitBytes = (unit: MemoryUnit): number =>
-  unit === 'k'
-    ? 1000
-    : unit === 'M'
-      ? 1_000_000
-      : unit === 'G'
-        ? 1_000_000_000
-        : unit === 'T'
-          ? 1_000_000_000_000
-          : unit === 'Ki'
-            ? 1024
-            : unit === 'Mi'
-              ? 1_048_576
-              : unit === 'Gi'
-                ? 1_073_741_824
-                : unit === 'Ti'
-                  ? 1_099_511_627_776
-                  : 1;
+/** The bytes one of each unit is: a power of 1000 for a decimal unit, of 1024 for a binary one, 1 for none. */
+const UNIT_BYTES: Readonly<Record<MemoryUnit, number>> = {
+  '': 1,
+  k: 1000,
+  M: 1_000_000,
+  G: 1_000_000_000,
+  T: 1_000_000_000_000,
+  Ki: 1024,
+  Mi: 1_048_576,
+  Gi: 1_073_741_824,
+  Ti: 1_099_511_627_776,
+};
+
+/** The bytes one of `unit` is. */
+const unitBytes = (unit: MemoryUnit): number => UNIT_BYTES[unit];
 
 /** The most bytes a limit may be: the largest whole number a JavaScript number holds exactly. */
-const MOST = Number.MAX_SAFE_INTEGER;
+const MOST = 9_007_199_254_740_991;
 
+/**
+ * The most of `unit` a limit may be: the largest whole amount of it whose bytes `MOST` holds, `MOST` over the unit's bytes rounded
+ * down, written out so that no law multiplies past what a number holds (a law binds only where its arithmetic is exact).
+ */
+const MOST_OF: Readonly<Record<MemoryUnit, number>> = {
+  '': MOST,
+  k: 9_007_199_254_740,
+  M: 9_007_199_254,
+  G: 9_007_199,
+  T: 9_007,
+  Ki: 8_796_093_022_207,
+  Mi: 8_589_934_591,
+  Gi: 8_388_607,
+  Ti: 8_191,
+};
+const mostOf = (unit: MemoryUnit): number => MOST_OF[unit];
+
+/**
+ * A whole amount is what is asked for: a fraction (`1.5Gi`) is refused by the reader, naming the same limit as a whole of the next
+ * unit (`1536Mi`), as Kubernetes writes it back; over a fraction the product of a double rounds, and no law of it could be proved.
+ */
 const quantityBytesSpec = spec<(amount: number, unit: MemoryUnit) => number | undefined>({
-  requires: ({ input: [amount] }) => Number.isFinite(amount),
+  requires: ({ input: [amount] }) => Number.isInteger(amount),
   ensures: {
     refusedForNothing: {
       description: 'An amount of nothing or less is no limit, and is refused',
@@ -46,12 +63,11 @@ const quantityBytesSpec = spec<(amount: number, unit: MemoryUnit) => number | un
     },
     refusedPastWhatANumberHolds: {
       description: 'A limit of more bytes than a number holds exactly is refused, never rounded to a neighbour',
-      condition: ({ input: [amount, unit], output }) => (amount * unitBytes(unit) > MOST ? output === undefined : true),
+      condition: ({ input: [amount, unit], output }) => (amount > mostOf(unit) ? output === undefined : true),
     },
     acceptedOtherwise: {
       description: 'An amount above nothing whose bytes a number holds is a limit',
-      condition: ({ input: [amount, unit], output }) =>
-        amount > 0 && amount * unitBytes(unit) <= MOST ? output !== undefined : true,
+      condition: ({ input: [amount, unit], output }) => (amount > 0 && amount <= mostOf(unit) ? output !== undefined : true),
     },
     wholeBytes: {
       description: 'A limit is a whole number of bytes, at least one, that a number holds exactly',
@@ -67,8 +83,7 @@ const quantityBytesSpec = spec<(amount: number, unit: MemoryUnit) => number | un
     },
     wholeAmountsExact: {
       description: 'A whole amount is exactly that many of its unit: 8Gi is 8 times 1024 cubed bytes',
-      condition: ({ input: [amount, unit], output }) =>
-        Number.isInteger(amount) && amount > 0 && amount * unitBytes(unit) <= MOST ? output === amount * unitBytes(unit) : true,
+      condition: ({ input: [amount, unit], output }) => (amount > 0 && amount <= mostOf(unit) ? output === amount * unitBytes(unit) : true),
     },
   },
 });

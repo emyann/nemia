@@ -2,7 +2,8 @@
  * Nemia's chat followed over HTTP (`GET /api/nemia/chat/stream`) on the app's registry (`Followings`): over the api's own engine with her
  * task's `view`, `transcript` and `follow` the test's, whose live moments the test pushes as they come. What it proves: two readers of
  * her chat share one upstream of her session, a moment pushed reaches both with no beat of reading the record, the person's words reach
- * a reader as her outbox is written, and the upstream is let go once both have gone.
+ * a reader as her outbox is written, and the upstream is let go once both have gone. A boundary file: the runtime's test engine keeps no
+ * `follow`, so the engine here is the api's own with that verb made the test's.
  */
 import { root } from '../../test/harness.ts';
 import { test, type TestContext } from 'node:test';

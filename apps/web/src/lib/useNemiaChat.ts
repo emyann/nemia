@@ -24,6 +24,7 @@ import {
 import { changedChat, followChat, mergeChatEvents, unreadChat, type ChatFollowed } from './chatFollowing.ts';
 import { forgetKept, keepUnsent, readKept, sendingOnce, editKept as writeKept, type ChatKept } from './chatOutbox.ts';
 import { animationFrames } from './follow.ts';
+import { browserSharing, sharedStream, type Sharing } from './sharedStream.ts';
 
 /** How long the board waits before it reads her chat again, or tries a kept message again, after one that did not work. */
 export const CHAT_RETRY_MS = 3_000;
@@ -58,14 +59,24 @@ export type NemiaChat = {
 /** What the read and the stream write into: the state they change, and the try they ask for again. */
 export type Reader = { setState: Dispatch<SetStateAction<ChatFollowed>>; tryAgain: () => void };
 
+/** The name the board's tabs share her chat's one stream under (`sharedStream`): its Web Lock and its channel. */
+export const CHAT_SHARED = 'nemia-chat-stream';
+
 /**
  * Reads her chat once and follows it from the cursor it answered, and asks for another try after `CHAT_RETRY_MS` where the read did not
- * work. Every read that works opens one stream, the panel open or closed: her docked face reads her presence from it. A read that did not
- * work is the end: it fills `error` and clears the `retrying` notice an earlier stream may have left, as `follow`'s end does. Returns
- * what stops it: the read abandoned, the retry dropped, the stream closed.
+ * work. Every read that works follows her, the panel open or closed: her docked face reads her presence from it. The stream is shared by
+ * the board's tabs (`sharedStream`): one tab holds it and hands it to the others, so a person's open tabs spend one connection on her
+ * between them, beside each tab's feed. A read that did not work is the end: it fills `error` and clears the `retrying` notice an
+ * earlier stream may have left, as `follow`'s end does. Returns what stops it: the read abandoned, the retry dropped, the stream closed.
  */
-export function reading({ setState, tryAgain }: Reader): () => void {
+export function reading({ setState, tryAgain }: Reader, sharing: Sharing | undefined = browserSharing()): () => void {
   const read = new AbortController();
+  const shared = sharedStream(
+    CHAT_SHARED,
+    (after) => `${chatStreamPath}?after=${encodeURIComponent(after)}`,
+    (url) => new EventSource(url),
+    sharing,
+  );
   let stop: (() => void) | undefined;
   let again: ReturnType<typeof setTimeout> | undefined;
   readChat({}, read.signal).then(
@@ -78,11 +89,11 @@ export function reading({ setState, tryAgain }: Reader): () => void {
         cursor: first.cursor,
         live: true,
       }));
-      const stream = new EventSource(`${chatStreamPath}?after=${encodeURIComponent(first.cursor)}`);
-      stop = followChat(stream, setState, animationFrames);
+      stop = followChat(shared.from(first.cursor), setState, animationFrames);
     },
     (err: unknown) => {
       if (read.signal.aborted) return;
+      shared.close();
       setState((s) => ({ ...s, loading: false, live: false, error: err instanceof Error ? err.message : String(err), retrying: null }));
       again = setTimeout(tryAgain, CHAT_RETRY_MS);
     },
@@ -90,7 +101,8 @@ export function reading({ setState, tryAgain }: Reader): () => void {
   return () => {
     read.abort();
     if (again !== undefined) clearTimeout(again);
-    stop?.();
+    if (stop) stop();
+    else shared.close();
   };
 }
 

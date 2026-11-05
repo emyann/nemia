@@ -37,7 +37,7 @@
  *   engine (`passEngine`) and reads (`ChatReads`: the informer and the filings an app keeps) built afresh for each cold call and kept for
  *   the warm ones. `chatHistory` is `chatHistory(place, {})`, what a reader lists on joining and what the board's dock read every 5 s
  *   before her chat was followed. `chatBeatBefore` is `followChat`'s `first` from the cursor that history gave, its follow none: the same
- *   reads and the same answer as `chatSince`, the whole re-projection the old stream paid every 2 s per open stream. `chatFoldStep` is
+ *   reads and the same answer as the old stream's beat, the whole re-projection it paid every 2 s per open stream. `chatFoldStep` is
  *   what a follower pays now for one moment of her session (`chatFold`): `followChat`'s `rest`, after a listing not timed, run until the
  *   first thing it sends, its follow handing one `events` moment of one new event; null where no session of hers is filed. Its time holds
  *   the rest's start too (the follow of the feed, the look at the files), so it bounds the fold from above.

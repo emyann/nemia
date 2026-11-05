@@ -130,6 +130,7 @@ test("a restart with only a landing's check running restarts at once, and the ch
     const events: string[] = [];
     let lease: DaemonStanding = leaseOf(OLD);
     const later: DaemonStanding[] = [];
+    let unitPid: number | null = OLD;
     const live = liveHost();
     const host = {
       ...live,
@@ -141,6 +142,7 @@ test("a restart with only a landing's check running restarts at once, and the ch
       signal: (pid: number) => {
         events.push(`signal ${pid}`);
         lease = leaseOf(pid, 'stopped');
+        unitPid = null;
       },
       pause: (said: { why?: string; by?: string }) => (events.push('pause'), live.pause(said)),
       resume: () => (events.push('resume'), live.resume()),
@@ -153,10 +155,13 @@ test("a restart with only a landing's check running restarts at once, and the ch
     const service = {
       start: () => {
         events.push('start');
+        unitPid = NEW;
         lease = leaseOf(NEW);
         later.push(leaseOf(NEW), leaseOf(NEW, 'ticking', true));
       },
       logs: 'journalctl --user -u nemia',
+      stateNow: () => ({ active: unitPid === null ? 'inactive' : 'active', enabled: 'enabled', pid: unitPid }),
+      startLine: 'systemctl --user start nemia.service',
     };
     const taken = await stage.runWith(b.e, takeOver(OLD, host, service, BY));
     assert.equal(taken.pid, NEW);

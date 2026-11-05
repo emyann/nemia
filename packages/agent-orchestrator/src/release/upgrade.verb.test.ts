@@ -90,7 +90,7 @@ function tagged(tag: string, marker: string, given: Record<string, string> = scr
 
 /**
  * The fake machine's world: the lease, the leases read after it in turn (`later`), the unit's main process, and what a signal and a start
- * change.
+ * change. As systemd does, a signal to the unit's main process ends it, clearing `unitPid`.
  */
 type World = {
   lease: DaemonStanding;
@@ -128,7 +128,8 @@ function hostOf(world: World): { host: ServiceHost; events: string[] } {
     path: '/usr/bin:/bin',
     user: () => ({ name: 'ann', uid: 1000 }),
     call: (argv) => {
-      if (argv.includes('show')) return `ActiveState=active\nUnitFileState=enabled\nMainPID=${world.unitPid ?? 0}\n`;
+      if (argv.includes('show'))
+        return `ActiveState=${world.unitPid === null ? 'inactive' : 'active'}\nUnitFileState=enabled\nMainPID=${world.unitPid ?? 0}\n`;
       events.push(argv.join(' '));
       if (argv[2] === 'start') world.onStart?.();
       return '';
@@ -142,6 +143,7 @@ function hostOf(world: World): { host: ServiceHost; events: string[] } {
     },
     signal: (pid) => {
       events.push(`signal ${pid}`);
+      if (world.unitPid === pid) world.unitPid = null;
       world.onSignal?.();
     },
     pause: (said) => {

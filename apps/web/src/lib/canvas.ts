@@ -90,7 +90,7 @@ export function edgesOf(graph: Frozen<RunGraph>, steps: readonly EdgeStep[]): Ca
     const id = edge.kind === 'loop' ? `loop:${edge.from}->${edge.to}` : `${edge.from}->${edge.to}`;
     if (!source || !target || seen.has(id)) return [];
     seen.add(id);
-    if (edge.kind === 'after') {
+    if (edge.kind === 'after' || edge.kind === 'route') {
       return [
         {
           id,
@@ -98,7 +98,7 @@ export function edgesOf(graph: Frozen<RunGraph>, steps: readonly EdgeStep[]): Ca
           target: edge.to,
           kind: 'after',
           state: edgeState(satisfiesAfter(source.state), target.state),
-          label: null,
+          label: edge.kind === 'route' ? edge.route : null,
         },
       ];
     }

@@ -491,8 +491,11 @@ const commandArgsRefusalOf = ({ command, env, niceness, terminationMessagePath }
   if (niceness !== undefined && !(Number.isSafeInteger(niceness) && niceness >= 0 && niceness <= 19)) {
     return `\`niceness: ${shown(niceness)}\` is not a niceness. Give a whole number from 0 to 19, like 10, or leave it out for the worker's own priority.`;
   }
-  if (terminationMessagePath !== undefined && !(isArg(terminationMessagePath) && path.isAbsolute(terminationMessagePath))) {
-    return `\`terminationMessagePath: ${JSON.stringify(terminationMessagePath)}\` is not an absolute path. Give the file the command writes its last words to from the root, like "/tmp/run/said", or leave it out.`;
-  }
-  return undefined;
+  return terminationPathRefusal(terminationMessagePath);
 };
+
+/** Why a `terminationMessagePath` names no file the runtime can read at exit — or `undefined`: it is absolute, with no NUL. */
+const terminationPathRefusal = (terminationMessagePath: string | undefined): string | undefined =>
+  terminationMessagePath !== undefined && !(isArg(terminationMessagePath) && path.isAbsolute(terminationMessagePath))
+    ? `\`terminationMessagePath: ${JSON.stringify(terminationMessagePath)}\` is not an absolute path. Give the file the command writes its last words to from the root, like "/tmp/run/said", or leave it out.`
+    : undefined;

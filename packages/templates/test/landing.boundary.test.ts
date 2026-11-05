@@ -770,8 +770,8 @@ test('REFUSED: a receipt whose ci is never reported at the merge commit names la
 
 test('a ci that waits on other jobs has the whole bound while one runs: red when it comes, and past the bound it names what still runs', () => {
   const w = afterMerge();
-  const slow = (conclusion: string | null, status = 'completed'): Record<string, unknown> =>
-    checkRun('slow', conclusion, status, 'https://github.com/o/r/actions/runs/1/job/5');
+  const SLOW_URL = 'https://github.com/o/r/actions/runs/1/job/5';
+  const slow = (conclusion: string | null, status = 'completed'): Record<string, unknown> => checkRun('slow', conclusion, status, SLOW_URL);
   w.gh.answers(
     landedWith(w, ...ciAt(w.merged, [[slow(null, 'in_progress')], [slow('failure'), checkRun('ci', 'failure')]]), tipIs(w.merged)),
   );
@@ -779,14 +779,14 @@ test('a ci that waits on other jobs has the whole bound while one runs: red when
   assert.equal(red.code, 1, red.out);
   assert.doesNotMatch(red.err, /no `ci` was reported/, 'not read as a ci that never runs on a push');
   assert.match(red.err, /red/);
-  assert.ok(red.err.includes('slow: FAILURE https://github.com/o/r/actions/runs/1/job/5'), red.err);
+  assert.ok(red.err.includes(`slow: FAILURE ${SLOW_URL}`), red.err);
   assert.ok(red.err.includes(RETRY), red.err);
 
   w.gh.answers(landedWith(w, ...ciAt(w.merged, [slow(null, 'in_progress')])));
   const running = land(w, 'receipt', receiptArgs(), NO_WAIT);
   assert.equal(running.code, 1, running.out);
   assert.match(running.err, /no `ci` was reported/);
-  assert.ok(running.err.includes('slow: in_progress https://github.com/o/r/actions/runs/1/job/5'), running.err);
+  assert.ok(running.err.includes(`slow: in_progress ${SLOW_URL}`), running.err);
   assert.ok(running.err.includes(RETRY), running.err);
 });
 

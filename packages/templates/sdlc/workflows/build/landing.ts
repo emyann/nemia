@@ -553,6 +553,9 @@ function sleep(secs: number): void {
   Atomics.wait(held, 0, 0, secs * 1000);
 }
 
+/** What GitHub's REST API answers at `repos/{owner}/{repo}/<path>`, parsed; refuses where `gh` fails or the answer is no JSON. */
+const api = <T>(path: string): T => parsed<T>(`gh api ${path}`, gh('api', `repos/{owner}/{repo}/${path}`));
+
 /** A check run or a status context as GitHub's REST API gives one: lower-case, a field absent or `null` where it has none. */
 type Rest = Partial<Record<string, string | null>>;
 
@@ -562,14 +565,8 @@ type Rest = Partial<Record<string, string | null>>;
  * `pending` with no context in it.
  */
 function entriesAt(sha: string): Entry[] {
-  const runs =
-    parsed<{ check_runs?: Rest[] }>(
-      `the check runs of ${sha.slice(0, 12)}`,
-      gh('api', `repos/{owner}/{repo}/commits/${sha}/check-runs?per_page=100`),
-    ).check_runs ?? [];
-  const statuses =
-    parsed<{ statuses?: Rest[] }>(`the statuses of ${sha.slice(0, 12)}`, gh('api', `repos/{owner}/{repo}/commits/${sha}/status`))
-      .statuses ?? [];
+  const runs = api<{ check_runs?: Rest[] }>(`commits/${sha}/check-runs?per_page=100`).check_runs ?? [];
+  const statuses = api<{ statuses?: Rest[] }>(`commits/${sha}/status`).statuses ?? [];
   return [
     ...runs.map((run) => ({
       name: run.name ?? undefined,
@@ -600,7 +597,8 @@ const commitUrl = (pr: Pr, sha: string): string => `${pr.url.replace(/\/pull\/\d
 
 /**
  * The CI context `check` at `oid`, the merge of `pr` on `onto`, waited out within the bounds: a line where it passed, a refusal where it
- * did not, never came, or never finished. A red that the base's tip has since answered (`fixedSince`) passes, and says so.
+ * did not, never came, or never finished. A red that the base's tip has since answered (`fixedSince`) passes, and says so. A context
+ * that sums up other jobs is reported only once they end, so while any check at the merge runs it has the whole bound, not the start's.
  */
 function ciAt(pr: Pr, oid: string, onto: string, check: string, id: string): string {
   const whole = seconds('WF_CI_WAIT_SECONDS', WHOLE_SECONDS);
@@ -620,9 +618,7 @@ function ciAt(pr: Pr, oid: string, onto: string, check: string, id: string): str
         return `\`${check}\` was red on \`${onto}\` at the merge ${at}, and is green at ${tip.slice(0, 12)}, the base's tip, which holds it`;
       throw new Refusal(reddened(pr, oid, onto, check, entries, stands, id));
     }
-    // A context that sums up other jobs is reported only once they end: while any check at the merge runs, it has the whole bound.
-    const running = entries.filter(pending);
-    const bound = seen === 'pending' || running.length ? whole : start;
+    const bound = seen === 'pending' || entries.some(pending) ? whole : start;
     if (Date.now() - began >= bound * 1000) {
       const said =
         seen === 'pending'
@@ -636,18 +632,21 @@ function ciAt(pr: Pr, oid: string, onto: string, check: string, id: string): str
   }
 }
 
+/** `listed` by name and verdict, or state where it has none yet, with its URL, one a line, at most `JOBS` of them. */
+const listing = (listed: readonly Entry[]): string[] => [
+  ...listed.slice(0, JOBS).map((e) => `    ${nameOf(e)}: ${verdict(e) || e.status?.toLowerCase() || 'no verdict'} ${linkOf(e)}`.trimEnd()),
+  ...(listed.length > JOBS ? [`    … and ${listed.length - JOBS} more`] : []),
+];
+
 /**
  * The refusal of a `check` never reported at `oid` within `secs`: the other checks there still running or not passed, with their URLs,
  * and that CI may not run `check` on pushes to the base, which the factory's `landingWaitsOnCi` answers, or has not yet.
  */
 function unreported(pr: Pr, oid: string, onto: string, check: string, entries: readonly Entry[], secs: number): string {
   const told = entries.filter((entry) => pending(entry) || !NOT_FAILED.has(verdict(entry)));
-  const jobs = told
-    .slice(0, JOBS)
-    .map((entry) => `    ${nameOf(entry)}: ${(verdict(entry) || entry.status || '').toLowerCase()} ${linkOf(entry)}`.trimEnd());
   return [
     `no \`${check}\` was reported on \`${onto}\` at ${oid.slice(0, 12)}, the merge of #${pr.number}, within ${secs} s (${commitUrl(pr, oid)}).`,
-    ...(told.length ? ['  The other checks there still running or not passed:', ...jobs] : []),
+    ...(told.length ? ['  The other checks there still running or not passed:', ...listing(told)] : []),
     `  Either CI does not run \`${check}\` on pushes to \`${onto}\`, and the factory sets \`landingWaitsOnCi\` false ` +
       '(`--set landingWaitsOnCi=false`), or it has not reported yet, and the step is retried.',
   ].join('\n');
@@ -659,12 +658,9 @@ function unreported(pr: Pr, oid: string, onto: string, check: string, entries: r
  */
 function fixedSince(oid: string, onto: string, check: string): string | undefined {
   try {
-    const tip = parsed<{ sha?: string }>(`the tip of \`${onto}\``, gh('api', `repos/{owner}/{repo}/commits/${onto}`)).sha;
+    const tip = api<{ sha?: string }>(`commits/${onto}`).sha;
     if (!tip || tip === oid) return undefined;
-    const compared = parsed<{ status?: string }>(
-      `how ${tip.slice(0, 12)} stands to ${oid.slice(0, 12)}`,
-      gh('api', `repos/{owner}/{repo}/compare/${oid}...${tip}`),
-    ).status;
+    const compared = api<{ status?: string }>(`compare/${oid}...${tip}`).status;
     if (compared !== 'ahead' && compared !== 'identical') return undefined;
     return seenOf(named(entriesAt(tip), check)) === 'passed' ? tip : undefined;
   } catch (err) {
@@ -676,14 +672,11 @@ function fixedSince(oid: string, onto: string, check: string): string | undefine
 /** The refusal of a merge that turned the base red: where, the jobs that did not pass with their URLs, and what a person does. */
 function reddened(pr: Pr, oid: string, onto: string, check: string, entries: readonly Entry[], stands: string, id: string): string {
   const unpassed = entries.filter((entry) => !pending(entry) && !NOT_FAILED.has(verdict(entry)));
-  const jobs = unpassed.slice(0, JOBS).map((entry) => `    ${nameOf(entry)}: ${verdict(entry) || 'no verdict'} ${linkOf(entry)}`.trimEnd());
-  const more = unpassed.length > jobs.length ? [`    … and ${unpassed.length - jobs.length} more`] : [];
   return [
     `\`${check}\` is red on \`${onto}\` at ${oid.slice(0, 12)}, the merge of #${pr.number}: this landing turned the base branch red.`,
     stands,
     `  The jobs that did not pass (${commitUrl(pr, oid)}):`,
-    ...jobs,
-    ...more,
+    ...listing(unpassed),
     '  Where CI failed on its own account, a person re-runs the failed jobs; where the change broke it, a fix is landed. Then the ' +
       'step is retried, which reads the merge and the base again.',
     retryLine(id),

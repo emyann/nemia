@@ -295,17 +295,20 @@ test('a run at its second gate has waited since that gate was reached, while its
   assert.equal(Date.parse(light.asOf) - Date.parse(row.waitingSince), 25 * MIN);
 });
 
-test('a run held until a person lifts the hold has waited since the hold was placed', async (t) => {
+test('a run held until a person lifts the hold waits on nobody: it is not among the runs waiting on a person, and says its hold', async (t) => {
   seeded(t);
   const id = await started({ work: null });
   const placed = new Date(T0 + 5 * MIN).toISOString();
   fs.writeFileSync(path.join(RUNS_DIR, `${id}.hold`), `${JSON.stringify({ at: placed, until: [] })}\n`);
   t.mock.timers.setTime(T0 + 20 * MIN);
 
-  const [row] = (await open()).waiting;
-  assert.equal(row.id, id);
+  const page = await open();
+  assert.ok(!page.waiting.some((run) => run.id === id), 'the hold is the person’s word already given, and asks them nothing');
+  const row = page.inFlight.find((run) => run.id === id);
+  assert.ok(row, 'it is listed beside the other held runs');
   assert.deepEqual(row.waitingOnYou, [], 'no step of a held run waits on a person');
-  assert.equal(row.waitingSince, placed);
+  assert.equal(row.holding?.waitingOnYou, false);
+  assert.equal(row.holding?.at, placed);
 });
 
 test('a run that waits on a run which never lands, held until one that will, waits on a person since no instant: its hold is nobody’s to lift', async (t) => {

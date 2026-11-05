@@ -25,6 +25,7 @@ import {
   dueNote,
   fromNote,
   holdAdvice,
+  holdNeedsYou,
   holdWord,
   inFullLines,
   inputsDir,
@@ -230,7 +231,7 @@ function standstill(d: Decided, head: string, steps: Steps, out: HeldOut): Await
 
 /** The screen of a run waiting on others (`--after`): what it waits for, and a hold beside it, whose lifting does not start the run. */
 function printWaiting({ run, waiting, holding }: Decided, head: string): void {
-  const never = run.hold && (!holding.length || holding.some((w) => w.missing || w.cancelledAt || w.gone?.length));
+  const never = run.hold && holdNeedsYou(holding);
   const alsoHeld = run.hold
     ? `\n  ${holdWord(holding, run.hold)} as well — ${never ? holdAdvice(run, holding) : `nemia hold ${run.id} --off lifts the hold, and not the wait above`}`
     : '';

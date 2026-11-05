@@ -2807,6 +2807,7 @@ itself.
 wf hold b-3z4w --until a-1x2y                  # nothing more of b-3z4w is filed until a-1x2y lands
 wf hold d-7t8s --until b-3z4w --until c-5v6u   # once for each run to wait on
 wf hold b-3z4w --until a-1x2y --why "merge conflicts in five files" --by operator   # say why, and who
+wf hold b-3z4w --why "folded into an intake"    # no run to wait on: held until you lift it
 wf hold b-3z4w --off                           # changed your mind: it goes on at the next tick
 ```
 
@@ -2836,26 +2837,33 @@ with no why says who put it, `held until a-1x2y lands (by operator)`. A hold fil
 `by`, says the plain `held until a-1x2y lands`. The words are one line, whatever was typed or written into
 the file: the reason is cut at 200 characters with `…`, the name at 64.
 
+A hold that names no run, `wf hold <run>` with no `--until`, holds the run the same way until a person lifts
+it, as Kubernetes' Job `spec.suspend` holds a Job: no tick lifts it, and only `wf hold <run> --off` (or the
+board's Lift…) does. Every screen says `held until a person lifts it`, with its why and who, and never
+`waiting on you`: the hold is the person's word already given, so nothing of the run is asked of them, and
+the board's bell stays quiet. Its file says `until: []`, so a restart keeps it. A folder run may take this
+hold, and only this one: it names no branch to land on.
+
 The hold is a person's fact in a file of its own, `runs/<id>.hold`, `{ at, until, why?, by }`, beside
 the record, as `.cancelled` is. `wf hold` writes it, the tick removes it when it lifts the hold (only the
 hold it read: one put again since stays), `wf hold --off` removes it, and `wf rm` removes it with the run. `wf rm` of a run another run
 is held until says so and names the `wf hold … --off` that lets it go.
 
 The board puts the same hold and lifts it, from a run's page: Hold… picks the runs of its repository to
-wait on and takes a why, and Lift… lifts it. Its `by` is the OS user the api runs as. The api serves them
+wait on, or none, and takes a why, and Lift… lifts it. Its `by` is the OS user the api runs as. The api serves them
 as `POST /api/runs/<id>/hold`, `{ "until": ["<run>", …], "why"?: "<words>", "by"?: "<name>" }`, and
 `DELETE /api/runs/<id>/hold`: the same file, refused in the same words as `wf hold`.
 
 `wf hold` refuses the following before anything is written, and names the fix for each:
 
-- no `--until`, `--until` and `--off` together, a flag it does not take, or `--until` with no run
+- `--until` and `--off` together, a flag it does not take, or `--until` with no run
 - `--why` or `--by` with no value, given twice, with `--off`, only blanks, or over its cap (200 characters
   for the reason, 64 for the name)
 - a run the store does not have, and `--off` of a run nobody holds
 - a run cancelled, pruned, landed, or succeeded with only a person's merge left: nothing is left to file
 - a run already held. A hold is put once, whole: `--off`, then hold it again with every run it waits on,
   and its `--why`, which the fix quotes back
-- a folder run, which lands nothing git could see merged
+- a folder run held `--until` a run, since it lands nothing git could see merged: hold it with no `--until`
 - of each run named, what `--after` refuses: given twice, the run itself, a run the store does not have, a
   folder run, another repository or base branch, a run started `--no-worktree`, a cancelled run, and one
   whose result branch is gone. Also a run that has already landed, since there is nothing to wait for

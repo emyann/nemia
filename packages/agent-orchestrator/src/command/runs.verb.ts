@@ -80,7 +80,7 @@ export const CANCEL: Command<{ id: string; plan: CancelPlan }> = {
 };
 
 /** `nemia hold`'s two forms, as each of its refusals ends on them. */
-const HOLD_SHAPE = 'nemia hold <runId> --until <runId> [--until <runId> ...] [--why "<words>"] [--by <name>], or nemia hold <runId> --off';
+const HOLD_SHAPE = 'nemia hold <runId> [--until <runId> ...] [--why "<words>"] [--by <name>], or nemia hold <runId> --off';
 
 /** `--why` or `--by`: the flag, the key it fills, what it takes as its refusals say it, and the longest it may be. */
 type Said = { readonly flag: '--why' | '--by'; readonly key: 'why' | 'by'; readonly takes: string; readonly cap: number };
@@ -143,8 +143,8 @@ const saidFlags = (said: readonly Said[], command: string, puts: string, refusal
 
 /**
  * Refused of `nemia hold`'s arguments before any run is read: a run to wait on empty or starting `-`, what `saidRefusal` refuses of `--why`
- * and `--by`; then together: `--until` and `--off` both, `--why` or `--by` with `--off`, and neither `--until` nor `--off`. A run named
- * twice is the verb's to refuse (`holdRefusal`), in its words.
+ * and `--by`; then together: `--until` and `--off` both, and `--why` or `--by` with `--off`. Neither `--until` nor `--off` is a hold that
+ * names no run, which a person alone lifts. A run named twice is the verb's to refuse (`holdRefusal`), in its words.
  */
 function holdArgsRefusal(args: Args): string | null {
   const until = listOf(args, 'until');
@@ -154,26 +154,29 @@ function holdArgsRefusal(args: Args): string | null {
   if (said) return said;
   if (off && until.length) return `nemia hold takes --until or --off, not both: lift the hold first, then hold it again — ${HOLD_SHAPE}.`;
   if (off && (args.why !== undefined || args.by !== undefined))
-    return `nemia hold --off lifts the hold whole, and takes no --why or --by: those go with --until, on the hold put next — ${HOLD_SHAPE}.`;
-  if (!off && !until.length) return `nemia hold needs the runs to wait on, or --off to lift a hold: ${HOLD_SHAPE}.`;
+    return `nemia hold --off lifts the hold whole, and takes no --why or --by: those go with the hold put next — ${HOLD_SHAPE}.`;
   return null;
 }
 
 /**
- * `nemia hold`: a run held until other runs land, or with `--off` its hold lifted now. The api serves both: it puts a hold on
- * `POST /api/runs/:runId/hold`, whose route fixes `off` false so no body lifts through it, and lifts one on `DELETE /api/runs/:runId/hold`.
+ * `nemia hold`: a run held until other runs land, or, naming none, until a person lifts it, or with `--off` its hold lifted now. The api
+ * serves both: it puts a hold on `POST /api/runs/:runId/hold`, whose route fixes `off` false so no body lifts through it, and lifts one on
+ * `DELETE /api/runs/:runId/hold`.
  */
 export const HOLD: Command<{ id: string; lifted: boolean; hold: Hold }> = {
   name: 'hold',
-  usage: '<runId> --until <runId> [--until <runId> ...] [--why "<words>"] [--by <name>]',
+  usage: '<runId> [--until <runId> ...] [--why "<words>"] [--by <name>]',
   help: [
     'file nothing more of a run until other runs land, as --after would',
     'have: what is in flight finishes, nothing new is filed, and nothing',
     'is asked of you — nemia ls and nemia decide say held until <run> lands, and',
     'what a step asks is asked once the hold lifts. The tick lifts it when',
-    'every run named has landed. Refused of a run cancelled, pruned,',
-    'finished or already held, and of a run named that is unknown, the run',
-    'itself, or one that already waits on it, through --after or a hold.',
+    'every run named has landed. With no --until, the run is held until a',
+    'person lifts it (--off), and no tick lifts it: nemia ls and nemia',
+    'decide say held until a person lifts it. Refused of a run cancelled,',
+    'pruned, finished or already held, and of a run named that is unknown,',
+    'the run itself, or one that already waits on it, through --after or a',
+    'hold.',
     '--why: the reason, shown beside held until <run> lands wherever it is',
     'said; --by: who puts the hold (default: your OS user).',
     'nemia hold <runId> --off: lift the hold now, and the next tick goes on as',
@@ -188,7 +191,7 @@ export const HOLD: Command<{ id: string; lifted: boolean; hold: Hold }> = {
     ],
     unknown: (arg) => `nemia hold does not take ${arg}. It takes the run, then the runs it waits on or --off: ${HOLD_SHAPE}.`,
     apart: (_value, flag) => takesFor(HOLD_TAKES, flag),
-    missing: 'nemia hold takes the run first: nemia hold <runId> --until <runId> [--until <runId> ...], or nemia hold <runId> --off.',
+    missing: 'nemia hold takes the run first: nemia hold <runId> [--until <runId> ...], or nemia hold <runId> --off.',
   },
   check: holdArgsRefusal,
   writes: true,
@@ -206,13 +209,13 @@ export const HOLD: Command<{ id: string; lifted: boolean; hold: Hold }> = {
     const { run, hold: put } = yield* hold(runId, [...listOf(args, 'until')], { why: saidOf(args, 'why'), by: saidOf(args, 'by') });
     return { id: run.id, lifted: false, hold: put };
   }),
-  print: ({ id, lifted, hold: put }, args) => [
+  print: ({ id, lifted, hold: put }) => [
     lifted
       ? `${id}  hold lifted — the next tick goes on, and what its steps ask is asked`
       : `${id}  ${holdWord(
-          listOf(args, 'until').map((u) => ({ run: u })),
+          put.until.map((u) => ({ run: u })),
           put,
-        )} — nothing more of it is filed, and nothing is asked of you, until then; the next tick lifts the hold`,
+        )} — nothing more of it is filed, and nothing is asked of you, until then; ${put.until.length ? 'the next tick lifts the hold' : `no tick lifts it: nemia hold ${id} --off`}`,
   ],
 };
 

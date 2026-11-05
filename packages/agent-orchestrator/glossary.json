@@ -143,7 +143,7 @@
     },
     {
       "term": "Hold",
-      "meaning": "only a person's hold of a run until other runs land (`nemia hold`): the run is pending, reason `Waiting`, `on` run; the runs the hold waits for are its `holdUntil`, on the assessment, the summary and the run object's status (`RunStatus`).",
+      "meaning": "only a person's hold of a run until other runs land (`nemia hold --until`), or, naming none, until a person lifts it (`nemia hold`, lifted by `nemia hold --off` alone): the run is pending, reason `Waiting`, `on` run; the runs the hold waits for are its `holdUntil`, on the assessment, the summary and the run object's status (`RunStatus`).",
       "type": "Run",
       "retired": [
         {
@@ -600,7 +600,7 @@
     },
     {
       "term": "Waiting on you",
-      "meaning": "whether a wait is the person's: `waitingOnYou` on a run's `--after` wait (`RunWaiting`) and on its hold (`RunHolding`), true where only a person's hand ends it; and the summary's `waitingOnYouWords`, the steps that wait on a person as `nemia ls` names them after `→ waiting on you:` (`onYouWords`), beside `waitingOnYou`, those steps by name.",
+      "meaning": "whether a wait is the person's: `waitingOnYou` on a run's `--after` wait (`RunWaiting`) and on its hold (`RunHolding`), true where only a person's hand ends it — on a hold, where a run it names never lands, and never for a hold that names none, the person's word already given; and the summary's `waitingOnYouWords`, the steps that wait on a person as `nemia ls` names them after `→ waiting on you:` (`onYouWords`), beside `waitingOnYou`, those steps by name.",
       "type": "RunWaiting",
       "retired": [
         {

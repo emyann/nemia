@@ -235,7 +235,9 @@ rm "$S"/node_modules; git worktree remove "$S"
      The workflow rebuilds it when main moves. After relabelling a merged pull request, run `gh workflow run release.yml` to rebuild
      it.
   3. Nothing to approve: the workflow dispatches `ci` and `release-label` on the release pull request's head, and those runs start
-     with no approval and report the checks main requires. Leave the runs that wait for approval alone: the workflow's own token
+     with no approval. Their check runs do not count on the pull request, since a dispatched check suite is linked to none, so each
+     run also posts its result as a commit status, `ci` and `release-label`, on the head: a status belongs to the commit, and is what
+     main's protection counts there. Leave the runs that wait for approval alone: the workflow's own token
      pushed `release`, so its pull_request runs wait, and they are not needed. A rebuild after main moves dispatches both again on the
      new head, and so does `gh workflow run release.yml` where a check failed, was cancelled or is missing on the head.
   4. Merge it, with the owner, once both are green. The merge sets the root `package.json` version on main, and the `release` workflow's `tag` job tags

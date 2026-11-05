@@ -115,8 +115,14 @@ export const shardRunStep = (workflow: Workflow): Step | undefined =>
  */
 export const staleStep = (workflow: Workflow): Step | undefined => runSteps(workflow, BUILD).find((step) => step.name === STALE_STEP);
 
-/** The gate's steps that run a command: the one that turns the needed jobs' results into the `ci` context. */
-export const gateSteps = (workflow: Workflow): Step[] => runSteps(workflow, GATE);
+/**
+ * The gate's steps that run a command and decide: the one that turns the needed jobs' results into the `ci` context. The steps that post
+ * that context as a commit status on a dispatched run (`statusDrift`) decide nothing, and are not among them.
+ */
+export const gateSteps = (workflow: Workflow): Step[] => runSteps(workflow, GATE).filter((step) => !step.run?.includes(STATUSES));
+
+/** The id of the gate's deciding step, whose outcome a dispatched run posts as the `ci` status. */
+export const VERDICT = 'verdict';
 
 /** The job that scans the push's or the pull request's new commits for a secret. */
 export const SCAN = 'gitleaks';
@@ -205,4 +211,71 @@ export function stallDrift(workflow: Workflow, file: string = FILE): string[] {
       return [];
     });
   });
+}
+
+/**
+ * Where a step posts a commit status: `POST /repos/{owner}/{repo}/statuses/{sha}`. A check run a `workflow_dispatch` makes belongs to a
+ * check suite no pull request is linked to, so the pull request's rollup never counts it; a status belongs to the commit, and one posted
+ * with the run's token is set by GitHub Actions, the app branch protection pins. So a dispatched run of a required check posts its
+ * context as a status too: pending as its job starts, its result as it ends.
+ */
+export const STATUSES = '/statuses/';
+
+/** The event a status is posted on, and no other: on a push or a pull request the check run already counts. */
+export const DISPATCHED = "github.event_name == 'workflow_dispatch'";
+
+/** The steps of `job` that post a commit status. */
+export const statusSteps = (job: Job | undefined): Step[] => (job?.steps ?? []).filter((step) => step.run?.includes(STATUSES) === true);
+
+/**
+ * A required context a dispatched run does not post as a status, posted on another event, under another name, on another commit, by a
+ * job other than the one whose result it is, or with an expression in its command line. `job` is the job whose result is the context,
+ * and `verdict` the id of its step whose outcome the result posts.
+ */
+export function statusDrift(workflow: Workflow, name: string, context: string, verdict: string, file: string = FILE): string[] {
+  const sentences: string[] = [];
+  const job = workflow.jobs[name];
+  const steps = job?.steps ?? [];
+  const posts = statusSteps(job);
+  const [first, last] = [steps[0], steps.at(-1)];
+  if (posts.length !== 2 || first === undefined || last === undefined || posts[0] !== first || posts[1] !== last)
+    sentences.push(
+      `the ${name} job in ${file} does not post the status ${context} first and last: give it a first step that posts it pending and a last that posts its result, each through POST repos/$GH_REPO/statuses/$SHA`,
+    );
+  for (const step of posts) {
+    if (!(step.if ?? '').includes(DISPATCHED))
+      sentences.push(
+        `the step "${step.name ?? '?'}" of the ${name} job in ${file} posts a status on every event: write if: ${DISPATCHED}, since on a push or a pull request the check run already counts`,
+      );
+    const env = step.env ?? {};
+    if (env.CONTEXT !== context || env.SHA?.includes('github.sha') !== true || env.TARGET_URL?.includes('github.run_id') !== true)
+      sentences.push(
+        `the step "${step.name ?? '?'}" of the ${name} job in ${file} does not post the context ${context} on github.sha with a target_url to the run: give it env CONTEXT: ${context}, SHA from github.sha and TARGET_URL from github.run_id`,
+      );
+    if ((step.run ?? '').includes('${{'))
+      sentences.push(
+        `the step "${step.name ?? '?'}" of the ${name} job in ${file} interpolates an expression into its run: pass it through the step's env and read it from there`,
+      );
+  }
+  if (posts.length === 2) {
+    const [pending, result] = posts as [Step, Step];
+    if (pending.env?.STATE !== 'pending')
+      sentences.push(`the first status step of the ${name} job in ${file} does not post STATE pending: write env STATE: pending`);
+    if (
+      !(result.if ?? '').includes('always()') ||
+      result.env?.STATE?.includes(`steps.${verdict}.outcome`) !== true ||
+      !steps.some((step) => step.id === verdict)
+    )
+      sentences.push(
+        `the last status step of the ${name} job in ${file} does not post the outcome of the step ${verdict} whatever happened: write if: always() && ${DISPATCHED}, and STATE from steps.${verdict}.outcome`,
+      );
+  }
+  if (job?.permissions?.statuses !== 'write')
+    sentences.push(`the ${name} job in ${file} is not granted statuses: write: grant it to this job, the one that posts ${context}`);
+  for (const [other, each] of Object.entries(workflow.jobs))
+    if (other !== name && each.permissions?.statuses !== undefined)
+      sentences.push(`the ${other} job in ${file} is granted statuses: take it off: only the ${name} job posts a status`);
+  if (workflow.permissions?.statuses !== undefined)
+    sentences.push(`${file}'s top-level permissions grant statuses: take it off, and grant statuses: write to the ${name} job alone`);
+  return sentences;
 }

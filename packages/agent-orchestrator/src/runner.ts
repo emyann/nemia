@@ -29,8 +29,7 @@
  * and load as a tree: the bottom, beneath `record.store.ts`, beneath `worktree.store.ts` and `write.store.ts`, beneath the rest, so no
  * cycle can form (`test/boundary.test.ts`).
  */
-export { attemptVerdict, CHECK_RESULTS, checkVerdictOf, verdictWord } from './check/check.ts';
-export type { CheckResult, CheckVerdict } from './check/check.ts';
+export { attemptVerdict, CHECK_RESULTS, checkVerdictOf, verdictWord, type CheckResult, type CheckVerdict } from './check/check.ts';
 export { VERSION } from './version/version.ts';
 export { leaseRelease, trialRefusal, checkoutPromiseLine, type Running } from './release/release.ts';
 export type { SessionHarness, SessionRelease } from './release/release.ts';
@@ -301,8 +300,7 @@ export {
 } from './daemon/daemon.store.ts';
 export type { TakenStore } from './daemon/daemon.store.ts';
 export { holdUrl, type QuotaAsk, runMain, up, type UpOptions } from './daemon/up.verb.ts';
-export { ensureDaemon, liveDemandHost } from './demand/demand.verb.ts';
-export type { DemandHost } from './demand/demand.verb.ts';
+export { ensureDaemon, liveDemandHost, type DemandHost } from './demand/demand.verb.ts';
 export { telemetryLayer } from './telemetry/telemetry.store.ts';
 export { addPass, breakdownLines, heaviest, PHASES, STATS_EVERY_MS, summaryDue, summaryLine } from './meter/index.ts';
 export type {
@@ -430,7 +428,7 @@ export type { MergeWord, StandingMerge } from './branches/index.ts';
 export type { Collision, Collisions } from './collide/collide.ts';
 export { factoryDraftOf, type FolderLoaded } from './workflows/workflows.verb.ts';
 export type { SkillPage } from './skills/skills.verb.ts';
-export { acceptRun, roundRun } from './round/round.verb.ts';
+export { acceptRun, roundRun, type Accepted, type RoundAsked } from './round/round.verb.ts';
 export { mergeRun } from './merge/merge.verb.ts';
 export { approveRun, type Approved } from './gate/gate.verb.ts';
 export { askedNow } from './question/asked.verb.ts';
@@ -470,10 +468,13 @@ export { builtinServerList, mcpServerList, mcpServerObject } from './factory-obj
 export { scheduleList, scheduleObject } from './factory-object/schedule.verb.ts';
 export { hireList, hireObject } from './factory-object/hire.verb.ts';
 export { volumeList, volumeObject } from './factory-object/volume.verb.ts';
+export { eventList, eventObject, type EventQuery } from './event-object/event.verb.ts';
+export { subscriptionList, subscriptionObject } from './subscription-object/subscription.verb.ts';
+export { templateList, templateObject, templateTree, TemplateRenders, type TemplateTreeRendered } from './template-object/template.verb.ts';
 export { folderRefusal, START } from './start/commands.verb.ts';
 export { INBOX, INBOX_ADD, INBOX_QUEUE } from './inbox/commands.verb.ts';
 export { FACTORY_INSTRUCT, FACTORY_INSTRUCTION, factoryInstruction } from './factory/instruction.verb.ts';
-export { FACTORY_RULES, factoryRules } from './rules/rules.verb.ts';
+export { FACTORY_RULES, factoryRules, type FactoryRules } from './rules/rules.verb.ts';
 /** A factory's own MCP servers: the entry that lists its record with each server's state, and the name rule the board shares. */
 export { FACTORY_SERVERS } from './servers/servers.verb.ts';
 export { serverNameRefusal } from './servers/index.ts';
@@ -482,7 +483,6 @@ export { BUILTIN_SERVERS, builtinServers } from './servers/servers.store.ts';
 /** A factory's server signed in to and out of from the board, through the engine; the builtin secret stays inside the package. */
 export { serverSignIn, serverSignInState, serverSignOut } from './servers/sign-in.verb.ts';
 export type { ServerSignInStarted, ServerSignInState } from './servers/sign-in.verb.ts';
-export type { FactoryRules } from './rules/rules.verb.ts';
 export type { FactoryInstruction } from './factory/instruction.verb.ts';
 export { AGENTS_CUSTOM } from './custom/custom.verb.ts';
 export { POLICY_PROPOSE } from './auto/auto.verb.ts';
@@ -490,7 +490,6 @@ export type { Command, Ran } from './command/entry.verb.ts';
 export { CLI, CLI_VERBS, commandBreaks, commandLine, generated, helpOf, leftOut, parseArgv, routeList } from './command/command.ts';
 export { renamedIn, renamedValues } from './command/command.ts';
 export type { Args, CommandSpec, Flag, Positional, Route, Spec } from './command/command.ts';
-export type { Accepted, RoundAsked } from './round/round.verb.ts';
 export type { Asked } from './retry/retry.verb.ts';
 export { forgetRun, runsForgetting } from './forget/forget.verb.ts';
 export { freeingMany, judgingMany, prune, type Listed, type Turned } from './prune/prune.verb.ts';

@@ -98,12 +98,12 @@ export const checkoutHold = Effect.fn('checkoutHold')(function* (
  *
  * It WAITS for the checkout on a person's word that would file it — an approval of an ending that has not run, or the ask for a try of one
  * that ended blocked — or, for an ending with no gate not yet filed, on its workflow's, as of the run's creation (`endingClaimedAt`): its
- * workflow files it with nobody's word once the step before it passes, into that same checkout. And only where the pass would in fact file it: a send-back of the work un-holds the gate, an ask no
- * tick honours files nothing, a run waiting on runs that have not landed files no root of its own (`runReady`), and neither does one the
- * cap on runs in flight holds (`runAdmitted`) — so an ending that will not be filed does not hold another run's. Those last two are the
- * questions `advance` asks before it files a ready step, and they bite only on a run with nothing filed: an ending is one when it is also
- * its root, which a folder whose one step merges has. Neither touches a try, since a run with a try due has started. Its `slot` is asked
- * for there alone, and the runs it waits on are read through `parents`.
+ * workflow files it with nobody's word once the step before it passes, into that same checkout. And only where the pass would in fact file
+ * it: a send-back of the work un-holds the gate, an ask no tick honours files nothing, a run waiting on runs that have not landed files no
+ * root of its own (`runReady`), and neither does one the cap on runs in flight holds (`runAdmitted`) — so an ending that will not be filed
+ * does not hold another run's. Those last two are the questions `advance` asks before it files a ready step, and they bite only on a run
+ * with nothing filed: an ending is one when it is also its root, which a folder whose one step merges has. Neither touches a try, since a
+ * run with a try due has started. Its `slot` is asked for there alone, and the runs it waits on are read through `parents`.
  */
 const mainClaim = Effect.fnUntraced(function* (
   e: Engine,

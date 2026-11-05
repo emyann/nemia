@@ -1450,7 +1450,6 @@ test('two runs of one repository land close together: each records the commit th
 test("an ending its workflow files with no gate waits for the checkout while another run's landing check runs, and is filed on the first pass after that run lands", async (t) => {
   const s = story(t);
   const { settle } = stage.board();
-  /** On one repository: A's ship staged and signed, its check filed on the merge; B of quick's shape, its review passed. */
   const aLandingAndAQuickRun = async () => {
     const repo = at.aRepo();
     const a = await at.stagedAndSigned({ repo });
@@ -1477,7 +1476,7 @@ test("an ending its workflow files with no gate waits for the checkout while ano
 
   await s.test("while A's check runs, B still files nothing", async () => {
     const { a, b } = one;
-    settle(a.checkId, 'running');
+    settle(a.checkId, 'working');
     assert.deepEqual((await at.pass(b.id)).filed, []);
   });
 

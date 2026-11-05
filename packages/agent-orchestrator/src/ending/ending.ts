@@ -217,8 +217,8 @@ export const LANDED_CAP = 160;
 /**
  * When the person's word that would file a run's ending step was given (`MainClaim`): the approval of an ending that has not run
  * (`approvalOf`), or the ask for the try that would file it again — a step that ended blocked, or whose check refused, is tried like any
- * other, and its try works in that same checkout. Undefined where there is no such word. An ending with no gate is filed with nobody's word,
- * so the claim reads `endingClaimedAt`, which gives it the run's creation; this stays the person's word alone, as the rest blocker
+ * other, and its try works in that same checkout. Undefined where there is no such word. An ending with no gate is filed with nobody's
+ * word, so the claim reads `endingClaimedAt`, which gives it the run's creation; this stays the person's word alone, as the rest blocker
  * `checkoutAsked` reads it. Pure.
  */
 export const endingAsked = (run: Run, step: Workflow, asks: readonly RetryAsk[]): string | undefined =>

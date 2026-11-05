@@ -47,7 +47,8 @@ export type ConversationLink = { words: string; href: string };
 
 /**
  * One block of a conversation, as the family's list draws it. `said` is a bubble — `who` and `at` over it, `yours` for the person's
- * own at the right, `markdown` for words drawn as markdown rather than as they stand, and `links` for the buttons under them; `note`
+ * own at the right, `by: 'peer'` for another agent's words, drawn at the left and apart from the conversation's own agent's, `markdown`
+ * for words drawn as markdown rather than as they stand, and `links` for the buttons under them; `note`
  * is one quiet line, `what` saying which; `work` is a turn, open while one of its lines is at work and folded into `turnWords` once
  * none is, its lines counted as `counts`; and `own` is the family's one escape hatch, carrying whatever the caller draws itself (`Own`).
  */
@@ -56,6 +57,7 @@ export type ConversationItem<Own = never> =
       kind: 'said';
       id: string;
       who: string;
+      by?: 'peer';
       at: string;
       text: string;
       markdown: boolean;

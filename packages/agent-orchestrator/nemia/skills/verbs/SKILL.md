@@ -31,7 +31,9 @@ They write nothing: run them unasked, as often as you need. One that sets with s
                                preview a templated factory's upgrade: what merges cleanly, and each
                                conflict with its sides; onto a template of another name, a switch
                                with no common base; or a hand-made factory's takeover by a
-                               template, and the plan nemia factory adopt takes; nothing is written
+                               template, and the plan nemia factory adopt takes; nothing is written.
+                               To change a parameter alone: --to the version applied, and
+                               --set <key>=<value> for each; it prints the line that files it
   nemia factory servers <factory>
                                a factory's own MCP servers, each with the state its harness reports
   nemia factory rules <name> [--file <path>|- | --clear]
@@ -136,6 +138,8 @@ They write nothing: run them unasked, as often as you need. One that sets with s
                                unasked, in a factory or a run: why each other rule cannot (a step approved
                                before it runs has done nothing to recommend or check; one with no check
                                never passed one), what keeps a rule from a run now, and the rules that would
+  nemia chat speakers
+                               the names an agent may speak under in her chat, each one you allowed
   nemia service status [--name <name>]
                                the login service and the lease: whether it is installed and runs,
                                the checkout it runs, who holds the store, and lingering
@@ -332,7 +336,9 @@ Each asks the person at a prompt every time it runs: say what it does before you
                                diff previewed it: its name, cards, runs and stats stay
   nemia factory upgrade <name> --to <x.y.z> [--template <name|folder|archive>] [--set <key>=<value> ...] [--plan <digest>] [--downgrade]
                                upgrade a templated factory: its file wants --to, and the daemon merges
-                               the template's change into its tree once each conflict is resolved
+                               the template's change into its tree once each conflict is resolved;
+                               with --to the version applied and --set, a change of its parameters
+                               alone, filed with the --plan nemia factory diff printed for it
   nemia factory resolve <name> <conflict> --ours|--theirs|--file <path>
                                choose for one conflict of a templated factory's upgrade or switch: your
                                tree, the template (none: drop the file), or the text of a file; the
@@ -439,6 +445,11 @@ Each asks the person at a prompt every time it runs: say what it does before you
   nemia policy rm <agent> <id>
                                take a rule out of force, the default among them: what it allowed is
                                asked of you again. Asked of you every time
+  nemia chat allow <name>
+                               let an agent speak in her chat under a name: its words reach her and the
+                               board as its own, never as yours. Asked of you every time
+  nemia chat disallow <name>
+                               take a name back: words under it are refused. Asked of you every time
   nemia service install [--env KEY=VALUE ...] [--name <name>] [--take-over <pid>]
                                install the daemon as a login service: a systemd user unit on Linux,
                                a launchd agent on macOS. It runs the api of this checkout with this

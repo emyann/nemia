@@ -57,6 +57,7 @@ const QUALIFIED = {
   'Waiting on limit': { reason: 'Waiting', on: 'limit', via: null },
   'Waiting on base': { reason: 'Waiting', on: 'base', via: null },
   'Waiting on pause': { reason: 'Waiting', on: 'pause', via: null },
+  'Waiting on hold': { reason: 'Waiting', on: 'hold', via: null },
   'AwaitingAnswer via session': { reason: 'AwaitingAnswer', on: null, via: 'session' },
   'AwaitingAnswer via closeout': { reason: 'AwaitingAnswer', on: null, via: 'closeout' },
 } as const satisfies Record<string, Omit<StepCodes, 'phase'>>;
@@ -86,6 +87,7 @@ test('stepState: each reason the api carries, read as the state a person acts on
       ['Waiting on run', 'waiting'],
       ['Waiting on base', 'waiting'],
       ['Waiting on pause', 'waiting'],
+      ['Waiting on hold', 'waiting'],
     ];
     for (const [named, state] of cases) assert.equal(stateAt(named), state, named);
   });

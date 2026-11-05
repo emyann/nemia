@@ -1015,23 +1015,29 @@ test('feedWords says each run and step in the word nemia ls prints, with its pru
         const said = feedWords(l, run, { status }).run;
         assert.deepEqual([said.reason, reasonOf(said, 'Run')], [reason, reason], `${status}${run.hold ? ', held' : ''}`);
       }
+      const on = (until: string[]) => feedWords(l, { hold: { ...hold, until } }, { status: 'running' }).run.on;
+      assert.deepEqual([on(['r-0']), on([])], ['run', 'hold'], 'a hold that names a run waits on it, one that names none on the hold');
     });
   });
-  await t.test("a run a person's word stops says its first waiting step's reason, and a held run waits on runs", () => {
-    const step = (reason: 'OverBudget' | 'AwaitingApproval' | 'Running' | 'Unsigned'): CodedStep => codedStep({ reason });
-    assert.deepEqual(runCodes('running', true), { reason: 'Waiting', on: 'run', phase: 'pending' });
-    assert.deepEqual(runCodes('waiting', false, [step('Running'), step('OverBudget'), step('AwaitingApproval')]), {
-      reason: 'OverBudget',
-      phase: 'waiting',
-    });
-    assert.deepEqual(runCodes('waiting', false, [step('AwaitingApproval'), step('Unsigned')]), { reason: 'Unsigned', phase: 'waiting' });
-    assert.deepEqual(runCodes('waiting', false, [codedStep({ reason: 'AwaitingAnswer', via: 'closeout' })]), {
-      reason: 'AwaitingAnswer',
-      via: 'closeout',
-      phase: 'waiting',
-    });
-    assert.deepEqual(runCodes('awaiting approval', false, [step('AwaitingApproval')]).reason, 'AwaitingApproval');
-  });
+  await t.test(
+    "a run a person's word stops says its first waiting step's reason, and a held run waits on the runs its hold names, or on the hold where it names none",
+    () => {
+      const step = (reason: 'OverBudget' | 'AwaitingApproval' | 'Running' | 'Unsigned'): CodedStep => codedStep({ reason });
+      assert.deepEqual(runCodes('running', ['r-2']), { reason: 'Waiting', on: 'run', phase: 'pending' });
+      assert.deepEqual(runCodes('running', []), { reason: 'Waiting', on: 'hold', phase: 'pending' }, 'a hold that names no run');
+      assert.deepEqual(runCodes('waiting', null, [step('Running'), step('OverBudget'), step('AwaitingApproval')]), {
+        reason: 'OverBudget',
+        phase: 'waiting',
+      });
+      assert.deepEqual(runCodes('waiting', null, [step('AwaitingApproval'), step('Unsigned')]), { reason: 'Unsigned', phase: 'waiting' });
+      assert.deepEqual(runCodes('waiting', null, [codedStep({ reason: 'AwaitingAnswer', via: 'closeout' })]), {
+        reason: 'AwaitingAnswer',
+        via: 'closeout',
+        phase: 'waiting',
+      });
+      assert.deepEqual(runCodes('awaiting approval', null, [step('AwaitingApproval')]).reason, 'AwaitingApproval');
+    },
+  );
   await t.test("the feed's word for a step waiting on a person is the word `nemia ls` prints, with what its harness waits for", () => {
     const steps = [{ name: 'plan', after: [], brief: 'plan it' }] as unknown as Parameters<typeof listing>[0]['steps'];
     const run = {

@@ -48,7 +48,7 @@
     },
     {
       "term": "Wait on",
-      "meaning": "what a step or a run waits on when the wait is a thing's, not a person's (reason `Waiting`): other runs (`run`), the limit on runs in flight (`limit`), the base branch the run lands on while another run lands there (`base`), or the store's pause (`pause`); a selector names it as `on=<word>` (`WAIT_ON`, `packages/objects/src/words.ts`). A feed line written before the rename reads `checkout` as `base`.",
+      "meaning": "what a step or a run waits on when the wait is a thing's, not a person's (reason `Waiting`): other runs (`run`), the limit on runs in flight (`limit`), the base branch the run lands on while another run lands there (`base`), the store's pause (`pause`), or a person's hold that names no run, which a person alone lifts (`hold`, `nemia hold` with no `--until`), where a hold that names runs is `run`; a selector names it as `on=<word>` (`WAIT_ON`, `packages/objects/src/words.ts`). A feed line written before the rename reads `checkout` as `base`.",
       "type": "WaitOn",
       "retired": [
         {

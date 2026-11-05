@@ -43,14 +43,23 @@ const SHAPE =
 type Row = Pick<SkillRow, 'dir' | 'entry' | 'error' | 'preload' | 'cost'>;
 
 /**
- * Every skill the namespace holds, at each origin: the factory's tree's, read here; yours, the repository's and the builtin as the picker
- * lists them (`listSkills`: where an agent of yours finds each name, a link or a SKILL.md that does not read listed with why).
+ * The skills of the factory's tree (`<tree>/workflows/skills`), each held at `origin` — `factory` in a namespace, `builtin` for a
+ * template's render — read here; none where the factory has no tree. The one reader of a tree's skills.
  */
-async function heldIn(s: Served): Promise<Held<Row>[]> {
+export async function treeSkillsHeld(s: Served, origin: Origin): Promise<Held<Row>[]> {
   const tree = s.factory?.tree === undefined ? undefined : path.join(s.factory.tree, 'workflows', SKILLS_FOLDER);
   const names = tree === undefined ? [] : skillFoldersIn(tree);
   const dirs = names.map((name) => path.join(tree ?? '', name));
   const reads = dirs.length ? await readsOf(s.e, s.placeService, dirs, s.home) : {};
+  return dirs.map((dir, i) => ({ name: names[i] ?? '', origin, item: { dir, ...readAt(reads, dir) } }));
+}
+
+/**
+ * Every skill the namespace holds, at each origin: the factory's tree's (`treeSkillsHeld`); yours, the repository's and the builtin as the
+ * picker lists them (`listSkills`: where an agent of yours finds each name, a link or a SKILL.md that does not read listed with why).
+ */
+async function heldIn(s: Served): Promise<Held<Row>[]> {
+  const own = await treeSkillsHeld(s, 'factory');
   const places = await listSkills(s.e, s.placeService, s.repo, s.home, await s.inRequest(yourSkillsRead(s.repo, s.home)));
   const theirs = repoSkillsDir(s.repo);
   const listedRepo = new Set(places.flatMap((p) => (p.from === 'repo' ? p.skills.map((row) => row.name) : [])));
@@ -59,7 +68,7 @@ async function heldIn(s: Served): Promise<Held<Row>[]> {
     .map((name) => path.join(theirs, name));
   const foldedReads = folded.length ? await readsOf(s.e, s.placeService, folded, s.home) : {};
   return [
-    ...dirs.map((dir, i) => ({ name: names[i] ?? '', origin: 'factory' as const, item: { dir, ...readAt(reads, dir) } })),
+    ...own,
     ...folded.map((dir) => ({ name: path.basename(dir), origin: 'repo' as const, item: { dir, ...readAt(foldedReads, dir) } })),
     ...places.flatMap((place) => place.skills.map((row) => ({ name: row.name, origin: place.from, item: row }))),
   ];
@@ -85,8 +94,11 @@ function specOf({ dir, error }: Row, name: string): SkillSpec {
   }
 }
 
-/** The objects of the skills `served`, read now. */
-async function objectsOf(s: Served, namespace: string, served: ReturnType<typeof servedOf<Row>>): Promise<Skill[]> {
+/**
+ * The objects of the skills `served`, read now: in `namespace`, with the ledger's revision, where one is given; with neither where none
+ * is (a template's documents, which the ledger does not count).
+ */
+export async function skillObjectsOf(s: Served, served: ReturnType<typeof servedOf<Row>>, namespace?: string): Promise<Skill[]> {
   const read = served.filter(({ item }) => item.error === null).map(({ item }) => item.dir);
   const versions = new Map(
     await Promise.all(read.map(async (dir) => [dir, await skillVersionAt(s.e, s.placeService, dir, s.home)] as const)),
@@ -96,7 +108,7 @@ async function objectsOf(s: Served, namespace: string, served: ReturnType<typeof
       Effect.gen(function* () {
         const { dir, entry, error, preload, cost } = row;
         const version = versions.get(dir) ?? '';
-        const revision = yield* definitionRevision('skill', name, version);
+        const revision = namespace === undefined ? undefined : yield* definitionRevision('skill', name, version);
         const usedBy = yield* skillUsers(dir, name, s.repo, s.home, s.factory?.tree);
         const copyHint =
           origin === 'yours'
@@ -107,12 +119,17 @@ async function objectsOf(s: Served, namespace: string, served: ReturnType<typeof
         return {
           apiVersion: API_VERSION,
           kind: 'Skill' as const,
-          metadata: { name, namespace, creationTimestamp: writtenAt(path.join(dir, 'SKILL.md')), resourceVersion: version },
+          metadata: {
+            name,
+            ...(namespace !== undefined && { namespace }),
+            creationTimestamp: writtenAt(path.join(dir, 'SKILL.md')),
+            resourceVersion: version,
+          },
           spec: specOf(row, name),
           status: {
             origin,
             ...(shadowedBy !== null && { shadowedBy }),
-            revision,
+            ...(revision !== undefined && { revision }),
             dir,
             entry,
             error,
@@ -132,7 +149,7 @@ const listPath = (namespace: string) => `GET /api/namespaces/${namespace}/skills
 
 /** The skill `name` the namespace serves (from `asked`, where one is), read now. */
 async function skillAt(s: Served, namespace: string, name: string, asked?: Origin): Promise<Skill> {
-  const [one] = await objectsOf(s, namespace, [servedNamed(await heldIn(s), name, asked, listPath(namespace))]);
+  const [one] = await skillObjectsOf(s, [servedNamed(await heldIn(s), name, asked, listPath(namespace))], namespace);
   if (one === undefined) throw new Error(`${name} was served and then not read.`);
   return one;
 }
@@ -149,7 +166,7 @@ export const skillsHandlers = HttpApiBuilder.group(Api, 'skills', (handlers) =>
     .handle('list', ({ params: { namespace }, query }) =>
       answered(async (s) => {
         const { origin, ...page } = query;
-        return listed('Skill', await objectsOf(s, namespace, servedOf(await heldIn(s), originAsked(origin))), queryOf(page));
+        return listed('Skill', await skillObjectsOf(s, servedOf(await heldIn(s), originAsked(origin)), namespace), queryOf(page));
       }),
     )
     .handle('get', ({ params: { namespace, name }, query }) => answered((s) => skillAt(s, namespace, name, originAsked(query.origin))))

@@ -13,9 +13,13 @@ import {
   ATTEMPT_ENDS,
   CHECK_RESULTS,
   ENGINE_OUTCOMES,
+  EVENT_REASONS,
+  EVENT_SOURCES,
+  EVENT_TYPES,
   FACTORY_CONDITION_REASONS,
   FACTORY_CONDITION_STATUSES,
   FACTORY_CONDITION_TYPES,
+  INVOLVED_KINDS,
   PLACE_KINDS,
   RETRY_MODES,
   REVISION_KINDS,
@@ -38,6 +42,7 @@ import type * as Revisions from '../revisions/revisions.ts';
 import type { AttemptEnd } from '../views/views-words.ts';
 import type { SaidAfterKind } from '../say/say.ts';
 import type * as Factories from '../factory/factory.ts';
+import type * as Feed from '../feed/index.ts';
 
 export {
   Run,
@@ -91,4 +96,8 @@ export const wordsHeld = {
   factoryConditionTypes: true satisfies Same<typeof FACTORY_CONDITION_TYPES, typeof Factories.FACTORY_CONDITION_TYPES>,
   factoryConditionReasons: true satisfies Same<typeof FACTORY_CONDITION_REASONS, typeof Factories.FACTORY_CONDITION_REASONS>,
   factoryConditionStatuses: true satisfies Same<typeof FACTORY_CONDITION_STATUSES, typeof Factories.FACTORY_CONDITION_STATUSES>,
+  eventReasons: true satisfies Same<Words<typeof EVENT_REASONS>, Feed.Reason>,
+  involvedKinds: true satisfies Same<Words<typeof INVOLVED_KINDS>, Feed.InvolvedKind>,
+  eventTypes: true satisfies Same<Words<typeof EVENT_TYPES>, Feed.LineType>,
+  eventSources: true satisfies Same<Words<typeof EVENT_SOURCES>, Feed.LineSource>,
 } as const;

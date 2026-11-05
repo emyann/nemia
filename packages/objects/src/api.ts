@@ -15,6 +15,10 @@
  * The definitions, each in a factory's namespace as the factory resolves it: groups `workflows`, `agents` and `skills`, each listed with
  * `?origin=` for one origin's, shadowed or not, read, and yours written in `default` alone; an agent tried and read as a card, a builtin
  * skill copied to yours and a skill's files listed by path.
+ *
+ * Cluster-scoped, beside the factories: group `templates`, the templates Nemia builds in, and each one's documents as the definitions'
+ * Schemas; group `subscriptions`, the feed's subscriptions, read alone here. Group `events`, the feed's lines, each in the namespace of
+ * the factory it names, a daemon's and the store's that name none in no namespace.
  */
 import { Schema } from 'effect';
 import { HttpApi, HttpApiEndpoint, HttpApiGroup } from 'effect/http-api';
@@ -38,9 +42,26 @@ import { Workflow, WorkflowCreate, WorkflowList, WorkflowWrite } from './workflo
 import { Agent, AgentCard, AgentList, AgentTried, AgentTry, AgentWrite } from './agent.ts';
 import { Skill, SkillFiles, SkillList, SkillWrite } from './skill.ts';
 import { LabelEdit, Labelled, Run, StepTold, StepTries, StepTry, TryCloseout } from './run.ts';
+import { Template, TemplateList } from './template.ts';
+import { Subscription, SubscriptionList } from './subscription.ts';
+import { Event, EventList } from './event.ts';
 
 /** The kinds the api serves as objects, each with its object Schema, its `<Kind>List` and its get endpoint here. */
-export const KINDS = ['Run', 'Card', 'Factory', 'McpServer', 'Schedule', 'Hire', 'Volume', 'Workflow', 'Agent', 'Skill'] as const;
+export const KINDS = [
+  'Run',
+  'Card',
+  'Factory',
+  'McpServer',
+  'Schedule',
+  'Hire',
+  'Volume',
+  'Workflow',
+  'Agent',
+  'Skill',
+  'Template',
+  'Subscription',
+  'Event',
+] as const;
 export type Kind = (typeof KINDS)[number];
 
 /** Nothing by that name, or not in that namespace: a 404. */
@@ -92,6 +113,14 @@ const AgentObject = Agent.annotate({ identifier: 'Agent' });
 const AgentListObject = AgentList.annotate({ identifier: 'AgentList' });
 const SkillObject = Skill.annotate({ identifier: 'Skill' });
 const SkillListObject = SkillList.annotate({ identifier: 'SkillList' });
+
+/** The cluster's templates, subscriptions and the feed's events, and a page of each, named so that the document holds each. */
+const TemplateObject = Template.annotate({ identifier: 'Template' });
+const TemplateListObject = TemplateList.annotate({ identifier: 'TemplateList' });
+const SubscriptionObject = Subscription.annotate({ identifier: 'Subscription' });
+const SubscriptionListObject = SubscriptionList.annotate({ identifier: 'SubscriptionList' });
+const EventObject = Event.annotate({ identifier: 'Event' });
+const EventListObject = EventList.annotate({ identifier: 'EventList' });
 
 /** A run's step, named in the path. */
 const stepParams = { runId: Schema.String, step: Schema.String };
@@ -491,6 +520,82 @@ export class SkillsGroup extends HttpApiGroup.make('skills').add(
   }),
 ) {}
 
+/** A template, by its name, and one of its documents, by the template's name and the document's. */
+const templateParams = { name: Schema.String };
+const documentParams = { name: Schema.String, doc: Schema.String };
+
+/**
+ * The templates Nemia builds in, which no namespace holds, listed and read; and each one's documents, its workflows, agents and skills,
+ * rendered with its parameters' defaults and served in the Schemas a namespace serves them in, with origin `builtin`.
+ */
+export class TemplatesGroup extends HttpApiGroup.make('templates').add(
+  HttpApiEndpoint.get('listAll', '/api/templates', { query: listQuery, success: TemplateListObject, error: objectErrors }),
+  HttpApiEndpoint.get('get', '/api/templates/:name', { params: templateParams, success: TemplateObject, error: objectErrors }),
+  HttpApiEndpoint.get('workflows', '/api/templates/:name/workflows', {
+    params: templateParams,
+    query: listQuery,
+    success: WorkflowListObject,
+    error: definitionErrors,
+  }),
+  HttpApiEndpoint.get('workflow', '/api/templates/:name/workflows/:doc', {
+    params: documentParams,
+    success: WorkflowObject,
+    error: definitionErrors,
+  }),
+  HttpApiEndpoint.get('agents', '/api/templates/:name/agents', {
+    params: templateParams,
+    query: listQuery,
+    success: AgentListObject,
+    error: definitionErrors,
+  }),
+  HttpApiEndpoint.get('agent', '/api/templates/:name/agents/:doc', {
+    params: documentParams,
+    success: AgentObject,
+    error: definitionErrors,
+  }),
+  HttpApiEndpoint.get('skills', '/api/templates/:name/skills', {
+    params: templateParams,
+    query: listQuery,
+    success: SkillListObject,
+    error: definitionErrors,
+  }),
+  HttpApiEndpoint.get('skill', '/api/templates/:name/skills/:doc', {
+    params: documentParams,
+    success: SkillObject,
+    error: definitionErrors,
+  }),
+) {}
+
+/** The feed's subscriptions, which no namespace holds, listed and read; subscribing and unsubscribing stay the api's own routes. */
+export class SubscriptionsGroup extends HttpApiGroup.make('subscriptions').add(
+  HttpApiEndpoint.get('listAll', '/api/subscriptions', { query: listQuery, success: SubscriptionListObject, error: objectErrors }),
+  HttpApiEndpoint.get('get', '/api/subscriptions/:name', {
+    params: templateParams,
+    success: SubscriptionObject,
+    error: objectErrors,
+  }),
+) {}
+
+/**
+ * The feed's lines as events, in the order they were written: all of them, or a namespace's, those of the factory they name; and one by
+ * its name, the byte its line starts at — a daemon's or the store's that names no factory in no namespace.
+ */
+export class EventsGroup extends HttpApiGroup.make('events').add(
+  HttpApiEndpoint.get('listAll', '/api/events', { query: listQuery, success: EventListObject, error: objectErrors }),
+  HttpApiEndpoint.get('list', '/api/namespaces/:namespace/events', {
+    params: namespaceParams,
+    query: listQuery,
+    success: EventListObject,
+    error: objectErrors,
+  }),
+  HttpApiEndpoint.get('getAll', '/api/events/:name', { params: templateParams, success: EventObject, error: objectErrors }),
+  HttpApiEndpoint.get('get', '/api/namespaces/:namespace/events/:name', {
+    params: cardParams,
+    success: EventObject,
+    error: objectErrors,
+  }),
+) {}
+
 /** Everything the api serves as objects. */
 export const Api = HttpApi.make('nemia')
   .add(RunsGroup)
@@ -503,4 +608,7 @@ export const Api = HttpApi.make('nemia')
   .add(VolumesGroup)
   .add(WorkflowsGroup)
   .add(AgentsGroup)
-  .add(SkillsGroup);
+  .add(SkillsGroup)
+  .add(TemplatesGroup)
+  .add(SubscriptionsGroup)
+  .add(EventsGroup);

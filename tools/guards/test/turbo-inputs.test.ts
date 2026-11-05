@@ -25,9 +25,9 @@
  * runtime's `remote-agent.test.ts`, the e2e's page names, the board's generated paths and every workspace's manifest
  * (`tools/guards/test/ci-workflow.test.ts`, `tools/guards/test/ci-scan.boundary.test.ts`), and `tools/guards/test/repo-guards.test.ts`
  * reads `CODEOWNERS`, under `.github/`, and the packages' manifests. The citation guard reads every `CLAUDE.md` and every test file, the
- * apps' among them (`claude-md-cites.test.ts`); the licence guard every workspace's manifest (`license.test.ts`); the verifier's guard every workspace's manifest and
- * every package's `src/` (`no-shipped-verifier.test.ts`); the team's
- * guards and the git reads' guard `.claude/settings.json`, the repository's skills and sdlc's role skills (`team-words.test.ts`,
+ * apps' among them (`claude-md-cites.test.ts`); the licence guard every workspace's manifest (`license.test.ts`); the verifier's
+ * guard every workspace's manifest and every package's `src/` (`no-shipped-verifier.test.ts`); the team's guards and the git
+ * reads' guard `.claude/settings.json`, the repository's skills and sdlc's role skills (`team-words.test.ts`,
  * `git-reads.test.ts`), the five layers' guard the docs site's pages and the agents' glossary table (`agent-layers-doc.test.ts`), and the
  * glossary guard every context's table and the apps' source (`glossary.test.ts`); the orchestrator's own files, and the runtime's through
  * it, reach this task through its dependency on `agent-orchestrator`. The same list is what `tools/guards/due.ts` reads to say whether CI

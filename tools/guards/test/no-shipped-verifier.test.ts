@@ -1,8 +1,8 @@
 /**
  * No workspace ships with the verifier. `@emyann/tsverify` carries `ink`, `react`, `typescript` and `z3-solver` as dependencies of its
- * own, so a package that declares it, or whose `src/` imports it, carries a prover for a call that does nothing at run time (an
- * `invariant()`, 2026-11-05). It stays in the root's `devDependencies`, read by the contracts under a package's `contracts/` and by
- * tests, and a law a step wants proved is made provable from the code, or restated so a helper's spec carries it.
+ * own, so a package that declares it, or whose `src/` imports it, carries a prover for a call that does nothing at run time. It stays
+ * in the root's `devDependencies`, read by the contracts under a package's `contracts/` and by tests, and a law a step wants proved is made
+ * provable from the code, or restated so a helper's spec carries it.
  *
  * Refused here: the verifier in the `dependencies`, `optionalDependencies` or `peerDependencies` of any workspace's `package.json`, and
  * an import of it, or of one of its subpaths, from any file under a workspace's `src/`.

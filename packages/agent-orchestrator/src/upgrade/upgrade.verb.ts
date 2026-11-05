@@ -21,7 +21,7 @@ import { templatePlace } from '../templates/templates.store.ts';
 import { nameOfSource, sourceGiven } from '../templates/templates.ts';
 import { Effect } from 'effect';
 import type { Factory, FactoryTemplate } from '../factory/factory.ts';
-import { renderedAt, renderedOrNot, setsOf, type RenderedAt } from '../applied/applied.verb.ts';
+import { renderedAt, renderedOrNot, sameParams, setsOf, type RenderedAt } from '../applied/applied.verb.ts';
 import {
   appliedDir,
   digestOf,
@@ -41,8 +41,11 @@ import {
   mergeTrees,
   planLines,
   resolveLine,
+  sameVersionChange,
   switchTrees,
   type Choice,
+  type MergeAt,
+  type SameVersionKind,
   type PlanNext,
   type Switched,
   type TreeMerge,
@@ -58,7 +61,7 @@ type Templated = Factory & { template: FactoryTemplate };
 /**
  * What an upgrade to `to` is asked of: the factory, the version its base holds where a status names it, the template's source, its
  * render at `to`, and, where the render is of another template than the one the base holds, both by name (a switch, merged with no
- * common base).
+ * common base); where `to` is the version the base holds, of the same template, what it asks (`sameVersionOf`).
  */
 type Asked = {
   factory: Templated;
@@ -68,7 +71,28 @@ type Asked = {
   render: RenderedAt;
   base: Entry[];
   switched?: Switched;
+  same?: SameVersionKind;
 };
+
+/**
+ * What wanting `render`, at the version the base `base` holds, of the same template, asks (`sameVersionChange`): judged against the
+ * template rendered with the parameters `status` recorded, read again only where they are not `render`'s; none where it is another
+ * version, a switch, or no status names the version.
+ */
+const sameVersionOf = Effect.fn('sameVersionOf')(function* (
+  source: string,
+  status: Status | undefined,
+  base: readonly Entry[],
+  render: RenderedAt,
+  switched: Switched | undefined,
+) {
+  if (status === undefined || status.version !== render.version || switched !== undefined) return undefined;
+  const wanted = digestOf(render.entries);
+  if (sameParams(status.params, render.params)) return sameVersionChange({ base: digestOf(base), recorded: wanted, wanted });
+  const read = yield* renderedOrNot(renderedAt(source, setsOf(status.params)));
+  const recorded = 'problems' in read ? undefined : digestOf(read.entries);
+  return sameVersionChange({ base: digestOf(base), recorded, wanted });
+});
 
 /** The switch an upgrade onto `render` is, from the base the status `status` names, both templates by name; none where it is no switch. */
 const switchOf = (status: Status | undefined, render: RenderedAt): Switched | undefined =>
@@ -173,7 +197,10 @@ const upgradeAsked = Effect.fn('upgradeAsked')(function* (args: Args, verb: stri
   if (given !== undefined && typeof status?.version === 'string' && status.template === undefined && status.upgrade === undefined)
     return yield* Effect.fail(yield* unnamedBase(verb, factory, given, notDone));
   const switched = switchOf(status, render);
-  return yield* tried(() => upgradeChecked({ factory, from, to, source, render, base, switched }, verb, notDone, downgrades, args));
+  const same = yield* sameVersionOf(source, status, base, render, switched);
+  return yield* tried(() =>
+    upgradeChecked({ factory, from, to, source, render, base, switched, ...(same ? { same } : {}) }, verb, notDone, downgrades, args),
+  );
 });
 
 /**
@@ -192,14 +219,17 @@ const unnamedBase = Effect.fn('unnamedBase')(function* (verb: string, factory: T
   return new Conflict({ message: `${verb}: ${why}: start the daemon, nemia up, whose next pass names it, then ${verb} again. ${notDone}` });
 });
 
-/** The upgrade `asked`, refused where it asks the version its base holds again, or a downgrade not asked for (`upgradeAsked`). */
+/**
+ * The upgrade `asked`, refused where it asks the version its base holds again — already applied, or a template changed under it — rather
+ * than a change of its parameters alone, or a downgrade not asked for (`upgradeAsked`).
+ */
 function upgradeChecked(asked: Asked, verb: string, notDone: string, downgrades: boolean, args: Args): Asked {
-  const { factory, from, to, render, base } = asked;
+  const { factory, from, to } = asked;
   if (asked.switched !== undefined) return asked;
-  if (to === from)
+  if (to === from && asked.same !== 'params')
     throw new Conflict({
       message:
-        digestOf(render.entries) === digestOf(base)
+        asked.same === 'applied'
           ? `${verb}: ${factory.name} is already applied at ${to}: its base holds the template at ${to}. ${notDone}`
           : `${verb}: ${factory.name} was applied at ${to}, and the template at ${to} now renders other content: a template changed under the same version is no upgrade — give it a new version, then ${verb} ${factory.name} --to <it>. ${notDone}`,
     });
@@ -338,7 +368,9 @@ export const FACTORY_PLAN: Command<Planned | AdoptPreview> = {
     "preview a templated factory's upgrade: what merges cleanly, and each",
     'conflict with its sides; onto a template of another name, a switch',
     "with no common base; or a hand-made factory's takeover by a",
-    'template, and the plan nemia factory adopt takes; nothing is written',
+    'template, and the plan nemia factory adopt takes; nothing is written.',
+    'To change a parameter alone, give --to the version applied and a',
+    '--set <key>=<value> each: it previews that change, with the line to file it',
   ],
   spec: PLAN_SPEC,
   check: (args) => leftOut(PLAN_SPEC, args),
@@ -412,7 +444,9 @@ export const FACTORY_UPGRADE: Command<Upgraded> = {
   usage: '<name> --to <x.y.z> [--template <name|folder|archive>] [--set <key>=<value> ...] [--plan <digest>] [--downgrade]',
   help: [
     'upgrade a templated factory: its file wants --to, and the daemon merges',
-    "the template's change into its tree once each conflict is resolved",
+    "the template's change into its tree once each conflict is resolved;",
+    'with --to the version applied and --set, a change of its parameters',
+    'alone, filed with the --plan nemia factory diff printed for it',
   ],
   spec: UPGRADE_SPEC,
   check: (args) => leftOut(UPGRADE_SPEC, args),
@@ -440,7 +474,7 @@ export const FACTORY_UPGRADE: Command<Upgraded> = {
       }),
     ),
   print: ({ name, from, to, file, dropped, conflicts }) => [
-    `${name}: ${from ?? UNKNOWN} → ${to}`,
+    from === to ? `${name}: its parameters at ${to}` : `${name}: ${from ?? UNKNOWN} → ${to}`,
     `filed: ${file}`,
     ...(dropped.length ? [`dropped: ${dropped.join(', ')}`] : []),
     conflicts
@@ -507,20 +541,23 @@ const resolved = Effect.fn('resolved')(function* (args: Args) {
     );
   const render = yield* renderTo(verb, factory, factory.template.source, to, notDone);
   const switched = switchOf(status, render);
-  if (to === from && switched === undefined)
+  const same = yield* sameVersionOf(factory.template.source, status, base, render, switched);
+  if (to === from && switched === undefined && same !== 'params')
     return yield* Effect.fail(
       new Conflict({
         message: `${verb}: no upgrade of ${factory.name} is under way, so it has no conflict to resolve: nemia factory diff ${factory.name} --to <x.y.z>, then nemia factory upgrade. ${notDone}`,
       }),
     );
-  return yield* tried(() => resolvedWith(args, factory, to, render.name, mergeOf(factory.name, base, render, switched)));
+  const merging = { from, to, template: render.name, base: digestOf(base) };
+  return yield* tried(() => resolvedWith(args, factory, merging, mergeOf(factory.name, base, render, switched)));
 });
 
 /**
- * The choice `args` give for one conflict of `merge`, the upgrade of `factory` to `to` of the template named `name`, written
- * (`resolved`), beside the choices already made for that version and that template.
+ * The choice `args` give for one conflict of `merge`, the upgrade of `factory` named by `merging` — its versions, its template and the
+ * digest of its base — written (`resolved`), beside the choices already made for that merge (`choicesFor`).
  */
-function resolvedWith(args: Args, factory: Templated, to: string, name: string, merge: TreeMerge): Resolved {
+function resolvedWith(args: Args, factory: Templated, merging: MergeAt, merge: TreeMerge): Resolved {
+  const { to } = merging;
   const verb = 'nemia factory resolve';
   const notDone = 'Nothing was resolved.';
   const at = textOf(args, 'conflict') ?? '';
@@ -530,8 +567,8 @@ function resolvedWith(args: Args, factory: Templated, to: string, name: string, 
     });
   const choice = choiceOf(args);
   const kept = readResolutions(factory.name);
-  const choices = { ...choicesFor(kept, to, name), [at]: choice };
-  writeResolutions(factory.name, { ...kept, to, template: name, choices });
+  const choices = { ...choicesFor(kept, merging), [at]: choice };
+  writeResolutions(factory.name, { ...kept, to, template: merging.template, base: merging.base, choices });
   const left = compose(merge, choices);
   return { name: factory.name, at, to, file: resolutionsFile(factory.name), left: 'pending' in left ? left.pending.map((c) => c.at) : [] };
 }

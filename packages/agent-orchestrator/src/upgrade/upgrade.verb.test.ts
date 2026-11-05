@@ -426,11 +426,112 @@ test('choices made for another version are not merged, and the next resolve drop
   assert.deepEqual(JSON.parse(fs.readFileSync(resolutionsFile('stale'), 'utf8')), {
     to: '0.3.0',
     template: 'team',
+    base: digestOf(entriesIn(appliedDir('stale'))),
     choices: { [`${README}:1-1`]: 'theirs' },
   });
   assert.deepEqual(
     reconciled(templated('stale')).upgrade?.conflicts.map((c) => c.at),
     [`${REVIEW}#rounds`],
+  );
+});
+
+/** The plan `nemia factory diff` printed in `printed`, and the line it prints last, which files it. */
+const planIn = (printed: string[]): { plan: string; line: string } => ({
+  plan: printed.find((line) => line.startsWith('plan: '))?.slice('plan: '.length) ?? '',
+  line: printed.at(-1) ?? '',
+});
+
+test('a parameter set again at the version applied: previewed, filed with its plan, merged with no new version', async (t) => {
+  await t.test('it merges with no conflict, and the factory\'s file records the new value', async (t) => {
+    t.mock.method(console, 'log', () => {});
+    await applied('reset');
+    const file = path.join(FACTORIES, 'reset.json');
+    const filedAs = JSON.parse(fs.readFileSync(file, 'utf8'));
+    rewrite(treeDir('reset'), REVIEW, 'rounds: 3', 'rounds: 4');
+    const before = bytesUnder(FACTORIES);
+    const preview = await printedBy(t, 'factory', 'diff', 'reset', '--to', '0.1.0', '--set', 'budget=9');
+    assert.equal(preview[0], 'reset: its parameters at 0.1.0');
+    const { plan, line } = planIn(preview);
+    assert.match(plan, /^sha256:[0-9a-f]{64}$/);
+    assert.ok(line.startsWith(`nemia factory upgrade reset --to 0.1.0 --set budget=9 --plan ${plan} files it`), preview.join('\n'));
+    assert.doesNotMatch(line, /--downgrade/);
+    const { plan: stale } = planIn(await printedBy(t, 'factory', 'diff', 'reset', '--to', '0.1.0', '--set', 'budget=8'));
+    const upgrade = (...rest: string[]) => main(['factory', 'upgrade', 'reset', '--to', '0.1.0', '--set', 'budget=9', ...rest], noEngine());
+    await assert.rejects(upgrade(), refusedWith('Invalid', /nemia factory diff reset --to 0\.1\.0 --set budget=9/));
+    await assert.rejects(upgrade('--plan', stale), refusedWith('Conflict', /nemia factory diff reset --to 0\.1\.0/));
+    assert.deepEqual(bytesUnder(FACTORIES), before, 'the previews and the refusals write nothing');
+    const folder = bytesUnder(path.join(FACTORIES, 'reset'));
+    await upgrade('--plan', plan);
+    assert.deepEqual(JSON.parse(fs.readFileSync(file, 'utf8')), {
+      ...filedAs,
+      template: { ...filedAs.template, params: { budget: 9 } },
+      generation: 2,
+    });
+    assert.deepEqual(bytesUnder(path.join(FACTORIES, 'reset')), folder, 'the upgrade writes no tree, base nor status');
+    const status = reconciled(templated('reset'));
+    assert.deepEqual([status.version, status.params], ['0.1.0', { budget: 9 }]);
+    assert.deepEqual(
+      status.conditions.map((c) => [c.type, c.status, c.reason]),
+      [
+        ['Applied', 'True', 'Upgraded'],
+        ['ConflictsPending', 'False', 'Merged'],
+      ],
+    );
+    assert.match(textIn(treeDir('reset'), REVIEW), /^budget: 9\nloop: implement\nrounds: 4$/m, 'the new value and the person\'s change');
+    assert.match(textIn(appliedDir('reset'), REVIEW), /^budget: 9\nloop: implement\nrounds: 3$/m, 'the base is the new render');
+    await assert.rejects(upgrade(), refusedWith('Conflict', /reset is already applied at 0\.1\.0/));
+  });
+  await t.test('REFUSED Conflict, nothing written: a --set at the version applied, where the template changed under it', async (t) => {
+    t.mock.method(console, 'log', () => {});
+    const { dir } = await applied('edited');
+    edit(dir, 'workflows/dev/workflow.yaml', (spec) => {
+      spec.steps[1].rounds = 5;
+    });
+    const before = bytesUnder(FACTORIES);
+    for (const verb of ['diff', 'upgrade'])
+      await assert.rejects(
+        main(['factory', verb, 'edited', '--to', '0.1.0', '--set', 'budget=9'], noEngine()),
+        refusedWith('Conflict', /the template at 0\.1\.0 now renders other content/),
+      );
+    assert.deepEqual(bytesUnder(FACTORIES), before);
+  });
+  await t.test(
+    'a conflict at the version applied waits for a choice, made against its base, which no later change at that version takes',
+    async (t) => {
+      t.mock.method(console, 'log', () => {});
+      await applied('clash');
+      const set = async (value: number) => {
+        const sets = ['--to', '0.1.0', '--set', `budget=${value}`];
+        const { plan } = planIn(await printedBy(t, 'factory', 'diff', 'clash', ...sets));
+        await main(['factory', 'upgrade', 'clash', ...sets, '--plan', plan], noEngine());
+      };
+      rewrite(treeDir('clash'), REVIEW, 'budget: 7', 'budget: 8');
+      await set(9);
+      const waiting = reconciled(templated('clash'));
+      assert.deepEqual(
+        [waiting.conditions[1].status, waiting.conditions[1].reason, waiting.upgrade?.conflicts.map((c) => c.at)],
+        ['True', 'Conflicts', [`${REVIEW}#budget`]],
+      );
+      assert.match(textIn(treeDir('clash'), REVIEW), /^budget: 8$/m, 'left as it is while the conflict waits');
+      await main(['factory', 'resolve', 'clash', `${REVIEW}#budget`, '--theirs'], noEngine());
+      assert.deepEqual(JSON.parse(fs.readFileSync(resolutionsFile('clash'), 'utf8')), {
+        to: '0.1.0',
+        template: 'team',
+        base: digestOf(entriesIn(appliedDir('clash'))),
+        choices: { [`${REVIEW}#budget`]: 'theirs' },
+      });
+      assert.equal(reconciled(templated('clash')).conditions[0].reason, 'Upgraded');
+      assert.match(textIn(treeDir('clash'), REVIEW), /^budget: 9$/m);
+      rewrite(treeDir('clash'), REVIEW, 'budget: 9', 'budget: 6');
+      await set(11);
+      const again = reconciled(templated('clash'));
+      assert.deepEqual(
+        again.upgrade?.conflicts.map((c) => c.at),
+        [`${REVIEW}#budget`],
+        'the choice made before the last merge landed answers no conflict of the next',
+      );
+      assert.match(textIn(treeDir('clash'), REVIEW), /^budget: 6$/m);
+    },
   );
 });
 

@@ -104,6 +104,42 @@ test('a watch of cards sends each as ADDED, then a BOOKMARK; then a card filed A
   }
 });
 
+test('a card started arrives as MODIFIED, its status.runs moved though its file, and so its resourceVersion, stand', async (t) => {
+  card('st-1');
+  const w = await watch(t, '/api/namespaces/default/cards?watch=true');
+  try {
+    const initial = await w.initial();
+    const sent = initial.find((e) => named(e) === 'st-1');
+    assert.ok(sent && sent.type !== 'BOOKMARK');
+    fs.mkdirSync(path.join(root, 'runs'), { recursive: true });
+    fs.writeFileSync(
+      path.join(root, 'runs', 'r-started-st-1.json'),
+      JSON.stringify({
+        id: 'r-started-st-1',
+        repo: '/code/app',
+        workspace: '/code/app',
+        baseRef: 'abc123',
+        branch: 'main',
+        isolate: true,
+        brief: 'Do st-1.',
+        workflowDir: path.join(root, 'no-such-workflow'),
+        createdAt: '2026-11-05T06:00:00.000Z',
+        workflow: [{ name: 'implement', after: [], body: 'Implement it.', harness: 'claude' }],
+        steps: { implement: { taskId: 't-r-started-st-1' } },
+        from: { inbox: 'st-1' },
+      }),
+    );
+    await waitFor(t, () => changes(w.events, 'st-1').includes('MODIFIED'), 'st-1 MODIFIED once a run names it');
+    const modified = w.events.find((e) => e.type === 'MODIFIED' && named(e) === 'st-1');
+    assert.ok(modified && modified.type !== 'BOOKMARK');
+    assert.equal(modified.object.metadata.resourceVersion, sent.object.metadata.resourceVersion, 'its resourceVersion stands');
+    assert.deepEqual((modified.object.status as { runs: string[] }).runs, ['r-started-st-1'], 'its status names the run');
+  } finally {
+    await w.stop();
+    fs.rmSync(path.join(root, 'runs', 'r-started-st-1.json'), { force: true });
+  }
+});
+
 test('a labelSelector keeps its cards on every read, and a card relabelled out of it arrives as DELETED', async (t) => {
   card('s-1', { team: 'core' });
   const w = await watch(t, '/api/namespaces/default/cards?watch=true&labelSelector=team%3Dcore');
@@ -169,5 +205,49 @@ test('every list the Api serves answers ?watch=true with its objects ADDED, then
     } finally {
       await w.stop();
     }
+  }
+});
+
+const feed = path.join(root, 'feed.jsonl');
+
+/** A run's line of the feed as the tick writes it: when, which run, its word, and its factory's label. */
+const runLine = (run: string, factory: string) =>
+  `${JSON.stringify({ at: '2026-11-05T10:00:00.000Z', run, word: 'running', labels: { run, factory } })}\n`;
+
+/** The runs the Events among `events` are about, in the order sent, with what was said of each. */
+const runsSaid = (events: readonly WatchEvent[]) =>
+  events.flatMap((e) =>
+    e.type === 'BOOKMARK' ? [] : [`${e.type} ${(e.object as { involved?: { name?: string } }).involved?.name ?? ''}`],
+  );
+
+test('a watch of the events sends each as ADDED, then a BOOKMARK, then each line the tick writes as one ADDED, never twice', async (t) => {
+  fs.appendFileSync(feed, runLine('ev-1', 'mill') + runLine('ev-2', 'press'));
+  const w = await watch(t, '/api/events?watch=true');
+  try {
+    const initial = await w.initial();
+    assert.ok(['ev-1', 'ev-2'].every((run) => runsSaid(initial).includes(`ADDED ${run}`)));
+    fs.appendFileSync(feed, runLine('ev-3', 'mill'));
+    await waitFor(t, () => runsSaid(w.events).includes('ADDED ev-3'), 'ev-3 ADDED');
+    fs.appendFileSync(feed, runLine('ev-4', 'mill'));
+    await waitFor(t, () => runsSaid(w.events).includes('ADDED ev-4'), 'ev-4 ADDED');
+    assert.deepEqual(
+      runsSaid(w.events).filter((said) => /ev-[1-4]$/.test(said)),
+      ['ADDED ev-1', 'ADDED ev-2', 'ADDED ev-3', 'ADDED ev-4'],
+      'each line once, in the order written',
+    );
+  } finally {
+    await w.stop();
+  }
+});
+
+test("a namespace's watch of the events sends none of another factory's", async (t) => {
+  const w = await watch(t, '/api/namespaces/mill/events?watch=true');
+  try {
+    await w.initial();
+    fs.appendFileSync(feed, runLine('ns-press', 'press') + runLine('ns-mill', 'mill'));
+    await waitFor(t, () => runsSaid(w.events).includes('ADDED ns-mill'), 'ns-mill ADDED');
+    assert.ok(!runsSaid(w.events).some((said) => said.endsWith('press') || said === 'ADDED ev-2'), 'no Event of press');
+  } finally {
+    await w.stop();
   }
 });

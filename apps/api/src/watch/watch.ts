@@ -83,11 +83,23 @@ const changedFrames = (sent: Read, now: Read) =>
   });
 
 /**
+ * What a list that follows the feed rather than reading itself again hands its watch (`follow`): for each line from byte `from`, the
+ * object it makes of the list's, if any, and the byte after it, read on the feed's `beat`. The Event lists' (feed-objects/events-watch.ts).
+ */
+export type Follow = (
+  c: RequestContext<ApiEnv>,
+  from: number,
+  beat: Duration.Input | undefined,
+) => Stream.Stream<{ readonly object: WatchedObject | undefined; readonly at: number }, unknown>;
+
+/**
  * `list` watched: without `watch` (or with `watch=false`) the request handed on as it is; with `watch=true` the stream above; any other
- * `watch`, or `limit` or `continue` beside it, refused 400 `{ error }` before anything is read.
+ * `watch`, or `limit` or `continue` beside it, refused 400 `{ error }` before anything is read. Given `follow`, a list whose objects are
+ * the feed's own lines: after the initial state each line the list keeps is sent ADDED as it is followed, once, and the list is never
+ * read again.
  */
 export const watchable =
-  (list: Listed) =>
+  (list: Listed, follow?: Follow) =>
   async (c: RequestContext<ApiEnv>): Promise<Response> => {
     const asked = c.req.query('watch');
     if (asked === undefined || asked === 'false') return list(c);
@@ -105,7 +117,7 @@ export const watchable =
       stream.onAbort(() => gone.abort());
       if (stream.aborted) gone.abort();
       const write = (frame: { data: string }) => Effect.promise(() => stream.writeSSE(frame));
-      const state = { sent: initial };
+      const state = { sent: initial, at: initial.at };
       for (const object of initial.objects.values()) await stream.writeSSE(frameOf({ type: 'ADDED', object }));
       await stream.writeSSE(bookmarkOf(initial.kind, initial.at));
       const again = Effect.gen(function* () {
@@ -115,6 +127,7 @@ export const watchable =
         const now = yield* Effect.promise(() => readOf(answer, at));
         const frames = changedFrames(state.sent, now);
         state.sent = now;
+        state.at = now.at;
         for (const frame of frames) yield* write(frame);
         yield* Effect.sleep(WATCH_SETTLE);
       });
@@ -128,14 +141,25 @@ export const watchable =
           Stream.drop(1),
           Stream.map(() => 'resync' as const),
         );
-        const reads = Stream.merge(lines, resync).pipe(
-          Stream.buffer({ capacity: 1, strategy: 'sliding' }),
-          Stream.mapEffect(() => again),
-          Stream.map(() => null),
-        );
+        const sentKeys = new Set(initial.objects.keys());
+        const reads =
+          follow === undefined
+            ? Stream.merge(lines, resync).pipe(
+                Stream.buffer({ capacity: 1, strategy: 'sliding' }),
+                Stream.mapEffect(() => again),
+                Stream.map(() => null),
+              )
+            : follow(c, at, beats.feed).pipe(
+                Stream.map(({ object, at: after }) => {
+                  state.at = after;
+                  if (object === undefined || sentKeys.has(keyOf(object))) return null;
+                  sentKeys.add(keyOf(object));
+                  return frameOf({ type: 'ADDED', object });
+                }),
+              );
         const bookmarks = Stream.tick(BOOKMARK_EVERY).pipe(
           Stream.drop(1),
-          Stream.map(() => bookmarkOf(state.sent.kind, state.sent.at)),
+          Stream.map(() => bookmarkOf(state.sent.kind, state.at)),
         );
         return yield* Stream.merge(reads, bookmarks, { haltStrategy: 'left' }).pipe(
           Stream.runForEach((frame) => (frame === null ? Effect.void : write(frame))),

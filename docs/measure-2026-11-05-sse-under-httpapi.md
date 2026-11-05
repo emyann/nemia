@@ -56,6 +56,9 @@ to back: one read, 0.5 s settled, the next. Derived from the store measures, not
   5 s on a quiet one. The first read of a cold api is the cold read.
 
 The SSE framing above costs microseconds an event beside it. The cards, the factories' parts and the definitions read in milliseconds.
+The Event lists are never read again: their watch follows the feed and makes each line an Event as it comes
+(`apps/api/src/feed-objects/events-watch.ts`), so after its first read, the whole feed as the list answers it, an events watch costs a
+line's parse per line, whatever the feed's length.
 
 ## Verdict
 

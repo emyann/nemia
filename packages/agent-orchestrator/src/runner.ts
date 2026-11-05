@@ -470,7 +470,7 @@ export { builtinServerList, mcpServerList, mcpServerObject } from './factory-obj
 export { scheduleList, scheduleObject } from './factory-object/schedule.verb.ts';
 export { hireList, hireObject } from './factory-object/hire.verb.ts';
 export { volumeList, volumeObject } from './factory-object/volume.verb.ts';
-export { eventList, eventObject, type EventQuery } from './event-object/event.verb.ts';
+export { eventKept, eventList, eventObject, type EventQuery } from './event-object/event.verb.ts';
 export { subscriptionList, subscriptionObject } from './subscription-object/subscription.verb.ts';
 export { templateList, templateObject, templateTree, TemplateRenders, type TemplateTreeRendered } from './template-object/template.verb.ts';
 export { folderRefusal, START } from './start/commands.verb.ts';

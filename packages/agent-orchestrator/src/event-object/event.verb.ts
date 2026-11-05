@@ -12,6 +12,7 @@ import { FeedDoor } from '../feed/feed.store.ts';
 import type { ObjectQuery } from '../factory-object/factory.verb.ts';
 import { Invalid, Missing } from '../refusal/refusal.ts';
 import { parseSelectors, selectorsRefusal, selects } from '../watch/selector.ts';
+import type { FeedLine } from '../feed/index.ts';
 import { eventOf } from './event.ts';
 import { continuedAfter, continueToken, listPage } from '../object/page.ts';
 
@@ -31,6 +32,21 @@ const eventsAfter = Effect.fn('eventsAfter')(function* (cursor: number, limit?: 
   }));
 });
 
+/**
+ * Which lines of the feed are Events of a list asked `query` — those its selectors take (`selects`) and, for a namespace, those
+ * `eventNamespace` puts there — as a function of a line and the bytes it starts and ends at: the Event, or undefined for a line the list
+ * leaves out. The one rule a page of events and a watch of them (the api's, following the feed) both read. Its selectors are taken as
+ * given: a list refuses one that is not before anything is read.
+ */
+export const eventKept = (query: Pick<EventQuery, 'namespace' | 'labelSelector'>) => {
+  const selectors = parseSelectors(query.labelSelector ?? []);
+  return (line: FeedLine, start: number, end: number): Event | undefined => {
+    if (!selects(selectors, line)) return undefined;
+    const event = eventOf(line, start, end);
+    return query.namespace === undefined || event.metadata.namespace === query.namespace ? event : undefined;
+  };
+};
+
 /** A page of the feed's events (`EventList`); `Invalid` for a selector, a limit or a token that is not one, or a cursor refused. */
 export const eventList = Effect.fn('eventList')(function* (query: EventQuery) {
   const asked = query.labelSelector ?? [];
@@ -39,7 +55,7 @@ export const eventList = Effect.fn('eventList')(function* (query: EventQuery) {
     return yield* Effect.fail(
       new Invalid({ message: `labelSelector: ${refusal}. Correct it, or leave labelSelector out to list every event` }),
     );
-  const selectors = parseSelectors(asked);
+  const kept = eventKept(query);
   let cursor = 0;
   if (query.continue !== undefined) {
     const after = continuedAfter(query.continue);
@@ -53,19 +69,19 @@ export const eventList = Effect.fn('eventList')(function* (query: EventQuery) {
       );
     cursor = byte;
   }
-  const kept = (yield* eventsAfter(cursor))
-    .filter(
-      ({ line, event }) => selects(selectors, line) && (query.namespace === undefined || event.metadata.namespace === query.namespace),
-    )
-    .map(({ event }) => event);
-  const cut = listPage(kept.length, 0, query.limit ?? null);
+  const read = yield* (yield* FeedDoor).lines.read(cursor);
+  const events = read.lines.flatMap((line, i) => {
+    const event = kept(line, i === 0 ? cursor : (read.ends[i - 1] ?? cursor), read.ends[i] ?? cursor);
+    return event === undefined ? [] : [event];
+  });
+  const cut = listPage(events.length, 0, query.limit ?? null);
   if ('refused' in cut)
     return yield* Effect.fail(
       new Invalid({
         message: `limit ${String(query.limit)} is no whole number from 1: pass ?limit=<n>, n from 1, or leave limit out for every event`,
       }),
     );
-  const items = kept.slice(cut.from, cut.to);
+  const items = events.slice(cut.from, cut.to);
   const last = items.at(-1);
   const list: EventList = {
     apiVersion: API_VERSION,

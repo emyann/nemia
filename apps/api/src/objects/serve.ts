@@ -28,7 +28,8 @@
  * answered 413 `{ error }` naming the limit.
  *
  * Every list is handed on through `listed`, which `watchable` wraps (src/watch/watch.ts): a list's route that does not go through it is not
- * watched. `GET /api` is discovery (src/discovery/discovery.ts), every resource read off the `Api`.
+ * watched; the Event lists' watch follows the feed instead of reading it again (`eventsFollowed`). `GET /api` is discovery
+ * (src/discovery/discovery.ts), every resource read off the `Api`.
  *
  * `GET /api/runs/:runId` with `?raw=` (not `false`) or `?view=` is passed on to the runs' own route (runs/runs.ts), which answers both.
  */
@@ -57,7 +58,7 @@ import { ServedNow } from './refused.ts';
 import { runsHandlers } from './runs.ts';
 import { watchable } from '../watch/watch.ts';
 import { discoveryHandlers } from '../discovery/discovery.ts';
-import { eventsHandlers, subscriptionsHandlers } from '../feed-objects/index.ts';
+import { eventsFollowed, eventsHandlers, subscriptionsHandlers } from '../feed-objects/index.ts';
 import { templatesHandlers } from '../template-objects/templates.ts';
 
 /** Where every path the objects are served on is listed, with what each takes. */
@@ -279,6 +280,7 @@ export function objectsRoutes(runtime: ApiRuntime): Hono<ApiEnv> {
     served(c, (s) => handler(request, Context.make(ServedNow, s), takes));
   const forward = (c: RequestContext<ApiEnv>) => handed(c, ONE_TAKES);
   const listed = watchable((c, request) => handed(c, LIST_TAKES, request));
+  const events = watchable((c, request) => handed(c, LIST_TAKES, request), eventsFollowed);
   const guarded = (write: (c: RequestContext<ApiEnv>) => Guarded) => (c: RequestContext<ApiEnv>) => {
     const guard = write(c);
     const refused = refusedBeforeReading(guard, c.req.header('host'), c.req.header('sec-fetch-site'), c.req.header('content-type'));
@@ -316,9 +318,9 @@ export function objectsRoutes(runtime: ApiRuntime): Hono<ApiEnv> {
     .get('/api/templates/:name/:plural{workflows|agents|skills}/:doc', forward)
     .get('/api/subscriptions', listed)
     .get('/api/subscriptions/:name', forward)
-    .get('/api/events', listed)
+    .get('/api/events', events)
     .get('/api/events/:name', forward)
-    .get('/api/namespaces/:namespace/events', listed)
+    .get('/api/namespaces/:namespace/events', events)
     .get('/api/namespaces/:namespace/events/:name', forward)
     .get('/api/cards', listed)
     .get('/api/namespaces/:namespace/cards', listed)

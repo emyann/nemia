@@ -1,0 +1,186 @@
+/**
+ * The feed's lines as Events (`eventList`, `eventObject`, event.verb.ts; `eventOf`, event.ts), over the Feed door's memory stand-in: a v0
+ * line and its v1 form are served alike, a reason this nemia does not know is served `Unknown`, a page walked by `continue` reads the
+ * next lines in feed order, a namespace's list holds no daemon's line, and an Event is read by the byte its line starts at — a byte
+ * inside a line, or a namespace the event is not in, is `Missing`. Kinds are asserted, never sentences.
+ */
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { Effect, Exit, Schema } from 'effect';
+import { Event, EventList } from 'objects';
+import { FeedDoor } from '../feed/feed.store.ts';
+import { feedDoorMemory } from '../feed/memory.store.ts';
+import type { FeedLine } from '../feed/feed.ts';
+import { Invalid, Missing } from '../refusal/refusal.ts';
+import { eventOf } from './event.ts';
+import { eventList, eventObject } from './event.verb.ts';
+
+const AT = '2026-11-01T00:00:00.000Z';
+
+/** A run's line as an older nemia wrote it: no version, no involved, no labels. */
+const v0: FeedLine = { at: AT, run: 'r-1', word: 'running' };
+
+/** The same line as this nemia writes it. */
+const v1: FeedLine = {
+  at: AT,
+  run: 'r-1',
+  word: 'running',
+  apiVersion: 'nemia/v1',
+  involved: { kind: 'Run', name: 'r-1' },
+  labels: { run: 'r-1' },
+  reason: 'Running',
+  type: 'Normal',
+  source: 'tick',
+  message: 'running',
+};
+
+/** A run's line in the factory `mill`. */
+const inMill = (run: string): FeedLine => ({
+  at: AT,
+  run,
+  word: 'running',
+  apiVersion: 'nemia/v1',
+  involved: { kind: 'Run', name: run },
+  labels: { run, factory: 'mill' },
+  reason: 'Running',
+  type: 'Normal',
+  source: 'tick',
+  message: 'running',
+});
+
+/** A daemon's line, which names no factory. */
+const daemon: FeedLine = { at: AT, daemon: 42, word: 'daemon started' };
+
+/** Runs `program` on a fresh memory feed holding `lines`, appended in order. */
+const over = <A, E>(lines: readonly FeedLine[], program: Effect.Effect<A, E>) =>
+  Effect.runSyncExit(
+    Effect.gen(function* () {
+      const door = yield* FeedDoor;
+      yield* door.lines.append(lines);
+      return yield* program;
+    }).pipe(Effect.provide(feedDoorMemory())),
+  );
+
+const value = <A, E>(exit: Exit.Exit<A, E>): A => {
+  assert.ok(Exit.isSuccess(exit), `expected a success, got ${String(exit)}`);
+  return exit.value;
+};
+
+const failure = <A, E>(exit: Exit.Exit<A, E>): unknown => {
+  assert.ok(Exit.isFailure(exit), 'expected a failure');
+  const err = exit.cause.reasons.find((r) => r._tag === 'Fail');
+  assert.ok(err !== undefined && err._tag === 'Fail', 'expected a refusal');
+  return err.error;
+};
+
+const decode = Schema.decodeUnknownSync(Event);
+
+test('a v0 line and its v1 form are served as the same Event, which decodes', () => {
+  const list = value(over([v0, v1], eventList({})));
+  Schema.decodeUnknownSync(EventList)(list);
+  const [a, b] = list.items;
+  assert.ok(a !== undefined && b !== undefined);
+  const strip = (e: Event) => ({ ...e, metadata: { ...e.metadata, name: '', resourceVersion: '' } });
+  assert.deepEqual(strip(decode(a)), strip(decode(b)));
+  assert.equal(a.reason, 'Running');
+  assert.equal(a.metadata.namespace, 'default');
+  assert.deepEqual(a.involved, { kind: 'Run', name: 'r-1' });
+  assert.equal(a.metadata.name, '0');
+  assert.equal(b.metadata.name, a.metadata.resourceVersion);
+});
+
+test('a reason this nemia does not know is served Unknown, its type and source the table says of Unknown', () => {
+  const line = { ...inMill('r-2'), reason: 'Frobbed', type: 'Severe', source: 'robot' } as unknown as FeedLine;
+  const event = decode(eventOf(line, 0, 10));
+  assert.equal(event.reason, 'Unknown');
+  assert.equal(event.type, 'Warning');
+  assert.equal(event.source, 'tick');
+  assert.equal(event.metadata.namespace, 'mill');
+  assert.equal(event.metadata.resourceVersion, '10');
+});
+
+test('a page of 2 reads on by continue in feed order, counting what follows', () => {
+  const lines = ['r-c', 'r-a', 'r-d', 'r-b'].map(inMill);
+  const first = value(over(lines, eventList({ limit: 2 })));
+  assert.deepEqual(
+    first.items.map((e) => e.involved.name),
+    ['r-c', 'r-a'],
+  );
+  assert.equal(first.metadata.remainingItemCount, 2);
+  const token = first.metadata.continue;
+  assert.ok(token !== undefined);
+  const second = value(over(lines, eventList({ limit: 2, continue: token })));
+  assert.deepEqual(
+    second.items.map((e) => e.involved.name),
+    ['r-d', 'r-b'],
+  );
+  assert.equal(second.metadata.remainingItemCount, 0);
+  assert.equal(second.metadata.continue, undefined);
+  assert.equal(second.items[0]?.metadata.name, first.items[1]?.metadata.resourceVersion);
+});
+
+test('a token that is no cursor, a cursor inside a line, a bad limit and a bad selector are Invalid', () => {
+  const lines = [inMill('r-1'), inMill('r-2')];
+  assert.ok(failure(over(lines, eventList({ continue: 'not a token!' }))) instanceof Invalid);
+  assert.ok(failure(over(lines, eventList({ continue: Buffer.from('r-1').toString('base64url') }))) instanceof Invalid);
+  assert.ok(failure(over(lines, eventList({ continue: Buffer.from('3').toString('base64url') }))) instanceof Invalid);
+  assert.ok(failure(over(lines, eventList({ limit: 0 }))) instanceof Invalid);
+  assert.ok(failure(over(lines, eventList({ labelSelector: ['(('] }))) instanceof Invalid);
+});
+
+test("a label selector keeps the lines the feed's own selector takes", () => {
+  const list = value(over([inMill('r-1'), v0, daemon], eventList({ labelSelector: ['kind=Daemon'] })));
+  assert.deepEqual(
+    list.items.map((e) => e.involved.kind),
+    ['Daemon'],
+  );
+  const byFactory = value(over([inMill('r-1'), v0, daemon], eventList({ labelSelector: ['factory=mill'] })));
+  assert.deepEqual(
+    byFactory.items.map((e) => e.involved.name),
+    ['r-1'],
+  );
+});
+
+test("a namespace's list holds no daemon's line; every namespace's holds it, cluster-scoped", () => {
+  const lines = [inMill('r-1'), daemon, v0];
+  const mill = value(over(lines, eventList({ namespace: 'mill' })));
+  assert.deepEqual(
+    mill.items.map((e) => e.involved.name),
+    ['r-1'],
+  );
+  const all = value(over(lines, eventList({})));
+  const started = all.items.find((e) => e.involved.kind === 'Daemon');
+  assert.ok(started !== undefined);
+  assert.equal(decode(started).metadata.namespace, undefined);
+  assert.equal(started.reason, 'DaemonStarted');
+  assert.equal(started.source, 'daemon');
+});
+
+test('an Event is read by its name, under its namespace or none', () => {
+  const lines = [inMill('r-1'), inMill('r-2')];
+  const all = value(over(lines, eventList({})));
+  const second = all.items[1];
+  assert.ok(second !== undefined);
+  assert.deepEqual(decode(value(over(lines, eventObject(second.metadata.name)))), second);
+  assert.deepEqual(value(over(lines, eventObject(second.metadata.name, 'mill'))), second);
+});
+
+test('a name inside a line, past the feed, or no number is Missing', () => {
+  const lines = [inMill('r-1'), inMill('r-2')];
+  assert.ok(failure(over(lines, eventObject('3'))) instanceof Missing);
+  assert.ok(failure(over(lines, eventObject('99999'))) instanceof Missing);
+  assert.ok(failure(over(lines, eventObject('r-1'))) instanceof Missing);
+  assert.ok(failure(over(lines, eventObject('-0'))) instanceof Missing);
+  const end = value(over(lines, eventList({}))).items[1]?.metadata.resourceVersion;
+  assert.ok(end !== undefined);
+  assert.ok(failure(over(lines, eventObject(end))) instanceof Missing);
+});
+
+test('an Event read under another namespace, or a cluster-scoped one under any, is Missing', () => {
+  const lines = [inMill('r-1'), daemon];
+  assert.ok(failure(over(lines, eventObject('0', 'default'))) instanceof Missing);
+  const started = value(over(lines, eventList({}))).items[1];
+  assert.ok(started !== undefined);
+  assert.ok(failure(over(lines, eventObject(started.metadata.name, 'mill'))) instanceof Missing);
+  assert.equal(value(over(lines, eventObject(started.metadata.name))).involved.kind, 'Daemon');
+});

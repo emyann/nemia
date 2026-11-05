@@ -317,4 +317,6 @@ tree (`resources.limits.memory`, `src/harness/cgroup.ts`), measured **2026-11-05
   (`node bin/ae-worker.ts`) running a `node -e` harness whose child allocates 16 MB at a time was itself `Killed`, its run file left
   `working` until the lease called it dead. With the harness given `oom_score_adj` 500 (its children inherit it; raising one's own
   needs no privilege), the child was killed, the worker wrote the end — exit 137, `memory: { limitBytes: 67108864, peakBytes: 67108864,
-  oomKills: 1 }` — and exited 0 (`test/memory-limit.boundary.test.ts`).
+  oomKills: 1 }` — and exited 0. On GitHub's runner the same 64Mi task ended by its worker with another exit than its child's kill:
+  three Node processes of some 40 MB each start near 64Mi, so which the kernel picks is the machine's. The boundary test runs at 256Mi,
+  where the runaway child is the largest process by far (`test/memory-limit.boundary.test.ts`).

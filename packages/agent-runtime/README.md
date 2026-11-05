@@ -2180,7 +2180,7 @@ of pure code sits beside it.
 | `test/engine.test.ts` | the crash cases, what a pass reports (`running` per harness) and that it chooses no order, the pass refusing an argument, the fields carried, against a fake harness |
 | `test/command.test.ts` | the command harness against the real worker: a long stdout read back whole, stderr apart, the exit code, `env`, `niceness`, a stop, a lingering child, a respawn, and its refusals |
 | `test/memory-limit.test.ts` | a host that makes no scope (the probe's program `false`): a limited task, its own limit or the engine's default, ends `unstartable` with no run file, and an unlimited one runs |
-| `test/memory-limit.boundary.test.ts` | a memory limit on a real cgroup: a runaway child of a 64Mi task killed in its scope, the attempt carrying the limit, the kill and the peak, and a neighbour untouched; skipped with the probe's words off systemd |
+| `test/memory-limit.boundary.test.ts` | a memory limit on a real cgroup: a runaway child of a 256Mi task killed in its scope, the attempt carrying the limit, the kill and the peak, and a neighbour untouched; skipped with the probe's words off systemd |
 | `test/detached.test.ts` | the worker, the lease, the composite, each spec's argv and refusals — `sh` as the harness |
 | `test/mcp.test.ts` | what each harness is given for MCP, at shipped defaults — fake `claude` and `codex` on `PATH` |
 | `test/io.test.ts` | what a pass costs as the runtime reports it: a tick's `ms` and each harness's observes, and `io()`'s bytes read and processes started |

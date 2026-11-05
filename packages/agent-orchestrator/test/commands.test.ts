@@ -45,11 +45,11 @@ test('every shipped command is classed once, and no class breaks its rules', () 
 /** A route as the pins say it: a route the api writes by hand (`hand`) marked so, its why left to the entry. */
 const pinned = (r: Route) => (r.hand === undefined ? r : { ...r, hand: true });
 
-test('each command is served on the api where it was before the table, the lift of a hold, a removal and a prune where their routes were', () => {
+test("each command is served on the api where it was before the table, the lift of a hold, a removal and a prune where their routes were, a run's named actions in its namespace", () => {
   assert.deepEqual(
     TABLE.map((c) => [c.name, Array.isArray(c.route) ? c.route.map(pinned) : c.route ? pinned(c.route as Route) : c.only?.side]),
     [
-      ['start', { method: 'POST', path: '/api/runs', status: 201, hand: true }],
+      ['start', { method: 'POST', path: '/api/namespaces/:namespace/runs', status: 201, hand: true }],
       ['concluded', { method: 'GET', path: '/api/runs/:runId/concluded', status: 200 }],
       ['inbox', 'cli'],
       ['inbox add', 'cli'],
@@ -63,7 +63,7 @@ test('each command is served on the api where it was before the table, the lift 
       ],
       ['inbox rm', 'cli'],
       ['inbox show', { method: 'GET', path: '/api/inbox/:name', status: 200 }],
-      ['label run', { method: 'POST', path: '/api/runs/:runId/labels', status: 200 }],
+      ['label run', { method: 'POST', path: '/api/namespaces/:namespace/runs/:runId/labels', status: 200, hand: true }],
       ['label inbox', 'cli'],
       ['factory', 'cli'],
       ['factory ls', 'cli'],
@@ -96,11 +96,11 @@ test('each command is served on the api where it was before the table, the lift 
       ['template export', 'cli'],
       ['template pack', 'cli'],
       ['template unpack', 'cli'],
-      ['retry', { method: 'POST', path: '/api/runs/:runId/steps/:step/retry', status: 202 }],
-      ['approve', { method: 'POST', path: '/api/runs/:runId/steps/:step/approve', status: 202 }],
+      ['retry', { method: 'POST', path: '/api/namespaces/:namespace/runs/:runId/steps/:step/retry', status: 202, hand: true }],
+      ['approve', { method: 'POST', path: '/api/namespaces/:namespace/runs/:runId/steps/:step/approve', status: 202, hand: true }],
       ['route', 'cli'],
-      ['refresh', { method: 'POST', path: '/api/runs/:runId/refresh', status: 202 }],
-      ['say', { method: 'POST', path: '/api/runs/:runId/steps/:step/say', status: 202 }],
+      ['refresh', { method: 'POST', path: '/api/namespaces/:namespace/runs/:runId/refresh', status: 202, hand: true }],
+      ['say', { method: 'POST', path: '/api/namespaces/:namespace/runs/:runId/steps/:step/say', status: 202, hand: true }],
       [
         'ls',
         [
@@ -115,13 +115,13 @@ test('each command is served on the api where it was before the table, the lift 
       ['told', { method: 'GET', path: '/api/runs/:runId/steps/:step/told', status: 200 }],
       ['logs', { method: 'GET', path: '/api/runs/:runId/steps/:step/log', status: 200 }],
       ['stats', { method: 'GET', path: '/api/stats', status: 200 }],
-      ['runs', { method: 'GET', path: '/api/runs', status: 200 }],
+      ['runs', 'api'],
       ['runs open', { method: 'GET', path: '/api/runs-open', status: 200 }],
       ['runs finished', { method: 'GET', path: '/api/runs-finished', status: 200 }],
-      ['step artifact', { method: 'GET', path: '/api/runs/:id/steps/:step/artifacts/:name', status: 200 }],
-      ['step file', { method: 'GET', path: '/api/runs/:id/steps/:step/files/:name', status: 200 }],
-      ['step path', { method: 'GET', path: '/api/runs/:id/steps/:step/path', status: 200 }],
-      ['step transcript', { method: 'GET', path: '/api/runs/:id/steps/:step/transcript', status: 200 }],
+      ['step artifact', { method: 'GET', path: '/api/runs/:runId/steps/:step/artifacts/:name', status: 200 }],
+      ['step file', { method: 'GET', path: '/api/runs/:runId/steps/:step/files/:name', status: 200 }],
+      ['step path', { method: 'GET', path: '/api/runs/:runId/steps/:step/path', status: 200 }],
+      ['step transcript', { method: 'GET', path: '/api/runs/:runId/steps/:step/transcript', status: 200 }],
       ['decide', { method: 'GET', path: '/api/runs/:runId/decision', status: 200 }],
       ['merges', 'api'],
       ['ceilings', { method: 'GET', path: '/api/ceilings', status: 200 }],
@@ -150,12 +150,12 @@ test('each command is served on the api where it was before the table, the lift 
       [
         'hold',
         [
-          { method: 'POST', path: '/api/runs/:runId/hold', status: 200, sets: { off: false } },
-          { method: 'DELETE', path: '/api/runs/:runId/hold', status: 200, sets: { off: true } },
+          { method: 'POST', path: '/api/namespaces/:namespace/runs/:runId/hold', status: 200, sets: { off: false }, hand: true },
+          { method: 'DELETE', path: '/api/namespaces/:namespace/runs/:runId/hold', status: 200, sets: { off: true }, hand: true },
         ],
       ],
-      ['rm', { method: 'DELETE', path: '/api/runs/:runId', status: 200 }],
-      ['prune', { method: 'POST', path: '/api/runs/:runId/prune', status: 200, sets: { yes: true } }],
+      ['rm', { method: 'DELETE', path: '/api/namespaces/:namespace/runs/:runId', status: 200, hand: true }],
+      ['prune', { method: 'POST', path: '/api/namespaces/:namespace/runs/:runId/prune', status: 200, sets: { yes: true }, hand: true }],
       ['pause', { method: 'POST', path: '/api/pause', status: 200, sets: { yes: true } }],
       ['pause-timeout', 'cli'],
       ['resume', { method: 'DELETE', path: '/api/pause', status: 200 }],

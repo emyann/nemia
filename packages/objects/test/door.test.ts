@@ -108,7 +108,7 @@ test('Card has its CardList, of kind CardList, and list endpoints across namespa
   assert.ok(endpoints.some((e) => e.method === 'GET' && e.path === '/api/namespaces/:namespace/cards'));
 });
 
-test("the Run is listed across namespaces and in one, read in one and across all by its id, and its named actions are served in its namespace", () => {
+test('the Run is listed across namespaces and in one, read in one and across all by its id, and its named actions are served in its namespace', () => {
   for (const [method, path] of [
     ['GET', '/api/runs'],
     ['GET', '/api/namespaces/:namespace/runs'],

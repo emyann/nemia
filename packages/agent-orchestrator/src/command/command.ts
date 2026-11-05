@@ -239,6 +239,13 @@ export const routeList = (command: Pick<CommandSpec, 'route'>): readonly Route[]
   command.route === undefined ? [] : Array.isArray(command.route) ? command.route : [command.route as Route];
 
 /** A route the table generates on the api: a write the api serves by no hand of its own. */
+/**
+ * Why a run's named action is served by hand: a handler of `objects`' Api serves it in the run's namespace
+ * (`/api/namespaces/<factory>/runs/<name>/…`), its body a Schema of that package, through the pipeline a generated route runs.
+ */
+export const NAMED_ACTION =
+  "a named action of the run: a handler of objects' Api serves it in the run's namespace, through the pipeline a generated route runs";
+
 export const generated = (route: Route): boolean => route.method !== 'GET' && route.hand === undefined;
 
 /** The dollars under `key`, or undefined where none were given. */
@@ -520,7 +527,13 @@ function runBreaks(c: Entry, runners: readonly string[]): string[] {
 }
 
 /**
- * Where an entry's words for its sides break the rules: a name in a route's path that no argument of its spec takes, which the command
+ * The name of a path's namespace (`/api/namespaces/:namespace/…`): no argument of a command, since the api finds the object first and
+ * refuses one in another namespace (`runIn`) before the command reads its arguments.
+ */
+const NAMESPACE_PARAM = 'namespace';
+
+/**
+ * Where an entry's words for its sides break the rules: a name in a route's path that no argument of its spec takes, but its namespace, which the command
  * would never read; a why left empty, of a route served by hand, of the side that serves it alone, or of a flag one side alone takes; and a
  * flag the api alone takes on an entry with no route that hands it — one the table generates, or one served by hand — which nothing would
  * ever hand it.
@@ -528,7 +541,7 @@ function runBreaks(c: Entry, runners: readonly string[]): string[] {
 function sideBreaks(c: Entry): string[] {
   const breaks: string[] = [];
   const takes = (key: string) =>
-    c.spec?.positionals.some((p) => p.key === key) === true || c.spec?.flags.some((f) => f.key === key) === true;
+    key === NAMESPACE_PARAM || c.spec?.positionals.some((p) => p.key === key) === true || c.spec?.flags.some((f) => f.key === key) === true;
   for (const r of routeList(c)) {
     for (const key of [...r.path.matchAll(/:(\w+)/g)].flatMap(([, k]) => (k === undefined ? [] : [k])).filter((k) => !takes(k)))
       breaks.push(`${c.name}'s route ${r.method} ${r.path} names :${key}, which no argument of its spec takes: key a positional ${key}`);

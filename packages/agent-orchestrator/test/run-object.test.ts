@@ -113,6 +113,7 @@ test('runObject: the run as one object, its status the list’s judged fields, i
     assert.equal(run.apiVersion, 'nemia/v1');
     assert.equal(run.kind, 'Run');
     assert.equal(run.metadata.name, id);
+    assert.equal(run.metadata.namespace, run.metadata.labels.factory, `${id}: its namespace is its factory, default for none`);
     const row = rows.find((r) => r.id === id);
     assert.ok(row);
     const keys = [

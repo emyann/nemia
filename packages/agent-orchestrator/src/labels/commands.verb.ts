@@ -4,7 +4,7 @@
  * its body a `LabelEdit` — `labels`, the edits, and `overwrite` — under the keys the command line gives them, so one handler reads both.
  */
 import { Effect } from 'effect';
-import type { Args, Spec } from '../command/command.ts';
+import { type Args, NAMED_ACTION, type Spec } from '../command/command.ts';
 import type { Command } from '../command/entry.verb.ts';
 import { rooted } from '../wiring/wire.verb.ts';
 import type { Labelled } from './labels.model.ts';
@@ -74,7 +74,7 @@ export const LABEL_RUN: Command<Labelled> = {
   check: noEdits('nemia label run', 'run'),
   writes: true,
   class: 'act',
-  route: { method: 'POST', path: '/api/runs/:runId/labels', status: 200 },
+  route: { method: 'POST', path: '/api/namespaces/:namespace/runs/:runId/labels', status: 200, hand: NAMED_ACTION },
   handler: (args, _env, home) =>
     rooted(
       home,

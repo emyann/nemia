@@ -39,7 +39,7 @@ import { pausedLines } from '../pause/pause.ts';
 import { agentCardRead, agentsRead } from '../roster/roster.store.ts';
 import { agentsLines, cardNote, type AgentsRead, type CardRead } from '../roster/roster.ts';
 import { AGENTS_SOURCES } from '../sources/sources.verb.ts';
-import { amountIn, commandLine, type Args, type CommandSpec, type Flag } from './command.ts';
+import { amountIn, commandLine, NAMED_ACTION, type Args, type CommandSpec, type Flag } from './command.ts';
 import type { Command, Ran } from './entry.verb.ts';
 import { READS, SERIES } from './reads.verb.ts';
 import { AGENTS_CUSTOM } from '../custom/custom.verb.ts';
@@ -199,7 +199,7 @@ const RETRY: Command<{
   writes: true,
   ticks: true,
   class: 'answer',
-  route: { method: 'POST', path: '/api/runs/:runId/steps/:step/retry', status: 202 },
+  route: { method: 'POST', path: '/api/namespaces/:namespace/runs/:runId/steps/:step/retry', status: 202, hand: NAMED_ACTION },
   apiTakes: ['answers'],
   apiKeys: ['try', 'file', 'stopFirst', 'step', 'round'],
   handler: Effect.fnUntraced(function* (args: Args, _env, home) {
@@ -283,7 +283,7 @@ const REFRESH: Command<{
   writes: true,
   ticks: true,
   class: 'act',
-  route: { method: 'POST', path: '/api/runs/:runId/refresh', status: 202 },
+  route: { method: 'POST', path: '/api/namespaces/:namespace/runs/:runId/refresh', status: 202, hand: NAMED_ACTION },
   apiKeys: ['drift', 'step', 'target', 'onto', 'sha', 'round', 'file'],
   handler: Effect.fnUntraced(function* (args: Args, _env?: NodeJS.ProcessEnv, home?: string) {
     const { runId } = named(args);
@@ -331,7 +331,7 @@ const SAY: Command<{
   },
   writes: true,
   class: 'act',
-  route: { method: 'POST', path: '/api/runs/:runId/steps/:step/say', status: 202 },
+  route: { method: 'POST', path: '/api/namespaces/:namespace/runs/:runId/steps/:step/say', status: 202, hand: NAMED_ACTION },
   apiKeys: ['at', 'attempt', 'text', 'after'],
   handler: Effect.fnUntraced(function* (args: Args) {
     const { runId, step } = named(args);

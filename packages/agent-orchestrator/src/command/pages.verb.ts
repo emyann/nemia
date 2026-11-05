@@ -92,7 +92,7 @@ const keyed = (key: string): Flag => ({ flag: `--${key}`, kind: 'text', key });
 
 /** The spec of a read of a step: the run's id and the step's name, then `more`, and its text flags by key. */
 const stepSpec = (more: readonly Positional[], keys: readonly string[]): Spec => ({
-  positionals: [{ key: 'id', takes: 'required', kind: 'name' }, { key: 'step', takes: 'required', kind: 'name' }, ...more],
+  positionals: [{ key: 'runId', takes: 'required', kind: 'name' }, { key: 'step', takes: 'required', kind: 'name' }, ...more],
   flags: keys.map(keyed),
   unknown: (arg) => `the board's reads of a step take no ${arg}.`,
 });
@@ -101,7 +101,7 @@ const stepSpec = (more: readonly Positional[], keys: readonly string[]): Spec =>
 const NAME: readonly Positional[] = [{ key: 'name', takes: 'required', kind: 'name' }];
 
 /** The run `id` names, found among the ids the store lists (`runs.find`); undefined for one it does not have. */
-const runOf = (args: Args): Run | undefined => runStore.runs.find(textOf(args, 'id') ?? '');
+const runOf = (args: Args): Run | undefined => runStore.runs.find(textOf(args, 'runId') ?? '');
 
 /**
  * Every run's summary, in the store's order (`runsSummarized`): read off the informer and the feed's filing times the caller
@@ -116,10 +116,9 @@ export const RUNS: Command<RunSummary[]> = {
   check: selectorCheck,
   writes: false,
   class: 'read',
-  route: { method: 'GET', path: '/api/runs', status: 200 },
   only: {
     side: 'api',
-    why: "the board's list is every run judged into a summary, kept between its polls while the run rests; the command line prints each run's lines",
+    why: "every run judged into a summary, kept between polls while the run rests: no route serves it since `GET /api/runs` is the RunList, and the command line prints each run's lines",
   },
   handler: Effect.fnUntraced(function* (args: Args, env?: NodeJS.ProcessEnv, home?: string, kept?: Kept) {
     const selectors = yield* selectorsIn(args);
@@ -214,12 +213,12 @@ export const RUNS_FINISHED: Command<FinishedPage> = {
 /** The file `name` of the files directory of the step `step` of the run `id` (`artifactFile`), or null where there is none. */
 export const STEP_ARTIFACT: Command<{ file: Buffer | null }> = {
   name: 'step artifact',
-  usage: '<id> <step> <name>',
+  usage: '<runId> <step> <name>',
   help: ["one file of a step's files directory"],
   spec: stepSpec(NAME, []),
   writes: false,
   class: 'read',
-  route: { method: 'GET', path: '/api/runs/:id/steps/:step/artifacts/:name', status: 200 },
+  route: { method: 'GET', path: '/api/runs/:runId/steps/:step/artifacts/:name', status: 200 },
   only: { side: 'api', why: "the board links each file a step's closeout named; at the command line a person opens the file" },
   handler: (args) =>
     tried(() => {
@@ -235,12 +234,12 @@ export const STEP_ARTIFACT: Command<{ file: Buffer | null }> = {
  */
 export const STEP_FILE: Command<{ folder: string | null; file: Buffer | null }> = {
   name: 'step file',
-  usage: '<id> <step> <name>',
+  usage: '<runId> <step> <name>',
   help: ["one file of a folder step's own folder"],
   spec: stepSpec(NAME, []),
   writes: false,
   class: 'read',
-  route: { method: 'GET', path: '/api/runs/:id/steps/:step/files/:name', status: 200 },
+  route: { method: 'GET', path: '/api/runs/:runId/steps/:step/files/:name', status: 200 },
   only: { side: 'api', why: "the board links each file a folder step's folder holds; at the command line a person opens the folder" },
   handler: (args) =>
     tried(() => {
@@ -257,12 +256,12 @@ export type LifecycleTransition = Effect.Success<ReturnType<Engine['path']>>[num
 /** The path through the runtime's lifecycle of the task `task` — a try of the step `step` of the run `id`, as the api resolved it. */
 export const STEP_PATH: Command<{ path: LifecycleTransition[] }> = {
   name: 'step path',
-  usage: '<id> <step>',
+  usage: '<runId> <step>',
   help: ["the path of a step's task through the runtime's lifecycle"],
   spec: stepSpec([], ['task']),
   writes: false,
   class: 'read',
-  route: { method: 'GET', path: '/api/runs/:id/steps/:step/path', status: 200 },
+  route: { method: 'GET', path: '/api/runs/:runId/steps/:step/path', status: 200 },
   only: { side: 'api', why: "the board draws each try of a step on the lifecycle's diagram; at the command line, nemia ls says its state" },
   handler: Effect.fnUntraced(function* (args: Args) {
     const e = yield* EngineService;
@@ -280,12 +279,12 @@ export type ConversationEvent = Effect.Success<ReturnType<Engine['transcript']>>
  */
 export const STEP_TRANSCRIPT: Command<{ events: ConversationEvent[]; cursor: string }> = {
   name: 'step transcript',
-  usage: '<id> <step>',
+  usage: '<runId> <step>',
   help: ["a read of a step's conversation"],
   spec: stepSpec([], ['task', 'after']),
   writes: false,
   class: 'read',
-  route: { method: 'GET', path: '/api/runs/:id/steps/:step/transcript', status: 200 },
+  route: { method: 'GET', path: '/api/runs/:runId/steps/:step/transcript', status: 200 },
   only: {
     side: 'api',
     why: "the board reads a step's conversation as it goes; at the command line, nemia logs reads what its session printed",

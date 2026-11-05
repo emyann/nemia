@@ -17,9 +17,7 @@ import { RETRY_MODES, SAID_AFTER } from './words.ts';
 const Strings = Schema.Array(Schema.String);
 
 /** A person's answers to the questions a step's closeout asks: the question, the options chosen, and their own words. */
-const Answers = Schema.Array(
-  Schema.Struct({ question: Schema.String, chose: Strings, own: Schema.optionalKey(Schema.String) }),
-);
+const Answers = Schema.Array(Schema.Struct({ question: Schema.String, chose: Strings, own: Schema.optionalKey(Schema.String) }));
 
 /**
  * A run started, as `nemia start` starts one: the workflow, where it is read from when both the repository and your library have it,

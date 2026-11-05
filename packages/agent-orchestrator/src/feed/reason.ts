@@ -211,7 +211,7 @@ const STEP_WORDS: readonly Rule[] = [
   { starts: 'paused', reason: 'Paused' },
   { starts: SLOT_WAIT, reason: 'Waiting', on: 'limit' },
   { is: PAUSE_WAIT, reason: 'Waiting', on: 'pause' },
-  { starts: 'waiting on the checkout', reason: 'Waiting', on: 'checkout' },
+  { starts: 'waiting on the checkout', reason: 'Waiting', on: 'base' },
   { is: 'waiting', reason: 'Pending' },
   { starts: 'waiting on ', reason: 'Waiting', on: 'run' },
   { starts: 'needs-human', reason: 'AwaitingAnswer', via: 'session' },

@@ -282,7 +282,10 @@ const StepArtifact = Schema.Union([
   Schema.Struct({ path: Schema.String }),
 ]);
 
-/** A step's gate, awaiting approval or approved (`StepGate`, tries.verb.ts). */
+/**
+ * A step's gate, awaiting approval or approved (`StepGate`, tries.verb.ts) — and a looping step's, once a person approved its try out of
+ * rounds as it stands (`nemia approve` of a loop), its approval that acceptance.
+ */
 const StepGate = Schema.Struct({
   awaiting: Schema.Boolean,
   approval: Schema.NullOr(Schema.Struct({ try: Schema.Finite, at: Schema.String, message: NullString })),
@@ -333,7 +336,6 @@ export const RunStepStatus = Schema.Struct({
   sessionUnread: NullString,
   lastLine: NullString,
   gate: Schema.NullOr(StepGate),
-  accepted: Schema.NullOr(Schema.Struct({ try: Schema.Finite, at: Schema.String, message: Schema.String })),
   said: List(Said),
   asked: Schema.NullOr(
     Schema.Struct({

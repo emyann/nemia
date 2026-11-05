@@ -426,8 +426,8 @@ test('a person holds a run until another lands: the list, the page and the decis
         [GATE, `/api/runs/${GATE}/steps/plan/retry`, { mode: 'continue', message: 'Store it first.' }],
         [BLOCKS, `/api/runs/${BLOCKS}/steps/implement/retry`, { mode: 'continue', message: 'Warm ones.' }],
         [BUDGET, `/api/runs/${BUDGET}/steps/palette/retry`, { mode: 'continue', message: 'Warm ones.', budget: 5 }],
-        [LOOP, `/api/runs/${LOOP}/round`, { step: 'review' }],
-        [LOOP, `/api/runs/${LOOP}/steps/review/accept`, { message: 'The findings are follow-up work.' }],
+        [LOOP, `/api/runs/${LOOP}/steps/review/retry`, { mode: 'continue', round: true }],
+        [LOOP, `/api/runs/${LOOP}/steps/review/approve`, { message: 'The findings are follow-up work.' }],
       ];
       for (const [id, route, body] of cases) {
         const res = await post(route, body);

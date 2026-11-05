@@ -61,6 +61,10 @@
  * `cordon`, on the day the leftover words were settled (the Pause row in the run core's table): the store's pause file keeps its name,
  * `PAUSE_FILE` (`pause.store.ts`), so a pause put before the verbs were renamed still stands and is lifted; and `readRun` drops the key a
  * record of that time may hold (`record.store.ts`). They stay while a store or a record on disk may say it.
+ *
+ * `checkout` in the objects' table too, on the day P7 renamed what a step waits on to `base` (Wait on): its two counts in `run.ts` are
+ * another word, the release a session ran on (`SessionRelease`, an install's tag or a checkout's folder), not a wait. `accepted`, `/round`,
+ * `/accept` and `/merge`, retired the same day (Approval in the objects' table, Ask route in the api's), are said by no file of theirs.
  */
 export const RETIRED_COUNTS: Readonly<Record<string, Readonly<Record<string, number>>>> = {
   'agents remove': {
@@ -85,7 +89,7 @@ export const RETIRED_COUNTS: Readonly<Record<string, Readonly<Record<string, num
     'packages/agent-orchestrator/src/admission/admission.ts': 1,
     'packages/agent-orchestrator/src/brief/brief-sections.ts': 2,
     'packages/agent-orchestrator/src/command/command.ts': 2,
-    'packages/agent-orchestrator/src/gate/commands.verb.ts': 3,
+    'packages/agent-orchestrator/src/gate/commands.verb.ts': 2,
     'packages/agent-orchestrator/src/gate/form.verb.ts': 1,
     'packages/agent-orchestrator/src/gate/gate.ts': 1,
     'packages/agent-orchestrator/src/nemia/level.verb.ts': 1,
@@ -146,6 +150,7 @@ export const RETIRED_COUNTS: Readonly<Record<string, Readonly<Record<string, num
   checkout: {
     'packages/agent-orchestrator/src/place/landing.store.ts': 15,
     'packages/agent-orchestrator/src/place/place.ts': 1,
+    'packages/objects/src/run.ts': 2,
   },
   heads: {
     'packages/agent-orchestrator/src/place/landing.store.ts': 13,

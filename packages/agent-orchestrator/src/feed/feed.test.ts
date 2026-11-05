@@ -886,7 +886,7 @@ test('feedWords says each run and step in the word nemia ls prints, with its pru
       [
         'an ending the checkout holds',
         { steps: ship, run: unfiled, phaseOf: () => 'unknown', closeoutOf: () => undefined, checkout: { run: 'r-2', step: 'ship' } },
-        'Waiting/checkout',
+        'Waiting/base',
       ],
       ['a task filed and not started', { steps: plan, run: filed, phaseOf: () => 'pending', closeoutOf: () => undefined }, 'Pending'],
       ['a session at work, in a live word', { steps: plan, run: filed, phaseOf: () => 'working', closeoutOf: () => undefined }, 'Running'],

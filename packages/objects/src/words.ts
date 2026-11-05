@@ -24,9 +24,9 @@ export type RunPhase = (typeof RUN_PHASES)[number];
 
 /**
  * What a step or a run waits on when the wait is a thing's, not a person's (reason `Waiting`): other runs (`run`), the limit on runs in
- * flight (`limit`), the repository's own checkout (`checkout`), or the store's pause (`pause`).
+ * flight (`limit`), the base branch the run lands on, while another run lands there (`base`), or the store's pause (`pause`).
  */
-export const WAIT_ON = ['run', 'limit', 'checkout', 'pause'] as const;
+export const WAIT_ON = ['run', 'limit', 'base', 'pause'] as const;
 
 /** One of `WAIT_ON`. */
 export type WaitOn = (typeof WAIT_ON)[number];

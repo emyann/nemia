@@ -18,7 +18,7 @@ import type { ListedPhase } from '../list/list.ts';
 import type { Assessment } from '../tick/assess.ts';
 
 /**
- * Where a step is in its life: not yet at work (`pending`, a wait on another step, a run, a slot, the checkout or the pause among it), at
+ * Where a step is in its life: not yet at work (`pending`, a wait on another step, a run, a slot, the base or the pause among it), at
  * work or its check running (`running`), waiting on a person (`waiting`: a gate, a question, a budget, a refused or unsigned try), done
  * (`succeeded`), broken (`failed`), or stopped by an operator or a cancel (`stopped`).
  */
@@ -35,10 +35,10 @@ export type RunPhase = (typeof RUN_PHASES)[number];
 
 /**
  * What a step or a run waits on when the wait is a thing's, not a person's (reason `Waiting`, phase `pending`): other runs it is filed
- * `--after` or held until (`run`), the limit on runs in flight (`limit`), the repository's own checkout (`checkout`), or the store's
- * pause (`pause`). A field beside the reason, never part of it, so a selector names it as a key (`on=limit`).
+ * `--after` or held until (`run`), the limit on runs in flight (`limit`), the base branch the run lands on, while another run lands there
+ * (`base`), or the store's pause (`pause`). A field beside the reason, never part of it, so a selector names it as a key (`on=limit`).
  */
-export const WAIT_ON = ['run', 'limit', 'checkout', 'pause'] as const;
+export const WAIT_ON = ['run', 'limit', 'base', 'pause'] as const;
 
 /** One of `WAIT_ON`. */
 export type WaitOn = (typeof WAIT_ON)[number];
@@ -180,7 +180,7 @@ export const ENGINE_REASON: Record<ListedPhase, QualifiedStep> = {
 
 /**
  * The phase each step reason stands in. `waiting` is a wait on a person, and nothing else: a step not filed — waiting on a step
- * (`Pending`), or on a thing (`Waiting`: a run, the limit, the checkout or the pause) — is `pending`, to come. `Unknown`, a task the
+ * (`Pending`), or on a thing (`Waiting`: a run, the limit, the base or the pause) — is `pending`, to come. `Unknown`, a task the
  * engine has no record of, is `pending` too, as the engine folds it; a step whose record does not read at all is `failed` with `Unknown`,
  * set where it is answered (`unjudged`).
  */

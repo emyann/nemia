@@ -121,27 +121,9 @@ test('each command is served on the api where it was before the table, the lift 
       ['template export', 'cli'],
       ['template pack', 'cli'],
       ['template unpack', 'cli'],
-      [
-        'retry',
-        [
-          { method: 'POST', path: '/api/runs/:runId/steps/:step/retry', status: 202 },
-          { method: 'POST', path: '/api/runs/:runId/round', status: 202, sets: { round: true, mode: 'continue' } },
-        ],
-      ],
-      [
-        'approve',
-        [
-          { method: 'POST', path: '/api/runs/:runId/steps/:step/approve', status: 202 },
-          { method: 'POST', path: '/api/runs/:runId/steps/:step/accept', status: 202 },
-        ],
-      ],
-      [
-        'refresh',
-        [
-          { method: 'POST', path: '/api/runs/:runId/refresh', status: 202 },
-          { method: 'POST', path: '/api/runs/:runId/merge', status: 202, sets: { base: true } },
-        ],
-      ],
+      ['retry', { method: 'POST', path: '/api/runs/:runId/steps/:step/retry', status: 202 }],
+      ['approve', { method: 'POST', path: '/api/runs/:runId/steps/:step/approve', status: 202 }],
+      ['refresh', { method: 'POST', path: '/api/runs/:runId/refresh', status: 202 }],
       ['say', { method: 'POST', path: '/api/runs/:runId/steps/:step/say', status: 202 }],
       [
         'ls',

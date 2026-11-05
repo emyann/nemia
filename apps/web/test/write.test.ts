@@ -208,7 +208,7 @@ test("each family of writes: its answer decoded, an answer unread refused with w
     answering(t, { error: words }, 422);
     for (const ask of [
       askTry('r-1', 'plan', { mode: 'continue' }),
-      askRound('r-1', {}),
+      askRound('r-1', 'review', {}),
       approveStep('r-1', 'plan', {}),
       sayToStep('r-1', 'plan', 'hi'),
     ]) {

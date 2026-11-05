@@ -31,9 +31,8 @@ export type Named = {
  * A routed command's words: `shape`, its body as a refusal shows it; `guard`, `issue` and `failed`, each said of what it names; `strict`,
  * where its body is refused a key its schema does not have, named before any it does; `named`, the refusal of a name in its path, 400,
  * before its body is read; `bodyless`, where its route reads no body but none or `{}`, the refusal of the text it was sent, 400; `notJson`,
- * the refusal of a body that is not JSON, 400, where it has words of its own; `on`, the words of a path the command serves besides its own,
- * kept from a command it absorbed, by the path's last fixed word (`wordsAt` in routes.ts) — a kept path takes no key on the api alone, as
- * the command it was did not. A route with no `failed` lets a failure that is no refusal through, to `app.onError`, as a 500.
+ * the refusal of a body that is not JSON, 400, where it has words of its own. A route with no `failed` lets a failure that is no refusal
+ * through, to `app.onError`, as a 500.
  */
 export type RouteWords = {
   readonly shape: string;
@@ -44,27 +43,17 @@ export type RouteWords = {
   readonly named?: (at: Named) => string | null;
   readonly bodyless?: (at: Named, text: string) => string | null;
   readonly notJson?: (at: Named) => string;
-  readonly on?: Readonly<Record<string, RouteWords>>;
 };
 
 /** The body `POST …/retry` takes: `nemia retry`'s flags, as JSON. */
 const RETRY_SHAPE =
-  '`{ "mode": "continue" | "fresh" | "recheck", "model"?: "<m>", "message"?: "<answer>", "budget"?: <amount>, "answers"?: [{ "question": "<title>", "chose": ["<label>"], "own"?: "<words>" }] }`';
+  '`{ "mode": "continue" | "fresh" | "recheck", "round"?: true, "model"?: "<m>", "message"?: "<answer>", "budget"?: <amount>, "answers"?: [{ "question": "<title>", "chose": ["<label>"], "own"?: "<words>" }] }`';
 
-/** The body `POST …/round` takes: `nemia retry --round`'s arguments, as JSON. */
-const ROUND_SHAPE = '`{ "step"?: "<looping step>", "budget"?: <amount> }`';
-
-/** The body `POST …/merge` takes: `nemia refresh --base`'s argument, as JSON. */
-const MERGE_SHAPE = '`{ "step"?: "<looping step>" }`';
+/** The body `POST …/refresh` takes: `nemia refresh`'s arguments, as JSON — with `base`, the looping step whose work merges its base. */
+const REFRESH_SHAPE = '`{ "base"?: true, "step"?: "<looping step>" }`';
 
 /** The body `POST …/approve` takes: `nemia approve`'s `--message`, as JSON. */
 const APPROVE_SHAPE = '`{ "message"?: "<words>", "answers"?: [{ "question": "<title>", "chose": ["<label>"], "own"?: "<words>" }] }`';
-
-/**
- * The body `POST …/accept` takes: `nemia approve`'s `--message` of a loop out of rounds, as JSON — required, as the command line requires
- * it, in the package's words: the schema types it only.
- */
-const ACCEPT_SHAPE = '`{ "message": "<why>" }`';
 
 /** The body `POST …/say` takes: the words, as `nemia say` takes them. */
 const SAY_SHAPE = '`{ "text": "<words>" }`';
@@ -84,24 +73,13 @@ const retryWords = ({ path: [key], input }: BodyIssue): string => {
     return `\`model\` names the model a new session runs on, as \`nemia retry --model <m>\` does: a name, or left out for the step's own. This request's was ${JSON.stringify(input)}.`;
   if (key === 'message')
     return `\`message\` is what to tell the step, as \`nemia retry --message "<answer>"\` takes it: text, or left out. This request's was ${JSON.stringify(input)}.`;
+  if (key === 'round')
+    return `\`round\` asks for another round of the loop the step closes, as \`nemia retry --round\` does: true, or left out for a try of the step. This request's was ${JSON.stringify(input)}: ${RETRY_SHAPE}.`;
   if (key === 'budget') return budgetWords(input, 'nemia retry', RETRY_SHAPE);
   if (key === 'answers')
     return `\`answers\` are a person's answers to the questions the step asks: a list of { "question": its title, "chose": the labels chosen, "own"?: words of their own }, or left out. This request's was ${JSON.stringify(input)}: ${RETRY_SHAPE}.`;
   return `POST …/retry takes a JSON object: ${RETRY_SHAPE}.`;
 };
-
-/**
- * Why `POST …/round`'s body is not an ask (400), by the first key its schema refused: the looping step, which `nemia retry --round` takes
- * when the run has more than one loop, and `--budget`, the cap each step of the loop over its budget is raised to.
- */
-const roundWords =
-  (id: string) =>
-  ({ path: [key], input }: BodyIssue): string => {
-    if (key === 'step')
-      return `\`step\` names the looping step whose loop goes round again, as \`nemia retry ${id} <step> --round\` does: a name, or left out for a run with one loop. This request's was ${JSON.stringify(input)}: ${ROUND_SHAPE}.`;
-    if (key === 'budget') return budgetWords(input, `nemia retry ${id} --round`, ROUND_SHAPE);
-    return `POST …/round takes a JSON object: ${ROUND_SHAPE}.`;
-  };
 
 /** Another try of a step, as the guard's refusals word it, its body and its failures. */
 const RETRY: RouteWords = {
@@ -118,51 +96,6 @@ const RETRY: RouteWords = {
   issue: () => retryWords,
   failed: ({ runId, step }, said) =>
     `Could not ask for another try of step '${step}': ${said}. \`nemia retry ${runId} ${step}\` asks the same way from the command line.`,
-};
-
-/**
- * Another round of a run's loop, on `POST …/round`, a path of `retry` (`nemia retry --round`), as the guard's refusals word it, its body
- * and its failures.
- */
-const ROUND: RouteWords = {
-  shape: ROUND_SHAPE,
-  guard: ({ runId }) => ({
-    route: `POST /api/runs/${runId}/round`,
-    does: "asks for another round of a run's loop",
-    forAnother: 'ask for one',
-    why: "the next tick files the round a person asks for, which runs the loop's steps again in this repository, past the cap a budget carried where it raises one",
-    reach: "raise it from the run's page on the board",
-    instead: `Raise it from the run's page on the board, or with \`nemia retry ${runId} [<step>] --round --budget <amount>\``,
-    shape: ROUND_SHAPE,
-  }),
-  issue: ({ runId }) => roundWords(runId),
-  failed: ({ runId }, said) =>
-    `Could not ask for another round of ${runId}'s loop: ${said}. \`nemia retry ${runId} --round\` asks the same way from the command line.`,
-};
-
-/**
- * A merge of the base into a loop's work, on `POST …/merge`, a path of `refresh` (`nemia refresh --base`), as the guard's refusals word
- * it, its body and its failures.
- */
-const MERGE: RouteWords = {
-  shape: MERGE_SHAPE,
-  guard: ({ runId }) => ({
-    route: `POST /api/runs/${runId}/merge`,
-    does: "sends a loop's work back to merge its base branch",
-    forAnother: 'ask for one',
-    why: "the next tick files the merge a person asks for, which runs the loop's target again in this repository to merge the base into its work",
-    reach: "ask it from the run's page on the board",
-    instead: `Ask it from the run's page on the board, or with \`nemia refresh ${runId} [<step>] --base\``,
-    shape: MERGE_SHAPE,
-  }),
-  issue:
-    ({ runId }) =>
-    ({ path: [key], input }) =>
-      key === 'step'
-        ? `\`step\` names the looping step whose work merges, as \`nemia refresh ${runId} <step> --base\` does: a name, or left out for a run with one loop. This request's was ${JSON.stringify(input)}: ${MERGE_SHAPE}.`
-        : `POST …/merge takes a JSON object: ${MERGE_SHAPE}.`,
-  failed: ({ runId }, said) =>
-    `Could not ask for a merge of ${runId}'s base: ${said}. \`nemia refresh ${runId} --base\` asks the same way from the command line.`,
 };
 
 /** An approval of a step waiting at its gate, as the guard's refusals word it, its body and its failures. */
@@ -190,34 +123,9 @@ const APPROVE: RouteWords = {
     `Could not approve step '${step}': ${said}. \`nemia approve ${runId} ${step}\` approves the same way from the command line.`,
 };
 
-/**
- * An acceptance of a loop out of rounds, on `POST …/accept`, a path of `approve` (`nemia approve` of a loop out of rounds), as the guard's
- * refusals word it, its body and its failures.
- */
-const ACCEPT: RouteWords = {
-  shape: ACCEPT_SHAPE,
-  guard: ({ runId, step }) => ({
-    route: `POST /api/runs/${runId}/steps/${step}/accept`,
-    does: 'accepts the work of a loop out of rounds as it stands',
-    forAnother: 'accept one',
-    why: 'the next tick files what waits on a loop a person accepts, and the words given with it go into the brief of every step after the loop, which an agent acts on in this repository',
-    reach: "accept it from the run's page on the board",
-    instead: `Accept it from the run's page on the board, or with \`nemia approve ${runId} ${step} --message "<why>"\``,
-    shape: ACCEPT_SHAPE,
-  }),
-  issue:
-    ({ runId, step }) =>
-    ({ path: [key], input }) =>
-      key === 'message'
-        ? `\`message\` is why the work is good enough with its findings open, which every step after the loop is handed, as \`nemia approve ${runId} ${step} --message "<why>"\` takes it: text. This request's was ${JSON.stringify(input)}: ${ACCEPT_SHAPE}.`
-        : `POST …/accept takes a JSON object: ${ACCEPT_SHAPE}.`,
-  failed: ({ runId, step }, said) =>
-    `Could not accept ${step}'s loop as it stands: ${said}. \`nemia approve ${runId} ${step} --message "<why>"\` accepts the same way from the command line.`,
-};
-
 /** A run told to take the new revisions of the kinds it resolved, as the guard's refusals word it, its body and its failures. */
 const REFRESH: RouteWords = {
-  shape: '`{}`',
+  shape: REFRESH_SHAPE,
   guard: ({ runId }) => ({
     route: `POST /api/runs/${runId}/refresh`,
     does: 'tells a run to take the new revisions of the kinds it resolved',
@@ -225,9 +133,16 @@ const REFRESH: RouteWords = {
     why: "every filing after it — a new step, a retry, a round — is filed on the newest revision of the run's workflow, its agents, their skills and its factory's rules, which an agent acts on in this repository",
     reach: `take them with \`nemia refresh ${runId}\``,
     instead: `Take them with \`nemia refresh ${runId}\`: the run's page on the board shows the drift and prints that verb, and has no button for it`,
-    shape: '`{}`',
+    shape: REFRESH_SHAPE,
   }),
-  issue: (at) => () => `POST /api/runs/${at.runId}/refresh takes no body.`,
+  issue:
+    ({ runId }) =>
+    ({ path: [key], input }) =>
+      key === 'step'
+        ? `\`step\` names the looping step whose work merges its base, as \`nemia refresh ${runId} <step> --base\` does: a name, or left out for a run with one loop. This request's was ${JSON.stringify(input)}: ${REFRESH_SHAPE}.`
+        : key === 'base'
+          ? `\`base\` sends a loop's work back to merge its base branch, as \`nemia refresh ${runId} --base\` does: true, or left out to take the new revisions. This request's was ${JSON.stringify(input)}: ${REFRESH_SHAPE}.`
+          : `POST /api/runs/${runId}/refresh takes a JSON object: ${REFRESH_SHAPE}.`,
   failed: ({ runId }, said) =>
     `Could not refresh ${runId}: ${said}. \`nemia refresh ${runId}\` takes the new revisions the same way from the command line.`,
 };
@@ -633,9 +548,9 @@ const FACTORY_FIRE: RouteWords = {
 
 /** The api's words for each routed command, by its name, with those of the paths it keeps from a command it absorbed (`on`). */
 export const WORDS: Readonly<Record<string, RouteWords>> = {
-  retry: { ...RETRY, on: { round: ROUND } },
-  refresh: { ...REFRESH, on: { merge: MERGE } },
-  approve: { ...APPROVE, on: { accept: ACCEPT } },
+  retry: RETRY,
+  refresh: REFRESH,
+  approve: APPROVE,
   say: SAY,
   hold: HOLD,
   pause: PAUSE,

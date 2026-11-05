@@ -132,14 +132,22 @@ export const takenLine = (
 /** One fact under a gate, as the inspector lists it: a label, the words, and where to read more (a step's section on the run's page). */
 export type GateFact = { label: string; said: string; state?: 'good' | 'bad'; step?: string };
 
+/** What a person's approval of a loop out of rounds adds to its last review's fact — its words, and the findings left open — or null. */
+function acceptedWords(looping: Pick<RunView['steps'][number], 'gate'>, findings: number | null): string | null {
+  const approval = looping.gate?.approval;
+  if (!approval) return null;
+  return `; a person accepted the work as it stands, with ${findings === 1 ? 'it' : 'them'} open${approval.message ? `: ${approval.message}` : ''}`;
+}
+
 /**
  * The facts under a gate, each off the record: the round the run is on of its loop's cap, and what it has cost; the last word of each
  * looping step (a review) — no further round asked, or how many findings it left; each check's verdict on its final try; and, off the run's
  * decision when it has been read, what the result touched and whether each branch still merges onto the base.
  *
  * A looping step's word is read off its closeout's output, the keys `wf`'s loop reads (`again`) and the reviewer's `findings`; a closeout
- * without them says it signed off, and how. A step not run says so. A looping step a person ended out of rounds (the CLI's `accept`) is
- * said accepted as it stands, with their words, not as asking another round, though its closeout still says `again: true`.
+ * without them says it signed off, and how. A step not run says so. A looping step a person approved out of rounds (`nemia approve` of a
+ * loop, its gate's approval) is said accepted as it stands, with their words, not as asking another round, though its closeout still says
+ * `again: true` (`acceptedWords`).
  */
 export function gateFacts(run: Pick<RunView, 'steps' | 'cost'>, decision: Decidable | null): GateFact[] {
   const facts: GateFact[] = [];
@@ -151,9 +159,7 @@ export function gateFacts(run: Pick<RunView, 'steps' | 'cost'>, decision: Decida
     const closeout = looping.closeout;
     const output = closeout?.output ?? {};
     const findings = Array.isArray(output.findings) ? output.findings.length : null;
-    const accepted = looping.accepted
-      ? `; a person accepted the work as it stands, with ${findings === 1 ? 'it' : 'them'} open: ${looping.accepted.message}`
-      : null;
+    const accepted = acceptedWords(looping, findings);
     const said = !closeout
       ? `${looping.name} has yet to sign off`
       : output.again === false

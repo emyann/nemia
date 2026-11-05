@@ -89,10 +89,7 @@ export const APPROVE: Command<{
   writes: true,
   ticks: true,
   class: 'answer',
-  route: [
-    { method: 'POST', path: '/api/runs/:runId/steps/:step/approve', status: 202 },
-    { method: 'POST', path: '/api/runs/:runId/steps/:step/accept', status: 202 },
-  ],
+  route: { method: 'POST', path: '/api/runs/:runId/steps/:step/approve', status: 202 },
   apiTakes: ['answers'],
   apiKeys: ['step', 'try', 'at', 'message', 'file'],
   handler: Effect.fnUntraced(function* (args: Args) {

@@ -222,7 +222,6 @@ function runWith(note: string | null): RunView {
         denied: null,
         sessionUnread: null,
         gate: null,
-        accepted: null,
         lastLine: null,
         said: [],
         asked: null,

@@ -21,9 +21,9 @@ export type RunPhase = (typeof RUN_PHASES)[number];
 
 /**
  * What a wait on a thing waits on (reason `Waiting`, phase `pending`): other runs (`run`), the limit on runs in flight (`limit`), the
- * repository's checkout (`checkout`), or the store's pause (`pause`).
+ * base branch's checkout (`base`), or the store's pause (`pause`).
  */
-export const WAIT_ON = ['run', 'limit', 'checkout', 'pause'] as const;
+export const WAIT_ON = ['run', 'limit', 'base', 'pause'] as const;
 
 /** Mirrors `WaitOn` in agent-orchestrator's phase/phase.ts: one of `WAIT_ON`. */
 export type WaitOn = (typeof WAIT_ON)[number];

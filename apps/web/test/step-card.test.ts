@@ -25,7 +25,6 @@ const quiet = (name: string, word: Word, extra: Partial<Step> = {}): Step =>
     denied: null,
     check: null,
     gate: null,
-    accepted: null,
     lastLine: null,
     needs: null,
     spent: { usd: 3.71, measured: 1, unmeasured: 0, said: '$3.71' },

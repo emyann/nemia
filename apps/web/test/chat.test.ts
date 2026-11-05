@@ -724,16 +724,18 @@ test('broughtOf and chatItems: a step her words link to is brought, drawn under 
   );
 });
 
-test('reading her chat: a read made again that fails is the end, and clears the notice an earlier stream left', async (t) => {
+test('reading her chat: one stream opened after the first read, from its cursor, and a read made again that fails is the end', async (t) => {
   const { reading } = await import('../src/lib/useNemiaChat.ts');
   const fetchBefore = globalThis.fetch;
   const sourceBefore = (globalThis as { EventSource?: unknown }).EventSource;
   const streams: Stream[] = [];
+  const urls: string[] = [];
   Object.assign(globalThis, {
     EventSource: class extends Stream {
-      constructor(_url: string) {
+      constructor(url: string) {
         super();
         streams.push(this);
+        urls.push(url);
       }
     },
   });
@@ -749,27 +751,58 @@ test('reading her chat: a read made again that fails is the end, and clears the 
     for (let i = 0; i < 200 && !done(); i++) await new Promise((r) => setImmediate(r));
     assert.ok(done(), 'the read answers');
   };
+  const told = story(t);
+  let open = () => {};
 
-  globalThis.fetch = async () =>
-    new Response(JSON.stringify({ events: [], before: null, cursor: 'c:1', presence: up }), {
-      status: 200,
-      headers: { 'content-type': 'application/json' },
-    });
-  const open = reading({ setState, tryAgain: () => {}, follow: true });
-  await until(() => streams.length === 1);
-  streams[0].send('unreadable', { error: 'Her chat is unreadable.', retrying: true });
-  assert.equal(state.retrying, 'Her chat is unreadable.', 'the panel open, the stream says the api reads her again');
+  await told.test('the first read answered, one stream is opened from its cursor, whoever reads her', async () => {
+    globalThis.fetch = async () =>
+      new Response(JSON.stringify({ events: [], before: null, cursor: 'c:1', presence: up }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    open = reading({ setState, tryAgain: () => {} });
+    await until(() => state.live);
+    for (let i = 0; i < 20; i++) await new Promise((r) => setImmediate(r));
+    assert.deepEqual(urls, ['/api/nemia/chat/stream?after=c%3A1'], 'one stream, from the cursor the read answered, and no beat of reads');
+  });
+  await told.test('the stream says the api reads her again', () => {
+    streams[0]?.send('unreadable', { error: 'Her chat is unreadable.', retrying: true });
+    assert.equal(state.retrying, 'Her chat is unreadable.');
+  });
+  await told.test('a read made again that fails is the end, and leaves no retrying notice beside its error', async () => {
+    open();
+    assert.equal(streams[0]?.readyState, 2, 'what stops the reading closes its stream');
+    globalThis.fetch = async () => {
+      throw new TypeError('fetch failed');
+    };
+    const closed = reading({ setState, tryAgain: () => {} });
+    await until(() => state.error !== null);
+    closed();
+    assert.deepEqual([state.live, state.retrying, streams.length], [false, null, 1]);
+  });
+});
 
-  open();
-  globalThis.fetch = async () => {
-    throw new TypeError('fetch failed');
-  };
-  const closed = reading({ setState, tryAgain: () => {}, follow: false });
-  await until(() => state.error !== null);
-  closed();
-  assert.deepEqual(
-    [state.live, state.retrying],
-    [false, null],
-    'the panel closed and the api down, the fresh read that fails is the end, and leaves no retrying notice beside its error',
-  );
+test('NemiaChatProvider: one holder of her chat for the frame, read by every consumer under it, and refused outside one', async (t) => {
+  await import('./tsx.ts');
+  const { createElement } = await import('react');
+  const { renderToStaticMarkup } = await import('react-dom/server');
+  const { NemiaChatProvider, useNemiaChat } = await import('../src/lib/useNemiaChat.ts');
+  type Held = ReturnType<typeof useNemiaChat>;
+  await t.test('the dock and the chat page under one provider read the same chat', () => {
+    const seen: Held[] = [];
+    const Consumer = () => {
+      seen.push(useNemiaChat());
+      return null;
+    };
+    renderToStaticMarkup(createElement(NemiaChatProvider, null, createElement(Consumer), createElement(Consumer)));
+    assert.equal(seen.length, 2);
+    assert.equal(seen[0], seen[1], 'one holder, so one reader and one stream, serves both');
+  });
+  await t.test('a consumer with no provider over it is refused', () => {
+    const Consumer = () => {
+      useNemiaChat();
+      return null;
+    };
+    assert.throws(() => renderToStaticMarkup(createElement(Consumer)), Error);
+  });
 });

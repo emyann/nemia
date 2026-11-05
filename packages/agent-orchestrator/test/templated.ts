@@ -5,13 +5,24 @@
  * Imported with `await import` after the file sets `WF_ROOT`, as the store's modules are.
  */
 import path from 'node:path';
-import { Cause, Effect, Exit } from 'effect';
+import { Cause, Clock, Effect, Exit } from 'effect';
 import { StoreRoot } from '../src/config/root.store.ts';
 import { BuiltinTemplates, TemplateDoor } from '../src/templates/templates.store.ts';
 import { TemplateSource } from '../src/templates/templates.model.ts';
 import { openedTree, packageSkillNames } from '../src/template/template.store.ts';
 import { exportedTemplate } from '../src/template/template.verb.ts';
 import { reconcileFactory } from '../src/applied/applied.verb.ts';
+
+/** A clock that says the time is `ms` (epoch milliseconds) whenever it is asked, and sleeps no one: a controller's pass, seeded. */
+export const seededClock = (ms: number): Clock.Clock => ({
+  currentTimeMillisUnsafe: () => ms,
+  currentTimeMillis: Effect.succeed(ms),
+  currentTimeNanosUnsafe: () => BigInt(ms) * 1_000_000n,
+  currentTimeNanos: Effect.succeed(BigInt(ms) * 1_000_000n),
+  monotonicTimeNanosUnsafe: () => BigInt(ms) * 1_000_000n,
+  monotonicTimeNanos: Effect.succeed(BigInt(ms) * 1_000_000n),
+  sleep: () => Effect.die(new Error('seededClock: a seeded pass sleeps no one; steer a rest with steeredClock (test/steered.ts)')),
+});
 
 /** `program` given the builtin folder `builtins`, where one is named. */
 export const withBuiltins = <A, E, R>(program: Effect.Effect<A, E, R>, builtins?: string): Effect.Effect<A, E, R> =>
@@ -37,5 +48,8 @@ export function templated(root: string, builtins?: string) {
     openTemplate: (source: string) => openedTree(source, read(source), packageSkillNames()),
     /** One pass of the factory controller over `factory`: the status it observed. */
     reconciled: (factory: Parameters<typeof reconcileFactory>[0]) => run(reconcileFactory(factory)),
+    /** One pass of the factory controller over `factory` on a clock seeded at `at` (ISO): the status it observed. */
+    reconciledAt: (factory: Parameters<typeof reconcileFactory>[0], at: string) =>
+      run(Effect.provideService(reconcileFactory(factory), Clock.Clock, seededClock(Date.parse(at)))),
   };
 }

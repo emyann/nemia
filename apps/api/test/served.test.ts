@@ -55,11 +55,64 @@ const OWN: Readonly<Record<string, string>> = {
   'GET /api/runs/:id/steps/:step/transcript/stream': "a stream of a step's transcript, held open for as long as the board reads it",
   'GET /api/workflows/keys': "the keys a step may set and what each means, the builder's form: no run, no store",
   'GET /api/repository': 'the repository the request is served on, as the request names it',
-  'POST /api/factories/:factory/servers/:server/sign-in':
-    'a sign-in a person makes in their browser, held by the engine until they approve: a CLI verb would wait on a browser in its own process, and none is asked for',
-  'GET /api/factories/:factory/servers/:server/sign-in': "the state of the sign-in the board holds open, read off the engine's memory",
-  'DELETE /api/factories/:factory/servers/:server/sign-in':
-    "a sign-out, the board's beside its sign-in, which no command of the table has either",
+  'GET /api/factories':
+    "the Factory's verbs, served by the objects' handler from `objects`' Api (src/objects/factories.ts) over the factories' entries",
+  'GET /api/factories/:name':
+    "the Factory's verbs, served by the objects' handler from `objects`' Api (src/objects/factories.ts) over the factories' entries",
+  'GET /api/factories/:name/commands':
+    "the Factory's verbs, served by the objects' handler from `objects`' Api (src/objects/factories.ts) over the factories' entries",
+  'GET /api/factories/:name/rules':
+    "the Factory's verbs, served by the objects' handler from `objects`' Api (src/objects/factories.ts) over the factories' entries",
+  'PUT /api/factories/:name/rules':
+    "the Factory's verbs, served by the objects' handler from `objects`' Api (src/objects/factories.ts) over the factories' entries",
+  'DELETE /api/factories/:name/rules':
+    "the Factory's verbs, served by the objects' handler from `objects`' Api (src/objects/factories.ts) over the factories' entries",
+  'GET /api/factories/:name/instruction':
+    "the Factory's verbs, served by the objects' handler from `objects`' Api (src/objects/factories.ts) over the factories' entries",
+  'PUT /api/factories/:name/instruction':
+    "the Factory's verbs, served by the objects' handler from `objects`' Api (src/objects/factories.ts) over the factories' entries",
+  'DELETE /api/factories/:name/instruction':
+    "the Factory's verbs, served by the objects' handler from `objects`' Api (src/objects/factories.ts) over the factories' entries",
+  'PUT /api/factories/:name/instruction/words':
+    "the Factory's verbs, served by the objects' handler from `objects`' Api (src/objects/factories.ts) over the factories' entries",
+  'DELETE /api/factories/:name/instruction/words':
+    "the Factory's verbs, served by the objects' handler from `objects`' Api (src/objects/factories.ts) over the factories' entries",
+  'GET /api/builtin/mcpservers':
+    "Nemia's builtin MCP servers, served by the objects' handler from `objects`' Api (src/factory-parts/mcp-servers.ts) off the package's folder",
+  'GET /api/namespaces/:namespace/mcpservers':
+    "the McpServer's verbs, served by the objects' handler from `objects`' Api (src/factory-parts/mcp-servers.ts) over the servers' entries",
+  'GET /api/namespaces/:namespace/mcpservers/:name':
+    "the McpServer's verbs, served by the objects' handler from `objects`' Api (src/factory-parts/mcp-servers.ts) over the servers' entries",
+  'PUT /api/namespaces/:namespace/mcpservers/:name':
+    "the McpServer's verbs, served by the objects' handler from `objects`' Api (src/factory-parts/mcp-servers.ts) over the servers' entries",
+  'DELETE /api/namespaces/:namespace/mcpservers/:name':
+    "the McpServer's verbs, served by the objects' handler from `objects`' Api (src/factory-parts/mcp-servers.ts) over the servers' entries",
+  'GET /api/namespaces/:namespace/mcpservers/:name/sign-in':
+    "a sign-in a person makes in their browser, held by the engine until they approve, served by the objects' handler (src/factory-parts/mcp-servers.ts): a CLI verb would wait on a browser in its own process",
+  'POST /api/namespaces/:namespace/mcpservers/:name/sign-in':
+    "a sign-in a person makes in their browser, held by the engine until they approve, served by the objects' handler (src/factory-parts/mcp-servers.ts): a CLI verb would wait on a browser in its own process",
+  'DELETE /api/namespaces/:namespace/mcpservers/:name/sign-in':
+    "a sign-in a person makes in their browser, held by the engine until they approve, served by the objects' handler (src/factory-parts/mcp-servers.ts): a CLI verb would wait on a browser in its own process",
+  'GET /api/namespaces/:namespace/schedules':
+    "the Schedule's verbs, served by the objects' handler from `objects`' Api (src/factory-parts/schedules.ts) over the schedules' entries",
+  'GET /api/namespaces/:namespace/schedules/:name':
+    "the Schedule's verbs, served by the objects' handler from `objects`' Api (src/factory-parts/schedules.ts) over the schedules' entries",
+  'PUT /api/namespaces/:namespace/schedules/:name':
+    "the Schedule's verbs, served by the objects' handler from `objects`' Api (src/factory-parts/schedules.ts) over the schedules' entries",
+  'DELETE /api/namespaces/:namespace/schedules/:name':
+    "the Schedule's verbs, served by the objects' handler from `objects`' Api (src/factory-parts/schedules.ts) over the schedules' entries",
+  'GET /api/namespaces/:namespace/hires':
+    "the Hire's verbs, served by the objects' handler from `objects`' Api (src/factory-parts/hires.ts) over the hire's entries",
+  'GET /api/namespaces/:namespace/hires/:name':
+    "the Hire's verbs, served by the objects' handler from `objects`' Api (src/factory-parts/hires.ts) over the hire's entries",
+  'PUT /api/namespaces/:namespace/hires/:name':
+    "the Hire's verbs, served by the objects' handler from `objects`' Api (src/factory-parts/hires.ts) over the hire's entries",
+  'DELETE /api/namespaces/:namespace/hires/:name':
+    "the Hire's verbs, served by the objects' handler from `objects`' Api (src/factory-parts/hires.ts) over the hire's entries",
+  'GET /api/namespaces/:namespace/volumes':
+    "the Volume's reads, served by the objects' handler from `objects`' Api (src/factory-parts/volumes.ts) off the factory's file and the informer",
+  'GET /api/namespaces/:namespace/volumes/:name':
+    "the Volume's reads, served by the objects' handler from `objects`' Api (src/factory-parts/volumes.ts) off the factory's file and the informer",
   'GET /api/metrics': "the api process's own metrics, kept in its memory: the command line runs in another process, which has none of them",
 };
 

@@ -1,6 +1,7 @@
 /**
- * Hiring into a step, in the factory a page is read in: the agent hired, with Fire; else why none can be hired, in the package's words;
- * else a picker of the agents beside the step's workflow, with Hire, and, on a workflow of yours, New agent, which comes back to hire.
+ * Hiring into a step, in the factory a page is read in, through its `Hire` (named `<workflow>.<step>`): the agent hired, with Fire;
+ * else why none can be hired, in the package's words; else a picker of the agents beside the step's workflow, with Hire, and, on a
+ * workflow of yours, New agent, which comes back to hire.
  */
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';

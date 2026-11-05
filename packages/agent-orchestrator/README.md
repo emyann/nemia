@@ -105,7 +105,13 @@ with its lift. A put says who paused and why, as the pause's file does, in field
 stands the same way. The verbs write
 no line: the tick's pass, which reads the store's pause (`$WF_ROOT/cordon`) already, offers the put while the pause stands and the lift
 for each put the feed holds that no longer stands (`storeOnce`), each counted off the feed's own lines, so a second daemon or a restart
-says neither again; a pause put and lifted between two passes leaves no line, since a pass reads what stands. `nemia watch -l
+says neither again; a pause put and lifted between two passes leaves no line, since a pass reads what stands. A factory's level is a
+line of the store too: `level changed`, `reason: "LevelChanged"`, `source: "person"`, labelled with its factory (`labels.factory`), its
+note the level in force in words (`acme is at auto until <its end>, then semi-auto`, `acme is at semi-auto`). It is a word that
+stands per factory, not a one-shot: the same pass reads each factory's level in force (`levelsNow`) and writes a line where it is not
+what the feed said of that factory last, so a set from the board or the CLI, a raise, its `--end` and its end passing, which nothing
+writes, are each one line, and a factory at `manual` the feed has said nothing of gets none; it is one of Nemia's selectors
+(`reason=LevelChanged`), and every subscription is handed it, scoped or not, so a factory set down to `manual` is heard. `nemia watch -l
 kind=Store` follows them, and the api sends them as a `store` event. **Nothing reads it to decide**: every pass still
 judges from the world, and a feed deleted by hand costs its history, never a decision.
 
@@ -3342,7 +3348,10 @@ recommendation, recaps what moved, carries their answer back as a `nemia` verb, 
   **`nemia policy propose <agent> --file <path>|-`** writes what the agent proposes from the custom instruction, its rules in words
   generated from their fields and the words the machinery cannot hold kept as guidance; **`nemia policy confirm <agent> <id> --words
   '<words>'`** and **`nemia policy rm <agent> <id>`** are the person's, on the board's Settings, and asked of them every time an agent
-  calls them. `nemia auto …`, the group's former name, still runs as `nemia policy …`, with a hint on stderr naming it, and admission
+  calls them. **`nemia policy reach <agent> (--factory <name> | --run <runId>)`** reads which steps at their gate the rules in force
+  could ever approve unasked: an ending approved before it runs has done nothing to recommend or check, and a step with no check never
+  passed one, so a rule needing either never reaches it. It says why each other rule misses, of a run what keeps a rule now, and
+  suggests, for each step no rule reaches, the rule asking all that can hold there, in the words a confirm checks. `nemia auto …`, the group's former name, still runs as `nemia policy …`, with a hint on stderr naming it, and admission
   reads it as the new name; the store's folder `auto/` keeps its name, so no confirmed rule is orphaned. A confirm carries the rule's words as the person read them, and is refused (`Conflict`), writing nothing, once the rule
   under that id reads otherwise. A rule nobody confirmed allows nothing, a try that raises a step's cap is always asked, and a list that
   does not read allows nothing. Auto holds in a session of hers filed since auto was built (`--auto` on her admission): one kept from before

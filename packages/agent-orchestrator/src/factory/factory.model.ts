@@ -18,9 +18,14 @@ export type FactoryName = Id<'FactoryName'>;
 
 /**
  * A folder of the person's machine a factory mounts for every local step of its runs (`Volume`): its path, and whether steps only read it,
- * the runtime's `Mount` field and Kubernetes' `volumeMounts.readOnly`, compose's long-form read_only. Marked always.
+ * the runtime's `Mount` field and Kubernetes' `volumeMounts.readOnly`, compose's long-form read_only. Marked always. Its `name`, the one it
+ * is served and linked under, where its file stores one (`volumesNamed` names one it does not).
  */
-export const Volume = Schema.Struct({ path: Schema.String, readOnly: Schema.Boolean }).annotate({ identifier: 'Volume' });
+export const Volume = Schema.Struct({
+  path: Schema.String,
+  readOnly: Schema.Boolean,
+  name: Schema.optional(Schema.String),
+}).annotate({ identifier: 'Volume' });
 export type Volume = typeof Volume.Type;
 
 /** A schedule of a workflow a factory has attached (`Schedule`). */
@@ -53,7 +58,8 @@ const workflowOf = (step: string): string => step.slice(0, step.indexOf('/'));
  * mounts no volume that is one of its repositories or named twice, and it hires and
  * schedules only into a workflow it offers — a hire or a schedule into one it has not attached is refused, and a workflow it still hires
  * into or schedules is not detached (`wiringRefusal`, `wiring.ts`, whose contract proves those refusals); this struct's own checks refuse a
- * factory the door writes that breaks them.
+ * factory the door writes that breaks them. Its `generation`, the count of changes to its spec, is the door's to count
+ * (`generationWritten`), never a caller's.
  */
 export const Factory = Schema.Struct({
   name: FactoryName.OnRead,
@@ -67,6 +73,7 @@ export const Factory = Schema.Struct({
   tree: Schema.optional(Schema.String),
   volumes: Schema.optional(Schema.Array(Volume)),
   harnessSettings: Schema.optional(HarnessSettings),
+  generation: Schema.optional(Schema.Number),
 })
   .check(
     Schema.makeFilter((factory) => factory.repos.length > 0 || 'a factory works on no repository: nemia factory add <name> --repo <path>'),

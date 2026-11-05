@@ -6,14 +6,33 @@
  * cards as objects, listed across namespaces or in one (a card's namespace is its factory, `default` for one that names none), read,
  * filed, dropped, started, queued and taken off the queue, and their labels edited. Every refusal is an object with one key, `error`, the
  * sentence that says what to do next, as the api's other routes answer one; a Conflict carries the `users` that hold the thing too.
+ *
+ * Group `factories`: the factories, which no namespace holds, listed and read, and each one's sub-resources — its rules and its
+ * instruction, read, written and cleared, and the lines a person types for it (`commands`). The factory's parts are each in the
+ * factory's namespace: group `mcpservers`, its MCP servers, read, recorded and taken off, and signed in to; group `builtin`, the servers
+ * Nemia offers, in no namespace; groups `schedules` and `hires`, read, written and taken back; and group `volumes`, read alone.
  */
 import { Schema } from 'effect';
 import { HttpApi, HttpApiEndpoint, HttpApiGroup } from 'effect/http-api';
 import { Card, CardFile, CardList, CardStart } from './card.ts';
+import {
+  Factory,
+  FactoryCommands,
+  FactoryInstruction,
+  FactoryInstructionWords,
+  FactoryInstructionWrite,
+  FactoryList,
+  FactoryRules,
+  FactoryRulesWrite,
+} from './factory.ts';
+import { Hire, HireList, HireWrite } from './hire.ts';
+import { McpServer, McpServerList, McpServerWrite, SignInStarted, SignInState, SignedOut } from './mcp-server.ts';
+import { Schedule, ScheduleList, ScheduleWrite } from './schedule.ts';
+import { Volume, VolumeList } from './volume.ts';
 import { LabelEdit, Labelled, Run, StepTold, StepTries, StepTry, TryCloseout } from './run.ts';
 
 /** The kinds the api serves as objects, each with its object Schema, its `<Kind>List` and its get endpoint here. */
-export const KINDS = ['Run', 'Card'] as const;
+export const KINDS = ['Run', 'Card', 'Factory', 'McpServer', 'Schedule', 'Hire', 'Volume'] as const;
 export type Kind = (typeof KINDS)[number];
 
 /** Nothing by that name, or not in that namespace: a 404. */
@@ -35,6 +54,19 @@ export class Unjudged extends Schema.Class<Unjudged>('Unjudged')({ error: Schema
 const CardObject = Card.annotate({ identifier: 'Card' });
 const CardListObject = CardList.annotate({ identifier: 'CardList' });
 
+/** The factory's kinds and a page of each, named so that the document holds each as a component. */
+const FactoryObject = Factory.annotate({ identifier: 'Factory' });
+const FactoryListObject = FactoryList.annotate({ identifier: 'FactoryList' });
+const FactoryCommandsObject = FactoryCommands.annotate({ identifier: 'FactoryCommands' });
+const McpServerObject = McpServer.annotate({ identifier: 'McpServer' });
+const McpServerListObject = McpServerList.annotate({ identifier: 'McpServerList' });
+const ScheduleObject = Schedule.annotate({ identifier: 'Schedule' });
+const ScheduleListObject = ScheduleList.annotate({ identifier: 'ScheduleList' });
+const HireObject = Hire.annotate({ identifier: 'Hire' });
+const HireListObject = HireList.annotate({ identifier: 'HireList' });
+const VolumeObject = Volume.annotate({ identifier: 'Volume' });
+const VolumeListObject = VolumeList.annotate({ identifier: 'VolumeList' });
+
 /** A run's step, named in the path. */
 const stepParams = { runId: Schema.String, step: Schema.String };
 
@@ -55,8 +87,14 @@ const listQuery = {
   selector: LabelQuery,
 };
 
-/** A card by its namespace and its name. */
+/** A card, or any object a namespace holds, by its namespace and its name. */
 const cardParams = { namespace: Schema.String, name: Schema.String };
+
+/** A namespace, for a list in it. */
+const namespaceParams = { namespace: Schema.String };
+
+/** A factory, by its name. */
+const factoryParams = { name: Schema.String };
 
 /** The run object and its sub-resources. */
 export class RunsGroup extends HttpApiGroup.make('runs').add(
@@ -131,5 +169,175 @@ export class CardsGroup extends HttpApiGroup.make('cards').add(
   }),
 ) {}
 
+/** What every verb of a factory and of its parts refuses with, as a card's do. */
+const objectErrors = cardErrors;
+
+/** The factories, which no namespace holds, and each one's rules, instruction and command lines. */
+export class FactoriesGroup extends HttpApiGroup.make('factories').add(
+  HttpApiEndpoint.get('listAll', '/api/factories', { query: listQuery, success: FactoryListObject, error: objectErrors }),
+  HttpApiEndpoint.get('get', '/api/factories/:name', { params: factoryParams, success: FactoryObject, error: objectErrors }),
+  HttpApiEndpoint.get('rules', '/api/factories/:name/rules', { params: factoryParams, success: FactoryRules, error: objectErrors }),
+  HttpApiEndpoint.put('putRules', '/api/factories/:name/rules', {
+    params: factoryParams,
+    payload: FactoryRulesWrite,
+    success: FactoryRules,
+    error: objectErrors,
+  }),
+  HttpApiEndpoint.delete('deleteRules', '/api/factories/:name/rules', {
+    params: factoryParams,
+    success: FactoryRules,
+    error: objectErrors,
+  }),
+  HttpApiEndpoint.get('instruction', '/api/factories/:name/instruction', {
+    params: factoryParams,
+    success: FactoryInstruction,
+    error: objectErrors,
+  }),
+  HttpApiEndpoint.put('putInstruction', '/api/factories/:name/instruction', {
+    params: factoryParams,
+    payload: FactoryInstructionWrite,
+    success: FactoryInstruction,
+    error: objectErrors,
+  }),
+  HttpApiEndpoint.delete('deleteInstruction', '/api/factories/:name/instruction', {
+    params: factoryParams,
+    success: FactoryInstruction,
+    error: objectErrors,
+  }),
+  HttpApiEndpoint.put('putInstructionWords', '/api/factories/:name/instruction/words', {
+    params: factoryParams,
+    payload: FactoryInstructionWords,
+    success: FactoryInstruction,
+    error: objectErrors,
+  }),
+  HttpApiEndpoint.delete('deleteInstructionWords', '/api/factories/:name/instruction/words', {
+    params: factoryParams,
+    success: FactoryInstruction,
+    error: objectErrors,
+  }),
+  HttpApiEndpoint.get('commands', '/api/factories/:name/commands', {
+    params: factoryParams,
+    success: FactoryCommandsObject,
+    error: objectErrors,
+  }),
+) {}
+
+/** A factory's MCP servers, in its namespace, and their sign-in. */
+export class McpServersGroup extends HttpApiGroup.make('mcpservers').add(
+  HttpApiEndpoint.get('list', '/api/namespaces/:namespace/mcpservers', {
+    params: namespaceParams,
+    query: listQuery,
+    success: McpServerListObject,
+    error: objectErrors,
+  }),
+  HttpApiEndpoint.get('get', '/api/namespaces/:namespace/mcpservers/:name', {
+    params: cardParams,
+    success: McpServerObject,
+    error: objectErrors,
+  }),
+  HttpApiEndpoint.put('put', '/api/namespaces/:namespace/mcpservers/:name', {
+    params: cardParams,
+    payload: McpServerWrite,
+    success: McpServerObject,
+    error: objectErrors,
+  }),
+  HttpApiEndpoint.delete('delete', '/api/namespaces/:namespace/mcpservers/:name', {
+    params: cardParams,
+    success: McpServerObject,
+    error: objectErrors,
+  }),
+  HttpApiEndpoint.post('signIn', '/api/namespaces/:namespace/mcpservers/:name/sign-in', {
+    params: cardParams,
+    success: SignInStarted,
+    error: objectErrors,
+  }),
+  HttpApiEndpoint.get('signInState', '/api/namespaces/:namespace/mcpservers/:name/sign-in', {
+    params: cardParams,
+    success: SignInState,
+    error: objectErrors,
+  }),
+  HttpApiEndpoint.delete('signOut', '/api/namespaces/:namespace/mcpservers/:name/sign-in', {
+    params: cardParams,
+    success: SignedOut,
+    error: objectErrors,
+  }),
+) {}
+
+/** The MCP servers Nemia offers a factory: a page whose items carry their spec alone, in no namespace. */
+export class BuiltinGroup extends HttpApiGroup.make('builtin').add(
+  HttpApiEndpoint.get('mcpservers', '/api/builtin/mcpservers', { success: McpServerListObject, error: objectErrors }),
+) {}
+
+/** A factory's schedules, in its namespace, each named by its workflow. */
+export class SchedulesGroup extends HttpApiGroup.make('schedules').add(
+  HttpApiEndpoint.get('list', '/api/namespaces/:namespace/schedules', {
+    params: namespaceParams,
+    query: listQuery,
+    success: ScheduleListObject,
+    error: objectErrors,
+  }),
+  HttpApiEndpoint.get('get', '/api/namespaces/:namespace/schedules/:name', {
+    params: cardParams,
+    success: ScheduleObject,
+    error: objectErrors,
+  }),
+  HttpApiEndpoint.put('put', '/api/namespaces/:namespace/schedules/:name', {
+    params: cardParams,
+    payload: ScheduleWrite,
+    success: ScheduleObject,
+    error: objectErrors,
+  }),
+  HttpApiEndpoint.delete('delete', '/api/namespaces/:namespace/schedules/:name', {
+    params: cardParams,
+    success: ScheduleObject,
+    error: objectErrors,
+  }),
+) {}
+
+/** A factory's hires, in its namespace, one per step it offers, each named `<workflow>.<step>`. */
+export class HiresGroup extends HttpApiGroup.make('hires').add(
+  HttpApiEndpoint.get('list', '/api/namespaces/:namespace/hires', {
+    params: namespaceParams,
+    query: listQuery,
+    success: HireListObject,
+    error: objectErrors,
+  }),
+  HttpApiEndpoint.get('get', '/api/namespaces/:namespace/hires/:name', { params: cardParams, success: HireObject, error: objectErrors }),
+  HttpApiEndpoint.put('put', '/api/namespaces/:namespace/hires/:name', {
+    params: cardParams,
+    payload: HireWrite,
+    success: HireObject,
+    error: objectErrors,
+  }),
+  HttpApiEndpoint.delete('delete', '/api/namespaces/:namespace/hires/:name', {
+    params: cardParams,
+    success: HireObject,
+    error: objectErrors,
+  }),
+) {}
+
+/** A factory's volumes, in its namespace, by their stored names: read alone over the api. */
+export class VolumesGroup extends HttpApiGroup.make('volumes').add(
+  HttpApiEndpoint.get('list', '/api/namespaces/:namespace/volumes', {
+    params: namespaceParams,
+    query: listQuery,
+    success: VolumeListObject,
+    error: objectErrors,
+  }),
+  HttpApiEndpoint.get('get', '/api/namespaces/:namespace/volumes/:name', {
+    params: cardParams,
+    success: VolumeObject,
+    error: objectErrors,
+  }),
+) {}
+
 /** Everything the api serves as objects. */
-export const Api = HttpApi.make('nemia').add(RunsGroup).add(CardsGroup);
+export const Api = HttpApi.make('nemia')
+  .add(RunsGroup)
+  .add(CardsGroup)
+  .add(FactoriesGroup)
+  .add(McpServersGroup)
+  .add(BuiltinGroup)
+  .add(SchedulesGroup)
+  .add(HiresGroup)
+  .add(VolumesGroup);

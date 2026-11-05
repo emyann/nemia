@@ -21,7 +21,8 @@ import { DEFAULT_FACTORY, noFactoryLine } from '../factory/factory.ts';
 import { readFactories } from '../factory/factory.store.ts';
 import { Invalid, Missing } from '../refusal/refusal.ts';
 import { factoryServers, factoryServersFile } from './servers.store.ts';
-import { factoryServerRefusal, serverNameRefusal, type FactoryServers } from './servers.ts';
+import { HEADER_MASK } from 'objects';
+import { factoryServerRefusal, headerWritten, maskedHeaders, serverNameRefusal, type FactoryServers } from './servers.ts';
 
 /** The text under `key`, as the spec read it. */
 const textOf = (args: Args, key: string): string => (typeof args[key] === 'string' ? args[key] : '');
@@ -62,12 +63,15 @@ export const statesOf = Effect.fn('statesOf')(function* (record: FactoryServers)
   return { by: new Map(read.servers.map((s) => [s.name, s])), unread: null };
 });
 
-/** One recorded server with the state read of it: `state: null` where none was, never a word invented for it. */
-const listedOf = (name: string, server: FactoryServers[string], state: McpServerState | undefined): ServerListed => ({
+/**
+ * One recorded server with the state read of it: `state: null` where none was, never a word invented for it; its headers masked
+ * (`maskedHeaders`), so a read carries no header's value out of the store.
+ */
+export const listedOf = (name: string, server: FactoryServers[string], state: McpServerState | undefined): ServerListed => ({
   name,
   type: server.type,
   url: server.url,
-  ...(server.headers === undefined ? {} : { headers: server.headers }),
+  ...(server.headers === undefined ? {} : { headers: maskedHeaders(server.headers) }),
   ...(server.oauth === undefined ? {} : { oauth: server.oauth }),
   state: state?.status ?? null,
   ...(state?.tools === undefined ? {} : { tools: state.tools }),
@@ -108,7 +112,7 @@ export const FACTORY_SERVERS: Command<ServersListing> = {
   },
   writes: false,
   class: 'read',
-  route: { method: 'GET', path: '/api/factories/:factory/servers', status: 200 },
+  only: { side: 'cli', why: "the api serves it as the McpServer's `list` of `objects`' Api, calling this handler" },
   handler: (args, _env, home) => serversListed(textOf(args, 'factory'), rootGiven(home, 'factory servers')),
   print: ({ factory, servers, unread }) =>
     servers.length === 0
@@ -222,7 +226,34 @@ export function factoryThere(name: string, verb: string): void {
   }
 }
 
-/** What an add answers: the file written, the server as it was recorded, and the one it replaced, or null. */
+/**
+ * `server`'s headers as a write keeps them against `stored`, the server of its name the record holds (`headerWritten`): each sent with a
+ * value of its own as sent, each sent as the mask a read served as the value stored. Refused (`Invalid`) for a mask sent for a header the
+ * record holds no value of, naming it and asking for its value: nothing is written.
+ */
+function headersKept(server: FactoryServers[string], stored: FactoryServers[string] | undefined): FactoryServers[string] {
+  if (server.headers === undefined) return server;
+  const headers: Record<string, string> = {};
+  for (const [header, sent] of Object.entries(server.headers)) {
+    const written = headerWritten(sent, stored?.headers?.[header] ?? null);
+    if ('refused' in written)
+      throw new Invalid({
+        message: `the header ${header} is sent as ${HEADER_MASK}, the mask a read serves, and the server records no value of it to keep: give its value, --header ${header}=<value>. Nothing was recorded.`,
+      });
+    headers[header] = written.value;
+  }
+  return { ...server, headers };
+}
+
+/** `server` as an answer gives it: its headers masked, as a read serves them. */
+const masked = (server: FactoryServers[string]): FactoryServers[string] =>
+  server.headers === undefined ? server : { ...server, headers: maskedHeaders(server.headers) };
+
+/** `server` masked (`masked`), or null for none. */
+const maskedOrNull = (server: FactoryServers[string] | undefined): FactoryServers[string] | null =>
+  server === undefined ? null : masked(server);
+
+/** What an add answers: the file written, the server as it was recorded, and the one it replaced, or null, each with its headers masked. */
 type Added = { file: string; name: string; server: FactoryServers[string]; replaced: FactoryServers[string] | null };
 
 /**
@@ -237,7 +268,7 @@ export const FACTORY_SERVER_ADD: Command<Added> = {
   check: addCheck,
   writes: true,
   class: 'ask',
-  route: { method: 'PUT', path: '/api/factories/:factory/servers/:server', status: 200 },
+  only: { side: 'cli', why: "the api serves it as the McpServer's `put` of `objects`' Api, calling this handler" },
   handler: (args, _env, home) =>
     rooted(
       home,
@@ -262,8 +293,9 @@ export const FACTORY_SERVER_ADD: Command<Added> = {
         if (refused) return yield* Effect.fail(new Invalid({ message: `${refused} Nothing was recorded.` }));
         const door = yield* FactoryDoor;
         const record = yield* door.servers.read(FactoryName.read(factory));
-        yield* door.servers.write(FactoryName.read(factory), { ...record, [name]: server });
-        return { file: factoryServersFile(store, factory), name, server, replaced: record[name] ?? null };
+        const kept = yield* tried(() => headersKept(server, record[name]));
+        yield* door.servers.write(FactoryName.read(factory), { ...record, [name]: kept });
+        return { file: factoryServersFile(store, factory), name, server: masked(kept), replaced: maskedOrNull(record[name]) };
       }),
     ),
   print: ({ file, name, server, replaced }, args) => [
@@ -294,7 +326,7 @@ export const FACTORY_SERVER_RM: Command<{ file: string; removed: string }> = {
   },
   writes: true,
   class: 'ask',
-  route: { method: 'DELETE', path: '/api/factories/:factory/servers/:server', status: 200 },
+  only: { side: 'cli', why: "the api serves it as the McpServer's `delete` of `objects`' Api, calling this handler" },
   handler: (args, _env, home) =>
     rooted(
       home,

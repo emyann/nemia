@@ -191,7 +191,6 @@ export {
   factoryLines,
   factoryNameRefusal,
   factoryRepo,
-  factoryVolumes,
   writersOf,
   fillsOf,
   hireRefusal,
@@ -322,7 +321,7 @@ export type {
 export { feedCursorRefusal, feedFile, feedSize, freshFeedMemo, readFeed, readFeedEnds, watchFeed } from './feed/feed.store.ts';
 export { cursorFileStart, cutCursorFile, keepCursor } from './watch/cursor.store.ts';
 export { emitFeed, FEED_FOLLOW_BEATS, FEED_FOLLOW_READS, FEED_FOLLOWERS, FeedHub, feedHubLayer, followFeed } from './feed/feed.verb.ts';
-export { followStep } from './following/following.verb.ts';
+export { followStep, followTask } from './following/following.verb.ts';
 export type { StepMoment } from './following/following.ts';
 export type { Followed } from './feed/feed.verb.ts';
 export { lockfileParts, provisionDeps } from './workspace/worktree.store.ts';
@@ -393,8 +392,6 @@ export {
   startFactory,
   templatedTree,
 } from './factory/factory.store.ts';
-export type { ScheduleListed } from './schedule/schedule.ts';
-export type { PlaceTrust, Untrusted } from './trust/trust.ts';
 export { EngineService, HARNESSES, asked, engine, engineOf, remoteAgents, runWith } from './runtime-client.ts';
 export { HARNESS_CHOICES } from 'agent-runtime/vocabulary';
 export { A2A_AGENTS_FILE, envNameOf } from './harness/a2a.store.ts';
@@ -467,14 +464,17 @@ export { runObject, type RunObjectAnswer, type TryCloseout } from './object/run.
 export { runLines, type RunLines, type StepCommands } from './object/lines.verb.ts';
 export { cardList, cardObject, type CardQuery } from './object/card.verb.ts';
 export { continueToken, continuedAfter, listPage, pageOf, type PageAsked, type Paged } from './object/page.ts';
+export { factoryCommandsOf, factoryList, factoryObject, type ObjectQuery } from './factory-object/factory.verb.ts';
+export { builtinServerList, mcpServerList, mcpServerObject } from './factory-object/mcp-server.verb.ts';
+export { scheduleList, scheduleObject } from './factory-object/schedule.verb.ts';
+export { hireList, hireObject } from './factory-object/hire.verb.ts';
+export { volumeList, volumeObject } from './factory-object/volume.verb.ts';
 export { folderRefusal, START } from './start/commands.verb.ts';
 export { INBOX, INBOX_ADD, INBOX_QUEUE } from './inbox/commands.verb.ts';
-export { FACTORY } from './factory/factory.verb.ts';
 export { FACTORY_INSTRUCT, FACTORY_INSTRUCTION, factoryInstruction } from './factory/instruction.verb.ts';
 export { FACTORY_RULES, factoryRules } from './rules/rules.verb.ts';
 /** A factory's own MCP servers: the entry that lists its record with each server's state, and the name rule the board shares. */
 export { FACTORY_SERVERS } from './servers/servers.verb.ts';
-export type { ServerListed, ServersListing } from './servers/servers.verb.ts';
 export { serverNameRefusal } from './servers/index.ts';
 export type { BuiltinServer } from './servers/index.ts';
 export { BUILTIN_SERVERS, builtinServers } from './servers/servers.store.ts';
@@ -545,8 +545,8 @@ export { driftWords, kindsDrift, revisionNow, REVISION_KINDS, stepsDrift } from 
 export type { Drift, KindName, Pin, Revision, RevisionKind } from './revisions/revisions.ts';
 export { ledgerOf } from './revisions/revisions.store.ts';
 export { driftNow } from './revisions/pin.verb.ts';
-export { chatAnswer, chatHistory, chatRead, chatSay, chatSince, chatStop } from './chat/chat.verb.ts';
-export type { ChatChanges, ChatHistory, ChatPlace, ChatReads } from './chat/chat.verb.ts';
+export { chatAnswer, chatHistory, chatRead, chatSay, chatStop, FILES_CHECK_MS, followChat, RECORD_BEAT_MS } from './chat/chat.verb.ts';
+export type { ChatChanges, ChatFollow, ChatFollowed, ChatHistory, ChatPlace, ChatReads, ChatSent } from './chat/chat.verb.ts';
 export type { Ask, AskAnswer, AskEvent, AskOption, AskPick, AskQuestion, CallState, ChatEvent, ChatFrom, Presence } from './chat/chat.ts';
 export { nemiaChatPlace } from './nemia/level.store.ts';
 

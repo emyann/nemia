@@ -1,8 +1,8 @@
 import path from 'node:path';
 import type { Locator, Page } from 'playwright';
-import { photograph, themeOf } from '../board.ts';
+import { factoriesAnswered, photograph, themeOf } from '../board.ts';
 import { expectCount, expectTexts, expectVisible, idle, Refused, settled } from '../checks.ts';
-import type { Ceilings, Daemon, Factory, FinishedPage, RunSummary } from '../../../src/lib/api.ts';
+import type { Ceilings, Daemon, FinishedPage, RunSummary } from '../../../src/lib/api.ts';
 import { tokensBreakdown } from '../../../src/lib/breakdown.ts';
 import { daemonDot } from '../../../src/lib/footer.ts';
 import { dollars, readoutOf, type Strip, stripOf } from '../../../src/lib/strip.ts';
@@ -45,7 +45,7 @@ const stickerOf = (strip: Locator, label: string): Locator =>
 async function expected(page: Page, factory?: string) {
   const [runs, factories, ceilings] = await Promise.all([
     answer<RunSummary[]>(page, '/api/runs'),
-    answer<Factory[]>(page, '/api/factories'),
+    factoriesAnswered(page),
     answer<Ceilings>(page, '/api/ceilings'),
   ]);
   const { now, dayStart } = await page.evaluate(() => {

@@ -1,10 +1,17 @@
 /**
- * The steps followed live in this process (`Followings`): one upstream `followStep` a run and step, shared by every follower of it, and
- * the message it is writing held in memory, so a follower who joins late is handed the text so far before what comes next.
+ * The sessions followed live in this process (`Followings`): one upstream a step (`followStep`) or a task (`followTask`), shared by
+ * every follower of it, and the message it is writing held in memory, so a follower who joins late is handed the text so far before what
+ * comes next. A step's conversation and Nemia's chat both follow through it.
  */
 import { Cause, Context, Deferred, Effect, FiberMap, Layer, Metric, PubSub, Stream } from 'effect';
-import { EngineService, followStep, type StepMoment } from 'agent-orchestrator';
+import { EngineService, followStep, followTask, type StepMoment } from 'agent-orchestrator';
 import type { Engine } from '../store.ts';
+
+/** What is followed: the step `step` of the run `runId`, or the task `taskId` itself. */
+export type Followed = { kind: 'step'; runId: string; step: string } | { kind: 'task'; taskId: string };
+
+/** The upstream of what `target` names. */
+const upstreamOf = (target: Followed) => (target.kind === 'step' ? followStep(target.runId, target.step) : followTask(target.taskId));
 
 /** One moment a follower is handed: the step's (`StepMoment`), or `ended` when the upstream stopped short of `settled`, and why. */
 export type Relayed = StepMoment<TranscriptEvent> | { kind: 'ended'; error: string };
@@ -32,9 +39,12 @@ type Entry = {
   last?: Relayed;
 };
 
-/** The upstreams opened, a step followed by nobody yet each (`followStep`): counted as they open, never as followers join one. */
+/**
+ * The upstreams opened, a step or a task followed by nobody yet each (`followStep`, `followTask`): counted as they open, never as
+ * followers join one. Its name is the dashboards' (`tools/observe`), kept from when only steps were followed.
+ */
 export const STEP_FOLLOWS = Metric.counter('api.step.follows', {
-  description: 'the upstream followings of a step opened',
+  description: 'the upstream followings of a step or a task opened',
   incremental: true,
 });
 
@@ -71,12 +81,12 @@ const joinedHead = (yes: boolean, caught: Relayed | undefined, queued: Numbered[
 ];
 
 /**
- * The registry of the steps followed by an app (`follow`), one for its runtime (`live`), its upstreams forked in the runtime's scope and
- * interrupted with it.
+ * The registry of the sessions followed by an app (`follow`), one for its runtime (`live`), its upstreams forked in the runtime's scope
+ * and interrupted with it.
  *
- * `follow(e, runId, step, caught)` follows the step `step` of the run `runId` over the engine `e`, on the upstream already open for it,
- * else on one it opens (`STEP_FOLLOWS`) once subscribed. It subscribes before it reads anything, so nothing published after is lost, and
- * an upstream that ended before is handed by its last moment; it waits for the
+ * `follow(e, target, caught)` follows what `target` names — a run's step, or a task — over the engine `e`, on the upstream already open
+ * for it, else on one it opens (`STEP_FOLLOWS`) once subscribed. It subscribes before it reads anything, so nothing published after is
+ * lost, and an upstream that ended before is handed by its last moment; it waits for the
  * upstream's first moment; then, a harness that streams, runs `caught` — the conversation since the follower's own read — and hands
  * the moments `joinedHead` says, then each as it is published. It ends after `settled`, `streamed: false`, or `ended` with the words of
  * an upstream that failed. A follower leaving lets the upstream go once it was the last (`refs`).
@@ -84,19 +94,14 @@ const joinedHead = (yes: boolean, caught: Relayed | undefined, queued: Numbered[
 export class Followings extends Context.Service<
   Followings,
   {
-    readonly follow: (
-      e: Engine['Service'],
-      runId: string,
-      step: string,
-      caught: Effect.Effect<Relayed | undefined>,
-    ) => Stream.Stream<Relayed>;
+    readonly follow: (e: Engine['Service'], target: Followed, caught: Effect.Effect<Relayed | undefined>) => Stream.Stream<Relayed>;
   }
 >()('api/Followings') {
   static readonly live: Layer.Layer<Followings> = Layer.effect(Followings)(
     Effect.gen(function* () {
       const upstreams = yield* FiberMap.make<string>();
       const entries = new Map<string, Entry>();
-      const opened = (e: Engine['Service'], runId: string, step: string, key: string) =>
+      const opened = (e: Engine['Service'], target: Followed, key: string) =>
         Effect.gen(function* () {
           const entry: Entry = {
             hub: yield* PubSub.unbounded<Numbered>(),
@@ -114,7 +119,7 @@ export class Followings extends Context.Service<
               PubSub.publishUnsafe(entry.hub, { seq: entry.seq, m });
             }).pipe(Effect.andThen(m.kind === 'streamed' ? Deferred.succeed(entry.opened, m.yes) : Effect.void));
           const ended = (error: string) => publish({ kind: 'ended', error }).pipe(Effect.andThen(Deferred.succeed(entry.opened, error)));
-          const upstream = followStep(runId, step).pipe(
+          const upstream = upstreamOf(target).pipe(
             Stream.runForEach(publish),
             Effect.catchCause((cause) => ended(wordsOf(Cause.squash(cause)))),
             Effect.provideService(EngineService, e),
@@ -129,12 +134,12 @@ export class Followings extends Context.Service<
           entries.delete(key);
           return FiberMap.remove(upstreams, key);
         });
-      const follow = (e: Engine['Service'], runId: string, step: string, caught: Effect.Effect<Relayed | undefined>) =>
+      const follow = (e: Engine['Service'], target: Followed, caught: Effect.Effect<Relayed | undefined>) =>
         Stream.unwrap(
           Effect.gen(function* () {
-            const key = JSON.stringify([runId, step]);
+            const key = JSON.stringify(target.kind === 'step' ? [target.kind, target.runId, target.step] : [target.kind, target.taskId]);
             const known = entries.get(key);
-            const { entry, start } = known ? { entry: known, start: Effect.void } : yield* opened(e, runId, step, key);
+            const { entry, start } = known ? { entry: known, start: Effect.void } : yield* opened(e, target, key);
             entry.refs += 1;
             yield* Effect.addFinalizer(() => left(key, entry));
             const sub = yield* PubSub.subscribe(entry.hub);

@@ -110,6 +110,35 @@ export const FACTORY_WALKS: Readonly<Record<string, readonly Walk[]>> = {
       walk: ({ door }) => act(door.factories.rewrite(aFactory('acme'))),
       says: { refused: 'Missing' },
     },
+    {
+      name: 'filed at generation 1, a hire counts one change more, a schedule none, and a generation sent is not taken',
+      walk: ({ door }) => {
+        filed(door, 'acme', { workflows: ['build'] });
+        const generation = () => done(door.factories.read(nameOf('acme'))).generation;
+        const filedAt = generation();
+        done(door.factories.rewrite(aFactory('acme', { workflows: ['build'], hires: { 'build/review': 'reviewer' } })));
+        const hired = generation();
+        const schedule = { cron: '0 9 * * 1', brief: 'weekly', since };
+        done(
+          door.factories.rewrite(
+            aFactory('acme', { workflows: ['build'], hires: { 'build/review': 'reviewer' }, schedules: { build: schedule } }),
+          ),
+        );
+        const scheduled = generation();
+        done(
+          door.factories.rewrite(
+            aFactory('acme', {
+              workflows: ['build'],
+              hires: { 'build/review': 'reviewer' },
+              schedules: { build: schedule },
+              generation: 9,
+            }),
+          ),
+        );
+        return { filedAt, hired, scheduled, sent: generation() };
+      },
+      says: { filedAt: 1, hired: 2, scheduled: 2, sent: 2 },
+    },
   ],
   'factories.remove': [
     {
@@ -138,6 +167,17 @@ export const FACTORY_WALKS: Readonly<Record<string, readonly Walk[]>> = {
         return { written, after: done(door.level.read(nameOf('acme'))) ?? 'none' };
       },
       says: { written: { level: 'auto', since }, after: 'none' },
+    },
+    {
+      name: "a level that changes counts one change more of the factory's generation; written again the same, it counts none",
+      walk: ({ door }) => {
+        filed(door, 'acme');
+        done(door.level.write(nameOf('acme'), { level: 'auto', since }));
+        const changed = done(door.factories.read(nameOf('acme'))).generation;
+        done(door.level.write(nameOf('acme'), { level: 'auto', since: '2026-11-02T00:00:00.000Z' }));
+        return { changed, same: done(door.factories.read(nameOf('acme'))).generation };
+      },
+      says: { changed: 2, same: 2 },
     },
     {
       name: 'REFUSED: a name that is no slug is Invalid',

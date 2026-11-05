@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Locator, Page, Request } from 'playwright';
+import { HEADER_MASK, type McpServerList } from 'objects';
 import { photograph, themeOf } from '../board.ts';
 import { expectCount, expectVisible, idle, Refused, settled, WAIT_MS } from '../checks.ts';
 import { FACTORIES } from '../seed.ts';
@@ -51,7 +52,7 @@ const recorded = (file: string): Record<string, { url?: string; headers?: Record
 
 /** Whether `request` is a read of the factory's servers, which is what reads their states. */
 const isStatesRead = (request: Request): boolean =>
-  request.method() === 'GET' && new URL(request.url()).pathname === `/api/factories/${FACTORY}/servers`;
+  request.method() === 'GET' && new URL(request.url()).pathname === `/api/namespaces/${FACTORY}/mcpservers`;
 
 /**
  * The api's own answer to a states read, as a map by name, around `act` — the page's load, or a press of Check again — and the network
@@ -75,16 +76,16 @@ async function statesRead(page: Page, what: string, act: () => Promise<unknown>)
   const answer = await reads[0].response();
   if (!answer) throw new Refused(`${what} reads the states — the read got no answer`);
   if (answer.status() !== 200) throw new Refused(`${what} reads the states — the api answered ${answer.status()}: ${await answer.text()}`);
-  const body = (await answer.json()) as { servers?: Array<{ name?: string; state?: string | null }> };
+  const body = (await answer.json()) as McpServerList;
   const states: States = new Map();
-  for (const s of body.servers ?? []) if (typeof s.name === 'string') states.set(s.name, s.state ?? null);
+  for (const s of body.items) states.set(s.metadata.name, s.status?.state ?? null);
   return states;
 }
 
 /** The answer to the next `method` on a server's own route under the factory. */
 const answered = (page: Page, method: 'PUT' | 'DELETE') =>
   page.waitForResponse(
-    (r) => r.request().method() === method && new URL(r.url()).pathname.startsWith(`/api/factories/${FACTORY}/servers/`),
+    (r) => r.request().method() === method && new URL(r.url()).pathname.startsWith(`/api/namespaces/${FACTORY}/mcpservers/`),
     { timeout: WAIT_MS },
   );
 
@@ -104,7 +105,11 @@ async function expectRows(section: Locator, states: States): Promise<void> {
   await expectCount(section.locator('[data-factory-server]'), 2, 'each server of the record is a row, once');
   const row = section.locator('[data-factory-server="github"]');
   await expectVisible(row.getByText(RECORDED.github.url, { exact: false }), "a row shows the server's address");
-  await expectVisible(row.locator('[data-server-headers]', { hasText: 'X-MCP-Toolsets' }), 'and the headers it is reached with');
+  await expectVisible(
+    row.locator('[data-server-headers]', { hasText: `X-MCP-Toolsets: ${HEADER_MASK}` }),
+    'and the headers it is reached with, each value masked',
+  );
+  await expectCount(row.getByText(RECORDED.github.headers['X-MCP-Toolsets'], { exact: false }), 0, "a header's value is never shown");
   await expectVisible(row.locator('[data-server-oauth]', { hasText: 'Iv23li-e2e' }), 'and the client it signs in as');
   for (const name of ['github', 'docs']) {
     const state = states.get(name);
@@ -179,6 +184,21 @@ async function recordAndRemove(page: Page, section: Locator, file: string): Prom
 }
 
 /**
+ * A recorded server loaded back into the form carries each header as the mask it was read with, and Record sends it back unchanged:
+ * the store's record keeps the value it held, never the mask.
+ */
+async function keepsTheMask(page: Page, section: Locator, file: string): Promise<void> {
+  await section.locator('[data-server-recorded]').getByRole('button', { name: 'github', exact: true }).click();
+  const header = await section.getByRole('textbox', { name: 'Headers' }).inputValue();
+  if (header !== `X-MCP-Toolsets=${HEADER_MASK}`)
+    throw new Refused(`the form holds the header as the mask — it holds ${JSON.stringify(header)}`);
+  await wrote(page, section, 'Record', 'PUT');
+  const held = recorded(file).github?.headers?.['X-MCP-Toolsets'];
+  if (held !== RECORDED.github.headers['X-MCP-Toolsets'])
+    throw new Refused(`the mask sent back keeps the value recorded — the record holds ${JSON.stringify(held)}`);
+}
+
+/**
  * The harness's own folder in the store (`CLAUDE_CONFIG_DIR`) as it stands, and a call that puts it back. Reading a state starts a
  * short-lived harness session, which writes its own files there — its config, a backup of it, its credentials, its cache of the servers
  * that need a sign-in — none of them the page's subject and none of them the store's seed: the page takes them back itself rather than
@@ -210,12 +230,13 @@ export default {
    * addresses, so which word comes back is the network's and the harness's, and what the page is about is that the board carries it.
    * The section says the servers are handed to the steps whose agent names one, before the checkout's `.mcp.json`, and that the state
    * is read on load and on a press alone, which Check again then does. The form records a remote server, which lands in the store's
-   * record and in the list, and Remove takes it off again. The record is taken back whatever happens.
+   * record and in the list, and Remove takes it off again; a header's value is shown as the mask, and a recorded server loaded back
+   * into the form and recorded again keeps the value the record holds. The record is taken back whatever happens.
    *
-   * What the api refuses of a record — an `Authorization` header, a local server — is proven in its own tests
-   * (`apps/api/src/servers/servers.test.ts`, each answered 422 by name) and not driven through the board, since the e2e's watch counts
-   * every 4xx against a page and a `PageSpec` has no way to expect one (`checks.ts`, `visit.ts`): the rule `350-lift.ts` states. What
-   * a refusal looks like drawn is the `ServerForm` stories' business, as the chips' colours are `ServerState`'s.
+   * What the api refuses of a record — an `Authorization` header, a local server — is proven in its own tests of the McpServer's
+   * write, each answered 422 by name, and not driven through the board, since the e2e's watch counts every 4xx against a page and a
+   * `PageSpec` has no way to expect one (`checks.ts`, `visit.ts`): the rule `350-lift.ts` states. What a refusal
+   * looks like drawn is the `ServerForm` stories' business, as the chips' colours are `ServerState`'s.
    */
   name: 'factory-servers',
   route: `/factories/${FACTORY}/settings`,
@@ -242,6 +263,7 @@ export default {
       await settled(page);
       await photograph(page, path.join(OUT, `factory-servers-listed-${await themeOf(page)}.png`), { fullPage: true });
       await recordAndRemove(page, section, file);
+      await keepsTheMask(page, section, file);
     } finally {
       fs.rmSync(folder, { recursive: true, force: true });
       harnessWas();

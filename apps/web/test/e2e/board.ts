@@ -3,6 +3,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { Locator, Page } from 'playwright';
 import { expectCount, expectTexts, expectVisible, idle, Refused, settled, WAIT_MS, watch } from './checks.ts';
+import type { FactoryCommands, FactoryList, ScheduleList } from 'objects';
+import { factoryViewOf, type Factory } from '../../src/lib/api/factories.ts';
 import { instantWhole, instantWords } from '../../src/lib/instant.ts';
 import { attachedFiles, attachedRun, DIAMOND } from './seed.ts';
 import { measure } from './contrast.ts';
@@ -506,6 +508,26 @@ export async function answered<T>(page: Page, pathname: string): Promise<T> {
 }
 
 /**
+ * The factories as the board's pages draw them, read apart from the page: the api's `FactoryList`, each factory's lines and, but for the
+ * default factory, its schedules, made the board's view as the board makes it (`factoryViewOf`).
+ */
+export async function factoriesAnswered(page: Page): Promise<Factory[]> {
+  const listed = await answered<FactoryList>(page, '/api/factories');
+  return Promise.all(
+    listed.items.map(async (factory) => {
+      const name = encodeURIComponent(factory.metadata.name);
+      const [commands, scheduled] = await Promise.all([
+        answered<FactoryCommands>(page, `/api/factories/${name}/commands`),
+        factory.metadata.name === 'default'
+          ? Promise.resolve({ items: [] })
+          : answered<ScheduleList>(page, `/api/namespaces/${name}/schedules`),
+      ]);
+      return factoryViewOf(factory, commands, scheduled.items);
+    }),
+  );
+}
+
+/**
  * Photographs the whole page as `<name>-<what>-<theme>.png` in the window it is in, then 390 wide as `<name>-<what>-phone-<theme>.png`,
  * and puts the window back. Takes none unless the page is pictured (`photograph`); the window is narrowed and put back all the same.
  */
@@ -693,7 +715,8 @@ export function herChat(what: HerChat): () => void {
 /**
  * Her chat made unreadable where it stands: a line the chat's record does not decode, written on the person's outbox, which every read
  * of her chat refuses (`decoded` in the orchestrator's `chat/chat.store.ts`) while it is there. The api's chat stream then says
- * `unreadable` with `retrying` on its next beat (`CHAT_BEAT_MS`) and goes on reading, which is what her panel draws as a quiet band.
+ * `unreadable` with `retrying` on its next look at her chat's files (`Beats.chatFiles` in apps/api) and goes on reading, which is
+ * what her panel draws as a quiet band.
  *
  * Answers what puts it back — the file as it was, or gone where there was none — so the read works on the beat after and the band goes.
  * Called between `herChat` and its take-back, whose removal of her folder would take the file too.

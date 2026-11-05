@@ -13,6 +13,9 @@ import {
   ATTEMPT_ENDS,
   CHECK_RESULTS,
   ENGINE_OUTCOMES,
+  FACTORY_CONDITION_REASONS,
+  FACTORY_CONDITION_STATUSES,
+  FACTORY_CONDITION_TYPES,
   PLACE_KINDS,
   RETRY_MODES,
   REVISION_KINDS,
@@ -34,6 +37,7 @@ import type { EngineOutcome, TaskSpan } from '../timeline/index.ts';
 import type * as Revisions from '../revisions/revisions.ts';
 import type { AttemptEnd } from '../views/views-words.ts';
 import type { SaidAfterKind } from '../say/say.ts';
+import type * as Factories from '../factory/factory.ts';
 
 export {
   Run,
@@ -84,4 +88,7 @@ export const wordsHeld = {
   engineOutcomes: true satisfies Same<Words<typeof ENGINE_OUTCOMES>, EngineOutcome>,
   attemptEnds: true satisfies Same<Words<typeof ATTEMPT_ENDS>, AttemptEnd>,
   saidAfter: true satisfies Same<Words<typeof SAID_AFTER>, SaidAfterKind>,
+  factoryConditionTypes: true satisfies Same<typeof FACTORY_CONDITION_TYPES, typeof Factories.FACTORY_CONDITION_TYPES>,
+  factoryConditionReasons: true satisfies Same<typeof FACTORY_CONDITION_REASONS, typeof Factories.FACTORY_CONDITION_REASONS>,
+  factoryConditionStatuses: true satisfies Same<typeof FACTORY_CONDITION_STATUSES, typeof Factories.FACTORY_CONDITION_STATUSES>,
 } as const;

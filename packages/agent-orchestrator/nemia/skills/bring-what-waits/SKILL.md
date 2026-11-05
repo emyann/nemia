@@ -39,6 +39,8 @@ Bring it, a short part each:
 - **Proof**: what was checked and what the check said — a command and its exit code. Say plainly what was only claimed.
 - **Risks**: what could go wrong, and what was left open or skipped.
 - **Cost**: what the run has spent, against its budget and the person's line.
+- **Why it is yours to bring**, in a factory at auto: in a line, why no rule of theirs let it through, read with `nemia policy reach
+  nemia --run <run>`: that none can ever approve it, and why, or what did not hold now. Never a reason of your own.
 - **Recommendation**: one, with its reason in a sentence:
   - let it hand on: `nemia approve <run> <step> --message "<their words>"`; where its closeout asks questions, with their answer to
     each, numbered as `nemia decide <run>` prints them: `nemia approve <run> <step> --answer 1=a --answer "2=b: <words>"`;

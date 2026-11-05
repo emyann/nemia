@@ -8,15 +8,13 @@
  * The list holds every card, each started card in its run's phase; the cards in play are those the api says are (`status.inPlay`), and
  * `--all` keeps every card. `-l <selector>` is sent as `labelSelector`, given again for another; a queued card's place is the one the api
  * answers (`status.place`), among every card queued, whatever the selector kept; the repository a card's factory picks for it is
- * read off `GET /api/factories` where a line says it. `--show-labels` and `-L <key>` are read here; any other words after `inbox` go to
- * the old path: `inbox add`, `inbox rm` and the rest are commands of their own there.
+ * read off the FactoryList (`GET /api/factories`) where a line says it. `--show-labels` and `-L <key>` are read here; any other words
+ * after `inbox` go to the old path: `inbox add`, `inbox rm` and the rest are commands of their own there.
  */
 import path from 'node:path';
-import { type Card, type CardState, DEFAULT_NAMESPACE } from 'objects';
-import type { FactoryAnswer } from '../../../api/src/client/client.ts';
-import { get } from '../client.ts';
+import { type Card, type CardState, DEFAULT_NAMESPACE, type FactoryList } from 'objects';
 import { spawned } from '../local.ts';
-import { asked } from '../objects.ts';
+import { asked, factoriesListed } from '../objects.ts';
 import { storeRoot } from '../where.ts';
 import { labelSegments, labelsAsked, type LabelMap, type LabelsAsked } from './labels.ts';
 
@@ -141,9 +139,13 @@ export const inboxPrinted = (
         ? [`no card of the inbox matches -l ${asked.selector.join(' -l ')} — see them all with nemia inbox --show-labels`]
         : [`the inbox is empty — park an idea with nemia inbox add "<idea>"`];
 
-/** The repository each factory picks for a card that names none: its one repository, for a factory with exactly one. */
-const reposOf = (factories: readonly Pick<FactoryAnswer, 'name' | 'repos'>[]): Map<string, string> =>
-  new Map(factories.flatMap(({ name, repos }) => (repos.length === 1 && repos[0] !== undefined ? [[name, repos[0]]] : [])));
+/** The repository each factory of `factories` picks for a card that names none: its one repository, for a factory with exactly one. */
+export const reposOf = (factories: FactoryList): Map<string, string> =>
+  new Map(
+    factories.items.flatMap(({ metadata: { name }, spec: { repos } }) =>
+      repos.length === 1 && repos[0] !== undefined ? [[name, repos[0]]] : [],
+    ),
+  );
 
 export async function inbox(args: readonly string[]): Promise<number> {
   const all = args.includes('--all');
@@ -155,7 +157,7 @@ export async function inbox(args: readonly string[]): Promise<number> {
   const selected = byFile((await listed(selector)).items);
   const shown = all ? selected : selected.filter((card) => card.status.inPlay);
   const picks = shown.some((c) => c.status.lastStart !== undefined && c.spec.repo === undefined && factoryOf(c) !== null);
-  const repos = picks ? reposOf(await get<FactoryAnswer[]>('inbox', '/api/factories')) : new Map<string, string>();
+  const repos = picks ? reposOf(await factoriesListed('inbox')) : new Map<string, string>();
   const rows = shown.map((card) => rowOf(card, repos));
   for (const line of inboxPrinted(rows, process.env, read.asked, selected.length - shown.length)) process.stdout.write(`${line}\n`);
   return 0;

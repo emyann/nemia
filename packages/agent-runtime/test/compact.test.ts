@@ -12,7 +12,7 @@ import { compactRuns } from '../src/harness/detached/compact.ts';
 import type { HarnessSpec } from '../src/harness/detached/detached.ts';
 import { claudeStreamKept, claudeStreamOutput } from '../src/harness/detached/output.ts';
 import { keptSaid, replaceCapture } from '../src/harness/detached/said.ts';
-import { CONVERSATION_STREAM, stream } from './reader-streams.ts';
+import { CONVERSATION_STREAM, resultLine, stream } from './reader-streams.ts';
 import { scratch } from './scratch.ts';
 import { story } from './checkpoints.ts';
 
@@ -176,4 +176,67 @@ test('a capture that changes while compact reads it is left whole, and named', (
     fs.readdirSync(dir).filter((f) => f.endsWith('.tmp')),
     [],
   );
+});
+
+/** An `init` line as the SDK prints one each turn: every tool and command listed beside what a reader reads. */
+const initOf = (version: string) =>
+  JSON.stringify({
+    ...JSON.parse(stream.init),
+    cwd: '/w',
+    claude_code_version: version,
+    tools: Array.from({ length: 40 }, (_, i) => `Tool${i}`),
+    slash_commands: Array.from({ length: 60 }, (_, i) => `command-${i}`),
+    mcp_servers: [{ name: 'a', status: 'connected' }],
+  });
+
+/** What a kept `init` line says: the fields a reader reads, and no other. */
+const keptInit = (version: string) =>
+  JSON.stringify({ type: 'system', subtype: 'init', cwd: '/w', model: JSON.parse(stream.init).model, claude_code_version: version });
+
+test('claudeStreamKept keeps no line twice, and each line it keeps as its reader reads it', async (t) => {
+  const turns = (n: number, version: string) =>
+    Array.from({ length: n }, () => [initOf(version), stream.calls([`toolu_${n}`, 'Read', { file_path: '/w/a.ts' }])]).flat();
+  const rows: [string, string, (kept: string) => void][] = [
+    [
+      'sixteen turns each printing the same init keep one, cut to what a reader reads',
+      turns(16, '2.1.315').join('\n'),
+      (kept) =>
+        assert.deepEqual(
+          kept.split('\n').filter((l) => l.includes('"init"')),
+          [keptInit('2.1.315')],
+        ),
+    ],
+    [
+      'a later init naming another version of Claude Code is kept, and one naming it again is not',
+      [...turns(2, '2.1.315'), ...turns(2, '2.1.316'), initOf('2.1.316')].join('\n'),
+      (kept) =>
+        assert.deepEqual(
+          kept.split('\n').filter((l) => l.includes('"init"')),
+          [keptInit('2.1.315'), keptInit('2.1.316')],
+        ),
+    ],
+    [
+      'a result keeps only the fields its reader reads: its text, its session and its turns go',
+      [initOf('2.1.315'), resultLine({ structured_output: { outcome: 'done' }, total_cost_usd: 0.3, result: 'All done.' })].join('\n'),
+      (kept) =>
+        assert.deepEqual(JSON.parse(kept.split('\n')[1]), {
+          type: 'result',
+          subtype: 'success',
+          structured_output: { outcome: 'done' },
+          total_cost_usd: 0.3,
+        }),
+    ],
+  ];
+  for (const [name, whole, says] of rows)
+    await t.test(name, () => {
+      const kept = claudeStreamKept(whole);
+      says(kept);
+      assert.equal(claudeStreamKept(kept), kept, 'kept again, the same');
+      assert.deepEqual(claudeStreamOutput(kept), claudeStreamOutput(whole), 'it reads as the whole');
+    });
+  await t.test('the conversation kept twice is kept the same, and reads as the whole', () => {
+    const kept = claudeStreamKept(CONVERSATION_STREAM);
+    assert.equal(claudeStreamKept(kept), kept);
+    assert.deepEqual(claudeStreamOutput(kept), claudeStreamOutput(CONVERSATION_STREAM));
+  });
 });

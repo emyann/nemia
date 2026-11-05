@@ -16,7 +16,8 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { Effect } from 'effect';
+import { Effect, Stream } from 'effect';
+import { bell, until } from 'agent-runtime/testing';
 import { scratch } from './scratch.ts';
 import { staged, story } from './story.ts';
 import { names } from './assessed.ts';
@@ -24,7 +25,9 @@ import type { EnginePhase } from '../src/views/views-words.ts';
 
 process.env.WF_ROOT = scratch('wf-nemia-chat-');
 process.env.WF_VERIFY_REST = '1';
-const { chatAnswer, chatHistory, chatRead, chatSay, chatSince, chatStop } = await import('../src/chat/chat.verb.ts');
+const { chatAnswer, chatHistory, chatRead, chatSay, chatStop, followChat } = await import('../src/chat/chat.verb.ts');
+type ChatFollowed = import('../src/chat/chat.verb.ts').ChatFollowed;
+type ChatSent = import('../src/chat/chat.verb.ts').ChatSent;
 const {
   appendAnswer,
   appendAsk,
@@ -60,6 +63,18 @@ const filed = async (name: string, phase?: EnginePhase) => {
 const saidTo = (id: string) => stage.board().said.filter((one) => one.taskId === id);
 /** Each answer written into a call of the task `id`, in order. */
 const answeredIn = (id: string) => stage.board().answered.filter((one) => one.taskId === id);
+
+/** What a reader at `after` lists of the chat at `place` before it follows anything: `followChat`'s first answer. */
+const since = (place: { task: string | undefined; dir: string }, after: string | undefined) =>
+  followChat(
+    () => place,
+    after,
+    {},
+    () => Stream.empty,
+  ).pipe(Effect.map((f) => f.first));
+
+/** The runtime's transcript cursor after `count` events, as the stand-in's reader gives it. */
+const cursorAfter = (count: number) => `${count}.${'0'.repeat(16)}`;
 
 /** One event of her transcript, her words. */
 const event = (id: string, words: string) => ({
@@ -244,7 +259,7 @@ test('Her chat read: a history across two attempts, a stream since its cursor, t
     assert.deepEqual([texts(older.events), older.before], [['One.', 'Two.'], null]);
   });
   await s.test('REFUSED: a read from a cursor no read gave', async () => {
-    await assert.rejects(run(chatSince(place, '9.0.0.0.0')), (err: Error) => {
+    await assert.rejects(run(since(place, '9.0.0.0.0')), (err: Error) => {
       names(err.message, '9.0.0.0.0 is not a cursor a chat read gave');
       return true;
     });
@@ -258,18 +273,80 @@ test('Her chat read: a history across two attempts, a stream since its cursor, t
   });
   await s.test("a read after the history's cursor gives only what came since, and the person's words once delivered", async () => {
     ({ cursor } = await run(chatHistory(place)));
-    assert.deepEqual((await run(chatSince(place, cursor))).events, []);
+    assert.deepEqual((await run(since(place, cursor))).events, []);
     const sent = await run(chatSay(place, 'Hi'));
-    const pending = await run(chatSince(place, cursor));
+    const pending = await run(since(place, cursor));
     assert.deepEqual(
       pending.events.map((x) => [x.id, x.kind === 'message' && x.delivered]),
       [[`p:${sent.id}`, null]],
     );
     stage.board().plantTranscript(place.task, 2, [event('c', 'Three.'), event('d', 'Four.')]);
-    const later = await run(chatSince(place, pending.cursor));
+    const later = await run(since(place, pending.cursor));
     assert.deepEqual(texts(later.events), ['Four.']);
-    assert.equal((await run(chatSince(place, undefined))).events.length, 6);
+    assert.equal((await run(since(place, undefined))).events.length, 6);
   });
+  await s.test(
+    "followed: her session's moments, the person's words as written and, once the follow ends, the record read on a beat, each sent once",
+    async (t) => {
+      const followed = await twoAttempts('follow');
+      const { first, rest } = await run(
+        followChat(
+          () => followed,
+          undefined,
+          {},
+          (task, caught) => follows.next(task, caught),
+          { filesMs: 5, beatMs: 5 },
+        ),
+      );
+      assert.deepEqual(texts(first.events), ['One.', 'Two.', '—', 'Three.']);
+      let release = () => {};
+      const gate = new Promise<void>((resolve) => (release = resolve));
+      const follows = {
+        count: 0,
+        next(task: string, caught: Effect.Effect<ChatFollowed | undefined>): Stream.Stream<ChatFollowed> {
+          this.count += 1;
+          assert.equal(task, followed.task, 'her task is the one followed');
+          const opened = Stream.concat(
+            Stream.make<[ChatFollowed]>({ kind: 'streamed', yes: true }),
+            Stream.fromEffect(caught).pipe(Stream.filter((m): m is ChatFollowed => m !== undefined)),
+          );
+          if (this.count > 1) return Stream.concat(opened, Stream.never);
+          return opened.pipe(
+            Stream.concat(Stream.make<[ChatFollowed]>({ kind: 'events', events: [event('d', 'Four.')], cursor: cursorAfter(2) })),
+            Stream.concat(Stream.fromEffect(Effect.promise(() => gate)).pipe(Stream.drain)),
+            Stream.concat(Stream.make<[ChatFollowed]>({ kind: 'ended', error: 'the upstream went away' })),
+          );
+        },
+      };
+      const got: ChatSent[] = [];
+      const rung = bell();
+      const said = () => got.flatMap((x) => (x.kind === 'changes' ? texts(x.changes.events) : []));
+      const done = run(
+        Stream.runForEach(rest.pipe(Stream.takeUntil((x) => x.kind === 'changes' && texts(x.changes.events).includes('Five.'))), (x) =>
+          Effect.sync(() => (got.push(x), rung.ring())),
+        ),
+      );
+      stage.board().plantTranscript(followed.task, 2, [event('c', 'Three.'), event('d', 'Four.')]);
+      await until(
+        t,
+        () => said().includes('Four.'),
+        () => `her words pushed by the follow: ${said()}`,
+        { bell: rung },
+      );
+      await run(chatSay(followed, 'Hello'));
+      await until(
+        t,
+        () => said().includes('Hello'),
+        () => `the person's words, read off her outbox: ${said()}`,
+        { bell: rung },
+      );
+      stage.board().plantTranscript(followed.task, 2, [event('c', 'Three.'), event('d', 'Four.'), event('e', 'Five.')]);
+      release();
+      await done;
+      assert.deepEqual(said(), ['Four.', 'Hello', 'Five.'], 'each sent once, in the order it came');
+      assert.ok(follows.count >= 2, 'the follow is asked for again after it ended');
+    },
+  );
   await s.test('the read mark moves forward only, and unread follows it', async () => {
     const marked = await twoAttempts('mark');
     await run(chatRead(marked, 'm:2:c'));

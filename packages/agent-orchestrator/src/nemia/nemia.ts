@@ -27,10 +27,11 @@ export const NEMIA_FLOOR: Level = 'semi-auto';
 export const NEMIA_SUBSCRIPTION = 'nemia';
 
 /**
- * The selectors of the feed that wake her, two lines a person reads in her record: the lines that wait on a person, and a step's calls
- * denied. Hers, not the package's default, and said in the feed's one grammar (`watch/selector.ts`), over the keys the tick stamps.
+ * The selectors of the feed that wake her, three lines a person reads in her record: the lines that wait on a person, a step's calls
+ * denied, and a factory's level changed — by the board, the CLI or a raise's end — so she hears a raise as she hears a gate. Hers, not
+ * the package's default, and said in the feed's one grammar (`watch/selector.ts`), over the keys the tick stamps.
  */
-export const NEMIA_SELECTORS: readonly string[] = ['waits=person', 'reason=ToolDenied'];
+export const NEMIA_SELECTORS: readonly string[] = ['waits=person', 'reason=ToolDenied', 'reason=LevelChanged'];
 
 /**
  * The minutes a digest of the feed's routine lines waits for a wake: a day, so routine news reaches her mostly folded into a line that
@@ -107,32 +108,36 @@ export type Keeping = {
   answered?: boolean;
 };
 
-/** What the keeper reads of her subscription: the task it tells, and whether it carries her floor (`NEMIA_FLOOR`). */
-export type HerSubscription = { task: string; scoped: boolean };
+/**
+ * What the keeper reads of her subscription: the task it tells, whether it carries her floor (`NEMIA_FLOOR`), and whether it carries her
+ * selectors as they ship (`NEMIA_SELECTORS`, `selected`), false for one put before a selector was added.
+ */
+export type HerSubscription = { task: string; scoped: boolean; selected: boolean };
 
 /** Whether her task is open: filed, not settled, and no stop asked. */
 const isOpen = (task: HerTask | undefined): boolean => task !== undefined && !task.settled && !task.stopRequested;
 
 /**
  * Where she is (`NemiaState`), off the levels (`keeping`), her task's record (`task`, absent where none is filed under her id) and her
- * subscription (`subscribed`): kept only once it tells her task and carries her floor, so one put before the floor is put again. Pure.
+ * subscription (`subscribed`): kept only once it tells her task and carries her floor and her selectors, so one put before the floor, or
+ * before a selector of hers was added, is put again. Pure.
  */
 export function nemiaState(keeping: Keeping, task: HerTask | undefined, subscribed: HerSubscription | undefined): NemiaState {
   if (!keeping.above) return isOpen(task) || subscribed !== undefined ? 'leaving' : 'off';
   if (task === undefined) return keeping.trusted === false ? 'untrusted' : 'due';
   if (!isOpen(task)) return 'stopped';
-  return subscribed !== undefined && subscribed.task === keeping.task && subscribed.scoped ? 'kept' : 'filed';
+  return subscribed !== undefined && subscribed.task === keeping.task && subscribed.scoped && subscribed.selected ? 'kept' : 'filed';
 }
 
 /**
  * What the keeper owes on a beat, in order: at `due`, file; at `filed`, subscribe, dropping first a subscription left for another task or
- * without her floor; at `kept`, say the person's custom words to her where they are not those her task was filed with (`stale`), then
- * say the person's chat words where some are owed and her session is live (`owed`, `up`), write down the questions her live session
- * holds open and mark what became of a question it no longer holds (`record`, where her task's view says one waits, `asking`, or the
- * chat holds one whose mark does not say what became of its call, `closing`), and carry the person's answers where one is
- * owed (`answered`); at `leaving`, stop the open task and drop
- * the subscription; at `stopped`, drop a subscription left; else nothing, at `untrusted` too: a session filed in a folder her harness does
- * not trust would be refused at its start. A task settled from outside is never filed again: the person said so by stopping it. Pure.
+ * without her floor or her selectors; at `kept`, say the person's custom words to her where they are not those her task was filed with
+ * (`stale`), then say the person's chat words where some are owed and her session is live (`owed`, `up`), write down the questions her
+ * live session holds open and mark what became of a question it no longer holds (`record`, where her task's view says one waits,
+ * `asking`, or the chat holds one whose mark does not say what became of its call, `closing`), and carry the person's answers where one
+ * is owed (`answered`); at `leaving`, stop the open task and drop the subscription; at `stopped`, drop a subscription left; else
+ * nothing, at `untrusted` too: a session filed in a folder her harness does not trust would be refused at its start. A task settled
+ * from outside is never filed again: the person said so by stopping it. Pure.
  */
 export function nemiaDue(keeping: Keeping, task: HerTask | undefined, subscribed: HerSubscription | undefined): NemiaAct[] {
   const state = nemiaState(keeping, task, subscribed);

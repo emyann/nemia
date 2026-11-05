@@ -1,7 +1,8 @@
+import type { Factory } from '../../../src/lib/api/factories.ts';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Page } from 'playwright';
-import { photograph, themeOf } from '../board.ts';
+import { factoriesAnswered, photograph, themeOf } from '../board.ts';
 import { expectCount, expectVisible, idle, Refused, settled } from '../checks.ts';
 import { FACTORIES } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -11,13 +12,9 @@ import { OUT, store } from '../world.ts';
 const FACTORY = FACTORIES.hiring.name;
 const NONE = FACTORIES.bare;
 
-/** A factory's volumes and its line that adds one, as `GET /api/factories` answers them. */
-type Listed = { name: string; volumes: { path: string; readOnly: boolean; commands: { rm: string } }[]; commands: { volume: string } };
-
-/** `factory` as the api answers it. */
-async function listed(page: Page, factory: string): Promise<Listed> {
-  const answer = await page.request.get(new URL('/api/factories', page.url()).href);
-  const found = ((await answer.json()) as Listed[]).find((f) => f.name === factory);
+/** `factory` as the board draws it from the api's Factory and its lines (`factoriesAnswered`): its volumes and the line that adds one. */
+async function listed(page: Page, factory: string): Promise<Factory> {
+  const found = (await factoriesAnswered(page)).find((f) => f.name === factory);
   if (!found) throw new Refused(`GET /api/factories answers ${factory} — it answers no factory of that name`);
   return found;
 }

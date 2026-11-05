@@ -34,6 +34,7 @@ import {
   type ChatEvent,
   type ChatSources,
   type SourceEvent,
+  withEvents,
 } from './chat.ts';
 
 const at = (s: number) => new Date(Date.UTC(2026, 9, 15, 12, 0, s)).toISOString();
@@ -493,5 +494,29 @@ test('her asks: what an ask is and which board draws it, the answer its held cal
     assert.equal(askDue(true, true), 'mark', 'a call that took the answer is owed nothing, whatever else is open');
     assert.equal(askDue(false, true), 'mark');
     assert.match(askWords(askOf(RAW), { [question]: 'Cut it on read' }), /You asked: .+ They answered: Cut it on read/);
+  });
+});
+
+test('`withEvents`: a session folded from pieces that overlap projects as the session read whole', async (t) => {
+  const whole = twoSessions();
+  const [first, second] = whole.sessions;
+  const listed = (events: readonly SourceEvent[]): ChatSources => ({
+    ...whole,
+    sessions: [{ ...first, events }, ...(second ? [second] : [])],
+  });
+  const rows: [string, ChatSources, SourceEvent[][]][] = [
+    ['events in pieces, in order', listed([]), [first.events.slice(0, 2), first.events.slice(2, 4), first.events.slice(4)]],
+    ["a call's result after the call, which carries its id", listed(first.events.slice(0, 2)), [first.events.slice(2)]],
+    ['a read and a moment that hold the same events', listed(first.events.slice(0, 3)), [first.events.slice(1, 5), first.events.slice(3)]],
+  ];
+  for (const [name, start, pieces] of rows)
+    await t.test(name, () => {
+      const folded = pieces.reduce((s, piece, i) => withEvents(s, 1, piece, `c${i}`), start);
+      assert.deepEqual(projectChat(folded), projectChat(whole));
+      assert.deepEqual(changedSince(projectChat(start), projectChat(folded)), changedSince(projectChat(start), projectChat(whole)));
+      assert.equal(chatCursor(cursorOf(folded)), chatCursor(cursorOf(whole)));
+    });
+  await t.test('an attempt it holds no session of is left as it was', () => {
+    assert.equal(withEvents(whole, 9, [text('z', 1, 'Lost.')], 'c'), whole);
   });
 });

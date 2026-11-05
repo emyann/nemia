@@ -306,7 +306,7 @@ test('claudeStreamKept and the shipped readers over the corpus: what they read i
     assert.deepEqual(
       claudeStreamOutput(claudeStreamKept(lone)),
       { denials: [{ tool: 'Bash' }], skills: [], ranOn: MODEL },
-      'the keep keeps the `init` line whole, so the model the session really started on survives it',
+      'the keep keeps what the `init` line says to a reader, so the model the session really started on survives it',
     );
   });
   await t.test('a kept capture holds nothing of the conversation no reader reads; a capture that does is named', () => {
@@ -334,14 +334,22 @@ test('claudeStreamKept and the shipped readers over the corpus: what they read i
     const written = stream.calls(['toolu_w', 'Write', { file_path: '/w/a.ts', content: 'all of it' }]);
     assert.deepEqual(conversationIn(written), ["line 1: Write's content"]);
   });
-  await t.test('a kept capture says what its whole stream says, and keeps the init, the denial, the result and stderr as printed', () => {
-    const kept = claudeStreamKept(CONVERSATION_STREAM);
-    assert.deepEqual(claudeStreamOutput(kept), claudeStreamOutput(CONVERSATION_STREAM));
-    assert.deepEqual(claudeStreamOutput(kept).files, ['a.ts', 'b.ts']);
-    const whole = CONVERSATION_STREAM.split('\n');
-    for (const at of [0, 6, 10, 11, 12]) assert.ok(kept.split('\n').includes(whole[at]), `line ${at + 1} kept as printed`);
-    assert.ok(kept.length < CONVERSATION_STREAM.length, `${kept.length} of ${CONVERSATION_STREAM.length} characters`);
-  });
+  await t.test(
+    'a kept capture says what its whole stream says, keeps stderr as printed, and the init, the denial and the result as read',
+    () => {
+      const kept = claudeStreamKept(CONVERSATION_STREAM);
+      assert.deepEqual(claudeStreamOutput(kept), claudeStreamOutput(CONVERSATION_STREAM));
+      assert.deepEqual(claudeStreamOutput(kept).files, ['a.ts', 'b.ts']);
+      const whole = CONVERSATION_STREAM.split('\n');
+      for (const at of [10, 12]) assert.ok(kept.split('\n').includes(whole[at]), `line ${at + 1} kept as printed`);
+      const keys = (line: string | undefined) => Object.keys(JSON.parse(line ?? '{}'));
+      const lines = kept.split('\n');
+      assert.deepEqual(keys(lines.find((l) => l.includes('"init"'))), ['type', 'subtype', 'cwd', 'model']);
+      assert.deepEqual(keys(lines.find((l) => l.includes('"permission_denied"'))), ['type', 'subtype', 'tool_name', 'tool_use_id']);
+      assert.deepEqual(keys(lines.find((l) => l.includes('"result"'))), ['type', 'subtype', 'structured_output', 'total_cost_usd']);
+      assert.ok(kept.length < CONVERSATION_STREAM.length, `${kept.length} of ${CONVERSATION_STREAM.length} characters`);
+    },
+  );
 });
 
 /** A spec of `claude -p`'s stream that keeps its streams apart and keeps of an ended capture what `keep` keeps, its reads counted. */

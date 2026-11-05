@@ -277,7 +277,6 @@ test('REFUSED: a kept object that differs from one built afresh makes a verified
   await assert.rejects(listOf(memo), (err: Error) => err.message.includes(run.id) && err.message.includes('WF_VERIFY_REST'));
 });
 
-
 test('an object is kept only on the entry holding the judgement it was built on: one a newer judgement replaced meanwhile is given none', async () => {
   const { keepObject, keptObject } = await import('../rest/informer.verb.ts');
   const memo = informerMemo<object, string>();

@@ -102,8 +102,7 @@ export const stepsReadingOf = Effect.fnUntraced(function* (
  * on such a read is served once and never kept, since the run's inputs may not move until it reads.
  */
 export const readFailed = ({ checks, stderr }: StepsReading): boolean =>
-  [...stderr.values()].some((said) => typeof said === 'string') ||
-  [...checks.values()].some((check) => check.refused?.unreadable != null);
+  [...stderr.values()].some((said) => typeof said === 'string') || [...checks.values()].some((check) => check.refused?.unreadable != null);
 
 /**
  * The run read once (`RunReading`): its steps (`stepsReading`), then its timeline, off the feed's filing times read on from `filings`

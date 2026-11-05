@@ -108,7 +108,8 @@ export const runList = Effect.fn('runList')(function* (e: Engine, how: SummaryHo
         });
       return yield* Effect.forEach(page, (run) =>
         Effect.gen(function* () {
-          const one = judged.runs.get(run.id) ?? (yield* Effect.die(new Error(`Run ${run.id} was handed to its judgement and not judged.`)));
+          const one =
+            judged.runs.get(run.id) ?? (yield* Effect.die(new Error(`Run ${run.id} was handed to its judgement and not judged.`)));
           if ('unjudged' in one) return one;
           const kept = keptObject(memo, run.id, one.judgement);
           if (kept !== undefined) {

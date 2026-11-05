@@ -911,6 +911,28 @@ test('REFUSED: no ci context within the bound, and a ci still pending at its end
   assert.match(unfinished.err, PERSONS, 'CI still running at the bound judged nothing');
 });
 
+test("wait reads a GitHub read that fails as not yet read: once, then answering, passes; failing to the bound, it names the last error, a person's", () => {
+  const timedOut = 'spawnSync gh ETIMEDOUT';
+  const at = placed();
+  const others = passing(at.repo).filter((rule) => rule.when !== 'pr view' && rule.when !== 'pr list');
+  const head = gitIn(at.repo, 'rev-parse', 'HEAD').trim();
+  const once = (when: string, then: string): Rule => ({ when, outs: ['', then], err: timedOut, statuses: [1, 0] });
+  at.gh.answers([...others, once('pr list', listed(head)), once('pr view', GREEN)]);
+  const r = pr(at, 'wait', CI, { WF_CI_POLL_SECONDS: '0' });
+  assert.equal(r.code, 0, r.err);
+  assert.equal(asked(r.calls, 'pr', 'list').length, 2, 'the pull request was read again after the read that failed');
+  assert.equal(asked(r.calls, 'pr', 'view').length, 2, 'its checks were read again after the read that failed');
+  assert.match(r.out, /nemia ci: `ci` passed on/);
+
+  const down = placed();
+  down.gh.answers([...passing(down.repo).filter((rule) => rule.when !== 'pr view'), { when: 'pr view', err: timedOut, status: 1 }]);
+  const failing = pr(down, 'wait', CI, { WF_CI_WAIT_SECONDS: '0', WF_CI_POLL_SECONDS: '0' });
+  assert.equal(failing.code, 1, failing.out);
+  assert.ok(failing.err.includes(timedOut), failing.err);
+  assert.ok(failing.err.includes(RETRY), failing.err);
+  assert.match(failing.err, PERSONS, 'a GitHub that cannot be read judged nothing');
+});
+
 /** A job of the workflow run 1234 as the rollup gives it: its name, its job id, when it started and how it stands. */
 const job = (name: string, id: number, startedAt: string, rest: Record<string, unknown>) => ({
   name,

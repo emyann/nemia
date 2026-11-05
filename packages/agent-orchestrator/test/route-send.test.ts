@@ -26,14 +26,16 @@ const { artifactsDir, readRun, rewriteRun } = await import('../src/record/record
 const { resultSteps } = await import('../src/branches/branches.ts');
 const { stepsOf } = await import('../src/steps/steps.verb.ts');
 const { inboxAt } = await import('../src/cards/cards.store.ts');
+const { runStore } = await import('../src/record/files.store.ts');
+const { parseInboxCard } = await import('../src/inbox/inbox.ts');
 const { engineOf } = await import('../src/runtime-client.ts');
 const { main } = await import('../src/cli/main.ts');
 const stage = staged({ runWith, main, engineOf });
 
 const SCHEMA = JSON.stringify({
   type: 'object',
-  properties: { surface: { type: 'string', enum: ['web', 'docs'] } },
-  required: ['surface'],
+  properties: { surface: { type: 'string', enum: ['web', 'docs'] }, title: { type: ['string', 'null'] } },
+  required: ['surface', 'title'],
   additionalProperties: false,
 });
 
@@ -62,12 +64,33 @@ const pass = (id: string) => stage.runWith(stage.board().e, advanceRun(readRun(i
 /** The inbox's cards, by file. */
 const cards = (): string[] => (fs.existsSync(inboxAt(ROOT)) ? fs.readdirSync(inboxAt(ROOT)).filter((f) => f.endsWith('.md')) : []);
 
-/** A run whose plan has signed off on `surface`, which triage's table routes by. */
-const planned = async (surface: string) => {
+/**
+ * A run whose plan has signed off on `surface`, which triage's table routes by, and on the routed card's `title`, null when none is
+ * given; labelled with `labels` when given.
+ */
+const planned = async (surface: string, given: { title?: string; labels?: Record<string, string> } = {}) => {
   const run = await started();
+  if (given.labels) runStore.labels.put(run.id, given.labels);
   assert.deepEqual((await pass(run.id)).filed, ['plan']);
-  stage.board().settle(`${run.id}-plan`, 'succeeded', { outcome: 'done', summary: 'planned', artifacts: [], needs: null, surface });
+  stage.board().settle(`${run.id}-plan`, 'succeeded', {
+    outcome: 'done',
+    summary: 'planned',
+    artifacts: [],
+    needs: null,
+    surface,
+    title: given.title ?? null,
+  });
   return run.id;
+};
+
+/** The routed card of a run's `ship` node, read as the inbox reads a card. */
+const routedCard = (id: string) => {
+  const file = `${id}-ship-routed.md`;
+  return parseInboxCard(
+    file,
+    fs.readFileSync(path.join(inboxAt(ROOT), file), 'utf8'),
+    (at) => fs.statSync(at, { throwIfNoEntry: false })?.isDirectory() ?? false,
+  );
 };
 
 /** What `nemia ls <id>` words each step. */
@@ -149,6 +172,35 @@ test('nemia route: refused off the list and on a step that is no condition, acce
     assert.equal(readRun(id).steps.ship?.sent, undefined);
     assert.equal((await words(id)).ship, 'skipped (triage: docs)');
     assert.ok(!cards().includes(`${id}-ship-routed.md`));
+  });
+});
+
+test("a routed card takes its title from the producer's closeout, else the run's, and carries the run's labels", async (t) => {
+  const s = story(t);
+  const labels = { area: 'src', work: 'feature', initiative: 'routing' };
+
+  await s.test("a producer that signs off on a title names the card by it, the run's labels on it", async () => {
+    const id = await planned('web', { title: 'src: examples are found by running', labels });
+    await pass(id);
+    const card = routedCard(id);
+    assert.equal(card.body.split('\n')[0], 'src: examples are found by running');
+    assert.deepEqual(card.labels, labels);
+    assert.equal(card.workflow, 'deliver');
+    assert.deepEqual(card.from, [id]);
+  });
+
+  await s.test("a producer that signs off on no title leaves the run's title on the card, the run's labels on it", async () => {
+    const id = await planned('web', { labels });
+    await pass(id);
+    const card = routedCard(id);
+    assert.equal(card.body.split('\n')[0], 'add a flag');
+    assert.deepEqual(card.labels, labels);
+  });
+
+  await s.test('a run with no labels files a card with none', async () => {
+    const id = await planned('web');
+    await pass(id);
+    assert.equal(routedCard(id).labels, undefined);
   });
 });
 

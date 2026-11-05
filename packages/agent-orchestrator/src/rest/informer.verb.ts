@@ -173,7 +173,7 @@ const committed = <T, O>(e: Engine, memo: InformerMemo<T, O>, held: ReadonlyMap<
  * nothing. The feed is read through `e`, `verify` is `WF_VERIFY_REST` as the caller's environment gives it, the tips a kept value is
  * checked against are what `git` read, with no process, and `same` says whether a value from memory and one judged afresh agree.
  */
-export const informerRead = Effect.fn('informerRead')(function* <T, O>(
+export const informerRead = Effect.fn('informerRead')(function* <T, O = unknown>(
   e: Engine,
   memo: InformerMemo<T, O>,
   verify: boolean,

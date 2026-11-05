@@ -2,9 +2,9 @@
  * The runs as a list of objects (`RunList`, from `objects`), and one run read in its namespace. A run's namespace is its factory,
  * `default` for one that names none (`runNamespace`, run-list.ts). A list keeps the runs of its namespace (every run where none is
  * given), then those its label selectors take off the record's whole map (`selectedRuns`), sorts them by name and cuts its page
- * (`pageOf`) — all before any run is judged — and only then judges the runs of the page into their objects (`runList`), so a page of
- * `limit` costs at most `limit` judgements. A run a task of which does not read is no `Run`: it is left out of `items` and named in `unjudged`
- * with why, never dropped with no word.
+ * (`pageOf`) — all before any run is judged — and only then judges the runs of the page into their objects (`runList`), so a page
+ * of `limit` costs at most `limit` judgements. A run a task of which does not read is no `Run`: it is left out of `items` and named in
+ * `unjudged` with why, never dropped with no word.
  */
 import { isDeepStrictEqual } from 'node:util';
 import { Effect } from 'effect';
@@ -41,8 +41,8 @@ const byName = (a: Listed, b: Listed): number => (a.id < b.id ? -1 : a.id > b.id
 
 /**
  * A page of `runs` (`RunList`): those of `query.namespace` (every run where none is given) that its label selectors keep, sorted by
- * name, cut by its `limit` after its `continue`, then judged by `judge`, the page at once, an answer for each run in its order; one it cannot judge named in `unjudged`. `Invalid` for a
- * selector, a limit or a token that is not one, before any run is judged.
+ * name, cut by its `limit` after its `continue`, then judged by `judge`, the page at once, an answer for each run in its order; one it
+ * cannot judge named in `unjudged`. `Invalid` for a selector, a limit or a token that is not one, before any run is judged.
  */
 export const runListOf = Effect.fn('runListOf')(function* <R extends Listed, E, S>(
   runs: readonly R[],

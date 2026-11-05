@@ -111,7 +111,7 @@ const listOf = (memo: InformerMemo, wrap: <A, E, R>(p: Effect.Effect<A, E, R>) =
         {},
       ),
     ),
-  ) as Promise<RunList>;
+  );
 
 /** `f` with `WF_VERIFY_REST` off: what the informer alone answers. */
 async function unverified<T>(f: () => Promise<T>): Promise<T> {

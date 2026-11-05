@@ -1,0 +1,9 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "noUncheckedIndexedAccess": false,
+    "types": ["node"]
+  },
+  "include": ["**/*"],
+  "exclude": []
+}

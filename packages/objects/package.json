@@ -1,0 +1,19 @@
+{
+  "name": "objects",
+  "version": "1.0.0",
+  "private": true,
+  "description": "The objects Nemia serves: their shapes and the HttpApi that serves them.",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "test": "node --test --test-concurrency=2 --test-timeout=120000 'test/*.test.ts'",
+    "typecheck": "tsrs --noEmit && tsrs --noEmit -p test"
+  },
+  "dependencies": {
+    "effect": "4.0.6"
+  },
+  "exports": {
+    ".": "./src/index.ts",
+    "./package.json": "./package.json"
+  }
+}

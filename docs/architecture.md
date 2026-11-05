@@ -1,6 +1,6 @@
 # Architecture
 
-Two packages and three apps, in layers. Each layer owns one thing and is reached through a
+Three packages and three apps, in layers. Each layer owns one thing and is reached through a
 short list of entries, its public contract. Four rules keep it that way, and each is a test that fails the suite when
 broken. This page says what the tests hold; the tests are the rules.
 
@@ -10,17 +10,23 @@ broken. This page says what the tests hold; the tests are the rules.
 |---|---|---|
 | `packages/agent-runtime` | Agent sessions on a harness, durably: a job that runs to its end, and a long-lived session that runs until stopped (`restartPolicy: 'Always'`, attached, the runtime's README, *A long-lived session*). How a session runs: its command, mounts, restart and spend, the journal, the attempts, the harnesses' vocabulary. The `ae` command. | `agent-runtime` → `src/index.ts`, the runtime in Effect. `agent-runtime/testing` → `src/testing.ts`, the engine's stand-in and the wait a test makes on its event (`until`, `bell`, `WAITED`), for test files alone. `agent-runtime/vocabulary` → `src/vocabulary.ts`, the harnesses' words, what their fence words reach (`fenceReach`), the first character of a path a harness's permission rule cannot carry (`unruledIn`) and the folders a harness reads as its own configuration in a mounted folder (`configFolderIn`), pure. `decide` is exported by none. |
 | `packages/agent-orchestrator` | A folder of markdown as a workflow, and a run of its steps: which task to file next, what a person must decide, what the run's record says. The revisions of each kind a run resolves — a ledger of (number, hash, when) per kind and name under `revisions/<kind>/<name>.json`, and the numbers pinned on the run and on each filed step. Each run's judgement, held in memory by the daemon that judged it (the informer, *Who owns what*). The in-process `nemia` command (`bin/nemia.ts`, and `bin/wf.ts`, the alias), which the client spawns. | `agent-orchestrator` → `src/runner.ts`: the controllers, everything that reads or writes the disk, and the refusals by kind, `Missing`, `Conflict` and `Invalid`, re-exported by name. `agent-orchestrator/run` → `src/run.ts`: `assess` (`src/tick/assess.ts`), the words a run is described in, and the shell a check runs under (`checkArgv`, `CHECK_DEADLINE_SECONDS`), re-exported by name. `agent-orchestrator/workflow` → `src/workflow.ts`: the format, pure. `agent-orchestrator/testing` → `place/memory/index.ts`, the test place (`testPlace`), for test files alone. `agent-orchestrator/bin` → `bin/nemia.ts` and `agent-orchestrator/bin/wf` → `bin/wf.ts`, the CLI's entries, resolved and spawned by `apps/cli/src/local.ts` alone and imported by no file. |
+| `packages/objects` | The objects' shapes: what every kind Nemia serves is, as a `nemia/v1` object (`apiVersion`, `kind`, `metadata`, and its spec and status), the metadata every object carries and the envelope of a list of it (`src/meta.ts`), and the HttpApi definition that serves them. It imports `effect` alone (`packages/objects/CLAUDE.md`). | `objects` → `src/index.ts`, the Schemas and constants, re-exported by name. |
 | `apps/api` | The workflows behind HTTP, and the feed as a stream, read through the orchestrator's live reader (`followFeed`) on the hub its daemon publishes to. | Its routes. |
-| `apps/web` | The board people look at. It talks to the api over HTTP, decodes each answer it reads with a schema of its own (`effect`), imports none of our packages, names no store path, and builds no command of its own: a command or a store folder it shows is text the api answered (`STORE_PATHS` and `COMMAND_TEXT` in `apps/web/test/structure.test.ts`, both empty). | Its pages. |
-| `apps/cli` | `nemia` and `wf`, as a client of the api, beside the board: the moved reads (`show`, `closeout`, `ls`, the inbox's read and `watch`, `READ_VERBS` in `apps/cli/contracts/route.contract.ts`) asked of the api serving the store over HTTP, a daemon started on demand where none serves; every other verb, a help, and a read typed with `--local` run on the orchestrator's own CLI, spawned with the same words. It imports no package of ours, and from the api only its client door's types. | Its commands. |
+| `apps/web` | The board people look at. It talks to the api over HTTP, decodes each answer it reads with a schema of its own (`effect`), imports none of our packages but `objects`, names no store path, and builds no command of its own: a command or a store folder it shows is text the api answered (`STORE_PATHS` and `COMMAND_TEXT` in `apps/web/test/structure.test.ts`, both empty). | Its pages. |
+| `apps/cli` | `nemia` and `wf`, as a client of the api, beside the board: the moved reads (`show`, `closeout`, `ls`, the inbox's read and `watch`, `READ_VERBS` in `apps/cli/contracts/route.contract.ts`) asked of the api serving the store over HTTP, a daemon started on demand where none serves; every other verb, a help, and a read typed with `--local` run on the orchestrator's own CLI, spawned with the same words. It imports no package of ours but `objects`, and from the api only its client door's types. | Its commands. |
 
 `apps/docs`, the documentation site, sits beside the layers and is none of them: it imports no workspace package and depends on
 none (`apps/docs/test/structure.test.ts`), and reads the repository's text at build, by path from its root. Its pages draw each state
 machine from between its `diagram:<name>` markers in the package docs, never from a copy (`apps/docs/src/mermaid.ts`).
 
-The order is `web, cli → api → orchestrator → runtime`. Each layer reaches exactly the one below it, and nothing reaches up or skips one:
+The order is `web, cli → api → orchestrator → runtime`, with `objects` at the bottom beside the runtime. Each layer reaches exactly the
+one below it, and nothing reaches up or skips one; the objects are the one exception, the words every layer above the runtime shares:
+the web, the cli, the api and the orchestrator each import them through their one entry, `objects`, values included, and never a path
+into them, and the runtime never imports them (`packages/agent-orchestrator/test/imports.boundary.test.ts`, the orchestrator's and the
+runtime's `contract.test.ts`, the web's and the cli's `structure.test.ts`):
 
-- the web reaches the api over HTTP alone (`apps/web/test/structure.test.ts`, and the web's lint block);
+- the web reaches the api over HTTP alone, and the shapes of what it serves by `objects` (`apps/web/test/structure.test.ts`, and the
+  web's lint block);
 - the cli reaches the api over HTTP alone, the shapes of its answers by `import type` from `apps/api/src/client/client.ts`, the store's
   daemon by its lease (`daemon.json`'s `url`) in `src/where.ts`, and the in-process path by spawning `agent-orchestrator/bin` from
   `src/local.ts` (`apps/cli/test/structure.test.ts`, the cli's lint block, and the resolve in
@@ -493,7 +499,9 @@ reach packages/agent-orchestrator through `agent-orchestrator`, `agent-orchestra
 and `agent-orchestrator/workflow` alone; `apps/cli/src/local.ts`, and no other file, resolves `agent-orchestrator/bin` and
 `agent-orchestrator/bin/wf` to the file it spawns, and no file imports either (`binBreaches` in the orchestrator's `contract.test.ts`);
 a test file, and no file of a `src` or a `bin`, may also import `agent-orchestrator/testing`,
-the test place (`testingBreaches` in the orchestrator's `contract.test.ts`). `./workflow` is the pure format, and what reads a folder from disk, and the
+the test place (`testingBreaches` in the orchestrator's `contract.test.ts`). Code outside packages/objects reaches it through `objects`
+alone (`OBJECTS` in the orchestrator's `contract.test.ts`), and no file of the runtime's `src` or `bin` reaches it at all
+(`objectsBreaches` in the runtime's `contract.test.ts`). `./workflow` is the pure format, and what reads a folder from disk, and the
 refusals by kind, are exported from `agent-orchestrator`. XState is a dependency
 of the runtime alone: `src/core/lifecycle.ts` is the one file of any workspace that imports it, and neither entry exports it,
 the machine, or the readings `decide` moves by. `agent-runtime` exports the lifecycle's graph as plain data (`lifecycleGraph`: its states, edges and a person's verbs),
@@ -502,10 +510,11 @@ caller runs over the engine with `runWith`, and `ae` runs each verb of `Engine.l
 a function that answers a Promise (`packages/agent-runtime/test/plain-faces.test.ts`).
 
 Lint holds the layers' imports as they are typed: `.oxlintrc.json` sets `no-restricted-imports` in one block per layer, over its
-source. The web's imports no workspace package, no harness SDK and no path into `packages/`; the cli's (`apps/cli/src` and `apps/cli/bin`)
-imports none of them either, and from the api only `import type` (`allowTypeImports`), of its client door alone; the api's imports the orchestrator
-through its three entries alone, and no runtime or harness SDK; the orchestrator's imports no harness SDK; the runtime's imports no
-layer above it. A harness SDK (`@anthropic-ai/claude-agent-sdk`, `@a2a-js/sdk`) is the runtime's alone.
+source. The web's imports no workspace package but `objects`, no harness SDK and no path into `packages/`; the cli's (`apps/cli/src` and
+`apps/cli/bin`) imports none of them either but `objects`, and from the api only `import type` (`allowTypeImports`), of its client door
+alone; the api's imports the orchestrator through its three entries alone, and no runtime or harness SDK; the orchestrator's imports no
+harness SDK; the runtime's imports no layer above it, and not `objects`; and the objects' (`packages/objects/src`) imports `effect` and
+its own files alone. Each block above the runtime refuses a path into the objects (`objects/**`): they are reached by their entry. A harness SDK (`@anthropic-ai/claude-agent-sdk`, `@a2a-js/sdk`) is the runtime's alone.
 
 Tests: `packages/agent-runtime/test/contract.test.ts`, `packages/agent-orchestrator/test/contract.test.ts`,
 `packages/agent-runtime/test/xstate-boundary.test.ts`, and `packages/agent-orchestrator/test/imports.boundary.test.ts`, which runs oxlint

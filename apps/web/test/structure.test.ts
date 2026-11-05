@@ -1,6 +1,7 @@
 /**
  * The board's structure (`docs/architecture.md`, *Who owns what*): it reaches the api over HTTP alone. Its source imports no workspace
- * package and no node built-in, and no relative path that leaves `apps/web` (`importBreaks`); the lint block for `apps/web/src` in
+ * package but the objects' one entry, `objects`, the shapes of what the api serves, and no path into them; no node built-in, and no
+ * relative path that leaves `apps/web` (`importBreaks`); the lint block for `apps/web/src` in
  * `.oxlintrc.json` refuses the same packages as they are typed. Only `lib/useFeed.ts` and `lib/useStepTranscript.ts` open an
  * `EventSource`, the api's two streams (`eventSourceBreaks`), and only `components/Markdown.tsx` imports a markdown renderer
  * (`rendererBreaks`). Its reads go through `lib/api/read.ts` (`unschemedReads`, `read.test.ts`).
@@ -98,6 +99,9 @@ const leavesWeb = (file: string, mod: string): boolean =>
 const reachesTests = (file: string, mod: string): boolean =>
   mod.startsWith('.') && path.posix.normalize(path.posix.join(path.posix.dirname(file), mod)).startsWith('test/');
 
+/** The objects' package, the one workspace package the board imports, by its entry alone: spelled once, so no plant names a path of it. */
+const OBJECTS = 'objects';
+
 /**
  * Each import of the board's source that reaches past the api — a workspace package, a node built-in, a path out of `apps/web` — or
  * into the board's own tests, which the built board never holds.
@@ -108,6 +112,8 @@ function importBreaks(texts: ReadonlyMap<string, string>): string[] {
     for (const mod of importsIn(text)) {
       if (/^agent-(runtime|orchestrator)(\/|$)/.test(mod))
         out.push(`${file} imports ${mod}, a workspace package: the board reaches the api over HTTP alone`);
+      else if (mod.startsWith(`${OBJECTS}/`))
+        out.push(`${file} imports ${mod}, a path into ${OBJECTS}: import what it names from its entry, '${OBJECTS}'`);
       else if (mod.startsWith('node:') || builtinModules.includes(mod))
         out.push(`${file} imports ${mod}, a node built-in: the board runs in a browser, and asks the api for what node knows`);
       else if (leavesWeb(file, mod)) out.push(`${file} imports ${mod}, a path out of apps/web: the board reaches the api over HTTP alone`);
@@ -211,8 +217,15 @@ test('REFUSED: a workspace package, a node built-in, and a path out of apps/web'
   assert.deepEqual(planted('../../api/src/app.ts'), [
     'src/x.ts imports ../../api/src/app.ts, a path out of apps/web: the board reaches the api over HTTP alone',
   ]);
-  for (const mod of ['react', 'agent-orchestrator-ui', './lib/api.ts', '@/lib/api.ts', './test/fixtures.ts'])
+  for (const mod of ['react', 'agent-orchestrator-ui', './lib/api.ts', '@/lib/api.ts', './test/fixtures.ts', OBJECTS, `${OBJECTS}-ui`])
     assert.deepEqual(planted(mod), [], `${mod} is let through`);
+});
+
+test('REFUSED: a path into the objects; their entry is let through', () => {
+  const planted = (mod: string): string[] => importBreaks(new Map([['src/x.ts', `import { y } from '${mod}';\n`]]));
+  assert.equal(planted(`${OBJECTS}/src/run.ts`).length, 1, 'a file of its src');
+  assert.equal(planted(`${OBJECTS}/package.json`).length, 1, 'its manifest');
+  assert.deepEqual(planted(OBJECTS), [], 'its entry');
 });
 
 test("REFUSED: a file of the source that imports a test file, the page of the look's stories among them", () => {

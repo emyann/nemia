@@ -1,0 +1,50 @@
+{
+  "context": "objects",
+  "title": "The objects",
+  "about": "`packages/objects` holds the shapes of the objects Nemia serves and the HttpApi that serves them, read by every layer above the runtime: its words are what an object is and how a list of it is read.",
+  "paths": [
+    "packages/objects"
+  ],
+  "terms": [
+    {
+      "term": "Object",
+      "meaning": "one thing Nemia serves, of one kind: its `apiVersion`, nemia/v1 (`API_VERSION`), its `kind`, and its `metadata`, which names it and says which change of it a reader holds (`ObjectMeta`, `packages/objects/src/meta.ts`). A kind's spec and status sit beside them.",
+      "type": "ObjectMeta"
+    },
+    {
+      "term": "Kind",
+      "meaning": "the type of an object, a word with a capital (`Run`, `Card`), written in its `kind` field; a page of a list of it is the kind `<Kind>List` (`listOf`, `packages/objects/src/meta.ts`)."
+    },
+    {
+      "term": "Namespace",
+      "meaning": "the folder of names an object's `metadata.namespace` puts it in: a name is unique in its namespace for its kind, and an object nobody gave one is in `default` (`DEFAULT_NAMESPACE`, `packages/objects/src/meta.ts`)."
+    },
+    {
+      "term": "resourceVersion",
+      "meaning": "an opaque word in an object's metadata that changes on every write to it: a reader compares it and never orders it, and a writer hands back the one it read to say which change it acted on (`ObjectMeta`, `packages/objects/src/meta.ts`)."
+    },
+    {
+      "term": "generation",
+      "meaning": "the count of changes to an object's spec, for a kind whose spec a person edits; a change to its status alone leaves it (`ObjectMeta`, `packages/objects/src/meta.ts`)."
+    },
+    {
+      "term": "List",
+      "meaning": "a page of objects of one kind, `{ apiVersion, kind: <Kind>List, metadata, items }`, whose metadata says where the page stands (`ListMeta`, `listOf`, `packages/objects/src/meta.ts`).",
+      "type": "ListMeta"
+    },
+    {
+      "term": "continue",
+      "meaning": "the opaque word a page of a list hands back to ask for the next, absent on the last page; a reader sends it back as it is and never builds one (`ListMeta`, `packages/objects/src/meta.ts`)."
+    },
+    {
+      "term": "labelSelector",
+      "meaning": "the query key of a list that keeps the objects whose labels it matches (`team=core`), given again for another, of which each must match (`packages/objects/src/index.ts`, the door it is served through).",
+      "retired": [
+        {
+          "spelling": "selector",
+          "card": "Resource objects: every kind Nemia serves is a nemia/v1 object"
+        }
+      ]
+    }
+  ]
+}

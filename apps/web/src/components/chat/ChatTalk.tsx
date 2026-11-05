@@ -15,9 +15,12 @@ import { ChatProposal } from './ChatProposal';
 /** The person's answer to an ask of hers, filed whole. */
 type Answering = (id: string, picks: readonly AskPick[]) => void;
 
-/** An ask of hers, drawn as `drawnAsk` says: the proposal's actions, one question's form, or the flow of several. */
+/**
+ * An ask of hers, drawn as `drawnAsk` says: the proposal's actions, one question's form, or the flow of several. A permission is
+ * always the form, the one part that draws what the SDK said of the call.
+ */
 function Asked({ ask, onAnswer }: { ask: Ask; onAnswer: Answering }) {
-  const drawn = drawnAsk(ask.questions);
+  const drawn = ask.kind === 'permission' ? 'form' : drawnAsk(ask.questions);
   if (drawn === 'many') return <ChatAskMany ask={ask} onAnswer={onAnswer} />;
   if (drawn === 'actions') return <ChatProposal ask={ask} onAnswer={onAnswer} />;
   return <ChatAsk ask={ask} onAnswer={onAnswer} />;

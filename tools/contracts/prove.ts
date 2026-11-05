@@ -25,7 +25,7 @@ const projectOf = (file: string): Project => {
 
 /**
  * The names of the contracts the file at `file` (absolute) exports, in order: each exported const that tsverify reads as a contract,
- * which are the names its CLI's `contractsIn` answers for each file of this repository's roots.
+ * the same names tsverify's CLI reads in each file of this repository's roots.
  */
 export const contractsOf = (file: string): string[] => {
   const project = projectOf(file);

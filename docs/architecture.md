@@ -155,11 +155,11 @@ command's class (`nemiaFence`).
 file (`factories/<name>/level.json`, written by `nemia level --factory` alone), the store's level (`nemia/level.json`) under it and for
 the default factory, and a raise for a stretch that ends by itself, read as it passes with no write (`levelOf`).
 
-**The rules for auto** are the person's and the orchestrator's (`src/auto/`): an agent's proposal (`auto/<agent>.proposed.json`, written
+**The policies** are the person's and the orchestrator's (`src/auto/`, a folder named as the store's `auto/`): an agent's proposal (`auto/<agent>.proposed.json`, written
 by `nemia policy propose` alone) and the person's confirmed list (`auto/<agent>.json`, written by `nemia policy confirm` and `nemia policy
 drop` alone, classed `ask` and asked every time, `asksAlways`; a confirm carries the words the person read, refused once the rule
 reads otherwise), the builtin rule in force while none is confirmed
-(`DEFAULT_AUTO`). Whether a rule allows an answer is pure (`allowedBy` over `Facts`, `src/auto/auto.ts` and `facts.ts`); the facts are
+(`DEFAULT_POLICY`). Whether a rule allows an answer is pure (`allowedBy` over `Facts`, `src/auto/auto.ts` and `facts.ts`); the facts are
 read off the run by a controller (`seenOf`, `src/admission/seen.verb.ts`), and admission gives unasked what the list allows in a run at
 `auto` (`nemia admit --auto <agent>`), naming no agent of its own.
 

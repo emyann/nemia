@@ -66,7 +66,8 @@ export type RunMetadata = typeof RunMetadata.Type;
 /**
  * One step as the run froze it: what it waits on (`after`), whose declared output it is handed (`input`), and on a looping step the step
  * a round runs again and how many rounds it may run (`loop`, `rounds`; null on any other); then the rest of its frontmatter the board
- * shows, each null where the step does not set it: `fence` is the fence word the run froze for its session, said in this layer's word.
+ * shows, each null where the step does not set it: `fence` is the fence word the run froze for its session, said in this layer's word; and
+ * the agent it is given, by name, absent for a step given none.
  */
 export const RunSpecStep = Schema.Struct({
   name: Schema.String,
@@ -85,6 +86,7 @@ export const RunSpecStep = Schema.Struct({
   sandbox: NullString,
   tools: Schema.NullOr(Strings),
   deadlineSeconds: NullNumber,
+  agent: Schema.optionalKey(Schema.String),
 }).annotate({ identifier: 'RunSpecStep' });
 export type RunSpecStep = typeof RunSpecStep.Type;
 

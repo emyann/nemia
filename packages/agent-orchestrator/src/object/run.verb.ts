@@ -88,6 +88,7 @@ const specStepOf = (s: Workflow): RunSpec['steps'][number] => ({
   sandbox: s.sandbox ?? null,
   tools: s.tools ?? null,
   deadlineSeconds: s.deadlineSeconds ?? null,
+  ...(s.agent?.name !== undefined ? { agent: s.agent.name } : {}),
 });
 
 /**

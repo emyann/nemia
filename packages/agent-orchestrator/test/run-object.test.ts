@@ -116,6 +116,12 @@ test('runObject: the run as one object, its status the list’s judged fields, i
     assert.equal(run.metadata.namespace, run.metadata.labels.factory, `${id}: its namespace is its factory, default for none`);
     const row = rows.find((r) => r.id === id);
     assert.ok(row);
+    for (const step of row.steps)
+      assert.equal(
+        run.spec.steps.find((s) => s.name === step.name)?.agent ?? null,
+        step.agent,
+        `${id}: ${step.name}'s agent, as the row says it`,
+      );
     const keys = [
       'status',
       'phase',

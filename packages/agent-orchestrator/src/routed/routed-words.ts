@@ -6,9 +6,28 @@
 import type { Verdict } from '../check/check.ts';
 import type { Closeout } from '../closeout/index.ts';
 import { satisfiesAfter, tryOf, type CloseoutAsked, type Run, type StepStatus, type TaskPhase } from '../record/record.ts';
-import type { Workflow } from '../step/step.ts';
+import type { RouteEval, Workflow } from '../step/step.ts';
 import { approvalOf, hasGate, standing, type SpendOf } from '../status/status.ts';
 import { conditionOf, nodeFate, nodeKind, tableRoute } from '../route/index.ts';
+
+/**
+ * Whether a condition's route is settled for the run: a node after it has been filed, or sent its card. Until then a table's copy on the
+ * record yields to its producer's closeout, read afresh, so a producer tried again proposes its route anew.
+ */
+export const routeSettled = (condition: Workflow, run: Run, steps: readonly Workflow[]): boolean =>
+  steps.some((s) => s.after.includes(condition.name) && Boolean(run.steps[s.name]?.taskId || run.steps[s.name]?.sent));
+
+/** What a table answers off its producer's signed closeout, read afresh; undefined until the producer has signed off on its work. */
+function tableRead(
+  by: Extract<RouteEval, { kind: 'table' }>,
+  routes: readonly string[],
+  closeoutOf: (step: string) => Closeout | undefined,
+  wordOf: (step: string) => StepStatus,
+): { kind: 'route'; route: string } | { kind: 'unsigned' } | undefined {
+  const [producer = '', ...field] = by.from.split('.');
+  const said = satisfiesAfter(wordOf(producer)) ? closeoutOf(producer) : undefined;
+  return said ? tableRoute(by, routes, said.output?.[field.join('.')]) : undefined;
+}
 
 /**
  * The route a condition answered on the try it is on, and who said it — or `unsigned`, a table with no row for its producer's fact, or
@@ -24,18 +43,15 @@ export function answeredRoute(
   run: Run,
   closeoutOf: (step: string) => Closeout | undefined,
   wordOf: (step: string) => StepStatus,
+  steps: readonly Workflow[],
 ): { kind: 'route'; route: string } | { kind: 'unsigned' } | undefined {
   const routes = condition.routes ?? [];
   const kept = run.steps[condition.name]?.route;
-  if (kept && kept.try === tryOf(run, condition.name) && routes.includes(kept.route)) return { kind: 'route', route: kept.route };
+  const keeps = kept !== undefined && kept.try === tryOf(run, condition.name) && routes.includes(kept.route);
   const by = condition.route;
-  if (by?.kind === 'table') {
-    const [producer = '', ...field] = by.from.split('.');
-    if (!satisfiesAfter(wordOf(producer))) return undefined;
-    const said = closeoutOf(producer);
-    if (!said) return undefined;
-    return tableRoute(by, routes, said.output?.[field.join('.')]);
-  }
+  if (keeps && (kept.by !== 'table' || by?.kind !== 'table' || routeSettled(condition, run, steps)))
+    return { kind: 'route', route: kept.route };
+  if (by?.kind === 'table') return tableRead(by, routes, closeoutOf, wordOf) ?? (keeps ? { kind: 'route', route: kept.route } : undefined);
   if (by !== undefined && satisfiesAfter(wordOf(condition.name))) {
     const route = closeoutOf(condition.name)?.output?.route;
     return typeof route === 'string' && routes.includes(route) ? { kind: 'route', route } : undefined;
@@ -84,7 +100,7 @@ function routedWord(
   if (record?.taskId) return step.route?.kind === 'script' ? scriptWord(step, run, closeoutOf, wordOf) : undefined;
   if (offRoute(step, steps, run, closeoutOf, wordOf)) return 'skipped';
   if (step.route?.kind !== 'table' || wordOf(step.name) !== 'pending') return undefined;
-  const answer = answeredRoute(step, run, closeoutOf, wordOf);
+  const answer = answeredRoute(step, run, closeoutOf, wordOf, steps);
   if (answer === undefined) return undefined;
   if (answer.kind === 'unsigned') return 'unsigned';
   return hasGate(step, run) && !approvalOf(run, step.name) ? 'awaiting approval' : 'unverified';
@@ -101,7 +117,7 @@ function scriptWord(
   wordOf: (step: string) => StepStatus,
 ): StepStatus | undefined {
   if (wordOf(step.name) !== 'unverified') return undefined;
-  return answeredRoute(step, run, closeoutOf, wordOf)?.kind === 'route' ? undefined : 'unsigned';
+  return answeredRoute(step, run, closeoutOf, wordOf, [])?.kind === 'route' ? undefined : 'unsigned';
 }
 
 /** Every step's word on this pass: where it stands (`standing`), with its routing laid over it (`routedWords`). Pure. */
@@ -131,12 +147,12 @@ function offRoute(
 ): boolean {
   const parents = step.after.map(wordOf);
   const condition = conditionOf(step, steps);
-  const answered = condition ? answeredRoute(condition, run, closeoutOf, wordOf) : undefined;
+  const answered = condition ? answeredRoute(condition, run, closeoutOf, wordOf, steps) : undefined;
   if (nodeFate(step.when, answered?.kind === 'route' ? answered.route : undefined, parents) === 'skipped') return true;
   return step.after.some((name) => {
     const parent = steps.find((s) => s.name === name);
     if (parent?.ends === undefined) return false;
-    const said = answeredRoute(parent, run, closeoutOf, wordOf);
+    const said = answeredRoute(parent, run, closeoutOf, wordOf, steps);
     return said?.kind === 'route' && parent.ends.includes(said.route);
   });
 }

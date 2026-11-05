@@ -41,6 +41,7 @@ const refusedAtLoad = (steps: Workflow[]): void => {
 
 test('load refuses a workflow whose routes do not close', async (t) => {
   const rows: Array<[string, Workflow[]]> = [
+    ['a judge, which owes no route until it is built', changed('triage', (s) => ({ ...s, route: { kind: 'judge' } }))],
     ['a when: naming a route the condition does not declare', changed('build-web', (s) => ({ ...s, when: ['mobile'] }))],
     ['a when: on a node that waits on no condition', changed('notes', (s) => ({ ...s, when: ['web'] }))],
     [
@@ -134,7 +135,6 @@ test('load refuses a workflow whose routes do not close', async (t) => {
 test('load takes a workflow whose routes close', async (t) => {
   const rows: Array<[string, Workflow[]]> = [
     ['the triage workflow', TRIAGE()],
-    ['a budget: on a judge', changed('triage', (s) => ({ ...s, route: { kind: 'judge' }, budget: 2 }))],
     ['a node after a condition with no when:, on every route', changed('log', (s) => ({ ...s, after: ['triage'] }))],
     [
       'a loop on one route, its target saying when:',

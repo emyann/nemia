@@ -130,6 +130,22 @@ test("a person's route wins over the table's", () => {
   assert.equal(words['build-web'], 'skipped');
 });
 
+test("a table's copied route yields to its producer tried again, until a node after it is filed", () => {
+  const fresh = passOf({
+    filed: { plan: 'succeeded' },
+    surface: 'backend',
+    records: { triage: { route: { route: 'web', try: 1, by: 'table' } } },
+  });
+  assert.deepEqual(fresh.a.ready, ['build-backend', 'log']);
+  assert.equal(fresh.words['build-web'], 'skipped');
+  const settled = passOf({
+    filed: { plan: 'succeeded', 'build-web': 'running' },
+    surface: 'backend',
+    records: { triage: { route: { route: 'web', try: 1, by: 'table' } } },
+  });
+  assert.equal(settled.words['build-backend'], 'skipped');
+});
+
 test('a table with no row for what its producer said reads unsigned, and nothing after it runs', () => {
   const { a, words } = passOf({ filed: { plan: 'succeeded' }, surface: 'mobile' });
   assert.equal(words.triage, 'unsigned');

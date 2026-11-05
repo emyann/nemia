@@ -13,7 +13,7 @@ import { CHECK_DEADLINE_SECONDS, CHECK_NICENESS, checkEnvOf, type Verdict } from
 import { stepTaskId, tryOf, type CloseoutAsked, type Run, type TaskPhase } from '../record/record.ts';
 import type { Workflow } from '../step/step.ts';
 import { MOMENTUM, stepStatus, type SpendOf } from '../status/status.ts';
-import { answeredRoute } from '../routed/index.ts';
+import { answeredRoute, routeSettled } from '../routed/index.ts';
 import type { Closeout } from '../closeout/index.ts';
 import { artifactsDir } from '../record/record.store.ts';
 import { workflowFilesDir } from '../frozen/frozen.store.ts';
@@ -59,9 +59,9 @@ export function answerTables(f: Pick<ScriptFiling, 'run' | 'reads'>): string[] {
     const record = run.steps[step.name];
     if (step.route?.kind !== 'table' || !record || record.taskId) continue;
     const n = tryOf(run, step.name);
-    if (record.route?.try === n) continue;
-    const answer = answeredRoute(step, run, reads.signedOff, wordOf);
-    if (answer?.kind !== 'route') continue;
+    if (record.route?.try === n && (record.route.by !== 'table' || routeSettled(step, run, reads.steps))) continue;
+    const answer = answeredRoute(step, run, reads.signedOff, wordOf, reads.steps);
+    if (answer?.kind !== 'route' || (record.route?.try === n && record.route.route === answer.route)) continue;
     run.steps[step.name] = { ...record, route: { route: answer.route, try: n, by: 'table' } };
     written.push(step.name);
   }

@@ -57,7 +57,7 @@ export function routedRows(input: RoutedInput): Map<string, RoutedRow> {
   const words = runWords(steps, run, settledOf(input.phaseOf), closeoutOf, input.askedCloseout, input.spendOf, input.verdictOf);
   const wordOf = (name: string): StepStatus => words.get(name) ?? 'pending';
   const routeOf = (condition: Workflow): string | undefined => {
-    const said = answeredRoute(condition, run, closeoutOf, wordOf);
+    const said = answeredRoute(condition, run, closeoutOf, wordOf, steps);
     return said?.kind === 'route' ? said.route : undefined;
   };
   for (const step of steps) {

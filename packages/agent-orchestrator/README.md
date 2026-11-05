@@ -2009,8 +2009,8 @@ A **condition** is a step with `routes:`: the closed list of names it picks amon
   condition's own task on the runtime's command harness. It is handed its request in a file and writes its answer to the file the
   runtime reads at exit and keeps on the attempt (a command task's `terminationMessagePath`); stdout cannot spoof it. Exit 0 with no
   answer that decodes reads `unsigned`, a non-zero exit `failed`, no exit `stopped`.
-- **A judge**: `route: judge`, with an `agent:` (or one hired into `<workflow>/<condition>`): a read-only session in its first parent's
-  workspace, whose closeout says `route`, one of `routes:`. A judge is the one condition that may carry a `budget:`.
+- **A judge**: `route: judge`, a read-only session whose closeout says `route`, one of `routes:`. Not built yet: load refuses
+  `route: judge` until the run owes a judge's closeout its `route` and holds its mode read-only.
 
 Any kind may answer `unsure` with its reason instead: the condition reads `blocked`, and a person names the route. A table or a script
 condition names no `agent:`. No condition has a workspace of its own: it cuts no worktree and commits nothing, and a step after it takes

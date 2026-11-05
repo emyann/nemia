@@ -14,10 +14,23 @@ export function routeRefusal(steps: readonly Workflow[]): string | undefined {
   const byName = new Map(steps.map((s) => [s.name, s]));
   for (const s of steps) {
     const refused =
-      whenRefusal(s, byName) ?? (s.routes === undefined ? undefined : conditionRefusal(s, steps, byName)) ?? workflowNodeRefusal(s);
+      judgeRefusal(s) ??
+      whenRefusal(s, byName) ??
+      (s.routes === undefined ? undefined : conditionRefusal(s, steps, byName)) ??
+      workflowNodeRefusal(s);
     if (refused !== undefined) return refused;
   }
   return undefined;
+}
+
+/**
+ * Why a condition may not be a judge yet: a judge's closeout owes no `route` field, its mode is not held read-only, and its brief names no
+ * target, so it would run as a session that may write and sign off with no route, its followers waiting for good.
+ */
+function judgeRefusal(s: Workflow): string | undefined {
+  return s.route?.kind === 'judge'
+    ? `${s.name}: \`route: judge\` is not built yet: a judge's closeout would owe no route. Give the condition a table (\`route: { from: <step>.<field>, table: { <value>: <route> } }\`) or a script (\`route: { script: <path> }\`).`
+    : undefined;
 }
 
 /** Why a node's `when:` takes no route: it waits on no condition or on two, names a route its condition lacks, or one it ends on. */

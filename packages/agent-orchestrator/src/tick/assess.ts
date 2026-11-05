@@ -193,7 +193,7 @@ function dueSteps(
     if (own === 'checking' && !run.steps[step.name]?.check) due.check.push(step.name);
     if (own !== 'pending') continue;
     const condition = conditionOf(step, steps);
-    const answered = condition ? answeredRoute(condition, run, closeoutOf, wordOf) : undefined;
+    const answered = condition ? answeredRoute(condition, run, closeoutOf, wordOf, steps) : undefined;
     const fate = nodeFate(step.when, answered?.kind === 'route' ? answered.route : undefined, step.after.map(wordOf));
     if (fate === 'unreachable') due.unreachable.push(step.name);
     else if (fate !== 'ready' || step.route?.kind === 'table') continue;

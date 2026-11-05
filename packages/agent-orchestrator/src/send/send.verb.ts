@@ -75,7 +75,7 @@ export const sendCards = Effect.fn('sendCards')(function* (f: { run: Run; reads:
     );
     if (node.workflow === undefined || run.steps[name]?.sent) continue;
     const condition = conditionOf(node, reads.steps);
-    const answer = condition ? answeredRoute(condition, run, reads.signedOff, wordOf) : undefined;
+    const answer = condition ? answeredRoute(condition, run, reads.signedOff, wordOf, reads.steps) : undefined;
     const card = sentCardName(run.id, name);
     const now = new Date().toISOString();
     const text = sentCardText(run, node, condition?.name ?? '', answer?.kind === 'route' ? answer.route : undefined, now);

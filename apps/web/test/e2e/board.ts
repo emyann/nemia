@@ -715,7 +715,8 @@ export function herChat(what: HerChat): () => void {
 /**
  * Her chat made unreadable where it stands: a line the chat's record does not decode, written on the person's outbox, which every read
  * of her chat refuses (`decoded` in the orchestrator's `chat/chat.store.ts`) while it is there. The api's chat stream then says
- * `unreadable` with `retrying` on its next beat (`CHAT_BEAT_MS`) and goes on reading, which is what her panel draws as a quiet band.
+ * `unreadable` with `retrying` on its next look at her chat's files (`Beats.chatFiles` in apps/api) and goes on reading, which is
+ * what her panel draws as a quiet band.
  *
  * Answers what puts it back — the file as it was, or gone where there was none — so the read works on the beat after and the band goes.
  * Called between `herChat` and its take-back, whose removal of her folder would take the file too.

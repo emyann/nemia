@@ -33,6 +33,14 @@
  * - `inbox`, `inboxAfterPass`: `GET /api/cards`, every card (a `CardList`), over an app built afresh for each cold call and kept for the
  *   warm ones, and the same asked after a pass has filled the app's informer, as `runListAfterPass` is. A baseline taken before the
  *   CardList read `GET /api/inbox?all=true`, every card too, so a `--compare` sets the two reads of every card side by side.
+ * - `chatHistory`, `chatBeatBefore`, `chatFoldStep`: her chat, at the place the copy's level file names (`nemiaChatPlace`), each over an
+ *   engine (`passEngine`) and reads (`ChatReads`: the informer and the filings an app keeps) built afresh for each cold call and kept for
+ *   the warm ones. `chatHistory` is `chatHistory(place, {})`, what a reader lists on joining and what the board's dock read every 5 s
+ *   before her chat was followed. `chatBeatBefore` is `followChat`'s `first` from the cursor that history gave, its follow none: the same
+ *   reads and the same answer as the old stream's beat, the whole re-projection it paid every 2 s per open stream. `chatFoldStep` is
+ *   what a follower pays now for one moment of her session (`chatFold`): `followChat`'s `rest`, after a listing not timed, run until the
+ *   first thing it sends, its follow handing one `events` moment of one new event; null where no session of hers is filed. Its time holds
+ *   the rest's start too (the follow of the feed, the look at the files), so it bounds the fold from above.
  *
  * Beside the numbers: the runs, finished and open, the inbox's cards and those a run was started from, the runtime's tasks and their
  * journals' bytes, the runs whose tasks did not read and the pass's unreadable lines, and `invariantRefusals`, the records the Run model
@@ -45,8 +53,8 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Effect, Layer, Logger } from 'effect';
-import type { Pass, RunSummary } from 'agent-orchestrator';
+import { Duration, Effect, Layer, Logger, Option, Stream } from 'effect';
+import type { ChatFollow, ChatFollowed, ChatReads, Pass, RunSummary } from 'agent-orchestrator';
 import { AE_LEFT_OUT, copyStore, destinationRefusal, installFence, placeRefused, readOnlyPlace, type Fence } from './fence.ts';
 import { comparedWith, MEASURES, rendered, type MeasureKey, type Measured, type StoreMeasure, type Timed } from './render.ts';
 
@@ -324,6 +332,92 @@ const passedOver = (orch: Orchestrator, place: Place, fence: Fence, wf: string, 
 /** The inbox, every card: the route ignores `all` where it does not read it, and lists every card then too. */
 const INBOX_URL = '/api/cards';
 
+/** How long `chatFold` waits for the moment it hands to be sent: a fold that sends nothing (no session of hers to fold into) is null. */
+const FOLD_BOUND_MS = 10_000;
+
+/** What `chatMeasured` reads with: a fresh engine on the copy and fresh reads, as a new app's are, or those kept between calls. */
+type ChatOver = { e: ReturnType<Orchestrator['engine']>; reads: ChatReads };
+
+/**
+ * One moment of her session folded by a follower that has listed: `followChat`'s `rest` run until the first thing it sends, its follow
+ * handing one `events` moment of one new assistant text, `n` apart from every other. Answers whether anything was sent within
+ * `FOLD_BOUND_MS`.
+ */
+const chatFold = <R>(rest: Stream.Stream<unknown, never, R>) =>
+  Effect.gen(function* () {
+    const head = yield* Stream.runHead(rest).pipe(Effect.timeoutOption(Duration.millis(FOLD_BOUND_MS)));
+    return Option.isSome(head) && Option.isSome(head.value);
+  });
+
+/**
+ * Her chat measured on the copy at the place its level file names: the history, the old beat (`followChat`'s `first` from the history's
+ * cursor) and the fold of one moment (`chatFold`), each cold over an engine and reads built afresh per call and warm over one kept.
+ */
+async function chatMeasured(orch: Orchestrator, place: Place, fence: Fence, repeat: number) {
+  const placed = Layer.merge(orch.PlaceService.layer(place), orch.storeRootLayer(process.env));
+  const fresh = (): ChatOver => ({
+    e: passEngine(orch.engine(), fence),
+    reads: { home: process.env.WF_ROOT, runs: orch.informerMemo(), filings: { filed: new Map(), cursor: 0 }, env: process.env },
+  });
+  const history = (at: ChatOver) => orch.runWith(at.e, orch.chatHistory(orch.nemiaChatPlace(), {}, at.reads).pipe(Effect.provide(placed)));
+  const listed = await history(fresh());
+  const none: ChatFollow = () => Stream.empty;
+  const followed = (at: ChatOver, follow: ChatFollow) =>
+    orch.runWith(at.e, orch.followChat(orch.nemiaChatPlace, listed.cursor, at.reads, follow).pipe(Effect.provide(placed)));
+  type Rest = Awaited<ReturnType<typeof followed>>['rest'];
+  let n = 0;
+  const moment: ChatFollow = () => {
+    n += 1;
+    const event = {
+      id: `store-measure-${n}`,
+      at: new Date().toISOString(),
+      role: 'assistant',
+      kind: 'text',
+      text: `a moment ${n}`,
+    } as const;
+    return Stream.make<[ChatFollowed]>({ kind: 'events', events: [event], cursor: `store-measure-${n}` });
+  };
+  const folds = async (at: ChatOver, rest: Rest) => {
+    if (!(await orch.runWith(at.e, chatFold(rest).pipe(Effect.provide(placed)))))
+      throw new Error(`a moment of her session was folded and nothing was sent within ${FOLD_BOUND_MS} ms`);
+  };
+  const over = async (read: (at: ChatOver) => Promise<unknown>): Promise<Measured> => {
+    const cold: Timed[] = [];
+    for (let i = 0; i < repeat; i++) {
+      const at = fresh();
+      cold.push(await timed(() => read(at)));
+    }
+    const kept = fresh();
+    await read(kept);
+    const warm: Timed[] = [];
+    for (let i = 0; i < repeat; i++) warm.push(await timed(() => read(kept)));
+    return { cold: medianOf(cold), warm: medianOf(warm) };
+  };
+  const foldOver = async (): Promise<Measured> => {
+    const cold: Timed[] = [];
+    for (let i = 0; i < repeat; i++) {
+      const at = fresh();
+      const { rest } = await followed(at, moment);
+      cold.push(await timed(() => folds(at, rest)));
+    }
+    const kept = fresh();
+    const { rest } = await followed(kept, moment);
+    await folds(kept, rest);
+    const warm: Timed[] = [];
+    for (let i = 0; i < repeat; i++) warm.push(await timed(() => folds(kept, rest)));
+    return { cold: medianOf(cold), warm: medianOf(warm) };
+  };
+  const task = orch.nemiaChatPlace().task ?? null;
+  return {
+    asked: { task, events: listed.events.length, cursor: listed.cursor },
+    measures: {
+      chatHistory: await over(history),
+      chatBeatBefore: await over(async (at) => (await followed(at, none)).first),
+      chatFoldStep: task === null ? null : await foldOver(),
+    },
+  };
+}
+
 /** The newest run of `listing`, by `createdAt`, finished or not; null where there is none. */
 const newestOf = (listing: readonly RunSummary[], finished: boolean): string | null =>
   listing
@@ -362,7 +456,12 @@ async function measure(asked: Asked, root: string, fence: Fence) {
     openRunAfterPass: await objectOf(openRun, passed),
     inbox: await overApps(fresh, (app) => getJson(app, INBOX_URL), repeat),
     inboxAfterPass: await overApps(passed, (app) => getJson(app, INBOX_URL), repeat),
+    chatHistory: null,
+    chatBeatBefore: null,
+    chatFoldStep: null,
   };
+  const chat = await chatMeasured(orch, place, fence, repeat);
+  Object.assign(measures, chat.measures);
   const { measured, pass } = await tickMeasured(orch, place, fence, wf, repeat);
   measures.tickPass = measured;
   measures.tickPassInformed = (await tickMeasured(orch, place, fence, wf, repeat, true)).measured;
@@ -380,7 +479,7 @@ async function measure(asked: Asked, root: string, fence: Fence) {
       unreadable: { runs: listing.filter((r) => r.unreadable !== null).length, passLines: pass?.unreadable?.length ?? 0 },
       invariantRefusals: await invariantRefusals(wf),
     },
-    asked: { finishedRun, openRun, feedCursor: feed.cursor, feedLinesRead: feed.read },
+    asked: { finishedRun, openRun, feedCursor: feed.cursor, feedLinesRead: feed.read, chat: chat.asked },
     measures,
   };
 }

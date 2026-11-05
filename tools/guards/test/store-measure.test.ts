@@ -2,7 +2,8 @@
  * The store's measure (`tools/store-measure/`): what it refuses to be called with, the copy it measures on — never the store itself,
  * never a destination inside it, and without the checkouts — the place that answers its reads and refuses every write, the fence that
  * makes it refuse itself where a read spawns anything but a read of git or writes outside its copy, and the report it writes on an
- * empty store: every measure's key, with no run and no card counted.
+ * empty store: every measure's key, with no run and no card counted, her chat's history and old beat read, and no fold where no
+ * session of hers is filed.
  *
  * The usage refusals, the refused destination and the empty store's report spawn `report.ts` in a child of its own, under a timeout;
  * the rest are its functions, called here.
@@ -184,13 +185,26 @@ test('on an empty store the report counts no run and holds every measure, the ma
   for (const key of ['cpu', 'cores', 'memoryBytes', 'node', 'load']) assert.ok(key in written.machine, key);
   assert.match(written.commit, /^[0-9a-f]{40}$/);
   assert.ok(Number.isFinite(Date.parse(written.date)));
-  for (const key of ['tickPass', 'tickPassInformed', 'runList', 'stats', 'runListAfterPass', 'inbox', 'inboxAfterPass'] as const) {
+  for (const key of [
+    'tickPass',
+    'tickPassInformed',
+    'runList',
+    'stats',
+    'runListAfterPass',
+    'inbox',
+    'inboxAfterPass',
+    'chatHistory',
+    'chatBeatBefore',
+  ] as const) {
     const measured = written.measures[key];
     assert.ok(measured !== null && Number.isFinite(measured.cold.ms) && Number.isFinite(measured.warm.ms), key);
   }
   assert.equal(written.measures.finishedRun, null, 'no finished run to read');
   assert.equal(written.measures.openRun, null, 'no open run to read');
   assert.equal(written.measures.openRunAfterPass, null, 'no open run to read after a pass either');
+  assert.equal(written.asked.chat?.task, null, 'no level file, so no session of hers is filed');
+  assert.equal(written.asked.chat?.events, 0, 'her history lists nothing');
+  assert.equal(written.measures.chatFoldStep, null, 'no session of hers to fold a moment into');
   assert.deepEqual(written.refusals, []);
   assert.deepEqual(fs.readdirSync(from), [], 'the store itself was not written');
 });

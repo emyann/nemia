@@ -8,6 +8,7 @@
 import path from 'node:path';
 import { firstPiece, type Denial, type Usage } from '../../core/index.ts';
 import { partialMarksOf, printedKindOf, printedLinesOf, type PrintedKind, type PrintedLine, type Printed } from '../claude/stream.ts';
+import type { InitKept, InitRead } from '../../../contracts/capture.contract.ts';
 import type { HarnessOutput } from './detached.ts';
 import type { PartialMark } from './follow.ts';
 
@@ -316,34 +317,65 @@ const assistantKept = (line: Printed<'assistant'>, denied: ReadonlySet<string>):
 };
 
 /**
- * What a job's stream capture keeps once its session has ended: what the shipped readers read of
- * it, and nothing of the conversation they do not, in the order printed. Kept whole: a line that is no JSON object (stderr, the
- * worker's own words, a line torn mid-write), and each line of a kind `claudeStreamOutput` reads whole — its `result`, its `system`
- * `init` and `permission_denied` lines. An `assistant` line is cut to its `tool_use` blocks, each its id, its tool and its input:
- * whole for a call the stream says was denied, else only the key a reader reads (`READ_INPUT_KEYS`), a command by its first word;
- * one that makes no call is dropped. Every other JSON line is dropped: tool results, partial messages, text and thinking, other
- * `system` lines. A capture kept so keeps the same, and reads the same.
+ * What a job's stream capture keeps once its session has ended: what the shipped readers read of it, and nothing of the conversation
+ * they do not, in the order printed. Kept whole: a line that is no JSON object (stderr, the worker's own words, a line torn mid-write).
+ * A line of a kind `claudeStreamOutput` reads is kept as its schema decodes it (`PRINTED`), every field no reader reads left out: its
+ * `result` and its `permission_denied` lines each time, and an `init` line only where it changes what a reader reads (`initKept`) —
+ * the SDK prints one per turn, each listing every tool and command. An `assistant` line is cut to its `tool_use` blocks, each its id,
+ * its tool and its input: whole for a call the stream says was denied, else only the key a reader reads (`READ_INPUT_KEYS`), a command
+ * by its first word; one that makes no call is dropped. Every other JSON line is dropped: tool results, partial messages, text and
+ * thinking, other `system` lines. A capture kept so keeps the same, and reads the same.
  *
  * Throws, as `claudeStreamOutput` does, when a line of a kind it reads does not decode: a refused capture is kept whole.
  */
 export const claudeStreamKept = (output: string): string => {
   const facts: StreamFacts = { events: [], inputs: new Map(), started: false, skills: new Map(), files: new Map(), denied: new Set() };
   for (const printed of decoded(output, STREAM_KINDS)) gather(facts, printed);
+  let read: InitRead | undefined;
   return output
     .split('\n')
-    .flatMap((text) => lineKept(text, facts.denied) ?? [])
+    .flatMap((text) => {
+      const init = initLineKept(text, read);
+      if (init === undefined) return lineKept(text, facts.denied) ?? [];
+      read = init.read;
+      return init.kept ?? [];
+    })
     .join('\n');
 };
 
-/** What a capture keeps of its line `text` (`claudeStreamKept`), the calls `denied` named whole, or nothing. */
+/** What a reader reads once `line` follows what `read` already said: the first folder, the first model, the last version named. */
+const readAfter = (read: InitRead | undefined, line: InitRead): InitRead => ({
+  cwd: read?.cwd ?? line.cwd,
+  model: read?.model ?? line.model,
+  claude_code_version: line.claude_code_version ?? read?.claude_code_version,
+});
+
+/**
+ * What a capture keeps of the line `text` when it is an `init` line, after earlier ones that said `read` (none before the first):
+ * the line as `initKept` keeps it, or nothing, and what a reader reads once it is read. None when `text` is no `init` line. Throws, as
+ * `claudeStreamKept` does, when it does not decode.
+ */
+export const initLineKept = (text: string, read: InitRead | undefined): { kept?: string; read: InitRead } | undefined => {
+  if (printedKindOf(text) !== 'system init') return undefined;
+  const [printed] = decoded(text, ['system init']);
+  if (printed?.kind !== 'system init') return undefined;
+  const { cwd, model, claude_code_version } = printed.line;
+  const line: InitRead = { cwd, model, claude_code_version };
+  const kept = initKept(line, read);
+  return {
+    ...(kept ? { kept: JSON.stringify({ type: 'system', subtype: 'init', ...kept }) } : {}),
+    read: readAfter(read, line),
+  };
+};
+
+/** What a capture keeps of its line `text` (`claudeStreamKept`) when it is no `init` line, the calls `denied` named whole, or nothing. */
 const lineKept = (text: string, denied: ReadonlySet<string>): string | undefined => {
   const kind = printedKindOf(text);
   if (kind === undefined) return text;
   if (kind === 'other' || !STREAM_KINDS.includes(kind)) return undefined;
-  if (kind !== 'assistant') return text;
-  const read = printedLinesOf(text, ['assistant']);
-  const line = 'lines' in read ? read.lines[0] : undefined;
-  return line?.kind === 'assistant' ? assistantKept(line.line, denied) : undefined;
+  const [printed] = decoded(text, [kind]);
+  if (printed?.kind === 'assistant') return assistantKept(printed.line, denied);
+  return printed ? JSON.stringify(printed.line) : undefined;
 };
 
 /**
@@ -355,4 +387,19 @@ export const claudePartials = (output: string, before: number): { marks: Partial
   const read = printedLinesOf('\n'.repeat(before) + output, ['stream_event']);
   if ('wrong' in read) return read;
   return { marks: read.lines.flatMap(({ line }) => partialMarksOf((line as Printed<'stream_event'>).event)) };
+};
+
+/**
+ * What a capture keeps of an `init` line `line`, given what its earlier `init` lines already say to a reader (`read`, none before the
+ * first): the first always, cut to what a reader reads; a later one only where it names a folder or a model none named before, or a
+ * version of Claude Code other than the last; else nothing. Proved by its contract (`contracts/capture.contract.ts`).
+ */
+export const initKept: InitKept = (line, read) => {
+  const { cwd, model, claude_code_version: version } = line;
+  const changes =
+    read === undefined ||
+    (read.cwd === undefined && cwd !== undefined) ||
+    (read.model === undefined && model !== undefined) ||
+    (version !== undefined && version !== read.claude_code_version);
+  return changes ? { cwd, model, claude_code_version: version } : undefined;
 };

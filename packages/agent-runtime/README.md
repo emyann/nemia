@@ -1726,8 +1726,11 @@ before.
 
 What a Claude Code job's capture keeps once it has ended is what those readers read, and nothing more of the conversation
 (`claudeStreamKept`, `harness/detached/output.ts`): Claude Code keeps the conversation in its own transcript, which `transcript`
-reads. Kept whole: a line that is no JSON object (stderr, the worker's words, a torn line), the `result` line (the final answer, usage,
-cost, the denials and their inputs), the `system` `init` line (the session id, the folder) and each `permission_denied` line. An
+reads. Kept whole: a line that is no JSON object (stderr, the worker's words, a torn line). Kept as `PRINTED` decodes it, every field
+no reader reads left out: the `result` line (the final answer, usage, cost, the denials and their inputs, never its text), each
+`permission_denied` line, and a `system` `init` line (the folder, the model, the version of Claude Code) only where it changes what a
+reader reads (`initKept`, proved by `contracts/capture.contract.ts`): the SDK prints one per turn, each listing every tool and command,
+so a session of sixteen turns keeps one. A held session's capture (`<name>.out.jsonl`) keeps each line so as it comes. An
 `assistant` line is cut to its `tool_use` blocks, each its id, its tool and its input: whole for a call the stream says was denied,
 which is the runtime's own fact, kept as it was called; for any other, only the key a reader reads (`READ_INPUT_KEYS`: a command, by
 its first word; a skill; a file tool's path). Every other line goes: text and thinking, tool results, partial messages
@@ -1740,7 +1743,8 @@ readers': the digest of the readers over the corpus kept so is `SAID_DIGEST` (`t
 What the runtime can no longer re-read of a capture kept so, and accepts: an assistant's text and thinking, a tool's result or output,
 any key of a call's input but the one a reader reads (a command past its first word, unless the call was denied; a file's content, an
 edit's strings, a search's pattern), the partial messages (so `follow` of an ended job shows no open block, and `logs` of one shows the
-calls, denials, result and stderr, not the assistant's words), a response's own usage, and every `system` line but `init` and
+calls, denials, result and stderr, not the assistant's words), a response's own usage, a result's text, an `init` line's session id,
+tools and commands, an `init` line that says nothing an earlier one did not, and every `system` line but `init` and
 `permission_denied`. A reader that starts reading one of these reads it from Claude Code's transcript, or only from captures written
 after `claudeStreamKept` keeps it. The captures written before are rewritten once by `ae compact [--yes]` (`Engine.compact`,
 `compactSessions` across the A2A seam, `compactRuns` in `harness/detached/compact.ts`): it counts, and with `--yes` rewrites, each

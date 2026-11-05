@@ -229,7 +229,7 @@ async function followed(
     Effect.map((got): Relayed => ({ kind: 'events', events: got.events, cursor: got.cursor })),
     Effect.orElseSucceed(() => undefined),
   );
-  const relayed = r.followings.follow(r.e, r.id, r.step, caught).pipe(
+  const relayed = r.followings.follow(r.e, { kind: 'step', runId: r.id, step: r.step }, caught).pipe(
     Stream.runForEach((m) =>
       Effect.promise(async () => {
         for (const message of messagesOf(m, sent, at)) if (!stream.aborted) await stream.writeSSE(message);

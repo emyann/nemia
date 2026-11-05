@@ -21,7 +21,7 @@ import { at, said, withHer } from './her.ts';
 import { Layer } from 'effect';
 import { app, appOf, liveOf } from '../src/app.ts';
 import { Beats } from '../src/layer.ts';
-import { CHAT_BEAT_MS } from '../src/nemia/chat.ts';
+import { FILES_CHECK_MS, RECORD_BEAT_MS } from 'agent-orchestrator';
 
 const BOARD = { 'content-type': 'application/json', 'sec-fetch-site': 'same-origin' };
 
@@ -272,12 +272,15 @@ test('REFUSED: a write to her chat before it reaches her — an answer or a stop
   );
 });
 
-/** The beat a test's own chat stream reads again on (`Beats.chat`), shorter than the shipped `CHAT_BEAT_MS`. */
+/**
+ * The beat a test's own chat stream reads the record again on (`Beats.chat`), and looks at her chat's files on (`Beats.chatFiles`),
+ * shorter than the shipped `RECORD_BEAT_MS` and `FILES_CHECK_MS`.
+ */
 const BEAT_MS = 100;
 
 test('a read that fails under an open stream is `unreadable` with retrying, and the first beat that works after it says `readable`', async (t) => {
-  assert.ok(BEAT_MS < CHAT_BEAT_MS, 'read again on a beat shorter than shipped, never longer');
-  const own = appOf(Layer.merge(liveOf(), Layer.succeed(Beats)({ ...Beats.defaultValue(), chat: BEAT_MS })));
+  assert.ok(BEAT_MS < RECORD_BEAT_MS && BEAT_MS < FILES_CHECK_MS, 'read again on a beat shorter than shipped, never longer');
+  const own = appOf(Layer.merge(liveOf(), Layer.succeed(Beats)({ ...Beats.defaultValue(), chat: BEAT_MS, chatFiles: BEAT_MS })));
   t.after(() => own.runtime.dispose());
   const { sessionId } = withHer(['One.']);
   const outbox = path.join(root, 'nemia', 'chat', 'outbox.jsonl');

@@ -1,10 +1,11 @@
 /**
  * Nemia's chat on the board: her history a page at a time with where she is, the same followed as server-sent events, the person's
  * words sent, a question of hers answered, their read mark moved, and the turn she is answering stopped. Each is a program of the
- * package's chat (`chatHistory`, `chatSince`, `chatSay`, `chatAnswer`, `chatRead`, `chatStop`)
- * over her place (`nemiaChatPlace`), and no command of the table: a write of the person's files kept out of her own fence.
+ * package's chat (`chatHistory`, `followChat`, `chatSay`, `chatAnswer`, `chatRead`, `chatStop`)
+ * over her place (`nemiaChatPlace`), and no command of the table: a write of the person's files kept out of her own fence. Her stream
+ * follows her task's session on the app's registry (`Followings`), one upstream however many read her.
  */
-import { Schema } from 'effect';
+import { Effect, Schema, Stream } from 'effect';
 import { Hono } from 'hono';
 import { type SSEStreamingApi, streamSSE } from 'hono/streaming';
 import {
@@ -12,17 +13,21 @@ import {
   chatHistory,
   chatRead,
   chatSay,
-  chatSince,
   chatStop,
+  EngineService,
+  followChat,
   nemiaChatPlace,
+  PlaceService,
+  StoreRoot,
   type ChatChanges,
+  type ChatFollow,
   type ChatReads,
+  type ChatSent,
 } from 'agent-orchestrator';
 import { NotBlank, readBody, type Words } from '../body.ts';
 import { refusedBeforeReading, type Guarded } from '../guard.ts';
 import { type ApiEnv, served, type Served } from '../layer.ts';
 import { runPlaced } from '../store.ts';
-import type { Effect } from 'effect';
 
 /** What `GET /api/nemia/chat` answers: a page of her chat, the cursor and her presence. */
 export type ChatHistoryAnswer = Effect.Success<ReturnType<typeof chatHistory>>;
@@ -36,9 +41,6 @@ export type ChatAnswerBody = Parameters<typeof chatAnswer>[1];
 export type ChatAnswerAnswer = Effect.Success<ReturnType<typeof chatAnswer>>;
 /** What `POST /api/nemia/chat/read` answers. */
 export type ChatReadAnswer = Effect.Success<ReturnType<typeof chatRead>>;
-
-/** How often a followed chat is read again by default: `Beats.chat`'s default (layer.ts). */
-export const CHAT_BEAT_MS = 2000;
 
 const SEND_SHAPE = '`{ "text": "<what you write to Nemia>" }`';
 const READ_SHAPE = '`{ "through": "<the id of the last event you saw>" }`';
@@ -92,6 +94,24 @@ async function sent(stream: SSEStreamingApi, read: ChatChanges, shown: string): 
   return presence;
 }
 
+/** What `followChat` reads with in a request: the request's engine, the app's place and the store's root. */
+const placed =
+  (s: Served) =>
+  <A, E, R>(stream: Stream.Stream<A, E, R>) =>
+    stream.pipe(
+      Stream.provideService(EngineService, s.e),
+      Stream.provideService(PlaceService, s.placeService),
+      Stream.provideService(StoreRoot, s.home),
+    );
+
+/** One thing `followChat` sends, written to `stream`; the presence last shown answered, as `sent` answers it. */
+async function written(stream: SSEStreamingApi, x: ChatSent, shown: string): Promise<string> {
+  if (x.kind === 'changes') return sent(stream, x.changes, shown);
+  if (x.kind === 'unreadable') await stream.writeSSE({ event: 'unreadable', data: JSON.stringify({ error: x.error, retrying: true }) });
+  else await stream.writeSSE({ event: 'readable', data: '{}' });
+  return shown;
+}
+
 /**
  * Her chat.
  *
@@ -103,12 +123,14 @@ async function sent(stream: SSEStreamingApi, read: ChatChanges, shown: string): 
  *   session's that would prompt a person, held as her question is, its one question offering `Allow once`, `Always allow` where the
  *   harness offers it, and `Deny`, and its `permission` the call's facts (the tool, a shell command as typed, the harness's title,
  *   description, reason and blocked path). 422 for a limit or a `before` that is none.
- * - `GET /api/nemia/chat/stream` — the same followed, as server-sent events read again every `CHAT_BEAT_MS`: `presence` first and
- *   once it changes, then `chat`, each event new or changed (an event is replaced by its id), the cursor the id of each read's last.
- *   It resumes after the Last-Event-ID an EventSource sends when it reconnects, else after `after`, else sends the history whole; a
- *   cursor no read gave is a 422 before the stream opens. A read that fails once the stream is open is an `unreadable` event with
- *   `retrying: true` — the next beat reads again, and gives up on nothing — and the first beat that works after one says `readable`,
- *   which takes the notice off the page.
+ * - `GET /api/nemia/chat/stream` — the same followed, as server-sent events: `presence` first and once it changes, then `chat`, each
+ *   event new or changed (an event is replaced by its id), the cursor the id of each read's last. It lists once from the Last-Event-ID
+ *   an EventSource sends when it reconnects, else from `after`, else sends the history whole; a cursor no read gave is a 422 before the
+ *   stream opens. Then it follows her (`followChat`): her session's moments on the one upstream the app holds for her task, the
+ *   person's words, her asks and their answers, the read mark and the keeper's markers as her chat's files are written, and the record
+ *   read again on a beat (`Beats.chat`) where her session cannot be followed. A read that fails once the stream is open is an
+ *   `unreadable` event with `retrying: true` — the next look reads again, and gives up on nothing — and the first that works after one
+ *   says `readable`, which takes the notice off the page.
  * - `POST /api/nemia/chat/send` — `{ text }` put in her outbox, which the keeper says to her once she is up: 201 with the entry
  *   `{ id, at, text }`. 400 for a body that is not one, 422 for text that is empty or too long.
  * - `POST /api/nemia/chat/answer` — `{ id, picks }`, the person's answer to a question, a proposal or a permission: each pick names
@@ -133,30 +155,23 @@ export const nemiaChat = new Hono<ApiEnv>()
   )
   .get('/api/nemia/chat/stream', (c) =>
     served(c, async (s) => {
-      const place = nemiaChatPlace();
       const after = c.req.header('Last-Event-ID') || c.req.query('after') || undefined;
-      const first = await runPlaced(s, s.e, chatSince(place, after, readsOf(s)));
+      const follow: ChatFollow = (taskId, caught) => s.followings.follow(s.e, { kind: 'task', taskId }, caught);
+      const paces = { ...(s.beats.chat ? { beatMs: s.beats.chat } : {}), ...(s.beats.chatFiles ? { filesMs: s.beats.chatFiles } : {}) };
+      const { first, rest } = await runPlaced(s, s.e, followChat(nemiaChatPlace, after, readsOf(s), follow, paces));
       return streamSSE(c, async (stream) => {
-        let read = first;
-        let shown = '';
-        let unread = false;
-        while (!stream.aborted) {
-          shown = await sent(stream, read, shown);
-          await stream.sleep(s.beats.chat ?? CHAT_BEAT_MS);
-          if (stream.aborted) break;
-          try {
-            read = await runPlaced(s, s.e, chatSince(nemiaChatPlace(), read.cursor, readsOf(s)));
-            if (unread) {
-              unread = false;
-              await stream.writeSSE({ event: 'readable', data: '{}' });
-            }
-          } catch (err) {
-            const error = err instanceof Error ? err.message : String(err);
-            unread = true;
-            await stream.writeSSE({ event: 'unreadable', data: JSON.stringify({ error, retrying: true }) });
-            read = { ...read, events: [] };
-          }
-        }
+        const gone = new AbortController();
+        stream.onAbort(() => gone.abort());
+        let shown = await sent(stream, first, '');
+        if (stream.aborted) return;
+        const relayed = placed(s)(rest).pipe(
+          Stream.runForEach((x) =>
+            Effect.promise(async () => {
+              if (!stream.aborted) shown = await written(stream, x, shown);
+            }),
+          ),
+        );
+        await c.var.runtime.runPromiseExit(relayed, { signal: gone.signal });
       });
     }),
   )

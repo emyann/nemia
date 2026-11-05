@@ -1,8 +1,8 @@
 /**
  * Nemia's face docked at the bottom right of every page of the board but the chat's own, every cue that holds beside it, and the panel
- * it opens above it (`ChatPanel`). It is the frame's, not a page's: it holds the one reader of her chat (`useNemiaChat`), so the stream
- * follows her whatever page a person is on, and her presence is read from the chat alone — never from the whole list of the runs, which
- * `frameReach` refuses the frame.
+ * it opens above it (`ChatPanel`). It is the frame's, not a page's: it reads her chat from the frame's one holder of it (`useNemiaChat`,
+ * under `NemiaChatProvider`), whose stream follows her whatever page a person is on and whether its panel is open or not, and her presence
+ * is read from that stream alone — never from the whole list of the runs, which `frameReach` refuses the frame.
  */
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
@@ -27,7 +27,7 @@ const DOCK_FACE = 60;
  */
 export function NemiaDock() {
   const [mode, setMode] = useState<ChatMode | null>(null);
-  const chat = useNemiaChat(mode !== null);
+  const chat = useNemiaChat();
   const nemia = useQuery(levelQuery).data;
   const open = useQuery(openRunsQuery()).data;
   const now = new Date(useNow(30_000));

@@ -5,8 +5,9 @@
  * proves are its laws' (`contracts/budget.contract.ts`), not rows here, but one: the full law `aProposalStands` narrows there, that each
  * budget the step proposed and the person did not change is the cap the approval sets for its step, is held here by `approvedCaps` over
  * every proposal and every set of amounts given, until tsverify proves a loop keeps every element it passes on
- * (src-a-filter-s-result-is-pro-p25m, in the tsverify factory). Each refusal row breaks one rule and is asserted by its kind and the
- * facts it names.
+ * (src-a-filter-s-result-is-pro-p25m, in the tsverify factory); so is `someCapAboveIsNamed`'s, that a cap above its step's own budget is
+ * named, held here by `aboveTheWorkflow` over every set of caps against every set of ceilings. Each refusal row breaks one rule and is
+ * asserted by its kind and the facts it names.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -19,6 +20,7 @@ import type { Run } from '../record/record.ts';
 import { names, phases, run } from '../../test/assessed.ts';
 import { gateBudgets } from '../gate-budgets/gate-budgets.ts';
 import {
+  aboveTheWorkflow,
   approvedCaps,
   BUDGETS_SCHEMA,
   budgetFields,
@@ -164,6 +166,28 @@ test('approvedCaps: each budget the step proposed that the person did not change
     }
   }
   assert.equal(cases, 64, 'every proposal against every set of amounts given');
+});
+
+test("aboveTheWorkflow: each cap above its step's own budget is named", () => {
+  const steps = ['implement', 'review', 'land'];
+  const subsets = (usd: number): StepBudget[][] =>
+    Array.from({ length: 2 ** steps.length }, (_, mask) =>
+      steps.filter((_, i) => mask & (1 << i)).map((step, i) => ({ step, usd: usd + i })),
+    );
+  let cases = 0;
+  for (const caps of [...subsets(10), ...subsets(30)]) {
+    for (const ceilings of subsets(20)) {
+      const named = aboveTheWorkflow(caps, ceilings);
+      for (const c of caps.filter((c) => ceilings.some((w) => w.step === c.step && c.usd > w.usd))) {
+        assert.ok(
+          named.includes(c.step),
+          `${c.step} capped at ${c.usd} above ${JSON.stringify(ceilings)}: named in ${JSON.stringify(named)}`,
+        );
+      }
+      cases += 1;
+    }
+  }
+  assert.equal(cases, 128, 'every set of caps, below and above, against every set of ceilings');
 });
 
 test('budgetOf: the cap in force, read from the record and the approvals in force on every pass', async (t) => {

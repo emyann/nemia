@@ -4,7 +4,9 @@
  * Here rather than in `filed/filed.ts` so the round's pure code may read it: `filed.ts` reads the retry's words, which the round reads too,
  * and a folder of the format may not need a folder that needs it (`test/layout.test.ts`).
  */
-import { closeoutHashOf } from '../closeout/index.ts';
+import type { FiledFields } from '../../contracts/filed-fields.contract.ts';
+import { closeoutHashOf, type Closeout } from '../closeout/index.ts';
+import { outputFields } from '../step/step.ts';
 import type { Pin } from '../revisions/revisions.ts';
 import type { Run, StepRecord } from '../record/record.ts';
 import type { Workflow } from '../workflow.ts';
@@ -28,10 +30,23 @@ export const stepPins = (step: Workflow, pins: readonly Pin[]): Pin[] => {
  * schema it was given (`closeoutHashOf`). Written at every filing, so a step that has landed says which revisions its try ran on even
  * once a refresh has moved the run's own past them. Nothing for a step the steps given do not hold. Pure.
  */
-export const filedOn = (f: PinsRead, step: Workflow | undefined): Pick<StepRecord, 'pinned' | 'closeoutHash'> => {
+export const filedOn = (f: PinsRead, step: Workflow | undefined): Pick<StepRecord, 'pinned' | 'closeoutHash' | 'declared'> => {
   if (!step) return {};
   const own = stepPins(step, f.run.pinned ?? []);
-  return { ...(own.length ? { pinned: own } : {}), closeoutHash: closeoutHashOf(step, f.reads.steps) };
+  return { ...(own.length ? { pinned: own } : {}), closeoutHash: closeoutHashOf(step, f.reads.steps), declared: outputFields(step) };
+};
+
+/**
+ * Which of the fields its `output:` declares a step's try owes (contract `filed-fields.contract.ts`): those it was filed with
+ * (`StepRecord.declared`), whatever its run follows later. A record written before they were kept owes what the step declares `now`
+ * where its schema has not `moved` since it was filed, and where it has, those of them its closeout `gave`: the harness held it to the
+ * schema it was handed, so a field it lacks is one that schema did not ask. Pure.
+ */
+export const filedFields: FiledFields = (filed, now, gave) => {
+  const declared = filed.declared;
+  if (declared !== undefined) return declared.slice();
+  if (!filed.moved) return now.slice();
+  return now.filter((f) => gave.includes(f));
 };
 
 /**
@@ -46,3 +61,34 @@ export const filedOn = (f: PinsRead, step: Workflow | undefined): Pick<StepRecor
  */
 export const resumeOn = (session: string | undefined, step: Workflow, f: PinsRead, record: StepRecord | undefined): string | undefined =>
   record?.closeoutHash === undefined || record.closeoutHash === closeoutHashOf(step, f.reads.steps) ? session : undefined;
+
+/**
+ * A run as its record is read, each step's record written before `declared` was kept given the fields its try was filed with, where they
+ * are known: its closeout schema's digest (`closeoutHash`) is the one its step is filed with now, so the step declares now what it did
+ * then. Where the digest has moved, the record is left without them, which `filedOwed` reads as moved. Read on every read of the record
+ * (`readRun`), so nothing is carried: the digest is compared here, outside what a pass judges, since a judgement reads no hash. Pure.
+ */
+export const keptDeclared = <R extends Pick<Run, 'steps' | 'workflow'>>(run: R): R => {
+  const steps = run.workflow;
+  if (!steps) return run;
+  const kept = Object.entries(run.steps).map(([name, record]) => {
+    const step = steps.find((s) => s.name === name);
+    const hash = record.declared === undefined ? record.closeoutHash : undefined;
+    const unmoved = hash !== undefined && step !== undefined && hash === closeoutHashOf(step, steps);
+    return [name, unmoved ? { ...record, declared: outputFields(step) } : record] as const;
+  });
+  return { ...run, steps: Object.fromEntries(kept) };
+};
+
+/**
+ * The fields of its `output:` a step's closeout `said` owes on the try it is on, as that try was filed (`filedFields`): those its record
+ * kept at the filing (`declared`), so a revision its run followed after it adds none. A record with none but a digest of its closeout
+ * schema is one whose schema has moved since it was filed (`keptDeclared` gave the others theirs): it owes those of the fields declared
+ * now its closeout gave. A record with neither owes what the step declares now.
+ */
+export const filedOwed = (step: Workflow, run: Pick<Run, 'steps'>, said: Closeout | undefined): string[] => {
+  const record = run.steps[step.name];
+  const declared = record?.declared;
+  const moved = declared === undefined && record?.closeoutHash !== undefined;
+  return filedFields({ ...(declared ? { declared } : {}), moved }, outputFields(step), Object.keys(said?.output ?? {}));
+};

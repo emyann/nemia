@@ -89,6 +89,7 @@ erDiagram
     TaskId handedOff FK "optional"
     object filesRead "optional"
     string closeoutHash "optional"
+    list declared "optional"
   }
   Try {
     TaskId taskId FK

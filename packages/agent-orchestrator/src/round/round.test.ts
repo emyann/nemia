@@ -349,6 +349,7 @@ test('roundFiled: a round moves every step of the loop behind it', async (t) => 
         ...where,
         tries: [{ taskId: 'r-1-implement', check: { taskId: 'r-1-implement-check' }, cause: 'round' }],
         closeoutHash: closeoutHashOf(IMPLEMENT, chain),
+        declared: [],
       },
       test: { taskId: null, ...where, tries: [{ taskId: 'r-1-test', cause: 'round' }] },
       review: { taskId: null, ...where, tries: [{ taskId: 'r-1-review', cause: 'round' }] },

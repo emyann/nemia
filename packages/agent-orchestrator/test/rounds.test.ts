@@ -116,9 +116,9 @@ const asksOf = (id: string, kind: string) =>
 /** The JSON under a brief's `heading`. */
 const dataUnder = (brief: string, heading: string) =>
   JSON.parse(new RegExp(`${heading}\\n[\\s\\S]*?\\n\`\`\`json\\n([\\s\\S]*?)\\n\`\`\``).exec(brief)![1]);
-/** A step's record without the revisions every filing pins (`pinned`, `closeoutHash`), whose subject is `revisions.test.ts`. */
+/** A step's record without the revisions every filing pins (`pinned`, `closeoutHash`, `declared`), whose subject is `revisions.test.ts`. */
 const filedAs = (record: StepRecord | undefined): Partial<StepRecord> => {
-  const { pinned: _, closeoutHash: __, ...rest } = record ?? { taskId: null };
+  const { pinned: _, closeoutHash: __, declared: ___, ...rest } = record ?? { taskId: null };
   return rest;
 };
 /** That `err` is a refusal of kind `tag` with exit 2, naming each of `facts`. */

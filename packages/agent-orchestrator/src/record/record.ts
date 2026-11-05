@@ -502,6 +502,12 @@ export type StepRecord = {
    * record written before it, which resumes as it always did.
    */
   closeoutHash?: string;
+  /**
+   * The fields the step's `output:` declared when its current try was filed (`outputFields`), in the schema's order: what that try's
+   * closeout owes of them (`filedFields`), whatever its run follows later. Written at each filing beside `closeoutHash`, so a try filed
+   * again owes what its new definition declares. Absent on a record written before it, which falls back on `closeoutHash`.
+   */
+  declared?: readonly string[];
 };
 
 /**

@@ -80,7 +80,7 @@ repository's suite on the commit the check pushed, and the check waits on it. La
 workflow: the required CI context on the head the review read, and a merge that refuses anything but this run's own green pull
 request. Where the factory's `landingWaitsOnCi` is true (the default), the receipt then waits on the CI context at the merge commit on
 the base branch, as `build`'s README says: a merge that turned the base red fails the land step though the merge stands, unless the
-base's tip holds it and is green there; set it false (`--set landingWaitsOnCi=false`) where CI does not run on pushes to the base.
+base's tip holds it and is green there, which passes a merge whose own run was cancelled or never reported too; set it false (`--set landingWaitsOnCi=false`) where CI does not run on pushes to the base.
 
 ## The review
 

@@ -91,7 +91,9 @@ up to 1800 s for it to be reported there, or 2400 s while another check there st
 check's own deadline). Green passes. Red fails the step
 though the merge stands — nothing is taken back — naming the jobs that did not pass: a person re-runs them where CI failed on its own
 account, or lands a fix, then types `nemia retry <run> land`; where the base's tip holds the merge and the context is green there, the
-receipt passes and says so. Still running at the bound fails with the same retry line. Never reported fails too, naming
+receipt passes and says so. A merge whose own run was cancelled — a CI that replaces a pending run of the base with a newer push's
+— or never reported is read at the base's tip where GitHub's compare says it holds the merge: green there passes, naming the commit
+read and why; red there fails the step naming that commit; anything else waits on, to the bounds. Still running at the bound fails with the same retry line. Never reported fails too, naming
 `landingWaitsOnCi`: a repository whose CI does not run on pushes to the base sets it false (`--set landingWaitsOnCi=false`), and the
 receipt then waits on nothing.
 

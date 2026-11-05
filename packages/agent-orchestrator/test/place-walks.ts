@@ -860,6 +860,25 @@ const STATUS: readonly Walk[] = [
     },
   },
   {
+    name: 'a tip that reaches the line only through a commit of another branch is read by the merge that brought that branch in',
+    walk: (side, area) => {
+      const { root, work } = forked(side, area);
+      const deeper = side.world.branch(root, 'deeper', { 'c.txt': 'three\n' }, work);
+      side.world.stage(root, 'deeper');
+      side.place.askNow('land', { repo: root, act: 'commit', message: 'land deeper' });
+      const merge = side.world.head(root);
+      const onTop = side.world.branch(root, 'main', { 'd.txt': 'four\n' });
+      return { work, deeper, merge, onTop, status: side.place.askNow('status', { repo: root, tips: { work } }) };
+    },
+    says: {
+      deeper: 'commit-1',
+      merge: 'commit-2',
+      onTop: 'commit-3',
+      status: { answer: { conflicted: false, merging: 'none', missing: [], tip: 'commit-3', landedBy: 'commit-2' } },
+      work: 'commit-4',
+    },
+  },
+  {
     name: 'REFUSED: a directory that is no repository, and a path that is none',
     walk: (side, area) => [
       side.place.askNow('status', { repo: area, tips: {} }),

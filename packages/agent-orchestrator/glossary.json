@@ -249,7 +249,7 @@
     },
     {
       "term": "Out of memory",
-      "meaning": "a step whose current try's session or check the kernel killed a process of at its memory limit, read off the attempt's `memory` record on every pass and said in the step's note on the feed, `nemia ls` and the run page: the limit, the peak where the kernel kept one, and the knob to raise, the step's own `memory:` where it names one, else `WF_MEMORY_LIMIT`, the daemon's default (`packages/agent-orchestrator/src/views/views-words.ts`).",
+      "meaning": "a step whose current try's session or check the kernel killed a process of at its memory limit, read off the attempt's `memory` record on every pass and said in the step's note on the feed, `nemia ls` and the run page: the limit, the peak where the kernel kept one, and the knob to raise, the step's own `memory:` where it names one, else `WF_MEMORY_LIMIT`, the daemon's default (`packages/agent-orchestrator/src/out-of-memory/out-of-memory.ts`).",
       "type": "KilledAtLimit"
     },
     {

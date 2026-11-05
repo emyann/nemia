@@ -121,7 +121,7 @@ function modulesLoaded(entry: string, more: readonly string[] = []): string[] {
  * list and of whether a write of one is taken, which imports nothing but its contracts' types.
  */
 const PINNED_MODULES: Record<string, { all: number; effect: number }> = {
-  'agent-orchestrator/run': { all: 191, effect: 15 },
+  'agent-orchestrator/run': { all: 192, effect: 15 },
   'agent-orchestrator/workflow': { all: 141, effect: 15 },
 };
 

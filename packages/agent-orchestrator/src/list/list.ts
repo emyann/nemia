@@ -6,7 +6,8 @@ import { gated, hasStarted, holdAdvice, holdNeedsYou, holdWord, waitAdvice, wait
 import { slotWord, type CheckoutHold, type RunSlot } from '../cap/cap.ts';
 import { checkoutWord, LANDED_CAP, landedWords, onBaseNote, toDecideWords, type ToDecide } from '../ending/ending.ts';
 import type { Workflow } from '../step/step.ts';
-import { outOfMemory, outOfMemoryWords, type AttemptMemory, type EnginePhase } from '../views/views-words.ts';
+import type { AttemptMemory, EnginePhase } from '../views/views-words.ts';
+import { outOfMemory, outOfMemoryWords } from '../out-of-memory/out-of-memory.ts';
 import { DENIED_CAP, DENIED_SHOWN, oneLine, satisfiesAfter, type CloseoutAsked, type Run, type StepStatus } from '../record/record.ts';
 import type { Closeout } from '../closeout/index.ts';
 import { checkVerdictOf, verdictWord, type CheckVerdict, type Verdict } from '../check/check.ts';

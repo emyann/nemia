@@ -5,15 +5,8 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import {
-  killedMemoryOf,
-  memoryBytesWord,
-  outOfMemory,
-  outOfMemoryWords,
-  type AttemptMemory,
-  type WordAttempt,
-  type WordView,
-} from './views-words.ts';
+import { killedMemoryOf, type AttemptMemory, type WordAttempt, type WordView } from './views-words.ts';
+import { memoryBytesWord, outOfMemory, outOfMemoryWords } from '../out-of-memory/out-of-memory.ts';
 
 const GI = 1024 ** 3;
 const KILLED: AttemptMemory = { limitBytes: 4 * GI, peakBytes: 4 * GI, oomKills: 1 };

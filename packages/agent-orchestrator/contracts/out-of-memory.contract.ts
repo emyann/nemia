@@ -1,8 +1,9 @@
 /**
- * Whether a step's session passed its memory limit (agent-orchestrator, src/views/views-words.ts, `outOfMemory`), off what the runtime
- * carries on the attempt (`Attempt.memory`: its limit in bytes, its peak where the kernel kept one, and how many processes the kernel's
- * OOM killer ended in its cgroup), and which knob the words that say so name: the step's own `memory:` where it names one, else the
- * daemon's default (`WF_MEMORY_LIMIT`), which is the only other place a session's limit comes from (`limitsOf`, src/tick/file.verb.ts).
+ * Whether a step's session passed its memory limit (agent-orchestrator, src/out-of-memory/out-of-memory.ts, `outOfMemory`), off what the
+ * runtime carries on the attempt (`Attempt.memory`: its limit in bytes, its peak where the kernel kept one, and how many processes the
+ * kernel's OOM killer ended in its cgroup), and which knob the words that say so name: the step's own `memory:` where it names one, else
+ * the daemon's default (`WF_MEMORY_LIMIT`), which is the only other place a session's limit comes from (`limitsOf`,
+ * src/tick/file.verb.ts).
  *
  * The runtime carries the record and judges nothing of it; this is the orchestrator's judgement, read off the attempt on every pass,
  * never off a transition. An attempt with no record — one a former runtime ran, or one run under no limit — says nothing, and so does
@@ -10,7 +11,7 @@
  *
  * `AttemptMemory` is written out here, as a pure file of the orchestrator writes a runtime's shape (views-words.ts), and is held equal to
  * the runtime's `MemoryUse` by a type-level check in src/runtime-client.ts. `KilledAtLimit` is what the words are written from
- * (`outOfMemoryWords`, src/views/views-words.ts). Both are imported from here by views-words.ts, as src/route/route.ts imports its
+ * (`outOfMemoryWords`, src/out-of-memory/out-of-memory.ts). Both are imported from here by the code, as src/route/route.ts imports its
  * contracts' types.
  */
 import { type Implementation, spec } from '@emyann/tsverify';

@@ -35,7 +35,9 @@ const itsOwn = (sub: SubscriptionAsked, kept: DeliveryKept | undefined): kept is
 
 const subscriptionDeliveredSpec = spec<(sub: SubscriptionAsked, kept: DeliveryKept | undefined) => DeliveredStatus>({
   requires: ({ input: [sub, kept] }) =>
-    count(sub.from) && (kept === undefined || (count(kept.cursor) && count(kept.pending) && count(kept.of.from))),
+    count(sub.from) &&
+    (kept === undefined ||
+      (count(kept.cursor) && count(kept.pending) && count(kept.of.from) && (kept.since === undefined || Number.isFinite(kept.since)))),
   ensures: {
     whereItsOwnFileSays: {
       description: "Where the deliverer's file was written for this subscription, the status is where that file says",
@@ -43,7 +45,7 @@ const subscriptionDeliveredSpec = spec<(sub: SubscriptionAsked, kept: DeliveryKe
         !itsOwn(sub, kept) || (output.cursor === kept.cursor && output.pending === kept.pending),
     },
     atItsStartOtherwise: {
-      description: "Where no file was written for this subscription, the deliverer is at its from, with nothing pending",
+      description: 'Where no file was written for this subscription, the deliverer is at its from, with nothing pending',
       condition: ({ input: [sub, kept], output }) =>
         itsOwn(sub, kept) || (output.cursor === sub.from && output.pending === 0 && output.since === undefined),
     },

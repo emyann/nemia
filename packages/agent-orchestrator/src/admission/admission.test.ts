@@ -76,8 +76,8 @@ test('`admissionOf` with no floor and no rules: what answers the person is asked
   });
   for (const line of [
     'nemia policy confirm nemia tries',
-    "nemia policy confirm nemia tries --words 'Try again the step implement unasked when its check passed and the run has cost under $20.'",
-    'nemia policy confirm nemia tries --words "Try again the step implement unasked."',
+    "nemia policy confirm nemia tries --words 'Try implement again on its own once its check passed and it has cost under $20.'",
+    'nemia policy confirm nemia tries --words "Try implement again on its own."',
     'nemia policy rm nemia default',
     'nemia show r && nemia policy confirm nemia tries',
     'nemia factory apply made --template /t --repo /r',
@@ -209,8 +209,8 @@ test('`admissionOf` under her floor and at auto: below the floor denied, unread 
     () => {
       for (const line of [
         'nemia policy confirm nemia tries',
-        "nemia policy confirm nemia tries --words 'Try again the step implement unasked when its check passed and the run has cost under $20.'",
-        'nemia policy confirm nemia tries --words "Try again the step implement unasked."',
+        "nemia policy confirm nemia tries --words 'Try implement again on its own once its check passed and it has cost under $20.'",
+        'nemia policy confirm nemia tries --words "Try implement again on its own."',
         'nemia policy rm nemia default',
         'nemia show r && nemia policy confirm nemia tries',
         'nemia auto drop nemia default',

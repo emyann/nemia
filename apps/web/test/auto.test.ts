@@ -13,7 +13,8 @@ const DEFAULT = {
   answer: 'approve',
   when: ['recommends', 'checked', 'accepted', 'withinBudget', 'nothingOpen'],
   from: 'default',
-  words: 'Approve any step unasked when all agree.',
+  words:
+    'Approve any step on its own once its agent recommends it, its check passed, its review passed, it stayed within budget and nothing waits on you.',
 } as const;
 
 /** Her rules, the default in force, one rule proposed and one word kept as guidance. */
@@ -26,7 +27,17 @@ const LIST: PolicyList = {
   proposed: {
     file: '/store/auto/nemia.proposed.json',
     at: '2026-10-06T12:00:00.000Z',
-    rules: [{ id: 'tries', answer: 'retry', steps: ['implement'], when: ['checked'], under: 3, words: 'Try again.', confirmed: false }],
+    rules: [
+      {
+        id: 'tries',
+        answer: 'retry',
+        steps: ['implement'],
+        when: ['checked'],
+        under: 3,
+        words: 'Try implement again on its own once its check passed and it has cost under $3.',
+        confirmed: false,
+      },
+    ],
     guidance: ['answer in French'],
     stale: false,
   },
@@ -64,10 +75,17 @@ test('policyQuery, confirmRule, dropRule: her rules read back as the api answers
     'a confirm is a PUT sending the words read and a drop a DELETE sending an empty body, each reading the rules back',
     async (t) => {
       const calls = answering(t, LIST);
-      assert.deepEqual(await confirmRule('nemia', 'tries', 'Try again.'), LIST);
+      assert.deepEqual(
+        await confirmRule('nemia', 'tries', 'Try implement again on its own once its check passed and it has cost under $3.'),
+        LIST,
+      );
       assert.deepEqual(await dropRule('nemia', 'default'), LIST);
       assert.deepEqual(calls, [
-        { method: 'PUT', path: '/api/policy/nemia/rules/tries', body: { words: 'Try again.' } },
+        {
+          method: 'PUT',
+          path: '/api/policy/nemia/rules/tries',
+          body: { words: 'Try implement again on its own once its check passed and it has cost under $3.' },
+        },
         { method: 'DELETE', path: '/api/policy/nemia/rules/default', body: {} },
       ]);
     },

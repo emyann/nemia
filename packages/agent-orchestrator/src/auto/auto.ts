@@ -82,7 +82,7 @@ export const allowedBy = (
 ): PolicyRule | undefined => list.find((rule) => allows(rule, answer, step, facts));
 
 /** Each condition as a rule says it. */
-const CONDITION_WORDS: Record<Condition, string> = {
+export const CONDITION_WORDS: Record<Condition, string> = {
   recommends: 'the agent recommends it',
   checked: 'its check passed',
   accepted: 'every reviewer accepted',

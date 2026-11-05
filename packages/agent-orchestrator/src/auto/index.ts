@@ -14,6 +14,7 @@ export {
   listInForce,
   ruleRefusal,
   ruleWords,
+  CONDITION_WORDS,
   type RuleAnswer,
   type PolicyRule,
   type Condition,

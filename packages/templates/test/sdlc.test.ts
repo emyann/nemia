@@ -281,3 +281,30 @@ test("build's design, read with Seldon, declares the later steps' budgets as dat
   assert.equal(budgets?.type, 'array', 'the shape is expanded to an array');
   assert.ok(!Object.hasOwn(budgets ?? {}, 'x-shape'), 'the marker is gone once expanded');
 });
+
+test("build's design, read with Seldon, hands the review the outside pages its spec rests on: sources, required and strict, read by the review", () => {
+  const tree = treeOf('set');
+  const agents = path.join(tree, 'workflows', 'agents');
+  const readAgents = (file: string): string | undefined =>
+    fs.existsSync(path.join(agents, file)) ? fs.readFileSync(path.join(agents, file), 'utf8') : undefined;
+  const seldon = parseAgent('seldon', fs.readFileSync(path.join(agents, 'seldon.md'), 'utf8'), readAgents);
+  const design = parseWorkflow(
+    'design',
+    fs.readFileSync(path.join(tree, 'workflows', 'build', 'design.md'), 'utf8'),
+    (file) => readAgents(file),
+    new Map([['seldon', seldon]]),
+    undefined,
+    { agent: 'seldon', factory: 'set', step: 'build/design' },
+  );
+  const schema = design.output?.schema;
+  assert.ok(schema, "design's output is Seldon's");
+  assert.ok(schema.required.includes('sources'), 'sources is required');
+  const sources = schema.properties.sources as
+    | { type?: unknown; items?: { additionalProperties?: unknown; required?: unknown } }
+    | undefined;
+  assert.equal(sources?.type, 'array');
+  assert.equal(sources?.items?.additionalProperties, false, 'each source is strict');
+  assert.deepEqual(sources?.items?.required, ['url', 'read', 'excerpt', 'claims']);
+  const input = stepIn(tree, 'build', 'review').front.input;
+  assert.ok([input].flat().includes('design'), "build's review reads design's declared fields");
+});

@@ -139,3 +139,12 @@ The agents and their skills are any software factory's, and say nothing of the r
 its commands, its paths, its tools — is in its own instructions (its `CLAUDE.md`), which every session reads. None of this workflow's
 steps declares a closeout of its own (no `output:`, and no schema beside them): what each closes out on is its agent's, review's
 `findings` and `again` being Agora's.
+
+## What design hands the review: the pages it read
+
+A spec can rest on a page outside the repository: a standard, a vendor's documentation, a file of another repository read on the web.
+Seldon declares each such page in `sources` on its output — the address, the day it was read, the passage word for word and the claims
+the spec takes from it — and the review, which reads design (`input: design`), is handed it in its brief with design's other declared
+fields, as implement is. The review's fetch stays as narrow as it is: a gating reviewer that may fetch any page can be pointed at any
+page by the change it judges, and would read the page as it is then, not as design read it. Agora checks each claim against its
+passage, and names a claim it cannot check at the top of its sign-off, where the person who approves the landing reads it.

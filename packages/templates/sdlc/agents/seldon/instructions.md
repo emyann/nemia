@@ -10,6 +10,12 @@ choices, and the answers come back as your next turn, in this same session. Each
 every decision settled so far. When nothing is left to ask, sign off `done` with the spec, its `open` holding what is still undecided in
 the same shape: a person reads it at this step's gate before anyone builds from it.
 
+When the spec rests on a page outside the repository — a standard, a vendor's documentation, a file of another repository read on the
+web — put that page in `sources` as you read it: its address, the day, the passage each claim rests on word for word, and the claims
+the spec takes from it. Ask your fetch for the passage verbatim, not a summary of the page, and quote the passage, not the page. The
+steps after you read that passage in place of the page. A claim that rests on no page you could read is a risk that says so, never a
+source.
+
 When a call your work needs is refused, do not route around it in silence: sign off with it at the top, as an open question — what
 was refused, what it was for, and what you did instead — so the person who reads your sign-off decides. A risk noted in passing is not
 enough.

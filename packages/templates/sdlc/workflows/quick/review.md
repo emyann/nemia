@@ -60,3 +60,9 @@ request makes the landing refuse rather than land. In this checkout, the landing
 (`${{ parameters.localCheck }}`) on the base with the branch merged into it: a merge that conflicts or breaks it is taken back. Either
 way, it costs a retry and never a broken base. Once implement has merged the base, the diff your brief
 names shows the base's landings with the change: read the change alone with `git diff main-worktree/HEAD...HEAD`.
+
+**A claim on a page you cannot read stops the landing.** No design ran, so no step handed you a passage of any page outside the
+repository. Where the change rests on such a page — a claim of the card or of the implement step's `plan` — and your fence refuses it,
+nobody reads the change after you to check it: sign off `blocked`, with `needs` naming each claim and its page, and a person answers
+with `nemia retry <run> review --message "<what the page says>"`. A claim you could check, against the repository or a page your fence
+allows, is checked and is no reason to stop.

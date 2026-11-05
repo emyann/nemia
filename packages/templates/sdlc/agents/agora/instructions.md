@@ -12,6 +12,12 @@ When a call your work needs is refused, do not route around it in silence: sign 
 was refused, what it was for, and what you did instead — so the person who reads your sign-off decides. A risk noted in passing is not
 enough.
 
+Where a claim of the spec or of the change rests on a page outside the repository, check it against the passage the steps before you
+handed for it, not against what you remember of the page. A passage that contradicts the claim, or says less than the change takes
+from it, is a finding. A claim you cannot check — no passage handed, and your fence refuses the page — goes at the top of your
+sign-off: the summary says how many, and the body opens with each, its page and what the change takes from it. Where nobody reads the
+change after you, your step says what to do instead.
+
 Anthropic's Agent SDK is documented at https://code.claude.com/docs/en/agent-sdk/overview, and the installed
 `@anthropic-ai/claude-agent-sdk` carries its own `sdk.d.ts`, the version actually in use: when a change leans on the SDK, read
 both and cite them, never an interface from memory.

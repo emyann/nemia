@@ -13,3 +13,7 @@ line each kept or absorbed assertion guards, broken once and seen failing; on a 
 
 The checks you may run here are the ones the repository's settings allow you, each bare and one command per call; what each is for,
 the repository's instructions say. Run nothing that writes the workspace or watches it.
+
+The review is handed your declared fields, `sources` among them, and may fetch none of the pages you read: the passage you quote there
+is all it has of each. A claim of the spec whose passage is not in `sources` is one the review cannot check, and says so to the person
+who approves the landing.

@@ -23,9 +23,12 @@ import {
   readMarkFile,
   readOutbox,
   readReadMark,
+  readSpeakers,
   readStops,
+  speakersFile,
   stopsFile,
   writeReadMark,
+  writeSpeakers,
 } from './chat.store.ts';
 
 /** That `read` refuses, naming the file and line `at`. */
@@ -57,6 +60,31 @@ test("the chat's files: read back in order, a last line still being written left
       { at: '2026-10-15T12:00:05.000Z', attempt: 1 },
       { at: '2026-10-15T12:00:06.000Z', attempt: 2 },
     ]);
+  });
+  await t.test("an agent's entry reads back with who wrote it, and a line written with none reads as before, the person's", () => {
+    const dir = scratch('wf-chat-store-');
+    fs.mkdirSync(path.dirname(outboxFile(dir)), { recursive: true });
+    fs.appendFileSync(outboxFile(dir), `${JSON.stringify({ id: 'o1', at: '2026-10-15T12:00:00.000Z', text: 'mine' })}\n`);
+    appendOutbox(dir, { id: 'o2', at: '2026-10-15T12:00:01.000Z', text: 'theirs', from: { kind: 'agent', name: 'operator' } });
+    assert.deepEqual(readOutbox(dir), [
+      { id: 'o1', at: '2026-10-15T12:00:00.000Z', text: 'mine' },
+      { id: 'o2', at: '2026-10-15T12:00:01.000Z', text: 'theirs', from: { kind: 'agent', name: 'operator' } },
+    ]);
+  });
+  await t.test('the names the person allowed: none with no file, read back whole as written, a key a newer writer added kept', () => {
+    const dir = scratch('wf-chat-store-');
+    assert.deepEqual(readSpeakers(dir), []);
+    writeSpeakers(dir, ['operator', 'nemia-ab12/design']);
+    fs.writeFileSync(speakersFile(dir), JSON.stringify({ allowed: ['operator', 'nemia-ab12/design'], since: 'a newer writer' }));
+    writeSpeakers(dir, ['operator']);
+    assert.deepEqual(readSpeakers(dir), ['operator']);
+    assert.equal(JSON.parse(fs.readFileSync(speakersFile(dir), 'utf8')).since, 'a newer writer', 'a key a newer writer added is kept');
+  });
+  await t.test('REFUSED: a speakers file that does not read as one, naming the file', () => {
+    const dir = scratch('wf-chat-store-');
+    fs.mkdirSync(path.dirname(speakersFile(dir)), { recursive: true });
+    fs.writeFileSync(speakersFile(dir), '{"allowed":"operator"}');
+    refused(() => readSpeakers(dir), `${speakersFile(dir)} is not`);
   });
   await t.test('a last line not yet ended is left out, as an append still being written', () => {
     const dir = scratch('wf-chat-store-');

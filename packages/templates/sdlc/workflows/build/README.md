@@ -19,8 +19,8 @@ The factory's `github` parameter, set when the template is applied, picks one. A
 workflow's steps, so both ways are in each file: the implement and land steps' checks are each one shell `if` on the rendered value, and the
 notes of implement, review and land each open with the answer and hold a part for each.
 
-- **`github: false`, the default: in this checkout.** No remote is read or written. The implement step's check runs `probe.ts`, then the
-  factory's `localCheck` parameter (the repository's lint, typecheck and test, where it has them, by default) on the round's tree; no
+- **`github: false`, the default: in this checkout.** No remote is read or written. The implement step's check runs `probe.ts` and `parts.ts`,
+  then the factory's `localCheck` parameter (the repository's lint, typecheck and test, where it has them, by default) on the round's tree; no
   pull request is opened. Land checks the checkout and stages every result branch in one `git merge --no-ff --no-commit`, as the git
   place's skill says (*Stage a landing*), and signs off with the merge's message; the land step's check runs `localCheck` again, on the merged
   tree, and the run commits the merge on its exit 0 and takes it back otherwise. `localCheck` is the only judge, so it runs the tests.
@@ -75,6 +75,13 @@ The implement step's check runs `probe.ts`, read from the frozen files as well: 
 only with `--answer`, and the step then stops `blocked` on the `needs` line it prints. The check refuses while a probe named for the
 run is live, naming `probe.ts stop`. Grace's and Otto's fences refuse a bare `claude --bg` or Remote Control, and an edit of a
 harness's trust or local settings anywhere.
+
+The implement step's check runs `parts.ts check` after it, read from the frozen files too: every other branch of the run
+(`wf/<run>/<part>`, a part Grace built beside her branch) has each of its commits' patches on her branch (`git cherry`, as the
+landing reads it), or the check refuses, naming each part left out and the two ways to settle it. A part whose work her branch
+replaced she declares replaced, `node "$WF_WORKFLOW_FILES/parts.ts" replaced <part>…`, which removes its branch and keeps its tip as
+`refs/backup/wf/<run>/<part>` — a step may not delete a branch — and names in her closeout; so the landing never finds a superseded
+part it would refuse.
 
 Review counts what it closes out on (`tally: findings, findings.kind=placement`): the findings of each round, and those of
 them whose `kind` is `placement` (a change in a boundary the repository's rules give to another concern). `nemia stats` totals each per

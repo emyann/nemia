@@ -25,7 +25,16 @@ const ROOT = scratch('wf-revisions-');
 process.env.WF_ROOT = ROOT;
 delete process.env.WF_MAX_CONCURRENT;
 delete process.env.WF_MAX_RUNS;
-const { addFactory, advanceRun, attachWorkflow, driftNow, startRun, retryRun, runWith: runEngine } = await import('../src/runner.ts');
+const {
+  addFactory,
+  advanceRun,
+  approveRun,
+  attachWorkflow,
+  driftNow,
+  startRun,
+  retryRun,
+  runWith: runEngine,
+} = await import('../src/runner.ts');
 const { engineOf } = await import('../src/runtime-client.ts');
 const { main } = await import('../src/cli/main.ts');
 const stage = staged({ runWith: runEngine, main, engineOf });
@@ -767,6 +776,82 @@ test('a round files its target on the closeout schema the folder declares now: c
     undefined,
     'and asks a fresh session, since the schema it is now given is not the one its last try answered in',
   );
+});
+
+test('a step that ended is judged by the fields it was filed with: a run that follows a schema gaining a field never unsigns it', async (t) => {
+  const s = story(t);
+  const team0 = team();
+  const agentSchema = path.join(path.dirname(team0.agentFile), `${team0.agent}.schema.json`);
+  fs.writeFileSync(team0.agentFile, `---\nskills: ${team0.skill}\noutput: ${team0.agent}.schema.json\n---\nYou build.\n`);
+  fs.writeFileSync(agentSchema, JSON.stringify(schemaOf('goal')));
+  fs.writeFileSync(team0.stepFile, `---\nplace: git\nagent: ${team0.agent}\ngate: true\n---\nBuild it.\n`);
+  fs.writeFileSync(path.join(team0.dir, 'review.md'), `---\nplace: git\nagent: ${team0.agent}\nafter: build\n---\nReview it.\n`);
+  const repo = aRepo();
+  const factory = `follows-filed-${team0.name}`;
+  addFactory({ name: factory, repos: [repo] });
+  attachWorkflow({ factory, workflow: team0.name });
+  setRevisions({ factory, revisions: 'follow' });
+  const run = await started(team0.dir, repo, { factory });
+  const b = board();
+
+  await s.test('build is filed, signs off with the one field its schema asks, and is approved at its gate', async () => {
+    await runWith(b.e, advanceRun(readRun(run.id)));
+    b.settle(`${run.id}-build`, 'succeeded', { closeout: { ...SIGNED, goal: 'a thing' } });
+    const held = await runWith(b.e, advanceRun(readRun(run.id)));
+    assert.equal(held.status, 'awaiting approval', JSON.stringify(held.waiting));
+    await runWith(b.e, approveRun(run.id, 'build'));
+  });
+
+  await s.test('the agent schema gains a required field, and the next pass re-pins the run and files nothing', async () => {
+    fs.writeFileSync(
+      agentSchema,
+      JSON.stringify({
+        type: 'object',
+        properties: { goal: { type: 'string' }, why: { type: 'string' } },
+        required: ['goal', 'why'],
+        additionalProperties: false,
+      }),
+    );
+    const repinned = await runWith(b.e, advanceRun(readRun(run.id)));
+    assert.deepEqual(repinned.tried, [], 'the pass that re-pins files nothing');
+    assert.equal(pinOf(readRun(run.id).pinned, 'agent', team0.agent)?.n, 2, 'the run follows the edited agent');
+    const build = readRun(run.id).workflow?.find((w) => w.name === 'build');
+    assert.deepEqual(Object.keys(build?.output?.schema.properties ?? {}), ['goal', 'why'], 'and its frozen build declares both');
+  });
+
+  await s.test('on the pass after, build still reads signed and review is filed', async () => {
+    const pass = await runWith(b.e, advanceRun(readRun(run.id)));
+    assert.doesNotMatch(pass.feed.steps.find((x) => x.name === 'build')?.word ?? '', /^unsigned/, JSON.stringify(pass.feed.steps));
+    assert.ok(!pass.waiting.some((w) => JSON.stringify(w).includes('build')), JSON.stringify(pass.waiting));
+    assert.ok(readRun(run.id).steps.review?.taskId, `review is filed: ${JSON.stringify(pass.feed.steps)}`);
+  });
+
+  await s.test('each record keeps the fields its own try was filed with', () => {
+    const { steps } = readRun(run.id);
+    assert.deepEqual(steps.build?.declared, ['goal'], 'build was filed before the move');
+    assert.deepEqual(steps.review?.declared, ['goal', 'why'], 'review after it');
+  });
+
+  await s.test(
+    'a record written before the fields were kept reads them where its schema has not moved, and build still signed',
+    async () => {
+      const file = path.join(ROOT, 'runs', `${run.id}.json`);
+      const record = JSON.parse(fs.readFileSync(file, 'utf8'));
+      for (const name of ['build', 'review']) delete record.steps[name].declared;
+      fs.writeFileSync(file, JSON.stringify(record, null, 2));
+      const { steps } = readRun(run.id);
+      assert.equal(steps.build?.declared, undefined, 'build, filed on a schema that has moved since, is given none');
+      assert.deepEqual(steps.review?.declared, ['goal', 'why'], 'review, whose schema has not moved, is given what it declares');
+      const pass = await runWith(b.e, advanceRun(readRun(run.id)));
+      assert.doesNotMatch(pass.feed.steps.find((x) => x.name === 'build')?.word ?? '', /^unsigned/, JSON.stringify(pass.feed.steps));
+    },
+  );
+
+  await s.test('review, filed after the move, owes the new field', async () => {
+    b.settle(`${run.id}-review`, 'succeeded', { closeout: { ...SIGNED, goal: 'reviewed' } });
+    const pass = await runWith(b.e, advanceRun(readRun(run.id)));
+    assert.match(pass.feed.steps.find((x) => x.name === 'review')?.word ?? '', /^unsigned/, JSON.stringify(pass.feed.steps));
+  });
 });
 
 /** What the `revisions` phase counted while `f` ran as one metered pass: the reads of the world a resolve made. */

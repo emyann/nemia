@@ -32,6 +32,11 @@ spec:
         - Bash(git branch --delete --force:*)
         - Bash(pkill:*)
         - Bash(killall:*)
+        - Bash(*pkill *)
+        - Bash(*killall *)
+        - Bash(*kill *pgrep*)
+        - Bash(*pgrep*kill *)
+        - Bash(*xargs kill*)
         - mcp__playwright__browser_run_code_unsafe
         - Bash(claude *--bg*)
         - Bash(claude *--background*)

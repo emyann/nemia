@@ -465,7 +465,7 @@ function printCloseout(
   if ('error' in c) return console.log(`    closeout unreadable — ${c.error}`);
   for (const line of envelopeLines(step, c, steps)) console.log(`    ${line}`);
   const asked = askedQuestions(step, c);
-  const fields = step ? owedFields(step, run, steps).filter((f) => !asked.some((a) => a.field === f)) : [];
+  const fields = step ? owedFields(step, run, steps, c).filter((f) => !asked.some((a) => a.field === f)) : [];
   for (const line of step ? [...outputLines(step, c, fields), ...questionLines(asked)] : []) console.log(`    ${line}`);
   if (c.needs) console.log(`    needs: ${c.needs}`);
   if (answering[name]) console.log(`    ${answering[name]}`);

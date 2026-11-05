@@ -3636,8 +3636,11 @@ screen of the board.
   left alone; `NEMIA_DAEMON_START=off` starts none, and says so.
 - **`nemia service restart` restarts the service's daemon gracefully** (`src/service/restart.verb.ts`), as `nemia service install
   --take-over` and `nemia upgrade` take a daemon over (`takeOver`, `src/service/takeover.verb.ts`): it pauses the store unless a person's
-  pause stands, lets each landing check finish, sends SIGTERM to the pid it confirmed, starts the unit, and resumes the store once the new
-  daemon has completed its first pass — never on a daemon that only ticks. A new daemon that stops before that pass, or a lease that does
+  pause stands, waits up to the timeout for the calls in flight of the daemon's own sessions, sends SIGTERM to the pid it confirmed,
+  starts the unit, and resumes the store once the new daemon has completed its first pass — never on a daemon that only ticks. It waits
+  on no check, a landing's wait on CI included: each runs on its worker through the restart, and the new daemon reads its result. The
+  pause it puts and the drain it holds the sessions by each name the process that put them, so a restart killed while it waits leaves
+  neither standing past the daemon's next pass (`liftLapsedPause`, `putDrain`). A new daemon that stops before that pass, or a lease that does
   not come back, is refused (exit 2) naming the service's log and `nemia service status`, the store left paused. A daemon started by hand
   is not the service's to start again: it is named with `nemia service install --take-over <pid>`, whether a service is installed or
   not; where nothing ticks, the service is started and waited for the same way, and a person's pause is left standing and said.

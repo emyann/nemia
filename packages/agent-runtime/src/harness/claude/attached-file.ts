@@ -319,27 +319,44 @@ export const isOpen = (state: AttachedState): boolean => OPEN_STATES.includes(st
 const DRAIN = 'drain.json';
 
 /**
- * The drain put for the holder `pid`: its new calls wait until it is lifted. Written by the process that puts it, with when `pid`
- * started, so a later process given the same pid is not held.
+ * The drain put for the holder `pid`: its new calls wait until it is lifted, or until the process that put it ends. Written by that
+ * process, with when `pid` started, so a later process given the same pid is not held, and with who put it (`by`: its pid and start),
+ * so a drain whose putter was killed before it lifted it holds nothing.
  */
 export const putDrain = (root: string, pid: number): void => {
   const start = processStart(pid);
+  const byStart = processStart(process.pid);
+  const by = { pid: process.pid, ...(byStart ? { start: byStart } : {}) };
   fs.mkdirSync(attachedDir(root), { recursive: true });
-  fs.writeFileSync(path.join(attachedDir(root), DRAIN), JSON.stringify({ pid, ...(start ? { start } : {}) }));
+  fs.writeFileSync(path.join(attachedDir(root), DRAIN), JSON.stringify({ pid, ...(start ? { start } : {}), by }));
 };
 
 /** The drain lifted: none waits. */
 export const liftDrain = (root: string): void => fs.rmSync(path.join(attachedDir(root), DRAIN), { force: true });
 
-/** Whether the drain put names this very process: its pid, and, where the drain says it, when it started. */
+/**
+ * Whether the process that put a drain is gone: its pid dead, or another process's now, where the drain says when it started. A drain
+ * that names no putter (`by`), written before it did, is never read as gone.
+ */
+const putterGone = (by: unknown): boolean => {
+  if (typeof by !== 'object' || by === null || !('pid' in by) || typeof by.pid !== 'number') return false;
+  if (!alive(by.pid)) return true;
+  const start = 'start' in by ? by.start : undefined;
+  return start !== undefined && processStart(by.pid) !== start;
+};
+
+/**
+ * Whether the drain put names this very process: its pid, and, where the drain says it, when it started; and its putter still runs
+ * (`putterGone`), so a take-over killed before it lifted its drain leaves nothing held.
+ */
 export const drainsThis = (root: string): boolean => {
-  let drain: { pid?: unknown; start?: unknown };
+  let drain: { pid?: unknown; start?: unknown; by?: unknown };
   try {
     drain = JSON.parse(fs.readFileSync(path.join(attachedDir(root), DRAIN), 'utf8')) as typeof drain;
   } catch {
     return false;
   }
-  return drain.pid === process.pid && (drain.start === undefined || drain.start === processStart(process.pid));
+  return drain.pid === process.pid && (drain.start === undefined || drain.start === processStart(process.pid)) && !putterGone(drain.by);
 };
 
 /**

@@ -539,14 +539,14 @@ test("declaredOutput and outputLines: a target's replies as `nemia decide` print
     ]);
   });
   await t.test('round 2: an empty list is named as not given', () => {
-    assert.deepEqual(outputLines(IMPLEMENT, replying([]), owedFields(IMPLEMENT, reviewDue(2), LOOP)), [
+    assert.deepEqual(outputLines(IMPLEMENT, replying([]), owedFields(IMPLEMENT, reviewDue(2), LOOP, replying([]))), [
       '!! declared and not given: replies',
     ]);
   });
   await t.test("round 1's empty replies go nowhere: not declared, missing only when asked, not printed", () => {
     assert.deepEqual(declaredOutput(IMPLEMENT, replying([])), { given: {}, missing: [] });
     assert.deepEqual(declaredOutput(IMPLEMENT, replying([]), ['replies']), { given: {}, missing: ['replies'] });
-    assert.deepEqual(outputLines(IMPLEMENT, replying([]), owedFields(IMPLEMENT, inRound(1), LOOP)), []);
+    assert.deepEqual(outputLines(IMPLEMENT, replying([]), owedFields(IMPLEMENT, inRound(1), LOOP, replying([]))), []);
   });
 });
 

@@ -128,7 +128,7 @@
     },
     {
       "term": "Timeout",
-      "meaning": "how long a pause, a restart and an upgrade give each session's tool call in flight before it is cut: a file of the store's (`timeoutFile`), ten minutes where none is set, set by `nemia pause-timeout <d>` and given once by `--timeout <d>` (`timeoutAt`, `timeoutGiven`). A restart waits on the daemon's own sessions alone, up to it; the jobs run on. Handed to the runtime's sessions' drain as its grace (`graceMs`), the runtime's own word for the same span.",
+      "meaning": "how long a pause, a restart and an upgrade give each session's tool call in flight before it is cut: a file of the store's (`timeoutFile`), ten minutes where none is set, set by `nemia pause-timeout <d>` and given once by `--timeout <d>` (`timeoutAt`, `timeoutGiven`). A restart waits on the daemon's own sessions alone, up to it, and on no check; the jobs and the checks run on. Handed to the runtime's sessions' drain as its grace (`graceMs`), the runtime's own word for the same span.",
       "type": "TimeoutAt"
     },
     {
@@ -254,7 +254,7 @@
     },
     {
       "term": "Pause",
-      "meaning": "the whole store paused by a person (`nemia pause`, lifted by `nemia resume`): one file, `pauseFile`, composed on read onto every run, under which no pass files new work and what is in flight runs on. The file keeps its former name, `cordon` (`PAUSE_FILE`), so that a pause put before the verbs were renamed still stands and is lifted.",
+      "meaning": "the whole store paused by a person (`nemia pause`, lifted by `nemia resume`): one file, `pauseFile`, composed on read onto every run, under which no pass files new work and what is in flight runs on. The file keeps its former name, `cordon` (`PAUSE_FILE`), so that a pause put before the verbs were renamed still stands and is lifted. A take-over's pause (`nemia service restart`, `nemia upgrade`, `nemia service install --take-over`) names the process that put it (`heldBy`), and the daemon's next pass lifts it once that process is gone (`liftLapsedPause`), so it never outlives its command; a person's names none.",
       "type": "Pause",
       "retired": [
         {

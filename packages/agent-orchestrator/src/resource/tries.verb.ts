@@ -30,6 +30,7 @@ import { LOOP_REPLIES, outputFields, type Workflow } from '../workflow.ts';
 import { closeoutRefusals } from '../question/index.ts';
 import { gateBudgets, type GateBudgets } from '../gate-budgets/gate-budgets.ts';
 import type { SpendOf } from '../status/status.ts';
+import { filedOwed } from '../pinned/pinned.ts';
 import type { Closeout } from '../closeout/index.ts';
 import { artifactOf, valueOf, type StepArtifact, type StepValue } from './files.store.ts';
 import { checkIn, type CheckStderr, type StepCheck } from './checks.verb.ts';
@@ -181,7 +182,8 @@ const attemptsOn = (state: TaskView['state'] | undefined, turn?: number): TaskVi
  * with what it gave of the fields its step declares, its `replies`, and each file it named as `artifactOf` reads it. Null for a
  * try that gave none, and for one whose closeout could not be read, which `unreadableIn` answers for. `replies` stand apart from the
  * declared fields: a loop's target owes them beside what its step declares, and they are shown as answers, not as a field. `schema` is
- * built with `fromEntries`, as `declaredOutput` builds its fields, so a field JSON names `__proto__` is a property of its own.
+ * built with `fromEntries`, as `declaredOutput` builds its fields, so a field JSON names `__proto__` is a property of its own. The
+ * current try's `missing` are of the fields it was filed with (`filedOwed`): one its step declares since a revision followed is not.
  */
 export function closeoutIn(
   run: Run,
@@ -196,7 +198,9 @@ export function closeoutIn(
   const c = said === undefined ? undefined : parseCloseout(said);
   if (!c || 'error' in c) return null;
   const fields = outputFields(step).filter((field) => field !== LOOP_REPLIES);
-  const { given, missing } = declaredOutput(step, c, fields);
+  const { given, missing: lacked } = declaredOutput(step, c, fields);
+  const owed = taskId === run.steps[name]?.taskId ? new Set(filedOwed(step, run, c)) : undefined;
+  const missing = owed ? lacked.filter((field) => owed.has(field)) : lacked;
   const replies = c.output?.[LOOP_REPLIES];
   const declared = step.output?.schema.properties ?? {};
   return {

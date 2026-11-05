@@ -19,7 +19,7 @@
  * a call held at its hook as the holder lets go, and a denial journalled while the attempt is at work.
  */
 import assert from 'node:assert/strict';
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import test, { type TestContext } from 'node:test';
@@ -784,6 +784,22 @@ test(
         'a drain says when its holder started',
       );
       fs.writeFileSync(path.join(attachedDir(root), 'drain.json'), JSON.stringify({ pid: process.pid, start: 'an earlier process' }));
+      const h = await holder(root);
+      rt.after(h.close);
+      await Effect.runPromise(h.attached.ops.spawn(request));
+      await until(rt, () => run(root)?.state === 'completed', 'the call let through and the session completed', { everyMs: 50 });
+    });
+
+    await t.test('a drain put by a process gone since holds nothing: it ends with the take-over that put it', async (rt) => {
+      const { root, dir, request } = place({ call: 'Read', output: {} });
+      fs.writeFileSync(path.join(dir, 'release'), '');
+      putDrain(root, process.pid);
+      const file = path.join(attachedDir(root), 'drain.json');
+      assert.equal(JSON.parse(fs.readFileSync(file, 'utf8')).by?.pid, process.pid, 'a drain names the process that put it');
+      const gone = spawnSync(process.execPath, ['-e', '']).pid;
+      assert.ok(gone, 'a child was spawned and has exited');
+      const drain = JSON.parse(fs.readFileSync(file, 'utf8'));
+      fs.writeFileSync(file, JSON.stringify({ ...drain, by: { pid: gone } }));
       const h = await holder(root);
       rt.after(h.close);
       await Effect.runPromise(h.attached.ops.spawn(request));

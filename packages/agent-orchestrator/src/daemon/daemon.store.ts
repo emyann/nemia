@@ -37,6 +37,7 @@ import {
   type Monotonic,
 } from './daemon.ts';
 import { Conflict } from '../refusal/refusal.ts';
+import type { PauseHolder } from '../pause/pause.ts';
 import { ALL_KINDS, DISK_PARTS } from '../disk/disk.ts';
 
 /** The text as JSON, or undefined where it is not: a file half written, or another program's. */
@@ -276,12 +277,21 @@ export function procStartOf(pid: number): number | undefined {
   }
 }
 
-/** What the process table says of the file's pid (`Identity` in daemon.ts): alive, and whether it is the process that wrote the file. */
-export function identify(file: DaemonFile): Identity {
+/**
+ * What the process table says of a file's pid (`Identity` in daemon.ts) — the lease's, or the holder a take-over's pause names: alive,
+ * and whether it is the process that wrote the file.
+ */
+export function identify(file: Pick<DaemonFile, 'pid' | 'procStart'>): Identity {
   if (!alive(file.pid)) return 'gone';
   const start = file.procStart === undefined ? undefined : procStartOf(file.pid);
   if (start === undefined) return alive(file.pid) ? 'unknown' : 'gone';
   return start === file.procStart ? 'same' : 'other';
+}
+
+/** This process as a file names it for `identify`: its pid, and when it started where the machine says. */
+export function thisProcess(): PauseHolder {
+  const procStart = procStartOf(process.pid);
+  return { pid: process.pid, ...(procStart === undefined ? {} : { procStart }) };
 }
 
 /** Where Linux keeps the id of the running boot, a fresh one at each. */

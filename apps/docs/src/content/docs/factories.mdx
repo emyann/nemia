@@ -148,7 +148,9 @@ whether it should, with one key, `revisions`, in its file, as a Pod's `imagePull
   `nemia refresh <run>`.
 - `follow`, as `Always`: every new filing of a run, a step, a retry or a round, is filed on the revisions the files hold then, as
   `nemia refresh` would take them. What was already filed is not run again, and the run's steps are neither added nor removed.
-  `nemia refresh` is refused of such a run, since there is nothing to ask for.
+  `nemia refresh` is refused of such a run, since there is nothing to ask for. A step already filed is judged by what it was filed
+  with: a field its agent's output schema gains later is owed by that step's next filing, a retry or a round, never by a try that has
+  ended, so following a revision never turns a step that signed off unsigned.
 
 A run that has filed nothing takes the files afresh at its first filing either way.
 

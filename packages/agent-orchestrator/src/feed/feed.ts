@@ -472,13 +472,15 @@ export type FeedPause = { at: string; by?: string; why?: string } | null;
 
 /**
  * The one-shots the store's pause owes the feed: the put, while a pause stands, and a lift for each put the feed holds that is not the one
- * standing. Both are a person's deed — only `nemia pause` puts the file and only `nemia resume` takes it away — so neither names a source
- * over the table's. A put or a lift already written is no concern of this: `oncePast` holds each to one line. Pure.
+ * standing. Each is a person's deed — `nemia pause` or a take-over they typed puts the file, and `nemia resume` takes it away, or the
+ * pass, of a take-over's pause whose command has gone (`liftLapsedPause`) — so neither names a source over the table's. A put or a lift
+ * already written is no concern of this: `oncePast` holds each to one line. Pure.
  *
- * **The lift is read off an absence**, as a hold's is (`holdOnce`): `nemia resume` deletes the file, so the next pass reads only that none
- * stands; the feed holds the put, so the lift is due, and once written the pair is matched. A pause put, lifted and put again is two puts
- * and two lifts, told apart by the moment each was put (`holdSince`); `nemia pause --now` on a store already paused keeps the standing
- * moment, and so writes no second put. A pause put and lifted between two passes leaves no line: a pass reads what stands.
+ * **The lift is read off an absence**, as a hold's is (`holdOnce`): `nemia resume` or the pass deletes the file, so the next pass reads
+ * only that none stands; the feed holds the put, so the lift is due, and once written the pair is matched. A pause put, lifted and put
+ * again is two puts and two lifts, told apart by the moment each was put (`holdSince`); `nemia pause --now` on a store already paused
+ * keeps the standing moment, and so writes no second put. A pause put and lifted between two passes leaves no line: a pass reads what
+ * stands.
  *
  * The put carries who put the pause and why, as fields of its own (`by`, `why`), never in its note: the note is what the lift is paired
  * by, and the lift, read off an absence, cannot know them.

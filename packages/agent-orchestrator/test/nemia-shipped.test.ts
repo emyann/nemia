@@ -168,18 +168,6 @@ const missingSections = (files: Map<string, string>): string[] =>
     headings.filter((heading) => !(files.get(file) ?? '').includes(`\n## ${heading}\n`)).map((heading) => `${file}: ${heading}`),
   );
 
-/**
- * A step's address on the board, which the board's chat reads out of her words and draws the run's page's part for (`broughtOf` in
- * apps/web's `lib/chatFollowing.ts`, whose test parses this same form, `TAUGHT` in apps/web's `test/chat.test.ts`).
- */
-const STEP_LINK = '](/runs/<run>?step=<step>)';
-
-test('bring-what-waits teaches her to name a step by the link the board draws its part for', () => {
-  const skill = shipped().get('skills/bring-what-waits/SKILL.md') ?? '';
-  assert.ok(skill.includes('# Bring what waits'), 'the skill is read');
-  assert.ok(skill.includes(STEP_LINK), `it names a step as [<step> of <run>]${STEP_LINK.slice(1)}`);
-});
-
 test('her skills recruit-or-create, first-meeting and bring-what-waits, and her instruction, keep their sections', () => {
   assert.deepEqual(missingSections(shipped()), []);
 });

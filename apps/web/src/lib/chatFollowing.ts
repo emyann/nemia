@@ -4,9 +4,9 @@
  * (`changedChat`, `followChat`), the one translation of the api's presence into the board's (`presenceOf`), her
  * consecutive calls folded into a turn (`foldChat`) and that fold mapped onto the one shape both conversations draw (`chatItems`, her
  * adapter onto `lib/conversation.ts`, a step's session having one of its own), the links read out of her words (`linksOf`) and the
- * steps of runs they bring (`broughtOf`), how an ask of hers is drawn (`drawnAsk`) and what is left to answer of one of several
- * questions (`askLeft`, `askAnswered`, `asksOpen`), which of them the composer's own words answer (`askInWords`, `wordsAnswer`), and
- * which of her messages are new to the person (`newFrom`, `readableFrom`).
+ * steps of runs they bring (`broughtOf`, `lib/stepLink.ts`), how an ask of hers is drawn (`drawnAsk`) and what is left to answer of
+ * one of several questions (`askLeft`, `askAnswered`, `asksOpen`), which of them the composer's own words answer (`askInWords`,
+ * `wordsAnswer`), and which of her messages are new to the person (`newFrom`, `readableFrom`).
  *
  * Beside the effect in `lib/useNemiaChat.ts`, as `lib/following.ts` sits beside `lib/useStepTranscript.ts`. The transport under
  * `followChat` is the one follower both conversations run on, `lib/follow.ts`.
@@ -16,6 +16,9 @@ import { chatDataOf } from './api/chat.ts';
 import type { ConversationItem, ConversationLine } from './conversation.ts';
 import { follow, type Followed, type Follower, type Frames, type StreamLike } from './follow.ts';
 import type { Presence } from './presence.ts';
+import { broughtOf } from './stepLink.ts';
+
+export { broughtOf } from './stepLink.ts';
 
 /** One tool call of hers, as her chat gives it. */
 export type ChatCall = Extract<ChatEvent, { kind: 'call' }>;
@@ -295,31 +298,6 @@ export type ChatBrought = { kind: 'brought'; run: string; step: string };
 
 /** What her talk draws itself, through the family's one escape hatch: an ask of hers, or a step her words bring. */
 export type ChatOwn = ChatAsk | ChatBrought;
-
-/** A step's address on the board: the run's page, its one path segment, with the step its bar opens (`routes/runs.$runId.tsx`). */
-const STEP_LINK = /^\/runs\/([^/?#]+)\?step=([^&#]+)$/;
-
-/** `part` URI-decoded, or undefined where it does not decode or decodes to nothing. */
-const decoded = (part: string): string | undefined => {
-  try {
-    const plain = decodeURIComponent(part);
-    return plain === '' ? undefined : plain;
-  } catch {
-    return undefined;
-  }
-};
-
-/**
- * The run and the step a link of hers names, where it is a step's address on the board (`/runs/<run>?step=<step>`, both parts
- * URI-decoded and neither empty); undefined for every other address, a run's page without a step among them. Pure.
- */
-export function broughtOf(href: string): { run: string; step: string } | undefined {
-  const parts = STEP_LINK.exec(href);
-  if (!parts) return undefined;
-  const run = decoded(parts[1]);
-  const step = decoded(parts[2]);
-  return run === undefined || step === undefined ? undefined : { run, step };
-}
 
 /** The steps the links `links` bring, each once, in the order she wrote them. */
 const broughtIn = (links: readonly ChatLink[]): ChatBrought[] => {

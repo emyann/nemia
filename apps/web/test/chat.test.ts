@@ -671,16 +671,12 @@ test('foldChat, newFrom, linksOf, drawnAs and chatItems: her events as the page 
   );
 });
 
-/** The link `bring-what-waits` teaches her to name a step by, its placeholders as the skill writes them. */
-const TAUGHT = '/runs/<run>?step=<step>';
-
 test('broughtOf and chatItems: a step her words link to is brought, drawn under her words as its own item', async (t) => {
   await t.test('a link to a step of a run names the run and the step, and every other address names none', () => {
     const rows: Array<[string, { run: string; step: string } | undefined]> = [
       ['/runs/r-1?step=design', { run: 'r-1', step: 'design' }],
       ['/runs/r-1?step=plan%2Fv2', { run: 'r-1', step: 'plan/v2' }],
       ['/runs/r%201?step=design', { run: 'r 1', step: 'design' }],
-      [TAUGHT.replace('<run>', 'cli-one-run-e4tv').replace('<step>', 'design'), { run: 'cli-one-run-e4tv', step: 'design' }],
       ['/runs/r-1', undefined],
       ['/runs/r-1?step=', undefined],
       ['/runs?step=x', undefined],

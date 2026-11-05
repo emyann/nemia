@@ -71,9 +71,9 @@ export default {
   /**
    * A factory's workflows are read in that factory. TREED is on a repository that is not the checkout, and its workflows are in its
    * tree: picked, the Workflows page lists what the api lists in it, by name — its tree's `dev`, which shadows the checkout's, its
-   * `tree-only`, and the one of yours it attaches — each tagged with it alone, none said to be this repository's, the tree's by the origin `factory`.
-   * Its `dev` leads to the tree's folder: its one step, no builder but the factory's way, nothing about a checkout or this repository,
-   * and why it cannot start there; a press on its step
+   * `tree-only`, and the one of yours it attaches — each tagged with it alone, none said to be this repository's, the tree's by the
+   * origin `factory`. Its `dev` leads to the tree's folder: its one step, no builder but the factory's way, nothing about a checkout or
+   * this repository, and why it cannot start there; a press on its step
    * opens the bar on the tree's step, whose Open, as a double click on the step, lands on the step's page in the factory. One of yours it
    * hires into still opens its builder, which drafts from the list read with no factory, and starts its run in the factory. TWIN, on two
    * repositories, asks which on the list and on a workflow's page, and is read on the one picked; a name no factory has says so on the
@@ -95,7 +95,7 @@ export default {
       await goto(page, `/workflows?factory=${TREED}`);
       await expectTexts(
         cards.locator('h2'),
-        [good.name, OWN.name, yours.name].toSorted(),
+        [good.name, OWN.name, yours.name].sort(),
         `with ${TREED} picked, Workflows lists what the api lists in it, by name as a list is paged: its tree's two and the one of yours it attaches`,
       );
       await expectCount(page.locator('section[data-from="factory"]'), 2, "the tree's folders are listed as the factory's, by its origin");

@@ -12,6 +12,7 @@ import { Effect, Exit, Logger, Scope } from 'effect';
 import { attachedSessions } from '../src/harness/claude/attached.ts';
 import { filesOf, readRun } from '../src/harness/claude/attached-file.ts';
 import type { SpawnRequest } from '../src/harness/seam.ts';
+import type { ScopeAt } from '../src/harness/scope.ts';
 import { scratch } from './scratch.ts';
 import { until } from '../src/waits/index.ts';
 
@@ -63,13 +64,14 @@ export const lines = (dir: string, file: string): unknown[] => {
 
 /**
  * A holder of the sessions under `root`, for a scope the test closes, its let-go bound `letGoMs` and the share of it the calls in flight
- * may take, `callsShare`, where each is given. `said` keeps every
+ * may take, `callsShare`, where each is given, and where a limited session's scope is made (`at`, `ScopeAt`). `said` keeps every
  * line its let-go logged, at its level, so what the holder says as it lets go is read rather than printed.
  */
-export const holder = async (root: string, letGoMs?: number, callsShare?: number) => {
+export const holder = async (root: string, letGoMs?: number, callsShare?: number, at: ScopeAt = {}) => {
   const attached = attachedSessions(root, STAND_IN, {
     ...(letGoMs === undefined ? {} : { letGoMs }),
     ...(callsShare === undefined ? {} : { callsShare }),
+    ...at,
   });
   const scope = Scope.makeUnsafe();
   const said: string[] = [];

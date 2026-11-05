@@ -322,7 +322,8 @@ export const letGoOf = (
 /**
  * How a holder takes up a session left behind under `root` (*Taken up*): what is left of its Claude Code's process group killed, then
  * ended `canceled` where it was stopped, `failed` where it never named its session, `failed` with `limit: 'budget'` where its attempt
- * has spent its cap (`resumedRequest`), and else resumed by `start` under the same session id, with what is left of its cap.
+ * has spent its cap (`resumedRequest`), and else resumed by `start` under the same session id, with what is left of its cap — or
+ * ended `failed` where `start` refuses it (a memory limit this host can no longer hold), so the next look does not take it up again.
  */
 const adoptIn =
   (
@@ -340,7 +341,12 @@ const adoptIn =
     if (stopped(run) || !run.sessionId) return writeRun(root, { ...mine, state: stopped(run) ? 'canceled' : 'failed' });
     const resumed = resumedRequest(root, run);
     if (resumed === undefined) return writeRun(root, { ...mine, state: 'failed', limit: 'budget' });
-    start(resumed, { ...mine, state: 'working' }, noteOf(run), run.sessionId);
+    try {
+      start(resumed, { ...mine, state: 'working' }, noteOf(run), run.sessionId);
+    } catch (err) {
+      if (!(err instanceof Refusal)) throw err;
+      writeRun(root, { ...mine, state: 'failed' });
+    }
   };
 
 /**

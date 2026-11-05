@@ -37,6 +37,9 @@ import { passRead, type PassRead } from '../cap/cap.verb.ts';
 import { passRevisions } from '../revisions/pin.verb.ts';
 import type { PassStanding } from '../standing/standing.verb.ts';
 
+/** A task the engine holds in flight, as `inFlight` counts one: its step is in the checkout now. Pure. */
+const inFlightPhase = (phase: TaskPhase): boolean => phase === 'pending' || phase === 'running';
+
 /**
  * Which run's `workspace: base` step holds the repository's own checkout while this run's waits for it (`heldCheckouts`) — or undefined,
  * when nothing does and this run's may be filed.
@@ -58,6 +61,9 @@ import type { PassStanding } from '../standing/standing.verb.ts';
  *   is listed, and that read, only past the run's own asks, and the cap read only where a claim waits on a slot.
  * @param env Where the cap on runs in flight is read before any pass has written one (`runSlots`): the process's, or the api's own.
  * @param memo The reading of the places (`StatusMemo`), shared with the pass's `landEnding`, so a checkout is read once a run.
+ * @param phaseOf The phase of this run's tasks as the caller read them on this pass (`advancePass`'s): an ending in flight there is in the
+ *   checkout already, so nothing holds it and no task is viewed again — a long-lived `workspace: base` step, filed and never landed, claims
+ *   as of the run's creation, and is read on each pass. Left out, the ending's task is viewed (`mainClaim`).
  */
 export const checkoutHold = Effect.fn('checkoutHold')(function* (
   e: Engine,
@@ -66,9 +72,12 @@ export const checkoutHold = Effect.fn('checkoutHold')(function* (
   from: { read: PassRead; slot: RunSlot | undefined } | { standing: Effect.Effect<PassStanding, Refusal> },
   env: NodeJS.ProcessEnv,
   memo: StatusMemo,
+  phaseOf?: (taskId: string) => TaskPhase,
 ) {
   const ending = steps.find((s) => endsOnBase(s));
   if (!ending || run.cancelledAt || endingClaimedAt(run, ending, runStore.asks.read(run.id).asks) === undefined) return undefined;
+  const taskId = run.steps[ending.name]?.taskId;
+  if (taskId && phaseOf && inFlightPhase(phaseOf(taskId))) return undefined;
   const read = 'read' in from ? from.read : passRead(e, runStore.runs.list(), env, yield* from.standing, yield* passRevisions());
   const slotOf = (id: string) => read.slots.pipe(Effect.map((slots) => slots.get(id)));
   const mine = yield* mainClaim(e, run, 'read' in from ? Effect.succeed(from.slot) : slotOf(run.id), read.parents, memo);
@@ -122,7 +131,7 @@ const mainClaim = Effect.fnUntraced(function* (
   const repo = path.resolve(run.repo);
   const taskId = run.steps[ending.name]?.taskId;
   const phase = taskId ? phaseOfView(yield* asked('view', e.view(taskId))) : 'unknown';
-  if (taskId && (phase === 'pending' || phase === 'running')) return { id: run.id, repo, step: ending.name, holds: true };
+  if (taskId && inFlightPhase(phase)) return { id: run.id, repo, step: ending.name, holds: true };
   if (taskId && landsOnCheck(ending, run) && !run.steps[ending.name]?.landed) {
     const { views, phaseOf } = yield* taskPhasesRead(run).pipe(over(e));
     const own = ownStatus(ending, run, phaseOf, closeoutReader(views, run), closeoutAsked(views), steps, spendReader(views));

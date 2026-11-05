@@ -28,8 +28,9 @@ export default {
   /**
    * Nemia down, twice over: her task filed with no session of hers on the daemon, and her level at Manual with her session ended.
    * At Manual with her session still up, before the keeper ends it, she reads up: her face reads her session alone, since a factory
-   * raised above Manual keeps it up at the store's Manual. Down, a Down cue stands beside her face, her panel says why she stopped and where it is started,
-   * and what the person writes is taken by the api and waits in her outbox. Her level and her task are the page's, taken back after.
+   * raised above Manual keeps it up at the store's Manual. Down, a Down cue stands beside her face, her panel says why she stopped
+   * and where it is started, and what the person writes is taken by the api and waits in her outbox. Her level and her task are the
+   * page's, taken back after.
    */
   name: 'chat-down',
   route: '/',

@@ -51,16 +51,10 @@ const placesOf = (args: Args, home: string | undefined): Places => ({
   ...(home !== undefined && { home }),
 });
 
-/**
- * What the loader fills the steps of a workflow with in the factory the arguments name, read once: its hires into them, by the
- * workflow's name, and its rules where they read (`factoryFills`), left out where they do not, since a listing refuses nothing a start
- * will; none with no factory.
- */
-function fillsIn(args: Args) {
+/** The factory the arguments name, read once from the store; none where they name none. */
+function factoryIn(args: Args): Factory | undefined {
   const name = textOf(args, 'factory');
-  if (name === undefined) return () => undefined;
-  const factory = readFactory(name);
-  return (workflow: string) => factoryFills(factory, workflow).fills;
+  return name === undefined ? undefined : readFactory(name);
 }
 
 /**
@@ -296,8 +290,7 @@ export const WORKFLOWS_LIST: Command<Record<string, FolderLoaded>> = {
       'workflows',
       Effect.gen(function* () {
         const dirs = Array.isArray(args.dirs) ? args.dirs : [];
-        const name = textOf(args, 'factory');
-        const factory = name === undefined ? undefined : yield* tried(() => readFactory(name));
+        const factory = yield* tried(() => factoryIn(args));
         return yield* foldersLoaded(dirs, placesOf(args, home), factory);
       }),
     ),
@@ -334,7 +327,10 @@ export const WORKFLOWS_STEP: Command<{ step: Workflow | null; steps: string[] }>
       Effect.gen(function* () {
         const name = textOf(args, 'name') ?? '';
         const dir = yield* tried(() => workflowDirAt(path.resolve(textOf(args, 'dir') ?? '')));
-        const fills = yield* tried(() => fillsIn(args)(name));
+        const fills = yield* tried(() => {
+          const factory = factoryIn(args);
+          return factory && factoryFills(factory, name).fills;
+        });
         const door = yield* WorkflowDoor;
         const steps = yield* door.workflows.read(dir, placesOf(args, home), fills);
         return { step: steps.find((s) => s.name === textOf(args, 'step')) ?? null, steps: steps.map((s) => s.name) };

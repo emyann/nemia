@@ -14,7 +14,7 @@ import path from 'node:path';
 import { parse, stringify } from 'yaml';
 import { Cause, Effect, Exit, Schema } from 'effect';
 import { Template, TemplateList } from 'objects';
-import { scratch } from '../../test/scratch.ts';
+import { machineTempDir, scratch } from '../../test/scratch.ts';
 import { teamCopy } from '../../test/team.ts';
 
 const ROOT = scratch('wf-template-object-');
@@ -153,7 +153,7 @@ test('the builtin templates as objects, and their renders', async (t) => {
         return yield* TemplateRenders;
       }),
     );
-    assert.equal(path.dirname(named), os.tmpdir());
+    assert.equal(path.dirname(named), machineTempDir());
     assert.equal(path.basename(named), `nemia-templates-${uid ?? os.userInfo().username}`);
     const renders = scratch('wf-template-renders-');
     fs.chmodSync(renders, 0o755);

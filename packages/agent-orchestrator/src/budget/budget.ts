@@ -188,18 +188,19 @@ export const ceilingsOf = (steps: readonly Workflow[]): StepBudget[] =>
 export const budgetArgs = (budgets: readonly StepBudget[]): string[] => budgets.map((b) => `${b.step}=${String(b.usd)}`);
 
 /**
- * The caps the approvals in force set for a step, the earliest given first: each approval of a try its step is still on (`approvalOf`'s
- * rule: one of an earlier try was spent by the try after it) that names the step among its `budgets`. Read from the person's files as
- * `readRun` composes them, on every pass. Pure.
+ * The cap the approvals in force set for a step, as a list of none or one: of each approval of a try its step is still on (`approvalOf`'s
+ * rule: one of an earlier try was spent by the try after it) that names the step among its `budgets`, the last given (`at`, a later file
+ * winning a tie). Read from the person's files as `readRun` composes them, on every pass. Pure: it changes nothing it is given.
  */
-export const approvedCapsOf = (run: Run, step: string): number[] =>
-  (run.approvals ?? [])
-    .filter((a) => a.try === tryOf(run, a.step))
-    .sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0))
-    .flatMap((a) => {
-      const usd = a.budgets?.[step];
-      return usd === undefined ? [] : [usd];
-    });
+export const approvedCapsOf = (run: Run, step: string): number[] => {
+  let last: { at: string; usd: number } | undefined;
+  for (const a of run.approvals ?? []) {
+    const usd = a.budgets?.[step];
+    if (usd === undefined || a.try !== tryOf(run, a.step)) continue;
+    if (last === undefined || a.at >= last.at) last = { at: a.at, usd };
+  }
+  return last === undefined ? [] : [last.usd];
+};
 
 /**
  * The cap in force on a step (`capInForce`): the last a person raised it to (`EarlierTry.budget`: `nemia retry --budget`, `nemia retry

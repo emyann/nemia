@@ -4,12 +4,12 @@
  * (`handedParts`). Pure.
  */
 import { outputFields, type Workflow } from '../step/step.ts';
-import { dataBlock, fenced } from '../record/record.ts';
+import { dataBlock, fenced, type Mount } from '../record/record.ts';
 import { declaredOutput, type Closeout } from '../closeout/index.ts';
 
 /**
  * A terminal step of a run another waited on: its step and how it signed off, and for a run that routed on to this one its artifacts
- * folder (`files`) — or its name, and why that cannot be given.
+ * folder (`files`), mounted read-only on this run's roots (`callerMounts`) — or its name, and why that cannot be given.
  */
 export type ParentStep = { step: Workflow; said: Closeout; files?: string } | { name: string; unreadable: string };
 
@@ -23,6 +23,18 @@ export type ParentCloseout = ({ run: string; asked: string; steps: readonly Pare
   landed: boolean;
 };
 
+/**
+ * The artifacts folders of the result steps of each run that routed on to this one (`ParentStep.files`), each read-only, for a root of
+ * this run (a step with no `after:`): filed with its mounts (`FiledFolders.caller`) and named by its brief's mount line (`mountsLine`),
+ * as the folders of the steps before a step are. None for a step after a root, or a run handed none.
+ */
+export const callerMounts = (step: Pick<Workflow, 'after'>, parents: readonly ParentCloseout[] | undefined): Mount[] =>
+  step.after.length
+    ? []
+    : (parents ?? []).flatMap((p) =>
+        'steps' in p ? p.steps.flatMap((s) => ('files' in s && s.files ? [{ path: s.files, readOnly: true }] : [])) : [],
+      );
+
 /** What a section says of a run that is all its work a remote step is given. */
 const STAYS = 'Its work stays on the machine that runs this workflow and is not sent to you';
 
@@ -35,7 +47,6 @@ function concludedLines(parent: Extract<ParentCloseout, { steps: readonly Parent
       continue;
     }
     lines.push('', `What ${s.step.name} said when it signed off, its \`summary\`:`, '', ...fenced(s.said.summary, 'text'));
-    if (s.files) lines.push('', `The files ${s.step.name} wrote are in ${s.files}: read them there, and write none of them.`);
     const fields = outputFields(s.step);
     if (fields.length) {
       lines.push(

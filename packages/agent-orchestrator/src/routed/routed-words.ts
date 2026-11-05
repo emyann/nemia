@@ -68,7 +68,8 @@ export function answeredRoute(
  * - A workflow node that filed its card (`StepRecord.sent`) is `sent`.
  * - A table condition, never filed, is `unverified` once its table answers a route, `unsigned` when it answers none, and `awaiting
  *   approval` in between where it is gated and the try it is on is not approved, as a gated step is. A judge condition reads as a step,
- *   and so does a script condition, but that a clean exit with no route it declares is `unsigned` (`scriptWord`).
+ *   and so does a script condition, but that a clean exit with no route it declares is `unsigned`; and a filed condition a person
+ *   routed is `unverified` (`filedWord`).
  *
  * A workflow with none of the routing keys reads exactly as `standing` read it.
  */
@@ -97,7 +98,7 @@ function routedWord(
 ): StepStatus | undefined {
   const record = run.steps[step.name];
   if (record?.sent) return nodeKind(step) === 'workflow' ? 'sent' : undefined;
-  if (record?.taskId) return step.route?.kind === 'script' ? scriptWord(step, run, closeoutOf, wordOf) : undefined;
+  if (record?.taskId) return filedWord(step, run, closeoutOf, wordOf);
   if (offRoute(step, steps, run, closeoutOf, wordOf)) return 'skipped';
   if (step.route?.kind !== 'table' || wordOf(step.name) !== 'pending') return undefined;
   const answer = answeredRoute(step, run, closeoutOf, wordOf, steps);
@@ -106,17 +107,26 @@ function routedWord(
   return hasGate(step, run) && !approvalOf(run, step.name) ? 'awaiting approval' : 'unverified';
 }
 
+/** Whether a person routed the condition for the try it is on (`nemia route`, laid on its record by `readRun`) with a route it has. */
+export const personRouted = (step: Workflow, run: Run): boolean => {
+  const kept = run.steps[step.name]?.route;
+  return kept?.by === 'person' && kept.try === tryOf(run, step.name) && (step.routes ?? []).includes(kept.route);
+};
+
 /**
- * A filed script condition's word: `unsigned` where its task exited 0 and it signed off with no route it declares (no answer file, an
- * undeclared route), which its standing reads `unverified`; else its standing's (a route, `blocked`, `failed`, `stopped`, running).
+ * A filed condition's word: `unverified` where a person routed its try (`nemia route`), whatever it said itself — a script's unsure answer,
+ * a judge that signed off blocked; else, for a script, `unsigned` where its task exited 0 and it signed off with no route it declares (no
+ * answer file, an undeclared route), which its standing reads `unverified`; else its standing's (a route, `blocked`, `failed`, `stopped`,
+ * running). A filed step that is no condition reads its standing's.
  */
-function scriptWord(
+function filedWord(
   step: Workflow,
   run: Run,
   closeoutOf: (step: string) => Closeout | undefined,
   wordOf: (step: string) => StepStatus,
 ): StepStatus | undefined {
-  if (wordOf(step.name) !== 'unverified') return undefined;
+  if (step.routes !== undefined && personRouted(step, run)) return 'unverified';
+  if (step.route?.kind !== 'script' || wordOf(step.name) !== 'unverified') return undefined;
   return answeredRoute(step, run, closeoutOf, wordOf, [])?.kind === 'route' ? undefined : 'unsigned';
 }
 

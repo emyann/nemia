@@ -22,6 +22,7 @@ const { main: cli } = await import('../src/cli/main.ts');
 const { engineOf, over } = await import('../src/runtime-client.ts');
 const { closeoutReader, taskPhasesRead } = await import('../src/views/views.verb.ts');
 const { runWords } = await import('../src/routed/routed-words.ts');
+const { routedRows } = await import('../src/routed/routed-lines.ts');
 const { staged } = await import('./story.ts');
 type Board = ReturnType<typeof stage.board>;
 const stage = staged({ runWith: runEngine, main: cli, engineOf });
@@ -113,6 +114,33 @@ for (const [name, end, word] of ENDS)
     assert.ok(!b.filings.some((f) => f === `${id}-web` || f === `${id}-docs`));
     assert.equal((await wordsOf(b, id)).pick, word);
   });
+
+/** The routed row of each step on a pass now, as `nemia ls` lays it, over the closeouts the tick reads. */
+const rowsOf = async (b: Board, id: string) => {
+  const run = readRun(id);
+  const steps = run.workflow ?? [];
+  const { views, phaseOf } = await stage.runWith(b.e, taskPhasesRead(run).pipe(over(b.e)));
+  return routedRows({ steps, run, phaseOf, closeoutOf: closeoutReader(views, run, steps) });
+};
+
+test('an unsure script reads blocked and offers nemia route; the route a person gives files its node, and the run goes on', async () => {
+  const { id, b, tick } = await atTheCondition();
+  b.end(`${id}-pick`, 'succeeded', { exitCode: 0, terminationMessage: '{"unsure":"half web, half docs"}' });
+  await tick();
+  assert.equal((await wordsOf(b, id)).pick, 'blocked');
+  const blocked = (await rowsOf(b, id)).get('pick');
+  assert.ok(blocked && 'note' in blocked && blocked.note?.includes(`nemia route ${id} pick <web|docs>`), JSON.stringify(blocked));
+  await stage.main(['route', id, 'pick', 'web']);
+  await tick();
+  assert.ok(b.filings.includes(`${id}-web`), "the person's route is filed");
+  assert.ok(!b.filings.includes(`${id}-docs`));
+  const words = await wordsOf(b, id);
+  assert.deepEqual([words.pick, words.docs], ['unverified', 'skipped']);
+  assert.notEqual(words.web, 'unreachable');
+  const routed = (await rowsOf(b, id)).get('pick');
+  assert.ok(routed && 'message' in routed && routed.message === 'routed: web', JSON.stringify(routed));
+  assert.equal(routed.note, undefined, 'no route offered once a node after it is filed');
+});
 
 test('a script that never exited (stopped) reads stopped, and routes nothing', async () => {
   const { id, b, tick } = await atTheCondition();

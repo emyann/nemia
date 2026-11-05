@@ -42,6 +42,8 @@ export const filedConfig = <Own extends object>(
     inputs?: string;
     /** The run's copy of its workflow folder (`workflowFilesDir`), absolute: absent where the record names none. */
     workflowFiles?: string;
+    /** The artifacts folders of the run that routed on to this one, for a root (`callerMounts`): absent for every other step. */
+    caller?: readonly Mount[];
     own: Own;
     landingDenied: () => readonly string[];
     /**
@@ -154,6 +156,8 @@ export type FiledFolders = {
   inputs: Mount[];
   /** The run's copy of its workflow folder, read-only (`workflowMounts`): absent or empty where it is not mounted. */
   workflow?: Mount[];
+  /** The result steps' artifacts folders of the run that routed on to this one, read-only, on a local root (`callerMounts`). */
+  caller?: Mount[];
   named?: Readonly<Record<string, HandedFiles>>;
   closeouts?: readonly string[];
 };
@@ -161,26 +165,35 @@ export type FiledFolders = {
 /**
  * The folders a step is filed with beyond its factory's, the one source of the filing's (`filedConfig`) and of what its brief names
  * (`mountsLine`, `inputsLine`): its own files directory (`ownMounts`), the artifacts folder of each step it comes after, under
- * `t.runArtifacts` (`handedMounts`), the store's folders its `reads:` names, the inbox at `t.inbox` (`readsMounts`), and the run's inputs
- * folder at `t.inputs`, given only for a run given inputs (`inputsMounts`). Pure.
+ * `t.runArtifacts` (`handedMounts`), the store's folders its `reads:` names, the inbox at `t.inbox` (`readsMounts`), the run's inputs
+ * folder at `t.inputs`, given only for a run given inputs (`inputsMounts`), and on a local root the caller's folders at `t.caller`
+ * (`callerMounts` in brief/handed.ts). Pure.
  */
 export const filedFolders = (
   step: Workflow,
   steps: readonly Workflow[],
-  t: { runArtifacts: string; inbox: string; inputs?: string; workflowFiles?: string },
+  t: { runArtifacts: string; inbox: string; inputs?: string; workflowFiles?: string; caller?: readonly Mount[] },
 ): FiledFolders => ({
   own: ownMounts(step, t.runArtifacts),
   handed: handedMounts(step, steps, t.runArtifacts),
   store: readsMounts(step, t.inbox),
   inputs: inputsMounts(step, steps, t.inputs),
   workflow: workflowMounts(step, t.workflowFiles),
+  caller: local(step.harness) ? [...(t.caller ?? [])] : [],
 });
 
 /**
- * A step's folders beyond its factory's, in the order they are filed: its own, the handed ones, the store's, the run's inputs, then the
- * run's copy of its workflow folder.
+ * A step's folders beyond its factory's, in the order they are filed: its own, the handed ones, the caller's, the store's, the run's
+ * inputs, then the run's copy of its workflow folder.
  */
-const folders = (f: FiledFolders): Mount[] => [...(f.own ?? []), ...f.handed, ...f.store, ...f.inputs, ...(f.workflow ?? [])];
+const folders = (f: FiledFolders): Mount[] => [
+  ...(f.own ?? []),
+  ...f.handed,
+  ...(f.caller ?? []),
+  ...f.store,
+  ...f.inputs,
+  ...(f.workflow ?? []),
+];
 
 /** Whether a step's harness reads the disk only through what it is filed: neither a remote agent nor one fenced by a sandbox. */
 const local = (harness: string | undefined): boolean => !isRemoteHarness(harness) && !sandboxed(harness ?? DEFAULT_HARNESS);

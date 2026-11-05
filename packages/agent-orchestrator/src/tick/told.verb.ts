@@ -12,6 +12,7 @@ import {
   isRepositoryRun,
   lackedOf,
   type CloseoutAsked,
+  type Mount,
   type Run,
   type StepRecord,
   type StepStatus,
@@ -223,8 +224,9 @@ export const foldersTold = (
   run: Run,
   reads: { steps: readonly Workflow[]; signedOff: (step: string) => Closeout | undefined },
   step: Workflow,
+  caller: readonly Mount[] = [],
 ): FiledFolders => {
-  const folders = filedFolders(step, reads.steps, filedFoldersAt(run));
+  const folders = filedFolders(step, reads.steps, { ...filedFoldersAt(run), caller });
   const closeouts = folders.handed.filter((m) => holdsCloseout(run, path.basename(m.path))).map((m) => m.path);
   const named = folders.handed
     .filter((m) => !closeouts.includes(m.path))

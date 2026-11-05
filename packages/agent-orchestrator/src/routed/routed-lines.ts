@@ -8,7 +8,7 @@ import type { CloseoutAsked, Run, StepStatus, TaskPhase } from '../record/record
 import type { Verdict } from '../check/check.ts';
 import type { SpendOf } from '../status/status.ts';
 import { codedStep, REASON_OF, type CodedStep } from '../phase/phase.ts';
-import { answeredRoute, runWords } from './routed-words.ts';
+import { answeredRoute, personRouted, runWords } from './routed-words.ts';
 
 /** A step's row as the routing words it: what to say, its code, and the line that routes a condition by hand. */
 /** A routed step's row: its whole line, or (`besides`) words said after the line its own work gives, as a gate's proposed route. */
@@ -45,7 +45,8 @@ const settledOf =
 /**
  * The rows the routing words for a run's steps never filed, by name: every other step reads as its own work says. A skipped node says the
  * condition and the route taken; a sent node its card; a condition never filed (a table, or one a person routed) the route it answers, or
- * that its table answers none, with the line that routes it by hand while no node after it is filed.
+ * that its table answers none, with the line that routes it by hand while no node after it is filed; a filed condition that stopped on no
+ * route of its own (`blocked`, `unsigned`) that line too, and one a person routed its route.
  */
 export function routedRows(input: RoutedInput): Map<string, RoutedRow> {
   const { steps, run } = input;
@@ -61,34 +62,52 @@ export function routedRows(input: RoutedInput): Map<string, RoutedRow> {
     const said = answeredRoute(condition, run, closeoutOf, wordOf, steps);
     return said?.kind === 'route' ? said.route : undefined;
   };
+  const needsOf = (name: string): string | undefined => closeoutOf(name)?.needs ?? undefined;
   for (const step of steps) {
-    const row = rowOf(step, steps, run, wordOf(step.name), routeOf);
+    const row = rowOf(step, steps, run, wordOf(step.name), { routeOf, needsOf });
     if (row) rows.set(step.name, row);
   }
   return rows;
 }
 
+/** What a row reads of the pass beyond a step's word: the route each condition answers, and what a step that signed off blocked needs. */
+type RowReads = {
+  readonly routeOf: (condition: Workflow) => string | undefined;
+  readonly needsOf: (step: string) => string | undefined;
+};
+
 /** One step's routed row, off its word on the pass and the route each condition answers; undefined where its own work says it. */
-function rowOf(
-  step: Workflow,
-  steps: readonly Workflow[],
-  run: Run,
-  word: StepStatus,
-  routeOf: (condition: Workflow) => string | undefined,
-): RoutedRow | undefined {
+function rowOf(step: Workflow, steps: readonly Workflow[], run: Run, word: StepStatus, reads: RowReads): RoutedRow | undefined {
   const record = run.steps[step.name];
   if (word === 'sent' && record?.sent) return { message: `sent → ${record.sent.card}`, ...codedStep(REASON_OF.sent) };
   if (word === 'skipped') {
     const condition = conditionBefore(step, steps);
-    const route = condition ? routeOf(condition) : undefined;
+    const route = condition ? reads.routeOf(condition) : undefined;
     return { message: condition && route ? `skipped (${condition.name}: ${route})` : 'skipped', ...codedStep(REASON_OF.skipped) };
   }
-  if (step.routes === undefined || record?.taskId) return undefined;
+  if (step.routes === undefined) return undefined;
   const settled = steps.some((s) => s.after.includes(step.name) && Boolean(run.steps[s.name]?.taskId || run.steps[s.name]?.sent));
   const offer = settled ? {} : { note: `route it by hand: ${routeLine(run, step)}` };
+  if (record?.taskId) return filedRow(step, run, word, reads, offer);
   if (word === 'unsigned') return { message: 'unsigned: its table answers no route', ...codedStep(REASON_OF.unsigned), ...offer };
-  const route = routeOf(step);
+  const route = reads.routeOf(step);
   if (route === undefined) return undefined;
   if (word === 'awaiting approval') return { besides: `proposes ${route}` };
   return { message: `routed: ${route}`, ...codedStep(REASON_OF[word]), ...offer };
+}
+
+/**
+ * A filed condition's row: one that stopped on no route of its own (`blocked`, a script's unsure answer; `unsigned`) says so with the line
+ * that routes it by hand while no node after it is filed, and one a person routed says the route; undefined where its own work says it.
+ */
+function filedRow(step: Workflow, run: Run, word: StepStatus, reads: RowReads, offer: { note?: string }): RoutedRow | undefined {
+  if (word === 'blocked') {
+    const needs = reads.needsOf(step.name);
+    return { message: needs ? `blocked: ${needs}` : 'blocked', ...codedStep(REASON_OF.blocked), ...offer };
+  }
+  if (word === 'unsigned') return { message: 'unsigned: it answered no route of its own', ...codedStep(REASON_OF.unsigned), ...offer };
+  const route = reads.routeOf(step);
+  return word === 'unverified' && route !== undefined && personRouted(step, run)
+    ? { message: `routed: ${route}`, ...codedStep(REASON_OF.unverified), ...offer }
+    : undefined;
 }

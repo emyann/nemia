@@ -1,9 +1,9 @@
 /**
- * A task whose journal holds an entry no runtime wrote costs the runs that read it, never the list: `GET /api/runs` answers every other
- * run as it would, and the run whose task does not read off its record, saying why in the runtime's words (`unjudged` in runs.ts) — as the
- * tick leaves such a run where it is and counts it in flight. So does a run waiting on it, whose parent's task is read to see if it
- * landed. A run's own page refuses in those words, and the cap on runs in flight counts both, unjudged, as the tick counts them. A pass
- * has read where the runs' branches stand (`passStanding`), which the list reads off `standing.json`.
+ * A task whose journal holds an entry no runtime wrote costs the runs that read it, never the list: the board's views (`summariesOf`)
+ * answer every other run as it would, and the run whose task does not read off its record, saying why in the runtime's words (`unjudged` in
+ * runs.ts) — as the tick leaves such a run where it is and counts it in flight. So does a run waiting on it, whose parent's task is read to
+ * see if it landed. A run's own page refuses in those words, and the cap on runs in flight counts both, unjudged, as the tick counts them.
+ * A pass has read where the runs' branches stand (`passStanding`), which the list reads off `standing.json`.
  *
  * At shipped defaults: the api's own engine over a store this file seeds, the harness's fake `claude` (test/harness.ts) first on PATH.
  */
@@ -16,8 +16,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { Ceilings } from '../factory/ceilings.ts';
 import { app } from '../app.ts';
-import { engine, passStanding, runStore, type RunSummary } from 'agent-orchestrator';
+import { engine, passStanding, runStore } from 'agent-orchestrator';
 import { runWith } from '../../test/builtin-place.ts';
+import { summariesOf } from '../../test/run-reads.ts';
 
 const git = (repo: string, ...args: string[]) =>
   execFileSync(
@@ -113,9 +114,7 @@ test('a run whose task journal holds an entry no runtime wrote is answered off i
   await s.test(
     'GET /api/runs answers every run while one task journal holds an entry no runtime wrote, and says of the runs that read it why',
     async () => {
-      const res = await app.request('/api/runs');
-      assert.equal(res.status, 200, await res.clone().text());
-      const runs = new Map(((await res.json()) as RunSummary[]).map((run) => [run.id, run]));
+      const runs = new Map((await summariesOf(app)).map((run) => [run.id, run]));
       assert.deepEqual([...runs.keys()].sort(), ['r-bad', 'r-child', 'r-good', 'r-sibling']);
 
       const good = runs.get('r-good')!;
@@ -158,7 +157,7 @@ test('a run whose task journal holds an entry no runtime wrote is answered off i
   await s.test(
     "a run a task of which does not read has its page refused in the list's words, and every other run answered in full",
     async () => {
-      const list = new Map(((await (await app.request('/api/runs')).json()) as RunSummary[]).map((run) => [run.id, run]));
+      const list = new Map((await summariesOf(app)).map((run) => [run.id, run]));
       for (const id of ['r-bad', 'r-child']) {
         const res = await app.request(`/api/runs/${id}`);
         const body = (await res.json()) as { error?: string };

@@ -5,11 +5,16 @@
  * factory-parts/parts.ts) or signed out of one (`DELETE` on the same path), each of which writes the harness's own store, which every
  * session of the factory reads; a factory's server recorded or taken off, a schedule written or taken back, an agent hired into a step or
  * fired, its rules written or cleared and its instruction placed, written or cleared (factory-parts/parts.ts), each what every run started
- * in the factory after acts on; a start (`POST /api/runs`, workflows.ts), which writes a run's record — and, for an inbox card, removes the
- * card; an ask for another try or another round (`POST /api/runs/:id/steps/:step/retry`, asks.ts, with `"round": true` for `nemia retry
+ * in the factory after acts on; the run's named actions (objects/serve.ts), each guarded in its command's words before the objects' handler
+ * reads its body: a start (`POST /api/namespaces/:namespace/runs`, `runStart` in workflows.ts), which writes a run's record; an ask for
+ * another try or another round (`POST /api/namespaces/:namespace/runs/:runId/steps/:step/retry`, with `"round": true` for `nemia retry
  * --round`), which writes a person's ask file; an approval of a step waiting at its gate, or of a loop out of rounds as it stands (`POST
- * /api/runs/:id/steps/:step/approve`, asks.ts), which writes a person's approval or acceptance file; words for a step's running session
- * (`POST /api/runs/:id/steps/:step/say`, asks.ts), which the engine hands the session and journals; the Card's six writes
+ * …/runs/:runId/steps/:step/approve`), which writes a person's approval or acceptance file; words for a step's running session (`POST
+ * …/runs/:runId/steps/:step/say`), which the engine hands the session and journals; a run's refresh and its labels edited (`POST
+ * …/runs/:runId/refresh`, `…/labels`); a run held (`POST …/runs/:runId/hold`) and its hold lifted (`DELETE …/runs/:runId/hold`, the route
+ * of `nemia hold --off`), which removes the hold file, so the run goes on at the next tick; a try's run removed (`DELETE …/runs/:runId`,
+ * the route of `nemia rm`), which removes the record and the folders it worked in; and a finished run pruned (`POST …/runs/:runId/prune`,
+ * the route of `nemia prune --yes`), which removes its worktrees, and its files when asked, for good; the Card's six writes
  * (objects/serve.ts): a card filed (`POST /api/namespaces/:namespace/cards`) or dropped (`DELETE …/cards/:name`), started (`POST
  * …/cards/:name/start`), queued (`…/queue`) or taken off the queue (`…/unqueue`), and its labels edited (`…/labels`), each of which writes
  * the store's inbox or starts a run, guarded before the objects' handler reads its body; and the Workflow's, Agent's and Skill's writes
@@ -22,16 +27,12 @@
  * writes the store's `workflows/skills/`, what every agent giving it is told; and an agent of yours tried on a short brief (`POST
  * …/agents/:name/try`), which writes its try's folder in the store's `tries/` and a run's record; and a person's custom instructions for an
  * agent written (`PUT /api/custom-instructions/:name`) or cleared (`DELETE /api/custom-instructions/:name`), custom.ts, each of which
- * writes the store's `custom-instructions/`, what every run started after is told after the agent's instructions; and a try's run removed
- * (`DELETE /api/runs/:id`, commands/routes.ts, the route of `nemia rm`), which removes the record and the folders it worked in; and a
- * person's hold on a run lifted (`DELETE /api/runs/:id/hold`, commands/routes.ts, the route of `nemia hold --off`), which removes the hold
- * file, so the run goes on at the next tick; and the store paused (`POST /api/pause`) or its pause lifted (`DELETE /api/pause`),
- * commands/routes.ts, the routes of `nemia pause` and `nemia resume`, which write or remove the store's pause file, so no pass starts new
- * work until the lift; and a finished run pruned (`POST /api/runs/:id/prune`, commands/routes.ts, the route of `nemia prune --yes`), which
- * removes its worktrees, and its files when asked, for good. Each is what an agent acts on in the repository — once a tick files it, or at
- * once, or once a person starts the card or the workflow, or once a run slot frees for a queued card — or a person's idea or step gone, or
- * its place, so a page on another site must not be able to make any of them; and a `fetch` with a body, from any page, reaches the api
- * without the browser asking it first, unless the body is JSON.
+ * writes the store's `custom-instructions/`, what every run started after is told after the agent's instructions; and the store paused
+ * (`POST /api/pause`) or its pause lifted (`DELETE /api/pause`), commands/routes.ts, the routes of `nemia pause` and `nemia resume`, which
+ * write or remove the store's pause file, so no pass starts new work until the lift. Each is what an agent acts on in the repository — once
+ * a tick files it, or at once, or once a person starts the card or the workflow, or once a run slot frees for a queued card — or a person's
+ * idea or step gone, or its place, so a page on another site must not be able to make any of them; and a `fetch` with a body, from any
+ * page, reaches the api without the browser asking it first, unless the body is JSON.
  */
 
 /** One status and what to do next. */
@@ -39,7 +40,7 @@ export type Refusal = { status: 400 | 403 | 404 | 409 | 415 | 422; error: string
 
 /** A write the guard stands in front of, in the words its refusals say it in. */
 export type Guarded = {
-  /** The request: `POST /api/runs`. */
+  /** The request: `POST /api/namespaces/default/runs`. */
   route: string;
   /** What the api does for it, and the same thing said of a site that would make one: `starts a run`, `start one`. */
   does: string;

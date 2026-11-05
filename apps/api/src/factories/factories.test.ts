@@ -18,7 +18,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from '../../test/scratch.ts';
 import { story } from '../../test/checkpoints.ts';
-import { linesOf } from '../../test/run-reads.ts';
+import { linesOf, summariesOf } from '../../test/run-reads.ts';
 import { app } from '../app.ts';
 import { workflowsListed } from '../../test/definitions.ts';
 import {
@@ -49,7 +49,6 @@ type FactoryCommands = import('objects').FactoryCommands;
 type VolumeList = import('objects').VolumeList;
 type Schedule = import('objects').Schedule;
 type ScheduleList = import('objects').ScheduleList;
-type RunListing = import('../runs/runs.ts').RunListing;
 
 const write = (file: string, text: string): void => {
   fs.mkdirSync(path.dirname(file), { recursive: true });
@@ -272,20 +271,20 @@ test('a person works in a factory with hires: the listing names what is unfilled
   );
 
   await s.test(
-    'POST /api/runs?factory= starts the run in the factory, its record naming the factory and its repository; a step unfilled is refused',
+    'POST /api/namespaces/<factory>/runs starts the run in the factory, its record naming the factory and its repository; a step unfilled is refused',
     async () => {
       const before = runFiles();
-      const refused = await post('/api/runs?factory=solo', { workflow: 'alpha', brief: 'Add a cache' });
+      const refused = await post('/api/namespaces/solo/runs', { workflow: 'alpha', brief: 'Add a cache' });
       assert.equal(refused.status, 422);
       assert.deepEqual(runFiles(), before, 'nothing written');
 
-      const res = await post('/api/runs?factory=hired', { workflow: 'alpha', brief: 'Add a cache' });
+      const res = await post('/api/namespaces/hired/runs', { workflow: 'alpha', brief: 'Add a cache' });
       assert.equal(res.status, 201, await res.clone().text());
       const { id } = (await res.json()) as { id: string };
       const run = runStore.runs.read(id);
       assert.deepEqual([run.factory, run.repo, run.workflowDir], ['hired', repoR, path.join(repoR, 'workflows', 'alpha')]);
 
-      const listed = await get<RunListing[]>('/api/runs');
+      const listed = { body: await summariesOf(app) };
       assert.equal(listed.body.find((r) => r.id === id)?.factory, 'hired', 'the list names the factory the run is in');
 
       const address = { from: 'repo', workflow: 'alpha', factory: 'hired', repo: repoR };
@@ -315,7 +314,7 @@ test('a person works in a factory with hires: the listing names what is unfilled
     'a card started in the factory: the record names the factory, its repository and the card, and the card stays, listed as started',
     async () => {
       const { card } = onStore(addToInbox({ text: 'Cache the views' }));
-      const res = await post('/api/runs?factory=hired', { workflow: 'alpha', card: card.name });
+      const res = await post(`/api/namespaces/default/cards/${card.name}/start?factory=hired`, { workflow: 'alpha' });
       assert.equal(res.status, 201, await res.clone().text());
       const { id } = (await res.json()) as { id: string };
       const run = runStore.runs.read(id);
@@ -333,7 +332,7 @@ test('a person works in a factory with hires: the listing names what is unfilled
     async () => {
       const { card } = onStore(addToInbox({ text: 'Cache the lists' }));
       const before = runFiles();
-      const res = await post('/api/runs?factory=solo', { workflow: 'alpha', card: card.name });
+      const res = await post(`/api/namespaces/default/cards/${card.name}/start?factory=solo`, { workflow: 'alpha' });
       assert.equal(res.status, 422);
       assert.ok(
         onStore(readInbox()).some((c) => c.name === card.name),
@@ -344,12 +343,12 @@ test('a person works in a factory with hires: the listing names what is unfilled
   );
 
   await s.test(
-    "the request's factory comes before the card's `factory:`: a card of hired started with ?factory=solo is refused as solo's",
+    "a card's namespace is its `factory:`: a card of hired started under solo is none of solo's, a 404, though hired would have run it",
     async () => {
       const { card } = onStore(addToInbox({ text: 'Cache the pages', factory: 'hired' }));
       const before = runFiles();
-      const res = await post('/api/runs?factory=solo', { workflow: 'alpha', card: card.name });
-      assert.equal(res.status, 422, 'started in hired, the card would have run: hired fills alpha');
+      const res = await post(`/api/namespaces/solo/cards/${card.name}/start`, { workflow: 'alpha' });
+      assert.equal(res.status, 404, 'started in hired, the card would have run: hired fills alpha');
       assert.ok(
         onStore(readInbox()).some((c) => c.name === card.name),
         'the card is still there',
@@ -379,59 +378,49 @@ function asShipped(t: { after: (fn: () => void) => void }): string {
   return repoT;
 }
 
-test('POST /api/runs as shipped: the factory a start with no ?factory= is filed in, or why it names none', async (t) => {
-  await t.test('with no ?factory= the run starts in the one factory whose repository holds ?repo=, on it', async (t) => {
+test('POST /api/namespaces/default/runs as shipped: the factory a start that names none is filed in, or why it names none', async (t) => {
+  await t.test('in `default` the run starts in the one factory whose repository holds ?repo=, on it', async (t) => {
     const repoT = asShipped(t);
-    const res = await post(`/api/runs?repo=${encodeURIComponent(repoT)}`, { workflow: 'delta', brief: 'Add a cache' });
+    const res = await post(`/api/namespaces/default/runs?repo=${encodeURIComponent(repoT)}`, { workflow: 'delta', brief: 'Add a cache' });
     assert.equal(res.status, 201, await res.clone().text());
     const run = runStore.runs.read(((await res.json()) as { id: string }).id);
     assert.deepEqual([run.factory, run.repo], ['trio', repoT]);
   });
 
   await t.test(
-    'REFUSED: on a repository three factories hold, or one none holds, a 422 naming ?factory=, and nothing is written',
+    'REFUSED: on a repository three factories hold, or one none holds, a 422 naming the namespace to start in, and nothing is written',
     async (t) => {
       asShipped(t);
       const before = runFiles();
-      const shared = await post(`/api/runs?repo=${encodeURIComponent(repoR)}`, { workflow: 'alpha', brief: 'Add a cache' });
+      const shared = await post(`/api/namespaces/default/runs?repo=${encodeURIComponent(repoR)}`, {
+        workflow: 'alpha',
+        brief: 'Add a cache',
+      });
       assert.equal(shared.status, 422);
       const many = said(await shared.json());
       assert.match(many, /^\S+: 3 factories work on this folder — hired on \S+, pair on \S+, solo on \S+ — /);
-      saysAll(many, ['?factory=hired', '?factory=pair', '?factory=solo']);
+      saysAll(many, ['POST /api/namespaces/hired/runs', 'POST /api/namespaces/pair/runs', 'POST /api/namespaces/solo/runs']);
       assert.ok(many.endsWith('Nothing was started.'), many);
-      const loose = await post('/api/runs', { workflow: 'beta', brief: 'Add a cache' });
+      const loose = await post('/api/namespaces/default/runs', { workflow: 'beta', brief: 'Add a cache' });
       assert.equal(loose.status, 422);
       const none = said(await loose.json());
       assert.ok(none.startsWith(`${own}: no factory works on this folder, `), none);
-      saysAll(none, ['?factory=<name>']);
+      saysAll(none, ['POST /api/namespaces/<name>/runs']);
       assert.deepEqual(runFiles(), before, 'nothing written');
     },
   );
 
   await t.test(
-    'REFUSED: ?factory=default, of a workflow or a card, is a 422 naming ?factory=<name> even with WF_DEFAULT_FACTORY_STARTS=1',
+    '`?factory=` is not read on a start: the namespace names the factory, and `default` names none — so `?factory=default` is no refusal',
     async (t) => {
       const repoT = asShipped(t);
-      process.env.WF_DEFAULT_FACTORY_STARTS = '1';
-      const { card } = onStore(addToInbox({ text: 'Cache the trios', factory: 'trio' }));
-      const before = runFiles();
-      const url = `/api/runs?factory=default&repo=${encodeURIComponent(repoT)}`;
-      for (const body of [
-        { workflow: 'delta', brief: 'Add a cache' },
-        { workflow: 'delta', card: card.name },
-      ]) {
-        const res = await post(url, body);
-        assert.equal(res.status, 422, JSON.stringify(body));
-        const words = said(await res.json());
-        assert.ok(words.startsWith('`default` is the default factory: '), words);
-        saysAll(words, ['?factory=<name>']);
-        assert.ok(words.endsWith('. Nothing was started.'), words);
-      }
-      assert.ok(
-        onStore(readInbox()).some((c) => c.name === card.name),
-        'the card is still there',
-      );
-      assert.deepEqual(runFiles(), before, 'nothing written');
+      const res = await post(`/api/namespaces/default/runs?factory=default&repo=${encodeURIComponent(repoT)}`, {
+        workflow: 'delta',
+        brief: 'Add a cache',
+      });
+      assert.equal(res.status, 201, await res.clone().text());
+      const run = runStore.runs.read(((await res.json()) as { id: string }).id);
+      assert.deepEqual([run.factory, run.repo], ['trio', repoT], 'started in the one factory that holds its repository');
     },
   );
 
@@ -441,7 +430,7 @@ test('POST /api/runs as shipped: the factory a start with no ?factory= is filed 
       const repoT = asShipped(t);
       const { card } = onStore(addToInbox({ text: 'Cache the trios' }));
       const before = runFiles();
-      const res = await post(`/api/runs?repo=${encodeURIComponent(repoT)}`, { workflow: 'delta', card: card.name });
+      const res = await post(`/api/namespaces/default/cards/${card.name}/start?repo=${encodeURIComponent(repoT)}`, { workflow: 'delta' });
       assert.equal(res.status, 422);
       assert.match(said(await res.json()), /: this card names no factory, .*, or name it at start: \?factory=<name>; /);
       assert.ok(
@@ -630,7 +619,7 @@ test('a person reads the factories: the default first, each by name, a broken fi
         assert.equal(page.body.dir, path.join(tree, 'workflows', 'alpha'));
         assert.match(page.body.source, /Implement it, as the tree says\./, "the tree's step file, as written");
 
-        const res = await post('/api/runs?factory=treed', { workflow: 'alpha', brief: 'Add a cache' });
+        const res = await post('/api/namespaces/treed/runs', { workflow: 'alpha', brief: 'Add a cache' });
         assert.equal(res.status, 201, await res.clone().text());
         const run = runStore.runs.read(((await res.json()) as { id: string }).id);
         assert.deepEqual([run.factory, run.repo, run.workflowDir], ['treed', repoR, path.join(tree, 'workflows', 'alpha')]);

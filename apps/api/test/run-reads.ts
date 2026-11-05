@@ -5,9 +5,13 @@
  *
  * `linesOf` is the lines read beside the object (`…/lines`, `RunLinesAnswer`), for what the object leaves out on purpose — the lines a
  * person types (`decide`, `refresh`, each step's `approve`, `retry` and `say`), `fromNote` and `workflowPage`.
+ *
+ * `summariesOf` is every run's summary (`RunListing`), as the board's two views of the list answer them: the runs that wait and those in
+ * flight (`GET /api/runs-open`), then the finished ones (`GET /api/runs-finished`), which between them hold every run once. `GET
+ * /api/runs` is the `RunList` of the objects.
  */
 import type { RunObject } from 'agent-orchestrator';
-import type { RunAnswer, RunLinesAnswer } from '../src/runs/runs.ts';
+import type { FinishedListing, OpenListing, RunAnswer, RunLinesAnswer } from '../src/runs/runs.ts';
 
 /** What a test reads through: the app, or anything that answers a request as it does. */
 export type Asked = { request: (url: string) => Response | Promise<Response> };
@@ -65,3 +69,17 @@ export const toldOf = async (app: Asked, id: string, step: string): Promise<RunO
 /** The lines read beside the run object (`…/lines`): what the object leaves out on purpose (this file's head). */
 export const linesOf = async (app: Asked, id: string): Promise<RunLinesAnswer> =>
   (await ok(app, `/api/runs/${encodeURIComponent(id)}/lines`)) as RunLinesAnswer;
+
+/** A run's summary as one of the board's views answers it: the list's own (`RunListing`), with what that view adds. */
+export type Summary = OpenListing['waiting'][number] | OpenListing['inFlight'][number] | FinishedListing['runs'][number];
+
+/**
+ * Every run's summary, waiting, in flight and finished, each of the board's two views read once with `query` (`?selector=` among them):
+ * the finished in one page of a hundred, which every test's store fits in.
+ */
+export async function summariesOf(app: Asked, query = ''): Promise<Summary[]> {
+  const more = query === '' ? '' : `&${query.replace(/^\?/, '')}`;
+  const open = (await ok(app, `/api/runs-open${query === '' ? '' : `?${query.replace(/^\?/, '')}`}`)) as OpenListing;
+  const finished = (await ok(app, `/api/runs-finished?size=100${more}`)) as FinishedListing;
+  return [...open.waiting, ...open.inFlight, ...finished.runs];
+}

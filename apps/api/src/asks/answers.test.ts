@@ -114,7 +114,7 @@ beforeEachTest(() => {
 
 const BOARD = { 'content-type': 'application/json', 'sec-fetch-site': 'same-origin', host: '127.0.0.1:8787' };
 const ask = (step: string, body: unknown) =>
-  app().request(`/api/runs/${R}/steps/${step}/retry`, { method: 'POST', headers: BOARD, body: JSON.stringify(body) });
+  app().request(`/api/namespaces/default/runs/${R}/steps/${step}/retry`, { method: 'POST', headers: BOARD, body: JSON.stringify(body) });
 const asksDir = path.join(root, 'runs', `${R}.asks`);
 const asked = (): string[] => (fs.existsSync(asksDir) ? (fs.readdirSync(asksDir, { recursive: true }) as string[]).sort() : []);
 const refused = async (res: Response): Promise<string> => {

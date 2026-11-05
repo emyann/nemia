@@ -31,10 +31,10 @@ test("appOf: a mounted router reads the engine and the store's root of the app i
       },
     };
     const { app: own } = appOf(Layer.merge(liveOf(), Layer.succeed(Engine)(counted)));
-    assert.equal((await own.request('/api/runs')).status, 200);
-    assert.ok(lists > 0, "GET /api/runs listed the tasks through the layer's engine");
+    assert.equal((await own.request('/api/runs-open')).status, 200);
+    assert.ok(lists > 0, "GET /api/runs-open listed the tasks through the layer's engine");
     const before = lists;
-    assert.equal((await app.request('/api/runs')).status, 200);
+    assert.equal((await app.request('/api/runs-open')).status, 200);
     assert.equal(lists, before, "the process's app reads through an engine of its own");
   });
   await t.test("a mounted router's route reads the store's root of the app it was asked through", async () => {
@@ -52,7 +52,7 @@ test("appOf: a mounted router reads the engine and the store's root of the app i
         engine().file({ id: 't-layer-filed', brief: 'Read me.', cwd: scratch('nemia-api-layer-cwd-'), harness: 'claude' }),
       );
       const memoOf = (on: typeof runtime) => on.runPromise(ReadMemo.useSync((memo) => memo));
-      assert.equal((await app.request('/api/runs')).status, 200);
+      assert.equal((await app.request('/api/runs-open')).status, 200);
       const theProcess = await memoOf(runtime);
       assert.ok(theProcess.filings.filed.has('t-layer-filed'), "the process's app read the filing off the feed");
       assert.ok(theProcess.filings.cursor > 0, 'and holds where it stopped');
@@ -70,7 +70,7 @@ test("appOf: a mounted router reads the engine and the store's root of the app i
         [mine.filings.cursor, mine.filings.filed.size, (await informerOf(ownRuntime))?.runs.size, mine.said.size],
         [0, 0, 0, 0],
       );
-      assert.equal((await own.request('/api/runs')).status, 200);
+      assert.equal((await own.request('/api/runs-open')).status, 200);
       assert.ok(mine.filings.filed.has('t-layer-filed'), "read from the feed's start, not from where the process's app stopped");
     },
   );

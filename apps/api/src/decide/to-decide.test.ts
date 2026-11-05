@@ -18,9 +18,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from '../../test/scratch.ts';
 import type { RunDecision } from './decision.ts';
-import { objectOf, specOf } from '../../test/run-reads.ts';
+import { objectOf, specOf, summariesOf } from '../../test/run-reads.ts';
 import { app } from '../app.ts';
-import { engine, passStanding, runStore, type RunSummary } from 'agent-orchestrator';
+import { engine, passStanding, runStore } from 'agent-orchestrator';
 import { runWith } from '../../test/builtin-place.ts';
 
 /** The real `git`, behind one first on PATH that notes each call in `gitCalls` and runs it: what says which runs the api asks git about. */
@@ -140,7 +140,7 @@ function writeRun(run: { id: string; repo: string; baseRef: string } & Record<st
 /** The run object of `id` (`GET /api/runs/:id`), what `nemia show` prints. */
 const detailOf = (id: string) => objectOf(app, id);
 const listedOf = async (id: string) => {
-  const run = ((await (await app.request('/api/runs')).json()) as RunSummary[]).find((r) => r.id === id);
+  const run = (await summariesOf(app)).find((r) => r.id === id);
   assert.ok(run, `${id} is on the list`);
   return run;
 };

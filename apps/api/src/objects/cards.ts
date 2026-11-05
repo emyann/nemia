@@ -1,6 +1,6 @@
 /**
  * The cards group's handlers (`objects`' `Api`): the inbox's cards as objects, over the package's entries the inbox's routes and the card
- * start of `POST /api/runs` run — a page of them (`cardList`), one (`cardObject`), filed (`nemia inbox add`), dropped (`inbox rm`),
+ * start run — a page of them (`cardList`), one (`cardObject`), filed (`nemia inbox add`), dropped (`inbox rm`),
  * started (`nemia start <card>`), queued and taken off (`inbox queue`), and its labels edited (`label inbox`).
  *
  * A card's namespace is its factory, `default` for one that names none: a card read, dropped, started, queued or labelled under a
@@ -27,7 +27,7 @@ import { filingOf } from '../inbox/inbox.ts';
 import type { Served } from '../layer.ts';
 import { commandNamed, runPlaced } from '../store.ts';
 import { cardStart } from '../workflows/workflows.ts';
-import { answered } from './refused.ts';
+import { answered, orFailed } from './refused.ts';
 
 /** The entries the verbs write through. */
 const INBOX_RM = commandNamed('inbox rm');
@@ -131,11 +131,15 @@ export const cardsHandlers = HttpApiBuilder.group(Api, 'cards', (handlers) =>
       }),
     )
     .handle('start', ({ params: { namespace, name }, payload }) =>
-      answered(async (s) => {
-        await cardIn(s, namespace, name);
-        const started = await cardStart(s, name, payload, factoryOf(namespace) ?? s.factory?.name);
-        return 'status' in started ? thrown(started) : { id: started.id, card: started.card };
-      }),
+      answered(
+        orFailed(async (s) => {
+          await cardIn(s, namespace, name);
+          const started = await cardStart(s, name, payload, factoryOf(namespace) ?? s.factory?.name);
+          if ('status' in started) return thrown(started);
+          const { id, card, ignoredRepo } = started;
+          return { id, card, ...(ignoredRepo !== undefined ? { ignoredRepo } : {}) };
+        }),
+      ),
     )
     .handle('queue', ({ params: { namespace, name } }) => queued(namespace, name, false))
     .handle('unqueue', ({ params: { namespace, name } }) => queued(namespace, name, true))

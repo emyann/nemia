@@ -19,7 +19,7 @@ import {
 } from '../record/record.ts';
 import type { Closeout } from '../closeout/index.ts';
 import { checkVerdictOf, verdictWord, type CheckVerdict, type Verdict } from '../check/check.ts';
-import { routedRows } from '../routed/index.ts';
+import { routedRows, runWords } from '../routed/index.ts';
 import { codedStep, ENGINE_REASON, holdsTheRun, REASON_OF, type CodedStep, type QualifiedStep } from '../phase/phase.ts';
 import { answerOf, dueNote, modeWord, retriesDue, tryNote, type RetryAsk } from '../retry/index.ts';
 import {
@@ -337,6 +337,8 @@ function listedSteps({
   const takenByHand = (name: string): boolean =>
     resultOnBase(standings) && !run.steps[name]?.taskId && steps.some((s) => s.name === name && approvedFirst(s, run));
 
+  // The run's word for each step, routing and all: a gated table condition never filed whose table answered waits at its gate.
+  const routed = runWords(steps, run, settledOf, readable, askedCloseout, spendOf, verdictOf);
   const waitingOnYou: string[] = [];
   const exhausted = new Set<string>();
   const heldLoops = new Set<string>();
@@ -383,7 +385,8 @@ function listedSteps({
     const { name } = step;
     const taskId = run.steps[name]?.taskId;
     const branch = run.steps[name]?.branch ?? null;
-    const { status: stands, own } = standing(step, run, settledOf, readable, askedCloseout, steps, spendOf, verdictOf);
+    const { status: stood, own } = standing(step, run, settledOf, readable, askedCloseout, steps, spendOf, verdictOf);
+    const stands: StepStatus = !taskId && routed.get(name) === 'awaiting approval' ? 'awaiting approval' : stood;
     if (!taskId && (stands !== 'awaiting approval' || waitingAgain.has(name))) {
       if (checkout && waitsOnCheckout(steps, name, checkout) && !waitingAgain.has(name))
         return { name, message: checkoutWord(checkout), ...coded({ reason: 'Waiting', on: 'base' }), branch };

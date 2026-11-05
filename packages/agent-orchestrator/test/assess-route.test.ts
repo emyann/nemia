@@ -16,7 +16,8 @@ import { workspacePlan } from '../src/workspace/workspace.ts';
 import type { Closeout } from '../src/closeout/closeout.ts';
 import type { Run, StepRecord, TaskPhase } from '../src/record/record.ts';
 import type { Workflow } from '../src/step/step.ts';
-import { phases, run, step, STEPS } from './assessed.ts';
+import { listing, phases, run, step, STEPS } from './assessed.ts';
+import { decision, onYouWords } from '../src/run.ts';
 
 const PLAN_SCHEMA = {
   type: 'object' as const,
@@ -160,6 +161,32 @@ test("a gated condition's row says the route it proposes beside its gate", () =>
     askedCloseout: () => true,
   });
   assert.deepEqual(rows.get('triage'), { besides: 'proposes web' });
+});
+
+test('nemia ls and nemia decide read a gated condition whose table answered as at its gate, waiting on you', () => {
+  const gated = TRIAGE.map((s) => (s.name === 'triage' ? { ...s, gate: true as const } : s));
+  const held = passOf({ filed: { plan: 'succeeded' }, steps: gated });
+  const said = (name: string): Closeout | undefined =>
+    name === 'plan' ? { outcome: 'done', summary: 'did plan', artifacts: [], output: { surface: 'web' } } : undefined;
+  const phaseOf = phases({ 't-plan': 'succeeded' });
+  const l = listing({ steps: gated, run: held.run, phaseOf, closeoutOf: said, askedCloseout: () => true });
+  const triage = l.steps.find((s) => s.name === 'triage');
+  assert.equal(triage?.message, 'awaiting approval · proposes web');
+  assert.equal(triage?.reason, 'AwaitingApproval');
+  assert.deepEqual(l.waitingOnYou, ['triage']);
+  assert.deepEqual(onYouWords(l), ['approve triage']);
+  assert.ok(triage?.note?.includes(`nemia approve ${held.run.id} triage`), triage?.note);
+  assert.ok(triage?.note?.includes(`nemia retry ${held.run.id} plan`), triage?.note);
+  const d = decision(
+    gated,
+    held.run,
+    phaseOf,
+    () => false,
+    said,
+    () => true,
+  );
+  assert.equal(d.kind, 'awaiting');
+  assert.ok(d.kind === 'awaiting' && d.awaitingApproval.includes('triage'));
 });
 
 test('a table with no row for what its producer said reads unsigned, and nothing after it runs', () => {

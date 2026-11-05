@@ -28,6 +28,7 @@ import {
 import type { CheckoutHold } from '../cap/cap.ts';
 import { assess } from '../tick/assess.ts';
 import { resultSteps } from '../branches/index.ts';
+import { runWords } from '../routed/index.ts';
 import { merges } from '../ending/ending.ts';
 
 /**
@@ -210,8 +211,12 @@ export function decision(
   const direct = run.branch !== undefined && branches.includes(run.branch);
 
   const stands = once(landed);
+  // A step never filed waits at its gate where the run's routed word says so: a gated table condition whose table answered.
+  const routed = runWords(steps, run, phaseOf, closeoutOf, askedCloseout, spendOf, verdictOf);
   const atGate = steps
-    .filter((s) => statusOf.get(s.name) === 'awaiting approval')
+    .filter(
+      (s) => statusOf.get(s.name) === 'awaiting approval' || (!run.steps[s.name]?.taskId && routed.get(s.name) === 'awaiting approval'),
+    )
     .map((s) => s.name)
     .sort();
   const unrunEnding = (name: string): boolean => !run.steps[name]?.taskId && steps.some((s) => s.name === name && approvedFirst(s, run));

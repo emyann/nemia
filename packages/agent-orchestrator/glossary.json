@@ -428,6 +428,11 @@
       }
     },
     {
+      "term": "Step machine",
+      "meaning": "the moves a step's status may make between its words, drawn by its code (`stepDiagram`, `packages/agent-orchestrator/src/step-machine/step-machine.ts`) and held to `stepStatus` by a replay of a step's record moved fact by fact: `stepMove` says of two words read on two passes whether the step stayed, moved along an edge (`STEP_EDGES`), or made a move the machine refuses. It decides nothing: `ownStatus` and `standing` work the word out on every pass.",
+      "type": "StepTransition"
+    },
+    {
       "term": "Step record",
       "meaning": "what a run's record keeps of one of its steps (`Step`, `packages/agent-orchestrator/src/record/record.model.ts`): its current try's task, the tries behind it, where it works and what the run did with it, keyed by its `StepName`.",
       "type": "Step"

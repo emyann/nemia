@@ -94,6 +94,9 @@ too, which holds parity with this one until the in-process reads retire.
   `needsOf` (`summary/judged.verb.ts`) and the web's `stepState` still compare `needs-human`. A new runtime phase is translated in `listing` and
   `phaseOfView`; put a new word beside a phase (`waitingOf`), never into it.
 - **A new step status is `working` on the board until `stepState` knows it**.
+- **A new step status is a state of the step machine, and its moves are edges a walk takes** (`src/step-machine/step-machine.ts`): a word
+  with no state fails the typecheck, and a move `stepStatus` makes that no edge draws, or an edge no walk takes, fails
+  `src/step-machine/step-machine.test.ts`; add the walk and the edge, then regenerate the README's `diagram:step` block.
 - **A revision answered for a kind nobody has resolved has no ledger entry, and the ledger's last entry is not what the files hold**:
   compare against a fresh resolve (`driftNow`, which numbers without a write), by digest, never against the ledger's top, or an edit
   reads as no drift and a reverted one as behind.

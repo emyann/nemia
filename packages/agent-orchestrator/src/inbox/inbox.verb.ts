@@ -292,7 +292,10 @@ const dropStaleTries = (names: Iterable<string>, listing: readonly CardListing[]
     const door = yield* CardDoor;
     for (const name of names) {
       if (listing.some((l) => l.name === name && l.tried)) continue;
-      yield* Effect.ignoreCause(door.tries.drop(CardName.read(name)));
+      yield* Effect.ignoreCause(door.tries.drop(CardName.read(name)), {
+        log: 'Unhandled',
+        message: `the stale try of the card ${name} could not be removed: a later pass removes it`,
+      });
     }
   });
 
@@ -353,7 +356,10 @@ export const startQueued = Effect.fn('startQueued')(function* (repo: string, giv
   const card = files.find((f) => f.file === next.file);
   if (card) {
     const record: MissedStart = { at: new Date().toISOString(), text: card.text, repo: on, why, refused };
-    yield* Effect.ignoreCause(door.tries.put(CardName.read(next.name), record));
+    yield* Effect.ignoreCause(door.tries.put(CardName.read(next.name), record), {
+      log: 'Unhandled',
+      message: `the try of the card ${next.name} could not be written: the next pass tries the card again`,
+    });
   }
   return refused
     ? ({ card: next.name, refused: why, ...where } satisfies QueueStarted)

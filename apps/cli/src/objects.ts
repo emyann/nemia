@@ -5,14 +5,24 @@
  *
  * A refused connection starts a daemon once and asks again. A refusal of the `Api`'s (`Missing`, `Conflict`, `Invalid`, `Unjudged`) is the
  * api's own words, exit 2. A 404 whose body is no refusal is a daemon older than this client, refused naming the restart; an answer that
- * does not decode as the `Api` says is one too, the daemon and this client being of two builds.
+ * does not decode as the `Api` says is one too, the daemon and this client being of two builds. A read the api takes and does not answer
+ * within `READ_BOUND_MS` gives up, refused naming the service's status and the read in process: it starts no daemon, since one holds
+ * the port and took the request.
  */
-import { Cause, Effect, Exit, Option } from 'effect';
+import { Cause, Duration, Effect, Exit, Option } from 'effect';
 import { FetchHttpClient, HttpClientError } from 'effect/http';
 import { HttpApiClient } from 'effect/http-api';
 import { Api, Conflict, Invalid, Missing, Unjudged } from 'objects';
 import { olderThanThis, Refused, served, unanswered } from './client.ts';
 import { daemonStarted } from './daemon.ts';
+
+/**
+ * How long a moved read waits on the api before it gives up: the whole call, from the request to the decoded answer. Thirty seconds, some
+ * twenty times the coldest read the cli asks on the measured store (the run list, 1.3 s on 100 runs; a run's page, 0.9 s:
+ * `tools/store-measure/baselines/s2-vs-s1.txt`), so a store ten times as large on a loaded machine still answers, while a person at
+ * the terminal is told within half a minute that an api which took the connection is not answering.
+ */
+export const READ_BOUND_MS = 30_000;
 
 /** The typed client of the `Api` at `base`. */
 const clientAt = (base: string) => HttpApiClient.make(Api, { baseUrl: base });
@@ -43,15 +53,27 @@ const pathOf = (err: HttpClientError.HttpClientError): string => {
   }
 };
 
-/** `call` asked of the client at `base`, run to its end. */
-const attempt = <A, E>(base: string, call: (client: ObjectsClient) => Effect.Effect<A, E>) =>
-  Effect.runPromiseExit(Effect.flatMap(clientAt(base), call).pipe(Effect.provide(FetchHttpClient.layer)));
+/** `call` asked of the client at `base`, run to its end or until `boundMs` is gone, when it is interrupted and fails with a timeout. */
+const attempt = <A, E>(base: string, call: (client: ObjectsClient) => Effect.Effect<A, E>, boundMs: number) =>
+  Effect.runPromiseExit(
+    Effect.flatMap(clientAt(base), call).pipe(Effect.timeout(Duration.millis(boundMs)), Effect.provide(FetchHttpClient.layer)),
+  );
 
-/** The answer of `exit`, or the refusal it is as a person reads it, for the read `verb` names, of the daemon at `base`. */
-function answerOf<A, E>(exit: Exit.Exit<A, E>, verb: string, base: string): A {
+/** A daemon that took the read and did not answer it within `boundMs`: refused, naming its status and the read in process. */
+const notInTime = (verb: string, base: string, boundMs: number): Refused =>
+  new Refused(
+    `the daemon at ${base} did not answer \`nemia ${verb}\` within ${boundMs / 1000} s. See whether it is up, \`nemia service status\`, or read in process: \`nemia ${verb} … --local\``,
+  );
+
+/**
+ * The answer of `exit`, or the refusal it is as a person reads it, for the read `verb` names, of the daemon at `base`, which had `boundMs`
+ * to answer.
+ */
+function answerOf<A, E>(exit: Exit.Exit<A, E>, verb: string, base: string, boundMs: number): A {
   if (Exit.isSuccess(exit)) return exit.value;
   const failed = failureOf(exit);
   if (failed === undefined) throw Cause.squash(exit.cause);
+  if (Cause.isTimeoutError(failed)) throw notInTime(verb, base, boundMs);
   if (isRefusal(failed)) return thrown(failed.error);
   if (HttpClientError.isHttpClientError(failed)) {
     const { reason } = failed;
@@ -74,20 +96,21 @@ const thrown = (said: string): never => {
 
 /**
  * What `call` answers of the objects' client, for the read `verb` names, in a process whose environment is `env`: on the daemon its lease
- * names, else one started now; on one started again where the first does not answer.
+ * names, else one started now; on one started again where the first takes no connection. Each attempt has `boundMs` to answer.
  */
 export async function asked<A, E>(
   verb: string,
   call: (client: ObjectsClient) => Effect.Effect<A, E>,
   env: NodeJS.ProcessEnv = process.env,
+  boundMs: number = READ_BOUND_MS,
 ): Promise<A> {
   let base = await served(verb, env);
-  let exit = await attempt(base, call);
+  let exit = await attempt(base, call, boundMs);
   if (unreached(exit)) {
     base = await daemonStarted(verb, env);
-    exit = await attempt(base, call);
+    exit = await attempt(base, call, boundMs);
   }
-  return answerOf(exit, verb, base);
+  return answerOf(exit, verb, base, boundMs);
 }
 
 /** The factories the api lists (`FactoryList`, `GET /api/factories`), the default first on its own repository, for the read `verb`. */

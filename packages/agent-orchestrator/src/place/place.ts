@@ -136,14 +136,17 @@ export type Trials = { readonly at: Readonly<Record<string, string | null>>; rea
 
 /**
  * What `status` answers of the repo an ending lands in: whose merge is in progress (`ours` when every commit it merges is one of the
- * run's tips), whether a path is unmerged, the result branches a commit now would leave out, and the commit the repo is at, its `tip`,
- * when there is one.
+ * run's tips), whether a path is unmerged, the result branches a commit now would leave out, the commit the repo is at, its `tip`,
+ * when there is one, and `landedBy`: once every tip asked of is in the repo's tip, with no merge of them in progress, the first commit
+ * of the line the tip follows by first parents that holds them all — the commit that merged them in, or the last tip itself where the
+ * repo was moved onto it. Never `tip` once a commit has come on top of it; none where no tip was asked of.
  */
 export type MergeState = {
   readonly merging: 'ours' | 'other' | 'none';
   readonly conflicted: boolean;
   readonly missing: readonly string[];
   readonly tip?: string;
+  readonly landedBy?: string;
 };
 
 /** What `land` answers: the commit that landed the merge in progress, or that the merge was taken back. */

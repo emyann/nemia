@@ -2384,8 +2384,9 @@ dropped. **Nothing in the packages knows what shipping means.**
   (`ls-files --unmerged`, not `git diff`). A `status` the place refuses or does not answer is no verdict: nothing is committed or
   aborted, and the run says why. A merge that is not this run's — its heads are not the result branches — is never touched. This
   run's is committed only on the word of an exit 0 already recorded, and aborted otherwise; after a restart, a commit
-  already on the base branch is recorded as landed, and a merge a person aborted by hand is recorded with the
-  check's words. An ending that stopped on its own word — blocked, unsigned, failed — with nothing staged is written
+  already on the base branch is recorded as landed — as the first commit of the base's first-parent line that holds every result
+  branch (`status`'s `landedBy`), never the checkout's HEAD, which another landing may have moved on top of it since — and a merge a
+  person aborted by hand is recorded with the check's words. An ending that stopped on its own word — blocked, unsigned, failed — with nothing staged is written
   down on the first pass that reads it settled (`landed: {untouched}`, with no git), so a merge a person stages there
   after it, to resolve what stopped it or on trial, is theirs: no pass takes it back, and `wf rm` does not wait on it.
   A folder whose ending has no `check:` lands nothing: the shipper's brief then has it run the check

@@ -66,8 +66,11 @@ export type FeedLayer = {
   readonly lines: {
     /** Where the feed ends (`FeedEnd`), or null for a feed not written yet. */
     readonly end: () => FeedEnd | null;
-    /** Every complete line after `after`, never past a line with no newline yet (`FeedRead`); the door has checked the cursor. */
-    readonly read: (after: number) => FeedRead;
+    /**
+     * Every complete line after `after`, never past a line with no newline yet (`FeedRead`) — or the first `limit` of them where it is
+     * given, read no further than they end, so one line is read without the rest of the feed; the door has checked the cursor.
+     */
+    readonly read: (after: number, limit?: number) => FeedRead;
     /** Why `after` cannot be read from, in words that say what to do (`cursorRefusalOf`) — or undefined when it can. */
     readonly cursorRefusal: (after: number) => string | undefined;
     /** `lines` appended, after a newline where the last line was left unended, and where their bytes went (`FeedAppended`). */
@@ -100,9 +103,10 @@ export function cursorRefusalOf(after: number, size: number, byteBefore: (at: nu
  * Every complete line of `buf`, which holds the feed's bytes from `after` on, each with the byte just after its newline (`ends`), and the
  * byte after the last complete line: never past a line with no newline yet. The ends are counted in bytes, on the buffer, not in
  * characters of the text — a note with a dash in it is three bytes of one character. A line nobody can read keeps no end, and moves the
- * cursor all the same. Both layers read by it.
+ * cursor all the same. Where `limit` is given, no more than that many lines are taken, and the cursor is the byte after the last taken.
+ * Both layers read by it.
  */
-export function linesIn(buf: Buffer, after: number): FeedRead {
+export function linesIn(buf: Buffer, after: number, limit = Infinity): FeedRead {
   const lines: FeedLine[] = [];
   const ends: number[] = [];
   let start = 0;
@@ -111,6 +115,7 @@ export function linesIn(buf: Buffer, after: number): FeedRead {
       lines.push(line);
       ends.push(after + nl + 1);
     }
+    if (lines.length >= limit) return { lines, ends, cursor: after + nl + 1 };
   }
   return { lines, ends, cursor: after + start };
 }
@@ -157,12 +162,12 @@ export function feedDoorOver(layer: FeedLayer): FeedDoorShape {
   return {
     lines: {
       ...door.lines,
-      read: (after) =>
+      read: (after, limit) =>
         Effect.gen(function* () {
           yield* cursorChecked(after);
           const refusal = yield* door.lines.cursorRefusal(after);
           if (refusal !== undefined) return yield* Effect.fail(new Invalid({ message: refusal }));
-          return yield* door.lines.read(after);
+          return yield* door.lines.read(after, limit);
         }),
       append: (lines) => Effect.andThen(linesChecked(lines), door.lines.append(lines)),
     },
@@ -187,17 +192,30 @@ function byteAt(file: string, at: number): number {
 const cursorRefusalAt = (file: string, after: number): string | undefined =>
   cursorRefusalOf(after, statOf(file)?.size ?? 0, (at) => byteAt(file, at), file);
 
-/** The file's complete lines from `after` to `size` (`linesIn`). */
-function linesFrom(file: string, after: number, size: number): FeedRead {
+/** The first bytes a read of a few lines takes from the file (`linesFrom`), doubled each time they hold too few lines. */
+const FIRST_CHUNK = 64 * 1024;
+
+/**
+ * The file's complete lines from `after` to `size` (`linesIn`): read whole, or, where `limit` is given, in chunks from `after` that double
+ * until they hold `limit` lines or reach `size`, so a few lines cost about what they take and never the rest of the feed.
+ */
+function linesFrom(file: string, after: number, size: number, limit?: number): FeedRead {
   if (after >= size) return { lines: [], ends: [], cursor: after };
-  const buf = Buffer.alloc(size - after);
   const fd = fs.openSync(file, 'r');
   try {
+    let buf = Buffer.alloc(limit === undefined ? size - after : Math.min(FIRST_CHUNK, size - after));
     countRead(fs.readSync(fd, buf, 0, buf.length, after));
+    for (;;) {
+      const read = linesIn(buf, after, limit);
+      if (limit === undefined || read.lines.length >= limit || after + buf.length >= size) return read;
+      const more = Buffer.alloc(Math.min(buf.length * 2, size - after));
+      buf.copy(more);
+      countRead(fs.readSync(fd, more, buf.length, more.length - buf.length, after + buf.length));
+      buf = more;
+    }
   } finally {
     fs.closeSync(fd);
   }
-  return linesIn(buf, after);
 }
 
 /** `lines` appended to the file in one write (`appendedText`): the file's size before and after, and the newline written first, if any. */
@@ -219,7 +237,7 @@ export function feedFiles(root: string): FeedLayer {
         const stat = statOf(file);
         return stat ? { cursor: stat.size, generation: stat.ino } : null;
       },
-      read: (after) => linesFrom(file, after, statOf(file)?.size ?? 0),
+      read: (after, limit) => linesFrom(file, after, statOf(file)?.size ?? 0, limit),
       cursorRefusal: (after) => cursorRefusalAt(file, after),
       append: (lines) => appendLines(file, lines),
     },

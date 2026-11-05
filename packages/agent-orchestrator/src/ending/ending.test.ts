@@ -54,7 +54,7 @@ const atLanding = (rest: Partial<RepositoryRun> = {}, ship: Partial<StepRecord> 
   },
 });
 const STAGED: MergeState = { merging: 'ours', conflicted: false, missing: [], tip: 'base000' };
-const ON_HEAD: MergeState = { merging: 'none', conflicted: false, missing: [], tip: 'merged0' };
+const ON_HEAD: MergeState = { merging: 'none', conflicted: false, missing: [], tip: 'merged0', landedBy: 'merged0' };
 const NOT_STAGED: MergeState = { merging: 'none', conflicted: false, missing: ['wf/r-1/implement'], tip: 'base000' };
 const CALLED_OFF = { cancelledAt: '2026-01-01T01:00:00Z' };
 /** The run `r` with ship's check unfiled where `check` is not given: its record has none. */
@@ -219,6 +219,14 @@ test('landingDue commits, aborts, waits or records', async (t) => {
     () => {
       assert.equal(due(atLanding(), 'checking', 'succeeded', undefined, STAGED), undefined, 'the check is filed on this pass');
       assert.deepEqual(due(atLanding(), 'checking', 'succeeded', 'succeeded', ON_HEAD), record({ commit: 'merged0' }), 'committed already');
+      assert.deepEqual(
+        due(atLanding(), 'checking', 'succeeded', 'succeeded', { ...ON_HEAD, tip: 'other00' }),
+        record({ commit: 'merged0' }),
+        'another landing moved the base on top: the commit that brought the result is recorded, never the tip',
+      );
+      const { landedBy: _none, ...unplaced } = ON_HEAD;
+      const said = due(atLanding(), 'checking', 'succeeded', 'succeeded', unplaced);
+      assert.ok(said?.act === 'record' && 'aborted' in said.landed, 'on the line with no commit that brought it: never the tip');
       assert.deepEqual(
         due(atLanding(), 'checking', 'succeeded', 'succeeded', NOT_STAGED),
         record({ aborted: 'its check passed, and the merge it judged was no longer staged, so nothing was committed' }),

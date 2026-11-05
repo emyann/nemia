@@ -440,7 +440,7 @@ function gateNotLoop(
   const gates = steps.filter((s) => words.get(s.name) === 'awaiting approval').map((s) => s.name);
   if (!gates.length) return undefined;
   return (
-    `no loop of ${run.id} is out of rounds, so there is no loop to accept, and ${andList(gates)} ${gates.length > 1 ? 'wait' : 'waits'} at ${gates.length > 1 ? 'their gates' : 'its gate'}: name the step to approve — ` +
+    `no loop of ${run.id} is out of rounds, so there is no loop to end on your word, and ${andList(gates)} ${gates.length > 1 ? 'wait' : 'waits'} at ${gates.length > 1 ? 'their gates' : 'its gate'}: name the step to approve — ` +
     gates.map((g) => `nemia approve ${run.id} ${g}`).join(' or ') +
     '.'
   );

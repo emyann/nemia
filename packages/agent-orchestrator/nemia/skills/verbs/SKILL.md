@@ -455,19 +455,24 @@ Each asks the person at a prompt every time it runs: say what it does before you
                                a launchd agent on macOS. It runs the api of this checkout with this
                                node, WF_ROOT and PATH, and each --env, written once; it restarts on
                                failure and starts at login. Started now unless another daemon holds
-                               the store; --take-over <pid> pauses the store, waits for landing
-                               checks, stops that pid and starts the service. --name: the service
+                               the store; --take-over <pid> pauses the store, waits for the calls
+                               in flight of its sessions, stops that pid and starts the service
+                               (checks and jobs run on, as nemia service restart --help says).
+                               --name: the service
                                name (nemia; required for a store that is not the default)
   nemia service uninstall [--name <name>]
                                stop the login service, disable it and remove its file; a daemon
                                started by hand is left alone
   nemia service restart [--name <name>] [--timeout <d>]
-                               restart the service's daemon on the code it runs: pause the store, wait
-                               for landing checks, give the daemon's sessions up to the timeout to end
-                               their tool calls (--timeout <d>, else nemia pause-timeout), stop it, start the
-                               service, and resume once the new daemon has completed its first pass;
-                               refused, naming the log, when that pass fails. Jobs run on; each
-                               session parks and resumes as the same try. A pause a person put stands.
+                               restart the service's daemon on the code it runs: pause the store, give
+                               the daemon's sessions up to the timeout to end their tool calls
+                               (--timeout <d>, else nemia pause-timeout, 10m by default), stop it (up to
+                               90s), start the service (up to 60s), and resume once the new daemon has
+                               completed its first pass; refused, naming the log, when that pass fails.
+                               Jobs and checks, a landing waiting on CI among them, run on and are not
+                               waited for; each session parks and resumes as the same try. Each wait is
+                               said on stderr as it waits. A pause a person put stands; the restart's
+                               own ends with the command: killed, the next pass of the daemon lifts it.
                                Starts the service where nothing ticks; a daemon started by hand is
                                named with --take-over's line
   nemia upgrade <tag> [--repo <path>] [--name <name>] [--timeout <d>]

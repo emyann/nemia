@@ -1,10 +1,12 @@
 /**
  * The store handed from a daemon started by hand to the login service, as a person restarts the daemon by hand: the store paused with no
- * timeout, so nothing new is filed and the jobs run on, each landing check let finish, the daemon's own sessions held at their next call
- * and their calls in flight waited for up to the timeout, the daemon of the confirmed pid stopped by SIGTERM — which writes `stoppedAt`,
- * its holder parking each session for the next — the service started, and the store resumed once the service's daemon has completed
- * its first pass. A pause a person put stands as it was. `nemia service install --take-over`, `nemia upgrade` and `nemia service
- * restart` run it.
+ * timeout, so nothing new is filed and the jobs run on, checks included — a landing's wait on CI among them — each on the runtime's
+ * worker, which outlives the daemon, its result read by the next; the daemon's own sessions held at their next call and their calls in
+ * flight waited for up to the timeout, the daemon of the confirmed pid stopped by SIGTERM — which writes `stoppedAt`, its holder parking
+ * each session for the next — the service started, and the store resumed once the service's daemon has completed its first pass. A
+ * pause a person put stands as it was. The pause it puts names the process that runs it (`heldBy`, put by its host), and so does the
+ * runtime's drain: a take-over killed while it waits leaves neither standing past the daemon's next pass. `nemia service install
+ * --take-over`, `nemia upgrade` and `nemia service restart` run it.
  */
 import type { PlaceService } from '../place/place.store.ts';
 import { Clock, Effect, Schedule } from 'effect';
@@ -15,7 +17,7 @@ import { tried, type EngineService } from '../runtime-client.ts';
 
 /**
  * What the take-over is handed of its host (`ServiceHost` in `service.verb.ts`): the lease, a signal to a pid, the store's pause put and
- * lifted, the landing checks running under it, the calls in flight of the sessions living in the daemon (`calls`), a line said while it
+ * lifted, the calls in flight of the sessions living in the daemon (`calls`), a line said while it
  * waits, how often it polls, how long it waits for the lease (`waitMs`), how long it gives those calls (`timeoutMs`), and how long it
  * waits for the signalled daemon to let the store go (`stopMs`), which stands above the runtime's own let-go.
  */
@@ -24,7 +26,6 @@ export type TakeoverHost = {
   readonly signal: (pid: number) => void;
   readonly pause: (said: { why?: string; by?: string }) => Pause;
   readonly resume: () => Pause;
-  readonly landings: () => Effect.Effect<readonly Finishing[], Refusal, EngineService | PlaceService>;
   readonly calls: () => Effect.Effect<readonly Finishing[], Refusal, EngineService | PlaceService>;
   readonly drain: (holder: number | null) => Effect.Effect<void, Refusal, EngineService>;
   readonly say: (line: string) => void;
@@ -80,36 +81,6 @@ const pauseFor = (pid: number, host: TakeoverHost, by: string) =>
     }
   });
 
-/**
- * Waits until `read` answers none, naming each it answers once as it is first seen, by `key`, in `words`; no deadline but the person's ^C.
- */
-const waitedOut = (
-  host: TakeoverHost,
-  read: () => Effect.Effect<readonly Finishing[], Refusal, EngineService | PlaceService>,
-  key: (f: Finishing) => string,
-  words: (f: Finishing) => string,
-): Effect.Effect<readonly Finishing[], Refusal, EngineService | PlaceService> => {
-  const named = new Set<string>();
-  const told = Effect.tap(read(), (found) =>
-    Effect.sync(() => {
-      for (const f of found.filter((f) => !named.has(key(f)))) {
-        named.add(key(f));
-        host.say(words(f));
-      }
-    }),
-  );
-  return Effect.repeat(told, { schedule: Schedule.spaced(host.pollMs), until: (found) => found.length === 0 });
-};
-
-/** Waits until no landing check runs, naming each once as it is first seen. */
-const landed = (host: TakeoverHost) =>
-  waitedOut(
-    host,
-    host.landings,
-    (f) => `${f.run} ${f.step}`,
-    (l) => `waiting for ${l.run}'s ${l.step} to land: its check runs, and the daemon is stopped once it has ended`,
-  );
-
 /** A timeout in words: `10m`, `90s`, or its milliseconds where it is under a second, as only a test gives one. */
 const timeoutSaid = (ms: number): string => (ms < 1_000 ? `${ms} ms` : timeoutWords(ms));
 
@@ -117,8 +88,7 @@ const timeoutSaid = (ms: number): string => (ms < 1_000 ? `${ms} ms` : timeoutWo
  * Waits until no session living in the daemon is in a tool call (`calls`), saying how many are and in how long they are cut
  * (`pausingWords`) each time either changes; at most the host's `timeoutMs`, past which it says which call it gives up on and goes on to
  * the signal, since the daemon's own holder cuts a call that never ends and the next holder resumes that session told which did not
- * finish. A job is not waited for: it runs on through the restart. A landing check is waited for with no bound (`landed`): a check that
- * did not finish is not a refusal.
+ * finish. A job is not waited for, nor a check, a landing's included: each runs on through the restart on its worker.
  */
 const called = (host: TakeoverHost) =>
   Effect.gen(function* () {
@@ -203,10 +173,10 @@ export const startedPassed = (host: TakeoverHost, service: Started, by: string, 
  * anything is done; a daemon that does not let the store go within the host's `stopMs`, which stands above the runtime's own
  * let-go so a daemon parking a session whose call it cut is not read as one that will not stop; a service that does not take the
  * store within its `waitMs`; or a service whose daemon ends before its first pass — the store left paused, since no work starts
- * without a daemon to judge it, and `nemia resume` said. Its pause has no timeout, so it parks no job: the jobs run on. Before the
- * signal it waits for each landing check (`landed`), then holds back the new tool calls of the daemon's attached sessions (`drain`)
- * and waits at most the host's `timeoutMs` for each call in flight (`called`), so the daemon stops between two calls where it can, and
- * says which call it gave up on where it cannot.
+ * without a daemon to judge it, until a daemon's first pass lifts it once this command has ended. Its pause has no timeout, so it parks
+ * no job: the jobs and the checks run on, and none is waited for. Before the signal it holds back the new tool calls of the daemon's
+ * attached sessions (`drain`) and waits at most the host's `timeoutMs` for each call in flight (`called`), so the daemon stops between
+ * two calls where it can, and says which call it gave up on where it cannot.
  * Interrupted before the signal, it lifts the drain and the pause it put; after it, the drain names a daemon that is gone, and no
  * other is held by it. Its pause and its lines name `by`.
  */
@@ -216,13 +186,14 @@ export const takeOver = Effect.fn('takeOver')(function* (pid: number, host: Take
   const own = yield* Effect.acquireRelease(pauseFor(pid, host, by), (put, exit) =>
     put && (exit._tag === 'Success' || !signalled) ? tried(() => host.resume()).pipe(Effect.ignore) : Effect.void,
   );
-  yield* landed(host);
   yield* Effect.acquireRelease(host.drain(pid), () => (signalled ? Effect.void : host.drain(null).pipe(Effect.ignore)));
   yield* called(host);
   yield* takeOverConfirmed(pid, host, by);
   signalled = true;
   yield* tried(() => host.signal(pid));
-  const left = own ? 'the store stays paused: nemia resume once a daemon ticks it' : 'the pause that stood is left as it was';
+  const left = own
+    ? 'the store stays paused until a daemon ticks it, whose first pass lifts the pause once this command has ended (nemia resume lifts it at once)'
+    : 'the pause that stood is left as it was';
   yield* leaseUntil(
     host,
     host.stopMs,

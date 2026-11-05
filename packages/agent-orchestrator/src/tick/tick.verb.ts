@@ -23,14 +23,14 @@ import { tipsSeen } from '../branches/index.ts';
 import { admissionOrder, slotFree, type RunSlot } from '../cap/cap.ts';
 import { passRead, type PassRead } from '../cap/cap.verb.ts';
 import { passRevisions } from '../revisions/pin.verb.ts';
-import { readPause } from '../pause/pause.store.ts';
+import { liftLapsedPause, readPause } from '../pause/pause.store.ts';
 import { finishingAmong, parkedAmong, type Finishing, type Parked, type Pause, type PauseStanding } from '../pause/pause.ts';
 import { isRepositoryRun, type Run } from '../record/record.ts';
 import { unloadedFolder } from '../steps/steps.ts';
 import { stepsAmong } from '../steps/steps.verb.ts';
 import type { Workflow } from '../workflow.ts';
 import { hasStarted } from '../wait/wait.ts';
-import { ceilings, recordCeilings, recordPassCost, recordRecentPass } from '../daemon/daemon.store.ts';
+import { ceilings, identify, recordCeilings, recordPassCost, recordRecentPass } from '../daemon/daemon.store.ts';
 import { verifiesRest } from '../config/config.store.ts';
 import { feedFile } from '../feed/feed.store.ts';
 import { emitFeed } from '../feed/feed.verb.ts';
@@ -236,6 +236,8 @@ export const tickRun = Effect.fn('tick')(function* ({ repo, memo, verifyRest, qu
 /**
  * The pass `tickRun` meters: the runtime's own pass, then every run judged off the views it reported (`reportedEngine`) — a task it did not
  * report, settled or changed by this pass since, is read off the engine's record where it is settled. In this order:
+ * - first, a take-over's pause whose command runs no more is lifted (`liftedLapsed`), then the sessions' drain is put as the pause
+ *   stands (`drainFromPause`), both read afresh from the store and the process table.
  * - the memo is brought up to the engine's feed after the runtime's pass (`restingPass`), so what it appended on it — a settled task's
  *   `measured` — is read on this one, and what is appended after is read on the next; a run `nemia rm` forgot leaves the memo
  *   (`forgotten`).
@@ -264,6 +266,7 @@ export const tickRun = Effect.fn('tick')(function* ({ repo, memo, verifyRest, qu
 const pass = Effect.fn('pass')(function* (engine: Engine, { repo, memo, verify }: PassOptions) {
   const informer = yield* Informer;
   if (informer) passStarted(informer);
+  yield* liftedLapsed();
   yield* drainFromPause(engine);
   const report = yield* asked('tick', engine.tick());
   noteSeen({ ...sessionsOf(report, Date.now()), load: loadNow() });
@@ -307,6 +310,19 @@ const pass = Effect.fn('pass')(function* (engine: Engine, { repo, memo, verify }
         }
       : {}),
   };
+});
+
+/**
+ * Lifts a take-over's pause whose process the process table says is gone (`liftLapsedPause`), so a `nemia service restart` killed while
+ * it waits never leaves the store paused past the next pass, and says so in the daemon's log: the feed reads the lift off the file's
+ * absence as any resume. A person's pause, which names no process, is never lifted here.
+ */
+const liftedLapsed = Effect.fnUntraced(function* () {
+  const lifted = yield* tried(() => liftLapsedPause(identify));
+  if (lifted)
+    yield* Effect.logWarning(
+      `the store's pause put by ${lifted.pause.by || 'a take-over'} is lifted: its command, pid ${lifted.heldBy.pid}, runs no more, so the store is resumed (nemia pause puts one again)`,
+    );
 });
 
 /**

@@ -24,7 +24,7 @@
 
 import type { HarnessArgs } from '../harness/args.ts';
 import type { FormerReason } from './event-schema.ts';
-import type { TranscriptMark } from '../harness/seam.ts';
+import type { PermissionFacts, TranscriptMark } from '../harness/seam.ts';
 import { transition, VERBS, type LifecycleEvent, type Move, type Refusal, type VerbGuard, type VerbName } from './lifecycle.ts';
 import { elapsedMs, type Instant, type Monotonic } from './clock.ts';
 import { backoffOf, endedWhen, restartWords } from './restart.ts';
@@ -205,8 +205,8 @@ export type Sighting = {
  * One call a session is waiting on a person for, as its harness recorded it: the call's own id, when it was made, what it is
  * (`kind`), and the questions it asks. A `question` is the session's own question (`AskUserQuestion`); a `permission` is a call its
  * harness would prompt a person for, held as one question whose choices are the answers to the prompt, with what the harness said of
- * it beside (`permission`). Carried whole, in the harness's own shape — what an ask means, and which of them a person sees first, is
- * the layer above's.
+ * it beside (`permission`, the harness's own shape, `harness/seam.ts`, which the core carries and never opens). Carried whole, in
+ * the harness's own shape — what an ask means, and which of them a person sees first, is the layer above's.
  */
 export type SessionAsk =
   | { id: string; at: string; kind: 'question'; questions: AskQuestion[] }
@@ -215,22 +215,7 @@ export type SessionAsk =
 /** What a session's ask is: a question the session asked, or a permission its harness would prompt a person for. */
 export type SessionAskKind = SessionAsk['kind'];
 
-/**
- * What a permission ask carries beside its one question, for whoever draws it: the tool, a shell call's command as typed, the
- * harness's words as it gave them (a sentence, a short name, a description, why it prompts, the path it blocked on), whether an
- * always-allow is offered, and whether deny is the default. Carried, never judged.
- */
-export type PermissionFacts = {
-  tool: string;
-  command?: string;
-  title?: string;
-  displayName?: string;
-  description?: string;
-  decisionReason?: string;
-  blockedPath?: string;
-  always: boolean;
-  defaultToNo: boolean;
-};
+export type { PermissionFacts };
 
 /**
  * One question of an ask: what it asks, the short word it is labelled by, the choices offered, and whether a person may pick several.

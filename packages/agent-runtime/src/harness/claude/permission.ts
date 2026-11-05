@@ -11,6 +11,7 @@
 import type { PermissionUpdate } from '@anthropic-ai/claude-agent-sdk';
 import type { PermissionAnswered, PermissionAskOf } from '../../../contracts/permission.contract.ts';
 import type { AskOption, SessionAsk } from '../../core/index.ts';
+import type { PermissionFacts } from '../seam.ts';
 
 /** What a call that would ask a person is told where no answer reached it: its holder was let go, or its turn was ended. */
 export const ASK_CUT =
@@ -27,6 +28,8 @@ export const PERMISSION_DENY = 'Deny';
 /** What a call the person denied with no words of their own is told. */
 export const PERMISSION_DENIED =
   'The person denied this call where it was shown to them. Do not run it again unasked: say in your answer what you were denied, and ask them if you need it.';
+
+export type { PermissionFacts };
 
 /** What the SDK hands `canUseTool` about a prompt, as the ask reads it: its words, its two hints, and the rules it suggests saving. */
 export type PermissionOffer = {

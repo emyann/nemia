@@ -310,7 +310,7 @@ const FACTS: PermissionFacts = {
   title: PERMISSION_QUESTION.question,
   description: 'Removes the build folder',
   decisionReason: 'No rule allows Bash(rm *)',
-  blockedPath: '/home/someone/project/dist',
+  blockedPath: '/srv/project/dist',
   always: true,
   defaultToNo: false,
 };
@@ -369,7 +369,7 @@ test('a permission of hers is an ask: waiting, drawn as the form, answered in wo
     assert.match(html, /Claude wants to run a command/);
     assert.match(html, /data-chat-permission="description"[^>]*>Removes the build folder</);
     assert.match(html, /data-chat-permission="reason"[^>]*>No rule allows Bash\(rm \*\)</);
-    assert.match(html, /data-chat-permission="path"[^>]*>\/home\/someone\/project\/dist</);
+    assert.match(html, /data-chat-permission="path"[^>]*>\/srv\/project\/dist</);
     assert.match(html, /data-chat-permission="command"[^>]*>rm -rf {2}\.\/dist &amp;&amp; echo &quot;done&quot;</, 'the command as typed');
     assert.match(html, /data-chat-option="Always allow"/);
     assert.match(html, /disabled=""/, 'nothing is picked where the SDK does not lean, so the Answer is off');

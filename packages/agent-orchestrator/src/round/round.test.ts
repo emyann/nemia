@@ -145,6 +145,10 @@ test('acceptAsk: what `nemia approve` takes', async (t) => {
       'nemia approve r-1 <step> --message "<why>"',
     );
   });
+  await t.test('REFUSED: no step named, no loop out of rounds, and a step at its gate: the approval of that step is named', () => {
+    const gated = run({ implement: 't1', review: 't2' }, { gates: ['review'] });
+    names(refusalOf(acceptAsk(STEPS, gated, undefined, undefined, ALL_SUCCEEDED, signedDone, asked)), 'nemia approve r-1 review');
+  });
   await t.test('REFUSED: a try already accepted, and a round already asked for', () => {
     const again = refusalOf(accept(inRound(3, acceptedTry(3)), 'review', ENOUGH));
     names(again, 'try 3 of review is already accepted', '2026-09-20T14:05:00.000Z');

@@ -2,7 +2,8 @@
  * A route to a workflow, as a person meets it: a condition routes to a workflow node, which files one queued card `<run>-<node>-routed`
  * with `workflow:` and `from:`, the node reads `sent`, and no pass — a second one, or one after a crash between the filing and the record —
  * files a second card; the caller's result is then what the condition read. And `nemia route`: a person's route wins over the table,
- * refused off the route list, on a step that is no condition, and once a node after the condition is filed or sent. Each story one test
+ * refused off the route list, on a step that is no condition, and once a node after the condition is filed or sent. And a gated table
+ * condition on the tests' team, approved with `nemia approve` once its table answered, which sends its workflow node. Each story one test
  * on the stage (`story.ts`).
  *
  * `WF_ROOT` is set before the runner is imported, which reads it as it loads.
@@ -13,6 +14,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from './scratch.ts';
 import { staged, story } from './story.ts';
+import { TEAM } from './team.ts';
 
 const ROOT = scratch('wf-route-send-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
@@ -229,5 +231,43 @@ test("the run a routed card starts mounts the caller's result folders read-only 
     );
     const named = spec.brief.split('## What was asked for')[1]?.split('\n## ')[0] ?? '';
     assert.ok(named.includes(plan), "the mount line under what was asked for names the caller's folder");
+  });
+});
+
+test("a gated table condition on the tests' team: its producer signs off, a person approves it, and its workflow node is sent", async (t) => {
+  const s = story(t);
+  const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
+  stage.place().world.repository(repo, { 'a.txt': 'one\n' });
+  const run = await stage.runPlaced(startRun({ brief: 'add a flag', repo, workflowDir: path.join(TEAM, 'triage'), gates: ['triage'] }));
+  const id = run.id;
+
+  await s.test('plan is filed, and signs off on the board', async () => {
+    assert.deepEqual((await pass(id)).filed, ['plan']);
+    const closeout = { outcome: 'done', summary: 'planned', artifacts: [], needs: null, findings: [], again: false, surface: 'web' };
+    stage.board().settle(`${id}-plan`, 'succeeded', closeout);
+  });
+
+  await s.test('the pass files nothing after triage, which nemia ls says waits at its gate on you', async () => {
+    const after = await pass(id);
+    assert.deepEqual(after.filed, []);
+    const listed = await stage.runWith(stage.board().e, list(stage.board().e, readRun(id)));
+    assert.equal(listed.steps.find((x) => x.name === 'triage')?.message, 'awaiting approval · proposes web');
+    assert.deepEqual(listed.waitingOnYou, ['triage']);
+  });
+
+  await s.test('nemia approve <run> triage is accepted', async () => {
+    await stage.main(['approve', id, 'triage']);
+    assert.ok(readRun(id).approvals?.some((a) => a.step === 'triage' && a.try === 1));
+  });
+
+  await s.test('the next pass files build-web and sends handoff its card', async () => {
+    const after = await pass(id);
+    assert.ok(after.filed.includes('build-web'), JSON.stringify(after.filed));
+    assert.equal(readRun(id).steps.handoff?.sent?.card, `${id}-handoff-routed`);
+    assert.equal((await words(id))['build-backend'], 'skipped (triage: web)');
+  });
+
+  await s.test('a second approval is refused, as the try is already approved', async () => {
+    await assert.rejects(stage.main(['approve', id, 'triage']), refusedAs('Conflict'));
   });
 });

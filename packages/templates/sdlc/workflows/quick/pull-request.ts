@@ -2,7 +2,8 @@
  * `node pull-request.ts <verb>` — the one door through which a run's change reaches GitHub: the push of this run's own branch, and the pull
  * request CI judges. A Bash prefix rule cannot tell `git push origin wf/…` from `git push origin main`, and no agent may type either, so
  * the act is this script, read from the run's frozen workflow files (`$WF_WORKFLOW_FILES`) as `probe.ts` is, and `gh` is denied whole to
- * the agents that run it.
+ * the agents that run it. It imports `node:child_process` and its sibling `ci-log.ts`, the pure rules of a failing job's log, and no
+ * other: a run freezes its workflow's whole folder, so the sibling is beside it wherever it runs.
  *
  * - `open --title <t> --body-file <f> --labels "<rules>"`, which the engineer types once a round after merging the base: it pushes her
  *   branch to `origin` and opens the pull request with the title and body she wrote, or updates the one that is open, never a draft and
@@ -33,7 +34,14 @@
  *   absent context refuses by name with the Actions URL, the failing jobs, and from each failing job's log the lines that failed it — a
  *   test with its diff, a type or lint error — or a bounded tail where none is, GitHub's post-job lines left out — the next try reads why
  *   CI went red here, since no agent may call `gh` itself — and the `nemia retry <run> <step> --recheck` line, whose step is the check's
- *   own (`WF_STEP`).
+ *   own (`WF_STEP`). A red it judged — a failure, never one only cancelled, skipped or neutral — is not refused at once: the failed jobs
+ *   of each workflow run the context's red entries name are re-run, once (`gh run rerun <id> --failed`, which brings back the jobs that
+ *   depend on them), and waited on again within the same 2400 s. Once is read from GitHub, never carried: a run is re-run only while
+ *   its `run_attempt` (`gh api repos/{owner}/{repo}/actions/runs/<id>`) is 1, so a `--recheck` or a later try never re-runs it again.
+ *   Until GitHub has replaced every job it re-ran, the red it still shows is no verdict. The pass, or the refusal, then names the jobs
+ *   re-run and how each ended the second time; a re-run still running at the bound is the work's refusal, not the person's, since the
+ *   next check reads its verdict. An attempt that cannot be read, a re-run `gh` refuses, or a red entry that is no Actions job means no
+ *   re-run, said in one line, and the refusal is as it would have been.
  *
  * The branch is read from `HEAD`, never given: a run's branch is `wf/<run>/<leaf>` — `wf/<run>/run` for the run's own line of work, one
  * branch per card, and `wf/<run>/<step>` for a fork beside it or a fan-in's merge — and the run it names is what the refusals print.
@@ -54,6 +62,7 @@
  * the work's, never the person's because of it. A green head's wait asks nothing of the base.
  */
 import { spawnSync } from 'node:child_process';
+import { failures } from './ci-log.ts';
 
 /** A reason the verb is refused: said on stderr, exit 1. */
 class Refusal extends Error {}
@@ -78,7 +87,8 @@ class Unlabelled extends PersonsRefusal {}
 const START_SECONDS = 1800;
 
 /**
- * How long the whole wait may take, in seconds, the start included; `WF_CI_WAIT_SECONDS` lowers it for a test. It must stay well under
+ * How long the whole wait may take, in seconds, the start and the one re-run of a red included: the re-run adds no time, sharing this
+ * one clock. `WF_CI_WAIT_SECONDS` lowers it for a test. It must stay well under
  * the round check's own deadline, which is the whole of the clauses before it as well: a wait longer than what is left of that
  * deadline would be killed by the engine, and the person would get no refusal in words.
  */
@@ -107,18 +117,8 @@ const HEAD_SECONDS = 30;
 /** How long the push sleeps between two reads of the head, in seconds; `WF_PR_HEAD_POLL_SECONDS` lowers it for a test. */
 const HEAD_POLL_SECONDS = 3;
 
-/** The most lines the refusal prints of one failing job's log: enough to read, never a log in a closeout. */
-const JOB_LINES = 60;
-
 /** The most lines the refusal prints of all the failing jobs' logs together. */
 const LOG_LINES = 200;
-
-/** The most lines from the end of a job's log the refusal prints where the log names no failing test: a typecheck, a lint, a build. */
-const TAIL_LINES = 30;
-
-/** How far past a line naming a failing test its assertion is looked for, in lines of the log, and how many of them are kept. */
-const AFTER_LINES = 30;
-const DETAIL_LINES = 14;
 
 /** The most failing jobs the refusal names. */
 const JOBS = 10;
@@ -463,70 +463,8 @@ function sleep(secs: number): void {
 /** The job GitHub's own URL names for `entry` (`…/actions/runs/<run>/job/<id>`); none where its URL names no job. */
 const jobIdOf = (entry: Entry): string | undefined => /\/job\/(\d+)/.exec(linkOf(entry))?.[1];
 
-/** The byte order mark GitHub opens a job's log with, built from its code so no raw mark sits in this file. */
-const BOM = String.fromCharCode(0xfeff);
-
-/** A line of a job's log as GitHub serves it, without the timestamp it prefixes each with and the mark it opens the log with. */
-const unstamped = (line: string): string => line.replace(BOM, '').replace(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z ?|\r$/g, '');
-
-/** A line without the prefix a monorepo's task runner gave it (`pkg:test: `), as Nemia's own check reads one. */
-const bare = (line: string): string => line.replace(/^\S+:\S+: /, '');
-
-/**
- * Whether `line` fails a job: a test node's reporters name, `✖` (spec) or `not ok ` (TAP) after its indent — never the heading
- * `✖ failing tests:` the spec reporter lists them again under, the rule of Nemia's own check, copied, since this script imports
- * nothing — a TypeScript error (`<path>(<line>,<col>): error TS<n>: …`) or oxlint's ` x <rule>: …` (`×` where it draws).
- */
-const failing = (line: string): boolean => {
-  const said = bare(line);
-  const test = /^\s*((?:✖|not ok ).*)$/.exec(said);
-  if (test !== null) return !test[1].startsWith('✖ failing tests:');
-  return /^\s*\S.*?(?:\(\d+,\d+\)|:\d+:\d+)(?::| -) error TS\d+: /.test(said) || /^\s*[x×] \S+: /.test(said);
-};
-
-/** Whether `line` ends the lines that tell one failing test: the next test, a pass, a summary, the spec reporter's location line. */
-const ends = (line: string): boolean => /^\s*(?:✔|ℹ|ok |# Subtest|test at )/.test(bare(line)) || failing(line);
-
-/**
- * Whether `line` tells why a test failed: an error's line (`AssertionError …`, `Error: …`), the diff (`+ actual - expected`, `+`, `-`), or
- * the location oxlint draws under its rule (`,-[src/a.ts:3:7]`, `╭─[…]`).
- */
-const detail = (line: string): boolean => {
-  const said = bare(line).trim();
-  return /^[+-](?:\s|$)/.test(said) || /^(?:,-|╭─)\[/.test(said) || (/error/i.test(said) && !said.startsWith('at '));
-};
-
-/**
- * Whether `line` is GitHub's own after the job's steps ran: the post-job cleanup, the git commands it runs there, the orphans it ends.
- * A tail drops them, and everything from `Post job cleanup.` on: none of it says why the job failed.
- */
-const postJob = (line: string): boolean =>
-  /^(?:Post job cleanup\.?|\[command\]\/usr\/bin\/git |Cleaning up orphan processes)/.test(line.trim());
-
-/**
- * What a failing job's log says of why it failed: each line that fails it (`failing`) once, in order, with the lines after it that tell
- * why (`detail`) — the occurrence that tells most, since the spec reporter prints the test bare where it ran and with its error under
- * `✖ failing tests:` — bounded by `JOB_LINES`. A log with no such line gives its
- * last `TAIL_LINES` before GitHub's post-job lines (`postJob`) instead.
- */
-function failures(log: string): { lines: string[]; tests: boolean } {
-  const all = log.split('\n').map(unstamped);
-  const told = new Map<string, string[]>();
-  all.forEach((line, i) => {
-    if (!failing(line)) return;
-    const after: string[] = [];
-    for (const next of all.slice(i + 1, i + 1 + AFTER_LINES)) {
-      if (ends(next)) break;
-      if (detail(next) && after.length < DETAIL_LINES) after.push(next);
-    }
-    const key = bare(line).trim();
-    if ((told.get(key)?.length ?? -1) <= after.length) told.set(key, [line, ...after]);
-  });
-  if (told.size) return { lines: [...told.values()].flat().slice(0, JOB_LINES), tests: true };
-  const cleanup = all.findIndex((line) => /^Post job cleanup\.?$/.test(line.trim()));
-  const ran = cleanup === -1 ? all : all.slice(0, cleanup);
-  return { lines: ran.filter((line) => line.trim() && !postJob(line)).slice(-TAIL_LINES), tests: false };
-}
+/** The workflow run GitHub's own URL names for `entry` (`…/actions/runs/<run>/job/<id>`); none where it is no job of an Actions run. */
+const runIdOf = (entry: Entry): string | undefined => /\/actions\/runs\/(\d+)\/job\/\d+/.exec(linkOf(entry))?.[1];
 
 /** `failed` by name and verdict with its URL, one a line, at most `JOBS` of them. */
 const listing = (failed: readonly Entry[]): string[] => [
@@ -722,32 +660,37 @@ function baseRed(pr: Pr, onto: string, check: string): string[] {
 
 /**
  * The refusal of a CI context `check` that gave a verdict this round cannot land on: what it said, where it judged the commit red what
- * the base `onto` says of it (`baseRed`), why, and what to type next.
+ * the base `onto` says of it (`baseRed`), why, and what to type next; `rerun`, the lines that say what was re-run and how it ended, or
+ * why nothing was, after its first line.
  */
-const redly = (pr: Pr, check: string, ours: readonly Entry[], entries: readonly Entry[], retry: string, onto: string): string =>
+const redly = (pr: Pr, check: string, ours: Entry[], entries: Entry[], retry: string, onto: string, rerun: string[] = []): string =>
   [
     `\`${check}\` for #${pr.number} is ${ours.map(verdict).join(', ').toLowerCase()}, so this round is red where it is judged.`,
+    ...rerun,
     ...(ours.some(judgedRed) ? baseRed(pr, onto, check) : []),
     `  The Actions URL: ${linkOf(ours[0]) || `${pr.url}/checks`}`,
     ...why(entries, check),
     retry,
   ].join('\n');
 
+/** How a CI entry not over stands, lower-cased; one over, whose re-run GitHub has not shown yet, is awaiting it. */
+const stateOf = (entry: Entry): string => (pending(entry) ? (entry.status ?? entry.state ?? '').toLowerCase() : 'awaiting its re-run');
+
 /** The refusal of a CI context `check` that never came, or never finished, within the bound the wait carries. */
-function unanswered(seen: Seen, pr: Pr, check: string, ours: Entry[], entries: Entry[], secs: number, retry: string): string {
+function unanswered(seen: Seen, pr: Pr, check: string, ours: Entry[], entries: Entry[], secs: number, tail: string[]): string {
   const checks = `${pr.url}/checks`;
   if (seen === 'pending')
     return [
-      `\`${check}\` for #${pr.number} was still ${ours.map((entry) => (entry.status ?? entry.state ?? '').toLowerCase()).join(', ')} after ${secs} s.`,
+      `\`${check}\` for #${pr.number} was still ${ours.map(stateOf).join(', ')} after ${secs} s.`,
       `  The Actions URL: ${linkOf(ours[0]) || checks}`,
-      retry,
+      ...tail,
     ].join('\n');
   return [
     `no \`${check}\` context was reported for #${pr.number} within ${secs} s, and \`${check}\` is the one context the base branch ` +
       'requires: nothing has judged this commit.',
     `  The Actions URL: ${checks}`,
     ...(entries.length ? why(entries, check) : ['no check at all was reported for this head']),
-    retry,
+    ...tail,
   ].join('\n');
 }
 
@@ -773,6 +716,52 @@ function unconflicted(branch: string, onto: string, check: string): Pr {
   }
 }
 
+/** What the wait re-ran of a red head: the workflow runs, their red jobs as they were, and the lines that say why a run was not re-run. */
+type Rerun = { runs: string[]; was: Entry[]; lines: string[] };
+
+/**
+ * The failed jobs of each workflow run a red entry of `ours`, the CI context's, names re-run, once, where it failed; none asked of a
+ * context pending, green, or only cancelled, skipped or neutral. Once: only a run GitHub says is on its first attempt (`run_attempt`), so
+ * whichever invocation asks, a run is re-run once at most. A run whose attempt cannot be read, or whose re-run `gh` refuses, is not, and
+ * a red entry that names no Actions job cannot be; each is said in a line. `entries`, the head's latest checks, give the jobs re-run.
+ */
+function rerunOnce(ours: readonly Entry[], entries: readonly Entry[]): Rerun | undefined {
+  const red = ours.filter(judgedRed);
+  if (seenOf(ours) !== 'failed' || !red.length) return undefined;
+  const lines = red.filter((entry) => !runIdOf(entry)).map((entry) => `  not re-run: ${nameOf(entry)} names no job of an Actions run`);
+  const runs = [...new Set(red.flatMap((entry) => runIdOf(entry) ?? []))].filter((id) => {
+    const attempt = hinted<{ run_attempt?: number }>(read('api', `repos/{owner}/{repo}/actions/runs/${id}`))?.run_attempt;
+    const asked = attempt === 1 ? read('run', 'rerun', id, '--failed') : undefined;
+    const not = asked
+      ? `\`gh run rerun ${id} --failed\` failed: ${asked.err.split('\n')[0]}`
+      : `its attempt is ${attempt ?? 'unread'}, not 1`;
+    if (asked?.status !== 0) lines.push(`  not re-run: run ${id}, as ${not}`);
+    return asked?.status === 0;
+  });
+  return { runs, was: entries.filter((entry) => judgedRed(entry) && runs.includes(runIdOf(entry) ?? '')), lines };
+}
+
+/** How a job the wait re-ran ended the second time, by `entries`: empty while GitHub still shows its first time, which is no verdict. */
+function second(entries: readonly Entry[], was: Entry): string {
+  const now = entries.find((entry) => checkKey(entry) === checkKey(was));
+  return !now || jobIdOf(now) === jobIdOf(was) ? '' : (verdict(now) || now.status || 'no verdict').toLowerCase();
+}
+
+/** What the wait re-ran and how each job ended the second time, then why any run was not re-run; nothing where it asked nothing. */
+function rerunSaid(rerun: Rerun | undefined, entries: readonly Entry[]): string[] {
+  if (!rerun?.runs.length) return rerun?.lines ?? [];
+  const jobs = rerun.was.map((was) => `${nameOf(was)}: ${second(entries, was) || 'not replaced yet'}`);
+  return [`  re-ran the failed jobs of run ${rerun.runs.join(', ')} once; the second time, ${jobs.join(', ')}`, ...rerun.lines];
+}
+
+/** How the CI context's entries `ours` read now, where a job the wait re-ran still shows its first time in `entries`: not over yet. */
+const seenAfter = (rerun: Rerun | undefined, entries: readonly Entry[], ours: readonly Entry[]): Seen =>
+  rerun?.was.some((was) => !second(entries, was)) ? 'pending' : seenOf(ours);
+
+/** What a refusal at the bound says after the re-run's lines, where a re-run was still running: the work's, answered by no change. */
+const RERUNNING =
+  "  the next check reads the re-run's own verdict and re-runs nothing again: change nothing for it, and sign off as before";
+
 /** The CI context `wait` reads, from `--check <name>`; refuses a wait given none, or given anything else. */
 function checkOf(args: readonly string[]): string {
   const [flag, name, ...rest] = args;
@@ -784,7 +773,10 @@ function checkOf(args: readonly string[]): string {
   return name;
 }
 
-/** `wait --check <name>`: that context of the pull request's head, waited out and read; its refusal says why CI went red. */
+/**
+ * `wait --check <name>`: that context of the pull request's head, waited out and read, a red re-run once first (`rerunOnce`) within the
+ * same bound; its refusal says why CI went red, and what the re-run did.
+ */
 function wait(args: string[]): string[] {
   const check = checkOf(args);
   const { branch, run: ofRun, onto } = placed();
@@ -794,14 +786,19 @@ function wait(args: string[]): string[] {
   const start = Math.min(seconds('WF_CI_START_SECONDS', START_SECONDS), whole);
   const poll = seconds('WF_CI_POLL_SECONDS', POLL_SECONDS);
   const began = Date.now();
+  let rerun: Rerun | undefined;
   for (;;) {
     const entries = latest(rollup(pr.number));
     const ours = entries.filter((entry) => nameOf(entry) === check);
-    const seen = seenOf(ours);
-    if (seen === 'passed') return [`\`${check}\` passed on ${pr.headRefOid.slice(0, 12)}: ${pr.url}`];
-    if (seen === 'failed') throw new (ours.some(judgedRed) ? Refusal : PersonsRefusal)(redly(pr, check, ours, entries, retry, onto));
+    const red = ours.filter(judgedRed);
+    rerun ??= rerunOnce(ours, entries);
+    const seen = seenAfter(rerun, entries, ours);
+    const said = rerunSaid(rerun, entries);
+    if (seen === 'passed') return [...said.map((line) => line.trim()), `\`${check}\` passed on ${pr.headRefOid.slice(0, 12)}: ${pr.url}`];
+    if (seen === 'failed') throw new (red.length ? Refusal : PersonsRefusal)(redly(pr, check, ours, entries, retry, onto, said));
     const bound = seen === 'absent' ? start : whole;
-    if (Date.now() - began >= bound * 1000) throw new PersonsRefusal(unanswered(seen, pr, check, ours, entries, bound, retry));
+    const [Kind, tail] = rerun?.runs.length ? [Refusal, [...said, RERUNNING, retry]] : [PersonsRefusal, [retry]];
+    if (Date.now() - began >= bound * 1000) throw new Kind(unanswered(seen, pr, check, ours, entries, bound, tail));
     sleep(poll);
   }
 }

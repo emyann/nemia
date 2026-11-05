@@ -42,7 +42,11 @@ base (refused at once, naming the merge of the base, since GitHub runs no CI on 
 for it to start, 2400 s whole), reading only the latest run of each check on the head, so a failure a later run of the same check
 superseded is neither judged nor listed: CI runs the repository's suite on that commit, and a red, cancelled or missing context is the check's
 refusal, with the Actions URL, the failing jobs and a bounded tail of their log — no writer of this team may type `gh`, so the script
-reads it for them. Where the context is red on the base branch too, at the commit of it the head holds, the refusal says so and names
+reads it for them. A red the context judged is first re-run, once: the failed jobs of its workflow run, with the jobs that need them
+(`gh run rerun <id> --failed`), waited on within the same 2400 s, and only a run on its first attempt is re-run, as GitHub says, so a
+head is never re-run twice; a job red again is the change's, and the pass or the refusal names each job re-run and how it ended the
+second time. A re-run still running at the bound is a refusal the next try answers by changing nothing, its check reading the re-run's
+verdict. An attempt that cannot be read, a re-run `gh` refuses, or a red that is no Actions job is not re-run, said in a line. Where the context is red on the base branch too, at the commit of it the head holds, the refusal says so and names
 the base's jobs that did not pass, so a failure that is the base's is not read as the change's; it stays the try's refusal. The reviewer alone reads the pull request and its checks itself (`gh pr view`, `gh pr checks`), its fence allowing
 those two and refusing every other form: a browser, `--watch`, a jq query or a template, another repository, and an assignment before
 `gh`.

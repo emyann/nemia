@@ -90,6 +90,7 @@ export const Step = Schema.Struct({
   landed: Schema.optional(Landing),
   filesRead: Schema.optional(Schema.Struct({ taskId: TaskId.OnRead, lacked: Schema.Record(Schema.String, Schema.String) })),
   closeoutHash: Schema.optional(Schema.String),
+  declared: Schema.optional(Schema.Array(Schema.String)),
 }).annotate({ identifier: 'Step' });
 export type Step = typeof Step.Type;
 

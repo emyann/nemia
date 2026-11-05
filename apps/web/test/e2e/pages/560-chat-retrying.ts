@@ -9,20 +9,20 @@ const SAID = [{ text: 'The night runs are through; two gates wait on you.' }] as
 
 export default {
   /**
-   * Her chat while the api cannot read it and reads it again on its beat. The page plants her talk, opens her panel, waits for the
-   * stream to be answered, and then writes a line her chat's record cannot read: the api's next read refuses, and its stream says so
-   * with `retrying` rather than giving up. Her panel draws the quiet band — a note at rest, never the red one that ends a page — keeps
-   * what she said, and takes the band away by itself on the beat that reads again. Her chat and that line are the page's, taken back
-   * after it.
+   * Her chat while the api cannot read it and reads it again on its beat. The page plants her talk, waits for the stream the frame
+   * opens on load to be answered, opens her panel, and then writes a line her chat's record cannot read: the api's next read refuses,
+   * and its stream says so with `retrying` rather than giving up. Her panel draws the quiet band — a note at rest, never the red one
+   * that ends a page — keeps what she said, and takes the band away by itself on the beat that reads again. Her chat and that line are
+   * the page's, taken back after it.
    */
   name: 'chat-retrying',
   route: '/',
   expect: async (page) => {
     const back = herChat({ said: SAID, session: 'up', read: 'm:1:e0:0' });
     try {
+      const streamed = page.waitForResponse((r) => new URL(r.url()).pathname === CHAT_STREAM, { timeout: WAIT_MS });
       await page.reload({ waitUntil: 'load' });
       await idle(page);
-      const streamed = page.waitForResponse((r) => new URL(r.url()).pathname === CHAT_STREAM, { timeout: WAIT_MS });
       const panel = await openChat(page);
       await expectVisible(panel.getByText(SAID[0].text, { exact: false }), 'her words are drawn');
       await streamed;

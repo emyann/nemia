@@ -28,7 +28,8 @@ import {
 import { bridgeDue, bridgeStateOf, enableBridge } from './attached-bridge.ts';
 import { bridgeAsked } from './vocabulary.ts';
 import { firstCall, HOOK_HOLD_S, inside, type CallsInFlight } from './job-hold.ts';
-import { claudeStreamKept } from '../detached/output.ts';
+import { claudeStreamKept, initLineKept } from '../detached/output.ts';
+import type { InitRead } from '../../../contracts/capture.contract.ts';
 import { ASK_CUT, permissionAnswered, permissionAskOf } from './permission.ts';
 import type { SpawnRequest } from '../seam.ts';
 import type { AskOption, AskQuestion } from '../../core/index.ts';
@@ -105,6 +106,8 @@ export type Live = {
   after?: { tool: string };
   done: Promise<void>;
   pushed?: (m: SDKMessage) => void;
+  /** What the `init` lines this process captured say to a reader of its capture (`initLineKept`): none before the first. */
+  initRead?: InitRead;
 };
 
 /**
@@ -338,10 +341,16 @@ const hooksOf = (root: string, live: Live, held: Held, mayAsk: boolean): Partial
   };
 };
 
-/** Appends `line` to the session's capture, as a reader of a job's stream reads it. */
-const capture = (root: string, name: string, line: object): void => {
-  const kept = claudeStreamKept(JSON.stringify(line));
-  if (kept) fs.appendFileSync(filesOf(root, name).out, `${kept}\n`);
+/**
+ * Appends `line` to the session's capture, as a reader of a job's stream reads it: an `init` line only where it changes what the
+ * process's earlier ones said (`initLineKept`, folding `live.initRead`), every other line as `claudeStreamKept` keeps it.
+ */
+const capture = (root: string, live: Live, line: object): void => {
+  const text = JSON.stringify(line);
+  const init = initLineKept(text, live.initRead);
+  if (init) live.initRead = init.read;
+  const kept = init ? init.kept : claudeStreamKept(text);
+  if (kept) fs.appendFileSync(filesOf(root, live.run.name).out, `${kept}\n`);
 };
 
 /**
@@ -360,10 +369,10 @@ const capture = (root: string, name: string, line: object): void => {
  * before Claude Code checks its rules, so it cannot know a call will prompt, and held there every call would wait on a person.
  */
 const decidedHere =
-  (root: string, name: string, live: Live, mayAsk: boolean): CanUseTool =>
+  (root: string, live: Live, mayAsk: boolean): CanUseTool =>
   async (tool, input, { toolUseID, signal, ...offer }) => {
     const denied = (message: string) => {
-      capture(root, name, { type: 'system', subtype: 'permission_denied', tool_name: tool, tool_use_id: toolUseID });
+      capture(root, live, { type: 'system', subtype: 'permission_denied', tool_name: tool, tool_use_id: toolUseID });
       return { behavior: 'deny' as const, message };
     };
     if (mayAsk && tool === ASK_TOOL) {
@@ -429,7 +438,7 @@ const answered = (live: Live, m: SDKMessage): void => {
  */
 const took = (root: string, live: Live, m: SDKMessage): void => {
   live.pushed?.(m);
-  if (m.type !== 'user' && m.type !== 'stream_event') capture(root, live.run.name, m);
+  if (m.type !== 'user' && m.type !== 'stream_event') capture(root, live, m);
   const over = callsEndedBy(m).filter((id) => live.calls.delete(id));
   const bridged = bridgeStateOf(m);
   if (m.type === 'system' && m.subtype === 'init' && m.session_id !== live.run.sessionId) rewrite(root, live, { sessionId: m.session_id });
@@ -534,7 +543,7 @@ export const startSession = (
       ...given,
       ...(options.resume ? { resume: options.resume } : {}),
       abortController: abort,
-      canUseTool: decidedHere(root, run.name, live, mayAsk),
+      canUseTool: decidedHere(root, live, mayAsk),
       hooks: hooksOf(root, live, options.held, mayAsk),
       ...(options.executable ? { pathToClaudeCodeExecutable: options.executable } : {}),
       spawnClaudeCodeProcess: (o) => {

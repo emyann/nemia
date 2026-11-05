@@ -124,8 +124,11 @@ export type SourceEvent = {
 /** Words said to the task, as the runtime journals them (`Said`): when, to which attempt, and the transcript event they followed. */
 export type SourceSaid = { at: string; attempt: number; text: string; after?: { kind: string; id: string } | null };
 
-/** One attempt's session: its number, when it began, and its transcript's events. */
-export type ChatSession = { attempt: number; startedAt: string; events: readonly SourceEvent[] };
+/**
+ * One attempt's session: its number, when it began, its transcript's events, and the runtime's transcript cursor after them, where its
+ * harness gave one (a read of what it wrote next starts there).
+ */
+export type ChatSession = { attempt: number; startedAt: string; events: readonly SourceEvent[]; cursor?: string };
 
 /** What the person wrote, as the outbox keeps it. */
 export type OutboxEntry = { id: string; at: string; text: string };
@@ -622,6 +625,24 @@ export function sourcesAt(sources: ChatSources, c: ChatCursor, text: string): Ch
     answers: sources.answers.slice(0, c.answers),
     closed: sources.closed.slice(0, c.closed),
   };
+}
+
+/**
+ * `sources` with `events` added to the session of the attempt `attempt`, after those it holds, each it holds already left out (by its
+ * kind and id: a call's result carries the call's id),
+ * and its transcript cursor moved to `cursor`: a read of what a session wrote since, or a follow's moment of it, folded in. Unchanged
+ * where it holds no session of that attempt. Pure.
+ */
+export function withEvents(sources: ChatSources, attempt: number, events: readonly SourceEvent[], cursor: string): ChatSources {
+  const at = sources.sessions.findIndex((s) => s.attempt === attempt);
+  const session = sources.sessions[at];
+  if (session === undefined) return sources;
+  const mark = (e: SourceEvent) => `${e.kind} ${e.id}`;
+  const held = new Set(session.events.map(mark));
+  const fresh = events.filter((e) => !held.has(mark(e)) && held.add(mark(e)));
+  const sessions = [...sources.sessions];
+  sessions[at] = { ...session, events: [...session.events, ...fresh], cursor };
+  return { ...sources, sessions };
 }
 
 /** The events of `now` a reader of `then` has not seen as they are: new ones, and those whose state or delivery changed. Pure. */

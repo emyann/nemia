@@ -4,7 +4,10 @@
  */
 import type { Refusal } from './fence.ts';
 
-/** The six reads, the run's object counted twice, and the list, an open run and the inbox read again after a pass: `measures`' keys. */
+/**
+ * The six reads, the run's object counted twice, the list, an open run and the inbox read again after a pass, and her chat's three
+ * (its history, the old beat's whole re-projection and the fold of one moment of her session): `measures`' keys.
+ */
 export const MEASURES = [
   'tickPass',
   'tickPassInformed',
@@ -17,6 +20,9 @@ export const MEASURES = [
   'openRunAfterPass',
   'inbox',
   'inboxAfterPass',
+  'chatHistory',
+  'chatBeatBefore',
+  'chatFoldStep',
 ] as const;
 
 /** A read the report measures. */
@@ -51,7 +57,14 @@ export type StoreMeasure = {
     /** The records the Run model refuses (`invariantRefusals`). */
     invariantRefusals: number;
   };
-  asked: { finishedRun: string | null; openRun: string | null; feedCursor: number; feedLinesRead: number };
+  asked: {
+    finishedRun: string | null;
+    openRun: string | null;
+    feedCursor: number;
+    feedLinesRead: number;
+    /** Her chat as the copy's level file names it: her task (null where none is filed), the events her history listed, its cursor. */
+    chat?: { task: string | null; events: number; cursor: string };
+  };
   measures: Record<MeasureKey, Measured | null>;
   /** Each child process the reads ran, by verdict and program, counted. */
   spawned: Record<string, number>;
@@ -76,7 +89,7 @@ export function rendered(report: StoreMeasure): string {
     `store measure of ${report.from} (${report.engine}), copied: ${report.copy.files} files, ${mb(report.copy.bytes)} MB in ${(report.copy.ms / 1000).toFixed(0)} s, without ${report.copy.leftOut.join(', ') || 'nothing'}`,
     `${counts.runs} runs (${counts.finishedRuns} finished, ${counts.openRuns} open), ${counts.tasks} tasks, ${mb(counts.journalBytes)} MB of journals, ${counts.feedLines} feed lines, ${counts.cards.listed} cards (${counts.cards.started} started); unreadable: ${counts.unreadable.runs} runs, ${counts.unreadable.passLines} pass lines; invariant refusals: ${counts.invariantRefusals}`,
     `${report.machine.cpu}, ${report.machine.cores} cores, ${mb(report.machine.memoryBytes)} MB, node ${report.machine.node}, load ${report.machine.load}; commit ${report.commit.slice(0, 12)}; ${report.date}; median of ${report.repeat}`,
-    `runs read: finished ${report.asked.finishedRun ?? '—'}, open ${report.asked.openRun ?? '—'}; feed from byte ${report.asked.feedCursor}, ${report.asked.feedLinesRead} lines`,
+    `runs read: finished ${report.asked.finishedRun ?? '—'}, open ${report.asked.openRun ?? '—'}; feed from byte ${report.asked.feedCursor}, ${report.asked.feedLinesRead} lines; her chat: task ${report.asked.chat?.task ?? '—'}, ${report.asked.chat?.events ?? 0} events listed, cursor ${report.asked.chat?.cursor ?? '—'}`,
     '',
     '| read | cold ms | cold heap MB | warm ms | warm heap MB |',
     '| --- | ---: | ---: | ---: | ---: |',

@@ -79,12 +79,13 @@ export class ReadMemo extends Context.Service<
 
 /**
  * How often the api's streams read again what nothing pushes to them: a step's conversation no live stream can be had of (`step`,
- * `readAgain` in steps/steps.ts), Nemia's chat (`chat`, nemia/chat.ts), and the feed's file for the lines no hub brought (`feed`,
- * `followFeed`). Each left out is the default beat its own module names (`STEP_BEAT_MS`, `CHAT_BEAT_MS`, the package's own for the
- * feed), so this file imports none of them; a test gives shorter ones with
+ * `readAgain` in steps/steps.ts), Nemia's chat where her session cannot be followed (`chat`) and the look at her chat's files
+ * (`chatFiles`, both `followChat`'s, nemia/chat.ts), and the feed's file for the lines no hub brought (`feed`, `followFeed`). Each left
+ * out is the default beat its own module names (`STEP_BEAT_MS`, the package's `RECORD_BEAT_MS` and `FILES_CHECK_MS`, and its own for
+ * the feed), so this file imports none of them; a test gives shorter ones with
  * `appOf(Layer.merge(liveOf(), Layer.succeed(Beats)({ ...Beats.defaultValue(), step: … })))` rather than wait them out.
  */
-export type BeatsShape = { readonly step?: number; readonly chat?: number; readonly feed?: Duration.Input };
+export type BeatsShape = { readonly step?: number; readonly chat?: number; readonly chatFiles?: number; readonly feed?: Duration.Input };
 export const Beats = Context.Reference<BeatsShape>('api/Beats', { defaultValue: () => ({}) });
 
 /**

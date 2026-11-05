@@ -7,10 +7,10 @@ import { queryOptions } from '@tanstack/react-query';
 import { Option, Schema } from 'effect';
 import type { DefinitionOrigin, Workflow, WorkflowStep, WorkflowStepStatus } from 'objects';
 import { decodes } from './decodes.ts';
-import { get, send } from './read.ts';
+import { get } from './read.ts';
 import type { GraphEdge, RunGraph } from './graph.ts';
 import { StepLayersSchema, type StepLayers } from './layers.ts';
-import { workflows as served, type Refuse } from './objects.ts';
+import { namespaceOf, runs, workflows as served, type Refuse } from './objects.ts';
 import {
   AgentSkillSchema,
   KeyRowSchema,
@@ -330,9 +330,6 @@ export const repositoryQuery = queryOptions({
 /** What a start answers: the new run. An inbox card started stays in the inbox, listed as `started`. */
 export type Started = { id: string };
 
-/** Decodes a `Started`. */
-const StartedSchema = decodes<Started>()(Schema.Struct({ id: Schema.String }));
-
 /**
  * Start a run of a workflow, as the CLI's `start` does: the api writes the run's record and files nothing. Resolves with the new run's id;
  * rejects with the api's refusal in full — the loader's, the CLI `start`'s (`afterRefusal`'s, for a run it will not wait on), or the api's
@@ -342,8 +339,9 @@ const StartedSchema = decodes<Started>()(Schema.Struct({ id: Schema.String }));
  *
  * An inbox card is started through the Card's own verb (`startCard`, inbox.ts), never here.
  *
- * `place` starts it in a factory, on one of its repositories, as the CLI's `start --factory` does (`placeQuery`): refused in the package's
- * words for a workflow the factory has not attached, a step its hires leave unfilled, or a repository outside it.
+ * `place` starts it in a factory, on one of its repositories, as the CLI's `start --factory` does: the Run's `create` in the factory's
+ * namespace, the repository sent as `?repo=` (none for the default factory, which needs none), refused in the package's words for a
+ * workflow the factory has not attached, a step its hires leave unfilled, or a repository outside it.
  *
  * Sent as `application/json`, which the api requires of a start: the one body a page on another site cannot send it unasked.
  */
@@ -357,10 +355,12 @@ export const startRun = (
   },
   place?: Place | null,
 ): Promise<Started> =>
-  send('POST', `/api/runs${placeQuery(place)}`, StartedSchema, {
-    body: { ...start, from: sourceOf(start.from) },
-    may: 'The run may have started: look on the Runs page before starting it again.',
-  });
+  runs.create(
+    namespaceOf(place?.factory),
+    { ...start, from: sourceOf(start.from) },
+    'The run may have started: look on the Runs page before starting it again.',
+    !place || place.factory === 'default' ? undefined : place.repo,
+  );
 
 /**
  * A write of the builder's the api refused: its sentence, and the steps it names — one, several for a cycle, or none for a refusal of the

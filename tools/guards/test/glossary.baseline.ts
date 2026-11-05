@@ -181,7 +181,7 @@ export const RETIRED_COUNTS: Readonly<Record<string, Readonly<Record<string, num
     'packages/agent-runtime/src/service/options.ts': 3,
   },
   selector: {
-    'packages/objects/src/api.ts': 2,
+    'packages/objects/src/api-errors.ts': 2,
   },
   cordon: {
     'packages/agent-orchestrator/src/pause/pause.store.ts': 1,

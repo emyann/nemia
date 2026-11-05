@@ -1,6 +1,7 @@
 /**
- * The api's words for the label edit it serves from the command table (`nemia label run`'s `POST /api/runs/:runId/labels`): the write
- * guard's, the body it takes, and why a body is not one (400). A card's labels are edited by the Card's `labels` verb (objects/serve.ts).
+ * The api's words for the label edit it serves from the command table (`nemia label run`'s `POST
+ * /api/namespaces/:namespace/runs/:runId/labels`, a named action of the run served by its objects' handler): the write guard's, the body it
+ * takes, and why a body is not one (400). A card's labels are edited by the Card's `labels` verb (objects/serve.ts).
  */
 import type { Words } from '../body.ts';
 import type { RouteWords } from '../commands/words.ts';
@@ -18,11 +19,13 @@ const labelIssue =
         ? `\`overwrite\` lets a set change a value the labels already have, as \`${as} --overwrite\` does: true or false, or left out. This request's was ${JSON.stringify(input)}.`
         : `POST …/labels takes a JSON object: ${LABEL_SHAPE}.`;
 
-/** A run's labels edited, as the guard's refusals word it (`POST /api/runs/:runId/labels`, `nemia label run`'s route). */
+/**
+ * A run's labels edited, as the guard's refusals word it (`POST /api/namespaces/:namespace/runs/:runId/labels`, `nemia label run`'s route).
+ */
 const LABEL_RUN_WORDS: RouteWords = {
   shape: LABEL_SHAPE,
-  guard: ({ runId }) => ({
-    route: `POST /api/runs/${runId}/labels`,
+  guard: ({ runId, namespace }) => ({
+    route: `POST /api/namespaces/${namespace}/runs/${runId}/labels`,
     does: "edits a run's labels",
     forAnother: 'edit any',
     why: "a run's labels are what its lists, its stats and the feed's watchers select it by",

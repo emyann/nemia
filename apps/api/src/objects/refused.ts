@@ -3,11 +3,14 @@
  * `Conflict` a 409 with the `users` that hold the thing, `Invalid` a 422, each `{ error }` in the package's words; and `answered`, which
  * runs a handler's work over the request's services (`ServedNow`) and fails with those, any other failure left to die, a 500. A handler
  * may throw the `Api`'s own errors, which pass as they are (an `Invalid` keeps its `way` and its `steps`), and words one of the api's
- * `Refusal`s by its status (`statusRefused`).
+ * `Refusal`s by its status (`statusRefused`). A run's named action answers the refusals of the command pipeline it runs (`actionAnswered`,
+ * `actionRefused`): a 400 `BadRequest` and a 502 `WriteFailed` besides.
  */
 import { Context, Effect } from 'effect';
+import { HttpServerResponse } from 'effect/http';
 import { isRefusal } from 'agent-orchestrator';
-import { Conflict, Failed, Invalid, Missing } from 'objects';
+import { BadRequest, Conflict, Failed, Invalid, Missing, WriteFailed } from 'objects';
+import type { CommandRefusal } from '../commands/routes.ts';
 import type { Refusal } from '../guard.ts';
 import type { Served } from '../layer.ts';
 
@@ -54,3 +57,59 @@ export const answeredWrite = <A>(work: (s: Served) => Promise<A>): Effect.Effect
       }),
     );
   });
+
+/** What a run's named action refuses with (`objects`' `runActionErrors`). */
+export type ActionError = BadRequest | Missing | Conflict | Invalid | WriteFailed;
+
+/**
+ * A refusal of the command pipeline (`commandAnswered`, commands/routes.ts) as the `Api`'s error, by its status: 400 `BadRequest`, 404
+ * `Missing`, 409 `Conflict`, 422 `Invalid`, 502 `WriteFailed`. The guard's 403 and 415 come before the pipeline, on the route that hands
+ * the request on (serve.ts), and are none of its refusals: any other status is a `BadRequest`.
+ */
+export const actionRefused = ({ status, error }: CommandRefusal): ActionError =>
+  status === 404
+    ? new Missing({ error })
+    : status === 409
+      ? new Conflict({ error })
+      : status === 422
+        ? new Invalid({ error })
+        : status === 502
+          ? new WriteFailed({ error })
+          : new BadRequest({ error });
+
+/**
+ * `work` over the request's services for a run's named action: a refusal of the package's, or one of the `Api`'s errors it throws, as
+ * `answered` fails with them, the action's own (`BadRequest`, `WriteFailed`) passed as they are; anything else dies, a 500.
+ */
+export const actionAnswered = <A>(work: (s: Served) => Promise<A>): Effect.Effect<A, ActionError, ServedNow> =>
+  Effect.gen(function* () {
+    const s = yield* ServedNow;
+    return yield* Effect.tryPromise({ try: () => work(s), catch: (err) => err }).pipe(
+      Effect.catch((err) => {
+        if (err instanceof BadRequest || err instanceof WriteFailed) return Effect.fail(err);
+        const refused = refusedAs(err);
+        return refused ? Effect.fail(refused) : Effect.die(err);
+      }),
+    );
+  });
+
+/** Whether `err` is a refusal: the package's, or one of the `Api`'s errors a handler throws. */
+const refusal = (err: unknown): boolean =>
+  isRefusal(err) || [Missing, Conflict, Invalid, BadRequest, WriteFailed, Failed].some((kind) => err instanceof kind);
+
+/**
+ * `work`, a failure that is no refusal answered as `app.onError` answers one on a Hono route (`answerError`, app.ts): said on stderr, and a
+ * 500 in its own words, `{ error }` — a start that git or the place refused before anything was written, which the queue tries again.
+ * What a start answers where the `Api` has no error for it; a refusal is thrown on, for `answered` or `actionAnswered` to answer.
+ */
+export const orFailed =
+  <A>(work: (s: Served) => Promise<A>) =>
+  async (s: Served): Promise<A | HttpServerResponse.HttpServerResponse> => {
+    try {
+      return await work(s);
+    } catch (err) {
+      if (refusal(err) || !(err instanceof Error)) throw err;
+      console.error(err);
+      return HttpServerResponse.jsonUnsafe({ error: err.message }, { status: 500 });
+    }
+  };

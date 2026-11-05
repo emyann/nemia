@@ -17,13 +17,24 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { RunDecision } from '../src/decide/decision.ts';
-import { askFile, decideRun, list, retryRun, roundAskFile, roundRun, runStore, type RunSummary, usedLines } from 'agent-orchestrator';
+import {
+  askFile,
+  decideRun,
+  list,
+  prunedKept,
+  prunedWords,
+  retryRun,
+  roundAskFile,
+  roundRun,
+  runStore,
+  usedLines,
+} from 'agent-orchestrator';
 import { Effect } from 'effect';
 import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from 'agent-orchestrator/testing';
 import { appOver, beforeEachTest, eachTest, engineFor, runOver } from './placed.ts';
 import { story } from './checkpoints.ts';
-import { objectOf, stepOf } from './run-reads.ts';
+import { objectOf, stepOf, summariesOf } from './run-reads.ts';
 
 const stand = eachTest(testPlace);
 const standIn = eachTest(testEngine);
@@ -214,7 +225,7 @@ const record = fs.readFileSync(recordFile, 'utf8');
 /** The run object `GET /api/runs/:id` answers. */
 const detail = async (id = R) => objectOf(app(), id);
 const summary = async (id = R) => {
-  const run = ((await (await app().request('/api/runs')).json()) as RunSummary[]).find((r) => r.id === id);
+  const run = (await summariesOf(app())).find((r) => r.id === id);
   assert.ok(run, `${id} is on the list`);
   return run;
 };
@@ -231,10 +242,10 @@ const BOARD = {
 const post = (route: string, body: unknown, headers: Record<string, string> = BOARD) =>
   app().request(route, { method: 'POST', headers, body: typeof body === 'string' ? body : JSON.stringify(body) });
 const askTry = (step: string, body: unknown, headers?: Record<string, string>, run = R) =>
-  post(`/api/runs/${run}/steps/${step}/retry`, body, headers);
+  post(`/api/namespaces/default/runs/${run}/steps/${step}/retry`, body, headers);
 /** A round of `step`'s loop as the board asks it: `POST …/steps/:step/retry` with `"round": true`, beside the rest of `how`. */
 const askRound = ({ step = 'review', ...how }: { step?: string; budget?: unknown; round?: unknown }, run = R) =>
-  post(`/api/runs/${run}/steps/${step}/retry`, { mode: 'continue', round: true, ...how });
+  post(`/api/namespaces/default/runs/${run}/steps/${step}/retry`, { mode: 'continue', round: true, ...how });
 
 const asksDir = path.join(root, 'runs', `${R}.asks`);
 /** Nothing was written: no ask, and the run's record as it was. */
@@ -334,7 +345,7 @@ test("a raise the package refuses, by POST …/retry of a try and of a round: it
       const notTrue = await askRound({ round: 'yes' });
       assert.equal(notTrue.status, 400);
       assert.ok(((await notTrue.json()) as Refused).error.startsWith('`round` asks for another round'));
-      assert.equal((await post(`/api/runs/${R}/steps/review/retry`, ['review'])).status, 400, 'a list is no body');
+      assert.equal((await post(`/api/namespaces/default/runs/${R}/steps/review/retry`, ['review'])).status, 400, 'a list is no body');
       nothingWritten('a round body that is not one');
     },
   );
@@ -575,7 +586,11 @@ test('a run whose steps went over their budgets: what each try cost, the steps h
         const run = await detail();
         assert.deepEqual(
           run.status.pruned,
-          { ...pruned, artifacts: null },
+          {
+            ...pruned,
+            artifacts: null,
+            said: `${prunedWords(pruned)}; ${prunedKept(pruned)}`,
+          },
           'the marker nemia prune --unmerged writes beside the record, which nothing removes: taken back, so what follows reads R as it was',
         );
         assert.deepEqual([run.status.waitingOnYou, run.status.steps.map((s) => s.raise)], [[], [null, null, null]]);

@@ -13,8 +13,9 @@ import { Effect } from 'effect';
 import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from 'agent-orchestrator/testing';
 import { runLines } from 'agent-orchestrator';
-import type { RunLinesAnswer, RunListing } from './runs.ts';
+import type { RunLinesAnswer } from './runs.ts';
 import { appOver, beforeEachTest, eachTest, engineFor } from '../../test/placed.ts';
+import { summariesOf } from '../../test/run-reads.ts';
 
 const stand = eachTest(testPlace);
 const standIn = eachTest(testEngine);
@@ -68,7 +69,7 @@ test("the lines route answers the run's command lines per step, and the workflow
   assert.deepEqual(rest, runLines(record(R)), "the package's lines of the run's record");
   assert.deepEqual(Object.keys(lines.steps), ['a', 'b']);
   assert.equal(lines.fromNote, null);
-  const listed = ((await (await app().request('/api/runs')).json()) as RunListing[]).find((r) => r.id === R);
+  const listed = (await summariesOf(app())).find((r) => r.id === R);
   assert.ok(listed, 'the list has the run');
   assert.deepEqual(workflowPage, listed.workflowPage, "the same workflow's page the list gives");
   const object = (await (await app().request(`/api/runs/${R}`)).json()) as Record<string, unknown>;

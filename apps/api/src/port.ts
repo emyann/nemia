@@ -38,9 +38,9 @@ export function argsOf(argv: readonly string[]): { ticks: false } | { ticks: tru
 export const ticksOf = (argv: readonly string[]): boolean => argsOf(argv).ticks;
 
 /**
- * The address the api listens on: this machine's loopback, and nothing else. On every interface — `serve`'s default — anyone
- * on the network could start a run (`POST /api/runs`), whose brief an agent acts on in the repository once the daemon files it.
- * The board reaches the api through vite's proxy, which runs on this machine too (vite.config.ts).
+ * The address the api listens on: this machine's loopback, and nothing else. On every interface — `serve`'s default — anyone on the network
+ * could start a run (`POST /api/namespaces/<namespace>/runs`), whose brief an agent acts on in the repository once the daemon files it. The
+ * board reaches the api through vite's proxy, which runs on this machine too (vite.config.ts).
  */
 export const HOST = '127.0.0.1';
 

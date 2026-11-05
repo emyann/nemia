@@ -8,19 +8,22 @@ import { POPOVER, SMALL } from './CardGate';
 import { BUTTON, Refusal } from './Ask';
 import { SECONDARY } from './Gate';
 import { runsMoved } from '@/lib/runWrites';
+import { useRunNamespace } from '@/lib/runNamespace';
 
 /** What a lift does, said before the second press: the package's `unhold`, as the CLI's `hold <run> --off` runs it. */
 const LIFTS = 'It goes on at the next tick, and what its steps asked while it was held is asked again.';
 
 /**
- * The lift, through the api (`DELETE /api/runs/:id/hold`), and the run read again once it is lifted: its record and the list, each alone
+ * The lift, through the api (`DELETE /api/namespaces/:namespace/runs/:id/hold`), in `namespace` where the caller holds it, else the run's
+ * own (`useRunNamespace`), and the run read again once it is lifted: its record and the list, each alone
  * (`exact`), as an approval reads them, since a decision is keyed by the state it was read for. The tick says the run moved on the feed
  * once it files what the hold kept back; the board does not wait for that to stop saying the hold.
  */
-function useLift(id: string, onLifted: () => void = () => undefined) {
+function useLift(id: string, namespace: string | undefined, onLifted: () => void = () => undefined) {
   const queryClient = useQueryClient();
+  const namespaceNow = useRunNamespace(id, namespace);
   return useMutation({
-    mutationFn: () => liftHold(id),
+    mutationFn: () => namespaceNow().then((ns) => liftHold(ns, id)),
     onSuccess: async () => {
       onLifted();
       await Promise.all([queryClient.invalidateQueries({ queryKey: ['runs', id], exact: true }), runsMoved(queryClient, id)]);
@@ -34,7 +37,7 @@ function useLift(id: string, onLifted: () => void = () => undefined) {
  */
 export function LiftHold({ id }: { id: string }) {
   const [asking, setAsking] = useState(false);
-  const lift = useLift(id);
+  const lift = useLift(id, undefined);
   return (
     <span data-lift className="flex flex-wrap items-center gap-2 pt-1 text-body-small">
       {asking ? (
@@ -73,7 +76,7 @@ export function LiftHold({ id }: { id: string }) {
  * Lift on the Factory's card, beside its `held` chip: the button opens a popover over the card, where the second press lifts the hold. In
  * the card's footer, which it fits, so a held card is no taller for it (`CELL_HEIGHT`). Clicks inside are the card's own, as `CardGate`'s.
  */
-export function CardLift({ id }: { id: string }) {
+export function CardLift({ id, namespace }: { id: string; namespace: string }) {
   return (
     <span
       role="presentation"
@@ -87,7 +90,7 @@ export function CardLift({ id }: { id: string }) {
         </AriaButton>
         <Popover placement="bottom end" offset={6} className={POPOVER}>
           <Dialog aria-label={`Lift the hold on ${id}`} className="space-y-2 outline-none">
-            {({ close }) => <LiftForm id={id} onClose={close} />}
+            {({ close }) => <LiftForm id={id} namespace={namespace} onClose={close} />}
           </Dialog>
         </Popover>
       </DialogTrigger>
@@ -96,8 +99,8 @@ export function CardLift({ id }: { id: string }) {
 }
 
 /** The lift, confirmed in the card's popover: what it does, and the press that does it. */
-function LiftForm({ id, onClose }: { id: string; onClose: () => void }) {
-  const lift = useLift(id, onClose);
+function LiftForm({ id, namespace, onClose }: { id: string; namespace: string; onClose: () => void }) {
+  const lift = useLift(id, namespace, onClose);
   return (
     <div className="space-y-2">
       <Heading slot="title" className="font-semibold">{`Lift the hold on ${id}?`}</Heading>

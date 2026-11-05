@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { fed, herChat, openChat, photograph, themeOf } from '../board.ts';
+import { fed, herChat, openChat, photograph, themeOf, isRunAction } from '../board.ts';
 import { expectCount, expectVisible, idle, Refused, settled, WAIT_MS } from '../checks.ts';
 import { ASKING, writeAsking } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -71,7 +71,7 @@ export default {
       await asked.locator(`fieldset[data-question="${where.title}"] label[data-option="${where.options[1].label}"]`).click();
       const [approved] = await Promise.all([
         page.waitForResponse(
-          (r) => r.request().method() === 'POST' && new URL(r.url()).pathname === `/api/runs/${id}/steps/${gated}/approve`,
+          (r) => r.request().method() === 'POST' && isRunAction(new URL(r.url()).pathname, id, `/steps/${gated}/approve`),
           { timeout: WAIT_MS },
         ),
         approve.click(),

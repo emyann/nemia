@@ -1,8 +1,8 @@
 /**
- * POST /api/runs/:id/steps/:step/approve of a loop out of rounds: a person's acceptance of it, as it stands, from the board — `nemia
- * approve` of a loop, the one route that takes it, which ends a loop out of rounds through the package's `acceptRun`, which writes the
- * acceptance and nothing else, and is refused in the package's words. The api judges none of it: every refusal of a loop here is
- * asserted equal to what `acceptRun` says.
+ * POST /api/namespaces/:namespace/runs/:runId/steps/:step/approve of a loop out of rounds: a person's acceptance of it, as it stands, from
+ * the board — `nemia approve` of a loop, the one route that takes it, which ends a loop out of rounds through the package's `acceptRun`,
+ * which writes the acceptance and nothing else, and is refused in the package's words. The api judges none of it: every refusal of a loop
+ * here is asserted equal to what `acceptRun` says.
  *
  * One table of what the route refuses, nothing written, then the story of a person accepting a loop out of rounds. A row reads the
  * status and the facts the words name, and that they are `acceptRun`'s own.
@@ -120,7 +120,7 @@ const BOARD = {
 };
 
 const acceptOver = (step: string, body: unknown, headers: Record<string, string> = BOARD, run = R) =>
-  app().request(`/api/runs/${run}/steps/${step}/approve`, {
+  app().request(`/api/namespaces/default/runs/${run}/steps/${step}/approve`, {
     method: 'POST',
     headers,
     body: typeof body === 'string' ? body : JSON.stringify(body),

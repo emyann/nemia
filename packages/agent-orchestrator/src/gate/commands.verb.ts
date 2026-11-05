@@ -4,7 +4,7 @@
  * accept` was, decision 7: `approveForm`), and what the next tick files because of it.
  */
 import { Effect } from 'effect';
-import { commandLine, type Args } from '../command/command.ts';
+import { commandLine, NAMED_ACTION, type Args } from '../command/command.ts';
 import { Invalid } from '../refusal/refusal.ts';
 import { acceptWordsRefusal } from '../round/round.ts';
 import { acceptRun } from '../round/round.verb.ts';
@@ -139,7 +139,7 @@ export const APPROVE: Command<{
   writes: true,
   ticks: true,
   class: 'answer',
-  route: { method: 'POST', path: '/api/runs/:runId/steps/:step/approve', status: 202 },
+  route: { method: 'POST', path: '/api/namespaces/:namespace/runs/:runId/steps/:step/approve', status: 202, hand: NAMED_ACTION },
   apiTakes: ['answers', 'budgets'],
   apiKeys: ['step', 'try', 'at', 'message', 'file'],
   handler: Effect.fnUntraced(function* (args: Args) {

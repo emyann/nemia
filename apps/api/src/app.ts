@@ -156,10 +156,11 @@ const viewerScript = () => (bundle ??= fs.readFile(REFERENCE_BUNDLE, 'utf8'));
  * - `GET /api/quota` — the subscription's quota, as the engine's `quota` answers it for the `claude` harness (Claude Code's get_usage
  *   request), asked at most once a keep however many boards read (`QuotaAsker`, factory/quota.ts): what the Factory says over its floor.
  *   Every case is a 200 with a sentence, the harness's failures and the engine's refusals included.
- * - commands/routes.ts — a person's asks of a run, generated from the package's command table: a try (with answers to its questions,
- *   commands/extend.ts and asks/answers.ts), a round, words for a running session, an approval and an acceptance; five writes. And the
- *   store's pause put and lifted, `nemia pause` and `nemia resume`'s routes; an inbox card dropped, queued and taken off the queue; an
- *   agent's custom instructions written and cleared; and a factory's instruction put where it is kept, and written and cleared.
+ * - commands/routes.ts — the pipeline every command of the package's table is served through: the run's named actions, a try (with answers
+ *   to its questions, commands/extend.ts and asks/answers.ts), a round, words for a running session, an approval and an acceptance, served
+ *   in the run's namespace by the objects' handlers (objects/runs.ts); and the routes it generates: the store's pause put and lifted,
+ *   `nemia pause` and `nemia resume`'s routes; an inbox card dropped, queued and taken off the queue; an agent's custom instructions
+ *   written and cleared; and a factory's instruction put where it is kept, and written and cleared.
  * - steps/steps.ts — a step's own reads: its output, its files, and its conversation, once or followed.
  * - factory/feed.ts — the workflow feed followed, as server-sent events.
  * - nemia/nemia.ts — Nemia, the store's own agent: where she is (`nemia level`'s read), and the facts she keeps (`nemia memory`). Her

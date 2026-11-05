@@ -462,6 +462,7 @@ export { CLOSEOUT, LOGS, STATS, TOLD, TRIES, TRY } from './command/reads.verb.ts
 export { runObject, type RunObjectAnswer, type TryCloseout } from './object/run.verb.ts';
 export { runLines, type RunLines, type StepCommands } from './object/lines.verb.ts';
 export { cardList, cardObject, type CardQuery } from './object/card.verb.ts';
+export { runIn, runList, runNamespace, type RunQuery } from './run-list/run-list.verb.ts';
 export { continueToken, continuedAfter, listPage, pageOf, type PageAsked, type Paged } from './object/page.ts';
 export { factoryCommandsOf, factoryList, factoryObject, type ObjectQuery } from './factory-object/factory.verb.ts';
 export { builtinServerList, mcpServerList, mcpServerObject } from './factory-object/mcp-server.verb.ts';

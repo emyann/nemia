@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { cancelledAt, nextVisit, photograph, themeOf } from '../board.ts';
+import { cancelledAt, nextVisit, photograph, themeOf, isRunStart } from '../board.ts';
 import { expectCount, expectInside, expectTexts, expectVisible, idle, Refused, settled, WAIT_MS, watch } from '../checks.ts';
 import { DIAMOND, DIAMOND_RUNS, FACTORIES, FAKE, WORKFLOWS } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -159,7 +159,7 @@ export default {
       await expectVisible(pick, `${DIAMOND.cancelled.id} is offered to wait on`);
       await pick.check();
       const [answered] = await Promise.all([
-        refused.waitForResponse((r) => r.request().method() === 'POST' && new URL(r.url()).pathname === '/api/runs', { timeout: WAIT_MS }),
+        refused.waitForResponse((r) => r.request().method() === 'POST' && isRunStart(new URL(r.url()).pathname), { timeout: WAIT_MS }),
         form.getByRole('button', { name: 'Start' }).click(),
       ]);
       const { error } = (await answered.json()) as { error?: string };

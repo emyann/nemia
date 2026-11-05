@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { PATH_POLL_MS } from '../../../src/lib/lifecyclePath.ts';
-import { fed, openDebug, photograph, sidebar, themeOf } from '../board.ts';
+import { fed, openDebug, photograph, sidebar, themeOf, isRunAction } from '../board.ts';
 import { expectCount, expectVisible, idle, Refused, settled } from '../checks.ts';
 import { FAKE, SESSION } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -39,7 +39,7 @@ export default {
     await idle(page);
     let reads = 0;
     page.on('request', (request) => {
-      if (new URL(request.url()).pathname === `/api/runs/${id}/steps/${step}/path`) reads += 1;
+      if (isRunAction(new URL(request.url()).pathname, id, `/steps/${step}/path`)) reads += 1;
     });
     try {
       const run = JSON.parse(seeded) as { steps: Record<string, Record<string, unknown>> };

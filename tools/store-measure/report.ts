@@ -54,7 +54,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { Duration, Effect, Layer, Logger, Option, Stream } from 'effect';
-import type { ChatFollow, ChatFollowed, ChatReads, Pass, RunSummary } from 'agent-orchestrator';
+import type { ChatFollow, ChatFollowed, ChatReads, Pass } from 'agent-orchestrator';
 import { AE_LEFT_OUT, copyStore, destinationRefusal, installFence, placeRefused, readOnlyPlace, type Fence } from './fence.ts';
 import { comparedWith, MEASURES, rendered, type MeasureKey, type Measured, type StoreMeasure, type Timed } from './render.ts';
 
@@ -418,8 +418,23 @@ async function chatMeasured(orch: Orchestrator, place: Place, fence: Fence, repe
   };
 }
 
+/** What the measure reads of the list `GET /api/runs` answers (a `RunList`): each run's name, word and when it was made. */
+type Listed = { id: string; status: string; createdAt: string };
+
+/** The runs a `RunList` holds, as the measure reads them, and how many it could not judge. */
+const listedOf = (list: unknown): { runs: Listed[]; unjudged: number } => {
+  const { items, unjudged } = list as {
+    items: Array<{ metadata: { name: string; creationTimestamp: string }; status: { status: string } }>;
+    unjudged?: unknown[];
+  };
+  return {
+    runs: items.map((r) => ({ id: r.metadata.name, status: r.status.status, createdAt: r.metadata.creationTimestamp })),
+    unjudged: unjudged?.length ?? 0,
+  };
+};
+
 /** The newest run of `listing`, by `createdAt`, finished or not; null where there is none. */
-const newestOf = (listing: readonly RunSummary[], finished: boolean): string | null =>
+const newestOf = (listing: readonly Listed[], finished: boolean): string | null =>
   listing
     .filter((r) => FINISHED.has(r.status) === finished)
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
@@ -435,7 +450,7 @@ async function measure(asked: Asked, root: string, fence: Fence) {
   const fresh = () => appOver(api, orch, place);
   const { repeat } = asked;
   const first = await fresh();
-  const listing = (await getJson(first.app, '/api/runs')) as RunSummary[];
+  const { runs: listing, unjudged } = listedOf(await getJson(first.app, '/api/runs'));
   const finishedRun = newestOf(listing, true);
   const openRun = newestOf(listing, false);
   const cards = ((await getJson(first.app, INBOX_URL)) as { items: { status: { runs: readonly string[] } }[] }).items;
@@ -476,7 +491,7 @@ async function measure(asked: Asked, root: string, fence: Fence) {
       journalBytes: tasks.reduce((sum, name) => sum + fs.statSync(path.join(wf, 'engine', 'tasks', name)).size, 0),
       feedLines: feed.lines,
       cards: { listed: cards.length, started: cards.filter((c) => c.status.runs.length > 0).length },
-      unreadable: { runs: listing.filter((r) => r.unreadable !== null).length, passLines: pass?.unreadable?.length ?? 0 },
+      unreadable: { runs: unjudged, passLines: pass?.unreadable?.length ?? 0 },
       invariantRefusals: await invariantRefusals(wf),
     },
     asked: { finishedRun, openRun, feedCursor: feed.cursor, feedLinesRead: feed.read, chat: chat.asked },

@@ -1,12 +1,13 @@
 /**
- * What a person asks of a run from the board — a try, a round, an approval (a gate's, or a loop's as it stands), words to a session
- * (the command table's routes, apps/api/src/commands/routes.ts).
+ * What a person asks of a run from the board — a try, a round, an approval (a gate's, or a loop's as it stands), words to a session —
+ * each a named action of the run in its namespace (`runs.retry`, `runs.approve`, `runs.say` of the objects' client), the namespace its
+ * factory's, `default` for a run of none (`namespaceOf`).
  */
 
 import { Schema } from 'effect';
-import { decodes } from './decodes.ts';
-import { send } from './read.ts';
-import { TRANSCRIPT_KINDS, type TranscriptEvent } from './steps.ts';
+import { decoded } from './read.ts';
+import { runs } from './objects.ts';
+import type { TranscriptEvent } from './steps.ts';
 
 /**
  * Mirrors `Said` in agent-orchestrator, the engine's `said` entry: words a person said to a step's running session, when, to which attempt
@@ -14,16 +15,6 @@ import { TRANSCRIPT_KINDS, type TranscriptEvent } from './steps.ts';
  * the transcript held none.
  */
 export type Said = { at: string; attempt: number; text: string; after: { kind: TranscriptEvent['kind']; id: string } | null };
-
-/** Decodes a `Said`. */
-const SaidSchema = decodes<Said>()(
-  Schema.Struct({
-    at: Schema.String,
-    attempt: Schema.Number,
-    text: Schema.String,
-    after: Schema.NullOr(Schema.Struct({ kind: Schema.Literals(TRANSCRIPT_KINDS), id: Schema.String })),
-  }),
-);
 
 /**
  * Mirrors `Answer` in agent-orchestrator's question/question.ts: a person's answer to one question a step asks, by its title — the labels
@@ -37,39 +28,25 @@ export type RetryMode = 'continue' | 'fresh' | 'recheck';
 /** What an ask for a try answers: the try asked for, its ask file, and whether the tick stops the step's blocked session first. */
 export type AskedTry = { try: number; file: string; stopFirst: boolean };
 
-/** Decodes an `AskedTry`. */
-const AskedTrySchema = decodes<AskedTry>()(
-  Schema.Struct({
-    try: Schema.Number,
-    file: Schema.String,
-    stopFirst: Schema.Boolean,
-  }),
-);
-
 /** What an ask for a round answers: the looping step, the round asked for, and its ask file. */
 export type AskedRound = { step: string; round: number; file: string };
 
-/** Decodes an `AskedRound`. */
-const AskedRoundSchema = decodes<AskedRound>()(
-  Schema.Struct({
-    step: Schema.String,
-    round: Schema.Number,
-    file: Schema.String,
-  }),
-);
+/**
+ * What an ask of a try must answer of `RunAsked`, which keeps each key optional since a try's ask and a round's answer different ones; and
+ * of a round's.
+ */
+const AskedTrySchema = Schema.Struct({ try: Schema.Number, file: Schema.String, stopFirst: Schema.Boolean });
+const AskedRoundSchema = Schema.Struct({ step: Schema.String, round: Schema.Number, file: Schema.String });
+
+/** The route an ask of `step` of the run `runId` is sent to, as an answer it does not read names it. */
+const retryRoute = (namespace: string, runId: string, step: string): string =>
+  `POST /api/namespaces/${encodeURIComponent(namespace)}/runs/${encodeURIComponent(runId)}/steps/${encodeURIComponent(step)}/retry`;
+
+const TRY_MAY = "The ask may be written: look at the step's note on the run's page before asking again.";
+const ROUND_MAY = "The ask may be written: look at the looping step's note on the run's page before asking again.";
 
 /** What an approval answers: the try approved, when, its words — null for none — and the approval's file. */
 export type Approved = { try: number; at: string; message: string | null; file: string };
-
-/** Decodes an `Approved`. */
-const ApprovedSchema = decodes<Approved>()(
-  Schema.Struct({
-    try: Schema.Number,
-    at: Schema.String,
-    message: Schema.NullOr(Schema.String),
-    file: Schema.String,
-  }),
-);
 
 /**
  * Ask for another try of a step, as the CLI's `retry` does: the api calls the package's `retry()`, which writes the ask and nothing else,
@@ -82,15 +59,16 @@ const ApprovedSchema = decodes<Approved>()(
  *
  * Sent as `application/json`, which the api requires of it, as of a start.
  */
-export const askTry = (
+export async function askTry(
+  namespace: string,
   runId: string,
   step: string,
   how: { mode: RetryMode; model?: string; message?: string; budget?: number; answers?: readonly QuestionAnswer[] },
-): Promise<AskedTry> =>
-  send('POST', `/api/runs/${encodeURIComponent(runId)}/steps/${encodeURIComponent(step)}/retry`, AskedTrySchema, {
-    body: how,
-    may: "The ask may be written: look at the step's note on the run's page before asking again.",
-  });
+): Promise<AskedTry> {
+  const asked = await runs.retry(namespace, runId, step, how, TRY_MAY);
+  const { try: n, file, stopFirst } = decoded(retryRoute(namespace, runId, step), AskedTrySchema, asked, TRY_MAY);
+  return { try: n, file, stopFirst };
+}
 
 /**
  * Ask for another round of the loop `step` closes, as the CLI's `retry --round` does — `POST …/retry` with `"round": true` — past a
@@ -101,11 +79,11 @@ export const askTry = (
  *
  * Sent as `application/json`, which the api requires of it, as of a try.
  */
-export const askRound = (runId: string, step: string, how: { budget?: number }): Promise<AskedRound> =>
-  send('POST', `/api/runs/${encodeURIComponent(runId)}/steps/${encodeURIComponent(step)}/retry`, AskedRoundSchema, {
-    body: { mode: 'continue', round: true, ...how },
-    may: "The ask may be written: look at the looping step's note on the run's page before asking again.",
-  });
+export async function askRound(namespace: string, runId: string, step: string, how: { budget?: number }): Promise<AskedRound> {
+  const asked = await runs.retry(namespace, runId, step, { mode: 'continue', round: true, ...how }, ROUND_MAY);
+  const { step: looping, round, file } = decoded(retryRoute(namespace, runId, step), AskedRoundSchema, asked, ROUND_MAY);
+  return { step: looping, round, file };
+}
 
 /**
  * Approve a step waiting at its gate, as the CLI's `approve` does — with `message`, `--message`, the words every step after the gate is
@@ -127,14 +105,14 @@ export const askRound = (runId: string, step: string, how: { budget?: number }):
  * Sent as `application/json`, which the api requires of it, as of an ask. Sending the step back is an ask for a try with words (`askTry`).
  */
 export const approveStep = (
+  namespace: string,
   runId: string,
   step: string,
   how: { message?: string; answers?: readonly QuestionAnswer[]; budgets?: readonly { step: string; usd: number }[] },
 ): Promise<Approved> =>
-  send('POST', `/api/runs/${encodeURIComponent(runId)}/steps/${encodeURIComponent(step)}/approve`, ApprovedSchema, {
-    body: how,
-    may: "The approval may be written: look at the step on the run's page before approving again.",
-  });
+  runs
+    .approve(namespace, runId, step, how, "The approval may be written: look at the step on the run's page before approving again.")
+    .then(({ try: n, at, message, file }) => ({ try: n, at, message, file }));
 
 /**
  * Tell a step's running session something, as the CLI's `say` does: the api calls the package's `say()`, which hands the words to the
@@ -144,8 +122,11 @@ export const approveStep = (
  *
  * Sent as `application/json`, which the api requires of it, as of a start and an ask.
  */
-export const sayToStep = (runId: string, step: string, text: string): Promise<Said> =>
-  send('POST', `/api/runs/${encodeURIComponent(runId)}/steps/${encodeURIComponent(step)}/say`, SaidSchema, {
-    body: { text },
-    may: "The words may have been said: read the step's conversation on its page before saying them again.",
-  });
+export const sayToStep = (namespace: string, runId: string, step: string, text: string): Promise<Said> =>
+  runs.say(
+    namespace,
+    runId,
+    step,
+    text,
+    "The words may have been said: read the step's conversation on its page before saying them again.",
+  );

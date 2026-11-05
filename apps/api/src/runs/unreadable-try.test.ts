@@ -17,6 +17,7 @@ import path from 'node:path';
 import { app } from '../app.ts';
 import { engine, passStanding, runStore, type RunSummary } from 'agent-orchestrator';
 import { runWith } from '../../test/builtin-place.ts';
+import { summariesOf } from '../../test/run-reads.ts';
 
 const git = (repo: string, ...args: string[]) =>
   execFileSync(
@@ -119,9 +120,7 @@ writeRun('r-child', {}, { after: ['r-check'] });
 await runWith(engine(), passStanding(runStore.runs.list()));
 
 const listed = async (): Promise<Map<string, RunSummary>> => {
-  const res = await app.request('/api/runs');
-  assert.equal(res.status, 200, await res.clone().text());
-  return new Map(((await res.json()) as RunSummary[]).map((run) => [run.id, run]));
+  return new Map((await summariesOf(app)).map((run) => [run.id, run]));
 };
 
 test("a check's or an earlier try's journal that does not read marks its step unreadable on the list, and refuses the run's decision as its page", async (t) => {

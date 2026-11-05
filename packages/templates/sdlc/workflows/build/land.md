@@ -22,7 +22,8 @@ the receipt that the merge happened — `${{ parameters.ciCheck }}` already judg
 Does the receipt then wait on `${{ parameters.ciCheck }}` at the merge commit on the base branch? **${{ parameters.landingWaitsOnCi }}**
 (the factory's `landingWaitsOnCi`). Where it does, it waits up to 40 minutes, and a merge that turned the base red fails this step
 though the merge stands: nothing is taken back, and the refusal names the jobs that did not pass and what a person does. A base whose
-tip holds the merge and is green there passes.
+tip holds the merge and is green there passes, as does one whose own run at the merge was cancelled (replaced by a newer push's) or
+never reported, while a red there fails this step naming that commit.
 
 ### false — in this checkout
 

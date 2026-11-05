@@ -1,9 +1,9 @@
 /**
- * A finished run pruned on the board (`POST /api/runs/:id/prune`), as `nemia prune <run> --yes` prunes it: its worktrees removed, and its
- * files with `artifacts`, its record and every branch kept; the list and its object say it was pruned in the package's words. And every
- * refusal refused, in `nemia prune`'s own words, with nothing touched: a run not over, a finished run nobody merged without `unmerged`, a
- * run pruned already, a folder run, a run the store has not, a body that is not the two switches, and a request from anywhere but the
- * board.
+ * A finished run pruned on the board (`POST /api/namespaces/:namespace/runs/:runId/prune`), as `nemia prune <run> --yes` prunes it: its
+ * worktrees removed, and its files with `artifacts`, its record and every branch kept; the list and its object say it was pruned in the
+ * package's words. And every refusal refused, in `nemia prune`'s own words, with nothing touched: a run not over, a finished run nobody
+ * merged without `unmerged`, a run pruned already, a folder run, a run the store has not, a body that is not the two switches, and a
+ * request from anywhere but the board.
  *
  * At shipped defaults: the api's own engine over a store this file seeds, git for real — branches, a merge, a worktree cut for each run —
  * and the harness's fake `claude` (test/harness.ts) first on PATH. The runs it seeds: `p-merged`, `p-unmerged` and `p-running`, repository
@@ -20,7 +20,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { Pruning } from 'agent-orchestrator';
 import { runWith } from '../../test/builtin-place.ts';
-import { objectOf } from '../../test/run-reads.ts';
+import { objectOf, summariesOf } from '../../test/run-reads.ts';
 import { app } from '../app.ts';
 import { engine, prune, prunedKept, prunedWords, runStore, type RunSummary } from 'agent-orchestrator';
 
@@ -160,13 +160,15 @@ const BOARD = {
 };
 /** A prune as the board sends it: a POST with the two switches as JSON, through the same guard as every write. */
 const pruneOn = (id: string, body: unknown = {}, headers: Record<string, string> = BOARD) =>
-  app.request(`/api/runs/${id}/prune`, { method: 'POST', headers, body: typeof body === 'string' ? body : JSON.stringify(body) });
+  app.request(`/api/namespaces/default/runs/${id}/prune`, {
+    method: 'POST',
+    headers,
+    body: typeof body === 'string' ? body : JSON.stringify(body),
+  });
 
 /** Each run on the list, by id. */
 const listed = async (): Promise<Map<string, RunSummary>> => {
-  const res = await app.request('/api/runs');
-  assert.equal(res.status, 200);
-  return new Map(((await res.json()) as RunSummary[]).map((r) => [r.id, r]));
+  return new Map((await summariesOf(app)).map((r) => [r.id, r]));
 };
 /** The run object of `id` (`GET /api/runs/:id`, a 200 or it throws), what `nemia show` prints. */
 const detail = (id: string) => objectOf(app, id);
@@ -326,7 +328,7 @@ test('a finished run pruned on the board as `nemia prune` prunes it: what it ref
   );
 });
 
-test('POST /api/runs/:id/prune refuses, touching nothing: a run not over or a folder run is a 409, a run the store has not a 404, a body not its two switches a 400', async (t) => {
+test('POST /api/namespaces/:namespace/runs/:runId/prune refuses, touching nothing: a run not over or a folder run is a 409, a run the store has not a 404, a body not its two switches a 400', async (t) => {
   await t.test(
     'REFUSED at shipped defaults: a run not over is a 409 in the words of `nemia prune`, whatever the switches, and nothing is touched',
     async () => {

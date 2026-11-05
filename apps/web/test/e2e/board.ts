@@ -4,6 +4,7 @@ import path from 'node:path';
 import type { Locator, Page } from 'playwright';
 import { expectCount, expectTexts, expectVisible, idle, Refused, settled, WAIT_MS, watch } from './checks.ts';
 import type { FactoryCommands, FactoryList, ScheduleList } from 'objects';
+import type { RunSummary } from '../../src/lib/api/runs.ts';
 import { factoryViewOf, type Factory } from '../../src/lib/api/factories.ts';
 import { instantWhole, instantWords } from '../../src/lib/instant.ts';
 import { attachedFiles, attachedRun, DIAMOND } from './seed.ts';
@@ -506,6 +507,25 @@ export async function expectInstant(
 export async function answered<T>(page: Page, pathname: string): Promise<T> {
   return (await (await page.request.get(new URL(pathname, page.url()).href)).json()) as T;
 }
+
+/** Every run's summary, read apart from the page as the board reads them (`GET /api/runs-summaries`). */
+export const rowsAnswered = (page: Page): Promise<RunSummary[]> => answered<RunSummary[]>(page, '/api/runs-summaries');
+
+/**
+ * Whether `pathname` is the run `id` on its namespaced path, in whichever namespace it is: the run itself (its removal), or with `tail` one
+ * of its named actions (`/hold`, `/labels`, `/steps/<step>/retry`).
+ */
+export const isRunAction = (pathname: string, id: string, tail = ''): boolean =>
+  /^\/api\/namespaces\/[^/]+\/runs\/(.+)$/.exec(pathname)?.[1] === `${id}${tail}`;
+
+/** The namespaced path of the run `id` (`/api/namespaces/<factory>/runs/<id>`), its namespace read off its object. */
+export async function runPath(page: Page, id: string): Promise<string> {
+  const run = await answered<{ metadata: { namespace?: string; labels: Record<string, string> } }>(page, `/api/runs/${id}`);
+  return `/api/namespaces/${run.metadata.namespace ?? run.metadata.labels.factory ?? 'default'}/runs/${id}`;
+}
+
+/** Whether `pathname` is a run's start, in whichever namespace (`POST /api/namespaces/<factory>/runs`). */
+export const isRunStart = (pathname: string): boolean => /^\/api\/namespaces\/[^/]+\/runs$/.test(pathname);
 
 /**
  * The factories as the board's pages draw them, read apart from the page: the api's `FactoryList`, each factory's lines and, but for the

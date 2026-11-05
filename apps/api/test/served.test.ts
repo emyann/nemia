@@ -29,6 +29,10 @@ const SUBSCRIPTION =
 const EVENT =
   "served by the objects' handler from `objects`' Api (src/feed-objects/events.ts): the feed's lines as Events, a page of the feed `nemia watch` streams";
 
+/** Why the runs as objects are the api's own: the `RunList` and one run in its namespace, which no entry of the table serves. */
+const RUN_LIST =
+  "the runs as objects, a RunList and one run in its namespace, served by the objects' handler from `objects`' Api (src/objects/runs.ts)";
+
 const OWN: Readonly<Record<string, string>> = {
   'GET /api/templates': TEMPLATE,
   'GET /api/templates/:name': TEMPLATE,
@@ -41,6 +45,9 @@ const OWN: Readonly<Record<string, string>> = {
   'GET /api/namespaces/:namespace/events': EVENT,
   'GET /api/namespaces/:namespace/events/:name': EVENT,
   'GET /api/health': 'the server answering at all, which no command of the orchestrator asks',
+  'GET /api/runs': RUN_LIST,
+  'GET /api/namespaces/:namespace/runs': RUN_LIST,
+  'GET /api/namespaces/:namespace/runs/:runId': RUN_LIST,
   'GET /api/cards': "the Card's verbs, served by the objects' handler from `objects`' Api (src/objects/cards.ts) over the inbox's entries",
   'GET /api/namespaces/:namespace/cards':
     "the Card's verbs, served by the objects' handler from `objects`' Api (src/objects/cards.ts) over the inbox's entries",
@@ -78,7 +85,7 @@ const OWN: Readonly<Record<string, string>> = {
   'GET /api/feed/stream': "a stream of the feed, held open for as long as the board reads it: the api's counterpart of nemia watch",
   'GET /api/runs/:runId/lines':
     "a run's command lines and its workflow page's address, built off the command table and the run's record: an api address and command text, no command's answer",
-  'GET /api/runs/:id/steps/:step/transcript/stream': "a stream of a step's transcript, held open for as long as the board reads it",
+  'GET /api/runs/:runId/steps/:step/transcript/stream': "a stream of a step's transcript, held open for as long as the board reads it",
   'GET /api/workflows/keys': "the keys a step may set and what each means, the builder's form: no run, no store",
   'GET /api/repository': 'the repository the request is served on, as the request names it',
   'GET /api/factories':
@@ -205,10 +212,11 @@ test('the Machines page retired with its two routes: GET /api/machines and GET /
   assert.equal((await app.request('/api/machines/lifecycle')).status, 404);
 });
 
-test("the runs' list is declared by runs, an entry the api serves alone; ls's answer, which nemia prints, is ls's own, on /api/listing", () => {
+test("the runs' list is the RunList, the objects' own; runs, an entry the api serves alone, routes none; ls's answer, which nemia prints, is ls's own, on /api/listing", () => {
   const runs = COMMANDS.find((c) => c.name === 'runs');
   const ls = COMMANDS.find((c) => c.name === 'ls');
-  assert.equal(declaredBy(COMMANDS).get('GET /api/runs'), 'runs');
+  assert.equal(declaredBy(COMMANDS).get('GET /api/runs'), undefined, 'no entry declares the list');
+  assert.ok(OWN['GET /api/runs'], "the RunList is the api's own, with its why");
   assert.equal(runs?.only?.side, 'api', 'the runs entry is served on the api alone');
   assert.ok(runs?.only?.why.trim(), 'and says why');
   assert.equal(declaredBy(COMMANDS).get('GET /api/listing'), 'ls', 'every run, as nemia ls lists them');
@@ -236,8 +244,8 @@ test('REFUSED: an OWN line the api does not serve, one an entry declares, and on
   assert.deepEqual(servedBreaks(app.routes, COMMANDS, { ...OWN, 'GET /api/gone': 'a route since removed' }), [
     'OWN lists GET /api/gone, which the api does not serve: take it off OWN.',
   ]);
-  assert.deepEqual(servedBreaks(app.routes, COMMANDS, { ...OWN, 'GET /api/runs': 'the runs' }), [
-    'OWN lists GET /api/runs, which runs declares: take it off OWN.',
+  assert.deepEqual(servedBreaks(app.routes, COMMANDS, { ...OWN, 'GET /api/listing': 'the runs' }), [
+    'OWN lists GET /api/listing, which ls declares: take it off OWN.',
   ]);
   assert.deepEqual(servedBreaks(app.routes, COMMANDS, { ...OWN, 'GET /api/health': ' ' }), [
     "OWN lists GET /api/health and says no why: say why it is the api's own.",

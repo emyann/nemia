@@ -1,9 +1,9 @@
 /**
  * The legs CI proves the contracts in (`tools/contracts/legs.ts`), and the `contracts` job of `.github/workflows/ci.yml` that runs
- * them: every contract proved by exactly one leg, a leg of its own whose contract is gone refused by every leg, the files a contract
- * may be in found as tsverify's CLI finds them, and the job wired to the legs — a matrix of every leg, each with its own verdict
- * cache, none cancelled by another — while `npm run contracts` still proves them all. `prove.ts` itself is proved by running it: CI's
- * job does on every push.
+ * them: every file a contract may be in proved by exactly one leg, a leg of its own whose file is gone refused by every leg, the files
+ * a contract may be in found as tsverify's CLI finds them, and the job wired to the legs — a matrix of every leg, each with its own
+ * verdict cache, none cancelled by another — while `npm run contracts` still proves them all. `prove.ts` itself is proved by running
+ * it: CI's job does on every push.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -11,8 +11,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from './scratch.ts';
 import { readWorkflow, type Workflow } from './ci-workflow.ts';
-import { ALONE, LEGS, commandsOf, contractFilesUnder, legOf, planOf, type Contract } from '../../contracts/legs.ts';
-import { contractsOf } from '../../contracts/prove.ts';
+import ts from 'typescript';
+import { loadProject, readContract, sourceFile } from '@emyann/tsverify/api';
+import { ALONE, LEGS, commandsOf, contractFilesUnder, legOf } from '../../contracts/legs.ts';
 
 const ROOT = path.join(import.meta.dirname, '..', '..', '..');
 
@@ -55,54 +56,58 @@ const contractsDrift = (workflow: Workflow, script: string | undefined): string[
 const rootScript = (): string | undefined =>
   (JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')) as { scripts?: Record<string, string> }).scripts?.contracts;
 
-const FOUND: Contract[] = [
-  { file: 'packages/agent-runtime/src/core/domain.ts', name: 'decide' },
-  ALONE.observe,
-  { file: 'packages/agent-orchestrator/src/gate/gate.ts', name: 'holdsOpen' },
-  ALONE['approval-refusal'],
-  { file: 'apps/cli/src/route.ts', name: 'routeOf' },
+/** Whether the file at `file` (absolute) exports `name` as a contract tsverify reads, through the program its CLI reads it by. */
+const exportsContract = (file: string, name: string): boolean => {
+  const config = ts.findConfigFile(path.dirname(file), (f) => ts.sys.fileExists(f));
+  assert.ok(config !== undefined, `a tsconfig.json above ${file}`);
+  const project = loadProject([file], config);
+  const exported = sourceFile(project, file).statements.some(
+    (stmt) =>
+      ts.isVariableStatement(stmt) &&
+      stmt.modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword) &&
+      stmt.declarationList.declarations.some((d) => ts.isIdentifier(d.name) && d.name.text === name),
+  );
+  if (!exported) return false;
+  try {
+    readContract(project, file, name);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+const FILES = [
+  'apps/cli/src/route.ts',
+  ALONE.observe.file,
+  'packages/agent-runtime/src/harness/mcp.ts',
+  'packages/agent-runtime/src/core/engine/filing.ts',
+  ALONE['approval-refusal'].file,
+  'packages/agent-orchestrator/src/adopt/adopt.ts',
 ];
 
-test('every contract found is proved by exactly one leg, and a leg of its own proves its contract alone', () => {
-  const proved = LEGS.flatMap((leg) => planOf(FOUND, leg));
-  assert.equal(proved.length, FOUND.length, 'no contract is proved twice');
-  assert.deepEqual(new Set(proved), new Set(FOUND), 'no contract is left out');
-  for (const [leg, contract] of Object.entries(ALONE)) assert.deepEqual(planOf(FOUND, legOf(contract)), [contract], leg);
-  assert.deepEqual(
-    planOf(FOUND, 'rest').map((c) => c.name),
-    ['decide', 'holdsOpen', 'routeOf'],
-    'the rest leg proves the contracts that share a file with a leg of its own',
-  );
-});
-
-test("each leg's tsverify commands: a root's files whole where the leg proves all of a file, one contract alone where it shares one", () => {
-  const found: Contract[] = [
-    ...FOUND,
-    { file: 'packages/agent-runtime/src/harness/mcp.ts', name: 'transportOf' },
-    { file: 'packages/agent-runtime/src/core/engine/filing.ts', name: 'requestStop' },
-  ];
-  assert.deepEqual(commandsOf(found, 'rest'), [
+test('every file a contract may be in is proved by exactly one leg, a root at a time', () => {
+  const named = LEGS.flatMap((leg) => commandsOf(FILES, leg).flatMap((args) => args.filter((a) => a !== '--cache')));
+  assert.equal(named.length, FILES.length, 'no file is proved twice');
+  assert.deepEqual(new Set(named), new Set(FILES), 'no file is left out');
+  for (const [leg, alone] of Object.entries(ALONE)) {
+    assert.equal(legOf(alone.file), leg);
+    assert.deepEqual(commandsOf(FILES, legOf(alone.file)), [[alone.file, '--cache']], leg);
+  }
+  assert.deepEqual(commandsOf(FILES, 'rest'), [
     ['packages/agent-runtime/src/core/engine/filing.ts', 'packages/agent-runtime/src/harness/mcp.ts', '--cache'],
+    ['packages/agent-orchestrator/src/adopt/adopt.ts', '--cache'],
     ['apps/cli/src/route.ts', '--cache'],
-    ['packages/agent-runtime/src/core/domain.ts', 'decide', '--cache'],
-    ['packages/agent-orchestrator/src/gate/gate.ts', 'holdsOpen', '--cache'],
   ]);
-  assert.deepEqual(commandsOf(found, 'observe'), [[ALONE.observe.file, ALONE.observe.name, '--cache']]);
-  assert.deepEqual(
-    commandsOf([{ file: 'apps/cli/src/route.ts', name: 'routeOf' }, ALONE.observe, ALONE['approval-refusal']], 'observe'),
-    [[ALONE.observe.file, '--cache']],
-    'a file whose every contract the leg proves is named whole',
-  );
 });
 
-test('REFUSED: a leg of its own whose contract is no longer where it names, by every leg', () => {
-  const moved = FOUND.filter((c) => c !== ALONE.observe);
+test('REFUSED: a leg of its own whose file holds no contract any more, by every leg', () => {
+  const moved = FILES.filter((f) => f !== ALONE.observe.file);
   for (const leg of LEGS) assert.throws(() => commandsOf(moved, leg), Error, leg);
 });
 
-test("the contracts ALONE names are each a contract tsverify reads in this checkout's file", () => {
-  for (const contract of Object.values(ALONE))
-    assert.ok(contractsOf(path.join(ROOT, contract.file)).includes(contract.name), contract.name);
+test("the contracts ALONE names are each a contract tsverify reads in this checkout's file, and only there", () => {
+  for (const alone of Object.values(ALONE)) assert.ok(exportsContract(path.join(ROOT, alone.file), alone.contract), alone.contract);
+  assert.equal(exportsContract(path.join(ROOT, ALONE.observe.file), ALONE['approval-refusal'].contract), false, 'a name the file lacks');
 });
 
 test('a file may hold a contract when it imports tsverify, or relatively imports a file that does, and not otherwise', () => {

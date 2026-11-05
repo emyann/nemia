@@ -9,7 +9,7 @@
  * writes each into a document that imports back into a Schema decoding the same object.
  */
 import { Schema } from 'effect';
-import { API_VERSION } from './meta.ts';
+import { API_VERSION, listOf } from './meta.ts';
 import { ObjectGraph } from './graph.ts';
 import {
   ANSWER_VIA,
@@ -51,11 +51,13 @@ const StepPhase = Schema.Literals(STEP_PHASES);
 const StepReason = Schema.Literals(STEP_REASONS);
 
 /**
- * The run's name, when it was made, and the labels it is found by, one map (`metadataLabels`): its `workflow`, the `factory` it was
- * started in (`default` for the default one, as the feed says it), and a person's labels on it (`nemia label run`), as `-l` selects them.
+ * The run's name, the namespace it is in (its factory, `default` for one that names none; absent on an object served before the run had
+ * one), when it was made, and the labels it is found by, one map (`metadataLabels`): its `workflow`, the `factory` it was started in
+ * (`default` for the default one, as the feed says it), and a person's labels on it (`nemia label run`), as `-l` selects them.
  */
 export const RunMetadata = Schema.Struct({
   name: Schema.String,
+  namespace: Schema.optionalKey(Schema.String),
   creationTimestamp: Schema.String,
   labels: Schema.Record(Schema.String, Schema.String),
 }).annotate({ identifier: 'RunMetadata' });
@@ -397,7 +399,7 @@ const RunToDecide = Schema.Union([
 ]);
 
 /** One kind and name the run or a step of it is behind the files on (`Drift`, revisions.ts). */
-const Drift = Schema.Struct({
+export const RunDrift = Schema.Struct({
   kind: Schema.Literals(REVISION_KINDS),
   name: Schema.String,
   pinned: Schema.Finite,
@@ -476,7 +478,7 @@ export const RunStatus = Schema.Struct({
   waitingOnYouWords: Strings,
   gates: Strings,
   warning: NullString,
-  kinds: List(Drift),
+  kinds: List(RunDrift),
 }).annotate({ identifier: 'RunStatus' });
 export type RunStatus = typeof RunStatus.Type;
 
@@ -489,6 +491,21 @@ export const Run = Schema.Struct({
   status: RunStatus,
 }).annotate({ identifier: 'Run' });
 export type Run = typeof Run.Type;
+
+/** A run that is in the list and could not be judged, so is no `Run`: its name, and why, in the words the list says it with. */
+export const RunUnjudged = Schema.Struct({ name: Schema.String, error: Schema.String }).annotate({ identifier: 'RunUnjudged' });
+export type RunUnjudged = typeof RunUnjudged.Type;
+
+/**
+ * A page of the runs (`RunList`): `listOf('Run', Run)`, and beside it `unjudged`, each run of the page a task of which does not read, left
+ * out of `items` since it cannot be judged into a `Run`. A departure from Kubernetes, whose list holds objects alone: a run dropped with
+ * no word would read as gone, and a page refused for one journal would blank every other run of it.
+ */
+export const RunList = Schema.Struct({
+  ...listOf('Run', Run).fields,
+  unjudged: Schema.optionalKey(Schema.Array(RunUnjudged)),
+}).annotate({ identifier: 'RunList' });
+export type RunList = typeof RunList.Type;
 
 /** A closeout's questions under one field of its output (`Asked`, question.ts). */
 const Asked = Schema.Struct({

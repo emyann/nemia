@@ -180,6 +180,30 @@
       "term": "Involved",
       "meaning": "what an Event is about: a run, one of its steps, a daemon or the store, by its kind (`INVOLVED_KINDS`) and its name (`EventInvolved`, `packages/objects/src/event.ts`).",
       "type": "EventInvolved"
+    },
+    {
+      "term": "RunList",
+      "meaning": "a page of the runs, across namespaces (`/api/runs`) or in one (`/api/namespaces/<factory>/runs`), each item a whole `Run`; beside its items, `unjudged`, the runs of the page that could not be judged (`RunList`, `packages/objects/src/run.ts`).",
+      "type": "RunList"
+    },
+    {
+      "term": "unjudged",
+      "meaning": "a run of a RunList's page a task of which does not read, so it is no `Run`: named in the list's `unjudged` with why, never dropped with no word (`RunUnjudged`, `packages/objects/src/run.ts`).",
+      "type": "RunUnjudged"
+    },
+    {
+      "term": "Named action",
+      "meaning": "a verb on a run served at its own path under the run in its namespace, its body and answer Schemas of their own: start, removal, refresh, prune, labels, hold and its lift, and a step's retry, approval and words said (`RunStart`, `RunRetry`, `RunApprove`, `RunSay`, `RunRefresh`, `RunHold`, `RunPrune`, `packages/objects/src/run-actions.ts`). Each is a past fact on the run's record, as the command line's is."
+    },
+    {
+      "term": "WriteFailed",
+      "meaning": "a 502 a run's action answers when the package began it and something under it failed — the engine, git, a harness that did not take the words — naming the command that asks the same way (`WriteFailed`, `packages/objects/src/api.ts`).",
+      "type": "WriteFailed"
+    },
+    {
+      "term": "BadRequest",
+      "meaning": "a 400 a run's action answers for a request the api read and refused before the package was asked: a body that is no JSON, a name no run can have (`BadRequest`, `packages/objects/src/api.ts`).",
+      "type": "BadRequest"
     }
   ]
 }

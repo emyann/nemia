@@ -1,6 +1,6 @@
 /**
  * The door (`src/api.ts`): every kind in `KINDS` is served — its object Schema says `nemia/v1` and its kind, and the Api gets one of it —
- * and every kind but the Run has its `<Kind>List`, answered by a list endpoint of the Api. The Run's list is a later intent.
+ * and every kind has its `<Kind>List`, answered by a list endpoint of the Api.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -30,11 +30,11 @@ const answers = Object.values(Api.groups).flatMap((group) =>
 );
 
 /**
- * The path a kind's objects are got at: the Run by its id, the Factory, the Template and the Subscription, which no namespace holds, by
+ * The path a kind's objects are got at: the Factory, the Template and the Subscription, which no namespace holds, by
  * their names, the Event by its name in any namespace, and every other kind by its namespace and name.
  */
 const GET_PATHS: Record<(typeof KINDS)[number], string> = {
-  Run: '/api/runs/:runId',
+  Run: '/api/namespaces/:namespace/runs/:name',
   Card: '/api/namespaces/:namespace/cards/:name',
   Factory: '/api/factories/:name',
   McpServer: '/api/namespaces/:namespace/mcpservers/:name',
@@ -49,9 +49,6 @@ const GET_PATHS: Record<(typeof KINDS)[number], string> = {
   Event: '/api/events/:name',
 };
 
-/** The kinds whose list is a later intent. */
-const UNLISTED: ReadonlyArray<(typeof KINDS)[number]> = ['Run'];
-
 for (const kind of KINDS) {
   test(`${kind} has an object Schema saying apiVersion ${API_VERSION} and kind ${kind}, and a get endpoint`, () => {
     const fields = schemaOf(kind)?.fields;
@@ -61,7 +58,7 @@ for (const kind of KINDS) {
   });
 }
 
-for (const kind of KINDS.filter((k) => !UNLISTED.includes(k))) {
+for (const kind of KINDS) {
   test(`${kind} has its ${kind}List, of kind ${kind}List, which a GET of the Api answers, and its get answers a ${kind}`, () => {
     assert.equal(schemaOf(`${kind}List`)?.fields?.kind?.literal, `${kind}List`);
     assert.ok(answers.some((e) => e.method === 'GET' && e.kinds.includes(`${kind}List`)));
@@ -111,7 +108,29 @@ test('Card has its CardList, of kind CardList, and list endpoints across namespa
   assert.ok(endpoints.some((e) => e.method === 'GET' && e.path === '/api/namespaces/:namespace/cards'));
 });
 
-test("the Run's list (RunList and its endpoint) is a later intent: the door has neither yet", () => {
-  assert.equal(schemaOf('RunList'), undefined);
-  assert.ok(!endpoints.some((e) => e.method === 'GET' && e.path === '/api/runs'));
+test("the Run is listed across namespaces and in one, read in one and across all by its id, and its named actions are served in its namespace", () => {
+  for (const [method, path] of [
+    ['GET', '/api/runs'],
+    ['GET', '/api/namespaces/:namespace/runs'],
+    ['GET', '/api/runs/:runId'],
+    ['POST', '/api/namespaces/:namespace/runs'],
+    ['DELETE', '/api/namespaces/:namespace/runs/:name'],
+    ['POST', '/api/namespaces/:namespace/runs/:name/refresh'],
+    ['POST', '/api/namespaces/:namespace/runs/:name/prune'],
+    ['POST', '/api/namespaces/:namespace/runs/:name/labels'],
+    ['POST', '/api/namespaces/:namespace/runs/:name/hold'],
+    ['DELETE', '/api/namespaces/:namespace/runs/:name/hold'],
+    ['POST', '/api/namespaces/:namespace/runs/:name/steps/:step/retry'],
+    ['POST', '/api/namespaces/:namespace/runs/:name/steps/:step/approve'],
+    ['POST', '/api/namespaces/:namespace/runs/:name/steps/:step/say'],
+  ])
+    assert.ok(
+      endpoints.some((e) => e.method === method && e.path === path),
+      `${method} ${path} is an endpoint of the Api`,
+    );
+  assert.ok(answers.some((e) => e.method === 'GET' && e.path === '/api/runs' && e.kinds.includes('RunList')));
+  assert.ok(
+    !endpoints.some((e) => e.method !== 'GET' && e.path.startsWith('/api/runs')),
+    'no action of a run is served under /api/runs: each is in its namespace',
+  );
 });

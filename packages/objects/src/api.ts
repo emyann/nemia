@@ -2,7 +2,10 @@
  * The one definition of what the api serves of the objects (`Api`): the handlers the api builds from it, the clients that read through
  * it and the OpenAPI document it writes (`OpenApi.fromApi(Api)`) are all made from this, so no layer keeps a shape of its own.
  *
- * Group `runs`: the run object and its four sub-resources, at the paths the api has always answered them on. Group `cards`: the inbox's
+ * Group `runs`: the run object, listed across namespaces and in one (a run's namespace is its factory, `default` for one that names none),
+ * read in its namespace and across all by its id, its four sub-resources at the paths the api has always answered them on, and its named
+ * actions, each in its namespace alone: started, removed, refreshed, pruned, labelled, held and lifted, and a step of it tried again,
+ * approved and said words to. Group `cards`: the inbox's
  * cards as objects, listed across namespaces or in one (a card's namespace is its factory, `default` for one that names none), read,
  * filed, dropped, started, queued and taken off the queue, and their labels edited. Every refusal is an object with one key, `error`, the
  * sentence that says what to do next, as the api's other routes answer one; a Conflict carries the `users` that hold the thing too.
@@ -41,7 +44,24 @@ import { WRITE_WAYS } from './words.ts';
 import { Workflow, WorkflowCreate, WorkflowList, WorkflowWrite } from './workflow.ts';
 import { Agent, AgentCard, AgentList, AgentTried, AgentTry, AgentWrite } from './agent.ts';
 import { Skill, SkillFiles, SkillList, SkillWrite } from './skill.ts';
-import { LabelEdit, Labelled, Run, StepTold, StepTries, StepTry, TryCloseout } from './run.ts';
+import { LabelEdit, Labelled, Run, RunList, StepTold, StepTries, StepTry, TryCloseout } from './run.ts';
+import {
+  RunApprove,
+  RunApproved,
+  RunAsked,
+  RunHeld,
+  RunHold,
+  RunPrune,
+  RunPruned,
+  RunRefresh,
+  RunRefreshed,
+  RunRemoved,
+  RunRetry,
+  RunSaid,
+  RunSay,
+  RunStart,
+  RunStarted,
+} from './run-actions.ts';
 import { Template, TemplateList } from './template.ts';
 import { Subscription, SubscriptionList } from './subscription.ts';
 import { Event, EventList } from './event.ts';
@@ -85,6 +105,15 @@ export class Invalid extends Schema.Class<Invalid>('Invalid')(
 
 /** A write the package let through and the disk then refused (a file that is a folder, one read-only): a 500, saying what failed. */
 export class Failed extends Schema.Class<Failed>('Failed')({ error: Schema.String }, { httpApiStatus: 500 }) {}
+
+/** A request the api reads and refuses before the package is asked — a body that is no JSON, a name no run can have: a 400. */
+export class BadRequest extends Schema.Class<BadRequest>('BadRequest')({ error: Schema.String }, { httpApiStatus: 400 }) {}
+
+/**
+ * A run's action the package began and something under it then failed — the engine, git, a harness that did not take the words: a 502,
+ * naming the command that asks the same way, since asking again may work.
+ */
+export class WriteFailed extends Schema.Class<WriteFailed>('WriteFailed')({ error: Schema.String }, { httpApiStatus: 502 }) {}
 
 /** A run one of whose tasks does not read, so it is not judged: a 502, in the words the list says it with. */
 export class Unjudged extends Schema.Class<Unjudged>('Unjudged')({ error: Schema.String }, { httpApiStatus: 502 }) {}
@@ -151,9 +180,100 @@ const namespaceParams = { namespace: Schema.String };
 /** A factory, by its name. */
 const factoryParams = { name: Schema.String };
 
-/** The run object and its sub-resources. */
+/** The Run and a page of them, named so that the document holds each as a component. */
+const RunObject = Run.annotate({ identifier: 'Run' });
+const RunListObject = RunList.annotate({ identifier: 'RunList' });
+
+/** What a run's reads refuse with: none by that name, a query the package refuses, a run not judged. */
+const runReadErrors = [Missing, Invalid, Unjudged];
+
+/** What a run's named actions refuse with: a body or a name read wrong, none there, a state that forbids it, its check, and a failure under it. */
+const runActionErrors = [BadRequest, Missing, Conflict, Invalid, WriteFailed];
+
+/** A run, by its namespace and its name. */
+const runParams = { namespace: Schema.String, name: Schema.String };
+
+/** A step of a run, by the run's namespace and name and the step's. */
+const runStepParams = { ...runParams, step: Schema.String };
+
+/** An action's answer, accepted and not yet done: a 202. */
+const accepted = <S extends Schema.Top>(answer: S) => answer.pipe(Schema.annotate({ httpApiStatus: 202 }));
+
+/**
+ * The run object, listed across namespaces (`/api/runs`) and in one, read in one and across all by its id (`/api/runs/:runId`), and its
+ * sub-resources; and its named actions, each in its namespace alone: started, removed, refreshed, pruned, its labels edited, held and its
+ * hold lifted, and a step of it tried again, approved and said words to. A run's namespace is its factory, `default` for one that names
+ * none: a run addressed under another is `Missing`.
+ */
 export class RunsGroup extends HttpApiGroup.make('runs').add(
-  HttpApiEndpoint.get('show', '/api/runs/:runId', { params: { runId: Schema.String }, success: Run, error: [Missing, Invalid, Unjudged] }),
+  HttpApiEndpoint.get('listAll', '/api/runs', { query: listQuery, success: RunListObject, error: runReadErrors }),
+  HttpApiEndpoint.get('list', '/api/namespaces/:namespace/runs', {
+    params: namespaceParams,
+    query: listQuery,
+    success: RunListObject,
+    error: runReadErrors,
+  }),
+  HttpApiEndpoint.get('get', '/api/namespaces/:namespace/runs/:name', { params: runParams, success: RunObject, error: runReadErrors }),
+  HttpApiEndpoint.post('create', '/api/namespaces/:namespace/runs', {
+    params: namespaceParams,
+    query: { repo: Schema.optionalKey(Schema.String) },
+    payload: RunStart,
+    success: RunStarted.pipe(Schema.annotate({ httpApiStatus: 201 })),
+    error: runActionErrors,
+  }),
+  HttpApiEndpoint.delete('delete', '/api/namespaces/:namespace/runs/:name', {
+    params: runParams,
+    success: RunRemoved,
+    error: runActionErrors,
+  }),
+  HttpApiEndpoint.post('refresh', '/api/namespaces/:namespace/runs/:name/refresh', {
+    params: runParams,
+    payload: RunRefresh,
+    success: accepted(RunRefreshed),
+    error: runActionErrors,
+  }),
+  HttpApiEndpoint.post('prune', '/api/namespaces/:namespace/runs/:name/prune', {
+    params: runParams,
+    payload: RunPrune,
+    success: RunPruned,
+    error: runActionErrors,
+  }),
+  HttpApiEndpoint.post('labels', '/api/namespaces/:namespace/runs/:name/labels', {
+    params: runParams,
+    payload: LabelEdit,
+    success: Labelled,
+    error: runActionErrors,
+  }),
+  HttpApiEndpoint.post('hold', '/api/namespaces/:namespace/runs/:name/hold', {
+    params: runParams,
+    payload: RunHold,
+    success: RunHeld,
+    error: runActionErrors,
+  }),
+  HttpApiEndpoint.delete('unhold', '/api/namespaces/:namespace/runs/:name/hold', {
+    params: runParams,
+    success: RunHeld,
+    error: runActionErrors,
+  }),
+  HttpApiEndpoint.post('retry', '/api/namespaces/:namespace/runs/:name/steps/:step/retry', {
+    params: runStepParams,
+    payload: RunRetry,
+    success: accepted(RunAsked),
+    error: runActionErrors,
+  }),
+  HttpApiEndpoint.post('approve', '/api/namespaces/:namespace/runs/:name/steps/:step/approve', {
+    params: runStepParams,
+    payload: RunApprove,
+    success: accepted(RunApproved),
+    error: runActionErrors,
+  }),
+  HttpApiEndpoint.post('say', '/api/namespaces/:namespace/runs/:name/steps/:step/say', {
+    params: runStepParams,
+    payload: RunSay,
+    success: accepted(RunSaid),
+    error: runActionErrors,
+  }),
+  HttpApiEndpoint.get('show', '/api/runs/:runId', { params: { runId: Schema.String }, success: Run, error: runReadErrors }),
   HttpApiEndpoint.get('tries', '/api/runs/:runId/steps/:step/tries', {
     params: stepParams,
     success: StepTries,

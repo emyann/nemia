@@ -2,8 +2,8 @@
  * The talk of Nemia's chat: the family's talk (`conversation/Talk`) fed her events through her own adapter (`chatItems`), under the
  * `chat` prefix every page of hers reads. What is hers and hers alone is the ask — a proposal, one question's form or the flow of
  * several, as `drawnAsk` says — and a step of a run her words link to, drawn as the run's page's own part for it (`ChatBrought`): each
- * drawn through the family's one escape hatch (`drawOwn`). And the two labels her log is read by. The line over what is new, the jump pill, the read mark's sentinel and the scroll that follows her latest are the
- * family's.
+ * drawn through the family's one escape hatch (`drawOwn`). And the two labels her log is read by. The line over what is new, the jump
+ * pill, the read mark's sentinel and the scroll that follows her latest are the family's.
  */
 import { chatItems, drawnAsk, newFrom, readableFrom, type ChatAsk as Ask, type ChatOwn } from '@/lib/chatFollowing';
 import type { AskPick, ChatEvent } from '@/lib/api';

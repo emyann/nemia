@@ -31,7 +31,10 @@ export default {
       await idle(page);
       const panel = await openChat(page);
       const gate = panel.locator(`[data-chat-brought="gate"][data-run="${id}"][data-step="${gated}"]`);
-      await expectVisible(gate.locator(`section[aria-label="What ${gated} asks of you"]`), "the gated step's gate, as the inspector draws it");
+      await expectVisible(
+        gate.locator(`section[aria-label="What ${gated} asks of you"]`),
+        "the gated step's gate, as the inspector draws it",
+      );
       const asked = gate.locator(`section[aria-label="What ${gated} asks"]`);
       await expectCount(asked.locator('fieldset[data-question]'), 2, 'a field for each question the step asks');
       const bubble = panel.locator('[data-chat-bubble="agent"]');
@@ -39,7 +42,10 @@ export default {
         await expectCount(bubble.filter({ hasText: title }), 0, `her words hold no copy of the step's question ${JSON.stringify(title)}`);
 
       const raise = panel.locator(`[data-chat-brought="answer"][data-step="${raised}"]`);
-      await expectVisible(raise.locator(`[data-offer="raise"][data-step="${raised}"]`), 'the step over its budget, the Decide row that raises it');
+      await expectVisible(
+        raise.locator(`[data-offer="raise"][data-step="${raised}"]`),
+        'the step over its budget, the Decide row that raises it',
+      );
 
       const approve = gate.getByRole('button', { name: 'Approve', exact: true });
       if (await approve.isEnabled()) throw new Refused('Approve waits for every answer, as on the run page');

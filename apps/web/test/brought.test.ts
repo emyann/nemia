@@ -47,7 +47,10 @@ test("broughtFacts: a step she brings, read as the run's page reads it, and the 
     ['waiting on nobody', live, 'ship', { found: true, atGate: false, offer: null, asked: false }, 'settled'],
     [
       'approved elsewhere: no longer waiting on you',
-      run(steps, waiting.filter((name) => name !== 'design')),
+      run(
+        steps,
+        waiting.filter((name) => name !== 'design'),
+      ),
       'design',
       { found: true, atGate: false, offer: null, asked: false },
       'settled',

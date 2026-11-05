@@ -693,36 +693,39 @@ test('broughtOf and chatItems: a step her words link to is brought, drawn under 
     ];
     for (const [href, named] of rows) assert.deepEqual(broughtOf(href), named, href);
   });
-  await t.test('her message brings each step it links once, after her words and in her order; a person who writes the same brings none', () => {
-    const items = chatItems([
-      message(
-        'm:1:a',
-        1,
-        'agent',
-        'Two wait. [design of r-1](/runs/r-1?step=design), [review of r-2](/runs/r-2?step=review), [design again](/runs/r-1?step=design), [the run](/runs/r-3).',
-      ),
-      message('p:1:b', 2, 'person', 'See [design of r-1](/runs/r-1?step=design).'),
-    ]);
-    assert.deepEqual(
-      items.map((item) => [item.kind, item.id]),
-      [
-        ['said', 'm:1:a'],
-        ['own', 'm:1:a:brought:r-1/design'],
-        ['own', 'm:1:a:brought:r-2/review'],
-        ['said', 'p:1:b'],
-      ],
-    );
-    const own = items[1];
-    if (own.kind !== 'own') throw new Error('a brought step is her own item');
-    assert.deepEqual(own.own, { kind: 'brought', run: 'r-1', step: 'design' });
-    const said = items[0];
-    if (said.kind !== 'said') throw new Error('her words are said');
-    assert.deepEqual(
-      said.links.map((link) => link.href),
-      ['/runs/r-1?step=design', '/runs/r-2?step=review', '/runs/r-1?step=design', '/runs/r-3'],
-      'every link stays a button beside what it brings',
-    );
-  });
+  await t.test(
+    'her message brings each step it links once, after her words and in her order; a person who writes the same brings none',
+    () => {
+      const items = chatItems([
+        message(
+          'm:1:a',
+          1,
+          'agent',
+          'Two wait. [design of r-1](/runs/r-1?step=design), [review of r-2](/runs/r-2?step=review), [design again](/runs/r-1?step=design), [the run](/runs/r-3).',
+        ),
+        message('p:1:b', 2, 'person', 'See [design of r-1](/runs/r-1?step=design).'),
+      ]);
+      assert.deepEqual(
+        items.map((item) => [item.kind, item.id]),
+        [
+          ['said', 'm:1:a'],
+          ['own', 'm:1:a:brought:r-1/design'],
+          ['own', 'm:1:a:brought:r-2/review'],
+          ['said', 'p:1:b'],
+        ],
+      );
+      const own = items[1];
+      if (own.kind !== 'own') throw new Error('a brought step is her own item');
+      assert.deepEqual(own.own, { kind: 'brought', run: 'r-1', step: 'design' });
+      const said = items[0];
+      if (said.kind !== 'said') throw new Error('her words are said');
+      assert.deepEqual(
+        said.links.map((link) => link.href),
+        ['/runs/r-1?step=design', '/runs/r-2?step=review', '/runs/r-1?step=design', '/runs/r-3'],
+        'every link stays a button beside what it brings',
+      );
+    },
+  );
 });
 
 test('reading her chat: a read made again that fails is the end, and clears the notice an earlier stream left', async (t) => {

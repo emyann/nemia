@@ -58,7 +58,8 @@ const broughtPartSpec = spec<(facts: BroughtFacts) => BroughtPart>({
     },
     askedSaysTheTry: {
       description: 'A step whose next try is asked already, and that nothing else is offered for, says that try and offers nothing',
-      condition: ({ input: [facts], output }) => !(facts.found && !facts.atGate && facts.offer === null && facts.asked) || output === 'asked',
+      condition: ({ input: [facts], output }) =>
+        !(facts.found && !facts.atGate && facts.offer === null && facts.asked) || output === 'asked',
     },
     settledWaitsOnNobody: {
       description: 'A step that waits on nobody, answered elsewhere or never waiting, says its state and offers nothing',

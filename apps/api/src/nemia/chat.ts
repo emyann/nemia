@@ -1,7 +1,7 @@
 /**
  * Nemia's chat on the board: her history a page at a time with where she is, the same followed as server-sent events, the person's
- * words sent, a question of hers answered, their read mark moved, and the turn she is answering stopped. Each is a program of the
- * package's chat (`chatHistory`, `followChat`, `chatSay`, `chatAnswer`, `chatRead`, `chatStop`)
+ * words sent, or an allowed agent's, a question of hers answered, their read mark moved, and the turn she is answering stopped. Each
+ * is a program of the package's chat (`chatHistory`, `followChat`, `chatSay`, `chatAnswer`, `chatRead`, `chatStop`)
  * over her place (`nemiaChatPlace`), and no command of the table: a write of the person's files kept out of her own fence. Her stream
  * follows her task's session on the app's registry (`Followings`), one upstream however many read her.
  */
@@ -42,12 +42,21 @@ export type ChatAnswerAnswer = Effect.Success<ReturnType<typeof chatAnswer>>;
 /** What `POST /api/nemia/chat/read` answers. */
 export type ChatReadAnswer = Effect.Success<ReturnType<typeof chatRead>>;
 
-const SEND_SHAPE = '`{ "text": "<what you write to Nemia>" }`';
+const SEND_SHAPE =
+  '`{ "text": "<what you write to Nemia>" }` from the board, or `{ "text": "<words>", "from": { "kind": "agent", "name": "<a name the person allowed>" } }` from anywhere else';
 const READ_SHAPE = '`{ "through": "<the id of the last event you saw>" }`';
 const STOP_SHAPE = '`{}`';
 const ANSWER_SHAPE = '`{ "id": "<the question\'s id>", "picks": [{ "question": "<its words>", "labels": ["<a choice>"] }] }`';
 
-const SEND_BODY = Schema.Struct({ text: Schema.String });
+const SEND_BODY = Schema.Struct({
+  text: Schema.String,
+  from: Schema.optional(
+    Schema.Union([
+      Schema.Struct({ kind: Schema.Literal('agent'), name: Schema.String }),
+      Schema.Struct({ kind: Schema.Literal('person') }),
+    ]),
+  ),
+});
 const READ_BODY = Schema.Struct({ through: NotBlank });
 const PICK_BODY = Schema.Struct({
   question: NotBlank,
@@ -74,6 +83,14 @@ const wordsOf =
     first === undefined
       ? `${route} takes a JSON object: ${shape}.`
       : `${route}: \`${key}\` is a string with something in it, and this request's was ${JSON.stringify(input)}. Send ${shape}.`;
+
+/** What a send says of the key it got wrong: `from`, who wrote the words, or `text`, the words. */
+const sendWords =
+  (route: string): Words =>
+  (issue, body) =>
+    issue.path[0] === 'from'
+      ? `${route}: \`from\` says who wrote the words, \`{ "kind": "agent", "name": "<a name the person allowed>" }\`, and this request's was ${JSON.stringify(issue.input)}. Send ${SEND_SHAPE}.`
+      : wordsOf(route, 'text', SEND_SHAPE)(issue, body);
 
 /** How her chat reads the runs that wait on the person: as the board's list does, off the app's informer. */
 const readsOf = ({ home, memo, informer, env }: Served): ChatReads => ({
@@ -118,7 +135,8 @@ async function written(stream: SSEStreamingApi, x: ChatSent, shown: string): Pro
  * - `GET /api/nemia/chat?before=<id>&limit=<n>` — a page of her history, oldest first: `{ events, before, cursor, presence }`, the
  *   last `limit` events (50 where none is asked, at most 200) before the event `before`, or the last ones; `before` the id to ask for
  *   the page older, null at the first; `cursor` where a stream resumes; `presence` `{ up, answering, waitsOnYou, unread }`. An event is
- *   a `message` (`from` her, the person, whose `delivered` is null until she was told, or the keeper's quiet marker), a `call`, a
+ *   a `message` (`from` her, the person, whose `delivered` is null until she was told, a `peer`, another agent under the `name` it
+ *   spoke under, delivered as the person's are, or the keeper's quiet marker), a `call`, a
  *   `session` line where one of her sessions ended and the next began, a `question` or a `proposal`, or a `permission`: a call of her
  *   session's that would prompt a person, held as her question is, its one question offering `Allow once`, `Always allow` where the
  *   harness offers it, and `Deny`, and its `permission` the call's facts (the tool, a shell command as typed, the harness's title,
@@ -131,8 +149,13 @@ async function written(stream: SSEStreamingApi, x: ChatSent, shown: string): Pro
  *   read again on a beat (`Beats.chat`) where her session cannot be followed. A read that fails once the stream is open is an
  *   `unreadable` event with `retrying: true` — the next look reads again, and gives up on nothing — and the first that works after one
  *   says `readable`, which takes the notice off the page.
- * - `POST /api/nemia/chat/send` — `{ text }` put in her outbox, which the keeper says to her once she is up: 201 with the entry
- *   `{ id, at, text }`. 400 for a body that is not one, 422 for text that is empty or too long.
+ * - `POST /api/nemia/chat/send` — `{ text, from? }` put in her outbox, which the keeper says to her once she is up, framed by who wrote
+ *   it: 201 with the entry `{ id, at, text, from? }`. `from` is who wrote it: none, or `{ kind: 'person' }`, is the person, taken from
+ *   the board alone (`Sec-Fetch-Site: same-origin`, which a browser on the board sends and a shell, a script or an MCP host does not);
+ *   `{ kind: 'agent', name }` is an agent speaking as itself, taken from anywhere under a name the person allowed (`nemia chat allow
+ *   <name>`) and drawn as a `peer`'s, never as the person's. 400 for a body that is not one, 422 for text that is empty or too long,
+ *   for words from anywhere but the board that name no agent, and for a name no agent speaks under, 409 for a name the person has not
+ *   allowed.
  * - `POST /api/nemia/chat/answer` — `{ id, picks }`, the person's answer to a question, a proposal or a permission: each pick names
  *   the question by its own words and carries the `labels` chosen or `words` of the person's own — a permission's by its choice's
  *   label, or by words, which deny the call and are what her session reads of why. 200 with the answer
@@ -185,9 +208,11 @@ export const nemiaChat = new Hono<ApiEnv>()
         c.req.header('content-type'),
       );
       if (refused) return c.json({ error: refused.error }, refused.status);
-      const read = await readBody(c.req, SEND_BODY, `${route} takes a JSON body: ${SEND_SHAPE}.`, wordsOf(route, 'text', SEND_SHAPE));
+      const read = await readBody(c.req, SEND_BODY, `${route} takes a JSON body: ${SEND_SHAPE}.`, sendWords(route));
       if ('status' in read) return c.json({ error: read.error }, read.status);
-      return c.json(await runPlaced(s, s.e, chatSay(nemiaChatPlace(), read.body.text)), 201);
+      const via = c.req.header('sec-fetch-site') === 'same-origin' ? 'board' : 'elsewhere';
+      const speaker = read.body.from ?? { kind: 'person' };
+      return c.json(await runPlaced(s, s.e, chatSay(nemiaChatPlace(), read.body.text, speaker, via)), 201);
     }),
   )
   .post('/api/nemia/chat/stop', (c) =>

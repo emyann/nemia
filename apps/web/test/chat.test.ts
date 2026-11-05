@@ -43,7 +43,7 @@ import type { AskQuestion, ChatEvent, ChatPresence, FactoryLevel, PermissionFact
 const at = (second: number): string => new Date(Date.UTC(2026, 9, 15, 17, 40, second)).toISOString();
 
 /** A message of hers, the person's or the keeper's. */
-const message = (id: string, second: number, from: 'agent' | 'person' | 'keeper', text: string): ChatMessage => ({
+const message = (id: string, second: number, from: 'agent' | 'person' | 'keeper' | 'peer', text: string): ChatMessage => ({
   kind: 'message',
   id,
   at: at(second),
@@ -585,6 +585,21 @@ test('foldChat, newFrom, linksOf, drawnAs and chatItems: her events as the page 
       'person',
       "a keeper's words drawn as the person's would put the framing sentence in their mouth",
     );
+  });
+  await t.test("another agent's words are drawn as that agent's, never as the person's, and go unread by nothing", () => {
+    const peer: ChatMessage = { ...message('o:1:p', 4, 'peer', 'Seen from the operator: the gate holds.'), name: 'operator' };
+    assert.equal(drawnAs(peer), 'peer');
+    assert.notEqual(drawnAs(peer), 'person', "an agent's words drawn as the person's would put them in their mouth");
+    const [said] = chatItems([peer]);
+    if (said?.kind !== 'said') throw new Error("a peer's words are said");
+    assert.deepEqual(
+      { who: said.who, by: said.by, yours: said.yours, markdown: said.markdown, text: said.text, links: said.links },
+      { who: 'operator', by: 'peer', yours: false, markdown: false, text: 'Seen from the operator: the gate holds.', links: [] },
+    );
+    assert.notEqual(said.who, 'You');
+    const events = [message('m:1:a', 1, 'agent', 'One.'), peer];
+    assert.equal(newFrom(events, 1), 'm:1:a', "a peer's words are never counted among hers unread");
+    assert.equal(readableFrom(events), 'm:1:a', 'and the read mark is never posted through them');
   });
   await t.test(
     'her adapter maps her events onto the one shape the family draws: each kind, in the order they came, with what it carries',

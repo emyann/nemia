@@ -562,6 +562,12 @@ export type HerQuestion = {
 /** One ask of hers in her chat: its id, its questions, and the person's answer where the page plants one answered already. */
 export type HerAsk = { id: string; questions: readonly HerQuestion[]; answers?: Record<string, string> };
 
+/**
+ * Who an outbox entry is from, as the orchestrator's `Speaker` writes it: the person, or another agent under the name it speaks as. An
+ * entry with no `from` is the person's.
+ */
+export type HerSpeaker = { kind: 'person' } | { kind: 'agent'; name: string };
+
 /** What a page plants of her: her level, where her session is, her transcript, the read mark, the person's outbox, and her asks. */
 export type HerChat = {
   level?: 'manual' | 'semi-auto' | 'auto';
@@ -571,8 +577,11 @@ export type HerChat = {
   said?: readonly HerLine[];
   /** The id the read mark names, which the chat gives each line of `said`. */
   read?: string;
-  /** What the person wrote that the api took, each entry drawn as their own bubble. */
-  outbox?: readonly { id: string; at: string; text: string }[];
+  /**
+   * What the api took for her outbox, each entry drawn as the person's own bubble, or, an entry `from` an agent, as that agent's: the
+   * `from` written on its line as the api writes it, and left off where the page names none.
+   */
+  outbox?: readonly { id: string; at: string; text: string; from?: HerSpeaker }[];
   /**
    * What the keeper said to her session, journalled as the runtime journals a said: a quiet marker in the chat, unless `delivers` names
    * an outbox entry it carried, which draws that entry as the person's own bubble.

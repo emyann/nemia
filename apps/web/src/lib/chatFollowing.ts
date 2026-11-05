@@ -23,7 +23,7 @@ export { broughtOf } from './stepLink.ts';
 /** One tool call of hers, as her chat gives it. */
 export type ChatCall = Extract<ChatEvent, { kind: 'call' }>;
 
-/** Her message, the person's, or the keeper's marker. */
+/** Her message, the person's, another agent's, or the keeper's marker. */
 export type ChatMessage = Extract<ChatEvent, { kind: 'message' }>;
 
 /**
@@ -244,10 +244,11 @@ export function foldChat(events: readonly ChatEvent[]): ChatItem[] {
 
 /**
  * How a message is drawn, by who it is from: the keeper's words as one quiet marker line, since the keeper frames what the person wrote
- * and writes nothing of its own; the person's own words as their bubble; hers as hers. Only an outbox entry is drawn as the person's.
+ * and writes nothing of its own; the person's own words as their bubble; another agent's as that agent's (`peer`), never the person's;
+ * hers as hers. Only an outbox entry the person wrote is drawn as the person's.
  */
-export const drawnAs = (message: ChatMessage): 'marker' | 'person' | 'agent' =>
-  message.from === 'keeper' ? 'marker' : message.from === 'person' ? 'person' : 'agent';
+export const drawnAs = (message: ChatMessage): 'marker' | 'person' | 'peer' | 'agent' =>
+  message.from === 'keeper' ? 'marker' : message.from === 'person' ? 'person' : message.from === 'peer' ? 'peer' : 'agent';
 
 /** Whether an event is a message of hers, which is what goes unread. */
 const hers = (event: ChatEvent): event is ChatMessage => event.kind === 'message' && event.from === 'agent';
@@ -321,12 +322,27 @@ const lineOf = (call: ChatCall): ConversationLine => ({
   state: call.state,
 });
 
-/** Her words, the person's own, or the keeper's quiet line: hers as markdown with her links named beside it (`linksOf`). */
+/**
+ * Her words, the person's own, another agent's, or the keeper's quiet line: hers as markdown with her links named beside it
+ * (`linksOf`), and another agent's as it stands, under the name it speaks under (`by: 'peer'`).
+ */
 function saidOf(message: ChatMessage): ConversationItem<ChatOwn> {
   const drawn = drawnAs(message);
   if (drawn === 'marker') return { kind: 'note', id: message.id, what: 'keeper', words: message.text };
   if (drawn === 'person')
     return { kind: 'said', id: message.id, who: 'You', at: message.at, text: message.text, markdown: false, yours: true, links: [] };
+  if (drawn === 'peer')
+    return {
+      kind: 'said',
+      id: message.id,
+      who: message.name ?? 'An agent',
+      by: 'peer',
+      at: message.at,
+      text: message.text,
+      markdown: false,
+      yours: false,
+      links: [],
+    };
   const { text, links } = linksOf(message.text);
   return { kind: 'said', id: message.id, who: 'Nemia', at: message.at, text, markdown: true, yours: false, links };
 }

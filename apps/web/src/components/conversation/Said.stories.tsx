@@ -3,8 +3,8 @@ import type { ConversationItem } from '@/lib/conversation';
 import { Note, Said, Writing } from './Said';
 
 /**
- * What is said in a conversation: the agent's words with their links, the person's own, the message being written, and a quiet line
- * that frames them.
+ * What is said in a conversation: the agent's words with their links, the person's own, another agent's, the message being written,
+ * and a quiet line that frames them.
  */
 const meta: Meta = { title: 'Conversation/Said' };
 export default meta;
@@ -41,6 +41,19 @@ const YOURS: Extract<ConversationItem, { kind: 'said' }> = {
   links: [],
 };
 
+/** Another agent's words to her session, under the name it speaks under: plain, at the left, in a ring. */
+const PEER: Extract<ConversationItem, { kind: 'said' }> = {
+  kind: 'said',
+  id: 'o:1',
+  who: 'operator',
+  by: 'peer',
+  at: '2026-10-15T17:46:00.000Z',
+  text: 'The gate on the card holds: its review asked for one more round.',
+  markdown: false,
+  yours: false,
+  links: [],
+};
+
 /** The agent's words with markdown in them and two links under them. */
 export const Theirs: StoryObj = {
   render: () => (
@@ -54,6 +67,17 @@ export const Theirs: StoryObj = {
 export const Yours: StoryObj = {
   render: () => (
     <div style={PANEL}>
+      <Said said={YOURS} marks="chat" />
+    </div>
+  ),
+};
+
+/** Another agent's words, at the left in a ringed bubble, apart from the agent's own and from the person's. */
+export const Peer: StoryObj = {
+  render: () => (
+    <div style={PANEL}>
+      <Said said={THEIRS} marks="chat" />
+      <Said said={PEER} marks="chat" />
       <Said said={YOURS} marks="chat" />
     </div>
   ),

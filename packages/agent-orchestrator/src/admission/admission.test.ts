@@ -144,6 +144,8 @@ test('`admissionOf` under her floor and at auto: below the floor denied, unread 
     'nemia factory fire pipao --step build/plan',
     'nemia show t && nemia hold s',
     'nemia show r 2>/dev/null',
+    'nemia policy reach nemia --factory pipao',
+    'nemia policy reach nemia --run r',
   ])
     await t.test(`REFUSED: a call on a run or a factory below the floor is denied, whatever its class: ${line}`, () => {
       assert.equal(scopedAnswer(line)?.decision, 'deny', line);
@@ -157,6 +159,7 @@ test('`admissionOf` under her floor and at auto: below the floor denied, unread 
     for (const line of ['nemia approve r gate', 'nemia show r', 'nemia retry r check --recheck', 'nemia start x.md --factory hkb', 'ls'])
       assert.deepEqual(scopedAnswer(line, open), answerOf(line), line);
     assert.equal(scopedAnswer('nemia show t'), undefined, 'a run of a factory above the floor is hers to read');
+    assert.equal(scopedAnswer('nemia policy reach nemia --factory hkb'), undefined, 'what her rules reach in a factory at her floor');
   });
   await t.test('REFUSED to pass unread: a run that does not read, and a scoped command whose words do not parse, are asked', () => {
     names(scopedAnswer('nemia show gone')?.message, 'names gone', 'does not read');

@@ -18,6 +18,8 @@ import type { Run, StepRecord, TaskPhase } from '../src/record/record.ts';
 import type { Workflow } from '../src/step/step.ts';
 import { listing, phases, run, step, STEPS } from './assessed.ts';
 import { decision, onYouWords } from '../src/run.ts';
+import { listing as listed } from '../src/list/list.ts';
+import { standing } from '../src/status/status.ts';
 
 const PLAN_SCHEMA = {
   type: 'object' as const,
@@ -252,4 +254,33 @@ test('a workflow without the routing keys assesses exactly as before', () => {
   assert.equal(done.status, 'succeeded');
   const broke = assess(STEPS, run({ implement: 't-i', review: null }), phases({ 't-i': 'failed' }));
   assert.deepEqual([broke.unreachable, broke.status], [['review'], 'failed']);
+});
+
+test("a run's listing judges each step's standing once, with the routing keys or without them", async (t) => {
+  const counted = (input: Parameters<typeof listed>[0]) => {
+    let calls = 0;
+    const l = listed(input, (...args) => {
+      calls += 1;
+      return standing(...args);
+    });
+    assert.deepEqual(l, listed(input), 'the count changes nothing the listing prints');
+    return { l, calls };
+  };
+  await t.test('a workflow with none of the routing keys: one per step', () => {
+    const r = run({ implement: 't-implement', review: null });
+    const said = (): Closeout => ({ outcome: 'done', summary: 'did implement', artifacts: [] });
+    const { calls } = counted({ steps: STEPS, run: r, phaseOf: phases({ 't-implement': 'succeeded' }), closeoutOf: said });
+    assert.equal(calls, STEPS.length);
+  });
+  await t.test('a routed workflow: one per step, its rows still routed', () => {
+    const gated = TRIAGE.map((s) => (s.name === 'triage' ? { ...s, gate: true as const } : s));
+    const held = passOf({ filed: { plan: 'succeeded' }, steps: gated });
+    const said = (name: string): Closeout | undefined =>
+      name === 'plan' ? { outcome: 'done', summary: 'did plan', artifacts: [], output: { surface: 'web' } } : undefined;
+    const input = { steps: gated, run: held.run, phaseOf: phases({ 't-plan': 'succeeded' }), closeoutOf: said, askedCloseout: () => true };
+    const { l, calls } = counted(input);
+    assert.equal(calls, gated.length);
+    assert.equal(l.steps.find((s) => s.name === 'triage')?.message, 'awaiting approval · proposes web');
+    assert.equal(l.steps.find((s) => s.name === 'build-backend')?.message, 'skipped (triage: web)');
+  });
 });

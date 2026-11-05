@@ -10,7 +10,8 @@ import type { EnginePhase } from '../views/views-words.ts';
 import { DENIED_CAP, DENIED_SHOWN, oneLine, satisfiesAfter, type CloseoutAsked, type Run, type StepStatus } from '../record/record.ts';
 import type { Closeout } from '../closeout/index.ts';
 import { checkVerdictOf, verdictWord, type CheckVerdict, type Verdict } from '../check/check.ts';
-import { listedWords, routedRows, settledOf as settledWord } from '../routed/index.ts';
+import { routedRows, routedWords, settledOf as settledWord } from '../routed/index.ts';
+import type { WhereAStepStands } from '../../contracts/standing.contract.ts';
 import { codedStep, ENGINE_REASON, holdsTheRun, REASON_OF, type CodedStep, type QualifiedStep } from '../phase/phase.ts';
 import { answerOf, dueNote, modeWord, retriesDue, tryNote, type RetryAsk } from '../retry/index.ts';
 import {
@@ -217,20 +218,45 @@ export interface ListingInput {
   readonly holds?: readonly Wait[];
 }
 
+/** Where a step stands on a pass: its word, and its own work's (`standing`). */
+type Stood = ReturnType<WhereAStepStands>;
+
+/** A listing's closeouts as a step's standing reads them: one nobody can read is none. */
+const readableOf =
+  (closeoutOf: ListingInput['closeoutOf']) =>
+  (name: string): Closeout | undefined => {
+    const c = closeoutOf(name);
+    return c && !('error' in c) ? c : undefined;
+  };
+
+/** Whether a step carries a routing key a step's word reads: a condition's `routes:`, or a workflow node's `workflow:`. */
+const routes = (step: Workflow): boolean => step.routes !== undefined || step.workflow !== undefined;
+
 /**
  * `listedSteps`, with the routing's rows laid over the steps it words (`routedRows`): a node `skipped (<condition>: <route>)`, a workflow
  * node `sent → <card>`, a condition never filed its route and the line that routes it by hand.
+ *
+ * Each step's standing is judged once (`stand`, `standing` but where a test counts its calls), and the routing laid over it only where a
+ * step has a routing key a word reads (`routes:`, `workflow:`): with none, the words are the standings (`routedWords`).
  */
-export function listing(input: ListingInput): Listing {
-  const listed = listedSteps(input, listedWords(input));
-  const routed = routedRows(input);
+export function listing(input: ListingInput, stand: WhereAStepStands = standing): Listing {
+  const { steps, run, askedCloseout = () => false, spendOf = () => undefined, verdictOf = () => undefined } = input;
+  const readable = readableOf(input.closeoutOf);
+  const settledOf = settledWord(input.phaseOf);
+  const stood = new Map(steps.map((s) => [s.name, stand(s, run, settledOf, readable, askedCloseout, steps, spendOf, verdictOf)]));
+  const statuses = new Map([...stood].map(([name, { status }]) => [name, status]));
+  const words = steps.some(routes) ? routedWords(steps, run, statuses, readable) : statuses;
+  const stoodOf = (step: Workflow): Stood =>
+    stood.get(step.name) ?? stand(step, run, settledOf, readable, askedCloseout, steps, spendOf, verdictOf);
+  const listed = listedSteps(input, stoodOf, words);
+  const routed = routedRows(input, words);
   if (!routed.size) return listed;
-  const steps = listed.steps.map((s) => {
+  const rows = listed.steps.map((s) => {
     const row = routed.get(s.name);
     if (row && 'besides' in row) return { ...s, message: `${s.message} · ${row.besides}` };
     return row ? { name: s.name, branch: s.branch, ...row } : s;
   });
-  return { ...listed, steps };
+  return { ...listed, steps: rows };
 }
 
 /**
@@ -273,7 +299,8 @@ export function listing(input: ListingInput): Listing {
  * ending's merge (`landed`), unless it found nothing staged; how many times it was spoken to; and what it
  * was denied. Its cost goes beside its word once measured, unless the word already shows it.
  *
- * @param routed Every step's word on this pass, routing and all (`listedWords`).
+ * @param stoodOf Where a step stands on this pass (`standing`), judged once by `listing`.
+ * @param routed Every step's word on this pass, routing and all (`routedWords` over `stood`).
  */
 function listedSteps(
   {
@@ -298,15 +325,13 @@ function listedSteps(
     parkedOf = () => undefined,
     holds,
   }: ListingInput,
+  stoodOf: (step: Workflow) => Stood,
   routed: ReadonlyMap<string, StepStatus>,
 ): Listing {
   const waiting = gated(run) ? [...waits] : [];
   const held = slot && !waiting.length && !hasStarted(run) && !run.cancelledAt ? slot : undefined;
   const settledOf = settledWord(phaseOf);
-  const readable = (name: string): Closeout | undefined => {
-    const c = closeoutOf(name);
-    return c && !('error' in c) ? c : undefined;
-  };
+  const readable = readableOf(closeoutOf);
   const due =
     run.cancelledAt || run.pruned || run.hold
       ? []
@@ -378,8 +403,8 @@ function listedSteps(
     const { name } = step;
     const taskId = run.steps[name]?.taskId;
     const branch = run.steps[name]?.branch ?? null;
-    const { status: stood, own } = standing(step, run, settledOf, readable, askedCloseout, steps, spendOf, verdictOf);
-    const stands: StepStatus = !taskId && routed.get(name) === 'awaiting approval' ? 'awaiting approval' : stood;
+    const { status: stoodAs, own } = stoodOf(step);
+    const stands: StepStatus = !taskId && routed.get(name) === 'awaiting approval' ? 'awaiting approval' : stoodAs;
     if (!taskId && (stands !== 'awaiting approval' || waitingAgain.has(name))) {
       if (checkout && waitsOnCheckout(steps, name, checkout) && !waitingAgain.has(name))
         return { name, message: checkoutWord(checkout), ...coded({ reason: 'Waiting', on: 'base' }), branch };

@@ -66,6 +66,8 @@ export type ClaudeOptions = {
   holdMs?: number;
   /** How often a job's own process reads the sessions' drain, in milliseconds: a test's shortening. Absent: `JOB_HOLD_POLL_MS`. */
   holdPollMs?: number;
+  /** The slice a job under a memory limit has its scope made in (`EngineOptions.cgroupParent`). Absent: the user manager's own. */
+  cgroupParent?: string;
 };
 
 /** What a job's process is handed to be held by the sessions' drain: the store whose drain it reads, and the bounds a test shortens. */
@@ -307,7 +309,8 @@ export const claudeCodeOps = (options: ClaudeOptions, attached?: Attached): Runn
     ...(holdMs !== undefined ? { holdMs } : {}),
     ...(holdPollMs !== undefined ? { holdPollMs } : {}),
   });
-  const plain = withHoldFiles(withBridgeFiles(detachedOps(spec, root), root), spec, root);
+  const scoped = options.cgroupParent ? { cgroupParent: options.cgroupParent } : {};
+  const plain = withHoldFiles(withBridgeFiles(detachedOps(spec, root, scoped), root), spec, root);
   const job = attached ? withAttached(plain, attached) : plain;
   const plainFind = detachedFind(spec, root);
   return {

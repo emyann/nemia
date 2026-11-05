@@ -227,13 +227,14 @@ export const reconcile = Effect.fn('reconcile')(function* (taskId: string, obser
 
 /**
  * What the sighting `seen` attempt `n` ended on says of it, as its `ended` event carries it, each key written, undefined or not — but
- * `terminationMessage`, written only where a harness read one, so an end before the key is written as it was — and
+ * `terminationMessage` and `memory`, each written only where a harness read one, so an end before the key is written as it was — and
  * what it says of a park (`parkedEnd`): `parked`, which `decide` continues, or `limit: 'budget'` for a park that spent its cap.
  */
 const endFacts = (state: State, n: number, seen: Sighting | undefined) => ({
   usage: seen?.usage,
   exitCode: seen?.exitCode,
   ...(seen?.terminationMessage === undefined ? {} : { terminationMessage: seen.terminationMessage }),
+  ...(seen?.memory === undefined ? {} : { memory: seen.memory }),
   denials: seen?.denials,
   skills: seen?.skills,
   files: seen?.files,
@@ -245,7 +246,7 @@ const endFacts = (state: State, n: number, seen: Sighting | undefined) => ({
 /**
  * What a harness is asked to start for attempt `n` of task `taskId`, named `name`: its brief (or the words that nudge it), folder,
  * harness and configuration for its turn — handed what is left of its cap where it continues a parked attempt (`continuedCap`) — the
- * session it continues, and the labels its telemetry says, the task's id among them.
+ * session it continues, the labels its telemetry says, the task's id among them, and what its process tree may use of the host.
  */
 const spawnRequestOf = (taskId: string, state: State, name: string, n: number): SpawnRequest => {
   const attempt = state.attempts.find((a) => a.n === n);
@@ -260,6 +261,7 @@ const spawnRequestOf = (taskId: string, state: State, name: string, n: number): 
     resumeFrom: attempt?.resumeFrom,
     resource: { ...state.labels, [TASK_LABEL]: taskId },
     traceparent: state.traceparent,
+    ...(state.resources ? { resources: state.resources } : {}),
     ...continuedCap(state, n, configForTurn(state.config, turnOf(state, attempt?.turn ?? 0).config)),
   };
 };

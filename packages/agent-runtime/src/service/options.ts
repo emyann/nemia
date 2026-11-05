@@ -3,13 +3,14 @@
  * reports it gives — and what the engine refuses of its options before it builds anything.
  */
 import { Layer } from 'effect';
-import type { Event } from '../core/index.ts';
+import { own, type Event } from '../core/index.ts';
 import type { HarnessArgs, RunnerOps } from '../harness/index.ts';
 import { Admission, type IoCounts, type ObserveCount, type RefusedMove, type StoreOps, type TaskView } from '../core/engine/index.ts';
 
 export type { ObserveCount } from '../core/engine/index.ts';
 import { claudeCodeOps, type Attached } from '../harness/claude/index.ts';
 import { DEFAULT_HARNESSES } from './default-harnesses.ts';
+import { memoryQuantityRefusal } from '../core/memory.ts';
 import { detachedOps, type HarnessSpec } from '../harness/detached/detached.ts';
 import { telemetered, telemetryRefusalOf, type Telemetry } from '../harness/telemetry.ts';
 import {
@@ -260,6 +261,21 @@ export const isRemote = (h: HarnessConfig): h is RemoteAgent => typeof h === 'ob
 export const isClaude = (h: HarnessConfig): h is 'claude' => h === 'claude';
 
 /**
+ * `task` with the engine's default limits written on where it was filed with no `resources` of its own, as a LimitRange's default is
+ * written into a Pod at admission: none on a remote agent's, whose process is the other party's and no cgroup of ours holds, so a
+ * default never makes a remote task unfileable (a limit the task asks for itself there is refused, `harnessRefusalOf`).
+ */
+export const limitedBy = <T extends TaskSpec & { harness: string }>(
+  defaults: EngineOptions['defaultLimits'],
+  task: T,
+  harnesses: Record<string, HarnessConfig>,
+): T => {
+  const h = own(harnesses, task.harness);
+  if (defaults === undefined || task.resources !== undefined || h === undefined || isRemote(h)) return task;
+  return { ...task, resources: { limits: { memory: defaults.memory } } };
+};
+
+/**
  * Each configured harness as the seam's value, by name: composed into one `Runner`, and asked directly for a task's logs. With
  * `telemetry`, each spawn is told where to export (`telemetered`).
  */
@@ -271,10 +287,11 @@ export const runnersOf = (
   telemetry?: Telemetry,
   attached?: Attached,
   claudeExecutable?: string,
+  cgroupParent?: string,
 ): Record<string, RunnerOps> =>
   Object.fromEntries(
     Object.entries(harnesses).map(([name, h]): [string, RunnerOps] => {
-      const ops = runnerOf(name, h, root, credentials, missingCredential, attached, claudeExecutable);
+      const ops = runnerOf(name, h, root, credentials, missingCredential, attached, claudeExecutable, cgroupParent);
       return [name, telemetry ? telemetered(ops, telemetry) : ops];
     }),
   );
@@ -288,11 +305,12 @@ const runnerOf = (
   missingCredential?: MissingCredential,
   attached?: Attached,
   claudeExecutable?: string,
+  cgroupParent?: string,
 ): RunnerOps =>
   h === 'claude'
-    ? claudeCodeOps({ root, ...(claudeExecutable ? { claudeExecutable } : {}) }, attached)
+    ? claudeCodeOps({ root, ...(claudeExecutable ? { claudeExecutable } : {}), ...(cgroupParent ? { cgroupParent } : {}) }, attached)
     : isSpec(h)
-      ? detachedOps(h, root)
+      ? detachedOps(h, root, cgroupParent ? { cgroupParent } : {})
       : isRemote(h)
         ? remoteOps(name, h, root, credentials, undefined, { missingCredential })
         : h;
@@ -333,6 +351,31 @@ const ceilingRefusalOf = (maxConcurrent: unknown): string | undefined =>
     ? undefined
     : `\`maxConcurrent: ${typeof maxConcurrent === 'number' ? maxConcurrent : JSON.stringify(maxConcurrent)}\` is not a ceiling. Give the sessions each pool may have at work at once, a whole number from 1, or leave it out for none.`;
 
+const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
+
+/** The name a systemd slice takes: a unit name, its parts joined by `-`, ending `.slice`. */
+const SLICE = /^[A-Za-z0-9:_.\\-]+\.slice$/;
+
+/**
+ * Why `defaultLimits` or `cgroupParent` cannot be held, or `undefined`: a `defaultLimits` that is not `{ memory }` alone, its quantity
+ * one `memoryBytesOf` does not read (`memoryQuantityRefusal`'s words); a `cgroupParent` that is not a slice's unit name.
+ */
+const limitsRefusalOf = (options: Omit<EngineOptions, 'root'>): string | undefined => {
+  const given: unknown = options.defaultLimits;
+  if (given !== undefined) {
+    const memory = isRecord(given) ? given.memory : undefined;
+    if (!isRecord(given) || typeof memory !== 'string' || Object.keys(given).some((k) => k !== 'memory'))
+      return `\`defaultLimits: ${JSON.stringify(given) ?? typeof given}\` is not a default limit. Give \`{ memory: '8Gi' }\`, a quantity every task filed with no limit of its own is held to, or leave it out.`;
+    const words = memoryQuantityRefusal(memory);
+    if (words) return `\`defaultLimits.memory\`: ${words}`;
+  }
+  const parent: unknown = options.cgroupParent;
+  if (parent !== undefined && (typeof parent !== 'string' || !SLICE.test(parent) || parent === '-.slice')) {
+    return `\`cgroupParent: ${JSON.stringify(parent) ?? typeof parent}\` is not a systemd slice. Give a unit name ending \`.slice\`, like \`nemia-sessions.slice\`, or leave it out for the user manager's own.`;
+  }
+  return undefined;
+};
+
 /**
  * Why the harness `name` cannot be taken as given, or `undefined`: a word other than `'claude'` — `'claude-bg'`, the `claude --bg`
  * road a former runtime had, named with what replaced it — a `pool` that is not a name, and a remote agent's config.
@@ -365,6 +408,8 @@ export const optionsRefusalOf = (options: Omit<EngineOptions, 'root'>): string |
   }
   const ceiling = ceilingRefusalOf(options.maxConcurrent);
   if (ceiling) return ceiling;
+  const limits = limitsRefusalOf(options);
+  if (limits) return limits;
   for (const [name, h] of Object.entries(options.harnesses ?? {})) {
     const refused = harnessConfigRefusalOf(name, h);
     if (refused) return refused;

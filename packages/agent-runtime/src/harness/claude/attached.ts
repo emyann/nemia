@@ -61,7 +61,8 @@ import {
   writeRun,
   type AttachedRun,
 } from './attached-file.ts';
-import { cutTurn, gone, hear, interruptTurn, killGroup, startSession, toldCut, type Held, type Live } from './attached-session.ts';
+import { cutTurn, gone, hear, interruptTurn, killGroup, startSession, toldCut, type Held, Refusal, type Live } from './attached-session.ts';
+import type { ScopeAt } from '../scope.ts';
 import { sessionDrainFile, sessionDrainOf } from './job-hold.ts';
 import { cutWords } from '../../core/restart.ts';
 import { pushesOf, type Pushes } from './attached-follow.ts';
@@ -184,6 +185,7 @@ const sightingOf = (root: string, run: AttachedRun): Sighting => {
     ...(run.calling && run.state === 'working' ? { calling: run.calling } : {}),
     ...heldBackOf(run),
     ...(run.limit ? { limit: run.limit } : {}),
+    ...(run.memory ? { memory: run.memory } : {}),
     ...asksOf(root, run),
   };
 };
@@ -339,12 +341,13 @@ const adoptIn =
   };
 
 /**
- * The attached sessions under `root`: `executable` the Claude Code they run, the SDK's own when absent (a test's stand-in otherwise).
+ * The attached sessions under `root`: `executable` the Claude Code they run, the SDK's own when absent (a test's stand-in otherwise);
+ * a session under a memory limit runs in a scope made in `options.cgroupParent` by `options.scopeProgram` (`ScopeAt`).
  *
  * A session's interrupt file is read on every look, never as a transition: another process's ask survives a restart of the holder,
  * and an ask that landed after its turn ended is dropped there, never kept for the next turn.
  */
-export const attachedSessions = (root: string, executable?: string, options: { letGoMs?: number } = {}): Attached => {
+export const attachedSessions = (root: string, executable?: string, options: { letGoMs?: number } & ScopeAt = {}): Attached => {
   const live = new Map<string, Live>();
   const letGoMs = options.letGoMs ?? LET_GO_MS;
   let holding = false;
@@ -352,15 +355,11 @@ export const attachedSessions = (root: string, executable?: string, options: { l
   const sessionsDrain = () => sessionDrainOf(sessionDrainFile(root));
   const held: Held = (l) => (draining || drainsThis(root) || sessionsDrain() !== null) && l.calls.size === 0;
   const pushes = pushesOf({ root, holds: (name) => live.has(name) });
+  const given = { held, scope: options, ...(executable ? { executable } : {}) };
   const start = (r: SpawnRequest, run: AttachedRun, first: string, resume?: string) =>
     live.set(
       run.name,
-      startSession(root, r, run, first, {
-        held,
-        pushed: (m) => pushes.push(run.name, m),
-        ...(executable ? { executable } : {}),
-        ...(resume ? { resume } : {}),
-      }),
+      startSession(root, r, run, first, { ...given, pushed: (m) => pushes.push(run.name, m), ...(resume ? { resume } : {}) }),
     );
 
   const stopped = (run: AttachedRun) => fs.existsSync(filesOf(root, run.name).stop);
@@ -455,9 +454,6 @@ const answerOn =
       },
       catch: failed('answer'),
     });
-
-/** What a verb refuses, thrown where it is read: nothing the harness can do will take it, and asking again will not change that. */
-class Refusal extends Error {}
 
 /** Why a verb failed, as the runner's error, a `Refusal` of it carried out as the refusal it is. */
 const failed = (verb: string) => (cause: unknown) =>

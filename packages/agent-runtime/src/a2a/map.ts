@@ -115,6 +115,7 @@ export const messageOf = (r: SpawnRequest, messageId: string): Message => ({
     closeoutSchema: r.closeoutSchema,
     resource: r.resource,
     traceparent: r.traceparent,
+    resources: r.resources,
   }),
   extensions: [RUNTIME_EXTENSION],
   referenceTaskIds: [],
@@ -222,6 +223,7 @@ export const spawnOf = (m: Message): SpawnRequest => {
     resumeFrom: m.contextId || undefined,
     resource: md.resource,
     traceparent: md.traceparent,
+    ...(md.resources ? { resources: md.resources } : {}),
   };
 };
 

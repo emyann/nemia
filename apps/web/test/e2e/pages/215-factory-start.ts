@@ -109,9 +109,9 @@ export default {
         other.waitForResponse((r) => r.request().method() === 'POST' && isRunStart(new URL(r.url()).pathname), { timeout: WAIT_MS }),
         form.getByRole('button', { name: 'Start' }).click(),
       ]);
-      const sent = new URL(started.url()).searchParams;
-      if (sent.get('factory') !== factory || sent.get('repo') !== checkout)
-        throw new Refused(`the start names the factory and its repository in its query — it was sent to ${started.url()}`);
+      const sentTo = new URL(started.url());
+      if (sentTo.pathname !== `/api/namespaces/${factory}/runs` || sentTo.searchParams.get('repo') !== checkout)
+        throw new Refused(`the start is sent in the factory's namespace, its repository in its query — it was sent to ${started.url()}`);
       if (started.status() !== 201)
         throw new Refused(`the api starts the run in ${factory} — it answered ${started.status()}: ${await started.text()}`);
       const { id } = (await started.json()) as { id: string };

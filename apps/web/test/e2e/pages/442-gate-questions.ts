@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Locator, Page } from 'playwright';
-import { fed, photograph, sidebar, stepBar, themeOf } from '../board.ts';
+import { fed, photograph, sidebar, stepBar, themeOf, isRunAction } from '../board.ts';
 import { expectCount, expectVisible, idle, Refused, settled, WAIT_MS } from '../checks.ts';
 import { ASKING, writeAsking } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -19,7 +19,7 @@ const askIn = (file: string): { message?: string; mode?: string; step?: string; 
 
 /** Whether `r` is the POST of `verb` on the gated step. */
 const posted = (verb: string) => (r: { request: () => { method: () => string }; url: () => string }) =>
-  r.request().method() === 'POST' && new URL(r.url()).pathname === `/api/runs/${ASKING.id}/steps/${ASKING.gated}/${verb}`;
+  r.request().method() === 'POST' && isRunAction(new URL(r.url()).pathname, ASKING.id, `/steps/${ASKING.gated}/${verb}`);
 
 /** The gate's questions answered as a person would: the recommended answers chosen, and the question with none answered by a click. */
 async function answer(page: Page, gate: Locator): Promise<void> {

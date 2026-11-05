@@ -11,7 +11,7 @@ import { refusedBeforeReading, type Guarded } from './guard.ts';
 
 /** A write as its refusals say it: the words stand for any route's. */
 const WRITE: Guarded = {
-  route: 'POST /api/runs',
+  route: 'POST /api/namespaces/default/runs',
   does: 'starts a run',
   forAnother: 'start one',
   why: 'a run acts on this repository',

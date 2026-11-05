@@ -283,12 +283,19 @@ object (`RunObject.Run`, an Effect Schema of `objects`, `packages/objects/src/ru
 the run, from the list's judged fields, `judgedFields`, and the one raise, `stepRaise`). The object carries all the board shows but
 each step's tries whole and what it was told, which are its sub-resources, each answered by a Schema of its own (`StepTries`,
 `StepTry`, `TryCloseout`, `StepTold`), and the lines a person types, which are the command table's (`runLines`, `src/object/lines.verb.ts`).
-`GET /api/runs/:id` answers the object, the route of the run's one entry of the command table (`show`, served on both sides, its
-`--raw` record the CLI's alone), and refuses any `?view=` with a 422 naming what to read instead. The board reads the object, each
-step's tries and told at `…/steps/:step/tries` and `…/steps/:step/told`, keyed by the step's stamp so a step reads again only when it
-moved, and the lines once at `GET /api/runs/:id/lines` (`RunLinesAnswer`, mirrored by hand); the api's tests read the same. The api
-serves the object and its sub-resources through the `Api` of `objects` (`apps/api/src/objects/`, off the command table's entries and the
-app's one informer), and its OpenAPI 3.1 document is `OpenApi.fromApi(Api)` (`apps/api/src/openapi/`, printed by its `print.ts`), and `GET /openapi` serves a page to browse it (Scalar's
+`GET /api/runs/:runId` answers the object across namespaces and `GET /api/namespaces/<factory>/runs/<name>` in the run's own (its
+factory, `default` for none; another namespace's is a 404), the route of the run's one entry of the command table (`show`, served on both
+sides, its `--raw` record the CLI's alone), and refuses any `?view=` with a 422 naming what to read instead. The runs are a `RunList` at
+`GET /api/runs` and `GET /api/namespaces/<factory>/runs`, paged by `?limit=` and `?continue=` and selected by `?labelSelector=`, for
+a client; the board's floor, strips and pickers read the runs' summaries still (`GET /api/runs-summaries`, the informer's), since
+the RunList judges each run it lists on every poll until the informer keeps each run's object. The
+board reads the object, each step's tries and told at `…/steps/:step/tries` and `…/steps/:step/told`, keyed by the step's stamp so a step
+reads again only when it moved, and the lines once at `GET /api/runs/:runId/lines` (`RunLinesAnswer`, mirrored by hand); the api's tests
+read the same. The run's named actions — its start (`POST /api/namespaces/<factory>/runs`), removal, refresh, prune, labels and hold,
+and a step's retry, approval and words — are endpoints of the same `Api` on the namespaced path alone, each served through the pipeline a
+route the command table generates runs (`commandAnswered`, `apps/api/src/commands/routes.ts`). The api serves the object, its list, its
+sub-resources and its actions through the `Api` of `objects` (`apps/api/src/objects/`, off the command table's entries and the app's one
+informer), and its OpenAPI 3.1 document is `OpenApi.fromApi(Api)` (`apps/api/src/openapi/`, printed by its `print.ts`), and `GET /openapi` serves a page to browse it (Scalar's
 reference, its script served by the api from the installed package, reading the document at its route). The board reads the Run and
 the Card through a client made from the same `Api` (`apps/web/src/lib/api/objects.ts`), with no schema of its own for either.
 

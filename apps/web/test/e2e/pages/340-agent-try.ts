@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Page } from 'playwright';
-import { fed, photograph, themeOf } from '../board.ts';
+import { fed, photograph, themeOf, isRunAction } from '../board.ts';
 import { expectCount, expectVisible, idle, Refused, settled, WAIT_MS } from '../checks.ts';
 import { AGENTS } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -21,6 +21,10 @@ const TRY = {
 
 const answered = (page: Page, method: 'POST' | 'DELETE', pathname: string) =>
   page.waitForResponse((r) => r.request().method() === method && new URL(r.url()).pathname === pathname, { timeout: WAIT_MS });
+
+/** The removal of the run `id`, in whichever namespace it is. */
+const removal = (page: Page, id: string) =>
+  page.waitForResponse((r) => r.request().method() === 'DELETE' && isRunAction(new URL(r.url()).pathname, id), { timeout: WAIT_MS });
 
 const goto = async (page: Page, to: string): Promise<void> => {
   await page.goto(new URL(to, page.url()).href, { waitUntil: 'load' });
@@ -204,10 +208,7 @@ export default {
       await settled(page);
       await photograph(page, path.join(OUT, `agent-try-run-${await themeOf(page)}.png`), { fullPage: true });
       await header.getByRole('button', { name: 'Remove…' }).click();
-      const [removed] = await Promise.all([
-        answered(page, 'DELETE', `/api/runs/${id}`),
-        header.getByRole('button', { name: 'Remove', exact: true }).click(),
-      ]);
+      const [removed] = await Promise.all([removal(page, id), header.getByRole('button', { name: 'Remove', exact: true }).click()]);
       if (removed.status() !== 200) throw new Refused(`the api removes the try — it answered ${removed.status()}: ${await removed.text()}`);
       await page.waitForURL((url) => url.pathname === '/runs', { timeout: WAIT_MS });
       await expectCount(page.locator(`a[href="/runs/${id}"]`), 0, 'removed, the try is off Runs');

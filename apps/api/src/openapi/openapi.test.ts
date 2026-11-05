@@ -151,6 +151,52 @@ test("the card's labels are a POST whose body is a LabelEdit and whose answer a 
   );
 });
 
+/** Each of the run's named actions in the document: its method on its path, the status it answers, and the component its body is. */
+const RUN_ACTIONS = [
+  ['post', '/api/namespaces/{namespace}/runs', '201', 'RunStart'],
+  ['delete', '/api/namespaces/{namespace}/runs/{name}', '200', null],
+  ['post', '/api/namespaces/{namespace}/runs/{name}/refresh', '202', 'RunRefresh'],
+  ['post', '/api/namespaces/{namespace}/runs/{name}/prune', '200', 'RunPrune'],
+  ['post', '/api/namespaces/{namespace}/runs/{name}/labels', '200', 'LabelEdit'],
+  ['post', '/api/namespaces/{namespace}/runs/{name}/hold', '200', 'RunHold'],
+  ['delete', '/api/namespaces/{namespace}/runs/{name}/hold', '200', null],
+  ['post', '/api/namespaces/{namespace}/runs/{name}/steps/{step}/retry', '202', 'RunRetry'],
+  ['post', '/api/namespaces/{namespace}/runs/{name}/steps/{step}/approve', '202', 'RunApprove'],
+  ['post', '/api/namespaces/{namespace}/runs/{name}/steps/{step}/say', '202', 'RunSay'],
+] as const;
+
+test("the document holds the RunList, a run in its namespace, and each of the run's named actions with its body and its refusals", async () => {
+  type Op = {
+    requestBody?: { content: { 'application/json': { schema: unknown } } };
+    responses: Record<string, { content?: { 'application/json': { schema: unknown } } }>;
+  };
+  const doc = (await (await app().request('/openapi/v3/nemia/v1')).json()) as {
+    paths: Record<string, Partial<Record<'get' | 'post' | 'delete', Op>>>;
+    components: { schemas: Record<string, unknown> };
+  };
+  assert.ok(doc.components.schemas['RunList'], 'RunList is a component');
+  for (const path of ['/api/runs', '/api/namespaces/{namespace}/runs'])
+    assert.deepEqual(
+      doc.paths[path]?.get?.responses['200']?.content?.['application/json'].schema,
+      { $ref: '#/components/schemas/RunList' },
+      `${path} answers a RunList`,
+    );
+  const inNamespace = doc.paths['/api/namespaces/{namespace}/runs/{name}']?.get?.responses['200']?.content?.['application/json'].schema;
+  assert.deepEqual(inNamespace, { $ref: '#/components/schemas/Run' }, 'the same component as /api/runs/{runId} answers');
+  for (const [method, path, status, body] of RUN_ACTIONS) {
+    const op = doc.paths[path]?.[method];
+    assert.ok(op, `${method.toUpperCase()} ${path} is in the document`);
+    assert.ok(op.responses[status], `${method.toUpperCase()} ${path} answers ${status}`);
+    for (const refused of ['400', '404', '409', '422', '502'])
+      assert.ok(op.responses[refused], `${method.toUpperCase()} ${path} says its ${refused}`);
+    if (body === null) assert.equal(op.requestBody, undefined, `${method.toUpperCase()} ${path} takes no body`);
+    else {
+      assert.deepEqual(op.requestBody?.content['application/json'].schema, { $ref: `#/components/schemas/${body}` }, `sent a ${body}`);
+      assert.ok(doc.components.schemas[body], `${body} is a component`);
+    }
+  }
+});
+
 /** The component each read of the runs group answers with, by its endpoint's name. */
 const ANSWERS = { show: 'Run', tries: 'StepTries', try: 'StepTry', closeout: 'TryCloseout', told: 'StepTold' } as const;
 

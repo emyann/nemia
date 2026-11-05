@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { Schema } from 'effect';
-import { API_VERSION, GATE_BUDGETS_FROM, RUN_PHASES, Run, StepTries, WAIT_ON } from 'objects';
+import { API_VERSION, GATE_BUDGETS_FROM, RUN_PHASES, Run, RunList, StepTries, WAIT_ON } from 'objects';
 
 const FIXTURES = path.join(import.meta.dirname, 'fixtures');
 const read = (name: string): string => fs.readFileSync(path.join(FIXTURES, name), 'utf8');
@@ -23,6 +23,25 @@ test('a judged run decodes through `Run` and encodes back equal, its JSON what t
   assert.deepEqual(encoded, judged, 'encoded back equal');
   assert.deepEqual(Schema.decodeUnknownSync(Run)(encoded), run, 'and decodes again to the same run');
   assert.equal(`${JSON.stringify(encoded, null, 2)}\n`, read('run.encoded.json'), 'byte for byte');
+});
+
+test('a page of runs decodes as a RunList and encodes back equal, a run with its namespace and one served before it had one', () => {
+  const old = judged as Run;
+  assert.equal(Object.hasOwn(old.metadata, 'namespace'), false, 'the fixture is a run served before the Run had a namespace');
+  const placed = { ...old, metadata: { ...old.metadata, name: 'r-2', namespace: 'foo' } };
+  const page = {
+    apiVersion: API_VERSION,
+    kind: 'RunList',
+    metadata: { continue: 'ci0y', remainingItemCount: 1 },
+    items: [old, placed],
+    unjudged: [{ name: 'r-3', error: 'its journal does not read' }],
+  };
+  const decoded = Schema.decodeUnknownSync(RunList)(page);
+  assert.equal(decoded.items[1]?.metadata.namespace, 'foo');
+  assert.deepEqual(Schema.encodeSync(RunList)(decoded), page, 'encoded back equal');
+  const { unjudged: _, ...judgedOnly } = page;
+  assert.deepEqual(Schema.encodeSync(RunList)(Schema.decodeUnknownSync(RunList)(judgedOnly)), judgedOnly, 'unjudged is optional');
+  assert.equal(Schema.decodeUnknownResult(RunList)({ ...page, kind: 'CardList' })._tag, 'Failure', 'the kind is `RunList`');
 });
 
 test('REFUSED: a run whose phase or wait is not among its words, or whose kind is not `Run`', () => {

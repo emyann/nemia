@@ -73,7 +73,7 @@ export type InboxFromAnswer = { name: string; file: string; from: string[]; was:
 /** One card read for its page (`inbox show`), an entry of the package's table the api serves alone: on `GET /api/inbox/:name`. */
 const CARD = commandNamed('inbox show');
 
-/** What the inbox's reads keep between requests: the app's informer, which judges each started card's run, as `GET /api/runs` keeps it. */
+/** What the inbox's reads keep between requests: the app's informer, which judges each started card's run, as the runs' lists keep it. */
 const keptOf = (informer: InformerMemo | undefined) => (informer ? { runs: informer } : {});
 
 const isDirectory = (at: string): boolean => Boolean(fs.statSync(at, { throwIfNoEntry: false })?.isDirectory());

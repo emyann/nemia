@@ -24,6 +24,7 @@ import { Labels } from '../components/Labels';
 import { runsMoved } from '../lib/runWrites';
 import { factoriesQuery, labelRun, runGone } from '../lib/api';
 import { loadRun, useRunView, type RunView, type StepView } from '../lib/runView';
+import { namespaceOf } from '../lib/runNamespace';
 import { untrustedFor, type UntrustedPlace } from '../lib/factories';
 import { askedIn, decideDrawn, gateOffered, stepAnchor } from '../lib/asks';
 import { barValue } from '../lib/bar';
@@ -97,7 +98,7 @@ function RunRead({ runId }: { runId: string }) {
 function RunLabels({ run }: { run: RunView }) {
   const queryClient = useQueryClient();
   const edit = (edits: readonly string[]) =>
-    labelRun(run.id, edits).then(() =>
+    labelRun(namespaceOf(run.labels.factory), run.id, edits).then(() =>
       Promise.all([queryClient.invalidateQueries({ queryKey: ['runs', run.id], exact: true }), runsMoved(queryClient, run.id)]),
     );
   return <Labels labels={run.labels} edit={edit} />;

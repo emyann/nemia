@@ -4,6 +4,7 @@ import { useNavigate } from '@tanstack/react-router';
 import { Button } from '@/components/ui/button';
 import { removeRun } from '../lib/api';
 import { runsMoved } from '@/lib/runWrites';
+import { useRunNamespace } from '@/lib/runNamespace';
 
 /**
  * Remove, on a try's page, asked twice: the first press asks, the second removes the run as the CLI's `rm` does — its record and the
@@ -14,8 +15,9 @@ export function RemoveRun({ id }: { id: string }) {
   const [asking, setAsking] = useState(false);
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const namespaceNow = useRunNamespace(id);
   const remove = useMutation({
-    mutationFn: () => removeRun(id),
+    mutationFn: () => namespaceNow().then((ns) => removeRun(ns, id)),
     onSuccess: async () => {
       await navigate({ to: '/runs' });
       queryClient.removeQueries({ queryKey: ['runs', id], exact: true });

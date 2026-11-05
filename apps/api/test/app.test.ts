@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from './scratch.ts';
 import { until } from './waits.ts';
-import { closeoutOf, linesOf, objectOf, specOf, stepOf, toldOf, triesOf } from './run-reads.ts';
+import { closeoutOf, linesOf, objectOf, specOf, stepOf, summariesOf, toldOf, triesOf } from './run-reads.ts';
 import { app } from '../src/app.ts';
 import {
   atWork,
@@ -15,6 +15,8 @@ import {
   engine,
   list,
   filingsRead,
+  prunedKept,
+  prunedWords,
   runTokens,
   timeline,
   runStore,
@@ -26,6 +28,7 @@ import { Engine } from 'agent-runtime';
 import { Context, Effect, Exit, Layer, Scope } from 'effect';
 import { DEFAULT_ROUNDS } from 'agent-orchestrator/workflow';
 import { PRECEDENCE } from 'agent-orchestrator/run';
+import type { RunList } from 'objects';
 /** A folder nothing is made in: a path under it names a workflow folder that is not there. */
 const NOWHERE = scratch('nemia-api-nowhere-');
 
@@ -184,7 +187,7 @@ const filedBare = {
 
 /** A run as GET /api/runs lists it. */
 const listed = async (id: string) => {
-  const run = ((await (await app.request('/api/runs')).json()) as RunSummary[]).find((r) => r.id === id);
+  const run = (await summariesOf(app)).find((r) => r.id === id);
   assert.ok(run, `${id} is on the list`);
   return run;
 };
@@ -298,7 +301,9 @@ test("a store's runs read on the list and on a run's page: each summarized with 
   const s = story(t);
   await s.test('an empty store lists no runs', async () => {
     const res = await app.request('/api/runs');
-    assert.deepEqual(await res.json(), []);
+    const list = (await res.json()) as RunList;
+    assert.deepEqual([list.kind, list.items], ['RunList', []], 'the RunList holds no run');
+    assert.deepEqual(await summariesOf(app), [], "and the board's views none");
   });
   await s.test('runs are read from the workflow store and summarized, with what each step is doing', async () => {
     writeRun({
@@ -319,8 +324,7 @@ test("a store's runs read on the list and on a run's page: each summarized with 
     });
     fs.writeFileSync(path.join(root, 'runs', 'r-1.cancelled'), '2026-09-12T01:00:00.000Z');
 
-    const res = await app.request('/api/runs');
-    assert.deepEqual(await res.json(), [
+    assert.deepEqual(await summariesOf(app), [
       {
         id: 'r-1',
         repo: '/code/app',
@@ -335,6 +339,11 @@ test("a store's runs read on the list and on a run's page: each summarized with 
         /** Started, and none of its filings on the feed (there is none here): when it was created. */
         startedAt: '2026-09-12T00:00:00.000Z',
         cancelledAt: '2026-09-12T01:00:00.000Z',
+        /** Finished, as `GET /api/runs-finished` lists it: when its work stopped, how, and its wall time in five parts. */
+        finishedAt: '2026-09-12T01:00:00.000Z',
+        outcome: 'cancelled',
+        wallMs: 3600000,
+        clock: { checksMs: 0, personMs: 0, restMs: 3600000, sessionsMs: 0, slotMs: 0, wallMs: 3600000 },
         /** Nobody pruned it: no mark beside its status. */
         pruned: null,
         /** Started without `--after`: it waits on no run. */
@@ -2700,7 +2709,8 @@ test("a step's files: a closeout's files with where they are served, each served
       fs.rmSync(path.join(root, 'runs', 'r-52', 'artifacts'), { recursive: true });
       try {
         const run = await objectOf(app, 'r-52');
-        assert.deepEqual(run.status.pruned, { at: files.at, worktrees: [], artifacts: files });
+        const marked = { at: files.at, worktrees: [], artifacts: files };
+        assert.deepEqual(run.status.pruned, { ...marked, said: `${prunedWords(marked)}; ${prunedKept(marked)}` });
         const said = `its files were removed at ${files.at} (nemia prune --artifacts)`;
         const shoot = await closeoutOf(app, 'r-52', 'shoot');
         assert.ok(shoot?.closeout);

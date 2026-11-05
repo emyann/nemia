@@ -6,6 +6,7 @@ import { cn } from '../lib/utils';
 import { RouteLink } from './AgentParts';
 import { BUTTON, Refusal, TEXTAREA, useAsk } from './Ask';
 import { SECONDARY, useApprove } from './Gate';
+import type { RunAt } from '@/lib/runNamespace';
 
 /**
  * What a card says once a person's word is taken there, the run's state it was taken in, and the state the answer moved it to once the
@@ -29,22 +30,22 @@ export const POPOVER =
  * outside the card, bubble through it as React does, so the stop is on the wrapper.
  */
 export function CardGate({
-  runId,
+  run,
   gate,
   title,
   stamp,
   onTaken,
 }: {
-  runId: string;
+  run: RunAt;
   gate: GateAsk;
   /** The gate's words in full, on hover under the line: the folder's own for an ending, the CLI `ls`'s for a step's hand-off. */
   title: string;
   stamp: string;
   onTaken: (taken: Taken) => void;
 }) {
-  const approval = useApprove(runId, gate.step, () => undefined);
+  const approval = useApprove(run.id, gate.step, () => undefined, run.namespace);
   const [to, setTo] = useState(gate.back[0] ?? gate.step);
-  const sendBack = useAsk(runId, gate.step, () => undefined);
+  const sendBack = useAsk(run.id, gate.step, () => undefined, run.namespace);
   const line = gateCardLine(gate);
   const read = readLink(gate);
 
@@ -109,8 +110,8 @@ export function CardGate({
         )}
         <RouteLink
           to="/runs/$runId"
-          params={{ runId }}
-          {...('step' in read ? { search: { bar: barValue({ kind: 'step', run: runId, step: read.step }) } } : { hash: read.hash })}
+          params={{ runId: run.id }}
+          {...('step' in read ? { search: { bar: barValue({ kind: 'step', run: run.id, step: read.step }) } } : { hash: read.hash })}
           data-read={gate.step}
           className="ml-auto min-w-0 truncate rounded-sm text-body-small font-medium text-foreground underline decoration-outline underline-offset-2 outline-none hover:decoration-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
         >

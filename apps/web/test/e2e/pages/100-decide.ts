@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Response } from 'playwright';
-import { expectRendered, fed, photograph, sidebar, themeOf } from '../board.ts';
+import { expectRendered, fed, photograph, sidebar, themeOf, isRunAction } from '../board.ts';
 import { expectCount, expectLeftOf, expectVisible, Refused, settled, WAIT_MS } from '../checks.ts';
 import { ENDING } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -100,7 +100,7 @@ export default {
     await settled(page);
     await photograph(page, path.join(OUT, `decide-awaiting-${await themeOf(page)}.png`), { fullPage: true });
 
-    const retried = (r: Response) => r.request().method() === 'POST' && new URL(r.url()).pathname === `/api/runs/${id}/steps/${back}/retry`;
+    const retried = (r: Response) => r.request().method() === 'POST' && isRunAction(new URL(r.url()).pathname, id, `/steps/${back}/retry`);
     await sendBack.getByRole('textbox').fill(ENDING.objection);
     const [sent] = await Promise.all([
       page.waitForResponse(retried, { timeout: WAIT_MS }),

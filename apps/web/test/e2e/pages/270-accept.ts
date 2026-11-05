@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { fed, photograph, sidebar, themeOf } from '../board.ts';
+import { fed, photograph, sidebar, themeOf, isRunAction } from '../board.ts';
 import { expectCount, expectVisible, Refused, settled, WAIT_MS } from '../checks.ts';
 import { LOOPING } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -55,7 +55,7 @@ export default {
     const message = 'Good enough to ship: the two findings left are for a later run.';
     await reason.fill(message);
     const accepted = (r: { request: () => { method: () => string }; url: () => string }) =>
-      r.request().method() === 'POST' && new URL(r.url()).pathname === `/api/runs/${id}/steps/${step}/approve`;
+      r.request().method() === 'POST' && isRunAction(new URL(r.url()).pathname, id, `/steps/${step}/approve`);
     try {
       const [response] = await Promise.all([page.waitForResponse(accepted, { timeout: WAIT_MS }), press.click()]);
       if (response.status() !== 202)

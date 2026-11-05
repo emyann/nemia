@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Dialog, DialogTrigger, Heading, Popover, Radio, RadioGroup, Text } from 'react-aria-components';
 import { Button } from '@/components/ui/button';
 import { decisionQuery, pruneRun } from '../lib/api';
+import { runNamespace } from '@/lib/runNamespace';
 import type { RunView } from '../lib/runView';
 import { decidableRun, decisionStamp } from '../lib/decide';
 import { awaitingOf, firstChoice, prunable, pruneOffer, pruneQuestion, type PruneChoice, type PruneOffer } from '../lib/prune.ts';
@@ -76,7 +77,7 @@ function PruneForm({ id, offer, onClose }: { id: string; offer: PruneOffer; onCl
   const choice = offer.choices.find((c) => c.key === key && !c.unavailable) ?? firstChoice(offer);
   const queryClient = useQueryClient();
   const prune = useMutation({
-    mutationFn: () => pruneRun(id, choice.how),
+    mutationFn: () => runNamespace(queryClient, id).then((ns) => pruneRun(ns, id, choice.how)),
     onSuccess: async (done) => {
       setAsking(false);
       if (done.left === 0) onClose();

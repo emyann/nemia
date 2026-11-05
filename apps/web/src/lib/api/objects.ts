@@ -42,6 +42,19 @@ import {
   McpServerList,
   type McpServerWrite,
   Run,
+  RunApproved,
+  type RunApprove,
+  RunAsked,
+  RunHeld,
+  type RunHold,
+  RunList,
+  type RunPrune,
+  RunPruned,
+  RunRemoved,
+  type RunRetry,
+  RunSaid,
+  type RunStart,
+  RunStarted,
   Schedule,
   ScheduleList,
   type ScheduleWrite,
@@ -154,10 +167,49 @@ const write = <A>(schema: Schema.Decoder<A>, may: string, query?: Record<string,
   ...(query ? { query } : {}),
 });
 
-/** The run object and its sub-resources. */
+/**
+ * The run object, its list and its sub-resources; and its named actions, each in the run's namespace (its factory, `default` for one that
+ * names none, `namespaceOf`), each taking what it may have done (`may`), which the caller's words say.
+ */
 export const runs = {
+  /**
+   * Every run, of every namespace, that `labelSelector` keeps by its labels, or every run for none (`GET /api/runs`), on one page: no
+   * `limit` is sent, so the api answers them all, with each it could not judge beside them (`unjudged`).
+   */
+  listAll: (labelSelector?: string): Promise<RunList> =>
+    call((c) => c.runs.listAll({ query: labelSelector === undefined ? {} : { labelSelector } }), read(RunList)),
   /** The run object (`GET /api/runs/:runId`). */
   show: (runId: string): Promise<Run> => call((c) => c.runs.show({ params: { runId } }), read(Run)),
+  /** A run started in `namespace`, on its repository `repo` where the factory has several (`?repo=`): its name. */
+  create: (namespace: string, start: RunStart, may: string, repo?: string): Promise<RunStarted> =>
+    call(
+      (c) => c.runs.create({ params: { namespace }, query: repo === undefined ? {} : { repo }, payload: start }),
+      write(RunStarted, may),
+    ),
+  /** A try's run removed: its record and the folders it worked in. */
+  delete: (namespace: string, name: string, may: string): Promise<RunRemoved> =>
+    call((c) => c.runs.delete({ params: { namespace, name } }), write(RunRemoved, may)),
+  /** A finished run pruned: its worktrees, and its files with `artifacts`. */
+  prune: (namespace: string, name: string, how: RunPrune, may: string): Promise<RunPruned> =>
+    call((c) => c.runs.prune({ params: { namespace, name }, payload: how }), write(RunPruned, may)),
+  /** A run's labels edited (`key=value`, `key-`); a changed value needs `overwrite`. */
+  labels: (namespace: string, name: string, edit: LabelEdit, may: string): Promise<Labelled> =>
+    call((c) => c.runs.labels({ params: { namespace, name }, payload: edit }), write(Labelled, may)),
+  /** A run held until the runs `hold.until` names land. */
+  hold: (namespace: string, name: string, hold: RunHold, may: string): Promise<RunHeld> =>
+    call((c) => c.runs.hold({ params: { namespace, name }, payload: hold }), write(RunHeld, may)),
+  /** A person's hold on a run lifted. */
+  unhold: (namespace: string, name: string, may: string): Promise<RunHeld> =>
+    call((c) => c.runs.unhold({ params: { namespace, name } }), write(RunHeld, may)),
+  /** Another try of a step, or with `round` another round of the loop it closes: the ask, written and not yet filed. */
+  retry: (namespace: string, name: string, step: string, how: RunRetry, may: string): Promise<RunAsked> =>
+    call((c) => c.runs.retry({ params: { namespace, name, step }, payload: how }), write(RunAsked, may)),
+  /** A step approved at its gate, or a loop out of rounds taken as it stands. */
+  approve: (namespace: string, name: string, step: string, how: RunApprove, may: string): Promise<RunApproved> =>
+    call((c) => c.runs.approve({ params: { namespace, name, step }, payload: how }), write(RunApproved, may)),
+  /** Words said to a step's running session. */
+  say: (namespace: string, name: string, step: string, text: string, may: string): Promise<RunSaid> =>
+    call((c) => c.runs.say({ params: { namespace, name, step }, payload: { text } }), write(RunSaid, may)),
   /** Every try of a step, earliest first. */
   tries: (runId: string, step: string): Promise<StepTries> => call((c) => c.runs.tries({ params: { runId, step } }), read(StepTries)),
   /** What a step was told. */

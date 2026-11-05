@@ -2,7 +2,10 @@
  * The one definition of what the api serves of the objects (`Api`): the handlers the api builds from it, the clients that read through
  * it and the OpenAPI document it writes (`OpenApi.fromApi(Api)`) are all made from this, so no layer keeps a shape of its own.
  *
- * Group `runs`: the run object and its four sub-resources, at the paths the api has always answered them on. Group `cards`: the inbox's
+ * Group `runs`: the run object, listed across namespaces and in one (a run's namespace is its factory, `default` for one that names none),
+ * read in its namespace and across all by its id, its four sub-resources at the paths the api has always answered them on, and its named
+ * actions, each in its namespace alone: started, removed, refreshed, pruned, labelled, held and lifted, and a step of it tried again,
+ * approved and said words to. Group `cards`: the inbox's
  * cards as objects, listed across namespaces or in one (a card's namespace is its factory, `default` for one that names none), read,
  * filed, dropped, started, queued and taken off the queue, and their labels edited. Every refusal is an object with one key, `error`, the
  * sentence that says what to do next, as the api's other routes answer one; a Conflict carries the `users` that hold the thing too.
@@ -37,14 +40,17 @@ import { Hire, HireList, HireWrite } from './hire.ts';
 import { McpServer, McpServerList, McpServerWrite, SignInStarted, SignInState, SignedOut } from './mcp-server.ts';
 import { Schedule, ScheduleList, ScheduleWrite } from './schedule.ts';
 import { Volume, VolumeList } from './volume.ts';
-import { WRITE_WAYS } from './words.ts';
 import { Workflow, WorkflowCreate, WorkflowList, WorkflowWrite } from './workflow.ts';
 import { Agent, AgentCard, AgentList, AgentTried, AgentTry, AgentWrite } from './agent.ts';
 import { Skill, SkillFiles, SkillList, SkillWrite } from './skill.ts';
-import { LabelEdit, Labelled, Run, StepTold, StepTries, StepTry, TryCloseout } from './run.ts';
+import { LabelEdit, Labelled } from './run.ts';
 import { Template, TemplateList } from './template.ts';
+import { BadRequest, Conflict, Failed, Invalid, listQuery, Missing, Unjudged, WriteFailed } from './api-errors.ts';
+import { RunsGroup } from './run-api.ts';
 import { Subscription, SubscriptionList } from './subscription.ts';
 import { Event, EventList } from './event.ts';
+
+export { BadRequest, Conflict, Failed, Invalid, Missing, Unjudged, WriteFailed, RunsGroup };
 
 /** The kinds the api serves as objects, each with its object Schema, its `<Kind>List` and its get endpoint here. */
 export const KINDS = [
@@ -63,31 +69,6 @@ export const KINDS = [
   'Event',
 ] as const;
 export type Kind = (typeof KINDS)[number];
-
-/** Nothing by that name, or not in that namespace: a 404. */
-export class Missing extends Schema.Class<Missing>('Missing')({ error: Schema.String }, { httpApiStatus: 404 }) {}
-
-/** The thing is held by something else, named in `users` where the package names them: a 409. */
-export class Conflict extends Schema.Class<Conflict>('Conflict')(
-  { error: Schema.String, users: Schema.optionalKey(Schema.Array(Schema.String)) },
-  { httpApiStatus: 409 },
-) {}
-
-/**
- * A request the package refuses as it is said — a label query, a limit, a token, a name: a 422. A write of a definition refused where it
- * is sent carries `way`, how the definition changes instead (`WRITE_WAYS`); a workflow's write refused for some of its steps names them
- * (`steps`), for the builder to mark.
- */
-export class Invalid extends Schema.Class<Invalid>('Invalid')(
-  { error: Schema.String, way: Schema.optionalKey(Schema.Literals(WRITE_WAYS)), steps: Schema.optionalKey(Schema.Array(Schema.String)) },
-  { httpApiStatus: 422 },
-) {}
-
-/** A write the package let through and the disk then refused (a file that is a folder, one read-only): a 500, saying what failed. */
-export class Failed extends Schema.Class<Failed>('Failed')({ error: Schema.String }, { httpApiStatus: 500 }) {}
-
-/** A run one of whose tasks does not read, so it is not judged: a 502, in the words the list says it with. */
-export class Unjudged extends Schema.Class<Unjudged>('Unjudged')({ error: Schema.String }, { httpApiStatus: 502 }) {}
 
 /** The Card and a page of them, named so that the document holds each as a component, as it holds the Run. */
 const CardObject = Card.annotate({ identifier: 'Card' });
@@ -122,26 +103,6 @@ const SubscriptionListObject = SubscriptionList.annotate({ identifier: 'Subscrip
 const EventObject = Event.annotate({ identifier: 'Event' });
 const EventListObject = EventList.annotate({ identifier: 'EventList' });
 
-/** A run's step, named in the path. */
-const stepParams = { runId: Schema.String, step: Schema.String };
-
-/** A step's try, by its number as the path says it. */
-const tryParams = { ...stepParams, try: Schema.String };
-
-/** One label query, or several given again, OR'd. */
-const LabelQuery = Schema.optionalKey(Schema.Union([Schema.String, Schema.Array(Schema.String)]));
-
-/**
- * The query of a list: `limit` (a whole number from 1), `continue` (the token the page before answered), `labelSelector`, and `selector`,
- * its retired spelling, read the same. Each kept as the text it was sent as, so a wrong one is refused in the package's words, a 422.
- */
-const listQuery = {
-  limit: Schema.optionalKey(Schema.String),
-  continue: Schema.optionalKey(Schema.String),
-  labelSelector: LabelQuery,
-  selector: LabelQuery,
-};
-
 /** A card, or any object a namespace holds, by its namespace and its name. */
 const cardParams = { namespace: Schema.String, name: Schema.String };
 
@@ -150,31 +111,6 @@ const namespaceParams = { namespace: Schema.String };
 
 /** A factory, by its name. */
 const factoryParams = { name: Schema.String };
-
-/** The run object and its sub-resources. */
-export class RunsGroup extends HttpApiGroup.make('runs').add(
-  HttpApiEndpoint.get('show', '/api/runs/:runId', { params: { runId: Schema.String }, success: Run, error: [Missing, Invalid, Unjudged] }),
-  HttpApiEndpoint.get('tries', '/api/runs/:runId/steps/:step/tries', {
-    params: stepParams,
-    success: StepTries,
-    error: [Missing, Invalid, Unjudged],
-  }),
-  HttpApiEndpoint.get('try', '/api/runs/:runId/steps/:step/tries/:try', {
-    params: tryParams,
-    success: StepTry,
-    error: [Missing, Invalid, Unjudged],
-  }),
-  HttpApiEndpoint.get('closeout', '/api/runs/:runId/steps/:step/tries/:try/closeout', {
-    params: tryParams,
-    success: TryCloseout,
-    error: [Missing, Invalid, Unjudged],
-  }),
-  HttpApiEndpoint.get('told', '/api/runs/:runId/steps/:step/told', {
-    params: stepParams,
-    success: StepTold,
-    error: [Missing, Invalid, Unjudged],
-  }),
-) {}
 
 /** What a card's verbs refuse with. */
 const cardErrors = [Missing, Conflict, Invalid];
@@ -203,7 +139,9 @@ export class CardsGroup extends HttpApiGroup.make('cards').add(
   HttpApiEndpoint.post('start', '/api/namespaces/:namespace/cards/:name/start', {
     params: cardParams,
     payload: CardStart,
-    success: Schema.Struct({ id: Schema.String, card: Schema.String }).pipe(Schema.annotate({ httpApiStatus: 201 })),
+    success: Schema.Struct({ id: Schema.String, card: Schema.String, ignoredRepo: Schema.optionalKey(Schema.String) }).pipe(
+      Schema.annotate({ httpApiStatus: 201 }),
+    ),
     error: cardErrors,
   }),
   HttpApiEndpoint.post('queue', '/api/namespaces/:namespace/cards/:name/queue', {

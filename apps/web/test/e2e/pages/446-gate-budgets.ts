@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Locator } from 'playwright';
-import { fed, photograph, sidebar, themeOf } from '../board.ts';
+import { fed, photograph, sidebar, themeOf, isRunAction } from '../board.ts';
 import { expectCount, expectVisible, idle, Refused, settled, WAIT_MS } from '../checks.ts';
 import { BUDGETING, writeBudgeting } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -9,7 +9,7 @@ import { OUT, store } from '../world.ts';
 
 /** Whether `r` is the POST of the approval of the gated step. */
 const approving = (r: { request: () => { method: () => string }; url: () => string }) =>
-  r.request().method() === 'POST' && new URL(r.url()).pathname === `/api/runs/${BUDGETING.id}/steps/${BUDGETING.gated}/approve`;
+  r.request().method() === 'POST' && isRunAction(new URL(r.url()).pathname, BUDGETING.id, `/steps/${BUDGETING.gated}/approve`);
 
 /** The JSON of the approval file `file`, or nothing where it is not there. */
 const approvalIn = (file: string): { budgets?: Record<string, number> } =>

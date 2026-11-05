@@ -11,17 +11,22 @@ import { LABEL_WORDS } from '../labels/index.ts';
 
 /**
  * What a route's path names: the run and the step — `step` empty on a route that names none, `runId` on a route of the store's own, where
- * `step` is a factory's hire's — the `name` of what else it names, a card or an agent, the `factory` a hire or an instruction names,
- * and the request's `method` and `path`, as a refusal says the route — a server a factory's route names is read off the path.
+ * `step` is a factory's hire's — the `name` of what else it names, a card or an agent, the `factory` a hire or an instruction names, the
+ * `namespace` a run's named action is addressed in (empty on a route that names none), and the request's `method` and `path`, as a
+ * refusal says the route — a server a factory's route names is read off the path.
  */
 export type Named = {
   readonly runId: string;
   readonly step: string;
   readonly name: string;
   readonly factory: string;
+  readonly namespace: string;
   readonly method: string;
   readonly path: string;
 };
+
+/** The path of the run a named action is addressed to, in its namespace: `/api/namespaces/<namespace>/runs/<runId>`. */
+export const runPath = ({ namespace, runId }: Pick<Named, 'namespace' | 'runId'>): string => `/api/namespaces/${namespace}/runs/${runId}`;
 
 /**
  * A routed command's words: `shape`, its body as a refusal shows it; `guard`, `issue` and `failed`, each said of what it names; `strict`,
@@ -81,8 +86,8 @@ const retryWords = ({ path: [key], input }: BodyIssue): string => {
 /** Another try of a step, as the guard's refusals word it, its body and its failures. */
 const RETRY: RouteWords = {
   shape: RETRY_SHAPE,
-  guard: ({ runId, step }) => ({
-    route: `POST /api/runs/${runId}/steps/${step}/retry`,
+  guard: ({ runId, step, namespace }) => ({
+    route: `POST ${runPath({ namespace, runId })}/steps/${step}/retry`,
     does: 'asks for another try of a step',
     forAnother: 'ask for one',
     why: 'the next tick files the try a person asks for, and the answer it carries goes into the brief an agent acts on in this repository',
@@ -98,8 +103,8 @@ const RETRY: RouteWords = {
 /** An approval of a step waiting at its gate, as the guard's refusals word it, its body and its failures. */
 const APPROVE: RouteWords = {
   shape: APPROVE_SHAPE,
-  guard: ({ runId, step }) => ({
-    route: `POST /api/runs/${runId}/steps/${step}/approve`,
+  guard: ({ runId, step, namespace }) => ({
+    route: `POST ${runPath({ namespace, runId })}/steps/${step}/approve`,
     does: 'approves a step waiting at its gate',
     forAnother: 'approve one',
     why: 'the next tick files what waits on a step a person approves, and the words given with it go into the brief of every step after the gate, which an agent acts on in this repository',
@@ -123,8 +128,8 @@ const APPROVE: RouteWords = {
 /** A run told to take the new revisions of the kinds it resolved, as the guard's refusals word it, its body and its failures. */
 const REFRESH: RouteWords = {
   shape: REFRESH_SHAPE,
-  guard: ({ runId }) => ({
-    route: `POST /api/runs/${runId}/refresh`,
+  guard: ({ runId, namespace }) => ({
+    route: `POST ${runPath({ namespace, runId })}/refresh`,
     does: 'tells a run to take the new revisions of the kinds it resolved',
     forAnother: 'refresh one',
     why: "every filing after it — a new step, a retry, a round — is filed on the newest revision of the run's workflow, its agents, their skills and its factory's rules, which an agent acts on in this repository",
@@ -133,13 +138,13 @@ const REFRESH: RouteWords = {
     shape: REFRESH_SHAPE,
   }),
   issue:
-    ({ runId }) =>
+    ({ runId, namespace }) =>
     ({ path: [key], input }) =>
       key === 'step'
         ? `\`step\` names the looping step whose work merges its base, as \`nemia refresh ${runId} <step> --base\` does: a name, or left out for a run with one loop. This request's was ${JSON.stringify(input)}: ${REFRESH_SHAPE}.`
         : key === 'base'
           ? `\`base\` sends a loop's work back to merge its base branch, as \`nemia refresh ${runId} --base\` does: true, or left out to take the new revisions. This request's was ${JSON.stringify(input)}: ${REFRESH_SHAPE}.`
-          : `POST /api/runs/${runId}/refresh takes a JSON object: ${REFRESH_SHAPE}.`,
+          : `POST ${runPath({ namespace, runId })}/refresh takes a JSON object: ${REFRESH_SHAPE}.`,
   failed: ({ runId }, said) =>
     `Could not refresh ${runId}: ${said}. \`nemia refresh ${runId}\` takes the new revisions the same way from the command line.`,
 };
@@ -147,8 +152,8 @@ const REFRESH: RouteWords = {
 /** Words for a step's running session, as the guard's refusals word them, and its body; words the harness did not take are its own. */
 const SAY: RouteWords = {
   shape: SAY_SHAPE,
-  guard: ({ runId, step }) => ({
-    route: `POST /api/runs/${runId}/steps/${step}/say`,
+  guard: ({ runId, step, namespace }) => ({
+    route: `POST ${runPath({ namespace, runId })}/steps/${step}/say`,
     does: "hands a person's words to a step's running session",
     forAnother: 'hand it any',
     why: "the words go into the session of a step at work in this repository, as a person's, and its agent acts on them",
@@ -172,17 +177,18 @@ const HOLD_PUT_SHAPE = '`{ "until": ["<runId>", ...], "why"?: "<words>", "by"?: 
 const HOLD_FLAGS = { until: '--until', why: '--why', by: '--by' } as const;
 
 /**
- * Why `POST /api/runs/<runId>/hold`'s body is not one (400), by the first thing its schema refused: every key it does not take, named at
- * once, and `off` pointed at the lift; a key it takes, sent as what it is not.
+ * Why `POST /api/namespaces/<namespace>/runs/<runId>/hold`'s body is not one (400), by the first thing its schema refused: every key it
+ * does not take, named at once, and `off` pointed at the lift; a key it takes, sent as what it is not.
  */
 const holdWords =
-  (runId: string) =>
+  (at: Pick<Named, 'namespace' | 'runId'>) =>
   ({ path: [key], kind, input }: BodyIssue, body: unknown): string => {
-    const route = `POST /api/runs/${runId}/hold`;
+    const runId = at.runId;
+    const route = `POST ${runPath(at)}/hold`;
     if (kind === 'excess' && typeof body === 'object' && body !== null) {
       const unknown = Object.keys(body).filter((k) => !Object.hasOwn(HOLD_FLAGS, k));
       const off = unknown.includes('off')
-        ? ` A hold is lifted with \`DELETE /api/runs/${runId}/hold\`, as \`nemia hold ${runId} --off\` lifts it.`
+        ? ` A hold is lifted with \`DELETE ${runPath(at)}/hold\`, as \`nemia hold ${runId} --off\` lifts it.`
         : '';
       return `${route} does not take ${unknown.map((k) => `\`${k}\``).join(', ')}: it takes ${HOLD_PUT_SHAPE}, as \`nemia hold\` takes --until, --why and --by.${off}`;
     }
@@ -199,10 +205,10 @@ const holdWords =
  */
 const HOLD: RouteWords = {
   shape: HOLD_PUT_SHAPE,
-  guard: ({ runId, method }) =>
+  guard: ({ runId, method, namespace }) =>
     method === 'DELETE'
       ? {
-          route: `DELETE /api/runs/${runId}/hold`,
+          route: `DELETE ${runPath({ namespace, runId })}/hold`,
           does: "lifts a run's hold",
           forAnother: 'lift one',
           why: 'a hold lifted lets the run go on at the next tick, its steps filed and what they asked asked again',
@@ -211,7 +217,7 @@ const HOLD: RouteWords = {
           shape: '`{}`',
         }
       : {
-          route: `POST /api/runs/${runId}/hold`,
+          route: `POST ${runPath({ namespace, runId })}/hold`,
           does: 'holds a run until other runs land',
           forAnother: 'hold one',
           why: 'a held run has nothing more of it filed, and nothing of it asked of a person, until every run it waits on has landed',
@@ -219,11 +225,12 @@ const HOLD: RouteWords = {
           instead: "Put it on the board's run page, or with `nemia hold <run> --until <runId>`",
           shape: HOLD_PUT_SHAPE,
         },
-  issue: ({ runId, method }) => (method === 'DELETE' ? () => 'DELETE …/hold takes no body: `{}`.' : holdWords(runId)),
-  failed: ({ runId, method }, said) =>
+  issue: ({ runId, method, namespace }) =>
+    method === 'DELETE' ? () => 'DELETE …/hold takes no body: `{}`.' : holdWords({ namespace, runId }),
+  failed: ({ runId, method, namespace }, said) =>
     method === 'DELETE'
-      ? `DELETE /api/runs/${runId}/hold: the hold was not lifted — ${said}. Lift it with \`nemia hold ${runId} --off\`.`
-      : `POST /api/runs/${runId}/hold: ${runId} was not held — ${said}. Hold it with \`nemia hold ${runId} --until <runId>\`.`,
+      ? `DELETE ${runPath({ namespace, runId })}/hold: the hold was not lifted — ${said}. Lift it with \`nemia hold ${runId} --off\`.`
+      : `POST ${runPath({ namespace, runId })}/hold: ${runId} was not held — ${said}. Hold it with \`nemia hold ${runId} --until <runId>\`.`,
   strict: true,
 };
 
@@ -277,8 +284,8 @@ const RESUME: RouteWords = {
 /** A try's run removed, as the guard's refusals word it; it takes no body, and a failure that is no refusal names `nemia rm`. */
 const RM: RouteWords = {
   shape: '`{}`',
-  guard: ({ runId }) => ({
-    route: `DELETE /api/runs/${runId}`,
+  guard: ({ runId, namespace }) => ({
+    route: `DELETE ${runPath({ namespace, runId })}`,
     does: 'removes a run',
     forAnother: 'remove one',
     why: "a run removed takes its record, every folder it worked in and the engine's journals and session files of its tasks with it, and nothing brings them back",
@@ -286,8 +293,9 @@ const RM: RouteWords = {
     instead: "Remove it on the board's run page, or with `nemia rm`",
     shape: '`{}`',
   }),
-  issue: () => () => 'DELETE /api/runs/:id takes no body: `{}`.',
-  failed: ({ runId }, said) => `DELETE /api/runs/${runId}: ${runId} was not removed — ${said}. Remove it with \`nemia rm ${runId}\`.`,
+  issue: () => () => 'DELETE /api/namespaces/:namespace/runs/:runId takes no body: `{}`.',
+  failed: ({ runId, namespace }, said) =>
+    `DELETE ${runPath({ namespace, runId })}: ${runId} was not removed — ${said}. Remove it with \`nemia rm ${runId}\`.`,
 };
 
 /** The body `POST …/prune` takes: `nemia prune`'s two flags, each a switch; `--yes` is its route's own. */
@@ -313,8 +321,8 @@ function pruneWords({ path: [key], kind, input }: BodyIssue, body: unknown): str
  */
 const PRUNE: RouteWords = {
   shape: PRUNE_SHAPE,
-  guard: ({ runId }) => ({
-    route: `POST /api/runs/${runId}/prune`,
+  guard: ({ runId, namespace }) => ({
+    route: `POST ${runPath({ namespace, runId })}/prune`,
     does: 'prunes a run',
     forAnother: 'prune one',
     why: 'a run pruned has its worktrees removed, and its files with `artifacts`, and none of its steps can be tried again, sent round or approved',
@@ -323,7 +331,8 @@ const PRUNE: RouteWords = {
     shape: PRUNE_SHAPE,
   }),
   issue: () => pruneWords,
-  failed: ({ runId }, said) => `POST /api/runs/${runId}/prune: ${runId} was not pruned — ${said}. Prune it with \`nemia prune ${runId}\`.`,
+  failed: ({ runId, namespace }, said) =>
+    `POST ${runPath({ namespace, runId })}/prune: ${runId} was not pruned — ${said}. Prune it with \`nemia prune ${runId}\`.`,
   strict: true,
 };
 

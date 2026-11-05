@@ -14,6 +14,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Composer } from '@/components/conversation/Composer';
 import { sayToStep, type Said } from '@/lib/api';
+import { useRunNamespace } from '@/lib/runNamespace';
 import { mark } from '@/lib/conversation';
 
 type Props = {
@@ -31,8 +32,9 @@ const MARKS = 'session';
 /** The composer, the line that says what a terminal would type, and the api's refusal where there is one. */
 export function SessionComposer({ runId, step, line, onSaid }: Props) {
   const queryClient = useQueryClient();
+  const namespaceNow = useRunNamespace(runId);
   const send = useMutation({
-    mutationFn: (words: string) => sayToStep(runId, step, words),
+    mutationFn: (words: string) => namespaceNow().then((ns) => sayToStep(ns, runId, step, words)),
     onSuccess: (said) => {
       onSaid(said);
       void queryClient.invalidateQueries({ queryKey: ['runs', runId], exact: true });

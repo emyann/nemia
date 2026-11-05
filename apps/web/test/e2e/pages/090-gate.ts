@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Locator, Page } from 'playwright';
-import { expectRendered, fed, photograph, sidebar, themeOf, stepBar } from '../board.ts';
+import { expectRendered, fed, photograph, sidebar, themeOf, stepBar, isRunAction } from '../board.ts';
 import { expectCount, expectLeftOf, expectVisible, idle, Refused, settled, WAIT_MS, watch } from '../checks.ts';
 import { GATED } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -45,9 +45,9 @@ export default {
     const recordFile = path.join(store!, 'runs', `${id}.json`);
     const seededRecord = fs.readFileSync(recordFile, 'utf8');
     const approved = (r: { request: () => { method: () => string }; url: () => string }) =>
-      r.request().method() === 'POST' && new URL(r.url()).pathname === `/api/runs/${id}/steps/${gated}/approve`;
+      r.request().method() === 'POST' && isRunAction(new URL(r.url()).pathname, id, `/steps/${gated}/approve`);
     const retried = (r: { request: () => { method: () => string }; url: () => string }) =>
-      r.request().method() === 'POST' && new URL(r.url()).pathname === `/api/runs/${id}/steps/${gated}/retry`;
+      r.request().method() === 'POST' && isRunAction(new URL(r.url()).pathname, id, `/steps/${gated}/retry`);
     const gateOf = (p: Page) => p.locator(`section[aria-label="The gate of ${gated}"]`);
     const wordsOf = (p: Page) => gateOf(p).getByRole('textbox', { name: `Words to approve ${gated} with, if any` });
     const approveOf = (p: Page) => gateOf(p).getByRole('button', { name: 'Approve', exact: true });

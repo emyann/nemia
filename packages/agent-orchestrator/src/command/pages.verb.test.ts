@@ -49,7 +49,7 @@ test("a step's file is read off the run the store lists, never off a path made o
   fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(path.join(dir, 'notes.md'), 'notes');
   const asked = { step: 'implement', name: 'notes.md' };
-  assert.equal((await runWith(noEngine(), STEP_ARTIFACT.handler({ id: started.id, ...asked }))).file?.toString(), 'notes');
-  assert.deepEqual(await runWith(noEngine(), STEP_ARTIFACT.handler({ id: `x/../${started.id}`, ...asked })), { file: null });
-  assert.deepEqual(await runWith(noEngine(), STEP_FILE.handler({ id: started.id, ...asked })), { folder: null, file: null });
+  assert.equal((await runWith(noEngine(), STEP_ARTIFACT.handler({ runId: started.id, ...asked }))).file?.toString(), 'notes');
+  assert.deepEqual(await runWith(noEngine(), STEP_ARTIFACT.handler({ runId: `x/../${started.id}`, ...asked })), { file: null });
+  assert.deepEqual(await runWith(noEngine(), STEP_FILE.handler({ runId: started.id, ...asked })), { folder: null, file: null });
 });

@@ -1,9 +1,10 @@
 /**
  * A gate on the board: a step's handoff that waits for a person, as the api carries it — `gates` and each step's `gate` on a run's detail,
- * the need `approve <step>` on the list and the detail — and POST /api/runs/:id/steps/:step/approve, which approves the step as
- * `nemia approve` does, through the package's `approveRun`, refused in the package's words. Sending a step back from its gate is POST
- * …/retry with words, as `nemia retry --message` is. A gate whose step asks questions as data is answered with `answers` on either:
- * checked against the questions its current closeout asks, and written in the package's words (`approvedAnswerText`, `answerText`).
+ * the need `approve <step>` on the list and the detail — and POST /api/namespaces/:namespace/runs/:runId/steps/:step/approve, which
+ * approves the step as `nemia approve` does, through the package's `approveRun`, refused in the package's words. Sending a step back from
+ * its gate is POST …/retry with words, as `nemia retry --message` is. A gate whose step asks questions as data is answered with `answers`
+ * on either: checked against the questions its current closeout asks, and written in the package's words (`approvedAnswerText`,
+ * `answerText`).
  *
  * One table of what the route refuses, with nothing written, then two stories: a person approving a gate, and a person sending a step
  * back from it. The refusals' words are the package's, relayed whole (proven once, `test/refusal.test.ts`): a row reads the status and
@@ -15,12 +16,12 @@
  */
 import { root } from '../../test/harness.ts';
 import type { DecideCommand, Decidable } from '../decide/decision.ts';
-import { closeoutOf, objectOf, stepOf } from '../../test/run-reads.ts';
+import { closeoutOf, objectOf, stepOf, summariesOf } from '../../test/run-reads.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { approvalFile, approveRun, askFile, list, retryRun, runStore, type RunSummary } from 'agent-orchestrator';
+import { approvalFile, approveRun, askFile, list, retryRun, runStore } from 'agent-orchestrator';
 import { answerText, approvedAnswerText, onYouWords, type Question } from 'agent-orchestrator/run';
 import { parseWorkflow } from 'agent-orchestrator/workflow';
 import { Effect } from 'effect';
@@ -109,13 +110,13 @@ const BOARD = {
 };
 
 const approveOver = (step: string, body: unknown, headers: Record<string, string> = BOARD, run = R) =>
-  app().request(`/api/runs/${run}/steps/${step}/approve`, {
+  app().request(`/api/namespaces/default/runs/${run}/steps/${step}/approve`, {
     method: 'POST',
     headers,
     body: typeof body === 'string' ? body : JSON.stringify(body),
   });
 const ask = (step: string, body: unknown, run = R) =>
-  app().request(`/api/runs/${run}/steps/${step}/retry`, { method: 'POST', headers: BOARD, body: JSON.stringify(body) });
+  app().request(`/api/namespaces/default/runs/${run}/steps/${step}/retry`, { method: 'POST', headers: BOARD, body: JSON.stringify(body) });
 
 /** Every file under a run's asks directory, waiting or consumed. */
 const asked = (run = R): string[] => {
@@ -150,7 +151,7 @@ const object = async (id = R) => objectOf(app(), id);
 const commandsOf = async (id = R): Promise<DecideCommand[]> =>
   ((await (await app().request(`/api/runs/${id}/decision`)).json()) as Decidable).commands;
 const summary = async (id = R) => {
-  const found = ((await (await app().request('/api/runs')).json()) as RunSummary[]).find((r) => r.id === id);
+  const found = (await summariesOf(app())).find((r) => r.id === id);
   assert.ok(found, `the list has ${id}`);
   return found;
 };

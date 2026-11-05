@@ -832,6 +832,21 @@ test('a step that ended is judged by the fields it was filed with: a run that fo
     assert.deepEqual(steps.review?.declared, ['goal', 'why'], 'review after it');
   });
 
+  await s.test(
+    'a record written before the fields were kept reads them where its schema has not moved, and build still signed',
+    async () => {
+      const file = path.join(ROOT, 'runs', `${run.id}.json`);
+      const record = JSON.parse(fs.readFileSync(file, 'utf8'));
+      for (const name of ['build', 'review']) delete record.steps[name].declared;
+      fs.writeFileSync(file, JSON.stringify(record, null, 2));
+      const { steps } = readRun(run.id);
+      assert.equal(steps.build?.declared, undefined, 'build, filed on a schema that has moved since, is given none');
+      assert.deepEqual(steps.review?.declared, ['goal', 'why'], 'review, whose schema has not moved, is given what it declares');
+      const pass = await runWith(b.e, advanceRun(readRun(run.id)));
+      assert.doesNotMatch(pass.feed.steps.find((x) => x.name === 'build')?.word ?? '', /^unsigned/, JSON.stringify(pass.feed.steps));
+    },
+  );
+
   await s.test('review, filed after the move, owes the new field', async () => {
     b.settle(`${run.id}-review`, 'succeeded', { closeout: { ...SIGNED, goal: 'reviewed' } });
     const pass = await runWith(b.e, advanceRun(readRun(run.id)));

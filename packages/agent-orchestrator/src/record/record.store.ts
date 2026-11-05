@@ -170,8 +170,7 @@ const wordsOf = (value: unknown, cap: number): string | undefined => (isText(val
 const isPrunedWorktree = Schema.is(Schema.StructWithRest(Schema.Struct({ path: Schema.String, bytes: Schema.Finite }), Rest));
 
 /** A marker's text as JSON, or undefined where it is not: each field is then read as missing, as a marker that does not read is. */
-const JsonText = Schema.fromJsonString(Schema.Unknown);
-const jsonOr = (text: string): unknown => Result.getOrUndefined(Schema.decodeUnknownResult(JsonText)(text));
+const jsonOr = (text: string): unknown => Result.getOrUndefined(Schema.decodeUnknownResult(Schema.fromJsonString(Schema.Unknown))(text));
 
 /** A person's marker file, as JSON where it reads as JSON (`jsonOr`) — or undefined, when there is no such file to read. */
 const markerOf = (file: string): { json: unknown } | undefined => {

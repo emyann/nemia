@@ -782,6 +782,10 @@ const FEED_WORD: Record<EnginePhase | 'unknown', ListedPhase> = {
 /** The engine's word for a task as the feed keeps it (`FEED_WORD`). Pure. */
 export const feedPhase = (word: EnginePhase | 'unknown'): ListedPhase => FEED_WORD[word];
 
+/** The runs a person's hold on `run` waits for, none for a hold that names no run; null where nobody holds it, or it was called off. */
+const holdingOn = (run: Pick<Run, 'hold'>, status: Assessment['status']): readonly string[] | null =>
+  run.hold && status !== 'cancelled' ? run.hold.until : null;
+
 /**
  * What the feed says of a run as a pass judged it: the listing `nemia ls` prints (`listing`, handed the engine's words through
  * `feedPhase`), in the feed's words. Pure.
@@ -824,7 +828,8 @@ export function feedWords(
   } = {},
 ): FeedWords {
   const waitingWords = onYouWords(l);
-  const held = Boolean(run.hold) && status !== 'cancelled';
+  const holding = holdingOn(run, status);
+  const held = holding !== null;
   return {
     ...(labelled.run ? { labels: labelled.run } : {}),
     ...(labelled.denials?.length ? { denials: labelled.denials } : {}),
@@ -840,7 +845,7 @@ export function feedWords(
         : waitingWords.length
           ? { note: `waiting on you: ${waitingWords.join(', ')}` }
           : {}),
-      ...said(runCodes(status, held, l.steps)),
+      ...said(runCodes(status, holding, l.steps)),
     },
     steps: l.steps.map((s) => {
       const note = [needsNote(closeoutOf(s.name)), s.note].filter(Boolean).join(' · ');

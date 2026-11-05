@@ -47,7 +47,8 @@ run copies this folder alone, so it carries `build`'s `probe.ts`, `parts.ts`, `p
    removed counts for nothing and a rename is one file). It says the files and the lines, a generated file (`package-lock.json`,
    `GENERATED` in `change.ts`, and each file the repository marks `linguist-generated` in its `.gitattributes`) left out, and refuses
    nothing by them. Its `nemia size:` line is the review's measure of the change; the `touched` list is the place's report, and may
-   count a rename as two. The step has no `retries:`: a refusal of any clause waits on a person.
+   count a rename as two. Its only refusals are of the run's environment or the check line, never of the work, so each ends with
+   `nemia change: not the work:` (below).
 2. `build`'s `probe.ts`, quick's copy of it: no probe is left live.
 3. `build`'s `parts.ts`, quick's copy of it: every other branch of the run (`wf/<run>/<part>`) is held by the branch, by patch,
    or was declared replaced (`parts.ts replaced <part>`, which removes it and keeps its tip under `refs/backup/`), so the landing
@@ -61,6 +62,14 @@ run copies this folder alone, so it carries `build`'s `probe.ts`, `parts.ts`, `p
    `pullRequestLabels` rules (`<key>=<value>:<label>`; empty, the default, labels nothing), as `build`'s README says, and as
    the implement step's `open` already did when it created the pull request; `wait` polls the CI context the factory names (its `ciCheck`
    parameter, `ci` by default) on that head, reading only the latest run of each check, and refuses a red, cancelled or missing one with the Actions URL, the failing jobs and a tail of their log.
+
+When the implement step's check refuses, at any clause and either way, the run tries implement again on its own, up to twice a round
+(`retries: 2`), continuing its session, each try under the step's `budget:`, and hands the try the check's verdict as data: the command,
+its exit and the last lines of what it printed, on GitHub the failing jobs and the lines that failed each. A refusal no change to the
+branch can answer ends with a line `<tag>: not the work: <why>` — every refusal of `change.ts`, and of `pull-request.ts` those
+`build`'s README names — and the implement step's note tells the try to change nothing and sign off `blocked` on it, quoting it, as on a failure
+it finds is not its change's. A step over its budget, a call denied under `denials: fail`, a check that did not finish and a blocked
+sign-off spend no try and wait on a person at once, and so does a refusal after the second try.
 
 On GitHub, no typecheck, no lint and no test on this machine: nothing here runs Grace's tests for her before the review. Her session runs the
 tests of what she changed, the types and the lint, as the repository's instructions say of a session's checks; CI runs the

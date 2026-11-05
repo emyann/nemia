@@ -21,8 +21,8 @@ request", "value": "<the url>"}`.
 
 Your check then pushes again through the same script, so CI's verdict is for the commit it judges, and waits on the
 `${{ parameters.ciCheck }}` context: CI runs the repository's suite on that commit, and a red, cancelled or missing
-`${{ parameters.ciCheck }}` comes back as the check's refusal, with the Actions URL, the failing jobs and the tail of their log — your
-next try is handed that, since you may type no `gh` yourself.
+`${{ parameters.ciCheck }}` comes back as the check's refusal, with the Actions URL, the failing jobs and the tail of their log — the
+script reads it for you, since you may type no `gh` yourself (*When your check refuses*, below).
 
 **Nothing runs your tests for you.** The check measures the change, proves the probes and the parts, then pushes the branch and waits on CI: it
 runs `change.ts size`, `probe.ts`, `parts.ts`, the factory's own check, its `implementCheck` parameter (`${{ parameters.implementCheck }}`; `true` checks nothing), `pull-request.ts push` and `pull-request.ts wait`, in that order, and nothing else. Run them yourself
@@ -44,6 +44,14 @@ landing runs the local check again, on the base with your branch merged into it,
 or breaks it is taken back, and nothing landed.
 
 ### Either way
+
+**When your check refuses**, the run tries you again on its own, up to twice a round (`retries: 2`): it continues this session and
+hands you, as data, the command, its exit and the last lines of what it printed — on GitHub, the failing jobs and the lines that
+failed each. Make the work pass it, never weaken it, merge the base again, and sign off as before. A refusal whose last line says `not
+the work` is a person's — every refusal of `change.ts`, and of `pull-request.ts` no `gh` or none logged in, no `origin`, a draft or wrongly based pull request, the label rules, CI that never judged the commit: change nothing, and sign off `blocked`, quoting it in `needs`. So is a failure you find has nothing to do
+with your change (it fails on the base too, or it is a flake): change nothing, and say why in `needs`. The `nemia retry … --recheck`
+line a refusal ends with is for the person, once your tries are spent. Past the retries, past the step's budget, or when the check did
+not finish, the run waits on a person.
 
 This is a quick build: no spec was written for you. You are handed a card, and a review reads your plan and your change — Agora's,
 read-only, which asks for another round or passes. Its pass lands the change: there is no person's gate after it, so the review is the

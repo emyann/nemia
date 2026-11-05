@@ -10,12 +10,16 @@
  * and refuses nothing by either number: the review reads the change whatever its size.
  *
  * Prints a `nemia size:` line and exits 0. Exits 1, on stderr, when `WF_BASE_REF` is not set, git cannot say what changed, or the verb is
- * another than `size`.
+ * another than `size`: each the environment's or the check line's, never the work's, so each refusal ends with one more line,
+ * `nemia change: not the work: <why>`, which tells a try retried on its own to change nothing and stop for the person.
  */
 import { spawnSync } from 'node:child_process';
 
 /** A reason the step is refused: said on stderr, exit 1. */
 class Refusal extends Error {}
+
+/** Why every refusal of this script is a person's: it measures the change, and refuses only where it cannot. */
+const NOT_THE_WORK = "a person fixes the run's environment or the check line; a change to the branch cannot";
 
 /**
  * The paths a tool writes in any repository, which the count leaves out: a file, or a folder by its closing slash. A repository says its
@@ -104,6 +108,7 @@ function main(): number {
   } catch (err) {
     if (!(err instanceof Refusal)) throw err;
     process.stderr.write(`nemia change: ${err.message}\n`);
+    process.stderr.write(`nemia change: not the work: ${NOT_THE_WORK}\n`);
     return 1;
   }
 }

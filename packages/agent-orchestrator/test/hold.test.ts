@@ -577,6 +577,7 @@ test('a run held until a person lifts it: no run named, nothing asked nor filed 
     assert.equal(summary.holding?.waitingOnYou, false);
     assert.deepEqual(summary.holding?.runs, []);
     assert.equal(summary.holding?.word, words);
+    assert.deepEqual([summary.reason, summary.on], ['Waiting', 'hold'], 'it waits on the hold, which names no run');
     assert.deepEqual(summary.waitingOnYou, []);
     assert.equal(summary.moving, false, 'a hold no tick lifts does not move');
   });

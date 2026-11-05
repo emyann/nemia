@@ -36,9 +36,10 @@ export type RunPhase = (typeof RUN_PHASES)[number];
 /**
  * What a step or a run waits on when the wait is a thing's, not a person's (reason `Waiting`, phase `pending`): other runs it is filed
  * `--after` or held until (`run`), the limit on runs in flight (`limit`), the base branch the run lands on, while another run lands there
- * (`base`), or the store's pause (`pause`). A field beside the reason, never part of it, so a selector names it as a key (`on=limit`).
+ * (`base`), the store's pause (`pause`), or a person's hold that names no run, lifted by a person alone (`hold`). A field beside the
+ * reason, never part of it, so a selector names it as a key (`on=limit`).
  */
-export const WAIT_ON = ['run', 'limit', 'base', 'pause'] as const;
+export const WAIT_ON = ['run', 'limit', 'base', 'pause', 'hold'] as const;
 
 /** One of `WAIT_ON`. */
 export type WaitOn = (typeof WAIT_ON)[number];
@@ -280,14 +281,19 @@ const stoppedOn = (step: CodedStep): QualifiedRun =>
     : { reason: step.reason as Exclude<RunReason, 'Waiting' | 'AwaitingAnswer'> };
 
 /**
- * A run's codes. A running run a person holds is `Waiting` on `run`. A `waiting` run carries the reason (and `via`) of its first step,
- * in the order `steps` gives them (the workflow's), whose phase is `waiting` and that is no gate — a run is `waiting` when some stop is
- * not a gate, so a gate before it does not say why; every such reason is a run's too; `AwaitingAnswer` with no `via` where none is.
- * Every other status is `RUN_REASON_OF`'s. Pure.
+ * A run's codes. A running run a person holds (`holding`, the runs the hold waits for, null when nobody holds it) is `Waiting` on `run`
+ * while the hold names a run, and on `hold` while it names none, so a person alone lifts it. A `waiting` run carries the reason (and
+ * `via`) of its first step, in the order `steps` gives them (the workflow's), whose phase is `waiting` and that is no gate — a run is
+ * `waiting` when some stop is not a gate, so a gate before it does not say why; every such reason is a run's too; `AwaitingAnswer` with
+ * no `via` where none is. Every other status is `RUN_REASON_OF`'s. Pure.
  */
-export function runCodes(status: RunStatus, holding: boolean, steps: readonly CodedStep[] = []): CodedRun {
+export function runCodes(status: RunStatus, holding: readonly unknown[] | null, steps: readonly CodedStep[] = []): CodedRun {
   const stop = status === 'waiting' ? steps.find((s) => s.phase === 'waiting' && s.reason !== 'AwaitingApproval') : undefined;
   const q: QualifiedRun =
-    status === 'running' && holding ? { reason: 'Waiting', on: 'run' } : stop ? stoppedOn(stop) : RUN_REASON_OF[status];
+    status === 'running' && holding !== null
+      ? { reason: 'Waiting', on: holding.length ? 'run' : 'hold' }
+      : stop
+        ? stoppedOn(stop)
+        : RUN_REASON_OF[status];
   return { ...q, phase: RUN_PHASE_OF[q.reason] };
 }

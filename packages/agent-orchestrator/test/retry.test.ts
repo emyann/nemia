@@ -616,6 +616,40 @@ test("a checked step, from its check's filing to `retries:` spent and the run wa
   });
 });
 
+test('a check that refuses once, at length, is tried with no ask, its brief carrying all of it, and a pass hands on', async (t) => {
+  const s = story(t);
+  const b = stage.board();
+  let run: RepositoryRun;
+  const id = () => run.id;
+  const try2 = () => `${id()}-implement-try2`;
+  const stderr = Array.from({ length: 150 }, (_, i) => `err ${i + 1}`).join('\n');
+  const stdout = Array.from({ length: 40 }, (_, i) => `out ${i + 1}`).join('\n');
+  await s.test('implement signs off, and its check refuses at length', async () => {
+    run = await throughCheck(['check: npm test', 'retries: 2'], 'failed', {
+      exitCode: 1,
+      printed: { stdout: `${stdout}\n`, stderr: `${stderr}\n` },
+    });
+  });
+  await s.test('one pass tries implement again, continuing its session, with no ask written', async () => {
+    const pass = await tick(id());
+    assert.deepEqual([pass.tried, pass.status], [['implement'], 'running']);
+    assert.equal(b.tasks.get(try2())?.spec.resumeFrom, `native-${id()}-implement`);
+    assert.deepEqual(retryAsks(id()), [], 'nobody asked for the try');
+  });
+  await s.test("the try's brief carries every line the check printed, not only the last 20", () => {
+    const brief = b.tasks.get(try2())!.spec.brief;
+    assert.deepEqual(JSON.parse(/\n```json\n([\s\S]*?)\n```/.exec(brief)![1]), { command: 'npm test', exit: 1, stdout, stderr });
+  });
+  await s.test('try 2 signs off, its check passes, review is filed, and nothing waits on you', async () => {
+    ended(try2(), 'succeeded', { closeout: SIGNED });
+    assert.deepEqual((await tick(id())).checked, ['implement']);
+    ended(`${try2()}-check`, 'succeeded', { exitCode: 0 });
+    assert.deepEqual((await tick(id())).filed, ['review']);
+    const l = await stage.runWith(b.e, list(b.e, readRun(id())));
+    assert.deepEqual(l.waitingOnYou, []);
+  });
+});
+
 const CHECK_SAID = "## What implement's check said";
 /** The line a check that touched no page prints last. */
 const NO_PAGES = 'wf check: nothing under apps/web/ or apps/api/ was touched: no build, no e2e';

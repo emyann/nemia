@@ -209,14 +209,15 @@ rm "$S"/node_modules; git worktree remove "$S"
   2. `nemia upgrade <tag>`. It exports the tag into `releases/<tag>` beside the running one and runs `npm ci`, `npm run build` and
      `npm run release:check` there on a trial store: minutes, and about 850 MB a release. Where a command fails it is refused with
      nothing changed, naming the command, its exit and its log. Otherwise it points `releases/current` at the tag and restarts the
-     service through the take-over: it puts its pause unless a person's pause stands, lets each landing check finish, holds the
+     service through the take-over: it puts its pause unless a person's pause stands, holds the
      daemon's attached sessions at their next tool call and waits up to the timeout (`nemia pause-timeout`, 10m by default; `--timeout <d>` on
      `nemia upgrade` for this one) for their calls in flight, printing `Pausing: N sessions finishing a tool call, cut in M min`, cuts
      what is left, sends SIGTERM, starts the unit, and resumes once the new daemon has made its first pass. The new daemon resumes each
      of those sessions as the same try, told it was paused between two calls (or which call was cut), on the new release
      (`packages/agent-orchestrator/src/service/takeover.verb.ts`).
-  3. Jobs and their checks are not paused: they run on, on the release they started on, since the take-over's pause has no timeout and
-     the restart signals the daemon alone (`KillMode=process`). Every new try, round or resume starts on the new release.
+  3. Jobs and their checks are not paused, nor waited for — a landing's check waiting on CI among them: they run on, on the release
+     they started on, since the take-over's pause has no timeout and the restart signals the daemon alone (`KillMode=process`), and
+     the new daemon reads their results. Every new try, round or resume starts on the new release.
   4. Read `nemia version`: `current:` and `daemon:` name the tag, and `sessions:` counts the sessions at work by release and Claude Code
      version; the old release's count falls to none as its sessions end. `nemia ls` says `on <tag>, claude <version>` beside a step
      at work, and the board's step inspector says what the latest attempt ran on. Report it to the person in one line.
@@ -252,6 +253,14 @@ rm "$S"/node_modules; git worktree remove "$S"
   link the main checkout's `node_modules`. The daemon and its sessions no longer read it; check the tree stays clean.
 - Never stop the daemon with the harness's task-stop, by a name pattern, or by a hand restart of the unit: `nemia upgrade` restarts it,
   and `nemia service restart` where nothing new is to be installed, each through the take-over.
+- **How long a restart waits, and on what.** `nemia service restart` (and `nemia upgrade`'s restart) waits on the daemon's own
+  sessions' calls in flight, up to the timeout (`--timeout <d>`, else `nemia pause-timeout`, 10m by default), then up to 90 s for the
+  old daemon to let the store go, up to 60 s for the service to tick, and the new daemon's first pass; never on a job or a check, a
+  landing waiting on CI included. Each wait is said on its stderr as it waits: `Pausing: N sessions finishing a tool call, cut in M
+  min`, `giving up on <run>'s <step>: …` once the timeout passes, and `pid N ticks the store: waiting for its first pass`. `nemia ls`
+  under its pause lists the jobs and checks too, which it does not wait on. A restart killed while it waits (`timeout`, ^C) leaves its
+  pause standing only until the daemon's next pass, which lifts it (the daemon's log says so); `nemia service status` shows whether
+  a pause still stands.
 - **Main is fast-forwarded by the run**, not by hand: the landing merges the pull request on GitHub, then runs `git fetch origin && git
   merge --ff-only origin/main` in the owner's checkout. Nothing is pushed afterwards, and GitHub deletes the head branch.
 - **A landing that signed off `blocked`:** nothing was merged and the checkout is untouched. The refusal names the exact `nemia retry`

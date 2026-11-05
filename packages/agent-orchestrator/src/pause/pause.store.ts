@@ -41,9 +41,7 @@ const isPauseFile = Schema.is(
 );
 
 /** The pause's holder as the file names it: a pid and, where written, its start. One that does not read is none, so the pause stands. */
-const isHolder = Schema.is(
-  Schema.Struct({ pid: Schema.Int.check(Schema.isGreaterThan(0)), procStart: Schema.optional(Schema.Int) }),
-);
+const isHolder = Schema.is(Schema.Struct({ pid: Schema.Int.check(Schema.isGreaterThan(0)), procStart: Schema.optional(Schema.Int) }));
 
 /** A timeout as the file holds it: whole milliseconds from 0, or none. */
 const timeoutRead = (value: unknown): number | undefined =>
@@ -107,12 +105,7 @@ function osUser(): string | undefined {
  * A take-over names itself as the pause's holder (`heldBy`), written to the file and not answered, so the pass lifts the pause once that
  * process is gone. Refuses (`Conflict`) a store already paused, naming who paused it, `nemia resume`, and `nemia pause --now`.
  */
-export function putPause(
-  said: { why?: string; by?: string },
-  now: Date = new Date(),
-  timeoutMs?: number,
-  heldBy?: PauseHolder,
-): Pause {
+export function putPause(said: { why?: string; by?: string }, now: Date = new Date(), timeoutMs?: number, heldBy?: PauseHolder): Pause {
   const by = said.by ?? osUser() ?? 'someone';
   const pause: Pause = {
     at: now.toISOString(),
@@ -167,9 +160,7 @@ export function resumePause(): Pause {
  * from the file and the process table, never remembered. The file is unlinked only while it holds the text judged, so a pause put again
  * between the read and the lift — a person's `nemia resume` then `nemia pause` — stands.
  */
-export function liftLapsedPause(
-  identify: (holder: PauseHolder) => Identity,
-): { pause: Pause; heldBy: PauseHolder } | null {
+export function liftLapsedPause(identify: (holder: PauseHolder) => Identity): { pause: Pause; heldBy: PauseHolder } | null {
   const read = readPauseFile();
   if (read === null || read.heldBy === undefined) return null;
   if (!pauseLapsed(identify(read.heldBy))) return null;

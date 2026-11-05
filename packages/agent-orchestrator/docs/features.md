@@ -2203,8 +2203,8 @@ in `src/service/`:
   `wsl --shutdown`); a store that is not the default without `--name`, or with `--name nemia`; an `--env` with no `=`, a bad key,
   `WF_ROOT` or `PATH`, a key given twice, or a control character in its value.
 - **Beside a daemon started by hand** it starts nothing and names that pid with its `--take-over <pid>` line. With it, after the pid is
-  confirmed as the lease's (`identity` `same`), it pauses the store, waits out each landing check with no deadline (^C cancels and lifts
-  its pause), sends SIGTERM, waits up to 60 s for the lease to say `stopped` or `gone`, starts the service, waits up to 60 s for it to
+  confirmed as the lease's (`identity` `same`), it pauses the store, waits up to the timeout for the calls in flight of the daemon's
+  own sessions and on no check (^C or a kill ends its pause: the daemon's next pass lifts it), sends SIGTERM, waits up to 60 s for the lease to say `stopped` or `gone`, starts the service, waits up to 60 s for it to
   tick, and resumes only the pause it put. A start that never ticks leaves the store paused and says `nemia resume`.
 - **`nemia service uninstall`** stops, disables and removes it; **`nemia service status`** names the unit's state, the checkout it runs,
   who holds the lease, and lingering (`loginctl show-user -p Linger`, read only). All three are the CLI's alone; Nemia's fence asks

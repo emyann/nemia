@@ -8,7 +8,8 @@
  * The take-over's process is a child spawned with the test's `WF_ROOT`, putting the pause through the live host's own `pause`, killed
  * with SIGKILL and waited to its exit: no pid is guessed. The tick is the store's pass (`tickRun`) on the stage's engine, given a pass of
  * its own that does nothing and no tally, as `pause.test.ts` gives it. The take-over runs on a host whose machine is the test's — a
- * lease it steps, a signal and a start it logs — and whose pause, resume and calls are the live host's, over the stage's engine.
+ * lease it steps, a signal and a start it logs — and whose pause, resume and calls are the live host's, over the stage's engine. A line
+ * the take-over says of waiting on the landing throws, so a take-over that waits on it fails at once rather than hanging the story.
  */
 import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
@@ -138,12 +139,11 @@ test("a restart with only a landing's check running restarts at once, and the ch
       },
       signal: (pid: number) => {
         events.push(`signal ${pid}`);
-        lease = { kind: 'stopped', file: leaseOf(pid).file, last: Date.now(), quiet: 0 } as DaemonStanding;
+        lease = leaseOf(pid, 'stopped');
       },
       pause: (said: { why?: string; by?: string }) => (events.push('pause'), live.pause(said)),
       resume: () => (events.push('resume'), live.resume()),
       say: (line: string) => {
-        // A wait on the landing fails the take-over at once rather than holding it: the restart this story refuses.
         if (line.includes(' to land')) throw new Error(`the restart waits on the landing: ${line}`);
         events.push(`say ${line}`);
       },
@@ -153,7 +153,7 @@ test("a restart with only a landing's check running restarts at once, and the ch
       start: () => {
         events.push('start');
         lease = leaseOf(NEW);
-        later.push(leaseOf(NEW), leaseOf(NEW, true));
+        later.push(leaseOf(NEW), leaseOf(NEW, 'ticking', true));
       },
       logs: 'journalctl --user -u nemia',
     };
@@ -174,10 +174,10 @@ test("a restart with only a landing's check running restarts at once, and the ch
   });
 });
 
-/** A lease of the daemon `pid`, ticking and confirmed, with a pass completed when `passed`. */
-function leaseOf(pid: number, passed = false): DaemonStanding {
+/** A lease of the daemon `pid`, standing as `kind` and confirmed, with a pass completed when `passed`. */
+function leaseOf(pid: number, kind: 'ticking' | 'stopped' = 'ticking', passed = false): DaemonStanding {
   return {
-    kind: 'ticking',
+    kind,
     file: {
       pid,
       by: 'api',
@@ -190,5 +190,5 @@ function leaseOf(pid: number, passed = false): DaemonStanding {
     last: Date.now(),
     quiet: 0,
     identity: 'same',
-  } as DaemonStanding;
+  };
 }

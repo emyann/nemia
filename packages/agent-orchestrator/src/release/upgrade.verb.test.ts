@@ -256,11 +256,7 @@ test('two tags: v1 built on its trial store, v2 switched in with the service on 
       world.onStart = () => ((world.lease = lease(NEW)), (world.later = [lease(NEW, 'ticking', true)]), (world.unitPid = NEW));
       const { host, events } = hostOf(world);
       const done = await run({ tag: 'v2', repo: REPO }, host);
-      assert.deepEqual(events.slice(0, 3), [
-        'pause by nemia upgrade',
-        `signal ${OLD}`,
-        'systemctl --user start nemia.service',
-      ]);
+      assert.deepEqual(events.slice(0, 3), ['pause by nemia upgrade', `signal ${OLD}`, 'systemctl --user start nemia.service']);
       assert.equal(events.at(-1), 'resume');
       assert.equal(done.restart, 'service');
       assert.equal(done.pid, NEW);

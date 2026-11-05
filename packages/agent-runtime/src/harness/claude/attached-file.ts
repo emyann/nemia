@@ -356,11 +356,7 @@ export const drainsThis = (root: string): boolean => {
   } catch {
     return false;
   }
-  return (
-    drain.pid === process.pid &&
-    (drain.start === undefined || drain.start === processStart(process.pid)) &&
-    !putterGone(drain.by)
-  );
+  return drain.pid === process.pid && (drain.start === undefined || drain.start === processStart(process.pid)) && !putterGone(drain.by);
 };
 
 /**

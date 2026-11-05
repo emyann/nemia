@@ -82,7 +82,8 @@ const passing = (world: World, pid: number): void => {
 };
 
 /**
- * The fake machine's world: the lease, and the leases each read after it moves on to (`later`), the unit's main process, and what a signal and a start change.
+ * The fake machine's world: the lease, and the leases each read after it moves on to (`later`), the unit's main process, and what a
+ * signal and a start change.
  */
 type World = {
   lease: DaemonStanding;
@@ -233,31 +234,28 @@ test('a hand daemon handed to the service: install, --take-over <pid>, restarts,
     },
   );
 
-  await s.test(
-    '--take-over pauses, stops the confirmed pid at once, starts the service, and resumes once it passed',
-    async () => {
-      const world: World = { lease: lease(OLD), unitPid: null };
-      world.onSignal = () => (world.lease = lease(OLD, 'stopped'));
-      world.onStart = () => passing(world, NEW);
-      const { host, events } = hostOf(world);
-      const done = await install({ takeOver: String(OLD) }, host);
-      assert.equal(done.did, 'taken');
-      assert.deepEqual(events.slice(0, 5), [
-        'systemctl --user daemon-reload',
-        'systemctl --user enable nemia.service',
-        'pause',
-        `signal ${OLD}`,
-        'systemctl --user start nemia.service',
-      ]);
-      assert.match(events[5], new RegExp(`^say pid ${NEW} ticks the store`));
-      assert.deepEqual(events.slice(6), [`read ${NEW} passed`, 'resume']);
-      assert.equal(readPause(), null);
-      assert.ok(
-        done.lines.some((l) => l.includes(`took the store over from pid ${OLD}`) && l.includes(`as pid ${NEW}`)),
-        done.lines.join('\n'),
-      );
-    },
-  );
+  await s.test('--take-over pauses, stops the confirmed pid at once, starts the service, and resumes once it passed', async () => {
+    const world: World = { lease: lease(OLD), unitPid: null };
+    world.onSignal = () => (world.lease = lease(OLD, 'stopped'));
+    world.onStart = () => passing(world, NEW);
+    const { host, events } = hostOf(world);
+    const done = await install({ takeOver: String(OLD) }, host);
+    assert.equal(done.did, 'taken');
+    assert.deepEqual(events.slice(0, 5), [
+      'systemctl --user daemon-reload',
+      'systemctl --user enable nemia.service',
+      'pause',
+      `signal ${OLD}`,
+      'systemctl --user start nemia.service',
+    ]);
+    assert.match(events[5], new RegExp(`^say pid ${NEW} ticks the store`));
+    assert.deepEqual(events.slice(6), [`read ${NEW} passed`, 'resume']);
+    assert.equal(readPause(), null);
+    assert.ok(
+      done.lines.some((l) => l.includes(`took the store over from pid ${OLD}`) && l.includes(`as pid ${NEW}`)),
+      done.lines.join('\n'),
+    );
+  });
 
   await s.test("status reads the unit back: what it runs, that the service's own process holds the store, and lingering", async () => {
     const after = await status(hostOf({ lease: lease(NEW), unitPid: NEW }).host);
@@ -276,22 +274,19 @@ test('a hand daemon handed to the service: install, --take-over <pid>, restarts,
     assert.equal(events.at(-1), 'systemctl --user restart nemia.service');
   });
 
-  await s.test(
-    "restart stops the service's daemon at once, starts the unit, and resumes after the first pass",
-    async () => {
-      const world: World = { lease: lease(OLD), unitPid: OLD };
-      world.onSignal = () => (world.lease = lease(OLD, 'stopped'));
-      world.onStart = () => passing(world, NEW);
-      const { host, events } = hostOf(world);
-      const done = await restart({}, host);
-      assert.deepEqual(events.slice(0, 3), ['pause', `signal ${OLD}`, 'systemctl --user start nemia.service']);
-      assert.deepEqual(events.slice(4), [`read ${NEW} passed`, 'resume']);
-      assert.equal(done.did, 'restarted');
-      assert.equal(done.pid, NEW);
-      assert.equal(readPause(), null);
-      assert.match(done.lines[0], new RegExp(`pid ${OLD} stopped, and pid ${NEW} ticks the store`));
-    },
-  );
+  await s.test("restart stops the service's daemon at once, starts the unit, and resumes after the first pass", async () => {
+    const world: World = { lease: lease(OLD), unitPid: OLD };
+    world.onSignal = () => (world.lease = lease(OLD, 'stopped'));
+    world.onStart = () => passing(world, NEW);
+    const { host, events } = hostOf(world);
+    const done = await restart({}, host);
+    assert.deepEqual(events.slice(0, 3), ['pause', `signal ${OLD}`, 'systemctl --user start nemia.service']);
+    assert.deepEqual(events.slice(4), [`read ${NEW} passed`, 'resume']);
+    assert.equal(done.did, 'restarted');
+    assert.equal(done.pid, NEW);
+    assert.equal(readPause(), null);
+    assert.match(done.lines[0], new RegExp(`pid ${OLD} stopped, and pid ${NEW} ticks the store`));
+  });
 
   await s.test('a restart where nothing ticks starts the unit and waits for its first pass, signalling and pausing nothing', async () => {
     const world: World = { lease: lease(OLD, 'stopped'), unitPid: null };
@@ -309,9 +304,7 @@ test('a hand daemon handed to the service: install, --take-over <pid>, restarts,
     async () => {
       putPause({ by: 'ann', why: 'reading the night' });
       for (const ticking of [true, false]) {
-        const world: World = ticking
-          ? { lease: lease(OLD), unitPid: OLD }
-          : { lease: lease(OLD, 'stopped'), unitPid: null };
+        const world: World = ticking ? { lease: lease(OLD), unitPid: OLD } : { lease: lease(OLD, 'stopped'), unitPid: null };
         world.onSignal = () => (world.lease = lease(OLD, 'stopped'));
         world.onStart = () => passing(world, NEW);
         const { host, events } = hostOf(world);

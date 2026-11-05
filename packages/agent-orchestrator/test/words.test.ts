@@ -251,8 +251,8 @@ const FENCE_WORDS: Baseline = {
 
 /** Each file outside the runtime that says a harness's word today, with its count and what removes them. */
 const HARNESS_WORDS: Baseline = {
-  'apps/api/src/agents/agents.ts': { count: 2, ...MOVES.prompt },
-  'apps/api/src/agents/skills.ts': { count: 7, ...MOVES.checkout },
+  'apps/api/src/agents/agents.ts': { count: 1, ...MOVES.prompt },
+  'apps/api/src/agents/skills.ts': { count: 4, ...MOVES.checkout },
   'apps/api/src/app.ts': { count: 3, ...MOVES.quota },
   'apps/api/src/capabilities/capabilities.ts': { count: 27, ...MOVES.reach },
   'apps/api/src/capabilities/reach.ts': { count: 44, ...MOVES.reach },

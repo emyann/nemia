@@ -38,7 +38,7 @@ const factory = (name: string, extra: Partial<Factory> = {}): Factory => ({
   default: false,
   repos: ['/code/nemia'],
   workflows: ['build'],
-  hires: { 'build/implement': 'ada' },
+  hires: { 'build/implement': 'implementer' },
   error: null,
   schedules: [],
   commands: {

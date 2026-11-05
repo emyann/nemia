@@ -28,8 +28,8 @@ write(path.join(repo, 'workflows', 'shared', 'go.md'), '---\nplace: git\n---\nTh
 write(path.join(repo, 'workflows', 'agents', 'rex.md'), '---\nharness: claude\n---\nYou review.\n');
 write(path.join(STORE, 'shared', 'go.md'), '---\nplace: git\n---\nYours says go.\n');
 write(path.join(STORE, 'mine', 'plan.md'), '---\nplace: git\nharness: claude\n---\nWrite PLAN.md.\n');
-write(path.join(STORE, 'mine', 'build.md'), '---\nafter: plan\nplace: git\nagent: ada\n---\nBuild it.\n');
-write(path.join(STORE, 'agents', 'ada.md'), '---\nharness: claude\nmodel: opus\n---\nYou build what the plan says.\n');
+write(path.join(STORE, 'mine', 'make.md'), '---\nafter: plan\nplace: git\nagent: implementer\n---\nBuild it.\n');
+write(path.join(STORE, 'agents', 'implementer.md'), '---\nharness: claude\nmodel: opus\n---\nYou make what the plan says.\n');
 addFactory({ name: 'works', repos: [repo] });
 attachWorkflow({ factory: 'works', workflow: 'make' });
 addFactory({ name: 'treed', repos: [repo], template: { source: '/t/team', version: '0.1.0', params: {} } });
@@ -118,21 +118,21 @@ test("a builder's save round-trips its spec, the step files keep only their own 
     steps.map((s) => [s.name, s.keys]),
     [
       ['plan', { place: 'git', harness: 'claude' }],
-      ['build', { after: ['plan'], place: 'git', agent: 'ada' }],
+      ['make', { after: ['plan'], place: 'git', agent: 'implementer' }],
     ],
   );
   const saved = await send('PUT', `${W}/mine`, { metadata: { resourceVersion: read.metadata.resourceVersion }, spec: { steps } });
   assert.equal(saved.status, 200, JSON.stringify(saved.body));
   assert.equal(saved.body.kind, 'Workflow');
   assert.deepEqual(saved.body.spec.steps, steps);
-  assert.doesNotMatch(fs.readFileSync(path.join(STORE, 'mine', 'build.md'), 'utf8'), /model:/, "the agent's keys stay its own");
+  assert.doesNotMatch(fs.readFileSync(path.join(STORE, 'mine', 'make.md'), 'utf8'), /model:/, "the agent's keys stay its own");
   const stale = await send('PUT', `${W}/mine`, { metadata: { resourceVersion: read.metadata.resourceVersion + 'x' }, spec: { steps } });
   assert.equal(stale.status, 409);
   const now = (await get<Obj>(`${W}/mine?origin=yours`)).body.metadata.resourceVersion;
-  const cycle = steps.map((s) => (s.name === 'plan' ? { ...s, keys: { ...s.keys, after: ['build'] } } : s));
+  const cycle = steps.map((s) => (s.name === 'plan' ? { ...s, keys: { ...s.keys, after: ['make'] } } : s));
   const refused = await send('PUT', `${W}/mine`, { metadata: { resourceVersion: now }, spec: { steps: cycle } });
   assert.equal(refused.status, 422);
-  assert.deepEqual(refused.body.steps, ['build', 'plan']);
+  assert.deepEqual(refused.body.steps, ['make', 'plan']);
 });
 
 test('a workflow of yours made with its first step (201), then removed at the version read', async () => {
@@ -159,8 +159,8 @@ test('an agent of yours made (201), tried (201), and its removal refused while a
   const tried = await send('POST', '/api/namespaces/default/agents/tess/try', { brief: 'Test the cache.' });
   assert.equal(tried.status, 201, JSON.stringify(tried.body));
   assert.equal(typeof tried.body.id, 'string');
-  const ada = (await get<Obj>('/api/namespaces/default/agents/ada?origin=yours')).body;
-  const kept = await send('DELETE', `/api/namespaces/default/agents/ada?resourceVersion=${ada.metadata.resourceVersion}`);
+  const implementer = (await get<Obj>('/api/namespaces/default/agents/implementer?origin=yours')).body;
+  const kept = await send('DELETE', `/api/namespaces/default/agents/implementer?resourceVersion=${implementer.metadata.resourceVersion}`);
   assert.equal(kept.status, 409, JSON.stringify(kept.body));
   assert.ok(Array.isArray(kept.body.users));
   const repos = (await get<List>('/api/namespaces/default/agents?origin=repo')).body;
@@ -190,9 +190,9 @@ test('each write is refused 403 for another site and 415 for a body that is not 
     ['PUT', `${W}/mine`],
     ['DELETE', `${W}/mine`],
     ['POST', '/api/namespaces/default/agents'],
-    ['PUT', '/api/namespaces/default/agents/ada'],
-    ['DELETE', '/api/namespaces/default/agents/ada'],
-    ['POST', '/api/namespaces/default/agents/ada/try'],
+    ['PUT', '/api/namespaces/default/agents/implementer'],
+    ['DELETE', '/api/namespaces/default/agents/implementer'],
+    ['POST', '/api/namespaces/default/agents/implementer/try'],
     ['POST', '/api/namespaces/default/skills'],
     ['PUT', '/api/namespaces/default/skills/x'],
     ['POST', '/api/namespaces/default/skills/x/copy'],
@@ -236,12 +236,12 @@ test('each retired path answers 404', async () => {
     ['PUT', '/api/workflows/yours/mine'],
     ['DELETE', '/api/workflows/yours/mine'],
     ['GET', '/api/agents'],
-    ['GET', '/api/agents/yours/ada'],
-    ['PUT', '/api/agents/yours/ada'],
-    ['DELETE', '/api/agents/yours/ada'],
+    ['GET', '/api/agents/yours/implementer'],
+    ['PUT', '/api/agents/yours/implementer'],
+    ['DELETE', '/api/agents/yours/implementer'],
     ['POST', '/api/agents/yours'],
-    ['GET', '/api/agents/yours/ada/card'],
-    ['POST', '/api/agents/yours/ada/try'],
+    ['GET', '/api/agents/yours/implementer/card'],
+    ['POST', '/api/agents/yours/implementer/try'],
     ['GET', '/api/skills'],
     ['GET', '/api/skills/yours/x'],
     ['PUT', '/api/skills/yours/x'],

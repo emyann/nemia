@@ -20,15 +20,15 @@ const step = {
 const workflow = {
   apiVersion: API_VERSION,
   kind: 'Workflow',
-  metadata: { name: 'build', namespace: 'mill', creationTimestamp: '2026-11-05T00:00:00.000Z', resourceVersion: 'sha256:1' },
+  metadata: { name: 'dev', namespace: 'acme', creationTimestamp: '2026-11-05T00:00:00.000Z', resourceVersion: 'sha256:1' },
   spec: { description: 'An intent to main.', readme: null, steps: [{ name: 'design', keys: { agent: 'architect' }, body: '' }] },
   status: {
     origin: 'factory',
     revision: 3,
-    dir: '/store/factories/mill/tree/workflows/build',
+    dir: '/store/factories/acme/tree/workflows/dev',
     graph: {
       roots: ['triage'],
-      edges: [{ from: 'triage', to: 'design', kind: 'route', route: 'build' }],
+      edges: [{ from: 'triage', to: 'design', kind: 'route', route: 'dev' }],
       nodes: [
         { name: 'triage', kind: 'condition', ends: ['drop'] },
         { name: 'design', kind: 'step' },

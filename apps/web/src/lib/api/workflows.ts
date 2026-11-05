@@ -18,6 +18,8 @@ import {
   type AgentSkill,
   type KeyRow,
   type SchemaFile,
+  StepKeySchema,
+  WorkflowStepSpecSchema,
   type StepKey,
   type WorkflowStepSpec,
 } from './library.ts';
@@ -83,73 +85,14 @@ export type WorkflowListing = {
   unfilled: string | null;
 };
 
-/** Every key a step may set, unset: what a key the object leaves out reads as. */
-const UNSET_SPEC: Readonly<WorkflowStepSpec> = {
-  harness: null,
-  model: null,
-  effort: null,
-  context: null,
-  after: [],
-  resume: null,
-  input: [],
-  place: null,
-  workspace: null,
-  writable: [],
-  reads: [],
-  slot: null,
-  agent: null,
-  skills: [],
-  mcp: [],
-  permissionMode: null,
-  sandbox: null,
-  tools: null,
-  disallowedTools: [],
-  allowedTools: [],
-  denials: null,
-  remote: null,
-  deadlineSeconds: null,
-  budget: null,
-  check: null,
-  retries: null,
-  gate: null,
-  output: null,
-  tally: [],
-  loop: null,
-  rounds: null,
-  routes: null,
-  route: null,
-  when: null,
-  ends: null,
-  workflow: null,
-};
-
 /** Whether `key` is a key a step may set. */
-const isStepKey = (key: string): key is StepKey => Object.hasOwn(UNSET_SPEC, key);
+const isStepKey = (key: string): key is StepKey => (StepKeySchema.literals as readonly string[]).includes(key);
 
 /** A list copied, as the board's plain types hold one: mutable. */
 const copied = <T>(list: readonly T[]): T[] => [...list];
 
-/** A list copied, or null for none. */
-const copiedOrNull = <T>(list: readonly T[] | null | undefined): T[] | null => (list ? [...list] : null);
-
-/** A step's keys as the object has them, every one: a key it leaves out unset, each list copied. */
-const specOf = (keys: WorkflowStepStatus['spec']): WorkflowStepSpec => ({
-  ...UNSET_SPEC,
-  ...keys,
-  after: copied(keys.after ?? []),
-  input: copied(keys.input ?? []),
-  writable: copied(keys.writable ?? []),
-  reads: copied(keys.reads ?? []),
-  skills: copied(keys.skills ?? []),
-  mcp: copied(keys.mcp ?? []),
-  tools: copiedOrNull(keys.tools),
-  disallowedTools: copied(keys.disallowedTools ?? []),
-  allowedTools: copied(keys.allowedTools ?? []),
-  tally: copied(keys.tally ?? []),
-  routes: copiedOrNull(keys.routes),
-  when: copiedOrNull(keys.when),
-  ends: copiedOrNull(keys.ends),
-});
+/** A step's keys as the object has them, decoded as the board's every key: a key the api left out refused, one it does not know dropped. */
+const specOf = (keys: WorkflowStepStatus['spec']): WorkflowStepSpec => Schema.decodeUnknownSync(WorkflowStepSpecSchema)(keys);
 
 /** A step of a Workflow's status, as the board reads it. */
 const stepOf = (step: WorkflowStepStatus): ListedStep => ({
@@ -206,7 +149,8 @@ const isSet = (key: string, value: unknown): boolean =>
  */
 export const writtenStepOf = (step: StepWritten): WorkflowStep => {
   const entries = Object.entries(step.spec) as Array<[StepKey, unknown]>;
-  const kept = step.own === null ? entries.filter(([key, value]) => isSet(key, value)) : entries.filter(([key]) => step.own?.keys.includes(key));
+  const kept =
+    step.own === null ? entries.filter(([key, value]) => isSet(key, value)) : entries.filter(([key]) => step.own?.keys.includes(key));
   return { name: step.name, keys: Object.fromEntries(kept), body: step.own === null ? step.body : step.own.body };
 };
 

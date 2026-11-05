@@ -81,6 +81,9 @@ export type SkillPlace = { from: SkillSource; dir: string; skills: SkillRow[] };
 /** What a copy answers: the skill as it now reads in your library, and its files by their path in it. */
 export type SkillAdded = { skill: SkillRow; written: string[] };
 
+/** The repository's own skills folder, the one its sessions are given, which the skills page lists first of the repository's. */
+export const repoSkillsDir = (repo: string): string => path.join(path.resolve(repo), '.claude', SKILLS_FOLDER);
+
 /** Nemia's builtin skills: the orchestrator package's `skills/`, none while the package has no such folder. */
 export { BUILTIN_SKILLS };
 
@@ -119,11 +122,7 @@ export function sourceOf(dir: string, repo: string, home: string): SkillSource |
   const parent = path.dirname(path.resolve(dir));
   if (parent === librarySkills(home)) return 'yours';
   if (parent === BUILTIN_SKILLS) return 'builtin';
-  if (
-    parent === path.join(path.resolve(repo), '.claude', SKILLS_FOLDER) ||
-    parent === path.join(path.resolve(repo), 'workflows', SKILLS_FOLDER)
-  )
-    return 'repo';
+  if (parent === repoSkillsDir(repo) || parent === path.join(path.resolve(repo), 'workflows', SKILLS_FOLDER)) return 'repo';
   return null;
 }
 
@@ -198,7 +197,7 @@ export async function listSkills(
   const agents = yourAgentsSkills(yoursRead.agents);
   const usedBy = (name: string) => agents.filter(([, skills]) => skills.includes(name)).map(([agent]) => agent);
   const yours: SkillPlace = { from: 'yours', dir: librarySkills(home), skills: [] };
-  const inRepo: SkillPlace = { from: 'repo', dir: path.join(path.resolve(repo), '.claude', SKILLS_FOLDER), skills: [] };
+  const inRepo: SkillPlace = { from: 'repo', dir: repoSkillsDir(repo), skills: [] };
   const places: SkillPlace[] = [yours, inRepo];
   const sorted = [...found.all]
     .filter(([, at]) => typeof at !== 'string' || !(isBuiltinPlace(at) || sourceOf(at, repo, home) === 'builtin'))
@@ -333,7 +332,7 @@ export function skillDirOf(from: SkillSource, name: string, repo: string, home: 
       ? [librarySkills(home)]
       : from === 'builtin'
         ? [builtin]
-        : [path.join(path.resolve(repo), '.claude', SKILLS_FOLDER), path.join(path.resolve(repo), 'workflows', SKILLS_FOLDER)];
+        : [repoSkillsDir(repo), path.join(path.resolve(repo), 'workflows', SKILLS_FOLDER)];
   return skillDirIn(places, name);
 }
 
@@ -401,11 +400,7 @@ export async function skillDetail(
     body = text.trim();
   }
   const copyHint =
-    from === 'yours'
-      ? skillCopyCommand(dir, path.join(path.resolve(repo), '.claude', SKILLS_FOLDER))
-      : from === 'repo'
-        ? skillCopyCommand(dir, librarySkills(home))
-        : null;
+    from === 'yours' ? skillCopyCommand(dir, repoSkillsDir(repo)) : from === 'repo' ? skillCopyCommand(dir, librarySkills(home)) : null;
   return { skill, version: version ?? '', draft, body, users, copyHint };
 }
 

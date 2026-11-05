@@ -1,8 +1,8 @@
 /**
  * The skills group's handlers (`objects`' `Api`): a namespace's skills as objects, each place read itself so a name two places hold is
  * served once, first origin wins, and `?origin=` reads each: the factory's tree (`<tree>/workflows/skills`), the repository
- * (`.claude/skills`, then `workflows/skills`), yours (`librarySkills`) and Nemia's builtin (`BUILTIN_SKILLS`). Its spec is the SKILL.md as
- * a draft (`skillDraftOf`), or its body alone where it does not read as one (`status.error` says why).
+ * (its own skills folder, `repoSkillsDir`, then `workflows/skills`), yours (`librarySkills`) and Nemia's builtin (`BUILTIN_SKILLS`).
+ * Its spec is the SKILL.md as a draft (`skillDraftOf`), or its body alone where it does not read as one (`status.error` says why).
  *
  * Writes are yours, in `default` alone (`writeGoes`), through `skills write`: made, written whole or its `preload:` alone at the
  * `metadata.resourceVersion` it was read at, and a builtin one copied to yours (`copy`). `files` lists a skill's files by their path in it.
@@ -19,6 +19,7 @@ import {
   listSkills,
   readAt,
   readsOf,
+  repoSkillsDir,
   skillDraftFrom,
   skillUsers,
   written,
@@ -50,7 +51,7 @@ async function heldIn(s: Served): Promise<Held<Row>[]> {
   const dirs = names.map((name) => path.join(tree ?? '', name));
   const reads = dirs.length ? await readsOf(s.e, s.placeService, dirs, s.home) : {};
   const places = await listSkills(s.e, s.placeService, s.repo, s.home, await s.inRequest(yourSkillsRead(s.repo, s.home)));
-  const theirs = path.join(path.resolve(s.repo), '.claude', SKILLS_FOLDER);
+  const theirs = repoSkillsDir(s.repo);
   const listedRepo = new Set(places.flatMap((p) => (p.from === 'repo' ? p.skills.map((row) => row.name) : [])));
   const folded = skillFoldersIn(theirs)
     .filter((name) => !listedRepo.has(name))
@@ -94,7 +95,7 @@ function objectsOf(s: Served, namespace: string, served: ReturnType<typeof serve
         const usedBy = yield* skillUsers(dir, name, s.repo, s.home);
         const copyHint =
           origin === 'yours'
-            ? skillCopyCommand(dir, path.join(path.resolve(s.repo), '.claude', SKILLS_FOLDER))
+            ? skillCopyCommand(dir, repoSkillsDir(s.repo))
             : origin === 'repo'
               ? skillCopyCommand(dir, librarySkills(s.home))
               : null;

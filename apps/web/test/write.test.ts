@@ -116,7 +116,7 @@ test("send: a write sent as JSON, its answer decoded, and a refusal of the api's
 });
 
 const agentDraft: AgentDraft = {
-  name: 'ada',
+  name: 'implementer',
   role: null,
   description: null,
   skills: null,
@@ -277,7 +277,7 @@ test("each family of writes: its answer decoded, an answer unread refused with w
       );
       assert.ok(err.message.includes('The agent may be written'), err.message);
       assert.deepEqual(JSON.parse(String(sent[0]?.init?.body)), {
-        metadata: { name: 'ada' },
+        metadata: { name: 'implementer' },
         spec: {
           role: null,
           description: null,
@@ -289,23 +289,23 @@ test("each family of writes: its answer decoded, an answer unread refused with w
         },
       });
 
-      const removing = answering(t, { error: 'build/implement still names ada.', users: ['build/implement'] }, 409);
-      const named = await rejection(removeAgent('ada', 'v1'));
+      const removing = answering(t, { error: 'build/implement still names implementer.', users: ['build/implement'] }, 409);
+      const named = await rejection(removeAgent('implementer', 'v1'));
       assert.ok(named instanceof AgentRefusal, String(named));
-      assert.deepEqual([named.message, named.users, named.status], ['build/implement still names ada.', ['build/implement'], 409]);
+      assert.deepEqual([named.message, named.users, named.status], ['build/implement still names implementer.', ['build/implement'], 409]);
       assert.deepEqual(
         [removing[0]?.init?.method, removing[0]?.url],
-        ['DELETE', '/api/namespaces/default/agents/ada?resourceVersion=v1'],
+        ['DELETE', '/api/namespaces/default/agents/implementer?resourceVersion=v1'],
         'the version it was read at is its query',
       );
       answering(t, { error: 'another site' }, 403);
-      const cross = await rejection(tryAgent('ada', 'brief'));
+      const cross = await rejection(tryAgent('implementer', 'brief'));
       assert.ok(cross instanceof AgentRefusal, String(cross));
       assert.deepEqual([cross.users, cross.status], [[], 403]);
       answering(t, { removed: 'all' });
       await assert.rejects(
-        removeAgent('ada', 'v1'),
-        (e: unknown) => e instanceof UnreadAnswer && e.route === 'DELETE /api/namespaces/default/agents/ada',
+        removeAgent('implementer', 'v1'),
+        (e: unknown) => e instanceof UnreadAnswer && e.route === 'DELETE /api/namespaces/default/agents/implementer',
       );
     },
   );

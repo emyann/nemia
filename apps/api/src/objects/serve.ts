@@ -12,7 +12,9 @@
  * what its route takes, and a path it serves nothing on (404) says where the paths it serves are listed. Its own refusals, already
  * `{ error }`, pass as they are.
  *
- * The factories and their parts are handed on by `partsRoutes` (factory-parts/parts.ts), which says each of their writes as the guard does.
+ * The factories and their parts are handed on by `partsRoutes` (factory-parts/parts.ts), which says each of their writes as the guard does;
+ * the Workflows, Agents and Skills by `definitionsRoutes` (definitions/routes.ts), each request placed in the factory its namespace names
+ * and on the repository its `?repo=` names (`placeFor`), so `default` is the api's repository and your library.
  *
  * `GET /api/runs/:runId` with `?raw=` (not `false`) or `?view=` is passed on to the runs' own route (runs/runs.ts), which answers both.
  */
@@ -33,6 +35,8 @@ import {
   schedulesHandlers,
   volumesHandlers,
 } from '../factory-parts/index.ts';
+import { agentsHandlers, definitionsRoutes, skillsHandlers, workflowsHandlers } from '../definitions/index.ts';
+import { placeFor } from '../factories/place.ts';
 import { ServedNow } from './refused.ts';
 import { runsHandlers } from './runs.ts';
 
@@ -88,6 +92,9 @@ export const objectsHandler = (runtime: ApiRuntime) => {
         schedulesHandlers,
         hiresHandlers,
         volumesHandlers,
+        workflowsHandlers,
+        agentsHandlers,
+        skillsHandlers,
       ]),
       Layer.provide(HttpServer.layerServices),
     ),
@@ -181,7 +188,22 @@ export function objectsRoutes(runtime: ApiRuntime): Hono<ApiEnv> {
     return refused ? c.json({ error: refused.error }, refused.status) : handed(c, guard.shape);
   };
   const at = (c: RequestContext<ApiEnv>) => [c.req.param('namespace') ?? '', c.req.param('name') ?? ''] as const;
-  return partsRoutes(new Hono<ApiEnv>(), { forward, listed, guarded })
+  const placed = (c: RequestContext<ApiEnv>, takes: string) =>
+    served(c, (s) => {
+      const place = placeFor({ factory: c.req.param('namespace'), repo: c.req.query('repo') }, s.env, s.running);
+      return handler(c.req.raw, Context.make(ServedNow, { ...s, repo: place.repo, factory: place.factory }), takes);
+    });
+  const placedGuarded = (write: (c: RequestContext<ApiEnv>) => Guarded) => (c: RequestContext<ApiEnv>) => {
+    const guard = write(c);
+    const refused = refusedBeforeReading(guard, c.req.header('host'), c.req.header('sec-fetch-site'), c.req.header('content-type'));
+    return refused ? c.json({ error: refused.error }, refused.status) : placed(c, guard.shape);
+  };
+  const definitions = definitionsRoutes(new Hono<ApiEnv>(), {
+    forward: (c) => placed(c, ONE_TAKES),
+    listed: (c) => placed(c, LIST_TAKES),
+    guarded: placedGuarded,
+  });
+  return partsRoutes(new Hono<ApiEnv>().route('/', definitions), { forward, listed, guarded })
     .get('/api/runs/:runId', (c, next) => (notTheObject(c) ? next() : forward(c)))
     .get('/api/runs/:runId/steps/:step/tries', forward)
     .get('/api/runs/:runId/steps/:step/tries/:try', forward)

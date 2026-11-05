@@ -9,18 +9,15 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Effect, Layer } from 'effect';
 import { scratch } from './scratch.ts';
-import type { WorkflowListing } from '../src/workflows/workflows.ts';
+import { listedIn } from './definitions.ts';
 import { app, appOf, liveOf, runtime } from '../src/app.ts';
 import { ReadMemo } from '../src/layer.ts';
 import { Engine, StoreRoot } from '../src/store.ts';
 import { engine, Informer } from 'agent-orchestrator';
 
-/** The names of the workflows `GET /api/workflows` lists as yours, through `on`. */
-const yoursOn = async (on: typeof app): Promise<string[]> => {
-  const res = await on.request('/api/workflows');
-  assert.equal(res.status, 200);
-  return ((await res.json()) as WorkflowListing[]).filter((w) => w.from === 'yours').map((w) => w.name);
-};
+/** The names of the workflows `GET /api/namespaces/default/workflows?origin=yours` lists as yours, through `on`. */
+const yoursOn = async (on: typeof app): Promise<string[]> =>
+  (await listedIn<{ from: string; name: string }>(on, 'workflows', 'origin=yours')).filter((w) => w.from === 'yours').map((w) => w.name);
 
 test("appOf: a mounted router reads the engine and the store's root of the app it was asked through, and an app keeps its reads of its own", async (t) => {
   await t.test("a mounted router's route reads the engine of the app it was asked through", async () => {

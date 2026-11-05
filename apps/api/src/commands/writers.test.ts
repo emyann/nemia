@@ -15,7 +15,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from '../../test/scratch.ts';
 import { TEAM } from '../../test/team.ts';
-import { COMMANDS, workflowTaken } from 'agent-orchestrator';
+import { addFactory, COMMANDS, workflowTaken } from 'agent-orchestrator';
+import type { Workflow } from 'objects';
 import { app } from '../app.ts';
 
 type Command = (typeof COMMANDS)[number];
@@ -56,6 +57,12 @@ async function watched(
   }
 }
 
+/**
+ * The keys the objects' handlers hand an entry beside its spec's (definitions/): those only the api ever handed, which left the specs when
+ * the routes that took them retired (`OBJECTS_HAND` in the orchestrator's writers-cli.test.ts).
+ */
+const OBJECTS_HAND = new Set(['draft', 'schema', 'repo', 'change', 'copy', 'builtin', 'readme', 'files']);
+
 /** The body `res` answered, its status `status`, and each call of `name`'s handler handed only keys its spec gives a handler. */
 async function heldToSpec(
   t: TestContext,
@@ -70,28 +77,33 @@ async function heldToSpec(
   const keys = handlerKeys(COMMANDS.find((c) => c.name === name)!);
   for (const args of handed)
     assert.deepEqual(
-      Object.keys(args).filter((key) => !keys.has(key)),
+      Object.keys(args).filter((key) => !keys.has(key) && !OBJECTS_HAND.has(key)),
       [],
       `${name}'s route hands its handler only keys its spec gives one`,
     );
   return body;
 }
 
-const versionOf = (body: Record<string, unknown>, key: string): string => (body[key] as { version: string }).version;
+const versionOf = (body: Record<string, unknown>): string => (body.metadata as { resourceVersion: string }).resourceVersion;
+const D = '/api/namespaces/default';
 
 test("each writer's route hands its handler only the keys its one spec gives a handler, and is answered as it is", async (t) => {
   const scribe = {
-    name: 'scribe',
     description: 'Use this when a change needs its notes written.',
     keys: { model: 'sonnet' },
-    body: 'Write it.',
+    instructions: 'Write it.',
   };
-  const made = await heldToSpec(t, 'agents write', 201, () => sent('POST', '/api/agents/yours', scribe));
+  const made = await heldToSpec(t, 'agents write', 201, () => sent('POST', `${D}/agents`, { metadata: { name: 'scribe' }, spec: scribe }));
   const put = await heldToSpec(t, 'agents write', 200, () =>
-    sent('PUT', '/api/agents/yours/scribe', { ...scribe, body: 'Write the notes.', version: versionOf(made, 'agent') }),
+    sent('PUT', `${D}/agents/scribe`, {
+      metadata: { resourceVersion: versionOf(made) },
+      spec: { ...scribe, instructions: 'Write the notes.' },
+    }),
   );
-  await heldToSpec(t, 'agents run', 201, () => sent('POST', '/api/agents/yours/scribe/try', { brief: 'Write the notes.' }));
-  await heldToSpec(t, 'agents rm', 200, () => sent('DELETE', '/api/agents/yours/scribe', { version: versionOf(put, 'agent') }));
+  await heldToSpec(t, 'agents run', 201, () => sent('POST', `${D}/agents/scribe/try`, { brief: 'Write the notes.' }));
+  await heldToSpec(t, 'agents rm', 200, () =>
+    app.request(`${D}/agents/scribe?resourceVersion=${versionOf(put)}`, { method: 'DELETE', headers: json }),
+  );
   const elsewhere = scratch('nemia-api-writers-copy-');
   fs.writeFileSync(path.join(elsewhere, 'clerk.md'), '---\ndescription: Use this when notes need filing.\n---\nFile them.\n');
   await heldToSpec(t, 'agents copy', 200, () =>
@@ -99,31 +111,29 @@ test("each writer's route hands its handler only the keys its one spec gives a h
   );
 
   const skill = {
-    name: 'tidy-notes',
     title: 'Tidy notes',
     description: 'Rewrites notes.',
     tags: ['notes'],
     examples: ['tidy my notes'],
     body: 'Tidy.',
   };
-  await heldToSpec(t, 'skills write', 201, () => sent('POST', '/api/skills/yours', { skill }));
-  const page = (await (await app.request('/api/skills/yours/tidy-notes')).json()) as { version: string };
+  const made2 = await heldToSpec(t, 'skills write', 201, () =>
+    sent('POST', `${D}/skills`, { metadata: { name: 'tidy-notes' }, spec: skill }),
+  );
   await heldToSpec(t, 'skills write', 200, () =>
-    sent('PUT', '/api/skills/yours/tidy-notes', { skill: { ...skill, body: 'Tidy them.' }, version: page.version }),
+    sent('PUT', `${D}/skills/tidy-notes`, { metadata: { resourceVersion: versionOf(made2) }, spec: { ...skill, body: 'Tidy them.' } }),
   );
 
-  const listed = (await (await app.request('/api/workflows')).json()) as Array<{
-    name: string;
-    from: string;
-    steps: unknown[];
-    version: string;
-  }>;
-  const dev = listed.find((w) => w.name === 'dev' && w.from === 'yours')!;
-  await heldToSpec(t, 'workflows write', 201, () => sent('POST', '/api/workflows/yours', { name: 'dev-2', step: dev.steps[0] }));
-  const changed = await heldToSpec(t, 'workflows write', 200, () =>
-    sent('PUT', '/api/workflows/yours/dev', { steps: dev.steps, version: dev.version }),
+  const dev = (await (await app.request(`${D}/workflows/dev?origin=yours`)).json()) as Workflow;
+  await heldToSpec(t, 'workflows write', 201, () =>
+    sent('POST', `${D}/workflows`, { metadata: { name: 'dev-2' }, spec: { steps: [dev.spec.steps[0]] } }),
   );
-  await heldToSpec(t, 'workflows rm', 200, () => sent('DELETE', '/api/workflows/yours/dev', { version: versionOf(changed, 'workflow') }));
+  const changed = await heldToSpec(t, 'workflows write', 200, () =>
+    sent('PUT', `${D}/workflows/dev`, { metadata: { resourceVersion: dev.metadata.resourceVersion }, spec: { steps: dev.spec.steps } }),
+  );
+  await heldToSpec(t, 'workflows rm', 200, () =>
+    app.request(`${D}/workflows/dev?resourceVersion=${versionOf(changed)}`, { method: 'DELETE', headers: json }),
+  );
 });
 
 test("a name yours has taken, a workflow or a file, is refused in workflowTaken's one sentence by the board's POST and by nemia", async () => {
@@ -131,19 +141,13 @@ test("a name yours has taken, a workflow or a file, is refused in workflowTaken'
   fs.writeFileSync(path.join(STORE, 'TAKEN.txt'), 'not a workflow\n');
   const draft = path.join(scratch('nemia-api-taken-'), 'taken');
   fs.cpSync(path.join(TEAM, 'dev'), draft, { recursive: true });
-  const listed = (await (await app.request('/api/workflows')).json()) as Array<{
-    name: string;
-    from: string;
-    steps: unknown[];
-    version: string;
-  }>;
-  const taken = listed.find((w) => w.name === 'taken' && w.from === 'yours')!;
+  const taken = (await (await app.request(`${D}/workflows/taken?origin=yours`)).json()) as Workflow;
   const nemia = path.join(import.meta.dirname, '../../../../packages/agent-orchestrator/bin/nemia.ts');
   for (const [name, version] of [
-    ['taken', taken.version],
+    ['taken', taken.metadata.resourceVersion],
     ['TAKEN.txt', null],
   ] as const) {
-    const res = await sent('POST', '/api/workflows/yours', { name, step: taken.steps[0] });
+    const res = await sent('POST', `${D}/workflows`, { metadata: { name }, spec: { steps: [taken.spec.steps[0]] } });
     const board = ((await res.json()) as { error: string }).error;
     assert.equal(res.status, 409, board);
     const typed = spawnSync(process.execPath, [nemia, 'workflows', 'write', 'yours', name, '--folder', draft], {
@@ -156,20 +160,19 @@ test("a name yours has taken, a workflow or a file, is refused in workflowTaken'
   }
 });
 
-test("REFUSED on the api: a writer's place `factory`, a factory's tree, which the command line alone writes, is 400 before any handler", async (t) => {
-  const skill = { name: 'tidy', description: 'Use this when notes need tidying.', body: 'Tidy them.' };
+test("REFUSED on the api: a write in a factory's namespace, whose own definitions the command line alone writes, is 422 the factory's way before any handler", async (t) => {
+  addFactory({ name: 'writers', repos: [process.env.HKB_REPO ?? root] });
+  const skill = { description: 'Use this when notes need tidying.', body: 'Tidy them.' };
+  const F = '/api/namespaces/writers';
   for (const [name, method, url, body] of [
-    ['agents write', 'POST', '/api/agents/factory', { name: 'scribe', body: 'Write it.' }],
-    ['agents write', 'PUT', '/api/agents/factory/scribe', { body: 'Write it.', version: 'v' }],
-    ['skills write', 'POST', '/api/skills/factory', { skill }],
-    ['skills write', 'PUT', '/api/skills/factory/tidy', { skill, version: 'v' }],
-    ['workflows write', 'POST', '/api/workflows/factory', { name: 'dev-3' }],
-    ['workflows write', 'PUT', '/api/workflows/factory/dev', { steps: [], version: 'v' }],
+    ['agents write', 'POST', `${F}/agents`, { metadata: { name: 'scribe' }, spec: { instructions: 'Write it.' } }],
+    ['skills write', 'POST', `${F}/skills`, { metadata: { name: 'tidy' }, spec: skill }],
+    ['workflows write', 'POST', `${F}/workflows`, { metadata: { name: 'dev-3' }, spec: { steps: [] } }],
   ] as const) {
     const { res, handed } = await watched(t, name, () => sent(method, url, body));
-    const { error } = (await res.json()) as { error: string };
-    assert.equal(res.status, 400, error);
-    assert.match(error, new RegExp(`^${method} ${url}: .*yours.*named "factory"`), `${method} ${url} says the board writes yours`);
+    const { error, way } = (await res.json()) as { error: string; way?: string };
+    assert.equal(res.status, 422, error);
+    assert.equal(way, 'factory', `${method} ${url} says the factory's way`);
     assert.equal(handed.length, 0, `${method} ${url} reaches no handler of ${name}`);
   }
 });

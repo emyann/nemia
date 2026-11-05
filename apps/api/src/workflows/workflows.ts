@@ -720,11 +720,6 @@ async function cardStarted(
  *   of a workflow or a card, is refused, `Invalid` (`defaultStartRefusal`): the default factory holds history, and no start names it.
  */
 export const workflows = new Hono<ApiEnv>()
-  .get('/api/workflows', (c) =>
-    served(c, async ({ e, placeService, repo, home, factory, inRequest }) =>
-      c.json(await listWorkflows(e, placeService, repo, home, inRequest, factory)),
-    ),
-  )
   .get('/api/repository', (c) => served(c, ({ repo }) => c.json({ repo })))
   .post('/api/runs', (c) =>
     served(c, async ({ e, placeService, repo, home, factory }) => {

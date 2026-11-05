@@ -17,7 +17,8 @@ import { Effect, Layer } from 'effect';
 import { AgentDoor, type AgentDoorShape } from 'agent-orchestrator';
 import { agentDoorMemory } from 'agent-orchestrator/testing';
 import { app, appOf, liveOf } from '../app.ts';
-import { DEFAULT_HARNESS, putSchemasBack, stepsNamed } from './builder.ts';
+import { DEFAULT_HARNESS, isRoleKey, putSchemasBack, stepsNamed } from './builder.ts';
+import { asWorkflowListing, listedIn } from '../../test/definitions.ts';
 import { StoreRoot, workflowVersion as versionIn } from 'agent-orchestrator';
 import { listWorkflows } from './workflows.ts';
 import { engine, builtinGitPlace, HARNESS_CHOICES, loadWorkflows, workflowTaken, writeWorkflow } from 'agent-orchestrator';
@@ -115,7 +116,7 @@ write(path.join(theirs, 'implement.md'), '---\nplace: git\nmodel: opus\n---\nImp
 
 /** A workflow's steps as GET /api/workflows lists them. */
 async function listedSteps(name: string, from = 'yours'): Promise<ListedStep[]> {
-  const all = (await (await app.request('/api/workflows')).json()) as Array<{ name: string; from: string; steps: ListedStep[] }>;
+  const all = await listedIn<{ name: string; from: string; steps: ListedStep[] }>(app, 'workflows', `origin=${from}`);
   const found = all.find((w) => w.name === name && w.from === from);
   assert.ok(found, `${from} lists ${name}`);
   return found.steps;
@@ -131,14 +132,49 @@ const put = (name: string, body: unknown, from = 'yours', headers: Record<string
     typeof body === 'object' && body !== null && !Array.isArray(body) && !('version' in body)
       ? { version: versionOf(path.join(STORE, decodeURIComponent(name))), ...body }
       : body;
-  return app.request(`/api/workflows/${from}/${name}`, {
-    method: 'PUT',
-    headers,
-    body: typeof read === 'string' ? read : JSON.stringify(read),
-  });
+  return sentTo('PUT', `/api/namespaces/default/workflows/${name}`, read, headers);
 };
-const post = (body: unknown, from = 'yours', headers: Record<string, string> = json) =>
-  app.request(`/api/workflows/${from}`, { method: 'POST', headers, body: typeof body === 'string' ? body : JSON.stringify(body) });
+const post = (body: unknown, _from = 'yours', headers: Record<string, string> = json) =>
+  sentTo('POST', '/api/namespaces/default/workflows', body, headers);
+
+type SentStep = { name?: unknown; spec?: Record<string, unknown>; body?: unknown; own?: { keys: string[]; body: string } | null };
+
+/** A step as the listing has it, as the object's spec writes it: the keys its file sets (its own, where an agent gives the rest). */
+const writtenOf = ({ name, spec: keys = {}, body, own }: SentStep) => {
+  const mine = keys.agent != null && own ? own : null;
+  const set = Object.entries(keys).filter(
+    ([key, value]) =>
+      value !== null &&
+      value !== undefined &&
+      !(Array.isArray(value) && value.length === 0) &&
+      (!mine || !isRoleKey(key) || mine.keys.includes(key)),
+  );
+  return { name, keys: Object.fromEntries(set), body: mine ? mine.body : body };
+};
+
+/**
+ * A save this story wrote for the routes the Workflow object replaced (`POST /api/workflows/yours`, `PUT /api/workflows/yours/<name>`),
+ * sent to the object's path in `default` (definitions/workflows.ts): its steps as the spec writes them (`writtenOf`), its `version` as
+ * `metadata.resourceVersion`, its `name` as `metadata.name`. A Workflow answered is read as `{ workflow }`, the listing; a refusal as is.
+ */
+async function sentTo(method: 'POST' | 'PUT', url: string, body: unknown, headers: Record<string, string>): Promise<Response> {
+  const asked = (typeof body === 'object' && body !== null && !Array.isArray(body) ? body : null) as Record<string, unknown> | null;
+  let sent = typeof body === 'string' ? body : JSON.stringify(body);
+  if (asked) {
+    const { name, version, step, steps, readme, schemas, from: _from, ...rest } = asked;
+    const all = step !== undefined ? [step] : steps;
+    const written = Array.isArray(all) ? all.map((s) => (typeof s === 'object' && s !== null ? writtenOf(s as SentStep) : s)) : all;
+    sent = JSON.stringify({
+      ...rest,
+      metadata: { ...(name !== undefined && { name }), ...(version !== undefined && { resourceVersion: version }) },
+      spec: { steps: written, ...(readme !== undefined && { readme }) },
+      ...(schemas !== undefined && { schemas }),
+    });
+  }
+  const res = await app.request(url, { method, headers, body: sent });
+  if (!res.ok) return res;
+  return new Response(JSON.stringify({ workflow: asWorkflowListing((await res.json()) as never) }), { status: res.status, headers: json });
+}
 
 /** A spec with every key unset but `fields` and the `place: git` every step says, as the listing has one. */
 const spec = (fields: Partial<WorkflowStepSpec> = {}): WorkflowStepSpec => ({
@@ -402,7 +438,6 @@ test('a person builds a workflow of theirs on the board: the form, a new folder,
         'README.md': '# fresh\n\nA plan.\n',
         'plan.md': '---\nplace: git\nharness: codex\ncheck: test -f PLAN.md\n---\nWrite PLAN.md.\n',
       });
-      assert.deepEqual(saved.written, ['README.md', 'plan.md']);
       assert.deepEqual(
         saved.workflow,
         (await listWorkflows(engine(), builtinGitPlace, repo, root, inRoot)).find((w) => w.name === 'fresh'),
@@ -444,7 +479,6 @@ test('a person builds a workflow of theirs on the board: the form, a new folder,
       const res = await put('as-listed', { steps });
       assert.equal(res.status, 200, await res.clone().text());
       const saved = (await res.json()) as WorkflowSaved;
-      assert.deepEqual([saved.written, saved.kept, saved.removed], [[], ['implement.md', 'review.md', 'ship.md'], []]);
       assert.deepEqual(snapshot(dir), before, 'byte for byte');
       assert.deepEqual(
         saved.workflow,
@@ -474,7 +508,6 @@ test('a person builds a workflow of theirs on the board: the form, a new folder,
       });
       assert.equal(res.status, 200, await res.clone().text());
       const saved = (await res.json()) as WorkflowSaved;
-      assert.deepEqual([saved.written, saved.kept, saved.removed], [['README.md', 'build.md', 'review.md'], ['plan.md'], []]);
       assert.equal(
         fs.readFileSync(path.join(dir, 'plan.md'), 'utf8'),
         '---\nplace: git\n# Plans first.\nharness: claude\n---\nWrite PLAN.md.\n',
@@ -546,7 +579,8 @@ test('a person builds a workflow of theirs on the board: the form, a new folder,
       const gone = await put('drawn', { steps: [plan, { name: 'build', spec: { place: 'git', check: 'npm test' }, body: 'Build it.' }] });
       assert.equal(gone.status, 200, await gone.clone().text());
       const after = (await gone.json()) as WorkflowSaved;
-      assert.deepEqual([after.written, after.removed], [['build.md'], ['review.md']], 'a step gone takes its file');
+      assert.equal(after.workflow.steps.length, 2);
+      assert.equal(fs.existsSync(path.join(STORE, 'drawn', 'review.md')), false, 'a step gone takes its file');
       assert.equal(
         fs.readFileSync(path.join(dir, 'build.md'), 'utf8'),
         '---\nplace: git\ncheck: npm test\n---\nBuild it.\n',
@@ -571,7 +605,7 @@ test('a person builds a workflow of theirs on the board: the form, a new folder,
       });
       assert.equal(res.status, 200, await res.clone().text());
       const saved = (await res.json()) as WorkflowSaved;
-      assert.deepEqual([saved.written, saved.kept, saved.removed], [['build.md', 'plan.md', 'plan.schema.json'], [], []]);
+      assert.ok(saved.workflow.schemas.includes('plan.schema.json'));
       assert.equal(fs.readFileSync(path.join(dir, 'plan.schema.json'), 'utf8'), `${risks}\n`, 'written ending in a line break');
       assert.deepEqual(
         saved.workflow.steps.map((s) => [s.name, s.spec.output, s.spec.input]),
@@ -593,7 +627,7 @@ test('a person builds a workflow of theirs on the board: the form, a new folder,
       const wider = risks.replace('"risks"', '"notes"').replace('"risks"', '"notes"');
       const replaced = await put('schemed', { steps, schemas: [{ file: 'plan.schema.json', text: wider }] });
       assert.equal(replaced.status, 200, await replaced.clone().text());
-      assert.deepEqual(((await replaced.json()) as WorkflowSaved).written, ['plan.schema.json'], 'another text replaces the file');
+      assert.equal(replaced.status, 200, 'another text replaces the file');
       assert.equal(fs.readFileSync(path.join(dir, 'plan.schema.json'), 'utf8'), `${wider}\n`);
     },
   );
@@ -638,11 +672,6 @@ test('a step with an agent on the board: listed resolved, with its layers and se
 
       let res = await put('with-agent', { steps: [build] });
       assert.equal(res.status, 200, await res.clone().text());
-      assert.deepEqual(
-        ((await res.json()) as WorkflowSaved).kept,
-        ['build.md'],
-        "as listed, nothing is written: the agent's keys and words stay in its file",
-      );
 
       const edited = {
         ...build,
@@ -1510,9 +1539,8 @@ test('PUT /api/workflows/yours/:name: a save the package refuses, or of a folder
         assert.notEqual(now, read, `${what}: the folder's version moves`);
         const res = await put('edited', draft);
         assert.equal(res.status, 409, `${what}: ${await res.clone().text()}`);
-        const { error, steps } = (await res.json()) as BuildRefused;
+        const { error } = (await res.json()) as BuildRefused;
         tells(error, `${dir} has changed since it was read at version ${read}`, [`(it is at version ${now})`, 'Nothing was written.']);
-        assert.deepEqual(steps, []);
         assert.deepEqual(snapshot(dir), edited, `${what}: the hand edit is kept, and nothing else written`);
         undo();
         assert.equal(versionOf(dir), read, `${what}: undone, the folder is at the version it was read at again`);

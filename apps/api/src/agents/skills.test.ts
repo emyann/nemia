@@ -25,6 +25,7 @@ import { app, appOf, liveOf } from '../app.ts';
 import { foundInOf, listSkills, BUILTIN_SKILLS, skillDetail, yourSkillsRead } from './skills.ts';
 import { StoreRoot } from '../store.ts';
 import { TEAM } from '../../test/team.ts';
+import { asAgentListing } from '../../test/definitions.ts';
 const repo = scratch('nemia-api-skills-repo-');
 process.env.HKB_REPO = repo;
 execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: repo });
@@ -74,8 +75,59 @@ fs.writeFileSync(path.join(root, 'workflows', 'agents', 'clerk.md'), '---\ndescr
 fs.writeFileSync(path.join(root, 'workflows', 'agents', 'broken.md'), '---\nskills: shared\ncheck: npm test\n---\nNope.\n');
 
 const json = { 'content-type': 'application/json' };
-const send = (url: string, body: unknown, headers: Record<string, string> = json) =>
-  app.request(url, { method: 'POST', headers, body: typeof body === 'string' ? body : JSON.stringify(body) });
+type SkillObject = {
+  metadata: { name: string; resourceVersion: string };
+  spec: Record<string, unknown> & { body: string };
+  status: Record<string, unknown> & { origin: string; dir: string; usedBy: Array<{ from: string; name: string }> };
+};
+
+/** A Skill as the row the retired `GET /api/skills` listed it as: its users of yours by name. */
+const rowOfObject = ({ metadata: { name }, status: o }: SkillObject): SkillRow =>
+  ({
+    name,
+    from: o.origin,
+    dir: o.dir,
+    entry: o.entry,
+    error: o.error,
+    preload: o.preload,
+    cost: o.cost,
+    usedBy: o.usedBy.filter((u) => u.from === 'yours').map((u) => u.name),
+    found: o.found,
+  }) as SkillRow;
+
+/** A Skill as the page the retired `GET /api/skills/<from>/<name>` answered: its row, version, draft, body, users and copy. */
+const detailOfObject = (o: SkillObject) => {
+  const { body, ...lines } = o.spec;
+  const draft = Object.keys(lines).length || o.status.error === null ? { name: o.metadata.name, ...lines, body } : null;
+  return { skill: rowOfObject(o), version: o.metadata.resourceVersion, draft, body, users: o.status.usedBy, copyHint: o.status.copyHint };
+};
+
+/**
+ * A write this story wrote for the routes the Skill object replaced, sent to the object's path in `default` (definitions/skills.ts): a
+ * `copy` of a builtin as its `/copy`, a `skill` as the spec named in `metadata`, a `preload` alone as itself, a `version` as
+ * `metadata.resourceVersion`. A Skill answered is read as the page the story asserts on; a refusal as it is.
+ */
+async function sentTo(method: 'POST' | 'PUT', url: string, body: unknown, headers: Record<string, string>): Promise<Response> {
+  const [, name] = /^\/api\/skills\/[^/]+(?:\/([^/]+))?$/.exec(url) ?? [];
+  const D = '/api/namespaces/default/skills';
+  const asked = (typeof body === 'object' && body !== null && !Array.isArray(body) ? body : null) as Record<string, unknown> | null;
+  let at = method === 'PUT' ? `${D}/${name}` : D;
+  let sent: string | undefined = typeof body === 'string' ? body : JSON.stringify(body);
+  if (asked) {
+    const { copy, skill, version, preload, ...rest } = asked;
+    if (method === 'POST' && typeof copy === 'string' && skill === undefined)
+      [at, sent] = [`${D}/${encodeURIComponent(copy)}/copy`, undefined];
+    else {
+      const { name: named, ...spec } = (typeof skill === 'object' && skill !== null ? skill : {}) as Record<string, unknown>;
+      const metadata = { ...(named !== undefined && { name: named }), ...(version !== undefined && { resourceVersion: version }) };
+      sent = JSON.stringify({ ...rest, metadata, ...(skill !== undefined && { spec }), ...(preload !== undefined && { preload }) });
+    }
+  }
+  const res = await app.request(at, { method, headers, ...(sent !== undefined && { body: sent }) });
+  if (!res.ok) return res;
+  return new Response(JSON.stringify(detailOfObject((await res.json()) as SkillObject)), { status: res.status, headers: json });
+}
+const send = (url: string, body: unknown, headers: Record<string, string> = json) => sentTo('POST', url, body, headers);
 
 /** Every file of the library, by its path in it, with what it holds. */
 const snapshot = (): Record<string, string> =>
@@ -100,10 +152,16 @@ async function refused(res: Response | Promise<Response>, status: number, patter
   );
 }
 
-async function listed(): Promise<SkillPlace[]> {
-  const res = await app.request('/api/skills');
-  assert.equal(res.status, 200);
-  return (await res.json()) as SkillPlace[];
+/** The skills by place, as the retired `GET /api/skills` listed them: yours, the repository's, the builtin. */
+async function listed(on: { request: typeof app.request } = app): Promise<SkillPlace[]> {
+  const places: SkillPlace[] = [];
+  for (const from of ['yours', 'repo', 'builtin'] as const) {
+    const res = await on.request(`/api/namespaces/default/skills?origin=${from}`);
+    assert.equal(res.status, 200);
+    const items = ((await res.json()) as { items: SkillObject[] }).items;
+    places.push({ from, dir: items[0] ? path.dirname(items[0].status.dir) : '', skills: items.map(rowOfObject) });
+  }
+  return places;
 }
 
 const rowOf = (places: SkillPlace[], from: string, name: string): SkillRow | undefined =>
@@ -125,8 +183,8 @@ test("the skills are listed by place — yours, the repository's, then what is b
   );
   assert.deepEqual(
     places[1].skills.map((s) => s.name),
-    [inRepo, 'review', 'scratch'].sort(),
-    'the name in both is in yours alone',
+    [inRepo, 'review', 'scratch', 'shared'].sort(),
+    "the name in both is the repository's too, read at its origin: yours shadows it",
   );
   assert.deepEqual(
     places[2].skills.map((s) => s.name),
@@ -212,7 +270,7 @@ test('a repository skill linked inside the repository lists under repo, read, wi
     assert.match(apart.error ?? '', /^apart is a link, and what it points at is outside the folder of skills/);
     const refused = await skillDetail(engine(), builtinGitPlace, inRoot, 'repo', 'apart', repo, root);
     assert.equal(refused?.skill.entry, null);
-    const res = await app.request('/api/skills/repo/apart');
+    const res = await pageOf('repo', 'apart');
     assert.equal(res.status, 200, 'its page answers, and says the refusal');
     assert.equal(
       ((await res.json()) as import('./skills.ts').SkillDetail).skill.error,
@@ -239,40 +297,19 @@ test('a builtin skill says where an agent of yours already finds its name: in yo
   );
 });
 
-test("REFUSED at shipped defaults: a skill Nemia does not ship, a name that is not a skill's, and a body that names none", async () => {
-  await refused(
-    send('/api/skills/yours', { copy: 'no-such-skill' }),
-    404,
-    /has no skill named no-such-skill: a skill is a folder holding a SKILL\.md/,
-  );
-  await refused(
-    send('/api/skills/yours', { copy: toCopy }),
-    404,
-    new RegExp(`has no skill named ${toCopy}: a skill is a folder holding a SKILL\\.md`),
-  );
-  await refused(send('/api/skills/yours', { copy: '../agents' }), 422, /`\.\.\/agents` is not a skill's name/);
-  await refused(send('/api/skills/yours', { copy: 'Bad_Name' }), 422, /`Bad_Name` is not a skill's name/);
-  await refused(send('/api/skills/yours', { copy: 7 }), 400, /`copy` is the name of the builtin skill to copy, a string/);
-  await refused(send('/api/skills/yours', [toCopy]), 400, /takes a JSON object: .*`{ "copy"/);
-  await refused(send('/api/skills/yours', '{'), 400, /takes a JSON body/);
-});
-
-test("REFUSED at shipped defaults: a copy into the repository's skills, or anywhere but yours, and nothing is written into the checkout", async () => {
-  const theirs = fs.readdirSync(THEIRS).sort();
-  await refused(send('/api/skills/repo', { copy: toCopy }), 403, /^POST \/api\/skills\/repo refuses to write the repository's skills/);
-  await refused(
-    send('/api/skills/elsewhere', { copy: toCopy }),
-    400,
-    /the board writes a skill into your library, at \/api\/skills\/yours/,
-  );
-  assert.deepEqual(fs.readdirSync(THEIRS).sort(), theirs);
+test("REFUSED at shipped defaults: a skill Nemia does not ship, a name that is not a skill's, and a body that is none", async () => {
+  for (const name of ['no-such-skill', toCopy, '../agents', 'Bad_Name'])
+    await refused(send('/api/skills/yours', { copy: name }), 404, /^Nothing is at that name/);
+  await refused(send('/api/skills/yours', { copy: 7 }), 400, /does not read as its route takes it/);
+  await refused(send('/api/skills/yours', [toCopy]), 400, /does not read as its route takes it/);
+  await refused(send('/api/skills/yours', '{'), 400, /does not read as its route takes it/);
 });
 
 test('an agent is listed with each skill it gives, where it is found and what it costs, and one no place has with why', async () => {
   fs.writeFileSync(path.join(root, 'workflows', 'agents', 'lost.md'), '---\ndescription: Lost.\nskills: always, gone\n---\nLook.\n');
   try {
-    const res = await app.request('/api/agents/yours/scribe');
-    const scribe = (await res.json()) as import('./agents.ts').AgentListing;
+    const res = await app.request('/api/namespaces/default/agents/scribe?origin=yours');
+    const scribe = asAgentListing((await res.json()) as never) as unknown as import('./agents.ts').AgentListing;
     assert.deepEqual(
       scribe.given.map((g) => [g.name, g.from, g.entry?.description ?? g.error]),
       [
@@ -281,7 +318,9 @@ test('an agent is listed with each skill it gives, where it is found and what it
         ['review', 'repo', 'Reviews a change.'],
       ],
     );
-    const lost = (await (await app.request('/api/agents/yours/lost')).json()) as import('./agents.ts').AgentListing;
+    const lost = asAgentListing(
+      (await (await app.request('/api/namespaces/default/agents/lost?origin=yours')).json()) as never,
+    ) as unknown as import('./agents.ts').AgentListing;
     assert.equal(lost.given[0].preload, true);
     assert.equal(lost.given[0].cost!.perTurn, lost.given[0].cost!.listed + lost.given[0].cost!.body);
     assert.deepEqual([lost.given[1].from, lost.given[1].cost], [null, null]);
@@ -294,18 +333,25 @@ test('an agent is listed with each skill it gives, where it is found and what it
 type SkillDetail = import('./skills.ts').SkillDetail;
 type SkillSaved = import('./skills.ts').SkillSaved;
 
-const put = (url: string, body: unknown, headers: Record<string, string> = json) =>
-  app.request(url, { method: 'PUT', headers, body: typeof body === 'string' ? body : JSON.stringify(body) });
+const put = (url: string, body: unknown, headers: Record<string, string> = json) => sentTo('PUT', url, body, headers);
+
+/** A skill's page, read from the object at its origin. */
+async function pageOf(from: string, name: string): Promise<Response> {
+  const res = await app.request(`/api/namespaces/default/skills/${name}?origin=${from}`);
+  if (!res.ok) return res;
+  return new Response(JSON.stringify(detailOfObject((await res.json()) as SkillObject)), { status: res.status, headers: json });
+}
 
 async function detail(from: string, name: string): Promise<SkillDetail> {
-  const res = await app.request(`/api/skills/${from}/${name}`);
+  const res = await pageOf(from, name);
   const body = await res.json();
   assert.equal(res.status, 200, JSON.stringify(body));
   return body as SkillDetail;
 }
 
 const agentVersionOf = async (name: string): Promise<string> =>
-  ((await (await app.request(`/api/agents/yours/${name}`)).json()) as { version: string }).version;
+  ((await (await app.request(`/api/namespaces/default/agents/${name}?origin=yours`)).json()) as { metadata: { resourceVersion: string } })
+    .metadata.resourceVersion;
 
 const NOTES = {
   name: 'tidy-notes',
@@ -324,7 +370,9 @@ test('a skill named with its folder is listed on its agent as written, found, wi
     '---\ndescription: Sets type.\nskills: review, apps/site:lay-out, apps/site:no-such\n---\nSet.\n',
   );
   try {
-    const typer = (await (await app.request('/api/agents/yours/typer')).json()) as import('./agents.ts').AgentListing;
+    const typer = asAgentListing(
+      (await (await app.request('/api/namespaces/default/agents/typer?origin=yours')).json()) as never,
+    ) as unknown as import('./agents.ts').AgentListing;
     assert.deepEqual(
       typer.given.map((g) => [g.name, g.from, g.foundIn, g.entry?.description ?? null]),
       [
@@ -341,9 +389,9 @@ test('a skill named with its folder is listed on its agent as written, found, wi
       'the picker lists none of them',
     );
     for (const name of ['apps%2Fsite:lay-out', 'site:lay-out']) {
-      const res = await app.request(`/api/skills/repo/${name}`);
+      const res = await pageOf('repo', name);
       const body = (await res.json()) as { error: string };
-      assert.equal(res.status, 400, body.error);
+      assert.equal(res.status, 404, body.error);
     }
   } finally {
     fs.rmSync(path.join(root, 'workflows', 'agents', 'typer.md'));
@@ -430,29 +478,21 @@ test("a skill's page says what it says, what it costs a turn, the agents of eith
   } finally {
     fs.rmSync(path.join(repo, 'workflows', 'agents'), { recursive: true });
   }
-  assert.equal((await app.request('/api/skills/yours/no-such')).status, 404);
-  assert.equal((await app.request('/api/skills/yours/Bad_Name')).status, 400);
-  assert.equal((await app.request('/api/skills/elsewhere/mine')).status, 400);
+  assert.equal((await pageOf('yours', 'no-such')).status, 404);
+  assert.equal((await pageOf('yours', 'Bad_Name')).status, 404);
+  assert.equal((await pageOf('elsewhere', 'mine')).status, 422, 'an origin that is none of the four');
 });
 
-test("a builtin skill's page is at /api/skills/builtin/<name>, and its former address answers a permanent redirect there", async () => {
-  const former = await app.request('/api/skills/shipped/x');
-  assert.equal(former.status, 308, 'a link or bookmark naming the former address is sent on, its method kept');
-  assert.equal(former.headers.get('location'), '/api/skills/builtin/x');
-  assert.equal(
-    (await app.request('/api/skills/shipped/a%20b')).headers.get('location'),
-    '/api/skills/builtin/a%20b',
-    'the name is carried encoded',
-  );
-  assert.equal((await app.request('/api/skills/builtin/no-such')).status, 404, '`builtin` is a place a page is read from');
-  assert.equal((await app.request('/api/skills/nope/mine')).status, 400, 'a place that is none of the three is still refused');
+test("a builtin skill's page is its object at ?origin=builtin, and an origin none of the four is refused", async () => {
+  assert.equal((await pageOf('builtin', 'no-such')).status, 404, '`builtin` is an origin a page is read from');
+  assert.equal((await pageOf('nope', 'mine')).status, 422, 'an origin that is none of the four is refused');
 });
 
 test('a skill written on the board is made in your library, read back as its page reads it, and listed', async () => {
   const res = await send('/api/skills/yours', { skill: NOTES });
   const made = (await res.json()) as SkillSaved;
   assert.equal(res.status, 201, JSON.stringify(made));
-  assert.deepEqual(made.written, ['SKILL.md']);
+  assert.deepEqual(fs.readdirSync(path.join(LIBRARY, 'tidy-notes')), ['SKILL.md']);
   assert.deepEqual(made.draft, { ...NOTES, preload: false });
   assert.equal(made.skill.dir, path.join(LIBRARY, 'tidy-notes'));
   assert.deepEqual(made.skill.entry, {
@@ -515,80 +555,26 @@ test('REFUSED at shipped defaults: a change at a version the skill has moved on 
   const { version } = await detail('yours', 'always');
   fs.appendFileSync(path.join(LIBRARY, 'always', 'SKILL.md'), 'Edited by hand.\n');
   await refused(put('/api/skills/yours/always', { version, preload: false }), 409, /^skills\/always changed since it was read \(version /);
-  await refused(put('/api/skills/yours/gone', { version, preload: false }), 404, /^skills\/gone is not there: it was removed/);
+  await refused(put('/api/skills/yours/gone', { version, preload: false }), 404, /^Nothing is at that name/);
   const now = (await detail('yours', 'always')).version;
   await refused(
     put('/api/skills/yours/always', { version: now, skill: { ...NOTES, name: 'renamed' } }),
-    400,
-    /the skill is named always, and this request's is "renamed"/,
+    422,
+    /a skill's name is its folder/,
   );
   await refused(
     put('/api/skills/yours/always', { version: now, skill: { ...NOTES, name: 'always', examples: [] } }),
     422,
     /`examples` is an empty list/,
   );
-  await refused(
-    put('/api/skills/yours/always', { version: now }),
-    400,
-    /takes one of `skill` .* and `preload` .* and this request sent neither/,
-  );
-  await refused(put('/api/skills/yours/always', { version: now, preload: true, skill: NOTES }), 400, /this request sent both/);
-  await refused(put('/api/skills/yours/always', { preload: true }), 400, /takes the `version` the skill was read at/);
-  await refused(put('/api/skills/yours/always', { version: now, preload: 'yes' }), 400, /`preload` is true or false/);
-  await refused(
-    send('/api/skills/yours', { copy: toCopy, skill: NOTES }),
-    400,
-    /takes one of `copy` .* and `skill` .* and this request sent both/,
-  );
+  await refused(put('/api/skills/yours/always', { version: now }), 400, /does not read as its route takes it/);
+  await refused(put('/api/skills/yours/always', { preload: true }), 422, /takes the resourceVersion the Skill was read at/);
+  await refused(put('/api/skills/yours/always', { version: now, preload: 'yes' }), 400, /does not read as its route takes it/);
   await refused(
     send('/api/skills/yours', { skill: { ...NOTES, name: 'fresh', tags: 'notes' } }),
     400,
-    /`tags` is a list of lines of text, or null/,
+    /does not read as its route takes it/,
   );
-  await refused(send('/api/skills/yours', { skill: { ...NOTES, name: 'fresh', color: 'red' } }), 400, /`color` is no key of a skill's/);
-});
-
-test("REFUSED at shipped defaults: each key of a skill sent as the wrong type is a 400 in the api's words, word for word, a key no skill has only once the rest are read — and a body sending both or neither is refused as such before either is read", async () => {
-  const route = 'POST /api/skills/yours';
-  const shape =
-    '`{ "copy": "<the name of a builtin skill>" }`, or `{ "skill": { "name": "<a-name>", "title": "<a title, or null>", "description": "<what it does, one line>", "tags": ["<a word>"] or null, "examples": ["<what a person would ask>"] or null, "preload": true or false, "body": "<its instructions>" } }`';
-  const fresh = { ...NOTES, name: 'fresh' };
-  for (const [skill, said] of [
-    [null, "`skill` is the skill, an object, and this request's was null"],
-    ['notes', '`skill` is the skill, an object, and this request\'s was "notes"'],
-    [{ ...fresh, name: 3 }, "`name` is the skill's name, its folder, a string, and this request's was 3"],
-    [{ ...fresh, name: 3, color: 'red' }, "`name` is the skill's name, its folder, a string, and this request's was 3"],
-    [{ ...fresh, title: 3 }, '`title` is a line of text, or null'],
-    [{ ...fresh, description: ['one'] }, '`description` is a line of text, or null'],
-    [{ ...fresh, tags: [1] }, '`tags` is a list of lines of text, or null'],
-    [{ ...fresh, examples: 'ask' }, '`examples` is a list of lines of text, or null'],
-    [{ ...fresh, preload: 'yes' }, '`preload` is true or false'],
-    [{ ...fresh, preload: null }, '`preload` is true or false'],
-    [{ ...fresh, body: 7 }, "`body` is the skill's instructions, a string, and this request's was 7"],
-    [{ ...fresh, color: 'red', size: 2 }, "`color` and `size` are no key of a skill's"],
-  ] as const) {
-    const res = await send('/api/skills/yours', { skill });
-    const { error } = (await res.json()) as { error: string };
-    assert.equal(res.status, 400, JSON.stringify(skill));
-    assert.equal(error, `${route}: ${said}. Send ${shape}.`);
-  }
-  await refused(send('/api/skills/yours', null), 400, /^POST \/api\/skills\/yours takes a JSON object: /);
-  await refused(send('/api/skills/yours', { copy: 3, skill: fresh }), 400, /this request sent both/);
-  await refused(send('/api/skills/yours', { skill: 'notes', copy: 3 }), 400, /this request sent both/);
-  const { version } = await detail('yours', 'always');
-  await refused(
-    put('/api/skills/yours/always', { version: 7, preload: true, skill: fresh }),
-    400,
-    /takes the `version` the skill was read at/,
-  );
-  await refused(put('/api/skills/yours/always', { version, preload: 'yes', skill: 3 }), 400, /this request sent both/);
-  await refused(
-    put('/api/skills/yours/always', { version, skill: { ...NOTES, name: 'always', tags: [1] } }),
-    400,
-    /`tags` is a list of lines/,
-  );
-  await refused(put('/api/skills/yours/always', { version: ' ', preload: true }), 409, /^skills\/always changed since it was read/);
-  assert.equal(fs.existsSync(path.join(LIBRARY, 'fresh')), false);
 });
 
 test("a skill's copy command, run as the page gives it, puts the folder under its name where the skills folder is not there yet, in a checkout whose path has a space and a quote", async () => {
@@ -606,19 +592,11 @@ test("a skill's copy command, run as the page gives it, puts the folder under it
   assert.deepEqual(fs.readdirSync(path.join(into, 'mine')), ['SKILL.md'], 'copied again, it lands on the same folder, not inside it');
 });
 
-test("REFUSED at shipped defaults: a write of the repository's skills, naming the copy to make by hand", async () => {
+test("REFUSED at shipped defaults: a write of the repository's skills, its own words saying to copy it to yours", async () => {
   const theirs = snapshotOf(THEIRS);
-  await refused(
-    send('/api/skills/repo', { skill: NOTES }),
-    403,
-    /^POST \/api\/skills\/repo refuses to write the repository's skills .* `mkdir -p '.*' && cp -r '.*\/<name>' '/,
-  );
-  const hint = `\`mkdir -p '${THEIRS}' && cp -r '${path.join(LIBRARY, 'review')}' '${THEIRS}/'\``;
   const res = await put('/api/skills/repo/review', { version: 'x', preload: true });
-  assert.equal(res.status, 403);
-  const { error } = (await res.json()) as { error: string };
-  assert.ok(error.startsWith("PUT /api/skills/repo/review refuses to write the repository's skills ") && error.includes(hint), error);
-  await refused(put('/api/skills/shipped/review', { version: 'x', preload: true }), 400, /the board changes a skill of your library/);
+  assert.equal(res.status, 422);
+  assert.match(((await res.json()) as { error: string }).error, /copy the definition to yours/);
   assert.deepEqual(snapshotOf(THEIRS), theirs, 'nothing is written into the checkout');
 });
 
@@ -653,9 +631,9 @@ test("the picker finds a skill and the agents of yours that give it through the 
     }),
   );
   assert.equal(fs.existsSync(path.join(LIBRARY, kept)), false, 'the skill is held by the door, not on disk');
-  const res = await own.request('/api/skills');
+  const res = { status: 200, json: async () => listed(own) };
   assert.equal(res.status, 200);
-  const places = (await res.json()) as SkillPlace[];
+  const places = await res.json();
   assert.deepEqual(
     places.find((p) => p.from === 'yours')?.skills.map((s) => [s.name, s.usedBy]),
     [[kept, [agent]]],

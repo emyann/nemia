@@ -294,6 +294,11 @@ test('receipt passes on the landing the merge made: merged, a merge commit, the 
   assert.equal(asked(r.calls, 'pr', 'merge').length, merges, 'the receipt merges nothing of its own');
   assert.equal(waited(r.calls, `commits/${w.merged}`).length, 1, 'it read the CI of the merge commit');
   assert.ok(r.out.includes(`\`ci\` passed on \`main\` at ${w.merged.slice(0, 12)}`), r.out);
+  assert.deepEqual(
+    r.calls.filter((call) => call.argv.some((word) => word.includes('commits/main') || word.includes('/compare/'))),
+    [],
+    "a merge green on its own reads neither the base's tip nor a comparison",
+  );
 });
 
 test('REFUSED: a verb the script has not, and a merge with no subject, no body file, or a body file that is missing or empty', () => {
@@ -859,6 +864,83 @@ test("a receipt red at the merge passes where the base's tip holds it and is gre
   const unread = land(w, 'receipt', receiptArgs());
   assert.equal(unread.code, 1, `a tip that cannot be read is the red refusal: ${unread.out}`);
   assert.match(unread.err, /merge stands/);
+});
+
+test("a receipt whose merge's own ci was cancelled or never reported reads the base's tip that holds it: green passes, saying which and why", () => {
+  const TIP = 'e'.repeat(40);
+  const later = (w: World, atMerge: Record<string, unknown>[], compared: string, ...atTip: Record<string, unknown>[]): Rule[] =>
+    landedWith(
+      w,
+      ...ciAt(w.merged, atMerge),
+      tipIs(TIP),
+      { when: `compare/${w.merged}...${TIP}`, out: JSON.stringify({ status: compared }) },
+      ...ciAt(TIP, atTip),
+    );
+  const w = afterMerge();
+  w.gh.answers(later(w, [checkRun('ci', 'cancelled')], 'ahead', checkRun('ci', 'success')));
+  const cancelled = land(w, 'receipt', receiptArgs(), { WF_CI_POLL_SECONDS: '0' });
+  assert.equal(cancelled.code, 0, cancelled.err);
+  assert.ok(cancelled.out.includes(w.merged.slice(0, 12)) && cancelled.out.includes(TIP.slice(0, 12)), cancelled.out);
+  assert.match(cancelled.out, /cancel/);
+  assert.doesNotMatch(cancelled.out, /red on/);
+
+  w.gh.answers(later(w, [], 'ahead', checkRun('ci', 'success')));
+  const unreported = land(w, 'receipt', receiptArgs(), { WF_CI_START_SECONDS: '0', WF_CI_POLL_SECONDS: '0' });
+  assert.equal(unreported.code, 0, unreported.err);
+  assert.ok(unreported.out.includes(TIP.slice(0, 12)), unreported.out);
+  assert.match(unreported.out, /not reported/);
+
+  w.gh.answers(
+    later(w, [checkRun('ci', 'cancelled')], 'ahead', checkRun('ci', 'failure', 'completed', 'https://github.com/o/r/actions/runs/3/job/4')),
+  );
+  const red = land(w, 'receipt', receiptArgs(), NO_WAIT);
+  assert.equal(red.code, 1, red.out);
+  assert.ok(red.err.includes(TIP.slice(0, 12)), `naming the later commit:\n${red.err}`);
+  assert.match(red.err, /red/);
+  assert.ok(red.err.includes('ci: FAILURE https://github.com/o/r/actions/runs/3/job/4'), red.err);
+  assert.match(red.err, /merge stands/);
+  assert.ok(red.err.includes(RETRY), red.err);
+
+  for (const [why, compared, atTip] of [
+    ['cancelled at the tip too', 'ahead', checkRun('ci', 'cancelled')],
+    ['a tip that does not hold the merge', 'diverged', checkRun('ci', 'success')],
+  ] as const) {
+    w.gh.answers(later(w, [checkRun('ci', 'cancelled')], compared, atTip));
+    const r = land(w, 'receipt', receiptArgs(), NO_WAIT);
+    assert.equal(r.code, 1, `${why}: ${r.out}`);
+    assert.doesNotMatch(r.err, /turned the base branch red/, why);
+    assert.ok(!r.err.includes(`red on \`main\` at ${TIP.slice(0, 12)}`), why);
+    assert.match(r.err, /merge stands/, why);
+  }
+});
+
+test("a receipt whose merge's own ci was cancelled waits for a later commit that holds it, and refuses as today at the bound where none comes", () => {
+  const TIP = 'e'.repeat(40);
+  const w = afterMerge();
+  w.gh.answers(
+    landedWith(
+      w,
+      ...ciAt(w.merged, [checkRun('ci', 'cancelled')]),
+      { when: 'commits/main', outs: [JSON.stringify({ sha: w.merged }), JSON.stringify({ sha: TIP })] },
+      { when: `compare/${w.merged}...${TIP}`, out: JSON.stringify({ status: 'ahead' }) },
+      ...ciAt(TIP, [checkRun('ci', 'success')]),
+    ),
+  );
+  const before = waited(w.gh.calls(), `commits/${w.merged}`).length;
+  const waits = land(w, 'receipt', receiptArgs(), { WF_CI_POLL_SECONDS: '0' });
+  assert.equal(waits.code, 0, waits.err);
+  assert.ok(
+    waited(waits.calls, `commits/${w.merged}`).length - before >= 2,
+    'it read the merge commit again while no later commit held it',
+  );
+
+  w.gh.answers(landedWith(w, ...ciAt(w.merged, [checkRun('ci', 'cancelled')]), tipIs(w.merged)));
+  const none = land(w, 'receipt', receiptArgs(), NO_WAIT);
+  assert.equal(none.code, 1, none.out);
+  assert.match(none.err, /cancel/);
+  assert.doesNotMatch(none.err, /turned the base branch red/);
+  assert.match(none.err, /merge stands/);
+  assert.ok(none.err.includes(RETRY), none.err);
 });
 
 test('a receipt told not to wait on ci reads no check, saying so by landingWaitsOnCi; a --wait-on-ci of neither, or none, is refused before gh', () => {

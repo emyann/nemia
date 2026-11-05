@@ -1,4 +1,15 @@
-import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
+import {
+  createContext,
+  createElement,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  type Dispatch,
+  type ReactNode,
+  type SetStateAction,
+} from 'react';
 import {
   answerChat,
   chatStreamPath,
@@ -13,16 +24,10 @@ import {
 import { changedChat, followChat, mergeChatEvents, unreadChat, type ChatFollowed } from './chatFollowing.ts';
 import { forgetKept, keepUnsent, readKept, sendingOnce, editKept as writeKept, type ChatKept } from './chatOutbox.ts';
 import { animationFrames } from './follow.ts';
+import { browserSharing, sharedStream, type Sharing } from './sharedStream.ts';
 
 /** How long the board waits before it reads her chat again, or tries a kept message again, after one that did not work. */
 export const CHAT_RETRY_MS = 3_000;
-
-/**
- * How long a page whose panel is closed waits before it reads her chat again. It follows no stream there: a browser holds six
- * connections to one address, the frame's feed holds one of them on every page, and a second stream a person's few open pages would
- * spend them all, leaving the board's own reads queued. The panel open, the stream is followed and this read is not made.
- */
-export const CHAT_BEAT_MS = 5_000;
 
 /** The person's words, drawn as their own at once, under the id her chat gives the outbox entry, which the stream replaces by. */
 const personEvent = (entry: ChatSent): ChatEvent => ({
@@ -51,16 +56,27 @@ export type NemiaChat = {
   markRead: (through: string) => void;
 };
 
-/** What the read and the stream write into: the state they change, the try they ask for again, and whether the stream is followed. */
-export type Reader = { setState: Dispatch<SetStateAction<ChatFollowed>>; tryAgain: () => void; follow: boolean };
+/** What the read and the stream write into: the state they change, and the try they ask for again. */
+export type Reader = { setState: Dispatch<SetStateAction<ChatFollowed>>; tryAgain: () => void };
+
+/** The name the board's tabs share her chat's one stream under (`sharedStream`): its Web Lock and its channel. */
+export const CHAT_SHARED = 'nemia-chat-stream';
 
 /**
  * Reads her chat once and follows it from the cursor it answered, and asks for another try after `CHAT_RETRY_MS` where the read did not
- * work. A read that did not work is the end: it fills `error` and clears the `retrying` notice an earlier stream may have left, as
- * `follow`'s end does. Returns what stops it: the read abandoned, the retry dropped, the stream closed.
+ * work. Every read that works follows her, the panel open or closed: her docked face reads her presence from it. The stream is shared by
+ * the board's tabs (`sharedStream`): one tab holds it and hands it to the others, so a person's open tabs spend one connection on her
+ * between them, beside each tab's feed. A read that did not work is the end: it fills `error` and clears the `retrying` notice an
+ * earlier stream may have left, as `follow`'s end does. Returns what stops it: the read abandoned, the retry dropped, the stream closed.
  */
-export function reading({ setState, tryAgain, follow }: Reader): () => void {
+export function reading({ setState, tryAgain }: Reader, sharing: Sharing | undefined = browserSharing()): () => void {
   const read = new AbortController();
+  const shared = sharedStream(
+    CHAT_SHARED,
+    (after) => `${chatStreamPath}?after=${encodeURIComponent(after)}`,
+    (url) => new EventSource(url),
+    sharing,
+  );
   let stop: (() => void) | undefined;
   let again: ReturnType<typeof setTimeout> | undefined;
   readChat({}, read.signal).then(
@@ -73,15 +89,11 @@ export function reading({ setState, tryAgain, follow }: Reader): () => void {
         cursor: first.cursor,
         live: true,
       }));
-      if (!follow) {
-        again = setTimeout(tryAgain, CHAT_BEAT_MS);
-        return;
-      }
-      const stream = new EventSource(`${chatStreamPath}?after=${encodeURIComponent(first.cursor)}`);
-      stop = followChat(stream, setState, animationFrames);
+      stop = followChat(shared.from(first.cursor), setState, animationFrames);
     },
     (err: unknown) => {
       if (read.signal.aborted) return;
+      shared.close();
       setState((s) => ({ ...s, loading: false, live: false, error: err instanceof Error ? err.message : String(err), retrying: null }));
       again = setTimeout(tryAgain, CHAT_RETRY_MS);
     },
@@ -89,20 +101,19 @@ export function reading({ setState, tryAgain, follow }: Reader): () => void {
   return () => {
     read.abort();
     if (again !== undefined) clearTimeout(again);
-    stop?.();
+    if (stop) stop();
+    else shared.close();
   };
 }
 
 /**
- * Nemia's chat, read once and then followed for as long as the page lives.
+ * Nemia's chat, read once and then followed for as long as the page is open: held by `NemiaChatProvider` over the frame, not by a
+ * route, so navigating keeps the one stream, and her docked face and the chat page read the same state from it.
  *
  * The read gives her history, the cursor a stream resumes from and where she is; an `EventSource` on the stream route follows it from
  * that cursor, as `followChat` says, and leaves a dropped connection to the EventSource, which reconnects with the id of the last event
  * it was sent. A read that did not work is said and made again after `CHAT_RETRY_MS`, so a daemon that comes back is followed without a
  * reload.
- *
- * `follow` is the panel being there to read her as she writes: false, which her docked face asks for while its panel is closed, reads
- * her again every `CHAT_BEAT_MS` instead and holds no stream open, since the browser has few connections to spend (`CHAT_BEAT_MS`).
  *
  * What the person writes goes to her outbox (`sendChat`), and is drawn as their own bubble at once under the id her chat gives it, which
  * the stream replaces by (`mergeChatEvents`). One the api would not take is kept in this browser (`lib/chatOutbox.ts`), survives a
@@ -119,13 +130,13 @@ export function reading({ setState, tryAgain, follow }: Reader): () => void {
  * on her chat as the keeper's quiet marker, which the stream brings down with the rest, and a refusal — her turn over by the time it
  * reached the api — is what her presence says a beat later.
  */
-export function useNemiaChat(follow = true): NemiaChat {
+function useHeldChat(): NemiaChat {
   const [state, setState] = useState<ChatFollowed>(() => unreadChat(true));
   const [kept, setKept] = useState<ChatKept | null>(() => readKept());
   const [attempt, setAttempt] = useState(0);
   const marked = useRef<string | null>(null);
 
-  useEffect(() => reading({ setState, tryAgain: () => setAttempt((n) => n + 1), follow }), [attempt, follow]);
+  useEffect(() => reading({ setState, tryAgain: () => setAttempt((n) => n + 1) }), [attempt]);
 
   const took = useCallback((entry: ChatSent) => {
     forgetKept();
@@ -196,4 +207,22 @@ export function useNemiaChat(follow = true): NemiaChat {
   }, []);
 
   return { state, kept, send, answer, stop, sendKept, editKept: edit, discardKept: discard, markRead };
+}
+
+const HeldChat = createContext<NemiaChat | null>(null);
+
+/**
+ * Holds her chat, its read and its one stream, for as long as it is mounted: the frame mounts it once over every page
+ * (`routes/__root.tsx`), so the page's visit holds one stream of hers beside the feed's, whatever route it is on.
+ */
+export function NemiaChatProvider({ children }: { children?: ReactNode }) {
+  return createElement(HeldChat.Provider, { value: useHeldChat() }, children);
+}
+
+/** Her chat as the frame's `NemiaChatProvider` holds it; a component drawn outside one is refused. */
+export function useNemiaChat(): NemiaChat {
+  const chat = useContext(HeldChat);
+  if (chat === null)
+    throw new Error('useNemiaChat reads her chat from NemiaChatProvider: draw this component under it (routes/__root.tsx).');
+  return chat;
 }

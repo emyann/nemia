@@ -11,19 +11,13 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { Context, Layer, Schema } from 'effect';
+import { Layer, Schema } from 'effect';
 import { testEngine } from 'agent-runtime/testing';
-import { testPlace } from 'agent-orchestrator/testing';
+import { BuiltinTemplates, testPlace } from 'agent-orchestrator/testing';
 import { TemplateRenders } from 'agent-orchestrator';
 import { Agent, AgentList, Skill, SkillList, Template, TemplateList, Workflow, WorkflowList } from 'objects';
 import { appOver, eachTest } from '../../test/placed.ts';
 import { scratch } from '../../test/scratch.ts';
-
-/**
- * The orchestrator's folder of builtin templates (`BuiltinTemplates`), named by its key: the package's entries do not export it, and a
- * service is found by its key, so a layer of this one gives the app's programs the scratch folder.
- */
-const BuiltinFolder = Context.Reference<string>('agent-orchestrator/BuiltinTemplates', { defaultValue: () => '' });
 
 const write = (file: string, text: string): void => {
   fs.mkdirSync(path.dirname(file), { recursive: true });
@@ -76,6 +70,7 @@ function template(folder: string, name: string, parameters?: string): void {
       'spec:',
       '  role: Drafter',
       '  description: Drafts a page.',
+      '  skills: [inking]',
       '  harness: claude',
       '',
     ].join('\n'),
@@ -92,7 +87,7 @@ template(folder, 'asks', '    budget:\n      type: number\n      description: do
 const stand = eachTest(testPlace);
 const standIn = eachTest(testEngine);
 const renders = scratch('nemia-api-renders-');
-const app = eachTest(() => appOver(standIn(), stand(), Layer.succeed(BuiltinFolder)(folder), Layer.succeed(TemplateRenders)(renders)));
+const app = eachTest(() => appOver(standIn(), stand(), Layer.succeed(BuiltinTemplates)(folder), Layer.succeed(TemplateRenders)(renders)));
 
 /** The api's answer to a GET of `url`: its status and its body. */
 async function get(url: string): Promise<{ status: number; body: unknown }> {
@@ -156,6 +151,8 @@ test("a template's agents are served as Agents read from its render", async () =
   const drafter = Schema.decodeUnknownSync(Agent)(one.body);
   outsideNamespaces(drafter);
   assert.equal(drafter.spec.role, 'Drafter');
+  const inking = drafter.status.given.find((g) => g.name === 'inking');
+  assert.ok(inking?.from !== null && inking?.from !== undefined, "the agent's skill is found in the template's own render");
   assert.ok(drafter.status.file.startsWith(renders), 'read from the render, under the folder of renders');
 });
 

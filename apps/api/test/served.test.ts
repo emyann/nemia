@@ -17,7 +17,29 @@ import { app } from '../src/app.ts';
 const DEFINITION =
   "served by the objects' handler from `objects`' Api (definitions/): a namespace's Workflows, Agents and Skills as its factory resolves them, which the table's entries they replace say `only`";
 
+/** Why a template's path is the api's own. */
+const TEMPLATE =
+  "served by the objects' handler from `objects`' Api (src/objects/templates.ts): the builtin templates and their documents as objects, which no command reads";
+
+/** Why a subscription's read is the api's own. */
+const SUBSCRIPTION =
+  "served by the objects' handler from `objects`' Api (src/objects/subscriptions.ts): a subscription read as an object, beside the subscribe and unsubscribe commands";
+
+/** Why an event's path is the api's own. */
+const EVENT =
+  "served by the objects' handler from `objects`' Api (src/objects/events.ts): the feed's lines as Events, a page of the feed `nemia watch` streams";
+
 const OWN: Readonly<Record<string, string>> = {
+  'GET /api/templates': TEMPLATE,
+  'GET /api/templates/:name': TEMPLATE,
+  'GET /api/templates/:name/:plural{workflows|agents|skills}': TEMPLATE,
+  'GET /api/templates/:name/:plural{workflows|agents|skills}/:doc': TEMPLATE,
+  'GET /api/subscriptions': SUBSCRIPTION,
+  'GET /api/subscriptions/:name': SUBSCRIPTION,
+  'GET /api/events': EVENT,
+  'GET /api/events/:name': EVENT,
+  'GET /api/namespaces/:namespace/events': EVENT,
+  'GET /api/namespaces/:namespace/events/:name': EVENT,
   'GET /api/health': 'the server answering at all, which no command of the orchestrator asks',
   'GET /api/cards': "the Card's verbs, served by the objects' handler from `objects`' Api (src/objects/cards.ts) over the inbox's entries",
   'GET /api/namespaces/:namespace/cards':

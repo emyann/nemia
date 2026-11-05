@@ -102,6 +102,9 @@ test('the document is the one Effect writes of the Api, and holds, for each of K
     Workflow: '/api/namespaces/{namespace}/workflows/{name}',
     Agent: '/api/namespaces/{namespace}/agents/{name}',
     Skill: '/api/namespaces/{namespace}/skills/{name}',
+    Template: '/api/templates/{name}',
+    Subscription: '/api/subscriptions/{name}',
+    Event: '/api/events/{name}',
   } as const;
   for (const kind of KINDS) {
     assert.ok(doc.paths[GET_PATHS[kind]]?.get, `${kind} is got at ${GET_PATHS[kind]}`);

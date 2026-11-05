@@ -97,7 +97,7 @@ const imported = (from: string, specifier: string): string | undefined => {
 
 /**
  * Every file under `root` (a folder, or a file taken as it is) that may hold a contract, by the rule tsverify's CLI applies to a
- * folder it is given (`contractFilesUnder` in its `cli.js`, 0.5.1): a TypeScript file that imports tsverify, or that imports, by a
+ * folder it is given (`contractFilesUnder` in its `cli.js`, 0.7.0): a TypeScript file that imports tsverify, or that imports, by a
  * relative path, a file that does. Absolute paths, sorted.
  */
 export const contractFilesUnder = (root: string): string[] => {

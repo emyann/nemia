@@ -52,14 +52,32 @@ const treeAgents = (s: Served) =>
     return read;
   });
 
-/** Every agent the namespace holds, at each origin, read now with its users and fills. */
+/**
+ * Every agent the namespace holds, at each origin, read now with its users and fills: the factory's tree's whether or not a step names
+ * them, since they are the factory's own; every other only where it fills a step there (`inFactory`).
+ */
 async function heldIn(s: Served): Promise<Held<LibraryAgent>[]> {
   const { agents } = (await runPlaced(s, s.e, AGENTS.handler({ repo: s.repo }, s.env, s.home))) as AgentsRead;
   const tree = await s.inRequest(treeAgents(s));
   const trees = new Set(tree.map((a) => a.file));
   const listings = await s.inRequest(Effect.forEach([...tree, ...agents], (one) => listingOf(one, s.repo, s.home)));
-  const library = inFactory(listings, stepsFilled(s.repo, s.home, s.factory), factoriesFilling(readFactories(), s.home), s.factory);
-  return library.map((item) => ({ name: item.name, origin: trees.has(item.file) ? 'factory' : item.from, item }));
+  const filled = stepsFilled(s.repo, s.home, s.factory);
+  const byFile = factoriesFilling(readFactories(), s.home);
+  const own = inFactory(
+    listings.filter((one) => trees.has(one.file)),
+    filled,
+    byFile,
+  );
+  const elsewhere = inFactory(
+    listings.filter((one) => !trees.has(one.file)),
+    filled,
+    byFile,
+    s.factory,
+  );
+  return [
+    ...own.map((item) => ({ name: item.name, origin: 'factory' as const, item })),
+    ...elsewhere.map((item) => ({ name: item.name, origin: item.from, item })),
+  ];
 }
 
 /** The object of one agent served, its revision read through the ledger. */

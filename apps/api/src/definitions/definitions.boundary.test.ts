@@ -36,6 +36,7 @@ addFactory({ name: 'treed', repos: [repo], template: { source: '/t/team', versio
 const tree = path.join(root, 'factories', 'treed', 'tree');
 write(path.join(tree, 'factory.json'), JSON.stringify({ workflows: ['make', 'shared'], hires: {} }));
 write(path.join(tree, 'workflows', 'make', 'implement.md'), '---\nplace: git\n---\nImplement it, as the tree says.\n');
+write(path.join(tree, 'workflows', 'agents', 'drafter.md'), '---\nharness: claude\n---\nYou draft, as the tree says.\n');
 
 const json = { 'content-type': 'application/json' };
 type Obj = {
@@ -93,6 +94,26 @@ test("in a factory, only its attached workflows; in one made from a template, it
   assert.equal(treed.shared?.status.origin, 'repo');
   const repos = (await get<Obj>('/api/namespaces/treed/workflows/make?origin=repo')).body;
   assert.deepEqual([repos.status.origin, repos.status.shadowedBy], ['repo', 'factory']);
+});
+
+test("a factory's own agent is served as `factory` in its factory, whether or not a step names it, and its write refused the factory's way", async () => {
+  const listed = byName((await get<List>('/api/namespaces/treed/agents')).body);
+  assert.equal(listed.drafter?.status.origin, 'factory', "the tree's agent no step names is listed in its factory");
+  const one = await get<Obj>('/api/namespaces/treed/agents/drafter?origin=factory');
+  assert.deepEqual([one.status, one.body.status.origin], [200, 'factory'], 'and read on its own, as its page reads it');
+  const file = path.join(tree, 'workflows', 'agents', 'drafter.md');
+  const before = fs.readFileSync(file, 'utf8');
+  const put = await send('PUT', '/api/namespaces/treed/agents/drafter', {
+    metadata: { resourceVersion: one.body.metadata.resourceVersion },
+    spec: { instructions: 'Changed.' },
+  });
+  assert.deepEqual([put.status, put.body.way], [422, 'factory'], "a write of it is refused the factory's way");
+  assert.equal(fs.readFileSync(file, 'utf8'), before, 'and its file is left as it was');
+  assert.equal(
+    (await get<List>('/api/namespaces/default/agents')).body.items.some((o) => o.metadata.name === 'drafter'),
+    false,
+    'and default serves none',
+  );
 });
 
 test("a factory's own workflow, a make in a factory and yours outside default are refused, each its way, nothing written", async () => {

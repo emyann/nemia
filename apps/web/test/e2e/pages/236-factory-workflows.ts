@@ -18,6 +18,8 @@ const OWN = { name: 'tree-only', step: 'only' };
 /** What its tree's `dev` says of itself, which the checkout's does not, and its one step, which the checkout's lacks. */
 const SHADOW = { description: "The tree's own dev, which shadows the checkout's.", step: 'draft' };
 
+/** The agent only its tree has, in its `agents/`, which no step names. */
+const TREE_AGENT = { name: 'drafter', body: 'You draft, as the tree says.' };
 /** The skill only its tree has, in its `skills/`. */
 const TREE_SKILL = { name: 'outline', description: "The tree's own outline." };
 
@@ -45,6 +47,7 @@ function written(): () => void {
   put(path.join(workflows, good.name, 'README.md'), `${SHADOW.description}\n`);
   put(path.join(workflows, good.name, `${SHADOW.step}.md`), stepFile('Draft it.'));
   put(path.join(workflows, OWN.name, `${OWN.step}.md`), stepFile('Do the one thing.'));
+  put(path.join(workflows, 'agents', `${TREE_AGENT.name}.md`), `---\nharness: claude\n---\n${TREE_AGENT.body}\n`);
   put(
     path.join(workflows, 'skills', TREE_SKILL.name, 'SKILL.md'),
     `---\nname: ${TREE_SKILL.name}\ndescription: ${TREE_SKILL.description}\n---\n# Outline\n`,
@@ -85,8 +88,8 @@ export default {
    * hires into still opens its builder, which drafts from the list read with no factory, and starts its run in the factory. TWIN, on two
    * repositories, asks which on the list and on a workflow's page, and is read on the one picked; a name no factory has says so on the
    * page and in the bar; a factory that does not offer a workflow says so on its page. With no factory picked, the tree's workflows are
-   * not listed, and `dev` is the checkout's. The tree's own skill opens on its page in the factory, which says the factory's way and
-   * offers no write. Each state is photographed, and the factories are taken back.
+   * not listed, and `dev` is the checkout's. The tree's own agent and skill each open on their page in the factory, which says the
+   * factory's way and offers no write. Each state is photographed, and the factories are taken back.
    */
   name: 'factory-workflows',
   route: '/workflows',
@@ -168,6 +171,15 @@ export default {
         'and its start, every step filled, runs in the factory',
       );
       await shoot('yours');
+
+      await goto(page, `/agents/factory/${TREE_AGENT.name}?factory=${TREED}`);
+      const agentPage = page.locator('article');
+      await expectVisible(
+        agentPage.locator('[data-read-only][data-way="factory"]', { hasText: "the factory's way" }),
+        `the tree's own ${TREE_AGENT.name}, which no step names, opens on its page in ${TREED} and says a factory's own agent changes the factory's way`,
+      );
+      await expectCount(agentPage.getByRole('button', { name: /^(Save|Remove…?)$/ }), 0, 'and offers no Save and no Remove');
+      await shoot('agent');
 
       await goto(page, `/agents/skills/factory/${TREE_SKILL.name}?factory=${TREED}`);
       const skillPage = page.locator('article');

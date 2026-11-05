@@ -25,7 +25,8 @@ import { BackToAgents } from './agents_.new';
 
 /**
  * The page of an agent, at /agents/$from/$agent: `agents_` draws it on its own, not inside the Agents page, which has no outlet for it. It
- * is read in the place its search names (`?factory=&repo=`), where a factory's own agent alone is found.
+ * is read in the place its search names (`?factory=&repo=`), where a factory's own agent alone is found; a factory's own has no custom
+ * instructions here, which are read by name in your library and the repository.
  */
 export const Route = createFileRoute('/agents_/$from/$agent')({
   validateSearch: pagePlaceOf,
@@ -34,7 +35,7 @@ export const Route = createFileRoute('/agents_/$from/$agent')({
     Promise.all([
       context.queryClient.ensureQueryData(agentQuery(params.from, params.agent, deps)),
       context.queryClient.prefetchQuery(keyFormQuery),
-      context.queryClient.prefetchQuery(customInstructionsQuery(params.agent)),
+      params.from === 'factory' ? null : context.queryClient.prefetchQuery(customInstructionsQuery(params.agent)),
     ]),
   component: AgentPage,
   errorComponent: ({ error }) => (
@@ -131,7 +132,7 @@ function AgentPage() {
         {form}
       </FormIn>
 
-      <CustomInstructions name={agent.name} />
+      {agent.from !== 'factory' && <CustomInstructions name={agent.name} />}
 
       {mine ? <TryAgent agent={agent} /> : <TryYours agent={agent} />}
     </article>

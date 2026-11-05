@@ -30,6 +30,9 @@ const SDK = path.join(ROOT, 'node_modules', '@anthropic-ai', 'claude-agent-sdk',
  * claim is about a whole type or a doc comment with its field, and then the identifier is looked for anywhere inside it.
  */
 const CLAIMS: Record<string, string> = {
+  '228': 'CanUseTool',
+  '232-239': 'suggestions',
+  '312': 'matchedAskRule',
   '1219-1234': 'McpHttpServerConfig',
   '1264': 'McpServerConfigForProcessTransport',
   '1280-1334': 'McpServerStatus',

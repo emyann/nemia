@@ -22,14 +22,20 @@ export type CallState = 'done' | 'running' | 'error' | 'pending' | 'waits';
  * a `message`, the person's carrying when it was delivered (`delivered`, the said's time, null while it waits in the outbox);
  * a `call`, one tool call, its `sentence`, a `fact` (its duration) and its `state`;
  * a `session` line where one attempt ended and the next began;
- * a `question` and a `proposal`, named in the shape and built by nothing yet.
+ * a `question` and a `proposal`, an ask of hers drawn as the form or as her buttons (`kindOfAsk`);
+ * a `permission`, a call of her session's that would prompt a person, held on the same path as her question and answered as one, with
+ * the facts of the call it holds (`PermissionFacts`).
  */
 export type ChatEvent =
   | { kind: 'message'; id: string; at: string; from: ChatFrom; text: string; delivered?: string | null }
   | { kind: 'call'; id: string; at: string; tool: string; sentence: string; fact?: string; state: CallState }
   | { kind: 'session'; id: string; at: string; attempt: number }
   | ({ kind: 'question' } & AskEvent)
-  | ({ kind: 'proposal' } & AskEvent);
+  | ({ kind: 'proposal' } & AskEvent)
+  | ({ kind: 'permission' } & AskEvent & { permission: PermissionFacts });
+
+/** The kinds of event an ask of hers is drawn as: her question, her proposal, or her session's call asking a person's leave. */
+export type ChatAskKind = 'question' | 'proposal' | 'permission';
 
 /**
  * A question of hers waiting on the person, or a proposal, which is one question whose choices explain nothing (`drawnAsk`): the
@@ -57,8 +63,29 @@ export type AskOption = { label: string; description: string; recommended: boole
 /** One question of an ask: what it asks, the short word it is labelled by, its choices, and whether the person may pick several. */
 export type AskQuestion = { question: string; header: string; options: AskOption[]; multiSelect: boolean };
 
-/** An ask of hers as the chat keeps it: its own id, when she asked it, and its questions. */
-export type Ask = { id: string; at: string; questions: AskQuestion[] };
+/**
+ * What a permission ask carries beside its one question, for the person who answers it: the tool, a shell call's command as typed,
+ * the harness's own words for the call (its title, display name, description, why it asks and the path it would reach), whether
+ * `Always allow` is offered, and whether the person should be started on `Deny`. The runtime's `PermissionFacts`, declared here
+ * rather than re-exported: the chat says its own words to the board.
+ */
+export type PermissionFacts = {
+  tool: string;
+  command?: string;
+  title?: string;
+  displayName?: string;
+  description?: string;
+  decisionReason?: string;
+  blockedPath?: string;
+  always: boolean;
+  defaultToNo: boolean;
+};
+
+/**
+ * An ask as the chat keeps it: its own id, when it was asked, its questions, and its kind — a question of hers, or a call of her
+ * session's that would prompt a person (`permission`), which carries the call's facts.
+ */
+export type Ask = { id: string; at: string; kind: 'question' | 'permission'; questions: AskQuestion[]; permission?: PermissionFacts };
 
 /** The person's answer to an ask: which ask, when they answered, and each question's answer by the question's own words. */
 export type AskAnswer = { id: string; at: string; answers: Record<string, string> };
@@ -76,7 +103,8 @@ export type AskClose = { id: string; how: 'cut' | 'again'; at: string; call?: st
 
 /**
  * Where the task is: `up`, its session live; `answering`, a turn in progress; `waitsOnYou`, what waits on the person (the runs waiting,
- * and the task's own questions and proposals they have not answered); `unread`, the agent's messages after the person's read mark.
+ * and the task's own questions, proposals and permissions they have not answered); `unread`, the agent's messages after the person's
+ * read mark.
  */
 export type Presence = { up: boolean; answering: boolean; waitsOnYou: number; unread: number };
 
@@ -300,11 +328,15 @@ const optionOf = (o: { label: string; description: string }): AskOption => {
 
 /**
  * An ask as the chat keeps it, off what the runtime says of the call her session holds open: each question as she asked it, each
- * choice's recommendation read out of its label (`RECOMMENDED`), since that is where the question tool's own words put it. Pure.
+ * choice's recommendation read out of its label (`RECOMMENDED`), since that is where the question tool's own words put it, and its
+ * kind, a permission carrying its call's facts. A raw ask that says no kind is a question, as every ask was before a permission was
+ * one. Pure.
  */
 export const askOf = (raw: {
   id: string;
   at: string;
+  kind?: 'question' | 'permission';
+  permission?: PermissionFacts;
   questions: readonly {
     question: string;
     header: string;
@@ -314,19 +346,26 @@ export const askOf = (raw: {
 }): Ask => ({
   id: raw.id,
   at: raw.at,
+  kind: raw.kind === 'permission' && raw.permission !== undefined ? 'permission' : 'question',
   questions: raw.questions.map((q) => ({
     question: q.question,
     header: q.header,
     options: q.options.map(optionOf),
     multiSelect: q.multiSelect,
   })),
+  ...(raw.kind === 'permission' && raw.permission !== undefined ? { permission: { ...raw.permission } } : {}),
 });
 
-/** The questions of an ask as one key: each question's own words, in order, so two asks of the same words key the same. Pure. */
-export const askKey = (ask: Pick<Ask, 'questions'>): string => JSON.stringify(ask.questions.map((q) => q.question));
+/**
+ * An ask as one key: a question's by each question's own words, in order, so two asks of the same words key the same and a question
+ * asked again after a restart is the one ask; a permission's by its own call's id, since leave given to one call is no leave for the
+ * next of the same words, and two such calls are two asks. Pure.
+ */
+export const askKey = (ask: Pick<Ask, 'id' | 'kind' | 'questions'>): string =>
+  ask.kind === 'permission' ? `permission:${ask.id}` : JSON.stringify(ask.questions.map((q) => q.question));
 
 /** The id of the ask among `asks` asking the same questions as `ask` under another id, where there is one. Pure. */
-export const sameWords = (asks: readonly Ask[], ask: Pick<Ask, 'id' | 'questions'>): string | undefined => {
+export const sameWords = (asks: readonly Ask[], ask: Pick<Ask, 'id' | 'kind' | 'questions'>): string | undefined => {
   const key = askKey(ask);
   return asks.find((one) => one.id !== ask.id && askKey(one) === key)?.id;
 };
@@ -339,7 +378,7 @@ export const sameWords = (asks: readonly Ask[], ask: Pick<Ask, 'id' | 'questions
 export const answeredBefore = (
   asks: readonly Ask[],
   answers: readonly AskAnswer[],
-  ask: Pick<Ask, 'id' | 'questions'>,
+  ask: Pick<Ask, 'id' | 'kind' | 'questions'>,
 ): AskAnswer | undefined => {
   const key = askKey(ask);
   const same = new Set(asks.filter((one) => one.id !== ask.id && askKey(one) === key).map((one) => one.id));
@@ -360,20 +399,25 @@ export const drawnAsk = (ask: Pick<Ask, 'questions'>): AskDrawn => {
   return one !== undefined && one.options.every((o) => o.description.trim() === '') ? 'actions' : 'form';
 };
 
-/** The event kind an ask is drawn as: a proposal where its drawing is her action buttons, a question otherwise. */
-const kindOfAsk = (ask: Pick<Ask, 'questions'>): 'question' | 'proposal' => (drawnAsk(ask) === 'actions' ? 'proposal' : 'question');
+/** The event kind an ask is drawn as: a permission as one, else a proposal where its drawing is her action buttons, else a question. */
+const kindOfAsk = (ask: Pick<Ask, 'kind' | 'questions'>): ChatAskKind =>
+  ask.kind === 'permission' ? 'permission' : drawnAsk(ask) === 'actions' ? 'proposal' : 'question';
 
-/** An ask as the chat draws it, with the person's answer where they have given one. Pure. */
-export const askEvent = (ask: Ask, answer: AskAnswer | undefined, cutAt?: string): ChatEvent => ({
-  kind: kindOfAsk(ask),
-  id: `q:${ask.id}`,
-  at: ask.at,
-  call: ask.id,
-  text: ask.questions[0]?.question ?? '',
-  questions: ask.questions,
-  ...(answer === undefined ? {} : { chose: answer.answers, choseAt: answer.at }),
-  ...(answer === undefined && cutAt !== undefined ? { cutAt } : {}),
-});
+/** An ask as the chat draws it, with the person's answer where they have given one, and a permission's call facts. Pure. */
+export const askEvent = (ask: Ask, answer: AskAnswer | undefined, cutAt?: string): ChatEvent => {
+  const drawn: AskEvent = {
+    id: `q:${ask.id}`,
+    at: ask.at,
+    call: ask.id,
+    text: ask.questions[0]?.question ?? '',
+    questions: ask.questions,
+    ...(answer === undefined ? {} : { chose: answer.answers, choseAt: answer.at }),
+    ...(answer === undefined && cutAt !== undefined ? { cutAt } : {}),
+  };
+  const kind = kindOfAsk(ask);
+  if (kind === 'permission' && ask.permission !== undefined) return { kind, ...drawn, permission: ask.permission };
+  return { kind: kind === 'proposal' ? 'proposal' : 'question', ...drawn };
+};
 
 /**
  * When each ask's call stopped waiting on the person, by the ask's id, off the keeper's marks: the latest mark of an ask is the one
@@ -461,8 +505,9 @@ export const askWords = (ask: Pick<Ask, 'questions'>, answers: Record<string, st
     ...ask.questions.map((q) => `You asked: ${q.question} They answered: ${answers[q.question] ?? '(nothing)'}`),
   ].join(' ');
 
-/** Whether a chat event is an ask of hers, which the board draws as a proposal or a question. */
-const asked = (e: ChatEvent): e is ChatEvent & { kind: 'question' | 'proposal' } => e.kind === 'question' || e.kind === 'proposal';
+/** Whether a chat event is an ask, which the board draws as a proposal, a question or a permission. */
+const asked = (e: ChatEvent): e is Extract<ChatEvent, { kind: ChatAskKind }> =>
+  e.kind === 'question' || e.kind === 'proposal' || e.kind === 'permission';
 
 /**
  * How many asks of hers wait on the person: what joins the count her face shows. An ask whose call was cut with nothing answered

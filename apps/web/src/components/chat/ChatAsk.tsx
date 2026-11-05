@@ -5,6 +5,8 @@
  * explain themselves, drawn as a radio form — checkboxes in the same fieldset where the question takes several — with the Answer
  * button off until it is answered, and a plain link where her words carry one. The question itself is her words over the fieldset
  * (`AskEvent.text` is the first question's own), so the fieldset names its header alone and never says the question twice.
+ * A permission — a call of hers that would prompt — is this same form, what the SDK handed over drawn over its fieldset
+ * (`PermissionFactsOf`), and `Deny` picked first where the SDK leans to no.
  *
  * Her one-question ask whose choices need no explanation is `ChatProposal` (boards 5 and 6), and several questions take
  * `ChatAskMany` (board 7b); `drawnAsk` says which of the three an ask takes.
@@ -16,7 +18,7 @@ import { Button } from '@/components/ui/button';
 import { CutTag, cutShape, TEXT_LINK } from '@/components/look';
 import { container } from '@/lib/meaning';
 import { askAnswered, linksOf, type ChatAsk as Ask } from '@/lib/chatFollowing';
-import type { AskPick, AskQuestion } from '@/lib/api';
+import type { AskPick, AskQuestion, PermissionFacts } from '@/lib/api';
 import { timeOfDay } from '@/lib/timeOfDay';
 import { Markdown } from '../Markdown';
 
@@ -29,13 +31,57 @@ const OPTION = 'grid grid-cols-[auto_minmax(0,1fr)] gap-x-2.5 gap-y-1 px-3 py-2.
 /** The same row chosen, and not. */
 const [OPTION_ON, OPTION_OFF] = [`bg-secondary-container text-on-secondary-container`, 'ring-1 ring-outline-variant ring-inset'];
 
-/** What the tag over an ask says, by what it is and whether it is answered. */
+/** What the tag over an ask says, by what it is and whether it is answered: a permission asks to run a call of hers. */
 export const askTag = (ask: Ask): { words: string; hue: 'yours' | 'money' | 'grey' } =>
   ask.chose !== undefined
     ? { words: ask.kind === 'proposal' ? 'Proposed' : 'Answered', hue: 'grey' }
     : ask.kind === 'proposal'
       ? { words: 'Proposes', hue: 'money' }
-      : { words: 'Asks you', hue: 'yours' };
+      : { words: ask.kind === 'permission' ? 'Asks to run' : 'Asks you', hue: 'yours' };
+
+/**
+ * What the SDK handed over with a call of hers that would prompt, drawn as it came and never rebuilt from the call's input: why it is
+ * asked (`description`), why it prompts (`decisionReason`), the path it reaches outside her folder (`blockedPath`), and a Bash call's
+ * command as typed, in mono with its spaces kept. A fact the SDK did not hand over is not drawn.
+ */
+export function PermissionFactsOf({ facts }: { facts: PermissionFacts }) {
+  const lines = [
+    { mark: 'description', words: facts.description },
+    { mark: 'reason', words: facts.decisionReason },
+    { mark: 'path', words: facts.blockedPath },
+  ].filter((line): line is { mark: string; words: string } => line.words !== undefined && line.words !== '');
+  return (
+    <>
+      {lines.map((line) => (
+        <p
+          key={line.mark}
+          data-chat-permission={line.mark}
+          className={`m-0 text-body-small text-on-surface-variant ${line.mark === 'path' ? 'font-mono break-all' : ''}`}
+        >
+          {line.words}
+        </p>
+      ))}
+      {facts.command !== undefined && facts.command !== '' && (
+        <pre
+          data-chat-permission="command"
+          className="m-0 bg-surface-container px-3 py-2 font-mono text-body-small whitespace-pre-wrap break-all text-on-surface"
+        >
+          {facts.command}
+        </pre>
+      )}
+    </>
+  );
+}
+
+/** The label of a permission's refusal, as the runtime offers it. */
+const DENY = 'Deny';
+
+/** What the form picks before the person does: `Deny` where a permission's SDK leans to no and offers it, nothing otherwise. */
+const firstPick = (ask: Ask, question: AskQuestion | undefined): AskPick => ({
+  question: question?.question ?? '',
+  labels:
+    ask.kind === 'permission' && ask.permission.defaultToNo && question?.options.some((option) => option.label === DENY) ? [DENY] : [],
+});
 
 /** Who asked and when, with the tag that says what it is. */
 export function AskHead({ ask }: { ask: Ask }) {
@@ -188,7 +234,7 @@ function Options({ question, pick, onPick }: { question: AskQuestion; pick: AskP
  */
 export function ChatAsk({ ask, onAnswer }: { ask: Ask; onAnswer: (id: string, picks: readonly AskPick[]) => void }) {
   const question = ask.questions[0];
-  const [pick, setPick] = useState<AskPick>({ question: question?.question ?? '', labels: [] });
+  const [pick, setPick] = useState<AskPick>(() => firstPick(ask, question));
   const answered = ask.chose !== undefined;
   return (
     <div data-chat-ask="form" className="flex flex-col gap-2.5">
@@ -196,6 +242,7 @@ export function ChatAsk({ ask, onAnswer }: { ask: Ask; onAnswer: (id: string, pi
       <AskWords text={ask.text} />
       {question !== undefined && !answered && (
         <>
+          {ask.kind === 'permission' && <PermissionFactsOf facts={ask.permission} />}
           <fieldset className="m-0 flex flex-col gap-2 border-0 p-0">
             <legend className="pb-2 text-label-small text-on-surface-variant uppercase">{`1 of 1 · ${question.header}`}</legend>
             <Options question={question} pick={pick} onPick={setPick} />

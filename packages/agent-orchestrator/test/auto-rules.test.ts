@@ -33,6 +33,7 @@ const { writeFactoryLevel } = await import('../src/level/level.store.ts');
 const { writeLevel } = await import('../src/nemia/level.store.ts');
 const { customInstructionsFile } = await import('../src/agents/read.store.ts');
 const { DEFAULT_POLICY, ruleWords } = await import('../src/auto/auto.ts');
+const { BUDGETS_SCHEMA } = await import('../src/budget/budget.ts');
 const { confirmedFile, confirmRule, digestOf, dropRule, proposedFile, readConfirmed, readProposed, writeProposed } =
   await import('../src/auto/auto.store.ts');
 const { POLICY, POLICY_PROPOSE, proposalOf } = await import('../src/auto/auto.verb.ts');
@@ -247,6 +248,34 @@ test('Auto rules decide an approval: proposed, confirmed beside the default, giv
       settled('g-free-check', undefined, 0);
       assert.equal(await decidedAtAuto('nemia retry g-free implement'), undefined, 'a try of a step that waits on no one');
       assert.equal(await decidedAtAuto('nemia retry g-free implement --budget 5'), 'ask', 'is asked once it raises the cap');
+    },
+  );
+  await s.test(
+    "REFUSED: at auto, a gate whose step proposes a cap above a step's own budget is asked; one within it is given unasked",
+    async () => {
+      const schema = { type: 'object', properties: { budgets: BUDGETS_SCHEMA }, required: ['budgets'], additionalProperties: false };
+      const PROPOSING = [
+        {
+          name: 'build',
+          after: [],
+          body: 'Build it.',
+          harness: 'codex',
+          gate: true,
+          check: 'npm test',
+          output: { file: 'b.json', schema },
+        },
+        { name: 'land', after: ['build'], body: 'Land it.', harness: 'codex', budget: 40 },
+      ];
+      for (const [id, usd] of [
+        ['g-above', 60],
+        ['g-within', 30],
+      ] as const) {
+        await plantRun(id, 'auto', PROPOSING, { build: { taskId: `${id}-build`, check: { taskId: `${id}-check` } } });
+        settled(`${id}-build`, { outcome: 'done', summary: 'Built.', artifacts: [], budgets: [{ step: 'land', usd, why: 'p90 of land' }] });
+        settled(`${id}-check`, undefined, 0);
+      }
+      assert.equal(await decidedAtAuto('nemia approve g-above build'), 'ask', "$60 for land, above the workflow's $40");
+      assert.equal(await decidedAtAuto('nemia approve g-within build'), undefined, '$30 for land, within it');
     },
   );
   await s.test('REFUSED: a confirm of a rule is asked every time, at auto', async () => {

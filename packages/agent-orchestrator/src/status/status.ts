@@ -11,6 +11,7 @@ import { loopSpan } from '../workflow/index.ts';
 import type { TaskClock } from '../timeline/index.ts';
 import { declaredOutput, isLoopTarget, type Closeout } from '../closeout/index.ts';
 import { closeoutRefusals } from '../question/index.ts';
+import { capInForce } from '../budget/budget.ts';
 import type { Retry, RetryHow } from '../retry/index.ts';
 import {
   lackedOf,
@@ -441,8 +442,8 @@ function roundWanted(
  * Whether `said` signs off `blocked` and the run accepts it: a blocked closeout whose questions do not read is refused
  * (`closeoutRefusals`).
  */
-const blockedAccepted = (step: Workflow, said: Closeout | undefined): boolean =>
-  said?.outcome === 'blocked' && !closeoutRefusals(step, said).length;
+const blockedAccepted = (step: Workflow, said: Closeout | undefined, steps: readonly Workflow[]): boolean =>
+  said?.outcome === 'blocked' && !closeoutRefusals(step, said, steps).length;
 
 /**
  * Where a step stands on its own work, its budget aside: `stepStatus`, but never `over budget` — `budget exhausted` is the harness's end of
@@ -462,7 +463,7 @@ export const ownStatus: OwnStatus = (step, run, phaseOf, closeoutOf, askedCloseo
   const st = run.steps[step.name];
   if (!st?.taskId) return 'pending';
   const said = closeoutOf(step.name);
-  if (blockedAccepted(step, said)) return 'blocked';
+  if (blockedAccepted(step, said, steps)) return 'blocked';
 
   const phase = phaseOf(st.taskId);
   if ((phase === 'failed' || phase === 'succeeded') && spendOf(st.taskId)?.budgetEnded) return 'budget exhausted';
@@ -496,7 +497,7 @@ const unaccepted = (step: Workflow, run: Run, steps: readonly Workflow[], said: 
   declaredOutput(step, said, owedFields(step, run, steps)).missing.length > 0 ||
   (Boolean(step.loop) && typeof said.output?.again !== 'boolean') ||
   lackedOf(run.steps[step.name]).length > 0 ||
-  closeoutRefusals(step, said).length > 0;
+  closeoutRefusals(step, said, steps).length > 0;
 
 /**
  * What sessions cost, as the engine measured them: the dollars of the attempts that ended with a cost on them, how many did (`measured`),
@@ -554,11 +555,30 @@ export const runSpend = (run: Run, spendOf: SpendOf): Spend =>
   addSpend(Object.keys(run.steps).map((name) => stepSpend(run, name, spendOf)));
 
 /**
- * The cap in force on a step: the last a person raised it to (`EarlierTry.budget`: `nemia retry --budget`, `nemia retry --round --budget`),
- * else its `budget:`.
+ * The caps the approvals in force set for a step, the earliest given first: each approval of a try its step is still on (`approvalOf`'s
+ * rule: one of an earlier try was spent by the try after it) that names the step among its `budgets`. Read from the person's files as
+ * `readRun` composes them, on every pass. Pure.
  */
-export const budgetOf = (step: Workflow, record: StepRecord | undefined): number | undefined =>
-  [...(record?.tries ?? [])].reverse().find((t) => t.budget !== undefined)?.budget ?? step.budget;
+export const approvedCapsOf = (run: Run, step: string): number[] =>
+  (run.approvals ?? [])
+    .filter((a) => a.try === tryOf(run, a.step))
+    .sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0))
+    .flatMap((a) => {
+      const usd = a.budgets?.[step];
+      return usd === undefined ? [] : [usd];
+    });
+
+/**
+ * The cap in force on a step (`capInForce`): the last a person raised it to (`EarlierTry.budget`: `nemia retry --budget`, `nemia retry
+ * --round --budget`), else the last cap an approval in force set for it (`approvedCapsOf`: `nemia approve --budget`, or the budgets its
+ * gated step proposed), else its `budget:`. Read from the record and the approvals on every pass, nothing carried.
+ */
+export const budgetOf = (step: Workflow, run: Run): number | undefined =>
+  capInForce({
+    raised: [...(run.steps[step.name]?.tries ?? [])].reverse().find((t) => t.budget !== undefined)?.budget,
+    approved: approvedCapsOf(run, step.name),
+    workflow: step.budget,
+  });
 
 /**
  * A step whose tries have together cost the cap in force on it or more — nothing left to spend, since any session spends something: what
@@ -566,7 +586,7 @@ export const budgetOf = (step: Workflow, record: StepRecord | undefined): number
  * something left, which `budgetUsdFor` hands a harness that keeps a cap.
  */
 export function overBudget(step: Workflow, run: Run, spendOf: SpendOf): { spent: Spend; cap: number } | undefined {
-  const cap = budgetOf(step, run.steps[step.name]);
+  const cap = budgetOf(step, run);
   if (cap === undefined) return undefined;
   const spent = stepSpend(run, step.name, spendOf);
   return spent.usd >= cap ? { spent, cap } : undefined;
@@ -628,7 +648,7 @@ export const stepMomentum = (step: Pick<Workflow, 'after'>): number => (step.aft
 export type Raise = { above: number; spent: Spend; cap: number };
 
 export function raiseOf(step: Workflow, run: Run, spendOf: SpendOf): Raise | undefined {
-  const cap = budgetOf(step, run.steps[step.name]);
+  const cap = budgetOf(step, run);
   if (cap === undefined) return undefined;
   const spent = stepSpend(run, step.name, spendOf);
   return { above: Math.max(spent.usd, cap), spent, cap };

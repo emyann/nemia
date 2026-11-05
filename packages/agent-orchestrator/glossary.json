@@ -22,6 +22,15 @@
       }
     },
     {
+      "term": "Approved budget",
+      "meaning": "the cap a gate's approval sets for a step after it: what the gated step's closeout proposed in a field of the `budgets` shape (`\"x-shape\": \"budgets\"`), with the amounts the person gave over it (`nemia approve --budget <step>=<amount>`), written into the approval file and read as the step's budget on every pass. A cap above the step's own `budget:` is said at the gate (`GateBudgets`), and no rule of auto approves it unasked.",
+      "type": "GateBudgets",
+      "see": {
+        "label": "What a step may spend",
+        "href": "/workflows/#what-a-step-may-spend"
+      }
+    },
+    {
       "term": "Attempt end",
       "meaning": "why a step's latest attempt ended, in the words a person reads for it (`endWords`): the runtime's reason (harness, lost, unstartable, operator, deadline: its `EndReason`, written out as `AttemptReason` and held equal in `packages/agent-orchestrator/src/runtime-client.ts`), or the orchestrator's own judging, `budget` (cut at the step's spend cap) and `unsigned` (ended without the statement its task asked for). The api serves it as `StepAttempts.latest.reason`, beside how it ended (`EngineOutcome`).",
       "type": "AttemptEnd"
@@ -33,7 +42,7 @@
     },
     {
       "term": "Budget",
-      "meaning": "the most a step's tries may cost together, in dollars.",
+      "meaning": "the most a step's tries may cost together, in dollars: its `budget:`, unless the approval of a gate before it set it a cap (an approved budget) or a person raised it (`nemia retry --budget`), which wins over both.",
       "see": {
         "label": "What a step may spend",
         "href": "/workflows/#what-a-step-may-spend"

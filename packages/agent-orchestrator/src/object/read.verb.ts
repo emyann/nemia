@@ -105,13 +105,13 @@ export const raiseReads = (run: Run, views: Views): RaiseReads => ({
 });
 
 /** The step `name`'s current try as judged: its codes and word, its check, its closeout or why it does not read, and its attempts. */
-export const currentOf = ({ run, source, views, judged, checks, releases }: StepsReading, name: string) => {
+export const currentOf = ({ run, source, steps, views, judged, checks, releases }: StepsReading, name: string) => {
   const taskId = run.steps[name]?.taskId ?? null;
   const step = source?.find((s) => s.name === name);
   return {
     ...stepSaid(judged, name),
     check: checks.get(name) ?? null,
-    closeout: closeoutIn(run, name, step ?? bare(name), taskId, views),
+    closeout: closeoutIn(run, name, step ?? bare(name), taskId, views, steps),
     unreadable: unreadableIn(taskId, views),
     attempts: attemptsIn(taskId, views, releases),
   };

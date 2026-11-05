@@ -112,10 +112,14 @@ function modulesLoaded(entry: string, more: readonly string[] = []): string[] {
  * `agent-orchestrator/run` is one more for `former-reason/former-reason.ts`, the pure reading of the feed's former reason codes, kept in
  * a folder of its own so the card that drops them deletes it whole, and one more for `harness-settings/harness-settings.ts`, the pure
  * judgement of a factory's harness settings `filedConfig` copies the allowed ones by, which imports nothing.
+ *
+ * Each is two more for the budgets a gate sets: `budget/budget.ts`, which `question/question.ts` expands the `budgets` shape by and
+ * `status/status.ts` reads the cap in force by (`capInForce`), and `shape/shape.ts`, the reading of an object's fields and a list's items
+ * both share; both pure, neither touching a disk.
  */
 const PINNED_MODULES: Record<string, { all: number; effect: number }> = {
-  'agent-orchestrator/run': { all: 180, effect: 15 },
-  'agent-orchestrator/workflow': { all: 132, effect: 15 },
+  'agent-orchestrator/run': { all: 182, effect: 15 },
+  'agent-orchestrator/workflow': { all: 134, effect: 15 },
 };
 
 const isEffectModule = (url: string): boolean => url.includes('/node_modules/effect/');

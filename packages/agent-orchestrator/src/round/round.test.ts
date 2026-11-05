@@ -364,6 +364,6 @@ test('roundFiled: a round moves every step of the loop behind it', async (t) => 
       [filed.implement.tries, filed.review.tries],
       [[{ taskId: 'i1', check: { taskId: 'c1' }, cause: 'round', budget: 10 }], [{ taskId: 'r1', cause: 'round' }]],
     );
-    assert.equal(budgetOf(BUDGETED_LOOP[0], filed.implement), 10);
+    assert.equal(budgetOf(BUDGETED_LOOP[0], { ...inRound(1), steps: filed }), 10);
   });
 });

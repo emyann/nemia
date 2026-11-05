@@ -202,8 +202,12 @@ function stoppedOnWord(each: ReadonlyArray<{ status: StepStatus; own: StepStatus
 }
 
 /** What the run refused of the last try's closeout (`closeoutRefusals`), as its next try is told it; nothing for none. */
-export const refusedTold = (step: Workflow | undefined, said: Closeout | undefined): Pick<RetryBriefing, 'refused'> => {
-  const refused = said ? closeoutRefusals(step, said) : [];
+export const refusedTold = (
+  step: Workflow | undefined,
+  said: Closeout | undefined,
+  steps: readonly Workflow[],
+): Pick<RetryBriefing, 'refused'> => {
+  const refused = said ? closeoutRefusals(step, said, steps) : [];
   return refused.length ? { refused } : {};
 };
 

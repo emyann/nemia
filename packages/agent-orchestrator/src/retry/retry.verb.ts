@@ -132,7 +132,7 @@ function tryRefused(
 ): string | undefined {
   if (how.mode === 'recheck' || isRemoteHarness(step.harness)) return undefined;
   const record = run.steps[step.name];
-  const budgetUsd = budgetUsdFor(how.budget ?? budgetOf(step, record), stepSpend(run, step.name, spendOf));
+  const budgetUsd = budgetUsdFor(how.budget ?? budgetOf(step, run), stepSpend(run, step.name, spendOf));
   const config = filedConfig(step, steps, run, {
     model: tryModel(step, record, how),
     budgetUsd,

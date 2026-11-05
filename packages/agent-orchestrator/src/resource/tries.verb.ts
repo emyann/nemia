@@ -28,6 +28,9 @@ import {
 } from '../run.ts';
 import { LOOP_REPLIES, outputFields, type Workflow } from '../workflow.ts';
 import { closeoutRefusals } from '../question/index.ts';
+import { gateBudgets, type GateBudgets } from '../gate-budgets/gate-budgets.ts';
+import type { SpendOf } from '../status/status.ts';
+import type { Closeout } from '../closeout/index.ts';
 import { artifactOf, valueOf, type StepArtifact, type StepValue } from './files.store.ts';
 import { checkIn, type CheckStderr, type StepCheck } from './checks.verb.ts';
 
@@ -42,9 +45,10 @@ export type StepApproval = { try: number; at: string; message: string | null };
  * verified first where it has a check, and the try it is on not approved: `nemia ls`'s `awaiting approval`, whatever else is asked of it.
  * And `approval`, once a person approved that try. Neither, for a gated step not signed off yet. A looping step a person approved out of
  * rounds as it stands (`nemia approve` of a loop, its acceptance) has one too, never awaiting, its approval that acceptance: the Run says
- * the two one way, as the command does.
+ * the two one way, as the command does. `budgets`: the caps its step proposes for the steps after it, or those its approval set
+ * (`gateBudgets`); absent where there are none.
  */
-export type StepGate = { awaiting: boolean; approval: StepApproval | null };
+export type StepGate = { awaiting: boolean; approval: StepApproval | null; budgets?: GateBudgets };
 
 /**
  * A person's acceptance of a loop out of rounds, on the try its looping step is on (`acceptanceOf`), off their file (`nemia approve`): the
@@ -185,6 +189,7 @@ export function closeoutIn(
   step: Workflow,
   taskId: string | null,
   views: Views,
+  steps: readonly Workflow[],
   turn?: number,
 ): StepCloseout | null {
   const said = taskId ? attemptsOn(views.get(taskId)?.state, turn).at(-1)?.closeout : undefined;
@@ -202,7 +207,7 @@ export function closeoutIn(
     needs: c.needs ?? null,
     artifacts: c.artifacts.map((file) => artifactOf(run, name, file)),
     values: (c.values ?? []).map(valueOf),
-    refused: closeoutRefusals(step, c),
+    refused: closeoutRefusals(step, c, steps),
     output: given,
     missing,
     replies: Array.isArray(replies) ? replies.map(replyOf) : null,
@@ -286,7 +291,7 @@ export function triesOf(
       ...earlierSaid(t, i),
       attempts: attemptsIn(t.taskId, views, releases, turnAt(t, i)),
       check: step.check ? checkIn(step.check, t.check?.taskId, views, stderr) : null,
-      closeout: closeoutIn(run, name, step, t.taskId, views, turnAt(t, i)),
+      closeout: closeoutIn(run, name, step, t.taskId, views, steps, turnAt(t, i)),
       unreadable: unreadableIn(t.taskId, views, turnAt(t, i)),
       answer: answerAt(i + 1),
     })),
@@ -347,14 +352,23 @@ export function driftOf(run: Run, workflows: readonly Workflow[]): string | null
  * A step's gate (`StepGate`), or null for a step with none: whether it waits at it, by its reason (`AwaitingApproval`), and the approval of
  * the try it is on — or, for a looping step, the acceptance of that try as it stands (`acceptanceOf`), which `nemia approve` of a loop
  * writes, a gate of its own where the step has none. Off the record as `runStore` composes it, with each approval and acceptance its files
- * hold: no read of its own.
+ * hold, the step's closeout (`closeoutOf`) and what its tries cost (`spendOf`): no read of its own.
  */
-export function gateOf(run: Run, step: Workflow, reason: StepReason): StepGate | null {
+export function gateOf(
+  run: Run,
+  step: Workflow,
+  reason: StepReason,
+  steps: readonly Workflow[],
+  closeoutOf: (step: string) => Closeout | undefined,
+  spendOf: SpendOf,
+): StepGate | null {
   const accepted = step.loop ? acceptanceOf(run, step.name) : undefined;
   if (!hasGate(step, run) && accepted === undefined) return null;
   const given = approvalOf(run, step.name) ?? accepted;
+  const budgets = gateBudgets(run, step, steps, closeoutOf(step.name), spendOf);
   return {
     awaiting: reason === 'AwaitingApproval',
     approval: given ? { try: given.try, at: given.at, message: given.message ?? null } : null,
+    ...(budgets ? { budgets } : {}),
   };
 }

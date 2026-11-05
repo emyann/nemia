@@ -20,6 +20,7 @@ import {
   countsLine,
   checkoutLine,
   decideRun,
+  dollars,
   runWith,
   type Place,
   dueNote,
@@ -57,7 +58,7 @@ import {
   waitAdvice,
   waitWord,
 } from '../../runner.ts';
-import type { BranchChanges, CheckReport, DecideCommand, Decided, RepositoryRun } from '../../runner.ts';
+import type { BranchChanges, CheckReport, DecideCommand, Decided, GateBudgets, RepositoryRun } from '../../runner.ts';
 import { HELP, placedIn, usage, type Engine } from '../flags.ts';
 
 export const DECIDE_HELP = `nemia decide <runId> [--sensitive <globs>]
@@ -402,12 +403,13 @@ function printStep(d: Decided, name: string, steps: Steps, place: Place): void {
 
 /** A step's name, blocked or not, with its try; then its gate, its acceptance, what its harness waits for and what it was denied. */
 function printStepHead(d: Decided, name: string, step: Steps[number] | undefined, steps: Steps): void {
-  const { run, closeouts, answers, gates, accepted, waitingOn, denied } = d;
+  const { run, closeouts, answers, gates, accepted, waitingOn, denied, budgets } = d;
   const c = closeouts[name];
   const blocked = c && !('error' in c) && c.outcome === 'blocked';
   const tried = step ? tryNote(step, run.steps[name], steps, Boolean(answers[name])) : '';
   console.log(`\n  ${name}${blocked ? '  BLOCKED' : ''}${tried ? `  (${tried})` : ''}`);
   if (gates[name]) console.log(`    gate  ${gates[name].split('\n').join('\n          ')}`);
+  for (const line of budgetLines(name, budgets[name], '    ')) console.log(line);
   if (accepted[name]) console.log(`    accepted  ${accepted[name].split('\n').join('\n              ')}`);
   if (waitingOn[name]) console.log(`    harness  ${waitingOn[name]}`);
   if (denied[name]) console.log(`    ${denied[name]}`);
@@ -440,11 +442,11 @@ function printTries({ used, costs, timeline, answers, said }: Decided, name: str
  * A closeout's envelope as `nemia decide` prints it: its summary, its body beneath, each value as `name: value`, and what the run refused
  * of it and of its question fields (`closeoutRefusals`), each marked `!! not accepted`.
  */
-const envelopeLines = (step: Steps[number] | undefined, c: Exclude<Closeout, { error: string }>): string[] => [
+const envelopeLines = (step: Steps[number] | undefined, c: Exclude<Closeout, { error: string }>, steps: Steps): string[] => [
   ...(c.summary ? [c.summary] : []),
   ...(c.body ? c.body.split('\n').map((l) => `  ${l}`) : []),
   ...(c.values ?? []).map((v) => `${v.name}: ${v.value}`),
-  ...closeoutRefusals(step, c).map((r) => `!! not accepted: ${r}`),
+  ...closeoutRefusals(step, c, steps).map((r) => `!! not accepted: ${r}`),
 ];
 
 /**
@@ -460,7 +462,7 @@ function printCloseout(
   place: Place,
 ): void {
   if ('error' in c) return console.log(`    closeout unreadable — ${c.error}`);
-  for (const line of envelopeLines(step, c)) console.log(`    ${line}`);
+  for (const line of envelopeLines(step, c, steps)) console.log(`    ${line}`);
   const asked = askedQuestions(step, c);
   const fields = step ? owedFields(step, run, steps).filter((f) => !asked.some((a) => a.field === f)) : [];
   for (const line of step ? [...outputLines(step, c, fields), ...questionLines(asked)] : []) console.log(`    ${line}`);
@@ -530,8 +532,9 @@ function printCollisions({ collisions }: Decided): void {
  * What is left to decide, as the run's commands say it (`Decided.commands`): the gated step to approve or send back, `nemia rm` for a
  * folder run, or the git commands to land or drop.
  */
-function printChoice({ run, toDecide, commands, closeouts }: Decided, steps: Steps): void {
-  if (toDecide?.kind === 'approve') return printApprove(run.id, toDecide, steps, commands, closeouts[toDecide.step]);
+function printChoice({ run, toDecide, commands, closeouts, budgets }: Decided, steps: Steps): void {
+  if (toDecide?.kind === 'approve')
+    return printApprove(run.id, toDecide, steps, commands, closeouts[toDecide.step], budgets[toDecide.step]);
   const said = (label: DecideCommand['label']) => commands.find((c) => c.label === label);
   const forget = said('forget it');
   if (forget) return console.log(`\n  done with it   ${forget.command}  — ${forget.said}`);
@@ -540,6 +543,28 @@ function printChoice({ run, toDecide, commands, closeouts }: Decided, steps: Ste
     console.log(`\n  land it   ${land.command}`);
     console.log(`  drop it   ${drop.command}`);
   }
+}
+
+/**
+ * The budgets at a step's gate (`GateBudgets`), as `nemia decide` prints them before its approve line: whose they are, then a line for
+ * each step — its amount, `above the workflow's $40.00` where it is above the step's own `budget:`, and why it was proposed — then the
+ * run's line. None where the gate has none.
+ */
+function budgetLines(gated: string, budgets: GateBudgets | undefined, indent: string): string[] {
+  if (!budgets) return [];
+  const width = Math.max(...budgets.steps.map((b) => b.step.length));
+  const whose =
+    budgets.from === 'proposed'
+      ? `${gated} proposes these caps for the steps after it, which your approval sets:`
+      : `the caps your approval of ${gated} set:`;
+  return [
+    `${indent}budgets  ${whose}`,
+    ...budgets.steps.map((b) => {
+      const above = b.above && b.workflow !== null ? ` (above the workflow's ${dollars(b.workflow)})` : '';
+      return `${indent}  ${b.step.padEnd(width)}  ${b.said}${above}${b.why ? ` — ${b.why}` : ''}`;
+    }),
+    `${indent}  ${budgets.said}`,
+  ];
 }
 
 /**
@@ -554,6 +579,7 @@ function printApprove(
   steps: Steps,
   commands: readonly DecideCommand[],
   said: Closeout | undefined,
+  budgets: GateBudgets | undefined,
 ): void {
   const step = steps.find((s) => s.name === toDecide.step);
   if (step === undefined) throw new Error(`the run has no step ${toDecide.step} to approve: report it as a defect of nemia decide`);
@@ -564,7 +590,10 @@ function printApprove(
   const at = commands.findIndex((c) => c.label === 'approve' && c.command === `nemia approve ${runId} ${step.name}`);
   const approve = commands[at];
   if (approve === undefined) return;
-  console.log(`\n  approve it    ${approve.command} ${answersOr(step, said, '[--message "<words>"]')}`);
+  if (budgets) console.log();
+  for (const line of budgetLines(step.name, budgets, '  ')) console.log(line);
+  const budgetHint = budgets?.from === 'proposed' ? ' [--budget <step>=<amount>]...' : '';
+  console.log(`\n  approve it    ${approve.command} ${answersOr(step, said, '[--message "<words>"]')}${budgetHint}`);
   for (const back of commands.slice(at + 1)) {
     if (back.label !== 'send back' || back.said !== null) break;
     console.log(`  send it back  ${back.command}`);

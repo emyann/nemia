@@ -4,6 +4,7 @@
  * runtime through the client (`runtime-client.ts`): an Effect program that requires the engine as a service (`EngineService`), run with
  * `runWith`.
  */
+import { gatesBudgets, type GateBudgets } from '../gate-budgets/gate-budgets.ts';
 import { Effect } from 'effect';
 import { EngineService, asked as engineAsked, nameFor, over, tried, type Engine, type TaskView, type Usage } from '../runtime-client.ts';
 import type { CheckoutHold, RunSlot } from '../cap/cap.ts';
@@ -105,6 +106,11 @@ export type Decided = {
    * and the commands.
    */
   gates: Record<string, string>;
+  /**
+   * For each gated step whose closeout proposes budgets for the steps after it, or whose approval set caps, those budgets (`gateBudgets`):
+   * what `nemia decide` prints beside its approve line, and the gate on the board.
+   */
+  budgets: Record<string, GateBudgets>;
   /**
    * For each looping step whose loop a person ended as it stands (`acceptedLines`): when, and the words they gave — why its findings are
    * open.
@@ -317,6 +323,7 @@ export const decideRun = Effect.fn('decide')(function* (id: string, env: NodeJS.
     answers,
     answering: answerLines(steps, run, d, phaseOf, reader, asked, spendOf),
     gates: gateLines(steps, run, phaseOf, reader, asked, verdictOf, spendOf, asks, rounds),
+    budgets: gatesBudgets(run, steps, reader, spendOf),
     accepted: acceptedLines(steps, run),
     waitingOn,
     denied,

@@ -13,12 +13,16 @@ import { runStore } from '../record/files.store.ts';
 import { standingsOf } from '../branches/branches.store.ts';
 import { standingLive } from '../standing/standing.verb.ts';
 import { closeoutAsked, closeoutReader, exitVerdicts, spendReader, taskPhasesRead } from '../views/views.verb.ts';
-import { Conflict, Missing } from '../refusal/refusal.ts';
+import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
+import { aboveTheWorkflow, approvedCaps, ceilingsOf, laterSteps, proposedBudgets, type StepBudget } from '../budget/budget.ts';
 import { RunDoor } from '../runs/runs.store.ts';
 import { RunId } from '../record/record.model.ts';
 
-/** What `nemia approve` did: the run, the approval as written, and its file. */
-export type Approved = { run: Run; approval: Approval; file: string };
+/**
+ * What `nemia approve` did: the run, the approval as written, and its file; the caps it set for the steps after the gate, in the order the
+ * file holds them (`approvedCaps`), and the steps among them whose cap is above their own `budget:` (`aboveTheWorkflow`).
+ */
+export type Approved = { run: Run; approval: Approval; file: string; caps: StepBudget[]; above: string[] };
 
 /**
  * Approve a step waiting at its gate — `nemia approve` — by writing the approval, and nothing else: `runs/<id>.asks/approve-<step>-<try>`,
@@ -33,10 +37,19 @@ export type Approved = { run: Run; approval: Approval; file: string };
  * between the look and the write is refused as the look would have refused it, and a file at the approval's name that is not one is
  * named, with how to clear it.
  *
+ * The approval carries the caps it sets for the steps after the gate (`budgets`): the budgets the step's closeout proposes (`"x-shape":
+ * "budgets"`), with each amount the person gave (`given`, `nemia approve --budget <step>=<amount>`) over them (`approvedCaps`). A given
+ * amount that names no step after the gate, is given twice, or is no amount is refused `Invalid`, exit 2, before anything is written.
+ *
  * Sending back is not this verb's: `nemia retry <run> <step> --message "<objection>"` — the try it files is one this approval does not
  * name. Fails with a refusal, the verb's or one a read threw; dies of anything else (`tried`).
  */
-export const approveRun = Effect.fn('approve')(function* (id: string, stepName: string, message?: string) {
+export const approveRun = Effect.fn('approve')(function* (
+  id: string,
+  stepName: string,
+  message?: string,
+  given: readonly StepBudget[] = [],
+) {
   if (!(yield* (yield* RunDoor).runs.exists(RunId.read(id))))
     return yield* Effect.fail(
       new Missing({
@@ -64,11 +77,25 @@ export const approveRun = Effect.fn('approve')(function* (id: string, stepName: 
     );
   const refused = yield* tried(() => refusal(run));
   if (refused) return yield* Effect.fail(new Conflict({ message: refused }));
+  const proposed = proposedBudgets(
+    steps.find((s) => s.name === stepName),
+    closeoutReader(views, run)(stepName),
+  ).map((p) => ({ step: p.step, usd: p.usd }));
+  const set = approvedCaps(proposed, given, laterSteps(steps, stepName));
+  if ('refused' in set) {
+    return yield* Effect.fail(
+      new Invalid({
+        message: `${set.refused}. Give each step after ${stepName} at most one amount: nemia approve ${id} ${stepName} --budget <step>=<amount>, once for each step.`,
+      }),
+    );
+  }
+  const caps = set.caps.map((c) => ({ step: c.step, usd: c.usd }));
   const approval: Approval = {
     step: stepName,
     try: tryOf(run, stepName),
     at: new Date().toISOString(),
     ...(message !== undefined ? { message } : {}),
+    ...(caps.length ? { budgets: Object.fromEntries(caps.map((c) => [c.step, c.usd])) } : {}),
   };
   const written = yield* (yield* RunDoor).asks.write(RunId.read(id), { kind: 'approve', of: 'gate', ask: approval });
   const file = written.where;
@@ -83,5 +110,5 @@ export const approveRun = Effect.fn('approve')(function* (id: string, stepName: 
     );
     return yield* Effect.fail(new Conflict({ message: why }));
   }
-  return { run, approval, file } satisfies Approved;
+  return { run, approval, file, caps, above: aboveTheWorkflow(caps, ceilingsOf(steps)) } satisfies Approved;
 });

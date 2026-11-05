@@ -55,7 +55,9 @@ export function gateOfStep(
 ): GateAsk | null {
   if (run.cancelledAt !== null || !step.approve || !run.waitingOnYou.includes(step.name)) return null;
   const ends = step.spec?.workspace === 'base';
-  const back = step.taskId ? [step.name] : run.graph.edges.filter((e) => e.kind === 'after' && e.to === step.name).map((e) => e.from);
+  const back = step.taskId
+    ? [step.name]
+    : run.graph.edges.filter((e) => (e.kind === 'after' || e.kind === 'route') && e.to === step.name).map((e) => e.from);
   return { step: step.name, ends: ends && !step.taskId, back, onto: run.branch };
 }
 

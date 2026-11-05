@@ -72,6 +72,8 @@ export type CanvasEdge = {
   kind: GraphEdge['kind'];
   state: EdgeState;
   label: string | null;
+  /** A route edge its condition answered another route than: drawn thin and faint (`StateEdge`). False on every other edge. */
+  untaken: boolean;
 };
 
 /** A step as its edges read it: its state, the note the list words beside it, and whether its next round is due, as the api answers it. */
@@ -79,40 +81,59 @@ export type EdgeStep = { name: string; state: StepState; note: string | null; ro
 
 /**
  * The run's graph as the api gives it, between the steps the run has: an `after` edge done when the work at both ends is
- * done — verified, or on its own word — and a `loop` edge from the looping step back to its target.
+ * done — verified, or on its own word — and a `loop` edge from the looping step back to its target. A `route` edge is drawn as an `after`
+ * one labelled with its route, and untaken where its condition took another route (`taken`, by condition) or its target was skipped.
  */
-export function edgesOf(graph: Frozen<RunGraph>, steps: readonly EdgeStep[]): CanvasEdge[] {
+export function edgesOf(graph: Frozen<RunGraph>, steps: readonly EdgeStep[], taken: ReadonlyMap<string, string> = new Map()): CanvasEdge[] {
   const of = new Map(steps.map((s) => [s.name, s]));
-  const seen = new Set<string>();
-  return graph.edges.flatMap((edge): CanvasEdge[] => {
+  const drawn = new Map<string, CanvasEdge>();
+  for (const edge of graph.edges) {
     const source = of.get(edge.from);
     const target = of.get(edge.to);
     const id = edge.kind === 'loop' ? `loop:${edge.from}->${edge.to}` : `${edge.from}->${edge.to}`;
-    if (!source || !target || seen.has(id)) return [];
-    seen.add(id);
-    if (edge.kind === 'after' || edge.kind === 'route') {
-      return [
-        {
-          id,
-          source: edge.from,
-          target: edge.to,
-          kind: 'after',
-          state: edgeState(satisfiesAfter(source.state), target.state),
-          label: edge.kind === 'route' ? edge.route : null,
-        },
-      ];
+    const was = drawn.get(id);
+    if (!source || !target) continue;
+    if (was) {
+      if (edge.kind === 'route') drawn.set(id, joinRoute(was, edge.route, untaken(edge, target.state, taken)));
+      continue;
     }
-    return [
-      {
-        id,
-        source: edge.from,
-        target: edge.to,
-        kind: 'loop',
-        state: source.roundDue ? 'running' : 'to-come',
-        label: loopLabel([source.note, target.note], edge.rounds),
-      },
-    ];
-  });
+    drawn.set(id, edgeOf(id, edge, source, target, taken));
+  }
+  return [...drawn.values()];
+}
+
+/** Whether a route edge is off the route: its condition took another route, or its target was skipped. */
+const untaken = (edge: Frozen<GraphEdge>, target: StepState, taken: ReadonlyMap<string, string>): boolean =>
+  edge.kind === 'route' && (target === 'skipped' || (taken.get(edge.from) ?? edge.route) !== edge.route);
+
+/** A second route between the same two steps, on the edge drawn for the first: both routes on its label, taken where either is. */
+const joinRoute = (edge: CanvasEdge, route: string, off: boolean): CanvasEdge => ({
+  ...edge,
+  label: edge.label ? `${edge.label} · ${route}` : route,
+  untaken: edge.untaken && off,
+});
+
+/** One edge of the graph as the canvas draws it, between `source` and `target` (`edgesOf`). */
+function edgeOf(id: string, edge: Frozen<GraphEdge>, source: EdgeStep, target: EdgeStep, taken: ReadonlyMap<string, string>): CanvasEdge {
+  if (edge.kind === 'loop')
+    return {
+      id,
+      source: edge.from,
+      target: edge.to,
+      kind: 'loop',
+      state: source.roundDue ? 'running' : 'to-come',
+      label: loopLabel([source.note, target.note], edge.rounds),
+      untaken: false,
+    };
+  return {
+    id,
+    source: edge.from,
+    target: edge.to,
+    kind: 'after',
+    state: edgeState(satisfiesAfter(source.state), target.state),
+    label: edge.kind === 'route' ? edge.route : null,
+    untaken: untaken(edge, target.state, taken),
+  };
 }
 
 /**

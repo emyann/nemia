@@ -68,8 +68,8 @@ const STEP_STATUS = {
   'failed (check)': { word: 'failed ✗ check (exit 1)', reason: 'CheckFailed' },
   failed: { word: 'failed', reason: 'Failed' },
   stopped: { word: 'stopped', reason: 'Stopped' },
-  skipped: { word: 'skipped', reason: 'Unknown' },
-  sent: { word: 'sent', reason: 'Unknown' },
+  skipped: { word: 'skipped (triage: web)', reason: 'Skipped' },
+  sent: { word: 'sent → r-1-handoff', reason: 'Sent' },
 } satisfies Record<StepStatus, { word: string; reason: Reason; via?: AnswerVia }>;
 
 /** What the engine's word for a task comes to in the feed (`feedPhase`), and the two words `listing` writes in its place. */
@@ -241,8 +241,8 @@ test('reasonOf names a reason for every word the package writes, only of a kind 
         `${runCodes('waiting', false, [codedStep(reason === 'AwaitingAnswer' ? { reason, via: 'session' } : ({ reason } as QualifiedStep))]).reason}/Run`,
       );
     const entries = REASON_CODES.flatMap((reason) => kindsOf(reason).map((kind) => `${reason}/${kind}`));
-    assert.equal(entries.length, 44, 'the table the owner named has 44 entries');
-    assert.equal(REASON_CODES.length, 33, 'of 33 distinct codes');
+    assert.equal(entries.length, 46, 'the table the owner named has 46 entries');
+    assert.equal(REASON_CODES.length, 35, 'of 35 distinct codes');
     assert.deepEqual(
       entries.filter((entry) => !reached.has(entry)),
       [],

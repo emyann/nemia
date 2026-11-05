@@ -47,6 +47,8 @@ const PHASE: Record<StepReason, StepPhase> = {
   CheckFailed: 'failed',
   UnreadableCloseout: 'failed',
   Stopped: 'stopped',
+  Skipped: 'stopped',
+  Sent: 'succeeded',
 };
 
 /** The readings of a qualified reason, by what qualifies it: a wait by what it waits on, a question by where it is asked. */

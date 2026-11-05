@@ -58,6 +58,8 @@ export const STEP_REASONS = [
   'CheckFailed',
   'UnreadableCloseout',
   'Stopped',
+  'Skipped',
+  'Sent',
   'Unknown',
 ] as const;
 

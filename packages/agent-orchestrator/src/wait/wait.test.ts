@@ -294,7 +294,7 @@ test('a hold in words: `holdsOf` says what holds a run, `holdWord` and `holdAdvi
     ['one run', [{ run: 'a-1' }], undefined, 'held until a-1 lands'],
     ['two, one cancelled', [{ run: 'a-1' }, { run: 'b-2', cancelledAt: 'then' }], undefined, 'held until a-1 and b-2 (cancelled) land'],
     ['one landed', [{ run: 'a-1', landed: true }], undefined, 'held until a-1 lands — it has landed, and the next tick lifts the hold'],
-    ['none', [], undefined, 'held, on a hold that names no run'],
+    ['none', [], undefined, 'held until a person lifts it'],
     ['the why and who, after `lands`', [{ run: 'a-1' }], said, 'held until a-1 lands (why: merge conflicts; by operator)'],
     ['a why alone', [{ run: 'a-1' }], { why: 'x' }, 'held until a-1 lands (why: x)'],
     ['who alone', [{ run: 'a-1' }], { by: 'operator' }, 'held until a-1 lands (by operator)'],
@@ -306,7 +306,7 @@ test('a hold in words: `holdsOf` says what holds a run, `holdWord` and `holdAdvi
       'held until a-1 lands (why: merge conflicts; by operator) — it has landed, and the next tick lifts the hold',
     ],
     ['the words after two', [{ run: 'a-1' }, { run: 'b-2' }], said, 'held until a-1 and b-2 land (why: merge conflicts; by operator)'],
-    ['the words on a hold that names no run', [], said, 'held, on a hold that names no run (why: merge conflicts; by operator)'],
+    ['the words on a hold that names no run', [], said, 'held until a person lifts it (why: merge conflicts; by operator)'],
   ];
   for (const [what, waits, given, line] of words) {
     await t.test(`holdWord: ${what}`, () => assert.equal(holdWord(waits, given), line));
@@ -322,7 +322,11 @@ test('a hold in words: `holdsOf` says what holds a run, `holdWord` and `holdAdvi
       [{ run: 'a-1', missing: true }],
       'the store has no run a-1 — yours to resolve: nemia hold r-1 --off, or nemia cancel r-1',
     ],
-    ['a hold that names no run', [], "the hold on r-1 names no run, so no run's landing lifts it — yours to lift: nemia hold r-1 --off"],
+    [
+      'a hold that names no run',
+      [],
+      'nothing of r-1 is filed, and nothing is asked of you, until a person lifts the hold; to go on: nemia hold r-1 --off',
+    ],
   ];
   for (const [what, waits, line] of advice) {
     await t.test(`holdAdvice: ${what}`, () => assert.equal(holdAdvice(r, waits), line));

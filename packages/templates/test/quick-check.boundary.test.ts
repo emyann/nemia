@@ -19,7 +19,7 @@ import path from 'node:path';
 import { loadWorkflows } from 'agent-orchestrator';
 import { checkArgv } from 'agent-orchestrator/run';
 import { scratch } from './scratch.ts';
-import { renderedSdlc } from './template.ts';
+import { copyOf, rendered, renderedSdlc } from './template.ts';
 import { type Rule, bareOrigin, ghIn, passing, rollup } from './origin.ts';
 
 /** The template these scripts ship in. */
@@ -162,6 +162,21 @@ const CHECK = stepsOf(RENDERED, 'quick').find((step) => step.name === 'implement
 const LOCAL = await renderedSdlc(['localCheck=local-check']);
 const LOCAL_FROZEN = path.join(LOCAL.tree, 'workflows', 'quick');
 const LOCAL_CHECK = stepsOf(LOCAL, 'quick').find((step) => step.name === 'implement')?.check ?? '';
+
+/** sdlc rendered with a check of the factory's own, a stub's name handed the run's id, on GitHub and in the checkout. */
+const OWN_COMMAND = 'own-check "$WF_RUN"';
+const OWN_RENDERED = await (async () => {
+  const both = await rendered([
+    { name: 'github', template: copyOf(SDLC), sets: ['github=true', `implementCheck=${OWN_COMMAND}`] },
+    { name: 'local', template: copyOf(SDLC), sets: ['localCheck=local-check', `implementCheck=${OWN_COMMAND}`] },
+  ]);
+  const treeOf = (name: 'github' | 'local'): { tree: string; store: string } => {
+    const at = both[name];
+    assert.ok(at?.tree, `${name} was rendered: ${JSON.stringify(at?.conditions)}`);
+    return { tree: at.tree, store: at.store };
+  };
+  return { github: treeOf('github'), local: treeOf('local') };
+})();
 
 /** Where a rendered check `check` branches on its way: what runs before, the GitHub branch, and the local one (`; else …`). */
 function waysOf(check: string): { before: string; github: string; local: string } {
@@ -360,6 +375,66 @@ test("REFUSED at shipped defaults, in the checkout: implement's check runs the s
   assert.equal(bareTip(), '');
 });
 
+test("the factory's own check, set, runs after the parts and before the push or the local check, either way, and its refusal pushes nothing", () => {
+  const bareTip = (repo: string): string => execFileSync('git', ['-C', repo, 'ls-remote', 'origin'], { encoding: 'utf8' });
+  const run = ({ repo, base }: { repo: string; base: string }, way: keyof typeof OWN_RENDERED, exit: number): Ran => {
+    const { bin, said } = stubs();
+    for (const [name, line] of [
+      ['own-check', 'own check ran for $1'],
+      ['local-check', 'local check ran'],
+    ] as const)
+      fs.writeFileSync(path.join(bin, name), `#!/bin/sh\necho "${line}"\nexit ${name === 'own-check' ? exit : 0}\n`, { mode: 0o755 });
+    const gh = ghIn(bin, passing(repo));
+    const check = stepsOf(OWN_RENDERED[way], 'quick').find((step) => step.name === 'implement')?.check ?? '';
+    const [cmd, ...args] = checkArgv(check);
+    const ran = spawnSync(cmd, args, {
+      cwd: repo,
+      env: envOf(repo, base, bin, {
+        ...gh.env(),
+        WF_CLOSEOUT: closeoutFile({ plan: 'p' }),
+        WF_CI_POLL_SECONDS: '0',
+        WF_WORKFLOW_FILES: path.join(OWN_RENDERED[way].tree, 'workflows', 'quick'),
+      }),
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+      timeout: 120_000,
+    });
+    return { code: ran.status, out: ran.stdout, err: ran.stderr, said: said() };
+  };
+  const ahead = [
+    /nemia size: 1 files, 1 lines/,
+    /no live probe of run r-1/,
+    /nemia parts: run r-1 has no branch but/,
+    /own check ran for r-1/,
+  ];
+  const PRINTS = {
+    github: [...ahead, /nemia pr: #7 is at [0-9a-f]{12}, the commit this check judges/, /nemia ci: `ci` passed on/],
+    local: [...ahead, /local check ran/],
+  };
+  for (const way of ['github', 'local'] as const) {
+    const printed = (ran: Ran): number[] => PRINTS[way].map((line) => ran.out.search(line));
+    const made = workOn({ 'src/a.ts': 'x\n' });
+    const passed = run(made, way, 0);
+    assert.equal(passed.code, 0, passed.out + passed.err);
+    assert.ok(
+      printed(passed).every((at, i, all) => at >= 0 && (i === 0 || at > (all[i - 1] ?? -1))),
+      `${way}: each clause prints its line, in order:\n${passed.out}`,
+    );
+    if (way === 'local') assert.equal(bareTip(made.repo), '', 'in the checkout nothing is pushed');
+  }
+  for (const way of ['github', 'local'] as const) {
+    const made = workOn({ 'src/a.ts': 'x\n' });
+    const refused = run(made, way, 3);
+    assert.notEqual(refused.code, 0, `${way}: ${refused.out}`);
+    assert.deepEqual(
+      PRINTS[way].map((line) => refused.out.search(line) >= 0),
+      PRINTS[way].map((_, i) => i < ahead.length),
+      `${way}: its refusal stops the check after it, before the push or the local check:\n${refused.out}`,
+    );
+    assert.equal(bareTip(made.repo), '', `${way}: and nothing is pushed`);
+  }
+});
+
 test('a change is counted in lines added plus removed, and none of them refuses it', () => {
   const made = based({ 'old.ts': lines(MANY + 5, 'old') });
   fs.rmSync(path.join(made.repo, 'old.ts'));
@@ -440,6 +515,10 @@ test('REFUSED: no base to measure from, and a verb the script has not', () => {
   }
 });
 
+/** The factory's own check as a note or a README names it: by its parameter, and in a note its rendered value. */
+const OWN_SAID =
+  "the\\s+factory's\\s+own\\s+check,\\s+its\\s+`implementCheck`\\s+parameter(?:\\s+\\(`\\$\\{\\{ parameters\\.implementCheck \\}\\}`;\\s+`true`\\s+checks\\s+nothing\\))?";
+
 /** The wait's flag, which a carried README, never rendered, says as `wait --check <name>`. */
 const WAIT_FLAG = '(?:\\s+--check\\s+<name>)?';
 
@@ -464,20 +543,21 @@ test("REFUSED: a note or a README that says a bound on the size, or other clause
     ['change.ts size', 'probe.ts', 'parts.ts'],
     'in the checkout, the size, the probes and the parts run before the local check',
   );
+  assert.ok(before.endsWith('{ true; } && '), `and the factory's own check, \`true\` by default, runs after them:\n${before}`);
   const runsHere = new RegExp(
-    `runs\\s+${ahead.map((clause) => `\`${clause.replace('.', '\\.').replace(' ', '\\s+')}\``).join(',\\s+')}\\s+and\\s+the\\s+local\\s+check,\\s+in\\s+that\\s+order,\\s+and\\s+nothing\\s+else`,
+    `runs\\s+${ahead.map((clause) => `\`${clause.replace('.', '\\.').replace(' ', '\\s+')}\``).join(',\\s+')},\\s+${OWN_SAID},?\\s+and\\s+the\\s+local\\s+check,\\s+in\\s+that\\s+order,\\s+and\\s+nothing\\s+else`,
   );
   const ticked = clauses.map(
     (clause, i) => `\`${clause.replace('.', '\\.').replace(' ', '\\s+')}${i === clauses.length - 1 ? WAIT_FLAG : ''}\``,
   );
   const runs = new RegExp(
-    `runs\\s+${ticked.slice(0, -1).join(',\\s+')}\\s+and\\s+${ticked.at(-1)},\\s+in\\s+that\\s+order,\\s+and\\s+nothing\\s+else`,
+    `runs\\s+${ticked.slice(0, ahead.length).join(',\\s+')},\\s+${OWN_SAID},\\s+${ticked.slice(ahead.length, -1).join(',\\s+')}\\s+and\\s+${ticked.at(-1)},\\s+in\\s+that\\s+order,\\s+and\\s+nothing\\s+else`,
   );
   for (const file of ['implement.md', 'README.md']) {
     assert.match(said(file), runs, `${file} says what the check runs`);
-    assert.doesNotMatch(said(file).replace(/`probe\.ts`,\s+`parts\.ts`,/, '`probe.ts`, `parts.ts`, `change.ts tests`,'), runs);
+    assert.doesNotMatch(said(file).replace(/`probe\.ts`,\s+`parts\.ts`,/g, '`probe.ts`, `parts.ts`, `change.ts tests`,'), runs);
     assert.match(said(file), runsHere, `${file} says what the check runs in the checkout`);
-    assert.doesNotMatch(said(file).replace(/`parts\.ts`\s+and\s+the\s+local/, '`parts.ts`, `change.ts tests` and the local'), runsHere);
+    assert.doesNotMatch(said(file).replace(/`parts\.ts`,/g, '`parts.ts`, `change.ts tests`,'), runsHere);
   }
   for (const made of /const GENERATED = \[([^\]]*)\];/
     .exec(TEXT)![1]

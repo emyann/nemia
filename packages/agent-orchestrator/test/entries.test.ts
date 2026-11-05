@@ -271,6 +271,7 @@ const PINNED: Record<string, string[]> = {
     'hireRefusalOf',
     'hold',
     'holdAdvice',
+    'holdNeedsYou',
     'holdRefusal',
     'holdUrl',
     'holdWord',

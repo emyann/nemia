@@ -255,14 +255,17 @@ They write, and are yours to run unasked, on your judgement: say what you did.
   nemia agents run yours <name> --brief <words>
                                an agent of yours tried on a short brief, in a folder of its own,
                                capped at $1
-  nemia hold <runId> --until <runId> [--until <runId> ...] [--why "<words>"] [--by <name>]
+  nemia hold <runId> [--until <runId> ...] [--why "<words>"] [--by <name>]
                                file nothing more of a run until other runs land, as --after would
                                have: what is in flight finishes, nothing new is filed, and nothing
                                is asked of you — nemia ls and nemia decide say held until <run> lands, and
                                what a step asks is asked once the hold lifts. The tick lifts it when
-                               every run named has landed. Refused of a run cancelled, pruned,
-                               finished or already held, and of a run named that is unknown, the run
-                               itself, or one that already waits on it, through --after or a hold.
+                               every run named has landed. With no --until, the run is held until a
+                               person lifts it (--off), and no tick lifts it: nemia ls and nemia
+                               decide say held until a person lifts it. Refused of a run cancelled,
+                               pruned, finished or already held, and of a run named that is unknown,
+                               the run itself, or one that already waits on it, through --after or a
+                               hold.
                                --why: the reason, shown beside held until <run> lands wherever it is
                                said; --by: who puts the hold (default: your OS user).
                                nemia hold <runId> --off: lift the hold now, and the next tick goes on as

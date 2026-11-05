@@ -911,6 +911,138 @@ test('REFUSED: no ci context within the bound, and a ci still pending at its end
   assert.match(unfinished.err, PERSONS, 'CI still running at the bound judged nothing');
 });
 
+/** A job of the workflow run 1234 as the rollup gives it: its name, its job id, when it started and how it stands. */
+const job = (name: string, id: number, startedAt: string, rest: Record<string, unknown>) => ({
+  name,
+  workflowName: 'ci',
+  detailsUrl: `https://github.com/o/r/actions/runs/1234/job/${id}`,
+  startedAt,
+  ...rest,
+});
+
+/** The head's checks as `gh pr view --json statusCheckRollup` gives them. */
+const checks = (...entries: Record<string, unknown>[]): string => JSON.stringify({ statusCheckRollup: entries });
+
+const FAILED = { status: 'COMPLETED', conclusion: 'FAILURE' };
+const PASSED_RUN = { status: 'COMPLETED', conclusion: 'SUCCESS' };
+const QUEUED = { status: 'QUEUED' };
+
+/** The first attempt of run 1234: `test x` red, and the gate `ci` that needs it red with it. */
+const FIRST = [job('test x', 5677, T1, FAILED), job('ci', 5678, T1, FAILED)];
+
+/** The second attempt's jobs, new ids, in the state `rest` says. */
+const second = (rest: Record<string, unknown>, at = T2) => [job('test x', 6677, at, rest), job('ci', 6678, at, rest)];
+
+/** The calls that re-ran run 1234's failed jobs. */
+const reruns = (calls: readonly Called[]): Called[] => asked(calls, 'run', 'rerun');
+
+/**
+ * The wait in a place whose rollup reads `outs` (one per poll, the last repeating) and whose run 1234 answers `attempt` (a rule, or a
+ * number); `rerun` answers `gh run rerun`; `more` sets the bounds.
+ */
+function redThen(outs: string[], attempt: Rule | number = 1, rerun: Rule = { when: 'run rerun' }, more: Record<string, string> = {}) {
+  const at = placed();
+  at.gh.answers([
+    ...passing(at.repo).filter((rule) => rule.when !== 'pr view'),
+    { when: 'pr view', outs },
+    typeof attempt === 'number' ? { when: 'actions/runs/1234', out: JSON.stringify({ id: 1234, run_attempt: attempt }) } : attempt,
+    rerun,
+    { when: 'actions/jobs', out: stamped(['Process completed with exit code 1.']) },
+  ]);
+  return pr(at, 'wait', CI, { WF_CI_WAIT_SECONDS: '60', WF_CI_START_SECONDS: '60', WF_CI_POLL_SECONDS: '0', ...more });
+}
+
+test("wait re-runs a red ci's failed jobs once, and a green second time passes the check, saying which jobs it re-ran and how each ended", () => {
+  const r = redThen([checks(...FIRST), checks(...FIRST, ...second(QUEUED, QUEUED_AT)), checks(...FIRST, ...second(PASSED_RUN))]);
+  assert.equal(r.code, 0, r.err);
+  assert.deepEqual(
+    reruns(r.calls).map((call) => call.argv),
+    [['run', 'rerun', '1234', '--failed']],
+    'the run is re-run once, its failed jobs',
+  );
+  const attemptAt = r.calls.findIndex((call) => call.argv.join(' ').includes('actions/runs/1234'));
+  assert.ok(attemptAt !== -1 && attemptAt < r.calls.findIndex((call) => call.argv[1] === 'rerun'), 'its attempt is read first');
+  assert.match(r.out, /re-ran .* run 1234/);
+  assert.match(r.out, /test x: success/);
+  assert.match(r.out, /ci: success/);
+  assert.match(r.out, /nemia ci: `ci` passed on/);
+});
+
+test("red twice is refused as today, the work's, with the re-run said and the second attempt's logs", () => {
+  const r = redThen([checks(...FIRST), checks(...FIRST, ...second(FAILED))]);
+  assert.equal(r.code, 1, r.out);
+  assert.doesNotMatch(r.err, PERSONS, 'a job red again is the change');
+  assert.equal(reruns(r.calls).length, 1, 'never a second re-run, the re-run red too');
+  assert.ok(r.err.includes('`ci` for #7 is failure'), r.err);
+  assert.match(r.err, /re-ran .* run 1234/);
+  assert.match(r.err, /test x: failure/);
+  assert.ok(r.err.includes(RETRY), r.err);
+  const logs = asked(r.calls, 'api').map((call) => call.argv[1]);
+  assert.ok(logs.includes('repos/{owner}/{repo}/actions/jobs/6677/logs'), "the second attempt's log is read");
+  assert.ok(!logs.includes('repos/{owner}/{repo}/actions/jobs/5677/logs'), 'not the first one');
+});
+
+test('never twice per head: a run GitHub says is past its first attempt is not re-run again', () => {
+  const r = redThen([checks(...FIRST)], 2);
+  assert.equal(r.code, 1, r.out);
+  assert.equal(reruns(r.calls).length, 0, 'no re-run');
+  assert.match(r.err, /attempt is 2/);
+  assert.doesNotMatch(r.err, PERSONS);
+});
+
+test('after a re-run, the old red GitHub still shows is waited on, not judged', () => {
+  const r = redThen([
+    checks(...FIRST),
+    checks(...FIRST),
+    checks(...FIRST, ...second(QUEUED, QUEUED_AT)),
+    checks(...FIRST, ...second(PASSED_RUN)),
+  ]);
+  assert.equal(r.code, 0, r.err);
+  assert.equal(reruns(r.calls).length, 1);
+});
+
+test("a re-run still running at the wait's bound is the work's refusal, within the same bound", () => {
+  const r = redThen(
+    [checks(...FIRST), checks(...FIRST, ...second(QUEUED, QUEUED_AT))],
+    1,
+    { when: 'run rerun' },
+    {
+      WF_CI_WAIT_SECONDS: '0',
+    },
+  );
+  assert.equal(r.code, 1, r.out);
+  assert.equal(reruns(r.calls).length, 1);
+  assert.match(r.err, /re-ran .* run 1234/);
+  assert.match(r.err, /re-runs nothing again/, 'saying the next check reads its verdict');
+  assert.ok(r.err.includes(RETRY), r.err);
+  assert.doesNotMatch(r.err, PERSONS, 'no person is needed');
+});
+
+test('REFUSED with no re-run, as today, where none can be asked', () => {
+  const refused = (r: ReturnType<typeof pr>, why: RegExp) => {
+    assert.equal(r.code, 1, r.out);
+    assert.ok(r.err.includes('`ci` for #7 is failure'), r.err);
+    assert.match(r.err, why);
+    assert.doesNotMatch(r.err, PERSONS);
+    return r;
+  };
+  const unread = refused(redThen([checks(...FIRST)], { when: 'actions/runs/1234', status: 1, err: 'HTTP 404' }), /its attempt is unread/);
+  assert.equal(reruns(unread.calls).length, 0);
+  refused(redThen([checks(...FIRST)], { when: 'actions/runs/1234', out: 'not json' }), /its attempt is unread/);
+  refused(redThen([checks(...FIRST)], 1, { when: 'run rerun', status: 1, err: 'HTTP 403: Resource not accessible' }), /HTTP 403/);
+  const status = refused(
+    redThen([checks({ context: 'ci', state: 'FAILURE', targetUrl: 'https://ci.example/build/9' })]),
+    /no job of an Actions run/,
+  );
+  assert.equal(reruns(status.calls).length, 0);
+
+  const cancelled = redThen([checks(job('ci', 5678, T1, { status: 'COMPLETED', conclusion: 'CANCELLED' }))]);
+  assert.equal(cancelled.code, 1, cancelled.out);
+  assert.match(cancelled.err, PERSONS, 'a cancelled ci judged nothing, and stays the person');
+  assert.ok(!cancelled.calls.some((call) => call.argv.join(' ').includes('actions/runs/1234')), 'its attempt is not read');
+  assert.equal(reruns(cancelled.calls).length, 0);
+});
+
 test("build's implement check, rendered on GitHub, pushes through the script before the round check, labelling by the rules it was set, waits last on the CI context it was set, and runs no suite and no e2e itself", async () => {
   const at = await renderedSdlc(['github=true', 'roundCheck=round-check --all', 'ciCheck=gate', `pullRequestLabels=${RULES}`]);
   const check = stepsOf(at, 'build').find((step) => step.name === 'implement')?.check;

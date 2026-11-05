@@ -14,7 +14,7 @@ const MADE = { name: 'unhired-e2e', description: 'Use this when a plan needs a s
 
 export default {
   /**
-   * New agent come from a step whose factory refuses the hire: the agent is written, the hire is answered 422 in the package's words,
+   * New agent come from a step whose factory refuses the hire: the agent is written, the hire is answered 404, its Hire not among the factory's, in the package's words,
    * and the person stays on the creator, which says in the window that the agent is created but not hired, and why, with the way back
    * to the step. Its one refusal is the point, so its page counts exactly it; the factory and the agent are written by the page and
    * taken back after.
@@ -49,8 +49,9 @@ export default {
         form.getByRole('button', { name: 'Create agent' }).click(),
       ]);
       const { error } = (await answered.json()) as { error?: string };
-      const sentence = `${FACTORY} does not offer the workflow ${yours.name}, so it hires no one into its steps. Attach it first — nemia factory attach ${FACTORY} ${yours.name} — then hire. Nothing was hired.`;
-      if (answered.status() !== 422 || error !== sentence)
+      // A step of a workflow the factory does not offer is no Hire of it: a 404 whose sentence names the attach to type.
+      const sentence = error ?? '';
+      if (answered.status() !== 404 || !sentence.includes(`nemia factory attach ${FACTORY}`))
         throw new Refused(`the api refuses the hire in the package's words — it answered ${answered.status()}: ${error}`);
       const unhired = refused.locator('[data-hire-unhired]');
       await expectVisible(unhired, 'the creator says the agent is created but not hired');
@@ -64,10 +65,10 @@ export default {
       await settled(refused);
       await photograph(refused, path.join(OUT, `step-hire-refused-says-${await themeOf(refused)}.png`));
       await idle(refused);
-      const expected = `request answered 422: PUT ${answered.url()}`;
+      const expected = `request answered 404: PUT ${answered.url()}`;
       const seen = problems();
       const others = seen.filter(
-        (p) => p !== expected && !/^console error: Failed to load resource: the server responded with a status of 422\b/.test(p),
+        (p) => p !== expected && !/^console error: Failed to load resource: the server responded with a status of 404\b/.test(p),
       );
       if (!seen.includes(expected) || others.length)
         throw new Refused(

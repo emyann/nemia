@@ -1132,6 +1132,13 @@ test("the builder's routes: a body not in its shape, a source not yours, a folde
         ],
       });
       assert.equal(twice.status, 422, 'a schema given twice: the api judges the schemas before it reads the folder');
+      const twiceSaid = String(((await twice.json()) as { error?: string }).error);
+      assert.match(
+        twiceSaid,
+        /metadata.*resourceVersion/,
+        "a schema given twice is told the Workflow's body, its `metadata.resourceVersion`",
+      );
+      assert.doesNotMatch(twiceSaid, /GET \/api\/workflows/, 'and never the retired route');
       for (const [version, status] of [
         [undefined, 422],
         ['', 409],

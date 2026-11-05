@@ -155,38 +155,12 @@ export function agentDraftOf(body: AgentDraftBody, name: string): { draft: Agent
 }
 
 /**
- * The agents' routes. A name in a path is refused in the package's words (400) before a file is read, so none reaches outside the folder,
- * and a place that is neither `repo` nor `yours` is 400 (`placeOf`). Each write is guarded (guard.ts) and writes only yours (`yoursOnly`:
- * 403 for the repository's); a write or a removal the package refuses is answered by its kind (`app.onError`), and a `Conflict` over an
- * agent steps still name with those steps, as `users`.
+ * The agents' one route of their own; every other read and write of an agent is the Agent object's, at
+ * `/api/namespaces/<namespace>/agents[/<name>]` (`src/definitions/agents.ts`), which calls `saved` here for its writes.
  *
- * - `GET /api/agents` — the agents of the factory the request names (`LibraryAgent`, the package's `inFactory`), read from disk on each
- *   request, so an agent a person has just edited lists as it is now. Each with the steps it fills in that factory (`fills`) and the
- *   factories it fills a step in (`factories`), a step credited to the agent file a start would run it with. In a factory, only the agents
- *   it hires into a step or its attached workflows' steps name; in the default factory, every agent (`AGENTS`, the package's `nemia
- *   agents`).
  * - `GET /api/agents/sources` — the agent files the store knows (`{ sources: AgentSource[] }`, as `nemia agents sources` lists them):
  *   each repository's a factory names, then your library, then the folder `?path=` names, a folder that is not there a 404. Each is a file
  *   `POST /api/agents/yours/copy` takes.
- * - `GET /api/agents/:from/:name` — one agent, for its page; 404 for a name the place has no file of.
- * - `GET /api/agents/:from/:name/card` — one agent in the shape of an A2A Agent Card (`AgentCardAnswer`), as `nemia agents card` prints it
- *   (`AGENT_CARD`). Not a valid card and it says so: A2A marks `supportedInterfaces` REQUIRED, an interface is a transport and a URL, and
- *   nothing here serves an agent over A2A — so `servedOverA2A` is false beside it, in the answer, rather than left for a reader to work
- *   out. Its skills are generated (`cardSkills`); an agent with no `description:`, or a skill that cannot be read, has no card, and the
- *   package's refusal says which (422).
- * - `POST /api/agents/:from` — a new agent of yours: `writeAgent` with no version, so a name already taken is refused. 201.
- * - `PUT /api/agents/:from/:name` — an agent of yours put back, and renamed when the body names it otherwise, against the `version` it was
- *   read at, so a save of an agent changed since is refused rather than written over what changed.
- * - `POST /api/agents/:from/:name/try` — an agent of yours tried on a short brief: its try's folder written, or written again when the
- *   agent's version has moved (`tryFolder`), and a run of it started with no repository, as any folder team's is — a tick files it.
- *   The try is the one start made in the default factory: an agent is tried before any factory hires it, and on no factory's repository.
- *   201 with the run (`AgentTried`). Refuses the repository's agents, which a start with no repository does not find, with 403 and the
- *   command that copies one, its schema beside it, into the store this api reads (read off its file when it has one); an empty brief (422);
- *   an agent that does not read, or whose name, harness or `remote:` the loader would refuse on the try's own step (422, before anything is
- *   written); an agent that gives a skill only the repository's .claude/skills has, which a start that looks at no repository does not find
- *   (422); and, while a try of it still moves, another (409): one at a time, so a second press does not spend a second budget.
- * - `DELETE /api/agents/:from/:name` — an agent of yours removed, against the `version` it was read at — refused while a step still names
- *   it, saying which. The steps looked at are yours and the repository the board serves; another repository is not known here.
  */
 export const agents = new Hono<ApiEnv>().get('/api/agents/sources', (c) =>
   served(c, async ({ e, placeService, env, home }) => {
@@ -221,7 +195,10 @@ export async function saved(
   };
   const done = (await runPlaced({ placeService, home }, e, WRITE.handler(args, undefined, home))) as AgentWritten;
   const agent = await inRequest(listedAgent('yours', done.dir, done.agent.name, repo, home));
-  if (agent === null) throw new Error(`The agent ${done.agent.name} written to ${done.dir} does not read back: GET /api/agents says why.`);
+  if (agent === null)
+    throw new Error(
+      `The agent ${done.agent.name} written to ${done.dir} does not read back: GET /api/namespaces/default/agents/${done.agent.name} says why, in the Agent's \`status.error\`.`,
+    );
   return {
     body: { agent, written: done.written, removed: done.removed },
     status: ok,

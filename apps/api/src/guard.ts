@@ -12,26 +12,26 @@
  * (`POST /api/runs/:id/steps/:step/say`, asks.ts), which the engine hands the session and journals; the Card's six writes
  * (objects/serve.ts): a card filed (`POST /api/namespaces/:namespace/cards`) or dropped (`DELETE …/cards/:name`), started (`POST
  * …/cards/:name/start`), queued (`…/queue`) or taken off the queue (`…/unqueue`), and its labels edited (`…/labels`), each of which writes
- * the store's inbox or starts a run, guarded before the objects' handler reads its body; and a workflow of yours built on the board — made
- * (`POST /api/workflows/yours`), or put back from its steps and the schemas pasted for them (`PUT /api/workflows/yours/:name`), builder.ts
- * — each of which writes the store's `workflows/`, and removes a step's file the folder has dropped — or removed whole (`DELETE
- * /api/workflows/yours/:name`, remove.ts); and an agent of yours made (`POST /api/agents/yours`), put back or renamed (`PUT
- * /api/agents/yours/:name`) or removed (`DELETE /api/agents/yours/:name`), agents.ts — each of which writes the store's
- * `workflows/agents/`, what every step naming the agent is told; and a person's custom instructions for an agent written (`PUT
- * /api/custom-instructions/:name`) or cleared (`DELETE /api/custom-instructions/:name`), custom.ts, each of which writes the store's
- * `custom-instructions/`, what every run started after is told after the agent's instructions; and a skill of yours made — written on the
- * board, or a builtin one copied into your library (`POST /api/skills/yours`) — or changed, whole or its `preload:` alone (`PUT
- * /api/skills/yours/:name`), skills.ts, each of which writes the store's `workflows/skills/`, what every agent giving it is told; and an
- * agent of yours tried on a short brief (`POST /api/agents/yours/:name/try`, agents.ts), which writes its try's folder in the store's
- * `tries/` and a run's record, and a try's run removed (`DELETE /api/runs/:id`, commands/routes.ts, the route of `nemia rm`), which removes
- * the record and the folders it worked in; and a person's hold on a run lifted (`DELETE /api/runs/:id/hold`, commands/routes.ts, the route
- * of `nemia hold --off`), which removes the hold file, so the run goes on at the next tick; and the store paused (`POST /api/pause`) or its
- * pause lifted (`DELETE /api/pause`), commands/routes.ts, the routes of `nemia pause` and `nemia resume`, which write or remove the store's
- * pause file, so no pass starts new work until the lift; and a finished run pruned (`POST /api/runs/:id/prune`, commands/routes.ts, the
- * route of `nemia prune --yes`), which removes its worktrees, and its files when asked, for good. Each is what an agent acts on in the
- * repository — once a tick files it, or at once, or once a person starts the card or the workflow, or once a run slot frees for a queued
- * card — or a person's idea or step gone, or its place, so a page on another site must not be able to make any of them; and a `fetch` with
- * a body, from any page, reaches the api without the browser asking it first, unless the body is JSON.
+ * the store's inbox or starts a run, guarded before the objects' handler reads its body; and the Workflow's, Agent's and Skill's writes
+ * (definitions/routes.ts, `DEFINITION_WRITES`), taken in `default` alone: a workflow of yours made (`POST
+ * /api/namespaces/:namespace/workflows`), put back from its steps and the schemas pasted for them (`PUT …/workflows/:name`) or removed
+ * whole (`DELETE …/workflows/:name`), each of which writes the store's `workflows/`, and removes a step's file the folder has dropped; an
+ * agent of yours made (`POST …/agents`), put back or renamed (`PUT …/agents/:name`) or removed (`DELETE …/agents/:name`), each of which
+ * writes the store's `workflows/agents/`, what every step naming the agent is told; a skill of yours made (`POST …/skills`), a builtin one
+ * copied into your library (`POST …/skills/:name/copy`), or changed, whole or its `preload:` alone (`PUT …/skills/:name`), each of which
+ * writes the store's `workflows/skills/`, what every agent giving it is told; and an agent of yours tried on a short brief (`POST
+ * …/agents/:name/try`), which writes its try's folder in the store's `tries/` and a run's record; and a person's custom instructions for an
+ * agent written (`PUT /api/custom-instructions/:name`) or cleared (`DELETE /api/custom-instructions/:name`), custom.ts, each of which
+ * writes the store's `custom-instructions/`, what every run started after is told after the agent's instructions; and a try's run removed
+ * (`DELETE /api/runs/:id`, commands/routes.ts, the route of `nemia rm`), which removes the record and the folders it worked in; and a
+ * person's hold on a run lifted (`DELETE /api/runs/:id/hold`, commands/routes.ts, the route of `nemia hold --off`), which removes the hold
+ * file, so the run goes on at the next tick; and the store paused (`POST /api/pause`) or its pause lifted (`DELETE /api/pause`),
+ * commands/routes.ts, the routes of `nemia pause` and `nemia resume`, which write or remove the store's pause file, so no pass starts new
+ * work until the lift; and a finished run pruned (`POST /api/runs/:id/prune`, commands/routes.ts, the route of `nemia prune --yes`), which
+ * removes its worktrees, and its files when asked, for good. Each is what an agent acts on in the repository — once a tick files it, or at
+ * once, or once a person starts the card or the workflow, or once a run slot frees for a queued card — or a person's idea or step gone, or
+ * its place, so a page on another site must not be able to make any of them; and a `fetch` with a body, from any page, reaches the api
+ * without the browser asking it first, unless the body is JSON.
  */
 
 /** One status and what to do next. */

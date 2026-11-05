@@ -10,7 +10,7 @@ import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { addFactory, attachWorkflow } from 'agent-orchestrator';
+import { addFactory, attachWorkflow, runStore } from 'agent-orchestrator';
 import { scratch } from '../../test/scratch.ts';
 import { app } from '../app.ts';
 
@@ -251,4 +251,59 @@ test('each retired path answers 404', async () => {
     const res = await app.request(url, { method, headers: json, ...(method !== 'GET' && { body: '{}' }) });
     assert.equal(res.status, 404, `${method} ${url}`);
   }
+});
+
+test("each status.revision is the number a run's start pins: 1 at the first start, then past 1 as the workflow, its agent and the agent's skill change and a start pins them again", async () => {
+  write(path.join(STORE, 'skills', 'notes', 'SKILL.md'), '---\nname: notes\ndescription: Keeps notes.\n---\nKeep notes.\n');
+  write(
+    path.join(STORE, 'agents', 'implementer.md'),
+    '---\nharness: claude\nmodel: opus\nskills: notes\n---\nYou make what the plan says.\n',
+  );
+  write(path.join(STORE, 'mine', 'plan.md'), '---\nplace: git\nagent: implementer\n---\nWrite PLAN.md.\n');
+  attachWorkflow({ factory: 'works', workflow: 'mine' });
+  execFileSync('git', ['-c', 'user.name=dev', '-c', 'user.email=dev@acme.test', 'commit', '-q', '--allow-empty', '-m', 'start'], {
+    cwd: repo,
+  });
+  const pinnedAtStart = async (): Promise<Record<string, number>> => {
+    const started = await send('POST', '/api/runs?factory=works', { workflow: 'mine', from: 'yours', brief: 'Make the plan.' });
+    assert.equal(started.status, 201, JSON.stringify(started.body));
+    const pins = runStore.runs.read(String(started.body.id)).pinned ?? [];
+    return Object.fromEntries(pins.map((p) => [`${p.kind}/${p.name}`, p.n]));
+  };
+  const served = async () => ({
+    'workflow/mine': (await get<Obj>(`${W}/mine?origin=yours`)).body.status.revision,
+    'agent/implementer': (await get<Obj>('/api/namespaces/default/agents/implementer?origin=yours')).body.status.revision,
+    'skill/notes': (await get<Obj>('/api/namespaces/default/skills/notes?origin=yours')).body.status.revision,
+  });
+  const first = await pinnedAtStart();
+  assert.deepEqual(
+    [first['workflow/mine'], first['agent/implementer'], first['skill/notes']],
+    [1, 1, 1],
+    'the first start pins each kind at 1',
+  );
+  assert.deepEqual(await served(), { 'workflow/mine': 1, 'agent/implementer': 1, 'skill/notes': 1 }, 'each served revision is the pin');
+  write(path.join(STORE, 'mine', 'plan.md'), '---\nplace: git\nagent: implementer\n---\nWrite PLAN.md, and say why.\n');
+  write(
+    path.join(STORE, 'agents', 'implementer.md'),
+    '---\nharness: claude\nmodel: opus\nskills: notes\n---\nYou make what the plan says, tested.\n',
+  );
+  const second = await pinnedAtStart();
+  assert.deepEqual(
+    [second['workflow/mine'], second['agent/implementer'], second['skill/notes']],
+    [2, 2, 1],
+    'a start after the edit pins the workflow and the agent at 2, the skill unchanged',
+  );
+  assert.deepEqual(
+    await served(),
+    { 'workflow/mine': 2, 'agent/implementer': 2, 'skill/notes': 1 },
+    'each served revision follows the pin past 1',
+  );
+  write(path.join(STORE, 'skills', 'notes', 'SKILL.md'), '---\nname: notes\ndescription: Keeps notes.\n---\nKeep notes, dated.\n');
+  const third = await pinnedAtStart();
+  assert.deepEqual(
+    third,
+    { 'workflow/mine': 3, 'agent/implementer': 3, 'skill/notes': 2 },
+    "a skill's edit moves the agent's and the workflow's pins too, the skill found beside the workflow counted in each",
+  );
+  assert.deepEqual(await served(), third, 'each served revision counts the skill as the pin does');
 });

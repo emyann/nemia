@@ -208,7 +208,7 @@ export const workflowsHandlers = HttpApiBuilder.group(Api, 'workflows', (handler
         const route = `PUT /api/namespaces/${namespace}/workflows/${name}`;
         writeGoes(namespace, 'replace', thereOf(heldIn(s), name));
         const steps = draftsOf(payload.spec.steps, route);
-        const schemas = schemasOf(payload.schemas, route);
+        const schemas = schemasOf(payload.schemas, route, SHAPE);
         if ('status' in schemas) throw statusRefused(schemas);
         const given = payload.metadata?.resourceVersion;
         if (given === undefined)

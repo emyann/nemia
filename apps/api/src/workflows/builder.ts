@@ -22,15 +22,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Effect, Schema } from 'effect';
 import { Hono } from 'hono';
-import {
-  AgentDoor,
-  HARNESS_CHOICES,
-  remoteAgents,
-  SkillDoor,
-  type WorkflowWritten,
-  repoWriteRefusal,
-  workflowVersion,
-} from 'agent-orchestrator';
+import { AgentDoor, HARNESS_CHOICES, remoteAgents, SkillDoor, type WorkflowWritten, workflowVersion } from 'agent-orchestrator';
 import {
   AGENT_KEYS,
   AGENT_OWN_KEYS,
@@ -201,9 +193,6 @@ export function stepsNamed(message: string, names: readonly string[]): string[] 
 
 const isObject = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
 
-const STEP_SHAPE =
-  '`{ "name": "<step>", "spec": { "after": ["<step>"], "harness": "claude", … }, "body": "<what its agent is told>", "own"?: { "keys": ["<key>", …], "body": "<its own note>" } }`, as GET /api/workflows lists a step, a key unset as null or left out';
-const PUT_SHAPE = `\`{ "version": "<as GET /api/workflows lists it>", "steps": [<step>, …], "schemas"?: [{ "file": "<name>.json", "text": "<a JSON Schema>" }, …], "readme"?: "<README.md>" }\`, each step ${STEP_SHAPE}`;
 /**
  * A step as a request sends it, its keys in the order they are refused. Each key of `spec` is typed by its kind (`KINDS`, in `draftOf`),
  * and a key no step has is passed on as it came, for the package to refuse in its words.
@@ -216,26 +205,6 @@ const STEP_BODY = Schema.Struct({
 });
 export type StepBody = typeof STEP_BODY.Type;
 
-/** A `from` beside a write: yours, the only place the builder writes (`yoursOnly` refuses any other, through the route's words). */
-const FROM = Schema.optionalKey(Schema.Literal('yours'));
-const README = Schema.optionalKey(Schema.String);
-
-/** A schema's file is one beside the steps (`schemaNameRefusal`), refused before its text is read. */
-const PUT_BODY = Schema.Struct({
-  from: FROM,
-  version: Schema.NonEmptyString,
-  steps: Schema.Array(STEP_BODY),
-  schemas: Schema.optionalKey(
-    Schema.Array(
-      Schema.Struct({
-        file: Schema.String.check(Schema.makeFilter((file: string) => schemaNameRefusal(file) === undefined)),
-        text: Schema.String,
-      }),
-    ),
-  ),
-  readme: README,
-});
-
 /** A write of yours, as the guard's refusals word it (guard.ts). */
 export const buildGuard = (route: string, does: string, shape: string): Guarded => ({
   route,
@@ -246,19 +215,6 @@ export const buildGuard = (route: string, does: string, shape: string): Guarded 
   instead: "Build it on the board's Workflows page, or edit the folder's files",
   shape,
 });
-
-/**
- * Why a write is not one of yours (403 for the repository's, with the copy to make by hand; 400 for anywhere else), or null. The api writes
- * nothing into a checkout: git would show a change nobody typed there, and a run started from the checkout would run it.
- */
-export function yoursOnly(route: string, from: unknown, name: string | null, repo: string, home: string): Refusal | null {
-  if (from === 'yours') return null;
-  if (from === 'repo') return { status: 403, error: repoWriteRefusal(route, 'workflows', name, repo, home) };
-  return {
-    status: 400,
-    error: `${route}: the builder writes yours, at /api/workflows/yours/…, and this request named ${JSON.stringify(from)}.`,
-  };
-}
 
 /** What a JSON value of each kind is, as a refusal of the wrong one says it. */
 const TYPES: Readonly<Record<KeyKind, { is: (value: unknown) => boolean; said: string }>> = (() => {
@@ -319,11 +275,11 @@ export const isRoleKey = (key: string): boolean => (ROLE_KEYS as readonly string
 export type SchemaFile = { file: string; text: string };
 
 /**
- * The schemas a PUT carries, or why not: not a list of `{ file, text }` (400), a file that is not a schema's (400, `schemaNameRefusal`) or
- * given twice (400). Each text is written ending in a line break, as a file is. Whether it is a schema a step can name is judged with the
- * steps.
+ * The schemas a PUT carries, or why not: a file that is not a schema's (400, `schemaNameRefusal`) or given twice (400, its refusal
+ * saying the route's `shape`). Each text is written ending in a line break, as a file is. Whether it is a schema a step can name is judged
+ * with the steps.
  */
-export function schemasOf(schemas: typeof PUT_BODY.Type.schemas, route: string): SchemaFile[] | Refusal {
+export function schemasOf(schemas: readonly SchemaFile[] | undefined, route: string, shape: string): SchemaFile[] | Refusal {
   const out: SchemaFile[] = [];
   for (const schema of schemas ?? []) {
     const wrong = schemaNameRefusal(schema.file);
@@ -331,7 +287,7 @@ export function schemasOf(schemas: typeof PUT_BODY.Type.schemas, route: string):
     if (out.some((s) => s.file === schema.file))
       return {
         status: 400,
-        error: `${route}: ${schema.file} is given twice, and a file holds one schema. Give it once. Send ${PUT_SHAPE}.`,
+        error: `${route}: ${schema.file} is given twice, and a file holds one schema. Give it once. Send ${shape}.`,
       };
     out.push({ file: schema.file, text: schema.text.endsWith('\n') ? schema.text : `${schema.text}\n` });
   }

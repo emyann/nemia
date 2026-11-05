@@ -276,12 +276,6 @@ export function givenSkills(skills: readonly string[], found: SkillsFound, repo:
   }));
 }
 
-const COPY_SHAPE = '`{ "copy": "<the name of a builtin skill>" }`';
-const DRAFT_SHAPE =
-  '`{ "name": "<a-name>", "title": "<a title, or null>", "description": "<what it does, one line>", "tags": ["<a word>"] or null, "examples": ["<what a person would ask>"] or null, "preload": true or false, "body": "<its instructions>" }`';
-const POST_SHAPE = `${COPY_SHAPE}, or \`{ "skill": ${DRAFT_SHAPE.slice(1, -1)} }\``;
-const PUT_SHAPE = `\`{ "version": "<as GET /api/skills/yours/<name> answers it>", "skill": ${DRAFT_SHAPE.slice(1, -1)} }\`, or \`{ "version": "…", "preload": true or false }\``;
-
 /**
  * A skill's keys, in the order they are refused; each value is then judged by the package, which says what is wrong with it in its words.
  */
@@ -299,14 +293,14 @@ const SKILL_KEYS = {
 export const SKILL_DRAFT = Schema.StructWithRest(Schema.Struct(SKILL_KEYS), [Schema.Record(Schema.String, Schema.Unknown)]);
 
 /** A write of a skill, as the guard's refusals word it (guard.ts). */
-export const skillGuard = (route: string, method: 'POST' | 'PUT'): Guarded => ({
+export const skillGuard = (route: string, method: 'POST' | 'PUT', shape: string): Guarded => ({
   route,
   does: method === 'POST' ? 'writes a skill into your library' : 'changes a skill in your library',
   forAnother: 'write one',
   why: 'a skill in your library is what every agent of yours that gives it is told, once a run of a workflow naming that agent starts',
   reach: 'write it on the board',
   instead: 'Write it on the board, or its folder in your library by hand',
-  shape: method === 'POST' ? POST_SHAPE : PUT_SHAPE,
+  shape,
 });
 
 /** An agent that gives a skill: its place and its name. */

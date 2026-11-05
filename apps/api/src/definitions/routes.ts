@@ -29,12 +29,10 @@ export const DEFINITION_WRITES = {
   replaceAgent: (ns: string, name: string) => agentGuard(`PUT /api/namespaces/${ns}/agents/${name}`, AGENT_SHAPE),
   deleteAgent: (ns: string, name: string) => agentGuard(`DELETE /api/namespaces/${ns}/agents/${name}`, NO_BODY),
   tryAgent: (ns: string, name: string) => tryGuard(`POST /api/namespaces/${ns}/agents/${name}/try`),
-  createSkill: (ns: string) => ({ ...skillGuard(`POST /api/namespaces/${ns}/skills`, 'POST'), shape: SKILL_SHAPE }),
-  replaceSkill: (ns: string, name: string) => ({ ...skillGuard(`PUT /api/namespaces/${ns}/skills/${name}`, 'PUT'), shape: SKILL_SHAPE }),
-  copySkill: (ns: string, name: string) => ({
-    ...skillGuard(`POST /api/namespaces/${ns}/skills/${name}/copy`, 'POST'),
-    shape: 'no body, or `{}`: the builtin skill is named in the path',
-  }),
+  createSkill: (ns: string) => skillGuard(`POST /api/namespaces/${ns}/skills`, 'POST', SKILL_SHAPE),
+  replaceSkill: (ns: string, name: string) => skillGuard(`PUT /api/namespaces/${ns}/skills/${name}`, 'PUT', SKILL_SHAPE),
+  copySkill: (ns: string, name: string) =>
+    skillGuard(`POST /api/namespaces/${ns}/skills/${name}/copy`, 'POST', 'no body, or `{}`: the builtin skill is named in the path'),
 } as const satisfies Record<string, (ns: string, name: string) => Guarded>;
 
 /** The namespace and the name a path names. */

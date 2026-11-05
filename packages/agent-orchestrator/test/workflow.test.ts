@@ -205,7 +205,10 @@ const placed = (lines: string): string => (/^(place:|workspace: folder)/m.test(l
 const fm = (name: string, lines: string) => parseWorkflow(name, `---\n${placed(lines)}\n---\nDo the work.\n`);
 
 test('every key a step has is read — none is accepted and then dropped', () => {
-  const values: Record<Exclude<StepKey, 'workspace' | 'slot' | 'agent' | 'skills' | 'mcp' | 'sandbox'>, string> = {
+  const values: Record<
+    Exclude<StepKey, 'workspace' | 'slot' | 'agent' | 'skills' | 'mcp' | 'sandbox' | 'routes' | 'route' | 'when' | 'ends' | 'workflow'>,
+    string
+  > = {
     after: 'implement',
     resume: 'implement',
     input: 'implement',
@@ -255,8 +258,17 @@ test('every key a step has is read — none is accepted and then dropped', () =>
   assert.deepEqual(attached.mcp, ['docs'], 'mcp: is read on a step with an agent, and src/agents/agents.test.ts reads it too');
   const fenced = fm('review', 'harness: codex\nsandbox: read-only');
   assert.equal(fenced.sandbox, 'read-only', "sandbox: is read on a step of its own: it is Codex's, and the step above runs on Claude Code");
+  const condition = fm('triage', 'routes: [web, docs]\nroute: judge\nends: [docs]');
+  assert.deepEqual([condition.routes, condition.route, condition.ends], [['web', 'docs'], { kind: 'judge' }, ['docs']]);
+  const routed = fm('to-build', 'after: triage\nwhen: web\nworkflow: build');
+  assert.deepEqual([routed.when, routed.workflow], [['web'], 'build'], 'a node on a route: src/route/route.test.ts reads them too');
   const all = {
     ...w,
+    routes: condition.routes,
+    route: condition.route,
+    ends: condition.ends,
+    when: routed.when,
+    workflow: routed.workflow,
     workspace: ending.workspace,
     slot: watching.slot,
     agent: attached.agent,

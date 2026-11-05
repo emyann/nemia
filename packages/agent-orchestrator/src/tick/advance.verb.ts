@@ -389,7 +389,7 @@ export const advancePass = Effect.fn('advancePass')(
     const { tried, rechecked } = yield* fileTries(f, due.retry);
     const looped = yield* fileRounds(f, due.round);
     const checked = yield* fileChecks(f, [...assessed.check, ...rechecked]);
-    const filed = yield* fileReady(f, due.ready, admission.starting, parents.git);
+    const filed = yield* fileReady(f, { ready: due.ready, send: assessed.send }, admission.starting, parents.git);
     const heldFirst = holdFirst(f, admission.held, assessed.ready);
     const { tipped, tips } = keepTips(run, steps, assessed.status, heads);
     const wrote =
@@ -477,7 +477,7 @@ export const mayFileOf = (run: Run): (() => boolean) => {
 const readPass = Effect.fnUntraced(function* (e: Engine, run: Run) {
   const steps = yield* stepsOf(run);
   const { views, phaseOf } = yield* taskPhasesRead(run, { earlierTries: underBudget(steps, run) }).pipe(over(e));
-  const signedOff = closeoutReader(views, run);
+  const signedOff = closeoutReader(views, run, steps);
   const asked = closeoutAsked(views);
   const verdictOf = exitVerdicts(views, run);
   const sessionBlocked = harnessBlocked(views);

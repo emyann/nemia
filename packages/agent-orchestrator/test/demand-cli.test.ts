@@ -37,6 +37,7 @@ const TICKING: Record<string, string[]> = {
   'inbox queue': ['inbox', 'queue', 'no-card'],
   retry: ['retry', 'no-run', 'implement'],
   approve: ['approve', 'no-run', 'design'],
+  route: ['route', 'no-run', 'next', 'build'],
   refresh: ['refresh', 'no-run'],
   cancel: ['cancel', 'no-run'],
   resume: ['resume'],

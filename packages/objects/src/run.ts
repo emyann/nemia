@@ -400,7 +400,16 @@ const GraphEdge = Schema.Union([
   Schema.Struct({ from: Schema.String, to: Schema.String, kind: Schema.Literal('after') }),
   Schema.Struct({ from: Schema.String, to: Schema.String, kind: Schema.Literal('input') }),
   Schema.Struct({ from: Schema.String, to: Schema.String, kind: Schema.Literal('loop'), rounds: Schema.Finite }),
+  Schema.Struct({ from: Schema.String, to: Schema.String, kind: Schema.Literal('route'), route: Schema.String }),
 ]);
+
+/** One node of the run's graph (`GraphNode`, graph.ts): a step, a condition with the routes it ends on, or a route to a workflow. */
+const GraphNode = Schema.Struct({
+  name: Schema.String,
+  kind: Schema.Literals(['step', 'condition', 'workflow']),
+  ends: Schema.optionalKey(Strings),
+  workflow: Schema.optionalKey(Schema.String),
+});
 
 /** One kind and name the run or a step of it is behind the files on (`Drift`, revisions.ts). */
 const Drift = Schema.Struct({
@@ -459,7 +468,7 @@ export const RunStatus = Schema.Struct({
     }),
   ),
   toDecide: Schema.NullOr(RunToDecide),
-  graph: Schema.Struct({ roots: Strings, edges: List(GraphEdge) }),
+  graph: Schema.Struct({ roots: Strings, edges: List(GraphEdge), nodes: Schema.optionalKey(List(GraphNode)) }),
   timeline: Schema.Struct({
     rounds: List(TimelineTotal),
     run: TimelineTotal,

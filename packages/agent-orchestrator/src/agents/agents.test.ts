@@ -266,6 +266,11 @@ const WIRING = [
   'budget',
   'deadlineSeconds',
   'tally',
+  'routes',
+  'route',
+  'when',
+  'ends',
+  'workflow',
 ];
 
 test('REFUSED at shipped defaults: an agent file, one row per line it may not say', async (t) => {

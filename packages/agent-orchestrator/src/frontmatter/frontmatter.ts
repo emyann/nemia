@@ -40,9 +40,9 @@ const FORMER_LINE = /^[A-Za-z_][\w.-]*[ \t]*:/;
 
 /**
  * A step's keys that hold one value: a flow collection YAML reads on one of them, `check: [ -f x ]` or `check: { a; b; }`, is the shell
- * the former form wrote, never a list or a map the key could take.
+ * the former form wrote, never a list or a map the key could take. Not `route:`, a condition's eval, which holds a map.
  */
-const ONE_VALUE: readonly string[] = STEP_KEYS.filter((key) => !LIST_KEYS.includes(key));
+const ONE_VALUE: readonly string[] = STEP_KEYS.filter((key) => !LIST_KEYS.includes(key) && key !== 'route');
 
 /** The options every parse here is read with. */
 const parsed = (block: string, lineCounter?: LineCounter) =>

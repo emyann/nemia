@@ -61,6 +61,7 @@ erDiagram
     unsigned former "optional"
     object usage
     number exitCode
+    string terminationMessage "optional"
     list denials "optional"
     list skills "optional"
     list files "optional"
@@ -104,6 +105,7 @@ erDiagram
     list command "optional"
     object env "optional"
     number niceness "optional"
+    string terminationMessagePath "optional"
     object callAdmission "optional"
     boolean mayAsk "optional"
     unknown enabledSkills "optional"

@@ -561,9 +561,8 @@
     {
       "files": ["apps/web/src/components/StepNode.tsx"],
       "rules": {
-        "max-lines-per-function": ["error", { "max": 88, "skipBlankLines": true, "skipComments": true }],
-        "complexity": ["error", { "max": 26 }],
-        "sonarjs/cognitive-complexity": ["error", 19]
+        "max-lines-per-function": ["error", { "max": 84, "skipBlankLines": true, "skipComments": true }],
+        "complexity": ["error", { "max": 25 }]
       }
     },
     {
@@ -725,8 +724,7 @@
     {
       "files": ["packages/agent-orchestrator/src/tick/assess.ts"],
       "rules": {
-        "complexity": ["error", { "max": 29 }],
-        "sonarjs/cognitive-complexity": ["error", 24]
+        "sonarjs/cognitive-complexity": ["error", 16]
       }
     },
     {

@@ -118,8 +118,8 @@ function modulesLoaded(entry: string, more: readonly string[] = []): string[] {
  * both share; both pure, neither touching a disk.
  */
 const PINNED_MODULES: Record<string, { all: number; effect: number }> = {
-  'agent-orchestrator/run': { all: 182, effect: 15 },
-  'agent-orchestrator/workflow': { all: 134, effect: 15 },
+  'agent-orchestrator/run': { all: 190, effect: 15 },
+  'agent-orchestrator/workflow': { all: 139, effect: 15 },
 };
 
 const isEffectModule = (url: string): boolean => url.includes('/node_modules/effect/');

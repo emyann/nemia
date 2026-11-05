@@ -1,0 +1,12 @@
+{
+  "type": "object",
+  "properties": {
+    "needsDesign": {
+      "type": "string",
+      "enum": ["yes", "no"],
+      "description": "Whether the intent needs a design before it is built. yes: a decision is still open — a shape, a contract, a choice between ways — and someone has to write a spec a person approves: it goes to build. no: the intent settles its change and leaves nothing to decide, whatever its size: it goes to quick. The person sees your answer as the proposed route and may change it at the gate."
+    }
+  },
+  "required": ["needsDesign"],
+  "additionalProperties": false
+}

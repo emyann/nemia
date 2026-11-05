@@ -46,7 +46,7 @@ import {
   type RoundAsk,
   type SpendOf,
 } from '../status/status.ts';
-import { composeBrief, remoteBrief, type ParentCloseout } from '../brief/index.ts';
+import { callerMounts, composeBrief, remoteBrief, type ParentCloseout } from '../brief/index.ts';
 import { handedOf } from '../brief/handed.verb.ts';
 import type { BranchReader } from '../branches/branches.store.ts';
 import { roundBriefed, roundFiled, roundFiledNote } from '../round/round.ts';
@@ -71,6 +71,8 @@ import { answerHeld, stopAsked } from './held.verb.ts';
 import { forStep } from '../telemetry/telemetry.store.ts';
 import { stepLabels } from '../telemetry/telemetry.ts';
 import { localFields } from './assess.ts';
+import { sendCards, type Due } from '../send/send.verb.ts';
+import { answerTables, fileScripts } from '../script/script.verb.ts';
 import { filedAt, foldersTold, placeTold, toldOf, type PlaceTold, type StepTold, type Told } from './told.verb.ts';
 import { found, recordNamed, stepNamed, taskToStop, tryTold } from './told.verb.ts';
 
@@ -257,7 +259,7 @@ const sendTry = Effect.fnUntraced(function* (f: Filing, r: Retry, step: Workflow
         checked,
         foldersTold(run, reads, told.step),
         yield* costsFor(f, step, Boolean(resumeFrom)),
-        { words: told.words, say: told.say },
+        { words: told.words, say: told.say, targets: told.targets },
       );
   const budgetUsd = budgetUsdFor(r.budget ?? budgetOf(step, run), stepSpend(run, r.step, reads.spendOf));
   if (answers) return yield* answerHeld(e, taskId, brief, budgetUsd);
@@ -341,6 +343,7 @@ const fileRound = Effect.fnUntraced(function* (f: Filing, r: Round, looped: stri
     const said = {
       words: landing.words,
       say: landing.say,
+      targets: landing.targets,
       landing: yield* landingOf(f, r),
       costs: yield* costsFor(f, target, Boolean(record.taskId && sessionIn(f.reads.views, record.taskId))),
     };
@@ -485,19 +488,24 @@ const fileCheck = Effect.fnUntraced(function* (f: Filing, name: string) {
 });
 
 /**
- * File the ready steps, in order, until the pass may file no more, each in the workspace cut for it: answers with the steps filed. A run
- * that waited on runs, on the pass that files its roots, moves its base to its branch as the pass read it (`Filing.heads`), and keeps it
- * where the pass did not; and a run that waited on runs or was handed runs as context reads what they concluded, where their branches
- * stand read through `git` (`handedOf`).
+ * File the ready steps (`due.ready`), in order, until the pass may file no more, each in the workspace cut for it: answers with the
+ * steps filed. A run that waited on runs, on the pass that files its roots, moves its base to its branch as the pass read it
+ * (`Filing.heads`), and keeps it where the pass did not; and a run that waited on runs or was handed runs as context reads what they
+ * concluded, where their branches stand read through `git` (`handedOf`). First, each table condition's route is copied onto its record
+ * (`answerTables`), each workflow node in `due.send` files its card (`sendCards`), and the ready script conditions are filed as command
+ * tasks (`fileScripts`), answered among the steps filed.
  */
-export const fileReady = Effect.fn('fileReady')(function* (f: Filing, ready: readonly string[], starting: boolean, git: BranchReader) {
+export const fileReady = Effect.fn('fileReady')(function* (f: Filing, due: Due, starting: boolean, git: BranchReader) {
   const { e, run } = f;
+  answerTables(f);
+  const ready = due.ready;
   if (ready.length && starting && run.after?.length && isRepositoryRun(run)) run.baseRef = f.heads?.()?.[run.branch] || run.baseRef;
   const parents = ready.length && starting ? yield* handedOf(e, run, git) : undefined;
-  const filed: string[] = [];
+  const scripts: string[] = yield* fileScripts(f, ready);
+  const filed: string[] = [...(yield* sendCards(f, due.send)), ...scripts];
   const placed = yield* PlaceService;
   const servers = yield* serversFiling(run.factory ?? DEFAULT_FACTORY, f.reads.home, ready, f.notes);
-  for (const name of ready) {
+  for (const name of ready.filter((n) => !scripts.includes(n))) {
     if (!f.mayFile()) break;
     const step = stepNamed(f, name);
     if (unsignedStep(servers, step, f.notes)) continue;
@@ -517,6 +525,7 @@ export const fileReady = Effect.fn('fileReady')(function* (f: Filing, ready: rea
       costs: yield* costsFor(f, step, false),
       words: landing.words,
       say: landing.say,
+      targets: landing.targets,
     };
     const taskId = yield* asked('file', e.file(readySpec(f, step, place, files, yield* toldOf(run, step), said))).pipe(forStep(run, step));
     run.steps[name] = { ...run.steps[name], taskId, workspace: place.workspace, branch: place.branch, ...filedOn(f, step) };
@@ -574,9 +583,9 @@ function readySpec(
           step.after.length ? undefined : parents,
           inputsDir(run),
           said.checked,
-          foldersTold(run, reads, told.step),
+          foldersTold(run, reads, told.step, callerMounts(step, parents)),
           said.costs,
-          { words: said.words, say: said.say },
+          { words: said.words, say: said.say, targets: said.targets },
           place.merge,
         ),
     cwd: place.workspace,
@@ -588,6 +597,7 @@ function readySpec(
       config: filedConfig(step, reads.steps, run, {
         model: step.model,
         ...filedAt(run, f.reads.home),
+        caller: callerMounts(step, parents),
         budgetUsd: budgetUsdFor(budgetOf(step, run), stepSpend(run, step.name, reads.spendOf)),
         own: told.own,
         landingDenied: () => said.words?.denied ?? [],

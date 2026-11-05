@@ -13,6 +13,9 @@ import { scratch } from '../../test/scratch.ts';
 const ROOT = scratch('wf-record-read-');
 process.env.WF_ROOT = ROOT;
 const store = await import('./record.store.ts');
+const { routeAsk } = await import('../status/status.ts');
+/** A person's route file for a condition's try, where `nemia route` writes it. */
+const routeFile = (id: string, step: string, n: number): string => path.join(store.asksDir(id), routeAsk(step, n));
 const {
   UnreadableRecord,
   acceptanceIn,
@@ -269,6 +272,24 @@ test("what the tick does not name survives a read and a rewrite: a key on the re
   const older = readRun('r-unplaced');
   assert.equal('placeSkill' in older, false, 'one with none reads as before');
   assert.equal((older as unknown as Record<string, unknown>).fromAnOlderWf, 1);
+});
+
+test("a person's route is read onto its condition's record for the try it names, wins over the record's, and is never written into it", () => {
+  const record = aRecord('r-routed');
+  (record.steps as Record<string, unknown>).review = { taskId: null, route: { route: 'web', try: 1, by: 'table' } };
+  put('r-routed', record);
+  fs.mkdirSync(path.dirname(routeFile('r-routed', 'review', 1)), { recursive: true });
+  fs.writeFileSync(routeFile('r-routed', 'review', 1), JSON.stringify({ route: 'docs', at: '2026-09-01T00:00:00.000Z' }));
+  fs.writeFileSync(routeFile('r-routed', 'review', 2), JSON.stringify({ route: 'backend', at: '2026-09-01T00:00:00.000Z' }));
+  const run = readRun('r-routed');
+  assert.deepEqual(run.steps.review?.route, { route: 'docs', try: 1, by: 'person' }, 'the try it is on; a later try is not read');
+  assert.ok(rewriteRun(run));
+  const written = JSON.parse(fs.readFileSync(runFile('r-routed'), 'utf8')) as { steps: Record<string, { route?: unknown }> };
+  assert.equal(written.steps.review?.route, undefined, "the person's route is their file's, never the record's");
+  put('r-unrouted', aRecord('r-unrouted'));
+  fs.mkdirSync(path.dirname(routeFile('r-unrouted', 'review', 1)), { recursive: true });
+  fs.writeFileSync(routeFile('r-unrouted', 'review', 1), JSON.stringify({ at: '2026-09-01T00:00:00.000Z' }));
+  assert.equal(readRun('r-unrouted').steps.review?.route, undefined, 'a file naming no route routes nothing');
 });
 
 test('a marker that does not read still holds its run: a prune marker is pruned, a hold holds, whatever their fields say', () => {

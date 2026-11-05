@@ -781,6 +781,145 @@ export function seedFinished(
 }
 
 /**
+ * A routed run, as a page writes it and takes it back (`seedRouted`): `plan` signed off that the change is on the board, `triage`, a
+ * condition whose table read it, took the `web` route, so `build-web` ran and `build-backend` was passed by, and `handoff`, a workflow
+ * node on the same route, filed its card for `dev`; `notes` joined after both builds. A folder run, in FOLDER's factory; its workflow
+ * is written beside it, a folder of yours (`ROUTED_FILES`), which the Workflows page draws.
+ */
+export const ROUTED = {
+  id: 'route-the-change-e2e31',
+  title: 'Route the change',
+  factory: FOLDER.factory,
+  condition: 'triage',
+  routes: ['web', 'backend', 'docs'],
+  ends: ['docs'],
+  taken: 'web',
+  ran: ['plan', 'build-web', 'notes'],
+  skipped: 'build-backend',
+  workflowNode: 'handoff',
+  workflow: 'dev',
+  /** The card `handoff` filed, `<run>-<node>`, as the send names it. */
+  card: 'route-the-change-e2e31-handoff',
+  /** The workflow folder of yours the page writes beside the run, its steps the run's, and takes back. */
+  folder: 'triage-e2e',
+} as const;
+
+/** ROUTED's workflow as its step files say it, each file's name and text: the run's steps, with `place: git` each, which load asks. */
+const ROUTED_FILES: ReadonlyArray<readonly [string, string]> = [
+  ['plan.md', '---\nplace: git\nharness: claude\noutput: plan.schema.json\n---\nSay which surface the change is on.\n'],
+  [
+    'plan.schema.json',
+    JSON.stringify({
+      type: 'object',
+      properties: { surface: { type: 'string', enum: ['web', 'backend', 'docs'], description: 'The surface the change is on.' } },
+      required: ['surface'],
+      additionalProperties: false,
+    }),
+  ],
+  [
+    'triage.md',
+    '---\nplace: git\nafter: plan\ninput: plan\nroutes: [web, backend, docs]\nroute: { from: plan.surface, table: { web: web, backend: backend, docs: docs } }\nends: [docs]\n---\nSend the change to the surface it is on.\n',
+  ],
+  ['build-web.md', '---\nplace: git\nharness: claude\nafter: triage\nwhen: [web]\n---\nMake the change on the board.\n'],
+  ['build-backend.md', '---\nplace: git\nharness: claude\nafter: triage\nwhen: [backend]\n---\nMake the change in the backend.\n'],
+  ['handoff.md', '---\nplace: git\nafter: triage\nwhen: [web]\nworkflow: dev\n---\nHand the board change to dev.\n'],
+  ['notes.md', '---\nplace: git\nharness: claude\nafter: build-web, build-backend\n---\nWrite the release notes.\n'],
+];
+
+/**
+ * Write ROUTED into the store at `root`: its record, its steps frozen with their routing keys, a journal per step that ran, and their
+ * events on the engine's feed; `triage`'s route kept on its record as the tick copies it, and `handoff`'s card on its. Times are minutes
+ * before `now`. Answers what takes it back: the record, the journals and the run's folder removed, and the feed as it was.
+ */
+export function seedRouted(root: string, now = Date.now()): () => void {
+  const ago = (minutes: number) => new Date(now - minutes * 60_000).toISOString();
+  const { id } = ROUTED;
+  const work = path.join(root, 'runs', id, 'work');
+  const record = path.join(root, 'runs', `${id}.json`);
+  const feed = path.join(root, 'engine', 'feed.jsonl');
+  const fedBefore = fs.readFileSync(feed, 'utf8');
+  const folder = path.join(root, 'workflows', ROUTED.folder);
+  for (const [name, text] of ROUTED_FILES) write(path.join(folder, name), text);
+  const body = (says: string) => ({ body: says, harness: 'claude', workspace: 'folder' as const, permissionMode: 'dontAsk' });
+  const table = Object.fromEntries(ROUTED.routes.map((r) => [r, r]));
+  write(
+    record,
+    JSON.stringify(
+      {
+        id,
+        place: { kind: 'folder' },
+        workspace: work,
+        brief: `${ROUTED.title}\n\nA routed run written by a page of npm run e2e, which takes it back.`,
+        workflowDir: path.join(root, 'workflows', ROUTED.folder),
+        workflow: [
+          { name: 'plan', after: [], ...body('Say which surface the change is on.') },
+          {
+            name: ROUTED.condition,
+            after: ['plan'],
+            body: 'Send the change to the surface it is on.',
+            routes: [...ROUTED.routes],
+            route: { kind: 'table', from: 'plan.surface', table },
+            ends: [...ROUTED.ends],
+          },
+          { name: 'build-web', after: [ROUTED.condition], when: ['web'], ...body('Make the change on the board.') },
+          { name: ROUTED.skipped, after: [ROUTED.condition], when: ['backend'], ...body('Make the change in the backend.') },
+          {
+            name: ROUTED.workflowNode,
+            after: [ROUTED.condition],
+            when: ['web'],
+            workflow: ROUTED.workflow,
+            body: 'Hand the board change to dev.',
+          },
+          { name: 'notes', after: ['build-web', ROUTED.skipped], ...body('Write the release notes.') },
+        ],
+        factory: ROUTED.factory,
+        createdAt: ago(30),
+        steps: {
+          plan: { taskId: `${id}-plan`, workspace: path.join(work, 'plan') },
+          [ROUTED.condition]: { taskId: null, route: { route: ROUTED.taken, try: 1, by: 'table' } },
+          'build-web': { taskId: `${id}-build-web`, workspace: path.join(work, 'build-web') },
+          [ROUTED.skipped]: { taskId: null },
+          [ROUTED.workflowNode]: { taskId: null, sent: { card: ROUTED.card, at: ago(24) } },
+          notes: { taskId: `${id}-notes`, workspace: path.join(work, 'notes') },
+        },
+      },
+      null,
+      2,
+    ),
+  );
+  const journals = ROUTED.ran.map((step, i) => {
+    const began = 28 - i * 4;
+    const closeout = { outcome: 'done', summary: `Did ${step}.`, needs: null, artifacts: [] };
+    const events = [
+      {
+        kind: 'filed',
+        at: ago(began),
+        brief: step,
+        cwd: path.join(work, step),
+        maxAttempts: 1,
+        harness: 'claude',
+        permissionMode: 'dontAsk',
+      },
+      { kind: 'starting', at: ago(began - 1), attempt: 1 },
+      { kind: 'spawned', at: ago(began - 1), attempt: 1 },
+      { kind: 'ended', at: ago(began - 2), attempt: 1, sessionId: `ae/${id}-${step}/1`, observed: 'done', reason: 'harness', closeout },
+      { kind: 'settled', at: ago(began - 2), outcome: 'succeeded' },
+    ];
+    const journal = path.join(root, 'engine', 'tasks', `${id}-${step}.jsonl`);
+    write(journal, lines(events));
+    fs.appendFileSync(feed, lines(events.map((event) => ({ taskId: `${id}-${step}`, event }))));
+    return journal;
+  });
+  return () => {
+    fs.rmSync(record, { force: true });
+    for (const journal of journals) fs.rmSync(journal, { force: true });
+    fs.rmSync(path.join(root, 'runs', id), { recursive: true, force: true });
+    fs.rmSync(folder, { recursive: true, force: true });
+    fs.writeFileSync(feed, fedBefore);
+  };
+}
+
+/**
  * The factories in the store, each a file in `factories/` as `wf factory add` writes it. `hiring` holds FOLDER's run, is offered WORKFLOWS'
  * `dev` and hires its agent into `implement`; `bare` names only a folder, and so do `others`, which are there so the menu has more
  * factories than it shows; `broken`'s file names no repository, so it does not read as a factory. Listed by name, as the api lists them.

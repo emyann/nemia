@@ -386,7 +386,9 @@ function StepSection({ run, step, runCancelled }: { run: RunView; step: StepView
  * it proposes for the steps after it (`gate.budgets`), sending back the step.
  */
 function AtGate({ run, step, acts }: { run: RunView; step: StepView; acts: boolean }) {
-  const back = acts ? run.graph.edges.filter((e) => e.kind === 'after' && e.to === step.name).map((e) => e.from) : [step.name];
+  const back = acts
+    ? run.graph.edges.filter((e) => (e.kind === 'after' || e.kind === 'route') && e.to === step.name).map((e) => e.from)
+    : [step.name];
   return (
     <>
       <StepPolicy layers={step.layers} />

@@ -439,13 +439,14 @@ which is the test of whether the seam was in the right place.
 ### A process as a harness: `command`
 
 A check — `npm test`, a build — is a process, not an agent, and runs on the same worker as one (`commandHarness`,
-`src/harness/command/command.ts`). A task gives it three arguments of its `config`, the fields a Pod's container has:
+`src/harness/command/command.ts`). A task gives it four arguments of its `config`, the fields a Pod's container has:
 
 | key | what it is |
 |---|---|
 | `command` | the program and its arguments, a list of strings, the program first, no shell between: `["sh", "-c", "npm test"]` |
 | `env` | variables laid over the worker's own environment, names to strings: `{ "CI": "1" }`. Journalled with the task, so it carries no secret |
 | `niceness` | 0 to 19: above 0 the process runs under `nice -n`, and in the idle IO class (`ionice -c3`) where the machine runs that — asked once a process, as the command would run it |
+| `terminationMessagePath` | an absolute path the process may write its last words to, read once when it exits (below) |
 
 Each is refused at `file()` when it is not what it says, and on any harness but one whose spec says `commandArgs: true`, which
 would run its own session without it; the command harness refuses a task without `command`, one that carries an agent's
@@ -466,6 +467,11 @@ yield* engine.output(id, 'stderr', 4096);  // its last 4096 bytes, starting on a
 no streams. It refuses (`OutputRefused`, exit 2 in `refusalWords`) a stream that is neither, a `lastBytes` that is not a whole
 number above 0, a task the board does not have, and a harness that keeps no whole streams, whose `logs` is what it has. On
 the command line, `ae output <task> [stdout|stderr]`, which says on stderr when there is nothing kept to print.
+
+A task's `terminationMessagePath` is Kubernetes' name for it, read as the kubelet reads a container's: once, when the process
+exits, its first 4096 bytes (`TERMINATION_MESSAGE_BYTES`, `src/harness/detached/termination-message.ts`) kept on the attempt as
+`terminationMessage`, beside `exitCode`, and nothing where the file is missing or no regular file. Its stdout never answers for
+it: what a caller reads off the attempt is only what the process wrote to that file. `decide` never reads it.
 
 ### Beneath the harnesses: an A2A seam
 

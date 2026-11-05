@@ -19,7 +19,7 @@ import { Effect } from 'effect';
 import { StoreRoot, workflowVersion as versionIn } from 'agent-orchestrator';
 import { runWith } from '../../test/builtin-place.ts';
 import { objectOf } from '../../test/run-reads.ts';
-import { listWorkflows } from './workflows.ts';
+import { listWorkflows, specOf } from './workflows.ts';
 import { engine, builtinGitPlace, hireRefusalOf, loadWorkflows, passStanding, runStore } from 'agent-orchestrator';
 import { AGENTS_FOLDER, STEP_KEY_MEANINGS, STEP_KEYS } from 'agent-orchestrator/workflow';
 /** The scratch repository, set as `HKB_REPO`, which the api reads on each request: a git repository, as `nemia start` reads its HEAD. */
@@ -111,6 +111,11 @@ const spec = (fields: Partial<WorkflowStepSpec>): WorkflowStepSpec => ({
   tally: [],
   loop: null,
   rounds: null,
+  routes: null,
+  route: null,
+  when: null,
+  ends: null,
+  workflow: null,
   ...fields,
 });
 
@@ -143,6 +148,29 @@ const runFiles = (): string[] => (fs.existsSync(path.join(root, 'runs')) ? fs.re
 /** The tasks filed with the engine: a journal each. */
 const filedTasks = (): string[] =>
   fs.existsSync(path.join(root, 'engine', 'tasks')) ? fs.readdirSync(path.join(root, 'engine', 'tasks')) : [];
+
+test("a condition's keys and a workflow node's are listed on the spec, the route as its line writes it", () => {
+  const condition = (route: NonNullable<Parameters<typeof specOf>[0]['route']>) =>
+    specOf({ name: 'triage', after: ['plan'], body: '', routes: ['web', 'docs'], route, ends: ['docs'] });
+  const table = condition({ kind: 'table', from: 'plan.surface', table: { web: 'web', docs: 'docs' } });
+  assert.deepEqual(
+    { routes: table.routes, route: table.route, ends: table.ends, when: table.when, workflow: table.workflow },
+    {
+      routes: ['web', 'docs'],
+      route: '{ from: plan.surface, table: { web: web, docs: docs } }',
+      ends: ['docs'],
+      when: null,
+      workflow: null,
+    },
+  );
+  assert.equal(condition({ kind: 'script', script: 'routes/pick.ts' }).route, '{ script: routes/pick.ts }');
+  assert.equal(condition({ kind: 'judge' }).route, 'judge');
+  const node = specOf({ name: 'to-build', after: ['triage'], body: '', when: ['web'], workflow: 'build' });
+  assert.deepEqual(
+    { routes: node.routes, route: node.route, when: node.when, workflow: node.workflow },
+    { routes: null, route: null, when: ['web'], workflow: 'build' },
+  );
+});
 
 test("a person reads the workflows on the board, opens a step's page, and is refused a page that is not there", async (t) => {
   const s = story(t);

@@ -141,14 +141,14 @@ test('a restart after a settle keeps the attempt as it ended, its usage with it;
   made.settle('a', 'failed', { exitCode: 1, usage });
   made.restart('a');
   made.restart('a');
-  made.settle('a', 'succeeded', { exitCode: 0, resumeFrom: 'ae/a/2' });
+  made.settle('a', 'succeeded', { exitCode: 0, resumeFrom: 'ae/a/2', terminationMessage: 'route: web' });
   const { attempts } = (await Effect.runPromise(engine.view('a'))).state;
   assert.deepEqual(
-    attempts.map((a) => [a.n, a.ended, a.exitCode, a.usage, a.resumeFrom ?? null]),
+    attempts.map((a) => [a.n, a.ended, a.exitCode, a.usage, a.resumeFrom ?? null, a.terminationMessage ?? null]),
     [
-      [1, 'failed', 1, usage, null],
-      [2, 'failed', null, null, null],
-      [3, 'succeeded', 0, null, 'ae/a/2'],
+      [1, 'failed', 1, usage, null, null],
+      [2, 'failed', null, null, null, null],
+      [3, 'succeeded', 0, null, 'ae/a/2', 'route: web'],
     ],
   );
 });

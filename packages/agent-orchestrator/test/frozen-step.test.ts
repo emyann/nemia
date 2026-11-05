@@ -134,6 +134,40 @@ test('a step with every key the parser types, its agent and its output reads as 
   }
 });
 
+test('a condition of each eval, a node after it and a workflow node read as they were frozen; a route of no eval is refused', () => {
+  const conditions: Workflow[] = [
+    {
+      name: 'triage',
+      after: ['plan'],
+      body: '',
+      routes: ['web', 'docs'],
+      route: { kind: 'table', from: 'plan.surface', table: { web: 'web', docs: 'docs' } },
+      ends: ['docs'],
+    },
+    { name: 'pick', after: ['plan'], body: '', routes: ['web', 'docs'], route: { kind: 'script', script: 'routes/pick.ts' } },
+    { name: 'judge', after: ['plan'], body: 'Pick one.', routes: ['web', 'docs'], route: { kind: 'judge' } },
+    { name: 'build-web', after: ['triage'], body: '', when: ['web'] },
+    { name: 'to-build', after: ['triage'], body: '', when: ['web'], workflow: 'build' },
+  ];
+  for (const step of conditions) {
+    const decoded = decode(frozen(step));
+    assert.ok(Result.isSuccess(decoded), `${step.name}: ${Result.isFailure(decoded) ? String(decoded.failure) : ''}`);
+    assert.deepEqual(decoded.success, frozen(step), `${step.name} reads as it was frozen`);
+  }
+  const triage = frozen(conditions[0]) as object;
+  for (const [key, value] of [
+    ['route', 'judge'],
+    ['route', { kind: 'table', from: 'plan.surface' }],
+    ['route', { kind: 'vote' }],
+    ['routes', 'web'],
+    ['when', 'web'],
+    ['ends', 'docs'],
+    ['workflow', ['build']],
+  ] as const) {
+    assert.ok(Result.isFailure(decode({ ...triage, [key]: value })), `${key}: ${JSON.stringify(value)} is refused`);
+  }
+});
+
 test('every former name of a key (`FORMER_KEYS`) is checked as the key it is now, on a step and in its agent, and read under the new', () => {
   for (const [former, now] of Object.entries(FORMER_KEYS)) {
     const step = {

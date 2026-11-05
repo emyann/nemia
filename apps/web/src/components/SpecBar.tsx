@@ -88,7 +88,9 @@ export function SpecBody({ listing, step: name }: { listing: WorkflowListing; st
         {listing.name} has no step named {name}.
       </p>
     );
-  const sources = new Set(listing.graph.edges.filter((e) => e.kind === 'after' && e.to === name).map((e) => e.from));
+  const sources = new Set(
+    listing.graph.edges.filter((e) => (e.kind === 'after' || e.kind === 'route') && e.to === name).map((e) => e.from),
+  );
   const waits = listing.steps.map((s) => s.name).filter((s) => sources.has(s));
   return (
     <>

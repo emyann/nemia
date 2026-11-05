@@ -26,7 +26,7 @@ export const seenOf = Effect.fnUntraced(function* (runId: string, stepName: stri
   const steps = yield* stepsOf(run);
   const step = steps.find((s) => s.name === stepName);
   const { views, phaseOf } = yield* taskPhasesRead(run);
-  const closeoutOf = closeoutReader(views, run);
+  const closeoutOf = closeoutReader(views, run, steps);
   const spendOf = spendReader(views);
   const waits = (other: (typeof steps)[number]) => {
     const standing = retryable(

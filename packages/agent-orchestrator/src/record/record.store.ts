@@ -10,7 +10,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Result, Schema, SchemaIssue } from 'effect';
 import { BY_CAP, oneLine, WHY_CAP, type Acceptance, type Approval, type Hold, type Pruned, type Run } from './record.ts';
-import { spentAcceptances, spentApprovals, type RoundAsk } from '../status/status.ts';
+import { personRoutes, spentAcceptances, spentApprovals, unrouted, withRoutes, type RoundAsk } from '../status/status.ts';
 import { spentRoundAsks } from '../round/round.ts';
 import { spentAsks, TRY_CAUSES, upgradeAsk, upgradeTries, type RetryAsk } from '../retry/index.ts';
 import { asNamed } from '../workflow.ts';
@@ -309,14 +309,13 @@ const readRecord = (id: string): Run => {
   for (const key of ['approvals', 'acceptances', 'pruned', 'hold', 'labels', 'pause', 'cordon']) delete read[key];
   const { workflow, ...unfrozen } = read;
   const run = workflow ? { ...read, workflow: workflow.map(asNamed) } : unfrozen;
-  const at = fs.existsSync(cancelFile(id)) ? readText(cancelFile(id)).trim() : '';
-  const [pruned, hold] = [readPruned(id), readHold(id)];
-  const { approvals, acceptances } = within('asks', () => {
+  const [at, pruned, hold] = [fs.existsSync(cancelFile(id)) ? readText(cancelFile(id)).trim() : '', readPruned(id), readHold(id)];
+  const { approvals, acceptances, routes } = within('asks', () => {
     const names = fileNames(asksDir(id));
-    return { ...readApprovalsNow(id, names), ...readAcceptancesNow(id, names) };
+    return { ...readApprovalsNow(id, names), ...readAcceptancesNow(id, names), routes: personRoutes(asksDir(id), names, heldIn) };
   });
   return {
-    ...run,
+    ...withRoutes(run, routes),
     ...(at ? { cancelledAt: at } : {}),
     ...(pruned ? { pruned } : {}),
     ...(hold ? { hold } : {}),
@@ -741,8 +740,8 @@ export const writeRun = ({ pause: _, labels: __, ...run }: Run) => {
  * opened `r+`, which never makes a file. Its existence is read at the moment of writing, and nothing is carried to decide it; a record
  * removed after it is opened takes the write with it.
  *
- * Without the approvals, acceptances, pruning and hold `readRun` composed onto it, nor the pause and labels `runStore` did: they are a
- * person's files, and a copy in the record would outlive the file it was read from.
+ * Without the approvals, acceptances, pruning, hold and a person's routes `readRun` composed onto it (`unrouted`), nor the pause and labels
+ * `runStore` did: they are a person's files, and a copy in the record would outlive the file it was read from.
  */
 export const rewriteRun = (run: Run): boolean => within('act', () => rewriteNow(run));
 
@@ -756,7 +755,7 @@ const rewriteNow = ({ approvals: _, acceptances: __, pruned: ___, hold: ____, la
   }
   try {
     fs.ftruncateSync(fd);
-    fs.writeFileSync(fd, recordText(run));
+    fs.writeFileSync(fd, recordText(unrouted(run)));
   } finally {
     fs.closeSync(fd);
   }

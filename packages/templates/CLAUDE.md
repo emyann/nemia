@@ -6,8 +6,8 @@ layout gives a place sits inside a template's folder: the workspace's own files 
 `released.json`, `test/`) sit beside it, since a render would carry anything inside.
 
 - `sdlc/` — the team that builds Nemia, with this repository's words taken out: six agents and four workflows, the role skills they
-  name, and the scripts their checks run (`landing.ts`, `pull-request.ts`, `probe.ts` in `build/` and `quick/`, held equal byte for
-  byte; `change.ts` in `quick/`; `cards.ts` in `janitor/`). What the repository a factory is applied to decides is a parameter of
+  name, and the scripts their checks run (`landing.ts`, `parts.ts`, `pull-request.ts`, `probe.ts` in `build/` and `quick/`, held equal
+  byte for byte; `change.ts` in `quick/`; `cards.ts` in `janitor/`). What the repository a factory is applied to decides is a parameter of
   `nemia.yaml`, written in text as `${{ parameters.<name> }}`; a carried script is never rendered, so a script takes what it needs as
   a flag (`--check <name>`).
 

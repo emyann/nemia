@@ -36,7 +36,9 @@ export type Unloaded = { workflow: string; message: string };
 /**
  * What an agent's rules reach: the agent; the factory read, and the run where one was named; the factory's level now; the reach of the
  * rules in force over the steps at their gate (`all`, `some`, `none`); a row for each such step; the rules suggested for the steps no rule
- * reaches, each with its words, as `nemia policy propose` takes them; and each attached workflow that does not load.
+ * reaches, each with its words; the whole proposal to propose them by (`proposal`), since a proposal replaces the last one: what the
+ * agent proposed already, rules and guidance, with the suggestions added, each over a proposed rule of its id; and each attached
+ * workflow that does not load.
  */
 export type PolicyReach = {
   agent: string;
@@ -46,6 +48,7 @@ export type PolicyReach = {
   reach: Reach;
   gates: GateReach[];
   suggested: WordedRule[];
+  proposal: { rules: PolicyRule[]; guidance: string[] };
   unloaded: Unloaded[];
 };
 
@@ -113,7 +116,8 @@ const runSites = Effect.fnUntraced(function* (runId: string) {
 const reachOf = Effect.fnUntraced(function* (home: string, args: Args) {
   const agent = agentIn(args);
   const inForce = listInForce(readConfirmed(home, agent)?.rules);
-  const proposed = readProposed(home, agent)?.rules ?? [];
+  const asProposed = readProposed(home, agent);
+  const proposed = asProposed?.rules ?? [];
   const runId = typeof args.runId === 'string' ? args.runId : undefined;
   const read =
     runId === undefined
@@ -130,6 +134,10 @@ const reachOf = Effect.fnUntraced(function* (home: string, args: Args) {
     reach,
     gates: rows,
     suggested: suggested.map((rule) => ({ ...rule, words: ruleWords(rule) })),
+    proposal: {
+      rules: [...proposed.filter((p) => !suggested.some((s) => s.id === p.id)), ...suggested],
+      guidance: asProposed?.guidance ?? [],
+    },
     unloaded: read.unloaded,
   } satisfies PolicyReach;
 });
@@ -161,7 +169,7 @@ function reachLines(r: PolicyReach): string[] {
     ...lines,
     'suggested, each reaching a step above:',
     ...r.suggested.map((s) => `  ${s.id}: ${s.words}`),
-    `propose them with nemia policy propose ${r.agent} --file -, given {"rules": [the suggested rules of --json]};`,
+    `propose them with nemia policy propose ${r.agent} --file -, given the proposal of --json, which keeps what is proposed already;`,
     `the person confirms each with nemia policy confirm ${r.agent} <id> --words '<its words>'.`,
   ];
 }

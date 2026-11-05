@@ -45,7 +45,9 @@ no check never passed one. `nemia policy reach nemia --factory <name>` says, of 
 ever approve it, why not, and the rules that would. Read it when a factory's level changes to auto (a `level changed` line wakes you)
 and before you say what auto does in a factory. Where your rules reach none or only some of its steps, say so in a line or two, in
 plain words: what you will answer on your own, what you will still bring them, and why. Offer only the rules it suggests, each in its
-words, never an id, a condition's name or JSON; propose one they accept with `nemia policy propose`, and they confirm it.
+words, never an id, a condition's name or JSON; propose one they accept with `nemia policy propose`,
+given the read's `proposal`, any suggestion they turned down taken out: a proposal replaces the last one, so it keeps what you
+proposed before. Then they confirm it.
 
 Each factory's folders are mounted for you to read, never to write. Rebuild what you know of a factory from the store each time you act
 in it — `nemia factory`, then `nemia ls` and `nemia decide` for its runs — and read its instruction with `nemia factory instruction

@@ -22,7 +22,8 @@ const { POLICY_REACH } = await import('./reach.verb.ts');
 const { TABLE } = await import('../command/commands.verb.ts');
 const { attachWorkflowAt, createFactoryAt } = await import('../factory/factory.store.ts');
 const { writeFactoryLevel } = await import('../level/level.store.ts');
-const { confirmRule, writeProposed } = await import('../auto/auto.store.ts');
+const { confirmRule, readProposed, writeProposed } = await import('../auto/auto.store.ts');
+const { POLICY_PROPOSE } = await import('../auto/auto.verb.ts');
 const { ruleWords } = await import('../auto/auto.ts');
 const { engineOf, runWith } = await import('../runtime-client.ts');
 const { RunDoor } = await import('../runs/runs.store.ts');
@@ -83,6 +84,19 @@ test('`nemia policy reach`: which steps at their gate her rules can approve in a
       'the suggestions are printed',
     );
     suggested = read.suggested;
+  });
+
+  await t.test('the proposal it gives keeps what was proposed, rules and guidance, with the suggestions added', async () => {
+    const tries = { id: 'tries', answer: 'retry' as const, steps: ['implement'], when: ['checked' as const] };
+    writeProposed(ROOT, 'nemia', { at: '2026-11-05T00:00:00.000Z', rules: [tries], guidance: ['be kind'], digest: null });
+    const read = await reach({ factory: 'f' });
+    await stage.runWith(
+      stage.board().e,
+      POLICY_PROPOSE.handler({ name: 'nemia', file: '-', words: JSON.stringify(read.proposal) }, undefined, ROOT),
+    );
+    const after = readProposed(ROOT, 'nemia');
+    assert.deepEqual(after?.rules.map((r) => r.id).sort(), ['approve-draft', 'approve-ship', 'tries']);
+    assert.deepEqual(after?.guidance, ['be kind']);
   });
 
   await t.test('a suggestion proposed shows on the row it would reach; once confirmed, it reaches it and the reach is some', async () => {

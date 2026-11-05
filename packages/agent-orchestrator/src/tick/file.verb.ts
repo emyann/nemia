@@ -41,7 +41,6 @@ import {
   sentBack,
   stepMomentum,
   stepSpend,
-  stepStatus,
   triedFrom,
   type Round,
   type RoundAsk,
@@ -73,6 +72,7 @@ import { forStep } from '../telemetry/telemetry.store.ts';
 import { stepLabels } from '../telemetry/telemetry.ts';
 import { localFields } from './assess.ts';
 import { answeredRoute } from '../route/route-words.ts';
+import { sendCards, wordReader, type Due } from '../route/send.verb.ts';
 import { filedAt, foldersTold, placeTold, toldOf, type PlaceTold, type StepTold, type Told } from './told.verb.ts';
 import { found, recordNamed, stepNamed, taskToStop, tryTold } from './told.verb.ts';
 
@@ -436,12 +436,7 @@ function roundSpec(
  */
 function answerTables(f: Pick<Filing, 'run' | 'reads'>): string[] {
   const { run, reads } = f;
-  const wordOf = (name: string) => {
-    const step = reads.steps.find((s) => s.name === name);
-    return step
-      ? stepStatus(step, run, reads.phaseOf, reads.signedOff, reads.asked, reads.steps, reads.spendOf, reads.verdictOf)
-      : 'pending';
-  };
+  const wordOf = wordReader(run, reads);
   const written: string[] = [];
   for (const step of reads.steps) {
     const record = run.steps[step.name];
@@ -515,20 +510,21 @@ const fileCheck = Effect.fnUntraced(function* (f: Filing, name: string) {
 });
 
 /**
- * File the ready steps, in order, until the pass may file no more, each in the workspace cut for it: answers with the steps filed. A run
- * that waited on runs, on the pass that files its roots, moves its base to its branch as the pass read it (`Filing.heads`), and keeps it
- * where the pass did not; and a run that waited on runs or was handed runs as context reads what they concluded, where their branches
- * stand read through `git` (`handedOf`). First, each table condition's route is copied onto its record (`answerTables`).
+ * File the ready steps (`due.ready`), in order, until the pass may file no more, each in the workspace cut for it: answers with the
+ * steps filed. A run that waited on runs, on the pass that files its roots, moves its base to its branch as the pass read it
+ * (`Filing.heads`), and keeps it where the pass did not; and a run that waited on runs or was handed runs as context reads what they
+ * concluded, where their branches stand read through `git` (`handedOf`). First, each table condition's route is copied onto its record
+ * (`answerTables`), and each workflow node in `due.send` files its card (`sendCards`), answered among the steps filed.
  */
-export const fileReady = Effect.fn('fileReady')(function* (f: Filing, ready: readonly string[], starting: boolean, git: BranchReader) {
+export const fileReady = Effect.fn('fileReady')(function* (f: Filing, due: Due, starting: boolean, git: BranchReader) {
   const { e, run } = f;
   answerTables(f);
-  if (ready.length && starting && run.after?.length && isRepositoryRun(run)) run.baseRef = f.heads?.()?.[run.branch] || run.baseRef;
-  const parents = ready.length && starting ? yield* handedOf(e, run, git) : undefined;
-  const filed: string[] = [];
+  if (due.ready.length && starting && run.after?.length && isRepositoryRun(run)) run.baseRef = f.heads?.()?.[run.branch] || run.baseRef;
+  const parents = due.ready.length && starting ? yield* handedOf(e, run, git) : undefined;
+  const filed: string[] = [...(yield* sendCards(f, due.send))];
   const placed = yield* PlaceService;
-  const servers = yield* serversFiling(run.factory ?? DEFAULT_FACTORY, f.reads.home, ready, f.notes);
-  for (const name of ready) {
+  const servers = yield* serversFiling(run.factory ?? DEFAULT_FACTORY, f.reads.home, due.ready, f.notes);
+  for (const name of due.ready) {
     if (!f.mayFile()) break;
     const step = stepNamed(f, name);
     if (unsignedStep(servers, step, f.notes)) continue;

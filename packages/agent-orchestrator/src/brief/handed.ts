@@ -7,8 +7,11 @@ import { outputFields, type Workflow } from '../step/step.ts';
 import { dataBlock, fenced } from '../record/record.ts';
 import { declaredOutput, type Closeout } from '../closeout/index.ts';
 
-/** A terminal step of a run another waited on: its step and how it signed off — or its name, and why that cannot be given. */
-export type ParentStep = { step: Workflow; said: Closeout } | { name: string; unreadable: string };
+/**
+ * A terminal step of a run another waited on: its step and how it signed off, and for a run that routed on to this one its artifacts
+ * folder (`files`) — or its name, and why that cannot be given.
+ */
+export type ParentStep = { step: Workflow; said: Closeout; files?: string } | { name: string; unreadable: string };
 
 /**
  * A run this one waited on (`--after`) or was handed as context (`--from`), as the pass that files this run's roots read it off the store
@@ -32,6 +35,7 @@ function concludedLines(parent: Extract<ParentCloseout, { steps: readonly Parent
       continue;
     }
     lines.push('', `What ${s.step.name} said when it signed off, its \`summary\`:`, '', ...fenced(s.said.summary, 'text'));
+    if (s.files) lines.push('', `The files ${s.step.name} wrote are in ${s.files}: read them there, and write none of them.`);
     const fields = outputFields(s.step);
     if (fields.length) {
       lines.push(

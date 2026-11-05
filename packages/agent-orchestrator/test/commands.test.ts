@@ -28,6 +28,7 @@ test('the commands whose work waits on the next pass tick, and the start itself 
       'refresh',
       'resume',
       'retry',
+      'route',
       'start',
     ],
   );
@@ -117,6 +118,7 @@ test('each command is served on the api where it was before the table, the lift 
       ['template unpack', 'cli'],
       ['retry', { method: 'POST', path: '/api/runs/:runId/steps/:step/retry', status: 202 }],
       ['approve', { method: 'POST', path: '/api/runs/:runId/steps/:step/approve', status: 202 }],
+      ['route', 'cli'],
       ['refresh', { method: 'POST', path: '/api/runs/:runId/refresh', status: 202 }],
       ['say', { method: 'POST', path: '/api/runs/:runId/steps/:step/say', status: 202 }],
       [

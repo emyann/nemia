@@ -47,6 +47,11 @@
       "type": "FeedDoorShape"
     },
     {
+      "term": "Level changed",
+      "meaning": "a Normal line about the store, `LevelChanged`, labelled with its factory (`labels.factory`): written by the tick each time a factory's level in force changes — set, raised, or a raise ended by `--end` or by its end passing — its note the level in words, a raise with its end; a factory at `manual` the feed has said nothing of gets none. A person's deed, and one of Nemia's selectors.",
+      "type": "Reason"
+    },
+    {
       "term": "Line",
       "meaning": "one judged change of a run, a step, a daemon or the store, written on the feed: a report, never an input.",
       "type": "FeedLine",
@@ -127,7 +132,7 @@
     },
     {
       "term": "Store's line",
-      "meaning": "a line of the store itself: its pause put or lifted.",
+      "meaning": "a line of the store itself: its pause put or lifted, or a factory's level changed.",
       "type": "StoreLine"
     },
     {

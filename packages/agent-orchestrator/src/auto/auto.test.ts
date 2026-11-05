@@ -10,6 +10,7 @@ import test from 'node:test';
 import { names } from '../../test/assessed.ts';
 import {
   allowedBy,
+  CONDITION_WORDS,
   CONDITIONS,
   DEFAULT_POLICY,
   listInForce,
@@ -59,19 +60,34 @@ test("`ruleWords`: a rule's words are made from its fields, each condition's phr
   const rule = ruleWords(DEFAULT_POLICY);
   assert.equal(
     rule,
-    'Approve any step unasked when the agent recommends it, its check passed, every reviewer accepted, no step is past its budget and ' +
-      'nothing is left open.',
+    'Approve any step on its own once its agent recommends it, its check passed, its review passed, it stayed within budget and ' +
+      'nothing waits on you.',
   );
-  for (const phrase of ['the agent recommends it', 'its check passed', 'every reviewer accepted', 'no step is past its budget'])
-    assert.equal(rule.split(phrase).length, 2, phrase);
-  assert.equal(
-    ruleWords({ id: 'tries', answer: 'retry', steps: ['implement', 'review'], when: ['recommends'], under: 20 }),
-    'Try again the steps implement and review unasked when the agent recommends it and the run has cost under $20.',
-  );
-  assert.equal(
-    ruleWords({ id: 'open', answer: 'approve', steps: ['design'], when: [] }),
-    'Approve the step design unasked, whatever the run’s state.',
-  );
+  for (const phrase of Object.values(CONDITION_WORDS)) assert.equal(rule.split(phrase).length, 2, phrase);
+  const rows: [PolicyRule, string][] = [
+    [
+      { id: 'land', answer: 'approve', steps: ['land'], when: ['recommends', 'accepted', 'withinBudget', 'nothingOpen'] },
+      'Approve land on its own once its agent recommends it, its review passed, it stayed within budget and nothing waits on you.',
+    ],
+    [
+      { id: 'two', answer: 'approve', steps: ['design', 'land'], when: ['accepted'] },
+      'Approve design and land on their own once its review passed.',
+    ],
+    [{ id: 'any', answer: 'approve', when: ['nothingOpen'] }, 'Approve any step on its own once nothing waits on you.'],
+    [
+      { id: 'tries', answer: 'retry', steps: ['design'], when: ['checked'], under: 5 },
+      'Try design again on its own once its check passed and it has cost under $5.',
+    ],
+    [
+      { id: 'tries', answer: 'retry', steps: ['implement', 'review'], when: ['recommends'], under: 20 },
+      'Try implement and review again on their own once its agent recommends it and it has cost under $20.',
+    ],
+    [{ id: 'spend', answer: 'retry', when: [], under: 5 }, 'Try any step again on its own once it has cost under $5.'],
+    [{ id: 'open', answer: 'approve', steps: ['land'], when: [] }, 'Approve land on its own, whatever its state.'],
+    [{ id: 'open', answer: 'approve', steps: ['design', 'land'], when: [] }, 'Approve design and land on their own, whatever their state.'],
+    [{ id: 'open', answer: 'retry', when: [] }, 'Try any step again on its own, whatever its state.'],
+  ];
+  for (const [r, words] of rows) assert.equal(ruleWords(r), words, JSON.stringify(r));
 });
 
 test('a confirmed list replaces the default; the default is in force only while none is confirmed', () => {

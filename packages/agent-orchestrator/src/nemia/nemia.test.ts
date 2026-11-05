@@ -10,7 +10,7 @@ import assert from 'node:assert/strict';
 import { DEFAULT_SELECTORS } from '../subscription/index.ts';
 import { parseSelectors, selects } from '../watch/selector.ts';
 import { DEMAND_OFF } from '../demand/demand.ts';
-import { DENIED, upgraded } from '../feed/index.ts';
+import { DENIED, LINE_WORDS, upgraded } from '../feed/index.ts';
 import { names } from '../../test/assessed.ts';
 import {
   NEMIA_SELECTORS,
@@ -30,9 +30,10 @@ import {
 
 const SEMI: Keeping = { above: true, task: 'nemia-1' };
 const MANUAL: Keeping = { above: false, task: 'nemia-1' };
-const HERS: HerSubscription = { task: 'nemia-1', scoped: true };
-const OLDER: HerSubscription = { task: 'nemia-0', scoped: true };
-const UNSCOPED: HerSubscription = { task: 'nemia-1', scoped: false };
+const HERS: HerSubscription = { task: 'nemia-1', scoped: true, selected: true };
+const OLDER: HerSubscription = { task: 'nemia-0', scoped: true, selected: true };
+const UNSCOPED: HerSubscription = { task: 'nemia-1', scoped: false, selected: true };
+const UNSELECTED: HerSubscription = { task: 'nemia-1', scoped: true, selected: false };
 const OPEN: HerTask = { settled: false, stopRequested: false };
 const SETTLED: HerTask = { settled: true, stopRequested: false };
 const STOPPING: HerTask = { settled: false, stopRequested: true };
@@ -86,6 +87,10 @@ test('`nemiaDue` and `nemiaState`: what the keeper owes, and where she stands, a
   await t.test('REFUSED: a subscription of hers without her floor is no keeping; it is dropped and put again with it', () => {
     assert.equal(nemiaState(SEMI, OPEN, UNSCOPED), 'filed');
     assert.deepEqual(nemiaDue(SEMI, OPEN, UNSCOPED), ['drop', 'subscribe']);
+  });
+  await t.test('REFUSED: a subscription of hers put before a selector of hers was added is no keeping; it is put again with them', () => {
+    assert.equal(nemiaState(SEMI, OPEN, UNSELECTED), 'filed');
+    assert.deepEqual(nemiaDue(SEMI, OPEN, UNSELECTED), ['drop', 'subscribe']);
   });
   await t.test('REFUSED: a task stopped or ended from outside is never filed again at semi-auto; a subscription left is dropped', () => {
     for (const task of [SETTLED, STOPPING]) {
@@ -177,6 +182,20 @@ test('her diagram draws every edge and each verb from every state it is taken fr
   );
 });
 
+test("a factory's level changed wakes her, and only her — her selectors name reason=LevelChanged, which the default does not", () => {
+  const level = upgraded({
+    at: '2026-11-05T13:00:00.000Z',
+    store: 'store',
+    word: LINE_WORDS.LevelChanged,
+    note: 'acme is at auto',
+    involved: { kind: 'Store', name: 'store' },
+    labels: { factory: 'acme' },
+  });
+  assert.deepEqual([level.reason, level.source, level.waits], ['LevelChanged', 'person', undefined], "a person's deed, waiting on nobody");
+  assert.equal(selects(parseSelectors([...NEMIA_SELECTORS]), level), true, 'she is told of a raise as of a gate');
+  assert.equal(selects(parseSelectors([...DEFAULT_SELECTORS]), level), false, 'and nobody else is woken');
+});
+
 test("REFUSED: a step's denied call wakes her, and only her — her selectors name reason=ToolDenied, which the default does not", () => {
   const shot = upgraded({
     at: '2026-10-05T16:00:00.000Z',
@@ -193,7 +212,11 @@ test("REFUSED: a step's denied call wakes her, and only her — her selectors na
   assert.equal(selects(parseSelectors([...NEMIA_SELECTORS]), shot), true, 'she is told of every denial at once');
   assert.equal(selects(parseSelectors([...DEFAULT_SELECTORS]), shot), false, 'and nobody else is woken, as nobody is today');
   assert.ok(shot.word.startsWith(DENIED), `the one-shot's word leads with ${JSON.stringify(DENIED)}, and her selector reads its reason`);
-  assert.deepEqual([...NEMIA_SELECTORS], ['waits=person', 'reason=ToolDenied'], 'two lines a person reads in her record');
+  assert.deepEqual(
+    [...NEMIA_SELECTORS],
+    ['waits=person', 'reason=ToolDenied', 'reason=LevelChanged'],
+    'three lines a person reads in her record',
+  );
   assert.equal(shot.waits, undefined, 'a denial waits on nobody: the step runs on');
 });
 

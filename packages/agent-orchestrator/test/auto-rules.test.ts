@@ -199,7 +199,7 @@ test('Auto rules decide an approval: proposed, confirmed beside the default, giv
     const list = await shown();
     assert.equal(list.isDefault, false);
     const words = list.rules[1]?.words ?? '';
-    for (const fact of ['Try again', 'implement', 'its check passed', 'under $20']) assert.ok(words.includes(fact), words);
+    for (const fact of ['Try implement again', 'its check passed', 'under $20']) assert.ok(words.includes(fact), words);
   });
   await s.test("a proposal written again leaves the person's list as it was: it is no proposal's to write", () => {
     const before = fs.readFileSync(confirmedFile(ROOT, 'nemia'));
@@ -348,7 +348,7 @@ test('The rules on disk refuse, by their kind, writing nothing', async (t) => {
     const { kind, message } = refusal(() => confirmRule(home, 'nemia', 'tries', TRIES, NOW));
     assert.equal(kind, 'Conflict');
     assert.ok(message.startsWith("nemia's rule tries"), message);
-    names(message, '"Approve any step unasked', 'nemia policy nemia');
+    names(message, '"Approve any step on its own', 'nemia policy nemia');
     assert.equal(fs.existsSync(confirmedFile(home, 'nemia')), false);
     assert.equal(refusal(() => confirmRule(home, 'nemia', 'default', `${DEFAULT} `, NOW)).kind, 'Conflict', "the default's own words");
     assert.equal(fs.existsSync(confirmedFile(home, 'nemia')), false);

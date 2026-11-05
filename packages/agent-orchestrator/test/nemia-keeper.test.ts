@@ -288,8 +288,8 @@ test("Nemia kept and let go: trusted late, filed long-lived in auto with the dae
       );
       assert.deepEqual(
         listSubscriptions()[0].subscription.selectors,
-        ['waits=person', 'reason=ToolDenied'],
-        "the lines that wait on a person, and a step's denied calls",
+        ['waits=person', 'reason=ToolDenied', 'reason=LevelChanged'],
+        "the lines that wait on a person, a step's denied calls, and a factory's level changed",
       );
       assert.deepEqual(listSubscriptions()[0].subscription.scope, { atLeast: 'semi-auto' }, 'told of no factory left alone');
       assert.deepEqual(await beat(), [], 'level-triggered: nothing filed again');

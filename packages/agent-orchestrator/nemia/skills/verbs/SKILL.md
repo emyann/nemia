@@ -131,6 +131,11 @@ They write nothing: run them unasked, as often as you need. One that sets with s
                                the agent's rules at auto: the answers it may give unasked, in force once
                                you confirm them, and what it proposed from your custom instruction,
                                with the words the machinery cannot hold, kept as guidance
+  nemia policy reach <agent> (--factory <name> | --run <runId>)
+                               which steps at their gate the agent's rules in force could ever approve
+                               unasked, in a factory or a run: why each other rule cannot (a step approved
+                               before it runs has done nothing to recommend or check; one with no check
+                               never passed one), what keeps a rule from a run now, and the rules that would
   nemia service status [--name <name>]
                                the login service and the lease: whether it is installed and runs,
                                the checkout it runs, who holds the store, and lingering

@@ -443,10 +443,10 @@ const recordText = (id: string) => fs.readFileSync(path.join(ROOT, 'runs', `${id
 
 /**
  * A step's record without what every filing writes of the revisions it took — the agent and skill pins and the digest of its closeout
- * schema, whose subject is `revisions.test.ts`.
+ * schema and the fields it declared, whose subject is `revisions.test.ts`.
  */
 const filedAs = (record: StepRecord | undefined): Partial<StepRecord> => {
-  const { pinned: _, closeoutHash: __, ...rest } = record ?? { taskId: null };
+  const { pinned: _, closeoutHash: __, declared: ___, ...rest } = record ?? { taskId: null };
   return rest;
 };
 

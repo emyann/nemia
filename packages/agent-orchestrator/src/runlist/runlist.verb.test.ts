@@ -506,11 +506,20 @@ test('REFUSED by kind: a selector that is none, on each read of the list', async
     );
 });
 
+/** What a read of a run's record meets, as `goneAsRead` stands it in. */
+type Meets = 'gone before it' | 'gone during it' | 'a failure, the record kept';
+
+/** The error `fs.readFileSync` throws for a file that is not there. */
+const enoent = (file: string): Error =>
+  Object.assign(new Error(`ENOENT: no such file or directory, open '${file}'`), { code: 'ENOENT', errno: -2, syscall: 'open', path: file });
+
 /**
- * The records of `ids` removed as each is read, after the store was listed: a run removed between the list and the read of its row, as
- * `nemia rm` removes one while the board polls. Each is put back before the next listing, so every read lists it.
+ * The records of `ids` read as `meets` says, after the store was listed: removed before the read looks for it (`Missing`); removed
+ * during it, after it found the record, so a file read fails (`ENOENT`) — each a run removed between the list and the read of its row,
+ * as `nemia rm` removes one while the board polls; or a read that fails with the record still there. Each is put back before the next
+ * listing, so every read lists it.
  */
-const goneAsRead = (t: TestContext, ids: readonly string[]): void => {
+const goneAsRead = (t: TestContext, ids: readonly string[], meets: Meets): void => {
   const fileOf = (id: string) => path.join(RUNS_DIR, `${id}.json`);
   const texts = new Map(ids.map((id) => [id, fs.readFileSync(fileOf(id), 'utf8')]));
   const { list, read } = { list: runStore.runs.list.bind(runStore.runs), read: runStore.runs.read.bind(runStore.runs) };
@@ -519,29 +528,43 @@ const goneAsRead = (t: TestContext, ids: readonly string[]): void => {
     return list(...args);
   });
   t.mock.method(runStore.runs, 'read', (id: string) => {
-    if (texts.has(id)) fs.rmSync(fileOf(id), { force: true });
+    if (!texts.has(id)) return read(id);
+    if (meets === 'a failure, the record kept') throw enoent(path.join(RUNS_DIR, `${id}.asks`));
+    fs.rmSync(fileOf(id), { force: true });
+    if (meets === 'gone during it') throw enoent(fileOf(id));
     return read(id);
   });
 };
 
 test('a run removed as its row is read is still its row, with no clock, on each read: neither read refuses the store over it', async (t) => {
-  const waiting = await aWaiting();
-  const moving = await anInFlight();
-  const done = await aFinished();
-  goneAsRead(t, [waiting, moving, done]);
+  for (const meets of ['gone before it', 'gone during it'] as const)
+    await t.test(meets, async (t) => {
+      fs.rmSync(RUNS_DIR, { recursive: true, force: true });
+      fs.mkdirSync(RUNS_DIR, { recursive: true });
+      const waiting = await aWaiting();
+      const moving = await anInFlight();
+      const done = await aFinished();
+      goneAsRead(t, [waiting, moving, done], meets);
 
-  const light = await open();
-  assert.deepEqual(
-    light.waiting.map((row) => [row.id, row.clock, row.stepCosts, row.waitingSince]),
-    [[waiting, null, null, null]],
-  );
-  assert.deepEqual(
-    light.inFlight.map((row) => [row.id, row.clock]),
-    [[moving, null]],
-  );
-  const page = await finishedPage();
-  assert.deepEqual(
-    page.runs.map((row) => [row.id, row.clock]),
-    [[done, null]],
-  );
+      const light = await open();
+      assert.deepEqual(
+        light.waiting.map((row) => [row.id, row.clock, row.stepCosts, row.waitingSince]),
+        [[waiting, null, null, null]],
+      );
+      assert.deepEqual(
+        light.inFlight.map((row) => [row.id, row.clock]),
+        [[moving, null]],
+      );
+      const page = await finishedPage();
+      assert.deepEqual(
+        page.runs.map((row) => [row.id, row.clock]),
+        [[done, null]],
+      );
+    });
+});
+
+test('REFUSED: a read of a row that fails while its record is still there fails the read, never passed over as a run removed', async (t) => {
+  const waiting = await aWaiting();
+  goneAsRead(t, [waiting], 'a failure, the record kept');
+  await assert.rejects(open(), (err: NodeJS.ErrnoException) => err.code === 'ENOENT');
 });

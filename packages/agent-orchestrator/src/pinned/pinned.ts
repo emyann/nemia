@@ -4,7 +4,9 @@
  * Here rather than in `filed/filed.ts` so the round's pure code may read it: `filed.ts` reads the retry's words, which the round reads too,
  * and a folder of the format may not need a folder that needs it (`test/layout.test.ts`).
  */
+import type { FiledFields } from '../../contracts/filed-fields.contract.ts';
 import { closeoutHashOf } from '../closeout/index.ts';
+import { outputFields } from '../step/step.ts';
 import type { Pin } from '../revisions/revisions.ts';
 import type { Run, StepRecord } from '../record/record.ts';
 import type { Workflow } from '../workflow.ts';
@@ -28,10 +30,23 @@ export const stepPins = (step: Workflow, pins: readonly Pin[]): Pin[] => {
  * schema it was given (`closeoutHashOf`). Written at every filing, so a step that has landed says which revisions its try ran on even
  * once a refresh has moved the run's own past them. Nothing for a step the steps given do not hold. Pure.
  */
-export const filedOn = (f: PinsRead, step: Workflow | undefined): Pick<StepRecord, 'pinned' | 'closeoutHash'> => {
+export const filedOn = (f: PinsRead, step: Workflow | undefined): Pick<StepRecord, 'pinned' | 'closeoutHash' | 'declared'> => {
   if (!step) return {};
   const own = stepPins(step, f.run.pinned ?? []);
-  return { ...(own.length ? { pinned: own } : {}), closeoutHash: closeoutHashOf(step, f.reads.steps) };
+  return { ...(own.length ? { pinned: own } : {}), closeoutHash: closeoutHashOf(step, f.reads.steps), declared: outputFields(step) };
+};
+
+/**
+ * Which of the fields its `output:` declares a step's try owes (contract `filed-fields.contract.ts`): those it was filed with
+ * (`StepRecord.declared`), whatever its run follows later. A record written before they were kept owes what the step declares `now`
+ * where its schema has not `moved` since it was filed, and where it has, those of them its closeout `gave`: the harness held it to the
+ * schema it was handed, so a field it lacks is one that schema did not ask. Pure.
+ */
+export const filedFields: FiledFields = (filed, now, gave) => {
+  const declared = filed.declared;
+  if (declared !== undefined) return declared.slice();
+  if (!filed.moved) return now.slice();
+  return now.filter((f) => gave.includes(f));
 };
 
 /**

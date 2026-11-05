@@ -59,6 +59,7 @@ const StepRecordSchema = Kept({
   filesRead: Schema.optional(Kept({ taskId: Schema.String, lacked: Schema.Record(Schema.String, Schema.String) })),
   pinned: Pins,
   closeoutHash: Schema.optional(Schema.String),
+  declared: Schema.optional(Strings),
 });
 
 /**

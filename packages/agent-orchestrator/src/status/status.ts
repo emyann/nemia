@@ -10,7 +10,8 @@ import { DEFAULT_ROUNDS, endsOnBase, JUDGE_ROUTE, LOOP_REPLIES, outputFields, ty
 import { loopSpan } from '../workflow/index.ts';
 import { isJudge } from '../route/index.ts';
 import type { TaskClock } from '../timeline/index.ts';
-import { declaredOutput, isLoopTarget, type Closeout } from '../closeout/index.ts';
+import { closeoutHashOf, declaredOutput, isLoopTarget, type Closeout } from '../closeout/index.ts';
+import { filedFields } from '../pinned/pinned.ts';
 import { closeoutRefusals } from '../question/index.ts';
 import { budgetOf } from '../budget/budget.ts';
 export { approvedCapsOf, budgetOf } from '../budget/budget.ts';
@@ -379,7 +380,8 @@ export const resultOnBase = (standings: readonly BranchStanding[]): boolean =>
  * else is `unsigned`. One that says `again: true` on the last round its `rounds:` allows is `exhausted`:
  * done by its check or its word, and final without letting what waits on it run — a person decides. Below
  * the cap it reads as signed, and `assess` files the next round (`roundsDue`). From its second round a
- * loop's target owes `replies` beside what it declares (`owedFields`), which is why `steps` is asked for.
+ * loop's target owes `replies` beside what it declares (`owedFields`), which is why `steps` is asked for. What it declares is what its
+ * try was filed with (`filedOwed`), so a revision its run follows after a try has ended never turns that try `unsigned`.
  *
  * **A budget is spent once the engine says so.** A task whose harness ended its last attempt at its cap is `budget exhausted`, whatever
  * else its session left: the runtime reports the cut (`limit: 'budget'`) and judges nothing of it, so this is where it is judged. A step
@@ -545,7 +547,7 @@ export const ownStatus: OwnStatus = (step, run, phaseOf, closeoutOf, askedCloseo
  * (`lackedOf`), or one the run refuses (`closeoutRefusals`: a `needs` on a `done` v1 closeout, a question field that does not read).
  */
 const unaccepted = (step: Workflow, run: Run, steps: readonly Workflow[], said: Closeout): boolean =>
-  declaredOutput(step, said, owedFields(step, run, steps)).missing.length > 0 ||
+  declaredOutput(step, said, owedFields(step, run, steps, said)).missing.length > 0 ||
   (Boolean(step.loop) && typeof said.output?.again !== 'boolean') ||
   lackedOf(run.steps[step.name]).length > 0 ||
   closeoutRefusals(step, said, steps).length > 0;
@@ -795,11 +797,25 @@ export function askingTry(steps: readonly Workflow[], run: Run, name: string): {
 }
 
 /**
- * The fields a step's closeout must give on the try it is on: what its `output:` declares, and `replies` on a loop's target past round 1 —
- * where an empty list is no answer (`declaredOutput`) — and `route` on a judge (`JUDGE_ROUTE`).
+ * The fields of its `output:` a step's closeout `said` owes on the try it is on, as that try was filed (`filedFields`): those its record
+ * kept at the filing (`declared`), so a revision its run followed after it adds none. A record written before they were kept owes what
+ * the step declares now where its closeout schema has not moved since (`closeoutHash`), and where it has, those of them it gave.
  */
-export const owedFields = (step: Workflow, run: Run, steps: readonly Workflow[]): string[] => [
-  ...outputFields(step),
+export const filedOwed = (step: Workflow, run: Run, steps: readonly Workflow[], said: Closeout | undefined): string[] => {
+  const record = run.steps[step.name];
+  const declared = record?.declared;
+  const hash = record?.closeoutHash;
+  const moved = declared === undefined && hash !== undefined && hash !== closeoutHashOf(step, steps);
+  return filedFields({ ...(declared ? { declared } : {}), moved }, outputFields(step), Object.keys(said?.output ?? {}));
+};
+
+/**
+ * The fields a step's closeout `said` must give on the try it is on: what its `output:` declared when that try was filed (`filedOwed`),
+ * and `replies` on a loop's target past round 1 — where an empty list is no answer (`declaredOutput`) — and `route` on a judge
+ * (`JUDGE_ROUTE`).
+ */
+export const owedFields = (step: Workflow, run: Run, steps: readonly Workflow[], said: Closeout | undefined): string[] => [
+  ...filedOwed(step, run, steps, said),
   ...(owesReplies(steps, run, step.name) ? [LOOP_REPLIES] : []),
   ...(isJudge(step) ? [JUDGE_ROUTE] : []),
 ];

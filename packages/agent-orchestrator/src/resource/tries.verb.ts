@@ -29,7 +29,7 @@ import {
 import { LOOP_REPLIES, outputFields, type Workflow } from '../workflow.ts';
 import { closeoutRefusals } from '../question/index.ts';
 import { gateBudgets, type GateBudgets } from '../gate-budgets/gate-budgets.ts';
-import type { SpendOf } from '../status/status.ts';
+import { filedOwed, type SpendOf } from '../status/status.ts';
 import type { Closeout } from '../closeout/index.ts';
 import { artifactOf, valueOf, type StepArtifact, type StepValue } from './files.store.ts';
 import { checkIn, type CheckStderr, type StepCheck } from './checks.verb.ts';
@@ -196,7 +196,10 @@ export function closeoutIn(
   const c = said === undefined ? undefined : parseCloseout(said);
   if (!c || 'error' in c) return null;
   const fields = outputFields(step).filter((field) => field !== LOOP_REPLIES);
-  const { given, missing } = declaredOutput(step, c, fields);
+  const { given, missing: lacked } = declaredOutput(step, c, fields);
+  // The current try owes what it was filed with (`filedOwed`): a field its step declares since a revision followed is not missing.
+  const owed = taskId === run.steps[name]?.taskId ? new Set(filedOwed(step, run, steps, c)) : undefined;
+  const missing = owed ? lacked.filter((field) => owed.has(field)) : lacked;
   const replies = c.output?.[LOOP_REPLIES];
   const declared = step.output?.schema.properties ?? {};
   return {

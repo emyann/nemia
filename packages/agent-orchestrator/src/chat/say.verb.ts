@@ -2,8 +2,8 @@
  * The delivery of a chat's outbox to its long-lived task: each entry written and no mark names yet, said to the task in the
  * words that frame it by who wrote it (`framedFor`), then marked. Before it says, it looks in what the runtime journalled as said
  * (`state.said`) for the entry's words said since it was written and claimed by no mark, and marks that one without saying again: a
- * delivery cut between the say and the mark is finished, never repeated. Level-triggered: it reads the files and the task's record each time, and carries
- * nothing between calls.
+ * delivery cut between the say and the mark is finished, never repeated. Level-triggered: it reads the files and the task's record
+ * each time, and carries nothing between calls.
  *
  * Beside it, the questions of hers that wait on the person: each ask the runtime says her session holds open copied into the chat's own
  * folder once (`recordAsks`), so the board's history does not depend on a session's files across a restart; and each answer the person

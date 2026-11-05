@@ -14,6 +14,10 @@ import { stepSetRefusal, validate } from '../src/workflow/validate.ts';
 import type { TaskPhase } from '../src/record/record.ts';
 import type { Workflow } from '../src/step/step.ts';
 import { phases, run, step } from './assessed.ts';
+import fs from 'node:fs';
+import path from 'node:path';
+import { scratch } from './scratch.ts';
+import { workflowTargets } from '../src/tick/told.verb.ts';
 
 const READER = { name: 'reviewer', keys: [], body: 'Read the change and choose.', given: {} };
 
@@ -67,6 +71,12 @@ test('a judge is filed as a step, and its signed route routes the nodes after it
     assert.equal(words.triage, 'unsigned');
     assert.deepEqual([a.ready, a.send], [[], []]);
   });
+
+  await t.test('a closeout naming a route the judge does not declare is unsigned, never a route', () => {
+    const { a, words } = passOf({ plan: 'succeeded', triage: 'succeeded' }, { route: 'mobile' });
+    assert.equal(words.triage, 'unsigned');
+    assert.deepEqual([a.ready, a.send], [[], []]);
+  });
 });
 
 test("a judge's closeout schema owes route, one of its routes; no other step's does", () => {
@@ -86,6 +96,20 @@ test("a judge's brief names each route's targets, and the route it ends on", () 
   assert.match(brief, /`backend`: a card for the workflow backend \(to-backend: Hand the backend change on\.\)/);
   assert.match(brief, /`docs`: ends the run/);
   assert.doesNotMatch(composeBrief(plan, run({ plan: null }), JUDGED), /routes you choose between/);
+});
+
+test("a judge's brief describes a workflow it routes to by that workflow's README, read beside the run's own", () => {
+  const [, triage] = JUDGED;
+  assert.ok(triage);
+  const team = scratch('judge-targets');
+  fs.mkdirSync(path.join(team, 'backend'), { recursive: true });
+  fs.writeFileSync(path.join(team, 'backend', 'README.md'), '# backend\n\nBuild a backend change to main.\n');
+  const r = { ...run({ plan: 't-plan', triage: null }), workflowDir: path.join(team, 'triage') };
+  const targets = workflowTargets(r, JUDGED, triage);
+  assert.deepEqual(Object.keys(targets), ['backend']);
+  const none = [undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined] as const;
+  const brief = composeBrief(triage, r, JUDGED, ...none, { targets });
+  assert.match(brief, /a card for the workflow backend \(to-backend: Build a backend change to main\.\)/);
 });
 
 test('a judge load left to a hire is refused at start while nothing hired it, and taken once a read-only agent is', () => {

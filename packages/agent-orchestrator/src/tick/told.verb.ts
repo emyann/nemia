@@ -30,6 +30,7 @@ import { splitFrontmatter, type Workflow } from '../step/step.ts';
 import { realRepoOf } from '../workspace/worktree.store.ts';
 import { agentFilesDir, renderedIn } from '../agents/agents.store.ts';
 import { placesOf } from '../folder/lookup.store.ts';
+import { workflowDescription } from '../folder/folder.store.ts';
 import { SkillDoor } from '../skills/skill-door.store.ts';
 import { SkillName } from '../agents/agents.model.ts';
 import { enabledSkillsOf, renderedFlags, rendersAgent, unrendered, type SkillAgain } from '../agents/agents.ts';
@@ -122,7 +123,11 @@ export const ownOf = (step: Pick<Workflow, 'harness' | 'remote'>, rendered: Clau
  * What a step's place says to it (`placeTold`): how it lands, undefined for a step that does not land on its check (`words`), and its
  * commands (`say`), undefined for a folder run's step.
  */
-export type PlaceTold = { readonly words: LandingWords | undefined; readonly say: PlaceSay | undefined };
+export type PlaceTold = {
+  readonly words: LandingWords | undefined;
+  readonly say: PlaceSay | undefined;
+  readonly targets: Readonly<Record<string, string>>;
+};
 
 /**
  * A step as the tick tells it (`toldOf`): the step its brief is composed for, and the harness's own arguments it is filed with.
@@ -139,6 +144,21 @@ export type Told = StepTold & PlaceTold;
  * What `step` of `run`, among its `steps`, is told and denied by `place` (`landingWords`, `placeSay`), its branches named off `heads`
  * where given.
  */
+/**
+ * For a judge (`route: judge`), what each workflow a node after it routes to says it is for: its README's description, read from the
+ * folder beside the run's own workflow, where a team keeps its workflows. Empty for any other step, and for a workflow with no description.
+ */
+export function workflowTargets(run: Run, steps: readonly Workflow[], step: Workflow): Record<string, string> {
+  if (step.route?.kind !== 'judge') return {};
+  const named = steps.filter((s) => s.after.includes(step.name)).flatMap((s) => (s.workflow === undefined ? [] : [s.workflow]));
+  return Object.fromEntries(
+    named.flatMap((w) => {
+      const about = workflowDescription(path.join(path.dirname(run.workflowDir), w));
+      return about ? [[w, about]] : [];
+    }),
+  );
+}
+
 export function placeTold(
   run: Run,
   steps: readonly Workflow[],
@@ -146,7 +166,7 @@ export function placeTold(
   place: Place,
   heads?: Readonly<Record<string, string>>,
 ): PlaceTold {
-  return { words: landingWords(run, steps, step, place, heads), say: placeSay(run, place) };
+  return { words: landingWords(run, steps, step, place, heads), say: placeSay(run, place), targets: workflowTargets(run, steps, step) };
 }
 
 /**

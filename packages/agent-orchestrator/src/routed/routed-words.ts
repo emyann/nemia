@@ -115,9 +115,9 @@ export const personRouted = (step: Workflow, run: Run): boolean => {
 
 /**
  * A filed condition's word: `unverified` where a person routed its try (`nemia route`), whatever it said itself — a script's unsure answer,
- * a judge that signed off blocked; else, for a script, `unsigned` where its task exited 0 and it signed off with no route it declares (no
- * answer file, an undeclared route), which its standing reads `unverified`; else its standing's (a route, `blocked`, `failed`, `stopped`,
- * running). A filed step that is no condition reads its standing's.
+ * a judge that signed off blocked; else, for a script or a judge, `unsigned` where it signed off with no route it declares (no answer
+ * file, an undeclared route), which its standing reads as signed; else its standing's (a route, `blocked`, `failed`, `stopped`, running).
+ * A filed step that is no condition reads its standing's.
  */
 function filedWord(
   step: Workflow,
@@ -126,7 +126,8 @@ function filedWord(
   wordOf: (step: string) => StepStatus,
 ): StepStatus | undefined {
   if (step.routes !== undefined && personRouted(step, run)) return 'unverified';
-  if (step.route?.kind !== 'script' || wordOf(step.name) !== 'unverified') return undefined;
+  const signed = wordOf(step.name) === 'unverified' || (step.route?.kind === 'judge' && wordOf(step.name) === 'awaiting approval');
+  if ((step.route?.kind !== 'script' && step.route?.kind !== 'judge') || !signed) return undefined;
   return answeredRoute(step, run, closeoutOf, wordOf, [])?.kind === 'route' ? undefined : 'unsigned';
 }
 

@@ -37,7 +37,11 @@ import { judgeSection } from '../route/index.ts';
  * What a step's place gives its brief: how an ending that lands on its check stages the merge and what it denies (`words`), and the
  * place's own commands (`say`). A folder run's place gives none; a repository run's absent `say` sends the step to its place's skill.
  */
-export type BriefPlace = { readonly words?: LandingWords; readonly say?: PlaceSay };
+/**
+ * What a step's place says to it: an ending's landing words (`words`), the place's commands (`say`), and, for a judge, what each workflow a
+ * node after it routes to says it is for (`targets`, by the workflow's name).
+ */
+export type BriefPlace = { readonly words?: LandingWords; readonly say?: PlaceSay; readonly targets?: Readonly<Record<string, string>> };
 
 /**
  * What a step's closeout says of `replies` (`closeoutContract`): owed on a round filed, none on a merge filed — told by the round itself,
@@ -175,7 +179,7 @@ export function composeBrief(
   ].join('\n');
   const again = againSection(step, run, steps, closeoutOf, inFolder, place.say, retry, round);
   if (retry?.resumed || round?.resumed) return again.slice(1) + contracts;
-  const given = givenSections(step, run, steps, closeoutOf, checked, place.say) + again + judgeSection(step, steps);
+  const given = givenSections(step, run, steps, closeoutOf, checked, place.say) + again + judgeSection(step, steps, place.targets);
   const tree = depsLines(deps);
   const handed = handedOf(step, run, steps, closeoutOf, parents, costs);
 

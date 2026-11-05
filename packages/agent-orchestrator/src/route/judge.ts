@@ -30,24 +30,28 @@ export function judgeRefusal(s: Workflow, fence: JudgeFence, hireable: boolean):
   return `${s.name}: \`route: judge\` is a read-only session, and ${whose} lets it write. Run it on a fence that writes nothing — its harness's narrowest mode, one that asks before an edit and allows none, or a tool list with no tool that writes — or hire a read-only agent into it: nemia factory hire <factory> <agent> --step <workflow>/${s.name}.`;
 }
 
-/** What a target says it is for: a step's own note's first line, or the card a workflow node files. */
-function described(target: Workflow): string {
+/**
+ * What a target says it is for: a step's own note's first line; or, for a workflow node, the card it files and what its workflow says it is
+ * for (`targets`, the workflow's description), else the node's own note.
+ */
+function described(target: Workflow, targets: Readonly<Record<string, string>>): string {
   const note = firstLine(target.agent ? target.agent.body : target.body) || firstLine(target.body);
-  return target.workflow === undefined
-    ? `the step ${target.name}${note ? `: ${note}` : ''}`
-    : `a card for the workflow ${target.workflow} (${target.name}${note ? `: ${note}` : ''})`;
+  if (target.workflow === undefined) return `the step ${target.name}${note ? `: ${note}` : ''}`;
+  const about = targets[target.workflow] ?? note;
+  return `a card for the workflow ${target.workflow} (${target.name}${about ? `: ${about}` : ''})`;
 }
 
 /**
- * What a judge's brief says of its routes: each with what it reaches — each node after the judge that takes it, by its first line — or that
- * it ends the run (`ends:`), and the field its closeout owes. Empty for any other step.
+ * What a judge's brief says of its routes: each with what it reaches — each node after the judge that takes it, by its first line, a
+ * workflow node by its workflow's description (`targets`) — or that it ends the run (`ends:`), and the field its closeout owes. Empty for
+ * any other step.
  */
-export function judgeSection(step: Workflow, steps: readonly Workflow[]): string {
+export function judgeSection(step: Workflow, steps: readonly Workflow[], targets: Readonly<Record<string, string>> = {}): string {
   if (!isJudge(step)) return '';
   const followers = steps.filter((s) => s.after.includes(step.name));
   const lines = (step.routes ?? []).map((route) => {
     if (step.ends?.includes(route)) return `- \`${route}\`: ends the run; nothing after ${step.name} runs.`;
-    const reached = followers.filter((f) => f.when === undefined || f.when.includes(route)).map(described);
+    const reached = followers.filter((f) => f.when === undefined || f.when.includes(route)).map((f) => described(f, targets));
     return `- \`${route}\`: ${reached.join('; ')}.`;
   });
   return [

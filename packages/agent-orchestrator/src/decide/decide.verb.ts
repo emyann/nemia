@@ -266,7 +266,7 @@ export const decideRun = Effect.fn('decide')(function* (id: string, env: NodeJS.
     yield* checkReportsRead(run, steps, phaseOf, (p) => p === 'succeeded' || p === 'failed' || p === 'stopped').pipe(over(e)),
   );
   const { asks, rounds } = yield* (yield* RunDoor).asks.read(RunId.read(id));
-  const reader = closeoutReader(views, run);
+  const reader = closeoutReader(views, run, steps);
   const asked = closeoutAsked(views);
   const verdictOf = (name: string) => checks[name]?.verdict;
   const blocked = harnessBlocked(views);

@@ -259,7 +259,7 @@ const sendTry = Effect.fnUntraced(function* (f: Filing, r: Retry, step: Workflow
         checked,
         foldersTold(run, reads, told.step),
         yield* costsFor(f, step, Boolean(resumeFrom)),
-        { words: told.words, say: told.say },
+        { words: told.words, say: told.say, targets: told.targets },
       );
   const budgetUsd = budgetUsdFor(r.budget ?? budgetOf(step, record), stepSpend(run, r.step, reads.spendOf));
   if (answers) return yield* answerHeld(e, taskId, brief, budgetUsd);
@@ -343,6 +343,7 @@ const fileRound = Effect.fnUntraced(function* (f: Filing, r: Round, looped: stri
     const said = {
       words: landing.words,
       say: landing.say,
+      targets: landing.targets,
       landing: yield* landingOf(f, r),
       costs: yield* costsFor(f, target, Boolean(record.taskId && sessionIn(f.reads.views, record.taskId))),
     };
@@ -524,6 +525,7 @@ export const fileReady = Effect.fn('fileReady')(function* (f: Filing, due: Due, 
       costs: yield* costsFor(f, step, false),
       words: landing.words,
       say: landing.say,
+      targets: landing.targets,
     };
     const taskId = yield* asked('file', e.file(readySpec(f, step, place, files, yield* toldOf(run, step), said))).pipe(forStep(run, step));
     run.steps[name] = { ...run.steps[name], taskId, workspace: place.workspace, branch: place.branch, ...filedOn(f, step) };
@@ -583,7 +585,7 @@ function readySpec(
           said.checked,
           foldersTold(run, reads, told.step, callerMounts(step, parents)),
           said.costs,
-          { words: said.words, say: said.say },
+          { words: said.words, say: said.say, targets: said.targets },
           place.merge,
         ),
     cwd: place.workspace,

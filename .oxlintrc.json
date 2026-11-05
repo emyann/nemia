@@ -562,7 +562,7 @@
       "files": ["apps/web/src/components/StepNode.tsx"],
       "rules": {
         "max-lines-per-function": ["error", { "max": 84, "skipBlankLines": true, "skipComments": true }],
-        "complexity": ["error", { "max": 26 }]
+        "complexity": ["error", { "max": 25 }]
       }
     },
     {

@@ -103,7 +103,7 @@ export function StepNode({ data, selected, sourcePosition = Position.Right, targ
       <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 border-t border-outline-variant px-3 py-1.5">
         <StatusChip codes={step} runCancelled={runCancelled} runHeld={runHeld} note={step.note} />
         <span className="font-mono text-body-small text-muted-foreground">
-          {attemptLine(step.attempts, live, now) ?? (step.taskId === null ? 'not filed yet' : 'no session yet')}
+          {attemptLine(step.attempts, live, now) ?? unfiledLine(step.taskId, node, spec)}
         </span>
       </div>
 
@@ -167,6 +167,19 @@ const headOf = (node: Frozen<GraphNode> | null | undefined, index: number): stri
  * What a condition or a workflow node runs on, in its node's second line: the workflow a workflow node files a card for; a condition with
  * an agent (a judge) runs on it as a step does, and one with none answers its route with no session.
  */
+/**
+ * What a node with no attempt says of its session: none at all for a workflow node, which files a card, and for a condition with no agent,
+ * which its table or script answers; else that it is not filed yet, or has no session yet.
+ */
+function unfiledLine(
+  taskId: string | null,
+  node: Frozen<GraphNode> | null | undefined,
+  spec: { agent?: string | null; harness: string | null; model: string | null } | null,
+): string {
+  if (node?.kind === 'workflow' || (node?.kind === 'condition' && !spec?.agent && taskId === null)) return 'runs no session';
+  return taskId === null ? 'not filed yet' : 'no session yet';
+}
+
 function nodeLine(
   node: Frozen<GraphNode> | null | undefined,
   spec: { agent?: string | null; harness: string | null; model: string | null } | null,

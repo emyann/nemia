@@ -341,15 +341,23 @@ test("what a templated factory's verbs read and write: its tree's wiring, instru
       reconciled(templated('wired'));
       const own = fs.readFileSync(path.join(FACTORIES, 'wired.json'), 'utf8');
       const wiring = () => JSON.parse(fs.readFileSync(path.join(treeDir('wired'), 'factory.json'), 'utf8'));
-      assert.deepEqual(readFactory('wired').workflows, ['dev']);
-      assert.deepEqual(readFactory('wired').hires, { 'dev/implement': 'implementer', 'dev/review': 'reviewer', 'dev/ship': 'shipper' });
+      assert.deepEqual(readFactory('wired').workflows, ['dev', 'triage']);
+      assert.deepEqual(readFactory('wired').hires, {
+        'dev/implement': 'implementer',
+        'dev/review': 'reviewer',
+        'dev/ship': 'shipper',
+        'triage/build-backend': 'implementer',
+        'triage/build-web': 'implementer',
+        'triage/notes': 'implementer',
+        'triage/plan': 'reviewer',
+      });
       fireAgent({ factory: 'wired', step: 'dev/review' });
       hireAgent({ factory: 'wired', agent: 'implementer', step: 'dev/review' });
       assert.equal(wiring().hires['dev/review'], 'implementer');
       attachWorkflow({ factory: 'wired', workflow: 'other' });
-      assert.deepEqual(wiring().workflows, ['dev', 'other']);
+      assert.deepEqual(wiring().workflows, ['dev', 'other', 'triage']);
       detachWorkflow({ factory: 'wired', workflow: 'other' });
-      assert.deepEqual(readFactory('wired').workflows, ['dev']);
+      assert.deepEqual(readFactory('wired').workflows, ['dev', 'triage']);
       setRevisions({ factory: 'wired', revisions: 'follow' });
       assert.deepEqual(
         [wiring().revisions, readFactory('wired').revisions],

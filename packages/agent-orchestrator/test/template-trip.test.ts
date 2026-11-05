@@ -127,7 +127,15 @@ test("a template's round trip: the team exported, checked, packed, unpacked, app
     assert.equal(fs.existsSync(path.join(dir, 'skills', 'grilling')), false, 'a builtin skill is not carried');
     assert.deepEqual(parse(fs.readFileSync(path.join(dir, 'nemia.yaml'), 'utf8')).spec, {
       version: '0.1.0',
-      hires: { 'dev/implement': 'implementer', 'dev/review': 'reviewer', 'dev/ship': 'shipper' },
+      hires: {
+        'dev/implement': 'implementer',
+        'dev/review': 'reviewer',
+        'dev/ship': 'shipper',
+        'triage/build-backend': 'implementer',
+        'triage/build-web': 'implementer',
+        'triage/notes': 'implementer',
+        'triage/plan': 'reviewer',
+      },
     });
     const agent = parse(fs.readFileSync(path.join(dir, 'agents/reviewer/agent.yaml'), 'utf8')).spec;
     assert.deepEqual(agent.claude, {
@@ -237,7 +245,7 @@ test("a template's round trip: the team exported, checked, packed, unpacked, app
       () => fs.writeFileSync(path.join(appliedDir('trip'), 'factory.json'), '{}'),
       (err: Error) => /EACCES/.test(err.message),
     );
-    assert.deepEqual(readFactory('trip').workflows, ['dev']);
+    assert.deepEqual(readFactory('trip').workflows, ['dev', 'triage']);
     fs.writeFileSync(review, fs.readFileSync(review, 'utf8').replace('budget: 7', 'budget: 9'));
     const written = fs.statSync(statusFile('trip')).mtimeMs;
     assert.deepEqual(reconciled(factory('trip')), status, 'a second pass reads the archive to the same base');

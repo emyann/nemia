@@ -67,8 +67,16 @@ test("what a render writes into a factory's tree, read back as today's folder re
       const { tree, out } = rendered(dir);
       assert.deepEqual(out.refusals, []);
       assert.deepEqual(out.wiring, {
-        workflows: ['dev'],
-        hires: { 'dev/implement': 'implementer', 'dev/review': 'reviewer', 'dev/ship': 'shipper' },
+        workflows: ['dev', 'triage'],
+        hires: {
+          'dev/implement': 'implementer',
+          'dev/review': 'reviewer',
+          'dev/ship': 'shipper',
+          'triage/build-backend': 'implementer',
+          'triage/build-web': 'implementer',
+          'triage/notes': 'implementer',
+          'triage/plan': 'reviewer',
+        },
       });
       assert.deepEqual(JSON.parse(fs.readFileSync(path.join(tree, 'factory.json'), 'utf8')), out.wiring);
       const fills = { factory: 'team', workflow: 'dev', agents: { implement: 'implementer', review: 'reviewer', ship: 'shipper' } };

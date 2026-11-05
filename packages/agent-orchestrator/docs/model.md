@@ -314,3 +314,35 @@ erDiagram
   Try ||--o{ RunLine : try
 ```
 <!-- diagram:orchestrator-model:end -->
+
+## A workflow's own machine
+
+A workflow is a machine of its own: its steps are the states, and `after`, a condition's routes, a loop and the ways a run ends are
+its moves. The graph every client draws (`graphOf`, `src/summary/graph.ts`) carries a `route` edge from a condition to each node that
+runs on one of its routes (`when:`), in place of the `after` edge between them, and, on a workflow with a condition or a workflow node,
+each node with its kind: `step`, `condition` (with the routes in its `ends:`) or `workflow` (with the workflow it files a card for).
+Gates are a property of a node, not an edge. Below is the tests' `triage` workflow (`test/fixtures/team/triage`), printed by
+`routedDiagram`; `src/summary/graph.test.ts` holds the data it is drawn from equal to that folder. On `web`, `build-backend` is skipped
+and `notes` runs after `build-web` alone; on `docs`, every node after `triage` is skipped and the run ends there, and succeeds.
+
+<!-- diagram:workflow:begin — generated, from the repository's root: node -e "import('./packages/agent-orchestrator/src/summary/graph.ts').then((m) => console.log(m.routedDiagram()))" -->
+```mermaid
+stateDiagram-v2
+  [*] --> plan
+  state "plan" as plan
+  state "triage (condition)" as triage
+  state "build-backend" as build_backend
+  state "build-web" as build_web
+  state "handoff (workflow dev)" as handoff
+  state "notes" as notes
+  plan --> triage
+  triage --> build_backend: backend
+  triage --> build_web: web
+  triage --> handoff: web
+  build_web --> notes
+  build_backend --> notes
+  triage --> [*]: docs (ends)
+  handoff --> [*]: sent
+  notes --> [*]
+```
+<!-- diagram:workflow:end -->

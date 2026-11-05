@@ -1812,6 +1812,78 @@ its own, and everything below reads the words back off the engine's view of the 
   reaching it, the turn stands in place of that line. The box is closed, with the reason, for a step with no session in
   flight.
 
+### A step's lifecycle
+
+A step's status is one of fifteen words (`StepStatus`), worked out afresh on every pass from facts — its task's phase, its
+closeout, its check, an approval, its spend (`ownStatus` and `standing`, `src/status/status.ts`). Nothing holds a step's state
+between passes, and no machine decides the word. The step machine (`src/step-machine/step-machine.ts`) is the drawing of the moves
+those functions make: each word a state, each move an edge named by the fact that makes it (`STEP_EDGES`). A replay holds it to
+them (`src/step-machine/step-machine.test.ts`): a step's record moved fact by fact, each pair of words read through `stepStatus` must
+be an edge, and every edge must be walked. A filed step reads `pending` again only once it stopped or signed off: a round
+unfiles its loop, an ending sent back with its work has its try moved behind, and an ending held at its gate before it is filed
+reads `pending` once approved, until the pass files it. A new word is a state, or the typecheck refuses it; a new move is an
+edge some walk takes, or the replay refuses it.
+
+<!-- diagram:step:begin — generated, from the repository's root: node -e "import('./packages/agent-orchestrator/src/step-machine/step-machine.ts').then((m) => console.log(m.stepDiagram()))" -->
+```mermaid
+stateDiagram-v2
+  [*] --> pending
+  state "pending" as pending
+  state "running" as running
+  state "checking" as checking
+  state "verified" as verified
+  state "unverified" as unverified
+  state "awaiting approval" as awaiting_approval
+  state "exhausted" as exhausted
+  state "blocked" as blocked
+  state "unsigned" as unsigned
+  state "denied" as denied
+  state "failed (check)" as failed_check
+  state "failed" as failed
+  state "stopped" as stopped
+  state "budget exhausted" as budget_exhausted
+  state "over budget" as over_budget
+  pending --> running: filed
+  pending --> awaiting_approval: its work handed on, at the gate of an ending
+  running --> unverified: signed, with no check
+  running --> checking: signed, with a check
+  running --> awaiting_approval: signed, at its gate
+  running --> exhausted: again, at its rounds
+  running --> blocked: signed blocked
+  running --> unsigned: ended with no closeout the run accepts
+  running --> denied: signed, denied a call under denials fail
+  running --> failed: its session failed
+  running --> stopped: its session stopped
+  running --> budget_exhausted: cut off at its budget
+  running --> over_budget: failed, over its budget
+  checking --> verified: its check passed, or its landing committed
+  checking --> awaiting_approval: its check passed, at its gate
+  checking --> failed_check: its check refused or did not finish, or its landing aborted
+  checking --> over_budget: its check refused, over its budget
+  verified --> running: a round files its target again
+  verified --> pending: a round unfiles its loop
+  unverified --> pending: a round unfiles its loop
+  awaiting_approval --> verified: approved, checked
+  awaiting_approval --> unverified: approved
+  awaiting_approval --> running: sent back from its gate
+  awaiting_approval --> pending: approved before it is filed, or its work sent back
+  exhausted --> unverified: accepted at its rounds
+  exhausted --> pending: a round on your word
+  blocked --> running: tried again
+  blocked --> over_budget: its session settled, over its budget
+  unsigned --> running: tried again
+  denied --> running: tried again
+  failed_check --> running: tried again
+  failed_check --> checking: checked again
+  failed_check --> pending: an ending sent back with its work
+  failed --> running: tried again
+  stopped --> running: tried again
+  budget_exhausted --> running: tried again, with a budget
+  over_budget --> running: tried again, with a budget
+  over_budget --> pending: a round on your word, with a budget
+```
+<!-- diagram:step:end -->
+
 ### Going round again: `loop:` and `rounds:`
 
 A workflow of implement, review and respond, then a person reading the reply beside the findings, leaves
@@ -4060,6 +4132,7 @@ holding a concurrency slot forever.
 | `src/brief/handed.verb.ts` | what a run's roots are handed of other runs, read off their records and the engine (`parentCloseouts`, `handedOf`) |
 | `src/record/record.ts` | a run's record, as data — pure: its shape (`Run`, `RepositoryRun`, `FolderRun`, `placeOf`), the facts a person files beside it (`Hold`, `Approval`, `Acceptance`, `Pruned`), a step's status words and its own record (`StepStatus`, `StepRecord`, `refusedCheck`), the task ids a run files (`stepTaskId`, `checkTaskId`, `stepTasks`, `runTasks`), the try a step is on (`tryOf`), why a run is left unjudged (`unjudgedWords`), and the small words the run's judgement shares (`andList`, `fenced`, `oneLine`); `record.store.ts` reads and writes it |
 | `src/status/status.ts` | where one step stands — pure: **`stepStatus`** and `ownStatus`, a gate's facts (`hasGate`, `approvalOf`, `atGate`), an ending's (`landsOnCheck`, `resultOnBase`), what a step may spend (`taskSpend`, `overBudget`, `budgetRefusal`), its momentum (`stepMomentum`), and a loop's (`roundOf`, `loopOf`, `owedFields`); and what a step consumed, in words (`sumUsage`, `readWords`, `usedLines`, `dollars`, `durationWord`) |
+| `src/step-machine/step-machine.ts` | a step's lifecycle as a machine — pure: **`stepMove`**, whether two words read on two passes are a move it draws (`STEP_EDGES`), and its drawing (`stepMachineGraph`, `stepDiagram`); it decides nothing, held to `stepStatus` by its replay |
 | `src/wait/wait.ts` | what a run waits on before its steps are filed — pure: **`runReady`**, whether a run's roots may be filed yet (`--after`, `waitsOf`), the holds a person put on it (`holdsOf`), their words and advice, and what they refuse (`holdRefusal`, `afterRefusal`) |
 | `src/artifacts/artifacts.ts` | the files a step leaves — pure: what its brief says of them (`artifactsContract`), where one it names is found (`artifactPlace`), and the lines that list them (`artifactLines`); `artifacts/artifacts.store.ts` copies them |
 | `src/prune/prune.ts` | a finished run pruned — pure: what a prune kept (`prunedKept`), whether it may run again (`pruneAgain`), what it refuses (`pruneRefusal`), what a pruned or a held run refuses (`prunedRefusal`, `heldRefusal`), and what it frees (`pruneLines`) |

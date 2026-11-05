@@ -535,6 +535,12 @@ const isBuiltin = (m: string): boolean => m.startsWith('node:') || builtinModule
 /** The files of `src` a place's code may import: what a place is, its contract and its service. */
 const PLACE_REACHES = ['src/place/place.ts', 'src/place/place.store.ts'];
 
+/**
+ * A contract of the package (`contracts/<name>.contract.ts`), which a place's pure code takes its type from with `import type`, as
+ * `src` does: the spec that proves it, erased when the place runs.
+ */
+const isContract = (m: string): boolean => /^contracts\/[^/]+\.contract\.ts$/.test(m);
+
 /** The one file of `src` that imports a place's code, and gives it to whoever composes a program. */
 const PLACE_DOOR = 'src/place/builtin.store.ts';
 
@@ -542,15 +548,16 @@ const PLACE_DOOR = 'src/place/builtin.store.ts';
 const DOOR_GIVES = 'place/git/';
 
 /**
- * A place's code stands beside the package: a file of `place/<name>/` imports node's built-ins, `effect`, the files of its own place and
- * `PLACE_REACHES`, never another package, another place or the rest of `src`; and of `packageFiles`, the package's `src` and `bin`,
- * `PLACE_DOOR` alone imports a file under `place/`, and of those only one under `DOOR_GIVES`.
+ * A place's code stands beside the package: a file of `place/<name>/` imports node's built-ins, `effect`, the files of its own place,
+ * `PLACE_REACHES` and a contract that proves it (`isContract`), never another package, another place or the rest of `src`; and of
+ * `packageFiles`, the package's `src` and `bin`, `PLACE_DOOR` alone imports a file under `place/`, and of those only one under
+ * `DOOR_GIVES`.
  */
 function placeBreaks(sources: Sources, packageFiles: Sources = {}): string[] {
   const own = (file: string) => `${file.split('/').slice(0, 2).join('/')}/`;
   const inPlace = Object.entries(sources).flatMap(([file, imports]) =>
     imports
-      .filter((m) => !isBuiltin(m) && !isEffect(m) && !m.startsWith(own(file)) && !PLACE_REACHES.includes(m))
+      .filter((m) => !isBuiltin(m) && !isEffect(m) && !m.startsWith(own(file)) && !PLACE_REACHES.includes(m) && !isContract(m))
       .map(
         (m) => `${file} imports ${m}: a place's code imports node's built-ins, effect, its own files and ${PLACE_REACHES.join(', ')} alone`,
       ),
@@ -845,11 +852,21 @@ test("REFUSED: a place's file that imports a package, the rest of src or another
     'src/runtime-client.ts',
     'src/tick/tick.verb.ts',
     'place/other/x.ts',
+    'contracts/helpers.ts',
   ])
     assert.deepEqual(placeBreaks(plant(m)), [
       `${at} imports ${m}: a place's code imports node's built-ins, effect, its own files and ${PLACE_REACHES.join(', ')} alone`,
     ]);
-  for (const m of ['node:fs', 'fs', 'path', 'node:child_process', 'effect', 'place/git/verbs/open.ts', 'src/place/place.ts'])
+  for (const m of [
+    'node:fs',
+    'fs',
+    'path',
+    'node:child_process',
+    'effect',
+    'place/git/verbs/open.ts',
+    'src/place/place.ts',
+    'contracts/landed-by.contract.ts',
+  ])
     assert.deepEqual(placeBreaks(plant(m)), [], `${m} is let through`);
   for (const file of [
     'src/tick/tick.verb.ts',

@@ -10,7 +10,7 @@
 import path from 'node:path';
 import { Effect } from 'effect';
 import { HttpApiBuilder } from 'effect/http-api';
-import { BUILTIN_SKILLS, definitionRevision, skillCopyCommand, skillVersion } from 'agent-orchestrator';
+import { BUILTIN_SKILLS, definitionRevision, skillCopyCommand } from 'agent-orchestrator';
 import { SKILLS_FOLDER, skillDraftOf, splitFrontmatter, type SkillDraft } from 'agent-orchestrator/workflow';
 import { Api, API_VERSION, Invalid, type Skill, type SkillSpec } from 'objects';
 import type { Served } from '../layer.ts';
@@ -21,6 +21,7 @@ import {
   readsOf,
   repoSkillsDir,
   skillDraftFrom,
+  skillVersionAt,
   skillUsers,
   written,
   yourSkillsRead,
@@ -85,12 +86,16 @@ function specOf({ dir, error }: Row, name: string): SkillSpec {
 }
 
 /** The objects of the skills `served`, read now. */
-function objectsOf(s: Served, namespace: string, served: ReturnType<typeof servedOf<Row>>): Promise<Skill[]> {
+async function objectsOf(s: Served, namespace: string, served: ReturnType<typeof servedOf<Row>>): Promise<Skill[]> {
+  const read = served.filter(({ item }) => item.error === null).map(({ item }) => item.dir);
+  const versions = new Map(
+    await Promise.all(read.map(async (dir) => [dir, await skillVersionAt(s.e, s.placeService, dir, s.home)] as const)),
+  );
   return s.inRequest(
     Effect.forEach(served, ({ name, origin, shadowedBy, item: row }) =>
       Effect.gen(function* () {
         const { dir, entry, error, preload, cost } = row;
-        const version = (error === null ? skillVersion(dir) : null) ?? '';
+        const version = versions.get(dir) ?? '';
         const revision = yield* definitionRevision('skill', name, version);
         const usedBy = yield* skillUsers(dir, name, s.repo, s.home);
         const copyHint =

@@ -149,6 +149,16 @@ const WRITE = commandNamed('skills write');
 export const readsOf = async (e: Engine['Service'], placeService: PlaceService['Service'], dirs: readonly string[], home: string) =>
   (await runPlaced({ placeService, home }, e, LIST.handler({ skills: dirs }, undefined, home))) as Record<string, SkillRead>;
 
+/** The version of the skill in the folder `dir`, as the package reads it through its Skill door (`skills show`): null where none reads. */
+export const skillVersionAt = async (e: Engine['Service'], placeService: PlaceService['Service'], dir: string, home: string) =>
+  (
+    (await runPlaced(
+      { placeService, home },
+      e,
+      READ.handler({ from: 'yours', name: path.basename(dir), dir }, undefined, home),
+    )) as SkillPage
+  ).version;
+
 /**
  * The reading of the folder `dir` among `reads`, which the table's `skills` gives for each folder it was asked: thrown, naming the
  * folder, where it gave none.

@@ -142,7 +142,7 @@ function closeoutFile(more: Record<string, unknown>): string {
 
 /** The scripts a run's base could hold, which the check never reads from it: quick's `change.ts` and the scripts it carries. */
 const SCRIPTS = Object.fromEntries(
-  ['change.ts', 'landing.ts', 'parts.ts', 'probe.ts', 'pull-request.ts'].map((name) => [
+  ['change.ts', 'ci-log.ts', 'landing.ts', 'parts.ts', 'probe.ts', 'pull-request.ts'].map((name) => [
     `workflows/quick/${name}`,
     fs.readFileSync(path.join(QUICK, name), 'utf8'),
   ]),

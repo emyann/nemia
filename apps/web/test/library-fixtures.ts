@@ -1,14 +1,13 @@
 /**
  * The library's reads as the api answers them, every key the board reads: an agent (`agent`), as the list reads it (`listedAgent`), the
  * skills by place (`skillPlace`), one skill's page (`skillDetail`), a workflow (`workflow`, its steps' keys from `stepSpec`), a step's page
- * (`stepPage`), the builder's form (`keyForm`) and a machine (`machine`). Each takes keys to put over its own.
+ * (`stepPage`) and the builder's form (`keyForm`). Each takes keys to put over its own.
  */
 import type {
   AgentListing,
   AgentSkill,
   KeyForm,
   LibraryAgent,
-  MachineGraph,
   SkillDetail,
   SkillPlace,
   SkillRow,
@@ -218,21 +217,5 @@ export const keyForm = (extra: Partial<KeyForm> = {}): KeyForm => ({
   policyKeys: ['tools', 'allowedTools', 'disallowedTools', 'permissionMode', 'sandbox', 'skills', 'mcp'],
   agents: { otto: { harness: 'claude', gate: true, tools: ['Read'] }, bare: {} },
   remote: { prefix: 'a2a:', refuses: ['tools', 'workspace'] },
-  ...extra,
-});
-
-/** A machine's graph, one edge under a guard and one without, and a verb a person writes from outside it. */
-export const machine = (extra: Partial<MachineGraph> = {}): MachineGraph => ({
-  name: 'lifecycle',
-  title: "A task's lifecycle",
-  source: 'packages/agent-runtime/src/core/lifecycle.ts',
-  initial: 'queued',
-  states: ['queued', 'running', 'done'],
-  final: ['done'],
-  edges: [
-    { from: 'queued', event: 'start', guard: 'hasSlot', to: 'running', action: 'spawn' },
-    { from: 'running', event: 'exit', to: 'done', action: 'record' },
-  ],
-  verbs: [{ verb: 'close', entry: 'closed', by: 'person', from: ['running'], to: 'done', guard: 'awaitsWord' }],
   ...extra,
 });

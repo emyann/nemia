@@ -4,7 +4,7 @@ import { Button as AriaButton, Slider, SliderThumb, SliderTrack, ToggleButton, T
 import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Sheet, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
-import { machineQuery, stepPathQuery, type LifecycleTransition, type MachineGraph, type StepPath } from '@/lib/api';
+import { stepPathQuery, type LifecycleTransition, type MachineGraph, type StepPath } from '@/lib/api';
 import type { RunView, StepView } from '@/lib/runView';
 import { byPerson, centredScroll, litAt, pathPoll, stepStamp, takenRoutes } from '@/lib/lifecyclePath';
 import { clockWord } from '@/lib/quota';
@@ -13,8 +13,8 @@ import { MachineCanvas } from './MachineCanvas';
 
 type Step = StepView;
 
-/** The machine the panel draws a task's path on: the runtime's lifecycle, as the `/machines` page draws it. */
-const LIFECYCLE = 'lifecycle';
+/** The machine the panel draws a task's path on, by its name and what a person calls it: the runtime's lifecycle. */
+const LIFECYCLE = { name: 'lifecycle', title: "A task's lifecycle" };
 
 /** The tallest the lifecycle is drawn in the panel: the conversation under it keeps the rest of the page. */
 const CANVAS_MAX_HEIGHT = 420;
@@ -36,7 +36,7 @@ export function DebugPanel({ run, step }: { run: RunView; step: Step }) {
             <CollapsibleTrigger className="w-full px-4 py-1.5 text-left text-body-small text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50">
               {isExpanded ? '▾' : '▸'} Debug
             </CollapsibleTrigger>
-            <CollapsibleContent>{isExpanded && <DebugBody run={run} step={step} />}</CollapsibleContent>
+            <CollapsibleContent>{isExpanded && <PathOf run={run} step={step} />}</CollapsibleContent>
           </>
         )}
       </Collapsible>
@@ -44,31 +44,23 @@ export function DebugPanel({ run, step }: { run: RunView; step: Step }) {
   );
 }
 
-/** The panel opened: the lifecycle's graph read first, then the path drawn on it. */
-function DebugBody({ run, step }: { run: RunView; step: Step }) {
-  const machine = useQuery(machineQuery(LIFECYCLE));
-  if (machine.error) {
-    return <p className="px-4 pb-3 text-body-medium text-failure">Could not read the lifecycle's graph: {machine.error.message}</p>;
-  }
-  if (!machine.data) return <p className="px-4 pb-3 text-body-medium text-muted-foreground">Reading the lifecycle…</p>;
-  return <PathOf run={run} step={step} machine={machine.data} />;
-}
-
 /**
- * One try's path on the lifecycle: the state it stands in lit, the routes it took to get there drawn over the graph, and a timeline of
- * every entry of its journal. The timeline follows the newest entry until a person moves it, and again once they move it back to the end;
- * picking another try follows that try's newest. The graph opened full width is drawn from the same read and the same entry shown.
+ * One try's path on the lifecycle, which the path's read carries (`StepPath`'s `lifecycle`): the state it stands in lit, the routes it took
+ * to get there drawn over the graph, and a timeline of every entry of its journal. The timeline follows the newest entry until a person
+ * moves it, and again once they move it back to the end; picking another try follows that try's newest. The graph opened full width is
+ * drawn from the same read and the same entry shown.
  */
-function PathOf({ run, step, machine }: { run: RunView; step: Step; machine: MachineGraph }) {
+function PathOf({ run, step }: { run: RunView; step: Step }) {
   const [tryNumber, setTryNumber] = useState<number | null>(null);
   const [pinned, setPinned] = useState<number | null>(null);
-  const poll = (r: StepPath | undefined) => pathPoll(r, machine.final, tryNumber === null);
+  const poll = (r: StepPath | undefined) => pathPoll(r, r?.lifecycle.final ?? [], tryNumber === null);
   const read = useQuery(stepPathQuery(run.id, step.name, stepStamp({ ...step, current: step.current ?? null }), tryNumber, poll));
+  const machine = read.data?.lifecycle;
   const path = read.data?.path ?? [];
   const last = path.length - 1;
   const at = pinned === null ? last : Math.min(pinned, last);
   const lit = litAt(path, at);
-  const taken = takenRoutes(path, at, machine);
+  const taken = machine ? takenRoutes(path, at, machine) : [];
   const current = step.tries.find((t) => t.current)?.try ?? step.tries.length;
   const pick = (n: number) => {
     setTryNumber(n === current ? null : n);
@@ -88,7 +80,7 @@ function PathOf({ run, step, machine }: { run: RunView; step: Step; machine: Mac
             </>
           ) : null}
         </span>
-        {read.data?.taskId && path.length > 0 ? (
+        {machine && read.data?.taskId && path.length > 0 ? (
           <WideGraph machine={machine} taskId={read.data.taskId} path={path} at={at} lit={lit} taken={taken} onScrub={onScrub} />
         ) : null}
         {step.tries.length > 1 && <TryPicker step={step} shown={tryNumber ?? current} onPick={pick} />}
@@ -97,18 +89,41 @@ function PathOf({ run, step, machine }: { run: RunView; step: Step; machine: Mac
         <p className="text-body-medium text-failure">Could not read the path: {read.error.message}</p>
       ) : !read.data ? (
         <p className="text-body-medium text-muted-foreground">Reading the path…</p>
-      ) : read.data.taskId === null ? (
-        <p className="text-body-medium text-muted-foreground">Not filed yet, so there is no path to show.</p>
       ) : (
-        <div
-          data-path={read.data.taskId}
-          data-reading={read.isPlaceholderData || undefined}
-          className={`grid gap-4 md:grid-cols-[minmax(0,1fr)_18rem] ${read.isPlaceholderData ? 'opacity-60' : ''}`}
-        >
-          <MachineCanvas machine={machine} id="debug-lifecycle" lit={lit} taken={taken} maxHeight={CANVAS_MAX_HEIGHT} />
-          <Timeline path={path} at={at} machine={machine} onScrub={onScrub} />
-        </div>
+        <PathDrawn read={read.data} reading={read.isPlaceholderData} at={at} lit={lit} taken={taken} onScrub={onScrub} />
       )}
+    </div>
+  );
+}
+
+/**
+ * A path read, drawn: the lifecycle it carries with the state `lit` and the routes `taken`, beside its timeline at entry `at`, dimmed while
+ * another try's is `reading`; a step not filed yet says so.
+ */
+function PathDrawn({
+  read,
+  reading,
+  at,
+  lit,
+  taken,
+  onScrub,
+}: {
+  read: StepPath;
+  reading: boolean;
+  at: number;
+  lit: string | undefined;
+  taken: readonly string[];
+  onScrub: (i: number) => void;
+}) {
+  if (read.taskId === null) return <p className="text-body-medium text-muted-foreground">Not filed yet, so there is no path to show.</p>;
+  return (
+    <div
+      data-path={read.taskId}
+      data-reading={reading || undefined}
+      className={`grid gap-4 md:grid-cols-[minmax(0,1fr)_18rem] ${reading ? 'opacity-60' : ''}`}
+    >
+      <MachineCanvas machine={read.lifecycle} {...LIFECYCLE} id="debug-lifecycle" lit={lit} taken={taken} maxHeight={CANVAS_MAX_HEIGHT} />
+      <Timeline path={read.path} at={at} machine={read.lifecycle} onScrub={onScrub} />
     </div>
   );
 }
@@ -174,7 +189,7 @@ function WideGraph({
           </div>
         </SheetHeader>
         <LitInView lit={lit}>
-          <MachineCanvas machine={machine} id="debug-lifecycle-wide" lit={lit} taken={taken} />
+          <MachineCanvas machine={machine} {...LIFECYCLE} id="debug-lifecycle-wide" lit={lit} taken={taken} />
         </LitInView>
       </Sheet>
     </SheetTrigger>

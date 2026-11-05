@@ -3,7 +3,17 @@
  * steps from `step`), the reads it is composed from (`readsOf`), a run's row in a list (`summary`), its decision (`decidable`), a step's
  * conversation (`transcript`) and its try's path (`stepPath`). Each takes keys to put over its own.
  */
-import type { Decidable, ListedRun, RunSummary, WaitingRun, StepPath, StepTranscript, StepTry, StepUsed } from '../src/lib/api.ts';
+import type {
+  Decidable,
+  ListedRun,
+  MachineGraph,
+  RunSummary,
+  WaitingRun,
+  StepPath,
+  StepTranscript,
+  StepTry,
+  StepUsed,
+} from '../src/lib/api.ts';
 import type { RunObject } from '../src/lib/api.ts';
 import type { RunLines } from '../src/lib/api/run.ts';
 import type { RunView, StepView } from '../src/lib/runView.ts';
@@ -433,7 +443,20 @@ export const transcript = (extra: Partial<StepTranscript> = {}): StepTranscript 
   ...extra,
 });
 
-/** A try's task and its path through the runtime's lifecycle. */
+/** The lifecycle a path walks, one edge under a guard and one without, and a verb a person writes from outside it. */
+export const machine = (extra: Partial<MachineGraph> = {}): MachineGraph => ({
+  initial: 'queued',
+  states: ['queued', 'running', 'done'],
+  final: ['done'],
+  edges: [
+    { from: 'queued', event: 'start', guard: 'hasSlot', to: 'running', action: 'spawn' },
+    { from: 'running', event: 'exit', to: 'done', action: 'record' },
+  ],
+  verbs: [{ verb: 'close', entry: 'closed', by: 'person', from: ['running'], to: 'done', guard: 'awaitsWord' }],
+  ...extra,
+});
+
+/** A try's task, its path through the runtime's lifecycle, and the lifecycle it walks. */
 export const stepPath = (extra: Partial<StepPath> = {}): StepPath => ({
   taskId: 't-2',
   try: 2,
@@ -441,6 +464,7 @@ export const stepPath = (extra: Partial<StepPath> = {}): StepPath => ({
     { state: 'queued', event: 'filed', at: '2026-09-30T05:01:00.000Z' },
     { state: 'running', event: 'spawned', at: '2026-09-30T05:02:00.000Z' },
   ],
+  lifecycle: machine(),
   ...extra,
 });
 

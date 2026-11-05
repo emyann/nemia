@@ -107,6 +107,8 @@ test("get, the run page's reads: each decodes what the api gives, keeps out what
     assert.equal(Object.hasOwn(read.events[0], 'tool') || Object.hasOwn(read.events[0], 'result'), false);
     answering(t, stepPath());
     assert.deepEqual(await readPath(), stepPath());
+    const [, unguarded] = (await readPath()).lifecycle.edges;
+    assert.equal(Object.hasOwn(unguarded, 'guard'), false, 'an edge under no guard is read without one');
   });
   await t.test('a tool called without an input, as Claude Code may record it, is read without one', async (t) => {
     const call = { id: 'e-1', at: '2026-09-30T05:02:00.000Z', role: 'assistant', kind: 'tool_use', tool: { name: 'Stop' } } as const;

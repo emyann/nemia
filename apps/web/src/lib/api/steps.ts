@@ -133,8 +133,66 @@ const LifecycleTransitionSchema = decodes<LifecycleTransition>()(
   }),
 );
 
-/** Mirrors `StepPath` in apps/api/src/steps/path.ts: a try's task, the try's number, and the task's path to the end of that try. */
-export type StepPath = { taskId: string | null; try: number; path: LifecycleTransition[] };
+/** Mirrors the runtime's `LifecycleEdge`: one edge, where it leaves from, on what event, under which guard, to where, doing what. */
+export type MachineEdge = { from: string; event: string; guard?: string; to: string; action: string };
+
+/** Decodes a `MachineEdge`: an edge under no guard has no `guard`. */
+const MachineEdgeSchema = decodes<MachineEdge>()(
+  Schema.Struct({
+    from: Schema.String,
+    event: Schema.String,
+    guard: Schema.optionalKey(Schema.String),
+    to: Schema.String,
+    action: Schema.String,
+  }),
+);
+
+/**
+ * Mirrors the runtime's `LifecycleVerb`: a verb a person writes from outside the machine, the entry it journals, who writes it, the
+ * states it is taken from, the state the next pass reads, and the guard its refusal asks first.
+ */
+export type MachineVerb = { verb: string; entry: string; by: string; from: string[]; to: string; guard: string };
+
+/** Decodes a `MachineVerb`. */
+const MachineVerbSchema = decodes<MachineVerb>()(
+  Schema.Struct({
+    verb: Schema.String,
+    entry: Schema.String,
+    by: Schema.String,
+    from: Schema.mutable(Schema.Array(Schema.String)),
+    to: Schema.String,
+    guard: Schema.String,
+  }),
+);
+
+/**
+ * Mirrors the orchestrator's `LifecycleGraph`, as the api carries it on a step's path: the lifecycle's first state, every state, the
+ * final ones, every edge, and every verb written from outside it.
+ */
+export type MachineGraph = {
+  initial: string;
+  states: string[];
+  final: string[];
+  edges: MachineEdge[];
+  verbs: MachineVerb[];
+};
+
+/** Decodes a `MachineGraph`. */
+const MachineGraphSchema = decodes<MachineGraph>()(
+  Schema.Struct({
+    initial: Schema.String,
+    states: Schema.mutable(Schema.Array(Schema.String)),
+    final: Schema.mutable(Schema.Array(Schema.String)),
+    edges: Schema.mutable(Schema.Array(MachineEdgeSchema)),
+    verbs: Schema.mutable(Schema.Array(MachineVerbSchema)),
+  }),
+);
+
+/**
+ * Mirrors `StepPath` in apps/api/src/steps/path.ts: a try's task, the try's number, the task's path to the end of that try, and the
+ * lifecycle it walks, which the Debug panel draws it on.
+ */
+export type StepPath = { taskId: string | null; try: number; path: LifecycleTransition[]; lifecycle: MachineGraph };
 
 /** Decodes a `StepPath`. */
 const StepPathSchema = decodes<StepPath>()(
@@ -142,6 +200,7 @@ const StepPathSchema = decodes<StepPath>()(
     taskId: Schema.NullOr(Schema.String),
     try: Schema.Number,
     path: Schema.mutable(Schema.Array(LifecycleTransitionSchema)),
+    lifecycle: MachineGraphSchema,
   }),
 );
 

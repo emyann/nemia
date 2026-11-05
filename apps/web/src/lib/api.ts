@@ -57,7 +57,6 @@ export * from './api/daemon.ts';
 export * from './api/quota.ts';
 export * from './api/version.ts';
 export * from './api/store.ts';
-export * from './api/machines.ts';
 export * from './api/factories.ts';
 export * from './api/pause.ts';
 export * from './api/nemia.ts';

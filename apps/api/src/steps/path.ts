@@ -1,17 +1,18 @@
 /** A step's try and the task that ran it, for the path of that task through the runtime's lifecycle (`engine.path`). */
 import type { Effect } from 'effect';
 import type { Run } from 'agent-orchestrator/run';
-import { turnOfTry } from 'agent-orchestrator';
+import { turnOfTry, type LifecycleGraph } from 'agent-orchestrator';
 import type { Engine } from '../store.ts';
 
 /** One transition of a task's path: the lifecycle state its journal says once an entry is on it, the entry's kind and its `at`. */
 export type LifecycleTransition = Effect.Success<ReturnType<Engine['Service']['path']>>[number];
 
 /**
- * The path of one try of a step: its task, the try's number counted from 1 as the step's tries count them (`triesOf`), and the task's
- * path from its filing to the end of that try. A step not filed yet has no task and an empty path.
+ * The path of one try of a step: its task, the try's number counted from 1 as the step's tries count them (`triesOf`), the task's path
+ * from its filing to the end of that try, and the lifecycle it walks, read off the runtime's code (`lifecycleGraph`), which the board's
+ * Debug panel draws the path on. A step not filed yet has no task and an empty path.
  */
-export type StepPath = { taskId: string | null; try: number; path: LifecycleTransition[] };
+export type StepPath = { taskId: string | null; try: number; path: LifecycleTransition[]; lifecycle: LifecycleGraph };
 
 /**
  * The try of `step` that `asked` names — the current one when it is undefined or empty — with its task, and the turn of that task it

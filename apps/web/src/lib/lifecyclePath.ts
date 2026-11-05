@@ -3,8 +3,7 @@
  * graph were taken to reach it, when the path is read again, and the stamp that keys it by the step's state. Pure, with file imports
  * only, so a node test reads it as the page does.
  */
-import type { MachineGraph, MachineVerb } from './api/machines.ts';
-import type { LifecycleTransition, StepPath } from './api/steps.ts';
+import type { LifecycleTransition, MachineGraph, MachineVerb, StepPath } from './api/steps.ts';
 import type { RunStepStatus } from './api/run.gen.ts';
 
 /**

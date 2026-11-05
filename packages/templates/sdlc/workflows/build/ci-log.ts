@@ -1,6 +1,8 @@
 /**
  * The lines of a failing CI job's log that say why it failed, for `pull-request.ts`'s refusal of a red CI context, and how a check of a
- * commit reads — its name, whether it is over, its verdict, the latest run of each — for that script's wait and `landing.ts`'s: pure,
+ * commit reads — its name, whether it is over, its verdict, the latest run of each, whether a context's runs were all superseded, and the
+ * jobs that did not pass as a refusal lists them — for that script's wait and `landing.ts`'s, and what `landing.ts`'s receipt says of
+ * its wait at the merge: pure,
  * reading no process and calling nothing. It sits beside the scripts rather than in them so each stays within its size, and it travels
  * with them: a run freezes its workflow's whole folder (`$WF_WORKFLOW_FILES`), so a script reads it there, as it is read here. It
  * imports nothing.
@@ -140,4 +142,107 @@ export function latest<T extends Check>(entries: readonly T[]): T[] {
   });
   const kept = new Set(newest.values());
   return entries.filter((_, i) => kept.has(i));
+}
+
+/**
+ * Whether `ours`, the CI context's checks of a commit, carry no verdict of the commit's own: none reported, or every one concluded
+ * `CANCELLED` — as a CI does whose pending run of a branch is replaced by a newer one. A check not over yet has no conclusion, so a
+ * context still running is never superseded.
+ */
+export const superseded = (ours: readonly Check[]): boolean => ours.every((entry) => verdict(entry) === 'CANCELLED');
+
+/** The verdicts of a job that did not fail it: a job that is over with any other did not pass. */
+export const NOT_FAILED: ReadonlySet<string> = new Set([PASSED, 'SKIPPED', 'NEUTRAL']);
+
+/** The entries of `entries` named `check`. */
+export const named = <T extends Check>(entries: readonly T[], check: string): T[] => entries.filter((entry) => nameOf(entry) === check);
+
+/** The most jobs that did not pass a refusal names. */
+const JOBS = 10;
+
+/** `listed` by name and verdict, or state where it has none yet, with its URL, one a line, at most `JOBS` of them. */
+export const listing = (listed: readonly Check[]): string[] => [
+  ...listed.slice(0, JOBS).map((e) => `    ${nameOf(e)}: ${verdict(e) || e.status?.toLowerCase() || 'no verdict'} ${linkOf(e)}`.trimEnd()),
+  ...(listed.length > JOBS ? [`    … and ${listed.length - JOBS} more`] : []),
+];
+
+/**
+ * A landing as the receipt's wait on CI names it in what it says: its pull request's number and address, its merge commit, the base
+ * branch it is on, and the CI context waited on.
+ */
+export type Landing = { number: number; url: string; oid: string; onto: string; check: string };
+
+/** Where a person reads a commit of the repository the landing's pull request is of. */
+const commitUrl = (l: Landing, sha: string): string => `${l.url.replace(/\/pull\/\d+$/, '')}/commit/${sha}`;
+
+/** What every refusal of the wait says: the merge stands, and nothing was taken back. */
+export const stands = (l: Landing): string => `  The merge stands and nothing was taken back: #${l.number} is on \`${l.onto}\`.`;
+
+/** Why the merge's own `ours`, `superseded`, carry no verdict: every run cancelled, or none reported. */
+export const noVerdict = (ours: readonly Check[]): string =>
+  ours.length
+    ? "the merge's own run was cancelled, most likely replaced by a newer run of the base's CI"
+    : "the merge's own was not reported there";
+
+/** What the receipt says where the context passed at `sha`, the base's tip, which holds the merge: red there, or `none` of its own. */
+export const greenLater = (l: Landing, sha: string, none?: string): string =>
+  none === undefined
+    ? `\`${l.check}\` was red on \`${l.onto}\` at the merge ${l.oid.slice(0, 12)}, and is green at ${sha.slice(0, 12)}, the base's tip, which holds it`
+    : `\`${l.check}\` is green on \`${l.onto}\` at ${sha.slice(0, 12)}, the base's tip, which holds the merge ${l.oid.slice(0, 12)}: ${none}`;
+
+/**
+ * What the wait says of the context at the merge once `secs` are out: never read from GitHub, naming the last error `unread`; still
+ * running; cancelled; or never reported.
+ */
+export function unfinished(l: Landing, entries: readonly Check[], secs: number, unread?: string): string {
+  const [ours, at] = [named(entries, l.check), `\`${l.check}\` on \`${l.onto}\` at ${l.oid.slice(0, 12)}, the merge of #${l.number},`];
+  if (unread !== undefined)
+    return `${at} could not be read from GitHub within ${secs} s; the last read said: ${unread}\n  Read ${commitUrl(l, l.oid)}.`;
+  if (seenOf(ours) === 'pending') {
+    const states = ours.map((entry) => (entry.status ?? entry.state ?? '').toLowerCase()).join(', ');
+    return `${at} was still ${states} after ${secs} s: read ${linkOf(ours[0]) || commitUrl(l, l.oid)}, and retry the step once it is over.`;
+  }
+  if (ours.length)
+    return [
+      `${at} was cancelled, most likely replaced by a newer run of the base's CI, and no later commit of \`${l.onto}\` that holds ` +
+        `it had a verdict within ${secs} s:`,
+      ...listing(ours),
+      `  A person re-runs it at its link, or the step is retried once a later commit's \`${l.check}\` is over.`,
+    ].join('\n');
+  return unreported(l, entries, secs);
+}
+
+/**
+ * The refusal of a context never reported at the merge within `secs`: the other checks there still running or not passed, with their
+ * URLs, and that CI may not run it on pushes to the base, which the factory's `landingWaitsOnCi` answers, or has not yet.
+ */
+function unreported(l: Landing, entries: readonly Check[], secs: number): string {
+  const told = entries.filter((entry) => pending(entry) || !NOT_FAILED.has(verdict(entry)));
+  return [
+    `no \`${l.check}\` was reported on \`${l.onto}\` at ${l.oid.slice(0, 12)}, the merge of #${l.number}, within ${secs} s ` +
+      `(${commitUrl(l, l.oid)}).`,
+    ...(told.length ? ['  The other checks there still running or not passed:', ...listing(told)] : []),
+    `  Either CI does not run \`${l.check}\` on pushes to \`${l.onto}\`, and the factory sets \`landingWaitsOnCi\` false ` +
+      '(`--set landingWaitsOnCi=false`), or it has not reported yet, and the step is retried.',
+  ].join('\n');
+}
+
+/**
+ * The refusal of a red context at `sha` on the base, its retry line left to the caller: where — the merge, which turned the base red,
+ * or the base's tip, which holds the merge that had `none` of its own — the jobs that did not pass with their URLs, and what a person
+ * does.
+ */
+export function reddened(l: Landing, sha: string, entries: readonly Check[], none?: string): string[] {
+  const [at, merge] = [sha.slice(0, 12), `the merge of #${l.number}`];
+  return [
+    none === undefined
+      ? `\`${l.check}\` is red on \`${l.onto}\` at ${at}, ${merge}: this landing turned the base branch red.`
+      : `\`${l.check}\` is red on \`${l.onto}\` at ${at}, the base's tip, which holds ${l.oid.slice(0, 12)}, ${merge}: ${none}. ` +
+        'The base branch is red there.',
+    stands(l),
+    `  The jobs that did not pass (${commitUrl(l, sha)}):`,
+    ...listing(entries.filter((entry) => !pending(entry) && !NOT_FAILED.has(verdict(entry)))),
+    '  Where CI failed on its own account, a person re-runs the failed jobs; where the change broke it, a fix is landed. Then the ' +
+      'step is retried, which reads the merge and the base again.',
+  ];
 }

@@ -92,7 +92,8 @@ export default {
    * repositories, asks which on the list and on a workflow's page, and is read on the one picked; a name no factory has says so on the
    * page and in the bar; a factory that does not offer a workflow says so on its page. With no factory picked, the tree's workflows are
    * not listed, and `dev` is the checkout's. The tree's own agent, pressed on its workflow's step, and its skill each open on their page
-   * in the factory, the top bar saying it, which says the factory's way and offers no write. Each state is photographed, and the
+   * in the factory, the top bar saying it, which says the factory's way and offers no write: the agent's skill found in its tree, none
+   * read as not found, and the skill given by the agent. Each state is photographed, and the
    * factories are taken back.
    */
   name: 'factory-workflows',
@@ -187,6 +188,11 @@ export default {
         `the tree's own ${TREE_AGENT.name} opens on its page in ${TREED} and says a factory's own agent changes the factory's way`,
       );
       await expectCount(agentPage.getByRole('button', { name: /^(Save|Remove…?)$/ }), 0, 'and offers no Save and no Remove');
+      await expectVisible(
+        agentPage.locator(`[data-given-skill="${TREE_SKILL.name}"] [data-skill-from="factory"]`),
+        `its ${TREE_SKILL.name} is found in its tree, as a start in ${TREED} finds it, and said to be the factory's`,
+      );
+      await expectCount(agentPage.locator('[data-skill-from="none"]'), 0, 'and no skill it gives reads as not found');
       await shoot('agent');
 
       await goto(page, `/agents/skills/factory/${TREE_SKILL.name}?factory=${TREED}`);
@@ -202,6 +208,10 @@ export default {
       );
       await expectCount(skillPage.getByRole('button', { name: 'Save', exact: true }), 0, 'and offers no Save');
       await expectCount(skillPage.locator('[data-preload] input:not([disabled])'), 0, 'nor a switch that writes its preload');
+      await expectVisible(
+        skillPage.locator(`[data-skill-users] [data-agent-link="${TREE_AGENT.name}"]`),
+        `it is given by the tree's own ${TREE_AGENT.name}`,
+      );
       await shoot('skill');
 
       await goto(page, `/workflows?factory=${TWIN.name}`);

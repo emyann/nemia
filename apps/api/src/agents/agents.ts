@@ -59,12 +59,18 @@ const SOURCES = commandNamed('agents sources');
 
 /**
  * The package's reading of an agent as the board lists it: its custom instructions' file left out, what it is given — its skills found
- * through the Skill door as a start on `repo` finds them — and why it is untried.
+ * through the Skill door as a start on `repo` finds them — and why it is untried. An agent of a factory's tree `tree` finds the tree's
+ * skills first, as a start in that factory does, and gives each as the factory's.
  */
-export const listingOf = Effect.fnUntraced(function* ({ custom: _custom, ...read }: AgentReading, repo: string, home: string) {
+export const listingOf = Effect.fnUntraced(function* (
+  { custom: _custom, ...read }: AgentReading,
+  repo: string,
+  home: string,
+  tree?: string,
+) {
   const given =
     read.error === null && read.skills
-      ? givenSkills(read.skills.split(', '), yield* agentSkillsFound(read.dir, repo, home), repo, home)
+      ? givenSkills(read.skills.split(', '), yield* agentSkillsFound(read.dir, repo, home), repo, home, tree)
       : [];
   return { ...read, given, untried: untriedOf({ ...read, schemaFile: read.schema?.file ?? null }, home) } satisfies AgentListing;
 });

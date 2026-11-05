@@ -97,7 +97,7 @@ async function objectsOf(s: Served, namespace: string, served: ReturnType<typeof
         const { dir, entry, error, preload, cost } = row;
         const version = versions.get(dir) ?? '';
         const revision = yield* definitionRevision('skill', name, version);
-        const usedBy = yield* skillUsers(dir, name, s.repo, s.home);
+        const usedBy = yield* skillUsers(dir, name, s.repo, s.home, s.factory?.tree);
         const copyHint =
           origin === 'yours'
             ? skillCopyCommand(dir, repoSkillsDir(s.repo))

@@ -13,12 +13,8 @@ import { type Implementation, spec } from '@emyann/tsverify';
 import type { StepStatus } from '../src/record/record.ts';
 import type { StepTransition } from '../src/step-machine/step-machine.ts';
 
-/**
- * A step's word: `StepStatus`, with the two the routing build adds to it, `skipped` (a node on a route not taken) and `sent` (a workflow
- * node that filed its card). Implement adds them to `StepStatus`, after which this is `StepStatus` itself, and may say so, which changes
- * no law.
- */
-export type StepWord = StepStatus | 'skipped' | 'sent';
+/** A step's word: `StepStatus` itself, `skipped` (a node on a route not taken) and `sent` (a workflow node that filed its card) in it. */
+export type StepWord = StepStatus;
 
 /** The words only a step judged by a check reads: `verified` needs a passed check, and `checking` and `failed (check)` one filed. */
 const CHECKED: ReadonlySet<StepWord> = new Set<StepWord>(['checking', 'verified', 'failed (check)']);
@@ -41,10 +37,10 @@ const stepMoveSpec = spec<(from: StepWord, to: StepWord) => StepTransition>({
         (from !== 'running' && from !== 'checking') || to !== 'pending' || output.kind === 'refused',
     },
     /**
-     * Was `satisfiedOnlyAfterItRan`, which refused `unverified` from `pending` too. The routing build loosens it there, on purpose: a
-     * condition whose eval is a table has no session to run, and reads `unverified` on the pass its producer's closeout is read and its
-     * table answers. That `pending → unverified` is a condition's alone is held by the replay (`step-machine.test.ts`), which walks it on a
-     * table condition and on nothing else.
+     * Loosened from the law that nothing is satisfied before it ran, which refused `unverified` from `pending` too. The routing build
+     * loosens it there, on purpose: a condition whose eval is a table has no session to run, and reads `unverified` on the pass its
+     * producer's closeout is read and its table answers. That `pending → unverified` is a condition's alone is held by the replay
+     * (`step-machine.test.ts`), which walks it on a table condition and on nothing else.
      */
     verifiedOnlyAfterItRan: {
       description:
@@ -60,14 +56,12 @@ const stepMoveSpec = spec<(from: StepWord, to: StepWord) => StepTransition>({
     skippedExactlyFromPending: {
       description:
         'A route not taken skips a node never filed, and nothing else: a move into skipped is drawn exactly from pending, since once a follower is filed the route is settled',
-      condition: ({ input: [from, to], output }) =>
-        to !== 'skipped' || from === to || (output.kind === 'edge') === (from === 'pending'),
+      condition: ({ input: [from, to], output }) => to !== 'skipped' || from === to || (output.kind === 'edge') === (from === 'pending'),
     },
     unskippedExactlyToPending: {
       description:
         'A skipped node moves exactly back to pending: a new route, named before any follower is filed, un-skips a node that was never filed',
-      condition: ({ input: [from, to], output }) =>
-        from !== 'skipped' || from === to || (output.kind === 'edge') === (to === 'pending'),
+      condition: ({ input: [from, to], output }) => from !== 'skipped' || from === to || (output.kind === 'edge') === (to === 'pending'),
     },
     sentExactlyFromPending: {
       description:
@@ -75,7 +69,8 @@ const stepMoveSpec = spec<(from: StepWord, to: StepWord) => StepTransition>({
       condition: ({ input: [from, to], output }) => to !== 'sent' || from === to || (output.kind === 'edge') === (from === 'pending'),
     },
     aCardFiledStaysFiled: {
-      description: 'A workflow node that sent its card never moves again: a card filed is never taken back, and no round crosses a condition',
+      description:
+        'A workflow node that sent its card never moves again: a card filed is never taken back, and no round crosses a condition',
       condition: ({ input: [from, to], output }) => from !== 'sent' || from === to || output.kind === 'refused',
     },
     anEdgeNamesItsEvent: {

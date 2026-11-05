@@ -41,6 +41,7 @@ import {
   sentBack,
   stepMomentum,
   stepSpend,
+  stepStatus,
   triedFrom,
   type Round,
   type RoundAsk,
@@ -71,6 +72,7 @@ import { answerHeld, stopAsked } from './held.verb.ts';
 import { forStep } from '../telemetry/telemetry.store.ts';
 import { stepLabels } from '../telemetry/telemetry.ts';
 import { localFields } from './assess.ts';
+import { answeredRoute } from '../route/route-words.ts';
 import { filedAt, foldersTold, placeTold, toldOf, type PlaceTold, type StepTold, type Told } from './told.verb.ts';
 import { found, recordNamed, stepNamed, taskToStop, tryTold } from './told.verb.ts';
 
@@ -426,6 +428,34 @@ function roundSpec(
   };
 }
 
+/**
+ * Copy each table condition's route onto its record, once for the try it is on (`StepRecord.route`, `by: 'table'`), where its table
+ * answers one and nothing is there for the try: a person's (`routeFile`) or one copied before. Answers with the conditions written. The
+ * pass reads the route afresh either way (`answeredRoute`); the copy, written with the record when the pass writes it — as it does on the
+ * pass that files the route's first node — keeps what the run took after the producer's closeout is pruned.
+ */
+function answerTables(f: Pick<Filing, 'run' | 'reads'>): string[] {
+  const { run, reads } = f;
+  const wordOf = (name: string) => {
+    const step = reads.steps.find((s) => s.name === name);
+    return step
+      ? stepStatus(step, run, reads.phaseOf, reads.signedOff, reads.asked, reads.steps, reads.spendOf, reads.verdictOf)
+      : 'pending';
+  };
+  const written: string[] = [];
+  for (const step of reads.steps) {
+    const record = run.steps[step.name];
+    if (step.route?.kind !== 'table' || !record || record.taskId) continue;
+    const n = tryOf(run, step.name);
+    if (record.route?.try === n) continue;
+    const answer = answeredRoute(step, run, reads.signedOff, wordOf);
+    if (answer?.kind !== 'route') continue;
+    run.steps[step.name] = { ...record, route: { route: answer.route, try: n, by: 'table' } };
+    written.push(step.name);
+  }
+  return written;
+}
+
 /** File the checks of these steps, in order, until the pass may file no more: answers with the steps whose checks are on the record. */
 export const fileChecks = Effect.fn('fileChecks')(function* (f: Filing, names: readonly string[]) {
   const checked: string[] = [];
@@ -488,10 +518,11 @@ const fileCheck = Effect.fnUntraced(function* (f: Filing, name: string) {
  * File the ready steps, in order, until the pass may file no more, each in the workspace cut for it: answers with the steps filed. A run
  * that waited on runs, on the pass that files its roots, moves its base to its branch as the pass read it (`Filing.heads`), and keeps it
  * where the pass did not; and a run that waited on runs or was handed runs as context reads what they concluded, where their branches
- * stand read through `git` (`handedOf`).
+ * stand read through `git` (`handedOf`). First, each table condition's route is copied onto its record (`answerTables`).
  */
 export const fileReady = Effect.fn('fileReady')(function* (f: Filing, ready: readonly string[], starting: boolean, git: BranchReader) {
   const { e, run } = f;
+  answerTables(f);
   if (ready.length && starting && run.after?.length && isRepositoryRun(run)) run.baseRef = f.heads?.()?.[run.branch] || run.baseRef;
   const parents = ready.length && starting ? yield* handedOf(e, run, git) : undefined;
   const filed: string[] = [];

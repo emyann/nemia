@@ -725,8 +725,7 @@
     {
       "files": ["packages/agent-orchestrator/src/tick/assess.ts"],
       "rules": {
-        "complexity": ["error", { "max": 29 }],
-        "sonarjs/cognitive-complexity": ["error", 24]
+        "sonarjs/cognitive-complexity": ["error", 16]
       }
     },
     {
@@ -753,7 +752,7 @@
     {
       "files": ["packages/agent-orchestrator/src/record/record.store.ts"],
       "rules": {
-        "max-lines": ["error", { "max": 512, "skipBlankLines": true, "skipComments": true }]
+        "max-lines": ["error", { "max": 511, "skipBlankLines": true, "skipComments": true }]
       }
     },
     {

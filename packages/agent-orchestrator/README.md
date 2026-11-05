@@ -1843,8 +1843,15 @@ stateDiagram-v2
   state "stopped" as stopped
   state "budget exhausted" as budget_exhausted
   state "over budget" as over_budget
+  state "skipped" as skipped
+  state "sent" as sent
   pending --> running: filed
   pending --> awaiting_approval: its work handed on, at the gate of an ending
+  pending --> unverified: answered by its table
+  pending --> unsigned: its table answered no route
+  pending --> skipped: its route not taken
+  pending --> sent: its card filed
+  skipped --> pending: a new route, before a follower is filed
   running --> unverified: signed, with no check
   running --> checking: signed, with a check
   running --> awaiting_approval: signed, at its gate

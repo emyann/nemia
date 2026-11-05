@@ -23,10 +23,18 @@ import { closeoutRefusals } from '../question/index.ts';
 import type { Verdict } from '../check/check.ts';
 import type { CheckoutHold } from '../cap/cap.ts';
 import { roundsDue } from '../round/round.ts';
+import { conditionOf, nodeFate, nodeKind } from '../route/route.ts';
+import { answeredRoute, routedWords } from '../route/route-words.ts';
 
 export type Assessment = {
-  /** Steps whose predecessors are all verified or unverified, and which have not been filed. File these. */
+  /**
+   * Steps whose predecessors are all satisfied — verified, unverified or sent — or skipped, at least one satisfied, on the route their
+   * condition answered (`nodeFate`), and which have not been filed. File these. Never a table condition, which the pass answers unfiled,
+   * nor a workflow node (`send`).
+   */
   ready: string[];
+  /** Workflow nodes (`workflow:`) due their card, on the route taken and never sent. Send these: each files a card for its workflow. */
+  send: string[];
   /** Steps that signed off with a `check:` nobody has filed yet. File their checks. */
   check: string[];
   /** Steps to try again, and how: a check `retries:` still covers, or a person's `nemia retry`. File these. */
@@ -114,12 +122,13 @@ export function assess(
   standings: readonly BranchStanding[] = [],
   checkout?: CheckoutHold,
 ): Assessment {
-  if (run.cancelledAt) return { ready: [], check: [], retry: [], round: [], unreachable: [], waitingOnCheckout: [], status: 'cancelled' };
+  if (run.cancelledAt)
+    return { ready: [], send: [], check: [], retry: [], round: [], unreachable: [], waitingOnCheckout: [], status: 'cancelled' };
   if (run.pruned) [asks, roundAsks] = [[], []];
   if (run.hold) [asks, roundAsks] = [[], []];
 
   const stood = new Map(steps.map((s) => [s.name, standing(s, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf)]));
-  const status = new Map([...stood].map(([name, st]) => [name, st.status]));
+  const status = routedWords(steps, run, new Map([...stood].map(([name, st]) => [name, st.status])), closeoutOf);
   const due = retriesDue(steps, run, phaseOf, closeoutOf, askedCloseout, verdictOf, asks, harnessBlocked, spendOf);
   const retry = due.filter((r) => !waitsOnCheckout(steps, r.step, checkout));
   const waitingOnCheckout: string[] = due.filter((r) => waitsOnCheckout(steps, r.step, checkout)).map((r) => r.step);
@@ -128,34 +137,31 @@ export function assess(
   unspent(status, stood, roundSpans(steps, round));
   for (const r of round) status.set(r.step, 'running');
   for (const name of unheld(steps, run, retry, round)) status.set(name, 'pending');
-  const ready: string[] = [];
-  const check: string[] = [];
-  const unreachable: string[] = [];
-
-  for (const step of steps) {
-    const own = status.get(step.name);
-    if (own === undefined) continue;
-    if (own === 'checking' && !run.steps[step.name]?.check) check.push(step.name);
-    if (own !== 'pending') continue;
-    const deps = step.after.map((a) => status.get(a) ?? 'pending');
-    if (deps.some(stopsFollowers)) unreachable.push(step.name);
-    else if (!deps.every(satisfiesAfter)) continue;
-    else if (waitsOnCheckout(steps, step.name, checkout)) waitingOnCheckout.push(step.name);
-    else ready.push(step.name);
-  }
+  const { ready, send, check, unreachable } = dueSteps(steps, run, status, closeoutOf, checkout, waitingOnCheckout);
 
   const all = [...status.values()];
-  const overall: Assessment['status'] = all.every(satisfiesAfter)
+  const overall: Assessment['status'] = succeeded(all)
     ? 'succeeded'
     : unreachable.length || all.some(stopsFollowers)
       ? stoppedOnWord(steps.flatMap((s) => wordsOf(status.get(s.name), stood.get(s.name))))
       : 'running';
 
   if (run.hold)
-    return { ready: [], check: [], retry: [], round: [], unreachable, waitingOnCheckout: [], status: 'running', holdUntil: run.hold.until };
+    return {
+      ready: [],
+      send: [],
+      check: [],
+      retry: [],
+      round: [],
+      unreachable,
+      waitingOnCheckout: [],
+      status: 'running',
+      holdUntil: run.hold.until,
+    };
   const decide = toDecide(steps, run, overall, (name) => status.get(name) ?? 'pending', standings);
   const assessed: Assessment = {
     ready,
+    send,
     check,
     retry,
     round,
@@ -167,15 +173,50 @@ export function assess(
   return underPause(run, assessed);
 }
 
+/**
+ * What of the run's steps is due on this pass, off each step's word: a check nobody has filed, a node whose fate is ready (`nodeFate`, its
+ * condition's route and its parents' words) filed as a session, or sent its card where it is a workflow node, or held for the checkout —
+ * never a table condition, which the pass answers unfiled — and one that waits on a step that stops it, unreachable. Pure.
+ */
+function dueSteps(
+  steps: readonly Workflow[],
+  run: Run,
+  status: ReadonlyMap<string, StepStatus>,
+  closeoutOf: (step: string) => Closeout | undefined,
+  checkout: CheckoutHold | undefined,
+  waitingOnCheckout: string[],
+): Pick<Assessment, 'ready' | 'send' | 'check' | 'unreachable'> {
+  const due: Pick<Assessment, 'ready' | 'send' | 'check' | 'unreachable'> = { ready: [], send: [], check: [], unreachable: [] };
+  const wordOf = (name: string): StepStatus => status.get(name) ?? 'pending';
+  for (const step of steps) {
+    const own = status.get(step.name);
+    if (own === 'checking' && !run.steps[step.name]?.check) due.check.push(step.name);
+    if (own !== 'pending') continue;
+    const condition = conditionOf(step, steps);
+    const answered = condition ? answeredRoute(condition, run, closeoutOf, wordOf) : undefined;
+    const fate = nodeFate(step.when, answered?.kind === 'route' ? answered.route : undefined, step.after.map(wordOf));
+    if (fate === 'unreachable') due.unreachable.push(step.name);
+    else if (fate !== 'ready' || step.route?.kind === 'table') continue;
+    else if (nodeKind(step) === 'workflow') due.send.push(step.name);
+    else if (waitsOnCheckout(steps, step.name, checkout)) waitingOnCheckout.push(step.name);
+    else due.ready.push(step.name);
+  }
+  return due;
+}
+
+/** Whether a run's words say it succeeded: every node satisfied, sent or skipped, and at least one that ran. */
+const succeeded = (all: readonly StepStatus[]): boolean =>
+  all.every((s) => satisfiesAfter(s) || s === 'skipped') && (all.length === 0 || all.some(satisfiesAfter));
+
 /** The assessment as the store's pause leaves it (`Run.pause`): nothing due, and what was due named in `waitingOnPause`. Pure. */
 function underPause(run: Run, a: Assessment): Assessment {
   if (!run.pause) return a;
   const steps = [
-    ...new Set([...a.ready, ...a.check, ...a.retry.map((r) => r.step), ...a.round.map((r) => r.step), ...a.waitingOnCheckout]),
+    ...new Set([...a.ready, ...a.send, ...a.check, ...a.retry.map((r) => r.step), ...a.round.map((r) => r.step), ...a.waitingOnCheckout]),
   ];
   const checks = [...new Set([...a.check, ...a.retry.filter((r) => r.mode === 'recheck').map((r) => r.step)])];
   const waitingOnPause = steps.length ? { waitingOnPause: { steps, checks } } : {};
-  return { ...a, ready: [], check: [], retry: [], round: [], waitingOnCheckout: [], ...waitingOnPause };
+  return { ...a, ready: [], send: [], check: [], retry: [], round: [], waitingOnCheckout: [], ...waitingOnPause };
 }
 
 /** Read each step of a round due (`roundSpans`) that is `over budget` as its own ending under it, in `status`: never one not stood. */

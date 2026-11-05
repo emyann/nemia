@@ -7,6 +7,7 @@ import { endsOnBase, LOOP_REPLIES, stepPlace, type Workflow, WorkflowError } fro
 import { isRemoteHarness } from '../harness/harness.ts';
 import { contextText, sessionContext } from '../keys/index.ts';
 import { LINE_NAME } from '../workspace/workspace.ts';
+import { routeRefusal } from '../route/route-load.ts';
 
 /**
  * Whether a team works in folders the run makes, with no git repository (`place: folder`): every step says it, or none does
@@ -111,6 +112,7 @@ export function validate(steps: readonly Workflow[]): void {
   if (cycle !== undefined) throw new WorkflowError(cycle);
 
   validateLoops(steps);
+  validateRoutes(steps);
 }
 
 /**
@@ -327,6 +329,31 @@ function validateLoops(steps: readonly Workflow[]): void {
       }
     }
   }
+}
+
+/**
+ * Why a loop crosses a condition, or `undefined`: a round files its whole span again (`loopSpan`), and a condition in it would be asked
+ * again after its followers were filed. So a span holds no condition but its looping step, and no `when:` node but its target.
+ */
+function loopRouteRefusal(steps: readonly Workflow[]): string | undefined {
+  for (const looping of steps) {
+    for (const name of looping.loop ? loopSpan(steps, looping) : []) {
+      const s = steps.find((x) => x.name === name);
+      if (name !== looping.name && s?.routes !== undefined) {
+        return `${looping.name}: \`loop: ${looping.loop}\` files ${name} again each round, and ${name} is a condition: a round would ask it again after its followers were filed. Loop back to a step after ${name}, or move the condition out of the loop.`;
+      }
+      if (name !== looping.loop && s?.when !== undefined) {
+        return `${looping.name}: \`loop: ${looping.loop}\` files ${name} again each round, and ${name} runs on a route (\`when:\`): only a loop's target may. Loop back to ${name}, or move it out of the loop.`;
+      }
+    }
+  }
+  return undefined;
+}
+
+/** Refused: a workflow whose routes do not close (`routeRefusal`), or a loop that crosses a condition (`loopRouteRefusal`). */
+function validateRoutes(steps: readonly Workflow[]): void {
+  const refused = routeRefusal(steps) ?? loopRouteRefusal(steps);
+  if (refused !== undefined) throw new WorkflowError(refused);
 }
 
 /**

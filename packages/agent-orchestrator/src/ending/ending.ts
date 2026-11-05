@@ -218,7 +218,8 @@ export const LANDED_CAP = 160;
  * When the person's word that would file a run's ending step was given (`MainClaim`): the approval of an ending that has not run
  * (`approvalOf`), or the ask for the try that would file it again — a step that ended blocked, or whose check refused, is tried like any
  * other, and its try works in that same checkout. Undefined where there is no such word. An ending with no gate is filed with nobody's
- * word, so the claim reads `endingClaimedAt`, which gives it the run's creation; this stays the person's word alone, as the rest blocker
+ * word, and a filed ending whose try landed no commit is tried again by the run itself, so the claim reads `endingClaimedAt`, which gives
+ * each the run's creation; this stays the person's word alone, as the rest blocker
  * `checkoutAsked` reads it. Pure.
  */
 export const endingAsked = (run: Run, step: Workflow, asks: readonly RetryAsk[]): string | undefined =>
@@ -229,16 +230,25 @@ export const endingAsked = (run: Run, step: Workflow, asks: readonly RetryAsk[])
 /**
  * When a run's ending claims the repository's own checkout (`MainClaim.at`), or none: the person's word that would file it, where there is
  * one; else, for an ending with no gate not yet filed, the run's creation, since its workflow files it with nobody's word once the step
- * before it passes; else nothing. Proved by `contracts/checkout-claim.contract.ts`. Pure.
+ * before it passes; else, for a filed ending whose try landed no commit, the run's creation too, since the run files its next try itself
+ * (a sign-off ask, a check's `retries:`) on the word the workflow gave at the start; else nothing. Proved by
+ * `contracts/checkout-claim.contract.ts`. Pure.
  */
-export const claimedAt: ClaimedAt = (w) => w.asked ?? (!w.gated && !w.filed ? w.createdAt : undefined);
+export const claimedAt: ClaimedAt = (w) => w.asked ?? (w.filed ? (w.landed ? undefined : w.createdAt) : w.gated ? undefined : w.createdAt);
 
-/** `claimedAt` of a run's ending, read off its record and its asks (`checkoutHold`, `mainClaim`). Pure. */
+/** Whether a try of an ending landed a commit on the base branch, read off its record's `landed`. Pure. */
+const landedCommit = (landed: LandingRecord | undefined): boolean => landed !== undefined && 'commit' in landed;
+
+/**
+ * `claimedAt` of a run's ending, read off its record and its asks (`checkoutHold`, `mainClaim`): `landed` is whether its try landed a
+ * commit, which a filed ending that aborted, ended untouched or never landed has not. Pure.
+ */
 export const endingClaimedAt = (run: Run, step: Workflow, asks: readonly RetryAsk[]): string | undefined =>
   claimedAt({
     asked: endingAsked(run, step, asks),
     gated: hasGate(step, run),
     filed: Boolean(run.steps[step.name]?.taskId),
+    landed: landedCommit(run.steps[step.name]?.landed),
     createdAt: run.createdAt,
   });
 

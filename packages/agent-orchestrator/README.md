@@ -2424,7 +2424,10 @@ dropped. **Nothing in the packages knows what shipping means.**
   session, and not the try a person asks for after one ended blocked, which works in that same directory. It
   reads `waiting on the checkout (<run>'s ship has it)` on `wf ls`, on its own line or beside the try it is
   waiting to take, and `wf decide` says which run's step has it. An ending with no gate, which its workflow files
-  once the step before it passes, waits the same way: it claims the checkout as of the run's creation. A landing
+  once the step before it passes, waits the same way: it claims the checkout as of the run's creation. So does the
+  try a run files itself of an ending whose try landed no commit — the ask to sign off of a session that ended
+  without its closeout, a check's `retries:` — which works in that same directory: it waits for another run's
+  ending as a person's try does, and `wf ls` says so beside the try. A landing
   holds the checkout until it has landed or aborted, not only while its session runs: while its check runs on the
   merge, and while the merge is staged and not yet committed or aborted, so another run's ending is filed on the
   first pass after that one. Such a run is running, not waiting on anybody:

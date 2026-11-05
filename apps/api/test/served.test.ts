@@ -38,7 +38,7 @@ const OWN: Readonly<Record<string, string>> = {
   'GET /api/nemia/chat': "Nemia's chat paged, a program of the package's chat and no command, as its writes are none",
   'GET /api/nemia/chat/stream': "Nemia's chat followed, a stream",
   'POST /api/nemia/chat/send':
-    "the person's words to Nemia, a program of the package's chat and no command: a command would enter her fence, a second writer",
+    "the person's words, or an allowed agent's, to Nemia, a program of the package's chat and no command: a command would enter her fence, a second writer",
   'POST /api/nemia/chat/answer':
     "the person's answer to a question of Nemia's, a program of the package's chat and no command: the answer is theirs, written out of her fence",
   'POST /api/nemia/chat/read': "the person's read mark of Nemia's chat, a program of the package's chat and no command, as the send",

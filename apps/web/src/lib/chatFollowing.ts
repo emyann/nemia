@@ -23,8 +23,14 @@ export type ChatCall = Extract<ChatEvent, { kind: 'call' }>;
 /** Her message, the person's, or the keeper's marker. */
 export type ChatMessage = Extract<ChatEvent, { kind: 'message' }>;
 
-/** A question of hers or a proposal: a call of hers waiting on the person, until they answer it. */
-export type ChatAsk = Extract<ChatEvent, { kind: 'question' | 'proposal' }>;
+/**
+ * A question of hers, a proposal, or a permission — a call of hers that would prompt: a call of hers waiting on the person, until they
+ * answer it.
+ */
+export type ChatAsk = Extract<ChatEvent, { kind: 'question' | 'proposal' | 'permission' }>;
+
+/** Whether an event of her chat is an ask of hers. */
+const isAsk = (event: ChatEvent): event is ChatAsk => event.kind === 'question' || event.kind === 'proposal' || event.kind === 'permission';
 
 /** How an ask is drawn: as the action buttons of a proposal, as the radio form of one question, or as the flow of several. */
 export type AskDrawn = 'actions' | 'form' | 'many';
@@ -51,10 +57,7 @@ export const askLeft = (open: number): string => (open > 0 ? `${open} not answer
  * is not holding a call open for.
  */
 export const asksOpen = (events: readonly ChatEvent[]): ChatAsk[] =>
-  events.filter(
-    (event): event is ChatAsk =>
-      (event.kind === 'question' || event.kind === 'proposal') && event.chose === undefined && event.cutAt === undefined,
-  );
+  events.filter((event): event is ChatAsk => isAsk(event) && event.chose === undefined && event.cutAt === undefined);
 
 /**
  * The ask of hers the composer's own words answer, where there is one: exactly one ask waits on the person and it is drawn as the form
@@ -309,8 +312,8 @@ function saidOf(message: ChatMessage): ConversationItem<ChatAsk> {
 /**
  * Her chat on the one shape the family draws (`lib/conversation.ts`), her adapter onto it: her consecutive calls folded into one `work`
  * item a line a call (`foldChat`), her words and the person's into `said`, the keeper's framing and the rule between two of her
- * sessions into `note`, and a question or a proposal of hers into `own`, carrying the event her talk draws itself (`drawnAsk`). An
- * event the board has no drawing for is left out. Pure: a node test proves the whole mapping without a browser.
+ * sessions into `note`, and a question, a proposal or a permission of hers into `own`, carrying the event her talk draws itself
+ * (`drawnAsk`). An event the board has no drawing for is left out. Pure: a node test proves the whole mapping without a browser.
  */
 export function chatItems(events: readonly ChatEvent[]): ConversationItem<ChatAsk>[] {
   const out: ConversationItem<ChatAsk>[] = [];
@@ -321,7 +324,7 @@ export function chatItems(events: readonly ChatEvent[]): ConversationItem<ChatAs
     }
     const event = item.event;
     if (event.kind === 'message') out.push(saidOf(event));
-    else if (event.kind === 'question' || event.kind === 'proposal') out.push({ kind: 'own', id: event.id, own: event });
+    else if (isAsk(event)) out.push({ kind: 'own', id: event.id, own: event });
     else if (event.kind === 'session')
       out.push({ kind: 'note', id: event.id, what: 'session', words: `A session of hers began — her ${event.attempt}` });
   }

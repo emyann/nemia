@@ -139,6 +139,7 @@ export type ChatCallState = Holds<Same<Board.ChatCallState, Extract<ChatEventOf,
 export type AskQuestion = Holds<Same<Board.AskQuestion, AskOf['questions'][number]>>;
 export type AskOption = Holds<Same<Board.AskOption, AskOf['questions'][number]['options'][number]>>;
 export type AskPick = Holds<Same<Board.AskPick, chat.ChatAnswerBody['picks'][number]>>;
+export type PermissionFacts = Holds<Same<Board.PermissionFacts, Extract<ChatEventOf, { kind: 'permission' }>['permission']>>;
 export type ChatSent = Holds<Same<Board.ChatSent, chat.ChatSentAnswer>>;
 export type ChatAnswer = Holds<Same<Board.ChatAnswer, chat.ChatAnswerAnswer>>;
 export type ChatStop = Holds<Same<Board.ChatStop, chat.ChatStopAnswer>>;

@@ -37,7 +37,7 @@ import { CHAT_OUTBOX_KEY, editKept, forgetKept, keepUnsent, parseKept, readKept,
 import { anyAbove, composerButton, composerWords } from '../src/lib/nemia.ts';
 import { faceOf, UP, type Presence } from '../src/lib/presence.ts';
 import type { StreamLike } from '../src/lib/follow.ts';
-import type { AskQuestion, ChatEvent, ChatPresence, FactoryLevel } from '../src/lib/api.ts';
+import type { AskQuestion, ChatEvent, ChatPresence, FactoryLevel, PermissionFacts } from '../src/lib/api.ts';
 
 const at = (second: number): string => new Date(Date.UTC(2026, 9, 15, 17, 40, second)).toISOString();
 
@@ -288,6 +288,99 @@ test('drawnAsk, askAnswered, asksOpen and askInWords: an ask of hers drawn, answ
     assert.equal(askInWords([asked('question', [EXPLAINED], { [EXPLAINED.question]: 'Cut it on read' })]), undefined, 'answered already');
     assert.equal(askInWords([]), undefined);
     assert.deepEqual(wordsAnswer(form, 'Neither: cut it on write'), [{ question: EXPLAINED.question, words: 'Neither: cut it on write' }]);
+  });
+});
+
+/** A call of hers that would prompt, as the SDK hands it over: its one question, its three choices, and the facts drawn over them. */
+const PERMISSION_QUESTION: AskQuestion = {
+  question: 'Claude wants to run a command',
+  header: 'Permission',
+  options: [
+    { label: 'Allow once', description: 'Run this call, and ask again next time.', recommended: false },
+    { label: 'Always allow', description: 'Run it, and calls like it, without asking.', recommended: false },
+    { label: 'Deny', description: 'Refuse the call; she is told it was refused.', recommended: false },
+  ],
+  multiSelect: false,
+};
+
+/** The facts the SDK handed over with the call, every one of them there. */
+const FACTS: PermissionFacts = {
+  tool: 'Bash',
+  command: 'rm -rf  ./dist && echo "done"',
+  title: PERMISSION_QUESTION.question,
+  description: 'Removes the build folder',
+  decisionReason: 'No rule allows Bash(rm *)',
+  blockedPath: '/home/someone/project/dist',
+  always: true,
+  defaultToNo: false,
+};
+
+/** A permission of hers waiting on the person, carrying `facts`, its choice on it where one was made. */
+const permission = (facts: PermissionFacts = FACTS, chose?: Record<string, string>): ChatAsk => ({
+  kind: 'permission',
+  id: 'q:permission',
+  at: at(2),
+  call: 'permission',
+  text: PERMISSION_QUESTION.question,
+  questions: [PERMISSION_QUESTION],
+  permission: facts,
+  ...(chose === undefined ? {} : { chose, choseAt: at(3) }),
+});
+
+test('a permission of hers is an ask: waiting, drawn as the form, answered in words, and tagged by what it asks', async (t) => {
+  await t.test('it is an ask that waits on the person until they answer it, drawn as one question’s form', () => {
+    const open = permission();
+    assert.equal(drawnAsk(open.questions), 'form', 'its choices explain themselves: the form, never a proposal’s buttons');
+    assert.deepEqual(
+      asksOpen([message('m:1', 1, 'agent', 'One.'), open]).map((ask) => ask.kind),
+      ['permission'],
+    );
+    assert.equal(asksOpen([permission(FACTS, { [PERMISSION_QUESTION.question]: 'Deny' })]).length, 0, 'answered: it waits on nobody');
+    assert.equal(asksOpen([{ ...open, cutAt: at(4) }]).length, 0, 'its call cut: nothing is held open for it');
+  });
+  await t.test('the composer’s words answer it, and the words are the answer filed', () => {
+    const open = permission();
+    assert.equal(askInWords([open])?.kind, 'permission');
+    assert.deepEqual(wordsAnswer(open, 'Not in dist, use out/'), [
+      { question: PERMISSION_QUESTION.question, words: 'Not in dist, use out/' },
+    ]);
+    assert.equal(askInWords([open, asked('question', [EXPLAINED])]), undefined, 'beside a question of hers, the words would name neither');
+  });
+  await t.test('her adapter hands it to her talk as her own, carrying its facts', () => {
+    const [own] = chatItems([permission()]);
+    if (own?.kind !== 'own') throw new Error('a permission of hers is her own to draw');
+    assert.equal(own.own.kind === 'permission' ? own.own.permission.command : undefined, FACTS.command);
+  });
+  await t.test('its tag says it asks to run while it waits, and that it was answered once chosen', async () => {
+    await import('./tsx.ts');
+    const { askTag } = await import('../src/components/chat/ChatAsk.tsx');
+    assert.deepEqual(askTag(permission()), { words: 'Asks to run', hue: 'yours' });
+    assert.deepEqual(askTag(permission(FACTS, { [PERMISSION_QUESTION.question]: 'Allow once' })), { words: 'Answered', hue: 'grey' });
+  });
+  await t.test('drawn, it shows what the SDK handed over and the command as typed, Deny picked where the SDK leans to no', async () => {
+    await import('./tsx.ts');
+    const { createElement } = await import('react');
+    const { renderToStaticMarkup } = await import('react-dom/server');
+    const { ChatAsk: Drawn } = await import('../src/components/chat/ChatAsk.tsx');
+    const draw = (ask: ChatAsk) => renderToStaticMarkup(createElement(Drawn, { ask, onAnswer: () => undefined }));
+    const html = draw(permission());
+    assert.match(html, /data-chat-ask="form"/);
+    assert.match(html, /data-chat-tag="asks to run"/);
+    assert.match(html, /Claude wants to run a command/);
+    assert.match(html, /data-chat-permission="description"[^>]*>Removes the build folder</);
+    assert.match(html, /data-chat-permission="reason"[^>]*>No rule allows Bash\(rm \*\)</);
+    assert.match(html, /data-chat-permission="path"[^>]*>\/home\/someone\/project\/dist</);
+    assert.match(html, /data-chat-permission="command"[^>]*>rm -rf {2}\.\/dist &amp;&amp; echo &quot;done&quot;</, 'the command as typed');
+    assert.match(html, /data-chat-option="Always allow"/);
+    assert.match(html, /disabled=""/, 'nothing is picked where the SDK does not lean, so the Answer is off');
+
+    const leans = draw(permission({ ...FACTS, defaultToNo: true }));
+    assert.match(leans, /data-chat-option="Deny"[^>]*data-selected="true"/, 'Deny is picked before the person picks');
+    assert.doesNotMatch(leans, /disabled=""/, 'and the Answer is on');
+
+    const bare = draw(permission({ tool: 'Bash', always: true, defaultToNo: false }));
+    assert.doesNotMatch(bare, /data-chat-permission=/, 'what the SDK did not hand over is not drawn');
+    assert.doesNotMatch(draw(permission(FACTS, { [PERMISSION_QUESTION.question]: 'Deny' })), /data-chat-option=/, 'answered: the record');
   });
 });
 

@@ -13,6 +13,7 @@
       "Bash(npm run lint)",
       "Bash(npx turbo run typecheck --force)",
       "Bash(npx tsc --noEmit:*)",
+      "Bash(npx tsrs --noEmit:*)",
       "Bash(npx oxlint:*)",
       "Bash(npx tsverify:*)",
       "Bash(nemia stats:*)",

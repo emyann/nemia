@@ -116,7 +116,7 @@ const lease = (pid: number, kind: 'ticking' | 'stopped' = 'ticking', passed = fa
   identity: 'same',
 });
 
-/** A host over `world` that logs, in order, every program it calls, the pause, each landings read, the signal and what it says. */
+/** A host over `world` that logs, in order, every program it calls, the pause, the signal and what it says. */
 function hostOf(world: World): { host: ServiceHost; events: string[] } {
   const events: string[] = [];
   const host: ServiceHost = {
@@ -154,11 +154,6 @@ function hostOf(world: World): { host: ServiceHost; events: string[] } {
     },
     calls: () => Effect.succeed([]),
     drain: () => Effect.void,
-    landings: () =>
-      Effect.sync(() => {
-        events.push('landings 0');
-        return [];
-      }),
     say: (line) => events.push(`say ${line}`),
     pollMs: 1,
     waitMs: 200,
@@ -261,12 +256,7 @@ test('two tags: v1 built on its trial store, v2 switched in with the service on 
       world.onStart = () => ((world.lease = lease(NEW)), (world.later = [lease(NEW, 'ticking', true)]), (world.unitPid = NEW));
       const { host, events } = hostOf(world);
       const done = await run({ tag: 'v2', repo: REPO }, host);
-      assert.deepEqual(events.slice(0, 4), [
-        'pause by nemia upgrade',
-        'landings 0',
-        `signal ${OLD}`,
-        'systemctl --user start nemia.service',
-      ]);
+      assert.deepEqual(events.slice(0, 3), ['pause by nemia upgrade', `signal ${OLD}`, 'systemctl --user start nemia.service']);
       assert.equal(events.at(-1), 'resume');
       assert.equal(done.restart, 'service');
       assert.equal(done.pid, NEW);

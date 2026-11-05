@@ -9,7 +9,7 @@
  * (`KillMode=process`, `AbandonProcessGroup`): the runtime's detached sessions and checks live on through a restart.
  */
 import { DAEMON_FILE, holderWords, lastPassWords, type DaemonStanding } from '../daemon/daemon.ts';
-import { pauseWords, type Finishing, type Pause, type Paused } from '../pause/pause.ts';
+import { pauseWords, type Pause } from '../pause/pause.ts';
 
 /** What the machine is, as the store reads it: its platform, whether it is WSL, and whether systemd runs as its init. */
 export type Machine = { readonly platform: string; readonly wsl: boolean; readonly systemd: boolean };
@@ -300,12 +300,6 @@ export const holderOfLease = (lease: DaemonStanding, state: UnitState | null): H
   if (lease.kind !== 'ticking') return 'none';
   return state?.pid === lease.file.pid ? 'service' : 'other';
 };
-
-/**
- * The landing checks a take-over waits out: each still running under the pause. A landing held staged or a check held unfiled does not
- * run until the resume, so it never holds up the hand-over.
- */
-export const landingsOf = (paused: Paused): Finishing[] => paused.finishing.filter((f) => f.kind === 'landing');
 
 /** How to stop the holder that is not the service and hand the store to it. */
 export const takeOverLine = (pid: number, name: string): string =>

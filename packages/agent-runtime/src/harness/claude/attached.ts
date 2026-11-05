@@ -17,8 +17,9 @@
  *   it was paused (`CARRY_ON`), or, when its holder ended mid-call, which call did not finish (`crashNote`). It is handed what is
  *   left of its attempt's spend cap, never the whole cap again (`capLeft`, `src/core/cap.ts`), and one that has spent it all is
  *   ended `failed` at its budget rather than resumed.
- * - **The drain.** A file naming the holder's pid and when it started (`putDrain`): while it names this process, the new calls of each
- *   session with none in flight wait at their hook, so a restart can wait for the calls in flight before it signals.
+ * - **The drain.** A file naming the holder's pid and when it started, and the process that put it (`putDrain`): while it names this
+ *   process and its putter runs, the new calls of each session with none in flight wait at their hook, so a restart can wait for the
+ *   calls in flight before it signals, and a restart killed before it lifts the drain leaves nothing held.
  * - **The sessions' drain.** The store's drain a person's pause puts (`putSessionDrain`, `job-hold.ts`), which holds the jobs too: while
  *   it stands, the new calls of each session with none in flight wait at their hook, as under the holder's. Read on every look, never
  *   as a transition (`paused`): past its `at` plus its `graceMs` with a call in flight, the session's turn is interrupted through the SDK

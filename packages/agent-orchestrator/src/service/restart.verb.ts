@@ -1,8 +1,11 @@
 /**
  * `nemia service restart`: the daemon that holds the store restarted on the code its service runs, as the take-over does it (`takeOver`)
- * — the store paused, each landing check let finish, the daemon's own sessions held and their calls in flight given up to the timeout
- * (`--timeout <d>`, else the store's), SIGTERM, the unit started, and the store resumed once the new daemon has completed its first pass.
- * The jobs run on through it, and each session the daemon parked is resumed by the new one as the same try. A daemon started by hand
+ * — the store paused, the daemon's own sessions held and their calls in flight given up to the timeout (`--timeout <d>`, else the
+ * store's), SIGTERM, the unit started, and the store resumed once the new daemon has completed its first pass. The jobs and the checks,
+ * a landing's wait on CI among them, run on through it on their workers and are not waited for, and each session the daemon parked is
+ * resumed by the new one as the same try. Its waits are bounded: the timeout, then the take-over's `stopMs` and `waitMs` (90 s and 60 s
+ * on the live host), then the new daemon's first pass; and its pause and drain end with its command, however it ends, lifted by the
+ * daemon's next pass where it was killed. A daemon started by hand
  * is not the service's to start again: it is named, with the take-over that hands it to the service. The command the CLI serves
  * alone, beside the service's others.
  */
@@ -98,12 +101,15 @@ const RESTART: Command<Restarted> = {
   name: 'service restart',
   usage: '[--name <name>] [--timeout <d>]',
   help: [
-    "restart the service's daemon on the code it runs: pause the store, wait",
-    "for landing checks, give the daemon's sessions up to the timeout to end",
-    'their tool calls (--timeout <d>, else nemia pause-timeout), stop it, start the',
-    'service, and resume once the new daemon has completed its first pass;',
-    'refused, naming the log, when that pass fails. Jobs run on; each',
-    'session parks and resumes as the same try. A pause a person put stands.',
+    "restart the service's daemon on the code it runs: pause the store, give",
+    "the daemon's sessions up to the timeout to end their tool calls",
+    '(--timeout <d>, else nemia pause-timeout, 10m by default), stop it (up to',
+    '90s), start the service (up to 60s), and resume once the new daemon has',
+    'completed its first pass; refused, naming the log, when that pass fails.',
+    'Jobs and checks, a landing waiting on CI among them, run on and are not',
+    'waited for; each session parks and resumes as the same try. Each wait is',
+    "said on stderr as it waits. A pause a person put stands; the restart's",
+    'own ends with the command: killed, the next pass of the daemon lifts it.',
     'Starts the service where nothing ticks; a daemon started by hand is',
     "named with --take-over's line",
   ],

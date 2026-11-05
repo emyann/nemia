@@ -7,8 +7,7 @@ import { Effect } from 'effect';
 import type { Command } from '../command/entry.verb.ts';
 import type { Args, Flag } from '../command/command.ts';
 import { daemonLine } from '../daemon/daemon.ts';
-import { daemonStanding } from '../daemon/daemon.store.ts';
-import { pausedRead } from '../list/list.verb.ts';
+import { daemonStanding, thisProcess } from '../daemon/daemon.store.ts';
 import { putPause, readPause, resumePause } from '../pause/pause.store.ts';
 import { Invalid, Missing, type Refusal } from '../refusal/refusal.ts';
 import { asked, drained, EngineService, tried, type TaskView } from '../runtime-client.ts';
@@ -21,7 +20,6 @@ import {
   envPairs,
   envRefusal,
   holderOfLease,
-  landingsOf,
   launchdLogs,
   launchdState,
   logsLine,
@@ -133,7 +131,8 @@ export const timedHost = (args: Args, home: string | undefined, verb: string): E
 /**
  * The machine as it is: the process's node, the store's lease and pause, `systemctl` and `launchctl` themselves. The daemon an install
  * runs is under `releases/current` (`pointedEntry`), so the service follows the pointer. A take-over gives the daemon's calls in
- * flight `timeoutMs` (`timeoutGiven`), ten minutes where none is given.
+ * flight `timeoutMs` (`timeoutGiven`), ten minutes where none is given, and its pause names this process as its holder (`thisProcess`),
+ * so the daemon's next pass lifts it once the command has ended.
  */
 export const liveHost = (timeoutMs: number = DEFAULT_TIMEOUT_MS): ServiceHost => ({
   machine: machineOf,
@@ -148,9 +147,8 @@ export const liveHost = (timeoutMs: number = DEFAULT_TIMEOUT_MS): ServiceHost =>
   standing: readPause,
   lease: () => daemonStanding(),
   signal: (pid) => process.kill(pid, 'SIGTERM'),
-  pause: putPause,
+  pause: (said) => putPause(said, new Date(), undefined, thisProcess()),
   resume: resumePause,
-  landings: () => Effect.map(pausedRead(), landingsOf),
   calls: attachedCalls(engineList),
   drain: drained,
   say: (line) => console.error(line),
@@ -286,7 +284,7 @@ function startedBeside(at: Placed, host: ServiceHost): Pick<Installed, 'did' | '
       holder: pid,
       lines: [
         `pid ${pid} holds the store (${daemonLine(lease, Date.now())}), so ${at.unit} is enabled and not started: it starts at the next login.`,
-        `To hand the store to the service now: ${takeOverLine(pid, at.name)} — it pauses the store, waits for any landing check, stops pid ${pid}, starts the service and resumes.`,
+        `To hand the store to the service now: ${takeOverLine(pid, at.name)} — it pauses the store, waits for the daemon's calls in flight, stops pid ${pid}, starts the service and resumes.`,
       ],
     };
   }
@@ -448,8 +446,10 @@ const INSTALL: Command<Installed> = {
     'a launchd agent on macOS. It runs the api of this checkout with this',
     'node, WF_ROOT and PATH, and each --env, written once; it restarts on',
     'failure and starts at login. Started now unless another daemon holds',
-    'the store; --take-over <pid> pauses the store, waits for landing',
-    'checks, stops that pid and starts the service. --name: the service',
+    'the store; --take-over <pid> pauses the store, waits for the calls',
+    'in flight of its sessions, stops that pid and starts the service',
+    '(checks and jobs run on, as nemia service restart --help says).',
+    '--name: the service',
     'name (nemia; required for a store that is not the default)',
   ],
   spec: {

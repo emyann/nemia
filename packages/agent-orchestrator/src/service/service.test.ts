@@ -8,7 +8,6 @@ import { LET_GO_MS } from 'agent-runtime';
 import type { DaemonStanding } from '../daemon/daemon.ts';
 import {
   envRefusal,
-  landingsOf,
   launchdState,
   nameRefusal,
   plistRead,
@@ -218,22 +217,6 @@ test('the system’s state is read: systemd’s show, launchd’s print, and a l
     pid: 777,
   });
   assert.deepEqual(launchdState(null), { active: 'not loaded', enabled: 'not loaded', pid: null });
-});
-
-test('a take-over waits for the landing checks that run; a landing held staged, or a check held, does not hold it up', () => {
-  const paused = {
-    pause: { at: '', by: 'ann' },
-    finishing: [
-      { run: 'r1', step: 'build', kind: 'session' as const },
-      { run: 'r2', step: 'test', kind: 'check' as const },
-      { run: 'r3', step: 'ship', kind: 'landing' as const },
-    ],
-    parked: [],
-    staged: [{ run: 'r4', step: 'ship', repo: '/srv/repo' }],
-    held: [{ run: 'r5', step: 'ship' }],
-  };
-  assert.deepEqual(landingsOf(paused), [{ run: 'r3', step: 'ship', kind: 'landing' }]);
-  assert.deepEqual(landingsOf({ ...paused, finishing: paused.finishing.slice(0, 2) }), []);
 });
 
 const READ: ServiceRead = {

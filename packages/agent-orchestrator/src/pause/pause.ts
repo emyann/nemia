@@ -6,7 +6,9 @@
  * `nemia watch --once`, `nemia start`, `nemia up` and the board say it. Pure: its file is `pause.store.ts`'s, and the gates that honour
  * it are `assess` and the tick's `pass`.
  */
+import type { PauseLapsed } from '../../contracts/pause-lapse.contract.ts';
 import type { Flag } from '../command/command.ts';
+import type { Identity } from '../daemon/daemon.ts';
 import type { Run } from '../record/record.ts';
 import type { RecordMemo } from '../rest/index.ts';
 import type { RetryAsk } from '../retry/index.ts';
@@ -21,6 +23,20 @@ import { parkedOf, phaseOfView, type WordView } from '../views/views-words.ts';
  * pauses.
  */
 export type Pause = { at: string; by: string; why?: string; timeoutMs?: number };
+
+/**
+ * The process a take-over's pause names as its holder (`heldBy` in the pause's file): its pid, and when it started (`procStart`, clock
+ * ticks since boot, absent where the machine does not say), so a pid reused by another process is told apart, as the lease tells it.
+ * A person's pause names none.
+ */
+export type PauseHolder = { pid: number; procStart?: number };
+
+/**
+ * Whether the store's pause has outlived the process that holds it, from what the process table says of that process (`holder`), or
+ * null for a pause no process holds: a person's never lapses; a holder gone, or whose pid is another process's now, lapses it; a
+ * holder alive or unconfirmed keeps it (contracts/pause-lapse.contract.ts).
+ */
+export const pauseLapsed: PauseLapsed = (holder: Identity | null): boolean => holder === 'gone' || holder === 'other';
 
 /** The timeout a store's pause gives a call in flight when nothing sets one: ten minutes (`pause-timeout.json`, `nemia pause-timeout`). */
 export const DEFAULT_TIMEOUT_MS = 600_000;

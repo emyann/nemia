@@ -3,17 +3,19 @@
  * between attempts, the keeper's words as markers and the person's as their own once a mark claims the said, a stopped turn — a page
  * across the session line and the pages it refuses (`chatPage`), the stream's cursor and the cursors it refuses (`readChatCursor`,
  * `sourcesAt`, `changedSince`), the presence in each state and in several at once (`presenceOf`); and her asks — what an ask is and
- * which board draws it (`askOf`, `drawnAsk`, `askEvent`), the answer its held call takes and the picks it refuses (`answerFor`), and
- * what an answer is owed (`askDue`, `askWords`). The chat on the engine's stand-in, written to, read and carried by the keeper, is told
- * in `test/nemia-chat.test.ts`.
+ * which board draws it (`askOf`, `drawnAsk`, `askEvent`), a permission keyed by its own call (`askKey`), the answer its held call
+ * takes and the picks it refuses (`answerFor`), and what an answer is owed (`askDue`, `askWords`). The chat on the engine's stand-in,
+ * written to, read and carried by the keeper, is told in `test/nemia-chat.test.ts`.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { names } from '../../test/assessed.ts';
 import {
   answerFor,
+  answeredBefore,
   askDue,
   askEvent,
+  askKey,
   askOf,
   askWords,
   asksWaiting,
@@ -26,6 +28,7 @@ import {
   presenceOf,
   projectChat,
   readChatCursor,
+  sameWords,
   sourcesAt,
   type AskQuestion,
   type ChatEvent,
@@ -113,6 +116,26 @@ const ACTIONS = {
 
 /** One ask of several questions, as her several-question ask arrives. */
 const MANY = { ...RAW, questions: [RAW.questions[0], { ...RAW.questions[0], question: 'And the values?', header: 'Values' }] };
+
+/** A call of her session's that would prompt a person, as the runtime holds it: its one question, its choices and its facts. */
+const PERMISSION = {
+  id: 'toolu-1',
+  at: '2026-10-16T18:03:00.000Z',
+  kind: 'permission' as const,
+  questions: [
+    {
+      question: 'Run git push origin main',
+      header: 'Permission',
+      options: [
+        { label: 'Allow once', description: 'Run it this once.' },
+        { label: 'Always allow', description: 'Run it, and calls like it, without asking.' },
+        { label: 'Deny', description: 'Do not run it.' },
+      ],
+      multiSelect: false,
+    },
+  ],
+  permission: { tool: 'Bash', command: 'git push origin main', title: 'Run git push origin main', always: true, defaultToNo: false },
+};
 
 /** The sources of a chat holding nothing but `over`. */
 const sources = (over: Partial<ChatSources> = {}): ChatSources => ({
@@ -432,6 +455,37 @@ test('her asks: what an ask is and which board draws it, the answer its held cal
     });
   await t.test('REFUSED: picks that leave a question of several out, naming it', () => {
     refusedBy(() => answerFor(askOf(MANY), [{ question, labels: ['Cut it on read'] }]), 'And the values?');
+  });
+  await t.test('a permission is drawn as one, with the facts of the call it holds, and waits on the person until answered', () => {
+    const ask = askOf(PERMISSION);
+    assert.equal(ask.kind, 'permission');
+    const drawn = askEvent(ask, undefined);
+    assert.equal(drawn.kind, 'permission');
+    assert.deepEqual(drawn.kind === 'permission' && drawn.permission, PERMISSION.permission);
+    assert.equal(drawn.kind === 'permission' && drawn.call, 'toolu-1');
+    const waiting = projectChat(sources({ asks: [ask] }));
+    assert.equal(asksWaiting(waiting), 1, 'an unanswered permission joins the count her face shows');
+    const answered = projectChat(
+      sources({
+        asks: [ask],
+        answers: [{ id: 'toolu-1', at: '2026-10-16T18:04:00.000Z', answers: { [PERMISSION.questions[0].question]: 'Deny' } }],
+      }),
+    );
+    assert.equal(asksWaiting(answered), 0);
+  });
+  await t.test('two permissions of the same words are two asks: an answer to the one never answers the other', () => {
+    const first = askOf(PERMISSION);
+    const second = askOf({ ...PERMISSION, id: 'toolu-2' });
+    assert.notEqual(askKey(first), askKey(second), 'a permission is keyed by its own call');
+    assert.equal(sameWords([first], second), undefined, 'and is never merged into the one before it');
+    const answers = [{ id: 'toolu-1', at: '2026-10-16T18:04:00.000Z', answers: { [PERMISSION.questions[0].question]: 'Allow once' } }];
+    assert.equal(answeredBefore([first], answers, second), undefined, 'leave given to one call is no leave for the next');
+    assert.equal(askKey(askOf(RAW)), askKey(askOf({ ...RAW, id: 'call-2' })), 'while a question is keyed by its words, as before');
+  });
+  await t.test('an ask the runtime says no kind of is a question', () => {
+    assert.equal(askOf(RAW).kind, 'question');
+    assert.equal(askOf(RAW).permission, undefined);
+    assert.equal(askOf({ ...RAW, kind: 'question' }).kind, 'question');
   });
   await t.test('what an answer is owed: back through a call still open, as words where none is, and nothing where its call took it', () => {
     assert.equal(askDue(true, false), 'return');

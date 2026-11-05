@@ -24,7 +24,7 @@
 
 import type { HarnessArgs } from '../harness/args.ts';
 import type { FormerReason } from './event-schema.ts';
-import type { TranscriptMark } from '../harness/seam.ts';
+import type { PermissionFacts, TranscriptMark } from '../harness/seam.ts';
 import { transition, VERBS, type LifecycleEvent, type Move, type Refusal, type VerbGuard, type VerbName } from './lifecycle.ts';
 import { elapsedMs, type Instant, type Monotonic } from './clock.ts';
 import { backoffOf, endedWhen, restartWords } from './restart.ts';
@@ -187,10 +187,10 @@ export type Sighting = {
    */
   parked?: Parked;
   /**
-   * The questions the session is waiting on a person for, each held open where its task may ask one (`config.mayAsk`), for a harness
-   * that holds such a call (Claude Code attached on the Agent SDK). `[]` from such a harness while none waits, and absent from one
-   * that cannot say. **Carried, never judged**: `decide` does not read it; a layer above draws each question and answers it
-   * (`RunnerOps.answer`).
+   * The questions and permissions the session is waiting on a person for, each held open where its task may ask one
+   * (`config.mayAsk`), for a harness that holds such a call (Claude Code attached on the Agent SDK). `[]` from such a harness while
+   * none waits, and absent from one that cannot say. **Carried, never judged**: `decide` does not read it; a layer above draws each
+   * question and answers it (`RunnerOps.answer`).
    */
   asks?: SessionAsk[];
   /**
@@ -202,11 +202,20 @@ export type Sighting = {
 };
 
 /**
- * One question a session is waiting on a person for, as its harness recorded the call: the call's own id, when it was made, and the
- * questions it asked. Carried whole, in the harness's own shape — what a question means, and which of them a person sees first, is the
- * layer above's.
+ * One call a session is waiting on a person for, as its harness recorded it: the call's own id, when it was made, what it is
+ * (`kind`), and the questions it asks. A `question` is the session's own question (`AskUserQuestion`); a `permission` is a call its
+ * harness would prompt a person for, held as one question whose choices are the answers to the prompt, with what the harness said of
+ * it beside (`permission`, the harness's own shape, `harness/seam.ts`, which the core carries and never opens). Carried whole, in
+ * the harness's own shape — what an ask means, and which of them a person sees first, is the layer above's.
  */
-export type SessionAsk = { id: string; at: string; questions: AskQuestion[] };
+export type SessionAsk =
+  | { id: string; at: string; kind: 'question'; questions: AskQuestion[] }
+  | { id: string; at: string; kind: 'permission'; questions: AskQuestion[]; permission: PermissionFacts };
+
+/** What a session's ask is: a question the session asked, or a permission its harness would prompt a person for. */
+export type SessionAskKind = SessionAsk['kind'];
+
+export type { PermissionFacts };
 
 /**
  * One question of an ask: what it asks, the short word it is labelled by, the choices offered, and whether a person may pick several.

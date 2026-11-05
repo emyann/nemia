@@ -130,6 +130,11 @@
       }
     },
     {
+      "term": "Session ask",
+      "meaning": "a call of a session's held for a person where its task says one can be asked (`mayAsk`), of one of two kinds (`SessionAskKind`): a `question` the session asked through `AskUserQuestion`, or a `permission`, a call Claude Code would prompt for, asked as one question whose choices are allow once, always allow and deny, beside what the SDK said of it (`PermissionFacts`). Written down once as open, answered through the session's answers file or cut by its turn's end, and carried on its sighting (`asks`).",
+      "type": "SessionAsk"
+    },
+    {
       "term": "Task door",
       "meaning": "the one way a task's journal is read and written (`Journal`, any store given through `Journal.layer`): its ids branded, and an append that breaks a task's invariants refused before any store is written.",
       "type": "Journal"

@@ -1,6 +1,7 @@
 /**
  * The chat's files: none reads as empty, each append reads back in order, a last line still being written is left out, a line that does
- * not decode is refused naming the file and the line, and the read mark is written whole and read back: one table, each row on a
+ * not decode is refused naming the file and the line, an ask line read with its kind (none a question), and the read mark is
+ * written whole and read back: one table, each row on a
  * folder of its own.
  */
 import { test } from 'node:test';
@@ -10,11 +11,14 @@ import path from 'node:path';
 import { scratch } from '../../test/scratch.ts';
 import { names } from '../../test/assessed.ts';
 import {
+  appendAsk,
   appendDelivered,
   appendOutbox,
   appendStop,
+  asksFile,
   deliveredFile,
   outboxFile,
+  readAsks,
   readDelivered,
   readMarkFile,
   readOutbox,
@@ -80,5 +84,28 @@ test("the chat's files: read back in order, a last line still being written left
     fs.mkdirSync(path.dirname(readMarkFile(dir)), { recursive: true });
     fs.writeFileSync(readMarkFile(dir), 'not json');
     refused(() => readReadMark(dir), `${readMarkFile(dir)} is not a line`);
+  });
+  await t.test('an ask line that says no kind reads as a question, and a permission reads back with its facts', () => {
+    const dir = scratch('wf-chat-store-');
+    const question = {
+      question: 'Which?',
+      header: 'Pick',
+      options: [{ label: 'One', description: 'the one', recommended: true }],
+      multiSelect: false,
+    };
+    fs.mkdirSync(path.dirname(asksFile(dir)), { recursive: true });
+    fs.appendFileSync(asksFile(dir), `${JSON.stringify({ id: 'call-1', at: '2026-10-15T12:00:00.000Z', questions: [question] })}\n`);
+    const permission = { tool: 'Bash', command: 'git push', always: false, defaultToNo: true };
+    appendAsk(dir, { id: 'toolu-1', at: '2026-10-15T12:00:01.000Z', kind: 'permission', questions: [question], permission });
+    assert.deepEqual(readAsks(dir), [
+      { id: 'call-1', at: '2026-10-15T12:00:00.000Z', kind: 'question', questions: [question] },
+      { id: 'toolu-1', at: '2026-10-15T12:00:01.000Z', kind: 'permission', questions: [question], permission },
+    ]);
+  });
+  await t.test('REFUSED: an ask line of a kind the chat has no word for, naming the file and the line', () => {
+    const dir = scratch('wf-chat-store-');
+    fs.mkdirSync(path.dirname(asksFile(dir)), { recursive: true });
+    fs.appendFileSync(asksFile(dir), `${JSON.stringify({ id: 'call-1', at: '2026-10-15T12:00:00.000Z', kind: 'plan', questions: [] })}\n`);
+    refused(() => readAsks(dir), `${asksFile(dir)}:1 is not a line`);
   });
 });

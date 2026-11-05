@@ -99,8 +99,10 @@ async function sent(stream: SSEStreamingApi, read: ChatChanges, shown: string): 
  *   last `limit` events (50 where none is asked, at most 200) before the event `before`, or the last ones; `before` the id to ask for
  *   the page older, null at the first; `cursor` where a stream resumes; `presence` `{ up, answering, waitsOnYou, unread }`. An event is
  *   a `message` (`from` her, the person, whose `delivered` is null until she was told, or the keeper's quiet marker), a `call`, a
- *   `session` line where one of her sessions ended and the next began, a `question` or a `proposal`. 422 for a limit or a `before`
- *   that is none.
+ *   `session` line where one of her sessions ended and the next began, a `question` or a `proposal`, or a `permission`: a call of her
+ *   session's that would prompt a person, held as her question is, its one question offering `Allow once`, `Always allow` where the
+ *   harness offers it, and `Deny`, and its `permission` the call's facts (the tool, a shell command as typed, the harness's title,
+ *   description, reason and blocked path). 422 for a limit or a `before` that is none.
  * - `GET /api/nemia/chat/stream` — the same followed, as server-sent events read again every `CHAT_BEAT_MS`: `presence` first and
  *   once it changes, then `chat`, each event new or changed (an event is replaced by its id), the cursor the id of each read's last.
  *   It resumes after the Last-Event-ID an EventSource sends when it reconnects, else after `after`, else sends the history whole; a
@@ -109,8 +111,9 @@ async function sent(stream: SSEStreamingApi, read: ChatChanges, shown: string): 
  *   which takes the notice off the page.
  * - `POST /api/nemia/chat/send` — `{ text }` put in her outbox, which the keeper says to her once she is up: 201 with the entry
  *   `{ id, at, text }`. 400 for a body that is not one, 422 for text that is empty or too long.
- * - `POST /api/nemia/chat/answer` — `{ id, picks }`, the person's answer to a question or a proposal of hers: each pick names the
- *   question by its own words and carries the `labels` chosen or `words` of the person's own. 200 with the answer
+ * - `POST /api/nemia/chat/answer` — `{ id, picks }`, the person's answer to a question, a proposal or a permission: each pick names
+ *   the question by its own words and carries the `labels` chosen or `words` of the person's own — a permission's by its choice's
+ *   label, or by words, which deny the call and are what her session reads of why. 200 with the answer
  *   `{ id, at, answers }`, keyed by each question's words, which the keeper carries to her held call or says to her as words. 404 for
  *   a question her chat does not hold, 409 for one answered already, 422 for picks that do not answer it.
  * - `POST /api/nemia/chat/read` — `{ through }`, the last event the person saw: 200 with the mark `{ through, at }`, never moved back.

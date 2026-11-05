@@ -24,16 +24,18 @@ import path from 'node:path';
 import readline from 'node:readline';
 
 /**
- * What the stand-in does after each user message, in order: `deny`, print a `permission_denied` line for that tool; `ask`, send
- * a `can_use_tool` request for that tool; `call`, run that tool, its `PreToolUse` hooks asked first, held until the file `release`
- * appears in its folder or until an `interrupt` request comes, which ends the turn with that call still held and unanswered, as
- * Claude Code leaves it; `nested`, once the file `nest` appears, ask the `PreToolUse` hooks of a second call of that tool, while
- * `call`'s is still in flight and before its release, carrying `agent_id` as a sub-agent's call does where `fromSubAgent` — or, with
- * no `call`, while no call of the main thread is in flight, as a background sub-agent's call comes; `next`, once `call` is over and
- * the file `next` appears, a second call of that tool (`call-next`), its `PreToolUse` hooks asked and the call held until the file
- * `release-next` appears or an interrupt comes, as `call` is; `hold`,
- * wait until the file `end` appears, or until an `interrupt` request comes; then its result, `output` as its `structured_output`, and
- * `cost` what the turn adds to the running total its `total_cost_usd` prints (0.01 when absent).
+ * What the stand-in does after each user message, in order: `deny`, print a `permission_denied` line for that tool; `ask`, send a
+ * `can_use_tool` request for that tool, its input `askInput` and its other fields `askOptions`, under the call id `asked-<n>`, the n-th
+ * such request of the process — and an interrupt that comes while it waits ends the turn with the request unanswered, its answer noted
+ * whenever it comes, as Claude Code leaves a prompt it is cut in; `call`, run that tool, its `PreToolUse` hooks asked first, held until
+ * the file `release` appears in its folder or until an `interrupt` request comes, which ends the turn with that call still held and
+ * unanswered, as Claude Code leaves it; `nested`, once the file `nest` appears, ask the `PreToolUse` hooks of a second call of that
+ * tool, while `call`'s is still in flight and before its release, carrying `agent_id` as a sub-agent's call does where `fromSubAgent` —
+ * or, with no `call`, while no call of the main thread is in flight, as a background sub-agent's call comes; `next`, once `call` is
+ * over and the file `next` appears, a second call of that tool (`call-next`), its `PreToolUse` hooks asked and the call held until the
+ * file `release-next` appears or an interrupt comes, as `call` is; `hold`, wait until the file `end` appears, or until an `interrupt`
+ * request comes; then its result, `output` as its `structured_output`, and `cost` what the turn adds to the running total its
+ * `total_cost_usd` prints (0.01 when absent).
  *
  * `stream` makes it print, before its result and only when its argv carries `--include-partial-messages` — the argument the SDK
  * passes for `includePartialMessages` — a message begun, a text block opened, one piece of text, then, once the file `more` appears
@@ -55,6 +57,21 @@ type Plan = {
   ask?: string;
   /** The input the `can_use_tool` request for `ask` carries; `{}` when none. */
   askInput?: unknown;
+  /**
+   * What else the `can_use_tool` request carries about its prompt, by the wire's names, as the pinned SDK's `sdk.mjs` reads them into
+   * `CanUseTool`'s options: `title`, `display_name`, `description`, `decision_reason`, `blocked_path`, `permission_suggestions`
+   * (its `suggestions`), `default_to_no` and `suppress_always_allow_rule`.
+   */
+  askOptions?: {
+    title?: string;
+    display_name?: string;
+    description?: string;
+    decision_reason?: string;
+    blocked_path?: string;
+    permission_suggestions?: unknown[];
+    default_to_no?: boolean;
+    suppress_always_allow_rule?: boolean;
+  };
   call?: string;
   /** The `tool_input` the `PreToolUse` hooks of `call` are given; absent when none. */
   callInput?: unknown;
@@ -100,6 +117,7 @@ const print = (line: object) => process.stdout.write(`${JSON.stringify(line)}\n`
 const pending = new Map<string, (response: unknown) => void>();
 let hooks: Record<string, { hookCallbackIds: string[] }[]> = {};
 let asked = 0;
+let prompted = 0;
 
 /** Sends a control request and waits for the SDK's answer. */
 const ask = (request: object): Promise<unknown> => {
@@ -191,11 +209,10 @@ const work = async () => {
   print({ type: 'system', subtype: 'init', session_id: sessionId, cwd: process.cwd(), tools: [], model: 'stand-in' });
   spent += plan.cost ?? 0.01;
   if (plan.deny) print({ type: 'system', subtype: 'permission_denied', tool_name: plan.deny, tool_use_id: 'denied-1', session_id: sessionId });
-  if (plan.ask)
-    note('answers.jsonl', {
-      event: 'can_use_tool',
-      answer: await ask({ subtype: 'can_use_tool', tool_name: plan.ask, input: plan.askInput ?? {}, tool_use_id: 'asked-1' }),
-    });
+  if (plan.ask) {
+    const request = { subtype: 'can_use_tool', tool_name: plan.ask, input: plan.askInput ?? {}, ...plan.askOptions, tool_use_id: `asked-${++prompted}` };
+    await cutOff(ask(request).then((answer) => note('answers.jsonl', { event: 'can_use_tool', answer })));
+  }
   if (plan.call && !interrupted) {
     print({ type: 'assistant', session_id: sessionId, message: { role: 'assistant', content: [{ type: 'tool_use', id: 'call-1', name: plan.call, input: {} }] } });
     await cutOff(hooked('PreToolUse', plan.call, 'call-1', plan.callInput === undefined ? {} : { tool_input: plan.callInput }));

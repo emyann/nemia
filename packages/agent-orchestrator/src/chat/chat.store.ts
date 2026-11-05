@@ -31,7 +31,7 @@ export const stopsFile = (dir: string): string => path.join(chatDir(dir), 'stops
 /** The person's read mark. */
 export const readMarkFile = (dir: string): string => path.join(chatDir(dir), 'read.json');
 
-/** The questions of hers the keeper saw waiting on the person, one ask a line. */
+/** The asks the keeper saw waiting on the person — her questions and her session's permissions — one ask a line. */
 export const asksFile = (dir: string): string => path.join(chatDir(dir), 'asks.jsonl');
 
 /** The person's answers to them, one a line. */
@@ -62,7 +62,26 @@ const QuestionSchema = Schema.Struct({
   multiSelect: Schema.Boolean,
 });
 
-const AskSchema = Schema.Struct({ id: Moment, at: Moment, questions: Schema.mutable(Schema.Array(QuestionSchema)) });
+const PermissionSchema = Schema.Struct({
+  tool: Schema.String,
+  command: Schema.optionalKey(Schema.String),
+  title: Schema.optionalKey(Schema.String),
+  displayName: Schema.optionalKey(Schema.String),
+  description: Schema.optionalKey(Schema.String),
+  decisionReason: Schema.optionalKey(Schema.String),
+  blockedPath: Schema.optionalKey(Schema.String),
+  always: Schema.Boolean,
+  defaultToNo: Schema.Boolean,
+});
+
+/** An ask's line: a line that says no kind is a question, as every line written before a permission was an ask. */
+const AskSchema = Schema.Struct({
+  id: Moment,
+  at: Moment,
+  kind: Schema.optionalKey(Schema.Literals(['question', 'permission'])),
+  questions: Schema.mutable(Schema.Array(QuestionSchema)),
+  permission: Schema.optionalKey(PermissionSchema),
+});
 const AnswerSchema = Schema.Struct({ id: Moment, at: Moment, answers: Schema.Record(Schema.String, Schema.String) });
 const AnswerDoneSchema = Schema.Struct({ id: Moment, how: Schema.Literals(['return', 'words', 'mark']), at: Moment });
 const AskCloseSchema = Schema.Struct({ id: Moment, how: Schema.Literals(['cut', 'again']), at: Moment, call: Schema.optionalKey(Moment) });
@@ -135,8 +154,14 @@ export function readReadMark(dir: string): ReadMark | undefined {
   return { ...decoded(ReadSchema, raw, readMarkFile(dir)) };
 }
 
-/** The questions of hers the keeper saw waiting, oldest first. */
-export const readAsks = (dir: string): Ask[] => linesOf(asksFile(dir), AskSchema).map((a) => ({ ...a }));
+/**
+ * The asks the keeper saw waiting, oldest first: a permission where its line says so and carries the call's facts, a question
+ * otherwise, which is how every line written before a permission was an ask reads.
+ */
+export const readAsks = (dir: string): Ask[] =>
+  linesOf(asksFile(dir), AskSchema).map(({ kind, permission, ...a }) =>
+    kind === 'permission' && permission !== undefined ? { ...a, kind, permission: { ...permission } } : { ...a, kind: 'question' },
+  );
 
 /** The person's answers to them, oldest first. */
 export const readAnswers = (dir: string): AskAnswer[] => linesOf(answersFile(dir), AnswerSchema).map((a) => ({ ...a }));

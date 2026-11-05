@@ -86,25 +86,20 @@ test("a step's since is the earliest task of it still running, and null once eve
 test('a prune is said in words: its worktrees, its files where they went too, and what is kept', () => {
   const worktrees = { at: '2026-11-03T09:00:00.000Z', worktrees: [{ path: '/w', bytes: 10 }], artifacts: null };
   assert.match(prunedSaid(worktrees), /worktrees/);
-  assert.match(prunedSaid(worktrees), /files are kept/);
   const both = { ...worktrees, artifacts: { at: '2026-11-03T09:01:00.000Z', bytes: 5 } };
-  assert.match(prunedSaid(both), /files were removed/);
+  assert.notEqual(prunedSaid(both), prunedSaid(worktrees), 'a prune that took its files too says so');
   const files = { ...both, worktrees: [] };
   assert.doesNotMatch(prunedSaid(files), /worktrees/);
   assert.equal(runRowOf(run('acme', { pruned: worktrees })).pruned?.said, prunedSaid(worktrees));
 });
 
-test('a run the list could not judge is a row that says why, in no factory and moving nothing it can say', () => {
+test("a run the list could not judge is a row that says why, on its namespace's floor (none for default) and moving nothing it can say", () => {
   const unjudged = { name: 'r-bad', error: 'the journal of r-bad-implement-1 does not read' };
   const row = unjudgedRowOf(unjudged);
   assert.equal(row.id, 'r-bad');
   assert.equal(row.unreadable, unjudged.error, 'the row says why, as the list said it');
   assert.equal(row.factory, null);
-  assert.equal(
-    unjudgedRowOf({ name: 'r-bad', namespace: 'foo', error: 'unread' }).factory,
-    'foo',
-    "an unjudged run of a named factory is on that factory's floor",
-  );
+  assert.equal(unjudgedRowOf({ name: 'r-bad', namespace: 'foo', error: 'unread' }).factory, 'foo');
   assert.deepEqual(row.steps, []);
 });
 

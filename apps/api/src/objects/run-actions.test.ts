@@ -25,6 +25,7 @@ import { LabelEdit, RunApprove, RunHold, RunPrune, RunRefresh, RunRetry, RunSay 
 import { bodySchema } from '../commands/routes.ts';
 import { commandNamed } from '../store.ts';
 import { appOver, eachTest, engineFor } from '../../test/placed.ts';
+import { OBJECT_BODY_LIMIT } from './serve.ts';
 
 const stand = eachTest(testPlace);
 const standIn = eachTest(testEngine);
@@ -277,7 +278,6 @@ test('the routes the actions replace are gone: a write on /api/runs/:runId/… a
 });
 
 test("REFUSED: a run's action whose body is over the limit is a 413, as every object's write is, never a body that is no JSON", async () => {
-  const { OBJECT_BODY_LIMIT } = await import('./serve.ts');
   const body = JSON.stringify({ workflow: 'flow', brief: 'x'.repeat(Number(OBJECT_BODY_LIMIT)) });
   for (const route of ['/api/namespaces/default/runs', `/api/namespaces/default/runs/${R}/hold`]) {
     const res = await app().request(route, { method: 'POST', headers: { 'content-type': 'application/json' }, body });

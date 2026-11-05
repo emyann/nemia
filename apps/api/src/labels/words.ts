@@ -4,7 +4,7 @@
  * takes, and why a body is not one (400). A card's labels are edited by the Card's `labels` verb (objects/serve.ts).
  */
 import type { Words } from '../body.ts';
-import { type RouteWords, runPath } from '../commands/words.ts';
+import type { RouteWords } from '../commands/words.ts';
 
 /** The body `POST …/labels` takes: `nemia label`'s edits and `--overwrite`, as JSON (`LabelEdit`). */
 const LABEL_SHAPE = '`{ "labels": ["<key>=<value>", "<key>-", …], "overwrite"?: true }`';
@@ -25,7 +25,7 @@ const labelIssue =
 const LABEL_RUN_WORDS: RouteWords = {
   shape: LABEL_SHAPE,
   guard: ({ runId, namespace }) => ({
-    route: `POST ${runPath({ namespace, runId })}/labels`,
+    route: `POST /api/namespaces/${namespace}/runs/${runId}/labels`,
     does: "edits a run's labels",
     forAnother: 'edit any',
     why: "a run's labels are what its lists, its stats and the feed's watchers select it by",

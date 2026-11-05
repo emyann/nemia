@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { fed, photograph, themeOf } from '../board.ts';
+import { fed, photograph, themeOf, isRunAction } from '../board.ts';
 import { expectVisible, idle, Refused, settled, WAIT_MS, watch } from '../checks.ts';
 import { ASKING, writeAsking } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -49,7 +49,7 @@ export default {
 
       const [answered] = await Promise.all([
         refused.waitForResponse(
-          (r) => r.request().method() === 'POST' && new URL(r.url()).pathname === `/api/runs/${id}/steps/${gated}/approve`,
+          (r) => r.request().method() === 'POST' && isRunAction(new URL(r.url()).pathname, id, `/steps/${gated}/approve`),
           { timeout: WAIT_MS },
         ),
         approve.click(),

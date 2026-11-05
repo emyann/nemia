@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Locator, Page } from 'playwright';
-import { photograph, startOf, themeOf } from '../board.ts';
+import { photograph, startOf, themeOf, isRunStart } from '../board.ts';
 import { expectCount, expectVisible, idle, Refused, settled, WAIT_MS, watch } from '../checks.ts';
 import { FACTORIES, WORKFLOWS } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -106,7 +106,7 @@ export default {
       form = await pickWorkflow(bar, workflow);
       await form.getByRole('textbox').fill(BRIEF);
       const [started] = await Promise.all([
-        other.waitForResponse((r) => r.request().method() === 'POST' && new URL(r.url()).pathname === '/api/runs', { timeout: WAIT_MS }),
+        other.waitForResponse((r) => r.request().method() === 'POST' && isRunStart(new URL(r.url()).pathname), { timeout: WAIT_MS }),
         form.getByRole('button', { name: 'Start' }).click(),
       ]);
       const sent = new URL(started.url()).searchParams;

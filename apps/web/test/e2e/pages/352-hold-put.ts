@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import type { Page } from 'playwright';
-import { fed, photograph, themeOf } from '../board.ts';
+import { fed, photograph, themeOf, isRunAction } from '../board.ts';
 import { cardOf } from '../canvas.ts';
 import { expectCount, expectVisible, idle, literal, Refused, settled, WAIT_MS } from '../checks.ts';
 import { GATED, HELD } from '../seed.ts';
@@ -46,7 +46,7 @@ export default {
       await photograph(page, path.join(OUT, `hold-put-form-${theme}.png`), { fullPage: true });
 
       const [answered] = await Promise.all([
-        page.waitForResponse((r) => r.request().method() === 'POST' && new URL(r.url()).pathname === `/api/runs/${id}/hold`, {
+        page.waitForResponse((r) => r.request().method() === 'POST' && isRunAction(new URL(r.url()).pathname, id, `/hold`), {
           timeout: WAIT_MS,
         }),
         put.click(),

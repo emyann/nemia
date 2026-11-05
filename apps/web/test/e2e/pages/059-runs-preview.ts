@@ -1,8 +1,8 @@
 import path from 'node:path';
 import type { Locator, Page } from 'playwright';
-import { photograph, reachClock, themeOf } from '../board.ts';
+import { photograph, reachClock, themeOf, rowsAnswered } from '../board.ts';
 import { expectCount, expectNone, expectVisible, idle, Refused } from '../checks.ts';
-import type { RunLines, RunObject, RunSummary } from '../../../src/lib/api.ts';
+import type { RunLines, RunObject } from '../../../src/lib/api.ts';
 import { agentViewOf } from '../../../src/lib/api/agents.ts';
 import { runViewOf } from '../../../src/lib/runView.ts';
 import { stepCardOf, type StepCardFacts } from '../../../src/lib/stepCard.ts';
@@ -125,7 +125,7 @@ async function aBar(page: Page): Promise<{ bar: Locator; run: string; step: stri
       found.map((bar) => ({ run: bar.closest('tr')!.getAttribute('data-run')!, step: bar.getAttribute('data-step-bar')! })),
     );
   if (bars.length === 0) throw new Refused('the table in flight draws its rails as buttons — no bar is a button');
-  const runs = await answer<RunSummary[]>(page, '/api/runs');
+  const runs = await rowsAnswered(page);
   const worked = bars.find(({ run, step }) => runs.find((r) => r.id === run)?.steps.find((s) => s.name === step)?.agent);
   const { run, step } = worked ?? bars[0];
   return { bar: page.locator(`${FLIGHT} tr[data-run="${run}"] [data-step-bar="${step}"]`), run, step };
@@ -138,7 +138,7 @@ async function aBar(page: Page): Promise<{ bar: Locator; run: string; step: stri
 async function expected(page: Page, run: string, step: string): Promise<StepCardFacts> {
   const at = `/api/runs/${encodeURIComponent(run)}`;
   const [runs, object, lines, agents] = await Promise.all([
-    answer<RunSummary[]>(page, '/api/runs'),
+    rowsAnswered(page),
     answer<RunObject.Run>(page, at),
     answer<RunLines>(page, `${at}/lines`),
     Promise.all(

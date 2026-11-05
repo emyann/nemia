@@ -504,10 +504,15 @@ test('fileCard, dropCard, startCard, queueCard: what the board sends the api for
       'the default factory, and no place, send no query',
     );
   });
-  await t.test('a run started of no card goes to POST /api/runs, its place in the query', async (t) => {
+  await t.test("a run started of no card goes to its factory's namespace, its repository in the query, none for the default", async (t) => {
     const sent = sending(t, () => answered(201, { id: 'r' }, 'Created'));
     await startRun({ workflow: 'good', from: 'repo', brief: 'Hire' }, { factory: 'hiring', repo: '/r/x' });
-    assert.equal(sent[0]?.url, '/api/runs?factory=hiring&repo=%2Fr%2Fx');
+    await startRun({ workflow: 'good', from: 'repo', brief: 'Hire' }, { factory: 'default', repo: '/r/x' });
+    await startRun({ workflow: 'good', from: 'repo', brief: 'Hire' });
+    assert.deepEqual(
+      sent.map((s) => s.url),
+      ['/api/namespaces/hiring/runs?repo=%2Fr%2Fx', '/api/namespaces/default/runs', '/api/namespaces/default/runs'],
+    );
   });
 });
 

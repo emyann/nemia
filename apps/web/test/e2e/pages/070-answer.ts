@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { fed, photograph, sidebar, themeOf } from '../board.ts';
+import { fed, photograph, sidebar, themeOf, isRunAction } from '../board.ts';
 import { expectCount, expectVisible, idle, Refused, settled, WAIT_MS, watch } from '../checks.ts';
 import { FAKE } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -24,7 +24,7 @@ export default {
   expect: async (page) => {
     await sidebar(page);
     const retried = (r: { request: () => { method: () => string }; url: () => string }) =>
-      r.request().method() === 'POST' && new URL(r.url()).pathname === `/api/runs/${FAKE.id}/steps/${FAKE.blocked}/retry`;
+      r.request().method() === 'POST' && isRunAction(new URL(r.url()).pathname, FAKE.id, `/steps/${FAKE.blocked}/retry`);
     const asks = path.join(store!, 'runs', `${FAKE.id}.asks`);
     const file = path.join(asks, `retry-${FAKE.blocked}-2`);
 

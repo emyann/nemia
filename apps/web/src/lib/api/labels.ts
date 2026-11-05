@@ -1,10 +1,10 @@
 /** A run's and a card's labels: the two writes that edit them (apps/api's label routes), and what the label page reads. */
 import { queryOptions } from '@tanstack/react-query';
 import { Schema } from 'effect';
-import { get, send } from './read.ts';
+import { get } from './read.ts';
 import { selectorKey, withSelector } from './selector.ts';
 import { Labelled } from 'objects';
-import { cards, namespaceOf } from './objects.ts';
+import { cards, namespaceOf, runs } from './objects.ts';
 
 /** A label map: a key, its value. */
 export type Labels = Record<string, string>;
@@ -12,12 +12,12 @@ export type Labels = Record<string, string>;
 /** The keys the store sets on every run, shown and never edited (`CLOSED_LABEL_KEYS` in the orchestrator). */
 export const CLOSED_LABEL_KEYS: readonly string[] = ['factory', 'workflow'];
 
-/** Edits `id`'s labels by `edits` (`key=value`, `key-`), as the CLI's label verb for a run does; a changed value needs `overwrite`. */
-export const labelRun = (id: string, edits: readonly string[], overwrite = false): Promise<Labelled> =>
-  send('POST', `/api/runs/${encodeURIComponent(id)}/labels`, Labelled, {
-    body: { labels: edits, overwrite },
-    may: 'The labels may be set: read the run again before sending it again.',
-  });
+/**
+ * Edits `id`'s labels by `edits` (`key=value`, `key-`), as the CLI's label verb for a run does: the Run's `labels` action, in the run's
+ * namespace (`namespaceOf`). A changed value needs `overwrite`.
+ */
+export const labelRun = (namespace: string, id: string, edits: readonly string[], overwrite = false): Promise<Labelled> =>
+  runs.labels(namespace, id, { labels: edits, overwrite }, 'The labels may be set: read the run again before sending it again.');
 
 /** Edits `card`'s labels by `edits`, as the CLI's label verb for a card does: the Card's `labels` verb, in the card's namespace. */
 export const labelCard = (card: { name: string; factory: string | null }, edits: readonly string[], overwrite = false): Promise<Labelled> =>

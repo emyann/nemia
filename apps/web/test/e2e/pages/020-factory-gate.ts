@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Page, Response } from 'playwright';
-import { fed, photograph, stepBar, themeOf } from '../board.ts';
+import { fed, photograph, stepBar, themeOf, isRunAction } from '../board.ts';
 import { cardOf, expectClearOfEachOther, showFinished } from '../canvas.ts';
 import { expectCount, expectVisible, idle, Refused, settled, WAIT_MS, watch } from '../checks.ts';
 import { ENDING, FAKE } from '../seed.ts';
@@ -23,8 +23,8 @@ export default {
     const { id, ending, back } = ENDING;
     const asks = path.join(store!, 'runs', `${id}.asks`);
     const approved = (r: Response) =>
-      r.request().method() === 'POST' && new URL(r.url()).pathname === `/api/runs/${id}/steps/${ending}/approve`;
-    const retried = (r: Response) => r.request().method() === 'POST' && new URL(r.url()).pathname === `/api/runs/${id}/steps/${back}/retry`;
+      r.request().method() === 'POST' && isRunAction(new URL(r.url()).pathname, id, `/steps/${ending}/approve`);
+    const retried = (r: Response) => r.request().method() === 'POST' && isRunAction(new URL(r.url()).pathname, id, `/steps/${back}/retry`);
     const lineOf = (p: Page) => cardOf(p, id).locator(`[data-gate-line="${ending}"]`);
     const answerOf = (p: Page, label: 'Approve' | 'Send back') => cardOf(p, id).locator(`[data-answer="${label}"]`);
     const approval = (p: Page) => p.getByRole('dialog', { name: `Approve ${ending}` });

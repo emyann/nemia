@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { isDeepStrictEqual } from 'node:util';
 import { QueryClient, QueryObserver } from '@tanstack/react-query';
-import { decisionQuery, ReadRefusal, retryRun, runGone, runObjectQuery, sayToStep, type RunObject } from '../src/lib/api.ts';
+import { decisionQuery, ReadRefusal, retryRun, WriteRefusal, runGone, runObjectQuery, sayToStep, type RunObject } from '../src/lib/api.ts';
 import { decisionStamp } from '../src/lib/decide.ts';
 import { coded, decidable, type Word } from './run-fixtures.ts';
 import { bell, until, WAITED } from './waits.ts';
@@ -11,7 +11,7 @@ const { workflowNameOf } = await import('../src/lib/api.ts');
 
 const { startRun } = await import('../src/lib/api.ts');
 
-/** POST /api/runs answering each start with `answer()`, for the length of the test: the requests the board sent. */
+/** POST /api/namespaces/default/runs answering each start with `answer()`, for the length of the test: the requests the board sent. */
 function starting(t: { after: (fn: () => void) => void }, answer: () => Response) {
   const before = globalThis.fetch;
   const sent: Array<{ url: string; init: RequestInit | undefined }> = [];
@@ -25,6 +25,10 @@ function starting(t: { after: (fn: () => void) => void }, answer: () => Response
   return sent;
 }
 
+/** A request's body as text: the objects' client sends its JSON as bytes. */
+const text = (body: BodyInit | null | undefined): string =>
+  typeof body === 'string' ? body : new TextDecoder().decode(body as Uint8Array);
+
 const answered = (status: number, body: object, statusText = '') =>
   new Response(JSON.stringify(body), { status, statusText, headers: { 'content-type': 'application/json' } });
 
@@ -36,14 +40,14 @@ test("startRun: posted as JSON, refused in the api's words, and an answer with n
     assert.deepEqual(await startRun(asked), { id: 'give-the-board-a-legend-ab12' });
     assert.equal(sent.length, 1);
     const [{ url, init }] = sent as [(typeof sent)[number]];
-    assert.equal(url, '/api/runs');
+    assert.equal(url, '/api/namespaces/default/runs');
     assert.equal(init?.method, 'POST');
     assert.equal(
       new Headers(init?.headers).get('content-type'),
       'application/json',
       'the api answers anything else 415: a body any page could send it unasked',
     );
-    assert.deepEqual(JSON.parse(String(init?.body)), asked);
+    assert.deepEqual(JSON.parse(text(init?.body)), asked);
   });
   await t.test("REFUSED: a start the api refuses rejects with the api's message word for word, whatever the status", async (t) => {
     let answer = answered(500, {});
@@ -82,15 +86,16 @@ test("startRun: posted as JSON, refused in the api's words, and an answer with n
         headers: { 'content-type': 'text/html' },
       });
       starting(t, () => answer);
-      await assert.rejects(startRun(asked), (err: Error) => err.message === 'POST /api/runs answered 502 Bad Gateway');
+      await assert.rejects(startRun(asked), (err: Error) => err.message === 'POST /api/namespaces/default/runs answered 502 Bad Gateway');
       answer = answered(422, { message: 'not the field the board reads' }, 'Unprocessable Entity');
-      await assert.rejects(startRun(asked), (err: Error) => err.message === 'POST /api/runs answered 422 Unprocessable Entity');
+      await assert.rejects(startRun(asked), (err: Error) => err instanceof WriteRefusal && err.status === 422);
       answer = answered(201, { run: 'give-the-board-a-legend-ab12' }, 'Created');
       await assert.rejects(
         startRun(asked),
         (err: Error) =>
-          err.message.startsWith('POST /api/runs answered what this board does not read: at id, the value is missing.') &&
-          /look on the Runs page before starting it again/.test(err.message),
+          err.message.startsWith(
+            'POST /api/namespaces/default/runs answered what this board does not read: at id, the value is missing.',
+          ) && /look on the Runs page before starting it again/.test(err.message),
       );
     },
   );
@@ -205,7 +210,7 @@ test("each ask of a run's page: posted as the api takes it, read back, and refus
       t.after(() => {
         globalThis.fetch = before;
       });
-      assert.deepEqual(await sayToStep('r 1', 'implement', 'Widen it.'), {
+      assert.deepEqual(await sayToStep('default', 'r 1', 'implement', 'Widen it.'), {
         at: '2026-09-14T16:06:19.851Z',
         attempt: 1,
         text: 'Widen it.',
@@ -213,19 +218,19 @@ test("each ask of a run's page: posted as the api takes it, read back, and refus
       });
       const [{ url, init }] = sent as [{ url: string; init: RequestInit }];
       assert.deepEqual(
-        [url, init.method, (init.headers as Record<string, string>)['content-type'], init.body],
-        ['/api/runs/r%201/steps/implement/say', 'POST', 'application/json', '{"text":"Widen it."}'],
+        [url, init.method, new Headers(init.headers).get('content-type'), text(init.body)],
+        ['/api/namespaces/default/runs/r%201/steps/implement/say', 'POST', 'application/json', '{"text":"Widen it."}'],
       );
 
       const refusal = "implement is not running: try 1's task settled `succeeded`, so no session of it is there to hear anything.";
       answer = () => new Response(JSON.stringify({ error: refusal }), { status: 409 });
-      await assert.rejects(sayToStep('r-1', 'implement', 'Widen it.'), (err: Error) => err.message === refusal);
+      await assert.rejects(sayToStep('default', 'r-1', 'implement', 'Widen it.'), (err: Error) => err.message === refusal);
       answer = () => new Response('{}', { status: 202 });
       await assert.rejects(
-        sayToStep('r-1', 'implement', 'Widen it.'),
+        sayToStep('default', 'r-1', 'implement', 'Widen it.'),
         (err: Error) =>
           err.message.startsWith(
-            'POST /api/runs/r-1/steps/implement/say answered what this board does not read: at at, the value is missing.',
+            'POST /api/namespaces/default/runs/r-1/steps/implement/say answered what this board does not read: at at, the value is missing.',
           ) && /before saying them again/.test(err.message),
       );
     },
@@ -235,24 +240,24 @@ test("each ask of a run's page: posted as the api takes it, read back, and refus
     async (t) => {
       const sent: Array<{ url: string; init: RequestInit }> = [];
       asking(t, 202, JSON.stringify({ try: 2, file: '/store/runs/r 1.asks/retry-implement-2', stopFirst: false }), sent);
-      assert.deepEqual(await askTry('r 1', 'implement', { mode: 'continue', message: '--flag stays' }), {
+      assert.deepEqual(await askTry('default', 'r 1', 'implement', { mode: 'continue', message: '--flag stays' }), {
         try: 2,
         file: '/store/runs/r 1.asks/retry-implement-2',
         stopFirst: false,
       });
       assert.equal(sent.length, 1);
-      assert.equal(sent[0].url, '/api/runs/r%201/steps/implement/retry');
+      assert.equal(sent[0].url, '/api/namespaces/default/runs/r%201/steps/implement/retry');
       assert.equal(sent[0].init.method, 'POST');
-      assert.deepEqual(sent[0].init.headers, { 'content-type': 'application/json' });
-      assert.deepEqual(JSON.parse(String(sent[0].init.body)), { mode: 'continue', message: '--flag stays' });
+      assert.equal(new Headers(sent[0].init.headers).get('content-type'), 'application/json');
+      assert.deepEqual(JSON.parse(text(sent[0].init.body)), { mode: 'continue', message: '--flag stays' });
 
       asking(t, 202, JSON.stringify({ try: 2, file: '/store/runs/r-1.asks/retry-held-2', stopFirst: true }), sent);
       assert.deepEqual(
-        await askTry('r-1', 'held', { mode: 'continue' }),
+        await askTry('default', 'r-1', 'held', { mode: 'continue' }),
         { try: 2, file: '/store/runs/r-1.asks/retry-held-2', stopFirst: true },
         'continue on a session the harness blocked: the tick stops it before it files the try, and the api says so',
       );
-      assert.deepEqual(JSON.parse(String(sent[1].init.body)), { mode: 'continue' });
+      assert.deepEqual(JSON.parse(text(sent[1].init.body)), { mode: 'continue' });
     },
   );
   await t.test(
@@ -262,21 +267,21 @@ test("each ask of a run's page: posted as the api takes it, read back, and refus
         'working is still running, so there is nothing to try again until it ends. Wait for it: wf ls r-1 (or stop the run: wf cancel r-1).';
       const sent: Array<{ url: string; init: RequestInit }> = [];
       asking(t, 409, JSON.stringify({ error: refusal }), sent);
-      await assert.rejects(askTry('r-1', 'working', { mode: 'continue' }), (err: Error) => err.message === refusal);
+      await assert.rejects(askTry('default', 'r-1', 'working', { mode: 'continue' }), (err: Error) => err.message === refusal);
 
-      globalThis.fetch = async () => new Response(JSON.stringify({ ok: true }), { status: 202 });
+      globalThis.fetch = async () => new Response(JSON.stringify({ file: '/f' }), { status: 202 });
       await assert.rejects(
-        askTry('r-1', 'implement', { mode: 'continue' }),
+        askTry('default', 'r-1', 'implement', { mode: 'continue' }),
         (err: Error) =>
           err.message.startsWith(
-            'POST /api/runs/r-1/steps/implement/retry answered what this board does not read: at try, the value is missing.',
+            'POST /api/namespaces/default/runs/r-1/steps/implement/retry answered what this board does not read: at try, the value is missing.',
           ) && /before asking again/.test(err.message),
       );
 
       globalThis.fetch = async () => new Response('<html>Bad Gateway</html>', { status: 502, statusText: 'Bad Gateway' });
       await assert.rejects(
-        askTry('r-1', 'implement', { mode: 'continue' }),
-        (err: Error) => err.message === 'POST /api/runs/r-1/steps/implement/retry answered 502 Bad Gateway',
+        askTry('default', 'r-1', 'implement', { mode: 'continue' }),
+        (err: Error) => err.message === 'POST /api/namespaces/default/runs/r-1/steps/implement/retry answered 502 Bad Gateway',
       );
     },
   );
@@ -287,16 +292,16 @@ test("each ask of a run's page: posted as the api takes it, read back, and refus
         "--budget 4 is not above $4.25, what tokens's tries have cost: a try under it would read over budget again as soon as it ended. Give more than $4.25: wf retry r-1 tokens --budget <amount>.";
       let answer = () => answered(202, { try: 3, file: '/store/runs/r-1.asks/retry-tokens-3', stopFirst: false });
       const sent = starting(t, () => answer());
-      assert.deepEqual(await askTry('r-1', 'tokens', { mode: 'continue', budget: 5 }), {
+      assert.deepEqual(await askTry('default', 'r-1', 'tokens', { mode: 'continue', budget: 5 }), {
         try: 3,
         file: '/store/runs/r-1.asks/retry-tokens-3',
         stopFirst: false,
       });
       answer = () => answered(409, { error: refusal });
-      await assert.rejects(askTry('r-1', 'tokens', { mode: 'continue', budget: 4 }), (err: Error) => err.message === refusal);
+      await assert.rejects(askTry('default', 'r-1', 'tokens', { mode: 'continue', budget: 4 }), (err: Error) => err.message === refusal);
 
       answer = () => answered(202, { step: 'review', round: 3, file: '/store/runs/r 1.asks/round-review-3' });
-      assert.deepEqual(await askRound('r 1', 'review', { budget: 3 }), {
+      assert.deepEqual(await askRound('default', 'r 1', 'review', { budget: 3 }), {
         step: 'review',
         round: 3,
         file: '/store/runs/r 1.asks/round-review-3',
@@ -304,24 +309,29 @@ test("each ask of a run's page: posted as the api takes it, read back, and refus
       const words =
         '--budget 2 is not above $2.10, what implement has cost: the round would be held again as soon as it was asked for. Give more than $2.10: nemia retry r-1 review --round --budget <amount>.';
       answer = () => answered(409, { error: words });
-      await assert.rejects(askRound('r-1', 'review', { budget: 2 }), (err: Error) => err.message === words);
-      answer = () => answered(202, {});
+      await assert.rejects(askRound('default', 'r-1', 'review', { budget: 2 }), (err: Error) => err.message === words);
+      answer = () => answered(202, { file: '/f' });
       await assert.rejects(
-        askRound('r-1', 'review', { budget: 3 }),
+        askRound('default', 'r-1', 'review', { budget: 3 }),
         (err: Error) =>
           err.message.startsWith(
-            'POST /api/runs/r-1/steps/review/retry answered what this board does not read: at step, the value is missing.',
+            'POST /api/namespaces/default/runs/r-1/steps/review/retry answered what this board does not read: at step, the value is missing.',
           ) && /before asking again/.test(err.message),
       );
 
       assert.deepEqual(
-        sent.map(({ url, init }) => [url, init?.method, new Headers(init?.headers).get('content-type'), JSON.parse(String(init?.body))]),
+        sent.map(({ url, init }) => [url, init?.method, new Headers(init?.headers).get('content-type'), JSON.parse(text(init?.body))]),
         [
-          ['/api/runs/r-1/steps/tokens/retry', 'POST', 'application/json', { mode: 'continue', budget: 5 }],
-          ['/api/runs/r-1/steps/tokens/retry', 'POST', 'application/json', { mode: 'continue', budget: 4 }],
-          ['/api/runs/r%201/steps/review/retry', 'POST', 'application/json', { mode: 'continue', round: true, budget: 3 }],
-          ['/api/runs/r-1/steps/review/retry', 'POST', 'application/json', { mode: 'continue', round: true, budget: 2 }],
-          ['/api/runs/r-1/steps/review/retry', 'POST', 'application/json', { mode: 'continue', round: true, budget: 3 }],
+          ['/api/namespaces/default/runs/r-1/steps/tokens/retry', 'POST', 'application/json', { mode: 'continue', budget: 5 }],
+          ['/api/namespaces/default/runs/r-1/steps/tokens/retry', 'POST', 'application/json', { mode: 'continue', budget: 4 }],
+          [
+            '/api/namespaces/default/runs/r%201/steps/review/retry',
+            'POST',
+            'application/json',
+            { mode: 'continue', round: true, budget: 3 },
+          ],
+          ['/api/namespaces/default/runs/r-1/steps/review/retry', 'POST', 'application/json', { mode: 'continue', round: true, budget: 2 }],
+          ['/api/namespaces/default/runs/r-1/steps/review/retry', 'POST', 'application/json', { mode: 'continue', round: true, budget: 3 }],
         ],
       );
     },

@@ -95,9 +95,10 @@ test('a prune is said in words: its worktrees, its files where they went too, an
 });
 
 test('a run the list could not judge is a row that says why, in no factory and moving nothing it can say', () => {
-  const row = unjudgedRowOf({ name: 'r-bad', error: 'the journal of r-bad-implement-1 does not read' });
+  const unjudged = { name: 'r-bad', error: 'the journal of r-bad-implement-1 does not read' };
+  const row = unjudgedRowOf(unjudged);
   assert.equal(row.id, 'r-bad');
-  assert.equal(row.unreadable, 'the journal of r-bad-implement-1 does not read');
+  assert.equal(row.unreadable, unjudged.error, 'the row says why, as the list said it');
   assert.equal(row.factory, null);
   assert.equal(
     unjudgedRowOf({ name: 'r-bad', namespace: 'foo', error: 'unread' }).factory,

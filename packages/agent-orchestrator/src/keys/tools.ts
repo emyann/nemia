@@ -160,7 +160,7 @@ const fileRuleRefusal = (named: string, rule: string, key: 'disallowedTools' | '
   }. Write \`Edit${rule.slice(rule.indexOf('('))}\` instead: an \`Edit\` rule covers every file-editing tool, ${FILE_TOOLS.join(', ')} with it.`;
 
 /** The file-editing tools whose calls a permission rule names by `Edit(…)`: Claude Code matches a file write against `Edit` rules alone. */
-const EDITING_TOOLS = ['Edit', 'Write', 'MultiEdit', 'NotebookEdit'];
+export const EDITING_TOOLS: readonly string[] = ['Edit', 'Write', 'MultiEdit', 'NotebookEdit'];
 
 /** The tools whose calls a permission rule names by a path, as `denialOf` in agent-runtime names the call by the path it was given. */
 const PATH_TOOLS = ['Read', ...EDITING_TOOLS];

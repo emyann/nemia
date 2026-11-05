@@ -122,7 +122,7 @@ const ChatEventSchema = decodes<ChatEvent>()(
 /**
  * Mirrors the package's `Presence`, as the api answers it: `up`, her session live; `answering`, a turn in progress; `waitsOnYou`, the
  * runs waiting on the person; `unread`, her messages after their read mark. The board's own presence, which her face and its cues read,
- * is `lib/presence.ts`'s, made of this and her level (`presenceOf` in `lib/chatFollowing.ts`).
+ * is `lib/presence.ts`'s, made of this (`presenceOf` in `lib/chatFollowing.ts`).
  */
 export type ChatPresence = { up: boolean; answering: boolean; waitsOnYou: number; unread: number };
 

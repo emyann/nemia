@@ -1,10 +1,10 @@
 /**
  * The store's pause, which the runtime calls unschedulable: while it stands no pass starts new work — no step, try, round or check
  * filed, no queued task admitted, no queued card started — and under a timeout each working session stops when its current tool call
- * ends, cut once the timeout passes, while under none it runs on to its end. What still finishes under it (`finishingOf`), read off
- * the views on each pass and never stored, and its words: "Pausing" while anything finishes, "Paused" once nothing does, as `nemia ls`,
- * `nemia watch --once`, `nemia start`, `nemia up` and the board say it. Pure: its file is `pause.store.ts`'s, and the gates that honour
- * it are `assess` and the tick's `pass`.
+ * ends, cut once the timeout passes (at once, and parked, under a timeout of 0), while under none it runs on to its end. What still
+ * finishes under it (`finishingOf`), read off the views on each pass and never stored, and its words: "Pausing" while anything
+ * finishes, "Paused" once nothing does, as `nemia ls`, `nemia watch --once`, `nemia start`, `nemia up` and the board say it. Pure: its
+ * file is `pause.store.ts`'s, and the gates that honour it are `assess` and the tick's `pass`.
  */
 import type { PauseLapsed } from '../../contracts/pause-lapse.contract.ts';
 import type { Flag } from '../command/command.ts';
@@ -149,9 +149,9 @@ export type FinishingView = WordView & {
   state: WordView['state'] & { stopRequested?: boolean };
 };
 
-/** What a pause at once costs, as `nemia pause --now` and the board's confirm say it before it is paid. */
+/** What a pause at once costs, as `nemia pause --now` and the board's confirm, its Stop now, say it before it is paid. */
 export const NOW_COST =
-  'A session has its tool call cut and continues as the same try, told which call was cut; a check runs again from its start.';
+  "Stopping now cuts a session's tool call, and it continues as the same try, told which call was cut; a check runs again from its start.";
 
 /** How `nemia resume` is typed, as every line that offers it says it. */
 export const RESUME_LINE = 'nemia resume';
@@ -287,13 +287,16 @@ const sinceWords = ({ at, by, why }: Pause): string =>
   `since ${at || 'a time its file no longer says'} by ${by || 'someone its file no longer names'}${why ? `: ${why}` : ''}`;
 
 /**
- * What the pause does, in words: nothing new starts, and under a timeout each working session stops when its current tool call ends, cut
- * once the timeout passes; under none (a restart's take-over) each runs on to its end. The client's printers copy it word for word.
+ * What the pause does, in words: nothing new starts, and under a timeout of 0 (a pause at once, the board's Stop now) each working session
+ * is cut at once and parks; under another timeout each stops when its current tool call ends, cut once the timeout passes; under none (a
+ * restart's take-over) each runs on to its end. The client's printers copy it word for word.
  */
 const pauseDoes = ({ timeoutMs }: Pause): string =>
-  timeoutMs !== undefined
-    ? 'nothing new starts, and each working session stops when its current tool call ends, cut once the timeout passes'
-    : 'nothing new starts, and each working session runs on to its end';
+  timeoutMs === 0
+    ? 'nothing new starts, and each working session is cut at once and parks'
+    : timeoutMs !== undefined
+      ? 'nothing new starts, and each working session stops when its current tool call ends, cut once the timeout passes'
+      : 'nothing new starts, and each working session runs on to its end';
 
 /** The pause as it was put, in one line: since when, by whom and why, what it stops, and the verb that resumes. */
 export const pauseWords = (pause: Pause): string =>

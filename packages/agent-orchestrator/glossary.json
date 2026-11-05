@@ -259,7 +259,7 @@
     },
     {
       "term": "Pause",
-      "meaning": "the whole store paused by a person (`nemia pause`, lifted by `nemia resume`): one file, `pauseFile`, composed on read onto every run, under which no pass files new work and what is in flight runs on. The file keeps its former name, `cordon` (`PAUSE_FILE`), so that a pause put before the verbs were renamed still stands and is lifted. A take-over's pause (`nemia service restart`, `nemia upgrade`, `nemia service install --take-over`) names the process that put it (`heldBy`), and the daemon's next pass lifts it once that process is gone (`liftLapsedPause`), so it never outlives its command; a person's names none.",
+      "meaning": "the whole store paused by a person (`nemia pause`, lifted by `nemia resume`): one file, `pauseFile`, composed on read onto every run, under which no pass files new work and what is in flight runs on. The file keeps its former name, `cordon` (`PAUSE_FILE`), so that a pause put before the verbs were renamed still stands and is lifted. A take-over's pause (`nemia service restart`, `nemia upgrade`, `nemia service install --take-over`) names the process that put it (`heldBy`), and the daemon's next pass lifts it once that process is gone (`liftLapsedPause`), so it never outlives its command; a person's names none. A pause at once (`nemia pause --now`, the board's **Stop now…**, `pauseNow`) is put with a timeout of 0: each step session at work but a landing's has its call cut at once and parks, going on as the same try at the resume, and each check is asked to stop and runs again; its words say so (`pauseDoes`: each working session is cut at once and parks).",
       "type": "Pause",
       "retired": [
         {

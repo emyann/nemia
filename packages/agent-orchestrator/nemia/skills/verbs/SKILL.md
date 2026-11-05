@@ -288,8 +288,9 @@ They write, and are yours to run unasked, on your judgement: say what you did.
                                (default: your OS user)
                                --timeout: how long a call in flight is given to end, for this pause
                                (90s, 10m, 2h; from 1s to 23h); default: the store's, nemia pause-timeout
-                               --now: pause at once — each step session at work, but a landing's,
-                               has its call cut and parks, going on as the same try on nemia resume;
+                               --now: pause at once, the board's Stop now — each step session at work,
+                               but a landing's, has its call cut at once and parks, going on as the
+                               same try on nemia resume;
                                each check is asked to stop and run again. A pause that stands is kept.
                                --yes: with --now, act; without it, --now only says what it would
                                cut

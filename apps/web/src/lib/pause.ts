@@ -11,11 +11,18 @@ import { clockWord } from './quota.ts';
 export const PAUSE_PARKS =
   'nothing new starts, and each working session stops when its current tool call ends, cut once the timeout passes';
 
+/** What a pause at once does (its timeout 0, the board's Stop now), the package's words: each working session is cut at once and parks. */
+export const PAUSE_CUTS = 'nothing new starts, and each working session is cut at once and parks';
+
 /** What a pause with no timeout does (a restart's take-over), the package's words: each working session runs on. */
 export const PAUSE_RUNS_ON = 'nothing new starts, and each working session runs on to its end';
 
-/** What `pause` does, as the package says it: `PAUSE_PARKS` under a timeout, `PAUSE_RUNS_ON` under none. */
-export const pauseDoes = ({ timeoutMs }: Pause): string => (timeoutMs !== undefined ? PAUSE_PARKS : PAUSE_RUNS_ON);
+/**
+ * What `pause` does, as the package says it: `PAUSE_CUTS` under a timeout of 0, `PAUSE_PARKS` under another,
+ * `PAUSE_RUNS_ON` under none.
+ */
+export const pauseDoes = ({ timeoutMs }: Pause): string =>
+  timeoutMs === 0 ? PAUSE_CUTS : timeoutMs !== undefined ? PAUSE_PARKS : PAUSE_RUNS_ON;
 
 /** The same words opening a sentence. */
 const opening = (words: string): string => `${words.charAt(0).toUpperCase()}${words.slice(1)}`;

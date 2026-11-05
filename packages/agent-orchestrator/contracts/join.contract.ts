@@ -13,7 +13,7 @@ import { type Implementation, spec } from '@emyann/tsverify';
 import type { StepStatus } from '../src/record/record.ts';
 
 /** A step's word, with the two the routing build adds to `StepStatus` (implement adds them there; this then reads `StepStatus`). */
-export type NodeWord = StepStatus | 'skipped' | 'sent';
+export type NodeWord = StepStatus;
 
 /** What a node not yet filed does on this pass. */
 export type Fate = 'ready' | 'waits' | 'skipped' | 'unreachable';
@@ -46,6 +46,8 @@ const onRoute = (when: readonly string[] | undefined, answered: string | undefin
   when === undefined || (answered !== undefined && when.includes(answered));
 
 const nodeFateSpec = spec<(when: readonly string[] | undefined, answered: string | undefined, parents: readonly NodeWord[]) => Fate>({
+  /** Which of `waits` and `unreachable` a node no law places reads is the code's: the laws say only what must be ready, skipped or stopped. */
+  open: ['output'],
   ensures: {
     offItsRouteIsSkipped: {
       description: 'A node whose condition answered a route it does not take is skipped',

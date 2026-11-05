@@ -224,6 +224,20 @@ export type Workflow = {
   /** How many rounds a `loop:` may run, the first included — then a person decides. Set to `DEFAULT_ROUNDS` when a loop does not say. */
   rounds?: number;
   /**
+   * `routes: [build, quick]`: this step is a condition node, and these are the routes it may answer, a closed list. A condition has no
+   * session of its own where its eval is a table or a script; only a judge (`route: judge`) runs an agent. Load closes every `when:` and
+   * `ends:` over the list (`routeRefusal`, `src/workflow/validate.ts`).
+   */
+  routes?: string[];
+  /** How a condition answers (`RouteEval`): a closed table over a producer's fact field, a script, or a read-only judge. */
+  route?: RouteEval;
+  /** `when: [web]`: the routes of the condition in `after:` on which this node runs. On any other route it reads `skipped`. */
+  when?: string[];
+  /** `ends: [docs]`: the routes of this condition on which the run ends, nothing after it running. */
+  ends?: string[];
+  /** `workflow: build`: this node is a route to a workflow, and files a card for it `from:` this run, then reads `sent`. */
+  workflow?: string;
+  /**
    * The agent attached to the step (`agent:`), and what the step said itself: the keys its own file set — never `agent` — and its own note.
    * The step's keys and body above are already resolved: the agent's role keys where the step sets none, and its instructions, then a
    * person's custom instructions for it, before the note. What the rest of the run reads is those; this says where each came from, which is
@@ -299,6 +313,16 @@ export const LOOP_REPLIES = 'replies';
  * A step's declared output: the file as the step names it (its agent's where the step names none), the schema at `nemia start` — its
  * agent's fields and its own, merged (`mergedOutput`) — and the one owner of each field, where the step hires an agent.
  */
+/**
+ * A condition's eval (`route:`): `{ from: <producer>.<field>, table: { <value>: <route> } }`, a table the pass looks the producer's signed
+ * closeout up in; `{ script: <path> }`, a command the run files whose answer file the runtime keeps at exit; or `judge`, a read-only agent
+ * whose closeout says the route.
+ */
+export type RouteEval =
+  | { readonly kind: 'table'; readonly from: string; readonly table: Readonly<Record<string, string>> }
+  | { readonly kind: 'script'; readonly script: string }
+  | { readonly kind: 'judge' };
+
 export type StepOutput = { file: string; schema: OutputSchema; owners?: Record<string, OutputOwner> };
 
 /** Who declares a field of a merged output: the agent or the step, by its name and the schema file its `output:` line names. */
@@ -346,6 +370,11 @@ export const STEP_KEYS = [
   'tally',
   'loop',
   'rounds',
+  'routes',
+  'route',
+  'when',
+  'ends',
+  'workflow',
 ] as const;
 export type StepKey = (typeof STEP_KEYS)[number];
 
@@ -365,6 +394,9 @@ export const LIST_KEYS: readonly string[] = [
   'disallowedTools',
   'allowedTools',
   'tally',
+  'routes',
+  'when',
+  'ends',
   'from',
   'overridable',
   'disallow',
@@ -430,6 +462,12 @@ export const STEP_KEY_MEANINGS: Readonly<Record<StepKey, string>> = {
     "what `nemia stats` counts of the step's closeouts, per day: fields its `output:` declares — an array's items, a number's value — or `field.flag`, an array's items whose boolean flag is true",
   loop: "the step to run again when this one's closeout says `again: true`: one it waits on",
   rounds: COUNTS.rounds.counts,
+  routes: 'the routes this condition may answer, a closed list: what follows it says which it takes (`when:`)',
+  route:
+    "how this condition answers: a table over a producer's fact field (`{ from: <step>.<field>, table: { <value>: <route> } }`), a script (`{ script: <path> }`), or `judge`, a read-only agent",
+  when: 'the routes of the condition this node waits on that it runs on: on any other it reads `skipped`',
+  ends: 'the routes of this condition on which the run ends, nothing after it running',
+  workflow: 'the workflow this node routes to: it files a card for it, `from:` this run, and reads `sent`',
 };
 
 /**

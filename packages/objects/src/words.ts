@@ -126,6 +126,8 @@ export const STEP_STATUSES = [
   'failed (check)',
   'failed',
   'stopped',
+  'skipped',
+  'sent',
 ] as const;
 
 /** How a try is taken: continuing the session, in a fresh one, or running the check again. */

@@ -18,9 +18,9 @@ export type TablePick = { readonly kind: 'route'; readonly route: string } | { r
 /** Whether `route` is one of the condition's declared routes. */
 const declared = (routes: readonly string[], route: string): boolean => routes.includes(route);
 
-/** The row the table holds for a value, when the value is a string and its row a string. */
+/** The row the table holds for a value, when the value is a string, the table's own key, and its row a string. */
 const rowOf = (table: RouteTable, value: unknown): string | undefined => {
-  if (typeof value !== 'string') return undefined;
+  if (typeof value !== 'string' || !Object.hasOwn(table.table, value)) return undefined;
   const row: unknown = table.table[value];
   return typeof row === 'string' ? row : undefined;
 };

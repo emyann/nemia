@@ -23,10 +23,12 @@
  *   over REST (its check runs and its status contexts; the combined `state` is never a verdict): 1800 s for it to be reported
  *   (`WF_CI_START_SECONDS`), 2400 s whole (`WF_CI_WAIT_SECONDS`), `WF_CI_POLL_SECONDS` the interval, inside the landing check's own
  *   deadline, the whole of it while another check at the merge still runs (a context that sums up other jobs comes once they end).
- *   Green passes. Red refuses, naming the jobs that did not pass — unless the base's tip holds the merge and the context is
- *   green there, which passes and says so. A read of GitHub that fails — `gh` timing out, exiting
- *   non-zero, or answering no JSON — is no verdict: the wait reads again within the whole bound, and a read still failing there
- *   refuses, naming the last error. Still running at the bound, or never reported (CI may not run on pushes to the base: the
+ *   Green passes. Red refuses, naming the jobs that did not pass — unless the base's tip holds the merge and the context is green there,
+ *   which passes and says so. A merge whose own run was cancelled (a CI's pending run replaced by a newer push's) or never reported is
+ *   read at the base's tip where it holds the merge, by GitHub's compare (`ahead` or `identical`): green there passes, saying which
+ *   commit was read and why, red there refuses naming that commit, and anything else waits on. A read of GitHub that fails — `gh` timing
+ *   out, exiting non-zero, or answering no JSON — is no verdict: the wait reads again within the whole bound, and a read still failing
+ *   there refuses, naming the last error. Still running at the bound, or never reported (CI may not run on pushes to the base: the
  *   factory then sets `landingWaitsOnCi` false), refuses. A refusal there takes nothing back: the merge stands, and the retry reads
  *   GitHub again.
  *
@@ -40,7 +42,21 @@
  */
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
-import { PASSED, linkOf, nameOf, pending, seenOf, verdict } from './ci-log.ts';
+import {
+  type Landing,
+  PASSED,
+  type Seen,
+  greenLater,
+  named,
+  noVerdict,
+  pending,
+  reddened,
+  seenOf,
+  stands,
+  superseded,
+  unfinished,
+  verdict,
+} from './ci-log.ts';
 
 /** A reason the verb is refused: said on stderr, exit 1. */
 class Refusal extends Error {}
@@ -60,9 +76,6 @@ const BOUND = 120_000;
  */
 type Entry = Partial<Record<'name' | 'context' | 'status' | 'state' | 'conclusion' | 'detailsUrl' | 'targetUrl' | 'startedAt', string>>;
 
-/** The verdicts of a job that did not fail it: a job that is over with any other did not pass. */
-const NOT_FAILED = new Set([PASSED, 'SKIPPED', 'NEUTRAL']);
-
 /**
  * How long the CI context has to be reported at the merge commit at all, in seconds; `WF_CI_START_SECONDS` lowers it for a test. A
  * context never reported is most often a CI that does not run on pushes to the base.
@@ -77,9 +90,6 @@ const WHOLE_SECONDS = 2400;
 
 /** How long the wait sleeps between two reads of the merge commit's checks, in seconds; `WF_CI_POLL_SECONDS` lowers it for a test. */
 const POLL_SECONDS = 15;
-
-/** The most jobs that did not pass the refusal names. */
-const JOBS = 10;
 
 /** A pull request as this script reads one. */
 type Pr = {
@@ -578,104 +588,64 @@ function readAt(sha: string): { entries: Entry[]; unread?: string } {
   }
 }
 
-/** The entries of `entries` named `check`. */
-const named = (entries: readonly Entry[], check: string): Entry[] => entries.filter((entry) => nameOf(entry) === check);
-
-/** Where a person reads a commit of the repository `pr` is of. */
-const commitUrl = (pr: Pr, sha: string): string => `${pr.url.replace(/\/pull\/\d+$/, '')}/commit/${sha}`;
-
 /**
  * The CI context `check` at `oid`, the merge of `pr` on `onto`, waited out within the bounds: a line where it passed, a refusal where it
- * did not, never came, or never finished. A red that the base's tip has since answered (`fixedSince`) passes, and says so. A context
- * that sums up other jobs is reported only once they end, so while any check at the merge runs it has the whole bound, not the start's.
+ * did not, never came, or never finished (`judgedAt`). A context that sums up other jobs is reported only once they end, so while any
+ * check at the merge runs it has the whole bound, not the start's.
  */
 function ciAt(pr: Pr, oid: string, onto: string, check: string, id: string): string {
   const whole = seconds('WF_CI_WAIT_SECONDS', WHOLE_SECONDS);
   const start = Math.min(seconds('WF_CI_START_SECONDS', START_SECONDS), whole);
   const poll = seconds('WF_CI_POLL_SECONDS', POLL_SECONDS);
   const began = Date.now();
-  const at = oid.slice(0, 12);
-  const stands = `  The merge stands and nothing was taken back: #${pr.number} is on \`${onto}\`.`;
+  const l: Landing = { number: pr.number, url: pr.url, oid, onto, check };
   for (;;) {
     const { entries, unread } = readAt(oid);
     const ours = named(entries, check);
-    const seen = unread === undefined ? seenOf(ours) : 'unread';
-    if (seen === 'passed') return `\`${check}\` passed on \`${onto}\` at ${at}, the merge commit`;
-    if (seen === 'failed') {
-      const tip = fixedSince(oid, onto, check);
-      if (tip)
-        return `\`${check}\` was red on \`${onto}\` at the merge ${at}, and is green at ${tip.slice(0, 12)}, the base's tip, which holds it`;
-      throw new Refusal(reddened(pr, oid, onto, check, entries, stands, id));
-    }
-    const bound = seen === 'absent' && !entries.some(pending) ? start : whole;
-    if (Date.now() - began >= bound * 1000)
-      throw new Refusal([unfinished(pr, oid, onto, check, entries, bound, unread), stands, retryLine(id)].join('\n'));
+    const said = unread === undefined ? judgedAt(l, entries, ours, id) : undefined;
+    if (said) return said;
+    const bound = unread === undefined && ours.length === 0 && !entries.some(pending) ? start : whole;
+    if (Date.now() - began >= bound * 1000) throw new Refusal([unfinished(l, entries, bound, unread), stands(l), retryLine(id)].join('\n'));
     sleep(poll);
   }
 }
 
 /**
- * What the wait says of `check` at `oid` once `secs` are out: never read from GitHub, naming the last error `unread`; still running; or
- * never reported.
+ * The merge's checks read once: a line where `ours` passed, or where they are red or carry no verdict of their own (`superseded`: never
+ * reported, or every run cancelled, as a CI does whose pending run a newer push replaced) and the base's tip that holds the merge
+ * (`later`) passed; a refusal where the merge is red and the tip did not pass, or the merge has no verdict and the tip is red; none, to
+ * wait on, where neither has a verdict yet.
  */
-function unfinished(pr: Pr, oid: string, onto: string, check: string, entries: readonly Entry[], secs: number, unread?: string): string {
-  const [ours, at] = [named(entries, check), `\`${check}\` on \`${onto}\` at ${oid.slice(0, 12)}, the merge of #${pr.number},`];
-  if (unread !== undefined)
-    return `${at} could not be read from GitHub within ${secs} s; the last read said: ${unread}\n  Read ${commitUrl(pr, oid)}.`;
-  if (seenOf(ours) !== 'pending') return unreported(pr, oid, onto, check, entries, secs);
-  const states = ours.map((entry) => (entry.status ?? entry.state ?? '').toLowerCase()).join(', ');
-  return `${at} was still ${states} after ${secs} s: read ${linkOf(ours[0]) || commitUrl(pr, oid)}, and retry the step once it is over.`;
-}
-
-/** `listed` by name and verdict, or state where it has none yet, with its URL, one a line, at most `JOBS` of them. */
-const listing = (listed: readonly Entry[]): string[] => [
-  ...listed.slice(0, JOBS).map((e) => `    ${nameOf(e)}: ${verdict(e) || e.status?.toLowerCase() || 'no verdict'} ${linkOf(e)}`.trimEnd()),
-  ...(listed.length > JOBS ? [`    … and ${listed.length - JOBS} more`] : []),
-];
-
-/**
- * The refusal of a `check` never reported at `oid` within `secs`: the other checks there still running or not passed, with their URLs,
- * and that CI may not run `check` on pushes to the base, which the factory's `landingWaitsOnCi` answers, or has not yet.
- */
-function unreported(pr: Pr, oid: string, onto: string, check: string, entries: readonly Entry[], secs: number): string {
-  const told = entries.filter((entry) => pending(entry) || !NOT_FAILED.has(verdict(entry)));
-  return [
-    `no \`${check}\` was reported on \`${onto}\` at ${oid.slice(0, 12)}, the merge of #${pr.number}, within ${secs} s (${commitUrl(pr, oid)}).`,
-    ...(told.length ? ['  The other checks there still running or not passed:', ...listing(told)] : []),
-    `  Either CI does not run \`${check}\` on pushes to \`${onto}\`, and the factory sets \`landingWaitsOnCi\` false ` +
-      '(`--set landingWaitsOnCi=false`), or it has not reported yet, and the step is retried.',
-  ].join('\n');
+function judgedAt(l: Landing, entries: readonly Entry[], ours: readonly Entry[], id: string): string | undefined {
+  const seen = seenOf(ours);
+  if (seen === 'passed') return `\`${l.check}\` passed on \`${l.onto}\` at ${l.oid.slice(0, 12)}, the merge commit`;
+  const none = superseded(ours) ? noVerdict(ours) : undefined;
+  if (seen !== 'failed' && none === undefined) return undefined;
+  const tip = later(l.oid, l.onto, l.check);
+  if (tip?.seen === 'passed') return greenLater(l, tip.sha, none);
+  if (none === undefined) throw new Refusal([...reddened(l, l.oid, entries), retryLine(id)].join('\n'));
+  if (tip?.seen === 'failed') throw new Refusal([...reddened(l, tip.sha, tip.entries, none), retryLine(id)].join('\n'));
+  return undefined;
 }
 
 /**
- * The base's tip where it holds `oid` and `check` passed there, read once; none where it is `oid` itself, does not hold it, has not
- * passed, or cannot be read — each of which leaves the red at the merge standing.
+ * The base's tip where it holds `oid`, by GitHub's compare (`ahead` or `identical`, never the order of commits), with how `check` reads
+ * there, a context with no verdict of its own (`superseded`) read as `absent`; read once a call. None where the tip is `oid` itself,
+ * does not hold it, or cannot be read.
  */
-function fixedSince(oid: string, onto: string, check: string): string | undefined {
+function later(oid: string, onto: string, check: string): { sha: string; entries: Entry[]; seen: Seen } | undefined {
   try {
-    const tip = api<{ sha?: string }>(`commits/${onto}`).sha;
-    if (!tip || tip === oid) return undefined;
-    const compared = api<{ status?: string }>(`compare/${oid}...${tip}`).status;
+    const sha = api<{ sha?: string }>(`commits/${onto}`).sha;
+    if (!sha || sha === oid) return undefined;
+    const compared = api<{ status?: string }>(`compare/${oid}...${sha}`).status;
     if (compared !== 'ahead' && compared !== 'identical') return undefined;
-    return seenOf(named(entriesAt(tip), check)) === 'passed' ? tip : undefined;
+    const entries = entriesAt(sha);
+    const ours = named(entries, check);
+    return { sha, entries, seen: superseded(ours) ? 'absent' : seenOf(ours) };
   } catch (err) {
     if (err instanceof Refusal) return undefined;
     throw err;
   }
-}
-
-/** The refusal of a merge that turned the base red: where, the jobs that did not pass with their URLs, and what a person does. */
-function reddened(pr: Pr, oid: string, onto: string, check: string, entries: readonly Entry[], stands: string, id: string): string {
-  const unpassed = entries.filter((entry) => !pending(entry) && !NOT_FAILED.has(verdict(entry)));
-  return [
-    `\`${check}\` is red on \`${onto}\` at ${oid.slice(0, 12)}, the merge of #${pr.number}: this landing turned the base branch red.`,
-    stands,
-    `  The jobs that did not pass (${commitUrl(pr, oid)}):`,
-    ...listing(unpassed),
-    '  Where CI failed on its own account, a person re-runs the failed jobs; where the change broke it, a fix is landed. Then the ' +
-      'step is retried, which reads the merge and the base again.',
-    retryLine(id),
-  ].join('\n');
 }
 
 /** The verbs, by name. */

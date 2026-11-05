@@ -208,3 +208,33 @@ export const SETTING_ORIGINS = ['step', 'agent', 'default'] as const;
 
 /** One of `SETTING_ORIGINS`. */
 export type SettingOrigin = (typeof SETTING_ORIGINS)[number];
+
+/** The levels a factory runs at, the least left to Nemia first: a person starts every run, some start themselves, or all do. */
+export const LEVELS = ['manual', 'semi-auto', 'auto'] as const;
+
+/** One of `LEVELS`. */
+export type Level = (typeof LEVELS)[number];
+
+/** Whether a factory's runs follow the revisions merged since they started (`follow`) or keep those they started on (`pinned`). */
+export const REVISIONS_POLICIES = ['follow', 'pinned'] as const;
+
+/** One of `REVISIONS_POLICIES`. */
+export type RevisionsPolicy = (typeof REVISIONS_POLICIES)[number];
+
+/** How an MCP server is reached over its url: streamable HTTP, or server-sent events. */
+export const MCP_TRANSPORTS = ['http', 'sse'] as const;
+
+/** One of `MCP_TRANSPORTS`. */
+export type McpTransport = (typeof MCP_TRANSPORTS)[number];
+
+/** The state of an MCP server as its harness reports it, the runtime's own words carried whole. */
+export const MCP_STATES = ['connected', 'needs-auth', 'failed', 'pending', 'disabled'] as const;
+
+/** One of `MCP_STATES`. */
+export type McpState = (typeof MCP_STATES)[number];
+
+/** Where an MCP server's sign-in stands: none asked, one waiting on the person, or how the last one ended. */
+export const SIGN_IN_STATES = ['none', 'waiting', 'connected', 'expired', 'failed'] as const;
+
+/** One of `SIGN_IN_STATES`. */
+export type SignInStateWord = (typeof SIGN_IN_STATES)[number];

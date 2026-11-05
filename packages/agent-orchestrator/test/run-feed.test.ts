@@ -950,7 +950,7 @@ test("a step's denials, each a one-shot of the runtime counted by its step and t
   });
 });
 
-test("a step whose session was killed at its memory limit says so in its note, read off its attempt each pass", async (t) => {
+test('a step whose session was killed at its memory limit says so in its note, read off its attempt each pass', async (t) => {
   const s = story(t);
   emptyStore();
   const GI = 1024 ** 3;

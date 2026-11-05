@@ -176,7 +176,11 @@ export const currentTurn = <A extends { turn?: number }>(state: { attempts: read
  * off the view on every pass, never off a transition.
  */
 export const killedMemoryOf = (v: WordView | undefined): AttemptMemory | undefined =>
-  v ? currentTurn(v.state).reverse().find((a) => (a.memory?.oomKills ?? 0) >= 1)?.memory : undefined;
+  v
+    ? currentTurn(v.state)
+        .reverse()
+        .find((a) => (a.memory?.oomKills ?? 0) >= 1)?.memory
+    : undefined;
 
 /**
  * Whether an attempt's memory record says the kernel killed a process at its limit, and which knob raises it: the step's own `memory:`

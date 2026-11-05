@@ -45,11 +45,13 @@ const GI = 1024 ** 3;
 const KILLED: AttemptMemory = { limitBytes: 4 * GI, peakBytes: 4 * GI, oomKills: 1 };
 
 test('a step killed at its memory limit says so in its note, and one with no kill reads unchanged', async (t) => {
-  /** The listing of a run whose implement failed as `t1`, its check `c1`, its implement naming `own` as its `memory:`. */
   const listed = (memoryOf?: (id: string) => AttemptMemory | undefined, own?: string) =>
     listing({
       steps: [{ ...step('implement'), ...(own ? { memory: own } : {}) }, STEPS[1]],
-      run: run({ implement: 't1', review: null }, { steps: { implement: { taskId: 't1', check: { taskId: 'c1' } }, review: { taskId: null } } }),
+      run: run(
+        { implement: 't1', review: null },
+        { steps: { implement: { taskId: 't1', check: { taskId: 'c1' } }, review: { taskId: null } } },
+      ),
       phaseOf: phases({ t1: 'failed', c1: 'failed' }),
       closeoutOf: () => undefined,
       ...(memoryOf ? { memoryOf } : {}),
@@ -76,7 +78,13 @@ test('a step killed at its memory limit says so in its note, and one with no kil
     assert.ok(note.includes('WF_MEMORY_LIMIT'));
   });
   await t.test('no record, or a record with no kill: the listing is the one built without memoryOf', () => {
-    assert.deepEqual(listed(() => undefined), listed());
-    assert.deepEqual(listed(() => ({ limitBytes: 4 * GI, peakBytes: GI, oomKills: 0 })), listed());
+    assert.deepEqual(
+      listed(() => undefined),
+      listed(),
+    );
+    assert.deepEqual(
+      listed(() => ({ limitBytes: 4 * GI, peakBytes: GI, oomKills: 0 })),
+      listed(),
+    );
   });
 });

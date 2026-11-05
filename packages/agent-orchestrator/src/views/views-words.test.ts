@@ -20,7 +20,13 @@ const KILLED: AttemptMemory = { limitBytes: 4 * GI, peakBytes: 4 * GI, oomKills:
 
 /** An ended attempt of turn `turn`, carrying `memory` where given. */
 const attempt = (memory?: AttemptMemory, turn = 0): WordAttempt =>
-  ({ spawnedAt: '2026-01-01T00:00:00Z', endedAt: '2026-01-01T00:01:00Z', ended: 'failed', turn, ...(memory ? { memory } : {}) }) as WordAttempt;
+  ({
+    spawnedAt: '2026-01-01T00:00:00Z',
+    endedAt: '2026-01-01T00:01:00Z',
+    ended: 'failed',
+    turn,
+    ...(memory ? { memory } : {}),
+  }) as WordAttempt;
 
 /** A task's view over `attempts`, held open with `inputs` answers where given. */
 const view = (attempts: WordAttempt[], inputs?: number): WordView =>
@@ -38,11 +44,14 @@ test('killedMemoryOf reads the kill off the current turn’s attempts', async (t
   await t.test('no view: none', () => assert.equal(killedMemoryOf(undefined), undefined));
   await t.test('attempts with no record, a former journal: none', () => assert.equal(killedMemoryOf(view([attempt()])), undefined));
   await t.test('a record with no kill: none', () =>
-    assert.equal(killedMemoryOf(view([attempt({ limitBytes: GI, peakBytes: GI / 2, oomKills: 0 })])), undefined));
+    assert.equal(killedMemoryOf(view([attempt({ limitBytes: GI, peakBytes: GI / 2, oomKills: 0 })])), undefined),
+  );
   await t.test('killed, then a clean continuation in the same turn: the killed record', () =>
-    assert.deepEqual(killedMemoryOf(view([attempt(KILLED), attempt({ limitBytes: 4 * GI, oomKills: 0 })])), KILLED));
+    assert.deepEqual(killedMemoryOf(view([attempt(KILLED), attempt({ limitBytes: 4 * GI, oomKills: 0 })])), KILLED),
+  );
   await t.test('a held task killed in an earlier turn, clean in the one it is on: none', () =>
-    assert.equal(killedMemoryOf(view([attempt(KILLED, 0), attempt({ limitBytes: 4 * GI, oomKills: 0 }, 1)], 1)), undefined));
+    assert.equal(killedMemoryOf(view([attempt(KILLED, 0), attempt({ limitBytes: 4 * GI, oomKills: 0 }, 1)], 1)), undefined),
+  );
 });
 
 test('memoryBytesWord prints a quantity memory: takes back', async (t) => {
@@ -75,6 +84,6 @@ test('outOfMemoryWords says the kill, the limit, the peak and what to raise', as
   await t.test('a check names WF_MEMORY_LIMIT alone, and says it is the check', () => {
     const words = said(KILLED, undefined, 'check');
     for (const fact of ['check', 'WF_MEMORY_LIMIT']) assert.ok(words.includes(fact), fact);
-    assert.ok(!words.includes('step'), 'a check runs under the default alone, so no step key is named');
+    assert.ok(!words.includes('step'));
   });
 });

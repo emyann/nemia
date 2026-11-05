@@ -51,8 +51,9 @@
         "additionalProperties": false
       }
     },
+    "budgets": { "x-shape": "budgets", "description": "The budget you propose for each step of this run after yours, by its name: the dollars it may spend across its tries, and in `why` the figures of recent runs the amount went by. The approval of your gate makes them those steps' caps; the person may change any of them there." },
     "open": { "x-shape": "questions", "description": "What is still undecided, each as a question with its options and your recommendation. Empty only when nothing is." }
   },
-  "required": ["goal", "constraints", "approach", "placement", "changes", "steps", "tests", "risks", "decisions", "open"],
+  "required": ["goal", "constraints", "approach", "placement", "changes", "steps", "tests", "risks", "decisions", "budgets", "open"],
   "additionalProperties": false
 }

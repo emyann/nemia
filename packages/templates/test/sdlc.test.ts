@@ -6,7 +6,7 @@
  * each of their notes opens with: on GitHub where it is set true, and in the checkout by default, where the local check judges each
  * round and the merged tree; a `github` that is no boolean is refused at apply. Each step that writes its own `output:` has its schema
  * beside it in the tree, the template's own bytes; the team is six agents, Ada none of them. Applied with no `--set`, each parameter
- * takes its default.
+ * takes its default. Build's design, read with its agent as a run reads it, declares the budgets of the later steps by their shape.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -14,7 +14,7 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import yaml from 'js-yaml';
-import { splitFrontmatter } from 'agent-orchestrator/workflow';
+import { parseAgent, parseWorkflow, splitFrontmatter } from 'agent-orchestrator/workflow';
 import { scratch } from './scratch.ts';
 import { copyOf, filesUnder, nemia, rendered, SDLC, storeEnv } from './template.ts';
 
@@ -156,4 +156,26 @@ test('the team is six agents, and Ada is none of them', () => {
     .map((leaf) => leaf.slice(0, -'.md'.length))
     .sort();
   assert.deepEqual(agents, ['agora', 'argus', 'grace', 'iris', 'otto', 'seldon']);
+});
+
+test("build's design, read with Seldon, declares the later steps' budgets as data: the budgets shape, expanded and required", () => {
+  const tree = treeOf('set');
+  const agents = path.join(tree, 'workflows', 'agents');
+  const readAgents = (file: string): string | undefined =>
+    fs.existsSync(path.join(agents, file)) ? fs.readFileSync(path.join(agents, file), 'utf8') : undefined;
+  const seldon = parseAgent('seldon', fs.readFileSync(path.join(agents, 'seldon.md'), 'utf8'), readAgents);
+  const design = parseWorkflow(
+    'design',
+    fs.readFileSync(path.join(tree, 'workflows', 'build', 'design.md'), 'utf8'),
+    (file) => readAgents(file),
+    new Map([['seldon', seldon]]),
+    undefined,
+    { agent: 'seldon', factory: 'set', step: 'build/design' },
+  );
+  const schema = design.output?.schema;
+  assert.ok(schema, "design's output is Seldon's");
+  assert.ok(schema.required.includes('budgets'), 'budgets is required');
+  const budgets = schema.properties.budgets;
+  assert.equal(budgets?.type, 'array', 'the shape is expanded to an array');
+  assert.ok(!Object.hasOwn(budgets ?? {}, 'x-shape'), 'the marker is gone once expanded');
 });

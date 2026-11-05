@@ -1,7 +1,7 @@
 /**
  * Nemia's chat as the panel holds it, and everything about it that is pure, so a node test proves it without a browser: the followed
  * state (`ChatFollowed`), the merge of the stream's events by their id (`mergeChatEvents`), what each of its frames does
- * (`changedChat`, `followChat`), the one translation of the api's presence and her level into the board's (`presenceOf`), her
+ * (`changedChat`, `followChat`), the one translation of the api's presence into the board's (`presenceOf`), her
  * consecutive calls folded into a turn (`foldChat`) and that fold mapped onto the one shape both conversations draw (`chatItems`, her
  * adapter onto `lib/conversation.ts`, a step's session having one of its own), the links read out of
  * her words (`linksOf`), how an ask of hers is drawn (`drawnAsk`) and what is left to answer of one of several questions
@@ -16,7 +16,6 @@ import { chatDataOf } from './api/chat.ts';
 import type { ConversationItem, ConversationLine } from './conversation.ts';
 import { follow, type Followed, type Follower, type Frames, type StreamLike } from './follow.ts';
 import type { Presence } from './presence.ts';
-import type { Level } from './api/nemia.ts';
 
 /** One tool call of hers, as her chat gives it. */
 export type ChatCall = Extract<ChatEvent, { kind: 'call' }>;
@@ -178,14 +177,15 @@ export const followChat = (stream: StreamLike, update: (change: (s: ChatFollowed
   follow(stream, chatFollower, update, frames);
 
 /**
- * Where she is as her face and its cues read it (`lib/presence.ts`), the one writer of it: the api's presence `api`, her `level`, and
- * whether this browser keeps a message the api would not take (`notSent`). She reads as down when her session is not up and when her
- * level is `manual`, at which she has no session to be up.
+ * Where she is as her face and its cues read it (`lib/presence.ts`), the one writer of it: the api's presence `api`, and whether this
+ * browser keeps a message the api would not take (`notSent`). She reads as down when her session is not up, and only then: no level
+ * says it, since a factory raised above Manual keeps her session up while the store's own level is at Manual. Whether she is at
+ * Manual everywhere is `anyAbove` (`lib/nemia.ts`), off every factory's level the api answers.
  */
-export const presenceOf = (api: ChatPresence, level: Level | undefined, notSent: boolean): Presence => ({
+export const presenceOf = (api: ChatPresence, notSent: boolean): Presence => ({
   waitsOnYou: api.waitsOnYou,
   notSent,
-  down: !api.up || level === 'manual',
+  down: !api.up,
   answering: api.answering,
   unread: api.unread,
 });

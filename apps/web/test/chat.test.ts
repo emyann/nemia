@@ -34,10 +34,10 @@ import {
 } from '../src/lib/chatFollowing.ts';
 import { turnWords } from '../src/lib/conversation.ts';
 import { CHAT_OUTBOX_KEY, editKept, forgetKept, keepUnsent, parseKept, readKept, sendingOnce } from '../src/lib/chatOutbox.ts';
-import { composerButton, composerWords } from '../src/lib/nemia.ts';
+import { anyAbove, composerButton, composerWords } from '../src/lib/nemia.ts';
 import { faceOf, UP, type Presence } from '../src/lib/presence.ts';
 import type { StreamLike } from '../src/lib/follow.ts';
-import type { AskQuestion, ChatEvent, ChatPresence } from '../src/lib/api.ts';
+import type { AskQuestion, ChatEvent, ChatPresence, FactoryLevel } from '../src/lib/api.ts';
 
 const at = (second: number): string => new Date(Date.UTC(2026, 9, 15, 17, 40, second)).toISOString();
 
@@ -362,17 +362,33 @@ test('her chat followed on one stream: what it does not read is dropped, where s
 
 test('presenceOf, composerWords and composerButton: where she is, and what the composer offers for it', async (t) => {
   await t.test(
-    "her presence is the api's, her level and this browser's kept message — and at manual she reads as down, whatever the api says",
+    "her presence is the api's and this browser's kept message — and she reads as down when her session is not up, only then",
     () => {
-      assert.deepEqual(presenceOf(up, 'semi-auto', false), { waitsOnYou: 0, notSent: false, down: false, answering: false, unread: 0 });
-      assert.equal(presenceOf(up, 'manual', false).down, true, 'at manual she has no session to be up');
-      assert.equal(faceOf(presenceOf(up, 'manual', false)), 'sleepy');
-      assert.equal(presenceOf({ ...up, up: false }, 'semi-auto', false).down, true);
-      assert.equal(presenceOf(up, 'semi-auto', true).notSent, true, 'a message this browser kept is hers to say');
-      assert.equal(faceOf(presenceOf(up, 'semi-auto', true)), 'unsure');
-      const every: Presence = presenceOf({ up: true, answering: true, waitsOnYou: 2, unread: 3 }, 'manual', true);
-      assert.deepEqual(every, { waitsOnYou: 2, notSent: true, down: true, answering: true, unread: 3 });
+      assert.deepEqual(presenceOf(up, false), { waitsOnYou: 0, notSent: false, down: false, answering: false, unread: 0 });
+      assert.equal(presenceOf({ ...up, up: false }, false).down, true);
+      assert.equal(faceOf(presenceOf({ ...up, up: false }, false)), 'sleepy');
+      assert.equal(presenceOf(up, true).notSent, true, 'a message this browser kept is hers to say');
+      assert.equal(faceOf(presenceOf(up, true)), 'unsure');
+      const every: Presence = presenceOf({ up: true, answering: true, waitsOnYou: 2, unread: 3 }, true);
+      assert.deepEqual(every, { waitsOnYou: 2, notSent: true, down: false, answering: true, unread: 3 });
       assert.equal(faceOf(every), 'surprised', 'what waits on a person comes first in the owner’s order');
+    },
+  );
+  await t.test(
+    'a store at Manual with one factory raised above it keeps her up: her face reads her session, never the store’s level',
+    () => {
+      const raised: FactoryLevel = {
+        factory: 'tsverify',
+        level: 'auto',
+        default: 'manual',
+        own: null,
+        raise: { level: 'auto', until: '2026-11-05T04:00:00.000Z' },
+      };
+      const kept = { level: 'manual' as const, factories: [raised] };
+      assert.equal(anyAbove(kept), true, 'the raise keeps her above Manual, though the store reads Manual');
+      assert.equal(presenceOf(up, false).down, false, 'her session is up, so she is');
+      assert.equal(faceOf(presenceOf(up, false)), 'idle');
+      assert.equal(anyAbove({ level: 'manual', factories: [{ ...raised, level: 'manual', raise: null }] }), false, 'Manual everywhere');
     },
   );
   await t.test('the composer invites what where she is asks for, and offers the stop while she answers', () => {

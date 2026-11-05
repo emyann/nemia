@@ -31,7 +31,7 @@ export function NemiaDock() {
   const nemia = useQuery(levelQuery).data;
   const open = useQuery(openRunsQuery()).data;
   const now = new Date(useNow(30_000));
-  const presence = presenceOf(chat.state.presence, nemia?.level, chat.kept !== null);
+  const presence = presenceOf(chat.state.presence, chat.kept !== null);
   const cues = cuesOf(presence);
 
   return (

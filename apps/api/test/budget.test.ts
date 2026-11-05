@@ -17,7 +17,18 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { RunDecision } from '../src/decide/decision.ts';
-import { askFile, decideRun, list, retryRun, roundAskFile, roundRun, runStore, usedLines } from 'agent-orchestrator';
+import {
+  askFile,
+  decideRun,
+  list,
+  prunedKept,
+  prunedWords,
+  retryRun,
+  roundAskFile,
+  roundRun,
+  runStore,
+  usedLines,
+} from 'agent-orchestrator';
 import { Effect } from 'effect';
 import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from 'agent-orchestrator/testing';
@@ -575,7 +586,11 @@ test('a run whose steps went over their budgets: what each try cost, the steps h
         const run = await detail();
         assert.deepEqual(
           run.status.pruned,
-          { ...pruned, artifacts: null },
+          {
+            ...pruned,
+            artifacts: null,
+            said: `${prunedWords(pruned)}; ${prunedKept(pruned)}`,
+          },
           'the marker nemia prune --unmerged writes beside the record, which nothing removes: taken back, so what follows reads R as it was',
         );
         assert.deepEqual([run.status.waitingOnYou, run.status.steps.map((s) => s.raise)], [[], [null, null, null]]);

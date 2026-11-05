@@ -19,7 +19,7 @@ test('a run is the row its fields say: its name, spec and status under the row n
   assert.equal(row.work, null);
   assert.equal(row.brief, 'a brief');
   assert.equal(row.workflowDir, '/team/quick');
-  assert.deepEqual(row.try, { agent: 'grace' });
+  assert.deepEqual(row.try, { agent: 'implementer' });
   assert.deepEqual(row.after, ['r-0']);
   assert.deepEqual(row.context, ['r-c']);
   assert.equal(row.status, 'running');
@@ -59,7 +59,7 @@ test('a step carries its codes and needs, its agent from its frozen step, and si
   assert.equal(implement?.taskId, 'r-1-implement-2');
   assert.equal(implement?.branch, 'wf/r-1/implement');
   assert.equal(implement?.note, 'try 2');
-  assert.equal(implement?.agent, 'grace');
+  assert.equal(implement?.agent, 'implementer');
   assert.equal(implement?.since, '2026-11-02T10:05:00.000Z');
   assert.equal(review?.agent, null);
   assert.equal(review?.since, null);

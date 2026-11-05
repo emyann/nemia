@@ -10,7 +10,7 @@ import assert from 'node:assert/strict';
 import { Effect, Exit } from 'effect';
 import type { Run as RunObject } from 'objects';
 import { runIn, runListOf, type RunQuery } from './run-list.verb.ts';
-import type { RunObjectAnswer } from './run.verb.ts';
+import type { RunObjectAnswer } from '../object/run.verb.ts';
 
 type Listed = { id: string; factory?: string; workflowDir: string; labels?: Record<string, string> };
 

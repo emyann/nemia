@@ -1,5 +1,5 @@
 /**
- * A run's namespace (agent-orchestrator, src/object/run-list.ts, `runNamespace`): the factory its record names, `default`
+ * A run's namespace (agent-orchestrator, src/run-list/run-list.ts, `runNamespace`): the factory its record names, `default`
  * for a run whose record names none. What the generic path reads to answer a run under `/api/namespaces/<namespace>/runs/<name>`: a run
  * is in exactly one namespace, and a read or a named action addressed under any other is `Missing`, as one no run has the name of. The
  * list of a namespace keeps the runs whose namespace it is; the list across namespaces keeps every run.
@@ -27,5 +27,5 @@ const runNamespaceSpec = spec<(factory: string | undefined) => string>({
   },
 });
 
-/** `runNamespace`'s type, which `src/object/run-list.ts` takes. */
+/** `runNamespace`'s type, which `src/run-list/run-list.ts` takes. */
 export type RunNamespace = Implementation<typeof runNamespaceSpec>;

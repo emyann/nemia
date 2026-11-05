@@ -72,13 +72,13 @@ const finished = (id: string, created: number, to: number, factory?: string) => 
 };
 
 beforeEachTest(() => {
-  finished('l-first', 0, 50, 'nemia');
+  finished('l-first', 0, 50, 'acme');
   finished('l-second', 5, 20);
-  finished('l-third', 10, 30, 'nemia');
+  finished('l-third', 10, 30, 'acme');
   finished('l-fourth', 15, 40);
-  finished('l-fifth', 16, 45, 'pipao');
+  finished('l-fifth', 16, 45, 'beta');
   journalled('l-asks-write', at(20), { to: at(25), closeout: BLOCKED });
-  aRun('l-asks', at(20), 'nemia');
+  aRun('l-asks', at(20), 'acme');
   journalled('l-moves-write', at(30));
   aRun('l-moves', at(30));
 });
@@ -172,10 +172,10 @@ test("the runs read in two halves answer the whole list: open and finished, a fa
   await s.test(
     '?ofFactory= keeps the runs of one factory, default those that name none, and a name no run carries answers empty',
     async () => {
-      const nemia = await read<OpenListing>('/api/runs-open?ofFactory=nemia');
-      assert.deepEqual(nemia.counts, { waiting: 1, inFlight: 0, finished: 2 });
+      const acme = await read<OpenListing>('/api/runs-open?ofFactory=acme');
+      assert.deepEqual(acme.counts, { waiting: 1, inFlight: 0, finished: 2 });
       assert.deepEqual(
-        (await everyPage('&ofFactory=nemia')).flatMap((page) => page.runs.map((run) => run.id)),
+        (await everyPage('&ofFactory=acme')).flatMap((page) => page.runs.map((run) => run.id)),
         ['l-first', 'l-third'],
       );
       assert.deepEqual((await read<OpenListing>('/api/runs-open?ofFactory=default')).counts, { waiting: 0, inFlight: 1, finished: 2 });
@@ -263,7 +263,7 @@ test('?selector= keeps the runs one of its selectors takes by their labels, on e
     );
   });
   await t.test('two selectors are either: a run one of them takes is kept', async () => {
-    const page = await read<FinishedListing>('/api/runs-finished?selector=team%3Dcore&selector=factory%3Dpipao');
+    const page = await read<FinishedListing>('/api/runs-finished?selector=team%3Dcore&selector=factory%3Dbeta');
     assert.deepEqual(page.runs.map((r) => r.id).sort(), ['l-fifth', 'l-second']);
   });
   for (const address of ['/api/runs', '/api/runs-open', '/api/runs-finished', '/api/listing', '/api/listing/l-second'])
@@ -285,19 +285,19 @@ test("the runs as a RunList: across namespaces at /api/runs, one namespace at /a
   assert.deepEqual(
     all.items.map((run) => [run.metadata.name, run.metadata.namespace]),
     [
-      ['l-asks', 'nemia'],
-      ['l-fifth', 'pipao'],
-      ['l-first', 'nemia'],
+      ['l-asks', 'acme'],
+      ['l-fifth', 'beta'],
+      ['l-first', 'acme'],
       ['l-fourth', 'default'],
       ['l-moves', 'default'],
       ['l-second', 'default'],
-      ['l-third', 'nemia'],
+      ['l-third', 'acme'],
     ],
     "a run's namespace is its factory, default for one that names none",
   );
   assert.equal(all.metadata.remainingItemCount, 0);
   assert.equal(all.metadata.continue, undefined, 'one page holds them all');
-  assert.deepEqual(namesOf(await read<RunList>('/api/namespaces/nemia/runs')), ['l-asks', 'l-first', 'l-third']);
+  assert.deepEqual(namesOf(await read<RunList>('/api/namespaces/acme/runs')), ['l-asks', 'l-first', 'l-third']);
   assert.deepEqual(namesOf(await read<RunList>('/api/namespaces/default/runs')), ['l-fourth', 'l-moves', 'l-second']);
   assert.deepEqual(namesOf(await read<RunList>('/api/namespaces/elsewhere/runs')), [], 'a namespace no run is in lists none');
 });
@@ -316,9 +316,9 @@ test('a RunList pages by ?limit= and ?continue=, every run once, in order', asyn
   } while (token !== undefined);
   assert.equal(pages, 3);
   assert.deepEqual(seen, ['l-asks', 'l-fifth', 'l-first', 'l-fourth', 'l-moves', 'l-second', 'l-third']);
-  const first = await read<RunList>('/api/namespaces/nemia/runs?limit=2');
+  const first = await read<RunList>('/api/namespaces/acme/runs?limit=2');
   assert.deepEqual(namesOf(first), ['l-asks', 'l-first']);
-  const next = await read<RunList>(`/api/namespaces/nemia/runs?limit=2&continue=${encodeURIComponent(first.metadata.continue ?? '')}`);
+  const next = await read<RunList>(`/api/namespaces/acme/runs?limit=2&continue=${encodeURIComponent(first.metadata.continue ?? '')}`);
   assert.deepEqual(namesOf(next), ['l-third'], "a namespace's page goes on in it");
 });
 
@@ -334,15 +334,11 @@ test('REFUSED: a RunList asked a limit that is no whole number from 1, or a toke
 });
 
 test('a run read in its namespace is the Run; under another, or by a name no run has, a 404; /api/runs/:runId reads it across them', async () => {
-  const one = await read<RunAnswer>('/api/namespaces/nemia/runs/l-first');
-  assert.deepEqual([one.kind, one.metadata.name, one.metadata.namespace], ['Run', 'l-first', 'nemia']);
+  const one = await read<RunAnswer>('/api/namespaces/acme/runs/l-first');
+  assert.deepEqual([one.kind, one.metadata.name, one.metadata.namespace], ['Run', 'l-first', 'acme']);
   assert.deepEqual(await read<RunAnswer>('/api/runs/l-first'), one, 'the same object across namespaces');
   assert.equal((await read<RunAnswer>('/api/namespaces/default/runs/l-second')).metadata.namespace, 'default');
-  for (const address of [
-    '/api/namespaces/default/runs/l-first',
-    '/api/namespaces/pipao/runs/l-first',
-    '/api/namespaces/nemia/runs/l-none',
-  ]) {
+  for (const address of ['/api/namespaces/default/runs/l-first', '/api/namespaces/beta/runs/l-first', '/api/namespaces/acme/runs/l-none']) {
     const res = await app().request(address);
     const body = (await res.json()) as { error?: string };
     assert.equal(res.status, 404, `${address}: ${JSON.stringify(body)}`);

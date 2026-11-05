@@ -113,7 +113,7 @@ export const run = (factory: string, extra: Partial<RunObject.RunStatus> = {}): 
     labels: { workflow: 'quick', factory, team: 'blue' },
   },
   spec: {
-    steps: [frozen('implement', 'grace'), frozen('review')],
+    steps: [frozen('implement', 'implementer'), frozen('review')],
     brief: 'a brief',
     place: 'git',
     repo: '/repo',
@@ -122,7 +122,7 @@ export const run = (factory: string, extra: Partial<RunObject.RunStatus> = {}): 
     isolate: true,
     work: null,
     workflowDir: '/team/quick',
-    try: { agent: 'grace' },
+    try: { agent: 'implementer' },
     after: ['r-0'],
     context: ['r-c'],
     from: null,

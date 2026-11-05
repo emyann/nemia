@@ -14,11 +14,11 @@ import { selectedRuns } from '../runlist/runlist.ts';
 import { storeRunsListed, type SummaryHow } from '../summary/summary.verb.ts';
 import { Invalid, Missing } from '../refusal/refusal.ts';
 import { parseSelectors, selectorsRefusal } from '../watch/selector.ts';
-import { pageOf } from './page.ts';
+import { pageOf } from '../object/page.ts';
 import { runNamespace } from './run-list.ts';
 
 export { runNamespace };
-import { type RunObjectAnswer, runObject, type RunReads } from './run.verb.ts';
+import { type RunObjectAnswer, runObject, type RunReads } from '../object/run.verb.ts';
 
 /** What a list of runs is asked: its namespace (none for every run), `?limit=`, `?continue=`, and its label selectors, OR'd. */
 export type RunQuery = {

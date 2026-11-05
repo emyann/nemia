@@ -15,6 +15,8 @@ import {
   engine,
   list,
   filingsRead,
+  prunedKept,
+  prunedWords,
   runTokens,
   timeline,
   runStore,
@@ -2707,7 +2709,8 @@ test("a step's files: a closeout's files with where they are served, each served
       fs.rmSync(path.join(root, 'runs', 'r-52', 'artifacts'), { recursive: true });
       try {
         const run = await objectOf(app, 'r-52');
-        assert.deepEqual(run.status.pruned, { at: files.at, worktrees: [], artifacts: files });
+        const marked = { at: files.at, worktrees: [], artifacts: files };
+        assert.deepEqual(run.status.pruned, { ...marked, said: `${prunedWords(marked)}; ${prunedKept(marked)}` });
         const said = `its files were removed at ${files.at} (nemia prune --artifacts)`;
         const shoot = await closeoutOf(app, 'r-52', 'shoot');
         assert.ok(shoot?.closeout);

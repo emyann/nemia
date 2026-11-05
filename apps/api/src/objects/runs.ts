@@ -164,7 +164,7 @@ const asJson = (data: Readonly<Record<string, unknown>>): Readonly<Record<string
 /** A run's action's path names: its namespace, the run by the `Api`'s `name`, and its step where it names one. */
 type At = { readonly namespace: string; readonly name: string; readonly step?: string };
 
-/** Whether a body's read failed for its size: effect's `HttpServerError`, its `reason` a parse error of `BodyTooLarge`. */
+/** Whether a body's read failed for its size: effect's server error, its reason a parse error of `BodyTooLarge`. */
 const tooLarge = (err: unknown): boolean => {
   const reason: unknown = typeof err === 'object' && err !== null && 'reason' in err ? err.reason : undefined;
   return typeof reason === 'object' && reason !== null && 'reason' in reason && reason.reason === 'BodyTooLarge';

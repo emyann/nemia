@@ -12,7 +12,17 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from '../../test/scratch.ts';
 import { Effect, Layer } from 'effect';
-import { engine, PlaceService, runStore, runWith as runEngine, builtinGitPlace, standingWhen, type Place } from 'agent-orchestrator';
+import {
+  engine,
+  PlaceService,
+  prunedKept,
+  prunedWords,
+  runStore,
+  runWith as runEngine,
+  builtinGitPlace,
+  standingWhen,
+  type Place,
+} from 'agent-orchestrator';
 import { app, appOf, liveOf } from '../app.ts';
 import { diffFiles, DIFF_LINES } from './decision.ts';
 import { objectOf } from '../../test/run-reads.ts';
@@ -751,7 +761,15 @@ test('a decision with nothing to try, nothing to decide, or no run: pruned, call
       const body = await decidable('r-d10');
       assert.deepEqual(body.commands, []);
       const page = await detailOf('r-d10');
-      assert.deepEqual(page.status.pruned, { ...pruned, artifacts: null }, 'its files are kept: a plain prune removes the worktrees alone');
+      assert.deepEqual(
+        page.status.pruned,
+        {
+          ...pruned,
+          artifacts: null,
+          said: `${prunedWords(pruned)}; ${prunedKept(pruned)}`,
+        },
+        'its files are kept: a plain prune removes the worktrees alone',
+      );
       assert.deepEqual(page.status.waitingOnYou, [], 'it waits on nobody: nothing a person does files anything for it');
       const asks = path.join(root, 'runs', 'r-d10.asks');
       fs.mkdirSync(asks, { recursive: true });

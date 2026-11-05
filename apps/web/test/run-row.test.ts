@@ -99,6 +99,11 @@ test('a run the list could not judge is a row that says why, in no factory and m
   assert.equal(row.id, 'r-bad');
   assert.equal(row.unreadable, 'the journal of r-bad-implement-1 does not read');
   assert.equal(row.factory, null);
+  assert.equal(
+    unjudgedRowOf({ name: 'r-bad', namespace: 'foo', error: 'unread' }).factory,
+    'foo',
+    "an unjudged run of a named factory is on that factory's floor",
+  );
   assert.deepEqual(row.steps, []);
 });
 

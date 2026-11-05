@@ -180,10 +180,6 @@ const namespaceParams = { namespace: Schema.String };
 /** A factory, by its name. */
 const factoryParams = { name: Schema.String };
 
-/** The Run and a page of them, named so that the document holds each as a component. */
-const RunObject = Run.annotate({ identifier: 'Run' });
-const RunListObject = RunList.annotate({ identifier: 'RunList' });
-
 /** What a run's reads refuse with: none by that name, a query the package refuses, a run not judged. */
 const runReadErrors = [Missing, Invalid, Unjudged];
 
@@ -206,14 +202,14 @@ const accepted = <S extends Schema.Top>(answer: S) => answer.pipe(Schema.annotat
  * none: a run addressed under another is `Missing`.
  */
 export class RunsGroup extends HttpApiGroup.make('runs').add(
-  HttpApiEndpoint.get('listAll', '/api/runs', { query: listQuery, success: RunListObject, error: runReadErrors }),
+  HttpApiEndpoint.get('listAll', '/api/runs', { query: listQuery, success: RunList, error: runReadErrors }),
   HttpApiEndpoint.get('list', '/api/namespaces/:namespace/runs', {
     params: namespaceParams,
     query: listQuery,
-    success: RunListObject,
+    success: RunList,
     error: runReadErrors,
   }),
-  HttpApiEndpoint.get('get', '/api/namespaces/:namespace/runs/:name', { params: runParams, success: RunObject, error: runReadErrors }),
+  HttpApiEndpoint.get('get', '/api/namespaces/:namespace/runs/:name', { params: runParams, success: Run, error: runReadErrors }),
   HttpApiEndpoint.post('create', '/api/namespaces/:namespace/runs', {
     params: namespaceParams,
     query: { repo: Schema.optionalKey(Schema.String) },
@@ -323,7 +319,9 @@ export class CardsGroup extends HttpApiGroup.make('cards').add(
   HttpApiEndpoint.post('start', '/api/namespaces/:namespace/cards/:name/start', {
     params: cardParams,
     payload: CardStart,
-    success: Schema.Struct({ id: Schema.String, card: Schema.String }).pipe(Schema.annotate({ httpApiStatus: 201 })),
+    success: Schema.Struct({ id: Schema.String, card: Schema.String, ignoredRepo: Schema.optionalKey(Schema.String) }).pipe(
+      Schema.annotate({ httpApiStatus: 201 }),
+    ),
     error: cardErrors,
   }),
   HttpApiEndpoint.post('queue', '/api/namespaces/:namespace/cards/:name/queue', {

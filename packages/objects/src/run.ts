@@ -494,8 +494,15 @@ export const Run = Schema.Struct({
 }).annotate({ identifier: 'Run' });
 export type Run = typeof Run.Type;
 
-/** A run that is in the list and could not be judged, so is no `Run`: its name, and why, in the words the list says it with. */
-export const RunUnjudged = Schema.Struct({ name: Schema.String, error: Schema.String }).annotate({ identifier: 'RunUnjudged' });
+/**
+ * A run that is in the list and could not be judged, so is no `Run`: its name, its namespace (its factory, `default` for none), and why,
+ * in the words the list says it with.
+ */
+export const RunUnjudged = Schema.Struct({
+  name: Schema.String,
+  namespace: Schema.optionalKey(Schema.String),
+  error: Schema.String,
+}).annotate({ identifier: 'RunUnjudged' });
 export type RunUnjudged = typeof RunUnjudged.Type;
 
 /**

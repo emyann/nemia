@@ -182,14 +182,7 @@ test("the document holds the RunList, a run in its namespace, and each of the ru
       `${path} answers a RunList`,
     );
   const inNamespace = doc.paths['/api/namespaces/{namespace}/runs/{name}']?.get?.responses['200']?.content?.['application/json'].schema;
-  assert.match(JSON.stringify(inNamespace), /"#\/components\/schemas\/Run(_\d+)?"/, 'a run in its namespace is a Run');
-  await t.test(
-    'and the same component as /api/runs/{runId} answers',
-    {
-      todo: "packages/objects/src/api.ts answers `get` (and the list's items) with `Run` annotated anew and `show` with `Run`: two components, `Run` and `Run_1` — give all three the one schema",
-    },
-    () => assert.deepEqual(inNamespace, { $ref: '#/components/schemas/Run' }),
-  );
+  assert.deepEqual(inNamespace, { $ref: '#/components/schemas/Run' }, 'the same component as /api/runs/{runId} answers');
   for (const [method, path, status, body] of RUN_ACTIONS) {
     const op = doc.paths[path]?.[method];
     assert.ok(op, `${method.toUpperCase()} ${path} is in the document`);

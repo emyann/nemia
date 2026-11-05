@@ -53,11 +53,11 @@ export const runListOf = Effect.fn('runListOf')(function* <R extends Listed, E, 
   const kept = [...selectedRuns(inNamespace, parseSelectors(selectors))].sort(byName);
   const page = pageOf(kept, (run) => run.id, { limit: query.limit ?? null, continue: query.continue });
   if (page instanceof Invalid) return yield* Effect.fail(page);
-  const judged = yield* Effect.forEach(page.items, (run) => Effect.map(judge(run), (answer) => [run.id, answer] as const));
+  const judged = yield* Effect.forEach(page.items, (run) => Effect.map(judge(run), (answer) => [run, answer] as const));
   const items: RunObject[] = [];
   const unjudged: RunUnjudged[] = [];
-  for (const [name, answer] of judged)
-    if ('unjudged' in answer) unjudged.push({ name, error: answer.unjudged });
+  for (const [run, answer] of judged)
+    if ('unjudged' in answer) unjudged.push({ name: run.id, namespace: runNamespace(run.factory), error: answer.unjudged });
     else items.push(answer);
   const answered: RunList = {
     apiVersion: API_VERSION,

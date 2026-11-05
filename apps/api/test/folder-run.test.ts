@@ -403,12 +403,10 @@ test('a folder team as the board finds and files for it, the repository a plain 
       const started = (await res.json()) as { id: string; card: string; ignoredRepo?: string; error?: string };
       assert.equal(res.status, 201, started.error);
       assert.equal(started.card, named);
-      await t.test(
+      assert.equal(
+        started.ignoredRepo,
+        notARepo,
         "the api says what `nemia start` prints and a tick's line carries: the card's `repo:` was not looked at",
-        {
-          todo: "the Card's `start` answer in packages/objects/src/api.ts is `{ id, card }`, which drops `ignoredRepo`: add it there, optional",
-        },
-        () => assert.equal(started.ignoredRepo, notARepo),
       );
       const run = (await objectOf(app(), started.id)).spec;
       assert.deepEqual(

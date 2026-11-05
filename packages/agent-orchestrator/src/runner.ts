@@ -464,6 +464,17 @@ export { runLines, type RunLines, type StepCommands } from './object/lines.verb.
 export { cardList, cardObject, type CardQuery } from './object/card.verb.ts';
 export { runIn, runList, runNamespace, type RunQuery } from './run-list/run-list.verb.ts';
 export { continueToken, continuedAfter, listPage, pageOf, type PageAsked, type Paged } from './object/page.ts';
+export { watchChanges, type Versioned, type WatchChange, type WatchChanges, type WatchChangeType } from './object/watch.ts';
+export {
+  resourcesOf,
+  routeOf,
+  type KindPlural,
+  type Resource,
+  type ResourcesOf,
+  type ResourceVerb,
+  type Route,
+  type RouteMethod,
+} from './object/discovery.ts';
 export { factoryCommandsOf, factoryList, factoryObject, type ObjectQuery } from './factory-object/factory.verb.ts';
 export { builtinServerList, mcpServerList, mcpServerObject } from './factory-object/mcp-server.verb.ts';
 export { scheduleList, scheduleObject } from './factory-object/schedule.verb.ts';

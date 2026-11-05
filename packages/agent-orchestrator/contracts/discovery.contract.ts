@@ -1,5 +1,5 @@
 /**
- * What the api's discovery says it serves (agent-orchestrator, src/object/discovery.ts, `resourcesOf`; no code yet): from the routes the
+ * What the api's discovery says it serves (agent-orchestrator, src/object/discovery.ts, `resourcesOf`): from the routes the
  * `Api` of `objects` serves, each read off its path (`routeOf`, whose rows a test holds), and the kinds it serves with their plurals
  * (`KINDS`, `RESOURCE_PLURALS`), one resource per kind, named by its plural, and one per sub-resource of a kind, named
  * `<plural>/<sub>`, as Kubernetes' discovery names `pods/log`. A resource is namespaced exactly when a route of it is under
@@ -9,31 +9,7 @@
  * kind is served by (`/api/builtin/mcpservers`) is said by none. The order of the resources and of their verbs is the door's.
  */
 import { type Implementation, spec } from '@emyann/tsverify';
-
-/** A method a route of the `Api` answers, as discovery reads it. */
-export type RouteMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
-
-/** A verb of a resource, in Kubernetes' words, as `objects` will name them (`RESOURCE_VERBS`). Declared here until it does. */
-export type ResourceVerb = 'get' | 'list' | 'watch' | 'create' | 'update' | 'patch' | 'delete';
-
-/**
- * A route as its path reads: the plural after `/api/` or `/api/namespaces/:namespace/`, whether it is under a namespace, whether a name
- * follows the plural (`item`), and the words after it with the names left out (`sub`, `steps/retry`), null where none follow. Declared
- * here until `src/object/discovery.ts` holds it.
- */
-export type Route = {
-  readonly method: RouteMethod;
-  readonly plural: string;
-  readonly namespaced: boolean;
-  readonly item: boolean;
-  readonly sub: string | null;
-};
-
-/** A kind the api serves, and the plural its paths name it by. */
-export type KindPlural = { readonly kind: string; readonly plural: string };
-
-/** A resource discovery lists: its name (a plural, or `<plural>/<sub>`), its kind, whether a namespace holds it, and its verbs. */
-export type Resource = { readonly name: string; readonly kind: string; readonly namespaced: boolean; readonly verbs: ResourceVerb[] };
+import type { KindPlural, Resource, ResourceVerb, Route } from '../src/object/discovery.ts';
 
 /** Every verb, to say of each whether a resource has it. */
 const VERBS: readonly ResourceVerb[] = ['get', 'list', 'watch', 'create', 'update', 'patch', 'delete'];
@@ -66,22 +42,30 @@ const subDoes = (route: Route, verb: ResourceVerb): boolean =>
           ? verb === 'patch'
           : verb === 'delete');
 
+/**
+ * The name of `plural`'s sub-resource `sub`, `<plural>/<sub>`. Joined with `+`, which the verifier reads as the strings joined, where it
+ * reads a template string as an unknown string of its parts and could not tell two names apart.
+ */
+const subName = (plural: string, sub: string): string => plural + '/' + sub;
+
 /** Whether no kind and no plural is given twice, and no plural holds a `/`. */
 const distinctKinds = (kinds: readonly KindPlural[]): boolean =>
-  kinds.every(
-    (k, i) => !k.plural.includes('/') && !kinds.slice(0, i).some((j) => j.kind === k.kind || j.plural === k.plural),
-  );
+  kinds.every((k, i) => !k.plural.includes('/') && !kinds.slice(0, i).some((j) => j.kind === k.kind || j.plural === k.plural));
 
-/** The resources named `name` among `resources`. */
-const named = (resources: readonly Resource[], name: string): Resource[] => resources.filter((r) => r.name === name);
+/**
+ * Whether `resources` lists `name` exactly once, and of `kind`: one resource of that name and kind, and no two of that name. Said
+ * without a `.filter`, which the verifier does not read inside a quantifier.
+ */
+const onceAs = (resources: readonly Resource[], name: string, kind: string): boolean =>
+  resources.some((r) => r.name === name && r.kind === kind) &&
+  resources.every((r, i) => r.name !== name || !resources.slice(0, i).some((q) => q.name === name));
 
 const resourcesOfSpec = spec<(routes: readonly Route[], kinds: readonly KindPlural[]) => Resource[]>({
   requires: ({ input: [, kinds] }) => distinctKinds(kinds),
   ensures: {
     oneResourcePerKind: {
       description: 'Every kind served is listed once, under its plural',
-      condition: ({ input: [, kinds], output }) =>
-        kinds.every((k) => named(output, k.plural).length === 1 && named(output, k.plural).every((r) => r.kind === k.kind)),
+      condition: ({ input: [, kinds], output }) => kinds.every((k) => onceAs(output, k.plural, k.kind)),
     },
     onlyWhatIsServed: {
       description: "A resource listed is a kind's, or a sub-resource one of a kind's routes serves",
@@ -90,7 +74,7 @@ const resourcesOfSpec = spec<(routes: readonly Route[], kinds: readonly KindPlur
           kinds.some(
             (k) =>
               r.kind === k.kind &&
-              (r.name === k.plural || routes.some((t) => t.plural === k.plural && t.sub !== null && r.name === `${k.plural}/${t.sub}`)),
+              (r.name === k.plural || routes.some((t) => t.plural === k.plural && t.sub !== null && r.name === subName(k.plural, t.sub))),
           ),
         ),
     },
@@ -98,14 +82,7 @@ const resourcesOfSpec = spec<(routes: readonly Route[], kinds: readonly KindPlur
       description: 'Each sub-resource a route of a kind serves is listed once, of that kind',
       condition: ({ input: [routes, kinds], output }) =>
         routes.every(
-          (t) =>
-            t.sub === null ||
-            kinds.every(
-              (k) =>
-                k.plural !== t.plural ||
-                (named(output, `${k.plural}/${t.sub}`).length === 1 &&
-                  named(output, `${k.plural}/${t.sub}`).every((r) => r.kind === k.kind)),
-            ),
+          (t) => t.sub === null || kinds.every((k) => k.plural !== t.plural || onceAs(output, subName(k.plural, t.sub), k.kind)),
         ),
     },
     verbsAreWhatTheRoutesDo: {
@@ -120,7 +97,7 @@ const resourcesOfSpec = spec<(routes: readonly Route[], kinds: readonly KindPlur
                   (k) =>
                     k.kind === r.kind &&
                     t.plural === k.plural &&
-                    (r.name === k.plural ? kindDoes(t, v) : t.sub !== null && r.name === `${k.plural}/${t.sub}` && subDoes(t, v)),
+                    (r.name === k.plural ? kindDoes(t, v) : t.sub !== null && r.name === subName(k.plural, t.sub) && subDoes(t, v)),
                 ),
               ),
           ),

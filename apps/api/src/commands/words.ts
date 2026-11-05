@@ -2,15 +2,12 @@
  * The api's own words for each command it serves, keyed by the command's name: the write guard's (guard.ts), the body its route takes,
  * why a body is not one (400), and what a failure that is not a refusal answers (502).
  */
-import { factoryNameRefusal, inboxNameRefusal } from 'agent-orchestrator';
+import { inboxNameRefusal } from 'agent-orchestrator';
 import { valueAt, type BodyIssue, type Words } from '../body.ts';
 import type { Guarded } from '../guard.ts';
 import { AGENTS_COPY, AGENTS_CUSTOM, POLICY_CONFIRM, POLICY_DROP } from './library.ts';
 import { LEVEL, SUBSCRIBE, UNSUBSCRIBE } from './sessions.ts';
 import { LABEL_WORDS } from '../labels/index.ts';
-import { FACTORY_RULES_WORDS } from '../factories/rules.ts';
-import { FACTORY_SCHEDULE, FACTORY_UNSCHEDULE } from '../factories/schedules.ts';
-import { FACTORY_SERVER_WORDS } from '../servers/index.ts';
 
 /**
  * What a route's path names: the run and the step — `step` empty on a route that names none, `runId` on a route of the store's own, where
@@ -357,116 +354,6 @@ const INBOX_FROM: RouteWords = {
   strict: true,
 };
 
-const INSTRUCTION_PUT_SHAPE = '`{ "path": "<path in the factory\'s first folder>" }` or `{ "store": true }`';
-
-const INSTRUCT_PUT_SHAPE = '`{ "words": "<what Nemia is to know about the factory>" }`';
-
-/**
- * The route of a factory's instruction `at` names, as a refusal says it: `PUT /api/factories/<name>/instruction`, and `…/words` for its
- * text.
- */
-const instructionRoute = ({ method, factory }: Named, words: boolean): string =>
-  `${method} /api/factories/${factory}/instruction${words ? '/words' : ''}`;
-
-/** A name in a factory's instruction's route that is no factory's, in the package's words, before anything is read. */
-const factoryNamed =
-  (words: boolean) =>
-  (at: Named): string | null => {
-    const wrong = factoryNameRefusal(at.factory);
-    return wrong === undefined ? null : `${instructionRoute(at, words)}: ${wrong}`;
-  };
-
-/**
- * Where a factory's instruction is kept, put or cleared, as the guard's refusals word it: a name that is no factory's is refused in the
- * package's words, a path or a store that is no string or `true` in the api's.
- */
-const FACTORY_INSTRUCTION: RouteWords = {
-  shape: INSTRUCTION_PUT_SHAPE,
-  guard: (at) => ({
-    route: instructionRoute(at, false),
-    does: "says where a factory's instruction is kept",
-    forAnother: 'move it',
-    why: 'Nemia reads the instruction kept there before she acts in the factory',
-    reach: "choose where it is kept on the factory's settings page on the board",
-    instead: "Choose where it is kept on the factory's settings page on the board",
-    shape: at.method === 'DELETE' ? '`{}`' : INSTRUCTION_PUT_SHAPE,
-  }),
-  issue: (at) => (_issue, body) =>
-    `${instructionRoute(at, false)}: a factory's instruction is kept at a \`path\` in its first folder, a string, or in the store, \`"store": true\`: ${INSTRUCTION_PUT_SHAPE}. This request sent ${JSON.stringify(body)}.`,
-  named: factoryNamed(false),
-  notJson: (at) => `${instructionRoute(at, false)} takes a JSON body: ${INSTRUCTION_PUT_SHAPE}.`,
-};
-
-/**
- * The text the store keeps as a factory's instruction, written or cleared, as the guard's refusals word it: a name that is no factory's
- * is refused in the package's words, words that are not a string in the api's.
- */
-const FACTORY_INSTRUCT: RouteWords = {
-  shape: INSTRUCT_PUT_SHAPE,
-  guard: (at) => ({
-    route: instructionRoute(at, true),
-    does: "writes a factory's instruction",
-    forAnother: 'write it',
-    why: 'Nemia reads it before she acts in the factory',
-    reach: "write it on the factory's settings page on the board",
-    instead: "Write it on the factory's settings page on the board",
-    shape: at.method === 'DELETE' ? '`{}`' : INSTRUCT_PUT_SHAPE,
-  }),
-  issue: (at) => (_issue, body) =>
-    `${instructionRoute(at, true)}: \`words\` are what Nemia is to know about the factory, a string: ${INSTRUCT_PUT_SHAPE}. This request's was ${JSON.stringify(valueAt(body, ['words']))}.`,
-  named: factoryNamed(true),
-  notJson: (at) => `${instructionRoute(at, true)} takes a JSON body: ${INSTRUCT_PUT_SHAPE}.`,
-};
-
-const HIRE_PUT_SHAPE = '`{ "agent": "<the agent\'s name>" }`';
-
-/** The route of the hire into a step `at` names, as a refusal says it, the step encoded as the path carries it. */
-const hireRoute = ({ method, factory, step }: Named): string => `${method} /api/factories/${factory}/hires/${encodeURIComponent(step)}`;
-
-/** A name in a hire's route that is no factory's, in the package's words, before anything is read. */
-const hireFactoryNamed = (at: Named): string | null => {
-  const wrong = factoryNameRefusal(at.factory);
-  return wrong === undefined ? null : `${hireRoute(at)}: ${wrong}`;
-};
-
-/**
- * An agent hired into a step of a factory's workflow, as the guard's refusals word it: a name that is no factory's is refused in the
- * package's words, an agent that is no string in the api's.
- */
-const FACTORY_HIRE: RouteWords = {
-  shape: HIRE_PUT_SHAPE,
-  guard: (at) => ({
-    route: hireRoute(at),
-    does: 'hires an agent into a step of a factory',
-    forAnother: 'hire one',
-    why: 'every run of the workflow started in the factory after runs the step as that agent, in its repositories',
-    reach: "hire it on the step's page on the board",
-    instead: "Hire it on the step's page on the board",
-    shape: HIRE_PUT_SHAPE,
-  }),
-  issue: (at) => (_issue, body) =>
-    `${hireRoute(at)}: \`agent\` names the agent to hire, a string, its file's name without .md: ${HIRE_PUT_SHAPE}. This request's was ${JSON.stringify(valueAt(body, ['agent'])) ?? 'left out'}.`,
-  named: hireFactoryNamed,
-  notJson: (at) => `${hireRoute(at)} takes a JSON body: ${HIRE_PUT_SHAPE}.`,
-};
-
-/** A step's hire taken back, as the guard's refusals word it: a name that is no factory's is refused in the package's words. */
-const FACTORY_FIRE: RouteWords = {
-  shape: '`{}`',
-  guard: (at) => ({
-    route: hireRoute(at),
-    does: "takes a step's hire back",
-    forAnother: 'take it back',
-    why: 'every run of the workflow started in the factory after runs the step with no agent hired, and a start refuses a step left with none',
-    reach: "fire it on the step's page on the board",
-    instead: "Fire it on the step's page on the board",
-    shape: '`{}`',
-  }),
-  issue: (at) => () => `${hireRoute(at)} takes no body.`,
-  named: hireFactoryNamed,
-};
-
-/** The api's words for each routed command, by its name, with those of the paths it keeps from a command it absorbed (`on`). */
 export const WORDS: Readonly<Record<string, RouteWords>> = {
   retry: RETRY,
   refresh: REFRESH,
@@ -486,12 +373,4 @@ export const WORDS: Readonly<Record<string, RouteWords>> = {
   ...LABEL_WORDS,
   'agents custom': AGENTS_CUSTOM,
   'agents copy': AGENTS_COPY,
-  'factory rules': FACTORY_RULES_WORDS,
-  'factory instruction': FACTORY_INSTRUCTION,
-  'factory instruct': FACTORY_INSTRUCT,
-  'factory hire': FACTORY_HIRE,
-  'factory fire': FACTORY_FIRE,
-  'factory schedule': FACTORY_SCHEDULE,
-  'factory unschedule': FACTORY_UNSCHEDULE,
-  ...FACTORY_SERVER_WORDS,
 };

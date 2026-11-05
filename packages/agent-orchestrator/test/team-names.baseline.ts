@@ -30,7 +30,7 @@ export const TEAM_NAMES: Baseline = {
   'apps/api/src/agents/fills.test.ts': { count: 28, ...TEAM_MOVES.fixtures },
   'apps/api/src/runs/hired-folder.test.ts': { count: 3, ...TEAM_MOVES.fixtures },
   'apps/api/src/factories/factories.test.ts': { count: 18, ...TEAM_MOVES.fixtures },
-  'apps/api/src/factories/hires.test.ts': { count: 18, ...TEAM_MOVES.fixtures },
+  'apps/api/src/factories/hires.test.ts': { count: 7, ...TEAM_MOVES.fixtures },
   'apps/api/src/runs/lists.test.ts': { count: 1, ...TEAM_MOVES.fixtures },
   'apps/api/src/runs/unreadable.test.ts': { count: 4, ...TEAM_MOVES.fixtures },
   'apps/api/src/stats/stats.test.ts': { count: 4, ...TEAM_MOVES.fixtures },
@@ -45,7 +45,6 @@ export const TEAM_NAMES: Baseline = {
   'apps/web/test/factory-fixtures.ts': { count: 2, ...TEAM_MOVES.fixtures },
   'apps/web/test/library-fixtures.ts': { count: 7, ...TEAM_MOVES.fixtures },
   'apps/web/test/placed.test.ts': { count: 6, ...TEAM_MOVES.fixtures },
-  'apps/web/test/read-factory.test.ts': { count: 5, ...TEAM_MOVES.fixtures },
   'apps/web/test/read-library.test.ts': { count: 4, ...TEAM_MOVES.fixtures },
   'apps/web/test/step-card.test.ts': { count: 3, ...TEAM_MOVES.fixtures },
   'apps/web/test/strip.test.ts': { count: 20, ...TEAM_MOVES.fixtures },
@@ -107,7 +106,6 @@ export const TEAM_NAMES: Baseline = {
 /** Each product file that names a path into one of the team's workflows today, with its count and the move that clears it. */
 export const TEAM_PATHS: Baseline = {
   'apps/api/src/runs/hired-folder.test.ts': { count: 1, ...TEAM_MOVES.fixtures },
-  'apps/api/src/factories/hires.test.ts': { count: 2, ...TEAM_MOVES.fixtures },
   'apps/api/src/stats/stats.test.ts': { count: 1, ...TEAM_MOVES.fixtures },
   'apps/api/src/step/step.test.ts': { count: 7, ...TEAM_MOVES.fixtures },
   'apps/web/test/library-fixtures.ts': { count: 2, ...TEAM_MOVES.fixtures },

@@ -67,7 +67,9 @@ export const DEFAULT_REVISIONS: RevisionsPolicy = 'pinned';
  * workflows, agents, skills, wiring and instruction, when it was made from one. `volumes`: the folders of the person's machine its runs
  * mount for every local step beside its repositories, each read-only or writable as it was named (`Volume`), when it names any.
  * `harnessSettings`: the settings of a harness every session of its runs' steps on it is given, when it names any (`HarnessSettings`), as
- * the file holds them: judged at a start and at the door's write, not on read.
+ * the file holds them: judged at a start and at the door's write, not on read. `generation`: the count of changes to its spec, Kubernetes'
+ * `metadata.generation`, counted by the door's writes (`generationWritten`, `factories/generation.ts`), when its file holds one; a file
+ * written before the counter reads as 1 (`generationOf`).
  */
 export type Factory = {
   name: string;
@@ -81,6 +83,7 @@ export type Factory = {
   tree?: string;
   volumes?: readonly Volume[];
   harnessSettings?: SettingsAsRead;
+  generation?: number;
 };
 
 /**
@@ -88,11 +91,22 @@ export type Factory = {
  * container is given a volume (`docker run -v <path>:ro|:rw`): its absolute path, and whether steps only read it. Marked always, as the
  * runtime's `Mount` is: a volume left unmarked would be writable without anyone having said so. It never makes the factory work on its
  * folder, and a writable one is not a run's workspace: nothing commits, lands or reverts what a step writes there. It is the
- * factory's own, kept in its file, never in a template.
+ * factory's own, kept in its file, never in a template. `name`: the name it is served and linked under, stored at `nemia factory volume
+ * add`, and given on read to one an older file stores none of (`volumesNamed`, `volume/volume.ts`).
  */
-export type Volume = { path: string; readOnly: boolean };
+export type Volume = { path: string; readOnly: boolean; name?: string };
 
-/** The volumes of `factory`, each as `path.resolve` spells it, sorted, once each: the first named of a path given twice. */
+/** A volume's own keys, its path, its mark and its name where it has one, and no other a file kept beside them. */
+export const volumeEntry = (v: Volume): Volume => ({
+  path: v.path,
+  readOnly: v.readOnly,
+  ...(v.name === undefined ? {} : { name: v.name }),
+});
+
+/**
+ * The volumes of `factory` as a run mounts them, each as `path.resolve` spells it, sorted, once each: the first named of a path given
+ * twice; its path and mark alone, a name being no mount's (`factoryVolumesNamed`, `volume/volume.ts`, names them).
+ */
 export function factoryVolumes(factory: Pick<Factory, 'volumes'>): Volume[] {
   const seen = new Map<string, Volume>();
   for (const v of factory.volumes ?? []) {
@@ -173,12 +187,22 @@ export const FACTORY_CONDITION_REASONS = [
 /** Why a factory's condition holds or not (`FACTORY_CONDITION_REASONS`); the sentence a person reads is its `message`. */
 export type FactoryConditionReason = (typeof FACTORY_CONDITION_REASONS)[number];
 
-/** A condition of a factory made from a template, as Kubernetes words one: its type, `True` or `False`, a reason, a sentence. */
+/** Whether a factory's condition holds, as Kubernetes words it. */
+export const FACTORY_CONDITION_STATUSES = ['True', 'False'] as const;
+
+/** One of `FACTORY_CONDITION_STATUSES`. */
+export type FactoryConditionStatus = (typeof FACTORY_CONDITION_STATUSES)[number];
+
+/**
+ * A condition of a factory made from a template, as Kubernetes words one: its type, `True` or `False`, a reason, a sentence, and when its
+ * status last moved, where the controller wrote it (`transitionedAt`, `applied/condition-time.ts`).
+ */
 export type FactoryCondition = {
   type: FactoryConditionType;
-  status: 'True' | 'False';
+  status: FactoryConditionStatus;
   reason: FactoryConditionReason;
   message: string;
+  lastTransitionTime?: string;
 };
 
 /**

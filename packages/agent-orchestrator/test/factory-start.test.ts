@@ -213,11 +213,11 @@ test('a factory from nothing to a run: filed, given workflows, hires and a sched
     async () => {
       const printed = await typedFrom(ROOT, ['factory', 'add', 'pipao', '--repo', a, '--repo', path.relative(ROOT, a), '--repo', b]);
       assert.deepEqual(factoryFiles(), ['pipao.json']);
-      assert.deepEqual(fileOf('pipao'), { repos: [a, b] }, 'an add writes no workflows key');
+      assert.deepEqual(fileOf('pipao'), { repos: [a, b], generation: 1 }, 'an add writes no workflows key, and its generation 1');
       assert.ok(!fs.existsSync(path.join(a, '.git')));
       assert.deepEqual(printed.slice(0, 2), [`pipao  ${a}, ${b}`, `filed: ${file}`]);
       assert.equal(printed[2], `trusted for Claude Code: ${a}`);
-      assert.deepEqual(readFactory('pipao'), { name: 'pipao', repos: [a, b], workflows: [], hires: {}, schedules: {} });
+      assert.deepEqual(readFactory('pipao'), { name: 'pipao', repos: [a, b], workflows: [], hires: {}, schedules: {}, generation: 1 });
       const listed = readFactories().find((f) => f.name === 'pipao');
       assert.ok(listed && !('error' in listed) && listed.workflows.length === 0, 'it has attached, hired and scheduled none');
     },
@@ -265,6 +265,7 @@ test('a factory from nothing to a run: filed, given workflows, hires and a sched
         later: { kept: true },
         workflows: ['build', 'notes'],
         hires: { 'build/implement': 'implementer', 'build/review': 'reviewer' },
+        generation: 10,
       });
       assert.deepEqual(factoryFiles(), ['pipao.json']);
     },
@@ -353,8 +354,8 @@ test('a factory from nothing to a run: filed, given workflows, hires and a sched
       assert.equal((await typedFrom(ROOT, ['factory', 'volume', 'add', f, `${notes}:ro`]))[0], `${f}  volume ${notes} :ro (was :rw)`);
       await typedFrom(ROOT, ['factory', 'volume', 'add', f, `${scratchpad}:rw`]);
       const volumes = [
-        { path: notes, readOnly: true },
-        { path: scratchpad, readOnly: false },
+        { path: notes, readOnly: true, name: path.basename(notes).toLowerCase() },
+        { path: scratchpad, readOnly: false, name: path.basename(scratchpad).toLowerCase() },
       ].sort((x, y) => x.path.localeCompare(y.path));
       assert.deepEqual((fileOf(f) as { volumes: unknown }).volumes, volumes);
       assert.deepEqual((fileOf(f) as { later: unknown }).later, { kept: true }, 'every other key kept');
@@ -376,7 +377,7 @@ test('a factory from nothing to a run: filed, given workflows, hires and a sched
     'a run started then mounts the volumes, frozen on its record and said at its start; a volume removed after changes no run started',
     async () => {
       const f = path.basename(file, '.json');
-      const volumes = readFactory(f).volumes ?? [];
+      const volumes = (readFactory(f).volumes ?? []).map(({ path: at, readOnly }) => ({ path: at, readOnly }));
       const out = await typedFrom(b, ['start', 'x', '--workflows', build, '--factory', f, '--no-worktree']);
       const id = startedId(out);
       assert.deepEqual(readRun(id).volumes, volumes);

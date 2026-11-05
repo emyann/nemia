@@ -40,6 +40,7 @@ import {
   type InstructionAt,
   type RevisionsPolicy,
   type Schedule,
+  volumeEntry,
 } from './factory.ts';
 import { firesOf } from '../schedule/schedule.store.ts';
 import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
@@ -47,6 +48,7 @@ import { firstRefusal, HOME, isDirectory } from '../record/record.store.ts';
 import { readStatusAt, readTreeWiringAt, treeDirAt, writeTreeWiringAt } from '../applied/applied.store.ts';
 import { rewired, wiringRefusal, type WiringChange } from '../wiring/wiring.ts';
 import { ownAgentRefusal } from '../wiring/own-agent.store.ts';
+import { generationWritten } from '../factories/generation.ts';
 
 /** Where the factories of the store `home` are: `<home>/factories`, beside `runs/` and `inbox/`. The default factory has no file there. */
 export const factoriesDirAt = (home: string): string => path.join(home, 'factories');
@@ -66,6 +68,12 @@ const ScheduleSchema = Schema.StructWithRest(
   [Schema.Record(Schema.String, Schema.Unknown)],
 );
 
+/** A volume as a factory's file holds it (`Volume`): its path, its mark, its name where it stores one, and a key a later `nemia` writes. */
+const VolumeEntrySchema = Schema.StructWithRest(
+  Schema.Struct({ path: Schema.String, readOnly: Schema.Boolean, name: Schema.optionalKey(Schema.String) }),
+  [Schema.Record(Schema.String, Schema.Unknown)],
+);
+
 /**
  * A factory's file: at least one repository, each a string; the workflows attached to it, each by its folder's name, its hires, a step's
  * `<workflow>/<step>` to an agent's name, and its schedules, by workflow, when it has any, and where its instruction is kept, a path or the
@@ -73,9 +81,8 @@ const ScheduleSchema = Schema.StructWithRest(
  * tree's wiring, and this key is not read); the folders it mounts beside its repositories (`volumes`), each `{ path, readOnly }`, kept in
  * this file whether or not it is made from a template, since they are the person's and never the template's; the settings of a harness
  * its runs' sessions are given (`harnessSettings`), kept here for the same reason and judged by the model at the door, not on read; and the
- * template it was made
- * from, when it was (`nemia factory apply`): its folder, its version and the parameters given. A key a later `nemia` writes beside them is
- * kept, not refused.
+ * template it was made from, when it was (`nemia factory apply`): its folder, its version and the parameters given; its `generation`, the
+ * count of changes to its spec, absent on a file written before the counter; a volume's `name`. A key a later `nemia` writes is kept.
  */
 const FactoryFileSchema = Schema.StructWithRest(
   Schema.Struct({
@@ -85,14 +92,9 @@ const FactoryFileSchema = Schema.StructWithRest(
     schedules: Schema.optionalKey(Schema.Record(Schema.String, ScheduleSchema)),
     instruction: Schema.optionalKey(Schema.Union([Schema.Struct({ path: Schema.String }), Schema.Struct({ store: Schema.Literal(true) })])),
     revisions: Schema.optionalKey(Schema.Literals(REVISIONS_POLICIES)),
-    volumes: Schema.optionalKey(
-      Schema.Array(
-        Schema.StructWithRest(Schema.Struct({ path: Schema.String, readOnly: Schema.Boolean }), [
-          Schema.Record(Schema.String, Schema.Unknown),
-        ]),
-      ),
-    ),
+    volumes: Schema.optionalKey(Schema.Array(VolumeEntrySchema)),
     harnessSettings: Schema.optionalKey(Schema.Record(Schema.String, Schema.Unknown)),
+    generation: Schema.optionalKey(Schema.Number),
     template: Schema.optionalKey(
       Schema.StructWithRest(
         Schema.Struct({
@@ -169,8 +171,9 @@ function factoryOf(home: string, name: string, content: FactoryFile): Factory | 
     schedules: content.schedules ?? {},
     ...(content.instruction === undefined ? {} : { instruction: content.instruction }),
     ...(template === undefined ? {} : { template, tree: treeDirAt(home, name) }),
-    ...(content.volumes?.length ? { volumes: content.volumes.map((v) => ({ path: v.path, readOnly: v.readOnly })) } : {}),
+    ...(content.volumes?.length ? { volumes: content.volumes.map(volumeEntry) } : {}),
     ...(content.harnessSettings === undefined ? {} : { harnessSettings: content.harnessSettings }),
+    ...(content.generation === undefined ? {} : { generation: content.generation }),
   };
 }
 
@@ -261,7 +264,7 @@ export function createFactoryAt(home: string, factory: Factory): string {
   const file = fileAt(home, factory.name);
   const hidden = path.join(factoriesDirAt(home), `.${factory.name}.json.${process.pid}.${randomBytes(4).toString('hex')}`);
   try {
-    fs.writeFileSync(hidden, `${JSON.stringify(fileContentOf(undefined, factory), null, 2)}\n`);
+    fs.writeFileSync(hidden, `${JSON.stringify(fileContentOf(undefined, { ...factory, generation: 1 }), null, 2)}\n`);
     fs.linkSync(hidden, file);
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code !== 'EEXIST') throw err;
@@ -298,11 +301,12 @@ function fileContentOf(content: FactoryFile | undefined, factory: Factory): Fact
   kept(
     'volumes',
     factory.volumes?.length
-      ? factory.volumes.map((v) => ({ ...content?.volumes?.find((was) => was.path === v.path), path: v.path, readOnly: v.readOnly }))
+      ? factory.volumes.map((v) => ({ ...content?.volumes?.find((was) => was.path === v.path), ...volumeEntry(v) }))
       : undefined,
   );
   kept('harnessSettings', factory.harnessSettings);
   kept('template', factory.template === undefined ? undefined : { ...content?.template, ...factory.template });
+  if (factory.generation !== undefined) next.generation = factory.generation;
   return next as FactoryFile;
 }
 
@@ -466,18 +470,20 @@ const wiringFileAt = (home: string, factory: Factory): string =>
 /**
  * The factory `factory` written back into the store `home`, the file it was read from: its file, every key the model does not name
  * kept (`fileContentOf`), and, made from a template, its workflows, hires and revisions policy into its tree's wiring (`factory.json`),
- * every other key of that kept. A file or a wiring that says what it said already is not written again. Returns the file of what
- * changed: the tree's wiring where that did, else the factory's file. Refused: a factory with no file (`Missing`, then `notDone`), a
- * file or a tree's wiring that does not read (`Invalid`), and a tree's wiring to change before the tree is rendered (`Conflict`). The
- * name and the factory's invariants are its caller's to check.
+ * every other key of that kept; its generation one more where the write changes its spec, the tree's wiring included, or `counted` says
+ * a change of it was made beside the file, its level (`generationWritten`). A file or a wiring that says what it said already is not
+ * written again. Returns the file of what changed: the tree's wiring where that did, else the factory's file. Refused: a factory with no
+ * file (`Missing`, then `notDone`), a file or a tree's wiring that does not read (`Invalid`), and a tree's wiring to change before the
+ * tree is rendered (`Conflict`). The name and the factory's invariants are its caller's to check.
  */
-export function rewriteFactoryAt(home: string, factory: Factory, notDone = 'Nothing was written.'): string {
+export function rewriteFactoryAt(home: string, factory: Factory, notDone = 'Nothing was written.', counted = false): string {
   const { name } = factory;
   const read = factoryFile(home, name);
   if (!fs.existsSync(read.file)) throw noFactory(home, name, notDone);
   if ('error' in read)
     throw new Invalid({ message: `the factory ${name}: ${read.file} ${read.error} It was left as it is, and nothing was changed.` });
   const content = read.content;
+  const written = generationWritten(factoryOf(home, name, content), factory, counted);
   let changed = read.file;
   if ((content.template ?? factory.template) !== undefined) {
     const tree = readTreeWiringAt(home, name);
@@ -496,7 +502,7 @@ export function rewriteFactoryAt(home: string, factory: Factory, notDone = 'Noth
       changed = path.join(treeDirAt(home, name), 'factory.json');
     }
   }
-  const after = fileContentOf(content, factory);
+  const after = fileContentOf(content, written);
   if (JSON.stringify(after) !== JSON.stringify(content)) writeWhole(read.file, after);
   return changed;
 }

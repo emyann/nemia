@@ -19,7 +19,15 @@ import { checked, doorOf, rootedDoor, type DoorOf } from '../door/door.store.ts'
 import { Conflict, type Invalid } from '../refusal/refusal.ts';
 import { defaultFactoryRefusal, DEFAULT_FACTORY, type Factory } from '../factory/factory.ts';
 import { Factory as FactoryModel, FactoryName } from '../factory/factory.model.ts';
-import { createFactoryAt, readFactoriesAt, readFactoryAt, removeFactoryAt, rewriteFactoryAt } from '../factory/factory.store.ts';
+import {
+  createFactoryAt,
+  factoryNamesAt,
+  readFactoriesAt,
+  readFactoryAt,
+  removeFactoryAt,
+  rewriteFactoryAt,
+} from '../factory/factory.store.ts';
+import { levelDiffers } from './generation.ts';
 import type { FactoryLevelFile } from '../level/level.ts';
 import { readFactoryLevelAt, writeFactoryLevelAt } from '../level/level.store.ts';
 import { readRules, rulesAtHome, rulesCleared, rulesWritten, type RulesRead } from '../rules/rules.store.ts';
@@ -102,8 +110,22 @@ export function factoryDoorOver(layer: FactoryLayer): FactoryDoorShape {
 }
 
 /**
+ * The level a factory's file held before a write, as `read` reads it: none where it held none, and none where it does not read, which a
+ * write replaces whole, so the write counts as a change.
+ */
+const levelHeld = (read: () => FactoryLevelFile | undefined): FactoryLevelFile | undefined => {
+  try {
+    return read();
+  } catch {
+    return undefined;
+  }
+};
+
+/**
  * The files of the store `home`, as a layer of the door: today's files, read and written by the store's own functions. A factory's
- * rules are its tree's where it is made from a template, so the rules ask the factory first, refused as a read refuses it.
+ * rules are its tree's where it is made from a template, so the rules ask the factory first, refused as a read refuses it. Its
+ * generation is counted by the file's writes: filed at 1 (`createFactoryAt`), one more by a write back that changes its spec
+ * (`rewriteFactoryAt`) and by a level written that changes it, of a factory that has a file.
  */
 export function factoryFiles(home: string): FactoryLayer {
   const rulesOf = (name: string, notDone: string) => rulesAtHome(home, readFactoryAt(home, name, notDone));
@@ -117,7 +139,12 @@ export function factoryFiles(home: string): FactoryLayer {
     },
     level: {
       read: (name) => readFactoryLevelAt(home, name),
-      write: (name, level) => writeFactoryLevelAt(home, name, level),
+      write: (name, level) => {
+        const was = levelHeld(() => readFactoryLevelAt(home, name));
+        writeFactoryLevelAt(home, name, level);
+        if (levelDiffers(was, level) && factoryNamesAt(home).includes(name))
+          rewriteFactoryAt(home, readFactoryAt(home, name), 'Nothing was written.', true);
+      },
     },
     rules: {
       read: (name) => {

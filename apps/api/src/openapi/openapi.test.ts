@@ -1,7 +1,8 @@
 /**
  * The objects' OpenAPI 3.1 document on its route, `OpenApi.fromApi(Api)`: an OpenAPI 3.1.0 document whose `components.schemas` hold
  * `Run`, which imports back through Effect's own JSON Schema into a Schema that decodes the object the package builds of a run — the
- * route a client generator of the board's mirror rests on — and each of KINDS its get path and its component.
+ * route a client generator of the board's mirror rests on — and each of KINDS its get path and its component, each kind's List, the
+ * builtin servers and a factory's commands.
  */
 import { root } from '../../test/harness.ts';
 import { test } from 'node:test';
@@ -90,7 +91,15 @@ test('the document is the one Effect writes of the Api, and holds, for each of K
     components: { schemas: Record<string, unknown> };
   };
   assert.deepEqual(doc, JSON.parse(JSON.stringify(OpenApi.fromApi(Api))), 'the document is OpenApi.fromApi(Api), as JSON');
-  const GET_PATHS = { Run: '/api/runs/{runId}', Card: '/api/namespaces/{namespace}/cards/{name}' } as const;
+  const GET_PATHS = {
+    Run: '/api/runs/{runId}',
+    Card: '/api/namespaces/{namespace}/cards/{name}',
+    Factory: '/api/factories/{name}',
+    McpServer: '/api/namespaces/{namespace}/mcpservers/{name}',
+    Schedule: '/api/namespaces/{namespace}/schedules/{name}',
+    Hire: '/api/namespaces/{namespace}/hires/{name}',
+    Volume: '/api/namespaces/{namespace}/volumes/{name}',
+  } as const;
   for (const kind of KINDS) {
     assert.ok(doc.paths[GET_PATHS[kind]]?.get, `${kind} is got at ${GET_PATHS[kind]}`);
     assert.ok(doc.components.schemas[kind], `${kind} is a component`);
@@ -98,6 +107,14 @@ test('the document is the one Effect writes of the Api, and holds, for each of K
   assert.ok(doc.paths['/api/cards']?.get, 'the cards are listed across namespaces');
   assert.ok(doc.paths['/api/namespaces/{namespace}/cards']?.get, 'and in one');
   assert.ok(doc.components.schemas['CardList'], 'CardList is a component');
+  for (const kind of ['Factory', 'McpServer', 'Schedule', 'Hire', 'Volume'])
+    assert.ok(doc.components.schemas[`${kind}List`], `${kind}List is a component`);
+  assert.ok(doc.paths['/api/factories']?.get, 'the factories are listed, cluster-scoped');
+  for (const plural of ['mcpservers', 'schedules', 'hires', 'volumes'])
+    assert.ok(doc.paths[`/api/namespaces/{namespace}/${plural}`]?.get, `the ${plural} are listed in a factory's namespace`);
+  assert.ok(doc.paths['/api/builtin/mcpservers']?.get, "Nemia's builtin servers are listed");
+  assert.ok(doc.paths['/api/factories/{name}/commands']?.get, "a factory's command lines are got");
+  assert.ok(doc.components.schemas['FactoryCommands'], 'FactoryCommands is a component');
 });
 
 test("the card's labels are a POST whose body is a LabelEdit and whose answer a Labelled, and a run's labels an object of strings", async () => {

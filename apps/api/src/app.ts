@@ -1,6 +1,6 @@
 import fs from 'node:fs/promises';
 import { Layer, ManagedRuntime, Metric } from 'effect';
-import { type ErrorHandler, Hono } from 'hono';
+import { type Context, type ErrorHandler, Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import type { ContentfulStatusCode } from 'hono/utils/http-status';
 import {
@@ -18,8 +18,6 @@ import { agents, skills } from './agents/index.ts';
 import { customInstructions } from './custom/custom.ts';
 import { commands } from './commands/index.ts';
 import { capabilitiesWithSteps, McpAsker } from './capabilities/index.ts';
-import { factories, factoryInstruction, factoryRules } from './factories/index.ts';
-import { factoryServers, serverSignIns } from './servers/index.ts';
 import { ceilingsOf, metricsOf, passesOf, seriesOf, pauseNowOf, pauseOf, feed, QuotaAsker, readDaemon } from './factory/index.ts';
 import { inbox } from './inbox/inbox.ts';
 import { ApiConfig, type ApiEnv, type ApiRuntime, ReadMemo, served, type Services } from './layer.ts';
@@ -109,14 +107,10 @@ const viewerScript = () => (bundle ??= fs.readFile(REFERENCE_BUNDLE, 'utf8'));
  * - `GET /api/health` — `{ ok: true }` while the api answers.
  * - `GET /api/version` — `{ version, release }`, the orchestrator's package version (`VERSION`) and the code the api runs (`RELEASE`), a
  *   checkout or an install: what the board's bottom bar says.
- * - factories/factories.ts — the factories a request may be answered in, each with its repositories, workflows and hires. Every route is
- *   answered in the factory and on the repository its query names (`?factory=`, `?repo=`), resolved before its handler runs, and refused
- *   when it names a repository no factory has (`placeFor`, factories/place.ts); a request naming neither is answered on the api's own.
- * - factories/rules.ts — a factory's rules, what every agent hired into it is told, read through `nemia factory rules`'s entry; written
- *   and removed on the routes the table generates from it.
- * - factories/instruction.ts — a factory's instruction, what Nemia is to know of it, read through `nemia factory instruction`'s entry;
- *   where it is kept put and cleared, and the store's text written and cleared, on the routes the table generates from it and
- *   `nemia factory instruct`'s.
+ * - objects/factories.ts, mcp-servers.ts, schedules.ts, hires.ts, volumes.ts — the factories as objects, and their servers, schedules,
+ *   hires and volumes in each factory's namespace, served through `objects`' Api (objects/serve.ts). Every route is answered in the
+ *   factory and on the repository its query names (`?factory=`, `?repo=`), resolved before its handler runs, and refused when it names a
+ *   repository no factory has (`placeFor`, factories/place.ts); a request naming neither is answered on the api's own.
  * - `GET /api/capabilities` — what the repository offers a step, read from the checkout on each request (capabilities/capabilities.ts), and
  *   what each step of each workflow gets of it (capabilities/reach.ts). Each MCP server the settings enable is started and asked for its
  *   tools once while the app runs (`McpAsker`); one that fails is an `error` on its entry, never a failed request.
@@ -196,11 +190,6 @@ export function appOf(layer: Layer.Layer<Services>): { app: Hono<ApiEnv>; runtim
         c.json(await capabilitiesWithSteps(repo, { e, placeService, env, home, asker: mcp, inRequest })),
       ),
     )
-    .route('/', factories)
-    .route('/', factoryRules)
-    .route('/', factoryServers)
-    .route('/', serverSignIns)
-    .route('/', factoryInstruction)
     .route('/', workflows)
     .route('/', step)
     .route('/', builder)
@@ -243,8 +232,22 @@ export function appOf(layer: Layer.Layer<Services>): { app: Hono<ApiEnv>; runtim
     .route('/', feed)
     .route('/', nemia)
     .route('/', nemiaChat)
+    .notFound(noRoute)
     .onError(answerError);
   return { app, runtime };
+}
+
+/**
+ * A path no route serves, a retired one among them (`/api/factories/:factory/servers`, `…/hires/:step`, `…/schedules/:workflow`), in the
+ * api's words: a 404 naming the restart that makes a client and the api one build, and where the paths it serves are listed.
+ */
+function noRoute(c: Context<ApiEnv>): Response {
+  return c.json(
+    {
+      error: `${c.req.method} ${new URL(c.req.url).pathname} is no route of this api, which a client of another build may still ask: restart the daemon with \`nemia service restart\` so the two are one build, or ask a path GET /openapi/v3/nemia/v1 lists.`,
+    },
+    404,
+  );
 }
 
 /** The api the process serves (main.ts), over the live services and `process.env`, and its runtime. */

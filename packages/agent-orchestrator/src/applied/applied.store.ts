@@ -10,7 +10,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createHash, randomBytes } from 'node:crypto';
 import { Result, Schema } from 'effect';
-import { FACTORY_CONDITION_REASONS, FACTORY_CONDITION_TYPES, REVISIONS_POLICIES } from '../factory/factory.ts';
+import { FACTORY_CONDITION_REASONS, FACTORY_CONDITION_STATUSES, FACTORY_CONDITION_TYPES, REVISIONS_POLICIES } from '../factory/factory.ts';
 import { firstRefusal, HOME } from '../record/record.store.ts';
 
 /** The folder the store `home` keeps a factory's own files in, beside its `<name>.json`. */
@@ -127,12 +127,16 @@ export const writeTreeWiringAt = (home: string, name: string, wiring: TreeWiring
 const wiringWritten = (file: string, wiring: TreeWiring): void =>
   writeWhole(file, `${JSON.stringify({ ...wiring, workflows: [...wiring.workflows].sort() }, null, 2)}\n`);
 
-/** A condition of a templated factory, as Kubernetes words one: its type, `True` or `False`, a reason in one word, and a sentence. */
+/**
+ * A condition of a templated factory, as Kubernetes words one: its type, `True` or `False`, a reason in one word, a sentence, and when its
+ * status last moved (`transitionedAt`), absent on a status written before the field.
+ */
 const ConditionSchema = Schema.Struct({
   type: Schema.Literals(FACTORY_CONDITION_TYPES),
-  status: Schema.Literals(['True', 'False']),
+  status: Schema.Literals(FACTORY_CONDITION_STATUSES),
   reason: Schema.Literals(FACTORY_CONDITION_REASONS),
   message: Schema.String,
+  lastTransitionTime: Schema.optionalKey(Schema.String),
 });
 
 /** A side of a conflict as the status keeps it: its text, cut, or null where that side has none. */
@@ -148,8 +152,9 @@ const UpgradeSchema = Schema.Struct({
 /**
  * What the controller observed of a templated factory: the template's version its base holds, and its name where the controller has
  * named it (a status written before names were recorded has none, until a pass names it); the base's digest, the parameters it was
- * rendered with, its conditions, `Applied` and `ConflictsPending`, and the upgrade waiting on the person's choices, where one does; a
- * key a later `nemia` writes is kept.
+ * rendered with, its conditions, `Applied` and `ConflictsPending`, and the upgrade waiting on the person's choices, where one does; the
+ * factory's generation the pass read (`observedGeneration`), absent on a status written before the field; a key a later `nemia` writes is
+ * kept.
  */
 const StatusSchema = Schema.StructWithRest(
   Schema.Struct({
@@ -159,6 +164,7 @@ const StatusSchema = Schema.StructWithRest(
     params: Schema.Record(Schema.String, Schema.Union([Schema.String, Schema.Number, Schema.Boolean])),
     conditions: Schema.Array(ConditionSchema),
     upgrade: Schema.optionalKey(UpgradeSchema),
+    observedGeneration: Schema.optionalKey(Schema.Number),
   }),
   [Schema.Record(Schema.String, Schema.Unknown)],
 );

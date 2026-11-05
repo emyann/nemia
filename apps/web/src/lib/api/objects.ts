@@ -1,7 +1,9 @@
 /**
  * The board's client of the objects (`objects`' `Api`): every read and write of a kind the api serves as an object goes through here, made
- * by `HttpApiClient` from the one definition the api serves, over `FetchHttpClient` — the Run and its sub-resources (`runs`), and the
- * inbox's cards (`cards`). Each is a promise, as TanStack Query's functions take one.
+ * by `HttpApiClient` from the one definition the api serves, over `FetchHttpClient` — the Run and its sub-resources (`runs`), the
+ * inbox's cards (`cards`), and a factory and its parts: the Factory with its rules, instruction and command lines (`factories`), its MCP
+ * servers and their sign-ins (`mcpServers`), Nemia's own servers (`builtin`), its schedules, hires and volumes. Each is a promise, as
+ * TanStack Query's functions take one.
  *
  * What a call rejects with is what the board's own reads and writes reject with (`read.ts`): a refusal in the api's words (its `error`)
  * and its status — a `ReadRefusal` for a read, so a run gone is still `runGone`, a `WriteRefusal` for a write — and an `UnreadAnswer`
@@ -20,9 +22,28 @@ import {
   type CardFile,
   CardList,
   type CardStart,
+  Factory,
+  FactoryCommands,
+  FactoryInstruction,
+  type FactoryInstructionWrite,
+  FactoryList,
+  FactoryRules,
+  Hire,
+  HireList,
   type LabelEdit,
   Labelled,
+  McpServer,
+  McpServerList,
+  type McpServerWrite,
   Run,
+  Schedule,
+  ScheduleList,
+  type ScheduleWrite,
+  SignedOut,
+  SignInStarted,
+  SignInState,
+  Volume,
+  VolumeList,
   StepTold,
   StepTries,
 } from 'objects';
@@ -180,4 +201,115 @@ export const cards = {
       (c) => c.cards.labels({ params: { namespace, name }, payload: edit }),
       write(Labelled, 'The labels may be set: read the card again before sending it again.'),
     ),
+};
+
+/** What a write of a factory's rules or instruction may have done, and what to look at before writing again. */
+const SETTINGS_WRITTEN = "The factory's settings may be changed: read its settings again before changing them again.";
+
+/** A factory, its rules, its instruction and the lines a person types for it (`/api/factories`). */
+export const factories = {
+  /** Every factory, the default one among them (`GET /api/factories`). */
+  listAll: (): Promise<FactoryList> => call((c) => c.factories.listAll({ query: {} }), read(FactoryList)),
+  /** The factory `name`. */
+  get: (name: string): Promise<Factory> => call((c) => c.factories.get({ params: { name } }), read(Factory)),
+  /** The lines a person types for the factory `name`: attach, rm, add, schedule, trust, volume, and each unschedule and volume rm. */
+  commands: (name: string): Promise<FactoryCommands> => call((c) => c.factories.commands({ params: { name } }), read(FactoryCommands)),
+  /** The rules of the factory `name`, what every agent hired into it is told. */
+  rules: (name: string): Promise<FactoryRules> => call((c) => c.factories.rules({ params: { name } }), read(FactoryRules)),
+  /** `words` written as the rules of the factory `name`: the rules as they then read. */
+  putRules: (name: string, words: string): Promise<FactoryRules> =>
+    call((c) => c.factories.putRules({ params: { name }, payload: { words } }), write(FactoryRules, SETTINGS_WRITTEN)),
+  /** The rules of the factory `name` removed: the rules as they then read, none. */
+  deleteRules: (name: string): Promise<FactoryRules> =>
+    call((c) => c.factories.deleteRules({ params: { name } }), write(FactoryRules, SETTINGS_WRITTEN)),
+  /** The instruction of the factory `name`, what Nemia is to know about it. */
+  instruction: (name: string): Promise<FactoryInstruction> =>
+    call((c) => c.factories.instruction({ params: { name } }), read(FactoryInstruction)),
+  /** The instruction of the factory `name` kept at `place`: a file of its first folder, or the store. */
+  putInstruction: (name: string, place: FactoryInstructionWrite): Promise<FactoryInstruction> =>
+    call((c) => c.factories.putInstruction({ params: { name }, payload: place }), write(FactoryInstruction, SETTINGS_WRITTEN)),
+  /** The instruction of the factory `name` read from `NEMIA.md` of its first folder again. */
+  deleteInstruction: (name: string): Promise<FactoryInstruction> =>
+    call((c) => c.factories.deleteInstruction({ params: { name } }), write(FactoryInstruction, SETTINGS_WRITTEN)),
+  /** `words` written as the instruction the store keeps for the factory `name`. */
+  putInstructionWords: (name: string, words: string): Promise<FactoryInstruction> =>
+    call((c) => c.factories.putInstructionWords({ params: { name }, payload: { words } }), write(FactoryInstruction, SETTINGS_WRITTEN)),
+  /** The instruction the store keeps for the factory `name` removed. */
+  deleteInstructionWords: (name: string): Promise<FactoryInstruction> =>
+    call((c) => c.factories.deleteInstructionWords({ params: { name } }), write(FactoryInstruction, SETTINGS_WRITTEN)),
+};
+
+/** What a write of a server may have done, and what to look at before writing again. */
+const SERVER_WRITTEN = "The server may be recorded: read the factory's servers again before writing them again.";
+
+/** What a sign-in or a sign-out may have done, and what to look at before asking again. */
+const SIGN_IN_ASKED = "The sign-in may have changed: read the server's state again before asking again.";
+
+/** A factory's MCP servers, in its namespace (the factory's name), each header's value served masked; and their sign-ins. */
+export const mcpServers = {
+  /** Every server the factory `namespace` records, with the state its harness reports of each. */
+  list: (namespace: string): Promise<McpServerList> =>
+    call((c) => c.mcpservers.list({ params: { namespace }, query: {} }), read(McpServerList)),
+  /** The server `name` recorded as `server`; a header sent as the mask keeps the value stored. */
+  put: (namespace: string, name: string, server: McpServerWrite): Promise<McpServer> =>
+    call((c) => c.mcpservers.put({ params: { namespace, name }, payload: server }), write(McpServer, SERVER_WRITTEN)),
+  /** The server `name` taken off the record: answers it as it was. */
+  delete: (namespace: string, name: string): Promise<McpServer> =>
+    call((c) => c.mcpservers.delete({ params: { namespace, name } }), write(McpServer, SERVER_WRITTEN)),
+  /** A sign-in to the server `name` started: the address the person opens. */
+  signIn: (namespace: string, name: string): Promise<SignInStarted> =>
+    call((c) => c.mcpservers.signIn({ params: { namespace, name } }), write(SignInStarted, SIGN_IN_ASKED)),
+  /** The state of the server `name`'s last sign-in, from the engine's memory. */
+  signInState: (namespace: string, name: string): Promise<SignInState> =>
+    call((c) => c.mcpservers.signInState({ params: { namespace, name } }), read(SignInState)),
+  /** The server `name` signed out. */
+  signOut: (namespace: string, name: string): Promise<SignedOut> =>
+    call((c) => c.mcpservers.signOut({ params: { namespace, name } }), write(SignedOut, SIGN_IN_ASKED)),
+};
+
+/** Nemia's own servers, which a factory may record (`GET /api/builtin/mcpservers`). */
+export const builtin = {
+  mcpServers: (): Promise<McpServerList> => call((c) => c.builtin.mcpservers({}), read(McpServerList)),
+};
+
+/** A factory's schedules, each named by its workflow. */
+export const schedules = {
+  list: (namespace: string): Promise<ScheduleList> =>
+    call((c) => c.schedules.list({ params: { namespace }, query: {} }), read(ScheduleList)),
+  get: (namespace: string, name: string): Promise<Schedule> =>
+    call((c) => c.schedules.get({ params: { namespace, name } }), read(Schedule)),
+  put: (namespace: string, name: string, schedule: ScheduleWrite): Promise<Schedule> =>
+    call(
+      (c) => c.schedules.put({ params: { namespace, name }, payload: schedule }),
+      write(Schedule, "The schedule may be changed: read the factory's schedules again before writing it again."),
+    ),
+  delete: (namespace: string, name: string): Promise<Schedule> =>
+    call(
+      (c) => c.schedules.delete({ params: { namespace, name } }),
+      write(Schedule, "The schedule may be removed: read the factory's schedules again before removing it again."),
+    ),
+};
+
+/** The name of the hire into `step` of `workflow`: the two joined by a dot. */
+export const hireName = (workflow: string, step: string): string => `${workflow}.${step}`;
+
+/** What a hire or a fire may have done, and what to look at before sending it again. */
+const HIRE_WRITTEN = "The factory's hires may be changed: read the step's page again before hiring or firing again.";
+
+/** A factory's hires, one per step of each workflow it offers, each named `<workflow>.<step>` (`hireName`). */
+export const hires = {
+  list: (namespace: string): Promise<HireList> => call((c) => c.hires.list({ params: { namespace }, query: {} }), read(HireList)),
+  get: (namespace: string, name: string): Promise<Hire> => call((c) => c.hires.get({ params: { namespace, name } }), read(Hire)),
+  /** The agent `agent` hired into the step the hire `name` is of: answers the hire as it then reads. */
+  put: (namespace: string, name: string, agent: string): Promise<Hire> =>
+    call((c) => c.hires.put({ params: { namespace, name }, payload: { agent } }), write(Hire, HIRE_WRITTEN)),
+  /** The agent hired into the step the hire `name` is of fired: answers the hire as it then reads. */
+  delete: (namespace: string, name: string): Promise<Hire> =>
+    call((c) => c.hires.delete({ params: { namespace, name } }), write(Hire, HIRE_WRITTEN)),
+};
+
+/** A factory's volumes, read-only: each folder its runs reach beside its repositories. */
+export const volumes = {
+  list: (namespace: string): Promise<VolumeList> => call((c) => c.volumes.list({ params: { namespace }, query: {} }), read(VolumeList)),
+  get: (namespace: string, name: string): Promise<Volume> => call((c) => c.volumes.get({ params: { namespace, name } }), read(Volume)),
 };

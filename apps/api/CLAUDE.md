@@ -44,7 +44,9 @@ from the orchestrator; what it holds today below its layer is in `docs/architect
 - **The list's `toDecide` is not the package's decision**: `decision` answers `awaiting` where `toDecide` says nothing.
 - **A remote step's wait is answered with `wf say`** (`answerIn` in the package's `needsOf`), never in Claude Code.
 - **A new key in `STEP_KEYS` or `AGENT_KEYS` has sites here**: see `packages/agent-orchestrator/CLAUDE.md`.
-- **The objects are served by HttpApi handlers in `src/objects/`** (`runs.ts`, `cards.ts`), built from `objects`' one `Api` into a web
+- **The objects are served by HttpApi handlers in `src/objects/`** (`runs.ts`, `cards.ts`, `factories.ts`; a factory's parts in
+  `src/factory-parts/`: `mcp-servers.ts`, `schedules.ts`, `hires.ts`, `volumes.ts`, and in `parts.ts` what they share, their paths and
+  the guard words of their writes), built from `objects`' one `Api` into a web
   handler (`serve.ts`) that Hono's routes hand exactly the paths it serves, each inside `served`, guarded first where it writes: a handler
   reads the request's services (`ServedNow`, the app's informer among them), never a layer of its own. A path added to the `Api` gets its
   forwarding route there, or Hono answers it 404. The feed, `watch` and every other route stay Hono's.

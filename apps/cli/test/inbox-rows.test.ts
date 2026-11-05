@@ -6,8 +6,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { inboxLines, type InboxListing, queueOrder } from 'agent-orchestrator';
-import { API_VERSION, type Card } from 'objects';
-import { inboxPrinted, rowOf } from '../src/reads/inbox.ts';
+import { API_VERSION, type Card, type Factory, type FactoryList } from 'objects';
+import { inboxPrinted, reposOf, rowOf } from '../src/reads/inbox.ts';
 
 /** A listing as the package lists a card, every key it does not set at its default. */
 const listing = (name: string, keys: Partial<InboxListing> = {}): InboxListing => ({
@@ -78,8 +78,31 @@ const listed = (() => {
   return raw.map((l) => (l.queued ? { ...l, queued: { at: l.queued.at, place: places.get(l.name) ?? null } } : l));
 })();
 
-/** The repository each factory picks: mill has one, pair several. */
-const repos = new Map([['mill', '/code/mill']]);
+/** A factory as the api's FactoryList serves it, on `repos`. */
+const factory = (name: string, repos: string[]): Factory => ({
+  apiVersion: API_VERSION,
+  kind: 'Factory',
+  metadata: { name, creationTimestamp: '2026-11-01T00:00:00.000Z', resourceVersion: '0' },
+  spec: { repos, hires: {}, volumes: [] },
+  status: { conditions: [], untrusted: [] },
+});
+
+/** The factories the api lists: mill on one repository, pair on several, and the default on the api's own. */
+const factories: FactoryList = {
+  apiVersion: API_VERSION,
+  kind: 'FactoryList',
+  metadata: { remainingItemCount: 0 },
+  items: [factory('default', ['/code/own']), factory('mill', ['/code/mill']), factory('pair', ['/code/a', '/code/b'])],
+};
+
+/** The repository each factory picks, read off the FactoryList: mill has one, pair several. */
+const repos = reposOf(factories);
+
+test('each factory of a FactoryList with one repository picks it; one with several picks none', () => {
+  assert.equal(repos.get('mill'), '/code/mill');
+  assert.equal(repos.get('pair'), undefined);
+  assert.equal(repos.get('default'), '/code/own');
+});
 
 test("each Card is the row the package's printer reads: the same lines, places and factory repositories as `inboxLines`", () => {
   const cards = listed.map(cardOf);

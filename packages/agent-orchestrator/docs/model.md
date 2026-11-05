@@ -148,6 +148,7 @@ erDiagram
     enum revisions "optional"
     string tree "optional"
     object harnessSettings "optional"
+    number generation "optional"
   }
   AppliedTemplate {
     TemplateSource source FK
@@ -163,6 +164,7 @@ erDiagram
   Volume {
     string path
     boolean readOnly
+    string name "optional"
   }
   Template {
     TemplateSource source PK

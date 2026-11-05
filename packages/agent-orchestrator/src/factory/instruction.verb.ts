@@ -149,16 +149,10 @@ export const FACTORY_INSTRUCTION: Command<FactoryInstruction> = {
   check: instructionCheck,
   writes: true,
   class: { bare: 'read', sets: 'ask', setsBy: ['--path', '--store', '--clear'] },
-  route: [
-    {
-      method: 'GET',
-      path: '/api/factories/:factory/instruction',
-      status: 200,
-      hand: 'a read of a command that writes: the api serves it by a route of its own, which calls the same handler',
-    },
-    { method: 'PUT', path: '/api/factories/:factory/instruction', status: 200, sets: { clear: false } },
-    { method: 'DELETE', path: '/api/factories/:factory/instruction', status: 200, sets: { clear: true } },
-  ],
+  only: {
+    side: 'cli',
+    why: "the api serves it as the Factory's `instruction`, `putInstruction` and `deleteInstruction` of `objects`' Api, calling this handler",
+  },
   handler: (args) => tried(() => placed(args)),
   print(data, args) {
     const asked = placeAsked(args);
@@ -176,19 +170,13 @@ const FILE = {
   only: { side: 'cli', why: 'the api is sent the words themselves, never a path to read' },
 } satisfies Flag;
 
-/** `nemia factory instruct`'s spec: the factory's name, then `--file` or `--clear`; and the words, which a body alone carries. */
+/**
+ * `nemia factory instruct`'s spec: the factory's name, then `--file` or `--clear`; the words, which the runner reads from the file or the
+ * api's handler is given, are no flag of it.
+ */
 const INSTRUCT_SPEC: Spec = {
   positionals: [{ key: 'factory', takes: 'required', kind: 'name' }],
-  flags: [
-    FILE,
-    { flag: '--clear', kind: 'switch', key: 'clear' },
-    {
-      flag: '--words',
-      kind: 'text',
-      key: 'words',
-      only: { side: 'api', why: 'the command line reads the words from --file', required: true },
-    },
-  ],
+  flags: [FILE, { flag: '--clear', kind: 'switch', key: 'clear' }],
   unknown: (arg) => `nemia factory instruct takes one factory's name, then --file <path> (or --file - for stdin) or --clear, not ${arg}.`,
   apart: () => FILE.takes,
   missing: "nemia factory instruct takes the factory's name: nemia factory instruct <name> --file <path>|- or --clear.",
@@ -219,10 +207,10 @@ export const FACTORY_INSTRUCT: Command<Instructed> = {
   },
   writes: true,
   class: 'ask',
-  route: [
-    { method: 'PUT', path: '/api/factories/:factory/instruction/words', status: 200, sets: { clear: false } },
-    { method: 'DELETE', path: '/api/factories/:factory/instruction/words', status: 200, sets: { clear: true } },
-  ],
+  only: {
+    side: 'cli',
+    why: "the api serves it as the Factory's `putInstructionWords` and `deleteInstructionWords` of `objects`' Api, calling this handler",
+  },
   handler: (args) => tried(() => instructed(args)),
   print(data) {
     if (data.removed !== undefined)

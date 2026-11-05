@@ -10,6 +10,9 @@
  * The form takes a **remote** server only, and refuses an `Authorization` header in the api's own words: nothing a person types enters
  * the record, and a server's own sign-in is the road for a credential. Every other header is kept, and a line beside the field says a
  * header changed after a sign-in asks for a new one.
+ *
+ * **A header's value is never shown.** The api serves each as the mask (`HEADER_MASK`), and a recorded server loaded back into the form
+ * carries the mask: sent back unchanged, it keeps the value the record holds.
  */
 import { useState, type ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -22,10 +25,11 @@ import { container, hairline } from '@/lib/meaning';
 import { CHIP } from './Reach';
 import { ServerSignIn } from './ServerSignIn';
 import { stateDrawn } from '../lib/serverState';
-import { factoryServersQuery, recordServer, removeServer, type FactoryServer, type BuiltinServer } from '../lib/api';
+import { HEADER_MASK } from 'objects';
+import { factoryServersQuery, recordServer, removeServer, type BuiltinServer, type FactoryServer, type McpServerWrite } from '../lib/api';
 
 /** What a person asks of a factory's record: one server recorded, or one taken off. */
-type Change = { kind: 'record'; server: string; body: Parameters<typeof recordServer>[2] } | { kind: 'remove'; server: string };
+type Change = { kind: 'record'; server: string; body: McpServerWrite } | { kind: 'remove'; server: string };
 
 /** What a change did, said once it is done, and what a refusal of it is headed with. */
 const SAID: Record<Change['kind'], { done: string; refused: string }> = {
@@ -104,7 +108,10 @@ type Draft = { name: string; url: string; transport: string; header: string; cli
 
 const EMPTY: Draft = { name: '', url: '', transport: 'http', header: '', clientId: '', callbackPort: '' };
 
-/** `builtin` as a draft: the facts Nemia holds of it, so a person types neither its address nor its client id. */
+/**
+ * `builtin` as a draft: the facts Nemia holds of it, so a person types neither its address nor its client id; or a recorded server's,
+ * each header's value the mask it was read with, which sent back keeps the value stored.
+ */
 const draftOf = (builtin: BuiltinServer): Draft => ({
   name: builtin.name,
   url: builtin.url,
@@ -127,7 +134,8 @@ function HeaderField({ draft, set }: Fills) {
       <Input id="server-header" name="header" value={draft.header} onChange={set('header')} placeholder="X-MCP-Toolsets=actions,repos" />
       <FieldDescription data-server-header-note>
         One <code className="font-mono text-body-small">name=value</code> per header, separated by commas. A header changed after a sign-in
-        asks for a new one: the state reads needs-auth again on the next read.{' '}
+        asks for a new one: the state reads needs-auth again on the next read. A value shown as{' '}
+        <code className="font-mono text-body-small">{HEADER_MASK}</code> is the one recorded, kept as it is when sent back unchanged.{' '}
         <code className="font-mono text-body-small">Authorization</code> is refused — nothing a person types enters the record, and a server
         signs in instead.
       </FieldDescription>
@@ -156,33 +164,63 @@ function SignInFields({ draft, set }: Fills) {
   );
 }
 
+/** The transports a draft may name, as the api takes them. */
+const TRANSPORTS = ['http', 'sse'] as const;
+
+/** The transport `draft` names, `http` where none is typed; null for a word the api takes no server from. */
+const transportOf = (draft: Draft): McpServerWrite['type'] | null => {
+  const typed = draft.transport.trim() || 'http';
+  return TRANSPORTS.find((one) => one === typed) ?? null;
+};
+
+/** `name=value`, as a header field holds one, split at its first `=`; null for one with none. */
+const headerOf = (one: string): [string, string] | null => {
+  const at = one.indexOf('=');
+  return at <= 0 ? null : [one.slice(0, at).trim(), one.slice(at + 1).trim()];
+};
+
+/**
+ * What `draft` records: its address, its transport (`transportOf`), each header as typed — a value the mask keeping the one stored — and
+ * its OAuth client.
+ */
+const writeOf = (draft: Draft, type: McpServerWrite['type']): McpServerWrite => {
+  const headers = Object.fromEntries(
+    draft.header
+      .split(',')
+      .map((one) => headerOf(one.trim()))
+      .filter((one) => one !== null),
+  );
+  const port = Number(draft.callbackPort.trim());
+  const clientId = draft.clientId.trim();
+  return {
+    url: draft.url.trim(),
+    ...(type === undefined ? {} : { type }),
+    ...(Object.keys(headers).length ? { headers } : {}),
+    ...(clientId ? { oauth: { clientId, ...(draft.callbackPort.trim() ? { callbackPort: port } : {}) } } : {}),
+  };
+};
+
 /**
  * The form that records a remote server: its name, address, transport, headers and the facts of its OAuth client. Exported for its
  * stories.
  */
 export function ServerForm({
   builtin,
+  recorded = [],
   pending,
   onRecord,
 }: {
   builtin: readonly BuiltinServer[];
+  recorded?: readonly BuiltinServer[];
   pending: boolean;
-  onRecord: (server: string, body: Parameters<typeof recordServer>[2]) => void;
+  onRecord: (server: string, body: McpServerWrite) => void;
 }) {
   const [draft, setDraft] = useState<Draft>(EMPTY);
   const set = (key: keyof Draft) => (e: { target: { value: string } }) => setDraft((was) => ({ ...was, [key]: e.target.value }));
-  const header = draft.header
-    .split(',')
-    .map((one) => one.trim())
-    .filter((one) => one.length > 0);
-  const send = () =>
-    onRecord(draft.name.trim(), {
-      url: draft.url.trim(),
-      transport: draft.transport.trim() || 'http',
-      ...(header.length ? { header } : {}),
-      ...(draft.clientId.trim() ? { clientId: draft.clientId.trim() } : {}),
-      ...(draft.callbackPort.trim() ? { callbackPort: draft.callbackPort.trim() } : {}),
-    });
+  const type = transportOf(draft);
+  const send = () => {
+    if (type !== null) onRecord(draft.name.trim(), writeOf(draft, type));
+  };
   return (
     <form
       data-server-form
@@ -196,6 +234,16 @@ export function ServerForm({
         <div data-server-builtin className="flex flex-wrap items-center gap-2">
           <span className="text-body-medium text-muted-foreground">Built into Nemia:</span>
           {builtin.map((one) => (
+            <Button key={one.name} type="button" variant="outline" size="sm" onClick={() => setDraft(draftOf(one))}>
+              {one.name}
+            </Button>
+          ))}
+        </div>
+      )}
+      {recorded.length > 0 && (
+        <div data-server-recorded className="flex flex-wrap items-center gap-2">
+          <span className="text-body-medium text-muted-foreground">Change one recorded:</span>
+          {recorded.map((one) => (
             <Button key={one.name} type="button" variant="outline" size="sm" onClick={() => setDraft(draftOf(one))}>
               {one.name}
             </Button>
@@ -221,13 +269,15 @@ export function ServerForm({
         <Field>
           <FieldLabel htmlFor="server-transport">Transport</FieldLabel>
           <Input id="server-transport" name="transport" value={draft.transport} onChange={set('transport')} placeholder="http" />
-          <FieldDescription>http or sse. The harness loads no server from an address without one.</FieldDescription>
+          <FieldDescription data-server-transport-note className={type === null ? 'text-failure' : undefined}>
+            http or sse. The harness loads no server from an address without one.
+          </FieldDescription>
         </Field>
         <HeaderField draft={draft} set={set} />
         <SignInFields draft={draft} set={set} />
       </FieldGroup>
       <div className="flex items-center gap-3">
-        <CutPress isDisabled={pending || !draft.name.trim() || !draft.url.trim()} onPress={send}>
+        <CutPress isDisabled={pending || type === null || !draft.name.trim() || !draft.url.trim()} onPress={send}>
           Record
         </CutPress>
       </div>
@@ -302,15 +352,10 @@ export function FactoryServers({ name }: { name: string }) {
       </p>
       {data ? (
         <>
-          {data.unread !== null && (
-            <Alert data-servers-unread>
-              <AlertTitle>The states were not read, which is not an absence</AlertTitle>
-              <AlertDescription className="break-words">{data.unread}</AlertDescription>
-            </Alert>
-          )}
           <ServerList factory={name} servers={servers} pending={change.isPending} onRemove={(server) => ask({ kind: 'remove', server })} />
           <ServerForm
             builtin={data.builtin}
+            recorded={servers}
             pending={change.isPending}
             onRecord={(server, body) => ask({ kind: 'record', server, body })}
           />

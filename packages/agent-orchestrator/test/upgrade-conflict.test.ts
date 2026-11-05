@@ -25,7 +25,7 @@ process.env.WF_ROOT = ROOT;
 process.env.WF_VERIFY_REST = '1';
 const FACTORIES = path.join(ROOT, 'factories');
 const { templated: programsAt } = await import('./templated.ts');
-const { exportTemplate, reconciled } = programsAt(ROOT);
+const { exportTemplate, reconciled, reconciledAt } = programsAt(ROOT);
 const { readFactory } = await import('../src/runner.ts');
 const { appliedDir, digestOf, entriesIn, readStatus, replaceBase, resolutionsFile, statusFile, swapTree, treeDir } =
   await import('../src/applied/applied.store.ts');
@@ -148,7 +148,11 @@ test('an upgrade with a conflict: previewed, filed, waited on with the status al
     const folder = bytesUnder(path.join(FACTORIES, 'crew'));
     const printed = await printedBy(t, 'factory', 'upgrade', 'crew', '--to', '0.2.0');
     assert.match(printed[2], /^2 conflicts wait for a choice: nemia factory diff crew --to 0\.2\.0 shows each/);
-    assert.deepEqual(JSON.parse(fs.readFileSync(file, 'utf8')), { ...filedAs, template: { ...filedAs.template, version: '0.2.0' } });
+    assert.deepEqual(JSON.parse(fs.readFileSync(file, 'utf8')), {
+      ...filedAs,
+      template: { ...filedAs.template, version: '0.2.0' },
+      generation: 2,
+    });
     assert.deepEqual(bytesUnder(path.join(FACTORIES, 'crew')), folder, 'the upgrade writes no tree, base nor status');
   });
 
@@ -212,7 +216,8 @@ test('an upgrade with a conflict: previewed, filed, waited on with the status al
   await s.test('once each conflict has a choice the controller merges: the tree takes every choice, the base the template', async () => {
     const oldBase = entriesIn(appliedDir('crew'));
     const oldStatus = fs.readFileSync(statusFile('crew'));
-    const merged = reconciled(factory('crew'));
+    const at = '2026-11-01T09:00:00.000Z';
+    const merged = reconciledAt(factory('crew'), at);
     assert.equal(merged.version, '0.2.0');
     assert.equal(merged.conditions[0].reason, 'Upgraded');
     assert.equal(merged.upgrade, undefined, 'no conflict is said once merged');
@@ -223,7 +228,7 @@ test('an upgrade with a conflict: previewed, filed, waited on with the status al
     const mergedTree = bytesUnder(tree());
     replaceBase('crew', oldBase);
     fs.writeFileSync(statusFile('crew'), oldStatus);
-    assert.deepEqual(reconciled(factory('crew')), merged, 'stopped after the tree was swapped, the next pass ends it');
+    assert.deepEqual(reconciledAt(factory('crew'), at), merged, 'stopped after the tree was swapped, the next pass ends it');
     assert.deepEqual(bytesUnder(tree()), mergedTree, 'composing the same tree');
     fs.writeFileSync(statusFile('crew'), oldStatus);
     const after = reconciled(factory('crew'));

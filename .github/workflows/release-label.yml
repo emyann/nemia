@@ -25,10 +25,11 @@ permissions:
   contents: read
   pull-requests: read
 
-concurrency:
-  group: release-label-${{ github.ref }}
-  cancel-in-progress: true
-
+# No concurrency group, on purpose: a group cancels a run of this required check, the running one under cancel-in-progress and,
+# without it, the pending one under the default queue (docs.github.com, actions/how-tos/write-workflows/choose-when-workflows-run/
+# control-workflow-concurrency). A pull request opened with its labels on fires opened and labeled together, and the cancelled run was
+# what branch protection read (#665). Every run reads the labels live and writes nothing on a pull_request event, so each goes to its
+# verdict.
 jobs:
   release-label:
     name: release-label

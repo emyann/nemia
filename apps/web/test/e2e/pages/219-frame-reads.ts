@@ -1,10 +1,9 @@
 import type { Page } from 'playwright';
-import type { Factory } from '../../../src/lib/api/factories.ts';
 import type { OpenRuns } from '../../../src/lib/api/runs.ts';
 import { barValue } from '../../../src/lib/bar.ts';
 import { openBlockOf, runsOf } from '../../../src/lib/factories.ts';
 import { atWork, atWorkWords } from '../../../src/lib/footer.ts';
-import { gaugesOf, railPlace } from '../board.ts';
+import { factoriesAnswered, gaugesOf, railPlace } from '../board.ts';
 import { expectNone, expectTexts, idle, Refused } from '../checks.ts';
 import { FACTORIES } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -59,7 +58,7 @@ export default {
       const bar = barValue({ kind: 'factory', factory: FACTORY });
       await visit(page, `/workflows?factory=${FACTORY}&bar=${encodeURIComponent(bar)}`);
       await railCounts(page, await answer<OpenRuns>(page, `${LIGHT}?ofFactory=${FACTORY}`), "a factory's Workflows");
-      const factory = (await answer<Factory[]>(page, '/api/factories')).find((one) => one.name === FACTORY);
+      const factory = (await factoriesAnswered(page)).find((one) => one.name === FACTORY);
       if (!factory) throw new Refused(`the seeded store has the factory ${FACTORY}`);
       const block = openBlockOf(factory, await answer<OpenRuns>(page, `${LIGHT}?ofFactory=${FACTORY}`));
       if (block.runs === 0) throw new Refused(`the factory ${FACTORY} holds a run, so its bar counts the finished`);

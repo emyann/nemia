@@ -21,7 +21,7 @@ const ROOT = scratch('wf-applied-');
 process.env.WF_ROOT = ROOT;
 const FACTORIES = path.join(ROOT, 'factories');
 const { templated: programsAt } = await import('../../test/templated.ts');
-const { exportTemplate, reconciled } = programsAt(ROOT);
+const { exportTemplate, reconciled, reconciledAt } = programsAt(ROOT);
 const { attachWorkflow, detachWorkflow, fireAgent, hireAgent, readFactories, readFactory } = await import('../runner.ts');
 const { main: cli } = await import('../cli/main.ts');
 const { reconcile } = await import('./applied.verb.ts');
@@ -212,7 +212,7 @@ test('what the controller says of a template or parameters moved since the rende
     assert.deepEqual(listed().status, { applied: '0.1.0', conditions: first.conditions }, 'the listing reads what the controller wrote');
     const status = reconciled(templated('drifted'));
     assert.deepEqual(listed().status, { applied: '0.1.0', conditions: status.conditions });
-    const { message: drift, ...drifted } = status.conditions[0];
+    const { message: drift, lastTransitionTime: _driftedAt, ...drifted } = status.conditions[0];
     assert.deepEqual(drifted, { type: 'Applied', status: 'False', reason: 'VersionDrift' });
     assert.ok(drift.includes('nemia factory diff drifted --to 0.2.0'), drift);
     assert.ok(drift.includes('nemia factory upgrade drifted --to 0.2.0'), drift);
@@ -235,7 +235,7 @@ test('what the controller says of a template or parameters moved since the rende
       fs.writeFileSync(file, JSON.stringify(content));
       const review = (folder: string) => fs.readFileSync(path.join(folder, 'workflows/dev/review.md'), 'utf8');
       const changed = reconciled(templated('moved'));
-      const { message: moved, ...params } = changed.conditions[0];
+      const { message: moved, lastTransitionTime: _movedAt, ...params } = changed.conditions[0];
       assert.deepEqual(params, { type: 'Applied', status: 'False', reason: 'ParamsChanged' });
       assert.ok(moved.includes('nemia factory diff moved --to <version>'), moved);
       assert.ok(moved.includes('nemia factory upgrade moved --to <version>'), moved);
@@ -248,7 +248,7 @@ test('what the controller says of a template or parameters moved since the rende
         spec.steps[1].rounds = 5;
       });
       const edited = reconciled(templated('moved'));
-      const { message: changedWords, ...contentChanged } = edited.conditions[0];
+      const { message: changedWords, lastTransitionTime: _editedAt, ...contentChanged } = edited.conditions[0];
       assert.deepEqual(contentChanged, { type: 'Applied', status: 'False', reason: 'ContentChanged' });
       assert.ok(changedWords.includes('0.1.0'), changedWords);
       assert.ok(changedWords.includes('a new version'), changedWords);
@@ -257,6 +257,57 @@ test('what the controller says of a template or parameters moved since the rende
       assert.doesNotMatch(review(treeDir('moved')), /^rounds: 5$/m);
     },
   );
+});
+
+test("the controller stamps each condition with when its status last moved, and the factory's generation it read", async (t) => {
+  t.mock.method(console, 'log', () => {});
+  const { repo, dir } = template();
+  await apply('stamped', dir, repo, '--set', 'budget=7');
+  const file = path.join(FACTORIES, 'stamped.json');
+  const times = (status: { conditions: readonly { type: string; status: string; lastTransitionTime?: string }[] }) =>
+    status.conditions.map((c) => [c.type, c.status, c.lastTransitionTime]);
+  const at = ['2026-11-01T09:00:00.000Z', '2026-11-01T09:00:05.000Z', '2026-11-01T09:00:10.000Z', '2026-11-01T09:00:15.000Z'];
+  await t.test('a condition the factory did not have is stamped with the time of the pass', () => {
+    assert.deepEqual(times(reconciledAt(templated('stamped'), at[0])), [
+      ['Applied', 'True', at[0]],
+      ['ConflictsPending', 'False', at[0]],
+    ]);
+  });
+  await t.test('a pass that observes the same status keeps the time each condition moved, and writes nothing', () => {
+    const before = fs.readFileSync(statusFile('stamped'), 'utf8');
+    assert.deepEqual(times(reconciledAt(templated('stamped'), at[1])), [
+      ['Applied', 'True', at[0]],
+      ['ConflictsPending', 'False', at[0]],
+    ]);
+    assert.equal(fs.readFileSync(statusFile('stamped'), 'utf8'), before);
+  });
+  await t.test("a condition whose status flips is stamped with the pass's time, the other keeps its own", () => {
+    const content = JSON.parse(fs.readFileSync(file, 'utf8'));
+    content.template.params.budget = 9;
+    fs.writeFileSync(file, JSON.stringify(content));
+    assert.deepEqual(times(reconciledAt(templated('stamped'), at[2])), [
+      ['Applied', 'False', at[2]],
+      ['ConflictsPending', 'False', at[0]],
+    ]);
+  });
+  await t.test('a status written before the field is stamped with the time of the pass that reads it', () => {
+    const status = JSON.parse(fs.readFileSync(statusFile('stamped'), 'utf8'));
+    for (const c of status.conditions) delete c.lastTransitionTime;
+    fs.writeFileSync(statusFile('stamped'), JSON.stringify(status));
+    assert.deepEqual(times(reconciledAt(templated('stamped'), at[3])), [
+      ['Applied', 'False', at[3]],
+      ['ConflictsPending', 'False', at[3]],
+    ]);
+  });
+  await t.test("observedGeneration is the factory's generation the pass read: 1 for a file without one, else its own", () => {
+    const content = JSON.parse(fs.readFileSync(file, 'utf8'));
+    delete content.generation;
+    fs.writeFileSync(file, JSON.stringify(content));
+    assert.equal(reconciledAt(templated('stamped'), at[3]).observedGeneration, 1);
+    fs.writeFileSync(file, JSON.stringify({ ...content, generation: 5 }));
+    assert.equal(reconciledAt(templated('stamped'), at[3]).observedGeneration, 5);
+    assert.equal(readStatus('stamped')?.observedGeneration, 5, 'and it is written');
+  });
 });
 
 /** The status of `name` rewritten as the controller wrote it before it named templates: with no `template`, changed by `change`. */
@@ -364,14 +415,19 @@ test("what a templated factory's verbs read and write: its tree's wiring, instru
         ['follow', 'follow'],
         "the policy is the tree wiring's, read back",
       );
-      assert.equal(fs.readFileSync(path.join(FACTORIES, 'wired.json'), 'utf8'), own, "the factory's own file is not written");
+      assert.deepEqual(
+        JSON.parse(fs.readFileSync(path.join(FACTORIES, 'wired.json'), 'utf8')),
+        { ...JSON.parse(own), generation: 6 },
+        "the factory's own file is written only for its generation, one more for each change of the tree's wiring: fire, hire, attach, detach, revisions",
+      );
       const tree = fs.readFileSync(path.join(treeDir('wired'), 'factory.json'), 'utf8');
       const notes = scratch('wf-applied-volume-');
       await main(['factory', 'volume', 'add', 'wired', `${notes}:ro`], noEngine());
       const file = JSON.parse(fs.readFileSync(path.join(FACTORIES, 'wired.json'), 'utf8'));
-      assert.deepEqual(file.volumes, [{ path: notes, readOnly: true }], "a volume is the factory's own, in its file");
+      const volume = { path: notes, readOnly: true, name: path.basename(notes).toLowerCase() };
+      assert.deepEqual(file.volumes, [volume], "a volume is the factory's own, in its file, under the name its folder gives it");
       assert.equal(fs.readFileSync(path.join(treeDir('wired'), 'factory.json'), 'utf8'), tree, 'and never in its tree');
-      assert.deepEqual(readFactory('wired').volumes, [{ path: notes, readOnly: true }]);
+      assert.deepEqual(readFactory('wired').volumes, [volume]);
     },
   );
   await t.test(
@@ -568,7 +624,7 @@ test('a builtin template, named: applied, recorded by its name, read wherever Ne
       fs.writeFileSync(statusFile('named'), JSON.stringify(unnamed));
       const gone = programsAt(ROOT, scratch('wf-applied-none-')).reconciled(templated('named'));
       assert.equal(gone.template, 'team', 'a builtin is named by the name it is recorded by, even where none has it any longer');
-      const { message, ...applied } = gone.conditions[0];
+      const { message, lastTransitionTime: _goneAt, ...applied } = gone.conditions[0];
       assert.deepEqual(applied, { type: 'Applied', status: 'False', reason: 'TemplateInvalid' });
       assert.ok(message.includes('./team'), message);
       assert.equal(gone.digest, digest);

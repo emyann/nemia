@@ -129,16 +129,19 @@ test('the rules routes: what a read or a write refuses, writing nothing', async 
     assert.equal(held(), 'Kept.\n');
     await answered(send('DELETE', URL, {}));
   });
-  await t.test('words left out, words that are no string, and a body that is not JSON are a 400 naming the route', async () => {
-    const none = await refused(() => send('PUT', URL, {}), 400);
-    assert.ok(none.startsWith('PUT /api/factories/mill/rules: `words`'), none);
-    const wrong = await refused(() => send('PUT', URL, { words: 7 }), 400);
-    assert.ok(wrong.endsWith("This request's was 7."), wrong);
-    assert.match(await refused(() => send('PUT', URL, 'not json'), 400), /^PUT \/api\/factories\/mill\/rules takes a JSON body/);
-  });
-  await t.test("a name that is no factory's is a 400, to read and to write", async () => {
-    await refused(() => app.request('/api/factories/Not%20One/rules'), 400);
-    await refused(() => app.request('/api/factories/..%2Fmill/rules'), 400);
-    await refused(() => send('PUT', '/api/factories/Not%20One/rules', { words: 'x' }), 400);
+  await t.test(
+    'words left out, words that are no string, and a body that is not JSON are a 400 naming the route and its shape',
+    async () => {
+      for (const body of [{}, { words: 7 }, 'not json']) {
+        const said = await refused(() => send('PUT', URL, body), 400);
+        assert.ok(said.startsWith('PUT /api/factories/mill/rules'), said);
+        assert.ok(said.includes('`{ "words": "<the factory\'s rules>" }`'), said);
+      }
+    },
+  );
+  await t.test("a name that is no factory's is a 422 in the package's words, to read and to write", async () => {
+    await refused(() => app.request('/api/factories/Not%20One/rules'), 422);
+    await refused(() => app.request('/api/factories/..%2Fmill/rules'), 422);
+    await refused(() => send('PUT', '/api/factories/Not%20One/rules', { words: 'x' }), 422);
   });
 });

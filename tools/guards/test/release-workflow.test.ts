@@ -106,7 +106,12 @@ function releaseDrift(workflow: Workflow): string[] {
   return sentences;
 }
 
-/** The `release-label` workflow: its events, its token, the job branch protection requires, and the check it runs. */
+/**
+ * The `release-label` workflow: its events, its token, the job branch protection requires, and the check it runs. It has no
+ * concurrency group, at the workflow or at a job: a group cancels a run of the check — with cancel-in-progress the running one, and
+ * without it, under the default queue, the one pending — and a pull request opened with its labels on fires opened and labeled
+ * together, so a cancelled run was what branch protection read for the required context (#665).
+ */
 function labelDrift(workflow: Workflow): string[] {
   const sentences: string[] = [];
   const pr = workflow.on?.pull_request;
@@ -123,6 +128,13 @@ function labelDrift(workflow: Workflow): string[] {
   if (!same(sortedKeys(workflow.permissions), { contents: 'read', 'pull-requests': 'read' }))
     sentences.push(
       `${LABEL_CHECK}'s permissions are not contents: read and pull-requests: read: it writes nothing, so grant that and no more`,
+    );
+  const grouped = [workflow.concurrency, ...Object.values(workflow.jobs).map((each) => each.concurrency)].some(
+    (each) => each !== undefined,
+  );
+  if (grouped)
+    sentences.push(
+      `${LABEL_CHECK} puts its runs in a concurrency group: take the concurrency: block out, so no run of the required ${CHECK_JOB} check is cancelled and every run reports its verdict`,
     );
   const job = workflow.jobs[CHECK_JOB];
   if (job === undefined || job.name !== CHECK_JOB)
@@ -230,7 +242,7 @@ test("REFUSED: a third party's action, a job with no bound, a network step with 
   );
 });
 
-test('REFUSED: a missing release-label job, the check not dispatchable with its pull request, no head to compare, labels from the payload, labels interpolated into a command, a type unlisted, and a status posted on every event, under another name or ungranted', () => {
+test('REFUSED: a missing release-label job, its runs in a concurrency group, the check not dispatchable with its pull request, no head to compare, labels from the payload, labels interpolated into a command, a type unlisted, and a status posted on every event, under another name or ungranted', () => {
   const all = (label: string, release = text(RELEASE)) => drift(release, label, text(NOTES));
   refused(
     all(planted(LABEL_CHECK, '  release-label:\n    name: release-label\n', '  label:\n    name: label\n')),
@@ -238,6 +250,13 @@ test('REFUSED: a missing release-label job, the check not dispatchable with its 
     'no release-label job',
   );
   refused(all(planted(LABEL_CHECK, '        required: true\n', '        required: false\n')), 'input pr', 'the pr input not required');
+  refused(
+    all(
+      planted(LABEL_CHECK, '\njobs:\n', '\nconcurrency:\n  group: release-label-${{ github.ref }}\n  cancel-in-progress: false\n\njobs:\n'),
+    ),
+    'concurrency',
+    'two runs of the required check in one group, one cancelled',
+  );
   refused(all(planted(LABEL_CHECK, ' || inputs.pr }}', ' }}')), 'inputs.pr', 'a dispatched run given no number');
   refused(
     all(planted(LABEL_CHECK, /^ {10}HEAD_SHA:.*\n/m.exec(text(LABEL_CHECK))?.[0] ?? 'HEAD_SHA', '')),

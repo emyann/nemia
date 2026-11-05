@@ -31,8 +31,8 @@ export default {
    * Each factory's level on the store's Settings, her folder trusted: every factory reads Manual, the default one's picked by the store's
    * level alone; a factory raised to Semi-auto for the stretch offered first reads raised, with its end, and keeps her session; its raise
    * ended, it reads Manual again and her session off; its default picked at Semi-auto offers a raise to Auto alone, which reads Auto until
-   * ended; its default picked at Auto offers none, and picked back at Manual. The trust, her folder and the factory's level file are
-   * written by the page and taken back after.
+   * ended; its default picked at Auto offers none, and picked back at Manual. The trust, her folder, the factory's level file and its file,
+   * whose generation each level picked counts, are written by the page and taken back after.
    */
   name: 'factory-levels',
   route: '/settings',
@@ -42,6 +42,8 @@ export default {
     const dir = path.join(store!, 'nemia');
     const factory = FACTORIES.bare;
     const own = path.join(store!, 'factories', factory);
+    const file = path.join(store!, 'factories', `${factory}.json`);
+    const fileText = fs.readFileSync(file, 'utf8');
     try {
       const parsed = (before === null ? {} : JSON.parse(before)) as { projects?: Record<string, unknown> };
       const trusted = { ...parsed, projects: { ...parsed.projects, [path.resolve(dir)]: { hasTrustDialogAccepted: true } } };
@@ -91,6 +93,7 @@ export default {
       else fs.writeFileSync(config, before);
       fs.rmSync(dir, { recursive: true, force: true });
       fs.rmSync(own, { recursive: true, force: true });
+      fs.writeFileSync(file, fileText);
     }
     await page.reload({ waitUntil: 'load' });
     await idle(page);

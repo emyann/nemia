@@ -172,6 +172,9 @@ async function onPhone(page: Page, theme: string): Promise<void> {
   }
 }
 
+/** A factory's file as the door reads it: one written before the counter reads as generation 1, so writing it 1 changes nothing. */
+const asRead = (text: string): Record<string, unknown> => ({ generation: 1, ...(JSON.parse(text) as Record<string, unknown>) });
+
 export default {
   /**
    * A factory's settings, reached by the Settings link on its floor. Its rules, drawn above its instruction: none yet; written, they are
@@ -199,7 +202,7 @@ export default {
       await keepInStore(page, section, stored);
       await wrote(page, section, 'Back to NEMIA.md', 'DELETE');
       await expectKept(section, 'folder', path.join(checkout, 'NEMIA.md'), 'Back to NEMIA.md reads NEMIA.md again');
-      if (JSON.stringify(JSON.parse(fs.readFileSync(factoryFile, 'utf8'))) !== JSON.stringify(JSON.parse(factoryText)))
+      if (JSON.stringify(asRead(fs.readFileSync(factoryFile, 'utf8'))) !== JSON.stringify(asRead(factoryText)))
         throw new Refused(`back to NEMIA.md, the factory's file is as it was — it holds ${fs.readFileSync(factoryFile, 'utf8')}`);
     } finally {
       fs.writeFileSync(factoryFile, factoryText);

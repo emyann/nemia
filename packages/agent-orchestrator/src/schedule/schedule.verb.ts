@@ -1,7 +1,7 @@
 /**
  * The factories' schedules (`schedulesRead`): started when due by the tick (`startDue`, through `startRun`, the start a person's takes),
- * and written by `nemia factory schedule` and `unschedule`, entries of the command table the api serves on
- * `/api/factories/:factory/schedules/:workflow`. No level is read here: a schedule is the daemon's, and starts at every level.
+ * and written by `nemia factory schedule` and `unschedule`, entries of the command table the api serves as a Schedule's writes,
+ * `/api/namespaces/:namespace/schedules/:name`. No level is read here: a schedule is the daemon's, and starts at every level.
  */
 import path from 'node:path';
 import { Cause, Effect, Exit } from 'effect';
@@ -130,7 +130,7 @@ export const FACTORY_SCHEDULE: Command<Scheduled> = {
   check: scheduleCheck,
   writes: true,
   class: 'ask',
-  route: { method: 'PUT', path: '/api/factories/:factory/schedules/:workflow', status: 200 },
+  only: { side: 'cli', why: "the api serves it as the Schedule's `put` of `objects`' Api, calling this handler" },
   handler: (args, _env, home) => {
     const repo = textOf(args, 'repo');
     const tz = textOf(args, 'tz');
@@ -171,7 +171,7 @@ export const FACTORY_UNSCHEDULE: Command<{ file: string; cleared: Schedule }> = 
   },
   writes: true,
   class: 'ask',
-  route: { method: 'DELETE', path: '/api/factories/:factory/schedules/:workflow', status: 200 },
+  only: { side: 'cli', why: "the api serves it as the Schedule's `delete` of `objects`' Api, calling this handler" },
   handler: (args, _env, home) => {
     const factory = textOf(args, 'factory');
     const workflow = textOf(args, 'workflow');

@@ -47,8 +47,8 @@ export type McpServer = {
   factoryState: string | null;
 };
 
-/** Decodes a `McpServer`. */
-const McpServerSchema = decodes<McpServer>()(
+/** Decodes a `McpServer` of the capabilities, a server a harness reaches: named apart from the kind of objects. */
+const ReachedServerSchema = decodes<McpServer>()(
   Schema.Struct({
     name: Schema.String,
     source: Schema.String,
@@ -298,7 +298,7 @@ const CapabilitiesSchema = decodes<Capabilities>()(
     repo: Schema.String,
     skills: List(DescribedSchema),
     agents: List(DescribedSchema),
-    mcp: List(McpServerSchema),
+    mcp: List(ReachedServerSchema),
     denied: List(RuleSchema),
     asked: List(RuleSchema),
     allowed: List(RuleSchema),

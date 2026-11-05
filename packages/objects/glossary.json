@@ -25,7 +25,7 @@
     },
     {
       "term": "generation",
-      "meaning": "the count of changes to an object's spec, for a kind whose spec a person edits; a change to its status alone leaves it (`ObjectMeta`, `packages/objects/src/meta.ts`)."
+      "meaning": "the count of changes to an object's spec, for a kind whose spec a person edits (`ObjectMeta`, `packages/objects/src/meta.ts`): a Factory's goes up by one when its repositories, workflows, hires, volumes, harness settings, revisions, template or level change, and a change to its status, or to its schedules alone, leaves it (`Factory`, `packages/objects/src/factory.ts`)."
     },
     {
       "term": "List",
@@ -66,6 +66,58 @@
           "card": "resource objects, P7: the Run's double spellings go before v1 — one approve, one retry, one refresh, and `base` for what a step waits on"
         }
       ]
+    },
+    {
+      "term": "Factory",
+      "meaning": "a factory served as an object, which no namespace holds since it is the namespace its parts are in: its spec is what its file says (repositories, workflows, hires, volumes, harness settings, revisions, template, level), its status what the controller last observed (conditions, the applied version, an upgrade waiting, places not trusted, why its file does not read), at `/api/factories/<name>` (`Factory`, `packages/objects/src/factory.ts`).",
+      "type": "Factory"
+    },
+    {
+      "term": "McpServer",
+      "meaning": "a remote MCP server a factory records, served as an object in the factory's namespace: its spec the transport, url, masked headers and OAuth client, its status the state its harness reports now; a builtin server Nemia offers is served at `/api/builtin/mcpservers` with its spec alone and no namespace (`McpServer`, `packages/objects/src/mcp-server.ts`).",
+      "type": "McpServer"
+    },
+    {
+      "term": "Schedule",
+      "meaning": "a factory's schedule of one of its workflows, served as an object in the factory's namespace and named by its workflow: its spec the cron, brief, repository and time zone, its status since when, its next fire, its last run and a refused fire (`Schedule`, `packages/objects/src/schedule.ts`).",
+      "type": "Schedule"
+    },
+    {
+      "term": "Hire",
+      "meaning": "one step a factory offers, served as an object in the factory's namespace and named `<workflow>.<step>`: its spec the agent the factory hires into it, its status who fills the step (fill origin) and where each setting a session there gets came from (setting origin) (`Hire`, `packages/objects/src/hire.ts`).",
+      "type": "Hire"
+    },
+    {
+      "term": "Volume",
+      "meaning": "a folder of the person's machine a factory mounts for every local step, served as an object in the factory's namespace by its stored name and read-only over the api: its spec its path and whether steps only read it, its status whether it is there, why a run would refuse it, and the runs in play that mount it (`Volume`, `packages/objects/src/volume.ts`).",
+      "type": "Volume"
+    },
+    {
+      "term": "observedGeneration",
+      "meaning": "the generation of a Factory's spec the controller last read, in its status: equal to `metadata.generation` once the controller has acted on the latest change, behind it until then (`FactoryStatus`, `packages/objects/src/factory.ts`)."
+    },
+    {
+      "term": "lastTransitionTime",
+      "meaning": "when a Factory's condition last changed its status, `True` to `False` or back, in the condition: a pass that writes the same status keeps it, and a condition written before it was kept has none (`FactoryCondition`, `packages/objects/src/factory.ts`)."
+    },
+    {
+      "term": "Header mask",
+      "meaning": "what an McpServer's header value is served as, `********`, never a value a header is sent with: sent back on a write, it keeps the value the server holds, and for a header the server does not hold it is refused (`HEADER_MASK`, `packages/objects/src/words.ts`)."
+    },
+    {
+      "term": "Fill origin",
+      "meaning": "who fills a Hire's step, in its status: the step's own file (`step`), the factory's hire (`factory`), neither (`unfilled`), or both, which a start refuses (`refused`) (`FILL_ORIGINS`, `packages/objects/src/words.ts`).",
+      "type": "FillOrigin"
+    },
+    {
+      "term": "Setting origin",
+      "meaning": "where a setting a session on a Hire's step gets came from: the step's own file (`step`), its agent's file (`agent`), or neither, the harness's own default (`default`) (`SETTING_ORIGINS`, `packages/objects/src/words.ts`).",
+      "type": "SettingOrigin"
+    },
+    {
+      "term": "Commands",
+      "meaning": "a Factory's sub-resource at `/api/factories/<name>/commands`: the lines a person types for it, built off the command table — attach, rm, add, schedule, trust, volume — and the line that takes back each schedule, by workflow, and each volume, by name (`FactoryCommands`, `packages/objects/src/factory.ts`).",
+      "type": "FactoryCommands"
     }
   ]
 }

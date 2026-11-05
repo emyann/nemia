@@ -189,7 +189,6 @@ export {
   factoryLines,
   factoryNameRefusal,
   factoryRepo,
-  factoryVolumes,
   writersOf,
   fillsOf,
   hireRefusal,
@@ -391,8 +390,6 @@ export {
   startFactory,
   templatedTree,
 } from './factory/factory.store.ts';
-export type { ScheduleListed } from './schedule/schedule.ts';
-export type { PlaceTrust, Untrusted } from './trust/trust.ts';
 export { EngineService, HARNESSES, asked, engine, engineOf, remoteAgents, runWith } from './runtime-client.ts';
 export { HARNESS_CHOICES } from 'agent-runtime/vocabulary';
 export { A2A_AGENTS_FILE, envNameOf } from './harness/a2a.store.ts';
@@ -466,14 +463,17 @@ export { runObject, type RunObjectAnswer, type TryCloseout } from './object/run.
 export { runLines, type RunLines, type StepCommands } from './object/lines.verb.ts';
 export { cardList, cardObject, type CardQuery } from './object/card.verb.ts';
 export { continueToken, continuedAfter, listPage, pageOf, type PageAsked, type Paged } from './object/page.ts';
+export { factoryCommandsOf, factoryList, factoryObject, type ObjectQuery } from './factory-object/factory.verb.ts';
+export { builtinServerList, mcpServerList, mcpServerObject } from './factory-object/mcp-server.verb.ts';
+export { scheduleList, scheduleObject } from './factory-object/schedule.verb.ts';
+export { hireList, hireObject } from './factory-object/hire.verb.ts';
+export { volumeList, volumeObject } from './factory-object/volume.verb.ts';
 export { folderRefusal, START } from './start/commands.verb.ts';
 export { INBOX, INBOX_ADD, INBOX_QUEUE } from './inbox/commands.verb.ts';
-export { FACTORY } from './factory/factory.verb.ts';
 export { FACTORY_INSTRUCT, FACTORY_INSTRUCTION, factoryInstruction } from './factory/instruction.verb.ts';
 export { FACTORY_RULES, factoryRules } from './rules/rules.verb.ts';
 /** A factory's own MCP servers: the entry that lists its record with each server's state, and the name rule the board shares. */
 export { FACTORY_SERVERS } from './servers/servers.verb.ts';
-export type { ServerListed, ServersListing } from './servers/servers.verb.ts';
 export { serverNameRefusal } from './servers/index.ts';
 export type { BuiltinServer } from './servers/index.ts';
 export { BUILTIN_SERVERS, builtinServers } from './servers/servers.store.ts';

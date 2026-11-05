@@ -1,9 +1,11 @@
 /**
  * A volume as a person spells it (`volumeOf`) and the volumes no run should mount (`volumeRefusal`): one table each, a row per input.
+ * And a volume's name: what its folder gives it (`volumeBase`), and the names a factory's volumes are served under (`volumesNamed`,
+ * `withVolume`) — what `volumeNameAmong`'s laws (contracts/volume-name.contract.ts) leave to them: the order they are named in.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { volumeOf, volumeRefusal, withVolume } from './volume.ts';
+import { volumeBase, volumeOf, volumeRefusal, volumesNamed, withVolume } from './volume.ts';
 
 test('a volume is read as compose spells it, and its mark is required', async (t) => {
   const rows: { name: string; spelled: string; want: { path: string; readOnly: boolean } | 'refused' }[] = [
@@ -57,8 +59,56 @@ test('a volume that is no directory, a repository, or reaches the store is refus
     });
 });
 
-test('a volume added again replaces the one of its path, and says what it was', () => {
-  const added = withVolume({ volumes: [{ path: '/b', readOnly: true }] }, { path: '/b', readOnly: false });
-  assert.deepEqual(added, { volumes: [{ path: '/b', readOnly: false }], was: true });
-  assert.deepEqual(withVolume({}, { path: '/a', readOnly: true }), { volumes: [{ path: '/a', readOnly: true }], was: null });
+test('a volume added again replaces the one of its path, keeping its name, and says what it was', () => {
+  const added = withVolume({ volumes: [{ path: '/b', readOnly: true, name: 'kept' }] }, { path: '/b', readOnly: false });
+  assert.deepEqual(added, { volumes: [{ path: '/b', readOnly: false, name: 'kept' }], was: true });
+  assert.deepEqual(withVolume({}, { path: '/a', readOnly: true }), { volumes: [{ path: '/a', readOnly: true, name: 'a' }], was: null });
+});
+
+test("a volume is named by its folder's name, a suffix telling two apart, and a name once stored is kept", async (t) => {
+  const rows: { name: string; volumes: { path: string; readOnly: boolean; name?: string }[]; want: string[] }[] = [
+    { name: 'its folder, as a slug', volumes: [{ path: '/home/me/My Notes', readOnly: true }], want: ['my-notes'] },
+    { name: 'the root, whose folder gives nothing', volumes: [{ path: '/', readOnly: true }], want: ['volume'] },
+    {
+      name: '/a/data and /b/data are data and data-2, named in path order',
+      volumes: [
+        { path: '/b/data', readOnly: true },
+        { path: '/a/data', readOnly: false },
+      ],
+      want: ['data-2', 'data'],
+    },
+    {
+      name: 'a stored name is kept, and one named on read takes another',
+      volumes: [
+        { path: '/a/data', readOnly: true },
+        { path: '/b/data', readOnly: true, name: 'data' },
+      ],
+      want: ['data-2', 'data'],
+    },
+  ];
+  for (const row of rows)
+    await t.test(row.name, () => {
+      assert.deepEqual(
+        volumesNamed(row.volumes).map((v) => v.name),
+        row.want,
+      );
+    });
+  await t.test('a stored name survives a volume added before it in path order', () => {
+    const first = withVolume({}, { path: '/b/data', readOnly: true });
+    const second = withVolume({ volumes: first.volumes }, { path: '/a/data', readOnly: true });
+    assert.deepEqual(
+      second.volumes.map((v) => [v.path, v.name]),
+      [
+        ['/a/data', 'data-2'],
+        ['/b/data', 'data'],
+      ],
+    );
+  });
+  await t.test('a volume an older file stores no name of keeps the one it is named on read when another is added', () => {
+    const old = [{ path: '/b/data', readOnly: true }];
+    const read = volumesNamed(old).map((v) => v.name);
+    const added = withVolume({ volumes: old }, { path: '/a/data', readOnly: true });
+    assert.deepEqual(added.volumes.find((v) => v.path === '/b/data')?.name, read[0]);
+  });
+  assert.equal(volumeBase('/srv/Data_Sets/'), 'data-sets');
 });

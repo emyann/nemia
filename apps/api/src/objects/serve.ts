@@ -12,6 +12,8 @@
  * what its route takes, and a path it serves nothing on (404) says where the paths it serves are listed. Its own refusals, already
  * `{ error }`, pass as they are.
  *
+ * The factories and their parts are handed on by `partsRoutes` (factory-parts/parts.ts), which says each of their writes as the guard does.
+ *
  * `GET /api/runs/:runId` with `?raw=` (not `false`) or `?view=` is passed on to the runs' own route (runs/runs.ts), which answers both.
  */
 import { Context, Layer } from 'effect';
@@ -22,6 +24,15 @@ import { Api } from 'objects';
 import { type Guarded, refusedBeforeReading } from '../guard.ts';
 import { type ApiEnv, type ApiRuntime, served } from '../layer.ts';
 import { cardsHandlers } from './cards.ts';
+import { factoriesHandlers } from './factories.ts';
+import {
+  builtinHandlers,
+  hiresHandlers,
+  mcpServersHandlers,
+  partsRoutes,
+  schedulesHandlers,
+  volumesHandlers,
+} from '../factory-parts/index.ts';
 import { ServedNow } from './refused.ts';
 import { runsHandlers } from './runs.ts';
 
@@ -67,7 +78,19 @@ export async function inApiWords(response: Response, request: Request, takes?: s
  */
 export const objectsHandler = (runtime: ApiRuntime) => {
   const web = HttpRouter.toWebHandler(
-    HttpApiBuilder.layer(Api).pipe(Layer.provide([runsHandlers, cardsHandlers]), Layer.provide(HttpServer.layerServices)),
+    HttpApiBuilder.layer(Api).pipe(
+      Layer.provide([
+        runsHandlers,
+        cardsHandlers,
+        factoriesHandlers,
+        mcpServersHandlers,
+        builtinHandlers,
+        schedulesHandlers,
+        hiresHandlers,
+        volumesHandlers,
+      ]),
+      Layer.provide(HttpServer.layerServices),
+    ),
     { memoMap: runtime.memoMap, disableLogger: true },
   );
   return {
@@ -158,7 +181,7 @@ export function objectsRoutes(runtime: ApiRuntime): Hono<ApiEnv> {
     return refused ? c.json({ error: refused.error }, refused.status) : handed(c, guard.shape);
   };
   const at = (c: RequestContext<ApiEnv>) => [c.req.param('namespace') ?? '', c.req.param('name') ?? ''] as const;
-  return new Hono<ApiEnv>()
+  return partsRoutes(new Hono<ApiEnv>(), { forward, listed, guarded })
     .get('/api/runs/:runId', (c, next) => (notTheObject(c) ? next() : forward(c)))
     .get('/api/runs/:runId/steps/:step/tries', forward)
     .get('/api/runs/:runId/steps/:step/tries/:try', forward)

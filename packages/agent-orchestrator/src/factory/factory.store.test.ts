@@ -223,7 +223,7 @@ test('REFUSED: `nemia factory` typed with a subcommand, a flag or an argument it
       const before = bytesOf('pipao');
       await assert.rejects(main(['factory', ...argv], noEngine()), refused('Invalid', ...facts));
       assert.deepEqual(bytesOf('pipao'), before);
-      assert.deepEqual(fileOf('pipao'), { repos: [repo], workflows: ['janitor'] });
+      assert.deepEqual(fileOf('pipao'), { repos: [repo], workflows: ['janitor'], generation: 2 });
     });
 });
 
@@ -359,7 +359,7 @@ test('REFUSED: `nemia factory attach` and `detach`, nothing written', async (t) 
     detachWorkflow({ factory: 'pipao', workflow: 'build' });
     assert.deepEqual(
       fileOf('pipao'),
-      { repos: [repo], workflows: ['builder'], hires: { 'builder/x': 'otto' } },
+      { repos: [repo], workflows: ['builder'], hires: { 'builder/x': 'otto' }, generation: 9 },
       "builder's hire does not hold build",
     );
   });

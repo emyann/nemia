@@ -1,7 +1,8 @@
 /**
  * A request answered in a factory and on a repository (`placeFor`, place.ts): one table of which repository and factory a request is
  * answered on and what is refused; a story of a person working in a factory with hires, from the listing to a run and a card started in
- * it; one table of the factory a start picks as shipped; and the stories of the factories served and of a schedule put and taken back —
+ * it; one table of the factory a start picks as shipped; and the stories of the factories served as objects (a FactoryList, a Factory
+ * got, its commands and its volumes) and of a Schedule put and taken back —
  * in a scratch store (`WF_ROOT`) whose factories are filed with the package's own verbs.
  *
  * The api's own repository (`HKB_REPO`) has the workflow `beta`. `repoR`, a git repository, has `alpha`, whose step `implement` names no
@@ -41,7 +42,12 @@ const onStore = <A, E>(program: Effect.Effect<A, E>): A => Effect.runSync(Effect
 
 type WorkflowListing = import('../workflows/workflows.ts').WorkflowListing;
 type WorkflowStepPage = import('../step/step.ts').WorkflowStepPage;
-type FactoryAnswer = import('./factories.ts').FactoryAnswer;
+type Factory = import('objects').Factory;
+type FactoryList = import('objects').FactoryList;
+type FactoryCommands = import('objects').FactoryCommands;
+type VolumeList = import('objects').VolumeList;
+type Schedule = import('objects').Schedule;
+type ScheduleList = import('objects').ScheduleList;
 type RunListing = import('../runs/runs.ts').RunListing;
 
 const write = (file: string, text: string): void => {
@@ -448,18 +454,22 @@ test('POST /api/runs as shipped: the factory a start with no ?factory= is filed 
 
 test('a person reads the factories: the default first, each by name, a broken file with why, the trust each wants, and a template', async (t) => {
   const s = story(t);
+  const listed = async () => (await get<FactoryList>('/api/factories')).body.items;
 
   await s.test(
-    'GET /api/factories serves the default factory first, then each factory by name, and one whose file does not read with why, hiding no other',
+    'GET /api/factories serves a FactoryList: the default factory first, then each factory by name, and one whose file does not read with why, hiding no other',
     async () => {
       write(path.join(root, 'factories', 'broken.json'), '{ not json');
       try {
-        const { status, body } = await get<FactoryAnswer[]>('/api/factories');
+        const { status, body } = await get<FactoryList>('/api/factories');
         assert.equal(status, 200);
+        assert.equal(body.kind, 'FactoryList');
         assert.deepEqual(
-          body.map((f) => f.name),
-          ['default', 'broken', 'hired', 'pair', 'solo'],
+          body.items.map((f) => f.metadata.name),
+          ['broken', 'default', 'hired', 'pair', 'solo'],
+          'sorted by name, as every list of objects is',
         );
+        const byName = (name: string) => body.items.find((f) => f.metadata.name === name);
         const commandsOf = (name: string) => ({
           attach: `nemia factory attach ${name} <workflow>`,
           rm: `nemia factory rm ${name}`,
@@ -467,65 +477,45 @@ test('a person reads the factories: the default first, each by name, a broken fi
           schedule: `nemia factory schedule ${name} <workflow> --cron <expr> --brief <text>`,
           trust: `nemia factory trust ${name}`,
           volume: `nemia factory volume add ${name} <path>:ro|:rw`,
+          unschedule: {},
+          volumeRm: {},
         });
-        assert.deepEqual(body[0], {
-          name: 'default',
-          default: true,
-          repos: [own],
-          workflows: null,
-          hires: {},
-          error: null,
-          schedules: [],
-          template: null,
-          untrusted: [],
-          volumes: [],
-          commands: commandsOf('default'),
-        });
-        assert.deepEqual(body[2].untrusted, [
+        assert.deepEqual(byName('default')?.spec, { repos: [own], hires: {}, volumes: [] }, 'no workflows: it offers every one');
+        assert.deepEqual(byName('default')?.status, { conditions: [], untrusted: [] });
+        assert.deepEqual(byName('hired')?.status.untrusted, [
           {
             place: repoR,
             harness: 'Claude Code',
             withheld: `the allow rules of ${repoR}/.claude/settings.json, for a session started there or in a worktree of it, and the start of a background session there`,
-            never: null,
           },
         ]);
         assert.deepEqual(
-          body[3].untrusted.map((u) => u.place),
+          byName('pair')?.status.untrusted.map((u) => u.place),
           [repoR, repoS],
         );
-        assert.deepEqual(body[1].untrusted, [], 'a file that does not read names no place');
+        assert.deepEqual(byName('broken')?.status.untrusted, [], 'a file that does not read names no place');
         fs.writeFileSync(path.join(config, '.claude.json'), JSON.stringify({ projects: { [repoR]: { hasTrustDialogAccepted: true } } }));
-        const trusting = (await get<FactoryAnswer[]>('/api/factories')).body;
-        assert.deepEqual(trusting[2].untrusted, [], 'trusted, nothing is said');
+        const trusting = await listed();
+        assert.deepEqual(trusting.find((f) => f.metadata.name === 'hired')?.status.untrusted, [], 'trusted, nothing is said');
         assert.deepEqual(
-          trusting[3].untrusted.map((u) => u.place),
+          trusting.find((f) => f.metadata.name === 'pair')?.status.untrusted.map((u) => u.place),
           [repoS],
         );
         fs.rmSync(path.join(config, '.claude.json'));
-        assert.deepEqual(
-          { ...body[2], untrusted: [] },
-          {
-            name: 'hired',
-            default: false,
-            repos: [repoR],
-            workflows: ['alpha'],
-            hires: { 'alpha/implement': 'ada' },
-            error: null,
-            schedules: [],
-            template: null,
-            untrusted: [],
-            volumes: [],
-            commands: commandsOf('hired'),
-          },
-        );
-        assert.deepEqual(body[1].commands, commandsOf('broken'), 'a file that does not read is filed again by the same lines');
-        assert.deepEqual(body[3].repos, [repoR, repoS]);
-        assert.equal(body[1].default, false);
-        assert.match(body[1].error ?? '', /is not JSON/);
-        assert.deepEqual(
-          [body[1].repos, body[1].workflows, body[1].hires, body[1].schedules, body[1].template, body[1].volumes],
-          [[], [], {}, [], null, []],
-        );
+        assert.deepEqual(byName('hired')?.spec, { repos: [repoR], workflows: ['alpha'], hires: { 'alpha/implement': 'ada' }, volumes: [] });
+        assert.equal(byName('hired')?.metadata.generation, 3, 'filed at 1, its attach and its hire each counted');
+        for (const name of ['default', 'hired', 'broken'])
+          assert.deepEqual(
+            (await get<FactoryCommands>(`/api/factories/${name}/commands`)).body,
+            commandsOf(name),
+            `${name}'s lines; a file that does not read is filed again by the same lines`,
+          );
+        assert.deepEqual(byName('pair')?.spec.repos, [repoR, repoS]);
+        assert.match(byName('broken')?.status.error ?? '', /is not JSON/);
+        assert.deepEqual(byName('broken')?.spec, { repos: [], workflows: [], hires: {}, volumes: [] });
+        assert.deepEqual((await get<Factory>('/api/factories/hired')).body, byName('hired'), 'got as it is listed');
+        assert.equal((await get<Factory>('/api/factories/default')).body.metadata.name, 'default');
+        assert.equal((await get('/api/factories/nowhere')).status, 404);
       } finally {
         fs.rmSync(path.join(root, 'factories', 'broken.json'));
       }
@@ -533,7 +523,7 @@ test('a person reads the factories: the default first, each by name, a broken fi
   );
 
   await s.test(
-    "a factory's volumes as the package lists them: resolved, sorted, once each, each with the line that takes it back",
+    "a factory's volumes as the package lists them: resolved, sorted, once each, each named, with the line that takes it back",
     async () => {
       const file = path.join(root, 'factories', 'vols.json');
       write(
@@ -553,18 +543,33 @@ test('a person reads the factories: the default first, each by name, a broken fi
         }),
       );
       try {
-        const vols = (await get<FactoryAnswer[]>('/api/factories')).body.find((f) => f.name === 'vols');
-        const rm = (at: string) => ({ rm: `nemia factory volume rm vols ${at}` });
+        const vols = (await listed()).find((f) => f.metadata.name === 'vols');
         assert.deepEqual(
-          vols?.volumes,
+          vols?.spec.volumes,
           [
-            { path: '/tmp/x/alpha', readOnly: true, commands: rm('/tmp/x/alpha') },
-            { path: '/tmp/x/notes', readOnly: false, commands: rm('/tmp/x/notes') },
-            { path: '/tmp/x/zeta', readOnly: true, commands: rm('/tmp/x/zeta') },
+            { name: 'alpha', path: '/tmp/x/alpha', readOnly: true },
+            { name: 'notes', path: '/tmp/x/notes', readOnly: false },
+            { name: 'zeta', path: '/tmp/x/zeta', readOnly: true },
           ],
           'sorted and resolved, a path named twice listed once as it was first named',
         );
-        assert.equal(vols?.commands.volume, 'nemia factory volume add vols <path>:ro|:rw');
+        const { body: volumes } = await get<VolumeList>('/api/namespaces/vols/volumes');
+        assert.equal(volumes.kind, 'VolumeList');
+        assert.deepEqual(
+          volumes.items.map((v) => [v.metadata.name, v.spec.path, v.status.present, v.status.runs]),
+          [
+            ['alpha', '/tmp/x/alpha', false, []],
+            ['notes', '/tmp/x/notes', false, []],
+            ['zeta', '/tmp/x/zeta', false, []],
+          ],
+        );
+        const commands = (await get<FactoryCommands>('/api/factories/vols/commands')).body;
+        assert.deepEqual(commands.volumeRm, {
+          alpha: 'nemia factory volume rm vols /tmp/x/alpha',
+          notes: 'nemia factory volume rm vols /tmp/x/notes',
+          zeta: 'nemia factory volume rm vols /tmp/x/zeta',
+        });
+        assert.equal(commands.volume, 'nemia factory volume add vols <path>:ro|:rw');
       } finally {
         fs.rmSync(file);
       }
@@ -575,22 +580,26 @@ test('a person reads the factories: the default first, each by name, a broken fi
     "a templated factory's template: not applied before the daemon renders it, then the version and conditions it wrote",
     async () => {
       addFactory({ name: 'shaped', repos: [repoR], template: { source: '/t/team', version: '0.1.0', params: { budget: 7 } } });
-      const shaped = async () => (await get<FactoryAnswer[]>('/api/factories')).body.find((f) => f.name === 'shaped')?.template;
+      const shaped = async () => (await get<Factory>('/api/factories/shaped')).body;
       try {
-        assert.deepEqual(await shaped(), { source: '/t/team', version: '0.1.0', params: { budget: 7 }, applied: null, conditions: [] });
+        assert.deepEqual((await shaped()).spec.template, { source: '/t/team', version: '0.1.0', params: { budget: 7 } });
+        assert.deepEqual((await shaped()).status, { conditions: [], untrusted: (await shaped()).status.untrusted });
         const drift = { type: 'Applied', status: 'False', reason: 'VersionDrift', message: 'The template is at version 0.2.0.' };
         const pending = { type: 'ConflictsPending', status: 'False', reason: 'NoUpgrade', message: 'No upgrade is under way.' };
         write(
           path.join(root, 'factories', 'shaped', 'status.json'),
-          JSON.stringify({ version: '0.1.0', digest: 'sha256:0', params: { budget: 7 }, conditions: [drift, pending] }),
+          JSON.stringify({
+            version: '0.1.0',
+            digest: 'sha256:0',
+            params: { budget: 7 },
+            conditions: [drift, pending],
+            observedGeneration: 1,
+          }),
         );
-        assert.deepEqual(await shaped(), {
-          source: '/t/team',
-          version: '0.1.0',
-          params: { budget: 7 },
-          applied: '0.1.0',
-          conditions: [drift, pending],
-        });
+        const status = (await shaped()).status;
+        assert.equal(status.applied, '0.1.0');
+        assert.deepEqual(status.conditions, [drift, pending]);
+        assert.equal(status.observedGeneration, 1);
       } finally {
         removeFactory('shaped');
       }
@@ -633,12 +642,12 @@ test('a person reads the factories: the default first, each by name, a broken fi
 
 test('a person schedules a workflow in a factory: listed with its next fire and last run, a cron refused, and taken back', async (t) => {
   const s = story(t);
-  const route = '/api/factories/solo/schedules/alpha';
+  const route = '/api/namespaces/solo/schedules/alpha';
   const json = { 'content-type': 'application/json' };
-  const schedulesOf = async (name: string) => (await get<FactoryAnswer[]>('/api/factories')).body.find((f) => f.name === name)?.schedules;
+  const schedulesOf = async (name: string) => (await get<ScheduleList>(`/api/namespaces/${name}/schedules`)).body.items;
 
   await s.test(
-    "GET /api/factories answers a factory's schedules with their next fire and last scheduled run, as the package lists them, and the line that takes each back",
+    'GET /api/namespaces/<factory>/schedules answers a ScheduleList with each next fire and last scheduled run, as the package lists them, and the line that takes each back',
     async (sub: TestContext) => {
       sub.mock.timers.enable({ apis: ['Date'], now: Date.parse('2026-10-08T12:00:00Z') });
       setSchedule({ factory: 'solo', workflow: 'alpha', cron: '0 9 * * 1', tz: 'America/Montreal', brief: 'Read the stats' });
@@ -662,27 +671,23 @@ test('a person schedules a workflow in a factory: listed with its next fire and 
         }),
       );
       try {
-        const { status, body } = await get<FactoryAnswer[]>('/api/factories');
+        const { status, body } = await get<ScheduleList>('/api/namespaces/solo/schedules');
         assert.equal(status, 200);
-        const solo = body.find((f) => f.name === 'solo');
-        assert.deepEqual(solo?.schedules, [
-          {
-            workflow: 'alpha',
-            cron: '0 9 * * 1',
-            tz: 'America/Montreal',
-            brief: 'Read the stats',
-            repo: null,
-            next: '2026-10-12T13:00:00.000Z',
-            last: { run: 'r-scheduled', at: '2026-10-05T13:00:02.000Z' },
-            refused: null,
-            commands: { unschedule: 'nemia factory unschedule solo alpha' },
-          },
-        ]);
+        assert.equal(body.kind, 'ScheduleList');
+        const [alpha] = body.items;
+        assert.equal(alpha?.metadata.name, 'alpha');
+        assert.equal(alpha?.metadata.namespace, 'solo');
+        assert.deepEqual(alpha?.spec, { cron: '0 9 * * 1', brief: 'Read the stats', tz: 'America/Montreal' });
         assert.deepEqual(
-          body.filter((f) => f.name !== 'solo').map((f) => f.schedules),
-          body.filter((f) => f.name !== 'solo').map(() => []),
-          'the default factory, and every factory with none, answers no schedule',
+          { ...alpha?.status, since: undefined },
+          { since: undefined, next: '2026-10-12T13:00:00.000Z', last: { run: 'r-scheduled', at: '2026-10-05T13:00:02.000Z' } },
         );
+        assert.match(alpha?.status.since ?? '', /^2026-10-08T12:00:00/, 'filed when it was scheduled');
+        assert.deepEqual((await get<Schedule>(route)).body, alpha, 'got as it is listed');
+        assert.deepEqual((await get<FactoryCommands>('/api/factories/solo/commands')).body.unschedule, {
+          alpha: 'nemia factory unschedule solo alpha',
+        });
+        for (const name of ['default', 'hired', 'pair']) assert.deepEqual(await schedulesOf(name), [], `${name} answers no schedule`);
       } finally {
         clearSchedule({ factory: 'solo', workflow: 'alpha' });
         fs.rmSync(record);
@@ -702,25 +707,29 @@ test('a person schedules a workflow in a factory: listed with its next fire and 
     assert.deepEqual(await schedulesOf('solo'), []);
   });
 
-  await s.test('REFUSED: a cron that is no string is a 400 naming the route, the key and what was sent', async () => {
+  await s.test('REFUSED: a cron that is no string is a 400 naming the route, and nothing is scheduled', async () => {
     const wrong = await app.request(route, { method: 'PUT', headers: json, body: JSON.stringify({ cron: 9, brief: 'Read the stats' }) });
     assert.equal(wrong.status, 400);
-    assert.match(said(await wrong.json()), /^PUT \/api\/factories\/solo\/schedules\/alpha: `cron` .* This request's was 9\.$/);
+    assert.match(said(await wrong.json()), /PUT \/api\/namespaces\/solo\/schedules\/alpha/);
+    assert.deepEqual(await schedulesOf('solo'), []);
   });
 
-  await s.test("a schedule PUT on the factory's route is listed on GET /api/factories and taken back by its DELETE", async () => {
+  await s.test('a Schedule PUT is listed in its factory and taken back by its DELETE, which answers what it took back', async () => {
     const put = await app.request(route, {
       method: 'PUT',
       headers: json,
       body: JSON.stringify({ cron: '0 9 * * 1', brief: 'Read the stats' }),
     });
     assert.equal(put.status, 200, said(await put.clone().json()));
+    assert.equal(((await put.json()) as Schedule).kind, 'Schedule');
     assert.deepEqual(
-      (await schedulesOf('solo'))?.map((s) => [s.workflow, s.cron, s.brief, s.commands.unschedule]),
-      [['alpha', '0 9 * * 1', 'Read the stats', 'nemia factory unschedule solo alpha']],
+      (await schedulesOf('solo')).map((s) => [s.metadata.name, s.spec.cron, s.spec.brief]),
+      [['alpha', '0 9 * * 1', 'Read the stats']],
     );
     const del = await app.request(route, { method: 'DELETE', headers: json, body: '{}' });
     assert.equal(del.status, 200);
+    assert.equal(((await del.json()) as Schedule).metadata.name, 'alpha');
     assert.deepEqual(await schedulesOf('solo'), []);
+    assert.equal((await app.request(route, { method: 'DELETE', headers: json, body: '{}' })).status, 404, 'none left to take back');
   });
 });

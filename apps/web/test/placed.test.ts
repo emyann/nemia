@@ -5,30 +5,31 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { QueryClient } from '@tanstack/react-query';
+import type { Factory } from 'objects';
 import { loadWorkflowsIn, rereadWorkflows } from '../src/lib/placed.ts';
+import { factoryCommands, factoryList, factoryObject, scheduleList } from './factory-fixtures.ts';
 
-/** A factory as the api lists it, on `repos`. */
-const factory = (name: string, repos: string[]) => ({
-  name,
-  default: false,
-  repos,
-  workflows: [],
-  hires: {},
-  error: null,
-  schedules: [],
-  commands: { attach: 'a', rm: 'r', add: 'd', schedule: 's', trust: 't', volume: 'v' },
-  untrusted: [],
-  volumes: [],
-  template: null,
-});
+/** A factory as the objects list it, on `repos`. */
+const factory = (name: string, repos: string[]) =>
+  factoryObject({ metadata: { name }, spec: { repos, workflows: [], hires: {}, volumes: [] } });
 
-/** Answers every fetch of the test `t`: the factories with `factories`, any other route with no workflow; returns the routes asked. */
-function answering(t: { after: (fn: () => void) => void }, factories: unknown[]): string[] {
+/**
+ * Answers every fetch of the test `t`: the factories with `factories`, each factory's lines and schedules, any other route with no
+ * workflow; returns the routes asked but a factory's lines and schedules, which the factories' read asks beside its list.
+ */
+function answering(t: { after: (fn: () => void) => void }, factories: Factory[]): string[] {
   const asked: string[] = [];
   const before = globalThis.fetch;
   globalThis.fetch = async (input) => {
-    asked.push(String(input));
-    const body = String(input) === '/api/factories' ? factories : [];
+    const url = String(input);
+    const body = url.startsWith('/api/factories/')
+      ? factoryCommands()
+      : url.startsWith('/api/namespaces/')
+        ? scheduleList()
+        : url.split('?')[0] === '/api/factories'
+          ? factoryList(...factories)
+          : [];
+    if (!url.startsWith('/api/factories/') && !url.startsWith('/api/namespaces/')) asked.push(url);
     return new Response(JSON.stringify(body), { headers: { 'content-type': 'application/json' } });
   };
   t.after(() => {

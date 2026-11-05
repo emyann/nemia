@@ -44,9 +44,9 @@ export type Assessment = {
   /** Steps that cannot run, because something they wait on stops what follows it (`stopsFollowers`). */
   unreachable: string[];
   /**
-   * Steps waiting on the repository's own checkout on this pass (`waitsOnCheckout`): an ending a person's word would file, or a try of one,
-   * while another run's `workspace: base` step is in that one directory. Nothing of them is filed, and the run is running for them — so the
-   * cap on runs in flight still counts it (`slotNeed`), as it counts a run whose next step the pass files.
+   * Steps waiting on the repository's own checkout on this pass (`waitsOnCheckout`): an ending a person's word, or its workflow, would
+   * file, or a try of one, while another run's `workspace: base` step is in that one directory. Nothing of them is filed, and the run is
+   * running for them — so the cap on runs in flight still counts it (`slotNeed`), as it counts a run whose next step the pass files.
    */
   waitingOnCheckout: string[];
   /**

@@ -5,13 +5,15 @@
 import type { Refusal } from './fence.ts';
 
 /**
- * The six reads, the run's object counted twice, the list, an open run and the inbox read again after a pass, and her chat's three
- * (its history, the old beat's whole re-projection and the fold of one moment of her session): `measures`' keys.
+ * The six reads, the run's object counted twice, the old list of summaries beside the RunList (its yardstick), the list, an open run
+ * and the inbox read again after a pass, and her chat's three (its history, the old beat's whole re-projection and the fold of one
+ * moment of her session): `measures`' keys.
  */
 export const MEASURES = [
   'tickPass',
   'tickPassInformed',
   'runList',
+  'runSummaries',
   'stats',
   'finishedRun',
   'openRun',

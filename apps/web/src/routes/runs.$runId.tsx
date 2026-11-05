@@ -35,8 +35,8 @@ import { container, ink } from '../lib/meaning';
 import { ENDED } from '../lib/words';
 
 /**
- * `step`, the old address of one step of the run, opens that step in the frame's bar: the page is loaded again in place of that address,
- * at `?bar=step:<run>/<step>`, so Back does not return to it.
+ * `step`, the old address of one step of the run and the one a message names a step by (`broughtOf`, `lib/chatFollowing.ts`), opens that
+ * step in the frame's bar: the page is loaded again in place of that address, at `?bar=step:<run>/<step>`, so Back does not return to it.
  */
 export const Route = createFileRoute('/runs/$runId')({
   validateSearch: (search: Record<string, unknown>): { step?: string } =>

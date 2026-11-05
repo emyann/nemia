@@ -116,6 +116,9 @@ class merge do, which no test refuses — are in `.claude/skills/change-the-boar
   `chat`, a step's session `session`, and `test/conversation.test.ts` reads both forms off every `.tsx` of the folder — and what is one
   conversation's alone stays in that conversation's folder: hers is `components/chat/` (her kept message, her asks), a step's session's
   is `components/session/` (its brief, its told turns, its closeout, its bands, its composer).
+- A step her message links to (`/runs/<run>?step=<step>`, read by `broughtOf` in `lib/chatFollowing.ts`) is drawn under her words by
+  `components/chat/ChatBrought.tsx` from the run's page's own parts, never a copy: `GateBrief`, Decide's `AnswerRow`, `Continue`,
+  `AskedRow`. Which one is `broughtPart` (`lib/brought.ts`, proved by `contracts/brought.contract.ts`), off the run's page's own reads.
 - A person's word for a step's state has one writer, `PERSON` in `lib/words.ts`, a total `Record<StepState, PersonWords>`: its rail word
   (on the chip, the rail and the card's tag), what it means on hover, and the words of its wait for a state that waits on a person. The
   run's own waits (`RUN_WAITS`) and how a run ended (`ENDED`, `called off` for `cancelled`) sit beside it. Where the board's word differs

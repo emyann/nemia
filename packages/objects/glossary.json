@@ -118,6 +118,44 @@
       "term": "Commands",
       "meaning": "a Factory's sub-resource at `/api/factories/<name>/commands`: the lines a person types for it, built off the command table — attach, rm, add, schedule, trust, volume — and the line that takes back each schedule, by workflow, and each volume, by name (`FactoryCommands`, `packages/objects/src/factory.ts`).",
       "type": "FactoryCommands"
+    },
+    {
+      "term": "Workflow",
+      "meaning": "a folder of steps a factory resolves, served in the factory's namespace: its `spec` its steps as their files write them, its `status` its origin, its typed graph, each step resolved and its revision (`Workflow`, `packages/objects/src/workflow.ts`).",
+      "type": "Workflow"
+    },
+    {
+      "term": "Agent",
+      "meaning": "an agent definition a factory resolves, served in the factory's namespace: its `spec` what its file says, its `status` where it was found, the steps it fills and the skills it gives (`Agent`, `packages/objects/src/agent.ts`).",
+      "type": "Agent"
+    },
+    {
+      "term": "Skill",
+      "meaning": "a skill folder a factory's starts can find, served in the factory's namespace: its `spec` what its SKILL.md says, its `status` where it was found, what it costs a turn and who gives it (`Skill`, `packages/objects/src/skill.ts`).",
+      "type": "Skill"
+    },
+    {
+      "term": "Origin",
+      "meaning": "where a definition is read from, in the order a factory looks a name up: `factory`, the factory's own tree; `repo`, the repository's checkout; `yours`, your library; `builtin`, what Nemia builds in (`DEFINITION_ORIGINS`, `packages/objects/src/words.ts`).",
+      "type": "DefinitionOrigin"
+    },
+    {
+      "term": "Shadowed",
+      "meaning": "a definition another origin holds the name of first in its namespace: served only when its origin is asked for (`?origin=`), its `status.shadowedBy` naming that origin (`definitionStatus`, `packages/objects/src/definition.ts`)."
+    },
+    {
+      "term": "Node kind",
+      "meaning": "what a node of a workflow's graph is: a `step`, a `condition` that routes, or a `workflow` node that files a card for another workflow (`NODE_KINDS`, `packages/objects/src/words.ts`).",
+      "type": "NodeKind"
+    },
+    {
+      "term": "Edge kind",
+      "meaning": "what an edge of a workflow's graph says: `after`, a wait; `input`, an output handed on; `loop`, a round run again; `route`, a condition's route (`EDGE_KINDS`, `packages/objects/src/words.ts`).",
+      "type": "EdgeKind"
+    },
+    {
+      "term": "revision",
+      "meaning": "a definition's number in the revision ledger for what its files hold now, read without a write: `status.revision` on a Workflow, an Agent and a Skill (`definitionStatus`, `packages/objects/src/definition.ts`)."
     }
   ]
 }

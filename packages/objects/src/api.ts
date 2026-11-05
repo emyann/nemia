@@ -11,6 +11,10 @@
  * instruction, read, written and cleared, and the lines a person types for it (`commands`). The factory's parts are each in the
  * factory's namespace: group `mcpservers`, its MCP servers, read, recorded and taken off, and signed in to; group `builtin`, the servers
  * Nemia offers, in no namespace; groups `schedules` and `hires`, read, written and taken back; and group `volumes`, read alone.
+ *
+ * The definitions, each in a factory's namespace as the factory resolves it: groups `workflows`, `agents` and `skills`, each listed with
+ * `?origin=` for one origin's, shadowed or not, read, and yours written in `default` alone; an agent tried and read as a card, a builtin
+ * skill copied to yours and a skill's files listed by path.
  */
 import { Schema } from 'effect';
 import { HttpApi, HttpApiEndpoint, HttpApiGroup } from 'effect/http-api';
@@ -29,10 +33,13 @@ import { Hire, HireList, HireWrite } from './hire.ts';
 import { McpServer, McpServerList, McpServerWrite, SignInStarted, SignInState, SignedOut } from './mcp-server.ts';
 import { Schedule, ScheduleList, ScheduleWrite } from './schedule.ts';
 import { Volume, VolumeList } from './volume.ts';
+import { Workflow, WorkflowCreate, WorkflowList, WorkflowWrite } from './workflow.ts';
+import { Agent, AgentCard, AgentList, AgentTried, AgentTry, AgentWrite } from './agent.ts';
+import { Skill, SkillFiles, SkillList, SkillWrite } from './skill.ts';
 import { LabelEdit, Labelled, Run, StepTold, StepTries, StepTry, TryCloseout } from './run.ts';
 
 /** The kinds the api serves as objects, each with its object Schema, its `<Kind>List` and its get endpoint here. */
-export const KINDS = ['Run', 'Card', 'Factory', 'McpServer', 'Schedule', 'Hire', 'Volume'] as const;
+export const KINDS = ['Run', 'Card', 'Factory', 'McpServer', 'Schedule', 'Hire', 'Volume', 'Workflow', 'Agent', 'Skill'] as const;
 export type Kind = (typeof KINDS)[number];
 
 /** Nothing by that name, or not in that namespace: a 404. */
@@ -66,6 +73,14 @@ const HireObject = Hire.annotate({ identifier: 'Hire' });
 const HireListObject = HireList.annotate({ identifier: 'HireList' });
 const VolumeObject = Volume.annotate({ identifier: 'Volume' });
 const VolumeListObject = VolumeList.annotate({ identifier: 'VolumeList' });
+
+/** The definitions and a page of each, named so that the document holds each as a component. */
+const WorkflowObject = Workflow.annotate({ identifier: 'Workflow' });
+const WorkflowListObject = WorkflowList.annotate({ identifier: 'WorkflowList' });
+const AgentObject = Agent.annotate({ identifier: 'Agent' });
+const AgentListObject = AgentList.annotate({ identifier: 'AgentList' });
+const SkillObject = Skill.annotate({ identifier: 'Skill' });
+const SkillListObject = SkillList.annotate({ identifier: 'SkillList' });
 
 /** A run's step, named in the path. */
 const stepParams = { runId: Schema.String, step: Schema.String };
@@ -331,6 +346,137 @@ export class VolumesGroup extends HttpApiGroup.make('volumes').add(
   }),
 ) {}
 
+/**
+ * The query of a definition's read: `origin`, the one origin asked for (`DEFINITION_ORIGINS`), whose definitions are served shadowed or
+ * not, each saying what shadows it; kept as the text it was sent as, so a wrong word is refused in the package's words, a 422.
+ */
+const originQuery = { origin: Schema.optionalKey(Schema.String) };
+
+/** The query of a removal: the `resourceVersion` it was read at, refused where the files now hold another. */
+const removeQuery = { resourceVersion: Schema.optionalKey(Schema.String) };
+
+/**
+ * A namespace's workflows: the factory's resolved view of each name (`default`: the api's repository and your library), listed, read,
+ * and — yours, in `default` alone — made, written whole and removed.
+ */
+export class WorkflowsGroup extends HttpApiGroup.make('workflows').add(
+  HttpApiEndpoint.get('list', '/api/namespaces/:namespace/workflows', {
+    params: namespaceParams,
+    query: { ...listQuery, ...originQuery },
+    success: WorkflowListObject,
+    error: objectErrors,
+  }),
+  HttpApiEndpoint.get('get', '/api/namespaces/:namespace/workflows/:name', {
+    params: cardParams,
+    query: originQuery,
+    success: WorkflowObject,
+    error: objectErrors,
+  }),
+  HttpApiEndpoint.post('create', '/api/namespaces/:namespace/workflows', {
+    params: namespaceParams,
+    payload: WorkflowCreate,
+    success: WorkflowObject.pipe(Schema.annotate({ httpApiStatus: 201 })),
+    error: objectErrors,
+  }),
+  HttpApiEndpoint.put('replace', '/api/namespaces/:namespace/workflows/:name', {
+    params: cardParams,
+    payload: WorkflowWrite,
+    success: WorkflowObject,
+    error: objectErrors,
+  }),
+  HttpApiEndpoint.delete('delete', '/api/namespaces/:namespace/workflows/:name', {
+    params: cardParams,
+    query: removeQuery,
+    success: WorkflowObject,
+    error: objectErrors,
+  }),
+) {}
+
+/** A namespace's agents, as the workflows: listed, read, yours made, written and removed in `default`, tried, and read as a card. */
+export class AgentsGroup extends HttpApiGroup.make('agents').add(
+  HttpApiEndpoint.get('list', '/api/namespaces/:namespace/agents', {
+    params: namespaceParams,
+    query: { ...listQuery, ...originQuery },
+    success: AgentListObject,
+    error: objectErrors,
+  }),
+  HttpApiEndpoint.get('get', '/api/namespaces/:namespace/agents/:name', {
+    params: cardParams,
+    query: originQuery,
+    success: AgentObject,
+    error: objectErrors,
+  }),
+  HttpApiEndpoint.post('create', '/api/namespaces/:namespace/agents', {
+    params: namespaceParams,
+    payload: AgentWrite,
+    success: AgentObject.pipe(Schema.annotate({ httpApiStatus: 201 })),
+    error: objectErrors,
+  }),
+  HttpApiEndpoint.put('replace', '/api/namespaces/:namespace/agents/:name', {
+    params: cardParams,
+    payload: AgentWrite,
+    success: AgentObject,
+    error: objectErrors,
+  }),
+  HttpApiEndpoint.delete('delete', '/api/namespaces/:namespace/agents/:name', {
+    params: cardParams,
+    query: removeQuery,
+    success: AgentObject,
+    error: objectErrors,
+  }),
+  HttpApiEndpoint.post('try', '/api/namespaces/:namespace/agents/:name/try', {
+    params: cardParams,
+    payload: AgentTry,
+    success: AgentTried.pipe(Schema.annotate({ httpApiStatus: 201 })),
+    error: objectErrors,
+  }),
+  HttpApiEndpoint.get('card', '/api/namespaces/:namespace/agents/:name/card', {
+    params: cardParams,
+    query: originQuery,
+    success: AgentCard,
+    error: objectErrors,
+  }),
+) {}
+
+/** A namespace's skills: listed, read, yours made and written in `default`, a builtin one copied to yours, and a folder's files by path. */
+export class SkillsGroup extends HttpApiGroup.make('skills').add(
+  HttpApiEndpoint.get('list', '/api/namespaces/:namespace/skills', {
+    params: namespaceParams,
+    query: { ...listQuery, ...originQuery },
+    success: SkillListObject,
+    error: objectErrors,
+  }),
+  HttpApiEndpoint.get('get', '/api/namespaces/:namespace/skills/:name', {
+    params: cardParams,
+    query: originQuery,
+    success: SkillObject,
+    error: objectErrors,
+  }),
+  HttpApiEndpoint.post('create', '/api/namespaces/:namespace/skills', {
+    params: namespaceParams,
+    payload: SkillWrite,
+    success: SkillObject.pipe(Schema.annotate({ httpApiStatus: 201 })),
+    error: objectErrors,
+  }),
+  HttpApiEndpoint.put('replace', '/api/namespaces/:namespace/skills/:name', {
+    params: cardParams,
+    payload: SkillWrite,
+    success: SkillObject,
+    error: objectErrors,
+  }),
+  HttpApiEndpoint.post('copy', '/api/namespaces/:namespace/skills/:name/copy', {
+    params: cardParams,
+    success: SkillObject.pipe(Schema.annotate({ httpApiStatus: 201 })),
+    error: objectErrors,
+  }),
+  HttpApiEndpoint.get('files', '/api/namespaces/:namespace/skills/:name/files', {
+    params: cardParams,
+    query: originQuery,
+    success: SkillFiles,
+    error: objectErrors,
+  }),
+) {}
+
 /** Everything the api serves as objects. */
 export const Api = HttpApi.make('nemia')
   .add(RunsGroup)
@@ -340,4 +486,7 @@ export const Api = HttpApi.make('nemia')
   .add(BuiltinGroup)
   .add(SchedulesGroup)
   .add(HiresGroup)
-  .add(VolumesGroup);
+  .add(VolumesGroup)
+  .add(WorkflowsGroup)
+  .add(AgentsGroup)
+  .add(SkillsGroup);

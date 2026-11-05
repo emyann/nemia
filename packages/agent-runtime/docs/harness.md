@@ -175,6 +175,33 @@ the orchestrator's code holds a fact today, it is named beside it.
   it outside `node_modules` was still attached; without the key, both were, and the dependency's text reached the model
   (`DEPENDENCY_CLAUDE_MD`, `harness/claude/memory.ts`; `test/live.test.ts`).
 
+## A permission prompt, as `canUseTool` is handed it
+
+What Claude Code hands `canUseTool` (`sdk.d.ts:228`) for a call it would prompt for, and what it does with an always allow, measured
+on **SDK 0.3.316 / Claude Code 2.1.316, 2026-11-04**, by a throwaway probe kept outside the repository: one `query()` on haiku from
+an empty folder under `/tmp`, `settingSources: ['project']`, its `canUseTool` logging every option it was given and answering allow
+with `updatedPermissions` set to the `suggestions` it was handed, as an always allow does (`permission.ts`, `permissionAnswered`).
+
+- **A prompt an ask rule forces comes with no suggestion, no `title` and no `decisionReason`**: with `permissions.ask:
+  ["Bash(echo nemia-probe*)"]` in the folder's `.claude/settings.json`, each of two `echo nemia-probe` calls was handed `displayName:
+  "Bash"`, a `description` that is the call's own `description` input (the words the model wrote, not a subtitle of Claude Code's),
+  `decisionReasonType: "rule"` and `serverPolicyAskOnly: false`, and nothing else: no `suggestions`, `title`, `decisionReason`,
+  `blockedPath`, `defaultToNo`, `suppressAlwaysAllowRule` or `matchedAskRule` (`sdk.d.ts:312`). So a permission an ask rule forced
+  offers no always allow (`permissionAskOf`: always needs a suggestion), and its question is the `displayName`. No rule can be saved
+  from it, and none equal to the ask rule: an always never widens a fence an ask rule holds, such as
+  `Bash(nemia agents custom *--file*)`.
+- **An ask rule prompts each matching call, in the same session**: the second `echo nemia-probe` was handed to `canUseTool` again
+  after the first was allowed.
+- **A prompt Claude Code's own mode forces comes with suggestions, and an always allow writes the folder's
+  `.claude/settings.local.json` under `settingSources: ['project']`**: in a folder with no rules, `mkdir nemia-probe-a` was handed
+  `blockedPath` (the folder it would create), `displayName: "Bash"`, the call's `description` input, and three suggestions, as the
+  SDK gives them: `addRules` of `Bash(mkdir nemia-probe-a *)` to `localSettings` — the exact command, a space and a `*`, not a
+  prefix of it — `addDirectories` of the folder to `session`, and `setMode` `acceptEdits` to `session`. Returned whole, the first was
+  written to `<cwd>/.claude/settings.local.json` as `permissions.allow: ["Bash(mkdir nemia-probe-a *)"]`, and the next call,
+  `mkdir nemia-probe-b`, which that rule does not match, ran without a prompt, which the `setMode` suggestion to `acceptEdits`
+  accounts for (not measured apart). An always allow returns every suggestion, as the SDK's comment on them asks (`sdk.d.ts:232-239`), and so can change
+  more than the one rule its choice's description names first.
+
 ## The claude.ai bridge
 
 **Any Claude Code session's bridge to claude.ai is opened on its `system`/`init` message, through the Agent SDK** (SDK 0.3.308,

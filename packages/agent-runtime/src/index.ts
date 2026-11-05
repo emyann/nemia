@@ -149,7 +149,7 @@ export { admissionHook, sdkRunner } from './harness/index.ts';
 export { a2aRunner } from './a2a/index.ts';
 
 export type { Event, State, Attempt, Sighting, EndReason, Usage, Said, Denial, Input, Bridge, Parked } from './core/index.ts';
-export type { AskOption, AskQuestion, SessionAsk } from './core/index.ts';
+export type { AskOption, AskQuestion, PermissionFacts, SessionAsk, SessionAskKind } from './core/index.ts';
 export type { SessionState, Outcome, TaskPhase } from './core/index.ts';
 export { TASK_PHASES } from './core/index.ts';
 /**

@@ -592,3 +592,21 @@ export const composite = (harnesses: Record<string, RunnerOps>, fallback: string
     },
   };
 };
+
+/**
+ * What a permission ask carries beside its one question, for whoever draws it: the tool, a shell call's command as typed, the
+ * SDK's words as it gave them (a sentence, a short name, a description, why it prompts, the path it blocked on), whether an
+ * always-allow is offered, and whether deny is the default. A harness's own shape, which the core carries on a
+ * `SessionAsk` and never opens. Carried, never judged.
+ */
+export type PermissionFacts = {
+  tool: string;
+  command?: string;
+  title?: string;
+  displayName?: string;
+  description?: string;
+  decisionReason?: string;
+  blockedPath?: string;
+  always: boolean;
+  defaultToNo: boolean;
+};

@@ -10,7 +10,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { Schema } from 'effect';
-import type { AskQuestion, SessionAsk, SessionState } from '../../core/index.ts';
+import type { AskQuestion, PermissionFacts, SessionAsk, SessionState } from '../../core/index.ts';
 import { BridgeFactsSchema } from './attached-bridge.ts';
 import { CarriedSchema } from '../detached/run-file.ts';
 import type { SpawnRequest } from '../seam.ts';
@@ -126,9 +126,42 @@ export const filesOf = (root: string, name: string) => {
 
 /**
  * One line of a session's asks file: the call that asked a person opened, with its questions, or the same call closed once its answer
- * reached it. Appended by the session's holder alone, and read by any process, which composes the two on read (`openAsks`).
+ * reached it. Appended by the session's holder alone, and read by any process, which composes the two on read (`openAsks`). A
+ * permission's line says `kind: 'permission'` and carries its facts; a line with no `kind` is a question, as every line was before
+ * a permission was held.
  */
-export type AskLine = { id: string; at: string; questions?: AskQuestion[]; closed?: string; how?: 'taken' | 'cut' };
+export type AskLine = {
+  id: string;
+  at: string;
+  questions?: AskQuestion[];
+  kind?: 'permission';
+  permission?: PermissionFacts;
+  closed?: string;
+  how?: 'taken' | 'cut';
+};
+
+/** The facts a permission's line carries, as `PermissionFacts` declares them: what is read of a line written by another process. */
+const PermissionFactsSchema = Schema.Struct({
+  tool: Schema.String,
+  command: Schema.optional(Schema.String),
+  title: Schema.optional(Schema.String),
+  displayName: Schema.optional(Schema.String),
+  description: Schema.optional(Schema.String),
+  decisionReason: Schema.optional(Schema.String),
+  blockedPath: Schema.optional(Schema.String),
+  always: Schema.Boolean,
+  defaultToNo: Schema.Boolean,
+});
+
+const decodePermission = Schema.decodeUnknownOption(PermissionFactsSchema);
+
+/** The ask an opening line says: a question, or a permission whose facts decode; nothing where they do not, which is unread. */
+const askOf = (l: AskLine & { questions: AskQuestion[] }): SessionAsk[] => {
+  if (l.kind === undefined) return [{ id: l.id, at: l.at, kind: 'question', questions: l.questions }];
+  if (l.kind !== 'permission') return [];
+  const facts = decodePermission(l.permission);
+  return facts._tag === 'Some' ? [{ id: l.id, at: l.at, kind: 'permission', questions: l.questions, permission: facts.value }] : [];
+};
 
 /** One line of a session's answers file: a person's answer to the ask `id`, each question's by the question's own text. */
 export type AnswerLine = { id: string; at: string; answers: Record<string, string> };
@@ -176,9 +209,7 @@ export const readAnswers = (root: string, name: string): AnswerLine[] => jsonLin
 export const openAsks = (root: string, name: string): SessionAsk[] => {
   const lines = jsonLines<AskLine>(filesOf(root, name).asks);
   const closed = new Set(lines.filter((l) => l.closed !== undefined).map((l) => l.id));
-  return lines.flatMap((l) =>
-    l.questions === undefined || closed.has(l.id) ? [] : [{ id: l.id, at: l.at, questions: l.questions } satisfies SessionAsk],
-  );
+  return lines.flatMap((l) => (l.questions === undefined || closed.has(l.id) ? [] : askOf({ ...l, questions: l.questions })));
 };
 
 /**

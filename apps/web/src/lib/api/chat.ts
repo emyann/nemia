@@ -41,17 +41,37 @@ export type AskEvent = {
 };
 
 /**
+ * Mirrors the package's `PermissionFacts`: what the SDK handed over with a call of hers that would prompt, drawn as it came — the
+ * tool, a Bash call's `command` as typed, its `title` (the question's own words), `displayName`, `description`, why it prompts
+ * (`decisionReason`) and the path it touches outside her folder (`blockedPath`), whether `Always allow` is offered (`always`) and
+ * whether the SDK leans to no (`defaultToNo`), which picks `Deny` before the person picks.
+ */
+export type PermissionFacts = {
+  tool: string;
+  command?: string;
+  title?: string;
+  displayName?: string;
+  description?: string;
+  decisionReason?: string;
+  blockedPath?: string;
+  always: boolean;
+  defaultToNo: boolean;
+};
+
+/**
  * Mirrors the package's `ChatEvent`, unique by its `id`: a `message`, the person's carrying when it was delivered (`delivered`, null
  * while it waits in her outbox); a `call`, one tool call with its sentence, a `fact` and its state; a `session` line where one of her
  * sessions ended and the next began; a `question` and a `proposal`, each an `AskEvent` — a call of hers waiting on the person, the
- * proposal her one-question ask.
+ * proposal her one-question ask; and a `permission`, an `AskEvent` too, a call of hers that would prompt, with what the SDK handed
+ * over about it.
  */
 export type ChatEvent =
   | { kind: 'message'; id: string; at: string; from: ChatFrom; text: string; delivered?: string | null }
   | { kind: 'call'; id: string; at: string; tool: string; sentence: string; fact?: string; state: ChatCallState }
   | { kind: 'session'; id: string; at: string; attempt: number }
   | ({ kind: 'question' } & AskEvent)
-  | ({ kind: 'proposal' } & AskEvent);
+  | ({ kind: 'proposal' } & AskEvent)
+  | ({ kind: 'permission' } & AskEvent & { permission: PermissionFacts });
 
 /** Decodes a `ChatFrom`. */
 const ChatFromSchema = Schema.Literals(['agent', 'person', 'keeper']);
@@ -78,7 +98,22 @@ const AskQuestionSchema = decodes<AskQuestion>()(
   }),
 );
 
-/** What a `question` and a `proposal` carry alike, for the member of each. */
+/** Decodes a `PermissionFacts`. */
+const PermissionFactsSchema = decodes<PermissionFacts>()(
+  Schema.Struct({
+    tool: Schema.String,
+    command: Schema.optionalKey(Schema.String),
+    title: Schema.optionalKey(Schema.String),
+    displayName: Schema.optionalKey(Schema.String),
+    description: Schema.optionalKey(Schema.String),
+    decisionReason: Schema.optionalKey(Schema.String),
+    blockedPath: Schema.optionalKey(Schema.String),
+    always: Schema.Boolean,
+    defaultToNo: Schema.Boolean,
+  }),
+);
+
+/** What a `question`, a `proposal` and a `permission` carry alike, for the member of each. */
 const ASK_FIELDS = {
   id: Schema.String,
   at: Schema.String,
@@ -113,6 +148,7 @@ const ChatEventSchema = decodes<ChatEvent>()(
       text: Schema.String,
       delivered: Schema.optionalKey(Schema.NullOr(Schema.String)),
     }),
+    Schema.Struct({ kind: Schema.Literal('permission'), ...ASK_FIELDS, permission: PermissionFactsSchema }),
     Schema.Struct({ kind: Schema.Literal('question'), ...ASK_FIELDS }),
     Schema.Struct({ kind: Schema.Literal('proposal'), ...ASK_FIELDS }),
     Schema.Struct({ kind: Schema.Literal('session'), id: Schema.String, at: Schema.String, attempt: Schema.Number }),

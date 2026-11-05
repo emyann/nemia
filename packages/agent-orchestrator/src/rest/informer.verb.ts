@@ -12,6 +12,10 @@
  * its judgement rests on sightings of its harnesses that no stamp or feed line announces. In memory alone: nothing is written for it, and
  * a process started again starts with none and judges every run afresh.
  *
+ * Beside a run's judgement it keeps the run's listed object built on it (`keepObject`), for the RunList: served exactly while that
+ * judgement is (`keptObject`), and gone with it. The object's parts no stamp watches — what is on disk, a folder run's step files, what
+ * the workflow folder says now — are read on every request instead (`diskPartsOf`, object/run.verb.ts).
+ *
  * `WF_VERIFY_REST=1` judges each run the informer answers afresh too, and a read whose answer differs is refused (`answered`): a change
  * it missed is a bug in what it watches. Such a read hands the store nothing from memory (`given`). A controller: it reads the feed
  * through the client, the store's stamps and the tips its reader gives, and writes nothing.
@@ -26,28 +30,56 @@ import { isRepositoryRun, type Run } from '../record/record.ts';
 import { type Judgements, type Judgement, type JudgedOrWhy, judgementsOf, restingOf } from '../summary/judgement.verb.ts';
 import { followedFeed } from './rest.verb.ts';
 import { evictedBy, informedOf } from './rest.ts';
+import type { Run as RunObject } from '../object/run.model.ts';
 
 /**
  * One run's kept value and what it was judged on: the run as it was read, which `given` hands back in place of its record; whether it was
  * at rest; and the pass that judged it, none where no pass had started.
  */
-type Entry<T> = {
+type Entry<T, O = unknown> = {
   stamp: string;
   run: Run;
   tips: Readonly<Record<string, string | null>>;
   atRest: boolean;
   pass: number | undefined;
   value: T;
+  /** The run's listed object built on `value` (`keepObject`), its disk parts as they were then: served while `value` is. */
+  object?: O;
 };
 
 /**
  * The informer's memory: each run's entry, where on the engine's feed it has read to (undefined until a read has read the feed), the
- * pass now running (none until a pass starts: `passStarted`), and how many answers it gave from memory.
+ * pass now running (none until a pass starts: `passStarted`), how many answers it gave from memory, and how many of the RunList's
+ * objects it served kept (`objectHits`).
  */
-export type InformerMemo<T = Judgement> = { cursor?: number; runs: Map<string, Entry<T>>; pass?: number; hits: number };
+export type InformerMemo<T = Judgement, O = RunObject> = {
+  cursor?: number;
+  runs: Map<string, Entry<T, O>>;
+  pass?: number;
+  hits: number;
+  objectHits: number;
+};
 
 /** An informer that holds nothing: what a serving process starts with. */
-export const informerMemo = <T = Judgement>(): InformerMemo<T> => ({ runs: new Map(), hits: 0 });
+export const informerMemo = <T = Judgement, O = RunObject>(): InformerMemo<T, O> => ({ runs: new Map(), hits: 0, objectHits: 0 });
+
+/**
+ * The listed object kept for the run `id` on the very entry that holds `judgement`, the one this read was served or judged: none where
+ * the entry holds another judgement, since an object is served exactly while the judgement it was built on is.
+ */
+export const keptObject = <T, O>(memo: InformerMemo<T, O>, id: string, judgement: T): O | undefined => {
+  const entry = memo.runs.get(id);
+  return entry !== undefined && entry.value === judgement ? entry.object : undefined;
+};
+
+/**
+ * Keep `object`, the run `id`'s listed object built on `judgement`, on the entry that holds that judgement, and on no other: an entry a
+ * request since replaced with a newer judgement is never given an older object. Its disk parts are read again on every request.
+ */
+export const keepObject = <T, O>(memo: InformerMemo<T, O>, id: string, judgement: T, object: O): void => {
+  const entry = memo.runs.get(id);
+  if (entry !== undefined && entry.value === judgement) entry.object = object;
+};
 
 /**
  * This process's informer, a `Context.Reference` whose default is none: a daemon gives one (`informerLayer`) that its passes fill and its
@@ -119,7 +151,7 @@ const tipsOf = (
  * to; otherwise each run no line of whose tasks is on the feed past `readTo`, read again from there; none where it cannot be read, or
  * went back.
  */
-const committed = <T>(e: Engine, memo: InformerMemo<T>, held: ReadonlyMap<string, Entry<T>>, readTo: number | undefined) =>
+const committed = <T, O>(e: Engine, memo: InformerMemo<T, O>, held: ReadonlyMap<string, Entry<T, O>>, readTo: number | undefined) =>
   Effect.gen(function* () {
     if (!held.size || readTo === undefined) return;
     if (memo.cursor === readTo) {
@@ -141,9 +173,9 @@ const committed = <T>(e: Engine, memo: InformerMemo<T>, held: ReadonlyMap<string
  * nothing. The feed is read through `e`, `verify` is `WF_VERIFY_REST` as the caller's environment gives it, the tips a kept value is
  * checked against are what `git` read, with no process, and `same` says whether a value from memory and one judged afresh agree.
  */
-export const informerRead = Effect.fn('informerRead')(function* <T>(
+export const informerRead = Effect.fn('informerRead')(function* <T, O = unknown>(
   e: Engine,
-  memo: InformerMemo<T>,
+  memo: InformerMemo<T, O>,
   verify: boolean,
   git: BranchReader,
   same: (kept: T, fresh: T) => boolean = isDeepStrictEqual,
@@ -161,7 +193,7 @@ export const informerRead = Effect.fn('informerRead')(function* <T>(
     return found;
   };
   const gave = new Map<string, T>();
-  const held = new Map<string, Entry<T>>();
+  const held = new Map<string, Entry<T, O>>();
   const read: InformerRead<T> = {
     verify,
     kept(run) {

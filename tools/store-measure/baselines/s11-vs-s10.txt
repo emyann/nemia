@@ -1,0 +1,44 @@
+store measure of ~/.agent-workflows (~/.agent-engine), copied: 209116 files, 4587.5 MB in 54 s, without api.log, daemon.json, engine/a2a, wf-up.log, worktrees
+282 runs (273 finished, 9 open), 8573 tasks, 130.3 MB of journals, 43487 feed lines, 249 cards (168 started); unreadable: 0 runs, 0 pass lines; invariant refusals: 0
+Intel(R) Core(TM) Ultra 9 275HX, 12 cores, 16770.1 MB, node v24.20.0, load 13.6; commit 71ad82b20c37; 2026-11-05T20:54:04.591Z; median of 5
+runs read: finished operations-nemia-service-res-vng1, open board-the-runs-page-reads-ge-jryc; feed from byte 11615077, 1000 lines; her chat: task nemia-20261105020011823, 50 events listed, cursor 1.183.16.11.11.0.0.0.0
+
+| read | cold ms | cold heap MB | warm ms | warm heap MB |
+| --- | ---: | ---: | ---: | ---: |
+| tickPass | 3663.7 | 0.5 | 307.0 | 0.3 |
+| tickPassInformed | 6952.3 | 3.9 | 420.6 | 0.4 |
+| runList | 3769.8 | 280.6 | 246.9 | 8.3 |
+| runSummaries | 3112.4 | 271.6 | 143.5 | 2.7 |
+| stats | 36679.0 | 155.0 | 425.6 | 0.6 |
+| finishedRun | 1252.7 | 104.7 | 79.3 | 0.2 |
+| openRun | 1167.0 | 104.2 | 72.5 | 0.2 |
+| feedFromCursor | 24.6 | 0.2 | 23.2 | 0.1 |
+| runListAfterPass | 2495.1 | 115.6 | 118.0 | 8.2 |
+| openRunAfterPass | 1090.7 | 103.3 | 63.4 | 0.1 |
+| inbox | 1754.6 | 147.9 | 238.6 | 1.5 |
+| inboxAfterPass | 118.4 | 0.8 | 126.6 | 1.4 |
+| chatHistory | 2850.4 | 0.5 | 156.8 | 0.3 |
+| chatBeatBefore | 3148.4 | 0.4 | 146.9 | 0.2 |
+| chatFoldStep | 3.4 | -0.4 | 3.3 | 0.0 |
+
+spawned: git read (pass) ×160; place writes refused: none
+
+against 4cc9b3f4fde4 of 2026-11-05T19:22:06.786Z: 282 runs now, 280 then; 8573 tasks now, 8524 then; 249 cards now, 247 then
+
+| read | cold ms | baseline | ratio | warm ms | baseline | ratio |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| tickPass | 3663.7 | 3268.6 | ×1.12 | 307.0 | 248.4 | ×1.24 |
+| tickPassInformed | 6952.3 | 4767.8 | ×1.46 | 420.6 | 338.7 | ×1.24 |
+| runList | 3769.8 | 2955.4 | ×1.28 | 246.9 | 149.4 | ×1.65 |
+| runSummaries | 3112.4 | — | — | 143.5 | — | — |
+| stats | 36679.0 | 12554.6 | ×2.92 | 425.6 | 438.2 | ×0.97 |
+| finishedRun | 1252.7 | 1071.6 | ×1.17 | 79.3 | 65.7 | ×1.21 |
+| openRun | 1167.0 | 1219.3 | ×0.96 | 72.5 | 241.9 | ×0.30 |
+| feedFromCursor | 24.6 | 23.9 | ×1.03 | 23.2 | 22.6 | ×1.03 |
+| runListAfterPass | 2495.1 | 1038.5 | ×2.40 | 118.0 | 40.0 | ×2.95 |
+| openRunAfterPass | 1090.7 | 1059.4 | ×1.03 | 63.4 | 61.3 | ×1.03 |
+| inbox | 1754.6 | 1566.5 | ×1.12 | 238.6 | 245.1 | ×0.97 |
+| inboxAfterPass | 118.4 | 107.5 | ×1.10 | 126.6 | 115.1 | ×1.10 |
+| chatHistory | 2850.4 | 2748.4 | ×1.04 | 156.8 | 135.5 | ×1.16 |
+| chatBeatBefore | 3148.4 | 2904.4 | ×1.08 | 146.9 | 145.4 | ×1.01 |
+| chatFoldStep | 3.4 | 2.4 | ×1.44 | 3.3 | 2.3 | ×1.42 |

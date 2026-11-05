@@ -17,6 +17,8 @@
  *   further.
  * - `runList`, `stats`: `GET /api/runs` and `GET /api/stats`, asked of the api in this process (`app.request`), over an app built
  *   afresh for each cold call (its `ReadMemo` new) and kept for the warm ones.
+ * - `runSummaries`: `GET /api/runs-summaries`, the old list of every run's summary, which the board reads, over apps as `runList` is:
+ *   the RunList's yardstick, timed on the same copy, so the RunList's warm time per run is read against it on one store.
  * - `finishedRun`, `openRun`: `GET /api/runs/:id` of the newest run finished and of the newest still open, by `createdAt`; null where
  *   the store has none. The route answers the run object (`runObject`), and only it: `baselines/s1.json` and `s2.json` timed the run's
  *   page, which that route answered then and which is gone, so a `--compare` of these two against either sets two different answers
@@ -461,6 +463,7 @@ async function measure(asked: Asked, root: string, fence: Fence) {
     id === null ? null : overApps(over, (app) => getJson(app, `/api/runs/${encodeURIComponent(id)}`), repeat);
   const measures: Record<MeasureKey, Measured | null> = {
     runList: await overApps(fresh, (app) => getJson(app, '/api/runs'), repeat),
+    runSummaries: await overApps(fresh, (app) => getJson(app, '/api/runs-summaries'), repeat),
     stats: await overApps(fresh, (app) => getJson(app, '/api/stats'), repeat),
     finishedRun: await objectOf(finishedRun),
     openRun: await objectOf(openRun),

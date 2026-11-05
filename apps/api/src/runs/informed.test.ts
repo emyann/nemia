@@ -84,6 +84,20 @@ test('an approval through the api is answered on the very next request, with no 
   assert.deepEqual((await object(GATED)).status.waitingOnYou, [], 'approved, on the next request');
 });
 
+test("an approval through the api is the RunList's on the very next request: the dropped run's kept object is not served", async () => {
+  process.env.WF_VERIFY_REST = '0';
+  try {
+    const gated = async () => (await runList()).items.find((item) => item.metadata.name === GATED)?.status.waitingOnYou;
+    assert.deepEqual(await gated(), ['implement'], 'the fixture waits at its gate');
+    assert.deepEqual(await gated(), ['implement'], 'and is listed again, warm');
+    assert.ok(informer().runs.get(GATED)?.object, 'the informer keeps its listed object');
+    assert.equal((await post(`/api/namespaces/default/runs/${GATED}/steps/implement/approve`, {})).status, 202);
+    assert.deepEqual(await gated(), [], 'approved, on the next request');
+  } finally {
+    process.env.WF_VERIFY_REST = '1';
+  }
+});
+
 test('a word said through the api to a session at work, which moves no stamp and no line of the stand-in’s feed, is seen at once: the drop alone takes the run out', async () => {
   informer().pass = 1;
   await object(AT_WORK);

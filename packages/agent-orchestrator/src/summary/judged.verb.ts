@@ -299,7 +299,8 @@ type Judged = {
   /** The run in one word, as `assess` judged it: `failed` where a step broke, `awaiting approval` or `waiting` where a person stops it. */
   status: RunStatus;
   /**
-   * Where the run is in its life, and why, as codes (`runCodes`): `Waiting` on `run` for a running run a person holds (`holding`), and
+   * Where the run is in its life, and why, as codes (`runCodes`): `Waiting` on `run` for a running run a person holds until a run lands
+   * (`holding`), on `hold` for one held until a person lifts it, and
    * for a run a person's word stops, the reason and `via` of its first step that waits on them.
    */
   phase: RunPhase;
@@ -482,7 +483,7 @@ export const judge = Effect.fn('judge')(function* (
     waitingOnYouWords: onYouWords({ steps: read.steps, waitingOnYou }),
     toDecide: toDecideOf(run, read.toDecide, steps),
     status,
-    ...runDoor(runCodes(status, holding !== null, read.steps)),
+    ...runDoor(runCodes(status, holding?.runs ?? null, read.steps)),
     moving:
       inFlight(run, read.phaseOf).length > 0 ||
       (tickReads &&

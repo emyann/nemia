@@ -239,7 +239,7 @@ test('reasonOf names a reason for every word the package writes, only of a kind 
     );
     for (const reason of STEP_REASONS.filter((r) => PHASE_OF[r] === 'waiting'))
       reached.add(
-        `${runCodes('waiting', false, [codedStep(reason === 'AwaitingAnswer' ? { reason, via: 'session' } : ({ reason } as QualifiedStep))]).reason}/Run`,
+        `${runCodes('waiting', null, [codedStep(reason === 'AwaitingAnswer' ? { reason, via: 'session' } : ({ reason } as QualifiedStep))]).reason}/Run`,
       );
     const entries = REASON_CODES.flatMap((reason) => kindsOf(reason).map((kind) => `${reason}/${kind}`));
     assert.equal(entries.length, 47, 'the table the owner named has 47 entries');

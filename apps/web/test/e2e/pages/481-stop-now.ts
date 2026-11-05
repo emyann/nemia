@@ -28,7 +28,8 @@ const NOW_WHY = 'the quota runs low';
 const PLAIN_WHY = 'merging by hand on main';
 
 /** What the package says an interrupted step costs. */
-const COST = 'A session has its tool call cut and continues as the same try, told which call was cut; a check runs again from its start.';
+const COST =
+  "Stopping now cuts a session's tool call, and it continues as the same try, told which call was cut; a check runs again from its start.";
 
 /** What `GET /api/pause/now` answers, each interrupt with the task it stops, which the board does not read. */
 type NowRead = { interrupts: Array<Interrupt & { taskId: string }>; cost: string };
@@ -85,12 +86,12 @@ const pauseFile = (): { at: string; by: string; why?: string } => JSON.parse(fs.
 /** The journal of `taskId`, as the engine keeps it. */
 const journalOf = (taskId: string): string => fs.readFileSync(path.join(store!, 'engine', 'tasks', `${taskId}.jsonl`), 'utf8');
 
-/** Opens the popover, then its Pause now…, and waits for what it would stop to be read: the api's own answer, which it returns. */
+/** Opens the popover, then its Stop now…, and waits for what it would stop to be read: the api's own answer, which it returns. */
 async function confirmOpened(page: Page): Promise<NowRead> {
   await pauseOf(page).click();
   await expectVisible(popoverOf(page), 'the button opens its popover');
-  await popoverOf(page).getByRole('button', { name: 'Pause now…' }).click();
-  await expectTexts(popoverOf(page).getByRole('heading'), ['Pause all factories now'], 'Pause now… asks before it acts');
+  await popoverOf(page).getByRole('button', { name: 'Stop now…' }).click();
+  await expectTexts(popoverOf(page).getByRole('heading'), ['Stop all factories now'], 'Stop now… asks before it acts');
   await expectVisible(popoverOf(page).locator('[data-pause-cost]'), 'once read, the confirm says what it costs');
   return apiRead<NowRead>(page, '/api/pause/now');
 }
@@ -98,17 +99,17 @@ async function confirmOpened(page: Page): Promise<NowRead> {
 export default {
   /**
    * All factories paused at once from the top bar, as `wf pause --now --yes` does (`POST /api/pause` with `now`). With a session at
-   * work and a landing at work (LANDING, which the page writes), Pause now…, offered beside Pause… while all factories run, names each
+   * work and a landing at work (LANDING, which the page writes), Stop now…, offered beside Pause… while all factories run, names each
    * run's step it stops — the api's read (`GET /api/pause/now`), which leaves the landing out — and says what that costs. Confirmed, the
    * pause's file holds its why; a session it named is asked no stop and no try, its call cut by the sessions' drain so it goes on as the
    * same try on the resume, while a check it named is asked to stop and has the try that runs it again beside its run; the landing is
    * left at work, and the popover reads Pausing, each named check stopping and tried again on the resume. From Pausing, after
-   * a plain Pause…, Pause now… is offered beside Resume, asks no why, and keeps the pause as it was put, its timeout cut to 0; on a phone's
+   * a plain Pause…, Stop now… is offered beside Resume, asks no why, and keeps the pause as it was put, its timeout cut to 0; on a phone's
    * screen its confirm fits. Resume takes the pause away. Which tasks a pause at once stops, and how the resume continues each, is the
    * package's judgement, proven in its own tests (`packages/agent-orchestrator/src/tick/pause.test.ts`). The page puts back every file it
    * wrote, and the window's size.
    */
-  name: 'pause-now',
+  name: 'stop-now',
   route: '/factories/default',
   expect: async (page) => {
     const theme = await themeOf(page);
@@ -123,7 +124,7 @@ export default {
       await idle(page);
       await expectVisible(button.and(page.locator('[data-pause="running"]')), 'all factories running');
       await button.click();
-      await expectTexts(popover.locator('[data-pause-actions] li'), ['Pause…', 'Pause now…'], 'running, Pause now… beside Pause…');
+      await expectTexts(popover.locator('[data-pause-actions] li'), ['Pause…', 'Stop now…'], 'running, Stop now… beside Pause…');
       await page.keyboard.press('Escape');
       await expectCount(popover, 0, 'Escape closes the popover');
 
@@ -138,8 +139,8 @@ export default {
       if (fs.existsSync(path.join(store!, 'cordon'))) throw new Refused('nothing is put while the confirm asks');
       await popover.locator('[data-pause-why]').fill(NOW_WHY);
       await settled(page);
-      await photograph(page, path.join(OUT, `pause-now-confirm-${theme}.png`));
-      await popover.getByRole('button', { name: 'Pause now', exact: true }).click();
+      await photograph(page, path.join(OUT, `stop-now-confirm-${theme}.png`));
+      await popover.getByRole('button', { name: 'Stop now', exact: true }).click();
       await expectCount(popover, 0, 'confirmed, the popover closes once the api answered');
 
       if (pauseFile().why !== NOW_WHY) throw new Refused(`the pause's file holds the why given — it holds ${JSON.stringify(pauseFile())}`);
@@ -160,6 +161,10 @@ export default {
         throw new Refused(`each check it named is stopping, tried again on the resume — the api reads ${JSON.stringify(paused.finishing)}`);
       await expectVisible(button.and(page.locator('[data-pause="pausing"]')), 'the button says Pausing while they stop');
       await button.click();
+      await expectVisible(
+        popover.locator('[data-pause-line]', { hasText: 'each working session is cut at once and parks' }),
+        'the pause says it cut at once, never that it waits on a timeout',
+      );
       await expectTexts(popover.locator('[data-pause-finishing] li'), paused.finishing.map(finishingSentence), 'each, stopping or not');
       if (checks.length)
         await expectVisible(
@@ -167,7 +172,7 @@ export default {
           'a check is stopping, and tried again on the resume',
         );
       await settled(page);
-      await photograph(page, path.join(OUT, `pause-now-stopping-${theme}.png`));
+      await photograph(page, path.join(OUT, `stop-now-stopping-${theme}.png`));
       await page.keyboard.press('Escape');
 
       restore(before);
@@ -183,14 +188,14 @@ export default {
       const plain = pauseFile();
       await expectVisible(button.and(page.locator('[data-pause="pausing"]')), "Pausing while each session stops at its tool call's end");
       await button.click();
-      await expectTexts(popover.locator('[data-pause-actions] li'), ['Pause now…', 'Resume'], 'pausing, Pause now… beside Resume');
+      await expectTexts(popover.locator('[data-pause-actions] li'), ['Stop now…', 'Resume'], 'pausing, Stop now… beside Resume');
       await page.keyboard.press('Escape');
       await page.setViewportSize({ width: 390, height: 844 });
       await confirmOpened(page);
       await expectCount(popover.locator('[data-pause-why]'), 0, 'a pause that stands keeps its why: the confirm asks none');
       await settled(page);
-      await photograph(page, path.join(OUT, `pause-now-phone-${theme}.png`));
-      await popover.getByRole('button', { name: 'Pause now', exact: true }).click();
+      await photograph(page, path.join(OUT, `stop-now-phone-${theme}.png`));
+      await popover.getByRole('button', { name: 'Stop now', exact: true }).click();
       await expectCount(popover, 0, 'confirmed from Pausing, the popover closes once the api answered');
       const cut = { ...plain, timeoutMs: 0 };
       if (JSON.stringify(pauseFile()) !== JSON.stringify(cut))

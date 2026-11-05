@@ -19,7 +19,7 @@ const HEADINGS: Record<PauseState, string> = {
   reading: 'Reading',
 };
 
-/** What the popover asks before it acts: nothing, why before a pause, or what a pause at once stops before it does. */
+/** What the popover asks before it acts: nothing, why before a pause, or what Stop now stops before it does. */
 type Asking = 'pause' | 'now' | null;
 
 /** The why of a pause, asked before it is put: optional, sent as given. */
@@ -80,9 +80,9 @@ function Lines({ lines, data, className }: { lines: readonly string[]; data: str
 }
 
 /**
- * What a pause at once stops, read afresh as it opens (`GET /api/pause/now`) and confirmed before it is sent: each run's step whose session
- * or check it stops, or that it stops nothing, and what an interrupted step costs, in the api's words. It asks why only where no pause
- * stands (`standing`): one that stands is kept as it was. `onPut` sends the why; `onClose` puts nothing.
+ * What Stop now stops (a pause at once), read afresh as it opens (`GET /api/pause/now`) and confirmed before it is sent: each run's step
+ * whose session or check it stops, or that it stops nothing, and what an interrupted step costs, in the api's words. It asks why only
+ * where no pause stands (`standing`): one that stands is kept as it was. `onPut` sends the why; `onClose` puts nothing.
  */
 function NowForm({
   standing,
@@ -113,8 +113,8 @@ function NowForm({
         <>
           <p className="text-body-small text-muted-foreground">
             {read.data.interrupts.length === 0
-              ? 'Nothing outside a landing is at work: pausing now stops nothing.'
-              : `A landing finishes; this cuts ${read.data.interrupts.length} at work, each going on at Resume:`}
+              ? 'Nothing outside a landing is at work: stopping now stops nothing.'
+              : `A landing finishes; stopping now cuts ${read.data.interrupts.length} at work, each going on at Resume:`}
           </p>
           <Lines lines={read.data.interrupts.map(interruptSentence)} data="data-pause-interrupt" />
           <p data-pause-cost className="text-body-small">
@@ -123,14 +123,14 @@ function NowForm({
         </>
       )}
       {!standing && <WhyField why={why} setWhy={setWhy} />}
-      <FormActions label="Pause now" onClose={onClose} isPending={isPending || !read.data} />
+      <FormActions label="Stop now" onClose={onClose} isPending={isPending || !read.data} />
     </Form>
   );
 }
 
 /**
  * The pause in the popover: its whole sentence, each task still finishing, each session parked and each landing held, then what may be
- * done — Pause… while all factories run (`onAsk('pause')`), Pause now… while they run or are Pausing (`onAsk('now')`), Resume while a
+ * done — Pause… while all factories run (`onAsk('pause')`), Stop now… while they run or are Pausing (`onAsk('now')`), Resume while a
  * pause stands (`onResume`).
  */
 function PauseFacts({
@@ -166,7 +166,7 @@ function PauseFacts({
           <li>
             <Button variant="outline" size="sm" className="w-full justify-start" onPress={() => onAsk('now')}>
               <CircleStop data-icon="inline-start" />
-              Pause now…
+              Stop now…
             </Button>
           </li>
         )}
@@ -190,9 +190,10 @@ function PauseFacts({
  * It opens a popover with the whole of it — since when, by whom and why, each task still finishing, each session parked at a tool call's
  * end, named by the call it stopped after, each landing held with its merge
  * staged, so a person who paused to use main knows why `MERGE_HEAD` is there, and each other check held — and a list of what may be
- * done: Pause…, which asks an optional why (`WhyForm`) and puts the pause (`POST /api/pause`); Pause now…, which says what it stops and
- * what that costs (`NowForm`) and pauses at once (`POST /api/pause` with `now`); or Resume (`DELETE /api/pause`); the popover closes
- * once the api answered. A refusal — a pause put or resumed elsewhere meanwhile — is said in the package's words, the popover open.
+ * done: Pause…, which asks an optional why (`WhyForm`) and puts the pause (`POST /api/pause`); Stop now…, which says what it stops and
+ * what that costs (`NowForm`) and pauses at once, each session cut at once (`POST /api/pause` with `now`); or Resume
+ * (`DELETE /api/pause`); the popover closes once the api answered. A refusal — a pause put or resumed elsewhere meanwhile — is said in
+ * the package's words, the popover open.
  */
 export function PauseButton() {
   const queryClient = useQueryClient();
@@ -238,7 +239,7 @@ export function PauseButton() {
       <Popover placement="bottom end" offset={6} className={POPOVER}>
         <Dialog aria-label="The pause of all factories" data-pause-popover className="flex flex-col gap-2 outline-none">
           <Heading slot="title" className="font-medium">
-            {asking === 'pause' ? 'Pause all factories' : asking === 'now' ? 'Pause all factories now' : HEADINGS[words.state]}
+            {asking === 'pause' ? 'Pause all factories' : asking === 'now' ? 'Stop all factories now' : HEADINGS[words.state]}
           </Heading>
           {asking === 'pause' && (
             <WhyForm onPut={(why) => act.mutate({ why, now: false })} onClose={() => setAsking(null)} isPending={act.isPending} />

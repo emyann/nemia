@@ -105,18 +105,26 @@ test('the pause in words: as put, Pausing while some finish, Paused once none do
     assert.match(words, /by ann: merging by hand — nothing new starts/);
     assert.match(words, /; nemia resume resumes it$/);
   });
-  await t.test("a pause with a timeout says each session stops at its tool call's end; one with none, that each runs on", () => {
-    const finishing: Finishing[] = [{ run: 'r-1', step: 'implement', kind: 'session' }];
-    const timed = { ...PAUSE, timeoutMs: 600_000 };
-    for (const words of [pauseWords(timed), pausedWords({ pause: timed, finishing, staged: [], held: [] }) ?? '']) {
-      assert.match(words, /current tool call ends, cut once the timeout passes/);
-      assert.doesNotMatch(words, /what runs finishes|runs on to its end/);
-    }
-    for (const words of [pauseWords(PAUSE), pausedWords({ pause: PAUSE, finishing, staged: [], held: [] }) ?? '']) {
-      assert.match(words, /nothing new starts, and each working session runs on/);
-      assert.doesNotMatch(words, /what runs finishes|tool call ends/);
-    }
-  });
+  await t.test(
+    "a pause with a timeout says each session stops at its tool call's end; one put at once, that each is cut at once; one with none, that each runs on",
+    () => {
+      const finishing: Finishing[] = [{ run: 'r-1', step: 'implement', kind: 'session' }];
+      const timed = { ...PAUSE, timeoutMs: 600_000 };
+      for (const words of [pauseWords(timed), pausedWords({ pause: timed, finishing, staged: [], held: [] }) ?? '']) {
+        assert.match(words, /current tool call ends, cut once the timeout passes/);
+        assert.doesNotMatch(words, /what runs finishes|runs on to its end/);
+      }
+      const now = { ...PAUSE, timeoutMs: 0 };
+      for (const words of [pauseWords(now), pausedWords({ pause: now, finishing, staged: [], held: [] }) ?? '']) {
+        assert.match(words, /each working session is cut at once/);
+        assert.doesNotMatch(words, /tool call ends|once the timeout passes|runs on to its end/);
+      }
+      for (const words of [pauseWords(PAUSE), pausedWords({ pause: PAUSE, finishing, staged: [], held: [] }) ?? '']) {
+        assert.match(words, /nothing new starts, and each working session runs on/);
+        assert.doesNotMatch(words, /what runs finishes|tool call ends/);
+      }
+    },
+  );
   await t.test('the pause says Pausing with how many still finish, names each and each check it holds; Paused once none finishes', () => {
     const finishing: Finishing[] = [
       { run: 'r-1', step: 'implement', kind: 'session' },

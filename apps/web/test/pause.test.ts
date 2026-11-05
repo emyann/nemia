@@ -3,7 +3,7 @@
  * does — under a pause with a timeout, how many sessions finish a tool call and when what is left is cut — Paused once none does, each
  * session it parked named by the call it stopped after, each task and each landing held named in a sentence, and a read that failed
  * said; what a pause at once would stop, and a task it asked to stop, each in its words. `npm run e2e` presses the buttons themselves
- * (`480-pause.ts`, `481-pause-now.ts`), and reads a parked step (`482-paused-step.ts`).
+ * (`480-pause.ts`, `481-stop-now.ts`), and reads a parked step (`482-paused-step.ts`).
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -164,6 +164,8 @@ test('pauseWords under a pause with a timeout: sessions finishing a call and whe
       /^Pausing: 1 session finishing a tool call, cut now — /,
       'a pause at once is cutting now',
     );
+    assert.match(pauseWords(now, null, NOW).line, /Nothing new starts, and each working session is cut at once and parks\./);
+    assert.doesNotMatch(pauseWords(now, null, NOW).line, /once the timeout passes/, 'a pause at once waits on no timeout');
     assert.match(pauseWords(early, null, new Date(NOW.getTime() + 600_000)).line, /cut now — /, 'past its timeout, the call is being cut');
     const ahead = new Date(NOW.getTime() - 30_000);
     assert.match(

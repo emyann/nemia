@@ -30,6 +30,8 @@ test("the client's pause lines are the orchestrator's: the count of sessions fin
   const cut = { ...paused, pause: { ...paused.pause, timeoutMs: 0 } };
   assert.deepEqual(pausedLines(cut, now), orchestratorLines(cut, now));
   assert.match(pausedWords(cut, now) ?? '', /cut now/, 'a pause at once says its calls are being cut');
+  assert.match(pausedWords(cut, now) ?? '', /each working session is cut at once and parks/, 'and that each session is cut at once');
+  assert.doesNotMatch(pausedWords(cut, now) ?? '', /once the timeout passes/, 'never that it waits on a timeout');
   const parked = { ...paused, finishing: [] };
   assert.deepEqual(pausedLines(parked, now), orchestratorLines(parked, now));
 });

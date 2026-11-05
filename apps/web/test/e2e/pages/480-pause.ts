@@ -104,7 +104,7 @@ export default {
   /**
    * All factories paused and resumed from the top bar's one button, right before the gauges, as `wf pause` and `wf resume` do
    * (`POST` and `DELETE /api/pause`), on the Factory. The popover's heading is the state: Running, Pausing or Paused. Running, the button
-   * is a pause icon; its popover says what pausing all factories does and offers Pause… beside Pause now… (`pause-now`'s page).
+   * is a pause icon; its popover says what pausing all factories does and offers Pause… beside Stop now… (`stop-now`'s page).
    * Pause… asks an optional why, and once sent the pause's file holds it and the popover says since when, by whom and why: `Pausing · N`
    * while the seed's sessions are at work, as the api reads them, its popover naming each; once nothing finishes and a landing is held
    * with its merge staged and another step's check held — the api's answer held with `route` — `Paused, 2 checks held`, its popover
@@ -135,8 +135,8 @@ export default {
       );
       await expectTexts(
         popover.locator('[data-pause-actions] li'),
-        ['Pause…', 'Pause now…'],
-        'its actions: Pause… and Pause now…, all factories running',
+        ['Pause…', 'Stop now…'],
+        'its actions: Pause… and Stop now…, all factories running',
       );
 
       await popover.getByRole('button', { name: 'Pause…' }).click();
@@ -176,8 +176,8 @@ export default {
       await expectTexts(popover.locator('[data-pause-finishing] li'), read.finishing.map(finishingSentence), 'and names each');
       await expectTexts(
         popover.locator('[data-pause-actions] li'),
-        ['Pause now…', 'Resume'],
-        "its actions: Pause now… and Resume, a pause standing while each session stops at its tool call's end",
+        ['Stop now…', 'Resume'],
+        "its actions: Stop now… and Resume, a pause standing while each session stops at its tool call's end",
       );
       await page.keyboard.press('Escape');
       await expectCount(popover, 0, 'Escape closes the popover');

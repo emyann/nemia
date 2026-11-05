@@ -22,7 +22,7 @@ import {
   type Verdict,
 } from '../check/check.ts';
 import type { Workflow } from '../step/step.ts';
-import { attemptIn, scriptCloseouts } from '../route/route.store.ts';
+import { attemptIn, scriptCloseouts } from '../script/script.store.ts';
 import { resultSteps } from '../branches/index.ts';
 import { isRepositoryRun, stepTasks, type CloseoutAsked, type Run, type StepRecord, type TaskPhase } from '../record/record.ts';
 import type { Said } from '../say/say.ts';

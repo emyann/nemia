@@ -1,7 +1,7 @@
 /** A script condition's answer file, decoded (`scriptAnswerOf`): a route or `unsure`, exactly one of them, or nothing the run can use. */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { scriptAnswerOf } from './route.store.ts';
+import { scriptAnswerOf } from './script.store.ts';
 
 test('an answer file decodes to a route or to unsure, and to nothing with both, neither, a wrong type or text that is not JSON', () => {
   const rows: [string | undefined, ReturnType<typeof scriptAnswerOf>][] = [

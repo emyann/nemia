@@ -8,7 +8,7 @@ import type { CloseoutAsked, Run, StepStatus, TaskPhase } from '../record/record
 import type { Verdict } from '../check/check.ts';
 import type { SpendOf } from '../status/status.ts';
 import { codedStep, REASON_OF, type CodedStep } from '../phase/phase.ts';
-import { answeredRoute, runWords } from './route-words.ts';
+import { answeredRoute, runWords } from './routed-words.ts';
 
 /** A step's row as the routing words it: what to say, its code, and the line that routes a condition by hand. */
 export type RoutedRow = CodedStep & { message: string; note?: string };

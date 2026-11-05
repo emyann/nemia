@@ -13,7 +13,7 @@ import type { Verdict } from '../check/check.ts';
 import type { OutputSchema, Workflow } from '../workflow.ts';
 import { run, step } from '../../test/assessed.ts';
 import { STEP_EDGES, stepDiagram, stepMachineGraph, stepMove } from './step-machine.ts';
-import { runWords } from '../route/route-words.ts';
+import { runWords } from '../routed/index.ts';
 
 /** Every fact `stepStatus` reads: the workflow, the run's record, and what the engine, the closeouts and the checks say. */
 type World = {

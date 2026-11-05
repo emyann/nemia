@@ -5,8 +5,8 @@
  * the manifest, NEMIA.md and RULES.md. Pure: the store reads with the loader's own readers, hands the parts in, and writes what comes
  * back. A key the template has no place for is refused by name.
  */
+import { readFrontmatter } from '../frontmatter/frontmatter.ts';
 import path from 'node:path';
-import { parse } from 'yaml';
 import { HARNESS_KNOBS } from 'agent-runtime/vocabulary';
 import type { Agent } from '../agents/agents.ts';
 import { DEFAULT_HARNESS, isRemoteHarness } from '../harness/harness.ts';
@@ -165,10 +165,10 @@ function routingOf(keys: Readonly<Partial<Record<string, unknown>>>): Partial<St
   return wired;
 }
 
-/** A line's YAML value, or the line itself where it does not read as YAML. */
+/** A line's YAML value, read by the step's own frontmatter reader, or the line itself where it does not read as YAML. */
 const flowOf = (written: string): unknown => {
   try {
-    return parse(written) as unknown;
+    return readFrontmatter('route', `route: ${written}`).entries[0]?.value ?? written;
   } catch {
     return written;
   }

@@ -14,7 +14,7 @@
 import { endsOnBase, type Workflow } from '../step/step.ts';
 import { terminalSteps } from '../workflow/index.ts';
 import type { Run } from '../record/record.ts';
-import { conditionOf } from '../route/route.ts';
+import { conditionOf } from '../route/index.ts';
 import type { Assessment } from '../tick/assess.ts';
 import type { Landed } from '../decide/decide.ts';
 import type { BranchStood } from '../place/place.ts';

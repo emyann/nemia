@@ -114,8 +114,9 @@ function modulesLoaded(entry: string, more: readonly string[] = []): string[] {
  * judgement of a factory's harness settings `filedConfig` copies the allowed ones by, which imports nothing.
  */
 const PINNED_MODULES: Record<string, { all: number; effect: number }> = {
-  'agent-orchestrator/run': { all: 180, effect: 15 },
-  'agent-orchestrator/workflow': { all: 132, effect: 15 },
+  // 187 and 136: the routing build's pure route/ and routed/ folders (their faces, route.ts, the keys, the load refusals, the routed words and lines).
+  'agent-orchestrator/run': { all: 187, effect: 15 },
+  'agent-orchestrator/workflow': { all: 136, effect: 15 },
 };
 
 const isEffectModule = (url: string): boolean => url.includes('/node_modules/effect/');

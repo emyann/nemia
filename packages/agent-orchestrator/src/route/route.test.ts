@@ -55,7 +55,7 @@ test('load refuses a workflow whose routes do not close', async (t) => {
     ['an ends: naming no route of the condition', changed('triage', (s) => ({ ...s, ends: ['docs', 'mobile'] }))],
     [
       'a workflow: node with an agent',
-      changed('to-build', (s) => ({ ...s, after: ['notes'], workflow: 'build', agent: { name: 'grace', keys: [], body: '', given: {} } })),
+      changed('to-build', (s) => ({ ...s, after: ['notes'], workflow: 'build', agent: { name: 'implementer', keys: [], body: '', given: {} } })),
     ],
     ['a workflow: node with a workspace', changed('to-build', (s) => ({ ...s, after: ['notes'], workflow: 'build', workspace: 'base' }))],
     ['a workflow: node with a check', changed('to-build', (s) => ({ ...s, after: ['notes'], workflow: 'build', check: 'npm test' }))],

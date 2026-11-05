@@ -8,7 +8,7 @@ import { attemptVerdict } from '../check/check.ts';
 import { summaryLine, type Closeout } from '../closeout/index.ts';
 import { stepTaskId, tryOf, type Run } from '../record/record.ts';
 import type { Workflow } from '../step/step.ts';
-import { scriptRoute, type ScriptAnswer, type ScriptRead } from './route.ts';
+import { scriptRoute, type ScriptAnswer, type ScriptRead } from '../route/index.ts';
 
 /** A task's last attempt, as far as a script condition reads it: its exit and the answer file the runtime kept. */
 export type AttemptOf = (taskId: string) => { exitCode?: number | null; reason?: string | null; terminationMessage?: string } | undefined;

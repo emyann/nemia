@@ -1,4 +1,4 @@
-import { nodeKind, type NodeKind } from '../route/route.ts';
+import { nodeKind, type NodeKind } from '../route/index.ts';
 import { DEFAULT_ROUNDS, type Workflow } from '../step/step.ts';
 
 /**

@@ -71,8 +71,8 @@ import { answerHeld, stopAsked } from './held.verb.ts';
 import { forStep } from '../telemetry/telemetry.store.ts';
 import { stepLabels } from '../telemetry/telemetry.ts';
 import { localFields } from './assess.ts';
-import { sendCards, type Due } from '../route/send.verb.ts';
-import { answerTables, fileScripts } from '../route/script.verb.ts';
+import { sendCards, type Due } from '../send/send.verb.ts';
+import { answerTables, fileScripts } from '../script/script.verb.ts';
 import { filedAt, foldersTold, placeTold, toldOf, type PlaceTold, type StepTold, type Told } from './told.verb.ts';
 import { found, recordNamed, stepNamed, taskToStop, tryTold } from './told.verb.ts';
 

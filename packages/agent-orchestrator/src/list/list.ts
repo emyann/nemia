@@ -19,7 +19,7 @@ import {
 } from '../record/record.ts';
 import type { Closeout } from '../closeout/index.ts';
 import { checkVerdictOf, verdictWord, type CheckVerdict, type Verdict } from '../check/check.ts';
-import { routedRows } from '../route/route-lines.ts';
+import { routedRows } from '../routed/index.ts';
 import { codedStep, ENGINE_REASON, holdsTheRun, REASON_OF, type CodedStep, type QualifiedStep } from '../phase/phase.ts';
 import { answerOf, dueNote, modeWord, retriesDue, tryNote, type RetryAsk } from '../retry/index.ts';
 import {

@@ -226,13 +226,14 @@ export const reconcile = Effect.fn('reconcile')(function* (taskId: string, obser
 });
 
 /**
- * What the sighting `seen` attempt `n` ended on says of it, as its `ended` event carries it, each key written, undefined or not, and
+ * What the sighting `seen` attempt `n` ended on says of it, as its `ended` event carries it, each key written, undefined or not — but
+ * `terminationMessage`, written only where a harness read one, so an end before the key is written as it was — and
  * what it says of a park (`parkedEnd`): `parked`, which `decide` continues, or `limit: 'budget'` for a park that spent its cap.
  */
 const endFacts = (state: State, n: number, seen: Sighting | undefined) => ({
   usage: seen?.usage,
   exitCode: seen?.exitCode,
-  terminationMessage: seen?.terminationMessage,
+  ...(seen?.terminationMessage === undefined ? {} : { terminationMessage: seen.terminationMessage }),
   denials: seen?.denials,
   skills: seen?.skills,
   files: seen?.files,

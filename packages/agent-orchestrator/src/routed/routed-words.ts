@@ -8,7 +8,7 @@ import type { Closeout } from '../closeout/index.ts';
 import { satisfiesAfter, tryOf, type CloseoutAsked, type Run, type StepStatus, type TaskPhase } from '../record/record.ts';
 import type { Workflow } from '../step/step.ts';
 import { approvalOf, hasGate, standing, type SpendOf } from '../status/status.ts';
-import { conditionOf, nodeFate, nodeKind, tableRoute } from './route.ts';
+import { conditionOf, nodeFate, nodeKind, tableRoute } from '../route/index.ts';
 
 /**
  * The route a condition answered on the try it is on, and who said it — or `unsigned`, a table with no row for its producer's fact, or

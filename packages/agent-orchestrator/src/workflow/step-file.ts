@@ -18,7 +18,7 @@ import {
 } from '../step/step.ts';
 import { fenceReach } from 'agent-runtime/vocabulary';
 import { renderFrontmatter, type FrontmatterPair } from '../frontmatter/frontmatter.ts';
-import { routeWritten, routingOf } from '../route/route-keys.ts';
+import { routeWritten, routingOf } from '../route/index.ts';
 import { DEFAULT_HARNESS, isRemoteHarness, remoteRefusal } from '../harness/harness.ts';
 import {
   budgetOf,

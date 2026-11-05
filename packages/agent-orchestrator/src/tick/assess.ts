@@ -23,8 +23,8 @@ import { closeoutRefusals } from '../question/index.ts';
 import type { Verdict } from '../check/check.ts';
 import type { CheckoutHold } from '../cap/cap.ts';
 import { roundsDue } from '../round/round.ts';
-import { conditionOf, nodeFate, nodeKind } from '../route/route.ts';
-import { answeredRoute, routedWords } from '../route/route-words.ts';
+import { conditionOf, nodeFate, nodeKind } from '../route/index.ts';
+import { answeredRoute, routedWords } from '../routed/index.ts';
 
 export type Assessment = {
   /**

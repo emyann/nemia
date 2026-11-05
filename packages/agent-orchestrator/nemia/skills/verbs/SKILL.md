@@ -221,6 +221,11 @@ They write, and are yours to run unasked, on your judgement: say what you did.
                                edit an inbox card's labels: key=value sets a key, key- removes it;
                                changing a value takes --overwrite. nemia inbox -l selects by them, and
                                the run the card starts is created with them
+  nemia route <runId> <condition> <route>
+                               route a condition by hand: the next tick takes your route over the
+                               condition's own answer, for the try it is on, and files the nodes
+                               whose when: names it. Refused once a node after it is filed or sent:
+                               nemia cancel <runId>, and start again.
   nemia refresh <runId> [<step>] [--base]
                                take the new revisions: a run keeps the workflow, agents, skills and
                                factory rules it resolved when it started, and this pins it to the

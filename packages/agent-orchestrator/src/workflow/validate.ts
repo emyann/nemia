@@ -7,7 +7,7 @@ import { endsOnBase, LOOP_REPLIES, stepPlace, type Workflow, WorkflowError } fro
 import { isRemoteHarness } from '../harness/harness.ts';
 import { contextText, sessionContext } from '../keys/index.ts';
 import { LINE_NAME } from '../workspace/workspace.ts';
-import { routeRefusal } from '../route/route-load.ts';
+import { routeRefusal } from '../route/index.ts';
 
 /**
  * Whether a team works in folders the run makes, with no git repository (`place: folder`): every step says it, or none does

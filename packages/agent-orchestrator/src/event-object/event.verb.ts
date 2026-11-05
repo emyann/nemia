@@ -14,7 +14,7 @@ import type { ObjectQuery } from '../factory-object/factory.verb.ts';
 import { Invalid, Missing } from '../refusal/refusal.ts';
 import { parseSelectors, selectorsRefusal, selects } from '../watch/selector.ts';
 import { eventOf } from './event.ts';
-import { continuedAfter, continueToken, listPage } from './page.ts';
+import { continuedAfter, continueToken, listPage } from '../object/page.ts';
 
 /** What a list of events is asked: its namespace (none for every event, cluster-scoped too), `?limit=`, `?continue=`, its selectors. */
 export type EventQuery = ObjectQuery;

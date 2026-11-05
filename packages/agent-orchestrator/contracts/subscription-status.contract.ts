@@ -1,6 +1,6 @@
 /**
  * Where the deliverer is with a subscription, as its `Subscription` object's status says it (agent-orchestrator,
- * src/object/subscription.ts; no code yet): the byte of the feed every line before which is delivered or folded (`cursor`), how many
+ * src/subscription-object/subscription.ts; no code yet): the byte of the feed every line before which is delivered or folded (`cursor`), how many
  * routine lines are folded and not yet said (`pending`, the digest's length), and when the first of them was folded (`since`, ms).
  *
  * The deliverer's file speaks for the subscription only where it was written for it, the same task and the same `from` (`resumedAt`,
@@ -14,7 +14,7 @@ export type SubscriptionAsked = { readonly task: string; readonly from: number }
 
 /**
  * The deliverer's file as read: the subscription it was written for (`of`), its cursor, the count of lines in its digest, and when the
- * first was folded (ms). Declared here until `src/object/subscription.ts` holds it.
+ * first was folded (ms). Declared here until `src/subscription-object/subscription.ts` holds it.
  */
 export type DeliveryKept = {
   readonly of: { readonly task: string; readonly from: number };
@@ -23,7 +23,7 @@ export type DeliveryKept = {
   readonly since?: number;
 };
 
-/** What the status says of the deliverer. Declared here until `src/object/subscription.ts` holds it. */
+/** What the status says of the deliverer. Declared here until `src/subscription-object/subscription.ts` holds it. */
 export type DeliveredStatus = { readonly cursor: number; readonly pending: number; readonly since?: number };
 
 /** A count: a whole number from 0, safe in a double. */
@@ -60,5 +60,5 @@ const subscriptionDeliveredSpec = spec<(sub: SubscriptionAsked, kept: DeliveryKe
   },
 });
 
-/** `subscriptionDelivered`'s type, which `src/object/subscription.ts` takes. */
+/** `subscriptionDelivered`'s type, which `src/subscription-object/subscription.ts` takes. */
 export type SubscriptionDelivered = Implementation<typeof subscriptionDeliveredSpec>;

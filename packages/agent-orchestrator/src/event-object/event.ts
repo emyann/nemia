@@ -17,8 +17,7 @@ import {
   WAIT_ON,
 } from 'objects';
 import type { EventInvolvedKind, EventNamespace, EventReason } from '../../contracts/event.contract.ts';
-import { isRunLine, isStoreLine, type FeedLine } from '../feed/feed.ts';
-import { messageOf, REASON_CODES, sourceOf, typeOf } from '../feed/reason.ts';
+import { isRunLine, isStoreLine, messageOf, REASON_CODES, sourceOf, typeOf, type FeedLine } from '../feed/index.ts';
 
 /** The namespace an event is in: the factory its line names, `default` for a run's or a step's that names none, else none. */
 export const eventNamespace: EventNamespace = (kind, factory) => {

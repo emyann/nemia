@@ -275,3 +275,9 @@ test("a step's latest attempt says the release and harness it ran on, each null 
   const other = { count: 1, latest: { ...latest, release: { kind: 'image', root: '/x' }, harness: null } };
   assert.equal(Schema.decodeUnknownResult(StepAttempts)(other)._tag, 'Failure', 'a release is an install or a checkout');
 });
+
+test("an Event's reasons are the feed's codes, in the feed's order", async () => {
+  const { EVENT_REASONS } = await import('objects');
+  const { REASON_CODES } = await import('../feed/index.ts');
+  assert.deepEqual([...EVENT_REASONS], [...REASON_CODES]);
+});

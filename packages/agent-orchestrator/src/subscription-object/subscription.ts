@@ -5,7 +5,7 @@
  * object itself is put together in `subscription.verb.ts`, beside its resourceVersion's digest.
  */
 import type { DeliveryKept, SubscriptionDelivered } from '../../contracts/subscription-status.contract.ts';
-import type { KeptDelivery } from '../subscription/subscription.ts';
+import type { KeptDelivery } from '../subscription/index.ts';
 
 /** Where the deliverer is with a subscription, as its status says it. */
 export const subscriptionDelivered: SubscriptionDelivered = (sub, kept) => {

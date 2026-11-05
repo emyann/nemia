@@ -1,5 +1,5 @@
 /**
- * A feed line served as an `Event` (agent-orchestrator, src/object/event.ts; no code yet): the namespace it is served in, and the reason it
+ * A feed line served as an `Event` (agent-orchestrator, src/event-object/event.ts; no code yet): the namespace it is served in, and the reason it
  * is served under.
  *
  * Its namespace (`eventNamespace`): the factory its line names (`labels.factory`, `default` on a run's line in the default
@@ -12,7 +12,7 @@
  */
 import { type Implementation, spec } from '@emyann/tsverify';
 
-/** What a line is about, as the feed's `involved.kind` says it. Declared here until `src/object/event.ts` holds it. */
+/** What a line is about, as the feed's `involved.kind` says it. Declared here until `src/event-object/event.ts` holds it. */
 export type EventInvolvedKind = 'Run' | 'Step' | 'Daemon' | 'Store';
 
 /** Whether a line of this kind is a run's: the run's own, or one of its steps'. */
@@ -38,7 +38,7 @@ const eventNamespaceSpec = spec<(kind: EventInvolvedKind, factory: string | unde
   },
 });
 
-/** `eventNamespace`'s type, which `src/object/event.ts` takes. */
+/** `eventNamespace`'s type, which `src/event-object/event.ts` takes. */
 export type EventNamespace = Implementation<typeof eventNamespaceSpec>;
 
 const eventReasonSpec = spec<(reason: string, known: readonly string[]) => string>({
@@ -59,5 +59,5 @@ const eventReasonSpec = spec<(reason: string, known: readonly string[]) => strin
   },
 });
 
-/** `eventReason`'s type, which `src/object/event.ts` takes. */
+/** `eventReason`'s type, which `src/event-object/event.ts` takes. */
 export type EventReason = Implementation<typeof eventReasonSpec>;

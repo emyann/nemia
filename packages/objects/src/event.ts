@@ -6,12 +6,12 @@
  *
  * Where it departs from Kubernetes' `core/v1` Event, on purpose:
  *
- * - `involved` {kind, name} for `involvedObject`, the feed's own spelling: what it is about is a run, a step, a daemon or the store,
+ * - `involved` {kind, name} for its involvedObject, the feed's own spelling: what it is about is a run, a step, a daemon or the store,
  *   never an object of another apiVersion.
- * - `source` is a word (`EVENT_SOURCES`), not an `EventSource` {component, host}.
+ * - `source` is a word (`EVENT_SOURCES`), not an EventSource {component, host}.
  * - `reason` is closed (`EVENT_REASONS`): a line whose reason this `nemia` does not know is served as `Unknown`.
- * - No `count`, `firstTimestamp`, `lastTimestamp` or `series`: each line is one occurrence, and folding repeats is the reader's.
- * - No `eventTime`: the line's `at` is `metadata.creationTimestamp`.
+ * - No count, firstTimestamp, lastTimestamp or series: each line is one occurrence, and folding repeats is the reader's.
+ * - No eventTime: the line's `at` is `metadata.creationTimestamp`.
  * - Its `metadata.name` is the byte of the feed its line starts at, and its `resourceVersion` the cursor just after it, the id the feed's
  *   stream sends it under: the feed only grows, so a name stays its line's.
  * - The fields the feed qualifies a reason with stay beside it: `waits`, `on` (what a `Waiting` line waits on), `via` (where an

@@ -412,8 +412,13 @@ export const When = Schema.String.check(Schema.makeFilter((at: string) => !Numbe
 const Dollars = Schema.Finite.check(Schema.isGreaterThan(0));
 const BUDGET_WORDS = 'its budget is not an amount of dollars above zero';
 
-const SomeCaps = Schema.optionalKey(Schema.Record(Schema.String, Dollars));
-const ApprovalFileSchema = Kept({ at: When, message: Schema.optionalKey(Said), proposed: SomeCaps, given: SomeCaps });
+const Caps = Schema.Record(Schema.String, Dollars);
+const ApprovalFileSchema = Kept({
+  at: When,
+  message: Schema.optionalKey(Said),
+  proposed: Schema.optionalKey(Caps),
+  given: Schema.optionalKey(Caps),
+});
 const AcceptanceFileSchema = Kept({ at: When, message: Said });
 const RoundAskFileSchema = Kept({ budget: Schema.optionalKey(Dollars), at: Schema.optionalKey(Schema.Unknown) });
 const RetryAskFileSchema = Kept({
@@ -446,7 +451,11 @@ export function readAs<S extends Schema.ConstraintDecoder<unknown>>(schema: S, v
 const messageWords = (held: unknown): string => (isText(fieldOf(held, 'message')) ? 'its message is empty' : 'its message is not text');
 
 /** Why an approval file is refused, by the field refused: one written by hand where `nemia approve` would have refused it. */
-const APPROVAL_WORDS: Record<string, string> = { at: 'it says no time it was given', proposed: BUDGET_WORDS, given: BUDGET_WORDS };
+const APPROVAL_WORDS: Record<string, string> = {
+  at: 'it says no time it was given',
+  proposed: 'the budgets it says were proposed are not dollars above zero',
+  given: 'the budgets it says were given are not dollars above zero',
+};
 const NO_APPROVAL = 'it is not an approval nemia approve wrote';
 
 /** One approval file, read: the step and the try from its name, when and what was said from what it holds — or why it cannot be read. */
@@ -456,7 +465,14 @@ export function approvalIn(file: string, step: string, n: number): Approval | st
   const read = readAs(ApprovalFileSchema, held.read);
   if ('refused' in read) return read.refused === 'message' ? messageWords(held.read) : (APPROVAL_WORDS[read.refused] ?? NO_APPROVAL);
   const { at, message, proposed, given } = read.read;
-  return { step, try: n, at, ...(message === undefined ? {} : { message }), ...(proposed && { proposed }), ...(given && { given }) };
+  return {
+    step,
+    try: n,
+    at,
+    ...(message === undefined ? {} : { message }),
+    ...(proposed === undefined ? {} : { proposed: { ...proposed } }),
+    ...(given === undefined ? {} : { given: { ...given } }),
+  };
 }
 
 /**

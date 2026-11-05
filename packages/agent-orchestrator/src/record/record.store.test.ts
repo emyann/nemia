@@ -341,7 +341,7 @@ test("an ask a verb would not write is refused in that verb's words, reason by r
     for (const [i, budgets] of [{ implement: 'x' }, { implement: 0 }, [60]].entries()) {
       for (const key of ['proposed', 'given']) {
         const why = approvalIn(ask(`a10-${i}-${key}`, { at: AT, [key]: budgets }), 'plan', 1);
-        assert.equal(typeof why, 'string', `refused, a ${key} that is not dollars above zero: ${JSON.stringify(why)}`);
+        assert.ok(typeof why === 'string' && why.includes('budgets'), `${key}: ${JSON.stringify(why)}`);
       }
     }
     assert.deepEqual(approvalIn(ask('a8', { at: AT, message: 'go', by: 'a newer wf' }), 'plan', 2), {

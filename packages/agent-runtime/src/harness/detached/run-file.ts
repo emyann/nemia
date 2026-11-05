@@ -8,6 +8,8 @@ import { instantNow } from '../../core/engine/now.ts';
 import { IMAGE } from '../image.ts';
 import { elapsedMs, type Instant, type Monotonic } from '../../core/clock.ts';
 
+export { TERMINATION_MESSAGE_BYTES } from './termination-message.ts';
+
 /**
  * What a resumed session's parent printed and its own totals carry on: cost, API time, and its whole session's tokens in their
  * classes (`carriedOf`). Each absent when the parent gave none; the tokens absent from a run file written before they were kept.
@@ -86,6 +88,13 @@ const RunFileSchema = Schema.StructWithRest(
     nativeId: Schema.optional(Schema.String),
     logFile: Schema.String,
     exitCode: Schema.optional(Schema.Finite),
+    /** For a command given `config.terminationMessagePath`: the file the worker reads once at the process's exit. */
+    terminationMessagePath: Schema.optional(Schema.String),
+    /**
+     * What that file held at the exit, its first `TERMINATION_MESSAGE_BYTES` bytes (`terminationMessageAt`), written beside
+     * `exitCode`. Absent where the file was missing or no regular file.
+     */
+    terminationMessage: Schema.optional(Schema.String),
     /** The harness's own id this run resumed, kept only for a spec whose printed totals carry the parent's. */
     resumeFrom: Schema.optional(Schema.String),
     /**

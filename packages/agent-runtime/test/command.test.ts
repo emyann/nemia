@@ -21,6 +21,7 @@ import { Engine as EngineService } from '../src/index.ts';
 import { commandHarness } from '../src/harness/command/command.ts';
 import { detachedOps } from '../src/harness/detached/detached.ts';
 import { codex } from '../src/harness/codex/codex.ts';
+import { TERMINATION_MESSAGE_BYTES } from '../src/harness/detached/run-file.ts';
 import { scratch } from './scratch.ts';
 import { builtEngine } from './engine.ts';
 import { story } from './checkpoints.ts';
@@ -44,7 +45,8 @@ test(
     const cwd = scratch('ae-command-cwd-');
     const engine = builtEngine(EngineService.layer({ root, harnesses: { command: commandHarness } }));
     const started = path.join(cwd, 'started');
-    const file = (command: string[], config: { env?: Record<string, string>; niceness?: number } = {}) =>
+    const term = (name: string) => path.join(cwd, name);
+    const file = (command: string[], config: { env?: Record<string, string>; niceness?: number; terminationMessagePath?: string } = {}) =>
       Effect.runPromise(engine.file({ brief: 'run it', cwd, harness: 'command', config: { command, ...config } }));
     const ids = {
       seq: await file(['seq', '1', '200000']),
@@ -55,6 +57,12 @@ test(
       held: await file(['sh', '-c', 'echo first; sleep 30 & echo last']),
       stopped: await file(['sh', '-c', `trap 'exit 7' TERM; : > ${started}; while :; do sleep 0.1; done`]),
       printed: await file(['sh', '-c', 'echo out; echo err >&2']),
+      said: await file(['sh', '-c', `printf 'route: web\\n' > ${term('said')}; echo stdout never answers; exit 3`], {
+        terminationMessagePath: term('said'),
+      }),
+      unsaid: await file(['true'], { terminationMessagePath: term('unsaid') }),
+      long: await file(['sh', '-c', `head -c 5000 /dev/zero | tr '\\0' x > ${term('long')}`], { terminationMessagePath: term('long') }),
+      folder: await file(['mkdir', term('folder')], { terminationMessagePath: term('folder') }),
     };
     const stdout = async (id: string) => Effect.runPromise(engine.output(id, 'stdout'));
     const attempt = async (id: string) => (await Effect.runPromise(engine.view(id))).state;
@@ -119,6 +127,18 @@ test(
         if (idleRuns()) assert.equal(io, 'idle');
         else assert.notEqual(io, 'idle');
         assert.equal((await stdout(ids.plain))!.trim(), String(ownNiceness()), "niceness 0 is the worker's own");
+      },
+    );
+
+    await s.test(
+      'a command given a terminationMessagePath keeps what it wrote there on its attempt, read once at its exit: none for a file it left missing or a folder, at most 4096 bytes',
+      async () => {
+        const said = (await attempt(ids.said)).attempts[0];
+        assert.deepEqual([said.exitCode, said.terminationMessage], [3, 'route: web\n'], 'the file, never its stdout');
+        assert.equal((await attempt(ids.unsaid)).attempts[0].terminationMessage, undefined, 'a missing file keeps nothing');
+        assert.equal((await attempt(ids.folder)).attempts[0].terminationMessage, undefined, 'a folder is no regular file');
+        assert.equal((await attempt(ids.long)).attempts[0].terminationMessage, 'x'.repeat(TERMINATION_MESSAGE_BYTES));
+        assert.equal(TERMINATION_MESSAGE_BYTES, 4096);
       },
     );
 
@@ -237,6 +257,20 @@ test('file(): command, niceness, env and projectMcp go to the harnesses that tak
         refusedNaming(await filed(harness, config), `\`${key}\``, `the \`${harness}\` harness`, 'File the task on `command`');
       }
     });
+
+  for (const harness of ['codex', 'claude', 'remote'])
+    await t.test(`terminationMessagePath is refused on ${harness}, a harness that runs no command`, async () => {
+      assert.equal((await filed(harness, { terminationMessagePath: '/tmp/said' })).tag, 'FileRefused');
+    });
+
+  await t.test(
+    'terminationMessagePath is filed on the command harness as an absolute path, and refused relative or with a NUL',
+    async () => {
+      const at = (p: string) => filed('command', { command: ['true'], terminationMessagePath: p });
+      assert.equal((await at('/tmp/said')).tag, 'filed');
+      for (const bad of ['said', './said', '', `/tmp/a${String.fromCharCode(0)}b`]) assert.equal((await at(bad)).tag, 'FileRefused', bad);
+    },
+  );
 
   await t.test("env is filed on every harness that spawns the session's process", async () => {
     const env = { CI: '1' };

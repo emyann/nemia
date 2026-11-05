@@ -13,7 +13,7 @@ import { renderAgent, type AgentDraft } from '../agents/agents.ts';
 import { DEFAULT_HARNESS } from '../harness/harness.ts';
 import { REVISIONS_POLICIES, type RevisionsPolicy } from '../factory/factory.ts';
 import { FACTORY_RULES_FILE, factoryRulesRefusal } from '../rules/rules.ts';
-import { AGENTS_FOLDER, SKILLS_FOLDER } from '../step/step.ts';
+import { AGENTS_FOLDER, SKILLS_FOLDER, type RouteEval } from '../step/step.ts';
 import { isMap, type ReadFolder } from '../template/index.ts';
 import { renderStep } from '../workflow/index.ts';
 import { baseSpelled } from '../former/former.ts';
@@ -117,11 +117,25 @@ const STEP_WORDS = [
   'check',
   'loop',
   'rounds',
+  'routes',
+  'ends',
+  'when',
+  'workflow',
   'retries',
   'deadlineSeconds',
   'reads',
   'tally',
 ];
+
+/** A template's `route:` (`TemplateRoute`) as the parser's `RouteEval`, which the step's file writes as YAML flow; undefined for none. */
+function routeEvalOf(route: unknown): RouteEval | undefined {
+  if (route === 'judge') return { kind: 'judge' };
+  if (!isMap(route)) return undefined;
+  if (typeof route.script === 'string') return { kind: 'script', script: route.script };
+  if (typeof route.from === 'string' && isMap(route.table))
+    return { kind: 'table', from: route.from, table: Object.fromEntries(Object.entries(route.table).map(([k, v]) => [k, String(v)])) };
+  return undefined;
+}
 
 /**
  * The step `step` of `workflow` as its file: its wiring, a former `workspace: main` written as `base` (`baseSpelled`), its overrides on
@@ -154,8 +168,9 @@ function stepFile(
   if (overrides.mcp !== undefined) keys.mcp = lineOf(overrides.mcp);
   Object.assign(keys, blockKeys(where, blocksOf(overrides, ['harness', 'skills', 'mcp']), harness, refusals));
   const body = textOr(step.instruction, `${WORKFLOWS}/${workflow}/${name}.md`, read, params) ?? '';
+  const route = routeEvalOf(step.route);
   try {
-    return renderStep({ name, body, ...keys } as never);
+    return renderStep({ name, body, ...keys, ...(route ? { route } : {}) } as never);
   } catch (err) {
     refusals.push(`${where}: ${(err as Error).message}`);
     return undefined;

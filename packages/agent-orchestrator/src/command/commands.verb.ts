@@ -19,6 +19,7 @@
  */
 import { Effect } from 'effect';
 import { APPROVE } from '../gate/commands.verb.ts';
+import { ROUTE } from '../gate/route.verb.ts';
 import { ANSWER_HELP, answerFlag, recheckAnswerRefusal, typedAnswers, typedOf } from '../question/asked.verb.ts';
 import { stepsOf } from '../steps/steps.verb.ts';
 import { messageRefusal, modeWord, type RetryHow } from '../retry/index.ts';
@@ -525,6 +526,7 @@ export const COMMANDS: readonly Command[] = [
   ...TEMPLATES,
   RETRY,
   APPROVE,
+  ROUTE,
   REFRESH,
   SAY,
   LS,

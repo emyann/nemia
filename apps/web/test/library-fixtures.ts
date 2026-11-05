@@ -140,6 +140,11 @@ export const stepSpec = (extra: Partial<WorkflowStepSpec> = {}): WorkflowStepSpe
   tally: [],
   loop: null,
   rounds: null,
+  routes: null,
+  route: null,
+  when: null,
+  ends: null,
+  workflow: null,
   ...extra,
 });
 

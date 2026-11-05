@@ -165,6 +165,11 @@ const ownStatusSpec = spec<
       description: 'A step on its own work is never at its budget or its gate, which standing alone says',
       condition: ({ output }) => output !== 'awaiting approval' && output !== 'over budget',
     },
+    neverRouted: {
+      description:
+        'A step on its own work is never sent nor skipped: those are its routing’s words, which routedWords lays over it from the other nodes',
+      condition: ({ output }) => output !== 'sent' && output !== 'skipped',
+    },
     pendingExactlyUnfiled: {
       description: 'A step is pending exactly while it has no task filed',
       condition: ({ input: [step, run], output }) => (output === 'pending') === !run.steps[step.name]?.taskId,

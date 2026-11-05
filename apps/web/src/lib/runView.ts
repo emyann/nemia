@@ -69,7 +69,12 @@ export type RunView = Pick<
     /** The inbox card the run was started from, and the words that say so: both absent for a run started from none. */
     readonly from?: { readonly inbox: string };
     readonly fromNote?: string;
-    readonly graph: { readonly roots: readonly string[]; readonly edges: readonly RunViewEdge[] };
+    readonly graph: {
+      readonly roots: readonly string[];
+      readonly edges: readonly RunViewEdge[];
+      /** Its conditions and workflow nodes beside its steps: absent on a workflow with neither. */
+      readonly nodes?: RunStatus['graph']['nodes'];
+    };
     readonly steps: readonly StepView[];
     readonly timeline: Pick<RunStatus['timeline'], 'rounds' | 'run'>;
   };
@@ -141,7 +146,11 @@ export const runViewOf = (
     decide: lines.decide,
     refresh: lines.refresh,
     workflowPage: lines.workflowPage,
-    graph: { roots: graph.roots, edges: graph.edges.filter((e): e is RunViewEdge => e.kind !== 'input') },
+    graph: {
+      roots: graph.roots,
+      edges: graph.edges.filter((e): e is RunViewEdge => e.kind !== 'input'),
+      ...(graph.nodes ? { nodes: graph.nodes } : {}),
+    },
     steps: steps.map((step) => stepViewOf(step, spec.steps, lines, tries[step.name] ?? [], told[step.name] ?? null)),
     timeline: { rounds: timeline.rounds, run: timeline.run },
   };

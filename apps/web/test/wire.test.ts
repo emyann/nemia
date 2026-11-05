@@ -164,6 +164,7 @@ export type RunSlot = Holds<Same<Board.RunSlot, NonNullable<Extract<decision.Run
 export type RunLines = Holds<Same<Board.RunLines, runs.RunLinesAnswer>>;
 export type RunGraph = Holds<Same<Board.RunGraph, runs.RunListing['graph']>>;
 export type GraphEdge = Holds<Same<Board.GraphEdge, runs.RunListing['graph']['edges'][number]>>;
+export type GraphNode = Holds<Same<Board.GraphNode, NonNullable<runs.RunListing['graph']['nodes']>[number]>>;
 
 export type InboxCardPage = Holds<Same<Board.InboxCardPage, inbox.InboxCardPage>>;
 export type FromSet = Holds<Same<Board.FromSet, inbox.InboxFromAnswer>>;

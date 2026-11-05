@@ -349,8 +349,10 @@ export type Acceptance = { step: string; try: number; at: string; message: strin
  *                    under the same frozen `allowedTools:` — a person does, `nemia retry`
  *   failed (check)   its check did not exit 0
  *   failed, stopped  the engine's own words for the step's task
+ *   skipped          a node on a route its condition did not take, or every parent of which is skipped: never filed (`nodeFate`)
+ *   sent             a workflow node (`workflow:`) that filed its card (`StepRecord.sent`)
  *
- * Only `verified` and `unverified` let a follower be filed. The engine's `succeeded` means the session
+ * Only `verified`, `unverified` and `sent` let a follower be filed. The engine's `succeeded` means the session
  * ended, never that the work is done.
  */
 export type StepStatus =
@@ -368,10 +370,12 @@ export type StepStatus =
   | 'denied'
   | 'failed (check)'
   | 'failed'
-  | 'stopped';
+  | 'stopped'
+  | 'skipped'
+  | 'sent';
 
-/** What a follower may be filed on. */
-export const satisfiesAfter = (s: StepStatus): boolean => s === 'verified' || s === 'unverified';
+/** What a follower may be filed on: work a step did, or a card a workflow node filed (`sent`). `skipped` neither satisfies nor stops. */
+export const satisfiesAfter = (s: StepStatus): boolean => s === 'verified' || s === 'unverified' || s === 'sent';
 
 /** A step in one of these stops what waits on it: for good where it broke, or until a person answers — a gate approved, a question met. */
 export const stopsFollowers = (s: StepStatus): boolean =>
@@ -450,8 +454,18 @@ export const namesInOrder = (run: Pick<Run, 'steps'>, steps: readonly Pick<Workf
 ];
 
 /** One step on the run's record: its current try's task and check, where it works, and the tries before (`Run.steps`). */
+/** Who said a condition's route: its table, its script's answer file, its judge's closeout, or a person (`nemia route`). */
+export type RouteBy = 'table' | 'script' | 'judge' | 'person';
+
+/** The route a condition answered on a try, copied onto its record once (`StepRecord.route`). */
+export type RouteRecord = { route: string; try: number; by: RouteBy };
+
 export type StepRecord = {
   taskId: string | null;
+  /** The route a condition answered on the try it is on, written once per try by the tick. Absent on any other step. */
+  route?: RouteRecord;
+  /** The card a workflow node filed (`<run>-<node>`), and when: once, never taken back. Absent on any other step. */
+  sent?: { card: string; at: string };
   workspace?: string;
   branch?: string;
   check?: { taskId: string };

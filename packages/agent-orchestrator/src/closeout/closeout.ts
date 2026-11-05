@@ -6,7 +6,7 @@
  * `advance.verb.ts` files each step with `closeoutSchemaOf`, and the controllers read the engine's record with `parseCloseout`; nothing
  * here reads a disk or calls the engine.
  */
-import { isObject, LOOP_REPLIES, outputFields, type Workflow } from '../step/step.ts';
+import { isObject, JUDGE_ROUTE, LOOP_REPLIES, outputFields, type Workflow } from '../step/step.ts';
 import { digestOf } from '../revisions/revisions.ts';
 import {
   artifactsOf,
@@ -52,18 +52,22 @@ export type CloseoutSchema = { type: string; properties: Record<string, object>;
  * was handed, which the next round's looping step reads. On every try, round 1's included, decided from the
  * frozen workflow alone and never from the round the run is on: the schema is the session's `StructuredOutput`
  * tool, and a session continued under another one pays for the whole conversation again. What
- * is owed, and when, is `owedFields`'.
+ * is owed, and when, is `owedFields`'. On a judge, `route` too, one of its routes (`judgeRouteSchema`).
  */
 export function closeoutSchemaOf(step: Workflow, steps: readonly Workflow[]): CloseoutSchema {
   const replies = isLoopTarget(steps, step.name);
-  if (!step.output && !replies) return CLOSEOUT_SCHEMA;
-  const properties = step.output?.schema.properties ?? {};
+  const properties = { ...step.output?.schema.properties, ...judgeRouteSchema(step) };
+  if (!Object.keys(properties).length && !replies) return CLOSEOUT_SCHEMA;
   return {
     ...CLOSEOUT_SCHEMA,
     properties: { ...CLOSEOUT_SCHEMA.properties, ...properties, ...(replies ? { [LOOP_REPLIES]: REPLIES_SCHEMA } : {}) },
     required: [...CLOSEOUT_SCHEMA.required, ...Object.keys(properties), ...(replies ? [LOOP_REPLIES] : [])],
   };
 }
+
+/** What the run adds to a judge's closeout schema (`route: judge`): `route`, one of its routes. Empty for any other step. */
+const judgeRouteSchema = (step: Workflow): Record<string, object> =>
+  step.route?.kind === 'judge' ? { [JUDGE_ROUTE]: { type: 'string', enum: [...(step.routes ?? [])] } } : {};
 
 /**
  * The digest of the schema a step is filed with (`closeoutSchemaOf`), kept on the step's record: read by a later filing that would continue

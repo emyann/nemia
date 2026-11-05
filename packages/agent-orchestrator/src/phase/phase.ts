@@ -76,6 +76,8 @@ export const STEP_REASONS = [
   'CheckFailed',
   'UnreadableCloseout',
   'Stopped',
+  'Skipped',
+  'Sent',
   'Unknown',
 ] as const satisfies readonly Reason[];
 
@@ -133,8 +135,10 @@ export type CodedRun = QualifiedRun & { phase: RunPhase };
  * The reason each of the record's statuses names before the listing narrows it (`lineOf`, `list.ts`): `failed (check)` is a check that
  * failed, `checking` a check at work, and `unverified` a step done on its own word. Where the listing knows more — the wait a step not
  * filed is in, the engine's word for a task at work, a closeout that signed off blocked — the row's reason is the narrower one. A step
- * the record says `waiting` is `Pending` here: the listing says `Waiting` where what it waits on is a thing (`unfiled`). Total: a status
- * added to `StepStatus` fails the typecheck here until it has a reason.
+ * the record says `waiting` is `Pending` here: the listing says `Waiting` where what it waits on is a thing (`unfiled`). A node a route
+ * passed by (`skipped`) is settled having done nothing (`Skipped`, phase `stopped`, as a step that will not run is); a workflow node
+ * that filed its card (`sent`) is done, its card handed on (`Sent`, phase `succeeded`). Total: a status added to `StepStatus` fails
+ * the typecheck here until it has a reason.
  */
 export const REASON_OF: Record<StepStatus, QualifiedStep> = {
   pending: { reason: 'Pending' },
@@ -152,6 +156,8 @@ export const REASON_OF: Record<StepStatus, QualifiedStep> = {
   'failed (check)': { reason: 'CheckFailed' },
   failed: { reason: 'Failed' },
   stopped: { reason: 'Stopped' },
+  skipped: { reason: 'Skipped' },
+  sent: { reason: 'Sent' },
 };
 
 /**
@@ -204,6 +210,8 @@ export const PHASE_OF: Record<StepReason, StepPhase> = {
   CheckFailed: 'failed',
   UnreadableCloseout: 'failed',
   Stopped: 'stopped',
+  Skipped: 'stopped',
+  Sent: 'succeeded',
 };
 
 /** A step's codes from its qualified reason: the phase is the reason's (`PHASE_OF`). Pure. */

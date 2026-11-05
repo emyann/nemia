@@ -151,7 +151,8 @@ export type HarnessSpec = {
    */
   resumeCostCarried?: true;
   /**
-   * The harness runs the process a task's `config.command` names, with its `config.env` and `config.niceness` (`commandHarness`).
+   * The harness runs the process a task's `config.command` names, with its `config.env` and `config.niceness` (`commandHarness`), and
+   * reads its `config.terminationMessagePath` once at its exit.
    * Absent: the harness has no such arguments, and `file()` refuses a task that carries them rather than run something else.
    */
   commandArgs?: true;
@@ -278,10 +279,15 @@ const sightingOf = (
   nativeId: run.nativeId,
   closeout: statement ?? (output?.read.closeout && { payload: output.read.closeout.payload }),
   ...(typeof run.exitCode === 'number' && run.exitCode >= 0 ? { exitCode: run.exitCode } : {}),
+  ...(run.terminationMessage !== undefined ? { terminationMessage: run.terminationMessage } : {}),
   ...(usage ? { usage } : {}),
   ...(output ? sightedOf(output.read) : {}),
   ...(run.image ? { image: run.image } : {}),
 });
+
+/** The file a command's worker reads once at its exit, for a spec that runs a task's command and a task that names one. */
+const terminationOf = (spec: HarnessSpec, r: SpawnRequest): { terminationMessagePath?: string } =>
+  spec.commandArgs && r.config?.terminationMessagePath ? { terminationMessagePath: r.config.terminationMessagePath } : {};
 
 /** What a spec's reader said of a run's output (`outputIn`): what it read, why it refused it, or nothing, with no output yet. */
 type Told = { read: HarnessOutput } | { wrong: string } | undefined;
@@ -834,7 +840,7 @@ const runnerOf = (spec: HarnessSpec, root: string, bounds: ReturnType<typeof wor
               : {}),
             ...(input ? { input } : {}),
           };
-          fs.writeFileSync(runFile(r.name), firstRunFile({ ...plan, ...bounds }));
+          fs.writeFileSync(runFile(r.name), firstRunFile({ ...plan, ...terminationOf(spec, r), ...bounds }));
 
           startWorker(runFile(r.name), r.cwd);
         },

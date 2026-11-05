@@ -669,6 +669,26 @@ test('decode: an entry no runtime wrote fails its read, naming the task, the ent
   );
 
   await t.test(
+    'the termination message an end carries is read back as written and folds onto the attempt; an end with none folds with none',
+    async () => {
+      const starting = (attempt: number) => ({ kind: 'starting', at: '2026-09-24T00:00:00Z', attempt });
+      const read = await run(
+        legacyStore({ 't-term': [TODAY, starting(1), end(1, {}), starting(2), end(2, { terminationMessage: 'route: web\n' })] }),
+        readOf('t-term'),
+      );
+      assert.deepEqual(
+        read.map((e) => (e.kind === 'ended' ? e.terminationMessage : undefined)),
+        [undefined, undefined, undefined, undefined, 'route: web\n'],
+      );
+      assert.deepEqual(
+        fold('t-term', read).attempts.map((a) => a.terminationMessage),
+        [undefined, 'route: web\n'],
+      );
+      await refusedRead([TODAY, starting(1), end(1, { terminationMessage: 5 })]);
+    },
+  );
+
+  await t.test(
     'the code and harness version an image entry names are read back as written and fold onto the attempt, the latest winning; a journal with none folds with neither',
     async () => {
       const starting = (attempt: number) => ({ kind: 'starting', at: '2026-09-24T00:00:00Z', attempt });

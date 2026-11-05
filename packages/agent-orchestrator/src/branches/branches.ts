@@ -14,6 +14,7 @@
 import { endsOnBase, type Workflow } from '../step/step.ts';
 import { terminalSteps } from '../workflow/index.ts';
 import type { Run } from '../record/record.ts';
+import { conditionOf } from '../route/index.ts';
 import type { Assessment } from '../tick/assess.ts';
 import type { Landed } from '../decide/decide.ts';
 import type { BranchStood } from '../place/place.ts';
@@ -26,10 +27,25 @@ import type { BranchStood } from '../place/place.ts';
  * the result, its `main` would be the run's own branch, and every question about the run's result — has it landed, what did it touch,
  * what is there to decide — would be asked of the base branch and answered yes.
  */
-export function resultSteps(steps: readonly Workflow[]): Workflow[] {
+export function resultSteps(steps: readonly Workflow[], run?: Run): Workflow[] {
+  const routed = run ? routedResult(steps, run) : [];
+  if (routed.length) return routed;
   const ends = terminalSteps(steps);
   const result = ends.flatMap((s) => (endsOnBase(s) ? steps.filter((x) => s.after.includes(x.name)) : [s]));
   return [...new Set(result)];
+}
+
+/**
+ * The result of a run that routed on to another workflow: for each workflow node that filed its card (`StepRecord.sent`), what its
+ * condition read — its `input:`, or the steps it waits on where it names none. What the routed run is handed. Empty for any other run.
+ */
+export function routedResult(steps: readonly Workflow[], run: Run): Workflow[] {
+  const read = steps.flatMap((s) => {
+    const condition = s.workflow !== undefined && run.steps[s.name]?.sent ? conditionOf(s, steps) : undefined;
+    const names = condition ? (condition.input ?? condition.after) : [];
+    return steps.filter((x) => names.includes(x.name));
+  });
+  return [...new Set(read)];
 }
 
 /**

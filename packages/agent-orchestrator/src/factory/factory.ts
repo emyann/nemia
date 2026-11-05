@@ -309,12 +309,16 @@ export function fillsOf(hires: Hires, workflow: string): Record<string, string> 
  * Why a run of `workflow` in the factory `factory` cannot start, or undefined: every step that is left with no agent — its file names none,
  * no hire fills it, and it runs on no remote agent — named, with the hire that fills each: in a factory, hiring is the way to fill a step.
  */
+/** Whether a step runs an agent: every step but a condition a table or a script answers, and a workflow node, which files a card. */
+const runsAnAgent = (s: Pick<Workflow, 'routes' | 'route' | 'workflow'>): boolean =>
+  s.workflow === undefined && (s.routes === undefined || s.route?.kind === 'judge');
+
 export function unfilledRefusal(
-  steps: readonly Pick<Workflow, 'name' | 'agent' | 'harness'>[],
+  steps: readonly Pick<Workflow, 'name' | 'agent' | 'harness' | 'routes' | 'route' | 'workflow'>[],
   factory: string,
   workflow: string,
 ): string | undefined {
-  const unfilled = steps.filter((s) => s.agent === undefined && !isRemoteHarness(s.harness)).map((s) => s.name);
+  const unfilled = steps.filter((s) => s.agent === undefined && !isRemoteHarness(s.harness) && runsAnAgent(s)).map((s) => s.name);
   if (!unfilled.length) return undefined;
   const which =
     unfilled.length === 1

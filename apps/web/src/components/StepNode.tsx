@@ -1,15 +1,18 @@
 import { Handle, Position, type Node, type NodeProps } from '@xyflow/react';
-import type { WorkflowStepSpec } from '../lib/api';
+import type { GraphNode, WorkflowStepSpec } from '../lib/api';
 import type { StepView } from '../lib/runView';
 import { deniedNodeText, needNodeText, needOf, needText, type Need } from '../lib/asks';
 import { gateNodeLine } from '../lib/gate';
 import { attemptLine, isLive, LOOP_SOURCE, LOOP_TARGET } from '../lib/canvas';
 import { contextText } from '../lib/builder';
 import { costText, pastBudget } from '../lib/cost';
-import { waitsAtGate, stepState } from '../lib/status';
+import { waitsAtGate, stepState, type StepState } from '../lib/status';
 import { useNow } from '../lib/useNow';
 import { StatusChip } from './StatusChip';
 import { PERSON } from '../lib/words';
+import type { Routed } from '../lib/routing';
+import type { Frozen } from '../lib/frozen';
+import { TextLink } from './look';
 
 /**
  * `index` is the step's place in the run's order, which is the order the CLI's `ls` lists it in. `waitingOnYou` is whether the
@@ -21,6 +24,12 @@ export type StepNodeData = {
   runCancelled: boolean;
   runHeld: boolean;
   waitingOnYou: boolean;
+  /** Its node in the graph where it is a condition or a workflow node (`nodeKinds`); null for a plain step. */
+  node?: Frozen<GraphNode> | null;
+  /** A condition's routes (`routesOf`), the one it took (`takenRoutes`), and what its sentence says of its routing (`routedOf`). */
+  routes?: string[];
+  taken?: string | null;
+  routed?: Routed | null;
 };
 export type StepFlowNode = Node<StepNodeData, 'step'>;
 
@@ -42,15 +51,15 @@ export type StepFlowNode = Node<StepNodeData, 'step'>;
  *   (`needNodeText`), and the whole of it, with what the session said last, is on hover and in the banner.
  * - What the harness denied its current try: a job carries on past a denied call, so its work may be short of it. How many, on a line
  *   that fits; which, in the package's words, on hover and on the step's section.
+ * - A condition is headed `condition` and lists its routes, the one it took marked and those it ends on said; a workflow node is headed
+ *   `workflow`, says the workflow it files a card for, and links to its card once sent; a node its route passed by sinks into the floor,
+ *   dashed (`RouteBand`, `nodeLine`, `nodeFrame`).
  * - Its handles: on its sides, then under it where the edge back that `loop:` makes leaves its looping step and comes into its target
  *   (`StateEdge`). The side ones come first, so an edge that names no handle takes the one on the side.
  */
-export function StepNode({
-  data: { step, index, runCancelled, runHeld, waitingOnYou },
-  selected,
-  sourcePosition = Position.Right,
-  targetPosition = Position.Left,
-}: NodeProps<StepFlowNode>) {
+export function StepNode({ data, selected, sourcePosition = Position.Right, targetPosition = Position.Left }: NodeProps<StepFlowNode>) {
+  const { step, index, runCancelled, runHeld, waitingOnYou } = data;
+  const { node } = data;
   const state = stepState(step, runCancelled, runHeld);
   const live = isLive(state);
   const now = useNow(live ? 1_000 : 30_000);
@@ -64,18 +73,16 @@ export function StepNode({
 
   return (
     <div
-      className={[
-        'w-56 overflow-hidden rounded-md bg-card text-foreground shadow-sm',
-        gate ? 'border-2 border-yours' : running ? 'border border-alive ring-4 ring-alive/25' : 'border border-outline',
-        selected ? 'outline-2 outline-offset-2 outline-foreground' : '',
-      ].join(' ')}
+      data-node-kind={node?.kind}
+      data-skipped={state === 'skipped' || undefined}
+      className={`w-56 overflow-hidden rounded-md text-foreground ${nodeFrame(state, gate)} ${selected ? 'outline-2 outline-offset-2 outline-foreground' : ''}`}
     >
       <Handle type="target" position={targetPosition} isConnectable={false} className="opacity-0" />
 
       <div className="px-3 pt-2 pb-2">
         <div className="flex items-center justify-between gap-2">
           <span className={`text-label-small uppercase ${gate ? 'text-yours' : 'text-muted-foreground'}`}>
-            {gate ? 'human gate' : stepLabel(index)}
+            {gate ? 'human gate' : headOf(node, index)}
           </span>
           {running && (
             <span
@@ -88,13 +95,15 @@ export function StepNode({
         <p className="mt-0.5 truncate text-body-medium font-semibold" title={step.name}>
           {step.name}
         </p>
-        <p className="mt-0.5 truncate font-mono text-body-small text-muted-foreground">{spec ? runsOn(spec) : 'no spec'}</p>
+        <p className="mt-0.5 truncate font-mono text-body-small text-muted-foreground">{nodeLine(node, spec)}</p>
       </div>
+
+      {node && <RouteBand node={node} routes={data.routes} taken={data.taken} routed={data.routed} />}
 
       <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 border-t border-outline-variant px-3 py-1.5">
         <StatusChip codes={step} runCancelled={runCancelled} runHeld={runHeld} note={step.note} />
         <span className="font-mono text-body-small text-muted-foreground">
-          {attemptLine(step.attempts, live, now) ?? (step.taskId === null ? 'not filed yet' : 'no session yet')}
+          {attemptLine(step.attempts, live, now) ?? unfiledLine(step.taskId, node, spec)}
         </span>
       </div>
 
@@ -140,6 +149,46 @@ export function StepNode({
   );
 }
 
+/**
+ * A step node's frame: sunk into the floor and dashed for a node its route passed by; else on a card, ringed in yours at a human gate,
+ * in the running colour while its session is at work.
+ */
+const nodeFrame = (state: StepState, gate: boolean): string => {
+  if (state === 'skipped') return 'border border-dashed border-outline bg-background';
+  if (gate) return 'bg-card shadow-sm border-2 border-yours';
+  return state === 'working' ? 'bg-card shadow-sm border border-alive ring-4 ring-alive/25' : 'bg-card shadow-sm border border-outline';
+};
+
+/** A node's head: its place in the order, after its kind where it is a condition or a workflow node (`condition · step 02`). */
+const headOf = (node: Frozen<GraphNode> | null | undefined, index: number): string =>
+  node ? `${node.kind} · ${stepLabel(index)}` : stepLabel(index);
+
+/**
+ * What a condition or a workflow node runs on, in its node's second line: the workflow a workflow node files a card for; a condition with
+ * an agent (a judge) runs on it as a step does, and one with none answers its route with no session.
+ */
+/**
+ * What a node with no attempt says of its session: none at all for a workflow node, which files a card, and for a condition with no agent,
+ * which its table or script answers; else that it is not filed yet, or has no session yet.
+ */
+function unfiledLine(
+  taskId: string | null,
+  node: Frozen<GraphNode> | null | undefined,
+  spec: { agent?: string | null; harness: string | null; model: string | null } | null,
+): string {
+  if (node?.kind === 'workflow' || (node?.kind === 'condition' && !spec?.agent && taskId === null)) return 'runs no session';
+  return taskId === null ? 'not filed yet' : 'no session yet';
+}
+
+function nodeLine(
+  node: Frozen<GraphNode> | null | undefined,
+  spec: { agent?: string | null; harness: string | null; model: string | null } | null,
+) {
+  if (node?.kind === 'workflow') return `files a card for ${node.workflow ?? 'a workflow'}`;
+  if (node?.kind === 'condition' && !spec?.agent) return 'answers its route, no session';
+  return spec ? runsOn(spec) : 'no spec';
+}
+
 /** A step's place in its workflow's order, as its node heads it: `step 01`. */
 const stepLabel = (index: number): string => `step ${String(index + 1).padStart(2, '0')}`;
 
@@ -161,6 +210,9 @@ export type SpecNodeData = {
   spec: WorkflowStepSpec;
   build?: { unsaved: boolean; refused: boolean; selected: boolean };
   inspected?: boolean;
+  /** Its node in the graph where it is a condition or a workflow node, and a condition's routes (`routesOf`). */
+  node?: Frozen<GraphNode> | null;
+  routes?: string[];
 };
 export type SpecFlowNode = Node<SpecNodeData, 'spec'>;
 
@@ -202,7 +254,7 @@ export function specLines(spec: WorkflowStepSpec): Array<[label: string, value: 
  * bar shows it, ringed on keyboard focus too. While the builder has it, it is a `BuildingNode`, which takes no mark of the bar's.
  */
 export function SpecNode({
-  data: { name, index, spec, build, inspected },
+  data: { name, index, spec, build, inspected, node = null, routes = [] },
   sourcePosition = Position.Right,
   targetPosition = Position.Left,
 }: NodeProps<SpecFlowNode>) {
@@ -223,20 +275,25 @@ export function SpecNode({
   return (
     <div
       data-spec
+      data-node-kind={node?.kind}
       data-inspected={inspected || undefined}
       className={`w-56 cursor-pointer overflow-hidden rounded-md border border-outline bg-card text-foreground shadow-sm ${inspected ? 'ring-2 ring-ring' : 'hover:border-on-surface-variant in-focus-visible:ring-2 in-focus-visible:ring-ring'}`}
     >
       <Handle type="target" position={targetPosition} isConnectable={false} className="opacity-0" />
 
       <div className="px-3 pt-2 pb-2">
-        <span className="text-label-small uppercase text-muted-foreground">{stepLabel(index)}</span>
+        <span className="text-label-small uppercase text-muted-foreground">
+          {node ? `${node.kind} · ${stepLabel(index)}` : stepLabel(index)}
+        </span>
         <p className="mt-0.5 truncate text-body-medium font-semibold" title={name}>
           {name}
         </p>
-        <p className="mt-0.5 truncate font-mono text-body-small text-muted-foreground">{runsOn(spec)}</p>
+        <p className="mt-0.5 truncate font-mono text-body-small text-muted-foreground">{nodeLine(node, spec)}</p>
       </div>
 
-      {lines.length > 0 && (
+      {node?.kind === 'condition' && <RouteBand node={node} routes={routes} taken={null} routed={null} />}
+
+      {lines.length > 0 && node?.kind !== 'workflow' && (
         <dl className="space-y-0.5 border-t border-outline-variant px-3 py-1.5 text-body-small">
           {lines.map(([label, value, title = value]) => (
             <div key={label} className="flex min-w-0 gap-1.5">
@@ -347,6 +404,56 @@ function BuildingNode({
         className={`${HANDLE} !bg-sage`}
       />
     </div>
+  );
+}
+
+/**
+ * What a condition or a workflow node says of its routing, under its head: a condition its routes, the one it took in bold and marked
+ * `data-taken`, the one a gate proposes said so, and each it ends on followed by `(ends)`; a workflow node the card it sent, a link to the
+ * card's page, which names the run it started.
+ */
+function RouteBand({
+  node,
+  routes = [],
+  taken = null,
+  routed = null,
+}: {
+  node: Frozen<GraphNode>;
+  routes?: readonly string[];
+  taken?: string | null;
+  routed?: Routed | null;
+}) {
+  if (node.kind === 'workflow')
+    return routed?.kind === 'sent' ? (
+      <p data-sent={routed.card} className="truncate border-t border-outline-variant px-3 py-1 text-body-small">
+        <span className="text-muted-foreground">sent </span>
+        <TextLink to="/inbox/$name" params={{ name: routed.card }} title={`The card ${routed.card}, and the run it started`}>
+          {routed.card}
+        </TextLink>
+      </p>
+    ) : null;
+  const proposes = routed?.kind === 'proposes' ? routed.route : null;
+  return (
+    <p
+      data-routes
+      title={taken ? `It took the route ${taken}.` : proposes ? `It proposes the route ${proposes}.` : 'No route taken yet.'}
+      className="truncate border-t border-outline-variant px-3 py-1 font-mono text-body-small text-muted-foreground"
+    >
+      {routes.map((route, i) => (
+        <span key={route}>
+          {i > 0 && ' · '}
+          <span
+            data-route={route}
+            data-taken={route === taken || undefined}
+            className={route === taken ? 'font-semibold text-foreground' : undefined}
+          >
+            {route === taken ? `→ ${route}` : route}
+            {node.ends?.includes(route) && ' (ends)'}
+          </span>
+        </span>
+      ))}
+      {proposes && <span data-proposes={proposes}>{` · proposes ${proposes}`}</span>}
+    </p>
   );
 }
 

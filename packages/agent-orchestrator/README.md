@@ -517,6 +517,11 @@ read), `slot` says whether the run is one the cap on runs in flight holds, and t
 who does the work and for how long. Whether the work goes round again is still a judgement: the looping step's own `again`
 (*Going round again*, under the check).
 
+The rule has one exception, and `again` was the first of it: **a route** (*Routes: a condition*, under the check). A condition
+picks among names the folder declares in a closed list (`routes:`), never a value an expression computes; its answer is a fact — a
+field of a signed closeout, the file a script's task wrote, or a judge's closeout — and the tick never evaluates anything: it reads
+which name was said, as it reads `again`.
+
 `permissionMode` and `sandbox` are the harness's words, checked against the harness the step runs on: Claude Code's permission
 mode, and Codex's sandbox. `sandbox: read-only` runs the step `-s read-only`: it reads and runs commands and writes nothing, which is why
 a reviewer that runs so hands its review on as its closeout. `retries` is how many times the run re-files
@@ -1849,8 +1854,15 @@ stateDiagram-v2
   state "stopped" as stopped
   state "budget exhausted" as budget_exhausted
   state "over budget" as over_budget
+  state "skipped" as skipped
+  state "sent" as sent
   pending --> running: filed
   pending --> awaiting_approval: its work handed on, at the gate of an ending
+  pending --> unverified: answered by its table
+  pending --> unsigned: its table answered no route
+  pending --> skipped: its route not taken
+  pending --> sent: its card filed
+  skipped --> pending: a new route, before a follower is filed
   running --> unverified: signed, with no check
   running --> checking: signed, with a check
   running --> awaiting_approval: signed, at its gate
@@ -1989,6 +2001,55 @@ round: a round is new work, and its check may refuse it afresh.
 
 The tests' team (`test/fixtures/team/dev/`) is implement ⇄ review → ship: its `review.md` loops back to
 `implement` with `rounds: 3`. A `respond` step is not needed: its three answers are the loop contract.
+
+### Routes: a condition — `routes:`, `route:`, `when:` and `ends:`
+
+A **condition** is a step with `routes:`: the closed list of names it picks among, at least two, each a word
+(`[a-z][a-z0-9-]*`). `route:` says how it picks, one of three kinds, each answering one name of the list:
+
+- **A table**, the default: `route: { from: plan.surface, table: { web: web, backend: backend, docs: docs } }`. It reads a field of a
+  producer's signed closeout — a fact the producer's `output:` declares as an enum (*the surface it changes*), never a route — and
+  looks it up. It runs nowhere: the pass reads it. Load refuses a table that is not closed: a key outside the field's enum, a value of the
+  enum with no row, a row whose route is not in `routes:`. A value the table answers no route for reads `unsigned`.
+- **A script**: `route: { script: routes/pick.ts }`, the author's code, read from the run's frozen workflow files and filed as the
+  condition's own task on the runtime's command harness. It is handed its request in a file and writes its answer to the file the
+  runtime reads at exit and keeps on the attempt (a command task's `terminationMessagePath`); stdout cannot spoof it. Exit 0 with no
+  answer that decodes reads `unsigned`, a non-zero exit `failed`, no exit `stopped`.
+- **A judge**: `route: judge`, a read-only session whose closeout says `route`, one of `routes:`: the run adds the field to its
+  closeout schema, and a closeout without it is unsigned. Its agent is its `agent:` or the one a factory hires into it (`nemia factory
+  hire <factory> <agent> --step <workflow>/<condition>`); load refuses a fence that writes (on Claude Code, `permissionMode: dontAsk`
+  with no `Edit` rule, or no tool that writes; on Codex, `sandbox: read-only`), and a start refuses one that nothing hired. Its brief
+  names each route with what it reaches — a step by its note's first line, a workflow node by its card — or that it ends the run.
+
+Any kind may answer `unsure` with its reason instead: the condition reads `blocked`, and a person names the route. A table or a script
+condition names no `agent:`. No condition has a workspace of its own: it cuts no worktree and commits nothing, and a step after it takes
+its workspace as if it followed the condition's first parent; load refuses `workspace:`, `check:`, `retries:` and `resume:` on it.
+
+A node after a condition says the route it runs on: **`when: [web]`** (or `when: [web, docs]`) beside `after: [triage]`, the
+condition among its parents and no other. A node after a condition with no `when:` runs on every route. **`ends: [docs]`** on the
+condition ends the run on that route, which succeeds. Load refuses a `when:` naming a route the condition does not declare, a `when:`
+on a node that waits on no condition or on two, and a route nobody takes and no `ends:` names. A route never goes back: an edge back is
+a `loop:` and nothing else, and a loop's span holds no condition but the looping step and no `when:` node but its target.
+
+A **workflow node** is a route to another workflow: `workflow: dev` beside its `when:` and `after:`, and no agent, workspace, check or
+gate. Once it is due it files a card for the named workflow (a bare name, resolved through the factory when the route is taken) and
+reads **`sent`**, which satisfies `after`: the caller goes on, or ends. **A routed run does not wait for its caller to land**: it is a
+card queued like any other, started from the base branch and handed its caller as `from:` (*Context without a wait*), never
+`--after`; a later card may add a wait. Each run keeps its own workspace, gate, budget and landing.
+
+On a route not taken, a node that was never filed reads **`skipped`**, and so does a node whose parents are all skipped; it is worked
+out on every pass from the conditions' answers and carries nothing between passes. `skipped` neither satisfies `after` nor stops a
+follower: a join runs once every parent is satisfied or skipped and at least one is satisfied, and a fan-in merges only the parents that
+ran. The run succeeds when every node is satisfied, `sent` or skipped and at least one ran. `nemia ls` and `nemia decide` say
+`skipped (triage: docs)`.
+
+A person changes the route, or answers an `unsure`, with **`nemia route <run> <condition> <route>`**, or asks the condition again with
+`nemia retry <run> <condition>`; a `gate: true` on a condition holds its answered route until `nemia approve`. Both are refused once a
+follower of the condition is filed: the route is settled for the run, and the fix is to cancel it and start again.
+
+The tests' team draws one: `test/fixtures/team/triage/` (plan → triage → build-web, build-backend or the handoff to `dev` → notes), whose
+graph `docs/model.md` holds between its `diagram:workflow` markers. The graph every client draws (`graphOf`) carries a `route` edge from
+a condition to each node that runs on one of its routes, in place of the `after` edge, and each node with its kind.
 
 ## Files a person gives the run: `wf start --input`
 

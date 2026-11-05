@@ -92,13 +92,31 @@ import type { MostSpent, RaiseVerdictOf } from '../../contracts/raise.contract.t
  * filed is such an ending. Only a looping step: its `again: true` is what gives the work a round, and a folder with no loop before its
  * ending has no way back but a new run (`retryRefusal` says so).
  *
+ * A condition (`routes:`) is tried only while none of its followers has been filed or sent its card: once one has, the route is
+ * settled for the run, and a new answer would leave a branch that ran beside one a new route takes. A node never filed — skipped on a
+ * route not taken among them — has no try to take.
+ *
  * @param harnessBlocked Whether the harness marked a task's session blocked while its attempt runs: the engine's `needs-human`
  *   (`harnessBlocked` in views.verb.ts).
  * @param spendOf What each task's sessions cost (`taskSpend`). Left out, no step is over budget, and none carries `raise`.
  * @param verdictOf What each step's current check exited with (`stepStatus`): a check that refused holds a step over its budget, one that
  *   did not finish does not.
  */
-export function retryable(
+export function retryable(...args: Parameters<typeof triedOn>): ReturnType<typeof triedOn> {
+  const [step, run, , , , steps = []] = args;
+  const tried = triedOn(...args);
+  if (!routeSettled(step, run, steps)) return tried;
+  const { sendsBack: _, back: __, raise: ___, ...rest } = tried;
+  return { ...rest, modes: [] };
+}
+
+/** Whether a condition's route is settled for the run: one of the nodes after it has been filed, or sent its card. */
+const routeSettled = (step: Workflow, run: Run, steps: readonly Workflow[]): boolean =>
+  step.routes !== undefined &&
+  steps.some((s) => s.after.includes(step.name) && Boolean(run.steps[s.name]?.taskId || run.steps[s.name]?.sent));
+
+/** `retryable` but for a condition's settled route: the ways a try of the step may be taken, off its own word. */
+function triedOn(
   step: Workflow,
   run: Run,
   phaseOf: (taskId: string) => TaskPhase,

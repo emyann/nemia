@@ -54,11 +54,16 @@
  * The harness's environment is the worker's, with the plan's `env` over it. Its stdout and stderr both go to the log, in the order
  * they arrive; with `streams`, each also goes whole to a file of its own, the one place a reader finds one apart from the other.
  *
- * argv: <runFile>  — JSON: { cmd, args, cwd, logFile, env?, streams?, stopFile?, start?, input?, inputAt?, stopGraceMs?, beatMs? }
+ * A plan with `terminationMessagePath` has that file read once, at the harness's exit, and what it held written as `terminationMessage`
+ * beside the exit code (`terminationMessageAt`).
+ *
+ * argv: <runFile>  — JSON: { cmd, args, cwd, logFile, env?, streams?, stopFile?, start?, input?, inputAt?, stopGraceMs?, beatMs?,
+ * terminationMessagePath? }
  */
 import fs from 'node:fs';
 import { spawn } from 'node:child_process';
 import { WORKER_BEAT_MS, WORKER_STOP_GRACE_MS } from '../src/harness/detached/worker-bounds.ts';
+import { terminationMessageAt } from '../src/harness/detached/termination-message.ts';
 
 /** The run file the worker is started on, its one argument; a worker started without one says how to start it, and exits 2. */
 const runFile = ((given: string | undefined): string => {
@@ -80,6 +85,7 @@ const plan = JSON.parse(fs.readFileSync(runFile, 'utf8')) as {
   inputAt?: number;
   stopGraceMs?: number;
   beatMs?: number;
+  terminationMessagePath?: string;
 };
 
 /** The running boot's id, read once from where Linux keeps it; `undefined` where the machine does not say. */
@@ -106,6 +112,7 @@ let status = {
   nativeId: undefined as string | undefined,
   startRefused: undefined as { line: number; field: string; found: string } | undefined,
   exitCode: undefined as number | undefined,
+  terminationMessage: undefined as string | undefined,
   /** A harness started here has closed nothing yet, whatever the one before it did. */
   inputClosed: undefined as true | undefined,
 };
@@ -391,7 +398,12 @@ child.on('exit', (code) => {
   const bound = new Promise<void>((resolve) => setTimeout(resolve, DRAIN_MS).unref());
   void Promise.race([drained, bound]).then(() =>
     endFiles(() => {
-      write({ state: stopping ? 'stopped' : code === 0 ? 'done' : 'failed', exitCode: stopping ? -1 : (code ?? -1) });
+      const said = plan.terminationMessagePath === undefined ? undefined : terminationMessageAt(plan.terminationMessagePath);
+      write({
+        state: stopping ? 'stopped' : code === 0 ? 'done' : 'failed',
+        exitCode: stopping ? -1 : (code ?? -1),
+        terminationMessage: said,
+      });
       setTimeout(() => void leave(0), 50);
     }),
   );

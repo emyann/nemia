@@ -35,6 +35,8 @@ export type StepState =
   | 'waiting-for-slot'
   | 'held'
   | 'cancelled'
+  | 'skipped'
+  | 'sent'
   | 'unreadable'
   | 'unknown';
 
@@ -91,7 +93,7 @@ const HELD_BY_A_HOLD: ReadonlySet<StepState> = new Set(['blocked', 'awaiting-app
  * The state each reason is drawn as, before what qualifies it narrows it (`codeState`). Total: a reason the api adds fails the typecheck
  * here until it has a state. A step not filed — on another step or run, the checkout, the pause, or nothing yet — is `waiting`; a question
  * is `blocked`, a closeout's; a session that ended on its own word (`Succeeded`) is at most `unverified`; one an operator or a cancel
- * stopped is drawn `cancelled`.
+ * stopped is drawn `cancelled`; a node its route passed by is `skipped`, and a workflow node that filed its card `sent`.
  */
 export const STATE_OF: Record<StepReason, StepState> = {
   Running: 'working',
@@ -111,6 +113,8 @@ export const STATE_OF: Record<StepReason, StepState> = {
   Pending: 'waiting',
   Waiting: 'waiting',
   Stopped: 'cancelled',
+  Skipped: 'skipped',
+  Sent: 'sent',
   UnreadableCloseout: 'unreadable',
   Unknown: 'unknown',
 };
@@ -128,8 +132,14 @@ function codeState({ phase, reason, on, via }: StepCodes, runCancelled: boolean)
   return STATE_OF[reason];
 }
 
-/** Final, and a follower may be filed on it — `satisfiesAfter` in agent-orchestrator: verified, or done on its own word. */
-export const satisfiesAfter = (state: StepState): boolean => state === 'verified' || state === 'unverified';
+/**
+ * Final, and a follower may be filed on it — `satisfiesAfter` in agent-orchestrator: verified, done on its own word, or a workflow node
+ * that filed its card.
+ */
+export const satisfiesAfter = (state: StepState): boolean => state === 'verified' || state === 'unverified' || state === 'sent';
+
+/** Settled with nothing more to come of it: done (`satisfiesAfter`), or a node its route passed by. */
+export const settledState = (state: StepState): boolean => satisfiesAfter(state) || state === 'skipped';
 
 /** How a state is drawn: the hue that says its meaning, the form the hue takes, and what marks it beside its colour. */
 export interface Drawn {
@@ -145,8 +155,9 @@ const GATE: Drawn = { hue: 'yours', form: 'filled', mark: 'font-semibold' };
  * the only filled accent; `yours` for a session asking, and ringed for work to try again, not a question (`unsigned`, `denied`). `alive`
  * for a session at work. `failure` for a failure and nothing else. The rest is at rest or done: sage for a check that runs, a step that is
  * done (ringed when only its own word says so, and `StatusChip` marks it too) and a step to come, a hairline; grey for a step a person
- * holds, one called off, and one the engine does not know, and grey ringed for a session the store's pause parked between two calls. No
- * state is `money`: amber is an amount, drawn beside the chip.
+ * holds, one called off, and one the engine does not know, grey dashed and italic for a node its route passed by, sage filled for a
+ * workflow node that filed its card, and grey ringed for a session the store's pause parked between two calls. No state is `money`:
+ * amber is an amount, drawn beside the chip.
  */
 export const stateDrawn: Record<StepState, Drawn> = {
   working: { hue: 'alive', form: 'container' },
@@ -168,6 +179,8 @@ export const stateDrawn: Record<StepState, Drawn> = {
   'waiting-for-slot': { hue: 'sage', form: 'hairline' },
   held: { hue: 'grey', form: 'filled' },
   cancelled: { hue: 'grey', form: 'container', mark: 'line-through' },
+  skipped: { hue: 'grey', form: 'dashed', mark: 'italic' },
+  sent: { hue: 'sage', form: 'filled' },
   unreadable: { hue: 'failure', form: 'dashed' },
   unknown: { hue: 'grey', form: 'dashed' },
 };

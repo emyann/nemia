@@ -4,11 +4,14 @@
  * (`handedParts`). Pure.
  */
 import { outputFields, type Workflow } from '../step/step.ts';
-import { dataBlock, fenced } from '../record/record.ts';
+import { dataBlock, fenced, type Mount } from '../record/record.ts';
 import { declaredOutput, type Closeout } from '../closeout/index.ts';
 
-/** A terminal step of a run another waited on: its step and how it signed off — or its name, and why that cannot be given. */
-export type ParentStep = { step: Workflow; said: Closeout } | { name: string; unreadable: string };
+/**
+ * A terminal step of a run another waited on: its step and how it signed off, and for a run that routed on to this one its artifacts
+ * folder (`files`), mounted read-only on this run's roots (`callerMounts`) — or its name, and why that cannot be given.
+ */
+export type ParentStep = { step: Workflow; said: Closeout; files?: string } | { name: string; unreadable: string };
 
 /**
  * A run this one waited on (`--after`) or was handed as context (`--from`), as the pass that files this run's roots read it off the store
@@ -19,6 +22,18 @@ export type ParentCloseout = ({ run: string; asked: string; steps: readonly Pare
   how: 'waited' | 'read';
   landed: boolean;
 };
+
+/**
+ * The artifacts folders of the result steps of each run that routed on to this one (`ParentStep.files`), each read-only, for a root of
+ * this run (a step with no `after:`): filed with its mounts (`FiledFolders.caller`) and named by its brief's mount line (`mountsLine`),
+ * as the folders of the steps before a step are. None for a step after a root, or a run handed none.
+ */
+export const callerMounts = (step: Pick<Workflow, 'after'>, parents: readonly ParentCloseout[] | undefined): Mount[] =>
+  step.after.length
+    ? []
+    : (parents ?? []).flatMap((p) =>
+        'steps' in p ? p.steps.flatMap((s) => ('files' in s && s.files ? [{ path: s.files, readOnly: true }] : [])) : [],
+      );
 
 /** What a section says of a run that is all its work a remote step is given. */
 const STAYS = 'Its work stays on the machine that runs this workflow and is not sent to you';

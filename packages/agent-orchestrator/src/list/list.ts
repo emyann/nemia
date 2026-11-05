@@ -19,6 +19,7 @@ import {
 } from '../record/record.ts';
 import type { Closeout } from '../closeout/index.ts';
 import { checkVerdictOf, verdictWord, type CheckVerdict, type Verdict } from '../check/check.ts';
+import { routedRows } from '../routed/index.ts';
 import { codedStep, ENGINE_REASON, holdsTheRun, REASON_OF, type CodedStep, type QualifiedStep } from '../phase/phase.ts';
 import { answerOf, dueNote, modeWord, retriesDue, tryNote, type RetryAsk } from '../retry/index.ts';
 import {
@@ -226,6 +227,22 @@ export interface ListingInput {
 }
 
 /**
+ * `listedSteps`, with the routing's rows laid over the steps it words (`routedRows`): a node `skipped (<condition>: <route>)`, a workflow
+ * node `sent → <card>`, a condition never filed its route and the line that routes it by hand.
+ */
+export function listing(input: ListingInput): Listing {
+  const listed = listedSteps(input);
+  const routed = routedRows(input);
+  if (!routed.size) return listed;
+  const steps = listed.steps.map((s) => {
+    const row = routed.get(s.name);
+    if (row && 'besides' in row) return { ...s, message: `${s.message} · ${row.besides}` };
+    return row ? { name: s.name, branch: s.branch, ...row } : s;
+  });
+  return { ...listed, steps };
+}
+
+/**
  * What `nemia ls` shows for each step of a run. Pure, like `decision`, and tested the same way.
  *
  * The words are `stepStatus`'s, so the list says what the run established and not only what the
@@ -262,7 +279,7 @@ export interface ListingInput {
  * ending's merge (`landed`), unless it found nothing staged; how many times it was spoken to; and what it
  * was denied. Its cost goes beside its word once measured, unless the word already shows it.
  */
-export function listing({
+function listedSteps({
   steps,
   run,
   phaseOf,

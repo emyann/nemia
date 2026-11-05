@@ -41,6 +41,8 @@ const STEP_STATES = {
   stopped: { id: 'stopped' },
   'budget exhausted': { id: 'budget_exhausted' },
   'over budget': { id: 'over_budget' },
+  skipped: { id: 'skipped' },
+  sent: { id: 'sent' },
 } satisfies Record<StepStatus, { id: string }>;
 
 const isStepStatus = (word: string): word is StepStatus => word in STEP_STATES;
@@ -53,10 +55,18 @@ const isStepStatus = (word: string): word is StepStatus => word in STEP_STATES;
  * its target (`roundFiled`), and an ending sent back with its work has its try moved behind (`sentBack`). And an ending held at its gate
  * before it is filed reads `pending` once approved, until the pass files it, and again when the work it waits on is sent back. A step in
  * flight — its session running, its check or its landing pending — is never unfiled.
+ *
+ * Routing adds a node's moves before it is filed: a table condition answers unfiled (`unverified`, or `unsigned` where its table names no
+ * route), a node off the route taken reads `skipped` until a new route takes it, and a workflow node reads `sent` once its card is filed.
  */
 export const STEP_EDGES: readonly StepEdge[] = [
   { from: 'pending', to: 'running', event: 'filed' },
   { from: 'pending', to: 'awaiting approval', event: 'its work handed on, at the gate of an ending' },
+  { from: 'pending', to: 'unverified', event: 'answered by its table' },
+  { from: 'pending', to: 'unsigned', event: 'its table answered no route' },
+  { from: 'pending', to: 'skipped', event: 'its route not taken' },
+  { from: 'pending', to: 'sent', event: 'its card filed' },
+  { from: 'skipped', to: 'pending', event: 'a new route, before a follower is filed' },
   { from: 'running', to: 'unverified', event: 'signed, with no check' },
   { from: 'running', to: 'checking', event: 'signed, with a check' },
   { from: 'running', to: 'awaiting approval', event: 'signed, at its gate' },

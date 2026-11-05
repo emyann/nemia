@@ -510,8 +510,26 @@ jobs:
     timeout-minutes: 5
     if: always()
     needs: [test, lint, typecheck, contracts, e2e, e2e-bound, build, gitleaks, guards]
+    # A dispatched run — the release workflow's, on the release pull request's head — also posts the ci context as a commit status. Its
+    # check runs belong to a check suite no pull request is linked to, so the pull request never counts them; a status belongs to the
+    # commit, and one posted with this token is set by GitHub Actions, the app branch protection pins. This job alone may write one,
+    # and on a push or a pull request it posts none: there the check run counts. tools/guards/test/ci-workflow.test.ts holds the lines.
+    permissions:
+      statuses: write
     steps:
+      - name: Post the ci status pending
+        if: github.event_name == 'workflow_dispatch'
+        timeout-minutes: 2
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+          CONTEXT: ci
+          STATE: pending
+          TARGET_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: gh api --method POST "repos/$GH_REPO/statuses/$SHA" -f state="$STATE" -f context="$CONTEXT" -f target_url="$TARGET_URL"
       - name: Every job succeeded
+        id: verdict
         # toJSON(needs) goes through env, never interpolated into the shell: on a pull request from a fork, an expression the branch
         # controls must not reach a command line.
         env:
@@ -535,3 +553,14 @@ jobs:
             fi
           done
           echo "ci: every job above succeeded."
+      - name: Post the ci status's result
+        if: always() && github.event_name == 'workflow_dispatch'
+        timeout-minutes: 2
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+          CONTEXT: ci
+          STATE: ${{ steps.verdict.outcome == 'success' && 'success' || 'failure' }}
+          TARGET_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: gh api --method POST "repos/$GH_REPO/statuses/$SHA" -f state="$STATE" -f context="$CONTEXT" -f target_url="$TARGET_URL"

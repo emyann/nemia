@@ -50,6 +50,8 @@ import {
   shardRunStep,
   stallDrift,
   staleStep,
+  statusDrift,
+  VERDICT,
   STALE_STEP,
   targetDrift,
   type Step,
@@ -887,6 +889,7 @@ const drift = (
   ...zoneDrift(workflow),
   ...filterDrift(workflow),
   ...verdictDrift(workflow),
+  ...statusDrift(workflow, GATE, GATE, VERDICT),
   ...cancelDrift(workflow),
   ...targetDrift(text),
   ...shardDrift(workflow, pages),
@@ -1669,4 +1672,24 @@ test("REFUSED: a job with no bound, a step that reaches the network with none, a
   const outlived = structuredClone(shipped);
   install(outlived)['timeout-minutes'] = outlived.jobs[E2E]['timeout-minutes'];
   refused(stallDrift(outlived), 'Install Chromium', "the install bounded at its job's bound");
+});
+
+test('REFUSED: the ci status posted on every event, under another name, granted to another job, and its result not the verdict', () => {
+  const text = workflowText();
+  assert.deepEqual(statusDrift(readWorkflow(text), GATE, GATE, VERDICT), [], 'a dispatched run posts the ci status today');
+  const refused = (from: string, to: string, token: string, why: string): void => {
+    assert.ok(text.includes(from), `${FILE} holds ${JSON.stringify(from)} today`);
+    const drift = statusDrift(readWorkflow(text.replace(from, to)), GATE, GATE, VERDICT);
+    assert.equal(drift.length, 1, `${why}: ${drift.join(' | ')}`);
+    assert.ok(drift[0].includes(token), `${why}: the sentence names ${token}`);
+  };
+  refused(
+    "      - name: Post the ci status pending\n        if: github.event_name == 'workflow_dispatch'\n",
+    '      - name: Post the ci status pending\n',
+    'every event',
+    'the pending status posted on a push and a pull request too',
+  );
+  refused('          CONTEXT: ci\n', '          CONTEXT: ci-dispatched\n', 'the context ci', 'the status under another name');
+  refused('  lint:\n', '  lint:\n    permissions:\n      statuses: write\n', 'the lint job', 'statuses granted to another job');
+  refused('        id: verdict\n', '', `steps.${VERDICT}.outcome`, 'the result read off no step');
 });

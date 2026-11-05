@@ -20,7 +20,7 @@ on:
         required: true
         type: string
 
-# The check reads the code and the pull request's labels, and writes nothing.
+# The check reads the code and the pull request's labels. Its job alone writes, and only a commit status, on a dispatched run.
 permissions:
   contents: read
   pull-requests: read
@@ -34,7 +34,25 @@ jobs:
     name: release-label
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    # A dispatched run also posts its result as the commit status release-label on the head it checks: a check run a dispatch makes is
+    # in a check suite no pull request is linked to, so the pull request never counts it, and a status belongs to the commit. Job-level
+    # permissions replace the top-level ones, so the reads are repeated beside the one write. On a pull_request event no status is posted.
+    permissions:
+      contents: read
+      pull-requests: read
+      statuses: write
     steps:
+      - name: Post the release-label status pending
+        if: github.event_name == 'workflow_dispatch'
+        timeout-minutes: 2
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+          CONTEXT: release-label
+          STATE: pending
+          TARGET_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: gh api --method POST "repos/$GH_REPO/statuses/$SHA" -f state="$STATE" -f context="$CONTEXT" -f target_url="$TARGET_URL"
       - uses: actions/checkout@v7
         timeout-minutes: 3
       - uses: actions/setup-node@v7
@@ -42,6 +60,7 @@ jobs:
         with:
           node-version: '24.16.0'
       - name: Check the pull request's release label
+        id: check
         timeout-minutes: 3
         # The number comes through env, never interpolated into the command line, and the labels are read from the API with it.
         # HEAD_SHA is the commit a dispatched run reports on, and empty on a pull_request event.
@@ -51,3 +70,14 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: node tools/release/release.ts check
+      - name: Post the release-label status's result
+        if: always() && github.event_name == 'workflow_dispatch'
+        timeout-minutes: 2
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+          CONTEXT: release-label
+          STATE: ${{ steps.check.outcome == 'success' && 'success' || 'failure' }}
+          TARGET_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: gh api --method POST "repos/$GH_REPO/statuses/$SHA" -f state="$STATE" -f context="$CONTEXT" -f target_url="$TARGET_URL"

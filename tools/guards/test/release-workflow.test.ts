@@ -17,7 +17,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import yaml from 'js-yaml';
-import { actionDrift, stallDrift, targetDrift, type Workflow } from './ci-workflow.ts';
+import { actionDrift, stallDrift, statusDrift, targetDrift, type Workflow } from './ci-workflow.ts';
 import { LABELS, type Label } from '../../release/release.ts';
 
 const ROOT = path.join(import.meta.dirname, '..', '..', '..');
@@ -47,6 +47,12 @@ const TYPES = ['opened', 'reopened', 'synchronize', 'labeled', 'unlabeled'];
 
 /** The check's job, by its id and by the name branch protection will require. */
 const CHECK_JOB = 'release-label';
+
+/** The id of the step that runs the check, whose outcome a dispatched run posts as the `release-label` commit status. */
+const CHECK_STEP = 'check';
+
+/** The check job's own grants: the workflow's two reads, and the commit status a dispatched run posts. */
+const JOB_GRANTS = { contents: 'read', 'pull-requests': 'read', statuses: 'write' };
 
 const same = (a: unknown, b: unknown): boolean => JSON.stringify(a) === JSON.stringify(b);
 const sortedKeys = (value: Record<string, string> | undefined) =>
@@ -122,6 +128,11 @@ function labelDrift(workflow: Workflow): string[] {
   if (job === undefined || job.name !== CHECK_JOB)
     sentences.push(`${LABEL_CHECK} has no job ${CHECK_JOB} named ${CHECK_JOB}: add it, the context branch protection requires`);
   else {
+    sentences.push(...statusDrift(workflow, CHECK_JOB, CHECK_JOB, CHECK_STEP, LABEL_CHECK));
+    if (job.permissions?.statuses === 'write' && !same(sortedKeys(job.permissions), JOB_GRANTS))
+      sentences.push(
+        `the ${CHECK_JOB} job in ${LABEL_CHECK} is granted ${JSON.stringify(job.permissions)}, not ${JSON.stringify(JOB_GRANTS)}: its permissions replace the top-level ones, so repeat the two reads beside statuses: write and grant nothing more`,
+      );
     const checks = (job.steps ?? []).filter((step) => step.run?.trim() === `${TOOL} check`);
     const live = (env: Record<string, string> | undefined) =>
       env?.PR_NUMBER !== undefined && env.GH_TOKEN !== undefined && env.LABELS === undefined;
@@ -219,7 +230,7 @@ test("REFUSED: a third party's action, a job with no bound, a network step with 
   );
 });
 
-test('REFUSED: a missing release-label job, the check not dispatchable with its pull request, no head to compare, labels from the payload, labels interpolated into a command, and a type unlisted', () => {
+test('REFUSED: a missing release-label job, the check not dispatchable with its pull request, no head to compare, labels from the payload, labels interpolated into a command, a type unlisted, and a status posted on every event, under another name or ungranted', () => {
   const all = (label: string, release = text(RELEASE)) => drift(release, label, text(NOTES));
   refused(
     all(planted(LABEL_CHECK, '  release-label:\n    name: release-label\n', '  label:\n    name: label\n')),
@@ -244,7 +255,8 @@ test('REFUSED: a missing release-label job, the check not dispatchable with its 
     'LABELS',
     "the payload's labels put back",
   );
-  refused(all(planted(LABEL_CHECK, '          GH_TOKEN: ${{ github.token }}\n', '')), 'GH_TOKEN', 'the live read given no token');
+  const head = "          HEAD_SHA: ${{ github.event_name == 'workflow_dispatch' && github.sha || '' }}\n";
+  refused(all(planted(LABEL_CHECK, `${head}          GH_TOKEN: \${{ github.token }}\n`, head)), 'GH_TOKEN', 'the live read given no token');
   refused(all(text(LABEL_CHECK), planted(RELEASE, '  workflow_dispatch:\n', '')), 'workflow_dispatch', "the release's dispatch gone");
   refused(
     all(
@@ -258,6 +270,28 @@ test('REFUSED: a missing release-label job, the check not dispatchable with its 
     'the labels in the command line',
   );
   refused(all(planted(LABEL_CHECK, ', unlabeled]', ']')), 'unlabeled', 'a label taken off, never checked');
+  refused(
+    all(
+      planted(
+        LABEL_CHECK,
+        "      - name: Post the release-label status's result\n        if: always() && github.event_name == 'workflow_dispatch'\n",
+        "      - name: Post the release-label status's result\n        if: always()\n",
+      ),
+    ),
+    'every event',
+    'the result posted on a pull_request event too',
+  );
+  refused(
+    all(planted(LABEL_CHECK, '          CONTEXT: release-label\n', '          CONTEXT: label\n')),
+    `the context ${CHECK_JOB}`,
+    'the status under another name',
+  );
+  refused(all(planted(LABEL_CHECK, '      statuses: write\n', '')), 'statuses: write', 'the job not granted the status it posts');
+  refused(
+    all(planted(LABEL_CHECK, '      pull-requests: read\n      statuses: write\n', '      pull-requests: write\n      statuses: write\n')),
+    'grant nothing more',
+    'the job granted a write it does not make',
+  );
 });
 
 test('REFUSED: a job granted a write it does not make, a job the release does not name, a job out of its concurrency, a job waiting on the wrong one, and a verb swapped', () => {

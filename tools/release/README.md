@@ -54,8 +54,13 @@ in the pull request's body. The next version (`nextVersion`) is the last bumped,
   for each of `DISPATCHED` (`ci.yml`, and `release-label.yml` given `-f pr=<n>`), it reads the head's dispatched runs
   (`actions/workflows/<file>/runs?head_sha=<head>&event=workflow_dispatch`) and runs `gh workflow run <file> --ref release` where
   none is pending or green: a missing, failed or cancelled one is dispatched again, so a rerun with nothing changed dispatches
-  nothing and `gh workflow run release.yml` retries a flake. A run the workflow's token dispatches starts with no approval, and main's
-  protection matches its required checks by name on the head commit, so these are what it counts. The `pull_request` runs the
+  nothing and `gh workflow run release.yml` retries a flake. A run the workflow's token dispatches starts with no approval, but its check runs do
+  not count on the pull request: a check suite a `workflow_dispatch` creates is linked to no pull request, so the pull request's
+  rollup never reads them. So each dispatched run also posts its result as a commit status of the same name, `ci` and
+  `release-label`, on the head (`POST repos/{owner}/{repo}/statuses/{sha}`, `pending` as its job starts and `success` or
+  `failure` as it ends, by the one job granted `statuses: write`). A status belongs to the commit and needs no link to a pull
+  request, and one posted with the run's token is set by GitHub Actions, the app main's protection pins, so these are what it
+  counts. On a push or a pull request no status is posted: there the check run counts. The `pull_request` runs the
   token's push creates wait for approval and are left alone. The label goes on before the dispatch, so the dispatched check reads
   it. A rebuild pushes a new head and dispatches both on it. With nothing to release it
   closes the open release pull request. GitHub refuses the workflow's token a pull request until the repository turns on **"Allow GitHub Actions to create and approve pull requests"**; `pr` then exits 1 naming it.

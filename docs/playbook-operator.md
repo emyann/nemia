@@ -255,12 +255,14 @@ rm "$S"/node_modules; git worktree remove "$S"
   and `nemia service restart` where nothing new is to be installed, each through the take-over.
 - **How long a restart waits, and on what.** `nemia service restart` (and `nemia upgrade`'s restart) waits on the daemon's own
   sessions' calls in flight, up to the timeout (`--timeout <d>`, else `nemia pause-timeout`, 10m by default), then up to 90 s for the
-  old daemon to let the store go, up to 60 s for the service to tick, and the new daemon's first pass; never on a job or a check, a
+  old daemon to let the store go, up to 90 s more for the unit to end that daemon's process (its `MainPID`), then up to 60 s
+  for the service to tick, and the new daemon's first pass; never on a job or a check, a
   landing waiting on CI included. Each wait is said on its stderr as it waits: `Pausing: N sessions finishing a tool call, cut in M
   min`, `giving up on <run>'s <step>: …` once the timeout passes, and `pid N ticks the store: waiting for its first pass`. `nemia ls`
   under its pause lists the jobs and checks too, which it does not wait on. A restart killed while it waits (`timeout`, ^C) leaves its
   pause standing only until the daemon's next pass, which lifts it (the daemon's log says so); `nemia service status` shows whether
-  a pause still stands.
+  a pause still stands. A start that leaves the unit with no process is refused (exit 2) saying the service is not running and naming
+  `systemctl --user start <unit>`, which starts it; the restart's pause stands until that daemon's first pass lifts it.
 - **Main is fast-forwarded by the run**, not by hand: the landing merges the pull request on GitHub, then runs `git fetch origin && git
   merge --ff-only origin/main` in the owner's checkout. Nothing is pushed afterwards, and GitHub deletes the head branch.
 - **A landing that signed off `blocked`:** nothing was merged and the checkout is untouched. The refusal names the exact `nemia retry`

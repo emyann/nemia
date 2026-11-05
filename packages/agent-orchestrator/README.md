@@ -3653,11 +3653,16 @@ screen of the board.
 - **`nemia service restart` restarts the service's daemon gracefully** (`src/service/restart.verb.ts`), as `nemia service install
   --take-over` and `nemia upgrade` take a daemon over (`takeOver`, `src/service/takeover.verb.ts`): it pauses the store unless a person's
   pause stands, waits up to the timeout for the calls in flight of the daemon's own sessions, sends SIGTERM to the pid it confirmed,
-  starts the unit, and resumes the store once the new daemon has completed its first pass — never on a daemon that only ticks. It waits
+  starts the unit once the system says the unit no longer runs that pid (`unitRunning`, read from `systemctl --user show`'s `MainPID`
+  or `launchctl print`'s `pid`: the daemon lets the lease go before its process exits, and systemd answers a start of a unit still
+  active as done and does nothing), and resumes the store once the new daemon has completed its first pass — never on a daemon that
+  only ticks. It waits
   on no check, a landing's wait on CI included: each runs on its worker through the restart, and the new daemon reads its result. The
   pause it puts and the drain it holds the sessions by each name the process that put them, so a restart killed while it waits leaves
   neither standing past the daemon's next pass (`liftLapsedPause`, `putDrain`). A new daemon that stops before that pass, or a lease that does
-  not come back, is refused (exit 2) naming the service's log and `nemia service status`, the store left paused. A daemon started by hand
+  not come back, is refused (exit 2) naming the service's log and `nemia service status`, the store left paused; where the unit then runs
+  no process, the refusal says it is not running and names the command that starts it (`systemctl --user start <unit>`), never "was
+  started", and a start the system refuses carries its first line. A daemon started by hand
   is not the service's to start again: it is named with `nemia service install --take-over <pid>`, whether a service is installed or
   not; where nothing ticks, the service is started and waited for the same way, and a person's pause is left standing and said.
 - **`wf tick` by hand is refused the same way while a daemon ticks**, with no force: the daemon runs the same pass within its interval,

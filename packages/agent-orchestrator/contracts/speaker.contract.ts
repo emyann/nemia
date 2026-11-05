@@ -8,30 +8,25 @@
  * The laws are the card's: an agent's words are never said nor shown as the person's, the person's words come from the board, and an
  * agent speaks only under a name the person allowed. The words of each refusal are nobody's law, only its kind.
  *
- * The types below are declared here until implement moves them into `src/chat/chat.ts`, which changes no law.
+ * The types and constants the laws read are `src/chat/chat.ts`'s, and so is the `speakerNameRefusal` that `speakerRefusal`'s laws read.
  */
-import { type Implementation, spec } from '@emyann/tsverify';
+import { assume, type Implementation, spec } from '@emyann/tsverify';
+import {
+  PERSON_FRAME,
+  RESERVED_SPEAKERS,
+  SPEAKER_NAME_MAX,
+  type Speaker,
+  type SpeakerRefused,
+  speakerNameRefusal,
+  type Via,
+  wellSpelt,
+} from '../src/chat/chat.ts';
 
-/** Who wrote words to a session's chat: the person, or an agent, by the name it speaks under. */
-export type Speaker = { kind: 'person' } | { kind: 'agent'; name: string };
+/** The characters a name takes, which no law reads (`speakerNameRefusal`'s `open`): declared pure, and nothing more. */
+export const spelt = assume(wellSpelt, { pure: true });
 
-/** Where words to the chat came from: the board, a person's browser on it, or anywhere else (a shell, a script, another agent's host). */
-export type Via = 'board' | 'elsewhere';
-
-/** Why words from a speaker are not taken: `Invalid`, what is given is wrong; `Conflict`, the person has not allowed that name. */
-export type SpeakerRefused = { kind: 'Invalid' | 'Conflict'; message: string };
-
-/** The words the person's own are said to the session in, before the words themselves, as the keeper has always said them. */
-export const PERSON_FRAME = 'The person writes from the board: ';
-
-/** The longest name an agent speaks under. */
-export const SPEAKER_NAME_MAX = 64;
-
-/** The names no agent speaks under: each would read, to the session or to the person, as the person or as the session's own agent. */
-export const RESERVED_SPEAKERS: readonly string[] = ['person', 'the-person', 'you', 'me', 'nemia', 'keeper', 'agent'];
-
-/** Whether no name of `names` is there twice. */
-const distinct = (names: readonly string[]): boolean => names.every((n, i) => !names.slice(i + 1).includes(n));
+/** Whether no name of `names` is there twice: each differs from every name before it. */
+const distinct = (names: readonly string[]): boolean => names.every((n, i) => !names.slice(0, i).includes(n));
 
 const speakerNameRefusalSpec = spec<(name: string) => string | undefined>({
   /**
@@ -57,9 +52,6 @@ const speakerNameRefusalSpec = spec<(name: string) => string | undefined>({
 });
 /** `speakerNameRefusal`'s type, which `src/chat/chat.ts` takes: why `name` is no name an agent speaks under, or undefined. */
 export type SpeakerNameRefusal = Implementation<typeof speakerNameRefusalSpec>;
-
-/** The one `speakerNameRefusal` the laws below read, its spec's. Declared, not defined: implement exports it from `src/chat/chat.ts`. */
-declare const speakerNameRefusal: SpeakerNameRefusal;
 
 /** Whether `speaker` is an agent whose name is one an agent speaks under. */
 const wellNamedAgent = (speaker: Speaker): boolean => speaker.kind === 'agent' && speakerNameRefusal(speaker.name) === undefined;

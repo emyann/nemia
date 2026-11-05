@@ -8,18 +8,24 @@
  * Pure. The files are `chat.store.ts`'s, the reads and the person's writes `chat.verb.ts`, and the delivery the keeper's
  * (`say.verb.ts`).
  */
+import { invariant } from '@emyann/tsverify';
+import type { FramedFor, SpeakerNameRefusal, SpeakerRefusal, WithSpeaker, WithoutSpeaker } from '../../contracts/speaker.contract.ts';
 import { Invalid } from '../refusal/refusal.ts';
 import type { EnginePhase } from '../views/views-words.ts';
 
-/** Who a message is from: the task's agent (`agent`), the person, or the keeper, whose words are a quiet marker. */
-export type ChatFrom = 'agent' | 'person' | 'keeper';
+/**
+ * Who a message is from: the task's agent (`agent`), the person, the keeper, whose words are a quiet marker, or another agent that
+ * wrote to the task in its chat under a name the person allowed (`peer`, the message carrying its `name`).
+ */
+export type ChatFrom = 'agent' | 'person' | 'keeper' | 'peer';
 
 /** Where a tool call stands: done, at work, failed, not begun, or waiting on the person. */
 export type CallState = 'done' | 'running' | 'error' | 'pending' | 'waits';
 
 /**
  * One event of a chat, unique by its `id`:
- * a `message`, the person's carrying when it was delivered (`delivered`, the said's time, null while it waits in the outbox);
+ * a `message`, the person's or a peer's carrying when it was delivered (`delivered`, the said's time, null while it waits in the
+ * outbox), a peer's carrying the `name` it spoke under;
  * a `call`, one tool call, its `sentence`, a `fact` (its duration) and its `state`;
  * a `session` line where one attempt ended and the next began;
  * a `question` and a `proposal`, an ask of hers drawn as the form or as her buttons (`kindOfAsk`);
@@ -27,7 +33,7 @@ export type CallState = 'done' | 'running' | 'error' | 'pending' | 'waits';
  * the facts of the call it holds (`PermissionFacts`).
  */
 export type ChatEvent =
-  | { kind: 'message'; id: string; at: string; from: ChatFrom; text: string; delivered?: string | null }
+  | { kind: 'message'; id: string; at: string; from: ChatFrom; text: string; delivered?: string | null; name?: string }
   | { kind: 'call'; id: string; at: string; tool: string; sentence: string; fact?: string; state: CallState }
   | { kind: 'session'; id: string; at: string; attempt: number }
   | ({ kind: 'question' } & AskEvent)
@@ -131,7 +137,7 @@ export type SourceSaid = { at: string; attempt: number; text: string; after?: { 
 export type ChatSession = { attempt: number; startedAt: string; events: readonly SourceEvent[]; cursor?: string };
 
 /** What the person wrote, as the outbox keeps it. */
-export type OutboxEntry = { id: string; at: string; text: string };
+export type OutboxEntry = { id: string; at: string; text: string; from?: Speaker };
 
 /** The keeper's mark of an outbox entry delivered: its `id`, and the said that carried it, by its time and attempt. */
 export type DeliveredMark = { id: string; said: string; attempt: number };
@@ -156,8 +162,96 @@ export type ChatSources = {
   phase: EnginePhase | null;
 };
 
-/** The words the person's `text` is said to the task in, so it knows who wrote them. Pure. */
-export const framedForHer = (text: string): string => `The person writes from the board: ${text}`;
+/** Who wrote words to a task's chat: the person, or an agent, by the name it speaks under. An entry with none is the person's. */
+export type Speaker = { kind: 'person' } | { kind: 'agent'; name: string };
+
+/** Where words to the chat came from: the board, a person's browser on it, or anywhere else (a shell, a script, another agent's host). */
+export type Via = 'board' | 'elsewhere';
+
+/** Why words from a speaker are not taken: `Invalid`, what is given is wrong; `Conflict`, the person has not allowed that name. */
+export type SpeakerRefused = { kind: 'Invalid' | 'Conflict'; message: string };
+
+/** The words the person's own are said to the task in, before the words themselves, as the keeper has always said them. */
+export const PERSON_FRAME = 'The person writes from the board: ';
+
+/** The longest name an agent speaks under. */
+export const SPEAKER_NAME_MAX = 64;
+
+/** The names no agent speaks under: each would read, to the task or to the person, as the person or as the task's own agent. */
+export const RESERVED_SPEAKERS: readonly string[] = ['person', 'the-person', 'you', 'me', 'nemia', 'keeper', 'agent'];
+
+/** The characters a name opens with. */
+const NAME_OPENS = 'abcdefghijklmnopqrstuvwxyz0123456789';
+
+/** The characters a name takes after its first: lowercase letters, digits, `.`, `_`, `-` and `/`. */
+const NAME_TAKES = `${NAME_OPENS}._-/`;
+
+/** Whether `name` opens with a lowercase letter or a digit and holds only the characters `NAME_TAKES` holds. */
+export const wellSpelt = (name: string): boolean => {
+  if (!NAME_OPENS.includes(name.charAt(0))) return false;
+  for (let i = 1; i < name.length; i++) if (!NAME_TAKES.includes(name.charAt(i))) return false;
+  return true;
+};
+
+/**
+ * Why `name` is no name an agent speaks under, or undefined where it is one: 1 to `SPEAKER_NAME_MAX` characters, spelt as `wellSpelt`
+ * says, and none of `RESERVED_SPEAKERS`. Pure.
+ */
+export const speakerNameRefusal: SpeakerNameRefusal = (name) => {
+  if (name.length === 0) return 'The name is empty: name the agent that speaks, such as `operator`.';
+  if (name.length > SPEAKER_NAME_MAX) return `The name is ${name.length} characters: name the agent in at most ${SPEAKER_NAME_MAX}.`;
+  if (RESERVED_SPEAKERS.includes(name))
+    return `\`${name}\` reads as the person or as the task's own agent: name the agent that speaks as itself, such as \`operator\`.`;
+  if (!wellSpelt(name))
+    return `\`${name}\` is no name an agent speaks under: use lowercase letters, digits, \`.\`, \`_\`, \`-\` and \`/\`, opening with a letter or a digit.`;
+  return undefined;
+};
+
+/**
+ * Why words from `speaker`, come `via`, are not taken, given the names the person `allowed`; null where they are. The person's words
+ * are taken from the board alone: anything else must say which agent wrote them (`Invalid`). An agent's are taken from anywhere under a
+ * name the person allowed, refused `Invalid` under a name no agent speaks under and `Conflict` under one not allowed. Pure.
+ */
+export const speakerRefusal: SpeakerRefusal = (speaker, via, allowed) => {
+  if (speaker.kind === 'person')
+    return via === 'board'
+      ? null
+      : {
+          kind: 'Invalid',
+          message:
+            'Words from anywhere but the board must say which agent wrote them: send `from: { kind: "agent", name: "<your name>" }`, a name the person allowed with `nemia chat allow <name>`.',
+        };
+  const bad = speakerNameRefusal(speaker.name);
+  if (bad !== undefined) return { kind: 'Invalid', message: bad };
+  if (!allowed.includes(speaker.name))
+    return {
+      kind: 'Conflict',
+      message: `The person has not allowed \`${speaker.name}\` to speak in this chat: they allow it with \`nemia chat allow ${speaker.name}\`.`,
+    };
+  return null;
+};
+
+/**
+ * The words `text` from `speaker` are said to the task in, so it knows who wrote them: the person's as they always were
+ * (`PERSON_FRAME`), an agent's under its name and never as the person's. Pure.
+ */
+export const framedFor: FramedFor = (speaker, text) =>
+  speaker.kind === 'person' ? PERSON_FRAME + text : 'The agent ' + speaker.name + ' writes, not the person: ' + text;
+
+/** The person's `allowed` names with `name` allowed, listed once. Pure. */
+export const withSpeaker: WithSpeaker = (allowed, name) => (allowed.includes(name) ? [...allowed] : [...allowed, name]);
+
+/** The person's `allowed` names with `name` taken back. Pure. */
+export const withoutSpeaker: WithoutSpeaker = (allowed, name) => {
+  let out: string[] = [];
+  for (const n of allowed) {
+    invariant((i) => allowed.slice(0, i).every((m) => m === name || out.includes(m)));
+    invariant(() => out.every((m) => m !== name));
+    invariant(() => out.every((m) => allowed.includes(m)));
+    if (n !== name) out = [...out, n];
+  }
+  return out;
+};
 
 /** The longest text the person may send at once. */
 export const CHAT_TEXT_MAX = 8000;

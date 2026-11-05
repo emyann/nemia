@@ -3,7 +3,7 @@
  * its `input` edges included (`inputGraphOf`), with every node named and its kind on it — a step, a condition or a workflow node — on
  * every workflow, routed or not, so a client never infers a node's kind from the keys of its step (decision 12 of resource-objects).
  */
-import { type Implementation, spec } from '@emyann/tsverify';
+import { type Implementation, assume, spec } from '@emyann/tsverify';
 import { type ObjectGraph, inputGraphOf } from '../src/summary/graph.ts';
 
 /** A step as the graph reads it: the keys `inputGraphOf` takes. */
@@ -13,7 +13,10 @@ type GraphStep = Parameters<typeof inputGraphOf>[0][number];
 export type TypedGraph = Omit<ObjectGraph, 'nodes'> & { nodes: NonNullable<ObjectGraph['nodes']> };
 
 /** Whether no two of `steps` share a name, as the loader holds of every workflow it reads. */
-const distinct = (steps: readonly GraphStep[]): boolean => new Set(steps.map((s) => s.name)).size === steps.length;
+const distinct = (steps: readonly GraphStep[]): boolean => steps.every((s, i) => !steps.slice(0, i).some((t) => t.name === s.name));
+
+/** The run's graph of the same steps: the verifier takes it as a pure function, read the same by the laws and the code. */
+export const runsGraph = assume(inputGraphOf, { pure: true });
 
 const typedGraphOfSpec = spec<(steps: readonly GraphStep[]) => TypedGraph>({
   requires: ({ input: [steps] }) => distinct(steps),
@@ -41,7 +44,14 @@ const typedGraphOfSpec = spec<(steps: readonly GraphStep[]) => TypedGraph>({
       description: "The graph's roots and edges are those a run of the same steps draws, its input edges among them",
       condition: ({ input: [steps], output }) => {
         const run = inputGraphOf(steps);
-        return JSON.stringify(run.roots) === JSON.stringify(output.roots) && JSON.stringify(run.edges) === JSON.stringify(output.edges);
+        return (
+          run.roots.length === output.roots.length &&
+          run.roots.every((r, i) => output.roots.at(i) === r) &&
+          run.edges.length === output.edges.length &&
+          run.edges.every(
+            (e, i) => output.edges.at(i)?.from === e.from && output.edges.at(i)?.to === e.to && output.edges.at(i)?.kind === e.kind,
+          )
+        );
       },
     },
   },

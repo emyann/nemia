@@ -1,5 +1,8 @@
 import { nodeKind, type NodeKind } from '../route/index.ts';
 import { DEFAULT_ROUNDS, type Workflow } from '../step/step.ts';
+import type { TypedGraphOf } from '../../contracts/workflow-graph.contract.ts';
+
+export type { TypedGraph } from '../../contracts/workflow-graph.contract.ts';
 
 /**
  * One edge of a run's graph, as the list and the run page draw it. `after`: `to` waits on `from`. `loop`: `from` is the looping step, and
@@ -27,7 +30,8 @@ export type RunGraph = { roots: string[]; edges: GraphEdge[]; nodes?: GraphNode[
 /** The run object's graph (`RunGraph`), its `input` edges beside `after`, `loop` and `route`. */
 export type ObjectGraph = { roots: string[]; edges: Array<GraphEdge | InputEdge>; nodes?: GraphNode[] };
 
-type GraphStep = Pick<Workflow, 'name' | 'after' | 'input' | 'loop' | 'rounds' | 'routes' | 'when' | 'ends' | 'workflow'>;
+/** A step as the graph reads it. */
+export type GraphStep = Pick<Workflow, 'name' | 'after' | 'input' | 'loop' | 'rounds' | 'routes' | 'when' | 'ends' | 'workflow'>;
 
 const nodeOf = (step: GraphStep): GraphNode => ({
   name: step.name,
@@ -79,6 +83,15 @@ export function inputGraphOf(steps: readonly GraphStep[]): ObjectGraph {
   const nodes = nodesOf(steps);
   return nodes ? { roots, edges, nodes } : { roots, edges };
 }
+
+/**
+ * A Workflow object's graph: the run's (`inputGraphOf`), with every node and its kind on every workflow, routed or not, so a client never
+ * infers a node's kind from its step's keys. Its laws are `contracts/workflow-graph.contract.ts`'s.
+ */
+export const typedGraphOf: TypedGraphOf = (steps) => {
+  const run = inputGraphOf(steps);
+  return { roots: run.roots, edges: run.edges, nodes: steps.map(nodeOf) };
+};
 
 /** `inputGraphOf` without its `input` edges: the graph the list and the run page draw. Pure. */
 export function graphOf(steps: readonly GraphStep[]): RunGraph {

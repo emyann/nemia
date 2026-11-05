@@ -62,6 +62,7 @@ export {
   TOLD_VIA,
   TRY_CAUSES,
   WAIT_ON,
+  WRITE_WAYS,
 } from './words.ts';
 export type {
   AnswerVia,
@@ -87,6 +88,7 @@ export type {
   StepReason,
   TryCause,
   WaitOn,
+  WriteWay,
 } from './words.ts';
 export { CARD_STATES, Card, CardFile, CardLastStart, CardList, CardSpec, CardStart, CardStatus, type CardState } from './card.ts';
 export {

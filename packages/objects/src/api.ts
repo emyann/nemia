@@ -33,6 +33,7 @@ import { Hire, HireList, HireWrite } from './hire.ts';
 import { McpServer, McpServerList, McpServerWrite, SignInStarted, SignInState, SignedOut } from './mcp-server.ts';
 import { Schedule, ScheduleList, ScheduleWrite } from './schedule.ts';
 import { Volume, VolumeList } from './volume.ts';
+import { WRITE_WAYS } from './words.ts';
 import { Workflow, WorkflowCreate, WorkflowList, WorkflowWrite } from './workflow.ts';
 import { Agent, AgentCard, AgentList, AgentTried, AgentTry, AgentWrite } from './agent.ts';
 import { Skill, SkillFiles, SkillList, SkillWrite } from './skill.ts';
@@ -51,8 +52,14 @@ export class Conflict extends Schema.Class<Conflict>('Conflict')(
   { httpApiStatus: 409 },
 ) {}
 
-/** A request the package refuses as it is said — a label query, a limit, a token, a name: a 422. */
-export class Invalid extends Schema.Class<Invalid>('Invalid')({ error: Schema.String }, { httpApiStatus: 422 }) {}
+/**
+ * A request the package refuses as it is said — a label query, a limit, a token, a name: a 422. A write of a definition refused where it
+ * is sent carries `way`, how the definition changes instead (`WRITE_WAYS`).
+ */
+export class Invalid extends Schema.Class<Invalid>('Invalid')(
+  { error: Schema.String, way: Schema.optionalKey(Schema.Literals(WRITE_WAYS)) },
+  { httpApiStatus: 422 },
+) {}
 
 /** A run one of whose tasks does not read, so it is not judged: a 502, in the words the list says it with. */
 export class Unjudged extends Schema.Class<Unjudged>('Unjudged')({ error: Schema.String }, { httpApiStatus: 502 }) {}

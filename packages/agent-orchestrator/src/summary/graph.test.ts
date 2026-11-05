@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { DEFAULT_ROUNDS, parseWorkflow, validate, type Workflow } from '../workflow.ts';
 import path from 'node:path';
 import { loadWorkflows } from '../workflows/workflows.store.ts';
-import { graphOf, inputGraphOf, routedDiagram, runGraph, TRIAGE } from './graph.ts';
+import { graphOf, inputGraphOf, routedDiagram, runGraph, TRIAGE, typedGraphOf } from './graph.ts';
 
 /**
  * Steps as `nemia start` freezes them, each file given `place: git`: parsed and validated, so the graph is read off what the run is judged
@@ -217,4 +217,27 @@ test("the drawing's workflow is the folder's: `TRIAGE` reads as the tests' triag
   const lines = routedDiagram().split('\n');
   for (const line of ['  triage --> build_web: web', '  triage --> [*]: docs (ends)', '  handoff --> [*]: sent', '  notes --> [*]'])
     assert.ok(lines.includes(line), line);
+});
+
+test("a Workflow's typed graph: every step a node with its kind, a routed one's and a plain one's, its edges the run's", () => {
+  const typed = typedGraphOf(TRIAGE);
+  assert.deepEqual(
+    typed.nodes.map((n) => [n.name, n.kind]),
+    TRIAGE.map((s) => [s.name, s.name === 'triage' ? 'condition' : s.name === 'handoff' ? 'workflow' : 'step']),
+  );
+  assert.equal(typed.nodes.find((n) => n.name === 'handoff')?.workflow, 'dev', 'a workflow node names the workflow it files for');
+  assert.deepEqual({ roots: typed.roots, edges: typed.edges }, { roots: inputGraphOf(TRIAGE).roots, edges: inputGraphOf(TRIAGE).edges });
+  const plain = [
+    { name: 'a', after: [] },
+    { name: 'b', after: ['a'] },
+  ];
+  assert.deepEqual(
+    typedGraphOf(plain).nodes,
+    [
+      { name: 'a', kind: 'step' },
+      { name: 'b', kind: 'step' },
+    ],
+    'a plain workflow has its nodes',
+  );
+  assert.equal(graphOf(plain).nodes, undefined, "the run's graph of a plain workflow still has none");
 });

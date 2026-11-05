@@ -40,7 +40,7 @@ import { Conflict } from '../refusal/refusal.ts';
 import type { SkillsFound } from '../agents/agents.ts';
 import type { Run } from '../record/record.ts';
 import { repoAllows, type Allows } from '../trust/allows.verb.ts';
-import { appendRevision, ledgerOf } from './revisions.store.ts';
+import { appendRevision, LedgerDoor, ledgerOf } from './revisions.store.ts';
 import { kindsDrift, revisionNow, stepsDrift, type Drift, type KindName, type Pin, type Revision, type RevisionKind } from './revisions.ts';
 import { RunDoor } from '../runs/runs.store.ts';
 import { RunId } from '../record/record.model.ts';
@@ -181,6 +181,15 @@ type Numbering = (kind: RevisionKind, name: string, hash: string, at: string) =>
 
 /** The number `hash` stands at for `kind` and `name`, read off the ledger and never appended: the next number for a content it lacks. */
 const lookedUp: Numbering = (kind, name, hash, at) => revisionNow(ledgerOf(kind, name), hash, at);
+
+/**
+ * The ledger's number for what a definition holds now, by its digest (`version`), read through the Ledger door and never appended: the
+ * number a run resolving that content was or would be given (`revisionNow`), so a read of a Workflow, an Agent or a Skill writes nothing.
+ */
+export const definitionRevision = Effect.fn('definitionRevision')(function* (kind: RevisionKind, name: string, version: string) {
+  const entries = yield* (yield* LedgerDoor).entries.of({ kind, name });
+  return revisionNow(entries, version, '').n;
+});
 
 /** As many keys as one pass's `Cache` holds: more than a pass can name, so nothing a pass read is let go before the pass is. */
 const PASS_KEYS = Number.MAX_SAFE_INTEGER;

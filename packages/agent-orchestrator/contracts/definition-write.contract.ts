@@ -55,10 +55,22 @@ const definitionWriteRefusalSpec = spec<(namespace: string, does: DefinitionWrit
         !(namespace === 'default' && does !== 'create' && there === 'none') || output?.kind === 'Missing',
     },
     notYoursIsInvalid: {
-      description: "A replace or a removal in default of the repository's or a builtin definition is Invalid: the api writes your library alone",
+      description:
+        "A replace or a removal in default of the repository's or a builtin definition is Invalid: the api writes your library alone",
       condition: ({ input: [namespace, does, there], output }) =>
         !(namespace === 'default' && (does === 'replace' || does === 'remove') && (there === 'repo' || there === 'builtin')) ||
         output?.kind === 'Invalid',
+    },
+    noOtherWayInDefault: {
+      description: 'A refusal in default of anything but a factory’s own definition names no other way: the fix is in default itself',
+      condition: ({ input: [namespace, , there], output }) =>
+        !(namespace === 'default' && there !== 'factory' && output !== null) || output.way === undefined,
+    },
+    actionOnWhatItFinds: {
+      description:
+        "An action in default on the repository's or a builtin definition goes on, judged by the action itself: a builtin skill is copied to yours, and a try says why it cannot run",
+      condition: ({ input: [namespace, does, there], output }) =>
+        !(namespace === 'default' && does === 'act' && (there === 'repo' || there === 'builtin')) || output === null,
     },
   },
 });

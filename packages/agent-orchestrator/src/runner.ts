@@ -503,7 +503,7 @@ export type { ReadingHow, RunReading } from './list/list.verb.ts';
 export type { Answered, Decided } from './decide/decide.verb.ts';
 export type { DecideCommand } from './decide/decide.ts';
 export type { RunsListed, Unjudged } from './list/list.ts';
-export { graphOf, runGraph, type GraphEdge, type RunGraph } from './summary/graph.ts';
+export { graphOf, runGraph, typedGraphOf, type GraphEdge, type GraphStep, type RunGraph, type TypedGraph } from './summary/graph.ts';
 export {
   bare,
   filedTimes,
@@ -544,7 +544,9 @@ export type { FinishedPage, FinishedRun, ListedRun, OpenRuns, RunClock, RunOutco
 export { driftWords, kindsDrift, revisionNow, REVISION_KINDS, stepsDrift } from './revisions/revisions.ts';
 export type { Drift, KindName, Pin, Revision, RevisionKind } from './revisions/revisions.ts';
 export { ledgerOf } from './revisions/revisions.store.ts';
-export { driftNow } from './revisions/pin.verb.ts';
+export { definitionRevision, driftNow } from './revisions/pin.verb.ts';
+export { definitionServed, definitionWriteRefusal } from './definition/served.ts';
+export type { DefinitionOrigin, DefinitionServed, DefinitionWrite, WriteRefused, WriteThere, WriteWay } from './definition/served.ts';
 export { chatAnswer, chatHistory, chatRead, chatSay, chatStop, FILES_CHECK_MS, followChat, RECORD_BEAT_MS } from './chat/chat.verb.ts';
 export type { ChatChanges, ChatFollow, ChatFollowed, ChatHistory, ChatPlace, ChatReads, ChatSent } from './chat/chat.verb.ts';
 export type { Ask, AskAnswer, AskEvent, AskOption, AskPick, AskQuestion, CallState, ChatEvent, ChatFrom, Presence } from './chat/chat.ts';

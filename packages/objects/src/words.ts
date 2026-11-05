@@ -245,7 +245,7 @@ export type SignInStateWord = (typeof SIGN_IN_STATES)[number];
 
 /**
  * Where a definition — a Workflow, an Agent, a Skill — is read from, in the order a factory looks a name up: the factory's own tree
- * (`factory`, the folder a factory made from a template keeps in the store), the repository's checkout (`repo`), your library (`yours`),
+ * (`factory`, the folder a factory made from a template keeps in the store), the repository (`repo`), your library (`yours`),
  * or what Nemia builds in (`builtin`).
  */
 export const DEFINITION_ORIGINS = ['factory', 'repo', 'yours', 'builtin'] as const;
@@ -264,3 +264,9 @@ export const EDGE_KINDS = ['after', 'input', 'loop', 'route'] as const;
 
 /** One of `EDGE_KINDS`. */
 export type EdgeKind = (typeof EDGE_KINDS)[number];
+
+/** How a refused write's definition changes instead: through the `default` namespace, or the factory's own way. */
+export const WRITE_WAYS = ['default', 'factory'] as const;
+
+/** One of `WRITE_WAYS`. */
+export type WriteWay = (typeof WRITE_WAYS)[number];

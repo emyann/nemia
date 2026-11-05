@@ -477,7 +477,7 @@ export const mayFileOf = (run: Run): (() => boolean) => {
 const readPass = Effect.fnUntraced(function* (e: Engine, run: Run) {
   const steps = yield* stepsOf(run);
   const { views, phaseOf } = yield* taskPhasesRead(run, { earlierTries: underBudget(steps, run) }).pipe(over(e));
-  const signedOff = closeoutReader(views, run);
+  const signedOff = closeoutReader(views, run, steps);
   const asked = closeoutAsked(views);
   const verdictOf = exitVerdicts(views, run);
   const sessionBlocked = harnessBlocked(views);

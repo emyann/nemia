@@ -71,8 +71,8 @@ import { answerHeld, stopAsked } from './held.verb.ts';
 import { forStep } from '../telemetry/telemetry.store.ts';
 import { stepLabels } from '../telemetry/telemetry.ts';
 import { localFields } from './assess.ts';
-import { answeredRoute } from '../route/route-words.ts';
-import { sendCards, wordReader, type Due } from '../route/send.verb.ts';
+import { sendCards, type Due } from '../route/send.verb.ts';
+import { answerTables, fileScripts } from '../route/script.verb.ts';
 import { filedAt, foldersTold, placeTold, toldOf, type PlaceTold, type StepTold, type Told } from './told.verb.ts';
 import { found, recordNamed, stepNamed, taskToStop, tryTold } from './told.verb.ts';
 
@@ -428,29 +428,6 @@ function roundSpec(
   };
 }
 
-/**
- * Copy each table condition's route onto its record, once for the try it is on (`StepRecord.route`, `by: 'table'`), where its table
- * answers one and nothing is there for the try: a person's (`routeFile`) or one copied before. Answers with the conditions written. The
- * pass reads the route afresh either way (`answeredRoute`); the copy, written with the record when the pass writes it — as it does on the
- * pass that files the route's first node — keeps what the run took after the producer's closeout is pruned.
- */
-function answerTables(f: Pick<Filing, 'run' | 'reads'>): string[] {
-  const { run, reads } = f;
-  const wordOf = wordReader(run, reads);
-  const written: string[] = [];
-  for (const step of reads.steps) {
-    const record = run.steps[step.name];
-    if (step.route?.kind !== 'table' || !record || record.taskId) continue;
-    const n = tryOf(run, step.name);
-    if (record.route?.try === n) continue;
-    const answer = answeredRoute(step, run, reads.signedOff, wordOf);
-    if (answer?.kind !== 'route') continue;
-    run.steps[step.name] = { ...record, route: { route: answer.route, try: n, by: 'table' } };
-    written.push(step.name);
-  }
-  return written;
-}
-
 /** File the checks of these steps, in order, until the pass may file no more: answers with the steps whose checks are on the record. */
 export const fileChecks = Effect.fn('fileChecks')(function* (f: Filing, names: readonly string[]) {
   const checked: string[] = [];
@@ -514,17 +491,20 @@ const fileCheck = Effect.fnUntraced(function* (f: Filing, name: string) {
  * steps filed. A run that waited on runs, on the pass that files its roots, moves its base to its branch as the pass read it
  * (`Filing.heads`), and keeps it where the pass did not; and a run that waited on runs or was handed runs as context reads what they
  * concluded, where their branches stand read through `git` (`handedOf`). First, each table condition's route is copied onto its record
- * (`answerTables`), and each workflow node in `due.send` files its card (`sendCards`), answered among the steps filed.
+ * (`answerTables`), each workflow node in `due.send` files its card (`sendCards`), and the ready script conditions are filed as command
+ * tasks (`fileScripts`), answered among the steps filed.
  */
 export const fileReady = Effect.fn('fileReady')(function* (f: Filing, due: Due, starting: boolean, git: BranchReader) {
   const { e, run } = f;
   answerTables(f);
-  if (due.ready.length && starting && run.after?.length && isRepositoryRun(run)) run.baseRef = f.heads?.()?.[run.branch] || run.baseRef;
-  const parents = due.ready.length && starting ? yield* handedOf(e, run, git) : undefined;
-  const filed: string[] = [...(yield* sendCards(f, due.send))];
+  const ready = due.ready;
+  if (ready.length && starting && run.after?.length && isRepositoryRun(run)) run.baseRef = f.heads?.()?.[run.branch] || run.baseRef;
+  const parents = ready.length && starting ? yield* handedOf(e, run, git) : undefined;
+  const scripts: string[] = yield* fileScripts(f, ready);
+  const filed: string[] = [...(yield* sendCards(f, due.send)), ...scripts];
   const placed = yield* PlaceService;
-  const servers = yield* serversFiling(run.factory ?? DEFAULT_FACTORY, f.reads.home, due.ready, f.notes);
-  for (const name of due.ready) {
+  const servers = yield* serversFiling(run.factory ?? DEFAULT_FACTORY, f.reads.home, ready, f.notes);
+  for (const name of ready.filter((n) => !scripts.includes(n))) {
     if (!f.mayFile()) break;
     const step = stepNamed(f, name);
     if (unsignedStep(servers, step, f.notes)) continue;

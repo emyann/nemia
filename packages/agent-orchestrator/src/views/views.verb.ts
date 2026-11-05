@@ -22,6 +22,7 @@ import {
   type Verdict,
 } from '../check/check.ts';
 import type { Workflow } from '../step/step.ts';
+import { attemptIn, scriptCloseouts } from '../route/route.store.ts';
 import { resultSteps } from '../branches/index.ts';
 import { isRepositoryRun, stepTasks, type CloseoutAsked, type Run, type StepRecord, type TaskPhase } from '../record/record.ts';
 import type { Said } from '../say/say.ts';
@@ -601,13 +602,21 @@ export function taskCloseout(views: ReadonlyMap<string, TaskView>, taskId: strin
   return c && !('error' in c) ? c : undefined;
 }
 
-/** Only the well-formed ones, for the pure functions that just want the outcome. */
-export const closeoutReader =
-  (views: ReadonlyMap<string, TaskView>, run: Run) =>
-  (stepName: string): Closeout | undefined => {
+/**
+ * Only the well-formed ones, for the pure functions that just want the outcome. Given the run's steps, a script condition's answer is
+ * read as its closeout (`scriptCloseouts`, route.store.ts).
+ */
+export const closeoutReader = (
+  views: ReadonlyMap<string, TaskView>,
+  run: Run,
+  steps?: readonly Workflow[],
+): ((stepName: string) => Closeout | undefined) => {
+  const read = (stepName: string): Closeout | undefined => {
     const taskId = run.steps[stepName]?.taskId;
     return taskId ? taskCloseout(views, taskId) : undefined;
   };
+  return steps ? scriptCloseouts(steps, attemptIn(views), run, read) : read;
+};
 
 /**
  * A run another waits on (`--after`), read by the pass that asks and carried nowhere — what `runReady` and `waitsOf` are handed.

@@ -14,8 +14,8 @@ import { conditionOf, nodeFate, nodeKind, tableRoute } from './route.ts';
  * The route a condition answered on the try it is on, and who said it — or `unsigned`, a table with no row for its producer's fact, or
  * `undefined` while nothing has answered. A person's word first (`nemia route`, its file composed onto the record as `by: 'person'` by
  * `readRun`), then what the record holds for the try (`StepRecord.route`, which the tick copies once), then, for a table, the producer's
- * signed closeout looked up in it (`tableRoute`), and for a judge its own signed closeout's `route`. A script's answer is the record's
- * alone. Pure.
+ * signed closeout looked up in it (`tableRoute`), and for a judge or a script its own signed closeout's `route` (a script's answer file is
+ * read as its closeout, `scriptCloseouts` in route.store.ts). Pure.
  *
  * @param wordOf The word each step reads on this pass: a producer is read only once it signed off on its work.
  */
@@ -36,7 +36,7 @@ export function answeredRoute(
     if (!said) return undefined;
     return tableRoute(by, routes, said.output?.[field.join('.')]);
   }
-  if (by?.kind === 'judge' && satisfiesAfter(wordOf(condition.name))) {
+  if (by !== undefined && satisfiesAfter(wordOf(condition.name))) {
     const route = closeoutOf(condition.name)?.output?.route;
     return typeof route === 'string' && routes.includes(route) ? { kind: 'route', route } : undefined;
   }
@@ -51,8 +51,8 @@ export function answeredRoute(
  *   when every node it waits on is skipped (`nodeFate`).
  * - A workflow node that filed its card (`StepRecord.sent`) is `sent`.
  * - A table condition, never filed, is `unverified` once its table answers a route, `unsigned` when it answers none, and `awaiting
- *   approval` in between where it is gated and the try it is on is not approved, as a gated step is. A script or judge condition reads as
- *   a step.
+ *   approval` in between where it is gated and the try it is on is not approved, as a gated step is. A judge condition reads as a step,
+ *   and so does a script condition, but that a clean exit with no route it declares is `unsigned` (`scriptWord`).
  *
  * A workflow with none of the routing keys reads exactly as `standing` read it.
  */
@@ -81,13 +81,27 @@ function routedWord(
 ): StepStatus | undefined {
   const record = run.steps[step.name];
   if (record?.sent) return nodeKind(step) === 'workflow' ? 'sent' : undefined;
-  if (record?.taskId) return undefined;
+  if (record?.taskId) return step.route?.kind === 'script' ? scriptWord(step, run, closeoutOf, wordOf) : undefined;
   if (offRoute(step, steps, run, closeoutOf, wordOf)) return 'skipped';
   if (step.route?.kind !== 'table' || wordOf(step.name) !== 'pending') return undefined;
   const answer = answeredRoute(step, run, closeoutOf, wordOf);
   if (answer === undefined) return undefined;
   if (answer.kind === 'unsigned') return 'unsigned';
   return hasGate(step, run) && !approvalOf(run, step.name) ? 'awaiting approval' : 'unverified';
+}
+
+/**
+ * A filed script condition's word: `unsigned` where its task exited 0 and it signed off with no route it declares (no answer file, an
+ * undeclared route), which its standing reads `unverified`; else its standing's (a route, `blocked`, `failed`, `stopped`, running).
+ */
+function scriptWord(
+  step: Workflow,
+  run: Run,
+  closeoutOf: (step: string) => Closeout | undefined,
+  wordOf: (step: string) => StepStatus,
+): StepStatus | undefined {
+  if (wordOf(step.name) !== 'unverified') return undefined;
+  return answeredRoute(step, run, closeoutOf, wordOf)?.kind === 'route' ? undefined : 'unsigned';
 }
 
 /** Every step's word on this pass: where it stands (`standing`), with its routing laid over it (`routedWords`). Pure. */

@@ -23,6 +23,9 @@ Your check runs `probe.ts`, `parts.ts` and the factory's own check, its `impleme
 (`${{ parameters.roundCheck }}`), and waits on the `${{ parameters.ciCheck }}` context: CI runs the repository's suite on that commit,
 and a red, cancelled or missing `${{ parameters.ciCheck }}` comes back as the check's refusal, with the Actions URL, the failing jobs
 and the tail of their log — the script reads it for you, since you may type no `gh` yourself (*When your check refuses*, below).
+A red context has been re-run once by then, its failed jobs, so a red refusal names the jobs re-run and how each ended the second
+time: a job red twice is the change's. A refusal that says the re-run was still running at the bound asks nothing of the work:
+change nothing, and sign off as before; the next check reads the re-run's own verdict and re-runs nothing again.
 
 ### false — in this checkout
 

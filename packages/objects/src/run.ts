@@ -509,7 +509,9 @@ export type RunUnjudged = typeof RunUnjudged.Type;
 /**
  * A page of the runs (`RunList`): `listOf('Run', Run)`, and beside it `unjudged`, each run of the page a task of which does not read, left
  * out of `items` since it cannot be judged into a `Run`. A departure from Kubernetes, whose list holds objects alone: a run dropped with
- * no word would read as gone, and a page refused for one journal would blank every other run of it.
+ * no word would read as gone, and a page refused for one journal would blank every other run of it. A run of a list is judged without
+ * the reads a poll should not pay for: no harness is asked for a blocked session's last line and no drift is read, so each step's
+ * `lastLine` is null and `kinds` empty there; the run read alone (`GET …/runs/<name>`) says them.
  */
 export const RunList = Schema.Struct({
   ...listOf('Run', Run).fields,

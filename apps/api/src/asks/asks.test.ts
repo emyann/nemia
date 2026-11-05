@@ -20,6 +20,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { askFile, list, runStore } from 'agent-orchestrator';
 import { Effect } from 'effect';
+import type { RunList } from 'objects';
 import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from 'agent-orchestrator/testing';
 import { appOver, beforeEachTest, eachTest, engineFor, runOver } from '../../test/placed.ts';
@@ -251,6 +252,14 @@ test("a blocked session's last line is what it said last — its last `text` or 
     false,
     'the list carries no last line: it reads no conversation',
   );
+  const listed = (await (await app().request('/api/runs')).json()) as RunList;
+  const onTheList = listed.items.find((run) => run.metadata.name === R);
+  assert.deepEqual(
+    onTheList?.status.steps.filter((step) => WAITED.includes(step.name)).map((step) => step.lastLine),
+    [null, null, null, null],
+    "the RunList asks no harness for a blocked session's words, which its poll would pay for each time: held's line, planted, is read on the run alone",
+  );
+  assert.deepEqual(onTheList?.status.kinds, [], 'nor does it read the drift through the doors');
 
   const since = [...held, event('a-4', 7, 'assistant', 'tool_use')];
   standIn().plantTranscript('t-held', 1, since);

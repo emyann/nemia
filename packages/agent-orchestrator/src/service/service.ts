@@ -10,6 +10,7 @@
  */
 import { DAEMON_FILE, holderWords, lastPassWords, type DaemonStanding } from '../daemon/daemon.ts';
 import { pauseWords, type Pause } from '../pause/pause.ts';
+import type { UnitRunningOf } from '../../contracts/unit-running.contract.ts';
 
 /** What the machine is, as the store reads it: its platform, whether it is WSL, and whether systemd runs as its init. */
 export type Machine = { readonly platform: string; readonly wsl: boolean; readonly systemd: boolean };
@@ -219,6 +220,13 @@ export const launchdLogs = (home: string, name: string): string => `${home}/Libr
 export const logsLine = (system: ServiceSystem, name: string, home: string): string =>
   system === 'systemd' ? `journalctl --user -u ${unitName(system, name)}` : `less ${launchdLogs(home, name)}`;
 
+/**
+ * How a person starts the service by hand: `systemctl --user start <unit>` for systemd, `launchctl bootstrap gui/<uid> <file>` for
+ * launchd.
+ */
+export const startLine = (system: ServiceSystem, name: string, file: string, uid: number): string =>
+  system === 'systemd' ? `systemctl --user start ${unitName(system, name)}` : `launchctl bootstrap gui/${uid} ${file}`;
+
 /** A unit's double-quoted word read back: its escapes undone, `$$` too where it is a word of `ExecStart=`. */
 const unquoted = (word: string, exec: boolean): string => {
   const inner = word.replace(/^"|"$/g, '').replaceAll('%%', '%');
@@ -282,6 +290,23 @@ export function launchdState(text: string | null): UnitState {
   const pid = Number(/^\s*pid = (\d+)$/m.exec(text)?.[1]);
   return { active: state, enabled: 'loaded', pid: pid > 0 ? pid : null };
 }
+
+/**
+ * What the unit runs: the daemon a take-over stopped (`old`), another process (`other`), no process (`none`), or the system could not
+ * say (`unknown`).
+ */
+export type UnitRunning = 'old' | 'other' | 'none' | 'unknown';
+
+/**
+ * What the unit runs, by the system's own word on it (`state`, null where it could not be asked), against `old`, the pid of the daemon
+ * the take-over signalled (null where it signalled none): never read from the store's lease, which the daemon lets go before its process
+ * has ended. Its laws are `contracts/unit-running.contract.ts`.
+ */
+export const unitRunning: UnitRunningOf = (state, old) => {
+  if (state === null) return 'unknown';
+  if (state.pid === null) return 'none';
+  return old !== null && state.pid === old ? 'old' : 'other';
+};
 
 /** The service as `nemia service status` reads it: its name, system and file, and, when installed, what it runs and its state. */
 export type ServiceRead = {

@@ -14,6 +14,7 @@ import { aFactory, FACTORY_WALKS } from '../../test/factory-walks.ts';
 import { FactoryDoor, factoryDoorFiles } from '../factories/factories.store.ts';
 import { FactoryName } from '../factory/factory.model.ts';
 import { StoreRoot } from '../config/root.store.ts';
+import { generationOf } from './generation.ts';
 
 const PKG = path.join(import.meta.dirname, '..', '..');
 
@@ -35,7 +36,17 @@ test('a key the model does not name is kept, where it was, by a write back', () 
   const planted = { ...(JSON.parse(fs.readFileSync(file, 'utf8')) as object), later: 1 };
   fs.writeFileSync(file, `${JSON.stringify(planted, null, 2)}\n`);
   done(door.factories.rewrite(aFactory('acme', { workflows: ['build'], hires: { 'build/review': 'reviewer' } })));
-  assert.deepEqual(JSON.parse(fs.readFileSync(file, 'utf8')), { ...planted, hires: { 'build/review': 'reviewer' } });
+  assert.deepEqual(JSON.parse(fs.readFileSync(file, 'utf8')), { ...planted, hires: { 'build/review': 'reviewer' }, generation: 2 });
+});
+
+test('a file written before the counter reads as generation 1, and a change of its spec writes 2', () => {
+  const { door, file } = store();
+  done(door.factories.create(aFactory('acme', { workflows: ['build'] })));
+  const { generation: _filed, ...old } = JSON.parse(fs.readFileSync(file, 'utf8')) as { generation?: number };
+  fs.writeFileSync(file, `${JSON.stringify(old, null, 2)}\n`);
+  assert.equal(generationOf(done(door.factories.read(FactoryName.read('acme')))), 1);
+  done(door.factories.rewrite(aFactory('acme', { workflows: ['build'], hires: { 'build/review': 'reviewer' } })));
+  assert.equal((JSON.parse(fs.readFileSync(file, 'utf8')) as { generation?: number }).generation, 2);
 });
 
 test("a templated factory's workflows and hires are written into its tree, and refused Conflict before the tree is rendered", () => {
@@ -50,7 +61,11 @@ test("a templated factory's workflows and hires are written into its tree, and r
   const written = done(door.factories.rewrite(aFactory('acme', { template, workflows: ['build'], hires: { 'build/review': 'reviewer' } })));
   assert.equal(written, path.join(tree, 'factory.json'));
   assert.deepEqual(JSON.parse(fs.readFileSync(written, 'utf8')), { workflows: ['build'], hires: { 'build/review': 'reviewer' } });
-  assert.equal(fs.readFileSync(file, 'utf8'), before, "the factory's own file is left as it was");
+  assert.deepEqual(
+    JSON.parse(fs.readFileSync(file, 'utf8')),
+    { ...(JSON.parse(before) as object), generation: 2 },
+    "the factory's own file is left as it was but for its generation, counted for the hire its tree took",
+  );
 });
 
 test('the default door reads the files at the store root the program is given, and refuses Invalid where it was given none', () => {

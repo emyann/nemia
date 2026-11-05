@@ -8,6 +8,7 @@ import { factoryVolumes, type Factory, type Volume } from '../factory/factory.ts
 import type { Mount } from '../record/record.ts';
 import { writesNothing, type Fenced } from '../workflow/index.ts';
 import { isRemoteHarness } from '../harness/harness.ts';
+import type { VolumeNameAmong } from '../../contracts/volume-name.contract.ts';
 
 /** How a volume is spelled, for a refusal that names both. */
 const SPELLED = '<path>:ro to read it, <path>:rw to write it';
@@ -63,12 +64,16 @@ export function volumeRefusal(
 }
 
 /**
- * `factory`'s volumes with `volume` among them, replacing one of its path, and what that one was marked (`was`), null for a new one.
+ * `factory`'s volumes with `volume` among them, replacing one of its path, and what that one was marked (`was`), null for a new one:
+ * each with its name, the one it is named on read for one its file stores none of (`volumesNamed`), and the new one's taken among them
+ * (`volumeNameAt`), so the file stores every name and none moves.
  */
 export function withVolume(factory: Pick<Factory, 'volumes'>, volume: Volume): { volumes: Volume[]; was: boolean | null } {
-  const volumes = factoryVolumes(factory);
+  const volumes = factoryVolumesNamed(factory);
   const was = volumes.find((v) => v.path === volume.path)?.readOnly ?? null;
-  return { volumes: factoryVolumes({ volumes: [...volumes.filter((v) => v.path !== volume.path), volume] }), was };
+  const named = { ...volume, name: volumeNameAt(volumes, volume.path) };
+  const kept = [...volumes.filter((v) => v.path !== volume.path), named];
+  return { volumes: kept.sort((a, b) => a.path.localeCompare(b.path)), was };
 }
 
 /**
@@ -80,4 +85,80 @@ export const volumeMounts = (step: Fenced, volumes: readonly Mount[] | undefined
   if (!volumes?.length || isRemoteHarness(step.harness)) return [];
   const unwriting = writesNothing(step);
   return volumes.map((v) => ({ path: v.path, readOnly: v.readOnly || unwriting }));
+};
+
+/** A volume with its name: the one its file stores, or the one `volumesNamed` gives it on read. */
+export type NamedVolume = Volume & { readonly name: string };
+
+/**
+ * The name a volume's folder gives it (`volumeNameAmong`'s `base`): the basename of its path as a slug, lowercase letters, digits and
+ * dashes, each run of anything else one dash, none at either end; `volume` where nothing of it is left, the root's say.
+ */
+export const volumeBase = (at: string): string =>
+  path
+    .basename(path.resolve(at))
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '') || 'volume';
+
+/**
+ * `volumes`, each with its name: the one its file stores, kept so a link to it stays, and for each with none, in path order, the first
+ * its folder gives it that no volume before it holds (`volumeNameAmong`, among the stored names and those named before it). Answered
+ * in the order given.
+ */
+export function volumesNamed(volumes: readonly Volume[]): NamedVolume[] {
+  const taken = volumes.flatMap((v) => (v.name === undefined ? [] : [v.name]));
+  const given = new Map<string, string>();
+  for (const v of [...volumes].filter((v) => v.name === undefined).sort((a, b) => a.path.localeCompare(b.path))) {
+    const name = volumeNameAmong(volumeBase(v.path), taken);
+    taken.push(name);
+    given.set(v.path, name);
+  }
+  return volumes.map((v) => ({ ...v, name: v.name ?? given.get(v.path) ?? volumeBase(v.path) }));
+}
+
+/**
+ * The volumes of `factory` as `factoryVolumes` gives them, each with its name: the one its file stores for the first of its path, else
+ * the one `volumesNamed` gives it.
+ */
+export function factoryVolumesNamed(factory: Pick<Factory, 'volumes'>): NamedVolume[] {
+  const stored = new Map<string, string>();
+  for (const v of factory.volumes ?? []) {
+    const at = path.resolve(v.path);
+    if (v.name !== undefined && !stored.has(at)) stored.set(at, v.name);
+  }
+  return volumesNamed(
+    factoryVolumes(factory).map((v) => {
+      const name = stored.get(v.path);
+      return name === undefined ? v : { ...v, name };
+    }),
+  );
+}
+
+/**
+ * The name a volume of `path` is stored under at `nemia factory volume add`, among `volumes`, the factory's others: its own where one of
+ * that path is named already (a second add replaces it, and a link to it stays), else the first its folder gives it that none of them
+ * holds, as each is named on read (`volumesNamed`), so none of theirs moves.
+ */
+export function volumeNameAt(volumes: readonly Volume[], at: string): string {
+  const named = volumesNamed(volumes);
+  const same = named.find((v) => v.path === at);
+  if (same !== undefined) return same.name;
+  return volumeNameAmong(
+    volumeBase(at),
+    named.map((v) => v.name),
+  );
+}
+
+/**
+ * The name of a volume with none stored, its folder's `base`, among the names other volumes of its factory hold (`taken`): `base` where
+ * none holds it, else the first of `<base>-2`, `<base>-3`, … that none holds. One is free by the count of `taken`'s names, so the loop
+ * ends.
+ */
+export const volumeNameAmong: VolumeNameAmong = (base, taken) => {
+  if (!taken.includes(base)) return base;
+  for (let n = 2n; ; n++) {
+    const name = base + '-' + `${n}`;
+    if (!taken.includes(name)) return name;
+  }
 };

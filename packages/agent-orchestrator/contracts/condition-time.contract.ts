@@ -1,13 +1,11 @@
 /**
- * When a factory's condition last moved (agent-orchestrator, src/applied/condition-time.ts; no code yet): the `lastTransitionTime` the
- * controller writes on each condition of a templated factory's `status.json`, as Kubernetes' `meta.SetStatusCondition` keeps it. `before`
+ * When a factory's condition last moved (agent-orchestrator, src/applied/condition-time.ts): the `lastTransitionTime` the
+ * controller writes on each condition of a templated factory's `status.json`, as Kubernetes' SetStatusCondition keeps it. `before`
  * is the condition of the same `type` the file held, null where it held none; its time null on a file written before the field. A reason
  * or a message that changes moves no time: only the status does.
  */
 import { type Implementation, spec } from '@emyann/tsverify';
-
-/** A condition's status, as the controller writes it (`FACTORY_CONDITION_STATUSES`, which implement moves into `objects`). */
-export type ConditionStatus = 'True' | 'False';
+import type { ConditionStatus } from 'objects';
 
 /** The condition of one type a status file held: its status, and when it last moved, null on a file written before the field. */
 export type HeldCondition = { readonly status: ConditionStatus; readonly lastTransitionTime: string | null };
@@ -21,10 +19,7 @@ const transitionedAtSpec = spec<(before: HeldCondition | null, status: Condition
     sameStatusKeepsItsTime: {
       description: 'A condition whose status did not change keeps the time it last moved',
       condition: ({ input: [before, status], output }) =>
-        before === null ||
-        before.status !== status ||
-        before.lastTransitionTime === null ||
-        output === before.lastTransitionTime,
+        before === null || before.status !== status || before.lastTransitionTime === null || output === before.lastTransitionTime,
     },
     movedIsStampedNow: {
       description: 'A condition whose status changed is stamped with the time it was observed',

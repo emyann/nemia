@@ -1,23 +1,17 @@
 /**
- * Where a hire's settings came from (agent-orchestrator, src/object/hire.ts; no code yet): the `Hire` object's status says, for the step
+ * Where a hire's settings came from (agent-orchestrator, src/hire/hire.ts): the `Hire` object's status says, for the step
  * `<workflow>.<step>` of a factory, who fills it and, for each setting a session gets there (model, effort, context, harness, fence,
  * skills, mcp), which layer set it. Two decisions, each from what the resolved step already carries (`StepAgent.keys`, the keys its
  * own file sets; `StepAgent.given`, what its agent gives): who fills the step (`fillOrigin`), and where one setting came from
- * (`settingOrigin`). The words are `objects`' (`SETTING_ORIGINS`, `FILL_ORIGINS`): implement moves the two types there and this file
- * imports them.
+ * (`settingOrigin`). The words are `objects`' (`SETTING_ORIGINS`, `FILL_ORIGINS`), whose two types this file imports.
  */
 import { type Implementation, spec } from '@emyann/tsverify';
-
-/** Where a step's agent came from: its own file's `agent:`, the factory's hire, neither, or both, which a start refuses. */
-export type FillOrigin = 'step' | 'factory' | 'unfilled' | 'refused';
-
-/** Where a setting a session gets came from: the step's own file, its agent's file, or neither, the harness's own default. */
-export type SettingOrigin = 'step' | 'agent' | 'default';
+import type { FillOrigin, SettingOrigin } from 'objects';
 
 const fillOriginSpec = spec<(written: boolean, hired: boolean) => FillOrigin>({
   ensures: {
     refusedExactlyWhenBothName: {
-      description: "A step is refused exactly when its own file names an agent and the factory hires one into it",
+      description: 'A step is refused exactly when its own file names an agent and the factory hires one into it',
       condition: ({ input: [written, hired], output }) => (output === 'refused') === (written && hired),
     },
     theStepsOwnLine: {
@@ -48,8 +42,8 @@ const settingOriginSpec = spec<(stepSets: boolean, agentGives: boolean) => Setti
   },
 });
 
-/** `fillOrigin`'s type, which `src/object/hire.ts` takes. */
+/** `fillOrigin`'s type, which `src/hire/hire.ts` takes. */
 export type FillOriginOf = Implementation<typeof fillOriginSpec>;
 
-/** `settingOrigin`'s type, which `src/object/hire.ts` takes. */
+/** `settingOrigin`'s type, which `src/hire/hire.ts` takes. */
 export type SettingOriginOf = Implementation<typeof settingOriginSpec>;

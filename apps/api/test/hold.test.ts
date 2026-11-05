@@ -437,11 +437,11 @@ test('a person holds a run until another lands: the list, the page and the decis
     },
   );
   await s.test(
-    "a hold that lifts only by a person's hand says so (`onYou`) — one naming no run, a run the store has none of, a cancelled run, a run whose branch is gone — and one on a run that may still land, or has, does not",
+    "a hold that waits on a person says so (`onYou`) — a run the store has none of, a cancelled run, a run whose branch is gone — and one on a run that may still land, or has, or naming no run, the person's word already given, does not",
     async () => {
       const runs = await listed();
       const onYou = Object.fromEntries(Object.keys(ON).map((kind) => [kind, runs.get(`h-on-${kind}`)!.holding!.waitingOnYou]));
-      assert.deepEqual(onYou, { live: false, landed: false, cancelled: true, gone: true, missing: true, none: true });
+      assert.deepEqual(onYou, { live: false, landed: false, cancelled: true, gone: true, missing: true, none: false });
       for (const kind of Object.keys(ON)) {
         const holding = runs.get(`h-on-${kind}`)!.holding!;
         assert.equal(
@@ -462,7 +462,9 @@ test('a person holds a run until another lands: the list, the page and the decis
       assert.deepEqual(runs.get('h-on-missing')!.holding!.runs, [
         { run: 'no-such-run', missing: true, cancelledAt: null, gone: [], landed: false },
       ]);
-      assert.equal(runs.get('h-on-none')!.holding!.word, 'held, on a hold that names no run');
+      assert.equal(runs.get('h-on-none')!.holding!.word, 'held until a person lifts it');
+      assert.deepEqual(runs.get('h-on-none')!.holding!.runs, []);
+      assert.deepEqual(runs.get('h-on-none')!.waitingOnYou, [], 'a hold naming no run asks nothing of anyone');
     },
   );
   await s.test(
@@ -722,6 +724,21 @@ test("a hold put on the board is put as `nemia hold --until --why --by` puts it,
       assert.equal(fs.existsSync(holdFile(PUT)), false);
     },
   );
+  await s.test('a hold put with no run to wait on, `{until: []}` or `{}`, holds the run until DELETE lifts it, and asks nothing', async () => {
+    for (const body of [{ until: [] }, { why: 'folded into an intake' }]) {
+      const res = await put(PUT, body);
+      assert.equal(res.status, 200, JSON.stringify(body));
+      assert.deepEqual((JSON.parse(fs.readFileSync(holdFile(PUT), 'utf8')) as { until: unknown }).until, []);
+      const row = (await listed()).get(PUT)!;
+      assert.match(row.holding?.word ?? '', /^held until a person lifts it/);
+      assert.equal(row.holding?.waitingOnYou, false);
+      assert.deepEqual(row.holdUntil, []);
+      assert.deepEqual(row.waitingOnYou, []);
+      assert.match((await detail(PUT)).holding?.word ?? '', /^held until a person lifts it/);
+      assert.equal((await lift(PUT)).status, 200);
+      assert.equal(fs.existsSync(holdFile(PUT)), false);
+    }
+  });
   await s.test('a hold put on the board takes its `by` where the body gives one, as `nemia hold --by` does', async () => {
     const res = await put(PUT, { until: ['p-live'], by: 'operator' });
     assert.equal(res.status, 200);
@@ -733,11 +750,9 @@ test("a hold put on the board is put as `nemia hold --until --why --by` puts it,
 
 test('POST /api/runs/:id/hold refuses, writing nothing: arguments `nemia hold` refuses a 422, a body it does not take a 400, a run the store has not a 404, a hold `hold` refuses a 409, the guard before any read', async (t) => {
   await t.test(
-    'REFUSED at shipped defaults: a hold whose arguments `nemia hold` refuses — no run to wait on, a why over 200 characters, a blank by — is a 422 in its words, before the run is read, and nothing is written',
+    'REFUSED at shipped defaults: a hold whose arguments `nemia hold` refuses — a why over 200 characters, a blank by — is a 422 in its words, before the run is read, and nothing is written',
     async () => {
       const cases: Array<[unknown, string]> = [
-        [{ until: [] }, 'nemia hold needs the runs to wait on, or --off to lift a hold'],
-        [{}, 'nemia hold needs the runs to wait on, or --off to lift a hold'],
         [{ until: ['p-live'], why: 'x'.repeat(201) }, '--why'],
         [{ until: ['p-live'], by: '  ' }, '--by'],
       ];

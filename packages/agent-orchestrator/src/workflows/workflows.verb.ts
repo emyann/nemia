@@ -17,6 +17,7 @@ import { cliPath, factoryFlag, FROM, versionFlag, writerSpec, yoursOrRefused } f
 import { workflowNameRefusal } from '../factory/factory.ts';
 import { readFactories, readFactory, readFactoryAt, templatedTree, templatedTreeAt } from '../factory/factory.store.ts';
 import { factoryFills } from '../rules/rules.store.ts';
+import type { Factory } from '../factory/factory.ts';
 import { readInbox } from '../inbox/inbox.store.ts';
 import { inboxDir, runStore } from '../record/files.store.ts';
 import { HOME, isDirectory } from '../record/record.store.ts';
@@ -254,6 +255,29 @@ const unloaded = (err: unknown): string => (err instanceof Error ? err.message :
 /** A folder loaded (`steps`), or why it does not load (`error`, the loader's words). */
 export type FolderLoaded = { steps: Workflow[] } | { error: string };
 
+/**
+ * Each folder of `dirs`, loaded as a start in `places` would load it, in `factory` with its hires and its rules where one is given
+ * (`factoryFills`), by folder (`FolderLoaded`). The factory is given whole, not named, so one the store does not hold loads alike: a
+ * template's render, read as a factory applied from it is.
+ */
+export const foldersLoaded = Effect.fn('foldersLoaded')(function* (
+  dirs: readonly string[],
+  places: Places,
+  factory?: Pick<Factory, 'name' | 'hires' | 'tree'>,
+) {
+  const door = yield* WorkflowDoor;
+  const loads: Array<[string, FolderLoaded]> = [];
+  for (const dir of dirs) {
+    const read = Effect.flatMap(
+      tried(() => workflowDirAt(path.resolve(dir))),
+      (at) => door.workflows.read(at, places, factory && factoryFills(factory, path.basename(dir)).fills),
+    );
+    const loaded = yield* Effect.exit(read);
+    loads.push([dir, Exit.isSuccess(loaded) ? { steps: loaded.value } : { error: unloaded(Cause.squash(loaded.cause)) }]);
+  }
+  return Object.fromEntries(loads);
+});
+
 /** Each folder `dirs` names, loaded as a start on `repo` would load it, in the factory named with its hires (`FolderLoaded`), by folder. */
 export const WORKFLOWS_LIST: Command<Record<string, FolderLoaded>> = {
   name: 'workflows',
@@ -272,18 +296,9 @@ export const WORKFLOWS_LIST: Command<Record<string, FolderLoaded>> = {
       'workflows',
       Effect.gen(function* () {
         const dirs = Array.isArray(args.dirs) ? args.dirs : [];
-        const fills = yield* tried(() => fillsIn(args));
-        const door = yield* WorkflowDoor;
-        const loads: Array<[string, FolderLoaded]> = [];
-        for (const dir of dirs) {
-          const read = Effect.flatMap(
-            tried(() => workflowDirAt(path.resolve(dir))),
-            (at) => door.workflows.read(at, placesOf(args, home), fills(path.basename(dir))),
-          );
-          const loaded = yield* Effect.exit(read);
-          loads.push([dir, Exit.isSuccess(loaded) ? { steps: loaded.value } : { error: unloaded(Cause.squash(loaded.cause)) }]);
-        }
-        return Object.fromEntries(loads);
+        const name = textOf(args, 'factory');
+        const factory = name === undefined ? undefined : yield* tried(() => readFactory(name));
+        return yield* foldersLoaded(dirs, placesOf(args, home), factory);
       }),
     ),
   print: () => [],

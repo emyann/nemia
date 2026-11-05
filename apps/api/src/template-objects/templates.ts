@@ -6,8 +6,8 @@
  * A template's documents are its render with its parameters' defaults (`templateTree`, written once per digest), read as a factory's tree
  * is read: the request placed in a factory of the template's wiring whose tree is the render (`renderedIn`), then the definitions' own
  * readers of a tree (`treeWorkflowsHeld`, `treeAgentsHeld`, `treeSkillsHeld`), each held at origin `builtin`, in no namespace, with no
- * revision of the ledger's, which counts a definition by its bare name. A workflow is loaded in no factory, since the loader reads one
- * from the store by its name and the store holds none of a template's: its hires fill none of its steps there. Each program runs over
+ * revision of the ledger's, which counts a definition by its bare name. A workflow is loaded in that factory, handed to the loader whole
+ * since the store holds none of a template's, so each of its hires fills its step as in a factory applied from it. Each program runs over
  * the request's own services (`inRequest`), so the builtin folder and the folder of renders are the app's.
  */
 import { HttpApiBuilder } from 'effect/http-api';
@@ -55,18 +55,14 @@ export const templatesHandlers = HttpApiBuilder.group(Api, 'templates', (handler
     .handle('workflows', ({ params: { name }, query }) =>
       answeredWrite(async (s) => {
         const at = await renderedIn(s, name);
-        return listed(
-          'Workflow',
-          await workflowObjectsOf(at, servedOf(treeWorkflowsHeld(at, 'builtin'), undefined), undefined, false),
-          queryOf(query),
-        );
+        return listed('Workflow', await workflowObjectsOf(at, servedOf(treeWorkflowsHeld(at, 'builtin'), undefined)), queryOf(query));
       }),
     )
     .handle('workflow', ({ params: { name, doc } }) =>
       answeredWrite(async (s) => {
         const at = await renderedIn(s, name);
         const one = servedNamed(treeWorkflowsHeld(at, 'builtin'), doc, undefined, listPath(name, 'workflows'));
-        return theOne(await workflowObjectsOf(at, [one], undefined, false), doc);
+        return theOne(await workflowObjectsOf(at, [one]), doc);
       }),
     )
     .handle('agents', ({ params: { name }, query }) =>

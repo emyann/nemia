@@ -2,10 +2,9 @@
  * The feed's lines as Events (`Event`, `EventList`, from `objects`), read through the Feed door. A list reads the feed in the order it was
  * written, from the cursor its `continue` token carries (0 where it carries none), keeps the lines the feed's own selector takes
  * (`selects`, as `/api/feed/stream?selector=` does) and, for a namespace, those `eventNamespace` puts there, then cuts the page
- * (`listPage`). An event
- * is read by its name, the byte its line starts at: one read from that byte of its first line alone, never the rest of the feed. A line's start is the cursor before
- * it — the end of the line before, or the cursor the read began at — so where a line nobody can read lies between two, the one after it
- * is named by where the unreadable one starts, and read from there all the same.
+ * (`listPage`). An event is read by its name, the byte its line starts at: one read from that byte of its first line alone, never the
+ * rest of the feed. A line's start is the cursor before it — the end of the line before, or the cursor the read began at — so where a
+ * line nobody can read lies between two, the one after it is named by where the unreadable one starts, and read from there all the same.
  */
 import { Effect } from 'effect';
 import { API_VERSION, type Event, type EventList } from 'objects';

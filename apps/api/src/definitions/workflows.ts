@@ -135,25 +135,19 @@ const workflowObject = (
 });
 
 /**
- * The objects of the folders `served`, each loaded now as a start in the request's factory would load it: in `namespace`, with the
- * ledger's revision, where one is given; with neither where none is (a template's documents, which the ledger does not count). The loader
- * reads the factory from the store by its name, so one the store does not hold (`stored` false: a template's render) is loaded in none:
- * its hires fill no step, and no step is said unfilled.
+ * The objects of the folders `served`, each loaded now as a start in the request's factory would load it, its hires filling their steps:
+ * in `namespace`, with the ledger's revision, where one is given; with neither where none is (a template's documents, which the ledger
+ * does not count). The factory is handed to the loader whole, so a template's render, which the store does not hold, is loaded in the
+ * factory of its wiring as one applied from it is.
  */
-export async function workflowObjectsOf(
-  s: Served,
-  served: ReturnType<typeof servedOf<Folder>>,
-  namespace?: string,
-  stored = true,
-): Promise<Workflow[]> {
-  const loadedIn = stored ? s.factory : undefined;
+export async function workflowObjectsOf(s: Served, served: ReturnType<typeof servedOf<Folder>>, namespace?: string): Promise<Workflow[]> {
   const loaded = await loadedOf(
     s.e,
     s.placeService,
     served.map((f) => f.item.dir),
     s.repo,
     s.home,
-    loadedIn,
+    s.factory,
   );
   return s.inRequest(
     Effect.forEach(served, ({ name, origin, shadowedBy, item: { from, dir } }) =>
@@ -161,7 +155,7 @@ export async function workflowObjectsOf(
         const version = yield* workflowVersion(dir, placesOf(s.repo, s.home));
         const revision = namespace === undefined ? undefined : yield* definitionRevision('workflow', name, version);
         const folder = loadedAt(loaded, dir);
-        return workflowObject(namespace, origin, shadowedBy, listingOf(name, from, dir, folder, version, loadedIn), folder, revision);
+        return workflowObject(namespace, origin, shadowedBy, listingOf(name, from, dir, folder, version, s.factory), folder, revision);
       }),
     ),
   );

@@ -1,7 +1,8 @@
 /**
  * The builtin templates on the api, on a scratch builtin folder, never the package's own: listed and read as `Template`s, and each one's
  * documents — its workflows, agents and skills — served as the Workflows, Agents and Skills a namespace serves, read from its render with
- * its parameters' defaults, origin `builtin`, in no namespace and with no revision of the ledger's; a document it lacks a 404, an unknown
+ * its parameters' defaults, origin `builtin`, in no namespace and with no revision of the ledger's, each step filled by the template's
+ * hires as in a factory applied from it; a document it lacks a 404, an unknown
  * template a 404, and one that does not render with its defaults a 422 on its documents while the template itself still reads.
  *
  * Over the stand-ins (`appOver`), the builtin folder and the folder of renders given to the app's layer.
@@ -135,6 +136,9 @@ test("a template's workflows are served as Workflows read from its render", asyn
     ['draft'],
   );
   assert.ok(press.status.dir.startsWith(renders), 'read from the render, under the folder of renders');
+  assert.equal(press.status.steps[0]?.hired, 'drafter', "the template's hires fill its step, as in a factory applied from it");
+  assert.equal(press.status.steps[0]?.layers?.agent, 'drafter', 'the step is told as the hired agent');
+  assert.equal(press.status.unfilled, null, 'every step is filled, so a run of it could start');
   assert.deepEqual(items[0], press, 'the list holds the object a read answers');
 });
 

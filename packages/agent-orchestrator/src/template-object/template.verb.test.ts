@@ -22,7 +22,8 @@ process.env.WF_ROOT = ROOT;
 const { templated, withBuiltins } = await import('../../test/templated.ts');
 const { exportTemplate } = templated(ROOT);
 const { StoreRoot } = await import('../config/root.store.ts');
-const { RenderOwner, TemplateRenders, templateDocumentsOf, templateList, templateObject, templateTree } = await import('./template.verb.ts');
+const { RenderOwner, TemplateRenders, templateDocumentsOf, templateList, templateObject, templateTree } =
+  await import('./template.verb.ts');
 
 /**
  * A builtin folder holding `mill`, the tests' team exported; `asks`, the same with a parameter that has no default; `odd`, the same with
@@ -147,9 +148,11 @@ test('the builtin templates as objects, and their renders', async (t) => {
 
   await t.test("the folder of renders is this user's own, by uid, and made 0700", () => {
     const uid = process.getuid?.();
-    const named = Effect.runSync(Effect.gen(function* () {
-      return yield* TemplateRenders;
-    }));
+    const named = Effect.runSync(
+      Effect.gen(function* () {
+        return yield* TemplateRenders;
+      }),
+    );
     assert.equal(path.dirname(named), os.tmpdir());
     assert.equal(path.basename(named), `nemia-templates-${uid ?? os.userInfo().username}`);
     const renders = scratch('wf-template-renders-');
@@ -172,15 +175,18 @@ test('the builtin templates as objects, and their renders', async (t) => {
     assert.ok(fs.statSync(path.join(dir, 'factory.json')).isFile());
   });
 
-  await t.test("a folder of renders owned by another user is refused Conflict, and what is planted in it is neither served nor touched", (t) => {
-    const uid = process.getuid?.();
-    if (uid === undefined) return t.skip('this platform has no uid');
-    const renders = scratch('wf-template-renders-');
-    const { dir } = run(templateTree('mill'), folder, renders);
-    fs.writeFileSync(path.join(dir, 'workflows', 'agents', 'reviewer.md'), 'planted\n');
-    assert.equal(failedAs(templateTree('mill'), folder, renders, uid + 1), 'Conflict');
-    assert.equal(fs.readFileSync(path.join(dir, 'workflows', 'agents', 'reviewer.md'), 'utf8'), 'planted\n');
-  });
+  await t.test(
+    'a folder of renders owned by another user is refused Conflict, and what is planted in it is neither served nor touched',
+    (t) => {
+      const uid = process.getuid?.();
+      if (uid === undefined) return t.skip('this platform has no uid');
+      const renders = scratch('wf-template-renders-');
+      const { dir } = run(templateTree('mill'), folder, renders);
+      fs.writeFileSync(path.join(dir, 'workflows', 'agents', 'reviewer.md'), 'planted\n');
+      assert.equal(failedAs(templateTree('mill'), folder, renders, uid + 1), 'Conflict');
+      assert.equal(fs.readFileSync(path.join(dir, 'workflows', 'agents', 'reviewer.md'), 'utf8'), 'planted\n');
+    },
+  );
 
   await t.test('a parameter with no default does not render, Invalid, and is still served as a Template', () => {
     assert.equal(failedWith(templateTree('asks'), folder), 'Invalid');

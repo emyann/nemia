@@ -25,8 +25,7 @@ export function feedDoorMemory(): Layer.Layer<never> {
   const layer: FeedLayer = {
     lines: {
       end: () => (bytes === null ? null : { cursor: bytes.length, generation }),
-      read: (after, limit) =>
-        linesIn(bytes === null || after >= bytes.length ? Buffer.alloc(0) : bytes.subarray(after), after, limit),
+      read: (after, limit) => linesIn(bytes === null || after >= bytes.length ? Buffer.alloc(0) : bytes.subarray(after), after, limit),
       cursorRefusal: (after) => cursorRefusalOf(after, size(), (at) => bytes?.[at] ?? 0, where),
       append: (lines) => {
         const before = size();

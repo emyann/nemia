@@ -59,13 +59,14 @@ export const listedWords = (input: RoutedInput): Map<string, StepStatus> =>
  * condition and the route taken; a sent node its card; a condition never filed (a table, or one a person routed) the route it answers, or
  * that its table answers none, with the line that routes it by hand while no node after it is filed; a filed condition that stopped on no
  * route of its own (`blocked`, `unsigned`) that line too, and one a person routed its route.
+ *
+ * @param words Every step's word on this pass (`runWords`), judged once by the caller (`listing`, or `listedWords` off the same input).
  */
-export function routedRows(input: RoutedInput): Map<string, RoutedRow> {
+export function routedRows(input: RoutedInput, words: ReadonlyMap<string, StepStatus>): Map<string, RoutedRow> {
   const { steps, run } = input;
   const rows = new Map<string, RoutedRow>();
   if (!steps.some((s) => s.routes !== undefined)) return rows;
   const closeoutOf = readableOf(input);
-  const words = listedWords(input);
   const wordOf = (name: string): StepStatus => words.get(name) ?? 'pending';
   const routeOf = (condition: Workflow): string | undefined => {
     const said = answeredRoute(condition, run, closeoutOf, wordOf, steps);

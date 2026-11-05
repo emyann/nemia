@@ -25,7 +25,16 @@ const ROOT = scratch('wf-revisions-');
 process.env.WF_ROOT = ROOT;
 delete process.env.WF_MAX_CONCURRENT;
 delete process.env.WF_MAX_RUNS;
-const { addFactory, advanceRun, approveRun, attachWorkflow, driftNow, startRun, retryRun, runWith: runEngine } = await import('../src/runner.ts');
+const {
+  addFactory,
+  advanceRun,
+  approveRun,
+  attachWorkflow,
+  driftNow,
+  startRun,
+  retryRun,
+  runWith: runEngine,
+} = await import('../src/runner.ts');
 const { engineOf } = await import('../src/runtime-client.ts');
 const { main } = await import('../src/cli/main.ts');
 const stage = staged({ runWith: runEngine, main, engineOf });

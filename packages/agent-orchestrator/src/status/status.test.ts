@@ -132,7 +132,8 @@ const GROWN: Workflow[] = [{ ...step('implement'), output: { file: 'implement.sc
 /** The same step as it was filed: `goal` alone. */
 const FILED: Workflow[] = [{ ...step('implement'), output: { file: 'implement.schema.json', schema: schemaOf('goal') } }];
 /** A run whose `implement` try's record says `record` of its filing. */
-const filedAs = (record: { declared?: string[]; closeoutHash?: string }): Run => run({ implement: 'i1' }, { steps: { implement: { taskId: 'i1', ...record } } });
+const filedAs = (record: { declared?: string[]; closeoutHash?: string }): Run =>
+  run({ implement: 'i1' }, { steps: { implement: { taskId: 'i1', ...record } } });
 
 /** A looping review and its target, the loop on round `n` with review unfiled. */
 const LOOPING: OutputSchema = {
@@ -176,7 +177,7 @@ test("a loop's target and a person's acceptance: what is owed, asked and spent",
     assert.deepEqual(owedFields(LOOP[0], inRound(1), LOOP, gave({})), []);
     assert.deepEqual(owedFields(LOOP[0], reviewDue(2), LOOP, gave({})), ['replies']);
   });
-  await t.test('owedFields: a loop\'s target in round 2 owes what it was filed with, then `replies`', () => {
+  await t.test("owedFields: a loop's target in round 2 owes what it was filed with, then `replies`", () => {
     const r = reviewDue(2);
     const filed = { ...r, steps: { ...r.steps, implement: { ...r.steps.implement, declared: ['goal'] } } };
     assert.deepEqual(owedFields(GROWN[0], filed, [GROWN[0], ...LOOP.slice(1)], gave({})), ['goal', 'replies']);
@@ -189,20 +190,23 @@ test("a loop's target and a person's acceptance: what is owed, asked and spent",
 });
 
 test('owedFields: a try owes the fields it was filed with, never those a revision followed later adds', async (t) => {
-  const [grown] = GROWN;
+  const grown = GROWN[0];
   await t.test('a record that kept its fields owes them, though its step declares more now', () => {
-    assert.deepEqual(owedFields(grown!, filedAs({ declared: ['goal'] }), GROWN, gave({ goal: 'g' })), ['goal']);
+    assert.deepEqual(owedFields(grown, filedAs({ declared: ['goal'] }), GROWN, gave({ goal: 'g' })), ['goal']);
   });
   await t.test('a record that kept no fields, whose schema has not moved, owes what its step declares now', () => {
-    const unmoved = filedAs({ closeoutHash: closeoutHashOf(grown!, GROWN) });
-    assert.deepEqual(owedFields(grown!, unmoved, GROWN, gave({ goal: 'g' })), ['goal', 'why']);
+    const unmoved = filedAs({ closeoutHash: closeoutHashOf(grown, GROWN) });
+    assert.deepEqual(owedFields(grown, unmoved, GROWN, gave({ goal: 'g' })), ['goal', 'why']);
   });
   await t.test('a record that kept no fields and no digest owes what its step declares now', () => {
-    assert.deepEqual(owedFields(grown!, filedAs({}), GROWN, gave({ goal: 'g' })), ['goal', 'why']);
+    assert.deepEqual(owedFields(grown, filedAs({}), GROWN, gave({ goal: 'g' })), ['goal', 'why']);
   });
-  await t.test('a record that kept no fields, whose schema has moved, owes those of today\'s fields its closeout gave, in their order', () => {
-    const moved = filedAs({ closeoutHash: closeoutHashOf(FILED[0]!, FILED) });
-    assert.deepEqual(owedFields(grown!, moved, GROWN, gave({ why: 'w', goal: 'g', other: 'o' })), ['goal', 'why']);
-    assert.deepEqual(owedFields(grown!, moved, GROWN, gave({ goal: 'g' })), ['goal']);
-  });
+  await t.test(
+    "a record that kept no fields, whose schema has moved, owes those of today's fields its closeout gave, in their order",
+    () => {
+      const moved = filedAs({ closeoutHash: closeoutHashOf(FILED[0], FILED) });
+      assert.deepEqual(owedFields(grown, moved, GROWN, gave({ why: 'w', goal: 'g', other: 'o' })), ['goal', 'why']);
+      assert.deepEqual(owedFields(grown, moved, GROWN, gave({ goal: 'g' })), ['goal']);
+    },
+  );
 });

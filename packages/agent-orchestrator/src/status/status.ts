@@ -6,12 +6,12 @@
  * it reads the record alone.
  */
 import type { Verdict } from '../check/check.ts';
-import { DEFAULT_ROUNDS, endsOnBase, JUDGE_ROUTE, LOOP_REPLIES, outputFields, type Workflow } from '../step/step.ts';
+import { DEFAULT_ROUNDS, endsOnBase, JUDGE_ROUTE, LOOP_REPLIES, type Workflow } from '../step/step.ts';
 import { loopSpan } from '../workflow/index.ts';
 import { isJudge } from '../route/index.ts';
 import type { TaskClock } from '../timeline/index.ts';
-import { closeoutHashOf, declaredOutput, isLoopTarget, type Closeout } from '../closeout/index.ts';
-import { filedFields } from '../pinned/pinned.ts';
+import { declaredOutput, isLoopTarget, type Closeout } from '../closeout/index.ts';
+import { filedOwed } from '../pinned/pinned.ts';
 import { closeoutRefusals } from '../question/index.ts';
 import { budgetOf } from '../budget/budget.ts';
 export { approvedCapsOf, budgetOf } from '../budget/budget.ts';
@@ -404,7 +404,7 @@ export const resultOnBase = (standings: readonly BranchStanding[]): boolean =>
  * @param verdictOf What each step's current check exited with (`refusedCheck`): only a check that refused holds a step over its budget.
  *   Left out, no check has refused, so a step whose check did not pass reads `failed (check)`, as `retriesDue` reads it: no try due.
  */
-export function stepStatus(
+export const stepStatus = (
   step: Workflow,
   run: Run,
   phaseOf: (taskId: string) => TaskPhase,
@@ -413,9 +413,7 @@ export function stepStatus(
   steps: readonly Workflow[] = [],
   spendOf: SpendOf = () => undefined,
   verdictOf: (step: string) => Verdict | undefined = () => undefined,
-): StepStatus {
-  return standing(step, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf).status;
-}
+): StepStatus => standing(step, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf).status;
 
 /**
  * Where a step stands (`stepStatus`), and where it would stand but for being over its budget or waiting at its gate (`own`): a try's ways
@@ -795,19 +793,6 @@ export function askingTry(steps: readonly Workflow[], run: Run, name: string): {
   const taskId = [...(run.steps[looping.name]?.tries ?? [])].reverse().find((t) => t.cause === 'round')?.taskId;
   return taskId ? { looping, taskId } : undefined;
 }
-
-/**
- * The fields of its `output:` a step's closeout `said` owes on the try it is on, as that try was filed (`filedFields`): those its record
- * kept at the filing (`declared`), so a revision its run followed after it adds none. A record written before they were kept owes what
- * the step declares now where its closeout schema has not moved since (`closeoutHash`), and where it has, those of them it gave.
- */
-export const filedOwed = (step: Workflow, run: Run, steps: readonly Workflow[], said: Closeout | undefined): string[] => {
-  const record = run.steps[step.name];
-  const declared = record?.declared;
-  const hash = record?.closeoutHash;
-  const moved = declared === undefined && hash !== undefined && hash !== closeoutHashOf(step, steps);
-  return filedFields({ ...(declared ? { declared } : {}), moved }, outputFields(step), Object.keys(said?.output ?? {}));
-};
 
 /**
  * The fields a step's closeout `said` must give on the try it is on: what its `output:` declared when that try was filed (`filedOwed`),

@@ -5,7 +5,7 @@
  * and a folder of the format may not need a folder that needs it (`test/layout.test.ts`).
  */
 import type { FiledFields } from '../../contracts/filed-fields.contract.ts';
-import { closeoutHashOf } from '../closeout/index.ts';
+import { closeoutHashOf, type Closeout } from '../closeout/index.ts';
 import { outputFields } from '../step/step.ts';
 import type { Pin } from '../revisions/revisions.ts';
 import type { Run, StepRecord } from '../record/record.ts';
@@ -61,3 +61,16 @@ export const filedFields: FiledFields = (filed, now, gave) => {
  */
 export const resumeOn = (session: string | undefined, step: Workflow, f: PinsRead, record: StepRecord | undefined): string | undefined =>
   record?.closeoutHash === undefined || record.closeoutHash === closeoutHashOf(step, f.reads.steps) ? session : undefined;
+
+/**
+ * The fields of its `output:` a step's closeout `said` owes on the try it is on, as that try was filed (`filedFields`): those its record
+ * kept at the filing (`declared`), so a revision its run followed after it adds none. A record written before they were kept owes what
+ * the step declares now where its closeout schema has not moved since (`closeoutHash`), and where it has, those of them it gave.
+ */
+export const filedOwed = (step: Workflow, run: Run, steps: readonly Workflow[], said: Closeout | undefined): string[] => {
+  const record = run.steps[step.name];
+  const declared = record?.declared;
+  const hash = record?.closeoutHash;
+  const moved = declared === undefined && hash !== undefined && hash !== closeoutHashOf(step, steps);
+  return filedFields({ ...(declared ? { declared } : {}), moved }, outputFields(step), Object.keys(said?.output ?? {}));
+};

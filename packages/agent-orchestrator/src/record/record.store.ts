@@ -42,11 +42,8 @@ const EarlierTrySchema = Kept({
   paused: Schema.optional(Schema.Literal(true)),
 });
 
-const LandedSchema = Schema.Union([
-  Schema.StructWithRest(Schema.Struct({ commit: Schema.String }), Rest),
-  Schema.StructWithRest(Schema.Struct({ aborted: Schema.String, refusedOn: Schema.optional(Schema.String) }), Rest),
-  Schema.StructWithRest(Schema.Struct({ untouched: Schema.String }), Rest),
-]);
+const Aborted = { aborted: Schema.String, refusedOn: Schema.optional(Schema.String) };
+const LandedSchema = Schema.Union([Kept({ commit: Schema.String }), Kept(Aborted), Kept({ untouched: Schema.String })]);
 
 const StepRecordSchema = Kept({
   taskId: Schema.NullOr(Schema.String),

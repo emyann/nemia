@@ -236,6 +236,7 @@ export function listing(input: ListingInput): Listing {
   if (!routed.size) return listed;
   const steps = listed.steps.map((s) => {
     const row = routed.get(s.name);
+    if (row && 'besides' in row) return { ...s, message: `${s.message} · ${row.besides}` };
     return row ? { name: s.name, branch: s.branch, ...row } : s;
   });
   return { ...listed, steps };

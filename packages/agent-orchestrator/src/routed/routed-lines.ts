@@ -11,7 +11,8 @@ import { codedStep, REASON_OF, type CodedStep } from '../phase/phase.ts';
 import { answeredRoute, runWords } from './routed-words.ts';
 
 /** A step's row as the routing words it: what to say, its code, and the line that routes a condition by hand. */
-export type RoutedRow = CodedStep & { message: string; note?: string };
+/** A routed step's row: its whole line, or (`besides`) words said after the line its own work gives, as a gate's proposed route. */
+export type RoutedRow = (CodedStep & { message: string; note?: string }) | { besides: string };
 
 /** The line a person types to route a condition by hand. */
 export const routeLine = (run: Pick<Run, 'id'>, condition: Workflow): string =>
@@ -87,6 +88,7 @@ function rowOf(
   const offer = settled ? {} : { note: `route it by hand: ${routeLine(run, step)}` };
   if (word === 'unsigned') return { message: 'unsigned: its table answers no route', ...codedStep(REASON_OF.unsigned), ...offer };
   const route = routeOf(step);
-  if (route === undefined || word === 'awaiting approval') return undefined;
+  if (route === undefined) return undefined;
+  if (word === 'awaiting approval') return { besides: `proposes ${route}` };
   return { message: `routed: ${route}`, ...codedStep(REASON_OF[word]), ...offer };
 }

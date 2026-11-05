@@ -9,6 +9,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { assess } from '../src/tick/assess.ts';
 import { runWords } from '../src/routed/routed-words.ts';
+import { routedRows } from '../src/routed/routed-lines.ts';
 import { retryable } from '../src/retry/retry.ts';
 import { ranShape } from '../src/workspace/worktree.store.ts';
 import { workspacePlan } from '../src/workspace/workspace.ts';
@@ -144,6 +145,21 @@ test("a table's copied route yields to its producer tried again, until a node af
     records: { triage: { route: { route: 'web', try: 1, by: 'table' } } },
   });
   assert.equal(settled.words['build-backend'], 'skipped');
+});
+
+test("a gated condition's row says the route it proposes beside its gate", () => {
+  const gated = TRIAGE.map((s) => (s.name === 'triage' ? { ...s, gate: true as const } : s));
+  const held = passOf({ filed: { plan: 'succeeded' }, steps: gated });
+  const said = (name: string): Closeout | undefined =>
+    name === 'plan' ? { outcome: 'done', summary: 'did plan', artifacts: [], output: { surface: 'web' } } : undefined;
+  const rows = routedRows({
+    steps: gated,
+    run: held.run,
+    phaseOf: phases({ 't-plan': 'succeeded' }),
+    closeoutOf: said,
+    askedCloseout: () => true,
+  });
+  assert.deepEqual(rows.get('triage'), { besides: 'proposes web' });
 });
 
 test('a table with no row for what its producer said reads unsigned, and nothing after it runs', () => {

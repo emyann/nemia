@@ -10,8 +10,11 @@ import type { PageSpec } from '../visit.ts';
 
 /** The factory whose bar the page opens: the one that holds a run. */
 const FACTORY = FACTORIES.hiring.name;
-/** The whole list of the runs, and the light answer, by their paths on the api. */
-const [WHOLE, LIGHT] = ['/api/runs', '/api/runs-open'];
+/**
+ * The whole list of the runs, and the light answer, by their paths on the api: the whole list is the light answer and every page of the
+ * finished runs (`runsQuery`), so the finished runs are what tells a reader of it.
+ */
+const [WHOLE, LIGHT] = ['/api/runs-finished', '/api/runs-open'];
 
 /** What the api answers at `pathname`, read apart from the page: the page's own requests do not count it. */
 async function answer<T>(page: Page, pathname: string): Promise<T> {

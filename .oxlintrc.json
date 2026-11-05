@@ -476,12 +476,6 @@
       }
     },
     {
-      "files": ["apps/api/src/workflows/workflows.ts"],
-      "rules": {
-        "complexity": ["error", { "max": 21 }]
-      }
-    },
-    {
       "files": ["apps/web/src/components/AgentForm.tsx"],
       "rules": {
         "max-lines-per-function": ["error", { "max": 141, "skipBlankLines": true, "skipComments": true }]

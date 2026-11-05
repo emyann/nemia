@@ -109,6 +109,21 @@ test("what a render writes into a factory's tree, read back as today's folder re
     assert.deepEqual(stepsOf(loaded), stepsOf(loadWorkflows(path.join(repo, 'workflows', 'dev'))));
     assert.deepEqual(loaded.find((step) => step.name === 'implement')?.output?.schema, JSON.parse(STEP_OUTPUT_SCHEMA));
   });
+  await t.test("a step's `memory:` is placed by the export, rendered back as its line, and loads as it did", () => {
+    const repo = scratch('wf-render-repo-');
+    fs.renameSync(teamCopy(), path.join(repo, 'workflows'));
+    const review = path.join(repo, 'workflows', 'dev', 'review.md');
+    fs.writeFileSync(review, fs.readFileSync(review, 'utf8').replace('budget: 20', 'budget: 20\nmemory: 4Gi'));
+    const dir = path.join(scratch('wf-render-out-'), 'team');
+    exportTemplate({ dir, from: repo });
+    const { tree, out } = rendered(dir);
+    assert.deepEqual(out.refusals, []);
+    assert.match(fs.readFileSync(path.join(tree, 'workflows/dev/review.md'), 'utf8'), /^memory: 4Gi$/m);
+    const fills = { factory: 'team', workflow: 'dev', agents: { implement: 'implementer', review: 'reviewer', ship: 'shipper' } };
+    const loaded = loadWorkflows(path.join(tree, 'workflows', 'dev'), {}, fills);
+    assert.equal(loaded.find((step) => step.name === 'review')?.memory, '4Gi');
+    assert.deepEqual(stepsOf(loaded), stepsOf(loadWorkflows(path.join(repo, 'workflows', 'dev'))));
+  });
   await t.test("a manifest's revisions policy is rendered into the tree's wiring, and a manifest that says none renders none", () => {
     const { dir } = exported();
     assert.equal(Object.hasOwn(rendered(dir).out.wiring, 'revisions'), false, 'a manifest that says nothing leaves the factory pinned');

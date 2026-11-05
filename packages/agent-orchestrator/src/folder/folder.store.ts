@@ -339,6 +339,7 @@ const frozenStepFields = {
   denials: Schema.optionalKey(Schema.Literal('fail')),
   remote: Schema.optionalKey(Schema.Boolean),
   deadlineSeconds: Schema.optionalKey(Schema.Finite),
+  memory: Schema.optionalKey(Schema.String),
   budget: Schema.optionalKey(Schema.Finite),
   check: Schema.optionalKey(Schema.String),
   retries: Schema.optionalKey(Schema.Finite),

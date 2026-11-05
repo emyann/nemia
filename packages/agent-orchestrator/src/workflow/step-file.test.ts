@@ -204,6 +204,14 @@ test('each key a step has: read as written, and refused blank, twice or with a w
       refuses(`deadlineSeconds: ${bad}`, 'review', `deadlineSeconds: ${bad}`, 'is not a count', 'above zero'),
     ),
 
+    ...['4Gi', '512Mi', '8G', '1073741824'].map((q) => reads(`memory: ${q}, as written`, 'implement', `memory: ${q}`, { memory: q })),
+    ...['user', 'project', 'local'].map((scope) =>
+      refuses(`memory: ${scope}, Claude Code's subagent memory`, 'implement', `memory: ${scope}`, 'subagent', '`memory: 4Gi`'),
+    ),
+    ...['8 GB', '8gb', '129e6', '100m', '1.5Gi', '0', 'lots'].map((bad) =>
+      refuses(`memory: ${bad}, which the runtime does not read`, 'implement', `memory: ${bad}`, `implement: \`memory: ${bad}\``),
+    ),
+
     ...(
       [
         ['5', 5],
@@ -909,6 +917,7 @@ const EVERY: Record<
   denials: 'fail',
   remote: 'true',
   deadlineSeconds: '900',
+  memory: '4Gi',
   budget: '2.50',
   check: `'npm test && node -e "console.log(1 ? 2 : 3)"'`,
   retries: '0',
@@ -974,6 +983,7 @@ test('`renderStep`: the parser run backwards, in one canonical form, and refusin
             'denials: fail',
             'remote: true',
             'deadlineSeconds: 900',
+            'memory: 4Gi',
             'budget: 2.5',
             `check: 'npm test && node -e "console.log(1 ? 2 : 3)"'`,
             'retries: 0',

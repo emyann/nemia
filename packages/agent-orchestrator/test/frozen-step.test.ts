@@ -75,6 +75,7 @@ test('a step with every key the parser types, its agent and its output reads as 
     denials: 'fail',
     remote: false,
     deadlineSeconds: 600,
+    memory: '4Gi',
     budget: 2.5,
     check: 'npm test',
     retries: 1,
@@ -110,6 +111,7 @@ test('a step with every key the parser types, its agent and its output reads as 
 
   for (const [key, value] of [
     ['context', '1M'],
+    ['memory', 4],
     ['slot', 'all'],
     ['denials', 'warn'],
     ['after', 'implement'],

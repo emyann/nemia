@@ -178,6 +178,13 @@ test('`ceilingLines`: sessions at work per pool, and runs in flight — `no cap`
       'runs in flight: at most 2 at once — a run with nothing filed waits for a slot, oldest first (WF_MAX_RUNS)',
     ),
   );
+  await t.test('a memory limit, said on a line of its own, its slice beside it; none, and no line', () => {
+    const lines = ceilingLines({ sessions: 2, runs: 0, memory: '8Gi', cgroupParent: 'agents.slice' });
+    assert.equal(lines.length, 3);
+    assert.match(lines[2], /\b8Gi\b.*agents\.slice.*\(WF_MEMORY_LIMIT, WF_CGROUP_PARENT\)$/);
+    assert.match(ceilingLines({ sessions: 2, runs: 0, memory: '8Gi' })[2], /\b8Gi\b.*\(WF_MEMORY_LIMIT\)$/);
+    assert.equal(ceilingLines({ sessions: 2, runs: 0 }).length, 2);
+  });
 });
 
 test('`listing` handed a run slot: the roots of a held run say `waiting for a run slot` where `waiting` would be — never a run that started, was called off or waits on a run', async (t) => {

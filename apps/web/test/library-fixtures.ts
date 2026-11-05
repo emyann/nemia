@@ -135,6 +135,7 @@ export const stepSpec = (extra: Partial<WorkflowStepSpec> = {}): WorkflowStepSpe
   denials: 'fail',
   remote: null,
   deadlineSeconds: 900,
+  memory: null,
   budget: 5,
   check: 'npm test',
   retries: 1,

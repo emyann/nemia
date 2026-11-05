@@ -36,6 +36,16 @@ import type { Decide } from '../../contracts/decide.contract.ts';
 import type { LifecycleOf } from '../../contracts/lifecycle.contract.ts';
 import type { Observe } from '../../contracts/observe.contract.ts';
 
+/**
+ * What a task's own cgroup said of its memory, for one run under a memory limit (`resources.limits.memory`): the limit in bytes, its
+ * peak where the kernel keeps one, and how many processes the kernel's OOM killer ended in it. Read by the runner off the cgroup's
+ * files (`cgroupMemoryOf`, `harness/cgroup.ts`); carried, never read by `decide`.
+ */
+export type MemoryUse = { limitBytes: number; peakBytes?: number; oomKills: number };
+
+/** What a task asks of its host's resources, as a container's `resources`: a memory limit, a Kubernetes quantity. */
+export type TaskResources = { limits?: { memory?: string } };
+
 /** Ended by the session itself, not stopped under it: an end on record that no deadline overrules. */
 const ENDED_OWN: ReadonlySet<SessionState> = new Set(['completed', 'failed', 'rejected']);
 
@@ -67,6 +77,8 @@ export type Sighting = {
   exitCode?: number;
   /** What the process left in its task's `terminationMessagePath` when it exited, for a harness that reads one. */
   terminationMessage?: string;
+  /** What the cgroup its process tree ran in said of its memory, for a task run under a memory limit (`MemoryUse`). */
+  memory?: MemoryUse;
   /**
    * What the workload said when it finished, and WHEN it said it — present only for a harness that
    * can take a structured final answer, and only once one was given.
@@ -469,6 +481,11 @@ export type Event =
       labels?: Record<string, string>;
       /** The W3C trace context of the span that filed the task, when its engine exports. Carried for the runner, never read by `decide`. */
       traceparent?: string;
+      /**
+       * What its process tree may use of the host, a container's `resources`: `limits.memory`, held by a cgroup of its own. The
+       * task's own, else its engine's `defaultLimits` as they were at filing. Carried for the runner, never read by `decide`.
+       */
+      resources?: TaskResources;
     }
   | { kind: 'starting'; at: string; attempt: number; resumeFrom?: string; nudge?: string; mono?: Monotonic }
   | { kind: 'spawned'; at: string; attempt: number; error?: string; mono?: Monotonic }
@@ -486,6 +503,7 @@ export type Event =
       usage?: Usage;
       exitCode?: number;
       terminationMessage?: string;
+      memory?: MemoryUse;
       denials?: Denial[];
       skills?: string[];
       files?: string[];
@@ -570,6 +588,11 @@ export type Attempt = {
    * task named no file. Carried, never read.
    */
   terminationMessage?: string;
+  /**
+   * What its cgroup said of its memory as it ended, for a task run under a memory limit: `oomKills` above 0 is the kernel ending a
+   * process of it at the limit. Absent where it ran under none, or its runner read nothing. Carried, never read.
+   */
+  memory?: MemoryUse;
   /** The tool calls its harness denied, when it denied any and said so. Carried, never read. */
   denials?: Denial[];
   /** The skills its session loaded, `[]` for none, when its harness said. Carried, never read. */
@@ -647,6 +670,8 @@ export type State = {
   labels?: Record<string, string>;
   /** The trace context of the span that filed the task. See the `filed` event. `decide` never reads it. */
   traceparent?: string;
+  /** What its process tree may use of the host, as filed. See the `filed` event. `decide` never reads it. */
+  resources?: TaskResources;
   /** Filed to wait for the layer above's word: absent on a journal an older runtime wrote, which reads as queued. See the `filed` event. */
   queued?: boolean;
   /** The turn the last `admitted` entry admitted, which is the turn current when it was written. See the `admitted` event. */
@@ -675,6 +700,7 @@ function endAttempt(a: Attempt, e: Extract<Event, { kind: 'ended' }>): void {
   a.usage = e.usage ?? a.usage;
   a.exitCode = e.exitCode ?? null;
   if (e.terminationMessage !== undefined) a.terminationMessage = e.terminationMessage;
+  if (e.memory !== undefined) a.memory = e.memory;
   if (e.denials?.length) a.denials = e.denials;
   if (e.skills) a.skills = e.skills;
   if (e.files) a.files = e.files;
@@ -707,6 +733,7 @@ function fileInto(s: State, e: Extract<Event, { kind: 'filed' }>): void {
   if (e.priority !== undefined) s.priority = e.priority;
   if (e.labels !== undefined) s.labels = e.labels;
   if (e.traceparent !== undefined) s.traceparent = e.traceparent;
+  if (e.resources !== undefined) s.resources = e.resources;
 }
 
 /** Observed state, folded. A `State` is never stored — it is always re-derived from the journal. */

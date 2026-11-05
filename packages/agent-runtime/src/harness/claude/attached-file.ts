@@ -86,6 +86,14 @@ const RunFileSchema = Schema.StructWithRest(
      * spent its whole cap (`capSpent`, `src/core/cap.ts`). Carried onto its sighting as the harness's own end at its cap would be.
      */
     limit: Schema.optional(Schema.Literal('budget')),
+    /**
+     * For a session run under a memory limit (`resources.limits.memory`): what its scope said of its memory, read by its holder off
+     * Claude Code's cgroup where it rewrites this file and once before it ends the session, the last read kept: the session's
+     * `Sighting.memory`. Best-effort: a scope that emptied with Claude Code killed in it reads nothing more. Absent with no limit.
+     */
+    memory: Schema.optional(
+      Schema.Struct({ limitBytes: Schema.Finite, peakBytes: Schema.optional(Schema.Finite), oomKills: Schema.Finite }),
+    ),
     /** What its claude.ai bridge came to, where one was asked for: its facts, or why there is none. */
     bridge: Schema.optional(BridgeFactsSchema),
     /** The spawn, its brief left out: what a holder resumes the session with. */

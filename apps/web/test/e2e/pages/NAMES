@@ -129,5 +129,6 @@ factory-volumes
 inbox-in-play
 chat-permission
 chat-brought
+chat-peer
 run-routed
 hold-open

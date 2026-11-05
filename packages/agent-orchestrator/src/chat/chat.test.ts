@@ -24,7 +24,11 @@ import {
   chatPage,
   cursorOf,
   drawnAsk,
-  framedForHer,
+  framedFor,
+  RESERVED_SPEAKERS,
+  SPEAKER_NAME_MAX,
+  speakerNameRefusal,
+  withoutSpeaker,
   presenceOf,
   projectChat,
   readChatCursor,
@@ -186,13 +190,13 @@ test("`projectChat`: what the board draws of her sessions, the keeper's words an
     assert.deepEqual(open('needs-human'), ['pending', 'waits']);
   });
   await t.test("the words the person's text is framed in are the approved sentence, to the letter", () => {
-    assert.equal(framedForHer('Merge it.'), 'The person writes from the board: Merge it.');
-    assert.equal(framedForHer(''), 'The person writes from the board: ');
+    assert.equal(framedFor({ kind: 'person' }, 'Merge it.'), 'The person writes from the board: Merge it.');
+    assert.equal(framedFor({ kind: 'person' }, ''), 'The person writes from the board: ');
   });
   await t.test(
     "the keeper's words are a marker after the event they followed; a said a mark claims is the person's message with their text",
     () => {
-      const framed = framedForHer('Merge it.');
+      const framed = framedFor({ kind: 'person' }, 'Merge it.');
       const said = [
         { at: at(3), attempt: 1, text: 'Woken: gate on 473Y\nmore lines', after: { kind: 'tool_use', id: 'u1' } },
         { at: at(12), attempt: 2, text: framed, after: { kind: 'text', id: 'a2' } },
@@ -219,6 +223,27 @@ test("`projectChat`: what the board draws of her sessions, the keeper's words an
   await t.test("an outbox entry no said carries yet is the person's, undelivered, last", () => {
     const events = projectChat(twoSessions({ outbox: [{ id: 'o2', at: at(30), text: 'Are you there?' }] }));
     assert.deepEqual(events.at(-1), { kind: 'message', id: 'p:o2', at: at(30), from: 'person', text: 'Are you there?', delivered: null });
+  });
+  await t.test("an agent's entry is a peer's message under its name, delivered or not, and never the person's", () => {
+    const from = { kind: 'agent' as const, name: 'operator' };
+    const outbox = [{ id: 'o3', at: at(30), text: 'I approved the gate.', from }];
+    const waiting = projectChat(twoSessions({ outbox }));
+    assert.deepEqual(waiting.at(-1), {
+      kind: 'message',
+      id: 'p:o3',
+      at: at(30),
+      from: 'peer',
+      name: 'operator',
+      text: 'I approved the gate.',
+      delivered: null,
+    });
+    const said = [{ at: at(31), attempt: 2, text: framedFor(from, 'I approved the gate.'), after: { kind: 'text' as const, id: 'a2' } }];
+    const delivered = projectChat(twoSessions({ outbox, said, delivered: [{ id: 'o3', said: at(31), attempt: 2 }] }));
+    assert.deepEqual(
+      delivered.find((e) => e.id === 'p:o3'),
+      { kind: 'message', id: 'p:o3', at: at(30), from: 'peer', name: 'operator', text: 'I approved the gate.', delivered: at(31) },
+    );
+    assert.ok(![...waiting, ...delivered].some((e) => e.kind === 'message' && e.from === 'person' && e.text === 'I approved the gate.'));
   });
   await t.test("a turn the person stopped is the keeper's quiet marker, in its place in time, and no new kind of event", () => {
     const stopped = twoSessions({ stops: [{ at: at(3), attempt: 1 }] });
@@ -284,7 +309,7 @@ test("the chat's cursor: it round-trips, says what changed since it, reads an ol
     assert.deepEqual(readChatCursor(cursor), cursorOf(before));
     const now = twoSessions({
       outbox,
-      said: [{ at: at(13), attempt: 2, text: framedForHer('Hi'), after: { kind: 'text', id: 'a2' } }],
+      said: [{ at: at(13), attempt: 2, text: framedFor({ kind: 'person' }, 'Hi'), after: { kind: 'text', id: 'a2' } }],
       delivered: [{ id: 'o1', said: at(13), attempt: 2 }],
     });
     const [first, second] = now.sessions;
@@ -365,7 +390,9 @@ test('`presenceOf`: down, up and idle, answering, waits on you, and unread after
   await t.test(
     'unread survives a said drawn again under another id: the mark on a marker a delivery claimed counts from its own moment',
     () => {
-      const said = [{ at: at(12), attempt: 2, text: framedForHer('Merge it.'), after: { kind: 'text' as const, id: 'a2' } }];
+      const said = [
+        { at: at(12), attempt: 2, text: framedFor({ kind: 'person' }, 'Merge it.'), after: { kind: 'text' as const, id: 'a2' } },
+      ];
       const outbox = [{ id: 'o1', at: at(11), text: 'Merge it.' }];
       const mark = { through: `k:2:${at(12)}`, at: at(13) };
       const marker = projectChat(twoSessions({ said, outbox }));
@@ -519,4 +546,26 @@ test('`withEvents`: a session folded from pieces that overlap projects as the se
   await t.test('an attempt it holds no session of is left as it was', () => {
     assert.equal(withEvents(whole, 9, [text('z', 1, 'Lost.')], 'c'), whole);
   });
+});
+
+test('`speakerNameRefusal`: the names an agent speaks under, by their characters, which its contract leaves to the code', async (t) => {
+  const taken = ['operator', 'run-x.design', 'nemia-ab12/design', 'a', '0_b', 'o'.repeat(SPEAKER_NAME_MAX)];
+  const refused = ['Operator', '-op', '.op', '/op', 'a b', 'op@host', '', 'o'.repeat(SPEAKER_NAME_MAX + 1), ...RESERVED_SPEAKERS];
+  for (const name of taken) await t.test(`taken: ${JSON.stringify(name)}`, () => assert.equal(speakerNameRefusal(name), undefined));
+  for (const name of refused)
+    await t.test(`REFUSED: ${JSON.stringify(name.slice(0, 20))}`, () => assert.equal(typeof speakerNameRefusal(name), 'string'));
+});
+
+test('`withoutSpeaker` takes back no name but the one named: the full law its contract narrows until tsverify proves a filter keeps every element that passes (src-a-filter-s-result-is-pro-p25m)', async (t) => {
+  const lists: readonly (readonly string[])[] = [[], ['operator'], ['operator', 'run-x.design'], ['a', 'operator', 'b', 'operator', 'c']];
+  for (const allowed of lists)
+    for (const name of ['operator', 'a', 'absent'])
+      await t.test(`${JSON.stringify(allowed)} less ${name}`, () => {
+        const left = withoutSpeaker(allowed, name);
+        assert.deepEqual(
+          allowed.filter((n) => n !== name && !left.includes(n)),
+          [],
+          'every other name stays allowed',
+        );
+      });
 });

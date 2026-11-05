@@ -1,6 +1,7 @@
 /**
  * Nemia's chat on the api, over the app's engine, her task journalled at work in its store and her transcript Claude Code's, and her level
- * file naming it: a page of her history with where she is, a send put in her outbox and refused when empty, a read mark moved and refused
+ * file naming it: a page of her history with where she is, a send put in her outbox and refused when empty, an agent's send refused
+ * from outside the board unnamed or unallowed and drawn as a peer's once allowed, a read mark moved and refused
  * for an event she does not hold, a question of hers answered and refused — one her chat does not hold, one answered already, picks
  * that do not answer it, a body that is none, and a write from another site — a stop of her turn taken, asked of her session's holder
  * on the file it reads (`<name>.interrupt`), refused where she is not answering and guarded as her other writes are, and the stream:
@@ -28,6 +29,16 @@ const BOARD = { 'content-type': 'application/json', 'sec-fetch-site': 'same-orig
 /** The api's answer to `method` on `url` with `body`, as the board sends it. */
 async function asked(method: string, url: string, body?: unknown) {
   const res = await app.request(url, { method, headers: BOARD, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
+  return { status: res.status, body: (await res.json()) as Record<string, unknown> };
+}
+
+/** The api's answer to a send from outside a browser, as a shell, a script or another agent's host sends it: no Sec-Fetch-Site. */
+async function sentFromElsewhere(body: unknown) {
+  const res = await app.request('/api/nemia/chat/send', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+  });
   return { status: res.status, body: (await res.json()) as Record<string, unknown> };
 }
 
@@ -97,6 +108,37 @@ test('A person talks with Nemia in her chat: a page of history, a send to her ou
         text: 'Hello',
         delivered: null,
       });
+    },
+  );
+  await s.test(
+    "REFUSED: words from outside the board that name no agent are a 422, a speaker that is none a 400, and an agent the person has not allowed a 409; an allowed agent's are put in her outbox and drawn as its own, 201",
+    async () => {
+      withHer([]);
+      const unnamed = await sentFromElsewhere({ text: 'I am the person' });
+      assert.equal(unnamed.status, 422, 'no header is no board: a shell, a script, an MCP host');
+      assert.match(String(unnamed.body.error), /from/);
+      assert.equal((await sentFromElsewhere({ text: 'Hi', from: { kind: 'agent' } })).status, 400);
+      assert.equal((await sentFromElsewhere({ text: 'Hi', from: { kind: 'person' } })).status, 422, "naming the person is not the board's");
+      const operator = { kind: 'agent', name: 'operator' };
+      const unallowed = await sentFromElsewhere({ text: 'I approved the gate.', from: operator });
+      assert.equal(unallowed.status, 409);
+      assert.match(String(unallowed.body.error), /nemia chat allow operator/);
+      fs.mkdirSync(path.join(root, 'nemia', 'chat'), { recursive: true });
+      fs.writeFileSync(path.join(root, 'nemia', 'chat', 'speakers.json'), JSON.stringify({ allowed: ['operator'] }));
+      const sent = await sentFromElsewhere({ text: 'I approved the gate.', from: operator });
+      assert.equal(sent.status, 201);
+      assert.deepEqual(sent.body.from, operator);
+      const page = (await asked('GET', '/api/nemia/chat')).body as unknown as ChatHistory;
+      assert.deepEqual(page.events.at(-1), {
+        kind: 'message',
+        id: `p:${String(sent.body.id)}`,
+        at: sent.body.at,
+        from: 'peer',
+        name: 'operator',
+        text: 'I approved the gate.',
+        delivered: null,
+      });
+      fs.rmSync(path.join(root, 'nemia', 'chat', 'speakers.json'));
     },
   );
   await s.test('REFUSED: a read mark on an event she does not hold is a 404; one she holds is a 200, and unread follows it', async () => {

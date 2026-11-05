@@ -40,6 +40,7 @@ import {
   readAsksClosed,
   readDelivered,
   readOutbox,
+  readSpeakers,
   readReadMark,
   readStops,
   writeReadMark,
@@ -55,6 +56,7 @@ import {
   projectChat,
   readChatCursor,
   sourcesAt,
+  speakerRefusal,
   withEvents,
   type ChatEvent,
   type ChatSession,
@@ -65,6 +67,8 @@ import {
   type Presence,
   type ReadMark,
   type SourceStop,
+  type Speaker,
+  type Via,
 } from './chat.ts';
 
 /** Which chat: the long-lived task it is with (none while none is filed), and the folder its files are kept in. */
@@ -398,17 +402,27 @@ export const followChat = Effect.fn('followChat')(function* (
 const entryId = (): string => `${Date.now().toString(36)}-${randomBytes(3).toString('hex')}`;
 
 /**
- * The person's `text` put in the outbox of the chat at `place`, which the keeper says to the task once it is up (`sayOutbox`): the
- * entry. Refused (`Invalid`) for text that is empty or longer than `CHAT_TEXT_MAX`.
+ * The `text` `speaker` wrote, come `via` the board or from elsewhere, put in the outbox of the chat at `place`, which the keeper says to
+ * the task once it is up (`sayOutbox`), in the words that say who wrote it (`framedFor`): the entry, carrying `from` where an agent wrote
+ * it. Refused (`Invalid`) for text that is empty or longer than `CHAT_TEXT_MAX`, and as `speakerRefusal` refuses the speaker over the
+ * names the person allowed (`readSpeakers`): `Invalid` for the person from anywhere but the board or an agent under a name no agent
+ * speaks under, `Conflict` for an agent under a name the person has not allowed.
  */
-export const chatSay = Effect.fn('chatSay')(function* (place: ChatPlace, text: string) {
+export const chatSay = Effect.fn('chatSay')(function* (place: ChatPlace, text: string, speaker: Speaker, via: Via) {
   if (typeof text !== 'string' || text.trim() === '')
     return yield* Effect.fail(new Invalid({ message: 'The message is empty: write something to send.' }));
   if (text.length > CHAT_TEXT_MAX)
     return yield* Effect.fail(
       new Invalid({ message: `The message is ${text.length} characters: send at most ${CHAT_TEXT_MAX}, in parts if it is longer.` }),
     );
-  const entry: OutboxEntry = { id: entryId(), at: new Date().toISOString(), text };
+  const allowed = speaker.kind === 'agent' ? yield* tried(() => readSpeakers(place.dir)) : [];
+  const refused = speakerRefusal(speaker, via, allowed);
+  if (refused !== null)
+    return yield* Effect.fail(
+      refused.kind === 'Conflict' ? new Conflict({ message: refused.message }) : new Invalid({ message: refused.message }),
+    );
+  const at = new Date().toISOString();
+  const entry: OutboxEntry = speaker.kind === 'agent' ? { id: entryId(), at, text, from: speaker } : { id: entryId(), at, text };
   yield* tried(() => appendOutbox(place.dir, entry));
   return entry;
 });

@@ -40,8 +40,9 @@ const {
   readOutbox,
   readReadMark,
   readStops,
+  writeSpeakers,
 } = await import('../src/chat/chat.store.ts');
-const { answeredBefore, askOf, asksWaiting, framedForHer, presenceOf, projectChat } = await import('../src/chat/chat.ts');
+const { answeredBefore, askOf, asksWaiting, framedFor, presenceOf, projectChat } = await import('../src/chat/chat.ts');
 const { answersDue, answersOwed, closesOwed, sayOutbox, outboxOwed, recordAsks } = await import('../src/chat/say.verb.ts');
 const { engineOf, runWith } = await import('../src/runtime-client.ts');
 /** The CLI's `main`, loaded only if a checkpoint types a command: these stories call the verbs, and its import is the slowest. */
@@ -58,6 +59,12 @@ const filed = async (name: string, phase?: EnginePhase) => {
   if (phase !== undefined) b.settle(id, phase);
   return { id, dir: scratch('wf-nemia-chat-dir-') };
 };
+
+/** The person, as the board's send names them. */
+const PERSON = { kind: 'person' } as const;
+
+/** The operator, an agent speaking as itself. */
+const OPERATOR = { kind: 'agent', name: 'operator' } as const;
 
 /** What was said to the task `id`, in order. */
 const saidTo = (id: string) => stage.board().said.filter((one) => one.taskId === id);
@@ -157,21 +164,45 @@ test("She is written to: the person's words kept while she is down, said once sh
   const s = story(t);
   await s.test('REFUSED: a send that is empty or too long puts nothing in the outbox; one that is not is put there once', async () => {
     const place = { task: undefined, dir: scratch('wf-nemia-chat-dir-') };
-    await assert.rejects(run(chatSay(place, '  ')), (err: Error) => {
+    await assert.rejects(run(chatSay(place, '  ', PERSON, 'board')), (err: Error) => {
       names(err.message, 'The message is empty');
       return true;
     });
-    await assert.rejects(run(chatSay(place, 'x'.repeat(8001))), (err: Error) => {
+    await assert.rejects(run(chatSay(place, 'x'.repeat(8001), PERSON, 'board')), (err: Error) => {
       names(err.message, 'send at most 8000');
       return true;
     });
     assert.deepEqual(readOutbox(place.dir), []);
-    const sent = await run(chatSay(place, 'Go'));
+    const sent = await run(chatSay(place, 'Go', PERSON, 'board'));
     assert.deepEqual(readOutbox(place.dir), [sent]);
   });
+  await s.test(
+    "REFUSED: words that name no agent from anywhere but the board, an agent under a bad name, and one the person has not allowed; an allowed agent's are put there with who wrote them",
+    async () => {
+      const place = { task: undefined, dir: scratch('wf-nemia-chat-dir-') };
+      const refusedAs = (kind: string, said: Promise<unknown>) =>
+        assert.rejects(said, (err: { _tag?: string }) => {
+          assert.equal(err._tag, kind);
+          return true;
+        });
+      await refusedAs('Invalid', run(chatSay(place, 'I am the person', PERSON, 'elsewhere')));
+      await refusedAs('Invalid', run(chatSay(place, 'Hi', { kind: 'agent', name: 'Op!' }, 'elsewhere')));
+      await refusedAs('Conflict', run(chatSay(place, 'I approved the gate.', OPERATOR, 'elsewhere')));
+      assert.deepEqual(readOutbox(place.dir), [], 'nothing refused is put in the outbox');
+      writeSpeakers(place.dir, ['operator']);
+      const sent = await run(chatSay(place, 'I approved the gate.', OPERATOR, 'elsewhere'));
+      assert.deepEqual(sent.from, OPERATOR);
+      assert.deepEqual(readOutbox(place.dir), [sent]);
+      const read = await run(chatHistory(place));
+      assert.deepEqual(
+        read.events.map((e) => (e.kind === 'message' ? [e.from, e.name] : [])),
+        [['peer', 'operator']],
+      );
+    },
+  );
   await s.test('no task filed is a chat with nothing but the outbox, and she is down', async () => {
     const place = { task: undefined, dir: scratch('wf-nemia-chat-dir-') };
-    await run(chatSay(place, 'Are you there?'));
+    await run(chatSay(place, 'Are you there?', PERSON, 'board'));
     const read = await run(chatHistory(place));
     assert.deepEqual(texts(read.events), ['Are you there?']);
     assert.deepEqual(read.presence, { up: false, answering: false, waitsOnYou: 0, unread: 0 });
@@ -184,7 +215,7 @@ test("She is written to: the person's words kept while she is down, said once sh
     stage.board().settle(id, 'working');
     assert.deepEqual(await run(sayOutbox(id, dir)), { marked: [], said: ['o1'], left: [] });
     assert.deepEqual(await run(sayOutbox(id, dir)), { marked: [], said: [], left: [] });
-    assert.deepEqual(saidTo(id), [{ taskId: id, text: framedForHer('Hello') }]);
+    assert.deepEqual(saidTo(id), [{ taskId: id, text: framedFor({ kind: 'person' }, 'Hello') }]);
     assert.equal(outboxOwed(dir), false);
   });
   await s.test('a word written while her turn is over, her session open to hear the next, is said on the next pass', async () => {
@@ -195,20 +226,37 @@ test("She is written to: the person's words kept while she is down, said once sh
       { marked: [], said: ['o1'], left: [] },
       'a long-lived session between turns is up, and hears the words as one in a turn does',
     );
-    assert.deepEqual(saidTo(id), [{ taskId: id, text: framedForHer('Next, the two kit cards') }]);
+    assert.deepEqual(saidTo(id), [{ taskId: id, text: framedFor({ kind: 'person' }, 'Next, the two kit cards') }]);
     assert.equal(outboxOwed(dir), false);
   });
   await s.test('REFUSED: a restart between the say and the mark is finished by the mark alone, never said twice', async () => {
     const { id, dir } = await filed('cut-short', 'working');
     appendOutbox(dir, { id: 'o1', at: new Date(Date.now() - 1000).toISOString(), text: 'Ship it' });
-    const heard = await run(stage.board().e.say(id, framedForHer('Ship it')));
+    const heard = await run(stage.board().e.say(id, framedFor({ kind: 'person' }, 'Ship it')));
     assert.deepEqual(await run(sayOutbox(id, dir)), { marked: ['o1'], said: [], left: [] });
     assert.equal(saidTo(id).length, 1, 'said once, by the delivery cut short');
     assert.deepEqual(readDelivered(dir), [{ id: 'o1', said: heard.at, attempt: 1 }]);
   });
+  await s.test(
+    "an agent's entry is said in its own frame, never the person's, and a delivery of it cut short is finished, not said again",
+    async () => {
+      const { id, dir } = await filed('peer', 'working');
+      appendOutbox(dir, { id: 'o1', at: new Date(Date.now() - 1000).toISOString(), text: 'Cut', from: OPERATOR });
+      const heard = await run(stage.board().e.say(id, framedFor(OPERATOR, 'Cut')));
+      appendOutbox(dir, { id: 'o2', at: new Date().toISOString(), text: 'I approved the gate.', from: OPERATOR });
+      assert.deepEqual(await run(sayOutbox(id, dir)), { marked: ['o1'], said: ['o2'], left: [] });
+      assert.deepEqual(readDelivered(dir)[0], { id: 'o1', said: heard.at, attempt: 1 });
+      const said = saidTo(id).map((one) => one.text);
+      assert.deepEqual(said, [framedFor(OPERATOR, 'Cut'), framedFor(OPERATOR, 'I approved the gate.')]);
+      assert.ok(
+        said.every((text) => !text.startsWith(framedFor(PERSON, ''))),
+        "never in the person's frame",
+      );
+    },
+  );
   await s.test('REFUSED: words said before the entry was written are never taken for it', async () => {
     const { id, dir } = await filed('before', 'working');
-    await run(stage.board().e.say(id, framedForHer('Again')));
+    await run(stage.board().e.say(id, framedFor({ kind: 'person' }, 'Again')));
     appendOutbox(dir, { id: 'o1', at: '2999-01-01T00:00:00.000Z', text: 'Again' });
     assert.deepEqual(await run(sayOutbox(id, dir)), { marked: [], said: ['o1'], left: [] });
     assert.equal(saidTo(id).length, 2);
@@ -219,7 +267,7 @@ test("She is written to: the person's words kept while she is down, said once sh
     appendOutbox(dir, { id: 'o1', at: new Date().toISOString(), text: 'yes' });
     appendOutbox(dir, { id: 'o2', at: new Date().toISOString(), text: 'yes' });
     sub.mock.timers.tick(5);
-    const first = await run(stage.board().e.say(id, framedForHer('yes')));
+    const first = await run(stage.board().e.say(id, framedFor({ kind: 'person' }, 'yes')));
     sub.mock.timers.tick(5);
     assert.deepEqual(await run(sayOutbox(id, dir)), { marked: ['o1'], said: ['o2'], left: [] });
     assert.deepEqual(
@@ -241,7 +289,7 @@ test("She is written to: the person's words kept while she is down, said once sh
     assert.deepEqual(await run(sayOutbox(id, dir)), { marked: [], said: ['o1', 'o2'], left: [] });
     assert.deepEqual(
       saidTo(id).map((one) => one.text),
-      [framedForHer('one'), framedForHer('two')],
+      [framedFor({ kind: 'person' }, 'one'), framedFor({ kind: 'person' }, 'two')],
     );
   });
 });
@@ -274,7 +322,7 @@ test('Her chat read: a history across two attempts, a stream since its cursor, t
   await s.test("a read after the history's cursor gives only what came since, and the person's words once delivered", async () => {
     ({ cursor } = await run(chatHistory(place)));
     assert.deepEqual((await run(since(place, cursor))).events, []);
-    const sent = await run(chatSay(place, 'Hi'));
+    const sent = await run(chatSay(place, 'Hi', PERSON, 'board'));
     const pending = await run(since(place, cursor));
     assert.deepEqual(
       pending.events.map((x) => [x.id, x.kind === 'message' && x.delivered]),
@@ -333,7 +381,7 @@ test('Her chat read: a history across two attempts, a stream since its cursor, t
         () => `her words pushed by the follow: ${said()}`,
         { bell: rung },
       );
-      await run(chatSay(followed, 'Hello'));
+      await run(chatSay(followed, 'Hello', PERSON, 'board'));
       await until(
         t,
         () => said().includes('Hello'),

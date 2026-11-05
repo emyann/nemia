@@ -19,7 +19,7 @@ import { DEFAULT_NAME } from '../lib/factories';
 import { factoryWords, freshLevel, LEVELS, levelWord, PRUNE_WORDS, RAISE_STRETCHES, raisesOver, sessionOf, spendWords } from '../lib/nemia';
 import { clockWord } from '../lib/quota';
 import { useNow } from '../lib/useNow';
-import { AutoRules } from './AutoRules';
+import { PolicyRules } from './PolicyRules';
 import { CopyButton } from './CopyButton';
 import { BridgeWords } from './Facts';
 import { TrustLine } from './NemiaTrust';
@@ -65,7 +65,7 @@ export function NemiaSettings() {
               <p className="font-mono text-body-small break-words whitespace-pre-wrap text-destructive">{write.error.message}</p>
             </div>
           )}
-          <AutoRules agent="nemia" />
+          <PolicyRules agent="nemia" />
           <SessionPart nemia={data} pending={write.isPending} onAsk={askLevel} />
           <ReachPart reach={data.reach} bridge={data.bridge} />
           <SpendPart nemia={data} />

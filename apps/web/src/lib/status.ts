@@ -9,7 +9,7 @@
  * of anyone while it stands — every verb that would answer it is refused — so it is drawn `held`, never as waiting on a person. A step not
  * started under a hold is not filed until the hold lifts, yet keeps its state (`waiting`, `waiting-for-slot`) and is drawn as any step not
  * started: the run's own chip says why nothing moves, and the step's hover says it waits on the hold (`stateWordsOf`). A step at work,
- * asking through its harness (`needs-human`), checking, or settled keeps its state too: what is in flight runs on, and a verdict is a
+ * asking through its harness (`asks-in-session`), checking, or settled keeps its state too: what is in flight runs on, and a verdict is a
  * verdict.
  */
 import type { StepCodes, StepReason } from './api/reasons.ts';
@@ -18,7 +18,7 @@ import { container, dashed, filled, hairline, meaningOf, paint, ringed, type Hue
 export type StepState =
   | 'working'
   | 'paused'
-  | 'needs-human'
+  | 'asks-in-session'
   | 'checking'
   | 'verified'
   | 'unverified'
@@ -43,7 +43,7 @@ export type StepState =
  * only a person can send (a refused try, an unsigned one).
  */
 const WAITS_ON_A_PERSON: ReadonlySet<StepState> = new Set([
-  'needs-human',
+  'asks-in-session',
   'blocked',
   'awaiting-approval',
   'exhausted',
@@ -61,7 +61,7 @@ const WAITS_ON_A_PERSON: ReadonlySet<StepState> = new Set([
  * try, which is work to try again (the CLI's `retry`).
  */
 const AT_A_GATE: ReadonlySet<StepState> = new Set(
-  [...WAITS_ON_A_PERSON].filter((state) => state !== 'needs-human' && state !== 'unsigned' && state !== 'denied'),
+  [...WAITS_ON_A_PERSON].filter((state) => state !== 'asks-in-session' && state !== 'unsigned' && state !== 'denied'),
 );
 
 /** Whether a step in `state` waits on a person's word (`WAITS_ON_A_PERSON`). On a run somebody called off, nobody waits any more. */
@@ -117,13 +117,13 @@ export const STATE_OF: Record<StepReason, StepState> = {
 
 /**
  * A step's state from its codes alone, and whether the run was called off: `STATE_OF`, but `unreadable` for a step whose record the api
- * could not judge (`Unknown` in phase `failed`), `cancelled` for a step to come on a run called off, `needs-human` for a question its
+ * could not judge (`Unknown` in phase `failed`), `cancelled` for a step to come on a run called off, `asks-in-session` for a question its
  * session asks (`AwaitingAnswer` via `session`), and `waiting-for-slot` for a wait on the limit on runs in flight (`Waiting` on `limit`).
  */
 function codeState({ phase, reason, on, via }: StepCodes, runCancelled: boolean): StepState {
   if (phase === 'failed' && reason === 'Unknown') return 'unreadable';
   if (phase === 'pending' && runCancelled) return 'cancelled';
-  if (reason === 'AwaitingAnswer' && via === 'session') return 'needs-human';
+  if (reason === 'AwaitingAnswer' && via === 'session') return 'asks-in-session';
   if (reason === 'Waiting' && on === 'limit') return 'waiting-for-slot';
   return STATE_OF[reason];
 }
@@ -151,7 +151,7 @@ const GATE: Drawn = { hue: 'yours', form: 'filled', mark: 'font-semibold' };
 export const stateDrawn: Record<StepState, Drawn> = {
   working: { hue: 'alive', form: 'container' },
   paused: { hue: 'grey', form: 'ringed' },
-  'needs-human': { hue: 'yours', form: 'container' },
+  'asks-in-session': { hue: 'yours', form: 'container' },
   checking: { hue: 'sage', form: 'container', mark: 'ring-1 ring-sage ring-inset' },
   verified: { hue: 'sage', form: 'filled' },
   unverified: { hue: 'sage', form: 'ringed' },

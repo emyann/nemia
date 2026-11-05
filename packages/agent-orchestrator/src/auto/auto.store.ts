@@ -11,12 +11,12 @@ import { Result, Schema } from 'effect';
 import { agentNameRefusal } from '../agents/agents.ts';
 import { firstRefusal, When } from '../record/record.store.ts';
 import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
-import { AUTO_ANSWERS, AUTO_FOLDER, CONDITIONS, DEFAULT_AUTO, DEFAULT_ID, ruleWords, type AutoRule } from './auto.ts';
+import { RULE_ANSWERS, POLICY_FOLDER, CONDITIONS, DEFAULT_POLICY, DEFAULT_ID, ruleWords, type PolicyRule } from './auto.ts';
 
 /** A rule as the files keep it. */
 const RuleSchema = Schema.Struct({
   id: Schema.String,
-  answer: Schema.Literals(AUTO_ANSWERS),
+  answer: Schema.Literals(RULE_ANSWERS),
   steps: Schema.optionalKey(Schema.Array(Schema.String)),
   when: Schema.Array(Schema.Literals(CONDITIONS)),
   under: Schema.optionalKey(Schema.Finite.check(Schema.isGreaterThan(0))),
@@ -38,13 +38,13 @@ const ProposedSchema = Schema.StructWithRest(
 );
 
 /** The person's confirmed list, as read. */
-export type Confirmed = { since: string; rules: AutoRule[] };
+export type Confirmed = { since: string; rules: PolicyRule[] };
 
 /** What an agent proposed, as read. */
-export type Proposed = { at: string; rules: AutoRule[]; guidance: string[]; digest: string | null };
+export type Proposed = { at: string; rules: PolicyRule[]; guidance: string[]; digest: string | null };
 
 /** The folder of `<store>/auto/`, under the store `home`. */
-export const autoDir = (home: string): string => path.join(home, AUTO_FOLDER);
+export const policyDir = (home: string): string => path.join(home, POLICY_FOLDER);
 
 /** `agent`'s name, refused (`Invalid`) where it is no agent's. */
 function named(agent: string): string {
@@ -54,17 +54,17 @@ function named(agent: string): string {
 }
 
 /** The file the person's confirmed list for `agent` is kept in, in the store `home`. Refused (`Invalid`): a name that is no agent's. */
-export const confirmedFile = (home: string, agent: string): string => path.join(autoDir(home), `${named(agent)}.json`);
+export const confirmedFile = (home: string, agent: string): string => path.join(policyDir(home), `${named(agent)}.json`);
 
 /** The file `agent`'s proposals are kept in, in the store `home`. Refused (`Invalid`): a name that is no agent's. */
-export const proposedFile = (home: string, agent: string): string => path.join(autoDir(home), `${named(agent)}.proposed.json`);
+export const proposedFile = (home: string, agent: string): string => path.join(policyDir(home), `${named(agent)}.proposed.json`);
 
 /** The digest of the words of a custom instruction, or null for none: what a proposal is stale against once the words change. */
 export const digestOf = (words: string | undefined): string | null =>
   words === undefined ? null : createHash('sha256').update(words).digest('hex').slice(0, 16);
 
 /** A rule as decoded, its optional keys left out where absent. */
-const ruleOf = (rule: Schema.Schema.Type<typeof RuleSchema>): AutoRule => ({
+const ruleOf = (rule: Schema.Schema.Type<typeof RuleSchema>): PolicyRule => ({
   id: rule.id,
   answer: rule.answer,
   ...(rule.steps === undefined ? {} : { steps: [...rule.steps] }),
@@ -141,7 +141,7 @@ export function writeProposed(home: string, agent: string, proposed: Proposed): 
  * in force already (`Conflict`).
  */
 export function confirmRule(home: string, agent: string, id: string, words: string, now: Date): Confirmed {
-  const rule = id === DEFAULT_ID ? DEFAULT_AUTO : readProposed(home, agent)?.rules.find((r) => r.id === id);
+  const rule = id === DEFAULT_ID ? DEFAULT_POLICY : readProposed(home, agent)?.rules.find((r) => r.id === id);
   if (rule === undefined)
     throw new Missing({
       message: `${agent} proposed no rule ${id}: see what it proposed with nemia policy ${agent}, or ask it to propose again.`,
@@ -150,7 +150,7 @@ export function confirmRule(home: string, agent: string, id: string, words: stri
     throw new Conflict({
       message: `${agent}'s rule ${id} now reads "${ruleWords(rule)}", not the words you confirmed: read it again with nemia policy ${agent}, and confirm what it says.`,
     });
-  const rules = readConfirmed(home, agent)?.rules ?? [DEFAULT_AUTO];
+  const rules = readConfirmed(home, agent)?.rules ?? [DEFAULT_POLICY];
   if (rules.some((r) => r.id === id))
     throw new Conflict({
       message: `the rule ${id} is in force already for ${agent}: drop it first with nemia policy rm ${agent} ${id}.`,
@@ -165,7 +165,7 @@ export function confirmRule(home: string, agent: string, id: string, words: stri
  * none. The list written. Refused, writing nothing: a rule not in force (`Missing`).
  */
 export function dropRule(home: string, agent: string, id: string, now: Date): Confirmed {
-  const rules = readConfirmed(home, agent)?.rules ?? [DEFAULT_AUTO];
+  const rules = readConfirmed(home, agent)?.rules ?? [DEFAULT_POLICY];
   if (!rules.some((r) => r.id === id))
     throw new Missing({
       message: `no rule ${id} is in force for ${agent}: the rules in force are ${rules.map((r) => r.id).join(', ') || 'none'} (nemia policy ${agent}).`,

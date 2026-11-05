@@ -69,7 +69,7 @@ test('kindOf: the five kinds of a card, from the phase the api carries', () => {
     ['running', 'working', false, 'work'],
     ['running', 'checking', true, 'work'],
     ['waiting', 'awaiting-approval', true, 'gate'],
-    ['waiting', 'needs-human', true, 'gate'],
+    ['waiting', 'asks-in-session', true, 'gate'],
     ['waiting', 'unsigned', true, 'gate'],
     ['succeeded', 'verified', true, 'done'],
     ['succeeded', 'unverified', true, 'done'],

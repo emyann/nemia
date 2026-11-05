@@ -17,6 +17,8 @@
  * (`personWordBreaks`), no file says a retired phrasing or `cancelled` to a person (`retiredBreaks`), and no hover says a runtime word
  * (`hoverRuntimeBreaks`). A person's words for an offer are written once, in its `OFFERS`: no other file spells a sentence of it
  * (`offerWordBreaks`).
+ *
+ * No file of the board compares the runtime's `needs-human`: a question a session asks is read off its codes (`needsHumanBreaks`).
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -378,6 +380,36 @@ test('REFUSED: an EventSource opened in another file; one named in a JSDoc is le
     `src/lib/x.ts opens an EventSource: the api's streams are opened in ${STREAMS.join(' and ')} alone`,
   ]);
   assert.deepEqual(planted('/** Follows an EventSource, or anything that dispatches its events. */\nexport const x = 1;\n'), []);
+});
+
+/** The runtime's word for a task whose harness stopped its session to ask, quoted as a value in code. */
+const NEEDS_HUMAN = /(['"`])needs-human\1/;
+
+/**
+ * Each file whose code quotes the runtime's `needs-human`: the runtime keeps that word, and the board reads the orchestrator's codes
+ * above it — a question its session asks is `AwaitingAnswer` with `via` `session`, the board's `asks-in-session` (`stepState`,
+ * `src/lib/status.ts`). A comment that names the engine's word is let through.
+ */
+const needsHumanBreaks = (texts: ReadonlyMap<string, string>): string[] =>
+  [...texts]
+    .filter(([, text]) => NEEDS_HUMAN.test(withoutComments(text)))
+    .map(
+      ([file]) =>
+        `${file} compares the runtime's needs-human: read the step's codes, reason AwaitingAnswer via session, as stepState in src/lib/status.ts does`,
+    );
+
+test("no file of the board compares the runtime's needs-human: a question its session asks is read off the codes", () => {
+  assert.deepEqual(needsHumanBreaks(sourceTexts()), []);
+});
+
+test('REFUSED: a needs-human comparison planted in the board; one named in a comment is let through', () => {
+  const planted = (text: string): string[] => needsHumanBreaks(new Map([...sourceTexts(), ['src/lib/x.ts', text]]));
+  for (const quote of ["'", '"', '`']) {
+    const breaks = planted(`export const asks = (word: string): boolean => word === ${quote}needs-human${quote};\n`);
+    assert.equal(breaks.length, 1, quote);
+    assert.match(breaks[0] ?? '', /^src\/lib\/x\.ts compares the runtime's needs-human:/, quote);
+  }
+  assert.deepEqual(planted("/** The engine's `needs-human`, read off the codes. */\nexport const x = 1;\n"), []);
 });
 
 test(`only ${RENDERER} imports a markdown renderer, and it does`, () => {

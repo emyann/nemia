@@ -162,10 +162,10 @@ test('REFUSED: a body that reads an imported root by name is found, and a file t
     'one line each, so the count is the lines that have to change',
   );
   assert.deepEqual(
-    globalRoots(`const ROOT = ${reader}();\nexport const cordon = (): string => path.join(ROOT, 'cordon');\n`),
+    globalRoots(`const ROOT = ${reader}();\nexport const pauseFile = (): string => path.join(ROOT, 'cordon');\n`),
     [
       `1: ROOT is a root this module reads as it loads — const ROOT = ${reader}();`,
-      "2: this line reads ROOT, a root read as this module loaded — export const cordon = (): string => path.join(ROOT, 'cordon');",
+      "2: this line reads ROOT, a root read as this module loaded — export const pauseFile = (): string => path.join(ROOT, 'cordon');",
     ],
     "a module's own binding counts, and so does each body that reads it",
   );

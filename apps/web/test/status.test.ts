@@ -78,7 +78,7 @@ const plain = (phase: StepPhase, reason: StepReason): StepCodes => ({ phase, rea
 test('stepState: each reason the api carries, read as the state a person acts on', async (t) => {
   await t.test('a qualified reason reads by what qualifies it: an answer by where it is asked, a wait by what it waits on', () => {
     const cases: Array<[keyof typeof QUALIFIED, StepState]> = [
-      ['AwaitingAnswer via session', 'needs-human'],
+      ['AwaitingAnswer via session', 'asks-in-session'],
       ['AwaitingAnswer via closeout', 'blocked'],
       ['Waiting on limit', 'waiting-for-slot'],
       ['Waiting on run', 'waiting'],
@@ -193,7 +193,7 @@ test('stepState, satisfiesAfter, waitsOnPerson, waitsAtGate: what is work done, 
       );
       assert.deepEqual(
         states.filter((s) => waitsOnPerson(s, false)),
-        ['needs-human', ...gates, 'unsigned', 'denied'],
+        ['asks-in-session', ...gates, 'unsigned', 'denied'],
         'and beside the gates, a session asking through its harness and work to try again that only a person sends',
       );
       assert.equal(states.filter((s) => waitsOnPerson(s, true) || waitsAtGate(s, true)).length, 0);
@@ -250,7 +250,7 @@ test('stepState, satisfiesAfter, waitsOnPerson, waitsAtGate: what is work done, 
       ['Waiting on pause', 'waiting'],
       ['Waiting on limit', 'waiting-for-slot'],
       ['Running', 'working'],
-      ['AwaitingAnswer via session', 'needs-human'],
+      ['AwaitingAnswer via session', 'asks-in-session'],
       ['Checking', 'checking'],
       ['CheckPassed', 'verified'],
       ['Succeeded', 'unverified'],

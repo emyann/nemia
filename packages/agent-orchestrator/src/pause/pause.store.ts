@@ -1,5 +1,5 @@
 /**
- * The store's pause on disk: `$WF_ROOT/cordon`, a person's file, `{at, by, why?, timeoutMs?}`, put by `nemia pause` and deleted by
+ * The store's pause on disk: `$WF_ROOT/<PAUSE_FILE>`, a person's file, `{at, by, why?, timeoutMs?}`, put by `nemia pause` and deleted by
  * `nemia resume`; `timeoutMs`, the timeout a call in flight is given before the sessions' drain cuts it, absent on a pause that parks no
  * session (the take-over's own, or one put before the timeout was written), and set to 0 by `nemia pause --now` (`cutPause`).
  * Every pass reads it, as `runStore` composes it onto each run it reads, so a pause put or lifted between two passes is honoured by the
@@ -19,8 +19,14 @@ import { RESUME_LINE, type Pause } from './pause.ts';
 /** The store whose pause this is, read once as the package loads, as `record.store.ts` reads its `HOME`. */
 const ROOT = wfRoot();
 
+/**
+ * The name of the pause's file in the store. The store keeps the name it had before the verbs became `nemia pause` and `nemia resume`,
+ * so that a pause put then still stands and is lifted: a file renamed would leave it standing, unseen.
+ */
+const PAUSE_FILE = 'cordon';
+
 /** The pause's file: one for the whole store. */
-export const pauseFile = (): string => path.join(ROOT, 'cordon');
+export const pauseFile = (): string => path.join(ROOT, PAUSE_FILE);
 
 /** A field of the file as it was written: one line of words, or absent. */
 const Said = Schema.optional(Schema.String);
@@ -109,7 +115,7 @@ export function cutPause(): Pause {
   if (stands === null) throw new Missing({ message: 'the store is not paused: there is nothing to cut (nemia pause --now puts one).' });
   const pause: Pause = { ...stands, timeoutMs: 0 };
   const file = pauseFile();
-  const hidden = path.join(path.dirname(file), `.cordon.${process.pid}`);
+  const hidden = path.join(path.dirname(file), `.${PAUSE_FILE}.${process.pid}`);
   fs.writeFileSync(hidden, `${JSON.stringify(pause)}\n`);
   fs.renameSync(hidden, file);
   return pause;

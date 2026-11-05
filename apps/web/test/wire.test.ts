@@ -102,7 +102,7 @@ export type Said = Holds<Same<Board.Said, SaidHeld>>;
 export type QuestionAnswer = Holds<Same<Board.QuestionAnswer, answers.Answer>>;
 
 export type PolicyList = Holds<Same<Board.PolicyList, nemia.PolicyAnswer>>;
-export type AutoRule = Holds<Same<Board.AutoRule, nemia.PolicyAnswer['rules'][number]>>;
+export type PolicyRule = Holds<Same<Board.PolicyRule, nemia.PolicyAnswer['rules'][number]>>;
 export type Condition = Holds<Same<Board.Condition, nemia.PolicyAnswer['rules'][number]['when'][number]>>;
 
 export type Bridge = Holds<Same<Board.Bridge, NonNullable<runs.StepFiled['bridge']>>>;

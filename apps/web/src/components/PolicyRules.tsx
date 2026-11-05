@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { policyQuery, confirmRule, dropRule, type PolicyList, type AutoRule } from '../lib/api';
+import { policyQuery, confirmRule, dropRule, type PolicyList, type PolicyRule } from '../lib/api';
 import { clockWord } from '../lib/quota';
 import { useNow } from '../lib/useNow';
 import { CustomInstructions, SESSION } from './CustomInstructions';
@@ -19,7 +19,7 @@ const DEFAULT_ID = 'default';
  * since, and the words kept as guidance, which nothing enforces. A write sets what the part shows from the api's answer and reads the
  * rules again; a refusal is shown in its words.
  */
-export function AutoRules({ agent }: { agent: string }) {
+export function PolicyRules({ agent }: { agent: string }) {
   const queryClient = useQueryClient();
   const query = policyQuery(agent);
   const { data, error } = useQuery(query);
@@ -43,7 +43,7 @@ export function AutoRules({ agent }: { agent: string }) {
       </p>
       <CustomInstructions name={agent} reach={SESSION} />
       {data ? (
-        <AutoParts list={data} pending={write.isPending} onAsk={ask} />
+        <PolicyParts list={data} pending={write.isPending} onAsk={ask} />
       ) : (
         <p className="text-body-medium text-muted-foreground">
           {error instanceof Error ? `Could not read her rules: ${error.message}` : 'Reading her rules…'}
@@ -60,7 +60,7 @@ export function AutoRules({ agent }: { agent: string }) {
 }
 
 /** The parts of an agent's rules, read. */
-function AutoParts({ list, pending, onAsk }: { list: PolicyList; pending: boolean; onAsk: (rule: RuleAsk) => void }) {
+function PolicyParts({ list, pending, onAsk }: { list: PolicyList; pending: boolean; onAsk: (rule: RuleAsk) => void }) {
   return (
     <>
       <InForce list={list} pending={pending} onAsk={onAsk} />
@@ -80,7 +80,7 @@ function Sub({ heading, children, ...data }: { heading: string; children: ReactN
 }
 
 /** One rule in its words, with what is said and offered beside it. */
-function Rule({ rule, children }: { rule: AutoRule; children?: ReactNode }) {
+function Rule({ rule, children }: { rule: PolicyRule; children?: ReactNode }) {
   return (
     <li data-auto-rule={rule.id} className="flex flex-wrap items-start justify-between gap-2 rounded-lg border px-3 py-2">
       <span data-auto-words className="min-w-0 flex-1 text-body-medium">

@@ -3,5 +3,5 @@
  * and Nemia's fence derived from the classes (`nemiaFence`, `widened`).
  */
 export { classBreaks, type CommandClass } from './class.ts';
-export { admissionOf, typedIn, type Auto, type Typed } from './admission.ts';
+export { admissionOf, typedIn, type PolicyReads, type Typed } from './admission.ts';
 export { nemiaFence, widened, type Fence } from './fence.ts';

@@ -6432,12 +6432,12 @@ test("an agent's custom instructions are anchored, so a step's page links to whe
 
 test("an agent's custom instructions say a run keeps the words it froze; the store's own agent's, beside her rules, that her open session is told them", async () => {
   const { CustomInstructions } = await import('../src/components/CustomInstructions.tsx');
-  const { AutoRules } = await import('../src/components/AutoRules.tsx');
+  const { PolicyRules } = await import('../src/components/PolicyRules.tsx');
   const hired = await routedWith(createElement(CustomInstructions, { name: 'writer' }));
   assert.match(hired, /data-custom-frozen[^>]*>A run already started keeps the words it froze/, 'a hired agent: a run keeps what it froze');
   assert.match(hired, /wherever it is hired/);
   assert.doesNotMatch(hired, /data-custom-told|open session/);
-  const hers = await routedWith(createElement(AutoRules, { agent: 'nemia' }));
+  const hers = await routedWith(createElement(PolicyRules, { agent: 'nemia' }));
   assert.match(hers, /<section id="custom-instructions"/, 'her rules sit beside her custom instruction');
   assert.match(
     hers,

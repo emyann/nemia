@@ -15,9 +15,9 @@ import { LEVELS, type Level } from '../level/level.ts';
 import { levelOfFactory, runFactory } from '../level/levels.verb.ts';
 import { agentNameRefusal } from '../agents/agents.ts';
 import { HOME } from '../record/record.store.ts';
-import { AUTO_ANSWERS, factsOf, listInForce, type AutoRule, type Facts } from '../auto/index.ts';
+import { RULE_ANSWERS, factsOf, listInForce, type PolicyRule, type Facts } from '../auto/index.ts';
 import { readConfirmed } from '../auto/auto.store.ts';
-import { admissionOf, answerOf, namedIn, typedIn, type Auto, type Scope } from './admission.ts';
+import { admissionOf, answerOf, namedIn, typedIn, type PolicyReads, type Scope } from './admission.ts';
 import { seenOf } from './seen.verb.ts';
 import { RunDoor } from '../runs/runs.store.ts';
 import { RunId } from '../record/record.model.ts';
@@ -113,7 +113,7 @@ const scopeRead = Effect.fnUntraced(function* (line: string, table: Parameters<t
 });
 
 /** The rules in force for `agent` in the store `home`: none where the person's list does not read, so nothing is let through by it. */
-function rulesOf(home: string, agent: string): readonly AutoRule[] {
+function rulesOf(home: string, agent: string): readonly PolicyRule[] {
   try {
     return listInForce(readConfirmed(home, agent)?.rules);
   } catch {
@@ -133,11 +133,11 @@ const levelRead = Effect.fnUntraced(function* (runId: string) {
  * level and its facts at the moment of the call, and for an approval the yes it gives (`approveForm`); a run that does not read has none of
  * them, and is asked.
  */
-const autoRead = Effect.fnUntraced(function* (line: string, table: Parameters<typeof admissionOf>[1], agent: string, home: string) {
+const policyRead = Effect.fnUntraced(function* (line: string, table: Parameters<typeof admissionOf>[1], agent: string, home: string) {
   const levels = new Map<string, Level | undefined>();
   const facts = new Map<string, Facts | undefined>();
   const forms = new Map<string, ApproveForm | undefined>();
-  for (const typed of typedIn(line, table).filter((t) => (AUTO_ANSWERS as readonly string[]).includes(t.name))) {
+  for (const typed of typedIn(line, table).filter((t) => (RULE_ANSWERS as readonly string[]).includes(t.name))) {
     const answer = answerOf(typed, table);
     if (answer === undefined) continue;
     if (!levels.has(answer.runId)) levels.set(answer.runId, yield* levelRead(answer.runId));
@@ -152,20 +152,20 @@ const autoRead = Effect.fnUntraced(function* (line: string, table: Parameters<ty
     levelOf: (runId) => levels.get(runId),
     factsOf: (runId, step) => facts.get(`${runId} ${step}`),
     formOf: (runId, step) => forms.get(`${runId} ${step}`),
-  } satisfies Auto;
+  } satisfies PolicyReads;
 });
 
 /**
  * Admission's answer for the call `given` (an `AdmissionCall` as JSON) against `table`: each step a retry on its line tries read first,
  * a run that does not read saying it is not there; given the level each is to be at least at (`atLeast`), each run and factory the
- * line names read for its level; given an agent (`autoAgent`), its rules in the store `home` and what they are judged on (`autoRead`). A
- * call that is no call is asked of the person.
+ * line names read for its level; given an agent (`policyAgent`), its rules in the store `home` and what they are judged on
+ * (`policyRead`). A call that is no call is asked of the person.
  */
 export const admitted = Effect.fnUntraced(function* (
   given: string,
   table: Parameters<typeof admissionOf>[1],
   atLeast?: Level,
-  autoAgent?: string,
+  policyAgent?: string,
   home: string = HOME,
 ) {
   const call = callOf(given);
@@ -179,6 +179,6 @@ export const admitted = Effect.fnUntraced(function* (
     waits.set(`${runId} ${step}`, Result.isSuccess(read) ? read.success : `is not there: ${read.failure.message}`);
   }
   const scope = atLeast === undefined ? undefined : yield* scopeRead(line, table, atLeast);
-  const auto = autoAgent === undefined ? undefined : yield* autoRead(line, table, autoAgent, home);
+  const auto = policyAgent === undefined ? undefined : yield* policyRead(line, table, policyAgent, home);
   return admissionOf(call, table, (runId, step) => waits.get(`${runId} ${step}`), scope, auto);
 });

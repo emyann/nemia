@@ -262,7 +262,7 @@ type RunBase = {
   pinned?: readonly Pin[];
   /**
    * That a person paused the whole store (`nemia pause`), by whom and why — composed on read onto every run from the store's one file,
-   * `$WF_ROOT/cordon`, and never written into a record. While it stands the run files nothing new, no step, try, round or check, and
+   * `pauseFile`, and never written into a record. While it stands the run files nothing new, no step, try, round or check, and
    * what a person writes meanwhile waits on its own files for the lift (`assess`); what is in flight runs on. Absent while the store is not
    * paused.
    */

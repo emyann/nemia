@@ -15,7 +15,7 @@ import { parseAgent } from '../agents/agents.ts';
 import { stepFrom } from '../workflow/index.ts';
 import type { Workflow } from '../step/step.ts';
 import { firstRefusal } from '../record/record.store.ts';
-import { AUTO_FOLDER } from '../auto/index.ts';
+import { POLICY_FOLDER } from '../auto/index.ts';
 import { Invalid, Missing } from '../refusal/refusal.ts';
 import { LEVELS, nemiaPrompt, type LevelFile, type ToldCustom } from './nemia.ts';
 
@@ -156,7 +156,7 @@ export function ownBin(root: string = PACKAGE): string | undefined {
 
 /**
  * The deny rules on every write in the store `root` but her own folder's: an `Edit` rule on each entry at its top, a folder's whole, the
- * rules for auto among them whether or not their folder is there yet (`AUTO_FOLDER`), and on her level, her instruction and the record
+ * rules for auto among them whether or not their folder is there yet (`POLICY_FOLDER`), and on her level, her instruction and the record
  * of the custom words she was told (`toldFile`), the three files of her folder she does not own. Read at each filing, so a folder the
  * store gains is denied at the next.
  */
@@ -171,10 +171,10 @@ export function storeDenies(root: string = ROOT): string[] {
   const own = path.basename(nemiaDir());
   return [
     ...names
-      .filter((name) => name !== own && name !== AUTO_FOLDER)
+      .filter((name) => name !== own && name !== POLICY_FOLDER)
       .map((name) => path.join(root, name))
       .map((at) => (fs.statSync(at, { throwIfNoEntry: false })?.isDirectory() ? `Edit(/${at}/**)` : `Edit(/${at})`)),
-    `Edit(/${path.join(root, AUTO_FOLDER)}/**)`,
+    `Edit(/${path.join(root, POLICY_FOLDER)}/**)`,
     `Edit(/${levelFile()})`,
     `Edit(/${promptFile()})`,
     `Edit(/${toldFile()})`,

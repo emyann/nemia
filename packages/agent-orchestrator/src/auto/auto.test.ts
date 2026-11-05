@@ -8,25 +8,35 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { names } from '../../test/assessed.ts';
-import { allowedBy, CONDITIONS, DEFAULT_AUTO, listInForce, NO_FACTS, ruleRefusal, ruleWords, type AutoRule, type Facts } from './index.ts';
+import {
+  allowedBy,
+  CONDITIONS,
+  DEFAULT_POLICY,
+  listInForce,
+  NO_FACTS,
+  ruleRefusal,
+  ruleWords,
+  type PolicyRule,
+  type Facts,
+} from './index.ts';
 
 /** A run where all agree: every condition holds, and it has cost $3. */
 const ALL_AGREE: Facts = { recommends: true, checked: true, accepted: true, withinBudget: true, nothingOpen: true, spend: 3 };
 
 test('`allowedBy`: the default allows an approval at any step where all agree and nothing else; a rule covers its answer, steps and line', async (t) => {
   await t.test('the default allows an approval at any step where all agree, and nothing else', () => {
-    assert.equal(allowedBy([DEFAULT_AUTO], { answer: 'approve', step: 'design' }, ALL_AGREE), DEFAULT_AUTO);
-    assert.equal(allowedBy([DEFAULT_AUTO], { answer: 'approve', step: 'land' }, ALL_AGREE), DEFAULT_AUTO);
-    assert.equal(allowedBy([DEFAULT_AUTO], { answer: 'retry', step: 'design' }, ALL_AGREE), undefined, 'a try is no approval');
-    assert.equal(allowedBy([DEFAULT_AUTO], { answer: 'approve', step: 'design' }, NO_FACTS), undefined, 'a run that does not read');
+    assert.equal(allowedBy([DEFAULT_POLICY], { answer: 'approve', step: 'design' }, ALL_AGREE), DEFAULT_POLICY);
+    assert.equal(allowedBy([DEFAULT_POLICY], { answer: 'approve', step: 'land' }, ALL_AGREE), DEFAULT_POLICY);
+    assert.equal(allowedBy([DEFAULT_POLICY], { answer: 'retry', step: 'design' }, ALL_AGREE), undefined, 'a try is no approval');
+    assert.equal(allowedBy([DEFAULT_POLICY], { answer: 'approve', step: 'design' }, NO_FACTS), undefined, 'a run that does not read');
     assert.equal(allowedBy([], { answer: 'approve', step: 'design' }, ALL_AGREE), undefined, 'an empty list allows nothing');
   });
   for (const condition of CONDITIONS)
     await t.test(`REFUSED: the default asks when ${condition} fails`, () => {
-      assert.equal(allowedBy([DEFAULT_AUTO], { answer: 'approve', step: 'design' }, { ...ALL_AGREE, [condition]: false }), undefined);
+      assert.equal(allowedBy([DEFAULT_POLICY], { answer: 'approve', step: 'design' }, { ...ALL_AGREE, [condition]: false }), undefined);
     });
   await t.test("a rule covers only its answer, its steps and the run's spend under its line", () => {
-    const rule: AutoRule = { id: 'gate', answer: 'approve', steps: ['design'], when: ['recommends'], under: 10 };
+    const rule: PolicyRule = { id: 'gate', answer: 'approve', steps: ['design'], when: ['recommends'], under: 10 };
     const facts = { ...NO_FACTS, recommends: true, spend: 9.99 };
     assert.equal(allowedBy([rule], { answer: 'approve', step: 'design' }, facts), rule);
     assert.equal(allowedBy([rule], { answer: 'approve', step: 'review' }, facts), undefined, 'a step it does not name');
@@ -37,7 +47,7 @@ test('`allowedBy`: the default allows an approval at any step where all agree an
 
 test('the default is pinned whole: approve, every step, all five conditions in order, from the default', () => {
   assert.deepEqual(CONDITIONS, ['recommends', 'checked', 'accepted', 'withinBudget', 'nothingOpen']);
-  assert.deepEqual(DEFAULT_AUTO, {
+  assert.deepEqual(DEFAULT_POLICY, {
     id: 'default',
     answer: 'approve',
     when: ['recommends', 'checked', 'accepted', 'withinBudget', 'nothingOpen'],
@@ -46,7 +56,7 @@ test('the default is pinned whole: approve, every step, all five conditions in o
 });
 
 test("`ruleWords`: a rule's words are made from its fields, each condition's phrase once", () => {
-  const rule = ruleWords(DEFAULT_AUTO);
+  const rule = ruleWords(DEFAULT_POLICY);
   assert.equal(
     rule,
     'Approve any step unasked when the agent recommends it, its check passed, every reviewer accepted, no step is past its budget and ' +
@@ -65,8 +75,8 @@ test("`ruleWords`: a rule's words are made from its fields, each condition's phr
 });
 
 test('a confirmed list replaces the default; the default is in force only while none is confirmed', () => {
-  const tries: AutoRule = { id: 'tries', answer: 'retry', when: ['recommends'] };
-  assert.deepEqual(listInForce(undefined), [DEFAULT_AUTO]);
+  const tries: PolicyRule = { id: 'tries', answer: 'retry', when: ['recommends'] };
+  assert.deepEqual(listInForce(undefined), [DEFAULT_POLICY]);
   assert.deepEqual(listInForce([tries]), [tries]);
   assert.deepEqual(listInForce([]), [], 'a list with the default dropped holds none');
 });

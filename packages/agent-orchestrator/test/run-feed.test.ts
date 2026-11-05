@@ -1174,7 +1174,7 @@ test(
   },
 );
 
-test("the store's pause and resume, each one line of the store's, said once by the pass off the cordon it reads, whatever reads the store", async (t) => {
+test("the store's pause and resume, each one line of the store's, said once by the pass off the pause file it reads, whatever reads the store", async (t) => {
   const s = story(t);
   emptyStore();
   const { pauseFile, readPause } = await import('../src/pause/pause.store.ts');

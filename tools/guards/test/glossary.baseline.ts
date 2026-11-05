@@ -57,6 +57,10 @@
  * `claude-detached` and `claude-bg`, on the day every Claude Code session moved onto the Agent SDK: each a harness name a former
  * runtime took, said now only by the refusal that names the fix to a task or an engine still giving it (`harness-refusal.ts`,
  * `options.ts`). They stay while a caller may still write them.
+ *
+ * `cordon`, on the day the leftover words were settled (the Pause row in the run core's table): the store's pause file keeps its name,
+ * `PAUSE_FILE` (`pause.store.ts`), so a pause put before the verbs were renamed still stands and is lifted; and `readRun` drops the key a
+ * record of that time may hold (`record.store.ts`). They stay while a store or a record on disk may say it.
  */
 export const RETIRED_COUNTS: Readonly<Record<string, Readonly<Record<string, number>>>> = {
   'agents remove': {
@@ -171,5 +175,9 @@ export const RETIRED_COUNTS: Readonly<Record<string, Readonly<Record<string, num
   },
   'claude-bg': {
     'packages/agent-runtime/src/service/options.ts': 3,
+  },
+  cordon: {
+    'packages/agent-orchestrator/src/pause/pause.store.ts': 1,
+    'packages/agent-orchestrator/src/record/record.store.ts': 1,
   },
 };

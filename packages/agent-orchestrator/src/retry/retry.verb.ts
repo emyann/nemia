@@ -109,7 +109,8 @@ export const retryRun = Effect.fn('retry')(function* (
     run,
     ask,
     file,
-    stopFirst: retryable(step, run, phaseOf, closeoutReader(views, run, steps), closeoutAsked(views), steps, blocked, spendOf).via === 'session',
+    stopFirst:
+      retryable(step, run, phaseOf, closeoutReader(views, run, steps), closeoutAsked(views), steps, blocked, spendOf).via === 'session',
   } satisfies Asked;
 });
 

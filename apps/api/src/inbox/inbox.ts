@@ -1,29 +1,18 @@
 /**
- * The inbox, for the board: cards parked before they are started — listed, filed and dropped.
+ * The inbox's card page, for the board: one card read as the inbox lists it, its file as written, and its keys (`GET /api/inbox/:name`);
+ * and what a card filed through the Card's verb files (`filingOf`, objects/cards.ts).
  *
- * The package's inbox, through the entries of its command table (`INBOX`, `INBOX_ADD`, and the routes it generates), `nemia inbox`'s own:
- * `$WF_ROOT/inbox/`, a card per `<name>.md`, read from disk on each request, as the workflows are, so a card a person has just filed or
- * dropped at the command line lists as it is now. Starting a card is a start, so it is `POST /api/runs` with `card` (workflows.ts),
- * through `startFromInbox`.
- *
- * A card's page reads one card: as the inbox lists it, as its file is written, and its keys (`GET /api/inbox/:name`).
- *
- * A card is queued to start on its own, and taken off the queue, as `nemia inbox queue <name>` and `nemia inbox queue <name> --off` do
- * (`POST` and `DELETE /api/inbox/:name/queue`, generated from `nemia inbox queue`'s entry): the tick starts the next card in the queue's
- * order when a run slot is free. The listing already says where each queued card stands — `queued`, its time and place, and `tried`, the
- * tick's last start of it that did not happen — since each entry is the package's.
- *
- * Every refusal is the package's sentence with the api's status, but for the body's shape, which is the api's own (400). Filing and
- * dropping are writes a page on another site must not make, so each passes the guard (guard.ts) before its body is read.
+ * The package's inbox, through the entries of its command table, `nemia inbox`'s own: `$WF_ROOT/inbox/`, a card per `<name>.md`, read
+ * from disk on each request, as the workflows are, so a card a person has just filed or dropped at the command line reads as it is now.
+ * The cards listed, filed, dropped, started, queued and taken off the queue, and their labels edited, are the Card's verbs, served from
+ * `objects`' `Api` (src/objects/cards.ts); a card's `from:` set or taken off is the route the package's command table generates from
+ * `nemia inbox from`'s entry (commands/routes.ts).
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { Effect, Schema } from 'effect';
+import { Effect } from 'effect';
 import { Hono } from 'hono';
 import {
-  DEFAULT_FACTORY,
-  INBOX,
-  INBOX_ADD,
   INBOX_KEY_MEANINGS,
   INBOX_KEYS,
   inboxNameRefusal,
@@ -37,11 +26,10 @@ import {
   type InboxListing,
   type InformerMemo,
 } from 'agent-orchestrator';
-import { readBody, type BodyIssue } from '../body.ts';
-import { refusedBeforeReading, type Guarded, type Refusal } from '../guard.ts';
+import type { CardFile } from 'objects';
+import type { Refusal } from '../guard.ts';
 import { type ApiEnv, served } from '../layer.ts';
 import { folderOf, type KeyRow } from '../workflows/workflows.ts';
-import { selectorOf } from '../labels/index.ts';
 import { commandNamed, runPlaced } from '../store.ts';
 
 /**
@@ -62,20 +50,10 @@ export type InboxEntry = InboxListing & { body: string | null; filedAt: string |
  */
 export type InboxCardPage = InboxEntry & { source: string; keys: KeyRow[] | null };
 
-/** What `POST /api/inbox` answers: the card written, as `nemia inbox add` prints it, `factory` null for a card that names none. */
-export type InboxFiled = {
-  name: string;
-  file: string;
-  workflow: string | null;
-  repo: string | null;
-  factory: string | null;
-  body: string;
-};
-
 /**
- * What `POST` and `DELETE /api/inbox/:name/queue` answer: what `nemia inbox queue` did (the package's `InboxQueued`) — `queued`, `taken
- * back`, or `not queued` for a card taken off a queue it was not in, which writes nothing — the card's `queued:` as it now reads, and, once
- * queued, its place in the queue's order and how many are in it.
+ * What `nemia inbox queue`'s entry answers (the package's `InboxQueued`) — `queued`, `taken back`, or `not queued` for a card taken off a
+ * queue it was not in — the card's `queued:` as it now reads, and, once queued, its place in the queue's order and how many are in it. No
+ * route answers it since the Card's `queue` and `unqueue` answer the Card; the board's mirror reads it until it moves onto the Card.
  */
 export type InboxQueueAnswer = {
   name: string;
@@ -130,53 +108,7 @@ const keyValue = (entry: InboxEntry, key: (typeof INBOX_KEYS)[number]): string |
   return entry[key] ?? null;
 };
 
-const FILE_SHAPE =
-  '`{ "body": "<the idea>" }`, with `"workflow": "<name>"` for what runs it — `"from": "repo"` or `"yours"` when both have a workflow of that name — `"repo": "<absolute path>"` for the repository it is about, `"factory": "<name>"` for the factory it is filed in, and `"label": ["<key>=<value>", …]` for the labels it carries';
-
-/**
- * `POST /api/inbox`'s body, its keys in the order they are refused: a workflow is a folder's name, never a path, `from` says where it
- * is read from only beside one (`filingOf`), and a factory is a named one, never the default, which is left out.
- */
-const FILE_BODY = Schema.Struct({
-  body: Schema.String,
-  workflow: Schema.optionalKey(Schema.String.check(Schema.makeFilter((name: string) => name !== '' && !/[\\/]/.test(name)))),
-  from: Schema.optionalKey(Schema.Literals(['repo', 'yours'])),
-  repo: Schema.optionalKey(Schema.String),
-  factory: Schema.optionalKey(Schema.String.check(Schema.makeFilter((name: string) => name !== DEFAULT_FACTORY))),
-  label: Schema.optionalKey(Schema.Array(Schema.String)),
-});
-
-/** Why `POST /api/inbox`'s body is not a filing (400), by the first key its schema refused. */
-function fileWords({ path: [key], input }: BodyIssue): string {
-  if (key === 'body')
-    return `\`body\` is the idea, as \`nemia inbox add "<idea>"\` takes it: text. This request's was ${JSON.stringify(input) ?? 'left out'}: ${FILE_SHAPE}.`;
-  if (key === 'workflow')
-    return `\`workflow\` names what runs the card, as GET /api/workflows lists a workflow: a folder's name, or left out for a card that says nothing of it. This request's was ${JSON.stringify(input)}.`;
-  if (key === 'from')
-    return `\`from\` is where the card's workflow is read from: "repo" or "yours", or left out when only one has a workflow of that name.`;
-  if (key === 'repo')
-    return `\`repo\` is the repository the idea is about, as \`nemia inbox add --repo <path>\` takes it: an absolute path, or left out. This request's was ${JSON.stringify(input)}.`;
-  if (key === 'factory' && input === DEFAULT_FACTORY)
-    return `\`factory\` names the factory the card is filed in, and \`${DEFAULT_FACTORY}\` is none to file into: it holds what names no factory. Leave \`factory\` out for a card that gets its factory when it is started.`;
-  if (key === 'factory')
-    return `\`factory\` names the factory the card is filed in, as \`nemia inbox add --factory <name>\` takes it: a factory's name, as GET /api/factories lists them, or left out for a card that gets its factory when it is started. This request's was ${JSON.stringify(input)}.`;
-  if (key === 'label')
-    return `\`label\` is the labels the card carries, as \`nemia inbox add --label <key>=<value>\` takes each: a list, such as \`"label": ["team=core"]\`, or left out. This request's was ${JSON.stringify(input)}.`;
-  return `POST /api/inbox takes a JSON object: ${FILE_SHAPE}.`;
-}
-
-/** A filing, as the guard's refusals word it. */
-const FILE: Guarded = {
-  route: 'POST /api/inbox',
-  does: 'files a card',
-  forAnother: 'file one',
-  why: "a card's body is what a run started from it is asked to do, in the repository it names",
-  reach: 'file the card from the board',
-  instead: "File it from the board's Inbox page, or with `nemia inbox add`",
-  shape: FILE_SHAPE,
-};
-
-/** What `POST /api/inbox` hands the package: the idea, and the keys the card writes. */
+/** What a card filed hands the package: the idea, and the keys the card writes. */
 export type Filing = { text: string; workflow?: string; repo?: string; factory?: string; label?: string[] };
 
 /** Why `factory` does not take a card about `repo`, not one of its repositories: an `Invalid`, naming them. */
@@ -222,7 +154,7 @@ function folderAmong(
  * several and none was sent), and written by name only where a start finds that same folder by its name: under the factory's tree, or
  * under the repository the card is about. Else by its folder, absolute.
  */
-function filingIn(factory: Factory, body: typeof FILE_BODY.Type, home: string): Filing | Refusal {
+function filingIn(factory: Factory, body: CardFile, home: string): Filing | Refusal {
   const repos = factory.repos.map((r) => path.resolve(r));
   const sent = body.repo === undefined ? undefined : path.resolve(body.repo);
   if (body.repo !== undefined && sent !== undefined && !repos.includes(sent)) throw outsideFactory(factory, body.repo);
@@ -241,8 +173,9 @@ function filingIn(factory: Factory, body: typeof FILE_BODY.Type, home: string): 
 }
 
 /**
- * What `POST /api/inbox` files, or why not, before the package is asked: the body's shape (400), and the workflow, found among the folders
- * a start finds one in (`folderOf`: 404, 409) — so a card names a workflow a start from the board can run, never a path that was sent.
+ * What a card filed (`POST /api/namespaces/:namespace/cards`) files, or why not, before the package is asked: `from` with no workflow
+ * (400), and the workflow, found among the folders a start finds one in (`folderOf`: 404, 409) — so a card names a workflow a start from
+ * the board can run, never a path that was sent.
  *
  * A repository's workflow is written by name, as `nemia inbox add --workflow dev` writes it, when the card starts on the api's repository:
  * a name is found under the repository's `workflows/` at start. Yours, or any workflow on a card about another repository, is written as
@@ -255,7 +188,7 @@ function filingIn(factory: Factory, body: typeof FILE_BODY.Type, home: string): 
  *
  * A filing that names a `factory` is the factory's to place (`filingIn`), and the api's repository is not looked at.
  */
-export function filingOf(body: typeof FILE_BODY.Type, repo: string, home: string): Filing | Refusal {
+export function filingOf(body: CardFile, repo: string, home: string): Filing | Refusal {
   const { body: text, workflow, from, repo: about } = body;
   if (from !== undefined && workflow === undefined) {
     return {
@@ -277,97 +210,37 @@ export function filingOf(body: typeof FILE_BODY.Type, repo: string, home: string
 }
 
 /**
- * The inbox's routes. Each write passes the guard (guard.ts) before its body is read.
+ * The inbox's routes.
  *
- * - `GET /api/inbox` — `nemia inbox`'s cards still in play, through its entry's handler, and every entry of the folder that does not read
- *   as one, with why: never hidden, as a workflow that does not load is not. A started card's `state` is its run's phase, judged through
- *   the app's informer as `GET /api/runs` judges it; `?all=true` lists the cards whose run ended too, as `nemia inbox --all` does, and any
- *   other value of `all` is a 422 naming `?all=true`. 500 for a run's record that does not parse: the listing reads them all, for the runs
- *   a card was started as. Each entry carries its person `labels` (`{}` where it sets none). `?selector=`, given again
- *   for another, keeps the cards one of them takes (OR), over the card's labels with its `workflow:` and `factory:` where it sets them,
- *   as `nemia inbox -l` keeps them; a selector the package's grammar refuses is a 422 naming the key or the clause.
  * - `GET /api/inbox/:name` — one card, for its page (`InboxCardPage`). A name that would leave the inbox, or a hidden one, is refused in
  *   the package's words (400) before anything is read; a card is found among the entries the inbox lists, never by a path joined from what
  *   was sent, and a card before a stray file of the same name (`notes.md` and `notes` both list as `notes`), through the package's entry
  *   (`inbox show`). 404 for a card not there, or dropped since the listing read it, the package's `Missing` naming the cards that are.
  *   Its keys are as the listing reads them: `queued` is when it was queued (the listing carries its place too), null when unset.
- * - `POST /api/inbox` — `nemia inbox add "<idea>" --workflow <name> --repo <path>`, through its entry's handler: a card filed, under the
- *   slug of its first line (201, `InboxFiled`). The body and its workflow are refused as `filingOf` says. With `factory`, the card is
- *   filed in that factory, as `--factory <name>` files it: `default` is refused as the body's shape is (400); a name the store has no
- *   factory of is the package's `Missing` (404), and one that is no slug or whose file does not read its `Invalid` (422), each from
- *   `readFactory`; a `repo` that is none of the factory's is a 422 naming them, and a workflow two of its repositories have, with no
- *   `repo`, a 409 (`filingIn`). No `repo:` is written that the request did not send. The package's refusal, word for
- *   word, is an `Invalid`, which `app.onError` answers 422: an idea with nothing in it, a key it would write on two lines, a repo that is
- *   not an absolute path to a directory, an `after:` in the idea's own frontmatter. Anything else is the store's, 500: the inbox could not
- *   be written.
  *
- * A card dropped (`DELETE /api/inbox/:name`), queued or taken off the queue (`POST` and `DELETE /api/inbox/:name/queue`), and its `from:`
- * set or taken off (`PUT` and `DELETE /api/inbox/:name/from`) are routes the package's command table generates (commands/routes.ts), each
- * from its entry, `nemia inbox rm`'s, `nemia inbox queue`'s and `nemia inbox from`'s.
+ * The list, the filing, the drop, the queue and the labels are the Card's (src/objects/cards.ts); `GET /api/inbox`, `POST /api/inbox`,
+ * `DELETE /api/inbox/:name`, `POST` and `DELETE /api/inbox/:name/queue` and `POST /api/inbox/:name/labels` are no route of the api's,
+ * and answer 404. A card's `from:` set or taken off (`PUT` and `DELETE /api/inbox/:name/from`) is the route the package's command table
+ * generates (commands/routes.ts) from `nemia inbox from`'s entry.
  */
-export const inbox = new Hono<ApiEnv>()
-  .get('/api/inbox', (c) => {
-    const all = c.req.query('all');
-    if (all !== undefined && all !== 'true')
-      return c.json(
-        { error: `GET /api/inbox takes ?all=true to list every card, not ?all=${all}: drop it to list the cards in play` },
-        422,
-      );
-    return served(c, async ({ e, placeService, informer, env, home }) => {
-      const { cards } = await runPlaced(
-        { placeService, home },
-        e,
-        INBOX.handler({ ...selectorOf(c), ...(all === 'true' ? { all: true } : {}) }, env, home, keptOf(informer)),
-      );
-      return c.json(await runPlaced({ placeService, home }, e, listInbox(cards, home)));
-    });
-  })
-  .get('/api/inbox/:name', (c) => {
-    const name = c.req.param('name');
-    const wrong = inboxNameRefusal(name);
-    if (wrong) return c.json({ error: wrong }, 400);
-    return served(c, async ({ e, placeService, informer, env, home }) => {
-      const { card, source } = (await runPlaced({ placeService, home }, e, CARD.handler({ name }, env, home, keptOf(informer)))) as {
-        card: InboxListing;
-        source: string;
-      };
-      const [entry = inboxEntry(card, { filedAt: null, text: null })] = await runPlaced({ placeService, home }, e, listInbox([card], home));
-      const keys =
-        entry.error === null
-          ? INBOX_KEYS.map((key) => ({
-              key,
-              value: keyValue(entry, key),
-              meaning: INBOX_KEY_MEANINGS[key],
-            }))
-          : null;
-      return c.json({ ...entry, source, keys } satisfies InboxCardPage);
-    });
-  })
-  .post('/api/inbox', (c) =>
-    served(c, async ({ e, placeService, repo, home }) => {
-      const refused = refusedBeforeReading(FILE, c.req.header('host'), c.req.header('sec-fetch-site'), c.req.header('content-type'));
-      if (refused) return c.json({ error: refused.error }, refused.status);
-      const read = await readBody(c.req, FILE_BODY, `POST /api/inbox takes a JSON body: ${FILE_SHAPE}.`, fileWords);
-      if ('status' in read) return c.json({ error: read.error }, read.status);
-      const asked = filingOf(read.body, repo, home);
-      if ('status' in asked) return c.json({ error: asked.error }, asked.status);
-      const { card, file } = await runPlaced(
-        { placeService, home },
-        e,
-        INBOX_ADD.handler(
-          { idea: asked.text, workflow: asked.workflow, repo: asked.repo, factory: asked.factory, label: asked.label },
-          undefined,
-          home,
-        ),
-      );
-      const filed: InboxFiled = {
-        name: card.name,
-        file,
-        workflow: card.workflow ?? null,
-        repo: card.repo ?? null,
-        factory: card.factory ?? null,
-        body: card.body,
-      };
-      return c.json(filed, 201);
-    }),
-  );
+export const inbox = new Hono<ApiEnv>().get('/api/inbox/:name', (c) => {
+  const name = c.req.param('name');
+  const wrong = inboxNameRefusal(name);
+  if (wrong) return c.json({ error: wrong }, 400);
+  return served(c, async ({ e, placeService, informer, env, home }) => {
+    const { card, source } = (await runPlaced({ placeService, home }, e, CARD.handler({ name }, env, home, keptOf(informer)))) as {
+      card: InboxListing;
+      source: string;
+    };
+    const [entry = inboxEntry(card, { filedAt: null, text: null })] = await runPlaced({ placeService, home }, e, listInbox([card], home));
+    const keys =
+      entry.error === null
+        ? INBOX_KEYS.map((key) => ({
+            key,
+            value: keyValue(entry, key),
+            meaning: INBOX_KEY_MEANINGS[key],
+          }))
+        : null;
+    return c.json({ ...entry, source, keys } satisfies InboxCardPage);
+  });
+});

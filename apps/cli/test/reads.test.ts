@@ -4,8 +4,9 @@
  * `-L` on a labelled run and card, print the same stdout and exit with the same code as the same command typed with `--local`, which
  * runs the orchestrator's own CLI in process (the parity guard: the printers live twice
  * until the in-process reads retire). Each read is seen asking the api, by the request line the api says. A bare 404 — an api older than
- * this client — exits 2 naming the restart; an unknown run exits 2 with the api's refusal; no api serving the store, and none started
- * (`NEMIA_DAEMON_START=off`), exits 2 naming `--local`.
+ * this client — exits 2 naming the restart, as does a client still reading `GET /api/inbox`, which the CardList replaced (planted); an
+ * unknown run exits 2 with the api's refusal; no api serving the store, and none started (`NEMIA_DAEMON_START=off`), exits 2 naming
+ * `--local`.
  *
  * The store is a scratch folder (the api's `scratch.ts`, which reaps what runs in it), never this machine's; the api writes no lease with
  * `--no-tick`, so the test writes the one the client reads, its `url` alone: a lease that names no holder, which both paths word alike.
@@ -18,6 +19,7 @@ import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
 import { scratch } from '../../api/test/scratch.ts';
+import { get, Refused } from '../src/client.ts';
 
 const CLI = path.join(import.meta.dirname, '..', 'bin', 'nemia.ts');
 const API = path.join(import.meta.dirname, '..', '..', 'api');
@@ -192,16 +194,16 @@ const READS: ReadonlyArray<readonly [readonly string[], RegExp]> = [
   [['closeout', RUN, 'review'], /\/api\/runs\/r-parity\/steps\/review\/tries/],
   [['ls'], /\/api\/listing\b/],
   [['ls', RUN], /\/api\/listing\/r-parity\b/],
-  [['inbox'], /\/api\/inbox\b/],
+  [['inbox'], /\/api\/cards\b/],
   [['ls', '-l', 'team=core', '--show-labels', '-L', 'team'], /\/api\/listing\b/],
   [['ls', '-l', 'team=core', '-l', 'team', '-L', 'workflow'], /\/api\/listing\b/],
   [['ls', RUN, '--show-labels'], /\/api\/listing\/r-parity\b/],
-  [['inbox', '-l', 'team=core', '-l', 'team=docs', '--show-labels', '-L', 'team'], /\/api\/inbox\b/],
-  [['inbox', '-L', 'team', '-L', 'workflow'], /\/api\/inbox\b/],
-  [['inbox', '-l', 'team=nope'], /\/api\/inbox\b/],
-  [['inbox', '--all'], /\/api\/inbox\b/],
-  [['inbox', '-l', 'team=gone'], /\/api\/inbox\b/],
-  [['inbox', '-l', 'team=gone', '--all'], /\/api\/inbox\b/],
+  [['inbox', '-l', 'team=core', '-l', 'team=docs', '--show-labels', '-L', 'team'], /\/api\/cards\b/],
+  [['inbox', '-L', 'team', '-L', 'workflow'], /\/api\/cards\b/],
+  [['inbox', '-l', 'team=nope'], /\/api\/cards\b/],
+  [['inbox', '--all'], /\/api\/cards\b/],
+  [['inbox', '-l', 'team=gone'], /\/api\/cards\b/],
+  [['inbox', '-l', 'team=gone', '--all'], /\/api\/cards\b/],
 ];
 
 test("a started card says its run's phase, `waiting on you` where its run waits on a person; one whose run ended is listed with --all alone", async () => {
@@ -261,6 +263,15 @@ test("REFUSED: an unknown run is the api's refusal, exit 2, naming the command t
   assert.match(shown.err, /no-such-run/);
   assert.match(shown.err, /nemia ls/);
   assert.equal(shown.out, '');
+});
+
+test('REFUSED, planted: a client still reading `GET /api/inbox`, which the CardList replaced, fails — exit 2 naming the restart', async () => {
+  await assert.rejects(get('inbox', '/api/inbox', {}, ENV), (err: unknown) => {
+    assert.ok(err instanceof Refused, String(err));
+    assert.equal(err.code, 2);
+    assert.match(err.message, /nemia service restart/);
+    return true;
+  });
 });
 
 test('REFUSED: a bare 404 — an api older than this nemia, with no /api/listing — exits 2 naming `nemia service restart`', async (t) => {

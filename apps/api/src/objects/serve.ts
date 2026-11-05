@@ -7,6 +7,11 @@
  * `StoreRoot`, its place and its memo, the request says one line, and its reads are counted (`POLL_READS`). A write is guarded first
  * (`refusedBeforeReading`, guard.ts): refused 403 for another site and 415 for a body that is not JSON before its body is read.
  *
+ * What HttpApi answers on its own is said in the api's words (`inApiWords`), as every other route of the api answers a refusal, `{ error }`
+ * with a sentence naming the fix: a request whose body, path or query its decoding refuses (400, which HttpApi answers with no body) says
+ * what its route takes, and a path it serves nothing on (404) says where the paths it serves are listed. Its own refusals, already
+ * `{ error }`, pass as they are.
+ *
  * `GET /api/runs/:runId` with `?raw=` (not `false`) or `?view=` is passed on to the runs' own route (runs/runs.ts), which answers both.
  */
 import { Context, Layer } from 'effect';
@@ -20,12 +25,57 @@ import { cardsHandlers } from './cards.ts';
 import { ServedNow } from './refused.ts';
 import { runsHandlers } from './runs.ts';
 
-/** The objects' web handler, its layer built in the app runtime's memo map. */
-export const objectsHandler = (runtime: ApiRuntime) =>
-  HttpRouter.toWebHandler(
+/** Where every path the objects are served on is listed, with what each takes. */
+const DOCUMENT = 'GET /openapi/v3/nemia/v1';
+
+/** What a list of objects takes in its query. */
+const LIST_TAKES =
+  '`?limit=<a whole number from 1>` and `?continue=<the token the page before answered>`, each once, and `?labelSelector=<selector>`, given again for another';
+
+/** What a read of one object takes: its names in the path, and nothing else. */
+const ONE_TAKES = 'the names in its path, and no body';
+
+/** Whether `text` is a refusal of the api's already: a JSON object whose `error` is a sentence. */
+const saysError = (text: string): boolean => {
+  try {
+    const body: unknown = JSON.parse(text);
+    return typeof body === 'object' && body !== null && 'error' in body && typeof body.error === 'string';
+  } catch {
+    return false;
+  }
+};
+
+/**
+ * `response`, which the objects' handler answered `request` with, in the api's words: a 400 or a 404 HttpApi answered on its own, with no
+ * `{ error }`, answered again with the same status and the sentence that names the fix — what the route takes (`takes`, said where the
+ * route is one the api forwards), or where the paths are listed. Anything else as it is.
+ */
+export async function inApiWords(response: Response, request: Request, takes?: string): Promise<Response> {
+  if (response.status !== 400 && response.status !== 404) return response;
+  if (saysError(await response.clone().text())) return response;
+  const route = `${request.method} ${new URL(request.url).pathname}`;
+  const error =
+    response.status === 404
+      ? `${route} is no path the objects are served on: ${DOCUMENT} lists each, with what it takes. Ask one of those.`
+      : `${route} does not read as its route takes it${takes ? `: ${takes}` : ''}. Send it in that shape: ${DOCUMENT} says each key and value.`;
+  return new Response(JSON.stringify({ error }), { status: response.status, headers: { 'content-type': 'application/json' } });
+}
+
+/**
+ * The objects' web handler, its layer built in the app runtime's memo map, each answer in the api's words (`inApiWords`), what the
+ * route takes said by the route that hands the request on (`takes`).
+ */
+export const objectsHandler = (runtime: ApiRuntime) => {
+  const web = HttpRouter.toWebHandler(
     HttpApiBuilder.layer(Api).pipe(Layer.provide([runsHandlers, cardsHandlers]), Layer.provide(HttpServer.layerServices)),
     { memoMap: runtime.memoMap, disableLogger: true },
   );
+  return {
+    dispose: web.dispose,
+    handler: async (request: Request, context: Context.Context<ServedNow>, takes?: string): Promise<Response> =>
+      inApiWords(await web.handler(request, context), request, takes),
+  };
+};
 
 /** What a write of a card is said as by the guard's refusals, by its method, its path and its verb. */
 const cardWrite = (route: string, does: string, forAnother: string, why: string, shape: string): Guarded => ({
@@ -46,7 +96,7 @@ const CARD_WRITES = {
       'files a card',
       'file one',
       "a card's body is what a run started from it is asked to do, in the repository it names",
-      '`{ "body": "<what to do>" }`, with `workflow`, `from`, `repo` and `label` if you like',
+      '`{ "body": "<what to do>" }`, with `workflow`, `from`, `repo`, `factory` and `label` if you like',
     ),
   delete: (ns: string, name: string) =>
     cardWrite(
@@ -99,10 +149,13 @@ const notTheObject = (c: RequestContext<ApiEnv>): boolean => {
 /** The routes that hand the objects' handler each path it serves, built over the app's runtime. */
 export function objectsRoutes(runtime: ApiRuntime): Hono<ApiEnv> {
   const { handler } = objectsHandler(runtime);
-  const forward = (c: RequestContext<ApiEnv>) => served(c, (s) => handler(c.req.raw, Context.make(ServedNow, s)));
+  const handed = (c: RequestContext<ApiEnv>, takes: string) => served(c, (s) => handler(c.req.raw, Context.make(ServedNow, s), takes));
+  const forward = (c: RequestContext<ApiEnv>) => handed(c, ONE_TAKES);
+  const listed = (c: RequestContext<ApiEnv>) => handed(c, LIST_TAKES);
   const guarded = (write: (c: RequestContext<ApiEnv>) => Guarded) => (c: RequestContext<ApiEnv>) => {
-    const refused = refusedBeforeReading(write(c), c.req.header('host'), c.req.header('sec-fetch-site'), c.req.header('content-type'));
-    return refused ? c.json({ error: refused.error }, refused.status) : forward(c);
+    const guard = write(c);
+    const refused = refusedBeforeReading(guard, c.req.header('host'), c.req.header('sec-fetch-site'), c.req.header('content-type'));
+    return refused ? c.json({ error: refused.error }, refused.status) : handed(c, guard.shape);
   };
   const at = (c: RequestContext<ApiEnv>) => [c.req.param('namespace') ?? '', c.req.param('name') ?? ''] as const;
   return new Hono<ApiEnv>()
@@ -111,8 +164,8 @@ export function objectsRoutes(runtime: ApiRuntime): Hono<ApiEnv> {
     .get('/api/runs/:runId/steps/:step/tries/:try', forward)
     .get('/api/runs/:runId/steps/:step/tries/:try/closeout', forward)
     .get('/api/runs/:runId/steps/:step/told', forward)
-    .get('/api/cards', forward)
-    .get('/api/namespaces/:namespace/cards', forward)
+    .get('/api/cards', listed)
+    .get('/api/namespaces/:namespace/cards', listed)
     .get('/api/namespaces/:namespace/cards/:name', forward)
     .post(
       '/api/namespaces/:namespace/cards',

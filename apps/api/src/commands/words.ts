@@ -2,9 +2,8 @@
  * The api's own words for each command it serves, keyed by the command's name: the write guard's (guard.ts), the body its route takes,
  * why a body is not one (400), and what a failure that is not a refusal answers (502).
  */
-import { Schema } from 'effect';
 import { factoryNameRefusal, inboxNameRefusal } from 'agent-orchestrator';
-import { decodeBody, valueAt, type BodyIssue, type Words } from '../body.ts';
+import { valueAt, type BodyIssue, type Words } from '../body.ts';
 import type { Guarded } from '../guard.ts';
 import { AGENTS_COPY, AGENTS_CUSTOM, POLICY_CONFIRM, POLICY_DROP } from './library.ts';
 import { LEVEL, SUBSCRIBE, UNSUBSCRIBE } from './sessions.ts';
@@ -330,85 +329,6 @@ const PRUNE: RouteWords = {
   strict: true,
 };
 
-/** A drop of the card `name`, as the guard's refusals word it. */
-/** A card dropped, as the guard's refusals word it; a name that would leave the inbox is refused in the package's words. */
-const INBOX_RM: RouteWords = {
-  shape: '`{}`',
-  guard: ({ name }): Guarded => ({
-    route: `DELETE /api/inbox/${name}`,
-    does: 'drops a card',
-    forAnother: 'drop one',
-    why: 'a card dropped is an idea gone, and nothing keeps a copy',
-    reach: 'drop the card from the board',
-    instead: `Drop it from the board's Inbox page, or with \`nemia inbox rm ${name}\``,
-    shape: 'no body, or `{}`: the card is named in the path',
-  }),
-  issue: () => () => 'DELETE /api/inbox/:name takes no body: `{}`.',
-  named: ({ name }) => inboxNameRefusal(name) ?? null,
-};
-
-const QUEUE_SHAPE = 'no body, or `{}`: the card is named in the path, and queued on the workflow it names';
-
-/** A queue of the card `name`, or its taking back (`off`), as the guard's refusals word it. */
-const queueGuard = (name: string, off: boolean): Guarded =>
-  off
-    ? {
-        route: `DELETE /api/inbox/${name}/queue`,
-        does: 'takes a card off the queue',
-        forAnother: 'take one off',
-        why: 'a card taken off the queue is an idea the tick no longer starts, and its place is lost',
-        reach: 'take the card off the queue from the board',
-        instead: `Take it off from the board's Inbox page, or with \`nemia inbox queue ${name} --off\``,
-        shape: QUEUE_SHAPE,
-      }
-    : {
-        route: `POST /api/inbox/${name}/queue`,
-        does: 'queues a card',
-        forAnother: 'queue one',
-        why: 'a queued card is started by the tick when a run slot frees, and its body is what the run is asked to do, in the repository it names',
-        reach: 'queue the card from the board',
-        instead: `Queue it from the board's Inbox page, or with \`nemia inbox queue ${name}\``,
-        shape: QUEUE_SHAPE,
-      };
-
-/** The one JSON body a queue takes: `{}`, an object with no key. */
-const QUEUE_BODY = Schema.Record(Schema.String, Schema.Never);
-
-/**
- * Why a queue's body is refused, or null: it takes none, or `{}`. `nemia inbox queue --workflow <w>` writes a workflow with the mark, and
- * the api does not: a card is queued from the board on the workflow it names, and one that names none is the package's to refuse — so a
- * `workflow` sent is refused by name rather than read as nothing.
- */
-function queueBodyRefusal(route: string, text: string): string | null {
-  if (!text.trim()) return null;
-  let body: unknown;
-  try {
-    body = JSON.parse(text);
-  } catch {
-    return `${route} takes ${QUEUE_SHAPE}, and this request's body is not JSON.`;
-  }
-  const decoded = decodeBody(QUEUE_BODY, body, () => {
-    const named =
-      valueAt(body, ['workflow']) !== undefined
-        ? ' A card is queued on the workflow it names: file it with one, or queue it with `nemia inbox queue <name> --workflow <w>`, which writes both.'
-        : '';
-    return `${route} takes ${QUEUE_SHAPE}, and this request sent ${JSON.stringify(body)}.${named}`;
-  });
-  return 'status' in decoded ? decoded.error : null;
-}
-
-/**
- * A card queued, or taken off the queue, as the guard's refusals word it: a name that would leave the inbox is refused in the package's
- * words, and a body but none or `{}` in the queue's (`queueBodyRefusal`), each before the card is read.
- */
-const INBOX_QUEUE: RouteWords = {
-  shape: QUEUE_SHAPE,
-  guard: ({ name, method }) => queueGuard(name, method === 'DELETE'),
-  issue: () => () => `the queue takes ${QUEUE_SHAPE}.`,
-  named: ({ name }) => inboxNameRefusal(name) ?? null,
-  bodyless: ({ name, method }, text) => queueBodyRefusal(queueGuard(name, method === 'DELETE').route, text),
-};
-
 const FROM_SHAPE = '`{ "runs": ["<runId>", ...] }`: the runs the card is handed as context, by id';
 
 /** A card's `from:` set (`PUT`), or taken off (`DELETE`), as the guard's refusals word it. */
@@ -562,9 +482,7 @@ export const WORDS: Readonly<Record<string, RouteWords>> = {
   'policy rm': POLICY_DROP,
   rm: RM,
   prune: PRUNE,
-  'inbox queue': INBOX_QUEUE,
   'inbox from': INBOX_FROM,
-  'inbox rm': INBOX_RM,
   ...LABEL_WORDS,
   'agents custom': AGENTS_CUSTOM,
   'agents copy': AGENTS_COPY,

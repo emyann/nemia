@@ -480,7 +480,7 @@ function startWords({ path: [key], input }: BodyIssue, body: unknown): string | 
   if (key === 'card') {
     return typeof input === 'string'
       ? (inboxNameRefusal(input) ?? `POST /api/runs takes a JSON object: ${SHAPE}.`)
-      : `\`card\` names the inbox card to start, as \`nemia inbox\` lists it: a name, such as \`"card": "cache-the-views-k2q9"\`, or left out for a run that starts from no card. This request's was ${JSON.stringify(input)}. GET /api/inbox lists the cards.`;
+      : `\`card\` names the inbox card to start, as \`nemia inbox\` lists it: a name, such as \`"card": "cache-the-views-k2q9"\`, or left out for a run that starts from no card. This request's was ${JSON.stringify(input)}. GET /api/cards lists the cards.`;
   }
   if (key === 'brief' && valueAt(body, ['card']) !== undefined)
     return `\`brief\` is what the run is asked to do in place of the card's body, as \`nemia start <card> --brief "<brief>"\` takes it: text, or left out for the card's body. This request's was ${JSON.stringify(input)}.`;

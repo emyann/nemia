@@ -1,7 +1,7 @@
 /**
  * `nemia label run` and `nemia label inbox`, entries of the command table: a person's labels on a run or a card edited, as `kubectl label`
- * spells it. The api serves each on a route of its own, its body a `LabelEdit` — `labels`, the edits, and `overwrite` — under the keys
- * the command line gives them, so one handler reads both.
+ * spells it. The api serves each, a run's on the route the table generates and a card's as the Card's `labels` verb (`objects`' Api),
+ * its body a `LabelEdit` — `labels`, the edits, and `overwrite` — under the keys the command line gives them, so one handler reads both.
  */
 import { Effect } from 'effect';
 import type { Args, Spec } from '../command/command.ts';
@@ -97,7 +97,10 @@ export const LABEL_CARD: Command<Labelled> = {
   check: noEdits('nemia label inbox', 'card'),
   writes: true,
   class: 'act',
-  route: { method: 'POST', path: '/api/inbox/:name/labels', status: 200 },
+  only: {
+    side: 'cli',
+    why: "the api serves it as the Card's `labels` verb of `objects`' Api (`POST /api/namespaces/:namespace/cards/:name/labels`), which calls this entry's handler: no route of its own",
+  },
   handler: (args, _env, home) =>
     rooted(
       home,

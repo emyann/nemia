@@ -1,16 +1,17 @@
 /**
  * The guard on the board's writes: a request refused before its body is read, whatever it asks for.
  *
- * Twenty-six writes pass it: a factory signed in to a server (`POST /api/factories/:factory/servers/:server/sign-in`,
+ * Twenty-eight writes pass it: a factory signed in to a server (`POST /api/factories/:factory/servers/:server/sign-in`,
  * servers/sign-in.ts) or signed out of one (`DELETE` on the same path), each of which writes the harness's own store, which every
  * session of the factory reads; a start (`POST /api/runs`, workflows.ts), which writes a run's record — and, for an inbox card, removes the
  * card; an ask for another try or another round (`POST /api/runs/:id/steps/:step/retry`, asks.ts, with `"round": true` for `nemia retry
  * --round`), which writes a person's ask file; an approval of a step waiting at its gate, or of a loop out of rounds as it stands (`POST
  * /api/runs/:id/steps/:step/approve`, asks.ts), which writes a person's approval or acceptance file;
  * words for a step's running session (`POST /api/runs/:id/steps/:step/say`, asks.ts),
- * which the engine hands the session and journals; a card filed in the inbox (`POST /api/inbox`, inbox.ts) or dropped from it (`DELETE
- * /api/inbox/:name`, inbox.ts); a card queued to start on its own (`POST /api/inbox/:name/queue`, inbox.ts) or taken off the queue (`DELETE
- * /api/inbox/:name/queue`), each of which writes the store's inbox; and a workflow of yours built on the board — made (`POST
+ * which the engine hands the session and journals; the Card's six writes (objects/serve.ts): a card filed (`POST
+ * /api/namespaces/:namespace/cards`) or dropped (`DELETE …/cards/:name`), started (`POST …/cards/:name/start`), queued (`…/queue`) or
+ * taken off the queue (`…/unqueue`), and its labels edited (`…/labels`), each of which writes the store's inbox or starts a run, guarded
+ * before the objects' handler reads its body; and a workflow of yours built on the board — made (`POST
  * /api/workflows/yours`), or put back from its steps and the schemas pasted for them (`PUT /api/workflows/yours/:name`), builder.ts — each
  * of which writes the store's `workflows/`, and removes a step's file the folder has dropped — or removed whole (`DELETE
  * /api/workflows/yours/:name`, remove.ts); and an agent of yours made (`POST
@@ -26,10 +27,7 @@
  * the route of `nemia hold --off`), which removes the hold file, so the run goes on at the next tick; and the store paused (`POST
  * /api/pause`) or its pause lifted (`DELETE /api/pause`), commands/routes.ts, the routes of `nemia pause` and `nemia resume`, which write
  * or remove the store's pause file, so no pass starts new work until the lift; and a finished run pruned (`POST /api/runs/:id/prune`,
- * commands/routes.ts, the route of `nemia prune --yes`), which removes its worktrees, and its files when asked, for good. Beside them, the
- * Card's six writes (objects/serve.ts): a card filed (`POST /api/namespaces/:namespace/cards`) or dropped (`DELETE …/cards/:name`), started
- * (`POST …/cards/:name/start`), queued (`…/queue`) or taken off the queue (`…/unqueue`), and its labels edited (`…/labels`), each of
- * which writes the store's inbox or starts a run, guarded before the objects' handler reads its body. Each is what an
+ * commands/routes.ts, the route of `nemia prune --yes`), which removes its worktrees, and its files when asked, for good. Each is what an
  * agent acts on in the repository — once a tick files it, or at once, or once a person starts the card or the workflow, or once a run
  * slot frees for a queued card — or a person's idea or step gone, or its place, so a page on another site must not be able to make any of
  * them; and a `fetch` with a body, from any page, reaches the api without the browser asking it first, unless the body is JSON.

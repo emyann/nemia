@@ -36,6 +36,18 @@ const refusalOf = (body: unknown): string | undefined => {
   return typeof said === 'string' ? said : undefined;
 };
 
+/** A daemon that took no request, even once started again: refused, naming the read in process and the restart. */
+export const unanswered = (verb: string, base: string, err: unknown): Refused =>
+  new Refused(
+    `the daemon started at ${base} does not answer (${err instanceof Error ? err.message : String(err)}). Read in process: \`nemia ${verb} --local …\`, or restart it: \`nemia service restart\``,
+  );
+
+/** A daemon that serves no `path` at all, a 404 with no `error`: older than this client, refused naming the restart. */
+export const olderThanThis = (verb: string, base: string, path: string): Refused =>
+  new Refused(
+    `the daemon at ${base} does not serve ${path}: it is older than this nemia. Restart it, \`nemia service restart\`, or read in process: \`nemia ${verb} … --local\``,
+  );
+
 /**
  * The api's answer to a GET of `path`, read as JSON. A refused connection starts a daemon once and asks again (a lease left by a daemon
  * that died). A 404 on the route itself — no `error` in its body — is a daemon older than this client: refused, naming the restart. Any
@@ -51,9 +63,7 @@ export async function get<T>(verb: string, path: string, query: Query = {}, env:
     try {
       response = await fetch(urlOf(base, path, query));
     } catch (err) {
-      throw new Refused(
-        `the daemon started at ${base} does not answer (${err instanceof Error ? err.message : String(err)}). Read in process: \`nemia ${verb} --local …\`, or restart it: \`nemia service restart\``,
-      );
+      throw unanswered(verb, base, err);
     }
   }
   const text = await response.text();
@@ -65,9 +75,6 @@ export async function get<T>(verb: string, path: string, query: Query = {}, env:
   }
   if (response.ok) return body as T;
   const said = refusalOf(body);
-  if (response.status === 404 && said === undefined)
-    throw new Refused(
-      `the daemon at ${base} does not serve ${path}: it is older than this nemia. Restart it, \`nemia service restart\`, or read in process: \`nemia ${verb} … --local\``,
-    );
+  if (response.status === 404 && said === undefined) throw olderThanThis(verb, base, path);
   throw new Refused(said ?? `the api answered ${response.status} to ${path}: ${text.slice(0, 200)}`);
 }

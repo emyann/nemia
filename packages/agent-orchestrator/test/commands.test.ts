@@ -50,15 +50,9 @@ test('each command is served on the api where it was before the table, the lift 
     [
       ['start', { method: 'POST', path: '/api/runs', status: 201, hand: true }],
       ['concluded', { method: 'GET', path: '/api/runs/:runId/concluded', status: 200 }],
-      ['inbox', { method: 'GET', path: '/api/inbox', status: 200 }],
-      ['inbox add', { method: 'POST', path: '/api/inbox', status: 201, hand: true }],
-      [
-        'inbox queue',
-        [
-          { method: 'POST', path: '/api/inbox/:name/queue', status: 200, sets: { off: false } },
-          { method: 'DELETE', path: '/api/inbox/:name/queue', status: 200, sets: { off: true } },
-        ],
-      ],
+      ['inbox', 'cli'],
+      ['inbox add', 'cli'],
+      ['inbox queue', 'cli'],
       [
         'inbox from',
         [
@@ -66,10 +60,10 @@ test('each command is served on the api where it was before the table, the lift 
           { method: 'DELETE', path: '/api/inbox/:name/from', status: 200, sets: { off: true } },
         ],
       ],
-      ['inbox rm', { method: 'DELETE', path: '/api/inbox/:name', status: 200 }],
+      ['inbox rm', 'cli'],
       ['inbox show', { method: 'GET', path: '/api/inbox/:name', status: 200 }],
       ['label run', { method: 'POST', path: '/api/runs/:runId/labels', status: 200 }],
-      ['label inbox', { method: 'POST', path: '/api/inbox/:name/labels', status: 200 }],
+      ['label inbox', 'cli'],
       ['factory', { method: 'GET', path: '/api/factories', status: 200 }],
       ['factory ls', 'cli'],
       ['factory add', 'cli'],

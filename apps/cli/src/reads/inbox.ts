@@ -1,20 +1,109 @@
 /**
- * `nemia inbox`, read from the api (`GET /api/inbox`): each card a line, then how to start, queue or drop one — or that the inbox is
- * empty — printed as the in-process command prints it (`inboxLines`, the orchestrator's `inbox/inbox.ts`, ported word for word). Where
- * a card that names no factory is said to start is this process's `WF_DEFAULT_FACTORY_STARTS`, and the folder named in the last line this
- * store's, as the in-process command reads both. The api lists the cards in play, each started card in its run's phase; `--all` (sent as
- * `?all=true`) lists every card. `-l <selector>` (sent as `?selector=`, given again for another), `--show-labels` and `-L <key>` are read
- * here; any other words after `inbox` go to the old path: `inbox add`, `inbox rm` and the rest are commands of their own there.
+ * `nemia inbox`, read from the api through the objects' client (`GET /api/cards`, a `CardList`): each card a line, then how to start, queue
+ * or drop one — or that the inbox is empty — printed as the in-process command prints it (`inboxLines`, the orchestrator's
+ * `inbox/inbox.ts`, ported word for word), each `Card` made the printer's row in one place (`rowOf`). Where a card that names no factory
+ * is said to start is this process's `WF_DEFAULT_FACTORY_STARTS`, and the folder named in the last line this store's, as the in-process
+ * command reads both.
+ *
+ * The list holds every card, each started card in its run's phase; the cards in play are kept here by their state (`IN_PLAY`, the
+ * orchestrator's `CARD_IN_PLAY`), and `--all` keeps every card. `-l <selector>` is sent as `labelSelector`, given again for another; a
+ * queued card's place is its place among every card queued and not started, in the order the tick starts them (`placesOf`, the
+ * orchestrator's `queueOrder`), so a list a selector cut is read beside the whole one; the repository a card's factory picks for it is
+ * read off `GET /api/factories` where a line says it. `--show-labels` and `-L <key>` are read here; any other words after `inbox` go to
+ * the old path: `inbox add`, `inbox rm` and the rest are commands of their own there.
  */
 import path from 'node:path';
-import type { InboxEntry } from '../../../api/src/client/client.ts';
+import { type Card, type CardState, DEFAULT_NAMESPACE } from 'objects';
+import type { FactoryAnswer } from '../../../api/src/client/client.ts';
 import { get } from '../client.ts';
 import { spawned } from '../local.ts';
+import { asked } from '../objects.ts';
 import { storeRoot } from '../where.ts';
 import { labelSegments, labelsAsked, type LabelMap, type LabelsAsked } from './labels.ts';
 
+/**
+ * A card as the printer reads it, the in-process `InboxListing`'s keys it reads: its factory null for one of the default factory, its
+ * place in the queue null for a card started, and the repository its factory picks for it (`factoryRepo`) null where it picks none.
+ */
+export type InboxRow = {
+  name: string;
+  title: string | null;
+  workflow: string | null;
+  repo: string | null;
+  gate?: string;
+  factory: string | null;
+  startedAs: readonly string[];
+  labels: LabelMap;
+  state: CardState;
+  error: string | null;
+  queued?: { at: string; place: number | null };
+  tried?: { at: string; repo: string; why: string; refused: boolean };
+  factoryRepo: string | null;
+};
+
+/** The factory a card's namespace names: none for the default one. */
+const factoryOf = (card: Card): string | null => {
+  const namespace = card.metadata.namespace ?? DEFAULT_NAMESPACE;
+  return namespace === DEFAULT_NAMESPACE ? null : namespace;
+};
+
+/** The card `card` as the printer's row, its place in the queue (`places`, by name) and the repository its factory picks (`repos`). */
+export const rowOf = (card: Card, places: ReadonlyMap<string, number>, repos: ReadonlyMap<string, string> = new Map()): InboxRow => {
+  const { metadata, spec, status } = card;
+  const factory = factoryOf(card);
+  const only = factory === null || spec.repo !== undefined ? undefined : repos.get(factory);
+  return {
+    name: metadata.name,
+    title: status.title ?? null,
+    workflow: spec.workflow ?? null,
+    repo: spec.repo ?? null,
+    ...(spec.gate !== undefined ? { gate: spec.gate } : {}),
+    factory,
+    startedAs: status.runs,
+    labels: metadata.labels ?? {},
+    state: status.state,
+    error: status.error ?? null,
+    ...(spec.queued !== undefined ? { queued: { at: spec.queued, place: places.get(metadata.name) ?? null } } : {}),
+    ...(status.lastStart !== undefined ? { tried: { ...status.lastStart } } : {}),
+    factoryRepo: only ?? null,
+  };
+};
+
+/**
+ * Each queued card's place, from 1, in the order the tick starts them: by when it was queued, then by name, a card a run was started from
+ * left out — the in-process `queueOrder`, over every card.
+ */
+export const placesOf = (cards: readonly Card[]): Map<string, number> =>
+  new Map(
+    cards
+      .flatMap((c) => (c.spec.queued !== undefined && !c.status.runs.length ? [{ name: c.metadata.name, at: c.spec.queued }] : []))
+      .sort((a, b) => a.at.localeCompare(b.at) || a.name.localeCompare(b.name))
+      .map(({ name }, at) => [name, at + 1]),
+  );
+
+/**
+ * Whether a card in each state is still in play, which `nemia inbox` lists by default: the in-process `CARD_IN_PLAY`. Total, so a new
+ * state is placed here before it typechecks.
+ */
+const IN_PLAY: Readonly<Record<CardState, boolean>> = {
+  filed: true,
+  queued: true,
+  refused: true,
+  pending: true,
+  running: true,
+  waiting: true,
+  succeeded: false,
+  failed: false,
+  stopped: false,
+  cancelled: false,
+};
+
+/** The cards in the order the in-process listing reads them: by file name, `<name>.md`, as `localeCompare` orders them. */
+const byFile = (cards: readonly Card[]): Card[] =>
+  [...cards].sort((a, b) => `${a.metadata.name}.md`.localeCompare(`${b.metadata.name}.md`));
+
 /** Why a queued card's last start did not happen, as the in-process `triedClause` says it. */
-function triedClause(l: InboxEntry, unfactoredStarts: boolean): string {
+function triedClause(l: InboxRow, unfactoredStarts: boolean): string {
   const t = l.tried;
   if (!t) return '';
   const said = l.error === null && !l.repo && (l.factory !== null || unfactoredStarts);
@@ -30,20 +119,20 @@ function triedClause(l: InboxEntry, unfactoredStarts: boolean): string {
  * The map a selector reads of an entry: its person labels, then its `workflow:` where set, and its `factory:` (`default` where it names
  * none) — the in-process `cardLabels`.
  */
-const cardLabels = (l: Pick<InboxEntry, 'labels' | 'workflow' | 'factory'>): LabelMap => ({
+const cardLabels = (l: Pick<InboxRow, 'labels' | 'workflow' | 'factory'>): LabelMap => ({
   ...l.labels,
   ...(l.workflow ? { workflow: l.workflow } : {}),
   factory: l.factory || 'default',
 });
 
 /** A started card's state beside its run, as the in-process `phaseSaid` says it: `waiting on you` for a run that waits on a person. */
-const phaseSaid = (state: InboxEntry['state']): string => (state === 'waiting' ? 'waiting on you' : state);
+const phaseSaid = (state: CardState): string => (state === 'waiting' ? 'waiting on you' : state);
 
 /** No label asked shown: the lines as they were. */
 const NONE_SHOWN: LabelsAsked = { selector: [], showLabels: false, columns: [] };
 
 /** A line per entry of the inbox, each ending on its labels' segments where `asked` shows them: the in-process `inboxLines`. */
-function inboxLines(listing: readonly InboxEntry[], unfactoredStarts: boolean, asked: LabelsAsked): string[] {
+function inboxLines(listing: readonly InboxRow[], unfactoredStarts: boolean, asked: LabelsAsked): string[] {
   const width = Math.max(0, ...listing.map((l) => l.name.length));
   const inLine = listing.filter((l) => l.queued?.place).length;
   return listing.map((l) => {
@@ -62,7 +151,7 @@ function inboxLines(listing: readonly InboxEntry[], unfactoredStarts: boolean, a
  * is empty — the in-process `INBOX`'s `print`.
  */
 export const inboxPrinted = (
-  cards: readonly InboxEntry[],
+  cards: readonly InboxRow[],
   env: NodeJS.ProcessEnv = process.env,
   asked: LabelsAsked = NONE_SHOWN,
   ended = 0,
@@ -80,14 +169,24 @@ export const inboxPrinted = (
         ? [`no card of the inbox matches -l ${asked.selector.join(' -l ')} — see them all with nemia inbox --show-labels`]
         : [`the inbox is empty — park an idea with nemia inbox add "<idea>"`];
 
+/** The repository each factory picks for a card that names none: its one repository, for a factory with exactly one. */
+const reposOf = (factories: readonly Pick<FactoryAnswer, 'name' | 'repos'>[]): Map<string, string> =>
+  new Map(factories.flatMap(({ name, repos }) => (repos.length === 1 && repos[0] !== undefined ? [[name, repos[0]]] : [])));
+
 export async function inbox(args: readonly string[]): Promise<number> {
   const all = args.includes('--all');
   const read = labelsAsked(args.filter((word) => word !== '--all'));
   if (read === null || read.rest.length) return spawned(['inbox', ...args]);
-  const listed = (every: boolean) =>
-    get<InboxEntry[]>('inbox', '/api/inbox', { selector: read.asked.selector, ...(every ? { all: 'true' } : {}) });
-  const cards = await listed(all);
-  const ended = cards.length || all ? 0 : (await listed(true)).length;
-  for (const line of inboxPrinted(cards, process.env, read.asked, ended)) process.stdout.write(`${line}\n`);
+  const { selector } = read.asked;
+  const listed = (labelSelector: readonly string[]) =>
+    asked('inbox', (client) => client.cards.listAll({ query: labelSelector.length ? { labelSelector } : {} }));
+  const selected = byFile((await listed(selector)).items);
+  const shown = all ? selected : selected.filter((card) => IN_PLAY[card.status.state]);
+  const queued = shown.some((c) => c.spec.queued !== undefined && !c.status.runs.length);
+  const places = placesOf(queued && selector.length ? (await listed([])).items : selected);
+  const picks = shown.some((c) => c.status.lastStart !== undefined && c.spec.repo === undefined && factoryOf(c) !== null);
+  const repos = picks ? reposOf(await get<FactoryAnswer[]>('inbox', '/api/factories')) : new Map<string, string>();
+  const rows = shown.map((card) => rowOf(card, places, repos));
+  for (const line of inboxPrinted(rows, process.env, read.asked, selected.length - shown.length)) process.stdout.write(`${line}\n`);
   return 0;
 }

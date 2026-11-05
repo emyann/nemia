@@ -43,6 +43,11 @@ fs.writeFileSync(
   }),
 );
 
+fs.writeFileSync(
+  path.join(home, 'factories', 'acme', 'level.json'),
+  JSON.stringify({ level: 'semi-auto', since: '2026-11-01T00:00:00.000Z' }),
+);
+
 const listed: FactoryListed = {
   factories: [acme, stray],
   schedules: [],
@@ -68,6 +73,11 @@ test("a factory's generation is its file's, its status the controller's, its pla
   assert.deepEqual(m?.status.untrusted, [{ place: repo, harness: 'Claude Code', withheld: 'its hooks' }]);
   assert.deepEqual(m?.spec.volumes, [{ name: 'a', path: '/data/a', readOnly: true }], 'an unnamed volume is read by its name');
   assert.deepEqual(m?.spec.workflows, ['make']);
+});
+
+test("a factory's own level is its spec's, read from its level file; one that follows the store's has none", () => {
+  assert.equal(byName('acme')?.spec.level, 'semi-auto');
+  assert.equal('level' in (objects[0]?.spec ?? {}), false, "the default factory follows the store's level");
 });
 
 test('a stray file is listed with why it does not read, and hides no other', () => {

@@ -44,8 +44,8 @@ export const generationWritten = (was: Factory | { error: string }, now: Factory
   'error' in was ? now : { ...now, generation: generationAfter(was.generation ?? null, counted || specDiffers(was, now)) };
 
 /**
- * Whether a factory's level file `now` changes the spec `was` held: its own default level or its raise, absent where none was written.
- * When it was written (`since`) is none of it.
+ * Whether a factory's level file `now` changes the spec `was` held: its own default level, absent where none was written. A raise and
+ * when it was written (`since`) are none of it: the spec holds the level alone (`Factory.spec.level`).
  */
 export const levelDiffers = (was: FactoryLevelFile | undefined, now: FactoryLevelFile): boolean =>
-  JSON.stringify([was?.level ?? null, was?.raise ?? null]) !== JSON.stringify([now.level ?? null, now.raise ?? null]);
+  (was?.level ?? null) !== (now.level ?? null);

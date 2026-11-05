@@ -178,3 +178,49 @@ test('REFUSED: a converted file that calls a store again, and a count the baseli
   const [first] = Object.keys(FACTORY_DOOR_DEBT);
   assert.equal(debtBreaks(sources, { ...FACTORY_DOOR_DEBT, [first]: (FACTORY_DOOR_DEBT[first] ?? 0) + 1 }).length, 1);
 });
+
+test("which writes count a change of the spec: the door's, row by row", async (t) => {
+  /** How many changes `write` counts on the file of `acme`, a factory filed with a level file at manual. */
+  const after = (write: (door: ReturnType<typeof store>['door']) => void): number => {
+    const { door, file } = store();
+    done(door.factories.create(aFactory('acme', { workflows: ['build'] })));
+    done(door.level.write('acme', { level: 'manual', since: '2026-11-01T00:00:00.000Z' }));
+    const held = (): number => (JSON.parse(fs.readFileSync(file, 'utf8')) as { generation: number }).generation;
+    const before = held();
+    write(door);
+    return held() - before;
+  };
+  await t.test('a schedule written keeps it', () => {
+    const schedules = { build: { cron: '0 9 * * 1', brief: 'The weekly build', since: '2026-11-01T00:00:00.000Z' } };
+    assert.equal(
+      after((door) => done(door.factories.rewrite(aFactory('acme', { workflows: ['build'], schedules })))),
+      0,
+    );
+  });
+  await t.test("the instruction's place written keeps it", () => {
+    const instruction = { store: true } as const;
+    assert.equal(
+      after((door) => done(door.factories.rewrite(aFactory('acme', { workflows: ['build'], instruction })))),
+      0,
+    );
+  });
+  await t.test('a level written with a new value counts one more', () => {
+    assert.equal(
+      after((door) => done(door.level.write('acme', { level: 'auto', since: '2026-11-02T00:00:00.000Z' }))),
+      1,
+    );
+  });
+  await t.test('the same level written again keeps it', () => {
+    assert.equal(
+      after((door) => done(door.level.write('acme', { level: 'manual', since: '2026-11-02T00:00:00.000Z' }))),
+      0,
+    );
+  });
+  await t.test('a raise, which the spec does not hold, keeps it', () => {
+    const raise = { level: 'auto' as const, until: '2026-11-03T00:00:00.000Z' };
+    assert.equal(
+      after((door) => done(door.level.write('acme', { level: 'manual', since: '2026-11-02T00:00:00.000Z', raise }))),
+      0,
+    );
+  });
+});

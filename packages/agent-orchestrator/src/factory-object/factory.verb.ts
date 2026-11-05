@@ -36,6 +36,8 @@ import { untrustedPlaces } from '../trust/trust.verb.ts';
 import type { ScheduleListed } from '../schedule/schedule.ts';
 import type { Untrusted } from '../trust/trust.ts';
 import { Invalid, Missing } from '../refusal/refusal.ts';
+import type { Level } from '../level/level.ts';
+import { readFactoryLevelAt } from '../level/level.store.ts';
 import { factoryVolumesNamed } from '../volume/volume.ts';
 import { parseSelectors, selectorsRefusal, selectsLabels } from '../watch/selector.ts';
 import { pageOf } from '../object/page.ts';
@@ -128,6 +130,19 @@ const objectOf = (meta: Omit<ObjectMeta, 'resourceVersion'>, spec: FactoryObject
 });
 
 /**
+ * The factory `name`'s own default level, from its level file: none where it follows the store's, an error where the file does not
+ * read.
+ */
+const ownLevel = (home: string, name: string): { level: Level } | { error: string } | {} => {
+  try {
+    const own = readFactoryLevelAt(home, name)?.level;
+    return own === undefined ? {} : { level: own };
+  } catch (err) {
+    return { error: err instanceof Invalid ? err.message : String(err) };
+  }
+};
+
+/**
  * The object of one factory `listing` of the store, read at the store `home`: a file that reads as its spec, its status the controller's
  * file and its places not trusted among `listed`'s; one that does not read with no spec but its name's, its error saying why.
  */
@@ -144,6 +159,7 @@ export const factoryObjectOf = (listing: FactoryListing, listed: FactoryListed, 
       },
     );
   const written = readStatusAt(home, listing.name);
+  const level = ownLevel(home, listing.name);
   const spec: FactoryObject['spec'] = {
     repos: [...listing.repos],
     workflows: [...listing.workflows],
@@ -154,6 +170,7 @@ export const factoryObjectOf = (listing: FactoryListing, listed: FactoryListed, 
     ...(listing.template === undefined
       ? {}
       : { template: { source: listing.template.source, version: listing.template.version, params: { ...listing.template.params } } }),
+    ...('level' in level ? { level: level.level } : {}),
   };
   const status: FactoryStatus = {
     ...(written?.observedGeneration === undefined ? {} : { observedGeneration: written.observedGeneration }),
@@ -163,6 +180,7 @@ export const factoryObjectOf = (listing: FactoryListing, listed: FactoryListed, 
       ? {}
       : { upgrade: { ...written.upgrade, conflicts: written.upgrade.conflicts.map((c) => ({ ...c })) } }),
     untrusted: untrustedOf(listed.untrusted, listing.name),
+    ...('error' in level ? { error: level.error } : {}),
   };
   return objectOf({ ...meta, generation: generationOf(listing) }, spec, status);
 };

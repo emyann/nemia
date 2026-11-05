@@ -1,12 +1,15 @@
 /**
  * The builtin templates as objects, on a scratch builtin folder (`withBuiltins`), never the package's own: listed and read by name, one
  * whose manifest does not read listed all the same with its problems, an unknown name `Missing`, and a template's render written once
- * into its folder of renders, laid out as a factory's tree, and refused `Invalid` where it does not render. `WF_ROOT` is set before the
+ * into its folder of renders, laid out as a factory's tree, and refused `Invalid` where it does not render. The folder of renders is this
+ * user's own: named by uid and made `0700`, a render planted there with other content staged again, and a folder owned by another user
+ * (a `RenderOwner` claimed for another uid, since a test cannot chown) refused `Conflict` and never served. `WF_ROOT` is set before the
  * import, since the store's modules read it as they load.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { parse, stringify } from 'yaml';
 import { Cause, Effect, Exit, Schema } from 'effect';
@@ -19,7 +22,7 @@ process.env.WF_ROOT = ROOT;
 const { templated, withBuiltins } = await import('../../test/templated.ts');
 const { exportTemplate } = templated(ROOT);
 const { StoreRoot } = await import('../config/root.store.ts');
-const { TemplateRenders, templateDocumentsOf, templateList, templateObject, templateTree } = await import('./template.verb.ts');
+const { RenderOwner, TemplateRenders, templateDocumentsOf, templateList, templateObject, templateTree } = await import('./template.verb.ts');
 
 /**
  * A builtin folder holding `mill`, the tests' team exported; `asks`, the same with a parameter that has no default; `odd`, the same with
@@ -50,6 +53,13 @@ const exitOf = <A, E>(program: Effect.Effect<A, E>, folder: string, renders: str
   Effect.runSyncExit(
     Effect.provideService(Effect.provideService(withBuiltins(program, folder), StoreRoot, ROOT), TemplateRenders, renders),
   );
+
+/** The tag `program` failed with, run as `uid` over the renders under `renders`. */
+const failedAs = <A, E>(program: Effect.Effect<A, E>, folder: string, renders: string, uid: number): string | undefined => {
+  const exit = exitOf(Effect.provideService(program, RenderOwner, uid), folder, renders);
+  if (Exit.isSuccess(exit)) return undefined;
+  return (Cause.squash(exit.cause) as { _tag?: string })._tag;
+};
 
 /** What `program` answers, or a throw of what it failed with. */
 const run = <A, E>(program: Effect.Effect<A, E>, folder: string, renders = scratch('wf-template-renders-')): A => {
@@ -133,6 +143,43 @@ test('the builtin templates as objects, and their renders', async (t) => {
     assert.ok(fs.statSync(path.join(first.dir, 'workflows', 'agents', 'reviewer.md')).isFile());
     assert.ok(fs.statSync(path.join(first.dir, 'workflows', 'skills', 'review-a-change', 'SKILL.md')).isFile());
     assert.deepEqual(fs.readdirSync(path.join(renders, first.digest)), ['mill'], 'no staged folder is left beside it');
+  });
+
+  await t.test("the folder of renders is this user's own, by uid, and made 0700", () => {
+    const uid = process.getuid?.();
+    const named = Effect.runSync(Effect.gen(function* () {
+      return yield* TemplateRenders;
+    }));
+    assert.equal(path.dirname(named), os.tmpdir());
+    assert.equal(path.basename(named), `nemia-templates-${uid ?? os.userInfo().username}`);
+    const renders = scratch('wf-template-renders-');
+    fs.chmodSync(renders, 0o755);
+    run(templateTree('mill'), folder, renders);
+    assert.equal(fs.statSync(renders).mode & 0o777, 0o700, 'one found open to others is closed');
+    const made = path.join(scratch('wf-template-renders-'), 'fresh');
+    run(templateTree('mill'), folder, made);
+    assert.equal(fs.statSync(made).mode & 0o777, 0o700, 'one made is made 0700');
+  });
+
+  await t.test('a render planted with other content is not served: it is staged again', () => {
+    const renders = scratch('wf-template-renders-');
+    const { dir } = run(templateTree('mill'), folder, renders);
+    fs.rmSync(dir, { recursive: true });
+    fs.mkdirSync(path.join(dir, 'workflows', 'agents'), { recursive: true });
+    fs.writeFileSync(path.join(dir, 'workflows', 'agents', 'reviewer.md'), 'planted\n');
+    run(templateTree('mill'), folder, renders);
+    assert.notEqual(fs.readFileSync(path.join(dir, 'workflows', 'agents', 'reviewer.md'), 'utf8'), 'planted\n');
+    assert.ok(fs.statSync(path.join(dir, 'factory.json')).isFile());
+  });
+
+  await t.test("a folder of renders owned by another user is refused Conflict, and what is planted in it is neither served nor touched", (t) => {
+    const uid = process.getuid?.();
+    if (uid === undefined) return t.skip('this platform has no uid');
+    const renders = scratch('wf-template-renders-');
+    const { dir } = run(templateTree('mill'), folder, renders);
+    fs.writeFileSync(path.join(dir, 'workflows', 'agents', 'reviewer.md'), 'planted\n');
+    assert.equal(failedAs(templateTree('mill'), folder, renders, uid + 1), 'Conflict');
+    assert.equal(fs.readFileSync(path.join(dir, 'workflows', 'agents', 'reviewer.md'), 'utf8'), 'planted\n');
   });
 
   await t.test('a parameter with no default does not render, Invalid, and is still served as a Template', () => {

@@ -25,7 +25,7 @@ import { pageOf } from '../object/page.ts';
 import { finishedPageOf, runNamespace, runStateSelector, type RunStateSelector, byFinishedPlace } from './run-list.ts';
 
 export { runNamespace };
-import { diskPartsOf, type RunObjectAnswer, runObjectOf, type RunReads, withDiskParts } from '../object/run.verb.ts';
+import { diskPartsOf, type RunObjectAnswer, runObjectCore, type RunReads, withDiskParts } from '../object/run.verb.ts';
 import { readFailed, runReadingOf, stepsReadingOf } from '../object/read.verb.ts';
 import { informedJudgements, keepObject, keptObject } from '../rest/informer.verb.ts';
 import { filedTimes, folderReader } from '../summary/reads.verb.ts';
@@ -150,18 +150,18 @@ const notJudged = (run: Pick<Run, 'id'>) => Effect.die(new Error(`Run ${run.id} 
 
 /**
  * How a run's listed object is answered (`listed`: no harness asked, no drift read) off its `judgement` and the feed's filing times: the
- * object kept beside that judgement (`keptObject`), its disk parts read now (`diskPartsOf`), or one built and kept (`keepObject`) where
- * none is and its read did not fail (`readFailed`). Under `verify`, one served from memory is built afresh too, and one that differs dies.
- * Each workflow folder is loaded once a request (`folderReader`).
+ * object kept beside that judgement (`keptObject`), before its disk parts (`runObjectCore`), with them read now and laid over
+ * (`withDiskParts`), or one built and its core kept (`keepObject`) where none is and its read did not fail (`readFailed`). Under `verify`,
+ * one served from memory is built afresh too, and one that differs dies. Each workflow folder is loaded once a request (`folderReader`).
  */
 const objectsOf = (e: Engine, { home, memo }: SummaryHow, reads: RunReads, verify: boolean) => {
   const folders = folderReader(home);
   const built = (run: Run, one: JudgedOrWhy, filed: ReadonlyMap<string, string>) =>
     Effect.gen(function* () {
       const steps = yield* stepsReadingOf(e, home, run, one, folders(run));
-      if ('unjudged' in steps) return { answer: steps, failed: false };
-      const object = yield* runObjectOf(run, runReadingOf(steps, filed), { said: reads.memo.said, listed: true });
-      return { answer: object, failed: readFailed(steps) };
+      if ('unjudged' in steps) return { core: undefined, answer: steps, failed: false };
+      const core = yield* runObjectCore(run, runReadingOf(steps, filed), { said: reads.memo.said, listed: true });
+      return { core, answer: withDiskParts(core, diskPartsOf(run, home, folders(run))), failed: readFailed(steps) };
     });
   return (run: Run, judgement: Judgement, filed: ReadonlyMap<string, string>) =>
     Effect.gen(function* () {
@@ -180,8 +180,8 @@ const objectsOf = (e: Engine, { home, memo }: SummaryHow, reads: RunReads, verif
         }
         return withDiskParts(kept, parts);
       }
-      const { answer, failed } = yield* built(run, { judgement }, filed);
-      if (!failed && run.workflow !== undefined && !('unjudged' in answer)) keepObject(memo, run.id, judgement, answer);
+      const { core, answer, failed } = yield* built(run, { judgement }, filed);
+      if (!failed && run.workflow !== undefined && core !== undefined) keepObject(memo, run.id, judgement, core);
       return answer;
     });
 };

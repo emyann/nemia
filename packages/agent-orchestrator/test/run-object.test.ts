@@ -123,6 +123,13 @@ test('runObject: the run as one object, its status the list’s judged fields, i
     assert.equal(run.apiVersion, 'nemia/v1');
     assert.equal(run.kind, 'Run');
     assert.equal(run.metadata.name, id);
+    assert.ok(
+      typeof run.metadata.resourceVersion === 'string' && run.metadata.resourceVersion !== '',
+      `${id}: it carries a resourceVersion`,
+    );
+    const again = await object(id);
+    assert.ok(!('unjudged' in again));
+    assert.equal(again.metadata.resourceVersion, run.metadata.resourceVersion, `${id}: read again unchanged, the same resourceVersion`);
     assert.equal(run.metadata.namespace, run.metadata.labels.factory, `${id}: its namespace is its factory, default for none`);
     const row = rows.find((r) => r.id === id);
     assert.ok(row);

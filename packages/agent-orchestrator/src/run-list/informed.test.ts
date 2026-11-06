@@ -235,15 +235,22 @@ test('each input that changes a run object, planted, is served fresh', async (t)
       const run = await make();
       const memo = informerMemo();
       if (pass) passStarted(memo);
-      await unverified(() => listOf(memo));
+      const built = itemOf(await unverified(() => listOf(memo)), run.id);
       const hits = memo.objectHits;
       const was = itemOf(await unverified(() => listOf(memo)), run.id);
       assert.ok(was, 'the fixture is listed');
       assert.equal(memo.objectHits - hits, 1, 'and served from memory before the plant');
+      assert.equal(typeof was.metadata.resourceVersion, 'string', 'the listed run carries a resourceVersion');
+      assert.equal(was.metadata.resourceVersion, built?.metadata.resourceVersion, 'a kept object answers the version it was built at');
       await plant(run, memo);
       const warm = await unverified(() => listOf(memo));
       assert.deepEqual(warm, await unverified(() => listOf(informerMemo())), 'the warm list answers as a cold one');
       assert.notDeepEqual(itemOf(warm, run.id), was, 'the planted input moved the object');
+      assert.notEqual(
+        itemOf(warm, run.id)?.metadata.resourceVersion,
+        was.metadata.resourceVersion,
+        'the planted input moved its resourceVersion',
+      );
     });
 });
 

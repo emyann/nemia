@@ -278,12 +278,12 @@ const byState = (e: Parameters<typeof runWith>[0], fieldSelector: string, kept =
 const open = (e: Parameters<typeof runWith>[0]) => byState(e, 'status.state!=finished');
 /**
  * An answer of the frame's list without its clocks, which the wall clock moves between two reads, nor the note of how many words a run in
- * flight was said, nor those words (`said`), which the story says to them between the two.
+ * flight was said, nor those words (`said`), which the story says to them between the two, nor the `resourceVersion` digested from them.
  */
 const unclocked = (answer: object) =>
   JSON.parse(
     JSON.stringify(answer, (key, value) =>
-      ['asOf', 'clock', 'wallMs', 'waitingSince', 'startedAt', 'note', 'said'].includes(key) ? undefined : value,
+      ['asOf', 'clock', 'wallMs', 'waitingSince', 'startedAt', 'note', 'said', 'resourceVersion'].includes(key) ? undefined : value,
     ),
   );
 

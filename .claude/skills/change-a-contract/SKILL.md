@@ -29,8 +29,9 @@ other write, `contracts/laws.ts` included: a helper the laws need is written ins
   `--watch`, which never ends). Each law you add or change comes back `counterexample` on the code as it is; one that comes back `proved`
   says nothing the code does not already do, and one that comes back `vacuous` holds of no input: rewrite either before you hand it on.
 - **The function does not exist yet**: the verifier refuses a spec with no implementation, so write the spec, export its
-  `Implementation<typeof …Spec>` type under the function's name, and declare and export beside it any type the signature needs that the
-  package's `src` lacks (implement moves it into `src`, which changes no law). Typecheck it, `npx tsrs --noEmit -p <package>` (each
+  `Implementation<typeof …Spec>` type under the function's name. A word or a shape `objects` holds (`packages/objects/src/words.ts`
+  and its Schemas) is imported by `import type` from its entry, `objects`, never declared again; declare and export beside the spec only
+  a type the signature needs that neither `objects` nor the package's `src` holds (implement moves it into `src`, which changes no law). Typecheck it, `npx tsrs --noEmit -p <package>` (each
   package that holds a `contracts/` has it in its tsconfig's `include`; a new one adds it), and say each law's verdict as `no code yet`.
 
 Your spec names the file and gives each law's name and verdict; it does not carry the laws in words. Name the file in your `artifacts`,

@@ -16,7 +16,8 @@ export default {
   /**
    * A task journal holding an entry no runtime wrote costs the runs that read it, never the list: the run whose session still works says,
    * on its row, where a row says what it does now, that its record reads and its task does not, and why in the runtime's words, and
-   * every run is drawn still. Its step's bar on the rail is `unreadable`. The run waiting on it is answered from the api's memo, since
+   * every run is drawn still. Its card is bare, no step on its rail: the RunList names a run it cannot judge (`unjudged`) without its
+   * steps. The run waiting on it is answered from the api's memo, since
    * nothing of its own moved and a hand edit writes no feed entry (the api's src/runs/unreadable.test.ts judges it afresh). The journal
    * is put back before the page ends, and said on the feed.
    */
@@ -42,9 +43,10 @@ export default {
         }),
         "the running run's row says its record reads and its task does not, in the runtime's words",
       );
-      await expectVisible(
-        row(running.id).locator('[data-run-steps][aria-label*="implement unreadable"] [data-state="unreadable"]'),
-        "its step's bar on the rail is drawn unreadable, and the rail says so aloud",
+      await expectCount(
+        row(running.id).locator('[data-run-steps] [data-state]'),
+        0,
+        'its card is bare: the RunList names a run it cannot judge without its steps, so the rail draws none of them',
       );
       await expectCount(runs, listed, 'every run of the store is drawn still');
       const said = await page.locator('[data-run][data-unreadable]').count();

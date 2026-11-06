@@ -744,9 +744,11 @@ test("what a filing, a card's page or a drop refuses, writing nothing", async (t
         ['notes.md', notesBody, notesText, 'dev'],
         "notes.md and a stray notes both list as notes: the read is the card's",
       );
-      // A stray file with no card of its name has a page all the same: its refusal and its text.
-      const stray = (await (await cardPage('notes.txt')).json()) as Card;
-      assert.deepEqual([stray.spec.body, stray.status.source, typeof stray.status.error], [undefined, strayText, 'string']);
+      const strayStillHasAPage = (await (await cardPage('notes.txt')).json()) as Card;
+      assert.deepEqual(
+        [strayStillHasAPage.spec.body, strayStillHasAPage.status.source, typeof strayStillHasAPage.status.error],
+        [undefined, strayText, 'string'],
+      );
     },
   );
 

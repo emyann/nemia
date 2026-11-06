@@ -362,9 +362,11 @@ test("a store's runs read on the list and on a run's page: each summarized with 
       denied: step.denied,
       sessionUnread: step.sessionUnread,
     });
+    const { resourceVersion, ...metadata } = run.metadata;
+    assert.equal(typeof resourceVersion, 'string', 'the listed run carries a resourceVersion');
     assert.deepEqual(
       {
-        metadata: run.metadata,
+        metadata,
         spec: {
           repo: spec.repo,
           place: spec.place,

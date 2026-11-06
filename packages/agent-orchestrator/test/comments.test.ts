@@ -460,8 +460,10 @@ const parse = (file: string, text: string): ts.SourceFile =>
 type Found = { line: number; text: string };
 
 /** Every comment of a file, each once: the leading and trailing comments of every node and token of its syntax tree. */
-function commentsOf(file: string, text: string): Found[] {
-  const source = parse(file, text);
+const commentsOf = (file: string, text: string): Found[] => commentsIn(parse(file, text), text);
+
+/** Every comment of a parsed file, as `commentsOf` reads them. */
+function commentsIn(source: ts.SourceFile, text: string): Found[] {
   const found = new Map<number, Found>();
   const add = (ranges: ts.CommentRange[] | undefined) => {
     for (const range of ranges ?? []) {
@@ -505,15 +507,31 @@ function namesOf(source: ts.SourceFile, into: Set<string>): Set<string> {
   return into;
 }
 
-let known: Set<string> | undefined;
+type Scanned = { names: ReadonlySet<string>; comments: ReadonlyMap<string, readonly Found[]> };
+
+let scanned: Scanned | undefined;
+/**
+ * The repository's source read once for the whole file, each file parsed once: the names its code has, from each source file but
+ * this one, whose fixtures quote stale names, and every file's comments. No test writes into it.
+ */
+const repository = (): Scanned => {
+  if (scanned) return scanned;
+  const names = new Set<string>();
+  const comments = new Map<string, readonly Found[]>();
+  for (const file of sourceFiles()) {
+    const text = fs.readFileSync(path.join(ROOT, file), 'utf8');
+    const source = parse(file, text);
+    if (file !== SELF) namesOf(source, names);
+    comments.set(file, commentsIn(source, text));
+  }
+  return (scanned = { names, comments });
+};
+
 /**
  * Every name the repository's code has, from each source file under packages/, apps/, lint/ and tools/ but this one, whose fixtures
  * quote stale names.
  */
-const knownNames = (): Set<string> =>
-  (known ??= sourceFiles()
-    .filter((file) => file !== SELF)
-    .reduce((names, file) => namesOf(parse(file, fs.readFileSync(path.join(ROOT, file), 'utf8')), names), new Set<string>()));
+const knownNames = (): ReadonlySet<string> => repository().names;
 
 /**
  * Other programs' words a comment may quote though the code never spells them, kept short: A2A's states, fields and SDK names; Claude
@@ -533,8 +551,11 @@ const OTHER_PROGRAMS = new Set([
 ]);
 
 /** Each quoted name in `file`'s comments that the code does not have, with its line. */
-function staleNames(file: string, text: string, names: Set<string>): string[] {
-  return commentsOf(file, text).flatMap(({ line, text: comment }) =>
+const staleNames = (file: string, text: string, names: ReadonlySet<string>): string[] => staleIn(file, commentsOf(file, text), names);
+
+/** Each quoted name in `comments`, `file`'s, that the code does not have, with its line. */
+function staleIn(file: string, comments: readonly Found[], names: ReadonlySet<string>): string[] {
+  return comments.flatMap(({ line, text: comment }) =>
     quotedNames(comment)
       .filter((parts) => parts.some((part) => !names.has(part) && !OTHER_PROGRAMS.has(part)))
       .map((parts) => `${file}:${line} quotes \`${parts.join('.')}\``),
@@ -575,14 +596,14 @@ test("no word on the other programs' list is a name the code has already", () =>
 
 test('in every file a guard block covers, a name a comment quotes in backticks is one the code has', () => {
   const covered = guardBlocks(readConfig()).flatMap((block) => block.files.map((glob) => glob.replace(/\/\*\*$/, '')));
-  const names = knownNames();
-  const scanned = new Set<string>();
-  const stale = sourceFiles()
-    .filter((file) => covered.some((dir) => file.startsWith(`${dir}/`)))
-    .flatMap((file) => {
-      scanned.add(covered.find((dir) => file.startsWith(`${dir}/`)) ?? '');
-      return staleNames(file, fs.readFileSync(path.join(ROOT, file), 'utf8'), names);
+  const { names, comments } = repository();
+  const read = new Set<string>();
+  const stale = [...comments]
+    .filter(([file]) => covered.some((dir) => file.startsWith(`${dir}/`)))
+    .flatMap(([file, found]) => {
+      read.add(covered.find((dir) => file.startsWith(`${dir}/`)) ?? '');
+      return staleIn(file, found, names);
     });
   assert.deepEqual(stale, [], 'rename the quoted name to the one the code has, or reword the comment');
-  assert.deepEqual([...scanned].sort(), [...covered].sort(), 'a folder a guard block covers had no source file to scan');
+  assert.deepEqual([...read].sort(), [...covered].sort(), 'a folder a guard block covers had no source file to scan');
 });

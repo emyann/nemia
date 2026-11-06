@@ -132,14 +132,7 @@ type Site = { line: number; matcher: Matcher['name'] };
  * node counts once.
  */
 function sitesIn(file: string, text: string, matchers: readonly Matcher[] = MATCHERS): Site[] {
-  const source = ts.createSourceFile(
-    file,
-    text,
-    ts.ScriptTarget.Latest,
-    true,
-    file.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
-  );
-  const facts = factsOf(source);
+  const { source, facts } = parsed(file, text);
   const sites: Site[] = [];
   const visit = (node: ts.Node): void => {
     const matcher = matchers.find((m) => m.matches(node, facts));
@@ -148,6 +141,39 @@ function sitesIn(file: string, text: string, matchers: readonly Matcher[] = MATC
   };
   visit(source);
   return sites;
+}
+
+/** Each file's syntax tree and facts, by its path, for the one text it was parsed from: a repository file is parsed once. */
+const trees = new Map<string, { text: string; source: ts.SourceFile; facts: FileFacts }>();
+
+/** `text` parsed as `file`, kept until the same file is given another text. */
+function parsed(file: string, text: string): { source: ts.SourceFile; facts: FileFacts } {
+  const kept = trees.get(file);
+  if (kept?.text === text) return kept;
+  const source = ts.createSourceFile(
+    file,
+    text,
+    ts.ScriptTarget.Latest,
+    true,
+    file.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
+  );
+  const tree = { text, source, facts: factsOf(source) };
+  trees.set(file, tree);
+  return tree;
+}
+
+/** Each file's sites under a list of matchers, for the one text they were measured in. */
+const siteCounts = new WeakMap<readonly Matcher[], Map<string, { text: string; count: number }>>();
+
+/** How many sites `matchers` find in `text`, kept per list and file: a repository file is measured once per list. */
+function siteCount(file: string, text: string, matchers: readonly Matcher[]): number {
+  let byFile = siteCounts.get(matchers);
+  if (!byFile) siteCounts.set(matchers, (byFile = new Map()));
+  const kept = byFile.get(file);
+  if (kept?.text === text) return kept.count;
+  const count = sitesIn(file, text, matchers).length;
+  byFile.set(file, { text, count });
+  return count;
 }
 
 /** Whether a file of a `src` is left out: a test, beside its code or in a `test` folder. */
@@ -170,7 +196,7 @@ function sourcesOf(root: string): string[] {
 
 /** Each file's count of sites, for the files that hold one at least. */
 const measured = (texts: ReadonlyMap<string, string>, matchers: readonly Matcher[] = GIT_MATCHERS): Record<string, number> =>
-  Object.fromEntries([...texts].map(([file, text]) => [file, sitesIn(file, text, matchers).length]).filter(([, count]) => count !== 0));
+  Object.fromEntries([...texts].map(([file, text]) => [file, siteCount(file, text, matchers)]).filter(([, count]) => count !== 0));
 
 /** What an entry fails to name: one card at least, each one `CARDS` knows. */
 function namingBreak(file: string, entry: Entry): string | undefined {
@@ -210,7 +236,10 @@ function ratchetBreaks(counts: Record<string, number>, baseline: Baseline, exist
 
 const onDisk = (file: string): boolean => fs.existsSync(path.join(ROOT, file));
 
-const repository = (): Map<string, string> => new Map(sourcesOf(ROOT).map((f) => [f, fs.readFileSync(path.join(ROOT, f), 'utf8')]));
+let sources: ReadonlyMap<string, string> | undefined;
+/** Every src file's text, read once for the whole file: a test plants a file into a copy, never into this. */
+const repository = (): ReadonlyMap<string, string> =>
+  (sources ??= new Map(sourcesOf(ROOT).map((f) => [f, fs.readFileSync(path.join(ROOT, f), 'utf8')])));
 
 /** Every `.ts` under the package's `place/` but in a folder that names a run's branches (`BRANCH_NAMERS`), by its path from `root`. */
 function placeSourcesOf(root: string): string[] {
@@ -333,9 +362,7 @@ test("the scan reads every workspace's src, and no test, script or file outside 
 });
 
 test("no src names a run's branch: the place names it, and the run core asks it", () => {
-  const texts = new Map(
-    [...sourcesOf(ROOT), ...placeSourcesOf(ROOT)].map((f) => [f, fs.readFileSync(path.join(ROOT, f), 'utf8')] as const),
-  );
+  const texts = new Map([...repository(), ...placeSourcesOf(ROOT).map((f) => [f, fs.readFileSync(path.join(ROOT, f), 'utf8')] as const)]);
   const branch = MATCHERS.filter((m) => m.name === 'branch');
   const built = [...texts].flatMap(([file, text]) => sitesIn(file, text, branch).map(({ line }) => `${file}:${line}`));
   assert.deepEqual(

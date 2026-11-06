@@ -1,13 +1,15 @@
 /**
  * A step as the tick tells it (`toldOf`): the step its brief is composed for, the harness's own arguments it is filed with (`ownOf`), and
  * what its place says to it (`placeTold`); the files its last closeout lacked (`lacksTold`), and which files the steps before it named
- * are there (`foldersTold`); and what a pass named, found or thrown as its fault (`found`, `recordNamed`). A controller: it reads the
- * run's rendered agent folder, the skills where a start of the run's folder finds them, and the run's place.
+ * are there (`foldersTold`); and what a pass named, found or thrown as its fault (`found`, `recordNamed`). And what one pass reads of a
+ * run before it adopts or files anything (`readPass`): the engine's views of its tasks, the readers made of them, and the asks beside
+ * it, through the Run door — the asks waiting, and every answer a person gave, waiting or consumed, which the steps after each are told.
+ * A controller: it reads the run's rendered agent folder, the skills where a start of the run's folder finds them, and the run's place.
  */
 import path from 'node:path';
 import { Effect, Result } from 'effect';
 import { refusedTold } from './assess.ts';
-import { mcpServerOf, type ClaudeFlags, type CodexArgs, type TaskView } from '../runtime-client.ts';
+import { mcpServerOf, over, type ClaudeFlags, type CodexArgs, type Engine, type TaskView } from '../runtime-client.ts';
 import {
   isRepositoryRun,
   lackedOf,
@@ -23,9 +25,14 @@ import { filedFolders, type FiledFolders } from '../filed/filed.ts';
 import { artifactFiles, filesHanded, holdsCloseout } from '../artifacts/artifacts.store.ts';
 import { lackLines } from '../artifacts/artifacts.ts';
 import type { EndingStopped, RetryBriefing } from '../brief/index.ts';
-import { ownStatus, type SpendOf } from '../status/status.ts';
+import { budgetOf, ownStatus, type SpendOf } from '../status/status.ts';
 import type { Retry } from '../retry/index.ts';
-import { saidIn } from '../views/views.verb.ts';
+import { closeoutAsked, closeoutReader, exitVerdicts, harnessBlocked, saidIn, spendReader, taskPhasesRead } from '../views/views.verb.ts';
+import { StoreRoot } from '../config/root.store.ts';
+import { RunId } from '../record/record.model.ts';
+import { stepsOf } from '../steps/steps.verb.ts';
+import { RunDoor } from '../runs/runs.store.ts';
+import type { PassReads } from './file.verb.ts';
 import { splitFrontmatter, type Workflow } from '../step/step.ts';
 import { realRepoOf } from '../workspace/worktree.store.ts';
 import { agentFilesDir, renderedIn } from '../agents/agents.store.ts';
@@ -333,4 +340,28 @@ export const tryTold = (
   ...(t.status === 'unsigned' ? lacksTold(f.run, r.step, record) : {}),
   ...(t.status === 'unsigned' ? refusedTold(stepNamed(f, r.step), f.reads.signedOff(r.step), f.reads.steps) : {}),
   ...(r.back?.[0] !== undefined ? { ending: endingSaid(f, stepNamed(f, r.back[0])) } : {}),
+});
+
+/**
+ * Whether any step of this run has a cap in force on it (`budgetOf`: its `budget:`, or the last a person raised it to) — read off the
+ * record, with nothing asked of the engine. What the tick's pass reads the earlier tries for (`taskPhases`): with no cap anywhere, what
+ * they cost is a number nothing in the pass looks at, and a step answered without limit would grow that read for ever.
+ */
+const underBudget = (steps: readonly Workflow[], run: Run): boolean => steps.some((s) => budgetOf(s, run) !== undefined);
+
+/** A pass's reads of a run, before it adopts or files anything: the engine's views of its tasks, the readers made of them, and its asks. */
+export const readPass = Effect.fnUntraced(function* (e: Engine, run: Run) {
+  const steps = yield* stepsOf(run);
+  const { views, phaseOf } = yield* taskPhasesRead(run, { earlierTries: underBudget(steps, run) }).pipe(over(e));
+  const signedOff = closeoutReader(views, run, steps);
+  const asked = closeoutAsked(views);
+  const verdictOf = exitVerdicts(views, run);
+  const sessionBlocked = harnessBlocked(views);
+  const spendOf = spendReader(views);
+  const door = yield* RunDoor;
+  const { asks, rounds: roundAsks, notes: askNotes } = yield* door.asks.read(RunId.read(run.id));
+  const answers = yield* door.asks.answers(RunId.read(run.id));
+  const home = yield* StoreRoot;
+  const reads: PassReads = { steps, views, phaseOf, signedOff, asked, verdictOf, sessionBlocked, spendOf, asks, roundAsks, answers, home };
+  return { reads, askNotes };
 });

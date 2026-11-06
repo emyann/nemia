@@ -15,6 +15,7 @@ import {
   cancelPlan,
   composeBrief,
   decision,
+  remoteBrief,
   ownStatus,
   retriesDue,
   retryable,
@@ -1295,6 +1296,98 @@ test("composeBrief of an answer: `## Your answer`, the person's text untouched i
       headingsOf(briefOf(blocked, '## Before you sign off\n\nNothing to run.')).filter((h) => h === '## Before you sign off'),
       ['## Before you sign off'],
     );
+  });
+});
+
+test("composeBrief after an answered step: `## Answered`, a person's answer handed to every step after it", async (t) => {
+  const steps: Workflow[] = [step('plan'), step('implement', ['plan']), step('review', ['implement'])];
+  const cut = 'Cut the board out of this build: it is a card of its own.';
+  const answer = (n: number, message: string, at: string, mode: RetryMode = 'continue'): RetryAsk => ({
+    step: 'implement',
+    try: n,
+    mode,
+    message,
+    at,
+  });
+  const answered = run(
+    { plan: 't0', implement: 't2', review: null },
+    {
+      steps: {
+        plan: { taskId: 't0' },
+        implement: { taskId: 't2', tries: [{ taskId: 't1', cause: 'continue' }] },
+        review: { taskId: null },
+      },
+    },
+  );
+  const briefHandedAnswers = (s: Workflow, r: Run, answers: readonly RetryAsk[]) =>
+    composeBrief(
+      s,
+      r,
+      steps,
+      ...([
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        {},
+        undefined,
+      ] as const),
+      answers,
+    );
+  const given = [answer(2, cut, '2026-11-06T03:10:00.000Z')];
+  const said = `implement, try 2, answered at 2026-11-06T03:10:00.000Z:\n\n\`\`\`text\n${cut}\n\`\`\``;
+  await t.test('the step after the answered one, beside what was asked for and before where to look', () => {
+    const review = briefHandedAnswers(steps[2], answered, given);
+    assert.ok(review.includes('\n## Answered\n'), review);
+    assert.ok(review.includes(said), review);
+    assert.ok(review.indexOf('## What was asked for') < review.indexOf('## Answered'));
+    assert.ok(review.indexOf('## Answered') < review.indexOf('## Where to look'));
+  });
+  await t.test('and on a remote agent after it', () =>
+    assert.ok(remoteBrief(steps[2], answered, steps, undefined, undefined, undefined, given).includes(said)),
+  );
+  await t.test('not a step before the answered one', () =>
+    assert.ok(!briefHandedAnswers(steps[0], answered, given).includes('## Answered')),
+  );
+  await t.test("not the answered step itself: its own answer is its try's `## Your answer`", () =>
+    assert.ok(!briefHandedAnswers(steps[1], answered, given).includes('## Answered')),
+  );
+  await t.test('nothing for a run where no step was answered', () =>
+    assert.equal(composeBrief(steps[2], answered, steps), briefHandedAnswers(steps[2], answered, [])),
+  );
+  await t.test('REFUSED an answer to a try never filed as it was asked: given to nobody, handed to nobody', () => {
+    const asked = [answer(2, cut, '2026-11-06T03:10:00.000Z', 'fresh'), answer(3, 'not yet filed', '2026-11-06T04:00:00.000Z')];
+    assert.ok(!briefHandedAnswers(steps[2], answered, asked).includes('## Answered'));
+  });
+  await t.test('two answers are each said, in the order given', () => {
+    const twice = run(
+      { plan: 't0', implement: 't3', review: null },
+      {
+        steps: {
+          plan: { taskId: 't0' },
+          implement: {
+            taskId: 't3',
+            tries: [
+              { taskId: 't1', cause: 'continue' },
+              { taskId: 't2', cause: 'continue' },
+            ],
+          },
+          review: { taskId: null },
+        },
+      },
+    );
+    const second = 'And keep `--flag` public.';
+    const review = briefHandedAnswers(steps[2], twice, [
+      answer(3, second, '2026-11-06T05:00:00.000Z'),
+      answer(2, cut, '2026-11-06T03:10:00.000Z'),
+    ]);
+    assert.ok(review.indexOf(cut) > 0 && review.indexOf(cut) < review.indexOf(second), review);
   });
 });
 

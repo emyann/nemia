@@ -12,7 +12,6 @@ import { endsOnBase } from '../step/step.ts';
 import { Effect } from 'effect';
 import { EngineService, asked as engineAsked, denialText, over, type Engine, type TaskView } from '../runtime-client.ts';
 import { wordFeed } from '../feed/word-feed.verb.ts';
-import { StoreRoot } from '../config/root.store.ts';
 import type { Verdict } from '../check/check.ts';
 import type { Workflow } from '../workflow.ts';
 import { folderPlace } from '../record/places.store.ts';
@@ -21,7 +20,7 @@ import { inFlight, runAdmitted, slotNeed, slotWord, takesNoSlot, type RunSlot } 
 import { endingAsked } from '../ending/ending.ts';
 import { holdsOpen } from '../gate/gate.ts';
 import { checkTaskId, isRepositoryRun, stepTaskId, tryOf, type CloseoutAsked, type Run, type TaskPhase } from '../record/record.ts';
-import { budgetOf, landsOnCheck, sentBack, stepStatus, type RoundAsk, type SpendOf } from '../status/status.ts';
+import { landsOnCheck, sentBack, stepStatus, type RoundAsk, type SpendOf } from '../status/status.ts';
 import { hasStarted, runReady, waitedOn, waitsOf, type ParentRun, type Wait } from '../wait/wait.ts';
 import { behindNow, followPass, passRevisions, pinPass, pinsWritten, type PinnedPass } from '../revisions/pin.verb.ts';
 import { handOffDue } from '../workspace/workspace.ts';
@@ -33,7 +32,6 @@ import { roundFiled, roundsDue } from '../round/round.ts';
 import type { Closeout } from '../closeout/index.ts';
 import { nextTry, pauseAsksVoid, retriesDue, turnsOf, type RetryAsk } from '../retry/index.ts';
 import { runsDir } from '../record/record.store.ts';
-import { stepsOf } from '../steps/steps.verb.ts';
 import { runStore } from '../record/files.store.ts';
 import { collectArtifacts, filesLacked, handCloseout } from '../artifacts/artifacts.store.ts';
 import {
@@ -46,20 +44,7 @@ import {
   type PassStanding,
 } from '../standing/standing.verb.ts';
 import { restBlockers, type RestFacts } from '../rest/index.ts';
-import {
-  answersIn,
-  closeoutAsked,
-  closeoutReader,
-  everyTryOf,
-  exitVerdicts,
-  harnessBlocked,
-  keptParent,
-  parentsRead,
-  passParents,
-  spendReader,
-  taskPhasesRead,
-  type Parents,
-} from '../views/views.verb.ts';
+import { answersIn, everyTryOf, keptParent, parentsRead, passParents, type Parents } from '../views/views.verb.ts';
 import { waitsForWord } from '../views/views-words.ts';
 import { withinEffect } from '../meter/tally.store.ts';
 import { PlaceService, type Place } from '../place/place.store.ts';
@@ -68,16 +53,9 @@ import { checkoutHold, landEnding } from '../ending/ending.verb.ts';
 import { statusMemo } from '../place/landing.store.ts';
 import type { PassRead } from '../cap/cap.verb.ts';
 import { fileChecks, fileReady, fileRounds, fileTries, type Closer, type Filing, type Heads, type PassReads } from './file.verb.ts';
-import { recordNamed } from './told.verb.ts';
+import { readPass, recordNamed } from './told.verb.ts';
 import { closeHeld, stopAsked } from './held.verb.ts';
 import { RunDoor } from '../runs/runs.store.ts';
-
-/**
- * Whether any step of this run has a cap in force on it (`budgetOf`: its `budget:`, or the last a person raised it to) — read off the
- * record, with nothing asked of the engine. What the tick's pass reads the earlier tries for (`taskPhases`): with no cap anywhere, what
- * they cost is a number nothing in the pass looks at, and a step answered without limit would grow that read for ever.
- */
-const underBudget = (steps: readonly Workflow[], run: Run): boolean => steps.some((s) => budgetOf(s, run) !== undefined);
 
 /**
  * Checks a pass filed and never wrote down, put back on the record in memory — `advance` is the one writer of the run's json, and writes
@@ -472,21 +450,6 @@ export const mayFileOf = (run: Run): (() => boolean) => {
   let calledOff = false;
   return () => !(calledOff ||= !runStore.runs.exists(run.id) || runStore.runs.calledOff(run.id));
 };
-
-/** A pass's reads of a run, before it adopts or files anything: the engine's views of its tasks, the readers made of them, and its asks. */
-const readPass = Effect.fnUntraced(function* (e: Engine, run: Run) {
-  const steps = yield* stepsOf(run);
-  const { views, phaseOf } = yield* taskPhasesRead(run, { earlierTries: underBudget(steps, run) }).pipe(over(e));
-  const signedOff = closeoutReader(views, run, steps);
-  const asked = closeoutAsked(views);
-  const verdictOf = exitVerdicts(views, run);
-  const sessionBlocked = harnessBlocked(views);
-  const spendOf = spendReader(views);
-  const { asks, rounds: roundAsks, notes: askNotes } = runStore.asks.read(run.id);
-  const home = yield* StoreRoot;
-  const reads: PassReads = { steps, views, phaseOf, signedOff, asked, verdictOf, sessionBlocked, spendOf, asks, roundAsks, home };
-  return { reads, askNotes };
-});
 
 /**
  * Adopt what a pass before this one filed and never wrote down: its rounds, then its tries, then its checks. Answers with every step

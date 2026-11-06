@@ -30,6 +30,7 @@ import {
   type CloseoutAsked,
   type Run,
   type StepRecord,
+  type StepStatus,
   type TaskPhase,
 } from '../record/record.ts';
 import {
@@ -47,7 +48,7 @@ import {
   type RoundAsk,
   type SpendOf,
 } from '../status/status.ts';
-import { callerMounts, composeBrief, remoteBrief, type ParentCloseout } from '../brief/index.ts';
+import { callerMounts, composeBrief, remoteBrief, type ParentCloseout, type RetryBriefing } from '../brief/index.ts';
 import { handedOf } from '../brief/handed.verb.ts';
 import type { BranchReader } from '../branches/branches.store.ts';
 import { roundBriefed, roundFiled, roundFiledNote } from '../round/round.ts';
@@ -103,6 +104,8 @@ export type PassReads = {
   spendOf: SpendOf;
   asks: RetryAsk[];
   roundAsks: RoundAsk[];
+  /** Every answer a person gave with `nemia retry --message` on the run, waiting or consumed: what the steps after each are handed. */
+  answers: readonly RetryAsk[];
   /** The store's root, as the pass was given it (`StoreRoot`): where a filing reads the run's factory's MCP server record. */
   home: string;
 };
@@ -228,6 +231,16 @@ const costsFor = Effect.fnUntraced(function* (f: Filing, step: Workflow, resumed
   return yield* costsRead(f.e, f.run);
 });
 
+/** What a try of a step on a remote agent is told of itself (`remoteBrief`): a new task, never a session continued. */
+const remoteTry = (r: Retry, status: StepStatus): RetryBriefing => ({
+  try: r.try,
+  by: r.by,
+  mode: r.mode,
+  resumed: false,
+  status,
+  ...(r.message !== undefined ? { message: r.message } : {}),
+});
+
 /**
  * Send a try to the engine, told what its place says to it (`PlaceTold`): filed as a task of its own, or given as the answer to the
  * task held open (`answers`). Answers with the engine's refusal of the answer, or undefined.
@@ -247,14 +260,7 @@ const sendTry = Effect.fnUntraced(function* (f: Filing, r: Retry, step: Workflow
   const status = triedFrom(step, run, reads.phaseOf, reads.signedOff, reads.asked, reads.steps, reads.spendOf);
   const told: Told = { ...(yield* toldOf(run, step)), ...landing };
   const brief = remote
-    ? remoteBrief(step, run, reads.steps, closeouts, {
-        try: r.try,
-        by: r.by,
-        mode: r.mode,
-        resumed: false,
-        status,
-        ...(r.message !== undefined ? { message: r.message } : {}),
-      })
+    ? remoteBrief(step, run, reads.steps, closeouts, remoteTry(r, status), undefined, reads.answers)
     : composeBrief(
         told.step,
         run,
@@ -270,6 +276,8 @@ const sendTry = Effect.fnUntraced(function* (f: Filing, r: Retry, step: Workflow
         foldersTold(run, reads, told.step),
         yield* costsFor(f, step, Boolean(resumeFrom)),
         { words: told.words, say: told.say, targets: told.targets },
+        undefined,
+        reads.answers,
       );
   const budgetUsd = budgetUsdFor(r.budget ?? budgetOf(step, run), stepSpend(run, r.step, reads.spendOf));
   if (answers) return yield* answerHeld(e, taskId, brief, budgetUsd);
@@ -416,6 +424,8 @@ function roundSpec(
       foldersTold(run, reads, told.step),
       said.costs,
       { words: said.words, say: said.say },
+      undefined,
+      reads.answers,
     ),
     cwd: record.workspace ?? run.workspace,
     harness: target.harness,
@@ -582,7 +592,7 @@ function readySpec(
      * nothing of this machine (`remoteBrief`).
      */
     brief: isRemoteHarness(step.harness)
-      ? remoteBrief(step, run, reads.steps, closeoutOf, undefined, step.after.length ? undefined : parents)
+      ? remoteBrief(step, run, reads.steps, closeoutOf, undefined, step.after.length ? undefined : parents, reads.answers)
       : composeBrief(
           told.step,
           run,
@@ -599,6 +609,7 @@ function readySpec(
           said.costs,
           { words: said.words, say: said.say, targets: said.targets },
           place.merge,
+          reads.answers,
         ),
     cwd: place.workspace,
     harness: step.harness,

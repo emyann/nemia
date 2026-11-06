@@ -1148,6 +1148,8 @@ it is between two engineers. A later step is told:
   concluded, under `## From run <id>` (below)
 - after a gate a person approved: the approval and the words given with it, under `## Approved`
   ([*A gate*](#a-gate-a-handoff-that-waits-for-a-person--gate---gate-and-wf-approve))
+- after a step a person sent back with an answer (`wf retry --message`): each answer, its step, try and time,
+  fenced as data, under `## Answered`, in the order given; the answered step itself reads its own as `## Your answer`
 
 And deliberately **not** told: the previous step's transcript, reasoning, or self-assessment.
 
@@ -1763,7 +1765,9 @@ retries: 1
   answer rides on the ask — `message`, in the person's own file — beside `--continue`, `--fresh` or `--model <m>`,
   and the next tick carries it into the try's brief inside `## Try <n>`, as `## Your answer`: the text as it was
   written, in a fence longer than any run of backticks in it, so a pasted snippet cannot close the section or
-  swallow the contract after it — after on whose word the try is and before what the check said. A step that did not sign off blocked
+  swallow the contract after it — after on whose word the try is and before what the check said. Every step after it, directly
+  or through another, is handed the answer too, under `## Answered`: what a person decided there is what the work after is judged
+  by, as an approval's words are. A step that did not sign off blocked
   may be told something too. `--message` takes the next argument as the answer, whatever it starts with, so
   an answer about a flag names it; `--message=<answer>` carries one that is only one of the verb's own flags.
   Refused before anything is written: an empty message, and `--message` with `--recheck`, which files no

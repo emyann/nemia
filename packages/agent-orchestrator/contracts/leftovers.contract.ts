@@ -35,18 +35,14 @@ const leftoversSpec = spec<(entries: readonly PidEntry[], logs: readonly BuildLo
       condition: ({ input: [, logs, nowMs], output }) =>
         output.logs.every((name) => logs.every((l) => l.name !== name || l.modifiedMs + LOGS_KEPT_MS < nowMs)),
     },
-    /**
-     * The full laws, "every entry whose process is gone is removed" and "every log older than 30 days is removed", wait on tsverify
-     * proving that a filter's result keeps every element that passes (src-a-filter-s-result-is-pro-p25m), as `retention`'s
-     * `somethingGoes` does; `src/retention/leftovers.test.ts` holds them until then.
-     */
-    somethingDeadGoes: {
-      description: "Where some build folder or link's process is gone, something is removed",
-      condition: ({ input: [entries], output }) => entries.every((e) => e.live) || output.entries.length > 0,
+    everyDeadGoes: {
+      description: 'A build folder or link whose process is gone is removed',
+      condition: ({ input: [entries], output }) => entries.every((e) => e.live || output.entries.includes(e.name)),
     },
-    someOldLogGoes: {
-      description: 'Where some build log is older than 30 days, some log is removed',
-      condition: ({ input: [, logs, nowMs], output }) => !logs.some((l) => l.modifiedMs + LOGS_KEPT_MS < nowMs) || output.logs.length > 0,
+    everyOldLogGoes: {
+      description: 'A build log older than 30 days is removed',
+      condition: ({ input: [, logs, nowMs], output }) =>
+        logs.every((l) => !(l.modifiedMs + LOGS_KEPT_MS < nowMs) || output.logs.includes(l.name)),
     },
   },
 });

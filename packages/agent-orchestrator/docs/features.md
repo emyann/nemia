@@ -2274,8 +2274,8 @@ it would crash that session. What was built, in `src/retention/` and `src/releas
 Tested in `src/retention/retention.test.ts` (the order and the words), `retention.verb.test.ts` (the sweep's story over a scratch
 store and the engine's stand-in), `src/release/release.store.test.ts` (the installed releases, a build under way, a release moved
 aside) and `upgrade.verb.test.ts` (an upgrade's removal, a session's pin, a build that holds, a rollback). The contract proves every
-law, its accepting side narrowed to `somethingGoes` (unheld, where a release can go, something is removed): that every such release goes
-waits on tsverify proving a filter keeps every element that passes, and `retention.test.ts` holds it until then. What a crashed upgrade leaves, and old build logs, are swept since: the next section.
+law, its accepting side whole since tsverify 0.9.0 (`everyOtherGoes`: unheld, every release that can go is removed); `retention.test.ts`
+holds it too. What a crashed upgrade leaves, and old build logs, are swept since: the next section.
 
 ## Shipped: a crashed upgrade's leftovers are swept (harness-updates)
 

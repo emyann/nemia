@@ -46,15 +46,10 @@ const retentionSpec = spec<(installed: readonly Installed[], inUse: InUse) => Re
       description: 'A local session in flight that recorded no release holds every removal',
       condition: ({ input: [, inUse], output }) => (output.held === 'unrecorded') === (inUse.current !== null && inUse.unrecorded > 0),
     },
-    /**
-     * The full law, "every installed release that is not current, not running and not among the two newest is removed", waits on
-     * tsverify proving that a filter's result keeps every element that passes (src-a-filter-s-result-is-pro-p25m), and
-     * harness-updates-retention-s-jhbx restores it once a release does; `src/retention/retention.test.ts` holds it until then.
-     */
-    somethingGoes: {
-      description: 'Unheld, where some installed release is not current, not running and not among the two newest, something is removed',
+    everyOtherGoes: {
+      description: 'Unheld, every installed release that is not current, not running and not among the two newest is removed',
       condition: ({ input: [installed, inUse], output }) =>
-        output.held !== null || installed.every((r, i) => i < 2 || inUseBy(inUse, r.tag)) || output.remove.length > 0,
+        output.held !== null || installed.every((r, i) => i < 2 || inUseBy(inUse, r.tag) || output.remove.includes(r.tag)),
     },
   },
 });

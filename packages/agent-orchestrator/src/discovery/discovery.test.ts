@@ -58,8 +58,8 @@ const subDoes = (route: ApiRoute, verb: ResourceVerb): boolean =>
 
 /**
  * Each law the contract leaves out until tsverify card `src-a-filter-s-result-is-pro-p25m` restores it, broken by `output`: every kind
- * listed once under its plural, nothing listed that no kind's route serves, every sub-resource listed once, and each resource's verbs
- * exactly what its routes do.
+ * listed once under its plural, every sub-resource listed once, and each resource's verbs exactly what its routes do; and nothing
+ * listed that no kind's route serves, which the contract proves since tsverify 0.9.0 (`onlyWhatIsServed`).
  */
 const broken = (routes: readonly ApiRoute[], kinds: readonly KindPlural[], output: readonly Resource[]): string[] => {
   const named = (name: string) => output.filter((r) => r.name === name);

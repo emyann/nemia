@@ -47,6 +47,8 @@ const { DEFAULT_HARNESS } = await import('../src/harness/harness.ts');
 const { nemiaFence } = await import('../src/admission/index.ts');
 const { TABLE } = await import('../src/command/commands.verb.ts');
 const { engineOf, over, runWith } = await import('../src/runtime-client.ts');
+const { SESSION_TOKEN } = await import('../src/filed/filed.ts');
+const { readToken } = await import('../src/token/token.store.ts');
 /** The CLI's `main`, loaded only if a checkpoint types a command: these stories call the verbs, and its import is the slowest. */
 const main: Parameters<typeof staged>[0]['main'] = async (...argv) => (await import('../src/cli/main.ts')).main(...argv);
 const stage = staged({ runWith, main, engineOf });
@@ -235,6 +237,9 @@ test("Nemia kept and let go: trusted late, filed long-lived in auto with the dae
       assert.equal('closeoutSchema' in spec || 'closeoutSchema' in spec.config, false, 'no closeout: she never ends');
       assert.ok((spec.config.allowedTools as string[]).includes(`Edit(/${memoryDir()}/**)`), 'her memory hers to write');
       assert.ok((spec.config.allowedTools as string[]).includes('Bash(curl -s http://127.0.0.1:8787/api/quota)'), 'the quota hers to read');
+      const token = (spec.config.env as Record<string, string>)[SESSION_TOKEN] ?? '';
+      assert.match(token, /^[A-Za-z0-9_-]{43}$/, 'her session token in her environment');
+      assert.deepEqual(readToken(ROOT, token), { agent: 'nemia', factory: null, run: null, step: null, attempt: 1, task: set.task });
       assert.match((spec as unknown as { brief: string }).brief, /`curl -s http:\/\/127\.0\.0\.1:8787\/api\/quota`/);
       const own = spec.config[DEFAULT_HARNESS] as { remoteControl: boolean; appendSystemPromptFile: string; settings: string };
       assert.equal(own.remoteControl, true);

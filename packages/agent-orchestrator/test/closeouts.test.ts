@@ -35,7 +35,7 @@ const { advanceRun, artifactFiles, closeoutAsked, decideRun, list, missingArtifa
 const { artifactsDir, asksDir, readRun, rewriteRun } = await import('../src/record/record.store.ts');
 const { SIGNOFF } = await import('../src/run.ts');
 const { lackedOf } = await import('../src/record/record.ts');
-const { RUN_LABELS, STEP_FILES } = await import('../src/filed/filed.ts');
+const { RUN_LABELS, SESSION_TOKEN, STEP_FILES } = await import('../src/filed/filed.ts');
 const { engineOf } = await import('../src/runtime-client.ts');
 const { main } = await import('../src/cli/main.ts');
 const stage = staged({ runWith, main, engineOf });
@@ -373,7 +373,9 @@ test('files a closeout names', async (t) => {
   await s.test("implement is filed its files directory, made outside the workspace, in its session's env and in its brief", async () => {
     ({ id, files, task } = await filed());
     const frozen = path.join(ROOT, 'runs', id, 'workflow', String(readRun(id).workflowFiles));
-    assert.deepEqual(taskOf(task).spec.config?.env, { [STEP_FILES]: files, WF_WORKFLOW_FILES: frozen, [RUN_LABELS]: '{}' });
+    const { [SESSION_TOKEN]: token, ...env } = taskOf(task).spec.config?.env ?? {};
+    assert.deepEqual(env, { [STEP_FILES]: files, WF_WORKFLOW_FILES: frozen, [RUN_LABELS]: '{}' });
+    assert.match(token ?? '', /^[A-Za-z0-9_-]{43}$/, 'beside them its session token (session-token.test.ts)');
     assert.ok(fs.statSync(files).isDirectory(), 'made before the step was filed');
     assert.ok(!files.startsWith(readRun(id).steps.implement.workspace! + path.sep), 'not in the workspace, where it would ride the branch');
     const brief = briefOf(task);

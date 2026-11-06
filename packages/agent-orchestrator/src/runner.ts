@@ -479,8 +479,7 @@ export { FACTORY_INSTRUCT, FACTORY_INSTRUCTION, factoryInstruction, type Factory
 export { FACTORY_RULES, factoryRules, type FactoryRules } from './rules/rules.verb.ts';
 /** A factory's own MCP servers: the entry that lists its record with each server's state, and the name rule the board shares. */
 export { FACTORY_SERVERS } from './servers/servers.verb.ts';
-export { serverNameRefusal } from './servers/index.ts';
-export type { BuiltinServer } from './servers/index.ts';
+export { serverNameRefusal, type BuiltinServer } from './servers/index.ts';
 export { BUILTIN_SERVERS, builtinServers } from './servers/servers.store.ts';
 /** A factory's server signed in to and out of from the board, through the engine; the builtin secret stays inside the package. */
 export { serverSignIn, serverSignInState, serverSignOut } from './servers/sign-in.verb.ts';
@@ -496,8 +495,7 @@ export { forgetRun, runsForgetting } from './forget/forget.verb.ts';
 export { freeingMany, judgingMany, prune, type Listed, type Turned } from './prune/prune.verb.ts';
 export { decideRun, type Answered, type Decided } from './decide/decide.verb.ts';
 export { freshStatsMemo, statsRun, type StatsMemo, type StatsOptions } from './stats/stats.verb.ts';
-export { seriesMemo } from './series/series.ts';
-export type { Health, SeriesMemo, SeriesPoint, SeriesRead } from './series/series.ts';
+export { seriesMemo, type Health, type SeriesMemo, type SeriesPoint, type SeriesRead } from './series/series.ts';
 export { BY_KEYS, statsLine, statsLines, statsQueryOf, type ByKey, type QueryKey, type Stats, type StatsQuery } from './stats/index.ts';
 export { list, pausedRead, runReading, unjudgedOf } from './list/list.verb.ts';
 export type { ReadingHow, RunReading } from './list/list.verb.ts';
@@ -558,3 +556,5 @@ import * as RunObject from './object/run.model.ts';
  * (`RunObject`, object/run.model.ts). One namespace each, imported and exported by name.
  */
 export { RunModel, RunObject };
+
+export * from './token/caller.verb.ts';

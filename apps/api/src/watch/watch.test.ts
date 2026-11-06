@@ -1,12 +1,12 @@
 /**
  * Every list watched (`?watch=true`, src/watch/watch.ts): the initial state as an ADDED per object then a BOOKMARK; a card filed,
  * relabelled, started and dropped arriving as ADDED, MODIFIED and DELETED, the DELETED carrying the last object sent; a labelSelector
- * kept on every read, a card relabelled out of it DELETED; a fieldSelector of the runs' state kept on every read, a run approved out of
+ * kept on every read, a card relabelled out of it DELETED; the runs of a store holding one watched, plain and namespaced; a fieldSelector of the runs' state kept on every read, a run approved out of
  * waiting DELETED; every GET list of the `Api` watchable; the watch's query refused before any
  * stream; and the feed's reader let go when the request is aborted. The resync beat is shortened (`Beats.watch`), never waited out.
  */
 import { root } from '../../test/harness.ts';
-import { test } from 'node:test';
+import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -171,61 +171,83 @@ const doneTask = (taskId: string) => {
   fs.writeFileSync(file, events.map((e) => `${JSON.stringify(e)}\n`).join(''));
 };
 
-/**
- * Why the watch of runs by state is a test node reports and does not fail on, until the watch reads a Run: it decodes each item as a
- * `WatchedObject` (objects' watch.ts), whose `ObjectMeta` asks a `resourceVersion` a Run's metadata does not carry, so
- * `GET /api/runs?watch=true` answers 500 once any run is in the store.
- */
-const RUN_WATCH_TODO = "a Run's metadata carries no resourceVersion, which the watch's WatchedObject requires: a watch of runs is a 500";
+/** A run of `default` waiting at its `design` gate, its task done, its record laid by hand and taken away after `t`. */
+const gatedRun = (t: TestContext, id: string) => {
+  t.after(() => fs.rmSync(path.join(root, 'runs', `${id}.json`), { force: true }));
+  doneTask(`t-${id}`);
+  fs.mkdirSync(path.join(root, 'runs'), { recursive: true });
+  fs.writeFileSync(
+    path.join(root, 'runs', `${id}.json`),
+    JSON.stringify({
+      id,
+      repo: '/code/app',
+      workspace: '/code/app',
+      baseRef: 'abc123',
+      branch: 'main',
+      isolate: true,
+      brief: 'Design it.',
+      workflowDir: path.join(root, 'no-such-workflow'),
+      createdAt: '2026-11-05T06:00:00.000Z',
+      workflow: [
+        { name: 'design', after: [], body: 'Design it.', harness: 'codex' },
+        { name: 'implement', after: ['design'], body: 'Implement it.', harness: 'codex' },
+      ],
+      gates: ['design'],
+      steps: { design: { taskId: `t-${id}` }, implement: { taskId: null } },
+    }),
+  );
+};
 
-test(
-  'a watch of the runs by state keeps its fieldSelector on every read: a run approved at its gate, waiting no more, arrives as DELETED',
-  { todo: RUN_WATCH_TODO },
-  async (t) => {
-    const id = 'r-watch-gated';
-    t.after(() => fs.rmSync(path.join(root, 'runs', `${id}.json`), { force: true }));
-    doneTask(`t-${id}`);
-    fs.mkdirSync(path.join(root, 'runs'), { recursive: true });
-    fs.writeFileSync(
-      path.join(root, 'runs', `${id}.json`),
-      JSON.stringify({
-        id,
-        repo: '/code/app',
-        workspace: '/code/app',
-        baseRef: 'abc123',
-        branch: 'main',
-        isolate: true,
-        brief: 'Design it.',
-        workflowDir: path.join(root, 'no-such-workflow'),
-        createdAt: '2026-11-05T06:00:00.000Z',
-        workflow: [
-          { name: 'design', after: [], body: 'Design it.', harness: 'codex' },
-          { name: 'implement', after: ['design'], body: 'Implement it.', harness: 'codex' },
-        ],
-        gates: ['design'],
-        steps: { design: { taskId: `t-${id}` }, implement: { taskId: null } },
-      }),
-    );
-    const w = await watch(t, '/api/runs?watch=true&fieldSelector=status.state%3Dwaiting');
+test('a watch of the runs over a store holding one, plain and namespaced, sends it ADDED as a Run carrying a resourceVersion, then a BOOKMARK of Run', async (t) => {
+  const id = 'r-watch-plain';
+  gatedRun(t, id);
+  for (const url of ['/api/runs?watch=true', '/api/namespaces/default/runs?watch=true']) {
+    const w = await watch(t, url);
     try {
-      const initial = await w.initial();
-      const sent = initial.find((e) => named(e) === id);
-      assert.ok(sent && sent.type === 'ADDED', 'the run at its gate is among the waiting');
+      const sent = (await w.initial()).find((e) => named(e) === id);
+      assert.ok(sent && sent.type === 'ADDED', `${url}: the run is sent ADDED`);
       assert.equal(sent.object.kind, 'Run');
-      assert.equal((sent.object.status as { state?: string }).state, 'waiting', 'with the frame its list carries');
-      const approved = await app.request(`/api/namespaces/default/runs/${id}/steps/design/approve`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json', 'sec-fetch-site': 'same-origin', host: '127.0.0.1:8787' },
-        body: '{}',
-      });
-      assert.equal(approved.status, 202, await approved.clone().text());
-      await waitFor(t, () => changes(w.events, id).includes('DELETED'), `${id} DELETED once it waits no more`);
-      assert.deepEqual(changes(w.events, id), ['ADDED', 'DELETED'], 'never MODIFIED into a state the selector does not keep');
+      assert.equal(typeof sent.object.metadata.resourceVersion, 'string', `${url}: the Run carries a resourceVersion`);
+      assert.equal(w.events.find((e) => e.type === 'BOOKMARK')?.object.kind, 'Run', `${url}: the BOOKMARK names Run`);
     } finally {
       await w.stop();
     }
-  },
-);
+  }
+});
+
+test('a watch of the runs by state keeps its fieldSelector on every read: a run approved at its gate, waiting no more, arrives as DELETED', async (t) => {
+  const id = 'r-watch-gated';
+  gatedRun(t, id);
+  const w = await watch(t, '/api/runs?watch=true&fieldSelector=status.state%3Dwaiting');
+  try {
+    const initial = await w.initial();
+    const sent = initial.find((e) => named(e) === id);
+    assert.ok(sent && sent.type === 'ADDED', 'the run at its gate is among the waiting');
+    assert.equal(sent.object.kind, 'Run');
+    assert.equal((sent.object.status as { state?: string }).state, 'waiting', 'with the frame its list carries');
+    const approved = await app.request(`/api/namespaces/default/runs/${id}/steps/design/approve`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'sec-fetch-site': 'same-origin', host: '127.0.0.1:8787' },
+      body: '{}',
+    });
+    assert.equal(approved.status, 202, await approved.clone().text());
+    await waitFor(t, () => changes(w.events, id).includes('DELETED'), `${id} DELETED once it waits no more`);
+    const said = w.events.filter((e) => named(e) === id);
+    assert.equal(said[0]?.type, 'ADDED', 'its first event ADDED');
+    assert.equal(said.at(-1)?.type, 'DELETED', 'its last DELETED');
+    for (const e of said.slice(1, -1)) {
+      assert.equal(e.type, 'MODIFIED', 'between them only MODIFIED');
+      if (e.type === 'MODIFIED')
+        assert.equal(
+          (e.object.status as { state?: string }).state,
+          'waiting',
+          'never MODIFIED into a state the selector does not keep (a MODIFIED still waiting is its frame measured to now again)',
+        );
+    }
+  } finally {
+    await w.stop();
+  }
+});
 
 test('the watch refuses watch=yes, and limit or continue beside watch=true, with 400 before any stream; an unknown namespace is the list own refusal', async () => {
   for (const query of ['watch=yes', 'watch=true&limit=2', 'watch=true&continue=YQ']) {

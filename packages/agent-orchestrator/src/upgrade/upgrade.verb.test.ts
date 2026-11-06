@@ -435,10 +435,10 @@ test('choices made for another version are not merged, and the next resolve drop
   );
 });
 
-/** The plan `nemia factory diff` printed in `printed`, and the line it prints last, which files it. */
+/** The plan `nemia factory diff` printed in `printed`, and the line that files it. */
 const planIn = (printed: string[]): { plan: string; line: string } => ({
   plan: printed.find((line) => line.startsWith('plan: '))?.slice('plan: '.length) ?? '',
-  line: printed.at(-1) ?? '',
+  line: printed.find((line) => line.includes(' files it')) ?? '',
 });
 
 test('a parameter set again at the version applied: previewed, filed with its plan, merged with no new version', async (t) => {

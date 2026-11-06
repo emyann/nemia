@@ -21,9 +21,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { RunDecision } from '../src/decide/decision.ts';
 import { app } from '../src/app.ts';
-import { decideRun, engine, list, passStanding, runStore, type RunSummary, waitAdvice, waitWord } from 'agent-orchestrator';
+import { decideRun, engine, list, passStanding, runStore, waitAdvice, waitWord } from 'agent-orchestrator';
 import { runWith } from './builtin-place.ts';
-import { objectOf, summariesOf } from './run-reads.ts';
+import { listedRuns as runList, objectOf } from './run-reads.ts';
+import type { Run } from 'objects';
 
 type Wait = import('agent-orchestrator').Wait;
 
@@ -141,11 +142,14 @@ fs.writeFileSync(
     .join(''),
 );
 
-type Listed = RunSummary;
+/** A run as the RunList (`GET /api/runs`) has it: its `status`, with the runs it froze to wait on and when it was made. */
+type Listed = Run['status'] & { after: readonly string[]; createdAt: string };
 
-const listedRuns = async (): Promise<Map<string, Listed>> => {
-  return new Map(((await summariesOf(app)) as Listed[]).map((r) => [r.id, r]));
-};
+/** Each run of the RunList, by name (`Listed`). */
+const listedRuns = async (): Promise<Map<string, Listed>> =>
+  new Map(
+    (await runList(app)).map((r) => [r.metadata.name, { ...r.status, after: r.spec.after, createdAt: r.metadata.creationTimestamp }]),
+  );
 
 /** The waits as the api gives them, back in the package's shape. */
 const asWaits = (waiting: Listed['waiting']): Wait[] =>

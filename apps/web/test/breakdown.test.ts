@@ -1,5 +1,5 @@
 /**
- * A waiting run's breakdowns (src/lib/breakdown.ts): each adds up to its tile over the light answer's own numbers, its last line for
+ * A waiting run's breakdowns (src/lib/breakdown.ts): each adds up to its tile over the frame's own numbers, its last line for
  * the rest included and absent when the rest is nothing, and what the rows say adds up as the tile says it.
  */
 import { test } from 'node:test';
@@ -18,7 +18,7 @@ import {
   type Breakdown,
 } from '../src/lib/breakdown.ts';
 import { presentWait, sinceWords } from '../src/lib/runWords.ts';
-import { summary, waitingRun } from './run-fixtures.ts';
+import { detail, runList, runObject, step, summary, waitingRun } from './run-fixtures.ts';
 
 const [S, M] = [1_000, 60_000];
 
@@ -70,11 +70,29 @@ const answered = (): WaitingRun =>
 
 const AS_OF = '2026-10-12T12:00:00.000Z';
 
-/** `run` as the board reads it, decoded through the light answer's schema; the run at its last gate where none is given. */
+/**
+ * `run` as the board reads it: its object, with its frame's parts, in the RunList of the runs not finished, made the frame's waiting row
+ * again (`openOf`); the run at its last gate where none is given.
+ */
 async function decoded(run: WaitingRun = answered()): Promise<WaitingRun> {
   const before = globalThis.fetch;
-  const open = { asOf: AS_OF, counts: { waiting: 1, inFlight: 0, finished: 0 }, waiting: [run], inFlight: [] };
-  globalThis.fetch = async () => new Response(JSON.stringify(open), { status: 200, headers: { 'content-type': 'application/json' } });
+  const { wallMs, clock, stepCosts, waitingSince, cost, tokens, waitingOnYou, waitingOnYouWords } = run;
+  const steps = run.steps.map(({ agent: _a, since: _s, ...own }) => step({ ...own, timeline: [] }));
+  const object = runObject(detail({ id: run.id, steps }), {
+    state: 'waiting',
+    wallMs,
+    clock,
+    stepCosts,
+    waitingSince,
+    finishedAt: null,
+    outcome: null,
+    cost,
+    tokens,
+    waitingOnYou,
+    waitingOnYouWords,
+  });
+  const list = runList([object], { asOf: AS_OF, counts: { waiting: 1, inFlight: 0, finished: 0 } });
+  globalThis.fetch = async () => new Response(JSON.stringify(list), { status: 200, headers: { 'content-type': 'application/json' } });
   const client = new QueryClient();
   try {
     return (await client.fetchQuery(openRunsQuery())).waiting[0];

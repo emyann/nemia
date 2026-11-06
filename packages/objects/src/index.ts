@@ -1,9 +1,6 @@
 /** The one door of `objects`: every layer above the runtime imports what it names from here, and never a file beside it. */
 export { API_VERSION, DEFAULT_NAMESPACE, ListMeta, ObjectMeta, listOf } from './meta.ts';
 export {
-  LabelEdit,
-  Labelled,
-  Labels,
   Run,
   RunDrift,
   RunList,
@@ -14,6 +11,7 @@ export {
   RunStepStatus,
   Spent,
   StepAttempts,
+  StepCost,
   StepCheck,
   StepCloseout,
   StepRaise,
@@ -26,6 +24,8 @@ export {
   TryShort,
   RunUnjudged,
 } from './run.ts';
+export { LabelEdit, Labelled, Labels } from './labels.ts';
+export { RunClock, RunListMeta } from './run-frame.ts';
 export {
   RETRY_ASKED_MODES,
   RunApprove,
@@ -76,8 +76,10 @@ export {
   RETRY_MODES,
   REVISION_KINDS,
   REVISIONS_POLICIES,
+  RUN_OUTCOMES,
   RUN_PHASES,
   RUN_REASONS,
+  RUN_STATES,
   RUN_STATUSES,
   RUNS_IN_BY,
   SAID_AFTER,
@@ -114,8 +116,10 @@ export type {
   PlaceKind,
   RevisionKind,
   RevisionsPolicy,
+  RunOutcome,
   RunPhase,
   RunReason,
+  RunState,
   SettingOrigin,
   SignInStateWord,
   StepPhase,

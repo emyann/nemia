@@ -58,7 +58,6 @@ const run = (statuses: readonly Word[], extra: Partial<RunSummary> = {}): RunSum
   work: null,
   brief: 'Do the thing',
   workflowDir: '/code/app/workflows/dev',
-  workflowPage: null,
   try: null,
   createdAt: '2026-09-13T00:00:00.000Z',
   startedAt: null,

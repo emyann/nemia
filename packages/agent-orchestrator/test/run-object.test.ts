@@ -23,7 +23,17 @@ process.env.WF_ROOT = ROOT;
 process.env.WF_DEFAULT_FACTORY_STARTS = '1';
 delete process.env.WF_MAX_CONCURRENT;
 delete process.env.WF_MAX_RUNS;
-const { RUNS } = await import('../src/command/pages.verb.ts');
+const { howOf } = await import('../src/command/pages.verb.ts');
+const { runsSummarized } = await import('../src/summary/summary.verb.ts');
+const { EngineService: RunsEngine } = await import('../src/runtime-client.ts');
+const { Effect: RunsEffect } = await import('effect');
+/** Every run's summary, as the whole list judges it (`runsSummarized`), read through the informer and filings `kept` hands. */
+const RUNS = {
+  handler: (_args: object, env?: NodeJS.ProcessEnv, home?: string, kept?: Parameters<typeof howOf>[2]) =>
+    RunsEffect.gen(function* () {
+      return yield* runsSummarized(yield* RunsEngine, howOf(env, home, kept));
+    }),
+};
 const { SHOW, TRIES, TRY, CLOSEOUT, TOLD } = await import('../src/command/reads.verb.ts');
 const { advanceRun, startRun, runWith: runEngine, RunObject, runObject } = await import('../src/runner.ts');
 const { tryShort } = await import('../src/object/run.verb.ts');

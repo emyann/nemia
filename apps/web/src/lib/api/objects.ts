@@ -168,17 +168,31 @@ const write = <A>(schema: Schema.Decoder<A>, may: string, query?: Record<string,
   ...(query ? { query } : {}),
 });
 
+/** What a list of runs is asked by: its labels, its state (`status.state=<state>`, `==`, `!=`), and a page of it. */
+export type RunListQuery = { labelSelector?: string; fieldSelector?: string; limit?: number; continue?: string };
+
+/** The query a list of runs is sent with: each key given, `limit` as the digits the api reads. */
+const runListQueryOf = (query: RunListQuery) => ({
+  ...(query.labelSelector === undefined ? {} : { labelSelector: query.labelSelector }),
+  ...(query.fieldSelector === undefined ? {} : { fieldSelector: query.fieldSelector }),
+  ...(query.limit === undefined ? {} : { limit: String(query.limit) }),
+  ...(query.continue === undefined ? {} : { continue: query.continue }),
+});
+
 /**
  * The run object, its list and its sub-resources; and its named actions, each in the run's namespace (its factory, `default` for one that
  * names none, `namespaceOf`), each taking what it may have done (`may`), which the caller's words say.
  */
 export const runs = {
   /**
-   * Every run, of every namespace, that `labelSelector` keeps by its labels, or every run for none (`GET /api/runs`), on one page: no
-   * `limit` is sent, so the api answers them all, with each it could not judge beside them (`unjudged`).
+   * Every run, of every namespace, that the query keeps (`GET /api/runs`), with each it could not judge beside them (`unjudged`): by its
+   * labels (`labelSelector`), by its state (`fieldSelector`, which brings the frame's parts and the counts), a page of `limit` runs from
+   * `continue`; with no `limit` the api answers them all.
    */
-  listAll: (labelSelector?: string): Promise<RunList> =>
-    call((c) => c.runs.listAll({ query: labelSelector === undefined ? {} : { labelSelector } }), read(RunList)),
+  listAll: (query: RunListQuery = {}): Promise<RunList> => call((c) => c.runs.listAll({ query: runListQueryOf(query) }), read(RunList)),
+  /** The runs of `namespace` the query keeps (`GET /api/namespaces/:namespace/runs`), as `listAll` asks them. */
+  list: (namespace: string, query: RunListQuery = {}): Promise<RunList> =>
+    call((c) => c.runs.list({ params: { namespace }, query: runListQueryOf(query) }), read(RunList)),
   /** The run object (`GET /api/runs/:runId`). */
   show: (runId: string): Promise<Run> => call((c) => c.runs.show({ params: { runId } }), read(Run)),
   /** A run started in `namespace`, on its repository `repo` where the factory has several (`?repo=`): its name. */

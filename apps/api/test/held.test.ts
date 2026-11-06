@@ -17,7 +17,7 @@ import assert from 'node:assert/strict';
 import { Effect } from 'effect';
 import fs from 'node:fs';
 import path from 'node:path';
-import { objectOf, summariesOf, triesOf } from './run-reads.ts';
+import { listedOf, objectOf, triesOf } from './run-reads.ts';
 import { list, runStore } from 'agent-orchestrator';
 import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from 'agent-orchestrator/testing';
@@ -97,11 +97,8 @@ beforeEachTest(() => {
 
 /** What the run object of `id` says of it and its steps (`GET /api/runs/:id`, `status`). */
 const detail = async (id: string) => (await objectOf(app(), id)).status;
-const summary = async (id: string) => {
-  const run = (await summariesOf(app())).find((r) => r.id === id);
-  assert.ok(run, `${id} is on the list`);
-  return run;
-};
+/** What the RunList (`GET /api/runs`) says of `id` and its steps (`status`). */
+const summary = async (id: string) => (await listedOf(app(), id)).status;
 
 test('a step whose task is held open reads as waiting on a person, never as a session still going: blocked, gated, and rechecked on one task', async (t) => {
   const s = story(t);

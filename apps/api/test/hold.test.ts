@@ -21,21 +21,9 @@ import path from 'node:path';
 import type { RunDecision } from '../src/decide/decision.ts';
 import type { RunAnswer } from '../src/runs/runs.ts';
 import { app } from '../src/app.ts';
-import {
-  decideRun,
-  engine,
-  hold,
-  holdAdvice,
-  holdWord,
-  list,
-  passStanding,
-  runStore,
-  type RunHolding,
-  type RunSummary,
-  unhold,
-} from 'agent-orchestrator';
+import { decideRun, engine, hold, holdAdvice, holdWord, list, passStanding, runStore, type RunHolding, unhold } from 'agent-orchestrator';
 import { runWith } from './builtin-place.ts';
-import { objectOf, summariesOf } from './run-reads.ts';
+import { listedRuns, objectOf } from './run-reads.ts';
 
 type Wait = import('agent-orchestrator').Wait;
 
@@ -241,9 +229,9 @@ const BOARD = {
 };
 const post = (route: string, body: unknown) => app.request(route, { method: 'POST', headers: BOARD, body: JSON.stringify(body) });
 
-const listed = async (): Promise<Map<string, RunSummary>> => {
-  return new Map((await summariesOf(app)).map((r) => [r.id, r]));
-};
+/** What the RunList (`GET /api/runs`) says of each run (`status`), by name. */
+const listed = async (): Promise<Map<string, RunAnswer['status']>> =>
+  new Map((await listedRuns(app)).map((r) => [r.metadata.name, r.status]));
 /** The run object's `status` (`GET /api/runs/:id`, a 200 or it throws): its hold, its steps and what waits on you. */
 const detail = async (id: string): Promise<RunAnswer['status']> => (await objectOf(app, id)).status;
 const decisionOf = async (id: string) => {

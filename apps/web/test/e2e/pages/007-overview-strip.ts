@@ -2,7 +2,9 @@ import path from 'node:path';
 import type { Locator, Page } from 'playwright';
 import { factoriesAnswered, photograph, themeOf, rowsAnswered } from '../board.ts';
 import { expectCount, expectTexts, expectVisible, idle, Refused, settled } from '../checks.ts';
-import type { Ceilings, Daemon, FinishedPage } from '../../../src/lib/api.ts';
+import type { RunList } from 'objects';
+import type { Ceilings, Daemon } from '../../../src/lib/api.ts';
+import { FINISHED_SELECTOR, finishedOf } from '../../../src/lib/api/runs.ts';
 import { tokensBreakdown } from '../../../src/lib/breakdown.ts';
 import { daemonDot } from '../../../src/lib/footer.ts';
 import { dollars, readoutOf, type Strip, stripOf } from '../../../src/lib/strip.ts';
@@ -157,7 +159,7 @@ export default {
       await expectVisible(strip, 'the Overview opens on its strip');
       const { strip: want, dayStart } = await expected(page);
       await expectStickers(strip, want);
-      const finished = await answer<FinishedPage>(page, '/api/runs-finished?size=100');
+      const finished = finishedOf(await answer<RunList>(page, `/api/runs?fieldSelector=${encodeURIComponent(FINISHED_SELECTOR)}`));
       const today = finished.runs.filter((run) => Date.parse(run.finishedAt) >= dayStart);
       const said = (outcome: string) => today.filter((run) => run.outcome === outcome).length;
       if (said('succeeded') !== want.landed || said('failed') !== want.failed)

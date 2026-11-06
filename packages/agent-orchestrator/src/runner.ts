@@ -540,7 +540,6 @@ export type { StepFiled, TaskPart } from './resource/told.verb.ts';
 export { totalOf, usedOf, type RunRead, type StepUsed, type Usage } from './resource/usage.ts';
 export { tailOf, type LastSaid, type StepCheck, type StepLog } from './resource/checks.verb.ts';
 export { refusedName, typeOf, type StepArtifact, type StepValue } from './resource/files.store.ts';
-export type { FinishedPage, FinishedRun, ListedRun, OpenRuns, RunClock, RunOutcome, StepCost, WaitingRun } from './runlist/runlist.verb.ts';
 export { driftWords, kindsDrift, revisionNow, REVISION_KINDS, stepsDrift, type Drift, type KindName } from './revisions/revisions.ts';
 export { driftNow } from './revisions/pin.verb.ts';
 export type { Pin, Revision, RevisionKind } from './revisions/revisions.ts';

@@ -1,9 +1,8 @@
 import path from 'node:path';
 import type { Locator, Page } from 'playwright';
 import { atWork, atWorkWords, versionWords } from '../../../src/lib/footer.ts';
-import type { OpenRuns } from '../../../src/lib/api/runs.ts';
 import type { Version } from '../../../src/lib/api/version.ts';
-import { gaugesButtonOf, photograph, themeOf, topBarOf } from '../board.ts';
+import { gaugesButtonOf, openAnswered, photograph, themeOf, topBarOf } from '../board.ts';
 import { expectCount, expectTexts, expectVisible, feedAnswered, idle, Refused, settled } from '../checks.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT } from '../world.ts';
@@ -42,7 +41,7 @@ async function opens(page: Page): Promise<void> {
   const bar = page.locator('[data-gauges]');
   await expectVisible(bar.locator('[data-daemon="none"]'), 'the gauges say whether a daemon ticks, and how to start one');
   await expectVisible(bar.locator('[data-feed-sentence="open"]'), 'whether the board follows the feed');
-  const work = atWorkWords(atWork(await answer<OpenRuns>(page, '/api/runs-open')));
+  const work = atWorkWords(atWork(await openAnswered(page)));
   if (work.text.startsWith('0 runs')) throw new Refused(`the seeded store has a run in flight — the api's light answer makes ${work.text}`);
   await expectTexts(bar.locator('[data-at-work-sentence]'), [work.title], 'what is at work across every factory, whole');
   await expectVisible(bar.locator('[data-quota="fresh"]'), 'the quota');

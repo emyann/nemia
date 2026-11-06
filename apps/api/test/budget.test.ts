@@ -34,7 +34,7 @@ import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from 'agent-orchestrator/testing';
 import { appOver, beforeEachTest, eachTest, engineFor, runOver } from './placed.ts';
 import { story } from './checkpoints.ts';
-import { objectOf, stepOf, summariesOf } from './run-reads.ts';
+import { listedOf, objectOf, stepOf } from './run-reads.ts';
 
 const stand = eachTest(testPlace);
 const standIn = eachTest(testEngine);
@@ -224,11 +224,8 @@ const record = fs.readFileSync(recordFile, 'utf8');
 
 /** The run object `GET /api/runs/:id` answers. */
 const detail = async (id = R) => objectOf(app(), id);
-const summary = async (id = R) => {
-  const run = (await summariesOf(app())).find((r) => r.id === id);
-  assert.ok(run, `${id} is on the list`);
-  return run;
-};
+/** What the RunList (`GET /api/runs`) says of `id` (`status`). */
+const summary = async (id = R) => (await listedOf(app(), id)).status;
 const decision = async (id = R) => (await (await app().request(`/api/runs/${id}/decision`)).json()) as RunDecision;
 type Refused = { error: string };
 

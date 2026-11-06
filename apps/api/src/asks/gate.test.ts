@@ -16,7 +16,7 @@
  */
 import { root } from '../../test/harness.ts';
 import type { DecideCommand, Decidable } from '../decide/decision.ts';
-import { closeoutOf, objectOf, stepOf, summariesOf } from '../../test/run-reads.ts';
+import { closeoutOf, listedOf, objectOf, stepOf } from '../../test/run-reads.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -150,11 +150,8 @@ type Approved = { step: string; try: number; at: string; message: string | null;
 const object = async (id = R) => objectOf(app(), id);
 const commandsOf = async (id = R): Promise<DecideCommand[]> =>
   ((await (await app().request(`/api/runs/${id}/decision`)).json()) as Decidable).commands;
-const summary = async (id = R) => {
-  const found = (await summariesOf(app())).find((r) => r.id === id);
-  assert.ok(found, `the list has ${id}`);
-  return found;
-};
+/** The status of `id` as the RunList (`GET /api/runs`) judges it. */
+const summary = async (id = R) => (await listedOf(app(), id)).status;
 
 /** A step declaring `open` as questions in its schema, as the loader reads it and the run freezes it. */
 const asking = (name: string, after: string[]) => ({
@@ -378,10 +375,10 @@ test('a person approves a gate on the board: the need on the list and the detail
           ['sketch', null],
         ],
       );
-      assert.equal(
-        listed.steps.some((s) => Object.hasOwn(s, 'gate')),
-        false,
-        'the list carries the need, and no gate: the Factory needs no more',
+      assert.deepEqual(
+        listed.steps.map((s) => s.gate),
+        run.status.steps.map((s) => s.gate),
+        "the RunList carries each step's gate as the run object does",
       );
 
       assert.deepEqual(

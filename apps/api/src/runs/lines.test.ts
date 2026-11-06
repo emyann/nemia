@@ -15,7 +15,7 @@ import { testPlace } from 'agent-orchestrator/testing';
 import { runLines } from 'agent-orchestrator';
 import type { RunLinesAnswer } from './runs.ts';
 import { appOver, beforeEachTest, eachTest, engineFor } from '../../test/placed.ts';
-import { summariesOf } from '../../test/run-reads.ts';
+import { listedOf } from '../../test/run-reads.ts';
 
 const stand = eachTest(testPlace);
 const standIn = eachTest(testEngine);
@@ -63,15 +63,14 @@ const linesOf = async (id: string): Promise<RunLinesAnswer> => {
   return (await res.json()) as RunLinesAnswer;
 };
 
-test("the lines route answers the run's command lines per step, and the workflow's page the list gives it", async () => {
+test("the lines route answers the run's command lines per step, and its workflow's page: none for another repository's folder", async () => {
   const lines = await linesOf(R);
   const { workflowPage, ...rest } = lines;
   assert.deepEqual(rest, runLines(record(R)), "the package's lines of the run's record");
   assert.deepEqual(Object.keys(lines.steps), ['a', 'b']);
   assert.equal(lines.fromNote, null);
-  const listed = (await summariesOf(app())).find((r) => r.id === R);
-  assert.ok(listed, 'the list has the run');
-  assert.deepEqual(workflowPage, listed.workflowPage, "the same workflow's page the list gives");
+  assert.equal((await listedOf(app(), R)).metadata.name, R, 'the RunList has the run');
+  assert.equal(workflowPage, null, 'a folder of another repository, in no factory: the board pages it on no address');
   const object = (await (await app().request(`/api/runs/${R}`)).json()) as Record<string, unknown>;
   assert.equal(object.decide, undefined, 'the object stays without the lines');
 });

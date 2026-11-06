@@ -25,7 +25,7 @@ import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from 'agent-orchestrator/testing';
 import { appOver, beforeEachTest, eachTest, engineFor, runOver } from '../../test/placed.ts';
 import { story } from '../../test/checkpoints.ts';
-import { objectOf, stepOf, summariesOf, triesOf } from '../../test/run-reads.ts';
+import { listedOf, objectOf, stepOf, triesOf } from '../../test/run-reads.ts';
 
 const stand = eachTest(testPlace);
 const standIn = eachTest(testEngine);
@@ -150,7 +150,8 @@ const nothingWritten = (why: string) => {
 
 /** The run object of `id` (`GET /api/runs/:id`). */
 const object = async (id = R) => objectOf(app(), id);
-const summary = async (id = R) => (await summariesOf(app())).find((r) => r.id === id)!;
+/** The status of `id` as the RunList (`GET /api/runs`) judges it. */
+const summary = async (id = R) => (await listedOf(app(), id)).status;
 
 /** The error a refused ask answered with, its status `status`. */
 const refusedWith = async (res: Response, status: number, said: string): Promise<string> => {
@@ -246,11 +247,6 @@ test("a blocked session's last line is what it said last — its last `text` or 
     await lastLines(),
     { held: login, idle: 'Session idle', silent: null, implement: null },
     "held's last text, past the call before it; idle's system line, trimmed, past the call after it; silent, with nothing said, none; and none for a step its closeout blocked, though its session said something",
-  );
-  assert.equal(
-    (await summary()).steps.some((step) => Object.hasOwn(step, 'lastLine')),
-    false,
-    'the list carries no last line: it reads no conversation',
   );
   const listed = (await (await app().request('/api/runs')).json()) as RunList;
   const onTheList = listed.items.find((run) => run.metadata.name === R);

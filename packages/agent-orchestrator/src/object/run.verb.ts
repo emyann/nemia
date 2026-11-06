@@ -44,7 +44,7 @@ import { folderFiles, workFolderOf } from '../resource/files.store.ts';
 import { type LastSaid, lastLineOf } from '../resource/checks.verb.ts';
 import { readOf, totalOf, usedOf } from '../resource/usage.ts';
 import type { Run as RunObject, RunSpec, RunStatus, RunStepStatus, StepTold, TryCloseout, TryShort } from './run.model.ts';
-import { runNamespace } from '../run-list/run-list.ts';
+import { runNamespace } from '../run-list/index.ts';
 import { prunedWords } from '../record/record.ts';
 import { prunedKept } from '../prune/prune.ts';
 import { currentOf, raiseReads, runReading, type RunReading, stepsReading, triesIn } from './read.verb.ts';

@@ -98,3 +98,38 @@ test("a step's tries decode as a sub-resource of their own, the current one last
   };
   assert.deepEqual(Schema.encodeSync(StepTries)(Schema.decodeUnknownSync(StepTries)(tries)), tries);
 });
+
+test('a RunList asked by state carries each run state, frame part, its counts and asOf; a page without them still decodes', () => {
+  const run = judged as Run;
+  const framed = {
+    ...run,
+    status: {
+      ...run.status,
+      state: 'finished',
+      wallMs: 60_000,
+      clock: { wallMs: 60_000, sessionsMs: 30_000, checksMs: 10_000, personMs: 5_000, slotMs: 5_000, restMs: 10_000 },
+      stepCosts: [{ step: 'build', cost: null }],
+      waitingSince: null,
+      finishedAt: '2026-11-05T10:01:00.000Z',
+      outcome: 'succeeded',
+    },
+  };
+  const page = {
+    apiVersion: API_VERSION,
+    kind: 'RunList',
+    metadata: { remainingItemCount: 0, counts: { waiting: 1, inFlight: 2, finished: 3 }, asOf: '2026-11-05T10:02:00.000Z' },
+    items: [framed],
+    unjudged: [{ name: 'r-3', namespace: 'default', error: 'its journal does not read', state: 'inFlight' }],
+  };
+  const decoded = Schema.decodeUnknownSync(RunList)(page);
+  assert.equal(decoded.items[0]?.status.outcome, 'succeeded');
+  assert.equal(decoded.metadata.counts?.finished, 3);
+  assert.equal(decoded.unjudged?.[0]?.state, 'inFlight');
+  assert.deepEqual(Schema.encodeSync(RunList)(decoded), page, 'encoded back equal');
+  assert.throws(() => Schema.decodeUnknownSync(RunList)({ ...page, items: [{ ...framed, status: { ...framed.status, state: 'done' } }] }));
+  assert.throws(() =>
+    Schema.decodeUnknownSync(RunList)({ ...page, items: [{ ...framed, status: { ...framed.status, outcome: 'ended' } }] }),
+  );
+  const plain = { apiVersion: API_VERSION, kind: 'RunList', metadata: {}, items: [run] };
+  assert.deepEqual(Schema.encodeSync(RunList)(Schema.decodeUnknownSync(RunList)(plain)), plain);
+});

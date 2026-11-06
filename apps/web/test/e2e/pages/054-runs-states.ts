@@ -20,7 +20,7 @@ async function loading(page: Page): Promise<void> {
     release = resolve;
   });
   try {
-    await other.route(/\/api\/runs-(open|finished)\b/, async (route) => {
+    await other.route(/\/runs\?[^#]*\bfieldSelector=/, async (route) => {
       await held;
       await route.continue();
     });
